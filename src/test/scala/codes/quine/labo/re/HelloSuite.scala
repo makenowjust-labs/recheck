@@ -1,4 +1,4 @@
-package codes.quine.labo.template
+package codes.quine.labo.re
 
 import minitest.SimpleTestSuite
 

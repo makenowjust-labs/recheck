@@ -1,6 +1,4 @@
-# template-scala
-
-> MakeNowJust-Labo's Scala project template.
+# re
 
 ## License
 
