@@ -1,9 +1,13 @@
-package codes.quine.labo.re.data
+package codes.quine.labo.re
+package data
 
 import IntervalSet._
+import unicode.CaseMap
+import unicode.CaseMap.Conversion
 
 /** IChar is a code point interval set with extra informations. */
-final case class IChar(set: IntervalSet[UChar], isNewline: Boolean, isWord: Boolean) extends Ordered[IChar] {
+final case class IChar(set: IntervalSet[UChar], isNewline: Boolean = false, isWord: Boolean = false)
+    extends Ordered[IChar] {
 
   /** Checks whether this interval set is empty or not. */
   def isEmpty: Boolean = set.isEmpty
@@ -31,4 +35,16 @@ object IChar {
 
   /** Creates an interval set containing any code points. */
   def any: IChar = IChar(IntervalSet((UChar(0), UChar(0x110000))), false, false)
+
+  /** Creates an interval set containing the character only. */
+  def apply(ch: Char): IChar = IChar(IntervalSet((UChar(ch), UChar(ch + 1))))
+
+  /** Normalizes the code point interval set. */
+  def canonicalize(c: IChar, unicode: Boolean): IChar = {
+    val conversions = if (unicode) CaseMap.Fold else CaseMap.Upper
+    val set = conversions.foldLeft(c.set) { case (set, Conversion(dom, offset)) =>
+      set.mapIntersection(dom)(u => UChar(u.value + offset))
+    }
+    c.copy(set = set)
+  }
 }

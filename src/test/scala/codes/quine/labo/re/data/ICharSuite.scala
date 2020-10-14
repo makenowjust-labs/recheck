@@ -9,6 +9,15 @@ object ICharSuite extends SimpleTestSuite {
     assertEquals(IChar.any, IChar(IntervalSet((UChar(0), UChar(0x110000))), false, false))
   }
 
+  test("IChar.apply") {
+    assertEquals(IChar('a'), IChar(IntervalSet((UChar(0x61), UChar(0x62))), false, false))
+  }
+
+  test("IChar.canonicalize") {
+    assertEquals(IChar.canonicalize(IChar('n'), false), IChar('N'))
+    assertEquals(IChar.canonicalize(IChar('N'), true), IChar('n'))
+  }
+
   test("IChar#isEmpty") {
     assert(IChar(IntervalSet.empty, false, false).isEmpty)
     assert(!IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, false).isEmpty)

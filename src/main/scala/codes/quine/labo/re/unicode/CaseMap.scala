@@ -7,6 +7,7 @@ import com.ibm.icu.lang.UCharacter
 import com.ibm.icu.util.ULocale
 
 import data.IntervalSet
+import data.UChar
 
 /** Utilities for Unicode case mapping/folding.
   *
@@ -15,7 +16,7 @@ import data.IntervalSet
 object CaseMap {
 
   /** Conversion is a pair of a conversion domain and a conversion offset. */
-  final case class Conversion(domain: IntervalSet[Int], offset: Int)
+  final case class Conversion(domain: IntervalSet[UChar], offset: Int)
 
   /** Builds a conversion mappings from the canonicalize function. */
   private def build(begin: Int, end: Int)(canonicalize: Int => Int): Seq[Conversion] = {
@@ -34,7 +35,9 @@ object CaseMap {
       }
     }
 
-    map.groupMap(_._2)(_._1).toSeq.map { case (d, it) => Conversion(IntervalSet.from(it.toSeq), d) }
+    map.groupMap(_._2)(_._1).toSeq.map { case (d, it) =>
+      Conversion(IntervalSet.from(it.toSeq).map(UChar(_)), d)
+    }
   }
 
   /** Upper case conversion mappings.
