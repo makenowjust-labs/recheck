@@ -28,6 +28,7 @@ lazy val root = project
     console / initialCommands := """
       |import codes.quine.labo.re._
       |import codes.quine.labo.re.data._
+      |import codes.quine.labo.re.unicode._
       """.stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
