@@ -5,9 +5,18 @@ import minitest.SimpleTestSuite
 import IntervalSet._
 
 object ICharSuite extends SimpleTestSuite {
+  test("IChar.any") {
+    assertEquals(IChar.any, IChar(IntervalSet((UChar(0), UChar(0x110000))), false, false))
+  }
+
   test("IChar#isEmpty") {
     assert(IChar(IntervalSet.empty, false, false).isEmpty)
     assert(!IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, false).isEmpty)
+  }
+
+  test("IChar#nonEmpty") {
+    assert(!IChar(IntervalSet.empty, false, false).nonEmpty)
+    assert(IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, false).nonEmpty)
   }
 
   test("IChar#partition") {
