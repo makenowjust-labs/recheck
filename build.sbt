@@ -27,6 +27,7 @@ lazy val root = project
     version := "0.1.0-SNAPSHOT",
     console / initialCommands := """
       |import codes.quine.labo.re._
+      |import codes.quine.labo.re.data._
       """.stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
