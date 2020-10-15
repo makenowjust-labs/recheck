@@ -12,6 +12,11 @@ object PropertySuite extends SimpleTestSuite {
     assert(set.isDefined)
     assert(set.get.contains(UChar('a')))
     assert(!set.get.contains(UChar('z')))
+
+    for (name <- Property.BinaryPropertyNames)
+      assert(Property.binary(name).isDefined)
+    for (name <- Property.BinaryPropertyAliases.keys)
+      assert(Property.binary(name).isDefined)
   }
 
   test("Property.binary: ASCII") {
@@ -41,6 +46,13 @@ object PropertySuite extends SimpleTestSuite {
     assert(set.isDefined)
     assert(set.get.contains(UChar('a')))
     assert(!set.get.contains(UChar('A')))
+
+    for (value <- Property.GeneralCategoryValues)
+      assert(Property.generalCategory(value).isDefined)
+    for (value <- Property.GeneralCategoryValueGroups.keys)
+      assert(Property.generalCategory(value).isDefined)
+    for (value <- Property.GeneralCategoryValueAliases.keys)
+      assert(Property.generalCategory(value).isDefined)
   }
 
   test("Property.script") {
@@ -50,6 +62,11 @@ object PropertySuite extends SimpleTestSuite {
     assert(!set.get.contains(UChar('a')))
     assert(set.get.contains(UChar('あ')))
     assert(!set.get.contains(UChar(0x30fc))) // U+30FC: KATAKANA-HIRAGANA PROLONGED SOUND MARK
+
+    for (value <- Property.ScriptValues)
+      assert(Property.script(value).isDefined)
+    for (value <- Property.ScriptValueAliases.keys)
+      assert(Property.script(value).isDefined)
   }
 
   test("Property.scriptExtensions") {
@@ -59,5 +76,10 @@ object PropertySuite extends SimpleTestSuite {
     assert(!set.get.contains(UChar('a')))
     assert(set.get.contains(UChar('あ')))
     assert(set.get.contains(UChar(0x30fc))) // U+30FC: KATAKANA-HIRAGANA PROLONGED SOUND MARK
+
+    for (value <- Property.ScriptValues)
+      assert(Property.scriptExtensions(value).isDefined)
+    for (value <- Property.ScriptValueAliases.keys)
+      assert(Property.scriptExtensions(value).isDefined)
   }
 }
