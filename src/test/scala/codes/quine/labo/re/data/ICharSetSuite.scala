@@ -4,13 +4,13 @@ import minitest.SimpleTestSuite
 
 object ICharSetSuite extends SimpleTestSuite {
   test("ICharSet.any") {
-    assertEquals(ICharSet.any(false, false).chars, Seq(IChar.any))
+    assertEquals(ICharSet.any(false, false).chars, Seq(IChar.Any))
 
-    assert(ICharSet.any(true, false).chars.head.set.contains(UChar('A')))
-    assert(!ICharSet.any(true, false).chars.head.set.contains(UChar('a')))
+    assert(ICharSet.any(true, false).chars.head.contains(UChar('A')))
+    assert(!ICharSet.any(true, false).chars.head.contains(UChar('a')))
 
-    assert(ICharSet.any(true, true).chars.head.set.contains(UChar('s')))
-    assert(!ICharSet.any(true, true).chars.head.set.contains(UChar(0x017f)))
+    assert(ICharSet.any(true, true).chars.head.contains(UChar('s')))
+    assert(!ICharSet.any(true, true).chars.head.contains(UChar(0x017f)))
   }
 
   test("ICharSet#add") {

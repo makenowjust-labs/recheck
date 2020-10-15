@@ -5,8 +5,46 @@ import minitest.SimpleTestSuite
 import IntervalSet._
 
 object ICharSuite extends SimpleTestSuite {
-  test("IChar.any") {
-    assertEquals(IChar.any, IChar(IntervalSet((UChar(0), UChar(0x110000))), false, false))
+  test("IChar.Any") {
+    assertEquals(IChar.Any, IChar(IntervalSet((UChar(0), UChar(0x110000))), false, false))
+  }
+
+  test("IChar.Digit") {
+    assert(IChar.Digit.contains(UChar('0')))
+    assert(!IChar.Digit.contains(UChar('a')))
+  }
+
+  test("IChar.Space") {
+    assert(IChar.Space.contains(UChar('\n')))
+    assert(IChar.Space.contains(UChar(' ')))
+    assert(!IChar.Space.contains(UChar('a')))
+  }
+
+  test("IChar.LineTerminator") {
+    assert(IChar.LineTerminator.contains(UChar('\n')))
+    assert(!IChar.LineTerminator.contains(UChar(' ')))
+  }
+
+  test("IChar.Word") {
+    assert(IChar.Word.contains(UChar('a')))
+    assert(IChar.Word.contains(UChar('0')))
+    assert(!IChar.Word.contains(UChar('!')))
+  }
+
+  test("IChar.UnicodeProperty") {
+    assertEquals(IChar.UnicodeProperty("invalid"), None)
+    assert(IChar.UnicodeProperty("ASCII").get.contains(UChar('A')))
+    assert(!IChar.UnicodeProperty("ASCII").get.contains(UChar(0x80)))
+    assert(IChar.UnicodeProperty("Letter").get.contains(UChar('A')))
+    assert(IChar.UnicodeProperty("L").get.contains(UChar('A')))
+  }
+
+  test("IChar.UnicodePropertyValue") {
+    assertEquals(IChar.UnicodePropertyValue("invalid", "invalid"), None)
+    assert(IChar.UnicodePropertyValue("General_Category", "N").get.contains(UChar('0')))
+    assert(!IChar.UnicodePropertyValue("gc", "Number").get.contains(UChar('a')))
+    assert(IChar.UnicodePropertyValue("Script", "Hira").get.contains(UChar('あ')))
+    assert(IChar.UnicodePropertyValue("Script_Extensions", "Hira").get.contains(UChar('あ')))
   }
 
   test("IChar.apply") {
@@ -39,7 +77,7 @@ object ICharSuite extends SimpleTestSuite {
 
   test("IChar#complement") {
     assertEquals(IChar('a').complement, IChar(IntervalSet((UChar(0), UChar('a')), (UChar('b'), UChar(0x110000)))))
-    assert(IChar.any.complement.isEmpty)
+    assert(IChar.Any.complement.isEmpty)
   }
 
   test("IChar#union") {
