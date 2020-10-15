@@ -16,6 +16,15 @@ object ICharSuite extends SimpleTestSuite {
   test("IChar.canonicalize") {
     assertEquals(IChar.canonicalize(IChar('n'), false), IChar('N'))
     assertEquals(IChar.canonicalize(IChar('N'), true), IChar('n'))
+
+    // U+FF21: FULLWIDTH LATIN CAPITAL LETTER A
+    // U+FF41: FULLWIDTH LATIN SMALL LETTER A
+    assertEquals(IChar.canonicalize(IChar(0xff41), false), IChar(0xff21))
+    assertEquals(IChar.canonicalize(IChar(0xff21), true), IChar(0xff41))
+
+    // U+017F: LATIN SMALL LETTER LONG S
+    assertEquals(IChar.canonicalize(IChar(0x017f), false), IChar(0x017f))
+    assertEquals(IChar.canonicalize(IChar(0x017f), true), IChar('s'))
   }
 
   test("IChar#isEmpty") {

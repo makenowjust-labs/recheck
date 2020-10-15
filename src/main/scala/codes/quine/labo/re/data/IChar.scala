@@ -49,7 +49,7 @@ object IChar {
   def any: IChar = IChar(IntervalSet((UChar(0), UChar(0x110000))), false, false)
 
   /** Creates an interval set containing the character only. */
-  def apply(ch: Char): IChar = IChar(IntervalSet((UChar(ch), UChar(ch + 1))))
+  def apply(ch: Int): IChar = IChar(IntervalSet((UChar(ch), UChar(ch + 1))))
 
   /** Normalizes the code point interval set. */
   def canonicalize(c: IChar, unicode: Boolean): IChar = {

@@ -4,12 +4,18 @@ import minitest.SimpleTestSuite
 
 object ICharSetSuite extends SimpleTestSuite {
   test("ICharSet.any") {
-    assertEquals(ICharSet.any.chars, Seq(IChar.any))
+    assertEquals(ICharSet.any(false, false).chars, Seq(IChar.any))
+
+    assert(ICharSet.any(true, false).chars.head.set.contains(UChar('A')))
+    assert(!ICharSet.any(true, false).chars.head.set.contains(UChar('a')))
+
+    assert(ICharSet.any(true, true).chars.head.set.contains(UChar('s')))
+    assert(!ICharSet.any(true, true).chars.head.set.contains(UChar(0x017f)))
   }
 
   test("ICharSet#add") {
     assertEquals(
-      ICharSet.any.add(IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, false)),
+      ICharSet.any(false, false).add(IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, false)),
       ICharSet(
         Seq(
           IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, false),
@@ -20,7 +26,8 @@ object ICharSetSuite extends SimpleTestSuite {
   }
 
   test("ICharSet#refine") {
-    val set = ICharSet.any
+    val set = ICharSet
+      .any(false, false)
       .add(IChar(IntervalSet((UChar(0x41), UChar(0x5b))), false, true))
       .add(IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, false))
     assertEquals(

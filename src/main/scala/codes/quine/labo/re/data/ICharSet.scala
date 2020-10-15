@@ -26,5 +26,7 @@ final case class ICharSet(chars: Seq[IChar]) {
 object ICharSet {
 
   /** Creates a [[ICharSet]] containing any [[IChar]]s. */
-  def any: ICharSet = ICharSet(Seq(IChar.any))
+  def any(ignoreCase: Boolean, unicode: Boolean): ICharSet =
+    if (ignoreCase) ICharSet(Seq(IChar.canonicalize(IChar.any, unicode)))
+    else ICharSet(Seq(IChar.any))
 }
