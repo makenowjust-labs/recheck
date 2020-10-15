@@ -28,6 +28,10 @@ object ICharSuite extends SimpleTestSuite {
     assert(IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, false).nonEmpty)
   }
 
+  test("IChar#union") {
+    assertEquals(IChar('a') union IChar('b'), IChar(IntervalSet((UChar('a'), UChar('c'))), false, false))
+  }
+
   test("IChar#partition") {
     assertEquals(
       IChar(IntervalSet((UChar(0x41), UChar(0x42))), true, false)

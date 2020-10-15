@@ -15,6 +15,10 @@ final case class IChar(set: IntervalSet[UChar], isNewline: Boolean = false, isWo
   /** Negates [[isEmpty]]. */
   def nonEmpty: Boolean = set.nonEmpty
 
+  /** Computes a union of two interval sets. */
+  def union(that: IChar): IChar =
+    IChar(set.union(that.set), isNewline || that.isNewline, isWord || that.isWord)
+
   /** Computes a partition of two interval sets. */
   def partition(that: IChar): Partition[IChar] = {
     val Partition(is, ls, rs) = set.partition(that.set)
