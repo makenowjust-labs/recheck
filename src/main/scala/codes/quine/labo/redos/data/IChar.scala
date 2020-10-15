@@ -1,4 +1,4 @@
-package codes.quine.labo.re
+package codes.quine.labo.redos
 package data
 
 import IntervalSet._

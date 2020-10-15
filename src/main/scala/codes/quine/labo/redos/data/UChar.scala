@@ -1,4 +1,4 @@
-package codes.quine.labo.re.data
+package codes.quine.labo.redos.data
 
 /** UChar is a Unicode code point. */
 final case class UChar(value: Int) extends Ordered[UChar] {

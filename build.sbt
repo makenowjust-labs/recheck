@@ -1,7 +1,7 @@
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
 ThisBuild / githubOwner := "MakeNowJust-Labo"
-ThisBuild / githubRepository := "re"
+ThisBuild / githubRepository := "redos"
 
 ThisBuild / scalaVersion := "2.13.3"
 ThisBuild / scalacOptions ++= Seq(
@@ -23,12 +23,12 @@ lazy val root = project
   .in(file("."))
   .settings(
     organization := "codes.quine.labo",
-    name := "re",
+    name := "redos",
     version := "0.1.0-SNAPSHOT",
     console / initialCommands := """
-      |import codes.quine.labo.re._
-      |import codes.quine.labo.re.data._
-      |import codes.quine.labo.re.unicode._
+      |import codes.quine.labo.redos._
+      |import codes.quine.labo.redos.data._
+      |import codes.quine.labo.redos.unicode._
       """.stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
