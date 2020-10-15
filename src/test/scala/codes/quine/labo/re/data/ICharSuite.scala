@@ -28,6 +28,11 @@ object ICharSuite extends SimpleTestSuite {
     assert(IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, false).nonEmpty)
   }
 
+  test("IChar#complement") {
+    assertEquals(IChar('a').complement, IChar(IntervalSet((UChar(0), UChar('a')), (UChar('b'), UChar(0x110000)))))
+    assert(IChar.any.complement.isEmpty)
+  }
+
   test("IChar#union") {
     assertEquals(IChar('a') union IChar('b'), IChar(IntervalSet((UChar('a'), UChar('c'))), false, false))
   }

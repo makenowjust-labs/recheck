@@ -15,6 +15,14 @@ final case class IChar(set: IntervalSet[UChar], isNewline: Boolean = false, isWo
   /** Negates [[isEmpty]]. */
   def nonEmpty: Boolean = set.nonEmpty
 
+  /** Computes a complement of this interval set. */
+  def complement: IChar = {
+    val (xys, z) = set.intervals.foldLeft((IndexedSeq.empty[(UChar, UChar)], UChar(0))) { case ((seq, x), (y, z)) =>
+      (seq :+ (x, y), z)
+    }
+    IChar(IntervalSet.from(xys :+ (z, UChar(0x110000))), isNewline, isWord)
+  }
+
   /** Computes a union of two interval sets. */
   def union(that: IChar): IChar =
     IChar(set.union(that.set), isNewline || that.isNewline, isWord || that.isWord)
