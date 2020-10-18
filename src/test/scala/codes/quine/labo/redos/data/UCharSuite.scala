@@ -3,6 +3,13 @@ package codes.quine.labo.redos.data
 import minitest.SimpleTestSuite
 
 object UCharSuite extends SimpleTestSuite {
+  test("UChar#isValidCodePoint") {
+    assert(UChar(0x41).isValidCodePoint)
+    assert(UChar(0x0).isValidCodePoint)
+    assert(UChar(0x10ffff).isValidCodePoint)
+    assert(!UChar(0x110000).isValidCodePoint)
+  }
+
   test("UChar#compare") {
     assertEquals(UChar(0x41).compare(UChar(0x41)), 0)
     assertEquals(UChar(0x41).compare(UChar(0x42)), -1)

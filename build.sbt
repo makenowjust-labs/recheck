@@ -28,6 +28,7 @@ lazy val root = project
     console / initialCommands := """
       |import codes.quine.labo.redos._
       |import codes.quine.labo.redos.data._
+      |import codes.quine.labo.redos.regexp._
       |import codes.quine.labo.redos.unicode._
       """.stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
@@ -39,6 +40,7 @@ lazy val root = project
       .toMap,
     // Dependencies:
     libraryDependencies += "com.ibm.icu" % "icu4j" % "67.1",
+    libraryDependencies += "com.lihaoyi" %% "fastparse" % "2.3.0",
     // Settings for test:
     libraryDependencies += "io.monix" %% "minitest" % "2.8.2" % Test,
     testFrameworks += new TestFramework("minitest.runner.Framework")
