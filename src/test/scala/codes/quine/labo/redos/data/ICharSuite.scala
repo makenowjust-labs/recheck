@@ -59,6 +59,11 @@ class ICharSuite extends munit.FunSuite {
     assertEquals(IChar.range(UChar('a'), UChar('z')), IChar(IntervalSet((UChar('a'), UChar('z' + 1)))))
   }
 
+  test("IChar.union") {
+    assertEquals(IChar.union(Seq(IChar('a'), IChar('z'))), IChar('a').union(IChar('z')))
+    assertEquals(IChar.union(Seq.empty), IChar.empty)
+  }
+
   test("IChar.canonicalize") {
     assertEquals(IChar.canonicalize(IChar('n'), false), IChar('N'))
     assertEquals(IChar.canonicalize(IChar('N'), true), IChar('n'))
@@ -71,6 +76,14 @@ class ICharSuite extends munit.FunSuite {
     // U+017F: LATIN SMALL LETTER LONG S
     assertEquals(IChar.canonicalize(IChar(0x017f), false), IChar(0x017f))
     assertEquals(IChar.canonicalize(IChar(0x017f), true), IChar('s'))
+  }
+
+  test("IChar#withLineTerminator") {
+    assert(IChar('\n').withLineTerminator.isLineTerminator)
+  }
+
+  test("IChar#withWord") {
+    assert(IChar('a').withWord.isWord)
   }
 
   test("IChar#isEmpty") {
@@ -102,6 +115,10 @@ class ICharSuite extends munit.FunSuite {
         IChar(IntervalSet((UChar(0x42), UChar(0x5b))), false, true)
       )
     )
+  }
+
+  test("IChar#diff") {
+    assertEquals(IChar.range(UChar('a'), UChar('c')).diff(IChar('a')), IChar.range(UChar('b'), UChar('c')))
   }
 
   test("IChar#compare") {

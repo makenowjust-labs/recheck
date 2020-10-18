@@ -13,6 +13,12 @@ final case class IChar(
     isWord: Boolean = false
 ) extends Ordered[IChar] {
 
+  /** Marks this set contains line terminator characters. */
+  def withLineTerminator: IChar = copy(isLineTerminator = true)
+
+  /** Marks this set contains word characters. */
+  def withWord: IChar = copy(isWord = true)
+
   /** Checks whether this interval set is empty or not. */
   def isEmpty: Boolean = set.isEmpty
 
@@ -37,6 +43,9 @@ final case class IChar(
     val ic = IChar(is, isLineTerminator || that.isLineTerminator, isWord || that.isWord)
     Partition(ic, copy(set = ls), that.copy(set = rs))
   }
+
+  /** Computes a difference interval set. */
+  def diff(that: IChar): IChar = partition(that).diffThat
 
   /** Checks whether the character is contained in this interval set or not. */
   def contains(value: UChar): Boolean = set.contains(value)
@@ -112,6 +121,10 @@ object IChar {
 
   /** Creates an interval set ranged in [begin, end]. */
   def range(begin: UChar, end: UChar): IChar = IChar(IntervalSet((begin, UChar(end.value + 1))))
+
+  /** Computes union of the interval sets. */
+  def union(chars: Seq[IChar]): IChar =
+    chars.foldLeft(IChar.empty)(_.union(_))
 
   /** Normalizes the code point interval set. */
   def canonicalize(c: IChar, unicode: Boolean): IChar = {
