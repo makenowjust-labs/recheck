@@ -3,7 +3,7 @@ package codes.quine.labo.redos.data
 import com.ibm.icu.lang.UCharacter
 
 /** UChar is a Unicode code point. */
-final case class UChar(value: Int) extends Ordered[UChar] {
+final case class UChar(value: Int) extends AnyVal with Ordered[UChar] {
 
   /** Checks this code point is valid or not. */
   def isValidCodePoint: Boolean = 0 <= value && value <= 0x10ffff

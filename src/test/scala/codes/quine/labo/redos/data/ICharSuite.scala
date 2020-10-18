@@ -49,7 +49,6 @@ object ICharSuite extends SimpleTestSuite {
 
   test("IChar.apply") {
     assertEquals(IChar('a'), IChar(IntervalSet((UChar(0x61), UChar(0x62))), false, false))
-    assertEquals(IChar(UChar('a')), IChar(IntervalSet((UChar(0x61), UChar(0x62))), false, false))
   }
 
   test("IChar.empty") {
