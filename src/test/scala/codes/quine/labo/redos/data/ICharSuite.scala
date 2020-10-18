@@ -49,6 +49,17 @@ object ICharSuite extends SimpleTestSuite {
 
   test("IChar.apply") {
     assertEquals(IChar('a'), IChar(IntervalSet((UChar(0x61), UChar(0x62))), false, false))
+    assertEquals(IChar(UChar('a')), IChar(IntervalSet((UChar(0x61), UChar(0x62))), false, false))
+  }
+
+  test("IChar.empty") {
+    assert(IChar.empty.isEmpty)
+  }
+
+  test("IChar.range") {
+    assertEquals(IChar.range(UChar('a'), UChar('a')), IChar('a'))
+    assertEquals(IChar.range(UChar('z'), UChar('a')), IChar.empty)
+    assertEquals(IChar.range(UChar('a'), UChar('z')), IChar(IntervalSet((UChar('a'), UChar('z' + 1)))))
   }
 
   test("IChar.canonicalize") {

@@ -1,9 +1,14 @@
 package codes.quine.labo.redos
 package regexp
 
+import scala.annotation.tailrec
 import scala.collection.mutable
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 
 import Pattern._
+import data.IChar
 import data.UChar
 
 /** Pattern is ECMA-262 `RegExp` pattern. */
@@ -36,11 +41,23 @@ object Pattern {
   /** Node is a node of pattern [[https://en.wikipedia.org/wiki/Abstract_syntax_tree AST (abstract syntax tree)]]. */
   sealed abstract class Node extends Serializable with Product
 
+  /** AtomNode is a node of pattern to match a character. */
+  sealed trait AtomNode extends Serializable with Product {
+
+    /** Converts this pattern to a corresponding interval set.
+      *
+      * Note that almost all nodes do not handle `ignoreCase` and `unicode` flags here.
+      * They are handled by automaton translation instead.
+      * However `SimpleEscapeClass(_, EscapeClassKind.Word)` should handle them here, so the arguments are needed.
+      */
+    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar]
+  }
+
   /** ClassNode is a node of pattern AST, but it can appear as a class child.
     *
     * This type does not inherit [[Node]] because [[ClassRange]] can appear as a class child only.
     */
-  sealed trait ClassNode extends Serializable with Product
+  sealed trait ClassNode extends AtomNode
 
   /** Disjunction is a disjunction of patterns. (e.g. `/x|y|z/`) */
   final case class Disjunction(children: Seq[Node]) extends Node
@@ -90,26 +107,68 @@ object Pattern {
   final case class LookBehind(negative: Boolean, child: Node) extends Node
 
   /** Character is a single character in pattern. (e.g. `/x/`) */
-  final case class Character(value: UChar) extends Node with ClassNode
+  final case class Character(value: UChar) extends Node with ClassNode {
+    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar] = Success(IChar(value))
+  }
 
   /** SimpleEscapeClass is an escape class. (e.g. `/\w/` or `/\s/`) */
-  final case class SimpleEscapeClass(invert: Boolean, kind: EscapeClassKind) extends Node with ClassNode
+  final case class SimpleEscapeClass(invert: Boolean, kind: EscapeClassKind) extends Node with ClassNode {
+    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar] = {
+      val char = kind match {
+        case EscapeClassKind.Digit => IChar.Digit
+        case EscapeClassKind.Word  => if (ignoreCase) IChar.canonicalize(IChar.Word, unicode) else IChar.Word
+        case EscapeClassKind.Space => IChar.Space
+      }
+      Success(if (invert) char.complement else char)
+    }
+  }
 
   /** UnicodeProperty is an escape class of Unicode property. (e.g. `/\p{ASCII}/` or `/\P{L}/`) */
-  final case class UnicodeProperty(invert: Boolean, property: String) extends Node with ClassNode
+  final case class UnicodeProperty(invert: Boolean, name: String) extends Node with ClassNode {
+    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar] = IChar.UnicodeProperty(name) match {
+      case Some(char) => Success(if (invert) char.complement else char)
+      case None       => Failure(new InvalidRegExpException(s"unknown Unicode property: $name"))
+    }
+  }
 
   /** UnicodePropertyValue is an escape class of Unicode property and value.
     * (e.g. `/\p{sc=Hira}/` or `/\P{General_Category=No}/`)
     */
-  final case class UnicodePropertyValue(invert: Boolean, property: String, value: String) extends Node with ClassNode
+  final case class UnicodePropertyValue(invert: Boolean, name: String, value: String) extends Node with ClassNode {
+    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar] = IChar.UnicodePropertyValue(name, value) match {
+      case Some(char) => Success(if (invert) char.complement else char)
+      case None       => Failure(new InvalidRegExpException(s"unknown Unicode property-value: $name=$value"))
+    }
+  }
 
   /** CharacterClass is a class (set) pattern of characters. (e.g. `/[a-z]/` or `/[^A-Z]/`) */
-  final case class CharacterClass(invert: Boolean, children: Seq[ClassNode]) extends Node
+  final case class CharacterClass(invert: Boolean, children: Seq[ClassNode]) extends Node with AtomNode {
+    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar] = {
+      @tailrec def loop(ch: IChar, cs: Seq[ClassNode]): Try[IChar] = cs match {
+        case Seq() => Success(if (invert) ch.complement else ch)
+        case c +: cs =>
+          c.toIChar(ignoreCase, unicode) match {
+            case Success(ch1) => loop(ch.union(ch1), cs)
+            case Failure(ex)  => Failure(ex)
+          }
+      }
+      loop(IChar.empty, children)
+    }
+  }
 
   /** ClassRange is a character rane pattern in a class. */
-  final case class ClassRange(begin: UChar, end: UChar) extends ClassNode
+  final case class ClassRange(begin: UChar, end: UChar) extends ClassNode {
+    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar] = {
+      val char = IChar.range(begin, end)
+      if (char.isEmpty) Failure(new InvalidRegExpException("an empty range"))
+      else Success(char)
+    }
+  }
 
-  /** Dot is any characters pattern. (e.g. `/./`) */
+  /** Dot is any characters pattern. (e.g. `/./`)
+    *
+    * This does not inherit `AtomNode` intentionally because this `toIChar` needs `dotAll` flag information.
+    */
   case object Dot extends Node
 
   /** BackReference is a back-reference pattern. (e.g. `/\1/`) */

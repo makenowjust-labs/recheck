@@ -1,12 +1,73 @@
 package codes.quine.labo.redos
 package regexp
 
+import scala.util.Success
+
 import minitest.SimpleTestSuite
 
 import Pattern._
+import data.IChar
 import data.UChar
 
 object PatternSuite extends SimpleTestSuite {
+  test("Pattern.AtomNode#toIChar") {
+    assertEquals(Character(UChar('x')).toIChar(false, false), Success(IChar('x')))
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Word).toIChar(false, false), Success(IChar.Word))
+    assertEquals(SimpleEscapeClass(true, EscapeClassKind.Word).toIChar(false, false), Success(IChar.Word.complement))
+    assertEquals(
+      SimpleEscapeClass(false, EscapeClassKind.Word).toIChar(true, true),
+      Success(IChar.canonicalize(IChar.Word, true))
+    )
+    assertEquals(
+      SimpleEscapeClass(true, EscapeClassKind.Word).toIChar(true, true),
+      Success(IChar.canonicalize(IChar.Word, true).complement)
+    )
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).toIChar(false, false), Success(IChar.Digit))
+    assertEquals(SimpleEscapeClass(true, EscapeClassKind.Digit).toIChar(false, false), Success(IChar.Digit.complement))
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Space).toIChar(false, false), Success(IChar.Space))
+    assertEquals(SimpleEscapeClass(true, EscapeClassKind.Space).toIChar(false, false), Success(IChar.Space.complement))
+    assertEquals(UnicodeProperty(false, "ASCII").toIChar(false, false), Success(IChar.UnicodeProperty("ASCII").get))
+    assertEquals(
+      UnicodeProperty(true, "ASCII").toIChar(false, false),
+      Success(IChar.UnicodeProperty("ASCII").get.complement)
+    )
+    assertEquals(UnicodeProperty(false, "L").toIChar(false, false), Success(IChar.UnicodeProperty("L").get))
+    assertEquals(UnicodeProperty(true, "L").toIChar(false, false), Success(IChar.UnicodeProperty("L").get.complement))
+    assertEquals(
+      intercept[InvalidRegExpException](UnicodeProperty(false, "invalid").toIChar(false, false).get).getMessage,
+      "unknown Unicode property: invalid"
+    )
+    val Hira = IChar.UnicodePropertyValue("sc", "Hira").get
+    assertEquals(UnicodePropertyValue(false, "sc", "Hira").toIChar(false, false), Success(Hira))
+    assertEquals(UnicodePropertyValue(true, "sc", "Hira").toIChar(false, false), Success(Hira.complement))
+    assertEquals(
+      intercept[InvalidRegExpException](
+        UnicodePropertyValue(false, "sc", "invalid").toIChar(false, false).get
+      ).getMessage,
+      "unknown Unicode property-value: sc=invalid"
+    )
+    assertEquals(
+      CharacterClass(false, Seq(Character(UChar('a')), Character(UChar('A')))).toIChar(false, false),
+      Success(IChar('a').union(IChar('A')))
+    )
+    assertEquals(
+      CharacterClass(true, Seq(Character(UChar('a')), Character(UChar('A')))).toIChar(false, false),
+      Success(IChar('a').union(IChar('A')).complement)
+    )
+    assertEquals(
+      intercept[InvalidRegExpException](
+        CharacterClass(true, Seq(ClassRange(UChar('z'), UChar('a')))).toIChar(false, false).get
+      ).getMessage,
+      "an empty range"
+    )
+    assertEquals(ClassRange(UChar('a'), UChar('a')).toIChar(false, false), Success(IChar('a')))
+    assertEquals(ClassRange(UChar('a'), UChar('z')).toIChar(false, false), Success(IChar.range(UChar('a'), UChar('z'))))
+    assertEquals(
+      intercept[InvalidRegExpException](ClassRange(UChar('z'), UChar('a')).toIChar(false, false).get).getMessage,
+      "an empty range"
+    )
+  }
+
   test("Pattern.showNode") {
     val x = Character(UChar('x'))
     assertEquals(showNode(Disjunction(Seq(Disjunction(Seq(x, x)), x))), "(?:x|x)|x")
