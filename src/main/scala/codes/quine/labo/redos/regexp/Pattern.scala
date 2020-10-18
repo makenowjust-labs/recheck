@@ -1,7 +1,6 @@
 package codes.quine.labo.redos
 package regexp
 
-import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.Failure
 import scala.util.Success
@@ -10,6 +9,7 @@ import scala.util.Try
 import Pattern._
 import data.IChar
 import data.UChar
+import util.TryUtil
 
 /** Pattern is ECMA-262 `RegExp` pattern. */
 final case class Pattern(node: Node, flagSet: FlagSet) {
@@ -143,17 +143,8 @@ object Pattern {
 
   /** CharacterClass is a class (set) pattern of characters. (e.g. `/[a-z]/` or `/[^A-Z]/`) */
   final case class CharacterClass(invert: Boolean, children: Seq[ClassNode]) extends Node with AtomNode {
-    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar] = {
-      @tailrec def loop(ch: IChar, cs: Seq[ClassNode]): Try[IChar] = cs match {
-        case Seq() => Success(if (invert) ch.complement else ch)
-        case c +: cs =>
-          c.toIChar(ignoreCase, unicode) match {
-            case Success(ch1) => loop(ch.union(ch1), cs)
-            case Failure(ex)  => Failure(ex)
-          }
-      }
-      loop(IChar.empty, children)
-    }
+    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar] =
+      TryUtil.traverse(children)(_.toIChar(ignoreCase, unicode)).map(IChar.union(_))
   }
 
   /** ClassRange is a character rane pattern in a class. */
