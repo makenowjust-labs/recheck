@@ -1,10 +1,8 @@
 package codes.quine.labo.redos.data
 
-import minitest.SimpleTestSuite
-
 import IntervalSet._
 
-object IntervalSetSuite extends SimpleTestSuite {
+class IntervalSetSuite extends munit.FunSuite {
   test("IntervalSet.apply") {
     assertEquals(IntervalSet((1, 2)).intervals, Vector((1, 2)))
     assertEquals(IntervalSet((1, 2), (3, 4)).intervals, Vector((1, 2), (3, 4)))
@@ -32,16 +30,16 @@ object IntervalSetSuite extends SimpleTestSuite {
   }
 
   test("IntervalSet#union") {
-    assertEquals(IntervalSet.empty[Int] union IntervalSet.empty, IntervalSet.empty)
+    assertEquals(IntervalSet.empty[Int] union IntervalSet.empty, IntervalSet.empty[Int])
     assertEquals(IntervalSet((1, 2)) union IntervalSet.empty, IntervalSet((1, 2)))
     assertEquals(IntervalSet((1, 2)) union IntervalSet((3, 4)), IntervalSet((1, 2), (3, 4)))
     assertEquals(IntervalSet((1, 2)) union IntervalSet((2, 3)), IntervalSet((1, 3)))
   }
 
   test("IntervalSet#intersection") {
-    assertEquals(IntervalSet.empty[Int] intersection IntervalSet.empty, IntervalSet.empty)
-    assertEquals(IntervalSet((1, 5)) intersection IntervalSet.empty, IntervalSet.empty)
-    assertEquals(IntervalSet.empty intersection IntervalSet((1, 5)), IntervalSet.empty)
+    assertEquals(IntervalSet.empty[Int] intersection IntervalSet.empty, IntervalSet.empty[Int])
+    assertEquals(IntervalSet((1, 5)) intersection IntervalSet.empty, IntervalSet.empty[Int])
+    assertEquals(IntervalSet.empty intersection IntervalSet((1, 5)), IntervalSet.empty[Int])
     assertEquals(IntervalSet((1, 5)) intersection IntervalSet((2, 4)), IntervalSet((2, 4)))
     assertEquals(IntervalSet((2, 4)) intersection IntervalSet((1, 5)), IntervalSet((2, 4)))
     assertEquals(IntervalSet((1, 5)) intersection IntervalSet((1, 2), (4, 5)), IntervalSet((1, 2), (4, 5)))

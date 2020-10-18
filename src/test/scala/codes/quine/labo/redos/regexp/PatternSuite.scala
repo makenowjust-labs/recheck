@@ -3,13 +3,11 @@ package regexp
 
 import scala.util.Success
 
-import minitest.SimpleTestSuite
-
 import Pattern._
 import data.IChar
 import data.UChar
 
-object PatternSuite extends SimpleTestSuite {
+class PatternSuite extends munit.FunSuite {
   test("Pattern.AtomNode#toIChar") {
     assertEquals(Character(UChar('x')).toIChar(false, false), Success(IChar('x')))
     assertEquals(SimpleEscapeClass(false, EscapeClassKind.Word).toIChar(false, false), Success(IChar.Word))

@@ -1,10 +1,8 @@
 package codes.quine.labo.redos.data
 
-import minitest.SimpleTestSuite
-
 import IntervalSet._
 
-object ICharSuite extends SimpleTestSuite {
+class ICharSuite extends munit.FunSuite {
   test("IChar.Any") {
     assertEquals(IChar.Any, IChar(IntervalSet((UChar(0), UChar(0x110000))), false, false))
   }

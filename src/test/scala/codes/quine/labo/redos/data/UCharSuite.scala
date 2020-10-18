@@ -1,8 +1,6 @@
 package codes.quine.labo.redos.data
 
-import minitest.SimpleTestSuite
-
-object UCharSuite extends SimpleTestSuite {
+class UCharSuite extends munit.FunSuite {
   test("UChar#isValidCodePoint") {
     assert(UChar(0x41).isValidCodePoint)
     assert(UChar(0x0).isValidCodePoint)

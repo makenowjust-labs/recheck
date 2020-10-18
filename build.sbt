@@ -44,6 +44,6 @@ lazy val root = project
     libraryDependencies += "com.ibm.icu" % "icu4j" % "67.1",
     libraryDependencies += "com.lihaoyi" %% "fastparse" % "2.3.0",
     // Settings for test:
-    libraryDependencies += "io.monix" %% "minitest" % "2.8.2" % Test,
-    testFrameworks += new TestFramework("minitest.runner.Framework")
+    libraryDependencies += "org.scalameta" %% "munit" % "0.7.14" % Test,
+    testFrameworks += new TestFramework("munit.Framework")
   )

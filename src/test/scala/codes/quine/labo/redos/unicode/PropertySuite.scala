@@ -1,11 +1,9 @@
 package codes.quine.labo.redos
 package unicode
 
-import minitest.SimpleTestSuite
-
 import data.UChar
 
-object PropertySuite extends SimpleTestSuite {
+class PropertySuite extends munit.FunSuite {
   test("Property.binary") {
     assertEquals(Property.binary("invalid"), None)
     val set = Property.binary("AHex")

@@ -1,11 +1,9 @@
 package codes.quine.labo.redos
 package unicode
 
-import minitest.SimpleTestSuite
-
 import data.UChar
 
-object CaseMapSuite extends SimpleTestSuite {
+class CaseMapSuite extends munit.FunSuite {
   test("CaseMap.Upper") {
     // Checks there is [a-z] to [A-Z] mapping.
     assert(CaseMap.Upper.find(_.offset == -32).exists(_.domain.intervals.contains((UChar(0x61), UChar(0x7b)))))

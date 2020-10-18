@@ -1,8 +1,6 @@
 package codes.quine.labo.redos.data
 
-import minitest.SimpleTestSuite
-
-object ICharSetSuite extends SimpleTestSuite {
+class ICharSetSuite extends munit.FunSuite {
   test("ICharSet.any") {
     assertEquals(ICharSet.any(false, false).chars, Seq(IChar.Any))
 

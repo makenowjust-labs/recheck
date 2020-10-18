@@ -1,8 +1,6 @@
 package codes.quine.labo.redos
 
-import minitest.SimpleTestSuite
-
-object ExceptionsSuite extends SimpleTestSuite {
+class ExceptionsSuite extends munit.FunSuite {
   test("RedosException#getMessage") {
     assertEquals(new RedosException("message").getMessage, "message")
   }

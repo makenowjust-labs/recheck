@@ -4,12 +4,11 @@ package regexp
 import scala.util.Success
 
 import fastparse._
-import minitest.SimpleTestSuite
 
 import Pattern._
 import data.UChar
 
-object ParserSuite extends SimpleTestSuite {
+class ParserSuite extends munit.FunSuite {
 
   /** A default parser instance for testing. */
   val P = new Parser(false, false, false, 0)
