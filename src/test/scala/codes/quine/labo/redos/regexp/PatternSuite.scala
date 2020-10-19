@@ -62,7 +62,7 @@ class PatternSuite extends munit.FunSuite {
     )
     assertEquals(
       CharacterClass(true, Seq(Character(UChar('a')), Character(UChar('A')))).toIChar(false, false),
-      Success(IChar('a').union(IChar('A')).complement(false))
+      Success(IChar('a').union(IChar('A'))) // Not complemented is intentionally.
     )
     assertEquals(
       intercept[InvalidRegExpException](

@@ -144,10 +144,8 @@ object Pattern {
   /** CharacterClass is a class (set) pattern of characters. (e.g. `/[a-z]/` or `/[^A-Z]/`) */
   final case class CharacterClass(invert: Boolean, children: Seq[ClassNode]) extends Node with AtomNode {
     def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar] =
-      TryUtil.traverse(children)(_.toIChar(ignoreCase, unicode)).map { chs =>
-        val ch = IChar.union(chs)
-        if (invert) ch.complement(unicode) else ch
-      }
+      // Inversion will be done in automaton translation instead of here.
+      TryUtil.traverse(children)(_.toIChar(ignoreCase, unicode)).map(IChar.union(_))
   }
 
   /** ClassRange is a character rane pattern in a class. */
