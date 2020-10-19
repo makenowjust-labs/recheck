@@ -27,9 +27,11 @@ lazy val root = project
     version := "0.1.0-SNAPSHOT",
     console / initialCommands := """
       |import codes.quine.labo.redos._
+      |import codes.quine.labo.redos.automaton._
       |import codes.quine.labo.redos.data._
       |import codes.quine.labo.redos.regexp._
       |import codes.quine.labo.redos.unicode._
+      |import codes.quine.labo.redos.util._
       """.stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
