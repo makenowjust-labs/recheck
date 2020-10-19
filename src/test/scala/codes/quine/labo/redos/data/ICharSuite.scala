@@ -97,8 +97,10 @@ class ICharSuite extends munit.FunSuite {
   }
 
   test("IChar#complement") {
-    assertEquals(IChar('a').complement, IChar(IntervalSet((UChar(0), UChar('a')), (UChar('b'), UChar(0x110000)))))
-    assert(IChar.Any.complement.isEmpty)
+    assertEquals(IChar('a').complement(true), IChar(IntervalSet((UChar(0), UChar('a')), (UChar('b'), UChar(0x110000)))))
+    assertEquals(IChar('a').complement(false), IChar(IntervalSet((UChar(0), UChar('a')), (UChar('b'), UChar(0x10000)))))
+    assert(IChar.Any.complement(true).isEmpty)
+    assert(IChar.Any16.complement(false).isEmpty)
   }
 
   test("IChar#union") {

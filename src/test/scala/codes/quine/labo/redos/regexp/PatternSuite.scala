@@ -11,33 +11,45 @@ class PatternSuite extends munit.FunSuite {
   test("Pattern.AtomNode#toIChar") {
     assertEquals(Character(UChar('x')).toIChar(false, false), Success(IChar('x')))
     assertEquals(SimpleEscapeClass(false, EscapeClassKind.Word).toIChar(false, false), Success(IChar.Word))
-    assertEquals(SimpleEscapeClass(true, EscapeClassKind.Word).toIChar(false, false), Success(IChar.Word.complement))
+    assertEquals(
+      SimpleEscapeClass(true, EscapeClassKind.Word).toIChar(false, false),
+      Success(IChar.Word.complement(false))
+    )
     assertEquals(
       SimpleEscapeClass(false, EscapeClassKind.Word).toIChar(true, true),
       Success(IChar.canonicalize(IChar.Word, true))
     )
     assertEquals(
       SimpleEscapeClass(true, EscapeClassKind.Word).toIChar(true, true),
-      Success(IChar.canonicalize(IChar.Word, true).complement)
+      Success(IChar.canonicalize(IChar.Word, true).complement(true))
     )
     assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).toIChar(false, false), Success(IChar.Digit))
-    assertEquals(SimpleEscapeClass(true, EscapeClassKind.Digit).toIChar(false, false), Success(IChar.Digit.complement))
+    assertEquals(
+      SimpleEscapeClass(true, EscapeClassKind.Digit).toIChar(false, false),
+      Success(IChar.Digit.complement(false))
+    )
     assertEquals(SimpleEscapeClass(false, EscapeClassKind.Space).toIChar(false, false), Success(IChar.Space))
-    assertEquals(SimpleEscapeClass(true, EscapeClassKind.Space).toIChar(false, false), Success(IChar.Space.complement))
+    assertEquals(
+      SimpleEscapeClass(true, EscapeClassKind.Space).toIChar(false, false),
+      Success(IChar.Space.complement(false))
+    )
     assertEquals(UnicodeProperty(false, "ASCII").toIChar(false, false), Success(IChar.UnicodeProperty("ASCII").get))
     assertEquals(
-      UnicodeProperty(true, "ASCII").toIChar(false, false),
-      Success(IChar.UnicodeProperty("ASCII").get.complement)
+      UnicodeProperty(true, "ASCII").toIChar(false, true),
+      Success(IChar.UnicodeProperty("ASCII").get.complement(true))
     )
     assertEquals(UnicodeProperty(false, "L").toIChar(false, false), Success(IChar.UnicodeProperty("L").get))
-    assertEquals(UnicodeProperty(true, "L").toIChar(false, false), Success(IChar.UnicodeProperty("L").get.complement))
+    assertEquals(
+      UnicodeProperty(true, "L").toIChar(false, true),
+      Success(IChar.UnicodeProperty("L").get.complement(true))
+    )
     assertEquals(
       intercept[InvalidRegExpException](UnicodeProperty(false, "invalid").toIChar(false, false).get).getMessage,
       "unknown Unicode property: invalid"
     )
     val Hira = IChar.UnicodePropertyValue("sc", "Hira").get
     assertEquals(UnicodePropertyValue(false, "sc", "Hira").toIChar(false, false), Success(Hira))
-    assertEquals(UnicodePropertyValue(true, "sc", "Hira").toIChar(false, false), Success(Hira.complement))
+    assertEquals(UnicodePropertyValue(true, "sc", "Hira").toIChar(false, true), Success(Hira.complement(true)))
     assertEquals(
       intercept[InvalidRegExpException](
         UnicodePropertyValue(false, "sc", "invalid").toIChar(false, false).get
@@ -50,7 +62,7 @@ class PatternSuite extends munit.FunSuite {
     )
     assertEquals(
       CharacterClass(true, Seq(Character(UChar('a')), Character(UChar('A')))).toIChar(false, false),
-      Success(IChar('a').union(IChar('A')).complement)
+      Success(IChar('a').union(IChar('A')).complement(false))
     )
     assertEquals(
       intercept[InvalidRegExpException](

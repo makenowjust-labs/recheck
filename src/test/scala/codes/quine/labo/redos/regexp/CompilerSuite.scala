@@ -17,9 +17,10 @@ class CompilerSuite extends munit.FunSuite {
     val flagSet4 = FlagSet(false, true, false, false, true, false)
     val word = IChar.Word.withWord
     val lineTerminator = IChar.LineTerminator.withLineTerminator
+    val dot16 = IChar.Any16.diff(IChar.LineTerminator)
     val dot = IChar.Any.diff(IChar.LineTerminator)
     assertEquals(Compiler.alphabet(Pattern(Sequence(Seq.empty), flagSet0)), Success(ICharSet.any(false, false)))
-    assertEquals(Compiler.alphabet(Pattern(Dot, flagSet0)), Success(ICharSet.any(false, false).add(dot)))
+    assertEquals(Compiler.alphabet(Pattern(Dot, flagSet0)), Success(ICharSet.any(false, false).add(dot16)))
     assertEquals(
       Compiler.alphabet(Pattern(Disjunction(Seq(Character(UChar('A')), Character(UChar('Z')))), flagSet0)),
       Success(ICharSet.any(false, false).add(IChar('A')).add(IChar('Z')))
@@ -49,7 +50,7 @@ class CompilerSuite extends munit.FunSuite {
     assertEquals(Compiler.alphabet(Pattern(Sequence(Seq.empty), flagSet3)), Success(ICharSet.any(true, false)))
     assertEquals(
       Compiler.alphabet(Pattern(Dot, flagSet3)),
-      Success(ICharSet.any(true, false).add(IChar.canonicalize(dot, false)))
+      Success(ICharSet.any(true, false).add(IChar.canonicalize(dot16, false)))
     )
     assertEquals(
       Compiler.alphabet(Pattern(Disjunction(Seq(Character(UChar('A')), Character(UChar('Z')))), flagSet3)),
@@ -94,7 +95,6 @@ class CompilerSuite extends munit.FunSuite {
     assertEquals(Compiler.needsLineTerminatorDistinction(Pattern(WordBoundary(true), flagSet0)), false)
     assertEquals(Compiler.needsLineTerminatorDistinction(Pattern(WordBoundary(false), flagSet0)), false)
     assertEquals(Compiler.needsLineTerminatorDistinction(Pattern(Dot, flagSet0)), false)
-    assertEquals(Compiler.needsLineTerminatorDistinction(Pattern(LineBegin, flagSet1)), false)
     assertEquals(Compiler.needsLineTerminatorDistinction(Pattern(LineBegin, flagSet1)), false)
   }
 

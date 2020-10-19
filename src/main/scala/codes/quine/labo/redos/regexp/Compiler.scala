@@ -39,7 +39,8 @@ object Compiler {
           Seq(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch)
         }
       case Dot =>
-        val ch = if (dotAll) IChar.Any else IChar.Any.diff(IChar.LineTerminator)
+        val any = if (unicode) IChar.Any else IChar.Any16
+        val ch = if (dotAll) any else any.diff(IChar.LineTerminator)
         Success(Seq(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch))
       case _ => Success(Seq.empty)
     }

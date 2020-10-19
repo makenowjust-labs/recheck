@@ -2,7 +2,8 @@ package codes.quine.labo.redos.data
 
 class ICharSetSuite extends munit.FunSuite {
   test("ICharSet.any") {
-    assertEquals(ICharSet.any(false, false).chars, Seq(IChar.Any))
+    assertEquals(ICharSet.any(false, true).chars, Seq(IChar.Any))
+    assertEquals(ICharSet.any(false, false).chars, Seq(IChar.Any16))
 
     assert(ICharSet.any(true, false).chars.head.contains(UChar('A')))
     assert(!ICharSet.any(true, false).chars.head.contains(UChar('a')))
@@ -17,7 +18,7 @@ class ICharSetSuite extends munit.FunSuite {
       ICharSet(
         Seq(
           IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, false),
-          IChar(IntervalSet((UChar(0), UChar(0x41)), (UChar(0x42), UChar(0x110000))), false, false)
+          IChar(IntervalSet((UChar(0), UChar(0x41)), (UChar(0x42), UChar(0x10000))), false, false)
         )
       )
     )

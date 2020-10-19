@@ -26,11 +26,11 @@ final case class IChar(
   def nonEmpty: Boolean = set.nonEmpty
 
   /** Computes a complement of this interval set. */
-  def complement: IChar = {
+  def complement(unicode: Boolean): IChar = {
     val (xys, z) = set.intervals.foldLeft((IndexedSeq.empty[(UChar, UChar)], UChar(0))) { case ((seq, x), (y, z)) =>
       (seq :+ (x, y), z)
     }
-    IChar(IntervalSet.from(xys :+ (z, UChar(0x110000))), isLineTerminator, isWord)
+    IChar(IntervalSet.from(xys :+ (z, UChar(if (unicode) 0x110000 else 0x10000))), isLineTerminator, isWord)
   }
 
   /** Computes a union of two interval sets. */
@@ -77,6 +77,9 @@ object IChar {
 
   /** Creates an interval set containing any code points. */
   def Any: IChar = IChar(IntervalSet((UChar(0), UChar(0x110000))))
+
+  /** Creates an interval set containing any UTF-16 code points. */
+  def Any16: IChar = IChar(IntervalSet((UChar(0), UChar(0x10000))))
 
   /** Returns an interval set containing digit characters. */
   def Digit: IChar = IChar(IntervalSet((UChar('0'), UChar('9' + 1))))
