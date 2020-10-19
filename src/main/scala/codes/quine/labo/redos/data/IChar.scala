@@ -52,6 +52,20 @@ final case class IChar(
 
   /** Compares to other code point interval set. */
   def compare(that: IChar): Int = IChar.ordering.compare(this, that)
+
+  /** Converts to string representation. */
+  override def toString: String = {
+    // This `showUCharInClass` is copied from `Pattern` for avoiding a circular dependency.
+    def showUCharInClass(u: UChar): String =
+      if (u.value.isValidChar && "[^-]".contains(u.value.toChar)) s"\\${u.value.toChar}"
+      else if (1 <= u.value && u.value < 32) s"\\c${(u.value + 0x40).toChar}"
+      else u.toString
+    val cls = set.intervals.map {
+      case (x, y) if x.value + 1 == y.value => showUCharInClass(x)
+      case (x, y)                           => s"${showUCharInClass(x)}-${showUCharInClass(UChar(y.value - 1))}"
+    }
+    cls.mkString("[", "", "]" ++ (if (isLineTerminator) "n" else "") ++ (if (isWord) "w" else ""))
+  }
 }
 
 /** IChar utilities. */

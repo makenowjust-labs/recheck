@@ -128,4 +128,19 @@ class ICharSuite extends munit.FunSuite {
     assertEquals(c1.compare(c2), -1)
     assertEquals(c2.compare(c1), 1)
   }
+
+  test("IChar#toString") {
+    assertEquals(
+      IChar(IntervalSet((UChar('a'), UChar('b')), (UChar('A'), UChar('Z' + 1))), true, false).toString,
+      "[A-Za]n"
+    )
+    assertEquals(
+      IChar(IntervalSet((UChar('a'), UChar('z' + 1)), (UChar('A'), UChar('B'))), false, true).toString,
+      "[Aa-z]w"
+    )
+    assertEquals(
+      IChar(0x01).union(IChar('-')).union(IChar(0x10ffff)).toString,
+      "[\\cA\\-\\u{10FFFF}]"
+    )
+  }
 }
