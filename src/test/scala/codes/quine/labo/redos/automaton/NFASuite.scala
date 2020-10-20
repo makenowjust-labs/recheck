@@ -16,21 +16,21 @@ class NFASuite extends munit.FunSuite {
     )
     assertEquals(
       nfa.toGraphviz,
-      """digraph {
-        |  "" [shape=point];
-        |  "" -> 0;
-        |  0 [shape=circle];
-        |  1 [shape=circle];
-        |  2 [shape=doublecircle];
-        |  0 -> 0 [label="a"];
-        |  0 -> 1 [label="a"];
-        |  0 -> 1 [label="b"];
-        |  0 -> 2 [label="b"];
-        |  1 -> 0 [label="a"];
-        |  1 -> 1 [label="a"];
-        |  1 -> 1 [label="b"];
-        |  1 -> 2 [label="b"];
-        |}""".stripMargin
+      """|digraph {
+         |  "" [shape=point];
+         |  "" -> 0;
+         |  0 [shape=circle];
+         |  1 [shape=circle];
+         |  2 [shape=doublecircle];
+         |  0 -> 0 [label="a"];
+         |  0 -> 1 [label="a"];
+         |  0 -> 1 [label="b"];
+         |  0 -> 2 [label="b"];
+         |  1 -> 0 [label="a"];
+         |  1 -> 1 [label="a"];
+         |  1 -> 1 [label="b"];
+         |  1 -> 2 [label="b"];
+         |}""".stripMargin
     )
   }
 

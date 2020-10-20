@@ -47,6 +47,7 @@ lazy val root = project
     // Dependencies:
     libraryDependencies += "com.ibm.icu" % "icu4j" % "67.1",
     libraryDependencies += "com.lihaoyi" %% "fastparse" % "2.3.0",
+    libraryDependencies += "org.scala-lang.modules" %% "scala-collection-contrib" % "0.2.1",
     // Settings for test:
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.14" % Test,
     testFrameworks += new TestFramework("munit.Framework")
