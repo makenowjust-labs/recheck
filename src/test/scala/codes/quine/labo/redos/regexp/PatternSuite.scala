@@ -43,19 +43,15 @@ class PatternSuite extends munit.FunSuite {
       UnicodeProperty(true, "L").toIChar(false, true),
       Success(IChar.UnicodeProperty("L").get.complement(true))
     )
-    assertEquals(
-      intercept[InvalidRegExpException](UnicodeProperty(false, "invalid").toIChar(false, false).get).getMessage,
-      "unknown Unicode property: invalid"
-    )
+    interceptMessage[InvalidRegExpException]("unknown Unicode property: invalid") {
+      UnicodeProperty(false, "invalid").toIChar(false, false).get
+    }
     val Hira = IChar.UnicodePropertyValue("sc", "Hira").get
     assertEquals(UnicodePropertyValue(false, "sc", "Hira").toIChar(false, false), Success(Hira))
     assertEquals(UnicodePropertyValue(true, "sc", "Hira").toIChar(false, true), Success(Hira.complement(true)))
-    assertEquals(
-      intercept[InvalidRegExpException](
-        UnicodePropertyValue(false, "sc", "invalid").toIChar(false, false).get
-      ).getMessage,
-      "unknown Unicode property-value: sc=invalid"
-    )
+    interceptMessage[InvalidRegExpException]("unknown Unicode property-value: sc=invalid") {
+      UnicodePropertyValue(false, "sc", "invalid").toIChar(false, false).get
+    }
     assertEquals(
       CharacterClass(false, Seq(Character(UChar('a')), Character(UChar('A')))).toIChar(false, false),
       Success(IChar('a').union(IChar('A')))
@@ -64,18 +60,14 @@ class PatternSuite extends munit.FunSuite {
       CharacterClass(true, Seq(Character(UChar('a')), Character(UChar('A')))).toIChar(false, false),
       Success(IChar('a').union(IChar('A'))) // Not complemented is intentionally.
     )
-    assertEquals(
-      intercept[InvalidRegExpException](
-        CharacterClass(true, Seq(ClassRange(UChar('z'), UChar('a')))).toIChar(false, false).get
-      ).getMessage,
-      "an empty range"
-    )
+    interceptMessage[InvalidRegExpException]("an empty range") {
+      CharacterClass(true, Seq(ClassRange(UChar('z'), UChar('a')))).toIChar(false, false).get
+    }
     assertEquals(ClassRange(UChar('a'), UChar('a')).toIChar(false, false), Success(IChar('a')))
     assertEquals(ClassRange(UChar('a'), UChar('z')).toIChar(false, false), Success(IChar.range(UChar('a'), UChar('z'))))
-    assertEquals(
-      intercept[InvalidRegExpException](ClassRange(UChar('z'), UChar('a')).toIChar(false, false).get).getMessage,
-      "an empty range"
-    )
+    interceptMessage[InvalidRegExpException]("an empty range") {
+      ClassRange(UChar('z'), UChar('a')).toIChar(false, false).get
+    }
   }
 
   test("Pattern.showNode") {

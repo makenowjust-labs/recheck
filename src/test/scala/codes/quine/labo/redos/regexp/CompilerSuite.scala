@@ -464,22 +464,18 @@ class CompilerSuite extends munit.FunSuite {
     )
 
     // LookAhead, LookBehind, BackReference, NamedBackreference
-    assertEquals(
-      intercept[UnsupportedException](Compiler.compile(Pattern(LookAhead(false, Dot), flagSet0)).get).getMessage,
-      "look-ahead assertion"
-    )
-    assertEquals(
-      intercept[UnsupportedException](Compiler.compile(Pattern(LookBehind(false, Dot), flagSet0)).get).getMessage,
-      "look-behind assertion"
-    )
-    assertEquals(
-      intercept[UnsupportedException](Compiler.compile(Pattern(BackReference(1), flagSet0)).get).getMessage,
-      "back-reference"
-    )
-    assertEquals(
-      intercept[UnsupportedException](Compiler.compile(Pattern(NamedBackReference("foo"), flagSet0)).get).getMessage,
-      "named back-reference"
-    )
+    interceptMessage[UnsupportedException]("look-ahead assertion") {
+      Compiler.compile(Pattern(LookAhead(false, Dot), flagSet0)).get
+    }
+    interceptMessage[UnsupportedException]("look-behind assertion") {
+      Compiler.compile(Pattern(LookBehind(false, Dot), flagSet0)).get
+    }
+    interceptMessage[UnsupportedException]("back-reference") {
+      Compiler.compile(Pattern(BackReference(1), flagSet0)).get
+    }
+    interceptMessage[UnsupportedException]("named back-reference") {
+      Compiler.compile(Pattern(NamedBackReference("foo"), flagSet0)).get
+    }
   }
 
   test("Compiler.hasLineBeginAtBegin") {

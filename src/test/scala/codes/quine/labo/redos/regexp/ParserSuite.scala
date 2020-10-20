@@ -23,15 +23,15 @@ class ParserSuite extends munit.FunSuite {
   val PAN = new Parser(false, true, true, 1)
 
   test("Parser.parse") {
-    assertEquals(intercept[InvalidRegExpException](Parser.parse("", "#", false).get).getMessage, "unknown flag")
-    assertEquals(intercept[InvalidRegExpException](Parser.parse("{", "", false).get).getMessage, "parsing failure at 0")
-    assertEquals(intercept[InvalidRegExpException](Parser.parse("{1}", "").get).getMessage, "parsing failure at 0")
+    interceptMessage[InvalidRegExpException]("unknown flag")(Parser.parse("", "#", false).get)
+    interceptMessage[InvalidRegExpException]("parsing failure at 0")(Parser.parse("{", "", false).get)
+    interceptMessage[InvalidRegExpException]("parsing failure at 0")(Parser.parse("{1}", "").get)
     assertEquals(Parser.parse(".", "g"), Success(Pattern(Dot, FlagSet(true, false, false, false, false, false))))
   }
 
   test("Parser.parseFlagSet") {
-    assertEquals(intercept[InvalidRegExpException](Parser.parseFlagSet("gg").get).getMessage, "duplicated flag")
-    assertEquals(intercept[InvalidRegExpException](Parser.parseFlagSet("#").get).getMessage, "unknown flag")
+    interceptMessage[InvalidRegExpException]("duplicated flag")(Parser.parseFlagSet("gg").get)
+    interceptMessage[InvalidRegExpException]("unknown flag")(Parser.parseFlagSet("#").get)
     assertEquals(Parser.parseFlagSet(""), Success(FlagSet(false, false, false, false, false, false)))
     assertEquals(Parser.parseFlagSet("gimsuy"), Success(FlagSet(true, true, true, true, true, true)))
   }
