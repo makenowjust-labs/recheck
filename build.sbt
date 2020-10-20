@@ -19,6 +19,8 @@ ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 ThisBuild / scalafixDependencies += "com.github.liancheng" %% "organize-imports" % "0.4.2"
 ThisBuild / scalafixDependencies += "com.github.vovapolu" %% "scaluzzi" % "0.1.14"
 
+addCommandAlias("amm", "launchAmmoniteRepl")
+
 lazy val root = project
   .in(file("."))
   .settings(
@@ -32,7 +34,7 @@ lazy val root = project
       |import codes.quine.labo.redos.regexp._
       |import codes.quine.labo.redos.unicode._
       |import codes.quine.labo.redos.util._
-      """.stripMargin,
+      |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
     // Settings for scaladoc:
