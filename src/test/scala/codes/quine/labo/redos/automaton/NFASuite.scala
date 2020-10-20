@@ -33,4 +33,36 @@ class NFASuite extends munit.FunSuite {
         |}""".stripMargin
     )
   }
+
+  test("NFA#toDFA") {
+    val nfa = NFA(
+      Set('a', 'b'),
+      Set(0, 1, 2),
+      Set(0),
+      Set(2),
+      Map(
+        (0, 'a') -> Set(0, 1),
+        (0, 'b') -> Set(1, 2),
+        (1, 'a') -> Set(0, 1),
+        (1, 'b') -> Set(1, 2)
+      )
+    )
+    assertEquals(
+      nfa.toDFA,
+      DFA(
+        Set('a', 'b'),
+        Set(Set(0, 1), Set(1, 2), Set(0)),
+        Set(0),
+        Set(Set(1, 2)),
+        Map(
+          (Set(1, 2), 'a') -> Set(0, 1),
+          (Set(0, 1), 'a') -> Set(0, 1),
+          (Set(0, 1), 'b') -> Set(1, 2),
+          (Set(0), 'b') -> Set(1, 2),
+          (Set(0), 'a') -> Set(0, 1),
+          (Set(1, 2), 'b') -> Set(1, 2)
+        )
+      )
+    )
+  }
 }
