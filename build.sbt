@@ -19,8 +19,6 @@ ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 ThisBuild / scalafixDependencies += "com.github.liancheng" %% "organize-imports" % "0.4.2"
 ThisBuild / scalafixDependencies += "com.github.vovapolu" %% "scaluzzi" % "0.1.14"
 
-addCommandAlias("amm", "launchAmmoniteRepl")
-
 lazy val root = project
   .in(file("."))
   .settings(
