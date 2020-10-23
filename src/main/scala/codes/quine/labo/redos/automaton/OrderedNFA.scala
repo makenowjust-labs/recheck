@@ -1,6 +1,7 @@
 package codes.quine.labo.redos
 package automaton
 
+import scala.collection.MultiSet
 import scala.collection.mutable
 
 import util.GraphvizUtil.escape
@@ -51,5 +52,33 @@ final case class OrderedNFA[A, Q](
     sb.append("}")
 
     sb.result()
+  }
+
+  /** Converts to [[MultiNFA]] with pruning in order of priorities. */
+  def toMultiNFA: MultiNFA[A, (Q, Set[Q])] = {
+    val reverseDFA = reverse.toDFA
+    val reverseDelta = reverseDFA.delta.groupMap(_._1._2) { case (p2, _) -> p1 => (p1, p2) }.withDefaultValue(Seq.empty)
+
+    val newStateSet = for (q <- stateSet; p <- reverseDFA.stateSet) yield (q, p)
+    val newInits = MultiSet.from(for (q <- inits; p <- reverseDFA.stateSet) yield (q, p))
+    val newAcceptSet = for (q <- acceptSet) yield (q, reverseDFA.init)
+
+    val newDelta = mutable.Map.empty[((Q, Set[Q]), A), MultiSet[(Q, Set[Q])]].withDefaultValue(MultiSet.empty)
+    for ((q1, a) -> qs <- delta) {
+      for ((p1, p2) <- reverseDelta(a)) {
+        // There is a transition `q1 --(a)-> qs` in ordered NFA, and
+        // there is a transition `p1 <-(a)-- p2` in reversed DFA.
+        // The result NFA contains a transition `(q1, p1) --(a)-> (qs(i), p2)`
+        // if and only if there is no `qs(j)` (`j < i`) in `p2`.
+        val qp2s = qs
+          .scanLeft(false)(_ || p2.contains(_))
+          .zip(qs)
+          .takeWhile(!_._1)
+          .map { case (_, q2) => (q2, p2) }
+        newDelta(((q1, p1), a)) = newDelta(((q1, p1), a)) ++ MultiSet.from(qp2s)
+      }
+    }
+
+    MultiNFA(alphabet, newStateSet, newInits, newAcceptSet, newDelta.toMap)
   }
 }

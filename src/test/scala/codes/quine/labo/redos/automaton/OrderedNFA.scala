@@ -1,5 +1,7 @@
 package codes.quine.labo.redos.automaton
 
+import scala.collection.MultiSet
+
 class OrderedNFASuite extends munit.FunSuite {
   test("OrderedNFA#rename") {
     val nfa = OrderedNFA(Set('a', 'b'), Set('p', 'q'), Seq('p'), Set('q'), Map(('p', 'a') -> Seq('q')))
@@ -41,6 +43,36 @@ class OrderedNFASuite extends munit.FunSuite {
          |  "1" -> "1" [label="0, b"];
          |  "1" -> "2" [label="1, b"];
          |}""".stripMargin
+    )
+  }
+
+  test("OrderedNFA#toMultiNFA") {
+    val nfa = OrderedNFA(
+      Set('a', 'b'),
+      Set(0, 1),
+      Seq(0),
+      Set(0, 1),
+      Map(
+        (0, 'a') -> Seq(0, 0, 1),
+        (0, 'b') -> Seq(1),
+        (1, 'a') -> Seq(1),
+        (1, 'b') -> Seq(1)
+      )
+    )
+    assertEquals(
+      nfa.toMultiNFA,
+      MultiNFA(
+        Set('a', 'b'),
+        Set((0, Set(0, 1)), (1, Set(0, 1))),
+        MultiSet((0, Set(0, 1))),
+        Set((0, Set(0, 1)), (1, Set(0, 1))),
+        Map(
+          ((0, Set(0, 1)), 'a') -> MultiSet((0, Set(0, 1))),
+          ((0, Set(0, 1)), 'b') -> MultiSet((1, Set(0, 1))),
+          ((1, Set(0, 1)), 'a') -> MultiSet((1, Set(0, 1))),
+          ((1, Set(0, 1)), 'b') -> MultiSet((1, Set(0, 1)))
+        )
+      )
     )
   }
 }
