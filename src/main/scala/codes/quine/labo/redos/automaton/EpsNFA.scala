@@ -6,6 +6,7 @@ import scala.collection.mutable
 import EpsNFA._
 import data.IChar
 import data.ICharSet
+import util.GraphvizUtil.escape
 
 /** EpsNFA is an ordered ε-NFA on unicode code points. */
 final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept: Q, tau: Map[Q, Transition[Q]]) {
@@ -15,25 +16,25 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
     val sb = new mutable.StringBuilder
 
     sb.append("digraph {\n")
-    sb.append("  \"\" [shape=point];\n")
-    sb.append("  \"\" -> " ++ init.toString ++ ";\n")
+    sb.append(s"  ${escape("")} [shape=point];\n")
+    sb.append(s"  ${escape("")} -> ${escape(init)};\n")
     for (q0 <- stateSet) {
       tau.get(q0) match {
         case Some(Eps(Seq(q1))) =>
-          sb.append(s"  $q0 [shape=circle];\n")
-          sb.append(s"  $q0 -> $q1;\n")
+          sb.append(s"  ${escape(q0)} [shape=circle];\n")
+          sb.append(s"  ${escape(q0)} -> ${escape(q1)};\n")
         case Some(Eps(qs)) =>
-          sb.append(s"  $q0 [shape=diamond];\n")
-          for ((q1, i) <- qs.zipWithIndex) sb.append(s"  $q0 -> $q1 [label=$i];\n")
+          sb.append(s"  ${escape(q0)} [shape=diamond];\n")
+          for ((q1, i) <- qs.zipWithIndex)
+            sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=$i];\n")
         case Some(Assert(k, q1)) =>
-          sb.append(s"  $q0 [shape=circle];\n")
-          sb.append(s"  $q0 -> $q1 [label=$k];\n")
+          sb.append(s"  ${escape(q0)} [shape=circle];\n")
+          sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(k)}];\n")
         case Some(Consume(chs, q1)) =>
-          sb.append(s"  $q0 [shape=circle];\n")
-          val label = "\"" ++ chs.mkString("{", ", ", "}").replace("\\", "\\\\").replace("\"", "\\\"") ++ "\""
-          sb.append(s"  $q0 -> $q1 [label=$label];\n")
+          sb.append(s"  ${escape(q0)} [shape=circle];\n")
+          sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(chs.mkString("{", ", ", "}"))}];\n")
         case None =>
-          sb.append(s"  $q0 [shape=doublecircle];\n")
+          sb.append(s"  ${escape(q0)} [shape=doublecircle];\n")
       }
     }
     sb.append("}")

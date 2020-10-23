@@ -1,6 +1,9 @@
-package codes.quine.labo.redos.automaton
+package codes.quine.labo.redos
+package automaton
 
 import scala.collection.mutable
+
+import util.GraphvizUtil.escape
 
 /** NFA is a [[https://en.wikipedia.org/wiki/Nondeterministic_finite_automaton NFA (non-deterministic finite state automaton)]] implementation. */
 final case class NFA[A, Q](
@@ -16,11 +19,11 @@ final case class NFA[A, Q](
     val sb = new mutable.StringBuilder
 
     sb.append("digraph {\n")
-    sb.append("  \"\" [shape=point];\n")
-    for (init <- initSet) sb.append("  \"\" -> " ++ init.toString ++ ";\n")
-    for (q <- stateSet) sb.append(s"  $q [shape=${if (acceptSet.contains(q)) "double" else ""}circle];\n")
+    sb.append(s"  ${escape("")} [shape=point];\n")
+    for (init <- initSet) sb.append(s"  ${escape("")} -> ${escape(init)};\n")
+    for (q <- stateSet) sb.append(s"  ${escape(q)} [shape=${if (acceptSet.contains(q)) "double" else ""}circle];\n")
     for (((q0, a), qs) <- delta; q1 <- qs)
-      sb.append("  " ++ q0.toString ++ " -> " ++ q1.toString ++ " [label=\"" ++ a.toString ++ "\"];\n")
+      sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(a)}];\n")
     sb.append("}")
 
     sb.result()

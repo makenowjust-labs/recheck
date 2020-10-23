@@ -47,17 +47,17 @@ class EpsNFASuite extends munit.FunSuite {
       nfa.toGraphviz,
       """|digraph {
          |  "" [shape=point];
-         |  "" -> 0;
-         |  0 [shape=circle];
-         |  0 -> 1;
-         |  1 [shape=diamond];
-         |  1 -> 2 [label=0];
-         |  1 -> 3 [label=1];
-         |  2 [shape=circle];
-         |  2 -> 4 [label="{[a]}"];
-         |  3 [shape=circle];
-         |  3 -> 4 [label=LineBegin];
-         |  4 [shape=doublecircle];
+         |  "" -> "0";
+         |  "0" [shape=circle];
+         |  "0" -> "1";
+         |  "1" [shape=diamond];
+         |  "1" -> "2" [label=0];
+         |  "1" -> "3" [label=1];
+         |  "2" [shape=circle];
+         |  "2" -> "4" [label="{[a]}"];
+         |  "3" [shape=circle];
+         |  "3" -> "4" [label="LineBegin"];
+         |  "4" [shape=doublecircle];
          |}""".stripMargin
     )
   }

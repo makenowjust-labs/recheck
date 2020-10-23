@@ -1,6 +1,9 @@
-package codes.quine.labo.redos.automaton
+package codes.quine.labo.redos
+package automaton
 
 import scala.collection.mutable
+
+import util.GraphvizUtil.escape
 
 /** OrderedNFA is a NFA, but its transitions are priorized in the order. */
 final case class OrderedNFA[A, Q](
@@ -40,13 +43,11 @@ final case class OrderedNFA[A, Q](
     val sb = new mutable.StringBuilder
 
     sb.append("digraph {\n")
-    sb.append("  \"\" [shape=point];\n")
-    for ((init, i) <- inits.zipWithIndex) sb.append("  \"\" -> " ++ init.toString ++ s" [label=$i];\n")
-    for (q <- stateSet) sb.append(s"  $q [shape=${if (acceptSet.contains(q)) "double" else ""}circle];\n")
+    sb.append(s"  ${escape("")} [shape=point];\n")
+    for ((init, i) <- inits.zipWithIndex) sb.append(s"  ${escape("")} -> ${escape(init)} [label=$i];\n")
+    for (q <- stateSet) sb.append(s"  ${escape(q)} [shape=${if (acceptSet.contains(q)) "double" else ""}circle];\n")
     for (((q0, a), qs) <- delta; (q1, i) <- qs.zipWithIndex)
-      sb.append(
-        "  " ++ q0.toString ++ " -> " ++ q1.toString ++ " [label=\"" ++ i.toString ++ ", " ++ a.toString ++ "\"];\n"
-      )
+      sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(s"${i}, ${a}")}];\n")
     sb.append("}")
 
     sb.result()

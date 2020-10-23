@@ -1,7 +1,11 @@
-package codes.quine.labo.redos.automaton
+package codes.quine.labo.redos
+package automaton
 
 import scala.collection.MultiSet
 import scala.collection.mutable
+
+import data.Graph
+import util.GraphvizUtil.escape
 
 /** MultiNFA is a NFA, but each it uses multi-set instead of set
   * for representing non-deterministic transition.
@@ -14,16 +18,19 @@ final case class MultiNFA[A, Q](
     delta: Map[(Q, A), MultiSet[Q]]
 ) {
 
+  /** Exports this transition function as a grapg. */
+  def toGraph: Graph[Q, A] = Graph.from(delta.iterator.flatMap { case (q1, a) -> qs => qs.map((q1, a, _)) }.toSeq)
+
   /** Converts to Graphviz format text. */
   def toGraphviz: String = {
     val sb = new mutable.StringBuilder
 
     sb.append("digraph {\n")
-    sb.append("  \"\" [shape=point];\n")
-    for (init <- initSet) sb.append("  \"\" -> " ++ init.toString ++ ";\n")
-    for (q <- stateSet) sb.append(s"  $q [shape=${if (acceptSet.contains(q)) "double" else ""}circle];\n")
+    sb.append(s"  ${escape("")} [shape=point];\n")
+    for (init <- initSet) sb.append(s"  ${escape("")} -> ${escape(init)};\n")
+    for (q <- stateSet) sb.append(s"  ${escape(q)} [shape=${if (acceptSet.contains(q)) "double" else ""}circle];\n")
     for (((q0, a), qs) <- delta; q1 <- qs)
-      sb.append("  " ++ q0.toString ++ " -> " ++ q1.toString ++ " [label=\"" ++ a.toString ++ "\"];\n")
+      sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(a)}];\n")
     sb.append("}")
 
     sb.result()

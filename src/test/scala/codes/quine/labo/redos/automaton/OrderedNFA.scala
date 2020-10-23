@@ -28,18 +28,18 @@ class OrderedNFASuite extends munit.FunSuite {
       nfa.toGraphviz,
       """|digraph {
          |  "" [shape=point];
-         |  "" -> 0 [label=0];
-         |  0 [shape=circle];
-         |  1 [shape=circle];
-         |  2 [shape=doublecircle];
-         |  0 -> 0 [label="0, a"];
-         |  0 -> 1 [label="1, a"];
-         |  0 -> 1 [label="0, b"];
-         |  0 -> 2 [label="1, b"];
-         |  1 -> 0 [label="0, a"];
-         |  1 -> 1 [label="1, a"];
-         |  1 -> 1 [label="0, b"];
-         |  1 -> 2 [label="1, b"];
+         |  "" -> "0" [label=0];
+         |  "0" [shape=circle];
+         |  "1" [shape=circle];
+         |  "2" [shape=doublecircle];
+         |  "0" -> "0" [label="0, a"];
+         |  "0" -> "1" [label="1, a"];
+         |  "0" -> "1" [label="0, b"];
+         |  "0" -> "2" [label="1, b"];
+         |  "1" -> "0" [label="0, a"];
+         |  "1" -> "1" [label="1, a"];
+         |  "1" -> "1" [label="0, b"];
+         |  "1" -> "2" [label="1, b"];
          |}""".stripMargin
     )
   }
