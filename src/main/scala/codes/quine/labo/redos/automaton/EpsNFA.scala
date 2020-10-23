@@ -101,7 +101,7 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
                 newStateSet.addOne((c1, qs1))
               }
             case Some(Consume(_, _)) | None =>
-            // Nothing to do here because of terminal state or non-match consuming state.
+              () // Nothing to do here because of terminal state or non-match consuming state.
             // $COVERAGE-OFF$
             case _ => throw new IllegalStateException
             // $COVERAFE-ON$
