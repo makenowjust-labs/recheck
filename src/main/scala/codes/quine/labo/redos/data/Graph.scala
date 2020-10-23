@@ -118,7 +118,7 @@ final case class Graph[V, L] private (neighbors: Map[V, Seq[(L, V)]]) {
       reachable.addAll(vs)
     }
 
-    Graph(newEdges.result())
+    Graph(newEdges.result().withDefaultValue(Seq.empty))
   }
 
   /** Computes a map from a vertex to vertices being reachable from the vertex.

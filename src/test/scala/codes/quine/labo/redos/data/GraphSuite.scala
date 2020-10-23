@@ -4,6 +4,7 @@ class GraphSuite extends munit.FunSuite {
   test("Graph.from") {
     val g = Graph.from(Seq((1, 'a', 2), (1, 'a', 3), (2, 'b', 3)))
     assertEquals(g.neighbors, Map(1 -> Seq(('a', 2), ('a', 3)), 2 -> Seq(('b', 3))))
+    assertEquals(g.neighbors(4), Seq.empty) // `withDefaultValue(Seq.empty)` is used
   }
 
   test("Graph#edges") {
@@ -66,6 +67,7 @@ class GraphSuite extends munit.FunSuite {
     )
     assertEquals(g.reachable(Set(1)), Graph.from(Seq((1, (), 2), (2, (), 3), (3, (), 1))))
     assertEquals(g.reachable(Set(4, 6)), Graph.from(Seq((4, (), 5), (6, (), 7))))
+    assertEquals(g.reachable(Set(1)).neighbors(4), Seq.empty) // `withDefaultValue(Seq.empty)` is used
   }
 
   test("Graph#reachableMap") {
