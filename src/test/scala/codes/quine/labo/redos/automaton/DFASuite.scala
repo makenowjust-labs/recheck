@@ -1,6 +1,26 @@
-package codes.quine.labo.redos.automaton
+package codes.quine.labo.redos
+package automaton
+
+import data.Graph
 
 class DFASuite extends munit.FunSuite {
+  test("DFA#toGraph") {
+    val dfa = DFA(
+      Set('a', 'b'),
+      Set(1, 2),
+      1,
+      Set(2),
+      Map(
+        (1, 'a') -> 1,
+        (1, 'b') -> 2,
+        (2, 'a') -> 2,
+        (2, 'b') -> 1
+      )
+    )
+    val g = Graph.from(Seq((1, 'a', 1), (1, 'b', 2), (2, 'a', 2), (2, 'b', 1)))
+    assertEquals(dfa.toGraph, g)
+  }
+
   test("DFA#toGraphviz") {
     val dfa = DFA(
       Set('a', 'b'),
