@@ -1,5 +1,9 @@
 package codes.quine.labo.redos
 
+import java.util.concurrent.TimeoutException
+
+import scala.concurrent.ExecutionContext.Implicits._
+import scala.concurrent.duration._
 import scala.util.Success
 
 import data.IChar
@@ -50,5 +54,13 @@ class CheckerSuite extends munit.FunSuite {
       Checker.check("^(a|b|ab)*$", ""),
       Success(Complexity.Exponential(Witness(Seq((Seq(b), Seq(b, a))), Seq(other2))))
     )
+  }
+
+  test("Checker.check: failure") {
+    intercept[UnsupportedException](Checker.check("(?<=a)", "").get)
+  }
+
+  test("Checker.check: timeout") {
+    intercept[TimeoutException](Checker.check("", "", 0.milli).get)
   }
 }

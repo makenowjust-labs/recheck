@@ -1,6 +1,13 @@
 package codes.quine.labo.redos
 
+import java.util.concurrent.TimeoutException
+
 import scala.collection.mutable
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.concurrent.blocking
+import scala.concurrent.duration.Duration
 import scala.util.Try
 
 import Checker._
@@ -43,34 +50,76 @@ object Checker {
 
   /** Checks a match time complexity of the ε-NFA. */
   def check[Q](epsNFA: EpsNFA[Q]): Complexity =
-    new Checker(epsNFA).check()
+    new Checker(epsNFA, None).check()
+
+  /** Checks a match time complexity of the ε-NFA with timeout. */
+  def check[Q](epsNFA: EpsNFA[Q], timeout: Duration)(implicit ec: ExecutionContext): Try[Complexity] =
+    Try {
+      val future = Future(blocking {
+        new Checker(epsNFA, Some(timeout)).check()
+      })
+      Await.result(future, timeout)
+    }
 
   /** Checks a match time complexity of the RegExp pattern. */
   def check(pattern: Pattern): Try[Complexity] =
     Compiler.compile(pattern).map(check(_))
 
+  /** Checks a match time complexity of the RegExp pattern with timeout. */
+  def check(pattern: Pattern, timeout: Duration)(implicit ec: ExecutionContext): Try[Complexity] =
+    Compiler.compile(pattern).flatMap(check(_, timeout))
+
   /** Checks a match time complexity of the RegExp. */
   def check(source: String, flags: String): Try[Complexity] =
     Parser.parse(source, flags).flatMap(check(_))
+
+  /** Checks a match time complexity of the RegExp. */
+  def check(source: String, flags: String, timeout: Duration)(implicit ec: ExecutionContext): Try[Complexity] =
+    Parser.parse(source, flags).flatMap(check(_, timeout))
 }
 
 /** Checker is a ReDoS vulnerable RegExp checker. */
-private final class Checker[Q](private[this] val epsNFA: EpsNFA[Q]) {
+private final class Checker[Q](
+    private[this] val epsNFA: EpsNFA[Q],
+    private[this] val timeout: Option[Duration]
+) {
+
+  private[this] val startTime: Long = System.currentTimeMillis()
+
+  private[this] def checkTimeout(phase: String): Unit = {
+    val isTimeout = timeout.exists(_.toMillis <= System.currentTimeMillis() - startTime)
+    if (isTimeout) throw new TimeoutException(phase)
+  }
 
   /** An ordered NFA constructed from [[epsNFA]]. */
-  private[this] val nfa = epsNFA.toOrderedNFA.rename
+  private[this] val nfa = {
+    checkTimeout("nfa")
+    epsNFA.toOrderedNFA.rename
+  }
 
   /** A reversed DFA constructed from [[orderedNFA]]. */
-  private[this] val reverseDFA = nfa.reverse.toDFA
+  private[this] val reverseDFA = {
+    checkTimeout("reverseDFA")
+    nfa.reverse.toDFA
+  }
 
   /** A NFA with multi-transitions constructed from [[orderedNFA]] (and [[reverseDFA]]). */
-  private[this] val multiNFA = nfa.toMultiNFA
+  private[this] val multiNFA = {
+    checkTimeout("multiNFA")
+    nfa.toMultiNFA
+  }
 
   /** A [[multiNFA]] transition graph. */
-  private[this] val graph = multiNFA.toGraph.reachable(multiNFA.initSet.toSet)
+  private[this] val graph = {
+    checkTimeout("graph")
+    multiNFA.toGraph.reachable(multiNFA.initSet.toSet)
+  }
 
   /** A [[multiNFA]] transition graph's SCCs. */
-  private[this] val scc = graph.scc
+  private[this] val scc = {
+    checkTimeout("scc")
+    graph.scc
+  }
 
   /** A map from a state of [[multiNFA]] to SCC. */
   private[this] val sccMap = (for (sc <- scc; q <- sc) yield q -> sc).toMap
@@ -120,13 +169,17 @@ private final class Checker[Q](private[this] val epsNFA: EpsNFA[Q]) {
     }
 
   /** Finds an EDA structure in the graph. */
-  private[this] def checkExponential(): Option[Pump] =
+  private[this] def checkExponential(): Option[Pump] = {
+    checkTimeout("checkExponential")
     scc.iterator.filterNot(isAtom(_)).flatMap(checkExponentialComponent(_)).nextOption()
+  }
 
   /** Finds an EDA structure in the SCC. */
   private[this] def checkExponentialComponent(sc: Seq[Q]): Option[Pump] = {
+    checkTimeout("checkExponentialComponent: edges")
     val edges = sccPairEdges((sc, sc))
 
+    checkTimeout("checkExponentialComponent: multi-transitions")
     edges.find { case (_, es) => es.size != es.distinct.size } match {
       // The SCC has multi-transitions. In this case, we can find an EDA easily by using it.
       case Some((a, es)) =>
@@ -137,13 +190,16 @@ private final class Checker[Q](private[this] val epsNFA: EpsNFA[Q]) {
       // In other cases, we need to use SCC of a pair graph.
       case None =>
         // A state pair graph with co-transition.
+        checkTimeout("checkExponentialComponent: G2")
         val g2 = Graph.from(for {
           a1 -> es <- edges.toSeq
           (q11, q12) <- es
           (q21, q22) <- es
         } yield ((q11, q21), a1, (q12, q22)))
+        checkTimeout("checkExponentialComponent: EDA")
         g2.scc.iterator
           .flatMap { sc =>
+            checkTimeout("checkExponentialComponent: EDA loop")
             for {
               // If there is a SCC of g2 contains `(q1, q1)` and `(q2, q3)` (s.t. `q2 != q3`),
               // then the SCC contains an EDA structure.
@@ -158,8 +214,10 @@ private final class Checker[Q](private[this] val epsNFA: EpsNFA[Q]) {
   }
 
   /** Finds an IDA structure chain in the graph. */
-  private[this] def checkPolynomial(): (Int, Seq[Pump]) =
+  private[this] def checkPolynomial(): (Int, Seq[Pump]) = {
+    checkTimeout("checkPolynomial")
     scc.map(checkPolynomialComponent(_)).maxBy(_._1)
+  }
 
   /** An internal cache of [[checkPolynomialComponent]] method's result. */
   private[this] val checkPolynomialComponentCache = mutable.Map.empty[Seq[Q], (Int, Seq[Pump])]
@@ -169,6 +227,7 @@ private final class Checker[Q](private[this] val epsNFA: EpsNFA[Q]) {
     checkPolynomialComponentCache.getOrElseUpdate(
       sc, {
         // Computes the maximum IDA structure chain from neighbors.
+        checkTimeout("checkPolynomialComponent: maximum IDA")
         val (maxDegree, maxPumps) =
           sccGraph
             .neighbors(sc)
@@ -179,6 +238,7 @@ private final class Checker[Q](private[this] val epsNFA: EpsNFA[Q]) {
         else if (isAtom(sc)) (maxDegree, maxPumps)
         else {
           // Appends an IDA structure between the SCC and the maximum chain's source into the chain.
+          checkTimeout("checkPolynomialComponent: append IDA")
           sccReachableMap(sc).iterator
             .filter(target => sc != target && !isAtom(target) && checkPolynomialComponent(target)._1 == maxDegree)
             .flatMap(target => checkPolynomialComponentBetween(sc, target).map((target, _)))
@@ -191,11 +251,16 @@ private final class Checker[Q](private[this] val epsNFA: EpsNFA[Q]) {
 
   /** Finds an IDA structure between source and target SCCs. */
   private[this] def checkPolynomialComponentBetween(source: Seq[Q], target: Seq[Q]): Option[Pump] = {
+    checkTimeout("checkPolynomialComponent: source edges")
     val sourceEdges = sccPairEdges((source, source))
+    checkTimeout("checkPolynomialComponent: between")
     val between = sccReachableMap(source) & sccReverseReachableMap(target)
+    checkTimeout("checkPolynomialComponent: between edges")
     val betweenEdges = for (sc1 <- between; sc2 <- between) yield sccPairEdges((sc1, sc2))
+    checkTimeout("checkPolynomialComponent: target edges")
     val targetEdges = sccPairEdges((target, target))
 
+    checkTimeout("checkPolynomialComponent: G3")
     val g3 = Graph.from(
       (for {
         a <- multiNFA.alphabet.iterator
@@ -204,13 +269,16 @@ private final class Checker[Q](private[this] val epsNFA: EpsNFA[Q]) {
         (q31, q32) <- targetEdges(a)
       } yield ((q11, q21, q31), a, (q12, q22, q32))).toSeq
     )
+    checkTimeout("checkPolynomialComponent: G3 with back edges")
     val g3back = Graph.from(
       source.flatMap(q1 => target.map { q2 => ((q1, q2, q2), None, (q1, q1, q2)) }) ++
         g3.edges.map { case (qqq1, a, qqq2) => (qqq1, Some(a), qqq2) }
     )
 
+    checkTimeout("checkPolynomialComponent: IDA")
     g3back.scc.iterator
       .flatMap { sc =>
+        checkTimeout("checkPolynomialComponent: IDA loop")
         // If there is a SCC of `g3back` contains `(q1, q1, q2)` and `(q1, q2, q2)`,
         // then an IDA structure exists between `source` and `target`.
         sc.collect { case (q1, q2, q3) if q1 == q2 && q2 != q3 && sc.contains((q1, q3, q3)) => (q1, q3) }
