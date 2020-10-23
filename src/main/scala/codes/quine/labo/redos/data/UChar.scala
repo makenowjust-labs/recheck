@@ -1,6 +1,7 @@
-package codes.quine.labo.redos.data
+package codes.quine.labo.redos
+package data
 
-import com.ibm.icu.lang.UCharacter
+import unicode.Property
 
 /** UChar is a Unicode code point. */
 final case class UChar(value: Int) extends AnyVal with Ordered[UChar] {
@@ -24,14 +25,14 @@ final case class UChar(value: Int) extends AnyVal with Ordered[UChar] {
 
   /** Show this Unicode point as human readable format. */
   override def toString: String = value match {
-    case 0x09                           => "\\t"
-    case 0x0a                           => "\\n"
-    case 0x0b                           => "\\v"
-    case 0x0c                           => "\\f"
-    case 0x0d                           => "\\r"
-    case c if UCharacter.isPrintable(c) => String.valueOf(toChars)
-    case c if c < 0x100                 => f"\\x$c%02X"
-    case c if c < 0x10000               => f"\\u$c%04X"
-    case c                              => f"\\u{$c%X}"
+    case 0x09                         => "\\t"
+    case 0x0a                         => "\\n"
+    case 0x0b                         => "\\v"
+    case 0x0c                         => "\\f"
+    case 0x0d                         => "\\r"
+    case c if Property.isPrintable(c) => String.valueOf(toChars)
+    case c if c < 0x100               => f"\\x$c%02X"
+    case c if c < 0x10000             => f"\\u$c%04X"
+    case c                            => f"\\u{$c%X}"
   }
 }

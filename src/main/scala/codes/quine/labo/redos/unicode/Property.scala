@@ -1,11 +1,6 @@
 package codes.quine.labo.redos
 package unicode
 
-import com.ibm.icu.lang.UCharacter
-import com.ibm.icu.lang.UCharacterEnums.ECharacterCategory
-import com.ibm.icu.lang.UProperty
-import com.ibm.icu.text.UnicodeSet
-
 import data.IntervalSet
 import data.UChar
 
@@ -16,7 +11,7 @@ object Property {
     *
     * See [[https://www.ecma-international.org/ecma-262/11.0/index.html#table-nonbinary-unicode-properties]].
     */
-  val NonBinaryPropertyAliases: Map[String, String] = Map(
+  lazy val NonBinaryPropertyAliases: Map[String, String] = Map(
     "gc" -> "General_Category",
     "sc" -> "Script",
     "scx" -> "Script_Extensions"
@@ -26,7 +21,7 @@ object Property {
     *
     * See [[https://www.ecma-international.org/ecma-262/11.0/index.html#table-binary-unicode-properties]].
     */
-  val BinaryPropertyAliases: Map[String, String] = Map(
+  lazy val BinaryPropertyAliases: Map[String, String] = Map(
     "AHex" -> "ASCII_Hex_Digit",
     "Alpha" -> "Alphabetic",
     "Bidi_C" -> "Bidi_Control",
@@ -73,67 +68,23 @@ object Property {
     *
     * See [[https://www.ecma-international.org/ecma-262/11.0/index.html#table-binary-unicode-properties]].
     */
-  val BinaryPropertyNames: Set[String] = Set(
-    "ASCII",
-    "ASCII_Hex_Digit",
-    "Alphabetic",
-    "Any",
-    "Assigned",
-    "Bidi_Control",
-    "Bidi_Mirrored",
-    "Case_Ignorable",
-    "Cased",
-    "Changes_When_Casefolded",
-    "Changes_When_Casemapped",
-    "Changes_When_Lowercased",
-    "Changes_When_NFKC_Casefolded",
-    "Changes_When_Titlecased",
-    "Changes_When_Uppercased",
-    "Dash",
-    "Default_Ignorable_Code_Point",
-    "Deprecated",
-    "Diacritic",
-    "Emoji",
-    "Emoji_Component",
-    "Emoji_Modifier",
-    "Emoji_Modifier_Base",
-    "Emoji_Presentation",
-    "Extended_Pictographic",
-    "Extender",
-    "Grapheme_Base",
-    "Grapheme_Extend",
-    "Hex_Digit",
-    "IDS_Binary_Operator",
-    "IDS_Trinary_Operator",
-    "ID_Continue",
-    "ID_Start",
-    "Ideographic",
-    "Join_Control",
-    "Logical_Order_Exception",
-    "Lowercase",
-    "Math",
-    "Noncharacter_Code_Point",
-    "Pattern_Syntax",
-    "Pattern_White_Space",
-    "Quotation_Mark",
-    "Radical",
-    "Regional_Indicator",
-    "Sentence_Terminal",
-    "Soft_Dotted",
-    "Terminal_Punctuation",
-    "Unified_Ideograph",
-    "Uppercase",
-    "Variation_Selector",
-    "White_Space",
-    "XID_Continue",
-    "XID_Start"
-  )
+  lazy val BinaryPropertyNames: Set[String] =
+    Set("ASCII", "Any", "Assigned") ++ PropertyData.BinaryPropertyMap.keySet
+
+  /** An interval set of "ASCII" binrary property code points. */
+  private lazy val ASCII = IntervalSet((UChar(0), UChar(0x80)))
+
+  /** An interval set of "Any" binrary property code points. */
+  private lazy val Any = IntervalSet((UChar(0), UChar(0x110000)))
+
+  /** An interval set of "Assigned" binrary property code points. */
+  private lazy val Assigned = Any.diff(PropertyData.GeneralCategoryMap("Unassigned"))
 
   /** A map from "General_Category" value alias to canonical value name.
     *
     * See [[https://www.ecma-international.org/ecma-262/11.0/index.html#table-unicode-general-category-values]].
     */
-  val GeneralCategoryValueAliases: Map[String, String] = Map(
+  lazy val GeneralCategoryValueAliases: Map[String, String] = Map(
     "LC" -> "Cased_Letter",
     "Pe" -> "Close_Punctuation",
     "Pc" -> "Connector_Punctuation",
@@ -182,60 +133,22 @@ object Property {
     *
     * See [[https://www.ecma-international.org/ecma-262/11.0/index.html#table-unicode-general-category-values]].
     */
-  val GeneralCategoryValues: Set[String] = Set(
-    "Cased_Letter",
-    "Close_Punctuation",
-    "Connector_Punctuation",
-    "Control",
-    "Currency_Symbol",
-    "Dash_Punctuation",
-    "Decimal_Number",
-    "Enclosing_Mark",
-    "Final_Punctuation",
-    "Format",
-    "Initial_Punctuation",
-    "Letter",
-    "Letter_Number",
-    "Line_Separator",
-    "Lowercase_Letter",
-    "Mark",
-    "Math_Symbol",
-    "Modifier_Letter",
-    "Modifier_Symbol",
-    "Nonspacing_Mark",
-    "Number",
-    "Open_Punctuation",
-    "Other",
-    "Other_Letter",
-    "Other_Number",
-    "Other_Punctuation",
-    "Other_Symbol",
-    "Paragraph_Separator",
-    "Private_Use",
-    "Punctuation",
-    "Separator",
-    "Space_Separator",
-    "Spacing_Mark",
-    "Surrogate",
-    "Symbol",
-    "Titlecase_Letter",
-    "Unassigned",
-    "Uppercase_Letter"
-  )
+  lazy val GeneralCategoryValues: Set[String] =
+    GeneralCategoryValueGroups.keySet ++ PropertyData.GeneralCategoryMap.keySet
 
   /** A map from "General_Category" group value to its component values.
     *
     * See [[https://www.unicode.org/reports/tr44/#GC_Values_Table]].
     */
-  val GeneralCategoryValueGroups: Map[String, Seq[String]] = Map(
-    "Cased_Letter" -> Seq("Lu", "Ll", "Lt"),
-    "Letter" -> Seq("Lu", "Ll", "Lt", "Lm", "Lo"),
-    "Mark" -> Seq("Mn", "Mc", "Me"),
-    "Number" -> Seq("Nd", "Nl", "No"),
-    "Punctuation" -> Seq("Pc", "Pd", "Ps", "Pe", "Pi", "Pf", "Po"),
-    "Symbol" -> Seq("Sm", "Sc", "Sk", "So"),
-    "Separator" -> Seq("Sm", "Sc", "Sk", "So"),
-    "Other" -> Seq("Cc", "Cf", "Cs", "Co", "Cn")
+  lazy val GeneralCategoryValueGroups: Map[String, Seq[String]] = Map(
+    "Cased_Letter" -> Seq("Lu", "Ll", "Lt").map(GeneralCategoryValueAliases),
+    "Letter" -> Seq("Lu", "Ll", "Lt", "Lm", "Lo").map(GeneralCategoryValueAliases),
+    "Mark" -> Seq("Mn", "Mc", "Me").map(GeneralCategoryValueAliases),
+    "Number" -> Seq("Nd", "Nl", "No").map(GeneralCategoryValueAliases),
+    "Punctuation" -> Seq("Pc", "Pd", "Ps", "Pe", "Pi", "Pf", "Po").map(GeneralCategoryValueAliases),
+    "Symbol" -> Seq("Sm", "Sc", "Sk", "So").map(GeneralCategoryValueAliases),
+    "Separator" -> Seq("Sm", "Sc", "Sk", "So").map(GeneralCategoryValueAliases),
+    "Other" -> Seq("Cc", "Cf", "Cs", "Co", "Cn").map(GeneralCategoryValueAliases)
   )
 
   /** A map from "Script"/"Script_Extensions" value alias to canonical value name.
@@ -397,180 +310,15 @@ object Property {
     *
     * See [[https://www.ecma-international.org/ecma-262/11.0/index.html#table-unicode-script-values]].
     */
-  val ScriptValues: Set[String] = Set(
-    "Adlam",
-    "Ahom",
-    "Anatolian_Hieroglyphs",
-    "Arabic",
-    "Armenian",
-    "Avestan",
-    "Balinese",
-    "Bamum",
-    "Bassa_Vah",
-    "Batak",
-    "Bengali",
-    "Bhaiksuki",
-    "Bopomofo",
-    "Brahmi",
-    "Braille",
-    "Buginese",
-    "Buhid",
-    "Canadian_Aboriginal",
-    "Carian",
-    "Caucasian_Albanian",
-    "Chakma",
-    "Cham",
-    "Cherokee",
-    "Common",
-    "Coptic",
-    "Cuneiform",
-    "Cypriot",
-    "Cyrillic",
-    "Deseret",
-    "Devanagari",
-    "Dogra",
-    "Duployan",
-    "Egyptian_Hieroglyphs",
-    "Elbasan",
-    "Elymaic",
-    "Ethiopic",
-    "Georgian",
-    "Glagolitic",
-    "Gothic",
-    "Grantha",
-    "Greek",
-    "Gujarati",
-    "Gunjala_Gondi",
-    "Gurmukhi",
-    "Han",
-    "Hangul",
-    "Hanifi_Rohingya",
-    "Hanunoo",
-    "Hatran",
-    "Hebrew",
-    "Hiragana",
-    "Imperial_Aramaic",
-    "Inherited",
-    "Inscriptional_Pahlavi",
-    "Inscriptional_Parthian",
-    "Javanese",
-    "Kaithi",
-    "Kannada",
-    "Katakana",
-    "Kayah_Li",
-    "Kharoshthi",
-    "Khmer",
-    "Khojki",
-    "Khudawadi",
-    "Lao",
-    "Latin",
-    "Lepcha",
-    "Limbu",
-    "Linear_A",
-    "Linear_B",
-    "Lisu",
-    "Lycian",
-    "Lydian",
-    "Mahajani",
-    "Makasar",
-    "Malayalam",
-    "Mandaic",
-    "Manichaean",
-    "Marchen",
-    "Medefaidrin",
-    "Masaram_Gondi",
-    "Meetei_Mayek",
-    "Mende_Kikakui",
-    "Meroitic_Cursive",
-    "Meroitic_Hieroglyphs",
-    "Miao",
-    "Modi",
-    "Mongolian",
-    "Mro",
-    "Multani",
-    "Myanmar",
-    "Nabataean",
-    "Nandinagari",
-    "New_Tai_Lue",
-    "Newa",
-    "Nko",
-    "Nushu",
-    "Nyiakeng_Puachue_Hmong",
-    "Ogham",
-    "Ol_Chiki",
-    "Old_Hungarian",
-    "Old_Italic",
-    "Old_North_Arabian",
-    "Old_Permic",
-    "Old_Persian",
-    "Old_Sogdian",
-    "Old_South_Arabian",
-    "Old_Turkic",
-    "Oriya",
-    "Osage",
-    "Osmanya",
-    "Pahawh_Hmong",
-    "Palmyrene",
-    "Pau_Cin_Hau",
-    "Phags_Pa",
-    "Phoenician",
-    "Psalter_Pahlavi",
-    "Rejang",
-    "Runic",
-    "Samaritan",
-    "Saurashtra",
-    "Sharada",
-    "Shavian",
-    "Siddham",
-    "SignWriting",
-    "Sinhala",
-    "Sogdian",
-    "Sora_Sompeng",
-    "Soyombo",
-    "Sundanese",
-    "Syloti_Nagri",
-    "Syriac",
-    "Tagalog",
-    "Tagbanwa",
-    "Tai_Le",
-    "Tai_Tham",
-    "Tai_Viet",
-    "Takri",
-    "Tamil",
-    "Tangut",
-    "Telugu",
-    "Thaana",
-    "Thai",
-    "Tibetan",
-    "Tifinagh",
-    "Tirhuta",
-    "Ugaritic",
-    "Vai",
-    "Wancho",
-    "Warang_Citi",
-    "Yi",
-    "Zanabazar_Square"
-  )
-
-  /** Builds a interval set from the UnicodeSet object. */
-  private def build(uset: UnicodeSet): IntervalSet[UChar] = {
-    val intervals =
-      (0 until uset.getRangeCount).map(i => (UChar(uset.getRangeStart(i)), UChar(uset.getRangeEnd(i) + 1)))
-    IntervalSet.from(intervals)
-  }
+  lazy val ScriptValues: Set[String] = PropertyData.ScriptMap.keySet
 
   /** Returns an interval set corresponding to the binary property. */
   def binary(name: String): Option[IntervalSet[UChar]] = BinaryPropertyAliases.getOrElse(name, name) match {
-    case "ASCII" => Some(IntervalSet((UChar(0), UChar(0x80))))
-    case "Any"   => Some(IntervalSet((UChar(0), UChar(0x110000))))
-    case "Assigned" =>
-      val uset =
-        new UnicodeSet().applyIntPropertyValue(UProperty.GENERAL_CATEGORY, ECharacterCategory.UNASSIGNED).complement()
-      Some(build(uset))
+    case "ASCII"    => Some(ASCII)
+    case "Any"      => Some(Any)
+    case "Assigned" => Some(Assigned)
     case name if BinaryPropertyNames.contains(name) =>
-      val prop = UCharacter.getPropertyEnum(name)
-      val uset = new UnicodeSet().applyIntPropertyValue(prop, 1)
-      Some(build(uset))
+      Some(PropertyData.BinaryPropertyMap(name))
     case _ => None
   }
 
@@ -579,32 +327,28 @@ object Property {
     val canonical = GeneralCategoryValueAliases.getOrElse(value, value)
     if (GeneralCategoryValueGroups.contains(canonical))
       Some(GeneralCategoryValueGroups(canonical).foldLeft(IntervalSet.empty[UChar]) { (set, v) =>
-        set.union(generalCategory(v).get)
+        set.union(PropertyData.GeneralCategoryMap(v))
       })
-    else if (GeneralCategoryValues.contains(canonical)) {
-      val enum = UCharacter.getPropertyValueEnum(UProperty.GENERAL_CATEGORY, canonical)
-      val uset = new UnicodeSet().applyIntPropertyValue(UProperty.GENERAL_CATEGORY, enum)
-      Some(build(uset))
-    } else None
+    else if (GeneralCategoryValues.contains(canonical))
+      Some(PropertyData.GeneralCategoryMap(canonical))
+    else None
   }
 
   /** Returns an interval set corresponding to the "Script" property value. */
   def script(value: String): Option[IntervalSet[UChar]] = {
     val canonical = ScriptValueAliases.getOrElse(value, value)
-    if (ScriptValues.contains(canonical)) {
-      val enum = UCharacter.getPropertyValueEnum(UProperty.SCRIPT, canonical)
-      val uset = new UnicodeSet().applyIntPropertyValue(UProperty.SCRIPT, enum)
-      Some(build(uset))
-    } else None
+    if (ScriptValues.contains(canonical)) Some(PropertyData.ScriptMap(canonical))
+    else None
   }
 
   /** Returns an interval set corresponding to the "Script_Extensions" property value. */
   def scriptExtensions(value: String): Option[IntervalSet[UChar]] = {
     val canonical = ScriptValueAliases.getOrElse(value, value)
-    if (ScriptValues.contains(canonical)) {
-      val enum = UCharacter.getPropertyValueEnum(UProperty.SCRIPT, canonical)
-      val uset = new UnicodeSet().applyIntPropertyValue(UProperty.SCRIPT_EXTENSIONS, enum)
-      Some(build(uset))
-    } else None
+    if (ScriptValues.contains(canonical)) Some(PropertyData.ScriptExtensionsMap(canonical))
+    else None
   }
+
+  /** Tests whether the character is printable or not. */
+  def isPrintable(ch: Int): Boolean =
+    !GeneralCategoryValueGroups("Other").exists(PropertyData.GeneralCategoryMap(_).contains(UChar(ch)))
 }

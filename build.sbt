@@ -1,3 +1,5 @@
+import java.nio.file.Path
+
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
 ThisBuild / githubOwner := "MakeNowJust-Labo"
@@ -43,10 +45,30 @@ lazy val root = project
       .map(_ -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"))
       .toMap,
     // Dependencies:
-    libraryDependencies += "com.ibm.icu" % "icu4j" % "67.1",
     libraryDependencies += "com.lihaoyi" %% "fastparse" % "2.3.0",
     libraryDependencies += "org.scala-lang.modules" %% "scala-collection-contrib" % "0.2.1",
+    // Generators:
+    Compile / sourceGenerators += generateUnicodeData.taskValue,
     // Settings for test:
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.14" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
+
+val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
+generateUnicodeData / fileInputs += baseDirectory.value.toGlob / "project" / "UniicodeDataGen.scala"
+generateUnicodeData / fileInputs += baseDirectory.value.toGlob / "project" / "CaseMapDataGen.scala"
+generateUnicodeData / fileInputs += baseDirectory.value.toGlob / "project" / "PropertyDataGen.scala"
+generateUnicodeData := {
+  val gens = Map[String, UnicodeDataGen](
+    "CaseMapDataGen.scala" -> CaseMapDataGen,
+    "PropertyDataGen.scala" -> PropertyDataGen
+  )
+  val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labo" / "redos" / "unicode"
+  val changes = generateUnicodeData.inputFileChanges
+  val updatedPaths = changes.created ++ changes.modified
+  for (path <- updatedPaths) {
+    val fileName = path.getFileName.toString
+    gens.get(fileName).foreach(_.gen(dir))
+  }
+  gens.map(_._2.file(dir)).toSeq
+}
