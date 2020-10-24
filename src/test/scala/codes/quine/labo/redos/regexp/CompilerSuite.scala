@@ -9,8 +9,13 @@ import automaton.EpsNFA._
 import data.IChar
 import data.ICharSet
 import data.UChar
+import util.Timeout
 
 class CompilerSuite extends munit.FunSuite {
+
+  /** Timeout checking is disabled in testing. */
+  implicit val timeout: Timeout.NoTimeout.type = Timeout.NoTimeout
+
   test("Compiler.compile") {
     val flagSet0 = FlagSet(false, false, false, false, false, false)
     val flagSet1 = FlagSet(false, true, false, false, false, false)

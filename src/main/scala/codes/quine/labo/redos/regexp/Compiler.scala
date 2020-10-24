@@ -12,16 +12,19 @@ import automaton.EpsNFA._
 import data.ICharSet
 import data.IChar
 import data.IChar.{LineTerminator, Word}
+import util.Timeout
 import util.TryUtil
 
 /** ECMA-262 RegExp to ε-NFA Compiler. */
 object Compiler {
 
   /** Compiles ECMA-262 RegExp into ε-NFA. */
-  def compile(pattern: Pattern): Try[EpsNFA[Int]] =
+  def compile(pattern: Pattern)(implicit timeout: Timeout): Try[EpsNFA[Int]] =
     for {
       alphabet <- Compiler.alphabet(pattern)
       (stateSet, init, accept, tau) <- {
+        import timeout._
+
         val FlagSet(_, ignoreCase, _, dotAll, unicode, _) = pattern.flagSet
 
         // Mutable states.
@@ -33,7 +36,7 @@ object Compiler {
         }
         val tau = Map.newBuilder[Int, Transition[Int]] // A transition function.
 
-        def loop(node: Node): Try[(Int, Int)] = node match {
+        def loop(node: Node): Try[(Int, Int)] = checkTimeoutWith("compile: loop")(node match {
           case Disjunction(ns) =>
             TryUtil.traverse(ns)(loop(_)).map { ss =>
               val i = nextQ()
@@ -134,7 +137,7 @@ object Compiler {
             Success((i, a))
           case BackReference(_)      => Failure(new UnsupportedException("back-reference"))
           case NamedBackReference(_) => Failure(new UnsupportedException("named back-reference"))
-        }
+        })
 
         loop(pattern.node).map { case (i0, a0) =>
           val i = if (!hasLineBeginAtBegin(pattern)) {
@@ -185,14 +188,16 @@ object Compiler {
   }
 
   /** Computes alphabet from the pattern. */
-  def alphabet(pattern: Pattern): Try[ICharSet] = {
+  def alphabet(pattern: Pattern)(implicit timeout: Timeout): Try[ICharSet] = {
+    import timeout._
+
     val FlagSet(_, ignoreCase, _, dotAll, unicode, _) = pattern.flagSet
     val set = ICharSet
       .any(ignoreCase, unicode)
       .pipe(set => if (needsLineTerminatorDistinction(pattern)) set.add(LineTerminator.withLineTerminator) else set)
       .pipe(set => if (needsWordDistinction(pattern)) set.add(Word.withWord) else set)
 
-    def loop(node: Node): Try[Seq[IChar]] = node match {
+    def loop(node: Node): Try[Seq[IChar]] = checkTimeoutWith("alphabet: loop")(node match {
       case Disjunction(ns)    => TryUtil.traverse(ns)(loop(_)).map(_.flatten)
       case Sequence(ns)       => TryUtil.traverse(ns)(loop(_)).map(_.flatten)
       case Capture(n)         => loop(n)
@@ -213,7 +218,7 @@ object Compiler {
         val ch = if (dotAll) any else any.diff(IChar.LineTerminator)
         Success(Seq(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch))
       case _ => Success(Seq.empty)
-    }
+    })
 
     loop(pattern.node).map(_.foldLeft(set)(_.add(_)))
   }

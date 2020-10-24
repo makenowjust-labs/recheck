@@ -34,6 +34,8 @@ lazy val root = project
       |import codes.quine.labo.redos.regexp._
       |import codes.quine.labo.redos.unicode._
       |import codes.quine.labo.redos.util._
+      |
+      |implicit val timeout = Timeout.NoTimeout
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",

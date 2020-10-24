@@ -1,38 +1,50 @@
 package codes.quine.labo.redos
 
-import java.util.concurrent.TimeoutException
-
-import scala.concurrent.ExecutionContext.Implicits._
-import scala.concurrent.duration._
 import scala.util.Success
+import scala.util.Try
 
 import data.IChar
+import regexp.Compiler
+import regexp.Parser
+import util.Timeout
 import Checker._
 
 class CheckerSuite extends munit.FunSuite {
+
+  /** Timeout checking is disabled in testing. */
+  implicit val timeout: Timeout.NoTimeout.type = Timeout.NoTimeout
+
+  /** Runs a checker against the RegExp. */
+  def check(source: String, flags: String): Try[Complexity] =
+    for {
+      pattern <- Parser.parse(source, flags)
+      epsNFA <- Compiler.compile(pattern)
+      result <- Checker.check(epsNFA)
+    } yield result
+
   test("Checker.check: constant") {
-    assertEquals(Checker.check("^foo$", ""), Success(Complexity.Constant))
-    assertEquals(Checker.check("^((fi|bu)z{2}){1,2}$", ""), Success(Complexity.Constant))
+    assertEquals(check("^foo$", ""), Success(Complexity.Constant))
+    assertEquals(check("^((fi|bu)z{2}){1,2}$", ""), Success(Complexity.Constant))
   }
 
   test("Checker.check: linear") {
-    assertEquals(Checker.check("a*", ""), Success(Complexity.Linear))
-    assertEquals(Checker.check("(a*)*", ""), Success(Complexity.Linear))
+    assertEquals(check("a*", ""), Success(Complexity.Linear))
+    assertEquals(check("(a*)*", ""), Success(Complexity.Linear))
   }
 
   test("Checker.check: polynomial") {
     val a = IChar('a')
     val other = IChar('a').complement(false)
     assertEquals(
-      Checker.check("^.*a.*a$", "s"),
+      check("^.*a.*a$", "s"),
       Success(Complexity.Polynomial(2, Witness(Seq((Seq(a), Seq(a))), Seq(other))))
     )
     assertEquals(
-      Checker.check("^(.a)*a(.a)*a$", "s"),
+      check("^(.a)*a(.a)*a$", "s"),
       Success(Complexity.Polynomial(2, Witness(Seq((Seq(other, a), Seq(a, a))), Seq(a, a, a))))
     )
     assertEquals(
-      Checker.check("^.*a.*a.*a$", "s"),
+      check("^.*a.*a.*a$", "s"),
       Success(Complexity.Polynomial(3, Witness(Seq((Seq(a), Seq(a)), (Seq.empty, Seq(a))), Seq(other))))
     )
   }
@@ -43,24 +55,21 @@ class CheckerSuite extends munit.FunSuite {
     val other1 = IChar('a').complement(false)
     val other2 = IChar.union(Seq(a, b)).complement(false)
     assertEquals(
-      Checker.check("^(a|a)*$", ""),
+      check("^(a|a)*$", ""),
       Success(Complexity.Exponential(Witness(Seq((Seq(a), Seq(a))), Seq(other1))))
     )
     assertEquals(
-      Checker.check("^((a)*)*$", ""),
+      check("^((a)*)*$", ""),
       Success(Complexity.Exponential(Witness(Seq((Seq(a), Seq(a))), Seq(other1))))
     )
     assertEquals(
-      Checker.check("^(a|b|ab)*$", ""),
+      check("^(a|b|ab)*$", ""),
       Success(Complexity.Exponential(Witness(Seq((Seq(b), Seq(b, a))), Seq(other2))))
     )
   }
 
   test("Checker.check: failure") {
-    intercept[UnsupportedException](Checker.check("(?<=a)", "").get)
-  }
-
-  test("Checker.check: timeout") {
-    intercept[TimeoutException](Checker.check("", "", 0.milli).get)
+    intercept[InvalidRegExpException](check("(", "").get)
+    intercept[UnsupportedException](check("(?<=a)", "").get)
   }
 }

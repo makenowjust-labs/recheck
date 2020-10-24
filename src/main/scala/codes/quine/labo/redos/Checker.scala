@@ -1,13 +1,6 @@
 package codes.quine.labo.redos
 
-import java.util.concurrent.TimeoutException
-
 import scala.collection.mutable
-import scala.concurrent.Await
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
-import scala.concurrent.blocking
-import scala.concurrent.duration.Duration
 import scala.util.Try
 
 import Checker._
@@ -15,11 +8,9 @@ import Checker.Complexity._
 import automaton._
 import data.Graph
 import data.IChar
-import regexp.Compiler
-import regexp.Parser
-import regexp.Pattern
+import util.Timeout
 
-/** ReDoS vulnerable RegExp checker frontend. */
+/** ReDoS vulnerable RegExp checker. */
 object Checker {
 
   /** Witness is a witness, which is a pump string with suffix.
@@ -49,79 +40,33 @@ object Checker {
   }
 
   /** Checks a match time complexity of the ε-NFA. */
-  def check[Q](epsNFA: EpsNFA[Q]): Complexity =
-    new Checker(epsNFA, None).check()
-
-  /** Checks a match time complexity of the ε-NFA with timeout. */
-  def check[Q](epsNFA: EpsNFA[Q], timeout: Duration)(implicit ec: ExecutionContext): Try[Complexity] =
-    Try {
-      val future = Future(blocking {
-        new Checker(epsNFA, Some(timeout)).check()
-      })
-      Await.result(future, timeout)
-    }
-
-  /** Checks a match time complexity of the RegExp pattern. */
-  def check(pattern: Pattern): Try[Complexity] =
-    Compiler.compile(pattern).map(check(_))
-
-  /** Checks a match time complexity of the RegExp pattern with timeout. */
-  def check(pattern: Pattern, timeout: Duration)(implicit ec: ExecutionContext): Try[Complexity] =
-    Compiler.compile(pattern).flatMap(check(_, timeout))
-
-  /** Checks a match time complexity of the RegExp. */
-  def check(source: String, flags: String): Try[Complexity] =
-    Parser.parse(source, flags).flatMap(check(_))
-
-  /** Checks a match time complexity of the RegExp. */
-  def check(source: String, flags: String, timeout: Duration)(implicit ec: ExecutionContext): Try[Complexity] =
-    Parser.parse(source, flags).flatMap(check(_, timeout))
+  def check[Q](epsNFA: EpsNFA[Q])(implicit timeout: Timeout): Try[Complexity] =
+    Try(new Checker(epsNFA, timeout).check())
 }
 
 /** Checker is a ReDoS vulnerable RegExp checker. */
 private final class Checker[Q](
     private[this] val epsNFA: EpsNFA[Q],
-    private[this] val timeout: Option[Duration]
+    private[this] val timeout: Timeout
 ) {
 
-  /** A start time in milliseconds for timeout implementation. */
-  private[this] val startTime: Long = System.currentTimeMillis()
-
-  /** Throws TimeoutException if it is failed in timeout. */
-  private[this] def checkTimeout(phase: String): Unit = {
-    val isTimeout = timeout.exists(_.toMillis <= System.currentTimeMillis() - startTime)
-    if (isTimeout) throw new TimeoutException(phase)
-  }
+  // Introduces `timeout` methods into the scope.
+  import timeout._
 
   /** An ordered NFA constructed from [[epsNFA]]. */
-  private[this] val nfa = {
-    checkTimeout("nfa")
-    epsNFA.toOrderedNFA.rename
-  }
+  private[this] val nfa = checkTimeoutWith("nfa")(epsNFA.toOrderedNFA.rename)
 
   /** A reversed DFA constructed from [[orderedNFA]]. */
-  private[this] val reverseDFA = {
-    checkTimeout("reverseDFA")
-    nfa.reverse.toDFA
-  }
+  private[this] val reverseDFA = checkTimeoutWith("reverseDFA")(nfa.reverse.toDFA)
 
   /** A NFA with multi-transitions constructed from [[orderedNFA]] (and [[reverseDFA]]). */
-  private[this] val multiNFA = {
-    checkTimeout("multiNFA")
-    nfa.toMultiNFA
-  }
+  private[this] val multiNFA = checkTimeoutWith("multiNFA")(nfa.toMultiNFA)
 
   /** A [[multiNFA]] transition graph. */
-  private[this] val graph = {
-    checkTimeout("graph")
-    multiNFA.toGraph.reachable(multiNFA.initSet.toSet)
-  }
+  private[this] val graph = checkTimeoutWith("graph")(multiNFA.toGraph.reachable(multiNFA.initSet.toSet))
 
   /** A [[multiNFA]] transition graph's SCCs. */
-  private[this] val scc = {
-    checkTimeout("scc")
-    graph.scc
-  }
+  private[this] val scc = checkTimeoutWith("scc")(graph.scc)
 
   /** A map from a state of [[multiNFA]] to SCC. */
   private[this] val sccMap = (for (sc <- scc; q <- sc) yield q -> sc).toMap
@@ -171,10 +116,10 @@ private final class Checker[Q](
     }
 
   /** Finds an EDA structure in the graph. */
-  private[this] def checkExponential(): Option[Pump] = {
-    checkTimeout("checkExponential")
-    scc.iterator.filterNot(isAtom(_)).flatMap(checkExponentialComponent(_)).nextOption()
-  }
+  private[this] def checkExponential(): Option[Pump] =
+    checkTimeoutWith("checkExponential") {
+      scc.iterator.filterNot(isAtom(_)).flatMap(checkExponentialComponent(_)).nextOption()
+    }
 
   /** Finds an EDA structure in the SCC. */
   private[this] def checkExponentialComponent(sc: Seq[Q]): Option[Pump] = {
@@ -216,10 +161,10 @@ private final class Checker[Q](
   }
 
   /** Finds an IDA structure chain in the graph. */
-  private[this] def checkPolynomial(): (Int, Seq[Pump]) = {
-    checkTimeout("checkPolynomial")
-    scc.map(checkPolynomialComponent(_)).maxBy(_._1)
-  }
+  private[this] def checkPolynomial(): (Int, Seq[Pump]) =
+    checkTimeoutWith("checkPolynomial") {
+      scc.map(checkPolynomialComponent(_)).maxBy(_._1)
+    }
 
   /** An internal cache of [[checkPolynomialComponent]] method's result. */
   private[this] val checkPolynomialComponentCache = mutable.Map.empty[Seq[Q], (Int, Seq[Pump])]

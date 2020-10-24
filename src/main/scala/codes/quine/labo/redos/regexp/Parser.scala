@@ -11,17 +11,20 @@ import fastparse._
 
 import Pattern.{FlagSet, Node, ClassNode}
 import data.UChar
+import util.Timeout
 import unicode.Property
 
 /** ECMA-262 RegExp parser implementation. */
 object Parser {
 
   /** Parses ECMA-262 RegExp string. */
-  def parse(source: String, flags: String, additional: Boolean = true): Try[Pattern] =
+  def parse(source: String, flags: String, additional: Boolean = true)(implicit timeout: Timeout): Try[Pattern] =
     for {
-      flagSet <- parseFlagSet(flags)
-      (hasNamedCapture, captures) = preprocessParens(source)
-      result = fastparse.parse(source, new Parser(flagSet.unicode, additional, hasNamedCapture, captures).Source(_))
+      flagSet <- timeout.checkTimeoutWith("parse: flags")(parseFlagSet(flags))
+      (hasNamedCapture, captures) = timeout.checkTimeoutWith("parse: preprodess")(preprocessParens(source))
+      result = timeout.checkTimeoutWith("parse: source") {
+        fastparse.parse(source, new Parser(flagSet.unicode, additional, hasNamedCapture, captures).Source(_))
+      }
       node <- result match {
         case Parsed.Success(node, _) => Success(node)
         case fail: Parsed.Failure    => Failure(new InvalidRegExpException(s"parsing failure at ${fail.index}"))
