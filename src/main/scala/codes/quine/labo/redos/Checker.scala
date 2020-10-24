@@ -84,8 +84,10 @@ private final class Checker[Q](
     private[this] val timeout: Option[Duration]
 ) {
 
+  /** A start time in milliseconds for timeout implementation. */
   private[this] val startTime: Long = System.currentTimeMillis()
 
+  /** Throws TimeoutException if it is failed in timeout. */
   private[this] def checkTimeout(phase: String): Unit = {
     val isTimeout = timeout.exists(_.toMillis <= System.currentTimeMillis() - startTime)
     if (isTimeout) throw new TimeoutException(phase)
