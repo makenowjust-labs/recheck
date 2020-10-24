@@ -1,9 +1,9 @@
 package codes.quine.labo.redos
 package automaton
 
-import scala.collection.MultiSet
 import scala.collection.mutable
 
+import data.MultiSet
 import util.GraphvizUtil.escape
 
 /** OrderedNFA is a NFA, but its transitions are priorized in the order. */

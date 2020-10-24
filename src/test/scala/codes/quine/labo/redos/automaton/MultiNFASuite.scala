@@ -1,9 +1,8 @@
 package codes.quine.labo.redos
 package automaton
 
-import scala.collection.MultiSet
-
 import data.Graph
+import data.MultiSet
 
 class MultiNFASuite extends munit.FunSuite {
   test("MultiNFA#toGraph") {

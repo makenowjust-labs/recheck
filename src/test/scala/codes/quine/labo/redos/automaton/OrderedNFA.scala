@@ -1,6 +1,7 @@
-package codes.quine.labo.redos.automaton
+package codes.quine.labo.redos
+package automaton
 
-import scala.collection.MultiSet
+import data.MultiSet
 
 class OrderedNFASuite extends munit.FunSuite {
   test("OrderedNFA#rename") {

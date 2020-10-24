@@ -1,10 +1,10 @@
 package codes.quine.labo.redos
 package automaton
 
-import scala.collection.MultiSet
 import scala.collection.mutable
 
 import data.Graph
+import data.MultiSet
 import util.GraphvizUtil.escape
 
 /** MultiNFA is a NFA, but each it uses multi-set instead of set
@@ -19,7 +19,9 @@ final case class MultiNFA[A, Q](
 ) {
 
   /** Exports this transition function as a grapg. */
-  def toGraph: Graph[Q, A] = Graph.from(delta.iterator.flatMap { case (q1, a) -> qs => qs.map((q1, a, _)) }.toSeq)
+  def toGraph: Graph[Q, A] = Graph.from(delta.iterator.flatMap { case (q1, a) -> qs =>
+    qs.iterator.map((q1, a, _))
+  }.toSeq)
 
   /** Converts to Graphviz format text. */
   def toGraphviz: String = {

@@ -48,7 +48,6 @@ lazy val root = project
       .toMap,
     // Dependencies:
     libraryDependencies += "com.lihaoyi" %% "fastparse" % "2.3.0",
-    libraryDependencies += "org.scala-lang.modules" %% "scala-collection-contrib" % "0.2.1",
     // Generators:
     Compile / sourceGenerators += generateUnicodeData.taskValue,
     // Settings for test:
