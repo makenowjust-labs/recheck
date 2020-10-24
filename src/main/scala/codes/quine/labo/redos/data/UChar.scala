@@ -30,6 +30,7 @@ final case class UChar(value: Int) extends AnyVal with Ordered[UChar] {
     case 0x0b                         => "\\v"
     case 0x0c                         => "\\f"
     case 0x0d                         => "\\r"
+    case c if 1 <= c && c < 32        => s"\\c${(c + 0x40).toChar}"
     case c if Property.isPrintable(c) => String.valueOf(toChars)
     case c if c < 0x100               => f"\\x$c%02X"
     case c if c < 0x10000             => f"\\u$c%04X"

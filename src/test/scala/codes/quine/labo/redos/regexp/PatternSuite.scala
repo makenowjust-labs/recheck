@@ -107,6 +107,8 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(showNode(LookBehind(true, x)), "(?<!x)")
     assertEquals(showNode(Character(UChar('/'))), "\\/")
     assertEquals(showNode(Character(UChar(1))), "\\cA")
+    assertEquals(showNode(Character(UChar('\n'))), "\\n")
+    assertEquals(showNode(Character(UChar(' '))), " ")
     assertEquals(showNode(Character(UChar('A'))), "A")
     assertEquals(showNode(CharacterClass(false, Seq(x))), "[x]")
     assertEquals(showNode(CharacterClass(false, Seq(ClassRange(UChar('a'), UChar('z'))))), "[a-z]")

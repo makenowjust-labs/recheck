@@ -288,12 +288,10 @@ object Pattern {
   /** Shows a character as a pattern. */
   private def showUChar(u: UChar): String =
     if (u.value.isValidChar && "^$\\.*+?()[]{}|/".contains(u.value.toChar)) s"\\${u.value.toChar}"
-    else if (1 <= u.value && u.value < 32) s"\\c${(u.value + 0x40).toChar}"
     else u.toString
 
   /** Shows a character as a class in pattern. */
   private def showUCharInClass(u: UChar): String =
     if (u.value.isValidChar && "[^-]".contains(u.value.toChar)) s"\\${u.value.toChar}"
-    else if (1 <= u.value && u.value < 32) s"\\c${(u.value + 0x40).toChar}"
     else u.toString
 }
