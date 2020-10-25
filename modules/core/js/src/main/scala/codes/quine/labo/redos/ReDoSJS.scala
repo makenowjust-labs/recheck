@@ -43,9 +43,9 @@ object ReDoSJS {
     "suffix" -> convertICharSeq(w.suffix)
   )
 
-  /** Converts a sequence of IChar into JS value. */
+  /** Converts a sequence of IChar into JS string. */
   def convertICharSeq(s: Seq[IChar]): String =
-    s.map(set => String.valueOf(set.head.toChars)).mkString("")
+    s.map(set => String.valueOf(set.head.toChars)).mkString
 
   /** Checks the given RegExp pattern. */
   @JSExportTopLevel("check")
