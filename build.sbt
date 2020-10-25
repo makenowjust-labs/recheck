@@ -33,6 +33,8 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
     name := "redos-core",
     version := "0.1.0-SNAPSHOT",
     console / initialCommands := """
+      |import scala.concurrent.duration._
+      |
       |import codes.quine.labo.redos._
       |import codes.quine.labo.redos.automaton._
       |import codes.quine.labo.redos.data._
