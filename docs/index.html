@@ -1,0 +1,99 @@
+<!doctype html>
+
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>redos</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.1/css/bulma.min.css">
+    <script defer src="https://use.fontawesome.com/releases/v5.14.0/js/all.js"></script>
+  </head>
+  <body>
+    <header class="hero is-medium is-dark is-bold">
+      <div class="hero-body">
+        <div class="container">
+          <div class="columns has-vcentered">
+            <div class="column is-half">
+              <h1 class="title">redos</h1>
+              <h2 class="subtitle">A vulnerable RegExp (ReDoS) checker.</p>
+              <div class="mt-4 buttons">
+                <a class="button is-link" href="https://github.com/MakeNowJust-Labo/redos"><span class="icon is-small"><i class="fab fa-github"></i></span><span>GitHub</span></a>
+              </div>
+            </div>
+            <div class="column is-half">
+              <div class="box">
+                <div class="field is-horizontal">
+                  <div class="field-label is-normal">
+                    <label class="label" for="regexp">RegExp</label>
+                  </div>
+                  <div class="field-body">
+                    <div class="field">
+                      <p class="control">
+                        <textarea id="regexp" class="textarea is-family-monospace" placeholder="/^(a|a)*$/" rows="2">/^(a|a)*$/</textarea>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div class="field has-text-right">
+                  <button id="check" class="button">Check</button>
+                </div>
+                <div class="box is-shadowless" style="border: dashed #787878 0.25em;">
+                  <p id="result" class="content has-text-centered">A result is shown here.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+    <section class="section">
+      <div class="container">
+        <div class="item columns">
+          <div class="column is-4">
+            <div class="content">
+              <p class="has-text-centered"><img width="48px" height="48px" src="img/automata.svg"></p>
+              <h4 class="has-text-centered">Automata Theory</h4>
+              <p class="has-text-centered">
+                Based on automata theory.<br>
+                Find a ReDoS vulnerability strictly.
+              </p>
+            </div>
+          </div>
+          <div class="column is-4">
+            <div class="content">
+              <p class="has-text-centered"><img width="48px" height="48px" src="img/javascript.svg"></p>
+              <h4 class="has-text-centered">JavaScript (ECMA-262)</h4>
+              <p class="has-text-centered">
+                Support JavaScript (ECMA-262) RegExp syntax.
+              </p>
+            </div>
+          </div>
+          <div class="column is-4">
+            <div class="content">
+              <p class="has-text-centered"><img width="48px" height="48px" src="img/scala.svg"></p>
+              <h4 class="has-text-centered">Scala</h4>
+              <p class="has-text-centered">
+                Built on Scala.js.<br>
+                This is not only Scala but also JavaScript library.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <footer class="footer">
+      <div class="content has-text-centered">
+        <p>2020 (C) TSUYUSATO "<a href="https://github.com/MakeNowJust">MakeNowJust</a>" Kitsune</p>
+      </div>
+    </footer>
+
+    <script>
+      (() => {
+        const script = document.createElement('script')
+        const host = location.hostname
+        script.src = location.protocol === 'file:' ? '../modules/demo/target/scala-2.13/redos-demo-fastopt.js' : 'js/redos-demo-opt.js';
+        document.body.appendChild(script);
+      })();
+    </script>
+  </body>
+</html>

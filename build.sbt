@@ -24,7 +24,7 @@ ThisBuild / scalafixDependencies += "com.github.vovapolu" %% "scaluzzi" % "0.1.1
 lazy val root = project
   .in(file("."))
   .settings(publish / skip := true)
-  .aggregate(coreJVM, coreJS)
+  .aggregate(coreJVM, coreJS, demoJS)
 
 lazy val core = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/core"))
@@ -83,3 +83,15 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
 
 lazy val coreJVM = core.jvm
 lazy val coreJS = core.js
+
+lazy val demoJS = project
+  .in(file("modules/demo"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(
+    publish / skip := true,
+    name := "redos-demo",
+    scalaJSUseMainModuleInitializer := true,
+    Compile / mainClass := Some("codes.quine.labo.redos.demo.DemoApp"),
+    libraryDependencies += "org.scala-js" %%% "scalajs-dom" % "1.1.0"
+  )
+  .dependsOn(coreJS)
