@@ -46,7 +46,7 @@ object DemoApp {
         return
     }
 
-    val result = ReDoS.check(source, flags, 1.second)
+    val result = ReDoS.check(source, flags, 5.second)
     val pattern = s"<code>/${escape(source)}/${escape(flags)}</code>"
     result match {
       case Success(complexity) =>
