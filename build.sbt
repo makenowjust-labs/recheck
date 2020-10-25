@@ -72,7 +72,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
             gens.get(fileName).foreach(_.gen(dir))
           }
           gens.map(_._2.file(dir)).toSeq
-        },
+        }
       )
     },
     // Settings for test:
