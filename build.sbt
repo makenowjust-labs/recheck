@@ -23,9 +23,14 @@ ThisBuild / scalafixDependencies += "com.github.vovapolu" %% "scaluzzi" % "0.1.1
 
 lazy val root = project
   .in(file("."))
+  .settings(publish / skip := true)
+  .aggregate(coreJVM, coreJS, demoJS)
+
+lazy val core = crossProject(JVMPlatform, JSPlatform)
+  .in(file("modules/core"))
   .settings(
     organization := "codes.quine.labo",
-    name := "redos",
+    name := "redos-core",
     version := "0.1.0-SNAPSHOT",
     console / initialCommands := """
       |import codes.quine.labo.redos._
@@ -47,29 +52,46 @@ lazy val root = project
       .map(_ -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"))
       .toMap,
     // Dependencies:
-    libraryDependencies += "com.lihaoyi" %% "fastparse" % "2.3.0",
+    libraryDependencies += "com.lihaoyi" %%% "fastparse" % "2.3.0",
     // Generators:
-    Compile / sourceGenerators += generateUnicodeData.taskValue,
+    {
+      val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
+      Seq(
+        Compile / sourceGenerators += generateUnicodeData.taskValue,
+        generateUnicodeData / fileInputs += baseDirectory.value.toGlob / ".." / ".." / ".." / "project" / "*DataGen.scala",
+        generateUnicodeData := {
+          val gens = Map[String, UnicodeDataGen](
+            "CaseMapDataGen.scala" -> CaseMapDataGen,
+            "PropertyDataGen.scala" -> PropertyDataGen
+          )
+          val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labo" / "redos" / "unicode"
+          val changes = generateUnicodeData.inputFileChanges
+          val updatedPaths = changes.created ++ changes.modified
+          for (path <- updatedPaths) {
+            val fileName = path.getFileName.toString
+            gens.get(fileName).foreach(_.gen(dir))
+          }
+          gens.map(_._2.file(dir)).toSeq
+        }
+      )
+    },
     // Settings for test:
-    libraryDependencies += "org.scalameta" %% "munit" % "0.7.14" % Test,
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.14" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
+  .jsSettings(scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) })
 
-val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
-generateUnicodeData / fileInputs += baseDirectory.value.toGlob / "project" / "UniicodeDataGen.scala"
-generateUnicodeData / fileInputs += baseDirectory.value.toGlob / "project" / "CaseMapDataGen.scala"
-generateUnicodeData / fileInputs += baseDirectory.value.toGlob / "project" / "PropertyDataGen.scala"
-generateUnicodeData := {
-  val gens = Map[String, UnicodeDataGen](
-    "CaseMapDataGen.scala" -> CaseMapDataGen,
-    "PropertyDataGen.scala" -> PropertyDataGen
+lazy val coreJVM = core.jvm
+lazy val coreJS = core.js
+
+lazy val demoJS = project
+  .in(file("modules/demo"))
+  .enablePlugins(ScalaJSPlugin)
+  .settings(
+    publish / skip := true,
+    name := "redos-demo",
+    scalaJSUseMainModuleInitializer := true,
+    Compile / mainClass := Some("codes.quine.labo.redos.demo.DemoApp"),
+    libraryDependencies += "org.scala-js" %%% "scalajs-dom" % "1.1.0"
   )
-  val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labo" / "redos" / "unicode"
-  val changes = generateUnicodeData.inputFileChanges
-  val updatedPaths = changes.created ++ changes.modified
-  for (path <- updatedPaths) {
-    val fileName = path.getFileName.toString
-    gens.get(fileName).foreach(_.gen(dir))
-  }
-  gens.map(_._2.file(dir)).toSeq
-}
+  .dependsOn(coreJS)

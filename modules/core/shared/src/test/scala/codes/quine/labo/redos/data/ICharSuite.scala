@@ -123,6 +123,16 @@ class ICharSuite extends munit.FunSuite {
     assertEquals(IChar.range(UChar('a'), UChar('c')).diff(IChar('a')), IChar.range(UChar('b'), UChar('c')))
   }
 
+  test("IChar#contains") {
+    assert(IChar.range(UChar('a'), UChar('z')).contains(UChar('a')))
+    assert(!IChar.range(UChar('a'), UChar('z')).contains(UChar('A')))
+  }
+
+  test("IChar#head") {
+    assertEquals(IChar('A').head, UChar('A'))
+    assertEquals(IChar.range(UChar('a'), UChar('z')).head, UChar('a'))
+  }
+
   test("IChar#compare") {
     val c1 = IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, false)
     val c2 = IChar(IntervalSet((UChar(0x42), UChar(0x43))), false, false)
