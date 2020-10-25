@@ -5,6 +5,7 @@ import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.util.Failure
 import scala.util.Success
+import scala.util.matching.Regex
 
 import org.scalajs.dom.document
 import org.scalajs.dom.html.Button
@@ -14,7 +15,6 @@ import org.scalajs.dom.raw.Event
 
 import Checker.Witness
 import Checker.Complexity._
-import scala.util.matching.Regex
 
 /** DemoApp is an implementation of demo application in the top page. */
 object DemoApp {
