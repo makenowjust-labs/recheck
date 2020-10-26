@@ -1,0 +1,6 @@
+{
+  "name": "@makenowjust-labo/redos",
+  "version": "0.1.0",
+  "description": "A vulnerable RegExp (ReDoS) checker for JavaScript (ECMA-262) RegExp.",
+  "main": "redos-core-opt.js"
+}

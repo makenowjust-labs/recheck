@@ -1,0 +1,21 @@
+name: NPM Release
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Build
+        run: |
+          sbt coreJS/fullOptJS
+          cp modules/core/js/target/scala-2.13/redos-core-opt.js* packages/redos/
+
+      - uses: JS-DevTools/npm-publish@v1
+        with:
+          package: packages/redos/package.json
+          token: ${{ secrets.NPM_TOKEN }}
