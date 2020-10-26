@@ -16,8 +16,6 @@ jobs:
           sbt demoJS/fullOptJS
           mkdir -p docs/js
           cp modules/demo/target/scala-2.13/redos-demo-opt.js* docs/js/
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
