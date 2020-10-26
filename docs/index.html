@@ -81,6 +81,36 @@
         </div>
       </div>
     </section>
+    <main class="section">
+      <div class="container">
+        <div class="content">
+          <h2>Getting Started</h2>
+          <h3>JavaScript</h3>
+          <p>Uses the following command to install this library:</p>
+          <pre><code>$ npm install @makenowjust-labo/redos</code></pre>
+          <p>This library exports only an API called <code>check</code>. It takes a RegExp pattern source and flags, and returns the analysis result.</p>
+          <pre><code>$ node
+> const { check } = require('@makenowjust-labo/redos');
+undefined
+> check('^(a|a)*$', '');
+{
+  complexity: 'exponential',
+  witness: { pumps: [ [Object] ], suffix: '\x00' }
+}</code></pre>
+          <h3>Scala</h3>
+          <p>Adds the following line into your <code>build.sbt</code>:</p>
+          <pre><code>libraryDependencies += "codes.quine.labo" %% "redos" % "0.1.0"</code></pre>
+          <p><code>ReDoS</code> object is a frontend of this library. You can use <code>ReDoS.check</code> method to analyze RegExp pattern.</p>
+          <pre><code>$ sbt console
+scala> import codes.quine.labo.redos.ReDoS
+import codes.quine.labo.redos.ReDoS
+
+scala> ReDoS.check("^(a|a)*$", "")
+val res0: scala.util.Try[codes.quine.labo.redos.Checker.Complexity] = Success(Exponential(Witness(List((List([a]),List([a]))),List([\x00-`b-\uFFFF]))))
+</code></pre>
+        </div>
+      </div>
+    </main>
     <footer class="footer">
       <div class="content has-text-centered">
         <p>2020 (C) TSUYUSATO "<a href="https://github.com/MakeNowJust">MakeNowJust</a>" Kitsune</p>
