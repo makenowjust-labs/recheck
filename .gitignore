@@ -30,3 +30,5 @@ project/plugins/project/
 metals.sbt
 
 docs/js/*
+packages/redos/*-opt.js
+packages/redos/*-opt.js.map
