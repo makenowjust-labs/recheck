@@ -7,10 +7,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: Publish to GitHub Packages
+    name: Publish to Maven Central
     steps:
       - uses: actions/checkout@v2
+      - uses: olafurpg/setup-gpg@v2
       - name: Publish
-        run: sbt publish
+        run: sbt ci-release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+          PGP_SECRET: ${{ secrets.PGP_SECRET }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}

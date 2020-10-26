@@ -2,8 +2,17 @@ import java.nio.file.Path
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
-ThisBuild / githubOwner := "MakeNowJust-Labo"
-ThisBuild / githubRepository := "redos"
+ThisBuild / organization := "codes.quine.labo"
+ThisBuild / homepage := Some(url("https://github.com/MakeNowJust-Labo/redos"))
+ThisBuild / licenses := Seq("MIT" -> url("http://opensource.org/licenses/MIT"))
+ThisBuild / developers := List(
+  Developer(
+    "MakeNowJust",
+    "TSUYUSATO Kitsune",
+    "make.just.on@gmail.com",
+    url("https://quine.codes/")
+  )
+)
 
 ThisBuild / scalaVersion := "2.13.3"
 ThisBuild / scalacOptions ++= Seq(
@@ -29,7 +38,6 @@ lazy val root = project
 lazy val core = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/core"))
   .settings(
-    organization := "codes.quine.labo",
     name := "redos-core",
     version := "0.1.0-SNAPSHOT",
     console / initialCommands := """
