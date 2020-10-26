@@ -2,6 +2,7 @@ import java.nio.file.Path
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
+ThisBuild / sonatypeProfileName := "codes.quine"
 ThisBuild / organization := "codes.quine.labo"
 ThisBuild / homepage := Some(url("https://github.com/MakeNowJust-Labo/redos"))
 ThisBuild / licenses := Seq("MIT" -> url("http://opensource.org/licenses/MIT"))
@@ -39,7 +40,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/core"))
   .settings(
     name := "redos-core",
-    version := "0.1.1-SNAPSHOT",
+    version := "0.1.0",
     console / initialCommands := """
       |import scala.concurrent.duration._
       |
