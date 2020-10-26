@@ -85,12 +85,10 @@ class EpsNFASuite extends munit.FunSuite {
         Map(
           ((CharInfo(true, false), Seq(2, 3, 4)), IChar('\n').withLineTerminator) -> Seq(
             (CharInfo(true, false), Seq(2, 3, 4, 2, 3, 4)),
-            (CharInfo(true, false), Seq(2, 3, 4, 2, 3, 4)),
             (CharInfo(true, false), Seq(2, 3, 4, 2, 3, 4))
           ),
           ((CharInfo(true, false), Seq(2, 3, 4)), IChar('\n').complement(false)) -> Seq.empty,
           ((CharInfo(true, false), Seq(2, 3, 4, 2, 3, 4)), IChar('\n').withLineTerminator) -> Seq(
-            (CharInfo(true, false), Seq(2, 3, 4, 2, 3, 4)),
             (CharInfo(true, false), Seq(2, 3, 4, 2, 3, 4)),
             (CharInfo(true, false), Seq(2, 3, 4, 2, 3, 4)),
             (CharInfo(true, false), Seq(2, 3, 4, 2, 3, 4)),

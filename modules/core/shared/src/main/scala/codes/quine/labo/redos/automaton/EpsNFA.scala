@@ -45,59 +45,63 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
   /** Converts this ε-NFA to ordered NFA. */
   def toOrderedNFA: OrderedNFA[IChar, (CharInfo, Seq[Q])] = {
     // Skips ε-transition without context infotmation.
-    def buildClosure0(q: Q, path: Seq[Q]): Seq[Q] =
+    def buildClosure0(q: Q, path: Seq[Q]): Seq[(Q, Seq[Q])] =
       // Exits this loop if a cyclic path is found.
-      if (path.lastOption.exists(p => path.containsSlice(Seq(p, q)))) Seq.empty
+      if (path.lastOption.exists(p => path.containsSlice(Seq(p, q)))) Vector.empty
       else
         tau.get(q) match {
           case Some(Eps(qs))       => qs.flatMap(buildClosure0(_, path :+ q))
-          case Some(Assert(_, _))  => Seq(q)
-          case Some(Consume(_, _)) => Seq(q)
-          case None                => Seq(q)
+          case Some(Assert(_, _))  => Vector((q, path))
+          case Some(Consume(_, _)) => Vector((q, path))
+          case None                => Vector((q, path))
         }
-    val closure0Cache = mutable.Map.empty[Q, Seq[Q]]
-    def closure0(q: Q): Seq[Q] = closure0Cache.getOrElseUpdate(q, buildClosure0(q, Seq.empty))
+    val closure0Cache = mutable.Map.empty[Q, Seq[(Q, Seq[Q])]]
+    def closure0(q: Q): Seq[(Q, Seq[Q])] = closure0Cache.getOrElseUpdate(q, buildClosure0(q, Vector.empty))
 
     // Skips ε-transition with context information.
     def buildClosure(c0: CharInfo, c1: CharInfo, q: Q, path: Seq[Q]): Seq[Q] =
       // Exits this loop if a cyclic path is found.
-      if (path.lastOption.exists(p => path.containsSlice(Seq(p, q)))) Seq.empty
+      if (path.lastOption.exists(p => path.containsSlice(Seq(p, q)))) Vector.empty
       else
         tau.get(q) match {
           case Some(Eps(qs)) => qs.flatMap(buildClosure(c0, c1, _, path :+ q))
           case Some(Assert(k, q1)) =>
-            if (AssertKind.accepts(k, c0, c1)) buildClosure(c0, c1, q1, path :+ q) else Seq.empty
-          case Some(Consume(_, _)) => Seq(q)
-          case None                => Seq(q)
+            if (AssertKind.accepts(k, c0, c1)) buildClosure(c0, c1, q1, path :+ q) else Vector.empty
+          case Some(Consume(_, _)) => Vector(q)
+          case None                => Vector(q)
         }
-    val closureCache = mutable.Map.empty[(CharInfo, CharInfo, Q), Seq[Q]]
-    def closure(c0: CharInfo, c1: CharInfo, q: Q): Seq[Q] =
-      closureCache.getOrElseUpdate((c0, c1, q), buildClosure(c0, c1, q, Seq.empty))
+    val closureCache = mutable.Map.empty[(CharInfo, CharInfo, Q, Seq[Q]), Seq[Q]]
+    def closure(c0: CharInfo, c1: CharInfo, q: Q, path: Seq[Q]): Seq[Q] =
+      closureCache.getOrElseUpdate((c0, c1, q, path), buildClosure(c0, c1, q, path))
 
-    val queue = mutable.Queue.empty[(CharInfo, Seq[Q])]
+    val closure0Init = closure0(init)
+
+    val queue = mutable.Queue.empty[(CharInfo, Seq[(Q, Seq[Q])])]
     val newStateSet = mutable.Set.empty[(CharInfo, Seq[Q])]
-    val newInits = Seq((CharInfo(true, false), closure0(init)))
+    val newInits = Seq((CharInfo(true, false), closure0Init.map(_._1)))
     val newAcceptSet = Set.newBuilder[(CharInfo, Seq[Q])]
     val newDelta = Map.newBuilder[((CharInfo, Seq[Q]), IChar), Seq[(CharInfo, Seq[Q])]]
 
-    queue.enqueueAll(newInits)
+    queue.enqueue((CharInfo(true, false), closure0Init))
     newStateSet.addAll(newInits)
 
     while (queue.nonEmpty) {
-      val (c0, qs) = queue.dequeue()
-      if (qs.exists(closure(c0, CharInfo(true, false), _).exists(_ == accept))) {
+      val (c0, qps) = queue.dequeue()
+      val qs = qps.map(_._1)
+      if (qps.exists { case (q, path) => closure(c0, CharInfo(true, false), q, path).exists(_ == accept) }) {
         newAcceptSet.addOne((c0, qs))
       }
       for (ch <- alphabet.chars) {
         val c1 = CharInfo.from(ch)
         val d = Seq.newBuilder[(CharInfo, Seq[Q])]
-        for (q0 <- qs; q1 <- closure(c0, c1, q0)) {
+        for ((q0, path) <- qps; q1 <- closure(c0, c1, q0, path)) {
           tau.get(q1) match {
             case Some(Consume(chs, q2)) if chs.contains(ch) =>
-              val qs1 = closure0(q2)
+              val qps1 = closure0(q2)
+              val qs1 = qps1.map(_._1)
               d.addOne((c1, qs1))
               if (!newStateSet.contains((c1, qs1))) {
-                queue.enqueue((c1, qs1))
+                queue.enqueue((c1, qps1))
                 newStateSet.addOne((c1, qs1))
               }
             case Some(Consume(_, _)) | None =>

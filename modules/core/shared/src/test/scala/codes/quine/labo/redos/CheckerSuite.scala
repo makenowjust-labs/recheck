@@ -30,6 +30,7 @@ class CheckerSuite extends munit.FunSuite {
   test("Checker.check: linear") {
     assertEquals(check("a*", ""), Success(Complexity.Linear))
     assertEquals(check("(a*)*", ""), Success(Complexity.Linear))
+    assertEquals(check("^([a:]|\\b)*$", ""), Success(Complexity.Linear))
   }
 
   test("Checker.check: polynomial") {
