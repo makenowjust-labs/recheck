@@ -39,7 +39,7 @@ lazy val root = project
   .aggregate(coreJVM, coreJS, demoJS)
 
 lazy val core = crossProject(JVMPlatform, JSPlatform)
-  .in(file("modules/core"))
+  .in(file("modules/redos-core"))
   .settings(
     name := "redos-core",
     console / initialCommands := """
