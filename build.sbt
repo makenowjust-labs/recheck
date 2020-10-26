@@ -40,7 +40,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/core"))
   .settings(
     name := "redos-core",
-    version := "0.1.0",
+    version := "0.1.1-SNAPSHOT",
     console / initialCommands := """
       |import scala.concurrent.duration._
       |
