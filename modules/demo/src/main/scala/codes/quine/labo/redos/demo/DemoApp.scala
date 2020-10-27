@@ -14,6 +14,7 @@ import org.scalajs.dom.html.Paragraph
 import org.scalajs.dom.raw.Event
 
 import Complexity._
+import data.IChar
 
 /** DemoApp is an implementation of demo application in the top page. */
 object DemoApp {
@@ -72,7 +73,7 @@ object DemoApp {
   }
 
   /** Constructs a witness strings. */
-  def witness(w: Witness): LazyList[String] =
+  def witness(w: Witness[IChar]): LazyList[String] =
     LazyList.from(1).map { n =>
       val sb = new mutable.StringBuilder
       for ((prefix, loop) <- w.pump) {

@@ -16,7 +16,7 @@ class CheckerSuite extends munit.FunSuite {
   implicit val timeout: Timeout.NoTimeout.type = Timeout.NoTimeout
 
   /** Runs a checker against the RegExp. */
-  def check(source: String, flags: String): Try[Complexity] =
+  def check(source: String, flags: String): Try[Complexity[IChar]] =
     for {
       pattern <- Parser.parse(source, flags)
       epsNFA <- Compiler.compile(pattern)

@@ -14,7 +14,7 @@ import util.Timeout
 object Checker {
 
   /** Checks a match time complexity of the ε-NFA. */
-  def check[Q](epsNFA: EpsNFA[Q])(implicit timeout: Timeout): Try[Complexity] =
+  def check[Q](epsNFA: EpsNFA[Q])(implicit timeout: Timeout): Try[Complexity[IChar]] =
     Try(new Checker(epsNFA, timeout).check())
 }
 
@@ -78,7 +78,7 @@ private final class Checker[Q](
     sc.size == 1 && !graph.neighbors(sc.head).exists(_._2 == sc.head)
 
   /** Runs a checker. */
-  def check(): Complexity =
+  def check(): Complexity[IChar] =
     checkExponential() match {
       case Some(pump) => Exponential(witness(Seq(pump)))
       case None =>
@@ -209,7 +209,7 @@ private final class Checker[Q](
   }
 
   /** Builds a witness object from pump strings and states. */
-  private[this] def witness(pumps: Seq[Pump]): Witness = {
+  private[this] def witness(pumps: Seq[Pump]): Witness[IChar] = {
     val (pumpPaths, qs) = pumps.foldLeft((Seq.empty[(Seq[IChar], Seq[IChar])], multiNFA.initSet.toSet)) {
       case ((pumpPaths, last), (q1, path, q2)) =>
         val prefix = graph.path(last, q1).get

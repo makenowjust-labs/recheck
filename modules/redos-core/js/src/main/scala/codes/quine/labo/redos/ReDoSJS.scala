@@ -14,14 +14,14 @@ import data.IChar
 object ReDoSJS {
 
   /** Converts a Try valuea into JS value. */
-  def convertTry(t: Try[Complexity]): js.Dictionary[js.Any] = t match {
+  def convertTry(t: Try[Complexity[IChar]]): js.Dictionary[js.Any] = t match {
     case Success(complexity) => convertComplexity(complexity)
     case Failure(exception) =>
       throw js.JavaScriptException(js.Error(s"${exception.getMessage} (${exception.getClass.getSimpleName})"))
   }
 
   /** Converts a Complexity object into JS value. */
-  def convertComplexity(c: Complexity): js.Dictionary[js.Any] = c match {
+  def convertComplexity(c: Complexity[IChar]): js.Dictionary[js.Any] = c match {
     case Constant => js.Dictionary("complexity" -> "constant")
     case Linear   => js.Dictionary("complexity" -> "linear")
     case Polynomial(degree, w) =>
@@ -31,7 +31,7 @@ object ReDoSJS {
   }
 
   /** Converts a Witness object into JS value. */
-  def convertWitness(w: Witness): js.Dictionary[js.Any] = js.Dictionary(
+  def convertWitness(w: Witness[IChar]): js.Dictionary[js.Any] = js.Dictionary(
     "pumps" ->
       js.Array(w.pump.map { case (pre, pump) =>
         js.Dictionary(
