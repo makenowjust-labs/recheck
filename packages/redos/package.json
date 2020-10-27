@@ -1,6 +1,6 @@
 {
   "name": "@makenowjust-labo/redos",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A vulnerable RegExp (ReDoS) checker for JavaScript (ECMA-262) RegExp.",
   "license": "MIT",
   "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
