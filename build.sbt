@@ -36,9 +36,9 @@ lazy val root = project
     sonatypeProfileName := "codes.quine",
     publish / skip := true,
     mdocVariables := Map(
-      "VERSION" -> previousStableVersion.value.getOrElse("0.0.0"),
+      "VERSION" -> previousStableVersion.value.getOrElse("0.0.0")
     ),
-    mdocOut := baseDirectory.value / "site" / "content",
+    mdocOut := baseDirectory.value / "site" / "content"
   )
   .enablePlugins(MdocPlugin)
   .aggregate(coreJVM, coreJS, demoJS)
