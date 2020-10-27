@@ -33,7 +33,7 @@ object ReDoSJS {
   /** Converts a Witness object into JS value. */
   def convertWitness(w: Witness[IChar]): js.Dictionary[js.Any] = js.Dictionary(
     "pumps" ->
-      js.Array(w.pump.map { case (pre, pump) =>
+      js.Array(w.pumps.map { case (pre, pump) =>
         js.Dictionary(
           "prefix" -> convertICharSeq(pre),
           "pump" -> convertICharSeq(pump)

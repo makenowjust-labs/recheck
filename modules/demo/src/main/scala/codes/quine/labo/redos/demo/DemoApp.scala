@@ -76,7 +76,7 @@ object DemoApp {
   def witness(w: Witness[IChar]): LazyList[String] =
     LazyList.from(1).map { n =>
       val sb = new mutable.StringBuilder
-      for ((prefix, loop) <- w.pump) {
+      for ((prefix, loop) <- w.pumps) {
         sb.append(prefix.map(_.head.toString).mkString)
         sb.append(loop.map(_.head.toString).mkString * n)
       }
