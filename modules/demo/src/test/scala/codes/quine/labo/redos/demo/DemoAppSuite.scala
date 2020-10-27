@@ -1,4 +1,7 @@
-package codes.quine.labo.redos.demo
+package codes.quine.labo.redos
+package demo
+
+import data.IChar
 
 class DemoAppSuite extends munit.FunSuite {
   test("DemoApp.SlashRegExp") {
@@ -11,5 +14,10 @@ class DemoAppSuite extends munit.FunSuite {
     assertEquals(DemoApp.SlashRegExp.unapplySeq("///"), None)
     assertEquals(DemoApp.SlashRegExp.unapplySeq("/x/imgsuy"), Some(List("x", "imgsuy")))
     assertEquals(DemoApp.SlashRegExp.unapplySeq("/x/x"), None)
+  }
+
+  test("DemoApp.witness") {
+    val w = Witness(Seq((Seq(IChar('a')), Seq(IChar('b')))), Seq(IChar('c')))
+    assertEquals(DemoApp.witness(w).take(3), LazyList("abc", "abbc", "abbbc"))
   }
 }

@@ -1,7 +1,6 @@
 package codes.quine.labo.redos
 package demo
 
-import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.util.Failure
 import scala.util.Success
@@ -74,15 +73,7 @@ object DemoApp {
 
   /** Constructs a witness strings. */
   def witness(w: Witness[IChar]): LazyList[String] =
-    LazyList.from(1).map { n =>
-      val sb = new mutable.StringBuilder
-      for ((prefix, loop) <- w.pumps) {
-        sb.append(prefix.map(_.head.toString).mkString)
-        sb.append(loop.map(_.head.toString).mkString * n)
-      }
-      sb.append(w.suffix.map(_.head.toString).mkString)
-      sb.result()
-    }
+    w.map(_.head.asString).toLazyList.map(_.mkString).drop(1)
 
   /** Returns an HTML escaped string. */
   def escape(s: String): String =
