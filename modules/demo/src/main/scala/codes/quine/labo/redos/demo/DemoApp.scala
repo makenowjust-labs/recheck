@@ -19,16 +19,16 @@ import Complexity._
 object DemoApp {
 
   /** A regular expression to extract slash separated input string. */
-  val SlashRegExp: Regex = """/(.*)/(.*)""".r
+  val SlashRegExp: Regex = raw"/((?:[^/\\\[]*|\\.|\[(?:[^\\\]]|\\.)*\])*)/([gimsuy]*)".r
 
   /** An input element to input a regexp pattern. */
-  val regexpInput: Input = document.querySelector("#regexp").asInstanceOf[Input]
+  lazy val regexpInput: Input = document.querySelector("#regexp").asInstanceOf[Input]
 
   /** A button element to start analyzing. */
-  val checkButton: Button = document.querySelector("#check").asInstanceOf[Button]
+  lazy val checkButton: Button = document.querySelector("#check").asInstanceOf[Button]
 
   /** A element for showing analyzing result. */
-  val resultArea: Paragraph = document.querySelector("#result").asInstanceOf[Paragraph]
+  lazy val resultArea: Paragraph = document.querySelector("#result").asInstanceOf[Paragraph]
 
   /** A entrypoint of the application. */
   def main(args: Array[String]): Unit = {
