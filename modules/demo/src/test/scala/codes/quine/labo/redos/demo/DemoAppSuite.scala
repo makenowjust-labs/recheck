@@ -20,4 +20,13 @@ class DemoAppSuite extends munit.FunSuite {
     val w = Witness(Seq((Seq(IChar('a')), Seq(IChar('b')))), Seq(IChar('c')))
     assertEquals(DemoApp.witness(w).take(3), LazyList("abc", "abbc", "abbbc"))
   }
+
+  test("DemoApp.escape") {
+    assertEquals(DemoApp.escape(""), "")
+    assertEquals(DemoApp.escape("hello"), "hello")
+    assertEquals(DemoApp.escape("&amp;"), "&amp;amp;")
+    assertEquals(DemoApp.escape("&&"), "&amp;&amp;")
+    assertEquals(DemoApp.escape("<>"), "&lt;&gt;")
+    assertEquals(DemoApp.escape("\"'"), "&quot;&#039;")
+  }
 }

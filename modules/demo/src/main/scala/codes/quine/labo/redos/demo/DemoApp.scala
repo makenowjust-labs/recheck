@@ -77,5 +77,5 @@ object DemoApp {
 
   /** Returns an HTML escaped string. */
   def escape(s: String): String =
-    s.replace("<", "&lt;").replace(">", "&gt;")
+    s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#039;")
 }
