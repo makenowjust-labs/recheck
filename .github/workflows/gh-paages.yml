@@ -20,6 +20,7 @@ jobs:
       - name: Build
         run: |
           sbt mdoc demoJS/fullOptJS
+          mkdir -p site/static/js
           cp modules/demo/target/scala-2.13/demo-opt.js* site/static/js/
           hugo -s site --minify
 
