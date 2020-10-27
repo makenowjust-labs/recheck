@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
+      - run: git fetch --unshallow
 
       - name: Setup Hugo
         uses: peaceiris/actions-hugo@v2
