@@ -7,8 +7,7 @@ import scala.util.Try
 
 import scalajs.js
 import scalajs.js.annotation.JSExportTopLevel
-import Checker._
-import Checker.Complexity._
+import Complexity._
 import data.IChar
 
 /** ReDoSJS is a JavaScript interface of this library. */

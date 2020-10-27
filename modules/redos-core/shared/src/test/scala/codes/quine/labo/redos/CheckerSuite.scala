@@ -3,11 +3,11 @@ package codes.quine.labo.redos
 import scala.util.Success
 import scala.util.Try
 
+import Complexity._
 import data.IChar
 import regexp.Compiler
 import regexp.Parser
 import util.Timeout
-import Checker._
 
 class CheckerSuite extends munit.FunSuite {
 
@@ -23,14 +23,14 @@ class CheckerSuite extends munit.FunSuite {
     } yield result
 
   test("Checker.check: constant") {
-    assertEquals(check("^foo$", ""), Success(Complexity.Constant))
-    assertEquals(check("^((fi|bu)z{2}){1,2}$", ""), Success(Complexity.Constant))
+    assertEquals(check("^foo$", ""), Success(Constant))
+    assertEquals(check("^((fi|bu)z{2}){1,2}$", ""), Success(Constant))
   }
 
   test("Checker.check: linear") {
-    assertEquals(check("a*", ""), Success(Complexity.Linear))
-    assertEquals(check("(a*)*", ""), Success(Complexity.Linear))
-    assertEquals(check("^([a:]|\\b)*$", ""), Success(Complexity.Linear))
+    assertEquals(check("a*", ""), Success(Linear))
+    assertEquals(check("(a*)*", ""), Success(Linear))
+    assertEquals(check("^([a:]|\\b)*$", ""), Success(Linear))
   }
 
   test("Checker.check: polynomial") {
@@ -38,15 +38,15 @@ class CheckerSuite extends munit.FunSuite {
     val other = IChar('a').complement(false)
     assertEquals(
       check("^.*a.*a$", "s"),
-      Success(Complexity.Polynomial(2, Witness(Seq((Seq(a), Seq(a))), Seq(other))))
+      Success(Polynomial(2, Witness(Seq((Seq(a), Seq(a))), Seq(other))))
     )
     assertEquals(
       check("^(.a)*a(.a)*a$", "s"),
-      Success(Complexity.Polynomial(2, Witness(Seq((Seq(other, a), Seq(a, a))), Seq(a, a, a))))
+      Success(Polynomial(2, Witness(Seq((Seq(other, a), Seq(a, a))), Seq(a, a, a))))
     )
     assertEquals(
       check("^.*a.*a.*a$", "s"),
-      Success(Complexity.Polynomial(3, Witness(Seq((Seq(a), Seq(a)), (Seq.empty, Seq(a))), Seq(other))))
+      Success(Polynomial(3, Witness(Seq((Seq(a), Seq(a)), (Seq.empty, Seq(a))), Seq(other))))
     )
   }
 
@@ -57,20 +57,15 @@ class CheckerSuite extends munit.FunSuite {
     val other2 = IChar.union(Seq(a, b)).complement(false)
     assertEquals(
       check("^(a|a)*$", ""),
-      Success(Complexity.Exponential(Witness(Seq((Seq(a), Seq(a))), Seq(other1))))
+      Success(Exponential(Witness(Seq((Seq(a), Seq(a))), Seq(other1))))
     )
     assertEquals(
       check("^((a)*)*$", ""),
-      Success(Complexity.Exponential(Witness(Seq((Seq(a), Seq(a))), Seq(other1))))
+      Success(Exponential(Witness(Seq((Seq(a), Seq(a))), Seq(other1))))
     )
     assertEquals(
       check("^(a|b|ab)*$", ""),
-      Success(Complexity.Exponential(Witness(Seq((Seq(b), Seq(b, a))), Seq(other2))))
+      Success(Exponential(Witness(Seq((Seq(b), Seq(b, a))), Seq(other2))))
     )
-  }
-
-  test("Checker.check: failure") {
-    intercept[InvalidRegExpException](check("(", "").get)
-    intercept[UnsupportedException](check("(?<=a)", "").get)
   }
 }

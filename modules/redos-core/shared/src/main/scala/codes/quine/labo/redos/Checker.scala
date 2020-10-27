@@ -3,8 +3,7 @@ package codes.quine.labo.redos
 import scala.collection.mutable
 import scala.util.Try
 
-import Checker._
-import Checker.Complexity._
+import Complexity._
 import automaton._
 import data.Graph
 import data.IChar
@@ -12,32 +11,6 @@ import util.Timeout
 
 /** ReDoS vulnerable RegExp checker. */
 object Checker {
-
-  /** Witness is a witness, which is a pump string with suffix.
-    *
-    * For example, when a witness object forms `Witness(Seq((x, y), (z, w)), u)`,
-    * an actual witness string is `x y^n z w^n u` for any integer `n`.
-    */
-  final case class Witness(pump: Seq[(Seq[IChar], Seq[IChar])], suffix: Seq[IChar])
-
-  /** Complexity is a result of [[check]] method. */
-  sealed abstract class Complexity extends Serializable with Product
-
-  /** Complexity types. */
-  object Complexity {
-
-    /** RegExp can check a match in constant time. */
-    final case object Constant extends Complexity
-
-    /** RegExp can check a match in linear time. */
-    final case object Linear extends Complexity
-
-    /** RegExp can check a match in polynomial time. */
-    final case class Polynomial(degree: Int, witness: Witness) extends Complexity
-
-    /** RegExp can check a match in exponential time. */
-    final case class Exponential(witness: Witness) extends Complexity
-  }
 
   /** Checks a match time complexity of the ε-NFA. */
   def check[Q](epsNFA: EpsNFA[Q])(implicit timeout: Timeout): Try[Complexity] =

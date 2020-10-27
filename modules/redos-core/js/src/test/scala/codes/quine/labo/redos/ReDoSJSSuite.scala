@@ -4,8 +4,7 @@ import scala.util.Failure
 import scala.util.Success
 
 import scalajs.js
-import Checker._
-import Checker.Complexity._
+import Complexity._
 import data.IChar
 import data.UChar
 
