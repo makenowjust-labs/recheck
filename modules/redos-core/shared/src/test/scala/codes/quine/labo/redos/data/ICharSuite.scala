@@ -25,7 +25,12 @@ class ICharSuite extends munit.FunSuite {
 
   test("IChar.Word") {
     assert(IChar.Word.contains(UChar('a')))
+    assert(IChar.Word.contains(UChar('z')))
+    assert(IChar.Word.contains(UChar('A')))
+    assert(IChar.Word.contains(UChar('Z')))
     assert(IChar.Word.contains(UChar('0')))
+    assert(IChar.Word.contains(UChar('9')))
+    assert(IChar.Word.contains(UChar('_')))
     assert(!IChar.Word.contains(UChar('!')))
   }
 
