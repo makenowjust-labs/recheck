@@ -34,9 +34,15 @@ lazy val root = project
   .in(file("."))
   .settings(
     sonatypeProfileName := "codes.quine",
-    publish / skip := true
+    publish / skip := true,
+    mdocVariables := Map(
+      "VERSION" -> previousStableVersion.value.getOrElse("0.0.0"),
+    ),
+    mdocOut := baseDirectory.value / "site" / "content",
   )
+  .enablePlugins(MdocPlugin)
   .aggregate(coreJVM, coreJS, demoJS)
+  .dependsOn(coreJVM)
 
 lazy val core = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/redos-core"))
@@ -101,7 +107,7 @@ lazy val demoJS = project
   .enablePlugins(ScalaJSPlugin)
   .settings(
     publish / skip := true,
-    name := "redos-demo",
+    name := "demo",
     scalaJSUseMainModuleInitializer := true,
     Compile / mainClass := Some("codes.quine.labo.redos.demo.DemoApp"),
     libraryDependencies += "org.scala-js" %%% "scalajs-dom" % "1.1.0"

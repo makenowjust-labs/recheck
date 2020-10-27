@@ -29,6 +29,9 @@ project/plugins/project/
 .bloop/
 metals.sbt
 
-docs/js/*
+site/content/*.md
+site/public/
+site/resources/
+site/static/js/demo-opt.js*
 packages/redos/*-opt.js
 packages/redos/*-opt.js.map
