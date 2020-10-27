@@ -111,7 +111,7 @@ object IChar {
   /** Returns an interval set containing word characters. */
   def Word: IChar = IChar(
     IntervalSet(
-      (UChar('0'), UChar('9')),
+      (UChar('0'), UChar('9' + 1)),
       (UChar('A'), UChar('Z' + 1)),
       (UChar('_'), UChar('_' + 1)),
       (UChar('a'), UChar('z' + 1))
