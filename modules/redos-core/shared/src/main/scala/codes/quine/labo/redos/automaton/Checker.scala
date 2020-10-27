@@ -1,4 +1,5 @@
 package codes.quine.labo.redos
+package automaton
 
 import scala.collection.mutable
 import scala.util.Try
