@@ -1,1 +1,0 @@
-../../../modules/demo/target/scala-2.13/demo-fastopt.js

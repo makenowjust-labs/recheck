@@ -32,6 +32,6 @@ metals.sbt
 site/content/*.md
 site/public/
 site/resources/
-site/static/js/demo-opt.js*
+site/static/js/*
 packages/redos/*-opt.js
 packages/redos/*-opt.js.map
