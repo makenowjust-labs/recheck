@@ -7,28 +7,24 @@ import scala.util.Try
 import Complexity._
 import automaton._
 import data.Graph
-import data.IChar
 import util.Timeout
 
 /** ReDoS vulnerable RegExp checker. */
 object Checker {
 
   /** Checks a match time complexity of the ε-NFA. */
-  def check[Q](epsNFA: EpsNFA[Q])(implicit timeout: Timeout): Try[Complexity[IChar]] =
-    Try(new Checker(epsNFA, timeout).check())
+  def check[A, Q](nfa: OrderedNFA[A, Q])(implicit timeout: Timeout): Try[Complexity[A]] =
+    Try(new Checker(nfa, timeout).check())
 }
 
 /** Checker is a ReDoS vulnerable RegExp checker. */
-private final class Checker[Q](
-    private[this] val epsNFA: EpsNFA[Q],
+private final class Checker[A, Q](
+    private[this] val nfa: OrderedNFA[A, Q],
     private[this] val timeout: Timeout
 ) {
 
   // Introduces `timeout` methods into the scope.
   import timeout._
-
-  /** An ordered NFA constructed from [[epsNFA]]. */
-  private[this] val nfa = checkTimeoutWith("nfa")(epsNFA.toOrderedNFA.rename)
 
   /** A reversed DFA constructed from [[orderedNFA]]. */
   private[this] val reverseDFA = checkTimeoutWith("reverseDFA")(nfa.reverse.toDFA)
@@ -68,17 +64,17 @@ private final class Checker[Q](
     .withDefaultValue(Map.empty.withDefaultValue(Seq.empty))
 
   /** A type of [[multiNFA]] state. */
-  private type Q = (Int, Set[Int])
+  private type R = (Q, Set[Q])
 
   /** A type of pumps of witness. */
-  private type Pump = (Q, Seq[IChar], Q)
+  private type Pump = (R, Seq[A], R)
 
   /** Tests whether the SCC is an atom, which is a singleton and does not have a self-loop. */
-  private[this] def isAtom(sc: Seq[Q]): Boolean =
+  private[this] def isAtom(sc: Seq[R]): Boolean =
     sc.size == 1 && !graph.neighbors(sc.head).exists(_._2 == sc.head)
 
   /** Runs a checker. */
-  def check(): Complexity[IChar] =
+  def check(): Complexity[A] =
     checkExponential() match {
       case Some(pump) => Exponential(witness(Seq(pump)))
       case None =>
@@ -96,7 +92,7 @@ private final class Checker[Q](
     }
 
   /** Finds an EDA structure in the SCC. */
-  private[this] def checkExponentialComponent(sc: Seq[Q]): Option[Pump] = {
+  private[this] def checkExponentialComponent(sc: Seq[R]): Option[Pump] = {
     checkTimeout("checkExponentialComponent: edges")
     val edges = sccPairEdges((sc, sc))
 
@@ -141,10 +137,10 @@ private final class Checker[Q](
     }
 
   /** An internal cache of [[checkPolynomialComponent]] method's result. */
-  private[this] val checkPolynomialComponentCache = mutable.Map.empty[Seq[Q], (Int, Seq[Pump])]
+  private[this] val checkPolynomialComponentCache = mutable.Map.empty[Seq[R], (Int, Seq[Pump])]
 
   /** Finds an IDA structure chain from the SCC. */
-  private[this] def checkPolynomialComponent(sc: Seq[Q]): (Int, Seq[Pump]) =
+  private[this] def checkPolynomialComponent(sc: Seq[R]): (Int, Seq[Pump]) =
     checkPolynomialComponentCache.getOrElseUpdate(
       sc, {
         // Computes the maximum IDA structure chain from neighbors.
@@ -171,7 +167,7 @@ private final class Checker[Q](
     )
 
   /** Finds an IDA structure between source and target SCCs. */
-  private[this] def checkPolynomialComponentBetween(source: Seq[Q], target: Seq[Q]): Option[Pump] = {
+  private[this] def checkPolynomialComponentBetween(source: Seq[R], target: Seq[R]): Option[Pump] = {
     checkTimeout("checkPolynomialComponent: source edges")
     val sourceEdges = sccPairEdges((source, source))
     checkTimeout("checkPolynomialComponent: between")
@@ -209,8 +205,8 @@ private final class Checker[Q](
   }
 
   /** Builds a witness object from pump strings and states. */
-  private[this] def witness(pumps: Seq[Pump]): Witness[IChar] = {
-    val (pumpPaths, qs) = pumps.foldLeft((Seq.empty[(Seq[IChar], Seq[IChar])], multiNFA.initSet.toSet)) {
+  private[this] def witness(pumps: Seq[Pump]): Witness[A] = {
+    val (pumpPaths, qs) = pumps.foldLeft((Seq.empty[(Seq[A], Seq[A])], multiNFA.initSet.toSet)) {
       case ((pumpPaths, last), (q1, path, q2)) =>
         val prefix = graph.path(last, q1).get
         (pumpPaths :+ (prefix, path), Set(q2))

@@ -20,7 +20,8 @@ class CheckerSuite extends munit.FunSuite {
     for {
       pattern <- Parser.parse(source, flags)
       epsNFA <- Compiler.compile(pattern)
-      result <- Checker.check(epsNFA)
+      nfa = epsNFA.toOrderedNFA.rename
+      result <- Checker.check(nfa)
     } yield result
 
   test("Checker.check: constant") {

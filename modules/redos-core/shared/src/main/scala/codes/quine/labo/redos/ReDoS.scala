@@ -24,7 +24,8 @@ object ReDoS {
       _ <- Try(()) // Ensures a `Try` context for catching TimeoutException surely.
       pattern <- Parser.parse(source, flags)
       epsNFA <- Compiler.compile(pattern)
-      result <- Checker.check(epsNFA)
+      nfa = timeout.checkTimeoutWith("nfa")(epsNFA.toOrderedNFA.rename)
+      result <- Checker.check(nfa)
     } yield result
   }
 }
