@@ -50,7 +50,10 @@ final case class IChar(
   /** Checks whether the character is contained in this interval set or not. */
   def contains(value: UChar): Boolean = set.contains(value)
 
-  /** Gets the first code poiint of this interval set. */
+  /** Gets the first code poiint of this interval set.
+    *
+    * If this interval set is empty, it throws a NoSuchElementException.
+    */
   def head: UChar = set.intervals.head._1
 
   /** Compares to other code point interval set. */

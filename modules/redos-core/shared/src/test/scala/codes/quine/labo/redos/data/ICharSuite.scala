@@ -136,6 +136,7 @@ class ICharSuite extends munit.FunSuite {
   test("IChar#head") {
     assertEquals(IChar('A').head, UChar('A'))
     assertEquals(IChar.range(UChar('a'), UChar('z')).head, UChar('a'))
+    intercept[NoSuchElementException](IChar.empty.head)
   }
 
   test("IChar#compare") {
