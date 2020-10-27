@@ -6,22 +6,19 @@ import data.IChar
 import data.ICharSet
 
 class EpsNFASuite extends munit.FunSuite {
-  // For coverage.
-  locally { EpsNFA.toString }
-
   test("EpsNFA.AssertKind.accepts") {
-    assert(AssertKind.accepts(AssertKind.LineBegin, CharInfo(true, false), CharInfo(false, false)))
-    assert(!AssertKind.accepts(AssertKind.LineBegin, CharInfo(false, false), CharInfo(false, false)))
-    assert(AssertKind.accepts(AssertKind.LineEnd, CharInfo(false, false), CharInfo(true, false)))
-    assert(!AssertKind.accepts(AssertKind.LineEnd, CharInfo(false, false), CharInfo(false, false)))
-    assert(AssertKind.accepts(AssertKind.WordBoundary, CharInfo(false, true), CharInfo(false, false)))
-    assert(AssertKind.accepts(AssertKind.WordBoundary, CharInfo(false, false), CharInfo(false, true)))
-    assert(!AssertKind.accepts(AssertKind.WordBoundary, CharInfo(false, false), CharInfo(false, false)))
-    assert(!AssertKind.accepts(AssertKind.WordBoundary, CharInfo(false, true), CharInfo(false, true)))
-    assert(AssertKind.accepts(AssertKind.NotWordBoundary, CharInfo(false, false), CharInfo(false, false)))
-    assert(AssertKind.accepts(AssertKind.NotWordBoundary, CharInfo(false, true), CharInfo(false, true)))
-    assert(!AssertKind.accepts(AssertKind.NotWordBoundary, CharInfo(false, true), CharInfo(false, false)))
-    assert(!AssertKind.accepts(AssertKind.NotWordBoundary, CharInfo(false, false), CharInfo(false, true)))
+    assert(AssertKind.LineBegin.accepts(CharInfo(true, false), CharInfo(false, false)))
+    assert(!AssertKind.LineBegin.accepts(CharInfo(false, false), CharInfo(false, false)))
+    assert(AssertKind.LineEnd.accepts(CharInfo(false, false), CharInfo(true, false)))
+    assert(!AssertKind.LineEnd.accepts(CharInfo(false, false), CharInfo(false, false)))
+    assert(AssertKind.WordBoundary.accepts(CharInfo(false, true), CharInfo(false, false)))
+    assert(AssertKind.WordBoundary.accepts(CharInfo(false, false), CharInfo(false, true)))
+    assert(!AssertKind.WordBoundary.accepts(CharInfo(false, false), CharInfo(false, false)))
+    assert(!AssertKind.WordBoundary.accepts(CharInfo(false, true), CharInfo(false, true)))
+    assert(AssertKind.NotWordBoundary.accepts(CharInfo(false, false), CharInfo(false, false)))
+    assert(AssertKind.NotWordBoundary.accepts(CharInfo(false, true), CharInfo(false, true)))
+    assert(!AssertKind.NotWordBoundary.accepts(CharInfo(false, true), CharInfo(false, false)))
+    assert(!AssertKind.NotWordBoundary.accepts(CharInfo(false, false), CharInfo(false, true)))
   }
 
   test("EpsNFA.CharInfo.from") {

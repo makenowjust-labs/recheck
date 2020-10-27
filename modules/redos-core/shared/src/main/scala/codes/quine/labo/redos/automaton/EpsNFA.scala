@@ -66,7 +66,7 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
         tau.get(q) match {
           case Some(Eps(qs)) => qs.flatMap(buildClosure(c0, c1, _, path :+ q))
           case Some(Assert(k, q1)) =>
-            if (AssertKind.accepts(k, c0, c1)) buildClosure(c0, c1, q1, path :+ q) else Vector.empty
+            if (k.accepts(c0, c1)) buildClosure(c0, c1, q1, path :+ q) else Vector.empty
           case Some(Consume(_, _)) => Vector(q)
           case None                => Vector(q)
         }
@@ -135,7 +135,16 @@ object EpsNFA {
   final case class Consume[Q](set: Set[IChar], to: Q) extends Transition[Q]
 
   /** AssertKind is assertion kind of this ε-NFA transition. */
-  sealed abstract class AssertKind extends Serializable with Product
+  sealed abstract class AssertKind extends Serializable with Product {
+
+    /** Tests the assertion on around character informations. */
+    def accepts(prev: CharInfo, next: CharInfo): Boolean = this match {
+      case AssertKind.LineBegin       => prev.isLineTerminator
+      case AssertKind.LineEnd         => next.isLineTerminator
+      case AssertKind.WordBoundary    => prev.isWord != next.isWord
+      case AssertKind.NotWordBoundary => prev.isWord == next.isWord
+    }
+  }
 
   /** AssertKind values and utilities. */
   object AssertKind {
@@ -151,14 +160,6 @@ object EpsNFA {
 
     /** LineBegin is `\B` assertion. */
     case object NotWordBoundary extends AssertKind
-
-    /** Tests the assertion on around character informations. */
-    def accepts(kind: AssertKind, prev: CharInfo, next: CharInfo): Boolean = kind match {
-      case LineBegin       => prev.isLineTerminator
-      case LineEnd         => next.isLineTerminator
-      case WordBoundary    => prev.isWord != next.isWord
-      case NotWordBoundary => prev.isWord == next.isWord
-    }
   }
 
   /** CharInfo is a minimum character information for assertion check. */
