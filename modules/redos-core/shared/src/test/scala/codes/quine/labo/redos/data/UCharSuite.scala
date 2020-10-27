@@ -19,6 +19,11 @@ class UCharSuite extends munit.FunSuite {
     assertEquals(String.valueOf(UChar(0x1f363).toChars), "🍣")
   }
 
+  test("UChar#asString") {
+    assertEquals(UChar(0x41).asString, "A")
+    assertEquals(UChar(0x1f363).asString, "🍣")
+  }
+
   test("UChar#toString") {
     assertEquals(UChar(0x09).toString, "\\t")
     assertEquals(UChar(0x0a).toString, "\\n")

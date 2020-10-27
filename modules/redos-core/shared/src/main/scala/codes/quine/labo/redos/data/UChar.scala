@@ -23,7 +23,10 @@ final case class UChar(value: Int) extends AnyVal with Ordered[UChar] {
       Array(d1, d2)
     }
 
-  /** Show this Unicode point as human readable format. */
+  /** Gets this Unicode code point value as a string. */
+  def asString: String = String.valueOf(toChars)
+
+  /** Show this Unicode code point as human readable format. */
   override def toString: String = value match {
     case 0x09                         => "\\t"
     case 0x0a                         => "\\n"
