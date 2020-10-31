@@ -428,11 +428,43 @@ class CompilerSuite extends munit.FunSuite {
     )
     assertEquals(
       Compiler.compile(Pattern(Sequence(Seq(LineBegin, Repeat(false, 1, Some(Some(1)), Dot), LineEnd)), flagSet2)),
-      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Dot, Question(false, Dot), LineEnd)), flagSet2))
+      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Dot, LineEnd)), flagSet2))
     )
     assertEquals(
       Compiler.compile(Pattern(Sequence(Seq(LineBegin, Repeat(true, 1, Some(Some(1)), Dot), LineEnd)), flagSet2)),
+      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Dot, LineEnd)), flagSet2))
+    )
+    interceptMessage[InvalidRegExpException]("out of order repetition quantifier") {
+      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Repeat(false, 2, Some(Some(1)), Dot), LineEnd)), flagSet2)).get
+    }
+    interceptMessage[InvalidRegExpException]("out of order repetition quantifier") {
+      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Repeat(true, 2, Some(Some(1)), Dot), LineEnd)), flagSet2)).get
+    }
+    assertEquals(
+      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Repeat(false, 1, Some(Some(2)), Dot), LineEnd)), flagSet2)),
+      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Dot, Question(false, Dot), LineEnd)), flagSet2))
+    )
+    assertEquals(
+      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Repeat(true, 1, Some(Some(2)), Dot), LineEnd)), flagSet2)),
       Compiler.compile(Pattern(Sequence(Seq(LineBegin, Dot, Question(true, Dot), LineEnd)), flagSet2))
+    )
+    assertEquals(
+      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Repeat(false, 1, Some(Some(3)), Dot), LineEnd)), flagSet2)),
+      Compiler.compile(
+        Pattern(
+          Sequence(Seq(LineBegin, Dot, Question(false, Sequence(Seq(Dot, Question(false, Dot)))), LineEnd)),
+          flagSet2
+        )
+      )
+    )
+    assertEquals(
+      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Repeat(true, 1, Some(Some(3)), Dot), LineEnd)), flagSet2)),
+      Compiler.compile(
+        Pattern(
+          Sequence(Seq(LineBegin, Dot, Question(true, Sequence(Seq(Dot, Question(true, Dot)))), LineEnd)),
+          flagSet2
+        )
+      )
     )
 
     // Capture, NamedCapture, Group (and Character also)

@@ -92,12 +92,21 @@ object Compiler {
               tau.addOne(i -> Eps(t))
               (i, a)
             }
-          case Repeat(nonGreedy, min, max, n) => {
+          case Repeat(_, min, None, n) =>
+            loop(Sequence(Vector.fill(min)(n)))
+          case Repeat(nonGreedy, min, Some(None), n) =>
+            loop(Sequence(Vector.fill(min)(n) :+ Star(nonGreedy, n)))
+          case Repeat(_, min, Some(Some(max)), _) if max < min =>
+            Failure(new InvalidRegExpException("out of order repetition quantifier"))
+          case Repeat(_, min, Some(Some(max)), n) if min == max =>
+            loop(Sequence(Vector.fill(min)(n)))
+          case Repeat(nonGreedy, min, Some(Some(max)), n) =>
             val minN = Vector.fill(min)(n)
-            val maxN =
-              max.toVector.flatMap(_.map(Vector.fill(_)(Question(nonGreedy, n))).getOrElse(Vector(Star(nonGreedy, n))))
-            loop(Sequence(minN ++ maxN))
-          }
+            val maxN = Question(
+              nonGreedy,
+              Vector.fill(max - min)(n).reduceRight((l, r) => Sequence(Vector(l, Question(nonGreedy, r))))
+            )
+            loop(Sequence(minN :+ maxN))
           case WordBoundary(invert) =>
             val i = nextQ()
             val a = nextQ()

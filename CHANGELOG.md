@@ -1,3 +1,9 @@
+# dev
+
+Fixes:
+
+  - Fix conversion from repeat pattern `a{n,m}` to ε-NFA correctly.
+
 # 0.2.0 (2020-11-01)
 
 Changes:
