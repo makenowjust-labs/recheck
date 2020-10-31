@@ -7,5 +7,10 @@
   "repository": "https://github.com/MakeNowJust-Labo/redos.git",
   "version": "0.1.1",
   "main": "redos-core-opt.js",
-  "types": "index.d.ts"
+  "types": "index.d.ts",
+  "keywords": [
+    "redos",
+    "regepx",
+    "security"
+  ]
 }
