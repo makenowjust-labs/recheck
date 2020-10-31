@@ -4,7 +4,6 @@ import scala.concurrent.duration.Duration
 import scala.util.Try
 
 import automaton.Checker
-import data.IChar
 import regexp.Compiler
 import regexp.Parser
 import util.Timeout
@@ -18,14 +17,14 @@ object ReDoS {
     * Note that it does not fork a thread for timeout, so it blocks CPU on running until timeout.
     * If you need to avoid CPU blocking, you should wrap this by Future for instance.
     */
-  def check(source: String, flags: String, atMost: Duration = Duration.Inf): Try[Complexity[IChar]] = {
+  def check(source: String, flags: String, atMost: Duration = Duration.Inf): Diagnostics = {
     implicit val timeout = Timeout.from(atMost)
-    for {
+    Diagnostics.from(for {
       _ <- Try(()) // Ensures a `Try` context for catching TimeoutException surely.
       pattern <- Parser.parse(source, flags)
       epsNFA <- Compiler.compile(pattern)
       nfa = timeout.checkTimeoutWith("nfa")(epsNFA.toOrderedNFA.rename)
       result <- Checker.check(nfa)
-    } yield result
+    } yield result)
   }
 }

@@ -1,7 +1,8 @@
 package codes.quine.labo.redos
+package automaton
 
-import data.IChar
 import Complexity._
+import data.IChar
 
 class ComplexitySuite extends munit.FunSuite {
   test("Complexity#isSafe") {

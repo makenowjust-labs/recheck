@@ -2,9 +2,6 @@ package codes.quine.labo.redos
 package demo
 
 import scala.concurrent.duration._
-import scala.scalajs.js.JSON
-import scala.util.Failure
-import scala.util.Success
 import scala.util.matching.Regex
 
 import org.scalajs.dom.document
@@ -13,7 +10,10 @@ import org.scalajs.dom.html.Input
 import org.scalajs.dom.html.Paragraph
 import org.scalajs.dom.raw.Event
 
-import Complexity._
+import scalajs.js.JSON
+import Diagnostics._
+import automaton.Complexity._
+import automaton.Witness
 import data.IChar
 
 /** DemoApp is an implementation of demo application in the top page. */
@@ -49,28 +49,42 @@ object DemoApp {
     val result = ReDoS.check(source, flags, 5.second)
     val pattern = s"<code>/${escape(source)}/${escape(flags)}</code>"
     result match {
-      case Success(complexity) =>
+      case Safe(complexity) =>
         complexity match {
-          case Constant =>
-            resultArea.innerHTML = s"${pattern} is safe (constant-time matching)."
-          case Linear =>
-            resultArea.innerHTML = s"${pattern} is safe (linear-time matching)."
-          case Exponential(w) =>
-            resultArea.innerHTML =
-              s"${pattern} is <span class='has-text-danger has-text-weight-bold is-uppercase'>unsafe</span> (exponential-time matching).<br>"
-            val ws = witness(w).take(3).map { s => s"<code>${JSON.stringify(escape(s))}</code>" }
-            resultArea.innerHTML ++= s"Example attack strings: ${ws.mkString(", ")}, ..."
-          case Polynomial(degree, w) =>
-            resultArea.innerHTML =
-              s"${pattern} is <span class='has-text-danger has-text-weight-bold is-uppercase'>unsafe</span> ($degree-degree polynomial-time matching).<br>"
-            val ws = witness(w).take(3).map { s => s"<code>${JSON.stringify(escape(s))}</code>" }
-            resultArea.innerHTML ++= s"Example attack strings: ${ws.mkString(", ")}, ..."
+          case Some(Constant) =>
+            resultArea.innerHTML = s"$pattern is safe (constant-time matching)."
+          case Some(Linear) =>
+            resultArea.innerHTML = s"$pattern is safe (linear-time matching)."
+          case None =>
+            resultArea.innerHTML = s"$pattern is safe."
         }
-      case Failure(exception) =>
-        resultArea.innerHTML =
-          s"An error is occured on anaylyzing: ${escape(exception.getMessage)} (${escape(exception.getClass.getSimpleName)})"
+      case Vulnerable(_, complexity) =>
+        val unsafe = "<span class='has-text-danger has-text-weight-bold is-uppercase'>unsafe</span>"
+        complexity match {
+          case Some(Exponential(w)) =>
+            resultArea.innerHTML = s"$pattern is $unsafe (exponential-time matching).<br>"
+            val ws = witness(w).take(3).map { s => s"<code>${JSON.stringify(escape(s))}</code>" }
+            resultArea.innerHTML ++= s"Example attack strings: ${ws.mkString(", ")}, ..."
+          case Some(Polynomial(d, w)) =>
+            resultArea.innerHTML = s"$pattern is $unsafe ($d${ordinal(d)} degree polynomial-time matching).<br>"
+            val ws = witness(w).take(3).map { s => s"<code>${JSON.stringify(escape(s))}</code>" }
+            resultArea.innerHTML ++= s"Example attack strings: ${ws.mkString(", ")}, ..."
+          case None =>
+            resultArea.innerHTML = s"$pattern is $unsafe."
+        }
+      case Unknown(err) =>
+        resultArea.innerHTML = s"An error is occured on anaylyzing: $err"
     }
   }
+
+  /** Returns an ordinal suffix for the integer value. */
+  def ordinal(d: Int): String =
+    (d % 10).abs match {
+      case 1 => "st"
+      case 2 => "nd"
+      case 3 => "rd"
+      case _ => "th"
+    }
 
   /** Constructs a witness strings. */
   def witness(w: Witness[IChar]): LazyList[String] =

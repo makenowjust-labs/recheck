@@ -1,4 +1,5 @@
 package codes.quine.labo.redos
+package automaton
 
 class WitnessSuite extends munit.FunSuite {
   test("Witness#map") {

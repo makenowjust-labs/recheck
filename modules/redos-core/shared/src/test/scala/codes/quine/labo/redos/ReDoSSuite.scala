@@ -1,13 +1,12 @@
 package codes.quine.labo.redos
 
-import java.util.concurrent.TimeoutException
-
 import scala.concurrent.duration._
-import scala.util.Success
+
+import automaton.Complexity
 
 class ReDoSSuite extends munit.FunSuite {
   test("ReDoS.check") {
-    assertEquals(ReDoS.check("^foo$", ""), Success(Complexity.Constant))
-    intercept[TimeoutException](ReDoS.check("(a?){50}a{50}", "", 0.second).get)
+    assertEquals(ReDoS.check("^foo$", ""), Diagnostics.Safe(Some(Complexity.Constant)))
+    assertEquals(ReDoS.check("(a?){50}a{50}", "", 0.second), Diagnostics.Unknown(Diagnostics.ErrorKind.Timeout))
   }
 }
