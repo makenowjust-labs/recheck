@@ -94,7 +94,8 @@ object Compiler {
             }
           case Repeat(nonGreedy, min, max, n) => {
             val minN = Vector.fill(min)(n)
-            val maxN = max.toVector.flatMap(_.map(Vector.fill(_)(Question(nonGreedy, n))).getOrElse(Vector(Star(nonGreedy, n))))
+            val maxN =
+              max.toVector.flatMap(_.map(Vector.fill(_)(Question(nonGreedy, n))).getOrElse(Vector(Star(nonGreedy, n))))
             loop(Sequence(minN ++ maxN))
           }
           case WordBoundary(invert) =>

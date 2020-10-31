@@ -57,7 +57,8 @@ final case class OrderedNFA[A, Q](
   /** Converts to [[MultiNFA]] with pruning in order of priorities. */
   def toMultiNFA: MultiNFA[A, (Q, Set[Q])] = {
     val reverseDFA = reverse.toDFA
-    val reverseDelta = reverseDFA.delta.groupMap(_._1._2) { case (p2, _) -> p1 => (p1, p2) }.withDefaultValue(Vector.empty)
+    val reverseDelta =
+      reverseDFA.delta.groupMap(_._1._2) { case (p2, _) -> p1 => (p1, p2) }.withDefaultValue(Vector.empty)
 
     val newStateSet = for (q <- stateSet; p <- reverseDFA.stateSet) yield (q, p)
     val newInits = MultiSet.from(for (q <- inits; p <- reverseDFA.stateSet) yield (q, p))
