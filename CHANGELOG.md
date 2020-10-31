@@ -1,3 +1,16 @@
+# 0.2.0 (2020-11-01)
+
+Changes:
+
+  - Move `Checker`, `Complexity` and `Witness` into `automaton` package.
+  - Add `Diagnostics`.
+  - Use `Vector` instead for performance.
+  - Improve `package.json` contents.
+
+Fixes:
+
+  - Refactor `EpsNFA.Assertion#accept`.
+
 # 0.1.1 (2020-10-27)
 
 Changes:
