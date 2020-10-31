@@ -20,7 +20,7 @@ import data.IChar
 object DemoApp {
 
   /** A regular expression to extract slash separated input string. */
-  val SlashRegExp: Regex = raw"/((?:[^/\\\[]*|\\.|\[(?:[^\\\]]|\\.)*\])*)/([gimsuy]*)".r
+  val SlashRegExp: Regex = raw"/((?:[^/\\\[\n]*|\\[^\n]|\[(?:[^\\\]\n]|\\[^\n])*\])*)/([gimsuy]*)".r
 
   /** An input element to input a regexp pattern. */
   lazy val regexpInput: Input = document.querySelector("#regexp").asInstanceOf[Input]

@@ -12,6 +12,7 @@ class DemoAppSuite extends munit.FunSuite {
     assertEquals(DemoApp.SlashRegExp.unapplySeq("/[\\]/]/"), Some(List("[\\]/]", "")))
     assertEquals(DemoApp.SlashRegExp.unapplySeq("/\\[/]/"), None)
     assertEquals(DemoApp.SlashRegExp.unapplySeq("///"), None)
+    assertEquals(DemoApp.SlashRegExp.unapplySeq("/\n/"), None)
     assertEquals(DemoApp.SlashRegExp.unapplySeq("/x/imgsuy"), Some(List("x", "imgsuy")))
     assertEquals(DemoApp.SlashRegExp.unapplySeq("/x/x"), None)
   }
