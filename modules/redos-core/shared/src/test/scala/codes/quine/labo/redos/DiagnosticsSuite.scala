@@ -48,4 +48,10 @@ class DiagnosticsSuite extends munit.FunSuite {
     }
     assertEquals(ex.getCause.getMessage, "foo")
   }
+
+  test("Diagnostics.ErrorKind#toString") {
+    assertEquals(Diagnostics.ErrorKind.Timeout.toString, "timeout")
+    assertEquals(Diagnostics.ErrorKind.Unsupported("foo").toString, "unsupported (foo)")
+    assertEquals(Diagnostics.ErrorKind.InvalidRegExp("foo").toString, "invalid RegExp (foo)")
+  }
 }

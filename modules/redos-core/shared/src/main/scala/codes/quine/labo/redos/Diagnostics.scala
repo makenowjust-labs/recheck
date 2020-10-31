@@ -53,12 +53,18 @@ object Diagnostics {
   object ErrorKind {
 
     /** Timeout is a timeout of RegExp analyzing. */
-    case object Timeout extends ErrorKind
+    case object Timeout extends ErrorKind {
+      override def toString: String = "timeout"
+    }
 
     /** Unsupported is the RegExp pattern is not supported yet. */
-    final case class Unsupported(message: String) extends ErrorKind
+    final case class Unsupported(message: String) extends ErrorKind {
+      override def toString: String = s"unsupported ($message)"
+    }
 
     /** InvalidRegExp is the RegExp pattern is invalid on parsing or semantics. */
-    final case class InvalidRegExp(message: String) extends ErrorKind
+    final case class InvalidRegExp(message: String) extends ErrorKind {
+      override def toString: String = s"invalid RegExp ($message)"
+    }
   }
 }
