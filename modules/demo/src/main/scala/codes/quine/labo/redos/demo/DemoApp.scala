@@ -2,6 +2,7 @@ package codes.quine.labo.redos
 package demo
 
 import scala.concurrent.duration._
+import scala.scalajs.js.JSON
 import scala.util.Failure
 import scala.util.Success
 import scala.util.matching.Regex
@@ -57,12 +58,12 @@ object DemoApp {
           case Exponential(w) =>
             resultArea.innerHTML =
               s"${pattern} is <span class='has-text-danger has-text-weight-bold is-uppercase'>unsafe</span> (exponential-time matching).<br>"
-            val ws = witness(w).take(3).map { s => "<code>\"" + escape(s) + "\"</code>" }
+            val ws = witness(w).take(3).map { s => s"<code>${JSON.stringify(escape(s))}</code>" }
             resultArea.innerHTML ++= s"Example attack strings: ${ws.mkString(", ")}, ..."
           case Polynomial(degree, w) =>
             resultArea.innerHTML =
               s"${pattern} is <span class='has-text-danger has-text-weight-bold is-uppercase'>unsafe</span> ($degree-degree polynomial-time matching).<br>"
-            val ws = witness(w).take(3).map { s => "<code>\"" + escape(s) + "\"</code>" }
+            val ws = witness(w).take(3).map { s => s"<code>${JSON.stringify(escape(s))}</code>" }
             resultArea.innerHTML ++= s"Example attack strings: ${ws.mkString(", ")}, ..."
         }
       case Failure(exception) =>
