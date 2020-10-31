@@ -2,24 +2,44 @@
  * Checks the given RegExp pattern `source` and `flags` is ReDoS vulnerable.
  * And, it takes an optional argument to specify `timeout` milliseconds.
  */
-export function check(source: string, flags: string, timeout?: number): Complexity;
+export function check(source: string, flags: string, timeout?: number): Diagnostics;
 
 /**
- * Complexity is an analysis result.
- * It is a matching time complexity of the RegExp pattern.
- * `"constant"` and `"linear"` are safe, but `"polynomial"` and `"exponential"`
- * are unsafe potentially.
+ * Diagnostics is an analyzing result.
+ * It takes one of the following three statuses:
+ *
+ * - `safe`: The given RegExp is safe.
+ * - `vulnerable`: The given RegExp is potentially vulnerable.
+ * - `unknown`: An error is occured on analyzing.
+ *   As a result, it is unknown wherher the RegExp is safe or vulnerable.
  */
-export type Complexity =
-  | { complexity: "constant" | "linear" }
+export type Diagnostics =
   | {
-      complexity: "polynomial";
-      degree: number;
-      witness: Witness;
+      status: "safe";
+      complexity?: { type: "constant" | "linear" };
     }
   | {
-      complexity: "exponential";
-      witness: Witness;
+      status: "vulnerable";
+      attack: string;
+      complexity?:
+        | {
+            type: "exponential";
+            witness: Witness;
+          }
+        | {
+            type: "polynomial";
+            degree: number;
+            witness: Witness;
+          };
+    }
+  | {
+      status: "unknown";
+      error:
+        | { kind: "timeout" }
+        | {
+            kind: "unsupported" | "invalid";
+            message: string;
+          };
     };
 
 /**
