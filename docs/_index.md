@@ -43,5 +43,5 @@ You can use `ReDoS.check` method to analyze RegExp pattern.
 ```scala mdoc
 import codes.quine.labo.redos.ReDoS
 
-println(ReDoS.check("^(a|a)*$", ""))
+println(ReDoS.check("^(a|a)*$", "").complexity)
 ```

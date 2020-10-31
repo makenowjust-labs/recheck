@@ -10,7 +10,11 @@ import data.IChar
 import automaton.Complexity
 
 /** Diagnostics is a vulnerability diagnostics. */
-sealed abstract class Diagnostics extends Serializable with Product
+sealed abstract class Diagnostics extends Serializable with Product {
+
+  /** A matching-time complexity. */
+  def complexity: Option[Complexity[IChar]]
+}
 
 /** Diagnostics utilities and types. */
 object Diagnostics {
@@ -44,7 +48,9 @@ object Diagnostics {
   final case class Safe(complexity: Option[Complexity.Safe]) extends Diagnostics
 
   /** Unknown is a unknown vulnerability diagnostics for some reasons. */
-  final case class Unknown(error: ErrorKind) extends Diagnostics
+  final case class Unknown(error: ErrorKind) extends Diagnostics {
+    def complexity: Option[Complexity[IChar]] = None
+  }
 
   /** ErrorKind is a reason of an unknown diagnostics. */
   sealed abstract class ErrorKind extends Serializable with Product

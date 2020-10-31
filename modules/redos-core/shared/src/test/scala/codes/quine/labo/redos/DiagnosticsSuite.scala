@@ -49,6 +49,18 @@ class DiagnosticsSuite extends munit.FunSuite {
     assertEquals(ex.getCause.getMessage, "foo")
   }
 
+  test("Diagnostics#complexity") {
+    assertEquals(Diagnostics.Safe(Some(Complexity.Constant)).complexity, Some(Complexity.Constant))
+    assertEquals(Diagnostics.Safe(None).complexity, None)
+    val w = Witness(Seq((Seq(IChar('a')), Seq(IChar('a')))), Seq(IChar('a')))
+    assertEquals(
+      Diagnostics.Vulnerable(Seq.empty, Some(Complexity.Exponential(w))).complexity,
+      Some(Complexity.Exponential(w))
+    )
+    assertEquals(Diagnostics.Vulnerable(Seq.empty, None).complexity, None)
+    assertEquals(Diagnostics.Unknown(Diagnostics.ErrorKind.Timeout).complexity, None)
+  }
+
   test("Diagnostics.ErrorKind#toString") {
     assertEquals(Diagnostics.ErrorKind.Timeout.toString, "timeout")
     assertEquals(Diagnostics.ErrorKind.Unsupported("foo").toString, "unsupported (foo)")
