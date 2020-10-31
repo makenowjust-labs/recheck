@@ -19,7 +19,7 @@ object Diagnostics {
   private[redos] val AttackSeqTimeComplexity = 100_000_000
 
   /** A size of attack seq for exponential complexity. */
-  private[redos] val AttackSeqSizeForExponential = Math.log10(AttackSeqTimeComplexity.toDouble).toInt
+  private[redos] val AttackSeqSizeForExponential = (Math.log(AttackSeqTimeComplexity.toDouble) / Math.log(2)).toInt
 
   /** Builds an attack seq from the vulnerable complexity. */
   private[redos] def buildAttack(vuln: Complexity.Vulnerable[IChar]): Seq[IChar] = vuln match {
