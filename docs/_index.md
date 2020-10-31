@@ -20,10 +20,11 @@ const { check } = require('@makenowjust-labo/redos');
 
 console.log(check('^(a|a)*$', ''));
 // {
-//   complexity: 'exponential',
-//   witness: {
-//     pumps: [ { prefix: 'a', pump: 'a' } ],
-//     suffix: '\x00'
+//   status: 'vulnerable',
+//   attack: 'aaaaaaaaa\x00',
+//   complexity: {
+//     type: 'exponential',
+//     witness: { pumps: [ { prefix: 'a', pump: 'a' } ], suffix: '\x00' }
 //   }
 // }
 ```
