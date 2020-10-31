@@ -42,14 +42,14 @@ object Compiler {
               val i = nextQ()
               tau.addOne(i -> Eps(ss.map(_._1)))
               val a = nextQ()
-              for ((_, a0) <- ss) tau.addOne(a0 -> Eps(Seq(a)))
+              for ((_, a0) <- ss) tau.addOne(a0 -> Eps(Vector(a)))
               (i, a)
             }
           case Sequence(ns) =>
             TryUtil
               .traverse(ns)(loop(_))
               .map(_.reduceLeftOption[(Int, Int)] { case ((i1, a1), (i2, a2)) =>
-                tau.addOne(a1 -> Eps(Seq(i2)))
+                tau.addOne(a1 -> Eps(Vector(i2)))
                 (i1, a2)
               }.getOrElse {
                 val q = nextQ()
@@ -67,9 +67,9 @@ object Compiler {
               //   +---------------+
               val i = nextQ()
               val a = nextQ()
-              val t = if (nonGreedy) Seq(a, i0) else Seq(i0, a)
+              val t = if (nonGreedy) Vector(a, i0) else Vector(i0, a)
               tau.addOne(i -> Eps(t))
-              tau.addOne(a0 -> Eps(Seq(i)))
+              tau.addOne(a0 -> Eps(Vector(i)))
               (i, a)
             }
           case Plus(nonGreedy, n) =>
@@ -78,7 +78,7 @@ object Compiler {
               // |           |
               // +->[i-->a0]-+->(a)
               val a = nextQ()
-              val t = if (nonGreedy) Seq(a, i) else Seq(i, a)
+              val t = if (nonGreedy) Vector(a, i) else Vector(i, a)
               tau.addOne(a0 -> Eps(t))
               (i, a)
             }
@@ -88,13 +88,13 @@ object Compiler {
               //     |        v
               // (i)-+->[i0-->a]
               val i = nextQ()
-              val t = if (nonGreedy) Seq(a, i0) else Seq(i0, a)
+              val t = if (nonGreedy) Vector(a, i0) else Vector(i0, a)
               tau.addOne(i -> Eps(t))
               (i, a)
             }
           case Repeat(nonGreedy, min, max, n) => {
-            val minN = Seq.fill(min)(n)
-            val maxN = max.toSeq.flatMap(_.map(Seq.fill(_)(Question(nonGreedy, n))).getOrElse(Seq(Star(nonGreedy, n))))
+            val minN = Vector.fill(min)(n)
+            val maxN = max.toVector.flatMap(_.map(Vector.fill(_)(Question(nonGreedy, n))).getOrElse(Vector(Star(nonGreedy, n))))
             loop(Sequence(minN ++ maxN))
           }
           case WordBoundary(invert) =>
@@ -143,14 +143,14 @@ object Compiler {
           val i = if (!hasLineBeginAtBegin(pattern)) {
             val i1 = nextQ()
             val i2 = nextQ()
-            tau.addOne(i1 -> Eps(Seq(i0, i2)))
+            tau.addOne(i1 -> Eps(Vector(i0, i2)))
             tau.addOne(i2 -> Consume(alphabet.chars.toSet, i1))
             i1
           } else i0
           val a = if (!hasLineEndAtEnd(pattern)) {
             val a1 = nextQ()
             val a2 = nextQ()
-            tau.addOne(a0 -> Eps(Seq(a1, a2)))
+            tau.addOne(a0 -> Eps(Vector(a1, a2)))
             tau.addOne(a2 -> Consume(alphabet.chars.toSet, a0))
             a1
           } else a0
@@ -211,13 +211,13 @@ object Compiler {
       case LookBehind(_, n)   => loop(n)
       case atom: AtomNode =>
         atom.toIChar(ignoreCase, unicode).map { ch =>
-          Seq(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch)
+          Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch)
         }
       case Dot =>
         val any = if (unicode) IChar.Any else IChar.Any16
         val ch = if (dotAll) any else any.diff(IChar.LineTerminator)
-        Success(Seq(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch))
-      case _ => Success(Seq.empty)
+        Success(Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch))
+      case _ => Success(Vector.empty)
     })
 
     loop(pattern.node).map(_.foldLeft(set)(_.add(_)))

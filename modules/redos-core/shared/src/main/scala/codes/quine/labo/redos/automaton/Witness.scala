@@ -14,7 +14,7 @@ final case class Witness[A](pumps: Seq[(Seq[A], Seq[A])], suffix: Seq[A]) {
 
   /** Builds an attack string with `n` times repetition. */
   def buildAttack(n: Int): Seq[A] =
-    pumps.flatMap { case (pre, pump) => pre ++ Seq.fill(n)(pump).flatten } ++ suffix
+    pumps.flatMap { case (pre, pump) => pre ++ Vector.fill(n)(pump).flatten } ++ suffix
 
   /** Constructs a witness strings.
     *

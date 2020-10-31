@@ -78,7 +78,7 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
 
     val queue = mutable.Queue.empty[(CharInfo, Seq[(Q, Seq[Q])])]
     val newStateSet = mutable.Set.empty[(CharInfo, Seq[Q])]
-    val newInits = Seq((CharInfo(true, false), closure0Init.map(_._1)))
+    val newInits = Vector((CharInfo(true, false), closure0Init.map(_._1)))
     val newAcceptSet = Set.newBuilder[(CharInfo, Seq[Q])]
     val newDelta = Map.newBuilder[((CharInfo, Seq[Q]), IChar), Seq[(CharInfo, Seq[Q])]]
 
@@ -93,7 +93,7 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
       if (accepts) newAcceptSet.addOne((c1, qs))
       for (ch <- alphabet.chars) {
         val c2 = CharInfo.from(ch)
-        val d = Seq.newBuilder[(CharInfo, Seq[Q])]
+        val d = Vector.newBuilder[(CharInfo, Seq[Q])]
         for ((q1, path) <- qps; (_, to) <- closure(c1, c2, q1, path))
           to match {
             case Some(Consume(chs, q2)) if chs.contains(ch) =>

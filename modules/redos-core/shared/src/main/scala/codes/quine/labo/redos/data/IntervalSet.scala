@@ -32,8 +32,8 @@ final case class IntervalSet[A] private (intervals: IndexedSeq[(A, A)]) {
 
   /** Computes `this intersect that`, `this diff that` and `that diff this` at once. */
   def partition(that: IntervalSet[A])(implicit A: Ordering[A]): Partition[IntervalSet[A]] = {
-    val lefts = intervals.flatMap { case (x, y) => Seq(Left(x), Left(y)) }
-    val rights = that.intervals.flatMap { case (x, y) => Seq(Right(x), Right(y)) }
+    val lefts = intervals.flatMap { case (x, y) => Vector(Left(x), Left(y)) }
+    val rights = that.intervals.flatMap { case (x, y) => Vector(Right(x), Right(y)) }
 
     val (_, _, is, ls, rs) = (lefts ++ rights)
       .sortBy(_.fold(identity[A], identity[A]))

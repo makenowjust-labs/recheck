@@ -18,6 +18,6 @@ object TryUtil {
           case Failure(xs) => Failure(xs)
         }
     }
-    loop(Seq.empty, xs)
+    loop(Vector.empty, xs)
   }
 }

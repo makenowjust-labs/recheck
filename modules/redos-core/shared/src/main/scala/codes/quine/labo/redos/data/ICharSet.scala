@@ -7,11 +7,11 @@ final case class ICharSet(chars: Seq[IChar]) {
 
   /** Updates this by adding the [[IChar]]. */
   def add(c: IChar): ICharSet = {
-    val (cs, d) = chars.foldLeft((Seq.empty[IChar], c)) { case ((cs, c), d) =>
+    val (cs, d) = chars.foldLeft((Vector.empty[IChar], c)) { case ((cs, c), d) =>
       val Partition(i, l, r) = c.partition(d)
-      (cs ++ Seq(i, r).filter(_.nonEmpty), l)
+      (cs ++ Vector(i, r).filter(_.nonEmpty), l)
     }
-    ICharSet(cs ++ Seq(d).filter(_.nonEmpty))
+    ICharSet(cs ++ Vector(d).filter(_.nonEmpty))
   }
 
   /** Splits the [[IChar]] into refinements on this set.
@@ -27,7 +27,7 @@ object ICharSet {
 
   /** Creates a [[ICharSet]] containing any [[IChar]]s. */
   def any(ignoreCase: Boolean, unicode: Boolean): ICharSet =
-    if (ignoreCase) ICharSet(Seq(IChar.canonicalize(IChar.Any, unicode)))
-    else if (unicode) ICharSet(Seq(IChar.Any))
-    else ICharSet(Seq(IChar.Any16))
+    if (ignoreCase) ICharSet(Vector(IChar.canonicalize(IChar.Any, unicode)))
+    else if (unicode) ICharSet(Vector(IChar.Any))
+    else ICharSet(Vector(IChar.Any16))
 }

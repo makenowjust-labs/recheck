@@ -141,15 +141,15 @@ object Property {
     * See [[https://www.unicode.org/reports/tr44/#GC_Values_Table]].
     */
   lazy val GeneralCategoryValueGroups: Map[String, Seq[String]] = Map(
-    "Cased_Letter" -> Seq("Lu", "Ll", "Lt").map(GeneralCategoryValueAliases),
-    "Letter" -> Seq("Lu", "Ll", "Lt", "Lm", "Lo").map(GeneralCategoryValueAliases),
-    "Mark" -> Seq("Mn", "Mc", "Me").map(GeneralCategoryValueAliases),
-    "Number" -> Seq("Nd", "Nl", "No").map(GeneralCategoryValueAliases),
-    "Punctuation" -> Seq("Pc", "Pd", "Ps", "Pe", "Pi", "Pf", "Po").map(GeneralCategoryValueAliases),
-    "Symbol" -> Seq("Sm", "Sc", "Sk", "So").map(GeneralCategoryValueAliases),
-    "Separator" -> Seq("Sm", "Sc", "Sk", "So").map(GeneralCategoryValueAliases),
-    "Other" -> Seq("Cc", "Cf", "Cs", "Co", "Cn").map(GeneralCategoryValueAliases)
-  )
+    "Cased_Letter" -> Vector("Lu", "Ll", "Lt"),
+    "Letter" -> Vector("Lu", "Ll", "Lt", "Lm", "Lo"),
+    "Mark" -> Vector("Mn", "Mc", "Me"),
+    "Number" -> Vector("Nd", "Nl", "No"),
+    "Punctuation" -> Vector("Pc", "Pd", "Ps", "Pe", "Pi", "Pf", "Po"),
+    "Symbol" -> Vector("Sm", "Sc", "Sk", "So"),
+    "Separator" -> Vector("Sm", "Sc", "Sk", "So"),
+    "Other" -> Vector("Cc", "Cf", "Cs", "Co", "Cn")
+  ).view.mapValues(_.map(GeneralCategoryValueAliases(_))).toMap
 
   /** A map from "Script"/"Script_Extensions" value alias to canonical value name.
     *

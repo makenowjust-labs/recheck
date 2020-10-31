@@ -59,9 +59,9 @@ private final class Checker[A, Q](
   private[this] val sccPairEdges = graph.edges
     .groupMap { case (q1, _, q2) => (sccMap(q1), sccMap(q2)) } { case (q1, a, q2) => a -> (q1, q2) }
     .view
-    .mapValues(_.groupMap(_._1)(_._2).withDefaultValue(Seq.empty))
+    .mapValues(_.groupMap(_._1)(_._2).withDefaultValue(Vector.empty))
     .toMap
-    .withDefaultValue(Map.empty.withDefaultValue(Seq.empty))
+    .withDefaultValue(Map.empty.withDefaultValue(Vector.empty))
 
   /** A type of [[multiNFA]] state. */
   private type R = (Q, Set[Q])
@@ -76,7 +76,7 @@ private final class Checker[A, Q](
   /** Runs a checker. */
   def check(): Complexity[A] =
     checkExponential() match {
-      case Some(pump) => Exponential(witness(Seq(pump)))
+      case Some(pump) => Exponential(witness(Vector(pump)))
       case None =>
         checkPolynomial() match {
           case (0, _)          => Constant
@@ -150,8 +150,8 @@ private final class Checker[A, Q](
             .neighbors(sc)
             .map { case ((), sc) => checkPolynomialComponent(sc) }
             .maxByOption(_._1)
-            .getOrElse((0, Seq.empty))
-        if (maxDegree == 0) (if (isAtom(sc)) 0 else 1, Seq.empty)
+            .getOrElse((0, Vector.empty))
+        if (maxDegree == 0) (if (isAtom(sc)) 0 else 1, Vector.empty)
         else if (isAtom(sc)) (maxDegree, maxPumps)
         else {
           // Appends an IDA structure between the SCC and the maximum chain's source into the chain.
@@ -206,7 +206,7 @@ private final class Checker[A, Q](
 
   /** Builds a witness object from pump strings and states. */
   private[this] def witness(pumps: Seq[Pump]): Witness[A] = {
-    val (pumpPaths, qs) = pumps.foldLeft((Seq.empty[(Seq[A], Seq[A])], multiNFA.initSet.toSet)) {
+    val (pumpPaths, qs) = pumps.foldLeft((Vector.empty[(Seq[A], Seq[A])], multiNFA.initSet.toSet)) {
       case ((pumpPaths, last), (q1, path, q2)) =>
         val prefix = graph.path(last, q1).get
         (pumpPaths :+ (prefix, path), Set(q2))

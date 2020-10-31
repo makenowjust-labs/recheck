@@ -7,7 +7,7 @@ object Graph {
 
   /** Creates a graph from the list of edges. */
   def from[V, L](edges: Seq[(V, L, V)]): Graph[V, L] =
-    Graph(edges.groupMap(_._1)(vlv => (vlv._2, vlv._3)).withDefaultValue(Seq.empty))
+    Graph(edges.groupMap(_._1)(vlv => (vlv._2, vlv._3)).withDefaultValue(Vector.empty))
 }
 
 /** Graph is a directed labelled multi-graph implementation. */
@@ -36,7 +36,7 @@ final case class Graph[V, L] private (neighbors: Map[V, Seq[(L, V)]]) {
     val stack = mutable.Stack.empty[V]
     val inStack = mutable.Set.empty[V]
 
-    val components = Seq.newBuilder[Seq[V]]
+    val components = Vector.newBuilder[Seq[V]]
 
     def dfs(v1: V): Unit = {
       visited(v1) = clock
@@ -46,7 +46,7 @@ final case class Graph[V, L] private (neighbors: Map[V, Seq[(L, V)]]) {
       stack.push(v1)
       inStack.add(v1)
 
-      for ((_, v2) <- neighbors.getOrElse(v1, Seq.empty)) {
+      for ((_, v2) <- neighbors.getOrElse(v1, Vector.empty)) {
         if (!visited.contains(v2)) {
           dfs(v2)
           lowlinks(v1) = Math.min(lowlinks(v1), lowlinks(v2))
@@ -56,7 +56,7 @@ final case class Graph[V, L] private (neighbors: Map[V, Seq[(L, V)]]) {
       }
 
       if (lowlinks(v1) == visited(v1)) {
-        val component = Seq.newBuilder[V]
+        val component = Vector.newBuilder[V]
         var v2 = stack.pop()
         inStack.remove(v2)
         while (v1 != v2) {
@@ -83,7 +83,7 @@ final case class Graph[V, L] private (neighbors: Map[V, Seq[(L, V)]]) {
     val queue = mutable.Queue.empty[(V, Seq[L])]
     val visited = mutable.Set.empty[V]
 
-    queue.enqueueAll(sources.map((_, Seq.empty)))
+    queue.enqueueAll(sources.map((_, Vector.empty)))
     visited.addAll(sources)
 
     while (queue.nonEmpty) {
@@ -118,7 +118,7 @@ final case class Graph[V, L] private (neighbors: Map[V, Seq[(L, V)]]) {
       reachable.addAll(vs)
     }
 
-    Graph(newEdges.result().withDefaultValue(Seq.empty))
+    Graph(newEdges.result().withDefaultValue(Vector.empty))
   }
 
   /** Computes a map from a vertex to vertices being reachable from the vertex.
