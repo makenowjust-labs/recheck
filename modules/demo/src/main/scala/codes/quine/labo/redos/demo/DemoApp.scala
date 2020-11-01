@@ -63,11 +63,11 @@ object DemoApp {
         complexity match {
           case Some(Exponential(w)) =>
             resultArea.innerHTML = s"$pattern is $unsafe (exponential-time matching).<br>"
-            val ws = witness(w).take(3).map { s => s"<code>${JSON.stringify(escape(s))}</code>" }
+            val ws = witness(w).take(3).map { s => s"<code>${escape(JSON.stringify(s))}</code>" }
             resultArea.innerHTML ++= s"Example attack strings: ${ws.mkString(", ")}, ..."
           case Some(Polynomial(d, w)) =>
             resultArea.innerHTML = s"$pattern is $unsafe ($d${ordinal(d)} degree polynomial-time matching).<br>"
-            val ws = witness(w).take(3).map { s => s"<code>${JSON.stringify(escape(s))}</code>" }
+            val ws = witness(w).take(3).map { s => s"<code>${escape(JSON.stringify(s))}</code>" }
             resultArea.innerHTML ++= s"Example attack strings: ${ws.mkString(", ")}, ..."
           case None =>
             resultArea.innerHTML = s"$pattern is $unsafe."
