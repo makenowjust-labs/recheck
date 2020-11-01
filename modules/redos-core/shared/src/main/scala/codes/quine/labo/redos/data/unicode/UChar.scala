@@ -1,5 +1,7 @@
 package codes.quine.labo.redos.data.unicode
 
+import scala.language.implicitConversions
+
 /** UChar is a Unicode code point. */
 final case class UChar(value: Int) extends AnyVal with Ordered[UChar] {
 
@@ -36,4 +38,8 @@ final case class UChar(value: Int) extends AnyVal with Ordered[UChar] {
     case c if c < 0x10000             => f"\\u$c%04X"
     case c                            => f"\\u{$c%X}"
   }
+}
+
+object UChar {
+  implicit def charToUChar(c: Char): UChar = UChar(c.toInt)
 }

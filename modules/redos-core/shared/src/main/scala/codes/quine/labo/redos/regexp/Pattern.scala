@@ -216,7 +216,7 @@ object Pattern {
 
   /** Character is a single character in pattern. (e.g. `/x/`) */
   final case class Character(value: UChar) extends Node with ClassNode {
-    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar] = Success(IChar(value.value))
+    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar] = Success(IChar(value))
   }
 
   /** SimpleEscapeClass is an escape class. (e.g. `/\w/` or `/\s/`) */

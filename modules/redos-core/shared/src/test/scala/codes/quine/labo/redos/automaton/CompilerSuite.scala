@@ -8,7 +8,6 @@ import regexp.Pattern
 import regexp.Pattern._
 import data.IChar
 import data.ICharSet
-import data.UChar
 import util.Timeout
 
 class CompilerSuite extends munit.FunSuite {
@@ -131,7 +130,7 @@ class CompilerSuite extends munit.FunSuite {
 
     // Character, CharacterClass
     assertEquals(
-      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Character(UChar('a')), LineEnd)), flagSet1)),
+      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Character('a'), LineEnd)), flagSet1)),
       Success(
         EpsNFA(
           ICharSet.any(true, false).add(IChar.canonicalize(IChar('a'), false)),
@@ -150,7 +149,7 @@ class CompilerSuite extends munit.FunSuite {
     )
     assertEquals(
       Compiler.compile(
-        Pattern(Sequence(Seq(LineBegin, CharacterClass(false, Seq(Character(UChar('a')))), LineEnd)), flagSet0)
+        Pattern(Sequence(Seq(LineBegin, CharacterClass(false, Seq(Character('a'))), LineEnd)), flagSet0)
       ),
       Success(
         EpsNFA(
@@ -170,7 +169,7 @@ class CompilerSuite extends munit.FunSuite {
     )
     assertEquals(
       Compiler.compile(
-        Pattern(Sequence(Seq(LineBegin, CharacterClass(true, Seq(Character(UChar('a')))), LineEnd)), flagSet0)
+        Pattern(Sequence(Seq(LineBegin, CharacterClass(true, Seq(Character('a'))), LineEnd)), flagSet0)
       ),
       Success(
         EpsNFA(
@@ -482,21 +481,21 @@ class CompilerSuite extends munit.FunSuite {
       )
     )
     assertEquals(
-      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Character(UChar('a')), LineEnd)), flagSet0)),
+      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Character('a'), LineEnd)), flagSet0)),
       Success(nfaA)
     )
     assertEquals(
-      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Capture(Character(UChar('a'))), LineEnd)), flagSet0)),
+      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Capture(Character('a')), LineEnd)), flagSet0)),
       Success(nfaA)
     )
     assertEquals(
       Compiler.compile(
-        Pattern(Sequence(Seq(LineBegin, NamedCapture("foo", Character(UChar('a'))), LineEnd)), flagSet0)
+        Pattern(Sequence(Seq(LineBegin, NamedCapture("foo", Character('a')), LineEnd)), flagSet0)
       ),
       Success(nfaA)
     )
     assertEquals(
-      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Group(Character(UChar('a'))), LineEnd)), flagSet0)),
+      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Group(Character('a')), LineEnd)), flagSet0)),
       Success(nfaA)
     )
 

@@ -137,7 +137,7 @@ object IChar {
   }
 
   /** Creates an interval set containing the character only. */
-  def apply(ch: Int): IChar = IChar(IntervalSet((UChar(ch), UChar(ch + 1))))
+  def apply(ch: UChar): IChar = IChar(IntervalSet((ch, UChar(ch.value + 1))))
 
   /** Creates an empty interval set. */
   def empty: IChar = IChar(IntervalSet.empty[UChar])

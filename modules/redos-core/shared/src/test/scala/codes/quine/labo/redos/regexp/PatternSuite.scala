@@ -6,11 +6,10 @@ import scala.util.Success
 import Pattern._
 import data.IChar
 import data.ICharSet
-import data.UChar
 
 class PatternSuite extends munit.FunSuite {
   test("Pattern.AtomNode#toIChar") {
-    assertEquals(Character(UChar('x')).toIChar(false, false), Success(IChar('x')))
+    assertEquals(Character('x').toIChar(false, false), Success(IChar('x')))
     assertEquals(SimpleEscapeClass(false, EscapeClassKind.Word).toIChar(false, false), Success(IChar.Word))
     assertEquals(
       SimpleEscapeClass(true, EscapeClassKind.Word).toIChar(false, false),
@@ -54,25 +53,25 @@ class PatternSuite extends munit.FunSuite {
       UnicodePropertyValue(false, "sc", "invalid").toIChar(false, false).get
     }
     assertEquals(
-      CharacterClass(false, Seq(Character(UChar('a')), Character(UChar('A')))).toIChar(false, false),
+      CharacterClass(false, Seq(Character('a'), Character('A'))).toIChar(false, false),
       Success(IChar('a').union(IChar('A')))
     )
     assertEquals(
-      CharacterClass(true, Seq(Character(UChar('a')), Character(UChar('A')))).toIChar(false, false),
+      CharacterClass(true, Seq(Character('a'), Character('A'))).toIChar(false, false),
       Success(IChar('a').union(IChar('A'))) // Not complemented is intentionally.
     )
     interceptMessage[InvalidRegExpException]("an empty range") {
-      CharacterClass(true, Seq(ClassRange(UChar('z'), UChar('a')))).toIChar(false, false).get
+      CharacterClass(true, Seq(ClassRange('z', 'a'))).toIChar(false, false).get
     }
-    assertEquals(ClassRange(UChar('a'), UChar('a')).toIChar(false, false), Success(IChar('a')))
-    assertEquals(ClassRange(UChar('a'), UChar('z')).toIChar(false, false), Success(IChar.range(UChar('a'), UChar('z'))))
+    assertEquals(ClassRange('a', 'a').toIChar(false, false), Success(IChar('a')))
+    assertEquals(ClassRange('a', 'z').toIChar(false, false), Success(IChar.range('a', 'z')))
     interceptMessage[InvalidRegExpException]("an empty range") {
-      ClassRange(UChar('z'), UChar('a')).toIChar(false, false).get
+      ClassRange('z', 'a').toIChar(false, false).get
     }
   }
 
   test("Pattern.showNode") {
-    val x = Character(UChar('x'))
+    val x = Character('x')
     assertEquals(showNode(Disjunction(Seq(Disjunction(Seq(x, x)), x))), "(?:x|x)|x")
     assertEquals(showNode(Disjunction(Seq(x, x, x))), "x|x|x")
     assertEquals(showNode(Sequence(Seq(Disjunction(Seq(x, x)), x))), "(?:x|x)x")
@@ -106,16 +105,16 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(showNode(LookAhead(true, x)), "(?!x)")
     assertEquals(showNode(LookBehind(false, x)), "(?<=x)")
     assertEquals(showNode(LookBehind(true, x)), "(?<!x)")
-    assertEquals(showNode(Character(UChar('/'))), "\\/")
-    assertEquals(showNode(Character(UChar(1))), "\\cA")
-    assertEquals(showNode(Character(UChar('\n'))), "\\n")
-    assertEquals(showNode(Character(UChar(' '))), " ")
-    assertEquals(showNode(Character(UChar('A'))), "A")
+    assertEquals(showNode(Character('/')), "\\/")
+    assertEquals(showNode(Character('\u0001')), "\\cA")
+    assertEquals(showNode(Character('\n')), "\\n")
+    assertEquals(showNode(Character(' ')), " ")
+    assertEquals(showNode(Character('A')), "A")
     assertEquals(showNode(CharacterClass(false, Seq(x))), "[x]")
-    assertEquals(showNode(CharacterClass(false, Seq(ClassRange(UChar('a'), UChar('z'))))), "[a-z]")
+    assertEquals(showNode(CharacterClass(false, Seq(ClassRange('a', 'z')))), "[a-z]")
     assertEquals(showNode(CharacterClass(false, Seq(SimpleEscapeClass(false, EscapeClassKind.Word)))), "[\\w]")
-    assertEquals(showNode(CharacterClass(false, Seq(Character(UChar(1))))), "[\\cA]")
-    assertEquals(showNode(CharacterClass(false, Seq(Character(UChar('-'))))), "[\\-]")
+    assertEquals(showNode(CharacterClass(false, Seq(Character('\u0001')))), "[\\cA]")
+    assertEquals(showNode(CharacterClass(false, Seq(Character('-')))), "[\\-]")
     assertEquals(showNode(CharacterClass(true, Seq(x))), "[^x]")
     assertEquals(showNode(SimpleEscapeClass(false, EscapeClassKind.Digit)), "\\d")
     assertEquals(showNode(SimpleEscapeClass(true, EscapeClassKind.Digit)), "\\D")
@@ -139,7 +138,7 @@ class PatternSuite extends munit.FunSuite {
 
   test("Pattern#toString") {
     assertEquals(
-      Pattern(Character(UChar('x')), FlagSet(true, true, false, false, false, false)).toString,
+      Pattern(Character('x'), FlagSet(true, true, false, false, false, false)).toString,
       "/x/gi"
     )
   }
@@ -201,7 +200,7 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(Pattern(Sequence(Seq.empty), flagSet0).alphabet, Success(ICharSet.any(false, false)))
     assertEquals(Pattern(Dot, flagSet0).alphabet, Success(ICharSet.any(false, false).add(dot16)))
     assertEquals(
-      Pattern(Disjunction(Seq(Character(UChar('A')), Character(UChar('Z')))), flagSet0).alphabet,
+      Pattern(Disjunction(Seq(Character('A'), Character('Z'))), flagSet0).alphabet,
       Success(ICharSet.any(false, false).add(IChar('A')).add(IChar('Z')))
     )
     assertEquals(
@@ -232,7 +231,7 @@ class PatternSuite extends munit.FunSuite {
       Success(ICharSet.any(true, false).add(IChar.canonicalize(dot16, false)))
     )
     assertEquals(
-      Pattern(Disjunction(Seq(Character(UChar('A')), Character(UChar('Z')))), flagSet3).alphabet,
+      Pattern(Disjunction(Seq(Character('A'), Character('Z'))), flagSet3).alphabet,
       Success(ICharSet.any(true, false).add(IChar('A')).add(IChar('Z')))
     )
     assertEquals(Pattern(Sequence(Seq.empty), flagSet4).alphabet, Success(ICharSet.any(true, true)))

@@ -60,9 +60,9 @@ class ICharSuite extends munit.FunSuite {
   }
 
   test("IChar.range") {
-    assertEquals(IChar.range(UChar('a'), UChar('a')), IChar('a'))
-    assertEquals(IChar.range(UChar('z'), UChar('a')), IChar.empty)
-    assertEquals(IChar.range(UChar('a'), UChar('z')), IChar(IntervalSet((UChar('a'), UChar('z' + 1)))))
+    assertEquals(IChar.range('a', 'a'), IChar('a'))
+    assertEquals(IChar.range('z', 'a'), IChar.empty)
+    assertEquals(IChar.range('a', 'z'), IChar(IntervalSet((UChar('a'), UChar('z' + 1)))))
   }
 
   test("IChar.union") {
@@ -76,12 +76,12 @@ class ICharSuite extends munit.FunSuite {
 
     // U+FF21: FULLWIDTH LATIN CAPITAL LETTER A
     // U+FF41: FULLWIDTH LATIN SMALL LETTER A
-    assertEquals(IChar.canonicalize(IChar(0xff41), false), IChar(0xff21))
-    assertEquals(IChar.canonicalize(IChar(0xff21), true), IChar(0xff41))
+    assertEquals(IChar.canonicalize(IChar('\uff41'), false), IChar('\uff21'))
+    assertEquals(IChar.canonicalize(IChar('\uff21'), true), IChar('\uff41'))
 
     // U+017F: LATIN SMALL LETTER LONG S
-    assertEquals(IChar.canonicalize(IChar(0x017f), false), IChar(0x017f))
-    assertEquals(IChar.canonicalize(IChar(0x017f), true), IChar('s'))
+    assertEquals(IChar.canonicalize(IChar('\u017f'), false), IChar('\u017f'))
+    assertEquals(IChar.canonicalize(IChar('\u017f'), true), IChar('s'))
   }
 
   test("IChar#withLineTerminator") {
@@ -126,17 +126,17 @@ class ICharSuite extends munit.FunSuite {
   }
 
   test("IChar#diff") {
-    assertEquals(IChar.range(UChar('a'), UChar('c')).diff(IChar('a')), IChar.range(UChar('b'), UChar('c')))
+    assertEquals(IChar.range('a', 'c').diff(IChar('a')), IChar.range('b', 'c'))
   }
 
   test("IChar#contains") {
-    assert(IChar.range(UChar('a'), UChar('z')).contains(UChar('a')))
-    assert(!IChar.range(UChar('a'), UChar('z')).contains(UChar('A')))
+    assert(IChar.range('a', 'z').contains(UChar('a')))
+    assert(!IChar.range('a', 'z').contains(UChar('A')))
   }
 
   test("IChar#head") {
     assertEquals(IChar('A').head, UChar('A'))
-    assertEquals(IChar.range(UChar('a'), UChar('z')).head, UChar('a'))
+    assertEquals(IChar.range('a', 'z').head, UChar('a'))
     intercept[NoSuchElementException](IChar.empty.head)
   }
 
@@ -158,7 +158,7 @@ class ICharSuite extends munit.FunSuite {
       "[Aa-z]w"
     )
     assertEquals(
-      IChar(0x01).union(IChar('-')).union(IChar(0x10ffff)).toString,
+      IChar('\u0001').union(IChar('-')).union(IChar(UChar(0x10ffff))).toString,
       "[\\cA\\-\\u{10FFFF}]"
     )
   }

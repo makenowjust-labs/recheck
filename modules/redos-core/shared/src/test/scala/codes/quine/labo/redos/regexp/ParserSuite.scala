@@ -49,7 +49,7 @@ class ParserSuite extends munit.FunSuite {
   }
 
   test("Parser#Source") {
-    assertEquals(parse("x", P.Source(_)), Parsed.Success(Character(UChar('x')), 1))
+    assertEquals(parse("x", P.Source(_)), Parsed.Success(Character('x'), 1))
     assert(!parse("x)", P.Source(_)).isSuccess)
   }
 
@@ -67,20 +67,20 @@ class ParserSuite extends munit.FunSuite {
   }
 
   test("Parser#Term") {
-    assertEquals(parse("x", P.Term(_)), Parsed.Success(Character(UChar('x')), 1))
-    assertEquals(parse("(?=x)*", P.Term(_)), Parsed.Success(LookAhead(false, Character(UChar('x'))), 5))
-    assertEquals(parse("(?=x)*", PA.Term(_)), Parsed.Success(Star(false, LookAhead(false, Character(UChar('x')))), 6))
-    assertEquals(parse("(?<=x)*", P.Term(_)), Parsed.Success(LookBehind(false, Character(UChar('x'))), 6))
+    assertEquals(parse("x", P.Term(_)), Parsed.Success(Character('x'), 1))
+    assertEquals(parse("(?=x)*", P.Term(_)), Parsed.Success(LookAhead(false, Character('x')), 5))
+    assertEquals(parse("(?=x)*", PA.Term(_)), Parsed.Success(Star(false, LookAhead(false, Character('x'))), 6))
+    assertEquals(parse("(?<=x)*", P.Term(_)), Parsed.Success(LookBehind(false, Character('x')), 6))
     assertEquals(parse("\\b*", P.Term(_)), Parsed.Success(WordBoundary(false), 2))
     assertEquals(parse("^*", P.Term(_)), Parsed.Success(LineBegin, 1))
     assertEquals(parse("$*", P.Term(_)), Parsed.Success(LineEnd, 1))
-    assertEquals(parse("x{1}", P.Term(_)), Parsed.Success(Repeat(false, 1, None, Character(UChar('x'))), 4))
-    assertEquals(parse("x*", P.Term(_)), Parsed.Success(Star(false, Character(UChar('x'))), 2))
-    assertEquals(parse("x*?", P.Term(_)), Parsed.Success(Star(true, Character(UChar('x'))), 3))
-    assertEquals(parse("x+", P.Term(_)), Parsed.Success(Plus(false, Character(UChar('x'))), 2))
-    assertEquals(parse("x+?", P.Term(_)), Parsed.Success(Plus(true, Character(UChar('x'))), 3))
-    assertEquals(parse("x?", P.Term(_)), Parsed.Success(Question(false, Character(UChar('x'))), 2))
-    assertEquals(parse("x??", P.Term(_)), Parsed.Success(Question(true, Character(UChar('x'))), 3))
+    assertEquals(parse("x{1}", P.Term(_)), Parsed.Success(Repeat(false, 1, None, Character('x')), 4))
+    assertEquals(parse("x*", P.Term(_)), Parsed.Success(Star(false, Character('x')), 2))
+    assertEquals(parse("x*?", P.Term(_)), Parsed.Success(Star(true, Character('x')), 3))
+    assertEquals(parse("x+", P.Term(_)), Parsed.Success(Plus(false, Character('x')), 2))
+    assertEquals(parse("x+?", P.Term(_)), Parsed.Success(Plus(true, Character('x')), 3))
+    assertEquals(parse("x?", P.Term(_)), Parsed.Success(Question(false, Character('x')), 2))
+    assertEquals(parse("x??", P.Term(_)), Parsed.Success(Question(true, Character('x')), 3))
   }
 
   test("Parser#Repeat") {
@@ -96,9 +96,9 @@ class ParserSuite extends munit.FunSuite {
     assertEquals(parse(".", P.Atom(_)), Parsed.Success(Dot, 1))
     assertEquals(parse("^", P.Atom(_)), Parsed.Success(LineBegin, 1))
     assertEquals(parse("$", P.Atom(_)), Parsed.Success(LineEnd, 1))
-    assertEquals(parse("[x]", P.Atom(_)), Parsed.Success(CharacterClass(false, Seq(Character(UChar('x')))), 3))
-    assertEquals(parse("\\0", P.Atom(_)), Parsed.Success(Character(UChar(0)), 2))
-    assertEquals(parse("(x)", P.Atom(_)), Parsed.Success(Capture(Character(UChar('x'))), 3))
+    assertEquals(parse("[x]", P.Atom(_)), Parsed.Success(CharacterClass(false, Seq(Character('x'))), 3))
+    assertEquals(parse("\\0", P.Atom(_)), Parsed.Success(Character('\u0000'), 2))
+    assertEquals(parse("(x)", P.Atom(_)), Parsed.Success(Capture(Character('x')), 3))
     assert(!parse("*", P.Atom(_)).isSuccess)
     assert(!parse("+", P.Atom(_)).isSuccess)
     assert(!parse("?", P.Atom(_)).isSuccess)
@@ -107,27 +107,27 @@ class ParserSuite extends munit.FunSuite {
     assert(!parse("{", P.Atom(_)).isSuccess)
     assert(!parse("}", P.Atom(_)).isSuccess)
     assert(!parse("]", P.Atom(_)).isSuccess)
-    assertEquals(parse("0", P.Atom(_)), Parsed.Success(Character(UChar('0')), 1))
-    assertEquals(parse("{", PA.Atom(_)), Parsed.Success(Character(UChar('{')), 1))
-    assertEquals(parse("}", PA.Atom(_)), Parsed.Success(Character(UChar('}')), 1))
+    assertEquals(parse("0", P.Atom(_)), Parsed.Success(Character('0'), 1))
+    assertEquals(parse("{", PA.Atom(_)), Parsed.Success(Character('{'), 1))
+    assertEquals(parse("}", PA.Atom(_)), Parsed.Success(Character('}'), 1))
   }
 
   test("Parser#Class") {
-    assertEquals(parse("[x]", P.Class(_)), Parsed.Success(CharacterClass(false, Seq(Character(UChar('x')))), 3))
-    assertEquals(parse("[^x]", P.Class(_)), Parsed.Success(CharacterClass(true, Seq(Character(UChar('x')))), 4))
+    assertEquals(parse("[x]", P.Class(_)), Parsed.Success(CharacterClass(false, Seq(Character('x'))), 3))
+    assertEquals(parse("[^x]", P.Class(_)), Parsed.Success(CharacterClass(true, Seq(Character('x'))), 4))
     assert(!parse("[x", P.Class(_)).isSuccess)
     assert(!parse("[^x", P.Class(_)).isSuccess)
   }
 
   test("Parser#ClassNode") {
-    assertEquals(parse("0", P.ClassNode(_)), Parsed.Success(Character(UChar('0')), 1))
+    assertEquals(parse("0", P.ClassNode(_)), Parsed.Success(Character('0'), 1))
     assertEquals(parse("\\w", P.ClassNode(_)), Parsed.Success(SimpleEscapeClass(false, EscapeClassKind.Word), 2))
     assert(!parse("\\w-", P.ClassNode(_)).isSuccess)
     assertEquals(parse("\\w-", PA.ClassNode(_)), Parsed.Success(SimpleEscapeClass(false, EscapeClassKind.Word), 2))
     assert(!parse("0-\\w", P.ClassNode(_)).isSuccess)
-    assertEquals(parse("0-\\w", PA.ClassNode(_)), Parsed.Success(Character(UChar('0')), 1))
-    assertEquals(parse("0-9", P.ClassNode(_)), Parsed.Success(ClassRange(UChar('0'), UChar('9')), 3))
-    assertEquals(parse("0-9", PA.ClassNode(_)), Parsed.Success(ClassRange(UChar('0'), UChar('9')), 3))
+    assertEquals(parse("0-\\w", PA.ClassNode(_)), Parsed.Success(Character('0'), 1))
+    assertEquals(parse("0-9", P.ClassNode(_)), Parsed.Success(ClassRange('0', '9'), 3))
+    assertEquals(parse("0-9", PA.ClassNode(_)), Parsed.Success(ClassRange('0', '9'), 3))
   }
 
   test("Parser#ClassAtom") {
@@ -147,12 +147,12 @@ class ParserSuite extends munit.FunSuite {
     assert(!parse("\\k<foo>", P.Escape(_)).isSuccess)
     assertEquals(parse("\\1", P.Escape(_)), Parsed.Success(BackReference(1), 2))
     assertEquals(parse("\\w", P.Escape(_)), Parsed.Success(SimpleEscapeClass(false, EscapeClassKind.Word), 2))
-    assertEquals(parse("\\0", P.Escape(_)), Parsed.Success(Character(UChar(0)), 2))
+    assertEquals(parse("\\0", P.Escape(_)), Parsed.Success(Character('\u0000'), 2))
     assertEquals(parse("\\b", PAN.Escape(_)), Parsed.Success(WordBoundary(false), 2))
     assertEquals(parse("\\k<foo>", PAN.Escape(_)), Parsed.Success(NamedBackReference("foo"), 7))
     assertEquals(parse("\\1", PAN.Escape(_)), Parsed.Success(BackReference(1), 2))
     assertEquals(parse("\\w", PAN.Escape(_)), Parsed.Success(SimpleEscapeClass(false, EscapeClassKind.Word), 2))
-    assertEquals(parse("\\0", PAN.Escape(_)), Parsed.Success(Character(UChar(0)), 2))
+    assertEquals(parse("\\0", PAN.Escape(_)), Parsed.Success(Character('\u0000'), 2))
   }
 
   test("Parser#WordBoundary") {
@@ -252,13 +252,13 @@ class ParserSuite extends munit.FunSuite {
   }
 
   test("Parser#Paren") {
-    assertEquals(parse("(x)", P.Paren(_)), Parsed.Success(Capture(Character(UChar('x'))), 3))
-    assertEquals(parse("(?:x)", P.Paren(_)), Parsed.Success(Group(Character(UChar('x'))), 5))
-    assertEquals(parse("(?=x)", P.Paren(_)), Parsed.Success(LookAhead(false, Character(UChar('x'))), 5))
-    assertEquals(parse("(?!x)", P.Paren(_)), Parsed.Success(LookAhead(true, Character(UChar('x'))), 5))
-    assertEquals(parse("(?<=x)", P.Paren(_)), Parsed.Success(LookBehind(false, Character(UChar('x'))), 6))
-    assertEquals(parse("(?<!x)", P.Paren(_)), Parsed.Success(LookBehind(true, Character(UChar('x'))), 6))
-    assertEquals(parse("(?<foo>x)", P.Paren(_)), Parsed.Success(NamedCapture("foo", Character(UChar('x'))), 9))
+    assertEquals(parse("(x)", P.Paren(_)), Parsed.Success(Capture(Character('x')), 3))
+    assertEquals(parse("(?:x)", P.Paren(_)), Parsed.Success(Group(Character('x')), 5))
+    assertEquals(parse("(?=x)", P.Paren(_)), Parsed.Success(LookAhead(false, Character('x')), 5))
+    assertEquals(parse("(?!x)", P.Paren(_)), Parsed.Success(LookAhead(true, Character('x')), 5))
+    assertEquals(parse("(?<=x)", P.Paren(_)), Parsed.Success(LookBehind(false, Character('x')), 6))
+    assertEquals(parse("(?<!x)", P.Paren(_)), Parsed.Success(LookBehind(true, Character('x')), 6))
+    assertEquals(parse("(?<foo>x)", P.Paren(_)), Parsed.Success(NamedCapture("foo", Character('x')), 9))
   }
 
   test("Parser#CaptureName") {
