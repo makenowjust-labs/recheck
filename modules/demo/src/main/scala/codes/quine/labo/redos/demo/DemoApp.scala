@@ -42,7 +42,7 @@ object DemoApp {
     val (source, flags) = input match {
       case SlashRegExp(source, flags) => (source, flags)
       case _ =>
-        resultArea.textContent = "An input text is invalid."
+        resultArea.textContent = "Error: invalid input"
         return
     }
 
@@ -73,7 +73,7 @@ object DemoApp {
             resultArea.innerHTML = s"$pattern is $unsafe."
         }
       case Unknown(err) =>
-        resultArea.innerHTML = s"An error is occured on anaylyzing: $err"
+        resultArea.innerHTML = s"Error: $err"
     }
   }
 
