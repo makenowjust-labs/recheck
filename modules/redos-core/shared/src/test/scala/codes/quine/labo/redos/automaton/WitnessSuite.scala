@@ -9,6 +9,12 @@ class WitnessSuite extends munit.FunSuite {
     )
   }
 
+  test("Witness#buildAttack") {
+    assertEquals(Witness(Seq((Seq(1), Seq(2))), Seq(3)).buildAttack(0), Seq(1, 3))
+    assertEquals(Witness(Seq((Seq(1), Seq(2))), Seq(3)).buildAttack(1), Seq(1, 2, 3))
+    assertEquals(Witness(Seq((Seq(1), Seq(2))), Seq(3)).buildAttack(2), Seq(1, 2, 2, 3))
+  }
+
   test("Witness#toLazyList") {
     assertEquals(
       Witness(Seq((Seq(1), Seq(2))), Seq(3)).toLazyList.take(3),
