@@ -1,5 +1,9 @@
 # dev
 
+Changes:
+
+  - Move `Compiler` to `automaton` package.
+
 Fixes:
 
   - Fix conversion from repeat pattern `a{n,m}` to ε-NFA correctly.
