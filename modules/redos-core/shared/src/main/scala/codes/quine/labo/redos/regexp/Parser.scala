@@ -18,10 +18,12 @@ import unicode.Property
 object Parser {
 
   /** Parses ECMA-262 RegExp string. */
-  def parse(source: String, flags: String, additional: Boolean = true)(implicit timeout: Timeout): Try[Pattern] =
+  def parse(source: String, flags: String, additional: Boolean = true)(implicit
+      timeout: Timeout = Timeout.NoTimeout
+  ): Try[Pattern] =
     for {
       flagSet <- timeout.checkTimeoutWith("parse: flags")(parseFlagSet(flags))
-      (hasNamedCapture, captures) = timeout.checkTimeoutWith("parse: preprodess")(preprocessParens(source))
+      (hasNamedCapture, captures) = timeout.checkTimeoutWith("parse: preprocess")(preprocessParens(source))
       result = timeout.checkTimeoutWith("parse: source") {
         fastparse.parse(source, new Parser(flagSet.unicode, additional, hasNamedCapture, captures).Source(_))
       }

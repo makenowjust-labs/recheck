@@ -13,7 +13,7 @@ import util.Timeout
 object Checker {
 
   /** Checks a match time complexity of the ε-NFA. */
-  def check[A, Q](nfa: OrderedNFA[A, Q])(implicit timeout: Timeout): Try[Complexity[A]] =
+  def check[A, Q](nfa: OrderedNFA[A, Q])(implicit timeout: Timeout = Timeout.NoTimeout): Try[Complexity[A]] =
     Try(new Checker(nfa, timeout).check())
 }
 
