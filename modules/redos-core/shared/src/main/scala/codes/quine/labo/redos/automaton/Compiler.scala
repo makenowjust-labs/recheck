@@ -1,17 +1,14 @@
 package codes.quine.labo.redos
-package regexp
+package automaton
 
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-import scala.util.chaining._
 
-import Pattern._
-import automaton.EpsNFA
-import automaton.EpsNFA._
-import data.ICharSet
+import EpsNFA._
 import data.IChar
-import data.IChar.{LineTerminator, Word}
+import regexp.Pattern
+import regexp.Pattern._
 import util.Timeout
 import util.TryUtil
 
@@ -19,9 +16,9 @@ import util.TryUtil
 object Compiler {
 
   /** Compiles ECMA-262 RegExp into ε-NFA. */
-  def compile(pattern: Pattern)(implicit timeout: Timeout): Try[EpsNFA[Int]] =
+  def compile(pattern: Pattern)(implicit timeout: Timeout = Timeout.NoTimeout): Try[EpsNFA[Int]] =
     for {
-      alphabet <- Compiler.alphabet(pattern)
+      alphabet <- pattern.alphabet
       (stateSet, init, accept, tau) <- {
         import timeout._
 
@@ -150,14 +147,14 @@ object Compiler {
         })
 
         loop(pattern.node).map { case (i0, a0) =>
-          val i = if (!hasLineBeginAtBegin(pattern)) {
+          val i = if (!pattern.hasLineBeginAtBegin) {
             val i1 = nextQ()
             val i2 = nextQ()
             tau.addOne(i1 -> Eps(Vector(i0, i2)))
             tau.addOne(i2 -> Consume(alphabet.chars.toSet, i1))
             i1
           } else i0
-          val a = if (!hasLineEndAtEnd(pattern)) {
+          val a = if (!pattern.hasLineEndAtEnd) {
             val a1 = nextQ()
             val a2 = nextQ()
             tau.addOne(a0 -> Eps(Vector(a1, a2)))
@@ -168,108 +165,4 @@ object Compiler {
         }
       }
     } yield EpsNFA(alphabet, stateSet, init, accept, tau)
-
-  /** Tests the pattern has line-begin assertion `^` at its begin position. */
-  private[regexp] def hasLineBeginAtBegin(pattern: Pattern): Boolean = {
-    def loop(node: Node): Boolean = node match {
-      case Disjunction(ns)    => ns.forall(loop(_))
-      case Sequence(ns)       => ns.headOption.exists(loop(_))
-      case Capture(n)         => loop(n)
-      case NamedCapture(_, n) => loop(n)
-      case Group(n)           => loop(n)
-      case LineBegin          => true
-      case _                  => false
-    }
-    !pattern.flagSet.multiline && loop(pattern.node)
-  }
-
-  /** Tests the pattern has line-end assertion `$` at its end position. */
-  private[regexp] def hasLineEndAtEnd(pattern: Pattern): Boolean = {
-    def loop(node: Node): Boolean = node match {
-      case Disjunction(ns)    => ns.forall(loop(_))
-      case Sequence(ns)       => ns.lastOption.exists(loop(_))
-      case Capture(n)         => loop(n)
-      case NamedCapture(_, n) => loop(n)
-      case Group(n)           => loop(n)
-      case LineEnd            => true
-      case _                  => false
-    }
-    !pattern.flagSet.multiline && loop(pattern.node)
-  }
-
-  /** Computes alphabet from the pattern. */
-  def alphabet(pattern: Pattern)(implicit timeout: Timeout): Try[ICharSet] = {
-    import timeout._
-
-    val FlagSet(_, ignoreCase, _, dotAll, unicode, _) = pattern.flagSet
-    val set = ICharSet
-      .any(ignoreCase, unicode)
-      .pipe(set => if (needsLineTerminatorDistinction(pattern)) set.add(LineTerminator.withLineTerminator) else set)
-      .pipe(set => if (needsWordDistinction(pattern)) set.add(Word.withWord) else set)
-
-    def loop(node: Node): Try[Seq[IChar]] = checkTimeoutWith("alphabet: loop")(node match {
-      case Disjunction(ns)    => TryUtil.traverse(ns)(loop(_)).map(_.flatten)
-      case Sequence(ns)       => TryUtil.traverse(ns)(loop(_)).map(_.flatten)
-      case Capture(n)         => loop(n)
-      case NamedCapture(_, n) => loop(n)
-      case Group(n)           => loop(n)
-      case Star(_, n)         => loop(n)
-      case Plus(_, n)         => loop(n)
-      case Question(_, n)     => loop(n)
-      case Repeat(_, _, _, n) => loop(n)
-      case LookAhead(_, n)    => loop(n)
-      case LookBehind(_, n)   => loop(n)
-      case atom: AtomNode =>
-        atom.toIChar(ignoreCase, unicode).map { ch =>
-          Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch)
-        }
-      case Dot =>
-        val any = if (unicode) IChar.Any else IChar.Any16
-        val ch = if (dotAll) any else any.diff(IChar.LineTerminator)
-        Success(Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch))
-      case _ => Success(Vector.empty)
-    })
-
-    loop(pattern.node).map(_.foldLeft(set)(_.add(_)))
-  }
-
-  /** Tests whether the pattern needs line terminator disinction or not. */
-  private[regexp] def needsLineTerminatorDistinction(pattern: Pattern): Boolean = {
-    def loop(node: Node): Boolean = node match {
-      case Disjunction(ns)     => ns.exists(loop(_))
-      case Sequence(ns)        => ns.exists(loop(_))
-      case Capture(n)          => loop(n)
-      case NamedCapture(_, n)  => loop(n)
-      case Group(n)            => loop(n)
-      case Star(_, n)          => loop(n)
-      case Plus(_, n)          => loop(n)
-      case Question(_, n)      => loop(n)
-      case Repeat(_, _, _, n)  => loop(n)
-      case LookAhead(_, n)     => loop(n)
-      case LookBehind(_, n)    => loop(n)
-      case LineBegin | LineEnd => true
-      case _                   => false
-    }
-    pattern.flagSet.multiline && loop(pattern.node)
-  }
-
-  /** Tests whether the pattern needs word character disinction or not. */
-  private[regexp] def needsWordDistinction(pattern: Pattern): Boolean = {
-    def loop(node: Node): Boolean = node match {
-      case Disjunction(ns)    => ns.exists(loop(_))
-      case Sequence(ns)       => ns.exists(loop(_))
-      case Capture(n)         => loop(n)
-      case NamedCapture(_, n) => loop(n)
-      case Group(n)           => loop(n)
-      case Star(_, n)         => loop(n)
-      case Plus(_, n)         => loop(n)
-      case Question(_, n)     => loop(n)
-      case Repeat(_, _, _, n) => loop(n)
-      case LookAhead(_, n)    => loop(n)
-      case LookBehind(_, n)   => loop(n)
-      case WordBoundary(_)    => true
-      case _                  => false
-    }
-    loop(pattern.node)
-  }
 }

@@ -4,7 +4,7 @@ import scala.concurrent.duration.Duration
 import scala.util.Try
 
 import automaton.Checker
-import regexp.Compiler
+import automaton.Compiler
 import regexp.Parser
 import util.Timeout
 

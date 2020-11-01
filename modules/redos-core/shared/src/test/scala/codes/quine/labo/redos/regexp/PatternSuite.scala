@@ -5,6 +5,7 @@ import scala.util.Success
 
 import Pattern._
 import data.IChar
+import data.ICharSet
 import data.UChar
 
 class PatternSuite extends munit.FunSuite {
@@ -141,5 +142,171 @@ class PatternSuite extends munit.FunSuite {
       Pattern(Character(UChar('x')), FlagSet(true, true, false, false, false, false)).toString,
       "/x/gi"
     )
+  }
+
+  test("Pattern#hasLineBeginAtBegin") {
+    val flagSet0 = FlagSet(false, false, false, false, false, false)
+    val flagSet1 = FlagSet(false, false, true, false, false, false)
+    assertEquals(Pattern(Disjunction(Seq(LineBegin, LineBegin)), flagSet0).hasLineBeginAtBegin, true)
+    assertEquals(Pattern(Disjunction(Seq(Dot, LineBegin)), flagSet0).hasLineBeginAtBegin, false)
+    assertEquals(Pattern(Disjunction(Seq(LineBegin, Dot)), flagSet0).hasLineBeginAtBegin, false)
+    assertEquals(Pattern(Disjunction(Seq(Dot, Dot)), flagSet0).hasLineBeginAtBegin, false)
+    assertEquals(Pattern(Sequence(Seq(Dot, LineBegin)), flagSet0).hasLineBeginAtBegin, false)
+    assertEquals(Pattern(Sequence(Seq(LineBegin, Dot)), flagSet0).hasLineBeginAtBegin, true)
+    assertEquals(Pattern(Sequence(Seq(Dot, Dot)), flagSet0).hasLineBeginAtBegin, false)
+    assertEquals(Pattern(Capture(LineBegin), flagSet0).hasLineBeginAtBegin, true)
+    assertEquals(Pattern(Capture(Dot), flagSet0).hasLineBeginAtBegin, false)
+    assertEquals(Pattern(NamedCapture("foo", LineBegin), flagSet0).hasLineBeginAtBegin, true)
+    assertEquals(Pattern(NamedCapture("foo", Dot), flagSet0).hasLineBeginAtBegin, false)
+    assertEquals(Pattern(Group(LineBegin), flagSet0).hasLineBeginAtBegin, true)
+    assertEquals(Pattern(Group(Dot), flagSet0).hasLineBeginAtBegin, false)
+    assertEquals(Pattern(LineBegin, flagSet0).hasLineBeginAtBegin, true)
+    assertEquals(Pattern(LineEnd, flagSet0).hasLineBeginAtBegin, false)
+    assertEquals(Pattern(Dot, flagSet0).hasLineBeginAtBegin, false)
+    assertEquals(Pattern(LineBegin, flagSet1).hasLineBeginAtBegin, false)
+  }
+
+  test("Pattern#hasLineEndAtEnd") {
+    val flagSet0 = FlagSet(false, false, false, false, false, false)
+    val flagSet1 = FlagSet(false, false, true, false, false, false)
+    assertEquals(Pattern(Disjunction(Seq(LineEnd, LineEnd)), flagSet0).hasLineEndAtEnd, true)
+    assertEquals(Pattern(Disjunction(Seq(Dot, LineEnd)), flagSet0).hasLineEndAtEnd, false)
+    assertEquals(Pattern(Disjunction(Seq(LineEnd, Dot)), flagSet0).hasLineEndAtEnd, false)
+    assertEquals(Pattern(Disjunction(Seq(Dot, Dot)), flagSet0).hasLineEndAtEnd, false)
+    assertEquals(Pattern(Sequence(Seq(Dot, LineEnd)), flagSet0).hasLineEndAtEnd, true)
+    assertEquals(Pattern(Sequence(Seq(LineEnd, Dot)), flagSet0).hasLineEndAtEnd, false)
+    assertEquals(Pattern(Sequence(Seq(Dot, Dot)), flagSet0).hasLineEndAtEnd, false)
+    assertEquals(Pattern(Capture(LineEnd), flagSet0).hasLineEndAtEnd, true)
+    assertEquals(Pattern(Capture(Dot), flagSet0).hasLineEndAtEnd, false)
+    assertEquals(Pattern(NamedCapture("foo", LineEnd), flagSet0).hasLineEndAtEnd, true)
+    assertEquals(Pattern(NamedCapture("foo", Dot), flagSet0).hasLineEndAtEnd, false)
+    assertEquals(Pattern(Group(LineEnd), flagSet0).hasLineEndAtEnd, true)
+    assertEquals(Pattern(Group(Dot), flagSet0).hasLineEndAtEnd, false)
+    assertEquals(Pattern(LineBegin, flagSet0).hasLineEndAtEnd, false)
+    assertEquals(Pattern(LineEnd, flagSet0).hasLineEndAtEnd, true)
+    assertEquals(Pattern(Dot, flagSet0).hasLineEndAtEnd, false)
+    assertEquals(Pattern(LineEnd, flagSet1).hasLineEndAtEnd, false)
+  }
+
+  test("Pattern#alphabet") {
+    val flagSet0 = FlagSet(false, false, false, false, false, false)
+    val flagSet1 = FlagSet(false, false, true, false, false, false)
+    val flagSet2 = FlagSet(false, false, false, true, false, false)
+    val flagSet3 = FlagSet(false, true, false, false, false, false)
+    val flagSet4 = FlagSet(false, true, false, false, true, false)
+    val word = IChar.Word.withWord
+    val lineTerminator = IChar.LineTerminator.withLineTerminator
+    val dot16 = IChar.Any16.diff(IChar.LineTerminator)
+    val dot = IChar.Any.diff(IChar.LineTerminator)
+    assertEquals(Pattern(Sequence(Seq.empty), flagSet0).alphabet, Success(ICharSet.any(false, false)))
+    assertEquals(Pattern(Dot, flagSet0).alphabet, Success(ICharSet.any(false, false).add(dot16)))
+    assertEquals(
+      Pattern(Disjunction(Seq(Character(UChar('A')), Character(UChar('Z')))), flagSet0).alphabet,
+      Success(ICharSet.any(false, false).add(IChar('A')).add(IChar('Z')))
+    )
+    assertEquals(
+      Pattern(WordBoundary(false), flagSet0).alphabet,
+      Success(ICharSet.any(false, false).add(word))
+    )
+    assertEquals(
+      Pattern(LineBegin, flagSet1).alphabet,
+      Success(ICharSet.any(false, false).add(lineTerminator))
+    )
+    assertEquals(
+      Pattern(Sequence(Seq(LineBegin, WordBoundary(false))), flagSet1).alphabet,
+      Success(ICharSet.any(false, false).add(lineTerminator).add(word))
+    )
+    assertEquals(Pattern(Capture(Dot), flagSet2).alphabet, Success(ICharSet.any(false, false)))
+    assertEquals(Pattern(NamedCapture("foo", Dot), flagSet2).alphabet, Success(ICharSet.any(false, false)))
+    assertEquals(Pattern(Group(Dot), flagSet2).alphabet, Success(ICharSet.any(false, false)))
+    assertEquals(Pattern(Star(false, Dot), flagSet2).alphabet, Success(ICharSet.any(false, false)))
+    assertEquals(Pattern(Plus(false, Dot), flagSet2).alphabet, Success(ICharSet.any(false, false)))
+    assertEquals(Pattern(Question(false, Dot), flagSet2).alphabet, Success(ICharSet.any(false, false)))
+    assertEquals(Pattern(Repeat(false, 2, None, Dot), flagSet2).alphabet, Success(ICharSet.any(false, false)))
+    assertEquals(Pattern(LookAhead(false, Dot), flagSet2).alphabet, Success(ICharSet.any(false, false)))
+    assertEquals(Pattern(LookBehind(false, Dot), flagSet2).alphabet, Success(ICharSet.any(false, false)))
+    assertEquals(Pattern(Dot, flagSet2).alphabet, Success(ICharSet.any(false, false)))
+    assertEquals(Pattern(Sequence(Seq.empty), flagSet3).alphabet, Success(ICharSet.any(true, false)))
+    assertEquals(
+      Pattern(Dot, flagSet3).alphabet,
+      Success(ICharSet.any(true, false).add(IChar.canonicalize(dot16, false)))
+    )
+    assertEquals(
+      Pattern(Disjunction(Seq(Character(UChar('A')), Character(UChar('Z')))), flagSet3).alphabet,
+      Success(ICharSet.any(true, false).add(IChar('A')).add(IChar('Z')))
+    )
+    assertEquals(Pattern(Sequence(Seq.empty), flagSet4).alphabet, Success(ICharSet.any(true, true)))
+    assertEquals(
+      Pattern(Dot, flagSet4).alphabet,
+      Success(ICharSet.any(true, true).add(IChar.canonicalize(dot, true)))
+    )
+  }
+
+  test("Pattern#needsLineTerminatorDistinction") {
+    val flagSet0 = FlagSet(false, false, true, false, false, false)
+    val flagSet1 = FlagSet(false, false, false, false, false, false)
+    assertEquals(Pattern(Disjunction(Seq(Dot, LineBegin)), flagSet0).needsLineTerminatorDistinction, true)
+    assertEquals(Pattern(Disjunction(Seq(LineBegin, Dot)), flagSet0).needsLineTerminatorDistinction, true)
+    assertEquals(Pattern(Disjunction(Seq(Dot, Dot)), flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(Pattern(Sequence(Seq(Dot, LineBegin)), flagSet0).needsLineTerminatorDistinction, true)
+    assertEquals(Pattern(Sequence(Seq(LineBegin, Dot)), flagSet0).needsLineTerminatorDistinction, true)
+    assertEquals(Pattern(Sequence(Seq(Dot, Dot)), flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(Pattern(Capture(LineBegin), flagSet0).needsLineTerminatorDistinction, true)
+    assertEquals(Pattern(Capture(Dot), flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(Pattern(NamedCapture("foo", LineBegin), flagSet0).needsLineTerminatorDistinction, true)
+    assertEquals(Pattern(NamedCapture("foo", Dot), flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(Pattern(Group(LineBegin), flagSet0).needsLineTerminatorDistinction, true)
+    assertEquals(Pattern(Group(Dot), flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(Pattern(Star(false, LineBegin), flagSet0).needsLineTerminatorDistinction, true)
+    assertEquals(Pattern(Star(false, Dot), flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(Pattern(Plus(false, LineBegin), flagSet0).needsLineTerminatorDistinction, true)
+    assertEquals(Pattern(Plus(false, Dot), flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(Pattern(Question(false, LineBegin), flagSet0).needsLineTerminatorDistinction, true)
+    assertEquals(Pattern(Question(false, Dot), flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(Pattern(Repeat(false, 2, None, LineBegin), flagSet0).needsLineTerminatorDistinction, true)
+    assertEquals(Pattern(Repeat(false, 2, None, Dot), flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(Pattern(LookAhead(false, LineBegin), flagSet0).needsLineTerminatorDistinction, true)
+    assertEquals(Pattern(LookAhead(false, Dot), flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(Pattern(LookBehind(false, LineBegin), flagSet0).needsLineTerminatorDistinction, true)
+    assertEquals(Pattern(LookBehind(false, Dot), flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(Pattern(LineBegin, flagSet0).needsLineTerminatorDistinction, true)
+    assertEquals(Pattern(LineEnd, flagSet0).needsLineTerminatorDistinction, true)
+    assertEquals(Pattern(WordBoundary(true), flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(Pattern(WordBoundary(false), flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(Pattern(Dot, flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(Pattern(LineBegin, flagSet1).needsLineTerminatorDistinction, false)
+  }
+
+  test("Pattern#needsWordDistinction") {
+    val flagSet = FlagSet(false, false, false, false, false, false)
+    assertEquals(Pattern(Disjunction(Seq(Dot, WordBoundary(false))), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(Disjunction(Seq(WordBoundary(false), Dot)), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(Disjunction(Seq(Dot, Dot)), flagSet).needsWordDistinction, false)
+    assertEquals(Pattern(Sequence(Seq(Dot, WordBoundary(false))), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(Sequence(Seq(WordBoundary(false), Dot)), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(Sequence(Seq(Dot, Dot)), flagSet).needsWordDistinction, false)
+    assertEquals(Pattern(Capture(WordBoundary(false)), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(Capture(Dot), flagSet).needsWordDistinction, false)
+    assertEquals(Pattern(NamedCapture("foo", WordBoundary(false)), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(NamedCapture("foo", Dot), flagSet).needsWordDistinction, false)
+    assertEquals(Pattern(Group(WordBoundary(false)), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(Group(Dot), flagSet).needsWordDistinction, false)
+    assertEquals(Pattern(Star(false, WordBoundary(false)), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(Star(false, Dot), flagSet).needsWordDistinction, false)
+    assertEquals(Pattern(Plus(false, WordBoundary(false)), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(Plus(false, Dot), flagSet).needsWordDistinction, false)
+    assertEquals(Pattern(Question(false, WordBoundary(false)), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(Question(false, Dot), flagSet).needsWordDistinction, false)
+    assertEquals(Pattern(Repeat(false, 2, None, WordBoundary(false)), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(Repeat(false, 2, None, Dot), flagSet).needsWordDistinction, false)
+    assertEquals(Pattern(LookAhead(false, WordBoundary(false)), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(LookAhead(false, Dot), flagSet).needsWordDistinction, false)
+    assertEquals(Pattern(LookBehind(false, WordBoundary(false)), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(LookBehind(false, Dot), flagSet).needsWordDistinction, false)
+    assertEquals(Pattern(WordBoundary(true), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(WordBoundary(false), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(LineBegin, flagSet).needsWordDistinction, false)
+    assertEquals(Pattern(LineEnd, flagSet).needsWordDistinction, false)
+    assertEquals(Pattern(Dot, flagSet).needsWordDistinction, false)
   }
 }

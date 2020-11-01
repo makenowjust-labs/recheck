@@ -5,8 +5,8 @@ import scala.util.Success
 import scala.util.Try
 
 import Complexity._
+import automaton.Compiler
 import data.IChar
-import regexp.Compiler
 import regexp.Parser
 import util.Timeout
 
