@@ -3,6 +3,7 @@
 Changes:
 
   - Move `Compiler` to `automaton` package.
+  - Move `unicode` package to `data` package.
 
 Fixes:
 

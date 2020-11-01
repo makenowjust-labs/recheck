@@ -1,7 +1,7 @@
-package codes.quine.labo.redos
-package data
+package codes.quine.labo.redos.data
 
-import IntervalSet._
+import unicode.IntervalSet
+import unicode.IntervalSet._
 import unicode.CaseMap
 import unicode.CaseMap.Conversion
 import unicode.Property

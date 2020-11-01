@@ -1,8 +1,4 @@
-package codes.quine.labo.redos
-package unicode
-
-import data.IntervalSet
-import data.UChar
+package codes.quine.labo.redos.data.unicode
 
 /** Utilities for Unicode case mapping/folding.
   *

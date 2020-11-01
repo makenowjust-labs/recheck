@@ -1,6 +1,6 @@
 package codes.quine.labo.redos.data
 
-import IntervalSet._
+import unicode.IntervalSet._
 
 /** ICharSet is a set of [[IChar]]. */
 final case class ICharSet(chars: Seq[IChar]) {

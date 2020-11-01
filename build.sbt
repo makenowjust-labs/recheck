@@ -55,7 +55,6 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labo.redos.automaton._
       |import codes.quine.labo.redos.data._
       |import codes.quine.labo.redos.regexp._
-      |import codes.quine.labo.redos.unicode._
       |import codes.quine.labo.redos.util._
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
@@ -80,7 +79,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
             "CaseMapDataGen.scala" -> CaseMapDataGen,
             "PropertyDataGen.scala" -> PropertyDataGen
           )
-          val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labo" / "redos" / "unicode"
+          val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labo" / "redos" / "data" / "unicode"
           val changes = generateUnicodeData.inputFileChanges
           val updatedPaths = changes.created ++ changes.modified
           for (path <- updatedPaths) {

@@ -1,6 +1,7 @@
 package codes.quine.labo.redos.data
 
-import IntervalSet._
+import unicode.IntervalSet
+import unicode.IntervalSet._
 
 class ICharSuite extends munit.FunSuite {
   test("IChar.Any") {

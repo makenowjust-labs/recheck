@@ -11,8 +11,8 @@ import fastparse._
 
 import Pattern.{FlagSet, Node, ClassNode}
 import data.UChar
+import data.unicode.Property
 import util.Timeout
-import unicode.Property
 
 /** ECMA-262 RegExp parser implementation. */
 object Parser {

@@ -1,7 +1,4 @@
-package codes.quine.labo.redos
-package data
-
-import unicode.Property
+package codes.quine.labo.redos.data.unicode
 
 /** UChar is a Unicode code point. */
 final case class UChar(value: Int) extends AnyVal with Ordered[UChar] {

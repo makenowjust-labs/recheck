@@ -1,4 +1,4 @@
-package codes.quine.labo.redos.data
+package codes.quine.labo.redos.data.unicode
 
 class UCharSuite extends munit.FunSuite {
   test("UChar#isValidCodePoint") {

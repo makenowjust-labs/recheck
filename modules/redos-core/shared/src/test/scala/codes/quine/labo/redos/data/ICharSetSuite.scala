@@ -1,5 +1,7 @@
 package codes.quine.labo.redos.data
 
+import unicode.IntervalSet
+
 class ICharSetSuite extends munit.FunSuite {
   test("ICharSet.any") {
     assertEquals(ICharSet.any(false, true).chars, Seq(IChar.Any))

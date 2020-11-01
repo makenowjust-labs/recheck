@@ -1,7 +1,4 @@
-package codes.quine.labo.redos
-package unicode
-
-import data.UChar
+package codes.quine.labo.redos.data.unicode
 
 class CaseMapSuite extends munit.FunSuite {
   test("CaseMap.Upper") {
