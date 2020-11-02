@@ -1,5 +1,4 @@
 package codes.quine.labo.redos
-package regexp
 package backtrack
 
 import data.IChar
