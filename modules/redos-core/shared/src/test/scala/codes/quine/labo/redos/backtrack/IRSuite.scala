@@ -18,7 +18,10 @@ class IRSuite extends munit.FunSuite {
         IR.Match
       )
     )
-    assertEquals(ir.toString, "/x/\n(caps: 2, names: {'foo' -> 2})\n#000: fork_cont\t#003\n#001: any\n#002: jump\t#000\n#003: match\n")
+    assertEquals(
+      ir.toString,
+      "/x/\n(caps: 2, names: {'foo' -> 2})\n#000: fork_cont\t#003\n#001: any\n#002: jump\t#000\n#003: match\n"
+    )
   }
 
   test("IR.OpCode#toString") {

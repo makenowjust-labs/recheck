@@ -15,10 +15,12 @@ final case class UString(seq: IndexedSeq[UChar]) extends AnyVal {
 
   /** Shows this string as human readable format. */
   override def toString: String =
-    seq.map {
-      case UChar('\'') => "\\'"
-      case c           => c.toString
-    }.mkString("'", "", "'")
+    seq
+      .map {
+        case UChar('\'') => "\\'"
+        case c           => c.toString
+      }
+      .mkString("'", "", "'")
 }
 
 /** UString utilities. */
