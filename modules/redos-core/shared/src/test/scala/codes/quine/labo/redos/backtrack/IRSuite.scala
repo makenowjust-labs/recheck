@@ -3,10 +3,14 @@ package backtrack
 
 import data.IChar
 import data.UChar
+import regexp.Pattern
 
 class IRSuite extends munit.FunSuite {
   test("IR#toString") {
     val ir = IR(
+      Pattern(Pattern.Character('x'), Pattern.FlagSet(false, false, false, false, false, false)),
+      2,
+      Map("foo" -> 2),
       IndexedSeq(
         IR.ForkCont(3),
         IR.Any,
@@ -14,7 +18,7 @@ class IRSuite extends munit.FunSuite {
         IR.Match
       )
     )
-    assertEquals(ir.toString, "#000: fork_cont\t#003\n#001: any\n#002: jump\t#000\n#003: match\n")
+    assertEquals(ir.toString, "/x/\n(caps: 2, names: {'foo' -> 2})\n#000: fork_cont\t#003\n#001: any\n#002: jump\t#000\n#003: match\n")
   }
 
   test("IR.OpCode#toString") {
