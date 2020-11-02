@@ -32,7 +32,13 @@ class UStringSuite extends munit.FunSuite {
     assertEquals(s.substring(2, 8), UString.from("234567", false))
   }
 
+  test("UString#asString") {
+    assertEquals(UString(IndexedSeq.empty).asString, "")
+    assertEquals(UString.from("foo", false).asString, "foo")
+  }
+
   test("UString#toString") {
+    assertEquals(UString(IndexedSeq.empty).toString, "''")
     assertEquals(UString.from("xyz", false).toString, "'xyz'")
     assertEquals(UString.from("a\nb", false).toString, "'a\\nb'")
     assertEquals(UString.from("a'b", false).toString, "'a\\'b'")

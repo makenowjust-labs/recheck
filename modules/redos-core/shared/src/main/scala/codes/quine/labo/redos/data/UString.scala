@@ -13,6 +13,9 @@ final case class UString(seq: IndexedSeq[UChar]) extends AnyVal {
   /** Returns substring of this string between `begin` and `end - 1`. */
   def substring(begin: Int, end: Int): UString = UString(seq.slice(begin, end))
 
+  /** Gets back to usual string. */
+  def asString: String = seq.iterator.map(_.asString).mkString
+
   /** Shows this string as human readable format. */
   override def toString: String =
     seq
