@@ -14,7 +14,7 @@ final case class IR(pattern: Pattern, capsSize: Int, names: Map[String, Int], co
     val sb = new mutable.StringBuilder
 
     sb.append(s"$pattern\n")
-    sb.append(s"(caps: $capsSize, names: ${names.map { case (k, v) => s"'$k' -> $v" }.mkString("{", ", ", "}")})\n")
+    sb.append(s"(caps: $capsSize, names: ${names.map { case (k, v) => s"'$k': $v" }.mkString("{", ", ", "}")})\n")
 
     for ((code, i) <- codes.zipWithIndex) {
       sb.append(f"#$i%03d: $code%s\n")
