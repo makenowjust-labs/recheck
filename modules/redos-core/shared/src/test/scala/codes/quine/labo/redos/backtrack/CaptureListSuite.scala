@@ -4,6 +4,13 @@ package backtrack
 import data.UString
 
 class CaptureListSuite extends munit.FunSuite {
+  test("CaptureList.apply") {
+    val s = UString.from("fizzbuzz", false)
+    val caps = CaptureList(s, Map("x" -> 1), IndexedSeq(0, 4, 0, 2, 2, 4))
+    assertEquals(caps.input, s)
+    assertEquals(caps.names, Map("x" -> 1))
+  }
+
   test("CaptureList#size") {
     val s = UString.from("fizzbuzz", false)
     val caps = CaptureList(s, Map.empty, IndexedSeq(0, 4, 0, 2, 2, 4))

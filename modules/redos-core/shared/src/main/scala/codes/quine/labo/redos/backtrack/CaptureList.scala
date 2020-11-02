@@ -3,11 +3,20 @@ package backtrack
 
 import data.UString
 
-/** CaptureList is immutable capture list. */
-final case class CaptureList(input: UString, names: Map[String, Int], caps: IndexedSeq[Int]) {
+/** CaptureList is a capture list. */
+abstract class CaptureList {
+
+  /** An input string. */
+  def input: UString
+
+  /** A map from a name to an index. */
+  def names: Map[String, Int]
+
+  /** A capture indexes. */
+  protected def caps(i: Int): Int
 
   /** A size of this capture list. */
-  def size: Int = caps.size / 2 - 1
+  def size: Int
 
   /** Gets the `n`-th capture string.
     *
@@ -15,7 +24,7 @@ final case class CaptureList(input: UString, names: Map[String, Int], caps: Inde
     * between `1` and `size` are capture groups.
     */
   def get(n: Int): Option[UString] =
-    if (0 <= n && n * 2 + 1 < caps.size) {
+    if (0 <= n && n <= size) {
       val begin = caps(n * 2)
       val end = caps(n * 2 + 1)
       if (begin >= 0 && end >= 0) Some(input.substring(begin, end)) else None
@@ -42,4 +51,17 @@ final case class CaptureList(input: UString, names: Map[String, Int], caps: Inde
       }
       .mkString("[", ", ", "]")
   }
+}
+
+/** CaptureList utilities. */
+object CaptureList {
+
+  /** Immutable implementation of CaptureList. */
+  private final case class Impl(input: UString, names: Map[String, Int], capsSeq: IndexedSeq[Int]) extends CaptureList {
+    def size: Int = capsSeq.size / 2 - 1
+    def caps(i: Int): Int = capsSeq(i)
+  }
+
+  /** Creates an immutable capture list. */
+  def apply(input: UString, names: Map[String, Int], caps: IndexedSeq[Int]): CaptureList = Impl(input, names, caps)
 }
