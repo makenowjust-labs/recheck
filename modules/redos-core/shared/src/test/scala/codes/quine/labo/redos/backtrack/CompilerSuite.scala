@@ -7,6 +7,24 @@ import regexp.Pattern
 import regexp.Pattern._
 
 class CompilerSuite extends munit.FunSuite {
+  test("Compiler.capsSize") {
+    val flagSet = FlagSet(false, false, false, false, false, false)
+    assertEquals(Compiler.capsSize(Pattern(Disjunction(Seq(Capture(1, Dot), Capture(2, Dot))), flagSet)), 2)
+    assertEquals(Compiler.capsSize(Pattern(Sequence(Seq(Capture(1, Dot), Capture(2, Dot))), flagSet)), 2)
+    assertEquals(Compiler.capsSize(Pattern(Capture(1, Dot), flagSet)), 1)
+    assertEquals(Compiler.capsSize(Pattern(Capture(1, Capture(2, Dot)), flagSet)), 2)
+    assertEquals(Compiler.capsSize(Pattern(NamedCapture(1, "x", Dot), flagSet)), 1)
+    assertEquals(Compiler.capsSize(Pattern(NamedCapture(1, "x", Capture(2, Dot)), flagSet)), 2)
+    assertEquals(Compiler.capsSize(Pattern(Group(Dot), flagSet)), 0)
+    assertEquals(Compiler.capsSize(Pattern(Star(false, Dot), flagSet)), 0)
+    assertEquals(Compiler.capsSize(Pattern(Plus(false, Dot), flagSet)), 0)
+    assertEquals(Compiler.capsSize(Pattern(Question(false, Dot), flagSet)), 0)
+    assertEquals(Compiler.capsSize(Pattern(Repeat(false, 2, None, Dot), flagSet)), 0)
+    assertEquals(Compiler.capsSize(Pattern(LookAhead(false, Dot), flagSet)), 0)
+    assertEquals(Compiler.capsSize(Pattern(LookBehind(false, Dot), flagSet)), 0)
+    assertEquals(Compiler.capsSize(Pattern(Dot, flagSet)), 0)
+  }
+
   test("Compiler.names") {
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(

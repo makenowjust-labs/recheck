@@ -12,6 +12,26 @@ import util.TryUtil
 /** Compiler from RegExp pattern to VM IR. */
 object Compiler {
 
+  /** Computes a size of captures of the pattern. */
+  private[backtrack] def capsSize(pattern: Pattern): Int = {
+    def loop(node: Node): Int = node match {
+      case Disjunction(ns)       => ns.map(loop).foldLeft(0)(Math.max(_, _))
+      case Sequence(ns)          => ns.map(loop).foldLeft(0)(Math.max(_, _))
+      case Capture(i, n)         => Math.max(i, loop(n))
+      case NamedCapture(i, _, n) => Math.max(i, loop(n))
+      case Group(n)              => loop(n)
+      case Star(_, n)            => loop(n)
+      case Plus(_, n)            => loop(n)
+      case Question(_, n)        => loop(n)
+      case Repeat(_, _, _, n)    => loop(n)
+      case LookAhead(_, n)       => loop(n)
+      case LookBehind(_, n)      => loop(n)
+      case _                     => 0
+    }
+
+    loop(pattern.node)
+  }
+
   /** Extracts capture names from the pattern. */
   private[backtrack] def names(pattern: Pattern): Try[Map[String, Int]] = {
     def merge(tm1: Try[Map[String, Int]], m2: Map[String, Int]): Try[Map[String, Int]] =
