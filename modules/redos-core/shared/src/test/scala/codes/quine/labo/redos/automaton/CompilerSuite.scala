@@ -485,12 +485,12 @@ class CompilerSuite extends munit.FunSuite {
       Success(nfaA)
     )
     assertEquals(
-      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Capture(Character('a')), LineEnd)), flagSet0)),
+      Compiler.compile(Pattern(Sequence(Seq(LineBegin, Capture(1, Character('a')), LineEnd)), flagSet0)),
       Success(nfaA)
     )
     assertEquals(
       Compiler.compile(
-        Pattern(Sequence(Seq(LineBegin, NamedCapture("foo", Character('a')), LineEnd)), flagSet0)
+        Pattern(Sequence(Seq(LineBegin, NamedCapture(1, "foo", Character('a')), LineEnd)), flagSet0)
       ),
       Success(nfaA)
     )

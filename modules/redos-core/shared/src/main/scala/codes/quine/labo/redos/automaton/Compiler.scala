@@ -52,9 +52,9 @@ object Compiler {
                 val q = nextQ()
                 (q, q)
               })
-          case Capture(n)         => loop(n)
-          case NamedCapture(_, n) => loop(n)
-          case Group(n)           => loop(n)
+          case Capture(_, n)         => loop(n)
+          case NamedCapture(_, _, n) => loop(n)
+          case Group(n)              => loop(n)
           case Star(nonGreedy, n) =>
             loop(n).map { case (i0, a0) =>
               //      +---------------+

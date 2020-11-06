@@ -20,13 +20,13 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
   /** Tests the pattern has line-begin assertion `^` at its begin position. */
   def hasLineBeginAtBegin: Boolean = {
     def loop(node: Node): Boolean = node match {
-      case Disjunction(ns)    => ns.forall(loop(_))
-      case Sequence(ns)       => ns.headOption.exists(loop(_))
-      case Capture(n)         => loop(n)
-      case NamedCapture(_, n) => loop(n)
-      case Group(n)           => loop(n)
-      case LineBegin          => true
-      case _                  => false
+      case Disjunction(ns)       => ns.forall(loop(_))
+      case Sequence(ns)          => ns.headOption.exists(loop(_))
+      case Capture(_, n)         => loop(n)
+      case NamedCapture(_, _, n) => loop(n)
+      case Group(n)              => loop(n)
+      case LineBegin             => true
+      case _                     => false
     }
     !flagSet.multiline && loop(node)
   }
@@ -34,13 +34,13 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
   /** Tests the pattern has line-end assertion `$` at its end position. */
   def hasLineEndAtEnd: Boolean = {
     def loop(node: Node): Boolean = node match {
-      case Disjunction(ns)    => ns.forall(loop(_))
-      case Sequence(ns)       => ns.lastOption.exists(loop(_))
-      case Capture(n)         => loop(n)
-      case NamedCapture(_, n) => loop(n)
-      case Group(n)           => loop(n)
-      case LineEnd            => true
-      case _                  => false
+      case Disjunction(ns)       => ns.forall(loop(_))
+      case Sequence(ns)          => ns.lastOption.exists(loop(_))
+      case Capture(_, n)         => loop(n)
+      case NamedCapture(_, _, n) => loop(n)
+      case Group(n)              => loop(n)
+      case LineEnd               => true
+      case _                     => false
     }
     !flagSet.multiline && loop(node)
   }
@@ -56,17 +56,17 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
       .pipe(set => if (needsWordDistinction) set.add(IChar.Word.withWord) else set)
 
     def loop(node: Node): Try[Seq[IChar]] = checkTimeoutWith("alphabet: loop")(node match {
-      case Disjunction(ns)    => TryUtil.traverse(ns)(loop(_)).map(_.flatten)
-      case Sequence(ns)       => TryUtil.traverse(ns)(loop(_)).map(_.flatten)
-      case Capture(n)         => loop(n)
-      case NamedCapture(_, n) => loop(n)
-      case Group(n)           => loop(n)
-      case Star(_, n)         => loop(n)
-      case Plus(_, n)         => loop(n)
-      case Question(_, n)     => loop(n)
-      case Repeat(_, _, _, n) => loop(n)
-      case LookAhead(_, n)    => loop(n)
-      case LookBehind(_, n)   => loop(n)
+      case Disjunction(ns)       => TryUtil.traverse(ns)(loop(_)).map(_.flatten)
+      case Sequence(ns)          => TryUtil.traverse(ns)(loop(_)).map(_.flatten)
+      case Capture(_, n)         => loop(n)
+      case NamedCapture(_, _, n) => loop(n)
+      case Group(n)              => loop(n)
+      case Star(_, n)            => loop(n)
+      case Plus(_, n)            => loop(n)
+      case Question(_, n)        => loop(n)
+      case Repeat(_, _, _, n)    => loop(n)
+      case LookAhead(_, n)       => loop(n)
+      case LookBehind(_, n)      => loop(n)
       case atom: AtomNode =>
         atom.toIChar(ignoreCase, unicode).map { ch =>
           Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch)
@@ -84,19 +84,19 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
   /** Tests whether the pattern needs line terminator disinction or not. */
   private[regexp] def needsLineTerminatorDistinction: Boolean = {
     def loop(node: Node): Boolean = node match {
-      case Disjunction(ns)     => ns.exists(loop(_))
-      case Sequence(ns)        => ns.exists(loop(_))
-      case Capture(n)          => loop(n)
-      case NamedCapture(_, n)  => loop(n)
-      case Group(n)            => loop(n)
-      case Star(_, n)          => loop(n)
-      case Plus(_, n)          => loop(n)
-      case Question(_, n)      => loop(n)
-      case Repeat(_, _, _, n)  => loop(n)
-      case LookAhead(_, n)     => loop(n)
-      case LookBehind(_, n)    => loop(n)
-      case LineBegin | LineEnd => true
-      case _                   => false
+      case Disjunction(ns)       => ns.exists(loop(_))
+      case Sequence(ns)          => ns.exists(loop(_))
+      case Capture(_, n)         => loop(n)
+      case NamedCapture(_, _, n) => loop(n)
+      case Group(n)              => loop(n)
+      case Star(_, n)            => loop(n)
+      case Plus(_, n)            => loop(n)
+      case Question(_, n)        => loop(n)
+      case Repeat(_, _, _, n)    => loop(n)
+      case LookAhead(_, n)       => loop(n)
+      case LookBehind(_, n)      => loop(n)
+      case LineBegin | LineEnd   => true
+      case _                     => false
     }
     flagSet.multiline && loop(node)
   }
@@ -104,19 +104,19 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
   /** Tests whether the pattern needs word character disinction or not. */
   private[regexp] def needsWordDistinction: Boolean = {
     def loop(node: Node): Boolean = node match {
-      case Disjunction(ns)    => ns.exists(loop(_))
-      case Sequence(ns)       => ns.exists(loop(_))
-      case Capture(n)         => loop(n)
-      case NamedCapture(_, n) => loop(n)
-      case Group(n)           => loop(n)
-      case Star(_, n)         => loop(n)
-      case Plus(_, n)         => loop(n)
-      case Question(_, n)     => loop(n)
-      case Repeat(_, _, _, n) => loop(n)
-      case LookAhead(_, n)    => loop(n)
-      case LookBehind(_, n)   => loop(n)
-      case WordBoundary(_)    => true
-      case _                  => false
+      case Disjunction(ns)       => ns.exists(loop(_))
+      case Sequence(ns)          => ns.exists(loop(_))
+      case Capture(_, n)         => loop(n)
+      case NamedCapture(_, _, n) => loop(n)
+      case Group(n)              => loop(n)
+      case Star(_, n)            => loop(n)
+      case Plus(_, n)            => loop(n)
+      case Question(_, n)        => loop(n)
+      case Repeat(_, _, _, n)    => loop(n)
+      case LookAhead(_, n)       => loop(n)
+      case LookBehind(_, n)      => loop(n)
+      case WordBoundary(_)       => true
+      case _                     => false
     }
     loop(node)
   }
@@ -174,10 +174,10 @@ object Pattern {
   final case class Sequence(children: Seq[Node]) extends Node
 
   /** Capture is a capture pattern. (e.g. `/(x)/`) */
-  final case class Capture(child: Node) extends Node
+  final case class Capture(index: Int, child: Node) extends Node
 
   /** NamedCapture is a named capture pattern. (e.g. `/(?<foo>x)/`) */
-  final case class NamedCapture(name: String, child: Node) extends Node
+  final case class NamedCapture(index: Int, name: String, child: Node) extends Node
 
   /** Group is a grouping of a pattern. (e.g. `/(?:x)/`) */
   final case class Group(child: Node) extends Node
@@ -304,8 +304,8 @@ object Pattern {
   private[regexp] def showNode(node: Node): String = node match {
     case Disjunction(ns)                        => ns.map(showNodeInDisjunction(_)).mkString("|")
     case Sequence(ns)                           => ns.map(showNodeInSequence(_)).mkString
-    case Capture(n)                             => s"(${showNode(n)})"
-    case NamedCapture(name, n)                  => s"(?<$name>${showNode(n)})"
+    case Capture(_, n)                          => s"(${showNode(n)})"
+    case NamedCapture(_, name, n)               => s"(?<$name>${showNode(n)})"
     case Group(n)                               => s"(?:${showNode(n)})"
     case Star(false, n)                         => s"${showNodeInRepeat(n)}*"
     case Star(true, n)                          => s"${showNodeInRepeat(n)}*?"

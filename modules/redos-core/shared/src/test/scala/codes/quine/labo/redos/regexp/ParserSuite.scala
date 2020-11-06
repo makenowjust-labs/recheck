@@ -15,22 +15,31 @@ class ParserSuite extends munit.FunSuite {
   implicit val timeout: Timeout.NoTimeout.type = Timeout.NoTimeout
 
   /** A default parser instance for testing. */
-  val P = new Parser(false, false, false, 0)
+  def P = new Parser(false, false, false, 0)
 
   /** A unicode enabled parser instance for testing. */
-  val PU = new Parser(true, false, false, 0)
+  def PU = new Parser(true, false, false, 0)
 
   /** An additional-feature enabled parser instance for testing. */
-  val PA = new Parser(false, true, false, 0)
+  def PA = new Parser(false, true, false, 0)
 
   /** An additional-feature enabled parser having named captures instance for testing. */
-  val PAN = new Parser(false, true, true, 1)
+  def PAN = new Parser(false, true, true, 1)
 
   test("Parser.parse") {
     interceptMessage[InvalidRegExpException]("unknown flag")(Parser.parse("", "#", false).get)
     interceptMessage[InvalidRegExpException]("parsing failure at 0")(Parser.parse("{", "", false).get)
     interceptMessage[InvalidRegExpException]("parsing failure at 0")(Parser.parse("{1}", "").get)
     assertEquals(Parser.parse(".", "g"), Success(Pattern(Dot, FlagSet(true, false, false, false, false, false))))
+    assertEquals(
+      Parser.parse("(.)(?<x>.)", ""),
+      Success(
+        Pattern(
+          Sequence(Seq(Capture(1, Dot), NamedCapture(2, "x", Dot))),
+          FlagSet(false, false, false, false, false, false)
+        )
+      )
+    )
   }
 
   test("Parser.parseFlagSet") {
@@ -98,7 +107,7 @@ class ParserSuite extends munit.FunSuite {
     assertEquals(parse("$", P.Atom(_)), Parsed.Success(LineEnd, 1))
     assertEquals(parse("[x]", P.Atom(_)), Parsed.Success(CharacterClass(false, Seq(Character('x'))), 3))
     assertEquals(parse("\\0", P.Atom(_)), Parsed.Success(Character('\u0000'), 2))
-    assertEquals(parse("(x)", P.Atom(_)), Parsed.Success(Capture(Character('x')), 3))
+    assertEquals(parse("(x)", P.Atom(_)), Parsed.Success(Capture(1, Character('x')), 3))
     assert(!parse("*", P.Atom(_)).isSuccess)
     assert(!parse("+", P.Atom(_)).isSuccess)
     assert(!parse("?", P.Atom(_)).isSuccess)
@@ -252,13 +261,13 @@ class ParserSuite extends munit.FunSuite {
   }
 
   test("Parser#Paren") {
-    assertEquals(parse("(x)", P.Paren(_)), Parsed.Success(Capture(Character('x')), 3))
+    assertEquals(parse("(x)", P.Paren(_)), Parsed.Success(Capture(1, Character('x')), 3))
     assertEquals(parse("(?:x)", P.Paren(_)), Parsed.Success(Group(Character('x')), 5))
     assertEquals(parse("(?=x)", P.Paren(_)), Parsed.Success(LookAhead(false, Character('x')), 5))
     assertEquals(parse("(?!x)", P.Paren(_)), Parsed.Success(LookAhead(true, Character('x')), 5))
     assertEquals(parse("(?<=x)", P.Paren(_)), Parsed.Success(LookBehind(false, Character('x')), 6))
     assertEquals(parse("(?<!x)", P.Paren(_)), Parsed.Success(LookBehind(true, Character('x')), 6))
-    assertEquals(parse("(?<foo>x)", P.Paren(_)), Parsed.Success(NamedCapture("foo", Character('x')), 9))
+    assertEquals(parse("(?<foo>x)", P.Paren(_)), Parsed.Success(NamedCapture(1, "foo", Character('x')), 9))
   }
 
   test("Parser#CaptureName") {
