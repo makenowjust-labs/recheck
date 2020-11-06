@@ -1,6 +1,10 @@
 package codes.quine.labo.redos.data
 
 class UStringSuite extends munit.FunSuite {
+  test("UString,empty") {
+    assertEquals(UString.empty, UString(IndexedSeq.empty))
+  }
+
   test("UString.from") {
     assertEquals(UString.from("", false), UString(IndexedSeq.empty))
     assertEquals(UString.from("", true), UString(IndexedSeq.empty))

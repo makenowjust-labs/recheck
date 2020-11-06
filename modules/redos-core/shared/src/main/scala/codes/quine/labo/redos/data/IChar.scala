@@ -82,16 +82,16 @@ object IChar {
     Ordering.by[IChar, IntervalSet[UChar]](_.set).orElseBy(_.isLineTerminator).orElseBy(_.isWord)
 
   /** Creates an interval set containing any code points. */
-  def Any: IChar = IChar(IntervalSet((UChar(0), UChar(0x110000))))
+  lazy val Any: IChar = IChar(IntervalSet((UChar(0), UChar(0x110000))))
 
   /** Creates an interval set containing any UTF-16 code points. */
-  def Any16: IChar = IChar(IntervalSet((UChar(0), UChar(0x10000))))
+  lazy val Any16: IChar = IChar(IntervalSet((UChar(0), UChar(0x10000))))
 
   /** Returns an interval set containing digit characters. */
-  def Digit: IChar = IChar(IntervalSet((UChar('0'), UChar('9' + 1))))
+  lazy val Digit: IChar = IChar(IntervalSet((UChar('0'), UChar('9' + 1))))
 
   /** Returns an interval set containing white-space characters. */
-  def Space: IChar = IChar(
+  lazy val Space: IChar = IChar(
     IntervalSet(
       (UChar('\t'), UChar('\t' + 1)), // <TAB>
       (UChar(0x000a), UChar(0x000d + 1)), // <LF>, <VT>, <FF>, <CR>
@@ -103,7 +103,7 @@ object IChar {
   )
 
   /** Returns an interval set containing line-terminator characters. */
-  def LineTerminator: IChar = IChar(
+  lazy val LineTerminator: IChar = IChar(
     IntervalSet(
       (UChar(0x000a), UChar(0x000a + 1)), // <LF>
       (UChar(0x000d), UChar(0x000d + 1)), // <CR>
@@ -112,7 +112,7 @@ object IChar {
   )
 
   /** Returns an interval set containing word characters. */
-  def Word: IChar = IChar(
+  lazy val Word: IChar = IChar(
     IntervalSet(
       (UChar('0'), UChar('9' + 1)),
       (UChar('A'), UChar('Z' + 1)),

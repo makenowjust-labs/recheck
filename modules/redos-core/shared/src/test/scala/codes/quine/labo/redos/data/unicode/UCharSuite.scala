@@ -1,6 +1,22 @@
 package codes.quine.labo.redos.data.unicode
 
 class UCharSuite extends munit.FunSuite {
+  test("UChar.canonicalize") {
+    assertEquals(UChar.canonicalize('a', false), UChar('A'))
+    assertEquals(UChar.canonicalize('A', false), UChar('A'))
+    assertEquals(UChar.canonicalize('a', true), UChar('a'))
+    assertEquals(UChar.canonicalize('A', true), UChar('a'))
+
+    // U+FF21: FULLWIDTH LATIN CAPITAL LETTER A
+    // U+FF41: FULLWIDTH LATIN SMALL LETTER A
+    assertEquals(UChar.canonicalize(UChar('\uff41'), false), UChar('\uff21'))
+    assertEquals(UChar.canonicalize(UChar('\uff21'), true), UChar('\uff41'))
+
+    // U+017F: LATIN SMALL LETTER LONG S
+    assertEquals(UChar.canonicalize(UChar('\u017f'), false), UChar('\u017f'))
+    assertEquals(UChar.canonicalize(UChar('\u017f'), true), UChar('s'))
+  }
+
   test("UChar#isValidCodePoint") {
     assert(UChar(0x41).isValidCodePoint)
     assert(UChar(0x0).isValidCodePoint)

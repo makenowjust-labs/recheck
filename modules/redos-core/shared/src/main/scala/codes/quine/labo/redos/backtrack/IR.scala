@@ -10,6 +10,13 @@ import regexp.Pattern
 
 /** IR is an internal representation of a compiled RegExp program. */
 final case class IR(pattern: Pattern, capsSize: Int, names: Map[String, Int], codes: IndexedSeq[OpCode]) {
+
+  /** An alias to `pattern.flagSet.ignoreCase`. */
+  def ignoreCase: Boolean = pattern.flagSet.ignoreCase
+
+  /** An alias to `pattern.flagSet.unicode`. */
+  def unicode: Boolean = pattern.flagSet.unicode
+
   override def toString: String = {
     val sb = new mutable.StringBuilder
 
@@ -30,7 +37,7 @@ object IR {
   /** Op is an IR op-code. */
   sealed abstract class OpCode
 
-  /** `any`: Advance `pos` by the current character size.
+  /** `any`: Advance `pos` if the current character exists.
     *
     * This op-code is used for dot pattern `.` when the pattern is `dotAll`.
     */
@@ -48,7 +55,7 @@ object IR {
   }
 
   /** `char c`: Try to match the current character with the character `c`.
-    * If matched, advance `pos` by the current character size, otherwise do backtrack.
+    * If matched, advance `pos`, otherwise do backtrack.
     *
     * `c` is canonicalized when the pattern is `ignoreCase`.
     */
@@ -57,7 +64,7 @@ object IR {
   }
 
   /** `class s`: Try to match the current character with the character set `s`.
-    * If matched, advance `pos` by the current character size, otherwise do backtrack.
+    * If matched, advance `pos`, otherwise do backtrack.
     *
     * `s` is canonicalized when the pattern is `ignoreCase`.
     */
@@ -66,7 +73,7 @@ object IR {
   }
 
   /** `class_not s`: Try to match the current character with the character set `s`.
-    * If not matched, advance `pos` by the current character size, otherwise do backtrack.
+    * If not matched, advance `pos`, otherwise do backtrack.
     *
     * `s` is canonicalized when the pattern is `ignoreCase`.
     */
@@ -104,8 +111,12 @@ object IR {
     override def toString: String = "dec"
   }
 
-  /** `dot`: Advance `pos` by the current character size
-    * if the current character is not a line terminator.
+  /** `done`: Halt VM execution as matched. */
+  case object Done extends OpCode {
+    override def toString: String = "done"
+  }
+
+  /** `dot`: Advance `pos` if the current character exists and is not a line terminator.
     *
     * This op-code is used for dot pattern `.` when the pattern is not `dotAll`.
     */
@@ -127,22 +138,22 @@ object IR {
     override def toString: String = "fail"
   }
 
-  /** `fork_cont #next`: Fork a new `proc` and set the new `proc`'s `pc` to `#next`.
+  /** `fork_cont @next`: Fork a new `proc` and set the new `proc`'s `pc` to `#next`.
     * After that, continue the current `proc`.
     *
     * This op-code is used for an entry of greedy loop.
     */
   final case class ForkCont(next: Int) extends OpCode {
-    override def toString: String = f"fork_cont\t#$next%03d"
+    override def toString: String = f"fork_cont\t@$next%+03d"
   }
 
-  /** `fork_next #next`: Fork a new `proc` and set the new `proc`'s `pc` to `#next`.
+  /** `fork_next @next`: Fork a new `proc` and set the new `proc`'s `pc` to `#next`.
     * After that, switch to the new `proc`. Now, the new `proc`'s fail refers to the prior `proc`'s `id`.
     *
     * This op-code is used for an entry of non-greedy loop.
     */
   final case class ForkNext(next: Int) extends OpCode {
-    override def toString: String = f"fork_next\t#$next%03d"
+    override def toString: String = f"fork_next\t@$next%+03d"
   }
 
   /** `input_begin`: If `pos` is `0`, it is matched. If not matched, do backtrack.
@@ -161,9 +172,9 @@ object IR {
     override def toString: String = "input_end"
   }
 
-  /** `jump #cont`: Set the current `pc` to `#cont`. */
+  /** `jump @cont`: Set the current `pc` to `#cont`. */
   final case class Jump(cont: Int) extends OpCode {
-    override def toString: String = f"jump\t#$cont%03d"
+    override def toString: String = f"jump\t@$cont%+03d"
   }
 
   /** `line_begin`: If `pos` is `0` or the previous character is a line terminator, it is matched.
@@ -184,14 +195,9 @@ object IR {
     override def toString: String = "line_end"
   }
 
-  /** `loop #cont`: If the `stack` top value is greater than `0`, set the current `pc` to `#cont`. */
+  /** `loop @cont`: If the `stack` top value is greater than `0`, set the current `pc` to `#cont`. */
   final case class Loop(cont: Int) extends OpCode {
-    override def toString: String = f"loop\t#$cont%03d"
-  }
-
-  /** `match`: Halt VM execution as matched. */
-  case object Match extends OpCode {
-    override def toString: String = "match"
+    override def toString: String = f"loop\t@$cont%+03d"
   }
 
   /** `pop`: Pop the stack top value from stack. */
@@ -214,7 +220,7 @@ object IR {
     override def toString: String = "push_proc"
   }
 
-  /** `ref`: Try to match the capture `i` from the current `pos`.
+  /** `ref i`: Try to match the capture `i` from the current `pos`.
     * If matched, advance `pos` by the capture `i` size.
     *
     * Note that an unmatched capture is treated as an empty string.
@@ -223,7 +229,7 @@ object IR {
     override def toString: String = s"ref\t$i"
   }
 
-  /** `ref_back`: Try to match the capture `i` from the current `pos` in reverse oreder.
+  /** `ref_back i`: Try to match the capture `i` from the current `pos` in reverse oreder.
     * If matched, go back `pos` by the capture `i` size.
     *
     * Note that an unmatched capture is treated as an empty string.

@@ -41,4 +41,11 @@ object UString {
       }
       UString(seq.result())
     } else UString(s.toIndexedSeq.map(UChar(_)))
+
+  /** An empty string. */
+  def empty: UString = UString(IndexedSeq.empty)
+
+  /** Canonicalizes the string. */
+  def canonicalize(s: UString, unicode: Boolean): UString =
+    UString(s.seq.map(UChar.canonicalize(_, unicode)))
 }
