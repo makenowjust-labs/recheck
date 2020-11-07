@@ -9,16 +9,16 @@ import automaton._
 import data.Graph
 import util.Timeout
 
-/** ReDoS vulnerable RegExp checker. */
-object Checker {
+/** ReDoS vulnerable RegExp checker based on automata theory. */
+object AutomatonChecker {
 
   /** Checks a match time complexity of the ε-NFA. */
   def check[A, Q](nfa: OrderedNFA[A, Q])(implicit timeout: Timeout = Timeout.NoTimeout): Try[Complexity[A]] =
-    Try(new Checker(nfa, timeout).check())
+    Try(new AutomatonChecker(nfa, timeout).check())
 }
 
-/** Checker is a ReDoS vulnerable RegExp checker. */
-private final class Checker[A, Q](
+/** AutomatonChecker is a ReDoS vulnerable RegExp checker based on automata theory. */
+private final class AutomatonChecker[A, Q](
     private[this] val nfa: OrderedNFA[A, Q],
     private[this] val timeout: Timeout
 ) {

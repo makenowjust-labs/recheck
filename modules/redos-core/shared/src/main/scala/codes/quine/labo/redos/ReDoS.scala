@@ -3,7 +3,7 @@ package codes.quine.labo.redos
 import scala.concurrent.duration.Duration
 import scala.util.Try
 
-import automaton.Checker
+import automaton.AutomatonChecker
 import automaton.EpsNFACompiler
 import regexp.Parser
 import util.Timeout
@@ -24,7 +24,7 @@ object ReDoS {
       pattern <- Parser.parse(source, flags)
       epsNFA <- EpsNFACompiler.compile(pattern)
       nfa = timeout.checkTimeoutWith("nfa")(epsNFA.toOrderedNFA.rename)
-      result <- Checker.check(nfa)
+      result <- AutomatonChecker.check(nfa)
     } yield result)
   }
 }

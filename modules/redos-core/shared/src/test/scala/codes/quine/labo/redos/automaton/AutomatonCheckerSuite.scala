@@ -9,7 +9,7 @@ import data.IChar
 import regexp.Parser
 import util.Timeout
 
-class CheckerSuite extends munit.FunSuite {
+class AutomatonCheckerSuite extends munit.FunSuite {
 
   /** Timeout checking is disabled in testing. */
   implicit val timeout: Timeout.NoTimeout.type = Timeout.NoTimeout
@@ -20,21 +20,21 @@ class CheckerSuite extends munit.FunSuite {
       pattern <- Parser.parse(source, flags)
       epsNFA <- EpsNFACompiler.compile(pattern)
       nfa = epsNFA.toOrderedNFA.rename
-      result <- Checker.check(nfa)
+      result <- AutomatonChecker.check(nfa)
     } yield result
 
-  test("Checker.check: constant") {
+  test("AutomatonChecker.check: constant") {
     assertEquals(check("^foo$", ""), Success(Constant))
     assertEquals(check("^((fi|bu)z{2}){1,2}$", ""), Success(Constant))
   }
 
-  test("Checker.check: linear") {
+  test("AutomatonChecker.check: linear") {
     assertEquals(check("a*", ""), Success(Linear))
     assertEquals(check("(a*)*", ""), Success(Linear))
     assertEquals(check("^([a:]|\\b)*$", ""), Success(Linear))
   }
 
-  test("Checker.check: polynomial") {
+  test("AutomatonChecker.check: polynomial") {
     val a = IChar('a')
     val other = IChar('a').complement(false)
     assertEquals(
@@ -51,7 +51,7 @@ class CheckerSuite extends munit.FunSuite {
     )
   }
 
-  test("Checker.check: exponential") {
+  test("AutomatonChecker.check: exponential") {
     val a = IChar('a')
     val b = IChar('b')
     val other1 = IChar('a').complement(false)
