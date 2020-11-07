@@ -42,7 +42,7 @@ object IRCompiler {
           case Plus(nonGreedy, n) =>
             loop(n, forward).map(State.some(nonGreedy, _))
           case Question(nonGreedy, n) =>
-            loop(n, forward).map(State.some(nonGreedy, _))
+            loop(n, forward).map(State.optional(nonGreedy, _))
           case Repeat(_, min, None, n) =>
             loop(n, forward).map(State.repeatN(min, _))
           case Repeat(nonGreedy, min, Some(None), n) =>
@@ -82,8 +82,7 @@ object IRCompiler {
           case NamedBackReference(name) =>
             names.get(name) match {
               case Some(i) =>
-                if (i <= 0 || capsSize < i) Failure(new InvalidRegExpException("invalid named back-reference"))
-                else Success(State(IndexedSeq(if (forward) IR.Ref(i) else IR.RefBack(i)), false))
+                Success(State(IndexedSeq(if (forward) IR.Ref(i) else IR.RefBack(i)), false))
               case None => Failure(new InvalidRegExpException("invalid named back-reference"))
             }
         }
@@ -97,8 +96,8 @@ object IRCompiler {
     /** Computes a union of two states. */
     def union(that: State): State =
       State(
-        IndexedSeq(IR.ForkCont(codes.size + 1)) ++ codes ++ IndexedSeq(IR.Jump(that.codes.size)) ++ codes,
-        advance && this.advance
+        IndexedSeq(IR.ForkCont(codes.size + 1)) ++ codes ++ IndexedSeq(IR.Jump(that.codes.size)) ++ that.codes,
+        advance && that.advance
       )
 
     /** Computes a concatination of two states. */
@@ -119,7 +118,7 @@ object IRCompiler {
   /** State utilities. */
   private[backtrack] object State {
 
-    /** Wraps a state in prelude codes. */
+    /** Wraps a state op-codes in prelude codes. */
     def prelude(hasLineBeginAtBegin: Boolean, state: State): IndexedSeq[IR.OpCode] = {
       val begin =
         if (!hasLineBeginAtBegin) IndexedSeq(IR.ForkNext(2), IR.Any, IR.Jump(-3), IR.CapBegin(0))
@@ -161,6 +160,7 @@ object IRCompiler {
 
     /** Wraps a state as optional repetition. */
     def optional(nonGreedy: Boolean, state: State): State =
+      // Here, `setupLoop(state)` is not needed, because problematic capture is reset by outer repetition.
       State(
         IndexedSeq(if (nonGreedy) IR.ForkNext(state.codes.size) else IR.ForkCont(state.codes.size)) ++ state.codes,
         false
@@ -184,7 +184,7 @@ object IRCompiler {
       case n =>
         val codes = setupLoop(state)
         State(
-          IndexedSeq(IR.Push(n), if (nonGreedy) IR.ForkNext(codes.size + 3) else IR.ForkCont(codes.size + 3)) ++
+          IndexedSeq(IR.Push(n), if (nonGreedy) IR.ForkNext(codes.size + 2) else IR.ForkCont(codes.size + 2)) ++
             codes ++
             IndexedSeq(IR.Dec, IR.Loop(-1 - codes.size - 2), IR.Pop),
           false
