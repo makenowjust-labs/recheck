@@ -5,7 +5,6 @@ import scala.util.Success
 import scala.util.Try
 
 import Complexity._
-import automaton.Compiler
 import data.IChar
 import regexp.Parser
 import util.Timeout
@@ -19,7 +18,7 @@ class CheckerSuite extends munit.FunSuite {
   def check(source: String, flags: String): Try[Complexity[IChar]] =
     for {
       pattern <- Parser.parse(source, flags)
-      epsNFA <- Compiler.compile(pattern)
+      epsNFA <- EpsNFACompiler.compile(pattern)
       nfa = epsNFA.toOrderedNFA.rename
       result <- Checker.check(nfa)
     } yield result

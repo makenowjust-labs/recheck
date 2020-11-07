@@ -13,7 +13,7 @@ import util.Timeout
 import util.TryUtil
 
 /** ECMA-262 RegExp to ε-NFA Compiler. */
-object Compiler {
+object EpsNFACompiler {
 
   /** Compiles ECMA-262 RegExp into ε-NFA. */
   def compile(pattern: Pattern)(implicit timeout: Timeout = Timeout.NoTimeout): Try[EpsNFA[Int]] =
