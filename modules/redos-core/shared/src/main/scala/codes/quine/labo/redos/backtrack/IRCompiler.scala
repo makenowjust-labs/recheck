@@ -16,6 +16,7 @@ import util.TryUtil
 /** Compiler from RegExp pattern to VM IR. */
 object IRCompiler {
 
+  /** Compiles the RegExp pattern to IR. */
   def compile(pattern: Pattern): Try[IR] =
     for {
       _ <- Try(()) // Ensures a `Try` context surely.
@@ -90,16 +91,21 @@ object IRCompiler {
       }
     } yield IR(pattern, capsSize, names, codes)
 
+  /** State is a compiling state. */
   private[backtrack] final case class State(codes: IndexedSeq[IR.OpCode], advance: Boolean) {
+
+    /** Computes a union of two states. */
     def union(that: State): State =
       State(
         IndexedSeq(IR.ForkCont(codes.size + 1)) ++ codes ++ IndexedSeq(IR.Jump(that.codes.size)) ++ codes,
         advance && this.advance
       )
 
+    /** Computes a concatination of two states. */
     def concat(that: State): State =
       State(codes ++ that.codes, advance || that.advance)
 
+    /** Computes a capture range of this state's IR op-codes. */
     def captureRange: Option[(Int, Int)] = {
       val captures = codes.collect {
         case IR.CapBegin(i) => i
@@ -110,7 +116,10 @@ object IRCompiler {
     }
   }
 
+  /** State utilities. */
   private[backtrack] object State {
+
+    /** Wraps a state in prelude codes. */
     def prelude(hasLineBeginAtBegin: Boolean, state: State): IndexedSeq[IR.OpCode] = {
       val begin =
         if (!hasLineBeginAtBegin) IndexedSeq(IR.ForkNext(2), IR.Any, IR.Jump(-3), IR.CapBegin(0))
@@ -119,6 +128,7 @@ object IRCompiler {
       begin ++ state.codes ++ end
     }
 
+    /** Wraps a state as a capture. */
     def capture(index: Int, state: State, forward: Boolean): State =
       State(
         if (forward) IndexedSeq(IR.CapBegin(index)) ++ state.codes ++ IndexedSeq(IR.CapEnd(index))
@@ -126,6 +136,7 @@ object IRCompiler {
         state.advance
       )
 
+    /** Wraps a state as many repetition. */
     def many(nonGreedy: Boolean, state: State): State = {
       val codes = setupLoop(state)
       State(
@@ -136,6 +147,7 @@ object IRCompiler {
       )
     }
 
+    /** Wraps a state as some repetition. */
     def some(nonGreedy: Boolean, state: State): State = {
       val codes = setupLoop(state)
       State(
@@ -147,12 +159,14 @@ object IRCompiler {
       )
     }
 
+    /** Wraps a state as optional repetition. */
     def optional(nonGreedy: Boolean, state: State): State =
       State(
         IndexedSeq(if (nonGreedy) IR.ForkNext(state.codes.size) else IR.ForkCont(state.codes.size)) ++ state.codes,
         false
       )
 
+    /** Wraps a state as `n`-times repetition. */
     def repeatN(n: Int, state: State): State = n match {
       case 0 => State(IndexedSeq.empty, false)
       case 1 => state
@@ -163,6 +177,7 @@ object IRCompiler {
         )
     }
 
+    /** Wraps a state as at most `n`-times repetition. */
     def repeatAtMost(n: Int, nonGreedy: Boolean, state: State): State = n match {
       case 0 => State(IndexedSeq.empty, false)
       case 1 => optional(nonGreedy, state)
@@ -176,6 +191,7 @@ object IRCompiler {
         )
     }
 
+    /** Sets up state op-codes for a loop. */
     def setupLoop(state: State): IndexedSeq[IR.OpCode] = {
       val codes = if (state.advance) state.codes else IndexedSeq(IR.PushPos) ++ state.codes ++ IndexedSeq(IR.EmptyCheck)
       state.captureRange match {
@@ -184,6 +200,7 @@ object IRCompiler {
       }
     }
 
+    /** Wraps a state as a look-around. */
     def lookAround(negative: Boolean, state: State): State = {
       State(
         if (negative)
@@ -198,6 +215,7 @@ object IRCompiler {
       )
     }
 
+    /** Creates a state with a character op-codes. */
     def char(code: IR.OpCode, forward: Boolean): State =
       State(if (forward) IndexedSeq(code) else IndexedSeq(IR.Back, code, IR.Back), true)
   }
