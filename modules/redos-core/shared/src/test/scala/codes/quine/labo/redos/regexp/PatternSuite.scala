@@ -9,64 +9,60 @@ import data.ICharSet
 
 class PatternSuite extends munit.FunSuite {
   test("Pattern.AtomNode#toIChar") {
-    assertEquals(Character('x').toIChar(false, false), Success(IChar('x')))
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Word).toIChar(false, false), Success(IChar.Word))
+    assertEquals(Character('x').toIChar(false), Success(IChar('x')))
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Word).toIChar(false), Success(IChar.Word))
     assertEquals(
-      SimpleEscapeClass(true, EscapeClassKind.Word).toIChar(false, false),
+      SimpleEscapeClass(true, EscapeClassKind.Word).toIChar(false),
       Success(IChar.Word.complement(false))
     )
     assertEquals(
-      SimpleEscapeClass(false, EscapeClassKind.Word).toIChar(true, true),
-      Success(IChar.canonicalize(IChar.Word, true))
+      SimpleEscapeClass(true, EscapeClassKind.Word).toIChar(true),
+      Success(IChar.Word.complement(true))
     )
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).toIChar(false), Success(IChar.Digit))
     assertEquals(
-      SimpleEscapeClass(true, EscapeClassKind.Word).toIChar(true, true),
-      Success(IChar.canonicalize(IChar.Word, true).complement(true))
-    )
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).toIChar(false, false), Success(IChar.Digit))
-    assertEquals(
-      SimpleEscapeClass(true, EscapeClassKind.Digit).toIChar(false, false),
+      SimpleEscapeClass(true, EscapeClassKind.Digit).toIChar(false),
       Success(IChar.Digit.complement(false))
     )
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Space).toIChar(false, false), Success(IChar.Space))
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Space).toIChar(false), Success(IChar.Space))
     assertEquals(
-      SimpleEscapeClass(true, EscapeClassKind.Space).toIChar(false, false),
+      SimpleEscapeClass(true, EscapeClassKind.Space).toIChar(false),
       Success(IChar.Space.complement(false))
     )
-    assertEquals(UnicodeProperty(false, "ASCII").toIChar(false, false), Success(IChar.UnicodeProperty("ASCII").get))
+    assertEquals(UnicodeProperty(false, "ASCII").toIChar(false), Success(IChar.UnicodeProperty("ASCII").get))
     assertEquals(
-      UnicodeProperty(true, "ASCII").toIChar(false, true),
+      UnicodeProperty(true, "ASCII").toIChar(true),
       Success(IChar.UnicodeProperty("ASCII").get.complement(true))
     )
-    assertEquals(UnicodeProperty(false, "L").toIChar(false, false), Success(IChar.UnicodeProperty("L").get))
+    assertEquals(UnicodeProperty(false, "L").toIChar(false), Success(IChar.UnicodeProperty("L").get))
     assertEquals(
-      UnicodeProperty(true, "L").toIChar(false, true),
+      UnicodeProperty(true, "L").toIChar(true),
       Success(IChar.UnicodeProperty("L").get.complement(true))
     )
     interceptMessage[InvalidRegExpException]("unknown Unicode property: invalid") {
-      UnicodeProperty(false, "invalid").toIChar(false, false).get
+      UnicodeProperty(false, "invalid").toIChar(false).get
     }
     val Hira = IChar.UnicodePropertyValue("sc", "Hira").get
-    assertEquals(UnicodePropertyValue(false, "sc", "Hira").toIChar(false, false), Success(Hira))
-    assertEquals(UnicodePropertyValue(true, "sc", "Hira").toIChar(false, true), Success(Hira.complement(true)))
+    assertEquals(UnicodePropertyValue(false, "sc", "Hira").toIChar(false), Success(Hira))
+    assertEquals(UnicodePropertyValue(true, "sc", "Hira").toIChar(true), Success(Hira.complement(true)))
     interceptMessage[InvalidRegExpException]("unknown Unicode property-value: sc=invalid") {
-      UnicodePropertyValue(false, "sc", "invalid").toIChar(false, false).get
+      UnicodePropertyValue(false, "sc", "invalid").toIChar(false).get
     }
     assertEquals(
-      CharacterClass(false, Seq(Character('a'), Character('A'))).toIChar(false, false),
+      CharacterClass(false, Seq(Character('a'), Character('A'))).toIChar(false),
       Success(IChar('a').union(IChar('A')))
     )
     assertEquals(
-      CharacterClass(true, Seq(Character('a'), Character('A'))).toIChar(false, false),
+      CharacterClass(true, Seq(Character('a'), Character('A'))).toIChar(false),
       Success(IChar('a').union(IChar('A'))) // Not complemented is intentionally.
     )
     interceptMessage[InvalidRegExpException]("an empty range") {
-      CharacterClass(true, Seq(ClassRange('z', 'a'))).toIChar(false, false).get
+      CharacterClass(true, Seq(ClassRange('z', 'a'))).toIChar(false).get
     }
-    assertEquals(ClassRange('a', 'a').toIChar(false, false), Success(IChar('a')))
-    assertEquals(ClassRange('a', 'z').toIChar(false, false), Success(IChar.range('a', 'z')))
+    assertEquals(ClassRange('a', 'a').toIChar(false), Success(IChar('a')))
+    assertEquals(ClassRange('a', 'z').toIChar(false), Success(IChar.range('a', 'z')))
     interceptMessage[InvalidRegExpException]("an empty range") {
-      ClassRange('z', 'a').toIChar(false, false).get
+      ClassRange('z', 'a').toIChar(false).get
     }
   }
 

@@ -68,7 +68,7 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
       case LookAhead(_, n)       => loop(n)
       case LookBehind(_, n)      => loop(n)
       case atom: AtomNode =>
-        atom.toIChar(ignoreCase, unicode).map { ch =>
+        atom.toIChar(unicode).map { ch =>
           Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch)
         }
       case Dot =>
@@ -152,13 +152,8 @@ object Pattern {
   /** AtomNode is a node of pattern to match a character. */
   sealed trait AtomNode extends Serializable with Product {
 
-    /** Converts this pattern to a corresponding interval set.
-      *
-      * Note that almost all node kinds do not handle `ignoreCase` and `unicode` flags here.
-      * They are handled by automaton translation instead.
-      * However `SimpleEscapeClass(_, EscapeClassKind.Word)` should handle them here, so the arguments are needed.
-      */
-    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar]
+    /** Converts this pattern to a corresponding interval set. */
+    def toIChar(unicode: Boolean): Try[IChar]
   }
 
   /** ClassNode is a node of pattern AST, but it can appear as a class child.
@@ -216,15 +211,15 @@ object Pattern {
 
   /** Character is a single character in pattern. (e.g. `/x/`) */
   final case class Character(value: UChar) extends Node with ClassNode {
-    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar] = Success(IChar(value))
+    def toIChar(unicode: Boolean): Try[IChar] = Success(IChar(value))
   }
 
   /** SimpleEscapeClass is an escape class. (e.g. `/\w/` or `/\s/`) */
   final case class SimpleEscapeClass(invert: Boolean, kind: EscapeClassKind) extends Node with ClassNode {
-    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar] = {
+    def toIChar(unicode: Boolean): Try[IChar] = {
       val char = kind match {
         case EscapeClassKind.Digit => IChar.Digit
-        case EscapeClassKind.Word  => if (ignoreCase) IChar.canonicalize(IChar.Word, unicode) else IChar.Word
+        case EscapeClassKind.Word  => IChar.Word
         case EscapeClassKind.Space => IChar.Space
       }
       Success(if (invert) char.complement(unicode) else char)
@@ -233,7 +228,7 @@ object Pattern {
 
   /** UnicodeProperty is an escape class of Unicode property. (e.g. `/\p{ASCII}/` or `/\P{L}/`) */
   final case class UnicodeProperty(invert: Boolean, name: String) extends Node with ClassNode {
-    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar] = IChar.UnicodeProperty(name) match {
+    def toIChar(unicode: Boolean): Try[IChar] = IChar.UnicodeProperty(name) match {
       case Some(char) => Success(if (invert) char.complement(unicode) else char)
       case None       => Failure(new InvalidRegExpException(s"unknown Unicode property: $name"))
     }
@@ -243,7 +238,7 @@ object Pattern {
     * (e.g. `/\p{sc=Hira}/` or `/\P{General_Category=No}/`)
     */
   final case class UnicodePropertyValue(invert: Boolean, name: String, value: String) extends Node with ClassNode {
-    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar] = IChar.UnicodePropertyValue(name, value) match {
+    def toIChar(unicode: Boolean): Try[IChar] = IChar.UnicodePropertyValue(name, value) match {
       case Some(char) => Success(if (invert) char.complement(unicode) else char)
       case None       => Failure(new InvalidRegExpException(s"unknown Unicode property-value: $name=$value"))
     }
@@ -251,14 +246,14 @@ object Pattern {
 
   /** CharacterClass is a class (set) pattern of characters. (e.g. `/[a-z]/` or `/[^A-Z]/`) */
   final case class CharacterClass(invert: Boolean, children: Seq[ClassNode]) extends Node with AtomNode {
-    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar] =
+    def toIChar(unicode: Boolean): Try[IChar] =
       // Inversion will be done in automaton translation instead of here.
-      TryUtil.traverse(children)(_.toIChar(ignoreCase, unicode)).map(IChar.union(_))
+      TryUtil.traverse(children)(_.toIChar(unicode)).map(IChar.union(_))
   }
 
   /** ClassRange is a character rane pattern in a class. */
   final case class ClassRange(begin: UChar, end: UChar) extends ClassNode {
-    def toIChar(ignoreCase: Boolean, unicode: Boolean): Try[IChar] = {
+    def toIChar(unicode: Boolean): Try[IChar] = {
       val char = IChar.range(begin, end)
       if (char.isEmpty) Failure(new InvalidRegExpException("an empty range"))
       else Success(char)

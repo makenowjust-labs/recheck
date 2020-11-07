@@ -65,12 +65,12 @@ object IRCompiler {
             val c = if (ignoreCase) UChar.canonicalize(c0, unicode) else c0
             Success(State.char(IR.Char(c), forward))
           case node @ CharacterClass(invert, _) =>
-            node.toIChar(ignoreCase, unicode).map { ch0 =>
+            node.toIChar(unicode).map { ch0 =>
               val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
               State.char(if (invert) IR.ClassNot(ch) else IR.Class(ch), forward)
             }
           case node: AtomNode =>
-            node.toIChar(ignoreCase, unicode).map { ch0 =>
+            node.toIChar(unicode).map { ch0 =>
               val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
               State.char(IR.Class(ch), forward)
             }

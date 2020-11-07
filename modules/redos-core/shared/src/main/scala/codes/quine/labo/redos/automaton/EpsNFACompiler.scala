@@ -122,7 +122,7 @@ object EpsNFACompiler {
           case LookAhead(_, _)  => Failure(new UnsupportedException("look-ahead assertion"))
           case LookBehind(_, _) => Failure(new UnsupportedException("look-behind assertion"))
           case atom: AtomNode =>
-            atom.toIChar(ignoreCase, unicode).map { ch0 =>
+            atom.toIChar(unicode).map { ch0 =>
               val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
               val chs = atom match {
                 // CharacterClass's inversion should be done here.
