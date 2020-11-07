@@ -14,13 +14,13 @@ import regexp.Pattern._
 import util.TryUtil
 
 /** Compiler from RegExp pattern to VM IR. */
-object Compiler {
+object IRCompiler {
 
   def compile(pattern: Pattern): Try[IR] =
     for {
       _ <- Try(()) // Ensures a `Try` context surely.
-      capsSize = Compiler.capsSize(pattern)
-      names <- Compiler.names(pattern)
+      capsSize = IRCompiler.capsSize(pattern)
+      names <- IRCompiler.names(pattern)
       codes <- {
         val FlagSet(_, ignoreCase, multiline, dotAll, unicode, _) = pattern.flagSet
 
