@@ -966,15 +966,51 @@ class IRCompilerSuite extends munit.FunSuite {
     }
 
     test("IRCompiler.compile: AtomNode") {
-      val pattern = Pattern(Sequence(Seq(LineBegin, SimpleEscapeClass(false, EscapeClassKind.Digit))), flagSet1)
+      val pattern1 = Pattern(Sequence(Seq(LineBegin, SimpleEscapeClass(false, EscapeClassKind.Digit))), flagSet1)
+      val pattern2 = Pattern(Sequence(Seq(LineBegin, SimpleEscapeClass(false, EscapeClassKind.Word))), flagSet3)
+      val pattern3 = Pattern(Sequence(Seq(LineBegin, SimpleEscapeClass(false, EscapeClassKind.Word))), flagSet4)
       assertEquals(
-        IRCompiler.compile(pattern),
+        IRCompiler.compile(pattern1),
         Success(
           IR(
-            pattern,
+            pattern1,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Class(IChar.Digit), IR.CapEnd(0), IR.Done)
+          )
+        )
+      )
+      assertEquals(
+        IRCompiler.compile(pattern2),
+        Success(
+          IR(
+            pattern2,
+            0,
+            Map.empty,
+            IndexedSeq(
+              IR.CapBegin(0),
+              IR.InputBegin,
+              IR.Class(IChar.canonicalize(IChar.Word, false)),
+              IR.CapEnd(0),
+              IR.Done
+            )
+          )
+        )
+      )
+      assertEquals(
+        IRCompiler.compile(pattern3),
+        Success(
+          IR(
+            pattern3,
+            0,
+            Map.empty,
+            IndexedSeq(
+              IR.CapBegin(0),
+              IR.InputBegin,
+              IR.Class(IChar.canonicalize(IChar.Word, true)),
+              IR.CapEnd(0),
+              IR.Done
+            )
           )
         )
       )
