@@ -7,12 +7,8 @@ import fastparse._
 
 import Pattern._
 import data.UChar
-import util.Timeout
 
 class ParserSuite extends munit.FunSuite {
-
-  /** Timeout checking is disabled in testing. */
-  implicit val timeout: Timeout.NoTimeout.type = Timeout.NoTimeout
 
   /** A default parser instance for testing. */
   def P = new Parser(false, false, false, 0)

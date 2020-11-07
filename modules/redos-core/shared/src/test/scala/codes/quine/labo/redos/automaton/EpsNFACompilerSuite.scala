@@ -8,12 +8,8 @@ import regexp.Pattern
 import regexp.Pattern._
 import data.IChar
 import data.ICharSet
-import util.Timeout
 
 class EpsNFACompilerSuite extends munit.FunSuite {
-
-  /** Timeout checking is disabled in testing. */
-  implicit val timeout: Timeout.NoTimeout.type = Timeout.NoTimeout
 
   locally {
     val flagSet0 = FlagSet(false, false, false, false, false, false)

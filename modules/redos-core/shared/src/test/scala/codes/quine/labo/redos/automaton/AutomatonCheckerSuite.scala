@@ -7,12 +7,8 @@ import scala.util.Try
 import Complexity._
 import data.IChar
 import regexp.Parser
-import util.Timeout
 
 class AutomatonCheckerSuite extends munit.FunSuite {
-
-  /** Timeout checking is disabled in testing. */
-  implicit val timeout: Timeout.NoTimeout.type = Timeout.NoTimeout
 
   /** Runs a checker against the RegExp. */
   def check(source: String, flags: String): Try[Complexity[IChar]] =
