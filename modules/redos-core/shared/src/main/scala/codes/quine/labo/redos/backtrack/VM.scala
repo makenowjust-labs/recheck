@@ -194,7 +194,7 @@ private[backtrack] final class VM(
         proc.pos = proc.stack.pop()
       case RewindProc =>
         val size = proc.stack.pop()
-        while (size < procs.size) procs.pop()
+        while (size <= procs.size) procs.pop()
         procs.push(proc)
       case WordBoundary =>
         val c1 = proc.previousChar

@@ -950,7 +950,7 @@ class VMSuite extends munit.FunSuite {
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 0)
-    vm.procs.top.stack.push(1)
+    vm.procs.top.stack.push(2)
     for (_ <- (1 to 3)) vm.procs.push(vm.procs.top.clone())
     assertEquals(vm.step(), None)
     assertEquals(vm.procs.size, 2)
