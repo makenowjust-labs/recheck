@@ -40,6 +40,18 @@ final case class UChar(value: Int) extends AnyVal with Ordered[UChar] {
   }
 }
 
+/** UChar utilities. */
 object UChar {
+
+  /** A implicit conversion from the char to a code point. */
   implicit def charToUChar(c: Char): UChar = UChar(c.toInt)
+
+  /** Canonicalizes the code point. */
+  def canonicalize(c: UChar, unicode: Boolean): UChar = {
+    val convs = if (unicode) CaseMap.Fold else CaseMap.Upper
+    convs.find(_.domain.contains(c)) match {
+      case Some(conv) => UChar(c.value + conv.offset)
+      case None       => c
+    }
+  }
 }

@@ -110,6 +110,15 @@ private[regexp] final class Parser(
     val captures: Int
 ) {
 
+  /** A last capture index to be assigned. */
+  var captureIndex = 0
+
+  /** Assign a capture index. */
+  def nextCaptureIndex: Int = {
+    captureIndex += 1
+    captureIndex
+  }
+
   /** {{{
     * Source :: Disjunction
     * }}}
@@ -451,14 +460,16 @@ private[regexp] final class Parser(
     */
   def Paren[_: P]: P[Node] =
     P {
-      ("(" ~ !"?" ~/ Disjunction ~ ")").map(Pattern.Capture(_)) |
+      ("(" ~ !"?" ~/ Pass(nextCaptureIndex) ~ Disjunction ~ ")").map { case (cap, node) =>
+        Pattern.Capture(cap, node)
+      } |
         ("(?:" ~/ Disjunction ~ ")").map(Pattern.Group(_)) |
         ("(?=" ~/ Disjunction ~ ")").map(Pattern.LookAhead(false, _)) |
         ("(?!" ~/ Disjunction ~ ")").map(Pattern.LookAhead(true, _)) |
         ("(?<=" ~/ Disjunction ~ ")").map(Pattern.LookBehind(false, _)) |
         ("(?<!" ~/ Disjunction ~ ")").map(Pattern.LookBehind(true, _)) |
-        ("(?<" ~/ CaptureName ~ ">" ~/ Disjunction ~ ")").map { case (name, node) =>
-          Pattern.NamedCapture(name, node)
+        ("(?<" ~/ CaptureName ~ ">" ~/ Pass(nextCaptureIndex) ~ Disjunction ~ ")").map { case (name, cap, node) =>
+          Pattern.NamedCapture(cap, name, node)
         }
     }
 

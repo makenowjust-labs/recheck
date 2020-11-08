@@ -12,6 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: olafurpg/setup-gpg@v2
+      - uses: olafurpg/setup-scala@v10
+        with:
+          java-version: adopt@1.14
       - name: Publish
         run: sbt ci-release
         env:

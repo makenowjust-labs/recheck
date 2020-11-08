@@ -13,7 +13,7 @@ import util.Timeout
 import util.TryUtil
 
 /** ECMA-262 RegExp to ε-NFA Compiler. */
-object Compiler {
+object EpsNFACompiler {
 
   /** Compiles ECMA-262 RegExp into ε-NFA. */
   def compile(pattern: Pattern)(implicit timeout: Timeout = Timeout.NoTimeout): Try[EpsNFA[Int]] =
@@ -52,9 +52,9 @@ object Compiler {
                 val q = nextQ()
                 (q, q)
               })
-          case Capture(n)         => loop(n)
-          case NamedCapture(_, n) => loop(n)
-          case Group(n)           => loop(n)
+          case Capture(_, n)         => loop(n)
+          case NamedCapture(_, _, n) => loop(n)
+          case Group(n)              => loop(n)
           case Star(nonGreedy, n) =>
             loop(n).map { case (i0, a0) =>
               //      +---------------+
@@ -122,7 +122,7 @@ object Compiler {
           case LookAhead(_, _)  => Failure(new UnsupportedException("look-ahead assertion"))
           case LookBehind(_, _) => Failure(new UnsupportedException("look-behind assertion"))
           case atom: AtomNode =>
-            atom.toIChar(ignoreCase, unicode).map { ch0 =>
+            atom.toIChar(unicode).map { ch0 =>
               val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
               val chs = atom match {
                 // CharacterClass's inversion should be done here.

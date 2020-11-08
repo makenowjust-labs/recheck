@@ -4,10 +4,12 @@ Changes:
 
   - Move `Compiler` to `automaton` package.
   - Move `unicode` package to `data` package.
+  - Add backtrack based RegExp VM.
 
 Fixes:
 
   - Fix conversion from repeat pattern `a{n,m}` to ε-NFA correctly.
+  - Remove duplicated canonicalization of word escape class on `ignore-case`.
 
 # 0.2.0 (2020-11-01)
 
