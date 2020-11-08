@@ -36,6 +36,15 @@ class ParserSuite extends munit.FunSuite {
         )
       )
     )
+    assertEquals(
+      Parser.parse("((.).)", ""),
+      Success(
+        Pattern(
+          Capture(1, Sequence(Seq(Capture(2, Dot), Dot))),
+          FlagSet(false, false, false, false, false, false)
+        )
+      )
+    )
   }
 
   test("Parser.parseFlagSet") {

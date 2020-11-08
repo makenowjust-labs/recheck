@@ -460,14 +460,16 @@ private[regexp] final class Parser(
     */
   def Paren[_: P]: P[Node] =
     P {
-      ("(" ~ !"?" ~/ Disjunction ~ ")").map(Pattern.Capture(nextCaptureIndex, _)) |
+      ("(" ~ !"?" ~/ Pass(nextCaptureIndex) ~ Disjunction ~ ")").map { case (cap, node) =>
+        Pattern.Capture(cap, node)
+      } |
         ("(?:" ~/ Disjunction ~ ")").map(Pattern.Group(_)) |
         ("(?=" ~/ Disjunction ~ ")").map(Pattern.LookAhead(false, _)) |
         ("(?!" ~/ Disjunction ~ ")").map(Pattern.LookAhead(true, _)) |
         ("(?<=" ~/ Disjunction ~ ")").map(Pattern.LookBehind(false, _)) |
         ("(?<!" ~/ Disjunction ~ ")").map(Pattern.LookBehind(true, _)) |
-        ("(?<" ~/ CaptureName ~ ">" ~/ Disjunction ~ ")").map { case (name, node) =>
-          Pattern.NamedCapture(nextCaptureIndex, name, node)
+        ("(?<" ~/ CaptureName ~ ">" ~/ Pass(nextCaptureIndex) ~ Disjunction ~ ")").map { case (name, cap, node) =>
+          Pattern.NamedCapture(cap, name, node)
         }
     }
 
