@@ -4,6 +4,7 @@ Changes:
 
   - Move `Compiler` to `automaton` package.
   - Move `unicode` package to `data` package.
+  - Add backtrack based RegExp VM.
 
 Fixes:
 
