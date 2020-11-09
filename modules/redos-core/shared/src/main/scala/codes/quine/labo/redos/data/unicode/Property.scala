@@ -1,7 +1,7 @@
 package codes.quine.labo.redos.data.unicode
 
 /** Utilities for Unicode properties. */
-object Property {
+private[data] object Property {
 
   /** A map from non-binary property alias to canonical name.
     *

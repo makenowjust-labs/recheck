@@ -1,7 +1,7 @@
 package codes.quine.labo.redos
 package automaton
 
-/** Complexity is a result of [[check]] method. */
+/** Complexity is a result of [[AutomatonChecker.check]] method. */
 sealed abstract class Complexity[+A] extends Serializable with Product {
 
   /** Tests whether this complexity is safe or not. */

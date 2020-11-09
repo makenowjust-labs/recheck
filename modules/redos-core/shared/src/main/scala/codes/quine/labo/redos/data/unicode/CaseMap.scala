@@ -4,7 +4,7 @@ package codes.quine.labo.redos.data.unicode
   *
   * The methods defined here are designed for implementing ignore-case of regexp.
   */
-object CaseMap {
+private[data] object CaseMap {
 
   /** Conversion is a pair of a conversion domain and a conversion offset. */
   final case class Conversion(domain: IntervalSet[UChar], offset: Int)

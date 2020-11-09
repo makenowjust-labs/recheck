@@ -12,7 +12,7 @@ import util.Timeout
 /** ReDoS vulnerable RegExp checker based on automata theory. */
 object AutomatonChecker {
 
-  /** Checks a match time complexity of the ε-NFA. */
+  /** Checks a match time complexity of the NFA. */
   def check[A, Q](nfa: OrderedNFA[A, Q])(implicit timeout: Timeout = Timeout.NoTimeout): Try[Complexity[A]] =
     Try(timeout.checkTimeout("automaton.AutomatonChecker")(new AutomatonChecker(nfa, timeout)).check())
 }
