@@ -53,10 +53,19 @@ final case class OrderedNFA[A, Q](
 
     sb.result()
   }
+}
 
-  /** Converts to [[MultiNFA]] with pruning in order of priorities. */
-  def toMultiNFA: MultiNFA[A, (Q, Set[Q])] = {
-    val reverseDFA = reverse.toDFA
+/** OrderedNFA utilities. */
+object OrderedNFA {
+
+  /** Prunes a transition function along with backtracking behavior for vulnerability detection.
+    *
+    * A result is pair of a reversed DFA and pruned NFA.
+    */
+  def prune[A, Q](nfa: OrderedNFA[A, Q]): (DFA[A, Set[Q]], MultiNFA[A, (Q, Set[Q])]) = {
+    val OrderedNFA(alphabet, stateSet, inits, acceptSet, delta) = nfa
+
+    val reverseDFA = nfa.reverse.toDFA
     val reverseDelta =
       reverseDFA.delta.groupMap(_._1._2) { case (p2, _) -> p1 => (p1, p2) }.withDefaultValue(Vector.empty)
 
@@ -80,6 +89,7 @@ final case class OrderedNFA[A, Q](
       }
     }
 
-    MultiNFA(alphabet, newStateSet, newInits, newAcceptSet, newDelta.toMap)
+    val multiNFA = MultiNFA[A, (Q, Set[Q])](alphabet, newStateSet, newInits, newAcceptSet, newDelta.toMap)
+    (reverseDFA, multiNFA)
   }
 }

@@ -4,6 +4,38 @@ package automaton
 import data.MultiSet
 
 class OrderedNFASuite extends munit.FunSuite {
+  test("OrderedNFA.prune") {
+    val nfa = OrderedNFA(
+      Set('a', 'b'),
+      Set(0, 1),
+      Seq(0),
+      Set(0, 1),
+      Map(
+        (0, 'a') -> Seq(0, 0, 1),
+        (0, 'b') -> Seq(1),
+        (1, 'a') -> Seq(1),
+        (1, 'b') -> Seq(1)
+      )
+    )
+    val (reverseDFA, multiNFA) = OrderedNFA.prune(nfa)
+    assertEquals(reverseDFA, nfa.reverse.toDFA)
+    assertEquals(
+      multiNFA,
+      MultiNFA(
+        Set('a', 'b'),
+        Set((0, Set(0, 1)), (1, Set(0, 1))),
+        MultiSet((0, Set(0, 1))),
+        Set((0, Set(0, 1)), (1, Set(0, 1))),
+        Map(
+          ((0, Set(0, 1)), 'a') -> MultiSet((0, Set(0, 1))),
+          ((0, Set(0, 1)), 'b') -> MultiSet((1, Set(0, 1))),
+          ((1, Set(0, 1)), 'a') -> MultiSet((1, Set(0, 1))),
+          ((1, Set(0, 1)), 'b') -> MultiSet((1, Set(0, 1)))
+        )
+      )
+    )
+  }
+
   test("OrderedNFA#rename") {
     val nfa = OrderedNFA(Set('a', 'b'), Set('p', 'q'), Seq('p'), Set('q'), Map(('p', 'a') -> Seq('q')))
     assertEquals(nfa.rename, OrderedNFA(Set('a', 'b'), Set(0, 1), Seq(0), Set(1), Map((0, 'a') -> Seq(1))))
@@ -44,36 +76,6 @@ class OrderedNFASuite extends munit.FunSuite {
          |  "1" -> "1" [label="0, b"];
          |  "1" -> "2" [label="1, b"];
          |}""".stripMargin
-    )
-  }
-
-  test("OrderedNFA#toMultiNFA") {
-    val nfa = OrderedNFA(
-      Set('a', 'b'),
-      Set(0, 1),
-      Seq(0),
-      Set(0, 1),
-      Map(
-        (0, 'a') -> Seq(0, 0, 1),
-        (0, 'b') -> Seq(1),
-        (1, 'a') -> Seq(1),
-        (1, 'b') -> Seq(1)
-      )
-    )
-    assertEquals(
-      nfa.toMultiNFA,
-      MultiNFA(
-        Set('a', 'b'),
-        Set((0, Set(0, 1)), (1, Set(0, 1))),
-        MultiSet((0, Set(0, 1))),
-        Set((0, Set(0, 1)), (1, Set(0, 1))),
-        Map(
-          ((0, Set(0, 1)), 'a') -> MultiSet((0, Set(0, 1))),
-          ((0, Set(0, 1)), 'b') -> MultiSet((1, Set(0, 1))),
-          ((1, Set(0, 1)), 'a') -> MultiSet((1, Set(0, 1))),
-          ((1, Set(0, 1)), 'b') -> MultiSet((1, Set(0, 1)))
-        )
-      )
     )
   }
 }

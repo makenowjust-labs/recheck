@@ -26,11 +26,10 @@ private final class AutomatonChecker[A, Q](
   // Introduces `timeout` methods into the scope.
   import timeout._
 
-  /** A reversed DFA constructed from [[orderedNFA]]. */
-  private[this] val reverseDFA = checkTimeoutWith("reverseDFA")(nfa.reverse.toDFA)
-
-  /** A NFA with multi-transitions constructed from [[orderedNFA]] (and [[reverseDFA]]). */
-  private[this] val multiNFA = checkTimeoutWith("multiNFA")(nfa.toMultiNFA)
+  /** A reversed DFA constructed from [[orderedNFA]],
+    * and a NFA with multi-transitions constructed from [[orderedNFA]].
+    */
+  private[this] val (reverseDFA, multiNFA) = checkTimeoutWith("prune")(OrderedNFA.prune(nfa))
 
   /** A [[multiNFA]] transition graph. */
   private[this] val graph = checkTimeoutWith("graph")(multiNFA.toGraph.reachable(multiNFA.initSet.toSet))
