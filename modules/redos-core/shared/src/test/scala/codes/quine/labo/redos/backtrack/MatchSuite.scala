@@ -30,15 +30,10 @@ class MatchSuite extends munit.FunSuite {
     assertEquals(caps.capture("y"), None)
   }
 
-  test("Match#matchPosition") {
-    val s = UString.from("fizzbuzz", false)
-    val caps = Match(s, Map.empty, IndexedSeq(0, 4, 0, 2, 2, 4))
-    assertEquals(caps.matchPosition, (0, 4))
-  }
-
   test("Match#position") {
     val s = UString.from("fizzbuzz", false)
     val caps = Match(s, Map("x" -> 1), IndexedSeq(0, 4, 0, 2, -1, -1, 2, 4))
+    assertEquals(caps.position, (0, 4))
     assertEquals(caps.position(0), Some((0, 4)))
     assertEquals(caps.position(1), Some((0, 2)))
     assertEquals(caps.position(2), None)

@@ -23,11 +23,11 @@ object VM {
   private[backtrack] final class Proc(
       val input: UString,
       val names: Map[String, Int],
-      val capsSeq: mutable.IndexedSeq[Int],
+      val caps: mutable.IndexedSeq[Int],
       val stack: mutable.Stack[Int],
       var pos: Int,
       var pc: Int
-  ) extends CaptureList {
+  ) {
 
     /** Returns the current character of this proc. */
     def currentChar: Option[UChar] = input.get(pos)
@@ -36,16 +36,25 @@ object VM {
     def previousChar: Option[UChar] = input.get(pos - 1)
 
     /** A size as capture list. */
-    def size: Int = capsSeq.size / 2 - 1
+    def size: Int = caps.size / 2 - 1
 
-    /** A capture indexes. */
-    def caps(i: Int): Int = capsSeq(i)
+    /** Gets the `n`-th capture string.
+      *
+      * An index `0` is whole match string, and indexes
+      * between `1` and `size` are capture groups.
+      */
+    def capture(n: Int): Option[UString] =
+      if (0 <= n && n <= size) {
+        val begin = caps(n * 2)
+        val end = caps(n * 2 + 1)
+        if (begin >= 0 && end >= 0) Some(input.substring(begin, end)) else None
+      } else None
 
     /** Updates a begin position of the `n`-th capture. */
-    def captureBegin(n: Int, pos: Int): Unit = capsSeq.update(n * 2, pos)
+    def captureBegin(n: Int, pos: Int): Unit = caps.update(n * 2, pos)
 
     /** Updates an end position of the `n`-th capture. */
-    def captureEnd(n: Int, pos: Int): Unit = capsSeq.update(n * 2 + 1, pos)
+    def captureEnd(n: Int, pos: Int): Unit = caps.update(n * 2 + 1, pos)
 
     /** Resets captures between `i` and `j`. */
     def captureReset(i: Int, j: Int): Unit = {
@@ -59,10 +68,10 @@ object VM {
       *
       * It copies mutable states deeply.
       */
-    override def clone(): Proc = new Proc(input, names, capsSeq.clone(), stack.clone(), pos, pc)
+    override def clone(): Proc = new Proc(input, names, caps.clone(), stack.clone(), pos, pc)
 
     /** Shows this proc. */
-    override def toString: String = s"Proc($input, $names, $capsSeq, $stack, $pos, $pc)"
+    override def toString: String = s"Proc($input, $names, $caps, $stack, $pos, $pc)"
   }
 }
 
@@ -139,7 +148,7 @@ private[backtrack] final class VM(
       case Done =>
         // Use `input` instead of `proc.input` here,
         // because `proc.input` is canonicalized.
-        return Some(Match(input, proc.names, proc.capsSeq.toIndexedSeq))
+        return Some(Match(input, proc.names, proc.caps.toIndexedSeq))
       case Dot =>
         proc.currentChar match {
           case Some(c) if !LineTerminator.contains(c) => proc.pos += 1
