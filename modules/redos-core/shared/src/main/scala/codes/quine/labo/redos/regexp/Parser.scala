@@ -20,11 +20,12 @@ object Parser {
   /** Parses ECMA-262 RegExp string. */
   def parse(source: String, flags: String, additional: Boolean = true)(implicit
       timeout: Timeout = Timeout.NoTimeout
-  ): Try[Pattern] =
+  ): Try[Pattern] = {
+    import timeout._
     for {
-      flagSet <- timeout.checkTimeoutWith("parse: flags")(parseFlagSet(flags))
-      (hasNamedCapture, captures) = timeout.checkTimeoutWith("parse: preprocess")(preprocessParens(source))
-      result = timeout.checkTimeoutWith("parse: source") {
+      flagSet <- checkTimeout("parse: flags")(parseFlagSet(flags))
+      (hasNamedCapture, captures) = checkTimeout("parse: preprocess")(preprocessParens(source))
+      result = checkTimeout("parse: source") {
         fastparse.parse(source, new Parser(flagSet.unicode, additional, hasNamedCapture, captures).Source(_))
       }
       node <- result match {
@@ -32,6 +33,7 @@ object Parser {
         case fail: Parsed.Failure    => Failure(new InvalidRegExpException(s"parsing failure at ${fail.index}"))
       }
     } yield Pattern(node, flagSet)
+  }
 
   /** Parses a flag set string. */
   private[regexp] def parseFlagSet(s: String): Try[FlagSet] = {

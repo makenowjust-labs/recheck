@@ -15,17 +15,9 @@ class TimeoutSuite extends munit.FunSuite {
 
   test("Timeout#checkTimeout") {
     interceptMessage[TimeoutException]("foo") {
-      DeadlineTimeout(-1.second.fromNow).checkTimeout("foo")
+      DeadlineTimeout(-1.second.fromNow).checkTimeout("foo")(1)
     }
-    assertEquals(DeadlineTimeout(1.second.fromNow).checkTimeout("foo"), ())
-    assertEquals(NoTimeout.checkTimeout("foo"), ())
-  }
-
-  test("Timeout#checkTimeoutWith") {
-    interceptMessage[TimeoutException]("foo") {
-      DeadlineTimeout(-1.second.fromNow).checkTimeoutWith("foo")(1)
-    }
-    assertEquals(DeadlineTimeout(1.second.fromNow).checkTimeoutWith("foo")(1), 1)
-    assertEquals(NoTimeout.checkTimeoutWith("foo")(1), 1)
+    assertEquals(DeadlineTimeout(1.second.fromNow).checkTimeout("foo")(1), 1)
+    assertEquals(NoTimeout.checkTimeout("foo")(1), 1)
   }
 }

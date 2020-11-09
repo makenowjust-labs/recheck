@@ -55,7 +55,7 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
       .pipe(set => if (needsLineTerminatorDistinction) set.add(IChar.LineTerminator.withLineTerminator) else set)
       .pipe(set => if (needsWordDistinction) set.add(IChar.Word.withWord) else set)
 
-    def loop(node: Node): Try[Seq[IChar]] = checkTimeoutWith("alphabet: loop")(node match {
+    def loop(node: Node): Try[Seq[IChar]] = checkTimeout("alphabet: loop")(node match {
       case Disjunction(ns)       => TryUtil.traverse(ns)(loop(_)).map(_.flatten)
       case Sequence(ns)          => TryUtil.traverse(ns)(loop(_)).map(_.flatten)
       case Capture(_, n)         => loop(n)

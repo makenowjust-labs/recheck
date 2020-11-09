@@ -33,7 +33,7 @@ object EpsNFACompiler {
         }
         val tau = Map.newBuilder[Int, Transition[Int]] // A transition function.
 
-        def loop(node: Node): Try[(Int, Int)] = checkTimeoutWith("compile: loop")(node match {
+        def loop(node: Node): Try[(Int, Int)] = checkTimeout("compile: loop")(node match {
           case Disjunction(ns) =>
             TryUtil.traverse(ns)(loop(_)).map { ss =>
               val i = nextQ()
