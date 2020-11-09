@@ -127,7 +127,7 @@ object EpsNFA {
   /** Assert is an ε-NFA transition with consuming no character and assertion. */
   final case class Assert[Q](kind: AssertKind, to: Q) extends Transition[Q]
 
-  /** Eps is an ε-NFA transition with consuming a character. */
+  /** Consume is an ε-NFA transition with consuming a character. */
   final case class Consume[Q](set: Set[IChar], to: Q) extends Transition[Q]
 
   /** AssertKind is assertion kind of this ε-NFA transition. */
@@ -148,13 +148,13 @@ object EpsNFA {
     /** LineBegin is `^` assertion. */
     case object LineBegin extends AssertKind
 
-    /** LineBegin is `$` assertion. */
+    /** LineEnd is `$` assertion. */
     case object LineEnd extends AssertKind
 
-    /** LineBegin is `\b` assertion. */
+    /** WordBoundary is `\b` assertion. */
     case object WordBoundary extends AssertKind
 
-    /** LineBegin is `\B` assertion. */
+    /** NotWordBoundary is `\B` assertion. */
     case object NotWordBoundary extends AssertKind
   }
 
