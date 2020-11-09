@@ -29,6 +29,7 @@ class AutomatonCheckerSuite extends munit.FunSuite {
     assertEquals(check("a*", ""), Success(Linear))
     assertEquals(check("(a*)*", ""), Success(Linear))
     assertEquals(check("^([a:]|\\b)*$", ""), Success(Linear))
+    assertEquals(check("^(\\w|\\W)*$", "i"), Success(Linear))
   }
 
   test("AutomatonChecker.check: polynomial") {
