@@ -17,8 +17,12 @@ object ReDoS {
     * Note that it does not fork a thread for timeout, so it blocks CPU on running until timeout.
     * If you need to avoid CPU blocking, you should wrap this by Future for instance.
     */
-  def check(source: String, flags: String, atMost: Duration = Duration.Inf): Diagnostics = {
-    implicit val timeout = Timeout.from(atMost)
+  def check(source: String, flags: String, atMost: Duration = Duration.Inf): Diagnostics =
+    check(source, flags, Timeout.from(atMost))
+
+  /** Tests the given RegExp pattern causes ReDoS with the timeout limit. */
+  def check(source: String, flags: String, timeout: Timeout): Diagnostics = {
+    implicit val t = timeout
     Diagnostics.from(for {
       _ <- Try(()) // Ensures a `Try` context for catching TimeoutException surely.
       pattern <- Parser.parse(source, flags)

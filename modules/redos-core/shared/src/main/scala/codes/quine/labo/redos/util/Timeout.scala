@@ -2,6 +2,7 @@ package codes.quine.labo.redos.util
 
 import java.util.concurrent.TimeoutException
 
+import scala.collection.mutable
 import scala.concurrent.duration.Deadline
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
@@ -41,5 +42,36 @@ object Timeout {
   /** NoTimeout is a timeout checker which is never timeout. */
   case object NoTimeout extends Timeout {
     def checkTimeout[A](phase: String)(body: => A): A = body
+  }
+
+  /** DebugTimeout is a timeout for debugging. */
+  final class DebugTimeout(val println: String => Unit = Predef.println) extends Timeout {
+
+    /** Stack is mutable variable to save the current stack. */
+    private[this] var stack = Vector.empty[String]
+
+    /** A map to record each execution times. */
+    private[this] val recordMap = mutable.Map.empty[Seq[String], Long].withDefaultValue(0)
+
+    /** A record map from stack name to execution time. */
+    def record: Map[Seq[String], Long] = recordMap.toMap
+
+    def checkTimeout[A](phase: String)(body: => A): A = {
+      // Saves the old stack.
+      val oldStack = stack
+      stack = stack :+ phase
+
+      // Executes body with recording
+      val start = System.currentTimeMillis()
+      val result = body
+      val time = System.currentTimeMillis() - start
+      println(s"${stack.mkString("> ")}> ${time} ms")
+      recordMap(stack) += time
+
+      // Restore the old stack.
+      stack = oldStack
+
+      result
+    }
   }
 }
