@@ -15,7 +15,7 @@ trait Tracer {
   def trace(pos: Int, pc: Int, backtrack: Boolean): Unit
 
   /** A tracer execution result. */
-  def result: Tracer.Result
+  def result(): Tracer.Result
 }
 
 /** Tracer instaances. */
@@ -46,12 +46,12 @@ object Tracer {
       traces(pos).addOne((pc, backtrack))
     }
 
-    def result: Result = Result(steps, traces.toMap.view.mapValues(_.result()).toMap)
+    def result(): Result = Result(steps, traces.toMap.view.mapValues(_.result()).toMap)
   }
 
   /** NoTracer is a tracer implementation which traces notthing in fact. */
   final case class NoTracer(timeout: Timeout = Timeout.NoTimeout) extends Tracer {
     def trace(pos: Int, pc: Int, backtrack: Boolean): Unit = ()
-    def result: Result = throw new UnsupportedOperationException
+    def result(): Result = throw new UnsupportedOperationException
   }
 }
