@@ -20,6 +20,7 @@ class AutomatonCheckerSuite extends munit.FunSuite {
     } yield result
 
   test("AutomatonChecker.check: constant") {
+    assertEquals(check("^$", ""), Success(Constant))
     assertEquals(check("^foo$", ""), Success(Constant))
     assertEquals(check("^((fi|bu)z{2}){1,2}$", ""), Success(Constant))
   }

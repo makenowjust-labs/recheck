@@ -137,7 +137,7 @@ private final class AutomatonChecker[A, Q](
   /** Finds an IDA structure chain in the graph. */
   private[this] def checkPolynomial(): (Int, Seq[Pump]) =
     checkTimeout("automaton.AutomatonChecker#checkPolynomial") {
-      scc.map(checkPolynomialComponent(_)).maxBy(_._1)
+      scc.map(checkPolynomialComponent(_)).maxByOption(_._1).getOrElse((0, Seq.empty))
     }
 
   /** An internal cache of [[checkPolynomialComponent]] method's result. */
