@@ -10,8 +10,8 @@ import fastparse.NoWhitespace._
 import fastparse._
 
 import Pattern.{FlagSet, Node, ClassNode}
+import data.IChar
 import data.UChar
-import data.unicode.Property
 import util.Timeout
 
 /** ECMA-262 RegExp parser implementation. */
@@ -122,10 +122,10 @@ object Parser {
   }
 
   /** An interval set contains "ID_Start" code points. */
-  private val IDStart = Property.binary("ID_Start").get
+  private lazy val IDStart = IChar.UnicodeProperty("ID_Start").get
 
   /** An interval set contains "ID_Continue" code points. */
-  private val IDContinue = Property.binary("ID_Continue").get
+  private lazy val IDContinue = IChar.UnicodeProperty("ID_Continue").get
 }
 
 /** Parser is a ECMA-262 RegExp parser.
