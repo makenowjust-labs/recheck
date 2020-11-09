@@ -23,14 +23,14 @@ object Parser {
   ): Try[Pattern] = timeout.checkTimeout("regexp.Parser.parse") {
     for {
       flagSet <- parseFlagSet(flags)
-      (hasNamedCapture, captures) = preprocessParens(source)
+      (hasNamedCapture, captures) = preprocessParen(source)
       result =
         fastparse.parse(source, new Parser(flagSet.unicode, additional, hasNamedCapture, captures).Source(_))
       node <- result match {
         case Parsed.Success(node, _) => Success(node)
         case fail: Parsed.Failure    => Failure(new InvalidRegExpException(s"parsing failure at ${fail.index}"))
       }
-    } yield Pattern(node, flagSet)
+    } yield Pattern(assignCaptureIndex(node), flagSet)
   }
 
   /** Parses a flag set string. */
@@ -58,7 +58,7 @@ object Parser {
     * The first value of result is a flag whether the source contains named capture or not,
     * and the second value is capture parentheses number in the source.
     */
-  private[regexp] def preprocessParens(s: String)(implicit timeout: Timeout = Timeout.NoTimeout): (Boolean, Int) =
+  private[regexp] def preprocessParen(s: String)(implicit timeout: Timeout = Timeout.NoTimeout): (Boolean, Int) =
     timeout.checkTimeout("regexp.Parser.preprocessParens") {
       var i = 0
       var hasNamedCapture = false
@@ -93,6 +93,34 @@ object Parser {
       (hasNamedCapture, captures)
     }
 
+  /** Assigns capture's index in left-to-right ordering. */
+  private[regexp] def assignCaptureIndex(node: Node): Node = {
+    import Pattern._
+
+    var currentIndex = 0
+
+    def loop(node: Node): Node = node match {
+      case Disjunction(ns) => Disjunction(ns.map(loop(_)))
+      case Sequence(ns)    => Sequence(ns.map(loop(_)))
+      case Capture(_, n) =>
+        currentIndex += 1
+        Capture(currentIndex, loop(n))
+      case NamedCapture(_, name, n) =>
+        currentIndex += 1
+        NamedCapture(currentIndex, name, loop(n))
+      case Group(n)                       => Group(loop(n))
+      case Star(nonGreedy, n)             => Star(nonGreedy, loop(n))
+      case Plus(nonGreedy, n)             => Plus(nonGreedy, loop(n))
+      case Question(nonGreedy, n)         => Question(nonGreedy, loop(n))
+      case Repeat(nonGreedy, min, max, n) => Repeat(nonGreedy, min, max, loop(n))
+      case LookAhead(negative, n)         => LookAhead(negative, loop(n))
+      case LookBehind(negative, n)        => LookBehind(negative, loop(n))
+      case _                              => node
+    }
+
+    loop(node)
+  }
+
   /** An interval set contains "ID_Start" code points. */
   private val IDStart = Property.binary("ID_Start").get
 
@@ -111,15 +139,6 @@ private[regexp] final class Parser(
     val hasNamedCapture: Boolean,
     val captures: Int
 ) {
-
-  /** A last capture index to be assigned. */
-  var captureIndex = 0
-
-  /** Assign a capture index. */
-  def nextCaptureIndex: Int = {
-    captureIndex += 1
-    captureIndex
-  }
 
   /** {{{
     * Source :: Disjunction
@@ -462,16 +481,14 @@ private[regexp] final class Parser(
     */
   def Paren[_: P]: P[Node] =
     P {
-      ("(" ~ !"?" ~/ Pass(nextCaptureIndex) ~ Disjunction ~ ")").map { case (cap, node) =>
-        Pattern.Capture(cap, node)
-      } |
+      ("(" ~ !"?" ~/ Disjunction ~ ")").map(Pattern.Capture(-1, _)) | // `-1` is dummy index.
         ("(?:" ~/ Disjunction ~ ")").map(Pattern.Group(_)) |
         ("(?=" ~/ Disjunction ~ ")").map(Pattern.LookAhead(false, _)) |
         ("(?!" ~/ Disjunction ~ ")").map(Pattern.LookAhead(true, _)) |
         ("(?<=" ~/ Disjunction ~ ")").map(Pattern.LookBehind(false, _)) |
         ("(?<!" ~/ Disjunction ~ ")").map(Pattern.LookBehind(true, _)) |
-        ("(?<" ~/ CaptureName ~ ">" ~/ Pass(nextCaptureIndex) ~ Disjunction ~ ")").map { case (name, cap, node) =>
-          Pattern.NamedCapture(cap, name, node)
+        ("(?<" ~/ CaptureName ~ ">" ~/ Disjunction ~ ")").map { case (name, node) =>
+          Pattern.NamedCapture(-1, name, node) // `-1` is dummy index.
         }
     }
 
