@@ -4,11 +4,14 @@ package backtrack
 import regexp.Parser
 
 class EngineSuite extends munit.FunSuite {
+
+  /** Asserts the pattern matching against the input. */
   def matches(source: String, flags: String, input: String, expected: Option[Seq[Option[(Int, Int)]]])(implicit
       loc: munit.Location
   ): Unit =
     matches(source, flags, input, 0, expected)
 
+  /** Asserts the pattern matching against the input from the position. */
   def matches(source: String, flags: String, input: String, pos: Int, expected: Option[Seq[Option[(Int, Int)]]])(
       implicit loc: munit.Location
   ): Unit = {
