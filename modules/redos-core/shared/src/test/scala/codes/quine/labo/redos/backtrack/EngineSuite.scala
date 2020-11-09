@@ -19,6 +19,12 @@ class EngineSuite extends munit.FunSuite {
     assertEquals(result, expected)
   }
 
+  test("Engine.matches: trace limit") {
+    val pattern = Parser.parse("^(a|a)*$", "").get
+    val tracer = new Tracer.LimitTracer(1000)
+    intercept[LimitException](Engine.matches(pattern, "aaaaaaaaaab", 0, tracer).get)
+  }
+
   test("Engine.matches: submatch") {
     matches("a", "", "a", Some(Seq(Some((0, 1)))))
     matches("a", "", "ab", Some(Seq(Some((0, 1)))))

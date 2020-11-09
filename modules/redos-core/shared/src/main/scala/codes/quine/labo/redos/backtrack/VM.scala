@@ -13,8 +13,8 @@ import data.UString
 object VM {
 
   /** Executes the IR on the input from the initial position. */
-  def execute(ir: IR, input: UString, pos: Int): Option[Match] =
-    new VM(ir, input, pos).execute()
+  def execute(ir: IR, input: UString, pos: Int, tracer: Tracer = Tracer.NoTracer()): Option[Match] =
+    new VM(ir, input, pos, tracer).execute()
 
   /** Proc is a state of VM execution.
     *
@@ -79,7 +79,8 @@ object VM {
 private[backtrack] final class VM(
     private[this] val ir: IR,
     private[this] val input: UString,
-    initPos: Int
+    initPos: Int,
+    private[this] val tracer: Tracer = Tracer.NoTracer()
 ) {
 
   /** An execution process list (stack). */
@@ -111,6 +112,12 @@ private[backtrack] final class VM(
     val proc = procs.top
     val code = ir.codes(proc.pc)
     var backtrack = false
+
+    // Saves pos and pc for tracing.
+    val oldPos = proc.pos
+    val oldPc = proc.pc
+
+    // Steps forward pc before execution.
     proc.pc += 1
 
     code match {
@@ -220,6 +227,9 @@ private[backtrack] final class VM(
     }
 
     if (backtrack) procs.pop()
+
+    // Traces this step.
+    tracer.trace(oldPos, oldPc, backtrack)
 
     None
   }

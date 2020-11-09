@@ -10,6 +10,26 @@ import regexp.Pattern
 import regexp.Pattern._
 
 class VMSuite extends munit.FunSuite {
+  test("VM.execute: trace limit") {
+    val input = UString.from("aaaaaaaaaab", false)
+    val codes = IndexedSeq(
+      IR.CapBegin(0),
+      IR.InputBegin,
+      IR.ForkCont(5),
+      IR.ForkCont(2),
+      IR.Char('a'),
+      IR.Jump(1),
+      IR.Char('a'),
+      IR.Jump(-6),
+      IR.InputEnd,
+      IR.CapEnd(0),
+      IR.Done
+    )
+    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 0, Map.empty, codes)
+    val tracer = new Tracer.LimitTracer(1000) // 2^10 = 1024 > 1000
+    intercept[LimitException](VM.execute(ir, input, 0, tracer))
+  }
+
   test("VM.execute: match") {
     val input = UString.from("xyz", false)
     val codes = IndexedSeq(

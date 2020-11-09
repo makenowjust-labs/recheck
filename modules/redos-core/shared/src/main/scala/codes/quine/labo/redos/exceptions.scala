@@ -8,3 +8,6 @@ class UnsupportedException(message: String) extends Exception(message)
 
 /** InvalidRegExpException is an exception thrown when regexp is invalid. */
 class InvalidRegExpException(message: String) extends Exception(message)
+
+/** LimitException is an exception thrown when VM execution step exceeds a limit. */
+class LimitException(message: String) extends Exception(message)
