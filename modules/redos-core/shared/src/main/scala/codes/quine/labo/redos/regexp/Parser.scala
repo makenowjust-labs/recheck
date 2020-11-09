@@ -20,14 +20,12 @@ object Parser {
   /** Parses ECMA-262 RegExp string. */
   def parse(source: String, flags: String, additional: Boolean = true)(implicit
       timeout: Timeout = Timeout.NoTimeout
-  ): Try[Pattern] = {
-    import timeout._
+  ): Try[Pattern] = timeout.checkTimeout("regexp.Parser.parse") {
     for {
-      flagSet <- checkTimeout("parse: flags")(parseFlagSet(flags))
-      (hasNamedCapture, captures) = checkTimeout("parse: preprocess")(preprocessParens(source))
-      result = checkTimeout("parse: source") {
+      flagSet <- parseFlagSet(flags)
+      (hasNamedCapture, captures) = preprocessParens(source)
+      result =
         fastparse.parse(source, new Parser(flagSet.unicode, additional, hasNamedCapture, captures).Source(_))
-      }
       node <- result match {
         case Parsed.Success(node, _) => Success(node)
         case fail: Parsed.Failure    => Failure(new InvalidRegExpException(s"parsing failure at ${fail.index}"))
@@ -36,62 +34,64 @@ object Parser {
   }
 
   /** Parses a flag set string. */
-  private[regexp] def parseFlagSet(s: String): Try[FlagSet] = {
-    val cs = s.toList
-    // A flag set accepts neither duplicated character nor unknown character.
-    if (cs.distinct != cs) Failure(new InvalidRegExpException("duplicated flag"))
-    else if (!cs.forall("gimsuy".contains(_))) Failure(new InvalidRegExpException("unknown flag"))
-    else
-      Success(
-        FlagSet(
-          cs.contains('g'),
-          cs.contains('i'),
-          cs.contains('m'),
-          cs.contains('s'),
-          cs.contains('u'),
-          cs.contains('y')
+  private[regexp] def parseFlagSet(s: String)(implicit timeout: Timeout = Timeout.NoTimeout): Try[FlagSet] =
+    timeout.checkTimeout("regexp.Parser.parseFlagSet") {
+      val cs = s.toList
+      // A flag set accepts neither duplicated character nor unknown character.
+      if (cs.distinct != cs) Failure(new InvalidRegExpException("duplicated flag"))
+      else if (!cs.forall("gimsuy".contains(_))) Failure(new InvalidRegExpException("unknown flag"))
+      else
+        Success(
+          FlagSet(
+            cs.contains('g'),
+            cs.contains('i'),
+            cs.contains('m'),
+            cs.contains('s'),
+            cs.contains('u'),
+            cs.contains('y')
+          )
         )
-      )
-  }
+    }
 
   /** Counts capture parentheses in the source and determine the source contains named capture.
     *
     * The first value of result is a flag whether the source contains named capture or not,
     * and the second value is capture parentheses number in the source.
     */
-  private[regexp] def preprocessParens(s: String): (Boolean, Int) = {
-    var i = 0
-    var hasNamedCapture = false
-    var captures = 0
-    while (i < s.length) {
-      (s.charAt(i): @switch) match {
-        case '(' =>
-          if (s.startsWith("(?", i)) {
-            // A named capture is started with "(?<",
-            // but it should not start with "(?<=" or "(?<!" dut to look-behind assertion.
-            if (s.startsWith("(?<", i) && !s.startsWith("(?<=", i) && !s.startsWith("(?<!", i)) {
-              hasNamedCapture = true
+  private[regexp] def preprocessParens(s: String)(implicit timeout: Timeout = Timeout.NoTimeout): (Boolean, Int) =
+    timeout.checkTimeout("regexp.Parser.preprocessParens") {
+      var i = 0
+      var hasNamedCapture = false
+      var captures = 0
+      while (i < s.length) {
+        (s.charAt(i): @switch) match {
+          case '(' =>
+            if (s.startsWith("(?", i)) {
+              // A named capture is started with "(?<",
+              // but it should not start with "(?<=" or "(?<!" dut to look-behind assertion.
+              if (s.startsWith("(?<", i) && !s.startsWith("(?<=", i) && !s.startsWith("(?<!", i)) {
+                hasNamedCapture = true
+                captures += 1
+              }
+            } else {
               captures += 1
             }
-          } else {
-            captures += 1
-          }
-          i += 1
-        // Skips character class, escaped character and ordinal character.
-        case '[' =>
-          i += 1
-          while (i < s.length && s.charAt(i) != ']') {
-            (s.charAt(i): @switch) match {
-              case '\\' => i += 2
-              case _    => i += 1
+            i += 1
+          // Skips character class, escaped character and ordinal character.
+          case '[' =>
+            i += 1
+            while (i < s.length && s.charAt(i) != ']') {
+              (s.charAt(i): @switch) match {
+                case '\\' => i += 2
+                case _    => i += 1
+              }
             }
-          }
-        case '\\' => i += 2
-        case _    => i += 1
+          case '\\' => i += 2
+          case _    => i += 1
+        }
       }
+      (hasNamedCapture, captures)
     }
-    (hasNamedCapture, captures)
-  }
 
   /** An interval set contains "ID_Start" code points. */
   private val IDStart = Property.binary("ID_Start").get

@@ -4,6 +4,7 @@ package automaton
 import scala.collection.mutable
 
 import data.MultiSet
+import util.Timeout
 import util.GraphvizUtil.escape
 
 /** OrderedNFA is a NFA, but its transitions are priorized in the order. */
@@ -16,28 +17,30 @@ final case class OrderedNFA[A, Q](
 ) {
 
   /** Renames its states as integers. */
-  def rename: OrderedNFA[A, Int] = {
-    val f = stateSet.zipWithIndex.toMap
-    OrderedNFA(
-      alphabet,
-      f.values.toSet,
-      inits.map(f),
-      acceptSet.map(f),
-      delta.map { case (q1, a) -> qs => (f(q1), a) -> qs.map(f) }
-    )
-  }
+  def rename(implicit timeout: Timeout = Timeout.NoTimeout): OrderedNFA[A, Int] =
+    timeout.checkTimeout("automaton.OrderedNFA#rename") {
+      val f = stateSet.zipWithIndex.toMap
+      OrderedNFA(
+        alphabet,
+        f.values.toSet,
+        inits.map(f),
+        acceptSet.map(f),
+        delta.map { case (q1, a) -> qs => (f(q1), a) -> qs.map(f) }
+      )
+    }
 
   /** Reverses this NFA.
     *
     * This method loses priorities, so the result type is usual [[NFA]].
     */
-  def reverse: NFA[A, Q] = {
-    val reverseDelta = mutable.Map.empty[(Q, A), Set[Q]].withDefaultValue(Set.empty)
-    for ((q1, a) -> qs <- delta; q2 <- qs) {
-      reverseDelta((q2, a)) = reverseDelta((q2, a)) | Set(q1)
+  def reverse(implicit timeout: Timeout = Timeout.NoTimeout): NFA[A, Q] =
+    timeout.checkTimeout("automaton.OrderedNFA#reverse") {
+      val reverseDelta = mutable.Map.empty[(Q, A), Set[Q]].withDefaultValue(Set.empty)
+      for ((q1, a) -> qs <- delta; q2 <- qs) {
+        reverseDelta((q2, a)) = reverseDelta((q2, a)) | Set(q1)
+      }
+      NFA(alphabet, stateSet, acceptSet, inits.toSet, reverseDelta.toMap)
     }
-    NFA(alphabet, stateSet, acceptSet, inits.toSet, reverseDelta.toMap)
-  }
 
   /** Converts to Graphviz format text. */
   def toGraphviz: String = {
@@ -62,7 +65,9 @@ object OrderedNFA {
     *
     * A result is pair of a reversed DFA and pruned NFA.
     */
-  def prune[A, Q](nfa: OrderedNFA[A, Q]): (DFA[A, Set[Q]], MultiNFA[A, (Q, Set[Q])]) = {
+  def prune[A, Q](nfa: OrderedNFA[A, Q])(implicit
+      timeout: Timeout = Timeout.NoTimeout
+  ): (DFA[A, Set[Q]], MultiNFA[A, (Q, Set[Q])]) = timeout.checkTimeout("automaton.OrderedNFA.prune") {
     val OrderedNFA(alphabet, stateSet, inits, acceptSet, delta) = nfa
 
     val reverseDFA = nfa.reverse.toDFA
@@ -74,7 +79,7 @@ object OrderedNFA {
     val newAcceptSet = for (q <- acceptSet) yield (q, reverseDFA.init)
 
     val newDelta = mutable.Map.empty[((Q, Set[Q]), A), MultiSet[(Q, Set[Q])]].withDefaultValue(MultiSet.empty)
-    for ((q1, a) -> qs <- delta) {
+    for ((q1, a) -> qs <- delta) timeout.checkTimeout("automaton.OrderedNFA.prune:loop") {
       for ((p1, p2) <- reverseDelta(a)) {
         // There is a transition `q1 --(a)-> qs` in ordered NFA, and
         // there is a transition `p1 <-(a)-- p2` in reversed DFA.

@@ -14,13 +14,13 @@ object AutomatonChecker {
 
   /** Checks a match time complexity of the ε-NFA. */
   def check[A, Q](nfa: OrderedNFA[A, Q])(implicit timeout: Timeout = Timeout.NoTimeout): Try[Complexity[A]] =
-    Try(new AutomatonChecker(nfa, timeout).check())
+    Try(timeout.checkTimeout("automaton.AutomatonChecker")(new AutomatonChecker(nfa, timeout)).check())
 }
 
 /** AutomatonChecker is a ReDoS vulnerable RegExp checker based on automata theory. */
 private final class AutomatonChecker[A, Q](
     private[this] val nfa: OrderedNFA[A, Q],
-    private[this] val timeout: Timeout
+    private[this] implicit val timeout: Timeout
 ) {
 
   // Introduces `timeout` methods into the scope.
@@ -29,24 +29,27 @@ private final class AutomatonChecker[A, Q](
   /** A reversed DFA constructed from [[orderedNFA]],
     * and a NFA with multi-transitions constructed from [[orderedNFA]].
     */
-  private[this] val (reverseDFA, multiNFA) = checkTimeout("prune")(OrderedNFA.prune(nfa))
+  private[this] val (reverseDFA, multiNFA) = OrderedNFA.prune(nfa)
 
   /** A [[multiNFA]] transition graph. */
-  private[this] val graph = checkTimeout("graph")(multiNFA.toGraph.reachable(multiNFA.initSet.toSet))
+  private[this] val graph = multiNFA.toGraph.reachable(multiNFA.initSet.toSet)
 
   /** A [[multiNFA]] transition graph's SCCs. */
-  private[this] val scc = checkTimeout("scc")(graph.scc)
+  private[this] val scc = graph.scc
 
   /** A map from a state of [[multiNFA]] to SCC. */
-  private[this] val sccMap = (for (sc <- scc; q <- sc) yield q -> sc).toMap
+  private[this] val sccMap =
+    checkTimeout("automaton.AutomatonChecker#sccMap")((for (sc <- scc; q <- sc) yield q -> sc).toMap)
 
   /** A graph with transitions between SCCs. */
-  private[this] val sccGraph = Graph.from(
-    graph.edges
-      .map { case (q1, _, q2) => (sccMap(q1), (), sccMap(q2)) }
-      .filter { case (sc1, _, sc2) => sc1 != sc2 }
-      .distinct
-  )
+  private[this] val sccGraph = checkTimeout("automaton.AutomatonChecker#sccGraph") {
+    Graph.from(
+      graph.edges
+        .map { case (q1, _, q2) => (sccMap(q1), (), sccMap(q2)) }
+        .filter { case (sc1, _, sc2) => sc1 != sc2 }
+        .distinct
+    )
+  }
 
   /** A map from SCC to reachable SCCs. */
   private[this] val sccReachableMap = sccGraph.reachableMap
@@ -55,12 +58,14 @@ private final class AutomatonChecker[A, Q](
   private[this] val sccReverseReachableMap = sccGraph.reverse.reachableMap
 
   /** A map from a pair of SCCs to edges (transitions) between two SCCs. */
-  private[this] val sccPairEdges = graph.edges
-    .groupMap { case (q1, _, q2) => (sccMap(q1), sccMap(q2)) } { case (q1, a, q2) => a -> (q1, q2) }
-    .view
-    .mapValues(_.groupMap(_._1)(_._2).withDefaultValue(Vector.empty))
-    .toMap
-    .withDefaultValue(Map.empty.withDefaultValue(Vector.empty))
+  private[this] val sccPairEdges = checkTimeout("automaton.AutomatonChecker#sccPairGraph") {
+    graph.edges
+      .groupMap { case (q1, _, q2) => (sccMap(q1), sccMap(q2)) } { case (q1, a, q2) => a -> (q1, q2) }
+      .view
+      .mapValues(_.groupMap(_._1)(_._2).withDefaultValue(Vector.empty))
+      .toMap
+      .withDefaultValue(Map.empty.withDefaultValue(Vector.empty))
+  }
 
   /** A type of [[multiNFA]] state. */
   private type R = (Q, Set[Q])
@@ -86,16 +91,18 @@ private final class AutomatonChecker[A, Q](
 
   /** Finds an EDA structure in the graph. */
   private[this] def checkExponential(): Option[Pump] =
-    checkTimeout("checkExponential") {
+    checkTimeout("automaton.AutomatonChecker#checkExponential") {
       scc.iterator.filterNot(isAtom(_)).flatMap(checkExponentialComponent(_)).nextOption()
     }
 
   /** Finds an EDA structure in the SCC. */
-  private[this] def checkExponentialComponent(sc: Seq[R]): Option[Pump] = {
-    val edges = checkTimeout("checkExponentialComponent: edges")(sccPairEdges((sc, sc)))
+  private[this] def checkExponentialComponent(sc: Seq[R]): Option[Pump] =
+    checkTimeout("automaton.AutomatonChecker#checkExponentialComponent") {
+      val edges = checkTimeout("automaton.AutomatonChecker#checkExponentialComponent:edges")(sccPairEdges((sc, sc)))
 
-    checkTimeout("checkExponentialComponent: multi-transitions") {
-      edges.find { case (_, es) => es.size != es.distinct.size } match {
+      checkTimeout("automaton.AutomatonChecker#checkExponentialComponent:edges.find") {
+        edges.find { case (_, es) => es.size != es.distinct.size }
+      } match {
         // The SCC has multi-transitions. In this case, we can find an EDA easily by using it.
         case Some((a, es)) =>
           for {
@@ -105,15 +112,15 @@ private final class AutomatonChecker[A, Q](
         // In other cases, we need to use SCC of a pair graph.
         case None =>
           // A state pair graph with co-transition.
-          val g2 = checkTimeout("checkExponentialComponent: G2")(Graph.from(for {
+          val g2 = checkTimeout("automaton.AutomatonChecker#checkExponentialComponent:g2")(Graph.from(for {
             a1 -> es <- edges.toSeq
             (q11, q12) <- es
             (q21, q22) <- es
           } yield ((q11, q21), a1, (q12, q22))))
-          checkTimeout("checkExponentialComponent: EDA") {
+          checkTimeout("automaton.AutomatonChecker#checkExponentialComponent:result") {
             g2.scc.iterator
               .flatMap { sc =>
-                checkTimeout("checkExponentialComponent: EDA loop")(for {
+                checkTimeout("automaton.AutomatonChecker#checkExponentialComponent:EDA")(for {
                   // If there is a SCC of g2 contains `(q1, q1)` and `(q2, q3)` (s.t. `q2 != q3`),
                   // then the SCC contains an EDA structure.
                   p1 <- sc.find { case (q1, q2) => q1 == q2 }
@@ -126,11 +133,10 @@ private final class AutomatonChecker[A, Q](
           }
       }
     }
-  }
 
   /** Finds an IDA structure chain in the graph. */
   private[this] def checkPolynomial(): (Int, Seq[Pump]) =
-    checkTimeout("checkPolynomial") {
+    checkTimeout("automaton.AutomatonChecker#checkPolynomial") {
       scc.map(checkPolynomialComponent(_)).maxBy(_._1)
     }
 
@@ -140,43 +146,49 @@ private final class AutomatonChecker[A, Q](
   /** Finds an IDA structure chain from the SCC. */
   private[this] def checkPolynomialComponent(sc: Seq[R]): (Int, Seq[Pump]) =
     checkPolynomialComponentCache.getOrElseUpdate(
-      sc, {
+      sc,
+      checkTimeout("automaton.AutomatonChecker#checkPolynomialComponent") {
         // Computes the maximum IDA structure chain from neighbors.
         val (maxDegree, maxPumps) =
-          checkTimeout("checkPolynomialComponent: maximum IDA")(
+          checkTimeout("automaton.AutomatonChecker#checkPolynomialComponent:(maxDegree,maxPumps)") {
             sccGraph
               .neighbors(sc)
               .map { case ((), sc) => checkPolynomialComponent(sc) }
               .maxByOption(_._1)
               .getOrElse((0, Vector.empty))
-          )
+          }
         if (maxDegree == 0) (if (isAtom(sc)) 0 else 1, Vector.empty)
         else if (isAtom(sc)) (maxDegree, maxPumps)
         else {
           // Appends an IDA structure between the SCC and the maximum chain's source into the chain.
-          checkTimeout("checkPolynomialComponent: append IDA")(
+          checkTimeout("automaton.AutomatonChecker#checkPolynomialComponent:result") {
             sccReachableMap(sc).iterator
               .filter(target => sc != target && !isAtom(target) && checkPolynomialComponent(target)._1 == maxDegree)
               .flatMap(target => checkPolynomialComponentBetween(sc, target).map((target, _)))
               .map { case (target, pump) => (maxDegree + 1, pump +: checkPolynomialComponent(target)._2) }
               .nextOption()
               .getOrElse((maxDegree, maxPumps))
-          )
+          }
         }
       }
     )
 
   /** Finds an IDA structure between source and target SCCs. */
   private[this] def checkPolynomialComponentBetween(source: Seq[R], target: Seq[R]): Option[Pump] = {
-    val sourceEdges = checkTimeout("checkPolynomialComponent: source edges")(sccPairEdges((source, source)))
-    val between =
-      checkTimeout("checkPolynomialComponent: between")(sccReachableMap(source) & sccReverseReachableMap(target))
-    val betweenEdges = checkTimeout("checkPolynomialComponent: between edges")(
+    val sourceEdges = checkTimeout("automaton.AutomatonChecker#checkPolynomialComponentBetween:sourceEdges") {
+      sccPairEdges((source, source))
+    }
+    val between = checkTimeout("automaton.AutomatonChecker#checkPolynomialComponentBetween:between") {
+      sccReachableMap(source) & sccReverseReachableMap(target)
+    }
+    val betweenEdges = checkTimeout("automaton.AutomatonChecker#checkPolynomialComponentBetween:betweenEdges") {
       for (sc1 <- between; sc2 <- between) yield sccPairEdges((sc1, sc2))
-    )
-    val targetEdges = checkTimeout("checkPolynomialComponent: target edges")(sccPairEdges((target, target)))
+    }
+    val targetEdges = checkTimeout("automaton.AutomatonChecker#checkPolynomialComponentBetween:targetEdges") {
+      sccPairEdges((target, target))
+    }
 
-    val g3 = checkTimeout("checkPolynomialComponent: G3")(
+    val g3 = checkTimeout("automaton.AutomatonChecker#checkPolynomialComponentBetween:g3") {
       Graph.from(
         (for {
           a <- multiNFA.alphabet.iterator
@@ -185,18 +197,18 @@ private final class AutomatonChecker[A, Q](
           (q31, q32) <- targetEdges(a)
         } yield ((q11, q21, q31), a, (q12, q22, q32))).toSeq
       )
-    )
-    val g3back = checkTimeout("checkPolynomialComponent: G3 with back edges")(
+    }
+    val g3back = checkTimeout("automaton.AutomatonChecker#checkPolynomialComponentBetween:g3back") {
       Graph.from(
         source.flatMap(q1 => target.map { q2 => ((q1, q2, q2), None, (q1, q1, q2)) }) ++
           g3.edges.map { case (qqq1, a, qqq2) => (qqq1, Some(a), qqq2) }
       )
-    )
+    }
 
-    checkTimeout("checkPolynomialComponent: IDA") {
+    checkTimeout("automaton.AutomatonChecker#checkPolynomialComponentBetween:result") {
       g3back.scc.iterator
         .flatMap { sc =>
-          checkTimeout("checkPolynomialComponent: IDA loop") {
+          checkTimeout("automaton.AutomatonChecker#checkPolynomialComponentBetween:IDA") {
             // If there is a SCC of `g3back` contains `(q1, q1, q2)` and `(q1, q2, q2)`,
             // then an IDA structure exists between `source` and `target`.
             sc.collect { case (q1, q2, q3) if q1 == q2 && q2 != q3 && sc.contains((q1, q3, q3)) => (q1, q3) }

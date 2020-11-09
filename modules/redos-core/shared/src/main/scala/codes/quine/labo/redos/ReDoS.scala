@@ -19,12 +19,11 @@ object ReDoS {
     */
   def check(source: String, flags: String, atMost: Duration = Duration.Inf): Diagnostics = {
     implicit val timeout = Timeout.from(atMost)
-    import timeout._
     Diagnostics.from(for {
       _ <- Try(()) // Ensures a `Try` context for catching TimeoutException surely.
       pattern <- Parser.parse(source, flags)
       epsNFA <- EpsNFACompiler.compile(pattern)
-      nfa = checkTimeout("nfa")(epsNFA.toOrderedNFA.rename)
+      nfa = epsNFA.toOrderedNFA.rename
       result <- AutomatonChecker.check(nfa)
     } yield result)
   }

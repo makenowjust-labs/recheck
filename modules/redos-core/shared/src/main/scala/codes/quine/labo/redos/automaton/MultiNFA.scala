@@ -6,6 +6,7 @@ import scala.collection.mutable
 import data.Graph
 import data.MultiSet
 import util.GraphvizUtil.escape
+import util.Timeout
 
 /** MultiNFA is a NFA, but each it uses multi-set instead of set
   * for representing non-deterministic transition.
@@ -19,9 +20,12 @@ final case class MultiNFA[A, Q](
 ) {
 
   /** Exports this transition function as a grapg. */
-  def toGraph: Graph[Q, A] = Graph.from(delta.iterator.flatMap { case (q1, a) -> qs =>
-    qs.iterator.map((q1, a, _))
-  }.toSeq)
+  def toGraph(implicit timeout: Timeout = Timeout.NoTimeout): Graph[Q, A] =
+    timeout.checkTimeout("automaton.MultiNFA#toGraph") {
+      Graph.from(delta.iterator.flatMap { case (q1, a) -> qs =>
+        qs.iterator.map((q1, a, _))
+      }.toSeq)
+    }
 
   /** Converts to Graphviz format text. */
   def toGraphviz: String = {

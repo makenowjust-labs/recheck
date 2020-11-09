@@ -46,40 +46,39 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
   }
 
   /** Computes alphabet from this pattern. */
-  def alphabet(implicit timeout: Timeout = Timeout.NoTimeout): Try[ICharSet] = {
-    import timeout._
+  def alphabet(implicit timeout: Timeout = Timeout.NoTimeout): Try[ICharSet] =
+    timeout.checkTimeout("regexp.Pattern#alphabet") {
+      val FlagSet(_, ignoreCase, _, dotAll, unicode, _) = flagSet
+      val set = ICharSet
+        .any(ignoreCase, unicode)
+        .pipe(set => if (needsLineTerminatorDistinction) set.add(IChar.LineTerminator.withLineTerminator) else set)
+        .pipe(set => if (needsWordDistinction) set.add(IChar.Word.withWord) else set)
 
-    val FlagSet(_, ignoreCase, _, dotAll, unicode, _) = flagSet
-    val set = ICharSet
-      .any(ignoreCase, unicode)
-      .pipe(set => if (needsLineTerminatorDistinction) set.add(IChar.LineTerminator.withLineTerminator) else set)
-      .pipe(set => if (needsWordDistinction) set.add(IChar.Word.withWord) else set)
+      def loop(node: Node): Try[Seq[IChar]] = timeout.checkTimeout("regexp.Pattern#alphabet:loop")(node match {
+        case Disjunction(ns)       => TryUtil.traverse(ns)(loop(_)).map(_.flatten)
+        case Sequence(ns)          => TryUtil.traverse(ns)(loop(_)).map(_.flatten)
+        case Capture(_, n)         => loop(n)
+        case NamedCapture(_, _, n) => loop(n)
+        case Group(n)              => loop(n)
+        case Star(_, n)            => loop(n)
+        case Plus(_, n)            => loop(n)
+        case Question(_, n)        => loop(n)
+        case Repeat(_, _, _, n)    => loop(n)
+        case LookAhead(_, n)       => loop(n)
+        case LookBehind(_, n)      => loop(n)
+        case atom: AtomNode =>
+          atom.toIChar(unicode).map { ch =>
+            Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch)
+          }
+        case Dot =>
+          val any = if (unicode) IChar.Any else IChar.Any16
+          val ch = if (dotAll) any else any.diff(IChar.LineTerminator)
+          Success(Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch))
+        case _ => Success(Vector.empty)
+      })
 
-    def loop(node: Node): Try[Seq[IChar]] = checkTimeout("alphabet: loop")(node match {
-      case Disjunction(ns)       => TryUtil.traverse(ns)(loop(_)).map(_.flatten)
-      case Sequence(ns)          => TryUtil.traverse(ns)(loop(_)).map(_.flatten)
-      case Capture(_, n)         => loop(n)
-      case NamedCapture(_, _, n) => loop(n)
-      case Group(n)              => loop(n)
-      case Star(_, n)            => loop(n)
-      case Plus(_, n)            => loop(n)
-      case Question(_, n)        => loop(n)
-      case Repeat(_, _, _, n)    => loop(n)
-      case LookAhead(_, n)       => loop(n)
-      case LookBehind(_, n)      => loop(n)
-      case atom: AtomNode =>
-        atom.toIChar(unicode).map { ch =>
-          Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch)
-        }
-      case Dot =>
-        val any = if (unicode) IChar.Any else IChar.Any16
-        val ch = if (dotAll) any else any.diff(IChar.LineTerminator)
-        Success(Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch))
-      case _ => Success(Vector.empty)
-    })
-
-    loop(node).map(_.foldLeft(set)(_.add(_)))
-  }
+      loop(node).map(_.foldLeft(set)(_.add(_)))
+    }
 
   /** Tests whether the pattern needs line terminator disinction or not. */
   private[regexp] def needsLineTerminatorDistinction: Boolean = {

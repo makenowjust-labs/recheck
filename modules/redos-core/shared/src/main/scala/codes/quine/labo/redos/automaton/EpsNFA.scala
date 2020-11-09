@@ -7,6 +7,7 @@ import EpsNFA._
 import data.IChar
 import data.ICharSet
 import util.GraphvizUtil.escape
+import util.Timeout
 
 /** EpsNFA is an ordered ε-NFA on unicode code points. */
 final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept: Q, tau: Map[Q, Transition[Q]]) {
@@ -42,77 +43,82 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
     sb.result()
   }
 
-  /** Converts this ε-NFA to ordered NFA. */
-  def toOrderedNFA: OrderedNFA[IChar, (CharInfo, Seq[Q])] = {
-    // Skips ε-transition without context infotmation.
-    def buildClosure0(q: Q, path: Seq[Q]): Seq[(Q, Seq[Q])] =
-      // Exits this loop if a cyclic path is found.
-      if (path.lastOption.exists(p => path.containsSlice(Seq(p, q)))) Vector.empty
-      else
-        tau.get(q) match {
-          case Some(Eps(qs))       => qs.flatMap(buildClosure0(_, path :+ q))
-          case Some(Assert(_, _))  => Vector((q, path))
-          case Some(Consume(_, _)) => Vector((q, path))
-          case None                => Vector((q, path))
+  /** Converts this ε-NFA to ordered NFA with ε-elimination. */
+  def toOrderedNFA(implicit timeout: Timeout = Timeout.NoTimeout): OrderedNFA[IChar, (CharInfo, Seq[Q])] =
+    timeout.checkTimeout("automaton.EpsNFA#toOrderedNFA") {
+      // Skips ε-transition without context infotmation.
+      def buildClosure0(q: Q, path: Seq[Q]): Seq[(Q, Seq[Q])] =
+        timeout.checkTimeout("automaton.EpsNFA#toOrderedNFA:buildClosure0") {
+          // Exits this loop if a cyclic path is found.
+          if (path.lastOption.exists(p => path.containsSlice(Seq(p, q)))) Vector.empty
+          else
+            tau.get(q) match {
+              case Some(Eps(qs))       => qs.flatMap(buildClosure0(_, path :+ q))
+              case Some(Assert(_, _))  => Vector((q, path))
+              case Some(Consume(_, _)) => Vector((q, path))
+              case None                => Vector((q, path))
+            }
         }
-    val closure0Cache = mutable.Map.empty[Q, Seq[(Q, Seq[Q])]]
-    def closure0(q: Q): Seq[(Q, Seq[Q])] = closure0Cache.getOrElseUpdate(q, buildClosure0(q, Vector.empty))
+      val closure0Cache = mutable.Map.empty[Q, Seq[(Q, Seq[Q])]]
+      def closure0(q: Q): Seq[(Q, Seq[Q])] = closure0Cache.getOrElseUpdate(q, buildClosure0(q, Vector.empty))
 
-    // Skips ε-transition with context information.
-    def buildClosure(c0: CharInfo, c1: CharInfo, q: Q, path: Seq[Q]): Seq[(Q, Option[Consume[Q]])] =
-      // Exits this loop if a cyclic path is found.
-      if (path.lastOption.exists(p => path.containsSlice(Seq(p, q)))) Vector.empty
-      else
-        tau.get(q) match {
-          case Some(Eps(qs)) => qs.flatMap(buildClosure(c0, c1, _, path :+ q))
-          case Some(Assert(k, q1)) =>
-            if (k.accepts(c0, c1)) buildClosure(c0, c1, q1, path :+ q) else Vector.empty
-          case Some(consume: Consume[Q]) => Vector((q, Some(consume)))
-          case None                      => Vector((q, None))
+      // Skips ε-transition with context information.
+      def buildClosure(c0: CharInfo, c1: CharInfo, q: Q, path: Seq[Q]): Seq[(Q, Option[Consume[Q]])] =
+        timeout.checkTimeout("automaton.EpsNFA#toOrderedNFA:buildClosure") {
+          // Exits this loop if a cyclic path is found.
+          if (path.lastOption.exists(p => path.containsSlice(Seq(p, q)))) Vector.empty
+          else
+            tau.get(q) match {
+              case Some(Eps(qs)) => qs.flatMap(buildClosure(c0, c1, _, path :+ q))
+              case Some(Assert(k, q1)) =>
+                if (k.accepts(c0, c1)) buildClosure(c0, c1, q1, path :+ q) else Vector.empty
+              case Some(consume: Consume[Q]) => Vector((q, Some(consume)))
+              case None                      => Vector((q, None))
+            }
         }
-    val closureCache = mutable.Map.empty[(CharInfo, CharInfo, Q, Seq[Q]), Seq[(Q, Option[Consume[Q]])]]
-    def closure(c0: CharInfo, c1: CharInfo, q: Q, path: Seq[Q]): Seq[(Q, Option[Consume[Q]])] =
-      closureCache.getOrElseUpdate((c0, c1, q, path), buildClosure(c0, c1, q, path))
+      val closureCache = mutable.Map.empty[(CharInfo, CharInfo, Q, Seq[Q]), Seq[(Q, Option[Consume[Q]])]]
+      def closure(c0: CharInfo, c1: CharInfo, q: Q, path: Seq[Q]): Seq[(Q, Option[Consume[Q]])] =
+        closureCache.getOrElseUpdate((c0, c1, q, path), buildClosure(c0, c1, q, path))
 
-    val closure0Init = closure0(init)
+      val closure0Init = closure0(init)
 
-    val queue = mutable.Queue.empty[(CharInfo, Seq[(Q, Seq[Q])])]
-    val newStateSet = mutable.Set.empty[(CharInfo, Seq[Q])]
-    val newInits = Vector((CharInfo(true, false), closure0Init.map(_._1)))
-    val newAcceptSet = Set.newBuilder[(CharInfo, Seq[Q])]
-    val newDelta = Map.newBuilder[((CharInfo, Seq[Q]), IChar), Seq[(CharInfo, Seq[Q])]]
+      val queue = mutable.Queue.empty[(CharInfo, Seq[(Q, Seq[Q])])]
+      val newStateSet = mutable.Set.empty[(CharInfo, Seq[Q])]
+      val newInits = Vector((CharInfo(true, false), closure0Init.map(_._1)))
+      val newAcceptSet = Set.newBuilder[(CharInfo, Seq[Q])]
+      val newDelta = Map.newBuilder[((CharInfo, Seq[Q]), IChar), Seq[(CharInfo, Seq[Q])]]
 
-    queue.enqueue((CharInfo(true, false), closure0Init))
-    newStateSet.addAll(newInits)
+      queue.enqueue((CharInfo(true, false), closure0Init))
+      newStateSet.addAll(newInits)
 
-    while (queue.nonEmpty) {
-      val (c1, qps) = queue.dequeue()
-      val qs = qps.map(_._1)
-      val accepts =
-        qps.exists { case (q, path) => closure(c1, CharInfo(true, false), q, path).exists(_._1 == accept) }
-      if (accepts) newAcceptSet.addOne((c1, qs))
-      for (ch <- alphabet.chars) {
-        val c2 = CharInfo.from(ch)
-        val d = Vector.newBuilder[(CharInfo, Seq[Q])]
-        for ((q1, path) <- qps; (_, to) <- closure(c1, c2, q1, path))
-          to match {
-            case Some(Consume(chs, q2)) if chs.contains(ch) =>
-              val qps1 = closure0(q2)
-              val qs1 = qps1.map(_._1)
-              d.addOne((c2, qs1))
-              if (!newStateSet.contains((c2, qs1))) {
-                queue.enqueue((c2, qps1))
-                newStateSet.addOne((c2, qs1))
-              }
-            case Some(_) | None =>
-              () // Nothing to do here because of terminal state or non-match consuming state.
-          }
-        newDelta.addOne(((c1, qs), ch) -> d.result())
+      while (queue.nonEmpty) timeout.checkTimeout("automaton.EpsNFA#toOrderedNFA:loop") {
+        val (c1, qps) = queue.dequeue()
+        val qs = qps.map(_._1)
+        val accepts =
+          qps.exists { case (q, path) => closure(c1, CharInfo(true, false), q, path).exists(_._1 == accept) }
+        if (accepts) newAcceptSet.addOne((c1, qs))
+        for (ch <- alphabet.chars) {
+          val c2 = CharInfo.from(ch)
+          val d = Vector.newBuilder[(CharInfo, Seq[Q])]
+          for ((q1, path) <- qps; (_, to) <- closure(c1, c2, q1, path))
+            to match {
+              case Some(Consume(chs, q2)) if chs.contains(ch) =>
+                val qps1 = closure0(q2)
+                val qs1 = qps1.map(_._1)
+                d.addOne((c2, qs1))
+                if (!newStateSet.contains((c2, qs1))) {
+                  queue.enqueue((c2, qps1))
+                  newStateSet.addOne((c2, qs1))
+                }
+              case Some(_) | None =>
+                () // Nothing to do here because of terminal state or non-match consuming state.
+            }
+          newDelta.addOne(((c1, qs), ch) -> d.result())
+        }
       }
-    }
 
-    OrderedNFA(alphabet.chars.toSet, newStateSet.toSet, newInits, newAcceptSet.result(), newDelta.result())
-  }
+      OrderedNFA(alphabet.chars.toSet, newStateSet.toSet, newInits, newAcceptSet.result(), newDelta.result())
+    }
 }
 
 /** EpsNFA types and utilities. */
