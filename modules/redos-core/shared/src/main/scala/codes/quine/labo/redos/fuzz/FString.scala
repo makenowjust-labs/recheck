@@ -42,4 +42,28 @@ object FString {
 
   /** Repeat is a repetition specifier in [[FString]]. */
   final case class Repeat(size: Int) extends FChar
+
+  /** Computes a crossing of two FString. */
+  def cross(fs1: FString, fs2: FString, n1: Int, n2: Int): (FString, FString) = {
+    val n = (fs1.n + fs2.n) / 2
+    val seq1 = fs1.seq.slice(0, n1) ++ fs2.seq.slice(n2, fs2.seq.size)
+    val seq2 = fs2.seq.slice(0, n2) ++ fs1.seq.slice(n1, fs1.seq.size)
+    (fix(FString(n, seq1)), fix(FString(n, seq2)))
+  }
+
+  /** Fixes a FString sequence. */
+  private[fuzz] def fix(fs: FString): FString = {
+    val seq = fs.seq.zipWithIndex
+      .map {
+        case (Repeat(size), idx) =>
+          Repeat(fs.seq.slice(idx + 1, idx + 1 + size).takeWhile(_.isInstanceOf[Wrap]).size)
+        case (fc, _) => fc
+      }
+      .filter {
+        case Repeat(size) => size > 0
+        case _            => true
+      }
+      .toIndexedSeq
+    FString(Math.max(fs.n, 1), seq)
+  }
 }
