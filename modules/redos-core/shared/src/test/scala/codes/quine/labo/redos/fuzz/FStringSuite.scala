@@ -21,6 +21,43 @@ class FStringSuite extends munit.FunSuite {
     )
   }
 
+  test("FString#size") {
+    assertEquals(FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c'))).size, 3)
+  }
+
+  test("FString#apply") {
+    assertEquals(FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c')))(1), Wrap('b'))
+  }
+
+  test("FString#delete") {
+    assertEquals(
+      FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c'), Wrap('d'))).delete(1, 2),
+      FString(2, IndexedSeq(Wrap('a'), Wrap('d')))
+    )
+  }
+
+  test("FString#insert") {
+    assertEquals(
+      FString(2, IndexedSeq(Wrap('a'), Wrap('b'))).insert(1, IndexedSeq(Wrap('c'), Wrap('d'))),
+      FString(2, IndexedSeq(Wrap('a'), Wrap('c'), Wrap('d'), Wrap('b')))
+    )
+  }
+
+  test("FString#replace") {
+    assertEquals(
+      FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c'), Wrap('d')))
+        .replace(1, 2, IndexedSeq(Wrap('e'), Wrap('f'))),
+      FString(2, IndexedSeq(Wrap('a'), Wrap('e'), Wrap('f'), Wrap('d')))
+    )
+  }
+
+  test("FString#mapN") {
+    assertEquals(
+      FString(2, IndexedSeq(Wrap('a'))).mapN(_ + 3),
+      FString(5, IndexedSeq(Wrap('a')))
+    )
+  }
+
   test("FString#toUString") {
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Repeat(2), Wrap('b'), Wrap('c'), Wrap('d'))).toUString,

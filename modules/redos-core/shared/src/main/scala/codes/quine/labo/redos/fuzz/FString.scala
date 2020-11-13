@@ -8,6 +8,28 @@ import FString._
 /** FString is a genetype string for fuzzing. */
 final case class FString(n: Int, seq: IndexedSeq[FChar]) {
 
+  /** A size of this string's characters. */
+  def size: Int = seq.size
+
+  /** Gets the `idx`-th character. */
+  def apply(idx: Int): FChar = seq(idx)
+
+  /** Deletes `size` characters from this. */
+  def delete(idx: Int, size: Int): FString =
+    replace(idx, size, IndexedSeq.empty)
+
+  /** Inserts characters after the `idx`-th character. */
+  def insert(idx: Int, part: IndexedSeq[FChar]): FString =
+    replace(idx, 0, part)
+
+  /** Replaces `size` characters from `idx`-th with the characters. */
+  def replace(idx: Int, size: Int, part: IndexedSeq[FChar]): FString =
+    fix(FString(n, seq.slice(0, idx) ++ part ++ seq.slice(idx + size, seq.size)))
+
+  /** Updates `n` by the function. */
+  def mapN(f: Int => Int): FString =
+    FString(Math.max(f(n), 1), seq)
+
   /** Builds a UString instance of this. */
   def toUString: UString = {
     val str = IndexedSeq.newBuilder[UChar]
@@ -64,6 +86,6 @@ object FString {
         case _            => true
       }
       .toIndexedSeq
-    FString(Math.max(fs.n, 1), seq)
+    FString(fs.n, seq)
   }
 }
