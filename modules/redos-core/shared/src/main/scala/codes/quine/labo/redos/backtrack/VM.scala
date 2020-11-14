@@ -24,7 +24,9 @@ object VM {
       val input: UString,
       val names: Map[String, Int],
       val caps: mutable.IndexedSeq[Int],
-      val stack: mutable.Stack[Int],
+      val poses: mutable.Stack[Int],
+      val cnts: mutable.Stack[Int],
+      val procs: mutable.Stack[Int],
       var pos: Int,
       var pc: Int
   ) {
@@ -68,10 +70,11 @@ object VM {
       *
       * It copies mutable states deeply.
       */
-    override def clone(): Proc = new Proc(input, names, caps.clone(), stack.clone(), pos, pc)
+    override def clone(): Proc =
+      new Proc(input, names, caps.clone(), poses.clone(), cnts.clone(), procs.clone(), pos, pc)
 
     /** Shows this proc. */
-    override def toString: String = s"Proc($input, $names, $caps, $stack, $pos, $pc)"
+    override def toString: String = s"Proc($input, $names, $caps, $poses, $cnts, $procs, $pos, $pc)"
   }
 }
 
@@ -90,6 +93,8 @@ private[backtrack] final class VM(
       canonicalized,
       ir.names,
       mutable.IndexedSeq.fill((ir.capsSize + 1) * 2)(-1),
+      mutable.Stack.empty,
+      mutable.Stack.empty,
       mutable.Stack.empty,
       initPos,
       0
@@ -151,7 +156,7 @@ private[backtrack] final class VM(
           case _                         => backtrack = true
         }
       case Dec =>
-        proc.stack(0) -= 1
+        proc.cnts(0) -= 1
       case Done =>
         // Use `input` instead of `proc.input` here,
         // because `proc.input` is canonicalized.
@@ -162,7 +167,7 @@ private[backtrack] final class VM(
           case _                                      => backtrack = true
         }
       case EmptyCheck =>
-        backtrack = proc.stack.pop() == proc.pos
+        backtrack = proc.poses.pop() == proc.pos
       case Fail =>
         backtrack = true
       case ForkCont(next) =>
@@ -186,16 +191,18 @@ private[backtrack] final class VM(
         val c = proc.currentChar
         backtrack = c.exists(!LineTerminator.contains(_))
       case Loop(cont) =>
-        val n = proc.stack.top
+        val n = proc.cnts.top
         if (n > 0) proc.pc += cont
-      case Pop =>
-        proc.stack.pop()
-      case Push(n) =>
-        proc.stack.push(n)
+      case PopCnt =>
+        proc.cnts.pop()
+      case PopProc =>
+        proc.procs.pop()
+      case PushCnt(n) =>
+        proc.cnts.push(n)
       case PushPos =>
-        proc.stack.push(proc.pos)
+        proc.poses.push(proc.pos)
       case PushProc =>
-        proc.stack.push(procs.size)
+        proc.procs.push(procs.size)
       case Ref(n) =>
         val s = proc.capture(n).getOrElse(UString.empty)
         val t = proc.input.substring(proc.pos, proc.pos + s.size)
@@ -207,9 +214,9 @@ private[backtrack] final class VM(
         if (s == t) proc.pos -= t.size
         else backtrack = true
       case RestorePos =>
-        proc.pos = proc.stack.pop()
+        proc.pos = proc.poses.pop()
       case RewindProc =>
-        val size = proc.stack.pop()
+        val size = proc.procs.pop()
         while (size <= procs.size) procs.pop()
         procs.push(proc)
       case WordBoundary =>
@@ -229,7 +236,7 @@ private[backtrack] final class VM(
     if (backtrack) procs.pop()
 
     // Traces this step.
-    tracer.trace(oldPos, oldPc, backtrack)
+    tracer.trace(oldPos, oldPc, backtrack, proc.capture(_), proc.cnts.toSeq)
 
     None
   }

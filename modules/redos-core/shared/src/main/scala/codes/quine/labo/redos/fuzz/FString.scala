@@ -3,28 +3,35 @@ package fuzz
 
 import data.UChar
 import data.UString
+import util.StringUtil
 import FString._
 
-/** FString is a genetype string for fuzzing. */
+/** FString is a gene-type string for fuzzing. */
 final case class FString(n: Int, seq: IndexedSeq[FChar]) {
+
+  /** Tests whether this string is constant or not. */
+  def isConstant: Boolean = seq.forall(_.isInstanceOf[Wrap])
+
+  /** Tests whether this string is empty or not. */
+  def isEmpty: Boolean = seq.isEmpty
 
   /** A size of this string's characters. */
   def size: Int = seq.size
 
   /** Gets the `idx`-th character. */
-  def apply(idx: Int): FChar = seq(idx)
+  def apply(pos: Int): FChar = seq(pos)
 
   /** Deletes `size` characters from this. */
-  def delete(idx: Int, size: Int): FString =
-    replace(idx, size, IndexedSeq.empty)
+  def delete(pos: Int, size: Int): FString =
+    replace(pos, size, IndexedSeq.empty)
 
-  /** Inserts characters after the `idx`-th character. */
-  def insert(idx: Int, part: IndexedSeq[FChar]): FString =
-    replace(idx, 0, part)
+  /** Inserts characters after the `pos`-th character. */
+  def insert(pos: Int, part: IndexedSeq[FChar]): FString =
+    replace(pos, 0, part)
 
-  /** Replaces `size` characters from `idx`-th with the characters. */
-  def replace(idx: Int, size: Int, part: IndexedSeq[FChar]): FString =
-    fix(FString(n, seq.slice(0, idx) ++ part ++ seq.slice(idx + size, seq.size)))
+  /** Replaces `size` characters from `pos`-th with the characters. */
+  def replace(pos: Int, size: Int, part: IndexedSeq[FChar]): FString =
+    fix(FString(n, seq.slice(0, pos) ++ part ++ seq.slice(pos + size, seq.size)))
 
   /** Updates `n` by the function. */
   def mapN(f: Int => Int): FString =
@@ -33,27 +40,71 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
   /** Builds a UString instance of this. */
   def toUString: UString = {
     val str = IndexedSeq.newBuilder[UChar]
-    var idx = 0
-    while (idx < seq.size) {
-      seq(idx) match {
+    var pos = 0
+    while (pos < seq.size) {
+      seq(pos) match {
         case Wrap(u) =>
-          idx += 1
+          pos += 1
           str.addOne(u)
-        case Repeat(size) =>
-          idx += 1
-          val part = seq.slice(idx, idx + size).map {
-            case Wrap(u)   => u
-            case Repeat(_) => throw new IllegalArgumentException
+        case Repeat(m, max, size) =>
+          pos += 1
+          val part = seq.slice(pos, pos + size).map {
+            case Wrap(u)         => u
+            case Repeat(_, _, _) => throw new IllegalArgumentException
           }
-          for (_ <- 1 to n) str.addAll(part)
-          idx += size
+          val repeat = max.map(Math.min(_, n + m)).getOrElse(n + m)
+          for (_ <- 1 to repeat) str.addAll(part)
+          pos += size
       }
     }
     UString(str.result())
   }
+
+  /** Returns a string reperesentation of this. */
+  override def toString: String = {
+    if (seq.isEmpty) return "''"
+
+    val parts = Seq.newBuilder[String]
+
+    val str = IndexedSeq.newBuilder[UChar]
+    var pos = 0
+
+    while (pos < seq.size) {
+      seq(pos) match {
+        case Wrap(u) =>
+          pos += 1
+          str.addOne(u)
+        case Repeat(m, max, size) =>
+          pos += 1
+          val repeat = max.map(Math.min(_, n + m)).getOrElse(n + m)
+          if (repeat > 1 || max.exists(_ != repeat)) {
+            val s = UString(str.result())
+            str.clear()
+            if (s.nonEmpty) parts.addOne(s.toString)
+            val part = seq.slice(pos, pos + size).map {
+              case Wrap(u)         => u
+              case Repeat(_, _, _) => throw new IllegalArgumentException
+            }
+            parts.addOne(
+              UString(part).toString ++ StringUtil.superscript(repeat) ++ max
+                .map(_ - repeat)
+                .filter(_ != 0)
+                .map(n => "\u207A" ++ StringUtil.superscript(n))
+                .getOrElse("")
+            )
+            pos += size
+          }
+      }
+    }
+
+    val s = UString(str.result())
+    if (s.nonEmpty) parts.addOne(s.toString)
+
+    parts.result().mkString(" ")
+  }
 }
 
-/** FStrinig types and utilities. */
+/** FString types and utilities. */
 object FString {
 
   /** FChar is a character of [[FString]]. */
@@ -63,7 +114,7 @@ object FString {
   final case class Wrap(u: UChar) extends FChar
 
   /** Repeat is a repetition specifier in [[FString]]. */
-  final case class Repeat(size: Int) extends FChar
+  final case class Repeat(m: Int, max: Option[Int], size: Int) extends FChar
 
   /** Computes a crossing of two FString. */
   def cross(fs1: FString, fs2: FString, n1: Int, n2: Int): (FString, FString) = {
@@ -77,13 +128,13 @@ object FString {
   private[fuzz] def fix(fs: FString): FString = {
     val seq = fs.seq.zipWithIndex
       .map {
-        case (Repeat(size), idx) =>
-          Repeat(fs.seq.slice(idx + 1, idx + 1 + size).takeWhile(_.isInstanceOf[Wrap]).size)
+        case (Repeat(m, max, size), pos) =>
+          Repeat(m, max, fs.seq.slice(pos + 1, pos + 1 + size).takeWhile(_.isInstanceOf[Wrap]).size)
         case (fc, _) => fc
       }
       .filter {
-        case Repeat(size) => size > 0
-        case _            => true
+        case Repeat(_, _, size) => size > 0
+        case _                  => true
       }
       .toIndexedSeq
     FString(fs.n, seq)

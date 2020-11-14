@@ -172,7 +172,7 @@ object IRCompiler {
       case 1 => state
       case _ =>
         State(
-          IndexedSeq(IR.Push(n)) ++ state.codes ++ IndexedSeq(IR.Dec, IR.Loop(-1 - state.codes.size - 1), IR.Pop),
+          IndexedSeq(IR.PushCnt(n)) ++ state.codes ++ IndexedSeq(IR.Dec, IR.Loop(-1 - state.codes.size - 1), IR.PopCnt),
           state.advance
         )
     }
@@ -184,9 +184,9 @@ object IRCompiler {
       case n =>
         val codes = setupLoop(state)
         State(
-          IndexedSeq(IR.Push(n), if (nonGreedy) IR.ForkNext(codes.size + 2) else IR.ForkCont(codes.size + 2)) ++
+          IndexedSeq(IR.PushCnt(n), if (nonGreedy) IR.ForkNext(codes.size + 2) else IR.ForkCont(codes.size + 2)) ++
             codes ++
-            IndexedSeq(IR.Dec, IR.Loop(-1 - codes.size - 2), IR.Pop),
+            IndexedSeq(IR.Dec, IR.Loop(-1 - codes.size - 2), IR.PopCnt),
           false
         )
     }
@@ -207,7 +207,7 @@ object IRCompiler {
           IndexedSeq(IR.PushPos, IR.PushProc, IR.ForkCont(state.codes.size + 2)) ++ state.codes ++ IndexedSeq(
             IR.RewindProc,
             IR.Fail,
-            IR.Pop,
+            IR.PopProc,
             IR.RestorePos
           )
         else IndexedSeq(IR.PushPos, IR.PushProc) ++ state.codes ++ IndexedSeq(IR.RewindProc, IR.RestorePos),

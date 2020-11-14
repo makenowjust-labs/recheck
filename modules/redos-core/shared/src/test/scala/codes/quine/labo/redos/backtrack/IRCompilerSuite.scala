@@ -428,12 +428,12 @@ class IRCompilerSuite extends munit.FunSuite {
             IndexedSeq(
               IR.CapBegin(0),
               IR.InputBegin,
-              IR.Push(2),
+              IR.PushCnt(2),
               IR.ForkCont(3),
               IR.Dot,
               IR.Dec,
               IR.Loop(-4),
-              IR.Pop,
+              IR.PopCnt,
               IR.CapEnd(0),
               IR.Done
             )
@@ -450,12 +450,12 @@ class IRCompilerSuite extends munit.FunSuite {
             IndexedSeq(
               IR.CapBegin(0),
               IR.InputBegin,
-              IR.Push(2),
+              IR.PushCnt(2),
               IR.ForkNext(3),
               IR.Dot,
               IR.Dec,
               IR.Loop(-4),
-              IR.Pop,
+              IR.PopCnt,
               IR.CapEnd(0),
               IR.Done
             )
@@ -512,12 +512,12 @@ class IRCompilerSuite extends munit.FunSuite {
               IR.CapBegin(0),
               IR.InputBegin,
               IR.Dot,
-              IR.Push(2),
+              IR.PushCnt(2),
               IR.ForkCont(3),
               IR.Dot,
               IR.Dec,
               IR.Loop(-4),
-              IR.Pop,
+              IR.PopCnt,
               IR.CapEnd(0),
               IR.Done
             )
@@ -534,11 +534,11 @@ class IRCompilerSuite extends munit.FunSuite {
             IndexedSeq(
               IR.CapBegin(0),
               IR.InputBegin,
-              IR.Push(2),
+              IR.PushCnt(2),
               IR.Dot,
               IR.Dec,
               IR.Loop(-3),
-              IR.Pop,
+              IR.PopCnt,
               IR.CapEnd(0),
               IR.Done
             )
@@ -555,11 +555,11 @@ class IRCompilerSuite extends munit.FunSuite {
             IndexedSeq(
               IR.CapBegin(0),
               IR.InputBegin,
-              IR.Push(2),
+              IR.PushCnt(2),
               IR.Dot,
               IR.Dec,
               IR.Loop(-3),
-              IR.Pop,
+              IR.PopCnt,
               IR.CapEnd(0),
               IR.Done
             )
@@ -576,11 +576,11 @@ class IRCompilerSuite extends munit.FunSuite {
             IndexedSeq(
               IR.CapBegin(0),
               IR.InputBegin,
-              IR.Push(2),
+              IR.PushCnt(2),
               IR.Dot,
               IR.Dec,
               IR.Loop(-3),
-              IR.Pop,
+              IR.PopCnt,
               IR.ForkCont(2),
               IR.Dot,
               IR.Jump(-3),
@@ -603,11 +603,11 @@ class IRCompilerSuite extends munit.FunSuite {
             IndexedSeq(
               IR.CapBegin(0),
               IR.InputBegin,
-              IR.Push(2),
+              IR.PushCnt(2),
               IR.Dot,
               IR.Dec,
               IR.Loop(-3),
-              IR.Pop,
+              IR.PopCnt,
               IR.CapEnd(0),
               IR.Done
             )
@@ -624,11 +624,11 @@ class IRCompilerSuite extends munit.FunSuite {
             IndexedSeq(
               IR.CapBegin(0),
               IR.InputBegin,
-              IR.Push(2),
+              IR.PushCnt(2),
               IR.Dot,
               IR.Dec,
               IR.Loop(-3),
-              IR.Pop,
+              IR.PopCnt,
               IR.ForkCont(1),
               IR.Dot,
               IR.CapEnd(0),
@@ -647,17 +647,17 @@ class IRCompilerSuite extends munit.FunSuite {
             IndexedSeq(
               IR.CapBegin(0),
               IR.InputBegin,
-              IR.Push(2),
+              IR.PushCnt(2),
               IR.Dot,
               IR.Dec,
               IR.Loop(-3),
-              IR.Pop,
-              IR.Push(2),
+              IR.PopCnt,
+              IR.PushCnt(2),
               IR.ForkCont(3),
               IR.Dot,
               IR.Dec,
               IR.Loop(-4),
-              IR.Pop,
+              IR.PopCnt,
               IR.CapEnd(0),
               IR.Done
             )
@@ -771,7 +771,7 @@ class IRCompilerSuite extends munit.FunSuite {
               IR.Dot,
               IR.RewindProc,
               IR.Fail,
-              IR.Pop,
+              IR.PopProc,
               IR.RestorePos,
               IR.CapEnd(0),
               IR.Done
@@ -851,7 +851,7 @@ class IRCompilerSuite extends munit.FunSuite {
               IR.Back,
               IR.RewindProc,
               IR.Fail,
-              IR.Pop,
+              IR.PopProc,
               IR.RestorePos,
               IR.CapEnd(0),
               IR.Done
@@ -1219,7 +1219,7 @@ class IRCompilerSuite extends munit.FunSuite {
     assertEquals(IRCompiler.State.repeatN(1, state), state)
     assertEquals(
       IRCompiler.State.repeatN(3, state),
-      IRCompiler.State(IndexedSeq(IR.Push(3), IR.Char('a'), IR.Dec, IR.Loop(-3), IR.Pop), true)
+      IRCompiler.State(IndexedSeq(IR.PushCnt(3), IR.Char('a'), IR.Dec, IR.Loop(-3), IR.PopCnt), true)
     )
   }
 
@@ -1243,11 +1243,11 @@ class IRCompilerSuite extends munit.FunSuite {
     )
     assertEquals(
       IRCompiler.State.repeatAtMost(3, false, state),
-      IRCompiler.State(IndexedSeq(IR.Push(3), IR.ForkCont(3), IR.Char('a'), IR.Dec, IR.Loop(-4), IR.Pop), false)
+      IRCompiler.State(IndexedSeq(IR.PushCnt(3), IR.ForkCont(3), IR.Char('a'), IR.Dec, IR.Loop(-4), IR.PopCnt), false)
     )
     assertEquals(
       IRCompiler.State.repeatAtMost(3, true, state),
-      IRCompiler.State(IndexedSeq(IR.Push(3), IR.ForkNext(3), IR.Char('a'), IR.Dec, IR.Loop(-4), IR.Pop), false)
+      IRCompiler.State(IndexedSeq(IR.PushCnt(3), IR.ForkNext(3), IR.Char('a'), IR.Dec, IR.Loop(-4), IR.PopCnt), false)
     )
   }
 
@@ -1281,7 +1281,7 @@ class IRCompilerSuite extends munit.FunSuite {
           IR.Char('a'),
           IR.RewindProc,
           IR.Fail,
-          IR.Pop,
+          IR.PopProc,
           IR.RestorePos
         ),
         false

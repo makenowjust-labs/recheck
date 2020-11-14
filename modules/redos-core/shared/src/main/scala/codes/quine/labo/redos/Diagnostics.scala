@@ -20,7 +20,7 @@ sealed abstract class Diagnostics extends Serializable with Product {
 object Diagnostics {
 
   /** A time-complexity for attack seq. */
-  private[redos] val AttackSeqTimeComplexity = 100_000_000
+  private[redos] val AttackSeqTimeComplexity = 1_000_000
 
   /** A size of attack seq for exponential complexity. */
   private[redos] val AttackSeqSizeForExponential = (Math.log(AttackSeqTimeComplexity.toDouble) / Math.log(2)).toInt

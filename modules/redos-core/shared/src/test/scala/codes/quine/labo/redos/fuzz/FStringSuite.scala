@@ -7,18 +7,31 @@ import FString._
 class FStringSuite extends munit.FunSuite {
   test("FString.cross") {
     val fs1 = FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c')))
-    val fs2 = FString(4, IndexedSeq(Wrap('d'), Repeat(1), Wrap('e')))
+    val fs2 = FString(4, IndexedSeq(Wrap('d'), Repeat(0, None, 1), Wrap('e')))
     assertEquals(
       FString.cross(fs1, fs2, 2, 1),
-      (FString(3, IndexedSeq(Wrap('a'), Wrap('b'), Repeat(1), Wrap('e'))), FString(3, IndexedSeq(Wrap('d'), Wrap('c'))))
+      (
+        FString(3, IndexedSeq(Wrap('a'), Wrap('b'), Repeat(0, None, 1), Wrap('e'))),
+        FString(3, IndexedSeq(Wrap('d'), Wrap('c')))
+      )
     )
   }
 
   test("FString.fix") {
     assertEquals(
-      FString.fix(FString(2, IndexedSeq(Wrap('a'), Repeat(2), Wrap('b'), Repeat(1), Wrap('c'), Repeat(1)))),
-      FString(2, IndexedSeq(Wrap('a'), Repeat(1), Wrap('b'), Repeat(1), Wrap('c')))
+      FString.fix(
+        FString(
+          2,
+          IndexedSeq(Wrap('a'), Repeat(0, None, 2), Wrap('b'), Repeat(0, Some(2), 1), Wrap('c'), Repeat(0, None, 1))
+        )
+      ),
+      FString(2, IndexedSeq(Wrap('a'), Repeat(0, None, 1), Wrap('b'), Repeat(0, Some(2), 1), Wrap('c')))
     )
+  }
+
+  test("FString#isConstant") {
+    assert(FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c'))).isConstant)
+    assert(!FString(2, IndexedSeq(Wrap('a'), Repeat(0, None, 1), Wrap('b'))).isConstant)
   }
 
   test("FString#size") {
@@ -60,11 +73,15 @@ class FStringSuite extends munit.FunSuite {
 
   test("FString#toUString") {
     assertEquals(
-      FString(2, IndexedSeq(Wrap('a'), Repeat(2), Wrap('b'), Wrap('c'), Wrap('d'))).toUString,
+      FString(2, IndexedSeq(Wrap('a'), Repeat(1, None, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toUString,
+      UString.from("abcbcbcd", false)
+    )
+    assertEquals(
+      FString(2, IndexedSeq(Wrap('a'), Repeat(1, Some(2), 2), Wrap('b'), Wrap('c'), Wrap('d'))).toUString,
       UString.from("abcbcd", false)
     )
     intercept[IllegalArgumentException] {
-      FString(1, IndexedSeq(Repeat(2), Wrap('a'), Repeat(1))).toUString
+      FString(1, IndexedSeq(Repeat(0, None, 2), Wrap('a'), Repeat(0, None, 1))).toUString
     }
   }
 }
