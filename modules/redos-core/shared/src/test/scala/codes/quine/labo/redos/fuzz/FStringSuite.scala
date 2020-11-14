@@ -34,6 +34,16 @@ class FStringSuite extends munit.FunSuite {
     assert(!FString(2, IndexedSeq(Wrap('a'), Repeat(0, None, 1), Wrap('b'))).isConstant)
   }
 
+  test("FString#isEmpty") {
+    assert(FString(2, IndexedSeq.empty).isEmpty)
+    assert(!FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c'))).isEmpty)
+  }
+
+  test("FString#nonEmpty") {
+    assert(!FString(2, IndexedSeq.empty).nonEmpty)
+    assert(FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c'))).nonEmpty)
+  }
+
   test("FString#size") {
     assertEquals(FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c'))).size, 3)
   }
@@ -49,10 +59,25 @@ class FStringSuite extends munit.FunSuite {
     )
   }
 
+  test("FString#insertAt") {
+    assertEquals(
+      FString(2, IndexedSeq(Wrap('a'), Wrap('b'))).insertAt(1, Wrap('c')),
+      FString(2, IndexedSeq(Wrap('a'), Wrap('c'), Wrap('b')))
+    )
+  }
+
   test("FString#insert") {
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Wrap('b'))).insert(1, IndexedSeq(Wrap('c'), Wrap('d'))),
       FString(2, IndexedSeq(Wrap('a'), Wrap('c'), Wrap('d'), Wrap('b')))
+    )
+  }
+
+  test("FString#replaceAt") {
+    assertEquals(
+      FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c')))
+        .replaceAt(1, Wrap('d')),
+      FString(2, IndexedSeq(Wrap('a'), Wrap('d'), Wrap('c')))
     )
   }
 
@@ -82,6 +107,21 @@ class FStringSuite extends munit.FunSuite {
     )
     intercept[IllegalArgumentException] {
       FString(1, IndexedSeq(Repeat(0, None, 2), Wrap('a'), Repeat(0, None, 1))).toUString
+    }
+  }
+
+  test("FString#toString") {
+    assertEquals(FString(2, IndexedSeq.empty).toString, "''")
+    assertEquals(
+      FString(2, IndexedSeq(Wrap('a'), Repeat(1, None, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toString,
+      "'a' 'bc'³ 'd'"
+    )
+    assertEquals(
+      FString(2, IndexedSeq(Repeat(1, Some(1), 1), Wrap('a'), Repeat(1, None, 1), Wrap('b'))).toString,
+      "'a' 'b'³"
+    )
+    intercept[IllegalArgumentException] {
+      FString(1, IndexedSeq(Repeat(1, None, 2), Wrap('a'), Repeat(0, None, 1))).toString
     }
   }
 }

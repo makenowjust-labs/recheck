@@ -136,6 +136,39 @@ class VMSuite extends munit.FunSuite {
     assertEquals(proc.caps(1), 2)
   }
 
+  test("VM.Proc#capture") {
+    val input = UString.from("xyz", false)
+    val proc = new VM.Proc(
+      input,
+      Map.empty,
+      mutable.IndexedSeq(1, 2),
+      mutable.Stack.empty,
+      mutable.Stack.empty,
+      mutable.Stack.empty,
+      0,
+      0
+    )
+    assertEquals(proc.capture(0), Some(UString.from("y", false)))
+    assertEquals(proc.capture(1), None)
+  }
+
+  test("VM.Proc#captures") {
+    val input = UString.from("xyz", false)
+    val proc = new VM.Proc(
+      input,
+      Map.empty,
+      mutable.IndexedSeq(1, 2),
+      mutable.Stack.empty,
+      mutable.Stack.empty,
+      mutable.Stack.empty,
+      0,
+      0
+    )
+    val captures = proc.captures
+    assertEquals(captures(0), Some(UString.from("y", false)))
+    assertEquals(captures(1), None)
+  }
+
   test("VM.Proc#captureBegin") {
     val input = UString.from("xyz", false)
     val proc = new VM.Proc(

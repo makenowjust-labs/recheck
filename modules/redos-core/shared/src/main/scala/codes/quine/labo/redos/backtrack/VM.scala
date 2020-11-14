@@ -52,6 +52,9 @@ object VM {
         if (begin >= 0 && end >= 0) Some(input.substring(begin, end)) else None
       } else None
 
+    /** Returns a lambda from a capture index to capture string. */
+    def captures: Int => Option[UString] = capture(_)
+
     /** Updates a begin position of the `n`-th capture. */
     def captureBegin(n: Int, pos: Int): Unit = caps.update(n * 2, pos)
 
@@ -222,21 +225,21 @@ private[backtrack] final class VM(
       case WordBoundary =>
         val c1 = proc.previousChar
         val c2 = proc.currentChar
-        val w1 = c1.exists(Word.contains(_))
-        val w2 = c2.exists(Word.contains(_))
+        val w1 = c1.exists(Word.contains)
+        val w2 = c2.exists(Word.contains)
         backtrack = !(w1 && !w2 || !w1 && w2)
       case WordBoundaryNot =>
         val c1 = proc.previousChar
         val c2 = proc.currentChar
-        val w1 = c1.exists(Word.contains(_))
-        val w2 = c2.exists(Word.contains(_))
+        val w1 = c1.exists(Word.contains)
+        val w2 = c2.exists(Word.contains)
         backtrack = w1 && !w2 || !w1 && w2
     }
 
     if (backtrack) procs.pop()
 
     // Traces this step.
-    tracer.trace(oldPos, oldPc, backtrack, proc.capture(_), proc.cnts.toSeq)
+    tracer.trace(oldPos, oldPc, backtrack, proc.captures, proc.cnts.toSeq)
 
     None
   }

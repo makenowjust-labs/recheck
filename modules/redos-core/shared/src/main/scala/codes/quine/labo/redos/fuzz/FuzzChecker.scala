@@ -194,7 +194,7 @@ private[fuzz] final class FuzzChecker(
     }
 
     val pos = random.between(0, t.size + 1)
-    val s = t.insert(pos, IndexedSeq(fc))
+    val s = t.insertAt(pos, fc)
     next.execute(s)
   }
 
@@ -224,7 +224,7 @@ private[fuzz] final class FuzzChecker(
         FString.Repeat(m, max, size)
     }
 
-    val s = t.replace(pos, 1, IndexedSeq(fc))
+    val s = t.replaceAt(pos, fc)
     next.execute(s)
   }
 
@@ -319,7 +319,7 @@ private[fuzz] final class FuzzChecker(
 
     /** Converts this to [[Generation]]. */
     def toGeneration: Generation = {
-      val traces = set.toIndexedSeq.sortBy(-_.steps).slice(0, maxGenerationSize)
+      val traces = set.toIndexedSeq.sortBy(-_.rate).slice(0, maxGenerationSize)
       val newMinRate = traces.map(_.rate).minOption.getOrElse(0.0)
       val newInputs = traces.map(_.str.toUString).toSet
       val newCovered = traces.iterator.flatMap(_.coverage).toSet

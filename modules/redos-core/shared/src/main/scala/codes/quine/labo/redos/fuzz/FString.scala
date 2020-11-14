@@ -15,19 +15,30 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
   /** Tests whether this string is empty or not. */
   def isEmpty: Boolean = seq.isEmpty
 
+  /** Negates [[isEmpty]]. */
+  def nonEmpty: Boolean = seq.nonEmpty
+
   /** A size of this string's characters. */
   def size: Int = seq.size
 
   /** Gets the `idx`-th character. */
   def apply(pos: Int): FChar = seq(pos)
 
-  /** Deletes `size` characters from this. */
-  def delete(pos: Int, size: Int): FString =
-    replace(pos, size, IndexedSeq.empty)
+  /** Inserts a character after the `pos`-th character. */
+  def insertAt(pos: Int, fc: FChar): FString =
+    replace(pos, 0, IndexedSeq(fc))
 
   /** Inserts characters after the `pos`-th character. */
   def insert(pos: Int, part: IndexedSeq[FChar]): FString =
     replace(pos, 0, part)
+
+  /** Deletes `size` characters from this. */
+  def delete(pos: Int, size: Int): FString =
+    replace(pos, size, IndexedSeq.empty)
+
+  /** Replaces a character from `pos`-th character with the character. */
+  def replaceAt(pos: Int, fc: FChar): FString =
+    replace(pos, 1, IndexedSeq(fc))
 
   /** Replaces `size` characters from `pos`-th with the characters. */
   def replace(pos: Int, size: Int, part: IndexedSeq[FChar]): FString =

@@ -8,6 +8,7 @@ class TracerSuite extends munit.FunSuite {
     val tracer = new Tracer.LimitTracer(2)
     assertEquals(tracer.limit, 2)
     tracer.trace(0, 0, false, _ => None, Seq.empty)
+    assertEquals(tracer.steps, 1)
     interceptMessage[LimitException]("limit is exceeded")(tracer.trace(0, 1, false, _ => None, Seq.empty))
   }
 
