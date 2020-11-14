@@ -21,5 +21,5 @@ final case class Witness[A](pumps: Seq[(Seq[A], Seq[A])], suffix: Seq[A]) {
     * This result's `n`-th element means `n` times repeated sequence.
     */
   def toLazyList: LazyList[Seq[A]] =
-    LazyList.from(0).map(buildAttack(_))
+    LazyList.from(0).map(buildAttack)
 }
