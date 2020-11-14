@@ -55,6 +55,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labo.redos.automaton._
       |import codes.quine.labo.redos.backtrack._
       |import codes.quine.labo.redos.data._
+      |import codes.quine.labo.redos.fuzz._
       |import codes.quine.labo.redos.regexp._
       |import codes.quine.labo.redos.util._
       |""".stripMargin,
