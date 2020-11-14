@@ -29,6 +29,8 @@ project/plugins/project/
 .bloop/
 metals.sbt
 
+.idea/
+
 site/content/*.md
 site/public/
 site/resources/
