@@ -167,14 +167,11 @@ private[fuzz] final class FuzzChecker(
     val t = gen.traces(i).str
     if (t.isConstant) return None
 
-    val s = random.between(0, 3) match {
+    val s = random.between(0, 2) match {
       case 0 =>
         val d = random.between(-10, 11)
         t.mapN(_ + d)
-      case 1 =>
-        t.mapN(_ * 2)
-      case 2 =>
-        t.mapN(_ / 2)
+      case 1 => t.mapN(_ * 2)
     }
     next.execute(s)
   }
@@ -214,12 +211,11 @@ private[fuzz] final class FuzzChecker(
         val c = alphabet.chars(k).head
         FString.Wrap(c)
       case FString.Repeat(m0, max, size0) =>
-        val m = random.between(0, 3) match {
+        val m = random.between(0, 2) match {
           case 0 =>
             val d = random.between(-10, 11)
             m0 + d
           case 1 => m0 * 2
-          case 2 => m0 / 2
         }
         val size = random.between(0, 2) match {
           case 0 => random.between(1, t.size - pos + 1)
