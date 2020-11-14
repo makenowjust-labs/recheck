@@ -64,7 +64,11 @@ class AutomatonCheckerSuite extends munit.FunSuite {
     )
     assertEquals(
       check("^(a|b|ab)*$", ""),
-      Success(Exponential(Witness(Seq((Seq(b), Seq(b, a))), Seq(other2))))
+      Success(Exponential(Witness(Seq((Seq(b), Seq(a, b))), Seq(other2))))
+    )
+    assertEquals(
+      check("^(aa|b|aab)*$", ""),
+      Success(Exponential(Witness(Seq((Seq(a), Seq(a, a, a, b, a))), Seq(other2))))
     )
   }
 }

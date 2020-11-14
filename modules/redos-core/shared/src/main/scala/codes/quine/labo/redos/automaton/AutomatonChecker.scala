@@ -125,8 +125,8 @@ private final class AutomatonChecker[A, Q](
                   // then the SCC contains an EDA structure.
                   p1 <- sc.find { case (q1, q2) => q1 == q2 }
                   p2 <- sc.find { case (q1, q2) => q1 != q2 }
-                  path1 <- g2.path(Set(p2), p1)
-                  path2 <- g2.path(Set(p1), p2)
+                  path1 <- g2.path(Set(p1), p2)
+                  path2 <- g2.path(Set(p2), p1)
                 } yield (p1._1, path1 ++ path2, p1._1))
               }
               .nextOption()
