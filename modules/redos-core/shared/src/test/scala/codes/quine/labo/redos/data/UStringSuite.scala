@@ -14,6 +14,16 @@ class UStringSuite extends munit.FunSuite {
     assertEquals(UString.from("🍣", true), UString(IndexedSeq(UChar(0x1f363))))
   }
 
+  test("UString#isEmpty") {
+    assert(UString.empty.isEmpty)
+    assert(!UString.from("xyz", false).isEmpty)
+  }
+
+  test("UString#nonEmpty") {
+    assert(!UString.empty.nonEmpty)
+    assert(UString.from("xyz", false).nonEmpty)
+  }
+
   test("UString#size") {
     assertEquals(UString.from("", false).size, 0)
     assertEquals(UString.from("xyz", false).size, 3)
@@ -34,6 +44,42 @@ class UStringSuite extends munit.FunSuite {
     assertEquals(s.substring(0, 1), UString.from("0", false))
     assertEquals(s.substring(1, 3), UString.from("12", false))
     assertEquals(s.substring(2, 8), UString.from("234567", false))
+  }
+
+  test("UString#insertAt") {
+    val s = UString.from("012", false)
+    assertEquals(s.insertAt(0, 'x'), UString.from("x012", false))
+    assertEquals(s.insertAt(1, 'x'), UString.from("0x12", false))
+    assertEquals(s.insertAt(2, 'x'), UString.from("01x2", false))
+    assertEquals(s.insertAt(3, 'x'), UString.from("012x", false))
+  }
+
+  test("UString#insert") {
+    val s = UString.from("012", false)
+    assertEquals(s.insert(0, UString.from("xyz", false)), UString.from("xyz012", false))
+    assertEquals(s.insert(1, UString.from("xyz", false)), UString.from("0xyz12", false))
+    assertEquals(s.insert(2, UString.from("xyz", false)), UString.from("01xyz2", false))
+    assertEquals(s.insert(3, UString.from("xyz", false)), UString.from("012xyz", false))
+  }
+
+  test("UString#delete") {
+    val s = UString.from("012", false)
+    assertEquals(s.delete(0, 3), UString.empty)
+    assertEquals(s.delete(1, 1), UString.from("02", false))
+  }
+
+  test("UString#replaceAt") {
+    val s = UString.from("012", false)
+    assertEquals(s.replaceAt(0, 'x'), UString.from("x12", false))
+    assertEquals(s.replaceAt(1, 'x'), UString.from("0x2", false))
+    assertEquals(s.replaceAt(2, 'x'), UString.from("01x", false))
+  }
+
+  test("UString#replace") {
+    val s = UString.from("012", false)
+    assertEquals(s.replace(1, 1, UString.from("xyz", false)), UString.from("0xyz2", false))
+    assertEquals(s.replace(0, 2, UString.from("xyz", false)), UString.from("xyz2", false))
+    assertEquals(s.replace(1, 2, UString.from("xyz", false)), UString.from("0xyz", false))
   }
 
   test("UString#asString") {
