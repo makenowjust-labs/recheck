@@ -129,11 +129,11 @@ object Seeder {
           }
         case IR.Ref(n) =>
           if (backtrack) {
-            patchesMap((pc, cnts)) = Patch.InsertString(pos, capture(n).getOrElse(UString.empty))
+            capture(n).foreach(s => patchesMap((pc, cnts)) = Patch.InsertString(pos, s))
           }
         case IR.RefBack(n) =>
           if (backtrack) {
-            patchesMap((pc, cnts)) = Patch.InsertString(pos, capture(n).getOrElse(UString.empty))
+            capture(n).foreach(s => patchesMap((pc, cnts)) = Patch.InsertString(pos, s))
           }
         case _ => () // Skips
       }

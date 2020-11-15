@@ -2,14 +2,34 @@ package codes.quine.labo.redos
 package fuzz
 
 import backtrack.IR
+import backtrack.IRCompiler
 import data.IChar
 import data.ICharSet
 import data.UString
 import regexp.Pattern
+import regexp.Parser
 import util.Timeout
 import Seeder._
 
 class SeederSuite extends munit.FunSuite {
+  test("Seeder.seed") {
+    def seed(source: String, flags: String): Set[String] = {
+      val result = for {
+        pattern <- Parser.parse(source, flags)
+        alphabet <- pattern.alphabet
+        ir <- IRCompiler.compile(pattern)
+      } yield Seeder.seed(ir, alphabet)
+      result.get.map(_.toString)
+    }
+
+    assertEquals(seed("^(a|b)$", ""), Set("''", "'a'", "'b'"))
+    assertEquals(seed("^(a|b)$", "i"), Set("''", "'A'", "'B'"))
+    assertEquals(seed("^(A|B)$", "iu"), Set("''", "'a'", "'b'"))
+    assertEquals(seed("^a*$", ""), Set("''", "'\\x00'", "'a'"))
+    assertEquals(seed("^a{2}$", ""), Set("''", "'a'¹⁺¹", "'a'²"))
+    assertEquals(seed("^(a?){50}a{50}$", ""), Set("''", "'a'¹⁺⁴⁹", "'a'²⁺⁴⁸"))
+  }
+
   test("Seeder.Patch.InsertChar#apply") {
     val alphabet = ICharSet.any(false, false).add(IChar('x'))
     assertEquals(
