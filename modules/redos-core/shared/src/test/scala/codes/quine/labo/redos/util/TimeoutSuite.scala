@@ -15,10 +15,10 @@ class TimeoutSuite extends munit.FunSuite {
 
   test("Timeout#checkTimeout") {
     interceptMessage[TimeoutException]("foo") {
-      DeadlineTimeout(0.second.fromNow).checkTimeout("foo")(1)
-    }
-    interceptMessage[TimeoutException]("foo") {
-      DeadlineTimeout(50.milli.fromNow).checkTimeout("foo")(Thread.sleep(100))
+      val start = System.currentTimeMillis()
+      DeadlineTimeout(10.milli.fromNow).checkTimeout("foo") {
+        while (System.currentTimeMillis() - start <= 10) {}
+      }
     }
     assertEquals(DeadlineTimeout(1.second.fromNow).checkTimeout("foo")(1), 1)
     assertEquals(new DebugTimeout(_ => ()).checkTimeout("foo")(1), 1)
