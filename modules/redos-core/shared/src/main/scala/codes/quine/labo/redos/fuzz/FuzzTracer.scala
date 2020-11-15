@@ -21,7 +21,7 @@ private[fuzz] class FuzzTracer(val ir: IR, val input: UString, limit: Int, timeo
   /** A ratio of the input size to steps number. */
   def rate(): Double = if (input.size == 0) 0 else steps.toDouble / input.size.toDouble
 
-  /** Builds a [[FString]] instance from the input string and traced informations. */
+  /** Builds a [[FString]] instance from the input string and traced information. */
   def buildFString(): FString = {
     val repeats = loops.toSeq.sorted
       .foldLeft(IndexedSeq.empty[(Int, Int, Int)]) {
@@ -31,7 +31,7 @@ private[fuzz] class FuzzTracer(val ir: IR, val input: UString, limit: Int, timeo
         case (xys, (x, y, pc))                                           => xys :+ (x, y, pc)
       }
       .map { case (pos, end, pc) =>
-        val max = ir.codes.lift(-pc - 1) match {
+        val max = ir.codes.lift(pc - 1) match {
           case Some(IR.PushCnt(n)) => Some(n)
           case _                   => None
         }
@@ -45,7 +45,7 @@ private[fuzz] class FuzzTracer(val ir: IR, val input: UString, limit: Int, timeo
     while (pos < input.size) {
       repeats.get(pos) match {
         case Some(FString.Repeat(_, max, size)) =>
-          // Detects a repetition.
+          // Compresses a repetition.
           val part = input.substring(pos, pos + size)
           pos += size
           var m = 0
@@ -53,7 +53,7 @@ private[fuzz] class FuzzTracer(val ir: IR, val input: UString, limit: Int, timeo
             m += 1
             pos += size
           }
-          str.addOne(FString.Repeat(m, max, size)).addAll(part.seq.map(FString.Wrap(_)))
+          str.addOne(FString.Repeat(m, max, size)).addAll(part.seq.map(FString.Wrap))
         case None =>
           str.addOne(FString.Wrap(input.seq(pos)))
           pos += 1
@@ -69,14 +69,12 @@ private[fuzz] class FuzzTracer(val ir: IR, val input: UString, limit: Int, timeo
     // Records coverage.
     coverageSet.add((pc, cnts, backtrack))
 
-    // Saves `pc` and `pos` pair to detech loops.
+    // Saves `pc` and `pos` pair to detect loops.
     pcToPos(pc) = pos
 
     // Checks `jump` and `loop` code to detect loops.
-    def recordLoop(cont: Int): Unit = pcToPos.get(pc + 1 + cont) match {
-      case Some(begin) => loops.append((begin, pos, -(pc + 1 + cont)))
-      case None        => () // skip
-    }
+    def recordLoop(cont: Int): Unit =
+      pcToPos.get(pc + 1 + cont).foreach(loops.addOne(_, pos, pc + 1 + cont))
 
     ir.codes(pc) match {
       case IR.Jump(cont) if cont < 0 => recordLoop(cont)
