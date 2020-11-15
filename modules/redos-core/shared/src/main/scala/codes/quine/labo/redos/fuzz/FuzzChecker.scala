@@ -83,8 +83,7 @@ private[fuzz] final class FuzzChecker(
     for (_ <- 1 to maxIteration; if gen.traces.nonEmpty) {
       iterate(gen) match {
         case Right(attack) => return Some(attack)
-        case Left(next) =>
-          gen = next
+        case Left(next) => gen = next
       }
     }
 
@@ -107,21 +106,10 @@ private[fuzz] final class FuzzChecker(
   def iterate(gen: Generation): Either[Generation, FString] = {
     val next = Population.from(gen)
 
-    for (_ <- 1 to crossSize) {
-      cross(gen, next) match {
-        case Some(attack) => return Right(attack)
-        case None         => () // Skips
-      }
-    }
+    val crossing = (1 to crossSize).iterator.flatMap(_ => cross(gen, next))
+    val mutation = (1 to mutateSize).iterator.flatMap(_ => mutate(gen, next))
 
-    for (_ <- 1 to mutateSize) {
-      mutate(gen, next) match {
-        case Some(attack) => return Right(attack)
-        case None         => () // Skips
-      }
-    }
-
-    Left(next.toGeneration)
+    (crossing ++ mutation).nextOption.fold(Left(next.toGeneration): Either[Generation, FString])(Right(_))
   }
 
   /** Simulates a crossing. */
@@ -136,14 +124,7 @@ private[fuzz] final class FuzzChecker(
     val pos2 = random.between(0, t2.size + 1)
 
     val (s1, s2) = FString.cross(t1, t2, pos1, pos2)
-    for (s <- Seq(s1, s2)) {
-      next.execute(s) match {
-        case Some(attack) => return Some(attack)
-        case None         => () // Skips
-      }
-    }
-
-    None
+    Seq(s1, s2).iterator.flatMap(next.execute).nextOption
   }
 
   /** Simulates a mutation. */

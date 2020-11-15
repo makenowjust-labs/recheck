@@ -15,7 +15,7 @@ import util.Timeout
 object Seeder {
 
   /** Computes a seed set of the IR with its alphabet. */
-  def seed(ir: IR, alphabet: ICharSet, limit: Int = 10000, maxSeedSetSize: Int = 100)(implicit
+  def seed(ir: IR, alphabet: ICharSet, limit: Int = 10_000, maxSeedSetSize: Int = 100)(implicit
       timeout: Timeout = Timeout.NoTimeout
   ): Set[FString] = {
     val set = mutable.Set.empty[FString]
