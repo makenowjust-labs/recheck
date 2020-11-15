@@ -210,12 +210,20 @@ private[fuzz] final class FuzzChecker(
         val k = random.nextInt(alphabet.chars.size)
         val c = alphabet.chars(k).head
         FString.Wrap(c)
-      case FString.Repeat(m0, max, size0) =>
+      case FString.Repeat(m0, max0, size0) =>
         val m = random.between(0, 2) match {
           case 0 =>
             val d = random.between(-10, 11)
             m0 + d
           case 1 => m0 * 2
+        }
+        val max = max0 match {
+          case Some(max0) =>
+            random.between(0, 2) match {
+              case 0 => Some(max0 + random.between(-10, 11))
+              case 1 => None
+            }
+          case None => None
         }
         val size = random.between(0, 2) match {
           case 0 => random.between(1, t.size - pos + 1)
@@ -292,24 +300,23 @@ private[fuzz] final class FuzzChecker(
       try VM.execute(ir, input, 0, t)
       catch {
         case _: LimitException =>
-          add(t)
+          add(str, t)
           return tryAttack(str)
       }
-      add(t)
+      add(str, t)
       None
     }
 
     /** Adds an IR execution result. */
-    def add(t: FuzzTracer): Unit = {
+    def add(str: FString, t: FuzzTracer): Unit = {
       inputs.add(t.input)
 
-      val str = t.buildFString()
       val rate = t.rate()
       val coverage = t.coverage()
       val trace = Trace(str, rate, t.steps, coverage)
 
       if (
-        str.size < maxAttackSize && !set.contains(trace) && (init || rate >= minRate || !coverage.subsetOf(visited))
+        t.input.size < maxAttackSize && !set.contains(trace) && (init || rate >= minRate || !coverage.subsetOf(visited))
       ) {
         minRate = Math.min(rate, minRate)
         set.add(trace)
