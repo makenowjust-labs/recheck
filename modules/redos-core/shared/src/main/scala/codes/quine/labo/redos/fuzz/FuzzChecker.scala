@@ -73,6 +73,9 @@ private[fuzz] final class FuzzChecker(
     implicit val timeout: Timeout
 ) {
 
+  /** A set of parts within the pattern. */
+  val parts = ir.pattern.parts.toSeq
+
   /** Runs this fuzzer. */
   def check(): Option[FString] = {
     var gen = init() match {
@@ -83,7 +86,7 @@ private[fuzz] final class FuzzChecker(
     for (_ <- 1 to maxIteration; if gen.traces.nonEmpty) {
       iterate(gen) match {
         case Right(attack) => return Some(attack)
-        case Left(next) => gen = next
+        case Left(next)    => gen = next
       }
     }
 
@@ -109,7 +112,7 @@ private[fuzz] final class FuzzChecker(
     val crossing = (1 to crossSize).iterator.flatMap(_ => cross(gen, next))
     val mutation = (1 to mutateSize).iterator.flatMap(_ => mutate(gen, next))
 
-    (crossing ++ mutation).nextOption.fold(Left(next.toGeneration): Either[Generation, FString])(Right(_))
+    (crossing ++ mutation).nextOption().fold(Left(next.toGeneration): Either[Generation, FString])(Right(_))
   }
 
   /** Simulates a crossing. */
@@ -124,7 +127,7 @@ private[fuzz] final class FuzzChecker(
     val pos2 = random.between(0, t2.size + 1)
 
     val (s1, s2) = FString.cross(t1, t2, pos1, pos2)
-    Seq(s1, s2).iterator.flatMap(next.execute).nextOption
+    Seq(s1, s2).iterator.flatMap(next.execute).nextOption()
   }
 
   /** Simulates a mutation. */
@@ -137,6 +140,7 @@ private[fuzz] final class FuzzChecker(
   val mutators: IndexedSeq[(Generation, Population) => Option[FString]] = IndexedSeq(
     mutateRepeat,
     mutateInsert,
+    mutateInsertPart,
     mutateUpdate,
     mutateCopy,
     mutateDelete
@@ -176,6 +180,28 @@ private[fuzz] final class FuzzChecker(
 
     val pos = random.between(0, t.size + 1)
     val s = t.insertAt(pos, fc)
+    next.execute(s)
+  }
+
+  /** A mutator to insert a part of the pattern (and a repeat specifier). */
+  def mutateInsertPart(gen: Generation, next: Population): Option[FString] = {
+    // Fallbacks when there is no part in the pattern.
+    if (parts.isEmpty) return mutateInsert(gen, next)
+
+    val i = random.nextInt(gen.traces.size)
+    val t = gen.traces(i).str
+
+    val idx = random.between(0, parts.size)
+    val part = parts(idx).seq.map(FString.Wrap(_))
+    val fcs = random.between(0, 2) match {
+      case 0 => part
+      case 1 =>
+        val m = random.between(0, 10)
+        IndexedSeq(FString.Repeat(m, None, part.size)) ++ part
+    }
+
+    val pos = random.between(0, t.size + 1)
+    val s = t.insert(pos, fcs)
     next.execute(s)
   }
 
