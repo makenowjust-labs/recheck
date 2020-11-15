@@ -137,17 +137,23 @@ object FString {
 
   /** Fixes a FString sequence. */
   private[fuzz] def fix(fs: FString): FString = {
-    val seq = fs.seq.zipWithIndex
-      .map {
-        case (Repeat(m, max, size), pos) =>
-          Repeat(m, max, fs.seq.slice(pos + 1, pos + 1 + size).takeWhile(_.isInstanceOf[Wrap]).size)
-        case (fc, _) => fc
+    val seq = IndexedSeq.newBuilder[FChar]
+    var repeat = 0
+    var pos = 0
+    while (pos < fs.size) {
+      fs.seq(pos) match {
+        case Wrap(c) =>
+          if (repeat > 0) repeat -= 1
+          pos += 1
+          seq.addOne(Wrap(c))
+        case Repeat(m, max, size) =>
+          if (repeat == 0) {
+            repeat = Math.max(0, Math.min(fs.size - pos - 1, size))
+            if (repeat > 0) seq.addOne(Repeat(m, max, size))
+          }
+          pos += 1
       }
-      .filter {
-        case Repeat(_, _, size) => size > 0
-        case _                  => true
-      }
-      .toIndexedSeq
-    FString(fs.n, seq)
+    }
+    FString(fs.n, seq.result())
   }
 }

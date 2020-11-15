@@ -25,7 +25,7 @@ class FStringSuite extends munit.FunSuite {
           IndexedSeq(Wrap('a'), Repeat(0, None, 2), Wrap('b'), Repeat(0, Some(2), 1), Wrap('c'), Repeat(0, None, 1))
         )
       ),
-      FString(2, IndexedSeq(Wrap('a'), Repeat(0, None, 1), Wrap('b'), Repeat(0, Some(2), 1), Wrap('c')))
+      FString(2, IndexedSeq(Wrap('a'), Repeat(0, None, 2), Wrap('b'), Wrap('c')))
     )
   }
 
@@ -117,8 +117,11 @@ class FStringSuite extends munit.FunSuite {
       "'a' 'bc'³ 'd'"
     )
     assertEquals(
-      FString(2, IndexedSeq(Repeat(1, Some(1), 1), Wrap('a'), Repeat(1, None, 1), Wrap('b'))).toString,
-      "'a' 'b'³"
+      FString(
+        2,
+        IndexedSeq(Repeat(1, Some(1), 1), Wrap('a'), Repeat(1, None, 1), Wrap('b'), Repeat(0, Some(3), 1), Wrap('c'))
+      ).toString,
+      "'a' 'b'³ 'c'²⁺¹"
     )
     intercept[IllegalArgumentException] {
       FString(1, IndexedSeq(Repeat(1, None, 2), Wrap('a'), Repeat(0, None, 1))).toString
