@@ -1,6 +1,7 @@
 package codes.quine.labo.redos
 package fuzz
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 import backtrack.IR
@@ -96,17 +97,18 @@ object Seeder {
     override def trace(pos: Int, pc: Int, backtrack: Boolean, capture: Int => Option[UString], cnts: Seq[Int]): Unit = {
       super.trace(pos, pc, backtrack, capture, cnts)
 
-      // Creates a patch to make the string passing this op-code.
-      def addPatch(pos: Int, pc: Int): Unit = ir.codes(pc) match {
+      // Creates a patch to make the string reaches this op-code.
+      @tailrec
+      def addPatch(pc: Int): Unit = ir.codes(pc) match {
         case IR.Any =>
           if (backtrack) {
-            patchesMap((pc, cnts)) = Patch.InsertChar(pos, if (ir.unicode) IChar.Any else IChar.Any16)
+            patchesMap((pc, cnts)) = Patch.InsertChar(pos, IChar.dot(ir.ignoreCase, true, ir.unicode))
           }
         case IR.Back =>
           if (backtrack) {
             // When `back` is failed, `pos` is `0`.
             // We want a patch to insert the first character, so it looks the next op-code.
-            addPatch(pos - 1, pc + 1)
+            addPatch(pc + 1)
           }
         case IR.Char(c) =>
           if (backtrack) {
@@ -118,12 +120,12 @@ object Seeder {
           }
         case IR.ClassNot(s) =>
           if (backtrack) {
-            patchesMap((pc, cnts)) = Patch.InsertChar(pos, s.complement(ir.unicode))
+            val any = IChar.dot(ir.ignoreCase, true, ir.unicode)
+            patchesMap((pc, cnts)) = Patch.InsertChar(pos, any.diff(s))
           }
         case IR.Dot =>
           if (backtrack) {
-            val s = IChar.LineTerminator.complement(ir.unicode)
-            patchesMap((pc, cnts)) = Patch.InsertChar(pos, s)
+            patchesMap((pc, cnts)) = Patch.InsertChar(pos, IChar.dot(ir.ignoreCase, false, ir.unicode))
           }
         case IR.Ref(n) =>
           if (backtrack) {
@@ -136,7 +138,7 @@ object Seeder {
         case _ => () // Skips
       }
 
-      addPatch(pos, pc)
+      addPatch(pc)
     }
   }
 }

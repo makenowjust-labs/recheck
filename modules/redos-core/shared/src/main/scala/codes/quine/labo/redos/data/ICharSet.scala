@@ -27,7 +27,5 @@ object ICharSet {
 
   /** Creates a [[ICharSet]] containing any [[IChar]]s. */
   def any(ignoreCase: Boolean, unicode: Boolean): ICharSet =
-    if (ignoreCase) ICharSet(Vector(IChar.canonicalize(IChar.Any, unicode)))
-    else if (unicode) ICharSet(Vector(IChar.Any))
-    else ICharSet(Vector(IChar.Any16))
+    ICharSet(Vector(IChar.dot(ignoreCase, true, unicode)))
 }

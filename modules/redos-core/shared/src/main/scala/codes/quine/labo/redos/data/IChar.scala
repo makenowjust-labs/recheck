@@ -142,6 +142,16 @@ object IChar {
   /** Creates an empty interval set. */
   def empty: IChar = IChar(IntervalSet.empty[UChar])
 
+  /** Creates an interval set contains any code points. */
+  def any(unicode: Boolean): IChar = if (unicode) IChar.Any else IChar.Any16
+
+  /** Creates an interval set for the dot pattern. */
+  def dot(ignoreCase: Boolean, dotAll: Boolean, unicode: Boolean): IChar = {
+    val any = IChar.any(unicode)
+    val dot = if (dotAll) any else any.diff(IChar.LineTerminator)
+    if (ignoreCase) IChar.canonicalize(dot, unicode) else dot
+  }
+
   /** Creates an interval set ranged in [begin, end]. */
   def range(begin: UChar, end: UChar): IChar = IChar(IntervalSet((begin, UChar(end.value + 1))))
 

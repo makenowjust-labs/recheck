@@ -1,0 +1,125 @@
+package codes.quine.labo.redos
+package fuzz
+
+import backtrack.IR
+import data.IChar
+import data.ICharSet
+import data.UString
+import regexp.Pattern
+import util.Timeout
+import Seeder._
+
+class SeederSuite extends munit.FunSuite {
+  test("Seeder.Patch.InsertChar#apply") {
+    val alphabet = ICharSet.any(false, false).add(IChar('x'))
+    assertEquals(
+      Patch.InsertChar(1, IChar('x')).apply(UString.from("012", false), alphabet),
+      Seq(UString.from("0x12", false), UString.from("0x2", false))
+    )
+  }
+
+  test("Seeder.Patch.InsertString#apply") {
+    val alphabet = ICharSet.any(false, false).add(IChar('x'))
+    assertEquals(
+      Patch.InsertString(1, UString.from("xyz", false)).apply(UString.from("012", false), alphabet),
+      Seq(UString.from("0xyz12", false))
+    )
+  }
+
+  test("Seeder.SeedTracer#patches") {
+    val ir = IR(
+      Pattern(Pattern.Dot, Pattern.FlagSet(false, false, false, false, false, false)),
+      1,
+      Map.empty,
+      IndexedSeq(
+        IR.Any,
+        IR.Back,
+        IR.Char('x'),
+        IR.Class(IChar.range('x', 'z')),
+        IR.ClassNot(IChar.range('x', 'z')),
+        IR.Dot,
+        IR.Ref(1),
+        IR.RefBack(1),
+        IR.PushCnt(1)
+      )
+    )
+
+    {
+      val tracer = new SeedTracer(ir, UString.from("123", false), 10000, Timeout.NoTimeout)
+      tracer.trace(1, 0, false, _ => None, Seq.empty)
+      assertEquals(tracer.patches().get((0, Seq.empty)), None)
+      tracer.trace(1, 0, true, _ => None, Seq.empty)
+      assertEquals(tracer.patches().get((0, Seq.empty)), Some(Patch.InsertChar(1, IChar.Any16)))
+    }
+
+    {
+      val tracer = new SeedTracer(ir, UString.from("123", false), 10000, Timeout.NoTimeout)
+      tracer.trace(0, 1, false, _ => None, Seq.empty)
+      assertEquals(tracer.patches().get((1, Seq.empty)), None)
+      tracer.trace(0, 1, true, _ => None, Seq.empty)
+      assertEquals(tracer.patches().get((2, Seq.empty)), Some(Patch.InsertChar(0, IChar('x'))))
+    }
+
+    {
+      val tracer = new SeedTracer(ir, UString.from("123", false), 10000, Timeout.NoTimeout)
+      tracer.trace(1, 2, false, _ => None, Seq.empty)
+      assertEquals(tracer.patches().get((2, Seq.empty)), None)
+      tracer.trace(1, 2, true, _ => None, Seq.empty)
+      assertEquals(tracer.patches().get((2, Seq.empty)), Some(Patch.InsertChar(1, IChar('x'))))
+    }
+
+    {
+      val tracer = new SeedTracer(ir, UString.from("123", false), 10000, Timeout.NoTimeout)
+      tracer.trace(1, 3, false, _ => None, Seq.empty)
+      assertEquals(tracer.patches().get((3, Seq.empty)), None)
+      tracer.trace(1, 3, true, _ => None, Seq.empty)
+      assertEquals(tracer.patches().get((3, Seq.empty)), Some(Patch.InsertChar(1, IChar.range('x', 'z'))))
+    }
+
+    {
+      val tracer = new SeedTracer(ir, UString.from("123", false), 10000, Timeout.NoTimeout)
+      tracer.trace(1, 4, false, _ => None, Seq.empty)
+      assertEquals(tracer.patches().get((4, Seq.empty)), None)
+      tracer.trace(1, 4, true, _ => None, Seq.empty)
+      assertEquals(
+        tracer.patches().get((4, Seq.empty)),
+        Some(Patch.InsertChar(1, IChar.range('x', 'z').complement(false)))
+      )
+    }
+
+    {
+      val tracer = new SeedTracer(ir, UString.from("123", false), 10000, Timeout.NoTimeout)
+      tracer.trace(1, 5, false, _ => None, Seq.empty)
+      assertEquals(tracer.patches().get((5, Seq.empty)), None)
+      tracer.trace(1, 5, true, _ => None, Seq.empty)
+      assertEquals(
+        tracer.patches().get((5, Seq.empty)),
+        Some(Patch.InsertChar(1, IChar.Any16.diff(IChar.LineTerminator)))
+      )
+    }
+
+    {
+      val tracer = new SeedTracer(ir, UString.from("123", false), 10000, Timeout.NoTimeout)
+      tracer.trace(1, 6, false, _ => Some(UString.from("123", false)), Seq.empty)
+      assertEquals(tracer.patches().get((6, Seq.empty)), None)
+      tracer.trace(1, 6, true, _ => Some(UString.from("123", false)), Seq.empty)
+      assertEquals(tracer.patches().get((6, Seq.empty)), Some(Patch.InsertString(1, UString.from("123", false))))
+    }
+
+    {
+      val tracer = new SeedTracer(ir, UString.from("123", false), 10000, Timeout.NoTimeout)
+      tracer.trace(1, 7, false, _ => Some(UString.from("123", false)), Seq.empty)
+      assertEquals(tracer.patches().get((7, Seq.empty)), None)
+      tracer.trace(1, 7, true, _ => Some(UString.from("123", false)), Seq.empty)
+      assertEquals(tracer.patches().get((7, Seq.empty)), Some(Patch.InsertString(1, UString.from("123", false))))
+    }
+
+    {
+      val tracer = new SeedTracer(ir, UString.from("123", false), 10000, Timeout.NoTimeout)
+      tracer.trace(1, 8, false, _ => None, Seq.empty)
+      assertEquals(tracer.patches().get((8, Seq.empty)), None)
+      tracer.trace(1, 8, true, _ => None, Seq.empty)
+      assertEquals(tracer.patches().get((8, Seq.empty)), None)
+    }
+  }
+}

@@ -135,12 +135,10 @@ object EpsNFACompiler {
               (i, a)
             }
           case Dot =>
-            val any = if (unicode) IChar.Any else IChar.Any16
-            val ch0 = if (dotAll) any else any.diff(IChar.LineTerminator)
-            val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
+            val dot = IChar.dot(ignoreCase, dotAll, unicode)
             val i = nextQ()
             val a = nextQ()
-            tau.addOne(i -> Consume(alphabet.refine(ch).toSet, a))
+            tau.addOne(i -> Consume(alphabet.refine(dot).toSet, a))
             Success((i, a))
           case BackReference(_)      => Failure(new UnsupportedException("back-reference"))
           case NamedBackReference(_) => Failure(new UnsupportedException("named back-reference"))
