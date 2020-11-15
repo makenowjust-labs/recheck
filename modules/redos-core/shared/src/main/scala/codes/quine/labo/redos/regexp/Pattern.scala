@@ -1,6 +1,7 @@
 package codes.quine.labo.redos
 package regexp
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.Failure
 import scala.util.Success
@@ -11,6 +12,7 @@ import Pattern._
 import data.IChar
 import data.ICharSet
 import data.UChar
+import data.UString
 import util.TryUtil
 import util.Timeout
 
@@ -115,6 +117,37 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
       case _                     => false
     }
     loop(node)
+  }
+
+  /** Extracts parts within the pattern. */
+  def parts: Set[UString] = {
+    @tailrec
+    def extract(ns: Seq[Node], set: Set[UString] = Set.empty): Set[UString] =
+      if (ns.isEmpty) set
+      else {
+        val (pre, suf) = ns.span(_.isInstanceOf[Character])
+        val s = UString(pre.collect { case Character(c) => c }.toIndexedSeq)
+        val newSet = set ++ (if (s.size > 1) Set(s) else Set.empty)
+        extract(suf.dropWhile(!_.isInstanceOf[Character]), newSet)
+      }
+
+    def loop(node: Node): Set[UString] = node match {
+      case Disjunction(ns)       => ns.flatMap(loop).toSet
+      case Sequence(ns)          => extract(ns) ++ ns.flatMap(loop).toSet
+      case Capture(_, n)         => loop(n)
+      case NamedCapture(_, _, n) => loop(n)
+      case Group(n)              => loop(n)
+      case Star(_, n)            => loop(n)
+      case Plus(_, n)            => loop(n)
+      case Question(_, n)        => loop(n)
+      case Repeat(_, _, _, n)    => loop(n)
+      case LookAhead(_, n)       => loop(n)
+      case LookBehind(_, n)      => loop(n)
+      case _                     => Set.empty
+    }
+
+    val set = loop(node)
+    if (flagSet.ignoreCase) set.map(UString.canonicalize(_, flagSet.unicode)) else set
   }
 
   override def toString: String =
