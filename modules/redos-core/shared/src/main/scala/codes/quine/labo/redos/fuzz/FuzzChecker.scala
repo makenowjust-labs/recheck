@@ -252,7 +252,7 @@ private[fuzz] final class FuzzChecker(
       val input = str.toUString
       if (input.size > maxAttackSize || str.n > maxAttackSize) return None
       val t = new LimitTracer(attackLimit, timeout)
-      try VM.execute(ir, input, 0, t)
+      try VM.execute(ir, input, 0, true, t)
       catch {
         case _: LimitException =>
           return Some(str)
@@ -278,7 +278,7 @@ private[fuzz] final class FuzzChecker(
       if (inputs.contains(input)) return None
 
       val t = new FuzzTracer(ir, input, populationLimit, timeout)
-      try VM.execute(ir, input, 0, t)
+      try VM.execute(ir, input, 0, true, t)
       catch {
         case _: LimitException =>
           add(str, t)

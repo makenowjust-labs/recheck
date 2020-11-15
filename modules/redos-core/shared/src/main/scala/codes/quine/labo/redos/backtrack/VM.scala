@@ -13,8 +13,14 @@ import data.UString
 object VM {
 
   /** Executes the IR on the input from the initial position. */
-  def execute(ir: IR, input: UString, pos: Int, tracer: Tracer = Tracer.NoTracer()): Option[Match] =
-    new VM(ir, input, pos, tracer).execute()
+  def execute(
+      ir: IR,
+      input: UString,
+      pos: Int,
+      skipCanonicalize: Boolean = false,
+      tracer: Tracer = Tracer.NoTracer()
+  ): Option[Match] =
+    new VM(ir, input, pos, skipCanonicalize, tracer).execute()
 
   /** Proc is a state of VM execution.
     *
@@ -86,14 +92,15 @@ private[backtrack] final class VM(
     private[this] val ir: IR,
     private[this] val input: UString,
     initPos: Int,
+    skipCanonicalize: Boolean = false,
     private[this] val tracer: Tracer = Tracer.NoTracer()
 ) {
 
   /** An execution process list (stack). */
   private[backtrack] val procs: mutable.Stack[Proc] = {
-    val canonicalized = if (ir.ignoreCase) UString.canonicalize(input, ir.unicode) else input
+    val canon = if (!skipCanonicalize && ir.ignoreCase) UString.canonicalize(input, ir.unicode) else input
     val proc = new Proc(
-      canonicalized,
+      canon,
       ir.names,
       mutable.IndexedSeq.fill((ir.capsSize + 1) * 2)(-1),
       mutable.Stack.empty,
@@ -105,7 +112,7 @@ private[backtrack] final class VM(
     mutable.Stack(proc)
   }
 
-  /** Eexecutes this VM. */
+  /** Executes this VM. */
   def execute(): Option[Match] = {
     while (procs.nonEmpty)
       step() match {

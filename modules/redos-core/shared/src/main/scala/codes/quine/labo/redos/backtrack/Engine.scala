@@ -11,5 +11,5 @@ object Engine {
 
   /** Tests a matching of the pattern on the input. */
   def matches(pattern: Pattern, input: String, pos: Int = 0, tracer: Tracer = Tracer.NoTracer()): Try[Option[Match]] =
-    IRCompiler.compile(pattern).map(VM.execute(_, UString.from(input, pattern.flagSet.unicode), pos, tracer))
+    IRCompiler.compile(pattern).map(VM.execute(_, UString.from(input, pattern.flagSet.unicode), pos, tracer = tracer))
 }
