@@ -10,6 +10,10 @@ import regexp.Pattern
 object Engine {
 
   /** Tests a matching of the pattern on the input. */
-  def matches(pattern: Pattern, input: String, pos: Int = 0, tracer: Tracer = Tracer.NoTracer()): Try[Option[Match]] =
-    IRCompiler.compile(pattern).map(VM.execute(_, UString.from(input, pattern.flagSet.unicode), pos, tracer = tracer))
+  def matches(pattern: Pattern, input: String, pos: Int = 0, tracer: Tracer = Tracer.NoTracer()): Try[Option[Match]] = {
+    val original = UString.from(input, pattern.flagSet.unicode)
+    val canonical =
+      if (pattern.flagSet.ignoreCase) UString.canonicalize(original, pattern.flagSet.unicode) else original
+    IRCompiler.compile(pattern).map(VM.execute(_, canonical, pos, tracer = tracer).map(_.copy(input = original)))
+  }
 }

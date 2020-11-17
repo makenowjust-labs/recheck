@@ -4,7 +4,6 @@ package backtrack
 import scala.collection.mutable
 
 import IR._
-import VM._
 import data.IChar.{LineTerminator, Word}
 import data.UChar
 import data.UString
@@ -12,7 +11,10 @@ import data.UString
 /** VM utilities. */
 object VM {
 
-  /** Executes the IR on the input from the initial position. */
+  /** Executes the IR on the input from the initial position.
+    *
+    * Note that the input string should be canonical.
+    */
   def execute(
       ir: IR,
       input: UString,
@@ -20,70 +22,6 @@ object VM {
       tracer: Tracer = Tracer.NoTracer()
   ): Option[Match] =
     new VM(ir, input, pos, tracer).execute()
-
-  /** Proc is a state of VM execution.
-    *
-    * It behaves a mutable [[CaptureList]] also.
-    */
-  private[backtrack] final class Proc(
-      val input: UString,
-      val names: Map[String, Int],
-      val caps: mutable.IndexedSeq[Int],
-      val poses: mutable.Stack[Int],
-      val cnts: mutable.Stack[Int],
-      val procs: mutable.Stack[Int],
-      var pos: Int,
-      var pc: Int
-  ) {
-
-    /** Returns the current character of this proc. */
-    def currentChar: Option[UChar] = input.get(pos)
-
-    /** Returns the previous character of this proc. */
-    def previousChar: Option[UChar] = input.get(pos - 1)
-
-    /** A size as capture list. */
-    def size: Int = caps.size / 2 - 1
-
-    /** Gets the `n`-th capture string.
-      *
-      * An index `0` is whole match string, and indexes
-      * between `1` and `size` are capture groups.
-      */
-    def capture(n: Int): Option[UString] =
-      if (0 <= n && n <= size) {
-        val begin = caps(n * 2)
-        val end = caps(n * 2 + 1)
-        if (begin >= 0 && end >= 0) Some(input.substring(begin, end)) else None
-      } else None
-
-    /** Returns a lambda from a capture index to capture string. */
-    def captures: Int => Option[UString] = capture
-
-    /** Updates a begin position of the `n`-th capture. */
-    def captureBegin(n: Int, pos: Int): Unit = caps.update(n * 2, pos)
-
-    /** Updates an end position of the `n`-th capture. */
-    def captureEnd(n: Int, pos: Int): Unit = caps.update(n * 2 + 1, pos)
-
-    /** Resets captures between `i` and `j`. */
-    def captureReset(i: Int, j: Int): Unit = {
-      for (k <- (i to j)) {
-        captureBegin(k, -1)
-        captureEnd(k, -1)
-      }
-    }
-
-    /** Returns a copy of this proc.
-      *
-      * It copies mutable states deeply.
-      */
-    override def clone(): Proc =
-      new Proc(input, names, caps.clone(), poses.clone(), cnts.clone(), procs.clone(), pos, pc)
-
-    /** Shows this proc. */
-    override def toString: String = s"Proc($input, $names, $caps, $poses, $cnts, $procs, $pos, $pc)"
-  }
 }
 
 /** VM is a RegExp matching VM. */
@@ -96,10 +34,7 @@ private[backtrack] final class VM(
 
   /** An execution process list (stack). */
   private[backtrack] val procs: mutable.Stack[Proc] = {
-    val canon = if (ir.ignoreCase) UString.canonicalize(input, ir.unicode) else input
     val proc = new Proc(
-      canon,
-      ir.names,
       mutable.IndexedSeq.fill((ir.capsSize + 1) * 2)(-1),
       mutable.Stack.empty,
       mutable.Stack.empty,
@@ -164,18 +99,16 @@ private[backtrack] final class VM(
           case _                         => backtrack = true
         }
       case Dec =>
-        proc.cnts(0) -= 1
+        proc.cntStack(0) -= 1
       case Done =>
-        // Use `input` instead of `proc.input` here,
-        // because `proc.input` is canonical.
-        return Some(Match(input, proc.names, proc.caps.toIndexedSeq))
+        return Some(Match(input, ir.names, proc.caps.toIndexedSeq))
       case Dot =>
         proc.currentChar match {
           case Some(c) if !LineTerminator.contains(c) => proc.pos += 1
           case _                                      => backtrack = true
         }
       case EmptyCheck =>
-        backtrack = proc.poses.pop() == proc.pos
+        backtrack = proc.posStack.pop() == proc.pos
       case Fail =>
         backtrack = true
       case ForkCont(next) =>
@@ -189,7 +122,7 @@ private[backtrack] final class VM(
       case InputBegin =>
         if (proc.pos != 0) backtrack = true
       case InputEnd =>
-        if (proc.pos != proc.input.size) backtrack = true
+        if (proc.pos != input.size) backtrack = true
       case Jump(cont) =>
         proc.pc += cont
       case LineBegin =>
@@ -199,32 +132,32 @@ private[backtrack] final class VM(
         val c = proc.currentChar
         backtrack = c.exists(!LineTerminator.contains(_))
       case Loop(cont) =>
-        val n = proc.cnts.top
+        val n = proc.cntStack.top
         if (n > 0) proc.pc += cont
       case PopCnt =>
-        proc.cnts.pop()
+        proc.cntStack.pop()
       case PopProc =>
-        proc.procs.pop()
+        proc.procStack.pop()
       case PushCnt(n) =>
-        proc.cnts.push(n)
+        proc.cntStack.push(n)
       case PushPos =>
-        proc.poses.push(proc.pos)
+        proc.posStack.push(proc.pos)
       case PushProc =>
-        proc.procs.push(procs.size)
+        proc.procStack.push(procs.size)
       case Ref(n) =>
         val s = proc.capture(n).getOrElse(UString.empty)
-        val t = proc.input.substring(proc.pos, proc.pos + s.size)
+        val t = input.substring(proc.pos, proc.pos + s.size)
         if (s == t) proc.pos += t.size
         else backtrack = true
       case RefBack(n) =>
         val s = proc.capture(n).getOrElse(UString.empty)
-        val t = proc.input.substring(proc.pos - s.size, proc.pos)
+        val t = input.substring(proc.pos - s.size, proc.pos)
         if (s == t) proc.pos -= t.size
         else backtrack = true
       case RestorePos =>
-        proc.pos = proc.poses.pop()
+        proc.pos = proc.posStack.pop()
       case RewindProc =>
-        val size = proc.procs.pop()
+        val size = proc.procStack.pop()
         while (size <= procs.size) procs.pop()
         procs.push(proc)
       case WordBoundary =>
@@ -244,8 +177,67 @@ private[backtrack] final class VM(
     if (backtrack) procs.pop()
 
     // Traces this step.
-    tracer.trace(oldPos, oldPc, backtrack, proc.captures, proc.cnts.toSeq)
+    tracer.trace(oldPos, oldPc, backtrack, proc.captures, proc.cntStack.toSeq)
 
     None
+  }
+
+  /** Proc is an internal state of VM execution. */
+  final class Proc(
+      val caps: mutable.IndexedSeq[Int],
+      val posStack: mutable.Stack[Int],
+      val cntStack: mutable.Stack[Int],
+      val procStack: mutable.Stack[Int],
+      var pos: Int,
+      var pc: Int
+  ) {
+
+    /** Returns the current character of this proc. */
+    def currentChar: Option[UChar] = input.get(pos)
+
+    /** Returns the previous character of this proc. */
+    def previousChar: Option[UChar] = input.get(pos - 1)
+
+    /** A size as capture list. */
+    def size: Int = caps.size / 2 - 1
+
+    /** Gets the `n`-th capture string.
+      *
+      * An index `0` is whole match string, and indexes
+      * between `1` and `size` are capture groups.
+      */
+    def capture(n: Int): Option[UString] =
+      if (0 <= n && n <= size) {
+        val begin = caps(n * 2)
+        val end = caps(n * 2 + 1)
+        if (begin >= 0 && end >= 0) Some(input.substring(begin, end)) else None
+      } else None
+
+    /** Returns a lambda from a capture index to capture string. */
+    def captures: Int => Option[UString] = capture
+
+    /** Updates a begin position of the `n`-th capture. */
+    def captureBegin(n: Int, pos: Int): Unit = caps.update(n * 2, pos)
+
+    /** Updates an end position of the `n`-th capture. */
+    def captureEnd(n: Int, pos: Int): Unit = caps.update(n * 2 + 1, pos)
+
+    /** Resets captures between `i` and `j`. */
+    def captureReset(i: Int, j: Int): Unit = {
+      for (k <- (i to j)) {
+        captureBegin(k, -1)
+        captureEnd(k, -1)
+      }
+    }
+
+    /** Returns a copy of this proc.
+      *
+      * It copies mutable states deeply.
+      */
+    override def clone(): Proc =
+      new Proc(caps.clone(), posStack.clone(), cntStack.clone(), procStack.clone(), pos, pc)
+
+    /** Shows this proc. */
+    override def toString: String = s"Proc($caps, $posStack, $cntStack, $procStack, $pos, $pc)"
   }
 }
