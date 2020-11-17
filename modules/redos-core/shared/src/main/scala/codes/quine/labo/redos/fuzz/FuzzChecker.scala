@@ -18,28 +18,28 @@ object FuzzChecker {
 
   /** Checks whether RegExp is ReDoS vulnerable or not. */
   def check(
-      ir: IR,
-      alphabet: ICharSet,
-      seed: Set[FString],
+      ctx: FuzzContext,
       random: Random = Random,
+      seedLimit: Int = 10_000,
       populationLimit: Int = 100_000,
       attackLimit: Int = 1_000_000,
       crossSize: Int = 25,
       mutateSize: Int = 50,
       maxAttackSize: Int = 10_000,
+      maxSeedSize: Int = 100,
       maxGenerationSize: Int = 100,
       maxIteration: Int = 30
   )(implicit timeout: Timeout = Timeout.NoTimeout): Option[FString] =
     new FuzzChecker(
-      ir,
-      alphabet,
-      seed,
+      ctx,
       random,
+      seedLimit,
       populationLimit,
       attackLimit,
       crossSize,
       mutateSize,
       maxAttackSize,
+      maxSeedSize,
       maxGenerationSize,
       maxIteration,
       timeout
@@ -59,22 +59,28 @@ object FuzzChecker {
 
 /** FuzzChecker is a ReDoS vulnerable RegExp checker based on fuzzing. */
 private[fuzz] final class FuzzChecker(
-    val ir: IR,
-    val alphabet: ICharSet,
-    val seed: Set[FString],
+    val ctx: FuzzContext,
     val random: Random,
+    val seedLimit: Int,
     val populationLimit: Int,
     val attackLimit: Int,
     val crossSize: Int,
     val mutateSize: Int,
     val maxAttackSize: Int,
+    val maxSeedSize: Int,
     val maxGenerationSize: Int,
     val maxIteration: Int,
     implicit val timeout: Timeout
 ) {
 
-  /** A set of parts within the pattern. */
-  val parts = ir.pattern.parts.toSeq
+  /** An alias to `ctx.ir`. */
+  def ir: IR = ctx.ir
+
+  /** An alias to `ctx.alphabet`. */
+  def alphabet: ICharSet = ctx.alphabet
+
+  /** A sequence of `ctx.parts` */
+  val parts: Seq[UString] = ctx.parts.toSeq
 
   /** Runs this fuzzer. */
   def check(): Option[FString] = {
@@ -95,6 +101,7 @@ private[fuzz] final class FuzzChecker(
 
   /** Creates the initial generation from the seed set. */
   def init(): Either[Generation, FString] = {
+    val seed = Seeder.seed(ctx, seedLimit, maxSeedSize)
     val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty, mutable.Set.empty, true)
     for (str <- seed) {
       pop.execute(str) match {
@@ -303,7 +310,7 @@ private[fuzz] final class FuzzChecker(
       val input = str.toUString
       if (inputs.contains(input)) return None
 
-      val t = new FuzzTracer(ir, input, populationLimit, timeout)
+      val t = new FuzzTracer(ctx.ir, input, populationLimit, timeout)
       try VM.execute(ir, input, 0, t)
       catch {
         case _: LimitException =>

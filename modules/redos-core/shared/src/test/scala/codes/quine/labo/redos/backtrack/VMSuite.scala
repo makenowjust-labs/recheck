@@ -6,8 +6,6 @@ import scala.collection.mutable
 import data.IChar
 import data.UChar
 import data.UString
-import regexp.Pattern
-import regexp.Pattern._
 
 class VMSuite extends munit.FunSuite {
   test("VM.execute: trace limit") {
@@ -25,7 +23,7 @@ class VMSuite extends munit.FunSuite {
       IR.CapEnd(0),
       IR.Done
     )
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 0, Map.empty, codes)
+    val ir = IR(0, Map.empty, codes)
     val tracer = new Tracer.LimitTracer(1000) // 2^10 = 1024 > 1000
     intercept[LimitException](VM.execute(ir, input, 0, tracer))
   }
@@ -41,7 +39,7 @@ class VMSuite extends munit.FunSuite {
       IR.CapEnd(0),
       IR.Done
     )
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 0, Map.empty, codes)
+    val ir = IR(0, Map.empty, codes)
     assertEquals(VM.execute(ir, input, 0), Some(Match(input, Map.empty, IndexedSeq(0, 3))))
   }
 
@@ -56,14 +54,13 @@ class VMSuite extends munit.FunSuite {
       IR.CapEnd(0),
       IR.Done
     )
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 0, Map.empty, codes)
+    val ir = IR(0, Map.empty, codes)
     assertEquals(VM.execute(ir, input, 0), None)
   }
 
   locally {
     val input = UString.from("xyz", false)
     val ir = IR(
-      Pattern(Dot, FlagSet(false, false, false, false, false, false)),
       0,
       Map.empty,
       IndexedSeq(IR.Done)
@@ -245,7 +242,7 @@ class VMSuite extends munit.FunSuite {
       IR.CapEnd(0),
       IR.Done
     )
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 0, Map.empty, codes)
+    val ir = IR(0, Map.empty, codes)
     val vm = new VM(ir, input, 0)
     assertEquals(vm.execute(), Some(Match(input, Map.empty, IndexedSeq(0, 3))))
   }
@@ -261,7 +258,7 @@ class VMSuite extends munit.FunSuite {
       IR.CapEnd(0),
       IR.Done
     )
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 0, Map.empty, codes)
+    val ir = IR(0, Map.empty, codes)
     val vm = new VM(ir, input, 0)
     assertEquals(vm.execute(), None)
   }
@@ -269,7 +266,7 @@ class VMSuite extends munit.FunSuite {
   test("VM: initial proc") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 0, Map.empty, IndexedSeq(IR.Dot, IR.Done))
+      IR(0, Map.empty, IndexedSeq(IR.Dot, IR.Done))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.caps, mutable.IndexedSeq.fill(2)(-1))
@@ -283,7 +280,7 @@ class VMSuite extends munit.FunSuite {
   test("VM: initial proc (ignore-case)") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, true, false, false, false, false)), 0, Map.empty, IndexedSeq(IR.Dot, IR.Done))
+      IR(0, Map.empty, IndexedSeq(IR.Dot, IR.Done))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.caps, mutable.IndexedSeq.fill(2)(-1))
@@ -297,7 +294,7 @@ class VMSuite extends munit.FunSuite {
   test("VM: initial proc (ignore-case + unicode)") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, true, false, false, true, false)), 0, Map.empty, IndexedSeq(IR.Dot, IR.Done))
+      IR(0, Map.empty, IndexedSeq(IR.Dot, IR.Done))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.caps, mutable.IndexedSeq.fill(2)(-1))
@@ -310,7 +307,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Any") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 0, Map.empty, IndexedSeq(IR.Any))
+    val ir = IR(0, Map.empty, IndexedSeq(IR.Any))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -323,7 +320,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Any (end)") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 0, Map.empty, IndexedSeq(IR.Any))
+    val ir = IR(0, Map.empty, IndexedSeq(IR.Any))
     val vm = new VM(ir, input, 9)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 9)
@@ -334,7 +331,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Back") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 0, Map.empty, IndexedSeq(IR.Back))
+    val ir = IR(0, Map.empty, IndexedSeq(IR.Back))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -347,7 +344,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Back (begin)") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 0, Map.empty, IndexedSeq(IR.Back))
+    val ir = IR(0, Map.empty, IndexedSeq(IR.Back))
     val vm = new VM(ir, input, 0)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 0)
@@ -359,7 +356,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: CapBegin") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 1, Map.empty, IndexedSeq(IR.CapBegin(1)))
+      IR(1, Map.empty, IndexedSeq(IR.CapBegin(1)))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -373,7 +370,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: CapEnd") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 1, Map.empty, IndexedSeq(IR.CapEnd(1)))
+    val ir = IR(1, Map.empty, IndexedSeq(IR.CapEnd(1)))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -388,7 +385,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: CapReset") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.CapReset(1, 2)))
+      IR(3, Map.empty, IndexedSeq(IR.CapReset(1, 2)))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -403,7 +400,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Char") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.Char('y')))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.Char('y')))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -416,7 +413,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Char (not match)") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.Char('y')))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.Char('y')))
     val vm = new VM(ir, input, 0)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 0)
@@ -427,7 +424,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Char (end)") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.Char('y')))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.Char('y')))
     val vm = new VM(ir, input, 9)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 9)
@@ -439,7 +436,6 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: Class") {
     val input = UString.from("xyz012XYZ", false)
     val ir = IR(
-      Pattern(Dot, FlagSet(false, false, false, false, false, false)),
       3,
       Map.empty,
       IndexedSeq(IR.Class(IChar('y')))
@@ -457,7 +453,6 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: Class (not match)") {
     val input = UString.from("xyz012XYZ", false)
     val ir = IR(
-      Pattern(Dot, FlagSet(false, false, false, false, false, false)),
       3,
       Map.empty,
       IndexedSeq(IR.Class(IChar('y')))
@@ -473,7 +468,6 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: Class (end)") {
     val input = UString.from("xyz012XYZ", false)
     val ir = IR(
-      Pattern(Dot, FlagSet(false, false, false, false, false, false)),
       3,
       Map.empty,
       IndexedSeq(IR.Class(IChar('y')))
@@ -489,7 +483,6 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: ClassNot") {
     val input = UString.from("xyz012XYZ", false)
     val ir = IR(
-      Pattern(Dot, FlagSet(false, false, false, false, false, false)),
       3,
       Map.empty,
       IndexedSeq(IR.ClassNot(IChar('x')))
@@ -507,7 +500,6 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: ClassNot (not match)") {
     val input = UString.from("xyz012XYZ", false)
     val ir = IR(
-      Pattern(Dot, FlagSet(false, false, false, false, false, false)),
       3,
       Map.empty,
       IndexedSeq(IR.ClassNot(IChar('x')))
@@ -523,7 +515,6 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: ClassNot (end)") {
     val input = UString.from("xyz012XYZ", false)
     val ir = IR(
-      Pattern(Dot, FlagSet(false, false, false, false, false, false)),
       3,
       Map.empty,
       IndexedSeq(IR.ClassNot(IChar('x')))
@@ -538,7 +529,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Dec") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.Dec))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.Dec))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -553,7 +544,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Done") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.Done))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.Done))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -566,7 +557,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Dot") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.Dot))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.Dot))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -579,7 +570,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Dot (newline)") {
     val input = UString.from("x\nyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.Dot))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.Dot))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -590,7 +581,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Dot (end)") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.Dot))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.Dot))
     val vm = new VM(ir, input, 9)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 9)
@@ -602,7 +593,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: EmptyCheck") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.EmptyCheck))
+      IR(3, Map.empty, IndexedSeq(IR.EmptyCheck))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -618,7 +609,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: EmptyCheck (empty)") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.EmptyCheck))
+      IR(3, Map.empty, IndexedSeq(IR.EmptyCheck))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -630,7 +621,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Fail") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.Fail))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.Fail))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -642,7 +633,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: ForkCont") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.ForkCont(-1)))
+      IR(3, Map.empty, IndexedSeq(IR.ForkCont(-1)))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -658,7 +649,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: ForkNext") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.ForkNext(-1)))
+      IR(3, Map.empty, IndexedSeq(IR.ForkNext(-1)))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -674,7 +665,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: InputBegin") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.InputBegin))
+      IR(3, Map.empty, IndexedSeq(IR.InputBegin))
     val vm = new VM(ir, input, 0)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 0)
@@ -688,7 +679,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: InputBegin (not begin)") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.InputBegin))
+      IR(3, Map.empty, IndexedSeq(IR.InputBegin))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -699,7 +690,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: InputEnd") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.InputEnd))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.InputEnd))
     val vm = new VM(ir, input, 9)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 9)
@@ -712,7 +703,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: InputEnd (not end)") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.InputEnd))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.InputEnd))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -724,7 +715,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: Jump") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.Jump(-1)))
+      IR(3, Map.empty, IndexedSeq(IR.Jump(-1)))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -737,7 +728,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: LineBegin") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.LineBegin))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.LineBegin))
     val vm = new VM(ir, input, 0)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 0)
@@ -750,7 +741,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: LineBegin (newline)") {
     val input = UString.from("\nyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.LineBegin))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.LineBegin))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -763,7 +754,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: LineBegin (not begin)") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.LineBegin))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.LineBegin))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -774,7 +765,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: LineEnd") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.LineEnd))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.LineEnd))
     val vm = new VM(ir, input, 9)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 9)
@@ -787,7 +778,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: LineEnd (newline)") {
     val input = UString.from("x\nz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.LineEnd))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.LineEnd))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -800,7 +791,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: LineEnd (not end)") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.LineEnd))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.LineEnd))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -812,7 +803,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: Loop") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.Loop(-1)))
+      IR(3, Map.empty, IndexedSeq(IR.Loop(-1)))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -827,7 +818,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: Loop (exit)") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.Loop(-1)))
+      IR(3, Map.empty, IndexedSeq(IR.Loop(-1)))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -841,7 +832,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: PopCnt") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.PopCnt))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.PopCnt))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -856,7 +847,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: PopProc") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.PopProc))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.PopProc))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -872,7 +863,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: PushCnt") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.PushCnt(2)))
+      IR(3, Map.empty, IndexedSeq(IR.PushCnt(2)))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -886,7 +877,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: PushPos") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.PushPos))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.PushPos))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -900,7 +891,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: PushProc") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.PushProc))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.PushProc))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -914,7 +905,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Ref") {
     val input = UString.from("xyz012xyz", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.Ref(2)))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.Ref(2)))
     val vm = new VM(ir, input, 6)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 6)
@@ -929,7 +920,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Ref (not captured)") {
     val input = UString.from("xyz012xyz", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.Ref(2)))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.Ref(2)))
     val vm = new VM(ir, input, 6)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 6)
@@ -942,7 +933,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Ref (not match)") {
     val input = UString.from("xyz012xyz", false)
-    val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.Ref(2)))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.Ref(2)))
     val vm = new VM(ir, input, 6)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 6)
@@ -956,7 +947,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: RefBack") {
     val input = UString.from("xyz012xyz", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.RefBack(2)))
+      IR(3, Map.empty, IndexedSeq(IR.RefBack(2)))
     val vm = new VM(ir, input, 9)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 9)
@@ -972,7 +963,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: RefBack (not captured)") {
     val input = UString.from("xyz012xyz", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.RefBack(2)))
+      IR(3, Map.empty, IndexedSeq(IR.RefBack(2)))
     val vm = new VM(ir, input, 9)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 9)
@@ -986,7 +977,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: RefBack (not match)") {
     val input = UString.from("xyz012xyz", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.RefBack(2)))
+      IR(3, Map.empty, IndexedSeq(IR.RefBack(2)))
     val vm = new VM(ir, input, 9)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 9)
@@ -1000,7 +991,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: RestorePos") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.RestorePos))
+      IR(3, Map.empty, IndexedSeq(IR.RestorePos))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -1016,7 +1007,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: RewindProc") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.RewindProc))
+      IR(3, Map.empty, IndexedSeq(IR.RewindProc))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -1034,7 +1025,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: WordBoundary (left)") {
     val input = UString.from("#x", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.WordBoundary))
+      IR(3, Map.empty, IndexedSeq(IR.WordBoundary))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -1048,7 +1039,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: WordBoundary (right)") {
     val input = UString.from("x#", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.WordBoundary))
+      IR(3, Map.empty, IndexedSeq(IR.WordBoundary))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -1062,7 +1053,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: WordBoundary (both word)") {
     val input = UString.from("xy", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.WordBoundary))
+      IR(3, Map.empty, IndexedSeq(IR.WordBoundary))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -1074,7 +1065,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: WordBoundary (both not word)") {
     val input = UString.from("##", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.WordBoundary))
+      IR(3, Map.empty, IndexedSeq(IR.WordBoundary))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -1086,7 +1077,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: WordBoundaryNot (left)") {
     val input = UString.from("#x", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.WordBoundaryNot))
+      IR(3, Map.empty, IndexedSeq(IR.WordBoundaryNot))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -1098,7 +1089,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: WordBoundaryNot (right)") {
     val input = UString.from("x#", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.WordBoundaryNot))
+      IR(3, Map.empty, IndexedSeq(IR.WordBoundaryNot))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -1110,7 +1101,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: WordBoundaryNot (both word)") {
     val input = UString.from("xy", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.WordBoundaryNot))
+      IR(3, Map.empty, IndexedSeq(IR.WordBoundaryNot))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -1124,7 +1115,7 @@ class VMSuite extends munit.FunSuite {
   test("VM#step: WordBoundaryNot (both not word)") {
     val input = UString.from("##", false)
     val ir =
-      IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 3, Map.empty, IndexedSeq(IR.WordBoundaryNot))
+      IR(3, Map.empty, IndexedSeq(IR.WordBoundaryNot))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)

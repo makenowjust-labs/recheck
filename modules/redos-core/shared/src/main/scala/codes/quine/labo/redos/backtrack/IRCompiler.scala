@@ -86,9 +86,10 @@ object IRCompiler {
               case None => Failure(new InvalidRegExpException("invalid named back-reference"))
             }
         }
+
         loop(pattern.node, true).map(State.prelude(pattern.hasLineBeginAtBegin, _))
       }
-    } yield IR(pattern, capsSize, names, codes)
+    } yield IR(capsSize, names, codes)
 
   /** State is a compiling state. */
   private[backtrack] final case class State(codes: IndexedSeq[IR.OpCode], advance: Boolean) {

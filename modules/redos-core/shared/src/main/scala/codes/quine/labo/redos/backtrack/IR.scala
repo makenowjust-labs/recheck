@@ -6,23 +6,14 @@ import scala.collection.mutable
 import IR._
 import data.IChar
 import data.UChar
-import regexp.Pattern
 
 /** IR is an internal representation of a compiled RegExp program. */
-final case class IR(pattern: Pattern, capsSize: Int, names: Map[String, Int], codes: IndexedSeq[OpCode]) {
-
-  /** An alias to `pattern.flagSet.ignoreCase`. */
-  def ignoreCase: Boolean = pattern.flagSet.ignoreCase
-
-  /** An alias to `pattern.flagSet.unicode`. */
-  def unicode: Boolean = pattern.flagSet.unicode
+final case class IR(capsSize: Int, names: Map[String, Int], codes: IndexedSeq[OpCode]) {
 
   override def toString: String = {
     val sb = new mutable.StringBuilder
 
-    sb.append(s"$pattern\n")
     sb.append(s"(caps: $capsSize, names: ${names.map { case (k, v) => s"'$k': $v" }.mkString("{", ", ", "}")})\n")
-
     for ((code, i) <- codes.zipWithIndex) {
       sb.append(f"#$i%03d: $code%s\n")
     }

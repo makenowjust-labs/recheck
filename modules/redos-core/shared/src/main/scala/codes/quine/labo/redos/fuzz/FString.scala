@@ -71,7 +71,7 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
     UString(str.result())
   }
 
-  /** Returns a string reperesentation of this. */
+  /** Returns a string representation of this. */
   override def toString: String = {
     if (seq.isEmpty) return "''"
 

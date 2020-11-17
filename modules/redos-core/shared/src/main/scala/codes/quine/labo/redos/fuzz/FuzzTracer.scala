@@ -11,8 +11,14 @@ import util.Timeout
 /** FuzzTracer is a tracer implementation for fuzzing. */
 private[fuzz] class FuzzTracer(val ir: IR, val input: UString, limit: Int, timeout: Timeout)
     extends LimitTracer(limit, timeout) {
+
+  /** A mutable set of [[coverage]]. */
   private[this] val coverageSet: mutable.Set[(Int, Seq[Int], Boolean)] = mutable.Set.empty
+
+  /** A map from pc to position to detect loops. */
   private[this] val pcToPos: mutable.Map[Int, Int] = mutable.Map.empty
+
+  /** A buffer for recorded loops. */
   private[this] val loops: mutable.Buffer[(Int, Int, Int)] = mutable.Buffer.empty
 
   /** A traced coverage. */

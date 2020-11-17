@@ -22,7 +22,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern1),
         Success(
           IR(
-            pattern1,
             0,
             Map.empty,
             IndexedSeq(IR.ForkNext(2), IR.Any, IR.Jump(-3), IR.CapBegin(0), IR.Dot, IR.CapEnd(0), IR.Done)
@@ -31,7 +30,7 @@ class IRCompilerSuite extends munit.FunSuite {
       )
       assertEquals(
         IRCompiler.compile(pattern2),
-        Success(IR(pattern2, 0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Dot, IR.CapEnd(0), IR.Done)))
+        Success(IR(0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Dot, IR.CapEnd(0), IR.Done)))
       )
     }
 
@@ -42,7 +41,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern),
         Success(
           IR(
-            pattern,
             0,
             Map.empty,
             IndexedSeq(
@@ -74,7 +72,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern1),
         Success(
           IR(
-            pattern1,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Char('a'), IR.Char('b'), IR.Char('c'), IR.CapEnd(0), IR.Done)
@@ -85,7 +82,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern2),
         Success(
           IR(
-            pattern2,
             0,
             Map.empty,
             IndexedSeq(
@@ -119,7 +115,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern1),
         Success(
           IR(
-            pattern1,
             1,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.CapBegin(1), IR.Dot, IR.CapEnd(1), IR.CapEnd(0), IR.Done)
@@ -130,7 +125,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern2),
         Success(
           IR(
-            pattern2,
             1,
             Map.empty,
             IndexedSeq(
@@ -160,7 +154,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern1),
         Success(
           IR(
-            pattern1,
             1,
             Map("x" -> 1),
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.CapBegin(1), IR.Dot, IR.CapEnd(1), IR.CapEnd(0), IR.Done)
@@ -171,7 +164,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern2),
         Success(
           IR(
-            pattern2,
             1,
             Map("x" -> 1),
             IndexedSeq(
@@ -200,7 +192,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern),
         Success(
           IR(
-            pattern,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Dot, IR.CapEnd(0), IR.Done)
@@ -217,7 +208,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern1),
         Success(
           IR(
-            pattern1,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.ForkCont(2), IR.Dot, IR.Jump(-3), IR.CapEnd(0), IR.Done)
@@ -228,7 +218,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern2),
         Success(
           IR(
-            pattern2,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.ForkNext(2), IR.Dot, IR.Jump(-3), IR.CapEnd(0), IR.Done)
@@ -239,7 +228,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern3),
         Success(
           IR(
-            pattern3,
             1,
             Map.empty,
             IndexedSeq(
@@ -267,7 +255,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern1),
         Success(
           IR(
-            pattern1,
             0,
             Map.empty,
             IndexedSeq(
@@ -287,7 +274,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern2),
         Success(
           IR(
-            pattern2,
             0,
             Map.empty,
             IndexedSeq(
@@ -307,7 +293,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern3),
         Success(
           IR(
-            pattern3,
             1,
             Map.empty,
             IndexedSeq(
@@ -337,7 +322,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern1),
         Success(
           IR(
-            pattern1,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.ForkCont(1), IR.Dot, IR.CapEnd(0), IR.Done)
@@ -348,7 +332,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern2),
         Success(
           IR(
-            pattern2,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.ForkNext(1), IR.Dot, IR.CapEnd(0), IR.Done)
@@ -379,13 +362,12 @@ class IRCompilerSuite extends munit.FunSuite {
       val pattern19 = Pattern(Sequence(Seq(LineBegin, Repeat(false, 2, Some(Some(4)), Dot))), flagSet1)
       assertEquals(
         IRCompiler.compile(pattern1),
-        Success(IR(pattern1, 0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.CapEnd(0), IR.Done)))
+        Success(IR(0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.CapEnd(0), IR.Done)))
       )
       assertEquals(
         IRCompiler.compile(pattern2),
         Success(
           IR(
-            pattern2,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.ForkCont(2), IR.Dot, IR.Jump(-3), IR.CapEnd(0), IR.Done)
@@ -396,7 +378,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern3),
         Success(
           IR(
-            pattern3,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.ForkNext(2), IR.Dot, IR.Jump(-3), IR.CapEnd(0), IR.Done)
@@ -405,13 +386,12 @@ class IRCompilerSuite extends munit.FunSuite {
       )
       assertEquals(
         IRCompiler.compile(pattern4),
-        Success(IR(pattern4, 0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.CapEnd(0), IR.Done)))
+        Success(IR(0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.CapEnd(0), IR.Done)))
       )
       assertEquals(
         IRCompiler.compile(pattern5),
         Success(
           IR(
-            pattern5,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.ForkCont(1), IR.Dot, IR.CapEnd(0), IR.Done)
@@ -422,7 +402,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern6),
         Success(
           IR(
-            pattern6,
             0,
             Map.empty,
             IndexedSeq(
@@ -444,7 +423,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern7),
         Success(
           IR(
-            pattern7,
             0,
             Map.empty,
             IndexedSeq(
@@ -464,13 +442,12 @@ class IRCompilerSuite extends munit.FunSuite {
       )
       assertEquals(
         IRCompiler.compile(pattern8),
-        Success(IR(pattern8, 0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Dot, IR.CapEnd(0), IR.Done)))
+        Success(IR(0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Dot, IR.CapEnd(0), IR.Done)))
       )
       assertEquals(
         IRCompiler.compile(pattern9),
         Success(
           IR(
-            pattern9,
             0,
             Map.empty,
             IndexedSeq(
@@ -488,13 +465,12 @@ class IRCompilerSuite extends munit.FunSuite {
       )
       assertEquals(
         IRCompiler.compile(pattern10),
-        Success(IR(pattern10, 0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Dot, IR.CapEnd(0), IR.Done)))
+        Success(IR(0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Dot, IR.CapEnd(0), IR.Done)))
       )
       assertEquals(
         IRCompiler.compile(pattern11),
         Success(
           IR(
-            pattern11,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Dot, IR.ForkCont(1), IR.Dot, IR.CapEnd(0), IR.Done)
@@ -505,7 +481,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern12),
         Success(
           IR(
-            pattern12,
             0,
             Map.empty,
             IndexedSeq(
@@ -528,7 +503,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern13),
         Success(
           IR(
-            pattern13,
             0,
             Map.empty,
             IndexedSeq(
@@ -549,7 +523,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern14),
         Success(
           IR(
-            pattern14,
             0,
             Map.empty,
             IndexedSeq(
@@ -570,7 +543,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern15),
         Success(
           IR(
-            pattern15,
             0,
             Map.empty,
             IndexedSeq(
@@ -597,7 +569,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern17),
         Success(
           IR(
-            pattern17,
             0,
             Map.empty,
             IndexedSeq(
@@ -618,7 +589,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern18),
         Success(
           IR(
-            pattern18,
             0,
             Map.empty,
             IndexedSeq(
@@ -641,7 +611,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern19),
         Success(
           IR(
-            pattern19,
             0,
             Map.empty,
             IndexedSeq(
@@ -672,14 +641,13 @@ class IRCompilerSuite extends munit.FunSuite {
       assertEquals(
         IRCompiler.compile(pattern1),
         Success(
-          IR(pattern1, 0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.WordBoundary, IR.CapEnd(0), IR.Done))
+          IR(0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.WordBoundary, IR.CapEnd(0), IR.Done))
         )
       )
       assertEquals(
         IRCompiler.compile(pattern2),
         Success(
           IR(
-            pattern2,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.WordBoundaryNot, IR.CapEnd(0), IR.Done)
@@ -693,13 +661,12 @@ class IRCompilerSuite extends munit.FunSuite {
       val pattern2 = Pattern(LineBegin, flagSet2)
       assertEquals(
         IRCompiler.compile(pattern1),
-        Success(IR(pattern1, 0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.CapEnd(0), IR.Done)))
+        Success(IR(0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.CapEnd(0), IR.Done)))
       )
       assertEquals(
         IRCompiler.compile(pattern2),
         Success(
           IR(
-            pattern2,
             0,
             Map.empty,
             IndexedSeq(IR.ForkNext(2), IR.Any, IR.Jump(-3), IR.CapBegin(0), IR.LineBegin, IR.CapEnd(0), IR.Done)
@@ -714,14 +681,13 @@ class IRCompilerSuite extends munit.FunSuite {
       assertEquals(
         IRCompiler.compile(pattern1),
         Success(
-          IR(pattern1, 0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.InputEnd, IR.CapEnd(0), IR.Done))
+          IR(0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.InputEnd, IR.CapEnd(0), IR.Done))
         )
       )
       assertEquals(
         IRCompiler.compile(pattern2),
         Success(
           IR(
-            pattern2,
             0,
             Map.empty,
             IndexedSeq(IR.ForkNext(2), IR.Any, IR.Jump(-3), IR.CapBegin(0), IR.LineEnd, IR.CapEnd(0), IR.Done)
@@ -738,7 +704,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern1),
         Success(
           IR(
-            pattern1,
             0,
             Map.empty,
             IndexedSeq(
@@ -759,7 +724,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern2),
         Success(
           IR(
-            pattern2,
             0,
             Map.empty,
             IndexedSeq(
@@ -783,7 +747,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern3),
         Success(
           IR(
-            pattern3,
             0,
             Map.empty,
             IndexedSeq(
@@ -814,7 +777,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern1),
         Success(
           IR(
-            pattern1,
             0,
             Map.empty,
             IndexedSeq(
@@ -837,7 +799,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern2),
         Success(
           IR(
-            pattern2,
             0,
             Map.empty,
             IndexedSeq(
@@ -863,7 +824,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern3),
         Success(
           IR(
-            pattern3,
             0,
             Map.empty,
             IndexedSeq(
@@ -895,19 +855,19 @@ class IRCompilerSuite extends munit.FunSuite {
       assertEquals(
         IRCompiler.compile(pattern1),
         Success(
-          IR(pattern1, 0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Char('a'), IR.CapEnd(0), IR.Done))
+          IR(0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Char('a'), IR.CapEnd(0), IR.Done))
         )
       )
       assertEquals(
         IRCompiler.compile(pattern2),
         Success(
-          IR(pattern2, 0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Char('A'), IR.CapEnd(0), IR.Done))
+          IR(0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Char('A'), IR.CapEnd(0), IR.Done))
         )
       )
       assertEquals(
         IRCompiler.compile(pattern3),
         Success(
-          IR(pattern3, 0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Char('a'), IR.CapEnd(0), IR.Done))
+          IR(0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Char('a'), IR.CapEnd(0), IR.Done))
         )
       )
     }
@@ -923,7 +883,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern1),
         Success(
           IR(
-            pattern1,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Class(IChar('a')), IR.CapEnd(0), IR.Done)
@@ -934,7 +893,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern2),
         Success(
           IR(
-            pattern2,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.ClassNot(IChar('a')), IR.CapEnd(0), IR.Done)
@@ -945,7 +903,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern3),
         Success(
           IR(
-            pattern3,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Class(IChar('A')), IR.CapEnd(0), IR.Done)
@@ -956,7 +913,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern4),
         Success(
           IR(
-            pattern4,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Class(IChar('a')), IR.CapEnd(0), IR.Done)
@@ -973,7 +929,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern1),
         Success(
           IR(
-            pattern1,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Class(IChar.Digit), IR.CapEnd(0), IR.Done)
@@ -984,7 +939,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern2),
         Success(
           IR(
-            pattern2,
             0,
             Map.empty,
             IndexedSeq(
@@ -1001,7 +955,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern3),
         Success(
           IR(
-            pattern3,
             0,
             Map.empty,
             IndexedSeq(
@@ -1023,7 +976,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern1),
         Success(
           IR(
-            pattern1,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Dot, IR.CapEnd(0), IR.Done)
@@ -1034,7 +986,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern2),
         Success(
           IR(
-            pattern2,
             0,
             Map.empty,
             IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.Any, IR.CapEnd(0), IR.Done)
@@ -1051,7 +1002,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern1),
         Success(
           IR(
-            pattern1,
             1,
             Map.empty,
             IndexedSeq(
@@ -1071,7 +1021,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern2),
         Success(
           IR(
-            pattern2,
             1,
             Map.empty,
             IndexedSeq(
@@ -1107,7 +1056,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern1),
         Success(
           IR(
-            pattern1,
             1,
             Map("x" -> 1),
             IndexedSeq(
@@ -1127,7 +1075,6 @@ class IRCompilerSuite extends munit.FunSuite {
         IRCompiler.compile(pattern2),
         Success(
           IR(
-            pattern2,
             1,
             Map("x" -> 1),
             IndexedSeq(

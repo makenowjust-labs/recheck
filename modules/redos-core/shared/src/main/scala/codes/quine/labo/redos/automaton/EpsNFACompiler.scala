@@ -126,8 +126,8 @@ object EpsNFACompiler {
               val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
               val chs = atom match {
                 // CharacterClass's inversion should be done here.
-                case CharacterClass(invert, _) if invert => alphabet.chars.toSet.diff(alphabet.refine(ch).toSet)
-                case _                                   => alphabet.refine(ch).toSet
+                case CharacterClass(invert, _) if invert => alphabet.refineInvert(ch)
+                case _                                   => alphabet.refine(ch)
               }
               val i = nextQ()
               val a = nextQ()

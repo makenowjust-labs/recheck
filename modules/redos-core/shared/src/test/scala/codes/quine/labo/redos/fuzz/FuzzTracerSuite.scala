@@ -4,7 +4,6 @@ package fuzz
 import backtrack.IR
 import backtrack.VM
 import data.UString
-import regexp.Pattern
 import util.Timeout
 import FString._
 
@@ -18,7 +17,6 @@ class FuzzTracerSuite extends munit.FunSuite {
   }
 
   val ir1: IR = IR(
-    Pattern(Pattern.Sequence(Seq.empty), Pattern.FlagSet(false, false, false, false, false, false)),
     0,
     Map.empty,
     IndexedSeq(
@@ -32,7 +30,6 @@ class FuzzTracerSuite extends munit.FunSuite {
   )
 
   val ir2: IR = IR(
-    Pattern(Pattern.Repeat(false, 3, None, Pattern.Dot), Pattern.FlagSet(false, false, false, true, false, false)),
     0,
     Map.empty,
     IndexedSeq(
@@ -47,10 +44,6 @@ class FuzzTracerSuite extends munit.FunSuite {
   )
 
   val ir3: IR = IR(
-    Pattern(
-      Pattern.Plus(false, Pattern.Star(false, Pattern.Dot)),
-      Pattern.FlagSet(false, false, false, true, false, false)
-    ),
     0,
     Map.empty,
     IndexedSeq(

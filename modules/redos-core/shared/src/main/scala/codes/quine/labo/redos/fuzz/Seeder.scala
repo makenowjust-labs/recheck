@@ -6,16 +6,14 @@ import scala.collection.mutable
 
 import backtrack.IR
 import backtrack.VM
-import data.IChar
-import data.ICharSet
-import data.UString
+import data.{IChar, ICharSet, UString}
 import util.Timeout
 
 /** Seeder computes a seed set for the pattern. */
 object Seeder {
 
-  /** Computes a seed set of the IR with its alphabet. */
-  def seed(ir: IR, alphabet: ICharSet, limit: Int = 10_000, maxSeedSetSize: Int = 100)(implicit
+  /** Computes a seed set of the context. */
+  def seed(ctx: FuzzContext, limit: Int = 10_000, maxSeedSetSize: Int = 100)(implicit
       timeout: Timeout = Timeout.NoTimeout
   ): Set[FString] = {
     val set = mutable.Set.empty[FString]
@@ -24,7 +22,7 @@ object Seeder {
     val covered = mutable.Set.empty[(Int, Seq[Int], Boolean)]
 
     queue.enqueue(UString.empty)
-    for (ch <- alphabet.chars) {
+    for (ch <- ctx.alphabet.chars) {
       val s = UString(IndexedSeq(ch.head))
       queue.enqueue(s)
       added.add(s)
@@ -33,8 +31,8 @@ object Seeder {
     while (queue.nonEmpty && set.size < maxSeedSetSize) {
       val input = queue.dequeue()
 
-      val t = new SeedTracer(ir, input, limit, timeout)
-      try VM.execute(ir, input, 0, t)
+      val t = new SeedTracer(ctx, input, limit, timeout)
+      try VM.execute(ctx.ir, input, 0, t)
       catch {
         case _: LimitException =>
           // When execution reaches the limit, it is possibly vulnerable.
@@ -53,7 +51,7 @@ object Seeder {
         covered.addAll(coverage)
         for (((pc, cnts), patch) <- patches) {
           if (!covered.contains((pc, cnts, false))) {
-            for (patched <- patch.apply(input, alphabet); if !added.contains(patched)) {
+            for (patched <- patch.apply(input); if !added.contains(patched)) {
               queue.enqueue(patched)
               added.add(patched)
             }
@@ -67,29 +65,34 @@ object Seeder {
 
   /** Patch is a patch to reach a new pc. */
   private[fuzz] sealed abstract class Patch extends Serializable with Product {
-    def apply(s: UString, alphabet: ICharSet): Seq[UString]
+    def apply(s: UString): Seq[UString]
   }
 
   /** Patch types. */
   private[fuzz] object Patch {
 
-    /** InsertChar is a patch to insert a character at the `pos`. */
-    final case class InsertChar(pos: Int, ch: IChar) extends Patch {
-      def apply(s: UString, alphabet: ICharSet): Seq[UString] =
-        alphabet.refine(ch).map(_.head).flatMap(c => Seq(s.insertAt(pos, c), s.replaceAt(pos, c)))
+    /** InsertChar is a patch to insert each characters at the `pos`. */
+    final case class InsertChar(pos: Int, chs: Set[IChar]) extends Patch {
+      def apply(s: UString): Seq[UString] =
+        chs.toSeq.map(_.head).flatMap(c => Seq(s.insertAt(pos, c), s.replaceAt(pos, c)))
     }
 
     /** InsertString is a patch to insert a string at the `pos`. */
     final case class InsertString(pos: Int, s: UString) extends Patch {
-      def apply(t: UString, alphabet: ICharSet): Seq[UString] =
+      def apply(t: UString): Seq[UString] =
         Seq(t.insert(pos, s))
     }
   }
 
   /** SeedTracer is a tracer implementation for the seeder. */
-  private[fuzz] class SeedTracer(ir: IR, input: UString, limit: Int, timeout: Timeout)
-      extends FuzzTracer(ir, input, limit, timeout) {
+  private[fuzz] class SeedTracer(ctx: FuzzContext, input: UString, limit: Int, timeout: Timeout)
+      extends FuzzTracer(ctx.ir, input, limit, timeout) {
+
+    /** A mutable data of [[patches]]. */
     private[this] val patchesMap: mutable.Map[(Int, Seq[Int]), Patch] = mutable.Map.empty
+
+    /*: An alias to `pattern.alphabet`. */
+    private def alphabet: ICharSet = ctx.alphabet
 
     /** A map from pc to patch. */
     def patches(): Map[(Int, Seq[Int]), Patch] = patchesMap.toMap
@@ -102,7 +105,7 @@ object Seeder {
       def addPatch(pc: Int): Unit = ir.codes(pc) match {
         case IR.Any =>
           if (backtrack) {
-            patchesMap((pc, cnts)) = Patch.InsertChar(pos, IChar.dot(ir.ignoreCase, true, ir.unicode))
+            patchesMap((pc, cnts)) = Patch.InsertChar(pos, alphabet.any)
           }
         case IR.Back =>
           if (backtrack) {
@@ -112,20 +115,19 @@ object Seeder {
           }
         case IR.Char(c) =>
           if (backtrack) {
-            patchesMap((pc, cnts)) = Patch.InsertChar(pos, IChar(c))
+            patchesMap((pc, cnts)) = Patch.InsertChar(pos, Set(IChar(c)))
           }
         case IR.Class(s) =>
           if (backtrack) {
-            patchesMap((pc, cnts)) = Patch.InsertChar(pos, s)
+            patchesMap((pc, cnts)) = Patch.InsertChar(pos, alphabet.refine(s))
           }
         case IR.ClassNot(s) =>
           if (backtrack) {
-            val any = IChar.dot(ir.ignoreCase, true, ir.unicode)
-            patchesMap((pc, cnts)) = Patch.InsertChar(pos, any.diff(s))
+            patchesMap((pc, cnts)) = Patch.InsertChar(pos, alphabet.refineInvert(s))
           }
         case IR.Dot =>
           if (backtrack) {
-            patchesMap((pc, cnts)) = Patch.InsertChar(pos, IChar.dot(ir.ignoreCase, false, ir.unicode))
+            patchesMap((pc, cnts)) = Patch.InsertChar(pos, alphabet.dot)
           }
         case IR.Ref(n) =>
           if (backtrack) {

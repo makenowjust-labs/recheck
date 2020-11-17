@@ -3,7 +3,6 @@ package fuzz
 
 import scala.util.Random
 
-import backtrack.IRCompiler
 import regexp.Parser
 
 class FuzzCheckerSuite extends munit.FunSuite {
@@ -15,9 +14,8 @@ class FuzzCheckerSuite extends munit.FunSuite {
   def check(source: String, flags: String, maxAttackSize: Int = 10_000): Boolean = {
     val result = for {
       pattern <- Parser.parse(source, flags)
-      alphabet <- pattern.alphabet
-      ir <- IRCompiler.compile(pattern)
-    } yield FuzzChecker.check(ir, alphabet, Seeder.seed(ir, alphabet), random0, maxAttackSize = maxAttackSize)
+      ctx <- FuzzContext.from(pattern)
+    } yield FuzzChecker.check(ctx, random0, maxAttackSize = maxAttackSize)
     result.get.isDefined
   }
 
