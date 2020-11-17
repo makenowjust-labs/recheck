@@ -321,13 +321,17 @@ private[fuzz] final class FuzzChecker(
       None
     }
 
-    /** Adds an IR execution result. */
+    /** Records an IR execution result. */
     def add(str: FString, t: FuzzTracer): Unit = {
       inputs.add(t.input)
 
+      val newStr = random.between(0, 2) match {
+        case 0 => str
+        case 1 => t.buildFString()
+      }
       val rate = t.rate()
       val coverage = t.coverage()
-      val trace = Trace(str, rate, t.steps, coverage)
+      val trace = Trace(newStr, rate, t.steps, coverage)
 
       if (
         t.input.size < maxAttackSize && !set.contains(trace) && (init || rate >= minRate || !coverage.subsetOf(visited))
