@@ -1,13 +1,13 @@
 package codes.quine.labo.redos
 
-/** RedosException is a base exception class. */
-class RedosException(message: String) extends Exception(message)
+/** ReDoSException is a base exception class. */
+sealed abstract class ReDoSException(message: String) extends Exception(message)
+
+/** TimeoutException is an exception thrown on timeout. */
+final class TimeoutException(message: String) extends ReDoSException(message)
 
 /** UnsupportedException is an exception thrown when unsupported feature is detected. */
-class UnsupportedException(message: String) extends Exception(message)
+final class UnsupportedException(message: String) extends ReDoSException(message)
 
 /** InvalidRegExpException is an exception thrown when regexp is invalid. */
-class InvalidRegExpException(message: String) extends Exception(message)
-
-/** LimitException is an exception thrown when VM execution step exceeds a limit. */
-class LimitException(message: String) extends Exception(message)
+final class InvalidRegExpException(message: String) extends ReDoSException(message)

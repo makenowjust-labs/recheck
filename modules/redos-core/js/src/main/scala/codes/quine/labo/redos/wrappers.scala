@@ -1,10 +1,14 @@
 package codes.quine.labo.redos
 
+import scala.concurrent.duration._
+import scala.util.Random
+
 import scalajs.js
 import scalajs.js.JSConverters._
 import automaton.Complexity
 import automaton.Witness
 import data.IChar
+import util.Timeout
 
 /** DiagnosticsJS is a JS wrapper for Diagnostics. */
 trait DiagnosticsJS extends js.Object {
@@ -35,7 +39,7 @@ object DiagnosticsJS {
       js.Dynamic
         .literal(
           status = "vulnerable",
-          attack = IStringJS.from(a),
+          attack = a.asString,
           complexity = c.map(ComplexityJS.from(_)).orUndefined
         )
         .asInstanceOf[DiagnosticsJS]
@@ -112,7 +116,7 @@ object PumpJS {
 /** IString (`Seq[IChar]`) utilities. */
 object IStringJS {
 
-  /** Constructs a Strinig from the actual IString. */
+  /** Constructs a String from the actual IString. */
   def from(seq: Seq[IChar]): String = seq.map(_.head.asString).mkString
 }
 
@@ -136,5 +140,91 @@ object ErrorKindJS {
       js.Dynamic.literal(kind = "unsupported", message = msg).asInstanceOf[ErrorKindJS]
     case Diagnostics.ErrorKind.InvalidRegExp(msg) =>
       js.Dynamic.literal(kind = "invalid", message = msg).asInstanceOf[ErrorKindJS]
+  }
+}
+
+/** ConfigJS is a JS wrapper for Config. */
+trait ConfigJS extends js.Object {
+
+  /** A timeout duration in a check. */
+  def timeout: js.UndefOr[Int]
+
+  /** A checker to use. */
+  def checker: js.UndefOr[String]
+
+  /** A maximum size of an attack string. */
+  def maxAttackSize: js.UndefOr[Int]
+
+  /** A limit of VM execution steps on attack string construction. */
+  def attackLimit: js.UndefOr[Int]
+
+  /** A ratio of a VM step and a NFA transition. */
+  def stepRate: js.UndefOr[Double]
+
+  /** A seed value for random instance. */
+  def randomSeed: js.UndefOr[Int]
+
+  /** A limit of VM execution steps on seeding. */
+  def seedLimit: js.UndefOr[Int]
+
+  /** A limit of VM execution steps on population. */
+  def populationLimit: js.UndefOr[Int]
+
+  /** A size to compute crossing. */
+  def crossSize: js.UndefOr[Int]
+
+  /** A size to compute mutation. */
+  def mutateSize: js.UndefOr[Int]
+
+  /** A maximum size of a initial seed set. */
+  def maxSeedSize: js.UndefOr[Int]
+
+  /** A maximum size of a population on a generation. */
+  def maxGenerationSize: js.UndefOr[Int]
+
+  /** A maximum iteration number of GA. */
+  def maxIteration: js.UndefOr[Int]
+
+  /** A maximum number of sum of repeat counts like `/a{10}/`.
+    * If this value is exceeded, it switches to use fuzzing based checker.
+    */
+  def maxRepeatCount: js.UndefOr[Int]
+
+  /** A maximum transition size of NFA to use the automaton based checker.
+    * If this value is exceeded, it switches to use fuzzing based checker.
+    */
+  def maxNFASize: js.UndefOr[Int]
+}
+
+/** ConfigJS utilities. */
+object ConfigJS {
+
+  /** Constructs a Config instance from ConfigJS object. */
+  def from(config: ConfigJS): Config = {
+    val timeout = Timeout.from(config.timeout.map(_.milli).getOrElse(Duration.Inf))
+    val checker = config.checker.getOrElse("hybrid") match {
+      case "hybrid"    => Checker.Hybrid
+      case "automaton" => Checker.Automaton
+      case "fuzz"      => Checker.Fuzz
+    }
+    val random = config.randomSeed.map(new Random(_)).getOrElse(Random)
+
+    Config(
+      timeout,
+      checker,
+      config.maxAttackSize.getOrElse(Config.MaxAttackSize),
+      config.attackLimit.getOrElse(Config.AttackLimit),
+      config.stepRate.getOrElse(Config.StepRate),
+      random,
+      config.seedLimit.getOrElse(Config.SeedLimit),
+      config.populationLimit.getOrElse(Config.PopulationLimit),
+      config.crossSize.getOrElse(Config.CrossSize),
+      config.mutateSize.getOrElse(Config.MutateSize),
+      config.maxSeedSize.getOrElse(Config.MaxSeedSize),
+      config.maxGenerationSize.getOrElse(Config.MaxGenerationSize),
+      config.maxIteration.getOrElse(Config.MaxIteration),
+      config.maxRepeatCount.getOrElse(Config.MaxRepeatCount),
+      config.maxNFASize.getOrElse(Config.MaxNFASize)
+    )
   }
 }

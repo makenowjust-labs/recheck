@@ -2,6 +2,7 @@ package codes.quine.labo.redos
 package backtrack
 
 import regexp.Parser
+import Tracer.LimitException
 
 class EngineSuite extends munit.FunSuite {
 

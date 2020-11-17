@@ -1,8 +1,8 @@
 package codes.quine.labo.redos
 
 class ExceptionsSuite extends munit.FunSuite {
-  test("RedosException#getMessage") {
-    assertEquals(new RedosException("message").getMessage, "message")
+  test("TimeoutException#getMessage") {
+    assertEquals(new TimeoutException("message").getMessage, "message")
   }
 
   test("UnsupportedException#getMessage") {

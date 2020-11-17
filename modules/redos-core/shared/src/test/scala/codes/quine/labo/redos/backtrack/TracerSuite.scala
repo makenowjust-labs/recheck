@@ -2,6 +2,7 @@ package codes.quine.labo.redos
 package backtrack
 
 import util.Timeout
+import Tracer.LimitException
 
 class TracerSuite extends munit.FunSuite {
   test("Tracer.LimitTracer") {

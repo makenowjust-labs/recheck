@@ -20,6 +20,9 @@ trait Tracer {
 /** Tracer instances. */
 object Tracer {
 
+  /** LimitException is an exception thrown when VM execution step exceeds a limit. */
+  class LimitException(message: String) extends Exception(message)
+
   /** LimitTracer is a tracer implementation which can trace execution on a limit.
     * When an execution step exceeds the limit, it throws [[LimitException]].
     */

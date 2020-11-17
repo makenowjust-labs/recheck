@@ -10,11 +10,12 @@ import org.scalajs.dom.html.Input
 import org.scalajs.dom.html.Paragraph
 import org.scalajs.dom.raw.Event
 
-import scalajs.js.JSON
 import Diagnostics._
 import automaton.Complexity._
 import automaton.Witness
 import data.IChar
+import data.UString
+import util.Timeout
 
 /** DemoApp is an implementation of demo application in the top page. */
 object DemoApp {
@@ -36,7 +37,7 @@ object DemoApp {
     checkButton.addEventListener("click", (_: Event) => check())
   }
 
-  /** A callback function on `checkButon` clicked. */
+  /** A callback function on `checkButton` clicked. */
   def check(): Unit = {
     val input = regexpInput.value
     val (source, flags) = input match {
@@ -46,7 +47,7 @@ object DemoApp {
         return
     }
 
-    val result = ReDoS.check(source, flags, 5.second)
+    val result = ReDoS.check(source, flags, Config(timeout = Timeout.from(10.second)))
     val pattern = s"<code>/${escape(source)}/${escape(flags)}</code>"
     result match {
       case Safe(complexity) =>
@@ -58,19 +59,20 @@ object DemoApp {
           case None =>
             resultArea.innerHTML = s"$pattern is safe."
         }
-      case Vulnerable(_, complexity) =>
+      case Vulnerable(attack, complexity) =>
         val unsafe = "<span class='has-text-danger has-text-weight-bold is-uppercase'>unsafe</span>"
         complexity match {
           case Some(Exponential(w)) =>
             resultArea.innerHTML = s"$pattern is $unsafe (exponential-time matching).<br>"
-            val ws = witness(w).take(3).map { s => s"<code>${escape(JSON.stringify(s))}</code>" }
+            val ws = witness(w).take(3).map { s => s"<code>${escape(s.toString)}</code>" }
             resultArea.innerHTML ++= s"Example attack strings: ${ws.mkString(", ")}, ..."
           case Some(Polynomial(d, w)) =>
             resultArea.innerHTML = s"$pattern is $unsafe ($d${ordinal(d)} degree polynomial-time matching).<br>"
-            val ws = witness(w).take(3).map { s => s"<code>${escape(JSON.stringify(s))}</code>" }
+            val ws = witness(w).take(3).map { s => s"<code>${escape(s.toString)}</code>" }
             resultArea.innerHTML ++= s"Example attack strings: ${ws.mkString(", ")}, ..."
           case None =>
-            resultArea.innerHTML = s"$pattern is $unsafe."
+            resultArea.innerHTML = s"$pattern is $unsafe.<br>"
+            resultArea.innerHTML ++= s"Example attack string: <code>${attack.toString}</code>"
         }
       case Unknown(err) =>
         resultArea.innerHTML = s"Error: $err"
@@ -87,10 +89,14 @@ object DemoApp {
     }
 
   /** Constructs a witness strings. */
-  def witness(w: Witness[IChar]): LazyList[String] =
-    w.map(_.head.asString).toLazyList.map(_.mkString).drop(1)
+  def witness(w: Witness[IChar]): LazyList[UString] =
+    w.map(_.head).toLazyList.map(s => UString(s.toIndexedSeq))
 
   /** Returns an HTML escaped string. */
   def escape(s: String): String =
-    s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#039;")
+    s.replace("&", "&amp;")
+      .replace("<", "&lt;")
+      .replace(">", "&gt;")
+      .replace("\"", "&quot;")
+      .replace("'", "&#039;")
 }

@@ -8,6 +8,7 @@ import scala.util.Random
 import FuzzChecker._
 import backtrack.IR
 import backtrack.Tracer.LimitTracer
+import backtrack.Tracer.LimitException
 import backtrack.VM
 import data.ICharSet
 import data.UString

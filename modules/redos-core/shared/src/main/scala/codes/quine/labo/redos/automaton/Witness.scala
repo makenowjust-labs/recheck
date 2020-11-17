@@ -16,6 +16,12 @@ final case class Witness[A](pumps: Seq[(Seq[A], Seq[A])], suffix: Seq[A]) {
   def buildAttack(n: Int): Seq[A] =
     pumps.flatMap { case (pre, pump) => pre ++ Vector.fill(n)(pump).flatten } ++ suffix
 
+  /** A sum of a repeat part size. */
+  def repeatSize: Int = pumps.map(_._2.size).sum
+
+  /** A sum of a fixed part size. */
+  def fixedSize: Int = pumps.map(_._1.size).sum + suffix.size
+
   /** Constructs a witness strings.
     *
     * This result's `n`-th element means `n` times repeated sequence.

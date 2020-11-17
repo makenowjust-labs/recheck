@@ -6,6 +6,7 @@ import automaton.Complexity
 import automaton.Witness
 import data.IChar
 import data.UChar
+import data.UString
 
 class WrappersSuite extends munit.FunSuite {
   test("DiagnosticsJS.from") {
@@ -21,7 +22,9 @@ class WrappersSuite extends munit.FunSuite {
     val w = Witness(Seq((Seq(IChar('a')), Seq(IChar('b')))), Seq(IChar('c')))
     val j = js.Dynamic.literal(pumps = js.Array(js.Dynamic.literal(prefix = "a", pump = "b")), suffix = "c")
     assertEquals(
-      JSON.stringify(DiagnosticsJS.from(Diagnostics.Vulnerable(Seq(IChar('a')), Some(Complexity.Exponential(w))))),
+      JSON.stringify(
+        DiagnosticsJS.from(Diagnostics.Vulnerable(UString.from("a", false), Some(Complexity.Exponential(w))))
+      ),
       JSON.stringify(
         js.Dynamic.literal(
           status = "vulnerable",
@@ -91,5 +94,16 @@ class WrappersSuite extends munit.FunSuite {
       JSON.stringify(ErrorKindJS.from(Diagnostics.ErrorKind.InvalidRegExp("foo"))),
       JSON.stringify(js.Dynamic.literal(kind = "invalid", message = "foo"))
     )
+  }
+
+  test("ConfigJS.from") {
+    assertEquals(ConfigJS.from(js.Dynamic.literal().asInstanceOf[ConfigJS]), Config())
+
+    assertEquals(ConfigJS.from(js.Dynamic.literal(checker = "hybrid").asInstanceOf[ConfigJS]).checker, Checker.Hybrid)
+    assertEquals(
+      ConfigJS.from(js.Dynamic.literal(checker = "automaton").asInstanceOf[ConfigJS]).checker,
+      Checker.Automaton
+    )
+    assertEquals(ConfigJS.from(js.Dynamic.literal(checker = "fuzz").asInstanceOf[ConfigJS]).checker, Checker.Fuzz)
   }
 }

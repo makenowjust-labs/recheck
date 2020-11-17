@@ -6,6 +6,7 @@ import scala.collection.mutable
 import data.IChar
 import data.UChar
 import data.UString
+import Tracer.LimitException
 
 class VMSuite extends munit.FunSuite {
   test("VM.execute: trace limit") {

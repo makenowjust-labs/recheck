@@ -6,6 +6,7 @@ import scala.collection.mutable
 
 import backtrack.IR
 import backtrack.VM
+import backtrack.Tracer.LimitException
 import data.{IChar, ICharSet, UString}
 import util.Timeout
 
