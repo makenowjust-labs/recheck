@@ -48,7 +48,7 @@ class ICharSetSuite extends munit.FunSuite {
     assertEquals(
       set.refineInvert(IChar(IntervalSet((UChar('A'), UChar('Z' + 1))), false, true)),
       Set(
-        IChar(IntervalSet((UChar(0x00), UChar('A')), (UChar('Z' + 1), UChar(0x10000))), false, false),
+        IChar(IntervalSet((UChar(0x00), UChar('A')), (UChar('Z' + 1), UChar(0x10000))), false, false)
       )
     )
   }
