@@ -21,7 +21,7 @@ object VM {
       pos: Int,
       tracer: Tracer = Tracer.NoTracer()
   ): Option[Match] =
-    new VM(ir, input, pos, tracer).execute()
+    tracer.checkTimeout("backtrack.VM.execute")(new VM(ir, input, pos, tracer).execute())
 }
 
 /** VM is a RegExp matching VM. */
@@ -31,6 +31,8 @@ private[backtrack] final class VM(
     initPos: Int,
     private[this] val tracer: Tracer = Tracer.NoTracer()
 ) {
+
+  import tracer._
 
   /** An execution process list (stack). */
   private[backtrack] val procs: mutable.Stack[Proc] = {
@@ -46,7 +48,7 @@ private[backtrack] final class VM(
   }
 
   /** Executes this VM. */
-  def execute(): Option[Match] = {
+  def execute(): Option[Match] = checkTimeout("backtrack.VM#execute") {
     while (procs.nonEmpty)
       step() match {
         case Some(m) => return Some(m)
@@ -56,7 +58,7 @@ private[backtrack] final class VM(
   }
 
   /** Runs this VM in a step. */
-  private[backtrack] def step(): Option[Match] = {
+  private[backtrack] def step(): Option[Match] = checkTimeout("backtrack.VM#step") {
     val proc = procs.top
     val code = ir.codes(proc.pc)
     var backtrack = false

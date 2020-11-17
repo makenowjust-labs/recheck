@@ -15,20 +15,24 @@ object Seeder {
   /** Computes a seed set of the context. */
   def seed(ctx: FuzzContext, limit: Int = 10_000, maxSeedSetSize: Int = 100)(implicit
       timeout: Timeout = Timeout.NoTimeout
-  ): Set[FString] = {
+  ): Set[FString] = timeout.checkTimeout("fuzz.Seeder.seed") {
+    import timeout._
+
     val set = mutable.Set.empty[FString]
     val added = mutable.Set.empty[UString]
     val queue = mutable.Queue.empty[UString]
     val covered = mutable.Set.empty[(Int, Seq[Int], Boolean)]
 
-    queue.enqueue(UString.empty)
-    for (ch <- ctx.alphabet.chars) {
-      val s = UString(IndexedSeq(ch.head))
-      queue.enqueue(s)
-      added.add(s)
+    checkTimeout("fuzz.Seeder.seed:init") {
+      queue.enqueue(UString.empty)
+      for (ch <- ctx.alphabet.chars) {
+        val s = UString(IndexedSeq(ch.head))
+        queue.enqueue(s)
+        added.add(s)
+      }
     }
 
-    while (queue.nonEmpty && set.size < maxSeedSetSize) {
+    while (queue.nonEmpty && set.size < maxSeedSetSize) checkTimeout("fuzz.Seeder.seed:loop") {
       val input = queue.dequeue()
 
       val t = new SeedTracer(ctx, input, limit, timeout)

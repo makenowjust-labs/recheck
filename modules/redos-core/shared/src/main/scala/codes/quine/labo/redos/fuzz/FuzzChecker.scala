@@ -30,20 +30,22 @@ object FuzzChecker {
       maxGenerationSize: Int = 100,
       maxIteration: Int = 30
   )(implicit timeout: Timeout = Timeout.NoTimeout): Option[FString] =
-    new FuzzChecker(
-      ctx,
-      random,
-      seedLimit,
-      populationLimit,
-      attackLimit,
-      crossSize,
-      mutateSize,
-      maxAttackSize,
-      maxSeedSize,
-      maxGenerationSize,
-      maxIteration,
-      timeout
-    ).check()
+    timeout.checkTimeout("fuzz.FuzzChecker.check")(
+      new FuzzChecker(
+        ctx,
+        random,
+        seedLimit,
+        populationLimit,
+        attackLimit,
+        crossSize,
+        mutateSize,
+        maxAttackSize,
+        maxSeedSize,
+        maxGenerationSize,
+        maxIteration,
+        timeout
+      ).check()
+    )
 
   /** Trace is a summary of IR execution. */
   private[fuzz] final case class Trace(str: FString, rate: Double, steps: Int, coverage: Set[(Int, Seq[Int], Boolean)])
@@ -73,6 +75,8 @@ private[fuzz] final class FuzzChecker(
     implicit val timeout: Timeout
 ) {
 
+  import timeout._
+
   /** An alias to `ctx.ir`. */
   def ir: IR = ctx.ir
 
@@ -83,7 +87,7 @@ private[fuzz] final class FuzzChecker(
   val parts: Seq[UString] = ctx.parts.toSeq
 
   /** Runs this fuzzer. */
-  def check(): Option[FString] = {
+  def check(): Option[FString] = checkTimeout("fuzz.FuzzChecker#check") {
     var gen = init() match {
       case Right(attack) => return Some(attack)
       case Left(gen)     => gen
@@ -100,7 +104,7 @@ private[fuzz] final class FuzzChecker(
   }
 
   /** Creates the initial generation from the seed set. */
-  def init(): Either[Generation, FString] = {
+  def init(): Either[Generation, FString] = checkTimeout("fuzz.FuzzChecker#init") {
     val seed = Seeder.seed(ctx, seedLimit, maxSeedSize)
     val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty, mutable.Set.empty, true)
     for (str <- seed) {
@@ -113,7 +117,7 @@ private[fuzz] final class FuzzChecker(
   }
 
   /** Iterates a generation. */
-  def iterate(gen: Generation): Either[Generation, FString] = {
+  def iterate(gen: Generation): Either[Generation, FString] = checkTimeout("fuzz.FuzzChecker#iterate") {
     val next = Population.from(gen)
 
     val crossing = (1 to crossSize).iterator.flatMap(_ => cross(gen, next))
@@ -123,7 +127,7 @@ private[fuzz] final class FuzzChecker(
   }
 
   /** Simulates a crossing. */
-  def cross(gen: Generation, next: Population): Option[FString] = {
+  def cross(gen: Generation, next: Population): Option[FString] = checkTimeout("fuzz.FuzzChecker#cross") {
     val i1 = random.between(0, gen.traces.size)
     val i2 = random.between(0, gen.traces.size)
 
@@ -138,7 +142,7 @@ private[fuzz] final class FuzzChecker(
   }
 
   /** Simulates a mutation. */
-  def mutate(gen: Generation, next: Population): Option[FString] = {
+  def mutate(gen: Generation, next: Population): Option[FString] = checkTimeout("fuzz.FuzzChecker#mutate") {
     val i = random.nextInt(mutators.size)
     mutators(i)(gen, next)
   }
@@ -154,7 +158,7 @@ private[fuzz] final class FuzzChecker(
   )
 
   /** A mutator to update a base repeat number. */
-  def mutateRepeat(gen: Generation, next: Population): Option[FString] = {
+  def mutateRepeat(gen: Generation, next: Population): Option[FString] = checkTimeout("fuzz.FuzzChecker#mutateRepeat") {
     val i = random.between(0, gen.traces.size)
     val t = gen.traces(i).str
     if (t.isConstant) return None
@@ -169,7 +173,7 @@ private[fuzz] final class FuzzChecker(
   }
 
   /** A mutator to insert a character or a repeat specifier. */
-  def mutateInsert(gen: Generation, next: Population): Option[FString] = {
+  def mutateInsert(gen: Generation, next: Population): Option[FString] = checkTimeout("fuzz.FuzzChecker#mutateInsert") {
     val i = random.nextInt(gen.traces.size)
     val t = gen.traces(i).str
 
@@ -191,29 +195,30 @@ private[fuzz] final class FuzzChecker(
   }
 
   /** A mutator to insert a part of the pattern (and a repeat specifier). */
-  def mutateInsertPart(gen: Generation, next: Population): Option[FString] = {
-    // Fallbacks when there is no part in the pattern.
-    if (parts.isEmpty) return mutateInsert(gen, next)
+  def mutateInsertPart(gen: Generation, next: Population): Option[FString] =
+    checkTimeout("fuzz.FuzzChecker#mutateInsertPart") {
+      // Fallbacks when there is no part in the pattern.
+      if (parts.isEmpty) return mutateInsert(gen, next)
 
-    val i = random.nextInt(gen.traces.size)
-    val t = gen.traces(i).str
+      val i = random.nextInt(gen.traces.size)
+      val t = gen.traces(i).str
 
-    val idx = random.between(0, parts.size)
-    val part = parts(idx).seq.map(FString.Wrap(_))
-    val fcs = random.between(0, 2) match {
-      case 0 => part
-      case 1 =>
-        val m = random.between(0, 10)
-        IndexedSeq(FString.Repeat(m, None, part.size)) ++ part
+      val idx = random.between(0, parts.size)
+      val part = parts(idx).seq.map(FString.Wrap(_))
+      val fcs = random.between(0, 2) match {
+        case 0 => part
+        case 1 =>
+          val m = random.between(0, 10)
+          IndexedSeq(FString.Repeat(m, None, part.size)) ++ part
+      }
+
+      val pos = random.between(0, t.size + 1)
+      val s = t.insert(pos, fcs)
+      next.execute(s)
     }
 
-    val pos = random.between(0, t.size + 1)
-    val s = t.insert(pos, fcs)
-    next.execute(s)
-  }
-
   /** A mutator to update a character or a repeat specifier. */
-  def mutateUpdate(gen: Generation, next: Population): Option[FString] = {
+  def mutateUpdate(gen: Generation, next: Population): Option[FString] = checkTimeout("fuzz.FuzzChecker#mutateUpdate") {
     val i = random.nextInt(gen.traces.size)
     val t = gen.traces(i).str
     if (t.isEmpty) return None
@@ -251,7 +256,7 @@ private[fuzz] final class FuzzChecker(
   }
 
   /** A mutator to copy a part of characters of a string. */
-  def mutateCopy(gen: Generation, next: Population): Option[FString] = {
+  def mutateCopy(gen: Generation, next: Population): Option[FString] = checkTimeout("fuzz.FuzzChecker#mutateCopy") {
     val i = random.nextInt(gen.traces.size)
     val t = gen.traces(i).str
     if (t.size < 2) return None
@@ -266,7 +271,7 @@ private[fuzz] final class FuzzChecker(
   }
 
   /** A mutator to delete a part of characters of a string. */
-  def mutateDelete(gen: Generation, next: Population): Option[FString] = {
+  def mutateDelete(gen: Generation, next: Population): Option[FString] = checkTimeout("fuzz.FuzzChecker#mutateDelete") {
     val i = random.nextInt(gen.traces.size)
     val t = gen.traces(i).str
 
@@ -279,7 +284,7 @@ private[fuzz] final class FuzzChecker(
   }
 
   /** Tries to construct an attack string. */
-  def tryAttack(str: FString): Option[FString] = {
+  def tryAttack(str: FString): Option[FString] = checkTimeout("fuzz.FuzzChecker#tryAttack") {
     @tailrec
     def loop(str: FString): Option[FString] = {
       val input = str.toUString

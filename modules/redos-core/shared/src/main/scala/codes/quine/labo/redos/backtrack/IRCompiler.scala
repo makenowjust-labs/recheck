@@ -5,91 +5,93 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-import codes.quine.labo.redos.backtrack.IR.CapBegin
-
 import data.IChar
 import data.UChar
 import regexp.Pattern
 import regexp.Pattern._
 import util.TryUtil
+import util.Timeout
 
 /** Compiler from RegExp pattern to VM IR. */
 object IRCompiler {
 
   /** Compiles the RegExp pattern to IR. */
-  def compile(pattern: Pattern): Try[IR] =
-    for {
+  def compile(pattern: Pattern)(implicit timeout: Timeout = Timeout.NoTimeout): Try[IR] =
+    timeout.checkTimeout("backtrack.IRCompiler.compile")(for {
       _ <- Try(()) // Ensures a `Try` context surely.
       capsSize = IRCompiler.capsSize(pattern)
       names <- IRCompiler.names(pattern)
       codes <- {
+        import timeout._
+
         val FlagSet(_, ignoreCase, multiline, dotAll, unicode, _) = pattern.flagSet
 
-        def loop(node: Node, forward: Boolean): Try[State] = node match {
-          case Disjunction(ns) =>
-            TryUtil.traverse(ns)(loop(_, forward)).map(_.reduceRight(_.union(_)))
-          case Sequence(ns) =>
-            TryUtil.traverse(if (forward) ns else ns.reverse)(loop(_, forward)).map { ss =>
-              ss.foldLeft(State(IndexedSeq.empty, false))(_.concat(_))
-            }
-          case Capture(index, n) =>
-            loop(n, forward).map(State.capture(index, _, forward))
-          case NamedCapture(index, _, n) =>
-            loop(n, forward).map(State.capture(index, _, forward))
-          case Group(n) => loop(n, forward)
-          case Star(nonGreedy, n) =>
-            loop(n, forward).map(State.many(nonGreedy, _))
-          case Plus(nonGreedy, n) =>
-            loop(n, forward).map(State.some(nonGreedy, _))
-          case Question(nonGreedy, n) =>
-            loop(n, forward).map(State.optional(nonGreedy, _))
-          case Repeat(_, min, None, n) =>
-            loop(n, forward).map(State.repeatN(min, _))
-          case Repeat(nonGreedy, min, Some(None), n) =>
-            loop(n, forward).map(s => State.repeatN(min, s).concat(State.many(nonGreedy, s)))
-          case Repeat(_, min, Some(Some(max)), _) if min > max =>
-            Failure(new InvalidRegExpException("out of order repetition quantifier"))
-          case Repeat(nonGreedy, min, Some(Some(max)), n) =>
-            loop(n, forward).map(s => State.repeatN(min, s).concat(State.repeatAtMost(max - min, nonGreedy, s)))
-          case WordBoundary(invert) =>
-            Success(State(IndexedSeq(if (invert) IR.WordBoundaryNot else IR.WordBoundary), false))
-          case LineBegin =>
-            Success(State(IndexedSeq(if (multiline) IR.LineBegin else IR.InputBegin), false))
-          case LineEnd =>
-            Success(State(IndexedSeq(if (multiline) IR.LineEnd else IR.InputEnd), false))
-          case LookAhead(negative, n) =>
-            loop(n, true).map(State.lookAround(negative, _))
-          case LookBehind(negative, n) =>
-            loop(n, false).map(State.lookAround(negative, _))
-          case Character(c0) =>
-            val c = if (ignoreCase) UChar.canonicalize(c0, unicode) else c0
-            Success(State.char(IR.Char(c), forward))
-          case node @ CharacterClass(invert, _) =>
-            node.toIChar(unicode).map { ch0 =>
-              val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
-              State.char(if (invert) IR.ClassNot(ch) else IR.Class(ch), forward)
-            }
-          case node: AtomNode =>
-            node.toIChar(unicode).map { ch0 =>
-              val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
-              State.char(IR.Class(ch), forward)
-            }
-          case Dot =>
-            Success(State.char(if (dotAll) IR.Any else IR.Dot, forward))
-          case BackReference(i) =>
-            if (i <= 0 || capsSize < i) Failure(new InvalidRegExpException("invalid back-reference"))
-            else Success(State(IndexedSeq(if (forward) IR.Ref(i) else IR.RefBack(i)), false))
-          case NamedBackReference(name) =>
-            names.get(name) match {
-              case Some(i) =>
-                Success(State(IndexedSeq(if (forward) IR.Ref(i) else IR.RefBack(i)), false))
-              case None => Failure(new InvalidRegExpException("invalid named back-reference"))
-            }
-        }
+        def loop(node: Node, forward: Boolean): Try[State] =
+          checkTimeout("backtrack.IRCompiler.compile:loop")(node match {
+            case Disjunction(ns) =>
+              TryUtil.traverse(ns)(loop(_, forward)).map(_.reduceRight(_.union(_)))
+            case Sequence(ns) =>
+              TryUtil.traverse(if (forward) ns else ns.reverse)(loop(_, forward)).map { ss =>
+                ss.foldLeft(State(IndexedSeq.empty, false))(_.concat(_))
+              }
+            case Capture(index, n) =>
+              loop(n, forward).map(State.capture(index, _, forward))
+            case NamedCapture(index, _, n) =>
+              loop(n, forward).map(State.capture(index, _, forward))
+            case Group(n) => loop(n, forward)
+            case Star(nonGreedy, n) =>
+              loop(n, forward).map(State.many(nonGreedy, _))
+            case Plus(nonGreedy, n) =>
+              loop(n, forward).map(State.some(nonGreedy, _))
+            case Question(nonGreedy, n) =>
+              loop(n, forward).map(State.optional(nonGreedy, _))
+            case Repeat(_, min, None, n) =>
+              loop(n, forward).map(State.repeatN(min, _))
+            case Repeat(nonGreedy, min, Some(None), n) =>
+              loop(n, forward).map(s => State.repeatN(min, s).concat(State.many(nonGreedy, s)))
+            case Repeat(_, min, Some(Some(max)), _) if min > max =>
+              Failure(new InvalidRegExpException("out of order repetition quantifier"))
+            case Repeat(nonGreedy, min, Some(Some(max)), n) =>
+              loop(n, forward).map(s => State.repeatN(min, s).concat(State.repeatAtMost(max - min, nonGreedy, s)))
+            case WordBoundary(invert) =>
+              Success(State(IndexedSeq(if (invert) IR.WordBoundaryNot else IR.WordBoundary), false))
+            case LineBegin =>
+              Success(State(IndexedSeq(if (multiline) IR.LineBegin else IR.InputBegin), false))
+            case LineEnd =>
+              Success(State(IndexedSeq(if (multiline) IR.LineEnd else IR.InputEnd), false))
+            case LookAhead(negative, n) =>
+              loop(n, true).map(State.lookAround(negative, _))
+            case LookBehind(negative, n) =>
+              loop(n, false).map(State.lookAround(negative, _))
+            case Character(c0) =>
+              val c = if (ignoreCase) UChar.canonicalize(c0, unicode) else c0
+              Success(State.char(IR.Char(c), forward))
+            case node @ CharacterClass(invert, _) =>
+              node.toIChar(unicode).map { ch0 =>
+                val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
+                State.char(if (invert) IR.ClassNot(ch) else IR.Class(ch), forward)
+              }
+            case node: AtomNode =>
+              node.toIChar(unicode).map { ch0 =>
+                val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
+                State.char(IR.Class(ch), forward)
+              }
+            case Dot =>
+              Success(State.char(if (dotAll) IR.Any else IR.Dot, forward))
+            case BackReference(i) =>
+              if (i <= 0 || capsSize < i) Failure(new InvalidRegExpException("invalid back-reference"))
+              else Success(State(IndexedSeq(if (forward) IR.Ref(i) else IR.RefBack(i)), false))
+            case NamedBackReference(name) =>
+              names.get(name) match {
+                case Some(i) =>
+                  Success(State(IndexedSeq(if (forward) IR.Ref(i) else IR.RefBack(i)), false))
+                case None => Failure(new InvalidRegExpException("invalid named back-reference"))
+              }
+          })
 
         loop(pattern.node, true).map(State.prelude(pattern.hasLineBeginAtBegin, _))
       }
-    } yield IR(capsSize, names, codes)
+    } yield IR(capsSize, names, codes))
 
   /** State is a compiling state. */
   private[backtrack] final case class State(codes: IndexedSeq[IR.OpCode], advance: Boolean) {
@@ -101,7 +103,7 @@ object IRCompiler {
         advance && that.advance
       )
 
-    /** Computes a concatination of two states. */
+    /** Computes a concatenation of two states. */
     def concat(that: State): State =
       State(codes ++ that.codes, advance || that.advance)
 
@@ -132,7 +134,7 @@ object IRCompiler {
     def capture(index: Int, state: State, forward: Boolean): State =
       State(
         if (forward) IndexedSeq(IR.CapBegin(index)) ++ state.codes ++ IndexedSeq(IR.CapEnd(index))
-        else IndexedSeq(IR.CapEnd(index)) ++ state.codes ++ IndexedSeq(CapBegin(index)),
+        else IndexedSeq(IR.CapEnd(index)) ++ state.codes ++ IndexedSeq(IR.CapBegin(index)),
         state.advance
       )
 
@@ -224,8 +226,8 @@ object IRCompiler {
   /** Computes a size of captures of the pattern. */
   private[backtrack] def capsSize(pattern: Pattern): Int = {
     def loop(node: Node): Int = node match {
-      case Disjunction(ns)       => ns.map(loop).foldLeft(0)(Math.max(_, _))
-      case Sequence(ns)          => ns.map(loop).foldLeft(0)(Math.max(_, _))
+      case Disjunction(ns)       => ns.map(loop).foldLeft(0)(Math.max)
+      case Sequence(ns)          => ns.map(loop).foldLeft(0)(Math.max)
       case Capture(i, n)         => Math.max(i, loop(n))
       case NamedCapture(i, _, n) => Math.max(i, loop(n))
       case Group(n)              => loop(n)
@@ -251,9 +253,9 @@ object IRCompiler {
 
     def loop(node: Node): Try[Map[String, Int]] = node match {
       case Disjunction(ns) =>
-        TryUtil.traverse(ns)(loop(_)).flatMap(_.foldLeft(Try(Map.empty[String, Int]))(merge(_, _)))
+        TryUtil.traverse(ns)(loop).flatMap(_.foldLeft(Try(Map.empty[String, Int]))(merge))
       case Sequence(ns) =>
-        TryUtil.traverse(ns)(loop(_)).flatMap(_.foldLeft(Try(Map.empty[String, Int]))(merge(_, _)))
+        TryUtil.traverse(ns)(loop).flatMap(_.foldLeft(Try(Map.empty[String, Int]))(merge))
       case Capture(_, n)                => loop(n)
       case NamedCapture(index, name, n) => loop(n).map(_ + (name -> index))
       case Group(n)                     => loop(n)

@@ -18,8 +18,8 @@ object FuzzContext {
 
   /** Builds a FuzzContext instance from the RegExp pattern. */
   def from(pattern: Pattern)(implicit timeout: Timeout = Timeout.NoTimeout): Try[FuzzContext] =
-    for {
+    timeout.checkTimeout("fuzz.FuzzContext.from")(for {
       ir <- IRCompiler.compile(pattern)
       alphabet <- pattern.alphabet
-    } yield FuzzContext(ir, alphabet, pattern.parts)
+    } yield FuzzContext(ir, alphabet, pattern.parts))
 }

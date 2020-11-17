@@ -17,7 +17,7 @@ object EpsNFACompiler {
 
   /** Compiles ECMA-262 RegExp into ε-NFA. */
   def compile(pattern: Pattern)(implicit timeout: Timeout = Timeout.NoTimeout): Try[EpsNFA[Int]] =
-    for {
+    timeout.checkTimeout("automaton.EpsNFACompiler.compile")(for {
       alphabet <- pattern.alphabet
       (stateSet, init, accept, tau) <- {
         import timeout._
@@ -33,7 +33,7 @@ object EpsNFACompiler {
         }
         val tau = Map.newBuilder[Int, Transition[Int]] // A transition function.
 
-        def loop(node: Node): Try[(Int, Int)] = checkTimeout("compile: loop")(node match {
+        def loop(node: Node): Try[(Int, Int)] = checkTimeout("automaton.EpsNFACompiler.compile:loop")(node match {
           case Disjunction(ns) =>
             TryUtil.traverse(ns)(loop(_)).map { ss =>
               val i = nextQ()
@@ -162,5 +162,5 @@ object EpsNFACompiler {
           ((0 until counterQ).toSet, i, a, tau.result())
         }
       }
-    } yield EpsNFA(alphabet, stateSet, init, accept, tau)
+    } yield EpsNFA(alphabet, stateSet, init, accept, tau))
 }

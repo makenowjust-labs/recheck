@@ -12,9 +12,12 @@ trait Tracer {
 
   /** Traces an execution. */
   def trace(pos: Int, pc: Int, backtrack: Boolean, capture: Int => Option[UString], cnts: Seq[Int]): Unit
+
+  /** An alias to `timeout.checkTimeout`. */
+  def checkTimeout[A](phase: String)(body: => A): A = timeout.checkTimeout(phase)(body)
 }
 
-/** Tracer instaances. */
+/** Tracer instances. */
 object Tracer {
 
   /** LimitTracer is a tracer implementation which can trace execution on a limit.
