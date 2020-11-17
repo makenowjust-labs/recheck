@@ -34,7 +34,7 @@ object Seeder {
       val input = queue.dequeue()
 
       val t = new SeedTracer(ir, input, limit, timeout)
-      try VM.execute(ir, input, 0, true, t)
+      try VM.execute(ir, input, 0, t)
       catch {
         case _: LimitException =>
           // When execution reaches the limit, it is possibly vulnerable.

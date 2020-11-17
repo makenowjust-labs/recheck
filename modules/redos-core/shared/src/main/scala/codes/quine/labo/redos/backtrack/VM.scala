@@ -17,10 +17,9 @@ object VM {
       ir: IR,
       input: UString,
       pos: Int,
-      skipCanonicalize: Boolean = false,
       tracer: Tracer = Tracer.NoTracer()
   ): Option[Match] =
-    new VM(ir, input, pos, skipCanonicalize, tracer).execute()
+    new VM(ir, input, pos, tracer).execute()
 
   /** Proc is a state of VM execution.
     *
@@ -59,7 +58,7 @@ object VM {
       } else None
 
     /** Returns a lambda from a capture index to capture string. */
-    def captures: Int => Option[UString] = capture(_)
+    def captures: Int => Option[UString] = capture
 
     /** Updates a begin position of the `n`-th capture. */
     def captureBegin(n: Int, pos: Int): Unit = caps.update(n * 2, pos)
@@ -92,13 +91,12 @@ private[backtrack] final class VM(
     private[this] val ir: IR,
     private[this] val input: UString,
     initPos: Int,
-    skipCanonicalize: Boolean = false,
     private[this] val tracer: Tracer = Tracer.NoTracer()
 ) {
 
   /** An execution process list (stack). */
   private[backtrack] val procs: mutable.Stack[Proc] = {
-    val canon = if (!skipCanonicalize && ir.ignoreCase) UString.canonicalize(input, ir.unicode) else input
+    val canon = if (ir.ignoreCase) UString.canonicalize(input, ir.unicode) else input
     val proc = new Proc(
       canon,
       ir.names,
@@ -169,7 +167,7 @@ private[backtrack] final class VM(
         proc.cnts(0) -= 1
       case Done =>
         // Use `input` instead of `proc.input` here,
-        // because `proc.input` is canonicalized.
+        // because `proc.input` is canonical.
         return Some(Match(input, proc.names, proc.caps.toIndexedSeq))
       case Dot =>
         proc.currentChar match {

@@ -13,7 +13,7 @@ class FuzzTracerSuite extends munit.FunSuite {
   /** Executes the IR with a tracer and returns the tracer. */
   def trace(ir: IR, input: UString): FuzzTracer = {
     val tracer = new FuzzTracer(ir, input, 10000, Timeout.NoTimeout)
-    VM.execute(ir, input, 0, true, tracer)
+    VM.execute(ir, input, 0, tracer)
     tracer
   }
 

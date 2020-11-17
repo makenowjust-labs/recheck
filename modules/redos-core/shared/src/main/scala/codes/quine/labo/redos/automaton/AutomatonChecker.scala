@@ -2,7 +2,6 @@ package codes.quine.labo.redos
 package automaton
 
 import scala.collection.mutable
-import scala.util.Try
 
 import Complexity._
 import automaton._
@@ -13,8 +12,8 @@ import util.Timeout
 object AutomatonChecker {
 
   /** Checks a match time complexity of the NFA. */
-  def check[A, Q](nfa: OrderedNFA[A, Q])(implicit timeout: Timeout = Timeout.NoTimeout): Try[Complexity[A]] =
-    Try(timeout.checkTimeout("automaton.AutomatonChecker")(new AutomatonChecker(nfa, timeout)).check())
+  def check[A, Q](nfa: OrderedNFA[A, Q])(implicit timeout: Timeout = Timeout.NoTimeout): Complexity[A] =
+    timeout.checkTimeout("automaton.AutomatonChecker")(new AutomatonChecker(nfa, timeout)).check()
 }
 
 /** AutomatonChecker is a ReDoS vulnerable RegExp checker based on automata theory. */

@@ -16,7 +16,7 @@ class AutomatonCheckerSuite extends munit.FunSuite {
       pattern <- Parser.parse(source, flags)
       epsNFA <- EpsNFACompiler.compile(pattern)
       nfa = epsNFA.toOrderedNFA.rename
-      result <- AutomatonChecker.check(nfa)
+      result <- Try(AutomatonChecker.check(nfa))
     } yield result
 
   test("AutomatonChecker.check: constant") {

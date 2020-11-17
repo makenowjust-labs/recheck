@@ -27,7 +27,7 @@ class VMSuite extends munit.FunSuite {
     )
     val ir = IR(Pattern(Dot, FlagSet(false, false, false, false, false, false)), 0, Map.empty, codes)
     val tracer = new Tracer.LimitTracer(1000) // 2^10 = 1024 > 1000
-    intercept[LimitException](VM.execute(ir, input, 0, false, tracer))
+    intercept[LimitException](VM.execute(ir, input, 0, tracer))
   }
 
   test("VM.execute: match") {
@@ -326,22 +326,6 @@ class VMSuite extends munit.FunSuite {
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.input, UString.canonicalize(input, true))
-    assertEquals(vm.procs.top.names, Map.empty[String, Int])
-    assertEquals(vm.procs.top.caps, mutable.IndexedSeq.fill(2)(-1))
-    assertEquals(vm.procs.top.poses, mutable.Stack.empty[Int])
-    assertEquals(vm.procs.top.cnts, mutable.Stack.empty[Int])
-    assertEquals(vm.procs.top.procs, mutable.Stack.empty[Int])
-    assertEquals(vm.procs.top.pos, 1)
-    assertEquals(vm.procs.top.pc, 0)
-  }
-
-  test("VM: initial proc (ignore-case + skip-canonicalize)") {
-    val input = UString.from("xyz012XYZ", false)
-    val ir =
-      IR(Pattern(Dot, FlagSet(false, true, false, false, false, false)), 0, Map.empty, IndexedSeq(IR.Dot, IR.Done))
-    val vm = new VM(ir, input, 1, true)
-    assertEquals(vm.procs.size, 1)
-    assertEquals(vm.procs.top.input, input)
     assertEquals(vm.procs.top.names, Map.empty[String, Int])
     assertEquals(vm.procs.top.caps, mutable.IndexedSeq.fill(2)(-1))
     assertEquals(vm.procs.top.poses, mutable.Stack.empty[Int])

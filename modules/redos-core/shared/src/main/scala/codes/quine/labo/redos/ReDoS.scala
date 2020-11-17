@@ -22,13 +22,13 @@ object ReDoS {
 
   /** Tests the given RegExp pattern causes ReDoS with the timeout limit. */
   def check(source: String, flags: String, timeout: Timeout): Diagnostics = {
-    implicit val t = timeout
+    implicit val t: Timeout = timeout
     Diagnostics.from(for {
       _ <- Try(()) // Ensures a `Try` context for catching TimeoutException surely.
       pattern <- Parser.parse(source, flags)
       epsNFA <- EpsNFACompiler.compile(pattern)
-      nfa = epsNFA.toOrderedNFA.rename
-      result <- AutomatonChecker.check(nfa)
+      nfa <- Try(epsNFA.toOrderedNFA.rename)
+      result <- Try(AutomatonChecker.check(nfa))
     } yield result)
   }
 }
