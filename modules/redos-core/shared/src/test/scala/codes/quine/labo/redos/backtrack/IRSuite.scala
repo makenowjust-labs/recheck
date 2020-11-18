@@ -3,12 +3,10 @@ package backtrack
 
 import data.IChar
 import data.UChar
-import regexp.Pattern
 
 class IRSuite extends munit.FunSuite {
   test("IR#toString") {
     val ir = IR(
-      Pattern(Pattern.Star(false, Pattern.Dot), Pattern.FlagSet(false, false, false, false, false, false)),
       2,
       Map("foo" -> 2),
       IndexedSeq(
@@ -20,7 +18,7 @@ class IRSuite extends munit.FunSuite {
     )
     assertEquals(
       ir.toString,
-      "/.*/\n(caps: 2, names: {'foo': 2})\n#000: fork_cont\t@+02\n#001: any\n#002: jump\t@-03\n#003: done\n"
+      "(caps: 2, names: {'foo': 2})\n#000: fork_cont\t@+02\n#001: any\n#002: jump\t@-03\n#003: done\n"
     )
   }
 
@@ -46,8 +44,9 @@ class IRSuite extends munit.FunSuite {
     assertEquals(IR.LineBegin.toString, "line_begin")
     assertEquals(IR.LineEnd.toString, "line_end")
     assertEquals(IR.Loop(12).toString, "loop\t@+12")
-    assertEquals(IR.Pop.toString, "pop")
-    assertEquals(IR.Push(1).toString, "push\t1")
+    assertEquals(IR.PopCnt.toString, "pop_cnt")
+    assertEquals(IR.PopProc.toString, "pop_proc")
+    assertEquals(IR.PushCnt(1).toString, "push\t1")
     assertEquals(IR.PushPos.toString, "push_pos")
     assertEquals(IR.PushProc.toString, "push_proc")
     assertEquals(IR.Ref(1).toString, "ref\t1")

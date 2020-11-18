@@ -1,6 +1,5 @@
-package codes.quine.labo.redos.util
-
-import java.util.concurrent.TimeoutException
+package codes.quine.labo.redos
+package util
 
 import scala.collection.mutable
 import scala.concurrent.duration.Deadline

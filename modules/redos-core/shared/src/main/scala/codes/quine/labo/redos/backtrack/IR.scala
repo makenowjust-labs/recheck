@@ -6,23 +6,14 @@ import scala.collection.mutable
 import IR._
 import data.IChar
 import data.UChar
-import regexp.Pattern
 
 /** IR is an internal representation of a compiled RegExp program. */
-final case class IR(pattern: Pattern, capsSize: Int, names: Map[String, Int], codes: IndexedSeq[OpCode]) {
-
-  /** An alias to `pattern.flagSet.ignoreCase`. */
-  def ignoreCase: Boolean = pattern.flagSet.ignoreCase
-
-  /** An alias to `pattern.flagSet.unicode`. */
-  def unicode: Boolean = pattern.flagSet.unicode
+final case class IR(capsSize: Int, names: Map[String, Int], codes: IndexedSeq[OpCode]) {
 
   override def toString: String = {
     val sb = new mutable.StringBuilder
 
-    sb.append(s"$pattern\n")
     sb.append(s"(caps: $capsSize, names: ${names.map { case (k, v) => s"'$k': $v" }.mkString("{", ", ", "}")})\n")
-
     for ((code, i) <- codes.zipWithIndex) {
       sb.append(f"#$i%03d: $code%s\n")
     }
@@ -103,7 +94,7 @@ object IR {
     override def toString: String = s"cap_reset\t$i\t$j"
   }
 
-  /** `dec`: Decrement `stack` top value.
+  /** `dec`: Decrement stack top value of counter stack.
     *
     * This op-code is used with push and loop for repetition `{n,m}`.
     */
@@ -124,7 +115,7 @@ object IR {
     override def toString: String = "dot"
   }
 
-  /** `empty_check`: Pop the old `pos` from `stack`, and compare with the current `pos`.
+  /** `empty_check`: Pop the old `pos` from pos stack, and compare with the current `pos`.
     * If they equal, it means "no advancing in this group`, so do backtrack.
     *
     * This op-code is needed for preventing infinite loop caused by nullable loop like `(a?)*`.
@@ -195,27 +186,32 @@ object IR {
     override def toString: String = "line_end"
   }
 
-  /** `loop @cont`: If the `stack` top value is greater than `0`, set the current `pc` to `#cont`. */
+  /** `loop @cont`: If the stack top value of counter stack is greater than `0`, set the current `pc` to `#cont`. */
   final case class Loop(cont: Int) extends OpCode {
     override def toString: String = f"loop\t@$cont%+03d"
   }
 
-  /** `pop`: Pop the stack top value from stack. */
-  case object Pop extends OpCode {
-    override def toString: String = "pop"
+  /** `pop_cnt`: Pop the stack top value from counter stack. */
+  case object PopCnt extends OpCode {
+    override def toString: String = "pop_cnt"
   }
 
-  /** `push n`: Push an integer value `n` to stack. */
-  final case class Push(n: Int) extends OpCode {
+  /** `pop_cnt`: Pop the stack top value from proc stack. */
+  case object PopProc extends OpCode {
+    override def toString: String = "pop_proc"
+  }
+
+  /** `push n`: Push an integer value `n` to counter stack. */
+  final case class PushCnt(n: Int) extends OpCode {
     override def toString: String = s"push\t$n"
   }
 
-  /** `push_pos`: Push the current `pos` to `stack`. */
+  /** `push_pos`: Push the current `pos` to pos stack. */
   case object PushPos extends OpCode {
     override def toString: String = "push_pos"
   }
 
-  /** `push_proc`: Push the current `proc`' `id` to `stack`. */
+  /** `push_proc`: Push the current `proc`' `id` to proc stack. */
   case object PushProc extends OpCode {
     override def toString: String = "push_proc"
   }
@@ -238,12 +234,12 @@ object IR {
     override def toString: String = s"ref_back\t$i"
   }
 
-  /** `restore_pos`: Pop the old `pos` from `stack` and set it to the current `pos`. */
+  /** `restore_pos`: Pop the old `pos` from pos stack and set it to the current `pos`. */
   case object RestorePos extends OpCode {
     override def toString: String = "restore_pos"
   }
 
-  /** `rewind_proc`: Pop the `id` from `stack` and rewind `proc` to this `id`.
+  /** `rewind_proc`: Pop the `id` from proc stack and rewind `proc` to this `id`.
     *
     * "Rewind" means to kill `proc`s having greater-or-equal `id` without the current `proc`.
     */

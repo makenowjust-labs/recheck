@@ -17,17 +17,16 @@ final case class OrderedNFA[A, Q](
 ) {
 
   /** Renames its states as integers. */
-  def rename(implicit timeout: Timeout = Timeout.NoTimeout): OrderedNFA[A, Int] =
-    timeout.checkTimeout("automaton.OrderedNFA#rename") {
-      val f = stateSet.zipWithIndex.toMap
-      OrderedNFA(
-        alphabet,
-        f.values.toSet,
-        inits.map(f),
-        acceptSet.map(f),
-        delta.map { case (q1, a) -> qs => (f(q1), a) -> qs.map(f) }
-      )
-    }
+  def rename: OrderedNFA[A, Int] = {
+    val f = stateSet.zipWithIndex.toMap
+    OrderedNFA(
+      alphabet,
+      f.values.toSet,
+      inits.map(f),
+      acceptSet.map(f),
+      delta.map { case (q1, a) -> qs => (f(q1), a) -> qs.map(f) }
+    )
+  }
 
   /** Reverses this NFA.
     *

@@ -25,4 +25,12 @@ class WitnessSuite extends munit.FunSuite {
       )
     )
   }
+
+  test("Witness#repeatSize") {
+    assertEquals(Witness(Seq((Seq(1), Seq(2))), Seq(3)).repeatSize, 1)
+  }
+
+  test("Witness#fixedSize") {
+    assertEquals(Witness(Seq((Seq(1), Seq(2))), Seq(3)).fixedSize, 2)
+  }
 }

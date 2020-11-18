@@ -35,6 +35,7 @@ lazy val root = project
   .settings(
     sonatypeProfileName := "codes.quine",
     publish / skip := true,
+    coverageEnabled := false,
     mdocVariables := Map(
       "VERSION" -> previousStableVersion.value.getOrElse("0.0.0")
     ),
@@ -55,6 +56,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labo.redos.automaton._
       |import codes.quine.labo.redos.backtrack._
       |import codes.quine.labo.redos.data._
+      |import codes.quine.labo.redos.fuzz._
       |import codes.quine.labo.redos.regexp._
       |import codes.quine.labo.redos.util._
       |""".stripMargin,
@@ -95,7 +97,10 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.17" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
-  .jsSettings(scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) })
+  .jsSettings(
+    coverageEnabled := false,
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
+  )
 
 lazy val coreJVM = core.jvm
 lazy val coreJS = core.js
@@ -105,6 +110,7 @@ lazy val demoJS = project
   .enablePlugins(ScalaJSPlugin)
   .settings(
     publish / skip := true,
+    coverageEnabled := false,
     name := "demo",
     scalaJSUseMainModuleInitializer := true,
     Compile / mainClass := Some("codes.quine.labo.redos.demo.DemoApp"),

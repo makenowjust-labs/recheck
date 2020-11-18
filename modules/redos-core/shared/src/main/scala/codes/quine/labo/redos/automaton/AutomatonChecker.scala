@@ -2,7 +2,6 @@ package codes.quine.labo.redos
 package automaton
 
 import scala.collection.mutable
-import scala.util.Try
 
 import Complexity._
 import automaton._
@@ -13,8 +12,8 @@ import util.Timeout
 object AutomatonChecker {
 
   /** Checks a match time complexity of the NFA. */
-  def check[A, Q](nfa: OrderedNFA[A, Q])(implicit timeout: Timeout = Timeout.NoTimeout): Try[Complexity[A]] =
-    Try(timeout.checkTimeout("automaton.AutomatonChecker")(new AutomatonChecker(nfa, timeout)).check())
+  def check[A, Q](nfa: OrderedNFA[A, Q])(implicit timeout: Timeout = Timeout.NoTimeout): Complexity[A] =
+    timeout.checkTimeout("automaton.AutomatonChecker.check")(new AutomatonChecker(nfa, timeout).check())
 }
 
 /** AutomatonChecker is a ReDoS vulnerable RegExp checker based on automata theory. */
@@ -79,7 +78,7 @@ private final class AutomatonChecker[A, Q](
 
   /** Runs a checker. */
   def check(): Complexity[A] =
-    checkExponential() match {
+    checkTimeout("automaton.AutomatonChecker#check")(checkExponential() match {
       case Some(pump) => Exponential(witness(Vector(pump)))
       case None =>
         checkPolynomial() match {
@@ -87,7 +86,7 @@ private final class AutomatonChecker[A, Q](
           case (1, _)          => Linear
           case (degree, pumps) => Polynomial(degree, witness(pumps))
         }
-    }
+    })
 
   /** Finds an EDA structure in the graph. */
   private[this] def checkExponential(): Option[Pump] =
@@ -125,8 +124,8 @@ private final class AutomatonChecker[A, Q](
                   // then the SCC contains an EDA structure.
                   p1 <- sc.find { case (q1, q2) => q1 == q2 }
                   p2 <- sc.find { case (q1, q2) => q1 != q2 }
-                  path1 <- g2.path(Set(p2), p1)
-                  path2 <- g2.path(Set(p1), p2)
+                  path1 <- g2.path(Set(p1), p2)
+                  path2 <- g2.path(Set(p2), p1)
                 } yield (p1._1, path1 ++ path2, p1._1))
               }
               .nextOption()

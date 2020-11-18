@@ -16,11 +16,11 @@ class ICharSetSuite extends munit.FunSuite {
 
   test("ICharSet#add") {
     assertEquals(
-      ICharSet.any(false, false).add(IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, false)),
+      ICharSet.any(false, false).add(IChar(IntervalSet((UChar('A'), UChar('B'))), false, false)),
       ICharSet(
         Seq(
-          IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, false),
-          IChar(IntervalSet((UChar(0), UChar(0x41)), (UChar(0x42), UChar(0x10000))), false, false)
+          IChar(IntervalSet((UChar('A'), UChar('B'))), false, false),
+          IChar(IntervalSet((UChar(0), UChar('A')), (UChar('B'), UChar(0x10000))), false, false)
         )
       )
     )
@@ -29,14 +29,47 @@ class ICharSetSuite extends munit.FunSuite {
   test("ICharSet#refine") {
     val set = ICharSet
       .any(false, false)
-      .add(IChar(IntervalSet((UChar(0x41), UChar(0x5b))), false, true))
-      .add(IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, false))
+      .add(IChar(IntervalSet((UChar('A'), UChar('Z' + 1))), false, true))
+      .add(IChar(IntervalSet((UChar('A'), UChar('A' + 1))), false, false))
     assertEquals(
-      set.refine(IChar(IntervalSet((UChar(0x41), UChar(0x5b))), false, true)),
-      Seq(
-        IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, true),
-        IChar(IntervalSet((UChar(0x42), UChar(0x5b))), false, true)
+      set.refine(IChar(IntervalSet((UChar('A'), UChar('Z' + 1))), false, true)),
+      Set(
+        IChar(IntervalSet((UChar('A'), UChar('A' + 1))), false, true),
+        IChar(IntervalSet((UChar('B'), UChar('Z' + 1))), false, true)
       )
     )
+  }
+
+  test("ICharSet#refineInvert") {
+    val set = ICharSet
+      .any(false, false)
+      .add(IChar(IntervalSet((UChar('A'), UChar('Z' + 1))), false, true))
+      .add(IChar(IntervalSet((UChar('A'), UChar('A' + 1))), false, false))
+    assertEquals(
+      set.refineInvert(IChar(IntervalSet((UChar('A'), UChar('Z' + 1))), false, true)),
+      Set(
+        IChar(IntervalSet((UChar(0x00), UChar('A')), (UChar('Z' + 1), UChar(0x10000))), false, false)
+      )
+    )
+  }
+
+  test("ICharSet#any") {
+    val set = ICharSet
+      .any(false, false)
+      .add(IChar(IntervalSet((UChar('A'), UChar('B'))), false, false))
+    assertEquals(
+      set.any,
+      Set(
+        IChar(IntervalSet((UChar('A'), UChar('B'))), false, false),
+        IChar(IntervalSet((UChar(0), UChar('A')), (UChar('B'), UChar(0x10000))), false, false)
+      )
+    )
+  }
+
+  test("ICharSet#dot") {
+    val set = ICharSet
+      .any(false, false)
+      .add(IChar.LineTerminator)
+    assertEquals(set.dot, set.refineInvert(IChar.LineTerminator))
   }
 }

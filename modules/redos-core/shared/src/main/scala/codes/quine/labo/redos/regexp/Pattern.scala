@@ -1,6 +1,7 @@
 package codes.quine.labo.redos
 package regexp
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.Failure
 import scala.util.Success
@@ -11,6 +12,7 @@ import Pattern._
 import data.IChar
 import data.ICharSet
 import data.UChar
+import data.UString
 import util.TryUtil
 import util.Timeout
 
@@ -20,8 +22,8 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
   /** Tests the pattern has line-begin assertion `^` at its begin position. */
   def hasLineBeginAtBegin: Boolean = {
     def loop(node: Node): Boolean = node match {
-      case Disjunction(ns)       => ns.forall(loop(_))
-      case Sequence(ns)          => ns.headOption.exists(loop(_))
+      case Disjunction(ns)       => ns.forall(loop)
+      case Sequence(ns)          => ns.headOption.exists(loop)
       case Capture(_, n)         => loop(n)
       case NamedCapture(_, _, n) => loop(n)
       case Group(n)              => loop(n)
@@ -34,8 +36,8 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
   /** Tests the pattern has line-end assertion `$` at its end position. */
   def hasLineEndAtEnd: Boolean = {
     def loop(node: Node): Boolean = node match {
-      case Disjunction(ns)       => ns.forall(loop(_))
-      case Sequence(ns)          => ns.lastOption.exists(loop(_))
+      case Disjunction(ns)       => ns.forall(loop)
+      case Sequence(ns)          => ns.lastOption.exists(loop)
       case Capture(_, n)         => loop(n)
       case NamedCapture(_, _, n) => loop(n)
       case Group(n)              => loop(n)
@@ -55,8 +57,8 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
         .pipe(set => if (needsWordDistinction) set.add(IChar.Word.withWord) else set)
 
       def loop(node: Node): Try[Seq[IChar]] = timeout.checkTimeout("regexp.Pattern#alphabet:loop")(node match {
-        case Disjunction(ns)       => TryUtil.traverse(ns)(loop(_)).map(_.flatten)
-        case Sequence(ns)          => TryUtil.traverse(ns)(loop(_)).map(_.flatten)
+        case Disjunction(ns)       => TryUtil.traverse(ns)(loop).map(_.flatten)
+        case Sequence(ns)          => TryUtil.traverse(ns)(loop).map(_.flatten)
         case Capture(_, n)         => loop(n)
         case NamedCapture(_, _, n) => loop(n)
         case Group(n)              => loop(n)
@@ -70,21 +72,18 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
           atom.toIChar(unicode).map { ch =>
             Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch)
           }
-        case Dot =>
-          val any = if (unicode) IChar.Any else IChar.Any16
-          val ch = if (dotAll) any else any.diff(IChar.LineTerminator)
-          Success(Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch))
-        case _ => Success(Vector.empty)
+        case Dot => Success(Vector(IChar.dot(ignoreCase, dotAll, unicode)))
+        case _   => Success(Vector.empty)
       })
 
       loop(node).map(_.foldLeft(set)(_.add(_)))
     }
 
-  /** Tests whether the pattern needs line terminator disinction or not. */
+  /** Tests whether the pattern needs line terminator distinction or not. */
   private[regexp] def needsLineTerminatorDistinction: Boolean = {
     def loop(node: Node): Boolean = node match {
-      case Disjunction(ns)       => ns.exists(loop(_))
-      case Sequence(ns)          => ns.exists(loop(_))
+      case Disjunction(ns)       => ns.exists(loop)
+      case Sequence(ns)          => ns.exists(loop)
       case Capture(_, n)         => loop(n)
       case NamedCapture(_, _, n) => loop(n)
       case Group(n)              => loop(n)
@@ -100,11 +99,11 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
     flagSet.multiline && loop(node)
   }
 
-  /** Tests whether the pattern needs word character disinction or not. */
+  /** Tests whether the pattern needs word character distinction or not. */
   private[regexp] def needsWordDistinction: Boolean = {
     def loop(node: Node): Boolean = node match {
-      case Disjunction(ns)       => ns.exists(loop(_))
-      case Sequence(ns)          => ns.exists(loop(_))
+      case Disjunction(ns)       => ns.exists(loop)
+      case Sequence(ns)          => ns.exists(loop)
       case Capture(_, n)         => loop(n)
       case NamedCapture(_, _, n) => loop(n)
       case Group(n)              => loop(n)
@@ -118,6 +117,37 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
       case _                     => false
     }
     loop(node)
+  }
+
+  /** Extracts parts within the pattern. */
+  def parts: Set[UString] = {
+    @tailrec
+    def extract(ns: Seq[Node], set: Set[UString] = Set.empty): Set[UString] =
+      if (ns.isEmpty) set
+      else {
+        val (pre, suf) = ns.span(_.isInstanceOf[Character])
+        val s = UString(pre.collect { case Character(c) => c }.toIndexedSeq)
+        val newSet = set ++ (if (s.size > 1) Set(s) else Set.empty)
+        extract(suf.dropWhile(!_.isInstanceOf[Character]), newSet)
+      }
+
+    def loop(node: Node): Set[UString] = node match {
+      case Disjunction(ns)       => ns.flatMap(loop).toSet
+      case Sequence(ns)          => extract(ns) ++ ns.flatMap(loop).toSet
+      case Capture(_, n)         => loop(n)
+      case NamedCapture(_, _, n) => loop(n)
+      case Group(n)              => loop(n)
+      case Star(_, n)            => loop(n)
+      case Plus(_, n)            => loop(n)
+      case Question(_, n)        => loop(n)
+      case Repeat(_, _, _, n)    => loop(n)
+      case LookAhead(_, n)       => loop(n)
+      case LookBehind(_, n)      => loop(n)
+      case _                     => Set.empty
+    }
+
+    val set = loop(node)
+    if (flagSet.ignoreCase) set.map(UString.canonicalize(_, flagSet.unicode)) else set
   }
 
   override def toString: String =

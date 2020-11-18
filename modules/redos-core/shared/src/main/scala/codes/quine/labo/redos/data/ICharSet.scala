@@ -18,8 +18,17 @@ final case class ICharSet(chars: Seq[IChar]) {
     *
     * Note the the [[IChar]] must add to the set before this method.
     */
-  def refine(c: IChar): Seq[IChar] =
-    chars.filter(d => c.set.intersection(d.set) == d.set)
+  def refine(c: IChar): Set[IChar] =
+    chars.filter(d => c.set.intersection(d.set) == d.set).toSet
+
+  /** Splits the [[IChar]] into inverted refinements on this set. */
+  def refineInvert(c: IChar): Set[IChar] = any.diff(refine(c))
+
+  /** A character set for a 'any' pattern. */
+  def any: Set[IChar] = chars.toSet
+
+  /** A character set for a 'dot' pattern. */
+  def dot: Set[IChar] = any.diff(refine(IChar.LineTerminator).toSet)
 }
 
 /** ICharSet utilities. */
@@ -27,7 +36,5 @@ object ICharSet {
 
   /** Creates a [[ICharSet]] containing any [[IChar]]s. */
   def any(ignoreCase: Boolean, unicode: Boolean): ICharSet =
-    if (ignoreCase) ICharSet(Vector(IChar.canonicalize(IChar.Any, unicode)))
-    else if (unicode) ICharSet(Vector(IChar.Any))
-    else ICharSet(Vector(IChar.Any16))
+    ICharSet(Vector(IChar.dot(ignoreCase, true, unicode)))
 }

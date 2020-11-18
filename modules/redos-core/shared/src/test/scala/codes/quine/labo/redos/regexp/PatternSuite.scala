@@ -6,6 +6,7 @@ import scala.util.Success
 import Pattern._
 import data.IChar
 import data.ICharSet
+import data.UString
 
 class PatternSuite extends munit.FunSuite {
   test("Pattern.AtomNode#toIChar") {
@@ -303,5 +304,34 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(Pattern(LineBegin, flagSet).needsWordDistinction, false)
     assertEquals(Pattern(LineEnd, flagSet).needsWordDistinction, false)
     assertEquals(Pattern(Dot, flagSet).needsWordDistinction, false)
+  }
+
+  test("Pattern#parts") {
+    val flagSet = FlagSet(false, false, false, false, false, false)
+    val seq = Sequence(Seq(Character('x'), Character('y'), Character('z')))
+    assertEquals(
+      Pattern(Sequence(Seq(Character('x'), Character('y'), Character('z'), Dot, Character('0'))), flagSet).parts,
+      Set(UString.from("xyz", false))
+    )
+    assertEquals(
+      Pattern(
+        Sequence(Seq(Character('x'), Character('y'), Character('z'), Dot, Character('0'))),
+        flagSet.copy(ignoreCase = true)
+      ).parts,
+      Set(UString.from("XYZ", false))
+    )
+    assertEquals(Pattern(Sequence(Seq(seq)), flagSet).parts, Set(UString.from("xyz", false)))
+    assertEquals(Pattern(Disjunction(Seq(seq, Dot)), flagSet).parts, Set(UString.from("xyz", false)))
+    assertEquals(Pattern(Capture(1, seq), flagSet).parts, Set(UString.from("xyz", false)))
+    assertEquals(Pattern(NamedCapture(1, "x", seq), flagSet).parts, Set(UString.from("xyz", false)))
+    assertEquals(Pattern(Group(seq), flagSet).parts, Set(UString.from("xyz", false)))
+    assertEquals(Pattern(Star(false, seq), flagSet).parts, Set(UString.from("xyz", false)))
+    assertEquals(Pattern(Plus(false, seq), flagSet).parts, Set(UString.from("xyz", false)))
+    assertEquals(Pattern(Question(false, seq), flagSet).parts, Set(UString.from("xyz", false)))
+    assertEquals(Pattern(Repeat(false, 2, None, seq), flagSet).parts, Set(UString.from("xyz", false)))
+    assertEquals(Pattern(LookAhead(false, seq), flagSet).parts, Set(UString.from("xyz", false)))
+    assertEquals(Pattern(LookBehind(false, seq), flagSet).parts, Set(UString.from("xyz", false)))
+    assertEquals(Pattern(Dot, flagSet).parts, Set.empty[UString])
+    assertEquals(Pattern(Character('x'), flagSet).parts, Set.empty[UString])
   }
 }

@@ -1,6 +1,5 @@
-package codes.quine.labo.redos.util
-
-import java.util.concurrent.TimeoutException
+package codes.quine.labo.redos
+package util
 
 import scala.concurrent.duration._
 
@@ -15,7 +14,16 @@ class TimeoutSuite extends munit.FunSuite {
 
   test("Timeout#checkTimeout") {
     interceptMessage[TimeoutException]("foo") {
-      DeadlineTimeout(-1.second.fromNow).checkTimeout("foo")(1)
+      val start = System.currentTimeMillis()
+      val timeout = DeadlineTimeout(0.milli.fromNow)
+      while (System.currentTimeMillis() - start <= 10) {}
+      timeout.checkTimeout("foo")(())
+    }
+    interceptMessage[TimeoutException]("foo") {
+      val start = System.currentTimeMillis()
+      DeadlineTimeout(10.milli.fromNow).checkTimeout("foo") {
+        while (System.currentTimeMillis() - start <= 20) {}
+      }
     }
     assertEquals(DeadlineTimeout(1.second.fromNow).checkTimeout("foo")(1), 1)
     assertEquals(new DebugTimeout(_ => ()).checkTimeout("foo")(1), 1)

@@ -17,7 +17,7 @@ object EpsNFACompiler {
 
   /** Compiles ECMA-262 RegExp into ε-NFA. */
   def compile(pattern: Pattern)(implicit timeout: Timeout = Timeout.NoTimeout): Try[EpsNFA[Int]] =
-    for {
+    timeout.checkTimeout("automaton.EpsNFACompiler.compile")(for {
       alphabet <- pattern.alphabet
       (stateSet, init, accept, tau) <- {
         import timeout._
@@ -33,7 +33,7 @@ object EpsNFACompiler {
         }
         val tau = Map.newBuilder[Int, Transition[Int]] // A transition function.
 
-        def loop(node: Node): Try[(Int, Int)] = checkTimeout("compile: loop")(node match {
+        def loop(node: Node): Try[(Int, Int)] = checkTimeout("automaton.EpsNFACompiler.compile:loop")(node match {
           case Disjunction(ns) =>
             TryUtil.traverse(ns)(loop(_)).map { ss =>
               val i = nextQ()
@@ -126,8 +126,8 @@ object EpsNFACompiler {
               val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
               val chs = atom match {
                 // CharacterClass's inversion should be done here.
-                case CharacterClass(invert, _) if invert => alphabet.chars.toSet.diff(alphabet.refine(ch).toSet)
-                case _                                   => alphabet.refine(ch).toSet
+                case CharacterClass(invert, _) if invert => alphabet.refineInvert(ch)
+                case _                                   => alphabet.refine(ch)
               }
               val i = nextQ()
               val a = nextQ()
@@ -135,12 +135,10 @@ object EpsNFACompiler {
               (i, a)
             }
           case Dot =>
-            val any = if (unicode) IChar.Any else IChar.Any16
-            val ch0 = if (dotAll) any else any.diff(IChar.LineTerminator)
-            val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
+            val dot = IChar.dot(ignoreCase, dotAll, unicode)
             val i = nextQ()
             val a = nextQ()
-            tau.addOne(i -> Consume(alphabet.refine(ch).toSet, a))
+            tau.addOne(i -> Consume(alphabet.refine(dot).toSet, a))
             Success((i, a))
           case BackReference(_)      => Failure(new UnsupportedException("back-reference"))
           case NamedBackReference(_) => Failure(new UnsupportedException("named back-reference"))
@@ -164,5 +162,5 @@ object EpsNFACompiler {
           ((0 until counterQ).toSet, i, a, tau.result())
         }
       }
-    } yield EpsNFA(alphabet, stateSet, init, accept, tau)
+    } yield EpsNFA(alphabet, stateSet, init, accept, tau))
 }

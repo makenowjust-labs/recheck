@@ -59,6 +59,22 @@ class ICharSuite extends munit.FunSuite {
     assert(IChar.empty.isEmpty)
   }
 
+  test("IChar.any") {
+    assertEquals(IChar.any(false), IChar.Any16)
+    assertEquals(IChar.any(true), IChar.Any)
+  }
+
+  test("IChar.dot") {
+    assertEquals(IChar.dot(false, true, false), IChar.Any16)
+    assertEquals(IChar.dot(false, true, true), IChar.Any)
+    assertEquals(IChar.dot(false, false, false), IChar.Any16.diff(IChar.LineTerminator))
+    assertEquals(IChar.dot(false, false, true), IChar.Any.diff(IChar.LineTerminator))
+    assertEquals(IChar.dot(true, true, false), IChar.canonicalize(IChar.Any16, false))
+    assertEquals(IChar.dot(true, true, true), IChar.canonicalize(IChar.Any, true))
+    assertEquals(IChar.dot(true, false, false), IChar.canonicalize(IChar.Any16.diff(IChar.LineTerminator), false))
+    assertEquals(IChar.dot(true, false, true), IChar.canonicalize(IChar.Any.diff(IChar.LineTerminator), true))
+  }
+
   test("IChar.range") {
     assertEquals(IChar.range('a', 'a'), IChar('a'))
     assertEquals(IChar.range('z', 'a'), IChar.empty)
