@@ -1,5 +1,10 @@
 package codes.quine.labo.redos
 
+import scala.util.{Random, Success}
+import automaton.Complexity
+import automaton.Witness
+import data.IChar
+import data.UString
 import regexp.Pattern
 import regexp.Pattern._
 
@@ -19,8 +24,99 @@ class CheckerSuite extends munit.FunSuite {
     assertEquals(Checker.repeatCount(Pattern(NamedCapture(1, "x", repeat5), flagSet)), 5)
     assertEquals(Checker.repeatCount(Pattern(Group(repeat5), flagSet)), 5)
     assertEquals(Checker.repeatCount(Pattern(Star(false, repeat5), flagSet)), 5)
+    assertEquals(Checker.repeatCount(Pattern(Plus(false, repeat5), flagSet)), 5)
+    assertEquals(Checker.repeatCount(Pattern(Question(false, repeat5), flagSet)), 5)
     assertEquals(Checker.repeatCount(Pattern(Repeat(false, 10, None, repeat5), flagSet)), 15)
     assertEquals(Checker.repeatCount(Pattern(LookAhead(false, repeat5), flagSet)), 5)
     assertEquals(Checker.repeatCount(Pattern(LookBehind(false, repeat5), flagSet)), 5)
+  }
+
+  test("Checker.Automaton.check") {
+    assertEquals(
+      Checker.Automaton.check(
+        Pattern(
+          Sequence(Seq(LineBegin, Star(false, Disjunction(Seq(Character('a'), Character('a')))), LineEnd)),
+          FlagSet(false, false, false, false, false, false)
+        ),
+        Config()
+      ),
+      Success(
+        Diagnostics.Vulnerable(
+          UString.from("aaaaaaaaaaaaaaaaaaaaa\u0000", false),
+          Some(
+            Complexity.Exponential(Witness(Seq((Seq(IChar('a')), Seq(IChar('a')))), Seq(IChar.Any16.diff(IChar('a')))))
+          )
+        )
+      )
+    )
+    assertEquals(
+      Checker.Automaton.check(
+        Pattern(
+          Sequence(Seq(LineBegin, Star(false, Disjunction(Seq(Dot, Dot))), LineEnd)),
+          FlagSet(false, false, false, true, false, false)
+        ),
+        Config()
+      ),
+      Success(Diagnostics.Safe(Some(Complexity.Linear)))
+    )
+  }
+
+  test("Checker.Fuzz.check") {
+    def random0: Random = new Random(0)
+    assertEquals(
+      Checker.Fuzz.check(
+        Pattern(
+          Sequence(Seq(LineBegin, Star(false, Disjunction(Seq(Character('a'), Character('a')))), LineEnd)),
+          FlagSet(false, false, false, false, false, false)
+        ),
+        Config(random = random0)
+      ),
+      Success(Diagnostics.Vulnerable(UString.from("aaaaaaaaaaaaaaaaaaaa\u0000", false), None))
+    )
+    assertEquals(
+      Checker.Fuzz.check(Pattern(Dot, FlagSet(false, false, false, false, false, false)), Config(random = random0)),
+      Success(Diagnostics.Safe(None))
+    )
+  }
+
+  test("Checker.Hybrid.check") {
+    def random0: Random = new Random(0)
+    assertEquals(
+      Checker.Hybrid.check(
+        Pattern(
+          Sequence(Seq(LineBegin, Star(false, Disjunction(Seq(Character('a'), Character('a')))), LineEnd)),
+          FlagSet(false, false, false, false, false, false)
+        ),
+        Config(random = random0)
+      ),
+      Success(
+        Diagnostics.Vulnerable(
+          UString.from("aaaaaaaaaaaaaaaaaaaaa\u0000", false),
+          Some(
+            Complexity.Exponential(Witness(Seq((Seq(IChar('a')), Seq(IChar('a')))), Seq(IChar.Any16.diff(IChar('a')))))
+          )
+        )
+      )
+    )
+    assertEquals(
+      Checker.Hybrid.check(
+        Pattern(
+          Sequence(Seq(LineBegin, Repeat(false, 5, None, Disjunction(Seq(Character('a'), Character('a')))), LineEnd)),
+          FlagSet(false, false, false, false, false, false)
+        ),
+        Config(random = random0, maxRepeatCount = 5)
+      ),
+      Success(Diagnostics.Safe(None))
+    )
+    assertEquals(
+      Checker.Hybrid.check(
+        Pattern(
+          Sequence(Seq(LineBegin, Repeat(false, 5, None, Disjunction(Seq(Character('a'), Character('a')))), LineEnd)),
+          FlagSet(false, false, false, false, false, false)
+        ),
+        Config(random = random0, maxNFASize = 5)
+      ),
+      Success(Diagnostics.Safe(None))
+    )
   }
 }
