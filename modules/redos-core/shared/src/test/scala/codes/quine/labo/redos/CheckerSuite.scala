@@ -1,6 +1,8 @@
 package codes.quine.labo.redos
 
-import scala.util.{Random, Success}
+import scala.util.Random
+import scala.util.Success
+
 import automaton.Complexity
 import automaton.Witness
 import data.IChar

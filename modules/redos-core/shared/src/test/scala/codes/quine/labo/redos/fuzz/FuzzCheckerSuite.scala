@@ -11,11 +11,11 @@ class FuzzCheckerSuite extends munit.FunSuite {
   def random0: Random = new Random(0)
 
   /** Tests the pattern is vulnerable or not. */
-  def check(source: String, flags: String, maxAttackSize: Int = 10_000): Boolean = {
+  def check(source: String, flags: String): Boolean = {
     val result = for {
       pattern <- Parser.parse(source, flags)
       ctx <- FuzzContext.from(pattern)
-    } yield FuzzChecker.check(ctx, random0, maxAttackSize = maxAttackSize)
+    } yield FuzzChecker.check(ctx, random0)
     result.get.isDefined
   }
 
@@ -37,11 +37,18 @@ class FuzzCheckerSuite extends munit.FunSuite {
 
   test("FuzzChecker.check: exponential") {
     assert(check("^(a|a)*$", ""))
-    assert(!check("^(a|a)*$", "", maxAttackSize = 5))
     assert(check("^(a*)*$", ""))
     assert(check("^(a?){50}a{50}$", ""))
     assert(check("^(a|b|ab)*$", ""))
     assert(check("^(a|B|Ab)*$", "i"))
     assert(check("^(aa|b|aab)*$", ""))
+
+    assert {
+      val result = for {
+        pattern <- Parser.parse("^(a|a)*$", "")
+        ctx <- FuzzContext.from(pattern)
+      } yield FuzzChecker.check(ctx, random0, populationLimit = 100, maxAttackSize = 5)
+      result.get.isEmpty
+    }
   }
 }

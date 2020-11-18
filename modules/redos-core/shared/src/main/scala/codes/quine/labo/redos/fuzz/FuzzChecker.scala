@@ -1,7 +1,6 @@
 package codes.quine.labo.redos
 package fuzz
 
-import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.Random
 
@@ -286,20 +285,19 @@ private[fuzz] final class FuzzChecker(
 
   /** Tries to construct an attack string. */
   def tryAttack(str: FString): Option[FString] = checkTimeout("fuzz.FuzzChecker#tryAttack") {
-    @tailrec
-    def loop(str: FString): Option[FString] = {
+    def loop(str: FString, prev: Option[UString]): Option[FString] = checkTimeout("fuzz.FuzzChecker#tryAttack:loop") {
       val input = str.toUString
-      if (input.size > maxAttackSize || str.n > maxAttackSize) return None
+      if (input.size > maxAttackSize || prev.contains(input)) return None
       val t = new LimitTracer(attackLimit, timeout)
       try VM.execute(ir, input, 0, t)
       catch {
         case _: LimitException =>
           return Some(str)
       }
-      loop(str.copy(n = str.n * 2))
+      loop(str.copy(n = str.n * 2), Some(input))
     }
 
-    loop(str)
+    loop(str, None)
   }
 
   /** Population is a mutable generation on fuzzing. */
