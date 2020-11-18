@@ -90,7 +90,7 @@ object DemoApp {
 
   /** Constructs a witness strings. */
   def witness(w: Witness[IChar]): LazyList[UString] =
-    w.map(_.head).toLazyList.map(s => UString(s.toIndexedSeq))
+    w.map(_.head).toLazyList.drop(1).map(s => UString(s.toIndexedSeq))
 
   /** Returns an HTML escaped string. */
   def escape(s: String): String =
