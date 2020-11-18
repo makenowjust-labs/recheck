@@ -17,6 +17,21 @@ class DiagnosticsSuite extends munit.FunSuite {
     assertEquals(Diagnostics.Unknown(Diagnostics.ErrorKind.Timeout).complexity, None)
   }
 
+  test("Diagnostics.Unknown.from") {
+    assertEquals(
+      Diagnostics.Unknown.from(new TimeoutException("foo")),
+      Diagnostics.Unknown(Diagnostics.ErrorKind.Timeout)
+    )
+    assertEquals(
+      Diagnostics.Unknown.from(new InvalidRegExpException("foo")),
+      Diagnostics.Unknown(Diagnostics.ErrorKind.InvalidRegExp("foo"))
+    )
+    assertEquals(
+      Diagnostics.Unknown.from(new UnsupportedException("foo")),
+      Diagnostics.Unknown(Diagnostics.ErrorKind.Unsupported("foo"))
+    )
+  }
+
   test("Diagnostics.ErrorKind#toString") {
     assertEquals(Diagnostics.ErrorKind.Timeout.toString, "timeout")
     assertEquals(Diagnostics.ErrorKind.Unsupported("foo").toString, "unsupported (foo)")
