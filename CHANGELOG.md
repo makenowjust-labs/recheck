@@ -1,3 +1,9 @@
+# 1.0.1 (2020-11-19)
+
+Fixes:
+
+- Handle timeout error in `ReDoS.check` correctly.
+
 # 1.0.0 (2020-11-19)
 
 Changes:
