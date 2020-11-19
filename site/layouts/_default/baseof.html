@@ -10,7 +10,7 @@
   </head>
   <body>
     {{ partial "header.html" . }}
-    {{ partial "feature.html" . }}
+    {{ block "feature" . }}{{ end }}
     <main class="section">
       <div class="container">
         <div class="content">{{ block "main" . }}main{{ end }}</div>
