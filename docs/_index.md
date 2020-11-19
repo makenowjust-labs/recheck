@@ -47,3 +47,7 @@ import codes.quine.labo.redos.ReDoS
 
 println(ReDoS.check("^(a|a)*$", ""))
 ```
+
+## License
+
+MIT License.
