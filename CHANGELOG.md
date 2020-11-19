@@ -5,6 +5,8 @@ Changes:
 - Move `Compiler` to `automaton` package.
 - Move `unicode` package to `data` package.
 - Add backtrack based RegExp VM.
+- Add fuzz checker.
+- Add hybrid checker.
 
 Fixes:
 
