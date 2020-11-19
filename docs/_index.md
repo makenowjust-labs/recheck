@@ -21,13 +21,15 @@ const { check } = require("@makenowjust-labo/redos");
 console.log(check("^(a|a)*$", ""));
 // {
 //   status: 'vulnerable',
-//   attack: 'aaaaaaaaaaaaaaaaaaaaaaaaaaa\x00',
+//   attack: 'aaaaaaaaaaaaaaaaaaaaa\x00',
 //   complexity: {
 //     type: 'exponential',
 //     witness: { pumps: [ { prefix: 'a', pump: 'a' } ], suffix: '\x00' }
 //   }
 // }
 ```
+
+See [the detailed information](https://github.com/MakeNowJust-Labo/redos/blob/master/packages/redos/README.md).
 
 ### Scala
 
@@ -43,5 +45,5 @@ You can use `ReDoS.check` method to analyze RegExp pattern.
 ```scala mdoc
 import codes.quine.labo.redos.ReDoS
 
-println(ReDoS.check("^(a|a)*$", "").complexity)
+println(ReDoS.check("^(a|a)*$", ""))
 ```
