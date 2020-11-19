@@ -1,9 +1,6 @@
 package codes.quine.labo.redos
 package demo
 
-import automaton.Witness
-import data.IChar
-
 class DemoAppSuite extends munit.FunSuite {
   test("DemoApp.SlashRegExp") {
     assertEquals(DemoApp.SlashRegExp.unapplySeq("//"), Some(List("", "")))
@@ -29,11 +26,6 @@ class DemoAppSuite extends munit.FunSuite {
       assertEquals(DemoApp.ordinal(i), "th")
       assertEquals(DemoApp.ordinal(10 + i), "th")
     }
-  }
-
-  test("DemoApp.witness") {
-    val w = Witness(Seq((Seq(IChar('a')), Seq(IChar('b')))), Seq(IChar('c')))
-    assertEquals(DemoApp.witness(w).take(3).map(_.asString), LazyList("abc", "abbc", "abbbc"))
   }
 
   test("DemoApp.escape") {

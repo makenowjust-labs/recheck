@@ -12,9 +12,6 @@ import org.scalajs.dom.raw.Event
 
 import Diagnostics._
 import automaton.Complexity._
-import automaton.Witness
-import data.IChar
-import data.UString
 import util.Timeout
 
 /** DemoApp is an implementation of demo application in the top page. */
@@ -40,10 +37,13 @@ object DemoApp {
   /** A callback function on `checkButton` clicked. */
   def check(): Unit = {
     val input = regexpInput.value
+
+    resultArea.innerHTML = "<h5>Result</h5>"
+
     val (source, flags) = input match {
       case SlashRegExp(source, flags) => (source, flags)
       case _ =>
-        resultArea.textContent = "Error: invalid input"
+        resultArea.innerHTML ++= "<p><span class='has-text-warning has-text-weight-bold'>Error</span>: invalid input</p>"
         return
     }
 
@@ -53,29 +53,26 @@ object DemoApp {
       case Safe(complexity) =>
         complexity match {
           case Some(Constant) =>
-            resultArea.innerHTML = s"$pattern is safe (constant-time matching)."
+            resultArea.innerHTML ++= s"<p>$pattern is safe (constant-time matching).</p>"
           case Some(Linear) =>
-            resultArea.innerHTML = s"$pattern is safe (linear-time matching)."
+            resultArea.innerHTML ++= s"<p>$pattern is safe (linear-time matching).</p>"
           case None =>
-            resultArea.innerHTML = s"$pattern is safe."
+            resultArea.innerHTML ++= s"<p>$pattern is safe.</p>"
         }
       case Vulnerable(attack, complexity) =>
         val unsafe = "<span class='has-text-danger has-text-weight-bold is-uppercase'>unsafe</span>"
         complexity match {
-          case Some(Exponential(w)) =>
-            resultArea.innerHTML = s"$pattern is $unsafe (exponential-time matching).<br>"
-            val ws = witness(w).take(3).map { s => s"<code>${escape(s.toString)}</code>" }
-            resultArea.innerHTML ++= s"Example attack strings: ${ws.mkString(", ")}, ..."
-          case Some(Polynomial(d, w)) =>
-            resultArea.innerHTML = s"$pattern is $unsafe ($d${ordinal(d)} degree polynomial-time matching).<br>"
-            val ws = witness(w).take(3).map { s => s"<code>${escape(s.toString)}</code>" }
-            resultArea.innerHTML ++= s"Example attack strings: ${ws.mkString(", ")}, ..."
+          case Some(Exponential(_)) =>
+            resultArea.innerHTML ++= s"<p>$pattern is $unsafe (exponential-time matching).</p>"
+          case Some(Polynomial(d, _)) =>
+            resultArea.innerHTML ++= s"<p>$pattern is $unsafe ($d${ordinal(d)} degree polynomial-time matching).</p>"
           case None =>
-            resultArea.innerHTML = s"$pattern is $unsafe.<br>"
-            resultArea.innerHTML ++= s"Example attack string: <code>${attack.toString}</code>"
+            resultArea.innerHTML ++= s"<p>$pattern is $unsafe.</p>"
         }
+        resultArea.innerHTML ++= "<h5>Attack String</h5>"
+        resultArea.innerHTML ++= s"<pre><code>${escape(attack.toString)}</code></pre>"
       case Unknown(err) =>
-        resultArea.innerHTML = s"Error: $err"
+        resultArea.innerHTML ++= s"<p><span class='has-text-warning has-text-weight-bold'>Error</span>: $err</p>"
     }
   }
 
@@ -87,10 +84,6 @@ object DemoApp {
       case 3 => "rd"
       case _ => "th"
     }
-
-  /** Constructs a witness strings. */
-  def witness(w: Witness[IChar]): LazyList[UString] =
-    w.map(_.head).toLazyList.drop(1).map(s => UString(s.toIndexedSeq))
 
   /** Returns an HTML escaped string. */
   def escape(s: String): String =
