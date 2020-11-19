@@ -20,6 +20,9 @@ object DemoApp {
   /** A regular expression to extract slash separated input string. */
   val SlashRegExp: Regex = raw"/((?:[^/\\\[\n]*|\\[^\n]|\[(?:[^\\\]\n]|\\[^\n])*\])*)/([gimsuy]*)".r
 
+  /** A timeout duration. */
+  val timeout: Duration = 30.second
+
   /** An input element to input a regexp pattern. */
   lazy val regexpInput: Input = document.querySelector("#regexp").asInstanceOf[Input]
 
@@ -47,7 +50,7 @@ object DemoApp {
         return
     }
 
-    val result = ReDoS.check(source, flags, Config(timeout = Timeout.from(10.second)))
+    val result = ReDoS.check(source, flags, Config(timeout = Timeout.from(timeout)))
     val pattern = s"<code>/${escape(source)}/${escape(flags)}</code>"
     result match {
       case Safe(complexity) =>
