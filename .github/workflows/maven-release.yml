@@ -11,7 +11,7 @@ jobs:
     name: Publish to Maven Central
     steps:
       - uses: actions/checkout@v2
-      - uses: olafurpg/setup-gpg@v2
+      - uses: olafurpg/setup-gpg@v3
       - uses: olafurpg/setup-scala@v10
         with:
           java-version: adopt@1.14
