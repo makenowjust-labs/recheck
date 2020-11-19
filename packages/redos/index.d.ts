@@ -131,8 +131,8 @@ export type Config = {
  *
  * - `safe`: The given RegExp is safe.
  * - `vulnerable`: The given RegExp is potentially vulnerable.
- * - `unknown`: An error is occured on analyzing.
- *   As a result, it is unknown wheher the RegExp is safe or vulnerable.
+ * - `unknown`: An error is occurred on analyzing.
+ *   As a result, it is unknown whether the RegExp is safe or vulnerable.
  */
 export type Diagnostics = Safe | Vulnerable | Unknown;
 
@@ -175,7 +175,7 @@ export type Linear = { type: "linear" };
 
 /**
  * Polynomial is a polynomial (super-linear) complexity.
- * This complexity is vulneable typically.
+ * This complexity is vulnerable typically.
  */
 export type Polynomial = {
   type: "polynomial";
