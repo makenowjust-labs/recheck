@@ -1,3 +1,14 @@
+# 1.1.0 (2020-11-20)
+
+Changes:
+
+- Add `maxDegree` parameter
+
+Fixes:
+
+- Optimize VM implementation
+- Improve attack string construction strategy
+
 # 1.0.1 (2020-11-19)
 
 Fixes:
