@@ -37,10 +37,10 @@ private[backtrack] final class VM(
   /** An execution process list (stack). */
   private[backtrack] val procs: mutable.Stack[Proc] = {
     val proc = new Proc(
-      mutable.IndexedSeq.fill((ir.capsSize + 1) * 2)(-1),
-      mutable.Stack.empty,
-      mutable.Stack.empty,
-      mutable.Stack.empty,
+      IndexedSeq.fill((ir.capsSize + 1) * 2)(-1),
+      Seq.empty,
+      Seq.empty,
+      Seq.empty,
       initPos,
       0
     )
@@ -101,16 +101,16 @@ private[backtrack] final class VM(
           case _                         => backtrack = true
         }
       case Dec =>
-        proc.cntStack(0) -= 1
+        proc.cntStack = (proc.cntStack.head - 1) +: proc.cntStack.tail
       case Done =>
-        return Some(Match(input, ir.names, proc.caps.toIndexedSeq))
+        return Some(Match(input, ir.names, proc.caps))
       case Dot =>
         proc.currentChar match {
           case Some(c) if !LineTerminator.contains(c) => proc.pos += 1
           case _                                      => backtrack = true
         }
       case EmptyCheck =>
-        backtrack = proc.posStack.pop() == proc.pos
+        backtrack = proc.popPosStack() == proc.pos
       case Fail =>
         backtrack = true
       case ForkCont(next) =>
@@ -134,18 +134,18 @@ private[backtrack] final class VM(
         val c = proc.currentChar
         backtrack = c.exists(!LineTerminator.contains(_))
       case Loop(cont) =>
-        val n = proc.cntStack.top
+        val n = proc.cntStack.head
         if (n > 0) proc.pc += cont
       case PopCnt =>
-        proc.cntStack.pop()
+        proc.popCntStack()
       case PopProc =>
-        proc.procStack.pop()
+        proc.popProcStack()
       case PushCnt(n) =>
-        proc.cntStack.push(n)
+        proc.pushCntStack(n)
       case PushPos =>
-        proc.posStack.push(proc.pos)
+        proc.pushPosStack(proc.pos)
       case PushProc =>
-        proc.procStack.push(procs.size)
+        proc.pushProcStack(procs.size)
       case Ref(n) =>
         val s = proc.capture(n).getOrElse(UString.empty)
         val t = input.substring(proc.pos, proc.pos + s.size)
@@ -157,9 +157,9 @@ private[backtrack] final class VM(
         if (s == t) proc.pos -= t.size
         else backtrack = true
       case RestorePos =>
-        proc.pos = proc.posStack.pop()
+        proc.pos = proc.popPosStack()
       case RewindProc =>
-        val size = proc.procStack.pop()
+        val size = proc.popProcStack()
         while (size <= procs.size) procs.pop()
         procs.push(proc)
       case WordBoundary =>
@@ -179,17 +179,17 @@ private[backtrack] final class VM(
     if (backtrack) procs.pop()
 
     // Traces this step.
-    tracer.trace(oldPos, oldPc, backtrack, proc.captures, proc.cntStack.toSeq)
+    tracer.trace(oldPos, oldPc, backtrack, proc.captures, proc.cntStack)
 
     None
   }
 
   /** Proc is an internal state of VM execution. */
   final class Proc(
-      val caps: mutable.IndexedSeq[Int],
-      val posStack: mutable.Stack[Int],
-      val cntStack: mutable.Stack[Int],
-      val procStack: mutable.Stack[Int],
+      var caps: IndexedSeq[Int],
+      var posStack: Seq[Int],
+      var cntStack: Seq[Int],
+      var procStack: Seq[Int],
       var pos: Int,
       var pc: Int
   ) {
@@ -219,17 +219,57 @@ private[backtrack] final class VM(
     def captures: Int => Option[UString] = capture
 
     /** Updates a begin position of the `n`-th capture. */
-    def captureBegin(n: Int, pos: Int): Unit = caps.update(n * 2, pos)
+    def captureBegin(n: Int, pos: Int): Unit = {
+      caps = caps.updated(n * 2, pos)
+    }
 
     /** Updates an end position of the `n`-th capture. */
-    def captureEnd(n: Int, pos: Int): Unit = caps.update(n * 2 + 1, pos)
+    def captureEnd(n: Int, pos: Int): Unit = {
+      caps = caps.updated(n * 2 + 1, pos)
+    }
 
     /** Resets captures between `i` and `j`. */
     def captureReset(i: Int, j: Int): Unit = {
-      for (k <- (i to j)) {
+      for (k <- i to j) {
         captureBegin(k, -1)
         captureEnd(k, -1)
       }
+    }
+
+    /** Pops a value from cnt stack. */
+    def popCntStack(): Int = {
+      val cnt = cntStack.head
+      cntStack = cntStack.tail
+      cnt
+    }
+
+    /** Pops a value from pos stack. */
+    def popPosStack(): Int = {
+      val pos = posStack.head
+      posStack = posStack.tail
+      pos
+    }
+
+    /** Pops a value from proc stack. */
+    def popProcStack(): Int = {
+      val size = procStack.head
+      procStack = procStack.tail
+      size
+    }
+
+    /** Pushes a value to cnt stack. */
+    def pushCntStack(n: Int): Unit = {
+      cntStack = n +: cntStack
+    }
+
+    /** Pushes a value to pos stack. */
+    def pushPosStack(n: Int): Unit = {
+      posStack = n +: posStack
+    }
+
+    /** Pushes a value to pos stack. */
+    def pushProcStack(n: Int): Unit = {
+      procStack = n +: procStack
     }
 
     /** Returns a copy of this proc.
@@ -237,7 +277,7 @@ private[backtrack] final class VM(
       * It copies mutable states deeply.
       */
     override def clone(): Proc =
-      new Proc(caps.clone(), posStack.clone(), cntStack.clone(), procStack.clone(), pos, pc)
+      new Proc(caps, posStack, cntStack, procStack, pos, pc)
 
     /** Shows this proc. */
     override def toString: String = s"Proc($caps, $posStack, $cntStack, $procStack, $pos, $pc)"

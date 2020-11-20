@@ -1,8 +1,5 @@
 package codes.quine.labo.redos
 package backtrack
-
-import scala.collection.mutable
-
 import data.IChar
 import data.UChar
 import data.UString
@@ -70,10 +67,10 @@ class VMSuite extends munit.FunSuite {
 
     test("VM#Proc#currentChar") {
       val proc = new vm.Proc(
-        mutable.IndexedSeq.fill(2)(-1),
-        mutable.Stack.empty,
-        mutable.Stack.empty,
-        mutable.Stack.empty,
+        IndexedSeq.fill(2)(-1),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
         0,
         0
       )
@@ -84,10 +81,10 @@ class VMSuite extends munit.FunSuite {
 
     test("VM#Proc#previousChar") {
       val proc = new vm.Proc(
-        mutable.IndexedSeq.fill(2)(-1),
-        mutable.Stack.empty,
-        mutable.Stack.empty,
-        mutable.Stack.empty,
+        IndexedSeq.fill(2)(-1),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
         0,
         0
       )
@@ -98,18 +95,18 @@ class VMSuite extends munit.FunSuite {
 
     test("VM#Proc#size") {
       val proc1 = new vm.Proc(
-        mutable.IndexedSeq.fill(2)(-1),
-        mutable.Stack.empty,
-        mutable.Stack.empty,
-        mutable.Stack.empty,
+        IndexedSeq.fill(2)(-1),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
         0,
         0
       )
       val proc2 = new vm.Proc(
-        mutable.IndexedSeq.fill(6)(-1),
-        mutable.Stack.empty,
-        mutable.Stack.empty,
-        mutable.Stack.empty,
+        IndexedSeq.fill(6)(-1),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
         0,
         0
       )
@@ -119,10 +116,10 @@ class VMSuite extends munit.FunSuite {
 
     test("VM#Proc#caps") {
       val proc = new vm.Proc(
-        mutable.IndexedSeq(1, 2),
-        mutable.Stack.empty,
-        mutable.Stack.empty,
-        mutable.Stack.empty,
+        IndexedSeq(1, 2),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
         0,
         0
       )
@@ -132,10 +129,10 @@ class VMSuite extends munit.FunSuite {
 
     test("VM#Proc#capture") {
       val proc = new vm.Proc(
-        mutable.IndexedSeq(1, 2),
-        mutable.Stack.empty,
-        mutable.Stack.empty,
-        mutable.Stack.empty,
+        IndexedSeq(1, 2),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
         0,
         0
       )
@@ -145,10 +142,10 @@ class VMSuite extends munit.FunSuite {
 
     test("VM#Proc#captures") {
       val proc = new vm.Proc(
-        mutable.IndexedSeq(1, 2),
-        mutable.Stack.empty,
-        mutable.Stack.empty,
-        mutable.Stack.empty,
+        IndexedSeq(1, 2),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
         0,
         0
       )
@@ -160,10 +157,10 @@ class VMSuite extends munit.FunSuite {
     test("VM#Proc#captureBegin") {
       UString.from("xyz", false)
       val proc = new vm.Proc(
-        mutable.IndexedSeq.fill(4)(-1),
-        mutable.Stack.empty,
-        mutable.Stack.empty,
-        mutable.Stack.empty,
+        IndexedSeq.fill(4)(-1),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
         0,
         0
       )
@@ -174,10 +171,10 @@ class VMSuite extends munit.FunSuite {
     test("VM#Proc#captureEnd") {
       UString.from("xyz", false)
       val proc = new vm.Proc(
-        mutable.IndexedSeq.fill(4)(-1),
-        mutable.Stack.empty,
-        mutable.Stack.empty,
-        mutable.Stack.empty,
+        IndexedSeq.fill(4)(-1),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
         0,
         0
       )
@@ -188,32 +185,32 @@ class VMSuite extends munit.FunSuite {
     test("VM#Proc#captureReset") {
       UString.from("xyz", false)
       val proc = new vm.Proc(
-        mutable.IndexedSeq(-1, -1, 1, 2, 3, 4, 5, 6),
-        mutable.Stack.empty,
-        mutable.Stack.empty,
-        mutable.Stack.empty,
+        IndexedSeq(-1, -1, 1, 2, 3, 4, 5, 6),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
         0,
         0
       )
       proc.captureReset(1, 2)
-      assertEquals(proc.caps, mutable.IndexedSeq(-1, -1, -1, -1, -1, -1, 5, 6))
+      assertEquals(proc.caps, IndexedSeq(-1, -1, -1, -1, -1, -1, 5, 6))
     }
 
     test("VM#Proc#clone") {
       UString.from("xyz", false)
       val proc = new vm.Proc(
-        mutable.IndexedSeq.fill(2)(-1),
-        mutable.Stack.empty,
-        mutable.Stack.empty,
-        mutable.Stack.empty,
+        IndexedSeq.fill(2)(-1),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
         0,
         0
       )
       val clone = proc.clone()
-      assert(proc.caps ne clone.caps)
-      assert(proc.posStack ne clone.posStack)
-      assert(proc.cntStack ne clone.cntStack)
-      assert(proc.procStack ne clone.procStack)
+      assertEquals(proc.caps, clone.caps)
+      assertEquals(proc.posStack, clone.posStack)
+      assertEquals(proc.cntStack, clone.cntStack)
+      assertEquals(proc.procStack, clone.procStack)
       assertEquals(clone.pos, proc.pos)
       assertEquals(clone.pc, proc.pc)
     }
@@ -221,14 +218,14 @@ class VMSuite extends munit.FunSuite {
     test("VM#Proc#toString") {
       UString.from("xyz", false)
       val proc = new vm.Proc(
-        mutable.IndexedSeq.fill(2)(-1),
-        mutable.Stack.empty,
-        mutable.Stack.empty,
-        mutable.Stack.empty,
+        IndexedSeq.fill(2)(-1),
+        Seq.empty,
+        Seq.empty,
+        Seq.empty,
         0,
         0
       )
-      assertEquals(proc.toString, "Proc(ArrayBuffer(-1, -1), Stack(), Stack(), Stack(), 0, 0)")
+      assertEquals(proc.toString, "Proc(Vector(-1, -1), List(), List(), List(), 0, 0)")
     }
   }
 
@@ -270,10 +267,10 @@ class VMSuite extends munit.FunSuite {
       IR(0, Map.empty, IndexedSeq(IR.Dot, IR.Done))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
-    assertEquals(vm.procs.top.caps, mutable.IndexedSeq.fill(2)(-1))
-    assertEquals(vm.procs.top.posStack, mutable.Stack.empty[Int])
-    assertEquals(vm.procs.top.cntStack, mutable.Stack.empty[Int])
-    assertEquals(vm.procs.top.procStack, mutable.Stack.empty[Int])
+    assertEquals(vm.procs.top.caps, IndexedSeq.fill(2)(-1))
+    assertEquals(vm.procs.top.posStack, Seq.empty[Int])
+    assertEquals(vm.procs.top.cntStack, Seq.empty[Int])
+    assertEquals(vm.procs.top.procStack, Seq.empty[Int])
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 0)
   }
@@ -284,10 +281,10 @@ class VMSuite extends munit.FunSuite {
       IR(0, Map.empty, IndexedSeq(IR.Dot, IR.Done))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
-    assertEquals(vm.procs.top.caps, mutable.IndexedSeq.fill(2)(-1))
-    assertEquals(vm.procs.top.posStack, mutable.Stack.empty[Int])
-    assertEquals(vm.procs.top.cntStack, mutable.Stack.empty[Int])
-    assertEquals(vm.procs.top.procStack, mutable.Stack.empty[Int])
+    assertEquals(vm.procs.top.caps, IndexedSeq.fill(2)(-1))
+    assertEquals(vm.procs.top.posStack, Seq.empty[Int])
+    assertEquals(vm.procs.top.cntStack, Seq.empty[Int])
+    assertEquals(vm.procs.top.procStack, Seq.empty[Int])
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 0)
   }
@@ -298,10 +295,10 @@ class VMSuite extends munit.FunSuite {
       IR(0, Map.empty, IndexedSeq(IR.Dot, IR.Done))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
-    assertEquals(vm.procs.top.caps, mutable.IndexedSeq.fill(2)(-1))
-    assertEquals(vm.procs.top.posStack, mutable.Stack.empty[Int])
-    assertEquals(vm.procs.top.cntStack, mutable.Stack.empty[Int])
-    assertEquals(vm.procs.top.procStack, mutable.Stack.empty[Int])
+    assertEquals(vm.procs.top.caps, IndexedSeq.fill(2)(-1))
+    assertEquals(vm.procs.top.posStack, Seq.empty[Int])
+    assertEquals(vm.procs.top.cntStack, Seq.empty[Int])
+    assertEquals(vm.procs.top.procStack, Seq.empty[Int])
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 0)
   }
@@ -391,12 +388,12 @@ class VMSuite extends munit.FunSuite {
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 0)
-    for (i <- (2 to 4)) vm.procs.top.caps(i) = 2
+    for (i <- (2 to 4)) vm.procs.top.caps = vm.procs.top.caps.updated(i, 2)
     assertEquals(vm.step(), None)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 1)
-    assertEquals(vm.procs.top.caps, mutable.IndexedSeq.fill(8)(-1))
+    assertEquals(vm.procs.top.caps, IndexedSeq.fill(8)(-1))
   }
 
   test("VM#step: Char") {
@@ -535,12 +532,12 @@ class VMSuite extends munit.FunSuite {
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 0)
-    vm.procs.top.cntStack.push(2)
+    vm.procs.top.cntStack +:= 2
     assertEquals(vm.step(), None)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 1)
-    assertEquals(vm.procs.top.cntStack.top, 1)
+    assertEquals(vm.procs.top.cntStack.head, 1)
   }
 
   test("VM#step: Done") {
@@ -599,7 +596,7 @@ class VMSuite extends munit.FunSuite {
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 0)
-    vm.procs.top.posStack.push(0)
+    vm.procs.top.posStack +:= 0
     assertEquals(vm.step(), None)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -615,7 +612,7 @@ class VMSuite extends munit.FunSuite {
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 0)
-    vm.procs.top.posStack.push(1)
+    vm.procs.top.posStack +:= 1
     assertEquals(vm.step(), None)
     assertEquals(vm.procs.size, 0)
   }
@@ -809,7 +806,7 @@ class VMSuite extends munit.FunSuite {
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 0)
-    vm.procs.top.cntStack.push(1)
+    vm.procs.top.cntStack +:= 1
     assertEquals(vm.step(), None)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -824,7 +821,7 @@ class VMSuite extends munit.FunSuite {
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 0)
-    vm.procs.top.cntStack.push(0)
+    vm.procs.top.cntStack +:= 0
     assertEquals(vm.step(), None)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -838,7 +835,7 @@ class VMSuite extends munit.FunSuite {
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 0)
-    vm.procs.top.cntStack.push(0)
+    vm.procs.top.cntStack +:= 0
     assertEquals(vm.step(), None)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -853,7 +850,7 @@ class VMSuite extends munit.FunSuite {
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 0)
-    vm.procs.top.procStack.push(0)
+    vm.procs.top.procStack +:= 0
     assertEquals(vm.step(), None)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -873,7 +870,7 @@ class VMSuite extends munit.FunSuite {
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 1)
-    assertEquals(vm.procs.top.cntStack, mutable.Stack(2))
+    assertEquals(vm.procs.top.cntStack, Seq(2))
   }
 
   test("VM#step: PushPos") {
@@ -887,7 +884,7 @@ class VMSuite extends munit.FunSuite {
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 1)
-    assertEquals(vm.procs.top.posStack, mutable.Stack(1))
+    assertEquals(vm.procs.top.posStack, Seq(1))
   }
 
   test("VM#step: PushProc") {
@@ -901,7 +898,7 @@ class VMSuite extends munit.FunSuite {
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 1)
-    assertEquals(vm.procs.top.procStack, mutable.Stack(1))
+    assertEquals(vm.procs.top.procStack, Seq(1))
   }
 
   test("VM#step: Ref") {
@@ -997,7 +994,7 @@ class VMSuite extends munit.FunSuite {
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 0)
-    vm.procs.top.posStack.push(0)
+    vm.procs.top.posStack +:= 0
     assertEquals(vm.step(), None)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 0)
@@ -1013,7 +1010,7 @@ class VMSuite extends munit.FunSuite {
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
     assertEquals(vm.procs.top.pc, 0)
-    vm.procs.top.procStack.push(2)
+    vm.procs.top.procStack +:= 2
     for (_ <- (1 to 3)) vm.procs.push(vm.procs.top.clone())
     assertEquals(vm.step(), None)
     assertEquals(vm.procs.size, 2)

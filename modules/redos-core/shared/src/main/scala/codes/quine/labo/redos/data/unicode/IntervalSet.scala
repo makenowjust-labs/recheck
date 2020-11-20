@@ -9,7 +9,7 @@ import IntervalSet._
   * [[intervals]] is a sequence of discrete intervals sorted by start value.
   * Each interval is represented by a pair of values `[start, end)`.
   */
-private[data] final case class IntervalSet[A] private (intervals: IndexedSeq[(A, A)]) {
+private[data] final case class IntervalSet[@specialized A](intervals: IndexedSeq[(A, A)]) {
 
   /** Checks whether this interval set is empty or not. */
   def isEmpty: Boolean = intervals.isEmpty

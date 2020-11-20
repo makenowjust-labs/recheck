@@ -3,13 +3,14 @@ package codes.quine.labo.redos.data.unicode
 import scala.language.implicitConversions
 
 /** UChar is a Unicode code point. */
-final case class UChar(value: Int) extends AnyVal with Ordered[UChar] {
+final case class UChar(value: Int) extends Ordered[UChar] {
 
   /** Checks this code point is valid or not. */
   def isValidCodePoint: Boolean = 0 <= value && value <= 0x10ffff
 
   /** Compares to other Unicode code point. */
-  def compare(that: UChar): Int = this.value.compare(that.value)
+  override def compare(that: UChar): Int =
+    value - that.value
 
   /** Converts to a UTF-16 characters. */
   def toChars: Array[Char] =
