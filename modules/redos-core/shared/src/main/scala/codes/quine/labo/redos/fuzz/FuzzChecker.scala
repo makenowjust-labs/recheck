@@ -197,7 +197,7 @@ private[fuzz] final class FuzzChecker(
   /** A mutator to insert a part of the pattern (and a repeat specifier). */
   def mutateInsertPart(gen: Generation, next: Population): Option[FString] =
     checkTimeout("fuzz.FuzzChecker#mutateInsertPart") {
-      // Fallbacks when there is no part in the pattern.
+      // Falls back when there is no part in the pattern.
       if (parts.isEmpty) return mutateInsert(gen, next)
 
       val i = random.nextInt(gen.traces.size)
@@ -283,21 +283,42 @@ private[fuzz] final class FuzzChecker(
     next.execute(s)
   }
 
-  /** Tries to construct an attack string. */
+  /** Construct an attack string. */
   def tryAttack(str: FString): Option[FString] = checkTimeout("fuzz.FuzzChecker#tryAttack") {
-    def loop(str: FString, prev: Option[UString]): Option[FString] = checkTimeout("fuzz.FuzzChecker#tryAttack:loop") {
-      val input = str.toUString
-      if (input.size > maxAttackSize || prev.contains(input)) return None
+    tryAttackExponential(str).orElse(Seq(4, 3, 2).iterator.flatMap(tryAttackPolynomial(str, _)).nextOption())
+  }
+
+  /** Construct an attack string on assuming the pattern is exponential. */
+  def tryAttackExponential(str: FString): Option[FString] = checkTimeout("fuzz.FuzzChecker#tryAttackExponential") {
+    val r = Math.max(1, Math.log(attackLimit) / Math.log(2) / str.n)
+    val attack = str.copy(n = Math.ceil(str.n * r).toInt)
+    tryAttackExecute(attack)
+  }
+
+  /** Construct an attack string on assuming the pattern is polynomial. */
+  def tryAttackPolynomial(str: FString, degree: Int): Option[FString] =
+    checkTimeout("fuzz.FuzzChecker#tryAttackPolynomial") {
+      val r = Math.pow(attackLimit, 1.0 / degree) / str.n
+      if (r < 1) None
+      else {
+        val attack = str.copy(n = Math.ceil(str.n * r).toInt)
+        tryAttackExecute(attack)
+      }
+    }
+
+  /** Executes the string to construct attack string. */
+  def tryAttackExecute(str: FString): Option[FString] = checkTimeout("fuzz.FuzzChecker#tryAttackExecute") {
+    val input = str.toUString
+    if (input.size > maxAttackSize) None
+    else {
       val t = new LimitTracer(attackLimit, timeout)
       try VM.execute(ir, input, 0, t)
       catch {
         case _: LimitException =>
           return Some(str)
       }
-      loop(str.copy(n = str.n * 2), Some(input))
     }
-
-    loop(str, None)
+    None
   }
 
   /** Population is a mutable generation on fuzzing. */
@@ -329,13 +350,9 @@ private[fuzz] final class FuzzChecker(
     def add(str: FString, t: FuzzTracer): Unit = {
       inputs.add(t.input)
 
-      val newStr = random.between(0, 2) match {
-        case 0 => str
-        case 1 => t.buildFString()
-      }
       val rate = t.rate()
       val coverage = t.coverage()
-      val trace = Trace(newStr, rate, t.steps, coverage)
+      val trace = Trace(str, rate, t.steps, coverage)
 
       if (
         t.input.size < maxAttackSize && !set.contains(trace) && (init || rate >= minRate || !coverage.subsetOf(visited))
