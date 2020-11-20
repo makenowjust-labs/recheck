@@ -28,7 +28,8 @@ object FuzzChecker {
       maxAttackSize: Int = 10_000,
       maxSeedSize: Int = 100,
       maxGenerationSize: Int = 100,
-      maxIteration: Int = 30
+      maxIteration: Int = 30,
+      maxDegree: Int = 4
   )(implicit timeout: Timeout = Timeout.NoTimeout): Option[FString] =
     timeout.checkTimeout("fuzz.FuzzChecker.check")(
       new FuzzChecker(
@@ -43,6 +44,7 @@ object FuzzChecker {
         maxSeedSize,
         maxGenerationSize,
         maxIteration,
+        maxDegree,
         timeout
       ).check()
     )
@@ -72,6 +74,7 @@ private[fuzz] final class FuzzChecker(
     val maxSeedSize: Int,
     val maxGenerationSize: Int,
     val maxIteration: Int,
+    val maxDegree: Int,
     implicit val timeout: Timeout
 ) {
 
@@ -285,7 +288,7 @@ private[fuzz] final class FuzzChecker(
 
   /** Construct an attack string. */
   def tryAttack(str: FString): Option[FString] = checkTimeout("fuzz.FuzzChecker#tryAttack") {
-    tryAttackExponential(str).orElse(Seq(4, 3, 2).iterator.flatMap(tryAttackPolynomial(str, _)).nextOption())
+    tryAttackExponential(str).orElse((maxDegree to 2 by -1).iterator.flatMap(tryAttackPolynomial(str, _)).nextOption())
   }
 
   /** Construct an attack string on assuming the pattern is exponential. */

@@ -104,9 +104,15 @@ export type Config = {
   maxGenerationSize?: number;
 
   /**
-   * An integer value of a number of iterations on the incubation phase. (default: `30`)
+   * An integer value of the number of iterations on the incubation phase. (default: `30`)
    */
   maxIteration?: number;
+
+  /**
+   * An integer value of a maximum degree to attempt on building an attack string.
+   * (default: `4`)
+   */
+  maxDegree?: number;
 
   /**
    * An integer value of a limit of repetition count in the RegExp. (default: `10`)

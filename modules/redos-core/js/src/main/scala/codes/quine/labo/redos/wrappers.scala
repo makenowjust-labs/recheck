@@ -185,6 +185,9 @@ trait ConfigJS extends js.Object {
   /** A maximum iteration number of GA. */
   def maxIteration: js.UndefOr[Int]
 
+  /** A maximum degree number to attempt on building attack string. * */
+  def maxDegree: js.UndefOr[Int]
+
   /** A maximum number of sum of repeat counts like `/a{10}/`.
     * If this value is exceeded, it switches to use fuzzing based checker.
     */
@@ -223,6 +226,7 @@ object ConfigJS {
       config.maxSeedSize.getOrElse(Config.MaxSeedSize),
       config.maxGenerationSize.getOrElse(Config.MaxGenerationSize),
       config.maxIteration.getOrElse(Config.MaxIteration),
+      config.maxDegree.getOrElse(Config.MaxDegree),
       config.maxRepeatCount.getOrElse(Config.MaxRepeatCount),
       config.maxNFASize.getOrElse(Config.MaxNFASize)
     )
