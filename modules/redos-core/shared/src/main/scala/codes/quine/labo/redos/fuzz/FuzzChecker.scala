@@ -346,8 +346,7 @@ private[fuzz] final class FuzzChecker(
           return tryAttack(str)
       }
       add(str, t)
-      if (t.rate() > attackLimit / populationLimit) tryAttack(str)
-      else None
+      None
     }
 
     /** Records an IR execution result. */
