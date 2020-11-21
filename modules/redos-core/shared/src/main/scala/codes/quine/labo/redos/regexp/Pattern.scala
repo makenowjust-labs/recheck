@@ -47,6 +47,26 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
     !flagSet.multiline && loop(node)
   }
 
+  /** Tests the pattern has no infinite repetition. */
+  def isConstant: Boolean = {
+    def loop(node: Node): Boolean = node match {
+      case Disjunction(ns)             => ns.forall(loop)
+      case Sequence(ns)                => ns.forall(loop)
+      case Capture(_, n)               => loop(n)
+      case NamedCapture(_, _, n)       => loop(n)
+      case Group(n)                    => loop(n)
+      case Star(_, _)                  => false
+      case Plus(_, _)                  => false
+      case Question(_, n)              => loop(n)
+      case Repeat(_, _, Some(None), _) => false
+      case Repeat(_, _, _, n)          => loop(n)
+      case LookAhead(_, n)             => loop(n)
+      case LookBehind(_, n)            => loop(n)
+      case _                           => true
+    }
+    loop(node)
+  }
+
   /** Computes alphabet from this pattern. */
   def alphabet(implicit timeout: Timeout = Timeout.NoTimeout): Try[ICharSet] =
     timeout.checkTimeout("regexp.Pattern#alphabet") {

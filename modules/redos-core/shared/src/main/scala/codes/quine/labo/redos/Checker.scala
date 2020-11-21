@@ -35,19 +35,26 @@ object Checker {
           if (checker == Hybrid && repeatCount(pattern) >= maxRepeatCount)
             Failure(new UnsupportedException("too many repeat"))
           else Success(())
-        epsNFA <- EpsNFACompiler.compile(pattern)
-        orderedNFA <- Try(epsNFA.toOrderedNFA.rename)
-        _ <-
-          if (checker == Hybrid && orderedNFA.delta.size >= maxNFASize)
-            Failure(new UnsupportedException("too large NFA"))
-          else Success(())
-      } yield AutomatonChecker.check(orderedNFA)
+        complexity <-
+          // When the pattern has no infinite repetition, then it is safe.
+          if (pattern.isConstant) Success(None)
+          else
+            for {
+              epsNFA <- EpsNFACompiler.compile(pattern)
+              orderedNFA <- Try(epsNFA.toOrderedNFA.rename)
+              _ <-
+                if (checker == Hybrid && orderedNFA.delta.size >= maxNFASize)
+                  Failure(new UnsupportedException("too large NFA"))
+                else Success(())
+            } yield Some(AutomatonChecker.check(orderedNFA))
+      } yield complexity
 
       result.map {
-        case vuln: Complexity.Vulnerable[IChar] =>
+        case Some(vuln: Complexity.Vulnerable[IChar]) =>
           val attack = UString(vuln.buildAttack(attackLimit, stepRate, maxAttackSize).map(_.head).toIndexedSeq)
           Diagnostics.Vulnerable(attack, Some(vuln))
-        case safe: Complexity.Safe => Diagnostics.Safe(Some(safe))
+        case Some(safe: Complexity.Safe) => Diagnostics.Safe(Some(safe))
+        case None                        => Diagnostics.Safe(None)
       }
     }
   }

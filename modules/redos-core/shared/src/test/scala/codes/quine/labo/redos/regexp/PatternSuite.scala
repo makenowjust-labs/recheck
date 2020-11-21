@@ -184,6 +184,32 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(Pattern(LineEnd, flagSet1).hasLineEndAtEnd, false)
   }
 
+  test("Pattern#isConstant") {
+    val flagSet = FlagSet(false, false, false, false, false, false)
+    assertEquals(Pattern(Disjunction(Seq(Dot, Dot)), flagSet).isConstant, true)
+    assertEquals(Pattern(Disjunction(Seq(Star(false, Dot), Dot)), flagSet).isConstant, false)
+    assertEquals(Pattern(Disjunction(Seq(Dot, Star(false, Dot))), flagSet).isConstant, false)
+    assertEquals(Pattern(Sequence(Seq(Dot, Dot)), flagSet).isConstant, true)
+    assertEquals(Pattern(Sequence(Seq(Star(false, Dot), Dot)), flagSet).isConstant, false)
+    assertEquals(Pattern(Sequence(Seq(Dot, Star(false, Dot))), flagSet).isConstant, false)
+    assertEquals(Pattern(Capture(1, Dot), flagSet).isConstant, true)
+    assertEquals(Pattern(Capture(1, Star(false, Dot)), flagSet).isConstant, false)
+    assertEquals(Pattern(NamedCapture(1, "x", Dot), flagSet).isConstant, true)
+    assertEquals(Pattern(NamedCapture(1, "x", Star(false, Dot)), flagSet).isConstant, false)
+    assertEquals(Pattern(Group(Dot), flagSet).isConstant, true)
+    assertEquals(Pattern(Group(Star(false, Dot)), flagSet).isConstant, false)
+    assertEquals(Pattern(Star(false, Dot), flagSet).isConstant, false)
+    assertEquals(Pattern(Plus(false, Dot), flagSet).isConstant, false)
+    assertEquals(Pattern(Question(false, Dot), flagSet).isConstant, true)
+    assertEquals(Pattern(Repeat(false, 1, None, Dot), flagSet).isConstant, true)
+    assertEquals(Pattern(Repeat(false, 1, Some(None), Dot), flagSet).isConstant, false)
+    assertEquals(Pattern(Repeat(false, 1, Some(Some(2)), Dot), flagSet).isConstant, true)
+    assertEquals(Pattern(LookAhead(false, Dot), flagSet).isConstant, true)
+    assertEquals(Pattern(LookAhead(false, Star(false, Dot)), flagSet).isConstant, false)
+    assertEquals(Pattern(LookBehind(false, Dot), flagSet).isConstant, true)
+    assertEquals(Pattern(LookBehind(false, Star(false, Dot)), flagSet).isConstant, false)
+  }
+
   test("Pattern#alphabet") {
     val flagSet0 = FlagSet(false, false, false, false, false, false)
     val flagSet1 = FlagSet(false, false, true, false, false, false)

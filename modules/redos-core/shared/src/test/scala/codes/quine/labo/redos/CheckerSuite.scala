@@ -61,6 +61,16 @@ class CheckerSuite extends munit.FunSuite {
       ),
       Success(Diagnostics.Safe(Some(Complexity.Linear)))
     )
+    assertEquals(
+      Checker.Automaton.check(
+        Pattern(
+          Sequence(Seq(LineBegin, Dot, LineEnd)),
+          FlagSet(false, false, false, false, false, false)
+        ),
+        Config()
+      ),
+      Success(Diagnostics.Safe(None))
+    )
   }
 
   test("Checker.Fuzz.check") {
