@@ -4,7 +4,6 @@ import scalajs.js
 import scalajs.js.JSON
 import automaton.Complexity
 import automaton.Witness
-import data.IChar
 import data.UChar
 import data.UString
 
@@ -19,7 +18,7 @@ class WrappersSuite extends munit.FunSuite {
       JSON.stringify(js.Dynamic.literal(status = "safe", complexity = ()))
     )
 
-    val w = Witness(Seq((Seq(IChar('a')), Seq(IChar('b')))), Seq(IChar('c')))
+    val w = Witness(Seq((Seq(UChar('a')), Seq(UChar('b')))), Seq(UChar('c')))
     val j = js.Dynamic.literal(pumps = js.Array(js.Dynamic.literal(prefix = "a", pump = "b")), suffix = "c")
     assertEquals(
       JSON.stringify(
@@ -50,7 +49,7 @@ class WrappersSuite extends munit.FunSuite {
       JSON.stringify(js.Dynamic.literal(`type` = "linear"))
     )
 
-    val w = Witness(Seq((Seq(IChar('a')), Seq(IChar('b')))), Seq(IChar('c')))
+    val w = Witness(Seq((Seq(UChar('a')), Seq(UChar('b')))), Seq(UChar('c')))
     val j = js.Dynamic.literal(pumps = js.Array(js.Dynamic.literal(prefix = "a", pump = "b")), suffix = "c")
     assertEquals(
       JSON.stringify(ComplexityJS.from(Complexity.Exponential(w))),
@@ -64,21 +63,16 @@ class WrappersSuite extends munit.FunSuite {
 
   test("WitnessJS.from") {
     assertEquals(
-      JSON.stringify(WitnessJS.from(Witness(Seq((Seq(IChar('a')), Seq(IChar('b')))), Seq(IChar('c'))))),
+      JSON.stringify(WitnessJS.from(Witness(Seq((Seq(UChar('a')), Seq(UChar('b')))), Seq(UChar('c'))))),
       JSON.stringify(js.Dynamic.literal(pumps = js.Array(js.Dynamic.literal(prefix = "a", pump = "b")), suffix = "c"))
     )
   }
 
   test("PumpJS.from") {
     assertEquals(
-      JSON.stringify(PumpJS.from((Seq(IChar('a')), Seq(IChar('a'))))),
+      JSON.stringify(PumpJS.from((Seq(UChar('a')), Seq(UChar('a'))))),
       JSON.stringify(js.Dynamic.literal(prefix = "a", pump = "a"))
     )
-  }
-
-  test("IStringJS.from") {
-    assertEquals(IStringJS.from(Seq(IChar('a'))), "a")
-    assertEquals(IStringJS.from(Seq(IChar('a'), IChar.range(UChar('b'), UChar('c')))), "ab")
   }
 
   test("ErrorKindJS.from") {

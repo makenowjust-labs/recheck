@@ -28,6 +28,16 @@ final case class OrderedNFA[A, Q](
     )
   }
 
+  /** Converts this NFA's alphabet by the function. */
+  def mapAlphabet[B](f: A => B): OrderedNFA[B, Q] =
+    OrderedNFA(
+      alphabet.map(f),
+      stateSet,
+      inits,
+      acceptSet,
+      delta.map { case ((q1, a), q2) => ((q1, f(a)), q2) }
+    )
+
   /** Reverses this NFA.
     *
     * This method loses priorities, so the result type is usual [[NFA]].

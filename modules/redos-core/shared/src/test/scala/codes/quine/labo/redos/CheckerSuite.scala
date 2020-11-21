@@ -5,7 +5,7 @@ import scala.util.Success
 
 import automaton.Complexity
 import automaton.Witness
-import data.IChar
+import data.UChar
 import data.UString
 import regexp.Pattern
 import regexp.Pattern._
@@ -46,7 +46,7 @@ class CheckerSuite extends munit.FunSuite {
         Diagnostics.Vulnerable(
           UString.from("aaaaaaaaaaaaaaaaaaaaa\u0000", false),
           Some(
-            Complexity.Exponential(Witness(Seq((Seq(IChar('a')), Seq(IChar('a')))), Seq(IChar.Any16.diff(IChar('a')))))
+            Complexity.Exponential(Witness(Seq((Seq(UChar('a')), Seq(UChar('a')))), Seq(UChar(0x00))))
           )
         )
       )
@@ -105,7 +105,7 @@ class CheckerSuite extends munit.FunSuite {
         Diagnostics.Vulnerable(
           UString.from("aaaaaaaaaaaaaaaaaaaaa\u0000", false),
           Some(
-            Complexity.Exponential(Witness(Seq((Seq(IChar('a')), Seq(IChar('a')))), Seq(IChar.Any16.diff(IChar('a')))))
+            Complexity.Exponential(Witness(Seq((Seq(UChar('a')), Seq(UChar('a')))), Seq(UChar(0x00))))
           )
         )
       )

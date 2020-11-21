@@ -41,6 +41,14 @@ class OrderedNFASuite extends munit.FunSuite {
     assertEquals(nfa.rename, OrderedNFA(Set('a', 'b'), Set(0, 1), Seq(0), Set(1), Map((0, 'a') -> Seq(1))))
   }
 
+  test("OrderedNFA#mapAlphabet") {
+    val nfa = OrderedNFA(Set('a', 'b'), Set(0, 1), Seq(0), Set(1), Map((0, 'a') -> Seq(1)))
+    assertEquals(
+      nfa.mapAlphabet(_.toString),
+      OrderedNFA(Set("a", "b"), Set(0, 1), Seq(0), Set(1), Map((0, "a") -> Seq(1)))
+    )
+  }
+
   test("OrderedNFA#reverse") {
     val nfa = OrderedNFA(Set('a', 'b'), Set(0, 1), Seq(0), Set(1), Map((0, 'a') -> Seq(1)))
     assertEquals(nfa.reverse, NFA(Set('a', 'b'), Set(0, 1), Set(1), Set(0), Map((1, 'a') -> Set(0))))

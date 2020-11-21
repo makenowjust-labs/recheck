@@ -1,14 +1,15 @@
 package codes.quine.labo.redos
+
 import automaton.Complexity
 import automaton.Witness
-import data.IChar
+import data.UChar
 import data.UString
 
 class DiagnosticsSuite extends munit.FunSuite {
   test("Diagnostics#complexity") {
     assertEquals(Diagnostics.Safe(Some(Complexity.Constant)).complexity, Some(Complexity.Constant))
     assertEquals(Diagnostics.Safe(None).complexity, None)
-    val w = Witness(Seq((Seq(IChar('a')), Seq(IChar('a')))), Seq(IChar('a')))
+    val w = Witness(Seq((Seq(UChar('a')), Seq(UChar('a')))), Seq(UChar('a')))
     assertEquals(
       Diagnostics.Vulnerable(UString.empty, Some(Complexity.Exponential(w))).complexity,
       Some(Complexity.Exponential(w))

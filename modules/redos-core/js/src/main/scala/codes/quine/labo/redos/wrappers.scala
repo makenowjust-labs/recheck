@@ -7,7 +7,8 @@ import scalajs.js
 import scalajs.js.JSConverters._
 import automaton.Complexity
 import automaton.Witness
-import data.IChar
+import data.UChar
+import data.UString
 import util.Timeout
 
 /** DiagnosticsJS is a JS wrapper for Diagnostics. */
@@ -65,7 +66,7 @@ trait ComplexityJS extends js.Object {
 object ComplexityJS {
 
   /** Constructs a ComplexityJS from the actual Complexity. */
-  def from(c: Complexity[IChar]): ComplexityJS = c match {
+  def from(c: Complexity[UChar]): ComplexityJS = c match {
     case Complexity.Constant => js.Dynamic.literal(`type` = "constant").asInstanceOf[ComplexityJS]
     case Complexity.Linear   => js.Dynamic.literal(`type` = "linear").asInstanceOf[ComplexityJS]
     case Complexity.Polynomial(d, w) =>
@@ -89,9 +90,9 @@ trait WitnessJS extends js.Object {
 object WitnessJS {
 
   /** Constructs a WitnessJS from the actual Witness. */
-  def from(w: Witness[IChar]): WitnessJS =
+  def from(w: Witness[UChar]): WitnessJS =
     js.Dynamic
-      .literal(pumps = w.pumps.map(PumpJS.from(_)).toJSArray, suffix = IStringJS.from(w.suffix))
+      .literal(pumps = w.pumps.map(PumpJS.from).toJSArray, suffix = UString(w.suffix.toIndexedSeq).asString)
       .asInstanceOf[WitnessJS]
 }
 
@@ -109,15 +110,10 @@ trait PumpJS extends js.Object {
 object PumpJS {
 
   /** Constructs a PumpJS from the actual Pump. */
-  def from(p: (Seq[IChar], Seq[IChar])): PumpJS =
-    js.Dynamic.literal(prefix = IStringJS.from(p._1), pump = IStringJS.from(p._2)).asInstanceOf[PumpJS]
-}
-
-/** IString (`Seq[IChar]`) utilities. */
-object IStringJS {
-
-  /** Constructs a String from the actual IString. */
-  def from(seq: Seq[IChar]): String = seq.map(_.head.asString).mkString
+  def from(p: (Seq[UChar], Seq[UChar])): PumpJS =
+    js.Dynamic
+      .literal(prefix = UString(p._1.toIndexedSeq).asString, pump = UString(p._2.toIndexedSeq).asString)
+      .asInstanceOf[PumpJS]
 }
 
 /** ErrorKindJS is a JS wrapper for ErrorKind. */

@@ -1,6 +1,6 @@
 package codes.quine.labo.redos
 
-import data.IChar
+import data.UChar
 import data.UString
 import automaton.Complexity
 
@@ -8,21 +8,21 @@ import automaton.Complexity
 sealed abstract class Diagnostics extends Serializable with Product {
 
   /** A matching-time complexity. */
-  def complexity: Option[Complexity[IChar]]
+  def complexity: Option[Complexity[UChar]]
 }
 
 /** Diagnostics utilities and types. */
 object Diagnostics {
 
   /** Vulnerable is a diagnostics for a vulnerable RegExp. */
-  final case class Vulnerable(attack: UString, complexity: Option[Complexity.Vulnerable[IChar]]) extends Diagnostics
+  final case class Vulnerable(attack: UString, complexity: Option[Complexity.Vulnerable[UChar]]) extends Diagnostics
 
   /** Safe is a diagnostics for a safe RegExp. */
   final case class Safe(complexity: Option[Complexity.Safe]) extends Diagnostics
 
   /** Unknown is a unknown vulnerability diagnostics for some reasons. */
   final case class Unknown(error: ErrorKind) extends Diagnostics {
-    def complexity: Option[Complexity[IChar]] = None
+    def complexity: Option[Complexity[UChar]] = None
   }
 
   /** Unknown utilities. */

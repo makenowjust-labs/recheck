@@ -9,7 +9,7 @@ import automaton.EpsNFACompiler
 import automaton.Complexity
 import fuzz.FuzzChecker
 import fuzz.FuzzContext
-import data.IChar
+import data.UChar
 import data.UString
 import regexp.Pattern
 import util.Timeout
@@ -41,7 +41,7 @@ object Checker {
           else
             for {
               epsNFA <- EpsNFACompiler.compile(pattern)
-              orderedNFA <- Try(epsNFA.toOrderedNFA.rename)
+              orderedNFA <- Try(epsNFA.toOrderedNFA.rename.mapAlphabet(_.head))
               _ <-
                 if (checker == Hybrid && orderedNFA.delta.size >= maxNFASize)
                   Failure(new UnsupportedException("too large NFA"))
@@ -50,8 +50,8 @@ object Checker {
       } yield complexity
 
       result.map {
-        case Some(vuln: Complexity.Vulnerable[IChar]) =>
-          val attack = UString(vuln.buildAttack(attackLimit, stepRate, maxAttackSize).map(_.head).toIndexedSeq)
+        case Some(vuln: Complexity.Vulnerable[UChar]) =>
+          val attack = UString(vuln.buildAttack(attackLimit, stepRate, maxAttackSize).toIndexedSeq)
           Diagnostics.Vulnerable(attack, Some(vuln))
         case Some(safe: Complexity.Safe) => Diagnostics.Safe(Some(safe))
         case None                        => Diagnostics.Safe(None)
