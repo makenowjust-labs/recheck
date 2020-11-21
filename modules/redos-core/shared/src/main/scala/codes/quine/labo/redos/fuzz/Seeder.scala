@@ -7,7 +7,9 @@ import scala.collection.mutable
 import backtrack.IR
 import backtrack.VM
 import backtrack.Tracer.LimitException
-import data.{IChar, ICharSet, UString}
+import data.IChar
+import data.ICharSet
+import data.UString
 import util.Timeout
 
 /** Seeder computes a seed set for the pattern. */
@@ -76,7 +78,7 @@ object Seeder {
   /** Patch types. */
   private[fuzz] object Patch {
 
-    /** InsertChar is a patch to insert each characters at the `pos`. */
+    /** InsertChar is a patch to insert (or replace) each characters at the `pos`. */
     final case class InsertChar(pos: Int, chs: Set[IChar]) extends Patch {
       def apply(s: UString): Seq[UString] =
         chs.toSeq.map(_.head).flatMap(c => Seq(s.insertAt(pos, c), s.replaceAt(pos, c)))

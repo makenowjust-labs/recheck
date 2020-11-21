@@ -48,7 +48,7 @@ object IR {
   /** `char c`: Try to match the current character with the character `c`.
     * If matched, advance `pos`, otherwise do backtrack.
     *
-    * `c` is canonicalized when the pattern is `ignoreCase`.
+    * `c` is canonical when the pattern is `ignoreCase`.
     */
   final case class Char(c: UChar) extends OpCode {
     override def toString: String = s"char\t'$c'"
@@ -57,7 +57,7 @@ object IR {
   /** `class s`: Try to match the current character with the character set `s`.
     * If matched, advance `pos`, otherwise do backtrack.
     *
-    * `s` is canonicalized when the pattern is `ignoreCase`.
+    * `s` is canonical when the pattern is `ignoreCase`.
     */
   final case class Class(s: IChar) extends OpCode {
     override def toString: String = s"class\t$s"
@@ -66,7 +66,7 @@ object IR {
   /** `class_not s`: Try to match the current character with the character set `s`.
     * If not matched, advance `pos`, otherwise do backtrack.
     *
-    * `s` is canonicalized when the pattern is `ignoreCase`.
+    * `s` is canonical when the pattern is `ignoreCase`.
     */
   final case class ClassNot(s: IChar) extends OpCode {
     override def toString: String = s"class_not\t$s"

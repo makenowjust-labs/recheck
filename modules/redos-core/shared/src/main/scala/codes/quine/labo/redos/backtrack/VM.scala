@@ -4,7 +4,8 @@ package backtrack
 import scala.collection.mutable
 
 import IR._
-import data.IChar.{LineTerminator, Word}
+import data.IChar.LineTerminator
+import data.IChar.Word
 import data.UChar
 import data.UString
 

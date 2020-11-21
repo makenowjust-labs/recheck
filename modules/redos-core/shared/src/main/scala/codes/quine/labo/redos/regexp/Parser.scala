@@ -9,7 +9,9 @@ import scala.util.Try
 import fastparse.NoWhitespace._
 import fastparse._
 
-import Pattern.{FlagSet, Node, ClassNode}
+import Pattern.FlagSet
+import Pattern.Node
+import Pattern.ClassNode
 import data.IChar
 import data.UChar
 import util.Timeout
