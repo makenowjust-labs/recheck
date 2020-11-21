@@ -119,7 +119,7 @@ An integer value of the number of mutations on one generation. (default: `50`)
 
 #### `maxSeedSize`
 
-An integer value of a maximum size of a seed set. (default: `100`)
+An integer value of a maximum size of a seed set. (default: `50`)
 
 #### `maxGenerationSize`
 
@@ -135,14 +135,14 @@ An integer value of a maximum degree to attempt on building an attack string. (d
 
 #### `maxRepeatCount`
 
-An integer value of a limit of repetition count in the RegExp. (default: `10`)
+An integer value of a limit of repetition count in the RegExp. (default: `16`)
 
 If the RegExp exceeds this limit on the hybrid checker, it switches to
 use the fuzz checker to analyze instead of the automaton based checker.
 
 #### `maxNFASize`
 
-An integer value of a maximum size of the transition function of NFA. (default: `1000`)
+An integer value of a maximum size of the transition function of NFA. (default: `40000`)
 
 If the NFA's transition function exceeds this limit on the hybrid checker,
 it switches to use fuzz checker to analyze instead of the automaton based checker.

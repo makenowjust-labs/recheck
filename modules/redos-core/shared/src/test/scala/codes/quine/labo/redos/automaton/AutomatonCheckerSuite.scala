@@ -15,7 +15,7 @@ class AutomatonCheckerSuite extends munit.FunSuite {
     for {
       pattern <- Parser.parse(source, flags)
       epsNFA <- EpsNFACompiler.compile(pattern)
-      nfa = epsNFA.toOrderedNFA.rename
+      nfa = epsNFA.toOrderedNFA().rename
       result <- Try(AutomatonChecker.check(nfa))
     } yield result
 

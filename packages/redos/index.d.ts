@@ -93,7 +93,7 @@ export type Config = {
   mutateSize?: number;
 
   /**
-   * An integer value of a maximum size of a seed set. (default: `100`)
+   * An integer value of a maximum size of a seed set. (default: `50`)
    */
   maxSeedSize?: number;
 
@@ -115,7 +115,7 @@ export type Config = {
   maxDegree?: number;
 
   /**
-   * An integer value of a limit of repetition count in the RegExp. (default: `10`)
+   * An integer value of a limit of repetition count in the RegExp. (default: `16`)
    *
    * If the RegExp exceeds this limit on the hybrid checker, it switches to use
    * the fuzz checker to analyze instead of the automaton based checker.
@@ -123,7 +123,7 @@ export type Config = {
   maxRepeatCount?: number;
 
   /**
-   * An integer value of a maximum size of the transition function of NFA. (default: `1000`)
+   * An integer value of a maximum size of the transition function of NFA. (default: `40000`)
    *
    * If the NFA's transition function exceeds this limit on the hybrid checker,
    * it switches to use fuzz checker to analyze instead of the automaton based checker.

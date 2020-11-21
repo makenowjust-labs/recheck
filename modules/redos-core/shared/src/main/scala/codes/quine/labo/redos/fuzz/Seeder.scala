@@ -23,44 +23,47 @@ object Seeder {
 
     val set = mutable.Set.empty[FString]
     val added = mutable.Set.empty[UString]
-    val queue = mutable.Queue.empty[UString]
+    val queue = mutable.Queue.empty[(UString, Option[(Int, Seq[Int])])]
     val covered = mutable.Set.empty[(Int, Seq[Int], Boolean)]
 
     checkTimeout("fuzz.Seeder.seed:init") {
-      queue.enqueue(UString.empty)
+      queue.enqueue((UString.empty, None))
       for (ch <- ctx.alphabet.chars) {
         val s = UString(IndexedSeq(ch.head))
-        queue.enqueue(s)
+        queue.enqueue((s, None))
         added.add(s)
       }
     }
 
     while (queue.nonEmpty && set.size < maxSeedSetSize) checkTimeout("fuzz.Seeder.seed:loop") {
-      val input = queue.dequeue()
+      val (input, target) = queue.dequeue()
 
-      val t = new SeedTracer(ctx, input, limit, timeout)
-      try VM.execute(ctx.ir, input, 0, t)
-      catch {
-        case _: LimitException =>
-          // When execution reaches the limit, it is possibly vulnerable.
-          // Then, it is added to a seed set and exits seeding.
+      if (target.forall { case (pc, cnts) => !covered.contains((pc, cnts, false)) }) {
+        val t = new SeedTracer(ctx, input, limit, timeout)
+        try VM.execute(ctx.ir, input, 0, t)
+        catch {
+          case _: LimitException =>
+            // When execution reaches the limit, it is possibly vulnerable.
+            // Then, it is added to a seed set and exits seeding.
+            set.add(t.buildFString())
+            return set.toSet
+        }
+
+        val coverage = t.coverage()
+        val patches = t.patches()
+
+        // If the input string can reach a new pc,
+        // it should be added to a seed set.
+        if (!coverage.subsetOf(covered)) {
           set.add(t.buildFString())
-          return set.toSet
-      }
-
-      val coverage = t.coverage()
-      val patches = t.patches()
-
-      // If the input string can reach a new pc,
-      // it should be added to a seed set.
-      if (!coverage.subsetOf(covered)) {
-        set.add(t.buildFString())
-        covered.addAll(coverage)
-        for (((pc, cnts), patch) <- patches) {
-          if (!covered.contains((pc, cnts, false))) {
-            for (patched <- patch.apply(input); if !added.contains(patched)) {
-              queue.enqueue(patched)
-              added.add(patched)
+          set.add(FString(1, input.seq.map(FString.Wrap)))
+          covered.addAll(coverage)
+          for (((pc, cnts), patch) <- patches) {
+            if (!covered.contains((pc, cnts, false))) {
+              for (patched <- patch.apply(input); if !added.contains(patched)) {
+                queue.enqueue((patched, Some((pc, cnts))))
+                added.add(patched)
+              }
             }
           }
         }

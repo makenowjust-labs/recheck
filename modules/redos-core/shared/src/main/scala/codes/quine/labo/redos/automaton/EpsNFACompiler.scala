@@ -35,7 +35,7 @@ object EpsNFACompiler {
 
         def loop(node: Node): Try[(Int, Int)] = checkTimeout("automaton.EpsNFACompiler.compile:loop")(node match {
           case Disjunction(ns) =>
-            TryUtil.traverse(ns)(loop(_)).map { ss =>
+            TryUtil.traverse(ns)(loop).map { ss =>
               val i = nextQ()
               tau.addOne(i -> Eps(ss.map(_._1)))
               val a = nextQ()
@@ -44,7 +44,7 @@ object EpsNFACompiler {
             }
           case Sequence(ns) =>
             TryUtil
-              .traverse(ns)(loop(_))
+              .traverse(ns)(loop)
               .map(_.reduceLeftOption[(Int, Int)] { case ((i1, a1), (i2, a2)) =>
                 tau.addOne(a1 -> Eps(Vector(i2)))
                 (i1, a2)

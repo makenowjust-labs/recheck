@@ -73,7 +73,7 @@ class EpsNFASuite extends munit.FunSuite {
       )
     )
     assertEquals(
-      nfa1.toOrderedNFA,
+      nfa1.toOrderedNFA(),
       OrderedNFA(
         Set(IChar('\n').withLineTerminator, IChar('\n').complement(false)),
         Set((CharInfo(true, false), Seq(2, 3, 4)), (CharInfo(true, false), Seq(2, 3, 4, 2, 3, 4))),
@@ -106,7 +106,7 @@ class EpsNFASuite extends munit.FunSuite {
       )
     )
     assertEquals(
-      nfa2.toOrderedNFA,
+      nfa2.toOrderedNFA(),
       OrderedNFA(
         Set(IChar('a'), IChar('a').complement(false)),
         Set((CharInfo(true, false), Seq(0)), (CharInfo(false, false), Seq(1))),

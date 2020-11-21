@@ -12,13 +12,16 @@ import util.Timeout
 object AutomatonChecker {
 
   /** Checks a match time complexity of the NFA. */
-  def check[A, Q](nfa: OrderedNFA[A, Q])(implicit timeout: Timeout = Timeout.NoTimeout): Complexity[A] =
-    timeout.checkTimeout("automaton.AutomatonChecker.check")(new AutomatonChecker(nfa, timeout).check())
+  def check[A, Q](nfa: OrderedNFA[A, Q], maxNFASize: Int = Int.MaxValue)(implicit
+      timeout: Timeout = Timeout.NoTimeout
+  ): Complexity[A] =
+    timeout.checkTimeout("automaton.AutomatonChecker.check")(new AutomatonChecker(nfa, maxNFASize, timeout).check())
 }
 
 /** AutomatonChecker is a ReDoS vulnerable RegExp checker based on automata theory. */
 private final class AutomatonChecker[A, Q](
     private[this] val nfa: OrderedNFA[A, Q],
+    maxNFASize: Int,
     private[this] implicit val timeout: Timeout
 ) {
 
@@ -28,7 +31,7 @@ private final class AutomatonChecker[A, Q](
   /** A reversed DFA constructed from [[orderedNFA]],
     * and a NFA with multi-transitions constructed from [[orderedNFA]].
     */
-  private[this] val (reverseDFA, multiNFA) = OrderedNFA.prune(nfa)
+  private[this] val (reverseDFA, multiNFA) = OrderedNFA.prune(nfa, maxNFASize)
 
   /** A [[multiNFA]] transition graph. */
   private[this] val graph = multiNFA.toGraph.reachable(multiNFA.initSet.toSet)

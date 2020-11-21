@@ -44,9 +44,11 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
   }
 
   /** Converts this ε-NFA to ordered NFA with ε-elimination. */
-  def toOrderedNFA(implicit timeout: Timeout = Timeout.NoTimeout): OrderedNFA[IChar, (CharInfo, Seq[Q])] =
+  def toOrderedNFA(
+      maxNFASize: Int = Int.MaxValue
+  )(implicit timeout: Timeout = Timeout.NoTimeout): OrderedNFA[IChar, (CharInfo, Seq[Q])] =
     timeout.checkTimeout("automaton.EpsNFA#toOrderedNFA") {
-      // Skips ε-transition without context infotmation.
+      // Skips ε-transition without context information.
       def buildClosure0(q: Q, path: Seq[Q]): Seq[(Q, Seq[Q])] =
         timeout.checkTimeout("automaton.EpsNFA#toOrderedNFA:buildClosure0") {
           // Exits this loop if a cyclic path is found.
@@ -87,6 +89,7 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
       val newInits = Vector((CharInfo(true, false), closure0Init.map(_._1)))
       val newAcceptSet = Set.newBuilder[(CharInfo, Seq[Q])]
       val newDelta = Map.newBuilder[((CharInfo, Seq[Q]), IChar), Seq[(CharInfo, Seq[Q])]]
+      var deltaSize = 0
 
       queue.enqueue((CharInfo(true, false), closure0Init))
       newStateSet.addAll(newInits)
@@ -113,7 +116,10 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
               case Some(_) | None =>
                 () // Nothing to do here because of terminal state or non-match consuming state.
             }
-          newDelta.addOne(((c1, qs), ch) -> d.result())
+          val to = d.result()
+          newDelta.addOne(((c1, qs), ch) -> to)
+          deltaSize += to.size
+          if (deltaSize >= maxNFASize) throw new UnsupportedException("OrderedNFA size is too large")
         }
       }
 

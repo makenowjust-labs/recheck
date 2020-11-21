@@ -74,7 +74,7 @@ object OrderedNFA {
     *
     * A result is pair of a reversed DFA and pruned NFA.
     */
-  def prune[A, Q](nfa: OrderedNFA[A, Q])(implicit
+  def prune[A, Q](nfa: OrderedNFA[A, Q], maxNFASize: Int = Int.MaxValue)(implicit
       timeout: Timeout = Timeout.NoTimeout
   ): (DFA[A, Set[Q]], MultiNFA[(A, Set[Q]), (Q, Set[Q])]) = timeout.checkTimeout("automaton.OrderedNFA.prune") {
     val OrderedNFA(alphabet, stateSet, inits, acceptSet, delta) = nfa
@@ -89,6 +89,7 @@ object OrderedNFA {
     val newAcceptSet = for (q <- acceptSet) yield (q, reverseDFA.init)
 
     val newDelta = mutable.Map.empty[((Q, Set[Q]), (A, Set[Q])), MultiSet[(Q, Set[Q])]].withDefaultValue(MultiSet.empty)
+    var deltaSize = 0
     for ((q1, a) -> qs <- delta) timeout.checkTimeout("automaton.OrderedNFA.prune:loop") {
       for ((p1, p2) <- reverseDelta(a)) {
         // There is a transition `q1 --(a)-> qs` in ordered NFA, and
@@ -101,6 +102,8 @@ object OrderedNFA {
           .takeWhile(!_._1)
           .map { case (_, q2) => (q2, p2) }
         newDelta(((q1, p1), (a, p2))) = newDelta(((q1, p1), (a, p2))) ++ MultiSet.from(qp2s)
+        deltaSize += qp2s.size
+        if (deltaSize >= maxNFASize) throw new UnsupportedException("MultiNFA size is too large")
       }
     }
 

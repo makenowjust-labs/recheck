@@ -74,7 +74,7 @@ object Config {
   val MutateSize = 50
 
   /** The default value of [[Config#maxSeedSize]]. */
-  val MaxSeedSize = 100
+  val MaxSeedSize = 50
 
   /** The default value of [[Config#maxGenerationSize]]. */
   val MaxGenerationSize = 100
@@ -86,8 +86,8 @@ object Config {
   val MaxDegree = 4
 
   /** The default value of [[Config#maxRepeatCount]]. */
-  val MaxRepeatCount = 10
+  val MaxRepeatCount = 16
 
   /** The default value of [[Config#maxNFASize]]. */
-  val MaxNFASize = 1000
+  val MaxNFASize = 40000
 }

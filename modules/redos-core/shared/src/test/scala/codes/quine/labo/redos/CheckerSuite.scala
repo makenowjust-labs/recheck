@@ -83,7 +83,7 @@ class CheckerSuite extends munit.FunSuite {
         ),
         Config(random = random0)
       ),
-      Success(Diagnostics.Vulnerable(UString.from("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u0000", false), None))
+      Success(Diagnostics.Vulnerable(UString.from("aaaaaaaaaaaaaaaaaaaaa\u0000", false), None))
     )
     assertEquals(
       Checker.Fuzz.check(Pattern(Dot, FlagSet(false, false, false, false, false, false)), Config(random = random0)),

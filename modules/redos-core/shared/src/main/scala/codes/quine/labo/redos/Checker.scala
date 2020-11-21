@@ -28,6 +28,7 @@ object Checker {
   case object Automaton extends Checker {
     def check(pattern: Pattern, config: Config): Try[Diagnostics] = {
       import config._
+      val maxNFASize = if (checker == Hybrid) config.maxNFASize else Int.MaxValue
 
       val result = for {
         _ <- Try(()) // Ensures `Try` context.
@@ -41,12 +42,8 @@ object Checker {
           else
             for {
               epsNFA <- EpsNFACompiler.compile(pattern)
-              orderedNFA <- Try(epsNFA.toOrderedNFA.rename.mapAlphabet(_.head))
-              _ <-
-                if (checker == Hybrid && orderedNFA.delta.size >= maxNFASize)
-                  Failure(new UnsupportedException("too large NFA"))
-                else Success(())
-            } yield Some(AutomatonChecker.check(orderedNFA))
+              orderedNFA <- Try(epsNFA.toOrderedNFA(maxNFASize).rename.mapAlphabet(_.head))
+            } yield Some(AutomatonChecker.check(orderedNFA, maxNFASize))
       } yield complexity
 
       result.map {
