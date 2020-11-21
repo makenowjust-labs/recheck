@@ -30,6 +30,10 @@ class UCharSuite extends munit.FunSuite {
     assertEquals(UChar(0x42).compare(UChar(0x41)), 1)
   }
 
+  test("UChar#hashCode") {
+    assertEquals(UChar(0x41).hashCode(), 0x41)
+  }
+
   test("UChar#toChars") {
     assertEquals(String.valueOf(UChar(0x41).toChars), "A")
     assertEquals(String.valueOf(UChar(0x1f363).toChars), "🍣")

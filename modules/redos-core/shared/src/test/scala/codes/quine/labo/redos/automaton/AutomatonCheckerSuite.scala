@@ -45,7 +45,7 @@ class AutomatonCheckerSuite extends munit.FunSuite {
     )
     assertEquals(
       check("^.*a.*a.*a$", "s"),
-      Success(Polynomial(3, Witness(Seq((Seq(a), Seq(a)), (Seq.empty, Seq(a))), Seq(other))))
+      Success(Polynomial(3, Witness(Seq((Seq(other), Seq(a)), (Seq.empty, Seq(a))), Seq(other))))
     )
   }
 

@@ -12,6 +12,9 @@ final case class UChar(value: Int) extends Ordered[UChar] {
   override def compare(that: UChar): Int =
     value - that.value
 
+  /** Returns its value as hash code. */
+  override def hashCode(): Int = value
+
   /** Converts to a UTF-16 characters. */
   def toChars: Array[Char] =
     if (value <= 0xffff) Array(value.toChar)
