@@ -70,7 +70,7 @@ private final class AutomatonChecker[A, Q](
   private type R = (Q, Set[Q])
 
   /** A type of pumps of witness. */
-  private type Pump = (R, Seq[A], R)
+  private type Pump = (R, Seq[(A, Set[Q])], R)
 
   /** Tests whether the SCC is an atom, which is a singleton and does not have a self-loop. */
   private[this] def isAtom(sc: Seq[R]): Boolean =
@@ -222,8 +222,8 @@ private final class AutomatonChecker[A, Q](
   private[this] def witness(pumps: Seq[Pump]): Witness[A] = {
     val (pumpPaths, qs) = pumps.foldLeft((Vector.empty[(Seq[A], Seq[A])], multiNFA.initSet.toSet)) {
       case ((pumpPaths, last), (q1, path, q2)) =>
-        val prefix = graph.path(last, q1).get
-        (pumpPaths :+ (prefix, path), Set(q2))
+        val prefix = graph.path(last, q1).get.map(_._1)
+        (pumpPaths :+ (prefix, path.map(_._1)), Set(q2))
     }
     val suffix = reverseDFA.toGraph.path(Set(reverseDFA.init), qs.head._2).get.reverse
     Witness(pumpPaths, suffix)

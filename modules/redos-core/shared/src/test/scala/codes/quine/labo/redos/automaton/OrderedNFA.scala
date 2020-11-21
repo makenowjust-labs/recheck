@@ -22,15 +22,15 @@ class OrderedNFASuite extends munit.FunSuite {
     assertEquals(
       multiNFA,
       MultiNFA(
-        Set('a', 'b'),
+        Set(('a', Set(0, 1)), ('b', Set(0, 1))),
         Set((0, Set(0, 1)), (1, Set(0, 1))),
         MultiSet((0, Set(0, 1))),
         Set((0, Set(0, 1)), (1, Set(0, 1))),
         Map(
-          ((0, Set(0, 1)), 'a') -> MultiSet((0, Set(0, 1))),
-          ((0, Set(0, 1)), 'b') -> MultiSet((1, Set(0, 1))),
-          ((1, Set(0, 1)), 'a') -> MultiSet((1, Set(0, 1))),
-          ((1, Set(0, 1)), 'b') -> MultiSet((1, Set(0, 1)))
+          ((0, Set(0, 1)), ('a', Set(0, 1))) -> MultiSet((0, Set(0, 1))),
+          ((0, Set(0, 1)), ('b', Set(0, 1))) -> MultiSet((1, Set(0, 1))),
+          ((1, Set(0, 1)), ('a', Set(0, 1))) -> MultiSet((1, Set(0, 1))),
+          ((1, Set(0, 1)), ('b', Set(0, 1))) -> MultiSet((1, Set(0, 1)))
         )
       )
     )
