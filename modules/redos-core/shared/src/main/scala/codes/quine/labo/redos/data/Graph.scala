@@ -1,6 +1,7 @@
 package codes.quine.labo.redos
 package data
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 import util.Timeout
@@ -9,16 +10,16 @@ import util.Timeout
 object Graph {
 
   /** Creates a graph from the list of edges. */
-  def from[V, L](edges: Seq[(V, L, V)]): Graph[V, L] =
+  def from[V, L](edges: IndexedSeq[(V, L, V)]): Graph[V, L] =
     Graph(edges.groupMap(_._1)(vlv => (vlv._2, vlv._3)).withDefaultValue(Vector.empty))
 }
 
 /** Graph is a directed labelled multi-graph implementation. */
-final case class Graph[V, L] private (neighbors: Map[V, Seq[(L, V)]]) {
+final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]) {
 
   /** Lists edges of this graph. */
-  def edges: Seq[(V, L, V)] =
-    neighbors.flatMap { case v1 -> lvs => lvs.map { case (l, v2) => (v1, l, v2) } }.toSeq
+  def edges: IndexedSeq[(V, L, V)] =
+    neighbors.flatMap { case v1 -> lvs => lvs.map { case (l, v2) => (v1, l, v2) } }.toIndexedSeq
 
   /** Lists vertices of this graph. */
   def vertices: Set[V] = neighbors.keySet | neighbors.values.flatMap(_.map(_._2)).toSet
@@ -32,7 +33,7 @@ final case class Graph[V, L] private (neighbors: Map[V, Seq[(L, V)]]) {
     *
     * This method uses [[https://en.wikipedia.org/wiki/Tarjan's_strongly_connected_components_algorithm Tarjan's algorithm]].
     */
-  def scc(implicit timeout: Timeout = Timeout.NoTimeout): Seq[Seq[V]] = timeout.checkTimeout("data.Graph#scc") {
+  def scc(implicit timeout: Timeout = Timeout.NoTimeout): Seq[IndexedSeq[V]] = timeout.checkTimeout("data.Graph#scc") {
     var clock = 0
     val visited = mutable.Map.empty[V, Int]
     val lowlinks = mutable.Map.empty[V, Int]
@@ -40,44 +41,52 @@ final case class Graph[V, L] private (neighbors: Map[V, Seq[(L, V)]]) {
     val stack = mutable.Stack.empty[V]
     val inStack = mutable.Set.empty[V]
 
-    val components = Vector.newBuilder[Seq[V]]
+    val components = Vector.newBuilder[IndexedSeq[V]]
 
-    def dfs(v1: V): Unit = timeout.checkTimeout("data.Graph#scc:dfs") {
-      visited(v1) = clock
-      lowlinks(v1) = clock
-      clock += 1
+    @tailrec
+    def dfs(cont: Seq[(V, Boolean, Int)]): Unit = cont match {
+      case (v1, update, i) +: rest =>
+        dfs(timeout.checkTimeout("data.Graph#scc:dfs") {
+          val neighbor = neighbors.getOrElse(v1, Vector.empty)
+          if (i == 0) {
+            visited(v1) = clock
+            lowlinks(v1) = clock
+            clock += 1
 
-      stack.push(v1)
-      inStack.add(v1)
+            stack.push(v1)
+            inStack.add(v1)
+          } else if (update) {
+            val (_, v2) = neighbor(i - 1)
+            lowlinks(v1) = Math.min(lowlinks(v1), lowlinks(v2))
+          }
 
-      for ((_, v2) <- neighbors.getOrElse(v1, Vector.empty)) timeout.checkTimeout("data.Graph#scc:dfs:loop") {
-        if (!visited.contains(v2)) {
-          dfs(v2)
-          lowlinks(v1) = Math.min(lowlinks(v1), lowlinks(v2))
-        } else if (inStack.contains(v2)) {
-          lowlinks(v1) = Math.min(lowlinks(v1), visited(v2))
-        }
-      }
-
-      if (lowlinks(v1) == visited(v1)) {
-        val component = Vector.newBuilder[V]
-        var v2 = stack.pop()
-        inStack.remove(v2)
-        while (v1 != v2) {
-          component.addOne(v2)
-          v2 = stack.pop()
-          inStack.remove(v2)
-        }
-        component.addOne(v1)
-        components.addOne(component.result())
-      }
+          if (i < neighbor.size) {
+            val (_, v2) = neighbor(i)
+            if (!visited.contains(v2)) (v2, false, 0) +: (v1, true, i + 1) +: rest
+            else {
+              if (inStack.contains(v2)) lowlinks(v1) = Math.min(lowlinks(v1), visited(v2))
+              (v1, false, i + 1) +: rest
+            }
+          } else {
+            if (lowlinks(v1) == visited(v1)) {
+              val component = Vector.newBuilder[V]
+              var v2 = stack.pop()
+              inStack.remove(v2)
+              while (v1 != v2) {
+                component.addOne(v2)
+                v2 = stack.pop()
+                inStack.remove(v2)
+              }
+              component.addOne(v1)
+              components.addOne(component.result())
+            }
+            rest
+          }
+        })
+      case Seq() => ()
     }
 
-    for (v <- vertices) timeout.checkTimeout("data.Graph#scc:loop") {
-      if (!visited.contains(v)) {
-        dfs(v)
-      }
-    }
+    for (v <- vertices; if !visited.contains(v)) dfs(Seq((v, false, 0)))
 
     components.result()
   }
@@ -109,7 +118,7 @@ final case class Graph[V, L] private (neighbors: Map[V, Seq[(L, V)]]) {
     timeout.checkTimeout("data.Graph#reachable") {
       val queue = mutable.Queue.empty[V]
       val reachable = mutable.Set.empty[V]
-      val newEdges = Map.newBuilder[V, Seq[(L, V)]]
+      val newEdges = Map.newBuilder[V, IndexedSeq[(L, V)]]
 
       queue.enqueueAll(init)
       reachable.addAll(init)
@@ -119,7 +128,7 @@ final case class Graph[V, L] private (neighbors: Map[V, Seq[(L, V)]]) {
         val es = neighbors(v1)
         val vs = es.map(_._2)
         if (es.nonEmpty) newEdges.addOne(v1 -> es)
-        queue.enqueueAll(vs.filterNot(reachable.contains(_)))
+        queue.enqueueAll(vs.filterNot(reachable.contains))
         reachable.addAll(vs)
       }
 

@@ -19,12 +19,12 @@ final case class MultiNFA[A, Q](
     delta: Map[(Q, A), MultiSet[Q]]
 ) {
 
-  /** Exports this transition function as a grapg. */
+  /** Exports this transition function as a graph. */
   def toGraph(implicit timeout: Timeout = Timeout.NoTimeout): Graph[Q, A] =
     timeout.checkTimeout("automaton.MultiNFA#toGraph") {
       Graph.from(delta.iterator.flatMap { case (q1, a) -> qs =>
         qs.iterator.map((q1, a, _))
-      }.toSeq)
+      }.toIndexedSeq)
     }
 
   /** Converts to Graphviz format text. */

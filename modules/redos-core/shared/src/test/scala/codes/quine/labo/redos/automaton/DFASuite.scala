@@ -17,7 +17,7 @@ class DFASuite extends munit.FunSuite {
         (2, 'b') -> 1
       )
     )
-    val g = Graph.from(Seq((1, 'a', 1), (1, 'b', 2), (2, 'a', 2), (2, 'b', 1)))
+    val g = Graph.from(IndexedSeq((1, 'a', 1), (1, 'b', 2), (2, 'a', 2), (2, 'b', 1)))
     assertEquals(dfa.toGraph, g)
   }
 
