@@ -4,6 +4,7 @@ package automaton
 import scala.collection.mutable
 
 import util.GraphvizUtil.escape
+import util.Timeout
 
 /** NFA is a [[https://en.wikipedia.org/wiki/Nondeterministic_finite_automaton NFA (non-deterministic finite state automaton)]] implementation. */
 final case class NFA[A, Q](
@@ -30,30 +31,31 @@ final case class NFA[A, Q](
   }
 
   /** Determinizes this NFA. */
-  def toDFA: DFA[A, Set[Q]] = {
-    val queue = mutable.Queue.empty[Set[Q]]
-    val newStateSet = mutable.Set.empty[Set[Q]]
-    val newAcceptSet = Set.newBuilder[Set[Q]]
-    val newDelta = Map.newBuilder[(Set[Q], A), Set[Q]]
+  def toDFA(implicit timeout: Timeout = Timeout.NoTimeout): DFA[A, Set[Q]] =
+    timeout.checkTimeout("automaton.NFA#toDFA") {
+      val queue = mutable.Queue.empty[Set[Q]]
+      val newStateSet = mutable.Set.empty[Set[Q]]
+      val newAcceptSet = Set.newBuilder[Set[Q]]
+      val newDelta = Map.newBuilder[(Set[Q], A), Set[Q]]
 
-    queue.enqueue(initSet)
-    newStateSet.add(initSet)
+      queue.enqueue(initSet)
+      newStateSet.add(initSet)
 
-    while (queue.nonEmpty) {
-      val qs = queue.dequeue()
-      if ((qs & acceptSet).nonEmpty) {
-        newAcceptSet.addOne(qs)
-      }
-      for (a <- alphabet) {
-        val qs2 = qs.flatMap(q => delta.getOrElse((q, a), Set.empty))
-        newDelta.addOne((qs, a) -> qs2)
-        if (!newStateSet.contains(qs2)) {
-          queue.enqueue(qs2)
-          newStateSet.add(qs2)
+      while (queue.nonEmpty) timeout.checkTimeout("automaton.NFA#toDFA:loop") {
+        val qs = queue.dequeue()
+        if ((qs & acceptSet).nonEmpty) {
+          newAcceptSet.addOne(qs)
+        }
+        for (a <- alphabet) {
+          val qs2 = qs.flatMap(q => delta.getOrElse((q, a), Set.empty))
+          newDelta.addOne((qs, a) -> qs2)
+          if (!newStateSet.contains(qs2)) {
+            queue.enqueue(qs2)
+            newStateSet.add(qs2)
+          }
         }
       }
-    }
 
-    DFA(alphabet, newStateSet.toSet, initSet, newAcceptSet.result(), newDelta.result())
-  }
+      DFA(alphabet, newStateSet.toSet, initSet, newAcceptSet.result(), newDelta.result())
+    }
 }

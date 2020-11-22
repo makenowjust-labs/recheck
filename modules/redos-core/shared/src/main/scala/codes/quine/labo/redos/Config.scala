@@ -43,7 +43,10 @@ final case class Config(
     maxRepeatCount: Int = Config.MaxRepeatCount,
     // A maximum transition size of NFA to use the automaton based checker.
     // If this value is exceeded, it switches to use fuzzing based checker.
-    maxNFASize: Int = Config.MaxNFASize
+    maxNFASize: Int = Config.MaxNFASize,
+    // A maximum pattern size to use the automaton based checker.
+    // If this value is exceeded, it switches to use fuzzing based checker.
+    maxPatternSize: Int = Config.MaxPatternSize
 ) {
 
   /** Provides a timeout instance as an implicit parameter. */
@@ -90,4 +93,7 @@ object Config {
 
   /** The default value of [[Config#maxNFASize]]. */
   val MaxNFASize = 40000
+
+  /** The default value of [[Config#maxPatternSize]]. */
+  val MaxPatternSize = 1500
 }

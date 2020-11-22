@@ -27,7 +27,7 @@ ThisBuild / scalacOptions ++= Seq(
 ThisBuild / scalafixScalaBinaryVersion := "2.13"
 ThisBuild / semanticdbEnabled := true
 ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
-ThisBuild / scalafixDependencies += "com.github.liancheng" %% "organize-imports" % "0.4.3"
+ThisBuild / scalafixDependencies += "com.github.liancheng" %% "organize-imports" % "0.4.4"
 ThisBuild / scalafixDependencies += "com.github.vovapolu" %% "scaluzzi" % "0.1.16"
 
 lazy val root = project
@@ -95,7 +95,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       )
     },
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.17" % Test,
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.18" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
@@ -117,7 +117,7 @@ lazy val demoJS = project
     Compile / mainClass := Some("codes.quine.labo.redos.demo.DemoApp"),
     libraryDependencies += "org.scala-js" %%% "scalajs-dom" % "1.1.0",
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.17" % Test,
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.18" % Test,
     testFrameworks += new TestFramework("munit.Framework"),
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )

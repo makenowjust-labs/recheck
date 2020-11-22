@@ -67,6 +67,27 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
     loop(node)
   }
 
+  /** Returns this pattern's size. */
+  def size: Int = {
+    def loop(node: Node): Int = node match {
+      case Disjunction(ns)                => ns.map(loop).sum + ns.size - 1
+      case Sequence(ns)                   => ns.map(loop).sum
+      case Capture(_, n)                  => loop(n)
+      case NamedCapture(_, _, n)          => loop(n)
+      case Group(n)                       => loop(n)
+      case Star(_, n)                     => loop(n) + 1
+      case Plus(_, n)                     => loop(n) + 1
+      case Question(_, n)                 => loop(n) + 1
+      case Repeat(_, m, None, n)          => loop(n) * m
+      case Repeat(_, m, Some(None), n)    => loop(n) * m + 1
+      case Repeat(_, m, Some(Some(l)), n) => loop(n) * l + (l - m)
+      case LookAhead(_, n)                => loop(n) + 1
+      case LookBehind(_, n)               => loop(n) + 1
+      case _                              => 1
+    }
+    loop(node)
+  }
+
   /** Computes alphabet from this pattern. */
   def alphabet(implicit timeout: Timeout = Timeout.NoTimeout): Try[ICharSet] =
     timeout.checkTimeout("regexp.Pattern#alphabet") {

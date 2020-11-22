@@ -17,6 +17,9 @@ trait DiagnosticsJS extends js.Object {
   /** A status of this diagnostics. One of `safe`, `vulnerable` and `unknown`. */
   def status: String
 
+  /** A checker named to be used. */
+  def used: js.UndefOr[String]
+
   /** An attack string. It is available on `vulnerable` diagnostics. */
   def attack: js.UndefOr[String]
 
@@ -32,20 +35,34 @@ object DiagnosticsJS {
 
   /** Constructs a DiagnosticsJS from the actual Diagnostics. */
   def from(d: Diagnostics): DiagnosticsJS = d match {
-    case Diagnostics.Safe(c) =>
+    case Diagnostics.Safe(c, used) =>
       js.Dynamic
-        .literal(status = "safe", complexity = c.map(ComplexityJS.from(_)).orUndefined)
+        .literal(status = "safe", used = CheckerJS.from(used), complexity = c.map(ComplexityJS.from(_)).orUndefined)
         .asInstanceOf[DiagnosticsJS]
-    case Diagnostics.Vulnerable(a, c) =>
+    case Diagnostics.Vulnerable(a, c, used) =>
       js.Dynamic
         .literal(
           status = "vulnerable",
+          used = CheckerJS.from(used),
           attack = a.asString,
           complexity = c.map(ComplexityJS.from(_)).orUndefined
         )
         .asInstanceOf[DiagnosticsJS]
-    case Diagnostics.Unknown(k) =>
-      js.Dynamic.literal(status = "unknown", error = ErrorKindJS.from(k)).asInstanceOf[DiagnosticsJS]
+    case Diagnostics.Unknown(k, used) =>
+      js.Dynamic
+        .literal(status = "unknown", used = CheckerJS.from(used), error = ErrorKindJS.from(k))
+        .asInstanceOf[DiagnosticsJS]
+  }
+}
+
+/** Checker utilities for JavaScript. */
+object CheckerJS {
+
+  /** Converts the checker name into a string. */
+  def from(c: Option[Checker]): js.UndefOr[String] = c match {
+    case Some(Checker.Automaton) => "automaton"
+    case Some(Checker.Fuzz)      => "fuzz"
+    case _                       => ()
   }
 }
 

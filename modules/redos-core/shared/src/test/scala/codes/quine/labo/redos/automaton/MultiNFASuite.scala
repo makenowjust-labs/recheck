@@ -19,7 +19,7 @@ class MultiNFASuite extends munit.FunSuite {
       )
     )
     val g = Graph.from(
-      Seq(
+      IndexedSeq(
         (0, 'a', 1),
         (0, 'a', 1),
         (0, 'b', 0),
