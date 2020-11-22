@@ -95,5 +95,5 @@ object Config {
   val MaxNFASize = 40000
 
   /** The default value of [[Config#maxPatternSize]]. */
-  val MaxPatternSize  = 1500
+  val MaxPatternSize = 1500
 }
