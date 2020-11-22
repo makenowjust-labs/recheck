@@ -47,7 +47,8 @@ class CheckerSuite extends munit.FunSuite {
           UString.from("aaaaaaaaaaaaaaaaaaaaa\u0000", false),
           Some(
             Complexity.Exponential(Witness(Seq((Seq(UChar('a')), Seq(UChar('a')))), Seq(UChar(0x00))))
-          )
+          ),
+          Some(Checker.Automaton)
         )
       )
     )
@@ -59,7 +60,7 @@ class CheckerSuite extends munit.FunSuite {
         ),
         Config()
       ),
-      Success(Diagnostics.Safe(Some(Complexity.Linear)))
+      Success(Diagnostics.Safe(Some(Complexity.Linear), Some(Checker.Automaton)))
     )
     assertEquals(
       Checker.Automaton.check(
@@ -69,7 +70,7 @@ class CheckerSuite extends munit.FunSuite {
         ),
         Config()
       ),
-      Success(Diagnostics.Safe(None))
+      Success(Diagnostics.Safe(None, Some(Checker.Automaton)))
     )
   }
 
@@ -83,11 +84,17 @@ class CheckerSuite extends munit.FunSuite {
         ),
         Config(random = random0)
       ),
-      Success(Diagnostics.Vulnerable(UString.from("aaaaaaaaaaaaaaaaaaaaa\u0000", false), None))
+      Success(
+        Diagnostics.Vulnerable(
+          UString.from("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u0000", false),
+          None,
+          Some(Checker.Fuzz)
+        )
+      )
     )
     assertEquals(
       Checker.Fuzz.check(Pattern(Dot, FlagSet(false, false, false, false, false, false)), Config(random = random0)),
-      Success(Diagnostics.Safe(None))
+      Success(Diagnostics.Safe(None, Some(Checker.Fuzz)))
     )
   }
 
@@ -106,7 +113,8 @@ class CheckerSuite extends munit.FunSuite {
           UString.from("aaaaaaaaaaaaaaaaaaaaa\u0000", false),
           Some(
             Complexity.Exponential(Witness(Seq((Seq(UChar('a')), Seq(UChar('a')))), Seq(UChar(0x00))))
-          )
+          ),
+          Some(Checker.Automaton)
         )
       )
     )
@@ -118,17 +126,17 @@ class CheckerSuite extends munit.FunSuite {
         ),
         Config(random = random0, maxRepeatCount = 5)
       ),
-      Success(Diagnostics.Safe(None))
+      Success(Diagnostics.Safe(None, Some(Checker.Fuzz)))
     )
     assertEquals(
       Checker.Hybrid.check(
         Pattern(
-          Sequence(Seq(LineBegin, Repeat(false, 5, None, Disjunction(Seq(Character('a'), Character('a')))), LineEnd)),
+          Sequence(Seq(LineBegin, Repeat(false, 5, Some(None), Disjunction(Seq(Character('a'), Character('a')))))),
           FlagSet(false, false, false, false, false, false)
         ),
         Config(random = random0, maxNFASize = 5)
       ),
-      Success(Diagnostics.Safe(None))
+      Success(Diagnostics.Safe(None, Some(Checker.Fuzz)))
     )
   }
 }

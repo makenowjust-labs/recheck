@@ -53,7 +53,7 @@ object DemoApp {
     val result = ReDoS.check(source, flags, Config(timeout = Timeout.from(timeout)))
     val pattern = s"<code>/${escape(source)}/${escape(flags)}</code>"
     result match {
-      case Safe(complexity) =>
+      case Safe(complexity, _) =>
         complexity match {
           case Some(Constant) =>
             resultArea.innerHTML ++= s"<p>$pattern is safe (constant-time matching).</p>"
@@ -62,7 +62,7 @@ object DemoApp {
           case None =>
             resultArea.innerHTML ++= s"<p>$pattern is safe.</p>"
         }
-      case Vulnerable(attack, complexity) =>
+      case Vulnerable(attack, complexity, _) =>
         val unsafe = "<span class='has-text-danger has-text-weight-bold is-uppercase'>unsafe</span>"
         complexity match {
           case Some(Exponential(_)) =>
@@ -74,7 +74,7 @@ object DemoApp {
         }
         resultArea.innerHTML ++= "<h5>Attack String</h5>"
         resultArea.innerHTML ++= s"<pre><code>${escape(attack.toString)}</code></pre>"
-      case Unknown(err) =>
+      case Unknown(err, _) =>
         resultArea.innerHTML ++= s"<p><span class='has-text-warning has-text-weight-bold'>Error</span>: $err</p>"
     }
   }

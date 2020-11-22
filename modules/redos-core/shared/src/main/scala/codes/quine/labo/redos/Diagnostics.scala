@@ -7,6 +7,9 @@ import automaton.Complexity
 /** Diagnostics is a vulnerability diagnostics. */
 sealed abstract class Diagnostics extends Serializable with Product {
 
+  /** A used checker. */
+  def used: Option[Checker]
+
   /** A matching-time complexity. */
   def complexity: Option[Complexity[UChar]]
 }
@@ -15,13 +18,14 @@ sealed abstract class Diagnostics extends Serializable with Product {
 object Diagnostics {
 
   /** Vulnerable is a diagnostics for a vulnerable RegExp. */
-  final case class Vulnerable(attack: UString, complexity: Option[Complexity.Vulnerable[UChar]]) extends Diagnostics
+  final case class Vulnerable(attack: UString, complexity: Option[Complexity.Vulnerable[UChar]], used: Option[Checker])
+      extends Diagnostics
 
   /** Safe is a diagnostics for a safe RegExp. */
-  final case class Safe(complexity: Option[Complexity.Safe]) extends Diagnostics
+  final case class Safe(complexity: Option[Complexity.Safe], used: Option[Checker]) extends Diagnostics
 
   /** Unknown is a unknown vulnerability diagnostics for some reasons. */
-  final case class Unknown(error: ErrorKind) extends Diagnostics {
+  final case class Unknown(error: ErrorKind, used: Option[Checker]) extends Diagnostics {
     def complexity: Option[Complexity[UChar]] = None
   }
 
@@ -35,7 +39,7 @@ object Diagnostics {
         case ex: UnsupportedException   => ErrorKind.Unsupported(ex.getMessage)
         case ex: InvalidRegExpException => ErrorKind.InvalidRegExp(ex.getMessage)
       }
-      Unknown(kind)
+      Unknown(kind, ex.used)
     }
   }
 

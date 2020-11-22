@@ -34,25 +34,34 @@ object Checker {
         _ <- Try(()) // Ensures `Try` context.
         _ <-
           if (checker == Hybrid && repeatCount(pattern) >= maxRepeatCount)
-            Failure(new UnsupportedException("too many repeat"))
+            Failure(new UnsupportedException("The pattern contains too many repeat"))
           else Success(())
         complexity <-
           // When the pattern has no infinite repetition, then it is safe.
           if (pattern.isConstant) Success(None)
           else
             for {
+              _ <-
+                if (checker == Hybrid && pattern.size >= maxPatternSize)
+                  Failure(new UnsupportedException("The pattern is too large"))
+                else Success(())
               epsNFA <- EpsNFACompiler.compile(pattern)
               orderedNFA <- Try(epsNFA.toOrderedNFA(maxNFASize).rename.mapAlphabet(_.head))
             } yield Some(AutomatonChecker.check(orderedNFA, maxNFASize))
       } yield complexity
 
-      result.map {
-        case Some(vuln: Complexity.Vulnerable[UChar]) =>
-          val attack = UString(vuln.buildAttack(attackLimit, stepRate, maxAttackSize).toIndexedSeq)
-          Diagnostics.Vulnerable(attack, Some(vuln))
-        case Some(safe: Complexity.Safe) => Diagnostics.Safe(Some(safe))
-        case None                        => Diagnostics.Safe(None)
-      }
+      result
+        .map {
+          case Some(vuln: Complexity.Vulnerable[UChar]) =>
+            val attack = UString(vuln.buildAttack(attackLimit, stepRate, maxAttackSize).toIndexedSeq)
+            Diagnostics.Vulnerable(attack, Some(vuln), Some(Automaton))
+          case Some(safe: Complexity.Safe) => Diagnostics.Safe(Some(safe), Some(Automaton))
+          case None                        => Diagnostics.Safe(None, Some(Automaton))
+        }
+        .recoverWith { case ex: ReDoSException =>
+          ex.used = Some(Automaton)
+          Failure(ex)
+        }
     }
   }
 
@@ -77,10 +86,15 @@ object Checker {
         )
       }
 
-      result.map {
-        case Some(attack) => Diagnostics.Vulnerable(attack.toUString, None)
-        case None         => Diagnostics.Safe(None)
-      }
+      result
+        .map {
+          case Some(attack) => Diagnostics.Vulnerable(attack.toUString, None, Some(Fuzz))
+          case None         => Diagnostics.Safe(None, Some(Fuzz))
+        }
+        .recoverWith { case ex: ReDoSException =>
+          ex.used = Some(Fuzz)
+          Failure(ex)
+        }
     }
   }
 

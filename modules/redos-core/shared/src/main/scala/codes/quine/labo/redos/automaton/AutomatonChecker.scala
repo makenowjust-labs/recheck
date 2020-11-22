@@ -69,6 +69,9 @@ private final class AutomatonChecker[A, Q](
       .withDefaultValue(Map.empty.withDefaultValue(Vector.empty))
   }
 
+  /** A map from a SCC to the lookahead DFA's states in this. */
+  private[this] val sccLookaheadMap = scc.map { sc => sc -> sc.map(_._2).toSet }.toMap
+
   /** A type of [[multiNFA]] state. */
   private type R = (Q, Set[Q])
 
@@ -165,7 +168,12 @@ private final class AutomatonChecker[A, Q](
           // Appends an IDA structure between the SCC and the maximum chain's source into the chain.
           checkTimeout("automaton.AutomatonChecker#checkPolynomialComponent:result") {
             sccReachableMap(sc).iterator
-              .filter(target => sc != target && !isAtom(target) && checkPolynomialComponent(target)._1 == maxDegree)
+              .filter { target =>
+                sc != target && !isAtom(target) && checkPolynomialComponent(target)._1 == maxDegree &&
+                // If the intersection of lookahead states of `sc` and `target` is empty,
+                // then there is no IDA structure between them.
+                (sccLookaheadMap(sc) & sccLookaheadMap(target)).nonEmpty
+              }
               .flatMap(target => checkPolynomialComponentBetween(sc, target).map((target, _)))
               .map { case (target, pump) => (maxDegree + 1, pump +: checkPolynomialComponent(target)._2) }
               .nextOption()
@@ -197,7 +205,9 @@ private final class AutomatonChecker[A, Q](
           (q11, q12) <- sourceEdges(a)
           (q21, q22) <- betweenEdges.flatMap(_(a))
           (q31, q32) <- targetEdges(a)
-        } yield ((q11, q21, q31), a, (q12, q22, q32))).toSeq
+        } yield checkTimeout("automaton.AutomatonChecker#checkPolynomialComponentBetween:g3:edge") {
+          ((q11, q21, q31), a, (q12, q22, q32))
+        }).toSeq
       )
     }
     val g3back = checkTimeout("automaton.AutomatonChecker#checkPolynomialComponentBetween:g3back") {

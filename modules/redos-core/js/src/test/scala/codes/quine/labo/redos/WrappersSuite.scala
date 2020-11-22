@@ -10,23 +10,24 @@ import data.UString
 class WrappersSuite extends munit.FunSuite {
   test("DiagnosticsJS.from") {
     assertEquals(
-      JSON.stringify(DiagnosticsJS.from(Diagnostics.Safe(Some(Complexity.Linear)))),
-      JSON.stringify(js.Dynamic.literal(status = "safe", complexity = js.Dynamic.literal(`type` = "linear")))
+      JSON.stringify(DiagnosticsJS.from(Diagnostics.Safe(Some(Complexity.Linear), None))),
+      JSON.stringify(js.Dynamic.literal(status = "safe", used = (), complexity = js.Dynamic.literal(`type` = "linear")))
     )
     assertEquals(
-      JSON.stringify(DiagnosticsJS.from(Diagnostics.Safe(None))),
-      JSON.stringify(js.Dynamic.literal(status = "safe", complexity = ()))
+      JSON.stringify(DiagnosticsJS.from(Diagnostics.Safe(None, None))),
+      JSON.stringify(js.Dynamic.literal(status = "safe", used = (), complexity = ()))
     )
 
     val w = Witness(Seq((Seq(UChar('a')), Seq(UChar('b')))), Seq(UChar('c')))
     val j = js.Dynamic.literal(pumps = js.Array(js.Dynamic.literal(prefix = "a", pump = "b")), suffix = "c")
     assertEquals(
       JSON.stringify(
-        DiagnosticsJS.from(Diagnostics.Vulnerable(UString.from("a", false), Some(Complexity.Exponential(w))))
+        DiagnosticsJS.from(Diagnostics.Vulnerable(UString.from("a", false), Some(Complexity.Exponential(w)), None))
       ),
       JSON.stringify(
         js.Dynamic.literal(
           status = "vulnerable",
+          used = (),
           attack = "a",
           complexity = js.Dynamic.literal(`type` = "exponential", witness = j)
         )
@@ -34,8 +35,8 @@ class WrappersSuite extends munit.FunSuite {
     )
 
     assertEquals(
-      JSON.stringify(DiagnosticsJS.from(Diagnostics.Unknown(Diagnostics.ErrorKind.Timeout))),
-      JSON.stringify(js.Dynamic.literal(status = "unknown", error = js.Dynamic.literal(kind = "timeout")))
+      JSON.stringify(DiagnosticsJS.from(Diagnostics.Unknown(Diagnostics.ErrorKind.Timeout, None))),
+      JSON.stringify(js.Dynamic.literal(status = "unknown", used = (), error = js.Dynamic.literal(kind = "timeout")))
     )
   }
 
