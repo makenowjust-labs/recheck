@@ -147,6 +147,13 @@ An integer value of a maximum size of the transition function of NFA. (default: 
 If the NFA's transition function exceeds this limit on the hybrid checker,
 it switches to use fuzz checker to analyze instead of the automaton based checker.
 
+#### `maxPatternSize`
+
+An integer value of maximum size of the pattern. (default: `1500`)
+
+If the pattern size exceeds this limit on the hybrid checker,
+it switches to use fuzz checker to analyze instead of the automaton based checker.
+
 </details>
 
 ## License

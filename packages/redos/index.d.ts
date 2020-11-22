@@ -129,6 +129,14 @@ export type Config = {
    * it switches to use fuzz checker to analyze instead of the automaton based checker.
    */
   maxNFASize?: number;
+
+  /**
+   * An integer value of maximum size of the pattern. (default: `1500`)
+   *
+   * If the pattern size exceeds this limit on the hybrid checker,
+   * it switches to use fuzz checker to analyze instead of the automaton based checker.
+   */
+  maxPatternSize?: number;
 };
 
 /**
@@ -147,6 +155,7 @@ export type Diagnostics = Safe | Vulnerable | Unknown;
  */
 export type Safe = {
   status: "safe";
+  used?: "automaton" | "fuzz";
   complexity?: Constant | Linear;
 };
 
@@ -155,6 +164,7 @@ export type Safe = {
  */
 export type Vulnerable = {
   status: "vulnerable";
+  used?: "automaton" | "fuzz";
   attack: string;
   complexity?: Polynomial | Exponential;
 };
@@ -164,6 +174,7 @@ export type Vulnerable = {
  */
 export type Unknown = {
   status: "unknown";
+  used?: "automaton" | "fuzz";
   error: Error;
 };
 
