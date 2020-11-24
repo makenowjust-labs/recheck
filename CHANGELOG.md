@@ -1,3 +1,14 @@
+# 1.1.1 (2020-11-24)
+
+Changes:
+
+- Add `used` checker information to `Diagnostics`
+
+Fixes:
+
+- Update default parameters
+- Optimize the automaton based checker implementation
+
 # 1.1.0 (2020-11-20)
 
 Changes:
