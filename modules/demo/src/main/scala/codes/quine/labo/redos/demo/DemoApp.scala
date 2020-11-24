@@ -21,7 +21,7 @@ object DemoApp {
   val SlashRegExp: Regex = raw"/((?:[^/\\\[\n]*|\\[^\n]|\[(?:[^\\\]\n]|\\[^\n])*\])*)/([gimsuy]*)".r
 
   /** A timeout duration. */
-  val timeout: Duration = 30.second
+  val timeout: Duration = 10.second
 
   /** An input element to input a regexp pattern. */
   lazy val regexpInput: Input = document.querySelector("#regexp").asInstanceOf[Input]
@@ -56,9 +56,9 @@ object DemoApp {
       case Safe(complexity, _) =>
         complexity match {
           case Some(Constant) =>
-            resultArea.innerHTML ++= s"<p>$pattern is safe (constant-time matching).</p>"
+            resultArea.innerHTML ++= s"<p>$pattern is safe (constant).</p>"
           case Some(Linear) =>
-            resultArea.innerHTML ++= s"<p>$pattern is safe (linear-time matching).</p>"
+            resultArea.innerHTML ++= s"<p>$pattern is safe (linear).</p>"
           case None =>
             resultArea.innerHTML ++= s"<p>$pattern is safe.</p>"
         }
@@ -66,9 +66,9 @@ object DemoApp {
         val unsafe = "<span class='has-text-danger has-text-weight-bold is-uppercase'>unsafe</span>"
         complexity match {
           case Some(Exponential(_)) =>
-            resultArea.innerHTML ++= s"<p>$pattern is $unsafe (exponential-time matching).</p>"
+            resultArea.innerHTML ++= s"<p>$pattern is $unsafe (exponential).</p>"
           case Some(Polynomial(d, _)) =>
-            resultArea.innerHTML ++= s"<p>$pattern is $unsafe ($d${ordinal(d)} degree polynomial-time matching).</p>"
+            resultArea.innerHTML ++= s"<p>$pattern is $unsafe ($d${ordinal(d)} degree polynomial).</p>"
           case None =>
             resultArea.innerHTML ++= s"<p>$pattern is $unsafe.</p>"
         }
