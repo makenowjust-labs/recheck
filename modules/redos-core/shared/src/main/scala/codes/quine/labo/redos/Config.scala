@@ -89,7 +89,7 @@ object Config {
   val MaxDegree = 4
 
   /** The default value of [[Config#maxRepeatCount]]. */
-  val MaxRepeatCount = 16
+  val MaxRepeatCount = 20
 
   /** The default value of [[Config#maxNFASize]]. */
   val MaxNFASize = 40000

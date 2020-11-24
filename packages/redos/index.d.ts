@@ -26,7 +26,7 @@ export type Config = {
    *
    * - `'automaton'`: A checker which works based on automaton theory.
    *   It can analyze ReDoS vulnerability of the RegExp without false positive,
-   *   however, it needs some minutes against some RegExps and it does not support some syntax.
+   *   however, it needs some minutes against some RegExp and it does not support some syntax.
    * - `'fuzz'`: A checker based on fuzzing.
    *   It can detect ReDoS vulnerability against the all RegExp syntax including back-references
    *   and look-around assertions. However, it needs some seconds on average and it may cause false
@@ -115,7 +115,7 @@ export type Config = {
   maxDegree?: number;
 
   /**
-   * An integer value of a limit of repetition count in the RegExp. (default: `16`)
+   * An integer value of a limit of repetition count in the RegExp. (default: `20`)
    *
    * If the RegExp exceeds this limit on the hybrid checker, it switches to use
    * the fuzz checker to analyze instead of the automaton based checker.

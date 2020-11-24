@@ -135,7 +135,7 @@ An integer value of a maximum degree to attempt on building an attack string. (d
 
 #### `maxRepeatCount`
 
-An integer value of a limit of repetition count in the RegExp. (default: `16`)
+An integer value of a limit of repetition count in the RegExp. (default: `20`)
 
 If the RegExp exceeds this limit on the hybrid checker, it switches to
 use the fuzz checker to analyze instead of the automaton based checker.
