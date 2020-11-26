@@ -60,6 +60,13 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labo.redos.fuzz._
       |import codes.quine.labo.redos.regexp._
       |import codes.quine.labo.redos.util._
+      |
+      |def time[A](body: => A): A = {
+      |  val start = System.nanoTime()
+      |  val result = body
+      |  println(s"${(System.nanoTime() - start) / 1e9} s")
+      |  result
+      |}
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
