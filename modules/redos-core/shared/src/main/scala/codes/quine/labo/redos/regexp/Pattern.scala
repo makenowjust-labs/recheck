@@ -20,32 +20,34 @@ import util.Timeout
 final case class Pattern(node: Node, flagSet: FlagSet) {
 
   /** Tests the pattern has line-begin assertion `^` at its begin position. */
-  def hasLineBeginAtBegin: Boolean = {
-    def loop(node: Node): Boolean = node match {
-      case Disjunction(ns)       => ns.forall(loop)
-      case Sequence(ns)          => ns.headOption.exists(loop)
-      case Capture(_, n)         => loop(n)
-      case NamedCapture(_, _, n) => loop(n)
-      case Group(n)              => loop(n)
-      case LineBegin             => true
-      case _                     => false
+  def hasLineBeginAtBegin(implicit timeout: Timeout = Timeout.NoTimeout): Boolean =
+    timeout.checkTimeout("regexp.Pattern#hasLineBeginAtBegin") {
+      def loop(node: Node): Boolean = timeout.checkTimeout("regexp.Pattern#hasLineBeginAtBegin:loop")(node match {
+        case Disjunction(ns)       => ns.forall(loop)
+        case Sequence(ns)          => ns.headOption.exists(loop)
+        case Capture(_, n)         => loop(n)
+        case NamedCapture(_, _, n) => loop(n)
+        case Group(n)              => loop(n)
+        case LineBegin             => true
+        case _                     => false
+      })
+      !flagSet.multiline && loop(node)
     }
-    !flagSet.multiline && loop(node)
-  }
 
   /** Tests the pattern has line-end assertion `$` at its end position. */
-  def hasLineEndAtEnd: Boolean = {
-    def loop(node: Node): Boolean = node match {
-      case Disjunction(ns)       => ns.forall(loop)
-      case Sequence(ns)          => ns.lastOption.exists(loop)
-      case Capture(_, n)         => loop(n)
-      case NamedCapture(_, _, n) => loop(n)
-      case Group(n)              => loop(n)
-      case LineEnd               => true
-      case _                     => false
+  def hasLineEndAtEnd(implicit timeout: Timeout = Timeout.NoTimeout): Boolean =
+    timeout.checkTimeout("regexp.Pattern#hasLineEndAtEnd") {
+      def loop(node: Node): Boolean = timeout.checkTimeout("regexp.Pattern#hasLineEndAtEnd:loop")(node match {
+        case Disjunction(ns)       => ns.forall(loop)
+        case Sequence(ns)          => ns.lastOption.exists(loop)
+        case Capture(_, n)         => loop(n)
+        case NamedCapture(_, _, n) => loop(n)
+        case Group(n)              => loop(n)
+        case LineEnd               => true
+        case _                     => false
+      })
+      !flagSet.multiline && loop(node)
     }
-    !flagSet.multiline && loop(node)
-  }
 
   /** Tests the pattern has no infinite repetition. */
   def isConstant: Boolean = {

@@ -28,8 +28,8 @@ private final class AutomatonChecker[A, Q](
   // Introduces `timeout` methods into the scope.
   import timeout._
 
-  /** A reversed DFA constructed from [[orderedNFA]],
-    * and a NFA with multi-transitions constructed from [[orderedNFA]].
+  /** A reversed DFA constructed from [[nfa]],
+    * and a NFA with multi-transitions constructed from [[nfa]].
     */
   private[this] val (reverseDFA, multiNFA) = OrderedNFA.prune(nfa, maxNFASize)
 
@@ -45,12 +45,14 @@ private final class AutomatonChecker[A, Q](
 
   /** A graph with transitions between SCCs. */
   private[this] val sccGraph = checkTimeout("automaton.AutomatonChecker#sccGraph") {
-    Graph.from(
-      graph.edges
-        .map { case (q1, _, q2) => (sccMap(q1), (), sccMap(q2)) }
-        .filter { case (sc1, _, sc2) => sc1 != sc2 }
-        .distinct
-    )
+    val edges = graph.edges.iterator
+      .map { case (q1, _, q2) => (sccMap(q1), (), sccMap(q2)) }
+      .filter { case (sc1, _, sc2) => sc1 != sc2 }
+    val edgeSet = mutable.LinkedHashSet.empty[(IndexedSeq[(Q, Set[Q])], (), IndexedSeq[(Q, Set[Q])])]
+    for (edge <- edges) checkTimeout("automaton.AutomatonChecker#sccGraph:loop") {
+      edgeSet.addOne(edge)
+    }
+    Graph.from(edgeSet.toIndexedSeq)
   }
 
   /** A map from SCC to reachable SCCs. */

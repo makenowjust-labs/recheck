@@ -31,20 +31,9 @@ class TimeoutSuite extends munit.FunSuite {
   }
 
   test("Timeout.DebugTimeout#record") {
-    var counter = 0
-    val println = (message: String) => {
-      counter += 1
-      counter match {
-        case 1 =>
-          assert(message.startsWith("foo> bar> "))
-        case 2 =>
-          assert(message.startsWith("foo> "))
-        case _ =>
-          fail("unexpected call")
-      }
-    }
+    val buf = Seq.newBuilder[String]
 
-    val timeout = new DebugTimeout(println)
+    val timeout = new DebugTimeout(buf.addOne)
     val x = timeout.checkTimeout("foo") {
       val x = timeout.checkTimeout("bar")(21)
       assertEquals(x, 21)
@@ -52,7 +41,10 @@ class TimeoutSuite extends munit.FunSuite {
     }
     assertEquals(x, 42)
 
-    assertEquals(counter, 2)
+    assertEquals(
+      buf.result().map(_.replaceAll("""\d+ ms""", "x ms")),
+      Seq("foo> start", "foo> bar> start", "foo> bar> end (x ms)", "foo> end (x ms)")
+    )
     assertEquals(timeout.record.keySet, Set(Seq("foo"), Seq("foo", "bar")))
   }
 }

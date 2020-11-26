@@ -61,10 +61,11 @@ object Timeout {
       stack = stack :+ phase
 
       // Executes body with recording
+      println(s"${stack.mkString("> ")}> start")
       val start = System.currentTimeMillis()
       val result = body
       val time = System.currentTimeMillis() - start
-      println(s"${stack.mkString("> ")}> ${time} ms")
+      println(s"${stack.mkString("> ")}> end (${time} ms)")
       recordMap(stack) += time
 
       // Restore the old stack.
