@@ -11,11 +11,17 @@ class FuzzCheckerSuite extends munit.FunSuite {
   def random0: Random = new Random(0)
 
   /** Tests the pattern is vulnerable or not. */
-  def check(source: String, flags: String): Boolean = {
+  def check(source: String, flags: String, quick: Boolean = false): Boolean = {
     val result = for {
       pattern <- Parser.parse(source, flags)
       ctx <- FuzzContext.from(pattern)
-    } yield FuzzChecker.check(ctx, random0)
+    } yield FuzzChecker.check(
+      ctx,
+      random0,
+      seedLimit = if (quick) 1_000 else 10_000,
+      populationLimit = if (quick) 10_000 else 100_000,
+      attackLimit = if (quick) 100_000 else 1_000_000
+    )
     result.get.isDefined
   }
 
@@ -31,17 +37,17 @@ class FuzzCheckerSuite extends munit.FunSuite {
   }
 
   test("FuzzChecker.check: polynomial") {
-    assert(check("\\s*$", ""))
-    assert(check("^a*aa*$", ""))
+    assert(check("\\s*$", "", quick = true))
+    assert(check("^a*aa*$", "", quick = true))
   }
 
   test("FuzzChecker.check: exponential") {
-    assert(check("^(a|a)*$", ""))
-    assert(check("^(a*)*$", ""))
-    assert(check("^(a?){50}a{50}$", ""))
-    assert(check("^(a|b|ab)*$", ""))
-    assert(check("^(a|B|Ab)*$", "i"))
-    assert(check("^(aa|b|aab)*$", ""))
+    assert(check("^(a|a)*$", "", quick = true))
+    assert(check("^(a*)*$", "", quick = true))
+    assert(check("^(a?){50}a{50}$", "", quick = true))
+    assert(check("^(a|b|ab)*$", "", quick = true))
+    assert(check("^(a|B|Ab)*$", "i", quick = true))
+    assert(check("^(aa|b|aab)*$", "", quick = true))
 
     assert {
       val result = for {
