@@ -102,7 +102,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       )
     },
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.18" % Test,
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.19" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
@@ -124,7 +124,7 @@ lazy val demoJS = project
     Compile / mainClass := Some("codes.quine.labo.redos.demo.DemoApp"),
     libraryDependencies += "org.scala-js" %%% "scalajs-dom" % "1.1.0",
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.18" % Test,
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.19" % Test,
     testFrameworks += new TestFramework("munit.Framework"),
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
