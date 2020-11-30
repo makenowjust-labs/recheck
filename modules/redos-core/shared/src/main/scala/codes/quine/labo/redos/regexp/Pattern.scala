@@ -81,7 +81,7 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
       case Plus(_, n)                     => loop(n) + 1
       case Question(_, n)                 => loop(n) + 1
       case Repeat(_, m, None, n)          => loop(n) * m
-      case Repeat(_, m, Some(None), n)    => loop(n) * m + 1
+      case Repeat(_, m, Some(None), n)    => loop(n) * (m + 1) + 1
       case Repeat(_, m, Some(Some(l)), n) => loop(n) * l + (l - m)
       case LookAhead(_, n)                => loop(n) + 1
       case LookBehind(_, n)               => loop(n) + 1

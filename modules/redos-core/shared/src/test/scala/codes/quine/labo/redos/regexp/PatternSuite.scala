@@ -210,6 +210,24 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(Pattern(LookBehind(false, Star(false, Dot)), flagSet).isConstant, false)
   }
 
+  test("Pattern#size") {
+    val flagSet = FlagSet(false, false, false, false, false, false)
+    assertEquals(Pattern(Disjunction(Seq(Dot, Dot)), flagSet).size, 3)
+    assertEquals(Pattern(Sequence(Seq(Dot, Dot)), flagSet).size, 2)
+    assertEquals(Pattern(Capture(1, Dot), flagSet).size, 1)
+    assertEquals(Pattern(NamedCapture(1, "x", Dot), flagSet).size, 1)
+    assertEquals(Pattern(Group(Dot), flagSet).size, 1)
+    assertEquals(Pattern(Star(false, Dot), flagSet).size, 2)
+    assertEquals(Pattern(Plus(false, Dot), flagSet).size, 2)
+    assertEquals(Pattern(Question(false, Dot), flagSet).size, 2)
+    assertEquals(Pattern(Repeat(false, 2, None, Dot), flagSet).size, 2)
+    assertEquals(Pattern(Repeat(false, 2, Some(None), Dot), flagSet).size, 4)
+    assertEquals(Pattern(Repeat(false, 2, Some(Some(3)), Dot), flagSet).size, 4)
+    assertEquals(Pattern(LookAhead(false, Dot), flagSet).size, 2)
+    assertEquals(Pattern(LookBehind(false, Dot), flagSet).size, 2)
+    assertEquals(Pattern(Dot, flagSet).size, 1)
+  }
+
   test("Pattern#alphabet") {
     val flagSet0 = FlagSet(false, false, false, false, false, false)
     val flagSet1 = FlagSet(false, false, true, false, false, false)
