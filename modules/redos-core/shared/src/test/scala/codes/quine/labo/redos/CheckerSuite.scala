@@ -40,7 +40,7 @@ class CheckerSuite extends munit.FunSuite {
           Sequence(Seq(LineBegin, Star(false, Disjunction(Seq(Character('a'), Character('a')))), LineEnd)),
           FlagSet(false, false, false, false, false, false)
         ),
-        Config()
+        Config(checker = Checker.Automaton)
       ),
       Success(
         Diagnostics.Vulnerable(
@@ -58,7 +58,7 @@ class CheckerSuite extends munit.FunSuite {
           Sequence(Seq(LineBegin, Star(false, Disjunction(Seq(Dot, Dot))), LineEnd)),
           FlagSet(false, false, false, true, false, false)
         ),
-        Config()
+        Config(checker = Checker.Automaton)
       ),
       Success(Diagnostics.Safe(Some(Complexity.Linear), Some(Checker.Automaton)))
     )
@@ -68,7 +68,7 @@ class CheckerSuite extends munit.FunSuite {
           Sequence(Seq(LineBegin, Dot, LineEnd)),
           FlagSet(false, false, false, false, false, false)
         ),
-        Config()
+        Config(checker = Checker.Automaton)
       ),
       Success(Diagnostics.Safe(None, Some(Checker.Automaton)))
     )
@@ -82,7 +82,7 @@ class CheckerSuite extends munit.FunSuite {
           Sequence(Seq(LineBegin, Star(false, Disjunction(Seq(Character('a'), Character('a')))), LineEnd)),
           FlagSet(false, false, false, false, false, false)
         ),
-        Config(random = random0)
+        Config(checker = Checker.Fuzz, random = random0)
       ),
       Success(
         Diagnostics.Vulnerable(
@@ -93,9 +93,21 @@ class CheckerSuite extends munit.FunSuite {
       )
     )
     assertEquals(
-      Checker.Fuzz.check(Pattern(Dot, FlagSet(false, false, false, false, false, false)), Config(random = random0)),
+      Checker.Fuzz.check(
+        Pattern(Dot, FlagSet(false, false, false, false, false, false)),
+        Config(checker = Checker.Fuzz, random = random0)
+      ),
       Success(Diagnostics.Safe(None, Some(Checker.Fuzz)))
     )
+    val ex = interceptMessage[InvalidRegExpException]("out of order repetition quantifier") {
+      Checker.Fuzz
+        .check(
+          Pattern(Repeat(false, 2, Some(Some(1)), Dot), FlagSet(false, false, false, false, false, false)),
+          Config(checker = Checker.Fuzz, random = random0)
+        )
+        .get
+    }
+    assertEquals(ex.used, Some(Checker.Fuzz))
   }
 
   test("Checker.Hybrid.check") {
@@ -135,6 +147,16 @@ class CheckerSuite extends munit.FunSuite {
           FlagSet(false, false, false, false, false, false)
         ),
         Config(random = random0, maxNFASize = 5)
+      ),
+      Success(Diagnostics.Safe(None, Some(Checker.Fuzz)))
+    )
+    assertEquals(
+      Checker.Hybrid.check(
+        Pattern(
+          Sequence(Seq(LineBegin, Star(false, Dot), LineEnd)),
+          FlagSet(false, false, false, false, false, false)
+        ),
+        Config(random = random0, maxPatternSize = 1)
       ),
       Success(Diagnostics.Safe(None, Some(Checker.Fuzz)))
     )

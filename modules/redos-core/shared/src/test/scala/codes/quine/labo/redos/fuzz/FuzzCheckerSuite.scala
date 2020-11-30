@@ -44,10 +44,11 @@ class FuzzCheckerSuite extends munit.FunSuite {
   test("FuzzChecker.check: exponential") {
     assert(check("^(a|a)*$", "", quick = true))
     assert(check("^(a*)*$", "", quick = true))
-    assert(check("^(a?){50}a{50}$", "", quick = true))
     assert(check("^(a|b|ab)*$", "", quick = true))
     assert(check("^(a|B|Ab)*$", "i", quick = true))
     assert(check("^(aa|b|aab)*$", "", quick = true))
+
+    assert(check("^(a?){50}a{50}$", ""))
 
     assert {
       val result = for {
