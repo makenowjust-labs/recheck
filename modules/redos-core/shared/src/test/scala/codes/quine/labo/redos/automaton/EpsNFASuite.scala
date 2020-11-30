@@ -120,5 +120,8 @@ class EpsNFASuite extends munit.FunSuite {
         )
       )
     )
+    interceptMessage[UnsupportedException]("OrderedNFA size is too large") {
+      nfa1.toOrderedNFA(maxNFASize = 1)
+    }
   }
 }

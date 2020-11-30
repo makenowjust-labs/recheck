@@ -34,6 +34,9 @@ class OrderedNFASuite extends munit.FunSuite {
         )
       )
     )
+    interceptMessage[UnsupportedException]("MultiNFA size is too large") {
+      OrderedNFA.prune(nfa, maxNFASize = 1)
+    }
   }
 
   test("OrderedNFA#rename") {
