@@ -21,6 +21,7 @@ const { check } = require("@makenowjust-labo/redos");
 console.log(check("^(a|a)*$", ""));
 // {
 //   status: 'vulnerable',
+//   used: 'automaton',
 //   attack: 'aaaaaaaaaaaaaaaaaaaaa\x00',
 //   complexity: {
 //     type: 'exponential',
