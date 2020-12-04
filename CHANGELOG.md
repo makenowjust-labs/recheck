@@ -1,3 +1,10 @@
+# 1.1.2 (2020-12-04)
+
+Fixes:
+
+- Insert timeout checks more and more
+- Improve some tests
+
 # 1.1.1 (2020-11-24)
 
 Changes:

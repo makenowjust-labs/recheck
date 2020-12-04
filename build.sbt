@@ -37,7 +37,10 @@ lazy val root = project
     publish / skip := true,
     coverageEnabled := false,
     mdocVariables := Map(
-      "VERSION" -> previousStableVersion.value.getOrElse("0.0.0")
+      "VERSION" -> {
+        if (version.value.endsWith("-SNAPSHOT")) previousStableVersion.value.getOrElse("0.0.0")
+        else version.value
+      }
     ),
     mdocOut := baseDirectory.value / "site" / "content"
   )
