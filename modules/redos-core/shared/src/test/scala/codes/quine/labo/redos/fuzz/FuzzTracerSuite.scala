@@ -87,15 +87,15 @@ class FuzzTracerSuite extends munit.FunSuite {
     assertEquals(trace(ir1, UString.empty).buildFString(), FString(1, IndexedSeq.empty))
     assertEquals(
       trace(ir1, UString.from("x", false)).buildFString(),
-      FString(1, IndexedSeq(Repeat(0, None, 1), Wrap('x')))
+      FString(1, IndexedSeq(Repeat(0, 1), Wrap('x')))
     )
     assertEquals(
       trace(ir2, UString.from("xxx", false)).buildFString(),
-      FString(1, IndexedSeq(Repeat(2, Some(3), 1), Wrap('x')))
+      FString(1, IndexedSeq(Repeat(2, 1), Wrap('x')))
     )
     assertEquals(
       trace(ir3, UString.from("xxx", false)).buildFString(),
-      FString(1, IndexedSeq(Wrap('x'), Repeat(0, None, 2), Wrap('x'), Wrap('x')))
+      FString(1, IndexedSeq(Wrap('x'), Repeat(0, 2), Wrap('x'), Wrap('x')))
     )
   }
 }

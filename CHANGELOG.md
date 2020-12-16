@@ -1,3 +1,9 @@
+# dev
+
+Changes:
+
+- Drop `max` from `FString.Repeat`
+
 # 1.1.2 (2020-12-04)
 
 Fixes:

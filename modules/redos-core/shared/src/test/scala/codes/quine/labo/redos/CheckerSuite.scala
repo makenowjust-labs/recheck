@@ -76,22 +76,17 @@ class CheckerSuite extends munit.FunSuite {
 
   test("Checker.Fuzz.check") {
     def random0: Random = new Random(0)
-    assertEquals(
-      Checker.Fuzz.check(
+    val result = Checker.Fuzz
+      .check(
         Pattern(
           Sequence(Seq(LineBegin, Star(false, Disjunction(Seq(Character('a'), Character('a')))), LineEnd)),
           FlagSet(false, false, false, false, false, false)
         ),
         Config(checker = Checker.Fuzz, random = random0)
-      ),
-      Success(
-        Diagnostics.Vulnerable(
-          UString.from("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u0000", false),
-          None,
-          Some(Checker.Fuzz)
-        )
       )
-    )
+      .get
+    assert(clue(result).isInstanceOf[Diagnostics.Vulnerable])
+    assertEquals(result.used, Some(Checker.Fuzz))
     assertEquals(
       Checker.Fuzz.check(
         Pattern(Dot, FlagSet(false, false, false, false, false, false)),

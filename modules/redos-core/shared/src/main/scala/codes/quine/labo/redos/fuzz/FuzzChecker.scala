@@ -189,7 +189,7 @@ private[fuzz] final class FuzzChecker(
         if (t.isEmpty) return None
         val m = random.between(0, 10)
         val size = random.between(0, t.size)
-        FString.Repeat(m, None, size)
+        FString.Repeat(m, size)
     }
 
     val pos = random.between(0, t.size + 1)
@@ -197,7 +197,7 @@ private[fuzz] final class FuzzChecker(
     next.execute(s)
   }
 
-  /** A mutator to insert a part of the pattern (and a repeat specifier). */
+  /** A mutator to insert a part of the pattern (with/without a repeat specifier). */
   def mutateInsertPart(gen: Generation, next: Population): Option[FString] =
     checkTimeout("fuzz.FuzzChecker#mutateInsertPart") {
       // Falls back when there is no part in the pattern.
@@ -207,12 +207,12 @@ private[fuzz] final class FuzzChecker(
       val t = gen.traces(i).str
 
       val idx = random.between(0, parts.size)
-      val part = parts(idx).seq.map(FString.Wrap(_))
+      val part = parts(idx).seq.map(FString.Wrap)
       val fcs = random.between(0, 2) match {
         case 0 => part
         case 1 =>
           val m = random.between(0, 10)
-          IndexedSeq(FString.Repeat(m, None, part.size)) ++ part
+          IndexedSeq(FString.Repeat(m, part.size)) ++ part
       }
 
       val pos = random.between(0, t.size + 1)
@@ -232,26 +232,18 @@ private[fuzz] final class FuzzChecker(
         val k = random.nextInt(alphabet.chars.size)
         val c = alphabet.chars(k).head
         FString.Wrap(c)
-      case FString.Repeat(m0, max0, size0) =>
+      case FString.Repeat(m0, size0) =>
         val m = random.between(0, 2) match {
           case 0 =>
             val d = random.between(-10, 11)
             m0 + d
           case 1 => m0 * 2
         }
-        val max = max0 match {
-          case Some(max0) =>
-            random.between(0, 2) match {
-              case 0 => Some(max0 + random.between(-10, 11))
-              case 1 => None
-            }
-          case None => None
-        }
         val size = random.between(0, 2) match {
           case 0 => random.between(1, t.size - pos + 1)
           case 1 => size0 + random.between(-10, 11)
         }
-        FString.Repeat(m, max, size)
+        FString.Repeat(m, size)
     }
 
     val s = t.replaceAt(pos, fc)

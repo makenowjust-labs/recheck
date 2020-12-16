@@ -57,13 +57,13 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
         case Wrap(u) =>
           pos += 1
           str.addOne(u)
-        case Repeat(m, max, size) =>
+        case Repeat(m, size) =>
           pos += 1
           val part = seq.slice(pos, pos + size).map {
-            case Wrap(u)         => u
-            case Repeat(_, _, _) => throw new IllegalArgumentException
+            case Wrap(u)      => u
+            case Repeat(_, _) => throw new IllegalArgumentException
           }
-          val repeat = max.map(Math.min(_, n + m)).getOrElse(n + m)
+          val repeat = n + m
           for (_ <- 1 to repeat) str.addAll(part)
           pos += size
       }
@@ -85,24 +85,18 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
         case Wrap(u) =>
           pos += 1
           str.addOne(u)
-        case Repeat(m, max, size) =>
+        case Repeat(m, size) =>
           pos += 1
-          val repeat = max.map(Math.min(_, n + m)).getOrElse(n + m)
-          if (repeat > 1 || max.exists(_ != repeat)) {
+          val repeat = n + m
+          if (repeat > 1) {
             val s = UString(str.result())
             str.clear()
             if (s.nonEmpty) parts.addOne(s.toString)
             val part = seq.slice(pos, pos + size).map {
-              case Wrap(u)         => u
-              case Repeat(_, _, _) => throw new IllegalArgumentException
+              case Wrap(u)      => u
+              case Repeat(_, _) => throw new IllegalArgumentException
             }
-            parts.addOne(
-              UString(part).toString ++ StringUtil.superscript(repeat) ++ max
-                .map(_ - repeat)
-                .filter(_ != 0)
-                .map(n => "\u207A" ++ StringUtil.superscript(n))
-                .getOrElse("")
-            )
+            parts.addOne(UString(part).toString ++ StringUtil.superscript(repeat))
             pos += size
           }
       }
@@ -125,7 +119,7 @@ object FString {
   final case class Wrap(u: UChar) extends FChar
 
   /** Repeat is a repetition specifier in [[FString]]. */
-  final case class Repeat(m: Int, max: Option[Int], size: Int) extends FChar
+  final case class Repeat(m: Int, size: Int) extends FChar
 
   /** Computes a crossing of two FString. */
   def cross(fs1: FString, fs2: FString, n1: Int, n2: Int): (FString, FString) = {
@@ -146,10 +140,10 @@ object FString {
           if (repeat > 0) repeat -= 1
           pos += 1
           seq.addOne(Wrap(c))
-        case Repeat(m, max, size) =>
+        case Repeat(m, size) =>
           if (repeat == 0) {
             repeat = Math.max(0, Math.min(fs.size - pos - 1, size))
-            if (repeat > 0) seq.addOne(Repeat(m, max, size))
+            if (repeat > 0) seq.addOne(Repeat(m, size))
           }
           pos += 1
       }

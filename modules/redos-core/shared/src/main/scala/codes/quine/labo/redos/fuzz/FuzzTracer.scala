@@ -19,7 +19,7 @@ private[fuzz] class FuzzTracer(val ir: IR, val input: UString, limit: Int, timeo
   private[this] val pcToPos: mutable.Map[Int, Int] = mutable.Map.empty
 
   /** A buffer for recorded loops. */
-  private[this] val loops: mutable.Buffer[(Int, Int, Int)] = mutable.Buffer.empty
+  private[this] val loops: mutable.Buffer[(Int, Int)] = mutable.Buffer.empty
 
   /** A traced coverage. */
   def coverage(): Set[(Int, Seq[Int], Boolean)] = coverageSet.toSet
@@ -30,19 +30,15 @@ private[fuzz] class FuzzTracer(val ir: IR, val input: UString, limit: Int, timeo
   /** Builds a [[FString]] instance from the input string and traced information. */
   def buildFString(): FString = {
     val repeats = loops.toSeq.sorted
-      .foldLeft(IndexedSeq.empty[(Int, Int, Int)]) {
-        case (xys, (x, y, _)) if x >= y                                  => xys
-        case (Seq(), (x, y, pc))                                         => IndexedSeq((x, y, pc))
-        case (xys :+ ((x1, y1, pc)), (x2, y2, _)) if x1 <= x2 && x2 < y1 => xys :+ (x1, Math.max(y1, y2), pc)
-        case (xys, (x, y, pc))                                           => xys :+ (x, y, pc)
+      .foldLeft(IndexedSeq.empty[(Int, Int)]) {
+        case (xys, (x, y)) if x >= y                              => xys
+        case (Seq(), (x, y))                                      => IndexedSeq((x, y))
+        case (xys :+ ((x1, y1)), (x2, y2)) if x1 <= x2 && x2 < y1 => xys :+ (x1, Math.max(y1, y2))
+        case (xys, (x, y))                                        => xys :+ (x, y)
       }
-      .map { case (pos, end, pc) =>
-        val max = ir.codes.lift(pc - 1) match {
-          case Some(IR.PushCnt(n)) => Some(n)
-          case _                   => None
-        }
+      .map { case (pos, end) =>
         // `m` is dummy. This is calculated below.
-        (pos, FString.Repeat(0, max, end - pos))
+        (pos, FString.Repeat(0, end - pos))
       }
       .toMap
 
@@ -50,16 +46,16 @@ private[fuzz] class FuzzTracer(val ir: IR, val input: UString, limit: Int, timeo
     var pos = 0
     while (pos < input.size) {
       repeats.get(pos) match {
-        case Some(FString.Repeat(_, max, size)) =>
+        case Some(FString.Repeat(_, size)) =>
           // Compresses a repetition.
           val part = input.substring(pos, pos + size)
           pos += size
           var m = 0
-          while (pos < input.size && max.forall(m < _) && part == input.substring(pos, pos + size)) {
+          while (pos < input.size && part == input.substring(pos, pos + size)) {
             m += 1
             pos += size
           }
-          str.addOne(FString.Repeat(m, max, size)).addAll(part.seq.map(FString.Wrap))
+          str.addOne(FString.Repeat(m, size)).addAll(part.seq.map(FString.Wrap))
         case None =>
           str.addOne(FString.Wrap(input.seq(pos)))
           pos += 1
@@ -80,7 +76,7 @@ private[fuzz] class FuzzTracer(val ir: IR, val input: UString, limit: Int, timeo
 
     // Checks `jump` and `loop` code to detect loops.
     def recordLoop(cont: Int): Unit =
-      pcToPos.get(pc + 1 + cont).foreach(loops.addOne(_, pos, pc + 1 + cont))
+      pcToPos.get(pc + 1 + cont).foreach(loops.addOne(_, pos))
 
     ir.codes(pc) match {
       case IR.Jump(cont) if cont < 0 => recordLoop(cont)
