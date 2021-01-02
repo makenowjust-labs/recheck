@@ -3,6 +3,12 @@
 Changes:
 
 - Drop `max` from `FString.Repeat`
+- Rename the module name `redos-core` to `redos`
+- Update Scala to 2.13.4
+
+Fixes:
+
+- Fix ε-loop elimination
 
 # 1.1.2 (2020-12-04)
 
