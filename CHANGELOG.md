@@ -5,6 +5,7 @@ Changes:
 - Drop `max` from `FString.Repeat`
 - Rename the module name `redos-core` to `redos`
 - Update Scala to 2.13.4
+- Rename `MultiNFA` to `NFAwLA`
 
 Fixes:
 

@@ -4,7 +4,7 @@ package automaton
 import data.MultiSet
 
 class OrderedNFASuite extends munit.FunSuite {
-  test("OrderedNFA.prune") {
+  test("OrderedNFA#toNFAwLA") {
     val nfa = OrderedNFA(
       Set('a', 'b'),
       Set(0, 1),
@@ -17,11 +17,10 @@ class OrderedNFASuite extends munit.FunSuite {
         (1, 'b') -> Seq(1)
       )
     )
-    val (reverseDFA, multiNFA) = OrderedNFA.prune(nfa)
-    assertEquals(reverseDFA, nfa.reverse.toDFA)
+    val nfaWLA = nfa.toNFAwLA()
     assertEquals(
-      multiNFA,
-      MultiNFA(
+      nfaWLA,
+      NFAwLA(
         Set(('a', Set(0, 1)), ('b', Set(0, 1))),
         Set((0, Set(0, 1)), (1, Set(0, 1))),
         MultiSet((0, Set(0, 1))),
@@ -31,11 +30,12 @@ class OrderedNFASuite extends munit.FunSuite {
           ((0, Set(0, 1)), ('b', Set(0, 1))) -> MultiSet((1, Set(0, 1))),
           ((1, Set(0, 1)), ('a', Set(0, 1))) -> MultiSet((1, Set(0, 1))),
           ((1, Set(0, 1)), ('b', Set(0, 1))) -> MultiSet((1, Set(0, 1)))
-        )
+        ),
+        nfa.reverse.toDFA
       )
     )
     interceptMessage[UnsupportedException]("MultiNFA size is too large") {
-      OrderedNFA.prune(nfa, maxNFASize = 1)
+      nfa.toNFAwLA(maxNFASize = 1)
     }
   }
 

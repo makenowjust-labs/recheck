@@ -51,6 +51,54 @@ final case class OrderedNFA[A, Q](
       NFA(alphabet, stateSet, acceptSet, inits.toSet, reverseDelta.toMap)
     }
 
+  /** Converts this into [[NFAwLA]]. */
+  def toNFAwLA(maxNFASize: Int = Int.MaxValue)(implicit timeout: Timeout = Timeout.NoTimeout): NFAwLA[A, Q] =
+    timeout.checkTimeout("automaton.OrderedNFA.prune") {
+      val reverseDFA = reverse.toDFA
+      val reverseDelta = timeout.checkTimeout("automaton.OrderedNFA.prune:reverseDelta") {
+        reverseDFA.delta
+          .groupMap(_._1._2) { case (p2, _) -> p1 =>
+            timeout.checkTimeout("automaton.OrderedNFA.prune:reverseDelta:loop")((p1, p2))
+          }
+          .withDefaultValue(Vector.empty)
+      }
+
+      val newAlphabet = Set.newBuilder[(A, Set[Q])]
+      val newStateSet = Set.newBuilder[(Q, Set[Q])]
+      val newInits = timeout.checkTimeout("automaton.OrderedNFA.prune:newInits") {
+        MultiSet.from(for (q <- inits; p <- reverseDFA.stateSet) yield (q, p))
+      }
+      val newAcceptSet = timeout.checkTimeout("automaton.OrderedNFA.prune:newAcceptSet") {
+        for (q <- acceptSet) yield (q, reverseDFA.init)
+      }
+
+      val newDelta =
+        mutable.Map.empty[((Q, Set[Q]), (A, Set[Q])), MultiSet[(Q, Set[Q])]].withDefaultValue(MultiSet.empty)
+      var deltaSize = 0
+      for ((q1, a) -> qs <- delta) timeout.checkTimeout("automaton.OrderedNFA.prune:loop") {
+        for ((p1, p2) <- reverseDelta(a)) {
+          // There is a transition `q1 --(a)-> qs` in ordered NFA, and
+          // there is a transition `p1 <-(a)-- p2` in reversed DFA.
+          // The result NFA contains a transition `(q1, p1) --(a)-> (qs(i), p2)`
+          // if and only if there is no `qs(j)` (`j < i`) in `p2`.
+          val qp2s = qs
+            .scanLeft(false)(_ || p2.contains(_))
+            .zip(qs)
+            .takeWhile(!_._1)
+            .map { case (_, q2) => (q2, p2) }
+          newDelta(((q1, p1), (a, p2))) = newDelta(((q1, p1), (a, p2))) ++ MultiSet.from(qp2s)
+
+          newAlphabet.addOne((a, p2))
+          newStateSet.addOne((q1, p1)).addAll(qp2s)
+
+          deltaSize += qp2s.size
+          if (deltaSize >= maxNFASize) throw new UnsupportedException("MultiNFA size is too large")
+        }
+      }
+
+      NFAwLA(newAlphabet.result(), newStateSet.result(), newInits, newAcceptSet, newDelta.toMap, reverseDFA)
+    }
+
   /** Converts to Graphviz format text. */
   def toGraphviz: String = {
     val sb = new mutable.StringBuilder
@@ -64,69 +112,5 @@ final case class OrderedNFA[A, Q](
     sb.append("}")
 
     sb.result()
-  }
-}
-
-/** OrderedNFA utilities. */
-object OrderedNFA {
-
-  /** Prunes a transition function along with backtracking behavior for vulnerability detection.
-    *
-    * A result is pair of a reversed DFA and pruned NFA.
-    */
-  def prune[A, Q](nfa: OrderedNFA[A, Q], maxNFASize: Int = Int.MaxValue)(implicit
-      timeout: Timeout = Timeout.NoTimeout
-  ): (DFA[A, Set[Q]], MultiNFA[(A, Set[Q]), (Q, Set[Q])]) = timeout.checkTimeout("automaton.OrderedNFA.prune") {
-    val OrderedNFA(_, _, inits, acceptSet, delta) = nfa
-
-    val reverseDFA = nfa.reverse.toDFA
-    val reverseDelta = timeout.checkTimeout("automaton.OrderedNFA.prune:reverseDelta") {
-      reverseDFA.delta
-        .groupMap(_._1._2) { case (p2, _) -> p1 =>
-          timeout.checkTimeout("automaton.OrderedNFA.prune:reverseDelta:loop")((p1, p2))
-        }
-        .withDefaultValue(Vector.empty)
-    }
-
-    val newAlphabet = Set.newBuilder[(A, Set[Q])]
-    val newStateSet = Set.newBuilder[(Q, Set[Q])]
-    val newInits = timeout.checkTimeout("automaton.OrderedNFA.prune:newInits") {
-      MultiSet.from(for (q <- inits; p <- reverseDFA.stateSet) yield (q, p))
-    }
-    val newAcceptSet = timeout.checkTimeout("automaton.OrderedNFA.prune:newAcceptSet") {
-      for (q <- acceptSet) yield (q, reverseDFA.init)
-    }
-
-    val newDelta = mutable.Map.empty[((Q, Set[Q]), (A, Set[Q])), MultiSet[(Q, Set[Q])]].withDefaultValue(MultiSet.empty)
-    var deltaSize = 0
-    for ((q1, a) -> qs <- delta) timeout.checkTimeout("automaton.OrderedNFA.prune:loop") {
-      for ((p1, p2) <- reverseDelta(a)) {
-        // There is a transition `q1 --(a)-> qs` in ordered NFA, and
-        // there is a transition `p1 <-(a)-- p2` in reversed DFA.
-        // The result NFA contains a transition `(q1, p1) --(a)-> (qs(i), p2)`
-        // if and only if there is no `qs(j)` (`j < i`) in `p2`.
-        val qp2s = qs
-          .scanLeft(false)(_ || p2.contains(_))
-          .zip(qs)
-          .takeWhile(!_._1)
-          .map { case (_, q2) => (q2, p2) }
-        newDelta(((q1, p1), (a, p2))) = newDelta(((q1, p1), (a, p2))) ++ MultiSet.from(qp2s)
-
-        newAlphabet.addOne((a, p2))
-        newStateSet.addOne((q1, p1)).addAll(qp2s)
-
-        deltaSize += qp2s.size
-        if (deltaSize >= maxNFASize) throw new UnsupportedException("MultiNFA size is too large")
-      }
-    }
-
-    val multiNFA = MultiNFA[(A, Set[Q]), (Q, Set[Q])](
-      newAlphabet.result(),
-      newStateSet.result(),
-      newInits,
-      newAcceptSet,
-      newDelta.toMap
-    )
-    (reverseDFA, multiNFA)
   }
 }

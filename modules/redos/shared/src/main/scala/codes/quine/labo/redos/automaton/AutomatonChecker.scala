@@ -4,7 +4,6 @@ package automaton
 import scala.collection.mutable
 
 import Complexity._
-import automaton._
 import data.Graph
 import util.Timeout
 
@@ -28,18 +27,17 @@ private final class AutomatonChecker[A, Q](
   // Introduces `timeout` methods into the scope.
   import timeout._
 
-  /** A reversed DFA constructed from [[nfa]],
-    * and a NFA with multi-transitions constructed from [[nfa]].
+  /** A NFA with look-ahead constructed from [[nfa]].
     */
-  private[this] val (reverseDFA, multiNFA) = OrderedNFA.prune(nfa, maxNFASize)
+  private[this] val nfaWLA = nfa.toNFAwLA(maxNFASize)
 
-  /** A [[multiNFA]] transition graph. */
-  private[this] val graph = multiNFA.toGraph.reachable(multiNFA.initSet.toSet)
+  /** A [[nfaWLA]] transition graph. */
+  private[this] val graph = nfaWLA.toGraph.reachable(nfaWLA.initSet.toSet)
 
-  /** A [[multiNFA]] transition graph's SCCs. */
+  /** A [[nfaWLA]] transition graph's SCCs. */
   private[this] val scc = graph.scc
 
-  /** A map from a state of [[multiNFA]] to SCC. */
+  /** A map from a state of [[nfaWLA]] to SCC. */
   private[this] val sccMap =
     checkTimeout("automaton.AutomatonChecker#sccMap")((for (sc <- scc; q <- sc) yield q -> sc).toMap)
 
@@ -71,10 +69,10 @@ private final class AutomatonChecker[A, Q](
       .withDefaultValue(Map.empty.withDefaultValue(Vector.empty))
   }
 
-  /** A map from a SCC to the lookahead DFA's states in this. */
+  /** A map from a SCC to the lookahead DFA states in this. */
   private[this] val sccLookaheadMap = scc.map { sc => sc -> sc.map(_._2).toSet }.toMap
 
-  /** A type of [[multiNFA]] state. */
+  /** A type of [[nfaWLA]] state. */
   private type R = (Q, Set[Q])
 
   /** A type of pumps of witness. */
@@ -203,7 +201,7 @@ private final class AutomatonChecker[A, Q](
     val g3 = checkTimeout("automaton.AutomatonChecker#checkPolynomialComponentBetween:g3") {
       Graph.from(
         (for {
-          a <- multiNFA.alphabet.iterator
+          a <- nfaWLA.alphabet.iterator
           (q11, q12) <- sourceEdges(a)
           (q21, q22) <- betweenEdges.flatMap(_(a))
           (q31, q32) <- targetEdges(a)
@@ -235,12 +233,12 @@ private final class AutomatonChecker[A, Q](
 
   /** Builds a witness object from pump strings and states. */
   private[this] def witness(pumps: Seq[Pump]): Witness[A] = {
-    val (pumpPaths, qs) = pumps.foldLeft((Vector.empty[(Seq[A], Seq[A])], multiNFA.initSet.toSet)) {
+    val (pumpPaths, qs) = pumps.foldLeft((Vector.empty[(Seq[A], Seq[A])], nfaWLA.initSet.toSet)) {
       case ((pumpPaths, last), (q1, path, q2)) =>
         val prefix = graph.path(last, q1).get.map(_._1)
         (pumpPaths :+ (prefix, path.map(_._1)), Set(q2))
     }
-    val suffix = reverseDFA.toGraph.path(Set(reverseDFA.init), qs.head._2).get.reverse
+    val suffix = nfaWLA.lookAheadDFA.toGraph.path(Set(nfaWLA.lookAheadDFA.init), qs.head._2).get.reverse
     Witness(pumpPaths, suffix)
   }
 }
