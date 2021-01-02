@@ -14,7 +14,7 @@ ThisBuild / developers := List(
   )
 )
 
-ThisBuild / scalaVersion := "2.13.3"
+ThisBuild / scalaVersion := "2.13.4"
 ThisBuild / scalacOptions ++= Seq(
   "-encoding",
   "UTF-8",

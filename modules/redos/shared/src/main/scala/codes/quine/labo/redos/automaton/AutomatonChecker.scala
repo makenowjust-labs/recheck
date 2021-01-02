@@ -48,7 +48,7 @@ private final class AutomatonChecker[A, Q](
     val edges = graph.edges.iterator
       .map { case (q1, _, q2) => (sccMap(q1), (), sccMap(q2)) }
       .filter { case (sc1, _, sc2) => sc1 != sc2 }
-    val edgeSet = mutable.LinkedHashSet.empty[(IndexedSeq[(Q, Set[Q])], (), IndexedSeq[(Q, Set[Q])])]
+    val edgeSet = mutable.LinkedHashSet.empty[(IndexedSeq[(Q, Set[Q])], Unit, IndexedSeq[(Q, Set[Q])])]
     for (edge <- edges) checkTimeout("automaton.AutomatonChecker#sccGraph:loop") {
       edgeSet.addOne(edge)
     }
