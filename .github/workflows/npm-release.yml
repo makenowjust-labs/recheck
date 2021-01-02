@@ -15,7 +15,7 @@ jobs:
 
       - name: Build
         run: |
-          sbt coreJS/fullOptJS
+          sbt redosJS/fullOptJS
           cp modules/redos/js/target/scala-2.13/redos-opt.js* packages/redos/
 
       - uses: JS-DevTools/npm-publish@v1
