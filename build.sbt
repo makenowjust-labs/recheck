@@ -45,13 +45,13 @@ lazy val root = project
     mdocOut := baseDirectory.value / "site" / "content"
   )
   .enablePlugins(MdocPlugin)
-  .aggregate(coreJVM, coreJS, demoJS)
-  .dependsOn(coreJVM)
+  .aggregate(redosJVM, redosJS, demoJS)
+  .dependsOn(redosJVM)
 
-lazy val core = crossProject(JVMPlatform, JSPlatform)
-  .in(file("modules/redos-core"))
+lazy val redos = crossProject(JVMPlatform, JSPlatform)
+  .in(file("modules/redos"))
   .settings(
-    name := "redos-core",
+    name := "redos",
     console / initialCommands := """
       |import scala.concurrent.duration._
       |import scala.util.Random
@@ -113,8 +113,8 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
 
-lazy val coreJVM = core.jvm
-lazy val coreJS = core.js
+lazy val redosJVM = redos.jvm
+lazy val redosJS = redos.js
 
 lazy val demoJS = project
   .in(file("modules/demo"))
@@ -131,4 +131,4 @@ lazy val demoJS = project
     testFrameworks += new TestFramework("munit.Framework"),
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
-  .dependsOn(coreJS)
+  .dependsOn(redosJS)

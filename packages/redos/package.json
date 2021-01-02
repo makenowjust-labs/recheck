@@ -6,7 +6,7 @@
   "homepage": "https://makenowjust-labo.github.io/redos/",
   "repository": "https://github.com/MakeNowJust-Labo/redos.git",
   "version": "1.1.2",
-  "main": "redos-core-opt.js",
+  "main": "redos-opt.js",
   "types": "index.d.ts",
   "keywords": [
     "redos",
