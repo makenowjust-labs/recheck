@@ -31,6 +31,12 @@ object EpsNFACompiler {
           counterQ += 1
           q
         }
+        var counterLoop = 0 // A next loop counter.
+        def nextLoop(): Int = {
+          val loop = counterLoop
+          counterLoop += 1
+          loop
+        }
         val tau = Map.newBuilder[Int, Transition[Int]] // A transition function.
 
         def loop(node: Node): Try[(Int, Int)] = checkTimeout("automaton.EpsNFACompiler.compile:loop")(node match {
@@ -57,26 +63,36 @@ object EpsNFACompiler {
           case Group(n)              => loop(n)
           case Star(nonGreedy, n) =>
             loop(n).map { case (i0, a0) =>
-              //      +---------------+
-              //      |               |
-              //  (i)-+->[i0-->a0]-+  +->(a)
-              //   ^               |
-              //   +---------------+
+              //       +--------------------+
+              //       |                    |
+              //  (i)-+->(i2)->[i0-->a0]-+  +->(a1)->(a)
+              //   ^                     |
+              //   +----------------------+
+              val loop = nextLoop()
               val i = nextQ()
+              val i2 = nextQ()
+              val a1 = nextQ()
               val a = nextQ()
-              val t = if (nonGreedy) Vector(a, i0) else Vector(i0, a)
+              val t = if (nonGreedy) Vector(a1, i2) else Vector(i2, a1)
               tau.addOne(i -> Eps(t))
+              tau.addOne(i2 -> LoopEnter(loop, i0))
               tau.addOne(a0 -> Eps(Vector(i)))
+              tau.addOne(a1 -> LoopExit(loop, a))
               (i, a)
             }
           case Plus(nonGreedy, n) =>
             loop(n).map { case (i, a0) =>
-              // +-----------+
+              // +----(i1)---+
               // |           |
-              // +->[i-->a0]-+->(a)
+              // +->[i-->a0]-+->(a1)->(a)
+              val loop = nextLoop()
+              val i1 = nextQ()
+              val a1 = nextQ()
               val a = nextQ()
-              val t = if (nonGreedy) Vector(a, i) else Vector(i, a)
+              val t = if (nonGreedy) Vector(a1, i1) else Vector(i1, a1)
               tau.addOne(a0 -> Eps(t))
+              tau.addOne(i1 -> LoopEnter(loop, i))
+              tau.addOne(a1 -> LoopExit(loop, a))
               (i, a)
             }
           case Question(nonGreedy, n) =>
@@ -146,18 +162,28 @@ object EpsNFACompiler {
 
         loop(pattern.node).map { case (i0, a0) =>
           val i = if (!pattern.hasLineBeginAtBegin) {
+            val loop = nextLoop()
             val i1 = nextQ()
             val i2 = nextQ()
-            tau.addOne(i1 -> Eps(Vector(i0, i2)))
-            tau.addOne(i2 -> Consume(alphabet.chars.toSet, i1))
+            val i3 = nextQ()
+            val i4 = nextQ()
+            tau.addOne(i1 -> Eps(Vector(i4, i2)))
+            tau.addOne(i2 -> LoopEnter(loop, i3))
+            tau.addOne(i3 -> Consume(alphabet.chars.toSet, i1))
+            tau.addOne(i4 -> LoopExit(loop, i0))
             i1
           } else i0
           val a = if (!pattern.hasLineEndAtEnd) {
+            val loop = nextLoop()
             val a1 = nextQ()
             val a2 = nextQ()
-            tau.addOne(a0 -> Eps(Vector(a1, a2)))
+            val a3 = nextQ()
+            val a4 = nextQ()
+            tau.addOne(a0 -> Eps(Vector(a3, a1)))
+            tau.addOne(a1 -> LoopEnter(loop, a2))
             tau.addOne(a2 -> Consume(alphabet.chars.toSet, a0))
-            a1
+            tau.addOne(a3 -> LoopExit(loop, a4))
+            a4
           } else a0
           ((0 until counterQ).toSet, i, a, tau.result())
         }
