@@ -34,6 +34,12 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
         case Some(Consume(chs, q1)) =>
           sb.append(s"  ${escape(q0)} [shape=circle];\n")
           sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(chs.mkString("{", ", ", "}"))}];\n")
+        case Some(LoopEnter(loop, q1)) =>
+          sb.append(s"  ${escape(q0)} [shape=circle];\n")
+          sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(s"Enter($loop)")}];\n")
+        case Some(LoopExit(loop, q1)) =>
+          sb.append(s"  ${escape(q0)} [shape=circle];\n")
+          sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(s"Exit($loop)")}];\n")
         case None =>
           sb.append(s"  ${escape(q0)} [shape=doublecircle];\n")
       }
@@ -48,79 +54,74 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
       maxNFASize: Int = Int.MaxValue
   )(implicit timeout: Timeout = Timeout.NoTimeout): OrderedNFA[IChar, (CharInfo, Seq[Q])] =
     timeout.checkTimeout("automaton.EpsNFA#toOrderedNFA") {
-      // Skips ε-transition without context information.
-      def buildClosure0(q: Q, path: Seq[Q]): Seq[(Q, Seq[Q])] =
-        timeout.checkTimeout("automaton.EpsNFA#toOrderedNFA:buildClosure0") {
-          // Exits this loop if a cyclic path is found.
-          if (path.lastOption.exists(p => path.containsSlice(Seq(p, q)))) Vector.empty
-          else
-            tau.get(q) match {
-              case Some(Eps(qs))       => qs.flatMap(buildClosure0(_, path :+ q))
-              case Some(Assert(_, _))  => Vector((q, path))
-              case Some(Consume(_, _)) => Vector((q, path))
-              case None                => Vector((q, path))
-            }
-        }
-      val closure0Cache = mutable.Map.empty[Q, Seq[(Q, Seq[Q])]]
-      def closure0(q: Q): Seq[(Q, Seq[Q])] = closure0Cache.getOrElseUpdate(q, buildClosure0(q, Vector.empty))
+      // Obtains a set of possible character information.
+      // `CharInfo(true, false)` means a beginning or ending marker.
+      val charInfoSet = alphabet.chars.toSet.map(CharInfo.from(_)) ++ Set(CharInfo(true, false))
 
-      // Skips ε-transition with context information.
-      def buildClosure(c0: CharInfo, c1: CharInfo, q: Q, path: Seq[Q]): Seq[(Q, Option[Consume[Q]])] =
+      /** Skips ε-transitions from the state and collects not ε-transition or terminal state. */
+      def buildClosure(c0: CharInfo, cs: Set[CharInfo], q: Q, loops: Set[Int]): Seq[(Q, Option[Consume[Q]])] =
         timeout.checkTimeout("automaton.EpsNFA#toOrderedNFA:buildClosure") {
-          // Exits this loop if a cyclic path is found.
-          if (path.lastOption.exists(p => path.containsSlice(Seq(p, q)))) Vector.empty
+          if (cs.isEmpty) Vector.empty
           else
             tau.get(q) match {
-              case Some(Eps(qs)) => qs.flatMap(buildClosure(c0, c1, _, path :+ q))
-              case Some(Assert(k, q1)) =>
-                if (k.accepts(c0, c1)) buildClosure(c0, c1, q1, path :+ q) else Vector.empty
-              case Some(consume: Consume[Q]) => Vector((q, Some(consume)))
-              case None                      => Vector((q, None))
+              case Some(Eps(qs))       => qs.flatMap(buildClosure(c0, cs, _, loops))
+              case Some(Assert(k, q1)) => buildClosure(c0, cs & k.toCharInfoSet(c0), q1, loops)
+              case Some(LoopEnter(loop, q1)) =>
+                if (loops.contains(loop)) Vector.empty // An ε-loop is detected.
+                else buildClosure(c0, cs, q1, loops ++ Set(loop))
+              case Some(LoopExit(loop, q1)) =>
+                if (loops.contains(loop)) Vector.empty // An ε-loop is detected.
+                else buildClosure(c0, cs, q1, loops)
+              case Some(Consume(chs, q1)) =>
+                val newChs = chs.filter(ch => cs.contains(CharInfo.from(ch)))
+                if (newChs.nonEmpty) Vector((q, Some(Consume(newChs, q1))))
+                else Vector.empty
+              case None =>
+                if (cs.contains(CharInfo(true, false))) Vector((q, None))
+                else Vector.empty
             }
         }
-      val closureCache = mutable.Map.empty[(CharInfo, CharInfo, Q, Seq[Q]), Seq[(Q, Option[Consume[Q]])]]
-      def closure(c0: CharInfo, c1: CharInfo, q: Q, path: Seq[Q]): Seq[(Q, Option[Consume[Q]])] =
-        closureCache.getOrElseUpdate((c0, c1, q, path), buildClosure(c0, c1, q, path))
+      val closureCache = mutable.Map.empty[(CharInfo, Q), Seq[(Q, Option[Consume[Q]])]]
+      def closure(c0: CharInfo, q: Q): Seq[(Q, Option[Consume[Q]])] =
+        closureCache.getOrElseUpdate((c0, q), buildClosure(c0, charInfoSet, q, Set.empty))
 
-      val closure0Init = closure0(init)
+      val closureInit = closure(CharInfo(true, false), init)
 
-      val queue = mutable.Queue.empty[(CharInfo, Seq[(Q, Seq[Q])])]
+      val queue = mutable.Queue.empty[(CharInfo, Seq[(Q, Option[Consume[Q]])])]
       val newStateSet = mutable.Set.empty[(CharInfo, Seq[Q])]
-      val newInits = Vector((CharInfo(true, false), closure0Init.map(_._1)))
+      val newInits = Vector((CharInfo(true, false), closureInit.map(_._1)))
       val newAcceptSet = Set.newBuilder[(CharInfo, Seq[Q])]
       val newDelta = Map.newBuilder[((CharInfo, Seq[Q]), IChar), Seq[(CharInfo, Seq[Q])]]
       var deltaSize = 0
 
-      queue.enqueue((CharInfo(true, false), closure0Init))
+      queue.enqueue((CharInfo(true, false), closureInit))
       newStateSet.addAll(newInits)
 
       while (queue.nonEmpty) timeout.checkTimeout("automaton.EpsNFA#toOrderedNFA:loop") {
-        val (c1, qps) = queue.dequeue()
-        val qs = qps.map(_._1)
-        val accepts =
-          qps.exists { case (q, path) => closure(c1, CharInfo(true, false), q, path).exists(_._1 == accept) }
-        if (accepts) newAcceptSet.addOne((c1, qs))
-        for (ch <- alphabet.chars) {
-          val c2 = CharInfo.from(ch)
-          val d = Vector.newBuilder[(CharInfo, Seq[Q])]
-          for ((q1, path) <- qps; (_, to) <- closure(c1, c2, q1, path))
-            to match {
-              case Some(Consume(chs, q2)) if chs.contains(ch) =>
-                val qps1 = closure0(q2)
+        val (c0, qps) = queue.dequeue()
+        val qs0 = qps.map(_._1)
+        if (qs0.contains(accept)) newAcceptSet.addOne((c0, qs0))
+        val d = mutable.Map.empty[IChar, Seq[(CharInfo, Seq[Q])]].withDefaultValue(Vector.empty)
+        for ((_, p) <- qps) {
+          p match {
+            case Some(Consume(chs, q1)) =>
+              for (ch <- chs) {
+                val c1 = CharInfo.from(ch)
+                val qps1 = closure(c1, q1)
                 val qs1 = qps1.map(_._1)
-                d.addOne((c2, qs1))
-                if (!newStateSet.contains((c2, qs1))) {
-                  queue.enqueue((c2, qps1))
-                  newStateSet.addOne((c2, qs1))
+                d(ch) = d(ch) :+ (c1, qs1)
+                if (!newStateSet.contains((c1, qs1))) {
+                  queue.enqueue((c1, qps1))
+                  newStateSet.addOne((c1, qs1))
                 }
-              case Some(_) | None =>
-                () // Nothing to do here because of terminal state or non-match consuming state.
-            }
-          val to = d.result()
-          newDelta.addOne(((c1, qs), ch) -> to)
-          deltaSize += to.size
-          if (deltaSize >= maxNFASize) throw new UnsupportedException("OrderedNFA size is too large")
+              }
+            case None =>
+              () // Nothing to do here because of terminal state.
+          }
         }
+        for ((ch, to) <- d) newDelta.addOne(((c0, qs0), ch) -> to)
+        deltaSize += d.size
+        if (deltaSize >= maxNFASize) throw new UnsupportedException("OrderedNFA size is too large")
       }
 
       OrderedNFA(alphabet.chars.toSet, newStateSet.toSet, newInits, newAcceptSet.result(), newDelta.result())
@@ -142,35 +143,62 @@ object EpsNFA {
   /** Consume is an ε-NFA transition with consuming a character. */
   final case class Consume[Q](set: Set[IChar], to: Q) extends Transition[Q]
 
+  /** LoopEnter is an ε-NFA transition with consuming no character and marking a entering of the loop. */
+  final case class LoopEnter[Q](loop: Int, to: Q) extends Transition[Q]
+
+  /** LoopExit is an ε-NFA transition with consuming no character and marking a exiting of the loop. */
+  final case class LoopExit[Q](loop: Int, to: Q) extends Transition[Q]
+
   /** AssertKind is assertion kind of this ε-NFA transition. */
   sealed abstract class AssertKind extends Serializable with Product {
 
-    /** Tests the assertion on around character informations. */
+    /** Tests the assertion on the around character information. */
     def accepts(prev: CharInfo, next: CharInfo): Boolean = this match {
       case AssertKind.LineBegin       => prev.isLineTerminator
       case AssertKind.LineEnd         => next.isLineTerminator
       case AssertKind.WordBoundary    => prev.isWord != next.isWord
       case AssertKind.NotWordBoundary => prev.isWord == next.isWord
     }
+
+    /** Returns a set of next possible character information from the previous character information. */
+    def toCharInfoSet(prev: CharInfo): Set[CharInfo]
   }
 
   /** AssertKind values and utilities. */
   object AssertKind {
 
     /** LineBegin is `^` assertion. */
-    case object LineBegin extends AssertKind
+    case object LineBegin extends AssertKind {
+      def toCharInfoSet(prev: CharInfo): Set[CharInfo] =
+        if (prev.isLineTerminator) Set(CharInfo(false, false), CharInfo(false, true), CharInfo(true, false))
+        else Set.empty
+    }
 
     /** LineEnd is `$` assertion. */
-    case object LineEnd extends AssertKind
+    case object LineEnd extends AssertKind {
+      def toCharInfoSet(prev: CharInfo): Set[CharInfo] = Set(CharInfo(true, false))
+    }
 
     /** WordBoundary is `\b` assertion. */
-    case object WordBoundary extends AssertKind
+    case object WordBoundary extends AssertKind {
+      def toCharInfoSet(prev: CharInfo): Set[CharInfo] =
+        if (prev.isWord) Set(CharInfo(false, false), CharInfo(true, false))
+        else Set(CharInfo(false, true))
+    }
 
     /** NotWordBoundary is `\B` assertion. */
-    case object NotWordBoundary extends AssertKind
+    case object NotWordBoundary extends AssertKind {
+      def toCharInfoSet(prev: CharInfo): Set[CharInfo] =
+        if (prev.isWord) Set(CharInfo(false, true))
+        else Set(CharInfo(false, false), CharInfo(true, false))
+    }
   }
 
-  /** CharInfo is a minimum character information for assertion check. */
+  /** CharInfo is a minimum character information for assertion check.
+    *
+    * Note that both of `isLineTerminator` and `isWord` must not be `true` at the same time
+    * because there is no character which is a line terminator and also a word.
+    */
   final case class CharInfo(isLineTerminator: Boolean, isWord: Boolean)
 
   /** CharInfo utilities. */

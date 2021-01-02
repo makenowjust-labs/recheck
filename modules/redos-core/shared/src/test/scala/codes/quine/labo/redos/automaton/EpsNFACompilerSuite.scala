@@ -23,13 +23,15 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1, 2, 3),
+            Set(0, 1, 2, 3, 4, 5),
             2,
             1,
             Map(
               0 -> Assert(AssertKind.LineEnd, 1),
-              2 -> Eps(Seq(0, 3)),
-              3 -> Consume(Set(IChar.Any16), 2)
+              2 -> Eps(Seq(5, 3)),
+              3 -> LoopEnter(0, 4),
+              4 -> Consume(Set(IChar.Any16), 2),
+              5 -> LoopExit(0, 0)
             )
           )
         )
@@ -39,13 +41,15 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1, 2, 3),
+            Set(0, 1, 2, 3, 4, 5),
             0,
-            2,
+            5,
             Map(
               0 -> Assert(AssertKind.LineBegin, 1),
-              1 -> Eps(Seq(2, 3)),
-              3 -> Consume(Set(IChar.Any16), 1)
+              1 -> Eps(Seq(4, 2)),
+              2 -> LoopEnter(0, 3),
+              3 -> Consume(Set(IChar.Any16), 1),
+              4 -> LoopExit(0, 5)
             )
           )
         )
@@ -294,17 +298,19 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4, 5, 6, 7),
+            Set(0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
             0,
-            7,
+            9,
             Map(
               0 -> Assert(AssertKind.LineBegin, 1),
               1 -> Eps(Seq(4)),
-              4 -> Eps(Seq(2, 5)),
+              4 -> Eps(Seq(5, 6)),
+              5 -> LoopEnter(0, 2),
               2 -> Consume(Set(IChar.Any16), 3),
               3 -> Eps(Seq(4)),
-              5 -> Eps(Seq(6)),
-              6 -> Assert(AssertKind.LineEnd, 7)
+              6 -> LoopExit(0, 7),
+              7 -> Eps(Seq(8)),
+              8 -> Assert(AssertKind.LineEnd, 9)
             )
           )
         )
@@ -314,17 +320,19 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4, 5, 6, 7),
+            Set(0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
             0,
-            7,
+            9,
             Map(
               0 -> Assert(AssertKind.LineBegin, 1),
               1 -> Eps(Seq(4)),
-              4 -> Eps(Seq(5, 2)),
+              4 -> Eps(Seq(6, 5)),
+              5 -> LoopEnter(0, 2),
               2 -> Consume(Set(IChar.Any16), 3),
               3 -> Eps(Seq(4)),
-              5 -> Eps(Seq(6)),
-              6 -> Assert(AssertKind.LineEnd, 7)
+              6 -> LoopExit(0, 7),
+              7 -> Eps(Seq(8)),
+              8 -> Assert(AssertKind.LineEnd, 9)
             )
           )
         )
@@ -337,16 +345,18 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4, 5, 6),
+            Set(0, 1, 2, 3, 4, 5, 6, 7, 8),
             0,
-            6,
+            8,
             Map(
               0 -> Assert(AssertKind.LineBegin, 1),
               1 -> Eps(Seq(2)),
               2 -> Consume(Set(IChar.Any16), 3),
-              3 -> Eps(Seq(2, 4)),
-              4 -> Eps(Seq(5)),
-              5 -> Assert(AssertKind.LineEnd, 6)
+              3 -> Eps(Seq(4, 5)),
+              4 -> LoopEnter(0, 2),
+              5 -> LoopExit(0, 6),
+              6 -> Eps(Seq(7)),
+              7 -> Assert(AssertKind.LineEnd, 8)
             )
           )
         )
@@ -356,16 +366,18 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4, 5, 6),
+            Set(0, 1, 2, 3, 4, 5, 6, 7, 8),
             0,
-            6,
+            8,
             Map(
               0 -> Assert(AssertKind.LineBegin, 1),
               1 -> Eps(Seq(2)),
               2 -> Consume(Set(IChar.Any16), 3),
-              3 -> Eps(Seq(4, 2)),
-              4 -> Eps(Seq(5)),
-              5 -> Assert(AssertKind.LineEnd, 6)
+              3 -> Eps(Seq(5, 4)),
+              4 -> LoopEnter(0, 2),
+              5 -> LoopExit(0, 6),
+              6 -> Eps(Seq(7)),
+              7 -> Assert(AssertKind.LineEnd, 8)
             )
           )
         )

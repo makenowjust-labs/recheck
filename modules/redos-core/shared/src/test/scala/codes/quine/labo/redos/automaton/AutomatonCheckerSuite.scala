@@ -30,6 +30,8 @@ class AutomatonCheckerSuite extends munit.FunSuite {
     assertEquals(check("(a*)*", ""), Success(Linear))
     assertEquals(check("^([a:]|\\b)*$", ""), Success(Linear))
     assertEquals(check("^(\\w|\\W)*$", "i"), Success(Linear))
+    assertEquals(check("^(a()*a)*$", ""), Success(Linear))
+    assertEquals(check("^(a(\\b)*:)*$", ""), Success(Linear))
   }
 
   test("AutomatonChecker.check: polynomial") {
@@ -41,7 +43,7 @@ class AutomatonCheckerSuite extends munit.FunSuite {
     )
     assertEquals(
       check("^(.a)*a(.a)*a$", "s"),
-      Success(Polynomial(2, Witness(Seq((Seq(other, a), Seq(a, a))), Seq(a, a, a))))
+      Success(Polynomial(2, Witness(Seq((Seq(a, a), Seq(a, a))), Seq(a, other, a, a, a))))
     )
     assertEquals(
       check("^.*a.*a.*a$", "s"),
@@ -68,7 +70,7 @@ class AutomatonCheckerSuite extends munit.FunSuite {
     )
     assertEquals(
       check("^(aa|b|aab)*$", ""),
-      Success(Exponential(Witness(Seq((Seq(a), Seq(a, a, a, b, a))), Seq(other2))))
+      Success(Exponential(Witness(Seq((Seq(a, a), Seq(b, a, a, b, a, a))), Seq(other2))))
     )
   }
 }
