@@ -23,21 +23,24 @@ object Tracer {
   /** LimitException is an exception thrown when VM execution step exceeds a limit. */
   class LimitException(message: String) extends Exception(message)
 
-  /** LimitTracer is a tracer implementation which can trace execution on a limit.
+  /** LimitTracer is a tracer implementation which can trace the execution on a limit.
     * When an execution step exceeds the limit, it throws [[LimitException]].
     */
-  class LimitTracer(val limit: Int = Int.MaxValue, val timeout: Timeout = Timeout.NoTimeout) extends Tracer {
+  class LimitTracer(val ir: IR, val limit: Int = Int.MaxValue, val timeout: Timeout = Timeout.NoTimeout)
+      extends Tracer {
     private[this] var counter = 0
 
     def steps: Int = counter
 
     def trace(pos: Int, pc: Int, backtrack: Boolean, capture: Int => Option[UString], cnts: Seq[Int]): Unit = {
-      counter += 1
-      if (counter >= limit) throw new LimitException("limit is exceeded")
+      if (ir.codes(pc).isConsumable && !backtrack) {
+        counter += 1
+        if (counter >= limit) throw new LimitException("limit is exceeded")
+      }
     }
   }
 
-  /** NoTracer is a tracer implementation which traces notthing in fact. */
+  /** NoTracer is a tracer implementation which traces nothing in fact. */
   final case class NoTracer(timeout: Timeout = Timeout.NoTimeout) extends Tracer {
     def trace(pos: Int, pc: Int, backtrack: Boolean, capture: Int => Option[UString], cnts: Seq[Int]): Unit = ()
   }

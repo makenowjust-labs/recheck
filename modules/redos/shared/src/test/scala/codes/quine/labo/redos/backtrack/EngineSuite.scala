@@ -2,7 +2,6 @@ package codes.quine.labo.redos
 package backtrack
 
 import regexp.Parser
-import Tracer.LimitException
 
 class EngineSuite extends munit.FunSuite {
 
@@ -18,12 +17,6 @@ class EngineSuite extends munit.FunSuite {
   ): Unit = {
     val result = Parser.parse(source, flags).flatMap(Engine.matches(_, input, pos).map(_.map(_.positions))).get
     assertEquals(result, expected)
-  }
-
-  test("Engine.matches: trace limit") {
-    val pattern = Parser.parse("^(a|a)*$", "").get
-    val tracer = new Tracer.LimitTracer(1000)
-    intercept[LimitException](Engine.matches(pattern, "aaaaaaaaaab", 0, tracer).get)
   }
 
   test("Engine.matches: submatch") {

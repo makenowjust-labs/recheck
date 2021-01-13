@@ -22,7 +22,7 @@ class VMSuite extends munit.FunSuite {
       IR.Done
     )
     val ir = IR(0, Map.empty, codes)
-    val tracer = new Tracer.LimitTracer(1000) // 2^10 = 1024 > 1000
+    val tracer = new Tracer.LimitTracer(ir, 1000) // 2^10 = 1024 > 1000
     intercept[LimitException](VM.execute(ir, input, 0, tracer))
   }
 

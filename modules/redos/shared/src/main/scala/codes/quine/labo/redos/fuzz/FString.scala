@@ -115,7 +115,7 @@ object FString {
   /** FChar is a character of [[FString]]. */
   sealed abstract class FChar extends Serializable with Product
 
-  /** Wrap is a wrapper of [[UChar]] in [[FString]]. */
+  /** Wrap is a wrapper of a unicode character in [[FString]]. */
   final case class Wrap(u: UChar) extends FChar
 
   /** Repeat is a repetition specifier in [[FString]]. */

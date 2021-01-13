@@ -26,13 +26,18 @@ final case class IR(capsSize: Int, names: Map[String, Int], codes: IndexedSeq[Op
 object IR {
 
   /** Op is an IR op-code. */
-  sealed abstract class OpCode
+  sealed abstract class OpCode {
+
+    /** Whether this op-code consumes characters. */
+    def isConsumable: Boolean = false
+  }
 
   /** `any`: Advance `pos` if the current character exists.
     *
     * This op-code is used for dot pattern `.` when the pattern is `dotAll`.
     */
   case object Any extends OpCode {
+    override def isConsumable: Boolean = true
     override def toString: String = "any"
   }
 
@@ -51,6 +56,7 @@ object IR {
     * `c` is canonical when the pattern is `ignoreCase`.
     */
   final case class Char(c: UChar) extends OpCode {
+    override def isConsumable: Boolean = true
     override def toString: String = s"char\t'$c'"
   }
 
@@ -60,6 +66,7 @@ object IR {
     * `s` is canonical when the pattern is `ignoreCase`.
     */
   final case class Class(s: IChar) extends OpCode {
+    override def isConsumable: Boolean = true
     override def toString: String = s"class\t$s"
   }
 
@@ -69,6 +76,7 @@ object IR {
     * `s` is canonical when the pattern is `ignoreCase`.
     */
   final case class ClassNot(s: IChar) extends OpCode {
+    override def isConsumable: Boolean = true
     override def toString: String = s"class_not\t$s"
   }
 
@@ -112,6 +120,7 @@ object IR {
     * This op-code is used for dot pattern `.` when the pattern is not `dotAll`.
     */
   case object Dot extends OpCode {
+    override def isConsumable: Boolean = true
     override def toString: String = "dot"
   }
 
@@ -222,6 +231,7 @@ object IR {
     * Note that an unmatched capture is treated as an empty string.
     */
   final case class Ref(i: Int) extends OpCode {
+    override def isConsumable: Boolean = true
     override def toString: String = s"ref\t$i"
   }
 
@@ -231,6 +241,7 @@ object IR {
     * Note that an unmatched capture is treated as an empty string.
     */
   final case class RefBack(i: Int) extends OpCode {
+    override def isConsumable: Boolean = true
     override def toString: String = s"ref_back\t$i"
   }
 

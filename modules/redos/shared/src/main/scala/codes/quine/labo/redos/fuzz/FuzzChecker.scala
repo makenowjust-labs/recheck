@@ -306,7 +306,7 @@ private[fuzz] final class FuzzChecker(
     val input = str.toUString
     if (input.size > maxAttackSize) None
     else {
-      val t = new LimitTracer(attackLimit, timeout)
+      val t = new LimitTracer(ir, attackLimit, timeout)
       try VM.execute(ir, input, 0, t)
       catch {
         case _: LimitException =>

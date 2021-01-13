@@ -9,8 +9,8 @@ import data.UString
 import util.Timeout
 
 /** FuzzTracer is a tracer implementation for fuzzing. */
-private[fuzz] class FuzzTracer(val ir: IR, val input: UString, limit: Int, timeout: Timeout)
-    extends LimitTracer(limit, timeout) {
+private[fuzz] class FuzzTracer(ir: IR, val input: UString, limit: Int, timeout: Timeout)
+    extends LimitTracer(ir, limit, timeout) {
 
   /** A mutable set of [[coverage]]. */
   private[this] val coverageSet: mutable.Set[(Int, Seq[Int], Boolean)] = mutable.Set.empty

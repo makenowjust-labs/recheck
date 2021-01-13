@@ -80,7 +80,7 @@ class FuzzTracerSuite extends munit.FunSuite {
 
   test("FuzzTracer#rate") {
     assertEquals(trace(ir1, UString.empty).rate(), 0.0)
-    assertEquals(trace(ir1, UString.from("x", false)).rate(), 7.0)
+    assertEquals(trace(ir1, UString.from("x", false)).rate(), 1.0)
   }
 
   test("FuzzTracer#buildFString") {
