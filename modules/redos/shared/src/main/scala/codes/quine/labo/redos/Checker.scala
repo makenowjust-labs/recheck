@@ -53,7 +53,7 @@ object Checker {
       result
         .map {
           case Some(vuln: Complexity.Vulnerable[UChar]) =>
-            val attack = UString(vuln.buildAttack(attackLimit, stepRate, maxAttackSize).toIndexedSeq)
+            val attack = UString(vuln.buildAttack(attackLimit, maxAttackSize).toIndexedSeq)
             Diagnostics.Vulnerable(attack, Some(vuln), Some(Automaton))
           case Some(safe: Complexity.Safe) => Diagnostics.Safe(Some(safe), Some(Automaton))
           case None                        => Diagnostics.Safe(None, Some(Automaton))

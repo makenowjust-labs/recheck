@@ -15,9 +15,6 @@ final case class Config(
     maxAttackSize: Int = Config.MaxAttackSize,
     // A limit of VM execution steps on attack string construction.
     attackLimit: Int = Config.AttackLimit,
-    // Automaton:
-    // A ratio of a VM step and a NFA transition.
-    stepRate: Double = Config.StepRate,
     // Fuzz:
     // A random instance for fuzzing.
     random: Random = Random,
@@ -56,19 +53,16 @@ final case class Config(
 object Config {
 
   /** The default value of [[Config#maxAttackSize]]. */
-  val MaxAttackSize = 10_000
+  val MaxAttackSize = 4_000
 
   /** The default value of [[Config#AttackLimit]]. */
-  val AttackLimit = 1_000_000
-
-  /** The default value of [[Config#stepRate]]. */
-  val StepRate = 1.5
+  val AttackLimit = 100_000
 
   /** The default value of [[Config#seedLimit]]. */
-  val SeedLimit = 10_000
+  val SeedLimit = 1_000
 
   /** The default value of [[Config#populationLimit]]. */
-  val PopulationLimit = 100_000
+  val PopulationLimit = 10_000
 
   /** The default value of [[Config#crossSize]]. */
   val CrossSize = 25

@@ -44,7 +44,7 @@ class CheckerSuite extends munit.FunSuite {
       ),
       Success(
         Diagnostics.Vulnerable(
-          UString.from("aaaaaaaaaaaaaaaaaaaaa\u0000", false),
+          UString.from("aaaaaaaaaaaaaaaaaa\u0000", false),
           Some(
             Complexity.Exponential(Witness(Seq((Seq(UChar('a')), Seq(UChar('a')))), Seq(UChar(0x00))))
           ),
@@ -117,7 +117,7 @@ class CheckerSuite extends munit.FunSuite {
       ),
       Success(
         Diagnostics.Vulnerable(
-          UString.from("aaaaaaaaaaaaaaaaaaaaa\u0000", false),
+          UString.from("aaaaaaaaaaaaaaaaaa\u0000", false),
           Some(
             Complexity.Exponential(Witness(Seq((Seq(UChar('a')), Seq(UChar('a')))), Seq(UChar(0x00))))
           ),

@@ -14,7 +14,7 @@ class ComplexitySuite extends munit.FunSuite {
 
   test("Complexity.Vulnerable#buildAttack") {
     val w = Witness(Seq((Seq(IChar('a')), Seq(IChar('a')))), Seq(IChar('\u0000')))
-    assertEquals(Exponential(w).buildAttack(1_000_000, 1.5, 10_000).size, 22)
-    assertEquals(Polynomial(2, w).buildAttack(1_000_000, 1.5, 10_000).size, 819)
+    assertEquals(Exponential(w).buildAttack(100_000, 4_000).size, 19)
+    assertEquals(Polynomial(2, w).buildAttack(100_000, 4_000).size, 319)
   }
 }

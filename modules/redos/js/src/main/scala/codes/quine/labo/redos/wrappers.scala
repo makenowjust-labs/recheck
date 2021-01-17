@@ -171,9 +171,6 @@ trait ConfigJS extends js.Object {
   /** A limit of VM execution steps on attack string construction. */
   def attackLimit: js.UndefOr[Int]
 
-  /** A ratio of a VM step and a NFA transition. */
-  def stepRate: js.UndefOr[Double]
-
   /** A seed value for random instance. */
   def randomSeed: js.UndefOr[Int]
 
@@ -230,7 +227,6 @@ object ConfigJS {
       checker,
       config.maxAttackSize.getOrElse(Config.MaxAttackSize),
       config.attackLimit.getOrElse(Config.AttackLimit),
-      config.stepRate.getOrElse(Config.StepRate),
       random,
       config.seedLimit.getOrElse(Config.SeedLimit),
       config.populationLimit.getOrElse(Config.PopulationLimit),

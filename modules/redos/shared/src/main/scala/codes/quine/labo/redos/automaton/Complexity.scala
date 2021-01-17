@@ -25,7 +25,7 @@ object Complexity {
     def isSafe: Boolean = false
 
     /** Builds an attack string of this. */
-    def buildAttack(stepLimit: Int, stepRate: Double, maxSize: Int): Seq[A]
+    def buildAttack(stepLimit: Int, maxSize: Int): Seq[A]
   }
 
   /** RegExp can check a match in constant time. */
@@ -36,9 +36,9 @@ object Complexity {
 
   /** RegExp can check a match in polynomial time. */
   final case class Polynomial[A](degree: Int, witness: Witness[A]) extends Vulnerable[A] {
-    def buildAttack(stepsLimit: Int, stepRate: Double, maxSize: Int): Seq[A] = {
-      val remainSteps = stepsLimit - (witness.fixedSize * stepRate)
-      val repeatSteps = stepRate * witness.repeatSize
+    def buildAttack(stepsLimit: Int, maxSize: Int): Seq[A] = {
+      val remainSteps = stepsLimit - witness.fixedSize
+      val repeatSteps = witness.repeatSize
       val repeatSize = Math.ceil(Math.pow(remainSteps / repeatSteps, 1 / degree.toDouble)).toInt
       val maxRepeatSize = Math.floor((maxSize - witness.fixedSize) / witness.repeatSize.toDouble).toInt
       witness.buildAttack(Math.min(repeatSize, maxRepeatSize))
@@ -47,9 +47,9 @@ object Complexity {
 
   /** RegExp can check a match in exponential time. */
   final case class Exponential[A](witness: Witness[A]) extends Vulnerable[A] {
-    def buildAttack(stepsLimit: Int, stepRate: Double, maxSize: Int): Seq[A] = {
-      val remainSteps = stepsLimit - (witness.fixedSize * stepRate)
-      val repeatSteps = stepRate * witness.repeatSize
+    def buildAttack(stepsLimit: Int, maxSize: Int): Seq[A] = {
+      val remainSteps = stepsLimit - witness.fixedSize
+      val repeatSteps = witness.repeatSize
       val repeatSize = Math.ceil(Math.log(remainSteps / repeatSteps) / Math.log(2)).toInt
       val maxRepeatSize = Math.floor((maxSize - witness.fixedSize) / witness.repeatSize.toDouble).toInt
       witness.buildAttack(Math.min(repeatSize, maxRepeatSize))
