@@ -18,9 +18,10 @@ class FuzzCheckerSuite extends munit.FunSuite {
     } yield FuzzChecker.check(
       ctx,
       random0,
-      seedLimit = if (quick) 1_000 else 10_000,
-      populationLimit = if (quick) 10_000 else 100_000,
-      attackLimit = if (quick) 100_000 else 1_000_000
+      maxAttackSize = if (quick) 400 else 4000,
+      seedLimit = if (quick) 1_00 else 1_000,
+      populationLimit = if (quick) 1_000 else 10_000,
+      attackLimit = if (quick) 10_000 else 100_000
     )
     result.get.isDefined
   }
