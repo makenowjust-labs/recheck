@@ -3,7 +3,7 @@ package fuzz
 
 import data.UChar
 import data.UString
-import util.StringUtil
+import util.NumberFormat
 import FString._
 
 /** FString is a gene-type string for fuzzing. */
@@ -96,7 +96,7 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
               case Wrap(u)      => u
               case Repeat(_, _) => throw new IllegalArgumentException
             }
-            parts.addOne(UString(part).toString ++ StringUtil.superscript(repeat))
+            parts.addOne(UString(part).toString ++ NumberFormat.superscript(repeat))
             pos += size
           }
       }

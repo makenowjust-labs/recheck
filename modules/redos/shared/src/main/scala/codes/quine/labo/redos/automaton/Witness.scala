@@ -1,7 +1,8 @@
 package codes.quine.labo.redos
 package automaton
 
-/** Witness is a witness, which is a pump string with suffix.
+/** Witness is a witness to the ReDoS attack, which is a pump string
+  * with a suffix.
   *
   * For example, when a witness object forms `Witness(Seq((x, y), (z, w)), u)`,
   * an actual witness string is `x y^n z w^n u` for any integer `n`.
