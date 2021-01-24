@@ -1,7 +1,7 @@
-package codes.quine.labo.redos
+package codes.quine.labo.redos.common
 
 /** ReDoSException is a base exception class. */
-sealed abstract class ReDoSException(message: String, var used: Option[Checker] = None) extends Exception(message)
+sealed abstract class ReDoSException(message: String, var used: Option[Checker.Used] = None) extends Exception(message)
 
 /** TimeoutException is an exception thrown on timeout. */
 final class TimeoutException(message: String) extends ReDoSException(message)

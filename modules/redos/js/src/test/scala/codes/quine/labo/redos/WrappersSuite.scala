@@ -4,6 +4,7 @@ import scalajs.js
 import scalajs.js.JSON
 import automaton.Complexity
 import automaton.Witness
+import common.Checker
 import data.UChar
 import data.UString
 

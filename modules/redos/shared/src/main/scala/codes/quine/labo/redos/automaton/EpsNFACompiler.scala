@@ -6,6 +6,8 @@ import scala.util.Success
 import scala.util.Try
 
 import EpsNFA._
+import common.InvalidRegExpException
+import common.UnsupportedException
 import data.IChar
 import regexp.Pattern
 import regexp.Pattern._

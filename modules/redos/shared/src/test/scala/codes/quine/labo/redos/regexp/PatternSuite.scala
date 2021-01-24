@@ -4,6 +4,7 @@ package regexp
 import scala.util.Success
 
 import Pattern._
+import common.InvalidRegExpException
 import data.IChar
 import data.ICharSet
 import data.UString

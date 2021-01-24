@@ -9,6 +9,7 @@ import scala.util.Try
 import scala.util.chaining._
 
 import Pattern._
+import common.InvalidRegExpException
 import data.IChar
 import data.ICharSet
 import data.UChar

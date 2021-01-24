@@ -3,6 +3,7 @@ package backtrack
 
 import scala.util.Success
 
+import common.InvalidRegExpException
 import data.IChar
 import regexp.Pattern
 import regexp.Pattern._

@@ -6,6 +6,8 @@ import scala.concurrent.duration.Deadline
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
 
+import common.TimeoutException
+
 /** Timeout is a interface of a timeout checker. */
 trait Timeout {
 

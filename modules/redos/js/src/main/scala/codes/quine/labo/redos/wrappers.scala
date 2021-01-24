@@ -7,6 +7,7 @@ import scalajs.js
 import scalajs.js.JSConverters._
 import automaton.Complexity
 import automaton.Witness
+import common.Checker
 import data.UChar
 import data.UString
 import util.Timeout

@@ -2,6 +2,9 @@ package codes.quine.labo.redos
 
 import automaton.Complexity
 import automaton.Witness
+import common.InvalidRegExpException
+import common.TimeoutException
+import common.UnsupportedException
 import data.UChar
 import data.UString
 

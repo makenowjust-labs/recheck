@@ -1,6 +1,7 @@
 package codes.quine.labo.redos
 package automaton
 
+import common.UnsupportedException
 import data.MultiSet
 
 class OrderedNFASuite extends munit.FunSuite {

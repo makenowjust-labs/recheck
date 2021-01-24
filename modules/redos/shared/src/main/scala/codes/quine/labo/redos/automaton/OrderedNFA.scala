@@ -3,6 +3,7 @@ package automaton
 
 import scala.collection.mutable
 
+import common.UnsupportedException
 import data.MultiSet
 import util.Timeout
 import util.GraphvizUtil.escape

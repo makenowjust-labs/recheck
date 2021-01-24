@@ -1,4 +1,4 @@
-package codes.quine.labo.redos
+package codes.quine.labo.redos.common
 
 class ExceptionsSuite extends munit.FunSuite {
   test("TimeoutException#getMessage") {

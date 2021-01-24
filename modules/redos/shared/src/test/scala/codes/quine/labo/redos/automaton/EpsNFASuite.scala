@@ -4,6 +4,7 @@ package automaton
 import scala.collection.immutable
 
 import EpsNFA._
+import common.UnsupportedException
 import data.IChar
 import data.ICharSet
 

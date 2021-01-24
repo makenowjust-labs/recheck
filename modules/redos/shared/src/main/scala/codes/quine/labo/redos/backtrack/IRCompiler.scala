@@ -5,6 +5,7 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
+import common.InvalidRegExpException
 import data.IChar
 import data.UChar
 import regexp.Pattern

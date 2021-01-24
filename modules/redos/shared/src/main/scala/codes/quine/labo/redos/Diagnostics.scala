@@ -1,14 +1,19 @@
 package codes.quine.labo.redos
 
+import automaton.Complexity
+import common.Checker
+import common.InvalidRegExpException
+import common.ReDoSException
+import common.TimeoutException
+import common.UnsupportedException
 import data.UChar
 import data.UString
-import automaton.Complexity
 
 /** Diagnostics is a vulnerability diagnostics. */
 sealed abstract class Diagnostics extends Serializable with Product {
 
   /** A used checker. */
-  def used: Option[Checker]
+  def used: Option[Checker.Used]
 
   /** A matching-time complexity. */
   def complexity: Option[Complexity[UChar]]
@@ -18,14 +23,17 @@ sealed abstract class Diagnostics extends Serializable with Product {
 object Diagnostics {
 
   /** Vulnerable is a diagnostics for a vulnerable RegExp. */
-  final case class Vulnerable(attack: UString, complexity: Option[Complexity.Vulnerable[UChar]], used: Option[Checker])
-      extends Diagnostics
+  final case class Vulnerable(
+      attack: UString,
+      complexity: Option[Complexity.Vulnerable[UChar]],
+      used: Option[Checker.Used]
+  ) extends Diagnostics
 
   /** Safe is a diagnostics for a safe RegExp. */
-  final case class Safe(complexity: Option[Complexity.Safe], used: Option[Checker]) extends Diagnostics
+  final case class Safe(complexity: Option[Complexity.Safe], used: Option[Checker.Used]) extends Diagnostics
 
   /** Unknown is a unknown vulnerability diagnostics for some reasons. */
-  final case class Unknown(error: ErrorKind, used: Option[Checker]) extends Diagnostics {
+  final case class Unknown(error: ErrorKind, used: Option[Checker.Used]) extends Diagnostics {
     def complexity: Option[Complexity[UChar]] = None
   }
 

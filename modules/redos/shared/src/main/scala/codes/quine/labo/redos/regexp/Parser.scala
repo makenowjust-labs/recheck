@@ -12,6 +12,7 @@ import fastparse._
 import Pattern.FlagSet
 import Pattern.Node
 import Pattern.ClassNode
+import common.InvalidRegExpException
 import data.IChar
 import data.UChar
 import util.Timeout

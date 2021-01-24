@@ -6,6 +6,7 @@ import scala.util.Success
 import fastparse._
 
 import Pattern._
+import common.InvalidRegExpException
 import data.UChar
 
 class ParserSuite extends munit.FunSuite {

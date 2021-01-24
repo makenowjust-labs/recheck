@@ -30,7 +30,7 @@ object AttackComplexity {
   }
 
   /** UnknownSafe is a complexity for a safe RegExp but the true complexity is unknown. */
-  private case class UnknownSafe(override val isFuzz: Boolean) extends Safe(isFuzz)
+  final private case class UnknownSafe(override val isFuzz: Boolean) extends Safe(isFuzz)
 
   /** RegExp can check a match in a constant time. */
   case object Constant extends Safe(false) {

@@ -4,10 +4,12 @@ package automaton
 import scala.util.Success
 
 import EpsNFA._
-import regexp.Pattern
-import regexp.Pattern._
+import common.InvalidRegExpException
+import common.UnsupportedException
 import data.IChar
 import data.ICharSet
+import regexp.Pattern
+import regexp.Pattern._
 
 class EpsNFACompilerSuite extends munit.FunSuite {
 

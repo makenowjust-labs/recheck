@@ -2,6 +2,7 @@ package codes.quine.labo.redos
 
 import scala.util.Random
 
+import common.Checker
 import util.Timeout
 
 /** Config is a ReDoS checker configuration. */
