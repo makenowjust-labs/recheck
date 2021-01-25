@@ -6,7 +6,7 @@ import data.UString
 import util.NumberFormat
 import FString._
 
-/** FString is a gene-type string for fuzzing. */
+/** FString is a string with a repetition structure for fuzzing. */
 final case class FString(n: Int, seq: IndexedSeq[FChar]) {
 
   /** Tests whether this string is constant or not. */
@@ -71,7 +71,6 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
     UString(str.result())
   }
 
-  /** Returns a string representation of this. */
   override def toString: String = {
     if (seq.isEmpty) return "''"
 
