@@ -59,7 +59,6 @@ final case class IChar(
   /** Compares to other code point interval set. */
   def compare(that: IChar): Int = IChar.ordering.compare(this, that)
 
-  /** Converts to string representation. */
   override def toString: String = {
     // This `showUCharInClass` is copied from `Pattern` for avoiding a circular dependency.
     def showUCharInClass(u: UChar): String =

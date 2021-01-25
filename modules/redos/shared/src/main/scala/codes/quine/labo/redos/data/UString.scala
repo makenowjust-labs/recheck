@@ -42,7 +42,6 @@ final case class UString(seq: IndexedSeq[UChar]) extends AnyVal {
   /** Gets back to usual string. */
   def asString: String = seq.iterator.map(_.asString).mkString
 
-  /** Shows this string as human readable format. */
   override def toString: String =
     seq
       .map {
