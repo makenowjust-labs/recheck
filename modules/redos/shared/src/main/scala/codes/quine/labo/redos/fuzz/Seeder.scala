@@ -16,7 +16,7 @@ import util.Timeout
 object Seeder {
 
   /** Computes a seed set of the context. */
-  def seed(ctx: FuzzContext, limit: Int = 10_000, maxSeedSetSize: Int = 100)(implicit
+  def seed(fuzz: FuzzIR, limit: Int = 10_000, maxSeedSetSize: Int = 100)(implicit
       timeout: Timeout = Timeout.NoTimeout
   ): Set[FString] = timeout.checkTimeout("fuzz.Seeder.seed") {
     import timeout._
@@ -28,7 +28,7 @@ object Seeder {
 
     checkTimeout("fuzz.Seeder.seed:init") {
       queue.enqueue((UString.empty, None))
-      for (ch <- ctx.alphabet.chars) {
+      for (ch <- fuzz.alphabet.chars) {
         val s = UString(IndexedSeq(ch.head))
         queue.enqueue((s, None))
         added.add(s)
@@ -39,8 +39,8 @@ object Seeder {
       val (input, target) = queue.dequeue()
 
       if (target.forall { case (pc, cnts) => !covered.contains((pc, cnts, false)) }) {
-        val t = new SeedTracer(ctx, input, limit, timeout)
-        try VM.execute(ctx.ir, input, 0, t)
+        val t = new SeedTracer(fuzz, input, limit, timeout)
+        try VM.execute(fuzz.ir, input, 0, t)
         catch {
           case _: LimitException =>
             // When execution reaches the limit, it is possibly vulnerable.
@@ -95,14 +95,14 @@ object Seeder {
   }
 
   /** SeedTracer is a tracer implementation for the seeder. */
-  private[fuzz] class SeedTracer(ctx: FuzzContext, input: UString, limit: Int, timeout: Timeout)
-      extends FuzzTracer(ctx.ir, input, limit, timeout) {
+  private[fuzz] class SeedTracer(fuzz: FuzzIR, input: UString, limit: Int, timeout: Timeout)
+      extends FuzzTracer(fuzz.ir, input, limit, timeout) {
 
     /** A mutable data of [[patches]]. */
     private[this] val patchesMap: mutable.Map[(Int, Seq[Int]), Patch] = mutable.Map.empty
 
     /*: An alias to `pattern.alphabet`. */
-    private def alphabet: ICharSet = ctx.alphabet
+    private def alphabet: ICharSet = fuzz.alphabet
 
     /** A map from pc to patch. */
     def patches(): Map[(Int, Seq[Int]), Patch] = patchesMap.toMap

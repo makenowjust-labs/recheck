@@ -13,7 +13,7 @@ import common.Checker
 import data.UChar
 import data.UString
 import fuzz.FuzzChecker
-import fuzz.FuzzContext
+import fuzz.FuzzIR
 import regexp.Parser
 import regexp.Pattern
 import util.Timeout
@@ -77,9 +77,9 @@ object ReDoS {
   private[redos] def checkFuzz(pattern: Pattern, config: Config): Try[Diagnostics] = {
     import config._
 
-    val result = FuzzContext.from(pattern).map { ctx =>
+    val result = FuzzIR.from(pattern).map { fuzz =>
       FuzzChecker.check(
-        ctx,
+        fuzz,
         random,
         seedLimit,
         populationLimit,

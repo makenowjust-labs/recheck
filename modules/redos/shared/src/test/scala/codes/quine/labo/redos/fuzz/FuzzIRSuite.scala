@@ -8,13 +8,13 @@ import regexp.Pattern
 import regexp.Pattern._
 import data.ICharSet
 
-class FuzzContextSuite extends munit.FunSuite {
-  test("FuzzContext.from") {
+class FuzzIRSuite extends munit.FunSuite {
+  test("FuzzIR.from") {
     val pattern = Pattern(LineBegin, FlagSet(false, false, false, false, false, false))
     assertEquals(
-      FuzzContext.from(pattern),
+      FuzzIR.from(pattern),
       Success(
-        FuzzContext(
+        FuzzIR(
           IR(0, Map.empty, IndexedSeq(IR.CapBegin(0), IR.InputBegin, IR.CapEnd(0), IR.Done)),
           ICharSet.any(false, false),
           Set.empty

@@ -14,9 +14,9 @@ class FuzzCheckerSuite extends munit.FunSuite {
   def check(source: String, flags: String, quick: Boolean = false): Boolean = {
     val result = for {
       pattern <- Parser.parse(source, flags)
-      ctx <- FuzzContext.from(pattern)
+      fuzz <- FuzzIR.from(pattern)
     } yield FuzzChecker.check(
-      ctx,
+      fuzz,
       random0,
       maxAttackSize = if (quick) 400 else 4000,
       seedLimit = if (quick) 1_00 else 1_000,
@@ -54,8 +54,8 @@ class FuzzCheckerSuite extends munit.FunSuite {
     assert {
       val result = for {
         pattern <- Parser.parse("^(a|a)*$", "")
-        ctx <- FuzzContext.from(pattern)
-      } yield FuzzChecker.check(ctx, random0, populationLimit = 100, maxAttackSize = 5)
+        fuzz <- FuzzIR.from(pattern)
+      } yield FuzzChecker.check(fuzz, random0, populationLimit = 100, maxAttackSize = 5)
       result.get.isEmpty
     }
   }

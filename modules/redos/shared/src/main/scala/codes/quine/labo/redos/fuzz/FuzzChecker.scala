@@ -18,7 +18,7 @@ object FuzzChecker {
 
   /** Checks whether RegExp is ReDoS vulnerable or not. */
   def check(
-      ctx: FuzzContext,
+      fuzz: FuzzIR,
       random: Random = Random,
       seedLimit: Int = 10_000,
       populationLimit: Int = 100_000,
@@ -33,7 +33,7 @@ object FuzzChecker {
   )(implicit timeout: Timeout = Timeout.NoTimeout): Option[FString] =
     timeout.checkTimeout("fuzz.FuzzChecker.check")(
       new FuzzChecker(
-        ctx,
+        fuzz,
         random,
         seedLimit,
         populationLimit,
@@ -63,7 +63,7 @@ object FuzzChecker {
 
 /** FuzzChecker is a ReDoS vulnerable RegExp checker based on fuzzing. */
 private[fuzz] final class FuzzChecker(
-    val ctx: FuzzContext,
+    val fuzz: FuzzIR,
     val random: Random,
     val seedLimit: Int,
     val populationLimit: Int,
@@ -80,14 +80,14 @@ private[fuzz] final class FuzzChecker(
 
   import timeout._
 
-  /** An alias to `ctx.ir`. */
-  def ir: IR = ctx.ir
+  /** An alias to `fuzz.ir`. */
+  def ir: IR = fuzz.ir
 
-  /** An alias to `ctx.alphabet`. */
-  def alphabet: ICharSet = ctx.alphabet
+  /** An alias to `fuzz.alphabet`. */
+  def alphabet: ICharSet = fuzz.alphabet
 
-  /** A sequence of `ctx.parts` */
-  val parts: Seq[UString] = ctx.parts.toSeq
+  /** A sequence of `fuzz.parts` */
+  val parts: Seq[UString] = fuzz.parts.toSeq
 
   /** Runs this fuzzer. */
   def check(): Option[FString] = checkTimeout("fuzz.FuzzChecker#check") {
@@ -108,7 +108,7 @@ private[fuzz] final class FuzzChecker(
 
   /** Creates the initial generation from the seed set. */
   def init(): Either[Generation, FString] = checkTimeout("fuzz.FuzzChecker#init") {
-    val seed = Seeder.seed(ctx, seedLimit, maxSeedSize)
+    val seed = Seeder.seed(fuzz, seedLimit, maxSeedSize)
     val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty, mutable.Set.empty, true)
     for (str <- seed) {
       pop.execute(str) match {
@@ -330,7 +330,7 @@ private[fuzz] final class FuzzChecker(
       val input = str.toUString
       if (inputs.contains(input)) return None
 
-      val t = new FuzzTracer(ctx.ir, input, populationLimit, timeout)
+      val t = new FuzzTracer(fuzz.ir, input, populationLimit, timeout)
       try VM.execute(ir, input, 0, t)
       catch {
         case _: LimitException =>
