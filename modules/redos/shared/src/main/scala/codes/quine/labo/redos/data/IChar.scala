@@ -6,7 +6,7 @@ import unicode.CaseMap
 import unicode.CaseMap.Conversion
 import unicode.Property
 
-/** IChar is a code point interval set with extra informations. */
+/** IChar is a code point interval set with extra information. */
 final case class IChar(
     set: IntervalSet[UChar],
     isLineTerminator: Boolean = false,
@@ -50,7 +50,7 @@ final case class IChar(
   /** Checks whether the character is contained in this interval set or not. */
   def contains(value: UChar): Boolean = set.contains(value)
 
-  /** Gets the first code poiint of this interval set.
+  /** Gets the first code point of this interval set.
     *
     * If this interval set is empty, it throws a NoSuchElementException.
     */

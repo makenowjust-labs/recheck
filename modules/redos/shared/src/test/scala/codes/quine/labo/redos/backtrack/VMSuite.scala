@@ -1,11 +1,17 @@
 package codes.quine.labo.redos
 package backtrack
+
+import common.Context
 import data.IChar
 import data.UChar
 import data.UString
 import Tracer.LimitException
 
 class VMSuite extends munit.FunSuite {
+
+  /** A default context. */
+  implicit def ctx: Context = Context()
+
   test("VM.execute: trace limit") {
     val input = UString.from("aaaaaaaaaab", false)
     val codes = IndexedSeq(

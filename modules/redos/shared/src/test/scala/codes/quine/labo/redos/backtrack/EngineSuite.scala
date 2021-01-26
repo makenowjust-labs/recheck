@@ -1,9 +1,13 @@
 package codes.quine.labo.redos
 package backtrack
 
+import common.Context
 import regexp.Parser
 
 class EngineSuite extends munit.FunSuite {
+
+  /** A default context. */
+  implicit def ctx: Context = Context()
 
   /** Asserts the pattern matching against the input. */
   def matches(source: String, flags: String, input: String, expected: Option[Seq[Option[(Int, Int)]]])(implicit

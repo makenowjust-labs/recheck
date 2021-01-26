@@ -1,10 +1,15 @@
 package codes.quine.labo.redos
 package automaton
 
+import common.Context
 import data.Graph
 import data.MultiSet
 
 class NFAwLASuite extends munit.FunSuite {
+
+  /** A default context. */
+  implicit def ctx: Context = Context()
+
   test("NFAwLA#toGraph") {
     val nfa = NFAwLA[Char, Int](
       Set(('a', Set(0)), ('b', Set(0))),

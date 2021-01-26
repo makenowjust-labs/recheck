@@ -3,8 +3,8 @@ package automaton
 
 import scala.collection.mutable
 
+import common.Context
 import util.GraphvizUtil.escape
-import util.Timeout
 
 /** NFA is a [[https://en.wikipedia.org/wiki/Nondeterministic_finite_automaton NFA (non-deterministic finite state automaton)]] implementation. */
 final case class NFA[A, Q](
@@ -31,8 +31,8 @@ final case class NFA[A, Q](
   }
 
   /** Determinizes this NFA. */
-  def toDFA(implicit timeout: Timeout = Timeout.NoTimeout): DFA[A, Set[Q]] =
-    timeout.checkTimeout("automaton.NFA#toDFA") {
+  def toDFA(implicit ctx: Context): DFA[A, Set[Q]] =
+    ctx.interrupt {
       val queue = mutable.Queue.empty[Set[Q]]
       val newStateSet = mutable.Set.empty[Set[Q]]
       val newAcceptSet = Set.newBuilder[Set[Q]]
@@ -41,7 +41,7 @@ final case class NFA[A, Q](
       queue.enqueue(initSet)
       newStateSet.add(initSet)
 
-      while (queue.nonEmpty) timeout.checkTimeout("automaton.NFA#toDFA:loop") {
+      while (queue.nonEmpty) ctx.interrupt {
         val qs = queue.dequeue()
         if ((qs & acceptSet).nonEmpty) {
           newAcceptSet.addOne(qs)

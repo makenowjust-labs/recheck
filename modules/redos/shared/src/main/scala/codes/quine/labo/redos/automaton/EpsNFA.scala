@@ -4,11 +4,11 @@ package automaton
 import scala.collection.mutable
 
 import EpsNFA._
+import common.Context
 import common.UnsupportedException
 import data.IChar
 import data.ICharSet
 import util.GraphvizUtil.escape
-import util.Timeout
 
 /** EpsNFA is an ordered ε-NFA on unicode code points. */
 final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept: Q, tau: Map[Q, Transition[Q]]) {
@@ -51,17 +51,18 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
   }
 
   /** Converts this ε-NFA to ordered NFA with ε-elimination. */
-  def toOrderedNFA(
-      maxNFASize: Int = Int.MaxValue
-  )(implicit timeout: Timeout = Timeout.NoTimeout): OrderedNFA[IChar, (CharInfo, Seq[Q])] =
-    timeout.checkTimeout("automaton.EpsNFA#toOrderedNFA") {
+  def toOrderedNFA(implicit ctx: Context): OrderedNFA[IChar, (CharInfo, Seq[Q])] = toOrderedNFA(Int.MaxValue)
+
+  /** Converts this ε-NFA to ordered NFA with ε-elimination. */
+  def toOrderedNFA(maxNFASize: Int)(implicit ctx: Context): OrderedNFA[IChar, (CharInfo, Seq[Q])] =
+    ctx.interrupt {
       // Obtains a set of possible character information.
       // `CharInfo(true, false)` means a beginning or ending marker.
-      val charInfoSet = alphabet.chars.toSet.map(CharInfo.from(_)) ++ Set(CharInfo(true, false))
+      val charInfoSet = alphabet.chars.toSet.map(CharInfo.from) ++ Set(CharInfo(true, false))
 
       /** Skips ε-transitions from the state and collects not ε-transition or terminal state. */
       def buildClosure(c0: CharInfo, cs: Set[CharInfo], q: Q, loops: Set[Int]): Seq[(Q, Option[Consume[Q]])] =
-        timeout.checkTimeout("automaton.EpsNFA#toOrderedNFA:buildClosure") {
+        ctx.interrupt {
           if (cs.isEmpty) Vector.empty
           else
             tau.get(q) match {
@@ -98,7 +99,7 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
       queue.enqueue((CharInfo(true, false), closureInit))
       newStateSet.addAll(newInits)
 
-      while (queue.nonEmpty) timeout.checkTimeout("automaton.EpsNFA#toOrderedNFA:loop") {
+      while (queue.nonEmpty) ctx.interrupt {
         val (c0, qps) = queue.dequeue()
         val qs0 = qps.map(_._1)
         if (qs0.contains(accept)) newAcceptSet.addOne((c0, qs0))

@@ -59,7 +59,7 @@ object UString {
     if (unicode) {
       val seq = IndexedSeq.newBuilder[UChar]
       var i = 0
-      while (i < s.size) {
+      while (i < s.length) {
         val code = s.codePointAt(i)
         i += Character.charCount(code)
         seq.addOne(UChar(code))
@@ -70,7 +70,7 @@ object UString {
   /** An empty string. */
   def empty: UString = UString(IndexedSeq.empty)
 
-  /** Canonicalizes the string. */
+  /** Makes the string canonical. */
   def canonicalize(s: UString, unicode: Boolean): UString =
     UString(s.seq.map(UChar.canonicalize(_, unicode)))
 }

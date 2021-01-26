@@ -7,7 +7,7 @@ final case class MultiSet[A] private (map: Map[A, Int]) extends Iterable[A] {
   def iterator: Iterator[A] =
     map.iterator.flatMap { case (a, n) => Iterator.fill(n)(a) }
 
-  /** Concatinates two multi-sets. */
+  /** Concatenates two multi-sets. */
   def ++(that: MultiSet[A]): MultiSet[A] = {
     val keySet = map.keySet | that.map.keySet
     new MultiSet(keySet.iterator.map(a => a -> (map.getOrElse(a, 0) + that.map.getOrElse(a, 0))).toMap)

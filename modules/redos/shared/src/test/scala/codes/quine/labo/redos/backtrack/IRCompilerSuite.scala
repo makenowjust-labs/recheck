@@ -3,12 +3,17 @@ package backtrack
 
 import scala.util.Success
 
+import common.Context
 import common.InvalidRegExpException
 import data.IChar
 import regexp.Pattern
 import regexp.Pattern._
 
 class IRCompilerSuite extends munit.FunSuite {
+
+  /** A default context. */
+  implicit def ctx: Context = Context()
+
   locally {
     val flagSet1 = FlagSet(false, false, false, false, false, false)
     val flagSet2 = FlagSet(false, false, true, false, false, false)

@@ -6,10 +6,14 @@ import scala.util.Success
 import fastparse._
 
 import Pattern._
+import common.Context
 import common.InvalidRegExpException
 import data.UChar
 
 class ParserSuite extends munit.FunSuite {
+
+  /** A default context. */
+  implicit def ctx: Context = Context()
 
   /** A default parser instance for testing. */
   def P = new Parser(false, false, false, 0)

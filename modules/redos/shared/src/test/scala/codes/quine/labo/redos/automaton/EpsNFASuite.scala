@@ -4,11 +4,16 @@ package automaton
 import scala.collection.immutable
 
 import EpsNFA._
+import common.Context
 import common.UnsupportedException
 import data.IChar
 import data.ICharSet
 
 class EpsNFASuite extends munit.FunSuite {
+
+  /** A default context. */
+  implicit def ctx: Context = Context()
+
   test("EpsNFA.AssertKind#accepts") {
     assert(AssertKind.LineBegin.accepts(CharInfo(true, false), CharInfo(false, false)))
     assert(!AssertKind.LineBegin.accepts(CharInfo(false, false), CharInfo(false, false)))
@@ -102,7 +107,7 @@ class EpsNFASuite extends munit.FunSuite {
       )
     )
     assertEquals(
-      nfa1.toOrderedNFA(),
+      nfa1.toOrderedNFA,
       OrderedNFA(
         Set(IChar('\n').withLineTerminator, IChar('\n').complement(false)),
         Set((CharInfo(true, false), Seq(3, 6))),
@@ -134,7 +139,7 @@ class EpsNFASuite extends munit.FunSuite {
       )
     )
     assertEquals(
-      nfa2.toOrderedNFA(),
+      nfa2.toOrderedNFA,
       OrderedNFA(
         Set(IChar('\n').withLineTerminator, IChar('a').withWord, IChar('a').union(IChar('\n')).complement(false)),
         Set(

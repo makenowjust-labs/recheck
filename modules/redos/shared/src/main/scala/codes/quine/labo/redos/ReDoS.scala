@@ -7,16 +7,16 @@ import scala.util.Try
 import automaton.AutomatonChecker
 import automaton.Complexity
 import automaton.EpsNFACompiler
+import common.Checker
+import common.Context
 import common.ReDoSException
 import common.UnsupportedException
-import common.Checker
 import data.UChar
 import data.UString
 import fuzz.FuzzChecker
 import fuzz.FuzzIR
 import regexp.Parser
 import regexp.Pattern
-import util.Timeout
 
 /** ReDoS is a ReDoS checker frontend. */
 object ReDoS {
@@ -108,25 +108,24 @@ object ReDoS {
     checkAutomaton(pattern, config).recoverWith { case _: UnsupportedException => checkFuzz(pattern, config) }
 
   /** Gets a sum of repeat specifier counts. */
-  private[redos] def repeatCount(pattern: Pattern)(implicit timeout: Timeout = Timeout.NoTimeout): Int =
-    timeout.checkTimeout("Checker.repeatCount") {
+  private[redos] def repeatCount(pattern: Pattern)(implicit ctx: Context): Int =
+    ctx.interrupt {
       import Pattern._
 
-      def loop(node: Node): Int =
-        timeout.checkTimeout("Checker.repeatCount:loop")(node match {
-          case Disjunction(ns)        => ns.map(loop).sum
-          case Sequence(ns)           => ns.map(loop).sum
-          case Capture(_, n)          => loop(n)
-          case NamedCapture(_, _, n)  => loop(n)
-          case Group(n)               => loop(n)
-          case Star(_, n)             => loop(n)
-          case Plus(_, n)             => loop(n)
-          case Question(_, n)         => loop(n)
-          case Repeat(_, min, max, n) => max.flatten.getOrElse(min) + loop(n)
-          case LookAhead(_, n)        => loop(n)
-          case LookBehind(_, n)       => loop(n)
-          case _                      => 0
-        })
+      def loop(node: Node): Int = ctx.interrupt(node match {
+        case Disjunction(ns)        => ns.map(loop).sum
+        case Sequence(ns)           => ns.map(loop).sum
+        case Capture(_, n)          => loop(n)
+        case NamedCapture(_, _, n)  => loop(n)
+        case Group(n)               => loop(n)
+        case Star(_, n)             => loop(n)
+        case Plus(_, n)             => loop(n)
+        case Question(_, n)         => loop(n)
+        case Repeat(_, min, max, n) => max.flatten.getOrElse(min) + loop(n)
+        case LookAhead(_, n)        => loop(n)
+        case LookBehind(_, n)       => loop(n)
+        case _                      => 0
+      })
 
       loop(pattern.node)
     }

@@ -1,10 +1,15 @@
 package codes.quine.labo.redos
 package automaton
 
+import common.Context
 import common.UnsupportedException
 import data.MultiSet
 
 class OrderedNFASuite extends munit.FunSuite {
+
+  /** A default context. */
+  implicit def ctx: Context = Context()
+
   test("OrderedNFA#toNFAwLA") {
     val nfa = OrderedNFA(
       Set('a', 'b'),
@@ -18,7 +23,7 @@ class OrderedNFASuite extends munit.FunSuite {
         (1, 'b') -> Seq(1)
       )
     )
-    val nfaWLA = nfa.toNFAwLA()
+    val nfaWLA = nfa.toNFAwLA
     assertEquals(
       nfaWLA,
       NFAwLA(

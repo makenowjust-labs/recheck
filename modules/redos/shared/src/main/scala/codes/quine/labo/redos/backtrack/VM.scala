@@ -4,6 +4,7 @@ package backtrack
 import scala.collection.mutable
 
 import IR._
+import common.Context
 import data.IChar.LineTerminator
 import data.IChar.Word
 import data.UChar
@@ -16,13 +17,10 @@ object VM {
     *
     * Note that the input string should be canonical.
     */
-  def execute(
-      ir: IR,
-      input: UString,
-      pos: Int,
-      tracer: Tracer = Tracer.NoTracer()
+  def execute(ir: IR, input: UString, pos: Int, tracer: Tracer = Tracer.NoTracer)(implicit
+      ctx: Context
   ): Option[Match] =
-    tracer.checkTimeout("backtrack.VM.execute")(new VM(ir, input, pos, tracer).execute())
+    ctx.interrupt(new VM(ir, input, pos, tracer).execute())
 }
 
 /** VM is a RegExp matching VM. */
@@ -30,10 +28,10 @@ private[backtrack] final class VM(
     private[this] val ir: IR,
     private[this] val input: UString,
     initPos: Int,
-    private[this] val tracer: Tracer = Tracer.NoTracer()
-) {
+    private[this] val tracer: Tracer = Tracer.NoTracer
+)(implicit private[this] val ctx: Context) {
 
-  import tracer._
+  import ctx._
 
   /** An execution process list (stack). */
   private[backtrack] val procs: mutable.Stack[Proc] = {
@@ -49,7 +47,7 @@ private[backtrack] final class VM(
   }
 
   /** Executes this VM. */
-  def execute(): Option[Match] = checkTimeout("backtrack.VM#execute") {
+  def execute(): Option[Match] = interrupt {
     while (procs.nonEmpty)
       step() match {
         case Some(m) => return Some(m)
@@ -59,7 +57,7 @@ private[backtrack] final class VM(
   }
 
   /** Runs this VM in a step. */
-  private[backtrack] def step(): Option[Match] = checkTimeout("backtrack.VM#step") {
+  private[backtrack] def step(): Option[Match] = interrupt {
     val proc = procs.top
     val code = ir.codes(proc.pc)
     var backtrack = false

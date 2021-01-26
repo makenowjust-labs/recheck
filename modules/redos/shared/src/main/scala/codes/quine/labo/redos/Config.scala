@@ -3,13 +3,13 @@ package codes.quine.labo.redos
 import scala.util.Random
 
 import common.Checker
-import util.Timeout
+import common.Context
 
 /** Config is a ReDoS checker configuration. */
 final case class Config(
     // General:
-    // A timeout in a check.
-    timeout: Timeout = Timeout.NoTimeout,
+    // An execution context in this analysis.
+    context: Context = Context(),
     // A checker to use.
     checker: Checker = Checker.Hybrid,
     // A maximum size of an attack string.
@@ -48,7 +48,7 @@ final case class Config(
 ) {
 
   /** Provides a timeout instance as an implicit parameter. */
-  implicit def configTimeout: Timeout = timeout
+  implicit def ctx: Context = context
 }
 
 object Config {

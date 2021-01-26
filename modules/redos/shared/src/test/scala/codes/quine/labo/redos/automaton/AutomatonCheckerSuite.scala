@@ -5,17 +5,21 @@ import scala.util.Success
 import scala.util.Try
 
 import Complexity._
+import common.Context
 import data.IChar
 import regexp.Parser
 
 class AutomatonCheckerSuite extends munit.FunSuite {
+
+  /** A default context. */
+  implicit def ctx: Context = Context()
 
   /** Runs a checker against the RegExp. */
   def check(source: String, flags: String): Try[Complexity[IChar]] =
     for {
       pattern <- Parser.parse(source, flags)
       epsNFA <- EpsNFACompiler.compile(pattern)
-      nfa = epsNFA.toOrderedNFA().rename
+      nfa = epsNFA.toOrderedNFA.rename
       result <- Try(AutomatonChecker.check(nfa))
     } yield result
 

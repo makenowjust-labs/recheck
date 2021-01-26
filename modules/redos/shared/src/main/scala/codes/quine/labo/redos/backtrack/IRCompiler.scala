@@ -5,30 +5,30 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
+import common.Context
 import common.InvalidRegExpException
 import data.IChar
 import data.UChar
 import regexp.Pattern
 import regexp.Pattern._
 import util.TryUtil
-import util.Timeout
 
 /** Compiler from RegExp pattern to VM IR. */
 object IRCompiler {
 
   /** Compiles the RegExp pattern to IR. */
-  def compile(pattern: Pattern)(implicit timeout: Timeout = Timeout.NoTimeout): Try[IR] =
-    timeout.checkTimeout("backtrack.IRCompiler.compile")(for {
+  def compile(pattern: Pattern)(implicit ctx: Context): Try[IR] =
+    ctx.interrupt(for {
       _ <- Try(()) // Ensures a `Try` context surely.
       capsSize = IRCompiler.capsSize(pattern)
       names <- IRCompiler.names(pattern)
       codes <- {
-        import timeout._
+        import ctx._
 
         val FlagSet(_, ignoreCase, multiline, dotAll, unicode, _) = pattern.flagSet
 
         def loop(node: Node, forward: Boolean): Try[State] =
-          checkTimeout("backtrack.IRCompiler.compile:loop")(node match {
+          interrupt(node match {
             case Disjunction(ns) =>
               TryUtil.traverse(ns)(loop(_, forward)).map(_.reduceRight(_.union(_)))
             case Sequence(ns) =>

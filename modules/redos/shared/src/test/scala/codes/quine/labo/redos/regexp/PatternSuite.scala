@@ -4,12 +4,17 @@ package regexp
 import scala.util.Success
 
 import Pattern._
+import common.Context
 import common.InvalidRegExpException
 import data.IChar
 import data.ICharSet
 import data.UString
 
 class PatternSuite extends munit.FunSuite {
+
+  /** A default context. */
+  implicit def ctx: Context = Context()
+
   test("Pattern.AtomNode#toIChar") {
     assertEquals(Character('x').toIChar(false), Success(IChar('x')))
     assertEquals(SimpleEscapeClass(false, EscapeClassKind.Word).toIChar(false), Success(IChar.Word))

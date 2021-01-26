@@ -4,6 +4,7 @@ package automaton
 import scala.util.Success
 
 import EpsNFA._
+import common.Context
 import common.InvalidRegExpException
 import common.UnsupportedException
 import data.IChar
@@ -12,6 +13,9 @@ import regexp.Pattern
 import regexp.Pattern._
 
 class EpsNFACompilerSuite extends munit.FunSuite {
+
+  /** A default context. */
+  implicit def ctx: Context = Context()
 
   locally {
     val flagSet0 = FlagSet(false, false, false, false, false, false)

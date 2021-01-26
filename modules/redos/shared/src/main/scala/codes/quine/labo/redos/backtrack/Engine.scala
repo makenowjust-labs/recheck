@@ -3,6 +3,7 @@ package backtrack
 
 import scala.util.Try
 
+import common.Context
 import data.UString
 import regexp.Pattern
 
@@ -10,7 +11,7 @@ import regexp.Pattern
 object Engine {
 
   /** Tests a matching of the pattern on the input. */
-  def matches(pattern: Pattern, input: String, pos: Int = 0): Try[Option[Match]] = {
+  def matches(pattern: Pattern, input: String, pos: Int = 0)(implicit ctx: Context): Try[Option[Match]] = {
     val original = UString.from(input, pattern.flagSet.unicode)
     val canonical =
       if (pattern.flagSet.ignoreCase) UString.canonicalize(original, pattern.flagSet.unicode) else original

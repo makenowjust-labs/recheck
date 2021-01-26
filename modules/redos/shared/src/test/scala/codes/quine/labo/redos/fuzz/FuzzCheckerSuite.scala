@@ -3,9 +3,13 @@ package fuzz
 
 import scala.util.Random
 
+import common.Context
 import regexp.Parser
 
 class FuzzCheckerSuite extends munit.FunSuite {
+
+  /** A default context. */
+  implicit def ctx: Context = Context()
 
   /** A fixed seed random instance for deterministic test. */
   def random0: Random = new Random(0)

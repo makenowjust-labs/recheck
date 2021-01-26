@@ -3,10 +3,10 @@ package automaton
 
 import scala.collection.mutable
 
+import common.Context
 import data.Graph
 import data.MultiSet
 import util.GraphvizUtil.escape
-import util.Timeout
 
 /** NFAwLA is a NFA with a look-ahead DFA.
   *
@@ -25,8 +25,8 @@ final case class NFAwLA[A, Q](
 ) {
 
   /** Exports this transition function as a graph. */
-  def toGraph(implicit timeout: Timeout = Timeout.NoTimeout): Graph[(Q, Set[Q]), (A, Set[Q])] =
-    timeout.checkTimeout("automaton.MultiNFA#toGraph") {
+  def toGraph(implicit ctx: Context): Graph[(Q, Set[Q]), (A, Set[Q])] =
+    ctx.interrupt {
       Graph.from(delta.iterator.flatMap { case (q1, a) -> qs =>
         qs.iterator.map((q1, a, _))
       }.toIndexedSeq)

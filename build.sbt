@@ -64,6 +64,8 @@ lazy val redos = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labo.redos.regexp._
       |import codes.quine.labo.redos.util._
       |
+      |implicit def ctx: Context = Context()
+      |
       |def time[A](body: => A): A = {
       |  val start = System.nanoTime()
       |  val result = body
@@ -108,7 +110,11 @@ lazy val redos = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.21" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
+  .jvmSettings(
+    libraryDependencies += "com.lihaoyi" %% "sourcecode" % "0.2.3"
+  )
   .jsSettings(
+    libraryDependencies += "com.lihaoyi" %%% "sourcecode" % "0.2.3",
     coverageEnabled := false,
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )

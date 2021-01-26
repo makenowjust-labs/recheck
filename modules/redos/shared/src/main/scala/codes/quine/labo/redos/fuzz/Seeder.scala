@@ -7,71 +7,70 @@ import scala.collection.mutable
 import backtrack.IR
 import backtrack.VM
 import backtrack.Tracer.LimitException
+import common.Context
 import data.IChar
 import data.ICharSet
 import data.UString
-import util.Timeout
 
 /** Seeder computes a seed set for the pattern. */
 object Seeder {
 
   /** Computes a seed set of the context. */
-  def seed(fuzz: FuzzIR, limit: Int = 10_000, maxSeedSetSize: Int = 100)(implicit
-      timeout: Timeout = Timeout.NoTimeout
-  ): Set[FString] = timeout.checkTimeout("fuzz.Seeder.seed") {
-    import timeout._
+  def seed(fuzz: FuzzIR, limit: Int = 10_000, maxSeedSetSize: Int = 100)(implicit ctx: Context): Set[FString] =
+    ctx.interrupt {
+      import ctx._
 
-    val set = mutable.Set.empty[FString]
-    val added = mutable.Set.empty[UString]
-    val queue = mutable.Queue.empty[(UString, Option[(Int, Seq[Int])])]
-    val covered = mutable.Set.empty[(Int, Seq[Int], Boolean)]
+      val set = mutable.Set.empty[FString]
+      val added = mutable.Set.empty[UString]
+      val queue = mutable.Queue.empty[(UString, Option[(Int, Seq[Int])])]
+      val covered = mutable.Set.empty[(Int, Seq[Int], Boolean)]
 
-    checkTimeout("fuzz.Seeder.seed:init") {
-      queue.enqueue((UString.empty, None))
-      for (ch <- fuzz.alphabet.chars) {
-        val s = UString(IndexedSeq(ch.head))
-        queue.enqueue((s, None))
-        added.add(s)
-      }
-    }
-
-    while (queue.nonEmpty && set.size < maxSeedSetSize) checkTimeout("fuzz.Seeder.seed:loop") {
-      val (input, target) = queue.dequeue()
-
-      if (target.forall { case (pc, cnts) => !covered.contains((pc, cnts, false)) }) {
-        val t = new SeedTracer(fuzz, input, limit, timeout)
-        try VM.execute(fuzz.ir, input, 0, t)
-        catch {
-          case _: LimitException =>
-            // When execution reaches the limit, it is possibly vulnerable.
-            // Then, it is added to a seed set and exits seeding.
-            set.add(t.buildFString())
-            return set.toSet
+      interrupt {
+        queue.enqueue((UString.empty, None))
+        for (ch <- fuzz.alphabet.chars) {
+          val s = UString(IndexedSeq(ch.head))
+          queue.enqueue((s, None))
+          added.add(s)
         }
+      }
 
-        val coverage = t.coverage()
-        val patches = t.patches()
+      while (queue.nonEmpty && set.size < maxSeedSetSize) interrupt {
+        val (input, target) = queue.dequeue()
 
-        // If the input string can reach a new pc,
-        // it should be added to a seed set.
-        if (!coverage.subsetOf(covered)) {
-          set.add(t.buildFString())
-          set.add(FString(1, input.seq.map(FString.Wrap)))
-          covered.addAll(coverage)
-          for (((pc, cnts), patch) <- patches) {
-            if (!covered.contains((pc, cnts, false))) {
-              for (patched <- patch.apply(input); if !added.contains(patched)) {
-                queue.enqueue((patched, Some((pc, cnts))))
-                added.add(patched)
+        if (target.forall { case (pc, cnts) => !covered.contains((pc, cnts, false)) }) {
+          val t = new SeedTracer(fuzz, input, limit)
+          try VM.execute(fuzz.ir, input, 0, t)
+          catch {
+            case _: LimitException =>
+              // When execution reaches the limit, it is possibly vulnerable.
+              // Then, it is added to a seed set and exits seeding.
+              set.add(t.buildFString())
+              return set.toSet
+          }
+
+          val coverage = t.coverage()
+          val patches = t.patches()
+
+          // If the input string can reach a new pc,
+          // it should be added to a seed set.
+          if (!coverage.subsetOf(covered)) {
+            set.add(t.buildFString())
+            set.add(FString(1, input.seq.map(FString.Wrap)))
+            covered.addAll(coverage)
+            for (((pc, cnts), patch) <- patches) {
+              if (!covered.contains((pc, cnts, false))) {
+                for (patched <- patch.apply(input); if !added.contains(patched)) {
+                  queue.enqueue((patched, Some((pc, cnts))))
+                  added.add(patched)
+                }
               }
             }
           }
         }
       }
-    }
 
-    set.toSet
-  }
+      set.toSet
+    }
 
   /** Patch is a patch to reach a new pc. */
   private[fuzz] sealed abstract class Patch extends Serializable with Product {
@@ -95,8 +94,7 @@ object Seeder {
   }
 
   /** SeedTracer is a tracer implementation for the seeder. */
-  private[fuzz] class SeedTracer(fuzz: FuzzIR, input: UString, limit: Int, timeout: Timeout)
-      extends FuzzTracer(fuzz.ir, input, limit, timeout) {
+  private[fuzz] class SeedTracer(fuzz: FuzzIR, input: UString, limit: Int) extends FuzzTracer(fuzz.ir, input, limit) {
 
     /** A mutable data of [[patches]]. */
     private[this] val patchesMap: mutable.Map[(Int, Seq[Int]), Patch] = mutable.Map.empty

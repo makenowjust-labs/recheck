@@ -7,20 +7,24 @@ import scala.util.Success
 import automaton.Complexity
 import automaton.Witness
 import common.Checker
+import common.Context
 import common.InvalidRegExpException
 import data.UChar
 import data.UString
 import regexp.Pattern
 import regexp.Pattern._
-import util.Timeout
 
 class ReDoSSuite extends munit.FunSuite {
+
+  /** A default context. */
+  implicit def ctx: Context = Context()
+
   test("ReDoS.check") {
     assertEquals(ReDoS.check("^foo$", ""), Diagnostics.Safe(None, Some(Checker.Automaton)))
     assertEquals(ReDoS.check("^.*$", ""), Diagnostics.Safe(Some(Complexity.Linear), Some(Checker.Automaton)))
     assertEquals(ReDoS.check("", "x"), Diagnostics.Unknown(Diagnostics.ErrorKind.InvalidRegExp("unknown flag"), None))
     assertEquals(
-      ReDoS.check("^foo$", "", Config(timeout = Timeout.from(-1.second))),
+      ReDoS.check("^foo$", "", Config(context = Context(timeout = -1.second))),
       Diagnostics.Unknown(Diagnostics.ErrorKind.Timeout, None)
     )
   }
