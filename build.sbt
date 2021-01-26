@@ -85,6 +85,7 @@ lazy val redos = crossProject(JVMPlatform, JSPlatform)
       .toMap,
     // Dependencies:
     libraryDependencies += "com.lihaoyi" %%% "fastparse" % "2.3.1",
+    libraryDependencies += "com.lihaoyi" %%% "sourcecode" % "0.2.3",
     // Generators:
     {
       val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
@@ -111,11 +112,8 @@ lazy val redos = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.21" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
-  .jvmSettings(
-    libraryDependencies += "com.lihaoyi" %% "sourcecode" % "0.2.3"
-  )
   .jsSettings(
-    libraryDependencies += "com.lihaoyi" %%% "sourcecode" % "0.2.3",
+    libraryDependencies += "org.scala-js" %%% "scalajs-dom" % "1.1.0",
     coverageEnabled := false,
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )

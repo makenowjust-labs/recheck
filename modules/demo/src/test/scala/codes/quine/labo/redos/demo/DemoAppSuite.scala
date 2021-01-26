@@ -15,19 +15,6 @@ class DemoAppSuite extends munit.FunSuite {
     assertEquals(DemoApp.SlashRegExp.unapplySeq("/x/x"), None)
   }
 
-  test("DemoApp.ordinal") {
-    assertEquals(DemoApp.ordinal(1), "st")
-    assertEquals(DemoApp.ordinal(11), "st")
-    assertEquals(DemoApp.ordinal(2), "nd")
-    assertEquals(DemoApp.ordinal(12), "nd")
-    assertEquals(DemoApp.ordinal(3), "rd")
-    assertEquals(DemoApp.ordinal(13), "rd")
-    for (i <- 4 to 9) {
-      assertEquals(DemoApp.ordinal(i), "th")
-      assertEquals(DemoApp.ordinal(10 + i), "th")
-    }
-  }
-
   test("DemoApp.escape") {
     assertEquals(DemoApp.escape(""), "")
     assertEquals(DemoApp.escape("hello"), "hello")

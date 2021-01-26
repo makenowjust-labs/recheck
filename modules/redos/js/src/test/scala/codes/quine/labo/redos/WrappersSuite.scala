@@ -93,7 +93,9 @@ class WrappersSuite extends munit.FunSuite {
   }
 
   test("ConfigJS.from") {
-    assertEquals(ConfigJS.from(js.Dynamic.literal().asInstanceOf[ConfigJS]), Config())
+    val config = Config()
+    // Replaces `context` with config's one because it is reference and it has an issue on equality.
+    assertEquals(ConfigJS.from(js.Dynamic.literal().asInstanceOf[ConfigJS]).copy(context = config.context), config)
 
     assertEquals(ConfigJS.from(js.Dynamic.literal(checker = "hybrid").asInstanceOf[ConfigJS]).checker, Checker.Hybrid)
     assertEquals(

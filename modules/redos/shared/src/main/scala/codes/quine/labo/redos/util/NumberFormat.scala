@@ -17,7 +17,7 @@ object NumberFormat {
 
   /** Gets a ordinalized string of the integer value. */
   def ordinalize(x: Int): String = {
-    x % 10 match {
+    (x % 10).abs match {
       case 1 => s"${x}st"
       case 2 => s"${x}nd"
       case 3 => s"${x}rd"
