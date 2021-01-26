@@ -14,11 +14,11 @@ final class Context private (
 ) {
 
   /** Checks whether this context is interrupted or not. */
-  @inline def isInterrupted: Boolean = cancelled || deadline.exists(_.isOverdue())
+  @inline def isInterrupted(): Boolean = cancelled || deadline.exists(_.isOverdue())
 
   /** Run the body with checking interruption on this context. */
   @inline def interrupt[A](body: => A)(implicit enclosing: sourcecode.Enclosing): A = {
-    if (isInterrupted) throw new TimeoutException(enclosing.value)
+    if (isInterrupted()) throw new TimeoutException(enclosing.value)
     val result = body
     result
   }
@@ -29,9 +29,9 @@ object Context {
 
   /** Creates a new context with the given timeout. */
   def apply(timeout: Duration = Duration.Inf): Context = timeout match {
-    case Duration.Inf | Duration.Undefined => new Context()
-    case Duration.MinusInf                 => new Context(cancelled = true)
-    case d: FiniteDuration                 => new Context(Some(Deadline(d)))
+    case d: FiniteDuration                         => new Context(Some(d.fromNow))
+    case d: Duration.Infinite if d < Duration.Zero => new Context(cancelled = true)
+    case _: Duration.Infinite                      => new Context(None)
   }
 
   /** Creates a new context and returns it with a cancellation function. */

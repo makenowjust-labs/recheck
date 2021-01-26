@@ -59,6 +59,7 @@ lazy val redos = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labo.redos._
       |import codes.quine.labo.redos.automaton._
       |import codes.quine.labo.redos.backtrack._
+      |import codes.quine.labo.redos.common._
       |import codes.quine.labo.redos.data._
       |import codes.quine.labo.redos.fuzz._
       |import codes.quine.labo.redos.regexp._
