@@ -12,7 +12,8 @@ import common.Context
 import common.ReDoSException
 import common.UnsupportedException
 import data.UChar
-import data.UString
+import diagnostics.AttackComplexity
+import diagnostics.Diagnostics
 import fuzz.FuzzChecker
 import fuzz.FuzzIR
 import regexp.Parser
@@ -62,14 +63,14 @@ object ReDoS {
 
     result
       .map {
-        case Some(vuln: Complexity.Vulnerable[UChar]) =>
-          val attack = UString(vuln.buildAttack(attackLimit, maxAttackSize).toIndexedSeq)
-          Diagnostics.Vulnerable(attack, Some(vuln), Some(Checker.Automaton))
-        case Some(safe: Complexity.Safe) => Diagnostics.Safe(Some(safe), Some(Checker.Automaton))
-        case None                        => Diagnostics.Safe(None, Some(Checker.Automaton))
+        case Some(vul: Complexity.Vulnerable[UChar]) =>
+          val attack = vul.buildAttackPattern(attackLimit, maxAttackSize)
+          Diagnostics.Vulnerable(vul.toAttackComplexity, attack, Checker.Automaton)
+        case Some(safe: Complexity.Safe) => Diagnostics.Safe(safe.toAttackComplexity, Checker.Automaton)
+        case None                        => Diagnostics.Safe(AttackComplexity.Safe(false), Checker.Automaton)
       }
       .recoverWith { case ex: ReDoSException =>
-        ex.used = Some(Checker.Automaton)
+        ex.checker = Some(Checker.Automaton)
         Failure(ex)
       }
   }
@@ -95,11 +96,11 @@ object ReDoS {
 
     result
       .map {
-        case Some(attack) => Diagnostics.Vulnerable(attack.toUString, None, Some(Checker.Fuzz))
-        case None         => Diagnostics.Safe(None, Some(Checker.Fuzz))
+        case Some((attack, complexity)) => Diagnostics.Vulnerable(attack, complexity, Checker.Fuzz)
+        case None                       => Diagnostics.Safe(AttackComplexity.Safe(true), Checker.Fuzz)
       }
       .recoverWith { case ex: ReDoSException =>
-        ex.used = Some(Checker.Fuzz)
+        ex.checker = Some(Checker.Fuzz)
         Failure(ex)
       }
   }

@@ -4,13 +4,13 @@ import scala.concurrent.duration._
 import scala.util.Random
 import scala.util.Success
 
-import automaton.Complexity
-import automaton.Witness
 import common.Checker
 import common.Context
 import common.InvalidRegExpException
-import data.UChar
 import data.UString
+import diagnostics.AttackComplexity
+import diagnostics.AttackPattern
+import diagnostics.Diagnostics
 import regexp.Pattern
 import regexp.Pattern._
 
@@ -20,8 +20,16 @@ class ReDoSSuite extends munit.FunSuite {
   implicit def ctx: Context = Context()
 
   test("ReDoS.check") {
-    assertEquals(ReDoS.check("^foo$", ""), Diagnostics.Safe(None, Some(Checker.Automaton)))
-    assertEquals(ReDoS.check("^.*$", ""), Diagnostics.Safe(Some(Complexity.Linear), Some(Checker.Automaton)))
+    assertEquals(ReDoS.check("^foo$", ""), Diagnostics.Safe(AttackComplexity.Safe(false), Checker.Automaton))
+    assertEquals(
+      ReDoS.check("^foo$", "", Config(checker = Checker.Automaton)),
+      Diagnostics.Safe(AttackComplexity.Safe(false), Checker.Automaton)
+    )
+    assertEquals(
+      ReDoS.check("^foo$", "", Config(checker = Checker.Fuzz)),
+      Diagnostics.Safe(AttackComplexity.Safe(true), Checker.Fuzz)
+    )
+    assertEquals(ReDoS.check("^.*$", ""), Diagnostics.Safe(AttackComplexity.Linear, Checker.Automaton))
     assertEquals(ReDoS.check("", "x"), Diagnostics.Unknown(Diagnostics.ErrorKind.InvalidRegExp("unknown flag"), None))
     assertEquals(
       ReDoS.check("^foo$", "", Config(context = Context(timeout = -1.second))),
@@ -40,11 +48,13 @@ class ReDoSSuite extends munit.FunSuite {
       ),
       Success(
         Diagnostics.Vulnerable(
-          UString.from("aaaaaaaaaaaaaaaaaa\u0000", false),
-          Some(
-            Complexity.Exponential(Witness(Seq((Seq(UChar('a')), Seq(UChar('a')))), Seq(UChar(0x00))))
+          AttackComplexity.Exponential(false),
+          AttackPattern(
+            Seq((UString.from("a", false), UString.from("a", false), 0)),
+            UString.from("\u0000", false),
+            17
           ),
-          Some(Checker.Automaton)
+          Checker.Automaton
         )
       )
     )
@@ -56,7 +66,7 @@ class ReDoSSuite extends munit.FunSuite {
         ),
         Config(checker = Checker.Automaton)
       ),
-      Success(Diagnostics.Safe(Some(Complexity.Linear), Some(Checker.Automaton)))
+      Success(Diagnostics.Safe(AttackComplexity.Linear, Checker.Automaton))
     )
     assertEquals(
       ReDoS.checkAutomaton(
@@ -66,7 +76,7 @@ class ReDoSSuite extends munit.FunSuite {
         ),
         Config(checker = Checker.Automaton)
       ),
-      Success(Diagnostics.Safe(None, Some(Checker.Automaton)))
+      Success(Diagnostics.Safe(AttackComplexity.Safe(false), Checker.Automaton))
     )
   }
 
@@ -82,13 +92,13 @@ class ReDoSSuite extends munit.FunSuite {
       )
       .get
     assert(clue(result).isInstanceOf[Diagnostics.Vulnerable])
-    assertEquals(result.used, Some(Checker.Fuzz))
+    assertEquals(result.asInstanceOf[Diagnostics.Vulnerable].checker, Checker.Fuzz)
     assertEquals(
       ReDoS.checkFuzz(
         Pattern(Dot, FlagSet(false, false, false, false, false, false)),
         Config(checker = Checker.Fuzz, random = random0)
       ),
-      Success(Diagnostics.Safe(None, Some(Checker.Fuzz)))
+      Success(Diagnostics.Safe(AttackComplexity.Safe(true), Checker.Fuzz))
     )
     val ex = interceptMessage[InvalidRegExpException]("out of order repetition quantifier") {
       ReDoS
@@ -98,7 +108,7 @@ class ReDoSSuite extends munit.FunSuite {
         )
         .get
     }
-    assertEquals(ex.used, Some(Checker.Fuzz))
+    assertEquals(ex.checker, Some(Checker.Fuzz))
   }
 
   test("ReDoS.checkHybrid") {
@@ -113,11 +123,13 @@ class ReDoSSuite extends munit.FunSuite {
       ),
       Success(
         Diagnostics.Vulnerable(
-          UString.from("aaaaaaaaaaaaaaaaaa\u0000", false),
-          Some(
-            Complexity.Exponential(Witness(Seq((Seq(UChar('a')), Seq(UChar('a')))), Seq(UChar(0x00))))
+          AttackComplexity.Exponential(false),
+          AttackPattern(
+            Seq((UString.from("a", false), UString.from("a", false), 0)),
+            UString.from("\u0000", false),
+            17
           ),
-          Some(Checker.Automaton)
+          Checker.Automaton
         )
       )
     )
@@ -129,7 +141,7 @@ class ReDoSSuite extends munit.FunSuite {
         ),
         Config(random = random0, maxRepeatCount = 5)
       ),
-      Success(Diagnostics.Safe(None, Some(Checker.Fuzz)))
+      Success(Diagnostics.Safe(AttackComplexity.Safe(true), Checker.Fuzz))
     )
     assertEquals(
       ReDoS.checkHybrid(
@@ -139,7 +151,7 @@ class ReDoSSuite extends munit.FunSuite {
         ),
         Config(random = random0, maxNFASize = 5)
       ),
-      Success(Diagnostics.Safe(None, Some(Checker.Fuzz)))
+      Success(Diagnostics.Safe(AttackComplexity.Safe(true), Checker.Fuzz))
     )
     assertEquals(
       ReDoS.checkHybrid(
@@ -149,7 +161,7 @@ class ReDoSSuite extends munit.FunSuite {
         ),
         Config(random = random0, maxPatternSize = 1)
       ),
-      Success(Diagnostics.Safe(None, Some(Checker.Fuzz)))
+      Success(Diagnostics.Safe(AttackComplexity.Safe(true), Checker.Fuzz))
     )
   }
 

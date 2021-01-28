@@ -3,6 +3,7 @@ package fuzz
 
 import data.UChar
 import data.UString
+import diagnostics.AttackPattern
 import util.NumberFormat
 import FString._
 
@@ -48,7 +49,7 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
   def mapN(f: Int => Int): FString =
     FString(Math.max(f(n), 1), seq)
 
-  /** Builds a UString instance of this. */
+  /** Builds a UString instance from this. */
   def toUString: UString = {
     val str = IndexedSeq.newBuilder[UChar]
     var pos = 0
@@ -69,6 +70,39 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
       }
     }
     UString(str.result())
+  }
+
+  /** Builds an attack pattern string from this. */
+  def toAttackPattern: AttackPattern = {
+    val pumps = Seq.newBuilder[(UString, UString, Int)]
+
+    val str = IndexedSeq.newBuilder[UChar]
+    var pos = 0
+
+    while (pos < seq.size) {
+      seq(pos) match {
+        case Wrap(u) =>
+          pos += 1
+          str.addOne(u)
+        case Repeat(m, size) =>
+          pos += 1
+          val repeat = n + m
+          if (repeat > 1) {
+            val s = UString(str.result())
+            str.clear()
+            val pump = seq.slice(pos, pos + size).map {
+              case Wrap(u)      => u
+              case Repeat(_, _) => throw new IllegalArgumentException
+            }
+            val t = UString(pump)
+            pumps.addOne((s, t, m))
+            pos += size
+          }
+      }
+    }
+
+    val suffix = UString(str.result())
+    AttackPattern(pumps.result(), suffix, n)
   }
 
   override def toString: String = {

@@ -53,8 +53,18 @@ class FuzzCheckerSuite extends munit.FunSuite {
     assert(check("^(a|B|Ab)*$", "i", quick = true))
     assert(check("^(aa|b|aab)*$", "", quick = true))
 
-    assert(check("^(a?){50}a{50}$", ""))
+    assert(check("^(a?){50}a{50}$", "", quick = true))
 
+    // The checker can find an attack string on seeding phase.
+    assert {
+      val result = for {
+        pattern <- Parser.parse("^(a?){50}a{50}$", "")
+        fuzz <- FuzzIR.from(pattern)
+      } yield FuzzChecker.check(fuzz, random0, seedLimit = 1000, populationLimit = 1000, attackLimit = 10000)
+      result.get.isDefined
+    }
+
+    // The checker cannot find too small attack string.
     assert {
       val result = for {
         pattern <- Parser.parse("^(a|a)*$", "")

@@ -45,10 +45,10 @@ object AttackComplexity {
   /** Vulnerable is a common class for unsafe complexity. */
   sealed abstract class Vulnerable extends AttackComplexity
 
-  /** RegExp can check a match in an `n`th polynomial time. */
-  final case class Polynomial(n: Int, isFuzz: Boolean) extends Vulnerable {
+  /** RegExp can check a match in a polynomial time. */
+  final case class Polynomial(degree: Int, isFuzz: Boolean) extends Vulnerable {
     override def toString: String =
-      s"${NumberFormat.ordinalize(n)} polynomial${if (isFuzz) " (fuzz)" else ""}"
+      s"${NumberFormat.ordinalize(degree)} degree polynomial${if (isFuzz) " (fuzz)" else ""}"
   }
 
   /** RegExp can check a match in an exponential time. */

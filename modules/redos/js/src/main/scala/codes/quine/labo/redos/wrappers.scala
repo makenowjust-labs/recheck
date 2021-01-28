@@ -8,12 +8,12 @@ import org.scalajs.dom.raw.Event
 
 import scalajs.js
 import scalajs.js.JSConverters._
-import automaton.Complexity
-import automaton.Witness
 import common.Context
 import common.Checker
-import data.UChar
 import data.UString
+import diagnostics.AttackComplexity
+import diagnostics.AttackPattern
+import diagnostics.Diagnostics
 
 /** DiagnosticsJS is a JS wrapper for Diagnostics. */
 trait DiagnosticsJS extends js.Object {
@@ -22,13 +22,13 @@ trait DiagnosticsJS extends js.Object {
   def status: String
 
   /** A checker named to be used. */
-  def used: js.UndefOr[String]
+  def checker: js.UndefOr[String]
 
   /** An attack string. It is available on `vulnerable` diagnostics. */
-  def attack: js.UndefOr[String]
+  def attack: js.UndefOr[AttackPatternJS]
 
   /** A matching-time complexity. It is available on `safe` or `vulnerable` diagnostics. */
-  def complexity: js.UndefOr[ComplexityJS]
+  def complexity: js.UndefOr[AttackComplexityJS]
 
   /** An error kind. It is available on `unknown` diagnostics. */
   def error: js.UndefOr[ErrorKindJS]
@@ -39,82 +39,86 @@ object DiagnosticsJS {
 
   /** Constructs a DiagnosticsJS from the actual Diagnostics. */
   def from(d: Diagnostics): DiagnosticsJS = d match {
-    case Diagnostics.Safe(c, used) =>
+    case Diagnostics.Safe(c, checker) =>
       js.Dynamic
-        .literal(status = "safe", used = CheckerJS.from(used), complexity = c.map(ComplexityJS.from(_)).orUndefined)
+        .literal(status = "safe", checker = checker.toString, complexity = AttackComplexityJS.from(c))
         .asInstanceOf[DiagnosticsJS]
-    case Diagnostics.Vulnerable(a, c, used) =>
+    case Diagnostics.Vulnerable(c, a, checker) =>
       js.Dynamic
         .literal(
           status = "vulnerable",
-          used = CheckerJS.from(used),
-          attack = a.asString,
-          complexity = c.map(ComplexityJS.from(_)).orUndefined
+          checker = checker.toString,
+          attack = AttackPatternJS.from(a),
+          complexity = AttackComplexityJS.from(c)
         )
         .asInstanceOf[DiagnosticsJS]
-    case Diagnostics.Unknown(k, used) =>
+    case Diagnostics.Unknown(k, checker) =>
       js.Dynamic
-        .literal(status = "unknown", used = CheckerJS.from(used), error = ErrorKindJS.from(k))
+        .literal(status = "unknown", checker = checker.map(_.toString).orUndefined, error = ErrorKindJS.from(k))
         .asInstanceOf[DiagnosticsJS]
   }
 }
 
-/** Checker utilities for JavaScript. */
-object CheckerJS {
-
-  /** Converts the checker name into a string. */
-  def from(c: Option[Checker]): js.UndefOr[String] = c match {
-    case Some(Checker.Automaton) => "automaton"
-    case Some(Checker.Fuzz)      => "fuzz"
-    case _                       => ()
-  }
-}
-
-/** ComplexityJS is a JS wrapper for Complexity. */
-trait ComplexityJS extends js.Object {
+/** AttackComplexityJS is a JS wrapper for AttackComplexity. */
+trait AttackComplexityJS extends js.Object {
 
   /** A type of this complexity. One of `constant`, `linear`, `exponential` and `polynomial`. */
   def `type`: String
 
+  /** When it is `true`, this complexity maybe wrong. Otherwise, this comes from a precise analysis. */
+  def isFuzz: Boolean
+
   /** A polynomial complexity's degree. It is available on `polynomial` complexity. */
   def degree: js.UndefOr[Int]
-
-  /** A witness pattern. It is available on `exponential` or `polynomial` complexity. */
-  def witness: js.UndefOr[WitnessJS]
 }
 
-/** ComplexityJS utilities. */
-object ComplexityJS {
+/** AttackComplexityJS utilities. */
+object AttackComplexityJS {
 
-  /** Constructs a ComplexityJS from the actual Complexity. */
-  def from(c: Complexity[UChar]): ComplexityJS = c match {
-    case Complexity.Constant => js.Dynamic.literal(`type` = "constant").asInstanceOf[ComplexityJS]
-    case Complexity.Linear   => js.Dynamic.literal(`type` = "linear").asInstanceOf[ComplexityJS]
-    case Complexity.Polynomial(d, w) =>
-      js.Dynamic.literal(`type` = "polynomial", degree = d, witness = WitnessJS.from(w)).asInstanceOf[ComplexityJS]
-    case Complexity.Exponential(w) =>
-      js.Dynamic.literal(`type` = "exponential", witness = WitnessJS.from(w)).asInstanceOf[ComplexityJS]
+  /** Constructs a AttackComplexityJS from the actual AttackComplexity. */
+  def from(c: AttackComplexity): AttackComplexityJS = c match {
+    case AttackComplexity.Constant =>
+      js.Dynamic.literal(`type` = "constant", isFuzz = false).asInstanceOf[AttackComplexityJS]
+    case AttackComplexity.Linear =>
+      js.Dynamic.literal(`type` = "linear", isFuzz = false).asInstanceOf[AttackComplexityJS]
+    case c: AttackComplexity.Safe =>
+      js.Dynamic.literal(`type` = "safe", isFuzz = c.isFuzz).asInstanceOf[AttackComplexityJS]
+    case AttackComplexity.Polynomial(d, fuzz) =>
+      js.Dynamic.literal(`type` = "polynomial", degree = d, isFuzz = fuzz).asInstanceOf[AttackComplexityJS]
+    case AttackComplexity.Exponential(fuzz) =>
+      js.Dynamic.literal(`type` = "exponential", isFuzz = fuzz).asInstanceOf[AttackComplexityJS]
   }
 }
 
-/** WitnessJS is a JS wrapper for Witness. */
-trait WitnessJS extends js.Object {
+/** AttackPatternJS is a JS wrapper for AttackPattern. */
+trait AttackPatternJS extends js.Object {
 
   /** Pump objects. */
   def pumps: js.Array[PumpJS]
 
   /** A suffix string. */
   def suffix: String
+
+  /** A repeat base. */
+  def base: Int
+
+  /** A string representation of this. */
+  def string: String
 }
 
-/** WitnessJS utilities. */
-object WitnessJS {
+/** AttackPatternJS utilities. */
+object AttackPatternJS {
 
   /** Constructs a WitnessJS from the actual Witness. */
-  def from(w: Witness[UChar]): WitnessJS =
+  def from(a: AttackPattern): AttackPatternJS =
     js.Dynamic
-      .literal(pumps = w.pumps.map(PumpJS.from).toJSArray, suffix = UString(w.suffix.toIndexedSeq).asString)
-      .asInstanceOf[WitnessJS]
+      .literal(
+        pumps = a.pumps.map(PumpJS.from).toJSArray,
+        suffix = a.suffix.asString,
+        base = a.n,
+        string = a.asUString.asString
+      )
+      .asInstanceOf[AttackPatternJS]
 }
 
 /** PumpJS is a JS wrapper for Pump. */
@@ -125,15 +129,18 @@ trait PumpJS extends js.Object {
 
   /** A pump string. */
   def pump: String
+
+  /** A repeat bias. */
+  def bias: Int
 }
 
 /** PumpJS utilities. */
 object PumpJS {
 
   /** Constructs a PumpJS from the actual Pump. */
-  def from(p: (Seq[UChar], Seq[UChar])): PumpJS =
+  def from(p: (UString, UString, Int)): PumpJS =
     js.Dynamic
-      .literal(prefix = UString(p._1.toIndexedSeq).asString, pump = UString(p._2.toIndexedSeq).asString)
+      .literal(prefix = p._1.asString, pump = p._2.asString, bias = p._3)
       .asInstanceOf[PumpJS]
 }
 

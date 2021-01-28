@@ -1,40 +1,55 @@
 package codes.quine.labo.redos
+package diagnostics
 
-import automaton.Complexity
 import common.Checker
 import common.InvalidRegExpException
 import common.ReDoSException
 import common.TimeoutException
 import common.UnsupportedException
-import data.UChar
-import data.UString
 
-/** Diagnostics is a vulnerability diagnostics. */
-sealed abstract class Diagnostics extends Serializable with Product {
+/** Diagnostics ia an analysis result. */
+sealed abstract class Diagnostics extends Product with Serializable
 
-  /** A used checker. */
-  def used: Option[Checker.Used]
-
-  /** A matching-time complexity. */
-  def complexity: Option[Complexity[UChar]]
-}
-
-/** Diagnostics utilities and types. */
+/** Diagnostics types. */
 object Diagnostics {
 
-  /** Vulnerable is a diagnostics for a vulnerable RegExp. */
+  /** Safe is a analysis result against a safe RegExp. */
+  final case class Safe(
+      complexity: AttackComplexity.Safe,
+      checker: Checker
+  ) extends Diagnostics {
+    override def toString: String =
+      s"""|Status    : safe
+          |Complexity: $complexity
+          |Checker   : $checker
+          |""".stripMargin
+  }
+
+  /** Vulnerable is an analysis result against a vulnerable RegExp. */
   final case class Vulnerable(
-      attack: UString,
-      complexity: Option[Complexity.Vulnerable[UChar]],
-      used: Option[Checker.Used]
-  ) extends Diagnostics
+      complexity: AttackComplexity.Vulnerable,
+      attack: AttackPattern,
+      checker: Checker
+  ) extends Diagnostics {
+    override def toString: String =
+      s"""|Status       : vulnerable
+          |Complexity   : $complexity
+          |Attack string: $attack
+          |Checker      : $checker
+          |""".stripMargin
+  }
 
-  /** Safe is a diagnostics for a safe RegExp. */
-  final case class Safe(complexity: Option[Complexity.Safe], used: Option[Checker.Used]) extends Diagnostics
+  /** Unknown is an analysis result against a RegExp in which vulnerability is unknown for some reason. */
+  final case class Unknown(
+      error: ErrorKind,
+      checker: Option[Checker]
+  ) extends Diagnostics {
+    override def toString: String =
+      s"""|Status : unknown
+          |Error  : $error
+          |Checker: ${checker.map(_.toString).getOrElse("(none)")}
+          |""".stripMargin
 
-  /** Unknown is a unknown vulnerability diagnostics for some reasons. */
-  final case class Unknown(error: ErrorKind, used: Option[Checker.Used]) extends Diagnostics {
-    def complexity: Option[Complexity[UChar]] = None
   }
 
   /** Unknown utilities. */
@@ -47,7 +62,7 @@ object Diagnostics {
         case ex: UnsupportedException   => ErrorKind.Unsupported(ex.getMessage)
         case ex: InvalidRegExpException => ErrorKind.InvalidRegExp(ex.getMessage)
       }
-      Unknown(kind, ex.used)
+      Unknown(kind, ex.checker)
     }
   }
 
