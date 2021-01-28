@@ -3,9 +3,6 @@ package codes.quine.labo.redos
 import scala.concurrent.duration._
 import scala.util.Random
 
-import org.scalajs.dom.experimental.AbortSignal
-import org.scalajs.dom.raw.Event
-
 import scalajs.js
 import scalajs.js.JSConverters._
 import common.Context
@@ -173,9 +170,6 @@ trait ConfigJS extends js.Object {
   /** A timeout duration in a check. */
   def timeout: js.UndefOr[Int]
 
-  /** A abort signal. */
-  def signal: js.UndefOr[AbortSignal]
-
   /** A checker to use. */
   def checker: js.UndefOr[String]
 
@@ -228,8 +222,7 @@ object ConfigJS {
 
   /** Constructs a Config instance from ConfigJS object. */
   def from(config: ConfigJS): Config = {
-    val (ctx, cancel) = Context.cancellable(timeout = config.timeout.map(_.milli).getOrElse(Duration.Inf))
-    config.signal.foreach(_.addEventListener("abort", (_: Event) => cancel()))
+    val context = Context(timeout = config.timeout.map(_.milli).getOrElse(Duration.Inf))
 
     val checker = config.checker.getOrElse("hybrid") match {
       case "hybrid"    => Checker.Hybrid
@@ -239,7 +232,7 @@ object ConfigJS {
     val random = config.randomSeed.map(new Random(_)).getOrElse(Random)
 
     Config(
-      ctx,
+      context,
       checker,
       config.maxAttackSize.getOrElse(Config.MaxAttackSize),
       config.attackLimit.getOrElse(Config.AttackLimit),

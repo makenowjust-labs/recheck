@@ -1,5 +1,3 @@
-import java.nio.file.Path
-
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
 ThisBuild / organization := "codes.quine.labo"
@@ -113,7 +111,6 @@ lazy val redos = crossProject(JVMPlatform, JSPlatform)
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
-    libraryDependencies += "org.scala-js" %%% "scalajs-dom" % "1.1.0",
     coverageEnabled := false,
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )

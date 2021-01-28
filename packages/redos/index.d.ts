@@ -140,65 +140,66 @@ export type Config = {
  * - `unknown`: An error is occurred on analyzing.
  *   As a result, it is unknown whether the RegExp is safe or vulnerable.
  */
-export type Diagnostics = Safe | Vulnerable | Unknown;
+export type Diagnostics = SafeDiagnostics | VulnerableDiagnostics | UnknownDiagnostics;
 
 /**
- * Safe is a diagnostics against a safe RegExp.
+ * SafeDiagnostics is a diagnostics against a safe RegExp.
  */
-export type Safe = {
+export type SafeDiagnostics = {
   status: "safe";
-  used?: "automaton" | "fuzz";
-  complexity?: Constant | Linear;
+  checker: "automaton" | "fuzz";
+  complexity: SafeComplexity;
 };
 
 /**
- * Vulnerable is a diagnostics against a vulnerable RegExp.
+ * VulnerableDiagnostics is a diagnostics against a vulnerable RegExp.
  */
-export type Vulnerable = {
+export type VulnerableDiagnostics = {
   status: "vulnerable";
-  used?: "automaton" | "fuzz";
-  attack: string;
-  complexity?: Polynomial | Exponential;
+  checker: "automaton" | "fuzz";
+  attack: AttackPattern;
+  complexity: VulnerableComplexity;
 };
 
 /**
- * Unknown is a diagnostics when an error is occurred on analyzing.
+ * UnknownDiagnostics is a diagnostics when an error is occurred on analyzing.
  */
-export type Unknown = {
+export type UnknownDiagnostics = {
   status: "unknown";
-  used?: "automaton" | "fuzz";
+  checker?: "automaton" | "fuzz";
   error: Error;
 };
 
 /**
- * Constant is a constant complexity.
- * This complexity is safe.
+ * SafeComplexity is a safe complexity.
  */
-export type Constant = { type: "constant" };
-
-/**
- * Linear is a linear complexity.
- * This complexity is safe.
- */
-export type Linear = { type: "linear" };
-
-/**
- * Polynomial is a polynomial (super-linear) complexity.
- * This complexity is vulnerable typically.
- */
-export type Polynomial = {
-  type: "polynomial";
-  degree: number;
-  witness: Witness;
+export type SafeComplexity = {
+  type: "constant" | "linear" | "safe";
+  isFuzz: boolean;
 };
 
 /**
- * Exponential is an exponential complexity.
+ * VulnerableComplexity is a vulnerable complexity.
+ */
+export type VulnerableComplexity = PolynomialComplexity | ExponentialComplexity;
+
+/**
+ * PolynomialComplexity is a polynomial (super-linear) complexity.
+ * This complexity is vulnerable typically.
+ */
+export type PolynomialComplexity = {
+  type: "polynomial";
+  degree: number;
+  isFuzz: boolean;
+};
+
+/**
+ * ExponentialComplexity is an exponential complexity.
  * This complexity is vulnerable very.
  */
-export type Exponential = {
+export type ExponentialComplexity = {
   type: "exponential";
-  witness: Witness;
+  isFuzz: boolean;
 };
 
 /**
@@ -228,13 +229,15 @@ export type Invalid = {
 };
 
 /**
- * Witness is a witness of ReDoS vulnerable complexity.
- * In short, it is a pattern of an attack string pattern.
+ * AttackPattern is an attack pattern string.
  */
-export type Witness = {
+export type AttackPattern = {
   pumps: {
     prefix: string;
     pump: string;
+    bias: number;
   }[];
   suffix: string;
+  base: number;
+  string: string;
 };
