@@ -1,3 +1,11 @@
+# dev
+
+Changes:
+
+- Use consuming steps instead of VM execution steps in fuzzing
+- Add cancellable `Context`
+- Refactor `Diagnostics`
+
 # 1.2.0 (2021-01-02)
 
 Changes:
