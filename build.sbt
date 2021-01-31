@@ -81,7 +81,7 @@ lazy val redos = crossProject(JVMPlatform, JSPlatform)
       .map(_ -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"))
       .toMap,
     // Dependencies:
-    libraryDependencies += "com.lihaoyi" %%% "fastparse" % "2.3.0",
+    libraryDependencies += "com.lihaoyi" %%% "fastparse" % "2.3.1",
     // Generators:
     {
       val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
