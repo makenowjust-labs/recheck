@@ -25,12 +25,14 @@ const { check } = require("@makenowjust-labo/recheck");
 console.log(check("^(a|a)*$", ""));
 // {
 //   status: 'vulnerable',
-//   used: 'automaton',
-//   attack: 'aaaaaaaaaaaaaaaaaaaaa\x00',
-//   complexity: {
-//     type: 'exponential',
-//     witness: { pumps: [ { prefix: 'a', pump: 'a' } ], suffix: '\x00' }
-//   }
+//   checker: 'automaton',
+//   attack: {
+//     pumps: [ { prefix: 'a', pump: 'a', bias: 0 } ],
+//     suffix: '\x00',
+//     base: 17,
+//     string: 'aaaaaaaaaaaaaaaaaa\x00'
+//   },
+//   complexity: { type: 'exponential', isFuzz: false }
 // }
 ```
 
