@@ -266,7 +266,7 @@ object PropertyDataGen extends UnicodeDataGen {
   def source: String = {
     val sb = new mutable.StringBuilder
 
-    sb.append("package codes.quine.labo.redos.data.unicode\n")
+    sb.append("package codes.quine.labo.recheck.data.unicode\n")
     sb.append("\n")
     sb.append("private[unicode] object PropertyData {\n")
 
