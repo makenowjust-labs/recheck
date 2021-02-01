@@ -1,10 +1,11 @@
-# dev
+# 2.0.0 (2021-02-01)
 
 Changes:
 
 - Use consuming steps instead of VM execution steps in fuzzing
 - Add cancellable `Context`
 - Refactor `Diagnostics`
+- Rename the project name `redos` to `recheck`
 
 # 1.2.0 (2021-01-02)
 
