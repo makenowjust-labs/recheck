@@ -5,10 +5,10 @@ import scala.util.Success
 
 import fastparse._
 
-import Pattern._
-import common.Context
-import common.InvalidRegExpException
-import data.UChar
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.InvalidRegExpException
+import codes.quine.labo.recheck.data.UChar
+import codes.quine.labo.recheck.regexp.Pattern._
 
 class ParserSuite extends munit.FunSuite {
 

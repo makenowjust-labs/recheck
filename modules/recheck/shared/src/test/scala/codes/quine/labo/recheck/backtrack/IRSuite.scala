@@ -1,8 +1,8 @@
 package codes.quine.labo.recheck
 package backtrack
 
-import data.IChar
-import data.UChar
+import codes.quine.labo.recheck.data.IChar
+import codes.quine.labo.recheck.data.UChar
 
 class IRSuite extends munit.FunSuite {
   test("IR#toString") {

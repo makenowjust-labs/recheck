@@ -1,11 +1,11 @@
 package codes.quine.labo.recheck
 package fuzz
 
-import data.UChar
-import data.UString
-import diagnostics.AttackPattern
-import util.NumberFormat
-import FString._
+import codes.quine.labo.recheck.data.UChar
+import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.diagnostics.AttackPattern
+import codes.quine.labo.recheck.fuzz.FString._
+import codes.quine.labo.recheck.util.NumberFormat
 
 /** FString is a string with a repetition structure for fuzzing. */
 final case class FString(n: Int, seq: IndexedSeq[FChar]) {

@@ -4,20 +4,20 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-import automaton.AutomatonChecker
-import automaton.Complexity
-import automaton.EpsNFACompiler
-import common.Checker
-import common.Context
-import common.ReDoSException
-import common.UnsupportedException
-import data.UChar
-import diagnostics.AttackComplexity
-import diagnostics.Diagnostics
-import fuzz.FuzzChecker
-import fuzz.FuzzIR
-import regexp.Parser
-import regexp.Pattern
+import codes.quine.labo.recheck.automaton.AutomatonChecker
+import codes.quine.labo.recheck.automaton.Complexity
+import codes.quine.labo.recheck.automaton.EpsNFACompiler
+import codes.quine.labo.recheck.common.Checker
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.ReDoSException
+import codes.quine.labo.recheck.common.UnsupportedException
+import codes.quine.labo.recheck.data.UChar
+import codes.quine.labo.recheck.diagnostics.AttackComplexity
+import codes.quine.labo.recheck.diagnostics.Diagnostics
+import codes.quine.labo.recheck.fuzz.FuzzChecker
+import codes.quine.labo.recheck.fuzz.FuzzIR
+import codes.quine.labo.recheck.regexp.Parser
+import codes.quine.labo.recheck.regexp.Pattern
 
 /** ReDoS is a ReDoS checker frontend. */
 object ReDoS {

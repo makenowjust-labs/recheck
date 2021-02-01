@@ -8,14 +8,14 @@ import scala.util.Success
 import scala.util.Try
 import scala.util.chaining._
 
-import Pattern._
-import common.Context
-import common.InvalidRegExpException
-import data.IChar
-import data.ICharSet
-import data.UChar
-import data.UString
-import util.TryUtil
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.InvalidRegExpException
+import codes.quine.labo.recheck.data.IChar
+import codes.quine.labo.recheck.data.ICharSet
+import codes.quine.labo.recheck.data.UChar
+import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.regexp.Pattern._
+import codes.quine.labo.recheck.util.TryUtil
 
 /** Pattern is ECMA-262 `RegExp` pattern. */
 final case class Pattern(node: Node, flagSet: FlagSet) {

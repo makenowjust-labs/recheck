@@ -3,10 +3,10 @@ package automaton
 
 import scala.collection.mutable
 
-import common.Context
-import data.Graph
-import data.MultiSet
-import util.GraphvizUtil.escape
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.data.Graph
+import codes.quine.labo.recheck.data.MultiSet
+import codes.quine.labo.recheck.util.GraphvizUtil.escape
 
 /** NFAwLA is a NFA with a look-ahead DFA.
   *

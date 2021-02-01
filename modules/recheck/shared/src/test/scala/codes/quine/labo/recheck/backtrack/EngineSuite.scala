@@ -1,8 +1,8 @@
 package codes.quine.labo.recheck
 package backtrack
 
-import common.Context
-import regexp.Parser
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.regexp.Parser
 
 class EngineSuite extends munit.FunSuite {
 

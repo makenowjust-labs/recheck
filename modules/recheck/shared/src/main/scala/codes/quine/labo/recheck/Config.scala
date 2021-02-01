@@ -2,8 +2,8 @@ package codes.quine.labo.recheck
 
 import scala.util.Random
 
-import common.Checker
-import common.Context
+import codes.quine.labo.recheck.common.Checker
+import codes.quine.labo.recheck.common.Context
 
 /** Config is a ReDoS checker configuration. */
 final case class Config(

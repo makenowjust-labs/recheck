@@ -5,13 +5,13 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-import common.Context
-import common.InvalidRegExpException
-import data.IChar
-import data.UChar
-import regexp.Pattern
-import regexp.Pattern._
-import util.TryUtil
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.InvalidRegExpException
+import codes.quine.labo.recheck.data.IChar
+import codes.quine.labo.recheck.data.UChar
+import codes.quine.labo.recheck.regexp.Pattern
+import codes.quine.labo.recheck.regexp.Pattern._
+import codes.quine.labo.recheck.util.TryUtil
 
 /** Compiler from RegExp pattern to VM IR. */
 object IRCompiler {

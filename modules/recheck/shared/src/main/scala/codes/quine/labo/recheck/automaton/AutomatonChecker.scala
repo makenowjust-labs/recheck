@@ -3,9 +3,9 @@ package automaton
 
 import scala.collection.mutable
 
-import Complexity._
-import common.Context
-import data.Graph
+import codes.quine.labo.recheck.automaton.Complexity._
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.data.Graph
 
 /** ReDoS vulnerable RegExp checker based on automata theory. */
 object AutomatonChecker {

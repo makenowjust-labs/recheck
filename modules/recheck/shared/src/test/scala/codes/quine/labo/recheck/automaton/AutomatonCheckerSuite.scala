@@ -4,10 +4,10 @@ package automaton
 import scala.util.Success
 import scala.util.Try
 
-import Complexity._
-import common.Context
-import data.IChar
-import regexp.Parser
+import codes.quine.labo.recheck.automaton.Complexity._
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.data.IChar
+import codes.quine.labo.recheck.regexp.Parser
 
 class AutomatonCheckerSuite extends munit.FunSuite {
 

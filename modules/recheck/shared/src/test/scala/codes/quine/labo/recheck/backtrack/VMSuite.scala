@@ -1,11 +1,11 @@
 package codes.quine.labo.recheck
 package backtrack
 
-import common.Context
-import data.IChar
-import data.UChar
-import data.UString
-import Tracer.LimitException
+import codes.quine.labo.recheck.backtrack.Tracer.LimitException
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.data.IChar
+import codes.quine.labo.recheck.data.UChar
+import codes.quine.labo.recheck.data.UString
 
 class VMSuite extends munit.FunSuite {
 

@@ -1,7 +1,7 @@
 package codes.quine.labo.recheck
 package backtrack
 
-import Tracer.LimitException
+import codes.quine.labo.recheck.backtrack.Tracer.LimitException
 
 class TracerSuite extends munit.FunSuite {
 

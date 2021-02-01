@@ -1,6 +1,6 @@
 package codes.quine.labo.recheck
 package backtrack
-import data.UString
+import codes.quine.labo.recheck.data.UString
 
 /** Tracer is a common interface of VM execution tracers. */
 trait Tracer {

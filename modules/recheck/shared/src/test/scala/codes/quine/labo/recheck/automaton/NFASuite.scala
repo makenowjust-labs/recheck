@@ -1,7 +1,7 @@
 package codes.quine.labo.recheck
 package automaton
 
-import common.Context
+import codes.quine.labo.recheck.common.Context
 
 class NFASuite extends munit.FunSuite {
 

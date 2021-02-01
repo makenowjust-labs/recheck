@@ -1,9 +1,9 @@
 package codes.quine.labo.recheck
 package automaton
 
-import common.Context
-import data.Graph
-import data.MultiSet
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.data.Graph
+import codes.quine.labo.recheck.data.MultiSet
 
 class NFAwLASuite extends munit.FunSuite {
 

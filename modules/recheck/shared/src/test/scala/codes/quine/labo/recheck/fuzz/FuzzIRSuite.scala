@@ -3,11 +3,11 @@ package fuzz
 
 import scala.util.Success
 
-import backtrack.IR
-import common.Context
-import regexp.Pattern
-import regexp.Pattern._
-import data.ICharSet
+import codes.quine.labo.recheck.backtrack.IR
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.data.ICharSet
+import codes.quine.labo.recheck.regexp.Pattern
+import codes.quine.labo.recheck.regexp.Pattern._
 
 class FuzzIRSuite extends munit.FunSuite {
 

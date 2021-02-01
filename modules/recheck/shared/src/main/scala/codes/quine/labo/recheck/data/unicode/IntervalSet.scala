@@ -2,7 +2,7 @@ package codes.quine.labo.recheck.data.unicode
 
 import scala.math.Ordering.Implicits._
 
-import IntervalSet._
+import codes.quine.labo.recheck.data.unicode.IntervalSet._
 
 /** IntervalSet is set of intervals.
   *

@@ -1,9 +1,9 @@
 package codes.quine.labo.recheck
 package diagnostics
 
-import data.UChar
-import data.UString
-import util.NumberFormat
+import codes.quine.labo.recheck.data.UChar
+import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.util.NumberFormat
 
 /** AttackPattern is an attack pattern string to ReDoS.
   *

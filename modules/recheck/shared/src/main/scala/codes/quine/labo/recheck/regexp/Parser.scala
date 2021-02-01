@@ -9,13 +9,13 @@ import scala.util.Try
 import fastparse.NoWhitespace._
 import fastparse._
 
-import Pattern.FlagSet
-import Pattern.Node
-import Pattern.ClassNode
-import common.Context
-import common.InvalidRegExpException
-import data.IChar
-import data.UChar
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.InvalidRegExpException
+import codes.quine.labo.recheck.data.IChar
+import codes.quine.labo.recheck.data.UChar
+import codes.quine.labo.recheck.regexp.Pattern.ClassNode
+import codes.quine.labo.recheck.regexp.Pattern.FlagSet
+import codes.quine.labo.recheck.regexp.Pattern.Node
 
 /** ECMA-262 RegExp parser implementation. */
 object Parser {

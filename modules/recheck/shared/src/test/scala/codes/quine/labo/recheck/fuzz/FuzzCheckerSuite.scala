@@ -3,8 +3,8 @@ package fuzz
 
 import scala.util.Random
 
-import common.Context
-import regexp.Parser
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.regexp.Parser
 
 class FuzzCheckerSuite extends munit.FunSuite {
 

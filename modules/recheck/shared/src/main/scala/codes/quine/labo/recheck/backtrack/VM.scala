@@ -3,12 +3,12 @@ package backtrack
 
 import scala.collection.mutable
 
-import IR._
-import common.Context
-import data.IChar.LineTerminator
-import data.IChar.Word
-import data.UChar
-import data.UString
+import codes.quine.labo.recheck.backtrack.IR._
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.data.IChar.LineTerminator
+import codes.quine.labo.recheck.data.IChar.Word
+import codes.quine.labo.recheck.data.UChar
+import codes.quine.labo.recheck.data.UString
 
 /** VM utilities. */
 object VM {

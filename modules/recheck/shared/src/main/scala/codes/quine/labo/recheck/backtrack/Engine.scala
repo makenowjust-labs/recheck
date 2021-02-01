@@ -3,9 +3,9 @@ package backtrack
 
 import scala.util.Try
 
-import common.Context
-import data.UString
-import regexp.Pattern
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.regexp.Pattern
 
 /** RegExp pattern matching Engine (frontend). */
 object Engine {

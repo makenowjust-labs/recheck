@@ -1,11 +1,11 @@
 package codes.quine.labo.recheck
 package diagnostics
 
-import common.Checker
-import common.InvalidRegExpException
-import common.ReDoSException
-import common.TimeoutException
-import common.UnsupportedException
+import codes.quine.labo.recheck.common.Checker
+import codes.quine.labo.recheck.common.InvalidRegExpException
+import codes.quine.labo.recheck.common.ReDoSException
+import codes.quine.labo.recheck.common.TimeoutException
+import codes.quine.labo.recheck.common.UnsupportedException
 
 /** Diagnostics ia an analysis result. */
 sealed abstract class Diagnostics extends Product with Serializable

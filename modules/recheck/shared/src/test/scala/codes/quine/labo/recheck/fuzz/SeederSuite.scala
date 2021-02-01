@@ -1,13 +1,13 @@
 package codes.quine.labo.recheck
 package fuzz
 
-import backtrack.IR
-import common.Context
-import data.IChar
-import data.ICharSet
-import data.UString
-import regexp.Parser
-import Seeder._
+import codes.quine.labo.recheck.backtrack.IR
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.data.IChar
+import codes.quine.labo.recheck.data.ICharSet
+import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.fuzz.Seeder._
+import codes.quine.labo.recheck.regexp.Parser
 
 class SeederSuite extends munit.FunSuite {
 

@@ -4,15 +4,15 @@ import scala.concurrent.duration._
 import scala.util.Random
 import scala.util.Success
 
-import common.Checker
-import common.Context
-import common.InvalidRegExpException
-import data.UString
-import diagnostics.AttackComplexity
-import diagnostics.AttackPattern
-import diagnostics.Diagnostics
-import regexp.Pattern
-import regexp.Pattern._
+import codes.quine.labo.recheck.common.Checker
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.InvalidRegExpException
+import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.diagnostics.AttackComplexity
+import codes.quine.labo.recheck.diagnostics.AttackPattern
+import codes.quine.labo.recheck.diagnostics.Diagnostics
+import codes.quine.labo.recheck.regexp.Pattern
+import codes.quine.labo.recheck.regexp.Pattern._
 
 class ReDoSSuite extends munit.FunSuite {
 

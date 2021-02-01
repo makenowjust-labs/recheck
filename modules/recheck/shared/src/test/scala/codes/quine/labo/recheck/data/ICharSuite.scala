@@ -1,7 +1,7 @@
 package codes.quine.labo.recheck.data
 
-import unicode.IntervalSet
-import unicode.IntervalSet._
+import codes.quine.labo.recheck.data.unicode.IntervalSet
+import codes.quine.labo.recheck.data.unicode.IntervalSet._
 
 class ICharSuite extends munit.FunSuite {
   test("IChar.Any") {

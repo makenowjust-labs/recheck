@@ -1,7 +1,7 @@
 package codes.quine.labo.recheck
 package automaton
 
-import data.Graph
+import codes.quine.labo.recheck.data.Graph
 
 class DFASuite extends munit.FunSuite {
   test("DFA#toGraph") {

@@ -1,10 +1,10 @@
 package codes.quine.labo.recheck.data
 
-import unicode.IntervalSet
-import unicode.IntervalSet._
-import unicode.CaseMap
-import unicode.CaseMap.Conversion
-import unicode.Property
+import codes.quine.labo.recheck.data.unicode.CaseMap
+import codes.quine.labo.recheck.data.unicode.CaseMap.Conversion
+import codes.quine.labo.recheck.data.unicode.IntervalSet
+import codes.quine.labo.recheck.data.unicode.IntervalSet._
+import codes.quine.labo.recheck.data.unicode.Property
 
 /** IChar is a code point interval set with extra information. */
 final case class IChar(

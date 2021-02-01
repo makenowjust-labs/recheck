@@ -1,9 +1,9 @@
 package codes.quine.labo.recheck
 package fuzz
 
-import FString._
-import data.UString
-import diagnostics.AttackPattern
+import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.diagnostics.AttackPattern
+import codes.quine.labo.recheck.fuzz.FString._
 
 class FStringSuite extends munit.FunSuite {
   test("FString.cross") {

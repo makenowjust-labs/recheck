@@ -4,16 +4,16 @@ package fuzz
 import scala.collection.mutable
 import scala.util.Random
 
-import FuzzChecker._
-import backtrack.IR
-import backtrack.Tracer.LimitTracer
-import backtrack.Tracer.LimitException
-import backtrack.VM
-import common.Context
-import data.ICharSet
-import data.UString
-import diagnostics.AttackComplexity
-import diagnostics.AttackPattern
+import codes.quine.labo.recheck.backtrack.IR
+import codes.quine.labo.recheck.backtrack.Tracer.LimitException
+import codes.quine.labo.recheck.backtrack.Tracer.LimitTracer
+import codes.quine.labo.recheck.backtrack.VM
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.data.ICharSet
+import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.diagnostics.AttackComplexity
+import codes.quine.labo.recheck.diagnostics.AttackPattern
+import codes.quine.labo.recheck.fuzz.FuzzChecker._
 
 /** ReDoS vulnerable RegExp checker based on fuzzing. */
 object FuzzChecker {

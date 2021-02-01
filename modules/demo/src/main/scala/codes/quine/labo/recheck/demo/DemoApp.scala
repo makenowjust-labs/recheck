@@ -10,8 +10,8 @@ import org.scalajs.dom.html.Input
 import org.scalajs.dom.html.Paragraph
 import org.scalajs.dom.raw.Event
 
-import common.Context
-import diagnostics.Diagnostics
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.diagnostics.Diagnostics
 
 /** DemoApp is an implementation of demo application in the top page. */
 object DemoApp {

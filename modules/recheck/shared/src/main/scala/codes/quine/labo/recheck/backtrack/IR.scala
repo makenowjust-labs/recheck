@@ -3,9 +3,9 @@ package backtrack
 
 import scala.collection.mutable
 
-import IR._
-import data.IChar
-import data.UChar
+import codes.quine.labo.recheck.backtrack.IR._
+import codes.quine.labo.recheck.data.IChar
+import codes.quine.labo.recheck.data.UChar
 
 /** IR is an internal representation of a compiled RegExp program. */
 final case class IR(capsSize: Int, names: Map[String, Int], codes: IndexedSeq[OpCode]) {

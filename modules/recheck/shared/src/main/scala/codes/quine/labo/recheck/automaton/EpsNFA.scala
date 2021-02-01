@@ -3,12 +3,12 @@ package automaton
 
 import scala.collection.mutable
 
-import EpsNFA._
-import common.Context
-import common.UnsupportedException
-import data.IChar
-import data.ICharSet
-import util.GraphvizUtil.escape
+import codes.quine.labo.recheck.automaton.EpsNFA._
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.UnsupportedException
+import codes.quine.labo.recheck.data.IChar
+import codes.quine.labo.recheck.data.ICharSet
+import codes.quine.labo.recheck.util.GraphvizUtil.escape
 
 /** EpsNFA is an ordered ε-NFA on unicode code points. */
 final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept: Q, tau: Map[Q, Transition[Q]]) {

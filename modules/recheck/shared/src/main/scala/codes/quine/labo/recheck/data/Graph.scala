@@ -4,7 +4,7 @@ package data
 import scala.annotation.tailrec
 import scala.collection.mutable
 
-import common.Context
+import codes.quine.labo.recheck.common.Context
 
 /** Graph utilities. */
 object Graph {

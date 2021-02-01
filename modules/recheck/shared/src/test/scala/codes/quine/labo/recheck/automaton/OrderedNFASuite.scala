@@ -1,9 +1,9 @@
 package codes.quine.labo.recheck
 package automaton
 
-import common.Context
-import common.UnsupportedException
-import data.MultiSet
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.UnsupportedException
+import codes.quine.labo.recheck.data.MultiSet
 
 class OrderedNFASuite extends munit.FunSuite {
 

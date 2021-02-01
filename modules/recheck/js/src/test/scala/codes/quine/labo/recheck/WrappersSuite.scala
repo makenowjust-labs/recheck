@@ -1,12 +1,13 @@
 package codes.quine.labo.recheck
 
-import scalajs.js
-import scalajs.js.JSON
-import common.Checker
-import diagnostics.AttackComplexity
-import diagnostics.AttackPattern
-import diagnostics.Diagnostics
-import data.UString
+import scala.scalajs.js
+import scala.scalajs.js.JSON
+
+import codes.quine.labo.recheck.common.Checker
+import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.diagnostics.AttackComplexity
+import codes.quine.labo.recheck.diagnostics.AttackPattern
+import codes.quine.labo.recheck.diagnostics.Diagnostics
 
 class WrappersSuite extends munit.FunSuite {
   test("DiagnosticsJS.from") {

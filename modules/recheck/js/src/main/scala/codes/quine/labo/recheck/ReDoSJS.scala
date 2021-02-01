@@ -1,7 +1,7 @@
 package codes.quine.labo.recheck
 
-import scalajs.js
-import scalajs.js.annotation.JSExportTopLevel
+import scala.scalajs.js
+import scala.scalajs.js.annotation.JSExportTopLevel
 
 /** ReDoSJS is a JavaScript interface of this library. */
 object ReDoSJS {

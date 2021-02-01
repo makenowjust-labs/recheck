@@ -1,7 +1,7 @@
 package codes.quine.labo.recheck
 package diagnostics
 
-import data.UString
+import codes.quine.labo.recheck.data.UString
 
 class AttackPatternSuite extends munit.FunSuite {
   test("AttackPattern#asUString") {

@@ -4,13 +4,13 @@ package fuzz
 import scala.annotation.tailrec
 import scala.collection.mutable
 
-import backtrack.IR
-import backtrack.VM
-import backtrack.Tracer.LimitException
-import common.Context
-import data.IChar
-import data.ICharSet
-import data.UString
+import codes.quine.labo.recheck.backtrack.IR
+import codes.quine.labo.recheck.backtrack.Tracer.LimitException
+import codes.quine.labo.recheck.backtrack.VM
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.data.IChar
+import codes.quine.labo.recheck.data.ICharSet
+import codes.quine.labo.recheck.data.UString
 
 /** Seeder computes a seed set for the pattern. */
 object Seeder {

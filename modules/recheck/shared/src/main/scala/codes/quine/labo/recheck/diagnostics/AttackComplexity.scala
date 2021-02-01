@@ -1,7 +1,7 @@
 package codes.quine.labo.recheck
 package diagnostics
 
-import util.NumberFormat
+import codes.quine.labo.recheck.util.NumberFormat
 
 /** AttackComplexity is a computational complexity to check a match
   * against an input string size.

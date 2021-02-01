@@ -1,7 +1,7 @@
 package codes.quine.labo.recheck
 package backtrack
 
-import data.UString
+import codes.quine.labo.recheck.data.UString
 
 class MatchSuite extends munit.FunSuite {
   test("Match.apply") {

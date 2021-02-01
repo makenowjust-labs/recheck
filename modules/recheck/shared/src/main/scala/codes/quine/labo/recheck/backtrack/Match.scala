@@ -1,7 +1,7 @@
 package codes.quine.labo.recheck
 package backtrack
 
-import data.UString
+import codes.quine.labo.recheck.data.UString
 
 /** Match is a match result of RegExp execution. */
 final case class Match(input: UString, names: Map[String, Int], caps: IndexedSeq[Int]) {

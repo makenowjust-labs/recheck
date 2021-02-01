@@ -5,14 +5,14 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-import EpsNFA._
-import common.Context
-import common.InvalidRegExpException
-import common.UnsupportedException
-import data.IChar
-import regexp.Pattern
-import regexp.Pattern._
-import util.TryUtil
+import codes.quine.labo.recheck.automaton.EpsNFA._
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.InvalidRegExpException
+import codes.quine.labo.recheck.common.UnsupportedException
+import codes.quine.labo.recheck.data.IChar
+import codes.quine.labo.recheck.regexp.Pattern
+import codes.quine.labo.recheck.regexp.Pattern._
+import codes.quine.labo.recheck.util.TryUtil
 
 /** ECMA-262 RegExp to ε-NFA Compiler. */
 object EpsNFACompiler {

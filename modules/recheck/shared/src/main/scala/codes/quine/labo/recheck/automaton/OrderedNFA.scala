@@ -3,10 +3,10 @@ package automaton
 
 import scala.collection.mutable
 
-import common.Context
-import common.UnsupportedException
-import data.MultiSet
-import util.GraphvizUtil.escape
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.UnsupportedException
+import codes.quine.labo.recheck.data.MultiSet
+import codes.quine.labo.recheck.util.GraphvizUtil.escape
 
 /** OrderedNFA is a NFA, but its transitions has a priority in the order. */
 final case class OrderedNFA[A, Q](

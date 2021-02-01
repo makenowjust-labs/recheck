@@ -1,9 +1,9 @@
 package codes.quine.labo.recheck
 package automaton
 
-import data.UChar
-import diagnostics.AttackComplexity
-import diagnostics.AttackPattern
+import codes.quine.labo.recheck.data.UChar
+import codes.quine.labo.recheck.diagnostics.AttackComplexity
+import codes.quine.labo.recheck.diagnostics.AttackPattern
 
 /** Complexity is a result of [[AutomatonChecker.check]] method. */
 sealed abstract class Complexity[+A] extends Serializable with Product {

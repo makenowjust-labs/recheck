@@ -3,9 +3,9 @@ package fuzz
 
 import scala.collection.mutable
 
-import backtrack.IR
-import backtrack.Tracer.LimitTracer
-import data.UString
+import codes.quine.labo.recheck.backtrack.IR
+import codes.quine.labo.recheck.backtrack.Tracer.LimitTracer
+import codes.quine.labo.recheck.data.UString
 
 /** FuzzTracer is a tracer implementation for fuzzing. */
 private[fuzz] class FuzzTracer(ir: IR, val input: UString, limit: Int) extends LimitTracer(ir, limit) {

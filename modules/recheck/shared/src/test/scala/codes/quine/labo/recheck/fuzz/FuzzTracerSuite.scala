@@ -1,11 +1,11 @@
 package codes.quine.labo.recheck
 package fuzz
 
-import backtrack.IR
-import backtrack.VM
-import common.Context
-import data.UString
-import FString._
+import codes.quine.labo.recheck.backtrack.IR
+import codes.quine.labo.recheck.backtrack.VM
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.fuzz.FString._
 
 class FuzzTracerSuite extends munit.FunSuite {
 
