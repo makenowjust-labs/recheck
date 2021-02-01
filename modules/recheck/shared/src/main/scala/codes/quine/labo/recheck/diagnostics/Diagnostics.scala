@@ -21,8 +21,7 @@ object Diagnostics {
     override def toString: String =
       s"""|Status    : safe
           |Complexity: $complexity
-          |Checker   : $checker
-          |""".stripMargin
+          |Checker   : $checker""".stripMargin
   }
 
   /** Vulnerable is an analysis result against a vulnerable RegExp. */
@@ -35,8 +34,7 @@ object Diagnostics {
       s"""|Status       : vulnerable
           |Complexity   : $complexity
           |Attack string: $attack
-          |Checker      : $checker
-          |""".stripMargin
+          |Checker      : $checker""".stripMargin
   }
 
   /** Unknown is an analysis result against a RegExp in which vulnerability is unknown for some reason. */
@@ -47,8 +45,7 @@ object Diagnostics {
     override def toString: String =
       s"""|Status : unknown
           |Error  : $error
-          |Checker: ${checker.map(_.toString).getOrElse("(none)")}
-          |""".stripMargin
+          |Checker: ${checker.map(_.toString).getOrElse("(none)")}""".stripMargin
 
   }
 

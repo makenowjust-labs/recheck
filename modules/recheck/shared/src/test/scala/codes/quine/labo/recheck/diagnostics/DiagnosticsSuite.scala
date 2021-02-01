@@ -13,8 +13,7 @@ class DiagnosticsSuite extends munit.FunSuite {
       Diagnostics.Safe(AttackComplexity.Constant, Checker.Automaton).toString,
       s"""|Status    : safe
           |Complexity: constant
-          |Checker   : automaton
-          |""".stripMargin
+          |Checker   : automaton""".stripMargin
     )
     assertEquals(
       Diagnostics
@@ -27,22 +26,19 @@ class DiagnosticsSuite extends munit.FunSuite {
       s"""|Status       : vulnerable
           |Complexity   : exponential
           |Attack string: 'a' 'b'² 'c'
-          |Checker      : automaton
-          |""".stripMargin
+          |Checker      : automaton""".stripMargin
     )
     assertEquals(
       Diagnostics.Unknown(Diagnostics.ErrorKind.Timeout, Some(Checker.Automaton)).toString,
       s"""|Status : unknown
           |Error  : timeout
-          |Checker: automaton
-          |""".stripMargin
+          |Checker: automaton""".stripMargin
     )
     assertEquals(
       Diagnostics.Unknown(Diagnostics.ErrorKind.Timeout, None).toString,
       s"""|Status : unknown
           |Error  : timeout
-          |Checker: (none)
-          |""".stripMargin
+          |Checker: (none)""".stripMargin
     )
   }
 
