@@ -1,7 +1,7 @@
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
 ThisBuild / organization := "codes.quine.labo"
-ThisBuild / homepage := Some(url("https://github.com/MakeNowJust-Labo/redos"))
+ThisBuild / homepage := Some(url("https://github.com/MakeNowJust-Labo/recheck"))
 ThisBuild / licenses := Seq("MIT" -> url("http://opensource.org/licenses/MIT"))
 ThisBuild / developers := List(
   Developer(
@@ -43,25 +43,25 @@ lazy val root = project
     mdocOut := baseDirectory.value / "site" / "content"
   )
   .enablePlugins(MdocPlugin)
-  .aggregate(redosJVM, redosJS, demoJS)
-  .dependsOn(redosJVM)
+  .aggregate(recheckJVM, recheckJS, demoJS)
+  .dependsOn(recheckJVM)
 
-lazy val redos = crossProject(JVMPlatform, JSPlatform)
-  .in(file("modules/redos"))
+lazy val recheck = crossProject(JVMPlatform, JSPlatform)
+  .in(file("modules/recheck"))
   .settings(
-    name := "redos",
+    name := "recheck",
     console / initialCommands := """
       |import scala.concurrent.duration._
       |import scala.util.Random
       |
-      |import codes.quine.labo.redos._
-      |import codes.quine.labo.redos.automaton._
-      |import codes.quine.labo.redos.backtrack._
-      |import codes.quine.labo.redos.common._
-      |import codes.quine.labo.redos.data._
-      |import codes.quine.labo.redos.fuzz._
-      |import codes.quine.labo.redos.regexp._
-      |import codes.quine.labo.redos.util._
+      |import codes.quine.labo.recheck._
+      |import codes.quine.labo.recheck.automaton._
+      |import codes.quine.labo.recheck.backtrack._
+      |import codes.quine.labo.recheck.common._
+      |import codes.quine.labo.recheck.data._
+      |import codes.quine.labo.recheck.fuzz._
+      |import codes.quine.labo.recheck.regexp._
+      |import codes.quine.labo.recheck.util._
       |
       |implicit def ctx: Context = Context()
       |
@@ -95,7 +95,7 @@ lazy val redos = crossProject(JVMPlatform, JSPlatform)
             "CaseMapDataGen.scala" -> CaseMapDataGen,
             "PropertyDataGen.scala" -> PropertyDataGen
           )
-          val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labo" / "redos" / "data" / "unicode"
+          val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labo" / "recheck" / "data" / "unicode"
           val changes = generateUnicodeData.inputFileChanges
           val updatedPaths = changes.created ++ changes.modified
           for (path <- updatedPaths) {
@@ -115,8 +115,8 @@ lazy val redos = crossProject(JVMPlatform, JSPlatform)
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
 
-lazy val redosJVM = redos.jvm
-lazy val redosJS = redos.js
+lazy val recheckJVM = recheck.jvm
+lazy val recheckJS = recheck.js
 
 lazy val demoJS = project
   .in(file("modules/demo"))
@@ -126,11 +126,11 @@ lazy val demoJS = project
     coverageEnabled := false,
     name := "demo",
     scalaJSUseMainModuleInitializer := true,
-    Compile / mainClass := Some("codes.quine.labo.redos.demo.DemoApp"),
+    Compile / mainClass := Some("codes.quine.labo.recheck.demo.DemoApp"),
     libraryDependencies += "org.scala-js" %%% "scalajs-dom" % "1.1.0",
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.21" % Test,
     testFrameworks += new TestFramework("munit.Framework"),
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
-  .dependsOn(redosJS)
+  .dependsOn(recheckJS)

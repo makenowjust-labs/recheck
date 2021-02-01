@@ -1,0 +1,17 @@
+{
+  "name": "@makenowjust-labo/recheck",
+  "description": "A vulnerable RegExp (ReDoS) checker for JavaScript (ECMA-262) RegExp.",
+  "license": "MIT",
+  "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
+  "homepage": "https://makenowjust-labo.github.io/recheck/",
+  "repository": "https://github.com/MakeNowJust-Labo/recheck.git",
+  "version": "1.2.0",
+  "main": "recheck-opt.js",
+  "types": "index.d.ts",
+  "keywords": [
+    "redos",
+    "regexp",
+    "security",
+    "vulnerability"
+  ]
+}

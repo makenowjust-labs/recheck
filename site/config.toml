@@ -1,9 +1,9 @@
-baseURL = "http://makenowjust-labo.github.io/redos/"
+baseURL = "http://makenowjust-labo.github.io/recheck/"
 languageCode = "en-us"
-title = "redos | MakeNowJust-Labo"
+title = "recheck | MakeNowJust-Labo"
 copyright = "2020 (C) TSUYUSATO \"MakeNowJust\" Kitsune"
 
 [params]
-name = "redos"
+name = "recheck"
 description = "A vulnerable RegExp (ReDoS) checker."
-github = "MakeNowJust-Labo/redos"
+github = "MakeNowJust-Labo/recheck"
