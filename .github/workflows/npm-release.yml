@@ -15,10 +15,10 @@ jobs:
 
       - name: Build
         run: |
-          sbt redosJS/fullOptJS
-          cp modules/redos/js/target/scala-2.13/redos-opt.js* packages/redos/
+          sbt recheckJS/fullOptJS
+          cp modules/recheck/js/target/scala-2.13/recheck-opt.js* packages/recheck/
 
       - uses: JS-DevTools/npm-publish@v1
         with:
-          package: packages/redos/package.json
+          package: packages/recheck/package.json
           token: ${{ secrets.NPM_TOKEN }}
