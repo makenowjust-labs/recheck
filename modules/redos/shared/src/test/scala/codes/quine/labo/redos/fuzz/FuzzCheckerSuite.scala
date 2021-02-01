@@ -3,9 +3,13 @@ package fuzz
 
 import scala.util.Random
 
+import common.Context
 import regexp.Parser
 
 class FuzzCheckerSuite extends munit.FunSuite {
+
+  /** A default context. */
+  implicit def ctx: Context = Context()
 
   /** A fixed seed random instance for deterministic test. */
   def random0: Random = new Random(0)
@@ -14,13 +18,14 @@ class FuzzCheckerSuite extends munit.FunSuite {
   def check(source: String, flags: String, quick: Boolean = false): Boolean = {
     val result = for {
       pattern <- Parser.parse(source, flags)
-      ctx <- FuzzContext.from(pattern)
+      fuzz <- FuzzIR.from(pattern)
     } yield FuzzChecker.check(
-      ctx,
+      fuzz,
       random0,
-      seedLimit = if (quick) 1_000 else 10_000,
-      populationLimit = if (quick) 10_000 else 100_000,
-      attackLimit = if (quick) 100_000 else 1_000_000
+      maxAttackSize = if (quick) 400 else 4000,
+      seedLimit = if (quick) 1_00 else 1_000,
+      populationLimit = if (quick) 1_000 else 10_000,
+      attackLimit = if (quick) 10_000 else 100_000
     )
     result.get.isDefined
   }
@@ -48,13 +53,23 @@ class FuzzCheckerSuite extends munit.FunSuite {
     assert(check("^(a|B|Ab)*$", "i", quick = true))
     assert(check("^(aa|b|aab)*$", "", quick = true))
 
-    assert(check("^(a?){50}a{50}$", ""))
+    assert(check("^(a?){50}a{50}$", "", quick = true))
 
+    // The checker can find an attack string on seeding phase.
+    assert {
+      val result = for {
+        pattern <- Parser.parse("^(a?){50}a{50}$", "")
+        fuzz <- FuzzIR.from(pattern)
+      } yield FuzzChecker.check(fuzz, random0, seedLimit = 1000, populationLimit = 1000, attackLimit = 10000)
+      result.get.isDefined
+    }
+
+    // The checker cannot find too small attack string.
     assert {
       val result = for {
         pattern <- Parser.parse("^(a|a)*$", "")
-        ctx <- FuzzContext.from(pattern)
-      } yield FuzzChecker.check(ctx, random0, populationLimit = 100, maxAttackSize = 5)
+        fuzz <- FuzzIR.from(pattern)
+      } yield FuzzChecker.check(fuzz, random0, populationLimit = 100, maxAttackSize = 5)
       result.get.isEmpty
     }
   }

@@ -3,10 +3,11 @@ package fuzz
 
 import data.UChar
 import data.UString
-import util.StringUtil
+import diagnostics.AttackPattern
+import util.NumberFormat
 import FString._
 
-/** FString is a gene-type string for fuzzing. */
+/** FString is a string with a repetition structure for fuzzing. */
 final case class FString(n: Int, seq: IndexedSeq[FChar]) {
 
   /** Tests whether this string is constant or not. */
@@ -48,7 +49,7 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
   def mapN(f: Int => Int): FString =
     FString(Math.max(f(n), 1), seq)
 
-  /** Builds a UString instance of this. */
+  /** Builds a UString instance from this. */
   def toUString: UString = {
     val str = IndexedSeq.newBuilder[UChar]
     var pos = 0
@@ -71,7 +72,39 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
     UString(str.result())
   }
 
-  /** Returns a string representation of this. */
+  /** Builds an attack pattern string from this. */
+  def toAttackPattern: AttackPattern = {
+    val pumps = Seq.newBuilder[(UString, UString, Int)]
+
+    val str = IndexedSeq.newBuilder[UChar]
+    var pos = 0
+
+    while (pos < seq.size) {
+      seq(pos) match {
+        case Wrap(u) =>
+          pos += 1
+          str.addOne(u)
+        case Repeat(m, size) =>
+          pos += 1
+          val repeat = n + m
+          if (repeat > 1) {
+            val s = UString(str.result())
+            str.clear()
+            val pump = seq.slice(pos, pos + size).map {
+              case Wrap(u)      => u
+              case Repeat(_, _) => throw new IllegalArgumentException
+            }
+            val t = UString(pump)
+            pumps.addOne((s, t, m))
+            pos += size
+          }
+      }
+    }
+
+    val suffix = UString(str.result())
+    AttackPattern(pumps.result(), suffix, n)
+  }
+
   override def toString: String = {
     if (seq.isEmpty) return "''"
 
@@ -96,7 +129,7 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
               case Wrap(u)      => u
               case Repeat(_, _) => throw new IllegalArgumentException
             }
-            parts.addOne(UString(part).toString ++ StringUtil.superscript(repeat))
+            parts.addOne(UString(part).toString ++ NumberFormat.superscript(repeat))
             pos += size
           }
       }
@@ -115,7 +148,7 @@ object FString {
   /** FChar is a character of [[FString]]. */
   sealed abstract class FChar extends Serializable with Product
 
-  /** Wrap is a wrapper of [[UChar]] in [[FString]]. */
+  /** Wrap is a wrapper of a unicode character in [[FString]]. */
   final case class Wrap(u: UChar) extends FChar
 
   /** Repeat is a repetition specifier in [[FString]]. */

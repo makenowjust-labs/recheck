@@ -1,6 +1,13 @@
-package codes.quine.labo.redos.data
+package codes.quine.labo.redos
+package data
+
+import common.Context
 
 class GraphSuite extends munit.FunSuite {
+
+  /** A default context. */
+  implicit def ctx: Context = Context()
+
   test("Graph.from") {
     val g = Graph.from(IndexedSeq((1, 'a', 2), (1, 'a', 3), (2, 'b', 3)))
     assertEquals(g.neighbors, Map(1 -> IndexedSeq(('a', 2), ('a', 3)), 2 -> IndexedSeq(('b', 3))))

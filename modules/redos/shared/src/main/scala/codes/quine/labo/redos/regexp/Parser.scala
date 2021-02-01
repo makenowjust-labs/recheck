@@ -12,32 +12,32 @@ import fastparse._
 import Pattern.FlagSet
 import Pattern.Node
 import Pattern.ClassNode
+import common.Context
+import common.InvalidRegExpException
 import data.IChar
 import data.UChar
-import util.Timeout
 
 /** ECMA-262 RegExp parser implementation. */
 object Parser {
 
   /** Parses ECMA-262 RegExp string. */
-  def parse(source: String, flags: String, additional: Boolean = true)(implicit
-      timeout: Timeout = Timeout.NoTimeout
-  ): Try[Pattern] = timeout.checkTimeout("regexp.Parser.parse") {
-    for {
-      flagSet <- parseFlagSet(flags)
-      (hasNamedCapture, captures) = preprocessParen(source)
-      result =
-        fastparse.parse(source, new Parser(flagSet.unicode, additional, hasNamedCapture, captures).Source(_))
-      node <- result match {
-        case Parsed.Success(node, _) => Success(node)
-        case fail: Parsed.Failure    => Failure(new InvalidRegExpException(s"parsing failure at ${fail.index}"))
-      }
-    } yield Pattern(assignCaptureIndex(node), flagSet)
-  }
+  def parse(source: String, flags: String, additional: Boolean = true)(implicit ctx: Context): Try[Pattern] =
+    ctx.interrupt {
+      for {
+        flagSet <- parseFlagSet(flags)
+        (hasNamedCapture, captures) = preprocessParen(source)
+        result =
+          fastparse.parse(source, new Parser(flagSet.unicode, additional, hasNamedCapture, captures).Source(_))
+        node <- result match {
+          case Parsed.Success(node, _) => Success(node)
+          case fail: Parsed.Failure    => Failure(new InvalidRegExpException(s"parsing failure at ${fail.index}"))
+        }
+      } yield Pattern(assignCaptureIndex(node), flagSet)
+    }
 
   /** Parses a flag set string. */
-  private[regexp] def parseFlagSet(s: String)(implicit timeout: Timeout = Timeout.NoTimeout): Try[FlagSet] =
-    timeout.checkTimeout("regexp.Parser.parseFlagSet") {
+  private[regexp] def parseFlagSet(s: String)(implicit ctx: Context): Try[FlagSet] =
+    ctx.interrupt {
       val cs = s.toList
       // A flag set accepts neither duplicated character nor unknown character.
       if (cs.distinct != cs) Failure(new InvalidRegExpException("duplicated flag"))
@@ -60,8 +60,8 @@ object Parser {
     * The first value of result is a flag whether the source contains named capture or not,
     * and the second value is capture parentheses number in the source.
     */
-  private[regexp] def preprocessParen(s: String)(implicit timeout: Timeout = Timeout.NoTimeout): (Boolean, Int) =
-    timeout.checkTimeout("regexp.Parser.preprocessParens") {
+  private[regexp] def preprocessParen(s: String)(implicit ctx: Context): (Boolean, Int) =
+    ctx.interrupt {
       var i = 0
       var hasNamedCapture = false
       var captures = 0
@@ -102,8 +102,8 @@ object Parser {
     var currentIndex = 0
 
     def loop(node: Node): Node = node match {
-      case Disjunction(ns) => Disjunction(ns.map(loop(_)))
-      case Sequence(ns)    => Sequence(ns.map(loop(_)))
+      case Disjunction(ns) => Disjunction(ns.map(loop))
+      case Sequence(ns)    => Sequence(ns.map(loop))
       case Capture(_, n) =>
         currentIndex += 1
         Capture(currentIndex, loop(n))
@@ -133,7 +133,7 @@ object Parser {
 /** Parser is a ECMA-262 RegExp parser.
   *
   * ECMA-262 RegExp syntax is modified when unicode flag is enabled or/and source has named captures.
-  * So, its constuctor takes these parameters.
+  * So, its constructor takes these parameters.
   */
 private[regexp] final class Parser(
     val unicode: Boolean,

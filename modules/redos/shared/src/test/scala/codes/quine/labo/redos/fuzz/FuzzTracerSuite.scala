@@ -3,15 +3,18 @@ package fuzz
 
 import backtrack.IR
 import backtrack.VM
+import common.Context
 import data.UString
-import util.Timeout
 import FString._
 
 class FuzzTracerSuite extends munit.FunSuite {
 
+  /** A default context. */
+  implicit def ctx: Context = Context()
+
   /** Executes the IR with a tracer and returns the tracer. */
   def trace(ir: IR, input: UString): FuzzTracer = {
-    val tracer = new FuzzTracer(ir, input, 10000, Timeout.NoTimeout)
+    val tracer = new FuzzTracer(ir, input, 10000)
     VM.execute(ir, input, 0, tracer)
     tracer
   }
@@ -80,7 +83,7 @@ class FuzzTracerSuite extends munit.FunSuite {
 
   test("FuzzTracer#rate") {
     assertEquals(trace(ir1, UString.empty).rate(), 0.0)
-    assertEquals(trace(ir1, UString.from("x", false)).rate(), 7.0)
+    assertEquals(trace(ir1, UString.from("x", false)).rate(), 1.0)
   }
 
   test("FuzzTracer#buildFString") {

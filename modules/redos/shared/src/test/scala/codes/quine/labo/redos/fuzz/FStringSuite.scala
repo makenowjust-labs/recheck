@@ -1,8 +1,9 @@
 package codes.quine.labo.redos
 package fuzz
 
-import data.UString
 import FString._
+import data.UString
+import diagnostics.AttackPattern
 
 class FStringSuite extends munit.FunSuite {
   test("FString.cross") {
@@ -103,6 +104,20 @@ class FStringSuite extends munit.FunSuite {
     )
     intercept[IllegalArgumentException] {
       FString(1, IndexedSeq(Repeat(0, 2), Wrap('a'), Repeat(0, 1))).toUString
+    }
+  }
+
+  test("FString#toAttackPattern") {
+    assertEquals(
+      FString(2, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toAttackPattern,
+      AttackPattern(Seq((UString.from("a", false), UString.from("bc", false), 1)), UString.from("d", false), 2)
+    )
+    assertEquals(
+      FString(0, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toAttackPattern,
+      AttackPattern(Seq.empty, UString.from("abcd", false), 0)
+    )
+    intercept[IllegalArgumentException] {
+      FString(1, IndexedSeq(Repeat(1, 2), Wrap('a'), Repeat(1, 1))).toAttackPattern
     }
   }
 

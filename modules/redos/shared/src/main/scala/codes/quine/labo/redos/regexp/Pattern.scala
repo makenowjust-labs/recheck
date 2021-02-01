@@ -9,20 +9,21 @@ import scala.util.Try
 import scala.util.chaining._
 
 import Pattern._
+import common.Context
+import common.InvalidRegExpException
 import data.IChar
 import data.ICharSet
 import data.UChar
 import data.UString
 import util.TryUtil
-import util.Timeout
 
 /** Pattern is ECMA-262 `RegExp` pattern. */
 final case class Pattern(node: Node, flagSet: FlagSet) {
 
   /** Tests the pattern has line-begin assertion `^` at its begin position. */
-  def hasLineBeginAtBegin(implicit timeout: Timeout = Timeout.NoTimeout): Boolean =
-    timeout.checkTimeout("regexp.Pattern#hasLineBeginAtBegin") {
-      def loop(node: Node): Boolean = timeout.checkTimeout("regexp.Pattern#hasLineBeginAtBegin:loop")(node match {
+  def hasLineBeginAtBegin(implicit ctx: Context): Boolean =
+    ctx.interrupt {
+      def loop(node: Node): Boolean = ctx.interrupt(node match {
         case Disjunction(ns)       => ns.forall(loop)
         case Sequence(ns)          => ns.headOption.exists(loop)
         case Capture(_, n)         => loop(n)
@@ -35,9 +36,9 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
     }
 
   /** Tests the pattern has line-end assertion `$` at its end position. */
-  def hasLineEndAtEnd(implicit timeout: Timeout = Timeout.NoTimeout): Boolean =
-    timeout.checkTimeout("regexp.Pattern#hasLineEndAtEnd") {
-      def loop(node: Node): Boolean = timeout.checkTimeout("regexp.Pattern#hasLineEndAtEnd:loop")(node match {
+  def hasLineEndAtEnd(implicit ctx: Context): Boolean =
+    ctx.interrupt {
+      def loop(node: Node): Boolean = ctx.interrupt(node match {
         case Disjunction(ns)       => ns.forall(loop)
         case Sequence(ns)          => ns.lastOption.exists(loop)
         case Capture(_, n)         => loop(n)
@@ -91,15 +92,15 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
   }
 
   /** Computes alphabet from this pattern. */
-  def alphabet(implicit timeout: Timeout = Timeout.NoTimeout): Try[ICharSet] =
-    timeout.checkTimeout("regexp.Pattern#alphabet") {
+  def alphabet(implicit ctx: Context): Try[ICharSet] =
+    ctx.interrupt {
       val FlagSet(_, ignoreCase, _, dotAll, unicode, _) = flagSet
       val set = ICharSet
         .any(ignoreCase, unicode)
         .pipe(set => if (needsLineTerminatorDistinction) set.add(IChar.LineTerminator.withLineTerminator) else set)
         .pipe(set => if (needsWordDistinction) set.add(IChar.Word.withWord) else set)
 
-      def loop(node: Node): Try[Seq[IChar]] = timeout.checkTimeout("regexp.Pattern#alphabet:loop")(node match {
+      def loop(node: Node): Try[Seq[IChar]] = ctx.interrupt(node match {
         case Disjunction(ns)       => TryUtil.traverse(ns)(loop).map(_.flatten)
         case Sequence(ns)          => TryUtil.traverse(ns)(loop).map(_.flatten)
         case Capture(_, n)         => loop(n)

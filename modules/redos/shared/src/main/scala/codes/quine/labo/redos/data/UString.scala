@@ -42,7 +42,6 @@ final case class UString(seq: IndexedSeq[UChar]) extends AnyVal {
   /** Gets back to usual string. */
   def asString: String = seq.iterator.map(_.asString).mkString
 
-  /** Shows this string as human readable format. */
   override def toString: String =
     seq
       .map {
@@ -60,7 +59,7 @@ object UString {
     if (unicode) {
       val seq = IndexedSeq.newBuilder[UChar]
       var i = 0
-      while (i < s.size) {
+      while (i < s.length) {
         val code = s.codePointAt(i)
         i += Character.charCount(code)
         seq.addOne(UChar(code))
@@ -71,7 +70,7 @@ object UString {
   /** An empty string. */
   def empty: UString = UString(IndexedSeq.empty)
 
-  /** Canonicalizes the string. */
+  /** Makes the string canonical. */
   def canonicalize(s: UString, unicode: Boolean): UString =
     UString(s.seq.map(UChar.canonicalize(_, unicode)))
 }

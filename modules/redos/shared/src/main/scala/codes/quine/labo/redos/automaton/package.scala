@@ -6,9 +6,9 @@ package codes.quine.labo.redos
   *
   *   - [[DFA]]
   *   - ε-NFA ([[EpsNFA]]) and a compiler from the RegExp pattern to ε-NFA ([[EpsNFACompiler]])
-  *   - [[NFA]] and its variants ([[OrderedNFA]], [[MultiNFA]])
+  *   - [[NFA]] and its variants ([[OrderedNFA]], [[NFAwLA]])
   *
-  * On top of them, [[AutomatonChecker]] is automaton theroy ReDoS checker implementation, and
+  * On top of them, [[AutomatonChecker]] is automaton theory ReDoS checker implementation, and
   *
   *   - [[Complexity]] is a checker's result type, in which checker
   *     reports vulnerability of the pattern as matching time complexity.

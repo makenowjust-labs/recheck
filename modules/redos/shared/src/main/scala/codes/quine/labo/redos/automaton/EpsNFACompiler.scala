@@ -6,22 +6,22 @@ import scala.util.Success
 import scala.util.Try
 
 import EpsNFA._
+import common.Context
+import common.InvalidRegExpException
+import common.UnsupportedException
 import data.IChar
 import regexp.Pattern
 import regexp.Pattern._
-import util.Timeout
 import util.TryUtil
 
 /** ECMA-262 RegExp to ε-NFA Compiler. */
 object EpsNFACompiler {
 
   /** Compiles ECMA-262 RegExp into ε-NFA. */
-  def compile(pattern: Pattern)(implicit timeout: Timeout = Timeout.NoTimeout): Try[EpsNFA[Int]] =
-    timeout.checkTimeout("automaton.EpsNFACompiler.compile")(for {
+  def compile(pattern: Pattern)(implicit ctx: Context): Try[EpsNFA[Int]] =
+    ctx.interrupt(for {
       alphabet <- pattern.alphabet
       (stateSet, init, accept, tau) <- {
-        import timeout._
-
         val FlagSet(_, ignoreCase, _, dotAll, unicode, _) = pattern.flagSet
 
         // Mutable states.
@@ -39,7 +39,7 @@ object EpsNFACompiler {
         }
         val tau = Map.newBuilder[Int, Transition[Int]] // A transition function.
 
-        def loop(node: Node): Try[(Int, Int)] = checkTimeout("automaton.EpsNFACompiler.compile:loop")(node match {
+        def loop(node: Node): Try[(Int, Int)] = ctx.interrupt(node match {
           case Disjunction(ns) =>
             TryUtil.traverse(ns)(loop).map { ss =>
               val i = nextQ()

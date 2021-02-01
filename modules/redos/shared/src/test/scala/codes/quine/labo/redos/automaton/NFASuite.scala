@@ -1,6 +1,13 @@
-package codes.quine.labo.redos.automaton
+package codes.quine.labo.redos
+package automaton
+
+import common.Context
 
 class NFASuite extends munit.FunSuite {
+
+  /** A default context. */
+  implicit def ctx: Context = Context()
+
   test("NFA#toGraphviz") {
     val nfa = NFA(
       Set('a', 'b'),

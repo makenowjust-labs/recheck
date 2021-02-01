@@ -1,5 +1,3 @@
-import java.nio.file.Path
-
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
 ThisBuild / organization := "codes.quine.labo"
@@ -59,10 +57,13 @@ lazy val redos = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labo.redos._
       |import codes.quine.labo.redos.automaton._
       |import codes.quine.labo.redos.backtrack._
+      |import codes.quine.labo.redos.common._
       |import codes.quine.labo.redos.data._
       |import codes.quine.labo.redos.fuzz._
       |import codes.quine.labo.redos.regexp._
       |import codes.quine.labo.redos.util._
+      |
+      |implicit def ctx: Context = Context()
       |
       |def time[A](body: => A): A = {
       |  val start = System.nanoTime()
@@ -82,6 +83,7 @@ lazy val redos = crossProject(JVMPlatform, JSPlatform)
       .toMap,
     // Dependencies:
     libraryDependencies += "com.lihaoyi" %%% "fastparse" % "2.3.1",
+    libraryDependencies += "com.lihaoyi" %%% "sourcecode" % "0.2.3",
     // Generators:
     {
       val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")

@@ -3,11 +3,12 @@ package automaton
 
 import scala.collection.mutable
 
+import common.Context
+import common.UnsupportedException
 import data.MultiSet
-import util.Timeout
 import util.GraphvizUtil.escape
 
-/** OrderedNFA is a NFA, but its transitions are priorized in the order. */
+/** OrderedNFA is a NFA, but its transitions has a priority in the order. */
 final case class OrderedNFA[A, Q](
     alphabet: Set[A],
     stateSet: Set[Q],
@@ -42,40 +43,37 @@ final case class OrderedNFA[A, Q](
     *
     * This method loses priorities, so the result type is usual [[NFA]].
     */
-  def reverse(implicit timeout: Timeout = Timeout.NoTimeout): NFA[A, Q] =
-    timeout.checkTimeout("automaton.OrderedNFA#reverse") {
+  def reverse(implicit ctx: Context): NFA[A, Q] =
+    ctx.interrupt {
       val reverseDelta = mutable.Map.empty[(Q, A), Set[Q]].withDefaultValue(Set.empty)
-      for ((q1, a) -> qs <- delta; q2 <- qs) timeout.checkTimeout("automaton.OrderedNFA#reverse:loop") {
+      for ((q1, a) -> qs <- delta; q2 <- qs) ctx.interrupt {
         reverseDelta((q2, a)) = reverseDelta((q2, a)) | Set(q1)
       }
       NFA(alphabet, stateSet, acceptSet, inits.toSet, reverseDelta.toMap)
     }
 
   /** Converts this into [[NFAwLA]]. */
-  def toNFAwLA(maxNFASize: Int = Int.MaxValue)(implicit timeout: Timeout = Timeout.NoTimeout): NFAwLA[A, Q] =
-    timeout.checkTimeout("automaton.OrderedNFA.prune") {
+  def toNFAwLA(implicit ctx: Context): NFAwLA[A, Q] = toNFAwLA(Int.MaxValue)
+
+  /** Converts this into [[NFAwLA]]. */
+  def toNFAwLA(maxNFASize: Int)(implicit ctx: Context): NFAwLA[A, Q] =
+    ctx.interrupt {
       val reverseDFA = reverse.toDFA
-      val reverseDelta = timeout.checkTimeout("automaton.OrderedNFA.prune:reverseDelta") {
+      val reverseDelta = ctx.interrupt {
         reverseDFA.delta
-          .groupMap(_._1._2) { case (p2, _) -> p1 =>
-            timeout.checkTimeout("automaton.OrderedNFA.prune:reverseDelta:loop")((p1, p2))
-          }
+          .groupMap(_._1._2) { case (p2, _) -> p1 => ctx.interrupt((p1, p2)) }
           .withDefaultValue(Vector.empty)
       }
 
       val newAlphabet = Set.newBuilder[(A, Set[Q])]
       val newStateSet = Set.newBuilder[(Q, Set[Q])]
-      val newInits = timeout.checkTimeout("automaton.OrderedNFA.prune:newInits") {
-        MultiSet.from(for (q <- inits; p <- reverseDFA.stateSet) yield (q, p))
-      }
-      val newAcceptSet = timeout.checkTimeout("automaton.OrderedNFA.prune:newAcceptSet") {
-        for (q <- acceptSet) yield (q, reverseDFA.init)
-      }
+      val newInits = ctx.interrupt(MultiSet.from(for (q <- inits; p <- reverseDFA.stateSet) yield (q, p)))
+      val newAcceptSet = ctx.interrupt(for (q <- acceptSet) yield (q, reverseDFA.init))
 
       val newDelta =
         mutable.Map.empty[((Q, Set[Q]), (A, Set[Q])), MultiSet[(Q, Set[Q])]].withDefaultValue(MultiSet.empty)
       var deltaSize = 0
-      for ((q1, a) -> qs <- delta) timeout.checkTimeout("automaton.OrderedNFA.prune:loop") {
+      for ((q1, a) -> qs <- delta) ctx.interrupt {
         for ((p1, p2) <- reverseDelta(a)) {
           // There is a transition `q1 --(a)-> qs` in ordered NFA, and
           // there is a transition `p1 <-(a)-- p2` in reversed DFA.

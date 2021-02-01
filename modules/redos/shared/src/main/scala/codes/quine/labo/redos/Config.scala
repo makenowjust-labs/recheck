@@ -2,22 +2,20 @@ package codes.quine.labo.redos
 
 import scala.util.Random
 
-import util.Timeout
+import common.Checker
+import common.Context
 
 /** Config is a ReDoS checker configuration. */
 final case class Config(
     // General:
-    // A timeout in a check.
-    timeout: Timeout = Timeout.NoTimeout,
+    // An execution context in this analysis.
+    context: Context = Context(),
     // A checker to use.
     checker: Checker = Checker.Hybrid,
     // A maximum size of an attack string.
     maxAttackSize: Int = Config.MaxAttackSize,
     // A limit of VM execution steps on attack string construction.
     attackLimit: Int = Config.AttackLimit,
-    // Automaton:
-    // A ratio of a VM step and a NFA transition.
-    stepRate: Double = Config.StepRate,
     // Fuzz:
     // A random instance for fuzzing.
     random: Random = Random,
@@ -50,25 +48,22 @@ final case class Config(
 ) {
 
   /** Provides a timeout instance as an implicit parameter. */
-  implicit def configTimeout: Timeout = timeout
+  implicit def ctx: Context = context
 }
 
 object Config {
 
   /** The default value of [[Config#maxAttackSize]]. */
-  val MaxAttackSize = 10_000
+  val MaxAttackSize = 4_000
 
   /** The default value of [[Config#AttackLimit]]. */
-  val AttackLimit = 1_000_000
-
-  /** The default value of [[Config#stepRate]]. */
-  val StepRate = 1.5
+  val AttackLimit = 100_000
 
   /** The default value of [[Config#seedLimit]]. */
-  val SeedLimit = 10_000
+  val SeedLimit = 1_000
 
   /** The default value of [[Config#populationLimit]]. */
-  val PopulationLimit = 100_000
+  val PopulationLimit = 10_000
 
   /** The default value of [[Config#crossSize]]. */
   val CrossSize = 25

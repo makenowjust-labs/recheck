@@ -4,7 +4,7 @@ package data
 import scala.annotation.tailrec
 import scala.collection.mutable
 
-import util.Timeout
+import common.Context
 
 /** Graph utilities. */
 object Graph {
@@ -25,7 +25,7 @@ final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]) {
   def vertices: Set[V] = neighbors.keySet | neighbors.values.flatMap(_.map(_._2)).toSet
 
   /** Computes a reversed graph of this graph. */
-  def reverse(implicit timeout: Timeout = Timeout.NoTimeout): Graph[V, L] = timeout.checkTimeout("data.Graph#reverse") {
+  def reverse(implicit ctx: Context): Graph[V, L] = ctx.interrupt {
     Graph.from(edges.map { case (v1, l, v2) => (v2, l, v1) })
   }
 
@@ -33,7 +33,7 @@ final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]) {
     *
     * This method uses [[https://en.wikipedia.org/wiki/Tarjan's_strongly_connected_components_algorithm Tarjan's algorithm]].
     */
-  def scc(implicit timeout: Timeout = Timeout.NoTimeout): Seq[IndexedSeq[V]] = timeout.checkTimeout("data.Graph#scc") {
+  def scc(implicit ctx: Context): Seq[IndexedSeq[V]] = ctx.interrupt {
     var clock = 0
     val visited = mutable.Map.empty[V, Int]
     val lowlinks = mutable.Map.empty[V, Int]
@@ -46,7 +46,7 @@ final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]) {
     @tailrec
     def dfs(cont: Seq[(V, Boolean, Int)]): Unit = cont match {
       case (v1, update, i) +: rest =>
-        dfs(timeout.checkTimeout("data.Graph#scc:dfs") {
+        dfs(ctx.interrupt {
           val neighbor = neighbors.getOrElse(v1, Vector.empty)
           if (i == 0) {
             visited(v1) = clock
@@ -110,12 +110,12 @@ final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]) {
       }
     }
 
-    return None
+    None
   }
 
   /** Computes a new graph collects vertices and edges can be reachable from the init vertices. */
-  def reachable(init: Set[V])(implicit timeout: Timeout = Timeout.NoTimeout): Graph[V, L] =
-    timeout.checkTimeout("data.Graph#reachable") {
+  def reachable(init: Set[V])(implicit ctx: Context): Graph[V, L] =
+    ctx.interrupt {
       val queue = mutable.Queue.empty[V]
       val reachable = mutable.Set.empty[V]
       val newEdges = Map.newBuilder[V, IndexedSeq[(L, V)]]
@@ -123,7 +123,7 @@ final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]) {
       queue.enqueueAll(init)
       reachable.addAll(init)
 
-      while (queue.nonEmpty) timeout.checkTimeout("data.Graph#reachable:loop") {
+      while (queue.nonEmpty) ctx.interrupt {
         val v1 = queue.dequeue()
         val es = neighbors(v1)
         val vs = es.map(_._2)
@@ -139,13 +139,13 @@ final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]) {
     *
     * Note that it causes a stack overflow when this graph has a cycle.
     */
-  def reachableMap(implicit timeout: Timeout = Timeout.NoTimeout): Map[V, Set[V]] =
-    timeout.checkTimeout("data.Graph#reachableMap") {
+  def reachableMap(implicit ctx: Context): Map[V, Set[V]] =
+    ctx.interrupt {
       val map = mutable.Map.empty[V, Set[V]]
-      def dfs(v1: V): Set[V] = timeout.checkTimeout("data.Graph#reachableMap:dfs") {
+      def dfs(v1: V): Set[V] = ctx.interrupt {
         map.getOrElseUpdate(v1, Set(v1) ++ neighbors(v1).flatMap { case (_, v) => dfs(v) }.toSet)
       }
-      vertices.foreach(timeout.checkTimeout("data.Graph#reachableMap:loop")(dfs(_)))
+      vertices.foreach(dfs)
       map.toMap
     }
 }

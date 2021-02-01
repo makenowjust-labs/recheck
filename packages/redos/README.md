@@ -79,22 +79,16 @@ and it needs to know the checkers in depth to set the correct value.
 
 #### `maxAttackSize`
 
-An integer value of a maximum length of an attack string. (default: `10_000`)
+An integer value of a maximum length of an attack string. (default: `4_000`)
 
 The checker finds a vulnerable string not to exceed this length.
 
 #### `attackLimit`
 
-An integer value of a limit of VM execution steps. (default: `1_000_000`)
+An integer value of a limit of VM execution steps. (default: `100_000`)
 
 The checker assumes the RegExp is vulnerable when a string exists
 against which steps exceed the limit.
-
-#### `stepRate`
-
-A floating-point number value which represents a ratio of a character to VM execution steps. (default: `1.5`)
-
-It is used to build an attack string from the complexity witness.
 
 #### `randomSeed`
 
@@ -104,11 +98,11 @@ When `undefined` is specified, it uses a system default seed.
 
 #### `seedLimit`
 
-An integer value of a limit of VM execution steps on the seeding phase. (default: `10_000`)
+An integer value of a limit of VM execution steps on the seeding phase. (default: `1_000`)
 
 #### `populationLimit`
 
-An integer value of a limit of VM execution steps on the incubation phase. (default: `100_000`)
+An integer value of a limit of VM execution steps on the incubation phase. (default: `10_000`)
 
 #### `crossSize`
 

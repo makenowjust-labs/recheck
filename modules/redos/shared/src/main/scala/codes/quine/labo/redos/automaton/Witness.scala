@@ -1,7 +1,12 @@
 package codes.quine.labo.redos
 package automaton
 
-/** Witness is a witness, which is a pump string with suffix.
+import data.UChar
+import data.UString
+import diagnostics.AttackPattern
+
+/** Witness is a witness to the ReDoS attack, which is a pump string
+  * with a suffix.
   *
   * For example, when a witness object forms `Witness(Seq((x, y), (z, w)), u)`,
   * an actual witness string is `x y^n z w^n u` for any integer `n`.
@@ -15,6 +20,15 @@ final case class Witness[A](pumps: Seq[(Seq[A], Seq[A])], suffix: Seq[A]) {
   /** Builds an attack string with `n` times repetition. */
   def buildAttack(n: Int): Seq[A] =
     pumps.flatMap { case (pre, pump) => pre ++ Vector.fill(n)(pump).flatten } ++ suffix
+
+  /** Builds an attack pattern string with `n` times repetition. */
+  def buildAttackPattern(n: Int)(implicit ev: A =:= UChar): AttackPattern = {
+    val pumps = this.pumps.map { case (s, t) =>
+      (UString(s.map(ev).toIndexedSeq), UString(t.map(ev).toIndexedSeq), 0)
+    }
+    val suffix = UString(this.suffix.map(ev).toIndexedSeq)
+    AttackPattern(pumps, suffix, n)
+  }
 
   /** A sum of a repeat part size. */
   def repeatSize: Int = pumps.map(_._2.size).sum

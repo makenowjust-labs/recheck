@@ -2,77 +2,103 @@ package codes.quine.labo.redos
 
 import scalajs.js
 import scalajs.js.JSON
-import automaton.Complexity
-import automaton.Witness
-import data.UChar
+import common.Checker
+import diagnostics.AttackComplexity
+import diagnostics.AttackPattern
+import diagnostics.Diagnostics
 import data.UString
 
 class WrappersSuite extends munit.FunSuite {
   test("DiagnosticsJS.from") {
     assertEquals(
-      JSON.stringify(DiagnosticsJS.from(Diagnostics.Safe(Some(Complexity.Linear), None))),
-      JSON.stringify(js.Dynamic.literal(status = "safe", used = (), complexity = js.Dynamic.literal(`type` = "linear")))
+      JSON.stringify(DiagnosticsJS.from(Diagnostics.Safe(AttackComplexity.Linear, Checker.Automaton))),
+      JSON.stringify(
+        js.Dynamic.literal(
+          status = "safe",
+          checker = "automaton",
+          complexity = js.Dynamic.literal(`type` = "linear", isFuzz = false)
+        )
+      )
     )
     assertEquals(
-      JSON.stringify(DiagnosticsJS.from(Diagnostics.Safe(None, None))),
-      JSON.stringify(js.Dynamic.literal(status = "safe", used = (), complexity = ()))
+      JSON.stringify(DiagnosticsJS.from(Diagnostics.Safe(AttackComplexity.Safe(true), Checker.Fuzz))),
+      JSON.stringify(
+        js.Dynamic
+          .literal(status = "safe", checker = "fuzz", complexity = js.Dynamic.literal(`type` = "safe", isFuzz = true))
+      )
     )
 
-    val w = Witness(Seq((Seq(UChar('a')), Seq(UChar('b')))), Seq(UChar('c')))
-    val j = js.Dynamic.literal(pumps = js.Array(js.Dynamic.literal(prefix = "a", pump = "b")), suffix = "c")
+    val attack =
+      AttackPattern(Seq((UString.from("a", false), UString.from("b", false), 1)), UString.from("c", false), 2)
+    val attackJS = js.Dynamic.literal(
+      pumps = js.Array(js.Dynamic.literal(prefix = "a", pump = "b", bias = 1)),
+      suffix = "c",
+      base = 2,
+      string = "abbbc"
+    )
     assertEquals(
       JSON.stringify(
-        DiagnosticsJS.from(Diagnostics.Vulnerable(UString.from("a", false), Some(Complexity.Exponential(w)), None))
+        DiagnosticsJS.from(Diagnostics.Vulnerable(AttackComplexity.Exponential(false), attack, Checker.Automaton))
       ),
       JSON.stringify(
         js.Dynamic.literal(
           status = "vulnerable",
-          used = (),
-          attack = "a",
-          complexity = js.Dynamic.literal(`type` = "exponential", witness = j)
+          checker = "automaton",
+          attack = attackJS,
+          complexity = js.Dynamic.literal(`type` = "exponential", isFuzz = false)
         )
       )
     )
 
     assertEquals(
       JSON.stringify(DiagnosticsJS.from(Diagnostics.Unknown(Diagnostics.ErrorKind.Timeout, None))),
-      JSON.stringify(js.Dynamic.literal(status = "unknown", used = (), error = js.Dynamic.literal(kind = "timeout")))
+      JSON.stringify(js.Dynamic.literal(status = "unknown", checker = (), error = js.Dynamic.literal(kind = "timeout")))
     )
   }
 
-  test("ComplexityJS.from") {
+  test("AttackComplexityJS.from") {
     assertEquals(
-      JSON.stringify(ComplexityJS.from(Complexity.Constant)),
-      JSON.stringify(js.Dynamic.literal(`type` = "constant"))
+      JSON.stringify(AttackComplexityJS.from(AttackComplexity.Constant)),
+      JSON.stringify(js.Dynamic.literal(`type` = "constant", isFuzz = false))
     )
     assertEquals(
-      JSON.stringify(ComplexityJS.from(Complexity.Linear)),
-      JSON.stringify(js.Dynamic.literal(`type` = "linear"))
-    )
-
-    val w = Witness(Seq((Seq(UChar('a')), Seq(UChar('b')))), Seq(UChar('c')))
-    val j = js.Dynamic.literal(pumps = js.Array(js.Dynamic.literal(prefix = "a", pump = "b")), suffix = "c")
-    assertEquals(
-      JSON.stringify(ComplexityJS.from(Complexity.Exponential(w))),
-      JSON.stringify(js.Dynamic.literal(`type` = "exponential", witness = j))
+      JSON.stringify(AttackComplexityJS.from(AttackComplexity.Linear)),
+      JSON.stringify(js.Dynamic.literal(`type` = "linear", isFuzz = false))
     )
     assertEquals(
-      JSON.stringify(ComplexityJS.from(Complexity.Polynomial(2, w))),
-      JSON.stringify(js.Dynamic.literal(`type` = "polynomial", degree = 2, witness = j))
+      JSON.stringify(AttackComplexityJS.from(AttackComplexity.Safe(true))),
+      JSON.stringify(js.Dynamic.literal(`type` = "safe", isFuzz = true))
+    )
+    assertEquals(
+      JSON.stringify(AttackComplexityJS.from(AttackComplexity.Exponential(false))),
+      JSON.stringify(js.Dynamic.literal(`type` = "exponential", isFuzz = false))
+    )
+    assertEquals(
+      JSON.stringify(AttackComplexityJS.from(AttackComplexity.Polynomial(2, false))),
+      JSON.stringify(js.Dynamic.literal(`type` = "polynomial", degree = 2, isFuzz = false))
     )
   }
 
-  test("WitnessJS.from") {
+  test("AttackPatternJS.from") {
+    val attack =
+      AttackPattern(Seq((UString.from("a", false), UString.from("b", false), 1)), UString.from("c", false), 2)
     assertEquals(
-      JSON.stringify(WitnessJS.from(Witness(Seq((Seq(UChar('a')), Seq(UChar('b')))), Seq(UChar('c'))))),
-      JSON.stringify(js.Dynamic.literal(pumps = js.Array(js.Dynamic.literal(prefix = "a", pump = "b")), suffix = "c"))
+      JSON.stringify(AttackPatternJS.from(attack)),
+      JSON.stringify(
+        js.Dynamic.literal(
+          pumps = js.Array(js.Dynamic.literal(prefix = "a", pump = "b", bias = 1)),
+          suffix = "c",
+          base = 2,
+          string = "abbbc"
+        )
+      )
     )
   }
 
   test("PumpJS.from") {
     assertEquals(
-      JSON.stringify(PumpJS.from((Seq(UChar('a')), Seq(UChar('a'))))),
-      JSON.stringify(js.Dynamic.literal(prefix = "a", pump = "a"))
+      JSON.stringify(PumpJS.from((UString.from("a", false), UString.from("b", false), 1))),
+      JSON.stringify(js.Dynamic.literal(prefix = "a", pump = "b", bias = 1))
     )
   }
 
@@ -92,7 +118,9 @@ class WrappersSuite extends munit.FunSuite {
   }
 
   test("ConfigJS.from") {
-    assertEquals(ConfigJS.from(js.Dynamic.literal().asInstanceOf[ConfigJS]), Config())
+    val config = Config()
+    // Replaces `context` with config's one because it is reference and it has an issue on equality.
+    assertEquals(ConfigJS.from(js.Dynamic.literal().asInstanceOf[ConfigJS]).copy(context = config.context), config)
 
     assertEquals(ConfigJS.from(js.Dynamic.literal(checker = "hybrid").asInstanceOf[ConfigJS]).checker, Checker.Hybrid)
     assertEquals(

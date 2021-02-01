@@ -16,5 +16,5 @@ package object data {
   type UChar = unicode.UChar
 
   /** An alias to unicode.UChar. */
-  val UChar = unicode.UChar
+  val UChar: unicode.UChar.type = unicode.UChar
 }

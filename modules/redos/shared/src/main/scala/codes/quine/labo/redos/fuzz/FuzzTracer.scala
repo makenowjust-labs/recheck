@@ -6,11 +6,9 @@ import scala.collection.mutable
 import backtrack.IR
 import backtrack.Tracer.LimitTracer
 import data.UString
-import util.Timeout
 
 /** FuzzTracer is a tracer implementation for fuzzing. */
-private[fuzz] class FuzzTracer(val ir: IR, val input: UString, limit: Int, timeout: Timeout)
-    extends LimitTracer(limit, timeout) {
+private[fuzz] class FuzzTracer(ir: IR, val input: UString, limit: Int) extends LimitTracer(ir, limit) {
 
   /** A mutable set of [[coverage]]. */
   private[this] val coverageSet: mutable.Set[(Int, Seq[Int], Boolean)] = mutable.Set.empty
@@ -25,7 +23,7 @@ private[fuzz] class FuzzTracer(val ir: IR, val input: UString, limit: Int, timeo
   def coverage(): Set[(Int, Seq[Int], Boolean)] = coverageSet.toSet
 
   /** A ratio of the input size to steps number. */
-  def rate(): Double = if (input.size == 0) 0 else steps.toDouble / input.size.toDouble
+  def rate(): Double = if (input.size == 0) 0 else steps().toDouble / input.size.toDouble
 
   /** Builds a [[FString]] instance from the input string and traced information. */
   def buildFString(): FString = {
