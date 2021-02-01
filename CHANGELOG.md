@@ -1,3 +1,9 @@
+# 2.0.1 (2021-02-01)
+
+Fixes:
+
+- Upload JavaScript file correctly
+
 # 2.0.0 (2021-02-01)
 
 Changes:
