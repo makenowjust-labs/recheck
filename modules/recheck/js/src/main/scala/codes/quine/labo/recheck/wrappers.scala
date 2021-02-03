@@ -105,8 +105,8 @@ object AttackComplexityJS {
       js.Dynamic
         .literal(
           `type` = "polynomial",
-          summary = c.toString,
           degree = d,
+          summary = c.toString,
           isFuzz = fuzz
         )
         .asInstanceOf[AttackComplexityJS]
