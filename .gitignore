@@ -35,5 +35,4 @@ site/content/*.md
 site/public/
 site/resources/
 site/static/js/*
-packages/recheck/*-opt.js
-packages/recheck/*-opt.js.map
+packages/recheck/recheck*

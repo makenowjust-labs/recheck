@@ -112,7 +112,8 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
   )
   .jsSettings(
     coverageEnabled := false,
-    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
+    Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
 
 lazy val recheckJVM = recheck.jvm
