@@ -1,3 +1,10 @@
+# 2.0.2 (2021-02-04)
+
+Fixes:
+
+- Update the web site
+- Add ES module build to JS package
+
 # 2.0.1 (2021-02-01)
 
 Fixes:
