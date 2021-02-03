@@ -1,3 +1,8 @@
+{{ $workerJS := resources.Get "js/worker.js" | js.Build "worker.js" | minify | fingerprint }}
+{{ $opts := dict "targetPath" "main.js" "params" (dict "workerJS" $workerJS.Permalink) }}
+{{ $mainJS := resources.Get "js/main.js" | js.Build $opts | minify | fingerprint }}
+<script src="{{ $mainJS.Permalink }}"></script>
+
 <header class="hero is-medium is-dark is-bold">
   <div class="hero-body">
     <div class="container">
@@ -126,8 +131,3 @@
     </div>
   </div>
 </header>
-
-{{ $workerJS := resources.Get "js/worker.js" | js.Build "worker.js" | minify | fingerprint }}
-{{ $opts := dict "targetPath" "main.js" "params" (dict "workerJS" $workerJS.Permalink) }}
-{{ $mainJS := resources.Get "js/main.js" | js.Build $opts | minify | fingerprint }}
-<script src="{{ $mainJS.Permalink }}"></script>
