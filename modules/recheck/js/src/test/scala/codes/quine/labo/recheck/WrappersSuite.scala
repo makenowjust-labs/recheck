@@ -25,7 +25,11 @@ class WrappersSuite extends munit.FunSuite {
       JSON.stringify(DiagnosticsJS.from(Diagnostics.Safe(AttackComplexity.Safe(true), Checker.Fuzz))),
       JSON.stringify(
         js.Dynamic
-          .literal(status = "safe", checker = "fuzz", complexity = js.Dynamic.literal(`type` = "safe", summary = "safe (fuzz)", isFuzz = true))
+          .literal(
+            status = "safe",
+            checker = "fuzz",
+            complexity = js.Dynamic.literal(`type` = "safe", summary = "safe (fuzz)", isFuzz = true)
+          )
       )
     )
 
@@ -36,7 +40,7 @@ class WrappersSuite extends munit.FunSuite {
       suffix = "c",
       base = 2,
       string = "abbbc",
-      pattern = "'a' 'b'³ 'c'",
+      pattern = "'a' 'b'³ 'c'"
     )
     assertEquals(
       JSON.stringify(
@@ -77,7 +81,9 @@ class WrappersSuite extends munit.FunSuite {
     )
     assertEquals(
       JSON.stringify(AttackComplexityJS.from(AttackComplexity.Polynomial(2, false))),
-      JSON.stringify(js.Dynamic.literal(`type` = "polynomial", degree = 2, summary = "2nd degree polynomial", isFuzz = false))
+      JSON.stringify(
+        js.Dynamic.literal(`type` = "polynomial", degree = 2, summary = "2nd degree polynomial", isFuzz = false)
+      )
     )
   }
 
@@ -92,7 +98,7 @@ class WrappersSuite extends munit.FunSuite {
           suffix = "c",
           base = 2,
           string = "abbbc",
-          pattern = "'a' 'b'³ 'c'",
+          pattern = "'a' 'b'³ 'c'"
         )
       )
     )
