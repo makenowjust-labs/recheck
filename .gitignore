@@ -36,3 +36,4 @@ site/public/
 site/resources/
 site/static/js/*
 packages/recheck/recheck*
+site/assets/js/lib/*

@@ -9,26 +9,117 @@
             <a class="button is-link" href="https://github.com/{{ .Site.Params.github }}"><span class="icon is-small"><i class="fab fa-github"></i></span><span>GitHub</span></a>
           </div>
         </div>
-        <div class="column is-half">
+        <div class="column is-half" x-data="checker()">
           <div class="box">
             <div class="field is-horizontal">
               <div class="field-label is-normal">
-                <label class="label" for="regexp">RegExp</label>
+                <label class="label" for="input">RegExp</label>
               </div>
               <div class="field-body">
                 <div class="field">
                   <p class="control">
-                    <textarea id="regexp" class="textarea is-family-monospace" placeholder="/^(a|a)*$/" rows="2">/^(a|a)*$/</textarea>
+                    <textarea 
+                      id="input"
+                      class="textarea is-family-monospace"
+                      placeholder="/^(a|a)*$/"
+                      rows="2"
+                      :disabled="state === 'checking'"
+                      x-model="input"
+                    ></textarea>
                   </p>
                 </div>
               </div>
             </div>
             <div class="field has-text-right">
-              <button id="check" class="button">Check</button>
+              <button
+                class="button is-light"
+                @click="cancel()"
+                x-show="state === 'checking'"
+              >Cancel</button>
+              <button
+                :class="{ 'button': true, 'is-loading': state === 'checking' }"
+                @click="check()"
+              >Check</button>
             </div>
-            <div class="box is-shadowless" style="border: dashed #787878 0.25em;">
-              <div id="result" class="content"><p>A result is shown here.</p></div>
-            </div>
+            <template x-if="state === 'checked'">
+              <div class="box is-shadowless">
+                <div class="columns">
+                  <div class="column is-one-quarters"><span class="has-text-weight-bold">Input</span></div>
+                  <div class="column is-three-quarters">
+                    <div class="content"><pre class="p-0" x-text="checkedInput"></pre></div>
+                  </div>
+                </div>
+                <div class="columns">
+                  <div class="column is-one-quarters"><span class="has-text-weight-bold">Time</span></div>
+                  <div class="column is-three-quarters" x-text="`${checkedTime / 1000} s`"></div>
+                </div>
+                <div class="columns">
+                  <div class="column is-one-quarters"><span class="has-text-weight-bold">Status</span></div>
+                  <div class="column is-three-quarters">
+                      <span 
+                        :class="{
+                          'tag': true,
+                          'is-danger': checkedResult.status === 'vulnerable',
+                          'is-success': checkedResult.status === 'safe',
+                          'is-warning': checkedResult.status === 'unknown',
+                        }"
+                        x-text="checkedResult.status"
+                      ></span>
+                  </div>
+                </div>
+                <template x-if="checkedResult.status !== 'unknown'">
+                  <div class="columns">
+                    <div class="column is-one-quarters"><span class="has-text-weight-bold">Complexity</span></div>
+                    <div class="column is-three-quarters">
+                      <span
+                        :class="{
+                          'tag': true,
+                          'is-danger': checkedResult.complexity.type === 'exponential',
+                          'is-warning': checkedResult.complexity.type === 'polynomial',
+                          'is-success': checkedResult.status === 'safe',
+                        }"
+                        x-text="checkedResult.complexity.summary"
+                      ></span>
+                    </div>
+                  </div>
+                </template>
+                <template x-if="checkedResult.status === 'vulnerable'">
+                  <div class="columns">
+                    <div class="column is-one-quarters"><span class="has-text-weight-bold">Attack string</span></div>
+                    <div class="column is-three-quarters">
+                      <div class="content"><pre class="p-0" x-text="checkedResult.attack.pattern"></pre></div>
+                    </div>
+                  </div>  
+                </template>
+                <template x-if="checkedResult.status === 'unknown'">
+                  <div class="columns">
+                    <div class="column is-one-quarters"><span class="has-text-weight-bold">Error</span></div>
+                    <div class="column is-three-quarters">
+                      <span
+                        :class="{
+                          'tag': true,
+                          'is-danger': checkedResult.error.kind !== 'timeout',
+                          'is-warning': checkedResult.error.kind === 'timeout',
+                        }"
+                        x-text="checkedResult.error.kind"
+                      ></span>
+                      <span
+                        x-text="`(${checkedResult.error.message})`"
+                        x-show="checkedResult.error.kind !== 'timeout'"
+                      ></span>
+                    </div>
+                  </div>
+                </template>
+                <template x-if="checkedResult.checker">
+                  <div class="columns">
+                    <div class="column is-one-quarters"><span class="has-text-weight-bold">Checker</span></div>
+                    <div class="column is-three-quarters">
+                      <span class="tag is-primary" x-text="checkedResult.checker"></span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -36,4 +127,7 @@
   </div>
 </header>
 
-<script src="js/demo-{{ if .Site.IsServer }}fastopt{{ else }}opt{{ end }}.js"></script>
+{{ $workerJS := resources.Get "js/worker.js" | js.Build "worker.js" | minify | fingerprint }}
+{{ $opts := dict "targetPath" "main.js" "params" (dict "workerJS" $workerJS.Permalink) }}
+{{ $mainJS := resources.Get "js/main.js" | js.Build $opts | minify | fingerprint }}
+<script src="{{ $mainJS.Permalink }}"></script>
