@@ -1,4 +1,4 @@
-baseURL = "http://makenowjust-labo.github.io/recheck/"
+baseURL = "https://makenowjust-labo.github.io/recheck/"
 languageCode = "en-us"
 title = "recheck | MakeNowJust-Labo"
 copyright = "2020-2021 (C) TSUYUSATO \"MakeNowJust\" Kitsune"
