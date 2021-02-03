@@ -30,9 +30,10 @@ console.log(check("^(a|a)*$", ""));
 //     pumps: [ { prefix: 'a', pump: 'a', bias: 0 } ],
 //     suffix: '\x00',
 //     base: 17,
-//     string: 'aaaaaaaaaaaaaaaaaa\x00'
+//     string: 'aaaaaaaaaaaaaaaaaa\x00',
+//     pattern: "'a' 'a'¹⁷ '\\x00'"
 //   },
-//   complexity: { type: 'exponential', isFuzz: false }
+//   complexity: { type: 'exponential', summary: 'exponential', isFuzz: false }
 // }
 ```
 

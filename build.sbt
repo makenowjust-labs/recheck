@@ -43,7 +43,7 @@ lazy val root = project
     mdocOut := baseDirectory.value / "site" / "content"
   )
   .enablePlugins(MdocPlugin)
-  .aggregate(recheckJVM, recheckJS, demoJS)
+  .aggregate(recheckJVM, recheckJS)
   .dependsOn(recheckJVM)
 
 lazy val recheck = crossProject(JVMPlatform, JSPlatform)
@@ -112,25 +112,9 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
   )
   .jsSettings(
     coverageEnabled := false,
-    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
+    Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
 
 lazy val recheckJVM = recheck.jvm
 lazy val recheckJS = recheck.js
-
-lazy val demoJS = project
-  .in(file("modules/demo"))
-  .enablePlugins(ScalaJSPlugin)
-  .settings(
-    publish / skip := true,
-    coverageEnabled := false,
-    name := "demo",
-    scalaJSUseMainModuleInitializer := true,
-    Compile / mainClass := Some("codes.quine.labo.recheck.demo.DemoApp"),
-    libraryDependencies += "org.scala-js" %%% "scalajs-dom" % "1.1.0",
-    // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.21" % Test,
-    testFrameworks += new TestFramework("munit.Framework"),
-    Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
-  )
-  .dependsOn(recheckJS)

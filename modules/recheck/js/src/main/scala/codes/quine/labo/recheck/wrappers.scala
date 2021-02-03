@@ -62,6 +62,9 @@ trait AttackComplexityJS extends js.Object {
   /** A type of this complexity. One of `constant`, `linear`, `exponential` and `polynomial`. */
   def `type`: String
 
+  /** A summary string of this like `"2nd degree polynomial"`. */
+  def summary: String
+
   /** When it is `true`, this complexity maybe wrong. Otherwise, this comes from a precise analysis. */
   def isFuzz: Boolean
 
@@ -75,15 +78,46 @@ object AttackComplexityJS {
   /** Constructs a AttackComplexityJS from the actual AttackComplexity. */
   def from(c: AttackComplexity): AttackComplexityJS = c match {
     case AttackComplexity.Constant =>
-      js.Dynamic.literal(`type` = "constant", isFuzz = false).asInstanceOf[AttackComplexityJS]
+      js.Dynamic
+        .literal(
+          `type` = "constant",
+          summary = c.toString,
+          isFuzz = false
+        )
+        .asInstanceOf[AttackComplexityJS]
     case AttackComplexity.Linear =>
-      js.Dynamic.literal(`type` = "linear", isFuzz = false).asInstanceOf[AttackComplexityJS]
+      js.Dynamic
+        .literal(
+          `type` = "linear",
+          summary = c.toString,
+          isFuzz = false
+        )
+        .asInstanceOf[AttackComplexityJS]
     case c: AttackComplexity.Safe =>
-      js.Dynamic.literal(`type` = "safe", isFuzz = c.isFuzz).asInstanceOf[AttackComplexityJS]
+      js.Dynamic
+        .literal(
+          `type` = "safe",
+          summary = c.toString,
+          isFuzz = c.isFuzz
+        )
+        .asInstanceOf[AttackComplexityJS]
     case AttackComplexity.Polynomial(d, fuzz) =>
-      js.Dynamic.literal(`type` = "polynomial", degree = d, isFuzz = fuzz).asInstanceOf[AttackComplexityJS]
+      js.Dynamic
+        .literal(
+          `type` = "polynomial",
+          degree = d,
+          summary = c.toString,
+          isFuzz = fuzz
+        )
+        .asInstanceOf[AttackComplexityJS]
     case AttackComplexity.Exponential(fuzz) =>
-      js.Dynamic.literal(`type` = "exponential", isFuzz = fuzz).asInstanceOf[AttackComplexityJS]
+      js.Dynamic
+        .literal(
+          `type` = "exponential",
+          summary = c.toString,
+          isFuzz = fuzz
+        )
+        .asInstanceOf[AttackComplexityJS]
   }
 }
 
@@ -99,8 +133,11 @@ trait AttackPatternJS extends js.Object {
   /** A repeat base. */
   def base: Int
 
-  /** A string representation of this. */
+  /** A string content of this. */
   def string: String
+
+  /** A string representation of this. */
+  def pattern: String
 }
 
 /** AttackPatternJS utilities. */
@@ -113,7 +150,8 @@ object AttackPatternJS {
         pumps = a.pumps.map(PumpJS.from).toJSArray,
         suffix = a.suffix.asString,
         base = a.n,
-        string = a.asUString.asString
+        string = a.asUString.asString,
+        pattern = a.toString
       )
       .asInstanceOf[AttackPatternJS]
 }

@@ -7,7 +7,7 @@ import scala.scalajs.js.annotation.JSExportTopLevel
 object ReDoSJS {
 
   /** Checks the given RegExp pattern. */
-  @JSExportTopLevel("check")
+  @JSExportTopLevel("check", "recheck")
   def check(source: String, flags: String, config: js.UndefOr[ConfigJS]): DiagnosticsJS = {
     val d = ReDoS.check(source, flags, config.map(ConfigJS.from).getOrElse(Config()))
     DiagnosticsJS.from(d)

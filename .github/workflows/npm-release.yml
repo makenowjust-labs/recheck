@@ -15,8 +15,10 @@ jobs:
 
       - name: Build
         run: |
-          sbt recheckJS/fullOptJS
-          cp modules/recheck/js/target/scala-2.13/recheck-opt.js* packages/recheck/
+          sbt recheckJS/fullLinkJS
+          cp modules/recheck/js/target/scala-2.13/recheck-opt/* packages/recheck/
+          cd packages/recheck
+          npx esbuild recheck.js --bundle --platform=node --outfile=recheck.bundle.js
 
       - uses: JS-DevTools/npm-publish@v1
         with:

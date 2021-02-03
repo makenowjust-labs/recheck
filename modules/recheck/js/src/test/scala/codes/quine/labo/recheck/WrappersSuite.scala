@@ -17,7 +17,7 @@ class WrappersSuite extends munit.FunSuite {
         js.Dynamic.literal(
           status = "safe",
           checker = "automaton",
-          complexity = js.Dynamic.literal(`type` = "linear", isFuzz = false)
+          complexity = js.Dynamic.literal(`type` = "linear", summary = "linear", isFuzz = false)
         )
       )
     )
@@ -25,7 +25,11 @@ class WrappersSuite extends munit.FunSuite {
       JSON.stringify(DiagnosticsJS.from(Diagnostics.Safe(AttackComplexity.Safe(true), Checker.Fuzz))),
       JSON.stringify(
         js.Dynamic
-          .literal(status = "safe", checker = "fuzz", complexity = js.Dynamic.literal(`type` = "safe", isFuzz = true))
+          .literal(
+            status = "safe",
+            checker = "fuzz",
+            complexity = js.Dynamic.literal(`type` = "safe", summary = "safe (fuzz)", isFuzz = true)
+          )
       )
     )
 
@@ -35,7 +39,8 @@ class WrappersSuite extends munit.FunSuite {
       pumps = js.Array(js.Dynamic.literal(prefix = "a", pump = "b", bias = 1)),
       suffix = "c",
       base = 2,
-      string = "abbbc"
+      string = "abbbc",
+      pattern = "'a' 'b'³ 'c'"
     )
     assertEquals(
       JSON.stringify(
@@ -46,7 +51,7 @@ class WrappersSuite extends munit.FunSuite {
           status = "vulnerable",
           checker = "automaton",
           attack = attackJS,
-          complexity = js.Dynamic.literal(`type` = "exponential", isFuzz = false)
+          complexity = js.Dynamic.literal(`type` = "exponential", summary = "exponential", isFuzz = false)
         )
       )
     )
@@ -60,23 +65,25 @@ class WrappersSuite extends munit.FunSuite {
   test("AttackComplexityJS.from") {
     assertEquals(
       JSON.stringify(AttackComplexityJS.from(AttackComplexity.Constant)),
-      JSON.stringify(js.Dynamic.literal(`type` = "constant", isFuzz = false))
+      JSON.stringify(js.Dynamic.literal(`type` = "constant", summary = "constant", isFuzz = false))
     )
     assertEquals(
       JSON.stringify(AttackComplexityJS.from(AttackComplexity.Linear)),
-      JSON.stringify(js.Dynamic.literal(`type` = "linear", isFuzz = false))
+      JSON.stringify(js.Dynamic.literal(`type` = "linear", summary = "linear", isFuzz = false))
     )
     assertEquals(
       JSON.stringify(AttackComplexityJS.from(AttackComplexity.Safe(true))),
-      JSON.stringify(js.Dynamic.literal(`type` = "safe", isFuzz = true))
+      JSON.stringify(js.Dynamic.literal(`type` = "safe", summary = "safe (fuzz)", isFuzz = true))
     )
     assertEquals(
       JSON.stringify(AttackComplexityJS.from(AttackComplexity.Exponential(false))),
-      JSON.stringify(js.Dynamic.literal(`type` = "exponential", isFuzz = false))
+      JSON.stringify(js.Dynamic.literal(`type` = "exponential", summary = "exponential", isFuzz = false))
     )
     assertEquals(
       JSON.stringify(AttackComplexityJS.from(AttackComplexity.Polynomial(2, false))),
-      JSON.stringify(js.Dynamic.literal(`type` = "polynomial", degree = 2, isFuzz = false))
+      JSON.stringify(
+        js.Dynamic.literal(`type` = "polynomial", degree = 2, summary = "2nd degree polynomial", isFuzz = false)
+      )
     )
   }
 
@@ -90,7 +97,8 @@ class WrappersSuite extends munit.FunSuite {
           pumps = js.Array(js.Dynamic.literal(prefix = "a", pump = "b", bias = 1)),
           suffix = "c",
           base = 2,
-          string = "abbbc"
+          string = "abbbc",
+          pattern = "'a' 'b'³ 'c'"
         )
       )
     )
