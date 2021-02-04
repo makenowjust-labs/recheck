@@ -77,7 +77,7 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
     // Add inline options:
     Compile / scalacOptions ++= Seq(
       "-opt:l:inline",
-      "-opt-inline-from:codes.quine.labo.recheck.**",
+      "-opt-inline-from:codes.quine.labo.recheck.**"
     ),
     // Settings for scaladoc:
     Compile / doc / scalacOptions += "-diagrams",
