@@ -37,10 +37,10 @@ final case class AttackPattern(pumps: Seq[(UString, UString, Int)], suffix: UStr
     val seq = Seq.newBuilder[String]
 
     for ((s, t, m) <- pumps) {
-      seq.addOne(s.toString)
+      if (s.nonEmpty) seq.addOne(s.toString)
       seq.addOne(s"${t}${NumberFormat.superscript(n + m)}")
     }
-    seq.addOne(suffix.toString)
+    if (suffix.nonEmpty) seq.addOne(suffix.toString)
 
     seq.result().mkString(" ")
   }
