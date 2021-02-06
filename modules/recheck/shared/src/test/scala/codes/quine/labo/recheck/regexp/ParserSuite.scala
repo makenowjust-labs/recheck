@@ -31,12 +31,12 @@ class ParserSuite extends munit.FunSuite {
     interceptMessage[InvalidRegExpException]("unknown flag")(Parser.parse("", "#", false).get)
     interceptMessage[InvalidRegExpException]("parsing failure at 0")(Parser.parse("{", "", false).get)
     interceptMessage[InvalidRegExpException]("parsing failure at 0")(Parser.parse("{1}", "").get)
-    assertEquals(Parser.parse(".", "g"), Success(Pattern(Dot, FlagSet(true, false, false, false, false, false))))
+    assertEquals(Parser.parse(".", "g"), Success(Pattern(Dot(), FlagSet(true, false, false, false, false, false))))
     assertEquals(
       Parser.parse("(.)(?<x>.)", ""),
       Success(
         Pattern(
-          Sequence(Seq(Capture(1, Dot), NamedCapture(2, "x", Dot))),
+          Sequence(Seq(Capture(1, Dot()), NamedCapture(2, "x", Dot()))),
           FlagSet(false, false, false, false, false, false)
         )
       )
@@ -45,7 +45,7 @@ class ParserSuite extends munit.FunSuite {
       Parser.parse("((.).)", ""),
       Success(
         Pattern(
-          Capture(1, Sequence(Seq(Capture(2, Dot), Dot))),
+          Capture(1, Sequence(Seq(Capture(2, Dot()), Dot()))),
           FlagSet(false, false, false, false, false, false)
         )
       )
@@ -69,35 +69,48 @@ class ParserSuite extends munit.FunSuite {
 
   test("Parser.assignCaptureIndex") {
     assertEquals(
-      Parser.assignCaptureIndex(Disjunction(Seq(Capture(-1, Dot), Capture(-1, Dot)))),
-      Disjunction(Seq(Capture(1, Dot), Capture(2, Dot)))
+      Parser.assignCaptureIndex(Disjunction(Seq(Capture(-1, Dot()), Capture(-1, Dot())))),
+      Disjunction(Seq(Capture(1, Dot()), Capture(2, Dot())))
     )
     assertEquals(
-      Parser.assignCaptureIndex(Sequence(Seq(Capture(-1, Dot), Capture(-1, Dot)))),
-      Sequence(Seq(Capture(1, Dot), Capture(2, Dot)))
+      Parser.assignCaptureIndex(Sequence(Seq(Capture(-1, Dot()), Capture(-1, Dot())))),
+      Sequence(Seq(Capture(1, Dot()), Capture(2, Dot())))
     )
-    assertEquals(Parser.assignCaptureIndex(Capture(-1, Dot)), Capture(1, Dot))
-    assertEquals(Parser.assignCaptureIndex(Capture(-1, Capture(-1, Dot))), Capture(1, Capture(2, Dot)))
-    assertEquals(Parser.assignCaptureIndex(NamedCapture(-1, "x", Dot)), NamedCapture(1, "x", Dot))
+    assertEquals(Parser.assignCaptureIndex(Capture(-1, Dot())), Capture(1, Dot()))
+    assertEquals(Parser.assignCaptureIndex(Capture(-1, Capture(-1, Dot()))), Capture(1, Capture(2, Dot())))
+    assertEquals(Parser.assignCaptureIndex(NamedCapture(-1, "x", Dot())), NamedCapture(1, "x", Dot()))
     assertEquals(
-      Parser.assignCaptureIndex(NamedCapture(-1, "x", NamedCapture(-1, "y", Dot))),
-      NamedCapture(1, "x", NamedCapture(2, "y", Dot))
+      Parser.assignCaptureIndex(NamedCapture(-1, "x", NamedCapture(-1, "y", Dot()))),
+      NamedCapture(1, "x", NamedCapture(2, "y", Dot()))
     )
-    assertEquals(Parser.assignCaptureIndex(Group(Capture(-1, Dot))), Group(Capture(1, Dot)))
-    assertEquals(Parser.assignCaptureIndex(Star(false, Capture(-1, Dot))), Star(false, Capture(1, Dot)))
-    assertEquals(Parser.assignCaptureIndex(Star(true, Capture(-1, Dot))), Star(true, Capture(1, Dot)))
-    assertEquals(Parser.assignCaptureIndex(Plus(false, Capture(-1, Dot))), Plus(false, Capture(1, Dot)))
-    assertEquals(Parser.assignCaptureIndex(Plus(true, Capture(-1, Dot))), Plus(true, Capture(1, Dot)))
-    assertEquals(Parser.assignCaptureIndex(Question(false, Capture(-1, Dot))), Question(false, Capture(1, Dot)))
-    assertEquals(Parser.assignCaptureIndex(Question(true, Capture(-1, Dot))), Question(true, Capture(1, Dot)))
+    assertEquals(Parser.assignCaptureIndex(Group(Capture(-1, Dot()))), Group(Capture(1, Dot())))
+    assertEquals(Parser.assignCaptureIndex(Star(false, Capture(-1, Dot()))), Star(false, Capture(1, Dot())))
+    assertEquals(Parser.assignCaptureIndex(Star(true, Capture(-1, Dot()))), Star(true, Capture(1, Dot())))
+    assertEquals(Parser.assignCaptureIndex(Plus(false, Capture(-1, Dot()))), Plus(false, Capture(1, Dot())))
+    assertEquals(Parser.assignCaptureIndex(Plus(true, Capture(-1, Dot()))), Plus(true, Capture(1, Dot())))
+    assertEquals(Parser.assignCaptureIndex(Question(false, Capture(-1, Dot()))), Question(false, Capture(1, Dot())))
+    assertEquals(Parser.assignCaptureIndex(Question(true, Capture(-1, Dot()))), Question(true, Capture(1, Dot())))
     assertEquals(
-      Parser.assignCaptureIndex(Repeat(false, 0, Some(Some(2)), Capture(-1, Dot))),
-      Repeat(false, 0, Some(Some(2)), Capture(1, Dot))
+      Parser.assignCaptureIndex(Repeat(false, 0, Some(Some(2)), Capture(-1, Dot()))),
+      Repeat(false, 0, Some(Some(2)), Capture(1, Dot()))
     )
-    assertEquals(Parser.assignCaptureIndex(LookAhead(false, Capture(-1, Dot))), LookAhead(false, Capture(1, Dot)))
-    assertEquals(Parser.assignCaptureIndex(LookAhead(true, Capture(-1, Dot))), LookAhead(true, Capture(1, Dot)))
-    assertEquals(Parser.assignCaptureIndex(LookBehind(false, Capture(-1, Dot))), LookBehind(false, Capture(1, Dot)))
-    assertEquals(Parser.assignCaptureIndex(LookBehind(true, Capture(-1, Dot))), LookBehind(true, Capture(1, Dot)))
+    assertEquals(Parser.assignCaptureIndex(LookAhead(false, Capture(-1, Dot()))), LookAhead(false, Capture(1, Dot())))
+    assertEquals(Parser.assignCaptureIndex(LookAhead(true, Capture(-1, Dot()))), LookAhead(true, Capture(1, Dot())))
+    assertEquals(Parser.assignCaptureIndex(LookBehind(false, Capture(-1, Dot()))), LookBehind(false, Capture(1, Dot())))
+    assertEquals(Parser.assignCaptureIndex(LookBehind(true, Capture(-1, Dot()))), LookBehind(true, Capture(1, Dot())))
+
+    // Checks it keeps the position.
+    assertEquals(Parser.assignCaptureIndex(Disjunction(Seq(Dot(), Dot())).withPos(0, 3)).pos, Some((0, 3)))
+    assertEquals(Parser.assignCaptureIndex(Sequence(Seq(Dot(), Dot())).withPos(0, 2)).pos, Some((0, 2)))
+    assertEquals(Parser.assignCaptureIndex(Capture(-1, Dot()).withPos(0, 3)).pos, Some((0, 3)))
+    assertEquals(Parser.assignCaptureIndex(NamedCapture(-1, "x", Dot()).withPos(0, 7)).pos, Some((0, 7)))
+    assertEquals(Parser.assignCaptureIndex(Group(Dot()).withPos(0, 5)).pos, Some((0, 5)))
+    assertEquals(Parser.assignCaptureIndex(Star(false, Dot()).withPos(0, 2)).pos, Some((0, 2)))
+    assertEquals(Parser.assignCaptureIndex(Plus(false, Dot()).withPos(0, 2)).pos, Some((0, 2)))
+    assertEquals(Parser.assignCaptureIndex(Question(false, Dot()).withPos(0, 2)).pos, Some((0, 2)))
+    assertEquals(Parser.assignCaptureIndex(Repeat(false, 0, Some(Some(2)), Dot()).withPos(0, 6)).pos, Some((0, 6)))
+    assertEquals(Parser.assignCaptureIndex(LookAhead(false, Dot()).withPos(0, 5)).pos, Some((0, 5)))
+    assertEquals(Parser.assignCaptureIndex(LookBehind(false, Dot()).withPos(0, 6)).pos, Some((0, 6)))
   }
 
   test("Parser#Source") {
@@ -106,13 +119,13 @@ class ParserSuite extends munit.FunSuite {
   }
 
   test("Parser#Disjunction") {
-    assertEquals(parse(".", P.Disjunction(_)), Parsed.Success(Dot, 1))
-    assertEquals(parse(".|.", P.Disjunction(_)), Parsed.Success(Disjunction(Seq(Dot, Dot)), 3))
+    assertEquals(parse(".", P.Disjunction(_)), Parsed.Success(Dot(), 1))
+    assertEquals(parse(".|.", P.Disjunction(_)), Parsed.Success(Disjunction(Seq(Dot(), Dot())), 3))
   }
 
   test("Parser#Sequence") {
-    assertEquals(parse(".", P.Sequence(_)), Parsed.Success(Dot, 1))
-    assertEquals(parse("..", P.Sequence(_)), Parsed.Success(Sequence(Seq(Dot, Dot)), 2))
+    assertEquals(parse(".", P.Sequence(_)), Parsed.Success(Dot(), 1))
+    assertEquals(parse("..", P.Sequence(_)), Parsed.Success(Sequence(Seq(Dot(), Dot())), 2))
     assertEquals(parse("", P.Sequence(_)), Parsed.Success(Sequence(Seq.empty), 0))
     assertEquals(parse("|", P.Sequence(_)), Parsed.Success(Sequence(Seq.empty), 0))
     assertEquals(parse(")", P.Sequence(_)), Parsed.Success(Sequence(Seq.empty), 0))
@@ -124,8 +137,8 @@ class ParserSuite extends munit.FunSuite {
     assertEquals(parse("(?=x)*", PA.Term(_)), Parsed.Success(Star(false, LookAhead(false, Character('x'))), 6))
     assertEquals(parse("(?<=x)*", P.Term(_)), Parsed.Success(LookBehind(false, Character('x')), 6))
     assertEquals(parse("\\b*", P.Term(_)), Parsed.Success(WordBoundary(false), 2))
-    assertEquals(parse("^*", P.Term(_)), Parsed.Success(LineBegin, 1))
-    assertEquals(parse("$*", P.Term(_)), Parsed.Success(LineEnd, 1))
+    assertEquals(parse("^*", P.Term(_)), Parsed.Success(LineBegin(), 1))
+    assertEquals(parse("$*", P.Term(_)), Parsed.Success(LineEnd(), 1))
     assertEquals(parse("x{1}", P.Term(_)), Parsed.Success(Repeat(false, 1, None, Character('x')), 4))
     assertEquals(parse("x*", P.Term(_)), Parsed.Success(Star(false, Character('x')), 2))
     assertEquals(parse("x*?", P.Term(_)), Parsed.Success(Star(true, Character('x')), 3))
@@ -145,9 +158,9 @@ class ParserSuite extends munit.FunSuite {
   }
 
   test("Parser#Atom") {
-    assertEquals(parse(".", P.Atom(_)), Parsed.Success(Dot, 1))
-    assertEquals(parse("^", P.Atom(_)), Parsed.Success(LineBegin, 1))
-    assertEquals(parse("$", P.Atom(_)), Parsed.Success(LineEnd, 1))
+    assertEquals(parse(".", P.Atom(_)), Parsed.Success(Dot(), 1))
+    assertEquals(parse("^", P.Atom(_)), Parsed.Success(LineBegin(), 1))
+    assertEquals(parse("$", P.Atom(_)), Parsed.Success(LineEnd(), 1))
     assertEquals(parse("[x]", P.Atom(_)), Parsed.Success(CharacterClass(false, Seq(Character('x'))), 3))
     assertEquals(parse("\\0", P.Atom(_)), Parsed.Success(Character('\u0000'), 2))
     assertEquals(parse("(x)", P.Atom(_)), Parsed.Success(Capture(-1, Character('x')), 3))

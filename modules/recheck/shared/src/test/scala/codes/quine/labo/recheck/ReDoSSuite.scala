@@ -41,7 +41,7 @@ class ReDoSSuite extends munit.FunSuite {
     assertEquals(
       ReDoS.checkAutomaton(
         Pattern(
-          Sequence(Seq(LineBegin, Star(false, Disjunction(Seq(Character('a'), Character('a')))), LineEnd)),
+          Sequence(Seq(LineBegin(), Star(false, Disjunction(Seq(Character('a'), Character('a')))), LineEnd())),
           FlagSet(false, false, false, false, false, false)
         ),
         Config(checker = Checker.Automaton)
@@ -61,7 +61,7 @@ class ReDoSSuite extends munit.FunSuite {
     assertEquals(
       ReDoS.checkAutomaton(
         Pattern(
-          Sequence(Seq(LineBegin, Star(false, Disjunction(Seq(Dot, Dot))), LineEnd)),
+          Sequence(Seq(LineBegin(), Star(false, Disjunction(Seq(Dot(), Dot()))), LineEnd())),
           FlagSet(false, false, false, true, false, false)
         ),
         Config(checker = Checker.Automaton)
@@ -71,7 +71,7 @@ class ReDoSSuite extends munit.FunSuite {
     assertEquals(
       ReDoS.checkAutomaton(
         Pattern(
-          Sequence(Seq(LineBegin, Dot, LineEnd)),
+          Sequence(Seq(LineBegin(), Dot(), LineEnd())),
           FlagSet(false, false, false, false, false, false)
         ),
         Config(checker = Checker.Automaton)
@@ -85,7 +85,7 @@ class ReDoSSuite extends munit.FunSuite {
     val result = ReDoS
       .checkFuzz(
         Pattern(
-          Sequence(Seq(LineBegin, Star(false, Disjunction(Seq(Character('a'), Character('a')))), LineEnd)),
+          Sequence(Seq(LineBegin(), Star(false, Disjunction(Seq(Character('a'), Character('a')))), LineEnd())),
           FlagSet(false, false, false, false, false, false)
         ),
         Config(checker = Checker.Fuzz, random = random0)
@@ -95,7 +95,7 @@ class ReDoSSuite extends munit.FunSuite {
     assertEquals(result.asInstanceOf[Diagnostics.Vulnerable].checker, Checker.Fuzz)
     assertEquals(
       ReDoS.checkFuzz(
-        Pattern(Dot, FlagSet(false, false, false, false, false, false)),
+        Pattern(Dot(), FlagSet(false, false, false, false, false, false)),
         Config(checker = Checker.Fuzz, random = random0)
       ),
       Success(Diagnostics.Safe(AttackComplexity.Safe(true), Checker.Fuzz))
@@ -103,7 +103,7 @@ class ReDoSSuite extends munit.FunSuite {
     val ex = interceptMessage[InvalidRegExpException]("out of order repetition quantifier") {
       ReDoS
         .checkFuzz(
-          Pattern(Repeat(false, 2, Some(Some(1)), Dot), FlagSet(false, false, false, false, false, false)),
+          Pattern(Repeat(false, 2, Some(Some(1)), Dot()), FlagSet(false, false, false, false, false, false)),
           Config(checker = Checker.Fuzz, random = random0)
         )
         .get
@@ -116,7 +116,7 @@ class ReDoSSuite extends munit.FunSuite {
     assertEquals(
       ReDoS.checkHybrid(
         Pattern(
-          Sequence(Seq(LineBegin, Star(false, Disjunction(Seq(Character('a'), Character('a')))), LineEnd)),
+          Sequence(Seq(LineBegin(), Star(false, Disjunction(Seq(Character('a'), Character('a')))), LineEnd())),
           FlagSet(false, false, false, false, false, false)
         ),
         Config(random = random0)
@@ -136,7 +136,9 @@ class ReDoSSuite extends munit.FunSuite {
     assertEquals(
       ReDoS.checkHybrid(
         Pattern(
-          Sequence(Seq(LineBegin, Repeat(false, 5, None, Disjunction(Seq(Character('a'), Character('a')))), LineEnd)),
+          Sequence(
+            Seq(LineBegin(), Repeat(false, 5, None, Disjunction(Seq(Character('a'), Character('a')))), LineEnd())
+          ),
           FlagSet(false, false, false, false, false, false)
         ),
         Config(random = random0, maxRepeatCount = 5)
@@ -146,7 +148,7 @@ class ReDoSSuite extends munit.FunSuite {
     assertEquals(
       ReDoS.checkHybrid(
         Pattern(
-          Sequence(Seq(LineBegin, Repeat(false, 5, Some(None), Disjunction(Seq(Character('a'), Character('a')))))),
+          Sequence(Seq(LineBegin(), Repeat(false, 5, Some(None), Disjunction(Seq(Character('a'), Character('a')))))),
           FlagSet(false, false, false, false, false, false)
         ),
         Config(random = random0, maxNFASize = 5)
@@ -156,7 +158,7 @@ class ReDoSSuite extends munit.FunSuite {
     assertEquals(
       ReDoS.checkHybrid(
         Pattern(
-          Sequence(Seq(LineBegin, Star(false, Dot), LineEnd)),
+          Sequence(Seq(LineBegin(), Star(false, Dot()), LineEnd())),
           FlagSet(false, false, false, false, false, false)
         ),
         Config(random = random0, maxPatternSize = 1)
@@ -167,10 +169,10 @@ class ReDoSSuite extends munit.FunSuite {
 
   test("ReDoS.repeatCount") {
     val flagSet = FlagSet(false, false, false, false, false, false)
-    val repeat4 = Repeat(false, 4, None, Dot)
-    val repeat5 = Repeat(false, 5, Some(None), Dot)
-    val repeat6 = Repeat(false, 4, Some(Some(6)), Dot)
-    assertEquals(ReDoS.repeatCount(Pattern(Dot, flagSet)), 0)
+    val repeat4 = Repeat(false, 4, None, Dot())
+    val repeat5 = Repeat(false, 5, Some(None), Dot())
+    val repeat6 = Repeat(false, 4, Some(Some(6)), Dot())
+    assertEquals(ReDoS.repeatCount(Pattern(Dot(), flagSet)), 0)
     assertEquals(ReDoS.repeatCount(Pattern(repeat4, flagSet)), 4)
     assertEquals(ReDoS.repeatCount(Pattern(repeat5, flagSet)), 5)
     assertEquals(ReDoS.repeatCount(Pattern(repeat6, flagSet)), 6)

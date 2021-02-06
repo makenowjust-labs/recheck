@@ -15,7 +15,7 @@ class FuzzIRSuite extends munit.FunSuite {
   implicit def ctx: Context = Context()
 
   test("FuzzIR.from") {
-    val pattern = Pattern(LineBegin, FlagSet(false, false, false, false, false, false))
+    val pattern = Pattern(LineBegin(), FlagSet(false, false, false, false, false, false))
     assertEquals(
       FuzzIR.from(pattern),
       Success(

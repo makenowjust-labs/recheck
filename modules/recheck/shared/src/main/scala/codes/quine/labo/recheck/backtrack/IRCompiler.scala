@@ -56,9 +56,9 @@ object IRCompiler {
               loop(n, forward).map(s => State.repeatN(min, s).concat(State.repeatAtMost(max - min, nonGreedy, s)))
             case WordBoundary(invert) =>
               Success(State(IndexedSeq(if (invert) IR.WordBoundaryNot else IR.WordBoundary), false))
-            case LineBegin =>
+            case LineBegin() =>
               Success(State(IndexedSeq(if (multiline) IR.LineBegin else IR.InputBegin), false))
-            case LineEnd =>
+            case LineEnd() =>
               Success(State(IndexedSeq(if (multiline) IR.LineEnd else IR.InputEnd), false))
             case LookAhead(negative, n) =>
               loop(n, true).map(State.lookAround(negative, _))
@@ -77,7 +77,7 @@ object IRCompiler {
                 val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
                 State.char(IR.Class(ch), forward)
               }
-            case Dot =>
+            case Dot() =>
               Success(State.char(if (dotAll) IR.Any else IR.Dot, forward))
             case BackReference(i) =>
               if (i <= 0 || capsSize < i) Failure(new InvalidRegExpException("invalid back-reference"))

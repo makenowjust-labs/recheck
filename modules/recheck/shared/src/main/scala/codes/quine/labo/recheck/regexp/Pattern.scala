@@ -29,7 +29,7 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
         case Capture(_, n)         => loop(n)
         case NamedCapture(_, _, n) => loop(n)
         case Group(n)              => loop(n)
-        case LineBegin             => true
+        case LineBegin()           => true
         case _                     => false
       })
       !flagSet.multiline && loop(node)
@@ -44,7 +44,7 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
         case Capture(_, n)         => loop(n)
         case NamedCapture(_, _, n) => loop(n)
         case Group(n)              => loop(n)
-        case LineEnd               => true
+        case LineEnd()             => true
         case _                     => false
       })
       !flagSet.multiline && loop(node)
@@ -116,8 +116,8 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
           atom.toIChar(unicode).map { ch =>
             Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch)
           }
-        case Dot => Success(Vector(IChar.dot(ignoreCase, dotAll, unicode)))
-        case _   => Success(Vector.empty)
+        case Dot() => Success(Vector(IChar.dot(ignoreCase, dotAll, unicode)))
+        case _     => Success(Vector.empty)
       })
 
       loop(node).map(_.foldLeft(set)(_.add(_)))
@@ -126,19 +126,19 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
   /** Tests whether the pattern needs line terminator distinction or not. */
   private[regexp] def needsLineTerminatorDistinction: Boolean = {
     def loop(node: Node): Boolean = node match {
-      case Disjunction(ns)       => ns.exists(loop)
-      case Sequence(ns)          => ns.exists(loop)
-      case Capture(_, n)         => loop(n)
-      case NamedCapture(_, _, n) => loop(n)
-      case Group(n)              => loop(n)
-      case Star(_, n)            => loop(n)
-      case Plus(_, n)            => loop(n)
-      case Question(_, n)        => loop(n)
-      case Repeat(_, _, _, n)    => loop(n)
-      case LookAhead(_, n)       => loop(n)
-      case LookBehind(_, n)      => loop(n)
-      case LineBegin | LineEnd   => true
-      case _                     => false
+      case Disjunction(ns)         => ns.exists(loop)
+      case Sequence(ns)            => ns.exists(loop)
+      case Capture(_, n)           => loop(n)
+      case NamedCapture(_, _, n)   => loop(n)
+      case Group(n)                => loop(n)
+      case Star(_, n)              => loop(n)
+      case Plus(_, n)              => loop(n)
+      case Question(_, n)          => loop(n)
+      case Repeat(_, _, _, n)      => loop(n)
+      case LookAhead(_, n)         => loop(n)
+      case LookBehind(_, n)        => loop(n)
+      case LineBegin() | LineEnd() => true
+      case _                       => false
     }
     flagSet.multiline && loop(node)
   }
@@ -220,7 +220,38 @@ object Pattern {
   )
 
   /** Node is a node of pattern [[https://en.wikipedia.org/wiki/Abstract_syntax_tree AST (abstract syntax tree)]]. */
-  sealed abstract class Node extends Serializable with Product
+  sealed abstract class Node extends Cloneable with Serializable with Product {
+
+    /** A internal field of the position of this node. */
+    private var _pos: Option[(Int, Int)] = None
+
+    /** Returns the position of this node. */
+    def pos: Option[(Int, Int)] = _pos
+
+    /** Returns the start position of this node. */
+    def startPos: Option[Int] = pos.map(_._1)
+
+    /** Returns the end position of this node. */
+    def endPos: Option[Int] = pos.map(_._2)
+
+    /** Returns a new node with the given position. */
+    def withPos(start: Int, end: Int): this.type = {
+      // If the position is already set, it returns `this` instead of an allocation.
+      if (pos.exists { case (s, e) => s == start && e == end }) this
+      else {
+        val cloned = clone().asInstanceOf[this.type]
+        cloned._pos = Some((start, end))
+        cloned
+      }
+    }
+
+    /** Copies the position from the given node if possible. */
+    def withPos(node: Node): this.type =
+      node.pos match {
+        case Some((start, end)) => withPos(start, end)
+        case None               => this
+      }
+  }
 
   /** AtomNode is a node of pattern to match a character. */
   sealed trait AtomNode extends Serializable with Product {
@@ -271,10 +302,10 @@ object Pattern {
   final case class WordBoundary(invert: Boolean) extends Node
 
   /** LineBegin is a begin-of-line assertion pattern. (e.g. `/^/`) */
-  case object LineBegin extends Node
+  final case class LineBegin() extends Node
 
   /** LineEnd is an end-of-line assertion pattern. (e.g. `/$/`) */
-  case object LineEnd extends Node
+  final case class LineEnd() extends Node
 
   /** LookAhead is a look-ahead assertion of a pattern. (e.g. `/(?=x)/` or `/(?!x)/`) */
   final case class LookAhead(negative: Boolean, child: Node) extends Node
@@ -324,7 +355,7 @@ object Pattern {
       TryUtil.traverse(children)(_.toIChar(unicode)).map(IChar.union(_))
   }
 
-  /** ClassRange is a character rane pattern in a class. */
+  /** ClassRange is a character range pattern in a class. */
   final case class ClassRange(begin: UChar, end: UChar) extends ClassNode {
     def toIChar(unicode: Boolean): Try[IChar] = {
       val char = IChar.range(begin, end)
@@ -337,7 +368,7 @@ object Pattern {
     *
     * This does not inherit `AtomNode` intentionally because this `toIChar` needs `dotAll` flag information.
     */
-  case object Dot extends Node
+  final case class Dot() extends Node
 
   /** BackReference is a back-reference pattern. (e.g. `/\1/`) */
   final case class BackReference(index: Int) extends Node
@@ -389,8 +420,8 @@ object Pattern {
     case Repeat(true, min, Some(Some(max)), n)  => s"${showNodeInRepeat(n)}{$min,$max}?"
     case WordBoundary(false)                    => "\\b"
     case WordBoundary(true)                     => "\\B"
-    case LineBegin                              => "^"
-    case LineEnd                                => "$"
+    case LineBegin()                            => "^"
+    case LineEnd()                              => "$"
     case LookAhead(false, n)                    => s"(?=${showNode(n)})"
     case LookAhead(true, n)                     => s"(?!${showNode(n)})"
     case LookBehind(false, n)                   => s"(?<=${showNode(n)})"
@@ -404,7 +435,7 @@ object Pattern {
     case UnicodeProperty(true, p)               => s"\\P{$p}"
     case UnicodePropertyValue(false, p, v)      => s"\\p{$p=$v}"
     case UnicodePropertyValue(true, p, v)       => s"\\P{$p=$v}"
-    case Dot                                    => "."
+    case Dot()                                  => "."
     case BackReference(i)                       => s"\\$i"
     case NamedBackReference(name)               => s"\\k<$name>"
   }
@@ -435,8 +466,8 @@ object Pattern {
     */
   private def showNodeInRepeat(node: Node): String =
     node match {
-      case _: Disjunction | _: Sequence | _: Star | _: Plus | _: Question | _: Repeat | _: WordBoundary | LineBegin |
-          LineEnd | _: LookAhead | _: LookBehind =>
+      case _: Disjunction | _: Sequence | _: Star | _: Plus | _: Question | _: Repeat | _: WordBoundary | _: LineBegin |
+          _: LineEnd | _: LookAhead | _: LookBehind =>
         s"(?:${showNode(node)})"
       case _ => showNode(node)
     }
