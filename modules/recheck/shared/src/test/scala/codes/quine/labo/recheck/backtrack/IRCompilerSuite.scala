@@ -1110,127 +1110,130 @@ class IRCompilerSuite extends munit.FunSuite {
     }
   }
 
-  test("IRCompiler.State.prelude") {
-    val state = IRCompiler.State(IndexedSeq(IR.Char('a')), false)
-    assertEquals(IRCompiler.State.prelude(true, state), IndexedSeq(IR.CapBegin(0), IR.Char('a'), IR.CapEnd(0), IR.Done))
+  test("IRCompiler.IRBlock.prelude") {
+    val block = IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), false)
     assertEquals(
-      IRCompiler.State.prelude(false, state),
+      IRCompiler.IRBlock.prelude(true, block),
+      IndexedSeq(IR.CapBegin(0), IR.Char('a'), IR.CapEnd(0), IR.Done)
+    )
+    assertEquals(
+      IRCompiler.IRBlock.prelude(false, block),
       IndexedSeq(IR.ForkNext(2), IR.Any, IR.Jump(-3), IR.CapBegin(0), IR.Char('a'), IR.CapEnd(0), IR.Done)
     )
   }
 
-  test("IRCompiler.State.capture") {
-    val state = IRCompiler.State(IndexedSeq(IR.Char('a')), true)
+  test("IRCompiler.IRBlock.capture") {
+    val block = IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), true)
     assertEquals(
-      IRCompiler.State.capture(2, state, true),
-      IRCompiler.State(IndexedSeq(IR.CapBegin(2), IR.Char('a'), IR.CapEnd(2)), true)
+      IRCompiler.IRBlock.capture(2, block, true),
+      IRCompiler.IRBlock(IndexedSeq(IR.CapBegin(2), IR.Char('a'), IR.CapEnd(2)), true)
     )
     assertEquals(
-      IRCompiler.State.capture(2, state, false),
-      IRCompiler.State(IndexedSeq(IR.CapEnd(2), IR.Char('a'), IR.CapBegin(2)), true)
-    )
-  }
-
-  test("IRCompiler.State.many") {
-    val state = IRCompiler.State(IndexedSeq(IR.Char('a')), true)
-    assertEquals(
-      IRCompiler.State.many(false, state),
-      IRCompiler.State(IndexedSeq(IR.ForkCont(2), IR.Char('a'), IR.Jump(-3)), false)
-    )
-    assertEquals(
-      IRCompiler.State.many(true, state),
-      IRCompiler.State(IndexedSeq(IR.ForkNext(2), IR.Char('a'), IR.Jump(-3)), false)
+      IRCompiler.IRBlock.capture(2, block, false),
+      IRCompiler.IRBlock(IndexedSeq(IR.CapEnd(2), IR.Char('a'), IR.CapBegin(2)), true)
     )
   }
 
-  test("IRCompiler.State.some") {
-    val state = IRCompiler.State(IndexedSeq(IR.Char('a')), true)
+  test("IRCompiler.IRBlock.many") {
+    val block = IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), true)
     assertEquals(
-      IRCompiler.State.some(false, state),
-      IRCompiler.State(IndexedSeq(IR.Char('a'), IR.ForkCont(2), IR.Char('a'), IR.Jump(-3)), true)
+      IRCompiler.IRBlock.many(false, block),
+      IRCompiler.IRBlock(IndexedSeq(IR.ForkCont(2), IR.Char('a'), IR.Jump(-3)), false)
     )
     assertEquals(
-      IRCompiler.State.some(true, state),
-      IRCompiler.State(IndexedSeq(IR.Char('a'), IR.ForkNext(2), IR.Char('a'), IR.Jump(-3)), true)
-    )
-  }
-
-  test("IRCompiler.State.optional") {
-    val state = IRCompiler.State(IndexedSeq(IR.Char('a')), true)
-    assertEquals(
-      IRCompiler.State.optional(false, state),
-      IRCompiler.State(IndexedSeq(IR.ForkCont(1), IR.Char('a')), false)
-    )
-    assertEquals(
-      IRCompiler.State.optional(true, state),
-      IRCompiler.State(IndexedSeq(IR.ForkNext(1), IR.Char('a')), false)
+      IRCompiler.IRBlock.many(true, block),
+      IRCompiler.IRBlock(IndexedSeq(IR.ForkNext(2), IR.Char('a'), IR.Jump(-3)), false)
     )
   }
 
-  test("IRCompiler.State.repeatN") {
-    val state = IRCompiler.State(IndexedSeq(IR.Char('a')), true)
+  test("IRCompiler.IRBlock.some") {
+    val block = IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), true)
     assertEquals(
-      IRCompiler.State.repeatN(0, state),
-      IRCompiler.State(IndexedSeq.empty, false)
-    )
-    assertEquals(IRCompiler.State.repeatN(1, state), state)
-    assertEquals(
-      IRCompiler.State.repeatN(3, state),
-      IRCompiler.State(IndexedSeq(IR.PushCnt(3), IR.Char('a'), IR.Dec, IR.Loop(-3), IR.PopCnt), true)
-    )
-  }
-
-  test("IRCompiler.State.repeatAtMost") {
-    val state = IRCompiler.State(IndexedSeq(IR.Char('a')), true)
-    assertEquals(
-      IRCompiler.State.repeatAtMost(0, false, state),
-      IRCompiler.State(IndexedSeq.empty, false)
+      IRCompiler.IRBlock.some(false, block),
+      IRCompiler.IRBlock(IndexedSeq(IR.Char('a'), IR.ForkCont(2), IR.Char('a'), IR.Jump(-3)), true)
     )
     assertEquals(
-      IRCompiler.State.repeatAtMost(0, true, state),
-      IRCompiler.State(IndexedSeq.empty, false)
-    )
-    assertEquals(
-      IRCompiler.State.repeatAtMost(1, false, state),
-      IRCompiler.State(IndexedSeq(IR.ForkCont(1), IR.Char('a')), false)
-    )
-    assertEquals(
-      IRCompiler.State.repeatAtMost(1, true, state),
-      IRCompiler.State(IndexedSeq(IR.ForkNext(1), IR.Char('a')), false)
-    )
-    assertEquals(
-      IRCompiler.State.repeatAtMost(3, false, state),
-      IRCompiler.State(IndexedSeq(IR.PushCnt(3), IR.ForkCont(3), IR.Char('a'), IR.Dec, IR.Loop(-4), IR.PopCnt), false)
-    )
-    assertEquals(
-      IRCompiler.State.repeatAtMost(3, true, state),
-      IRCompiler.State(IndexedSeq(IR.PushCnt(3), IR.ForkNext(3), IR.Char('a'), IR.Dec, IR.Loop(-4), IR.PopCnt), false)
+      IRCompiler.IRBlock.some(true, block),
+      IRCompiler.IRBlock(IndexedSeq(IR.Char('a'), IR.ForkNext(2), IR.Char('a'), IR.Jump(-3)), true)
     )
   }
 
-  test("IRCompiler.State.setupLoop") {
+  test("IRCompiler.IRBlock.optional") {
+    val block = IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), true)
     assertEquals(
-      IRCompiler.State.setupLoop(IRCompiler.State(IndexedSeq(IR.Char('a')), true)),
+      IRCompiler.IRBlock.optional(false, block),
+      IRCompiler.IRBlock(IndexedSeq(IR.ForkCont(1), IR.Char('a')), false)
+    )
+    assertEquals(
+      IRCompiler.IRBlock.optional(true, block),
+      IRCompiler.IRBlock(IndexedSeq(IR.ForkNext(1), IR.Char('a')), false)
+    )
+  }
+
+  test("IRCompiler.IRBlock.repeatN") {
+    val block = IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), true)
+    assertEquals(
+      IRCompiler.IRBlock.repeatN(0, block),
+      IRCompiler.IRBlock(IndexedSeq.empty, false)
+    )
+    assertEquals(IRCompiler.IRBlock.repeatN(1, block), block)
+    assertEquals(
+      IRCompiler.IRBlock.repeatN(3, block),
+      IRCompiler.IRBlock(IndexedSeq(IR.PushCnt(3), IR.Char('a'), IR.Dec, IR.Loop(-3), IR.PopCnt), true)
+    )
+  }
+
+  test("IRCompiler.IRBlock.repeatAtMost") {
+    val block = IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), true)
+    assertEquals(
+      IRCompiler.IRBlock.repeatAtMost(0, false, block),
+      IRCompiler.IRBlock(IndexedSeq.empty, false)
+    )
+    assertEquals(
+      IRCompiler.IRBlock.repeatAtMost(0, true, block),
+      IRCompiler.IRBlock(IndexedSeq.empty, false)
+    )
+    assertEquals(
+      IRCompiler.IRBlock.repeatAtMost(1, false, block),
+      IRCompiler.IRBlock(IndexedSeq(IR.ForkCont(1), IR.Char('a')), false)
+    )
+    assertEquals(
+      IRCompiler.IRBlock.repeatAtMost(1, true, block),
+      IRCompiler.IRBlock(IndexedSeq(IR.ForkNext(1), IR.Char('a')), false)
+    )
+    assertEquals(
+      IRCompiler.IRBlock.repeatAtMost(3, false, block),
+      IRCompiler.IRBlock(IndexedSeq(IR.PushCnt(3), IR.ForkCont(3), IR.Char('a'), IR.Dec, IR.Loop(-4), IR.PopCnt), false)
+    )
+    assertEquals(
+      IRCompiler.IRBlock.repeatAtMost(3, true, block),
+      IRCompiler.IRBlock(IndexedSeq(IR.PushCnt(3), IR.ForkNext(3), IR.Char('a'), IR.Dec, IR.Loop(-4), IR.PopCnt), false)
+    )
+  }
+
+  test("IRCompiler.IRBlock.setupLoop") {
+    assertEquals(
+      IRCompiler.IRBlock.setupLoop(IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), true)),
       IndexedSeq(IR.Char('a'))
     )
     assertEquals(
-      IRCompiler.State.setupLoop(IRCompiler.State(IndexedSeq(IR.WordBoundary), false)),
+      IRCompiler.IRBlock.setupLoop(IRCompiler.IRBlock(IndexedSeq(IR.WordBoundary), false)),
       IndexedSeq(IR.PushPos, IR.WordBoundary, IR.EmptyCheck)
     )
     assertEquals(
-      IRCompiler.State.setupLoop(IRCompiler.State(IndexedSeq(IR.CapBegin(1), IR.CapEnd(1)), true)),
+      IRCompiler.IRBlock.setupLoop(IRCompiler.IRBlock(IndexedSeq(IR.CapBegin(1), IR.CapEnd(1)), true)),
       IndexedSeq(IR.CapReset(1, 1), IR.CapBegin(1), IR.CapEnd(1))
     )
     assertEquals(
-      IRCompiler.State.setupLoop(IRCompiler.State(IndexedSeq(IR.CapBegin(1), IR.CapEnd(1)), false)),
+      IRCompiler.IRBlock.setupLoop(IRCompiler.IRBlock(IndexedSeq(IR.CapBegin(1), IR.CapEnd(1)), false)),
       IndexedSeq(IR.CapReset(1, 1), IR.PushPos, IR.CapBegin(1), IR.CapEnd(1), IR.EmptyCheck)
     )
   }
 
-  test("IRCompiler.State.lookAround") {
+  test("IRCompiler.IRBlock.lookAround") {
     assertEquals(
-      IRCompiler.State.lookAround(true, IRCompiler.State(IndexedSeq(IR.Char('a')), true)),
-      IRCompiler.State(
+      IRCompiler.IRBlock.lookAround(true, IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), true)),
+      IRCompiler.IRBlock(
         IndexedSeq(
           IR.PushPos,
           IR.PushProc,
@@ -1245,70 +1248,70 @@ class IRCompilerSuite extends munit.FunSuite {
       )
     )
     assertEquals(
-      IRCompiler.State.lookAround(false, IRCompiler.State(IndexedSeq(IR.Char('a')), true)),
-      IRCompiler.State(
+      IRCompiler.IRBlock.lookAround(false, IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), true)),
+      IRCompiler.IRBlock(
         IndexedSeq(IR.PushPos, IR.PushProc, IR.Char('a'), IR.RewindProc, IR.RestorePos),
         false
       )
     )
   }
 
-  test("IRCompiler.State.char") {
-    assertEquals(IRCompiler.State.char(IR.Char('a'), true), IRCompiler.State(IndexedSeq(IR.Char('a')), true))
+  test("IRCompiler.IRBlock.char") {
+    assertEquals(IRCompiler.IRBlock.char(IR.Char('a'), true), IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), true))
     assertEquals(
-      IRCompiler.State.char(IR.Char('a'), false),
-      IRCompiler.State(IndexedSeq(IR.Back, IR.Char('a'), IR.Back), true)
+      IRCompiler.IRBlock.char(IR.Char('a'), false),
+      IRCompiler.IRBlock(IndexedSeq(IR.Back, IR.Char('a'), IR.Back), true)
     )
   }
 
-  test("IRCompiler.State#union") {
+  test("IRCompiler.IRBlock#union") {
     assertEquals(
-      IRCompiler.State(IndexedSeq(IR.Char('a')), false).union(IRCompiler.State(IndexedSeq(IR.Char('b')), false)),
-      IRCompiler.State(IndexedSeq(IR.ForkCont(2), IR.Char('a'), IR.Jump(1), IR.Char('b')), false)
+      IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), false).union(IRCompiler.IRBlock(IndexedSeq(IR.Char('b')), false)),
+      IRCompiler.IRBlock(IndexedSeq(IR.ForkCont(2), IR.Char('a'), IR.Jump(1), IR.Char('b')), false)
     )
     assertEquals(
-      IRCompiler.State(IndexedSeq(IR.Char('a')), false).union(IRCompiler.State(IndexedSeq(IR.Char('b')), true)),
-      IRCompiler.State(IndexedSeq(IR.ForkCont(2), IR.Char('a'), IR.Jump(1), IR.Char('b')), false)
+      IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), false).union(IRCompiler.IRBlock(IndexedSeq(IR.Char('b')), true)),
+      IRCompiler.IRBlock(IndexedSeq(IR.ForkCont(2), IR.Char('a'), IR.Jump(1), IR.Char('b')), false)
     )
     assertEquals(
-      IRCompiler.State(IndexedSeq(IR.Char('a')), true).union(IRCompiler.State(IndexedSeq(IR.Char('b')), false)),
-      IRCompiler.State(IndexedSeq(IR.ForkCont(2), IR.Char('a'), IR.Jump(1), IR.Char('b')), false)
+      IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), true).union(IRCompiler.IRBlock(IndexedSeq(IR.Char('b')), false)),
+      IRCompiler.IRBlock(IndexedSeq(IR.ForkCont(2), IR.Char('a'), IR.Jump(1), IR.Char('b')), false)
     )
     assertEquals(
-      IRCompiler.State(IndexedSeq(IR.Char('a')), true).union(IRCompiler.State(IndexedSeq(IR.Char('b')), true)),
-      IRCompiler.State(IndexedSeq(IR.ForkCont(2), IR.Char('a'), IR.Jump(1), IR.Char('b')), true)
-    )
-  }
-
-  test("IRCompiler.State#concat") {
-    assertEquals(
-      IRCompiler.State(IndexedSeq(IR.Char('a')), false).concat(IRCompiler.State(IndexedSeq(IR.Char('b')), false)),
-      IRCompiler.State(IndexedSeq(IR.Char('a'), IR.Char('b')), false)
-    )
-    assertEquals(
-      IRCompiler.State(IndexedSeq(IR.Char('a')), false).concat(IRCompiler.State(IndexedSeq(IR.Char('b')), true)),
-      IRCompiler.State(IndexedSeq(IR.Char('a'), IR.Char('b')), true)
-    )
-    assertEquals(
-      IRCompiler.State(IndexedSeq(IR.Char('a')), true).concat(IRCompiler.State(IndexedSeq(IR.Char('b')), false)),
-      IRCompiler.State(IndexedSeq(IR.Char('a'), IR.Char('b')), true)
-    )
-    assertEquals(
-      IRCompiler.State(IndexedSeq(IR.Char('a')), true).concat(IRCompiler.State(IndexedSeq(IR.Char('b')), true)),
-      IRCompiler.State(IndexedSeq(IR.Char('a'), IR.Char('b')), true)
+      IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), true).union(IRCompiler.IRBlock(IndexedSeq(IR.Char('b')), true)),
+      IRCompiler.IRBlock(IndexedSeq(IR.ForkCont(2), IR.Char('a'), IR.Jump(1), IR.Char('b')), true)
     )
   }
 
-  test("IRCompiler.State#captureRange") {
-    assertEquals(IRCompiler.State(IndexedSeq.empty, false).captureRange, None)
-    assertEquals(IRCompiler.State(IndexedSeq(IR.Char('a')), false).captureRange, None)
-    assertEquals(IRCompiler.State(IndexedSeq(IR.CapBegin(1), IR.CapEnd(1)), false).captureRange, Some((1, 1)))
+  test("IRCompiler.IRBlock#concat") {
     assertEquals(
-      IRCompiler.State(IndexedSeq(IR.CapBegin(2), IR.CapEnd(2), IR.CapBegin(3), IR.CapBegin(3)), false).captureRange,
+      IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), false).concat(IRCompiler.IRBlock(IndexedSeq(IR.Char('b')), false)),
+      IRCompiler.IRBlock(IndexedSeq(IR.Char('a'), IR.Char('b')), false)
+    )
+    assertEquals(
+      IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), false).concat(IRCompiler.IRBlock(IndexedSeq(IR.Char('b')), true)),
+      IRCompiler.IRBlock(IndexedSeq(IR.Char('a'), IR.Char('b')), true)
+    )
+    assertEquals(
+      IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), true).concat(IRCompiler.IRBlock(IndexedSeq(IR.Char('b')), false)),
+      IRCompiler.IRBlock(IndexedSeq(IR.Char('a'), IR.Char('b')), true)
+    )
+    assertEquals(
+      IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), true).concat(IRCompiler.IRBlock(IndexedSeq(IR.Char('b')), true)),
+      IRCompiler.IRBlock(IndexedSeq(IR.Char('a'), IR.Char('b')), true)
+    )
+  }
+
+  test("IRCompiler.IRBlock#captureRange") {
+    assertEquals(IRCompiler.IRBlock(IndexedSeq.empty, false).captureRange, None)
+    assertEquals(IRCompiler.IRBlock(IndexedSeq(IR.Char('a')), false).captureRange, None)
+    assertEquals(IRCompiler.IRBlock(IndexedSeq(IR.CapBegin(1), IR.CapEnd(1)), false).captureRange, Some((1, 1)))
+    assertEquals(
+      IRCompiler.IRBlock(IndexedSeq(IR.CapBegin(2), IR.CapEnd(2), IR.CapBegin(3), IR.CapBegin(3)), false).captureRange,
       Some((2, 3))
     )
     assertEquals(
-      IRCompiler.State(IndexedSeq(IR.CapEnd(3), IR.CapBegin(3), IR.CapEnd(2), IR.CapBegin(2)), false).captureRange,
+      IRCompiler.IRBlock(IndexedSeq(IR.CapEnd(3), IR.CapBegin(3), IR.CapEnd(2), IR.CapBegin(2)), false).captureRange,
       Some((2, 3))
     )
   }

@@ -138,7 +138,7 @@ object IR {
     override def toString: String = "fail"
   }
 
-  /** `fork_cont @next`: Fork a new `proc` and set the new `proc`'s `pc` to `#next`.
+  /** `fork_cont @next`: Fork a new `proc` and add `#next` to the new `proc`'s `pc`.
     * After that, continue the current `proc`.
     *
     * This op-code is used for an entry of greedy loop.
@@ -147,7 +147,7 @@ object IR {
     override def toString: String = f"fork_cont\t@$next%+03d"
   }
 
-  /** `fork_next @next`: Fork a new `proc` and set the new `proc`'s `pc` to `#next`.
+  /** `fork_next @next`: Fork a new `proc` and add `#next` to the new `proc`'s `pc`.
     * After that, switch to the new `proc`. Now, the new `proc`'s fail refers to the prior `proc`'s `id`.
     *
     * This op-code is used for an entry of non-greedy loop.
@@ -172,7 +172,7 @@ object IR {
     override def toString: String = "input_end"
   }
 
-  /** `jump @cont`: Set the current `pc` to `#cont`. */
+  /** `jump @cont`: Add `#cont` to the current `pc`. It is relative jump. */
   final case class Jump(cont: Int) extends OpCode {
     override def toString: String = f"jump\t@$cont%+03d"
   }
