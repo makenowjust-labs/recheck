@@ -96,8 +96,8 @@ object ReDoS {
 
     result
       .map {
-        case Some((attack, complexity)) => Diagnostics.Vulnerable(attack, complexity, Checker.Fuzz)
-        case None                       => Diagnostics.Safe(AttackComplexity.Safe(true), Checker.Fuzz)
+        case Some((attack, complexity, _)) => Diagnostics.Vulnerable(attack, complexity, Checker.Fuzz)
+        case None                          => Diagnostics.Safe(AttackComplexity.Safe(true), Checker.Fuzz)
       }
       .recoverWith { case ex: ReDoSException =>
         ex.checker = Some(Checker.Fuzz)

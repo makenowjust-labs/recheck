@@ -13,6 +13,7 @@ import codes.quine.labo.recheck.data.ICharSet
 import codes.quine.labo.recheck.data.UString
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
+import codes.quine.labo.recheck.diagnostics.Hotspot
 import codes.quine.labo.recheck.fuzz.FuzzChecker._
 
 /** ReDoS vulnerable RegExp checker based on fuzzing. */
@@ -32,7 +33,7 @@ object FuzzChecker {
       maxGenerationSize: Int = 100,
       maxIteration: Int = 30,
       maxDegree: Int = 4
-  )(implicit ctx: Context): Option[(AttackComplexity.Vulnerable, AttackPattern)] =
+  )(implicit ctx: Context): Option[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)] =
     ctx.interrupt {
       new FuzzChecker(
         fuzz,
@@ -60,6 +61,34 @@ object FuzzChecker {
       inputs: Set[UString],
       covered: Set[(Int, Seq[Int], Boolean)]
   )
+
+  /** HotspotTracer is a tracer with tracing heatmap. */
+  private[fuzz] final class HotspotTracer(ir: IR, limit: Int) extends LimitTracer(ir, limit) {
+
+    /** A heatmap traced by this. */
+    private[this] val heatmap: mutable.Map[(Int, Int), Int] = mutable.Map.empty[(Int, Int), Int].withDefaultValue(0)
+
+    /** Builds a hotspot from the traced heatmap. */
+    def buildHotspot(heatRate: Double = 0.001): Hotspot = heatmap.maxByOption(_._2) match {
+      case Some((_, max)) =>
+        Hotspot(heatmap.toSeq.map { case ((start, end), count) =>
+          Hotspot.Spot(start, end, if (count >= max * heatRate) Hotspot.Heat else Hotspot.Normal)
+        })
+      case None => Hotspot(Seq.empty)
+    }
+
+    override def trace(pos: Int, pc: Int, backtrack: Boolean, capture: Int => Option[UString], cnts: Seq[Int]): Unit = {
+      super.trace(pos, pc, backtrack, capture, cnts)
+
+      if (!backtrack) {
+        ir.codes(pc) match {
+          case code: IR.Consumable if code.pos.isDefined =>
+            heatmap(code.pos.get) += 1
+          case _ => ()
+        }
+      }
+    }
+  }
 }
 
 /** FuzzChecker is a ReDoS vulnerable RegExp checker based on fuzzing. */
@@ -89,7 +118,7 @@ private[fuzz] final class FuzzChecker(
   /** A sequence of `fuzz.parts` */
   val parts: Seq[UString] = fuzz.parts.toSeq
 
-  type AttackResult = (AttackComplexity.Vulnerable, AttackPattern)
+  type AttackResult = (AttackComplexity.Vulnerable, AttackPattern, Hotspot)
 
   /** Runs this fuzzer. */
   def check(): Option[AttackResult] = interrupt {
@@ -288,7 +317,7 @@ private[fuzz] final class FuzzChecker(
   def tryAttackExponential(str: FString): Option[AttackResult] = interrupt {
     val r = Math.max(1, Math.log(attackLimit) / Math.log(2) / str.n)
     val attack = str.copy(n = Math.ceil(str.n * r).toInt)
-    tryAttackExecute(attack).map(pattern => (AttackComplexity.Exponential(true), pattern))
+    tryAttackExecute(attack).map { case (pattern, hotspot) => (AttackComplexity.Exponential(true), pattern, hotspot) }
   }
 
   /** Construct an attack string on assuming the pattern is polynomial. */
@@ -297,20 +326,22 @@ private[fuzz] final class FuzzChecker(
     if (r < 1) None
     else {
       val attack = str.copy(n = Math.ceil(str.n * r).toInt)
-      tryAttackExecute(attack).map(pattern => (AttackComplexity.Polynomial(degree, true), pattern))
+      tryAttackExecute(attack).map { case (pattern, hotspot) =>
+        (AttackComplexity.Polynomial(degree, true), pattern, hotspot)
+      }
     }
   }
 
   /** Executes the string to construct attack string. */
-  def tryAttackExecute(str: FString): Option[AttackPattern] = interrupt {
+  def tryAttackExecute(str: FString): Option[(AttackPattern, Hotspot)] = interrupt {
     val input = str.toUString
     if (input.size > maxAttackSize) None
     else {
-      val t = new LimitTracer(ir, attackLimit)
+      val t = new HotspotTracer(ir, attackLimit)
       try VM.execute(ir, input, 0, t)
       catch {
         case _: LimitException =>
-          return Some(str.toAttackPattern)
+          return Some((str.toAttackPattern, t.buildHotspot()))
       }
     }
     None
