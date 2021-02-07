@@ -32,7 +32,7 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
         case Some(Assert(k, q1)) =>
           sb.append(s"  ${escape(q0)} [shape=circle];\n")
           sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(k)}];\n")
-        case Some(Consume(chs, q1)) =>
+        case Some(Consume(chs, q1, _)) =>
           sb.append(s"  ${escape(q0)} [shape=circle];\n")
           sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(chs.mkString("{", ", ", "}"))}];\n")
         case Some(LoopEnter(loop, q1)) =>
@@ -74,9 +74,9 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
               case Some(LoopExit(loop, q1)) =>
                 if (loops.contains(loop)) Vector.empty // An ε-loop is detected.
                 else buildClosure(c0, cs, q1, loops)
-              case Some(Consume(chs, q1)) =>
+              case Some(Consume(chs, q1, pos)) =>
                 val newChs = chs.filter(ch => cs.contains(CharInfo.from(ch)))
-                if (newChs.nonEmpty) Vector((q, Some(Consume(newChs, q1))))
+                if (newChs.nonEmpty) Vector((q, Some(Consume(newChs, q1, pos))))
                 else Vector.empty
               case None =>
                 if (cs.contains(CharInfo(true, false))) Vector((q, None))
@@ -94,6 +94,9 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
       val newInits = Vector((CharInfo(true, false), closureInit.map(_._1)))
       val newAcceptSet = Set.newBuilder[(CharInfo, Seq[Q])]
       val newDelta = Map.newBuilder[((CharInfo, Seq[Q]), IChar), Seq[(CharInfo, Seq[Q])]]
+      val newSourcemap = mutable.Map
+        .empty[((CharInfo, Seq[Q]), IChar, (CharInfo, Seq[Q])), Seq[(Int, Int)]]
+        .withDefaultValue(Vector.empty)
       var deltaSize = 0
 
       queue.enqueue((CharInfo(true, false), closureInit))
@@ -106,12 +109,13 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
         val d = mutable.Map.empty[IChar, Seq[(CharInfo, Seq[Q])]].withDefaultValue(Vector.empty)
         for ((_, p) <- qps) {
           p match {
-            case Some(Consume(chs, q1)) =>
+            case Some(Consume(chs, q1, pos)) =>
               for (ch <- chs) {
                 val c1 = CharInfo.from(ch)
                 val qps1 = closure(c1, q1)
                 val qs1 = qps1.map(_._1)
                 d(ch) = d(ch) :+ (c1, qs1)
+                newSourcemap(((c0, qs0), ch, (c1, qs1))) ++= pos
                 if (!newStateSet.contains((c1, qs1))) {
                   queue.enqueue((c1, qps1))
                   newStateSet.addOne((c1, qs1))
@@ -126,7 +130,14 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
         if (deltaSize >= maxNFASize) throw new UnsupportedException("OrderedNFA size is too large")
       }
 
-      OrderedNFA(alphabet.chars.toSet, newStateSet.toSet, newInits, newAcceptSet.result(), newDelta.result())
+      OrderedNFA(
+        alphabet.chars.toSet,
+        newStateSet.toSet,
+        newInits,
+        newAcceptSet.result(),
+        newDelta.result(),
+        newSourcemap.toMap.filter(_._2.nonEmpty)
+      )
     }
 }
 
@@ -143,7 +154,7 @@ object EpsNFA {
   final case class Assert[Q](kind: AssertKind, to: Q) extends Transition[Q]
 
   /** Consume is an ε-NFA transition with consuming a character. */
-  final case class Consume[Q](set: Set[IChar], to: Q) extends Transition[Q]
+  final case class Consume[Q](set: Set[IChar], to: Q, pos: Option[(Int, Int)] = None) extends Transition[Q]
 
   /** LoopEnter is an ε-NFA transition with consuming no character and marking a entering of the loop. */
   final case class LoopEnter[Q](loop: Int, to: Q) extends Transition[Q]

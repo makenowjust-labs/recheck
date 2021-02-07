@@ -4,6 +4,7 @@ package automaton
 import codes.quine.labo.recheck.data.UChar
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
+import codes.quine.labo.recheck.diagnostics.Hotspot
 
 /** Complexity is a result of [[AutomatonChecker.check]] method. */
 sealed abstract class Complexity[+A] extends Serializable with Product {
@@ -36,6 +37,9 @@ object Complexity {
 
     /** Converts this into a diagnostics complexity. */
     def toAttackComplexity: AttackComplexity.Vulnerable
+
+    /** A hotspot for this. */
+    def hotspot: Hotspot
   }
 
   /** RegExp can check a match in a constant time. */
@@ -49,7 +53,8 @@ object Complexity {
   }
 
   /** RegExp can check a match in a `n`th polynomial time. */
-  final case class Polynomial[A](degree: Int, witness: Witness[A]) extends Vulnerable[A] {
+  final case class Polynomial[A](degree: Int, witness: Witness[A], hotspot: Hotspot = Hotspot.empty)
+      extends Vulnerable[A] {
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Polynomial(degree, false)
 
     def buildAttackPattern(stepsLimit: Int, maxSize: Int)(implicit ev: A =:= UChar): AttackPattern = {
@@ -62,7 +67,7 @@ object Complexity {
   }
 
   /** RegExp can check a match in an exponential time. */
-  final case class Exponential[A](witness: Witness[A]) extends Vulnerable[A] {
+  final case class Exponential[A](witness: Witness[A], hotspot: Hotspot = Hotspot.empty) extends Vulnerable[A] {
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Exponential(false)
 
     def buildAttackPattern(stepsLimit: Int, maxSize: Int)(implicit ev: A =:= UChar): AttackPattern = {

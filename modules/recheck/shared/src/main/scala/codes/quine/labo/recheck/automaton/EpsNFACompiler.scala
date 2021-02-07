@@ -147,14 +147,14 @@ object EpsNFACompiler {
               }
               val i = nextQ()
               val a = nextQ()
-              tau.addOne(i -> Consume(chs, a))
+              tau.addOne(i -> Consume(chs, a, node.pos))
               (i, a)
             }
           case Dot() =>
             val dot = IChar.dot(ignoreCase, dotAll, unicode)
             val i = nextQ()
             val a = nextQ()
-            tau.addOne(i -> Consume(alphabet.refine(dot).toSet, a))
+            tau.addOne(i -> Consume(alphabet.refine(dot).toSet, a, node.pos))
             Success((i, a))
           case BackReference(_)      => Failure(new UnsupportedException("back-reference"))
           case NamedBackReference(_) => Failure(new UnsupportedException("named back-reference"))

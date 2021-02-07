@@ -6,6 +6,7 @@ import scala.collection.mutable
 import codes.quine.labo.recheck.automaton.Complexity._
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.data.Graph
+import codes.quine.labo.recheck.diagnostics.Hotspot
 
 /** ReDoS vulnerable RegExp checker based on automata theory. */
 object AutomatonChecker {
@@ -24,8 +25,7 @@ private final class AutomatonChecker[A, Q](
   // Introduces `ctx` methods into the scope.
   import ctx._
 
-  /** A NFA with look-ahead constructed from [[nfa]].
-    */
+  /** A NFA with look-ahead constructed from [[nfa]]. */
   private[this] val nfaWLA = nfa.toNFAwLA(maxNFASize)
 
   /** A [[nfaWLA]] transition graph. */
@@ -69,8 +69,11 @@ private final class AutomatonChecker[A, Q](
   /** A type of [[nfaWLA]] state. */
   private type R = (Q, Set[Q])
 
-  /** A type of pumps of witness. */
-  private type Pump = (R, Seq[(A, Set[Q])], R)
+  /** A type of [[nfaWLA]] alphabet. */
+  private type B = (A, Set[Q])
+
+  /** A type of a pair of pumps of witness and hotspots. */
+  private type Pump = (R, Seq[B], R, Seq[(Int, Int)])
 
   /** Tests whether the SCC is an atom, which is a singleton and does not have a self-loop. */
   private[this] def isAtom(sc: Seq[R]): Boolean =
@@ -78,12 +81,16 @@ private final class AutomatonChecker[A, Q](
 
   /** Runs a checker. */
   def check(): Complexity[A] = interrupt(checkExponential() match {
-    case Some(pump) => Exponential(witness(Vector(pump)))
+    case Some(pump) =>
+      val (w, hotspot) = witness(Vector(pump))
+      Exponential(w, hotspot)
     case None =>
       checkPolynomial() match {
-        case (0, _)          => Constant
-        case (1, _)          => Linear
-        case (degree, pumps) => Polynomial(degree, witness(pumps))
+        case (0, _) => Constant
+        case (1, _) => Linear
+        case (degree, pumps) =>
+          val (w, hotspot) = witness(pumps)
+          Polynomial(degree, w, hotspot)
       }
   })
 
@@ -102,8 +109,8 @@ private final class AutomatonChecker[A, Q](
         case Some((a, es)) =>
           for {
             (q1, q2) <- es.diff(es.distinct).headOption
-            back <- graph.path(Set(q2), q1)
-          } yield (q1, a +: back, q1)
+            (back, last) <- graph.path(Set(q2), q1)
+          } yield (q1, a +: back.map(_._2), q1, spots((q1, a) +: back, last))
         // In other cases, we need to use SCC of a pair graph.
         case None =>
           // A state pair graph with co-transition.
@@ -113,19 +120,17 @@ private final class AutomatonChecker[A, Q](
             (q21, q22) <- es
           } yield ((q11, q21), a1, (q12, q22))))
           val result = interrupt {
-            g2.scc.iterator
-              .flatMap { sc =>
-                val eda = interrupt(for {
-                  // If there is a SCC of g2 contains `(q1, q1)` and `(q2, q3)` (s.t. `q2 != q3`),
-                  // then the SCC contains an EDA structure.
-                  p1 <- sc.find { case (q1, q2) => q1 == q2 }
-                  p2 <- sc.find { case (q1, q2) => q1 != q2 }
-                  path1 <- g2.path(Set(p1), p2)
-                  path2 <- g2.path(Set(p2), p1)
-                } yield (p1._1, path1 ++ path2, p1._1))
-                eda
-              }
-              .nextOption()
+            g2.scc.view.flatMap { sc =>
+              val eda = interrupt(for {
+                // If there is a SCC of g2 contains `(q1, q1)` and `(q2, q3)` (s.t. `q2 != q3`),
+                // then the SCC contains an EDA structure.
+                p1 <- sc.find { case (q1, q2) => q1 == q2 }
+                p2 <- sc.find { case (q1, q2) => q1 != q2 }
+                (path1, _) <- g2.path(Set(p1), p2)
+                (path2, _) <- g2.path(Set(p2), p1)
+              } yield (p1._1, path1.map(_._2) ++ path2.map(_._2), p1._1, spotsG2(path1 ++ path2, p1)))
+              eda
+            }.headOption
           }
           result
       }
@@ -207,7 +212,11 @@ private final class AutomatonChecker[A, Q](
             // If there is a SCC of `g3back` contains `(q1, q1, q2)` and `(q1, q2, q2)`,
             // then an IDA structure exists between `source` and `target`.
             sc.collect { case (q1, q2, q3) if q1 == q2 && q2 != q3 && sc.contains((q1, q3, q3)) => (q1, q3) }
-              .flatMap { case (q1, q2) => g3.path(Set((q1, q1, q2)), (q1, q2, q2)).map((q1, _, q2)) }
+              .flatMap { case (q1, q2) =>
+                g3.path(Set((q1, q1, q2)), (q1, q2, q2)).map { case (path, _) =>
+                  (q1, path.map(_._2), q2, spotsG3(path, (q1, q2, q2)))
+                }
+              }
           }
           ida
         }
@@ -217,13 +226,39 @@ private final class AutomatonChecker[A, Q](
   }
 
   /** Builds a witness object from pump strings and states. */
-  private[this] def witness(pumps: Seq[Pump]): Witness[A] = {
-    val (pumpPaths, qs) = pumps.foldLeft((Vector.empty[(Seq[A], Seq[A])], nfaWLA.initSet.toSet)) {
-      case ((pumpPaths, last), (q1, path, q2)) =>
-        val prefix = graph.path(last, q1).get.map(_._1)
-        (pumpPaths :+ (prefix, path.map(_._1)), Set(q2))
-    }
-    val suffix = nfaWLA.lookAheadDFA.toGraph.path(Set(nfaWLA.lookAheadDFA.init), qs.head._2).get.reverse
-    Witness(pumpPaths, suffix)
+  private[this] def witness(pumps: Seq[Pump]): (Witness[A], Hotspot) = {
+    val (pumpPaths, qs, spots) =
+      pumps.foldLeft((Vector.empty[(Seq[A], Seq[A])], nfaWLA.initSet.toSet, Vector.empty[Hotspot.Spot])) {
+        case ((pumpPaths, last, spots), (q1, path, q2, pos)) =>
+          val (prefix, _) = graph.path(last, q1).get
+          val newSpots = spots ++ pos.map { case (s, e) => Hotspot.Spot(s, e, Hotspot.Heat) } ++
+            this.spots(prefix, q1).map { case (s, e) => Hotspot.Spot(s, e, Hotspot.Normal) }
+          (pumpPaths :+ (prefix.map(_._2._1), path.map(_._1)), Set(q2), newSpots)
+      }
+    val suffix = nfaWLA.lookAheadDFA.toGraph.path(Set(nfaWLA.lookAheadDFA.init), qs.head._2).get._1.map(_._2).reverse
+    (Witness(pumpPaths, suffix), Hotspot(spots))
+  }
+
+  /** Gets hotspots positions from a path. */
+  private def spots(path: Seq[(R, B)], last: R): Seq[(Int, Int)] =
+    path
+      .foldRight((last, Vector.empty[(Int, Int)])) { case ((q1, a), (q2, spots)) =>
+        (q1, spots ++ nfaWLA.sourcemap.getOrElse((q1, a, q2), Vector.empty))
+      }
+      ._2
+
+  /** Gets hotspots positions from a G2 path. */
+  private def spotsG2(path: Seq[((R, R), B)], last: (R, R)): Seq[(Int, Int)] = {
+    val spots1 = spots(path.map { case ((q1, _), a) => (q1, a) }, last._1)
+    val spots2 = spots(path.map { case ((_, q2), a) => (q2, a) }, last._2)
+    spots1 ++ spots2
+  }
+
+  /** Gets hotspots positions from a G3 path. */
+  private def spotsG3(path: Seq[((R, R, R), B)], last: (R, R, R)): Seq[(Int, Int)] = {
+    val spots1 = spots(path.map { case ((q1, _, _), a) => (q1, a) }, last._1)
+    val spots2 = spots(path.map { case ((_, q2, _), a) => (q2, a) }, last._2)
+    val spots3 = spots(path.map { case ((_, _, q3), a) => (q3, a) }, last._3)
+    spots1 ++ spots2 ++ spots3
   }
 }
