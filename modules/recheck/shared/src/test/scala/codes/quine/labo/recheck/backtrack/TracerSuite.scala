@@ -11,7 +11,7 @@ class TracerSuite extends munit.FunSuite {
       Map("foo" -> 2),
       IndexedSeq(
         IR.ForkCont(2),
-        IR.Any,
+        IR.Any(),
         IR.Jump(-3),
         IR.Done
       )

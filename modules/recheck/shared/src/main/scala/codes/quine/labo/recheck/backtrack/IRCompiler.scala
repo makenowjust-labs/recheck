@@ -66,26 +66,26 @@ object IRCompiler {
               loop(n, false).map(IRBlock.lookAround(negative, _))
             case Character(c0) =>
               val c = if (ignoreCase) UChar.canonicalize(c0, unicode) else c0
-              Success(IRBlock.char(IR.Char(c), forward))
+              Success(IRBlock.char(IR.Char(c, node.pos), forward))
             case node @ CharacterClass(invert, _) =>
               node.toIChar(unicode).map { ch0 =>
                 val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
-                IRBlock.char(if (invert) IR.ClassNot(ch) else IR.Class(ch), forward)
+                IRBlock.char(if (invert) IR.ClassNot(ch, node.pos) else IR.Class(ch, node.pos), forward)
               }
             case node: AtomNode =>
               node.toIChar(unicode).map { ch0 =>
                 val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
-                IRBlock.char(IR.Class(ch), forward)
+                IRBlock.char(IR.Class(ch, node.pos), forward)
               }
             case Dot() =>
-              Success(IRBlock.char(if (dotAll) IR.Any else IR.Dot, forward))
+              Success(IRBlock.char(if (dotAll) IR.Any(node.pos) else IR.Dot(node.pos), forward))
             case BackReference(i) =>
               if (i <= 0 || capsSize < i) Failure(new InvalidRegExpException("invalid back-reference"))
-              else Success(IRBlock(IndexedSeq(if (forward) IR.Ref(i) else IR.RefBack(i)), false))
+              else Success(IRBlock(IndexedSeq(if (forward) IR.Ref(i, node.pos) else IR.RefBack(i, node.pos)), false))
             case NamedBackReference(name) =>
               names.get(name) match {
                 case Some(i) =>
-                  Success(IRBlock(IndexedSeq(if (forward) IR.Ref(i) else IR.RefBack(i)), false))
+                  Success(IRBlock(IndexedSeq(if (forward) IR.Ref(i, node.pos) else IR.RefBack(i, node.pos)), false))
                 case None => Failure(new InvalidRegExpException("invalid named back-reference"))
               }
           })
@@ -125,7 +125,7 @@ object IRCompiler {
     /** Wraps a block op-codes in prelude codes. */
     def prelude(hasLineBeginAtBegin: Boolean, block: IRBlock): IndexedSeq[IR.OpCode] = {
       val begin =
-        if (!hasLineBeginAtBegin) IndexedSeq(IR.ForkNext(2), IR.Any, IR.Jump(-3), IR.CapBegin(0))
+        if (!hasLineBeginAtBegin) IndexedSeq(IR.ForkNext(2), IR.Any(), IR.Jump(-3), IR.CapBegin(0))
         else IndexedSeq(IR.CapBegin(0))
       val end = IndexedSeq(IR.CapEnd(0), IR.Done)
       begin ++ block.codes ++ end

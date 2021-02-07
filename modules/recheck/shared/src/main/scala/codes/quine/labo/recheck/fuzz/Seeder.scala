@@ -111,7 +111,7 @@ object Seeder {
       // Creates a patch to make the string reaches this op-code.
       @tailrec
       def addPatch(pc: Int): Unit = ir.codes(pc) match {
-        case IR.Any =>
+        case IR.Any(_) =>
           if (backtrack) {
             patchesMap((pc, cnts)) = Patch.InsertChar(pos, alphabet.any)
           }
@@ -121,27 +121,27 @@ object Seeder {
             // We want a patch to insert the first character, so it looks the next op-code.
             addPatch(pc + 1)
           }
-        case IR.Char(c) =>
+        case IR.Char(c, _) =>
           if (backtrack) {
             patchesMap((pc, cnts)) = Patch.InsertChar(pos, Set(IChar(c)))
           }
-        case IR.Class(s) =>
+        case IR.Class(s, _) =>
           if (backtrack) {
             patchesMap((pc, cnts)) = Patch.InsertChar(pos, alphabet.refine(s))
           }
-        case IR.ClassNot(s) =>
+        case IR.ClassNot(s, _) =>
           if (backtrack) {
             patchesMap((pc, cnts)) = Patch.InsertChar(pos, alphabet.refineInvert(s))
           }
-        case IR.Dot =>
+        case IR.Dot(_) =>
           if (backtrack) {
             patchesMap((pc, cnts)) = Patch.InsertChar(pos, alphabet.dot)
           }
-        case IR.Ref(n) =>
+        case IR.Ref(n, _) =>
           if (backtrack) {
             capture(n).foreach(s => patchesMap((pc, cnts)) = Patch.InsertString(pos, s))
           }
-        case IR.RefBack(n) =>
+        case IR.RefBack(n, _) =>
           if (backtrack) {
             capture(n).foreach(s => patchesMap((pc, cnts)) = Patch.InsertString(pos, s))
           }

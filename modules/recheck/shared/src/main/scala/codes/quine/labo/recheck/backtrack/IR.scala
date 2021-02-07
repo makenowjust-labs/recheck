@@ -32,13 +32,27 @@ object IR {
     def isConsumable: Boolean = false
   }
 
+  /** Consumable is a trait for consumable op-codes like `any` or `char`. */
+  trait Consumable { code: OpCode =>
+
+    /** A position corresponding to this op-code. */
+    def pos: Option[(Int, Int)]
+
+    /** Returns a string representation of the position. */
+    protected def posToString: String = pos match {
+      case Some((start, end)) => s" ; $start-$end"
+      case None               => ""
+    }
+
+    override def isConsumable: Boolean = true
+  }
+
   /** `any`: Advance `pos` if the current character exists.
     *
     * This op-code is used for dot pattern `.` when the pattern is `dotAll`.
     */
-  case object Any extends OpCode {
-    override def isConsumable: Boolean = true
-    override def toString: String = "any"
+  final case class Any(pos: Option[(Int, Int)] = None) extends OpCode with Consumable {
+    override def toString: String = s"any$posToString"
   }
 
   /** `back`: Go back `pos` to the previous character.
@@ -55,9 +69,8 @@ object IR {
     *
     * `c` is canonical when the pattern is `ignoreCase`.
     */
-  final case class Char(c: UChar) extends OpCode {
-    override def isConsumable: Boolean = true
-    override def toString: String = s"char\t'$c'"
+  final case class Char(c: UChar, pos: Option[(Int, Int)] = None) extends OpCode with Consumable {
+    override def toString: String = s"char\t'$c'$posToString"
   }
 
   /** `class s`: Try to match the current character with the character set `s`.
@@ -65,9 +78,8 @@ object IR {
     *
     * `s` is canonical when the pattern is `ignoreCase`.
     */
-  final case class Class(s: IChar) extends OpCode {
-    override def isConsumable: Boolean = true
-    override def toString: String = s"class\t$s"
+  final case class Class(s: IChar, pos: Option[(Int, Int)] = None) extends OpCode with Consumable {
+    override def toString: String = s"class\t$s$posToString"
   }
 
   /** `class_not s`: Try to match the current character with the character set `s`.
@@ -75,9 +87,8 @@ object IR {
     *
     * `s` is canonical when the pattern is `ignoreCase`.
     */
-  final case class ClassNot(s: IChar) extends OpCode {
-    override def isConsumable: Boolean = true
-    override def toString: String = s"class_not\t$s"
+  final case class ClassNot(s: IChar, pos: Option[(Int, Int)] = None) extends OpCode with Consumable {
+    override def toString: String = s"class_not\t$s$posToString"
   }
 
   /** `cap_begin i`: Save the current `pos` as the begin position of the capture `i`.
@@ -119,9 +130,8 @@ object IR {
     *
     * This op-code is used for dot pattern `.` when the pattern is not `dotAll`.
     */
-  case object Dot extends OpCode {
-    override def isConsumable: Boolean = true
-    override def toString: String = "dot"
+  final case class Dot(pos: Option[(Int, Int)] = None) extends OpCode with Consumable {
+    override def toString: String = s"dot$posToString"
   }
 
   /** `empty_check`: Pop the old `pos` from pos stack, and compare with the current `pos`.
@@ -230,19 +240,17 @@ object IR {
     *
     * Note that an unmatched capture is treated as an empty string.
     */
-  final case class Ref(i: Int) extends OpCode {
-    override def isConsumable: Boolean = true
-    override def toString: String = s"ref\t$i"
+  final case class Ref(i: Int, pos: Option[(Int, Int)] = None) extends OpCode with Consumable {
+    override def toString: String = s"ref\t$i$posToString"
   }
 
-  /** `ref_back i`: Try to match the capture `i` from the current `pos` in reverse oreder.
+  /** `ref_back i`: Try to match the capture `i` from the current `pos` in reverse order.
     * If matched, go back `pos` by the capture `i` size.
     *
     * Note that an unmatched capture is treated as an empty string.
     */
-  final case class RefBack(i: Int) extends OpCode {
-    override def isConsumable: Boolean = true
-    override def toString: String = s"ref_back\t$i"
+  final case class RefBack(i: Int, pos: Option[(Int, Int)] = None) extends OpCode with Consumable {
+    override def toString: String = s"ref_back\t$i$posToString"
   }
 
   /** `restore_pos`: Pop the old `pos` from pos stack and set it to the current `pos`. */

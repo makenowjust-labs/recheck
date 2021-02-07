@@ -50,12 +50,12 @@ class SeederSuite extends munit.FunSuite {
       1,
       Map.empty,
       IndexedSeq(
-        IR.Any,
+        IR.Any(),
         IR.Back,
         IR.Char('x'),
         IR.Class(IChar.range('x', 'z')),
         IR.ClassNot(IChar.range('x', 'z')),
-        IR.Dot,
+        IR.Dot(),
         IR.Ref(1),
         IR.RefBack(1),
         IR.PushCnt(1)

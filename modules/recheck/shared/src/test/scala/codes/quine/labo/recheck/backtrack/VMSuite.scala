@@ -270,7 +270,7 @@ class VMSuite extends munit.FunSuite {
   test("VM: initial proc") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(0, Map.empty, IndexedSeq(IR.Dot, IR.Done))
+      IR(0, Map.empty, IndexedSeq(IR.Dot(), IR.Done))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.caps, IndexedSeq.fill(2)(-1))
@@ -284,7 +284,7 @@ class VMSuite extends munit.FunSuite {
   test("VM: initial proc (ignore-case)") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(0, Map.empty, IndexedSeq(IR.Dot, IR.Done))
+      IR(0, Map.empty, IndexedSeq(IR.Dot(), IR.Done))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.caps, IndexedSeq.fill(2)(-1))
@@ -298,7 +298,7 @@ class VMSuite extends munit.FunSuite {
   test("VM: initial proc (ignore-case + unicode)") {
     val input = UString.from("xyz012XYZ", false)
     val ir =
-      IR(0, Map.empty, IndexedSeq(IR.Dot, IR.Done))
+      IR(0, Map.empty, IndexedSeq(IR.Dot(), IR.Done))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.caps, IndexedSeq.fill(2)(-1))
@@ -311,7 +311,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Any") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(0, Map.empty, IndexedSeq(IR.Any))
+    val ir = IR(0, Map.empty, IndexedSeq(IR.Any()))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -324,7 +324,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Any (end)") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(0, Map.empty, IndexedSeq(IR.Any))
+    val ir = IR(0, Map.empty, IndexedSeq(IR.Any()))
     val vm = new VM(ir, input, 9)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 9)
@@ -561,7 +561,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Dot") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(3, Map.empty, IndexedSeq(IR.Dot))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.Dot()))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -574,7 +574,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Dot (newline)") {
     val input = UString.from("x\nyz012XYZ", false)
-    val ir = IR(3, Map.empty, IndexedSeq(IR.Dot))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.Dot()))
     val vm = new VM(ir, input, 1)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 1)
@@ -585,7 +585,7 @@ class VMSuite extends munit.FunSuite {
 
   test("VM#step: Dot (end)") {
     val input = UString.from("xyz012XYZ", false)
-    val ir = IR(3, Map.empty, IndexedSeq(IR.Dot))
+    val ir = IR(3, Map.empty, IndexedSeq(IR.Dot()))
     val vm = new VM(ir, input, 9)
     assertEquals(vm.procs.size, 1)
     assertEquals(vm.procs.top.pos, 9)

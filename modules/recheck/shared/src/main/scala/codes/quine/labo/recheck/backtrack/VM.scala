@@ -4,6 +4,7 @@ package backtrack
 import scala.collection.mutable
 
 import codes.quine.labo.recheck.backtrack.IR._
+import codes.quine.labo.recheck.backtrack.Tracer.NoTracer
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.data.IChar.LineTerminator
 import codes.quine.labo.recheck.data.IChar.Word
@@ -15,11 +16,9 @@ object VM {
 
   /** Executes the IR on the input from the initial position.
     *
-    * Note that the input string should be canonical.
+    * The input string must be canonical.
     */
-  def execute(ir: IR, input: UString, pos: Int, tracer: Tracer = Tracer.NoTracer)(implicit
-      ctx: Context
-  ): Option[Match] =
+  def execute(ir: IR, input: UString, pos: Int, tracer: Tracer = NoTracer)(implicit ctx: Context): Option[Match] =
     ctx.interrupt(new VM(ir, input, pos, tracer).execute())
 }
 
@@ -70,7 +69,7 @@ private[backtrack] final class VM(
     proc.pc += 1
 
     code match {
-      case Any =>
+      case Any(_) =>
         proc.currentChar match {
           case Some(_) => proc.pos += 1
           case _       => backtrack = true
@@ -84,17 +83,17 @@ private[backtrack] final class VM(
         proc.captureEnd(n, proc.pos)
       case CapReset(i, j) =>
         proc.captureReset(i, j)
-      case Char(c) =>
+      case Char(c, _) =>
         proc.currentChar match {
           case Some(d) if c == d => proc.pos += 1
           case _                 => backtrack = true
         }
-      case Class(s) =>
+      case Class(s, _) =>
         proc.currentChar match {
           case Some(c) if s.contains(c) => proc.pos += 1
           case _                        => backtrack = true
         }
-      case ClassNot(s) =>
+      case ClassNot(s, _) =>
         proc.currentChar match {
           case Some(c) if !s.contains(c) => proc.pos += 1
           case _                         => backtrack = true
@@ -103,7 +102,7 @@ private[backtrack] final class VM(
         proc.cntStack = (proc.cntStack.head - 1) +: proc.cntStack.tail
       case Done =>
         return Some(Match(input, ir.names, proc.caps))
-      case Dot =>
+      case Dot(_) =>
         proc.currentChar match {
           case Some(c) if !LineTerminator.contains(c) => proc.pos += 1
           case _                                      => backtrack = true
@@ -145,12 +144,12 @@ private[backtrack] final class VM(
         proc.pushPosStack(proc.pos)
       case PushProc =>
         proc.pushProcStack(procs.size)
-      case Ref(n) =>
+      case Ref(n, _) =>
         val s = proc.capture(n).getOrElse(UString.empty)
         val t = input.substring(proc.pos, proc.pos + s.size)
         if (s == t) proc.pos += t.size
         else backtrack = true
-      case RefBack(n) =>
+      case RefBack(n, _) =>
         val s = proc.capture(n).getOrElse(UString.empty)
         val t = input.substring(proc.pos - s.size, proc.pos)
         if (s == t) proc.pos -= t.size
