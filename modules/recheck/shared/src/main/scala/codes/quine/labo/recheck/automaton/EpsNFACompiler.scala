@@ -125,12 +125,12 @@ object EpsNFACompiler {
             val a = nextQ()
             tau.addOne(i -> Assert(if (invert) AssertKind.NotWordBoundary else AssertKind.WordBoundary, a))
             Success((i, a))
-          case LineBegin =>
+          case LineBegin() =>
             val i = nextQ()
             val a = nextQ()
             tau.addOne(i -> Assert(AssertKind.LineBegin, a))
             Success((i, a))
-          case LineEnd =>
+          case LineEnd() =>
             val i = nextQ()
             val a = nextQ()
             tau.addOne(i -> Assert(AssertKind.LineEnd, a))
@@ -147,14 +147,14 @@ object EpsNFACompiler {
               }
               val i = nextQ()
               val a = nextQ()
-              tau.addOne(i -> Consume(chs, a))
+              tau.addOne(i -> Consume(chs, a, node.pos))
               (i, a)
             }
-          case Dot =>
+          case Dot() =>
             val dot = IChar.dot(ignoreCase, dotAll, unicode)
             val i = nextQ()
             val a = nextQ()
-            tau.addOne(i -> Consume(alphabet.refine(dot).toSet, a))
+            tau.addOne(i -> Consume(alphabet.refine(dot).toSet, a, node.pos))
             Success((i, a))
           case BackReference(_)      => Failure(new UnsupportedException("back-reference"))
           case NamedBackReference(_) => Failure(new UnsupportedException("named back-reference"))

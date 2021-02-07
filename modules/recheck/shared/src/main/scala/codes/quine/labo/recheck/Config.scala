@@ -35,6 +35,8 @@ final case class Config(
     maxIteration: Int = Config.MaxIteration,
     // A maximum degree number to attempt on building attack string.
     maxDegree: Int = Config.MaxDegree,
+    // A rate of a hotspot steps by the maximum steps.
+    heatRate: Double = Config.HeatRate,
     // Hybrid:
     // A maximum number of sum of repeat counts like `/a{10}/`.
     // If this value is exceeded, it switches to use fuzzing based checker.
@@ -82,6 +84,9 @@ object Config {
 
   /** The default value of [[Config#maxDegree]]. */
   val MaxDegree = 4
+
+  /** The default value of [[Config#heatRate]]. */
+  val HeatRate = 0.001
 
   /** The default value of [[Config#maxRepeatCount]]. */
   val MaxRepeatCount = 20

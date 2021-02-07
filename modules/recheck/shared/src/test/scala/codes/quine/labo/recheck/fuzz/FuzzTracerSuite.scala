@@ -24,7 +24,7 @@ class FuzzTracerSuite extends munit.FunSuite {
     Map.empty,
     IndexedSeq(
       IR.ForkCont(2),
-      IR.Any,
+      IR.Any(),
       IR.Jump(-3),
       IR.CapBegin(0),
       IR.CapEnd(0),
@@ -38,7 +38,7 @@ class FuzzTracerSuite extends munit.FunSuite {
     IndexedSeq(
       IR.CapBegin(0),
       IR.PushCnt(3),
-      IR.Any,
+      IR.Any(),
       IR.Loop(-2),
       IR.PopCnt,
       IR.CapEnd(0),
@@ -51,11 +51,11 @@ class FuzzTracerSuite extends munit.FunSuite {
     Map.empty,
     IndexedSeq(
       IR.CapBegin(0),
-      IR.Any,
+      IR.Any(),
       IR.ForkCont(4),
-      IR.Any,
+      IR.Any(),
       IR.ForkCont(2),
-      IR.Any,
+      IR.Any(),
       IR.Jump(-3),
       IR.Jump(-5),
       IR.CapEnd(0),

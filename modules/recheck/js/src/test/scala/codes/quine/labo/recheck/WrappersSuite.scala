@@ -8,13 +8,16 @@ import codes.quine.labo.recheck.data.UString
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Diagnostics
+import codes.quine.labo.recheck.diagnostics.Hotspot
 
 class WrappersSuite extends munit.FunSuite {
   test("DiagnosticsJS.from") {
     assertEquals(
-      JSON.stringify(DiagnosticsJS.from(Diagnostics.Safe(AttackComplexity.Linear, Checker.Automaton))),
+      JSON.stringify(DiagnosticsJS.from(Diagnostics.Safe("foo", "", AttackComplexity.Linear, Checker.Automaton))),
       JSON.stringify(
         js.Dynamic.literal(
+          source = "foo",
+          flags = "",
           status = "safe",
           checker = "automaton",
           complexity = js.Dynamic.literal(`type` = "linear", summary = "linear", isFuzz = false)
@@ -22,10 +25,12 @@ class WrappersSuite extends munit.FunSuite {
       )
     )
     assertEquals(
-      JSON.stringify(DiagnosticsJS.from(Diagnostics.Safe(AttackComplexity.Safe(true), Checker.Fuzz))),
+      JSON.stringify(DiagnosticsJS.from(Diagnostics.Safe("foo", "", AttackComplexity.Safe(true), Checker.Fuzz))),
       JSON.stringify(
         js.Dynamic
           .literal(
+            source = "foo",
+            flags = "",
             status = "safe",
             checker = "fuzz",
             complexity = js.Dynamic.literal(`type` = "safe", summary = "safe (fuzz)", isFuzz = true)
@@ -42,23 +47,41 @@ class WrappersSuite extends munit.FunSuite {
       string = "abbbc",
       pattern = "'a' 'b'³ 'c'"
     )
+    val hotspot = Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat), Hotspot.Spot(3, 4, Hotspot.Heat)))
+    val hotspotJS = js.Array(
+      js.Dynamic.literal(start = 1, end = 2, temperature = "heat"),
+      js.Dynamic.literal(start = 3, end = 4, temperature = "heat")
+    )
     assertEquals(
       JSON.stringify(
-        DiagnosticsJS.from(Diagnostics.Vulnerable(AttackComplexity.Exponential(false), attack, Checker.Automaton))
+        DiagnosticsJS.from(
+          Diagnostics.Vulnerable("(a|a)*$", "", AttackComplexity.Exponential(false), attack, hotspot, Checker.Automaton)
+        )
       ),
       JSON.stringify(
         js.Dynamic.literal(
+          source = "(a|a)*$",
+          flags = "",
           status = "vulnerable",
           checker = "automaton",
           attack = attackJS,
-          complexity = js.Dynamic.literal(`type` = "exponential", summary = "exponential", isFuzz = false)
+          complexity = js.Dynamic.literal(`type` = "exponential", summary = "exponential", isFuzz = false),
+          hotspot = hotspotJS
         )
       )
     )
 
     assertEquals(
-      JSON.stringify(DiagnosticsJS.from(Diagnostics.Unknown(Diagnostics.ErrorKind.Timeout, None))),
-      JSON.stringify(js.Dynamic.literal(status = "unknown", checker = (), error = js.Dynamic.literal(kind = "timeout")))
+      JSON.stringify(DiagnosticsJS.from(Diagnostics.Unknown("", "", Diagnostics.ErrorKind.Timeout, None))),
+      JSON.stringify(
+        js.Dynamic.literal(
+          source = "",
+          flags = "",
+          status = "unknown",
+          checker = (),
+          error = js.Dynamic.literal(kind = "timeout")
+        )
+      )
     )
   }
 
@@ -108,6 +131,19 @@ class WrappersSuite extends munit.FunSuite {
     assertEquals(
       JSON.stringify(PumpJS.from((UString.from("a", false), UString.from("b", false), 1))),
       JSON.stringify(js.Dynamic.literal(prefix = "a", pump = "b", bias = 1))
+    )
+  }
+
+  test("HotspotJS.from") {
+    val hotspot = Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat), Hotspot.Spot(3, 4, Hotspot.Heat)))
+    assertEquals(
+      JSON.stringify(HotspotJS.from(hotspot)),
+      JSON.stringify(
+        js.Array(
+          js.Dynamic.literal(start = 1, end = 2, temperature = "heat"),
+          js.Dynamic.literal(start = 3, end = 4, temperature = "heat")
+        )
+      )
     )
   }
 

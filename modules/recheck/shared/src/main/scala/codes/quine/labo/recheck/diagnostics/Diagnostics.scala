@@ -15,35 +15,46 @@ object Diagnostics {
 
   /** Safe is a analysis result against a safe RegExp. */
   final case class Safe(
+      source: String,
+      flags: String,
       complexity: AttackComplexity.Safe,
       checker: Checker
   ) extends Diagnostics {
     override def toString: String =
-      s"""|Status    : safe
+      s"""|Input     : /$source/$flags
+          |Status    : safe
           |Complexity: $complexity
           |Checker   : $checker""".stripMargin
   }
 
   /** Vulnerable is an analysis result against a vulnerable RegExp. */
   final case class Vulnerable(
+      source: String,
+      flags: String,
       complexity: AttackComplexity.Vulnerable,
       attack: AttackPattern,
+      hotspot: Hotspot,
       checker: Checker
   ) extends Diagnostics {
     override def toString: String =
-      s"""|Status       : vulnerable
+      s"""|Input        : /$source/$flags
+          |Status       : vulnerable
           |Complexity   : $complexity
           |Attack string: $attack
+          |Hotspot      : /${hotspot.highlight(source)}/$flags
           |Checker      : $checker""".stripMargin
   }
 
   /** Unknown is an analysis result against a RegExp in which vulnerability is unknown for some reason. */
   final case class Unknown(
+      source: String,
+      flags: String,
       error: ErrorKind,
       checker: Option[Checker]
   ) extends Diagnostics {
     override def toString: String =
-      s"""|Status : unknown
+      s"""|Input  : /$source/$flags
+          |Status : unknown
           |Error  : $error
           |Checker: ${checker.map(_.toString).getOrElse("(none)")}""".stripMargin
 
@@ -53,13 +64,13 @@ object Diagnostics {
   object Unknown {
 
     /** Creates a diagnostics from the exception. */
-    def from(ex: ReDoSException): Diagnostics = {
+    def from(source: String, flags: String, ex: ReDoSException): Diagnostics = {
       val kind = ex match {
         case _: TimeoutException        => ErrorKind.Timeout
         case ex: UnsupportedException   => ErrorKind.Unsupported(ex.getMessage)
         case ex: InvalidRegExpException => ErrorKind.InvalidRegExp(ex.getMessage)
       }
-      Unknown(kind, ex.checker)
+      Unknown(source, flags, kind, ex.checker)
     }
   }
 

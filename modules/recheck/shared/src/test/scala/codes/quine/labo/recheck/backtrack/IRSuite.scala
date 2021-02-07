@@ -11,7 +11,7 @@ class IRSuite extends munit.FunSuite {
       Map("foo" -> 2),
       IndexedSeq(
         IR.ForkCont(2),
-        IR.Any,
+        IR.Any(),
         IR.Jump(-3),
         IR.Done
       )
@@ -23,7 +23,8 @@ class IRSuite extends munit.FunSuite {
   }
 
   test("IR.OpCode#toString") {
-    assertEquals(IR.Any.toString, "any")
+    assertEquals(IR.Any().toString, "any")
+    assertEquals(IR.Any(Some((1, 2))).toString, "any ; 1-2")
     assertEquals(IR.Back.toString, "back")
     assertEquals(IR.Char(UChar('a')).toString, "char\t'a'")
     assertEquals(IR.Class(IChar('a')).toString, "class\t[a]")
@@ -33,7 +34,8 @@ class IRSuite extends munit.FunSuite {
     assertEquals(IR.CapReset(1, 2).toString, "cap_reset\t1\t2")
     assertEquals(IR.Dec.toString, "dec")
     assertEquals(IR.Done.toString, "done")
-    assertEquals(IR.Dot.toString, "dot")
+    assertEquals(IR.Dot().toString, "dot")
+    assertEquals(IR.Dot(Some((1, 2))).toString, "dot ; 1-2")
     assertEquals(IR.EmptyCheck.toString, "empty_check")
     assertEquals(IR.Fail.toString, "fail")
     assertEquals(IR.ForkCont(12).toString, "fork_cont\t@+12")
@@ -58,7 +60,7 @@ class IRSuite extends munit.FunSuite {
   }
 
   test("IR.OpCode#isConsumable") {
-    assertEquals(IR.Any.isConsumable, true)
+    assertEquals(IR.Any().isConsumable, true)
     assertEquals(IR.Back.isConsumable, false)
     assertEquals(IR.Char(UChar('a')).isConsumable, true)
     assertEquals(IR.Class(IChar('a')).isConsumable, true)
@@ -68,7 +70,7 @@ class IRSuite extends munit.FunSuite {
     assertEquals(IR.CapReset(1, 2).isConsumable, false)
     assertEquals(IR.Dec.isConsumable, false)
     assertEquals(IR.Done.isConsumable, false)
-    assertEquals(IR.Dot.isConsumable, true)
+    assertEquals(IR.Dot().isConsumable, true)
     assertEquals(IR.EmptyCheck.isConsumable, false)
     assertEquals(IR.Fail.isConsumable, false)
     assertEquals(IR.ForkCont(12).isConsumable, false)

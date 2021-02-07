@@ -37,7 +37,8 @@
                 x-show="state === 'checking'"
               >Cancel</button>
               <button
-                :class="{ 'button': true, 'is-loading': state === 'checking' }"
+                class="button"
+                :class="{ 'is-loading': state === 'checking' }"
                 @click="check()"
               >Check</button>
             </div>
@@ -56,9 +57,9 @@
                 <div class="columns">
                   <div class="column is-one-quarters"><span class="has-text-weight-bold">Status</span></div>
                   <div class="column is-three-quarters">
-                      <span 
+                      <span
+                        class="tag"
                         :class="{
-                          'tag': true,
                           'is-danger': checkedResult.status === 'vulnerable',
                           'is-success': checkedResult.status === 'safe',
                           'is-warning': checkedResult.status === 'unknown',
@@ -72,8 +73,8 @@
                     <div class="column is-one-quarters"><span class="has-text-weight-bold">Complexity</span></div>
                     <div class="column is-three-quarters">
                       <span
+                        class="tag"
                         :class="{
-                          'tag': true,
                           'is-danger': checkedResult.complexity.type === 'exponential',
                           'is-warning': checkedResult.complexity.type === 'polynomial',
                           'is-success': checkedResult.status === 'safe',
@@ -89,15 +90,32 @@
                     <div class="column is-three-quarters">
                       <div class="content"><pre class="p-2" x-text="checkedResult.attack.pattern"></pre></div>
                     </div>
-                  </div>  
+                  </div>
+                </template>
+                <template x-if="checkedResult.status === 'vulnerable'">
+                  <div class="columns">
+                    <div class="column is-one-quarters"><span class="has-text-weight-bold">Hotspot</span></div>
+                    <div class="column is-three-quarters">
+                      <div class="content">
+                        <pre class="p-2">/<span><template x-for="(spot, index) in checkedHotspot" :key="index"><span
+                          :class="{
+                            'has-text-white': spot.temperature,
+                            'has-background-danger-dark': spot.temperature === 'heat',
+                            'has-background-success-dark': spot.temperature === 'normal',
+                          }"
+                          x-text="spot.text"
+                        ></span></template></span>/<span x-text="checkedResult.flags"></span></pre>
+                      </div>
+                    </div>
+                  </div>
                 </template>
                 <template x-if="checkedResult.status === 'unknown'">
                   <div class="columns">
                     <div class="column is-one-quarters"><span class="has-text-weight-bold">Error</span></div>
                     <div class="column is-three-quarters">
                       <span
+                        class="tag"
                         :class="{
-                          'tag': true,
                           'is-danger': checkedResult.error.kind !== 'timeout',
                           'is-warning': checkedResult.error.kind === 'timeout',
                         }"

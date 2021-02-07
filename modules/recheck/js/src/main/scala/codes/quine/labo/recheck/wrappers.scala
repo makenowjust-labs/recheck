@@ -11,9 +11,16 @@ import codes.quine.labo.recheck.data.UString
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Diagnostics
+import codes.quine.labo.recheck.diagnostics.Hotspot
 
 /** DiagnosticsJS is a JS wrapper for Diagnostics. */
 trait DiagnosticsJS extends js.Object {
+
+  /** An input source. */
+  def source: String
+
+  /** An input flags. */
+  def flags: String
 
   /** A status of this diagnostics. One of `safe`, `vulnerable` and `unknown`. */
   def status: String
@@ -27,6 +34,9 @@ trait DiagnosticsJS extends js.Object {
   /** A matching-time complexity. It is available on `safe` or `vulnerable` diagnostics. */
   def complexity: js.UndefOr[AttackComplexityJS]
 
+  /** A hotspot. */
+  def hotspot: js.UndefOr[js.Array[HotspotJS]]
+
   /** An error kind. It is available on `unknown` diagnostics. */
   def error: js.UndefOr[ErrorKindJS]
 }
@@ -36,22 +46,37 @@ object DiagnosticsJS {
 
   /** Constructs a DiagnosticsJS from the actual Diagnostics. */
   def from(d: Diagnostics): DiagnosticsJS = d match {
-    case Diagnostics.Safe(c, checker) =>
-      js.Dynamic
-        .literal(status = "safe", checker = checker.toString, complexity = AttackComplexityJS.from(c))
-        .asInstanceOf[DiagnosticsJS]
-    case Diagnostics.Vulnerable(c, a, checker) =>
+    case Diagnostics.Safe(source, flags, c, checker) =>
       js.Dynamic
         .literal(
-          status = "vulnerable",
+          source = source,
+          flags = flags,
+          status = "safe",
           checker = checker.toString,
-          attack = AttackPatternJS.from(a),
           complexity = AttackComplexityJS.from(c)
         )
         .asInstanceOf[DiagnosticsJS]
-    case Diagnostics.Unknown(k, checker) =>
+    case Diagnostics.Vulnerable(source, flags, c, a, hotspot, checker) =>
       js.Dynamic
-        .literal(status = "unknown", checker = checker.map(_.toString).orUndefined, error = ErrorKindJS.from(k))
+        .literal(
+          source = source,
+          flags = flags,
+          status = "vulnerable",
+          checker = checker.toString,
+          attack = AttackPatternJS.from(a),
+          complexity = AttackComplexityJS.from(c),
+          hotspot = HotspotJS.from(hotspot)
+        )
+        .asInstanceOf[DiagnosticsJS]
+    case Diagnostics.Unknown(source, flags, k, checker) =>
+      js.Dynamic
+        .literal(
+          source = source,
+          flags = flags,
+          status = "unknown",
+          checker = checker.map(_.toString).orUndefined,
+          error = ErrorKindJS.from(k)
+        )
         .asInstanceOf[DiagnosticsJS]
   }
 }
@@ -179,6 +204,27 @@ object PumpJS {
       .asInstanceOf[PumpJS]
 }
 
+/** Hotspot is a JS wrapper for Hotspot.Spot. */
+trait HotspotJS extends js.Object {
+
+  /** A start position. */
+  def start: Int
+
+  /** An end position. */
+  def end: Int
+
+  /** A temperature of this hotspot. */
+  def temperature: String
+}
+
+/** Hotspot utilities. */
+object HotspotJS {
+  def from(hotspot: Hotspot): js.Array[HotspotJS] =
+    hotspot.spots.map { case Hotspot.Spot(start, end, t) =>
+      js.Dynamic.literal(start = start, end = end, temperature = t.toString).asInstanceOf[HotspotJS]
+    }.toJSArray
+}
+
 /** ErrorKindJS is a JS wrapper for ErrorKind. */
 trait ErrorKindJS extends js.Object {
 
@@ -244,6 +290,9 @@ trait ConfigJS extends js.Object {
   /** A maximum degree number to attempt on building attack string. * */
   def maxDegree: js.UndefOr[Int]
 
+  /** A rate of a hotspot steps by the maximum steps. */
+  def heatRate: js.UndefOr[Double]
+
   /** A maximum number of sum of repeat counts like `/a{10}/`.
     * If this value is exceeded, it switches to use fuzzing based checker.
     */
@@ -283,6 +332,7 @@ object ConfigJS {
       config.maxGenerationSize.getOrElse(Config.MaxGenerationSize),
       config.maxIteration.getOrElse(Config.MaxIteration),
       config.maxDegree.getOrElse(Config.MaxDegree),
+      config.heatRate.getOrElse(Config.HeatRate),
       config.maxRepeatCount.getOrElse(Config.MaxRepeatCount),
       config.maxNFASize.getOrElse(Config.MaxNFASize)
     )

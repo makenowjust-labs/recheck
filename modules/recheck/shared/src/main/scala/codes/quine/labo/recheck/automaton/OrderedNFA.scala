@@ -14,7 +14,8 @@ final case class OrderedNFA[A, Q](
     stateSet: Set[Q],
     inits: Seq[Q],
     acceptSet: Set[Q],
-    delta: Map[(Q, A), Seq[Q]]
+    delta: Map[(Q, A), Seq[Q]],
+    sourcemap: Map[(Q, A, Q), Seq[(Int, Int)]] = Map.empty[(Q, A, Q), Seq[(Int, Int)]]
 ) {
 
   /** Renames its states as integers. */
@@ -25,7 +26,8 @@ final case class OrderedNFA[A, Q](
       f.values.toSet,
       inits.map(f),
       acceptSet.map(f),
-      delta.map { case (q1, a) -> qs => (f(q1), a) -> qs.map(f) }
+      delta.map { case (q1, a) -> qs => (f(q1), a) -> qs.map(f) },
+      sourcemap.map { case ((q1, a, q2), pos) => (f(q1), a, f(q2)) -> pos }
     )
   }
 
@@ -36,7 +38,8 @@ final case class OrderedNFA[A, Q](
       stateSet,
       inits,
       acceptSet,
-      delta.map { case ((q1, a), q2) => ((q1, f(a)), q2) }
+      delta.map { case ((q1, a), q2) => ((q1, f(a)), q2) },
+      sourcemap.map { case ((q1, a, q2), pos) => ((q1, f(a), q2), pos) }
     )
 
   /** Reverses this NFA.
@@ -69,6 +72,8 @@ final case class OrderedNFA[A, Q](
       val newStateSet = Set.newBuilder[(Q, Set[Q])]
       val newInits = ctx.interrupt(MultiSet.from(for (q <- inits; p <- reverseDFA.stateSet) yield (q, p)))
       val newAcceptSet = ctx.interrupt(for (q <- acceptSet) yield (q, reverseDFA.init))
+      val newSourcemap =
+        mutable.Map.empty[((Q, Set[Q]), (A, Set[Q]), (Q, Set[Q])), Seq[(Int, Int)]].withDefaultValue(Vector.empty)
 
       val newDelta =
         mutable.Map.empty[((Q, Set[Q]), (A, Set[Q])), MultiSet[(Q, Set[Q])]].withDefaultValue(MultiSet.empty)
@@ -85,6 +90,9 @@ final case class OrderedNFA[A, Q](
             .takeWhile(!_._1)
             .map { case (_, q2) => (q2, p2) }
           newDelta(((q1, p1), (a, p2))) = newDelta(((q1, p1), (a, p2))) ++ MultiSet.from(qp2s)
+          for ((q2, p2) <- qp2s) {
+            newSourcemap(((q1, p1), (a, p2), (q2, p2))) ++= sourcemap.getOrElse((q1, a, q2), Vector.empty)
+          }
 
           newAlphabet.addOne((a, p2))
           newStateSet.addOne((q1, p1)).addAll(qp2s)
@@ -94,7 +102,15 @@ final case class OrderedNFA[A, Q](
         }
       }
 
-      NFAwLA(newAlphabet.result(), newStateSet.result(), newInits, newAcceptSet, newDelta.toMap, reverseDFA)
+      NFAwLA(
+        newAlphabet.result(),
+        newStateSet.result(),
+        newInits,
+        newAcceptSet,
+        newDelta.toMap,
+        reverseDFA,
+        newSourcemap.toMap.filter(_._2.nonEmpty)
+      )
     }
 
   /** Converts to Graphviz format text. */

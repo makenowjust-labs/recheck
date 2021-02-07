@@ -92,8 +92,8 @@ final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]) {
   }
 
   /** Computes a path from the sources to the target. */
-  def path(sources: Set[V], target: V): Option[Seq[L]] = {
-    val queue = mutable.Queue.empty[(V, Seq[L])]
+  def path(sources: Set[V], target: V): Option[(Seq[(V, L)], V)] = {
+    val queue = mutable.Queue.empty[(V, Seq[(V, L)])]
     val visited = mutable.Set.empty[V]
 
     queue.enqueueAll(sources.map((_, Vector.empty)))
@@ -101,11 +101,9 @@ final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]) {
 
     while (queue.nonEmpty) {
       val (v1, path) = queue.dequeue()
-      if (v1 == target) {
-        return Some(path)
-      }
+      if (v1 == target) return Some((path, v1))
       for ((l, v2) <- neighbors(v1); if !visited.contains(v2)) {
-        queue.enqueue((v2, path :+ l))
+        queue.enqueue((v2, path :+ (v1, l)))
         visited.add(v2)
       }
     }

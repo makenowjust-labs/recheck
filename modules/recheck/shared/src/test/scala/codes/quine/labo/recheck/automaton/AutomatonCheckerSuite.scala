@@ -7,6 +7,8 @@ import scala.util.Try
 import codes.quine.labo.recheck.automaton.Complexity._
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.data.IChar
+import codes.quine.labo.recheck.diagnostics.Hotspot
+import codes.quine.labo.recheck.diagnostics.Hotspot._
 import codes.quine.labo.recheck.regexp.Parser
 
 class AutomatonCheckerSuite extends munit.FunSuite {
@@ -43,15 +45,29 @@ class AutomatonCheckerSuite extends munit.FunSuite {
     val other = IChar('a').complement(false)
     assertEquals(
       check("^.*a.*a$", "s"),
-      Success(Polynomial(2, Witness(Seq((Seq(a), Seq(a))), Seq(other))))
+      Success(
+        Polynomial(2, Witness(Seq((Seq(a), Seq(a))), Seq(other)), Hotspot(Seq(Spot(1, 2, Heat), Spot(3, 5, Heat))))
+      )
     )
     assertEquals(
       check("^(.a)*a(.a)*a$", "s"),
-      Success(Polynomial(2, Witness(Seq((Seq(a, a), Seq(a, a))), Seq(a, other, a, a, a))))
+      Success(
+        Polynomial(
+          2,
+          Witness(Seq((Seq(a, a), Seq(a, a))), Seq(a, other, a, a, a)),
+          Hotspot(Seq(Spot(2, 4, Heat), Spot(6, 7, Heat), Spot(8, 10, Heat)))
+        )
+      )
     )
     assertEquals(
       check("^.*a.*a.*a$", "s"),
-      Success(Polynomial(3, Witness(Seq((Seq(other), Seq(a)), (Seq.empty, Seq(a))), Seq(other))))
+      Success(
+        Polynomial(
+          3,
+          Witness(Seq((Seq(other), Seq(a)), (Seq.empty, Seq(a))), Seq(other)),
+          Hotspot(Seq(Spot(1, 2, Heat), Spot(3, 5, Heat), Spot(6, 8, Heat)))
+        )
+      )
     )
   }
 
@@ -62,19 +78,31 @@ class AutomatonCheckerSuite extends munit.FunSuite {
     val other2 = IChar.union(Seq(a, b)).complement(false)
     assertEquals(
       check("^(a|a)*$", ""),
-      Success(Exponential(Witness(Seq((Seq(a), Seq(a))), Seq(other1))))
+      Success(
+        Exponential(Witness(Seq((Seq(a), Seq(a))), Seq(other1)), Hotspot(Seq(Spot(2, 3, Heat), Spot(4, 5, Heat))))
+      )
     )
     assertEquals(
       check("^((a)*)*$", ""),
-      Success(Exponential(Witness(Seq((Seq(a), Seq(a))), Seq(other1))))
+      Success(Exponential(Witness(Seq((Seq(a), Seq(a))), Seq(other1)), Hotspot(Seq(Spot(3, 4, Heat)))))
     )
     assertEquals(
       check("^(a|b|ab)*$", ""),
-      Success(Exponential(Witness(Seq((Seq(a), Seq(a, b))), Seq(other2))))
+      Success(
+        Exponential(
+          Witness(Seq((Seq(a), Seq(a, b))), Seq(other2)),
+          Hotspot(Seq(Spot(2, 3, Heat), Spot(4, 5, Heat), Spot(6, 8, Heat)))
+        )
+      )
     )
     assertEquals(
       check("^(aa|b|aab)*$", ""),
-      Success(Exponential(Witness(Seq((Seq(a, a), Seq(b, a, a, b, a, a))), Seq(other2))))
+      Success(
+        Exponential(
+          Witness(Seq((Seq(a, a), Seq(b, a, a, b, a, a))), Seq(other2)),
+          Hotspot(Seq(Spot(2, 4, Heat), Spot(5, 6, Heat), Spot(7, 10, Heat)))
+        )
+      )
     )
   }
 }

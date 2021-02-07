@@ -7,7 +7,7 @@ const worker = (() => {
       if (webWorker === null) {
         webWorker = new Worker(params.workerJS);
       }
-    
+
       webWorker.postMessage({ input });
       return new Promise(resolve => {
         const handle = e => {
@@ -57,5 +57,17 @@ window.checker = () => ({
     this.checkedResult = null;
 
     worker.cancel();
+  },
+  get checkedHotspot() {
+    const input = this.checkedResult.source;
+    let index = 0;
+    const parts = [];
+    for (const { start, end, temperature } of this.checkedResult.hotspot) {
+      if (index < start) parts.push({ text: input.substring(index, start) });
+      parts.push({ text: input.substring(start, end), temperature });
+      index = end;
+    }
+    if (index < input.length) parts.push({ text: input.substring(index) });
+    return parts;
   },
 });

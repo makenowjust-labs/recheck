@@ -56,10 +56,10 @@ class GraphSuite extends munit.FunSuite {
         (3, 'e', 5)
       )
     )
-    assertEquals(g.path(Set(1), 4), Some(IndexedSeq('a', 'b', 'd')))
-    assertEquals(g.path(Set(1), 5), Some(IndexedSeq('a', 'b', 'e')))
+    assertEquals(g.path(Set(1), 4), Some((IndexedSeq((1, 'a'), (2, 'b'), (3, 'd')), 4)))
+    assertEquals(g.path(Set(1), 5), Some((IndexedSeq((1, 'a'), (2, 'b'), (3, 'e')), 5)))
     assertEquals(g.path(Set(4), 5), None)
-    assertEquals(g.path(Set(4, 3), 5), Some(IndexedSeq('e')))
+    assertEquals(g.path(Set(4, 3), 5), Some((IndexedSeq((3, 'e')), 5)))
   }
 
   test("Graph#reachable") {

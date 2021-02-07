@@ -131,6 +131,10 @@ An integer value of a number of iterations on the incubation phase. (default: `3
 
 An integer value of a maximum degree to attempt on building an attack string. (default: `4`)
 
+#### `heatRate`
+
+A rate of a hotspot steps by the maximum steps. (default: `0.001`)
+
 #### `maxRepeatCount`
 
 An integer value of a limit of repetition count in the RegExp. (default: `20`)

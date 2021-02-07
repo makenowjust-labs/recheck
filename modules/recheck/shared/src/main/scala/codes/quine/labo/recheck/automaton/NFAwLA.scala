@@ -21,7 +21,9 @@ final case class NFAwLA[A, Q](
     initSet: MultiSet[(Q, Set[Q])],
     acceptSet: Set[(Q, Set[Q])],
     delta: Map[((Q, Set[Q]), (A, Set[Q])), MultiSet[(Q, Set[Q])]],
-    lookAheadDFA: DFA[A, Set[Q]]
+    lookAheadDFA: DFA[A, Set[Q]],
+    sourcemap: Map[((Q, Set[Q]), (A, Set[Q]), (Q, Set[Q])), Seq[(Int, Int)]] =
+      Map.empty[((Q, Set[Q]), (A, Set[Q]), (Q, Set[Q])), Seq[(Int, Int)]]
 ) {
 
   /** Exports this transition function as a graph. */
