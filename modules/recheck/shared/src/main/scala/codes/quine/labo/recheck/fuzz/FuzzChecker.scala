@@ -32,7 +32,8 @@ object FuzzChecker {
       maxSeedSize: Int = 100,
       maxGenerationSize: Int = 100,
       maxIteration: Int = 30,
-      maxDegree: Int = 4
+      maxDegree: Int = 4,
+      heatRate: Double = 0.001
   )(implicit ctx: Context): Option[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)] =
     ctx.interrupt {
       new FuzzChecker(
@@ -47,7 +48,8 @@ object FuzzChecker {
         maxSeedSize,
         maxGenerationSize,
         maxIteration,
-        maxDegree
+        maxDegree,
+        heatRate
       ).check()
     }
 
@@ -104,7 +106,8 @@ private[fuzz] final class FuzzChecker(
     val maxSeedSize: Int,
     val maxGenerationSize: Int,
     val maxIteration: Int,
-    val maxDegree: Int
+    val maxDegree: Int,
+    val heatRate: Double
 )(implicit val ctx: Context) {
 
   import ctx._
@@ -341,7 +344,7 @@ private[fuzz] final class FuzzChecker(
       try VM.execute(ir, input, 0, t)
       catch {
         case _: LimitException =>
-          return Some((str.toAttackPattern, t.buildHotspot()))
+          return Some((str.toAttackPattern, t.buildHotspot(heatRate)))
       }
     }
     None

@@ -29,15 +29,20 @@ object ReDoS {
       _ <- Try(()) // Ensures `Try` context.
       pattern <- Parser.parse(source, flags)
       diagnostics <- checker match {
-        case Checker.Automaton => checkAutomaton(pattern, config)
-        case Checker.Fuzz      => checkFuzz(pattern, config)
-        case Checker.Hybrid    => checkHybrid(pattern, config)
+        case Checker.Automaton => checkAutomaton(source, flags, pattern, config)
+        case Checker.Fuzz      => checkFuzz(source, flags, pattern, config)
+        case Checker.Hybrid    => checkHybrid(source, flags, pattern, config)
       }
     } yield diagnostics
-    result.recover { case ex: ReDoSException => Diagnostics.Unknown.from(ex) }.get
+    result.recover { case ex: ReDoSException => Diagnostics.Unknown.from(source, flags, ex) }.get
   }
 
-  private[recheck] def checkAutomaton(pattern: Pattern, config: Config): Try[Diagnostics] = {
+  private[recheck] def checkAutomaton(
+      source: String,
+      flags: String,
+      pattern: Pattern,
+      config: Config
+  ): Try[Diagnostics] = {
     import config._
     val maxNFASize = if (checker == Checker.Hybrid) config.maxNFASize else Int.MaxValue
 
@@ -65,9 +70,9 @@ object ReDoS {
       .map {
         case Some(vul: Complexity.Vulnerable[UChar]) =>
           val attack = vul.buildAttackPattern(attackLimit, maxAttackSize)
-          Diagnostics.Vulnerable(vul.toAttackComplexity, attack, Checker.Automaton)
-        case Some(safe: Complexity.Safe) => Diagnostics.Safe(safe.toAttackComplexity, Checker.Automaton)
-        case None                        => Diagnostics.Safe(AttackComplexity.Safe(false), Checker.Automaton)
+          Diagnostics.Vulnerable(source, flags, vul.toAttackComplexity, attack, vul.hotspot, Checker.Automaton)
+        case Some(safe: Complexity.Safe) => Diagnostics.Safe(source, flags, safe.toAttackComplexity, Checker.Automaton)
+        case None                        => Diagnostics.Safe(source, flags, AttackComplexity.Safe(false), Checker.Automaton)
       }
       .recoverWith { case ex: ReDoSException =>
         ex.checker = Some(Checker.Automaton)
@@ -75,7 +80,7 @@ object ReDoS {
       }
   }
 
-  private[recheck] def checkFuzz(pattern: Pattern, config: Config): Try[Diagnostics] = {
+  private[recheck] def checkFuzz(source: String, flags: String, pattern: Pattern, config: Config): Try[Diagnostics] = {
     import config._
 
     val result = FuzzIR.from(pattern).map { fuzz =>
@@ -90,14 +95,17 @@ object ReDoS {
         maxAttackSize,
         maxSeedSize,
         maxGenerationSize,
-        maxIteration
+        maxIteration,
+        maxDegree,
+        heatRate
       )
     }
 
     result
       .map {
-        case Some((attack, complexity, _)) => Diagnostics.Vulnerable(attack, complexity, Checker.Fuzz)
-        case None                          => Diagnostics.Safe(AttackComplexity.Safe(true), Checker.Fuzz)
+        case Some((attack, complexity, hotspot)) =>
+          Diagnostics.Vulnerable(source, flags, attack, complexity, hotspot, Checker.Fuzz)
+        case None => Diagnostics.Safe(source, flags, AttackComplexity.Safe(true), Checker.Fuzz)
       }
       .recoverWith { case ex: ReDoSException =>
         ex.checker = Some(Checker.Fuzz)
@@ -105,8 +113,10 @@ object ReDoS {
       }
   }
 
-  private[recheck] def checkHybrid(pattern: Pattern, config: Config): Try[Diagnostics] =
-    checkAutomaton(pattern, config).recoverWith { case _: UnsupportedException => checkFuzz(pattern, config) }
+  private[recheck] def checkHybrid(source: String, flags: String, pattern: Pattern, config: Config): Try[Diagnostics] =
+    checkAutomaton(source, flags, pattern, config).recoverWith { case _: UnsupportedException =>
+      checkFuzz(source, flags, pattern, config)
+    }
 
   /** Gets a sum of repeat specifier counts. */
   private[recheck] def repeatCount(pattern: Pattern)(implicit ctx: Context): Int =

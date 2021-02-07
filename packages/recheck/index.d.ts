@@ -106,6 +106,12 @@ export type Config = {
    */
   maxDegree?: number;
 
+   /**
+    * A rate of a hotspot steps by the maximum steps.
+    * (default: `0.001`)
+    */
+  heatRate?: number;
+
   /**
    * An integer value of a limit of repetition count in the RegExp. (default: `20`)
    *
@@ -146,6 +152,8 @@ export type Diagnostics = SafeDiagnostics | VulnerableDiagnostics | UnknownDiagn
  * SafeDiagnostics is a diagnostics against a safe RegExp.
  */
 export type SafeDiagnostics = {
+  source: string;
+  flags: string;
   status: "safe";
   checker: "automaton" | "fuzz";
   complexity: SafeComplexity;
@@ -155,16 +163,21 @@ export type SafeDiagnostics = {
  * VulnerableDiagnostics is a diagnostics against a vulnerable RegExp.
  */
 export type VulnerableDiagnostics = {
+  source: string;
+  flags: string;
   status: "vulnerable";
   checker: "automaton" | "fuzz";
   attack: AttackPattern;
   complexity: VulnerableComplexity;
+  hotspot: Hotspot[];
 };
 
 /**
  * UnknownDiagnostics is a diagnostics when an error is occurred on analyzing.
  */
 export type UnknownDiagnostics = {
+  source: string;
+  flags: string;
   status: "unknown";
   checker?: "automaton" | "fuzz";
   error: Error;
@@ -200,6 +213,15 @@ export type PolynomialComplexity = {
 export type ExponentialComplexity = {
   type: "exponential";
   isFuzz: boolean;
+};
+
+/**
+ * Hotspot is a hotspot of the RegExp pattern.
+ */
+export type Hotspot = {
+  start: number;
+  end: number;
+  temperature: "heat" | "normal";
 };
 
 /**
