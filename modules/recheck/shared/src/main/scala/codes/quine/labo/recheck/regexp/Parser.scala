@@ -102,21 +102,21 @@ object Parser {
     var currentIndex = 0
 
     def loop(node: Node): Node = node match {
-      case Disjunction(ns) => Disjunction(ns.map(loop)).withPos(node)
-      case Sequence(ns)    => Sequence(ns.map(loop)).withPos(node)
+      case Disjunction(ns) => Disjunction(ns.map(loop)).withLoc(node)
+      case Sequence(ns)    => Sequence(ns.map(loop)).withLoc(node)
       case Capture(_, n) =>
         currentIndex += 1
-        Capture(currentIndex, loop(n)).withPos(node)
+        Capture(currentIndex, loop(n)).withLoc(node)
       case NamedCapture(_, name, n) =>
         currentIndex += 1
-        NamedCapture(currentIndex, name, loop(n)).withPos(node)
-      case Group(n)                       => Group(loop(n)).withPos(node)
-      case Star(nonGreedy, n)             => Star(nonGreedy, loop(n)).withPos(node)
-      case Plus(nonGreedy, n)             => Plus(nonGreedy, loop(n)).withPos(node)
-      case Question(nonGreedy, n)         => Question(nonGreedy, loop(n)).withPos(node)
-      case Repeat(nonGreedy, min, max, n) => Repeat(nonGreedy, min, max, loop(n)).withPos(node)
-      case LookAhead(negative, n)         => LookAhead(negative, loop(n)).withPos(node)
-      case LookBehind(negative, n)        => LookBehind(negative, loop(n)).withPos(node)
+        NamedCapture(currentIndex, name, loop(n)).withLoc(node)
+      case Group(n)                       => Group(loop(n)).withLoc(node)
+      case Star(nonGreedy, n)             => Star(nonGreedy, loop(n)).withLoc(node)
+      case Plus(nonGreedy, n)             => Plus(nonGreedy, loop(n)).withLoc(node)
+      case Question(nonGreedy, n)         => Question(nonGreedy, loop(n)).withLoc(node)
+      case Repeat(nonGreedy, min, max, n) => Repeat(nonGreedy, min, max, loop(n)).withLoc(node)
+      case LookAhead(negative, n)         => LookAhead(negative, loop(n)).withLoc(node)
+      case LookBehind(negative, n)        => LookBehind(negative, loop(n)).withLoc(node)
       case _                              => node
     }
 
@@ -154,7 +154,7 @@ private[regexp] final class Parser(
     * }}}
     */
   def Disjunction[_: P]: P[Node] =
-    P(WithPos {
+    P(WithLoc {
       (Sequence ~ ("|" ~ Sequence).rep).map {
         case (node, Seq()) => node
         case (node, nodes) => Pattern.Disjunction(node +: nodes)
@@ -167,7 +167,7 @@ private[regexp] final class Parser(
     * }}}
     */
   def Sequence[_: P]: P[Node] =
-    P(WithPos {
+    P(WithLoc {
       (!CharPred(isSequenceDelimiter) ~ Term).rep.map {
         case Seq(node) => node
         case nodes     => Pattern.Sequence(nodes)
@@ -180,7 +180,7 @@ private[regexp] final class Parser(
     * }}}
     */
   def Term[_: P]: P[Node] =
-    P(WithPos {
+    P(WithLoc {
       Atom.flatMap {
         case node: Pattern.LookAhead if !additional => Pass(node)
         case node: Pattern.LookBehind               => Pass(node)
@@ -228,7 +228,7 @@ private[regexp] final class Parser(
     * }}}
     */
   def Atom[_: P]: P[Node] =
-    P(WithPos {
+    P(WithLoc {
       "." ~ Pass(Pattern.Dot()) |
         "^" ~ Pass(Pattern.LineBegin()) |
         "$" ~ Pass(Pattern.LineEnd()) |
@@ -249,7 +249,7 @@ private[regexp] final class Parser(
     * }}}
     */
   def Class[_: P]: P[Node] =
-    P(WithPos {
+    P(WithLoc {
       ("[" ~/ (("^": P[Unit]).map(_ => true) | Pass(false)) ~ (!"]" ~/ ClassNode).rep ~ "]").map {
         case (invert, items) => Pattern.CharacterClass(invert, items)
       }
@@ -303,7 +303,7 @@ private[regexp] final class Parser(
     * }}}
     */
   def Escape[_: P]: P[Node] =
-    P(WithPos {
+    P(WithLoc {
       WordBoundary |
         (if (hasNamedCapture) NamedBackReference else Fail) |
         BackReference |
@@ -316,7 +316,7 @@ private[regexp] final class Parser(
     * }}}
     */
   def WordBoundary[_: P]: P[Node] =
-    P(WithPos {
+    P(WithLoc {
       "\\b" ~ Pass(Pattern.WordBoundary(false)) |
         "\\B" ~ Pass(Pattern.WordBoundary(true))
     })
@@ -326,7 +326,7 @@ private[regexp] final class Parser(
     * }}}
     */
   def BackReference[_: P]: P[Node] =
-    P(WithPos {
+    P(WithLoc {
       "\\" ~ !"0" ~ Digits.flatMap {
         case x if additional && !unicode =>
           if (x <= captures) Pass(Pattern.BackReference(x)) else Fail
@@ -339,7 +339,7 @@ private[regexp] final class Parser(
     * }}}
     */
   def NamedBackReference[_: P]: P[Node] =
-    P(WithPos {
+    P(WithLoc {
       ("\\k<" ~ CaptureName ~ ">").map(Pattern.NamedBackReference)
     })
 
@@ -349,7 +349,7 @@ private[regexp] final class Parser(
     * }}}
     */
   def EscapeClass[_: P]: P[Node with ClassNode] =
-    P(WithPos {
+    P(WithLoc {
       ("\\w" ~ Pass(Pattern.SimpleEscapeClass(false, Pattern.EscapeClassKind.Word))) |
         ("\\W" ~ Pass(Pattern.SimpleEscapeClass(true, Pattern.EscapeClassKind.Word))) |
         ("\\d" ~ Pass(Pattern.SimpleEscapeClass(false, Pattern.EscapeClassKind.Digit))) |
@@ -367,7 +367,7 @@ private[regexp] final class Parser(
     * }}}
     */
   def UnicodeEscapeClass[_: P]: P[Node with ClassNode] =
-    P(WithPos {
+    P(WithLoc {
       (("\\p{" ~ Pass(false) | "\\P{" ~ Pass(true)) ~/ UnicodePropertyName ~ ("=" ~ UnicodePropertyValue).? ~/ "}")
         .map {
           case (invert, p, None)    => Pattern.UnicodeProperty(invert, p)
@@ -482,7 +482,7 @@ private[regexp] final class Parser(
     * }}}
     */
   def Paren[_: P]: P[Node] =
-    P(WithPos {
+    P(WithLoc {
       ("(" ~ !"?" ~/ Disjunction ~ ")").map(Pattern.Capture(-1, _)) | // `-1` is dummy index.
         ("(?:" ~/ Disjunction ~ ")").map(Pattern.Group) |
         ("(?=" ~/ Disjunction ~ ")").map(Pattern.LookAhead(false, _)) |
@@ -524,9 +524,9 @@ private[regexp] final class Parser(
     */
   def HexDigit[_: P]: P[Unit] = P(CharPred(isHexDigit))
 
-  /** Wraps the given parser with adding the position. */
-  def WithPos[_: P, A <: Node](parser: => P[A]): P[A] =
-    P((Index ~ parser ~ Index).map { case (start, node, end) => node.withPos(start, end) })
+  /** Wraps the given parser with adding the location. */
+  def WithLoc[_: P, A <: Node](parser: => P[A]): P[A] =
+    P((Index ~ parser ~ Index).map { case (start, node, end) => node.withLoc(start, end) })
 
   /** Tests whether the character is digit or not. */
   private def isDigit(c: Char): Boolean =

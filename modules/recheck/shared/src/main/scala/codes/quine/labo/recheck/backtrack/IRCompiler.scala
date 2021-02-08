@@ -66,26 +66,26 @@ object IRCompiler {
               loop(n, false).map(IRBlock.lookAround(negative, _))
             case Character(c0) =>
               val c = if (ignoreCase) UChar.canonicalize(c0, unicode) else c0
-              Success(IRBlock.char(IR.Char(c, node.pos), forward))
+              Success(IRBlock.char(IR.Char(c, node.loc), forward))
             case node @ CharacterClass(invert, _) =>
               node.toIChar(unicode).map { ch0 =>
                 val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
-                IRBlock.char(if (invert) IR.ClassNot(ch, node.pos) else IR.Class(ch, node.pos), forward)
+                IRBlock.char(if (invert) IR.ClassNot(ch, node.loc) else IR.Class(ch, node.loc), forward)
               }
             case node: AtomNode =>
               node.toIChar(unicode).map { ch0 =>
                 val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
-                IRBlock.char(IR.Class(ch, node.pos), forward)
+                IRBlock.char(IR.Class(ch, node.loc), forward)
               }
             case Dot() =>
-              Success(IRBlock.char(if (dotAll) IR.Any(node.pos) else IR.Dot(node.pos), forward))
+              Success(IRBlock.char(if (dotAll) IR.Any(node.loc) else IR.Dot(node.loc), forward))
             case BackReference(i) =>
               if (i <= 0 || capsSize < i) Failure(new InvalidRegExpException("invalid back-reference"))
-              else Success(IRBlock(IndexedSeq(if (forward) IR.Ref(i, node.pos) else IR.RefBack(i, node.pos)), false))
+              else Success(IRBlock(IndexedSeq(if (forward) IR.Ref(i, node.loc) else IR.RefBack(i, node.loc)), false))
             case NamedBackReference(name) =>
               names.get(name) match {
                 case Some(i) =>
-                  Success(IRBlock(IndexedSeq(if (forward) IR.Ref(i, node.pos) else IR.RefBack(i, node.pos)), false))
+                  Success(IRBlock(IndexedSeq(if (forward) IR.Ref(i, node.loc) else IR.RefBack(i, node.loc)), false))
                 case None => Failure(new InvalidRegExpException("invalid named back-reference"))
               }
           })

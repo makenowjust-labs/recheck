@@ -109,13 +109,13 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
         val d = mutable.Map.empty[IChar, Seq[(CharInfo, Seq[Q])]].withDefaultValue(Vector.empty)
         for ((_, p) <- qps) {
           p match {
-            case Some(Consume(chs, q1, pos)) =>
+            case Some(Consume(chs, q1, loc)) =>
               for (ch <- chs) {
                 val c1 = CharInfo.from(ch)
                 val qps1 = closure(c1, q1)
                 val qs1 = qps1.map(_._1)
                 d(ch) = d(ch) :+ (c1, qs1)
-                newSourcemap(((c0, qs0), ch, (c1, qs1))) ++= pos
+                newSourcemap(((c0, qs0), ch, (c1, qs1))) ++= loc
                 if (!newStateSet.contains((c1, qs1))) {
                   queue.enqueue((c1, qps1))
                   newStateSet.addOne((c1, qs1))
@@ -154,7 +154,7 @@ object EpsNFA {
   final case class Assert[Q](kind: AssertKind, to: Q) extends Transition[Q]
 
   /** Consume is an ε-NFA transition with consuming a character. */
-  final case class Consume[Q](set: Set[IChar], to: Q, pos: Option[(Int, Int)] = None) extends Transition[Q]
+  final case class Consume[Q](set: Set[IChar], to: Q, loc: Option[(Int, Int)] = None) extends Transition[Q]
 
   /** LoopEnter is an ε-NFA transition with consuming no character and marking a entering of the loop. */
   final case class LoopEnter[Q](loop: Int, to: Q) extends Transition[Q]

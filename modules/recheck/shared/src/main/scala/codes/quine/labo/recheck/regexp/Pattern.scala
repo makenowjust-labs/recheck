@@ -225,19 +225,13 @@ object Pattern {
     /** A internal field of the position of this node. */
     private var _pos: Option[(Int, Int)] = None
 
-    /** Returns the position of this node. */
-    def pos: Option[(Int, Int)] = _pos
-
-    /** Returns the start position of this node. */
-    def startPos: Option[Int] = pos.map(_._1)
-
-    /** Returns the end position of this node. */
-    def endPos: Option[Int] = pos.map(_._2)
+    /** Returns the location of this node. */
+    def loc: Option[(Int, Int)] = _pos
 
     /** Returns a new node with the given position. */
-    def withPos(start: Int, end: Int): this.type = {
+    def withLoc(start: Int, end: Int): this.type = {
       // If the position is already set, it returns `this` instead of an allocation.
-      if (pos.exists { case (s, e) => s == start && e == end }) this
+      if (loc.exists { case (s, e) => s == start && e == end }) this
       else {
         val cloned = clone().asInstanceOf[this.type]
         cloned._pos = Some((start, end))
@@ -245,10 +239,10 @@ object Pattern {
       }
     }
 
-    /** Copies the position from the given node if possible. */
-    def withPos(node: Node): this.type =
-      node.pos match {
-        case Some((start, end)) => withPos(start, end)
+    /** Copies the location from the given node if possible. */
+    def withLoc(node: Node): this.type =
+      node.loc match {
+        case Some((start, end)) => withLoc(start, end)
         case None               => this
       }
   }

@@ -35,11 +35,11 @@ object IR {
   /** Consumable is a trait for consumable op-codes like `any` or `char`. */
   trait Consumable { code: OpCode =>
 
-    /** A position corresponding to this op-code. */
-    def pos: Option[(Int, Int)]
+    /** A location corresponding to this op-code. */
+    def loc: Option[(Int, Int)]
 
-    /** Returns a string representation of the position. */
-    protected def posToString: String = pos match {
+    /** Returns a string representation of the location. */
+    protected def locToString: String = loc match {
       case Some((start, end)) => s" ; $start-$end"
       case None               => ""
     }
@@ -51,8 +51,8 @@ object IR {
     *
     * This op-code is used for dot pattern `.` when the pattern is `dotAll`.
     */
-  final case class Any(pos: Option[(Int, Int)] = None) extends OpCode with Consumable {
-    override def toString: String = s"any$posToString"
+  final case class Any(loc: Option[(Int, Int)] = None) extends OpCode with Consumable {
+    override def toString: String = s"any$locToString"
   }
 
   /** `back`: Go back `pos` to the previous character.
@@ -69,8 +69,8 @@ object IR {
     *
     * `c` is canonical when the pattern is `ignoreCase`.
     */
-  final case class Char(c: UChar, pos: Option[(Int, Int)] = None) extends OpCode with Consumable {
-    override def toString: String = s"char\t'$c'$posToString"
+  final case class Char(c: UChar, loc: Option[(Int, Int)] = None) extends OpCode with Consumable {
+    override def toString: String = s"char\t'$c'$locToString"
   }
 
   /** `class s`: Try to match the current character with the character set `s`.
@@ -78,8 +78,8 @@ object IR {
     *
     * `s` is canonical when the pattern is `ignoreCase`.
     */
-  final case class Class(s: IChar, pos: Option[(Int, Int)] = None) extends OpCode with Consumable {
-    override def toString: String = s"class\t$s$posToString"
+  final case class Class(s: IChar, loc: Option[(Int, Int)] = None) extends OpCode with Consumable {
+    override def toString: String = s"class\t$s$locToString"
   }
 
   /** `class_not s`: Try to match the current character with the character set `s`.
@@ -87,8 +87,8 @@ object IR {
     *
     * `s` is canonical when the pattern is `ignoreCase`.
     */
-  final case class ClassNot(s: IChar, pos: Option[(Int, Int)] = None) extends OpCode with Consumable {
-    override def toString: String = s"class_not\t$s$posToString"
+  final case class ClassNot(s: IChar, loc: Option[(Int, Int)] = None) extends OpCode with Consumable {
+    override def toString: String = s"class_not\t$s$locToString"
   }
 
   /** `cap_begin i`: Save the current `pos` as the begin position of the capture `i`.
@@ -130,8 +130,8 @@ object IR {
     *
     * This op-code is used for dot pattern `.` when the pattern is not `dotAll`.
     */
-  final case class Dot(pos: Option[(Int, Int)] = None) extends OpCode with Consumable {
-    override def toString: String = s"dot$posToString"
+  final case class Dot(loc: Option[(Int, Int)] = None) extends OpCode with Consumable {
+    override def toString: String = s"dot$locToString"
   }
 
   /** `empty_check`: Pop the old `pos` from pos stack, and compare with the current `pos`.
@@ -240,8 +240,8 @@ object IR {
     *
     * Note that an unmatched capture is treated as an empty string.
     */
-  final case class Ref(i: Int, pos: Option[(Int, Int)] = None) extends OpCode with Consumable {
-    override def toString: String = s"ref\t$i$posToString"
+  final case class Ref(i: Int, loc: Option[(Int, Int)] = None) extends OpCode with Consumable {
+    override def toString: String = s"ref\t$i$locToString"
   }
 
   /** `ref_back i`: Try to match the capture `i` from the current `pos` in reverse order.
@@ -249,8 +249,8 @@ object IR {
     *
     * Note that an unmatched capture is treated as an empty string.
     */
-  final case class RefBack(i: Int, pos: Option[(Int, Int)] = None) extends OpCode with Consumable {
-    override def toString: String = s"ref_back\t$i$posToString"
+  final case class RefBack(i: Int, loc: Option[(Int, Int)] = None) extends OpCode with Consumable {
+    override def toString: String = s"ref_back\t$i$locToString"
   }
 
   /** `restore_pos`: Pop the old `pos` from pos stack and set it to the current `pos`. */

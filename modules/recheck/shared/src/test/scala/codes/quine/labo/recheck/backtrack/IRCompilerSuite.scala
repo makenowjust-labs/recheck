@@ -858,7 +858,7 @@ class IRCompilerSuite extends munit.FunSuite {
       val pattern1 = Pattern(Sequence(Seq(LineBegin(), Character('a'))), flagSet1)
       val pattern2 = Pattern(Sequence(Seq(LineBegin(), Character('a'))), flagSet3) // ignoreCase
       val pattern3 = Pattern(Sequence(Seq(LineBegin(), Character('A'))), flagSet4) // ignoreCase + unicode
-      val pattern4 = Pattern(Sequence(Seq(LineBegin(), Character('a').withPos(1, 2))), flagSet1)
+      val pattern4 = Pattern(Sequence(Seq(LineBegin(), Character('a').withLoc(1, 2))), flagSet1)
       assertEquals(
         IRCompiler.compile(pattern1),
         Success(
@@ -896,7 +896,7 @@ class IRCompilerSuite extends munit.FunSuite {
           flagSet4
         ) // ignoreCase + unicode
       val pattern5 =
-        Pattern(Sequence(Seq(LineBegin(), CharacterClass(false, Seq(Character('a'))).withPos(1, 4))), flagSet1)
+        Pattern(Sequence(Seq(LineBegin(), CharacterClass(false, Seq(Character('a'))).withLoc(1, 4))), flagSet1)
       assertEquals(
         IRCompiler.compile(pattern1),
         Success(
@@ -954,7 +954,7 @@ class IRCompilerSuite extends munit.FunSuite {
       val pattern2 = Pattern(Sequence(Seq(LineBegin(), SimpleEscapeClass(false, EscapeClassKind.Word))), flagSet3)
       val pattern3 = Pattern(Sequence(Seq(LineBegin(), SimpleEscapeClass(false, EscapeClassKind.Word))), flagSet4)
       val pattern4 =
-        Pattern(Sequence(Seq(LineBegin(), SimpleEscapeClass(false, EscapeClassKind.Word).withPos(1, 3))), flagSet1)
+        Pattern(Sequence(Seq(LineBegin(), SimpleEscapeClass(false, EscapeClassKind.Word).withLoc(1, 3))), flagSet1)
       assertEquals(
         IRCompiler.compile(pattern1),
         Success(
@@ -1012,7 +1012,7 @@ class IRCompilerSuite extends munit.FunSuite {
     test("IRCompiler.compile: Dot") {
       val pattern1 = Pattern(Sequence(Seq(LineBegin(), Dot())), flagSet1)
       val pattern2 = Pattern(Sequence(Seq(LineBegin(), Dot())), flagSet5)
-      val pattern3 = Pattern(Sequence(Seq(LineBegin(), Dot().withPos(1, 2))), flagSet1)
+      val pattern3 = Pattern(Sequence(Seq(LineBegin(), Dot().withLoc(1, 2))), flagSet1)
       assertEquals(
         IRCompiler.compile(pattern1),
         Success(

@@ -84,8 +84,8 @@ object FuzzChecker {
 
       if (!backtrack) {
         ir.codes(pc) match {
-          case code: IR.Consumable if code.pos.isDefined =>
-            heatmap(code.pos.get) += 1
+          case code: IR.Consumable if code.loc.isDefined =>
+            heatmap(code.loc.get) += 1
           case _ => ()
         }
       }

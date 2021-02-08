@@ -73,28 +73,14 @@ class PatternSuite extends munit.FunSuite {
     }
   }
 
-  test("Pattern.Node#withPos") {
+  test("Pattern.Node#withLoc") {
     val node1 = Character('x')
-    val node2 = node1.withPos(0, 1)
-    val node3 = Character('y').withPos(node2)
-    assertEquals(node1.pos, None)
-    assertEquals(node2.pos, Some((0, 1)))
-    assertEquals(node3.pos, Some((0, 1)))
-    assert(clue(node2.withPos(0, 1)) eq clue(node2))
-  }
-
-  test("Pattern.Node#startPos") {
-    val node1 = Character('x')
-    val node2 = node1.withPos(0, 1)
-    assertEquals(node1.startPos, None)
-    assertEquals(node2.startPos, Some(0))
-  }
-
-  test("Pattern.Node#endPos") {
-    val node1 = Character('x')
-    val node2 = node1.withPos(0, 1)
-    assertEquals(node1.endPos, None)
-    assertEquals(node2.endPos, Some(1))
+    val node2 = node1.withLoc(0, 1)
+    val node3 = Character('y').withLoc(node2)
+    assertEquals(node1.loc, None)
+    assertEquals(node2.loc, Some((0, 1)))
+    assertEquals(node3.loc, Some((0, 1)))
+    assert(clue(node2.withLoc(0, 1)) eq clue(node2))
   }
 
   test("Pattern.showNode") {

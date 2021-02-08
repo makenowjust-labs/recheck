@@ -100,17 +100,17 @@ class ParserSuite extends munit.FunSuite {
     assertEquals(Parser.assignCaptureIndex(LookBehind(true, Capture(-1, Dot()))), LookBehind(true, Capture(1, Dot())))
 
     // Checks it keeps the position.
-    assertEquals(Parser.assignCaptureIndex(Disjunction(Seq(Dot(), Dot())).withPos(0, 3)).pos, Some((0, 3)))
-    assertEquals(Parser.assignCaptureIndex(Sequence(Seq(Dot(), Dot())).withPos(0, 2)).pos, Some((0, 2)))
-    assertEquals(Parser.assignCaptureIndex(Capture(-1, Dot()).withPos(0, 3)).pos, Some((0, 3)))
-    assertEquals(Parser.assignCaptureIndex(NamedCapture(-1, "x", Dot()).withPos(0, 7)).pos, Some((0, 7)))
-    assertEquals(Parser.assignCaptureIndex(Group(Dot()).withPos(0, 5)).pos, Some((0, 5)))
-    assertEquals(Parser.assignCaptureIndex(Star(false, Dot()).withPos(0, 2)).pos, Some((0, 2)))
-    assertEquals(Parser.assignCaptureIndex(Plus(false, Dot()).withPos(0, 2)).pos, Some((0, 2)))
-    assertEquals(Parser.assignCaptureIndex(Question(false, Dot()).withPos(0, 2)).pos, Some((0, 2)))
-    assertEquals(Parser.assignCaptureIndex(Repeat(false, 0, Some(Some(2)), Dot()).withPos(0, 6)).pos, Some((0, 6)))
-    assertEquals(Parser.assignCaptureIndex(LookAhead(false, Dot()).withPos(0, 5)).pos, Some((0, 5)))
-    assertEquals(Parser.assignCaptureIndex(LookBehind(false, Dot()).withPos(0, 6)).pos, Some((0, 6)))
+    assertEquals(Parser.assignCaptureIndex(Disjunction(Seq(Dot(), Dot())).withLoc(0, 3)).loc, Some((0, 3)))
+    assertEquals(Parser.assignCaptureIndex(Sequence(Seq(Dot(), Dot())).withLoc(0, 2)).loc, Some((0, 2)))
+    assertEquals(Parser.assignCaptureIndex(Capture(-1, Dot()).withLoc(0, 3)).loc, Some((0, 3)))
+    assertEquals(Parser.assignCaptureIndex(NamedCapture(-1, "x", Dot()).withLoc(0, 7)).loc, Some((0, 7)))
+    assertEquals(Parser.assignCaptureIndex(Group(Dot()).withLoc(0, 5)).loc, Some((0, 5)))
+    assertEquals(Parser.assignCaptureIndex(Star(false, Dot()).withLoc(0, 2)).loc, Some((0, 2)))
+    assertEquals(Parser.assignCaptureIndex(Plus(false, Dot()).withLoc(0, 2)).loc, Some((0, 2)))
+    assertEquals(Parser.assignCaptureIndex(Question(false, Dot()).withLoc(0, 2)).loc, Some((0, 2)))
+    assertEquals(Parser.assignCaptureIndex(Repeat(false, 0, Some(Some(2)), Dot()).withLoc(0, 6)).loc, Some((0, 6)))
+    assertEquals(Parser.assignCaptureIndex(LookAhead(false, Dot()).withLoc(0, 5)).loc, Some((0, 5)))
+    assertEquals(Parser.assignCaptureIndex(LookBehind(false, Dot()).withLoc(0, 6)).loc, Some((0, 6)))
   }
 
   test("Parser#Source") {
