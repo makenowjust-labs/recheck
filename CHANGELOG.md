@@ -1,3 +1,9 @@
+# dev
+
+Changes:
+
+- Add `hotspot` information to `Diagnostics`
+
 # 2.0.2 (2021-02-04)
 
 Fixes:
