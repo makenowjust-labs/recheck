@@ -1,7 +1,8 @@
-# dev
+# 2.1.0 (2021-02-08)
 
 Changes:
 
+- Add `loc` to RegExp AST nodes
 - Add `hotspot` information to `Diagnostics`
 
 # 2.0.2 (2021-02-04)

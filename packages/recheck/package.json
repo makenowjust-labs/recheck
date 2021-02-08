@@ -5,7 +5,7 @@
   "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
   "homepage": "https://makenowjust-labo.github.io/recheck/",
   "repository": "https://github.com/MakeNowJust-Labo/recheck.git",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "main": "recheck.bundle.js",
   "module": "recheck.js",
   "types": "index.d.ts",
