@@ -162,4 +162,4 @@ it switches to use fuzz checker to analyze instead of the automaton based checke
 
 MIT License.
 
-2020 (C) TSUYUSATO "MakeNowJust" Kitsune
+2020-2021 (C) TSUYUSATO "MakeNowJust" Kitsune
