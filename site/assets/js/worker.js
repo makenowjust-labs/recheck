@@ -13,13 +13,13 @@ const extract = input => {
 };
 
 onmessage = e => {
-  const { input } = e.data;
+  const { checker, input } = e.data;
   const extracted = extract(input);
   if (extracted === null) {
     postMessage({ status: 'unknown', error: { kind: 'invalid', message: 'invalid input' } });
     return;
   }
   const { source, flags } = extracted;
-  const result = check(source, flags, { timeout: TIMEOUT, checker: 'hybrid' });
+  const result = check(source, flags, { timeout: TIMEOUT, checker });
   postMessage(result);
 };

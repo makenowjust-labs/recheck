@@ -3,12 +3,12 @@ import * as params from '@params';
 const worker = (() => {
   let webWorker = null;
   return {
-    run(input) {
+    run(checker, input) {
       if (webWorker === null) {
         webWorker = new Worker(params.workerJS);
       }
 
-      webWorker.postMessage({ input });
+      webWorker.postMessage({ checker, input });
       return new Promise(resolve => {
         const handle = e => {
           resolve(e.data);
@@ -29,6 +29,7 @@ const worker = (() => {
 window.checker = () => ({
   state: 'init', // One of 'init', 'checking' or 'checked'.
   input: '/^(a|a)*$/',
+  checker: 'hybrid',
   checkedInput: '',
   checkedTime: 0,
   checkedResult: null,
@@ -42,7 +43,7 @@ window.checker = () => ({
 
     const input = this.input;
     const startTime = Date.now();
-    const result = await worker.run(input);
+    const result = await worker.run(this.checker, input);
     const checkedTime = Date.now() - startTime;
 
     this.state = 'checked';

@@ -18,7 +18,7 @@
               <div class="field-body">
                 <div class="field">
                   <p class="control">
-                    <textarea 
+                    <textarea
                       id="input"
                       class="textarea is-family-monospace"
                       placeholder="/^(a|a)*$/"
@@ -28,6 +28,22 @@
                     ></textarea>
                   </p>
                 </div>
+              </div>
+            </div>
+            <div class="field has-text-right">
+              <div class="control">
+                <label class="radio">
+                  <input type="radio" name="checker" value="hybrid" x-model="checker">
+                  Hybrid
+                </label>
+                <label class="radio">
+                  <input type="radio" name="checker" value="automaton" x-model="checker">
+                  Automaton
+                </label>
+                <label class="radio">
+                  <input type="radio" name="checker" value="fuzz" x-model="checker">
+                  Fuzz
+                </label>
               </div>
             </div>
             <div class="field has-text-right">
