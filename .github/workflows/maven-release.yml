@@ -2,7 +2,7 @@ name: Maven Release
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     tags: ["*"]
 
 jobs:
