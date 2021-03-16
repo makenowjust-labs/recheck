@@ -394,4 +394,53 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(Pattern(Dot(), flagSet).parts, Set.empty[UString])
     assertEquals(Pattern(Character('x'), flagSet).parts, Set.empty[UString])
   }
+
+  test("IRCompiler.capsSize") {
+    val flagSet = FlagSet(false, false, false, false, false, false)
+    assertEquals(Pattern(Disjunction(Seq(Capture(1, Dot()), Capture(2, Dot()))), flagSet).capsSize, 2)
+    assertEquals(Pattern(Sequence(Seq(Capture(1, Dot()), Capture(2, Dot()))), flagSet).capsSize, 2)
+    assertEquals(Pattern(Capture(1, Dot()), flagSet).capsSize, 1)
+    assertEquals(Pattern(Capture(1, Capture(2, Dot())), flagSet).capsSize, 2)
+    assertEquals(Pattern(NamedCapture(1, "x", Dot()), flagSet).capsSize, 1)
+    assertEquals(Pattern(NamedCapture(1, "x", Capture(2, Dot())), flagSet).capsSize, 2)
+    assertEquals(Pattern(Group(Dot()), flagSet).capsSize, 0)
+    assertEquals(Pattern(Star(false, Dot()), flagSet).capsSize, 0)
+    assertEquals(Pattern(Plus(false, Dot()), flagSet).capsSize, 0)
+    assertEquals(Pattern(Question(false, Dot()), flagSet).capsSize, 0)
+    assertEquals(Pattern(Repeat(false, 2, None, Dot()), flagSet).capsSize, 0)
+    assertEquals(Pattern(LookAhead(false, Dot()), flagSet).capsSize, 0)
+    assertEquals(Pattern(LookBehind(false, Dot()), flagSet).capsSize, 0)
+    assertEquals(Pattern(Dot(), flagSet).capsSize, 0)
+  }
+
+  test("Pattern#names") {
+    val flagSet = FlagSet(false, false, false, false, false, false)
+    assertEquals(
+      Pattern(Disjunction(Seq(NamedCapture(1, "x", Dot()), NamedCapture(2, "y", Dot()))), flagSet).names,
+      Success(Map("x" -> 1, "y" -> 2))
+    )
+    interceptMessage[InvalidRegExpException]("duplicated named capture") {
+      Pattern(Disjunction(Seq(NamedCapture(1, "x", Dot()), NamedCapture(2, "x", Dot()))), flagSet).names.get
+    }
+    assertEquals(
+      Pattern(Sequence(Seq(NamedCapture(1, "x", Dot()), NamedCapture(2, "y", Dot()))), flagSet).names,
+      Success(Map("x" -> 1, "y" -> 2))
+    )
+    interceptMessage[InvalidRegExpException]("duplicated named capture") {
+      Pattern(Sequence(Seq(NamedCapture(1, "x", Dot()), NamedCapture(2, "x", Dot()))), flagSet).names.get
+    }
+    assertEquals(Pattern(Capture(1, NamedCapture(2, "x", Dot())), flagSet).names, Success(Map("x" -> 2)))
+    assertEquals(
+      Pattern(NamedCapture(1, "x", NamedCapture(2, "y", Dot())), flagSet).names,
+      Success(Map("x" -> 1, "y" -> 2))
+    )
+    assertEquals(Pattern(Group(NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
+    assertEquals(Pattern(Star(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
+    assertEquals(Pattern(Plus(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
+    assertEquals(Pattern(Question(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
+    assertEquals(Pattern(Repeat(false, 2, None, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
+    assertEquals(Pattern(LookAhead(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
+    assertEquals(Pattern(LookBehind(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
+    assertEquals(Pattern(Dot(), flagSet).names, Success(Map.empty[String, Int]))
+  }
 }
