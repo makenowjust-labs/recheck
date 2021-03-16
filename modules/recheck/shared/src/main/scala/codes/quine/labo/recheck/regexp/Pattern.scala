@@ -444,9 +444,6 @@ object Pattern {
 
   /** ClassRange is a character range pattern in a class. */
   final case class ClassRange(begin: UChar, end: UChar) extends ClassNode {
-    def captureRange: CaptureRange = CaptureRange(None)
-    def isEmpty: Boolean = false
-
     def toIChar(unicode: Boolean): Try[IChar] = {
       val char = IChar.range(begin, end)
       if (char.isEmpty) Failure(new InvalidRegExpException("an empty range"))
@@ -498,7 +495,10 @@ object Pattern {
     }
   }
 
+  /** CaptureRange is a range of capture indexes. */
   final case class CaptureRange(range: Option[(Int, Int)]) {
+
+    /** Merges two ranges. */
     def merge(other: CaptureRange): CaptureRange =
       (range, other.range) match {
         case (Some((min1, max1)), Some((min2, max2))) =>
