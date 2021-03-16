@@ -147,6 +147,13 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(NamedBackReference("foo").isEmpty, true)
   }
 
+  test("Pattern.CaptureRange#merge") {
+    assertEquals(CaptureRange(None).merge(CaptureRange(None)), CaptureRange(None))
+    assertEquals(CaptureRange(Some((1, 1))).merge(CaptureRange(None)), CaptureRange(Some((1, 1))))
+    assertEquals(CaptureRange(None).merge(CaptureRange(Some((2, 2)))), CaptureRange(Some((2, 2))))
+    assertEquals(CaptureRange(Some((1, 1))).merge(CaptureRange(Some((2, 2)))), CaptureRange(Some((1, 2))))
+  }
+
   test("Pattern.showNode") {
     val x = Character('x')
     assertEquals(showNode(Disjunction(Seq(Disjunction(Seq(x, x)), x))), "(?:x|x)|x")
