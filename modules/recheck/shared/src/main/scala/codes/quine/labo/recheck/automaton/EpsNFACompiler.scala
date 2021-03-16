@@ -123,7 +123,7 @@ object EpsNFACompiler {
           case WordBoundary(invert) =>
             val i = nextQ()
             val a = nextQ()
-            tau.addOne(i -> Assert(if (invert) AssertKind.NotWordBoundary else AssertKind.WordBoundary, a))
+            tau.addOne(i -> Assert(if (invert) AssertKind.WordBoundaryNot else AssertKind.WordBoundary, a))
             Success((i, a))
           case LineBegin() =>
             val i = nextQ()

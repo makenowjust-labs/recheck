@@ -194,6 +194,37 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
     if (flagSet.ignoreCase) set.map(UString.canonicalize(_, flagSet.unicode)) else set
   }
 
+  /** Returns a maximum capture index or `0`. */
+  def capsSize: Int = node.captureRange.range.map(_._2).getOrElse(0)
+
+  /** Extracts capture names of the pattern. */
+  def names: Try[Map[String, Int]] = {
+    def merge(tm1: Try[Map[String, Int]], m2: Map[String, Int]): Try[Map[String, Int]] =
+      tm1.flatMap { m1 =>
+        if (m1.keySet.intersect(m2.keySet).nonEmpty) Failure(new InvalidRegExpException("duplicated named capture"))
+        else Success(m1 ++ m2)
+      }
+
+    def loop(node: Node): Try[Map[String, Int]] = node match {
+      case Disjunction(ns) =>
+        TryUtil.traverse(ns)(loop).flatMap(_.foldLeft(Try(Map.empty[String, Int]))(merge))
+      case Sequence(ns) =>
+        TryUtil.traverse(ns)(loop).flatMap(_.foldLeft(Try(Map.empty[String, Int]))(merge))
+      case Capture(_, n)                => loop(n)
+      case NamedCapture(index, name, n) => loop(n).map(_ + (name -> index))
+      case Group(n)                     => loop(n)
+      case Star(_, n)                   => loop(n)
+      case Plus(_, n)                   => loop(n)
+      case Question(_, n)               => loop(n)
+      case Repeat(_, _, _, n)           => loop(n)
+      case LookAhead(_, n)              => loop(n)
+      case LookBehind(_, n)             => loop(n)
+      case _                            => Success(Map.empty)
+    }
+
+    loop(node)
+  }
+
   override def toString: String =
     s"/${showNode(node)}/${showFlagSet(flagSet)}"
 }
@@ -223,10 +254,10 @@ object Pattern {
   sealed abstract class Node extends Cloneable with Serializable with Product {
 
     /** A internal field of the position of this node. */
-    private var _pos: Option[(Int, Int)] = None
+    private var _loc: Option[(Int, Int)] = None
 
     /** Returns the location of this node. */
-    def loc: Option[(Int, Int)] = _pos
+    def loc: Option[(Int, Int)] = _loc
 
     /** Returns a new node with the given position. */
     def withLoc(start: Int, end: Int): this.type = {
@@ -234,7 +265,7 @@ object Pattern {
       if (loc.exists { case (s, e) => s == start && e == end }) this
       else {
         val cloned = clone().asInstanceOf[this.type]
-        cloned._pos = Some((start, end))
+        cloned._loc = Some((start, end))
         cloned
       }
     }
@@ -245,6 +276,12 @@ object Pattern {
         case Some((start, end)) => withLoc(start, end)
         case None               => this
       }
+
+    /** Returns a capture range within this node. */
+    def captureRange: CaptureRange
+
+    /** Checks this node can match an empty string. */
+    def isEmpty: Boolean
   }
 
   /** AtomNode is a node of pattern to match a character. */
@@ -261,28 +298,52 @@ object Pattern {
   sealed trait ClassNode extends AtomNode
 
   /** Disjunction is a disjunction of patterns. (e.g. `/x|y|z/`) */
-  final case class Disjunction(children: Seq[Node]) extends Node
+  final case class Disjunction(children: Seq[Node]) extends Node {
+    def captureRange: CaptureRange = children.map(_.captureRange).foldLeft(CaptureRange(None))(_.merge(_))
+    def isEmpty: Boolean = children.exists(_.isEmpty)
+  }
 
   /** Sequence is a sequence of patterns. (e.g. `/xyz/`) */
-  final case class Sequence(children: Seq[Node]) extends Node
+  final case class Sequence(children: Seq[Node]) extends Node {
+    def captureRange: CaptureRange = children.map(_.captureRange).foldLeft(CaptureRange(None))(_.merge(_))
+    def isEmpty: Boolean = children.forall(_.isEmpty)
+  }
 
   /** Capture is a capture pattern. (e.g. `/(x)/`) */
-  final case class Capture(index: Int, child: Node) extends Node
+  final case class Capture(index: Int, child: Node) extends Node {
+    def captureRange: CaptureRange = CaptureRange(Some((index, index))).merge(child.captureRange)
+    def isEmpty: Boolean = child.isEmpty
+  }
 
   /** NamedCapture is a named capture pattern. (e.g. `/(?<foo>x)/`) */
-  final case class NamedCapture(index: Int, name: String, child: Node) extends Node
+  final case class NamedCapture(index: Int, name: String, child: Node) extends Node {
+    def captureRange: CaptureRange = CaptureRange(Some((index, index))).merge(child.captureRange)
+    def isEmpty: Boolean = child.isEmpty
+  }
 
   /** Group is a grouping of a pattern. (e.g. `/(?:x)/`) */
-  final case class Group(child: Node) extends Node
+  final case class Group(child: Node) extends Node {
+    def captureRange: CaptureRange = child.captureRange
+    def isEmpty: Boolean = child.isEmpty
+  }
 
   /** Star is a zero-or-more repetition pattern. (e.g. `/x*&#47; or `/x*?/`) */
-  final case class Star(nonGreedy: Boolean, child: Node) extends Node
+  final case class Star(nonGreedy: Boolean, child: Node) extends Node {
+    def captureRange: CaptureRange = child.captureRange
+    def isEmpty: Boolean = true
+  }
 
   /** Plus is a one-or-more repetition pattern. (e.g. `/x+/` or `/x+?/`) */
-  final case class Plus(nonGreedy: Boolean, child: Node) extends Node
+  final case class Plus(nonGreedy: Boolean, child: Node) extends Node {
+    def captureRange: CaptureRange = child.captureRange
+    def isEmpty: Boolean = child.isEmpty
+  }
 
   /** Question is a zero-or-one matching pattern. (e.g. `/x?/` or `/x??/`) */
-  final case class Question(nonGreedy: Boolean, child: Node) extends Node
+  final case class Question(nonGreedy: Boolean, child: Node) extends Node {
+    def captureRange: CaptureRange = child.captureRange
+    def isEmpty: Boolean = true
+  }
 
   /** Repeat is a repetition pattern. (e.g. `/x{1,2}/`)
     *
@@ -290,30 +351,53 @@ object Pattern {
     *   - If `max` is `Some(None)`, it means `max` is not specified (i.e. unlimited repetition).
     *   - If `max` is `Some(n)`, it means `max` is specified.
     */
-  final case class Repeat(nonGreedy: Boolean, min: Int, max: Option[Option[Int]], child: Node) extends Node
+  final case class Repeat(nonGreedy: Boolean, min: Int, max: Option[Option[Int]], child: Node) extends Node {
+    def captureRange: CaptureRange = child.captureRange
+    def isEmpty: Boolean = min == 0 || child.isEmpty
+  }
 
   /** WordBoundary is a word-boundary assertion pattern. (e.g. `/\b/` or `/\B/`) */
-  final case class WordBoundary(invert: Boolean) extends Node
+  final case class WordBoundary(invert: Boolean) extends Node {
+    def captureRange: CaptureRange = CaptureRange(None)
+    def isEmpty: Boolean = true
+  }
 
   /** LineBegin is a begin-of-line assertion pattern. (e.g. `/^/`) */
-  final case class LineBegin() extends Node
+  final case class LineBegin() extends Node {
+    def captureRange: CaptureRange = CaptureRange(None)
+    def isEmpty: Boolean = true
+  }
 
   /** LineEnd is an end-of-line assertion pattern. (e.g. `/$/`) */
-  final case class LineEnd() extends Node
+  final case class LineEnd() extends Node {
+    def captureRange: CaptureRange = CaptureRange(None)
+    def isEmpty: Boolean = true
+  }
 
   /** LookAhead is a look-ahead assertion of a pattern. (e.g. `/(?=x)/` or `/(?!x)/`) */
-  final case class LookAhead(negative: Boolean, child: Node) extends Node
+  final case class LookAhead(negative: Boolean, child: Node) extends Node {
+    def captureRange: CaptureRange = child.captureRange
+    def isEmpty: Boolean = true
+  }
 
   /** LookBehind is a look-behind assertion of a pattern. (e.g. `/(?<=x)/` or `/(?<!x)/`) */
-  final case class LookBehind(negative: Boolean, child: Node) extends Node
+  final case class LookBehind(negative: Boolean, child: Node) extends Node {
+    def captureRange: CaptureRange = child.captureRange
+    def isEmpty: Boolean = true
+  }
 
   /** Character is a single character in pattern. (e.g. `/x/`) */
   final case class Character(value: UChar) extends Node with ClassNode {
+    def captureRange: CaptureRange = CaptureRange(None)
+    def isEmpty: Boolean = false
     def toIChar(unicode: Boolean): Try[IChar] = Success(IChar(value))
   }
 
   /** SimpleEscapeClass is an escape class. (e.g. `/\w/` or `/\s/`) */
   final case class SimpleEscapeClass(invert: Boolean, kind: EscapeClassKind) extends Node with ClassNode {
+    def captureRange: CaptureRange = CaptureRange(None)
+    def isEmpty: Boolean = false
+
     def toIChar(unicode: Boolean): Try[IChar] = {
       val char = kind match {
         case EscapeClassKind.Digit => IChar.Digit
@@ -326,6 +410,9 @@ object Pattern {
 
   /** UnicodeProperty is an escape class of Unicode property. (e.g. `/\p{ASCII}/` or `/\P{L}/`) */
   final case class UnicodeProperty(invert: Boolean, name: String) extends Node with ClassNode {
+    def captureRange: CaptureRange = CaptureRange(None)
+    def isEmpty: Boolean = false
+
     def toIChar(unicode: Boolean): Try[IChar] = IChar.UnicodeProperty(name) match {
       case Some(char) => Success(if (invert) char.complement(unicode) else char)
       case None       => Failure(new InvalidRegExpException(s"unknown Unicode property: $name"))
@@ -336,6 +423,9 @@ object Pattern {
     * (e.g. `/\p{sc=Hira}/` or `/\P{General_Category=No}/`)
     */
   final case class UnicodePropertyValue(invert: Boolean, name: String, value: String) extends Node with ClassNode {
+    def captureRange: CaptureRange = CaptureRange(None)
+    def isEmpty: Boolean = false
+
     def toIChar(unicode: Boolean): Try[IChar] = IChar.UnicodePropertyValue(name, value) match {
       case Some(char) => Success(if (invert) char.complement(unicode) else char)
       case None       => Failure(new InvalidRegExpException(s"unknown Unicode property-value: $name=$value"))
@@ -344,6 +434,9 @@ object Pattern {
 
   /** CharacterClass is a class (set) pattern of characters. (e.g. `/[a-z]/` or `/[^A-Z]/`) */
   final case class CharacterClass(invert: Boolean, children: Seq[ClassNode]) extends Node with AtomNode {
+    def captureRange: CaptureRange = CaptureRange(None)
+    def isEmpty: Boolean = false
+
     def toIChar(unicode: Boolean): Try[IChar] =
       // Inversion will be done in automaton translation instead of here.
       TryUtil.traverse(children)(_.toIChar(unicode)).map(IChar.union(_))
@@ -351,6 +444,9 @@ object Pattern {
 
   /** ClassRange is a character range pattern in a class. */
   final case class ClassRange(begin: UChar, end: UChar) extends ClassNode {
+    def captureRange: CaptureRange = CaptureRange(None)
+    def isEmpty: Boolean = false
+
     def toIChar(unicode: Boolean): Try[IChar] = {
       val char = IChar.range(begin, end)
       if (char.isEmpty) Failure(new InvalidRegExpException("an empty range"))
@@ -362,13 +458,22 @@ object Pattern {
     *
     * This does not inherit `AtomNode` intentionally because this `toIChar` needs `dotAll` flag information.
     */
-  final case class Dot() extends Node
+  final case class Dot() extends Node {
+    def captureRange: CaptureRange = CaptureRange(None)
+    def isEmpty: Boolean = false
+  }
 
   /** BackReference is a back-reference pattern. (e.g. `/\1/`) */
-  final case class BackReference(index: Int) extends Node
+  final case class BackReference(index: Int) extends Node {
+    def captureRange: CaptureRange = CaptureRange(None)
+    def isEmpty: Boolean = true
+  }
 
   /** NamedBackReference is a back-reference pattern. (e.g. `/\k<foo>/`) */
-  final case class NamedBackReference(name: String) extends Node
+  final case class NamedBackReference(name: String) extends Node {
+    def captureRange: CaptureRange = CaptureRange(None)
+    def isEmpty: Boolean = true
+  }
 
   /** EscapeClassKind is a kind of [[SimpleEscapeClass]]. */
   sealed abstract class EscapeClassKind extends Serializable with Product
@@ -393,10 +498,21 @@ object Pattern {
     }
   }
 
+  final case class CaptureRange(range: Option[(Int, Int)]) {
+    def merge(other: CaptureRange): CaptureRange =
+      (range, other.range) match {
+        case (Some((min1, max1)), Some((min2, max2))) =>
+          CaptureRange(Some((Math.min(min1, min2), Math.max(max1, max2))))
+        case (Some((min, max)), None) => CaptureRange(Some((min, max)))
+        case (None, Some((min, max))) => CaptureRange(Some((min, max)))
+        case (None, None)             => CaptureRange(None)
+      }
+  }
+
   /** Shows a [[Node]] as a pattern. */
   private[regexp] def showNode(node: Node): String = node match {
-    case Disjunction(ns)                        => ns.map(showNodeInDisjunction(_)).mkString("|")
-    case Sequence(ns)                           => ns.map(showNodeInSequence(_)).mkString
+    case Disjunction(ns)                        => ns.map(showNodeInDisjunction).mkString("|")
+    case Sequence(ns)                           => ns.map(showNodeInSequence).mkString
     case Capture(_, n)                          => s"(${showNode(n)})"
     case NamedCapture(_, name, n)               => s"(?<$name>${showNode(n)})"
     case Group(n)                               => s"(?:${showNode(n)})"
@@ -421,8 +537,8 @@ object Pattern {
     case LookBehind(false, n)                   => s"(?<=${showNode(n)})"
     case LookBehind(true, n)                    => s"(?<!${showNode(n)})"
     case Character(u)                           => showUChar(u)
-    case CharacterClass(false, items)           => s"[${items.map(showClassNode(_)).mkString}]"
-    case CharacterClass(true, items)            => s"[^${items.map(showClassNode(_)).mkString}]"
+    case CharacterClass(false, items)           => s"[${items.map(showClassNode).mkString}]"
+    case CharacterClass(true, items)            => s"[^${items.map(showClassNode).mkString}]"
     case SimpleEscapeClass(false, k)            => EscapeClassKind.showEscapeClassKind(k)
     case SimpleEscapeClass(true, k)             => EscapeClassKind.showEscapeClassKind(k).toUpperCase
     case UnicodeProperty(false, p)              => s"\\p{$p}"

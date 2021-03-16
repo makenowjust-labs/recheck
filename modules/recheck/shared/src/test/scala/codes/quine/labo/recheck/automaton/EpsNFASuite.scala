@@ -23,10 +23,10 @@ class EpsNFASuite extends munit.FunSuite {
     assert(AssertKind.WordBoundary.accepts(CharInfo(false, false), CharInfo(false, true)))
     assert(!AssertKind.WordBoundary.accepts(CharInfo(false, false), CharInfo(false, false)))
     assert(!AssertKind.WordBoundary.accepts(CharInfo(false, true), CharInfo(false, true)))
-    assert(AssertKind.NotWordBoundary.accepts(CharInfo(false, false), CharInfo(false, false)))
-    assert(AssertKind.NotWordBoundary.accepts(CharInfo(false, true), CharInfo(false, true)))
-    assert(!AssertKind.NotWordBoundary.accepts(CharInfo(false, true), CharInfo(false, false)))
-    assert(!AssertKind.NotWordBoundary.accepts(CharInfo(false, false), CharInfo(false, true)))
+    assert(AssertKind.WordBoundaryNot.accepts(CharInfo(false, false), CharInfo(false, false)))
+    assert(AssertKind.WordBoundaryNot.accepts(CharInfo(false, true), CharInfo(false, true)))
+    assert(!AssertKind.WordBoundaryNot.accepts(CharInfo(false, true), CharInfo(false, false)))
+    assert(!AssertKind.WordBoundaryNot.accepts(CharInfo(false, false), CharInfo(false, true)))
   }
 
   test("EpsNFA.AssertKind#toCharInfoSet") {
@@ -42,9 +42,9 @@ class EpsNFASuite extends munit.FunSuite {
     assertEquals(AssertKind.WordBoundary.toCharInfoSet(neutral), Set(word))
     assertEquals(AssertKind.WordBoundary.toCharInfoSet(lineTerminator), Set(word))
     assertEquals(AssertKind.WordBoundary.toCharInfoSet(word), Set(neutral, lineTerminator))
-    assertEquals(AssertKind.NotWordBoundary.toCharInfoSet(neutral), Set(neutral, lineTerminator))
-    assertEquals(AssertKind.NotWordBoundary.toCharInfoSet(lineTerminator), Set(neutral, lineTerminator))
-    assertEquals(AssertKind.NotWordBoundary.toCharInfoSet(word), Set(word))
+    assertEquals(AssertKind.WordBoundaryNot.toCharInfoSet(neutral), Set(neutral, lineTerminator))
+    assertEquals(AssertKind.WordBoundaryNot.toCharInfoSet(lineTerminator), Set(neutral, lineTerminator))
+    assertEquals(AssertKind.WordBoundaryNot.toCharInfoSet(word), Set(word))
   }
 
   test("EpsNFA.CharInfo.from") {
@@ -133,7 +133,7 @@ class EpsNFASuite extends munit.FunSuite {
         4 -> Consume(Set(IChar('\n').withLineTerminator), 1),
         5 -> Consume(Set(IChar('a').withWord), 6),
         6 -> Eps(Seq(7, 1)),
-        7 -> Assert(AssertKind.NotWordBoundary, 1),
+        7 -> Assert(AssertKind.WordBoundaryNot, 1),
         8 -> LoopExit(0, 9),
         9 -> Assert(AssertKind.WordBoundary, 10)
       )

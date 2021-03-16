@@ -62,6 +62,7 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labo.recheck.fuzz._
       |import codes.quine.labo.recheck.regexp._
       |import codes.quine.labo.recheck.util._
+      |import codes.quine.labo.recheck.vm._
       |
       |implicit def ctx: Context = Context()
       |
