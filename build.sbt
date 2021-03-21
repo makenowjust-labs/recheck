@@ -88,7 +88,7 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
       .toMap,
     // Dependencies:
     libraryDependencies += "com.lihaoyi" %%% "fastparse" % "2.3.1",
-    libraryDependencies += "com.lihaoyi" %%% "sourcecode" % "0.2.3",
+    libraryDependencies += "com.lihaoyi" %%% "sourcecode" % "0.2.4",
     // Generators:
     {
       val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
