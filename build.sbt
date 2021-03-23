@@ -64,7 +64,7 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labo.recheck.util._
       |import codes.quine.labo.recheck.vm._
       |
-      |implicit def ctx: Context = Context()
+      |implicit def ctx: Context = Context(10.seconds)
       |
       |def time[A](body: => A): A = {
       |  val start = System.nanoTime()
