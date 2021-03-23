@@ -9,10 +9,13 @@ import codes.quine.labo.recheck.data.UChar
 import codes.quine.labo.recheck.data.UString
 import codes.quine.labo.recheck.vm.Inst.AssertKind
 import codes.quine.labo.recheck.vm.Inst.ReadKind
+import codes.quine.labo.recheck.vm.Interpreter.CoverageItem
+import codes.quine.labo.recheck.vm.Interpreter.CoverageLocation
 import codes.quine.labo.recheck.vm.Interpreter.Diff
+import codes.quine.labo.recheck.vm.Interpreter.FailedPoint
 import codes.quine.labo.recheck.vm.Interpreter.Junction
+import codes.quine.labo.recheck.vm.Interpreter.MatchState
 import codes.quine.labo.recheck.vm.Interpreter.Options
-import codes.quine.labo.recheck.vm.Interpreter.State
 
 /** Interpreter executes a program on a input. */
 object Interpreter {
@@ -23,17 +26,30 @@ object Interpreter {
   /** Options is an options for running an interpreter. */
   final case class Options(
       limit: Int = Int.MaxValue,
-      useAcceleration: Boolean = false
+      usesAcceleration: Boolean = false,
+      needsLoopAnalysis: Boolean = false,
+      needsFailedPoints: Boolean = false,
+      needsCoverage: Boolean = false,
+      needsHotspot: Boolean = false
   )
 
-  /** State is a state of matching. */
-  final case class State(id: Int, pos: Int, counters: Vector[Int], captures: Option[Vector[Int]])
+  /** MatchState is a state of matching. */
+  final case class MatchState(blockID: Int, pos: Int, counters: Vector[Int], captures: Option[Vector[Int]])
 
   /** Junction is a state for a junction block. */
-  final case class Junction(state: State, steps: Int)
+  final case class Junction(state: MatchState, steps: Int, heatmap: Option[Map[(Int, Int), Int]])
 
   /** Diff is a difference of state on matching. */
-  final case class Diff(steps: Int)
+  final case class Diff(steps: Int, heatmap: Option[Map[(Int, Int), Int]])
+
+  /** CoverageLocation is a location in coverage. */
+  final case class CoverageLocation(instID: Int, counters: Vector[Int])
+
+  /** CoverageItem is an item of matching coverage. */
+  final case class CoverageItem(loc: CoverageLocation, ok: Boolean)
+
+  /** FailedPoint is a failed point on matching. */
+  final case class FailedPoint(target: CoverageLocation, pos: Int, kind: ReadKind, capture: Option[UString])
 }
 
 /** Interpreter is an interpreter of a program and an input. */
@@ -84,8 +100,8 @@ class Interpreter(program: Program, input: UString, options: Options = Options()
       }
 
     /** Converts this frame into a corresponding state. */
-    def toState: State =
-      Interpreter.State(label.index, pos, counters, if (program.meta.hasRef) Some(captures) else None)
+    def toState: MatchState =
+      Interpreter.MatchState(label.index, pos, counters, if (program.meta.hasRef) Some(captures) else None)
 
     override def clone(): Frame =
       new Frame(label, pos, captures, counters, canaries, rollback, fallback, junctions)
@@ -98,7 +114,19 @@ class Interpreter(program: Program, input: UString, options: Options = Options()
   private[this] var steps: Int = 0
 
   /** A memoization table. */
-  private[this] var memoTable: mutable.Map[State, Diff] = mutable.Map.empty
+  private[this] val memoTable: mutable.Map[MatchState, Diff] = mutable.Map.empty
+
+  /** A loop map table from block ID to positions. */
+  private[this] val loops: mutable.Map[Int, Seq[Int]] = mutable.Map.empty[Int, Seq[Int]].withDefaultValue(Seq.empty)
+
+  /** A coverage set. */
+  private[this] val coverage: mutable.Set[CoverageItem] = mutable.Set.empty
+
+  /** A failed points list */
+  private[this] val failedPoints: mutable.Buffer[FailedPoint] = mutable.Buffer.empty
+
+  /** A heatmap on matching. */
+  private[this] var heatmap: Map[(Int, Int), Int] = Map.empty[(Int, Int), Int].withDefaultValue(0)
 
   /** Runs matching from a position. */
   def run(pos: Int): Boolean = {
@@ -117,14 +145,27 @@ class Interpreter(program: Program, input: UString, options: Options = Options()
       if (options.limit <= steps) throw new Interpreter.LimitException("limit is exceeded")
 
       var memoized = false
-      if (options.useAcceleration && program.meta.predecessors(frame.label.index).size >= 2) {
+      if (options.usesAcceleration && program.meta.predecessors(frame.label.index).size >= 2) {
         val state = frame.toState
         memoTable.get(state) match {
           case Some(diff) =>
             memoized = true
             steps += diff.steps
+            if (options.needsHotspot) {
+              for ((loc, n) <- diff.heatmap.get) {
+                heatmap = heatmap.updated(loc, heatmap(loc) + n)
+              }
+            }
           case None =>
-            frame.junctions = Junction(state, steps) +: frame.junctions
+            val junction = Junction(state, steps, if (options.needsHotspot) Some(heatmap) else None)
+            frame.junctions = junction +: frame.junctions
+        }
+      }
+
+      if (options.needsLoopAnalysis) {
+        val isLoop = program.meta.predecessors(frame.label.index).exists(_.index >= frame.label.index)
+        if (isLoop) {
+          loops(frame.label.index) :+= frame.pos
         }
       }
 
@@ -170,10 +211,19 @@ class Interpreter(program: Program, input: UString, options: Options = Options()
       } else {
         frame.fallback match {
           case Some(fallback) =>
-            if (options.useAcceleration && frame.junctions.size > fallback.junctions.size) {
+            if (options.usesAcceleration && frame.junctions.size > fallback.junctions.size) {
               val d = frame.junctions.size - fallback.junctions.size
               for (jx <- frame.junctions.take(d)) {
-                memoTable(jx.state) = Diff(steps - jx.steps)
+                val diffHeatmap = if (options.needsHotspot) {
+                  val jxHeatmap = jx.heatmap.get
+                  val builder = Map.newBuilder[(Int, Int), Int]
+                  for ((loc, n) <- heatmap) {
+                    val m = jxHeatmap(loc)
+                    if (n != m) builder.addOne(loc -> (n - m))
+                  }
+                  Some(builder.result())
+                } else None
+                memoTable(jx.state) = Diff(steps - jx.steps, diffHeatmap)
               }
             }
             frame = fallback
@@ -234,35 +284,79 @@ class Interpreter(program: Program, input: UString, options: Options = Options()
           case AssertKind.InputEnd =>
             frame.pos == input.size
         }
-      case Inst.Read(ReadKind.Ref(index), _) =>
+      case Inst.Read(ReadKind.Ref(index), loc) =>
         val s = frame.capture(index) match {
           case Some(s) => s
           case None    => UString.empty
         }
-        if (s == input.substring(frame.pos, frame.pos + s.size)) {
+        val ok = s == input.substring(frame.pos, frame.pos + s.size)
+        if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
+        if (ok) {
+          if (options.needsHotspot && loc.isDefined) {
+            heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
+          }
           frame.pos += s.size
           true
-        } else false
-      case Inst.Read(kind, _) =>
-        if (read(frame.currentChar, kind)) {
+        } else {
+          if (options.needsFailedPoints) {
+            val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, ReadKind.Ref(index), Some(s))
+            failedPoints.append(point)
+          }
+          false
+        }
+      case Inst.Read(kind, loc) =>
+        val ok = read(frame.currentChar, kind)
+        if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
+        if (ok) {
+          if (options.needsHotspot && loc.isDefined) {
+            heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
+          }
           steps += 1
           frame.pos += 1
           true
-        } else false
-      case Inst.ReadBack(ReadKind.Ref(index), _) =>
+        } else {
+          if (options.needsFailedPoints) {
+            val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, kind, None)
+            failedPoints.append(point)
+          }
+          false
+        }
+      case Inst.ReadBack(ReadKind.Ref(index), loc) =>
         val s = frame.capture(index) match {
           case Some(s) => s
           case None    => UString.empty
         }
-        if (s == input.substring(frame.pos - s.size, frame.pos)) {
+        val ok = s == input.substring(frame.pos - s.size, frame.pos)
+        if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
+        if (ok) {
+          if (options.needsHotspot && loc.isDefined) {
+            heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
+          }
           frame.pos -= s.size
           true
-        } else false
-      case Inst.ReadBack(kind, _) =>
+        } else {
+          if (options.needsFailedPoints) {
+            val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, ReadKind.Ref(index), Some(s))
+            failedPoints.append(point)
+          }
+          false
+        }
+      case Inst.ReadBack(kind, loc) =>
+        val ok = read(frame.previousChar, kind)
+        if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
         if (read(frame.previousChar, kind)) {
+          if (options.needsHotspot && loc.isDefined) {
+            heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
+          }
           frame.pos -= 1
           true
-        } else false
+        } else {
+          if (options.needsFailedPoints) {
+            val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, kind, None)
+            failedPoints.append(point)
+          }
+          false
+        }
       case Inst.CapBegin(index) =>
         frame.capBegin(index)
         true
