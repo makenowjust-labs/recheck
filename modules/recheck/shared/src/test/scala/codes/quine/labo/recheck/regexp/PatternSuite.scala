@@ -466,7 +466,7 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(Pattern(Character('x'), flagSet).parts, Set.empty[UString])
   }
 
-  test("IRCompiler.capsSize") {
+  test("Pattern#capturesSize") {
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(Capture(1, Dot()), Capture(2, Dot()))), flagSet).capturesSize, 2)
     assertEquals(Pattern(Sequence(Seq(Capture(1, Dot()), Capture(2, Dot()))), flagSet).capturesSize, 2)
