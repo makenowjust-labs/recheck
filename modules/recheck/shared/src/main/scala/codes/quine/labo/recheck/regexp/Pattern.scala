@@ -195,7 +195,7 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
   }
 
   /** Returns a maximum capture index or `0`. */
-  def capsSize: Int = node.captureRange.range.map(_._2).getOrElse(0)
+  def capturesSize: Int = node.captureRange.range.map(_._2).getOrElse(0)
 
   /** Extracts capture names of the pattern. */
   def names: Try[Map[String, Int]] = {

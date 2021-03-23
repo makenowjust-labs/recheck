@@ -49,7 +49,7 @@ object Inst {
   /** `cmp`: Compares a `reg` value with its operands, and jumps to a block depending on the comparison result.
     * If `reg < n`, it jumps to a `lt` label, or if `n <= reg`, it jumps to a `ge` label.
     */
-  final case class Cmp(reg: Reg, n: Int, lt: Label, ge: Label) extends Terminator {
+  final case class Cmp(reg: CounterReg, n: Int, lt: Label, ge: Label) extends Terminator {
     def successors: Set[Label] = Set(lt, ge)
     override def toString: String = s"cmp $reg $n $lt $ge"
   }
@@ -75,25 +75,25 @@ object Inst {
     */
   sealed abstract class NonTerminator extends Inst
 
-  /** `push_canary`: Pushes current position to a stack for canary checking. */
-  case object PushCanary extends NonTerminator {
-    override def toString: String = "push_canary"
+  /** `set_canary`: Sets current position to a canary register. */
+  final case class SetCanary(reg: CanaryReg) extends NonTerminator {
+    override def toString: String = s"set_canary $reg"
   }
 
-  /** `check_canary`: Checks current position is advanced from a last saved one.
+  /** `check_canary`: Checks current position is advanced from saved in the canary register.
     * If it is not, a matching is failed.
     */
-  case object CheckCanary extends NonTerminator {
-    override def toString: String = "check_canary"
+  final case class CheckCanary(reg: CanaryReg) extends NonTerminator {
+    override def toString: String = s"check_canary $reg"
   }
 
   /** `reset`: Sets a `reg` value to `0`. */
-  final case class Reset(reg: Reg) extends NonTerminator {
+  final case class Reset(reg: CounterReg) extends NonTerminator {
     override def toString: String = s"reset $reg"
   }
 
   /** `inc`: Increments a `reg` value. */
-  final case class Inc(reg: Reg) extends NonTerminator {
+  final case class Inc(reg: CounterReg) extends NonTerminator {
     override def toString: String = s"inc $reg"
   }
 

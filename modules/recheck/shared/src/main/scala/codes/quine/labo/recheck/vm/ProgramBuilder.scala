@@ -20,27 +20,33 @@ object ProgramBuilder {
   def build(pattern: Pattern)(implicit ctx: Context): Try[Program] =
     for {
       _ <- Try(())
-      capsSize = pattern.capsSize
+      capturesSize = pattern.capturesSize
       names <- pattern.names
-      builder = new ProgramBuilder(pattern, capsSize, names)
+      builder = new ProgramBuilder(pattern, capturesSize, names)
       program <- Try(builder.build())
     } yield program
 }
 
 private[vm] class ProgramBuilder(
     private[this] val pattern: Pattern,
-    private[this] val capsSize: Int,
+    private[this] val capturesSize: Int,
     private[this] val names: Map[String, Int]
 )(implicit ctx: Context) {
   import ctx._
   import pattern._
   import flagSet._
 
-  /** A buffer of created registers. */
-  private[this] val regs: mutable.Buffer[Reg] = mutable.Buffer.empty
+  /** A buffer of created counter registers. */
+  private[this] val counters: mutable.Buffer[CounterReg] = mutable.Buffer.empty
 
-  /** A pool of free registers. */
-  private[this] val regsPool: mutable.Stack[Reg] = mutable.Stack.empty
+  /** A pool of free counter registers. */
+  private[this] val countersPool: mutable.Stack[CounterReg] = mutable.Stack.empty
+
+  /** A buffer of created canary registers. */
+  private[this] val canaries: mutable.Buffer[CanaryReg] = mutable.Buffer.empty
+
+  /** A pool of free canary registers. */
+  private[this] val canariesPool: mutable.Stack[CanaryReg] = mutable.Stack.empty
 
   /** A buffer collecting predecessors of a block. */
   private[this] val predecessorsBuffer: mutable.Buffer[mutable.Set[Label]] = mutable.Buffer.empty
@@ -63,19 +69,34 @@ private[vm] class ProgramBuilder(
   /** Whether a matching direction is backward or not. */
   private[this] var back: Boolean = false
 
-  /** Allocates a new register, or reuses a free register. */
-  def allocateReg(): Reg =
-    if (regsPool.nonEmpty) regsPool.pop()
+  /** Allocates a new counter register, or reuses a free register. */
+  def allocateCounter(): CounterReg =
+    if (countersPool.nonEmpty) countersPool.pop()
     else {
-      val index = regs.size
-      val reg = Reg(index)
-      regs.append(reg)
+      val index = counters.size
+      val reg = CounterReg(index)
+      counters.append(reg)
       reg
     }
 
-  /** Marks the register is free. */
-  def freeReg(reg: Reg): Unit = {
-    regsPool.push(reg)
+  /** Marks the counter register is free. */
+  def freeCounter(reg: CounterReg): Unit = {
+    countersPool.push(reg)
+  }
+
+  /** Allocates a new canary register, or reuses a free register. */
+  def allocateCanary(): CanaryReg =
+    if (canariesPool.nonEmpty) canariesPool.pop()
+    else {
+      val index = canaries.size
+      val reg = CanaryReg(index)
+      canaries.append(reg)
+      reg
+    }
+
+  /** Marks the canary register is free. */
+  def freeCanary(reg: CanaryReg): Unit = {
+    canariesPool.push(reg)
   }
 
   /** Allocates a new label with an unique ID. */
@@ -156,7 +177,7 @@ private[vm] class ProgramBuilder(
   def result(): Program = {
     val blocks = labelsBuffer.iterator.map(label => (label, label.block)).toVector
     val predecessors = predecessorsBuffer.iterator.map(_.toSet).toVector
-    val meta = Meta(flagSet.ignoreCase, hasRef, capsSize, regs.size, predecessors)
+    val meta = Meta(flagSet.ignoreCase, hasRef, capturesSize, counters.size, canaries.size, predecessors)
     Program(blocks, meta)
   }
 
@@ -219,7 +240,7 @@ private[vm] class ProgramBuilder(
     case Dot() =>
       emitRead(if (dotAll) ReadKind.Any else ReadKind.Dot, node.loc)
     case BackReference(index) =>
-      if (index <= 0 || capsSize < index) throw new InvalidRegExpException("invalid back-reference")
+      if (index <= 0 || capturesSize < index) throw new InvalidRegExpException("invalid back-reference")
       emitRead(ReadKind.Ref(index), node.loc)
     case NamedBackReference(name) =>
       val index = names.getOrElse(name, throw new InvalidRegExpException("invalid named back reference"))
@@ -271,16 +292,16 @@ private[vm] class ProgramBuilder(
     emitTerminator(if (nonGreedy) Inst.Try(cont, loop) else Inst.Try(loop, cont))
 
     enterBlock(loop)
-    if (isEmpty) emitInst(Inst.PushCanary)
-    for ((min, max) <- captureRange.range) emitInst(Inst.CapReset(min, max))
-    build(child)
-    if (isEmpty) emitInst(Inst.CheckCanary)
+    wrapCanary(isEmpty) {
+      for ((min, max) <- captureRange.range) emitInst(Inst.CapReset(min, max))
+      build(child)
+    }
     emitTerminator(Inst.Jmp(begin))
 
     enterBlock(cont)
   }
 
-  /** A builder for `x+`` node. */
+  /** A builder for `x+` node. */
   def buildPlus(nonGreedy: Boolean, child: Node): Unit = {
     build(child)
     buildStar(nonGreedy, child)
@@ -336,7 +357,7 @@ private[vm] class ProgramBuilder(
     val loop = allocateEntrance("loop")
     val cont = allocateLabel("cont")
 
-    val reg = allocateReg()
+    val reg = allocateCounter()
 
     build(child)
     emitInst(Inst.Inc(reg))
@@ -345,7 +366,7 @@ private[vm] class ProgramBuilder(
     enterBlock(cont)
     emitInst(Inst.Reset(reg))
 
-    freeReg(reg)
+    freeCounter(reg)
   }
 
   /** A builder for `x{0,n}` node. */
@@ -357,22 +378,33 @@ private[vm] class ProgramBuilder(
     val loop = allocateLabel("loop")
     val cont = allocateLabel("cont")
 
-    val reg = allocateReg()
+    val reg = allocateCounter()
 
     emitTerminator(if (nonGreedy) Inst.Try(cont, loop) else Inst.Try(loop, cont))
 
     enterBlock(loop)
-    if (isEmpty) emitInst(Inst.PushCanary)
-    for ((min, max) <- captureRange.range) emitInst(Inst.CapReset(min, max))
-    build(child)
-    if (isEmpty) emitInst(Inst.CheckCanary)
+    wrapCanary(isEmpty) {
+      for ((min, max) <- captureRange.range) emitInst(Inst.CapReset(min, max))
+      build(child)
+    }
     emitInst(Inst.Inc(reg))
     emitTerminator(Inst.Cmp(reg, n, begin, cont))
 
     enterBlock(cont)
     emitInst(Inst.Reset(reg))
 
-    freeReg(reg)
+    freeCounter(reg)
+  }
+
+  /** Inserts a canary around a loop body if needed. */
+  def wrapCanary(isEmpty: Boolean)(run: => Unit): Unit = {
+    if (isEmpty) {
+      val reg = allocateCanary()
+      emitInst(Inst.SetCanary(reg))
+      run
+      emitInst(Inst.CheckCanary(reg))
+      freeCanary(reg)
+    } else run
   }
 
   /** A builder for positive look-around assertion. */
@@ -389,7 +421,7 @@ private[vm] class ProgramBuilder(
     enterBlock(cont)
   }
 
-  /** A builder for negative look-aroud assertion. */
+  /** A builder for negative look-around assertion. */
   def buildNegativeLookAround(child: Node): Unit = {
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")

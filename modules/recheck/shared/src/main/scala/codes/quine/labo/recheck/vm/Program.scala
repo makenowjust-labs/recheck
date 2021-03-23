@@ -21,8 +21,9 @@ object Program {
   final case class Meta(
       ignoreCase: Boolean,
       hasRef: Boolean,
-      capsSize: Int,
-      regsSize: Int,
+      capturesSize: Int,
+      countersSize: Int,
+      canariesSize: Int,
       predecessors: Vector[Set[Label]]
   )
 }
