@@ -1,5 +1,7 @@
 package codes.quine.labo.recheck.vm
 
+import scala.collection.mutable
+
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.data.IChar.LineTerminator
 import codes.quine.labo.recheck.data.IChar.Word
@@ -7,9 +9,35 @@ import codes.quine.labo.recheck.data.UChar
 import codes.quine.labo.recheck.data.UString
 import codes.quine.labo.recheck.vm.Inst.AssertKind
 import codes.quine.labo.recheck.vm.Inst.ReadKind
+import codes.quine.labo.recheck.vm.Interpreter.Diff
+import codes.quine.labo.recheck.vm.Interpreter.Junction
+import codes.quine.labo.recheck.vm.Interpreter.Options
+import codes.quine.labo.recheck.vm.Interpreter.State
+
+/** Interpreter executes a program on a input. */
+object Interpreter {
+
+  /** LimitException is an exception thrown when VM execution step exceeds a limit. */
+  class LimitException(message: String) extends Exception(message)
+
+  /** Options is an options for running an interpreter. */
+  final case class Options(
+      limit: Int = Int.MaxValue,
+      useAcceleration: Boolean = false
+  )
+
+  /** State is a state of matching. */
+  final case class State(id: Int, pos: Int, counters: Vector[Int], captures: Option[Vector[Int]])
+
+  /** Junction is a state for a junction block. */
+  final case class Junction(state: State, steps: Int)
+
+  /** Diff is a difference of state on matching. */
+  final case class Diff(steps: Int)
+}
 
 /** Interpreter is an interpreter of a program and an input. */
-class Interpreter(program: Program, input: UString)(implicit ctx: Context) {
+class Interpreter(program: Program, input: UString, options: Options = Options())(implicit ctx: Context) {
 
   /** Frame is a stack frame. */
   class Frame(
@@ -19,7 +47,8 @@ class Interpreter(program: Program, input: UString)(implicit ctx: Context) {
       var counters: Vector[Int],
       var canaries: Vector[Int],
       var rollback: Option[Frame],
-      var fallback: Option[Frame]
+      var fallback: Option[Frame],
+      var junctions: Vector[Junction]
   ) {
 
     /** Gets a previous character. */
@@ -54,10 +83,22 @@ class Interpreter(program: Program, input: UString)(implicit ctx: Context) {
         case (begin, end) => Some(input.substring(begin, end))
       }
 
-    override def clone(): Frame = new Frame(label, pos, captures, counters, canaries, rollback, fallback)
+    /** Converts this frame into a corresponding state. */
+    def toState: State =
+      Interpreter.State(label.index, pos, counters, if (program.meta.hasRef) Some(captures) else None)
 
-    override def toString: String = s"Frame($label, $pos, $captures, $counters, $canaries, $rollback, $fallback)"
+    override def clone(): Frame =
+      new Frame(label, pos, captures, counters, canaries, rollback, fallback, junctions)
+
+    override def toString: String =
+      s"Frame($label, $pos, $captures, $counters, $canaries, $rollback, $fallback, $junctions)"
   }
+
+  /** A number of current execution step. */
+  private[this] var steps: Int = 0
+
+  /** A memoization table. */
+  private[this] var memoTable: mutable.Map[State, Diff] = mutable.Map.empty
 
   /** Runs matching from a position. */
   def run(pos: Int): Boolean = {
@@ -68,11 +109,26 @@ class Interpreter(program: Program, input: UString)(implicit ctx: Context) {
       Vector.fill(program.meta.countersSize)(0),
       Vector.fill(program.meta.canariesSize)(0),
       None,
-      None
+      None,
+      Vector.empty
     )
 
     while (true) ctx.interrupt {
-      if (block(frame, frame.label.block)) {
+      if (options.limit <= steps) throw new Interpreter.LimitException("limit is exceeded")
+
+      var memoized = false
+      if (options.useAcceleration && program.meta.predecessors(frame.label.index).size >= 2) {
+        val state = frame.toState
+        memoTable.get(state) match {
+          case Some(diff) =>
+            memoized = true
+            steps += diff.steps
+          case None =>
+            frame.junctions = Junction(state, steps) +: frame.junctions
+        }
+      }
+
+      if (!memoized && block(frame, frame.label.block)) {
         frame.label.block.terminator match {
           case Inst.Ok => return true
           case Inst.Jmp(next) =>
@@ -114,8 +170,15 @@ class Interpreter(program: Program, input: UString)(implicit ctx: Context) {
       } else {
         frame.fallback match {
           case Some(fallback) =>
+            if (options.useAcceleration && frame.junctions.size > fallback.junctions.size) {
+              val d = frame.junctions.size - fallback.junctions.size
+              for (jx <- frame.junctions.take(d)) {
+                memoTable(jx.state) = Diff(steps - jx.steps)
+              }
+            }
             frame = fallback
-          case None => return false
+          case None =>
+            return false
         }
       }
     }
@@ -182,6 +245,7 @@ class Interpreter(program: Program, input: UString)(implicit ctx: Context) {
         } else false
       case Inst.Read(kind, _) =>
         if (read(frame.currentChar, kind)) {
+          steps += 1
           frame.pos += 1
           true
         } else false
