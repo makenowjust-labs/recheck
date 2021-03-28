@@ -87,7 +87,7 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
       .map(_ -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"))
       .toMap,
     // Dependencies:
-    libraryDependencies += "com.lihaoyi" %%% "fastparse" % "2.3.1",
+    libraryDependencies += "com.lihaoyi" %%% "fastparse" % "2.3.2",
     libraryDependencies += "com.lihaoyi" %%% "sourcecode" % "0.2.4",
     // Generators:
     {
