@@ -15,7 +15,7 @@ import codes.quine.labo.recheck.data.UChar
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.Diagnostics
 import codes.quine.labo.recheck.fuzz.FuzzChecker
-import codes.quine.labo.recheck.fuzz.FuzzIR
+import codes.quine.labo.recheck.fuzz.FuzzProgram
 import codes.quine.labo.recheck.regexp.Parser
 import codes.quine.labo.recheck.regexp.Pattern
 
@@ -83,12 +83,12 @@ object ReDoS {
   private[recheck] def checkFuzz(source: String, flags: String, pattern: Pattern, config: Config): Try[Diagnostics] = {
     import config._
 
-    val result = FuzzIR.from(pattern).map { fuzz =>
+    val result = FuzzProgram.from(pattern).map { fuzz =>
       FuzzChecker.check(
         fuzz,
         random,
         seedLimit,
-        populationLimit,
+        incubationLimit,
         attackLimit,
         crossSize,
         mutateSize,
@@ -97,7 +97,8 @@ object ReDoS {
         maxGenerationSize,
         maxIteration,
         maxDegree,
-        heatRate
+        heatRate,
+        usesAcceleration
       )
     }
 

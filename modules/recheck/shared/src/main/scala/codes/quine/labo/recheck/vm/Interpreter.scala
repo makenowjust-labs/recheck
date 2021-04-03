@@ -24,7 +24,7 @@ object Interpreter {
 
   /** Runs a program on a given input.
     *
-    * Note that an input string must be normalized before matching.
+    * Note that we assume an input string is normalized here.
     */
   def run(program: Program, input: UString, pos: Int, options: Options)(implicit ctx: Context): Result = {
     val interpreter = new Interpreter(program, input, options)
@@ -302,7 +302,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         frame.counters = frame.counters.updated(reg.index, frame.counters(reg.index) + 1)
         true
       case Inst.Assert(kind) =>
-        kind match {
+        val ok = kind match {
           case AssertKind.WordBoundary =>
             val c1 = frame.previousChar
             val c2 = frame.currentChar
@@ -326,7 +326,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           case AssertKind.InputEnd =>
             frame.pos == input.size
         }
-      case Inst.Read(ReadKind.Ref(index), loc) =>
+        if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
+        ok
+      case Inst.Read(kind @ ReadKind.Ref(index), loc) =>
         val s = frame.capture(index) match {
           case Some(s) => s
           case None    => UString.empty
@@ -341,7 +343,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           true
         } else {
           if (options.needsFailedPoints) {
-            val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, ReadKind.Ref(index), Some(s))
+            val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, kind, Some(s))
             failedPoints.add(point)
           }
           false
@@ -363,7 +365,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           }
           false
         }
-      case Inst.ReadBack(ReadKind.Ref(index), loc) =>
+      case Inst.ReadBack(kind @ ReadKind.Ref(index), loc) =>
         val s = frame.capture(index) match {
           case Some(s) => s
           case None    => UString.empty
@@ -378,7 +380,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           true
         } else {
           if (options.needsFailedPoints) {
-            val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, ReadKind.Ref(index), Some(s))
+            val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, kind, Some(s))
             failedPoints.add(point)
           }
           false

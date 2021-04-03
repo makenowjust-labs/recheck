@@ -18,13 +18,13 @@ class FuzzCheckerSuite extends munit.FunSuite {
   def check(source: String, flags: String, quick: Boolean = false): Boolean = {
     val result = for {
       pattern <- Parser.parse(source, flags)
-      fuzz <- FuzzIR.from(pattern)
+      fuzz <- FuzzProgram.from(pattern)
     } yield FuzzChecker.check(
       fuzz,
       random0,
       maxAttackSize = if (quick) 400 else 4000,
       seedLimit = if (quick) 1_00 else 1_000,
-      populationLimit = if (quick) 1_000 else 10_000,
+      incubationLimit = if (quick) 1_000 else 10_000,
       attackLimit = if (quick) 10_000 else 100_000
     )
     result.get.isDefined
@@ -59,8 +59,8 @@ class FuzzCheckerSuite extends munit.FunSuite {
     assert {
       val result = for {
         pattern <- Parser.parse("^(a?){50}a{50}$", "")
-        fuzz <- FuzzIR.from(pattern)
-      } yield FuzzChecker.check(fuzz, random0, seedLimit = 1000, populationLimit = 1000, attackLimit = 10000)
+        fuzz <- FuzzProgram.from(pattern)
+      } yield FuzzChecker.check(fuzz, random0, seedLimit = 1000, incubationLimit = 1000, attackLimit = 10000)
       result.get.isDefined
     }
 
@@ -68,8 +68,8 @@ class FuzzCheckerSuite extends munit.FunSuite {
     assert {
       val result = for {
         pattern <- Parser.parse("^(a|a)*$", "")
-        fuzz <- FuzzIR.from(pattern)
-      } yield FuzzChecker.check(fuzz, random0, populationLimit = 100, maxAttackSize = 5)
+        fuzz <- FuzzProgram.from(pattern)
+      } yield FuzzChecker.check(fuzz, random0, incubationLimit = 100, maxAttackSize = 5)
       result.get.isEmpty
     }
   }

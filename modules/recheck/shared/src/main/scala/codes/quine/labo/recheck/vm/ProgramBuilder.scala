@@ -109,10 +109,10 @@ private[vm] class ProgramBuilder(
   /** Starts a block of the label. */
   def enterBlock(label: Label): Unit = {
     if ((currentLabel ne null) || instsBuffer.nonEmpty) {
-      throw new IllegalCallerException("unterminated block is found")
+      throw new IllegalStateException("unterminated block is found")
     }
     if (label.block ne null) {
-      throw new IllegalCallerException("a block cannot be re-entered")
+      throw new IllegalStateException("a block cannot be re-entered")
     }
 
     currentLabel = label
@@ -121,7 +121,7 @@ private[vm] class ProgramBuilder(
   /** Adds an instruction to a block. */
   def emitInst(inst: Inst.NonTerminator): Unit = {
     if (currentLabel eq null) {
-      throw new IllegalCallerException("block is not entered")
+      throw new IllegalStateException("block is not entered")
     }
 
     // Updates a meta information.
@@ -141,7 +141,7 @@ private[vm] class ProgramBuilder(
   /** Adds a terminator instruction to a block, and finishes the block. */
   def emitTerminator(inst: Inst.Terminator): Unit = {
     if (currentLabel eq null) {
-      throw new IllegalCallerException("block is not entered")
+      throw new IllegalStateException("block is not entered")
     }
 
     // Updates a predecessor information.

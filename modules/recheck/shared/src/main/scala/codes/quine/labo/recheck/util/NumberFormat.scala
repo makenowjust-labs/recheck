@@ -15,7 +15,7 @@ object NumberFormat {
         ('\u2074' + (c.toInt - '4')).toChar
     }
 
-  /** Gets a ordinalized string of the integer value. */
+  /** Gets a string of the integer value with an ordinal suffix. */
   def ordinalize(x: Int): String = {
     (x % 10).abs match {
       case 1 => s"${x}st"

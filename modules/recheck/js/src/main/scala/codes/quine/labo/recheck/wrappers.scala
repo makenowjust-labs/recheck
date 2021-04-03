@@ -293,6 +293,9 @@ trait ConfigJS extends js.Object {
   /** A rate of a hotspot steps by the maximum steps. */
   def heatRate: js.UndefOr[Double]
 
+  /** Whether using acceleration or not. */
+  def usesAcceleration: js.UndefOr[Boolean]
+
   /** A maximum number of sum of repeat counts like `/a{10}/`.
     * If this value is exceeded, it switches to use fuzzing based checker.
     */
@@ -325,7 +328,7 @@ object ConfigJS {
       config.attackLimit.getOrElse(Config.AttackLimit),
       random,
       config.seedLimit.getOrElse(Config.SeedLimit),
-      config.populationLimit.getOrElse(Config.PopulationLimit),
+      config.populationLimit.getOrElse(Config.IncubationLimit),
       config.crossSize.getOrElse(Config.CrossSize),
       config.mutateSize.getOrElse(Config.MutateSize),
       config.maxSeedSize.getOrElse(Config.MaxSeedSize),
@@ -333,6 +336,7 @@ object ConfigJS {
       config.maxIteration.getOrElse(Config.MaxIteration),
       config.maxDegree.getOrElse(Config.MaxDegree),
       config.heatRate.getOrElse(Config.HeatRate),
+      config.usesAcceleration.getOrElse(Config.UsesAcceleration),
       config.maxRepeatCount.getOrElse(Config.MaxRepeatCount),
       config.maxNFASize.getOrElse(Config.MaxNFASize)
     )
