@@ -6,13 +6,6 @@ import codes.quine.labo.recheck.data.UChar
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 
 class ComplexitySuite extends munit.FunSuite {
-  test("Complexity#isSafe") {
-    assert(Constant.isSafe)
-    assert(Linear.isSafe)
-    assert(!Polynomial(2, Witness(Seq((Seq(UChar('a')), Seq(UChar('a')))), Seq(UChar('a')))).isSafe)
-    assert(!Exponential(Witness(Seq((Seq(UChar('a')), Seq(UChar('a')))), Seq(UChar('a')))).isSafe)
-  }
-
   test("Complexity#toAttackComplexity") {
     assertEquals(Constant.toAttackComplexity, AttackComplexity.Constant)
     assertEquals(Linear.toAttackComplexity, AttackComplexity.Linear)
