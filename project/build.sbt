@@ -1,1 +1,1 @@
-libraryDependencies += "com.ibm.icu" % "icu4j" % "68.2"
+libraryDependencies += "com.ibm.icu" % "icu4j" % "69.1"
