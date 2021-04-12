@@ -129,7 +129,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     def capture(index: Int): Option[UString] =
       (captures(index * 2), captures(index * 2 + 1)) match {
         case (b, e) if b == -1 || e == -1 => None
-        case (b, e) => Some(input.substring(b, e))
+        case (b, e)                       => Some(input.substring(b, e))
       }
 
     /** Converts this frame into a corresponding state. */
@@ -434,7 +434,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           case ReadKind.Ref(_)      =>
             // $COVERAGE-OFF$
             sys.error("unreachable")
-            // $COVERAGE-ON$
+          // $COVERAGE-ON$
         }
       case None => false
     }

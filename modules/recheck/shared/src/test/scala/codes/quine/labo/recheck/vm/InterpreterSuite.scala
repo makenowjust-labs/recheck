@@ -4,7 +4,12 @@ import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.data.UString
 import codes.quine.labo.recheck.regexp.Parser
 import codes.quine.labo.recheck.vm.Inst.ReadKind
-import codes.quine.labo.recheck.vm.Interpreter.{CoverageItem, CoverageLocation, FailedPoint, Options, Result, Status}
+import codes.quine.labo.recheck.vm.Interpreter.CoverageItem
+import codes.quine.labo.recheck.vm.Interpreter.CoverageLocation
+import codes.quine.labo.recheck.vm.Interpreter.FailedPoint
+import codes.quine.labo.recheck.vm.Interpreter.Options
+import codes.quine.labo.recheck.vm.Interpreter.Result
+import codes.quine.labo.recheck.vm.Interpreter.Status
 
 class InterpreterSuite extends munit.FunSuite {
   implicit val ctx: Context = Context()
@@ -22,7 +27,7 @@ class InterpreterSuite extends munit.FunSuite {
   }
 
   def assertMatches(source: String, flags: String, input: String, pos: Int)(implicit loc: munit.Location): Unit =
-    assertMatches(source, flags,  UString.from(input, false), pos)
+    assertMatches(source, flags, UString.from(input, false), pos)
 
   def assertMatches(source: String, flags: String, input: UString, pos: Int)(implicit loc: munit.Location): Unit = {
     val opts = Options()
@@ -31,7 +36,7 @@ class InterpreterSuite extends munit.FunSuite {
   }
 
   def assertNotMatches(source: String, flags: String, input: String, pos: Int)(implicit loc: munit.Location): Unit =
-    assertNotMatches(source, flags,  UString.from(input, false), pos)
+    assertNotMatches(source, flags, UString.from(input, false), pos)
 
   def assertNotMatches(source: String, flags: String, input: UString, pos: Int)(implicit loc: munit.Location): Unit = {
     val opts = Options()
@@ -62,7 +67,7 @@ class InterpreterSuite extends munit.FunSuite {
           FailedPoint(CoverageLocation(12, Vector.empty), 4, ReadKind.Ref(1), Some(UString.from("aaaa", false))),
           FailedPoint(CoverageLocation(18, Vector.empty), 0, ReadKind.Char('a'), None),
           FailedPoint(CoverageLocation(21, Vector.empty), 0, ReadKind.Ref(2), Some(UString.from("aaaa", false))),
-          FailedPoint(CoverageLocation(21, Vector.empty), 1, ReadKind.Ref(2), Some(UString.from("aaa", false))),
+          FailedPoint(CoverageLocation(21, Vector.empty), 1, ReadKind.Ref(2), Some(UString.from("aaa", false)))
         ),
         Set(
           CoverageItem(CoverageLocation(1, Vector.empty), true),
@@ -76,13 +81,13 @@ class InterpreterSuite extends munit.FunSuite {
           CoverageItem(CoverageLocation(18, Vector.empty), true),
           CoverageItem(CoverageLocation(18, Vector.empty), false),
           CoverageItem(CoverageLocation(21, Vector.empty), true),
-          CoverageItem(CoverageLocation(21, Vector.empty), false),
+          CoverageItem(CoverageLocation(21, Vector.empty), false)
         ),
         Map(
           (5, 6) -> 4,
           (8, 10) -> 1,
           (14, 16) -> 1,
-          (17, 18) -> 4,
+          (17, 18) -> 4
         )
       )
     )
