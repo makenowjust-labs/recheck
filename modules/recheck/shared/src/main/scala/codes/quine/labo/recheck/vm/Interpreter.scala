@@ -128,9 +128,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     /** Returns a capture string. */
     def capture(index: Int): Option[UString] =
       (captures(index * 2), captures(index * 2 + 1)) match {
-        case (-1, _)      => None
-        case (_, -1)      => None
-        case (begin, end) => Some(input.substring(begin, end))
+        case (b, e) if b == -1 || e == -1 => None
+        case (b, e) => Some(input.substring(b, e))
       }
 
     /** Converts this frame into a corresponding state. */
@@ -175,7 +174,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     var frame = new Frame(
       program.blocks.head._1,
       pos,
-      Vector.fill((program.meta.capturesSize + 1) * 2)(0),
+      Vector.fill((program.meta.capturesSize + 1) * 2)(-1),
       Vector.fill(program.meta.countersSize)(0),
       Vector.fill(program.meta.canariesSize)(0),
       None,
@@ -183,7 +182,10 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       Vector.empty
     )
 
+    // $COVERAGE-OFF$
     while (true) ctx.interrupt {
+      // $COVERAGE-ON$
+
       if (options.limit <= steps) return result(Status.Limit, None)
 
       var memoized = false
@@ -229,8 +231,10 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           case Inst.Rollback =>
             frame.rollback match {
               case Some(rollback) =>
+                val captures = frame.captures
                 frame = rollback
-              case None => sys.error("unreachable")
+                frame.captures = captures
+              case None => return result(Status.Fail, None)
             }
           case Inst.Tx(next, rollback, fallback) =>
             val rollbackFrame = rollback match {
@@ -275,7 +279,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       }
     }
 
+    // $COVERAGE-OFF$
     sys.error("unreachable")
+    // $COVERAGE-ON$
   }
 
   /** Runs a given block. */
@@ -308,13 +314,13 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
             val c2 = frame.currentChar
             val w1 = c1.exists(Word.contains)
             val w2 = c2.exists(Word.contains)
-            w1 && !w2 || !w1 && w2
+            w1 != w2
           case AssertKind.WordBoundaryNot =>
             val c1 = frame.previousChar
             val c2 = frame.currentChar
             val w1 = c1.exists(Word.contains)
             val w2 = c2.exists(Word.contains)
-            !(w1 && !w2 || !w1 && w2)
+            w1 == w2
           case AssertKind.LineBegin =>
             val c1 = frame.previousChar
             c1.forall(LineTerminator.contains)
@@ -339,6 +345,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           if (options.needsHeatmap && loc.isDefined) {
             heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
           }
+          steps += 1
           frame.pos += s.size
           true
         } else {
@@ -376,6 +383,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           if (options.needsHeatmap && loc.isDefined) {
             heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
           }
+          steps += 1
           frame.pos -= s.size
           true
         } else {
@@ -392,6 +400,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           if (options.needsHeatmap && loc.isDefined) {
             heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
           }
+          steps += 1
           frame.pos -= 1
           true
         } else {
@@ -422,7 +431,10 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           case ReadKind.Char(d)     => c == d
           case ReadKind.Class(s)    => s.contains(c)
           case ReadKind.ClassNot(s) => !s.contains(c)
-          case ReadKind.Ref(_)      => sys.error("unreachable")
+          case ReadKind.Ref(_)      =>
+            // $COVERAGE-OFF$
+            sys.error("unreachable")
+            // $COVERAGE-ON$
         }
       case None => false
     }

@@ -108,21 +108,19 @@ private[vm] class ProgramBuilder(
 
   /** Starts a block of the label. */
   def enterBlock(label: Label): Unit = {
-    if ((currentLabel ne null) || instsBuffer.nonEmpty) {
-      throw new IllegalStateException("unterminated block is found")
-    }
-    if (label.block ne null) {
-      throw new IllegalStateException("a block cannot be re-entered")
-    }
+    // $COVERAGE-OFF$
+    if ((currentLabel ne null) || instsBuffer.nonEmpty) throw new IllegalStateException("unterminated block is found")
+    if (label.block ne null) throw new IllegalStateException("a block cannot be re-entered")
+    // $COVERAGE-ON$
 
     currentLabel = label
   }
 
   /** Adds an instruction to a block. */
   def emitInst(inst: Inst.NonTerminator): Unit = {
-    if (currentLabel eq null) {
-      throw new IllegalStateException("block is not entered")
-    }
+    // $COVERAGE-OFF$
+    if (currentLabel eq null) throw new IllegalStateException("block is not entered")
+    // $COVERAGE-ON$
 
     // Updates a meta information.
     inst match {
@@ -140,9 +138,9 @@ private[vm] class ProgramBuilder(
 
   /** Adds a terminator instruction to a block, and finishes the block. */
   def emitTerminator(inst: Inst.Terminator): Unit = {
-    if (currentLabel eq null) {
-      throw new IllegalStateException("block is not entered")
-    }
+    // $COVERAGE-OFF$
+    if (currentLabel eq null) throw new IllegalStateException("block is not entered")
+    // $COVERAGE-ON$
 
     // Updates a predecessor information.
     for (successor <- inst.successors) predecessorsBuffer(successor.index).add(currentLabel)
@@ -187,7 +185,7 @@ private[vm] class ProgramBuilder(
     enterBlock(main)
 
     // Adds `.*` part if the pattern does not start with `^`.
-    if (!pattern.hasLineBeginAtBegin) {
+    if (!pattern.hasLineBeginAtBegin && !pattern.flagSet.sticky) {
       val loop = allocateLabel("loop")
       val cont = allocateLabel("cont")
 
@@ -240,10 +238,14 @@ private[vm] class ProgramBuilder(
     case Dot() =>
       emitRead(if (dotAll) ReadKind.Any else ReadKind.Dot, node.loc)
     case BackReference(index) =>
+      // $COVERAGE-OFF$
       if (index <= 0 || capturesSize < index) throw new InvalidRegExpException("invalid back-reference")
+      // $COVERAGE-ON$
       emitRead(ReadKind.Ref(index), node.loc)
     case NamedBackReference(name) =>
+      // $COVERAGE-OFF$
       val index = names.getOrElse(name, throw new InvalidRegExpException("invalid named back reference"))
+      // $COVERAGE-ON$
       emitRead(ReadKind.Ref(index), node.loc)
   })
 
