@@ -76,11 +76,12 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
     Test / console / scalacOptions -= "-Wunused",
     // Add inline options:
     Compile / scalacOptions ++= {
-      if ((ThisBuild/coverageEnabled).value) Seq.empty
-      else Seq(
-        "-opt:l:inline",
-        "-opt-inline-from:codes.quine.labo.recheck.common.Context.**"
-      )
+      if ((ThisBuild / coverageEnabled).value) Seq.empty
+      else
+        Seq(
+          "-opt:l:inline",
+          "-opt-inline-from:codes.quine.labo.recheck.common.Context.**"
+        )
     },
     // Settings for scaladoc:
     Compile / doc / scalacOptions += "-diagrams",
