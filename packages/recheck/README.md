@@ -103,7 +103,7 @@ When `undefined` is specified, it uses a system default seed.
 
 An integer value of a limit of VM execution steps on the seeding phase. (default: `1_000`)
 
-#### `populationLimit`
+#### `incubationLimit`
 
 An integer value of a limit of VM execution steps on the incubation phase. (default: `10_000`)
 
@@ -134,6 +134,10 @@ An integer value of a maximum degree to attempt on building an attack string. (d
 #### `heatRate`
 
 A rate of a hotspot steps by the maximum steps. (default: `0.001`)
+
+#### `usesAcceleration`
+
+Whether to use acceleration or not on fuzzing. (default: `true`)
 
 #### `maxRepeatCount`
 

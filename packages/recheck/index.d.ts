@@ -72,7 +72,7 @@ export type Config = {
    * An integer value of a limit of VM execution steps on the incubation phase.
    * (default: `10_000`)
    */
-  populationLimit?: number;
+  incubationLimit?: number;
 
   /**
    * An integer value of the number of crossings on one generation. (default: `25`)
@@ -111,6 +111,12 @@ export type Config = {
     * (default: `0.001`)
     */
   heatRate?: number;
+
+  /**
+   * Whether to use acceleration or not on fuzzing.
+   * (default: `true`)
+   */
+  usesAcceleration?: boolean;
 
   /**
    * An integer value of a limit of repetition count in the RegExp. (default: `20`)

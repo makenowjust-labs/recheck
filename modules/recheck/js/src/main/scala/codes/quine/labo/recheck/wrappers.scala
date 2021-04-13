@@ -269,8 +269,8 @@ trait ConfigJS extends js.Object {
   /** A limit of VM execution steps on seeding. */
   def seedLimit: js.UndefOr[Int]
 
-  /** A limit of VM execution steps on population. */
-  def populationLimit: js.UndefOr[Int]
+  /** A limit of VM execution steps on incubation. */
+  def incubationLimit: js.UndefOr[Int]
 
   /** A size to compute crossing. */
   def crossSize: js.UndefOr[Int]
@@ -328,7 +328,7 @@ object ConfigJS {
       config.attackLimit.getOrElse(Config.AttackLimit),
       random,
       config.seedLimit.getOrElse(Config.SeedLimit),
-      config.populationLimit.getOrElse(Config.IncubationLimit),
+      config.incubationLimit.getOrElse(Config.IncubationLimit),
       config.crossSize.getOrElse(Config.CrossSize),
       config.mutateSize.getOrElse(Config.MutateSize),
       config.maxSeedSize.getOrElse(Config.MaxSeedSize),

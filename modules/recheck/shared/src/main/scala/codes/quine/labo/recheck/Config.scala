@@ -66,7 +66,7 @@ object Config {
   /** The default value of [[Config#seedLimit]]. */
   val SeedLimit = 1_000
 
-  /** The default value of [[Config#populationLimit]]. */
+  /** The default value of [[Config#incubationLimit]]. */
   val IncubationLimit = 10_000
 
   /** The default value of [[Config#crossSize]]. */
