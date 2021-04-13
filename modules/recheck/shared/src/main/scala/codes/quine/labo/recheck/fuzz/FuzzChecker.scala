@@ -4,10 +4,6 @@ package fuzz
 import scala.collection.mutable
 import scala.util.Random
 
-import codes.quine.labo.recheck.backtrack.IR
-import codes.quine.labo.recheck.backtrack.Tracer.LimitException
-import codes.quine.labo.recheck.backtrack.Tracer.LimitTracer
-import codes.quine.labo.recheck.backtrack.VM
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.data.ICharSet
 import codes.quine.labo.recheck.data.UString
@@ -15,16 +11,22 @@ import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Hotspot
 import codes.quine.labo.recheck.fuzz.FuzzChecker._
+import codes.quine.labo.recheck.vm.Interpreter
+import codes.quine.labo.recheck.vm.Interpreter.CoverageItem
+import codes.quine.labo.recheck.vm.Interpreter.Options
+import codes.quine.labo.recheck.vm.Interpreter.Result
+import codes.quine.labo.recheck.vm.Interpreter.Status
+import codes.quine.labo.recheck.vm.Program
 
 /** ReDoS vulnerable RegExp checker based on fuzzing. */
 object FuzzChecker {
 
   /** Checks whether RegExp is ReDoS vulnerable or not. */
   def check(
-      fuzz: FuzzIR,
+      fuzz: FuzzProgram,
       random: Random = Random,
       seedLimit: Int = 10_000,
-      populationLimit: Int = 100_000,
+      incubationLimit: Int = 100_000,
       attackLimit: Int = 1_000_000,
       crossSize: Int = 25,
       mutateSize: Int = 50,
@@ -33,14 +35,15 @@ object FuzzChecker {
       maxGenerationSize: Int = 100,
       maxIteration: Int = 30,
       maxDegree: Int = 4,
-      heatRate: Double = 0.001
+      heatRate: Double = 0.001,
+      usesAcceleration: Boolean = true
   )(implicit ctx: Context): Option[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)] =
     ctx.interrupt {
       new FuzzChecker(
         fuzz,
         random,
         seedLimit,
-        populationLimit,
+        incubationLimit,
         attackLimit,
         crossSize,
         mutateSize,
@@ -49,56 +52,29 @@ object FuzzChecker {
         maxGenerationSize,
         maxIteration,
         maxDegree,
-        heatRate
+        heatRate,
+        usesAcceleration
       ).check()
     }
 
   /** Trace is a summary of IR execution. */
-  private[fuzz] final case class Trace(str: FString, rate: Double, steps: Int, coverage: Set[(Int, Seq[Int], Boolean)])
+  private[fuzz] final case class Trace(str: FString, rate: Double, steps: Int, coverage: Set[CoverageItem])
 
   /** Generation is an immutable generation. */
   private[fuzz] final case class Generation(
       minRate: Double,
       traces: IndexedSeq[Trace],
       inputs: Set[UString],
-      covered: Set[(Int, Seq[Int], Boolean)]
+      covered: Set[CoverageItem]
   )
-
-  /** HotspotTracer is a tracer with tracing heatmap. */
-  private[fuzz] final class HotspotTracer(ir: IR, limit: Int) extends LimitTracer(ir, limit) {
-
-    /** A heatmap traced by this. */
-    private[this] val heatmap: mutable.Map[(Int, Int), Int] = mutable.Map.empty[(Int, Int), Int].withDefaultValue(0)
-
-    /** Builds a hotspot from the traced heatmap. */
-    def buildHotspot(heatRate: Double = 0.001): Hotspot = heatmap.maxByOption(_._2) match {
-      case Some((_, max)) =>
-        Hotspot(heatmap.toSeq.map { case ((start, end), count) =>
-          Hotspot.Spot(start, end, if (count >= max * heatRate) Hotspot.Heat else Hotspot.Normal)
-        })
-      case None => Hotspot(Seq.empty)
-    }
-
-    override def trace(pos: Int, pc: Int, backtrack: Boolean, capture: Int => Option[UString], cnts: Seq[Int]): Unit = {
-      super.trace(pos, pc, backtrack, capture, cnts)
-
-      if (!backtrack) {
-        ir.codes(pc) match {
-          case code: IR.Consumable if code.loc.isDefined =>
-            heatmap(code.loc.get) += 1
-          case _ => ()
-        }
-      }
-    }
-  }
 }
 
 /** FuzzChecker is a ReDoS vulnerable RegExp checker based on fuzzing. */
 private[fuzz] final class FuzzChecker(
-    val fuzz: FuzzIR,
+    val fuzz: FuzzProgram,
     val random: Random,
     val seedLimit: Int,
-    val populationLimit: Int,
+    val incubationLimit: Int,
     val attackLimit: Int,
     val crossSize: Int,
     val mutateSize: Int,
@@ -107,13 +83,14 @@ private[fuzz] final class FuzzChecker(
     val maxGenerationSize: Int,
     val maxIteration: Int,
     val maxDegree: Int,
-    val heatRate: Double
+    val heatRate: Double,
+    val usesAcceleration: Boolean
 )(implicit val ctx: Context) {
 
   import ctx._
 
-  /** An alias to `fuzz.ir`. */
-  def ir: IR = fuzz.ir
+  /** An alias to `fuzz.program`. */
+  def program: Program = fuzz.program
 
   /** An alias to `fuzz.alphabet`. */
   def alphabet: ICharSet = fuzz.alphabet
@@ -142,7 +119,7 @@ private[fuzz] final class FuzzChecker(
 
   /** Creates the initial generation from the seed set. */
   def init(): Either[Generation, AttackResult] = interrupt {
-    val seed = Seeder.seed(fuzz, seedLimit, maxSeedSize)
+    val seed: Set[FString] = Seeder.seed(fuzz, seedLimit, maxSeedSize)
     val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty, mutable.Set.empty, true)
     for (str <- seed) {
       pop.execute(str) match {
@@ -338,13 +315,11 @@ private[fuzz] final class FuzzChecker(
   /** Executes the string to construct attack string. */
   def tryAttackExecute(str: FString): Option[(AttackPattern, Hotspot)] = interrupt {
     val input = str.toUString
-    if (input.size > maxAttackSize) None
-    else {
-      val t = new HotspotTracer(ir, attackLimit)
-      try VM.execute(ir, input, 0, t)
-      catch {
-        case _: LimitException =>
-          return Some((str.toAttackPattern, t.buildHotspot(heatRate)))
+    if (input.size <= maxAttackSize) {
+      val opts = Options(attackLimit, usesAcceleration = usesAcceleration, needsHeatmap = true)
+      val result = Interpreter.run(program, input, 0, opts)
+      if (result.status == Status.Limit) {
+        return Some((str.toAttackPattern, Hotspot.build(result.heatmap, heatRate)))
       }
     }
     None
@@ -355,7 +330,7 @@ private[fuzz] final class FuzzChecker(
       var minRate: Double,
       val set: mutable.Set[Trace],
       val inputs: mutable.Set[UString],
-      val visited: mutable.Set[(Int, Seq[Int], Boolean)],
+      val visited: mutable.Set[CoverageItem],
       val init: Boolean
   ) {
 
@@ -364,31 +339,30 @@ private[fuzz] final class FuzzChecker(
       val input = str.toUString
       if (inputs.contains(input)) return None
 
-      val t = new FuzzTracer(fuzz.ir, input, populationLimit)
-      try VM.execute(ir, input, 0, t)
-      catch {
-        case _: LimitException =>
-          add(str, t)
-          return tryAttack(str)
+      val opts = Options(incubationLimit, usesAcceleration = usesAcceleration, needsCoverage = true)
+      val result = Interpreter.run(program, input, 0, opts)
+      add(str, input, result)
+      if (result.status == Status.Limit) {
+        return tryAttack(str)
       }
-      add(str, t)
+
       None
     }
 
     /** Records an IR execution result. */
-    def add(str: FString, t: FuzzTracer): Unit = {
-      inputs.add(t.input)
+    def add(str: FString, input: UString, result: Result): Unit = {
+      inputs.add(input)
 
-      val rate = t.rate()
-      val coverage = t.coverage()
-      val trace = Trace(str, rate, t.steps(), coverage)
+      val rate = if (input.size == 0) 0 else result.steps.toDouble / input.size
+      val coverage = result.coverage
+      val trace = Trace(str, rate, result.steps, coverage)
 
-      if (
-        t.input.size < maxAttackSize && !set.contains(trace) && (init || rate >= minRate || !coverage.subsetOf(visited))
-      ) {
-        minRate = Math.min(rate, minRate)
-        set.add(trace)
-        visited.addAll(coverage)
+      if (input.size < maxAttackSize && !set.contains(trace)) {
+        if (init || rate >= minRate || !coverage.subsetOf(visited)) {
+          minRate = Math.min(rate, minRate)
+          set.add(trace)
+          visited.addAll(coverage)
+        }
       }
     }
 

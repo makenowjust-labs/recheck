@@ -21,8 +21,8 @@ final case class Config(
     random: Random = Random,
     // A limit of VM execution steps on seeding.
     seedLimit: Int = Config.SeedLimit,
-    // A limit of VM execution steps on population.
-    populationLimit: Int = Config.PopulationLimit,
+    // A limit of VM execution steps on incubation.
+    incubationLimit: Int = Config.IncubationLimit,
     // A size to compute crossing.
     crossSize: Int = Config.CrossSize,
     // A size to compute mutation.
@@ -37,6 +37,8 @@ final case class Config(
     maxDegree: Int = Config.MaxDegree,
     // A rate of a hotspot steps by the maximum steps.
     heatRate: Double = Config.HeatRate,
+    // Whether using acceleration or not.
+    usesAcceleration: Boolean = Config.UsesAcceleration,
     // Hybrid:
     // A maximum number of sum of repeat counts like `/a{10}/`.
     // If this value is exceeded, it switches to use fuzzing based checker.
@@ -65,7 +67,7 @@ object Config {
   val SeedLimit = 1_000
 
   /** The default value of [[Config#populationLimit]]. */
-  val PopulationLimit = 10_000
+  val IncubationLimit = 10_000
 
   /** The default value of [[Config#crossSize]]. */
   val CrossSize = 25
@@ -87,6 +89,9 @@ object Config {
 
   /** The default value of [[Config#heatRate]]. */
   val HeatRate = 0.001
+
+  /** The default value of [[Config#usesAcceleration]]. */
+  val UsesAcceleration = true
 
   /** The default value of [[Config#maxRepeatCount]]. */
   val MaxRepeatCount = 20

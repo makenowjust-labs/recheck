@@ -128,7 +128,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
             Map(
               0 -> Assert(AssertKind.LineBegin, 1),
               1 -> Eps(Seq(2)),
-              2 -> Assert(AssertKind.NotWordBoundary, 3),
+              2 -> Assert(AssertKind.WordBoundaryNot, 3),
               3 -> Eps(Seq(4)),
               4 -> Assert(AssertKind.LineEnd, 5)
             )

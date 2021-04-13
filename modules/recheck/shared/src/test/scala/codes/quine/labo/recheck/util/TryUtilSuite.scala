@@ -10,4 +10,11 @@ class TryUtilSuite extends munit.FunSuite {
       TryUtil.traverse(Seq(1, 2, 3))(x => if (x % 2 == 0) Failure(new Exception("foo")) else Success(x)).get
     }
   }
+
+  test("TryUtil.traverseUnit") {
+    assertEquals(TryUtil.traverseUnit(Seq(1, 2, 3))(_ => Success(())), Success(()))
+    interceptMessage[Exception]("foo") {
+      TryUtil.traverseUnit(Seq(1, 2, 3))(x => if (x % 2 == 0) Failure(new Exception("foo")) else Success(())).get
+    }
+  }
 }

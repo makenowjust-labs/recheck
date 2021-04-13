@@ -20,4 +20,8 @@ object TryUtil {
     }
     loop(Vector.empty, xs)
   }
+
+  /** Like `traverse`, but discards results. */
+  def traverseUnit[A, B](xs: Seq[A])(f: A => Try[Unit]): Try[Unit] =
+    traverse(xs)(f).map(_ => ())
 }

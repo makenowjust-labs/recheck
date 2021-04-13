@@ -56,14 +56,14 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
       |
       |import codes.quine.labo.recheck._
       |import codes.quine.labo.recheck.automaton._
-      |import codes.quine.labo.recheck.backtrack._
       |import codes.quine.labo.recheck.common._
       |import codes.quine.labo.recheck.data._
       |import codes.quine.labo.recheck.fuzz._
       |import codes.quine.labo.recheck.regexp._
       |import codes.quine.labo.recheck.util._
+      |import codes.quine.labo.recheck.vm._
       |
-      |implicit def ctx: Context = Context()
+      |implicit def ctx: Context = Context(10.seconds)
       |
       |def time[A](body: => A): A = {
       |  val start = System.nanoTime()
@@ -75,10 +75,14 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
     // Add inline options:
-    Compile / scalacOptions ++= Seq(
-      "-opt:l:inline",
-      "-opt-inline-from:codes.quine.labo.recheck.**"
-    ),
+    Compile / scalacOptions ++= {
+      if ((ThisBuild / coverageEnabled).value) Seq.empty
+      else
+        Seq(
+          "-opt:l:inline",
+          "-opt-inline-from:codes.quine.labo.recheck.common.Context.**"
+        )
+    },
     // Settings for scaladoc:
     Compile / doc / scalacOptions += "-diagrams",
     // Set URL mapping of scala standard API for Scaladoc.

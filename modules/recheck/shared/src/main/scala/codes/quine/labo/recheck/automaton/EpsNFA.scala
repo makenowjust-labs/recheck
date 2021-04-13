@@ -170,7 +170,7 @@ object EpsNFA {
       case AssertKind.LineBegin       => prev.isLineTerminator
       case AssertKind.LineEnd         => next.isLineTerminator
       case AssertKind.WordBoundary    => prev.isWord != next.isWord
-      case AssertKind.NotWordBoundary => prev.isWord == next.isWord
+      case AssertKind.WordBoundaryNot => prev.isWord == next.isWord
     }
 
     /** Returns a set of next possible character information from the previous character information. */
@@ -199,8 +199,8 @@ object EpsNFA {
         else Set(CharInfo(false, true))
     }
 
-    /** NotWordBoundary is `\B` assertion. */
-    case object NotWordBoundary extends AssertKind {
+    /** WordBoundaryNot is `\B` assertion. */
+    case object WordBoundaryNot extends AssertKind {
       def toCharInfoSet(prev: CharInfo): Set[CharInfo] =
         if (prev.isWord) Set(CharInfo(false, true))
         else Set(CharInfo(false, false), CharInfo(true, false))

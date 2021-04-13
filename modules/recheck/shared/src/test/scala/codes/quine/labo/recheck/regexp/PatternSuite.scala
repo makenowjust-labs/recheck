@@ -83,6 +83,77 @@ class PatternSuite extends munit.FunSuite {
     assert(clue(node2.withLoc(0, 1)) eq clue(node2))
   }
 
+  test("Pattern.Node#captureRange") {
+    assertEquals(Sequence(Seq(Capture(1, Dot()), Capture(2, Dot()))).captureRange, CaptureRange(Some((1, 2))))
+    assertEquals(Disjunction(Seq(Capture(1, Dot()), Capture(2, Dot()))).captureRange, CaptureRange(Some((1, 2))))
+    assertEquals(Capture(1, Dot()).captureRange, CaptureRange(Some((1, 1))))
+    assertEquals(Capture(1, Capture(2, Dot())).captureRange, CaptureRange(Some((1, 2))))
+    assertEquals(NamedCapture(1, "x", Dot()).captureRange, CaptureRange(Some((1, 1))))
+    assertEquals(NamedCapture(1, "x", Capture(2, Dot())).captureRange, CaptureRange(Some((1, 2))))
+    assertEquals(Group(Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
+    assertEquals(Star(false, Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
+    assertEquals(Plus(false, Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
+    assertEquals(Question(false, Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
+    assertEquals(Repeat(false, 1, None, Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
+    assertEquals(WordBoundary(false).captureRange, CaptureRange(None))
+    assertEquals(LineBegin().captureRange, CaptureRange(None))
+    assertEquals(LineEnd().captureRange, CaptureRange(None))
+    assertEquals(LookAhead(false, Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
+    assertEquals(LookBehind(false, Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
+    assertEquals(Character('a').captureRange, CaptureRange(None))
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).captureRange, CaptureRange(None))
+    assertEquals(UnicodeProperty(false, "L").captureRange, CaptureRange(None))
+    assertEquals(UnicodePropertyValue(false, "sc", "Hira").captureRange, CaptureRange(None))
+    assertEquals(CharacterClass(false, Seq(Character('a'))).captureRange, CaptureRange(None))
+    assertEquals(Dot().captureRange, CaptureRange(None))
+    assertEquals(BackReference(1).captureRange, CaptureRange(None))
+    assertEquals(NamedBackReference("foo").captureRange, CaptureRange(None))
+  }
+
+  test("Pattern.Node#isEmpty") {
+    assertEquals(Sequence(Seq(Dot(), Dot())).isEmpty, false)
+    assertEquals(Sequence(Seq.empty).isEmpty, true)
+    assertEquals(Disjunction(Seq(Dot(), Dot())).isEmpty, false)
+    assertEquals(Disjunction(Seq(Sequence(Seq.empty), Dot())).isEmpty, true)
+    assertEquals(Disjunction(Seq(Dot(), Sequence(Seq.empty))).isEmpty, true)
+    assertEquals(Capture(1, Dot()).isEmpty, false)
+    assertEquals(Capture(1, Sequence(Seq.empty)).isEmpty, true)
+    assertEquals(NamedCapture(1, "x", Dot()).isEmpty, false)
+    assertEquals(NamedCapture(1, "x", Sequence(Seq.empty)).isEmpty, true)
+    assertEquals(Group(Dot()).isEmpty, false)
+    assertEquals(Group(Sequence(Seq.empty)).isEmpty, true)
+    assertEquals(Star(false, Dot()).isEmpty, true)
+    assertEquals(Star(false, Sequence(Seq.empty)).isEmpty, true)
+    assertEquals(Plus(false, Dot()).isEmpty, false)
+    assertEquals(Plus(false, Sequence(Seq.empty)).isEmpty, true)
+    assertEquals(Question(false, Dot()).isEmpty, true)
+    assertEquals(Question(false, Sequence(Seq.empty)).isEmpty, true)
+    assertEquals(Repeat(false, 0, Some(Some(1)), Dot()).isEmpty, true)
+    assertEquals(Repeat(false, 0, Some(Some(1)), Sequence(Seq.empty)).isEmpty, true)
+    assertEquals(Repeat(false, 1, Some(Some(2)), Dot()).isEmpty, false)
+    assertEquals(Repeat(false, 1, Some(Some(2)), Sequence(Seq.empty)).isEmpty, true)
+    assertEquals(WordBoundary(false).isEmpty, true)
+    assertEquals(LineBegin().isEmpty, true)
+    assertEquals(LineEnd().isEmpty, true)
+    assertEquals(LookAhead(false, Dot()).isEmpty, true)
+    assertEquals(LookBehind(false, Dot()).isEmpty, true)
+    assertEquals(Character('a').isEmpty, false)
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).isEmpty, false)
+    assertEquals(UnicodeProperty(false, "L").isEmpty, false)
+    assertEquals(UnicodePropertyValue(false, "sc", "Hira").isEmpty, false)
+    assertEquals(CharacterClass(false, Seq(Character('a'))).isEmpty, false)
+    assertEquals(Dot().isEmpty, false)
+    assertEquals(BackReference(1).isEmpty, true)
+    assertEquals(NamedBackReference("foo").isEmpty, true)
+  }
+
+  test("Pattern.CaptureRange#merge") {
+    assertEquals(CaptureRange(None).merge(CaptureRange(None)), CaptureRange(None))
+    assertEquals(CaptureRange(Some((1, 1))).merge(CaptureRange(None)), CaptureRange(Some((1, 1))))
+    assertEquals(CaptureRange(None).merge(CaptureRange(Some((2, 2)))), CaptureRange(Some((2, 2))))
+    assertEquals(CaptureRange(Some((1, 1))).merge(CaptureRange(Some((2, 2)))), CaptureRange(Some((1, 2))))
+  }
+
   test("Pattern.showNode") {
     val x = Character('x')
     assertEquals(showNode(Disjunction(Seq(Disjunction(Seq(x, x)), x))), "(?:x|x)|x")
@@ -393,5 +464,54 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(Pattern(LookBehind(false, seq), flagSet).parts, Set(UString.from("xyz", false)))
     assertEquals(Pattern(Dot(), flagSet).parts, Set.empty[UString])
     assertEquals(Pattern(Character('x'), flagSet).parts, Set.empty[UString])
+  }
+
+  test("Pattern#capturesSize") {
+    val flagSet = FlagSet(false, false, false, false, false, false)
+    assertEquals(Pattern(Disjunction(Seq(Capture(1, Dot()), Capture(2, Dot()))), flagSet).capturesSize, 2)
+    assertEquals(Pattern(Sequence(Seq(Capture(1, Dot()), Capture(2, Dot()))), flagSet).capturesSize, 2)
+    assertEquals(Pattern(Capture(1, Dot()), flagSet).capturesSize, 1)
+    assertEquals(Pattern(Capture(1, Capture(2, Dot())), flagSet).capturesSize, 2)
+    assertEquals(Pattern(NamedCapture(1, "x", Dot()), flagSet).capturesSize, 1)
+    assertEquals(Pattern(NamedCapture(1, "x", Capture(2, Dot())), flagSet).capturesSize, 2)
+    assertEquals(Pattern(Group(Dot()), flagSet).capturesSize, 0)
+    assertEquals(Pattern(Star(false, Dot()), flagSet).capturesSize, 0)
+    assertEquals(Pattern(Plus(false, Dot()), flagSet).capturesSize, 0)
+    assertEquals(Pattern(Question(false, Dot()), flagSet).capturesSize, 0)
+    assertEquals(Pattern(Repeat(false, 2, None, Dot()), flagSet).capturesSize, 0)
+    assertEquals(Pattern(LookAhead(false, Dot()), flagSet).capturesSize, 0)
+    assertEquals(Pattern(LookBehind(false, Dot()), flagSet).capturesSize, 0)
+    assertEquals(Pattern(Dot(), flagSet).capturesSize, 0)
+  }
+
+  test("Pattern#names") {
+    val flagSet = FlagSet(false, false, false, false, false, false)
+    assertEquals(
+      Pattern(Disjunction(Seq(NamedCapture(1, "x", Dot()), NamedCapture(2, "y", Dot()))), flagSet).names,
+      Success(Map("x" -> 1, "y" -> 2))
+    )
+    interceptMessage[InvalidRegExpException]("duplicated named capture") {
+      Pattern(Disjunction(Seq(NamedCapture(1, "x", Dot()), NamedCapture(2, "x", Dot()))), flagSet).names.get
+    }
+    assertEquals(
+      Pattern(Sequence(Seq(NamedCapture(1, "x", Dot()), NamedCapture(2, "y", Dot()))), flagSet).names,
+      Success(Map("x" -> 1, "y" -> 2))
+    )
+    interceptMessage[InvalidRegExpException]("duplicated named capture") {
+      Pattern(Sequence(Seq(NamedCapture(1, "x", Dot()), NamedCapture(2, "x", Dot()))), flagSet).names.get
+    }
+    assertEquals(Pattern(Capture(1, NamedCapture(2, "x", Dot())), flagSet).names, Success(Map("x" -> 2)))
+    assertEquals(
+      Pattern(NamedCapture(1, "x", NamedCapture(2, "y", Dot())), flagSet).names,
+      Success(Map("x" -> 1, "y" -> 2))
+    )
+    assertEquals(Pattern(Group(NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
+    assertEquals(Pattern(Star(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
+    assertEquals(Pattern(Plus(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
+    assertEquals(Pattern(Question(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
+    assertEquals(Pattern(Repeat(false, 2, None, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
+    assertEquals(Pattern(LookAhead(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
+    assertEquals(Pattern(LookBehind(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
+    assertEquals(Pattern(Dot(), flagSet).names, Success(Map.empty[String, Int]))
   }
 }

@@ -1,29 +1,44 @@
 package codes.quine.labo.recheck
 package fuzz
-
-import scala.annotation.tailrec
 import scala.collection.mutable
 
-import codes.quine.labo.recheck.backtrack.IR
-import codes.quine.labo.recheck.backtrack.Tracer.LimitException
-import codes.quine.labo.recheck.backtrack.VM
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.data.IChar
 import codes.quine.labo.recheck.data.ICharSet
 import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.vm.Inst.ReadKind
+import codes.quine.labo.recheck.vm.Interpreter
+import codes.quine.labo.recheck.vm.Interpreter.CoverageItem
+import codes.quine.labo.recheck.vm.Interpreter.CoverageLocation
+import codes.quine.labo.recheck.vm.Interpreter.FailedPoint
+import codes.quine.labo.recheck.vm.Interpreter.Options
+import codes.quine.labo.recheck.vm.Interpreter.Status
 
 /** Seeder computes a seed set for the pattern. */
 object Seeder {
 
   /** Computes a seed set of the context. */
-  def seed(fuzz: FuzzIR, limit: Int = 10_000, maxSeedSetSize: Int = 100)(implicit ctx: Context): Set[FString] =
+  def seed(
+      fuzz: FuzzProgram,
+      limit: Int = 10_000,
+      maxSeedSetSize: Int = 100,
+      usesAcceleration: Boolean = true
+  )(implicit ctx: Context): Set[FString] =
     ctx.interrupt {
       import ctx._
 
       val set = mutable.Set.empty[FString]
       val added = mutable.Set.empty[UString]
-      val queue = mutable.Queue.empty[(UString, Option[(Int, Seq[Int])])]
-      val covered = mutable.Set.empty[(Int, Seq[Int], Boolean)]
+      val queue = mutable.Queue.empty[(UString, Option[CoverageLocation])]
+      val covered = mutable.Set.empty[CoverageItem]
+
+      val opts = Options(
+        limit,
+        usesAcceleration = usesAcceleration,
+        needsLoopAnalysis = true,
+        needsFailedPoints = true,
+        needsCoverage = true
+      )
 
       interrupt {
         queue.enqueue((UString.empty, None))
@@ -37,30 +52,24 @@ object Seeder {
       while (queue.nonEmpty && set.size < maxSeedSetSize) interrupt {
         val (input, target) = queue.dequeue()
 
-        if (target.forall { case (pc, cnts) => !covered.contains((pc, cnts, false)) }) {
-          val t = new SeedTracer(fuzz, input, limit)
-          try VM.execute(fuzz.ir, input, 0, t)
-          catch {
-            case _: LimitException =>
-              // When execution reaches the limit, it is possibly vulnerable.
-              // Then, it is added to a seed set and exits seeding.
-              set.add(t.buildFString())
-              return set.toSet
+        if (target.forall(loc => !covered.contains(CoverageItem(loc, true)))) {
+          val result = Interpreter.run(fuzz.program, input, 0, opts)
+          if (result.status == Status.Limit) {
+            set.add(FString(input))
+            set.add(FString.build(input, result.loops))
+            return set.toSet
           }
-
-          val coverage = t.coverage()
-          val patches = t.patches()
 
           // If the input string can reach a new pc,
           // it should be added to a seed set.
-          if (!coverage.subsetOf(covered)) {
-            set.add(t.buildFString())
-            set.add(FString(1, input.seq.map(FString.Wrap)))
-            covered.addAll(coverage)
-            for (((pc, cnts), patch) <- patches) {
-              if (!covered.contains((pc, cnts, false))) {
-                for (patched <- patch.apply(input); if !added.contains(patched)) {
-                  queue.enqueue((patched, Some((pc, cnts))))
+          if (!result.coverage.subsetOf(covered)) {
+            covered.addAll(result.coverage)
+            set.add(FString(input))
+            set.add(FString.build(input, result.loops))
+            for (failedPoint <- result.failedPoints) {
+              if (!covered.contains(CoverageItem(failedPoint.target, true))) {
+                for (patched <- Patch.build(failedPoint, fuzz.alphabet).apply(input); if !added.contains(patched)) {
+                  queue.enqueue((patched, Some(failedPoint.target)))
                   added.add(patched)
                 }
               }
@@ -77,7 +86,6 @@ object Seeder {
     def apply(s: UString): Seq[UString]
   }
 
-  /** Patch types. */
   private[fuzz] object Patch {
 
     /** InsertChar is a patch to insert (or replace) each characters at the `pos`. */
@@ -91,64 +99,16 @@ object Seeder {
       def apply(t: UString): Seq[UString] =
         Seq(t.insert(pos, s))
     }
-  }
 
-  /** SeedTracer is a tracer implementation for the seeder. */
-  private[fuzz] class SeedTracer(fuzz: FuzzIR, input: UString, limit: Int) extends FuzzTracer(fuzz.ir, input, limit) {
-
-    /** A mutable data of [[patches]]. */
-    private[this] val patchesMap: mutable.Map[(Int, Seq[Int]), Patch] = mutable.Map.empty
-
-    /*: An alias to `pattern.alphabet`. */
-    private def alphabet: ICharSet = fuzz.alphabet
-
-    /** A map from pc to patch. */
-    def patches(): Map[(Int, Seq[Int]), Patch] = patchesMap.toMap
-
-    override def trace(pos: Int, pc: Int, backtrack: Boolean, capture: Int => Option[UString], cnts: Seq[Int]): Unit = {
-      super.trace(pos, pc, backtrack, capture, cnts)
-
-      // Creates a patch to make the string reaches this op-code.
-      @tailrec
-      def addPatch(pc: Int): Unit = ir.codes(pc) match {
-        case IR.Any(_) =>
-          if (backtrack) {
-            patchesMap((pc, cnts)) = Patch.InsertChar(pos, alphabet.any)
-          }
-        case IR.Back =>
-          if (backtrack) {
-            // When `back` is failed, `pos` is `0`.
-            // We want a patch to insert the first character, so it looks the next op-code.
-            addPatch(pc + 1)
-          }
-        case IR.Char(c, _) =>
-          if (backtrack) {
-            patchesMap((pc, cnts)) = Patch.InsertChar(pos, Set(IChar(c)))
-          }
-        case IR.Class(s, _) =>
-          if (backtrack) {
-            patchesMap((pc, cnts)) = Patch.InsertChar(pos, alphabet.refine(s))
-          }
-        case IR.ClassNot(s, _) =>
-          if (backtrack) {
-            patchesMap((pc, cnts)) = Patch.InsertChar(pos, alphabet.refineInvert(s))
-          }
-        case IR.Dot(_) =>
-          if (backtrack) {
-            patchesMap((pc, cnts)) = Patch.InsertChar(pos, alphabet.dot)
-          }
-        case IR.Ref(n, _) =>
-          if (backtrack) {
-            capture(n).foreach(s => patchesMap((pc, cnts)) = Patch.InsertString(pos, s))
-          }
-        case IR.RefBack(n, _) =>
-          if (backtrack) {
-            capture(n).foreach(s => patchesMap((pc, cnts)) = Patch.InsertString(pos, s))
-          }
-        case _ => () // Skips
+    /** Builds a patch from a failed point. */
+    def build(failed: FailedPoint, alphabet: ICharSet): Patch =
+      failed.kind match {
+        case ReadKind.Any         => InsertChar(failed.pos, alphabet.any)
+        case ReadKind.Dot         => InsertChar(failed.pos, alphabet.dot)
+        case ReadKind.Char(c)     => InsertChar(failed.pos, Set(IChar(c)))
+        case ReadKind.Class(s)    => InsertChar(failed.pos, alphabet.refine(s))
+        case ReadKind.ClassNot(s) => InsertChar(failed.pos, alphabet.refineInvert(s))
+        case ReadKind.Ref(_)      => InsertString(failed.pos, failed.capture.get)
       }
-
-      addPatch(pc)
-    }
   }
 }

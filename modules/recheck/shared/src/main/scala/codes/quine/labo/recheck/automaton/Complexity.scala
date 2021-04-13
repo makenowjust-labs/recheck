@@ -7,18 +7,13 @@ import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Hotspot
 
 /** Complexity is a result of [[AutomatonChecker.check]] method. */
-sealed abstract class Complexity[+A] extends Serializable with Product {
-
-  /** Tests whether this complexity is safe or not. */
-  def isSafe: Boolean
-}
+sealed abstract class Complexity[+A] extends Serializable with Product
 
 /** Complexity types. */
 object Complexity {
 
   /** Safe is a common class for safe complexity. */
   sealed abstract class Safe extends Complexity[Nothing] {
-    def isSafe: Boolean = true
 
     /** Converts this into a diagnostics complexity. */
     def toAttackComplexity: AttackComplexity.Safe
@@ -29,8 +24,6 @@ object Complexity {
 
     /** A witness for this complexity. */
     def witness: Witness[A]
-
-    def isSafe: Boolean = false
 
     /** Builds an attack string pattern of this. */
     def buildAttackPattern(stepsLimit: Int, maxSize: Int)(implicit ev: A =:= UChar): AttackPattern

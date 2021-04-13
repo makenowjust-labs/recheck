@@ -23,8 +23,18 @@ class HotspotSuite extends munit.FunSuite {
     )
   }
 
-  test("Heatmap.Temperature#toString") {
+  test("Hotspot.Temperature#toString") {
     assertEquals(Hotspot.Heat.toString, "heat")
     assertEquals(Hotspot.Normal.toString, "normal")
+  }
+
+  test("Hotspot.build") {
+    val hotspot = Hotspot.build(Map((0, 1) -> 4, (2, 3) -> 2, (4, 5) -> 1), 0.5)
+    assertEquals(
+      hotspot,
+      Hotspot(
+        Seq(Hotspot.Spot(0, 1, Hotspot.Heat), Hotspot.Spot(2, 3, Hotspot.Heat), Hotspot.Spot(4, 5, Hotspot.Normal))
+      )
+    )
   }
 }

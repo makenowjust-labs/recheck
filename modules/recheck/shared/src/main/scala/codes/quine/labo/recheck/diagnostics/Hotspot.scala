@@ -34,6 +34,16 @@ object Hotspot {
         }
     )
 
+  /** Builds hotspots from a heatmap and rate. */
+  def build(heatmap: Map[(Int, Int), Int], heatRate: Double): Hotspot =
+    heatmap.maxByOption(_._2) match {
+      case Some(((_, _), max)) =>
+        Hotspot(heatmap.toSeq.map { case ((start, end), count) =>
+          Hotspot.Spot(start, end, if (count >= max * heatRate) Hotspot.Heat else Hotspot.Normal)
+        })
+      case None => empty
+    }
+
   /** An empty hotspot. */
   def empty: Hotspot = new Hotspot(Seq.empty)
 

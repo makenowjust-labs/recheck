@@ -22,7 +22,7 @@ object EpsNFACompiler {
     ctx.interrupt(for {
       alphabet <- pattern.alphabet
       (stateSet, init, accept, tau) <- {
-        val FlagSet(_, ignoreCase, _, dotAll, unicode, _) = pattern.flagSet
+        val FlagSet(_, ignoreCase, _, dotAll, unicode, sticky) = pattern.flagSet
 
         // Mutable states.
         var counterQ = 0 // A next state counter.
@@ -123,7 +123,7 @@ object EpsNFACompiler {
           case WordBoundary(invert) =>
             val i = nextQ()
             val a = nextQ()
-            tau.addOne(i -> Assert(if (invert) AssertKind.NotWordBoundary else AssertKind.WordBoundary, a))
+            tau.addOne(i -> Assert(if (invert) AssertKind.WordBoundaryNot else AssertKind.WordBoundary, a))
             Success((i, a))
           case LineBegin() =>
             val i = nextQ()
@@ -161,7 +161,7 @@ object EpsNFACompiler {
         })
 
         loop(pattern.node).map { case (i0, a0) =>
-          val i = if (!pattern.hasLineBeginAtBegin) {
+          val i = if (!pattern.hasLineBeginAtBegin && !sticky) {
             val loop = nextLoop()
             val i1 = nextQ()
             val i2 = nextQ()

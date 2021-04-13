@@ -145,14 +145,44 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
 /** FString types and utilities. */
 object FString {
 
-  /** FChar is a character of [[FString]]. */
+  /** FChar is a character of FString. */
   sealed abstract class FChar extends Serializable with Product
 
-  /** Wrap is a wrapper of a unicode character in [[FString]]. */
+  /** Wrap is a wrapper of a unicode character in FString. */
   final case class Wrap(u: UChar) extends FChar
 
-  /** Repeat is a repetition specifier in [[FString]]. */
+  /** Repeat is a repetition specifier in FString. */
   final case class Repeat(m: Int, size: Int) extends FChar
+
+  /** Builds a FString from a string. */
+  def apply(input: UString): FString = FString(1, input.seq.map(Wrap))
+
+  /** Builds a FString from a string with a loop analysis information. */
+  def build(input: UString, loops: Seq[(Int, Int)]): FString = {
+    val repeats = loops.iterator.collect { case (start, end) if start != end => (start, end - start) }.toMap
+
+    val str = IndexedSeq.newBuilder[FChar]
+    var pos = 0
+    while (pos < input.size) {
+      repeats.get(pos) match {
+        case Some(size) =>
+          val part = input.substring(pos, pos + size)
+          pos += size
+          // Compresses a repetition.
+          var m = 0
+          while (pos < input.size && part == input.substring(pos, pos + size)) {
+            m += 1
+            pos += size
+          }
+          str.addOne(Repeat(m, size)).addAll(part.seq.map(Wrap))
+        case None =>
+          str.addOne(Wrap(input.seq(pos)))
+          pos += 1
+      }
+    }
+
+    FString(1, str.result())
+  }
 
   /** Computes a crossing of two FString. */
   def cross(fs1: FString, fs2: FString, n1: Int, n2: Int): (FString, FString) = {
