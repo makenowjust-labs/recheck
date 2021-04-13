@@ -108,7 +108,7 @@ object Seeder {
         case ReadKind.Char(c)     => InsertChar(failed.pos, Set(IChar(c)))
         case ReadKind.Class(s)    => InsertChar(failed.pos, alphabet.refine(s))
         case ReadKind.ClassNot(s) => InsertChar(failed.pos, alphabet.refineInvert(s))
-        case ReadKind.Ref(_)      => InsertString(failed.pos, failed.capture.getOrElse(UString.empty))
+        case ReadKind.Ref(_)      => InsertString(failed.pos, failed.capture.get)
       }
   }
 }
