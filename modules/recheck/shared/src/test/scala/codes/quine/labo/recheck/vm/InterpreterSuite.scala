@@ -35,6 +35,23 @@ class InterpreterSuite extends munit.FunSuite {
     assertEquals(matches(source, flags, input, pos, opts.copy(usesAcceleration = true)).status, Status.Ok)
   }
 
+  def assertCaptures(source: String, flags: String, input: String, pos: Int)(captures: Seq[Int])(implicit
+      loc: munit.Location
+  ): Unit =
+    assertCaptures(source, flags, UString.from(input, false), pos)(captures)
+
+  def assertCaptures(source: String, flags: String, input: UString, pos: Int)(
+      captures: Seq[Int]
+  )(implicit loc: munit.Location): Unit = {
+    val opts = Options()
+    val result1 = matches(source, flags, input, pos, opts)
+    assertEquals(result1.status, Status.Ok)
+    assertEquals(result1.captures, Some(captures))
+    val result2 = matches(source, flags, input, pos, opts.copy(usesAcceleration = true))
+    assertEquals(result2.status, Status.Ok)
+    assertEquals(result2.captures, Some(captures))
+  }
+
   def assertNotMatches(source: String, flags: String, input: String, pos: Int)(implicit loc: munit.Location): Unit =
     assertNotMatches(source, flags, UString.from(input, false), pos)
 
@@ -242,5 +259,22 @@ class InterpreterSuite extends munit.FunSuite {
 
     assertMatches("(?<!a)$", "", "", 0)
     assertNotMatches("(?<!a)$", "", "a", 0)
+  }
+
+  test("Interpreter.run: captures") {
+    assertCaptures("a", "", "a", 0)(Seq(0, 1))
+    assertCaptures("a", "", "bab", 0)(Seq(1, 2))
+    assertCaptures("^(?:(a)|(b))*$", "", "aba", 0)(Seq(0, 3, 2, 3, -1, -1))
+    assertCaptures("^(?:(a)|(b))*$", "", "bab", 0)(Seq(0, 3, -1, -1, 2, 3))
+    assertCaptures("(?=a)", "", "a", 0)(Seq(0, 0))
+    assertCaptures("(?=(a))", "", "a", 0)(Seq(0, 0, 0, 1))
+    assertCaptures("(?<=(a))", "", "a", 0)(Seq(1, 1, 0, 1))
+    assertCaptures("(?=(a))", "", "a", 0)(Seq(0, 0, 0, 1))
+    assertCaptures("(?=(?<=(a))(a))", "", "aa", 0)(Seq(1, 1, 0, 1, 1, 2))
+    assertCaptures("(?=(?<!(a))(a))", "", "a", 0)(Seq(0, 0, -1, -1, 0, 1))
+    assertCaptures("(?<=(a)(?=(a)))", "", "aa", 0)(Seq(1, 1, 0, 1, 1, 2))
+    assertCaptures("(?<=(a)(?!(a)))", "", "a", 0)(Seq(1, 1, 0, 1, -1, -1))
+    assertCaptures("^(a*)(a*)$", "", "aaa", 0)(Seq(0, 3, 0, 3, 3, 3))
+    assertCaptures("^(a*?)(a*?)$", "", "aaa", 0)(Seq(0, 3, 0, 0, 0, 3))
   }
 }

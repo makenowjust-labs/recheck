@@ -1,5 +1,6 @@
 package codes.quine.labo.recheck.vm
 
+import scala.annotation.nowarn
 import scala.collection.mutable
 
 import codes.quine.labo.recheck.common.Context
@@ -96,7 +97,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       var captures: Vector[Int],
       var counters: Vector[Int],
       var canaries: Vector[Int],
-      var rollback: Option[Frame],
+      var rollback: Option[Rollback],
       var fallback: Option[Frame],
       var junctions: Vector[Junction]
   ) {
@@ -141,6 +142,21 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
     override def toString: String =
       s"Frame($label, $pos, $captures, $counters, $canaries, $rollback, $fallback, $junctions)"
+  }
+
+  /** Rollback holds an information for rollbacks. */
+  private[this] sealed abstract class Rollback extends Product with Serializable
+
+  @nowarn // Ignores 'The outer reference in this type test cannot be checked at run time.' error.
+  private[this] object Rollback {
+
+    /** HasSuccessor is a pair of a label and a position for rollback
+      * when `rollback` instruction has rollback successor label.
+      */
+    final case class HasSuccessor private (next: Label, pos: Int, rollback: Option[Rollback]) extends Rollback
+
+    /** Fallback is a fallback frame for rollback when `rollback` instruction has no rollback successor label. */
+    final case class Fallback private (fallback: Option[Frame]) extends Rollback
   }
 
   /** A number of current execution step. */
@@ -188,6 +204,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
       if (options.limit <= steps) return result(Status.Limit, None)
 
+      // When acceleration mode is enabled and current block is junction,
+      // it tries to retrieve a result from memoization table, or adds a junction information.
       var memoized = false
       if (options.usesAcceleration && program.meta.predecessors(frame.label.index).size >= 2) {
         val state = frame.toState
@@ -214,37 +232,42 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         }
       }
 
-      if (!memoized && block(frame, frame.label.block)) {
-        frame.label.block.terminator match {
+      val failed = memoized || !block(frame, frame.label.block) ||
+        (frame.label.block.terminator match {
           case Inst.Ok => return result(Status.Ok, Some(frame.captures))
           case Inst.Jmp(next) =>
             frame.label = next
+            false
           case Inst.Try(next, fallback) =>
             val fallbackFrame = frame.clone()
             fallbackFrame.label = fallback
             frame.label = next
             frame.fallback = Some(fallbackFrame)
+            false
           case Inst.Cmp(reg, n, lt, ge) =>
             val r = frame.counters(reg.index)
             val next = if (r < n) lt else ge
             frame.label = next
+            false
           case Inst.Rollback =>
-            frame.rollback match {
-              case Some(rollback) =>
-                val captures = frame.captures
-                frame = rollback
-                frame.captures = captures
-              case None => return result(Status.Fail, None)
+            @nowarn // Ignores 'The outer reference in this type test cannot be checked at run time.' error.
+            val failed = frame.rollback.get match {
+              case Rollback.HasSuccessor(next, pos, rollback) =>
+                frame.label = next
+                frame.pos = pos
+                frame.rollback = rollback
+                false
+              case Rollback.Fallback(fallback) =>
+                frame.fallback = fallback
+                true
             }
+            failed
           case Inst.Tx(next, rollback, fallback) =>
-            val rollbackFrame = rollback match {
-              case Some(rollback) =>
-                val rollbackFrame = frame.clone()
-                rollbackFrame.label = rollback
-                Some(rollbackFrame)
-              case None => frame.fallback
+            val nextRollback = rollback match {
+              case Some(rollback) => Rollback.HasSuccessor(rollback, frame.pos, frame.rollback)
+              case None           => Rollback.Fallback(frame.fallback)
             }
-            val fallbackFrame = fallback match {
+            val nextFallback = fallback match {
               case Some(fallback) =>
                 val fallbackFrame = frame.clone()
                 fallbackFrame.label = fallback
@@ -252,10 +275,12 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
               case None => frame.fallback
             }
             frame.label = next
-            frame.rollback = rollbackFrame
-            frame.fallback = fallbackFrame
-        }
-      } else {
+            frame.rollback = Some(nextRollback)
+            frame.fallback = nextFallback
+            false
+        })
+
+      if (failed) {
         frame.fallback match {
           case Some(fallback) =>
             if (options.usesAcceleration && frame.junctions.size > fallback.junctions.size) {
