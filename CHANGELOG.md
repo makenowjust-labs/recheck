@@ -1,3 +1,10 @@
+# 3.0.0 (2021-04-14)
+
+Changes:
+
+- Add a new VM implementation for fuzzing :tada:
+  - acceleration mode & opt-in analysis
+
 # 2.1.0 (2021-02-08)
 
 Changes:
@@ -9,7 +16,7 @@ Changes:
 
 Fixes:
 
-- Update the web site
+- Update the website
 - Add ES module build to JS package
 
 # 2.0.1 (2021-02-01)
