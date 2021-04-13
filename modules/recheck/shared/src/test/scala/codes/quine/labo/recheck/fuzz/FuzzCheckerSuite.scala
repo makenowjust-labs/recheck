@@ -60,7 +60,7 @@ class FuzzCheckerSuite extends munit.FunSuite {
       val result = for {
         pattern <- Parser.parse("^(a?){50}a{50}$", "")
         fuzz <- FuzzProgram.from(pattern)
-      } yield FuzzChecker.check(fuzz, random0, seedLimit = 1000, incubationLimit = 1000, attackLimit = 10000)
+      } yield FuzzChecker.check(fuzz, random0, seedLimit = 10000, incubationLimit = 10000, attackLimit = 10000)
       result.get.isDefined
     }
 
