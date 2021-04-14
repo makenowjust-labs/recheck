@@ -103,7 +103,7 @@ private[data] object IntervalSet {
       case (xys, (x, y))                                         => xys :+ (x, y)
     }
 
-  /** Creats an interval set from the intervals. */
+  /** Creates an interval set from the intervals. */
   def apply[A](intervals: (A, A)*)(implicit A: Ordering[A]): IntervalSet[A] =
     from(intervals)
 
