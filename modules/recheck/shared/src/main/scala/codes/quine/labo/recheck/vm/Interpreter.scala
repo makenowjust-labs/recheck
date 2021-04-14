@@ -153,7 +153,12 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     /** HasSuccessor is a pair of a label and a position for rollback
       * when `rollback` instruction has rollback successor label.
       */
-    final case class HasSuccessor private (next: Label, pos: Int, rollback: Option[Rollback]) extends Rollback
+    final case class HasSuccessor private (
+        next: Label,
+        pos: Int,
+        rollback: Option[Rollback],
+        fallback: Option[Frame]
+    ) extends Rollback
 
     /** Fallback is a fallback frame for rollback when `rollback` instruction has no rollback successor label. */
     final case class Fallback private (fallback: Option[Frame]) extends Rollback
@@ -252,10 +257,11 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           case Inst.Rollback =>
             @nowarn // Ignores 'The outer reference in this type test cannot be checked at run time.' error.
             val failed = frame.rollback.get match {
-              case Rollback.HasSuccessor(next, pos, rollback) =>
+              case Rollback.HasSuccessor(next, pos, rollback, fallback) =>
                 frame.label = next
                 frame.pos = pos
                 frame.rollback = rollback
+                frame.fallback = fallback
                 false
               case Rollback.Fallback(fallback) =>
                 frame.fallback = fallback
@@ -264,7 +270,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
             failed
           case Inst.Tx(next, rollback, fallback) =>
             val nextRollback = rollback match {
-              case Some(rollback) => Rollback.HasSuccessor(rollback, frame.pos, frame.rollback)
+              case Some(rollback) => Rollback.HasSuccessor(rollback, frame.pos, frame.rollback, frame.fallback)
               case None           => Rollback.Fallback(frame.fallback)
             }
             val nextFallback = fallback match {
