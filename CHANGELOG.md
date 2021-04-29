@@ -1,3 +1,9 @@
+# dev
+
+Changes:
+
+- Remove `isLineTerminator` and `isWord` flag from `IChar` ([#62](https://github.com/MakeNowJust-Labo/recheck/pull/62))
+
 # 3.0.0 (2021-04-14)
 
 Changes:
