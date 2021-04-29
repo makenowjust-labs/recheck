@@ -58,7 +58,8 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
     ctx.interrupt {
       // Obtains a set of possible character information.
       // `CharInfo(true, false)` means a beginning or ending marker.
-      val charInfoSet = alphabet.chars.toSet.map(CharInfo.from) ++ Set(CharInfo(true, false))
+      val icharToCharInfo = alphabet.chars.iterator.map(ch => ch -> CharInfo(ch.isLineTerminator, ch.isWord)).toMap
+      val charInfoSet = icharToCharInfo.values.toSet ++ Set(CharInfo(true, false))
 
       /** Skips ε-transitions from the state and collects not ε-transition or terminal state. */
       def buildClosure(c0: CharInfo, cs: Set[CharInfo], q: Q, loops: Set[Int]): Seq[(Q, Option[Consume[Q]])] =
@@ -75,7 +76,7 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
                 if (loops.contains(loop)) Vector.empty // An ε-loop is detected.
                 else buildClosure(c0, cs, q1, loops)
               case Some(Consume(chs, q1, pos)) =>
-                val newChs = chs.filter(ch => cs.contains(CharInfo.from(ch)))
+                val newChs = chs.filter(ch => cs.contains(icharToCharInfo(ch)))
                 if (newChs.nonEmpty) Vector((q, Some(Consume(newChs, q1, pos))))
                 else Vector.empty
               case None =>
@@ -111,7 +112,7 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
           p match {
             case Some(Consume(chs, q1, loc)) =>
               for (ch <- chs) {
-                val c1 = CharInfo.from(ch)
+                val c1 = icharToCharInfo(ch)
                 val qps1 = closure(c1, q1)
                 val qs1 = qps1.map(_._1)
                 d(ch) = d(ch) :+ (c1, qs1)
@@ -213,11 +214,4 @@ object EpsNFA {
     * because there is no character which is a line terminator and also a word.
     */
   final case class CharInfo(isLineTerminator: Boolean, isWord: Boolean)
-
-  /** CharInfo utilities. */
-  object CharInfo {
-
-    /** Extracts a character information from the interval set. */
-    def from(ch: IChar): CharInfo = CharInfo(ch.isLineTerminator, ch.isWord)
-  }
 }

@@ -16,11 +16,11 @@ class ICharSetSuite extends munit.FunSuite {
 
   test("ICharSet#add") {
     assertEquals(
-      ICharSet.any(false, false).add(IChar(IntervalSet((UChar('A'), UChar('B'))), false, false)),
+      ICharSet.any(false, false).add(IChar(IntervalSet((UChar('A'), UChar('B'))))),
       ICharSet(
         Seq(
-          IChar(IntervalSet((UChar('A'), UChar('B'))), false, false),
-          IChar(IntervalSet((UChar(0), UChar('A')), (UChar('B'), UChar(0x10000))), false, false)
+          IChar(IntervalSet((UChar('A'), UChar('B')))),
+          IChar(IntervalSet((UChar(0), UChar('A')), (UChar('B'), UChar(0x10000))))
         )
       )
     )
@@ -29,13 +29,13 @@ class ICharSetSuite extends munit.FunSuite {
   test("ICharSet#refine") {
     val set = ICharSet
       .any(false, false)
-      .add(IChar(IntervalSet((UChar('A'), UChar('Z' + 1))), false, true))
-      .add(IChar(IntervalSet((UChar('A'), UChar('A' + 1))), false, false))
+      .add(IChar(IntervalSet((UChar('A'), UChar('Z' + 1)))))
+      .add(IChar(IntervalSet((UChar('A'), UChar('A' + 1)))))
     assertEquals(
-      set.refine(IChar(IntervalSet((UChar('A'), UChar('Z' + 1))), false, true)),
+      set.refine(IChar(IntervalSet((UChar('A'), UChar('Z' + 1))))),
       Set(
-        IChar(IntervalSet((UChar('A'), UChar('A' + 1))), false, true),
-        IChar(IntervalSet((UChar('B'), UChar('Z' + 1))), false, true)
+        IChar(IntervalSet((UChar('A'), UChar('A' + 1)))),
+        IChar(IntervalSet((UChar('B'), UChar('Z' + 1))))
       )
     )
   }
@@ -43,25 +43,23 @@ class ICharSetSuite extends munit.FunSuite {
   test("ICharSet#refineInvert") {
     val set = ICharSet
       .any(false, false)
-      .add(IChar(IntervalSet((UChar('A'), UChar('Z' + 1))), false, true))
-      .add(IChar(IntervalSet((UChar('A'), UChar('A' + 1))), false, false))
+      .add(IChar(IntervalSet((UChar('A'), UChar('Z' + 1)))))
+      .add(IChar(IntervalSet((UChar('A'), UChar('A' + 1)))))
     assertEquals(
-      set.refineInvert(IChar(IntervalSet((UChar('A'), UChar('Z' + 1))), false, true)),
-      Set(
-        IChar(IntervalSet((UChar(0x00), UChar('A')), (UChar('Z' + 1), UChar(0x10000))), false, false)
-      )
+      set.refineInvert(IChar(IntervalSet((UChar('A'), UChar('Z' + 1))))),
+      Set(IChar(IntervalSet((UChar(0x00), UChar('A')), (UChar('Z' + 1), UChar(0x10000)))))
     )
   }
 
   test("ICharSet#any") {
     val set = ICharSet
       .any(false, false)
-      .add(IChar(IntervalSet((UChar('A'), UChar('B'))), false, false))
+      .add(IChar(IntervalSet((UChar('A'), UChar('B')))))
     assertEquals(
       set.any,
       Set(
-        IChar(IntervalSet((UChar('A'), UChar('B'))), false, false),
-        IChar(IntervalSet((UChar(0), UChar('A')), (UChar('B'), UChar(0x10000))), false, false)
+        IChar(IntervalSet((UChar('A'), UChar('B')))),
+        IChar(IntervalSet((UChar(0), UChar('A')), (UChar('B'), UChar(0x10000))))
       )
     )
   }

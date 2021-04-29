@@ -9,7 +9,7 @@ import codes.quine.labo.recheck.data.unicode.IntervalSet._
   * [[intervals]] is a sequence of discrete intervals sorted by start value.
   * Each interval is represented by a pair of values `[start, end)`.
   */
-private[data] final case class IntervalSet[@specialized A](intervals: IndexedSeq[(A, A)]) {
+private[data] final case class IntervalSet[A](intervals: IndexedSeq[(A, A)]) {
 
   /** Checks whether this interval set is empty or not. */
   def isEmpty: Boolean = intervals.isEmpty
@@ -35,11 +35,16 @@ private[data] final case class IntervalSet[@specialized A](intervals: IndexedSeq
     val lefts = intervals.flatMap { case (x, y) => Vector(Left(x), Left(y)) }
     val rights = that.intervals.flatMap { case (x, y) => Vector(Right(x), Right(y)) }
 
+    val init = (
+      Option.empty[A], //          <- last left item
+      Option.empty[A], //          <- last right item
+      IndexedSeq.empty[(A, A)], // <- intersections
+      IndexedSeq.empty[(A, A)], // <- lefts
+      IndexedSeq.empty[(A, A)] //  <- rights
+    )
     val (_, _, is, ls, rs) = (lefts ++ rights)
       .sortBy(_.fold(identity[A], identity[A]))
-      .foldLeft(
-        (Option.empty[A], Option.empty[A], IndexedSeq.empty[(A, A)], IndexedSeq.empty[(A, A)], IndexedSeq.empty[(A, A)])
-      ) {
+      .foldLeft(init) {
         case ((None, None, is, ls, rs), Left(x))           => (Some(x), None, is, ls, rs)
         case ((None, None, is, ls, rs), Right(x))          => (None, Some(x), is, ls, rs)
         case ((Some(x), None, is, ls, rs), Left(y))        => (None, None, is, ls :+ (x, y), rs)
@@ -61,6 +66,14 @@ private[data] final case class IntervalSet[@specialized A](intervals: IndexedSeq
     i < intervals.size && contains(intervals(i), value) || 0 < i && contains(intervals(i - 1), value)
   }
 
+  /** Checks whether this interval set is a subset of the set. */
+  def isSubsetOf(set: IntervalSet[A])(implicit A: Ordering[A]): Boolean =
+    intervals.forall { case (x, y) =>
+      val i = set.intervals.search((x, y)).insertionPoint
+      def contains(xy: (A, A), x: A, y: A): Boolean = xy._1 <= x && y <= xy._2
+      i < set.intervals.size && contains(set.intervals(i), x, y) || 0 < i && contains(set.intervals(i - 1), x, y)
+    }
+
   /** Converts each interval by the mapping.
     *
     * Note that the mapping `f` must be monotonic on each interval.
@@ -77,7 +90,6 @@ private[data] final case class IntervalSet[@specialized A](intervals: IndexedSeq
     is.map(f).union(ls)
   }
 
-  /** Returns a string representation of this interval set. */
   override def toString: String =
     intervals.map { case (x, y) => s"($x, $y)" }.mkString("IntervalSet(", ", ", ")")
 }
@@ -90,10 +102,7 @@ private[data] object IntervalSet {
 
   /** Normalizes an interval sequence.
     *
-    * It does two things.
-    *
-    *   1. it merges overlaps.
-    *   2. it removes empty intervals.
+    * It merges overlaps and removes empty intervals.
     */
   private def normalize[A](intervals: Seq[(A, A)])(implicit A: Ordering[A]): IndexedSeq[(A, A)] =
     intervals.sorted.foldLeft(IndexedSeq.empty[(A, A)]) {
@@ -104,8 +113,7 @@ private[data] object IntervalSet {
     }
 
   /** Creates an interval set from the intervals. */
-  def apply[A](intervals: (A, A)*)(implicit A: Ordering[A]): IntervalSet[A] =
-    from(intervals)
+  def apply[A](intervals: (A, A)*)(implicit A: Ordering[A]): IntervalSet[A] = from(intervals)
 
   /** Creates an empty interval set. */
   def empty[A]: IntervalSet[A] = IntervalSet(IndexedSeq.empty)
