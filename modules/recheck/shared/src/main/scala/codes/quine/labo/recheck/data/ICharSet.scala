@@ -28,10 +28,10 @@ final case class ICharSet(chars: Seq[IChar]) {
   def any: Set[IChar] = chars.toSet
 
   /** A character set for a 'dot' pattern. */
-  def dot: Set[IChar] = any.diff(newline)
+  def dot: Set[IChar] = any.diff(lineTerminator)
 
-  /** A character set for newline characters. */
-  def newline: Set[IChar] = refine(IChar.LineTerminator)
+  /** A character set for new-line characters. */
+  def lineTerminator: Set[IChar] = refine(IChar.LineTerminator)
 }
 
 /** ICharSet utilities. */

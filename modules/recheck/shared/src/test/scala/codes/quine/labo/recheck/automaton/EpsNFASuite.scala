@@ -47,12 +47,6 @@ class EpsNFASuite extends munit.FunSuite {
     assertEquals(AssertKind.WordBoundaryNot.toCharInfoSet(word), Set(word))
   }
 
-  test("EpsNFA.CharInfo.from") {
-    assertEquals(CharInfo.from(IChar('a')), CharInfo(false, false))
-    assertEquals(CharInfo.from(IChar('a').withLineTerminator), CharInfo(true, false))
-    assertEquals(CharInfo.from(IChar('a').withWord), CharInfo(false, true))
-  }
-
   test("EpsNFA#toGraphviz") {
     val nfa = EpsNFA(
       ICharSet.any(false, false).add(IChar('a')),
@@ -93,7 +87,7 @@ class EpsNFASuite extends munit.FunSuite {
 
   test("EpsNFA#toOrderedNFA") {
     val nfa1 = EpsNFA(
-      ICharSet.any(false, false).add(IChar('\n').withLineTerminator),
+      ICharSet.any(false, false).add(IChar('\n')),
       Set(0, 1, 2, 3, 4, 5, 6),
       0,
       6,
@@ -101,7 +95,7 @@ class EpsNFASuite extends munit.FunSuite {
         0 -> Eps(Seq(1, 5)),
         1 -> LoopEnter(0, 2),
         2 -> Eps(Seq(3, 4)),
-        3 -> Consume(Set(IChar('\n').withLineTerminator), 0),
+        3 -> Consume(Set(IChar('\n')), 0),
         4 -> Assert(AssertKind.LineEnd, 0),
         5 -> LoopExit(0, 6)
       )
@@ -109,19 +103,19 @@ class EpsNFASuite extends munit.FunSuite {
     assertEquals(
       nfa1.toOrderedNFA,
       OrderedNFA(
-        Set(IChar('\n').withLineTerminator, IChar('\n').complement(false)),
+        Set(IChar('\n'), IChar('\n').complement(false)),
         Set((CharInfo(true, false), Seq(3, 6))),
         Vector((CharInfo(true, false), Seq(3, 6))),
         Set((CharInfo(true, false), Seq(3, 6))),
         Map(
-          ((CharInfo(true, false), Seq(3, 6)), IChar('\n').withLineTerminator) -> Vector(
+          ((CharInfo(true, false), Seq(3, 6)), IChar('\n')) -> Vector(
             (CharInfo(true, false), Seq(3, 6))
           )
         )
       )
     )
     val nfa2 = EpsNFA(
-      ICharSet.any(false, false).add(IChar('\n').withLineTerminator).add(IChar('a').withWord),
+      ICharSet.any(false, false).add(IChar('\n')).add(IChar('a')),
       Set(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
       0,
       10,
@@ -130,8 +124,8 @@ class EpsNFASuite extends munit.FunSuite {
         1 -> Eps(Seq(2, 8)),
         2 -> LoopEnter(0, 3),
         3 -> Eps(Seq(4, 5)),
-        4 -> Consume(Set(IChar('\n').withLineTerminator), 1),
-        5 -> Consume(Set(IChar('a').withWord), 6),
+        4 -> Consume(Set(IChar('\n')), 1),
+        5 -> Consume(Set(IChar('a')), 6),
         6 -> Eps(Seq(7, 1)),
         7 -> Assert(AssertKind.WordBoundaryNot, 1),
         8 -> LoopExit(0, 9),
@@ -141,7 +135,7 @@ class EpsNFASuite extends munit.FunSuite {
     assertEquals(
       nfa2.toOrderedNFA,
       OrderedNFA(
-        Set(IChar('\n').withLineTerminator, IChar('a').withWord, IChar('a').union(IChar('\n')).complement(false)),
+        Set(IChar('\n'), IChar('a'), IChar('a').union(IChar('\n')).complement(false)),
         Set(
           (CharInfo(true, false), Seq(4)),
           (CharInfo(true, false), Seq(4, 5)),
@@ -150,19 +144,19 @@ class EpsNFASuite extends munit.FunSuite {
         Vector((CharInfo(true, false), Seq(4))),
         Set((CharInfo(false, true), Seq(5, 4, 5, 10))),
         Map(
-          ((CharInfo(true, false), Seq(4)), IChar('\n').withLineTerminator) -> Vector(
+          ((CharInfo(true, false), Seq(4)), IChar('\n')) -> Vector(
             (CharInfo(true, false), Seq(4, 5))
           ),
-          ((CharInfo(true, false), Seq(4, 5)), IChar('a').withWord) -> Vector(
+          ((CharInfo(true, false), Seq(4, 5)), IChar('a')) -> Vector(
             (CharInfo(false, true), Seq(5, 4, 5, 10))
           ),
-          ((CharInfo(true, false), Seq(4, 5)), IChar('\n').withLineTerminator) -> Vector(
+          ((CharInfo(true, false), Seq(4, 5)), IChar('\n')) -> Vector(
             (CharInfo(true, false), Seq(4, 5))
           ),
-          ((CharInfo(false, true), Seq(5, 4, 5, 10)), IChar('\n').withLineTerminator) -> Vector(
+          ((CharInfo(false, true), Seq(5, 4, 5, 10)), IChar('\n')) -> Vector(
             (CharInfo(true, false), Seq(4, 5))
           ),
-          ((CharInfo(false, true), Seq(5, 4, 5, 10)), IChar('a').withWord) -> Vector(
+          ((CharInfo(false, true), Seq(5, 4, 5, 10)), IChar('a')) -> Vector(
             (CharInfo(false, true), Seq(5, 4, 5, 10)),
             (CharInfo(false, true), Seq(5, 4, 5, 10))
           )
