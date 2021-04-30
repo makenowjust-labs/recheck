@@ -1,3 +1,9 @@
+# dev
+
+Fixes:
+
+- Fix nested look-around assertion behavior correctly
+
 # 3.0.0 (2021-04-14)
 
 Changes:
