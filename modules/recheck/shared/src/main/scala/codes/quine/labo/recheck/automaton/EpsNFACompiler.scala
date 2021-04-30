@@ -24,7 +24,7 @@ object EpsNFACompiler {
       (stateSet, init, accept, tau) <- {
         val FlagSet(_, ignoreCase, _, dotAll, unicode, sticky) = pattern.flagSet
 
-        // Mutable states:
+        // Mutable states.
         var counterQ = 0 // A next state counter.
         def nextQ(): Int = {
           val q = counterQ
@@ -154,7 +154,7 @@ object EpsNFACompiler {
             val dot = IChar.dot(ignoreCase, dotAll, unicode)
             val i = nextQ()
             val a = nextQ()
-            tau.addOne(i -> Consume(alphabet.refine(dot), a, node.loc))
+            tau.addOne(i -> Consume(alphabet.refine(dot).toSet, a, node.loc))
             Success((i, a))
           case BackReference(_)      => Failure(new UnsupportedException("back-reference"))
           case NamedBackReference(_) => Failure(new UnsupportedException("named back-reference"))

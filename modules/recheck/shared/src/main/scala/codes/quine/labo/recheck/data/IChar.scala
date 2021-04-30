@@ -6,8 +6,18 @@ import codes.quine.labo.recheck.data.unicode.IntervalSet
 import codes.quine.labo.recheck.data.unicode.IntervalSet._
 import codes.quine.labo.recheck.data.unicode.Property
 
-/** IChar is a wrapper of code point interval set with extra information. */
-final case class IChar(set: IntervalSet[UChar]) extends Ordered[IChar] {
+/** IChar is a code point interval set with extra information. */
+final case class IChar(
+    set: IntervalSet[UChar],
+    isLineTerminator: Boolean = false,
+    isWord: Boolean = false
+) extends Ordered[IChar] {
+
+  /** Marks this set contains line terminator characters. */
+  def withLineTerminator: IChar = copy(isLineTerminator = true)
+
+  /** Marks this set contains word characters. */
+  def withWord: IChar = copy(isWord = true)
 
   /** Checks whether this interval set is empty or not. */
   def isEmpty: Boolean = set.isEmpty
@@ -15,28 +25,23 @@ final case class IChar(set: IntervalSet[UChar]) extends Ordered[IChar] {
   /** Negates [[isEmpty]]. */
   def nonEmpty: Boolean = set.nonEmpty
 
-  /** Checks whether this interval set is included in new-line characters. */
-  def isLineTerminator: Boolean = set.isSubsetOf(IChar.LineTerminator.set)
-
-  /** Checks whether this interval set is included in word characters. */
-  def isWord: Boolean = set.isSubsetOf(IChar.Word.set)
-
   /** Computes a complement of this interval set. */
   def complement(unicode: Boolean): IChar = {
     val (xys, z) = set.intervals.foldLeft((IndexedSeq.empty[(UChar, UChar)], UChar(0))) { case ((seq, x), (y, z)) =>
       (seq :+ (x, y), z)
     }
-    IChar(IntervalSet.from(xys :+ (z, UChar(if (unicode) 0x110000 else 0x10000))))
+    IChar(IntervalSet.from(xys :+ (z, UChar(if (unicode) 0x110000 else 0x10000))), isLineTerminator, isWord)
   }
 
   /** Computes a union of two interval sets. */
   def union(that: IChar): IChar =
-    IChar(set.union(that.set))
+    IChar(set.union(that.set), isLineTerminator || that.isLineTerminator, isWord || that.isWord)
 
   /** Computes a partition of two interval sets. */
   def partition(that: IChar): Partition[IChar] = {
     val Partition(is, ls, rs) = set.partition(that.set)
-    Partition(IChar(is), IChar(ls), IChar(rs))
+    val ic = IChar(is, isLineTerminator || that.isLineTerminator, isWord || that.isWord)
+    Partition(ic, copy(set = ls), that.copy(set = rs))
   }
 
   /** Computes a difference interval set. */
@@ -64,7 +69,7 @@ final case class IChar(set: IntervalSet[UChar]) extends Ordered[IChar] {
       case (x, y) if x.value + 1 == y.value => showUCharInClass(x)
       case (x, y)                           => s"${showUCharInClass(x)}-${showUCharInClass(UChar(y.value - 1))}"
     }
-    cls.mkString("[", "", "]")
+    cls.mkString("[", "", "]" ++ (if (isLineTerminator) "n" else "") ++ (if (isWord) "w" else ""))
   }
 }
 
@@ -72,18 +77,19 @@ final case class IChar(set: IntervalSet[UChar]) extends Ordered[IChar] {
 object IChar {
 
   /** [[scala.math.Ordering]] instance for [[IChar]]. */
-  private val ordering: Ordering[IChar] = Ordering.by[IChar, IntervalSet[UChar]](_.set)
+  private val ordering: Ordering[IChar] =
+    Ordering.by[IChar, IntervalSet[UChar]](_.set).orElseBy(_.isLineTerminator).orElseBy(_.isWord)
 
-  /** Creates an ichar containing any code points. */
+  /** Creates an interval set containing any code points. */
   lazy val Any: IChar = IChar(IntervalSet((UChar(0), UChar(0x110000))))
 
-  /** Creates an ichar containing any UTF-16 code points. */
+  /** Creates an interval set containing any UTF-16 code points. */
   lazy val Any16: IChar = IChar(IntervalSet((UChar(0), UChar(0x10000))))
 
-  /** Returns an ichar containing digit characters. */
+  /** Returns an interval set containing digit characters. */
   lazy val Digit: IChar = IChar(IntervalSet((UChar('0'), UChar('9' + 1))))
 
-  /** Returns an ichar containing white-space characters. */
+  /** Returns an interval set containing white-space characters. */
   lazy val Space: IChar = IChar(
     IntervalSet(
       (UChar('\t'), UChar('\t' + 1)), // <TAB>
@@ -114,11 +120,11 @@ object IChar {
     )
   )
 
-  /** Returns an interval set containing code points have the unicode property . */
+  /** Return an interval set containing the unicode property code points. */
   def UnicodeProperty(name: String): Option[IChar] =
     Property.generalCategory(name).orElse(Property.binary(name)).map(IChar(_))
 
-  /** Returns an interval set containing code points have the unicode property with the value. */
+  /** Return an interval set containing the unicode property code points. */
   def UnicodePropertyValue(name: String, value: String): Option[IChar] = {
     val optSet = Property.NonBinaryPropertyAliases.getOrElse(name, name) match {
       case "General_Category"  => Property.generalCategory(value)
@@ -155,8 +161,9 @@ object IChar {
   /** Normalizes the code point interval set. */
   def canonicalize(c: IChar, unicode: Boolean): IChar = {
     val conversions = if (unicode) CaseMap.Fold else CaseMap.Upper
-    IChar(conversions.foldLeft(c.set) { case (set, Conversion(dom, offset)) =>
+    val set = conversions.foldLeft(c.set) { case (set, Conversion(dom, offset)) =>
       set.mapIntersection(dom)(u => UChar(u.value + offset))
-    })
+    }
+    c.copy(set = set)
   }
 }

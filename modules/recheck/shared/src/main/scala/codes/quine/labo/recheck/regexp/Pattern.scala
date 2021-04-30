@@ -97,8 +97,8 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
       val FlagSet(_, ignoreCase, _, dotAll, unicode, _) = flagSet
       val set = ICharSet
         .any(ignoreCase, unicode)
-        .pipe(set => if (needsLineTerminatorDistinction) set.add(IChar.LineTerminator) else set)
-        .pipe(set => if (needsWordDistinction) set.add(IChar.Word) else set)
+        .pipe(set => if (needsLineTerminatorDistinction) set.add(IChar.LineTerminator.withLineTerminator) else set)
+        .pipe(set => if (needsWordDistinction) set.add(IChar.Word.withWord) else set)
 
       def loop(node: Node): Try[Seq[IChar]] = ctx.interrupt(node match {
         case Disjunction(ns)       => TryUtil.traverse(ns)(loop).map(_.flatten)
@@ -327,7 +327,7 @@ object Pattern {
     def isEmpty: Boolean = child.isEmpty
   }
 
-  /** Star is a zero-or-more repetition pattern. (e.g. `/x*&#47;` or `/x*?/`) */
+  /** Star is a zero-or-more repetition pattern. (e.g. `/x*&#47; or `/x*?/`) */
   final case class Star(nonGreedy: Boolean, child: Node) extends Node {
     def captureRange: CaptureRange = child.captureRange
     def isEmpty: Boolean = true
@@ -439,7 +439,7 @@ object Pattern {
 
     def toIChar(unicode: Boolean): Try[IChar] =
       // Inversion will be done in automaton translation instead of here.
-      TryUtil.traverse(children)(_.toIChar(unicode)).map(IChar.union)
+      TryUtil.traverse(children)(_.toIChar(unicode)).map(IChar.union(_))
   }
 
   /** ClassRange is a character range pattern in a class. */

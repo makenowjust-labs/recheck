@@ -103,7 +103,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), WordBoundary(false), LineEnd())), flagSet0)),
         Success(
           EpsNFA(
-            ICharSet.any(false, false).add(IChar.Word),
+            ICharSet.any(false, false).add(IChar.Word.withWord),
             Set(0, 1, 2, 3, 4, 5),
             0,
             5,
@@ -121,7 +121,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), WordBoundary(true), LineEnd())), flagSet0)),
         Success(
           EpsNFA(
-            ICharSet.any(false, false).add(IChar.Word),
+            ICharSet.any(false, false).add(IChar.Word.withWord),
             Set(0, 1, 2, 3, 4, 5),
             0,
             5,
