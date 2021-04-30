@@ -42,7 +42,7 @@ object Seeder {
 
       interrupt {
         queue.enqueue((UString.empty, None))
-        for (ch <- fuzz.alphabet.chars) {
+        for ((ch, _) <- fuzz.alphabet.pairs) {
           val s = UString(IndexedSeq(ch.head))
           queue.enqueue((s, None))
           added.add(s)
@@ -103,11 +103,11 @@ object Seeder {
     /** Builds a patch from a failed point. */
     def build(failed: FailedPoint, alphabet: ICharSet): Patch =
       failed.kind match {
-        case ReadKind.Any         => InsertChar(failed.pos, alphabet.any)
-        case ReadKind.Dot         => InsertChar(failed.pos, alphabet.dot)
+        case ReadKind.Any         => InsertChar(failed.pos, alphabet.any.map(_._1))
+        case ReadKind.Dot         => InsertChar(failed.pos, alphabet.dot.map(_._1))
         case ReadKind.Char(c)     => InsertChar(failed.pos, Set(IChar(c)))
-        case ReadKind.Class(s)    => InsertChar(failed.pos, alphabet.refine(s))
-        case ReadKind.ClassNot(s) => InsertChar(failed.pos, alphabet.refineInvert(s))
+        case ReadKind.Class(s)    => InsertChar(failed.pos, alphabet.refine(s).map(_._1))
+        case ReadKind.ClassNot(s) => InsertChar(failed.pos, alphabet.refineInvert(s).map(_._1))
         case ReadKind.Ref(_)      => InsertString(failed.pos, failed.capture.get)
       }
   }

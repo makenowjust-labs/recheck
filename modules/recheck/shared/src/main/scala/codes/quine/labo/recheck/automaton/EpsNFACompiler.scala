@@ -169,7 +169,7 @@ object EpsNFACompiler {
             val i4 = nextQ()
             tau.addOne(i1 -> Eps(Vector(i4, i2)))
             tau.addOne(i2 -> LoopEnter(loop, i3))
-            tau.addOne(i3 -> Consume(alphabet.chars.toSet, i1))
+            tau.addOne(i3 -> Consume(alphabet.any, i1))
             tau.addOne(i4 -> LoopExit(loop, i0))
             i1
           } else i0
@@ -181,7 +181,7 @@ object EpsNFACompiler {
             val a4 = nextQ()
             tau.addOne(a0 -> Eps(Vector(a3, a1)))
             tau.addOne(a1 -> LoopEnter(loop, a2))
-            tau.addOne(a2 -> Consume(alphabet.chars.toSet, a0))
+            tau.addOne(a2 -> Consume(alphabet.any, a0))
             tau.addOne(a3 -> LoopExit(loop, a4))
             a4
           } else a0

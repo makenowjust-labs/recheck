@@ -12,6 +12,7 @@ import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.data.IChar
 import codes.quine.labo.recheck.data.ICharSet
+import codes.quine.labo.recheck.data.ICharSet.CharKind
 import codes.quine.labo.recheck.data.UChar
 import codes.quine.labo.recheck.data.UString
 import codes.quine.labo.recheck.regexp.Pattern._
@@ -97,8 +98,10 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
       val FlagSet(_, ignoreCase, _, dotAll, unicode, _) = flagSet
       val set = ICharSet
         .any(ignoreCase, unicode)
-        .pipe(set => if (needsLineTerminatorDistinction) set.add(IChar.LineTerminator.withLineTerminator) else set)
-        .pipe(set => if (needsWordDistinction) set.add(IChar.Word.withWord) else set)
+        .pipe(set =>
+          if (needsLineTerminatorDistinction) set.add(IChar.LineTerminator, CharKind.LineTerminator) else set
+        )
+        .pipe(set => if (needsWordDistinction) set.add(IChar.Word, CharKind.Word) else set)
 
       def loop(node: Node): Try[Seq[IChar]] = ctx.interrupt(node match {
         case Disjunction(ns)       => TryUtil.traverse(ns)(loop).map(_.flatten)
@@ -439,7 +442,7 @@ object Pattern {
 
     def toIChar(unicode: Boolean): Try[IChar] =
       // Inversion will be done in automaton translation instead of here.
-      TryUtil.traverse(children)(_.toIChar(unicode)).map(IChar.union(_))
+      TryUtil.traverse(children)(_.toIChar(unicode)).map(IChar.union)
   }
 
   /** ClassRange is a character range pattern in a class. */
