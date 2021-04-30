@@ -321,8 +321,8 @@ class PatternSuite extends munit.FunSuite {
     val flagSet2 = FlagSet(false, false, false, true, false, false)
     val flagSet3 = FlagSet(false, true, false, false, false, false)
     val flagSet4 = FlagSet(false, true, false, false, true, false)
-    val word = IChar.Word
-    val lineTerminator = IChar.LineTerminator
+    val word = IChar.Word.withWord
+    val lineTerminator = IChar.LineTerminator.withLineTerminator
     val dot16 = IChar.Any16.diff(IChar.LineTerminator)
     val dot = IChar.Any.diff(IChar.LineTerminator)
     assertEquals(Pattern(Sequence(Seq.empty), flagSet0).alphabet, Success(ICharSet.any(false, false)))
