@@ -68,7 +68,7 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
           else
             tau.get(q) match {
               case Some(Eps(qs))       => qs.flatMap(buildClosure(k0, ks, _, loops))
-              case Some(Assert(k, q1)) => buildClosure(k0, ks & k.toCharInfoSet(k0), q1, loops)
+              case Some(Assert(k, q1)) => buildClosure(k0, ks & k.toCharKindSet(k0), q1, loops)
               case Some(LoopEnter(loop, q1)) =>
                 if (loops.contains(loop)) Vector.empty // An ε-loop is detected.
                 else buildClosure(k0, ks, q1, loops ++ Set(loop))
@@ -166,7 +166,7 @@ object EpsNFA {
   sealed abstract class AssertKind extends Serializable with Product {
 
     /** Returns a set of next possible character information from the previous character information. */
-    def toCharInfoSet(prev: CharKind): Set[CharKind]
+    def toCharKindSet(prev: CharKind): Set[CharKind]
   }
 
   /** AssertKind values and utilities. */
@@ -174,26 +174,26 @@ object EpsNFA {
 
     /** LineBegin is `^` assertion. */
     case object LineBegin extends AssertKind {
-      def toCharInfoSet(prev: CharKind): Set[CharKind] =
+      def toCharKindSet(prev: CharKind): Set[CharKind] =
         if (prev == CharKind.LineTerminator) Set(CharKind.Normal, CharKind.LineTerminator, CharKind.Word)
         else Set.empty
     }
 
     /** LineEnd is `$` assertion. */
     case object LineEnd extends AssertKind {
-      def toCharInfoSet(prev: CharKind): Set[CharKind] = Set(CharKind.LineTerminator)
+      def toCharKindSet(prev: CharKind): Set[CharKind] = Set(CharKind.LineTerminator)
     }
 
     /** WordBoundary is `\b` assertion. */
     case object WordBoundary extends AssertKind {
-      def toCharInfoSet(prev: CharKind): Set[CharKind] =
+      def toCharKindSet(prev: CharKind): Set[CharKind] =
         if (prev == CharKind.Word) Set(CharKind.Normal, CharKind.LineTerminator)
         else Set(CharKind.Word)
     }
 
     /** WordBoundaryNot is `\B` assertion. */
     case object WordBoundaryNot extends AssertKind {
-      def toCharInfoSet(prev: CharKind): Set[CharKind] =
+      def toCharKindSet(prev: CharKind): Set[CharKind] =
         if (prev == CharKind.Word) Set(CharKind.Word)
         else Set(CharKind.Normal, CharKind.LineTerminator)
     }
