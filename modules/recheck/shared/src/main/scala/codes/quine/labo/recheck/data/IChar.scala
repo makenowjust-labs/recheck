@@ -7,17 +7,7 @@ import codes.quine.labo.recheck.data.unicode.IntervalSet._
 import codes.quine.labo.recheck.data.unicode.Property
 
 /** IChar is a code point interval set with extra information. */
-final case class IChar(
-    set: IntervalSet[UChar],
-    isLineTerminator: Boolean = false,
-    isWord: Boolean = false
-) extends Ordered[IChar] {
-
-  /** Marks this set contains line terminator characters. */
-  def withLineTerminator: IChar = copy(isLineTerminator = true)
-
-  /** Marks this set contains word characters. */
-  def withWord: IChar = copy(isWord = true)
+final case class IChar(set: IntervalSet[UChar]) extends Ordered[IChar] {
 
   /** Checks whether this interval set is empty or not. */
   def isEmpty: Boolean = set.isEmpty
@@ -30,18 +20,16 @@ final case class IChar(
     val (xys, z) = set.intervals.foldLeft((IndexedSeq.empty[(UChar, UChar)], UChar(0))) { case ((seq, x), (y, z)) =>
       (seq :+ (x, y), z)
     }
-    IChar(IntervalSet.from(xys :+ (z, UChar(if (unicode) 0x110000 else 0x10000))), isLineTerminator, isWord)
+    IChar(IntervalSet.from(xys :+ (z, UChar(if (unicode) 0x110000 else 0x10000))))
   }
 
   /** Computes a union of two interval sets. */
-  def union(that: IChar): IChar =
-    IChar(set.union(that.set), isLineTerminator || that.isLineTerminator, isWord || that.isWord)
+  def union(that: IChar): IChar = IChar(set.union(that.set))
 
   /** Computes a partition of two interval sets. */
   def partition(that: IChar): Partition[IChar] = {
     val Partition(is, ls, rs) = set.partition(that.set)
-    val ic = IChar(is, isLineTerminator || that.isLineTerminator, isWord || that.isWord)
-    Partition(ic, copy(set = ls), that.copy(set = rs))
+    Partition(IChar(is), IChar(ls), IChar(rs))
   }
 
   /** Computes a difference interval set. */
@@ -69,7 +57,7 @@ final case class IChar(
       case (x, y) if x.value + 1 == y.value => showUCharInClass(x)
       case (x, y)                           => s"${showUCharInClass(x)}-${showUCharInClass(UChar(y.value - 1))}"
     }
-    cls.mkString("[", "", "]" ++ (if (isLineTerminator) "n" else "") ++ (if (isWord) "w" else ""))
+    cls.mkString("[", "", "]")
   }
 }
 
@@ -78,7 +66,7 @@ object IChar {
 
   /** [[scala.math.Ordering]] instance for [[IChar]]. */
   private val ordering: Ordering[IChar] =
-    Ordering.by[IChar, IntervalSet[UChar]](_.set).orElseBy(_.isLineTerminator).orElseBy(_.isWord)
+    Ordering.by[IChar, IntervalSet[UChar]](_.set)
 
   /** Creates an interval set containing any code points. */
   lazy val Any: IChar = IChar(IntervalSet((UChar(0), UChar(0x110000))))

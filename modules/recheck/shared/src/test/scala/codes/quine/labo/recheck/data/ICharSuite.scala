@@ -5,7 +5,7 @@ import codes.quine.labo.recheck.data.unicode.IntervalSet._
 
 class ICharSuite extends munit.FunSuite {
   test("IChar.Any") {
-    assertEquals(IChar.Any, IChar(IntervalSet((UChar(0), UChar(0x110000))), false, false))
+    assertEquals(IChar.Any, IChar(IntervalSet((UChar(0), UChar(0x110000)))))
   }
 
   test("IChar.Digit") {
@@ -52,7 +52,7 @@ class ICharSuite extends munit.FunSuite {
   }
 
   test("IChar.apply") {
-    assertEquals(IChar('a'), IChar(IntervalSet((UChar(0x61), UChar(0x62))), false, false))
+    assertEquals(IChar('a'), IChar(IntervalSet((UChar(0x61), UChar(0x62)))))
   }
 
   test("IChar.empty") {
@@ -100,22 +100,14 @@ class ICharSuite extends munit.FunSuite {
     assertEquals(IChar.canonicalize(IChar('\u017f'), true), IChar('s'))
   }
 
-  test("IChar#withLineTerminator") {
-    assert(IChar('\n').withLineTerminator.isLineTerminator)
-  }
-
-  test("IChar#withWord") {
-    assert(IChar('a').withWord.isWord)
-  }
-
   test("IChar#isEmpty") {
-    assert(IChar(IntervalSet.empty, false, false).isEmpty)
-    assert(!IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, false).isEmpty)
+    assert(IChar(IntervalSet.empty[UChar]).isEmpty)
+    assert(!IChar(IntervalSet((UChar(0x41), UChar(0x42)))).isEmpty)
   }
 
   test("IChar#nonEmpty") {
-    assert(!IChar(IntervalSet.empty, false, false).nonEmpty)
-    assert(IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, false).nonEmpty)
+    assert(!IChar(IntervalSet.empty[UChar]).nonEmpty)
+    assert(IChar(IntervalSet((UChar(0x41), UChar(0x42)))).nonEmpty)
   }
 
   test("IChar#complement") {
@@ -126,17 +118,17 @@ class ICharSuite extends munit.FunSuite {
   }
 
   test("IChar#union") {
-    assertEquals(IChar('a') union IChar('b'), IChar(IntervalSet((UChar('a'), UChar('c'))), false, false))
+    assertEquals(IChar('a') union IChar('b'), IChar(IntervalSet((UChar('a'), UChar('c')))))
   }
 
   test("IChar#partition") {
     assertEquals(
-      IChar(IntervalSet((UChar(0x41), UChar(0x42))), true, false)
-        .partition(IChar(IntervalSet((UChar(0x41), UChar(0x5b))), false, true)),
+      IChar(IntervalSet((UChar(0x41), UChar(0x42))))
+        .partition(IChar(IntervalSet((UChar(0x41), UChar(0x5b))))),
       Partition(
-        IChar(IntervalSet((UChar(0x41), UChar(0x42))), true, true),
-        IChar(IntervalSet.empty, true, false),
-        IChar(IntervalSet((UChar(0x42), UChar(0x5b))), false, true)
+        IChar(IntervalSet((UChar(0x41), UChar(0x42)))),
+        IChar(IntervalSet.empty[UChar]),
+        IChar(IntervalSet((UChar(0x42), UChar(0x5b))))
       )
     )
   }
@@ -157,8 +149,8 @@ class ICharSuite extends munit.FunSuite {
   }
 
   test("IChar#compare") {
-    val c1 = IChar(IntervalSet((UChar(0x41), UChar(0x42))), false, false)
-    val c2 = IChar(IntervalSet((UChar(0x42), UChar(0x43))), false, false)
+    val c1 = IChar(IntervalSet((UChar(0x41), UChar(0x42))))
+    val c2 = IChar(IntervalSet((UChar(0x42), UChar(0x43))))
     assertEquals(c1.compare(c1), 0)
     assertEquals(c1.compare(c2), -1)
     assertEquals(c2.compare(c1), 1)
@@ -166,12 +158,8 @@ class ICharSuite extends munit.FunSuite {
 
   test("IChar#toString") {
     assertEquals(
-      IChar(IntervalSet((UChar('a'), UChar('b')), (UChar('A'), UChar('Z' + 1))), true, false).toString,
-      "[A-Za]n"
-    )
-    assertEquals(
-      IChar(IntervalSet((UChar('a'), UChar('z' + 1)), (UChar('A'), UChar('B'))), false, true).toString,
-      "[Aa-z]w"
+      IChar(IntervalSet((UChar('a'), UChar('b')), (UChar('A'), UChar('Z' + 1)))).toString,
+      "[A-Za]"
     )
     assertEquals(
       IChar('\u0001').union(IChar('-')).union(IChar(UChar(0x10ffff))).toString,

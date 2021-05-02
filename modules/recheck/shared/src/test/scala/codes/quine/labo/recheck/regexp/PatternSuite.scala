@@ -7,6 +7,7 @@ import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.data.IChar
 import codes.quine.labo.recheck.data.ICharSet
+import codes.quine.labo.recheck.data.ICharSet.CharKind
 import codes.quine.labo.recheck.data.UString
 import codes.quine.labo.recheck.regexp.Pattern._
 
@@ -321,8 +322,8 @@ class PatternSuite extends munit.FunSuite {
     val flagSet2 = FlagSet(false, false, false, true, false, false)
     val flagSet3 = FlagSet(false, true, false, false, false, false)
     val flagSet4 = FlagSet(false, true, false, false, true, false)
-    val word = IChar.Word.withWord
-    val lineTerminator = IChar.LineTerminator.withLineTerminator
+    val word = IChar.Word
+    val lineTerminator = IChar.LineTerminator
     val dot16 = IChar.Any16.diff(IChar.LineTerminator)
     val dot = IChar.Any.diff(IChar.LineTerminator)
     assertEquals(Pattern(Sequence(Seq.empty), flagSet0).alphabet, Success(ICharSet.any(false, false)))
@@ -333,15 +334,15 @@ class PatternSuite extends munit.FunSuite {
     )
     assertEquals(
       Pattern(WordBoundary(false), flagSet0).alphabet,
-      Success(ICharSet.any(false, false).add(word))
+      Success(ICharSet.any(false, false).add(word, CharKind.Word))
     )
     assertEquals(
       Pattern(LineBegin(), flagSet1).alphabet,
-      Success(ICharSet.any(false, false).add(lineTerminator))
+      Success(ICharSet.any(false, false).add(lineTerminator, CharKind.LineTerminator))
     )
     assertEquals(
       Pattern(Sequence(Seq(LineBegin(), WordBoundary(false))), flagSet1).alphabet,
-      Success(ICharSet.any(false, false).add(lineTerminator).add(word))
+      Success(ICharSet.any(false, false).add(lineTerminator, CharKind.LineTerminator).add(word, CharKind.Word))
     )
     assertEquals(Pattern(Capture(1, Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))
     assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))

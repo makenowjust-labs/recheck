@@ -193,8 +193,8 @@ private[fuzz] final class FuzzChecker(
 
     val fc = random.between(0, 2) match {
       case 0 =>
-        val idx = random.between(0, alphabet.chars.size)
-        val c = alphabet.chars(idx).head
+        val idx = random.between(0, alphabet.pairs.size)
+        val c = alphabet.pairs(idx)._1.head
         FString.Wrap(c)
       case 1 =>
         if (t.isEmpty) return None
@@ -239,8 +239,8 @@ private[fuzz] final class FuzzChecker(
     val pos = random.between(0, t.size)
     val fc = t(pos) match {
       case FString.Wrap(_) =>
-        val k = random.nextInt(alphabet.chars.size)
-        val c = alphabet.chars(k).head
+        val k = random.nextInt(alphabet.pairs.size)
+        val c = alphabet.pairs(k)._1.head
         FString.Wrap(c)
       case FString.Repeat(m0, size0) =>
         val m = random.between(0, 2) match {
