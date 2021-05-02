@@ -1,5 +1,9 @@
 # dev
 
+Changes:
+
+- Remove `isLineTerminator` and `isWord` flags from `IChar`
+
 Fixes:
 
 - Fix nested look-around assertion behavior correctly
