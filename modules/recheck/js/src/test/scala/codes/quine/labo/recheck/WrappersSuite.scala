@@ -72,6 +72,20 @@ class WrappersSuite extends munit.FunSuite {
     )
 
     assertEquals(
+      JSON.stringify(
+        DiagnosticsJS.from(Diagnostics.Unknown("", "", Diagnostics.ErrorKind.Timeout, Some(Checker.Fuzz)))
+      ),
+      JSON.stringify(
+        js.Dynamic.literal(
+          source = "",
+          flags = "",
+          status = "unknown",
+          checker = "fuzz",
+          error = js.Dynamic.literal(kind = "timeout")
+        )
+      )
+    )
+    assertEquals(
       JSON.stringify(DiagnosticsJS.from(Diagnostics.Unknown("", "", Diagnostics.ErrorKind.Timeout, None))),
       JSON.stringify(
         js.Dynamic.literal(
@@ -173,5 +187,8 @@ class WrappersSuite extends munit.FunSuite {
       Checker.Automaton
     )
     assertEquals(ConfigJS.from(js.Dynamic.literal(checker = "fuzz").asInstanceOf[ConfigJS]).checker, Checker.Fuzz)
+
+    assertEquals(ConfigJS.from(js.Dynamic.literal(timeout = -1).asInstanceOf[ConfigJS]).context.isInterrupted(), true)
+    assertEquals(ConfigJS.from(js.Dynamic.literal(randomSeed = 0).asInstanceOf[ConfigJS]).random.nextInt(), -1155484576)
   }
 }
