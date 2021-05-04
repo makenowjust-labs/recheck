@@ -4,6 +4,7 @@ Changes:
 
 - Remove `isLineTerminator` and `isWord` flags from `IChar`
 - Simplify `UString` implementation as `String` wrapper
+- Send coverage to Codecov
 
 Fixes:
 

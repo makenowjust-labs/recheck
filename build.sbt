@@ -120,7 +120,6 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
-    coverageEnabled := false,
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
