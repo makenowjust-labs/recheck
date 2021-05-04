@@ -22,7 +22,7 @@ class DiagnosticsSuite extends munit.FunSuite {
           "abbc",
           "",
           AttackComplexity.Exponential(false),
-          AttackPattern(Seq((UString.from("a", false), UString.from("b", false), 0)), UString.from("c", false), 2),
+          AttackPattern(Seq((UString("a"), UString("b"), 0)), UString("c"), 2),
           Hotspot.empty,
           Checker.Automaton
         )

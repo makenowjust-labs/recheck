@@ -72,10 +72,10 @@ final case class UString(asString: String) extends AnyVal {
     } else asString.iterator.map(UChar(_))
 
   override def toString: String =
-    asString
+    iterator(true)
       .map {
-        case '\'' => "\\'"
-        case c    => c.toString
+        case UChar('\'') => "\\'"
+        case c           => c.toString
       }
       .mkString("'", "", "'")
 }
