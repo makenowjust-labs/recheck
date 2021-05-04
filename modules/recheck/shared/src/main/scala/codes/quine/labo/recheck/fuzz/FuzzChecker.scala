@@ -95,6 +95,9 @@ private[fuzz] final class FuzzChecker(
   /** An alias to `fuzz.alphabet`. */
   def alphabet: ICharSet = fuzz.alphabet
 
+  /** An alias to `fuzz.program.meta.unicode` */
+  def unicode: Boolean = fuzz.program.meta.unicode
+
   /** A sequence of `fuzz.parts` */
   val parts: Seq[UString] = fuzz.parts.toSeq
 
@@ -217,7 +220,7 @@ private[fuzz] final class FuzzChecker(
     val t = gen.traces(i).str
 
     val idx = random.between(0, parts.size)
-    val part = parts(idx).seq.map(FString.Wrap)
+    val part = parts(idx).iterator(unicode).map(FString.Wrap).toIndexedSeq
     val fcs = random.between(0, 2) match {
       case 0 => part
       case 1 =>
@@ -315,7 +318,7 @@ private[fuzz] final class FuzzChecker(
   /** Executes the string to construct attack string. */
   def tryAttackExecute(str: FString): Option[(AttackPattern, Hotspot)] = interrupt {
     val input = str.toUString
-    if (input.size <= maxAttackSize) {
+    if (input.sizeAsString <= maxAttackSize) {
       val opts = Options(attackLimit, usesAcceleration = usesAcceleration, needsHeatmap = true)
       val result = Interpreter.run(program, input, 0, opts)
       if (result.status == Status.Limit) {
@@ -353,11 +356,11 @@ private[fuzz] final class FuzzChecker(
     def add(str: FString, input: UString, result: Result): Unit = {
       inputs.add(input)
 
-      val rate = if (input.size == 0) 0 else result.steps.toDouble / input.size
+      val rate = if (input.isEmpty) 0 else result.steps.toDouble / input.sizeAsString
       val coverage = result.coverage
       val trace = Trace(str, rate, result.steps, coverage)
 
-      if (input.size < maxAttackSize && !set.contains(trace)) {
+      if (input.sizeAsString < maxAttackSize && !set.contains(trace)) {
         if (init || rate >= minRate || !coverage.subsetOf(visited)) {
           minRate = Math.min(rate, minRate)
           set.add(trace)

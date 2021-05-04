@@ -33,15 +33,15 @@ class SeederSuite extends munit.FunSuite {
 
   test("Seeder.Patch.InsertChar#apply") {
     assertEquals(
-      Patch.InsertChar(1, Set(IChar('x'))).apply(UString.from("012", false)),
-      Seq(UString.from("0x12", false), UString.from("0x2", false))
+      Patch.InsertChar(1, Set(IChar('x'))).apply(UString("012"), false),
+      Seq(UString("0x12"), UString("0x2"))
     )
   }
 
   test("Seeder.Patch.InsertString#apply") {
     assertEquals(
-      Patch.InsertString(1, UString.from("xyz", false)).apply(UString.from("012", false)),
-      Seq(UString.from("0xyz12", false))
+      Patch.InsertString(1, UString("xyz")).apply(UString("012"), false),
+      Seq(UString("0xyz12"))
     )
   }
 }

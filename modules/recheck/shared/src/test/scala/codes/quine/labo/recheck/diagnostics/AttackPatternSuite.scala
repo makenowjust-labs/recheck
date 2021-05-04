@@ -5,32 +5,16 @@ import codes.quine.labo.recheck.data.UString
 
 class AttackPatternSuite extends munit.FunSuite {
   test("AttackPattern#asUString") {
-    val attack = AttackPattern(
-      Seq((UString.from("ab", false), UString.from("cd", false), 2)),
-      UString.from("ef", false),
-      1
-    )
-    assertEquals(attack.asUString, UString.from("abcdcdcdef", false))
+    val attack = AttackPattern(Seq((UString("ab"), UString("cd"), 2)), UString("ef"), 1)
+    assertEquals(attack.asUString, UString("abcdcdcdef"))
   }
 
   test("AttackPattern#toString") {
-    val attack1 = AttackPattern(
-      Seq((UString.from("ab", false), UString.from("cd", false), 2)),
-      UString.from("ef", false),
-      1
-    )
+    val attack1 = AttackPattern(Seq((UString("ab"), UString("cd"), 2)), UString("ef"), 1)
     assertEquals(attack1.toString, "'ab' 'cd'³ 'ef'")
-    val attack2 = AttackPattern(
-      Seq((UString.from("", false), UString.from("cd", false), 2)),
-      UString.from("ef", false),
-      1
-    )
+    val attack2 = AttackPattern(Seq((UString(""), UString("cd"), 2)), UString("ef"), 1)
     assertEquals(attack2.toString, "'cd'³ 'ef'")
-    val attack3 = AttackPattern(
-      Seq((UString.from("ab", false), UString.from("cd", false), 2)),
-      UString.from("", false),
-      1
-    )
+    val attack3 = AttackPattern(Seq((UString("ab"), UString("cd"), 2)), UString(""), 1)
     assertEquals(attack3.toString, "'ab' 'cd'³")
   }
 }

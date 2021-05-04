@@ -24,9 +24,9 @@ final case class Witness[A](pumps: Seq[(Seq[A], Seq[A])], suffix: Seq[A]) {
   /** Builds an attack pattern string with `n` times repetition. */
   def buildAttackPattern(n: Int)(implicit ev: A =:= UChar): AttackPattern = {
     val pumps = this.pumps.map { case (s, t) =>
-      (UString(s.map(ev).toIndexedSeq), UString(t.map(ev).toIndexedSeq), 0)
+      (UString.from(s.map(ev)), UString.from(t.map(ev)), 0)
     }
-    val suffix = UString(this.suffix.map(ev).toIndexedSeq)
+    val suffix = UString.from(this.suffix.map(ev))
     AttackPattern(pumps, suffix, n)
   }
 

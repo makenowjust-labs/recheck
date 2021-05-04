@@ -60,11 +60,7 @@ class ReDoSSuite extends munit.FunSuite {
           "^(?:a|a)*$",
           "",
           AttackComplexity.Exponential(false),
-          AttackPattern(
-            Seq((UString.from("a", false), UString.from("a", false), 0)),
-            UString.from("\u0000", false),
-            17
-          ),
+          AttackPattern(Seq((UString("a"), UString("a"), 0)), UString("\u0000"), 17),
           Hotspot.empty,
           Checker.Automaton
         )
@@ -150,11 +146,7 @@ class ReDoSSuite extends munit.FunSuite {
           "^(?:a|a)*$",
           "",
           AttackComplexity.Exponential(false),
-          AttackPattern(
-            Seq((UString.from("a", false), UString.from("a", false), 0)),
-            UString.from("\u0000", false),
-            17
-          ),
+          AttackPattern(Seq((UString("a"), UString("a"), 0)), UString("\u0000"), 17),
           Hotspot.empty,
           Checker.Automaton
         )

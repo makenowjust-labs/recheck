@@ -27,6 +27,8 @@ object Seeder {
     ctx.interrupt {
       import ctx._
 
+      val unicode = fuzz.program.meta.unicode
+
       val set = mutable.Set.empty[FString]
       val added = mutable.Set.empty[UString]
       val queue = mutable.Queue.empty[(UString, Option[CoverageLocation])]
@@ -43,7 +45,7 @@ object Seeder {
       interrupt {
         queue.enqueue((UString.empty, None))
         for ((ch, _) <- fuzz.alphabet.pairs) {
-          val s = UString(IndexedSeq(ch.head))
+          val s = UString(ch.head.asString)
           queue.enqueue((s, None))
           added.add(s)
         }
@@ -55,8 +57,8 @@ object Seeder {
         if (target.forall(loc => !covered.contains(CoverageItem(loc, true)))) {
           val result = Interpreter.run(fuzz.program, input, 0, opts)
           if (result.status == Status.Limit) {
-            set.add(FString(input))
-            set.add(FString.build(input, result.loops))
+            set.add(FString(input, unicode))
+            set.add(FString.build(input, result.loops, unicode))
             return set.toSet
           }
 
@@ -64,11 +66,13 @@ object Seeder {
           // it should be added to a seed set.
           if (!result.coverage.subsetOf(covered)) {
             covered.addAll(result.coverage)
-            set.add(FString(input))
-            set.add(FString.build(input, result.loops))
+            set.add(FString(input, unicode))
+            set.add(FString.build(input, result.loops, unicode))
             for (failedPoint <- result.failedPoints) {
               if (!covered.contains(CoverageItem(failedPoint.target, true))) {
-                for (patched <- Patch.build(failedPoint, fuzz.alphabet).apply(input); if !added.contains(patched)) {
+                for (
+                  patched <- Patch.build(failedPoint, fuzz.alphabet).apply(input, unicode); if !added.contains(patched)
+                ) {
                   queue.enqueue((patched, Some(failedPoint.target)))
                   added.add(patched)
                 }
@@ -83,20 +87,20 @@ object Seeder {
 
   /** Patch is a patch to reach a new pc. */
   private[fuzz] sealed abstract class Patch extends Serializable with Product {
-    def apply(s: UString): Seq[UString]
+    def apply(s: UString, unicode: Boolean): Seq[UString]
   }
 
   private[fuzz] object Patch {
 
     /** InsertChar is a patch to insert (or replace) each characters at the `pos`. */
     final case class InsertChar(pos: Int, chs: Set[IChar]) extends Patch {
-      def apply(s: UString): Seq[UString] =
-        chs.toSeq.map(_.head).flatMap(c => Seq(s.insertAt(pos, c), s.replaceAt(pos, c)))
+      def apply(s: UString, unicode: Boolean): Seq[UString] =
+        chs.toSeq.map(_.head).flatMap(c => Seq(s.insertAt(pos, c), s.replaceAt(pos, c, unicode)))
     }
 
     /** InsertString is a patch to insert a string at the `pos`. */
     final case class InsertString(pos: Int, s: UString) extends Patch {
-      def apply(t: UString): Seq[UString] =
+      def apply(t: UString, unicode: Boolean): Seq[UString] =
         Seq(t.insert(pos, s))
     }
 

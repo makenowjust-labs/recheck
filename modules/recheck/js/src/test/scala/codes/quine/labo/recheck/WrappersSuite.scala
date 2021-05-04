@@ -39,7 +39,7 @@ class WrappersSuite extends munit.FunSuite {
     )
 
     val attack =
-      AttackPattern(Seq((UString.from("a", false), UString.from("b", false), 1)), UString.from("c", false), 2)
+      AttackPattern(Seq((UString("a"), UString("b"), 1)), UString("c"), 2)
     val attackJS = js.Dynamic.literal(
       pumps = js.Array(js.Dynamic.literal(prefix = "a", pump = "b", bias = 1)),
       suffix = "c",
@@ -112,7 +112,7 @@ class WrappersSuite extends munit.FunSuite {
 
   test("AttackPatternJS.from") {
     val attack =
-      AttackPattern(Seq((UString.from("a", false), UString.from("b", false), 1)), UString.from("c", false), 2)
+      AttackPattern(Seq((UString("a"), UString("b"), 1)), UString("c"), 2)
     assertEquals(
       JSON.stringify(AttackPatternJS.from(attack)),
       JSON.stringify(
@@ -129,7 +129,7 @@ class WrappersSuite extends munit.FunSuite {
 
   test("PumpJS.from") {
     assertEquals(
-      JSON.stringify(PumpJS.from((UString.from("a", false), UString.from("b", false), 1))),
+      JSON.stringify(PumpJS.from((UString("a"), UString("b"), 1))),
       JSON.stringify(js.Dynamic.literal(prefix = "a", pump = "b", bias = 1))
     )
   }

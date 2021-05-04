@@ -100,7 +100,7 @@ class FStringSuite extends munit.FunSuite {
   test("FString#toUString") {
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toUString,
-      UString.from("abcbcbcd", false)
+      UString("abcbcbcd")
     )
     intercept[IllegalArgumentException] {
       FString(1, IndexedSeq(Repeat(0, 2), Wrap('a'), Repeat(0, 1))).toUString
@@ -110,11 +110,11 @@ class FStringSuite extends munit.FunSuite {
   test("FString#toAttackPattern") {
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toAttackPattern,
-      AttackPattern(Seq((UString.from("a", false), UString.from("bc", false), 1)), UString.from("d", false), 2)
+      AttackPattern(Seq((UString("a"), UString("bc"), 1)), UString("d"), 2)
     )
     assertEquals(
       FString(0, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toAttackPattern,
-      AttackPattern(Seq.empty, UString.from("abcd", false), 0)
+      AttackPattern(Seq.empty, UString("abcd"), 0)
     )
     intercept[IllegalArgumentException] {
       FString(1, IndexedSeq(Repeat(1, 2), Wrap('a'), Repeat(1, 1))).toAttackPattern

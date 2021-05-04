@@ -14,22 +14,16 @@ import codes.quine.labo.recheck.vm.Interpreter.Status
 class InterpreterSuite extends munit.FunSuite {
   implicit val ctx: Context = Context()
 
-  def matches(source: String, flags: String, input: String, pos: Int, opts: Options): Result =
-    matches(source, flags, UString.from(input, false), pos, opts)
-
-  def matches(source: String, flags: String, input: UString, pos: Int, opts: Options): Result = {
+  def matches(source: String, flags: String, input: String, pos: Int, opts: Options): Result = {
     val t = for {
       pattern <- Parser.parse(source, flags)
       program <- ProgramBuilder.build(pattern)
-      result = Interpreter.run(program, input, pos, opts)
+      result = Interpreter.run(program, UString(input), pos, opts)
     } yield result
     t.get
   }
 
-  def assertMatches(source: String, flags: String, input: String, pos: Int)(implicit loc: munit.Location): Unit =
-    assertMatches(source, flags, UString.from(input, false), pos)
-
-  def assertMatches(source: String, flags: String, input: UString, pos: Int)(implicit loc: munit.Location): Unit = {
+  def assertMatches(source: String, flags: String, input: String, pos: Int)(implicit loc: munit.Location): Unit = {
     val opts = Options()
     assertEquals(matches(source, flags, input, pos, opts).status, Status.Ok)
     assertEquals(matches(source, flags, input, pos, opts.copy(usesAcceleration = true)).status, Status.Ok)
@@ -37,12 +31,7 @@ class InterpreterSuite extends munit.FunSuite {
 
   def assertCaptures(source: String, flags: String, input: String, pos: Int)(captures: Seq[Int])(implicit
       loc: munit.Location
-  ): Unit =
-    assertCaptures(source, flags, UString.from(input, false), pos)(captures)
-
-  def assertCaptures(source: String, flags: String, input: UString, pos: Int)(
-      captures: Seq[Int]
-  )(implicit loc: munit.Location): Unit = {
+  ): Unit = {
     val opts = Options()
     val result1 = matches(source, flags, input, pos, opts)
     assertEquals(result1.status, Status.Ok)
@@ -52,10 +41,7 @@ class InterpreterSuite extends munit.FunSuite {
     assertEquals(result2.captures, Some(captures))
   }
 
-  def assertNotMatches(source: String, flags: String, input: String, pos: Int)(implicit loc: munit.Location): Unit =
-    assertNotMatches(source, flags, UString.from(input, false), pos)
-
-  def assertNotMatches(source: String, flags: String, input: UString, pos: Int)(implicit loc: munit.Location): Unit = {
+  def assertNotMatches(source: String, flags: String, input: String, pos: Int)(implicit loc: munit.Location): Unit = {
     val opts = Options()
     assertEquals(matches(source, flags, input, pos, opts).status, Status.Fail)
     assertEquals(matches(source, flags, input, pos, opts.copy(usesAcceleration = true)).status, Status.Fail)
@@ -80,11 +66,11 @@ class InterpreterSuite extends munit.FunSuite {
         Set(
           FailedPoint(CoverageLocation(6, Vector.empty), 4, ReadKind.Char('a'), None),
           FailedPoint(CoverageLocation(9, Vector.empty), 4, ReadKind.Char('a'), None),
-          FailedPoint(CoverageLocation(12, Vector.empty), 3, ReadKind.Ref(1), Some(UString.from("aaa", false))),
-          FailedPoint(CoverageLocation(12, Vector.empty), 4, ReadKind.Ref(1), Some(UString.from("aaaa", false))),
+          FailedPoint(CoverageLocation(12, Vector.empty), 3, ReadKind.Ref(1), Some(UString("aaa"))),
+          FailedPoint(CoverageLocation(12, Vector.empty), 4, ReadKind.Ref(1), Some(UString("aaaa"))),
           FailedPoint(CoverageLocation(18, Vector.empty), 0, ReadKind.Char('a'), None),
-          FailedPoint(CoverageLocation(21, Vector.empty), 0, ReadKind.Ref(2), Some(UString.from("aaaa", false))),
-          FailedPoint(CoverageLocation(21, Vector.empty), 1, ReadKind.Ref(2), Some(UString.from("aaa", false)))
+          FailedPoint(CoverageLocation(21, Vector.empty), 0, ReadKind.Ref(2), Some(UString("aaaa"))),
+          FailedPoint(CoverageLocation(21, Vector.empty), 1, ReadKind.Ref(2), Some(UString("aaa")))
         ),
         Set(
           CoverageItem(CoverageLocation(1, Vector.empty), true),
