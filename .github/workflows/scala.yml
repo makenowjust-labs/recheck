@@ -12,6 +12,7 @@ jobs:
         with:
           java-version: adopt@1.14
       - name: Test
-        run: sbt test
+        run: sbt coverage test coverageAggregate
       - name: Format and Lint
         run: sbt scalafmtCheckAll scalafmtSbtCheck 'scalafixAll --check'
+      - uses: codecov/codecov-action@v1
