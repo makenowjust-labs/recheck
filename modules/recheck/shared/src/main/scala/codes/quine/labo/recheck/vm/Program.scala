@@ -20,6 +20,7 @@ object Program {
   /** Meta is a meta information of a program for matching and analysis. */
   final case class Meta(
       ignoreCase: Boolean,
+      unicode: Boolean,
       hasRef: Boolean,
       capturesSize: Int,
       countersSize: Int,

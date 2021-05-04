@@ -173,8 +173,8 @@ final case class Pattern(node: Node, flagSet: FlagSet) {
       if (ns.isEmpty) set
       else {
         val (pre, suf) = ns.span(_.isInstanceOf[Character])
-        val s = UString(pre.collect { case Character(c) => c }.toIndexedSeq)
-        val newSet = set ++ (if (s.size > 1) Set(s) else Set.empty)
+        val s = UString(pre.collect { case Character(c) => c.asString }.mkString)
+        val newSet = set ++ (if (s.sizeAsString > 1) Set(s) else Set.empty)
         extract(suf.dropWhile(!_.isInstanceOf[Character]), newSet)
       }
 

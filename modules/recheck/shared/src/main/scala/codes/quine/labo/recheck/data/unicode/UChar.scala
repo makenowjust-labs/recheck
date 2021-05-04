@@ -5,6 +5,9 @@ import scala.language.implicitConversions
 /** UChar is a Unicode code point. */
 final case class UChar(value: Int) extends Ordered[UChar] {
 
+  /** Returns the size of the character. */
+  def size: Int = if (value >= 0x10000) 2 else 1
+
   /** Checks this code point is valid or not. */
   def isValidCodePoint: Boolean = 0 <= value && value <= 0x10ffff
 

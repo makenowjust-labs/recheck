@@ -103,10 +103,10 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   ) {
 
     /** Gets a previous character. */
-    def previousChar: Option[UChar] = input.get(pos - 1)
+    def previousChar: Option[UChar] = input.getBefore(pos, program.meta.unicode)
 
     /** Gets a current character. */
-    def currentChar: Option[UChar] = input.get(pos)
+    def currentChar: Option[UChar] = input.getAt(pos, program.meta.unicode)
 
     /** Captures a beginning position of the index. */
     def capBegin(index: Int): Unit = {
@@ -361,7 +361,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           case AssertKind.InputBegin =>
             frame.pos == 0
           case AssertKind.InputEnd =>
-            frame.pos == input.size
+            frame.pos == input.sizeAsString
         }
         if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
         ok
@@ -370,14 +370,14 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           case Some(s) => s
           case None    => UString.empty
         }
-        val ok = s == input.substring(frame.pos, frame.pos + s.size)
+        val ok = s == input.substring(frame.pos, frame.pos + s.sizeAsString)
         if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
         if (ok) {
           if (options.needsHeatmap && loc.isDefined) {
             heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
           }
           steps += 1
-          frame.pos += s.size
+          frame.pos += s.sizeAsString
           true
         } else {
           if (options.needsFailedPoints) {
@@ -387,14 +387,15 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           false
         }
       case Inst.Read(kind, loc) =>
-        val ok = read(frame.currentChar, kind)
+        val c = frame.currentChar
+        val ok = read(c, kind)
         if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
         if (ok) {
           if (options.needsHeatmap && loc.isDefined) {
             heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
           }
           steps += 1
-          frame.pos += 1
+          frame.pos += c.size
           true
         } else {
           if (options.needsFailedPoints) {
@@ -408,14 +409,14 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           case Some(s) => s
           case None    => UString.empty
         }
-        val ok = s == input.substring(frame.pos - s.size, frame.pos)
+        val ok = s == input.substring(frame.pos - s.sizeAsString, frame.pos)
         if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
         if (ok) {
           if (options.needsHeatmap && loc.isDefined) {
             heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
           }
           steps += 1
-          frame.pos -= s.size
+          frame.pos -= s.sizeAsString
           true
         } else {
           if (options.needsFailedPoints) {
@@ -425,14 +426,15 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           false
         }
       case Inst.ReadBack(kind, loc) =>
-        val ok = read(frame.previousChar, kind)
+        val c = frame.previousChar
+        val ok = read(c, kind)
         if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
         if (read(frame.previousChar, kind)) {
           if (options.needsHeatmap && loc.isDefined) {
             heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
           }
           steps += 1
-          frame.pos -= 1
+          frame.pos -= c.size
           true
         } else {
           if (options.needsFailedPoints) {

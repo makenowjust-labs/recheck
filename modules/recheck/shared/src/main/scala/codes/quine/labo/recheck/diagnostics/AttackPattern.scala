@@ -1,7 +1,5 @@
 package codes.quine.labo.recheck
 package diagnostics
-
-import codes.quine.labo.recheck.data.UChar
 import codes.quine.labo.recheck.data.UString
 import codes.quine.labo.recheck.util.NumberFormat
 
@@ -22,15 +20,15 @@ final case class AttackPattern(pumps: Seq[(UString, UString, Int)], suffix: UStr
 
   /** Returns the [[UString]]] represented by this. */
   def asUString: UString = {
-    val seq = IndexedSeq.newBuilder[UChar]
+    val str = new StringBuilder
 
     for ((s, t, m) <- pumps) {
-      seq.addAll(s.seq)
-      for (_ <- 1 to (n + m)) seq.addAll(t.seq)
+      str.append(s.asString)
+      for (_ <- 1 to (n + m)) str.append(t.asString)
     }
-    seq.addAll(suffix.seq)
+    str.append(suffix.asString)
 
-    UString(seq.result())
+    UString(str.result())
   }
 
   override def toString: String = {

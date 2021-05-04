@@ -51,21 +51,24 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
 
   /** Builds a UString instance from this. */
   def toUString: UString = {
-    val str = IndexedSeq.newBuilder[UChar]
+    val str = new StringBuilder
     var pos = 0
     while (pos < seq.size) {
       seq(pos) match {
         case Wrap(u) =>
           pos += 1
-          str.addOne(u)
+          str.append(u.asString)
         case Repeat(m, size) =>
           pos += 1
-          val part = seq.slice(pos, pos + size).map {
-            case Wrap(u)      => u
-            case Repeat(_, _) => throw new IllegalArgumentException
-          }
+          val part = seq
+            .slice(pos, pos + size)
+            .map {
+              case Wrap(u)      => u.asString
+              case Repeat(_, _) => throw new IllegalArgumentException
+            }
+            .mkString
           val repeat = n + m
-          for (_ <- 1 to repeat) str.addAll(part)
+          for (_ <- 1 to repeat) str.append(part)
           pos += size
       }
     }
@@ -76,24 +79,27 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
   def toAttackPattern: AttackPattern = {
     val pumps = Seq.newBuilder[(UString, UString, Int)]
 
-    val str = IndexedSeq.newBuilder[UChar]
+    val str = new StringBuilder
     var pos = 0
 
     while (pos < seq.size) {
       seq(pos) match {
         case Wrap(u) =>
           pos += 1
-          str.addOne(u)
+          str.append(u.asString)
         case Repeat(m, size) =>
           pos += 1
           val repeat = n + m
           if (repeat > 1) {
             val s = UString(str.result())
             str.clear()
-            val pump = seq.slice(pos, pos + size).map {
-              case Wrap(u)      => u
-              case Repeat(_, _) => throw new IllegalArgumentException
-            }
+            val pump = seq
+              .slice(pos, pos + size)
+              .map {
+                case Wrap(u)      => u.asString
+                case Repeat(_, _) => throw new IllegalArgumentException
+              }
+              .mkString
             val t = UString(pump)
             pumps.addOne((s, t, m))
             pos += size
@@ -110,14 +116,14 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
 
     val parts = Seq.newBuilder[String]
 
-    val str = IndexedSeq.newBuilder[UChar]
+    val str = new StringBuilder
     var pos = 0
 
     while (pos < seq.size) {
       seq(pos) match {
         case Wrap(u) =>
           pos += 1
-          str.addOne(u)
+          str.append(u.asString)
         case Repeat(m, size) =>
           pos += 1
           val repeat = n + m
@@ -125,10 +131,13 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
             val s = UString(str.result())
             str.clear()
             if (s.nonEmpty) parts.addOne(s.toString)
-            val part = seq.slice(pos, pos + size).map {
-              case Wrap(u)      => u
-              case Repeat(_, _) => throw new IllegalArgumentException
-            }
+            val part = seq
+              .slice(pos, pos + size)
+              .map {
+                case Wrap(u)      => u.asString
+                case Repeat(_, _) => throw new IllegalArgumentException
+              }
+              .mkString
             parts.addOne(UString(part).toString ++ NumberFormat.superscript(repeat))
             pos += size
           }
@@ -155,28 +164,28 @@ object FString {
   final case class Repeat(m: Int, size: Int) extends FChar
 
   /** Builds a FString from a string. */
-  def apply(input: UString): FString = FString(1, input.seq.map(Wrap))
+  def apply(input: UString, unicode: Boolean): FString = FString(1, input.iterator(unicode).map(Wrap).toIndexedSeq)
 
   /** Builds a FString from a string with a loop analysis information. */
-  def build(input: UString, loops: Seq[(Int, Int)]): FString = {
+  def build(input: UString, loops: Seq[(Int, Int)], unicode: Boolean): FString = {
     val repeats = loops.iterator.collect { case (start, end) if start != end => (start, end - start) }.toMap
 
     val str = IndexedSeq.newBuilder[FChar]
     var pos = 0
-    while (pos < input.size) {
+    while (pos < input.sizeAsString) {
       repeats.get(pos) match {
         case Some(size) =>
           val part = input.substring(pos, pos + size)
           pos += size
           // Compresses a repetition.
           var m = 0
-          while (pos < input.size && part == input.substring(pos, pos + size)) {
+          while (pos < input.sizeAsString && part == input.substring(pos, pos + size)) {
             m += 1
             pos += size
           }
-          str.addOne(Repeat(m, size)).addAll(part.seq.map(Wrap))
+          str.addOne(Repeat(m, size)).addAll(part.iterator(unicode).map(Wrap))
         case None =>
-          str.addOne(Wrap(input.seq(pos)))
+          str.addOne(Wrap(input.getAt(pos, unicode).get))
           pos += 1
       }
     }
