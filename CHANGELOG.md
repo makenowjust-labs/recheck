@@ -9,6 +9,7 @@ Changes:
 Fixes:
 
 - Fix nested look-around assertion behavior correctly
+- Improve code coverage
 
 # 3.0.0 (2021-04-14)
 

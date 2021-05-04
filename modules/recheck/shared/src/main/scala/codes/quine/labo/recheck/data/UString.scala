@@ -6,10 +6,6 @@ final case class UString(asString: String) extends AnyVal {
   /** An alias of `asString.length`. */
   def sizeAsString: Int = asString.length
 
-  /** A size of this string. */
-  def size(unicode: Boolean): Int =
-    if (unicode) asString.codePointCount(0, sizeAsString) else sizeAsString
-
   /** Tests whether this string is empty or not. */
   def isEmpty: Boolean = asString.isEmpty
 
