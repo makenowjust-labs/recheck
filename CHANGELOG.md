@@ -5,11 +5,13 @@ Changes:
 - Remove `isLineTerminator` and `isWord` flags from `IChar`
 - Simplify `UString` implementation as `String` wrapper
 - Send coverage to Codecov
+- Rename `EpsNFACompiler` to `EpsNFABuilder`
 
 Fixes:
 
 - Fix nested look-around assertion behavior correctly
 - Improve code coverage
+- Refactor `EpsNFABuilder` by using a class.
 
 # 3.0.0 (2021-04-14)
 
