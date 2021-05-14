@@ -25,7 +25,7 @@ object EpsNFABuilder {
     } yield epsNFA)
 }
 
-class EpsNFABuilder(
+private class EpsNFABuilder(
     private[this] val pattern: Pattern,
     private[this] val alphabet: ICharSet
 )(implicit ctx: Context) {
