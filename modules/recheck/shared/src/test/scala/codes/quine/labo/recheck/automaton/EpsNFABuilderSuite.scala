@@ -13,7 +13,7 @@ import codes.quine.labo.recheck.data.ICharSet.CharKind
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.regexp.Pattern._
 
-class EpsNFACompilerSuite extends munit.FunSuite {
+class EpsNFABuilderSuite extends munit.FunSuite {
 
   /** A default context. */
   implicit def ctx: Context = Context()
@@ -26,7 +26,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
 
     test("EpsNFACompiler.compile: submatch") {
       assertEquals(
-        EpsNFACompiler.compile(Pattern(LineEnd(), flagSet0)),
+        EpsNFABuilder.compile(Pattern(LineEnd(), flagSet0)),
         Success(
           EpsNFA(
             ICharSet.any(false, false),
@@ -44,7 +44,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         )
       )
       assertEquals(
-        EpsNFACompiler.compile(Pattern(LineBegin(), flagSet0)),
+        EpsNFABuilder.compile(Pattern(LineBegin(), flagSet0)),
         Success(
           EpsNFA(
             ICharSet.any(false, false),
@@ -65,7 +65,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
 
     test("EpsNFACompiler.compiler: LineBegin, LineEnd, Sequence") {
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), LineEnd())), flagSet0)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), LineEnd())), flagSet0)),
         Success(
           EpsNFA(
             ICharSet.any(false, false),
@@ -81,7 +81,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         )
       )
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Sequence(Seq.empty), LineEnd())), flagSet0)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Sequence(Seq.empty), LineEnd())), flagSet0)),
         Success(
           EpsNFA(
             ICharSet.any(false, false),
@@ -101,7 +101,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
 
     test("EpsNFACompiler.compiler: WordBoundary") {
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), WordBoundary(false), LineEnd())), flagSet0)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), WordBoundary(false), LineEnd())), flagSet0)),
         Success(
           EpsNFA(
             ICharSet.any(false, false).add(IChar.Word, CharKind.Word),
@@ -119,7 +119,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         )
       )
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), WordBoundary(true), LineEnd())), flagSet0)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), WordBoundary(true), LineEnd())), flagSet0)),
         Success(
           EpsNFA(
             ICharSet.any(false, false).add(IChar.Word, CharKind.Word),
@@ -140,7 +140,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
 
     test("EpsNFACompiler.compile: Character, CharacterClass") {
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Character('a'), LineEnd())), flagSet1)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Character('a'), LineEnd())), flagSet1)),
         Success(
           EpsNFA(
             ICharSet.any(true, false).add(IChar.canonicalize(IChar('a'), false)),
@@ -158,7 +158,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         )
       )
       assertEquals(
-        EpsNFACompiler.compile(
+        EpsNFABuilder.compile(
           Pattern(Sequence(Seq(LineBegin(), CharacterClass(false, Seq(Character('a'))), LineEnd())), flagSet0)
         ),
         Success(
@@ -178,7 +178,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         )
       )
       assertEquals(
-        EpsNFACompiler.compile(
+        EpsNFABuilder.compile(
           Pattern(Sequence(Seq(LineBegin(), CharacterClass(true, Seq(Character('a'))), LineEnd())), flagSet0)
         ),
         Success(
@@ -201,7 +201,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
 
     test("EpsNFACompiler.compile: Dot") {
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet0)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet0)),
         Success(
           EpsNFA(
             ICharSet.any(false, false).add(IChar.Any16.diff(IChar.LineTerminator)),
@@ -219,7 +219,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         )
       )
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet1)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet1)),
         Success(
           EpsNFA(
             ICharSet.any(true, false).add(IChar.canonicalize(IChar.Any16.diff(IChar.LineTerminator), false)),
@@ -240,7 +240,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         )
       )
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet2)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet2)),
         Success(
           EpsNFA(
             ICharSet.any(false, false),
@@ -258,7 +258,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         )
       )
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet3)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet3)),
         Success(
           EpsNFA(
             ICharSet.any(false, true),
@@ -279,7 +279,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
 
     test("EpsNFACompiler.compile: Disjunction") {
       assertEquals(
-        EpsNFACompiler.compile(
+        EpsNFABuilder.compile(
           Pattern(Sequence(Seq(LineBegin(), Disjunction(Seq(Dot(), Dot())), LineEnd())), flagSet2)
         ),
         Success(
@@ -306,7 +306,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
 
     test("EpsNFACompiler.compile: Star") {
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Star(false, Dot()), LineEnd())), flagSet2)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Star(false, Dot()), LineEnd())), flagSet2)),
         Success(
           EpsNFA(
             ICharSet.any(false, false),
@@ -328,7 +328,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         )
       )
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Star(true, Dot()), LineEnd())), flagSet2)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Star(true, Dot()), LineEnd())), flagSet2)),
         Success(
           EpsNFA(
             ICharSet.any(false, false),
@@ -353,7 +353,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
 
     test("EpsNFACompiler.compile: Plus") {
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Plus(false, Dot()), LineEnd())), flagSet2)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Plus(false, Dot()), LineEnd())), flagSet2)),
         Success(
           EpsNFA(
             ICharSet.any(false, false),
@@ -374,7 +374,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         )
       )
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Plus(true, Dot()), LineEnd())), flagSet2)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Plus(true, Dot()), LineEnd())), flagSet2)),
         Success(
           EpsNFA(
             ICharSet.any(false, false),
@@ -398,7 +398,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
 
     test("EpsNFACompiler.compile: Question") {
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Question(false, Dot()), LineEnd())), flagSet2)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Question(false, Dot()), LineEnd())), flagSet2)),
         Success(
           EpsNFA(
             ICharSet.any(false, false),
@@ -417,7 +417,7 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         )
       )
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Question(true, Dot()), LineEnd())), flagSet2)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Question(true, Dot()), LineEnd())), flagSet2)),
         Success(
           EpsNFA(
             ICharSet.any(false, false),
@@ -439,64 +439,64 @@ class EpsNFACompilerSuite extends munit.FunSuite {
 
     test("EpsNFACompiler.compile: Repeat") {
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Repeat(false, 1, None, Dot()), LineEnd())), flagSet2)),
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet2))
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Repeat(false, 1, None, Dot()), LineEnd())), flagSet2)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet2))
       )
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Repeat(false, 2, None, Dot()), LineEnd())), flagSet2)),
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), Dot(), LineEnd())), flagSet2))
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Repeat(false, 2, None, Dot()), LineEnd())), flagSet2)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), Dot(), LineEnd())), flagSet2))
       )
       assertEquals(
-        EpsNFACompiler.compile(
+        EpsNFABuilder.compile(
           Pattern(Sequence(Seq(LineBegin(), Repeat(false, 1, Some(None), Dot()), LineEnd())), flagSet2)
         ),
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), Star(false, Dot()), LineEnd())), flagSet2))
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), Star(false, Dot()), LineEnd())), flagSet2))
       )
       assertEquals(
-        EpsNFACompiler.compile(
+        EpsNFABuilder.compile(
           Pattern(Sequence(Seq(LineBegin(), Repeat(true, 1, Some(None), Dot()), LineEnd())), flagSet2)
         ),
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), Star(true, Dot()), LineEnd())), flagSet2))
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), Star(true, Dot()), LineEnd())), flagSet2))
       )
       assertEquals(
-        EpsNFACompiler.compile(
+        EpsNFABuilder.compile(
           Pattern(Sequence(Seq(LineBegin(), Repeat(false, 1, Some(Some(1)), Dot()), LineEnd())), flagSet2)
         ),
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet2))
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet2))
       )
       assertEquals(
-        EpsNFACompiler.compile(
+        EpsNFABuilder.compile(
           Pattern(Sequence(Seq(LineBegin(), Repeat(true, 1, Some(Some(1)), Dot()), LineEnd())), flagSet2)
         ),
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet2))
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet2))
       )
       interceptMessage[InvalidRegExpException]("out of order repetition quantifier") {
-        EpsNFACompiler
+        EpsNFABuilder
           .compile(Pattern(Sequence(Seq(LineBegin(), Repeat(false, 2, Some(Some(1)), Dot()), LineEnd())), flagSet2))
           .get
       }
       interceptMessage[InvalidRegExpException]("out of order repetition quantifier") {
-        EpsNFACompiler
+        EpsNFABuilder
           .compile(Pattern(Sequence(Seq(LineBegin(), Repeat(true, 2, Some(Some(1)), Dot()), LineEnd())), flagSet2))
           .get
       }
       assertEquals(
-        EpsNFACompiler.compile(
+        EpsNFABuilder.compile(
           Pattern(Sequence(Seq(LineBegin(), Repeat(false, 1, Some(Some(2)), Dot()), LineEnd())), flagSet2)
         ),
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), Question(false, Dot()), LineEnd())), flagSet2))
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), Question(false, Dot()), LineEnd())), flagSet2))
       )
       assertEquals(
-        EpsNFACompiler.compile(
+        EpsNFABuilder.compile(
           Pattern(Sequence(Seq(LineBegin(), Repeat(true, 1, Some(Some(2)), Dot()), LineEnd())), flagSet2)
         ),
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), Question(true, Dot()), LineEnd())), flagSet2))
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Dot(), Question(true, Dot()), LineEnd())), flagSet2))
       )
       assertEquals(
-        EpsNFACompiler.compile(
+        EpsNFABuilder.compile(
           Pattern(Sequence(Seq(LineBegin(), Repeat(false, 1, Some(Some(3)), Dot()), LineEnd())), flagSet2)
         ),
-        EpsNFACompiler.compile(
+        EpsNFABuilder.compile(
           Pattern(
             Sequence(Seq(LineBegin(), Dot(), Question(false, Sequence(Seq(Dot(), Question(false, Dot())))), LineEnd())),
             flagSet2
@@ -504,10 +504,10 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         )
       )
       assertEquals(
-        EpsNFACompiler.compile(
+        EpsNFABuilder.compile(
           Pattern(Sequence(Seq(LineBegin(), Repeat(true, 1, Some(Some(3)), Dot()), LineEnd())), flagSet2)
         ),
-        EpsNFACompiler.compile(
+        EpsNFABuilder.compile(
           Pattern(
             Sequence(Seq(LineBegin(), Dot(), Question(true, Sequence(Seq(Dot(), Question(true, Dot())))), LineEnd())),
             flagSet2
@@ -531,37 +531,37 @@ class EpsNFACompilerSuite extends munit.FunSuite {
         )
       )
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Character('a'), LineEnd())), flagSet0)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Character('a'), LineEnd())), flagSet0)),
         Success(nfaA)
       )
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Capture(1, Character('a')), LineEnd())), flagSet0)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Capture(1, Character('a')), LineEnd())), flagSet0)),
         Success(nfaA)
       )
       assertEquals(
-        EpsNFACompiler.compile(
+        EpsNFABuilder.compile(
           Pattern(Sequence(Seq(LineBegin(), NamedCapture(1, "foo", Character('a')), LineEnd())), flagSet0)
         ),
         Success(nfaA)
       )
       assertEquals(
-        EpsNFACompiler.compile(Pattern(Sequence(Seq(LineBegin(), Group(Character('a')), LineEnd())), flagSet0)),
+        EpsNFABuilder.compile(Pattern(Sequence(Seq(LineBegin(), Group(Character('a')), LineEnd())), flagSet0)),
         Success(nfaA)
       )
     }
 
     test("EpsNFACompiler.compile: LookAhead, LookBehind, BackReference, NamedBackreference") {
       interceptMessage[UnsupportedException]("look-ahead assertion") {
-        EpsNFACompiler.compile(Pattern(LookAhead(false, Dot()), flagSet0)).get
+        EpsNFABuilder.compile(Pattern(LookAhead(false, Dot()), flagSet0)).get
       }
       interceptMessage[UnsupportedException]("look-behind assertion") {
-        EpsNFACompiler.compile(Pattern(LookBehind(false, Dot()), flagSet0)).get
+        EpsNFABuilder.compile(Pattern(LookBehind(false, Dot()), flagSet0)).get
       }
       interceptMessage[UnsupportedException]("back-reference") {
-        EpsNFACompiler.compile(Pattern(BackReference(1), flagSet0)).get
+        EpsNFABuilder.compile(Pattern(BackReference(1), flagSet0)).get
       }
       interceptMessage[UnsupportedException]("named back-reference") {
-        EpsNFACompiler.compile(Pattern(NamedBackReference("foo"), flagSet0)).get
+        EpsNFABuilder.compile(Pattern(NamedBackReference("foo"), flagSet0)).get
       }
     }
   }

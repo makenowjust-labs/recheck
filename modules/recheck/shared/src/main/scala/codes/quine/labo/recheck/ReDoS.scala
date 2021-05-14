@@ -6,7 +6,7 @@ import scala.util.Try
 
 import codes.quine.labo.recheck.automaton.AutomatonChecker
 import codes.quine.labo.recheck.automaton.Complexity
-import codes.quine.labo.recheck.automaton.EpsNFACompiler
+import codes.quine.labo.recheck.automaton.EpsNFABuilder
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.ReDoSException
@@ -61,7 +61,7 @@ object ReDoS {
               if (checker == Checker.Hybrid && pattern.size >= maxPatternSize)
                 Failure(new UnsupportedException("The pattern is too large"))
               else Success(())
-            epsNFA <- EpsNFACompiler.compile(pattern)
+            epsNFA <- EpsNFABuilder.compile(pattern)
             orderedNFA <- Try(epsNFA.toOrderedNFA(maxNFASize).rename.mapAlphabet(_.head))
           } yield Some(AutomatonChecker.check(orderedNFA, maxNFASize))
     } yield complexity

@@ -20,7 +20,7 @@ class AutomatonCheckerSuite extends munit.FunSuite {
   def check(source: String, flags: String): Try[Complexity[IChar]] =
     for {
       pattern <- Parser.parse(source, flags)
-      epsNFA <- EpsNFACompiler.compile(pattern)
+      epsNFA <- EpsNFABuilder.compile(pattern)
       nfa = epsNFA.toOrderedNFA.rename
       result <- Try(AutomatonChecker.check(nfa))
     } yield result

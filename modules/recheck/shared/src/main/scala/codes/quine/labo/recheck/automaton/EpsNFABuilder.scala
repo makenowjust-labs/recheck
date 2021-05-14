@@ -15,7 +15,7 @@ import codes.quine.labo.recheck.regexp.Pattern._
 import codes.quine.labo.recheck.util.TryUtil
 
 /** ECMA-262 RegExp to ε-NFA Compiler. */
-object EpsNFACompiler {
+object EpsNFABuilder {
 
   /** Compiles ECMA-262 RegExp into ε-NFA. */
   def compile(pattern: Pattern)(implicit ctx: Context): Try[EpsNFA[Int]] =
