@@ -245,6 +245,12 @@ class InterpreterSuite extends munit.FunSuite {
 
     assertMatches("(?<!a)$", "", "", 0)
     assertNotMatches("(?<!a)$", "", "a", 0)
+
+    assertMatches("(?<=ab)$", "", "ab", 2)
+    assertNotMatches("(?<=ab)$", "", "ba", 2)
+
+    assertMatches("(?<!ab)$", "", "ba", 2)
+    assertNotMatches("(?<!ab)$", "", "ab", 2)
   }
 
   test("Interpreter.run: captures") {
