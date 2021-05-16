@@ -1,3 +1,19 @@
+# dev
+
+Changes:
+
+- Move unicode related types into new `recheck-unicode` module ([#77](https://github.com/MakeNowJust-Labo/recheck/pull/77))
+- Move `RegExp` parser into new `recheck-parse` module ([#78](https://github.com/MakeNowJust-Labo/recheck/pull/78))
+- Move JS binding into new `recheck-js` module ([#79](https://github.com/MakeNowJust-Labo/recheck/pull/79))
+
+Fixes:
+
+- Update `sourcecode` to 0.2.7 ([#72](https://github.com/MakeNowJust-Labo/recheck/pull/72))
+- Update `sbt` to 1.5.2 ([#73](https://github.com/MakeNowJust-Labo/recheck/pull/73))
+- Update `mdoc`, `sbt-mdoc` to 2.2.21 ([#74](https://github.com/MakeNowJust-Labo/recheck/pull/74))
+- Update `munit` to 0.7.26 ([#75](https://github.com/MakeNowJust-Labo/recheck/pull/75))
+- Update `sbt-scoverage` to 1.8.0 ([#76](https://github.com/MakeNowJust-Labo/recheck/pull/76))
+
 # 3.1.0 (2021-05-14)
 
 Changes:
