@@ -7,11 +7,11 @@ import scala.util.Random
 
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.Context
-import codes.quine.labo.recheck.data.UString
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Diagnostics
 import codes.quine.labo.recheck.diagnostics.Hotspot
+import codes.quine.labo.recheck.unicode.UString
 
 /** DiagnosticsJS is a JS wrapper for Diagnostics. */
 trait DiagnosticsJS extends js.Object {
