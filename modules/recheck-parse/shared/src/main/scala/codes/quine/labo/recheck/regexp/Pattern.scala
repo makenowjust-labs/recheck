@@ -1,5 +1,4 @@
-package codes.quine.labo.recheck
-package regexp
+package codes.quine.labo.recheck.regexp
 
 import scala.collection.mutable
 
@@ -85,7 +84,7 @@ object Pattern {
   /** Group is a grouping of a pattern. (e.g. `/(?:x)/`) */
   final case class Group(child: Node) extends Node
 
-  /** Star is a zero-or-more repetition pattern. (e.g. `/x*&#47; or `/x*?/`) */
+  /** Star is a zero-or-more repetition pattern. (e.g. <code>/x*&#47;</code> or <code>/x*?/</code>) */
   final case class Star(nonGreedy: Boolean, child: Node) extends Node
 
   /** Plus is a one-or-more repetition pattern. (e.g. `/x+/` or `/x+?/`) */

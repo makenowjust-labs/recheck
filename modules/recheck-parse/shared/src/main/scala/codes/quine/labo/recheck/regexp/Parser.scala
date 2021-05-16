@@ -1,16 +1,10 @@
-package codes.quine.labo.recheck
-package regexp
+package codes.quine.labo.recheck.regexp
 
 import scala.annotation.switch
-import scala.util.Failure
-import scala.util.Success
-import scala.util.Try
 
 import fastparse.NoWhitespace._
 import fastparse._
 
-import codes.quine.labo.recheck.common.Context
-import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.regexp.Pattern.ClassNode
 import codes.quine.labo.recheck.regexp.Pattern.FlagSet
 import codes.quine.labo.recheck.regexp.Pattern.Node
@@ -20,80 +14,80 @@ import codes.quine.labo.recheck.unicode.UChar
 /** ECMA-262 RegExp parser implementation. */
 object Parser {
 
-  /** Parses ECMA-262 RegExp string. */
-  def parse(source: String, flags: String, additional: Boolean = true)(implicit ctx: Context): Try[Pattern] =
-    ctx.interrupt {
-      for {
-        flagSet <- parseFlagSet(flags)
-        (hasNamedCapture, captures) = preprocessParen(source)
-        result =
-          fastparse.parse(source, new Parser(flagSet.unicode, additional, hasNamedCapture, captures).Source(_))
-        node <- result match {
-          case Parsed.Success(node, _) => Success(node)
-          case fail: Parsed.Failure    => Failure(new InvalidRegExpException(s"parsing failure at ${fail.index}"))
-        }
-      } yield Pattern(assignCaptureIndex(node), flagSet)
-    }
+  /** Parses ECMA-262 RegExp string.
+    *
+    * When parsing is failed, it returns `Left` value with an error message.
+    * Or, it returns `Right` value with the result pattern.
+    */
+  def parse(source: String, flags: String, additional: Boolean = true): Either[String, Pattern] =
+    for {
+      flagSet <- parseFlagSet(flags)
+      (hasNamedCapture, captures) = preprocessParen(source)
+      result =
+        fastparse.parse(source, new Parser(flagSet.unicode, additional, hasNamedCapture, captures).Source(_))
+      node <- result match {
+        case Parsed.Success(node, _) => Right(node)
+        case fail: Parsed.Failure    => Left(s"parsing failure at ${fail.index}")
+      }
+    } yield Pattern(assignCaptureIndex(node), flagSet)
 
   /** Parses a flag set string. */
-  private[regexp] def parseFlagSet(s: String)(implicit ctx: Context): Try[FlagSet] =
-    ctx.interrupt {
-      val cs = s.toList
-      // A flag set accepts neither duplicated character nor unknown character.
-      if (cs.distinct != cs) Failure(new InvalidRegExpException("duplicated flag"))
-      else if (!cs.forall("gimsuy".contains(_))) Failure(new InvalidRegExpException("unknown flag"))
-      else
-        Success(
-          FlagSet(
-            cs.contains('g'),
-            cs.contains('i'),
-            cs.contains('m'),
-            cs.contains('s'),
-            cs.contains('u'),
-            cs.contains('y')
-          )
+  private[regexp] def parseFlagSet(s: String): Either[String, FlagSet] = {
+    val cs = s.toList
+    // A flag set accepts neither duplicated character nor unknown character.
+    if (cs.distinct != cs) Left("duplicated flag")
+    else if (!cs.forall("gimsuy".contains(_))) Left("unknown flag")
+    else
+      Right(
+        FlagSet(
+          cs.contains('g'),
+          cs.contains('i'),
+          cs.contains('m'),
+          cs.contains('s'),
+          cs.contains('u'),
+          cs.contains('y')
         )
-    }
+      )
+  }
 
   /** Counts capture parentheses in the source and determine the source contains named capture.
     *
     * The first value of result is a flag whether the source contains named capture or not,
     * and the second value is capture parentheses number in the source.
     */
-  private[regexp] def preprocessParen(s: String)(implicit ctx: Context): (Boolean, Int) =
-    ctx.interrupt {
-      var i = 0
-      var hasNamedCapture = false
-      var captures = 0
-      while (i < s.length) {
-        (s.charAt(i): @switch) match {
-          case '(' =>
-            if (s.startsWith("(?", i)) {
-              // A named capture is started with "(?<",
-              // but it should not start with "(?<=" or "(?<!" dut to look-behind assertion.
-              if (s.startsWith("(?<", i) && !s.startsWith("(?<=", i) && !s.startsWith("(?<!", i)) {
-                hasNamedCapture = true
-                captures += 1
-              }
-            } else {
+  private[regexp] def preprocessParen(s: String): (Boolean, Int) = {
+    var i = 0
+    var hasNamedCapture = false
+    var captures = 0
+    while (i < s.length) {
+      (s.charAt(i): @switch) match {
+        case '(' =>
+          if (s.startsWith("(?", i)) {
+            // A named capture is started with "(?<",
+            // but it should not start with "(?<=" or "(?<!" dut to look-behind assertion.
+            if (s.startsWith("(?<", i) && !s.startsWith("(?<=", i) && !s.startsWith("(?<!", i)) {
+              hasNamedCapture = true
               captures += 1
             }
-            i += 1
-          // Skips character class, escaped character and ordinal character.
-          case '[' =>
-            i += 1
-            while (i < s.length && s.charAt(i) != ']') {
-              (s.charAt(i): @switch) match {
-                case '\\' => i += 2
-                case _    => i += 1
-              }
+          } else {
+            captures += 1
+          }
+          i += 1
+        // Skips character class, escaped character and ordinal character.
+        case '[' =>
+          i += 1
+          while (i < s.length && s.charAt(i) != ']') {
+            (s.charAt(i): @switch) match {
+              case '\\' => i += 2
+              case _    => i += 1
             }
-          case '\\' => i += 2
-          case _    => i += 1
-        }
+          }
+        case '\\' => i += 2
+        case _    => i += 1
       }
-      (hasNamedCapture, captures)
     }
+    (hasNamedCapture, captures)
+  }
 
   /** Assigns capture's index in left-to-right ordering. */
   private[regexp] def assignCaptureIndex(node: Node): Node = {

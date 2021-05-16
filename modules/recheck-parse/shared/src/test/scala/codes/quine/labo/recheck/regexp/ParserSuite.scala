@@ -1,19 +1,10 @@
-package codes.quine.labo.recheck
-package regexp
-
-import scala.util.Success
-
+package codes.quine.labo.recheck.regexp
 import fastparse._
 
-import codes.quine.labo.recheck.common.Context
-import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.regexp.Pattern._
 import codes.quine.labo.recheck.unicode.UChar
 
 class ParserSuite extends munit.FunSuite {
-
-  /** A default context. */
-  implicit def ctx: Context = Context()
 
   /** A default parser instance for testing. */
   def P = new Parser(false, false, false, 0)
@@ -28,13 +19,13 @@ class ParserSuite extends munit.FunSuite {
   def PAN = new Parser(false, true, true, 1)
 
   test("Parser.parse") {
-    interceptMessage[InvalidRegExpException]("unknown flag")(Parser.parse("", "#", false).get)
-    interceptMessage[InvalidRegExpException]("parsing failure at 0")(Parser.parse("{", "", false).get)
-    interceptMessage[InvalidRegExpException]("parsing failure at 0")(Parser.parse("{1}", "").get)
-    assertEquals(Parser.parse(".", "g"), Success(Pattern(Dot(), FlagSet(true, false, false, false, false, false))))
+    assertEquals(Parser.parse("", "#", false), Left("unknown flag"))
+    assertEquals(Parser.parse("{", "", false), Left("parsing failure at 0"))
+    assertEquals(Parser.parse("{1}", ""), Left("parsing failure at 0"))
+    assertEquals(Parser.parse(".", "g"), Right(Pattern(Dot(), FlagSet(true, false, false, false, false, false))))
     assertEquals(
       Parser.parse("(.)(?<x>.)", ""),
-      Success(
+      Right(
         Pattern(
           Sequence(Seq(Capture(1, Dot()), NamedCapture(2, "x", Dot()))),
           FlagSet(false, false, false, false, false, false)
@@ -43,7 +34,7 @@ class ParserSuite extends munit.FunSuite {
     )
     assertEquals(
       Parser.parse("((.).)", ""),
-      Success(
+      Right(
         Pattern(
           Capture(1, Sequence(Seq(Capture(2, Dot()), Dot()))),
           FlagSet(false, false, false, false, false, false)
@@ -53,10 +44,10 @@ class ParserSuite extends munit.FunSuite {
   }
 
   test("Parser.parseFlagSet") {
-    interceptMessage[InvalidRegExpException]("duplicated flag")(Parser.parseFlagSet("gg").get)
-    interceptMessage[InvalidRegExpException]("unknown flag")(Parser.parseFlagSet("#").get)
-    assertEquals(Parser.parseFlagSet(""), Success(FlagSet(false, false, false, false, false, false)))
-    assertEquals(Parser.parseFlagSet("gimsuy"), Success(FlagSet(true, true, true, true, true, true)))
+    assertEquals(Parser.parseFlagSet("gg"), Left("duplicated flag"))
+    assertEquals(Parser.parseFlagSet("#"), Left("unknown flag"))
+    assertEquals(Parser.parseFlagSet(""), Right(FlagSet(false, false, false, false, false, false)))
+    assertEquals(Parser.parseFlagSet("gimsuy"), Right(FlagSet(true, true, true, true, true, true)))
   }
 
   test("Parser.preprocessParen") {

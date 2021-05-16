@@ -1,9 +1,12 @@
 package codes.quine.labo.recheck
 package fuzz
 
+import scala.util.Failure
 import scala.util.Random
+import scala.util.Success
 
 import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.regexp.Parser
 
 class FuzzCheckerSuite extends munit.FunSuite {
@@ -17,7 +20,10 @@ class FuzzCheckerSuite extends munit.FunSuite {
   /** Tests the pattern is vulnerable or not. */
   def check(source: String, flags: String, quick: Boolean = false): Boolean = {
     val result = for {
-      pattern <- Parser.parse(source, flags)
+      pattern <- Parser.parse(source, flags) match {
+        case Right(pattern) => Success(pattern)
+        case Left(message)  => Failure(new InvalidRegExpException(message))
+      }
       fuzz <- FuzzProgram.from(pattern)
     } yield FuzzChecker.check(
       fuzz,
@@ -58,7 +64,10 @@ class FuzzCheckerSuite extends munit.FunSuite {
     // The checker can find an attack string on seeding phase.
     assert {
       val result = for {
-        pattern <- Parser.parse("^(a?){50}a{50}$", "")
+        pattern <- Parser.parse("^(a?){50}a{50}$", "") match {
+          case Right(pattern) => Success(pattern)
+          case Left(message)  => Failure(new InvalidRegExpException(message))
+        }
         fuzz <- FuzzProgram.from(pattern)
       } yield FuzzChecker.check(fuzz, random0, seedLimit = 10000, incubationLimit = 10000, attackLimit = 10000)
       result.get.isDefined
@@ -67,7 +76,10 @@ class FuzzCheckerSuite extends munit.FunSuite {
     // The checker cannot find too small attack string.
     assert {
       val result = for {
-        pattern <- Parser.parse("^(a|a)*$", "")
+        pattern <- Parser.parse("^(a|a)*$", "") match {
+          case Right(pattern) => Success(pattern)
+          case Left(message)  => Failure(new InvalidRegExpException(message))
+        }
         fuzz <- FuzzProgram.from(pattern)
       } yield FuzzChecker.check(fuzz, random0, incubationLimit = 100, attackLimit = 100, maxAttackSize = 5)
       result.get.isEmpty

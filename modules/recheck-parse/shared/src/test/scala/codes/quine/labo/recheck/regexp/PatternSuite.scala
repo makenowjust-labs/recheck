@@ -1,5 +1,4 @@
-package codes.quine.labo.recheck
-package regexp
+package codes.quine.labo.recheck.regexp
 
 import codes.quine.labo.recheck.regexp.Pattern._
 

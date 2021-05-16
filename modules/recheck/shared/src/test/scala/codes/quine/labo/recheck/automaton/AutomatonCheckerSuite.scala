@@ -1,11 +1,13 @@
 package codes.quine.labo.recheck
 package automaton
 
+import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
 import codes.quine.labo.recheck.automaton.Complexity._
 import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.diagnostics.Hotspot
 import codes.quine.labo.recheck.diagnostics.Hotspot._
 import codes.quine.labo.recheck.regexp.Parser
@@ -19,7 +21,10 @@ class AutomatonCheckerSuite extends munit.FunSuite {
   /** Runs a checker against the RegExp. */
   def check(source: String, flags: String): Try[Complexity[IChar]] =
     for {
-      pattern <- Parser.parse(source, flags)
+      pattern <- Parser.parse(source, flags) match {
+        case Right(pattern) => Success(pattern)
+        case Left(message)  => Failure(new InvalidRegExpException(message))
+      }
       epsNFA <- EpsNFABuilder.compile(pattern)
       nfa = epsNFA.toOrderedNFA.rename
       result <- Try(AutomatonChecker.check(nfa))
