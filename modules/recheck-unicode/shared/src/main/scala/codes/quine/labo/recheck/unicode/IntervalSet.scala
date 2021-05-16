@@ -9,7 +9,7 @@ import codes.quine.labo.recheck.unicode.IntervalSet._
   * [[intervals]] is a sequence of discrete intervals sorted by start value.
   * Each interval is represented by a pair of values `[start, end)`.
   */
-private[unicode] final case class IntervalSet[@specialized A](intervals: IndexedSeq[(A, A)]) {
+final case class IntervalSet[@specialized A](intervals: IndexedSeq[(A, A)]) {
 
   /** Checks whether this interval set is empty or not. */
   def isEmpty: Boolean = intervals.isEmpty
@@ -83,7 +83,7 @@ private[unicode] final case class IntervalSet[@specialized A](intervals: Indexed
 }
 
 /** IntervalSet utilities. */
-private[unicode] object IntervalSet {
+object IntervalSet {
 
   /** Partition is a result type of [[IntervalSet#partition]]. */
   final case class Partition[A](intersection: A, diffThat: A, diffThis: A)
