@@ -43,7 +43,7 @@ lazy val root = project
     mdocOut := baseDirectory.value / "site" / "content"
   )
   .enablePlugins(MdocPlugin)
-  .aggregate(recheckJVM, recheckJS)
+  .aggregate(recheckJVM, recheckJS, unicodeJVM, unicodeJS)
   .dependsOn(recheckJVM)
 
 lazy val recheck = crossProject(JVMPlatform, JSPlatform)

@@ -17,6 +17,7 @@ import codes.quine.labo.recheck.fuzz.FuzzChecker
 import codes.quine.labo.recheck.fuzz.FuzzProgram
 import codes.quine.labo.recheck.regexp.Parser
 import codes.quine.labo.recheck.regexp.Pattern
+import codes.quine.labo.recheck.regexp.PatternExtensions._
 import codes.quine.labo.recheck.unicode.UChar
 
 /** ReDoS is a ReDoS checker frontend. */
