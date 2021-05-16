@@ -11,13 +11,13 @@ import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.ReDoSException
 import codes.quine.labo.recheck.common.UnsupportedException
-import codes.quine.labo.recheck.unicode.UChar
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.Diagnostics
 import codes.quine.labo.recheck.fuzz.FuzzChecker
 import codes.quine.labo.recheck.fuzz.FuzzProgram
 import codes.quine.labo.recheck.regexp.Parser
 import codes.quine.labo.recheck.regexp.Pattern
+import codes.quine.labo.recheck.unicode.UChar
 
 /** ReDoS is a ReDoS checker frontend. */
 object ReDoS {

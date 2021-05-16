@@ -8,10 +8,10 @@ import codes.quine.labo.recheck.automaton.EpsNFA._
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.common.UnsupportedException
-import codes.quine.labo.recheck.unicode.IChar
-import codes.quine.labo.recheck.unicode.ICharSet
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.regexp.Pattern._
+import codes.quine.labo.recheck.unicode.IChar
+import codes.quine.labo.recheck.unicode.ICharSet
 
 /** ECMA-262 RegExp to ε-NFA Compiler. */
 object EpsNFABuilder {

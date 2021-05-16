@@ -3,9 +3,9 @@ package codes.quine.labo.recheck.fuzz
 import scala.util.Try
 
 import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.unicode.ICharSet
 import codes.quine.labo.recheck.unicode.UString
-import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.vm.Program
 import codes.quine.labo.recheck.vm.ProgramBuilder
 

@@ -5,10 +5,10 @@ import scala.util.Try
 
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.InvalidRegExpException
-import codes.quine.labo.recheck.unicode.IChar
-import codes.quine.labo.recheck.unicode.UChar
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.regexp.Pattern._
+import codes.quine.labo.recheck.unicode.IChar
+import codes.quine.labo.recheck.unicode.UChar
 import codes.quine.labo.recheck.vm.Inst.AssertKind
 import codes.quine.labo.recheck.vm.Inst.ReadKind
 import codes.quine.labo.recheck.vm.Program.Meta
