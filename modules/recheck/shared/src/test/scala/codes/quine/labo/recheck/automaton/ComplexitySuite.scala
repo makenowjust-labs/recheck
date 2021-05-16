@@ -2,7 +2,7 @@ package codes.quine.labo.recheck
 package automaton
 
 import codes.quine.labo.recheck.automaton.Complexity._
-import codes.quine.labo.recheck.data.UChar
+import codes.quine.labo.recheck.unicode.UChar
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 
 class ComplexitySuite extends munit.FunSuite {

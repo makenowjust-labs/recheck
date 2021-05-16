@@ -11,8 +11,8 @@ import fastparse._
 
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.InvalidRegExpException
-import codes.quine.labo.recheck.data.IChar
-import codes.quine.labo.recheck.data.UChar
+import codes.quine.labo.recheck.unicode.IChar
+import codes.quine.labo.recheck.unicode.UChar
 import codes.quine.labo.recheck.regexp.Pattern.ClassNode
 import codes.quine.labo.recheck.regexp.Pattern.FlagSet
 import codes.quine.labo.recheck.regexp.Pattern.Node

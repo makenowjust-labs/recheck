@@ -1,8 +1,8 @@
 package codes.quine.labo.recheck
 package automaton
 
-import codes.quine.labo.recheck.data.UChar
-import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.unicode.UChar
+import codes.quine.labo.recheck.unicode.UString
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 
 /** Witness is a witness to the ReDoS attack, which is a pump string

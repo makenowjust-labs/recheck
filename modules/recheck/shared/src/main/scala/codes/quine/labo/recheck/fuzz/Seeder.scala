@@ -1,11 +1,12 @@
 package codes.quine.labo.recheck
 package fuzz
+
 import scala.collection.mutable
 
 import codes.quine.labo.recheck.common.Context
-import codes.quine.labo.recheck.data.IChar
-import codes.quine.labo.recheck.data.ICharSet
-import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.unicode.IChar
+import codes.quine.labo.recheck.unicode.ICharSet
+import codes.quine.labo.recheck.unicode.UString
 import codes.quine.labo.recheck.vm.Inst.ReadKind
 import codes.quine.labo.recheck.vm.Interpreter
 import codes.quine.labo.recheck.vm.Interpreter.CoverageItem

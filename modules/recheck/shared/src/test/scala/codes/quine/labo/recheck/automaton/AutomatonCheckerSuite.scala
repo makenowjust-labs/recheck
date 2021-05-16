@@ -6,7 +6,7 @@ import scala.util.Try
 
 import codes.quine.labo.recheck.automaton.Complexity._
 import codes.quine.labo.recheck.common.Context
-import codes.quine.labo.recheck.data.IChar
+import codes.quine.labo.recheck.unicode.IChar
 import codes.quine.labo.recheck.diagnostics.Hotspot
 import codes.quine.labo.recheck.diagnostics.Hotspot._
 import codes.quine.labo.recheck.regexp.Parser

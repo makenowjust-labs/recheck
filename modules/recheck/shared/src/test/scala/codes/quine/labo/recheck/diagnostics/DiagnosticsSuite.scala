@@ -5,7 +5,7 @@ import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.common.TimeoutException
 import codes.quine.labo.recheck.common.UnsupportedException
-import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.unicode.UString
 
 class DiagnosticsSuite extends munit.FunSuite {
   test("Diagnostics#toString") {

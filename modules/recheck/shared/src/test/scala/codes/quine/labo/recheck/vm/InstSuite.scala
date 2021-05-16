@@ -1,6 +1,6 @@
 package codes.quine.labo.recheck.vm
 
-import codes.quine.labo.recheck.data.IChar
+import codes.quine.labo.recheck.unicode.IChar
 import codes.quine.labo.recheck.vm.Inst.AssertKind
 import codes.quine.labo.recheck.vm.Inst.ReadKind
 

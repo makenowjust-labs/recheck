@@ -1,7 +1,7 @@
 package codes.quine.labo.recheck.vm
 
 import codes.quine.labo.recheck.common.Context
-import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.unicode.UString
 import codes.quine.labo.recheck.regexp.Parser
 import codes.quine.labo.recheck.vm.Inst.ReadKind
 import codes.quine.labo.recheck.vm.Interpreter.CoverageItem

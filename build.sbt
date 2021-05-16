@@ -60,6 +60,7 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labo.recheck.data._
       |import codes.quine.labo.recheck.fuzz._
       |import codes.quine.labo.recheck.regexp._
+      |import codes.quine.labo.recheck.unicode._
       |import codes.quine.labo.recheck.util._
       |import codes.quine.labo.recheck.vm._
       |
@@ -93,29 +94,6 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
     // Dependencies:
     libraryDependencies += "com.lihaoyi" %%% "fastparse" % "2.3.2",
     libraryDependencies += "com.lihaoyi" %%% "sourcecode" % "0.2.7",
-    // Generators:
-    {
-      val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
-      Seq(
-        Compile / sourceGenerators += generateUnicodeData.taskValue,
-        generateUnicodeData / fileInputs += baseDirectory.value.toGlob / ".." / ".." / ".." / "project" / "*DataGen.scala",
-        generateUnicodeData := {
-          val gens = Map[String, UnicodeDataGen](
-            "CaseMapDataGen.scala" -> CaseMapDataGen,
-            "PropertyDataGen.scala" -> PropertyDataGen
-          )
-          val pkg = "codes.quine.labo.recheck.data.unicode"
-          val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labo" / "recheck" / "data" / "unicode"
-          val changes = generateUnicodeData.inputFileChanges
-          val updatedPaths = changes.created ++ changes.modified
-          for (path <- updatedPaths) {
-            val fileName = path.getFileName.toString
-            gens.get(fileName).foreach(_.gen(pkg, dir))
-          }
-          gens.map(_._2.file(dir)).toSeq
-        }
-      )
-    },
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.26" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -124,6 +102,7 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
+  .dependsOn(unicode)
 
 lazy val recheckJVM = recheck.jvm
 lazy val recheckJS = recheck.js

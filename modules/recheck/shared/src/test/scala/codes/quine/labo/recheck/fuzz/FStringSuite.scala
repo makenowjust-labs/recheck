@@ -1,7 +1,7 @@
 package codes.quine.labo.recheck
 package fuzz
 
-import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.unicode.UString
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.fuzz.FString._
 

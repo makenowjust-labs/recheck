@@ -5,10 +5,10 @@ import scala.util.Success
 
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.InvalidRegExpException
-import codes.quine.labo.recheck.data.IChar
-import codes.quine.labo.recheck.data.ICharSet
-import codes.quine.labo.recheck.data.ICharSet.CharKind
-import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.unicode.IChar
+import codes.quine.labo.recheck.unicode.ICharSet
+import codes.quine.labo.recheck.unicode.ICharSet.CharKind
+import codes.quine.labo.recheck.unicode.UString
 import codes.quine.labo.recheck.regexp.Pattern._
 
 class PatternSuite extends munit.FunSuite {

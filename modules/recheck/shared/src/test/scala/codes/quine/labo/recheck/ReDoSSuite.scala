@@ -7,7 +7,7 @@ import scala.util.Success
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.InvalidRegExpException
-import codes.quine.labo.recheck.data.UString
+import codes.quine.labo.recheck.unicode.UString
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Diagnostics
