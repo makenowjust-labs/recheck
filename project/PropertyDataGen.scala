@@ -1,5 +1,3 @@
-import scala.collection.mutable
-
 import com.ibm.icu.lang.UCharacter
 import com.ibm.icu.lang.UCharacterEnums.ECharacterCategory
 import com.ibm.icu.lang.UProperty
@@ -263,10 +261,10 @@ object PropertyDataGen extends UnicodeDataGen {
   def file(dir: File): File = dir / "PropertyData.scala"
 
   /** A generated source code. */
-  def source: String = {
-    val sb = new mutable.StringBuilder
+  def source(pkg: String): String = {
+    val sb = new StringBuilder
 
-    sb.append("package codes.quine.labo.recheck.data.unicode\n")
+    sb.append(s"package $pkg\n")
     sb.append("\n")
     sb.append("private[unicode] object PropertyData {\n")
 

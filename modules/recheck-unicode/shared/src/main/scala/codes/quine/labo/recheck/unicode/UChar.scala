@@ -1,4 +1,4 @@
-package codes.quine.labo.recheck.data.unicode
+package codes.quine.labo.recheck.unicode
 
 import scala.language.implicitConversions
 
@@ -52,7 +52,7 @@ object UChar {
   /** A implicit conversion from the char to a code point. */
   implicit def charToUChar(c: Char): UChar = UChar(c.toInt)
 
-  /** Canonicalizes the code point. */
+  /** Does canonicalization to the code point. */
   def canonicalize(c: UChar, unicode: Boolean): UChar = {
     val convs = if (unicode) CaseMap.Fold else CaseMap.Upper
     convs.find(_.domain.contains(c)) match {

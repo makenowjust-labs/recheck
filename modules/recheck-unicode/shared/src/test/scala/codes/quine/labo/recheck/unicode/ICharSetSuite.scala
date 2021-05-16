@@ -1,7 +1,6 @@
-package codes.quine.labo.recheck.data
+package codes.quine.labo.recheck.unicode
 
-import codes.quine.labo.recheck.data.ICharSet.CharKind
-import codes.quine.labo.recheck.data.unicode.IntervalSet
+import codes.quine.labo.recheck.unicode.ICharSet._
 
 class ICharSetSuite extends munit.FunSuite {
   test("ICharSet.any") {

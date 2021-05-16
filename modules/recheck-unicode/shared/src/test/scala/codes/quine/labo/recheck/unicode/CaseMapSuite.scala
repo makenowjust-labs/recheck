@@ -1,4 +1,4 @@
-package codes.quine.labo.recheck.data.unicode
+package codes.quine.labo.recheck.unicode
 
 class CaseMapSuite extends munit.FunSuite {
   test("CaseMap.Upper") {

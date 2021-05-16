@@ -1,7 +1,7 @@
 package codes.quine.labo.recheck.vm
 
-import codes.quine.labo.recheck.data.IChar
-import codes.quine.labo.recheck.data.UChar
+import codes.quine.labo.recheck.unicode.IChar
+import codes.quine.labo.recheck.unicode.UChar
 
 /** Inst is an instruction. */
 sealed abstract class Inst {

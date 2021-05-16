@@ -1,10 +1,11 @@
 package codes.quine.labo.recheck
 package fuzz
+
 import codes.quine.labo.recheck.common.Context
-import codes.quine.labo.recheck.data.IChar
-import codes.quine.labo.recheck.data.UString
 import codes.quine.labo.recheck.fuzz.Seeder._
 import codes.quine.labo.recheck.regexp.Parser
+import codes.quine.labo.recheck.unicode.IChar
+import codes.quine.labo.recheck.unicode.UString
 
 class SeederSuite extends munit.FunSuite {
 

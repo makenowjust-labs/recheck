@@ -1,7 +1,7 @@
-package codes.quine.labo.recheck.data
+package codes.quine.labo.recheck.unicode
 
-import codes.quine.labo.recheck.data.ICharSet.CharKind
-import codes.quine.labo.recheck.data.unicode.IntervalSet._
+import codes.quine.labo.recheck.unicode.ICharSet._
+import codes.quine.labo.recheck.unicode.IntervalSet._
 
 /** ICharSet is a set of pairs of an interval character and a character kind. */
 final case class ICharSet(pairs: Seq[(IChar, CharKind)]) {

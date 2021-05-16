@@ -6,9 +6,9 @@ import scala.collection.mutable
 import codes.quine.labo.recheck.automaton.EpsNFA._
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.UnsupportedException
-import codes.quine.labo.recheck.data.IChar
-import codes.quine.labo.recheck.data.ICharSet
-import codes.quine.labo.recheck.data.ICharSet.CharKind
+import codes.quine.labo.recheck.unicode.IChar
+import codes.quine.labo.recheck.unicode.ICharSet
+import codes.quine.labo.recheck.unicode.ICharSet.CharKind
 import codes.quine.labo.recheck.util.GraphvizUtil.escape
 
 /** EpsNFA is an ordered ε-NFA on unicode code points. */

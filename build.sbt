@@ -60,6 +60,7 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labo.recheck.data._
       |import codes.quine.labo.recheck.fuzz._
       |import codes.quine.labo.recheck.regexp._
+      |import codes.quine.labo.recheck.unicode._
       |import codes.quine.labo.recheck.util._
       |import codes.quine.labo.recheck.vm._
       |
@@ -93,6 +94,35 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
     // Dependencies:
     libraryDependencies += "com.lihaoyi" %%% "fastparse" % "2.3.2",
     libraryDependencies += "com.lihaoyi" %%% "sourcecode" % "0.2.7",
+    // Settings for test:
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.26" % Test,
+    testFrameworks += new TestFramework("munit.Framework")
+  )
+  .jsSettings(
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
+    Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
+  )
+  .dependsOn(unicode)
+
+lazy val recheckJVM = recheck.jvm
+lazy val recheckJS = recheck.js
+
+lazy val unicode = crossProject(JVMPlatform, JSPlatform)
+  .in(file("modules/recheck-unicode"))
+  .settings(
+    name := "recheck-unicode",
+    console / initialCommands := """
+      |import codes.quine.labo.recheck.unicode._
+      |""".stripMargin,
+    Compile / console / scalacOptions -= "-Wunused",
+    Test / console / scalacOptions -= "-Wunused",
+    // Settings for scaladoc:
+    Compile / doc / scalacOptions += "-diagrams",
+    // Set URL mapping of scala standard API for Scaladoc.
+    apiMappings ++= scalaInstance.value.libraryJars
+      .filter(file => file.getName.startsWith("scala-library") && file.getName.endsWith(".jar"))
+      .map(_ -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"))
+      .toMap,
     // Generators:
     {
       val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
@@ -104,12 +134,13 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
             "CaseMapDataGen.scala" -> CaseMapDataGen,
             "PropertyDataGen.scala" -> PropertyDataGen
           )
-          val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labo" / "recheck" / "data" / "unicode"
+          val pkg = "codes.quine.labo.recheck.unicode"
+          val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labo" / "recheck" / "unicode"
           val changes = generateUnicodeData.inputFileChanges
           val updatedPaths = changes.created ++ changes.modified
           for (path <- updatedPaths) {
             val fileName = path.getFileName.toString
-            gens.get(fileName).foreach(_.gen(dir))
+            gens.get(fileName).foreach(_.gen(pkg, dir))
           }
           gens.map(_._2.file(dir)).toSeq
         }
@@ -124,5 +155,5 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
 
-lazy val recheckJVM = recheck.jvm
-lazy val recheckJS = recheck.js
+lazy val unicodeJVM = unicode.jvm
+lazy val unicodeJS = unicode.js

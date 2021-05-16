@@ -1,4 +1,4 @@
-package codes.quine.labo.recheck.data
+package codes.quine.labo.recheck.unicode
 
 class UStringSuite extends munit.FunSuite {
   test("UString,empty") {

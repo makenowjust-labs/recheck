@@ -1,15 +1,15 @@
-package codes.quine.labo.recheck.data.unicode
+package codes.quine.labo.recheck.unicode
 
 import scala.math.Ordering.Implicits._
 
-import codes.quine.labo.recheck.data.unicode.IntervalSet._
+import codes.quine.labo.recheck.unicode.IntervalSet._
 
 /** IntervalSet is set of intervals.
   *
   * [[intervals]] is a sequence of discrete intervals sorted by start value.
   * Each interval is represented by a pair of values `[start, end)`.
   */
-private[data] final case class IntervalSet[@specialized A](intervals: IndexedSeq[(A, A)]) {
+final case class IntervalSet[@specialized A](intervals: IndexedSeq[(A, A)]) {
 
   /** Checks whether this interval set is empty or not. */
   def isEmpty: Boolean = intervals.isEmpty
@@ -83,7 +83,7 @@ private[data] final case class IntervalSet[@specialized A](intervals: IndexedSeq
 }
 
 /** IntervalSet utilities. */
-private[data] object IntervalSet {
+object IntervalSet {
 
   /** Partition is a result type of [[IntervalSet#partition]]. */
   final case class Partition[A](intersection: A, diffThat: A, diffThis: A)

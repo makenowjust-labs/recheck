@@ -1,4 +1,4 @@
-package codes.quine.labo.recheck.data
+package codes.quine.labo.recheck.unicode
 
 /** UString is a wrapper of a string with Unicode manipulation. */
 final case class UString(asString: String) extends AnyVal {

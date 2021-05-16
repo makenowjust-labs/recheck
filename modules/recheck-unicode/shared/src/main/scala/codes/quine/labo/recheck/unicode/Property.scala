@@ -1,7 +1,7 @@
-package codes.quine.labo.recheck.data.unicode
+package codes.quine.labo.recheck.unicode
 
 /** Utilities for Unicode properties. */
-private[data] object Property {
+private[unicode] object Property {
 
   /** A map from non-binary property alias to canonical name.
     *

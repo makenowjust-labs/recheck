@@ -1,4 +1,4 @@
-package codes.quine.labo.recheck.data.unicode
+package codes.quine.labo.recheck.unicode
 
 class PropertySuite extends munit.FunSuite {
   test("Property.binary") {

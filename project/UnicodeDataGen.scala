@@ -10,9 +10,9 @@ trait UnicodeDataGen {
   def file(dir: File): File
 
   /** A generated source code. */
-  def source: String
+  def source(pkg: String): String
 
   /** Run this generator. */
-  def gen(dir: File): Unit =
-    IO.write(file(dir), source)
+  def gen(pkg: String, dir: File): Unit =
+    IO.write(file(dir), source(pkg))
 }

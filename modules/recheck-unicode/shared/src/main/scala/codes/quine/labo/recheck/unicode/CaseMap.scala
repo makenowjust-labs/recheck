@@ -1,10 +1,10 @@
-package codes.quine.labo.recheck.data.unicode
+package codes.quine.labo.recheck.unicode
 
 /** Utilities for Unicode case mapping/folding.
   *
   * The methods defined here are designed for implementing ignore-case of regexp.
   */
-private[data] object CaseMap {
+private[unicode] object CaseMap {
 
   /** Conversion is a pair of a conversion domain and a conversion offset. */
   final case class Conversion(domain: IntervalSet[UChar], offset: Int)
