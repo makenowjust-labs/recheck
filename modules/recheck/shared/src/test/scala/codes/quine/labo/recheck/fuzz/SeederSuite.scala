@@ -1,7 +1,11 @@
 package codes.quine.labo.recheck
 package fuzz
 
+import scala.util.Failure
+import scala.util.Success
+
 import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.fuzz.Seeder._
 import codes.quine.labo.recheck.regexp.Parser
 import codes.quine.labo.recheck.unicode.IChar
@@ -15,7 +19,10 @@ class SeederSuite extends munit.FunSuite {
   test("Seeder.seed") {
     def seed(source: String, flags: String): Set[String] = {
       val result = for {
-        pattern <- Parser.parse(source, flags)
+        pattern <- Parser.parse(source, flags) match {
+          case Right(pattern) => Success(pattern)
+          case Left(message)  => Failure(new InvalidRegExpException(message))
+        }
         fuzz <- FuzzProgram.from(pattern)
       } yield Seeder.seed(fuzz)
       result.get.map(_.toString)

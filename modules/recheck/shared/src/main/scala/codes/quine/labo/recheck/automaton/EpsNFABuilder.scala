@@ -10,6 +10,7 @@ import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.common.UnsupportedException
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.regexp.Pattern._
+import codes.quine.labo.recheck.regexp.PatternExtensions._
 import codes.quine.labo.recheck.unicode.IChar
 import codes.quine.labo.recheck.unicode.ICharSet
 

@@ -43,7 +43,7 @@ lazy val root = project
     mdocOut := baseDirectory.value / "site" / "content"
   )
   .enablePlugins(MdocPlugin)
-  .aggregate(recheckJVM, recheckJS)
+  .aggregate(recheckJVM, recheckJS, unicodeJVM, unicodeJS, parseJVM, parseJS)
   .dependsOn(recheckJVM)
 
 lazy val recheck = crossProject(JVMPlatform, JSPlatform)
@@ -102,7 +102,7 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
-  .dependsOn(unicode)
+  .dependsOn(unicode, parse)
 
 lazy val recheckJVM = recheck.jvm
 lazy val recheckJS = recheck.js
@@ -157,3 +157,34 @@ lazy val unicode = crossProject(JVMPlatform, JSPlatform)
 
 lazy val unicodeJVM = unicode.jvm
 lazy val unicodeJS = unicode.js
+
+lazy val parse = crossProject(JVMPlatform, JSPlatform)
+  .in(file("modules/recheck-parse"))
+  .settings(
+    name := "recheck-parse",
+    console / initialCommands := """
+      |import codes.quine.labo.recheck.regexp._
+      |""".stripMargin,
+    Compile / console / scalacOptions -= "-Wunused",
+    Test / console / scalacOptions -= "-Wunused",
+    // Settings for scaladoc:
+    Compile / doc / scalacOptions += "-diagrams",
+    // Set URL mapping of scala standard API for Scaladoc.
+    apiMappings ++= scalaInstance.value.libraryJars
+      .filter(file => file.getName.startsWith("scala-library") && file.getName.endsWith(".jar"))
+      .map(_ -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"))
+      .toMap,
+    // Dependencies:
+    libraryDependencies += "com.lihaoyi" %%% "fastparse" % "2.3.2",
+    // Settings for test:
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.26" % Test,
+    testFrameworks += new TestFramework("munit.Framework")
+  )
+  .jsSettings(
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
+    Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
+  )
+  .dependsOn(unicode)
+
+lazy val parseJVM = parse.jvm
+lazy val parseJS = parse.js

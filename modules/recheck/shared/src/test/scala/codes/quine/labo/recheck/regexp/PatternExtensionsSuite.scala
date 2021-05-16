@@ -1,22 +1,22 @@
-package codes.quine.labo.recheck
-package regexp
+package codes.quine.labo.recheck.regexp
 
 import scala.util.Success
 
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.regexp.Pattern._
+import codes.quine.labo.recheck.regexp.PatternExtensions._
 import codes.quine.labo.recheck.unicode.IChar
 import codes.quine.labo.recheck.unicode.ICharSet
 import codes.quine.labo.recheck.unicode.ICharSet.CharKind
 import codes.quine.labo.recheck.unicode.UString
 
-class PatternSuite extends munit.FunSuite {
+class PatternExtensionsSuite extends munit.FunSuite {
 
   /** A default context. */
   implicit def ctx: Context = Context()
 
-  test("Pattern.AtomNode#toIChar") {
+  test("PatternExtensions.AtomNodeOps#toIChar") {
     assertEquals(Character('x').toIChar(false), Success(IChar('x')))
     assertEquals(SimpleEscapeClass(false, EscapeClassKind.Word).toIChar(false), Success(IChar.Word))
     assertEquals(
@@ -74,17 +74,7 @@ class PatternSuite extends munit.FunSuite {
     }
   }
 
-  test("Pattern.Node#withLoc") {
-    val node1 = Character('x')
-    val node2 = node1.withLoc(0, 1)
-    val node3 = Character('y').withLoc(node2)
-    assertEquals(node1.loc, None)
-    assertEquals(node2.loc, Some((0, 1)))
-    assertEquals(node3.loc, Some((0, 1)))
-    assert(clue(node2.withLoc(0, 1)) eq clue(node2))
-  }
-
-  test("Pattern.Node#captureRange") {
+  test("PatternExtensions.NodeOps#captureRange") {
     assertEquals(Sequence(Seq(Capture(1, Dot()), Capture(2, Dot()))).captureRange, CaptureRange(Some((1, 2))))
     assertEquals(Disjunction(Seq(Capture(1, Dot()), Capture(2, Dot()))).captureRange, CaptureRange(Some((1, 2))))
     assertEquals(Capture(1, Dot()).captureRange, CaptureRange(Some((1, 1))))
@@ -111,7 +101,7 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(NamedBackReference("foo").captureRange, CaptureRange(None))
   }
 
-  test("Pattern.Node#isEmpty") {
+  test("PatternExtensions.NodeOps#isEmpty") {
     assertEquals(Sequence(Seq(Dot(), Dot())).isEmpty, false)
     assertEquals(Sequence(Seq.empty).isEmpty, true)
     assertEquals(Disjunction(Seq(Dot(), Dot())).isEmpty, false)
@@ -148,87 +138,14 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(NamedBackReference("foo").isEmpty, true)
   }
 
-  test("Pattern.CaptureRange#merge") {
+  test("PatternExtensions.CaptureRange#merge") {
     assertEquals(CaptureRange(None).merge(CaptureRange(None)), CaptureRange(None))
     assertEquals(CaptureRange(Some((1, 1))).merge(CaptureRange(None)), CaptureRange(Some((1, 1))))
     assertEquals(CaptureRange(None).merge(CaptureRange(Some((2, 2)))), CaptureRange(Some((2, 2))))
     assertEquals(CaptureRange(Some((1, 1))).merge(CaptureRange(Some((2, 2)))), CaptureRange(Some((1, 2))))
   }
 
-  test("Pattern.showNode") {
-    val x = Character('x')
-    assertEquals(showNode(Disjunction(Seq(Disjunction(Seq(x, x)), x))), "(?:x|x)|x")
-    assertEquals(showNode(Disjunction(Seq(x, x, x))), "x|x|x")
-    assertEquals(showNode(Sequence(Seq(Disjunction(Seq(x, x)), x))), "(?:x|x)x")
-    assertEquals(showNode(Sequence(Seq(Sequence(Seq(x, x)), x))), "(?:xx)x")
-    assertEquals(showNode(Sequence(Seq(x, x, x))), "xxx")
-    assertEquals(showNode(Capture(1, x)), "(x)")
-    assertEquals(showNode(NamedCapture(1, "foo", x)), "(?<foo>x)")
-    assertEquals(showNode(Group(x)), "(?:x)")
-    assertEquals(showNode(Star(false, x)), "x*")
-    assertEquals(showNode(Star(true, x)), "x*?")
-    assertEquals(showNode(Star(false, Disjunction(Seq(x, x)))), "(?:x|x)*")
-    assertEquals(showNode(Star(false, Sequence(Seq(x, x)))), "(?:xx)*")
-    assertEquals(showNode(Star(false, Star(false, x))), "(?:x*)*")
-    assertEquals(showNode(Star(false, LookAhead(false, x))), "(?:(?=x))*")
-    assertEquals(showNode(Star(false, LookBehind(false, x))), "(?:(?<=x))*")
-    assertEquals(showNode(Plus(false, x)), "x+")
-    assertEquals(showNode(Plus(true, x)), "x+?")
-    assertEquals(showNode(Question(false, x)), "x?")
-    assertEquals(showNode(Question(true, x)), "x??")
-    assertEquals(showNode(Repeat(false, 3, None, x)), "x{3}")
-    assertEquals(showNode(Repeat(true, 3, None, x)), "x{3}?")
-    assertEquals(showNode(Repeat(false, 3, Some(None), x)), "x{3,}")
-    assertEquals(showNode(Repeat(true, 3, Some(None), x)), "x{3,}?")
-    assertEquals(showNode(Repeat(false, 3, Some(Some(5)), x)), "x{3,5}")
-    assertEquals(showNode(Repeat(true, 3, Some(Some(5)), x)), "x{3,5}?")
-    assertEquals(showNode(WordBoundary(false)), "\\b")
-    assertEquals(showNode(WordBoundary(true)), "\\B")
-    assertEquals(showNode(LineBegin()), "^")
-    assertEquals(showNode(LineEnd()), "$")
-    assertEquals(showNode(LookAhead(false, x)), "(?=x)")
-    assertEquals(showNode(LookAhead(true, x)), "(?!x)")
-    assertEquals(showNode(LookBehind(false, x)), "(?<=x)")
-    assertEquals(showNode(LookBehind(true, x)), "(?<!x)")
-    assertEquals(showNode(Character('/')), "\\/")
-    assertEquals(showNode(Character('\u0001')), "\\cA")
-    assertEquals(showNode(Character('\n')), "\\n")
-    assertEquals(showNode(Character(' ')), " ")
-    assertEquals(showNode(Character('A')), "A")
-    assertEquals(showNode(CharacterClass(false, Seq(x))), "[x]")
-    assertEquals(showNode(CharacterClass(false, Seq(ClassRange('a', 'z')))), "[a-z]")
-    assertEquals(showNode(CharacterClass(false, Seq(SimpleEscapeClass(false, EscapeClassKind.Word)))), "[\\w]")
-    assertEquals(showNode(CharacterClass(false, Seq(Character('\u0001')))), "[\\cA]")
-    assertEquals(showNode(CharacterClass(false, Seq(Character('-')))), "[\\-]")
-    assertEquals(showNode(CharacterClass(true, Seq(x))), "[^x]")
-    assertEquals(showNode(SimpleEscapeClass(false, EscapeClassKind.Digit)), "\\d")
-    assertEquals(showNode(SimpleEscapeClass(true, EscapeClassKind.Digit)), "\\D")
-    assertEquals(showNode(SimpleEscapeClass(false, EscapeClassKind.Word)), "\\w")
-    assertEquals(showNode(SimpleEscapeClass(true, EscapeClassKind.Word)), "\\W")
-    assertEquals(showNode(SimpleEscapeClass(false, EscapeClassKind.Space)), "\\s")
-    assertEquals(showNode(SimpleEscapeClass(true, EscapeClassKind.Space)), "\\S")
-    assertEquals(showNode(UnicodeProperty(false, "ASCII")), "\\p{ASCII}")
-    assertEquals(showNode(UnicodeProperty(true, "ASCII")), "\\P{ASCII}")
-    assertEquals(showNode(UnicodePropertyValue(false, "sc", "Hira")), "\\p{sc=Hira}")
-    assertEquals(showNode(UnicodePropertyValue(true, "sc", "Hira")), "\\P{sc=Hira}")
-    assertEquals(showNode(Dot()), ".")
-    assertEquals(showNode(BackReference(1)), "\\1")
-    assertEquals(showNode(NamedBackReference("foo")), "\\k<foo>")
-  }
-
-  test("Pattern.showFlagSet") {
-    assertEquals(showFlagSet(FlagSet(false, false, false, false, false, false)), "")
-    assertEquals(showFlagSet(FlagSet(true, true, true, true, true, true)), "gimsuy")
-  }
-
-  test("Pattern#toString") {
-    assertEquals(
-      Pattern(Character('x'), FlagSet(true, true, false, false, false, false)).toString,
-      "/x/gi"
-    )
-  }
-
-  test("Pattern#hasLineBeginAtBegin") {
+  test("PatternExtensions.PatternOps#hasLineBeginAtBegin") {
     val flagSet0 = FlagSet(false, false, false, false, false, false)
     val flagSet1 = FlagSet(false, false, true, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(LineBegin(), LineBegin())), flagSet0).hasLineBeginAtBegin, true)
@@ -250,7 +167,7 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(Pattern(LineBegin(), flagSet1).hasLineBeginAtBegin, false)
   }
 
-  test("Pattern#hasLineEndAtEnd") {
+  test("PatternExtensions.PatternOps#hasLineEndAtEnd") {
     val flagSet0 = FlagSet(false, false, false, false, false, false)
     val flagSet1 = FlagSet(false, false, true, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(LineEnd(), LineEnd())), flagSet0).hasLineEndAtEnd, true)
@@ -272,7 +189,7 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(Pattern(LineEnd(), flagSet1).hasLineEndAtEnd, false)
   }
 
-  test("Pattern#isConstant") {
+  test("PatternExtensions.PatternOps#isConstant") {
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(Dot(), Dot())), flagSet).isConstant, true)
     assertEquals(Pattern(Disjunction(Seq(Star(false, Dot()), Dot())), flagSet).isConstant, false)
@@ -298,7 +215,7 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(Pattern(LookBehind(false, Star(false, Dot())), flagSet).isConstant, false)
   }
 
-  test("Pattern#size") {
+  test("PatternExtensions.PatternOps#size") {
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(Dot(), Dot())), flagSet).size, 3)
     assertEquals(Pattern(Sequence(Seq(Dot(), Dot())), flagSet).size, 2)
@@ -316,7 +233,7 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(Pattern(Dot(), flagSet).size, 1)
   }
 
-  test("Pattern#alphabet") {
+  test("PatternExtensions.PatternOps#alphabet") {
     val flagSet0 = FlagSet(false, false, false, false, false, false)
     val flagSet1 = FlagSet(false, false, true, false, false, false)
     val flagSet2 = FlagSet(false, false, false, true, false, false)
@@ -370,7 +287,7 @@ class PatternSuite extends munit.FunSuite {
     )
   }
 
-  test("Pattern#needsLineTerminatorDistinction") {
+  test("PatternExtensions.PatternOps#needsLineTerminatorDistinction") {
     val flagSet0 = FlagSet(false, false, true, false, false, false)
     val flagSet1 = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(Dot(), LineBegin())), flagSet0).needsLineTerminatorDistinction, true)
@@ -405,7 +322,7 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(Pattern(LineBegin(), flagSet1).needsLineTerminatorDistinction, false)
   }
 
-  test("Pattern#needsWordDistinction") {
+  test("PatternExtensions.PatternOps#needsWordDistinction") {
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(Dot(), WordBoundary(false))), flagSet).needsWordDistinction, true)
     assertEquals(Pattern(Disjunction(Seq(WordBoundary(false), Dot())), flagSet).needsWordDistinction, true)
@@ -438,7 +355,7 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(Pattern(Dot(), flagSet).needsWordDistinction, false)
   }
 
-  test("Pattern#parts") {
+  test("PatternExtensions.PatternOps#parts") {
     val flagSet = FlagSet(false, false, false, false, false, false)
     val seq = Sequence(Seq(Character('x'), Character('y'), Character('z')))
     assertEquals(
@@ -467,7 +384,7 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(Pattern(Character('x'), flagSet).parts, Set.empty[UString])
   }
 
-  test("Pattern#capturesSize") {
+  test("PatternExtensions.PatternOps#capturesSize") {
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(Capture(1, Dot()), Capture(2, Dot()))), flagSet).capturesSize, 2)
     assertEquals(Pattern(Sequence(Seq(Capture(1, Dot()), Capture(2, Dot()))), flagSet).capturesSize, 2)
@@ -485,7 +402,7 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(Pattern(Dot(), flagSet).capturesSize, 0)
   }
 
-  test("Pattern#names") {
+  test("PatternExtensions.PatternOps#names") {
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(
       Pattern(Disjunction(Seq(NamedCapture(1, "x", Dot()), NamedCapture(2, "y", Dot()))), flagSet).names,

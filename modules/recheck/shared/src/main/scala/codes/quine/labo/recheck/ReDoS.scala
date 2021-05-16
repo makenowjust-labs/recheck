@@ -9,6 +9,7 @@ import codes.quine.labo.recheck.automaton.Complexity
 import codes.quine.labo.recheck.automaton.EpsNFABuilder
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.common.ReDoSException
 import codes.quine.labo.recheck.common.UnsupportedException
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
@@ -17,6 +18,7 @@ import codes.quine.labo.recheck.fuzz.FuzzChecker
 import codes.quine.labo.recheck.fuzz.FuzzProgram
 import codes.quine.labo.recheck.regexp.Parser
 import codes.quine.labo.recheck.regexp.Pattern
+import codes.quine.labo.recheck.regexp.PatternExtensions._
 import codes.quine.labo.recheck.unicode.UChar
 
 /** ReDoS is a ReDoS checker frontend. */
@@ -27,7 +29,10 @@ object ReDoS {
     import config._
     val result = for {
       _ <- Try(()) // Ensures `Try` context.
-      pattern <- Parser.parse(source, flags)
+      pattern <- ctx.interrupt(Parser.parse(source, flags) match {
+        case Right(pattern) => Success(pattern)
+        case Left(message)  => Failure(new InvalidRegExpException(message))
+      })
       diagnostics <- checker match {
         case Checker.Automaton => checkAutomaton(source, flags, pattern, config)
         case Checker.Fuzz      => checkFuzz(source, flags, pattern, config)
