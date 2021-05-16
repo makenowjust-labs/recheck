@@ -47,10 +47,10 @@ object CaseMapDataGen extends UnicodeDataGen {
   def file(dir: File): File = dir / "CaseMapData.scala"
 
   /** A generated source code. */
-  def source: String = {
-    val sb = new mutable.StringBuilder
+  def source(pkg: String): String = {
+    val sb = new StringBuilder
 
-    sb.append("package codes.quine.labo.recheck.data.unicode\n")
+    sb.append(s"package $pkg\n")
     sb.append("\n")
     sb.append("import CaseMap.Conversion\n")
     sb.append("\n")

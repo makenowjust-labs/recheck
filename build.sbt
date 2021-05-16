@@ -104,12 +104,13 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
             "CaseMapDataGen.scala" -> CaseMapDataGen,
             "PropertyDataGen.scala" -> PropertyDataGen
           )
+          val pkg = "codes.quine.labo.recheck.data.unicode"
           val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labo" / "recheck" / "data" / "unicode"
           val changes = generateUnicodeData.inputFileChanges
           val updatedPaths = changes.created ++ changes.modified
           for (path <- updatedPaths) {
             val fileName = path.getFileName.toString
-            gens.get(fileName).foreach(_.gen(dir))
+            gens.get(fileName).foreach(_.gen(pkg, dir))
           }
           gens.map(_._2.file(dir)).toSeq
         }
@@ -126,3 +127,54 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
 
 lazy val recheckJVM = recheck.jvm
 lazy val recheckJS = recheck.js
+
+lazy val unicode = crossProject(JVMPlatform, JSPlatform)
+  .in(file("modules/recheck-unicode"))
+  .settings(
+    name := "recheck-unicode",
+    console / initialCommands := """
+      |import codes.quine.labo.recheck.unicode._
+      |""".stripMargin,
+    Compile / console / scalacOptions -= "-Wunused",
+    Test / console / scalacOptions -= "-Wunused",
+    // Settings for scaladoc:
+    Compile / doc / scalacOptions += "-diagrams",
+    // Set URL mapping of scala standard API for Scaladoc.
+    apiMappings ++= scalaInstance.value.libraryJars
+      .filter(file => file.getName.startsWith("scala-library") && file.getName.endsWith(".jar"))
+      .map(_ -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"))
+      .toMap,
+    // Generators:
+    {
+      val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
+      Seq(
+        Compile / sourceGenerators += generateUnicodeData.taskValue,
+        generateUnicodeData / fileInputs += baseDirectory.value.toGlob / ".." / ".." / ".." / "project" / "*DataGen.scala",
+        generateUnicodeData := {
+          val gens = Map[String, UnicodeDataGen](
+            "CaseMapDataGen.scala" -> CaseMapDataGen,
+            "PropertyDataGen.scala" -> PropertyDataGen
+          )
+          val pkg = "codes.quine.labo.recheck.unicode"
+          val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labo" / "recheck" / "unicode"
+          val changes = generateUnicodeData.inputFileChanges
+          val updatedPaths = changes.created ++ changes.modified
+          for (path <- updatedPaths) {
+            val fileName = path.getFileName.toString
+            gens.get(fileName).foreach(_.gen(pkg, dir))
+          }
+          gens.map(_._2.file(dir)).toSeq
+        }
+      )
+    },
+    // Settings for test:
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.26" % Test,
+    testFrameworks += new TestFramework("munit.Framework")
+  )
+  .jsSettings(
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
+    Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
+  )
+
+lazy val unicodeJVM = unicode.jvm
+lazy val unicodeJS = unicode.js
