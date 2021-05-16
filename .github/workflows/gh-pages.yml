@@ -23,9 +23,9 @@ jobs:
 
       - name: Build
         run: |
-          sbt mdoc recheckJS/fullLinkJS
+          sbt mdoc js/fullLinkJS
           mkdir -p site/assets/js/lib/
-          cp modules/recheck/js/target/scala-2.13/recheck-opt/* site/assets/js/lib/
+          cp modules/recheck-js/target/scala-2.13/recheck-js-opt/* site/assets/js/lib/
           hugo -s site --minify
 
       - name: Deploy
