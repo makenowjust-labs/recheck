@@ -213,3 +213,32 @@ lazy val js = project
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
   .dependsOn(recheckJS)
+
+lazy val cli = project
+  .in(file("modules/recheck-cli"))
+  .enablePlugins(NativeImagePlugin)
+  .settings(
+    name := "recheck-cli",
+    publish / skip := true,
+    coverageEnabled := false,
+    Compile / mainClass := Some("codes.quine.labo.recheck.cli.Main"),
+    nativeImageOptions ++= List(
+      "--no-fallback",
+      "--initialize-at-build-time"
+    ),
+    console / initialCommands := """
+      |import io.circe._
+      |import io.circe.parser._
+      |import io.circe.syntax._
+      |
+      |import codes.quine.labo.recheck.cli._
+      |""".stripMargin,
+    Compile / console / scalacOptions -= "-Wunused",
+    Test / console / scalacOptions -= "-Wunused",
+    // Dependencies:
+    libraryDependencies += "com.monovore" %% "decline" % "1.3.0",
+    libraryDependencies += "io.circe" %% "circe-core" % "0.13.0",
+    libraryDependencies += "io.circe" %% "circe-generic" % "0.13.0",
+    libraryDependencies += "io.circe" %% "circe-parser" % "0.13.0"
+  )
+  .dependsOn(recheckJVM)
