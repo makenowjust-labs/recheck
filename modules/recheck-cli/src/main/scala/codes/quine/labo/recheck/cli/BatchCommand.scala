@@ -1,5 +1,6 @@
 package codes.quine.labo.recheck.cli
 
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 import scala.collection.mutable
@@ -12,7 +13,6 @@ import codes.quine.labo.recheck.ReDoS
 import codes.quine.labo.recheck.cli.BatchCommand._
 import codes.quine.labo.recheck.cli.codecs._
 import codes.quine.labo.recheck.diagnostics.Diagnostics
-import java.util.concurrent.ExecutorService
 
 object BatchCommand {
   final case class CheckParams(source: String, flags: String, config: InputConfig)

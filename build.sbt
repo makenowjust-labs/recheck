@@ -240,6 +240,9 @@ lazy val cli = project
     libraryDependencies += "com.monovore" %% "decline" % "1.3.0",
     libraryDependencies += "io.circe" %% "circe-core" % "0.13.0",
     libraryDependencies += "io.circe" %% "circe-generic" % "0.13.0",
-    libraryDependencies += "io.circe" %% "circe-parser" % "0.13.0"
+    libraryDependencies += "io.circe" %% "circe-parser" % "0.13.0",
+    // Settings for test:
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.26" % Test,
+    testFrameworks += new TestFramework("munit.Framework")
   )
   .dependsOn(recheckJVM)
