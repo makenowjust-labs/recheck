@@ -2,7 +2,9 @@ package codes.quine.labo.recheck.cli
 
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
+
 import cats.data.Validated
+
 import codes.quine.labo.recheck.cli.arguments._
 import codes.quine.labo.recheck.common.Checker
 

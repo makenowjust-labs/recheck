@@ -2,7 +2,6 @@ package codes.quine.labo.recheck.cli
 
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 

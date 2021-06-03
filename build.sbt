@@ -43,7 +43,7 @@ lazy val root = project
     mdocOut := baseDirectory.value / "site" / "content"
   )
   .enablePlugins(MdocPlugin)
-  .aggregate(recheckJVM, recheckJS, unicodeJVM, unicodeJS, parseJVM, parseJS, js)
+  .aggregate(recheckJVM, recheckJS, unicodeJVM, unicodeJS, parseJVM, parseJS, js, cli)
   .dependsOn(recheckJVM)
 
 lazy val recheck = crossProject(JVMPlatform, JSPlatform)
@@ -242,7 +242,7 @@ lazy val cli = project
     libraryDependencies += "io.circe" %% "circe-generic" % "0.13.0",
     libraryDependencies += "io.circe" %% "circe-parser" % "0.13.0",
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.26" % Test,
+    libraryDependencies += "org.scalameta" %% "munit" % "0.7.26" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .dependsOn(recheckJVM)

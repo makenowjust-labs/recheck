@@ -1,7 +1,6 @@
 package codes.quine.labo.recheck.cli
 
 import java.util.concurrent.TimeUnit
-
 import scala.concurrent.duration.Duration
 
 import cats.syntax.apply._
