@@ -62,6 +62,8 @@ final case class InputConfig(
 }
 
 object InputConfig {
+
+  /** A `Decoder` instance for `InputConfig`. */
   implicit def decode: Decoder[InputConfig] = (c: HCursor) =>
     for {
       timeout <- c.get[Option[Int]]("timeout")
