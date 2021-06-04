@@ -6,6 +6,7 @@ Changes:
 - Move `RegExp` parser into new `recheck-parse` module ([#78](https://github.com/MakeNowJust-Labo/recheck/pull/78))
 - Move JS binding into new `recheck-js` module ([#79](https://github.com/MakeNowJust-Labo/recheck/pull/79))
 - Add `recheck` CLI ([#83](https://github.com/MakeNowJust-Labo/recheck/pull/83))
+- Build `recheck` CLI by using Graal `native-image`
 
 Fixes:
 
