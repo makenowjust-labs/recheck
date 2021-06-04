@@ -22,7 +22,7 @@ class RPCSuite extends munit.FunSuite {
     assertEquals(RPC.ID.decode.decodeJson(42.asJson), Right(RPC.IntID(42)))
     assertEquals(RPC.ID.decode.decodeJson("foo".asJson), Right(RPC.StringID("foo")))
     assertEquals(RPC.ID.decode.decodeJson(Json.Null), Right(RPC.NullID))
-    assertEquals(RPC.ID.decode.decodeJson(false.asJson).isLeft, true)
+    assert(clue(RPC.ID.decode.decodeJson(false.asJson)).isLeft)
   }
 
   test("RPC.NullID.encode") {
@@ -52,12 +52,7 @@ class RPCSuite extends munit.FunSuite {
         ),
       Right(RPC.Request(RPC.JsonRPCVersion, Some(RPC.NullID), "foo", Json.obj()))
     )
-    assertEquals(
-      RPC.Request.decode
-        .decodeJson(Json.obj("jsonrpc" := RPC.JsonRPCVersion, "id" := false, "method" := "foo", "params" := Json.obj()))
-        .isLeft,
-      true
-    )
+    assert(clue(RPC.Request.decode.decodeJson(Json.obj())).isLeft)
   }
 
   test("RPC.IO.stdio") {

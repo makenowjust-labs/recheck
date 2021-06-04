@@ -14,14 +14,21 @@ import codes.quine.labo.recheck.cli.arguments._
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.diagnostics.Diagnostics
 
+/** Main provides the entrypoint of `recheck` command. */
 object Main {
+
+  /** Action is a subcommand of `recheck` command. */
   sealed abstract class Action extends Product with Serializable
 
+  /** BatchAction holds `recheck batch` subcommand parameters. */
   final case class BatchAction(threadSize: Int) extends Action
+
+  /** CheckAction holds `recheck check` subcommand parameters. */
   final case class CheckAction(pattern: InputPattern, config: InputConfig) extends Action
 
-  val command: Command[Action] =
-    Command(name = "recheck", header = "A command-line utility of Recheck") {
+  /** A command-line definition of `recheck`. */
+  def command: Command[Action] =
+    Command(name = "recheck", header = "Checks ReDoS vulnerability on the given RegExp pattern") {
       val timeout = Opts
         .option[Duration](
           long = "timeout",
@@ -113,7 +120,7 @@ object Main {
       val batch: Opts[Action] = Opts.subcommand(name = "batch", help = "Starts the batch mode.") {
         val threadSize = Opts
           .option[Int](long = "thread-size", short = "t", help = "A number of thread for processing")
-          .withDefault(Runtime.getRuntime().availableProcessors())
+          .withDefault(sys.runtime.availableProcessors())
 
         threadSize.map(BatchAction.apply)
       }
@@ -121,17 +128,18 @@ object Main {
       batch <+> check
     }
 
+  /** An entrypoint of `recheck` command. */
   def main(args: Array[String]): Unit = command.parse(args.toSeq, sys.env) match {
     case Left(help) =>
-      System.err.println(help.toString)
+      Console.err.println(help.toString)
       sys.exit(2)
 
     case Right(action: CheckAction) =>
       val (config, _) = action.config.instantiate()
       val diagnostics = ReDoS.check(action.pattern.source, action.pattern.flags, config)
-      println(diagnostics)
+      Console.out.println(diagnostics)
       diagnostics match {
-        case _: Diagnostics.Safe                                => // skip
+        case _: Diagnostics.Safe                                => () // skip
         case _: Diagnostics.Vulnerable | _: Diagnostics.Unknown => sys.exit(1)
       }
 
