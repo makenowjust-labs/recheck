@@ -221,7 +221,6 @@ lazy val cli = project
     name := "recheck-cli",
     NativeImage / name := "recheck",
     publish / skip := true,
-    coverageEnabled := false,
     Compile / mainClass := Some("codes.quine.labo.recheck.cli.Main"),
     nativeImageOptions ++= List(
       "--no-fallback",
