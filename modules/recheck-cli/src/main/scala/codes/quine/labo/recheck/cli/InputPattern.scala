@@ -8,6 +8,8 @@ import com.monovore.decline.Argument
 final case class InputPattern(source: String, flags: String)
 
 object InputPattern {
+
+  /** An `Argument` instance for `InputPattern`. */
   implicit val argument: Argument[InputPattern] = new Argument[InputPattern] {
     def read(string: String): ValidatedNel[String, InputPattern] = {
       if (string.nonEmpty && string.charAt(0) == '/') {
@@ -18,7 +20,7 @@ object InputPattern {
           return Validated.validNel(InputPattern(source, flags))
         }
       }
-      Validated.invalidNel(s"Invalid pattern: $string")
+      Validated.invalidNel(s"invalid pattern: $string")
     }
 
     override def defaultMetavar: String = "pattern"
