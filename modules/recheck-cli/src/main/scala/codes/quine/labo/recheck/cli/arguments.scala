@@ -8,7 +8,7 @@ import com.monovore.decline.Argument
 
 import codes.quine.labo.recheck.common.Checker
 
-/** The object `arguments` holds decline's `Argument` instances for this application. */
+/** The object `arguments` provides decline's `Argument` instances for this application. */
 object arguments {
 
   /** `Argument` instance for `Duration`. */
