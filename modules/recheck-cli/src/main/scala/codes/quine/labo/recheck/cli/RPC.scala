@@ -1,7 +1,6 @@
 package codes.quine.labo.recheck.cli
 
 import scala.concurrent.ExecutionContext
-import scala.io.Source
 
 import cats.syntax.functor._
 import io.circe.Decoder
@@ -113,43 +112,6 @@ object RPC {
     implicit def encode: Encoder[Error] = deriveEncoder
   }
 
-  /** Handler represents an handler of JSON-RPC. */
-  sealed trait Handler {
-    type Params
-    def decodeParams: Decoder[Params]
-  }
-
-  /** RequestHandler represents an handler of JSON-RPC request. */
-  sealed trait RequestHandler extends Handler {
-    type Result
-    def encodeResult: Encoder[Result]
-
-    def apply(id: ID, params: Params): Either[Error, Result]
-  }
-
-  object RequestHandler {
-    def apply[P: Decoder, R: Encoder](handle: (ID, P) => Either[Error, R]): RequestHandler = new RequestHandler {
-      type Params = P
-      def decodeParams: Decoder[P] = Decoder[P]
-      type Result = R
-      def encodeResult: Encoder[R] = Encoder[R]
-      def apply(id: ID, params: P): Either[Error, R] = handle(id, params)
-    }
-  }
-
-  /** NotificationHandler represents an handler of JSON-RPC notification. */
-  sealed trait NotificationHandler extends Handler {
-    def apply(params: Params): Unit
-  }
-
-  object NotificationHandler {
-    def apply[P: Decoder](handle: P => Unit): NotificationHandler = new NotificationHandler {
-      type Params = P
-      def decodeParams: Decoder[P] = Decoder[P]
-      def apply(params: P): Unit = handle(params)
-    }
-  }
-
   /** IO is an abstraction of I/O for JSON-RPC implementation. */
   trait IO {
 
@@ -166,85 +128,145 @@ object RPC {
 
   object IO {
     def stdio: IO = new IO {
-      def read(): Iterator[String] = Source.stdin.getLines()
-
-      def write(line: String): Unit = synchronized(Console.println(line))
+      def read(): Iterator[String] = Iterator.continually(Console.in.readLine()).takeWhile(_ ne null)
+      def write(line: String): Unit = synchronized(Console.out.println(line))
     }
   }
 
   /** Starts RPC server. It blocks the process until input stream are closed. */
-  def start(io: IO)(handlers: (String, Handler)*)(implicit ec: ExecutionContext): Unit = {
+  def run(io: IO)(handlers: (String, Handler)*)(implicit ec: ExecutionContext): Unit = {
     val handlerMap = handlers.toMap
-
-    def handle(line: String): Unit = {
-      // Reads a request object from the line.
-      val (optID, method, paramsJson) = decode[Request](line) match {
-        case Right(Request(jsonrpc, optID, method, paramsJson)) =>
-          if (jsonrpc != JsonRPCVersion) {
-            if (optID.isDefined) {
-              io.write(ErrorResponse.InvalidRequest(optID.get, "invalid JSON-RPC version"))
-            }
-            return
-          }
-          (optID, method, paramsJson)
-        case Left(err) =>
-          io.write(ErrorResponse.ParseError(err.getMessage))
-          return
-      }
-
-      // Finds an handler for the request.
-      val handler = handlerMap.get(method) match {
-        case Some(handler) => handler
-        case None =>
-          if (optID.isDefined) {
-            io.write(ErrorResponse.MethodNotFound(optID.get, s"method '$method' is not found"))
-          }
-          return
-      }
-
-      // Processes the request along with the handler type.
-      handler match {
-        case handler: RequestHandler =>
-          val id = optID match {
-            case Some(id) => id
-            case None     =>
-              // A request should have 'id' property.
-              return
-          }
-
-          val params = paramsJson.as(handler.decodeParams) match {
-            case Right(params) => params
-            case Left(err) =>
-              io.write(ErrorResponse.InvalidParams(id, err.getMessage))
-              return
-          }
-
-          handler(id, params) match {
-            case Right(value) =>
-              io.write(ResultResponse(JsonRPCVersion, id, value.asJson(handler.encodeResult)))
-            case Left(err) =>
-              io.write(ErrorResponse(JsonRPCVersion, Some(id), err))
-          }
-
-        case handler: NotificationHandler =>
-          if (optID.isDefined) {
-            io.write(ErrorResponse.InvalidRequest(optID.get, "notification should not have 'id'"))
-          }
-
-          val params = paramsJson.as(handler.decodeParams) match {
-            case Right(params) => params
-            case Left(_)       =>
-              // Parsing params is failed, but error response is omitted due to notification.
-              return
-          }
-
-          handler(params)
-      }
-    }
 
     // Starts main loop.
     for (line <- io.read()) {
-      ec.execute(() => handle(line))
+      ec.execute(() => {
+        val result = for {
+          request <- read(line)
+          (optID, method, paramsJson) = request
+          handler <- find(handlerMap, optID, method)
+          response <- handler.handle(optID, paramsJson)
+        } yield response
+
+        // Sends the response to IO.
+        result match {
+          case Left(None) | Right(None) => () // Skip because the response is missing
+          case Right(Some(response))    => io.write(response)
+          case Left(Some(response))     => io.write(response)
+        }
+      })
+    }
+  }
+
+  /** Result is an internal result type on processing JSON-RPC request. */
+  type Result[+A] = Either[Option[ErrorResponse], A]
+
+  object Result {
+
+    /** Returns an ok result with the value. */
+    def ok[A](value: A): Result[A] = Right(value)
+
+    /** Returns an error result with error object. */
+    def raise(error: ErrorResponse): Result[Nothing] =
+      Left(Some(error))
+
+    /** Returns an error result without error object. */
+    def fail: Result[Nothing] = Left(None)
+
+    /** Returns an error result. This error result has an error value when `cond` is satisfied. */
+    def raiseIf(cond: Boolean)(error: => ErrorResponse): Result[Nothing] =
+      Left(Option.when(cond)(error))
+  }
+
+  /** Reads and decodes a request object from the line. */
+  private[cli] def read(line: String): Result[(Option[ID], String, Json)] =
+    decode[Request](line) match {
+      case Right(Request(jsonrpc, optID, method, paramsJson)) =>
+        if (jsonrpc != JsonRPCVersion)
+          Result.raiseIf(optID.isDefined)(ErrorResponse.InvalidRequest(optID.get, "invalid JSON-RPC version"))
+        else Result.ok((optID, method, paramsJson))
+      case Left(err) => Result.raise(ErrorResponse.ParseError(err.getMessage))
+    }
+
+  /** Finds an handler for the request. */
+  private[cli] def find(handlerMap: Map[String, Handler], optID: Option[ID], method: String): Result[Handler] =
+    handlerMap.get(method) match {
+      case Some(handler) => Result.ok(handler)
+      case None =>
+        Result.raiseIf(optID.isDefined)(ErrorResponse.MethodNotFound(optID.get, s"method '$method' is not found"))
+    }
+
+  /** Handler represents an handler of JSON-RPC. */
+  sealed trait Handler {
+    type Params
+    def decodeParams: Decoder[Params]
+    private[cli] def handle(optID: Option[ID], paramsJson: Json): Result[Option[ResultResponse]]
+  }
+
+  /** RequestHandler represents an handler of JSON-RPC request. */
+  sealed trait RequestHandler extends Handler {
+    type Result
+    def encodeResult: Encoder[Result]
+    def apply(id: ID, params: Params): Either[Error, Result]
+
+    private[cli] def handle(optID: Option[ID], paramsJson: Json): RPC.Result[Option[ResultResponse]] =
+      for {
+        id <- validateID(optID)
+        params <- doDecodeParams(id, paramsJson)
+        result <- apply(id, params).left.map(err => Some(ErrorResponse(JsonRPCVersion, Some(id), err)))
+      } yield Some(ResultResponse(JsonRPCVersion, id, encodeResult(result)))
+
+    private[cli] def validateID(optID: Option[ID]): RPC.Result[ID] =
+      optID match {
+        case Some(id) => RPC.Result.ok(id)
+        case None     => RPC.Result.fail
+      }
+
+    private[cli] def doDecodeParams(id: ID, paramsJson: Json): RPC.Result[Params] =
+      decodeParams.decodeJson(paramsJson) match {
+        case Right(params) => RPC.Result.ok(params)
+        case Left(err)     => RPC.Result.raise(ErrorResponse.InvalidParams(id, err.getMessage))
+      }
+  }
+
+  object RequestHandler {
+    def apply[P: Decoder, R: Encoder](h: (ID, P) => Either[Error, R]): RequestHandler = new RequestHandler {
+      type Params = P
+      def decodeParams: Decoder[P] = Decoder[P]
+      type Result = R
+      def encodeResult: Encoder[R] = Encoder[R]
+      def apply(id: ID, params: P): Either[Error, R] = h(id, params)
+    }
+  }
+
+  /** NotificationHandler represents an handler of JSON-RPC notification. */
+  sealed trait NotificationHandler extends Handler {
+    def apply(params: Params): Unit
+
+    private[cli] def handle(optID: Option[ID], paramsJson: Json): Result[Option[ResultResponse]] =
+      for {
+        _ <- validateID(optID)
+        params <- doDecodeParams(paramsJson)
+        () = apply(params)
+      } yield None
+
+    private[cli] def validateID(optID: Option[ID]): Result[Unit] =
+      optID match {
+        case Some(id) => Result.raise(ErrorResponse.InvalidRequest(id, "notification should not have 'id'"))
+        case None     => Result.ok(())
+      }
+
+    private[cli] def doDecodeParams(paramsJson: Json): Result[Params] =
+      decodeParams.decodeJson(paramsJson) match {
+        case Right(params) => Result.ok(params)
+        case Left(_)       => Result.fail
+      }
+  }
+
+  object NotificationHandler {
+    def apply[P: Decoder](h: P => Unit): NotificationHandler = new NotificationHandler {
+      type Params = P
+      def decodeParams: Decoder[P] = Decoder[P]
+      def apply(params: P): Unit = h(params)
     }
   }
 }
