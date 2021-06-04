@@ -7,7 +7,7 @@ on:
   release:
     types: [published]
 jobs:
-  unix:
+  build:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -32,7 +32,7 @@ jobs:
         if: ${{ matrix.os != 'windows-latest' }}
       - run: echo $(pwd)
         shell: bash
-      - name: sbt test
+      - name: sbt cli/nativeImage
         shell: cmd
         if: ${{ matrix.os == 'windows-latest' }}
         run: >-
