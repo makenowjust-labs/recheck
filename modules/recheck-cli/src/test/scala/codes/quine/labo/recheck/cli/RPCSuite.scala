@@ -3,7 +3,11 @@ package codes.quine.labo.recheck.cli
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import scala.concurrent.ExecutionContext
 
+import io.circe.DecodingFailure
 import io.circe.Json
 import io.circe.syntax._
 
@@ -19,6 +23,15 @@ class RPCSuite extends munit.FunSuite {
     assertEquals(RPC.ID.decode.decodeJson("foo".asJson), Right(RPC.StringID("foo")))
     assertEquals(RPC.ID.decode.decodeJson(Json.Null), Right(RPC.NullID))
     assertEquals(RPC.ID.decode.decodeJson(false.asJson).isLeft, true)
+  }
+
+  test("RPC.NullID.encode") {
+    assertEquals(RPC.NullID.encode(RPC.NullID), Json.Null)
+  }
+
+  test("RPC.NullID.decode") {
+    assertEquals(RPC.NullID.decode.decodeJson(Json.Null), Right(RPC.NullID))
+    assertEquals(RPC.NullID.decode.decodeJson(Json.obj()), Left(DecodingFailure("null is expected", List.empty)))
   }
 
   test("RPC.Request.decode") {
@@ -56,10 +69,43 @@ class RPCSuite extends munit.FunSuite {
       assertEquals(io.read().toSeq, Seq("hello", "world"))
       io.write("hello")
       io.write("world")
+      io.write(42)
     })
 
     newOut.close()
-    assertEquals(newOut.toString(StandardCharsets.UTF_8), s"hello\nworld\n")
+    val nl = System.getProperty("line.separator")
+    assertEquals(newOut.toString(StandardCharsets.UTF_8), s"hello${nl}world${nl}42$nl")
+  }
+
+  test("RPC.run") {
+    val in = Seq(
+      """{}""",
+      """{"jsonrpc": "1.0", "id": 1, "method": "foo", "params": {}}""",
+      s"""{"jsonrpc": "${RPC.JsonRPCVersion}", "id": 1, "method": "foo", "params": {}}""",
+      s"""{"jsonrpc": "${RPC.JsonRPCVersion}", "method": "bar", "params": {}}"""
+    )
+    val out = Seq.newBuilder[String]
+    val io = new RPC.IO {
+      def read(): Iterator[String] = in.iterator
+      def write(line: String): Unit = out.addOne(line)
+    }
+
+    val executor = Executors.newSingleThreadExecutor()
+    implicit val ec = ExecutionContext.fromExecutor(executor)
+    RPC.run(io)(
+      "foo" -> RPC.RequestHandler((_, _: Unit) => Right(())),
+      "bar" -> RPC.NotificationHandler((_: Unit) => ())
+    )
+    executor.shutdown()
+    executor.awaitTermination(Long.MaxValue, TimeUnit.NANOSECONDS)
+    assertEquals(
+      out.result(),
+      Seq(
+        s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":null,"error":{"code":-32700,"message":"Attempt to decode value on failed cursor: DownField(jsonrpc)"}}""",
+        s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":1,"error":{"code":-32600,"message":"invalid JSON-RPC version"}}""",
+        s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":1,"result":{}}"""
+      )
+    )
   }
 
   test("RPC.read") {
@@ -93,12 +139,20 @@ class RPCSuite extends munit.FunSuite {
   }
 
   test("RPC.RequestHandler#handle") {
-    val handler = RPC.RequestHandler((_, _: Unit) => Right(()))
+    val handler = RPC.RequestHandler { (_, x: Boolean) =>
+      if (x) Right(()) else Left(RPC.Error(RPC.Error.InternalErrorCode, "foo"))
+    }
     assertEquals(
-      handler.handle(Some(RPC.IntID(1)), Json.obj()),
+      handler.handle(Some(RPC.IntID(1)), true.asJson),
       RPC.Result.ok(Some(RPC.ResultResponse(RPC.JsonRPCVersion, RPC.IntID(1), Json.obj())))
     )
-    // Exception cases are covered by the below tests.
+    assertEquals(
+      handler.handle(Some(RPC.IntID(1)), false.asJson),
+      RPC.Result.raise(
+        RPC.ErrorResponse(RPC.JsonRPCVersion, Some(RPC.IntID(1)), RPC.Error(RPC.Error.InternalErrorCode, "foo"))
+      )
+    )
+    // Other exception cases are covered by the below tests.
   }
 
   test("RPC.RequestHandler#validateID") {

@@ -19,8 +19,10 @@ import io.circe.syntax._
   */
 object RPC {
 
+  // $COVERAGE-OFF$ `final val` constant is inlined.
   /** The supported JSON-RPC version string. */
   final val JsonRPCVersion = "2.0"
+  // $COVERAGE-ON$
 
   /** ID is an ID of JSON-RPC requests. */
   sealed abstract class ID extends Product with Serializable
@@ -103,11 +105,13 @@ object RPC {
   final case class Error(code: Int, message: String)
 
   object Error {
+    // $COVERAGE-OFF$ `final val` constant is inlined.
     final val ParseErrorCode = -32700
     final val InvalidRequestCode = -32600
     final val MethodNotFoundCode = -32601
     final val InvalidParamsCode = -32602
     final val InternalErrorCode = -32603
+    // $COVERAGE-ON$
 
     implicit def encode: Encoder[Error] = deriveEncoder
   }
