@@ -5,7 +5,9 @@ import scala.io.Source
 
 import cats.syntax.functor._
 import io.circe.Decoder
+import io.circe.DecodingFailure
 import io.circe.Encoder
+import io.circe.HCursor
 import io.circe.Json
 import io.circe.generic.semiauto._
 import io.circe.parser.decode
@@ -13,10 +15,8 @@ import io.circe.syntax._
 
 /** A lightweight JSON-RPC implementation via stdio.
   *
-  * This totally implements [[https://www.jsonrpc.org/specification JSON-RPC 2.0 specification]],
-  * but it is incompatible at some points.
-  * For example, `null` is not a valid ID in this implementation, it means notify request instead.
-  * Also, batch requests are not supported for now.
+  * This totally implements [[https://www.jsonrpc.org/specification JSON-RPC 2.0 specification]].
+  * However, batch requests are not supported for now.
   */
 object RPC {
 
@@ -30,13 +30,11 @@ object RPC {
     implicit def encode: Encoder[ID] = {
       case id: StringID => id.asJson
       case id: IntID    => id.asJson
+      case NullID       => Json.Null
     }
 
     implicit def decode: Decoder[ID] =
-      List[Decoder[ID]](
-        StringID.decode.widen,
-        IntID.decode.widen
-      ).reduceLeft(_ or _)
+      List[Decoder[ID]](NullID.decode.widen, StringID.decode.widen, IntID.decode.widen).reduceLeft(_ or _)
   }
 
   /** StringID is an ID consists a string value. */
@@ -55,11 +53,25 @@ object RPC {
     implicit def decode: Decoder[IntID] = _.as[Int].map(IntID(_))
   }
 
+  /** NullID is a `null` id. */
+  case object NullID extends ID {
+    implicit def encode: Encoder[NullID.type] = _ => Json.Null
+    implicit def decode: Decoder[NullID.type] =
+      (c: HCursor) => if (c.value.isNull) Right(NullID) else Left(DecodingFailure("null is expected", c.history))
+  }
+
   /** Request is JSON-RPC request object. */
   final case class Request(jsonrpc: String, id: Option[ID], method: String, params: Json)
 
   object Request {
-    implicit def decode: Decoder[Request] = deriveDecoder
+    implicit def decode: Decoder[Request] = (c: HCursor) =>
+      for {
+        jsonrpc <- c.get[String]("jsonrpc")
+        // If the field `id` exists, it must be a valid ID. In other case, ID is missing.
+        id <- if (c.downField("id").succeeded) c.get[ID]("id").map(Some(_)) else Right(None)
+        method <- c.get[String]("method")
+        params <- c.get[Json]("params")
+      } yield Request(jsonrpc, id, method, params)
   }
 
   /** ResultResponse is JSON-RPC response object with result value. */
@@ -156,9 +168,7 @@ object RPC {
     def stdio: IO = new IO {
       def read(): Iterator[String] = Source.stdin.getLines()
 
-      def write(line: String): Unit = synchronized {
-        Console.println(line)
-      }
+      def write(line: String): Unit = synchronized(Console.println(line))
     }
   }
 
@@ -232,6 +242,7 @@ object RPC {
       }
     }
 
+    // Starts main loop.
     for (line <- io.read()) {
       ec.execute(() => handle(line))
     }
