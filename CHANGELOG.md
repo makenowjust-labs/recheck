@@ -7,6 +7,7 @@ Changes:
 - Move JS binding into new `recheck-js` module ([#79](https://github.com/MakeNowJust-Labo/recheck/pull/79))
 - Add `recheck` CLI ([#83](https://github.com/MakeNowJust-Labo/recheck/pull/83))
 - Build `recheck` CLI by using Graal `native-image`
+- Move circe codes into `recheck-codec` module ([#91](https://github.com/MakeNowJust-Labo/recheck/pull/91))
 
 Fixes:
 
