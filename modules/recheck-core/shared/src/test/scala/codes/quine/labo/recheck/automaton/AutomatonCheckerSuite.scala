@@ -25,7 +25,7 @@ class AutomatonCheckerSuite extends munit.FunSuite {
         case Right(pattern) => Success(pattern)
         case Left(message)  => Failure(new InvalidRegExpException(message))
       }
-      epsNFA <- EpsNFABuilder.compile(pattern)
+      epsNFA <- EpsNFABuilder.build(pattern)
       nfa = epsNFA.toOrderedNFA.rename
       result <- Try(AutomatonChecker.check(nfa))
     } yield result
