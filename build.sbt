@@ -238,9 +238,9 @@ lazy val cli = project
     Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "com.monovore" %% "decline" % "1.4.0",
-    libraryDependencies += "io.circe" %% "circe-core" % "0.13.0",
-    libraryDependencies += "io.circe" %% "circe-generic" % "0.13.0",
-    libraryDependencies += "io.circe" %% "circe-parser" % "0.13.0",
+    libraryDependencies += "io.circe" %% "circe-core" % "0.14.1",
+    libraryDependencies += "io.circe" %% "circe-generic" % "0.14.1",
+    libraryDependencies += "io.circe" %% "circe-parser" % "0.14.1",
     // Settings for test:
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.26" % Test,
     testFrameworks += new TestFramework("munit.Framework")
