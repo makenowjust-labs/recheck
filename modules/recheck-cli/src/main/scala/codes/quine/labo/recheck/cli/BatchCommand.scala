@@ -4,7 +4,6 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext
 
 import io.circe.Decoder
 import io.circe.generic.semiauto._
@@ -30,35 +29,57 @@ object BatchCommand {
   object CancelParams {
     implicit def decode: Decoder[CancelParams] = deriveDecoder
   }
+
+  /** A running execution token to cancel. */
+  private[cli] final case class Token(source: String, flags: String, send: RPC.Send[Diagnostics], cancel: () => Unit)
 }
 
 /** `recheck batch` command implementation. */
 class BatchCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio) {
 
-  /** A thread pool used by RPC runner. */
+  /** A thread pool used by checking. */
   val executor: ExecutorService = Executors.newFixedThreadPool(threadSize)
 
-  /** An execution context wrapping the thread pool. */
-  implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(executor)
-
-  /** A map from current running request IDs to cancel functions. */
-  val cancels: mutable.Map[RPC.ID, () => Unit] = mutable.Map.empty
+  /** A map from current running request IDs to their tokens. */
+  val tokens: mutable.Map[RPC.ID, Token] = mutable.Map.empty
 
   /** `"check"` method implementation. */
-  def handleCheck(id: RPC.ID, params: CheckParams): Either[RPC.Error, Diagnostics] = {
+  def handleCheck(id: RPC.ID, params: CheckParams, send: RPC.Send[Diagnostics]): Unit = {
     val config = synchronized {
       val (config, cancel) = params.config.instantiate()
-      cancels.remove(id).foreach(_.apply())
-      cancels(id) = cancel
+      tokens.remove(id).foreach(doCancel)
+      tokens.update(id, Token(params.source, params.flags, send, cancel))
       config
     }
-    try Right(ReDoS.check(params.source, params.flags, config))
-    finally cancels.remove(id)
+    executor.execute(() => {
+      val diagnostics = ReDoS.check(params.source, params.flags, config)
+      synchronized {
+        send(Right(diagnostics))
+        tokens.remove(id)
+        // When there is no running execution, it enforces GC.
+        if (tokens.isEmpty) gc()
+      }
+    })
   }
 
   /** `"cancel"` method implementation. */
   def handleCancel(params: CancelParams): Unit = synchronized {
-    cancels.remove(params.id).foreach(_.apply())
+    tokens.remove(params.id).foreach(doCancel)
+    // When there is no running execution, it enforces GC.
+    if (tokens.isEmpty) gc()
+  }
+
+  /** Cancels the given token execution. */
+  def doCancel(token: Token): Unit = {
+    token.cancel()
+    // TODO: add `ErrorKind.Cancel` to represent cancellation error.
+    token.send(Right(Diagnostics.Unknown(token.source, token.flags, Diagnostics.ErrorKind.Timeout, None)))
+  }
+
+  /** Enforces GC. */
+  def gc(): Unit = {
+    System.gc()
+    System.runFinalization()
   }
 
   def run(): Unit =
@@ -68,10 +89,8 @@ class BatchCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio) {
         "cancel" -> RPC.NotificationHandler(handleCancel)
       )
     } finally {
-      // $COVERAGE-OFF$
-      cancels.foreach(_._2.apply())
-      // $COVERAGE-ON$
-      cancels.clear()
+      tokens.values.foreach(doCancel)
+      tokens.clear()
       executor.shutdown()
       executor.awaitTermination(Long.MaxValue, TimeUnit.NANOSECONDS)
     }
