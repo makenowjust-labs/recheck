@@ -9,6 +9,7 @@ Changes:
 - Build `recheck` CLI by using Graal `native-image`
 - Move circe codes into `recheck-codec` module ([#91](https://github.com/MakeNowJust-Labo/recheck/pull/91))
 - Rename `recheck` module to `recheck-core` ([#92](https://github.com/MakeNowJust-Labo/recheck/pull/92))
+- Add `ErrorKind.Cancel` for canceled execution ([#93](https://github.com/MakeNowJust-Labo/recheck/pull/93))
 
 Fixes:
 

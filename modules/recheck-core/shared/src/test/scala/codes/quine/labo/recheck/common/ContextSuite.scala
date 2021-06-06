@@ -22,6 +22,7 @@ class ContextSuite extends munit.FunSuite {
     val (ctx, cancel) = Context.cancellable()
     assertEquals(ctx.interrupt(42), 42)
     cancel()
-    intercept[TimeoutException](ctx.interrupt(42))
+    intercept[CancelException](ctx.interrupt(42))
+    intercept[TimeoutException](Context(timeout = -1.second).interrupt(42))
   }
 }

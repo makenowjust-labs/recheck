@@ -5,6 +5,10 @@ class ExceptionsSuite extends munit.FunSuite {
     assertEquals(new TimeoutException("message").getMessage, "message")
   }
 
+  test("CancelException#getMessage") {
+    assertEquals(new CancelException("message").getMessage, "message")
+  }
+
   test("UnsupportedException#getMessage") {
     assertEquals(new UnsupportedException("message").getMessage, "message")
   }

@@ -107,7 +107,8 @@ class CodecSuite extends munit.FunSuite {
   }
 
   test("codec.encodeErrorKind") {
-    assertEquals(encodeErrorKind(ErrorKind.Timeout), Json.obj("kind" -> "timeout".asJson))
+    assertEquals(encodeErrorKind(ErrorKind.Timeout), Json.obj("kind" := "timeout"))
+    assertEquals(encodeErrorKind(ErrorKind.Cancel), Json.obj("kind" := "cancel"))
     assertEquals(encodeErrorKind(ErrorKind.Unsupported("foo")), Json.obj("kind" := "unsupported", "message" := "foo"))
     assertEquals(encodeErrorKind(ErrorKind.InvalidRegExp("foo")), Json.obj("kind" := "invalid", "message" := "foo"))
   }

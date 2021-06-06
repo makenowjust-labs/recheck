@@ -233,12 +233,15 @@ export type Hotspot = {
 /**
  * Error is a possible error on analyzing.
  */
-export type Error = Timeout | Unsupported | Invalid;
+export type Error = Timeout | Cancel | Unsupported | Invalid;
 
 /**
  * Timeout is a timeout error.
  */
 export type Timeout = { kind: "timeout" };
+
+/** Cancel is a cancel error. */
+export type Cancel = { kind: "cancel" };
 
 /**
  * Unsupported is an error reported when the RegExp is not supported.
