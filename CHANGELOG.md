@@ -8,6 +8,7 @@ Changes:
 - Add `recheck` CLI ([#83](https://github.com/MakeNowJust-Labo/recheck/pull/83))
 - Build `recheck` CLI by using Graal `native-image`
 - Move circe codes into `recheck-codec` module ([#91](https://github.com/MakeNowJust-Labo/recheck/pull/91))
+- Rename `recheck` module to `recheck-core` ([#92](https://github.com/MakeNowJust-Labo/recheck/pull/92))
 
 Fixes:
 
