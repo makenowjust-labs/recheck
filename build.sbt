@@ -12,7 +12,7 @@ ThisBuild / developers := List(
   )
 )
 
-ThisBuild / scalaVersion := "2.13.5"
+ThisBuild / scalaVersion := "2.13.6"
 ThisBuild / scalacOptions ++= Seq(
   "-encoding",
   "UTF-8",
@@ -26,7 +26,7 @@ ThisBuild / scalafixScalaBinaryVersion := "2.13"
 ThisBuild / semanticdbEnabled := true
 ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 ThisBuild / scalafixDependencies += "com.github.liancheng" %% "organize-imports" % "0.5.0"
-ThisBuild / scalafixDependencies += "com.github.vovapolu" %% "scaluzzi" % "0.1.18"
+ThisBuild / scalafixDependencies += "com.github.vovapolu" %% "scaluzzi" % "0.1.20"
 
 lazy val root = project
   .in(file("."))
@@ -193,6 +193,7 @@ lazy val js = project
   .enablePlugins(ScalaJSPlugin)
   .settings(
     name := "recheck-js",
+    publish / skip := true,
     console / initialCommands := """
       |import codes.quine.labo.recheck._
       |""".stripMargin,
@@ -236,10 +237,10 @@ lazy val cli = project
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
-    libraryDependencies += "com.monovore" %% "decline" % "1.3.0",
-    libraryDependencies += "io.circe" %% "circe-core" % "0.14.1",
-    libraryDependencies += "io.circe" %% "circe-generic" % "0.14.1",
-    libraryDependencies += "io.circe" %% "circe-parser" % "0.14.1",
+    libraryDependencies += "com.monovore" %% "decline" % "1.4.0",
+    libraryDependencies += "io.circe" %% "circe-core" % "0.13.0",
+    libraryDependencies += "io.circe" %% "circe-generic" % "0.13.0",
+    libraryDependencies += "io.circe" %% "circe-parser" % "0.13.0",
     // Settings for test:
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.26" % Test,
     testFrameworks += new TestFramework("munit.Framework")

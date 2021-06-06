@@ -15,6 +15,7 @@ Fixes:
 - Update `mdoc`, `sbt-mdoc` to 2.2.21 ([#74](https://github.com/MakeNowJust-Labo/recheck/pull/74))
 - Update `munit` to 0.7.26 ([#75](https://github.com/MakeNowJust-Labo/recheck/pull/75))
 - Update `sbt-scoverage` to 1.8.0 ([#76](https://github.com/MakeNowJust-Labo/recheck/pull/76))
+- Update Scala version to 2.13.6
 
 # 3.1.0 (2021-05-14)
 
