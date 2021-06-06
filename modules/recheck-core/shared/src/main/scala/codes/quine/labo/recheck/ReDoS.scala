@@ -66,7 +66,7 @@ object ReDoS {
               if (checker == Checker.Hybrid && pattern.size >= maxPatternSize)
                 Failure(new UnsupportedException("The pattern is too large"))
               else Success(())
-            epsNFA <- EpsNFABuilder.compile(pattern)
+            epsNFA <- EpsNFABuilder.build(pattern)
             orderedNFA <- Try(epsNFA.toOrderedNFA(maxNFASize).rename.mapAlphabet(_.head))
           } yield Some(AutomatonChecker.check(orderedNFA, maxNFASize))
     } yield complexity

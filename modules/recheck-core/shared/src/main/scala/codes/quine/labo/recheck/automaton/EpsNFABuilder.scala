@@ -18,7 +18,7 @@ import codes.quine.labo.recheck.unicode.ICharSet
 object EpsNFABuilder {
 
   /** Compiles ECMA-262 RegExp into ε-NFA. */
-  def compile(pattern: Pattern)(implicit ctx: Context): Try[EpsNFA[Int]] =
+  def build(pattern: Pattern)(implicit ctx: Context): Try[EpsNFA[Int]] =
     ctx.interrupt(for {
       alphabet <- pattern.alphabet
       builder = new EpsNFABuilder(pattern, alphabet)
