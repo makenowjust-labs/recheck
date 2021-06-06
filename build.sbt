@@ -193,6 +193,7 @@ lazy val js = project
   .enablePlugins(ScalaJSPlugin)
   .settings(
     name := "recheck-js",
+    publish / skip := true,
     console / initialCommands := """
       |import codes.quine.labo.recheck._
       |""".stripMargin,
