@@ -43,7 +43,7 @@ lazy val root = project
     mdocOut := baseDirectory.value / "site" / "content"
   )
   .enablePlugins(MdocPlugin)
-  .aggregate(recheckJVM, recheckJS, unicodeJVM, unicodeJS, parseJVM, parseJS, codecJVM, codecJS js, cli)
+  .aggregate(recheckJVM, recheckJS, unicodeJVM, unicodeJS, parseJVM, parseJS, codecJVM, codecJS, js, cli)
   .dependsOn(recheckJVM)
 
 lazy val recheck = crossProject(JVMPlatform, JSPlatform)
@@ -247,7 +247,7 @@ lazy val js = project
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
-  .dependsOn(recheckJS)
+  .dependsOn(recheckJS, codecJS)
 
 lazy val cli = project
   .in(file("modules/recheck-cli"))
@@ -279,4 +279,4 @@ lazy val cli = project
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.26" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
-  .dependsOn(recheckJVM)
+  .dependsOn(recheckJVM, codecJVM)

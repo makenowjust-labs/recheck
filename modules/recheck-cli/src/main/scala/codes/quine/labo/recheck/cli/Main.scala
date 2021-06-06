@@ -2,15 +2,14 @@ package codes.quine.labo.recheck.cli
 
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
-
 import cats.syntax.apply._
 import cats.syntax.semigroupk._
 import com.monovore.decline.Command
 import com.monovore.decline.Opts
-
 import codes.quine.labo.recheck.Config
 import codes.quine.labo.recheck.ReDoS
 import codes.quine.labo.recheck.cli.arguments._
+import codes.quine.labo.recheck.codec._
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.diagnostics.Diagnostics
 
@@ -24,7 +23,7 @@ object Main {
   final case class BatchAction(threadSize: Int) extends Action
 
   /** CheckAction holds `recheck check` subcommand parameters. */
-  final case class CheckAction(pattern: InputPattern, config: InputConfig) extends Action
+  final case class CheckAction(pattern: InputPattern, config: ConfigData) extends Action
 
   /** A command-line definition of `recheck`. */
   def command: Command[Action] =
@@ -112,7 +111,7 @@ object Main {
         maxRepeatCount,
         maxNFASize,
         maxPatternSize
-      ).mapN(InputConfig.apply)
+      ).mapN(ConfigData.apply)
 
       val pattern = Opts.argument[InputPattern](metavar = "pattern")
       val check: Opts[Action] = (pattern, config).mapN(CheckAction)

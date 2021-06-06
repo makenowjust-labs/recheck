@@ -58,7 +58,7 @@ class ConfigDataSuite extends munit.FunSuite {
     assertEquals(result.context.isInterrupted(), true)
   }
 
-  test("InputConfig.decode") {
+  test("ConfigData.decode") {
     assertEquals(
       ConfigData.decode.decodeJson(Json.obj()),
       Right(
