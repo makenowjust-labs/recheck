@@ -5,6 +5,7 @@ import codes.quine.labo.recheck.common.CancelException
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.common.ReDoSException
+import codes.quine.labo.recheck.common.TimeoutException
 import codes.quine.labo.recheck.common.UnsupportedException
 
 /** Diagnostics ia an analysis result. */
