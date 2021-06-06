@@ -87,6 +87,8 @@ package object codec {
   implicit def encodeErrorKind: Encoder[ErrorKind] = {
     case ErrorKind.Timeout =>
       Json.obj("kind" := "timeout")
+    case ErrorKind.Cancel =>
+      Json.obj("kind" := "cancel")
     case ErrorKind.Unsupported(message) =>
       Json.obj("kind" := "unsupported", "message" := message)
     case ErrorKind.InvalidRegExp(message) =>

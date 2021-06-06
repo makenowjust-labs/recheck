@@ -1,11 +1,12 @@
 package codes.quine.labo.recheck
 package diagnostics
 
-import codes.quine.labo.recheck.common.Checker
+import codes.quine.labo.recheck.common.CancelException
+import codes.quine.labo.recheck.common.Checker.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.common.ReDoSException
-import codes.quine.labo.recheck.common.TimeoutException
 import codes.quine.labo.recheck.common.UnsupportedException
+import codes.quine.labo.recheck.diagnostics.Diagnostics.quine.labo.recheck.common.TimeoutException
 
 /** Diagnostics ia an analysis result. */
 sealed abstract class Diagnostics extends Product with Serializable
@@ -67,6 +68,7 @@ object Diagnostics {
     def from(source: String, flags: String, ex: ReDoSException): Diagnostics = {
       val kind = ex match {
         case _: TimeoutException        => ErrorKind.Timeout
+        case _: CancelException         => ErrorKind.Cancel
         case ex: UnsupportedException   => ErrorKind.Unsupported(ex.getMessage)
         case ex: InvalidRegExpException => ErrorKind.InvalidRegExp(ex.getMessage)
       }
@@ -80,9 +82,14 @@ object Diagnostics {
   /** ErrorKind types. */
   object ErrorKind {
 
-    /** Timeout is a timeout of RegExp analyzing. */
+    /** Timeout is a timeout on RegExp analyzing. */
     case object Timeout extends ErrorKind {
       override def toString: String = "timeout"
+    }
+
+    /** Cancel is a cancel on RegExp analyzing. */
+    case object Cancel extends ErrorKind {
+      override def toString: String = "cancel"
     }
 
     /** Unsupported is the RegExp pattern is not supported yet. */

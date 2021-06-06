@@ -72,8 +72,7 @@ class BatchCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio) {
   /** Cancels the given token execution. */
   def doCancel(token: Token): Unit = {
     token.cancel()
-    // TODO: add `ErrorKind.Cancel` to represent cancellation error.
-    token.send(Right(Diagnostics.Unknown(token.source, token.flags, Diagnostics.ErrorKind.Timeout, None)))
+    token.send(Right(Diagnostics.Unknown(token.source, token.flags, Diagnostics.ErrorKind.Cancel, None)))
   }
 
   /** Enforces GC. */

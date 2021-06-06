@@ -1,6 +1,7 @@
 package codes.quine.labo.recheck
 package diagnostics
 
+import codes.quine.labo.recheck.common.CancelException
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.common.TimeoutException
@@ -56,6 +57,10 @@ class DiagnosticsSuite extends munit.FunSuite {
       Diagnostics.Unknown("", "", Diagnostics.ErrorKind.Timeout, None)
     )
     assertEquals(
+      Diagnostics.Unknown.from("", "", new CancelException("foo")),
+      Diagnostics.Unknown("", "", Diagnostics.ErrorKind.Cancel, None)
+    )
+    assertEquals(
       Diagnostics.Unknown.from("", "", new InvalidRegExpException("foo")),
       Diagnostics.Unknown("", "", Diagnostics.ErrorKind.InvalidRegExp("foo"), None)
     )
@@ -67,6 +72,7 @@ class DiagnosticsSuite extends munit.FunSuite {
 
   test("Diagnostics.ErrorKind#toString") {
     assertEquals(Diagnostics.ErrorKind.Timeout.toString, "timeout")
+    assertEquals(Diagnostics.ErrorKind.Cancel.toString, "cancel")
     assertEquals(Diagnostics.ErrorKind.Unsupported("foo").toString, "unsupported (foo)")
     assertEquals(Diagnostics.ErrorKind.InvalidRegExp("foo").toString, "invalid RegExp (foo)")
   }

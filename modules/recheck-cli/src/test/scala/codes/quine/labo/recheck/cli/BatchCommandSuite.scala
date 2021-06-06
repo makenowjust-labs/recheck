@@ -35,10 +35,10 @@ class BatchCommandSuite extends munit.FunSuite {
       out.result().sorted, // Result ordering depends on scheduling.
       Seq(
         """{"jsonrpc":"2.0","id":1,"result":{"source":"a","flags":"","status":"safe","checker":"automaton","complexity":{"type":"safe","summary":"safe","isFuzz":false}}}""",
-        """{"jsonrpc":"2.0","id":2,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"timeout"}}}""",
-        """{"jsonrpc":"2.0","id":3,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"timeout"}}}""",
+        """{"jsonrpc":"2.0","id":2,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"cancel"}}}""",
+        """{"jsonrpc":"2.0","id":3,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"cancel"}}}""",
         """{"jsonrpc":"2.0","id":3,"result":{"source":"a","flags":"","status":"safe","checker":"automaton","complexity":{"type":"safe","summary":"safe","isFuzz":false}}}""",
-        """{"jsonrpc":"2.0","id":4,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"timeout"}}}"""
+        """{"jsonrpc":"2.0","id":4,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"cancel"}}}"""
       )
     )
   }
