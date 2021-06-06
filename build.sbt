@@ -43,13 +43,13 @@ lazy val root = project
     mdocOut := baseDirectory.value / "site" / "content"
   )
   .enablePlugins(MdocPlugin)
-  .aggregate(recheckJVM, recheckJS, unicodeJVM, unicodeJS, parseJVM, parseJS, codecJVM, codecJS, js, cli)
-  .dependsOn(recheckJVM)
+  .aggregate(coreJVM, coreJS, unicodeJVM, unicodeJS, parseJVM, parseJS, codecJVM, codecJS, js, cli)
+  .dependsOn(coreJVM)
 
-lazy val recheck = crossProject(JVMPlatform, JSPlatform)
-  .in(file("modules/recheck"))
+lazy val core = crossProject(JVMPlatform, JSPlatform)
+  .in(file("modules/recheck-core"))
   .settings(
-    name := "recheck",
+    name := "recheck-core",
     console / initialCommands := """
       |import scala.concurrent.duration._
       |import scala.util.Random
@@ -103,8 +103,8 @@ lazy val recheck = crossProject(JVMPlatform, JSPlatform)
   )
   .dependsOn(unicode, parse)
 
-lazy val recheckJVM = recheck.jvm
-lazy val recheckJS = recheck.js
+lazy val coreJVM = core.jvm
+lazy val coreJS = core.js
 
 lazy val unicode = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/recheck-unicode"))
@@ -217,7 +217,7 @@ lazy val codec = crossProject(JVMPlatform, JSPlatform)
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
-  .dependsOn(recheck)
+  .dependsOn(core)
 
 lazy val codecJVM = codec.jvm
 lazy val codecJS = codec.js
@@ -249,7 +249,7 @@ lazy val js = project
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
-  .dependsOn(recheckJS, codecJS)
+  .dependsOn(coreJS, codecJS)
 
 lazy val cli = project
   .in(file("modules/recheck-cli"))
@@ -281,4 +281,4 @@ lazy val cli = project
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.26" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
-  .dependsOn(recheckJVM, codecJVM)
+  .dependsOn(coreJVM, codecJVM)
