@@ -1,10 +1,9 @@
-package codes.quine.labo.recheck.cli
+package codes.quine.labo.recheck.codec
 
 import io.circe.DecodingFailure
 import io.circe.Json
 import io.circe.syntax._
 
-import codes.quine.labo.recheck.cli.codecs._
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
@@ -13,8 +12,8 @@ import codes.quine.labo.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labo.recheck.diagnostics.Hotspot
 import codes.quine.labo.recheck.unicode.UString
 
-class CodecsSuite extends munit.FunSuite {
-  test("codecs.encodeDiagnostics") {
+class CodecSuite extends munit.FunSuite {
+  test("codec.encodeDiagnostics") {
     assertEquals(
       encodeDiagnostics(Diagnostics.Safe("a", "", AttackComplexity.Linear, Checker.Fuzz)),
       Json.obj(
@@ -58,13 +57,13 @@ class CodecsSuite extends munit.FunSuite {
     )
   }
 
-  test("codecs.encodeChecker") {
+  test("codec.encodeChecker") {
     assertEquals(encodeChecker(Checker.Hybrid), "hybrid".asJson)
     assertEquals(encodeChecker(Checker.Fuzz), "fuzz".asJson)
     assertEquals(encodeChecker(Checker.Automaton), "automaton".asJson)
   }
 
-  test("codecs.encodeAttackComplexity") {
+  test("codec.encodeAttackComplexity") {
     assertEquals(
       encodeAttackComplexity(AttackComplexity.Constant),
       Json.obj("type" := "constant", "summary" := "constant", "isFuzz" := false)
@@ -87,7 +86,7 @@ class CodecsSuite extends munit.FunSuite {
     )
   }
 
-  test("codecs.encodeAttackPattern") {
+  test("codec.encodeAttackPattern") {
     assertEquals(
       encodeAttackPattern(AttackPattern(Seq((UString("a"), UString("b"), 1)), UString("c"), 0)),
       Json.obj(
@@ -100,24 +99,24 @@ class CodecsSuite extends munit.FunSuite {
     )
   }
 
-  test("codecs.encodeHotspot") {
+  test("codec.encodeHotspot") {
     assertEquals(
       encodeHotspot(Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat)))),
       Json.arr(Json.obj("start" := 1, "end" := 2, "temperature" := "heat"))
     )
   }
 
-  test("codecs.encodeErrorKind") {
+  test("codec.encodeErrorKind") {
     assertEquals(encodeErrorKind(ErrorKind.Timeout), Json.obj("kind" -> "timeout".asJson))
     assertEquals(encodeErrorKind(ErrorKind.Unsupported("foo")), Json.obj("kind" := "unsupported", "message" := "foo"))
     assertEquals(encodeErrorKind(ErrorKind.InvalidRegExp("foo")), Json.obj("kind" := "invalid", "message" := "foo"))
   }
 
-  test("codecs.encodeUString") {
+  test("codec.encodeUString") {
     assertEquals(encodeUString(UString("foo")), Json.fromString("foo"))
   }
 
-  test("codecs.decodeChecker") {
+  test("codec.decodeChecker") {
     assertEquals(decodeChecker.decodeJson("hybrid".asJson), Right(Checker.Hybrid))
     assertEquals(decodeChecker.decodeJson("automaton".asJson), Right(Checker.Automaton))
     assertEquals(decodeChecker.decodeJson("fuzz".asJson), Right(Checker.Fuzz))

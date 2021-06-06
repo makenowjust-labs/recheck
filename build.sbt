@@ -43,7 +43,7 @@ lazy val root = project
     mdocOut := baseDirectory.value / "site" / "content"
   )
   .enablePlugins(MdocPlugin)
-  .aggregate(recheckJVM, recheckJS, unicodeJVM, unicodeJS, parseJVM, parseJS, js, cli)
+  .aggregate(recheckJVM, recheckJS, unicodeJVM, unicodeJS, parseJVM, parseJS, codecJVM, codecJS, js, cli)
   .dependsOn(recheckJVM)
 
 lazy val recheck = crossProject(JVMPlatform, JSPlatform)
@@ -188,6 +188,40 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
 lazy val parseJVM = parse.jvm
 lazy val parseJS = parse.js
 
+lazy val codec = crossProject(JVMPlatform, JSPlatform)
+  .in(file("modules/recheck-codec"))
+  .settings(
+    name := "recheck-codec",
+    console / initialCommands := """
+      |import io.circe._
+      |import io.circe.syntax._
+      |
+      |import codes.quine.labo.recheck.codec._
+      |""".stripMargin,
+    Compile / console / scalacOptions -= "-Wunused",
+    Test / console / scalacOptions -= "-Wunused",
+    // Settings for scaladoc:
+    Compile / doc / scalacOptions += "-diagrams",
+    // Set URL mapping of scala standard API for Scaladoc.
+    apiMappings ++= scalaInstance.value.libraryJars
+      .filter(file => file.getName.startsWith("scala-library") && file.getName.endsWith(".jar"))
+      .map(_ -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"))
+      .toMap,
+    // Dependencies:
+    libraryDependencies += "io.circe" %%% "circe-core" % "0.14.1",
+    // Settings for test:
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.26" % Test,
+    testFrameworks += new TestFramework("munit.Framework")
+  )
+  .jsSettings(
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
+    Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
+  )
+  .dependsOn(recheck)
+
+lazy val codecJVM = codec.jvm
+lazy val codecJS = codec.js
+
 lazy val js = project
   .in(file("modules/recheck-js"))
   .enablePlugins(ScalaJSPlugin)
@@ -206,6 +240,8 @@ lazy val js = project
       .filter(file => file.getName.startsWith("scala-library") && file.getName.endsWith(".jar"))
       .map(_ -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"))
       .toMap,
+    // Dependencies:
+    libraryDependencies += "io.circe" %%% "circe-scalajs" % "0.14.1",
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.26" % Test,
     testFrameworks += new TestFramework("munit.Framework"),
@@ -213,7 +249,7 @@ lazy val js = project
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
-  .dependsOn(recheckJS)
+  .dependsOn(recheckJS, codecJS)
 
 lazy val cli = project
   .in(file("modules/recheck-cli"))
@@ -245,4 +281,4 @@ lazy val cli = project
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.26" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
-  .dependsOn(recheckJVM)
+  .dependsOn(recheckJVM, codecJVM)

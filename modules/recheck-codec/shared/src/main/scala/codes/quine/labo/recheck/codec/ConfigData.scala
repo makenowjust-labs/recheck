@@ -1,4 +1,4 @@
-package codes.quine.labo.recheck.cli
+package codes.quine.labo.recheck.codec
 
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
@@ -8,12 +8,11 @@ import io.circe.Decoder
 import io.circe.HCursor
 
 import codes.quine.labo.recheck.Config
-import codes.quine.labo.recheck.cli.codecs._
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.Context
 
-/** InputConfig is a state-less data object of the configuration. */
-final case class InputConfig(
+/** ConfigData is a state-less data object of the configuration to check. */
+final case class ConfigData(
     timeout: Duration,
     checker: Checker,
     maxAttackSize: Int,
@@ -61,10 +60,10 @@ final case class InputConfig(
   }
 }
 
-object InputConfig {
+object ConfigData {
 
-  /** A `Decoder` instance for `InputConfig`. */
-  implicit def decode: Decoder[InputConfig] = (c: HCursor) =>
+  /** A `Decoder` instance for `ConfigData`. */
+  implicit def decode: Decoder[ConfigData] = (c: HCursor) =>
     for {
       timeout <- c.get[Option[Int]]("timeout")
       checker <- c.getOrElse[Checker]("checker")(Checker.Hybrid)
@@ -84,7 +83,7 @@ object InputConfig {
       maxRepeatCount <- c.getOrElse("maxRepeatCount")(Config.MaxRepeatCount)
       maxNFASize <- c.getOrElse("maxNFASize")(Config.MaxNFASize)
       maxPatternSize <- c.getOrElse("maxPatternSize")(Config.MaxPatternSize)
-    } yield InputConfig(
+    } yield ConfigData(
       timeout.map(Duration(_, TimeUnit.MILLISECONDS)).getOrElse(Duration.Inf),
       checker = checker,
       maxAttackSize = maxAttackSize,

@@ -10,14 +10,14 @@ import io.circe.generic.semiauto._
 
 import codes.quine.labo.recheck.ReDoS
 import codes.quine.labo.recheck.cli.BatchCommand._
-import codes.quine.labo.recheck.cli.codecs._
+import codes.quine.labo.recheck.codec._
 import codes.quine.labo.recheck.diagnostics.Diagnostics
 
 /** `recheck batch` method types. */
 object BatchCommand {
 
   /** `"check"` method parameter. */
-  final case class CheckParams(source: String, flags: String, config: InputConfig)
+  final case class CheckParams(source: String, flags: String, config: ConfigData)
 
   object CheckParams {
     implicit def decode: Decoder[CheckParams] = deriveDecoder

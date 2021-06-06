@@ -1,5 +1,6 @@
-package codes.quine.labo.recheck.cli
+package codes.quine.labo.recheck.codec
 
+import scala.concurrent.duration.Duration
 import scala.concurrent.duration._
 
 import io.circe.Json
@@ -8,9 +9,9 @@ import io.circe.syntax._
 import codes.quine.labo.recheck.Config
 import codes.quine.labo.recheck.common.Checker
 
-class InputConfigSuite extends munit.FunSuite {
-  test("InputConfig#instantiate") {
-    val (result, cancel) = InputConfig(
+class ConfigDataSuite extends munit.FunSuite {
+  test("ConfigData#instantiate") {
+    val (result, cancel) = ConfigData(
       timeout = 10.seconds,
       checker = Checker.Automaton,
       maxAttackSize = 12345,
@@ -57,11 +58,11 @@ class InputConfigSuite extends munit.FunSuite {
     assertEquals(result.context.isInterrupted(), true)
   }
 
-  test("InputConfig.decode") {
+  test("ConfigData.decode") {
     assertEquals(
-      InputConfig.decode.decodeJson(Json.obj()),
+      ConfigData.decode.decodeJson(Json.obj()),
       Right(
-        InputConfig(
+        ConfigData(
           timeout = Duration.Inf,
           checker = Checker.Hybrid,
           maxAttackSize = Config.MaxAttackSize,
@@ -84,7 +85,7 @@ class InputConfigSuite extends munit.FunSuite {
       )
     )
     assertEquals(
-      InputConfig.decode.decodeJson(
+      ConfigData.decode.decodeJson(
         Json.obj(
           "timeout" := 10000,
           "checker" := "fuzz",
@@ -107,7 +108,7 @@ class InputConfigSuite extends munit.FunSuite {
         )
       ),
       Right(
-        InputConfig(
+        ConfigData(
           timeout = 10000.millis,
           checker = Checker.Fuzz,
           maxAttackSize = 12345,
@@ -130,4 +131,5 @@ class InputConfigSuite extends munit.FunSuite {
       )
     )
   }
+
 }

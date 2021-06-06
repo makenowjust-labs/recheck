@@ -1,4 +1,4 @@
-package codes.quine.labo.recheck.cli
+package codes.quine.labo.recheck
 
 import io.circe.Decoder
 import io.circe.Encoder
@@ -13,8 +13,8 @@ import codes.quine.labo.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labo.recheck.diagnostics.Hotspot
 import codes.quine.labo.recheck.unicode.UString
 
-/** The object `codes` provides circe's `Encoder`/`Decoder` instances for this application. */
-object codecs {
+/** Package `codec` provides recheck types `Decoder`/`Encoder` of circe. */
+package object codec {
 
   /** An `Encoder` for `Diagnostics`. */
   implicit def encodeDiagnostics: Encoder[Diagnostics] = {
