@@ -208,7 +208,7 @@ lazy val codec = crossProject(JVMPlatform, JSPlatform)
       .map(_ -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"))
       .toMap,
     // Dependencies:
-    libraryDependencies += "io.circe" %% "circe-core" % "0.14.1",
+    libraryDependencies += "io.circe" %%% "circe-core" % "0.14.1",
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.26" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -240,6 +240,8 @@ lazy val js = project
       .filter(file => file.getName.startsWith("scala-library") && file.getName.endsWith(".jar"))
       .map(_ -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"))
       .toMap,
+    // Dependencies:
+    libraryDependencies += "io.circe" %%% "circe-scalajs" % "0.14.1",
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.26" % Test,
     testFrameworks += new TestFramework("munit.Framework"),
