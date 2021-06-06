@@ -2,10 +2,12 @@ package codes.quine.labo.recheck.cli
 
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
+
 import cats.syntax.apply._
 import cats.syntax.semigroupk._
 import com.monovore.decline.Command
 import com.monovore.decline.Opts
+
 import codes.quine.labo.recheck.Config
 import codes.quine.labo.recheck.ReDoS
 import codes.quine.labo.recheck.cli.arguments._

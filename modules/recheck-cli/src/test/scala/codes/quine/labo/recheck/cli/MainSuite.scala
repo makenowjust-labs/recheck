@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets
 import java.security.Permission
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
+
 import codes.quine.labo.recheck.Config
 import codes.quine.labo.recheck.codec.ConfigData
 import codes.quine.labo.recheck.common.Checker
