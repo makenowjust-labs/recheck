@@ -6,7 +6,9 @@ import scala.collection.mutable
 import codes.quine.labo.recheck.data.Graph
 import codes.quine.labo.recheck.util.GraphvizUtil.escape
 
-/** DFA is a [[https://en.wikipedia.org/wiki/Deterministic_finite_automaton DFA (deterministic finite automaton)]] implementation. */
+/** DFA is a [[https://en.wikipedia.org/wiki/Deterministic_finite_automaton DFA (deterministic finite automaton)]]
+  * implementation.
+  */
 final case class DFA[A, Q](
     alphabet: Set[A],
     stateSet: Set[Q],

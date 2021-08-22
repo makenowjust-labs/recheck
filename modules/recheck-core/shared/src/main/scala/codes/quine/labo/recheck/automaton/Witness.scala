@@ -5,11 +5,10 @@ import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.unicode.UChar
 import codes.quine.labo.recheck.unicode.UString
 
-/** Witness is a witness to the ReDoS attack, which is a pump string
-  * with a suffix.
+/** Witness is a witness to the ReDoS attack, which is a pump string with a suffix.
   *
-  * For example, when a witness object forms `Witness(Seq((x, y), (z, w)), u)`,
-  * an actual witness string is `x y^n z w^n u` for any integer `n`.
+  * For example, when a witness object forms `Witness(Seq((x, y), (z, w)), u)`, an actual witness string is `x y^n z w^n
+  * u` for any integer `n`.
   */
 final case class Witness[A](pumps: Seq[(Seq[A], Seq[A])], suffix: Seq[A]) {
 

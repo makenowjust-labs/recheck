@@ -77,7 +77,7 @@ object ReDoS {
           val attack = vul.buildAttackPattern(attackLimit, maxAttackSize)
           Diagnostics.Vulnerable(source, flags, vul.toAttackComplexity, attack, vul.hotspot, Checker.Automaton)
         case Some(safe: Complexity.Safe) => Diagnostics.Safe(source, flags, safe.toAttackComplexity, Checker.Automaton)
-        case None                        => Diagnostics.Safe(source, flags, AttackComplexity.Safe(false), Checker.Automaton)
+        case None => Diagnostics.Safe(source, flags, AttackComplexity.Safe(false), Checker.Automaton)
       }
       .recoverWith { case ex: ReDoSException =>
         ex.checker = Some(Checker.Automaton)

@@ -10,10 +10,9 @@ import codes.quine.labo.recheck.util.GraphvizUtil.escape
 
 /** NFAwLA is a NFA with a look-ahead DFA.
   *
-  * This NFA uses a multi-set instead of a set for duplicated transitions.
-  * A look-ahead DFA is a DFA which is constructed from the reversed original NFA.
-  * A state of this NFA is a pair of the original NFA state and the look-ahead DFA state,
-  * and the transition function must be pruned along with the backtrack behavior.
+  * This NFA uses a multi-set instead of a set for duplicated transitions. A look-ahead DFA is a DFA which is
+  * constructed from the reversed original NFA. A state of this NFA is a pair of the original NFA state and the
+  * look-ahead DFA state, and the transition function must be pruned along with the backtrack behavior.
   */
 final case class NFAwLA[A, Q](
     alphabet: Set[(A, Set[Q])],

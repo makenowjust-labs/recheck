@@ -19,8 +19,7 @@ sealed abstract class Inst {
 
 object Inst {
 
-  /** Branch is a base class for terminal instructions.
-    * Such a type instruction is placed in a last of a basic block.
+  /** Branch is a base class for terminal instructions. Such a type instruction is placed in a last of a basic block.
     */
   sealed abstract class Terminator extends Inst {
 
@@ -46,8 +45,8 @@ object Inst {
     override def toString: String = s"try $next $fallback"
   }
 
-  /** `cmp`: Compares a `reg` value with its operands, and jumps to a block depending on the comparison result.
-    * If `reg < n`, it jumps to a `lt` label, or if `n <= reg`, it jumps to a `ge` label.
+  /** `cmp`: Compares a `reg` value with its operands, and jumps to a block depending on the comparison result. If `reg
+    * < n`, it jumps to a `lt` label, or if `n <= reg`, it jumps to a `ge` label.
     */
   final case class Cmp(reg: CounterReg, n: Int, lt: Label, ge: Label) extends Terminator {
     def successors: Set[Label] = Set(lt, ge)
@@ -60,18 +59,16 @@ object Inst {
     override def toString: String = "rollback"
   }
 
-  /** `tx`: Marks as a transaction point, then jumps a `next` block.
-    * When it is terminated with a rollback, it jumps to a `rollback` block,
-    * and when it is failed, it jumps to a `fallback` block.
-    * `rollback` and `fallback` blocks are optional. When each of them is `None`, it means failed on jumping.
+  /** `tx`: Marks as a transaction point, then jumps a `next` block. When it is terminated with a rollback, it jumps to
+    * a `rollback` block, and when it is failed, it jumps to a `fallback` block. `rollback` and `fallback` blocks are
+    * optional. When each of them is `None`, it means failed on jumping.
     */
   final case class Tx(next: Label, rollback: Option[Label], fallback: Option[Label]) extends Terminator {
     def successors: Set[Label] = Set(Some(next), rollback, fallback).flatten
     override def toString: String = s"tx $next ${rollback.getOrElse("FAIL")} ${fallback.getOrElse("FAIL")}"
   }
 
-  /** NonTerminator is a base class for non-terminal instructions.
-    * They appear in a basic block except its last.
+  /** NonTerminator is a base class for non-terminal instructions. They appear in a basic block except its last.
     */
   sealed abstract class NonTerminator extends Inst
 
@@ -80,8 +77,8 @@ object Inst {
     override def toString: String = s"set_canary $reg"
   }
 
-  /** `check_canary`: Checks current position is advanced from saved in the canary register.
-    * If it is not, a matching is failed.
+  /** `check_canary`: Checks current position is advanced from saved in the canary register. If it is not, a matching is
+    * failed.
     */
   final case class CheckCanary(reg: CanaryReg) extends NonTerminator {
     override def toString: String = s"check_canary $reg"

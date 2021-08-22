@@ -97,8 +97,8 @@ private class EpsNFABuilder(
     EpsNFA(alphabet, stateSet(), init, accept, tau.result())
   }
 
-  /** Builds EpsNFA transitions for the node.
-    * The result pair is, the first is initial state, and the second is final state of the node.
+  /** Builds EpsNFA transitions for the node. The result pair is, the first is initial state, and the second is final
+    * state of the node.
     */
   def buildNode(node: Node): (Int, Int) = ctx.interrupt(node match {
     case Disjunction(ns) =>

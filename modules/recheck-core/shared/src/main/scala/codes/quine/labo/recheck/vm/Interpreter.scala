@@ -150,8 +150,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   @nowarn // Ignores 'The outer reference in this type test cannot be checked at run time.' error.
   private[this] object Rollback {
 
-    /** HasSuccessor is a pair of a label and a position for rollback
-      * when `rollback` instruction has rollback successor label.
+    /** HasSuccessor is a pair of a label and a position for rollback when `rollback` instruction has rollback successor
+      * label.
       */
     final case class HasSuccessor private (
         next: Label,

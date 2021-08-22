@@ -3,13 +3,11 @@ package diagnostics
 
 import codes.quine.labo.recheck.util.NumberFormat
 
-/** AttackComplexity is a computational complexity to check a match
-  * against an input string size.
+/** AttackComplexity is a computational complexity to check a match against an input string size.
   */
 sealed abstract class AttackComplexity extends Product with Serializable {
 
-  /** When it is `true`, this complexity maybe wrong.
-    * Otherwise, this comes from a precise analysis.
+  /** When it is `true`, this complexity maybe wrong. Otherwise, this comes from a precise analysis.
     */
   def isFuzz: Boolean
 }
