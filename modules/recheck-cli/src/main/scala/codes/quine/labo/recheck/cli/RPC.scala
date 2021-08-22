@@ -13,8 +13,8 @@ import io.circe.syntax._
 
 /** A lightweight JSON-RPC implementation via stdio.
   *
-  * This totally implements [[https://www.jsonrpc.org/specification JSON-RPC 2.0 specification]].
-  * However, batch requests are not supported for now.
+  * This totally implements [[https://www.jsonrpc.org/specification JSON-RPC 2.0 specification]]. However, batch
+  * requests are not supported for now.
   */
 object RPC {
 

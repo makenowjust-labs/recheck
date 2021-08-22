@@ -16,8 +16,8 @@ object Parser {
 
   /** Parses ECMA-262 RegExp string.
     *
-    * When parsing is failed, it returns `Left` value with an error message.
-    * Or, it returns `Right` value with the result pattern.
+    * When parsing is failed, it returns `Left` value with an error message. Or, it returns `Right` value with the
+    * result pattern.
     */
   def parse(source: String, flags: String, additional: Boolean = true): Either[String, Pattern] =
     for {
@@ -52,8 +52,8 @@ object Parser {
 
   /** Counts capture parentheses in the source and determine the source contains named capture.
     *
-    * The first value of result is a flag whether the source contains named capture or not,
-    * and the second value is capture parentheses number in the source.
+    * The first value of result is a flag whether the source contains named capture or not, and the second value is
+    * capture parentheses number in the source.
     */
   private[regexp] def preprocessParen(s: String): (Boolean, Int) = {
     var i = 0
@@ -126,8 +126,8 @@ object Parser {
 
 /** Parser is a ECMA-262 RegExp parser.
   *
-  * ECMA-262 RegExp syntax is modified when unicode flag is enabled or/and source has named captures.
-  * So, its constructor takes these parameters.
+  * ECMA-262 RegExp syntax is modified when unicode flag is enabled or/and source has named captures. So, its
+  * constructor takes these parameters.
   */
 private[regexp] final class Parser(
     val unicode: Boolean,
@@ -144,7 +144,7 @@ private[regexp] final class Parser(
 
   /** {{{
     * Disjunction :: Sequence
-    *              | Sequence "|" Disjunction
+    *               | Sequence "|" Disjunction
     * }}}
     */
   def Disjunction[_: P]: P[Node] =
@@ -237,7 +237,7 @@ private[regexp] final class Parser(
 
   /** {{{
     * Class :: "[" ClassNodes "]"
-    *        | "[" "^" ClassNodes "]"
+    *         | "[" "^" ClassNodes "]"
     * ClassNodes :: [empty]
     *             | ClassNodes ClassNode
     * }}}
@@ -251,7 +251,7 @@ private[regexp] final class Parser(
 
   /** {{{
     * ClassNode :: ClassAtom
-    *            | ClassAtom "-" ClassAtom
+    *             | ClassAtom "-" ClassAtom
     * }}}
     */
   def ClassNode[_: P]: P[ClassNode] =
@@ -279,8 +279,8 @@ private[regexp] final class Parser(
     }
 
   /** {{{
-    *  ClassCharacter :: "\\-" | "\\b"
-    *                  | Character | EscapeCharacter
+    *   ClassCharacter :: "\\-" | "\\b"
+    *                   | Character | EscapeCharacter
     * }}}
     */
   def ClassCharacter[_: P]: P[UChar] =
@@ -339,7 +339,7 @@ private[regexp] final class Parser(
 
   /** {{{
     * EscapeClass :: "\\w" | "\\w" | "\\d" | "\\D" | "\\s" | "\\S"
-    *              | UnicodeEscapeClass
+    *               | UnicodeEscapeClass
     * }}}
     */
   def EscapeClass[_: P]: P[Node with ClassNode] =
@@ -383,10 +383,10 @@ private[regexp] final class Parser(
 
   /** {{{
     * EscapeCharacter :: "\\t" | "\\n" | "\\v" | "\\f" | "\\r"
-    *                  | "\\c" [A-Za-z]
-    *                  | "\x" HexDigit HexDigit
-    *                  | "\\0"
-    *                  | OctalEscape | IdentityEscape
+    *                   | "\\c" [A-Za-z]
+    *                   | "\x" HexDigit HexDigit
+    *                   | "\\0"
+    *                   | OctalEscape | IdentityEscape
     * }}}
     */
   def EscapeCharacter[_: P]: P[UChar] =
@@ -408,7 +408,7 @@ private[regexp] final class Parser(
     * UnicodeEscape :: "\\u" HexDigit HexDigit HexDigit HexDigit
     *                 | "\\u{" HexDigits "}"
     * HexDigits :: HexDigit
-    *            | HexDigits HexDigit
+    *             | HexDigits HexDigit
     * }}}
     */
   def UnicodeEscape[_: P]: P[UChar] =
@@ -467,12 +467,12 @@ private[regexp] final class Parser(
 
   /** {{{
     * Paren :: "(" Disjunction ")"
-    *        | "(?:" Disjunction ")"
-    *        | "(?=" Disjunction ")"
-    *        | "(?!" Disjunction ")"
-    *        | "(?<=" Disjunction ")"
-    *        | "(?<!" Disjunction ")"
-    *        | "(?<" CaptureName ">" Disjunction ")"
+    *         | "(?:" Disjunction ")"
+    *         | "(?=" Disjunction ")"
+    *         | "(?!" Disjunction ")"
+    *         | "(?<=" Disjunction ")"
+    *         | "(?<!" Disjunction ")"
+    *         | "(?<" CaptureName ">" Disjunction ")"
     * }}}
     */
   def Paren[_: P]: P[Node] =
@@ -490,7 +490,7 @@ private[regexp] final class Parser(
 
   /** {{{
     * CaptureName :: CaptureNameChar
-    *              | CaptureName CaptureNameChar
+    *               | CaptureName CaptureNameChar
     * }}}
     */
   def CaptureName[_: P]: P[String] =

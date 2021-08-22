@@ -125,8 +125,8 @@ object Pattern {
   /** UnicodeProperty is an escape class of Unicode property. (e.g. `/\p{ASCII}/` or `/\P{L}/`) */
   final case class UnicodeProperty(invert: Boolean, name: String) extends Node with ClassNode
 
-  /** UnicodePropertyValue is an escape class of Unicode property and value.
-    * (e.g. `/\p{sc=Hira}/` or `/\P{General_Category=No}/`)
+  /** UnicodePropertyValue is an escape class of Unicode property and value. (e.g. `/\p{sc=Hira}/` or
+    * `/\P{General_Category=No}/`)
     */
   final case class UnicodePropertyValue(invert: Boolean, name: String, value: String) extends Node with ClassNode
 

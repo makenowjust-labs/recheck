@@ -31,7 +31,8 @@ final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]) {
 
   /** Computes a strongly connected components of this graph.
     *
-    * This method uses [[https://en.wikipedia.org/wiki/Tarjan's_strongly_connected_components_algorithm Tarjan's algorithm]].
+    * This method uses
+    * [[https://en.wikipedia.org/wiki/Tarjan's_strongly_connected_components_algorithm Tarjan's algorithm]].
     */
   def scc(implicit ctx: Context): Seq[IndexedSeq[V]] = ctx.interrupt {
     var clock = 0

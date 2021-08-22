@@ -6,8 +6,8 @@ import codes.quine.labo.recheck.unicode.IntervalSet._
 
 /** IntervalSet is set of intervals.
   *
-  * [[intervals]] is a sequence of discrete intervals sorted by start value.
-  * Each interval is represented by a pair of values `[start, end)`.
+  * [[intervals]] is a sequence of discrete intervals sorted by start value. Each interval is represented by a pair of
+  * values `[start, end)`.
   */
 final case class IntervalSet[@specialized A](intervals: IndexedSeq[(A, A)]) {
 
@@ -92,8 +92,7 @@ object IntervalSet {
     *
     * It does two things.
     *
-    *   1. it merges overlaps.
-    *   2. it removes empty intervals.
+    *   1. it merges overlaps. 2. it removes empty intervals.
     */
   private def normalize[A](intervals: Seq[(A, A)])(implicit A: Ordering[A]): IndexedSeq[(A, A)] =
     intervals.sorted.foldLeft(IndexedSeq.empty[(A, A)]) {

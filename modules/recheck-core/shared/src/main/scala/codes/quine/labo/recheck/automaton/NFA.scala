@@ -6,7 +6,10 @@ import scala.collection.mutable
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.util.GraphvizUtil.escape
 
-/** NFA is a [[https://en.wikipedia.org/wiki/Nondeterministic_finite_automaton NFA (non-deterministic finite state automaton)]] implementation. */
+/** NFA is a
+  * [[https://en.wikipedia.org/wiki/Nondeterministic_finite_automaton NFA (non-deterministic finite state automaton)]]
+  * implementation.
+  */
 final case class NFA[A, Q](
     alphabet: Set[A],
     stateSet: Set[Q],
