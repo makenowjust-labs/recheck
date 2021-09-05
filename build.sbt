@@ -94,7 +94,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
     // Dependencies:
     libraryDependencies += "com.lihaoyi" %%% "sourcecode" % "0.2.7",
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.28" % Test,
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
@@ -146,7 +146,7 @@ lazy val unicode = crossProject(JVMPlatform, JSPlatform)
       )
     },
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.28" % Test,
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
@@ -176,7 +176,7 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
     // Dependencies:
     libraryDependencies += "com.lihaoyi" %%% "fastparse" % "2.3.2",
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.28" % Test,
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
@@ -210,7 +210,7 @@ lazy val codec = crossProject(JVMPlatform, JSPlatform)
     // Dependencies:
     libraryDependencies += "io.circe" %%% "circe-core" % "0.14.1",
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.28" % Test,
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
@@ -243,7 +243,7 @@ lazy val js = project
     // Dependencies:
     libraryDependencies += "io.circe" %%% "circe-scalajs" % "0.14.1",
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.28" % Test,
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework"),
     // ScalaJS config:
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
@@ -278,7 +278,7 @@ lazy val cli = project
     libraryDependencies += "io.circe" %% "circe-generic" % "0.14.1",
     libraryDependencies += "io.circe" %% "circe-parser" % "0.14.1",
     // Settings for test:
-    libraryDependencies += "org.scalameta" %% "munit" % "0.7.28" % Test,
+    libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .dependsOn(coreJVM, codecJVM)
