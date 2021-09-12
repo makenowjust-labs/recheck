@@ -357,11 +357,15 @@ private[vm] class ProgramBuilder(
 
   /** A builder for `x{n}` node. */
   def buildRepeatN(n: Int, child: Node): Unit = {
+    val captureRange = child.captureRange
+
     val loop = allocateEntrance("loop")
     val cont = allocateLabel("cont")
 
     val reg = allocateCounter()
 
+    // Note that `wrapCanary` is not needed.
+    for ((min, max) <- captureRange.range) emitInst(Inst.CapReset(min, max))
     build(child)
     emitInst(Inst.Inc(reg))
     emitTerminator(Inst.Cmp(reg, n, loop, cont))
