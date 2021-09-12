@@ -275,5 +275,7 @@ class InterpreterSuite extends munit.FunSuite {
     assertCaptures("(?<=(a)(?!(a)))", "", "a", 0)(Seq(1, 1, 0, 1, -1, -1))
     assertCaptures("^(a*)(a*)$", "", "aaa", 0)(Seq(0, 3, 0, 3, 3, 3))
     assertCaptures("^(a*?)(a*?)$", "", "aaa", 0)(Seq(0, 3, 0, 0, 0, 3))
+    assertCaptures("^(?:(a)|(b)){2}$", "", "ba", 0)(Seq(0, 2, 1, 2, -1, -1))
+    assertCaptures("^(?:(a)|(b)){2}$", "", "ab", 0)(Seq(0, 2, -1, -1, 1, 2))
   }
 }
