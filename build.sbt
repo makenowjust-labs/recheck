@@ -174,7 +174,7 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
       .map(_ -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"))
       .toMap,
     // Dependencies:
-    libraryDependencies += "com.lihaoyi" %%% "fastparse" % "2.3.2",
+    libraryDependencies += "com.lihaoyi" %%% "fastparse" % "2.3.3",
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
