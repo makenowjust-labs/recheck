@@ -1,5 +1,7 @@
 package codes.quine.labo.recheck.regexp
-import fastparse._
+
+import fastparse.P
+import fastparse.Parsed
 
 import codes.quine.labo.recheck.regexp.Pattern._
 import codes.quine.labo.recheck.unicode.UChar
@@ -17,6 +19,22 @@ class ParserSuite extends munit.FunSuite {
 
   /** An additional-feature enabled parser having named captures instance for testing. */
   def PAN = new Parser(false, true, true, 1)
+
+  /** Parses the input by using the given parser. It accepts only a node parser, and it checks location is set
+    * correctly.
+    */
+  def parse[T <: Node](input: String, parser: P[_] => P[T])(implicit loc: munit.Location): Parsed[T] = {
+    val result = parse0(input, parser)
+    // Checks that location is set correctly.
+    result match {
+      case Parsed.Success(node, _) => assert(node.loc.isDefined)
+      case _: Parsed.Failure       => () // ignore
+    }
+    result
+  }
+
+  /** Parses the input by using the given parser. */
+  def parse0[T](input: String, parser: P[_] => P[T]): Parsed[T] = fastparse.parse(input, parser)
 
   test("Parser.parse") {
     assertEquals(Parser.parse("", "#", false), Left("unknown flag"))
@@ -140,12 +158,12 @@ class ParserSuite extends munit.FunSuite {
   }
 
   test("Parser#Repeat") {
-    assertEquals(parse("{1}", P.Repeat(_)), Parsed.Success((false, 1, None), 3))
-    assertEquals(parse("{1}?", P.Repeat(_)), Parsed.Success((true, 1, None), 4))
-    assertEquals(parse("{1,}", P.Repeat(_)), Parsed.Success((false, 1, Some(None)), 4))
-    assertEquals(parse("{1,}?", P.Repeat(_)), Parsed.Success((true, 1, Some(None)), 5))
-    assertEquals(parse("{1,2}", P.Repeat(_)), Parsed.Success((false, 1, Some(Some(2))), 5))
-    assertEquals(parse("{1,2}?", P.Repeat(_)), Parsed.Success((true, 1, Some(Some(2))), 6))
+    assertEquals(parse0("{1}", P.Repeat(_)), Parsed.Success((false, 1, None), 3))
+    assertEquals(parse0("{1}?", P.Repeat(_)), Parsed.Success((true, 1, None), 4))
+    assertEquals(parse0("{1,}", P.Repeat(_)), Parsed.Success((false, 1, Some(None)), 4))
+    assertEquals(parse0("{1,}?", P.Repeat(_)), Parsed.Success((true, 1, Some(None)), 5))
+    assertEquals(parse0("{1,2}", P.Repeat(_)), Parsed.Success((false, 1, Some(Some(2))), 5))
+    assertEquals(parse0("{1,2}?", P.Repeat(_)), Parsed.Success((true, 1, Some(Some(2))), 6))
   }
 
   test("Parser#Atom") {
@@ -176,26 +194,29 @@ class ParserSuite extends munit.FunSuite {
   }
 
   test("Parser#ClassNode") {
-    assertEquals(parse("0", P.ClassNode(_)), Parsed.Success(Character('0'), 1))
-    assertEquals(parse("\\w", P.ClassNode(_)), Parsed.Success(SimpleEscapeClass(false, EscapeClassKind.Word), 2))
-    assert(!parse("\\w-", P.ClassNode(_)).isSuccess)
-    assertEquals(parse("\\w-", PA.ClassNode(_)), Parsed.Success(SimpleEscapeClass(false, EscapeClassKind.Word), 2))
-    assert(!parse("0-\\w", P.ClassNode(_)).isSuccess)
-    assertEquals(parse("0-\\w", PA.ClassNode(_)), Parsed.Success(Character('0'), 1))
-    assertEquals(parse("0-9", P.ClassNode(_)), Parsed.Success(ClassRange('0', '9'), 3))
-    assertEquals(parse("0-9", PA.ClassNode(_)), Parsed.Success(ClassRange('0', '9'), 3))
+    assertEquals(parse0("0", P.ClassNode(_)), Parsed.Success(Character('0'), 1))
+    assertEquals(parse0("\\w", P.ClassNode(_)), Parsed.Success(SimpleEscapeClass(false, EscapeClassKind.Word), 2))
+    assert(!parse0("\\w-", P.ClassNode(_)).isSuccess)
+    assertEquals(parse0("\\w-", PA.ClassNode(_)), Parsed.Success(SimpleEscapeClass(false, EscapeClassKind.Word), 2))
+    assert(!parse0("0-\\w", P.ClassNode(_)).isSuccess)
+    assertEquals(parse0("0-\\w", PA.ClassNode(_)), Parsed.Success(Character('0'), 1))
+    assertEquals(parse0("0-9", P.ClassNode(_)), Parsed.Success(ClassRange('0', '9'), 3))
+    assertEquals(parse0("0-9", PA.ClassNode(_)), Parsed.Success(ClassRange('0', '9'), 3))
   }
 
   test("Parser#ClassAtom") {
-    assertEquals(parse("\\w", P.ClassAtom(_)), Parsed.Success(Right(SimpleEscapeClass(false, EscapeClassKind.Word)), 2))
-    assertEquals(parse("0", P.ClassAtom(_)), Parsed.Success(Left(UChar('0')), 1))
+    assertEquals(
+      parse0("\\w", P.ClassAtom(_)),
+      Parsed.Success(Right(SimpleEscapeClass(false, EscapeClassKind.Word)), 2)
+    )
+    assertEquals(parse0("0", P.ClassAtom(_)), Parsed.Success(Left(UChar('0')), 1))
   }
 
   test("Parser#ClassCharacter") {
-    assertEquals(parse("\\-", P.ClassCharacter(_)), Parsed.Success(UChar('-'), 2))
-    assertEquals(parse("\\b", P.ClassCharacter(_)), Parsed.Success(UChar(0x08), 2))
-    assertEquals(parse("\\0", P.ClassCharacter(_)), Parsed.Success(UChar(0), 2))
-    assertEquals(parse("0", P.ClassCharacter(_)), Parsed.Success(UChar('0'), 1))
+    assertEquals(parse0("\\-", P.ClassCharacter(_)), Parsed.Success(UChar('-'), 2))
+    assertEquals(parse0("\\b", P.ClassCharacter(_)), Parsed.Success(UChar(0x08), 2))
+    assertEquals(parse0("\\0", P.ClassCharacter(_)), Parsed.Success(UChar(0), 2))
+    assertEquals(parse0("0", P.ClassCharacter(_)), Parsed.Success(UChar('0'), 1))
   }
 
   test("Parser#Escape") {
@@ -247,64 +268,64 @@ class ParserSuite extends munit.FunSuite {
   }
 
   test("Parser#UnicodePropertyName") {
-    assertEquals(parse("foo", P.UnicodePropertyName(_)), Parsed.Success("foo", 3))
-    assert(!parse("123", P.UnicodePropertyName(_)).isSuccess)
+    assertEquals(parse0("foo", P.UnicodePropertyName(_)), Parsed.Success("foo", 3))
+    assert(!parse0("123", P.UnicodePropertyName(_)).isSuccess)
   }
 
   test("Parser#UnicodePropertyValue") {
-    assertEquals(parse("foo", P.UnicodePropertyValue(_)), Parsed.Success("foo", 3))
-    assertEquals(parse("123", P.UnicodePropertyValue(_)), Parsed.Success("123", 3))
+    assertEquals(parse0("foo", P.UnicodePropertyValue(_)), Parsed.Success("foo", 3))
+    assertEquals(parse0("123", P.UnicodePropertyValue(_)), Parsed.Success("123", 3))
   }
 
   test("Parser#EscapeCharacter") {
-    assertEquals(parse("\\t", P.EscapeCharacter(_)), Parsed.Success(UChar('\t'), 2))
-    assertEquals(parse("\\n", P.EscapeCharacter(_)), Parsed.Success(UChar('\n'), 2))
-    assertEquals(parse("\\v", P.EscapeCharacter(_)), Parsed.Success(UChar(0x0b), 2))
-    assertEquals(parse("\\f", P.EscapeCharacter(_)), Parsed.Success(UChar('\f'), 2))
-    assertEquals(parse("\\r", P.EscapeCharacter(_)), Parsed.Success(UChar('\r'), 2))
-    assertEquals(parse("\\cA", P.EscapeCharacter(_)), Parsed.Success(UChar(0x01), 3))
-    assertEquals(parse("\\ca", P.EscapeCharacter(_)), Parsed.Success(UChar(0x01), 3))
-    assertEquals(parse("\\cZ", P.EscapeCharacter(_)), Parsed.Success(UChar(0x1a), 3))
-    assertEquals(parse("\\cz", P.EscapeCharacter(_)), Parsed.Success(UChar(0x1a), 3))
-    assertEquals(parse("\\x11", P.EscapeCharacter(_)), Parsed.Success(UChar(0x11), 4))
-    assertEquals(parse("\\0", P.EscapeCharacter(_)), Parsed.Success(UChar(0), 2))
+    assertEquals(parse0("\\t", P.EscapeCharacter(_)), Parsed.Success(UChar('\t'), 2))
+    assertEquals(parse0("\\n", P.EscapeCharacter(_)), Parsed.Success(UChar('\n'), 2))
+    assertEquals(parse0("\\v", P.EscapeCharacter(_)), Parsed.Success(UChar(0x0b), 2))
+    assertEquals(parse0("\\f", P.EscapeCharacter(_)), Parsed.Success(UChar('\f'), 2))
+    assertEquals(parse0("\\r", P.EscapeCharacter(_)), Parsed.Success(UChar('\r'), 2))
+    assertEquals(parse0("\\cA", P.EscapeCharacter(_)), Parsed.Success(UChar(0x01), 3))
+    assertEquals(parse0("\\ca", P.EscapeCharacter(_)), Parsed.Success(UChar(0x01), 3))
+    assertEquals(parse0("\\cZ", P.EscapeCharacter(_)), Parsed.Success(UChar(0x1a), 3))
+    assertEquals(parse0("\\cz", P.EscapeCharacter(_)), Parsed.Success(UChar(0x1a), 3))
+    assertEquals(parse0("\\x11", P.EscapeCharacter(_)), Parsed.Success(UChar(0x11), 4))
+    assertEquals(parse0("\\0", P.EscapeCharacter(_)), Parsed.Success(UChar(0), 2))
   }
 
   test("Parser#UnicodeEscape") {
-    assertEquals(parse("\\u1234", P.UnicodeEscape(_)), Parsed.Success(UChar(0x1234), 6))
-    assert(!parse("\\u{1234}", P.UnicodeEscape(_)).isSuccess)
-    assertEquals(parse("\\u1234", PU.UnicodeEscape(_)), Parsed.Success(UChar(0x1234), 6))
-    assertEquals(parse("\\u{1234}", PU.UnicodeEscape(_)), Parsed.Success(UChar(0x1234), 8))
-    assertEquals(parse("\\ud83c\\udf63", PU.UnicodeEscape(_)), Parsed.Success(UChar(0x1f363), 12))
-    assertEquals(parse("\\ud83c\\u0041", PU.UnicodeEscape(_)), Parsed.Success(UChar(0xd83c), 6))
+    assertEquals(parse0("\\u1234", P.UnicodeEscape(_)), Parsed.Success(UChar(0x1234), 6))
+    assert(!parse0("\\u{1234}", P.UnicodeEscape(_)).isSuccess)
+    assertEquals(parse0("\\u1234", PU.UnicodeEscape(_)), Parsed.Success(UChar(0x1234), 6))
+    assertEquals(parse0("\\u{1234}", PU.UnicodeEscape(_)), Parsed.Success(UChar(0x1234), 8))
+    assertEquals(parse0("\\ud83c\\udf63", PU.UnicodeEscape(_)), Parsed.Success(UChar(0x1f363), 12))
+    assertEquals(parse0("\\ud83c\\u0041", PU.UnicodeEscape(_)), Parsed.Success(UChar(0xd83c), 6))
   }
 
   test("Parser#OctalEscape") {
-    assert(!parse("\\012", P.OctalEscape(_)).isSuccess)
-    assertEquals(parse("\\012", PA.OctalEscape(_)), Parsed.Success(UChar(0x0a), 4))
-    assertEquals(parse("\\12x", PA.OctalEscape(_)), Parsed.Success(UChar(0x0a), 3))
-    assertEquals(parse("\\404", PA.OctalEscape(_)), Parsed.Success(UChar(0x20), 3))
+    assert(!parse0("\\012", P.OctalEscape(_)).isSuccess)
+    assertEquals(parse0("\\012", PA.OctalEscape(_)), Parsed.Success(UChar(0x0a), 4))
+    assertEquals(parse0("\\12x", PA.OctalEscape(_)), Parsed.Success(UChar(0x0a), 3))
+    assertEquals(parse0("\\404", PA.OctalEscape(_)), Parsed.Success(UChar(0x20), 3))
   }
 
   test("Parser#IdenittyEscape") {
-    assertEquals(parse("\\|", P.IdentityEscape(_)), Parsed.Success(UChar('|'), 2))
-    assertEquals(parse("\\=", P.IdentityEscape(_)), Parsed.Success(UChar('='), 2))
-    assert(!parse("\\w", P.IdentityEscape(_)).isSuccess)
-    assertEquals(parse("\\|", PU.IdentityEscape(_)), Parsed.Success(UChar('|'), 2))
-    assert(!parse("\\=", PU.IdentityEscape(_)).isSuccess)
-    assert(!parse("\\w", PU.IdentityEscape(_)).isSuccess)
-    assertEquals(parse("\\|", PA.IdentityEscape(_)), Parsed.Success(UChar('|'), 2))
-    assertEquals(parse("\\=", PA.IdentityEscape(_)), Parsed.Success(UChar('='), 2))
-    assertEquals(parse("\\c", PA.IdentityEscape(_)), Parsed.Success(UChar('\\'), 1))
-    assert(!parse("\\k", PAN.IdentityEscape(_)).isSuccess)
+    assertEquals(parse0("\\|", P.IdentityEscape(_)), Parsed.Success(UChar('|'), 2))
+    assertEquals(parse0("\\=", P.IdentityEscape(_)), Parsed.Success(UChar('='), 2))
+    assert(!parse0("\\w", P.IdentityEscape(_)).isSuccess)
+    assertEquals(parse0("\\|", PU.IdentityEscape(_)), Parsed.Success(UChar('|'), 2))
+    assert(!parse0("\\=", PU.IdentityEscape(_)).isSuccess)
+    assert(!parse0("\\w", PU.IdentityEscape(_)).isSuccess)
+    assertEquals(parse0("\\|", PA.IdentityEscape(_)), Parsed.Success(UChar('|'), 2))
+    assertEquals(parse0("\\=", PA.IdentityEscape(_)), Parsed.Success(UChar('='), 2))
+    assertEquals(parse0("\\c", PA.IdentityEscape(_)), Parsed.Success(UChar('\\'), 1))
+    assert(!parse0("\\k", PAN.IdentityEscape(_)).isSuccess)
   }
 
   test("Parser#Character") {
-    assertEquals(parse("x", P.Character(_)), Parsed.Success(UChar('x'), 1))
-    assert(!parse("\\u0041", P.Character(_)).isSuccess)
-    assertEquals(parse("x", PU.Character(_)), Parsed.Success(UChar('x'), 1))
-    assertEquals(parse("\ud83c\udf63", PU.Character(_)), Parsed.Success(UChar(0x1f363), 2))
-    assert(!parse("\\u0041", PU.Character(_)).isSuccess)
+    assertEquals(parse0("x", P.Character(_)), Parsed.Success(UChar('x'), 1))
+    assert(!parse0("\\u0041", P.Character(_)).isSuccess)
+    assertEquals(parse0("x", PU.Character(_)), Parsed.Success(UChar('x'), 1))
+    assertEquals(parse0("\ud83c\udf63", PU.Character(_)), Parsed.Success(UChar(0x1f363), 2))
+    assert(!parse0("\\u0041", PU.Character(_)).isSuccess)
   }
 
   test("Parser#Paren") {
@@ -318,26 +339,26 @@ class ParserSuite extends munit.FunSuite {
   }
 
   test("Parser#CaptureName") {
-    assertEquals(parse("foo", P.CaptureName(_)), Parsed.Success("foo", 3))
-    assertEquals(parse("h\\u0065llo", P.CaptureName(_)), Parsed.Success("hello", 10))
-    assert(!parse("0", P.CaptureName(_)).isSuccess)
+    assertEquals(parse0("foo", P.CaptureName(_)), Parsed.Success("foo", 3))
+    assertEquals(parse0("h\\u0065llo", P.CaptureName(_)), Parsed.Success("hello", 10))
+    assert(!parse0("0", P.CaptureName(_)).isSuccess)
   }
 
   test("Parser#CaptureNameChar") {
-    assertEquals(parse("x", P.CaptureNameChar(_)), Parsed.Success(UChar('x'), 1))
-    assertEquals(parse("\\u1234", P.CaptureNameChar(_)), Parsed.Success(UChar(0x1234), 6))
+    assertEquals(parse0("x", P.CaptureNameChar(_)), Parsed.Success(UChar('x'), 1))
+    assertEquals(parse0("\\u1234", P.CaptureNameChar(_)), Parsed.Success(UChar(0x1234), 6))
   }
 
   test("Parser#Digits") {
-    assertEquals(parse("0", P.Digits(_)), Parsed.Success(0, 1))
-    assertEquals(parse("123", P.Digits(_)), Parsed.Success(123, 3))
-    assert(!parse("z", P.Digits(_)).isSuccess)
+    assertEquals(parse0("0", P.Digits(_)), Parsed.Success(0, 1))
+    assertEquals(parse0("123", P.Digits(_)), Parsed.Success(123, 3))
+    assert(!parse0("z", P.Digits(_)).isSuccess)
   }
 
   test("Parser#HexDigit") {
-    assertEquals(parse("0", P.HexDigit(_)), Parsed.Success((), 1))
-    assertEquals(parse("A", P.HexDigit(_)), Parsed.Success((), 1))
-    assertEquals(parse("a", P.HexDigit(_)), Parsed.Success((), 1))
-    assert(!parse("z", P.HexDigit(_)).isSuccess)
+    assertEquals(parse0("0", P.HexDigit(_)), Parsed.Success((), 1))
+    assertEquals(parse0("A", P.HexDigit(_)), Parsed.Success((), 1))
+    assertEquals(parse0("a", P.HexDigit(_)), Parsed.Success((), 1))
+    assert(!parse0("z", P.HexDigit(_)).isSuccess)
   }
 }
