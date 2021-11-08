@@ -50,6 +50,7 @@ class UCharSuite extends munit.FunSuite {
     assertEquals(UChar(0x0b).toString, "\\v")
     assertEquals(UChar(0x0c).toString, "\\f")
     assertEquals(UChar(0x0d).toString, "\\r")
+    assertEquals(UChar(0x5c).toString, "\\\\")
     assertEquals(UChar(0x01).toString, "\\cA")
     assertEquals(UChar('a').toString, "a")
     assertEquals(UChar(0).toString, "\\x00")
