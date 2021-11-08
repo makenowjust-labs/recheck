@@ -93,6 +93,7 @@ class UStringSuite extends munit.FunSuite {
     assertEquals(UString("").toString, "''")
     assertEquals(UString("xyz").toString, "'xyz'")
     assertEquals(UString("a\nb").toString, "'a\\nb'")
+    assertEquals(UString("a\\b").toString, "'a\\\\b'")
     assertEquals(UString("a'b").toString, "'a\\'b'")
   }
 }
