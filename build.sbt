@@ -259,7 +259,7 @@ lazy val cli = project
     NativeImage / name := "recheck",
     publish / skip := true,
     Compile / mainClass := Some("codes.quine.labo.recheck.cli.Main"),
-    nativeImageVersion := "21.1.0",
+    nativeImageVersion := "21.3.0",
     nativeImageOptions ++= List(
       "--no-fallback",
       "--initialize-at-build-time"
