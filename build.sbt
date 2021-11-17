@@ -12,7 +12,7 @@ ThisBuild / developers := List(
   )
 )
 
-ThisBuild / scalaVersion := "2.13.6"
+ThisBuild / scalaVersion := "2.13.7"
 ThisBuild / scalacOptions ++= Seq(
   "-encoding",
   "UTF-8",
@@ -259,6 +259,7 @@ lazy val cli = project
     NativeImage / name := "recheck",
     publish / skip := true,
     Compile / mainClass := Some("codes.quine.labo.recheck.cli.Main"),
+    nativeImageVersion := "21.3.0",
     nativeImageOptions ++= List(
       "--no-fallback",
       "--initialize-at-build-time"
