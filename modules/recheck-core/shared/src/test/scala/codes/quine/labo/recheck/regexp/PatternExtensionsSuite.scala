@@ -98,7 +98,7 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(CharacterClass(false, Seq(Character('a'))).captureRange, CaptureRange(None))
     assertEquals(Dot().captureRange, CaptureRange(None))
     assertEquals(BackReference(1).captureRange, CaptureRange(None))
-    assertEquals(NamedBackReference("foo").captureRange, CaptureRange(None))
+    assertEquals(NamedBackReference(1, "foo").captureRange, CaptureRange(None))
   }
 
   test("PatternExtensions.NodeOps#isEmpty") {
@@ -135,7 +135,7 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(CharacterClass(false, Seq(Character('a'))).isEmpty, false)
     assertEquals(Dot().isEmpty, false)
     assertEquals(BackReference(1).isEmpty, true)
-    assertEquals(NamedBackReference("foo").isEmpty, true)
+    assertEquals(NamedBackReference(1, "foo").isEmpty, true)
   }
 
   test("PatternExtensions.CaptureRange#merge") {

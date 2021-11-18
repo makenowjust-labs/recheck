@@ -31,7 +31,7 @@ object ReDoS {
       _ <- Try(()) // Ensures `Try` context.
       pattern <- ctx.interrupt(Parser.parse(source, flags) match {
         case Right(pattern) => Success(pattern)
-        case Left(message)  => Failure(new InvalidRegExpException(message))
+        case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
       })
       diagnostics <- checker match {
         case Checker.Automaton => checkAutomaton(source, flags, pattern, config)

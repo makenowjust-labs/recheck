@@ -23,7 +23,7 @@ class AutomatonCheckerSuite extends munit.FunSuite {
     for {
       pattern <- Parser.parse(source, flags) match {
         case Right(pattern) => Success(pattern)
-        case Left(message)  => Failure(new InvalidRegExpException(message))
+        case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
       }
       epsNFA <- EpsNFABuilder.build(pattern)
       nfa = epsNFA.toOrderedNFA.rename

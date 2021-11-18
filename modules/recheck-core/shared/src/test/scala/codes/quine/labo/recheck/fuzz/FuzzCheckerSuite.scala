@@ -22,7 +22,7 @@ class FuzzCheckerSuite extends munit.FunSuite {
     val result = for {
       pattern <- Parser.parse(source, flags) match {
         case Right(pattern) => Success(pattern)
-        case Left(message)  => Failure(new InvalidRegExpException(message))
+        case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
       }
       fuzz <- FuzzProgram.from(pattern)
     } yield FuzzChecker.check(
@@ -66,7 +66,7 @@ class FuzzCheckerSuite extends munit.FunSuite {
       val result = for {
         pattern <- Parser.parse("^(a?){50}a{50}$", "") match {
           case Right(pattern) => Success(pattern)
-          case Left(message)  => Failure(new InvalidRegExpException(message))
+          case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
         }
         fuzz <- FuzzProgram.from(pattern)
       } yield FuzzChecker.check(fuzz, random0, seedLimit = 10000, incubationLimit = 10000, attackLimit = 10000)
@@ -78,7 +78,7 @@ class FuzzCheckerSuite extends munit.FunSuite {
       val result = for {
         pattern <- Parser.parse("^(a|a)*$", "") match {
           case Right(pattern) => Success(pattern)
-          case Left(message)  => Failure(new InvalidRegExpException(message))
+          case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
         }
         fuzz <- FuzzProgram.from(pattern)
       } yield FuzzChecker.check(fuzz, random0, incubationLimit = 100, attackLimit = 100, maxAttackSize = 5)

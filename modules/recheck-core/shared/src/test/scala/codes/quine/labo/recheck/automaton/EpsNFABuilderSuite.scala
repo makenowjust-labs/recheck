@@ -561,7 +561,7 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         EpsNFABuilder.build(Pattern(BackReference(1), flagSet0)).get
       }
       interceptMessage[UnsupportedException]("named back-reference") {
-        EpsNFABuilder.build(Pattern(NamedBackReference("foo"), flagSet0)).get
+        EpsNFABuilder.build(Pattern(NamedBackReference(1, "foo"), flagSet0)).get
       }
     }
   }

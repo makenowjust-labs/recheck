@@ -211,7 +211,7 @@ private class EpsNFABuilder(
       val a = nextQ()
       emit(i -> Consume(alphabet.refine(dot), a, node.loc))
       (i, a)
-    case BackReference(_)      => throw new UnsupportedException("back-reference")
-    case NamedBackReference(_) => throw new UnsupportedException("named back-reference")
+    case BackReference(_)         => throw new UnsupportedException("back-reference")
+    case NamedBackReference(_, _) => throw new UnsupportedException("named back-reference")
   })
 }

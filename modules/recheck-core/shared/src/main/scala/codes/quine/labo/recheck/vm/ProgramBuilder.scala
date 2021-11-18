@@ -243,7 +243,7 @@ private[vm] class ProgramBuilder(
       if (index <= 0 || capturesSize < index) throw new InvalidRegExpException("invalid back-reference")
       // $COVERAGE-ON$
       emitRead(ReadKind.Ref(index), node.loc)
-    case NamedBackReference(name) =>
+    case NamedBackReference(_, name) =>
       // $COVERAGE-OFF$
       val index = names.getOrElse(name, throw new InvalidRegExpException("invalid named back reference"))
       // $COVERAGE-ON$

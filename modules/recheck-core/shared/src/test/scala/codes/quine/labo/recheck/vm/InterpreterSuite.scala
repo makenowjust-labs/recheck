@@ -22,7 +22,7 @@ class InterpreterSuite extends munit.FunSuite {
     val t = for {
       pattern <- Parser.parse(source, flags) match {
         case Right(pattern) => Success(pattern)
-        case Left(message)  => Failure(new InvalidRegExpException(message))
+        case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
       }
       program <- ProgramBuilder.build(pattern)
       result = Interpreter.run(program, UString(input), pos, opts)

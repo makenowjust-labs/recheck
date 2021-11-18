@@ -262,19 +262,19 @@ object PatternExtensions {
 
     /** Checks this node can match an empty string. */
     def isEmpty: Boolean = node match {
-      case Disjunction(ns)                           => ns.exists(_.isEmpty)
-      case Sequence(ns)                              => ns.forall(_.isEmpty)
-      case Capture(_, n)                             => n.isEmpty
-      case NamedCapture(_, _, n)                     => n.isEmpty
-      case Group(n)                                  => n.isEmpty
-      case Star(_, _)                                => true
-      case Plus(_, n)                                => n.isEmpty
-      case Question(_, _)                            => true
-      case Repeat(_, min, _, n)                      => min == 0 || n.isEmpty
-      case WordBoundary(_) | LineBegin() | LineEnd() => true
-      case LookAhead(_, _) | LookBehind(_, _)        => true
-      case BackReference(_) | NamedBackReference(_)  => true
-      case _                                         => false
+      case Disjunction(ns)                             => ns.exists(_.isEmpty)
+      case Sequence(ns)                                => ns.forall(_.isEmpty)
+      case Capture(_, n)                               => n.isEmpty
+      case NamedCapture(_, _, n)                       => n.isEmpty
+      case Group(n)                                    => n.isEmpty
+      case Star(_, _)                                  => true
+      case Plus(_, n)                                  => n.isEmpty
+      case Question(_, _)                              => true
+      case Repeat(_, min, _, n)                        => min == 0 || n.isEmpty
+      case WordBoundary(_) | LineBegin() | LineEnd()   => true
+      case LookAhead(_, _) | LookBehind(_, _)          => true
+      case BackReference(_) | NamedBackReference(_, _) => true
+      case _                                           => false
     }
   }
 
