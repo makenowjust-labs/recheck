@@ -19,24 +19,24 @@ object Parser {
     * When parsing is failed, it returns `Left` value with an error message. Or, it returns `Right` value with the
     * result pattern.
     */
-  def parse(source: String, flags: String, additional: Boolean = true): Either[String, Pattern] =
+  def parse(source: String, flags: String, additional: Boolean = true): Either[ParsingException, Pattern] =
     for {
       flagSet <- parseFlagSet(flags)
       (hasNamedCapture, captures) = preprocessParen(source)
       result =
         fastparse.parse(source, new Parser(flagSet.unicode, additional, hasNamedCapture, captures).Source(_))
-      node <- result match {
+      node <- (result match {
         case Parsed.Success(node, _) => Right(node)
-        case fail: Parsed.Failure    => Left(s"parsing failure at ${fail.index}")
-      }
-    } yield Pattern(assignCaptureIndex(node), flagSet)
+        case fail: Parsed.Failure    => Left(new ParsingException(s"parsing failure", Some((fail.index, fail.index))))
+      }).map(assignCaptureIndex).flatMap(assignBackReferenceIndex)
+    } yield Pattern(node, flagSet)
 
   /** Parses a flag set string. */
-  private[regexp] def parseFlagSet(s: String): Either[String, FlagSet] = {
+  private[regexp] def parseFlagSet(s: String): Either[ParsingException, FlagSet] = {
     val cs = s.toList
     // A flag set accepts neither duplicated character nor unknown character.
-    if (cs.distinct != cs) Left("duplicated flag")
-    else if (!cs.forall("gimsuy".contains(_))) Left("unknown flag")
+    if (cs.distinct != cs) Left(new ParsingException("duplicated flag", None))
+    else if (!cs.forall("gimsuy".contains(_))) Left(new ParsingException("unknown flag", None))
     else
       Right(
         FlagSet(
@@ -89,7 +89,7 @@ object Parser {
     (hasNamedCapture, captures)
   }
 
-  /** Assigns capture's index in left-to-right ordering. */
+  /** Returns a new node in which capture indices are assigned. */
   private[regexp] def assignCaptureIndex(node: Node): Node = {
     import Pattern._
 
@@ -115,6 +115,53 @@ object Parser {
     }
 
     loop(node)
+  }
+
+  /** Returns a new node named in which back-references are resolved. */
+  private[regexp] def assignBackReferenceIndex(node: Node): Either[ParsingException, Node] = {
+    import Pattern._
+
+    def collect(caps: Map[String, Int], node: Node): Map[String, Int] = node match {
+      case Disjunction(ns) => ns.foldLeft(caps)(collect)
+      case Sequence(ns)    => ns.foldLeft(caps)(collect)
+      case Capture(_, n)   => collect(caps, n)
+      case NamedCapture(index, name, n) =>
+        if (caps.contains(name)) throw new ParsingException("duplicated name", node.loc)
+        collect(caps ++ Map(name -> index), n)
+      case Group(n)           => collect(caps, n)
+      case Star(_, n)         => collect(caps, n)
+      case Plus(_, n)         => collect(caps, n)
+      case Question(_, n)     => collect(caps, n)
+      case Repeat(_, _, _, n) => collect(caps, n)
+      case LookAhead(_, n)    => collect(caps, n)
+      case LookBehind(_, n)   => collect(caps, n)
+      case _                  => caps
+    }
+
+    def loop(caps: Map[String, Int], node: Node): Node = node match {
+      case Disjunction(ns)                => Disjunction(ns.map(loop(caps, _))).withLoc(node)
+      case Sequence(ns)                   => Sequence(ns.map(loop(caps, _))).withLoc(node)
+      case Capture(index, n)              => Capture(index, loop(caps, n)).withLoc(node)
+      case NamedCapture(index, name, n)   => NamedCapture(index, name, loop(caps, n)).withLoc(node)
+      case Group(n)                       => Group(loop(caps, n)).withLoc(node)
+      case Star(nonGreedy, n)             => Star(nonGreedy, loop(caps, n)).withLoc(node)
+      case Plus(nonGreedy, n)             => Plus(nonGreedy, loop(caps, n)).withLoc(node)
+      case Question(nonGreedy, n)         => Question(nonGreedy, loop(caps, n)).withLoc(node)
+      case Repeat(nonGreedy, min, max, n) => Repeat(nonGreedy, min, max, loop(caps, n)).withLoc(node)
+      case LookAhead(negative, n)         => LookAhead(negative, loop(caps, n)).withLoc(node)
+      case LookBehind(negative, n)        => LookBehind(negative, loop(caps, n)).withLoc(node)
+      case NamedBackReference(_, name) =>
+        if (!caps.contains(name)) throw new ParsingException("invalid name", node.loc)
+        NamedBackReference(caps(name), name).withLoc(node)
+      case _ => node
+    }
+
+    try {
+      val caps = collect(Map.empty, node)
+      Right(loop(caps, node))
+    } catch {
+      case ex: ParsingException => Left(ex)
+    }
   }
 
   /** An interval set contains "ID_Start" code points. */
@@ -334,7 +381,7 @@ private[regexp] final class Parser(
     */
   def NamedBackReference[_: P]: P[Node] =
     P(WithLoc {
-      ("\\k<" ~ CaptureName ~ ">").map(Pattern.NamedBackReference)
+      ("\\k<" ~ CaptureName ~ ">").map(Pattern.NamedBackReference(-1, _)) // `-1` is dummy index.
     })
 
   /** {{{

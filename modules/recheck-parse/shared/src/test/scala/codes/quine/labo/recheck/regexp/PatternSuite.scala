@@ -72,7 +72,7 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(showNode(UnicodePropertyValue(true, "sc", "Hira")), "\\P{sc=Hira}")
     assertEquals(showNode(Dot()), ".")
     assertEquals(showNode(BackReference(1)), "\\1")
-    assertEquals(showNode(NamedBackReference("foo")), "\\k<foo>")
+    assertEquals(showNode(NamedBackReference(1, "foo")), "\\k<foo>")
   }
 
   test("Pattern.showFlagSet") {

@@ -146,7 +146,7 @@ object Pattern {
   final case class BackReference(index: Int) extends Node
 
   /** NamedBackReference is a back-reference pattern. (e.g. `/\k<foo>/`) */
-  final case class NamedBackReference(name: String) extends Node
+  final case class NamedBackReference(index: Int, name: String) extends Node
 
   /** EscapeClassKind is a kind of [[SimpleEscapeClass]]. */
   sealed abstract class EscapeClassKind extends Serializable with Product
@@ -209,7 +209,7 @@ object Pattern {
     case UnicodePropertyValue(true, p, v)       => s"\\P{$p=$v}"
     case Dot()                                  => "."
     case BackReference(i)                       => s"\\$i"
-    case NamedBackReference(name)               => s"\\k<$name>"
+    case NamedBackReference(_, name)            => s"\\k<$name>"
   }
 
   /** Shows a node as a [[Disjunction]] child.

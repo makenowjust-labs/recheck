@@ -37,9 +37,9 @@ class ParserSuite extends munit.FunSuite {
   def parse0[T](input: String, parser: P[_] => P[T]): Parsed[T] = fastparse.parse(input, parser)
 
   test("Parser.parse") {
-    assertEquals(Parser.parse("", "#", false), Left("unknown flag"))
-    assertEquals(Parser.parse("{", "", false), Left("parsing failure at 0"))
-    assertEquals(Parser.parse("{1}", ""), Left("parsing failure at 0"))
+    interceptMessage[ParsingException]("unknown flag")(Parser.parse("", "#", false).toTry.get)
+    interceptMessage[ParsingException]("parsing failure (at 0)")(Parser.parse("{", "", false).toTry.get)
+    interceptMessage[ParsingException]("parsing failure (at 0)")(Parser.parse("{1}", "").toTry.get)
     assertEquals(Parser.parse(".", "g"), Right(Pattern(Dot(), FlagSet(true, false, false, false, false, false))))
     assertEquals(
       Parser.parse("(.)(?<x>.)", ""),
@@ -62,8 +62,8 @@ class ParserSuite extends munit.FunSuite {
   }
 
   test("Parser.parseFlagSet") {
-    assertEquals(Parser.parseFlagSet("gg"), Left("duplicated flag"))
-    assertEquals(Parser.parseFlagSet("#"), Left("unknown flag"))
+    interceptMessage[ParsingException]("duplicated flag")(Parser.parseFlagSet("gg").toTry.get)
+    interceptMessage[ParsingException]("unknown flag")(Parser.parseFlagSet("#").toTry.get)
     assertEquals(Parser.parseFlagSet(""), Right(FlagSet(false, false, false, false, false, false)))
     assertEquals(Parser.parseFlagSet("gimsuy"), Right(FlagSet(true, true, true, true, true, true)))
   }
@@ -226,7 +226,7 @@ class ParserSuite extends munit.FunSuite {
     assertEquals(parse("\\w", P.Escape(_)), Parsed.Success(SimpleEscapeClass(false, EscapeClassKind.Word), 2))
     assertEquals(parse("\\0", P.Escape(_)), Parsed.Success(Character('\u0000'), 2))
     assertEquals(parse("\\b", PAN.Escape(_)), Parsed.Success(WordBoundary(false), 2))
-    assertEquals(parse("\\k<foo>", PAN.Escape(_)), Parsed.Success(NamedBackReference("foo"), 7))
+    assertEquals(parse("\\k<foo>", PAN.Escape(_)), Parsed.Success(NamedBackReference(-1, "foo"), 7))
     assertEquals(parse("\\1", PAN.Escape(_)), Parsed.Success(BackReference(1), 2))
     assertEquals(parse("\\w", PAN.Escape(_)), Parsed.Success(SimpleEscapeClass(false, EscapeClassKind.Word), 2))
     assertEquals(parse("\\0", PAN.Escape(_)), Parsed.Success(Character('\u0000'), 2))
@@ -245,7 +245,7 @@ class ParserSuite extends munit.FunSuite {
   }
 
   test("Parser#NamedBackReference") {
-    assertEquals(parse("\\k<foo>", P.NamedBackReference(_)), Parsed.Success(NamedBackReference("foo"), 7))
+    assertEquals(parse("\\k<foo>", P.NamedBackReference(_)), Parsed.Success(NamedBackReference(-1, "foo"), 7))
   }
 
   test("Parser#EscapeClass") {
