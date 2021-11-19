@@ -187,14 +187,14 @@ private[regexp] final class Parser(
     * Source :: Disjunction
     * }}}
     */
-  def Source[_: P]: P[Node] = P(Disjunction ~ End)
+  def Source[X: P]: P[Node] = P(Disjunction ~ End)
 
   /** {{{
     * Disjunction :: Sequence
     *               | Sequence "|" Disjunction
     * }}}
     */
-  def Disjunction[_: P]: P[Node] =
+  def Disjunction[X: P]: P[Node] =
     P(WithLoc {
       (Sequence ~ ("|" ~ Sequence).rep).map {
         case (node, Seq()) => node
@@ -207,7 +207,7 @@ private[regexp] final class Parser(
     *           | Sequence Term
     * }}}
     */
-  def Sequence[_: P]: P[Node] =
+  def Sequence[X: P]: P[Node] =
     P(WithLoc {
       (!CharPred(isSequenceDelimiter) ~ Term).rep.map {
         case Seq(node) => node
@@ -220,7 +220,7 @@ private[regexp] final class Parser(
     *       | Atom (Repeat | "*?" | "*" | "+?" | "+" | "??" | "?")
     * }}}
     */
-  def Term[_: P]: P[Node] =
+  def Term[X: P]: P[Node] =
     P(WithLoc {
       Atom.flatMap {
         case node: Pattern.LookAhead if !additional => Pass(node)
@@ -251,7 +251,7 @@ private[regexp] final class Parser(
     *         | "{" Digits "," Digits "}?"
     * }}}
     */
-  def Repeat[_: P]: P[(Boolean, Int, Option[Option[Int]])] =
+  def Repeat[X: P]: P[(Boolean, Int, Option[Option[Int]])] =
     P {
       (
         (if (additional && !unicode) ("{": P[Unit]) else "{"./) ~
@@ -268,7 +268,7 @@ private[regexp] final class Parser(
     *       | Class | Escape | Paren | Character
     * }}}
     */
-  def Atom[_: P]: P[Node] =
+  def Atom[X: P]: P[Node] =
     P(WithLoc {
       "." ~ Pass(Pattern.Dot()) |
         "^" ~ Pass(Pattern.LineBegin()) |
@@ -289,7 +289,7 @@ private[regexp] final class Parser(
     *             | ClassNodes ClassNode
     * }}}
     */
-  def Class[_: P]: P[Node] =
+  def Class[X: P]: P[Node] =
     P(WithLoc {
       ("[" ~/ (("^": P[Unit]).map(_ => true) | Pass(false)) ~ (!"]" ~/ ClassNode).rep ~ "]").map {
         case (invert, items) => Pattern.CharacterClass(invert, items)
@@ -301,7 +301,7 @@ private[regexp] final class Parser(
     *             | ClassAtom "-" ClassAtom
     * }}}
     */
-  def ClassNode[_: P]: P[ClassNode] =
+  def ClassNode[X: P]: P[ClassNode] =
     P {
       (ClassAtom ~ ((&("-") ~ !"-]" ~ Pass(true)) | Pass(false)))./.flatMap {
         case (Left(c), false)                              => Pass(Pattern.Character(c))
@@ -320,7 +320,7 @@ private[regexp] final class Parser(
     * ClassAtom :: EscapeClass | ClassCharacter
     * }}}
     */
-  def ClassAtom[_: P]: P[Either[UChar, ClassNode]] =
+  def ClassAtom[X: P]: P[Either[UChar, ClassNode]] =
     P {
       EscapeClass.map(Right(_)) | ClassCharacter.map(Left(_))
     }
@@ -330,7 +330,7 @@ private[regexp] final class Parser(
     *                   | Character | EscapeCharacter
     * }}}
     */
-  def ClassCharacter[_: P]: P[UChar] =
+  def ClassCharacter[X: P]: P[UChar] =
     P {
       ("\\-" ~ Pass(UChar(0x2d))) | ("\\b" ~ Pass(UChar(0x08))) | Character | EscapeCharacter
     }
@@ -343,7 +343,7 @@ private[regexp] final class Parser(
     *         | EscapeCharacter
     * }}}
     */
-  def Escape[_: P]: P[Node] =
+  def Escape[X: P]: P[Node] =
     P(WithLoc {
       WordBoundary |
         (if (hasNamedCapture) NamedBackReference else Fail) |
@@ -356,7 +356,7 @@ private[regexp] final class Parser(
     * WordBoundary :: "\\b" | "\\B"
     * }}}
     */
-  def WordBoundary[_: P]: P[Node] =
+  def WordBoundary[X: P]: P[Node] =
     P(WithLoc {
       "\\b" ~ Pass(Pattern.WordBoundary(false)) |
         "\\B" ~ Pass(Pattern.WordBoundary(true))
@@ -366,7 +366,7 @@ private[regexp] final class Parser(
     * BackReference :: "\\" Digits
     * }}}
     */
-  def BackReference[_: P]: P[Node] =
+  def BackReference[X: P]: P[Node] =
     P(WithLoc {
       "\\" ~ !"0" ~ Digits.flatMap {
         case x if additional && !unicode =>
@@ -379,7 +379,7 @@ private[regexp] final class Parser(
     * NamedBackReference :: "\\k<" CaptureName ">"
     * }}}
     */
-  def NamedBackReference[_: P]: P[Node] =
+  def NamedBackReference[X: P]: P[Node] =
     P(WithLoc {
       ("\\k<" ~ CaptureName ~ ">").map(Pattern.NamedBackReference(-1, _)) // `-1` is dummy index.
     })
@@ -389,7 +389,7 @@ private[regexp] final class Parser(
     *               | UnicodeEscapeClass
     * }}}
     */
-  def EscapeClass[_: P]: P[Node with ClassNode] =
+  def EscapeClass[X: P]: P[Node with ClassNode] =
     P(WithLoc {
       ("\\w" ~ Pass(Pattern.SimpleEscapeClass(false, Pattern.EscapeClassKind.Word))) |
         ("\\W" ~ Pass(Pattern.SimpleEscapeClass(true, Pattern.EscapeClassKind.Word))) |
@@ -407,7 +407,7 @@ private[regexp] final class Parser(
     *                     | "\\P{" UnicodePropertyName "=" UnicodePropertyValue "}"
     * }}}
     */
-  def UnicodeEscapeClass[_: P]: P[Node with ClassNode] =
+  def UnicodeEscapeClass[X: P]: P[Node with ClassNode] =
     P(WithLoc {
       (("\\p{" ~ Pass(false) | "\\P{" ~ Pass(true)) ~/ UnicodePropertyName ~ ("=" ~ UnicodePropertyValue).? ~/ "}")
         .map {
@@ -420,13 +420,13 @@ private[regexp] final class Parser(
     * UnicodePropertyName :: sequence of characters `c` such that isUnicodeProperty(`c`)
     * }}}
     */
-  def UnicodePropertyName[_: P]: P[String] = P(CharsWhile(isUnicodeProperty).!)
+  def UnicodePropertyName[X: P]: P[String] = P(CharsWhile(isUnicodeProperty).!)
 
   /** {{{
     * UnicodePropertyValue :: sequence of characters `c` such that isUnicodePropertyValue(`c`)
     * }}}
     */
-  def UnicodePropertyValue[_: P]: P[String] = P(CharsWhile(isUnicodePropertyValue).!)
+  def UnicodePropertyValue[X: P]: P[String] = P(CharsWhile(isUnicodePropertyValue).!)
 
   /** {{{
     * EscapeCharacter :: "\\t" | "\\n" | "\\v" | "\\f" | "\\r"
@@ -436,7 +436,7 @@ private[regexp] final class Parser(
     *                   | OctalEscape | IdentityEscape
     * }}}
     */
-  def EscapeCharacter[_: P]: P[UChar] =
+  def EscapeCharacter[X: P]: P[UChar] =
     P {
       UnicodeEscape |
         ("\\t" ~ Pass(UChar(0x09))) |
@@ -458,7 +458,7 @@ private[regexp] final class Parser(
     *             | HexDigits HexDigit
     * }}}
     */
-  def UnicodeEscape[_: P]: P[UChar] =
+  def UnicodeEscape[X: P]: P[UChar] =
     if (!unicode) P("\\u" ~/ HexDigit.rep(exactly = 4).!.map(s => UChar(Integer.parseInt(s, 16))))
     else
       P {
@@ -477,7 +477,7 @@ private[regexp] final class Parser(
     * OctalEscape :: "\\" [0-7] [0-7] [0-7]
     * }}}
     */
-  def OctalEscape[_: P]: P[UChar] =
+  def OctalEscape[X: P]: P[UChar] =
     if (additional && !unicode)
       P {
         "\\" ~ (
@@ -491,7 +491,7 @@ private[regexp] final class Parser(
     * IdentityEscape :: "\\" [\^$\\.*+?()[]{}|/]
     * }}}
     */
-  def IdentityEscape[_: P]: P[UChar] =
+  def IdentityEscape[X: P]: P[UChar] =
     if (unicode) P("\\" ~ CharPred(isSyntax).!.map(s => UChar(s.charAt(0).toInt)))
     else if (additional)
       P {
@@ -504,7 +504,7 @@ private[regexp] final class Parser(
     * Character :: any character
     * }}}
     */
-  def Character[_: P]: P[UChar] =
+  def Character[X: P]: P[UChar] =
     if (unicode)
       P {
         !"\\" ~ (CharPred(_.isHighSurrogate) ~ CharPred(_.isLowSurrogate)).!.map(s => UChar(s.codePointAt(0))) |
@@ -522,7 +522,7 @@ private[regexp] final class Parser(
     *         | "(?<" CaptureName ">" Disjunction ")"
     * }}}
     */
-  def Paren[_: P]: P[Node] =
+  def Paren[X: P]: P[Node] =
     P(WithLoc {
       ("(" ~ !"?" ~/ Disjunction ~ ")").map(Pattern.Capture(-1, _)) | // `-1` is dummy index.
         ("(?:" ~/ Disjunction ~ ")").map(Pattern.Group) |
@@ -540,7 +540,7 @@ private[regexp] final class Parser(
     *               | CaptureName CaptureNameChar
     * }}}
     */
-  def CaptureName[_: P]: P[String] =
+  def CaptureName[X: P]: P[String] =
     P {
       (CaptureNameChar.filter(isIDStart) ~ CaptureNameChar.filter(isIDPart).rep).map { case (x, xs) =>
         String.valueOf((x +: xs).toArray.flatMap(_.toChars))
@@ -551,22 +551,22 @@ private[regexp] final class Parser(
     * CaptureNameChar :: UnicodeEscape | Character
     * }}}
     */
-  def CaptureNameChar[_: P]: P[UChar] = P(UnicodeEscape | Character)
+  def CaptureNameChar[X: P]: P[UChar] = P(UnicodeEscape | Character)
 
   /** {{{
     * Digits :: [0-9]
     * }}}
     */
-  def Digits[_: P]: P[Int] = P(CharsWhile(isDigit).!.map(_.toInt))
+  def Digits[X: P]: P[Int] = P(CharsWhile(isDigit).!.map(_.toInt))
 
   /** {{{
     * HexDigits :: [0-9A-Fa-f]
     * }}}
     */
-  def HexDigit[_: P]: P[Unit] = P(CharPred(isHexDigit))
+  def HexDigit[X: P]: P[Unit] = P(CharPred(isHexDigit))
 
   /** Wraps the given parser with adding the location. */
-  def WithLoc[_: P, A <: Node](parser: => P[A]): P[A] =
+  def WithLoc[X: P, A <: Node](parser: => P[A]): P[A] =
     P((Index ~ parser ~ Index).map { case (start, node, end) => node.withLoc(start, end) })
 
   /** Tests whether the character is digit or not. */
