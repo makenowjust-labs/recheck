@@ -6,6 +6,7 @@ import scala.collection.mutable
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.UnsupportedException
 import codes.quine.labo.recheck.data.MultiSet
+import codes.quine.labo.recheck.regexp.Pattern.Location
 import codes.quine.labo.recheck.util.GraphvizUtil.escape
 
 /** OrderedNFA is a NFA, but its transitions has a priority in the order. */
@@ -15,7 +16,7 @@ final case class OrderedNFA[A, Q](
     inits: Seq[Q],
     acceptSet: Set[Q],
     delta: Map[(Q, A), Seq[Q]],
-    sourcemap: Map[(Q, A, Q), Seq[(Int, Int)]] = Map.empty[(Q, A, Q), Seq[(Int, Int)]]
+    sourcemap: Map[(Q, A, Q), Seq[Location]] = Map.empty[(Q, A, Q), Seq[Location]]
 ) {
 
   /** Renames its states as integers. */
@@ -73,7 +74,7 @@ final case class OrderedNFA[A, Q](
       val newInits = ctx.interrupt(MultiSet.from(for (q <- inits; p <- reverseDFA.stateSet) yield (q, p)))
       val newAcceptSet = ctx.interrupt(for (q <- acceptSet) yield (q, reverseDFA.init))
       val newSourcemap =
-        mutable.Map.empty[((Q, Set[Q]), (A, Set[Q]), (Q, Set[Q])), Seq[(Int, Int)]].withDefaultValue(Vector.empty)
+        mutable.Map.empty[((Q, Set[Q]), (A, Set[Q]), (Q, Set[Q])), Seq[Location]].withDefaultValue(Vector.empty)
 
       val newDelta =
         mutable.Map.empty[((Q, Set[Q]), (A, Set[Q])), MultiSet[(Q, Set[Q])]].withDefaultValue(MultiSet.empty)

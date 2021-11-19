@@ -9,8 +9,8 @@ class PatternSuite extends munit.FunSuite {
     val node2 = node1.withLoc(0, 1)
     val node3 = Character('y').withLoc(node2)
     assertEquals(node1.loc, None)
-    assertEquals(node2.loc, Some((0, 1)))
-    assertEquals(node3.loc, Some((0, 1)))
+    assertEquals(node2.loc, Some(Location(0, 1)))
+    assertEquals(node3.loc, Some(Location(0, 1)))
     assert(clue(node2.withLoc(0, 1)) eq clue(node2))
   }
 

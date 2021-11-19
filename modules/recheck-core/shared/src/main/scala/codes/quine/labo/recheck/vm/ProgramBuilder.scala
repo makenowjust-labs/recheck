@@ -454,7 +454,7 @@ private[vm] class ProgramBuilder(
   }
 
   /** Adds a `read` (or `read_back`) instruction. */
-  def emitRead(kind: ReadKind, loc: Option[(Int, Int)]): Unit = {
+  def emitRead(kind: ReadKind, loc: Option[Location]): Unit = {
     emitInst(if (back) Inst.ReadBack(kind, loc) else Inst.Read(kind, loc))
   }
 }

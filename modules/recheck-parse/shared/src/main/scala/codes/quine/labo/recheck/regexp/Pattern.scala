@@ -36,18 +36,18 @@ object Pattern {
   sealed abstract class Node extends Cloneable with Serializable with Product {
 
     /** A internal field of the position of this node. */
-    private var _loc: Option[(Int, Int)] = None
+    private var _loc: Option[Location] = None
 
     /** Returns the location of this node. */
-    def loc: Option[(Int, Int)] = _loc
+    def loc: Option[Location] = _loc
 
     /** Returns a new node with the given position. */
     private[regexp] def withLoc(start: Int, end: Int): this.type = {
-      // If the position is already set, it returns `this` instead of an allocation.
-      if (loc.exists { case (s, e) => s == start && e == end }) this
+      // If the position is already set, it returns `this` immediately, for avoiding allocation.
+      if (loc.exists { case Location(s, e) => s == start && e == end }) this
       else {
         val cloned = clone().asInstanceOf[this.type]
-        cloned._loc = Some((start, end))
+        cloned._loc = Some(Location(start, end))
         cloned
       }
     }
@@ -55,10 +55,13 @@ object Pattern {
     /** Copies the location from the given node if possible. */
     private[regexp] def withLoc(node: Node): this.type =
       node.loc match {
-        case Some((start, end)) => withLoc(start, end)
-        case None               => this
+        case Some(Location(start, end)) => withLoc(start, end)
+        case None                       => this
       }
   }
+
+  /** Location is a location of a node in a source. */
+  final case class Location(start: Int, end: Int)
 
   /** AtomNode is a node of pattern to match a character. */
   sealed trait AtomNode extends Serializable with Product

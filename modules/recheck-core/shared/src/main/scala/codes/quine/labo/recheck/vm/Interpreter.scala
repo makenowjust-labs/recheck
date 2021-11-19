@@ -4,6 +4,7 @@ import scala.annotation.nowarn
 import scala.collection.mutable
 
 import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.regexp.Pattern.Location
 import codes.quine.labo.recheck.unicode.IChar.LineTerminator
 import codes.quine.labo.recheck.unicode.IChar.Word
 import codes.quine.labo.recheck.unicode.UChar
@@ -50,7 +51,7 @@ object Interpreter {
       loops: Seq[(Int, Int)],
       failedPoints: Set[FailedPoint],
       coverage: Set[CoverageItem],
-      heatmap: Map[(Int, Int), Int]
+      heatmap: Map[Location, Int]
   )
 
   /** Status is a matching status. */
@@ -81,10 +82,10 @@ object Interpreter {
   private[vm] final case class MatchState(blockID: Int, pos: Int, counters: Vector[Int], captures: Option[Vector[Int]])
 
   /** Junction is a state for a junction block. */
-  private[vm] final case class Junction(state: MatchState, steps: Int, heatmap: Option[Map[(Int, Int), Int]])
+  private[vm] final case class Junction(state: MatchState, steps: Int, heatmap: Option[Map[Location, Int]])
 
   /** Diff is a difference of state on matching. */
-  private[vm] final case class Diff(steps: Int, heatmap: Option[Map[(Int, Int), Int]])
+  private[vm] final case class Diff(steps: Int, heatmap: Option[Map[Location, Int]])
 }
 
 /** Interpreter is an interpreter of a program and an input. */
@@ -180,7 +181,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   private[this] val failedPoints: mutable.Set[FailedPoint] = mutable.Set.empty
 
   /** A heatmap on matching. */
-  private[this] var heatmap: Map[(Int, Int), Int] = Map.empty[(Int, Int), Int].withDefaultValue(0)
+  private[this] var heatmap: Map[Location, Int] = Map.empty[Location, Int].withDefaultValue(0)
 
   /** Constructs a result of matching. */
   private def result(status: Status, captures: Option[Seq[Int]]): Result = {
@@ -294,7 +295,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
               for (jx <- frame.junctions.take(d)) {
                 val diffHeatmap = if (options.needsHeatmap) {
                   val jxHeatmap = jx.heatmap.get
-                  val builder = Map.newBuilder[(Int, Int), Int]
+                  val builder = Map.newBuilder[Location, Int]
                   for ((loc, n) <- heatmap) {
                     val m = jxHeatmap(loc)
                     if (n != m) builder.addOne(loc -> (n - m))

@@ -6,6 +6,7 @@ import scala.collection.mutable
 import codes.quine.labo.recheck.automaton.EpsNFA._
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.UnsupportedException
+import codes.quine.labo.recheck.regexp.Pattern.Location
 import codes.quine.labo.recheck.unicode.IChar
 import codes.quine.labo.recheck.unicode.ICharSet
 import codes.quine.labo.recheck.unicode.ICharSet.CharKind
@@ -96,7 +97,7 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
       val newAcceptSet = Set.newBuilder[(CharKind, Seq[Q])]
       val newDelta = Map.newBuilder[((CharKind, Seq[Q]), IChar), Seq[(CharKind, Seq[Q])]]
       val newSourcemap = mutable.Map
-        .empty[((CharKind, Seq[Q]), IChar, (CharKind, Seq[Q])), Seq[(Int, Int)]]
+        .empty[((CharKind, Seq[Q]), IChar, (CharKind, Seq[Q])), Seq[Location]]
         .withDefaultValue(Vector.empty)
       var deltaSize = 0
 
@@ -154,7 +155,7 @@ object EpsNFA {
   final case class Assert[Q](kind: AssertKind, to: Q) extends Transition[Q]
 
   /** Consume is an ε-NFA transition with consuming a character. */
-  final case class Consume[Q](set: Set[(IChar, CharKind)], to: Q, loc: Option[(Int, Int)] = None) extends Transition[Q]
+  final case class Consume[Q](set: Set[(IChar, CharKind)], to: Q, loc: Option[Location] = None) extends Transition[Q]
 
   /** LoopEnter is an ε-NFA transition with consuming no character and marking a entering of the loop. */
   final case class LoopEnter[Q](loop: Int, to: Q) extends Transition[Q]

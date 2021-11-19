@@ -109,17 +109,20 @@ class ParserSuite extends munit.FunSuite {
     assertEquals(Parser.assignCaptureIndex(LookBehind(true, Capture(-1, Dot()))), LookBehind(true, Capture(1, Dot())))
 
     // Checks it keeps the position.
-    assertEquals(Parser.assignCaptureIndex(Disjunction(Seq(Dot(), Dot())).withLoc(0, 3)).loc, Some((0, 3)))
-    assertEquals(Parser.assignCaptureIndex(Sequence(Seq(Dot(), Dot())).withLoc(0, 2)).loc, Some((0, 2)))
-    assertEquals(Parser.assignCaptureIndex(Capture(-1, Dot()).withLoc(0, 3)).loc, Some((0, 3)))
-    assertEquals(Parser.assignCaptureIndex(NamedCapture(-1, "x", Dot()).withLoc(0, 7)).loc, Some((0, 7)))
-    assertEquals(Parser.assignCaptureIndex(Group(Dot()).withLoc(0, 5)).loc, Some((0, 5)))
-    assertEquals(Parser.assignCaptureIndex(Star(false, Dot()).withLoc(0, 2)).loc, Some((0, 2)))
-    assertEquals(Parser.assignCaptureIndex(Plus(false, Dot()).withLoc(0, 2)).loc, Some((0, 2)))
-    assertEquals(Parser.assignCaptureIndex(Question(false, Dot()).withLoc(0, 2)).loc, Some((0, 2)))
-    assertEquals(Parser.assignCaptureIndex(Repeat(false, 0, Some(Some(2)), Dot()).withLoc(0, 6)).loc, Some((0, 6)))
-    assertEquals(Parser.assignCaptureIndex(LookAhead(false, Dot()).withLoc(0, 5)).loc, Some((0, 5)))
-    assertEquals(Parser.assignCaptureIndex(LookBehind(false, Dot()).withLoc(0, 6)).loc, Some((0, 6)))
+    assertEquals(Parser.assignCaptureIndex(Disjunction(Seq(Dot(), Dot())).withLoc(0, 3)).loc, Some(Location(0, 3)))
+    assertEquals(Parser.assignCaptureIndex(Sequence(Seq(Dot(), Dot())).withLoc(0, 2)).loc, Some(Location(0, 2)))
+    assertEquals(Parser.assignCaptureIndex(Capture(-1, Dot()).withLoc(0, 3)).loc, Some(Location(0, 3)))
+    assertEquals(Parser.assignCaptureIndex(NamedCapture(-1, "x", Dot()).withLoc(0, 7)).loc, Some(Location(0, 7)))
+    assertEquals(Parser.assignCaptureIndex(Group(Dot()).withLoc(0, 5)).loc, Some(Location(0, 5)))
+    assertEquals(Parser.assignCaptureIndex(Star(false, Dot()).withLoc(0, 2)).loc, Some(Location(0, 2)))
+    assertEquals(Parser.assignCaptureIndex(Plus(false, Dot()).withLoc(0, 2)).loc, Some(Location(0, 2)))
+    assertEquals(Parser.assignCaptureIndex(Question(false, Dot()).withLoc(0, 2)).loc, Some(Location(0, 2)))
+    assertEquals(
+      Parser.assignCaptureIndex(Repeat(false, 0, Some(Some(2)), Dot()).withLoc(0, 6)).loc,
+      Some(Location(0, 6))
+    )
+    assertEquals(Parser.assignCaptureIndex(LookAhead(false, Dot()).withLoc(0, 5)).loc, Some(Location(0, 5)))
+    assertEquals(Parser.assignCaptureIndex(LookBehind(false, Dot()).withLoc(0, 6)).loc, Some(Location(0, 6)))
   }
 
   test("Parser.assignBackReferenceIndex") {
@@ -143,47 +146,44 @@ class ParserSuite extends munit.FunSuite {
     // Checks it keeps the position.
     assertEquals(
       Parser.assignBackReferenceIndex(Disjunction(Seq(Dot(), Dot())).withLoc(0, 3), 0).toTry.get.loc,
-      Some((0, 3))
+      Some(Location(0, 3))
     )
     assertEquals(
       Parser.assignBackReferenceIndex(Sequence(Seq(Dot(), Dot())).withLoc(0, 2), 0).toTry.get.loc,
-      Some((0, 2))
+      Some(Location(0, 2))
     )
     assertEquals(
       Parser.assignBackReferenceIndex(Capture(1, Dot()).withLoc(0, 3), 1).toTry.get.loc,
-      Some((0, 3))
+      Some(Location(0, 3))
     )
     assertEquals(
       Parser.assignBackReferenceIndex(NamedCapture(1, "x", Dot()).withLoc(0, 7), 1).toTry.get.loc,
-      Some((0, 7))
+      Some(Location(0, 7))
     )
-    assertEquals(
-      Parser.assignBackReferenceIndex(Group(Dot()).withLoc(0, 5), 0).toTry.get.loc,
-      Some((0, 5))
-    )
+    assertEquals(Parser.assignBackReferenceIndex(Group(Dot()).withLoc(0, 5), 0).toTry.get.loc, Some(Location(0, 5)))
     assertEquals(
       Parser.assignBackReferenceIndex(Star(false, Dot()).withLoc(0, 2), 0).toTry.get.loc,
-      Some((0, 2))
+      Some(Location(0, 2))
     )
     assertEquals(
       Parser.assignBackReferenceIndex(Plus(false, Dot()).withLoc(0, 2), 0).toTry.get.loc,
-      Some((0, 2))
+      Some(Location(0, 2))
     )
     assertEquals(
       Parser.assignBackReferenceIndex(Question(false, Dot()).withLoc(0, 2), 0).toTry.get.loc,
-      Some((0, 2))
+      Some(Location(0, 2))
     )
     assertEquals(
       Parser.assignBackReferenceIndex(Repeat(false, 0, Some(Some(2)), Dot()).withLoc(0, 6), 0).toTry.get.loc,
-      Some((0, 6))
+      Some(Location(0, 6))
     )
     assertEquals(
       Parser.assignBackReferenceIndex(LookAhead(false, Dot()).withLoc(0, 5), 0).toTry.get.loc,
-      Some((0, 5))
+      Some(Location(0, 5))
     )
     assertEquals(
       Parser.assignBackReferenceIndex(LookBehind(false, Dot()).withLoc(0, 6), 0).toTry.get.loc,
-      Some((0, 6))
+      Some(Location(0, 6))
     )
   }
 

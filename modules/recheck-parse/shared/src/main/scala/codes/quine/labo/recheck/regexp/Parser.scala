@@ -27,7 +27,8 @@ object Parser {
         fastparse.parse(source, new Parser(flagSet.unicode, additional, hasNamedCapture, captures).Source(_))
       node <- (result match {
         case Parsed.Success(node, _) => Right(node)
-        case fail: Parsed.Failure    => Left(new ParsingException(s"parsing failure", Some((fail.index, fail.index))))
+        case fail: Parsed.Failure =>
+          Left(new ParsingException(s"parsing failure", Some(Pattern.Location(fail.index, fail.index))))
       }).map(assignCaptureIndex).flatMap(assignBackReferenceIndex(_, captures))
     } yield Pattern(node, flagSet)
 
