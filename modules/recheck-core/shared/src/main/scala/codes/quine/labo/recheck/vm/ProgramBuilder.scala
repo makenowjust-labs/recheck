@@ -22,16 +22,14 @@ object ProgramBuilder {
     for {
       _ <- Try(())
       capturesSize = pattern.capturesSize
-      names <- pattern.names
-      builder = new ProgramBuilder(pattern, capturesSize, names)
+      builder = new ProgramBuilder(pattern, capturesSize)
       program <- Try(builder.build())
     } yield program
 }
 
 private[vm] class ProgramBuilder(
     private[this] val pattern: Pattern,
-    private[this] val capturesSize: Int,
-    private[this] val names: Map[String, Int]
+    private[this] val capturesSize: Int
 )(implicit ctx: Context) {
   import ctx._
   import pattern._
@@ -238,16 +236,8 @@ private[vm] class ProgramBuilder(
       emitRead(ReadKind.Class(ch), node.loc)
     case Dot() =>
       emitRead(if (dotAll) ReadKind.Any else ReadKind.Dot, node.loc)
-    case BackReference(index) =>
-      // $COVERAGE-OFF$
-      if (index <= 0 || capturesSize < index) throw new InvalidRegExpException("invalid back-reference")
-      // $COVERAGE-ON$
-      emitRead(ReadKind.Ref(index), node.loc)
-    case NamedBackReference(_, name) =>
-      // $COVERAGE-OFF$
-      val index = names.getOrElse(name, throw new InvalidRegExpException("invalid named back reference"))
-      // $COVERAGE-ON$
-      emitRead(ReadKind.Ref(index), node.loc)
+    case BackReference(index)         => emitRead(ReadKind.Ref(index), node.loc)
+    case NamedBackReference(index, _) => emitRead(ReadKind.Ref(index), node.loc)
   })
 
   /** A builder for a disjunction node. */

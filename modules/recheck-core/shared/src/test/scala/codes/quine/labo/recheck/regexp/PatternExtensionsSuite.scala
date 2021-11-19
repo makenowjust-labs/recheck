@@ -401,35 +401,4 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(LookBehind(false, Dot()), flagSet).capturesSize, 0)
     assertEquals(Pattern(Dot(), flagSet).capturesSize, 0)
   }
-
-  test("PatternExtensions.PatternOps#names") {
-    val flagSet = FlagSet(false, false, false, false, false, false)
-    assertEquals(
-      Pattern(Disjunction(Seq(NamedCapture(1, "x", Dot()), NamedCapture(2, "y", Dot()))), flagSet).names,
-      Success(Map("x" -> 1, "y" -> 2))
-    )
-    interceptMessage[InvalidRegExpException]("duplicated named capture") {
-      Pattern(Disjunction(Seq(NamedCapture(1, "x", Dot()), NamedCapture(2, "x", Dot()))), flagSet).names.get
-    }
-    assertEquals(
-      Pattern(Sequence(Seq(NamedCapture(1, "x", Dot()), NamedCapture(2, "y", Dot()))), flagSet).names,
-      Success(Map("x" -> 1, "y" -> 2))
-    )
-    interceptMessage[InvalidRegExpException]("duplicated named capture") {
-      Pattern(Sequence(Seq(NamedCapture(1, "x", Dot()), NamedCapture(2, "x", Dot()))), flagSet).names.get
-    }
-    assertEquals(Pattern(Capture(1, NamedCapture(2, "x", Dot())), flagSet).names, Success(Map("x" -> 2)))
-    assertEquals(
-      Pattern(NamedCapture(1, "x", NamedCapture(2, "y", Dot())), flagSet).names,
-      Success(Map("x" -> 1, "y" -> 2))
-    )
-    assertEquals(Pattern(Group(NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
-    assertEquals(Pattern(Star(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
-    assertEquals(Pattern(Plus(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
-    assertEquals(Pattern(Question(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
-    assertEquals(Pattern(Repeat(false, 2, None, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
-    assertEquals(Pattern(LookAhead(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
-    assertEquals(Pattern(LookBehind(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
-    assertEquals(Pattern(Dot(), flagSet).names, Success(Map.empty[String, Int]))
-  }
 }
