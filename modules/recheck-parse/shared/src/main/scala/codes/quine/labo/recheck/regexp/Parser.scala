@@ -28,7 +28,7 @@ object Parser {
       node <- (result match {
         case Parsed.Success(node, _) => Right(node)
         case fail: Parsed.Failure    => Left(new ParsingException(s"parsing failure", Some((fail.index, fail.index))))
-      }).map(assignCaptureIndex).flatMap(assignBackReferenceIndex)
+      }).map(assignCaptureIndex).flatMap(assignBackReferenceIndex(_, captures))
     } yield Pattern(node, flagSet)
 
   /** Parses a flag set string. */
@@ -117,48 +117,55 @@ object Parser {
     loop(node)
   }
 
-  /** Returns a new node named in which back-references are resolved. */
-  private[regexp] def assignBackReferenceIndex(node: Node): Either[ParsingException, Node] = {
+  /** Returns a new node named in which named back-references are resolved.
+    *
+    * It also validates named capture names and back-reference indices. If an invalid named capture name or
+    * back-reference index is found, it returns [[ParsingException]] as Left value.
+    */
+  private[regexp] def assignBackReferenceIndex(node: Node, captures: Int): Either[ParsingException, Node] = {
     import Pattern._
 
-    def collect(caps: Map[String, Int], node: Node): Map[String, Int] = node match {
-      case Disjunction(ns) => ns.foldLeft(caps)(collect)
-      case Sequence(ns)    => ns.foldLeft(caps)(collect)
-      case Capture(_, n)   => collect(caps, n)
+    def collect(names: Map[String, Int], node: Node): Map[String, Int] = node match {
+      case Disjunction(ns) => ns.foldLeft(names)(collect)
+      case Sequence(ns)    => ns.foldLeft(names)(collect)
+      case Capture(_, n)   => collect(names, n)
       case NamedCapture(index, name, n) =>
-        if (caps.contains(name)) throw new ParsingException("duplicated name", node.loc)
-        collect(caps ++ Map(name -> index), n)
-      case Group(n)           => collect(caps, n)
-      case Star(_, n)         => collect(caps, n)
-      case Plus(_, n)         => collect(caps, n)
-      case Question(_, n)     => collect(caps, n)
-      case Repeat(_, _, _, n) => collect(caps, n)
-      case LookAhead(_, n)    => collect(caps, n)
-      case LookBehind(_, n)   => collect(caps, n)
-      case _                  => caps
+        if (names.contains(name)) throw new ParsingException("duplicated name", node.loc)
+        collect(names ++ Map(name -> index), n)
+      case Group(n)           => collect(names, n)
+      case Star(_, n)         => collect(names, n)
+      case Plus(_, n)         => collect(names, n)
+      case Question(_, n)     => collect(names, n)
+      case Repeat(_, _, _, n) => collect(names, n)
+      case LookAhead(_, n)    => collect(names, n)
+      case LookBehind(_, n)   => collect(names, n)
+      case _                  => names
     }
 
-    def loop(caps: Map[String, Int], node: Node): Node = node match {
-      case Disjunction(ns)                => Disjunction(ns.map(loop(caps, _))).withLoc(node)
-      case Sequence(ns)                   => Sequence(ns.map(loop(caps, _))).withLoc(node)
-      case Capture(index, n)              => Capture(index, loop(caps, n)).withLoc(node)
-      case NamedCapture(index, name, n)   => NamedCapture(index, name, loop(caps, n)).withLoc(node)
-      case Group(n)                       => Group(loop(caps, n)).withLoc(node)
-      case Star(nonGreedy, n)             => Star(nonGreedy, loop(caps, n)).withLoc(node)
-      case Plus(nonGreedy, n)             => Plus(nonGreedy, loop(caps, n)).withLoc(node)
-      case Question(nonGreedy, n)         => Question(nonGreedy, loop(caps, n)).withLoc(node)
-      case Repeat(nonGreedy, min, max, n) => Repeat(nonGreedy, min, max, loop(caps, n)).withLoc(node)
-      case LookAhead(negative, n)         => LookAhead(negative, loop(caps, n)).withLoc(node)
-      case LookBehind(negative, n)        => LookBehind(negative, loop(caps, n)).withLoc(node)
+    def loop(names: Map[String, Int], node: Node): Node = node match {
+      case Disjunction(ns)                => Disjunction(ns.map(loop(names, _))).withLoc(node)
+      case Sequence(ns)                   => Sequence(ns.map(loop(names, _))).withLoc(node)
+      case Capture(index, n)              => Capture(index, loop(names, n)).withLoc(node)
+      case NamedCapture(index, name, n)   => NamedCapture(index, name, loop(names, n)).withLoc(node)
+      case Group(n)                       => Group(loop(names, n)).withLoc(node)
+      case Star(nonGreedy, n)             => Star(nonGreedy, loop(names, n)).withLoc(node)
+      case Plus(nonGreedy, n)             => Plus(nonGreedy, loop(names, n)).withLoc(node)
+      case Question(nonGreedy, n)         => Question(nonGreedy, loop(names, n)).withLoc(node)
+      case Repeat(nonGreedy, min, max, n) => Repeat(nonGreedy, min, max, loop(names, n)).withLoc(node)
+      case LookAhead(negative, n)         => LookAhead(negative, loop(names, n)).withLoc(node)
+      case LookBehind(negative, n)        => LookBehind(negative, loop(names, n)).withLoc(node)
+      case BackReference(index) =>
+        if (index < 1 || captures < index) throw new ParsingException("invalid back-reference", node.loc)
+        BackReference(index).withLoc(node)
       case NamedBackReference(_, name) =>
-        if (!caps.contains(name)) throw new ParsingException("invalid name", node.loc)
-        NamedBackReference(caps(name), name).withLoc(node)
+        if (!names.contains(name)) throw new ParsingException("invalid named back-reference", node.loc)
+        NamedBackReference(names(name), name).withLoc(node)
       case _ => node
     }
 
     try {
-      val caps = collect(Map.empty, node)
-      Right(loop(caps, node))
+      val names = collect(Map.empty, node)
+      Right(loop(names, node))
     } catch {
       case ex: ParsingException => Left(ex)
     }

@@ -122,6 +122,71 @@ class ParserSuite extends munit.FunSuite {
     assertEquals(Parser.assignCaptureIndex(LookBehind(false, Dot()).withLoc(0, 6)).loc, Some((0, 6)))
   }
 
+  test("Parser.assignBackReferenceIndex") {
+    interceptMessage[ParsingException]("duplicated name") {
+      val result =
+        Parser.assignBackReferenceIndex(Sequence(Seq(NamedCapture(1, "foo", Dot()), NamedCapture(2, "foo", Dot()))), 2)
+      result.toTry.get
+    }
+    interceptMessage[ParsingException]("invalid back-reference") {
+      Parser.assignBackReferenceIndex(BackReference(1), 0).toTry.get
+    }
+    interceptMessage[ParsingException]("invalid named back-reference") {
+      Parser.assignBackReferenceIndex(NamedBackReference(-1, "foo"), 0).toTry.get
+    }
+
+    assertEquals(
+      Parser.assignBackReferenceIndex(Sequence(Seq(NamedCapture(1, "foo", Dot()), NamedBackReference(-1, "foo"))), 1),
+      Right(Sequence(Seq(NamedCapture(1, "foo", Dot()), NamedBackReference(1, "foo"))))
+    )
+
+    // Checks it keeps the position.
+    assertEquals(
+      Parser.assignBackReferenceIndex(Disjunction(Seq(Dot(), Dot())).withLoc(0, 3), 0).toTry.get.loc,
+      Some((0, 3))
+    )
+    assertEquals(
+      Parser.assignBackReferenceIndex(Sequence(Seq(Dot(), Dot())).withLoc(0, 2), 0).toTry.get.loc,
+      Some((0, 2))
+    )
+    assertEquals(
+      Parser.assignBackReferenceIndex(Capture(1, Dot()).withLoc(0, 3), 1).toTry.get.loc,
+      Some((0, 3))
+    )
+    assertEquals(
+      Parser.assignBackReferenceIndex(NamedCapture(1, "x", Dot()).withLoc(0, 7), 1).toTry.get.loc,
+      Some((0, 7))
+    )
+    assertEquals(
+      Parser.assignBackReferenceIndex(Group(Dot()).withLoc(0, 5), 0).toTry.get.loc,
+      Some((0, 5))
+    )
+    assertEquals(
+      Parser.assignBackReferenceIndex(Star(false, Dot()).withLoc(0, 2), 0).toTry.get.loc,
+      Some((0, 2))
+    )
+    assertEquals(
+      Parser.assignBackReferenceIndex(Plus(false, Dot()).withLoc(0, 2), 0).toTry.get.loc,
+      Some((0, 2))
+    )
+    assertEquals(
+      Parser.assignBackReferenceIndex(Question(false, Dot()).withLoc(0, 2), 0).toTry.get.loc,
+      Some((0, 2))
+    )
+    assertEquals(
+      Parser.assignBackReferenceIndex(Repeat(false, 0, Some(Some(2)), Dot()).withLoc(0, 6), 0).toTry.get.loc,
+      Some((0, 6))
+    )
+    assertEquals(
+      Parser.assignBackReferenceIndex(LookAhead(false, Dot()).withLoc(0, 5), 0).toTry.get.loc,
+      Some((0, 5))
+    )
+    assertEquals(
+      Parser.assignBackReferenceIndex(LookBehind(false, Dot()).withLoc(0, 6), 0).toTry.get.loc,
+      Some((0, 6))
+    )
+  }
+
   test("Parser#Source") {
     assertEquals(parse("x", P.Source(_)), Parsed.Success(Character('x'), 1))
     assert(!parse("x)", P.Source(_)).isSuccess)
