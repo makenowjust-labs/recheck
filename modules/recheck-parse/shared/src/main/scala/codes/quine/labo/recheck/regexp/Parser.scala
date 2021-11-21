@@ -105,14 +105,11 @@ object Parser {
       case NamedCapture(_, name, n) =>
         currentIndex += 1
         NamedCapture(currentIndex, name, loop(n)).withLoc(node)
-      case Group(n)                       => Group(loop(n)).withLoc(node)
-      case Star(nonGreedy, n)             => Star(nonGreedy, loop(n)).withLoc(node)
-      case Plus(nonGreedy, n)             => Plus(nonGreedy, loop(n)).withLoc(node)
-      case Question(nonGreedy, n)         => Question(nonGreedy, loop(n)).withLoc(node)
-      case Repeat(nonGreedy, min, max, n) => Repeat(nonGreedy, min, max, loop(n)).withLoc(node)
-      case LookAhead(negative, n)         => LookAhead(negative, loop(n)).withLoc(node)
-      case LookBehind(negative, n)        => LookBehind(negative, loop(n)).withLoc(node)
-      case _                              => node
+      case Group(n)                => Group(loop(n)).withLoc(node)
+      case Repeat(q, n)            => Repeat(q, loop(n)).withLoc(node)
+      case LookAhead(negative, n)  => LookAhead(negative, loop(n)).withLoc(node)
+      case LookBehind(negative, n) => LookBehind(negative, loop(n)).withLoc(node)
+      case _                       => node
     }
 
     loop(node)
@@ -133,28 +130,22 @@ object Parser {
       case NamedCapture(index, name, n) =>
         if (names.contains(name)) throw new ParsingException("duplicated name", node.loc)
         collect(names ++ Map(name -> index), n)
-      case Group(n)           => collect(names, n)
-      case Star(_, n)         => collect(names, n)
-      case Plus(_, n)         => collect(names, n)
-      case Question(_, n)     => collect(names, n)
-      case Repeat(_, _, _, n) => collect(names, n)
-      case LookAhead(_, n)    => collect(names, n)
-      case LookBehind(_, n)   => collect(names, n)
-      case _                  => names
+      case Group(n)         => collect(names, n)
+      case Repeat(_, n)     => collect(names, n)
+      case LookAhead(_, n)  => collect(names, n)
+      case LookBehind(_, n) => collect(names, n)
+      case _                => names
     }
 
     def loop(names: Map[String, Int], node: Node): Node = node match {
-      case Disjunction(ns)                => Disjunction(ns.map(loop(names, _))).withLoc(node)
-      case Sequence(ns)                   => Sequence(ns.map(loop(names, _))).withLoc(node)
-      case Capture(index, n)              => Capture(index, loop(names, n)).withLoc(node)
-      case NamedCapture(index, name, n)   => NamedCapture(index, name, loop(names, n)).withLoc(node)
-      case Group(n)                       => Group(loop(names, n)).withLoc(node)
-      case Star(nonGreedy, n)             => Star(nonGreedy, loop(names, n)).withLoc(node)
-      case Plus(nonGreedy, n)             => Plus(nonGreedy, loop(names, n)).withLoc(node)
-      case Question(nonGreedy, n)         => Question(nonGreedy, loop(names, n)).withLoc(node)
-      case Repeat(nonGreedy, min, max, n) => Repeat(nonGreedy, min, max, loop(names, n)).withLoc(node)
-      case LookAhead(negative, n)         => LookAhead(negative, loop(names, n)).withLoc(node)
-      case LookBehind(negative, n)        => LookBehind(negative, loop(names, n)).withLoc(node)
+      case Disjunction(ns)              => Disjunction(ns.map(loop(names, _))).withLoc(node)
+      case Sequence(ns)                 => Sequence(ns.map(loop(names, _))).withLoc(node)
+      case Capture(index, n)            => Capture(index, loop(names, n)).withLoc(node)
+      case NamedCapture(index, name, n) => NamedCapture(index, name, loop(names, n)).withLoc(node)
+      case Group(n)                     => Group(loop(names, n)).withLoc(node)
+      case Repeat(q, n)                 => Repeat(q, loop(names, n)).withLoc(node)
+      case LookAhead(negative, n)       => LookAhead(negative, loop(names, n)).withLoc(node)
+      case LookBehind(negative, n)      => LookBehind(negative, loop(names, n)).withLoc(node)
       case BackReference(index) =>
         if (index < 1 || captures < index) throw new ParsingException("invalid back-reference", node.loc)
         BackReference(index).withLoc(node)
@@ -225,7 +216,7 @@ private[regexp] final class Parser(
 
   /** {{{
     * Term :: Atom
-    *       | Atom (Repeat | "*?" | "*" | "+?" | "+" | "??" | "?")
+    *       | Atom Quantifier
     * }}}
     */
   def Term[X: P]: P[Node] =
@@ -237,39 +228,49 @@ private[regexp] final class Parser(
         case node: Pattern.LineBegin                => Pass(node)
         case node: Pattern.LineEnd                  => Pass(node)
         case node =>
-          Repeat.map { case (nonGreedy, min, max) =>
-            Pattern.Repeat(nonGreedy, min, max, node)
-          } |
-            ("*?" ~ Pass(Pattern.Star(true, node))) |
-            ("*" ~ Pass(Pattern.Star(false, node))) |
-            ("+?" ~ Pass(Pattern.Plus(true, node))) |
-            ("+" ~ Pass(Pattern.Plus(false, node))) |
-            ("??" ~ Pass(Pattern.Question(true, node))) |
-            ("?" ~ Pass(Pattern.Question(false, node))) |
-            Pass(node)
+          Quantifier.map(q => Pattern.Repeat(q, node)) | Pass(node)
       }
     })
 
   /** {{{
-    * Repeat :: "{" Digits "}"
-    *         | "{" Digits "}?"
-    *         | "{" Digits "," "}"
-    *         | "{" Digits "," "}?"
-    *         | "{" Digits "," Digits "}"
-    *         | "{" Digits "," Digits "}?"
+    * Quantifier :: "*" | "*?"
+    *             | "+" | "+?"
+    *             | "?" | "??"
+    *             | NormalizedQuantifier
     * }}}
     */
-  def Repeat[X: P]: P[(Boolean, Int, Option[Option[Int]])] =
-    P {
-      (
-        (if (additional && !unicode) ("{": P[Unit]) else "{"./) ~
-          Digits ~
-          ("," ~ (Digits.map(n => Option(Option(n))) | Pass(Option(None))) | Pass(None)) ~ "}" ~
-          (("?": P[Unit]).map(_ => true) | Pass(false))
-      ).map { case (min, max, nonGreedy) =>
-        (nonGreedy, min, max)
-      }
+  def Quantifier[X: P]: P[Pattern.Quantifier] =
+    P(WithLoc {
+      NormalizedQuantifier |
+        ("*?" ~ Pass(Pattern.Quantifier.Star(true))) |
+        ("*" ~ Pass(Pattern.Quantifier.Star(false))) |
+        ("+?" ~ Pass(Pattern.Quantifier.Plus(true))) |
+        ("+" ~ Pass(Pattern.Quantifier.Plus(false))) |
+        ("??" ~ Pass(Pattern.Quantifier.Question(true))) |
+        ("?" ~ Pass(Pattern.Quantifier.Question(false)))
+    })
+
+  /** {{{
+    * NormalizedQuantifier :: "{" Digits "}"
+    *                       | "{" Digits "}?"
+    *                       | "{" Digits "," "}"
+    *                       | "{" Digits "," "}?"
+    *                       | "{" Digits "," Digits "}"
+    *                       | "{" Digits "," Digits "}?"
+    * }}}
+    */
+  def NormalizedQuantifier[X: P]: P[Pattern.NormalizedQuantifier] = P {
+    (
+      (if (additional && !unicode) ("{": P[Unit]) else "{"./) ~
+        Digits ~
+        ("," ~ (Digits.map(n => Option(Option(n))) | Pass(Option(None))) | Pass(None)) ~ "}" ~
+        (("?": P[Unit]).map(_ => true) | Pass(false))
+    ).map {
+      case (min, Some(Some(max)), isLazy) => Pattern.Quantifier.Bounded(min, max, isLazy)
+      case (min, Some(None), isLazy)      => Pattern.Quantifier.Unbounded(min, isLazy)
+      case (n, None, isLazy)              => Pattern.Quantifier.Exact(n, isLazy)
     }
+  }
 
   /** {{{
     * Atom :: "." | "^" | "$"
@@ -284,7 +285,7 @@ private[regexp] final class Parser(
         Class | Escape | Paren |
         (CharIn("*+?)|") ~/ Fail) |
         (
-          if (additional && !unicode) &(Repeat) ~/ Fail
+          if (additional && !unicode) &(NormalizedQuantifier) ~/ Fail
           else &(CharIn("{}]")) ~/ Fail
         ) |
         Character.map(Pattern.Character)
@@ -574,7 +575,7 @@ private[regexp] final class Parser(
   def HexDigit[X: P]: P[Unit] = P(CharPred(isHexDigit))
 
   /** Wraps the given parser with adding the location. */
-  def WithLoc[X: P, A <: Node](parser: => P[A]): P[A] =
+  def WithLoc[X: P, A <: Pattern.HasLocation](parser: => P[A]): P[A] =
     P((Index ~ parser ~ Index).map { case (start, node, end) => node.withLoc(start, end) })
 
   /** Tests whether the character is digit or not. */

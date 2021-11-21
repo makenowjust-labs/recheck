@@ -93,15 +93,9 @@ class ParserSuite extends munit.FunSuite {
       NamedCapture(1, "x", NamedCapture(2, "y", Dot()))
     )
     assertEquals(Parser.assignCaptureIndex(Group(Capture(-1, Dot()))), Group(Capture(1, Dot())))
-    assertEquals(Parser.assignCaptureIndex(Star(false, Capture(-1, Dot()))), Star(false, Capture(1, Dot())))
-    assertEquals(Parser.assignCaptureIndex(Star(true, Capture(-1, Dot()))), Star(true, Capture(1, Dot())))
-    assertEquals(Parser.assignCaptureIndex(Plus(false, Capture(-1, Dot()))), Plus(false, Capture(1, Dot())))
-    assertEquals(Parser.assignCaptureIndex(Plus(true, Capture(-1, Dot()))), Plus(true, Capture(1, Dot())))
-    assertEquals(Parser.assignCaptureIndex(Question(false, Capture(-1, Dot()))), Question(false, Capture(1, Dot())))
-    assertEquals(Parser.assignCaptureIndex(Question(true, Capture(-1, Dot()))), Question(true, Capture(1, Dot())))
     assertEquals(
-      Parser.assignCaptureIndex(Repeat(false, 0, Some(Some(2)), Capture(-1, Dot()))),
-      Repeat(false, 0, Some(Some(2)), Capture(1, Dot()))
+      Parser.assignCaptureIndex(Repeat(Quantifier.Star(false), Capture(-1, Dot()))),
+      Repeat(Quantifier.Star(false), Capture(1, Dot()))
     )
     assertEquals(Parser.assignCaptureIndex(LookAhead(false, Capture(-1, Dot()))), LookAhead(false, Capture(1, Dot())))
     assertEquals(Parser.assignCaptureIndex(LookAhead(true, Capture(-1, Dot()))), LookAhead(true, Capture(1, Dot())))
@@ -114,11 +108,8 @@ class ParserSuite extends munit.FunSuite {
     assertEquals(Parser.assignCaptureIndex(Capture(-1, Dot()).withLoc(0, 3)).loc, Some(Location(0, 3)))
     assertEquals(Parser.assignCaptureIndex(NamedCapture(-1, "x", Dot()).withLoc(0, 7)).loc, Some(Location(0, 7)))
     assertEquals(Parser.assignCaptureIndex(Group(Dot()).withLoc(0, 5)).loc, Some(Location(0, 5)))
-    assertEquals(Parser.assignCaptureIndex(Star(false, Dot()).withLoc(0, 2)).loc, Some(Location(0, 2)))
-    assertEquals(Parser.assignCaptureIndex(Plus(false, Dot()).withLoc(0, 2)).loc, Some(Location(0, 2)))
-    assertEquals(Parser.assignCaptureIndex(Question(false, Dot()).withLoc(0, 2)).loc, Some(Location(0, 2)))
     assertEquals(
-      Parser.assignCaptureIndex(Repeat(false, 0, Some(Some(2)), Dot()).withLoc(0, 6)).loc,
+      Parser.assignCaptureIndex(Repeat(Quantifier.Star(false), Dot()).withLoc(0, 6)).loc,
       Some(Location(0, 6))
     )
     assertEquals(Parser.assignCaptureIndex(LookAhead(false, Dot()).withLoc(0, 5)).loc, Some(Location(0, 5)))
@@ -162,19 +153,7 @@ class ParserSuite extends munit.FunSuite {
     )
     assertEquals(Parser.assignBackReferenceIndex(Group(Dot()).withLoc(0, 5), 0).toTry.get.loc, Some(Location(0, 5)))
     assertEquals(
-      Parser.assignBackReferenceIndex(Star(false, Dot()).withLoc(0, 2), 0).toTry.get.loc,
-      Some(Location(0, 2))
-    )
-    assertEquals(
-      Parser.assignBackReferenceIndex(Plus(false, Dot()).withLoc(0, 2), 0).toTry.get.loc,
-      Some(Location(0, 2))
-    )
-    assertEquals(
-      Parser.assignBackReferenceIndex(Question(false, Dot()).withLoc(0, 2), 0).toTry.get.loc,
-      Some(Location(0, 2))
-    )
-    assertEquals(
-      Parser.assignBackReferenceIndex(Repeat(false, 0, Some(Some(2)), Dot()).withLoc(0, 6), 0).toTry.get.loc,
+      Parser.assignBackReferenceIndex(Repeat(Quantifier.Star(false), Dot()).withLoc(0, 6), 0).toTry.get.loc,
       Some(Location(0, 6))
     )
     assertEquals(
@@ -208,27 +187,45 @@ class ParserSuite extends munit.FunSuite {
   test("Parser#Term") {
     assertEquals(parse("x", P.Term(_)), Parsed.Success(Character('x'), 1))
     assertEquals(parse("(?=x)*", P.Term(_)), Parsed.Success(LookAhead(false, Character('x')), 5))
-    assertEquals(parse("(?=x)*", PA.Term(_)), Parsed.Success(Star(false, LookAhead(false, Character('x'))), 6))
+    assertEquals(
+      parse("(?=x)*", PA.Term(_)),
+      Parsed.Success(Repeat(Quantifier.Star(false), LookAhead(false, Character('x'))), 6)
+    )
     assertEquals(parse("(?<=x)*", P.Term(_)), Parsed.Success(LookBehind(false, Character('x')), 6))
     assertEquals(parse("\\b*", P.Term(_)), Parsed.Success(WordBoundary(false), 2))
     assertEquals(parse("^*", P.Term(_)), Parsed.Success(LineBegin(), 1))
     assertEquals(parse("$*", P.Term(_)), Parsed.Success(LineEnd(), 1))
-    assertEquals(parse("x{1}", P.Term(_)), Parsed.Success(Repeat(false, 1, None, Character('x')), 4))
-    assertEquals(parse("x*", P.Term(_)), Parsed.Success(Star(false, Character('x')), 2))
-    assertEquals(parse("x*?", P.Term(_)), Parsed.Success(Star(true, Character('x')), 3))
-    assertEquals(parse("x+", P.Term(_)), Parsed.Success(Plus(false, Character('x')), 2))
-    assertEquals(parse("x+?", P.Term(_)), Parsed.Success(Plus(true, Character('x')), 3))
-    assertEquals(parse("x?", P.Term(_)), Parsed.Success(Question(false, Character('x')), 2))
-    assertEquals(parse("x??", P.Term(_)), Parsed.Success(Question(true, Character('x')), 3))
+    assertEquals(parse("x{1}", P.Term(_)), Parsed.Success(Repeat(Quantifier.Exact(1, false), Character('x')), 4))
+    assertEquals(parse("x*", P.Term(_)), Parsed.Success(Repeat(Quantifier.Star(false), Character('x')), 2))
+    assertEquals(parse("x*?", P.Term(_)), Parsed.Success(Repeat(Quantifier.Star(true), Character('x')), 3))
+    assertEquals(parse("x+", P.Term(_)), Parsed.Success(Repeat(Quantifier.Plus(false), Character('x')), 2))
+    assertEquals(parse("x+?", P.Term(_)), Parsed.Success(Repeat(Quantifier.Plus(true), Character('x')), 3))
+    assertEquals(parse("x?", P.Term(_)), Parsed.Success(Repeat(Quantifier.Question(false), Character('x')), 2))
+    assertEquals(parse("x??", P.Term(_)), Parsed.Success(Repeat(Quantifier.Question(true), Character('x')), 3))
   }
 
-  test("Parser#Repeat") {
-    assertEquals(parse0("{1}", P.Repeat(_)), Parsed.Success((false, 1, None), 3))
-    assertEquals(parse0("{1}?", P.Repeat(_)), Parsed.Success((true, 1, None), 4))
-    assertEquals(parse0("{1,}", P.Repeat(_)), Parsed.Success((false, 1, Some(None)), 4))
-    assertEquals(parse0("{1,}?", P.Repeat(_)), Parsed.Success((true, 1, Some(None)), 5))
-    assertEquals(parse0("{1,2}", P.Repeat(_)), Parsed.Success((false, 1, Some(Some(2))), 5))
-    assertEquals(parse0("{1,2}?", P.Repeat(_)), Parsed.Success((true, 1, Some(Some(2))), 6))
+  test("Parser#Quantifier") {
+    assertEquals(parse0("*", P.Quantifier(_)), Parsed.Success(Quantifier.Star(false), 1))
+    assertEquals(parse0("*?", P.Quantifier(_)), Parsed.Success(Quantifier.Star(true), 2))
+    assertEquals(parse0("+", P.Quantifier(_)), Parsed.Success(Quantifier.Plus(false), 1))
+    assertEquals(parse0("+?", P.Quantifier(_)), Parsed.Success(Quantifier.Plus(true), 2))
+    assertEquals(parse0("?", P.Quantifier(_)), Parsed.Success(Quantifier.Question(false), 1))
+    assertEquals(parse0("??", P.Quantifier(_)), Parsed.Success(Quantifier.Question(true), 2))
+    assertEquals(parse0("{1}", P.Quantifier(_)), Parsed.Success(Quantifier.Exact(1, false), 3))
+    assertEquals(parse0("{1}?", P.Quantifier(_)), Parsed.Success(Quantifier.Exact(1, true), 4))
+    assertEquals(parse0("{1,}", P.Quantifier(_)), Parsed.Success(Quantifier.Unbounded(1, false), 4))
+    assertEquals(parse0("{1,}?", P.Quantifier(_)), Parsed.Success(Quantifier.Unbounded(1, true), 5))
+    assertEquals(parse0("{1,2}", P.Quantifier(_)), Parsed.Success(Quantifier.Bounded(1, 2, false), 5))
+    assertEquals(parse0("{1,2}?", P.Quantifier(_)), Parsed.Success(Quantifier.Bounded(1, 2, true), 6))
+  }
+
+  test("Parser#NormalizedQuantifier") {
+    assertEquals(parse0("{1}", P.NormalizedQuantifier(_)), Parsed.Success(Quantifier.Exact(1, false), 3))
+    assertEquals(parse0("{1}?", P.NormalizedQuantifier(_)), Parsed.Success(Quantifier.Exact(1, true), 4))
+    assertEquals(parse0("{1,}", P.NormalizedQuantifier(_)), Parsed.Success(Quantifier.Unbounded(1, false), 4))
+    assertEquals(parse0("{1,}?", P.NormalizedQuantifier(_)), Parsed.Success(Quantifier.Unbounded(1, true), 5))
+    assertEquals(parse0("{1,2}", P.NormalizedQuantifier(_)), Parsed.Success(Quantifier.Bounded(1, 2, false), 5))
+    assertEquals(parse0("{1,2}?", P.NormalizedQuantifier(_)), Parsed.Success(Quantifier.Bounded(1, 2, true), 6))
   }
 
   test("Parser#Atom") {
