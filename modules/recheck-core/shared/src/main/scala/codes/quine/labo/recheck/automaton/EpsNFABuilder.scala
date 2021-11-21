@@ -6,7 +6,6 @@ import scala.util.Try
 
 import codes.quine.labo.recheck.automaton.EpsNFA._
 import codes.quine.labo.recheck.common.Context
-import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.common.UnsupportedException
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.regexp.Pattern._
@@ -117,10 +116,10 @@ private class EpsNFABuilder(
         val q = nextQ()
         (q, q)
       }
-    case Capture(_, n)         => buildNode(n)
-    case NamedCapture(_, _, n) => buildNode(n)
-    case Group(n)              => buildNode(n)
-    case Star(nonGreedy, n)    =>
+    case Capture(_, n)                      => buildNode(n)
+    case NamedCapture(_, _, n)              => buildNode(n)
+    case Group(n)                           => buildNode(n)
+    case Repeat(Quantifier.Star(isLazy), n) =>
       //       +--------------------+
       //       |                    |
       //  (i)-+->(i2)->[i0-->a0]-+  +->(a1)->(a)
@@ -132,13 +131,13 @@ private class EpsNFABuilder(
       val i2 = nextQ()
       val a1 = nextQ()
       val a = nextQ()
-      val t = if (nonGreedy) Vector(a1, i2) else Vector(i2, a1)
+      val t = if (isLazy) Vector(a1, i2) else Vector(i2, a1)
       emit(i -> Eps(t))
       emit(i2 -> LoopEnter(loop, i0))
       emit(a0 -> Eps(Vector(i)))
       emit(a1 -> LoopExit(loop, a))
       (i, a)
-    case Plus(nonGreedy, n) =>
+    case Repeat(Quantifier.Plus(isLazy), n) =>
       val (i, a0) = buildNode(n)
       // +----(i1)---+
       // |           |
@@ -147,35 +146,34 @@ private class EpsNFABuilder(
       val i1 = nextQ()
       val a1 = nextQ()
       val a = nextQ()
-      val t = if (nonGreedy) Vector(a1, i1) else Vector(i1, a1)
+      val t = if (isLazy) Vector(a1, i1) else Vector(i1, a1)
       emit(a0 -> Eps(t))
       emit(i1 -> LoopEnter(loop, i))
       emit(a1 -> LoopExit(loop, a))
       (i, a)
-    case Question(nonGreedy, n) =>
+    case Repeat(Quantifier.Question(isLazy), n) =>
       val (i0, a) = buildNode(n)
       //     +--------+
       //     |        v
       // (i)-+->[i0-->a]
       val i = nextQ()
-      val t = if (nonGreedy) Vector(a, i0) else Vector(i0, a)
+      val t = if (isLazy) Vector(a, i0) else Vector(i0, a)
       emit(i -> Eps(t))
       (i, a)
-    case Repeat(_, min, None, n) =>
-      buildNode(Sequence(Vector.fill(min)(n)))
-    case Repeat(nonGreedy, min, Some(None), n) =>
-      buildNode(Sequence(Vector.fill(min)(n) :+ Star(nonGreedy, n)))
-    case Repeat(_, min, Some(Some(max)), _) if max < min =>
-      throw new InvalidRegExpException("out of order repetition quantifier")
-    case Repeat(_, min, Some(Some(max)), n) if min == max =>
-      buildNode(Sequence(Vector.fill(min)(n)))
-    case Repeat(nonGreedy, min, Some(Some(max)), n) =>
-      val minN = Vector.fill(min)(n)
-      val maxN = Question(
-        nonGreedy,
-        Vector.fill(max - min)(n).reduceRight((l, r) => Sequence(Vector(l, Question(nonGreedy, r))))
-      )
-      buildNode(Sequence(minN :+ maxN))
+    case Repeat(q, n) =>
+      q.normalized match {
+        case Quantifier.Exact(m, _) =>
+          buildNode(Sequence(Vector.fill(m)(n)))
+        case Quantifier.Unbounded(min, isLazy) =>
+          buildNode(Sequence(Vector.fill(min)(n) :+ Repeat(Quantifier.Star(isLazy), n)))
+        case Quantifier.Bounded(min, max, isLazy) =>
+          val minN = Vector.fill(min)(n)
+          val maxN = Repeat(
+            Quantifier.Question(isLazy),
+            Vector.fill(max - min)(n).reduceRight((l, r) => Sequence(Vector(l, Repeat(Quantifier.Question(isLazy), r))))
+          )
+          buildNode(Sequence(minN :+ maxN))
+      }
     case WordBoundary(invert) =>
       val i = nextQ()
       val a = nextQ()

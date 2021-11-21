@@ -4,7 +4,6 @@ import scala.collection.mutable
 import scala.util.Try
 
 import codes.quine.labo.recheck.common.Context
-import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.regexp.Pattern._
 import codes.quine.labo.recheck.regexp.PatternExtensions._
@@ -207,15 +206,12 @@ private[vm] class ProgramBuilder(
 
   /** Builds a program from a node. */
   def build(node: Node): Unit = interrupt(node match {
-    case Disjunction(children)              => buildDisjunction(children)
-    case Sequence(children)                 => buildSequence(children)
-    case Capture(index, child)              => buildCapture(index, child)
-    case NamedCapture(index, _, child)      => buildCapture(index, child)
-    case Group(child)                       => build(child)
-    case Star(nonGreedy, child)             => buildStar(nonGreedy, child)
-    case Plus(nonGreedy, child)             => buildPlus(nonGreedy, child)
-    case Question(nonGreedy, child)         => buildQuestion(nonGreedy, child)
-    case Repeat(nonGreedy, min, max, child) => buildRepeat(nonGreedy, min, max, child)
+    case Disjunction(children)         => buildDisjunction(children)
+    case Sequence(children)            => buildSequence(children)
+    case Capture(index, child)         => buildCapture(index, child)
+    case NamedCapture(index, _, child) => buildCapture(index, child)
+    case Group(child)                  => build(child)
+    case Repeat(q, child)              => buildRepeat(q.normalized, child)
     case WordBoundary(invert)     => emitAssert(if (invert) AssertKind.WordBoundaryNot else AssertKind.WordBoundary)
     case LineBegin()              => emitAssert(if (multiline) AssertKind.LineBegin else AssertKind.InputBegin)
     case LineEnd()                => emitAssert(if (multiline) AssertKind.LineEnd else AssertKind.InputEnd)
@@ -274,7 +270,7 @@ private[vm] class ProgramBuilder(
   }
 
   /** A builder for `x*` node. */
-  def buildStar(nonGreedy: Boolean, child: Node): Unit = {
+  def buildStar(isLazy: Boolean, child: Node): Unit = {
     val isEmpty = child.isEmpty
     val captureRange = child.captureRange
 
@@ -282,7 +278,7 @@ private[vm] class ProgramBuilder(
     val loop = allocateLabel("loop")
     val cont = allocateLabel("cont")
 
-    emitTerminator(if (nonGreedy) Inst.Try(cont, loop) else Inst.Try(loop, cont))
+    emitTerminator(if (isLazy) Inst.Try(cont, loop) else Inst.Try(loop, cont))
 
     enterBlock(loop)
     wrapCanary(isEmpty) {
@@ -295,17 +291,17 @@ private[vm] class ProgramBuilder(
   }
 
   /** A builder for `x+` node. */
-  def buildPlus(nonGreedy: Boolean, child: Node): Unit = {
+  def buildPlus(isLazy: Boolean, child: Node): Unit = {
     build(child)
-    buildStar(nonGreedy, child)
+    buildStar(isLazy, child)
   }
 
   /** A builder for `x?` node. */
-  def buildQuestion(nonGreedy: Boolean, child: Node): Unit = {
+  def buildQuestion(isLazy: Boolean, child: Node): Unit = {
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
 
-    emitTerminator(if (nonGreedy) Inst.Try(cont, main) else Inst.Try(main, cont))
+    emitTerminator(if (isLazy) Inst.Try(cont, main) else Inst.Try(main, cont))
 
     enterBlock(main)
     build(child)
@@ -315,34 +311,30 @@ private[vm] class ProgramBuilder(
   }
 
   /** A builder for `x{n,m}` node. */
-  def buildRepeat(nonGreedy: Boolean, min: Int, max: Option[Option[Int]], child: Node): Unit =
-    (min, max) match {
-      case (n, Some(Some(m))) if n > m => throw new InvalidRegExpException("out of order repetition quantifier")
-      case (0, None)                   => // nothing to do
-      case (1, None)                   => build(child)
-      case (n, None)                   => buildRepeatN(n, child)
-      case (0, Some(None))             => buildStar(nonGreedy, child)
-      case (1, Some(None))             => buildPlus(nonGreedy, child)
-      case (n, Some(None)) =>
+  def buildRepeat(quantifier: NormalizedQuantifier, child: Node): Unit =
+    quantifier match {
+      case Quantifier.Exact(0, _)          => // nothing to do
+      case Quantifier.Exact(1, _)          => build(child)
+      case Quantifier.Exact(n, _)          => buildRepeatN(n, child)
+      case Quantifier.Unbounded(0, isLazy) => buildStar(isLazy, child)
+      case Quantifier.Unbounded(1, isLazy) => buildPlus(isLazy, child)
+      case Quantifier.Unbounded(n, isLazy) =>
         buildRepeatN(n, child)
-        buildStar(nonGreedy, child)
-      case (0, Some(Some(0))) => // nothing to do
-      case (0, Some(Some(1))) => buildQuestion(nonGreedy, child)
-      case (0, Some(Some(n))) => buildRepeatAtMostN(nonGreedy, n, child)
-      case (1, Some(Some(1))) => build(child)
-      case (1, Some(Some(2))) =>
+        buildStar(isLazy, child)
+      case Quantifier.Bounded(0, 1, isLazy) => buildQuestion(isLazy, child)
+      case Quantifier.Bounded(0, n, isLazy) => buildRepeatAtMostN(isLazy, n, child)
+      case Quantifier.Bounded(1, 2, isLazy) =>
         build(child)
-        buildQuestion(nonGreedy, child)
-      case (1, Some(Some(m))) =>
+        buildQuestion(isLazy, child)
+      case Quantifier.Bounded(1, m, isLazy) =>
         build(child)
-        buildRepeatAtMostN(nonGreedy, m - 1, child)
-      case (n, Some(Some(m))) if n == m => buildRepeatN(n, child)
-      case (n, Some(Some(m))) if m - n == 1 =>
+        buildRepeatAtMostN(isLazy, m - 1, child)
+      case Quantifier.Bounded(n, m, isLazy) if m - n == 1 =>
         buildRepeatN(n, child)
-        buildQuestion(nonGreedy, child)
-      case (n, Some(Some(m))) =>
+        buildQuestion(isLazy, child)
+      case Quantifier.Bounded(n, m, isLazy) =>
         buildRepeatN(n, child)
-        buildRepeatAtMostN(nonGreedy, m - n, child)
+        buildRepeatAtMostN(isLazy, m - n, child)
     }
 
   /** A builder for `x{n}` node. */
@@ -367,7 +359,7 @@ private[vm] class ProgramBuilder(
   }
 
   /** A builder for `x{0,n}` node. */
-  def buildRepeatAtMostN(nonGreedy: Boolean, n: Int, child: Node): Unit = {
+  def buildRepeatAtMostN(isLazy: Boolean, n: Int, child: Node): Unit = {
     val isEmpty = child.isEmpty
     val captureRange = child.captureRange
 
@@ -377,7 +369,7 @@ private[vm] class ProgramBuilder(
 
     val reg = allocateCounter()
 
-    emitTerminator(if (nonGreedy) Inst.Try(cont, loop) else Inst.Try(loop, cont))
+    emitTerminator(if (isLazy) Inst.Try(cont, loop) else Inst.Try(loop, cont))
 
     enterBlock(loop)
     wrapCanary(isEmpty) {
