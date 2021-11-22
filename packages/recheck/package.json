@@ -25,7 +25,7 @@
   "optionalDependencies": {
     "recheck-darwin-x64": "4.0.0",
     "recheck-linux-x64": "4.0.0",
-    "recheck-win32-x64": "4.0.0"
+    "recheck-windows-x64": "4.0.0"
   },
   "devDependencies": {
     "esbuild": "^0.13.15"

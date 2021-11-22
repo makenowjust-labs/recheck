@@ -2,15 +2,28 @@ import * as child_process from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
+const osNames = {
+  darwin: 'darwin',
+  linux: 'linux',
+  win32: 'windows',
+};
+
+const cpuNames = {
+  x64: 'x64',
+};
+
 const getCLIPath = () => {
   const RECHECK_PATH = process.env['RECHECK_PATH'] || null;
   if (RECHECK_PATH !== null) {
     return RECHECK_PATH;
   }
 
-  const os = process.platform;
-  const cpu = process.arch;
-  const isWin32 = os === 'win32';
+  const os = osNames[process.platform];
+  const cpu = cpuNames[process.arch];
+  const isWin32 = os === 'windows';
+  if (!os || !cpu) {
+    return null;
+  }
 
   try {
     const dir = require.resolve(`recheck-${os}-${cpu}`);
