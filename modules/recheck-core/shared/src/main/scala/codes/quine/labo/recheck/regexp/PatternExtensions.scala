@@ -19,7 +19,7 @@ object PatternExtensions {
     def merge(other: CaptureRange): CaptureRange =
       (range, other.range) match {
         case (Some((min1, max1)), Some((min2, max2))) =>
-          new CaptureRange(Some((Math.min(min1, min2), Math.max(max1, max2))))
+          CaptureRange(Some((Math.min(min1, min2), Math.max(max1, max2))))
         case (Some((min, max)), None) => CaptureRange(Some((min, max)))
         case (None, Some((min, max))) => CaptureRange(Some((min, max)))
         case (None, None)             => CaptureRange(None)
@@ -212,17 +212,17 @@ object PatternExtensions {
     }
 
     /** Checks this node can match an empty string. */
-    def isEmpty: Boolean = node match {
-      case Disjunction(ns)       => ns.exists(_.isEmpty)
-      case Sequence(ns)          => ns.forall(_.isEmpty)
-      case Capture(_, n)         => n.isEmpty
-      case NamedCapture(_, _, n) => n.isEmpty
-      case Group(n)              => n.isEmpty
+    def canMatchEmpty: Boolean = node match {
+      case Disjunction(ns)       => ns.exists(_.canMatchEmpty)
+      case Sequence(ns)          => ns.forall(_.canMatchEmpty)
+      case Capture(_, n)         => n.canMatchEmpty
+      case NamedCapture(_, _, n) => n.canMatchEmpty
+      case Group(n)              => n.canMatchEmpty
       case Repeat(q, n) =>
         q.normalized match {
-          case Quantifier.Exact(m, _)      => m == 0 || n.isEmpty
-          case Quantifier.Unbounded(m, _)  => m == 0 || n.isEmpty
-          case Quantifier.Bounded(m, _, _) => m == 0 || n.isEmpty
+          case Quantifier.Exact(m, _)      => m == 0 || n.canMatchEmpty
+          case Quantifier.Unbounded(m, _)  => m == 0 || n.canMatchEmpty
+          case Quantifier.Bounded(m, _, _) => m == 0 || n.canMatchEmpty
         }
       case WordBoundary(_) | LineBegin() | LineEnd()   => true
       case LookAhead(_, _) | LookBehind(_, _)          => true

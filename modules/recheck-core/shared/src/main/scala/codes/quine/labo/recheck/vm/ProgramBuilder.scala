@@ -271,20 +271,12 @@ private[vm] class ProgramBuilder(
 
   /** A builder for `x*` node. */
   def buildStar(isLazy: Boolean, child: Node): Unit = {
-    val isEmpty = child.isEmpty
-    val captureRange = child.captureRange
-
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
     val cont = allocateLabel("cont")
 
-    emitTerminator(if (isLazy) Inst.Try(cont, loop) else Inst.Try(loop, cont))
-
-    enterBlock(loop)
-    wrapCanary(isEmpty) {
-      for ((min, max) <- captureRange.range) emitInst(Inst.CapReset(min, max))
-      build(child)
-    }
+    enterLoopBlock(isLazy, loop, cont)
+    wrapCanary(child)(wrapReset(child)(build(node)))
     emitTerminator(Inst.Jmp(begin))
 
     enterBlock(cont)
@@ -339,61 +331,62 @@ private[vm] class ProgramBuilder(
 
   /** A builder for `x{n}` node. */
   def buildRepeatN(n: Int, child: Node): Unit = {
-    val captureRange = child.captureRange
-
     val loop = allocateEntrance("loop")
     val cont = allocateLabel("cont")
 
     val reg = allocateCounter()
 
     // Note that `wrapCanary` is not needed.
-    for ((min, max) <- captureRange.range) emitInst(Inst.CapReset(min, max))
-    build(child)
+    wrapReset(child)(build(child))
     emitInst(Inst.Inc(reg))
-    emitTerminator(Inst.Cmp(reg, n, loop, cont))
-
-    enterBlock(cont)
-    emitInst(Inst.Reset(reg))
-
-    freeCounter(reg)
+    closeLoopBlock(reg, n, loop, cont)
   }
 
   /** A builder for `x{0,n}` node. */
   def buildRepeatAtMostN(isLazy: Boolean, n: Int, child: Node): Unit = {
-    val isEmpty = child.isEmpty
-    val captureRange = child.captureRange
-
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
     val cont = allocateLabel("cont")
 
     val reg = allocateCounter()
 
-    emitTerminator(if (isLazy) Inst.Try(cont, loop) else Inst.Try(loop, cont))
-
-    enterBlock(loop)
-    wrapCanary(isEmpty) {
-      for ((min, max) <- captureRange.range) emitInst(Inst.CapReset(min, max))
-      build(child)
-    }
+    enterLoopBlock(isLazy, loop, cont)
+    wrapCanary(child)(wrapReset(child)(build(child)))
     emitInst(Inst.Inc(reg))
+    closeLoopBlock(reg, n, begin, cont)
+  }
+
+  /** Emits a loop block entering instructions. */
+  def enterLoopBlock(isLazy: Boolean, loop: Label, cont: Label): Unit = {
+    emitTerminator(if (isLazy) Inst.Try(cont, loop) else Inst.Try(loop, cont))
+    enterBlock(loop)
+  }
+
+  /** Emits a loop block closing instructions. */
+  def closeLoopBlock(reg: CounterReg, n: Int, begin: Label, cont: Label): Unit = {
     emitTerminator(Inst.Cmp(reg, n, begin, cont))
 
     enterBlock(cont)
-    emitInst(Inst.Reset(reg))
+    emitInst(Inst.Reset(reg)) // A counter should be reset after the loop for working memoization well.
 
     freeCounter(reg)
   }
 
   /** Inserts a canary around a loop body if needed. */
-  def wrapCanary(isEmpty: Boolean)(run: => Unit): Unit = {
-    if (isEmpty) {
+  def wrapCanary(child: Node)(run: => Unit): Unit = {
+    if (child.canMatchEmpty) {
       val reg = allocateCanary()
       emitInst(Inst.SetCanary(reg))
       run
       emitInst(Inst.CheckCanary(reg))
       freeCanary(reg)
     } else run
+  }
+
+  /** Emits a `cap-reset`, then execute a `run`. */
+  def wrapReset(child: Node)(run: => Unit): Unit = {
+    for ((min, max) <- child.captureRange.range) emitInst(Inst.CapReset(min, max))
+    run
   }
 
   /** A builder for positive look-around assertion. */
