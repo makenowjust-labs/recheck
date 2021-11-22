@@ -1,4 +1,4 @@
-# recheck-darwin-x64
+# `recheck-macos-x64`
 
 > The macOS 64-bit binary for recheck.
 

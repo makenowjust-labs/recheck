@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const osNames = {
-  darwin: 'darwin',
+  darwin: 'macos',
   linux: 'linux',
   win32: 'windows',
 };

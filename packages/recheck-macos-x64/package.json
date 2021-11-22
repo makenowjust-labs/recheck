@@ -1,5 +1,5 @@
 {
-  "name": "recheck-darwin-x64",
+  "name": "recheck-macos-x64",
   "version": "4.0.0",
   "description": "The macOS 64-bit binary for recheck.",
   "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",

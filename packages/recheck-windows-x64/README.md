@@ -1,4 +1,4 @@
-# recheck-win32-x64
+# recheck-windows-x64
 
 > The Windows 64-bit binary for recheck.
 

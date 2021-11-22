@@ -23,7 +23,7 @@
     "main.js"
   ],
   "optionalDependencies": {
-    "recheck-darwin-x64": "4.0.0",
+    "recheck-macos-x64": "4.0.0",
     "recheck-linux-x64": "4.0.0",
     "recheck-windows-x64": "4.0.0"
   },
