@@ -104,6 +104,7 @@ jobs:
           path: |
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
+      - run: git fetch --unshallow
       - name: Publish
         run: sbt ci-release
         env:
