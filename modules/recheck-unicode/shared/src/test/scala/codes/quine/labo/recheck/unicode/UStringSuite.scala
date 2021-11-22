@@ -11,6 +11,11 @@ class UStringSuite extends munit.FunSuite {
     assertEquals(UString.from(IndexedSeq(UChar(0x1f363))), UString("🍣"))
   }
 
+  test("UString.canonicalize") {
+    assertEquals(UString.canonicalize(UString("xyz"), false), UString("XYZ"))
+    assertEquals(UString.canonicalize(UString("XYZ"), true), UString("xyz"))
+  }
+
   test("UString#isEmpty") {
     assert(UString.empty.isEmpty)
     assert(!UString("xyz").isEmpty)
@@ -82,6 +87,12 @@ class UStringSuite extends munit.FunSuite {
     assertEquals(s1.replaceAt(2, 'x', false), UString("01x"))
     assertEquals(s2.replaceAt(1, 'x', false), UString("0x\udf634"))
     assertEquals(s2.replaceAt(1, 'x', true), UString("0x4"))
+  }
+
+  test("UString#iterator") {
+    val s = UString("0🍣4")
+    assertEquals(s.iterator(false).toSeq, Seq(UChar('0'), UChar(0xd83c), UChar(0xdf63), UChar('4')))
+    assertEquals(s.iterator(true).toSeq, Seq(UChar('0'), UChar(0x1f363), UChar('4')))
   }
 
   test("UString#asString") {
