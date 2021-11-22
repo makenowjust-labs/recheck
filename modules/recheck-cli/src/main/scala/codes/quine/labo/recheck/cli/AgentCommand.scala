@@ -9,12 +9,12 @@ import io.circe.Decoder
 import io.circe.generic.semiauto._
 
 import codes.quine.labo.recheck.ReDoS
-import codes.quine.labo.recheck.cli.BatchCommand._
+import codes.quine.labo.recheck.cli.AgentCommand._
 import codes.quine.labo.recheck.codec._
 import codes.quine.labo.recheck.diagnostics.Diagnostics
 
-/** `recheck batch` method types. */
-object BatchCommand {
+/** `recheck agent` method types. */
+object AgentCommand {
 
   /** `"check"` method parameter. */
   final case class CheckParams(source: String, flags: String, config: ConfigData)
@@ -34,8 +34,8 @@ object BatchCommand {
   private[cli] final case class Token(source: String, flags: String, send: RPC.Send[Diagnostics], cancel: () => Unit)
 }
 
-/** `recheck batch` command implementation. */
-class BatchCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio) {
+/** `recheck agent` command implementation. */
+class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio) {
 
   /** A thread pool used by checking. */
   val executor: ExecutorService = Executors.newFixedThreadPool(threadSize)

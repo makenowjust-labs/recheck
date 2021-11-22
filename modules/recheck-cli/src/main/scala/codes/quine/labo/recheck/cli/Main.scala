@@ -10,6 +10,9 @@ import com.monovore.decline.Opts
 
 import codes.quine.labo.recheck.Config
 import codes.quine.labo.recheck.ReDoS
+import codes.quine.labo.recheck.cli.Main.BatchAction
+import codes.quine.labo.recheck.cli.Main.CheckAction
+import codes.quine.labo.recheck.cli.Main.command
 import codes.quine.labo.recheck.cli.arguments._
 import codes.quine.labo.recheck.codec._
 import codes.quine.labo.recheck.common.Checker
@@ -118,7 +121,7 @@ object Main {
       val pattern = Opts.argument[InputPattern](metavar = "pattern")
       val check: Opts[Action] = (pattern, config).mapN(CheckAction)
 
-      val batch: Opts[Action] = Opts.subcommand(name = "batch", help = "Starts the batch mode.") {
+      val agent: Opts[Action] = Opts.subcommand(name = "agent", help = "Starts the batch mode.") {
         val threadSize = Opts
           .option[Int](long = "thread-size", short = "t", help = "A number of thread for processing")
           .withDefault(sys.runtime.availableProcessors())
@@ -126,14 +129,24 @@ object Main {
         threadSize.map(BatchAction.apply)
       }
 
-      batch <+> check
+      agent <+> check
     }
 
+  // $COVERAGE-OFF$
   /** An entrypoint of `recheck` command. */
-  def main(args: Array[String]): Unit = command.parse(args.toSeq, sys.env) match {
+  def main(args: Array[String]): Unit = new Main().run(args)
+  // $COVERAGE-ON$
+}
+
+class Main {
+  // $COVERAGE-OFF$
+  def exit(exitCode: Int): Unit = sys.exit(exitCode)
+  // $COVERAGE-ON$
+
+  def run(args: Array[String]): Unit = command.parse(args.toSeq, sys.env) match {
     case Left(help) =>
       Console.err.println(help.toString)
-      sys.exit(2)
+      exit(2)
 
     case Right(action: CheckAction) =>
       val (config, _) = action.config.instantiate()
@@ -141,10 +154,10 @@ object Main {
       Console.out.println(diagnostics)
       diagnostics match {
         case _: Diagnostics.Safe                                => () // skip
-        case _: Diagnostics.Vulnerable | _: Diagnostics.Unknown => sys.exit(1)
+        case _: Diagnostics.Vulnerable | _: Diagnostics.Unknown => exit(1)
       }
 
     case Right(action: BatchAction) =>
-      new BatchCommand(action.threadSize).run()
+      new AgentCommand(action.threadSize).run()
   }
 }
