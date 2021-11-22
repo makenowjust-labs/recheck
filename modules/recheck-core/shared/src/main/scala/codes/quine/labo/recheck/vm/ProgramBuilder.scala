@@ -276,7 +276,7 @@ private[vm] class ProgramBuilder(
     val cont = allocateLabel("cont")
 
     enterLoopBlock(isLazy, loop, cont)
-    wrapCanary(child)(wrapReset(child)(build(node)))
+    wrapCanary(child)(wrapReset(child)(build(child)))
     emitTerminator(Inst.Jmp(begin))
 
     enterBlock(cont)
@@ -338,7 +338,6 @@ private[vm] class ProgramBuilder(
 
     // Note that `wrapCanary` is not needed.
     wrapReset(child)(build(child))
-    emitInst(Inst.Inc(reg))
     closeLoopBlock(reg, n, loop, cont)
   }
 
@@ -352,7 +351,6 @@ private[vm] class ProgramBuilder(
 
     enterLoopBlock(isLazy, loop, cont)
     wrapCanary(child)(wrapReset(child)(build(child)))
-    emitInst(Inst.Inc(reg))
     closeLoopBlock(reg, n, begin, cont)
   }
 
@@ -364,6 +362,7 @@ private[vm] class ProgramBuilder(
 
   /** Emits a loop block closing instructions. */
   def closeLoopBlock(reg: CounterReg, n: Int, begin: Label, cont: Label): Unit = {
+    emitInst(Inst.Inc(reg))
     emitTerminator(Inst.Cmp(reg, n, begin, cont))
 
     enterBlock(cont)
