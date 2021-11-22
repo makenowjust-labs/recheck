@@ -1,6 +1,6 @@
 {
   "name": "recheck-linux-x64",
-  "version": "4.0.1",
+  "version": "4.0.2",
   "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
   "homepage": "https://makenowjust-labo.github.io/recheck/",
   "description": "The Linux 64-bit binary for recheck.",

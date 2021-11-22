@@ -147,21 +147,21 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: recheck-darwin-x64
+          path: packages/recheck-macos-x64/
       - uses: actions/download-artifact@v2
         with:
           name: recheck-linux-x64
+          path: packages/recheck-linux-x64/
       - uses: actions/download-artifact@v2
         with:
           name: recheck-win32-x64.exe
+          path: packages/recheck-windows-x64/
       - name: Build
         run: |
           sbt js/fullLinkJS
-          yarn workflow recheck build
-          chmod +x ./recheck-darwin-x64
-          mv ./recheck-darwin-x64 packages/recheck-macos-x64/recheck
-          chmod +x ./recheck-linux-x64
-          mv ./recheck-linux-x64 packages/recheck-linux-x64/recheck
-          mv ./recheck-win32-x64.exe packages/recheck-windows-x64/recheck.exe
+          yarn workspace recheck build
+          chmod +x packages/recheck-macos-x64/recheck
+          chmod +x packages/recheck-linux-x64/recheck
       - uses: JS-DevTools/npm-publish@v1
         with:
           package: packages/recheck/package.json

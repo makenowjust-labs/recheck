@@ -1,3 +1,7 @@
+# 4.0.2 (2021-11-23)
+
+A test release (second).
+
 # 4.0.1 (2021-11-23)
 
 A test release.
