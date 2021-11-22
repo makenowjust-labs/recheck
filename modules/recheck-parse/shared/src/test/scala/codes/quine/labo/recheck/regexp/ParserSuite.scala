@@ -136,6 +136,10 @@ class ParserSuite extends munit.FunSuite {
     }
 
     assertEquals(
+      Parser.assignBackReferenceIndex(Sequence(Seq(Capture(1, Dot()), BackReference(1))), 1),
+      Right(Sequence(Seq(Capture(1, Dot()), BackReference(1))))
+    )
+    assertEquals(
       Parser.assignBackReferenceIndex(Sequence(Seq(NamedCapture(1, "foo", Dot()), NamedBackReference(-1, "foo"))), 1),
       Right(Sequence(Seq(NamedCapture(1, "foo", Dot()), NamedBackReference(1, "foo"))))
     )
@@ -192,6 +196,10 @@ class ParserSuite extends munit.FunSuite {
     assertEquals(
       Parser.resolveUnicodeProperty(CharacterClass(false, Seq(UnicodeProperty(false, "ASCII", null)))),
       Right(CharacterClass(false, Seq(UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get))))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(CharacterClass(false, Seq(ClassRange('a', 'b')))),
+      Right(CharacterClass(false, Seq(ClassRange('a', 'b'))))
     )
 
     assertEquals(Parser.resolveUnicodeProperty(Dot()), Right(Dot()))

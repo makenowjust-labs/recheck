@@ -3,9 +3,7 @@ package codes.quine.labo.recheck
 import scala.concurrent.duration._
 import scala.util.Random
 import scala.util.Success
-
-import codes.quine.labo.recheck.common.Checker
-import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.{Checker, Context, TimeoutException}
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Diagnostics
@@ -127,6 +125,15 @@ class ReDoSSuite extends munit.FunSuite {
       ),
       Success(Diagnostics.Safe(".", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
+    interceptMessage[TimeoutException]("codes.quine.labo.recheck.fuzz.FuzzProgram.from") {
+      val result = ReDoS.checkFuzz(
+        ".",
+        "",
+        Pattern(Dot(), FlagSet(false, false, false, false, false, false)),
+        Config(context = Context(timeout = -1.second))
+      )
+      result.get
+    }
   }
 
   test("ReDoS.checkHybrid") {

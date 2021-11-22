@@ -14,6 +14,23 @@ class PatternSuite extends munit.FunSuite {
     assert(clue(node2.withLoc(0, 1)) eq clue(node2))
   }
 
+  test("Pattern.Quantifier#normalized") {
+    assertEquals(Quantifier.Star(false).normalized, Quantifier.Unbounded(0, false))
+    assertEquals(Quantifier.Star(true).normalized, Quantifier.Unbounded(0, true))
+    assertEquals(Quantifier.Plus(false).normalized, Quantifier.Unbounded(1, false))
+    assertEquals(Quantifier.Plus(true).normalized, Quantifier.Unbounded(1, true))
+    assertEquals(Quantifier.Question(false).normalized, Quantifier.Bounded(0, 1, false))
+    assertEquals(Quantifier.Question(true).normalized, Quantifier.Bounded(0, 1, true))
+    assertEquals(Quantifier.Exact(1, false).normalized, Quantifier.Exact(1, false))
+    assertEquals(Quantifier.Exact(1, true).normalized, Quantifier.Exact(1, true))
+    assertEquals(Quantifier.Unbounded(1, false).normalized, Quantifier.Unbounded(1, false))
+    assertEquals(Quantifier.Unbounded(1, true).normalized, Quantifier.Unbounded(1, true))
+    assertEquals(Quantifier.Bounded(1, 1, false).normalized, Quantifier.Exact(1, false))
+    assertEquals(Quantifier.Bounded(1, 1, true).normalized, Quantifier.Exact(1, true))
+    assertEquals(Quantifier.Bounded(1, 2, false).normalized, Quantifier.Bounded(1, 2, false))
+    assertEquals(Quantifier.Bounded(1, 2, true).normalized, Quantifier.Bounded(1, 2, true))
+  }
+
   test("Pattern.showNode") {
     val x = Character('x')
     assertEquals(showNode(Disjunction(Seq(Disjunction(Seq(x, x)), x))), "(?:x|x)|x")
