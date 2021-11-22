@@ -11,16 +11,14 @@ Changes:
 - Rename `recheck` module to `recheck-core` ([#92](https://github.com/MakeNowJust-Labo/recheck/pull/92))
 - Add `ErrorKind.Cancel` for canceled execution ([#93](https://github.com/MakeNowJust-Labo/recheck/pull/93))
 - Rename `EpsNFABuilder.compile` to `.build` ([#94](https://github.com/MakeNowJust-Labo/recheck/pull/94))
+- Improve AST node structure ([#138](https://github.com/MakeNowJust-Labo/recheck/pull/138))
 
 Fixes:
 
 - Update `sourcecode` to 0.2.7 ([#72](https://github.com/MakeNowJust-Labo/recheck/pull/72))
-- Update `sbt` to 1.5.2 ([#73](https://github.com/MakeNowJust-Labo/recheck/pull/73))
-- Update `mdoc`, `sbt-mdoc` to 2.2.21 ([#74](https://github.com/MakeNowJust-Labo/recheck/pull/74))
-- Update `munit` to 0.7.26 ([#75](https://github.com/MakeNowJust-Labo/recheck/pull/75))
-- Update `sbt-scoverage` to 1.8.0 ([#76](https://github.com/MakeNowJust-Labo/recheck/pull/76))
 - Update Scala version to 2.13.6
 - Run `recheck batch` requests in asynchronous ([#89](https://github.com/MakeNowJust-Labo/recheck/pull/89))
+- Update Scala version tp 2.13.7
 
 # 3.1.0 (2021-05-14)
 

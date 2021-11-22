@@ -21,7 +21,7 @@ class SeederSuite extends munit.FunSuite {
       val result = for {
         pattern <- Parser.parse(source, flags) match {
           case Right(pattern) => Success(pattern)
-          case Left(message)  => Failure(new InvalidRegExpException(message))
+          case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
         }
         fuzz <- FuzzProgram.from(pattern)
       } yield Seeder.seed(fuzz)

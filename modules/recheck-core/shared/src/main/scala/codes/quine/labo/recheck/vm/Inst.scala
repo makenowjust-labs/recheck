@@ -1,5 +1,6 @@
 package codes.quine.labo.recheck.vm
 
+import codes.quine.labo.recheck.regexp.Pattern.Location
 import codes.quine.labo.recheck.unicode.IChar
 import codes.quine.labo.recheck.unicode.UChar
 
@@ -100,22 +101,22 @@ object Inst {
   }
 
   /** `read`: Tests current position with advancing. */
-  final case class Read(kind: ReadKind, loc: Option[(Int, Int)]) extends NonTerminator {
+  final case class Read(kind: ReadKind, loc: Option[Location]) extends NonTerminator {
     override def toString: String = {
       val loc = this.loc match {
-        case Some((start, end)) => s" ; $start-$end"
-        case None               => ""
+        case Some(Location(start, end)) => s" ; $start-$end"
+        case None                       => ""
       }
       s"read $kind$loc"
     }
   }
 
   /** `read_back`: Tests current position with receding. */
-  final case class ReadBack(kind: ReadKind, loc: Option[(Int, Int)]) extends NonTerminator {
+  final case class ReadBack(kind: ReadKind, loc: Option[Location]) extends NonTerminator {
     override def toString: String = {
       val loc = this.loc match {
-        case Some((start, end)) => s" ; $start-$end"
-        case None               => ""
+        case Some(Location(start, end)) => s" ; $start-$end"
+        case None                       => ""
       }
       s"read_back $kind$loc"
     }

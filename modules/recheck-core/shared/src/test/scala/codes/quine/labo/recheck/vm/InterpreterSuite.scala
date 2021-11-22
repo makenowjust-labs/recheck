@@ -6,6 +6,7 @@ import scala.util.Success
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.regexp.Parser
+import codes.quine.labo.recheck.regexp.Pattern.Location
 import codes.quine.labo.recheck.unicode.UString
 import codes.quine.labo.recheck.vm.Inst.ReadKind
 import codes.quine.labo.recheck.vm.Interpreter.CoverageItem
@@ -22,7 +23,7 @@ class InterpreterSuite extends munit.FunSuite {
     val t = for {
       pattern <- Parser.parse(source, flags) match {
         case Right(pattern) => Success(pattern)
-        case Left(message)  => Failure(new InvalidRegExpException(message))
+        case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
       }
       program <- ProgramBuilder.build(pattern)
       result = Interpreter.run(program, UString(input), pos, opts)
@@ -94,10 +95,10 @@ class InterpreterSuite extends munit.FunSuite {
           CoverageItem(CoverageLocation(21, Vector.empty), false)
         ),
         Map(
-          (5, 6) -> 4,
-          (8, 10) -> 1,
-          (14, 16) -> 1,
-          (17, 18) -> 4
+          Location(5, 6) -> 4,
+          Location(8, 10) -> 1,
+          Location(14, 16) -> 1,
+          Location(17, 18) -> 4
         )
       )
     )

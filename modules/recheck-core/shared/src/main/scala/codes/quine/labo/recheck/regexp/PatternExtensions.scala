@@ -1,19 +1,14 @@
 package codes.quine.labo.recheck.regexp
 
 import scala.annotation.tailrec
-import scala.util.Failure
-import scala.util.Success
-import scala.util.Try
 import scala.util.chaining._
 
 import codes.quine.labo.recheck.common.Context
-import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.regexp.Pattern._
 import codes.quine.labo.recheck.unicode.IChar
 import codes.quine.labo.recheck.unicode.ICharSet
 import codes.quine.labo.recheck.unicode.ICharSet.CharKind
 import codes.quine.labo.recheck.unicode.UString
-import codes.quine.labo.recheck.util.TryUtil
 
 object PatternExtensions {
 
@@ -24,7 +19,7 @@ object PatternExtensions {
     def merge(other: CaptureRange): CaptureRange =
       (range, other.range) match {
         case (Some((min1, max1)), Some((min2, max2))) =>
-          new CaptureRange(Some((Math.min(min1, min2), Math.max(max1, max2))))
+          CaptureRange(Some((Math.min(min1, min2), Math.max(max1, max2))))
         case (Some((min, max)), None) => CaptureRange(Some((min, max)))
         case (None, Some((min, max))) => CaptureRange(Some((min, max)))
         case (None, None)             => CaptureRange(None)
@@ -67,19 +62,19 @@ object PatternExtensions {
     /** Tests the pattern has no infinite repetition. */
     def isConstant: Boolean = {
       def loop(node: Node): Boolean = node match {
-        case Disjunction(ns)             => ns.forall(loop)
-        case Sequence(ns)                => ns.forall(loop)
-        case Capture(_, n)               => loop(n)
-        case NamedCapture(_, _, n)       => loop(n)
-        case Group(n)                    => loop(n)
-        case Star(_, _)                  => false
-        case Plus(_, _)                  => false
-        case Question(_, n)              => loop(n)
-        case Repeat(_, _, Some(None), _) => false
-        case Repeat(_, _, _, n)          => loop(n)
-        case LookAhead(_, n)             => loop(n)
-        case LookBehind(_, n)            => loop(n)
-        case _                           => true
+        case Disjunction(ns)       => ns.forall(loop)
+        case Sequence(ns)          => ns.forall(loop)
+        case Capture(_, n)         => loop(n)
+        case NamedCapture(_, _, n) => loop(n)
+        case Group(n)              => loop(n)
+        case Repeat(q, n) =>
+          q.normalized match {
+            case Quantifier.Unbounded(_, _) => false
+            case _                          => loop(n)
+          }
+        case LookAhead(_, n)  => loop(n)
+        case LookBehind(_, n) => loop(n)
+        case _                => true
       }
       loop(node)
     }
@@ -87,26 +82,26 @@ object PatternExtensions {
     /** Returns this pattern's size. */
     def size: Int = {
       def loop(node: Node): Int = node match {
-        case Disjunction(ns)                => ns.map(loop).sum + ns.size - 1
-        case Sequence(ns)                   => ns.map(loop).sum
-        case Capture(_, n)                  => loop(n)
-        case NamedCapture(_, _, n)          => loop(n)
-        case Group(n)                       => loop(n)
-        case Star(_, n)                     => loop(n) + 1
-        case Plus(_, n)                     => loop(n) + 1
-        case Question(_, n)                 => loop(n) + 1
-        case Repeat(_, m, None, n)          => loop(n) * m
-        case Repeat(_, m, Some(None), n)    => loop(n) * (m + 1) + 1
-        case Repeat(_, m, Some(Some(l)), n) => loop(n) * l + (l - m)
-        case LookAhead(_, n)                => loop(n) + 1
-        case LookBehind(_, n)               => loop(n) + 1
-        case _                              => 1
+        case Disjunction(ns)                        => ns.map(loop).sum + ns.size - 1
+        case Sequence(ns)                           => ns.map(loop).sum
+        case Capture(_, n)                          => loop(n)
+        case NamedCapture(_, _, n)                  => loop(n)
+        case Group(n)                               => loop(n)
+        case Repeat(Quantifier.Star(_), n)          => loop(n) + 1
+        case Repeat(Quantifier.Plus(_), n)          => loop(n) + 1
+        case Repeat(Quantifier.Question(_), n)      => loop(n) + 1
+        case Repeat(Quantifier.Exact(m, _), n)      => loop(n) * m
+        case Repeat(Quantifier.Unbounded(m, _), n)  => loop(n) * (m + 1) + 1
+        case Repeat(Quantifier.Bounded(m, l, _), n) => loop(n) * l + (l - m)
+        case LookAhead(_, n)                        => loop(n) + 1
+        case LookBehind(_, n)                       => loop(n) + 1
+        case _                                      => 1
       }
       loop(node)
     }
 
     /** Computes alphabet from this pattern. */
-    def alphabet(implicit ctx: Context): Try[ICharSet] =
+    def alphabet(implicit ctx: Context): ICharSet =
       ctx.interrupt {
         val FlagSet(_, ignoreCase, _, dotAll, unicode, _) = flagSet
         val set = ICharSet
@@ -116,27 +111,23 @@ object PatternExtensions {
           )
           .pipe(set => if (needsWordDistinction) set.add(IChar.Word, CharKind.Word) else set)
 
-        def loop(node: Node): Try[Seq[IChar]] = ctx.interrupt(node match {
-          case Disjunction(ns)       => TryUtil.traverse(ns)(loop).map(_.flatten)
-          case Sequence(ns)          => TryUtil.traverse(ns)(loop).map(_.flatten)
+        def loop(node: Node): Seq[IChar] = ctx.interrupt(node match {
+          case Disjunction(ns)       => ns.flatMap(loop)
+          case Sequence(ns)          => ns.flatMap(loop)
           case Capture(_, n)         => loop(n)
           case NamedCapture(_, _, n) => loop(n)
           case Group(n)              => loop(n)
-          case Star(_, n)            => loop(n)
-          case Plus(_, n)            => loop(n)
-          case Question(_, n)        => loop(n)
-          case Repeat(_, _, _, n)    => loop(n)
+          case Repeat(_, n)          => loop(n)
           case LookAhead(_, n)       => loop(n)
           case LookBehind(_, n)      => loop(n)
           case atom: AtomNode =>
-            atom.toIChar(unicode).map { ch =>
-              Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch)
-            }
-          case Dot() => Success(Vector(IChar.dot(ignoreCase, dotAll, unicode)))
-          case _     => Success(Vector.empty)
+            val ch = atom.toIChar(unicode)
+            Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch)
+          case Dot() => Vector(IChar.dot(ignoreCase, dotAll, unicode))
+          case _     => Vector.empty
         })
 
-        loop(node).map(_.foldLeft(set)(_.add(_)))
+        loop(node).foldLeft(set)(_.add(_))
       }
 
     /** Tests whether the pattern needs line terminator distinction or not. */
@@ -147,10 +138,7 @@ object PatternExtensions {
         case Capture(_, n)           => loop(n)
         case NamedCapture(_, _, n)   => loop(n)
         case Group(n)                => loop(n)
-        case Star(_, n)              => loop(n)
-        case Plus(_, n)              => loop(n)
-        case Question(_, n)          => loop(n)
-        case Repeat(_, _, _, n)      => loop(n)
+        case Repeat(_, n)            => loop(n)
         case LookAhead(_, n)         => loop(n)
         case LookBehind(_, n)        => loop(n)
         case LineBegin() | LineEnd() => true
@@ -167,10 +155,7 @@ object PatternExtensions {
         case Capture(_, n)         => loop(n)
         case NamedCapture(_, _, n) => loop(n)
         case Group(n)              => loop(n)
-        case Star(_, n)            => loop(n)
-        case Plus(_, n)            => loop(n)
-        case Question(_, n)        => loop(n)
-        case Repeat(_, _, _, n)    => loop(n)
+        case Repeat(_, n)          => loop(n)
         case LookAhead(_, n)       => loop(n)
         case LookBehind(_, n)      => loop(n)
         case WordBoundary(_)       => true
@@ -197,10 +182,7 @@ object PatternExtensions {
         case Capture(_, n)         => loop(n)
         case NamedCapture(_, _, n) => loop(n)
         case Group(n)              => loop(n)
-        case Star(_, n)            => loop(n)
-        case Plus(_, n)            => loop(n)
-        case Question(_, n)        => loop(n)
-        case Repeat(_, _, _, n)    => loop(n)
+        case Repeat(_, n)          => loop(n)
         case LookAhead(_, n)       => loop(n)
         case LookBehind(_, n)      => loop(n)
         case _                     => Set.empty
@@ -212,34 +194,6 @@ object PatternExtensions {
 
     /** Returns a maximum capture index or `0`. */
     def capturesSize: Int = node.captureRange.range.map(_._2).getOrElse(0)
-
-    /** Extracts capture names of the pattern. */
-    def names: Try[Map[String, Int]] = {
-      def merge(tm1: Try[Map[String, Int]], m2: Map[String, Int]): Try[Map[String, Int]] =
-        tm1.flatMap { m1 =>
-          if (m1.keySet.intersect(m2.keySet).nonEmpty) Failure(new InvalidRegExpException("duplicated named capture"))
-          else Success(m1 ++ m2)
-        }
-
-      def loop(node: Node): Try[Map[String, Int]] = node match {
-        case Disjunction(ns) =>
-          TryUtil.traverse(ns)(loop).flatMap(_.foldLeft(Try(Map.empty[String, Int]))(merge))
-        case Sequence(ns) =>
-          TryUtil.traverse(ns)(loop).flatMap(_.foldLeft(Try(Map.empty[String, Int]))(merge))
-        case Capture(_, n)                => loop(n)
-        case NamedCapture(index, name, n) => loop(n).map(_ + (name -> index))
-        case Group(n)                     => loop(n)
-        case Star(_, n)                   => loop(n)
-        case Plus(_, n)                   => loop(n)
-        case Question(_, n)               => loop(n)
-        case Repeat(_, _, _, n)           => loop(n)
-        case LookAhead(_, n)              => loop(n)
-        case LookBehind(_, n)             => loop(n)
-        case _                            => Success(Map.empty)
-      }
-
-      loop(node)
-    }
   }
 
   implicit final class NodeOps(private val node: Node) extends AnyVal {
@@ -251,62 +205,48 @@ object PatternExtensions {
       case Capture(index, n)         => CaptureRange(Some((index, index))).merge(n.captureRange)
       case NamedCapture(index, _, n) => CaptureRange(Some((index, index))).merge(n.captureRange)
       case Group(n)                  => n.captureRange
-      case Star(_, n)                => n.captureRange
-      case Plus(_, n)                => n.captureRange
-      case Question(_, n)            => n.captureRange
-      case Repeat(_, _, _, n)        => n.captureRange
+      case Repeat(_, n)              => n.captureRange
       case LookAhead(_, n)           => n.captureRange
       case LookBehind(_, n)          => n.captureRange
       case _                         => CaptureRange(None)
     }
 
     /** Checks this node can match an empty string. */
-    def isEmpty: Boolean = node match {
-      case Disjunction(ns)                           => ns.exists(_.isEmpty)
-      case Sequence(ns)                              => ns.forall(_.isEmpty)
-      case Capture(_, n)                             => n.isEmpty
-      case NamedCapture(_, _, n)                     => n.isEmpty
-      case Group(n)                                  => n.isEmpty
-      case Star(_, _)                                => true
-      case Plus(_, n)                                => n.isEmpty
-      case Question(_, _)                            => true
-      case Repeat(_, min, _, n)                      => min == 0 || n.isEmpty
-      case WordBoundary(_) | LineBegin() | LineEnd() => true
-      case LookAhead(_, _) | LookBehind(_, _)        => true
-      case BackReference(_) | NamedBackReference(_)  => true
-      case _                                         => false
+    def canMatchEmpty: Boolean = node match {
+      case Disjunction(ns)       => ns.exists(_.canMatchEmpty)
+      case Sequence(ns)          => ns.forall(_.canMatchEmpty)
+      case Capture(_, n)         => n.canMatchEmpty
+      case NamedCapture(_, _, n) => n.canMatchEmpty
+      case Group(n)              => n.canMatchEmpty
+      case Repeat(q, n) =>
+        q.normalized match {
+          case Quantifier.Exact(m, _)      => m == 0 || n.canMatchEmpty
+          case Quantifier.Unbounded(m, _)  => m == 0 || n.canMatchEmpty
+          case Quantifier.Bounded(m, _, _) => m == 0 || n.canMatchEmpty
+        }
+      case WordBoundary(_) | LineBegin() | LineEnd()   => true
+      case LookAhead(_, _) | LookBehind(_, _)          => true
+      case BackReference(_) | NamedBackReference(_, _) => true
+      case _                                           => false
     }
   }
 
   implicit final class AtomNodeOps(private val atom: AtomNode) extends AnyVal {
 
     /** Converts this pattern to a corresponding interval set. */
-    def toIChar(unicode: Boolean): Try[IChar] = atom match {
-      case Character(c) => Success(IChar(c))
+    def toIChar(unicode: Boolean): IChar = atom match {
+      case Character(c) => IChar(c)
       case SimpleEscapeClass(invert, k) =>
         val char = k match {
           case EscapeClassKind.Digit => IChar.Digit
           case EscapeClassKind.Word  => IChar.Word
           case EscapeClassKind.Space => IChar.Space
         }
-        Success(if (invert) char.complement(unicode) else char)
-      case UnicodeProperty(invert, name) =>
-        IChar.UnicodeProperty(name) match {
-          case Some(char) => Success(if (invert) char.complement(unicode) else char)
-          case None       => Failure(new InvalidRegExpException(s"unknown Unicode property: $name"))
-        }
-      case UnicodePropertyValue(invert, name, value) =>
-        IChar.UnicodePropertyValue(name, value) match {
-          case Some(char) => Success(if (invert) char.complement(unicode) else char)
-          case None       => Failure(new InvalidRegExpException(s"unknown Unicode property-value: $name=$value"))
-        }
-      case CharacterClass(_, ns) =>
-        // Inversion will be done in automaton translation instead of here.
-        TryUtil.traverse(ns)(_.toIChar(unicode)).map(IChar.union)
-      case ClassRange(b, e) =>
-        val char = IChar.range(b, e)
-        if (char.isEmpty) Failure(new InvalidRegExpException("an empty range"))
-        else Success(char)
+        if (invert) char.complement(unicode) else char
+      case UnicodeProperty(_, _, contents)         => contents
+      case UnicodePropertyValue(_, _, _, contents) => contents
+      case CharacterClass(_, ns)                   => IChar.union(ns.map(_.toIChar(unicode)))
+      case ClassRange(b, e)                        => IChar.range(b, e)
     }
   }
 }

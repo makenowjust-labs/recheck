@@ -31,7 +31,7 @@ object ReDoS {
       _ <- Try(()) // Ensures `Try` context.
       pattern <- ctx.interrupt(Parser.parse(source, flags) match {
         case Right(pattern) => Success(pattern)
-        case Left(message)  => Failure(new InvalidRegExpException(message))
+        case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
       })
       diagnostics <- checker match {
         case Checker.Automaton => checkAutomaton(source, flags, pattern, config)
@@ -130,18 +130,22 @@ object ReDoS {
       import Pattern._
 
       def loop(node: Node): Int = ctx.interrupt(node match {
-        case Disjunction(ns)        => ns.map(loop).sum
-        case Sequence(ns)           => ns.map(loop).sum
-        case Capture(_, n)          => loop(n)
-        case NamedCapture(_, _, n)  => loop(n)
-        case Group(n)               => loop(n)
-        case Star(_, n)             => loop(n)
-        case Plus(_, n)             => loop(n)
-        case Question(_, n)         => loop(n)
-        case Repeat(_, min, max, n) => max.flatten.getOrElse(min) + loop(n)
-        case LookAhead(_, n)        => loop(n)
-        case LookBehind(_, n)       => loop(n)
-        case _                      => 0
+        case Disjunction(ns)       => ns.map(loop).sum
+        case Sequence(ns)          => ns.map(loop).sum
+        case Capture(_, n)         => loop(n)
+        case NamedCapture(_, _, n) => loop(n)
+        case Group(n)              => loop(n)
+        case Repeat(q, n) =>
+          val count = loop(n)
+          q match {
+            case Quantifier.Exact(n, _)        => count + n
+            case Quantifier.Unbounded(min, _)  => count + min
+            case Quantifier.Bounded(_, max, _) => count + max
+            case _                             => count
+          }
+        case LookAhead(_, n)  => loop(n)
+        case LookBehind(_, n) => loop(n)
+        case _                => 0
       })
 
       loop(pattern.node)

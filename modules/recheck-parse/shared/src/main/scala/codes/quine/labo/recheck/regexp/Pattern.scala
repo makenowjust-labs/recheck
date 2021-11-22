@@ -3,6 +3,7 @@ package codes.quine.labo.recheck.regexp
 import scala.collection.mutable
 
 import codes.quine.labo.recheck.regexp.Pattern._
+import codes.quine.labo.recheck.unicode.IChar
 import codes.quine.labo.recheck.unicode.UChar
 
 /** Pattern is ECMA-262 `RegExp` pattern. */
@@ -32,36 +33,44 @@ object Pattern {
       sticky: Boolean
   )
 
-  /** Node is a node of pattern [[https://en.wikipedia.org/wiki/Abstract_syntax_tree AST (abstract syntax tree)]]. */
-  sealed abstract class Node extends Cloneable with Serializable with Product {
+  /** Location is a location of a node in a source. */
+  final case class Location(start: Int, end: Int)
+
+  /** HasLocation is a base class having a location. */
+  trait HasLocation extends Cloneable {
 
     /** A internal field of the position of this node. */
-    private var _loc: Option[(Int, Int)] = None
+    private var _loc: Option[Location] = None
 
     /** Returns the location of this node. */
-    def loc: Option[(Int, Int)] = _loc
+    def loc: Option[Location] = _loc
 
     /** Returns a new node with the given position. */
     private[regexp] def withLoc(start: Int, end: Int): this.type = {
-      // If the position is already set, it returns `this` instead of an allocation.
-      if (loc.exists { case (s, e) => s == start && e == end }) this
+      // If the position is already set, it returns `this` immediately, for avoiding allocation.
+      if (loc.exists { case Location(s, e) => s == start && e == end }) this
       else {
         val cloned = clone().asInstanceOf[this.type]
-        cloned._loc = Some((start, end))
+        cloned._loc = Some(Location(start, end))
         cloned
       }
     }
 
     /** Copies the location from the given node if possible. */
-    private[regexp] def withLoc(node: Node): this.type =
+    private[regexp] def withLoc(node: HasLocation): this.type =
       node.loc match {
-        case Some((start, end)) => withLoc(start, end)
-        case None               => this
+        case Some(Location(start, end)) => withLoc(start, end)
+        case None                       => this
       }
+
+    override protected def clone(): AnyRef = super.clone()
   }
 
+  /** Node is a node of pattern [[https://en.wikipedia.org/wiki/Abstract_syntax_tree AST (abstract syntax tree)]]. */
+  sealed abstract class Node extends HasLocation with Serializable with Product
+
   /** AtomNode is a node of pattern to match a character. */
-  sealed trait AtomNode extends Serializable with Product
+  sealed trait AtomNode extends HasLocation with Serializable with Product
 
   /** ClassNode is a node of pattern AST, but it can appear as a class child.
     *
@@ -84,22 +93,8 @@ object Pattern {
   /** Group is a grouping of a pattern. (e.g. `/(?:x)/`) */
   final case class Group(child: Node) extends Node
 
-  /** Star is a zero-or-more repetition pattern. (e.g. <code>/x*&#47;</code> or <code>/x*?/</code>) */
-  final case class Star(nonGreedy: Boolean, child: Node) extends Node
-
-  /** Plus is a one-or-more repetition pattern. (e.g. `/x+/` or `/x+?/`) */
-  final case class Plus(nonGreedy: Boolean, child: Node) extends Node
-
-  /** Question is a zero-or-one matching pattern. (e.g. `/x?/` or `/x??/`) */
-  final case class Question(nonGreedy: Boolean, child: Node) extends Node
-
-  /** Repeat is a repetition pattern. (e.g. `/x{1,2}/`)
-    *
-    *   - If `max` is `None`, it means `max` is missing (i.e. fixed count repetition).
-    *   - If `max` is `Some(None)`, it means `max` is not specified (i.e. unlimited repetition).
-    *   - If `max` is `Some(n)`, it means `max` is specified.
-    */
-  final case class Repeat(nonGreedy: Boolean, min: Int, max: Option[Option[Int]], child: Node) extends Node
+  /** Repeat is a repetition pattern. */
+  final case class Repeat(quantifier: Quantifier, child: Node) extends Node
 
   /** WordBoundary is a word-boundary assertion pattern. (e.g. `/\b/` or `/\B/`) */
   final case class WordBoundary(invert: Boolean) extends Node
@@ -123,12 +118,14 @@ object Pattern {
   final case class SimpleEscapeClass(invert: Boolean, kind: EscapeClassKind) extends Node with ClassNode
 
   /** UnicodeProperty is an escape class of Unicode property. (e.g. `/\p{ASCII}/` or `/\P{L}/`) */
-  final case class UnicodeProperty(invert: Boolean, name: String) extends Node with ClassNode
+  final case class UnicodeProperty(invert: Boolean, name: String, contents: IChar) extends Node with ClassNode
 
   /** UnicodePropertyValue is an escape class of Unicode property and value. (e.g. `/\p{sc=Hira}/` or
     * `/\P{General_Category=No}/`)
     */
-  final case class UnicodePropertyValue(invert: Boolean, name: String, value: String) extends Node with ClassNode
+  final case class UnicodePropertyValue(invert: Boolean, name: String, value: String, contents: IChar)
+      extends Node
+      with ClassNode
 
   /** CharacterClass is a class (set) pattern of characters. (e.g. `/[a-z]/` or `/[^A-Z]/`) */
   final case class CharacterClass(invert: Boolean, children: Seq[ClassNode]) extends Node with AtomNode
@@ -146,7 +143,7 @@ object Pattern {
   final case class BackReference(index: Int) extends Node
 
   /** NamedBackReference is a back-reference pattern. (e.g. `/\k<foo>/`) */
-  final case class NamedBackReference(name: String) extends Node
+  final case class NamedBackReference(index: Int, name: String) extends Node
 
   /** EscapeClassKind is a kind of [[SimpleEscapeClass]]. */
   sealed abstract class EscapeClassKind extends Serializable with Product
@@ -171,45 +168,76 @@ object Pattern {
     }
   }
 
+  /** Quantifier is a repetition quantifier. */
+  sealed abstract class Quantifier extends HasLocation with Serializable with Product {
+
+    /** Checks backtracking strategy of this quantifier is lazy. */
+    def isLazy: Boolean
+
+    /** Returns a normalized version of this quantifier. */
+    def normalized: NormalizedQuantifier = this match {
+      case Quantifier.Star(isLazy)                            => Quantifier.Unbounded(0, isLazy).withLoc(this)
+      case Quantifier.Plus(isLazy)                            => Quantifier.Unbounded(1, isLazy).withLoc(this)
+      case Quantifier.Question(isLazy)                        => Quantifier.Bounded(0, 1, isLazy).withLoc(this)
+      case q: Quantifier.Exact                                => q
+      case q: Quantifier.Unbounded                            => q
+      case Quantifier.Bounded(min, max, isLazy) if min == max => Quantifier.Exact(min, isLazy).withLoc(this)
+      case q: Quantifier.Bounded                              => q
+    }
+  }
+
+  /** NormalizedQuantifier is a normalized version of [[Quantifier]]. */
+  sealed abstract class NormalizedQuantifier extends Quantifier
+
+  object Quantifier {
+
+    /** Star is a star quantifier `*`. */
+    final case class Star(isLazy: Boolean) extends Quantifier
+
+    /** Plus is a plus quantifier `+`. */
+    final case class Plus(isLazy: Boolean) extends Quantifier
+
+    /** Question is a question quantifier `?`. */
+    final case class Question(isLazy: Boolean) extends Quantifier
+
+    /** Exact is an exact repetition quantifier `{n}`. */
+    final case class Exact(n: Int, isLazy: Boolean) extends NormalizedQuantifier
+
+    /** Unbounded is an unbounded repetition quantifier `{min,}`. */
+    final case class Unbounded(min: Int, isLazy: Boolean) extends NormalizedQuantifier
+
+    /** Bounded is a bonded repetition quantifier `{min,max}`. */
+    final case class Bounded(min: Int, max: Int, isLazy: Boolean) extends NormalizedQuantifier
+  }
+
   /** Shows a [[Node]] as a pattern. */
   private[regexp] def showNode(node: Node): String = node match {
-    case Disjunction(ns)                        => ns.map(showNodeInDisjunction).mkString("|")
-    case Sequence(ns)                           => ns.map(showNodeInSequence).mkString
-    case Capture(_, n)                          => s"(${showNode(n)})"
-    case NamedCapture(_, name, n)               => s"(?<$name>${showNode(n)})"
-    case Group(n)                               => s"(?:${showNode(n)})"
-    case Star(false, n)                         => s"${showNodeInRepeat(n)}*"
-    case Star(true, n)                          => s"${showNodeInRepeat(n)}*?"
-    case Plus(false, n)                         => s"${showNodeInRepeat(n)}+"
-    case Plus(true, n)                          => s"${showNodeInRepeat(n)}+?"
-    case Question(false, n)                     => s"${showNodeInRepeat(n)}?"
-    case Question(true, n)                      => s"${showNodeInRepeat(n)}??"
-    case Repeat(false, min, None, n)            => s"${showNodeInRepeat(n)}{$min}"
-    case Repeat(true, min, None, n)             => s"${showNodeInRepeat(n)}{$min}?"
-    case Repeat(false, min, Some(None), n)      => s"${showNodeInRepeat(n)}{$min,}"
-    case Repeat(true, min, Some(None), n)       => s"${showNodeInRepeat(n)}{$min,}?"
-    case Repeat(false, min, Some(Some(max)), n) => s"${showNodeInRepeat(n)}{$min,$max}"
-    case Repeat(true, min, Some(Some(max)), n)  => s"${showNodeInRepeat(n)}{$min,$max}?"
-    case WordBoundary(false)                    => "\\b"
-    case WordBoundary(true)                     => "\\B"
-    case LineBegin()                            => "^"
-    case LineEnd()                              => "$"
-    case LookAhead(false, n)                    => s"(?=${showNode(n)})"
-    case LookAhead(true, n)                     => s"(?!${showNode(n)})"
-    case LookBehind(false, n)                   => s"(?<=${showNode(n)})"
-    case LookBehind(true, n)                    => s"(?<!${showNode(n)})"
-    case Character(u)                           => showUChar(u)
-    case CharacterClass(false, items)           => s"[${items.map(showClassNode).mkString}]"
-    case CharacterClass(true, items)            => s"[^${items.map(showClassNode).mkString}]"
-    case SimpleEscapeClass(false, k)            => EscapeClassKind.showEscapeClassKind(k)
-    case SimpleEscapeClass(true, k)             => EscapeClassKind.showEscapeClassKind(k).toUpperCase
-    case UnicodeProperty(false, p)              => s"\\p{$p}"
-    case UnicodeProperty(true, p)               => s"\\P{$p}"
-    case UnicodePropertyValue(false, p, v)      => s"\\p{$p=$v}"
-    case UnicodePropertyValue(true, p, v)       => s"\\P{$p=$v}"
-    case Dot()                                  => "."
-    case BackReference(i)                       => s"\\$i"
-    case NamedBackReference(name)               => s"\\k<$name>"
+    case Disjunction(ns)                      => ns.map(showNodeInDisjunction).mkString("|")
+    case Sequence(ns)                         => ns.map(showNodeInSequence).mkString
+    case Capture(_, n)                        => s"(${showNode(n)})"
+    case NamedCapture(_, name, n)             => s"(?<$name>${showNode(n)})"
+    case Group(n)                             => s"(?:${showNode(n)})"
+    case Repeat(q, n)                         => s"${showNodeInRepeat(n)}${showQuantifier(q)}"
+    case WordBoundary(false)                  => "\\b"
+    case WordBoundary(true)                   => "\\B"
+    case LineBegin()                          => "^"
+    case LineEnd()                            => "$"
+    case LookAhead(false, n)                  => s"(?=${showNode(n)})"
+    case LookAhead(true, n)                   => s"(?!${showNode(n)})"
+    case LookBehind(false, n)                 => s"(?<=${showNode(n)})"
+    case LookBehind(true, n)                  => s"(?<!${showNode(n)})"
+    case Character(u)                         => showUChar(u)
+    case CharacterClass(false, items)         => s"[${items.map(showClassNode).mkString}]"
+    case CharacterClass(true, items)          => s"[^${items.map(showClassNode).mkString}]"
+    case SimpleEscapeClass(false, k)          => EscapeClassKind.showEscapeClassKind(k)
+    case SimpleEscapeClass(true, k)           => EscapeClassKind.showEscapeClassKind(k).toUpperCase
+    case UnicodeProperty(false, p, _)         => s"\\p{$p}"
+    case UnicodeProperty(true, p, _)          => s"\\P{$p}"
+    case UnicodePropertyValue(false, p, v, _) => s"\\p{$p=$v}"
+    case UnicodePropertyValue(true, p, v, _)  => s"\\P{$p=$v}"
+    case Dot()                                => "."
+    case BackReference(i)                     => s"\\$i"
+    case NamedBackReference(_, name)          => s"\\k<$name>"
   }
 
   /** Shows a node as a [[Disjunction]] child.
@@ -238,8 +266,8 @@ object Pattern {
     */
   private def showNodeInRepeat(node: Node): String =
     node match {
-      case _: Disjunction | _: Sequence | _: Star | _: Plus | _: Question | _: Repeat | _: WordBoundary | _: LineBegin |
-          _: LineEnd | _: LookAhead | _: LookBehind =>
+      case _: Disjunction | _: Sequence | _: Repeat | _: WordBoundary | _: LineBegin | _: LineEnd | _: LookAhead |
+          _: LookBehind =>
         s"(?:${showNode(node)})"
       case _ => showNode(node)
     }
@@ -262,6 +290,19 @@ object Pattern {
     if (flagSet.unicode) sb.append('u')
     if (flagSet.sticky) sb.append('y')
     sb.result()
+  }
+
+  /** Shows a [[Quantifier]] as a pattern. */
+  private[regexp] def showQuantifier(quantifier: Quantifier): String = {
+    val s = quantifier match {
+      case Quantifier.Star(_)              => "*"
+      case Quantifier.Plus(_)              => "+"
+      case Quantifier.Question(_)          => "?"
+      case Quantifier.Exact(n, _)          => s"{$n}"
+      case Quantifier.Unbounded(min, _)    => s"{$min,}"
+      case Quantifier.Bounded(min, max, _) => s"{$min,$max}"
+    }
+    if (quantifier.isLazy) s"$s?" else s
   }
 
   /** Shows a character as a pattern. */

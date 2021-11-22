@@ -4,6 +4,7 @@ import fastparse.P
 import fastparse.Parsed
 
 import codes.quine.labo.recheck.regexp.Pattern._
+import codes.quine.labo.recheck.unicode.IChar
 import codes.quine.labo.recheck.unicode.UChar
 
 class ParserSuite extends munit.FunSuite {
@@ -37,9 +38,14 @@ class ParserSuite extends munit.FunSuite {
   def parse0[T](input: String, parser: P[_] => P[T]): Parsed[T] = fastparse.parse(input, parser)
 
   test("Parser.parse") {
-    assertEquals(Parser.parse("", "#", false), Left("unknown flag"))
-    assertEquals(Parser.parse("{", "", false), Left("parsing failure at 0"))
-    assertEquals(Parser.parse("{1}", ""), Left("parsing failure at 0"))
+    interceptMessage[ParsingException]("unknown flag")(Parser.parse("", "#", false).toTry.get)
+    interceptMessage[ParsingException]("parsing failure (at 0)")(Parser.parse("{", "", false).toTry.get)
+    interceptMessage[ParsingException]("parsing failure (at 0)")(Parser.parse("{1}", "").toTry.get)
+    interceptMessage[ParsingException]("invalid back-reference (at 0:2)")(Parser.parse("\\1", "u").toTry.get)
+    interceptMessage[ParsingException]("invalid named back-reference (at 6:11)") {
+      Parser.parse("(?<y>)\\k<x>", "u").toTry.get
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 1:6)")(Parser.parse("a{1,0}", "").toTry.get)
     assertEquals(Parser.parse(".", "g"), Right(Pattern(Dot(), FlagSet(true, false, false, false, false, false))))
     assertEquals(
       Parser.parse("(.)(?<x>.)", ""),
@@ -62,8 +68,8 @@ class ParserSuite extends munit.FunSuite {
   }
 
   test("Parser.parseFlagSet") {
-    assertEquals(Parser.parseFlagSet("gg"), Left("duplicated flag"))
-    assertEquals(Parser.parseFlagSet("#"), Left("unknown flag"))
+    interceptMessage[ParsingException]("duplicated flag")(Parser.parseFlagSet("gg").toTry.get)
+    interceptMessage[ParsingException]("unknown flag")(Parser.parseFlagSet("#").toTry.get)
     assertEquals(Parser.parseFlagSet(""), Right(FlagSet(false, false, false, false, false, false)))
     assertEquals(Parser.parseFlagSet("gimsuy"), Right(FlagSet(true, true, true, true, true, true)))
   }
@@ -93,15 +99,9 @@ class ParserSuite extends munit.FunSuite {
       NamedCapture(1, "x", NamedCapture(2, "y", Dot()))
     )
     assertEquals(Parser.assignCaptureIndex(Group(Capture(-1, Dot()))), Group(Capture(1, Dot())))
-    assertEquals(Parser.assignCaptureIndex(Star(false, Capture(-1, Dot()))), Star(false, Capture(1, Dot())))
-    assertEquals(Parser.assignCaptureIndex(Star(true, Capture(-1, Dot()))), Star(true, Capture(1, Dot())))
-    assertEquals(Parser.assignCaptureIndex(Plus(false, Capture(-1, Dot()))), Plus(false, Capture(1, Dot())))
-    assertEquals(Parser.assignCaptureIndex(Plus(true, Capture(-1, Dot()))), Plus(true, Capture(1, Dot())))
-    assertEquals(Parser.assignCaptureIndex(Question(false, Capture(-1, Dot()))), Question(false, Capture(1, Dot())))
-    assertEquals(Parser.assignCaptureIndex(Question(true, Capture(-1, Dot()))), Question(true, Capture(1, Dot())))
     assertEquals(
-      Parser.assignCaptureIndex(Repeat(false, 0, Some(Some(2)), Capture(-1, Dot()))),
-      Repeat(false, 0, Some(Some(2)), Capture(1, Dot()))
+      Parser.assignCaptureIndex(Repeat(Quantifier.Star(false), Capture(-1, Dot()))),
+      Repeat(Quantifier.Star(false), Capture(1, Dot()))
     )
     assertEquals(Parser.assignCaptureIndex(LookAhead(false, Capture(-1, Dot()))), LookAhead(false, Capture(1, Dot())))
     assertEquals(Parser.assignCaptureIndex(LookAhead(true, Capture(-1, Dot()))), LookAhead(true, Capture(1, Dot())))
@@ -109,17 +109,198 @@ class ParserSuite extends munit.FunSuite {
     assertEquals(Parser.assignCaptureIndex(LookBehind(true, Capture(-1, Dot()))), LookBehind(true, Capture(1, Dot())))
 
     // Checks it keeps the position.
-    assertEquals(Parser.assignCaptureIndex(Disjunction(Seq(Dot(), Dot())).withLoc(0, 3)).loc, Some((0, 3)))
-    assertEquals(Parser.assignCaptureIndex(Sequence(Seq(Dot(), Dot())).withLoc(0, 2)).loc, Some((0, 2)))
-    assertEquals(Parser.assignCaptureIndex(Capture(-1, Dot()).withLoc(0, 3)).loc, Some((0, 3)))
-    assertEquals(Parser.assignCaptureIndex(NamedCapture(-1, "x", Dot()).withLoc(0, 7)).loc, Some((0, 7)))
-    assertEquals(Parser.assignCaptureIndex(Group(Dot()).withLoc(0, 5)).loc, Some((0, 5)))
-    assertEquals(Parser.assignCaptureIndex(Star(false, Dot()).withLoc(0, 2)).loc, Some((0, 2)))
-    assertEquals(Parser.assignCaptureIndex(Plus(false, Dot()).withLoc(0, 2)).loc, Some((0, 2)))
-    assertEquals(Parser.assignCaptureIndex(Question(false, Dot()).withLoc(0, 2)).loc, Some((0, 2)))
-    assertEquals(Parser.assignCaptureIndex(Repeat(false, 0, Some(Some(2)), Dot()).withLoc(0, 6)).loc, Some((0, 6)))
-    assertEquals(Parser.assignCaptureIndex(LookAhead(false, Dot()).withLoc(0, 5)).loc, Some((0, 5)))
-    assertEquals(Parser.assignCaptureIndex(LookBehind(false, Dot()).withLoc(0, 6)).loc, Some((0, 6)))
+    assertEquals(Parser.assignCaptureIndex(Disjunction(Seq(Dot(), Dot())).withLoc(0, 3)).loc, Some(Location(0, 3)))
+    assertEquals(Parser.assignCaptureIndex(Sequence(Seq(Dot(), Dot())).withLoc(0, 2)).loc, Some(Location(0, 2)))
+    assertEquals(Parser.assignCaptureIndex(Capture(-1, Dot()).withLoc(0, 3)).loc, Some(Location(0, 3)))
+    assertEquals(Parser.assignCaptureIndex(NamedCapture(-1, "x", Dot()).withLoc(0, 7)).loc, Some(Location(0, 7)))
+    assertEquals(Parser.assignCaptureIndex(Group(Dot()).withLoc(0, 5)).loc, Some(Location(0, 5)))
+    assertEquals(
+      Parser.assignCaptureIndex(Repeat(Quantifier.Star(false), Dot()).withLoc(0, 6)).loc,
+      Some(Location(0, 6))
+    )
+    assertEquals(Parser.assignCaptureIndex(LookAhead(false, Dot()).withLoc(0, 5)).loc, Some(Location(0, 5)))
+    assertEquals(Parser.assignCaptureIndex(LookBehind(false, Dot()).withLoc(0, 6)).loc, Some(Location(0, 6)))
+  }
+
+  test("Parser.assignBackReferenceIndex") {
+    interceptMessage[ParsingException]("duplicated name") {
+      val result =
+        Parser.assignBackReferenceIndex(Sequence(Seq(NamedCapture(1, "foo", Dot()), NamedCapture(2, "foo", Dot()))), 2)
+      result.toTry.get
+    }
+    interceptMessage[ParsingException]("invalid back-reference") {
+      Parser.assignBackReferenceIndex(BackReference(1), 0).toTry.get
+    }
+    interceptMessage[ParsingException]("invalid named back-reference") {
+      Parser.assignBackReferenceIndex(NamedBackReference(-1, "foo"), 0).toTry.get
+    }
+
+    assertEquals(
+      Parser.assignBackReferenceIndex(Sequence(Seq(Capture(1, Dot()), BackReference(1))), 1),
+      Right(Sequence(Seq(Capture(1, Dot()), BackReference(1))))
+    )
+    assertEquals(
+      Parser.assignBackReferenceIndex(Sequence(Seq(NamedCapture(1, "foo", Dot()), NamedBackReference(-1, "foo"))), 1),
+      Right(Sequence(Seq(NamedCapture(1, "foo", Dot()), NamedBackReference(1, "foo"))))
+    )
+
+    // Checks it keeps the position.
+    assertEquals(
+      Parser.assignBackReferenceIndex(Disjunction(Seq(Dot(), Dot())).withLoc(0, 3), 0).toTry.get.loc,
+      Some(Location(0, 3))
+    )
+    assertEquals(
+      Parser.assignBackReferenceIndex(Sequence(Seq(Dot(), Dot())).withLoc(0, 2), 0).toTry.get.loc,
+      Some(Location(0, 2))
+    )
+    assertEquals(
+      Parser.assignBackReferenceIndex(Capture(1, Dot()).withLoc(0, 3), 1).toTry.get.loc,
+      Some(Location(0, 3))
+    )
+    assertEquals(
+      Parser.assignBackReferenceIndex(NamedCapture(1, "x", Dot()).withLoc(0, 7), 1).toTry.get.loc,
+      Some(Location(0, 7))
+    )
+    assertEquals(Parser.assignBackReferenceIndex(Group(Dot()).withLoc(0, 5), 0).toTry.get.loc, Some(Location(0, 5)))
+    assertEquals(
+      Parser.assignBackReferenceIndex(Repeat(Quantifier.Star(false), Dot()).withLoc(0, 6), 0).toTry.get.loc,
+      Some(Location(0, 6))
+    )
+    assertEquals(
+      Parser.assignBackReferenceIndex(LookAhead(false, Dot()).withLoc(0, 5), 0).toTry.get.loc,
+      Some(Location(0, 5))
+    )
+    assertEquals(
+      Parser.assignBackReferenceIndex(LookBehind(false, Dot()).withLoc(0, 6), 0).toTry.get.loc,
+      Some(Location(0, 6))
+    )
+  }
+
+  test("Parser.resolveUnicodeProperty") {
+    assertEquals(
+      Parser.resolveUnicodeProperty(UnicodeProperty(false, "ASCII", null)),
+      Right(UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(UnicodeProperty(true, "ASCII", null)),
+      Right(UnicodeProperty(true, "ASCII", IChar.UnicodeProperty("ASCII").get.complement(true)))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(UnicodePropertyValue(false, "sc", "Hira", null)),
+      Right(UnicodePropertyValue(false, "sc", "Hira", IChar.UnicodePropertyValue("sc", "Hira").get))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(UnicodePropertyValue(true, "sc", "Hira", null)),
+      Right(UnicodePropertyValue(true, "sc", "Hira", IChar.UnicodePropertyValue("sc", "Hira").get.complement(true)))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(CharacterClass(false, Seq(UnicodeProperty(false, "ASCII", null)))),
+      Right(CharacterClass(false, Seq(UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get))))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(CharacterClass(false, Seq(ClassRange('a', 'b')))),
+      Right(CharacterClass(false, Seq(ClassRange('a', 'b'))))
+    )
+
+    assertEquals(Parser.resolveUnicodeProperty(Dot()), Right(Dot()))
+
+    assertEquals(
+      Parser.resolveUnicodeProperty(Disjunction(Seq(Dot(), UnicodeProperty(false, "ASCII", null)))),
+      Right(Disjunction(Seq(Dot(), UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get))))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(Sequence(Seq(Dot(), UnicodeProperty(false, "ASCII", null)))),
+      Right(Sequence(Seq(Dot(), UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get))))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(Capture(1, UnicodeProperty(false, "ASCII", null))),
+      Right(Capture(1, UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(NamedCapture(1, "x", UnicodeProperty(false, "ASCII", null))),
+      Right(NamedCapture(1, "x", UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(Group(UnicodeProperty(false, "ASCII", null))),
+      Right(Group(UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(Repeat(Quantifier.Star(false), UnicodeProperty(false, "ASCII", null))),
+      Right(Repeat(Quantifier.Star(false), UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(LookAhead(false, UnicodeProperty(false, "ASCII", null))),
+      Right(LookAhead(false, UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(LookBehind(false, UnicodeProperty(false, "ASCII", null))),
+      Right(LookBehind(false, UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+    )
+
+    interceptMessage[ParsingException]("unknown Unicode property: invalid (at 0:11)") {
+      Parser.resolveUnicodeProperty(UnicodeProperty(false, "invalid", null).withLoc(0, 11)).toTry.get
+    }
+    interceptMessage[ParsingException]("unknown Unicode property-value: sc=invalid (at 0:14)") {
+      Parser.resolveUnicodeProperty(UnicodePropertyValue(false, "sc", "invalid", null).withLoc(0, 14)).toTry.get
+    }
+    interceptMessage[ParsingException]("an empty range (at 1:4)") {
+      Parser.resolveUnicodeProperty(CharacterClass(false, Seq(ClassRange('b', 'a').withLoc(1, 4)))).toTry.get
+    }
+  }
+
+  test("Parser.checkRepeatQuantifier") {
+    assertEquals(
+      Parser.checkRepeatQuantifier(Repeat(Quantifier.Bounded(0, 1, false).withLoc(1, 6), Dot())),
+      Right(Repeat(Quantifier.Bounded(0, 1, false).withLoc(1, 5), Dot()))
+    )
+
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 1:6)") {
+      Parser.checkRepeatQuantifier(Repeat(Quantifier.Bounded(1, 0, false).withLoc(1, 6), Dot())).toTry.get.loc
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 3:8)") {
+      val result = Parser.checkRepeatQuantifier(
+        Disjunction(Seq(Dot(), Repeat(Quantifier.Bounded(1, 0, false).withLoc(3, 8), Dot())))
+      )
+      result.toTry.get.loc
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 2:7)") {
+      val result =
+        Parser.checkRepeatQuantifier(Sequence(Seq(Dot(), Repeat(Quantifier.Bounded(1, 0, false).withLoc(2, 7), Dot()))))
+      result.toTry.get.loc
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 2:7)") {
+      val result =
+        Parser.checkRepeatQuantifier(Capture(1, Repeat(Quantifier.Bounded(1, 0, false).withLoc(2, 7), Dot())))
+      result.toTry.get.loc
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 6:11)") {
+      val result = Parser.checkRepeatQuantifier(
+        NamedCapture(1, "x", Repeat(Quantifier.Bounded(1, 0, false).withLoc(6, 11), Dot()))
+      )
+      result.toTry.get.loc
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 4:9)") {
+      val result = Parser.checkRepeatQuantifier(Group(Repeat(Quantifier.Bounded(1, 0, false).withLoc(4, 9), Dot())))
+      result.toTry.get.loc
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 2:7)") {
+      val result = Parser.checkRepeatQuantifier(
+        Repeat(Quantifier.Star(false), Repeat(Quantifier.Bounded(1, 0, false).withLoc(2, 7), Dot()))
+      )
+      result.toTry.get.loc
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 4:9)") {
+      val result = Parser.checkRepeatQuantifier(
+        LookAhead(false, Repeat(Quantifier.Bounded(1, 0, false).withLoc(4, 9), Dot()))
+      )
+      result.toTry.get.loc
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 5:10)") {
+      val result = Parser.checkRepeatQuantifier(
+        LookBehind(false, Repeat(Quantifier.Bounded(1, 0, false).withLoc(5, 10), Dot()))
+      )
+      result.toTry.get.loc
+    }
   }
 
   test("Parser#Source") {
@@ -143,27 +324,45 @@ class ParserSuite extends munit.FunSuite {
   test("Parser#Term") {
     assertEquals(parse("x", P.Term(_)), Parsed.Success(Character('x'), 1))
     assertEquals(parse("(?=x)*", P.Term(_)), Parsed.Success(LookAhead(false, Character('x')), 5))
-    assertEquals(parse("(?=x)*", PA.Term(_)), Parsed.Success(Star(false, LookAhead(false, Character('x'))), 6))
+    assertEquals(
+      parse("(?=x)*", PA.Term(_)),
+      Parsed.Success(Repeat(Quantifier.Star(false), LookAhead(false, Character('x'))), 6)
+    )
     assertEquals(parse("(?<=x)*", P.Term(_)), Parsed.Success(LookBehind(false, Character('x')), 6))
     assertEquals(parse("\\b*", P.Term(_)), Parsed.Success(WordBoundary(false), 2))
     assertEquals(parse("^*", P.Term(_)), Parsed.Success(LineBegin(), 1))
     assertEquals(parse("$*", P.Term(_)), Parsed.Success(LineEnd(), 1))
-    assertEquals(parse("x{1}", P.Term(_)), Parsed.Success(Repeat(false, 1, None, Character('x')), 4))
-    assertEquals(parse("x*", P.Term(_)), Parsed.Success(Star(false, Character('x')), 2))
-    assertEquals(parse("x*?", P.Term(_)), Parsed.Success(Star(true, Character('x')), 3))
-    assertEquals(parse("x+", P.Term(_)), Parsed.Success(Plus(false, Character('x')), 2))
-    assertEquals(parse("x+?", P.Term(_)), Parsed.Success(Plus(true, Character('x')), 3))
-    assertEquals(parse("x?", P.Term(_)), Parsed.Success(Question(false, Character('x')), 2))
-    assertEquals(parse("x??", P.Term(_)), Parsed.Success(Question(true, Character('x')), 3))
+    assertEquals(parse("x{1}", P.Term(_)), Parsed.Success(Repeat(Quantifier.Exact(1, false), Character('x')), 4))
+    assertEquals(parse("x*", P.Term(_)), Parsed.Success(Repeat(Quantifier.Star(false), Character('x')), 2))
+    assertEquals(parse("x*?", P.Term(_)), Parsed.Success(Repeat(Quantifier.Star(true), Character('x')), 3))
+    assertEquals(parse("x+", P.Term(_)), Parsed.Success(Repeat(Quantifier.Plus(false), Character('x')), 2))
+    assertEquals(parse("x+?", P.Term(_)), Parsed.Success(Repeat(Quantifier.Plus(true), Character('x')), 3))
+    assertEquals(parse("x?", P.Term(_)), Parsed.Success(Repeat(Quantifier.Question(false), Character('x')), 2))
+    assertEquals(parse("x??", P.Term(_)), Parsed.Success(Repeat(Quantifier.Question(true), Character('x')), 3))
   }
 
-  test("Parser#Repeat") {
-    assertEquals(parse0("{1}", P.Repeat(_)), Parsed.Success((false, 1, None), 3))
-    assertEquals(parse0("{1}?", P.Repeat(_)), Parsed.Success((true, 1, None), 4))
-    assertEquals(parse0("{1,}", P.Repeat(_)), Parsed.Success((false, 1, Some(None)), 4))
-    assertEquals(parse0("{1,}?", P.Repeat(_)), Parsed.Success((true, 1, Some(None)), 5))
-    assertEquals(parse0("{1,2}", P.Repeat(_)), Parsed.Success((false, 1, Some(Some(2))), 5))
-    assertEquals(parse0("{1,2}?", P.Repeat(_)), Parsed.Success((true, 1, Some(Some(2))), 6))
+  test("Parser#Quantifier") {
+    assertEquals(parse0("*", P.Quantifier(_)), Parsed.Success(Quantifier.Star(false), 1))
+    assertEquals(parse0("*?", P.Quantifier(_)), Parsed.Success(Quantifier.Star(true), 2))
+    assertEquals(parse0("+", P.Quantifier(_)), Parsed.Success(Quantifier.Plus(false), 1))
+    assertEquals(parse0("+?", P.Quantifier(_)), Parsed.Success(Quantifier.Plus(true), 2))
+    assertEquals(parse0("?", P.Quantifier(_)), Parsed.Success(Quantifier.Question(false), 1))
+    assertEquals(parse0("??", P.Quantifier(_)), Parsed.Success(Quantifier.Question(true), 2))
+    assertEquals(parse0("{1}", P.Quantifier(_)), Parsed.Success(Quantifier.Exact(1, false), 3))
+    assertEquals(parse0("{1}?", P.Quantifier(_)), Parsed.Success(Quantifier.Exact(1, true), 4))
+    assertEquals(parse0("{1,}", P.Quantifier(_)), Parsed.Success(Quantifier.Unbounded(1, false), 4))
+    assertEquals(parse0("{1,}?", P.Quantifier(_)), Parsed.Success(Quantifier.Unbounded(1, true), 5))
+    assertEquals(parse0("{1,2}", P.Quantifier(_)), Parsed.Success(Quantifier.Bounded(1, 2, false), 5))
+    assertEquals(parse0("{1,2}?", P.Quantifier(_)), Parsed.Success(Quantifier.Bounded(1, 2, true), 6))
+  }
+
+  test("Parser#NormalizedQuantifier") {
+    assertEquals(parse0("{1}", P.NormalizedQuantifier(_)), Parsed.Success(Quantifier.Exact(1, false), 3))
+    assertEquals(parse0("{1}?", P.NormalizedQuantifier(_)), Parsed.Success(Quantifier.Exact(1, true), 4))
+    assertEquals(parse0("{1,}", P.NormalizedQuantifier(_)), Parsed.Success(Quantifier.Unbounded(1, false), 4))
+    assertEquals(parse0("{1,}?", P.NormalizedQuantifier(_)), Parsed.Success(Quantifier.Unbounded(1, true), 5))
+    assertEquals(parse0("{1,2}", P.NormalizedQuantifier(_)), Parsed.Success(Quantifier.Bounded(1, 2, false), 5))
+    assertEquals(parse0("{1,2}?", P.NormalizedQuantifier(_)), Parsed.Success(Quantifier.Bounded(1, 2, true), 6))
   }
 
   test("Parser#Atom") {
@@ -226,7 +425,7 @@ class ParserSuite extends munit.FunSuite {
     assertEquals(parse("\\w", P.Escape(_)), Parsed.Success(SimpleEscapeClass(false, EscapeClassKind.Word), 2))
     assertEquals(parse("\\0", P.Escape(_)), Parsed.Success(Character('\u0000'), 2))
     assertEquals(parse("\\b", PAN.Escape(_)), Parsed.Success(WordBoundary(false), 2))
-    assertEquals(parse("\\k<foo>", PAN.Escape(_)), Parsed.Success(NamedBackReference("foo"), 7))
+    assertEquals(parse("\\k<foo>", PAN.Escape(_)), Parsed.Success(NamedBackReference(-1, "foo"), 7))
     assertEquals(parse("\\1", PAN.Escape(_)), Parsed.Success(BackReference(1), 2))
     assertEquals(parse("\\w", PAN.Escape(_)), Parsed.Success(SimpleEscapeClass(false, EscapeClassKind.Word), 2))
     assertEquals(parse("\\0", PAN.Escape(_)), Parsed.Success(Character('\u0000'), 2))
@@ -245,7 +444,7 @@ class ParserSuite extends munit.FunSuite {
   }
 
   test("Parser#NamedBackReference") {
-    assertEquals(parse("\\k<foo>", P.NamedBackReference(_)), Parsed.Success(NamedBackReference("foo"), 7))
+    assertEquals(parse("\\k<foo>", P.NamedBackReference(_)), Parsed.Success(NamedBackReference(-1, "foo"), 7))
   }
 
   test("Parser#EscapeClass") {
@@ -256,13 +455,13 @@ class ParserSuite extends munit.FunSuite {
     assertEquals(parse("\\s", P.EscapeClass(_)), Parsed.Success(SimpleEscapeClass(false, EscapeClassKind.Space), 2))
     assertEquals(parse("\\S", P.EscapeClass(_)), Parsed.Success(SimpleEscapeClass(true, EscapeClassKind.Space), 2))
     assert(!parse("\\p{AHex}", P.EscapeClass(_)).isSuccess)
-    assertEquals(parse("\\p{AHex}", PU.EscapeClass(_)), Parsed.Success(UnicodeProperty(false, "AHex"), 8))
+    assertEquals(parse("\\p{AHex}", PU.EscapeClass(_)), Parsed.Success(UnicodeProperty(false, "AHex", null), 8))
   }
 
   test("Parser#UnicodeEscapeClass") {
-    assertEquals(parse("\\p{ASCII}", P.UnicodeEscapeClass(_)), Parsed.Success(UnicodeProperty(false, "ASCII"), 9))
-    assertEquals(parse("\\P{AHex}", P.UnicodeEscapeClass(_)), Parsed.Success(UnicodeProperty(true, "AHex"), 8))
-    val Hira = UnicodePropertyValue(false, "sc", "Hira")
+    assertEquals(parse("\\p{ASCII}", P.UnicodeEscapeClass(_)), Parsed.Success(UnicodeProperty(false, "ASCII", null), 9))
+    assertEquals(parse("\\P{AHex}", P.UnicodeEscapeClass(_)), Parsed.Success(UnicodeProperty(true, "AHex", null), 8))
+    val Hira = UnicodePropertyValue(false, "sc", "Hira", null)
     assertEquals(parse("\\p{sc=Hira}", P.UnicodeEscapeClass(_)), Parsed.Success(Hira, 11))
     assertEquals(parse("\\P{sc=Hira}", P.UnicodeEscapeClass(_)), Parsed.Success(Hira.copy(invert = true), 11))
   }

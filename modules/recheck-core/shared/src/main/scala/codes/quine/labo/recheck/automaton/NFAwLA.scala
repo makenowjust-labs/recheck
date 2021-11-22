@@ -6,6 +6,7 @@ import scala.collection.mutable
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.data.Graph
 import codes.quine.labo.recheck.data.MultiSet
+import codes.quine.labo.recheck.regexp.Pattern.Location
 import codes.quine.labo.recheck.util.GraphvizUtil.escape
 
 /** NFAwLA is a NFA with a look-ahead DFA.
@@ -21,8 +22,8 @@ final case class NFAwLA[A, Q](
     acceptSet: Set[(Q, Set[Q])],
     delta: Map[((Q, Set[Q]), (A, Set[Q])), MultiSet[(Q, Set[Q])]],
     lookAheadDFA: DFA[A, Set[Q]],
-    sourcemap: Map[((Q, Set[Q]), (A, Set[Q]), (Q, Set[Q])), Seq[(Int, Int)]] =
-      Map.empty[((Q, Set[Q]), (A, Set[Q]), (Q, Set[Q])), Seq[(Int, Int)]]
+    sourcemap: Map[((Q, Set[Q]), (A, Set[Q]), (Q, Set[Q])), Seq[Location]] =
+      Map.empty[((Q, Set[Q]), (A, Set[Q]), (Q, Set[Q])), Seq[Location]]
 ) {
 
   /** Exports this transition function as a graph. */

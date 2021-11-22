@@ -1,9 +1,6 @@
 package codes.quine.labo.recheck.regexp
 
-import scala.util.Success
-
 import codes.quine.labo.recheck.common.Context
-import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.regexp.Pattern._
 import codes.quine.labo.recheck.regexp.PatternExtensions._
 import codes.quine.labo.recheck.unicode.IChar
@@ -17,61 +14,58 @@ class PatternExtensionsSuite extends munit.FunSuite {
   implicit def ctx: Context = Context()
 
   test("PatternExtensions.AtomNodeOps#toIChar") {
-    assertEquals(Character('x').toIChar(false), Success(IChar('x')))
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Word).toIChar(false), Success(IChar.Word))
+    assertEquals(Character('x').toIChar(false), IChar('x'))
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Word).toIChar(false), IChar.Word)
     assertEquals(
       SimpleEscapeClass(true, EscapeClassKind.Word).toIChar(false),
-      Success(IChar.Word.complement(false))
+      IChar.Word.complement(false)
     )
     assertEquals(
       SimpleEscapeClass(true, EscapeClassKind.Word).toIChar(true),
-      Success(IChar.Word.complement(true))
+      IChar.Word.complement(true)
     )
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).toIChar(false), Success(IChar.Digit))
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).toIChar(false), IChar.Digit)
     assertEquals(
       SimpleEscapeClass(true, EscapeClassKind.Digit).toIChar(false),
-      Success(IChar.Digit.complement(false))
+      IChar.Digit.complement(false)
     )
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Space).toIChar(false), Success(IChar.Space))
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Space).toIChar(false), IChar.Space)
     assertEquals(
       SimpleEscapeClass(true, EscapeClassKind.Space).toIChar(false),
-      Success(IChar.Space.complement(false))
+      IChar.Space.complement(false)
     )
-    assertEquals(UnicodeProperty(false, "ASCII").toIChar(false), Success(IChar.UnicodeProperty("ASCII").get))
     assertEquals(
-      UnicodeProperty(true, "ASCII").toIChar(true),
-      Success(IChar.UnicodeProperty("ASCII").get.complement(true))
+      UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get).toIChar(false),
+      IChar.UnicodeProperty("ASCII").get
     )
-    assertEquals(UnicodeProperty(false, "L").toIChar(false), Success(IChar.UnicodeProperty("L").get))
     assertEquals(
-      UnicodeProperty(true, "L").toIChar(true),
-      Success(IChar.UnicodeProperty("L").get.complement(true))
+      UnicodeProperty(true, "ASCII", IChar.UnicodeProperty("ASCII").get.complement(true)).toIChar(true),
+      IChar.UnicodeProperty("ASCII").get.complement(true)
     )
-    interceptMessage[InvalidRegExpException]("unknown Unicode property: invalid") {
-      UnicodeProperty(false, "invalid").toIChar(false).get
-    }
+    assertEquals(
+      UnicodeProperty(false, "L", IChar.UnicodeProperty("L").get).toIChar(false),
+      IChar.UnicodeProperty("L").get
+    )
+    assertEquals(
+      UnicodeProperty(true, "L", IChar.UnicodeProperty("L").get.complement(true)).toIChar(true),
+      IChar.UnicodeProperty("L").get.complement(true)
+    )
     val Hira = IChar.UnicodePropertyValue("sc", "Hira").get
-    assertEquals(UnicodePropertyValue(false, "sc", "Hira").toIChar(false), Success(Hira))
-    assertEquals(UnicodePropertyValue(true, "sc", "Hira").toIChar(true), Success(Hira.complement(true)))
-    interceptMessage[InvalidRegExpException]("unknown Unicode property-value: sc=invalid") {
-      UnicodePropertyValue(false, "sc", "invalid").toIChar(false).get
-    }
+    assertEquals(UnicodePropertyValue(false, "sc", "Hira", Hira).toIChar(false), Hira)
+    assertEquals(
+      UnicodePropertyValue(true, "sc", "Hira", Hira.complement(true)).toIChar(true),
+      Hira.complement(true)
+    )
     assertEquals(
       CharacterClass(false, Seq(Character('a'), Character('A'))).toIChar(false),
-      Success(IChar('a').union(IChar('A')))
+      IChar('a').union(IChar('A'))
     )
     assertEquals(
       CharacterClass(true, Seq(Character('a'), Character('A'))).toIChar(false),
-      Success(IChar('a').union(IChar('A'))) // Not complemented is intentionally.
+      IChar('a').union(IChar('A')) // Not complemented is intentionally.
     )
-    interceptMessage[InvalidRegExpException]("an empty range") {
-      CharacterClass(true, Seq(ClassRange('z', 'a'))).toIChar(false).get
-    }
-    assertEquals(ClassRange('a', 'a').toIChar(false), Success(IChar('a')))
-    assertEquals(ClassRange('a', 'z').toIChar(false), Success(IChar.range('a', 'z')))
-    interceptMessage[InvalidRegExpException]("an empty range") {
-      ClassRange('z', 'a').toIChar(false).get
-    }
+    assertEquals(ClassRange('a', 'a').toIChar(false), IChar('a'))
+    assertEquals(ClassRange('a', 'z').toIChar(false), IChar.range('a', 'z'))
   }
 
   test("PatternExtensions.NodeOps#captureRange") {
@@ -82,10 +76,7 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(NamedCapture(1, "x", Dot()).captureRange, CaptureRange(Some((1, 1))))
     assertEquals(NamedCapture(1, "x", Capture(2, Dot())).captureRange, CaptureRange(Some((1, 2))))
     assertEquals(Group(Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
-    assertEquals(Star(false, Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
-    assertEquals(Plus(false, Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
-    assertEquals(Question(false, Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
-    assertEquals(Repeat(false, 1, None, Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
+    assertEquals(Repeat(Quantifier.Exact(1, false), Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
     assertEquals(WordBoundary(false).captureRange, CaptureRange(None))
     assertEquals(LineBegin().captureRange, CaptureRange(None))
     assertEquals(LineEnd().captureRange, CaptureRange(None))
@@ -93,49 +84,57 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(LookBehind(false, Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
     assertEquals(Character('a').captureRange, CaptureRange(None))
     assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).captureRange, CaptureRange(None))
-    assertEquals(UnicodeProperty(false, "L").captureRange, CaptureRange(None))
-    assertEquals(UnicodePropertyValue(false, "sc", "Hira").captureRange, CaptureRange(None))
+    assertEquals(UnicodeProperty(false, "L", null).captureRange, CaptureRange(None))
+    assertEquals(UnicodePropertyValue(false, "sc", "Hira", null).captureRange, CaptureRange(None))
     assertEquals(CharacterClass(false, Seq(Character('a'))).captureRange, CaptureRange(None))
     assertEquals(Dot().captureRange, CaptureRange(None))
     assertEquals(BackReference(1).captureRange, CaptureRange(None))
-    assertEquals(NamedBackReference("foo").captureRange, CaptureRange(None))
+    assertEquals(NamedBackReference(1, "foo").captureRange, CaptureRange(None))
   }
 
   test("PatternExtensions.NodeOps#isEmpty") {
-    assertEquals(Sequence(Seq(Dot(), Dot())).isEmpty, false)
-    assertEquals(Sequence(Seq.empty).isEmpty, true)
-    assertEquals(Disjunction(Seq(Dot(), Dot())).isEmpty, false)
-    assertEquals(Disjunction(Seq(Sequence(Seq.empty), Dot())).isEmpty, true)
-    assertEquals(Disjunction(Seq(Dot(), Sequence(Seq.empty))).isEmpty, true)
-    assertEquals(Capture(1, Dot()).isEmpty, false)
-    assertEquals(Capture(1, Sequence(Seq.empty)).isEmpty, true)
-    assertEquals(NamedCapture(1, "x", Dot()).isEmpty, false)
-    assertEquals(NamedCapture(1, "x", Sequence(Seq.empty)).isEmpty, true)
-    assertEquals(Group(Dot()).isEmpty, false)
-    assertEquals(Group(Sequence(Seq.empty)).isEmpty, true)
-    assertEquals(Star(false, Dot()).isEmpty, true)
-    assertEquals(Star(false, Sequence(Seq.empty)).isEmpty, true)
-    assertEquals(Plus(false, Dot()).isEmpty, false)
-    assertEquals(Plus(false, Sequence(Seq.empty)).isEmpty, true)
-    assertEquals(Question(false, Dot()).isEmpty, true)
-    assertEquals(Question(false, Sequence(Seq.empty)).isEmpty, true)
-    assertEquals(Repeat(false, 0, Some(Some(1)), Dot()).isEmpty, true)
-    assertEquals(Repeat(false, 0, Some(Some(1)), Sequence(Seq.empty)).isEmpty, true)
-    assertEquals(Repeat(false, 1, Some(Some(2)), Dot()).isEmpty, false)
-    assertEquals(Repeat(false, 1, Some(Some(2)), Sequence(Seq.empty)).isEmpty, true)
-    assertEquals(WordBoundary(false).isEmpty, true)
-    assertEquals(LineBegin().isEmpty, true)
-    assertEquals(LineEnd().isEmpty, true)
-    assertEquals(LookAhead(false, Dot()).isEmpty, true)
-    assertEquals(LookBehind(false, Dot()).isEmpty, true)
-    assertEquals(Character('a').isEmpty, false)
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).isEmpty, false)
-    assertEquals(UnicodeProperty(false, "L").isEmpty, false)
-    assertEquals(UnicodePropertyValue(false, "sc", "Hira").isEmpty, false)
-    assertEquals(CharacterClass(false, Seq(Character('a'))).isEmpty, false)
-    assertEquals(Dot().isEmpty, false)
-    assertEquals(BackReference(1).isEmpty, true)
-    assertEquals(NamedBackReference("foo").isEmpty, true)
+    assertEquals(Sequence(Seq(Dot(), Dot())).canMatchEmpty, false)
+    assertEquals(Sequence(Seq.empty).canMatchEmpty, true)
+    assertEquals(Disjunction(Seq(Dot(), Dot())).canMatchEmpty, false)
+    assertEquals(Disjunction(Seq(Sequence(Seq.empty), Dot())).canMatchEmpty, true)
+    assertEquals(Disjunction(Seq(Dot(), Sequence(Seq.empty))).canMatchEmpty, true)
+    assertEquals(Capture(1, Dot()).canMatchEmpty, false)
+    assertEquals(Capture(1, Sequence(Seq.empty)).canMatchEmpty, true)
+    assertEquals(NamedCapture(1, "x", Dot()).canMatchEmpty, false)
+    assertEquals(NamedCapture(1, "x", Sequence(Seq.empty)).canMatchEmpty, true)
+    assertEquals(Group(Dot()).canMatchEmpty, false)
+    assertEquals(Group(Sequence(Seq.empty)).canMatchEmpty, true)
+    assertEquals(Repeat(Quantifier.Star(false), Dot()).canMatchEmpty, true)
+    assertEquals(Repeat(Quantifier.Star(false), Sequence(Seq.empty)).canMatchEmpty, true)
+    assertEquals(Repeat(Quantifier.Plus(false), Dot()).canMatchEmpty, false)
+    assertEquals(Repeat(Quantifier.Plus(false), Sequence(Seq.empty)).canMatchEmpty, true)
+    assertEquals(Repeat(Quantifier.Question(false), Dot()).canMatchEmpty, true)
+    assertEquals(Repeat(Quantifier.Question(false), Sequence(Seq.empty)).canMatchEmpty, true)
+    assertEquals(Repeat(Quantifier.Exact(0, false), Dot()).canMatchEmpty, true)
+    assertEquals(Repeat(Quantifier.Exact(0, false), Sequence(Seq.empty)).canMatchEmpty, true)
+    assertEquals(Repeat(Quantifier.Exact(1, false), Dot()).canMatchEmpty, false)
+    assertEquals(Repeat(Quantifier.Exact(1, false), Sequence(Seq.empty)).canMatchEmpty, true)
+    assertEquals(Repeat(Quantifier.Unbounded(0, false), Dot()).canMatchEmpty, true)
+    assertEquals(Repeat(Quantifier.Unbounded(0, false), Sequence(Seq.empty)).canMatchEmpty, true)
+    assertEquals(Repeat(Quantifier.Unbounded(1, false), Dot()).canMatchEmpty, false)
+    assertEquals(Repeat(Quantifier.Unbounded(1, false), Sequence(Seq.empty)).canMatchEmpty, true)
+    assertEquals(Repeat(Quantifier.Bounded(0, 1, false), Dot()).canMatchEmpty, true)
+    assertEquals(Repeat(Quantifier.Bounded(0, 1, false), Sequence(Seq.empty)).canMatchEmpty, true)
+    assertEquals(Repeat(Quantifier.Bounded(1, 2, false), Dot()).canMatchEmpty, false)
+    assertEquals(Repeat(Quantifier.Bounded(1, 2, false), Sequence(Seq.empty)).canMatchEmpty, true)
+    assertEquals(WordBoundary(false).canMatchEmpty, true)
+    assertEquals(LineBegin().canMatchEmpty, true)
+    assertEquals(LineEnd().canMatchEmpty, true)
+    assertEquals(LookAhead(false, Dot()).canMatchEmpty, true)
+    assertEquals(LookBehind(false, Dot()).canMatchEmpty, true)
+    assertEquals(Character('a').canMatchEmpty, false)
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).canMatchEmpty, false)
+    assertEquals(UnicodeProperty(false, "L", null).canMatchEmpty, false)
+    assertEquals(UnicodePropertyValue(false, "sc", "Hira", null).canMatchEmpty, false)
+    assertEquals(CharacterClass(false, Seq(Character('a'))).canMatchEmpty, false)
+    assertEquals(Dot().canMatchEmpty, false)
+    assertEquals(BackReference(1).canMatchEmpty, true)
+    assertEquals(NamedBackReference(1, "foo").canMatchEmpty, true)
   }
 
   test("PatternExtensions.CaptureRange#merge") {
@@ -192,27 +191,27 @@ class PatternExtensionsSuite extends munit.FunSuite {
   test("PatternExtensions.PatternOps#isConstant") {
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(Dot(), Dot())), flagSet).isConstant, true)
-    assertEquals(Pattern(Disjunction(Seq(Star(false, Dot()), Dot())), flagSet).isConstant, false)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), Star(false, Dot()))), flagSet).isConstant, false)
+    assertEquals(Pattern(Disjunction(Seq(Repeat(Quantifier.Star(false), Dot()), Dot())), flagSet).isConstant, false)
+    assertEquals(Pattern(Disjunction(Seq(Dot(), Repeat(Quantifier.Star(false), Dot()))), flagSet).isConstant, false)
     assertEquals(Pattern(Sequence(Seq(Dot(), Dot())), flagSet).isConstant, true)
-    assertEquals(Pattern(Sequence(Seq(Star(false, Dot()), Dot())), flagSet).isConstant, false)
-    assertEquals(Pattern(Sequence(Seq(Dot(), Star(false, Dot()))), flagSet).isConstant, false)
+    assertEquals(Pattern(Sequence(Seq(Repeat(Quantifier.Star(false), Dot()), Dot())), flagSet).isConstant, false)
+    assertEquals(Pattern(Sequence(Seq(Dot(), Repeat(Quantifier.Star(false), Dot()))), flagSet).isConstant, false)
     assertEquals(Pattern(Capture(1, Dot()), flagSet).isConstant, true)
-    assertEquals(Pattern(Capture(1, Star(false, Dot())), flagSet).isConstant, false)
+    assertEquals(Pattern(Capture(1, Repeat(Quantifier.Star(false), Dot())), flagSet).isConstant, false)
     assertEquals(Pattern(NamedCapture(1, "x", Dot()), flagSet).isConstant, true)
-    assertEquals(Pattern(NamedCapture(1, "x", Star(false, Dot())), flagSet).isConstant, false)
+    assertEquals(Pattern(NamedCapture(1, "x", Repeat(Quantifier.Star(false), Dot())), flagSet).isConstant, false)
     assertEquals(Pattern(Group(Dot()), flagSet).isConstant, true)
-    assertEquals(Pattern(Group(Star(false, Dot())), flagSet).isConstant, false)
-    assertEquals(Pattern(Star(false, Dot()), flagSet).isConstant, false)
-    assertEquals(Pattern(Plus(false, Dot()), flagSet).isConstant, false)
-    assertEquals(Pattern(Question(false, Dot()), flagSet).isConstant, true)
-    assertEquals(Pattern(Repeat(false, 1, None, Dot()), flagSet).isConstant, true)
-    assertEquals(Pattern(Repeat(false, 1, Some(None), Dot()), flagSet).isConstant, false)
-    assertEquals(Pattern(Repeat(false, 1, Some(Some(2)), Dot()), flagSet).isConstant, true)
+    assertEquals(Pattern(Group(Repeat(Quantifier.Star(false), Dot())), flagSet).isConstant, false)
+    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet).isConstant, false)
+    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet).isConstant, false)
+    assertEquals(Pattern(Repeat(Quantifier.Question(false), Dot()), flagSet).isConstant, true)
+    assertEquals(Pattern(Repeat(Quantifier.Exact(1, false), Dot()), flagSet).isConstant, true)
+    assertEquals(Pattern(Repeat(Quantifier.Unbounded(1, false), Dot()), flagSet).isConstant, false)
+    assertEquals(Pattern(Repeat(Quantifier.Bounded(1, 2, false), Dot()), flagSet).isConstant, true)
     assertEquals(Pattern(LookAhead(false, Dot()), flagSet).isConstant, true)
-    assertEquals(Pattern(LookAhead(false, Star(false, Dot())), flagSet).isConstant, false)
+    assertEquals(Pattern(LookAhead(false, Repeat(Quantifier.Star(false), Dot())), flagSet).isConstant, false)
     assertEquals(Pattern(LookBehind(false, Dot()), flagSet).isConstant, true)
-    assertEquals(Pattern(LookBehind(false, Star(false, Dot())), flagSet).isConstant, false)
+    assertEquals(Pattern(LookBehind(false, Repeat(Quantifier.Star(false), Dot())), flagSet).isConstant, false)
   }
 
   test("PatternExtensions.PatternOps#size") {
@@ -222,12 +221,12 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(Capture(1, Dot()), flagSet).size, 1)
     assertEquals(Pattern(NamedCapture(1, "x", Dot()), flagSet).size, 1)
     assertEquals(Pattern(Group(Dot()), flagSet).size, 1)
-    assertEquals(Pattern(Star(false, Dot()), flagSet).size, 2)
-    assertEquals(Pattern(Plus(false, Dot()), flagSet).size, 2)
-    assertEquals(Pattern(Question(false, Dot()), flagSet).size, 2)
-    assertEquals(Pattern(Repeat(false, 2, None, Dot()), flagSet).size, 2)
-    assertEquals(Pattern(Repeat(false, 2, Some(None), Dot()), flagSet).size, 4)
-    assertEquals(Pattern(Repeat(false, 2, Some(Some(3)), Dot()), flagSet).size, 4)
+    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet).size, 2)
+    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet).size, 2)
+    assertEquals(Pattern(Repeat(Quantifier.Question(false), Dot()), flagSet).size, 2)
+    assertEquals(Pattern(Repeat(Quantifier.Exact(2, false), Dot()), flagSet).size, 2)
+    assertEquals(Pattern(Repeat(Quantifier.Unbounded(2, false), Dot()), flagSet).size, 4)
+    assertEquals(Pattern(Repeat(Quantifier.Bounded(2, 3, false), Dot()), flagSet).size, 4)
     assertEquals(Pattern(LookAhead(false, Dot()), flagSet).size, 2)
     assertEquals(Pattern(LookBehind(false, Dot()), flagSet).size, 2)
     assertEquals(Pattern(Dot(), flagSet).size, 1)
@@ -243,47 +242,53 @@ class PatternExtensionsSuite extends munit.FunSuite {
     val lineTerminator = IChar.LineTerminator
     val dot16 = IChar.Any16.diff(IChar.LineTerminator)
     val dot = IChar.Any.diff(IChar.LineTerminator)
-    assertEquals(Pattern(Sequence(Seq.empty), flagSet0).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(Dot(), flagSet0).alphabet, Success(ICharSet.any(false, false).add(dot16)))
+    assertEquals(Pattern(Sequence(Seq.empty), flagSet0).alphabet, ICharSet.any(false, false))
+    assertEquals(Pattern(Dot(), flagSet0).alphabet, ICharSet.any(false, false).add(dot16))
     assertEquals(
       Pattern(Disjunction(Seq(Character('A'), Character('Z'))), flagSet0).alphabet,
-      Success(ICharSet.any(false, false).add(IChar('A')).add(IChar('Z')))
+      ICharSet.any(false, false).add(IChar('A')).add(IChar('Z'))
     )
     assertEquals(
       Pattern(WordBoundary(false), flagSet0).alphabet,
-      Success(ICharSet.any(false, false).add(word, CharKind.Word))
+      ICharSet.any(false, false).add(word, CharKind.Word)
     )
     assertEquals(
       Pattern(LineBegin(), flagSet1).alphabet,
-      Success(ICharSet.any(false, false).add(lineTerminator, CharKind.LineTerminator))
+      ICharSet.any(false, false).add(lineTerminator, CharKind.LineTerminator)
     )
     assertEquals(
       Pattern(Sequence(Seq(LineBegin(), WordBoundary(false))), flagSet1).alphabet,
-      Success(ICharSet.any(false, false).add(lineTerminator, CharKind.LineTerminator).add(word, CharKind.Word))
+      ICharSet.any(false, false).add(lineTerminator, CharKind.LineTerminator).add(word, CharKind.Word)
     )
-    assertEquals(Pattern(Capture(1, Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(Group(Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(Star(false, Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(Plus(false, Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(Question(false, Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(Repeat(false, 2, None, Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(LookAhead(false, Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(LookBehind(false, Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(Dot(), flagSet2).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(Sequence(Seq.empty), flagSet3).alphabet, Success(ICharSet.any(true, false)))
+    assertEquals(Pattern(Capture(1, Dot()), flagSet2).alphabet, ICharSet.any(false, false))
+    assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet2).alphabet, ICharSet.any(false, false))
+    assertEquals(Pattern(Group(Dot()), flagSet2).alphabet, ICharSet.any(false, false))
+    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet2).alphabet, ICharSet.any(false, false))
+    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet2).alphabet, ICharSet.any(false, false))
+    assertEquals(
+      Pattern(Repeat(Quantifier.Question(false), Dot()), flagSet2).alphabet,
+      ICharSet.any(false, false)
+    )
+    assertEquals(
+      Pattern(Repeat(Quantifier.Exact(2, false), Dot()), flagSet2).alphabet,
+      ICharSet.any(false, false)
+    )
+    assertEquals(Pattern(LookAhead(false, Dot()), flagSet2).alphabet, ICharSet.any(false, false))
+    assertEquals(Pattern(LookBehind(false, Dot()), flagSet2).alphabet, ICharSet.any(false, false))
+    assertEquals(Pattern(Dot(), flagSet2).alphabet, ICharSet.any(false, false))
+    assertEquals(Pattern(Sequence(Seq.empty), flagSet3).alphabet, ICharSet.any(true, false))
     assertEquals(
       Pattern(Dot(), flagSet3).alphabet,
-      Success(ICharSet.any(true, false).add(IChar.canonicalize(dot16, false)))
+      ICharSet.any(true, false).add(IChar.canonicalize(dot16, false))
     )
     assertEquals(
       Pattern(Disjunction(Seq(Character('A'), Character('Z'))), flagSet3).alphabet,
-      Success(ICharSet.any(true, false).add(IChar('A')).add(IChar('Z')))
+      ICharSet.any(true, false).add(IChar('A')).add(IChar('Z'))
     )
-    assertEquals(Pattern(Sequence(Seq.empty), flagSet4).alphabet, Success(ICharSet.any(true, true)))
+    assertEquals(Pattern(Sequence(Seq.empty), flagSet4).alphabet, ICharSet.any(true, true))
     assertEquals(
       Pattern(Dot(), flagSet4).alphabet,
-      Success(ICharSet.any(true, true).add(IChar.canonicalize(dot, true)))
+      ICharSet.any(true, true).add(IChar.canonicalize(dot, true))
     )
   }
 
@@ -302,14 +307,20 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet0).needsLineTerminatorDistinction, false)
     assertEquals(Pattern(Group(LineBegin()), flagSet0).needsLineTerminatorDistinction, true)
     assertEquals(Pattern(Group(Dot()), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(Pattern(Star(false, LineBegin()), flagSet0).needsLineTerminatorDistinction, true)
-    assertEquals(Pattern(Star(false, Dot()), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(Pattern(Plus(false, LineBegin()), flagSet0).needsLineTerminatorDistinction, true)
-    assertEquals(Pattern(Plus(false, Dot()), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(Pattern(Question(false, LineBegin()), flagSet0).needsLineTerminatorDistinction, true)
-    assertEquals(Pattern(Question(false, Dot()), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(Pattern(Repeat(false, 2, None, LineBegin()), flagSet0).needsLineTerminatorDistinction, true)
-    assertEquals(Pattern(Repeat(false, 2, None, Dot()), flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(Pattern(Repeat(Quantifier.Star(false), LineBegin()), flagSet0).needsLineTerminatorDistinction, true)
+    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(Pattern(Repeat(Quantifier.Plus(false), LineBegin()), flagSet0).needsLineTerminatorDistinction, true)
+    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(
+      Pattern(Repeat(Quantifier.Question(false), LineBegin()), flagSet0).needsLineTerminatorDistinction,
+      true
+    )
+    assertEquals(Pattern(Repeat(Quantifier.Question(false), Dot()), flagSet0).needsLineTerminatorDistinction, false)
+    assertEquals(
+      Pattern(Repeat(Quantifier.Exact(2, false), LineBegin()), flagSet0).needsLineTerminatorDistinction,
+      true
+    )
+    assertEquals(Pattern(Repeat(Quantifier.Exact(2, false), Dot()), flagSet0).needsLineTerminatorDistinction, false)
     assertEquals(Pattern(LookAhead(false, LineBegin()), flagSet0).needsLineTerminatorDistinction, true)
     assertEquals(Pattern(LookAhead(false, Dot()), flagSet0).needsLineTerminatorDistinction, false)
     assertEquals(Pattern(LookBehind(false, LineBegin()), flagSet0).needsLineTerminatorDistinction, true)
@@ -336,14 +347,14 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet).needsWordDistinction, false)
     assertEquals(Pattern(Group(WordBoundary(false)), flagSet).needsWordDistinction, true)
     assertEquals(Pattern(Group(Dot()), flagSet).needsWordDistinction, false)
-    assertEquals(Pattern(Star(false, WordBoundary(false)), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(Star(false, Dot()), flagSet).needsWordDistinction, false)
-    assertEquals(Pattern(Plus(false, WordBoundary(false)), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(Plus(false, Dot()), flagSet).needsWordDistinction, false)
-    assertEquals(Pattern(Question(false, WordBoundary(false)), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(Question(false, Dot()), flagSet).needsWordDistinction, false)
-    assertEquals(Pattern(Repeat(false, 2, None, WordBoundary(false)), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(Repeat(false, 2, None, Dot()), flagSet).needsWordDistinction, false)
+    assertEquals(Pattern(Repeat(Quantifier.Star(false), WordBoundary(false)), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet).needsWordDistinction, false)
+    assertEquals(Pattern(Repeat(Quantifier.Plus(false), WordBoundary(false)), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet).needsWordDistinction, false)
+    assertEquals(Pattern(Repeat(Quantifier.Question(false), WordBoundary(false)), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(Repeat(Quantifier.Question(false), Dot()), flagSet).needsWordDistinction, false)
+    assertEquals(Pattern(Repeat(Quantifier.Exact(2, false), WordBoundary(false)), flagSet).needsWordDistinction, true)
+    assertEquals(Pattern(Repeat(Quantifier.Exact(2, false), Dot()), flagSet).needsWordDistinction, false)
     assertEquals(Pattern(LookAhead(false, WordBoundary(false)), flagSet).needsWordDistinction, true)
     assertEquals(Pattern(LookAhead(false, Dot()), flagSet).needsWordDistinction, false)
     assertEquals(Pattern(LookBehind(false, WordBoundary(false)), flagSet).needsWordDistinction, true)
@@ -374,10 +385,10 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(Capture(1, seq), flagSet).parts, Set(UString("xyz")))
     assertEquals(Pattern(NamedCapture(1, "x", seq), flagSet).parts, Set(UString("xyz")))
     assertEquals(Pattern(Group(seq), flagSet).parts, Set(UString("xyz")))
-    assertEquals(Pattern(Star(false, seq), flagSet).parts, Set(UString("xyz")))
-    assertEquals(Pattern(Plus(false, seq), flagSet).parts, Set(UString("xyz")))
-    assertEquals(Pattern(Question(false, seq), flagSet).parts, Set(UString("xyz")))
-    assertEquals(Pattern(Repeat(false, 2, None, seq), flagSet).parts, Set(UString("xyz")))
+    assertEquals(Pattern(Repeat(Quantifier.Star(false), seq), flagSet).parts, Set(UString("xyz")))
+    assertEquals(Pattern(Repeat(Quantifier.Plus(false), seq), flagSet).parts, Set(UString("xyz")))
+    assertEquals(Pattern(Repeat(Quantifier.Question(false), seq), flagSet).parts, Set(UString("xyz")))
+    assertEquals(Pattern(Repeat(Quantifier.Exact(2, false), seq), flagSet).parts, Set(UString("xyz")))
     assertEquals(Pattern(LookAhead(false, seq), flagSet).parts, Set(UString("xyz")))
     assertEquals(Pattern(LookBehind(false, seq), flagSet).parts, Set(UString("xyz")))
     assertEquals(Pattern(Dot(), flagSet).parts, Set.empty[UString])
@@ -393,43 +404,12 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(NamedCapture(1, "x", Dot()), flagSet).capturesSize, 1)
     assertEquals(Pattern(NamedCapture(1, "x", Capture(2, Dot())), flagSet).capturesSize, 2)
     assertEquals(Pattern(Group(Dot()), flagSet).capturesSize, 0)
-    assertEquals(Pattern(Star(false, Dot()), flagSet).capturesSize, 0)
-    assertEquals(Pattern(Plus(false, Dot()), flagSet).capturesSize, 0)
-    assertEquals(Pattern(Question(false, Dot()), flagSet).capturesSize, 0)
-    assertEquals(Pattern(Repeat(false, 2, None, Dot()), flagSet).capturesSize, 0)
+    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet).capturesSize, 0)
+    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet).capturesSize, 0)
+    assertEquals(Pattern(Repeat(Quantifier.Question(false), Dot()), flagSet).capturesSize, 0)
+    assertEquals(Pattern(Repeat(Quantifier.Exact(2, false), Dot()), flagSet).capturesSize, 0)
     assertEquals(Pattern(LookAhead(false, Dot()), flagSet).capturesSize, 0)
     assertEquals(Pattern(LookBehind(false, Dot()), flagSet).capturesSize, 0)
     assertEquals(Pattern(Dot(), flagSet).capturesSize, 0)
-  }
-
-  test("PatternExtensions.PatternOps#names") {
-    val flagSet = FlagSet(false, false, false, false, false, false)
-    assertEquals(
-      Pattern(Disjunction(Seq(NamedCapture(1, "x", Dot()), NamedCapture(2, "y", Dot()))), flagSet).names,
-      Success(Map("x" -> 1, "y" -> 2))
-    )
-    interceptMessage[InvalidRegExpException]("duplicated named capture") {
-      Pattern(Disjunction(Seq(NamedCapture(1, "x", Dot()), NamedCapture(2, "x", Dot()))), flagSet).names.get
-    }
-    assertEquals(
-      Pattern(Sequence(Seq(NamedCapture(1, "x", Dot()), NamedCapture(2, "y", Dot()))), flagSet).names,
-      Success(Map("x" -> 1, "y" -> 2))
-    )
-    interceptMessage[InvalidRegExpException]("duplicated named capture") {
-      Pattern(Sequence(Seq(NamedCapture(1, "x", Dot()), NamedCapture(2, "x", Dot()))), flagSet).names.get
-    }
-    assertEquals(Pattern(Capture(1, NamedCapture(2, "x", Dot())), flagSet).names, Success(Map("x" -> 2)))
-    assertEquals(
-      Pattern(NamedCapture(1, "x", NamedCapture(2, "y", Dot())), flagSet).names,
-      Success(Map("x" -> 1, "y" -> 2))
-    )
-    assertEquals(Pattern(Group(NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
-    assertEquals(Pattern(Star(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
-    assertEquals(Pattern(Plus(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
-    assertEquals(Pattern(Question(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
-    assertEquals(Pattern(Repeat(false, 2, None, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
-    assertEquals(Pattern(LookAhead(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
-    assertEquals(Pattern(LookBehind(false, NamedCapture(1, "x", Dot())), flagSet).names, Success(Map("x" -> 1)))
-    assertEquals(Pattern(Dot(), flagSet).names, Success(Map.empty[String, Int]))
   }
 }

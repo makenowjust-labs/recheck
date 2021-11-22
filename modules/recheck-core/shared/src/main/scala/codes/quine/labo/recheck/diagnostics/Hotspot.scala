@@ -3,6 +3,7 @@ package codes.quine.labo.recheck.diagnostics
 import scala.io.AnsiColor._
 
 import codes.quine.labo.recheck.diagnostics.Hotspot._
+import codes.quine.labo.recheck.regexp.Pattern.Location
 
 /** Hotspot is a collection of hotspots in the analyzed RegExp. */
 final case class Hotspot(spots: Seq[Spot]) {
@@ -35,10 +36,10 @@ object Hotspot {
     )
 
   /** Builds hotspots from a heatmap and rate. */
-  def build(heatmap: Map[(Int, Int), Int], heatRate: Double): Hotspot =
+  def build(heatmap: Map[Location, Int], heatRate: Double): Hotspot =
     heatmap.maxByOption(_._2) match {
-      case Some(((_, _), max)) =>
-        Hotspot(heatmap.toSeq.map { case ((start, end), count) =>
+      case Some((Location(_, _), max)) =>
+        Hotspot(heatmap.toSeq.map { case (Location(start, end), count) =>
           Hotspot.Spot(start, end, if (count >= max * heatRate) Hotspot.Heat else Hotspot.Normal)
         })
       case None => empty

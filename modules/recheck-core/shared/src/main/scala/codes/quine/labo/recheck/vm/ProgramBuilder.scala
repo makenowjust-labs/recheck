@@ -4,7 +4,6 @@ import scala.collection.mutable
 import scala.util.Try
 
 import codes.quine.labo.recheck.common.Context
-import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.regexp.Pattern._
 import codes.quine.labo.recheck.regexp.PatternExtensions._
@@ -22,16 +21,14 @@ object ProgramBuilder {
     for {
       _ <- Try(())
       capturesSize = pattern.capturesSize
-      names <- pattern.names
-      builder = new ProgramBuilder(pattern, capturesSize, names)
+      builder = new ProgramBuilder(pattern, capturesSize)
       program <- Try(builder.build())
     } yield program
 }
 
 private[vm] class ProgramBuilder(
     private[this] val pattern: Pattern,
-    private[this] val capturesSize: Int,
-    private[this] val names: Map[String, Int]
+    private[this] val capturesSize: Int
 )(implicit ctx: Context) {
   import ctx._
   import pattern._
@@ -209,15 +206,12 @@ private[vm] class ProgramBuilder(
 
   /** Builds a program from a node. */
   def build(node: Node): Unit = interrupt(node match {
-    case Disjunction(children)              => buildDisjunction(children)
-    case Sequence(children)                 => buildSequence(children)
-    case Capture(index, child)              => buildCapture(index, child)
-    case NamedCapture(index, _, child)      => buildCapture(index, child)
-    case Group(child)                       => build(child)
-    case Star(nonGreedy, child)             => buildStar(nonGreedy, child)
-    case Plus(nonGreedy, child)             => buildPlus(nonGreedy, child)
-    case Question(nonGreedy, child)         => buildQuestion(nonGreedy, child)
-    case Repeat(nonGreedy, min, max, child) => buildRepeat(nonGreedy, min, max, child)
+    case Disjunction(children)         => buildDisjunction(children)
+    case Sequence(children)            => buildSequence(children)
+    case Capture(index, child)         => buildCapture(index, child)
+    case NamedCapture(index, _, child) => buildCapture(index, child)
+    case Group(child)                  => build(child)
+    case Repeat(q, child)              => buildRepeat(q.normalized, child)
     case WordBoundary(invert)     => emitAssert(if (invert) AssertKind.WordBoundaryNot else AssertKind.WordBoundary)
     case LineBegin()              => emitAssert(if (multiline) AssertKind.LineBegin else AssertKind.InputBegin)
     case LineEnd()                => emitAssert(if (multiline) AssertKind.LineEnd else AssertKind.InputEnd)
@@ -229,25 +223,17 @@ private[vm] class ProgramBuilder(
       val c = if (ignoreCase) UChar.canonicalize(c0, unicode) else c0
       emitRead(ReadKind.Char(c), node.loc)
     case node @ CharacterClass(invert, _) =>
-      val ch0 = node.toIChar(unicode).get
+      val ch0 = node.toIChar(unicode)
       val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
       emitRead(if (invert) ReadKind.ClassNot(ch) else ReadKind.Class(ch), node.loc)
     case node: AtomNode =>
-      val ch0 = node.toIChar(unicode).get
+      val ch0 = node.toIChar(unicode)
       val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
       emitRead(ReadKind.Class(ch), node.loc)
     case Dot() =>
       emitRead(if (dotAll) ReadKind.Any else ReadKind.Dot, node.loc)
-    case BackReference(index) =>
-      // $COVERAGE-OFF$
-      if (index <= 0 || capturesSize < index) throw new InvalidRegExpException("invalid back-reference")
-      // $COVERAGE-ON$
-      emitRead(ReadKind.Ref(index), node.loc)
-    case NamedBackReference(name) =>
-      // $COVERAGE-OFF$
-      val index = names.getOrElse(name, throw new InvalidRegExpException("invalid named back reference"))
-      // $COVERAGE-ON$
-      emitRead(ReadKind.Ref(index), node.loc)
+    case BackReference(index)         => emitRead(ReadKind.Ref(index), node.loc)
+    case NamedBackReference(index, _) => emitRead(ReadKind.Ref(index), node.loc)
   })
 
   /** A builder for a disjunction node. */
@@ -284,38 +270,30 @@ private[vm] class ProgramBuilder(
   }
 
   /** A builder for `x*` node. */
-  def buildStar(nonGreedy: Boolean, child: Node): Unit = {
-    val isEmpty = child.isEmpty
-    val captureRange = child.captureRange
-
+  def buildStar(isLazy: Boolean, child: Node): Unit = {
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
     val cont = allocateLabel("cont")
 
-    emitTerminator(if (nonGreedy) Inst.Try(cont, loop) else Inst.Try(loop, cont))
-
-    enterBlock(loop)
-    wrapCanary(isEmpty) {
-      for ((min, max) <- captureRange.range) emitInst(Inst.CapReset(min, max))
-      build(child)
-    }
+    enterLoopBlock(isLazy, loop, cont)
+    wrapCanary(child)(wrapReset(child)(build(child)))
     emitTerminator(Inst.Jmp(begin))
 
     enterBlock(cont)
   }
 
   /** A builder for `x+` node. */
-  def buildPlus(nonGreedy: Boolean, child: Node): Unit = {
+  def buildPlus(isLazy: Boolean, child: Node): Unit = {
     build(child)
-    buildStar(nonGreedy, child)
+    buildStar(isLazy, child)
   }
 
   /** A builder for `x?` node. */
-  def buildQuestion(nonGreedy: Boolean, child: Node): Unit = {
+  def buildQuestion(isLazy: Boolean, child: Node): Unit = {
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
 
-    emitTerminator(if (nonGreedy) Inst.Try(cont, main) else Inst.Try(main, cont))
+    emitTerminator(if (isLazy) Inst.Try(cont, main) else Inst.Try(main, cont))
 
     enterBlock(main)
     build(child)
@@ -325,93 +303,89 @@ private[vm] class ProgramBuilder(
   }
 
   /** A builder for `x{n,m}` node. */
-  def buildRepeat(nonGreedy: Boolean, min: Int, max: Option[Option[Int]], child: Node): Unit =
-    (min, max) match {
-      case (n, Some(Some(m))) if n > m => throw new InvalidRegExpException("out of order repetition quantifier")
-      case (0, None)                   => // nothing to do
-      case (1, None)                   => build(child)
-      case (n, None)                   => buildRepeatN(n, child)
-      case (0, Some(None))             => buildStar(nonGreedy, child)
-      case (1, Some(None))             => buildPlus(nonGreedy, child)
-      case (n, Some(None)) =>
+  def buildRepeat(quantifier: NormalizedQuantifier, child: Node): Unit =
+    quantifier match {
+      case Quantifier.Exact(0, _)          => // nothing to do
+      case Quantifier.Exact(1, _)          => build(child)
+      case Quantifier.Exact(n, _)          => buildRepeatN(n, child)
+      case Quantifier.Unbounded(0, isLazy) => buildStar(isLazy, child)
+      case Quantifier.Unbounded(1, isLazy) => buildPlus(isLazy, child)
+      case Quantifier.Unbounded(n, isLazy) =>
         buildRepeatN(n, child)
-        buildStar(nonGreedy, child)
-      case (0, Some(Some(0))) => // nothing to do
-      case (0, Some(Some(1))) => buildQuestion(nonGreedy, child)
-      case (0, Some(Some(n))) => buildRepeatAtMostN(nonGreedy, n, child)
-      case (1, Some(Some(1))) => build(child)
-      case (1, Some(Some(2))) =>
+        buildStar(isLazy, child)
+      case Quantifier.Bounded(0, 1, isLazy) => buildQuestion(isLazy, child)
+      case Quantifier.Bounded(0, n, isLazy) => buildRepeatAtMostN(isLazy, n, child)
+      case Quantifier.Bounded(1, 2, isLazy) =>
         build(child)
-        buildQuestion(nonGreedy, child)
-      case (1, Some(Some(m))) =>
+        buildQuestion(isLazy, child)
+      case Quantifier.Bounded(1, m, isLazy) =>
         build(child)
-        buildRepeatAtMostN(nonGreedy, m - 1, child)
-      case (n, Some(Some(m))) if n == m => buildRepeatN(n, child)
-      case (n, Some(Some(m))) if m - n == 1 =>
+        buildRepeatAtMostN(isLazy, m - 1, child)
+      case Quantifier.Bounded(n, m, isLazy) if m - n == 1 =>
         buildRepeatN(n, child)
-        buildQuestion(nonGreedy, child)
-      case (n, Some(Some(m))) =>
+        buildQuestion(isLazy, child)
+      case Quantifier.Bounded(n, m, isLazy) =>
         buildRepeatN(n, child)
-        buildRepeatAtMostN(nonGreedy, m - n, child)
+        buildRepeatAtMostN(isLazy, m - n, child)
     }
 
   /** A builder for `x{n}` node. */
   def buildRepeatN(n: Int, child: Node): Unit = {
-    val captureRange = child.captureRange
-
     val loop = allocateEntrance("loop")
     val cont = allocateLabel("cont")
 
     val reg = allocateCounter()
 
     // Note that `wrapCanary` is not needed.
-    for ((min, max) <- captureRange.range) emitInst(Inst.CapReset(min, max))
-    build(child)
-    emitInst(Inst.Inc(reg))
-    emitTerminator(Inst.Cmp(reg, n, loop, cont))
-
-    enterBlock(cont)
-    emitInst(Inst.Reset(reg))
-
-    freeCounter(reg)
+    wrapReset(child)(build(child))
+    closeLoopBlock(reg, n, loop, cont)
   }
 
   /** A builder for `x{0,n}` node. */
-  def buildRepeatAtMostN(nonGreedy: Boolean, n: Int, child: Node): Unit = {
-    val isEmpty = child.isEmpty
-    val captureRange = child.captureRange
-
+  def buildRepeatAtMostN(isLazy: Boolean, n: Int, child: Node): Unit = {
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
     val cont = allocateLabel("cont")
 
     val reg = allocateCounter()
 
-    emitTerminator(if (nonGreedy) Inst.Try(cont, loop) else Inst.Try(loop, cont))
+    enterLoopBlock(isLazy, loop, cont)
+    wrapCanary(child)(wrapReset(child)(build(child)))
+    closeLoopBlock(reg, n, begin, cont)
+  }
 
+  /** Emits a loop block entering instructions. */
+  def enterLoopBlock(isLazy: Boolean, loop: Label, cont: Label): Unit = {
+    emitTerminator(if (isLazy) Inst.Try(cont, loop) else Inst.Try(loop, cont))
     enterBlock(loop)
-    wrapCanary(isEmpty) {
-      for ((min, max) <- captureRange.range) emitInst(Inst.CapReset(min, max))
-      build(child)
-    }
+  }
+
+  /** Emits a loop block closing instructions. */
+  def closeLoopBlock(reg: CounterReg, n: Int, begin: Label, cont: Label): Unit = {
     emitInst(Inst.Inc(reg))
     emitTerminator(Inst.Cmp(reg, n, begin, cont))
 
     enterBlock(cont)
-    emitInst(Inst.Reset(reg))
+    emitInst(Inst.Reset(reg)) // A counter should be reset after the loop for working memoization well.
 
     freeCounter(reg)
   }
 
   /** Inserts a canary around a loop body if needed. */
-  def wrapCanary(isEmpty: Boolean)(run: => Unit): Unit = {
-    if (isEmpty) {
+  def wrapCanary(child: Node)(run: => Unit): Unit = {
+    if (child.canMatchEmpty) {
       val reg = allocateCanary()
       emitInst(Inst.SetCanary(reg))
       run
       emitInst(Inst.CheckCanary(reg))
       freeCanary(reg)
     } else run
+  }
+
+  /** Emits a `cap-reset`, then execute a `run`. */
+  def wrapReset(child: Node)(run: => Unit): Unit = {
+    for ((min, max) <- child.captureRange.range) emitInst(Inst.CapReset(min, max))
+    run
   }
 
   /** A builder for positive look-around assertion. */
@@ -464,7 +438,7 @@ private[vm] class ProgramBuilder(
   }
 
   /** Adds a `read` (or `read_back`) instruction. */
-  def emitRead(kind: ReadKind, loc: Option[(Int, Int)]): Unit = {
+  def emitRead(kind: ReadKind, loc: Option[Location]): Unit = {
     emitInst(if (back) Inst.ReadBack(kind, loc) else Inst.Read(kind, loc))
   }
 }
