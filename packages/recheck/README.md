@@ -1,4 +1,4 @@
-# `@makenowjust-labo/recheck`
+# `recheck`
 
 > A vulnerable RegExp ([ReDoS][]) checker for JavaScript ([ECMA-262][]) RegExp.
 
@@ -10,7 +10,7 @@
 Uses the following command to install this library:
 
 ```console
-$ npm install @makenowjust-labo/recheck
+$ npm install recheck
 ```
 
 ## Usage
@@ -20,9 +20,9 @@ It takes a RegExp pattern source and flags to be checked (and a configuration op
 then it returns the analysis result.
 
 ```javascript
-const { check } = require("@makenowjust-labo/recheck");
+const { check } = require("recheck");
 
-console.log(check("^(a|a)*$", ""));
+console.log(await check("^(a|a)*$", ""));
 // {
 //   status: 'vulnerable',
 //   checker: 'automaton',
@@ -42,7 +42,7 @@ console.log(check("^(a|a)*$", ""));
 A configuration parameter specifies as the 3rd argument of the `check` function.
 
 ```javascript
-console.log(check("^(a|a)*$", "", { timeout: 1000, checker: "fuzz" }));
+console.log(await check("^(a|a)*$", "", { timeout: 1000, checker: "fuzz" }));
 ```
 
 The following parameters are available.

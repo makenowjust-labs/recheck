@@ -16,9 +16,9 @@ This library exports only an API called `check`.
 It takes a RegExp pattern source and flags, and returns the analysis result.
 
 ```javascript
-const { check } = require("@makenowjust-labo/recheck");
+const { check } = require("recheck");
 
-console.log(check("^(a|a)*$", ""));
+console.log(await check("^(a|a)*$", ""));
 // {
 //   status: 'vulnerable',
 //   checker: 'automaton',
