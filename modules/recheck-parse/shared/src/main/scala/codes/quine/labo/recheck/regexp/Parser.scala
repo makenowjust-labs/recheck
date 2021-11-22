@@ -29,7 +29,10 @@ object Parser {
         case Parsed.Success(node, _) => Right(node)
         case fail: Parsed.Failure =>
           Left(new ParsingException(s"parsing failure", Some(Pattern.Location(fail.index, fail.index))))
-      }).map(assignCaptureIndex).flatMap(assignBackReferenceIndex(_, captures)).flatMap(checkRepeatQuantifier)
+      }).map(assignCaptureIndex)
+        .flatMap(assignBackReferenceIndex(_, captures))
+        .flatMap(resolveUnicodeProperty)
+        .flatMap(checkRepeatQuantifier)
     } yield Pattern(node, flagSet)
 
   /** Parses a flag set string. */
@@ -115,7 +118,7 @@ object Parser {
     loop(node)
   }
 
-  /** Returns a new node named in which named back-references are resolved.
+  /** Returns a new node in which named back-references are resolved.
     *
     * It also validates named capture names and back-reference indices. If an invalid named capture name or
     * back-reference index is found, it returns [[ParsingException]] as Left value.
@@ -159,6 +162,53 @@ object Parser {
       val names = collect(Map.empty, node)
       Right(loop(names, node))
     } catch {
+      case ex: ParsingException => Left(ex)
+    }
+  }
+
+  /** Returns a new node in which unicode properties are resolved.
+    *
+    * It also checks an empty class range. If it is found, it returns a [[Left]] value.
+    */
+  private[regexp] def resolveUnicodeProperty(node: Node): Either[ParsingException, Node] = {
+    import Pattern._
+
+    def loop(node: Node): Node = node match {
+      case Disjunction(ns)              => Disjunction(ns.map(loop)).withLoc(node)
+      case Sequence(ns)                 => Sequence(ns.map(loop)).withLoc(node)
+      case Capture(index, n)            => Capture(index, loop(n)).withLoc(node)
+      case NamedCapture(index, name, n) => NamedCapture(index, name, loop(n)).withLoc(node)
+      case Group(n)                     => Group(loop(n)).withLoc(node)
+      case Repeat(q, n)                 => Repeat(q, loop(n)).withLoc(node)
+      case LookAhead(negative, n)       => LookAhead(negative, loop(n)).withLoc(node)
+      case LookBehind(negative, n)      => LookBehind(negative, loop(n)).withLoc(node)
+      case CharacterClass(invert, ns)   => CharacterClass(invert, ns.map(classNode)).withLoc(node)
+      case n: ClassNode                 => classNode(n).asInstanceOf[Node]
+      case _                            => node
+    }
+
+    def classNode(node: ClassNode): ClassNode = node match {
+      case UnicodeProperty(invert, name, _) =>
+        val contents = IChar.UnicodeProperty(name) match {
+          case Some(char) => if (invert) char.complement(unicode = true) else char
+          case None       => throw new ParsingException(s"unknown Unicode property: $name", node.loc)
+        }
+        UnicodeProperty(invert, name, contents).withLoc(node)
+      case UnicodePropertyValue(invert, name, value, _) =>
+        val contents = IChar.UnicodePropertyValue(name, value) match {
+          case Some(char) => if (invert) char.complement(unicode = true) else char
+          case None       => throw new ParsingException(s"unknown Unicode property-value: $name=$value", node.loc)
+        }
+        UnicodePropertyValue(invert, name, value, contents).withLoc(node)
+      case ClassRange(b, e) =>
+        val char = IChar.range(b, e)
+        if (char.isEmpty) throw new ParsingException("an empty range", node.loc)
+        else node
+      case _ => node
+    }
+
+    try Right(loop(node))
+    catch {
       case ex: ParsingException => Left(ex)
     }
   }
@@ -340,7 +390,7 @@ private[regexp] final class Parser(
     * }}}
     */
   def ClassNode[X: P]: P[ClassNode] =
-    P {
+    P(WithLoc {
       (ClassAtom ~ ((&("-") ~ !"-]" ~ Pass(true)) | Pass(false)))./.flatMap {
         case (Left(c), false)                              => Pass(Pattern.Character(c))
         case (Right(node), false)                          => Pass(node)
@@ -352,7 +402,7 @@ private[regexp] final class Parser(
         case (Left(c), true) =>
           ("-" ~ ClassCharacter).map(Pattern.ClassRange(c, _))
       }
-    }
+    })
 
   /** {{{
     * ClassAtom :: EscapeClass | ClassCharacter
@@ -449,8 +499,8 @@ private[regexp] final class Parser(
     P(WithLoc {
       (("\\p{" ~ Pass(false) | "\\P{" ~ Pass(true)) ~/ UnicodePropertyName ~ ("=" ~ UnicodePropertyValue).? ~/ "}")
         .map {
-          case (invert, p, None)    => Pattern.UnicodeProperty(invert, p)
-          case (invert, p, Some(v)) => Pattern.UnicodePropertyValue(invert, p, v)
+          case (invert, p, None)    => Pattern.UnicodeProperty(invert, p, null)
+          case (invert, p, Some(v)) => Pattern.UnicodePropertyValue(invert, p, v, null)
         }
     })
 

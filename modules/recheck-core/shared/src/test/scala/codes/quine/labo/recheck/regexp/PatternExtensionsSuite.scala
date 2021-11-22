@@ -1,9 +1,6 @@
 package codes.quine.labo.recheck.regexp
 
-import scala.util.Success
-
 import codes.quine.labo.recheck.common.Context
-import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.regexp.Pattern._
 import codes.quine.labo.recheck.regexp.PatternExtensions._
 import codes.quine.labo.recheck.unicode.IChar
@@ -17,61 +14,58 @@ class PatternExtensionsSuite extends munit.FunSuite {
   implicit def ctx: Context = Context()
 
   test("PatternExtensions.AtomNodeOps#toIChar") {
-    assertEquals(Character('x').toIChar(false), Success(IChar('x')))
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Word).toIChar(false), Success(IChar.Word))
+    assertEquals(Character('x').toIChar(false), IChar('x'))
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Word).toIChar(false), IChar.Word)
     assertEquals(
       SimpleEscapeClass(true, EscapeClassKind.Word).toIChar(false),
-      Success(IChar.Word.complement(false))
+      IChar.Word.complement(false)
     )
     assertEquals(
       SimpleEscapeClass(true, EscapeClassKind.Word).toIChar(true),
-      Success(IChar.Word.complement(true))
+      IChar.Word.complement(true)
     )
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).toIChar(false), Success(IChar.Digit))
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).toIChar(false), IChar.Digit)
     assertEquals(
       SimpleEscapeClass(true, EscapeClassKind.Digit).toIChar(false),
-      Success(IChar.Digit.complement(false))
+      IChar.Digit.complement(false)
     )
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Space).toIChar(false), Success(IChar.Space))
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Space).toIChar(false), IChar.Space)
     assertEquals(
       SimpleEscapeClass(true, EscapeClassKind.Space).toIChar(false),
-      Success(IChar.Space.complement(false))
+      IChar.Space.complement(false)
     )
-    assertEquals(UnicodeProperty(false, "ASCII").toIChar(false), Success(IChar.UnicodeProperty("ASCII").get))
     assertEquals(
-      UnicodeProperty(true, "ASCII").toIChar(true),
-      Success(IChar.UnicodeProperty("ASCII").get.complement(true))
+      UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get).toIChar(false),
+      IChar.UnicodeProperty("ASCII").get
     )
-    assertEquals(UnicodeProperty(false, "L").toIChar(false), Success(IChar.UnicodeProperty("L").get))
     assertEquals(
-      UnicodeProperty(true, "L").toIChar(true),
-      Success(IChar.UnicodeProperty("L").get.complement(true))
+      UnicodeProperty(true, "ASCII", IChar.UnicodeProperty("ASCII").get.complement(true)).toIChar(true),
+      IChar.UnicodeProperty("ASCII").get.complement(true)
     )
-    interceptMessage[InvalidRegExpException]("unknown Unicode property: invalid") {
-      UnicodeProperty(false, "invalid").toIChar(false).get
-    }
+    assertEquals(
+      UnicodeProperty(false, "L", IChar.UnicodeProperty("L").get).toIChar(false),
+      IChar.UnicodeProperty("L").get
+    )
+    assertEquals(
+      UnicodeProperty(true, "L", IChar.UnicodeProperty("L").get.complement(true)).toIChar(true),
+      IChar.UnicodeProperty("L").get.complement(true)
+    )
     val Hira = IChar.UnicodePropertyValue("sc", "Hira").get
-    assertEquals(UnicodePropertyValue(false, "sc", "Hira").toIChar(false), Success(Hira))
-    assertEquals(UnicodePropertyValue(true, "sc", "Hira").toIChar(true), Success(Hira.complement(true)))
-    interceptMessage[InvalidRegExpException]("unknown Unicode property-value: sc=invalid") {
-      UnicodePropertyValue(false, "sc", "invalid").toIChar(false).get
-    }
+    assertEquals(UnicodePropertyValue(false, "sc", "Hira", Hira).toIChar(false), Hira)
+    assertEquals(
+      UnicodePropertyValue(true, "sc", "Hira", Hira.complement(true)).toIChar(true),
+      Hira.complement(true)
+    )
     assertEquals(
       CharacterClass(false, Seq(Character('a'), Character('A'))).toIChar(false),
-      Success(IChar('a').union(IChar('A')))
+      IChar('a').union(IChar('A'))
     )
     assertEquals(
       CharacterClass(true, Seq(Character('a'), Character('A'))).toIChar(false),
-      Success(IChar('a').union(IChar('A'))) // Not complemented is intentionally.
+      IChar('a').union(IChar('A')) // Not complemented is intentionally.
     )
-    interceptMessage[InvalidRegExpException]("an empty range") {
-      CharacterClass(true, Seq(ClassRange('z', 'a'))).toIChar(false).get
-    }
-    assertEquals(ClassRange('a', 'a').toIChar(false), Success(IChar('a')))
-    assertEquals(ClassRange('a', 'z').toIChar(false), Success(IChar.range('a', 'z')))
-    interceptMessage[InvalidRegExpException]("an empty range") {
-      ClassRange('z', 'a').toIChar(false).get
-    }
+    assertEquals(ClassRange('a', 'a').toIChar(false), IChar('a'))
+    assertEquals(ClassRange('a', 'z').toIChar(false), IChar.range('a', 'z'))
   }
 
   test("PatternExtensions.NodeOps#captureRange") {
@@ -90,8 +84,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(LookBehind(false, Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
     assertEquals(Character('a').captureRange, CaptureRange(None))
     assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).captureRange, CaptureRange(None))
-    assertEquals(UnicodeProperty(false, "L").captureRange, CaptureRange(None))
-    assertEquals(UnicodePropertyValue(false, "sc", "Hira").captureRange, CaptureRange(None))
+    assertEquals(UnicodeProperty(false, "L", null).captureRange, CaptureRange(None))
+    assertEquals(UnicodePropertyValue(false, "sc", "Hira", null).captureRange, CaptureRange(None))
     assertEquals(CharacterClass(false, Seq(Character('a'))).captureRange, CaptureRange(None))
     assertEquals(Dot().captureRange, CaptureRange(None))
     assertEquals(BackReference(1).captureRange, CaptureRange(None))
@@ -127,8 +121,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(LookBehind(false, Dot()).isEmpty, true)
     assertEquals(Character('a').isEmpty, false)
     assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).isEmpty, false)
-    assertEquals(UnicodeProperty(false, "L").isEmpty, false)
-    assertEquals(UnicodePropertyValue(false, "sc", "Hira").isEmpty, false)
+    assertEquals(UnicodeProperty(false, "L", null).isEmpty, false)
+    assertEquals(UnicodePropertyValue(false, "sc", "Hira", null).isEmpty, false)
     assertEquals(CharacterClass(false, Seq(Character('a'))).isEmpty, false)
     assertEquals(Dot().isEmpty, false)
     assertEquals(BackReference(1).isEmpty, true)
@@ -240,53 +234,53 @@ class PatternExtensionsSuite extends munit.FunSuite {
     val lineTerminator = IChar.LineTerminator
     val dot16 = IChar.Any16.diff(IChar.LineTerminator)
     val dot = IChar.Any.diff(IChar.LineTerminator)
-    assertEquals(Pattern(Sequence(Seq.empty), flagSet0).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(Dot(), flagSet0).alphabet, Success(ICharSet.any(false, false).add(dot16)))
+    assertEquals(Pattern(Sequence(Seq.empty), flagSet0).alphabet, ICharSet.any(false, false))
+    assertEquals(Pattern(Dot(), flagSet0).alphabet, ICharSet.any(false, false).add(dot16))
     assertEquals(
       Pattern(Disjunction(Seq(Character('A'), Character('Z'))), flagSet0).alphabet,
-      Success(ICharSet.any(false, false).add(IChar('A')).add(IChar('Z')))
+      ICharSet.any(false, false).add(IChar('A')).add(IChar('Z'))
     )
     assertEquals(
       Pattern(WordBoundary(false), flagSet0).alphabet,
-      Success(ICharSet.any(false, false).add(word, CharKind.Word))
+      ICharSet.any(false, false).add(word, CharKind.Word)
     )
     assertEquals(
       Pattern(LineBegin(), flagSet1).alphabet,
-      Success(ICharSet.any(false, false).add(lineTerminator, CharKind.LineTerminator))
+      ICharSet.any(false, false).add(lineTerminator, CharKind.LineTerminator)
     )
     assertEquals(
       Pattern(Sequence(Seq(LineBegin(), WordBoundary(false))), flagSet1).alphabet,
-      Success(ICharSet.any(false, false).add(lineTerminator, CharKind.LineTerminator).add(word, CharKind.Word))
+      ICharSet.any(false, false).add(lineTerminator, CharKind.LineTerminator).add(word, CharKind.Word)
     )
-    assertEquals(Pattern(Capture(1, Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(Group(Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))
+    assertEquals(Pattern(Capture(1, Dot()), flagSet2).alphabet, ICharSet.any(false, false))
+    assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet2).alphabet, ICharSet.any(false, false))
+    assertEquals(Pattern(Group(Dot()), flagSet2).alphabet, ICharSet.any(false, false))
+    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet2).alphabet, ICharSet.any(false, false))
+    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet2).alphabet, ICharSet.any(false, false))
     assertEquals(
       Pattern(Repeat(Quantifier.Question(false), Dot()), flagSet2).alphabet,
-      Success(ICharSet.any(false, false))
+      ICharSet.any(false, false)
     )
     assertEquals(
       Pattern(Repeat(Quantifier.Exact(2, false), Dot()), flagSet2).alphabet,
-      Success(ICharSet.any(false, false))
+      ICharSet.any(false, false)
     )
-    assertEquals(Pattern(LookAhead(false, Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(LookBehind(false, Dot()), flagSet2).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(Dot(), flagSet2).alphabet, Success(ICharSet.any(false, false)))
-    assertEquals(Pattern(Sequence(Seq.empty), flagSet3).alphabet, Success(ICharSet.any(true, false)))
+    assertEquals(Pattern(LookAhead(false, Dot()), flagSet2).alphabet, ICharSet.any(false, false))
+    assertEquals(Pattern(LookBehind(false, Dot()), flagSet2).alphabet, ICharSet.any(false, false))
+    assertEquals(Pattern(Dot(), flagSet2).alphabet, ICharSet.any(false, false))
+    assertEquals(Pattern(Sequence(Seq.empty), flagSet3).alphabet, ICharSet.any(true, false))
     assertEquals(
       Pattern(Dot(), flagSet3).alphabet,
-      Success(ICharSet.any(true, false).add(IChar.canonicalize(dot16, false)))
+      ICharSet.any(true, false).add(IChar.canonicalize(dot16, false))
     )
     assertEquals(
       Pattern(Disjunction(Seq(Character('A'), Character('Z'))), flagSet3).alphabet,
-      Success(ICharSet.any(true, false).add(IChar('A')).add(IChar('Z')))
+      ICharSet.any(true, false).add(IChar('A')).add(IChar('Z'))
     )
-    assertEquals(Pattern(Sequence(Seq.empty), flagSet4).alphabet, Success(ICharSet.any(true, true)))
+    assertEquals(Pattern(Sequence(Seq.empty), flagSet4).alphabet, ICharSet.any(true, true))
     assertEquals(
       Pattern(Dot(), flagSet4).alphabet,
-      Success(ICharSet.any(true, true).add(IChar.canonicalize(dot, true)))
+      ICharSet.any(true, true).add(IChar.canonicalize(dot, true))
     )
   }
 

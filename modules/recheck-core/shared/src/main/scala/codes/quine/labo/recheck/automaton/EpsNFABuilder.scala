@@ -19,7 +19,8 @@ object EpsNFABuilder {
   /** Compiles ECMA-262 RegExp into ε-NFA. */
   def build(pattern: Pattern)(implicit ctx: Context): Try[EpsNFA[Int]] =
     ctx.interrupt(for {
-      alphabet <- pattern.alphabet
+      _ <- Try(())
+      alphabet = pattern.alphabet
       builder = new EpsNFABuilder(pattern, alphabet)
       epsNFA <- Try(builder.build())
     } yield epsNFA)
@@ -192,7 +193,7 @@ private class EpsNFABuilder(
     case LookAhead(_, _)  => throw new UnsupportedException("look-ahead assertion")
     case LookBehind(_, _) => throw new UnsupportedException("look-behind assertion")
     case atom: AtomNode =>
-      val ch0 = atom.toIChar(unicode).get
+      val ch0 = atom.toIChar(unicode)
       val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
       val chs = atom match {
         // CharacterClass's inversion should be done here.

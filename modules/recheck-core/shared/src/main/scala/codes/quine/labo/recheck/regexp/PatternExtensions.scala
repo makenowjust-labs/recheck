@@ -1,19 +1,14 @@
 package codes.quine.labo.recheck.regexp
 
 import scala.annotation.tailrec
-import scala.util.Failure
-import scala.util.Success
-import scala.util.Try
 import scala.util.chaining._
 
 import codes.quine.labo.recheck.common.Context
-import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.regexp.Pattern._
 import codes.quine.labo.recheck.unicode.IChar
 import codes.quine.labo.recheck.unicode.ICharSet
 import codes.quine.labo.recheck.unicode.ICharSet.CharKind
 import codes.quine.labo.recheck.unicode.UString
-import codes.quine.labo.recheck.util.TryUtil
 
 object PatternExtensions {
 
@@ -106,7 +101,7 @@ object PatternExtensions {
     }
 
     /** Computes alphabet from this pattern. */
-    def alphabet(implicit ctx: Context): Try[ICharSet] =
+    def alphabet(implicit ctx: Context): ICharSet =
       ctx.interrupt {
         val FlagSet(_, ignoreCase, _, dotAll, unicode, _) = flagSet
         val set = ICharSet
@@ -116,9 +111,9 @@ object PatternExtensions {
           )
           .pipe(set => if (needsWordDistinction) set.add(IChar.Word, CharKind.Word) else set)
 
-        def loop(node: Node): Try[Seq[IChar]] = ctx.interrupt(node match {
-          case Disjunction(ns)       => TryUtil.traverse(ns)(loop).map(_.flatten)
-          case Sequence(ns)          => TryUtil.traverse(ns)(loop).map(_.flatten)
+        def loop(node: Node): Seq[IChar] = ctx.interrupt(node match {
+          case Disjunction(ns)       => ns.flatMap(loop)
+          case Sequence(ns)          => ns.flatMap(loop)
           case Capture(_, n)         => loop(n)
           case NamedCapture(_, _, n) => loop(n)
           case Group(n)              => loop(n)
@@ -126,14 +121,13 @@ object PatternExtensions {
           case LookAhead(_, n)       => loop(n)
           case LookBehind(_, n)      => loop(n)
           case atom: AtomNode =>
-            atom.toIChar(unicode).map { ch =>
-              Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch)
-            }
-          case Dot() => Success(Vector(IChar.dot(ignoreCase, dotAll, unicode)))
-          case _     => Success(Vector.empty)
+            val ch = atom.toIChar(unicode)
+            Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch)
+          case Dot() => Vector(IChar.dot(ignoreCase, dotAll, unicode))
+          case _     => Vector.empty
         })
 
-        loop(node).map(_.foldLeft(set)(_.add(_)))
+        loop(node).foldLeft(set)(_.add(_))
       }
 
     /** Tests whether the pattern needs line terminator distinction or not. */
@@ -240,32 +234,19 @@ object PatternExtensions {
   implicit final class AtomNodeOps(private val atom: AtomNode) extends AnyVal {
 
     /** Converts this pattern to a corresponding interval set. */
-    def toIChar(unicode: Boolean): Try[IChar] = atom match {
-      case Character(c) => Success(IChar(c))
+    def toIChar(unicode: Boolean): IChar = atom match {
+      case Character(c) => IChar(c)
       case SimpleEscapeClass(invert, k) =>
         val char = k match {
           case EscapeClassKind.Digit => IChar.Digit
           case EscapeClassKind.Word  => IChar.Word
           case EscapeClassKind.Space => IChar.Space
         }
-        Success(if (invert) char.complement(unicode) else char)
-      case UnicodeProperty(invert, name) =>
-        IChar.UnicodeProperty(name) match {
-          case Some(char) => Success(if (invert) char.complement(unicode) else char)
-          case None       => Failure(new InvalidRegExpException(s"unknown Unicode property: $name"))
-        }
-      case UnicodePropertyValue(invert, name, value) =>
-        IChar.UnicodePropertyValue(name, value) match {
-          case Some(char) => Success(if (invert) char.complement(unicode) else char)
-          case None       => Failure(new InvalidRegExpException(s"unknown Unicode property-value: $name=$value"))
-        }
-      case CharacterClass(_, ns) =>
-        // Inversion will be done in automaton translation instead of here.
-        TryUtil.traverse(ns)(_.toIChar(unicode)).map(IChar.union)
-      case ClassRange(b, e) =>
-        val char = IChar.range(b, e)
-        if (char.isEmpty) Failure(new InvalidRegExpException("an empty range"))
-        else Success(char)
+        if (invert) char.complement(unicode) else char
+      case UnicodeProperty(_, _, contents)         => contents
+      case UnicodePropertyValue(_, _, _, contents) => contents
+      case CharacterClass(_, ns)                   => IChar.union(ns.map(_.toIChar(unicode)))
+      case ClassRange(b, e)                        => IChar.range(b, e)
     }
   }
 }

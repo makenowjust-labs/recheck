@@ -3,6 +3,7 @@ package codes.quine.labo.recheck.regexp
 import scala.collection.mutable
 
 import codes.quine.labo.recheck.regexp.Pattern._
+import codes.quine.labo.recheck.unicode.IChar
 import codes.quine.labo.recheck.unicode.UChar
 
 /** Pattern is ECMA-262 `RegExp` pattern. */
@@ -32,11 +33,11 @@ object Pattern {
       sticky: Boolean
   )
 
-  /** Node is a node of pattern [[https://en.wikipedia.org/wiki/Abstract_syntax_tree AST (abstract syntax tree)]]. */
-  sealed abstract class Node extends HasLocation with Serializable with Product
+  /** Location is a location of a node in a source. */
+  final case class Location(start: Int, end: Int)
 
   /** HasLocation is a base class having a location. */
-  abstract class HasLocation extends Cloneable {
+  trait HasLocation extends Cloneable {
 
     /** A internal field of the position of this node. */
     private var _loc: Option[Location] = None
@@ -61,13 +62,15 @@ object Pattern {
         case Some(Location(start, end)) => withLoc(start, end)
         case None                       => this
       }
+
+    override protected def clone(): AnyRef = super.clone()
   }
 
-  /** Location is a location of a node in a source. */
-  final case class Location(start: Int, end: Int)
+  /** Node is a node of pattern [[https://en.wikipedia.org/wiki/Abstract_syntax_tree AST (abstract syntax tree)]]. */
+  sealed abstract class Node extends HasLocation with Serializable with Product
 
   /** AtomNode is a node of pattern to match a character. */
-  sealed trait AtomNode extends Serializable with Product
+  sealed trait AtomNode extends HasLocation with Serializable with Product
 
   /** ClassNode is a node of pattern AST, but it can appear as a class child.
     *
@@ -115,12 +118,14 @@ object Pattern {
   final case class SimpleEscapeClass(invert: Boolean, kind: EscapeClassKind) extends Node with ClassNode
 
   /** UnicodeProperty is an escape class of Unicode property. (e.g. `/\p{ASCII}/` or `/\P{L}/`) */
-  final case class UnicodeProperty(invert: Boolean, name: String) extends Node with ClassNode
+  final case class UnicodeProperty(invert: Boolean, name: String, contents: IChar) extends Node with ClassNode
 
   /** UnicodePropertyValue is an escape class of Unicode property and value. (e.g. `/\p{sc=Hira}/` or
     * `/\P{General_Category=No}/`)
     */
-  final case class UnicodePropertyValue(invert: Boolean, name: String, value: String) extends Node with ClassNode
+  final case class UnicodePropertyValue(invert: Boolean, name: String, value: String, contents: IChar)
+      extends Node
+      with ClassNode
 
   /** CharacterClass is a class (set) pattern of characters. (e.g. `/[a-z]/` or `/[^A-Z]/`) */
   final case class CharacterClass(invert: Boolean, children: Seq[ClassNode]) extends Node with AtomNode
@@ -207,32 +212,32 @@ object Pattern {
 
   /** Shows a [[Node]] as a pattern. */
   private[regexp] def showNode(node: Node): String = node match {
-    case Disjunction(ns)                   => ns.map(showNodeInDisjunction).mkString("|")
-    case Sequence(ns)                      => ns.map(showNodeInSequence).mkString
-    case Capture(_, n)                     => s"(${showNode(n)})"
-    case NamedCapture(_, name, n)          => s"(?<$name>${showNode(n)})"
-    case Group(n)                          => s"(?:${showNode(n)})"
-    case Repeat(q, n)                      => s"${showNodeInRepeat(n)}${showQuantifier(q)}"
-    case WordBoundary(false)               => "\\b"
-    case WordBoundary(true)                => "\\B"
-    case LineBegin()                       => "^"
-    case LineEnd()                         => "$"
-    case LookAhead(false, n)               => s"(?=${showNode(n)})"
-    case LookAhead(true, n)                => s"(?!${showNode(n)})"
-    case LookBehind(false, n)              => s"(?<=${showNode(n)})"
-    case LookBehind(true, n)               => s"(?<!${showNode(n)})"
-    case Character(u)                      => showUChar(u)
-    case CharacterClass(false, items)      => s"[${items.map(showClassNode).mkString}]"
-    case CharacterClass(true, items)       => s"[^${items.map(showClassNode).mkString}]"
-    case SimpleEscapeClass(false, k)       => EscapeClassKind.showEscapeClassKind(k)
-    case SimpleEscapeClass(true, k)        => EscapeClassKind.showEscapeClassKind(k).toUpperCase
-    case UnicodeProperty(false, p)         => s"\\p{$p}"
-    case UnicodeProperty(true, p)          => s"\\P{$p}"
-    case UnicodePropertyValue(false, p, v) => s"\\p{$p=$v}"
-    case UnicodePropertyValue(true, p, v)  => s"\\P{$p=$v}"
-    case Dot()                             => "."
-    case BackReference(i)                  => s"\\$i"
-    case NamedBackReference(_, name)       => s"\\k<$name>"
+    case Disjunction(ns)                      => ns.map(showNodeInDisjunction).mkString("|")
+    case Sequence(ns)                         => ns.map(showNodeInSequence).mkString
+    case Capture(_, n)                        => s"(${showNode(n)})"
+    case NamedCapture(_, name, n)             => s"(?<$name>${showNode(n)})"
+    case Group(n)                             => s"(?:${showNode(n)})"
+    case Repeat(q, n)                         => s"${showNodeInRepeat(n)}${showQuantifier(q)}"
+    case WordBoundary(false)                  => "\\b"
+    case WordBoundary(true)                   => "\\B"
+    case LineBegin()                          => "^"
+    case LineEnd()                            => "$"
+    case LookAhead(false, n)                  => s"(?=${showNode(n)})"
+    case LookAhead(true, n)                   => s"(?!${showNode(n)})"
+    case LookBehind(false, n)                 => s"(?<=${showNode(n)})"
+    case LookBehind(true, n)                  => s"(?<!${showNode(n)})"
+    case Character(u)                         => showUChar(u)
+    case CharacterClass(false, items)         => s"[${items.map(showClassNode).mkString}]"
+    case CharacterClass(true, items)          => s"[^${items.map(showClassNode).mkString}]"
+    case SimpleEscapeClass(false, k)          => EscapeClassKind.showEscapeClassKind(k)
+    case SimpleEscapeClass(true, k)           => EscapeClassKind.showEscapeClassKind(k).toUpperCase
+    case UnicodeProperty(false, p, _)         => s"\\p{$p}"
+    case UnicodeProperty(true, p, _)          => s"\\P{$p}"
+    case UnicodePropertyValue(false, p, v, _) => s"\\p{$p=$v}"
+    case UnicodePropertyValue(true, p, v, _)  => s"\\P{$p=$v}"
+    case Dot()                                => "."
+    case BackReference(i)                     => s"\\$i"
+    case NamedBackReference(_, name)          => s"\\k<$name>"
   }
 
   /** Shows a node as a [[Disjunction]] child.

@@ -19,6 +19,6 @@ object FuzzProgram {
   def from(pattern: Pattern)(implicit ctx: Context): Try[FuzzProgram] =
     ctx.interrupt(for {
       program <- ProgramBuilder.build(pattern)
-      alphabet <- pattern.alphabet
+      alphabet = pattern.alphabet
     } yield FuzzProgram(program, alphabet, pattern.parts))
 }

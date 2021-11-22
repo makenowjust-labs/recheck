@@ -223,11 +223,11 @@ private[vm] class ProgramBuilder(
       val c = if (ignoreCase) UChar.canonicalize(c0, unicode) else c0
       emitRead(ReadKind.Char(c), node.loc)
     case node @ CharacterClass(invert, _) =>
-      val ch0 = node.toIChar(unicode).get
+      val ch0 = node.toIChar(unicode)
       val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
       emitRead(if (invert) ReadKind.ClassNot(ch) else ReadKind.Class(ch), node.loc)
     case node: AtomNode =>
-      val ch0 = node.toIChar(unicode).get
+      val ch0 = node.toIChar(unicode)
       val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
       emitRead(ReadKind.Class(ch), node.loc)
     case Dot() =>

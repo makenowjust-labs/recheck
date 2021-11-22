@@ -4,6 +4,7 @@ import fastparse.P
 import fastparse.Parsed
 
 import codes.quine.labo.recheck.regexp.Pattern._
+import codes.quine.labo.recheck.unicode.IChar
 import codes.quine.labo.recheck.unicode.UChar
 
 class ParserSuite extends munit.FunSuite {
@@ -44,7 +45,7 @@ class ParserSuite extends munit.FunSuite {
     interceptMessage[ParsingException]("invalid named back-reference (at 6:11)") {
       Parser.parse("(?<y>)\\k<x>", "u").toTry.get
     }
-    interceptMessage[ParsingException]("out of order in {} quantifier (at 1:6)")(Parser.parse("a{0,1}", "").toTry.get)
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 1:6)")(Parser.parse("a{1,0}", "").toTry.get)
     assertEquals(Parser.parse(".", "g"), Right(Pattern(Dot(), FlagSet(true, false, false, false, false, false))))
     assertEquals(
       Parser.parse("(.)(?<x>.)", ""),
@@ -169,6 +170,74 @@ class ParserSuite extends munit.FunSuite {
       Parser.assignBackReferenceIndex(LookBehind(false, Dot()).withLoc(0, 6), 0).toTry.get.loc,
       Some(Location(0, 6))
     )
+  }
+
+  test("Parser.resolveUnicodeProperty") {
+    assertEquals(
+      Parser.resolveUnicodeProperty(UnicodeProperty(false, "ASCII", null)),
+      Right(UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(UnicodeProperty(true, "ASCII", null)),
+      Right(UnicodeProperty(true, "ASCII", IChar.UnicodeProperty("ASCII").get.complement(true)))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(UnicodePropertyValue(false, "sc", "Hira", null)),
+      Right(UnicodePropertyValue(false, "sc", "Hira", IChar.UnicodePropertyValue("sc", "Hira").get))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(UnicodePropertyValue(true, "sc", "Hira", null)),
+      Right(UnicodePropertyValue(true, "sc", "Hira", IChar.UnicodePropertyValue("sc", "Hira").get.complement(true)))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(CharacterClass(false, Seq(UnicodeProperty(false, "ASCII", null)))),
+      Right(CharacterClass(false, Seq(UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get))))
+    )
+
+    assertEquals(Parser.resolveUnicodeProperty(Dot()), Right(Dot()))
+
+    assertEquals(
+      Parser.resolveUnicodeProperty(Disjunction(Seq(Dot(), UnicodeProperty(false, "ASCII", null)))),
+      Right(Disjunction(Seq(Dot(), UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get))))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(Sequence(Seq(Dot(), UnicodeProperty(false, "ASCII", null)))),
+      Right(Sequence(Seq(Dot(), UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get))))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(Capture(1, UnicodeProperty(false, "ASCII", null))),
+      Right(Capture(1, UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(NamedCapture(1, "x", UnicodeProperty(false, "ASCII", null))),
+      Right(NamedCapture(1, "x", UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(Group(UnicodeProperty(false, "ASCII", null))),
+      Right(Group(UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(Repeat(Quantifier.Star(false), UnicodeProperty(false, "ASCII", null))),
+      Right(Repeat(Quantifier.Star(false), UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(LookAhead(false, UnicodeProperty(false, "ASCII", null))),
+      Right(LookAhead(false, UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+    )
+    assertEquals(
+      Parser.resolveUnicodeProperty(LookBehind(false, UnicodeProperty(false, "ASCII", null))),
+      Right(LookBehind(false, UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+    )
+
+    interceptMessage[ParsingException]("unknown Unicode property: invalid (at 0:11)") {
+      Parser.resolveUnicodeProperty(UnicodeProperty(false, "invalid", null).withLoc(0, 11)).toTry.get
+    }
+    interceptMessage[ParsingException]("unknown Unicode property-value: sc=invalid (at 0:14)") {
+      Parser.resolveUnicodeProperty(UnicodePropertyValue(false, "sc", "invalid", null).withLoc(0, 14)).toTry.get
+    }
+    interceptMessage[ParsingException]("an empty range (at 1:4)") {
+      Parser.resolveUnicodeProperty(CharacterClass(false, Seq(ClassRange('b', 'a').withLoc(1, 4)))).toTry.get
+    }
   }
 
   test("Parser.checkRepeatQuantifier") {
@@ -378,13 +447,13 @@ class ParserSuite extends munit.FunSuite {
     assertEquals(parse("\\s", P.EscapeClass(_)), Parsed.Success(SimpleEscapeClass(false, EscapeClassKind.Space), 2))
     assertEquals(parse("\\S", P.EscapeClass(_)), Parsed.Success(SimpleEscapeClass(true, EscapeClassKind.Space), 2))
     assert(!parse("\\p{AHex}", P.EscapeClass(_)).isSuccess)
-    assertEquals(parse("\\p{AHex}", PU.EscapeClass(_)), Parsed.Success(UnicodeProperty(false, "AHex"), 8))
+    assertEquals(parse("\\p{AHex}", PU.EscapeClass(_)), Parsed.Success(UnicodeProperty(false, "AHex", null), 8))
   }
 
   test("Parser#UnicodeEscapeClass") {
-    assertEquals(parse("\\p{ASCII}", P.UnicodeEscapeClass(_)), Parsed.Success(UnicodeProperty(false, "ASCII"), 9))
-    assertEquals(parse("\\P{AHex}", P.UnicodeEscapeClass(_)), Parsed.Success(UnicodeProperty(true, "AHex"), 8))
-    val Hira = UnicodePropertyValue(false, "sc", "Hira")
+    assertEquals(parse("\\p{ASCII}", P.UnicodeEscapeClass(_)), Parsed.Success(UnicodeProperty(false, "ASCII", null), 9))
+    assertEquals(parse("\\P{AHex}", P.UnicodeEscapeClass(_)), Parsed.Success(UnicodeProperty(true, "AHex", null), 8))
+    val Hira = UnicodePropertyValue(false, "sc", "Hira", null)
     assertEquals(parse("\\p{sc=Hira}", P.UnicodeEscapeClass(_)), Parsed.Success(Hira, 11))
     assertEquals(parse("\\P{sc=Hira}", P.UnicodeEscapeClass(_)), Parsed.Success(Hira.copy(invert = true), 11))
   }
