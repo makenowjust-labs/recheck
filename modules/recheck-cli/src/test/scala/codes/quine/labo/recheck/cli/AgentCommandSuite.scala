@@ -1,7 +1,7 @@
 package codes.quine.labo.recheck.cli
 
-class BatchCommandSuite extends munit.FunSuite {
-  test("BatchCommand.run") {
+class AgentCommandSuite extends munit.FunSuite {
+  test("AgentCommand.run") {
     val simple = """"method":"check","params":{"source":"a","flags":"","config":{}}"""
     val complex =
       """"method":"check","params":{"source":"(a|b|aba)*$","flags":"","config":{"checker":"fuzz","usesAcceleration":false}}"""
@@ -30,7 +30,7 @@ class BatchCommandSuite extends munit.FunSuite {
       def write(line: String): Unit = out.addOne(line)
     }
 
-    new BatchCommand(2, io).run()
+    new AgentCommand(2, io).run()
     assertEquals(
       out.result().sorted, // Result ordering depends on scheduling.
       Seq(

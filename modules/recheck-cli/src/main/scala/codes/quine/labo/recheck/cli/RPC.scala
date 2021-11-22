@@ -143,7 +143,7 @@ object RPC {
     // Start main loop.
     for (line <- io.read()) {
       // A function to send a response to IO.
-      // The handler take this function for asynchronous execution.
+      // The handler takes this function for asynchronous execution.
       val sent = new AtomicBoolean(false)
       val send = (result: Either[ErrorResponse, ResultResponse]) =>
         if (!sent.getAndSet(true)) {

@@ -12,6 +12,7 @@ Changes:
 - Add `ErrorKind.Cancel` for canceled execution ([#93](https://github.com/MakeNowJust-Labo/recheck/pull/93))
 - Rename `EpsNFABuilder.compile` to `.build` ([#94](https://github.com/MakeNowJust-Labo/recheck/pull/94))
 - Improve AST node structure ([#138](https://github.com/MakeNowJust-Labo/recheck/pull/138))
+- Rename `batch` subcommand to `agent` ([#139](https://github.com/MakeNowJust-Labo/recheck/pull/139))
 
 Fixes:
 
