@@ -1,0 +1,16 @@
+{
+  "name": "recheck-darwin-x64",
+  "version": "3.1.0",
+  "description": "The macOS 64-bit binary for recheck.",
+  "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
+  "homepage": "https://makenowjust-labo.github.io/recheck/",
+  "repository": "https://github.com/MakeNowJust-Labo/recheck",
+  "license": "MIT",
+  "preferUnplugged": false,
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ]
+}
