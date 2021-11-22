@@ -3,7 +3,10 @@ package codes.quine.labo.recheck
 import scala.concurrent.duration._
 import scala.util.Random
 import scala.util.Success
-import codes.quine.labo.recheck.common.{Checker, Context, TimeoutException}
+
+import codes.quine.labo.recheck.common.Checker
+import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.TimeoutException
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Diagnostics
