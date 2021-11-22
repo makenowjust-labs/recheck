@@ -33,8 +33,9 @@ object Pattern {
   )
 
   /** Node is a node of pattern [[https://en.wikipedia.org/wiki/Abstract_syntax_tree AST (abstract syntax tree)]]. */
-  sealed abstract class Node extends HasLocation with Serializable with Product {}
+  sealed abstract class Node extends HasLocation with Serializable with Product
 
+  /** HasLocation is a base class having a location. */
   abstract class HasLocation extends Cloneable {
 
     /** A internal field of the position of this node. */

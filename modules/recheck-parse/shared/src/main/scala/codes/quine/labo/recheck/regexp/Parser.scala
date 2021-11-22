@@ -29,7 +29,7 @@ object Parser {
         case Parsed.Success(node, _) => Right(node)
         case fail: Parsed.Failure =>
           Left(new ParsingException(s"parsing failure", Some(Pattern.Location(fail.index, fail.index))))
-      }).map(assignCaptureIndex).flatMap(assignBackReferenceIndex(_, captures))
+      }).map(assignCaptureIndex).flatMap(assignBackReferenceIndex(_, captures)).flatMap(checkRepeatQuantifier)
     } yield Pattern(node, flagSet)
 
   /** Parses a flag set string. */
@@ -158,6 +158,35 @@ object Parser {
     try {
       val names = collect(Map.empty, node)
       Right(loop(names, node))
+    } catch {
+      case ex: ParsingException => Left(ex)
+    }
+  }
+
+  /** Validates all repeat quantifiers in the given node. */
+  private[regexp] def checkRepeatQuantifier(node: Node): Either[ParsingException, Node] = {
+    import Pattern._
+
+    def loop(node: Node): Unit = node match {
+      case Disjunction(ns)       => ns.foreach(loop)
+      case Sequence(ns)          => ns.foreach(loop)
+      case Capture(_, n)         => loop(n)
+      case NamedCapture(_, _, n) => loop(n)
+      case Group(n)              => loop(n)
+      case Repeat(q, n) =>
+        q.normalized match {
+          case Quantifier.Bounded(min, max, _) if min > max =>
+            throw new ParsingException("out of order in {} quantifier", q.loc)
+          case _ => loop(n)
+        }
+      case LookAhead(_, n)  => loop(n)
+      case LookBehind(_, n) => loop(n)
+      case _                => ()
+    }
+
+    try {
+      loop(node)
+      Right(node)
     } catch {
       case ex: ParsingException => Left(ex)
     }

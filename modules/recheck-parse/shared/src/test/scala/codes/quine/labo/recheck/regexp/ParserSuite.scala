@@ -40,6 +40,11 @@ class ParserSuite extends munit.FunSuite {
     interceptMessage[ParsingException]("unknown flag")(Parser.parse("", "#", false).toTry.get)
     interceptMessage[ParsingException]("parsing failure (at 0)")(Parser.parse("{", "", false).toTry.get)
     interceptMessage[ParsingException]("parsing failure (at 0)")(Parser.parse("{1}", "").toTry.get)
+    interceptMessage[ParsingException]("invalid back-reference (at 0:2)")(Parser.parse("\\1", "u").toTry.get)
+    interceptMessage[ParsingException]("invalid named back-reference (at 6:11)") {
+      Parser.parse("(?<y>)\\k<x>", "u").toTry.get
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 1:6)")(Parser.parse("a{0,1}", "").toTry.get)
     assertEquals(Parser.parse(".", "g"), Right(Pattern(Dot(), FlagSet(true, false, false, false, false, false))))
     assertEquals(
       Parser.parse("(.)(?<x>.)", ""),
@@ -164,6 +169,61 @@ class ParserSuite extends munit.FunSuite {
       Parser.assignBackReferenceIndex(LookBehind(false, Dot()).withLoc(0, 6), 0).toTry.get.loc,
       Some(Location(0, 6))
     )
+  }
+
+  test("Parser.checkRepeatQuantifier") {
+    assertEquals(
+      Parser.checkRepeatQuantifier(Repeat(Quantifier.Bounded(0, 1, false).withLoc(1, 6), Dot())),
+      Right(Repeat(Quantifier.Bounded(0, 1, false).withLoc(1, 5), Dot()))
+    )
+
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 1:6)") {
+      Parser.checkRepeatQuantifier(Repeat(Quantifier.Bounded(1, 0, false).withLoc(1, 6), Dot())).toTry.get.loc
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 3:8)") {
+      val result = Parser.checkRepeatQuantifier(
+        Disjunction(Seq(Dot(), Repeat(Quantifier.Bounded(1, 0, false).withLoc(3, 8), Dot())))
+      )
+      result.toTry.get.loc
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 2:7)") {
+      val result =
+        Parser.checkRepeatQuantifier(Sequence(Seq(Dot(), Repeat(Quantifier.Bounded(1, 0, false).withLoc(2, 7), Dot()))))
+      result.toTry.get.loc
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 2:7)") {
+      val result =
+        Parser.checkRepeatQuantifier(Capture(1, Repeat(Quantifier.Bounded(1, 0, false).withLoc(2, 7), Dot())))
+      result.toTry.get.loc
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 6:11)") {
+      val result = Parser.checkRepeatQuantifier(
+        NamedCapture(1, "x", Repeat(Quantifier.Bounded(1, 0, false).withLoc(6, 11), Dot()))
+      )
+      result.toTry.get.loc
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 4:9)") {
+      val result = Parser.checkRepeatQuantifier(Group(Repeat(Quantifier.Bounded(1, 0, false).withLoc(4, 9), Dot())))
+      result.toTry.get.loc
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 2:7)") {
+      val result = Parser.checkRepeatQuantifier(
+        Repeat(Quantifier.Star(false), Repeat(Quantifier.Bounded(1, 0, false).withLoc(2, 7), Dot()))
+      )
+      result.toTry.get.loc
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 4:9)") {
+      val result = Parser.checkRepeatQuantifier(
+        LookAhead(false, Repeat(Quantifier.Bounded(1, 0, false).withLoc(4, 9), Dot()))
+      )
+      result.toTry.get.loc
+    }
+    interceptMessage[ParsingException]("out of order in {} quantifier (at 5:10)") {
+      val result = Parser.checkRepeatQuantifier(
+        LookBehind(false, Repeat(Quantifier.Bounded(1, 0, false).withLoc(5, 10), Dot()))
+      )
+      result.toTry.get.loc
+    }
   }
 
   test("Parser#Source") {
