@@ -152,23 +152,23 @@ jobs:
           name: recheck-linux-x64
       - uses: actions/download-artifact@v2
         with:
-          name: recheck-win32-x64
+          name: recheck-win32-x64.exe
       - name: Build
         run: |
           sbt js/fullLinkJS
           yarn workflow recheck build
           chmod +x ./recheck-darwin-x64
-          mv ./recheck-darwin-x64 packages/recheck-darwin-x64/recheck
+          mv ./recheck-darwin-x64 packages/recheck-macos-x64/recheck
           chmod +x ./recheck-linux-x64
           mv ./recheck-linux-x64 packages/recheck-linux-x64/recheck
-          mv ./recheck-win32-x64.exe packages/recheck-win32-x64/recheck.exe
+          mv ./recheck-win32-x64.exe packages/recheck-windows-x64/recheck.exe
       - uses: JS-DevTools/npm-publish@v1
         with:
           package: packages/recheck/package.json
           token: ${{ secrets.NPM_TOKEN }}
       - uses: JS-DevTools/npm-publish@v1
         with:
-          package: packages/recheck-darwin-x64/package.json
+          package: packages/recheck-macos-x64/package.json
           token: ${{ secrets.NPM_TOKEN }}
       - uses: JS-DevTools/npm-publish@v1
         with:
@@ -176,7 +176,7 @@ jobs:
           token: ${{ secrets.NPM_TOKEN }}
       - uses: JS-DevTools/npm-publish@v1
         with:
-          package: packages/recheck-win32-x64/package.json
+          package: packages/recheck-windows-x64/package.json
           token: ${{ secrets.NPM_TOKEN }}
 
   gh-pages:
