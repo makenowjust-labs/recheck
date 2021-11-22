@@ -6,7 +6,7 @@ export function check(
   source: string,
   flags: string,
   config?: Config
-): Diagnostics;
+): Promise<Diagnostics>;
 
 /**
  * Config is a configuration parameter of analyzing.
@@ -106,7 +106,7 @@ export type Config = {
    */
   maxDegree?: number;
 
-   /**
+  /**
     * A rate of a hotspot steps by the maximum steps.
     * (default: `0.001`)
     */
@@ -141,6 +141,11 @@ export type Config = {
    * it switches to use fuzz checker to analyze instead of the automaton based checker.
    */
   maxPatternSize?: number;
+
+  /**
+   * An signal to abort the check.
+   */
+  signal?: AbortSignal;
 };
 
 /**

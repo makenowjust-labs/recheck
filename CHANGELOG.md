@@ -13,6 +13,8 @@ Changes:
 - Rename `EpsNFABuilder.compile` to `.build` ([#94](https://github.com/MakeNowJust-Labo/recheck/pull/94))
 - Improve AST node structure ([#138](https://github.com/MakeNowJust-Labo/recheck/pull/138))
 - Rename `batch` subcommand to `agent` ([#139](https://github.com/MakeNowJust-Labo/recheck/pull/139))
+- Add `recheck-${os}-${cpu}` packages to distribute binaries ([#141](https://github.com/MakeNowJust-Labo/recheck/pull/139))
+- Rename `@makenowjust/recheck` package to `recheck` ([#141](https://github.com/MakeNowJust-Labo/recheck/pull/139))
 
 Fixes:
 

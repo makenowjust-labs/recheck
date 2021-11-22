@@ -1,18 +1,24 @@
-name: Scala
+name: Test
 
 on: [push]
 
 jobs:
-  build:
+  scala-test:
     runs-on: ubuntu-latest
-    name: Scala CI
+    name: Scala Test
     steps:
       - uses: actions/checkout@v2
       - uses: olafurpg/setup-scala@v10
         with:
           java-version: adopt@1.14
+      - name: Cache SBT
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.cache/coursier
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
       - name: Test
         run: sbt coverage test coverageAggregate
-      - name: Format and Lint
-        run: sbt scalafmtCheckAll scalafmtSbtCheck 'scalafixAll --check'
       - uses: codecov/codecov-action@v1

@@ -1,0 +1,221 @@
+name: Release
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build
+    steps:
+      - uses: actions/checkout@v2
+      - uses: olafurpg/setup-scala@v10
+        with:
+          java-version: adopt@1.14
+      - name: Cache SBT
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.cache/coursier
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
+      - name: Cache Build Files
+        uses: actions/cache@v2
+        with:
+          path: |
+            **/target
+          key: ${{ runner.os }}-build-${{ github.sha }}
+      - name: Build
+        run: sbt compile
+
+  native-build:
+    needs: [build]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macOS-latest, ubuntu-latest, windows-latest]
+        include:
+          - os: macOS-latest
+            artifact_filename: recheck-darwin-x64
+            local_path: modules/recheck-cli/target/native-image/recheck
+          - os: ubuntu-latest
+            artifact_filename: recheck-linux-x64
+            local_path: modules/recheck-cli/target/native-image/recheck
+          - os: windows-latest
+            artifact_filename: recheck-win32-x64.exe
+            local_path: modules/recheck-cli/target/native-image/recheck.exe
+    steps:
+      - uses: actions/checkout@v2
+      - uses: olafurpg/setup-scala@v10
+        with:
+          java-version: adopt@1.14
+      - name: Cache SBT
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.cache/coursier
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
+      - name: Cache Build Files
+        uses: actions/cache@v2
+        with:
+          path: |
+            **/target
+          key: ${{ runner.os }}-build-${{ github.sha }}
+      - run: git fetch --unshallow
+      - run: sbt cli/nativeImage
+        if: ${{ matrix.os != 'windows-latest' }}
+      - name: sbt cli/nativeImage
+        if: ${{ matrix.os == 'windows-latest' }}
+        shell: cmd
+        run: >-
+          "C:\Program Files (x86)\Microsoft Visual
+          Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && sbt
+          cli/nativeImage
+      - uses: actions/upload-artifact@v2
+        with:
+          path: ${{ matrix.local_path }}
+          name: ${{ matrix.artifact_filename }}
+
+  maven-release:
+    needs: [build]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    name: Publish to Maven Central
+    steps:
+      - uses: actions/checkout@v2
+      - uses: olafurpg/setup-gpg@v3
+      - uses: olafurpg/setup-scala@v10
+        with:
+          java-version: adopt@1.14
+      - name: Cache SBT
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.cache/coursier
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
+      - name: Cache Build Files
+        uses: actions/cache@v2
+        with:
+          path: |
+            **/target
+          key: ${{ runner.os }}-build-${{ github.sha }}
+      - run: git fetch --unshallow
+      - name: Publish
+        run: sbt ci-release
+        env:
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+          PGP_SECRET: ${{ secrets.PGP_SECRET }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+
+  npm-release:
+    needs: [build, native-build]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    name: Publish to NPM
+    steps:
+      - uses: actions/checkout@v1
+      - uses: olafurpg/setup-scala@v10
+        with:
+          java-version: adopt@1.14
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+          cache: 'yarn'
+      - name: Cache SBT
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.cache/coursier
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
+      - name: Cache Build Files
+        uses: actions/cache@v2
+        with:
+          path: |
+            **/target
+          key: ${{ runner.os }}-build-${{ github.sha }}
+      - name: Install
+        run: yarn install --frozen-lockfile
+      - uses: actions/download-artifact@v2
+        with:
+          name: recheck-darwin-x64
+      - uses: actions/download-artifact@v2
+        with:
+          name: recheck-linux-x64
+      - uses: actions/download-artifact@v2
+        with:
+          name: recheck-win32-x64
+      - name: Build
+        run: |
+          sbt js/fullLinkJS
+          yarn workflow recheck build
+          chmod +x ./recheck-darwin-x64
+          mv ./recheck-darwin-x64 packages/recheck-darwin-x64/recheck
+          chmod +x ./recheck-linux-x64
+          mv ./recheck-linux-x64 packages/recheck-linux-x64/recheck
+          mv ./recheck-win32-x64.exe packages/recheck-win32-x64/recheck.exe
+      - uses: JS-DevTools/npm-publish@v1
+        with:
+          package: packages/recheck/package.json
+          token: ${{ secrets.NPM_TOKEN }}
+      - uses: JS-DevTools/npm-publish@v1
+        with:
+          package: packages/recheck-darwin-x64/package.json
+          token: ${{ secrets.NPM_TOKEN }}
+      - uses: JS-DevTools/npm-publish@v1
+        with:
+          package: packages/recheck-linux-x64/package.json
+          token: ${{ secrets.NPM_TOKEN }}
+      - uses: JS-DevTools/npm-publish@v1
+        with:
+          package: packages/recheck-win32-x64/package.json
+          token: ${{ secrets.NPM_TOKEN }}
+
+  gh-pages:
+    needs: [build]
+    if: github.ref == 'main'
+    runs-on: ubuntu-latest
+    name: Deploy to GitHub Pages
+    steps:
+      - uses: actions/checkout@v2
+      - uses: olafurpg/setup-scala@v10
+        with:
+          java-version: adopt@1.14
+      - name: Cache SBT
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.cache/coursier
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
+      - name: Cache Build Files
+        uses: actions/cache@v2
+        with:
+          path: |
+            **/target
+          key: ${{ runner.os }}-build-${{ github.sha }}
+      - run: git fetch --unshallow
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v2
+        with:
+          hugo-version: '0.80.0'
+          extended: true
+      - name: Build
+        run: |
+          sbt mdoc js/fullLinkJS
+          mkdir -p site/assets/js/lib/
+          cp modules/recheck-js/target/scala-2.13/recheck-js-opt/* site/assets/js/lib/
+          hugo -s site --minify
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: site/public
