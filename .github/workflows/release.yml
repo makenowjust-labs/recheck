@@ -64,10 +64,12 @@ jobs:
           path: |
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
+      - run: git fetch --unshallow
       - run: sbt cli/nativeImage
         if: ${{ matrix.os != 'windows-latest' }}
       - name: sbt cli/nativeImage
         if: ${{ matrix.os == 'windows-latest' }}
+        shell: cmd
         run: >-
           "C:\Program Files (x86)\Microsoft Visual
           Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && sbt
@@ -177,6 +179,7 @@ jobs:
 
   gh-pages:
     needs: [build]
+    if: github.ref == 'main'
     runs-on: ubuntu-latest
     name: Deploy to GitHub Pages
     steps:
@@ -192,6 +195,12 @@ jobs:
             ~/.cache/coursier
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
+      - name: Cache Build Files
+        uses: actions/cache@v2
+        with:
+          path: |
+            **/target
+          key: ${{ runner.os }}-build-${{ github.sha }}
       - run: git fetch --unshallow
       - name: Setup Hugo
         uses: peaceiris/actions-hugo@v2
