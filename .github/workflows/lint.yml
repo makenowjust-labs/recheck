@@ -3,7 +3,7 @@ name: Lint
 on: [push]
 
 jobs:
-  scala-test:
+  scala-lint:
     runs-on: ubuntu-latest
     name: Scala Lint
     steps:
@@ -21,3 +21,17 @@ jobs:
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
       - name: Lint
         run: sbt scalafmtCheckAll scalafmtSbtCheck 'scalafixAll --check'
+
+  node-typecheck:
+    runs-on: ubuntu-latest
+    name: Node Type Check
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+          cache: 'yarn'
+      - name: Install
+        run: yarn install --frozen-lockfile --ignore-platform
+      - name: Type Check
+        run: yarn workspace recheck typecheck
