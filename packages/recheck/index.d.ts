@@ -37,7 +37,7 @@ export type Config = {
    *
    * The hybrid checker performs better than others in many cases.
    */
-  checker: "hybrid" | "automaton" | "fuzz";
+  checker?: "hybrid" | "automaton" | "fuzz";
 
   /**
    * An integer value of a maximum length of an attack string. (default: `4_000`)
