@@ -1,7 +1,7 @@
 import { check as fallback } from './fallback';
 import { ensureAgent } from './agent';
 
-export async function check(source, flags, config) {
+export async function check(source, flags, config = {}) {
   let signal = config.signal ?? null;
   if (signal) {
     delete config.signal;

@@ -1,6 +1,12 @@
+# dev
+
+Fixes:
+
+- Set default value to check config ([#143](https://github.com/MakeNowJust-Labo/recheck/issues/143))
+
 # 4.0.2 (2021-11-23)
 
-A test release (second).
+A test release. (Second)
 
 # 4.0.1 (2021-11-23)
 
