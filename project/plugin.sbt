@@ -6,3 +6,6 @@ addSbtPlugin("org.portable-scala" % "sbt-scalajs-crossproject" % "1.1.0")
 addSbtPlugin("com.github.sbt" % "sbt-ci-release" % "1.5.10")
 addSbtPlugin("org.scalameta" % "sbt-mdoc" % "2.2.24")
 addSbtPlugin("org.scalameta" % "sbt-native-image" % "0.3.2")
+
+// https://github.com/scala-js/scala-js-js-envs/issues/12#issuecomment-958925883
+libraryDependencies += "org.scala-js" %% "scalajs-env-nodejs" % "1.2.1"
