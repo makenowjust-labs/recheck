@@ -9,7 +9,7 @@ title = ""
 Uses the following command to install this library:
 
 ```bash
-$ npm install @makenowjust-labo/recheck
+$ npm install recheck
 ```
 
 This library exports only an API called `check`.
