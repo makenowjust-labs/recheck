@@ -107,9 +107,9 @@ export type Config = {
   maxDegree?: number;
 
   /**
-    * A rate of a hotspot steps by the maximum steps.
-    * (default: `0.001`)
-    */
+   * A rate of a hotspot steps by the maximum steps.
+   * (default: `0.001`)
+   */
   heatRate?: number;
 
   /**
@@ -157,7 +157,10 @@ export type Config = {
  * - `unknown`: An error is occurred on analyzing.
  *   As a result, it is unknown whether the RegExp is safe or vulnerable.
  */
-export type Diagnostics = SafeDiagnostics | VulnerableDiagnostics | UnknownDiagnostics;
+export type Diagnostics =
+  | SafeDiagnostics
+  | VulnerableDiagnostics
+  | UnknownDiagnostics;
 
 /**
  * SafeDiagnostics is a diagnostics against a safe RegExp.
