@@ -17,6 +17,8 @@
   ],
   "scripts": {
     "build": "esbuild --bundle --platform=node --format=cjs src/index.ts --outfile=main.js && esbuild --bundle --platform=browser --format=esm src/fallback.ts --outfile=browser.js",
+    "format": "prettier -w src/**/*.ts *.json index.d.ts",
+    "lint": "prettier --list-different src/**/*.ts *.json index.d.ts",
     "typecheck": "tsc --noEmit -p ."
   },
   "files": [
@@ -31,6 +33,7 @@
   "devDependencies": {
     "@types/node": "^16.11.9",
     "esbuild": "^0.13.15",
+    "prettier": "^2.4.1",
     "typescript": "^4.5.2"
   }
 }

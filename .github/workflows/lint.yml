@@ -22,9 +22,9 @@ jobs:
       - name: Lint
         run: sbt scalafmtCheckAll scalafmtSbtCheck 'scalafixAll --check'
 
-  node-typecheck:
+  node-lint:
     runs-on: ubuntu-latest
-    name: Node Type Check
+    name: Node Lint
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
@@ -33,5 +33,7 @@ jobs:
           cache: 'yarn'
       - name: Install
         run: yarn install --frozen-lockfile --ignore-platform
+      - name: Lint
+        run: yarn workspace recheck lint
       - name: Type Check
         run: yarn workspace recheck typecheck
