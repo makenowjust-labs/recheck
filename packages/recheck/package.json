@@ -6,8 +6,8 @@
   "homepage": "https://makenowjust-labo.github.io/recheck/",
   "repository": "https://github.com/MakeNowJust-Labo/recheck.git",
   "version": "4.0.2",
-  "main": "main.js",
-  "browser": "browser.js",
+  "main": "lib/main.js",
+  "browser": "lib/browser.js",
   "types": "index.d.ts",
   "keywords": [
     "redos",
@@ -16,14 +16,14 @@
     "vulnerability"
   ],
   "scripts": {
-    "build": "esbuild --bundle --platform=node --format=cjs src/index.ts --outfile=main.js && esbuild --bundle --platform=browser --format=esm src/fallback.ts --outfile=browser.js",
-    "format": "prettier -w src/**/*.ts *.json index.d.ts",
-    "lint": "prettier --list-different src/**/*.ts *.json index.d.ts",
+    "build": "esbuild --bundle --platform=node --format=cjs src/index.ts --outfile=lib/main.js && esbuild --bundle --platform=browser --format=esm src/fallback.ts --outfile=lib/browser.js",
+    "clean": "rimraf lib",
+    "format": "prettier -w *.{json,md} src/**/*.ts index.d.ts",
+    "lint": "prettier --list-different *.{json,md} src/**/*.ts index.d.ts",
     "typecheck": "tsc --noEmit -p ."
   },
   "files": [
-    "browser.js",
-    "main.js"
+    "lib"
   ],
   "optionalDependencies": {
     "recheck-linux-x64": "4.0.2",
@@ -34,6 +34,7 @@
     "@types/node": "^16.11.9",
     "esbuild": "^0.13.15",
     "prettier": "^2.4.1",
+    "rimraf": "^3.0.2",
     "typescript": "^4.5.2"
   }
 }
