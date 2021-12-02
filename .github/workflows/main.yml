@@ -1,11 +1,11 @@
-name: Release
+name: Main
 
 on: [push]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: Build
+    name: Scala Build
     steps:
       - uses: actions/checkout@v2
       - uses: olafurpg/setup-scala@v10
@@ -26,7 +26,99 @@ jobs:
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
       - name: Build
-        run: sbt compile
+        run: sbt compile js/fullLinkJS
+      - uses: actions/upload-artifact@v2
+        with:
+          path: modules/recheck-js/target/scala-2.13/recheck-js-opt/recheck.js
+          name: recheck.js
+
+  scala-lint:
+    needs: [build]
+    runs-on: ubuntu-latest
+    name: Scala Lint
+    steps:
+      - uses: actions/checkout@v2
+      - uses: olafurpg/setup-scala@v10
+        with:
+          java-version: adopt@1.14
+      - name: Cache SBT
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.cache/coursier
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
+      - name: Cache Build Files
+        uses: actions/cache@v2
+        with:
+          path: |
+            **/target
+          key: ${{ runner.os }}-build-${{ github.sha }}
+      - name: Lint
+        run: sbt scalafmtCheckAll scalafmtSbtCheck 'scalafixAll --check'
+
+  node-lint:
+    runs-on: ubuntu-latest
+    name: Node Lint
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+          cache: 'yarn'
+      - name: Install
+        run: yarn install --frozen-lockfile --ignore-platform
+      - name: Lint
+        run: |
+          yarn workspace eslint-plugin-redos lint
+          yarn workspace recheck lint
+      - name: Type Check
+        run: |
+          yarn workspace eslint-plugin-redos typecheck
+          yarn workspace recheck typecheck
+
+  scala-test:
+    runs-on: ubuntu-latest
+    name: Scala Test
+    steps:
+      - uses: actions/checkout@v2
+      - uses: olafurpg/setup-scala@v10
+        with:
+          java-version: adopt@1.14
+      - name: Cache SBT
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.cache/coursier
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
+      - name: Test
+        run: sbt coverage test coverageAggregate
+      - uses: codecov/codecov-action@v1
+
+  node-test:
+    needs: [build]
+    runs-on: ubuntu-latest
+    name: Node Test
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+          cache: 'yarn'
+      - name: Install
+        run: yarn install --frozen-lockfile --ignore-platform
+      - uses: actions/download-artifact@v2
+        with:
+          name: recheck.js
+          path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
+      - name: Build
+        run: yarn workspace recheck build
+      - name: Test
+        run: |
+          yarn workspace eslint-plugin-redos test
 
   native-build:
     needs: [build]
@@ -146,6 +238,10 @@ jobs:
         run: yarn install --frozen-lockfile --ignore-platform
       - uses: actions/download-artifact@v2
         with:
+          name: recheck.js
+          path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
+      - uses: actions/download-artifact@v2
+        with:
           name: recheck-darwin-x64
           path: packages/recheck-macos-x64/
       - uses: actions/download-artifact@v2
@@ -158,10 +254,14 @@ jobs:
           path: packages/recheck-windows-x64/
       - name: Build
         run: |
-          sbt js/fullLinkJS
           yarn workspace recheck build
+          yarn workspace eslint-plugin-redos build
           chmod +x packages/recheck-macos-x64/recheck
           chmod +x packages/recheck-linux-x64/recheck
+      - uses: JS-DevTools/npm-publish@v1
+        with:
+          package: packages/eslint-plugin-redos/package.json
+          token: ${{ secrets.NPM_TOKEN }}
       - uses: JS-DevTools/npm-publish@v1
         with:
           package: packages/recheck/package.json
