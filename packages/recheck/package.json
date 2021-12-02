@@ -31,10 +31,10 @@
     "recheck-windows-x64": "4.0.2"
   },
   "devDependencies": {
-    "@types/node": "^16.11.9",
-    "esbuild": "^0.13.15",
-    "prettier": "^2.4.1",
-    "rimraf": "^3.0.2",
-    "typescript": "^4.5.2"
+    "@types/node": "16.11.9",
+    "esbuild": "0.13.15",
+    "prettier": "2.4.1",
+    "rimraf": "3.0.2",
+    "typescript": "4.5.2"
   }
 }
