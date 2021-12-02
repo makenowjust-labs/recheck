@@ -26,7 +26,11 @@ jobs:
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
       - name: Build
-        run: sbt compile
+        run: sbt compile js/fullLinkJS
+      - uses: actions/upload-artifact@v2
+        with:
+          path: modules/recheck-js/target/scala-2.13/recheck-js-opt/recheck.js
+          name: recheck.js
 
   scala-lint:
     needs: [build]
@@ -95,6 +99,7 @@ jobs:
       - uses: codecov/codecov-action@v1
 
   node-test:
+    needs: [build]
     runs-on: ubuntu-latest
     name: Node Test
     steps:
@@ -105,7 +110,13 @@ jobs:
           cache: 'yarn'
       - name: Install
         run: yarn install --frozen-lockfile --ignore-platform
-      - name: Lint
+      - uses: actions/download-artifact@v2
+        with:
+          name: recheck.js
+          path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
+      - name: Build
+        run: yarn workspace recheck build
+      - name: Test
         run: |
           yarn workspace eslint-plugin-redos test
 
@@ -227,6 +238,10 @@ jobs:
         run: yarn install --frozen-lockfile --ignore-platform
       - uses: actions/download-artifact@v2
         with:
+          name: recheck.js
+          path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
+      - uses: actions/download-artifact@v2
+        with:
           name: recheck-darwin-x64
           path: packages/recheck-macos-x64/
       - uses: actions/download-artifact@v2
@@ -239,7 +254,6 @@ jobs:
           path: packages/recheck-windows-x64/
       - name: Build
         run: |
-          sbt js/fullLinkJS
           yarn workspace recheck build
           chmod +x packages/recheck-macos-x64/recheck
           chmod +x packages/recheck-linux-x64/recheck
