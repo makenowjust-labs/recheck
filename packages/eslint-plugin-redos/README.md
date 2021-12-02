@@ -1,8 +1,7 @@
 # eslint-plugin-redos
 
 > [ESLint][] plugin for catching [ReDoS][] vulnerability.
-> [eslint]: https://eslint.org
-> [redos]: https://en.wikipedia.org/wiki/ReDoS
+> [eslint]: https://eslint.org > [redos]: https://en.wikipedia.org/wiki/ReDoS
 
 [![npm (scoped)](https://img.shields.io/npm/v/eslint-plugin-redos?logo=javascript&style=for-the-badge)](https://www.npmjs.com/package/eslint-plugin-redos)
 
