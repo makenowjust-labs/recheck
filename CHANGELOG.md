@@ -1,5 +1,9 @@
 # dev
 
+Changes:
+
+- Add `checkSync` function to NPM package ([#156](https://github.com/MakeNowJust-Labo/recheck/pull/156))
+
 Fixes:
 
 - Set default value to check config ([#143](https://github.com/MakeNowJust-Labo/recheck/issues/143))
