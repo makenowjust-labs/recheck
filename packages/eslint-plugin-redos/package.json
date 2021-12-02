@@ -13,7 +13,8 @@
     "clean": "rimraf lib",
     "format": "prettier -w *.{json,md} src/**/*.ts",
     "lint": "prettier --list-different *.{json,md} src/**/*.ts",
-    "test": "jest"
+    "test": "jest",
+    "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
     "recheck": "4.0.2"
@@ -27,6 +28,7 @@
     "eslint": "8.3.0",
     "jest": "27.3.1",
     "prettier": "2.4.1",
+    "rimraf": "3.0.2",
     "ts-jest": "27.0.7",
     "typescript": "4.5.2"
   },

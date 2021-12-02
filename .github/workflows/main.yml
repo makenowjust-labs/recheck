@@ -1,11 +1,11 @@
-name: Release
+name: Main
 
 on: [push]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: Build
+    name: Scala Build
     steps:
       - uses: actions/checkout@v2
       - uses: olafurpg/setup-scala@v10
@@ -27,6 +27,87 @@ jobs:
           key: ${{ runner.os }}-build-${{ github.sha }}
       - name: Build
         run: sbt compile
+
+  scala-lint:
+    needs: [build]
+    runs-on: ubuntu-latest
+    name: Scala Lint
+    steps:
+      - uses: actions/checkout@v2
+      - uses: olafurpg/setup-scala@v10
+        with:
+          java-version: adopt@1.14
+      - name: Cache SBT
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.cache/coursier
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
+      - name: Cache Build Files
+        uses: actions/cache@v2
+        with:
+          path: |
+            **/target
+          key: ${{ runner.os }}-build-${{ github.sha }}
+      - name: Lint
+        run: sbt scalafmtCheckAll scalafmtSbtCheck 'scalafixAll --check'
+
+  node-lint:
+    runs-on: ubuntu-latest
+    name: Node Lint
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+          cache: 'yarn'
+      - name: Install
+        run: yarn install --frozen-lockfile --ignore-platform
+      - name: Lint
+        run: |
+          yarn workspace eslint-plugin-redos lint
+          yarn workspace recheck lint
+      - name: Type Check
+        run: |
+          yarn workspace eslint-plugin-redos typecheck
+          yarn workspace recheck typecheck
+
+  scala-test:
+    runs-on: ubuntu-latest
+    name: Scala Test
+    steps:
+      - uses: actions/checkout@v2
+      - uses: olafurpg/setup-scala@v10
+        with:
+          java-version: adopt@1.14
+      - name: Cache SBT
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.cache/coursier
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
+      - name: Test
+        run: sbt coverage test coverageAggregate
+      - uses: codecov/codecov-action@v1
+
+  node-test:
+    runs-on: ubuntu-latest
+    name: Node Lint
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+          cache: 'yarn'
+      - name: Install
+        run: yarn install --frozen-lockfile --ignore-platform
+      - name: Lint
+        run: |
+          yarn workspace eslint-plugin-redos test
 
   native-build:
     needs: [build]
