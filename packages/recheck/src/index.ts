@@ -7,6 +7,8 @@ import { check as agentCheck, ensureAgent } from "./agent";
 
 import type { Config, Diagnostics } from "..";
 
+export { checkSync } from "./fallback";
+
 const debug = debuglog("recheck");
 
 export async function check(
