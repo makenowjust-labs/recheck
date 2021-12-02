@@ -3,6 +3,7 @@
 Changes:
 
 - Add `checkSync` function to NPM package ([#156](https://github.com/MakeNowJust-Labo/recheck/pull/156))
+- Add `eslint-plugin-redos` package ([#160](https://github.com/MakeNowJust-Labo/recheck/pull/160))
 
 Fixes:
 
