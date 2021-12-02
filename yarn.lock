@@ -617,7 +617,7 @@
   resolved "https://registry.yarnpkg.com/@types/node/-/node-16.11.10.tgz#2e3ad0a680d96367103d3e670d41c2fed3da61ae"
   integrity sha512-3aRnHa1KlOEEhJ6+CvyHKK5vE9BcLGjtUpwvqYLRvYNQKMfabu3BwfJaA/SLW8dxe28LsNDjtHwePTuzn3gmOA==
 
-"@types/node@^16.11.9":
+"@types/node@16.11.9":
   version "16.11.9"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-16.11.9.tgz#879be3ad7af29f4c1a5c433421bf99fab7047185"
   integrity sha512-MKmdASMf3LtPzwLyRrFjtFFZ48cMf8jmX5VRYrDQiJa8Ybu5VAmkqBWqKU8fdCwD8ysw4mQ9nrEHvzg6gunR7A==
@@ -1183,7 +1183,7 @@ esbuild-windows-arm64@0.13.15:
   resolved "https://registry.yarnpkg.com/esbuild-windows-arm64/-/esbuild-windows-arm64-0.13.15.tgz#482173070810df22a752c686509c370c3be3b3c3"
   integrity sha512-zzvyCVVpbwQQATaf3IG8mu1IwGEiDxKkYUdA4FpoCHi1KtPa13jeScYDjlW0Qh+ebWzpKfR2ZwvqAQkSWNcKjA==
 
-esbuild@^0.13.15:
+esbuild@0.13.15:
   version "0.13.15"
   resolved "https://registry.yarnpkg.com/esbuild/-/esbuild-0.13.15.tgz#db56a88166ee373f87dbb2d8798ff449e0450cdf"
   integrity sha512-raCxt02HBKv8RJxE8vkTSCXGIyKHdEdGfUmiYb8wnabnaEmHzyW7DCHb5tEN0xU8ryqg5xw54mcwnYkC4x3AIw==
@@ -2488,7 +2488,7 @@ prelude-ls@~1.1.2:
   resolved "https://registry.yarnpkg.com/prelude-ls/-/prelude-ls-1.1.2.tgz#21932a549f5e52ffd9a827f570e04be62a97da54"
   integrity sha1-IZMqVJ9eUv/ZqCf1cOBL5iqX2lQ=
 
-prettier@2.4.1, prettier@^2.4.1:
+prettier@2.4.1:
   version "2.4.1"
   resolved "https://registry.yarnpkg.com/prettier/-/prettier-2.4.1.tgz#671e11c89c14a4cfc876ce564106c4a6726c9f5c"
   integrity sha512-9fbDAXSBcc6Bs1mZrDYb3XKzDLm4EXXL9sC1LqKP5rZkT6KRr/rf9amVUcODVXgguK/isJz0d0hP72WeaKWsvA==
@@ -2852,7 +2852,7 @@ typedarray-to-buffer@^3.1.5:
   dependencies:
     is-typedarray "^1.0.0"
 
-typescript@4.5.2, typescript@^4.5.2:
+typescript@4.5.2:
   version "4.5.2"
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.5.2.tgz#8ac1fba9f52256fdb06fb89e4122fa6a346c2998"
   integrity sha512-5BlMof9H1yGt0P8/WF+wPNw6GfctgGjXp5hkblpyT+8rkASSmkUKMXrxR0Xg8ThVCi/JnHQiKXeBaEwCeQwMFw==
