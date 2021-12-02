@@ -255,8 +255,13 @@ jobs:
       - name: Build
         run: |
           yarn workspace recheck build
+          yarn workspace eslint-plugin-redos build
           chmod +x packages/recheck-macos-x64/recheck
           chmod +x packages/recheck-linux-x64/recheck
+      - uses: JS-DevTools/npm-publish@v1
+        with:
+          package: packages/eslint-plugin-redos/package.json
+          token: ${{ secrets.NPM_TOKEN }}
       - uses: JS-DevTools/npm-publish@v1
         with:
           package: packages/recheck/package.json
