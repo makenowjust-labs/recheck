@@ -211,6 +211,7 @@ export type UnknownDiagnostics = {
  */
 export type SafeComplexity = {
   type: "constant" | "linear" | "safe";
+  summary: string;
   isFuzz: boolean;
 };
 
@@ -225,6 +226,7 @@ export type VulnerableComplexity = PolynomialComplexity | ExponentialComplexity;
  */
 export type PolynomialComplexity = {
   type: "polynomial";
+  summary: string;
   degree: number;
   isFuzz: boolean;
 };
@@ -235,6 +237,7 @@ export type PolynomialComplexity = {
  */
 export type ExponentialComplexity = {
   type: "exponential";
+  summary: string;
   isFuzz: boolean;
 };
 

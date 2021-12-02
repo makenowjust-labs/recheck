@@ -1,7 +1,6 @@
 import { Rule } from "eslint";
 import type ESTree from "estree";
 import * as ReDoS from "recheck";
-import { ordinalize } from "inflected";
 
 type Options = {
   ignoreErrors: boolean;
@@ -67,16 +66,9 @@ const rule: Rule.RuleModule = {
           }
           switch (result.complexity?.type) {
             case "exponential":
-              context.report({
-                message: "Found a ReDoS vulnerable RegExp (exponential).",
-                node,
-              });
-              break;
             case "polynomial":
-              // TODO: use `result.complexity.summary` instead (type definition is missing currently).
-              const degree = ordinalize(result.complexity.degree);
               context.report({
-                message: `Found a ReDoS vulnerable RegExp (${degree} degree polynomial).`,
+                message: `Found a ReDoS vulnerable RegExp (${result.complexity.summary}).`,
                 node,
               });
               break;
@@ -111,7 +103,7 @@ const rule: Rule.RuleModule = {
     };
 
     return {
-      Literal: async (node) => {
+      Literal: (node) => {
         // Tests `/.../`?
         if (!(node.value instanceof RegExp)) {
           return;
@@ -120,7 +112,7 @@ const rule: Rule.RuleModule = {
         const { source, flags } = node.value;
         check(node, source, flags);
       },
-      NewExpression: async (node) => {
+      NewExpression: (node) => {
         // Tests `new RegExp(...)`?
         if (
           !(node.callee.type === "Identifier" && node.callee.name === "RegExp")
@@ -146,7 +138,7 @@ const rule: Rule.RuleModule = {
         );
         check(node, source, flags);
       },
-      CallExpression: async (node) => {
+      CallExpression: (node) => {
         // Tests `RegExp(...)`?
         if (
           !(node.callee.type === "Identifier" && node.callee.name === "RegExp")

@@ -122,7 +122,7 @@ The default value is `'hybrid'`.
 
 ## Related Projects
 
-- [@makenowjust-labo/recheck](https://makenowjust-labo.github.io/recheck): a ReDoS detection library used in this plugin.
+- [`recheck`](https://makenowjust-labo.github.io/recheck): a ReDoS detection library used in this plugin.
 
 ---
 
