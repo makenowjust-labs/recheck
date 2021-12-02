@@ -16,3 +16,5 @@ export async function check(
     resolve(bundle.check(source, flags, config))
   );
 }
+
+export const checkSync = bundle.check;

@@ -9,6 +9,15 @@ export function check(
 ): Promise<Diagnostics>;
 
 /**
+ * Synchronous version of `check`. Take care that it will block the Node.js process.
+ */
+export function checkSync(
+  source: string,
+  flags: string,
+  config?: Config
+): Diagnostics;
+
+/**
  * Config is a configuration parameter of analyzing.
  */
 export type Config = {
