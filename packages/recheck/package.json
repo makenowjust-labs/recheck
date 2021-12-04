@@ -27,9 +27,9 @@
     "index.d.ts"
   ],
   "optionalDependencies": {
-    "recheck-linux-x64": "4.0.2",
-    "recheck-macos-x64": "4.0.2",
-    "recheck-windows-x64": "4.0.2"
+    "recheck-linux-x64": "4.1.0",
+    "recheck-macos-x64": "4.1.0",
+    "recheck-windows-x64": "4.1.0"
   },
   "devDependencies": {
     "@types/node": "16.11.11",
