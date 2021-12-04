@@ -2555,21 +2555,6 @@ react-is@^17.0.1:
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-17.0.2.tgz#e691d4a8e9c789365655539ab372762b0efb54f0"
   integrity sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==
 
-recheck-linux-x64@4.0.2:
-  version "4.0.2"
-  resolved "https://registry.yarnpkg.com/recheck-linux-x64/-/recheck-linux-x64-4.0.2.tgz#bf8808424e40761f11c23d1f4794c0a3725dc160"
-  integrity sha512-JKwtBw2WFecggo7InIaZHKEdFSayyShu0fpkbB7uHKqjOSyfOxE3Zr1W3DGvZNfUipjKvfSS2KmIOgDqF/51LA==
-
-recheck-macos-x64@4.0.2:
-  version "4.0.2"
-  resolved "https://registry.yarnpkg.com/recheck-macos-x64/-/recheck-macos-x64-4.0.2.tgz#ee5e9125d1b1e2911ede55440d2541e814889c46"
-  integrity sha512-IuacFmA+hV/npiFIyPBFW5RznXCkCHxOnSA4wgVe9xLo/eWIgij9zKWVjCghZ6mXGSXgW/Rq4HsDWANuR4ClXA==
-
-recheck-windows-x64@4.0.2:
-  version "4.0.2"
-  resolved "https://registry.yarnpkg.com/recheck-windows-x64/-/recheck-windows-x64-4.0.2.tgz#d8af3c6f7daecbbf2009848cc43004af32c5c5a1"
-  integrity sha512-/Zwe0gO/HgePJ38K9LGNkcZ7HEIx9dRM6PpsbpN0Wth4BbCDBtpBOhmqMfnSsukf0cGNenZgRGTdVMVyCRAk9Q==
-
 regexpp@^3.2.0:
   version "3.2.0"
   resolved "https://registry.yarnpkg.com/regexpp/-/regexpp-3.2.0.tgz#0425a2768d8f23bad70ca4b90461fa2f1213e1b2"
