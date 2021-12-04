@@ -3,7 +3,7 @@
   "description": "ESLint plugin for catching ReDoS vulnerability.",
   "license": "MIT",
   "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
-  "version": "4.1.0",
+  "version": "4.1.1",
   "main": "lib/index.js",
   "files": [
     "lib"
@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "recheck": "4.1.0"
+    "recheck": "4.1.1"
   },
   "peerDependencies": {
     "eslint": ">= 3"

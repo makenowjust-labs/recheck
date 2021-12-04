@@ -5,7 +5,7 @@
   "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
   "homepage": "https://makenowjust-labo.github.io/recheck/",
   "repository": "https://github.com/MakeNowJust-Labo/recheck.git",
-  "version": "4.1.0",
+  "version": "4.1.1",
   "main": "lib/main.js",
   "browser": "lib/browser.js",
   "types": "index.d.ts",
@@ -27,9 +27,9 @@
     "index.d.ts"
   ],
   "optionalDependencies": {
-    "recheck-linux-x64": "4.1.0",
-    "recheck-macos-x64": "4.1.0",
-    "recheck-windows-x64": "4.1.0"
+    "recheck-linux-x64": "4.1.1",
+    "recheck-macos-x64": "4.1.1",
+    "recheck-windows-x64": "4.1.1"
   },
   "devDependencies": {
     "@types/node": "16.11.11",

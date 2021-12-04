@@ -1,3 +1,10 @@
+# 4.1.1 (2021-12-04)
+
+Fixes:
+
+- Add `index.d.ts` file to the package ([#184](https://github.com/MakeNowJust-Labo/recheck/pull/184))
+- Fix `optionalDependencies` in `recheck` package ([#185](https://github.com/MakeNowJust-Labo/recheck/pull/185))
+
 # 4.1.0 (2021-12-04)
 
 Changes:
