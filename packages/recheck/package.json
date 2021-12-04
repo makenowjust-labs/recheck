@@ -23,7 +23,8 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "files": [
-    "lib"
+    "lib",
+    "index.d.ts"
   ],
   "optionalDependencies": {
     "recheck-linux-x64": "4.0.2",
