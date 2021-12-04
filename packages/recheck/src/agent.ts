@@ -96,7 +96,7 @@ class Agent {
       const text = JSON.stringify(object) + "\n";
       debug("Send a request: %s", text);
       this.child.stdin!.write(text);
-      this.refs.set(id, { resolve, reject });
+      this.registerRef(id, { resolve, reject });
     });
     return { id, promise };
   }
@@ -117,7 +117,7 @@ class Agent {
   }
 
   /** Sets up response handlers to `recheck agent` process. */
-  private handle() {
+  private handle(): void {
     // Holds the remaining last line of the response.
     let remainingLastLine = "";
 
@@ -135,15 +135,15 @@ class Agent {
       }
 
       ref.resolve(result);
-      this.refs.delete(id);
+      this.unregisterRef(id);
     };
 
     this.child.stdout!.on("data", (data) => {
       const text = data.toString("utf-8");
       const lines = text.split("\n");
 
-      const firstLine = lines.shift() ?? "";
       const lastLine = lines.pop() ?? "";
+      const firstLine = lines.shift() ?? "";
 
       handleLine(remainingLastLine + firstLine);
       for (const line of lines) {
@@ -152,6 +152,26 @@ class Agent {
 
       remainingLastLine = lastLine;
     });
+  }
+
+  /** Registers the given reference. */
+  private registerRef(id: number, ref: Ref): void {
+    this.refs.set(id, ref);
+
+    if (this.refs.size === 1) {
+      debug("A agent process is referenced.");
+      this.child.ref();
+    }
+  }
+
+  /** Removes a registration of the given ID reference. */
+  private unregisterRef(id: number): void {
+    this.refs.delete(id);
+
+    if (this.refs.size === 0) {
+      debug("A agent process is unreferenced.");
+      this.child.unref();
+    }
   }
 }
 
@@ -177,6 +197,16 @@ export function ensureAgent(): Agent | null {
     windowsHide: true,
     stdio: ["pipe", "pipe", "inherit"],
   });
+  debug("Agent PID: %d", child.pid);
+
+  // Remove references from the child process.
+  child.unref();
+  if ((child.stdin as any)?.unref) {
+    (child.stdin as any).unref();
+  }
+  if ((child.stdout as any)?.unref) {
+    (child.stdout as any).unref();
+  }
 
   agent = new Agent(child);
   return agent;
