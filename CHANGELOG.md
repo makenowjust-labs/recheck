@@ -9,6 +9,7 @@ Fixes:
 
 - Set default value to check config ([#143](https://github.com/MakeNowJust-Labo/recheck/issues/143))
 - Rewrite `recheck` package in TypeScript ([#149](https://github.com/MakeNowJust-Labo/recheck/pull/149))
+- Call `subprocess.ref()`/`unref()` correctly ([#181](https://github.com/MakeNowJust-Labo/recheck/pull/181))
 
 # 4.0.2 (2021-11-23)
 
