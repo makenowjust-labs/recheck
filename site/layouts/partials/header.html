@@ -162,7 +162,8 @@
   </div>
 </header>
 
-{{ $workerJS := resources.Get "js/worker.js" | js.Build "worker.js" | minify | fingerprint }}
+{{/* FIXME: worker.js is not minified due to Hugo (ESBuild) bug. If it is fixed, we should add `minify` filter again. */}}
+{{ $workerJS := resources.Get "js/worker.js" | js.Build "worker.js" | fingerprint }}
 {{ $opts := dict "targetPath" "main.js" "params" (dict "workerJS" $workerJS.Permalink) }}
 {{ $mainJS := resources.Get "js/main.js" | js.Build $opts | minify | fingerprint }}
 <script src="{{ $mainJS.Permalink }}"></script>
