@@ -122,6 +122,7 @@ jobs:
 
   native-build:
     needs: [build]
+    if: github.ref_name == 'main' || startsWith(github.ref, 'refs/tags/')
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
