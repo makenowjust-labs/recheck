@@ -68,7 +68,7 @@ jobs:
           node-version: '14'
           cache: 'yarn'
       - name: Install
-        run: yarn install --frozen-lockfile --ignore-platform
+        run: yarn install --frozen-lockfile
       - name: Lint
         run: |
           yarn workspace eslint-plugin-redos lint
@@ -109,7 +109,7 @@ jobs:
           node-version: '14'
           cache: 'yarn'
       - name: Install
-        run: yarn install --frozen-lockfile --ignore-platform
+        run: yarn install --frozen-lockfile
       - uses: actions/download-artifact@v2
         with:
           name: recheck.js
@@ -242,7 +242,7 @@ jobs:
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
       - name: Install
-        run: yarn install --frozen-lockfile --ignore-platform
+        run: yarn install --frozen-lockfile
       - uses: actions/download-artifact@v2
         with:
           name: recheck.js
