@@ -1,7 +1,9 @@
 # eslint-plugin-redos
 
 > [ESLint][] plugin for catching [ReDoS][] vulnerability.
-> [eslint]: https://eslint.org > [redos]: https://en.wikipedia.org/wiki/ReDoS
+
+[eslint]: https://eslint.org
+[redos]: https://en.wikipedia.org/wiki/ReDoS
 
 [![npm (scoped)](https://img.shields.io/npm/v/eslint-plugin-redos?logo=javascript&style=for-the-badge)](https://www.npmjs.com/package/eslint-plugin-redos)
 
@@ -40,10 +42,12 @@ This rule detects a RegExp literal causing problematic backtracking behavior pot
 
 ```javascript
 /*eslint redos/no-vulnerable: "error"*/
+
 // Exponential times backtracking examples:
 /^(a*)*$/;
 /^(a|a)*$/;
 /^(a|b|ab)*$/;
+
 // Polynomial times backtracking examples:
 /^a*a*$/;
 /^[\s\u200c]+|[\s\u200c]+$/; // See https://stackstatus.net/post/147710624694/outage-postmortem-july-20-2016.
@@ -53,9 +57,11 @@ This rule detects a RegExp literal causing problematic backtracking behavior pot
 
 ```javascript
 /*eslint redos/no-vulnerable: "error"*/
+
 // Fixed times backtracking examples:
 /^a$/;
 /^foo$/;
+
 // Linear times backtracking examples;
 /foo/;
 /(a*)*/;
@@ -129,4 +135,4 @@ The default value is `'hybrid'`.
 
 MIT license.
 
-2020 (C) TSUYUSATO "MakeNowJust" Kitsune
+2020-2021 (C) TSUYUSATO "MakeNowJust" Kitsune
