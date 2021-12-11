@@ -113,7 +113,7 @@ class ReDoSSuite extends munit.FunSuite {
           ),
           FlagSet(false, false, false, false, false, false)
         ),
-        Parameters(checker = Checker.Fuzz, randomSeed = 0)
+        Parameters(checker = Checker.Fuzz, randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
       )
       .get
     assert(clue(result).isInstanceOf[Diagnostics.Vulnerable])
@@ -123,7 +123,7 @@ class ReDoSSuite extends munit.FunSuite {
         ".",
         "",
         Pattern(Dot(), FlagSet(false, false, false, false, false, false)),
-        Parameters(checker = Checker.Fuzz, randomSeed = 0)
+        Parameters(checker = Checker.Fuzz, randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
       ),
       Success(Diagnostics.Safe(".", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
@@ -183,7 +183,7 @@ class ReDoSSuite extends munit.FunSuite {
           ),
           FlagSet(false, false, false, false, false, false)
         ),
-        Parameters(randomSeed = 0, maxRepeatCount = 5)
+        Parameters(randomSeed = 0, maxRepeatCount = 5, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
       ),
       Success(Diagnostics.Safe("^(?:a|a){5}$", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
@@ -197,7 +197,7 @@ class ReDoSSuite extends munit.FunSuite {
           ),
           FlagSet(false, false, false, false, false, false)
         ),
-        Parameters(randomSeed = 0, maxNFASize = 5)
+        Parameters(randomSeed = 0, maxNFASize = 5, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
       ),
       Success(Diagnostics.Safe("^(?:a|a){5}$", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
