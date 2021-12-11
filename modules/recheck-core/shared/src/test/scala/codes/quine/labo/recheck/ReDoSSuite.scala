@@ -209,7 +209,7 @@ class ReDoSSuite extends munit.FunSuite {
           Sequence(Seq(LineBegin(), Repeat(Quantifier.Star(false), Dot()), LineEnd())),
           FlagSet(false, false, false, false, false, false)
         ),
-        Parameters(randomSeed = 0, maxPatternSize = 1)
+        Parameters(randomSeed = 0, maxPatternSize = 1, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
       ),
       Success(Diagnostics.Safe("^.*$", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
