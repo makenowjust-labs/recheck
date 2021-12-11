@@ -1,5 +1,7 @@
 package codes.quine.labo.recheck.vm
 
+import scala.concurrent.duration.Duration
+import scala.concurrent.duration.MILLISECONDS
 import scala.util.Failure
 import scala.util.Success
 
@@ -278,5 +280,37 @@ class InterpreterSuite extends munit.FunSuite {
     assertCaptures("^(a*?)(a*?)$", "", "aaa", 0)(Seq(0, 3, 0, 0, 0, 3))
     assertCaptures("^(?:(a)|(b)){2}$", "", "ba", 0)(Seq(0, 2, 1, 2, -1, -1))
     assertCaptures("^(?:(a)|(b)){2}$", "", "ab", 0)(Seq(0, 2, -1, -1, 1, 2))
+  }
+
+  test("Interpreter.runWithTimeout") {
+    def matchesWithTimeout(
+        source: String,
+        flags: String,
+        input: String,
+        pos: Int,
+        opts: Options,
+        timeout: Duration
+    ): Result = {
+      val t = for {
+        pattern <- Parser.parse(source, flags) match {
+          case Right(pattern) => Success(pattern)
+          case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
+        }
+        program <- ProgramBuilder.build(pattern)
+        result = Interpreter.runWithTimeout(program, UString(input), pos, opts, timeout)
+      } yield result
+      t.get
+    }
+
+    assertEquals(matchesWithTimeout("^.*$", "", "xx", 0, Options(), Duration.Inf).status, Status.Ok)
+    assertEquals(matchesWithTimeout("^.*$", "", "xx", 0, Options(), Duration.MinusInf).status, Status.Timeout)
+    assertEquals(
+      matchesWithTimeout("^.*$", "", "x".repeat(10000), 0, Options(), Duration.Zero).status,
+      Status.Timeout
+    )
+    assertEquals(
+      matchesWithTimeout("^.*$", "", "x".repeat(10000), 0, Options(), Duration(1, MILLISECONDS)).status,
+      Status.Timeout
+    )
   }
 }
