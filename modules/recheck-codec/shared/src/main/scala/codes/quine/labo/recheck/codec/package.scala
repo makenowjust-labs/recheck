@@ -1,11 +1,16 @@
 package codes.quine.labo.recheck
 
+import scala.concurrent.duration.Duration
+import scala.concurrent.duration.MILLISECONDS
+
 import io.circe.Decoder
 import io.circe.Encoder
+import io.circe.HCursor
 import io.circe.Json
 import io.circe.syntax._
 
 import codes.quine.labo.recheck.common.Checker
+import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Diagnostics
@@ -97,6 +102,62 @@ package object codec {
 
   /** An `Encoder` for `UString`. */
   implicit def encodeUString: Encoder[UString] = _.asString.asJson
+
+  /** A `Decoder` for `Parameters`. */
+  implicit def decodeParameters: Decoder[Parameters] = (c: HCursor) =>
+    for {
+      checker <- c.getOrElse[Checker]("checker")(Parameters.CHECKER)
+      timeout <- c.getOrElse[Duration]("timeout")(Parameters.TIMEOUT)
+      maxAttackStringSize <- c.getOrElse[Int]("maxAttackStringSize")(Parameters.MAX_ATTACK_STRING_SIZE)
+      attackLimit <- c.getOrElse[Int]("attackLimit")(Parameters.ATTACK_LIMIT)
+      randomSeed <- c.getOrElse[Long]("randomSeed")(Parameters.RANDOM_SEED)
+      maxIteration <- c.getOrElse[Int]("maxIteration")(Parameters.MAX_ITERATION)
+      seedingLimit <- c.getOrElse[Int]("seedingLimit")(Parameters.SEEDING_LIMIT)
+      seedingTimeout <- c.getOrElse[Duration]("seedingTimeout")(Parameters.SEEDING_TIMEOUT)
+      maxInitialGenerationSize <- c.getOrElse[Int]("maxInitialGenerationSize")(Parameters.MAX_INITIAL_GENERATION_SIZE)
+      incubationLimit <- c.getOrElse[Int]("incubationLimit")(Parameters.INCUBATION_LIMIT)
+      incubationTimeout <- c.getOrElse[Duration]("incubationTimeout")(Parameters.INCUBATION_TIMEOUT)
+      maxGeneStringSize <- c.getOrElse[Int]("maxGeneStringSize")(Parameters.MAX_GENE_STRING_SIZE)
+      maxGenerationSize <- c.getOrElse[Int]("maxGenerationSize")(Parameters.MAX_GENERATION_SIZE)
+      crossoverSize <- c.getOrElse[Int]("crossoverSize")(Parameters.CROSSOVER_SIZE)
+      mutationSize <- c.getOrElse[Int]("mutationSize")(Parameters.MUTATION_SIZE)
+      attackTimeout <- c.getOrElse[Duration]("attackTimeout")(Parameters.ATTACK_TIMEOUT)
+      maxDegree <- c.getOrElse[Int]("maxDegree")(Parameters.MAX_DEGREE)
+      heatRatio <- c.getOrElse[Double]("heatRatio")(Parameters.HEAT_RATIO)
+      usesAcceleration <- c.getOrElse[Boolean]("usesAcceleration")(Parameters.USES_ACCELERATION)
+      maxRepeatCount <- c.getOrElse[Int]("maxRepeatCount")(Parameters.MAX_REPEAT_COUNT)
+      maxNFASize <- c.getOrElse[Int]("maxNFASize")(Parameters.MAX_N_F_A_SIZE)
+      maxPatternSize <- c.getOrElse[Int]("maxPatternSize")(Parameters.MAX_PATTERN_SIZE)
+    } yield Parameters(
+      checker,
+      timeout,
+      maxAttackStringSize,
+      attackLimit,
+      randomSeed,
+      maxIteration,
+      seedingLimit,
+      seedingTimeout,
+      maxInitialGenerationSize,
+      incubationLimit,
+      incubationTimeout,
+      maxGeneStringSize,
+      maxGenerationSize,
+      crossoverSize,
+      mutationSize,
+      attackTimeout,
+      maxDegree,
+      heatRatio,
+      usesAcceleration,
+      maxRepeatCount,
+      maxNFASize,
+      maxPatternSize
+    )
+
+  /** A `Decoder` for `Duration`. */
+  implicit def decodeDuration: Decoder[Duration] = Decoder[Option[Int]].map {
+    case Some(d) => Duration(d, MILLISECONDS)
+    case None    => Duration.Inf
+  }
 
   /** A `Decoder` for `Checker`. */
   implicit def decodeChecker: Decoder[Checker] =

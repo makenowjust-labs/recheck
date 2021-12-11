@@ -2,9 +2,11 @@ package codes.quine.labo.recheck
 package fuzz
 
 import scala.collection.mutable
+import scala.concurrent.duration.Duration
 import scala.util.Random
 
 import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Hotspot
@@ -24,35 +26,43 @@ object FuzzChecker {
   /** Checks whether RegExp is ReDoS vulnerable or not. */
   def check(
       fuzz: FuzzProgram,
-      random: Random = Random,
-      seedLimit: Int = 10_000,
-      incubationLimit: Int = 100_000,
-      attackLimit: Int = 1_000_000,
-      crossSize: Int = 25,
-      mutateSize: Int = 50,
-      maxAttackSize: Int = 10_000,
-      maxSeedSize: Int = 100,
-      maxGenerationSize: Int = 100,
-      maxIteration: Int = 30,
-      maxDegree: Int = 4,
-      heatRate: Double = 0.001,
-      usesAcceleration: Boolean = true
+      random: Random = new Random(Parameters.RANDOM_SEED),
+      seedingLimit: Int = Parameters.SEEDING_LIMIT,
+      seedingTimeout: Duration = Parameters.SEEDING_TIMEOUT,
+      incubationLimit: Int = Parameters.INCUBATION_LIMIT,
+      incubationTimeout: Duration = Parameters.INCUBATION_TIMEOUT,
+      maxGeneStringSize: Int = Parameters.MAX_GENE_STRING_SIZE,
+      attackLimit: Int = Parameters.ATTACK_LIMIT,
+      attackTimeout: Duration = Parameters.ATTACK_TIMEOUT,
+      crossoverSize: Int = Parameters.CROSSOVER_SIZE,
+      mutationSize: Int = Parameters.MUTATION_SIZE,
+      maxAttackStringSize: Int = Parameters.MAX_ATTACK_STRING_SIZE,
+      maxInitialGenerationSize: Int = Parameters.MAX_INITIAL_GENERATION_SIZE,
+      maxGenerationSize: Int = Parameters.MAX_GENERATION_SIZE,
+      maxIteration: Int = Parameters.MAX_ITERATION,
+      maxDegree: Int = Parameters.MAX_DEGREE,
+      heatRatio: Double = Parameters.HEAT_RATIO,
+      usesAcceleration: Boolean = Parameters.USES_ACCELERATION
   )(implicit ctx: Context): Option[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)] =
     ctx.interrupt {
       new FuzzChecker(
         fuzz,
         random,
-        seedLimit,
+        seedingLimit,
+        seedingTimeout,
         incubationLimit,
+        incubationTimeout,
+        maxGeneStringSize,
         attackLimit,
-        crossSize,
-        mutateSize,
-        maxAttackSize,
-        maxSeedSize,
+        attackTimeout,
+        crossoverSize,
+        mutationSize,
+        maxAttackStringSize,
+        maxInitialGenerationSize,
         maxGenerationSize,
         maxIteration,
         maxDegree,
-        heatRate,
+        heatRatio,
         usesAcceleration
       ).check()
     }
@@ -73,17 +83,21 @@ object FuzzChecker {
 private[fuzz] final class FuzzChecker(
     val fuzz: FuzzProgram,
     val random: Random,
-    val seedLimit: Int,
+    val seedingLimit: Int,
+    val seedingTimeout: Duration,
     val incubationLimit: Int,
+    val incubationTimeout: Duration,
+    val maxGeneStringSize: Int,
     val attackLimit: Int,
-    val crossSize: Int,
-    val mutateSize: Int,
-    val maxAttackSize: Int,
-    val maxSeedSize: Int,
+    val attackTimeout: Duration,
+    val crossoverSize: Int,
+    val mutationSize: Int,
+    val maxAttackStringSize: Int,
+    val maxInitialGenerationSize: Int,
     val maxGenerationSize: Int,
     val maxIteration: Int,
     val maxDegree: Int,
-    val heatRate: Double,
+    val heatRatio: Double,
     val usesAcceleration: Boolean
 )(implicit val ctx: Context) {
 
@@ -122,7 +136,7 @@ private[fuzz] final class FuzzChecker(
 
   /** Creates the initial generation from the seed set. */
   def init(): Either[Generation, AttackResult] = interrupt {
-    val seed: Set[FString] = Seeder.seed(fuzz, seedLimit, maxSeedSize)
+    val seed: Set[FString] = Seeder.seed(fuzz, seedingLimit, seedingTimeout, maxInitialGenerationSize)
     val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty, mutable.Set.empty, true)
     for (str <- seed) {
       pop.execute(str) match {
@@ -137,13 +151,13 @@ private[fuzz] final class FuzzChecker(
   def iterate(gen: Generation): Either[Generation, AttackResult] = interrupt {
     val next = Population.from(gen)
 
-    val crossing = (1 to crossSize).iterator.flatMap(_ => cross(gen, next))
-    val mutation = (1 to mutateSize).iterator.flatMap(_ => mutate(gen, next))
+    val crossovers = (1 to crossoverSize).iterator.flatMap(_ => cross(gen, next))
+    val mutations = (1 to mutationSize).iterator.flatMap(_ => mutate(gen, next))
 
-    (crossing ++ mutation).nextOption().fold(Left(next.toGeneration): Either[Generation, AttackResult])(Right(_))
+    (crossovers ++ mutations).nextOption().fold(Left(next.toGeneration): Either[Generation, AttackResult])(Right(_))
   }
 
-  /** Simulates a crossing. */
+  /** Simulates a crossover. */
   def cross(gen: Generation, next: Population): Option[AttackResult] = interrupt {
     val i1 = random.between(0, gen.traces.size)
     val i2 = random.between(0, gen.traces.size)
@@ -184,7 +198,9 @@ private[fuzz] final class FuzzChecker(
       case 0 =>
         val d = random.between(-10, 11)
         t.mapN(_ + d)
-      case 1 => t.mapN(_ * 2)
+      case 1 =>
+        val d = random.between(2, 8)
+        t.mapN(_ * d)
     }
     next.execute(s)
   }
@@ -318,11 +334,11 @@ private[fuzz] final class FuzzChecker(
   /** Executes the string to construct attack string. */
   def tryAttackExecute(str: FString): Option[(AttackPattern, Hotspot)] = interrupt {
     val input = str.toUString
-    if (input.sizeAsString <= maxAttackSize) {
+    if (input.sizeAsString <= maxAttackStringSize) {
       val opts = Options(attackLimit, usesAcceleration = usesAcceleration, needsHeatmap = true)
-      val result = Interpreter.run(program, input, 0, opts)
-      if (result.status == Status.Limit) {
-        return Some((str.toAttackPattern, Hotspot.build(result.heatmap, heatRate)))
+      val result = Interpreter.runWithTimeout(program, input, 0, opts, attackTimeout)
+      if (result.status == Status.Limit || result.status == Status.Timeout) {
+        return Some((str.toAttackPattern, Hotspot.build(result.heatmap, heatRatio)))
       }
     }
     None
@@ -339,13 +355,15 @@ private[fuzz] final class FuzzChecker(
 
     /** Executes the string and adds its result. */
     def execute(str: FString): Option[AttackResult] = {
+      if (str.countRepeat >= maxDegree) return None
+
       val input = str.toUString
       if (inputs.contains(input)) return None
 
       val opts = Options(incubationLimit, usesAcceleration = usesAcceleration, needsCoverage = true)
-      val result = Interpreter.run(program, input, 0, opts)
+      val result = Interpreter.runWithTimeout(program, input, 0, opts, incubationTimeout)
       add(str, input, result)
-      if (result.status == Status.Limit) {
+      if (result.status == Status.Limit || result.status == Status.Timeout) {
         return tryAttack(str)
       }
 
@@ -360,7 +378,7 @@ private[fuzz] final class FuzzChecker(
       val coverage = result.coverage
       val trace = Trace(str, rate, result.steps, coverage)
 
-      if (input.sizeAsString < maxAttackSize && !set.contains(trace)) {
+      if (input.sizeAsString < maxGeneStringSize && !set.contains(trace)) {
         if (init || rate >= minRate || !coverage.subsetOf(visited)) {
           minRate = Math.min(rate, minRate)
           set.add(trace)

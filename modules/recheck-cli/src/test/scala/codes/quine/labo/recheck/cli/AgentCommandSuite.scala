@@ -2,9 +2,9 @@ package codes.quine.labo.recheck.cli
 
 class AgentCommandSuite extends munit.FunSuite {
   test("AgentCommand.run") {
-    val simple = """"method":"check","params":{"source":"a","flags":"","config":{}}"""
+    val simple = """"method":"check","params":{"source":"a","flags":"","params":{}}"""
     val complex =
-      """"method":"check","params":{"source":"(a|b|aba)*$","flags":"","config":{"checker":"fuzz","usesAcceleration":false}}"""
+      """"method":"check","params":{"source":"(a|b|aba)*$","flags":"","params":{"checker":"fuzz","usesAcceleration":false}}"""
     val in = Seq(
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":1,$simple}"""),
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":2,$complex}"""),

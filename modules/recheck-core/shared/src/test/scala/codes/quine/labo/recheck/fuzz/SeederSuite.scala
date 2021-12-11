@@ -36,7 +36,7 @@ class SeederSuite extends munit.FunSuite {
     assertEquals(seed("^(a)\\1$", ""), Set("''", "'a'", "'aa'"))
     assertEquals(seed("^a*$", ""), Set("''", "'\\x00'", "'a'"))
     assertEquals(seed("^a{2}$", ""), Set("''", "'a'", "'aa'", "'a'²"))
-    assertEquals(seed("^(a?){50}a{50}$", ""), Set("''", "'a'", "'aa'", "'a'²", "'aaa'", "'a'³"))
+    assertEquals(seed("^(a?){50}a{50}$", ""), Set("''", "'a'", "'aa'", "'a'²"))
   }
 
   test("Seeder.Patch.InsertChar#apply") {

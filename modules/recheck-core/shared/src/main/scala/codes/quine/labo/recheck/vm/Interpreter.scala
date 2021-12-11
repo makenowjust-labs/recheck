@@ -2,8 +2,10 @@ package codes.quine.labo.recheck.vm
 
 import scala.annotation.nowarn
 import scala.collection.mutable
+import scala.concurrent.duration.Duration
 
 import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.TimeoutException
 import codes.quine.labo.recheck.regexp.Pattern.Location
 import codes.quine.labo.recheck.unicode.IChar.LineTerminator
 import codes.quine.labo.recheck.unicode.IChar.Word
@@ -31,6 +33,25 @@ object Interpreter {
   def run(program: Program, input: UString, pos: Int, options: Options)(implicit ctx: Context): Result = {
     val interpreter = new Interpreter(program, input, options)
     interpreter.run(pos)
+  }
+
+  /** Runs a program on a given input and a timeout. */
+  def runWithTimeout(program: Program, input: UString, pos: Int, options: Options, timeout: Duration)(implicit
+      ctx: Context
+  ): Result = {
+    timeout match {
+      case d if d < Duration.Zero => Result(Status.Timeout, None, 0, Seq.empty, Set.empty, Set.empty, Map.empty)
+      case _: Duration.Infinite   => run(program, input, pos, options)
+      case d =>
+        val newCtx = Context(d, Option(ctx.token))
+        if (ctx.deadline != null && ctx.deadline < newCtx.deadline) run(program, input, pos, options)
+
+        val interpreter = new Interpreter(program, input, options)(newCtx)
+        try interpreter.run(pos)
+        catch {
+          case _: TimeoutException => interpreter.result(Status.Timeout, None)
+        }
+    }
   }
 
   /** Options is an options for running an interpreter. */
@@ -67,6 +88,8 @@ object Interpreter {
 
     /** A limit is exceeded on matching. */
     case object Limit extends Status
+
+    case object Timeout extends Status
   }
 
   /** CoverageLocation is a location in coverage. */
@@ -184,7 +207,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   private[this] var heatmap: Map[Location, Int] = Map.empty[Location, Int].withDefaultValue(0)
 
   /** Constructs a result of matching. */
-  private def result(status: Status, captures: Option[Seq[Int]]): Result = {
+  private[vm] def result(status: Status, captures: Option[Seq[Int]]): Result = {
     val loops = this.loops.iterator.flatMap { case (_, seq) =>
       seq.sliding(2).collect { case Seq(i, j) if i < j => (i, j) }
     }.toSeq

@@ -2,8 +2,10 @@ package codes.quine.labo.recheck
 package fuzz
 
 import scala.collection.mutable
+import scala.concurrent.duration.Duration
 
 import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.unicode.IChar
 import codes.quine.labo.recheck.unicode.ICharSet
 import codes.quine.labo.recheck.unicode.UString
@@ -15,15 +17,16 @@ import codes.quine.labo.recheck.vm.Interpreter.FailedPoint
 import codes.quine.labo.recheck.vm.Interpreter.Options
 import codes.quine.labo.recheck.vm.Interpreter.Status
 
-/** Seeder computes a seed set for the pattern. */
+/** Seeder computes an initial generation for the pattern. */
 object Seeder {
 
-  /** Computes a seed set of the context. */
+  /** Computes an initial generation of the program. */
   def seed(
       fuzz: FuzzProgram,
-      limit: Int = 10_000,
-      maxSeedSetSize: Int = 100,
-      usesAcceleration: Boolean = true
+      limit: Int = Parameters.SEEDING_LIMIT,
+      timeout: Duration = Parameters.SEEDING_TIMEOUT,
+      maxInitialGenerationSize: Int = Parameters.MAX_INITIAL_GENERATION_SIZE,
+      usesAcceleration: Boolean = Parameters.USES_ACCELERATION
   )(implicit ctx: Context): Set[FString] =
     ctx.interrupt {
       import ctx._
@@ -52,12 +55,12 @@ object Seeder {
         }
       }
 
-      while (queue.nonEmpty && set.size < maxSeedSetSize) interrupt {
+      while (queue.nonEmpty && set.size < maxInitialGenerationSize) interrupt {
         val (input, target) = queue.dequeue()
 
         if (target.forall(loc => !covered.contains(CoverageItem(loc, true)))) {
-          val result = Interpreter.run(fuzz.program, input, 0, opts)
-          if (result.status == Status.Limit) {
+          val result = Interpreter.runWithTimeout(fuzz.program, input, 0, opts, timeout)
+          if (result.status == Status.Limit || result.status == Status.Timeout) {
             set.add(FString(input, unicode))
             set.add(FString.build(input, result.loops, unicode))
             return set.toSet

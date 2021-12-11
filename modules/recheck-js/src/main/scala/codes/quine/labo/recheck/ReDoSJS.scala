@@ -8,18 +8,18 @@ import io.circe.scalajs.decodeJs
 import io.circe.syntax._
 
 import codes.quine.labo.recheck.codec._
+import codes.quine.labo.recheck.common.Parameters
 
 /** ReDoSJS is a JavaScript interface of this library. */
 object ReDoSJS {
 
   /** Checks the given RegExp pattern. */
   @JSExportTopLevel("check", "recheck")
-  def check(source: String, flags: String, config: js.UndefOr[js.Any]): js.Any = {
-    val cfg = decodeJs[ConfigData](config.getOrElse(js.Object())) match {
-      case Right(cfg) => cfg.instantiate()._1 // Ignore `cancel` function for now.
-      case Left(ex)   => throw ex
+  def check(source: String, flags: String, params: js.UndefOr[js.Any]): js.Any =
+    decodeJs[Parameters](params.getOrElse(js.Object())) match {
+      case Right(params) =>
+        val d = ReDoS.check(source, flags, params)
+        convertJsonToJs(d.asJson) // Back it to JavaScript object.
+      case Left(ex) => throw ex
     }
-    val d = ReDoS.check(source, flags, cfg)
-    convertJsonToJs(d.asJson) // Back it to JavaScript object.
-  }
 }

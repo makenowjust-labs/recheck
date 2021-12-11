@@ -43,7 +43,7 @@ lazy val root = project
     mdocOut := baseDirectory.value / "site" / "content"
   )
   .enablePlugins(MdocPlugin)
-  .aggregate(coreJVM, coreJS, unicodeJVM, unicodeJS, parseJVM, parseJS, codecJVM, codecJS, js, cli)
+  .aggregate(coreJVM, coreJS, commonJVM, commonJS, unicodeJVM, unicodeJS, parseJVM, parseJS, codecJVM, codecJS, js, cli)
   .dependsOn(coreJVM)
 
 lazy val core = crossProject(JVMPlatform, JSPlatform)
@@ -75,24 +75,6 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
-    // Add inline options:
-    Compile / scalacOptions ++= {
-      if ((ThisBuild / coverageEnabled).value) Seq.empty
-      else
-        Seq(
-          "-opt:l:inline",
-          "-opt-inline-from:codes.quine.labo.recheck.common.Context.**"
-        )
-    },
-    // Settings for scaladoc:
-    Compile / doc / scalacOptions += "-diagrams",
-    // Set URL mapping of scala standard API for Scaladoc.
-    apiMappings ++= scalaInstance.value.libraryJars
-      .filter(file => file.getName.startsWith("scala-library") && file.getName.endsWith(".jar"))
-      .map(_ -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"))
-      .toMap,
-    // Dependencies:
-    libraryDependencies += "com.lihaoyi" %%% "sourcecode" % "0.2.7",
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -101,10 +83,29 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
-  .dependsOn(unicode, parse)
+  .dependsOn(common, unicode, parse)
 
 lazy val coreJVM = core.jvm
 lazy val coreJS = core.js
+
+lazy val common = crossProject(JVMPlatform, JSPlatform)
+  .in(file("modules/recheck-common"))
+  .settings(
+    name := "recheck-common",
+    console / initialCommands := """
+      |import codes.quine.labo.recheck.common._
+      |""".stripMargin,
+    Compile / console / scalacOptions -= "-Wunused",
+    Test / console / scalacOptions -= "-Wunused",
+    // Dependencies:
+    libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value % Provided,
+    // Settings for test:
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
+    testFrameworks += new TestFramework("munit.Framework")
+  )
+
+lazy val commonJVM = common.jvm
+lazy val commonJS = common.js
 
 lazy val unicode = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/recheck-unicode"))
@@ -115,13 +116,6 @@ lazy val unicode = crossProject(JVMPlatform, JSPlatform)
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
-    // Settings for scaladoc:
-    Compile / doc / scalacOptions += "-diagrams",
-    // Set URL mapping of scala standard API for Scaladoc.
-    apiMappings ++= scalaInstance.value.libraryJars
-      .filter(file => file.getName.startsWith("scala-library") && file.getName.endsWith(".jar"))
-      .map(_ -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"))
-      .toMap,
     // Generators:
     {
       val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
@@ -166,13 +160,6 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
-    // Settings for scaladoc:
-    Compile / doc / scalacOptions += "-diagrams",
-    // Set URL mapping of scala standard API for Scaladoc.
-    apiMappings ++= scalaInstance.value.libraryJars
-      .filter(file => file.getName.startsWith("scala-library") && file.getName.endsWith(".jar"))
-      .map(_ -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"))
-      .toMap,
     // Dependencies:
     libraryDependencies += "com.lihaoyi" %%% "fastparse" % "2.3.3",
     // Settings for test:
@@ -200,13 +187,6 @@ lazy val codec = crossProject(JVMPlatform, JSPlatform)
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
-    // Settings for scaladoc:
-    Compile / doc / scalacOptions += "-diagrams",
-    // Set URL mapping of scala standard API for Scaladoc.
-    apiMappings ++= scalaInstance.value.libraryJars
-      .filter(file => file.getName.startsWith("scala-library") && file.getName.endsWith(".jar"))
-      .map(_ -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"))
-      .toMap,
     // Dependencies:
     libraryDependencies += "io.circe" %%% "circe-core" % "0.14.1",
     // Settings for test:
@@ -233,13 +213,6 @@ lazy val js = project
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
-    // Settings for scaladoc:
-    Compile / doc / scalacOptions += "-diagrams",
-    // Set URL mapping of scala standard API for Scaladoc.
-    apiMappings ++= scalaInstance.value.libraryJars
-      .filter(file => file.getName.startsWith("scala-library") && file.getName.endsWith(".jar"))
-      .map(_ -> url(s"http://www.scala-lang.org/api/${scalaVersion.value}/"))
-      .toMap,
     // Dependencies:
     libraryDependencies += "io.circe" %%% "circe-scalajs" % "0.14.1",
     // Settings for test:

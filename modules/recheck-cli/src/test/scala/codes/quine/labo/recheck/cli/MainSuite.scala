@@ -3,37 +3,13 @@ package codes.quine.labo.recheck.cli
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.TimeUnit
-import scala.concurrent.duration.Duration
 
-import codes.quine.labo.recheck.Config
-import codes.quine.labo.recheck.codec.ConfigData
-import codes.quine.labo.recheck.common.Checker
+import codes.quine.labo.recheck.common.Parameters
 
 class MainSuite extends munit.FunSuite {
   test("Main.command") {
-    val config = ConfigData(
-      timeout = Duration(10, TimeUnit.SECONDS),
-      checker = Checker.Hybrid,
-      maxAttackSize = Config.MaxAttackSize,
-      attackLimit = Config.AttackLimit,
-      randomSeed = 42L,
-      seedLimit = Config.SeedLimit,
-      incubationLimit = Config.IncubationLimit,
-      crossSize = Config.CrossSize,
-      mutateSize = Config.MutateSize,
-      maxSeedSize = Config.MaxSeedSize,
-      maxGenerationSize = Config.MaxGenerationSize,
-      maxIteration = Config.MaxIteration,
-      maxDegree = Config.MaxDegree,
-      heatRate = Config.HeatRate,
-      usesAcceleration = Config.UsesAcceleration,
-      maxRepeatCount = Config.MaxRepeatCount,
-      maxNFASize = Config.MaxNFASize,
-      maxPatternSize = Config.MaxPatternSize
-    )
     assert(clue(Main.command.parse(Seq.empty)).isLeft)
-    assertEquals(Main.command.parse(Seq("/foo/")), Right(Main.CheckAction(InputPattern("foo", ""), config)))
+    assertEquals(Main.command.parse(Seq("/foo/")), Right(Main.CheckAction(InputPattern("foo", ""), Parameters())))
     assertEquals(Main.command.parse(Seq("agent", "--thread-size=2")), Right(Main.BatchAction(2)))
     assertEquals(Main.command.parse(Seq("agent")), Right(Main.BatchAction(sys.runtime.availableProcessors())))
   }

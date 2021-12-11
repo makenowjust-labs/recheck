@@ -1,11 +1,11 @@
 package codes.quine.labo.recheck
 
 import scala.concurrent.duration._
-import scala.util.Random
 import scala.util.Success
 
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.common.TimeoutException
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
@@ -26,11 +26,11 @@ class ReDoSSuite extends munit.FunSuite {
       Diagnostics.Safe("^foo$", "", AttackComplexity.Safe(false), Checker.Automaton)
     )
     assertEquals(
-      ReDoS.check("^foo$", "", Config(checker = Checker.Automaton)),
+      ReDoS.check("^foo$", "", Parameters(checker = Checker.Automaton)),
       Diagnostics.Safe("^foo$", "", AttackComplexity.Safe(false), Checker.Automaton)
     )
     assertEquals(
-      ReDoS.check("^foo$", "", Config(checker = Checker.Fuzz)),
+      ReDoS.check("^foo$", "", Parameters(checker = Checker.Fuzz)),
       Diagnostics.Safe("^foo$", "", AttackComplexity.Safe(true), Checker.Fuzz)
     )
     assertEquals(ReDoS.check("^.*$", ""), Diagnostics.Safe("^.*$", "", AttackComplexity.Linear, Checker.Automaton))
@@ -39,7 +39,7 @@ class ReDoSSuite extends munit.FunSuite {
       Diagnostics.Unknown("", "x", Diagnostics.ErrorKind.InvalidRegExp("unknown flag"), None)
     )
     assertEquals(
-      ReDoS.check("^foo$", "", Config(context = Context(timeout = -1.second))),
+      ReDoS.check("^foo$", "", Parameters(timeout = -1.second)),
       Diagnostics.Unknown("^foo$", "", Diagnostics.ErrorKind.Timeout, None)
     )
   }
@@ -59,14 +59,14 @@ class ReDoSSuite extends munit.FunSuite {
           ),
           FlagSet(false, false, false, false, false, false)
         ),
-        Config(checker = Checker.Automaton)
+        Parameters(checker = Checker.Automaton)
       ),
       Success(
         Diagnostics.Vulnerable(
           "^(?:a|a)*$",
           "",
           AttackComplexity.Exponential(false),
-          AttackPattern(Seq((UString("a"), UString("a"), 0)), UString("\u0000"), 17),
+          AttackPattern(Seq((UString("a"), UString("a"), 0)), UString("\u0000"), 27),
           Hotspot.empty,
           Checker.Automaton
         )
@@ -80,7 +80,7 @@ class ReDoSSuite extends munit.FunSuite {
           Sequence(Seq(LineBegin(), Repeat(Quantifier.Star(false), Group(Disjunction(Seq(Dot(), Dot())))), LineEnd())),
           FlagSet(false, false, false, true, false, false)
         ),
-        Config(checker = Checker.Automaton)
+        Parameters(checker = Checker.Automaton)
       ),
       Success(Diagnostics.Safe("^(?:.|.)*$", "s", AttackComplexity.Linear, Checker.Automaton))
     )
@@ -92,14 +92,13 @@ class ReDoSSuite extends munit.FunSuite {
           Sequence(Seq(LineBegin(), Dot(), LineEnd())),
           FlagSet(false, false, false, false, false, false)
         ),
-        Config(checker = Checker.Automaton)
+        Parameters(checker = Checker.Automaton)
       ),
       Success(Diagnostics.Safe("^.$", "", AttackComplexity.Safe(false), Checker.Automaton))
     )
   }
 
   test("ReDoS.checkFuzz") {
-    def random0: Random = new Random(0)
     val result = ReDoS
       .checkFuzz(
         "^(?:a|a)*$",
@@ -114,7 +113,7 @@ class ReDoSSuite extends munit.FunSuite {
           ),
           FlagSet(false, false, false, false, false, false)
         ),
-        Config(checker = Checker.Fuzz, random = random0)
+        Parameters(checker = Checker.Fuzz, randomSeed = 0)
       )
       .get
     assert(clue(result).isInstanceOf[Diagnostics.Vulnerable])
@@ -124,23 +123,25 @@ class ReDoSSuite extends munit.FunSuite {
         ".",
         "",
         Pattern(Dot(), FlagSet(false, false, false, false, false, false)),
-        Config(checker = Checker.Fuzz, random = random0)
+        Parameters(checker = Checker.Fuzz, randomSeed = 0)
       ),
       Success(Diagnostics.Safe(".", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
-    interceptMessage[TimeoutException]("codes.quine.labo.recheck.fuzz.FuzzProgram.from") {
+    interceptMessage[TimeoutException](
+      "timeout at modules/recheck-core/shared/src/main/scala/codes/quine/labo/recheck/fuzz/FuzzProgram.scala:20"
+    ) {
+      val ctx = Context(timeout = -1.second)
       val result = ReDoS.checkFuzz(
         ".",
         "",
         Pattern(Dot(), FlagSet(false, false, false, false, false, false)),
-        Config(context = Context(timeout = -1.second))
-      )
+        Parameters(timeout = -1.second)
+      )(ctx)
       result.get
     }
   }
 
   test("ReDoS.checkHybrid") {
-    def random0: Random = new Random(0)
     assertEquals(
       ReDoS.checkHybrid(
         "^(?:a|a)*$",
@@ -155,14 +156,14 @@ class ReDoSSuite extends munit.FunSuite {
           ),
           FlagSet(false, false, false, false, false, false)
         ),
-        Config(random = random0)
+        Parameters(randomSeed = 0)
       ),
       Success(
         Diagnostics.Vulnerable(
           "^(?:a|a)*$",
           "",
           AttackComplexity.Exponential(false),
-          AttackPattern(Seq((UString("a"), UString("a"), 0)), UString("\u0000"), 17),
+          AttackPattern(Seq((UString("a"), UString("a"), 0)), UString("\u0000"), 27),
           Hotspot.empty,
           Checker.Automaton
         )
@@ -182,7 +183,7 @@ class ReDoSSuite extends munit.FunSuite {
           ),
           FlagSet(false, false, false, false, false, false)
         ),
-        Config(random = random0, maxRepeatCount = 5)
+        Parameters(randomSeed = 0, maxRepeatCount = 5)
       ),
       Success(Diagnostics.Safe("^(?:a|a){5}$", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
@@ -196,7 +197,7 @@ class ReDoSSuite extends munit.FunSuite {
           ),
           FlagSet(false, false, false, false, false, false)
         ),
-        Config(random = random0, maxNFASize = 5)
+        Parameters(randomSeed = 0, maxNFASize = 5)
       ),
       Success(Diagnostics.Safe("^(?:a|a){5}$", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
@@ -208,7 +209,7 @@ class ReDoSSuite extends munit.FunSuite {
           Sequence(Seq(LineBegin(), Repeat(Quantifier.Star(false), Dot()), LineEnd())),
           FlagSet(false, false, false, false, false, false)
         ),
-        Config(random = random0, maxPatternSize = 1)
+        Parameters(randomSeed = 0, maxPatternSize = 1)
       ),
       Success(Diagnostics.Safe("^.*$", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
