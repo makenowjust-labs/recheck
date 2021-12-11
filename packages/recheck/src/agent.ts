@@ -5,7 +5,7 @@ import { debuglog } from "util";
 
 import type { ChildProcess } from "child_process";
 
-import type { Config, Diagnostics } from "..";
+import type { Diagnostics, HasAbortSignal, Parameters } from "..";
 
 const debug = debuglog("recheck-agent");
 
@@ -215,11 +215,11 @@ export function ensureAgent(): Agent | null {
 export async function check(
   source: string,
   flags: string,
-  config: Config = {}
+  params: Parameters & HasAbortSignal = {}
 ): Promise<Diagnostics> {
-  const signal = config.signal ?? null;
+  const signal = params.signal ?? null;
   if (signal) {
-    delete config.signal;
+    delete params.signal;
   }
 
   const agent = ensureAgent();
@@ -227,7 +227,7 @@ export async function check(
     throw new Error("`recheck` command is missing.");
   }
 
-  const { id, promise } = agent.request("check", { source, flags, config });
+  const { id, promise } = agent.request("check", { source, flags, params });
   signal?.addEventListener("abort", () => {
     agent.notify("cancel", { id });
   });

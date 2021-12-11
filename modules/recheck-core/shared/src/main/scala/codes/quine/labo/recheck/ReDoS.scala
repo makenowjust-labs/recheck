@@ -1,15 +1,18 @@
 package codes.quine.labo.recheck
 
 import scala.util.Failure
+import scala.util.Random
 import scala.util.Success
 import scala.util.Try
 
 import codes.quine.labo.recheck.automaton.AutomatonChecker
 import codes.quine.labo.recheck.automaton.Complexity
 import codes.quine.labo.recheck.automaton.EpsNFABuilder
+import codes.quine.labo.recheck.common.CancellationToken
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.InvalidRegExpException
+import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.common.ReDoSException
 import codes.quine.labo.recheck.common.UnsupportedException
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
@@ -25,8 +28,16 @@ import codes.quine.labo.recheck.unicode.UChar
 object ReDoS {
 
   /** Tests the given RegExp pattern causes ReDoS. */
-  def check(source: String, flags: String, config: Config = Config()): Diagnostics = {
-    import config._
+  def check(
+      source: String,
+      flags: String,
+      params: Parameters = Parameters(),
+      token: Option[CancellationToken] = None
+  ): Diagnostics = {
+    import params._
+
+    implicit val ctx = Context(params.timeout, token)
+
     val result = for {
       _ <- Try(()) // Ensures `Try` context.
       pattern <- ctx.interrupt(Parser.parse(source, flags) match {
@@ -34,9 +45,9 @@ object ReDoS {
         case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
       })
       diagnostics <- checker match {
-        case Checker.Automaton => checkAutomaton(source, flags, pattern, config)
-        case Checker.Fuzz      => checkFuzz(source, flags, pattern, config)
-        case Checker.Hybrid    => checkHybrid(source, flags, pattern, config)
+        case Checker.Automaton => checkAutomaton(source, flags, pattern, params)
+        case Checker.Fuzz      => checkFuzz(source, flags, pattern, params)
+        case Checker.Hybrid    => checkHybrid(source, flags, pattern, params)
       }
     } yield diagnostics
     result.recover { case ex: ReDoSException => Diagnostics.Unknown.from(source, flags, ex) }.get
@@ -46,10 +57,10 @@ object ReDoS {
       source: String,
       flags: String,
       pattern: Pattern,
-      config: Config
-  ): Try[Diagnostics] = {
-    import config._
-    val maxNFASize = if (checker == Checker.Hybrid) config.maxNFASize else Int.MaxValue
+      params: Parameters
+  )(implicit ctx: Context): Try[Diagnostics] = {
+    import params._
+    val maxNFASize = if (checker == Checker.Hybrid) params.maxNFASize else Int.MaxValue
 
     val result = for {
       _ <- Try(()) // Ensures `Try` context.
@@ -74,7 +85,7 @@ object ReDoS {
     result
       .map {
         case Some(vul: Complexity.Vulnerable[UChar]) =>
-          val attack = vul.buildAttackPattern(attackLimit, maxAttackSize)
+          val attack = vul.buildAttackPattern(attackLimit, maxAttackStringSize)
           Diagnostics.Vulnerable(source, flags, vul.toAttackComplexity, attack, vul.hotspot, Checker.Automaton)
         case Some(safe: Complexity.Safe) => Diagnostics.Safe(source, flags, safe.toAttackComplexity, Checker.Automaton)
         case None => Diagnostics.Safe(source, flags, AttackComplexity.Safe(false), Checker.Automaton)
@@ -85,24 +96,32 @@ object ReDoS {
       }
   }
 
-  private[recheck] def checkFuzz(source: String, flags: String, pattern: Pattern, config: Config): Try[Diagnostics] = {
-    import config._
+  private[recheck] def checkFuzz(source: String, flags: String, pattern: Pattern, params: Parameters)(implicit
+      ctx: Context
+  ): Try[Diagnostics] = {
+    import params._
+
+    val random = new Random(randomSeed)
 
     val result = FuzzProgram.from(pattern).map { fuzz =>
       FuzzChecker.check(
         fuzz,
         random,
-        seedLimit,
+        seedingLimit,
+        seedingTimeout,
         incubationLimit,
+        incubationTimeout,
+        maxGeneStringSize,
         attackLimit,
-        crossSize,
-        mutateSize,
-        maxAttackSize,
-        maxSeedSize,
+        attackTimeout,
+        crossoverSize,
+        mutationSize,
+        maxAttackStringSize,
+        maxInitialGenerationSize,
         maxGenerationSize,
         maxIteration,
         maxDegree,
-        heatRate,
+        heatRatio,
         usesAcceleration
       )
     }
@@ -119,9 +138,11 @@ object ReDoS {
       }
   }
 
-  private[recheck] def checkHybrid(source: String, flags: String, pattern: Pattern, config: Config): Try[Diagnostics] =
-    checkAutomaton(source, flags, pattern, config).recoverWith { case _: UnsupportedException =>
-      checkFuzz(source, flags, pattern, config)
+  private[recheck] def checkHybrid(source: String, flags: String, pattern: Pattern, params: Parameters)(implicit
+      ctx: Context
+  ): Try[Diagnostics] =
+    checkAutomaton(source, flags, pattern, params).recoverWith { case _: UnsupportedException =>
+      checkFuzz(source, flags, pattern, params)
     }
 
   /** Gets a sum of repeat specifier counts. */

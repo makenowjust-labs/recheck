@@ -1,10 +1,14 @@
 package codes.quine.labo.recheck.codec
 
+import scala.concurrent.duration.Duration
+import scala.concurrent.duration.MILLISECONDS
+
 import io.circe.DecodingFailure
 import io.circe.Json
 import io.circe.syntax._
 
 import codes.quine.labo.recheck.common.Checker
+import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Diagnostics
@@ -115,6 +119,69 @@ class CodecSuite extends munit.FunSuite {
 
   test("codec.encodeUString") {
     assertEquals(encodeUString(UString("foo")), Json.fromString("foo"))
+  }
+
+  test("codec.decodeParameters") {
+    assertEquals(decodeParameters.decodeJson(Json.obj()), Right(Parameters()))
+    assertEquals(
+      decodeParameters.decodeJson(
+        Json.obj(
+          "checker" := "fuzz",
+          "timeout" := 123,
+          "maxAttackStringSize" := 123,
+          "attackLimit" := 123,
+          "randomSeed" := 123,
+          "maxIteration" := 123,
+          "seedingLimit" := 123,
+          "seedingTimeout" := 123,
+          "maxInitialGenerationSize" := 123,
+          "incubationLimit" := 123,
+          "incubationTimeout" := 123,
+          "maxGeneStringSize" := 123,
+          "maxGenerationSize" := 123,
+          "crossoverSize" := 123,
+          "mutationSize" := 123,
+          "attackTimeout" := 123,
+          "maxDegree" := 123,
+          "heatRatio" := 0.123,
+          "usesAcceleration" := false,
+          "maxRepeatCount" := 123,
+          "maxNFASize" := 123,
+          "maxPatternSize" := 123
+        )
+      ),
+      Right(
+        Parameters(
+          checker = Checker.Fuzz,
+          timeout = Duration(123, MILLISECONDS),
+          maxAttackStringSize = 123,
+          attackLimit = 123,
+          randomSeed = 123,
+          maxIteration = 123,
+          seedingLimit = 123,
+          seedingTimeout = Duration(123, MILLISECONDS),
+          maxInitialGenerationSize = 123,
+          incubationLimit = 123,
+          incubationTimeout = Duration(123, MILLISECONDS),
+          maxGeneStringSize = 123,
+          maxGenerationSize = 123,
+          crossoverSize = 123,
+          mutationSize = 123,
+          attackTimeout = Duration(123, MILLISECONDS),
+          maxDegree = 123,
+          heatRatio = 0.123,
+          usesAcceleration = false,
+          maxRepeatCount = 123,
+          maxNFASize = 123,
+          maxPatternSize = 123
+        )
+      )
+    )
+  }
+
+  test("codec.decodeDuration") {
+    assertEquals(decodeDuration.decodeJson(Json.Null), Right(Duration.Inf))
+    assertEquals(decodeDuration.decodeJson(100.asJson), Right(Duration(100, MILLISECONDS)))
   }
 
   test("codec.decodeChecker") {

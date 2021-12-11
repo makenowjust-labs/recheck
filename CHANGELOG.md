@@ -1,3 +1,12 @@
+# dev
+
+Changes:
+
+- Split `common` package into another module `recheck-common` ([#202](https://github.com/MakeNowJust-Labo/recheck/pull/184))
+- Increase default parameter values ([#202](https://github.com/MakeNowJust-Labo/recheck/pull/184))
+- Restrict repeats contained in gene ([#202](https://github.com/MakeNowJust-Labo/recheck/pull/184))
+- Add `Parameters` as immutable version of `Config` ([#202](https://github.com/MakeNowJust-Labo/recheck/pull/184))
+
 # 4.1.1 (2021-12-04)
 
 Fixes:

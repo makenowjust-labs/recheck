@@ -2,11 +2,11 @@ package codes.quine.labo.recheck.common
 
 class ExceptionsSuite extends munit.FunSuite {
   test("TimeoutException#getMessage") {
-    assertEquals(new TimeoutException("message").getMessage, "message")
+    assertEquals(new TimeoutException("source").getMessage, "timeout at source")
   }
 
   test("CancelException#getMessage") {
-    assertEquals(new CancelException("message").getMessage, "message")
+    assertEquals(new CancelException("source").getMessage, "cancel at source")
   }
 
   test("UnsupportedException#getMessage") {

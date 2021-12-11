@@ -22,6 +22,9 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
   /** A size of this string's characters. */
   def size: Int = seq.size
 
+  /** Counts [[Repeat]] characters in this string. */
+  def countRepeat: Int = seq.count(_.isInstanceOf[Repeat])
+
   /** Gets the `idx`-th character. */
   def apply(pos: Int): FChar = seq(pos)
 

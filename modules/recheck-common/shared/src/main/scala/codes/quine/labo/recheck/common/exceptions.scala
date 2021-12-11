@@ -5,10 +5,10 @@ sealed abstract class ReDoSException(message: String, var checker: Option[Checke
     extends Exception(message)
 
 /** TimeoutException is an exception thrown on timeout. */
-final class TimeoutException(message: String) extends ReDoSException(message)
+final class TimeoutException(val source: String) extends ReDoSException(s"timeout at $source")
 
 /** TimeoutException is an exception thrown on canceled. */
-final class CancelException(message: String) extends ReDoSException(message)
+final class CancelException(val source: String) extends ReDoSException(s"cancel at $source")
 
 /** UnsupportedException is an exception thrown when unsupported feature is detected. */
 final class UnsupportedException(message: String) extends ReDoSException(message)

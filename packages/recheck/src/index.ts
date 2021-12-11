@@ -5,7 +5,7 @@ import { debuglog } from "util";
 import { check as fallbackCheck } from "./fallback";
 import { check as agentCheck, ensureAgent } from "./agent";
 
-import type { Config, Diagnostics } from "..";
+import type { Diagnostics, HasAbortSignal, Parameters } from "..";
 
 export { checkSync } from "./fallback";
 
@@ -14,28 +14,28 @@ const debug = debuglog("recheck");
 export async function check(
   source: string,
   flags: string,
-  config: Config = {}
+  params: Parameters & HasAbortSignal = {}
 ): Promise<Diagnostics> {
   const RECHECK_MODE = process.env["RECHECK_MODE"] ?? "";
   debug("`recheck` mode: %s", RECHECK_MODE);
   switch (RECHECK_MODE) {
     case "agent":
-      return await agentCheck(source, flags, config);
+      return await agentCheck(source, flags, params);
     case "fallback":
-      return await fallbackCheck(source, flags, config);
+      return await fallbackCheck(source, flags, params);
   }
 
-  const signal = config.signal ?? null;
+  const signal = params.signal ?? null;
   if (signal) {
-    delete config.signal;
+    delete params.signal;
   }
 
   const agent = ensureAgent();
   if (agent === null) {
-    return await fallbackCheck(source, flags, config);
+    return await fallbackCheck(source, flags, params);
   }
 
-  const { id, promise } = agent.request("check", { source, flags, config });
+  const { id, promise } = agent.request("check", { source, flags, params });
   signal?.addEventListener("abort", () => {
     agent.notify("cancel", { id });
   });
