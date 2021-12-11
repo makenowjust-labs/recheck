@@ -1,11 +1,11 @@
 /**
  * Checks whether the given RegExp pattern is ReDoS vulnerable or safe.
- * It takes an optional argument to specify a configuration.
+ * It takes an optional argument to specify parameters.
  */
 export function check(
   source: string,
   flags: string,
-  config?: Config
+  params?: Parameters & HasAbortSignal
 ): Promise<Diagnostics>;
 
 /**
@@ -14,22 +14,15 @@ export function check(
 export function checkSync(
   source: string,
   flags: string,
-  config?: Config
+  params?: Parameters
 ): Diagnostics;
 
 /**
- * Config is a configuration parameter of analyzing.
+ * Parameters is parameters for analysis.
  */
-export type Config = {
+export type Parameters = {
   /**
-   * An integer value of timeout duration milliseconds. (default: `undefined`)
-   *
-   * When `undefined` is specified, it means there is no timeout.
-   */
-  timeout?: number | undefined;
-
-  /**
-   * A checker name to use. (default: `'hybrid'`)
+   * Type of checker used for analysis.
    *
    * There are three checkers:
    *
@@ -40,119 +33,198 @@ export type Config = {
    *   It can detect ReDoS vulnerability against the all RegExp syntax including back-references
    *   and look-around assertions. However, it needs some seconds on average and it may cause false
    *   negative.
-   * - `'hybrid'`: A checker which combines the automaton based checker and the fuzz checker.
-   *   If the RegExp is supported by the automaton based checker and some thresholds are passed,
-   *   it uses the automaton based checker. Otherwise, it falls back to the fuzz checker.
+   * - `'hybrid'`: A checker which combines the automaton checker and the fuzzing checker.
+   *   If the RegExp is supported by the automaton checker and some thresholds are passed,
+   *   it uses the automaton checker. Otherwise, it falls back to the fuzzing checker.
    *
    * The hybrid checker performs better than others in many cases.
+   *
+   * (default: `'hybrid'`)
    */
-  checker?: "hybrid" | "automaton" | "fuzz";
+  checker?: "hybrid" | "fuzz" | "automaton";
 
   /**
-   * An integer value of a maximum length of an attack string. (default: `4_000`)
+   * Upper limit of analysis time.
    *
-   * The checker finds a vulnerable string not to exceed this length.
+   * If the analysis time exceeds this value, the result will be reported as a timeout.
+   * If the value is the positive infinite duration, the result never become a timeout.
+   *
+   * If the `number` value is specified, it is parsed in milliseconds.
+   * If the value is `null`, it is parsed as the positive infinite duration.
+   *
+   *
+   * (default: `10000`)
    */
-  maxAttackSize?: number;
+  timeout?: number | null;
 
   /**
-   * An integer value of a limit of VM execution steps. (default: `100_000`)
+   * Maximum length of an attack string.
    *
-   * The checker assumes the RegExp is vulnerable when a string exists
-   * against which steps exceed the limit.
+   * (default: `400000`)
+   */
+  maxAttackStringSize?: number;
+
+  /**
+   * Upper limit on the number of characters read by the VM during attack string construction.
+   *
+   * (default: `100000000`)
    */
   attackLimit?: number;
 
   /**
-   * An integer value of seed for pseudo-random number generator in fuzzing.
-   * (default: `undefined`)
+   * Seed value for PRNG used by fuzzing.
    *
-   * When `undefined` is specified, it uses a system default seed.
+   * (default: `0`)
    */
-  randomSeed?: number | undefined;
+  randomSeed?: number;
 
   /**
-   * An integer value of a limit of VM execution steps on the seeding phase.
-   * (default: `1_000`)
+   * Maximum number of iterations of genetic algorithm.
+   *
+   * (default: `30`)
    */
-  seedLimit?: number;
+  maxIteration?: number;
 
   /**
-   * An integer value of a limit of VM execution steps on the incubation phase.
-   * (default: `10_000`)
+   * Upper limit on the number of characters read by the VM during seeding.
+   *
+   * (default: `1000`)
+   */
+  seedingLimit?: number;
+
+  /**
+   * Upper limit of VM execution time during seeding.
+   *
+   * If the `number` value is specified, it is parsed in milliseconds.
+   * If the value is `null`, it is parsed as the positive infinite duration.
+   *
+   *
+   * (default: `100`)
+   */
+  seedingTimeout?: number | null;
+
+  /**
+   * Maximum population at the initial generation.
+   *
+   * (default: `50`)
+   */
+  maxInitialGenerationSize?: number;
+
+  /**
+   * Upper limit on the number of characters read by the VM during incubation.
+   *
+   * (default: `100000`)
    */
   incubationLimit?: number;
 
   /**
-   * An integer value of the number of crossings on one generation. (default: `25`)
+   * Upper limit of VM execution time during incubation.
+   *
+   * If the `number` value is specified, it is parsed in milliseconds.
+   * If the value is `null`, it is parsed as the positive infinite duration.
+   *
+   *
+   * (default: `250`)
    */
-  crossSize?: number;
+  incubationTimeout?: number | null;
 
   /**
-   * An integer value of the number of mutations on one generation. (default: `50`)
+   * Maximum length of an attack string on genetic algorithm iterations.
+   *
+   * (default: `4000`)
    */
-  mutateSize?: number;
+  maxGeneStringSize?: number;
 
   /**
-   * An integer value of a maximum size of a seed set. (default: `50`)
-   */
-  maxSeedSize?: number;
-
-  /**
-   * An integer value of a maximum size of a living population on one generation.
+   * Maximum population at a single generation.
+   *
    * (default: `100`)
    */
   maxGenerationSize?: number;
 
   /**
-   * An integer value of the number of iterations on the incubation phase. (default: `30`)
+   * Number of crossovers in a single generation.
+   *
+   * (default: `25`)
    */
-  maxIteration?: number;
+  crossoverSize?: number;
 
   /**
-   * An integer value of a maximum degree to attempt on building an attack string.
+   * Number of mutations in a single generation.
+   *
+   * (default: `50`)
+   */
+  mutationSize?: number;
+
+  /**
+   * The upper limit of the VM execution time when constructing a attack string.
+   *
+   * If the execution time exceeds this value, the result will be reported as a vulnerable.
+   *
+   * If the `number` value is specified, it is parsed in milliseconds.
+   * If the value is `null`, it is parsed as the positive infinite duration.
+   *
+   *
+   * (default: `1000`)
+   */
+  attackTimeout?: number | null;
+
+  /**
+   * Maximum degree for constructing attack string.
+   *
    * (default: `4`)
    */
   maxDegree?: number;
 
   /**
-   * A rate of a hotspot steps by the maximum steps.
+   * Ratio of the number of characters read to the maximum number to be considered a hotspot.
+   *
    * (default: `0.001`)
    */
-  heatRate?: number;
+  heatRatio?: number;
 
   /**
-   * Whether to use acceleration or not on fuzzing.
+   * Whether to use acceleration for VM execution.
+   *
    * (default: `true`)
    */
   usesAcceleration?: boolean;
 
   /**
-   * An integer value of a limit of repetition count in the RegExp. (default: `20`)
+   * Maximum number of sum of repeat counts.
    *
-   * If the RegExp exceeds this limit on the hybrid checker, it switches to use
-   * the fuzz checker to analyze instead of the automaton based checker.
+   * If this value is exceeded, it switches to use the fuzzing checker.
+   *
+   * (default: `20`)
    */
   maxRepeatCount?: number;
 
   /**
-   * An integer value of a maximum size of the transition function of NFA. (default: `40000`)
+   * Maximum transition size of NFA to use the automaton checker.
    *
-   * If the NFA's transition function exceeds this limit on the hybrid checker,
-   * it switches to use fuzz checker to analyze instead of the automaton based checker.
+   * If transition size of NFA (and also DFA because it is larger in general) exceeds this value,
+   * it switches to use the fuzzing checker.
+   *
+   * (default: `40000`)
    */
   maxNFASize?: number;
 
   /**
-   * An integer value of maximum size of the pattern. (default: `1500`)
+   * Maximum pattern size to use the automaton checker.
    *
-   * If the pattern size exceeds this limit on the hybrid checker,
-   * it switches to use fuzz checker to analyze instead of the automaton based checker.
+   * If this value is exceeded, it switches to use the fuzzing checker.
+   *
+   * (default: `1500`)
    */
   maxPatternSize?: number;
+};
 
+/**
+ * HasAbortSignal is a mix-in type for having `signal` field.
+ */
+export type HasAbortSignal = {
   /**
-   * An signal to abort the check.
+   * Signal to abort the check.
    */
   signal?: AbortSignal;
 };
