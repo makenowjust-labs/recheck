@@ -172,7 +172,7 @@ package object codec {
   /** A `Decoder` for `AccelerationMode`. */
   implicit def decodeAccelerationMode: Decoder[AccelerationMode] =
     Decoder[String].emap {
-      case "autp" => Right(AccelerationMode.Auto)
+      case "auto" => Right(AccelerationMode.Auto)
       case "on"   => Right(AccelerationMode.On)
       case "off"  => Right(AccelerationMode.Off)
       case s      => Left(s"Unknown acceleration mode: $s")

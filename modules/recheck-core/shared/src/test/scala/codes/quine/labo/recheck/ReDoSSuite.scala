@@ -66,7 +66,7 @@ class ReDoSSuite extends munit.FunSuite {
           "^(?:a|a)*$",
           "",
           AttackComplexity.Exponential(false),
-          AttackPattern(Seq((UString("a"), UString("a"), 0)), UString("\u0000"), 27),
+          AttackPattern(Seq((UString("a"), UString("a"), 0)), UString("\u0000"), 30),
           Hotspot.empty,
           Checker.Automaton
         )
@@ -128,7 +128,7 @@ class ReDoSSuite extends munit.FunSuite {
       Success(Diagnostics.Safe(".", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
     interceptMessage[TimeoutException](
-      "timeout at modules/recheck-core/shared/src/main/scala/codes/quine/labo/recheck/fuzz/FuzzProgram.scala:20"
+      "timeout at modules/recheck-core/shared/src/main/scala/codes/quine/labo/recheck/fuzz/FuzzProgram.scala:30"
     ) {
       val ctx = Context(timeout = -1.second)
       val result = ReDoS.checkFuzz(
@@ -163,7 +163,7 @@ class ReDoSSuite extends munit.FunSuite {
           "^(?:a|a)*$",
           "",
           AttackComplexity.Exponential(false),
-          AttackPattern(Seq((UString("a"), UString("a"), 0)), UString("\u0000"), 27),
+          AttackPattern(Seq((UString("a"), UString("a"), 0)), UString("\u0000"), 30),
           Hotspot.empty,
           Checker.Automaton
         )

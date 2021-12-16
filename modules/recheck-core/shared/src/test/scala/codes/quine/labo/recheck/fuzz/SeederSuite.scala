@@ -1,6 +1,7 @@
 package codes.quine.labo.recheck
 package fuzz
 
+import scala.concurrent.duration._
 import scala.util.Failure
 import scala.util.Success
 
@@ -24,7 +25,7 @@ class SeederSuite extends munit.FunSuite {
           case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
         }
         fuzz <- FuzzProgram.from(pattern)
-      } yield Seeder.seed(fuzz)
+      } yield Seeder.seed(fuzz, timeout = Duration.Inf)
       result.get.map(_.toString)
     }
 
