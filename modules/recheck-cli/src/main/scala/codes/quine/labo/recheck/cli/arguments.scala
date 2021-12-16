@@ -6,6 +6,7 @@ import cats.data.Validated
 import cats.data.ValidatedNel
 import com.monovore.decline.Argument
 
+import codes.quine.labo.recheck.common.AccelerationMode
 import codes.quine.labo.recheck.common.Checker
 
 /** The object `arguments` provides decline's `Argument` instances for this application. */
@@ -32,5 +33,16 @@ object arguments {
     }
 
     def defaultMetavar: String = "checker"
+  }
+
+  implicit val accelerationModeArgument: Argument[AccelerationMode] = new Argument[AccelerationMode] {
+    def read(string: String): ValidatedNel[String, AccelerationMode] = string match {
+      case "auto" => Validated.validNel(AccelerationMode.Auto)
+      case "on"   => Validated.validNel(AccelerationMode.On)
+      case "off"  => Validated.validNel(AccelerationMode.Off)
+      case s      => Validated.invalidNel(s"unknown acceleration mode: $s")
+    }
+
+    def defaultMetavar: String = "mode"
   }
 }

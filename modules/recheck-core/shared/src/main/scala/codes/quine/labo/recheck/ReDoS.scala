@@ -122,7 +122,7 @@ object ReDoS {
         maxIteration,
         maxDegree,
         heatRatio,
-        usesAcceleration
+        accelerationMode
       )
     }
 

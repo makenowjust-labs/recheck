@@ -1,11 +1,25 @@
-package codes.quine.labo.recheck.common
+package codes.quine.labo.recheck
+package common
 
 import scala.concurrent.duration._
 
-/** Parameters is an immutable representation of [[codes.quine.labo.recheck.ReDoS.check ReDoS.check]] parameters.
+/** Parameters is an immutable representation of parameters.
   *
   * @param checker
-  *   Checker Type of checker used for analysis. (default: `Checker.Hybrid`)
+  *   Checker Type of checker used for analysis.
+  *
+  * There are three checkers:
+  *
+  *   - `'automaton'`: A checker which works based on automaton theory. It can analyze ReDoS vulnerability of the RegExp
+  *     without false positive, however, it needs some minutes against some RegExp and it does not support some syntax.
+  *   - `'fuzz'`: A checker based on fuzzing. It can detect ReDoS vulnerability against the all RegExp syntax including
+  *     back-references and look-around assertions. However, it needs some seconds on average and it may cause false
+  *     negative.
+  *   - `'hybrid'`: A checker which combines the automaton checker and the fuzzing checker. If the RegExp is supported
+  *     by the automaton checker and some thresholds are passed, it uses the automaton checker. Otherwise, it falls back
+  *     to the fuzzing checker.
+  *
+  * The hybrid checker performs better than others in many cases. (default: `common.Checker.Hybrid`)
   *
   * @param timeout
   *   Duration Upper limit of analysis time.
@@ -20,7 +34,7 @@ import scala.concurrent.duration._
   *
   * @param attackLimit
   *   Int Upper limit on the number of characters read by the VM during attack string construction. (default:
-  *   `100000000`)
+  *   `1000000000`)
   *
   * @param randomSeed
   *   Long Seed value for PRNG used by fuzzing. (default: `0`)
@@ -72,8 +86,15 @@ import scala.concurrent.duration._
   * @param heatRatio
   *   Double Ratio of the number of characters read to the maximum number to be considered a hotspot. (default: `0.001`)
   *
-  * @param usesAcceleration
-  *   Boolean Whether to use acceleration for VM execution. (default: `true`)
+  * @param accelerationMode
+  *   AccelerationMode Mode of acceleration of VM execution.
+  *
+  * There are three mode:
+  *
+  *   - `'auto'`: The automatic mode. When it is specified, VM acceleration is used for regular expressions contains no
+  *     back-reference, because back-reference makes VM acceleration slow sometimes.
+  *   - `'on'`: The force **on** mode.
+  *   - `'off'`: The force **off** mode. (default: `common.AccelerationMode.Auto`)
   *
   * @param maxRepeatCount
   *   Int Maximum number of sum of repeat counts.
@@ -92,95 +113,95 @@ import scala.concurrent.duration._
   * If this value is exceeded, it switches to use the fuzzing checker. (default: `1500`)
   */
 final case class Parameters(
-    checker: Checker = Parameters.CHECKER,
-    timeout: Duration = Parameters.TIMEOUT,
-    maxAttackStringSize: Int = Parameters.MAX_ATTACK_STRING_SIZE,
-    attackLimit: Int = Parameters.ATTACK_LIMIT,
-    randomSeed: Long = Parameters.RANDOM_SEED,
-    maxIteration: Int = Parameters.MAX_ITERATION,
-    seedingLimit: Int = Parameters.SEEDING_LIMIT,
-    seedingTimeout: Duration = Parameters.SEEDING_TIMEOUT,
-    maxInitialGenerationSize: Int = Parameters.MAX_INITIAL_GENERATION_SIZE,
-    incubationLimit: Int = Parameters.INCUBATION_LIMIT,
-    incubationTimeout: Duration = Parameters.INCUBATION_TIMEOUT,
-    maxGeneStringSize: Int = Parameters.MAX_GENE_STRING_SIZE,
-    maxGenerationSize: Int = Parameters.MAX_GENERATION_SIZE,
-    crossoverSize: Int = Parameters.CROSSOVER_SIZE,
-    mutationSize: Int = Parameters.MUTATION_SIZE,
-    attackTimeout: Duration = Parameters.ATTACK_TIMEOUT,
-    maxDegree: Int = Parameters.MAX_DEGREE,
-    heatRatio: Double = Parameters.HEAT_RATIO,
-    usesAcceleration: Boolean = Parameters.USES_ACCELERATION,
-    maxRepeatCount: Int = Parameters.MAX_REPEAT_COUNT,
-    maxNFASize: Int = Parameters.MAX_N_F_A_SIZE,
-    maxPatternSize: Int = Parameters.MAX_PATTERN_SIZE
+    checker: Checker = Parameters.Checker,
+    timeout: Duration = Parameters.Timeout,
+    maxAttackStringSize: Int = Parameters.MaxAttackStringSize,
+    attackLimit: Int = Parameters.AttackLimit,
+    randomSeed: Long = Parameters.RandomSeed,
+    maxIteration: Int = Parameters.MaxIteration,
+    seedingLimit: Int = Parameters.SeedingLimit,
+    seedingTimeout: Duration = Parameters.SeedingTimeout,
+    maxInitialGenerationSize: Int = Parameters.MaxInitialGenerationSize,
+    incubationLimit: Int = Parameters.IncubationLimit,
+    incubationTimeout: Duration = Parameters.IncubationTimeout,
+    maxGeneStringSize: Int = Parameters.MaxGeneStringSize,
+    maxGenerationSize: Int = Parameters.MaxGenerationSize,
+    crossoverSize: Int = Parameters.CrossoverSize,
+    mutationSize: Int = Parameters.MutationSize,
+    attackTimeout: Duration = Parameters.AttackTimeout,
+    maxDegree: Int = Parameters.MaxDegree,
+    heatRatio: Double = Parameters.HeatRatio,
+    accelerationMode: AccelerationMode = Parameters.AccelerationMode,
+    maxRepeatCount: Int = Parameters.MaxRepeatCount,
+    maxNFASize: Int = Parameters.MaxNFASize,
+    maxPatternSize: Int = Parameters.MaxPatternSize
 )
 
 object Parameters {
 
   /** The default value of [[Parameters.checker]]. */
-  val CHECKER: Checker = Checker.Hybrid
+  val Checker: Checker = common.Checker.Hybrid
 
   /** The default value of [[Parameters.timeout]]. */
-  val TIMEOUT: Duration = Duration(10, SECONDS)
+  val Timeout: Duration = Duration(10, SECONDS)
 
   /** The default value of [[Parameters.maxAttackStringSize]]. */
-  val MAX_ATTACK_STRING_SIZE: Int = 400000
+  val MaxAttackStringSize: Int = 400000
 
   /** The default value of [[Parameters.attackLimit]]. */
-  val ATTACK_LIMIT: Int = 100000000
+  val AttackLimit: Int = 1000000000
 
   /** The default value of [[Parameters.randomSeed]]. */
-  val RANDOM_SEED: Long = 0
+  val RandomSeed: Long = 0
 
   /** The default value of [[Parameters.maxIteration]]. */
-  val MAX_ITERATION: Int = 30
+  val MaxIteration: Int = 30
 
   /** The default value of [[Parameters.seedingLimit]]. */
-  val SEEDING_LIMIT: Int = 1000
+  val SeedingLimit: Int = 1000
 
   /** The default value of [[Parameters.seedingTimeout]]. */
-  val SEEDING_TIMEOUT: Duration = Duration(100, MILLISECONDS)
+  val SeedingTimeout: Duration = Duration(100, MILLISECONDS)
 
   /** The default value of [[Parameters.maxInitialGenerationSize]]. */
-  val MAX_INITIAL_GENERATION_SIZE: Int = 50
+  val MaxInitialGenerationSize: Int = 50
 
   /** The default value of [[Parameters.incubationLimit]]. */
-  val INCUBATION_LIMIT: Int = 100000
+  val IncubationLimit: Int = 100000
 
   /** The default value of [[Parameters.incubationTimeout]]. */
-  val INCUBATION_TIMEOUT: Duration = Duration(250, MILLISECONDS)
+  val IncubationTimeout: Duration = Duration(250, MILLISECONDS)
 
   /** The default value of [[Parameters.maxGeneStringSize]]. */
-  val MAX_GENE_STRING_SIZE: Int = 4000
+  val MaxGeneStringSize: Int = 4000
 
   /** The default value of [[Parameters.maxGenerationSize]]. */
-  val MAX_GENERATION_SIZE: Int = 100
+  val MaxGenerationSize: Int = 100
 
   /** The default value of [[Parameters.crossoverSize]]. */
-  val CROSSOVER_SIZE: Int = 25
+  val CrossoverSize: Int = 25
 
   /** The default value of [[Parameters.mutationSize]]. */
-  val MUTATION_SIZE: Int = 50
+  val MutationSize: Int = 50
 
   /** The default value of [[Parameters.attackTimeout]]. */
-  val ATTACK_TIMEOUT: Duration = Duration(1000, MILLISECONDS)
+  val AttackTimeout: Duration = Duration(1000, MILLISECONDS)
 
   /** The default value of [[Parameters.maxDegree]]. */
-  val MAX_DEGREE: Int = 4
+  val MaxDegree: Int = 4
 
   /** The default value of [[Parameters.heatRatio]]. */
-  val HEAT_RATIO: Double = 0.001
+  val HeatRatio: Double = 0.001
 
-  /** The default value of [[Parameters.usesAcceleration]]. */
-  val USES_ACCELERATION: Boolean = true
+  /** The default value of [[Parameters.accelerationMode]]. */
+  val AccelerationMode: AccelerationMode = common.AccelerationMode.Auto
 
   /** The default value of [[Parameters.maxRepeatCount]]. */
-  val MAX_REPEAT_COUNT: Int = 20
+  val MaxRepeatCount: Int = 20
 
   /** The default value of [[Parameters.maxNFASize]]. */
-  val MAX_N_F_A_SIZE: Int = 40000
+  val MaxNFASize: Int = 40000
 
   /** The default value of [[Parameters.maxPatternSize]]. */
-  val MAX_PATTERN_SIZE: Int = 1500
+  val MaxPatternSize: Int = 1500
 }

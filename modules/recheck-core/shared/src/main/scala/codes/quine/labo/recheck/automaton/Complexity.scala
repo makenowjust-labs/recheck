@@ -26,7 +26,7 @@ object Complexity {
     def witness: Witness[A]
 
     /** Builds an attack string pattern of this. */
-    def buildAttackPattern(stepsLimit: Int, maxSize: Int)(implicit ev: A =:= UChar): AttackPattern
+    def buildAttackPattern(attackLimit: Int, maxSize: Int)(implicit ev: A =:= UChar): AttackPattern
 
     /** Converts this into a diagnostics complexity. */
     def toAttackComplexity: AttackComplexity.Vulnerable
@@ -50,8 +50,8 @@ object Complexity {
       extends Vulnerable[A] {
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Polynomial(degree, false)
 
-    def buildAttackPattern(stepsLimit: Int, maxSize: Int)(implicit ev: A =:= UChar): AttackPattern = {
-      val remainSteps = stepsLimit - witness.fixedSize
+    def buildAttackPattern(attackLimit: Int, maxSize: Int)(implicit ev: A =:= UChar): AttackPattern = {
+      val remainSteps = attackLimit - witness.fixedSize
       val repeatSteps = witness.repeatSize
       val repeatSize = Math.ceil(Math.pow(remainSteps / repeatSteps, 1 / degree.toDouble)).toInt
       val maxRepeatSize = Math.floor((maxSize - witness.fixedSize) / witness.repeatSize.toDouble).toInt
@@ -63,8 +63,8 @@ object Complexity {
   final case class Exponential[A](witness: Witness[A], hotspot: Hotspot = Hotspot.empty) extends Vulnerable[A] {
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Exponential(false)
 
-    def buildAttackPattern(stepsLimit: Int, maxSize: Int)(implicit ev: A =:= UChar): AttackPattern = {
-      val remainSteps = stepsLimit - witness.fixedSize
+    def buildAttackPattern(attackLimit: Int, maxSize: Int)(implicit ev: A =:= UChar): AttackPattern = {
+      val remainSteps = attackLimit - witness.fixedSize
       val repeatSteps = witness.repeatSize
       val repeatSize = Math.ceil(Math.log(remainSteps / repeatSteps) / Math.log(2)).toInt
       val maxRepeatSize = Math.floor((maxSize - witness.fixedSize) / witness.repeatSize.toDouble).toInt

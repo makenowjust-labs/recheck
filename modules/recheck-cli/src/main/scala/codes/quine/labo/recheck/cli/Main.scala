@@ -11,6 +11,7 @@ import codes.quine.labo.recheck.cli.Main.BatchAction
 import codes.quine.labo.recheck.cli.Main.CheckAction
 import codes.quine.labo.recheck.cli.Main.command
 import codes.quine.labo.recheck.cli.arguments._
+import codes.quine.labo.recheck.common.AccelerationMode
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.diagnostics.Diagnostics
@@ -32,90 +33,88 @@ object Main {
     Command(name = "recheck", header = "Checks ReDoS vulnerability on the given RegExp pattern") {
       val checker = Opts
         .option[Checker](long = "checker", short = "c", help = "Type of checker used for analysis.")
-        .withDefault(Parameters.CHECKER)
-      val timeout =
-        Opts
-          .option[Duration](long = "timeout", short = "t", help = "Upper limit of analysis time.")
-          .withDefault(Parameters.TIMEOUT)
+        .withDefault(Parameters.Checker)
+      val timeout = Opts
+        .option[Duration](long = "timeout", short = "t", help = "Upper limit of analysis time.")
+        .withDefault(Parameters.Timeout)
       val maxAttackStringSize = Opts
         .option[Int](long = "max-attack-string-size", help = "Maximum length of an attack string.")
-        .withDefault(Parameters.MAX_ATTACK_STRING_SIZE)
+        .withDefault(Parameters.MaxAttackStringSize)
       val attackLimit = Opts
         .option[Int](
           long = "attack-limit",
           help = "Upper limit on the number of characters read by the VM during attack string construction."
         )
-        .withDefault(Parameters.ATTACK_LIMIT)
+        .withDefault(Parameters.AttackLimit)
       val randomSeed = Opts
         .option[Long](long = "random-seed", help = "Seed value for PRNG used by fuzzing.")
-        .withDefault(Parameters.RANDOM_SEED)
+        .withDefault(Parameters.RandomSeed)
       val maxIteration = Opts
         .option[Int](long = "max-iteration", help = "Maximum number of iterations of genetic algorithm.")
-        .withDefault(Parameters.MAX_ITERATION)
+        .withDefault(Parameters.MaxIteration)
       val seedingLimit = Opts
         .option[Int](
           long = "seeding-limit",
           help = "Upper limit on the number of characters read by the VM during seeding."
         )
-        .withDefault(Parameters.SEEDING_LIMIT)
+        .withDefault(Parameters.SeedingLimit)
       val seedingTimeout = Opts
         .option[Duration](long = "seeding-timeout", help = "Upper limit of VM execution time during seeding.")
-        .withDefault(Parameters.SEEDING_TIMEOUT)
+        .withDefault(Parameters.SeedingTimeout)
       val maxInitialGenerationSize = Opts
         .option[Int](long = "max-initial-generation-size", help = "Maximum population at the initial generation.")
-        .withDefault(Parameters.MAX_INITIAL_GENERATION_SIZE)
+        .withDefault(Parameters.MaxInitialGenerationSize)
       val incubationLimit = Opts
         .option[Int](
           long = "incubation-limit",
           help = "Upper limit on the number of characters read by the VM during incubation."
         )
-        .withDefault(Parameters.INCUBATION_LIMIT)
+        .withDefault(Parameters.IncubationLimit)
       val incubationTimeout = Opts
         .option[Duration](long = "incubation-timeout", help = "Upper limit of VM execution time during incubation.")
-        .withDefault(Parameters.INCUBATION_TIMEOUT)
+        .withDefault(Parameters.IncubationTimeout)
       val maxGeneStringSize = Opts
         .option[Int](
           long = "max-gene-string-size",
           help = "Maximum length of an attack string on genetic algorithm iterations."
         )
-        .withDefault(Parameters.MAX_GENE_STRING_SIZE)
+        .withDefault(Parameters.MaxGeneStringSize)
       val maxGenerationSize = Opts
         .option[Int](long = "max-generation-size", help = "Maximum population at a single generation.")
-        .withDefault(Parameters.MAX_GENERATION_SIZE)
+        .withDefault(Parameters.MaxGenerationSize)
       val crossoverSize = Opts
         .option[Int](long = "crossover-size", help = "Number of crossovers in a single generation.")
-        .withDefault(Parameters.CROSSOVER_SIZE)
+        .withDefault(Parameters.CrossoverSize)
       val mutationSize = Opts
         .option[Int](long = "mutation-size", help = "Number of mutations in a single generation.")
-        .withDefault(Parameters.MUTATION_SIZE)
+        .withDefault(Parameters.MutationSize)
       val attackTimeout = Opts
         .option[Duration](
           long = "attack-timeout",
           help = "The upper limit of the VM execution time when constructing a attack string."
         )
-        .withDefault(Parameters.ATTACK_TIMEOUT)
+        .withDefault(Parameters.AttackTimeout)
       val maxDegree = Opts
         .option[Int](long = "max-degree", help = "Maximum degree for constructing attack string.")
-        .withDefault(Parameters.MAX_DEGREE)
+        .withDefault(Parameters.MaxDegree)
       val heatRatio = Opts
         .option[Double](
           long = "heat-ratio",
           help = "Ratio of the number of characters read to the maximum number to be considered a hotspot."
         )
-        .withDefault(Parameters.HEAT_RATIO)
-      val noUsesAcceleration = Opts
-        .flag(long = "no-uses-acceleration", help = "Whether to use acceleration for VM execution.")
-        .orTrue
+        .withDefault(Parameters.HeatRatio)
+      val accelerationMode = Opts
+        .option[AccelerationMode](long = "acceleration-mode", help = "Mode of acceleration of VM execution.")
+        .withDefault(Parameters.AccelerationMode)
       val maxRepeatCount = Opts
         .option[Int](long = "max-repeat-count", help = "Maximum number of sum of repeat counts.")
-        .withDefault(Parameters.MAX_REPEAT_COUNT)
+        .withDefault(Parameters.MaxRepeatCount)
       val maxNFASize = Opts
         .option[Int](long = "max-n-f-a-size", help = "Maximum transition size of NFA to use the automaton checker.")
-        .withDefault(Parameters.MAX_N_F_A_SIZE)
+        .withDefault(Parameters.MaxNFASize)
       val maxPatternSize = Opts
         .option[Int](long = "max-pattern-size", help = "Maximum pattern size to use the automaton checker.")
-        .withDefault(Parameters.MAX_PATTERN_SIZE)
-
+        .withDefault(Parameters.MaxPatternSize)
       val params = (
         checker,
         timeout,
@@ -135,12 +134,11 @@ object Main {
         attackTimeout,
         maxDegree,
         heatRatio,
-        noUsesAcceleration,
+        accelerationMode,
         maxRepeatCount,
         maxNFASize,
         maxPatternSize
       ).mapN(Parameters.apply)
-
       val pattern = Opts.argument[InputPattern](metavar = "pattern")
       val check: Opts[Action] = (pattern, params).mapN(CheckAction)
 

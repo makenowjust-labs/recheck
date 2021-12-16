@@ -7,6 +7,7 @@ import io.circe.DecodingFailure
 import io.circe.Json
 import io.circe.syntax._
 
+import codes.quine.labo.recheck.common.AccelerationMode
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
@@ -144,7 +145,7 @@ class CodecSuite extends munit.FunSuite {
           "attackTimeout" := 123,
           "maxDegree" := 123,
           "heatRatio" := 0.123,
-          "usesAcceleration" := false,
+          "accelerationMode" := "off",
           "maxRepeatCount" := 123,
           "maxNFASize" := 123,
           "maxPatternSize" := 123
@@ -170,7 +171,7 @@ class CodecSuite extends munit.FunSuite {
           attackTimeout = Duration(123, MILLISECONDS),
           maxDegree = 123,
           heatRatio = 0.123,
-          usesAcceleration = false,
+          accelerationMode = AccelerationMode.Off,
           maxRepeatCount = 123,
           maxNFASize = 123,
           maxPatternSize = 123
@@ -189,5 +190,15 @@ class CodecSuite extends munit.FunSuite {
     assertEquals(decodeChecker.decodeJson("automaton".asJson), Right(Checker.Automaton))
     assertEquals(decodeChecker.decodeJson("fuzz".asJson), Right(Checker.Fuzz))
     assertEquals(decodeChecker.decodeJson("xxx".asJson), Left(DecodingFailure("Unknown checker: xxx", List.empty)))
+  }
+
+  test("codec.decodeAccelerationMode") {
+    assertEquals(decodeAccelerationMode.decodeJson("auto".asJson), Right(AccelerationMode.Auto))
+    assertEquals(decodeAccelerationMode.decodeJson("on".asJson), Right(AccelerationMode.On))
+    assertEquals(decodeAccelerationMode.decodeJson("off".asJson), Right(AccelerationMode.Off))
+    assertEquals(
+      decodeAccelerationMode.decodeJson("xxx".asJson),
+      Left(DecodingFailure("Unknown acceleration mode: xxx", List.empty))
+    )
   }
 }

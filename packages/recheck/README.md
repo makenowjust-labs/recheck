@@ -122,7 +122,7 @@ Maximum length of an attack string.
 
 Type: `number`
 
-Default: `100000000`
+Default: `1000000000`
 
 Upper limit on the number of characters read by the VM during attack string construction.
 
@@ -249,13 +249,21 @@ Default: `0.001`
 
 Ratio of the number of characters read to the maximum number to be considered a hotspot.
 
-#### `usesAcceleration`
+#### `accelerationMode`
 
-Type: `boolean`
+Type: `'auto' | 'on' | 'off'`
 
-Default: `true`
+Default: `'auto'`
 
-Whether to use acceleration for VM execution.
+Mode of acceleration of VM execution.
+
+There are three mode:
+
+- `'auto'`: The automatic mode.
+  When it is specified, VM acceleration is used for regular expressions contains no back-reference,
+  because back-reference makes VM acceleration slow sometimes.
+- `'on'`: The force **on** mode.
+- `'off'`: The force **off** mode.
 
 #### `maxRepeatCount`
 
