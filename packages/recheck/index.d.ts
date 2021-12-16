@@ -67,7 +67,7 @@ export type Parameters = {
   /**
    * Upper limit on the number of characters read by the VM during attack string construction.
    *
-   * (default: `100000000`)
+   * (default: `1000000000`)
    */
   attackLimit?: number;
 
@@ -184,11 +184,19 @@ export type Parameters = {
   heatRatio?: number;
 
   /**
-   * Whether to use acceleration for VM execution.
+   * Mode of acceleration of VM execution.
    *
-   * (default: `true`)
+   * There are three mode:
+   *
+   * - `'auto'`: The automatic mode.
+   *   When it is specified, VM acceleration is used for regular expressions contains no back-reference,
+   *   because back-reference makes VM acceleration slow sometimes.
+   * - `'on'`: The force **on** mode.
+   * - `'off'`: The force **off** mode.
+   *
+   * (default: `'auto'`)
    */
-  usesAcceleration?: boolean;
+  accelerationMode?: "auto" | "on" | "off";
 
   /**
    * Maximum number of sum of repeat counts.

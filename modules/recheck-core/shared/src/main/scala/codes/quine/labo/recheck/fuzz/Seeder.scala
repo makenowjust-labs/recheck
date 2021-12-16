@@ -4,6 +4,7 @@ package fuzz
 import scala.collection.mutable
 import scala.concurrent.duration.Duration
 
+import codes.quine.labo.recheck.common.AccelerationMode
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.unicode.IChar
@@ -23,10 +24,10 @@ object Seeder {
   /** Computes an initial generation of the program. */
   def seed(
       fuzz: FuzzProgram,
-      limit: Int = Parameters.SEEDING_LIMIT,
-      timeout: Duration = Parameters.SEEDING_TIMEOUT,
-      maxInitialGenerationSize: Int = Parameters.MAX_INITIAL_GENERATION_SIZE,
-      usesAcceleration: Boolean = Parameters.USES_ACCELERATION
+      limit: Int = Parameters.SeedingLimit,
+      timeout: Duration = Parameters.SeedingTimeout,
+      maxInitialGenerationSize: Int = Parameters.MaxInitialGenerationSize,
+      accelerationMode: AccelerationMode = Parameters.AccelerationMode
   )(implicit ctx: Context): Set[FString] =
     ctx.interrupt {
       import ctx._
@@ -40,7 +41,7 @@ object Seeder {
 
       val opts = Options(
         limit,
-        usesAcceleration = usesAcceleration,
+        usesAcceleration = fuzz.usesAcceleration(accelerationMode),
         needsLoopAnalysis = true,
         needsFailedPoints = true,
         needsCoverage = true
