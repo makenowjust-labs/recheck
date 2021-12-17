@@ -23,7 +23,12 @@ object EpsNFABuilder {
       alphabet = pattern.alphabet
       builder = new EpsNFABuilder(pattern, alphabet)
       epsNFA <- Try(builder.build())
-    } yield epsNFA)
+    } yield {
+      ctx.log(s"""|automaton: EpsNFA construction
+                  |     state size: ${epsNFA.stateSet.size}
+                  |  alphabet size: ${epsNFA.alphabet.pairs.size}""".stripMargin)
+      epsNFA
+    })
 }
 
 private class EpsNFABuilder(

@@ -36,14 +36,16 @@ object ReDoS {
   ): Diagnostics = {
     import params._
 
-    implicit val ctx = Context(params.timeout, token)
+    implicit val ctx = Context(params.timeout, token, logger)
 
     val result = for {
       _ <- Try(()) // Ensures `Try` context.
+      _ = ctx.log("parse: start")
       pattern <- ctx.interrupt(Parser.parse(source, flags) match {
         case Right(pattern) => Success(pattern)
         case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
       })
+      _ = ctx.log(s"parse: finish\n  pattern: $pattern")
       diagnostics <- checker match {
         case Checker.Automaton => checkAutomaton(source, flags, pattern, params)
         case Checker.Fuzz      => checkFuzz(source, flags, pattern, params)
@@ -65,18 +67,22 @@ object ReDoS {
     val result = for {
       _ <- Try(()) // Ensures `Try` context.
       _ <-
-        if (checker == Checker.Hybrid && repeatCount(pattern) >= maxRepeatCount)
+        if (checker == Checker.Hybrid && repeatCount(pattern) >= maxRepeatCount) {
+          ctx.log("hybrid: exceed maxRepeatCount")
           Failure(new UnsupportedException("The pattern contains too many repeat"))
-        else Success(())
+        } else Success(())
       complexity <-
         // When the pattern has no infinite repetition, then it is safe.
-        if (pattern.isConstant) Success(None)
-        else
+        if (pattern.isConstant) {
+          ctx.log("automaton: constant pattern")
+          Success(None)
+        } else
           for {
             _ <-
-              if (checker == Checker.Hybrid && pattern.size >= maxPatternSize)
+              if (checker == Checker.Hybrid && pattern.size >= maxPatternSize) {
+                ctx.log("hybrid: exceed maxPatternSize")
                 Failure(new UnsupportedException("The pattern is too large"))
-              else Success(())
+              } else Success(())
             epsNFA <- EpsNFABuilder.build(pattern)
             orderedNFA <- Try(epsNFA.toOrderedNFA(maxNFASize).rename.mapAlphabet(_.head))
           } yield Some(AutomatonChecker.check(orderedNFA, maxNFASize))

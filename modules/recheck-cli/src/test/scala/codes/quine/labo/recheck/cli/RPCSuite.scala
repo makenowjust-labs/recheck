@@ -82,7 +82,7 @@ class RPCSuite extends munit.FunSuite {
     }
 
     RPC.run(io)(
-      "foo" -> RPC.RequestHandler((_, _: Unit, send: RPC.Send[Unit]) => send(Right(()))),
+      "foo" -> RPC.RequestHandler((_, _: Unit, _: RPC.Push[Unit], send: RPC.Send[Unit]) => send(Right(()))),
       "bar" -> RPC.NotificationHandler((_: Unit) => ())
     )
     assertEquals(
@@ -115,7 +115,7 @@ class RPCSuite extends munit.FunSuite {
   }
 
   test("RPC.find") {
-    val handler = RPC.RequestHandler((_, _: Unit, send: RPC.Send[Unit]) => send(Right(())))
+    val handler = RPC.RequestHandler((_, _: Unit, _: RPC.Push[Unit], send: RPC.Send[Unit]) => send(Right(())))
     val handlerMap = Map("foo" -> handler)
     assertEquals(RPC.find(handlerMap, Some(RPC.IntID(1)), "foo"), RPC.Result.ok(handler))
     assertEquals(
@@ -126,33 +126,33 @@ class RPCSuite extends munit.FunSuite {
   }
 
   test("RPC.RequestHandler#handle") {
-    val handler = RPC.RequestHandler { (_, x: Boolean, send: RPC.Send[Unit]) =>
+    val handler = RPC.RequestHandler { (_, x: Boolean, _: RPC.Push[Unit], send: RPC.Send[Unit]) =>
       send(if (x) Right(()) else Left(RPC.Error(RPC.Error.InternalErrorCode, "foo")))
     }
-    def cheat(f: RPC.ResponseSend => Unit): Either[RPC.ErrorResponse, RPC.ResultResponse] = {
+    def cheat(f: (RPC.ResponsePush, RPC.ResponseSend) => Unit): Either[RPC.ErrorResponse, RPC.ResultResponse] = {
       var result: Either[RPC.ErrorResponse, RPC.ResultResponse] = null
-      f(r => result = r)
+      f(_ => ???, r => result = r)
       result
     }
     assertEquals(
-      cheat(handler.handle(Some(RPC.IntID(1)), true.asJson, _)),
+      cheat(handler.handle(Some(RPC.IntID(1)), true.asJson, _, _)),
       Right(RPC.ResultResponse(RPC.JsonRPCVersion, RPC.IntID(1), Json.obj()))
     )
     assertEquals(
-      cheat(handler.handle(Some(RPC.IntID(1)), false.asJson, _)),
+      cheat(handler.handle(Some(RPC.IntID(1)), false.asJson, _, _)),
       Left(RPC.ErrorResponse(RPC.JsonRPCVersion, Some(RPC.IntID(1)), RPC.Error(RPC.Error.InternalErrorCode, "foo")))
     )
     // Other exception cases are covered by the below tests.
   }
 
   test("RPC.RequestHandler#validateID") {
-    val handler = RPC.RequestHandler((_, _: Unit, send: RPC.Send[Unit]) => send(Right(())))
+    val handler = RPC.RequestHandler((_, _: Unit, _: RPC.Push[Unit], send: RPC.Send[Unit]) => send(Right(())))
     assertEquals(handler.validateID(Some(RPC.IntID(1))), RPC.Result.ok(RPC.IntID(1)))
     assertEquals(handler.validateID(None), RPC.Result.fail)
   }
 
   test("RPC.RequestHandler#doDecodeParams") {
-    val handler = RPC.RequestHandler((_, _: Unit, send: RPC.Send[Unit]) => send(Right(())))
+    val handler = RPC.RequestHandler((_, _: Unit, _: RPC.Push[Unit], send: RPC.Send[Unit]) => send(Right(())))
     assertEquals(handler.doDecodeParams(RPC.IntID(1), Json.obj()).asInstanceOf[RPC.Result[Any]], RPC.Result.ok(()))
     assertEquals(
       handler.doDecodeParams(RPC.IntID(1), 1.asJson).asInstanceOf[RPC.Result[Any]],
@@ -162,7 +162,7 @@ class RPCSuite extends munit.FunSuite {
 
   test("RPC.NotificationHandler#handle") {
     val handler = RPC.NotificationHandler((_: Unit) => ())
-    assertEquals(handler.handle(None, Json.obj(), _ => ???), RPC.Result.ok(()))
+    assertEquals(handler.handle(None, Json.obj(), _ => ???, _ => ???), RPC.Result.ok(()))
     // Exception cases are covered by the below tests.
   }
 

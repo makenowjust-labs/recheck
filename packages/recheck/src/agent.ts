@@ -57,6 +57,7 @@ const getCLIPath = (): string | null => {
 type Ref = {
   resolve: (value: any) => void;
   reject: (err: Error) => void;
+  subscribe: (message: any) => void;
 };
 
 /**
@@ -83,12 +84,13 @@ class Agent {
   /** Sends a request to `recheck agent` process. */
   public request(
     method: string,
-    params: any
+    params: any,
+    subscribe: (message: any) => void
   ): { id: number; promise: Promise<any> } {
     const id = this.id++;
     const promise = new Promise((resolve, reject) => {
       const object = {
-        jsonrpc: "2.0",
+        jsonrpc: "2.0+push",
         id,
         method,
         params,
@@ -96,7 +98,7 @@ class Agent {
       const text = JSON.stringify(object) + "\n";
       debug("Send a request: %s", text);
       this.child.stdin!.write(text);
-      this.registerRef(id, { resolve, reject });
+      this.registerRef(id, { resolve, reject, subscribe });
     });
     return { id, promise };
   }
@@ -105,7 +107,7 @@ class Agent {
   public notify(method: string, params: any): Promise<void> {
     return new Promise((resolve) => {
       const object = {
-        jsonrpc: "2.0",
+        jsonrpc: "2.0+push",
         method,
         params,
       };
@@ -127,15 +129,22 @@ class Agent {
       }
 
       debug("Handle a response line: %s", line);
-      const { id, result } = JSON.parse(line);
+      const { id, message, result } = JSON.parse(line);
       const ref = this.refs.get(id) ?? null;
       if (ref === null) {
         debug("A promise reference is missing: %s", id);
         return;
       }
 
-      ref.resolve(result);
-      this.unregisterRef(id);
+      if (message != undefined) {
+        ref.subscribe(message);
+        return;
+      }
+
+      if (result !== undefined) {
+        ref.resolve(result);
+        this.unregisterRef(id);
+      }
     };
 
     this.child.stdout!.on("data", (data) => {
@@ -227,7 +236,16 @@ export async function check(
     throw new Error("`recheck` command is missing.");
   }
 
-  const { id, promise } = agent.request("check", { source, flags, params });
+  const logger = params.logger ?? ((message: string) => {});
+  if (params?.logger) {
+    params.logger = [] as any;
+  }
+
+  const { id, promise } = agent.request(
+    "check",
+    { source, flags, params },
+    logger
+  );
   signal?.addEventListener("abort", () => {
     agent.notify("cancel", { id });
   });

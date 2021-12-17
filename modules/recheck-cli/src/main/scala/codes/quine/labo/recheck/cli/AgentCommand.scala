@@ -12,11 +12,14 @@ import codes.quine.labo.recheck.ReDoS
 import codes.quine.labo.recheck.cli.AgentCommand._
 import codes.quine.labo.recheck.codec._
 import codes.quine.labo.recheck.common.CancellationTokenSource
+import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.diagnostics.Diagnostics
 
 /** `recheck agent` method types. */
 object AgentCommand {
+
+  /** A dummy decoder for logger. */
 
   /** `"check"` method parameter. */
   final case class CheckParams(source: String, flags: String, params: Parameters)
@@ -51,14 +54,16 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio) {
   val tokens: mutable.Map[RPC.ID, Token] = mutable.Map.empty
 
   /** `"check"` method implementation. */
-  def handleCheck(id: RPC.ID, check: CheckParams, send: RPC.Send[Diagnostics]): Unit = {
-    val (params, token) = synchronized {
+  def handleCheck(id: RPC.ID, check: CheckParams, push: RPC.Push[String], send: RPC.Send[Diagnostics]): Unit = {
+    val token = synchronized {
       val source = new CancellationTokenSource
       tokens.remove(id).foreach(doCancel)
       tokens.update(id, Token(check.source, check.flags, send, source))
-      (check.params, source.token)
+      source.token
     }
     executor.execute(() => {
+      val params =
+        if (check.params.logger.isDefined) check.params.copy(logger = Some(message => push(message))) else check.params
       val diagnostics = ReDoS.check(check.source, check.flags, params, Some(token))
       synchronized {
         send(Right(diagnostics))
@@ -70,8 +75,8 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio) {
   }
 
   /** `"cancel"` method implementation. */
-  def handleCancel(params: CancelParams): Unit = synchronized {
-    tokens.remove(params.id).foreach(doCancel)
+  def handleCancel(cancel: CancelParams): Unit = synchronized {
+    tokens.remove(cancel.id).foreach(doCancel)
     // When there is no running execution, it enforces GC.
     if (tokens.isEmpty) gc()
   }

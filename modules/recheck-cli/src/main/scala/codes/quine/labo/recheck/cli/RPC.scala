@@ -11,16 +11,18 @@ import io.circe.generic.semiauto._
 import io.circe.parser.decode
 import io.circe.syntax._
 
-/** A lightweight JSON-RPC implementation via stdio.
+/** A lightweight JSON-RPC (plus alpha) implementation via stdio.
   *
   * This totally implements [[https://www.jsonrpc.org/specification JSON-RPC 2.0 specification]]. However, batch
   * requests are not supported for now.
+  *
+  * In addition, it supports "push" feature. It is used for logging on handling for example.
   */
 object RPC {
 
   // $COVERAGE-OFF$ `final val` constant is inlined.
   /** The supported JSON-RPC version string. */
-  final val JsonRPCVersion = "2.0"
+  final val JsonRPCVersion = "2.0+push"
   // $COVERAGE-ON$
 
   /** ID is an ID of JSON-RPC requests. */
@@ -72,6 +74,13 @@ object RPC {
         method <- c.get[String]("method")
         params <- c.get[Json]("params")
       } yield Request(jsonrpc, id, method, params)
+  }
+
+  /** PushResponse is non standard JSON-RPC response object with push message. */
+  final case class PushResponse(jsonrpc: String, id: ID, message: Json)
+
+  object PushResponse {
+    implicit def encode: Encoder[PushResponse] = deriveEncoder
   }
 
   /** ResultResponse is JSON-RPC response object with result value. */
@@ -132,7 +141,11 @@ object RPC {
   object IO {
     def stdio: IO = new IO {
       def read(): Iterator[String] = Iterator.continually(Console.in.readLine()).takeWhile(_ ne null)
-      def write(line: String): Unit = synchronized(Console.out.println(line))
+      def write(line: String): Unit = synchronized {
+        Console.out.print(line)
+        Console.out.print("\n")
+        Console.out.flush()
+      }
     }
   }
 
@@ -145,19 +158,23 @@ object RPC {
       // A function to send a response to IO.
       // The handler takes this function for asynchronous execution.
       val sent = new AtomicBoolean(false)
-      val send = (result: Either[ErrorResponse, ResultResponse]) =>
+      val push: ResponsePush = (response: PushResponse) =>
+        if (!sent.get()) {
+          io.write(response)
+        }
+      val send: ResponseSend = (result: Either[ErrorResponse, ResultResponse]) =>
         if (!sent.getAndSet(true)) {
           result match {
             case Left(response)  => io.write(response)
             case Right(response) => io.write(response)
           }
-        } else ()
+        }
 
       val result = for {
         request <- read(line)
         (optID, method, paramsJson) = request
         handler <- find(handlerMap, optID, method)
-        _ <- handler.handle(optID, paramsJson, send)
+        _ <- handler.handle(optID, paramsJson, push, send)
       } yield ()
 
       result match {
@@ -205,8 +222,13 @@ object RPC {
         Result.raiseIf(optID.isDefined)(ErrorResponse.MethodNotFound(optID.get, s"method '$method' is not found"))
     }
 
+  type Push[A] = A => Unit
+
   /** A function type to send a response in request handler. */
   type Send[A] = Either[Error, A] => Unit
+
+  /** A function type to push a message in handler. */
+  private[cli] type ResponsePush = PushResponse => Unit
 
   /** A function type to send a response in handler. */
   private[cli] type ResponseSend = Either[ErrorResponse, ResultResponse] => Unit
@@ -215,20 +237,27 @@ object RPC {
   sealed trait Handler {
     type Params
     def decodeParams: Decoder[Params]
-    private[cli] def handle(optID: Option[ID], paramsJson: Json, send: ResponseSend): Result[Unit]
+    private[cli] def handle(optID: Option[ID], paramsJson: Json, push: ResponsePush, send: ResponseSend): Result[Unit]
   }
 
   /** RequestHandler represents an handler of JSON-RPC request. */
   sealed trait RequestHandler extends Handler {
+    type Message
+    def encodeMessage: Encoder[Message]
     type Result
     def encodeResult: Encoder[Result]
-    def apply(id: ID, params: Params, send: Send[Result]): Unit
+    def apply(id: ID, params: Params, push: Push[Message], send: Send[Result]): Unit
 
-    private[cli] def handle(optID: Option[ID], paramsJson: Json, send: ResponseSend): RPC.Result[Unit] =
+    private[cli] def handle(
+        optID: Option[ID],
+        paramsJson: Json,
+        push: ResponsePush,
+        send: ResponseSend
+    ): RPC.Result[Unit] =
       for {
         id <- validateID(optID)
         params <- doDecodeParams(id, paramsJson)
-        _ = apply(id, params, wrapSend(id, send))
+        _ = apply(id, params, wrapPush(id, push), wrapSend(id, send))
       } yield ()
 
     private[cli] def validateID(optID: Option[ID]): RPC.Result[ID] =
@@ -243,6 +272,10 @@ object RPC {
         case Left(err)     => RPC.Result.raise(ErrorResponse.InvalidParams(id, err.getMessage))
       }
 
+    private[cli] def wrapPush(id: ID, push: ResponsePush): Push[Message] = { message =>
+      push(PushResponse(JsonRPCVersion, id, encodeMessage(message)))
+    }
+
     private[cli] def wrapSend(id: ID, send: ResponseSend): Send[Result] = {
       case Right(result) => send(Right(ResultResponse(JsonRPCVersion, id, encodeResult(result))))
       case Left(err)     => send(Left(ErrorResponse(JsonRPCVersion, Some(id), err)))
@@ -250,20 +283,23 @@ object RPC {
   }
 
   object RequestHandler {
-    def apply[P: Decoder, R: Encoder](h: (ID, P, Send[R]) => Unit): RequestHandler = new RequestHandler {
-      type Params = P
-      def decodeParams: Decoder[P] = Decoder[P]
-      type Result = R
-      def encodeResult: Encoder[R] = Encoder[R]
-      def apply(id: ID, params: P, send: Send[R]): Unit = h(id, params, send)
-    }
+    def apply[P: Decoder, M: Encoder, R: Encoder](h: (ID, P, Push[M], Send[R]) => Unit): RequestHandler =
+      new RequestHandler {
+        type Params = P
+        def decodeParams: Decoder[P] = Decoder[P]
+        type Message = M
+        def encodeMessage: Encoder[M] = Encoder[M]
+        type Result = R
+        def encodeResult: Encoder[R] = Encoder[R]
+        def apply(id: ID, params: P, push: Push[M], send: Send[R]): Unit = h(id, params, push, send)
+      }
   }
 
   /** NotificationHandler represents an handler of JSON-RPC notification. */
   sealed trait NotificationHandler extends Handler {
     def apply(params: Params): Unit
 
-    private[cli] def handle(optID: Option[ID], paramsJson: Json, send: ResponseSend): Result[Unit] =
+    private[cli] def handle(optID: Option[ID], paramsJson: Json, push: ResponsePush, send: ResponseSend): Result[Unit] =
       for {
         _ <- validateID(optID)
         params <- doDecodeParams(paramsJson)

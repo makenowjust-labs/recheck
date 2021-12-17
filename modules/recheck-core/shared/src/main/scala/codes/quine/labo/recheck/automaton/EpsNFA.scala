@@ -128,10 +128,13 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
         }
         for ((ch, to) <- d) newDelta.addOne(((c0, qs0), ch) -> to)
         deltaSize += d.size
-        if (deltaSize >= maxNFASize) throw new UnsupportedException("OrderedNFA size is too large")
+        if (deltaSize >= maxNFASize) {
+          ctx.log("hybrid: exceed maxNFASize on OrderedNFA construction")
+          throw new UnsupportedException("OrderedNFA size is too large")
+        }
       }
 
-      OrderedNFA(
+      val orderedNFA = OrderedNFA(
         alphabet.any.map(_._1),
         newStateSet.toSet,
         newInits,
@@ -139,6 +142,12 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
         newDelta.result(),
         newSourcemap.toMap.filter(_._2.nonEmpty)
       )
+      ctx.log {
+        s"""|automaton: OrderedNFA construction
+            |     state size: ${orderedNFA.stateSet.size}
+            |  alphabet size: ${orderedNFA.alphabet.size}""".stripMargin
+      }
+      orderedNFA
     }
 }
 

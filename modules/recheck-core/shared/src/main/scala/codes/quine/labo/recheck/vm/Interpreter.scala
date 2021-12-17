@@ -43,8 +43,8 @@ object Interpreter {
       case d if d < Duration.Zero => Result(Status.Timeout, None, 0, Seq.empty, Set.empty, Set.empty, Map.empty)
       case _: Duration.Infinite   => run(program, input, pos, options)
       case d =>
+        if ((ctx.deadline ne null) && ctx.deadline.timeLeft < d) run(program, input, pos, options)
         val newCtx = Context(d, Option(ctx.token))
-        if (ctx.deadline != null && ctx.deadline < newCtx.deadline) run(program, input, pos, options)
 
         val interpreter = new Interpreter(program, input, options)(newCtx)
         try interpreter.run(pos)
@@ -81,15 +81,23 @@ object Interpreter {
   object Status {
 
     /** Matching is succeeded. */
-    case object Ok extends Status
+    case object Ok extends Status {
+      override def toString: String = "ok"
+    }
 
     /** Matching is failed. */
-    case object Fail extends Status
+    case object Fail extends Status {
+      override def toString: String = "fail"
+    }
 
     /** A limit is exceeded on matching. */
-    case object Limit extends Status
+    case object Limit extends Status {
+      override def toString: String = "limit"
+    }
 
-    case object Timeout extends Status
+    case object Timeout extends Status {
+      override def toString: String = "timeout"
+    }
   }
 
   /** CoverageLocation is a location in coverage. */

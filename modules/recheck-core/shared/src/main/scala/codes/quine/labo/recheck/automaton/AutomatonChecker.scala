@@ -81,23 +81,31 @@ private final class AutomatonChecker[A, Q](
     sc.size == 1 && !graph.neighbors(sc.head).exists(_._2 == sc.head)
 
   /** Runs a checker. */
-  def check(): Complexity[A] = interrupt(checkExponential() match {
-    case Some(pump) =>
-      val (w, hotspot) = witness(Vector(pump))
-      Exponential(w, hotspot)
-    case None =>
-      checkPolynomial() match {
-        case (0, _) => Constant
-        case (1, _) => Linear
-        case (degree, pumps) =>
-          val (w, hotspot) = witness(pumps)
-          Polynomial(degree, w, hotspot)
-      }
-  })
+  def check(): Complexity[A] = interrupt {
+    ctx.log {
+      s"""|automaton: start
+          |  scc size: ${scc.size}""".stripMargin
+    }
+    checkExponential() match {
+      case Some(pump) =>
+        val (w, hotspot) = witness(Vector(pump))
+        Exponential(w, hotspot)
+      case None =>
+        checkPolynomial() match {
+          case (0, _) => Constant
+          case (1, _) => Linear
+          case (degree, pumps) =>
+            val (w, hotspot) = witness(pumps)
+            Polynomial(degree, w, hotspot)
+        }
+    }
+  }
 
   /** Finds an EDA structure in the graph. */
-  private[this] def checkExponential(): Option[Pump] =
+  private[this] def checkExponential(): Option[Pump] = {
+    log("automaton: find EDA")
     interrupt(scc.iterator.filterNot(isAtom).flatMap(checkExponentialComponent).nextOption())
+  }
 
   /** Finds an EDA structure in the SCC. */
   private[this] def checkExponentialComponent(sc: IndexedSeq[R]): Option[Pump] =
@@ -138,8 +146,10 @@ private final class AutomatonChecker[A, Q](
     }
 
   /** Finds an IDA structure chain in the graph. */
-  private[this] def checkPolynomial(): (Int, Seq[Pump]) =
+  private[this] def checkPolynomial(): (Int, Seq[Pump]) = {
+    log("automaton: find IDA")
     interrupt(scc.map(checkPolynomialComponent).maxByOption(_._1).getOrElse((0, Seq.empty)))
+  }
 
   /** An internal cache of [[checkPolynomialComponent]] method's result. */
   private[this] val checkPolynomialComponentCache = mutable.Map.empty[Seq[R], (Int, Seq[Pump])]
@@ -228,6 +238,7 @@ private final class AutomatonChecker[A, Q](
 
   /** Builds a witness object from pump strings and states. */
   private[this] def witness(pumps: Seq[Pump]): (Witness[A], Hotspot) = {
+    log("automaton: either EDA or IDA is found")
     val (pumpPaths, qs, spots) =
       pumps.foldLeft((Vector.empty[(Seq[A], Seq[A])], nfaWLA.initSet.toSet, Vector.empty[Hotspot.Spot])) {
         case ((pumpPaths, last, spots), (q1, path, q2, pos)) =>

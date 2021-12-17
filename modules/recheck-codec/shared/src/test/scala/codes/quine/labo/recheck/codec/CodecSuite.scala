@@ -3,12 +3,14 @@ package codes.quine.labo.recheck.codec
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.MILLISECONDS
 
+import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Json
 import io.circe.syntax._
 
 import codes.quine.labo.recheck.common.AccelerationMode
 import codes.quine.labo.recheck.common.Checker
+import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
@@ -123,12 +125,17 @@ class CodecSuite extends munit.FunSuite {
   }
 
   test("codec.decodeParameters") {
+
+    implicit val decodeLogger: Decoder[Context.Logger] =
+      Decoder.decodeUnit.map(_ => null.asInstanceOf[Context.Logger])
+
     assertEquals(decodeParameters.decodeJson(Json.obj()), Right(Parameters()))
     assertEquals(
       decodeParameters.decodeJson(
         Json.obj(
           "checker" := "fuzz",
           "timeout" := 123,
+          "logger" := Json.arr(),
           "maxAttackStringSize" := 123,
           "attackLimit" := 123,
           "randomSeed" := 123,
@@ -155,6 +162,7 @@ class CodecSuite extends munit.FunSuite {
         Parameters(
           checker = Checker.Fuzz,
           timeout = Duration(123, MILLISECONDS),
+          logger = Some(null),
           maxAttackStringSize = 123,
           attackLimit = 123,
           randomSeed = 123,
