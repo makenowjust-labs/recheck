@@ -20,6 +20,8 @@ import codes.quine.labo.recheck.diagnostics.Diagnostics
 object AgentCommand {
 
   /** A dummy decoder for logger. */
+  implicit val decodeLogger: Decoder[Context.Logger] =
+    Decoder.decodeUnit.map(_ => null.asInstanceOf[Context.Logger])
 
   /** `"check"` method parameter. */
   final case class CheckParams(source: String, flags: String, params: Parameters)
