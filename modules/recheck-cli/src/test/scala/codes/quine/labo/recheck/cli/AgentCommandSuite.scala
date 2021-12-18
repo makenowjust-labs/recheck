@@ -5,6 +5,7 @@ class AgentCommandSuite extends munit.FunSuite {
     val simple = """"method":"check","params":{"source":"a","flags":"","params":{}}"""
     val complex =
       """"method":"check","params":{"source":"(a|b|aba)*$","flags":"","params":{"checker":"fuzz","usesAcceleration":false}}"""
+    val simpleLog = """"method":"check","params":{"source":"a","flags":"","params":{"logger":[]}}"""
     val in = Seq(
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":1,$simple}"""),
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":2,$complex}"""),
@@ -16,7 +17,9 @@ class AgentCommandSuite extends munit.FunSuite {
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":3,$complex}"""),
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":3,$simple}"""),
       Left(250), // Wait the above `check` execution.
-      Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":4,$complex}""")
+      Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":4,$simpleLog}"""),
+      Left(250), // Wait the above `check` execution.
+      Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":5,$complex}""")
     )
     val out = Seq.newBuilder[String]
     val io = new RPC.IO {
@@ -38,7 +41,11 @@ class AgentCommandSuite extends munit.FunSuite {
         """{"jsonrpc":"2.0+push","id":2,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"cancel"}}}""",
         """{"jsonrpc":"2.0+push","id":3,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"cancel"}}}""",
         """{"jsonrpc":"2.0+push","id":3,"result":{"source":"a","flags":"","status":"safe","checker":"automaton","complexity":{"type":"safe","summary":"safe","isFuzz":false}}}""",
-        """{"jsonrpc":"2.0+push","id":4,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"cancel"}}}"""
+        """{"jsonrpc":"2.0+push","id":4,"message":"automaton: constant pattern"}""",
+        """{"jsonrpc":"2.0+push","id":4,"message":"parse: finish\n  pattern: /a/"}""",
+        """{"jsonrpc":"2.0+push","id":4,"message":"parse: start"}""",
+        """{"jsonrpc":"2.0+push","id":4,"result":{"source":"a","flags":"","status":"safe","checker":"automaton","complexity":{"type":"safe","summary":"safe","isFuzz":false}}}""",
+        """{"jsonrpc":"2.0+push","id":5,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"cancel"}}}"""
       )
     )
   }

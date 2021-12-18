@@ -142,7 +142,7 @@ final case class Parameters(
 )
 
 object Parameters {
-
+  // $COVERAGE-OFF$
   /** The default value of [[Parameters.checker]]. */
   val Checker: Checker = common.Checker.Hybrid
 
@@ -211,4 +211,5 @@ object Parameters {
 
   /** The default value of [[Parameters.maxPatternSize]]. */
   val MaxPatternSize: Int = 1500
+  // $COVERAGE-ON$
 }

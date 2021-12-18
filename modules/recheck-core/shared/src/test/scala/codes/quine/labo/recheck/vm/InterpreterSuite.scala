@@ -290,7 +290,7 @@ class InterpreterSuite extends munit.FunSuite {
         pos: Int,
         opts: Options,
         timeout: Duration
-    ): Result = {
+    )(implicit ctx: Context): Result = {
       val t = for {
         pattern <- Parser.parse(source, flags) match {
           case Right(pattern) => Success(pattern)
@@ -312,5 +312,18 @@ class InterpreterSuite extends munit.FunSuite {
       matchesWithTimeout("^.*$", "", "x".repeat(10000), 0, Options(), Duration(1, MILLISECONDS)).status,
       Status.Timeout
     )
+    assertEquals(
+      matchesWithTimeout("^.*$", "", "xx", 0, Options(), Duration(1000, MILLISECONDS))(
+        Context(Duration(100, MILLISECONDS))
+      ).status,
+      Status.Ok
+    )
+  }
+
+  test("Interpreter.Status#toString") {
+    assertEquals(Interpreter.Status.Ok.toString, "ok")
+    assertEquals(Interpreter.Status.Fail.toString, "fail")
+    assertEquals(Interpreter.Status.Limit.toString, "limit")
+    assertEquals(Interpreter.Status.Timeout.toString, "timeout")
   }
 }

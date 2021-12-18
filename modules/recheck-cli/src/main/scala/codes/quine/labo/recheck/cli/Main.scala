@@ -39,7 +39,7 @@ object Main {
       val timeout =
         Opts.option[Duration](long = "timeout", help = "Upper limit of analysis time.").withDefault(Parameters.Timeout)
       val logger = Opts
-        .flag(long = "log", help = "Enable logging.")
+        .flag(long = "enable-log", help = "Enable logging.")
         .orFalse
         .map {
           case true =>
