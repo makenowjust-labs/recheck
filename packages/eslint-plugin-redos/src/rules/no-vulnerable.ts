@@ -58,23 +58,14 @@ const rule: Rule.RuleModule = {
         case "safe":
           break;
         case "vulnerable":
-          if (
-            result.complexity &&
-            permittableComplexities.includes(result.complexity?.type)
-          ) {
+          if (permittableComplexities.includes(result.complexity.type)) {
             break;
           }
-          switch (result.complexity?.type) {
+          switch (result.complexity.type) {
             case "exponential":
             case "polynomial":
               context.report({
                 message: `Found a ReDoS vulnerable RegExp (${result.complexity.summary}).`,
-                node,
-              });
-              break;
-            case undefined:
-              context.report({
-                message: "Found a ReDoS vulnerable RegExp.",
                 node,
               });
               break;
@@ -102,6 +93,32 @@ const rule: Rule.RuleModule = {
       }
     };
 
+    const isCallOrNewRegExp = (
+      node: ESTree.NewExpression | ESTree.CallExpression
+    ) => {
+      // Tests `RegExp(...)` or `new RegExp(...)`?
+      if (
+        !(node.callee.type === "Identifier" && node.callee.name === "RegExp")
+      ) {
+        return false;
+      }
+      // Tests `RegExp(...)`, `RegExp(..., ...)`?
+      if (!(node.arguments.length == 1 || node.arguments.length == 2)) {
+        return false;
+      }
+      // TODO: Support template literals.
+      // Tests `RegExp('...', '...')`?
+      if (
+        !node.arguments.every(
+          (arg) => arg.type === "Literal" && typeof arg.value === "string"
+        )
+      ) {
+        return false;
+      }
+
+      return true;
+    };
+
     return {
       Literal: (node) => {
         // Tests `/.../`?
@@ -113,23 +130,7 @@ const rule: Rule.RuleModule = {
         check(node, source, flags);
       },
       NewExpression: (node) => {
-        // Tests `new RegExp(...)`?
-        if (
-          !(node.callee.type === "Identifier" && node.callee.name === "RegExp")
-        ) {
-          return;
-        }
-        // TODO: Support template literals.
-        // Tests `new RegExp(...)` or `new RegExp(..., ...)`?
-        if (!(node.arguments.length == 1 || node.arguments.length == 2)) {
-          return;
-        }
-        // Tests `new RegExp('...', '...')`?
-        if (
-          !node.arguments.every(
-            (arg) => arg.type === "Literal" && typeof arg.value === "string"
-          )
-        ) {
+        if (!isCallOrNewRegExp(node)) {
           return;
         }
 
@@ -139,23 +140,7 @@ const rule: Rule.RuleModule = {
         check(node, source, flags);
       },
       CallExpression: (node) => {
-        // Tests `RegExp(...)`?
-        if (
-          !(node.callee.type === "Identifier" && node.callee.name === "RegExp")
-        ) {
-          return;
-        }
-        // TODO: Support template literals.
-        // Tests `RegExp(...)` or `RegExp(..., ...)`?
-        if (!(node.arguments.length == 1 || node.arguments.length == 2)) {
-          return;
-        }
-        // Tests `RegExp('...', '...')`?
-        if (
-          !node.arguments.every(
-            (arg) => arg.type === "Literal" && typeof arg.value === "string"
-          )
-        ) {
+        if (!isCallOrNewRegExp(node)) {
           return;
         }
 
