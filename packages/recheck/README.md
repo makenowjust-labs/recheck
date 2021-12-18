@@ -92,15 +92,13 @@ If the value is the positive infinite duration, the result never become a timeou
 If the `number` value is specified, it is parsed in milliseconds.
 If the value is `null`, it is parsed as the positive infinite duration.
 
-#### `signal`
+#### `logger`
 
-Type: `AbortSignal`
+Type: `((message: string) => void) | null`
 
-Default: `undefined`
+Default: `null`
 
-Signal to abort the check.
-
-Note that this parameter is only available for `check` function.
+Logger to log an analysis execution.
 
 <details>
 

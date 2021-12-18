@@ -39,6 +39,7 @@ class MainSuite extends munit.FunSuite {
       ("", "Missing expected command (agent), or positional argument!\n\n" + Main.command.showHelp + "\n", 2)
     )
     assertEquals(runMain(Seq("/foo/"))._3, 0)
+    assertEquals(runMain(Seq("/foo/", "--enable-log"))._1.linesIterator.size, 8)
     assertEquals(runMain(Seq("/(a|a)*$/"))._3, 1)
     assertEquals(runMain(Seq("agent")), ("", "", 0))
   }

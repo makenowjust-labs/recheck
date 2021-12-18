@@ -69,7 +69,12 @@ object FuzzChecker {
     }
 
   /** Trace is a summary of IR execution. */
-  private[fuzz] final case class Trace(str: FString, rate: Double, steps: Int, coverage: Set[CoverageItem])
+  private[fuzz] final case class Trace(
+      str: FString,
+      rate: Double,
+      steps: Int,
+      coverage: Set[CoverageItem]
+  )
 
   /** Generation is an immutable generation. */
   private[fuzz] final case class Generation(
@@ -121,13 +126,15 @@ private[fuzz] final class FuzzChecker(
 
   /** Runs this fuzzer. */
   def check(): Option[AttackResult] = interrupt {
+    log(s"fuzz: start (usesAcceleration: ${fuzz.usesAcceleration(accelerationMode)})")
+
     var gen = init() match {
       case Right(result) => return Some(result)
       case Left(gen)     => gen
     }
 
-    for (_ <- 1 to maxIteration; if gen.traces.nonEmpty) {
-      iterate(gen) match {
+    for (i <- 1 to maxIteration; if gen.traces.nonEmpty) {
+      iterate(i, gen) match {
         case Right(result) => return Some(result)
         case Left(next)    => gen = next
       }
@@ -138,8 +145,9 @@ private[fuzz] final class FuzzChecker(
 
   /** Creates the initial generation from the seed set. */
   def init(): Either[Generation, AttackResult] = interrupt {
+    log("fuzz: seeding")
     val seed: Set[FString] = Seeder.seed(fuzz, seedingLimit, seedingTimeout, maxInitialGenerationSize)
-    val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty, mutable.Set.empty, true)
+    val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty, mutable.Set.empty)
     for (str <- seed) {
       pop.execute(str) match {
         case Some(result) => return Right(result)
@@ -150,7 +158,13 @@ private[fuzz] final class FuzzChecker(
   }
 
   /** Iterates a generation. */
-  def iterate(gen: Generation): Either[Generation, AttackResult] = interrupt {
+  def iterate(i: Int, gen: Generation): Either[Generation, AttackResult] = interrupt {
+    log {
+      val max = gen.traces.maxBy(_.steps)
+      s"""|fuzz: iteration $i
+          |  traces: ${gen.traces.size}
+          |     max: ${max.str} (steps: ${max.steps})""".stripMargin
+    }
     val next = Population.from(gen)
 
     val crossovers = (1 to crossoverSize).iterator.flatMap(_ => cross(gen, next))
@@ -287,7 +301,7 @@ private[fuzz] final class FuzzChecker(
     val t = gen.traces(i).str
     if (t.size < 2) return None
 
-    val pos1 = random.between(0, t.size)
+    val pos1 = random.between(0, t.size - 1)
     val size = random.between(1, t.size - pos1 + 1)
     val part = t.seq.slice(pos1, pos1 + size)
 
@@ -316,6 +330,7 @@ private[fuzz] final class FuzzChecker(
 
   /** Construct an attack string on assuming the pattern is exponential. */
   def tryAttackExponential(str: FString): Option[AttackResult] = interrupt {
+    log("fuzz: attack (exponential)")
     val r = Math.max(1, Math.log(attackLimit) / Math.log(2) / str.n)
     val attack = str.copy(n = Math.ceil(str.n * r).toInt)
     tryAttackExecute(attack).map { case (pattern, hotspot) => (AttackComplexity.Exponential(true), pattern, hotspot) }
@@ -323,6 +338,7 @@ private[fuzz] final class FuzzChecker(
 
   /** Construct an attack string on assuming the pattern is polynomial. */
   def tryAttackPolynomial(str: FString, degree: Int): Option[AttackResult] = interrupt {
+    log(s"fuzz: attack (polynomial: $degree)")
     val r = Math.pow(attackLimit, 1.0 / degree) / str.n
     if (r < 1) None
     else {
@@ -340,6 +356,10 @@ private[fuzz] final class FuzzChecker(
       val opts = Options(attackLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode), needsHeatmap = true)
       val result = Interpreter.runWithTimeout(program, input, 0, opts, attackTimeout)
       if (result.status == Status.Limit || result.status == Status.Timeout) {
+        log {
+          s"""|fuzz: attack succeeded (status: ${result.status})
+              |  string: ${str}""".stripMargin
+        }
         return Some((str.toAttackPattern, Hotspot.build(result.heatmap, heatRatio)))
       }
     }
@@ -351,8 +371,7 @@ private[fuzz] final class FuzzChecker(
       var minRate: Double,
       val set: mutable.Set[Trace],
       val inputs: mutable.Set[UString],
-      val visited: mutable.Set[CoverageItem],
-      val init: Boolean
+      val visited: mutable.Set[CoverageItem]
   ) {
 
     /** Executes the string and adds its result. */
@@ -367,13 +386,17 @@ private[fuzz] final class FuzzChecker(
       val result = Interpreter.runWithTimeout(program, input, 0, opts, incubationTimeout)
       add(str, input, result)
       if (result.status == Status.Limit || result.status == Status.Timeout) {
+        log {
+          s"""|fuzz: attack start (status: ${result.status})
+              |  string: $str""".stripMargin
+        }
         return tryAttack(str)
       }
 
       None
     }
 
-    /** Records an IR execution result. */
+    /** Records the execution result. */
     def add(str: FString, input: UString, result: Result): Unit = {
       inputs.add(input)
 
@@ -382,7 +405,7 @@ private[fuzz] final class FuzzChecker(
       val trace = Trace(str, rate, result.steps, coverage)
 
       if (input.sizeAsString < maxGeneStringSize && !set.contains(trace)) {
-        if (init || rate >= minRate || !coverage.subsetOf(visited)) {
+        if (rate >= minRate || !coverage.subsetOf(visited)) {
           minRate = Math.min(rate, minRate)
           set.add(trace)
           visited.addAll(coverage)
@@ -409,8 +432,7 @@ private[fuzz] final class FuzzChecker(
         gen.minRate,
         mutable.Set.from(gen.traces),
         mutable.Set.from(gen.inputs),
-        mutable.Set.from(gen.covered),
-        false
+        mutable.Set.from(gen.covered)
       )
   }
 }

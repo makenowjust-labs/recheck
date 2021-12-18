@@ -59,6 +59,12 @@ final case class NFA[A, Q](
         }
       }
 
-      DFA(alphabet, newStateSet.toSet, initSet, newAcceptSet.result(), newDelta.result())
+      val dfa = DFA(alphabet, newStateSet.toSet, initSet, newAcceptSet.result(), newDelta.result())
+      ctx.log {
+        s"""|automaton: DFA construction
+            |     state size: ${dfa.stateSet.size}
+            |  alphabet size: ${dfa.alphabet.size}""".stripMargin
+      }
+      dfa
     }
 }

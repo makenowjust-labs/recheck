@@ -58,6 +58,13 @@ export type Parameters = {
   timeout?: number | null;
 
   /**
+   * Logger to log an analysis execution.
+   *
+   * (default: `null`)
+   */
+  logger?: ((message: string) => void) | null;
+
+  /**
    * Maximum length of an attack string.
    *
    * (default: `400000`)

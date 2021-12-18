@@ -29,4 +29,28 @@ class ContextSuite extends munit.FunSuite {
       "timeout at modules/recheck-common/shared/src/test/scala/codes/quine/labo/recheck/common/ContextSuite.scala:30"
     )(Context(timeout = -1.second).interrupt(42))
   }
+
+  test("Context#log") {
+    var called: Boolean = false
+    var args: Option[String] = None
+    val logger: Context.Logger = (message) => {
+      args = Some(message)
+    }
+    val ctx1 = Context()
+    val ctx2 = Context(logger = Some(logger))
+
+    ctx1.log {
+      called = true
+      "foo"
+    }
+    assertEquals(called, false)
+    assertEquals(args, None)
+
+    ctx2.log {
+      called = true
+      "foo"
+    }
+    assertEquals(called, true)
+    assertEquals(args, Some("foo"))
+  }
 }

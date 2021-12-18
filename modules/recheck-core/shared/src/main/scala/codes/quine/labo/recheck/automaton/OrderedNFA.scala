@@ -99,11 +99,14 @@ final case class OrderedNFA[A, Q](
           newStateSet.addOne((q1, p1)).addAll(qp2s)
 
           deltaSize += qp2s.size
-          if (deltaSize >= maxNFASize) throw new UnsupportedException("MultiNFA size is too large")
+          if (deltaSize >= maxNFASize) {
+            ctx.log("hybrid: exceed maxNFASize on NFAwLA construction")
+            throw new UnsupportedException("NFAwLA size is too large")
+          }
         }
       }
 
-      NFAwLA(
+      val nfaWLA = NFAwLA[A, Q](
         newAlphabet.result(),
         newStateSet.result(),
         newInits,
@@ -112,6 +115,12 @@ final case class OrderedNFA[A, Q](
         reverseDFA,
         newSourcemap.toMap.filter(_._2.nonEmpty)
       )
+      ctx.log {
+        s"""|automaton: NFAwLA construction
+            |     state size: ${nfaWLA.stateSet.size}
+            |  alphabet size: ${nfaWLA.alphabet.size}""".stripMargin
+      }
+      nfaWLA
     }
 
   /** Converts to Graphviz format text. */

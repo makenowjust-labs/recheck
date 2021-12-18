@@ -40,7 +40,7 @@ class OrderedNFASuite extends munit.FunSuite {
         nfa.reverse.toDFA
       )
     )
-    interceptMessage[UnsupportedException]("MultiNFA size is too large") {
+    interceptMessage[UnsupportedException]("NFAwLA size is too large") {
       nfa.toNFAwLA(maxNFASize = 1)
     }
   }

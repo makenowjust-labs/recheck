@@ -66,6 +66,11 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |
       |implicit def ctx: Context = Context(10.seconds)
       |
+      |def logger: Context.Logger = (message: String) => {
+      |  val date = java.time.LocalDateTime.now()
+      |  Console.out.println(s"[$date] $message")
+      |}
+      |
       |def time[A](body: => A): A = {
       |  val start = System.nanoTime()
       |  val result = body

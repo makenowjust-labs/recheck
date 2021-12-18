@@ -35,7 +35,16 @@ export async function check(
     return await fallbackCheck(source, flags, params);
   }
 
-  const { id, promise } = agent.request("check", { source, flags, params });
+  const logger = params.logger ?? ((message: string) => {});
+  if (params?.logger) {
+    params.logger = [] as any;
+  }
+
+  const { id, promise } = agent.request(
+    "check",
+    { source, flags, params },
+    logger
+  );
   signal?.addEventListener("abort", () => {
     agent.notify("cancel", { id });
   });

@@ -11,6 +11,7 @@ import io.circe.syntax._
 
 import codes.quine.labo.recheck.common.AccelerationMode
 import codes.quine.labo.recheck.common.Checker
+import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
@@ -105,10 +106,11 @@ package object codec {
   implicit def encodeUString: Encoder[UString] = _.asString.asJson
 
   /** A `Decoder` for `Parameters`. */
-  implicit def decodeParameters: Decoder[Parameters] = (c: HCursor) =>
+  implicit def decodeParameters(implicit decodeLogger: Decoder[Context.Logger]): Decoder[Parameters] = (c: HCursor) =>
     for {
       checker <- c.getOrElse[Checker]("checker")(Parameters.Checker)
       timeout <- c.getOrElse[Duration]("timeout")(Parameters.Timeout)
+      logger <- c.getOrElse[Option[Context.Logger]]("logger")(Parameters.Logger)
       maxAttackStringSize <- c.getOrElse[Int]("maxAttackStringSize")(Parameters.MaxAttackStringSize)
       attackLimit <- c.getOrElse[Int]("attackLimit")(Parameters.AttackLimit)
       randomSeed <- c.getOrElse[Long]("randomSeed")(Parameters.RandomSeed)
@@ -132,6 +134,7 @@ package object codec {
     } yield Parameters(
       checker,
       timeout,
+      logger,
       maxAttackStringSize,
       attackLimit,
       randomSeed,

@@ -1,4 +1,5 @@
 package codes.quine.labo.recheck.cli
+import java.time.LocalDateTime
 import scala.concurrent.duration.Duration
 
 import cats.syntax.apply._
@@ -13,6 +14,7 @@ import codes.quine.labo.recheck.cli.Main.command
 import codes.quine.labo.recheck.cli.arguments._
 import codes.quine.labo.recheck.common.AccelerationMode
 import codes.quine.labo.recheck.common.Checker
+import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.diagnostics.Diagnostics
 
@@ -32,11 +34,21 @@ object Main {
   def command: Command[Action] =
     Command(name = "recheck", header = "Checks ReDoS vulnerability on the given RegExp pattern") {
       val checker = Opts
-        .option[Checker](long = "checker", short = "c", help = "Type of checker used for analysis.")
+        .option[Checker](long = "checker", help = "Type of checker used for analysis.")
         .withDefault(Parameters.Checker)
-      val timeout = Opts
-        .option[Duration](long = "timeout", short = "t", help = "Upper limit of analysis time.")
-        .withDefault(Parameters.Timeout)
+      val timeout =
+        Opts.option[Duration](long = "timeout", help = "Upper limit of analysis time.").withDefault(Parameters.Timeout)
+      val logger = Opts
+        .flag(long = "enable-log", help = "Enable logging.")
+        .orFalse
+        .map {
+          case true =>
+            Some[Context.Logger] { message =>
+              val date = LocalDateTime.now()
+              Console.out.println(s"[$date] $message")
+            }
+          case false => None
+        }
       val maxAttackStringSize = Opts
         .option[Int](long = "max-attack-string-size", help = "Maximum length of an attack string.")
         .withDefault(Parameters.MaxAttackStringSize)
@@ -116,29 +128,86 @@ object Main {
         .option[Int](long = "max-pattern-size", help = "Maximum pattern size to use the automaton checker.")
         .withDefault(Parameters.MaxPatternSize)
       val params = (
-        checker,
-        timeout,
-        maxAttackStringSize,
-        attackLimit,
-        randomSeed,
-        maxIteration,
-        seedingLimit,
-        seedingTimeout,
-        maxInitialGenerationSize,
-        incubationLimit,
-        incubationTimeout,
-        maxGeneStringSize,
-        maxGenerationSize,
-        crossoverSize,
-        mutationSize,
-        attackTimeout,
-        maxDegree,
-        heatRatio,
-        accelerationMode,
-        maxRepeatCount,
-        maxNFASize,
-        maxPatternSize
-      ).mapN(Parameters.apply)
+        (
+          checker,
+          timeout,
+          logger
+        ).tupled,
+        (
+          maxAttackStringSize,
+          attackLimit,
+          randomSeed,
+          maxIteration,
+          seedingLimit,
+          seedingTimeout,
+          maxInitialGenerationSize,
+          incubationLimit,
+          incubationTimeout,
+          maxGeneStringSize,
+          maxGenerationSize,
+          crossoverSize,
+          mutationSize,
+          attackTimeout,
+          maxDegree,
+          heatRatio,
+          accelerationMode,
+          maxRepeatCount,
+          maxNFASize,
+          maxPatternSize
+        ).tupled
+      ).mapN {
+        case (
+              (checker, timeout, logger),
+              (
+                maxAttackStringSize,
+                attackLimit,
+                randomSeed,
+                maxIteration,
+                seedingLimit,
+                seedingTimeout,
+                maxInitialGenerationSize,
+                incubationLimit,
+                incubationTimeout,
+                maxGeneStringSize,
+                maxGenerationSize,
+                crossoverSize,
+                mutationSize,
+                attackTimeout,
+                maxDegree,
+                heatRatio,
+                accelerationMode,
+                maxRepeatCount,
+                maxNFASize,
+                maxPatternSize
+              )
+            ) =>
+          Parameters(
+            checker,
+            timeout,
+            logger,
+            maxAttackStringSize,
+            attackLimit,
+            randomSeed,
+            maxIteration,
+            seedingLimit,
+            seedingTimeout,
+            maxInitialGenerationSize,
+            incubationLimit,
+            incubationTimeout,
+            maxGeneStringSize,
+            maxGenerationSize,
+            crossoverSize,
+            mutationSize,
+            attackTimeout,
+            maxDegree,
+            heatRatio,
+            accelerationMode,
+            maxRepeatCount,
+            maxNFASize,
+            maxPatternSize
+          )
+      }
+
       val pattern = Opts.argument[InputPattern](metavar = "pattern")
       val check: Opts[Action] = (pattern, params).mapN(CheckAction)
 

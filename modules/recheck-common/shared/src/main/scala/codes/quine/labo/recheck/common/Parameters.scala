@@ -29,6 +29,9 @@ import scala.concurrent.duration._
   *
   * (default: `Duration(10, SECONDS)`)
   *
+  * @param logger
+  *   Option[Context.Logger] Logger to log an analysis execution. (default: `None`)
+  *
   * @param maxAttackStringSize
   *   Int Maximum length of an attack string. (default: `400000`)
   *
@@ -115,6 +118,7 @@ import scala.concurrent.duration._
 final case class Parameters(
     checker: Checker = Parameters.Checker,
     timeout: Duration = Parameters.Timeout,
+    logger: Option[Context.Logger] = Parameters.Logger,
     maxAttackStringSize: Int = Parameters.MaxAttackStringSize,
     attackLimit: Int = Parameters.AttackLimit,
     randomSeed: Long = Parameters.RandomSeed,
@@ -138,12 +142,15 @@ final case class Parameters(
 )
 
 object Parameters {
-
+  // $COVERAGE-OFF$
   /** The default value of [[Parameters.checker]]. */
   val Checker: Checker = common.Checker.Hybrid
 
   /** The default value of [[Parameters.timeout]]. */
   val Timeout: Duration = Duration(10, SECONDS)
+
+  /** The default value of [[Parameters.logger]]. */
+  val Logger: Option[Context.Logger] = None
 
   /** The default value of [[Parameters.maxAttackStringSize]]. */
   val MaxAttackStringSize: Int = 400000
@@ -204,4 +211,5 @@ object Parameters {
 
   /** The default value of [[Parameters.maxPatternSize]]. */
   val MaxPatternSize: Int = 1500
+  // $COVERAGE-ON$
 }
