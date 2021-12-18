@@ -122,7 +122,8 @@ jobs:
         run: yarn workspace recheck build
       - name: Test
         run: |
-          yarn workspace eslint-plugin-redos test
+          yarn workspace eslint-plugin-redos test --coverage
+      - uses: codecov/codecov-action@v2
 
   native-build:
     needs: [build]
