@@ -133,7 +133,7 @@ private[fuzz] final class FuzzChecker(
       case Left(gen)     => gen
     }
 
-    for (i <- 1 to maxIteration; if gen.traces.nonEmpty) {
+    for (i <- 1 to maxIteration) {
       iterate(i, gen) match {
         case Right(result) => return Some(result)
         case Left(next)    => gen = next
@@ -146,7 +146,7 @@ private[fuzz] final class FuzzChecker(
   /** Creates the initial generation from the seed set. */
   def init(): Either[Generation, AttackResult] = interrupt {
     log("fuzz: seeding")
-    val seed: Set[FString] = Seeder.seed(fuzz, seedingLimit, seedingTimeout, maxInitialGenerationSize)
+    val seed: Set[FString] = DynamicSeeder.seed(fuzz, seedingLimit, seedingTimeout, maxInitialGenerationSize)
     val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty, mutable.Set.empty)
     for (str <- seed) {
       pop.execute(str) match {
@@ -159,6 +159,8 @@ private[fuzz] final class FuzzChecker(
 
   /** Iterates a generation. */
   def iterate(i: Int, gen: Generation): Either[Generation, AttackResult] = interrupt {
+    if (gen.traces.isEmpty) return Left(gen)
+
     log {
       val max = gen.traces.maxBy(_.steps)
       s"""|fuzz: iteration $i
