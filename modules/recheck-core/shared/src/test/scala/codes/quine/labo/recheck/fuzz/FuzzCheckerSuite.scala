@@ -26,6 +26,7 @@ class FuzzCheckerSuite extends munit.FunSuite {
       }
       fuzz <- FuzzProgram.from(pattern)
     } yield FuzzChecker.check(
+      pattern,
       fuzz,
       random = random0,
       maxGeneStringSize = if (quick) 400 else 4000,
@@ -70,7 +71,14 @@ class FuzzCheckerSuite extends munit.FunSuite {
           case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
         }
         fuzz <- FuzzProgram.from(pattern)
-      } yield FuzzChecker.check(fuzz, random0, seedingLimit = 10000, incubationLimit = 10000, attackLimit = 10000)
+      } yield FuzzChecker.check(
+        pattern,
+        fuzz,
+        random0,
+        seedingLimit = 10000,
+        incubationLimit = 10000,
+        attackLimit = 10000
+      )
       result.get.isDefined
     }
 
@@ -83,6 +91,7 @@ class FuzzCheckerSuite extends munit.FunSuite {
         }
         fuzz <- FuzzProgram.from(pattern)
       } yield FuzzChecker.check(
+        pattern,
         fuzz,
         random0,
         incubationLimit = 100,

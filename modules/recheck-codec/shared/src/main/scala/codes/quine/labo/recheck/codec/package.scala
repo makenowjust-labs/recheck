@@ -13,6 +13,7 @@ import codes.quine.labo.recheck.common.AccelerationMode
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.Parameters
+import codes.quine.labo.recheck.common.Seeder
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Diagnostics
@@ -115,6 +116,8 @@ package object codec {
       attackLimit <- c.getOrElse[Int]("attackLimit")(Parameters.AttackLimit)
       randomSeed <- c.getOrElse[Long]("randomSeed")(Parameters.RandomSeed)
       maxIteration <- c.getOrElse[Int]("maxIteration")(Parameters.MaxIteration)
+      seeder <- c.getOrElse[Seeder]("seeder")(Parameters.Seeder)
+      maxSimpleRepeatCount <- c.getOrElse[Int]("maxSimpleRepeatCount")(Parameters.MaxSimpleRepeatCount)
       seedingLimit <- c.getOrElse[Int]("seedingLimit")(Parameters.SeedingLimit)
       seedingTimeout <- c.getOrElse[Duration]("seedingTimeout")(Parameters.SeedingTimeout)
       maxInitialGenerationSize <- c.getOrElse[Int]("maxInitialGenerationSize")(Parameters.MaxInitialGenerationSize)
@@ -139,6 +142,8 @@ package object codec {
       attackLimit,
       randomSeed,
       maxIteration,
+      seeder,
+      maxSimpleRepeatCount,
       seedingLimit,
       seedingTimeout,
       maxInitialGenerationSize,
@@ -179,5 +184,13 @@ package object codec {
       case "on"   => Right(AccelerationMode.On)
       case "off"  => Right(AccelerationMode.Off)
       case s      => Left(s"Unknown acceleration mode: $s")
+    }
+
+  /** A `Decoder` for `Seeder`. */
+  implicit def decodeSeeder: Decoder[Seeder] =
+    Decoder[String].emap {
+      case "static"  => Right(Seeder.Static)
+      case "dynamic" => Right(Seeder.Dynamic)
+      case s         => Left(s"Unknown seeder: $s")
     }
 }

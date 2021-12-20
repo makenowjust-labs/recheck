@@ -111,8 +111,11 @@ object ReDoS {
 
     val result = FuzzProgram.from(pattern).map { fuzz =>
       FuzzChecker.check(
+        pattern,
         fuzz,
         random,
+        seeder,
+        maxSimpleRepeatCount,
         seedingLimit,
         seedingTimeout,
         incubationLimit,

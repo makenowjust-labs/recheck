@@ -8,10 +8,12 @@ import scala.util.Random
 import codes.quine.labo.recheck.common.AccelerationMode
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.Parameters
+import codes.quine.labo.recheck.common.Seeder
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Hotspot
 import codes.quine.labo.recheck.fuzz.FuzzChecker._
+import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.unicode.ICharSet
 import codes.quine.labo.recheck.unicode.UString
 import codes.quine.labo.recheck.vm.Interpreter
@@ -26,8 +28,11 @@ object FuzzChecker {
 
   /** Checks whether RegExp is ReDoS vulnerable or not. */
   def check(
+      pattern: Pattern,
       fuzz: FuzzProgram,
       random: Random = new Random(Parameters.RandomSeed),
+      seeder: Seeder = Parameters.Seeder,
+      maxSimpleRepeatCount: Int = Parameters.MaxSimpleRepeatCount,
       seedingLimit: Int = Parameters.SeedingLimit,
       seedingTimeout: Duration = Parameters.SeedingTimeout,
       incubationLimit: Int = Parameters.IncubationLimit,
@@ -47,8 +52,11 @@ object FuzzChecker {
   )(implicit ctx: Context): Option[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)] =
     ctx.interrupt {
       new FuzzChecker(
+        pattern,
         fuzz,
         random,
+        seeder,
+        maxSimpleRepeatCount,
         seedingLimit,
         seedingTimeout,
         incubationLimit,
@@ -87,8 +95,11 @@ object FuzzChecker {
 
 /** FuzzChecker is a ReDoS vulnerable RegExp checker based on fuzzing. */
 private[fuzz] final class FuzzChecker(
+    val pattern: Pattern,
     val fuzz: FuzzProgram,
     val random: Random,
+    val seeder: Seeder,
+    val maxSimpleRepeatCount: Int,
     val seedingLimit: Int,
     val seedingTimeout: Duration,
     val incubationLimit: Int,
@@ -145,8 +156,16 @@ private[fuzz] final class FuzzChecker(
 
   /** Creates the initial generation from the seed set. */
   def init(): Either[Generation, AttackResult] = interrupt {
-    log("fuzz: seeding")
-    val seed: Set[FString] = DynamicSeeder.seed(fuzz, seedingLimit, seedingTimeout, maxInitialGenerationSize)
+    log(s"fuzz: seeding start (seeder: $seeder)")
+    val seed: Set[FString] = seeder match {
+      case Seeder.Static =>
+        StaticSeeder.seed(pattern, maxSimpleRepeatCount, maxInitialGenerationSize, incubationLimit)
+      case Seeder.Dynamic =>
+        DynamicSeeder.seed(fuzz, seedingLimit, seedingTimeout, maxInitialGenerationSize)
+    }
+    log(s"""|fuzz: seeding finish
+            |  size: ${seed.size}""".stripMargin)
+
     val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty, mutable.Set.empty)
     for (str <- seed) {
       pop.execute(str) match {
@@ -154,6 +173,7 @@ private[fuzz] final class FuzzChecker(
         case None         => () // Skips
       }
     }
+
     Left(pop.toGeneration)
   }
 
@@ -355,7 +375,8 @@ private[fuzz] final class FuzzChecker(
   def tryAttackExecute(str: FString): Option[(AttackPattern, Hotspot)] = interrupt {
     val input = str.toUString
     if (input.sizeAsString <= maxAttackStringSize) {
-      val opts = Options(attackLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode), needsHeatmap = true)
+      val opts =
+        Options(attackLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode), needsHeatmap = true)
       val result = Interpreter.runWithTimeout(program, input, 0, opts, attackTimeout)
       if (result.status == Status.Limit || result.status == Status.Timeout) {
         log {

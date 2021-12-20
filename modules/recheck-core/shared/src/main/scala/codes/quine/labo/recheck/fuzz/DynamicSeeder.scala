@@ -18,7 +18,7 @@ import codes.quine.labo.recheck.vm.Interpreter.FailedPoint
 import codes.quine.labo.recheck.vm.Interpreter.Options
 import codes.quine.labo.recheck.vm.Interpreter.Status
 
-/** DynamicSeeder computes an initial generation for the pattern. */
+/** DynamicSeeder computes an initial generation for the pattern with dynamic analysis. */
 object DynamicSeeder {
 
   /** Computes an initial generation of the program. */

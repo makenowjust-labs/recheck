@@ -64,12 +64,12 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labo.recheck.util._
       |import codes.quine.labo.recheck.vm._
       |
-      |implicit def ctx: Context = Context(10.seconds)
-      |
       |def logger: Context.Logger = (message: String) => {
       |  val date = java.time.LocalDateTime.now()
       |  Console.out.println(s"[$date] $message")
       |}
+      |
+      |implicit def ctx: Context = Context(timeout = 10.seconds, logger = Some(logger))
       |
       |def time[A](body: => A): A = {
       |  val start = System.nanoTime()

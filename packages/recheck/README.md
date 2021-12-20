@@ -112,7 +112,7 @@ and it needs to know the checkers in depth to set the correct value.
 
 Type: `number`
 
-Default: `400000`
+Default: `700000`
 
 Maximum length of an attack string.
 
@@ -136,9 +136,30 @@ Seed value for PRNG used by fuzzing.
 
 Type: `number`
 
-Default: `30`
+Default: `10`
 
 Maximum number of iterations of genetic algorithm.
+
+#### `seeder`
+
+Type: `'static' | 'dynamic'`
+
+Default: `'static'`
+
+Type of seeder used for constructing the initial generation of fuzzing.
+
+There are two seeders:
+
+- `'static'`: Seeder to construct the initial generation by using static analysis to the given pattern.
+- `'dynamic'`: Seeder to construct the initial generation by using dynamic analysis to the given pattern.
+
+#### `maxSimpleRepeatCount`
+
+Type: `number`
+
+Default: `30`
+
+Maximum number of sum of repeat counts for static seeder.
 
 #### `seedingLimit`
 
@@ -163,7 +184,7 @@ If the value is `null`, it is parsed as the positive infinite duration.
 
 Type: `number`
 
-Default: `50`
+Default: `500`
 
 Maximum population at the initial generation.
 
@@ -267,7 +288,7 @@ There are three mode:
 
 Type: `number`
 
-Default: `20`
+Default: `30`
 
 Maximum number of sum of repeat counts.
 
@@ -277,7 +298,7 @@ If this value is exceeded, it switches to use the fuzzing checker.
 
 Type: `number`
 
-Default: `40000`
+Default: `35000`
 
 Maximum transition size of NFA to use the automaton checker.
 
