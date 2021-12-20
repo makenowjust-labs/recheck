@@ -33,7 +33,7 @@
   },
   "devDependencies": {
     "@types/node": "16.11.14",
-    "esbuild": "0.14.5",
+    "esbuild": "0.14.6",
     "prettier": "2.5.1",
     "rimraf": "3.0.2",
     "typescript": "4.5.4"
