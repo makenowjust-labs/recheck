@@ -402,7 +402,7 @@ private[fuzz] final class FuzzChecker(
       if (str.countRepeat >= maxDegree) return None
 
       val input = str.toUString
-      if (inputs.contains(input)) return None
+      if (inputs.contains(input) || input.sizeAsString >= maxGeneStringSize) return None
 
       val opts =
         Options(incubationLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode), needsCoverage = true)
@@ -427,12 +427,12 @@ private[fuzz] final class FuzzChecker(
       val coverage = result.coverage
       val trace = Trace(str, rate, result.steps, coverage)
 
-      if (input.sizeAsString < maxGeneStringSize && !set.contains(trace)) {
-        if (rate >= minRate || !coverage.subsetOf(visited)) {
-          minRate = Math.min(rate, minRate)
-          set.add(trace)
-          visited.addAll(coverage)
-        }
+      if (set.contains(trace)) return
+
+      if (rate >= minRate || !coverage.subsetOf(visited)) {
+        minRate = Math.min(rate, minRate)
+        set.add(trace)
+        visited.addAll(coverage)
       }
     }
 
