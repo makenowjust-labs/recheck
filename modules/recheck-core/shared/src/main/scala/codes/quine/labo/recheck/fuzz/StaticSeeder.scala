@@ -1,8 +1,8 @@
 package codes.quine.labo.recheck.fuzz
 
 import codes.quine.labo.recheck.automaton.EpsNFABuilder
-import codes.quine.labo.recheck.automaton.OrderedNFA
 import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.data.Graph
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.regexp.Pattern._
 import codes.quine.labo.recheck.unicode.UChar
@@ -17,7 +17,13 @@ object StaticSeeder {
     val simplePattern = simplify(pattern, maxSimpleRepeatSize)
     val epsNFA = EpsNFABuilder.build(simplePattern).get
     val orderedNFA = epsNFA.toOrderedNFA.rename.mapAlphabet(_.head)
-    val seeder = new StaticSeeder(orderedNFA)
+    val nfaWLA = orderedNFA.toNFAwLA
+    val seeder = new StaticSeeder(
+      nfaWLA.lookAheadDFA.alphabet,
+      nfaWLA.initSet.toSet,
+      nfaWLA.acceptSet,
+      Graph.from(nfaWLA.toGraph.edges.map { case (q1, (a, _), q2) => (q1, a, q2) })
+    )
     seeder.seed(maxInitialGenerationSize, incubationLimit)
   }
 
@@ -66,11 +72,13 @@ object StaticSeeder {
   }
 }
 
-private[fuzz] class StaticSeeder[A, Q](val orderedNFA: OrderedNFA[A, Q])(implicit ctx: Context) {
+private[fuzz] class StaticSeeder[A, Q](
+    val alphabet: Set[A],
+    val initSet: Set[Q],
+    val acceptSet: Set[Q],
+    val graph: Graph[Q, A]
+)(implicit ctx: Context) {
   import ctx._
-
-  /** A graph obtained from [[orderedNFA]]. */
-  val graph = orderedNFA.toGraph
 
   /** A reversed graph of [[graph]]. */
   val reverseGraph = graph.reverse
@@ -109,7 +117,7 @@ private[fuzz] class StaticSeeder[A, Q](val orderedNFA: OrderedNFA[A, Q])(implici
   /** Returns all possible tiny EDAs from `q0`. */
   def findTinyEDA(q0: Q): Iterator[(Seq[A], Seq[A], Seq[A])] =
     for {
-      w1 <- path(orderedNFA.inits.toSet, q0).iterator
+      w1 <- path(initSet, q0).iterator
       w3 <- deadPath(q0).iterator
       (b, q2s) <- insMap(q0).filter(_._2.size >= 2)
       q2 <- q2s
@@ -121,7 +129,7 @@ private[fuzz] class StaticSeeder[A, Q](val orderedNFA: OrderedNFA[A, Q])(implici
   /** Returns all possible tiny IDAs from `q0`. */
   def findTinyIDA(q0: Q): Iterator[(Seq[A], Seq[A], Seq[A])] =
     for {
-      w1 <- path(orderedNFA.inits.toSet, q0).iterator
+      w1 <- path(initSet, q0).iterator
       (a, _) <- outsMap(q0)
       (b, _) <- insMap(q0)
       (q3, _) <- charToInsMap(b)
@@ -143,14 +151,14 @@ private[fuzz] class StaticSeeder[A, Q](val orderedNFA: OrderedNFA[A, Q])(implici
 
   /** Finds a dead path from `q`. */
   def deadPath(q: Q): Option[Seq[A]] =
-    interrupt(orderedNFA.alphabet.diff(graph.neighbors(q).map(_._1).toSet)).headOption match {
+    interrupt(alphabet.diff(graph.neighbors(q).map(_._1).toSet)).headOption match {
       case Some(c) => Some(Seq(c))
       case None =>
         interrupt {
           graph
             .neighbors(q)
             .map(_._2)
-            .filterNot(orderedNFA.acceptSet)
+            .filterNot(acceptSet)
             .find(_ != q)
             .flatMap(path(Set(q), _))
         }
