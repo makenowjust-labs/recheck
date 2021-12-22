@@ -17,12 +17,12 @@ object StaticSeeder {
     val simplePattern = simplify(pattern, maxSimpleRepeatSize)
     val epsNFA = EpsNFABuilder.build(simplePattern).get
     val orderedNFA = epsNFA.toOrderedNFA.rename.mapAlphabet(_.head)
-    val nfaWLA = orderedNFA.toNFAwLA
     val seeder = new StaticSeeder(
-      nfaWLA.lookAheadDFA.alphabet,
-      nfaWLA.initSet.toSet,
-      nfaWLA.acceptSet,
-      Graph.from(nfaWLA.toGraph.edges.map { case (q1, (a, _), q2) => (q1, a, q2) })
+      orderedNFA.alphabet,
+      orderedNFA.stateSet,
+      orderedNFA.inits.toSet,
+      orderedNFA.acceptSet,
+      orderedNFA.toGraph
     )
     seeder.seed(maxInitialGenerationSize, incubationLimit)
   }
@@ -74,6 +74,7 @@ object StaticSeeder {
 
 private[fuzz] class StaticSeeder[A, Q](
     val alphabet: Set[A],
+    val stateSet: Set[Q],
     val initSet: Set[Q],
     val acceptSet: Set[Q],
     val graph: Graph[Q, A]
@@ -154,14 +155,7 @@ private[fuzz] class StaticSeeder[A, Q](
     interrupt(alphabet.diff(graph.neighbors(q).map(_._1).toSet)).headOption match {
       case Some(c) => Some(Seq(c))
       case None =>
-        interrupt {
-          graph
-            .neighbors(q)
-            .map(_._2)
-            .filterNot(acceptSet)
-            .find(_ != q)
-            .flatMap(path(Set(q), _))
-        }
+        interrupt(reverseGraph.path(stateSet.diff(acceptSet), q).map(_._1.map(_._2).reverse))
     }
 
   /** Constructs a FString from an EDA/IDA triple. */
