@@ -93,7 +93,7 @@ final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]) {
   }
 
   /** Computes a path from the sources to the target. */
-  def path(sources: Set[V], target: V): Option[(Seq[(V, L)], V)] = {
+  def path(sources: Set[V], target: V)(implicit ctx: Context): Option[(Seq[(V, L)], V)] = ctx.interrupt {
     val queue = mutable.Queue.empty[(V, Seq[(V, L)])]
     val visited = mutable.Set.empty[V]
 

@@ -159,9 +159,19 @@ private[fuzz] final class FuzzChecker(
     log(s"fuzz: seeding start (seeder: $seeder)")
     val seed: Set[FString] = seeder match {
       case Seeder.Static =>
-        StaticSeeder.seed(pattern, maxSimpleRepeatCount, maxInitialGenerationSize, incubationLimit)
+        val staticSeed = StaticSeeder.seed(pattern, maxSimpleRepeatCount, maxInitialGenerationSize, incubationLimit)
+        if (staticSeed.size < maxInitialGenerationSize) {
+          val dynamicSeed = DynamicSeeder.seed(
+            fuzz,
+            seedingLimit,
+            seedingTimeout,
+            maxInitialGenerationSize - staticSeed.size,
+            accelerationMode
+          )
+          staticSeed ++ dynamicSeed
+        } else staticSeed
       case Seeder.Dynamic =>
-        DynamicSeeder.seed(fuzz, seedingLimit, seedingTimeout, maxInitialGenerationSize)
+        DynamicSeeder.seed(fuzz, seedingLimit, seedingTimeout, maxInitialGenerationSize, accelerationMode)
     }
     log(s"""|fuzz: seeding finish
             |  size: ${seed.size}""".stripMargin)

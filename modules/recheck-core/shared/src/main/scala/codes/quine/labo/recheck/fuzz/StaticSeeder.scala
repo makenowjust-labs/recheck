@@ -13,7 +13,7 @@ object StaticSeeder {
   /** Computes an initial generation of the pattern. */
   def seed(pattern: Pattern, maxSimpleRepeatSize: Int, maxInitialGenerationSize: Int, incubationLimit: Int)(implicit
       ctx: Context
-  ): Set[FString] = {
+  ): Set[FString] = ctx.interrupt {
     val simplePattern = simplify(pattern, maxSimpleRepeatSize)
     val epsNFA = EpsNFABuilder.build(simplePattern).get
     val orderedNFA = epsNFA.toOrderedNFA.rename.mapAlphabet(_.head)
@@ -104,13 +104,13 @@ private[fuzz] class StaticSeeder[A, Q](
   }
 
   /** Generates the initial generation. */
-  def seed(maxInitialGenerationSize: Int, incubationLimit: Int)(implicit ev: A =:= UChar): Set[FString] =
+  def seed(maxInitialGenerationSize: Int, limit: Int)(implicit ev: A =:= UChar): Set[FString] =
     outsMap.iterator
       .filter(_._2.nonEmpty)
       .flatMap { case (q0, _) =>
-        val edas = findTinyEDA(q0).map(construct(_, Math.log(incubationLimit).toInt))
-        val idas = findTinyIDA(q0).map(construct(_, Math.sqrt(incubationLimit).toInt))
-        edas ++ idas
+        val idas = findTinyIDA(q0).map(construct(_, Math.sqrt(limit).toInt))
+        val edas = findTinyEDA(q0).map(construct(_, Math.log(limit).toInt))
+        idas ++ edas
       }
       .take(maxInitialGenerationSize)
       .toSet
@@ -120,9 +120,9 @@ private[fuzz] class StaticSeeder[A, Q](
     for {
       w1 <- path(initSet, q0).iterator
       w3 <- deadPath(q0).iterator
-      (b, q2s) <- insMap(q0).filter(_._2.size >= 2)
+      (b, q2s) <- insMap(q0).filter(_._2.size >= 2).iterator
       q2 <- q2s
-      (a, q1s) <- outsMap(q0)
+      (a, q1s) <- outsMap(q0).iterator
       q1 <- q1s
       w2 <- loopPath(q0, a, q1, b, q2).iterator
     } yield interrupt((w1, w2, w3))
@@ -131,11 +131,11 @@ private[fuzz] class StaticSeeder[A, Q](
   def findTinyIDA(q0: Q): Iterator[(Seq[A], Seq[A], Seq[A])] =
     for {
       w1 <- path(initSet, q0).iterator
-      (a, _) <- outsMap(q0)
-      (b, _) <- insMap(q0)
-      (q3, _) <- charToInsMap(b)
+      (a, q1s) <- outsMap(q0).iterator
+      (b, _) <- insMap(q0).iterator
+      (q3, _) <- charToInsMap(b).iterator
       if graph.neighbors(q3).exists(_._1 == a)
-      w2 <- path(Set(q0), q3).iterator
+      w2 <- loopPath(q0, a, q1s.toSet, b, q3).iterator
       w3 <- deadPath(q3).iterator
     } yield interrupt((w1, w2, w3))
 
@@ -149,6 +149,13 @@ private[fuzz] class StaticSeeder[A, Q](
     else if (q0 == q1) path(Set(q0), q2).map(_ :+ b)
     else if (q0 == q2) path(Set(q1), q0).map(a +: _)
     else path(Set(q1), q2).map(w => a +: w :+ b)
+
+  /** Finds a loop path from `q0` through one of `q1s` at first with `a` and `q2` at last with `b`. */
+  def loopPath(q0: Q, a: A, q1s: Set[Q], b: A, q2: Q): Option[Seq[A]] =
+    if (q1s.contains(q0) && q0 == q2) Option(Seq(a))
+    else if (q1s.contains(q0)) path(Set(q0), q2).map(_ :+ b)
+    else if (q0 == q2) path(q1s, q0).map(a +: _)
+    else path(q1s, q2).map(w => a +: w :+ b)
 
   /** Finds a dead path from `q`. */
   def deadPath(q: Q): Option[Seq[A]] =
