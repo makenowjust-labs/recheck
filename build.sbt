@@ -18,7 +18,8 @@ ThisBuild / scalacOptions ++= Seq(
   "UTF-8",
   "-feature",
   "-deprecation",
-  "-Wunused"
+  "-Wunused",
+  "-P:bm4:implicit-patterns:n"
 )
 
 // Scalafix config:
@@ -80,6 +81,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -104,6 +106,7 @@ lazy val common = crossProject(JVMPlatform, JSPlatform)
     Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value % Provided,
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -121,6 +124,7 @@ lazy val unicode = crossProject(JVMPlatform, JSPlatform)
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Generators:
     {
       val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
@@ -167,6 +171,7 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
     Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "com.lihaoyi" %%% "fastparse" % "2.3.3",
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -194,6 +199,7 @@ lazy val codec = crossProject(JVMPlatform, JSPlatform)
     Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "io.circe" %%% "circe-core" % "0.14.1",
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -220,6 +226,7 @@ lazy val js = project
     Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "io.circe" %%% "circe-scalajs" % "0.14.1",
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework"),
@@ -256,6 +263,7 @@ lazy val cli = project
     libraryDependencies += "io.circe" %% "circe-core" % "0.14.1",
     libraryDependencies += "io.circe" %% "circe-generic" % "0.14.1",
     libraryDependencies += "io.circe" %% "circe-parser" % "0.14.1",
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
