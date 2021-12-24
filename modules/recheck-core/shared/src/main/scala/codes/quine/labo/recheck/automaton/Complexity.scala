@@ -52,7 +52,7 @@ object Complexity {
 
     def buildAttackPattern(attackLimit: Int, maxSize: Int)(implicit ev: A =:= UChar): AttackPattern = {
       val remainSteps = attackLimit - witness.fixedSize
-      val repeatSteps = witness.repeatSize
+      val repeatSteps = witness.repeatSize.toDouble / (1 to degree).product
       val repeatSize = Math.ceil(Math.pow(remainSteps / repeatSteps, 1 / degree.toDouble)).toInt
       val maxRepeatSize = Math.floor((maxSize - witness.fixedSize) / witness.repeatSize.toDouble).toInt
       witness.buildAttackPattern(Math.min(repeatSize, maxRepeatSize))

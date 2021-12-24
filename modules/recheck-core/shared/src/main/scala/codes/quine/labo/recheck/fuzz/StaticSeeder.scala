@@ -48,8 +48,8 @@ object StaticSeeder {
             if (min == 0) Repeat(Quantifier.Star(q.isLazy), loop(n))
             else Repeat(Quantifier.Plus(q.isLazy), loop(n))
           } else Repeat(q, loop(n))
-        case LookAhead(_, _)          => Sequence(Seq.empty)
-        case LookBehind(_, _)         => Sequence(Seq.empty)
+        case LookAhead(_, n)          => Disjunction(Seq(loop(n), Sequence(Seq.empty)))
+        case LookBehind(_, n)         => Disjunction(Seq(loop(n), Sequence(Seq.empty)))
         case BackReference(i)         => Disjunction(Seq(loop(backRefs(i)), Sequence(Seq.empty)))
         case NamedBackReference(i, _) => Disjunction(Seq(loop(backRefs(i)), Sequence(Seq.empty)))
         case n                        => n
@@ -108,8 +108,8 @@ private[fuzz] class StaticSeeder[A, Q](
     outsMap.iterator
       .filter(_._2.nonEmpty)
       .flatMap { case (q0, _) =>
-        val idas = findTinyIDA(q0).map(construct(_, Math.sqrt(limit).toInt))
-        val edas = findTinyEDA(q0).map(construct(_, Math.log(limit).toInt))
+        val idas = findTinyIDA(q0).map(t => construct(t, Math.sqrt(limit / (t._2.size.toDouble / 2)).toInt))
+        val edas = findTinyEDA(q0).map(t => construct(t, Math.log(limit / t._2.size.toDouble).toInt))
         idas ++ edas
       }
       .take(maxInitialGenerationSize)
@@ -124,7 +124,7 @@ private[fuzz] class StaticSeeder[A, Q](
       q2 <- q2s
       (a, q1s) <- outsMap(q0).iterator
       q1 <- q1s
-      w2 <- loopPath(q0, a, q1, b, q2).iterator
+      w2 <- loopPath(q0, a, q1, q2, b).iterator
     } yield interrupt((w1, w2, w3))
 
   /** Returns all possible tiny IDAs from `q0`. */
@@ -133,29 +133,29 @@ private[fuzz] class StaticSeeder[A, Q](
       w1 <- path(initSet, q0).iterator
       (a, q1s) <- outsMap(q0).iterator
       (b, _) <- insMap(q0).iterator
-      (q3, _) <- charToInsMap(b).iterator
+      (q3, q2s) <- charToInsMap(b).iterator
       if graph.neighbors(q3).exists(_._1 == a)
-      w2 <- loopPath(q0, a, q1s.toSet, b, q3).iterator
+      w2 <- middlePath(q0, a, q1s.toSet, q2s.toSet, b, q3).iterator
       w3 <- deadPath(q3).iterator
     } yield interrupt((w1, w2, w3))
 
-  /** Finds a path from `qs` to `q`. */
-  def path(qs: Set[Q], q: Q): Option[Seq[A]] =
-    graph.path(qs, q).map(_._1.map(_._2))
+  /** Finds a path from `q0s` to `q1`. */
+  def path(q0s: Set[Q], q1: Q): Option[Seq[A]] =
+    graph.path(q0s, q1).map(_._1.map(_._2))
+
+  /** Finds a path from `q0s` to `q1s`. */
+  def path(q0s: Set[Q], q1s: Set[Q]): Option[Seq[A]] =
+    graph.path(q0s, q1s).map(_._1.map(_._2))
 
   /** Finds a loop path from `q0` through `q1` at first with `a` and `q2` at last with `b`. */
-  def loopPath(q0: Q, a: A, q1: Q, b: A, q2: Q): Option[Seq[A]] =
-    if (q0 == q1 && q0 == q2) Option(Seq(a))
-    else if (q0 == q1) path(Set(q0), q2).map(_ :+ b)
-    else if (q0 == q2) path(Set(q1), q0).map(a +: _)
+  def loopPath(q0: Q, a: A, q1: Q, q2: Q, b: A): Option[Seq[A]] =
+    if (a == b && q0 == q1 && q0 == q2) Some(Seq(a))
     else path(Set(q1), q2).map(w => a +: w :+ b)
 
-  /** Finds a loop path from `q0` through one of `q1s` at first with `a` and `q2` at last with `b`. */
-  def loopPath(q0: Q, a: A, q1s: Set[Q], b: A, q2: Q): Option[Seq[A]] =
-    if (q1s.contains(q0) && q0 == q2) Option(Seq(a))
-    else if (q1s.contains(q0)) path(Set(q0), q2).map(_ :+ b)
-    else if (q0 == q2) path(q1s, q0).map(a +: _)
-    else path(q1s, q2).map(w => a +: w :+ b)
+  /** Finds a middle path from `q0` to `q3` through one of `q1s` at first with `a` and `b` as the last label. */
+  def middlePath(q0: Q, a: A, q1s: Set[Q], q2s: Set[Q], b: A, q3: Q): Option[Seq[A]] =
+    if (a == b && q1s.contains(q3) && q2s.contains(q0)) Some(Seq(a))
+    else path(q1s, q2s).map(w => a +: w :+ b)
 
   /** Finds a dead path from `q`. */
   def deadPath(q: Q): Option[Seq[A]] =
@@ -166,10 +166,11 @@ private[fuzz] class StaticSeeder[A, Q](
     }
 
   /** Constructs a FString from an EDA/IDA triple. */
-  def construct(t: (Seq[A], Seq[A], Seq[A]), n: Int)(implicit ev: A =:= UChar): FString = {
+  def construct(t: (Seq[A], Seq[A], Seq[A]), n0: Int)(implicit ev: A =:= UChar): FString = {
     val w1 = t._1.map(u => FString.Wrap(ev(u))).toIndexedSeq
     val w2 = t._2.map(u => FString.Wrap(ev(u))).toIndexedSeq
     val w3 = t._3.map(u => FString.Wrap(ev(u))).toIndexedSeq
+    val n = if (w2.size == 1) n0 * 2 else n0
     FString(n, (w1 :+ FString.Repeat(0, w2.size)) ++ w2 ++ w3)
   }
 }

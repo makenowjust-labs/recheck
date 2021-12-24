@@ -371,7 +371,8 @@ private[fuzz] final class FuzzChecker(
   /** Construct an attack string on assuming the pattern is polynomial. */
   def tryAttackPolynomial(str: FString, degree: Int): Option[AttackResult] = interrupt {
     log(s"fuzz: attack (polynomial: $degree)")
-    val r = Math.pow(attackLimit, 1.0 / degree) / str.n
+    val repeatSteps = str.repeatSize.toDouble / (1 to degree).product
+    val r = Math.pow(attackLimit / repeatSteps, 1.0 / degree) / str.n
     if (r < 1) None
     else {
       val attack = str.copy(n = Math.ceil(str.n * r).toInt)
