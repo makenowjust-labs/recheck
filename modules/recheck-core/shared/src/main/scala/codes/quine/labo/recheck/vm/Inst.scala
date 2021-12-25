@@ -46,6 +46,18 @@ object Inst {
     override def toString: String = s"try $next $fallback"
   }
 
+  /** `try-la`: Compound instruction of `try` and `read`. */
+  final case class TryLA(read: Read, next: Label, fallback: Label) extends Terminator {
+    def successors: Set[Label] = Set(next, fallback)
+    override def toString: String = s"try-la (${read.kind}) $next $fallback"
+  }
+
+  /** `try-lb`: Compound instruction of `try` and `read-back`. */
+  final case class TryLB(read: ReadBack, next: Label, fallback: Label) extends Terminator {
+    def successors: Set[Label] = Set(next, fallback)
+    override def toString: String = s"try-lb (${read.kind}) $next $fallback"
+  }
+
   /** `cmp`: Compares a `reg` value with its operands, and jumps to a block depending on the comparison result. If `reg
     * < n`, it jumps to a `lt` label, or if `n <= reg`, it jumps to a `ge` label.
     */

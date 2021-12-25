@@ -89,6 +89,11 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |    case Left(ex)       => throw new InvalidRegExpException(ex.getMessage)
       |  })
       |
+      |def compile(source: String, flags: String): Program = {
+      |  val pattern = parse(source, flags)
+      |  time("compile")(ProgramBuilder.build(pattern).get)
+      |}
+      |
       |def run(
       |    source: String,
       |    flags: String,
