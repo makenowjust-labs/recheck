@@ -24,7 +24,7 @@ class AgentCommandSuite extends munit.FunSuite {
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":5,$complex}""")
     )
     val out = Seq.newBuilder[String]
-    val sem = new Semaphore(1)
+    val sem = new Semaphore(0)
     val io = new RPC.IO {
       def read(): Iterator[String] =
         in.iterator.flatMap {
