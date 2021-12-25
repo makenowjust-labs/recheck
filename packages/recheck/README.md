@@ -112,7 +112,7 @@ and it needs to know the checkers in depth to set the correct value.
 
 Type: `number`
 
-Default: `700000`
+Default: `300000`
 
 Maximum length of an attack string.
 
@@ -120,7 +120,7 @@ Maximum length of an attack string.
 
 Type: `number`
 
-Default: `1000000000`
+Default: `1500000000`
 
 Upper limit on the number of characters read by the VM during attack string construction.
 

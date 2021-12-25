@@ -33,11 +33,11 @@ import scala.concurrent.duration._
   *   Option[Context.Logger] Logger to log an analysis execution. (default: `None`)
   *
   * @param maxAttackStringSize
-  *   Int Maximum length of an attack string. (default: `700000`)
+  *   Int Maximum length of an attack string. (default: `300000`)
   *
   * @param attackLimit
   *   Int Upper limit on the number of characters read by the VM during attack string construction. (default:
-  *   `1000000000`)
+  *   `1500000000`)
   *
   * @param randomSeed
   *   Long Seed value for PRNG used by fuzzing. (default: `0`)
@@ -167,10 +167,10 @@ object Parameters {
   val Logger: Option[Context.Logger] = None
 
   /** The default value of [[Parameters.maxAttackStringSize]]. */
-  val MaxAttackStringSize: Int = 700000
+  val MaxAttackStringSize: Int = 300000
 
   /** The default value of [[Parameters.attackLimit]]. */
-  val AttackLimit: Int = 1000000000
+  val AttackLimit: Int = 1500000000
 
   /** The default value of [[Parameters.randomSeed]]. */
   val RandomSeed: Long = 0

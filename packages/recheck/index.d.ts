@@ -67,14 +67,14 @@ export type Parameters = {
   /**
    * Maximum length of an attack string.
    *
-   * (default: `700000`)
+   * (default: `300000`)
    */
   maxAttackStringSize?: number;
 
   /**
    * Upper limit on the number of characters read by the VM during attack string construction.
    *
-   * (default: `1000000000`)
+   * (default: `1500000000`)
    */
   attackLimit?: number;
 
