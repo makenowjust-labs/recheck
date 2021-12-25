@@ -139,7 +139,7 @@ export type Parameters = {
   /**
    * Upper limit on the number of characters read by the VM during incubation.
    *
-   * (default: `100000`)
+   * (default: `25000`)
    */
   incubationLimit?: number;
 
@@ -157,7 +157,7 @@ export type Parameters = {
   /**
    * Maximum length of an attack string on genetic algorithm iterations.
    *
-   * (default: `4000`)
+   * (default: `2400`)
    */
   maxGeneStringSize?: number;
 

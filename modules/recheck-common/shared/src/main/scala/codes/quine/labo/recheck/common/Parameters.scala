@@ -69,7 +69,7 @@ import scala.concurrent.duration._
   *   Int Maximum population at the initial generation. (default: `500`)
   *
   * @param incubationLimit
-  *   Int Upper limit on the number of characters read by the VM during incubation. (default: `100000`)
+  *   Int Upper limit on the number of characters read by the VM during incubation. (default: `25000`)
   *
   * @param incubationTimeout
   *   Duration Upper limit of VM execution time during incubation.
@@ -77,7 +77,7 @@ import scala.concurrent.duration._
   * (default: `Duration(250, MILLISECONDS)`)
   *
   * @param maxGeneStringSize
-  *   Int Maximum length of an attack string on genetic algorithm iterations. (default: `4000`)
+  *   Int Maximum length of an attack string on genetic algorithm iterations. (default: `2400`)
   *
   * @param maxGenerationSize
   *   Int Maximum population at a single generation. (default: `100`)
@@ -194,13 +194,13 @@ object Parameters {
   val MaxInitialGenerationSize: Int = 500
 
   /** The default value of [[Parameters.incubationLimit]]. */
-  val IncubationLimit: Int = 100000
+  val IncubationLimit: Int = 25000
 
   /** The default value of [[Parameters.incubationTimeout]]. */
   val IncubationTimeout: Duration = Duration(250, MILLISECONDS)
 
   /** The default value of [[Parameters.maxGeneStringSize]]. */
-  val MaxGeneStringSize: Int = 4000
+  val MaxGeneStringSize: Int = 2400
 
   /** The default value of [[Parameters.maxGenerationSize]]. */
   val MaxGenerationSize: Int = 100

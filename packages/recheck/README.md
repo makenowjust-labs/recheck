@@ -47,7 +47,7 @@ Noting that `checkSync` is synchronous version of `check`, it blocks JavaScript 
 
 ### Configuration
 
-Optional parameters specifiy as the 3rd argument of the `check` function.
+Optional parameters specify as the 3rd argument of the `check` function.
 
 ```javascript
 console.log(await check("^(a|a)*$", "", { timeout: 1000, checker: "fuzz" }));
@@ -86,7 +86,7 @@ Default: `10000`
 
 Upper limit of analysis time.
 
-If the analysis time exceeds this value, the result will be reported as a timeout.
+If the analysis time exceeds this value, the result will be reported as a timeout.  
 If the value is the positive infinite duration, the result never become a timeout.
 
 If the `number` value is specified, it is parsed in milliseconds.
@@ -192,7 +192,7 @@ Maximum population at the initial generation.
 
 Type: `number`
 
-Default: `100000`
+Default: `25000`
 
 Upper limit on the number of characters read by the VM during incubation.
 
@@ -211,7 +211,7 @@ If the value is `null`, it is parsed as the positive infinite duration.
 
 Type: `number`
 
-Default: `4000`
+Default: `2400`
 
 Maximum length of an attack string on genetic algorithm iterations.
 
