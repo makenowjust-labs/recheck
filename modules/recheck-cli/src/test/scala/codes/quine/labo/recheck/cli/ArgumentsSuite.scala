@@ -8,6 +8,7 @@ import cats.data.Validated
 import codes.quine.labo.recheck.cli.arguments._
 import codes.quine.labo.recheck.common.AccelerationMode
 import codes.quine.labo.recheck.common.Checker
+import codes.quine.labo.recheck.common.Seeder
 
 class ArgumentsSuite extends munit.FunSuite {
   test("arguments.durationArgument") {
@@ -30,5 +31,12 @@ class ArgumentsSuite extends munit.FunSuite {
     assertEquals(accelerationModeArgument.read("off"), Validated.validNel(AccelerationMode.Off))
     assertEquals(accelerationModeArgument.read("xxx"), Validated.invalidNel("unknown acceleration mode: xxx"))
     assertEquals(accelerationModeArgument.defaultMetavar, "mode")
+  }
+
+  test("arguments.seederArgument") {
+    assertEquals(seederArgument.read("static"), Validated.validNel(Seeder.Static))
+    assertEquals(seederArgument.read("dynamic"), Validated.validNel(Seeder.Dynamic))
+    assertEquals(seederArgument.read("xxx"), Validated.invalidNel("unknown seeder: xxx"))
+    assertEquals(seederArgument.defaultMetavar, "seeder")
   }
 }

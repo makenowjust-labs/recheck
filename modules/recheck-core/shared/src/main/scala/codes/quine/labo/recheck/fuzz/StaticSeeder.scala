@@ -2,6 +2,7 @@ package codes.quine.labo.recheck.fuzz
 
 import codes.quine.labo.recheck.automaton.EpsNFABuilder
 import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.data.Graph
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.regexp.Pattern._
@@ -11,7 +12,12 @@ import codes.quine.labo.recheck.unicode.UChar
 object StaticSeeder {
 
   /** Computes an initial generation of the pattern. */
-  def seed(pattern: Pattern, maxSimpleRepeatSize: Int, maxInitialGenerationSize: Int, incubationLimit: Int)(implicit
+  def seed(
+      pattern: Pattern,
+      maxSimpleRepeatSize: Int = Parameters.MaxSimpleRepeatCount,
+      maxInitialGenerationSize: Int = Parameters.MaxInitialGenerationSize,
+      limit: Int = Parameters.IncubationLimit
+  )(implicit
       ctx: Context
   ): Set[FString] = ctx.interrupt {
     val simplePattern = simplify(pattern, maxSimpleRepeatSize)
@@ -24,7 +30,7 @@ object StaticSeeder {
       orderedNFA.acceptSet,
       orderedNFA.toGraph
     )
-    seeder.seed(maxInitialGenerationSize, incubationLimit)
+    seeder.seed(maxInitialGenerationSize, limit)
   }
 
   /** Returns a simplified pattern. */
