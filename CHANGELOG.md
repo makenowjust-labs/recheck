@@ -12,6 +12,7 @@ Changes:
 - Decrease some parameters default values ([#227](https://github.com/MakeNowJust-Labo/recheck/pull/227))
 - Improve repetition count estimation ([#227](https://github.com/MakeNowJust-Labo/recheck/pull/227))
 - Use JavaScript style representation for `AttackPattern#toString` ([#229](https://github.com/MakeNowJust-Labo/recheck/pull/229))
+- Apply look-ahead optimization to VM ([#233](https://github.com/MakeNowJust-Labo/recheck/pull/233))
 
 Fixes:
 
