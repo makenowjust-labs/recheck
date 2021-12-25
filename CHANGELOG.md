@@ -13,6 +13,10 @@ Changes:
 - Improve repetition count estimation ([#227](https://github.com/MakeNowJust-Labo/recheck/pull/227))
 - Use JavaScript style representation for `AttackPattern#toString` ([#229](https://github.com/MakeNowJust-Labo/recheck/pull/229))
 
+Fixes:
+
+- Fix semaphore usage in test ([#230](https://github.com/MakeNowJust-Labo/recheck/pull/230))
+
 # 4.1.1 (2021-12-04)
 
 Fixes:
