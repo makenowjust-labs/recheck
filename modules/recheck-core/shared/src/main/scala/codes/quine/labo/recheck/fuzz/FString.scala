@@ -5,7 +5,6 @@ import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.fuzz.FString._
 import codes.quine.labo.recheck.unicode.UChar
 import codes.quine.labo.recheck.unicode.UString
-import codes.quine.labo.recheck.util.NumberFormat
 
 /** FString is a string with a repetition structure for fuzzing. */
 final case class FString(n: Int, seq: IndexedSeq[FChar]) {
@@ -114,7 +113,8 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
     AttackPattern(pumps.result(), suffix, n)
   }
 
-  override def toString: String = {
+  /** Returns the string representation of this string. */
+  def toString(style: AttackPattern.Style): String = {
     if (seq.isEmpty) return "''"
 
     val parts = Seq.newBuilder[String]
@@ -141,7 +141,7 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
                 case Repeat(_, _) => throw new IllegalArgumentException
               }
               .mkString
-            parts.addOne(UString(part).toString ++ NumberFormat.superscript(repeat))
+            parts.addOne(s"${UString(part)}${style.repeat(repeat)}")
             pos += size
           }
       }
@@ -150,8 +150,10 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
     val s = UString(str.result())
     if (s.nonEmpty) parts.addOne(s.toString)
 
-    parts.result().mkString(" ")
+    parts.result().mkString(style.join)
   }
+
+  override def toString: String = toString(AttackPattern.JavaScript)
 }
 
 /** FString types and utilities. */

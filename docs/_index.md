@@ -26,8 +26,8 @@ console.log(await check("^(a|a)*$", ""));
 //     pumps: [ { prefix: 'a', pump: 'a', bias: 0 } ],
 //     suffix: '\x00',
 //     base: 17,
-//     string: 'aaaaaaaaaaaaaaaaaa\x00',
-//     pattern: "'a' 'a'¹⁷ '\\x00'"
+//     string: 'aaaaaaaaaaaaaaaaaaaaaaaaaaa\x00',
+//     pattern: "'a' + 'a'.repeat(27) + '\\x00'"
 //   },
 //   complexity: { type: 'exponential', summary: 'exponential', isFuzz: false }
 // }

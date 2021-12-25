@@ -31,15 +31,43 @@ final case class AttackPattern(pumps: Seq[(UString, UString, Int)], suffix: UStr
     UString(str.result())
   }
 
-  override def toString: String = {
+  /** Returns the string reperesentation of this. */
+  def toString(style: AttackPattern.Style): String = {
     val seq = Seq.newBuilder[String]
 
     for ((s, t, m) <- pumps) {
       if (s.nonEmpty) seq.addOne(s.toString)
-      seq.addOne(s"${t}${NumberFormat.superscript(n + m)}")
+      seq.addOne(s"${t}${style.repeat(n + m)}")
     }
     if (suffix.nonEmpty) seq.addOne(suffix.toString)
 
-    seq.result().mkString(" ")
+    seq.result().mkString(style.join)
+  }
+
+  override def toString: String = toString(AttackPattern.JavaScript)
+}
+
+object AttackPattern {
+
+  /** Style is an enumeration to specify `toString` style of [[AttackPattern]] and similar classes. */
+  sealed abstract class Style extends Product with Serializable {
+
+    /** Returns a repeat suffix. */
+    def repeat(n: Int): String
+
+    /** Returns a string concatenation operator. */
+    def join: String
+  }
+
+  /** JavaScript is a JavaScript style specifier. */
+  case object JavaScript extends Style {
+    def repeat(n: Int): String = s".repeat(${n})"
+    def join: String = " + "
+  }
+
+  /** Superscript is a superscript style specifier. */
+  case object Superscript extends Style {
+    def repeat(n: Int): String = NumberFormat.superscript(n)
+    def join: String = " "
   }
 }

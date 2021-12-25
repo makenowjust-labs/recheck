@@ -33,7 +33,7 @@ console.log(await check("^(a|a)*$", ""));
 //     suffix: '\x00',
 //     base: 27,
 //     string: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaa\x00',
-//     pattern: "'a' 'a'²⁷ '\\x00'"
+//     pattern: "'a' + 'a'.repeat(27) + '\\x00'"
 //   },
 //   complexity: { type: 'exponential', summary: 'exponential', isFuzz: false },
 //   hotspot: [
