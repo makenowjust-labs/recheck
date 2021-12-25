@@ -31,7 +31,7 @@ class DiagnosticsSuite extends munit.FunSuite {
       s"""|Input        : /abbc/
           |Status       : vulnerable
           |Complexity   : exponential
-          |Attack string: 'a' 'b'² 'c'
+          |Attack string: 'a' + 'b'.repeat(2) + 'c'
           |Hotspot      : /abbc/
           |Checker      : automaton""".stripMargin
     )

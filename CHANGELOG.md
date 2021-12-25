@@ -8,6 +8,7 @@ Changes:
 - Add `Parameters` as immutable version of `Config` ([#202](https://github.com/MakeNowJust-Labo/recheck/pull/202))
 - Add `accelerationMode` parameter to specify acceleration mode behavior ([#211](https://github.com/MakeNowJust-Labo/recheck/pull/211))
 - Rename default parameter constant names ([#211](https://github.com/MakeNowJust-Labo/recheck/pull/211))
+- Use JavaScript style representation for `AttackPattern#toString` ([#229](https://github.com/MakeNowJust-Labo/recheck/pull/229))
 
 # 4.1.1 (2021-12-04)
 
