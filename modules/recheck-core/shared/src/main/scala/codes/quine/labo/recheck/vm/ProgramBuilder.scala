@@ -171,9 +171,32 @@ private[vm] class ProgramBuilder(
 
   /** Returns a built program. */
   def result(): Program = {
+    /*
+    for (label <- labelsBuffer) {
+      val block = label.block
+      block.terminator match {
+        case t: Inst.Try =>
+          val next = t.next
+          if (predecessorsBuffer(next.index) == Set(label)) {
+            next.block.insts.headOption match {
+              case Some(read: Inst.Read) =>
+                label.block = Block(block.insts, Inst.TryLA(read, t.next, t.fallback))
+                next.block = Block(next.block.insts.tail, next.block.terminator)
+              case Some(read: Inst.ReadBack) =>
+                label.block = Block(block.insts, Inst.TryLB(read, t.next, t.fallback))
+                next.block = Block(next.block.insts.tail, next.block.terminator)
+              case _ => () // nothing to do
+            }
+          }
+        case _ => () // nothing to do
+      }
+    }
+     */
+
     val blocks = labelsBuffer.iterator.map(label => (label, label.block)).toVector
     val predecessors = predecessorsBuffer.iterator.map(_.toSet).toVector
     val meta = Meta(ignoreCase, unicode, hasRef, capturesSize, counters.size, canaries.size, predecessors)
+
     Program(blocks, meta)
   }
 

@@ -289,6 +289,32 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
             frame.label = next
             frame.fallback = Some(fallbackFrame)
             false
+          case Inst.TryLA(read, next, fallback) =>
+            val oldPos = frame.pos
+            if (instRead(frame, read)) {
+              val fallbackFrame = frame.clone()
+              fallbackFrame.pos = oldPos
+              fallbackFrame.label = fallback
+              frame.label = next
+              frame.fallback = Some(fallbackFrame)
+              false
+            } else {
+              frame.label = fallback
+              false
+            }
+          case Inst.TryLB(read, next, fallback) =>
+            val oldPos = frame.pos
+            if (instReadBack(frame, read)) {
+              val fallbackFrame = frame.clone()
+              fallbackFrame.pos = oldPos
+              fallbackFrame.label = fallback
+              frame.label = next
+              frame.fallback = Some(fallbackFrame)
+              false
+            } else {
+              frame.label = fallback
+              false
+            }
           case Inst.Cmp(reg, n, lt, ge) =>
             val r = frame.counters(reg.index)
             val next = if (r < n) lt else ge
@@ -404,84 +430,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         }
         if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
         ok
-      case Inst.Read(kind @ ReadKind.Ref(index), loc) =>
-        val s = frame.capture(index) match {
-          case Some(s) => s
-          case None    => UString.empty
-        }
-        val ok = s == input.substring(frame.pos, frame.pos + s.sizeAsString)
-        if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
-        if (ok) {
-          if (options.needsHeatmap && loc.isDefined) {
-            heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-          }
-          steps = Math.addExact(steps, 1)
-          frame.pos += s.sizeAsString
-          true
-        } else {
-          if (options.needsFailedPoints) {
-            val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, kind, Some(s))
-            failedPoints.add(point)
-          }
-          false
-        }
-      case Inst.Read(kind, loc) =>
-        val c = frame.currentChar
-        val ok = read(c, kind)
-        if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
-        if (ok) {
-          if (options.needsHeatmap && loc.isDefined) {
-            heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-          }
-          steps = Math.addExact(steps, 1)
-          frame.pos += c.size
-          true
-        } else {
-          if (options.needsFailedPoints) {
-            val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, kind, None)
-            failedPoints.add(point)
-          }
-          false
-        }
-      case Inst.ReadBack(kind @ ReadKind.Ref(index), loc) =>
-        val s = frame.capture(index) match {
-          case Some(s) => s
-          case None    => UString.empty
-        }
-        val ok = s == input.substring(frame.pos - s.sizeAsString, frame.pos)
-        if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
-        if (ok) {
-          if (options.needsHeatmap && loc.isDefined) {
-            heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-          }
-          steps = Math.addExact(steps, 1)
-          frame.pos -= s.sizeAsString
-          true
-        } else {
-          if (options.needsFailedPoints) {
-            val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, kind, Some(s))
-            failedPoints.add(point)
-          }
-          false
-        }
-      case Inst.ReadBack(kind, loc) =>
-        val c = frame.previousChar
-        val ok = read(c, kind)
-        if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
-        if (read(frame.previousChar, kind)) {
-          if (options.needsHeatmap && loc.isDefined) {
-            heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-          }
-          steps = Math.addExact(steps, 1)
-          frame.pos -= c.size
-          true
-        } else {
-          if (options.needsFailedPoints) {
-            val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, kind, None)
-            failedPoints.add(point)
-          }
-          false
-        }
+      case read: Inst.Read     => instRead(frame, read)
+      case read: Inst.ReadBack => instReadBack(frame, read)
       case Inst.CapBegin(index) =>
         frame.capBegin(index)
         true
@@ -492,6 +442,92 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         frame.capReset(from, to)
         true
     }
+
+  /** Runs a given `read` instruction. */
+  private def instRead(frame: Frame, inst: Inst.Read): Boolean = inst match {
+    case Inst.Read(kind @ ReadKind.Ref(index), loc) =>
+      val s = frame.capture(index) match {
+        case Some(s) => s
+        case None    => UString.empty
+      }
+      val ok = s == input.substring(frame.pos, frame.pos + s.sizeAsString)
+      if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
+      if (ok) {
+        if (options.needsHeatmap && loc.isDefined) {
+          heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
+        }
+        steps = Math.addExact(steps, 1)
+        frame.pos += s.sizeAsString
+        true
+      } else {
+        if (options.needsFailedPoints) {
+          val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, kind, Some(s))
+          failedPoints.add(point)
+        }
+        false
+      }
+    case Inst.Read(kind, loc) =>
+      val c = frame.currentChar
+      val ok = read(c, kind)
+      if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
+      if (ok) {
+        if (options.needsHeatmap && loc.isDefined) {
+          heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
+        }
+        steps = Math.addExact(steps, 1)
+        frame.pos += c.size
+        true
+      } else {
+        if (options.needsFailedPoints) {
+          val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, kind, None)
+          failedPoints.add(point)
+        }
+        false
+      }
+  }
+
+  /** Runs a given `read-back` instruction. */
+  private def instReadBack(frame: Frame, inst: Inst.ReadBack): Boolean = inst match {
+    case Inst.ReadBack(kind @ ReadKind.Ref(index), loc) =>
+      val s = frame.capture(index) match {
+        case Some(s) => s
+        case None    => UString.empty
+      }
+      val ok = s == input.substring(frame.pos - s.sizeAsString, frame.pos)
+      if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
+      if (ok) {
+        if (options.needsHeatmap && loc.isDefined) {
+          heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
+        }
+        steps = Math.addExact(steps, 1)
+        frame.pos -= s.sizeAsString
+        true
+      } else {
+        if (options.needsFailedPoints) {
+          val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, kind, Some(s))
+          failedPoints.add(point)
+        }
+        false
+      }
+    case Inst.ReadBack(kind, loc) =>
+      val c = frame.previousChar
+      val ok = read(c, kind)
+      if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
+      if (ok) {
+        if (options.needsHeatmap && loc.isDefined) {
+          heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
+        }
+        steps = Math.addExact(steps, 1)
+        frame.pos -= c.size
+        true
+      } else {
+        if (options.needsFailedPoints) {
+          val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, kind, None)
+          failedPoints.add(point)
+        }
+        false
+      }
+  }
 
   /** Checks to match `read` instruction. */
   private def read(c: Option[UChar], kind: ReadKind): Boolean =

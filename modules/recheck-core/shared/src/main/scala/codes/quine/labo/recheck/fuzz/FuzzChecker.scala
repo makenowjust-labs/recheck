@@ -194,10 +194,10 @@ private[fuzz] final class FuzzChecker(
     if (gen.traces.isEmpty) return Left(gen)
 
     log {
-      val max = gen.traces.maxBy(_.steps)
+      val max = gen.traces.maxBy(_.rate)
       s"""|fuzz: iteration $i
           |  traces: ${gen.traces.size}
-          |     max: ${max.str} (steps: ${max.steps})""".stripMargin
+          |     max: ${max.str} (steps: ${max.steps}, rate: ${max.rate})""".stripMargin
     }
     val next = Population.from(gen)
 

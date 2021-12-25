@@ -10,6 +10,14 @@ class InstSuite extends munit.FunSuite {
     assertEquals(Inst.Ok.toString, "ok")
     assertEquals(Inst.Jmp(Label("x", 0)).toString, "jmp #x@0")
     assertEquals(Inst.Try(Label("x", 0), Label("y", 1)).toString, "try #x@0 #y@1")
+    assertEquals(
+      Inst.TryLA(Inst.Read(ReadKind.Char('a'), None), Label("x", 0), Label("y", 1)).toString,
+      "try-la (char 'a') #x@0 #y@1"
+    )
+    assertEquals(
+      Inst.TryLB(Inst.ReadBack(ReadKind.Char('a'), None), Label("x", 0), Label("y", 1)).toString,
+      "try-lb (char 'a') #x@0 #y@1"
+    )
     assertEquals(Inst.Cmp(CounterReg(0), 1, Label("x", 2), Label("y", 3)).toString, "cmp %0 1 #x@2 #y@3")
     assertEquals(Inst.Rollback.toString, "rollback")
     assertEquals(Inst.Tx(Label("x", 0), None, None).toString, "tx #x@0 FAIL FAIL")
