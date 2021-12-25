@@ -57,6 +57,11 @@ class InterpreterSuite extends munit.FunSuite {
     assertEquals(matches(source, flags, input, pos, opts.copy(usesAcceleration = true)).status, Status.Fail)
   }
 
+  def assertLimit(source: String, flags: String, input: String, pos: Int)(implicit loc: munit.Location): Unit = {
+    val opts = Options(usesAcceleration = true)
+    assertEquals(matches(source, flags, input, pos, opts).status, Status.Limit)
+  }
+
   test("Interpreter.run: result") {
     val opts = Options(
       usesAcceleration = true,
@@ -261,6 +266,8 @@ class InterpreterSuite extends munit.FunSuite {
 
     assertMatches("(?<!ab)$", "", "ba", 2)
     assertNotMatches("(?<!ab)$", "", "ab", 2)
+
+    assertLimit("^(a|a)*$", "", "a" * 32 + "b", 0)
   }
 
   test("Interpreter.run: captures") {

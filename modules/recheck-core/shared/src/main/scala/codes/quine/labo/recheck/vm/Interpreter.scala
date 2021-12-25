@@ -224,7 +224,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
   /** Runs matching from a position. */
   def run(pos: Int): Result = {
-    var frame = new Frame(
+    val frame = new Frame(
       program.blocks.head._1,
       pos,
       Vector.fill((program.meta.capturesSize + 1) * 2)(-1),
@@ -234,6 +234,14 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       None,
       Vector.empty
     )
+
+    try runLoop(frame)
+    catch { case _: ArithmeticException => result(Status.Limit, None) }
+  }
+
+  /** Runs matching loop. */
+  private def runLoop(initialFrame: Frame): Result = {
+    var frame = initialFrame
 
     // $COVERAGE-OFF$
     while (true) ctx.interrupt {
@@ -249,7 +257,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         memoTable.get(state) match {
           case Some(diff) =>
             memoized = true
-            steps += diff.steps
+            steps = Math.addExact(steps, diff.steps)
             if (options.needsHeatmap) {
               for ((loc, n) <- diff.heatmap.get) {
                 heatmap = heatmap.updated(loc, heatmap(loc) + n)
@@ -341,7 +349,6 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         }
       }
     }
-
     // $COVERAGE-OFF$
     sys.error("unreachable")
     // $COVERAGE-ON$
@@ -408,7 +415,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           if (options.needsHeatmap && loc.isDefined) {
             heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
           }
-          steps += 1
+          steps = Math.addExact(steps, 1)
           frame.pos += s.sizeAsString
           true
         } else {
@@ -426,7 +433,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           if (options.needsHeatmap && loc.isDefined) {
             heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
           }
-          steps += 1
+          steps = Math.addExact(steps, 1)
           frame.pos += c.size
           true
         } else {
@@ -447,7 +454,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           if (options.needsHeatmap && loc.isDefined) {
             heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
           }
-          steps += 1
+          steps = Math.addExact(steps, 1)
           frame.pos -= s.sizeAsString
           true
         } else {
@@ -465,7 +472,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           if (options.needsHeatmap && loc.isDefined) {
             heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
           }
-          steps += 1
+          steps = Math.addExact(steps, 1)
           frame.pos -= c.size
           true
         } else {
