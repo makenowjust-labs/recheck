@@ -95,13 +95,13 @@ class CodecSuite extends munit.FunSuite {
 
   test("codec.encodeAttackPattern") {
     assertEquals(
-      encodeAttackPattern(AttackPattern(Seq((UString("a"), UString("b"), 1)), UString("c"), 0)),
+      encodeAttackPattern(AttackPattern(Seq((UString("a"), UString("b"), 2)), UString("c"), 0)),
       Json.obj(
-        "pumps" := Json.arr(Json.obj("prefix" := "a", "pump" := "b", "bias" := 1)),
+        "pumps" := Json.arr(Json.obj("prefix" := "a", "pump" := "b", "bias" := 2)),
         "suffix" := "c",
         "base" := 0,
-        "string" := "abc",
-        "pattern" := "'a' 'b'¹ 'c'"
+        "string" := "abbc",
+        "pattern" := "'a' + 'b'.repeat(2) + 'c'"
       )
     )
   }
