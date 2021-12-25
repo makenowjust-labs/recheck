@@ -23,11 +23,14 @@ class StaticSeederSuite extends munit.FunSuite {
       result.get.map(_.toString)
     }
 
-    assertEquals(seed("^a+a+$", ""), Set("'a' 'a'²²⁴ '\\x00'", "'a' 'a'¹⁵ '\\x00'"))
-    assertEquals(seed("^(a+)\\1$", ""), Set("'a' 'a'²²⁴ '\\x00'", "'a' 'a'¹⁵ '\\x00'"))
-    assertEquals(seed("^(?<foo>a+)\\k<foo>$", ""), Set("'a' 'a'²²⁴ '\\x00'", "'a' 'a'¹⁵ '\\x00'"))
-    assertEquals(seed("^a+(?=a+)$", ""), Set("'a' 'a'²²⁴ '\\x00'", "'a' 'a'¹⁵ '\\x00'"))
-    assertEquals(seed("^a+(?<=a+)$", ""), Set("'a' 'a'²²⁴ '\\x00'", "'a' 'a'¹⁵ '\\x00'"))
-    assertEquals(seed("^a{11,}a{11,}$", ""), Set("'a' 'a'²²⁴ '\\x00'", "'a' 'a'¹⁵ '\\x00'"))
+    assertEquals(seed("^a+a+$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
+    assertEquals(seed("^(a+)\\1$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
+    assertEquals(
+      seed("^(?<foo>a+)\\k<foo>$", ""),
+      Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'")
+    )
+    assertEquals(seed("^a+(?=a+)$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
+    assertEquals(seed("^a+(?<=a+)$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
+    assertEquals(seed("^a{11,}a{11,}$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
   }
 }
