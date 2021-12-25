@@ -5,6 +5,7 @@ import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Hotspot
 import codes.quine.labo.recheck.unicode.UChar
+import codes.quine.labo.recheck.util.RepeatUtil
 
 /** Complexity is a result of [[AutomatonChecker.check]] method. */
 sealed abstract class Complexity[+A] extends Serializable with Product
@@ -51,11 +52,8 @@ object Complexity {
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Polynomial(degree, false)
 
     def buildAttackPattern(attackLimit: Int, maxSize: Int)(implicit ev: A =:= UChar): AttackPattern = {
-      val remainSteps = attackLimit - witness.fixedSize
-      val repeatSteps = witness.repeatSize.toDouble / (1 to degree).product
-      val repeatSize = Math.ceil(Math.pow(remainSteps / repeatSteps, 1 / degree.toDouble)).toInt
-      val maxRepeatSize = Math.floor((maxSize - witness.fixedSize) / witness.repeatSize.toDouble).toInt
-      witness.buildAttackPattern(Math.min(repeatSize, maxRepeatSize))
+      val bestRepeatCount = RepeatUtil.polynomial(degree, attackLimit, witness.fixedSize, witness.repeatSize, maxSize)
+      witness.buildAttackPattern(bestRepeatCount)
     }
   }
 
@@ -64,11 +62,8 @@ object Complexity {
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Exponential(false)
 
     def buildAttackPattern(attackLimit: Int, maxSize: Int)(implicit ev: A =:= UChar): AttackPattern = {
-      val remainSteps = attackLimit - witness.fixedSize
-      val repeatSteps = witness.repeatSize
-      val repeatSize = Math.ceil(Math.log(remainSteps / repeatSteps) / Math.log(2)).toInt
-      val maxRepeatSize = Math.floor((maxSize - witness.fixedSize) / witness.repeatSize.toDouble).toInt
-      witness.buildAttackPattern(Math.min(repeatSize, maxRepeatSize))
+      val bestRepeatCount = RepeatUtil.exponential(attackLimit, witness.fixedSize, witness.repeatSize, maxSize)
+      witness.buildAttackPattern(bestRepeatCount)
     }
   }
 }

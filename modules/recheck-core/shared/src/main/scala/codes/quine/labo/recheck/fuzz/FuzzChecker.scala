@@ -16,6 +16,7 @@ import codes.quine.labo.recheck.fuzz.FuzzChecker._
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.unicode.ICharSet
 import codes.quine.labo.recheck.unicode.UString
+import codes.quine.labo.recheck.util.RepeatUtil
 import codes.quine.labo.recheck.vm.Interpreter
 import codes.quine.labo.recheck.vm.Interpreter.CoverageItem
 import codes.quine.labo.recheck.vm.Interpreter.Options
@@ -159,7 +160,8 @@ private[fuzz] final class FuzzChecker(
     log(s"fuzz: seeding start (seeder: $seeder)")
     val seed: Set[FString] = seeder match {
       case Seeder.Static =>
-        val staticSeed = StaticSeeder.seed(pattern, maxSimpleRepeatCount, maxInitialGenerationSize, incubationLimit)
+        val staticSeed =
+          StaticSeeder.seed(pattern, maxSimpleRepeatCount, maxInitialGenerationSize, incubationLimit, maxGeneStringSize)
         if (staticSeed.size < maxInitialGenerationSize) {
           val dynamicSeed = DynamicSeeder.seed(
             fuzz,
@@ -363,22 +365,18 @@ private[fuzz] final class FuzzChecker(
   /** Construct an attack string on assuming the pattern is exponential. */
   def tryAttackExponential(str: FString): Option[AttackResult] = interrupt {
     log("fuzz: attack (exponential)")
-    val r = Math.max(1, Math.log(attackLimit) / Math.log(2) / str.n)
-    val attack = str.copy(n = Math.ceil(str.n * r).toInt)
+    val n = RepeatUtil.exponential(attackLimit, str.fixedSize, str.repeatSize, maxAttackStringSize)
+    val attack = str.copy(n = n)
     tryAttackExecute(attack).map { case (pattern, hotspot) => (AttackComplexity.Exponential(true), pattern, hotspot) }
   }
 
   /** Construct an attack string on assuming the pattern is polynomial. */
   def tryAttackPolynomial(str: FString, degree: Int): Option[AttackResult] = interrupt {
     log(s"fuzz: attack (polynomial: $degree)")
-    val repeatSteps = str.repeatSize.toDouble / (1 to degree).product
-    val r = Math.pow(attackLimit / repeatSteps, 1.0 / degree) / str.n
-    if (r < 1) None
-    else {
-      val attack = str.copy(n = Math.ceil(str.n * r).toInt)
-      tryAttackExecute(attack).map { case (pattern, hotspot) =>
-        (AttackComplexity.Polynomial(degree, true), pattern, hotspot)
-      }
+    val n = RepeatUtil.polynomial(degree, attackLimit, str.fixedSize, str.repeatSize, maxAttackStringSize)
+    val attack = str.copy(n = n)
+    tryAttackExecute(attack).map { case (pattern, hotspot) =>
+      (AttackComplexity.Polynomial(degree, true), pattern, hotspot)
     }
   }
 
@@ -386,8 +384,8 @@ private[fuzz] final class FuzzChecker(
   def tryAttackExecute(str: FString): Option[(AttackPattern, Hotspot)] = interrupt {
     val input = str.toUString
     if (input.sizeAsString <= maxAttackStringSize) {
-      val opts =
-        Options(attackLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode), needsHeatmap = true)
+      val usesAcceleration = fuzz.usesAcceleration(accelerationMode)
+      val opts = Options(attackLimit, usesAcceleration = usesAcceleration, needsHeatmap = true)
       val result = Interpreter.runWithTimeout(program, input, 0, opts, attackTimeout)
       if (result.status == Status.Limit || result.status == Status.Timeout) {
         log {

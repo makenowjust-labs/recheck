@@ -7,6 +7,7 @@ import codes.quine.labo.recheck.data.Graph
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.regexp.Pattern._
 import codes.quine.labo.recheck.unicode.UChar
+import codes.quine.labo.recheck.util.RepeatUtil
 
 /** StaticSeeder computes an initial generation for the pattern with static analysis. */
 object StaticSeeder {
@@ -16,7 +17,8 @@ object StaticSeeder {
       pattern: Pattern,
       maxSimpleRepeatSize: Int = Parameters.MaxSimpleRepeatCount,
       maxInitialGenerationSize: Int = Parameters.MaxInitialGenerationSize,
-      limit: Int = Parameters.IncubationLimit
+      limit: Int = Parameters.IncubationLimit,
+      maxSize: Int = Parameters.MaxGeneStringSize
   )(implicit
       ctx: Context
   ): Set[FString] = ctx.interrupt {
@@ -30,7 +32,7 @@ object StaticSeeder {
       orderedNFA.acceptSet,
       orderedNFA.toGraph
     )
-    seeder.seed(maxInitialGenerationSize, limit)
+    seeder.seed(maxInitialGenerationSize, limit, maxSize)
   }
 
   /** Returns a simplified pattern. */
@@ -110,12 +112,12 @@ private[fuzz] class StaticSeeder[A, Q](
   }
 
   /** Generates the initial generation. */
-  def seed(maxInitialGenerationSize: Int, limit: Int)(implicit ev: A =:= UChar): Set[FString] =
+  def seed(maxInitialGenerationSize: Int, limit: Int, maxSize: Int)(implicit ev: A =:= UChar): Set[FString] =
     outsMap.iterator
       .filter(_._2.nonEmpty)
       .flatMap { case (q0, _) =>
-        val idas = findTinyIDA(q0).map(t => construct(t, Math.sqrt(limit / (t._2.size.toDouble / 2)).toInt))
-        val edas = findTinyEDA(q0).map(t => construct(t, Math.log(limit / t._2.size.toDouble).toInt))
+        val idas = findTinyIDA(q0).map(construct(_, RepeatUtil.polynomial(2, limit, _, _, maxSize)))
+        val edas = findTinyEDA(q0).map(construct(_, RepeatUtil.exponential(limit, _, _, maxSize)))
         idas ++ edas
       }
       .take(maxInitialGenerationSize)
@@ -172,11 +174,11 @@ private[fuzz] class StaticSeeder[A, Q](
     }
 
   /** Constructs a FString from an EDA/IDA triple. */
-  def construct(t: (Seq[A], Seq[A], Seq[A]), n0: Int)(implicit ev: A =:= UChar): FString = {
+  def construct(t: (Seq[A], Seq[A], Seq[A]), f: (Int, Int) => Int)(implicit ev: A =:= UChar): FString = {
     val w1 = t._1.map(u => FString.Wrap(ev(u))).toIndexedSeq
     val w2 = t._2.map(u => FString.Wrap(ev(u))).toIndexedSeq
     val w3 = t._3.map(u => FString.Wrap(ev(u))).toIndexedSeq
-    val n = if (w2.size == 1) n0 * 2 else n0
-    FString(n, (w1 :+ FString.Repeat(0, w2.size)) ++ w2 ++ w3)
+    val n = f(w1.size + w3.size, w2.size)
+    FString(n, w1 ++ (FString.Repeat(0, w2.size) +: w2) ++ w3)
   }
 }
