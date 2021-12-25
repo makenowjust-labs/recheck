@@ -1,4 +1,5 @@
 Global / onChangedBuildSource := ReloadOnSourceChanges
+Global / excludeLintKeys += nativeImageVersion
 
 ThisBuild / organization := "codes.quine.labo"
 ThisBuild / homepage := Some(url("https://github.com/MakeNowJust-Labo/recheck"))
@@ -41,7 +42,8 @@ lazy val root = project
         else version.value
       }
     ),
-    mdocOut := baseDirectory.value / "site" / "content"
+    mdocOut := baseDirectory.value / "site" / "content",
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
   )
   .enablePlugins(MdocPlugin)
   .aggregate(coreJVM, coreJS, commonJVM, commonJS, unicodeJVM, unicodeJS, parseJVM, parseJS, codecJVM, codecJS, js, cli)
