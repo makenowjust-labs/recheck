@@ -171,7 +171,6 @@ private[vm] class ProgramBuilder(
 
   /** Returns a built program. */
   def result(): Program = {
-    /*
     for (label <- labelsBuffer) {
       val block = label.block
       block.terminator match {
@@ -191,7 +190,6 @@ private[vm] class ProgramBuilder(
         case _ => () // nothing to do
       }
     }
-     */
 
     val blocks = labelsBuffer.iterator.map(label => (label, label.block)).toVector
     val predecessors = predecessorsBuffer.iterator.map(_.toSet).toVector
