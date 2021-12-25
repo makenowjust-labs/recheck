@@ -16,6 +16,7 @@ Changes:
 Fixes:
 
 - Fix semaphore usage in test ([#230](https://github.com/MakeNowJust-Labo/recheck/pull/230))
+- Fix `sbt` file issues ([#231](https://github.com/MakeNowJust-Labo/recheck/pull/231))
 
 # 4.1.1 (2021-12-04)
 
