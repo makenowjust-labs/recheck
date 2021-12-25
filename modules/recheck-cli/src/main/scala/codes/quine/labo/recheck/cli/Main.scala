@@ -16,6 +16,7 @@ import codes.quine.labo.recheck.common.AccelerationMode
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.Parameters
+import codes.quine.labo.recheck.common.Seeder
 import codes.quine.labo.recheck.diagnostics.Diagnostics
 
 /** Main provides the entrypoint of `recheck` command. */
@@ -64,6 +65,18 @@ object Main {
       val maxIteration = Opts
         .option[Int](long = "max-iteration", help = "Maximum number of iterations of genetic algorithm.")
         .withDefault(Parameters.MaxIteration)
+      val seeder = Opts
+        .option[Seeder](
+          long = "seeder",
+          help = "Type of seeder used for constructing the initial generation of fuzzing."
+        )
+        .withDefault(Parameters.Seeder)
+      val maxSimpleRepeatCount = Opts
+        .option[Int](
+          long = "max-simple-repeat-count",
+          help = "Maximum number of sum of repeat counts for static seeder."
+        )
+        .withDefault(Parameters.MaxSimpleRepeatCount)
       val seedingLimit = Opts
         .option[Int](
           long = "seeding-limit",
@@ -138,6 +151,8 @@ object Main {
           attackLimit,
           randomSeed,
           maxIteration,
+          seeder,
+          maxSimpleRepeatCount,
           seedingLimit,
           seedingTimeout,
           maxInitialGenerationSize,
@@ -163,6 +178,8 @@ object Main {
                 attackLimit,
                 randomSeed,
                 maxIteration,
+                seeder,
+                maxSimpleRepeatCount,
                 seedingLimit,
                 seedingTimeout,
                 maxInitialGenerationSize,
@@ -189,6 +206,8 @@ object Main {
             attackLimit,
             randomSeed,
             maxIteration,
+            seeder,
+            maxSimpleRepeatCount,
             seedingLimit,
             seedingTimeout,
             maxInitialGenerationSize,

@@ -12,6 +12,7 @@ import codes.quine.labo.recheck.common.AccelerationMode
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.Parameters
+import codes.quine.labo.recheck.common.Seeder
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Diagnostics
@@ -140,6 +141,8 @@ class CodecSuite extends munit.FunSuite {
           "attackLimit" := 123,
           "randomSeed" := 123,
           "maxIteration" := 123,
+          "seeder" := "dynamic",
+          "maxSimpleRepeatCount" := 123,
           "seedingLimit" := 123,
           "seedingTimeout" := 123,
           "maxInitialGenerationSize" := 123,
@@ -167,6 +170,8 @@ class CodecSuite extends munit.FunSuite {
           attackLimit = 123,
           randomSeed = 123,
           maxIteration = 123,
+          seeder = Seeder.Dynamic,
+          maxSimpleRepeatCount = 123,
           seedingLimit = 123,
           seedingTimeout = Duration(123, MILLISECONDS),
           maxInitialGenerationSize = 123,
@@ -208,5 +213,11 @@ class CodecSuite extends munit.FunSuite {
       decodeAccelerationMode.decodeJson("xxx".asJson),
       Left(DecodingFailure("Unknown acceleration mode: xxx", List.empty))
     )
+  }
+
+  test("codec.decodeSeeder") {
+    assertEquals(decodeSeeder.decodeJson("static".asJson), Right(Seeder.Static))
+    assertEquals(decodeSeeder.decodeJson("dynamic".asJson), Right(Seeder.Dynamic))
+    assertEquals(decodeSeeder.decodeJson("xxx".asJson), Left(DecodingFailure("Unknown seeder: xxx", List.empty)))
   }
 }

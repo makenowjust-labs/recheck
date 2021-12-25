@@ -5,6 +5,7 @@ import scala.collection.mutable
 
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.UnsupportedException
+import codes.quine.labo.recheck.data.Graph
 import codes.quine.labo.recheck.data.MultiSet
 import codes.quine.labo.recheck.regexp.Pattern.Location
 import codes.quine.labo.recheck.util.GraphvizUtil.escape
@@ -42,6 +43,14 @@ final case class OrderedNFA[A, Q](
       delta.map { case ((q1, a), q2) => ((q1, f(a)), q2) },
       sourcemap.map { case ((q1, a, q2), pos) => ((q1, f(a), q2), pos) }
     )
+
+  /** Exports this transition function as a graph. */
+  def toGraph(implicit ctx: Context): Graph[Q, A] =
+    ctx.interrupt {
+      Graph.from(delta.iterator.flatMap { case (q1, a) -> qs =>
+        qs.iterator.map((q1, a, _))
+      }.toIndexedSeq)
+    }
 
   /** Reverses this NFA.
     *

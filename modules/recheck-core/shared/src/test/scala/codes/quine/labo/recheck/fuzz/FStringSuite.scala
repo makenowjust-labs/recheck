@@ -49,6 +49,14 @@ class FStringSuite extends munit.FunSuite {
     assertEquals(FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c'))).size, 3)
   }
 
+  test("FString#fixedSize") {
+    assertEquals(FString(2, IndexedSeq(Wrap('a'), Repeat(0, 1), Wrap('b'), Wrap('c'))).fixedSize, 2)
+  }
+
+  test("FString#repeatSize") {
+    assertEquals(FString(2, IndexedSeq(Wrap('a'), Repeat(0, 1), Wrap('b'), Wrap('c'))).repeatSize, 1)
+  }
+
   test("FString#apply") {
     assertEquals(FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c')))(1), Wrap('b'))
   }

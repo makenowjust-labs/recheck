@@ -18,7 +18,8 @@ ThisBuild / scalacOptions ++= Seq(
   "UTF-8",
   "-feature",
   "-deprecation",
-  "-Wunused"
+  "-Wunused",
+  "-P:bm4:implicit-patterns:n"
 )
 
 // Scalafix config:
@@ -52,34 +53,141 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
     name := "recheck-core",
     console / initialCommands := """
       |import scala.concurrent.duration._
-      |import scala.util.Random
+      |import scala.util.{Failure, Random, Success, Try}
       |
       |import codes.quine.labo.recheck._
       |import codes.quine.labo.recheck.automaton._
       |import codes.quine.labo.recheck.common._
       |import codes.quine.labo.recheck.data._
+      |import codes.quine.labo.recheck.diagnostics._
       |import codes.quine.labo.recheck.fuzz._
       |import codes.quine.labo.recheck.regexp._
       |import codes.quine.labo.recheck.unicode._
       |import codes.quine.labo.recheck.util._
       |import codes.quine.labo.recheck.vm._
       |
-      |implicit def ctx: Context = Context(10.seconds)
-      |
       |def logger: Context.Logger = (message: String) => {
       |  val date = java.time.LocalDateTime.now()
       |  Console.out.println(s"[$date] $message")
       |}
       |
-      |def time[A](body: => A): A = {
+      |implicit def ctx: Context = Context(timeout = 10.seconds, logger = Some(logger))
+      |
+      |def time[A](name: String)(body: => A): A = {
       |  val start = System.nanoTime()
-      |  val result = body
-      |  println(s"${(System.nanoTime() - start) / 1e9} s")
-      |  result
+      |  try body
+      |  finally {
+      |    println(s"$name: ${(System.nanoTime() - start) / 1e9} s")
+      |  }
+      |}
+      |
+      |def parse(source: String, flags: String): Pattern =
+      |  time("parse")(Parser.parse(source, flags) match {
+      |    case Right(pattern) => pattern
+      |    case Left(ex)       => throw new InvalidRegExpException(ex.getMessage)
+      |  })
+      |
+      |def run(
+      |    source: String,
+      |    flags: String,
+      |    input: String,
+      |    pos: Int = 0,
+      |    limit: Int = Int.MaxValue,
+      |    usesAcceleration: Boolean = true,
+      |    needsLoopAnalysis: Boolean = false,
+      |    needsFailedPoints: Boolean = false,
+      |    needsCoverage: Boolean = false,
+      |    needsHeatmap: Boolean = false
+      |)(implicit ctx: Context): Interpreter.Result = {
+      |  val pattern = parse(source, flags)
+      |  val flagSet = pattern.flagSet
+      |  val program = time("compile")(ProgramBuilder.build(pattern).get)
+      |  val uinput0 = UString(input)
+      |  val uinput = if (flagSet.ignoreCase) UString.canonicalize(uinput0, flagSet.unicode) else uinput0
+      |  val opts = Interpreter.Options(
+      |    limit = limit,
+      |    usesAcceleration = usesAcceleration,
+      |    needsLoopAnalysis = needsLoopAnalysis,
+      |    needsFailedPoints = needsFailedPoints,
+      |    needsCoverage = needsCoverage,
+      |    needsHeatmap = needsHeatmap
+      |  )
+      |  time("run")(Interpreter.run(program, uinput, 0, opts))
+      |}
+      |
+      |def seed(
+      |    source: String,
+      |    flags: String,
+      |    maxSimpleRepeatSize: Int = Parameters.MaxSimpleRepeatCount,
+      |    maxInitialGenerationSize: Int = Parameters.MaxInitialGenerationSize,
+      |    limit: Int = Parameters.IncubationLimit
+      |)(implicit ctx: Context): Set[FString] = {
+      |  val pattern = parse(source, flags)
+      |  time("seed")(StaticSeeder.seed(pattern, maxSimpleRepeatSize, maxInitialGenerationSize, limit))
+      |}
+      |
+      |def check(
+      |    source: String,
+      |    flags: String,
+      |    checker: Checker = Parameters.Checker,
+      |    timeout: Duration = Parameters.Timeout,
+      |    logger: Option[Context.Logger] = Parameters.Logger,
+      |    maxAttackStringSize: Int = Parameters.MaxAttackStringSize,
+      |    attackLimit: Int = Parameters.AttackLimit,
+      |    randomSeed: Long = Parameters.RandomSeed,
+      |    maxIteration: Int = Parameters.MaxIteration,
+      |    seeder: Seeder = Parameters.Seeder,
+      |    maxSimpleRepeatCount: Int = Parameters.MaxSimpleRepeatCount,
+      |    seedingLimit: Int = Parameters.SeedingLimit,
+      |    seedingTimeout: Duration = Parameters.SeedingTimeout,
+      |    maxInitialGenerationSize: Int = Parameters.MaxInitialGenerationSize,
+      |    incubationLimit: Int = Parameters.IncubationLimit,
+      |    incubationTimeout: Duration = Parameters.IncubationTimeout,
+      |    maxGeneStringSize: Int = Parameters.MaxGeneStringSize,
+      |    maxGenerationSize: Int = Parameters.MaxGenerationSize,
+      |    crossoverSize: Int = Parameters.CrossoverSize,
+      |    mutationSize: Int = Parameters.MutationSize,
+      |    attackTimeout: Duration = Parameters.AttackTimeout,
+      |    maxDegree: Int = Parameters.MaxDegree,
+      |    heatRatio: Double = Parameters.HeatRatio,
+      |    accelerationMode: AccelerationMode = Parameters.AccelerationMode,
+      |    maxRepeatCount: Int = Parameters.MaxRepeatCount,
+      |    maxNFASize: Int = Parameters.MaxNFASize,
+      |    maxPatternSize: Int = Parameters.MaxPatternSize
+      |): Diagnostics = {
+      |  val params = Parameters(
+      |        checker,
+      |      timeout,
+      |      logger,
+      |      maxAttackStringSize,
+      |      attackLimit,
+      |      randomSeed,
+      |      maxIteration,
+      |      seeder,
+      |      maxSimpleRepeatCount,
+      |      seedingLimit,
+      |      seedingTimeout,
+      |      maxInitialGenerationSize,
+      |      incubationLimit,
+      |      incubationTimeout,
+      |      maxGeneStringSize,
+      |      maxGenerationSize,
+      |      crossoverSize,
+      |      mutationSize,
+      |      attackTimeout,
+      |      maxDegree,
+      |      heatRatio,
+      |      accelerationMode,
+      |      maxRepeatCount,
+      |      maxNFASize,
+      |      maxPatternSize
+      |  )
+      |  time("check")(ReDoS.check(source, flags, params))
       |}
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -104,6 +212,7 @@ lazy val common = crossProject(JVMPlatform, JSPlatform)
     Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value % Provided,
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -121,6 +230,7 @@ lazy val unicode = crossProject(JVMPlatform, JSPlatform)
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Generators:
     {
       val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
@@ -167,6 +277,7 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
     Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "com.lihaoyi" %%% "fastparse" % "2.3.3",
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -194,6 +305,7 @@ lazy val codec = crossProject(JVMPlatform, JSPlatform)
     Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "io.circe" %%% "circe-core" % "0.14.1",
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -220,6 +332,7 @@ lazy val js = project
     Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "io.circe" %%% "circe-scalajs" % "0.14.1",
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework"),
@@ -256,6 +369,7 @@ lazy val cli = project
     libraryDependencies += "io.circe" %% "circe-core" % "0.14.1",
     libraryDependencies += "io.circe" %% "circe-generic" % "0.14.1",
     libraryDependencies += "io.circe" %% "circe-parser" % "0.14.1",
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")

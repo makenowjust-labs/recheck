@@ -8,6 +8,7 @@ import com.monovore.decline.Argument
 
 import codes.quine.labo.recheck.common.AccelerationMode
 import codes.quine.labo.recheck.common.Checker
+import codes.quine.labo.recheck.common.Seeder
 
 /** The object `arguments` provides decline's `Argument` instances for this application. */
 object arguments {
@@ -35,6 +36,7 @@ object arguments {
     def defaultMetavar: String = "checker"
   }
 
+  /** `Argument` instance for `AccelerationMode`. */
   implicit val accelerationModeArgument: Argument[AccelerationMode] = new Argument[AccelerationMode] {
     def read(string: String): ValidatedNel[String, AccelerationMode] = string match {
       case "auto" => Validated.validNel(AccelerationMode.Auto)
@@ -44,5 +46,16 @@ object arguments {
     }
 
     def defaultMetavar: String = "mode"
+  }
+
+  /** `Argument` instance for `Seeder`. */
+  implicit val seederArgument: Argument[Seeder] = new Argument[Seeder] {
+    def read(string: String): ValidatedNel[String, Seeder] = string match {
+      case "static"  => Validated.validNel(Seeder.Static)
+      case "dynamic" => Validated.validNel(Seeder.Dynamic)
+      case s         => Validated.invalidNel(s"unknown seeder: $s")
+    }
+
+    def defaultMetavar: String = "seeder"
   }
 }

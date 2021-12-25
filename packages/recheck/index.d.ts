@@ -67,14 +67,14 @@ export type Parameters = {
   /**
    * Maximum length of an attack string.
    *
-   * (default: `400000`)
+   * (default: `300000`)
    */
   maxAttackStringSize?: number;
 
   /**
    * Upper limit on the number of characters read by the VM during attack string construction.
    *
-   * (default: `1000000000`)
+   * (default: `1500000000`)
    */
   attackLimit?: number;
 
@@ -88,9 +88,28 @@ export type Parameters = {
   /**
    * Maximum number of iterations of genetic algorithm.
    *
-   * (default: `30`)
+   * (default: `10`)
    */
   maxIteration?: number;
+
+  /**
+   * Type of seeder used for constructing the initial generation of fuzzing.
+   *
+   * There are two seeders:
+   *
+   * - `'static'`: Seeder to construct the initial generation by using static analysis to the given pattern.
+   * - `'dynamic'`: Seeder to construct the initial generation by using dynamic analysis to the given pattern.
+   *
+   * (default: `'static'`)
+   */
+  seeder?: "static" | "dynamic";
+
+  /**
+   * Maximum number of sum of repeat counts for static seeder.
+   *
+   * (default: `30`)
+   */
+  maxSimpleRepeatCount?: number;
 
   /**
    * Upper limit on the number of characters read by the VM during seeding.
@@ -113,14 +132,14 @@ export type Parameters = {
   /**
    * Maximum population at the initial generation.
    *
-   * (default: `50`)
+   * (default: `500`)
    */
   maxInitialGenerationSize?: number;
 
   /**
    * Upper limit on the number of characters read by the VM during incubation.
    *
-   * (default: `100000`)
+   * (default: `25000`)
    */
   incubationLimit?: number;
 
@@ -138,7 +157,7 @@ export type Parameters = {
   /**
    * Maximum length of an attack string on genetic algorithm iterations.
    *
-   * (default: `4000`)
+   * (default: `2400`)
    */
   maxGeneStringSize?: number;
 
@@ -210,7 +229,7 @@ export type Parameters = {
    *
    * If this value is exceeded, it switches to use the fuzzing checker.
    *
-   * (default: `20`)
+   * (default: `30`)
    */
   maxRepeatCount?: number;
 
@@ -220,7 +239,7 @@ export type Parameters = {
    * If transition size of NFA (and also DFA because it is larger in general) exceeds this value,
    * it switches to use the fuzzing checker.
    *
-   * (default: `40000`)
+   * (default: `35000`)
    */
   maxNFASize?: number;
 

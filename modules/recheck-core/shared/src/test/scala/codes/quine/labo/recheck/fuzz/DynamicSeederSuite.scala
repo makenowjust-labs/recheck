@@ -7,17 +7,17 @@ import scala.util.Success
 
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.InvalidRegExpException
-import codes.quine.labo.recheck.fuzz.Seeder._
+import codes.quine.labo.recheck.fuzz.DynamicSeeder._
 import codes.quine.labo.recheck.regexp.Parser
 import codes.quine.labo.recheck.unicode.IChar
 import codes.quine.labo.recheck.unicode.UString
 
-class SeederSuite extends munit.FunSuite {
+class DynamicSeederSuite extends munit.FunSuite {
 
   /** A default context. */
   implicit def ctx: Context = Context()
 
-  test("Seeder.seed") {
+  test("DynamicSeeder.seed") {
     def seed(source: String, flags: String): Set[String] = {
       val result = for {
         pattern <- Parser.parse(source, flags) match {
@@ -25,7 +25,7 @@ class SeederSuite extends munit.FunSuite {
           case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
         }
         fuzz <- FuzzProgram.from(pattern)
-      } yield Seeder.seed(fuzz, timeout = Duration.Inf)
+      } yield DynamicSeeder.seed(fuzz, timeout = Duration.Inf)
       result.get.map(_.toString)
     }
 
@@ -40,14 +40,14 @@ class SeederSuite extends munit.FunSuite {
     assertEquals(seed("^(a?){50}a{50}$", ""), Set("''", "'a'", "'aa'", "'a'.repeat(2)"))
   }
 
-  test("Seeder.Patch.InsertChar#apply") {
+  test("DynamicSeeder.Patch.InsertChar#apply") {
     assertEquals(
       Patch.InsertChar(1, Set(IChar('x'))).apply(UString("012"), false),
       Seq(UString("0x12"), UString("0x2"))
     )
   }
 
-  test("Seeder.Patch.InsertString#apply") {
+  test("DynamicSeeder.Patch.InsertString#apply") {
     assertEquals(
       Patch.InsertString(1, UString("xyz")).apply(UString("012"), false),
       Seq(UString("0xyz12"))

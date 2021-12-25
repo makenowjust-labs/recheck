@@ -21,6 +21,12 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
   /** A size of this string's characters. */
   def size: Int = seq.size
 
+  /** A sum of size of each repeat parts in this string. */
+  def repeatSize: Int = seq.collect { case Repeat(_, size) => size }.sum
+
+  /** A sum of size of each fixed parts in this string. */
+  def fixedSize: Int = size - seq.collect { case Repeat(_, _) => 1 }.sum - repeatSize
+
   /** Counts [[Repeat]] characters in this string. */
   def countRepeat: Int = seq.count(_.isInstanceOf[Repeat])
 

@@ -33,17 +33,29 @@ import scala.concurrent.duration._
   *   Option[Context.Logger] Logger to log an analysis execution. (default: `None`)
   *
   * @param maxAttackStringSize
-  *   Int Maximum length of an attack string. (default: `400000`)
+  *   Int Maximum length of an attack string. (default: `300000`)
   *
   * @param attackLimit
   *   Int Upper limit on the number of characters read by the VM during attack string construction. (default:
-  *   `1000000000`)
+  *   `1500000000`)
   *
   * @param randomSeed
   *   Long Seed value for PRNG used by fuzzing. (default: `0`)
   *
   * @param maxIteration
-  *   Int Maximum number of iterations of genetic algorithm. (default: `30`)
+  *   Int Maximum number of iterations of genetic algorithm. (default: `10`)
+  *
+  * @param seeder
+  *   Seeder Type of seeder used for constructing the initial generation of fuzzing.
+  *
+  * There are two seeders:
+  *
+  *   - `'static'`: Seeder to construct the initial generation by using static analysis to the given pattern.
+  *   - `'dynamic'`: Seeder to construct the initial generation by using dynamic analysis to the given pattern.
+  *     (default: `common.Seeder.Static`)
+  *
+  * @param maxSimpleRepeatCount
+  *   Int Maximum number of sum of repeat counts for static seeder. (default: `30`)
   *
   * @param seedingLimit
   *   Int Upper limit on the number of characters read by the VM during seeding. (default: `1000`)
@@ -54,10 +66,10 @@ import scala.concurrent.duration._
   * (default: `Duration(100, MILLISECONDS)`)
   *
   * @param maxInitialGenerationSize
-  *   Int Maximum population at the initial generation. (default: `50`)
+  *   Int Maximum population at the initial generation. (default: `500`)
   *
   * @param incubationLimit
-  *   Int Upper limit on the number of characters read by the VM during incubation. (default: `100000`)
+  *   Int Upper limit on the number of characters read by the VM during incubation. (default: `25000`)
   *
   * @param incubationTimeout
   *   Duration Upper limit of VM execution time during incubation.
@@ -65,7 +77,7 @@ import scala.concurrent.duration._
   * (default: `Duration(250, MILLISECONDS)`)
   *
   * @param maxGeneStringSize
-  *   Int Maximum length of an attack string on genetic algorithm iterations. (default: `4000`)
+  *   Int Maximum length of an attack string on genetic algorithm iterations. (default: `2400`)
   *
   * @param maxGenerationSize
   *   Int Maximum population at a single generation. (default: `100`)
@@ -102,13 +114,13 @@ import scala.concurrent.duration._
   * @param maxRepeatCount
   *   Int Maximum number of sum of repeat counts.
   *
-  * If this value is exceeded, it switches to use the fuzzing checker. (default: `20`)
+  * If this value is exceeded, it switches to use the fuzzing checker. (default: `30`)
   *
   * @param maxNFASize
   *   Int Maximum transition size of NFA to use the automaton checker.
   *
   * If transition size of NFA (and also DFA because it is larger in general) exceeds this value, it switches to use the
-  * fuzzing checker. (default: `40000`)
+  * fuzzing checker. (default: `35000`)
   *
   * @param maxPatternSize
   *   Int Maximum pattern size to use the automaton checker.
@@ -123,6 +135,8 @@ final case class Parameters(
     attackLimit: Int = Parameters.AttackLimit,
     randomSeed: Long = Parameters.RandomSeed,
     maxIteration: Int = Parameters.MaxIteration,
+    seeder: Seeder = Parameters.Seeder,
+    maxSimpleRepeatCount: Int = Parameters.MaxSimpleRepeatCount,
     seedingLimit: Int = Parameters.SeedingLimit,
     seedingTimeout: Duration = Parameters.SeedingTimeout,
     maxInitialGenerationSize: Int = Parameters.MaxInitialGenerationSize,
@@ -153,16 +167,22 @@ object Parameters {
   val Logger: Option[Context.Logger] = None
 
   /** The default value of [[Parameters.maxAttackStringSize]]. */
-  val MaxAttackStringSize: Int = 400000
+  val MaxAttackStringSize: Int = 300000
 
   /** The default value of [[Parameters.attackLimit]]. */
-  val AttackLimit: Int = 1000000000
+  val AttackLimit: Int = 1500000000
 
   /** The default value of [[Parameters.randomSeed]]. */
   val RandomSeed: Long = 0
 
   /** The default value of [[Parameters.maxIteration]]. */
-  val MaxIteration: Int = 30
+  val MaxIteration: Int = 10
+
+  /** The default value of [[Parameters.seeder]]. */
+  val Seeder: Seeder = common.Seeder.Static
+
+  /** The default value of [[Parameters.maxSimpleRepeatCount]]. */
+  val MaxSimpleRepeatCount: Int = 30
 
   /** The default value of [[Parameters.seedingLimit]]. */
   val SeedingLimit: Int = 1000
@@ -171,16 +191,16 @@ object Parameters {
   val SeedingTimeout: Duration = Duration(100, MILLISECONDS)
 
   /** The default value of [[Parameters.maxInitialGenerationSize]]. */
-  val MaxInitialGenerationSize: Int = 50
+  val MaxInitialGenerationSize: Int = 500
 
   /** The default value of [[Parameters.incubationLimit]]. */
-  val IncubationLimit: Int = 100000
+  val IncubationLimit: Int = 25000
 
   /** The default value of [[Parameters.incubationTimeout]]. */
   val IncubationTimeout: Duration = Duration(250, MILLISECONDS)
 
   /** The default value of [[Parameters.maxGeneStringSize]]. */
-  val MaxGeneStringSize: Int = 4000
+  val MaxGeneStringSize: Int = 2400
 
   /** The default value of [[Parameters.maxGenerationSize]]. */
   val MaxGenerationSize: Int = 100
@@ -204,10 +224,10 @@ object Parameters {
   val AccelerationMode: AccelerationMode = common.AccelerationMode.Auto
 
   /** The default value of [[Parameters.maxRepeatCount]]. */
-  val MaxRepeatCount: Int = 20
+  val MaxRepeatCount: Int = 30
 
   /** The default value of [[Parameters.maxNFASize]]. */
-  val MaxNFASize: Int = 40000
+  val MaxNFASize: Int = 35000
 
   /** The default value of [[Parameters.maxPatternSize]]. */
   val MaxPatternSize: Int = 1500
