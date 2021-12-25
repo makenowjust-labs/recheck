@@ -41,6 +41,14 @@ class InstSuite extends munit.FunSuite {
     assertEquals(Inst.Ok.successors, Set.empty[Label])
     assertEquals(Inst.Jmp(Label("x", 0)).successors, Set(Label("x", 0)))
     assertEquals(Inst.Try(Label("x", 0), Label("y", 1)).successors, Set(Label("x", 0), Label("y", 1)))
+    assertEquals(
+      Inst.TryLA(Inst.Read(ReadKind.Char('a'), None), Label("x", 0), Label("y", 1)).successors,
+      Set(Label("x", 0), Label("y", 1))
+    )
+    assertEquals(
+      Inst.TryLB(Inst.ReadBack(ReadKind.Char('a'), None), Label("x", 0), Label("y", 1)).successors,
+      Set(Label("x", 0), Label("y", 1))
+    )
     assertEquals(Inst.Cmp(CounterReg(0), 1, Label("x", 2), Label("y", 3)).successors, Set(Label("x", 2), Label("y", 3)))
     assertEquals(Inst.Rollback.successors, Set.empty[Label])
     assertEquals(Inst.Tx(Label("x", 0), None, None).successors, Set(Label("x", 0)))
