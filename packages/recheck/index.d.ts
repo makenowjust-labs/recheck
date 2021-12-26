@@ -21,7 +21,6 @@ export function checkSync(
  * Parameters is parameters for analysis.
  */
 export type Parameters = {
-
   /**
    * Type of checker used for analysis.
    *
@@ -42,7 +41,7 @@ export type Parameters = {
    *
    * (default: `'hybrid'`)
    */
-  checker?: 'hybrid' | 'fuzz' | 'automaton'
+  checker?: "hybrid" | "fuzz" | "automaton";
 
   /**
    * Upper limit of analysis time.
@@ -56,42 +55,42 @@ export type Parameters = {
    *
    * (default: `10000`)
    */
-  timeout?: number | null
+  timeout?: number | null;
 
   /**
    * Logger to log an analysis execution.
    *
    * (default: `null`)
    */
-  logger?: ((message: string) => void) | null
+  logger?: ((message: string) => void) | null;
 
   /**
    * Maximum length of an attack string.
    *
    * (default: `300000`)
    */
-  maxAttackStringSize?: number
+  maxAttackStringSize?: number;
 
   /**
    * Upper limit on the number of characters read by the VM during attack string construction.
    *
    * (default: `1500000000`)
    */
-  attackLimit?: number
+  attackLimit?: number;
 
   /**
    * Seed value for PRNG used by fuzzing.
    *
    * (default: `0`)
    */
-  randomSeed?: number
+  randomSeed?: number;
 
   /**
    * Maximum number of iterations of genetic algorithm.
    *
    * (default: `10`)
    */
-  maxIteration?: number
+  maxIteration?: number;
 
   /**
    * Type of seeder used for constructing the initial generation of fuzzing.
@@ -103,21 +102,21 @@ export type Parameters = {
    *
    * (default: `'static'`)
    */
-  seeder?: 'static' | 'dynamic'
+  seeder?: "static" | "dynamic";
 
   /**
    * Maximum number of sum of repeat counts for static seeder.
    *
    * (default: `30`)
    */
-  maxSimpleRepeatCount?: number
+  maxSimpleRepeatCount?: number;
 
   /**
    * Upper limit on the number of characters read by the VM during seeding.
    *
    * (default: `1000`)
    */
-  seedingLimit?: number
+  seedingLimit?: number;
 
   /**
    * Upper limit of VM execution time during seeding.
@@ -128,21 +127,21 @@ export type Parameters = {
    *
    * (default: `100`)
    */
-  seedingTimeout?: number | null
+  seedingTimeout?: number | null;
 
   /**
    * Maximum population at the initial generation.
    *
    * (default: `500`)
    */
-  maxInitialGenerationSize?: number
+  maxInitialGenerationSize?: number;
 
   /**
    * Upper limit on the number of characters read by the VM during incubation.
    *
    * (default: `25000`)
    */
-  incubationLimit?: number
+  incubationLimit?: number;
 
   /**
    * Upper limit of VM execution time during incubation.
@@ -153,35 +152,35 @@ export type Parameters = {
    *
    * (default: `250`)
    */
-  incubationTimeout?: number | null
+  incubationTimeout?: number | null;
 
   /**
    * Maximum length of an attack string on genetic algorithm iterations.
    *
    * (default: `2400`)
    */
-  maxGeneStringSize?: number
+  maxGeneStringSize?: number;
 
   /**
    * Maximum population at a single generation.
    *
    * (default: `100`)
    */
-  maxGenerationSize?: number
+  maxGenerationSize?: number;
 
   /**
    * Number of crossovers in a single generation.
    *
    * (default: `25`)
    */
-  crossoverSize?: number
+  crossoverSize?: number;
 
   /**
    * Number of mutations in a single generation.
    *
    * (default: `50`)
    */
-  mutationSize?: number
+  mutationSize?: number;
 
   /**
    * The upper limit of the VM execution time when constructing a attack string.
@@ -194,21 +193,21 @@ export type Parameters = {
    *
    * (default: `1000`)
    */
-  attackTimeout?: number | null
+  attackTimeout?: number | null;
 
   /**
    * Maximum degree for constructing attack string.
    *
    * (default: `4`)
    */
-  maxDegree?: number
+  maxDegree?: number;
 
   /**
    * Ratio of the number of characters read to the maximum number to be considered a hotspot.
    *
    * (default: `0.001`)
    */
-  heatRatio?: number
+  heatRatio?: number;
 
   /**
    * Mode of acceleration of VM execution.
@@ -223,21 +222,21 @@ export type Parameters = {
    *
    * (default: `'auto'`)
    */
-  accelerationMode?: 'auto' | 'on' | 'off'
+  accelerationMode?: "auto" | "on" | "off";
 
   /**
    * Maximum length of an attack string on the recall validation.
    *
    * (default: `300000`)
    */
-  maxRecallStringSize?: number
+  maxRecallStringSize?: number;
 
   /**
    * Upper limit on the number of characters read on the recall validation.
    *
    * (default: `1500000000`)
    */
-  recallLimit?: number
+  recallLimit?: number;
 
   /**
    * Upper limit of recall validation time.
@@ -254,7 +253,7 @@ export type Parameters = {
    *
    * (default: `-1`)
    */
-  recallTimeout?: number | null
+  recallTimeout?: number | null;
 
   /**
    * Maximum number of sum of repeat counts.
@@ -263,7 +262,7 @@ export type Parameters = {
    *
    * (default: `30`)
    */
-  maxRepeatCount?: number
+  maxRepeatCount?: number;
 
   /**
    * Maximum transition size of NFA to use the automaton checker.
@@ -273,7 +272,7 @@ export type Parameters = {
    *
    * (default: `35000`)
    */
-  maxNFASize?: number
+  maxNFASize?: number;
 
   /**
    * Maximum pattern size to use the automaton checker.
@@ -282,8 +281,8 @@ export type Parameters = {
    *
    * (default: `1500`)
    */
-  maxPatternSize?: number
-}
+  maxPatternSize?: number;
+};
 
 /**
  * HasAbortSignal is a mix-in type for having `signal` field.

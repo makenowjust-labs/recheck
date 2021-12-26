@@ -92,7 +92,6 @@ If the value is the positive infinite duration, the result never become a timeou
 If the `number` value is specified, it is parsed in milliseconds.
 If the value is `null`, it is parsed as the positive infinite duration.
 
-
 #### `logger`
 
 Type: `((message: string) => void) | null`
@@ -108,6 +107,7 @@ Logger to log an analysis execution.
 And, there are other parameters to specify detailed behavior.
 They are set to perform better as the default, so it is rare to specify them
 and it needs to know the checkers in depth to set the correct value.
+
 #### `maxAttackStringSize`
 
 Type: `number`
@@ -180,7 +180,6 @@ Upper limit of VM execution time during seeding.
 If the `number` value is specified, it is parsed in milliseconds.
 If the value is `null`, it is parsed as the positive infinite duration.
 
-
 #### `maxInitialGenerationSize`
 
 Type: `number`
@@ -207,7 +206,6 @@ Upper limit of VM execution time during incubation.
 
 If the `number` value is specified, it is parsed in milliseconds.
 If the value is `null`, it is parsed as the positive infinite duration.
-
 
 #### `maxGeneStringSize`
 
@@ -253,7 +251,6 @@ If the execution time exceeds this value, the result will be reported as a vulne
 
 If the `number` value is specified, it is parsed in milliseconds.
 If the value is `null`, it is parsed as the positive infinite duration.
-
 
 #### `maxDegree`
 
@@ -319,7 +316,6 @@ If the value is `null`, it is parsed as the positive infinite duration.
 
 Note that Scala.js does not support the recall validation for now.
 Please set negative value in this case.
-
 
 #### `maxRepeatCount`
 
