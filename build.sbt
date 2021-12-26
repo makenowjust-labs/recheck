@@ -63,6 +63,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labo.recheck.data._
       |import codes.quine.labo.recheck.diagnostics._
       |import codes.quine.labo.recheck.fuzz._
+      |import codes.quine.labo.recheck.recall._
       |import codes.quine.labo.recheck.regexp._
       |import codes.quine.labo.recheck.unicode._
       |import codes.quine.labo.recheck.util._
@@ -158,9 +159,12 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |    maxDegree: Int = Parameters.MaxDegree,
       |    heatRatio: Double = Parameters.HeatRatio,
       |    accelerationMode: AccelerationMode = Parameters.AccelerationMode,
+      |    maxRecallStringSize: Int = Parameters.MaxRecallStringSize,
+      |    recallLimit: Int = Parameters.RecallLimit,
+      |    recallTimeout: Duration = Parameters.RecallTimeout,
       |    maxRepeatCount: Int = Parameters.MaxRepeatCount,
       |    maxNFASize: Int = Parameters.MaxNFASize,
-      |    maxPatternSize: Int = Parameters.MaxPatternSize
+      |    maxPatternSize: Int = Parameters.MaxPatternSize,
       |): Diagnostics = {
       |  val params = Parameters(
       |        checker,
@@ -185,6 +189,9 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |      maxDegree,
       |      heatRatio,
       |      accelerationMode,
+      |      maxRecallStringSize,
+      |      recallLimit,
+      |      recallTimeout,
       |      maxRepeatCount,
       |      maxNFASize,
       |      maxPatternSize

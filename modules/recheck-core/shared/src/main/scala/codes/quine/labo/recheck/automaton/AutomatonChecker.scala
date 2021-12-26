@@ -13,14 +13,17 @@ import codes.quine.labo.recheck.regexp.Pattern.Location
 object AutomatonChecker {
 
   /** Checks a match time complexity of the NFA. */
-  def check[A, Q](nfa: OrderedNFA[A, Q], maxNFASize: Int = Int.MaxValue)(implicit ctx: Context): Complexity[A] =
+  def check[A, Q](
+      nfa: OrderedNFA[A, Q],
+      maxNFASize: Int = Int.MaxValue
+  )(implicit ctx: Context): Iterator[Complexity[A]] =
     ctx.interrupt(new AutomatonChecker(nfa, maxNFASize).check())
 }
 
 /** AutomatonChecker is a ReDoS vulnerable RegExp checker based on automata theory. */
 private final class AutomatonChecker[A, Q](
     private[this] val nfa: OrderedNFA[A, Q],
-    maxNFASize: Int
+    val maxNFASize: Int
 )(implicit private[this] implicit val ctx: Context) {
 
   // Introduces `ctx` methods into the scope.
@@ -81,30 +84,21 @@ private final class AutomatonChecker[A, Q](
     sc.size == 1 && !graph.neighbors(sc.head).exists(_._2 == sc.head)
 
   /** Runs a checker. */
-  def check(): Complexity[A] = interrupt {
+  def check(): Iterator[Complexity[A]] = interrupt {
     ctx.log {
       s"""|automaton: start
           |  scc size: ${scc.size}""".stripMargin
     }
-    checkExponential() match {
-      case Some(pump) =>
-        val (w, hotspot) = witness(Vector(pump))
-        Exponential(w, hotspot)
-      case None =>
-        checkPolynomial() match {
-          case (0, _) => Constant
-          case (1, _) => Linear
-          case (degree, pumps) =>
-            val (w, hotspot) = witness(pumps)
-            Polynomial(degree, w, hotspot)
-        }
-    }
+    checkExponential() ++ checkPolynomial()
   }
 
   /** Finds an EDA structure in the graph. */
-  private[this] def checkExponential(): Option[Pump] = {
+  private[this] def checkExponential(): Iterator[Complexity[A]] = {
     log("automaton: find EDA")
-    interrupt(scc.iterator.filterNot(isAtom).flatMap(checkExponentialComponent).nextOption())
+    interrupt(scc.iterator.filterNot(isAtom).flatMap(checkExponentialComponent).map { pump =>
+      val (w, hotspot) = witness(Vector(pump))
+      Exponential(w, hotspot)
+    })
   }
 
   /** Finds an EDA structure in the SCC. */
@@ -146,9 +140,15 @@ private final class AutomatonChecker[A, Q](
     }
 
   /** Finds an IDA structure chain in the graph. */
-  private[this] def checkPolynomial(): (Int, Seq[Pump]) = {
+  private[this] def checkPolynomial(): Seq[Complexity[A]] = {
     log("automaton: find IDA")
-    interrupt(scc.map(checkPolynomialComponent).maxByOption(_._1).getOrElse((0, Seq.empty)))
+    interrupt(scc.map(checkPolynomialComponent).sortBy(-_._1).map {
+      case (0, _) => Constant
+      case (1, _) => Linear
+      case (degree, pumps) =>
+        val (w, hotspot) = witness(pumps)
+        Polynomial(degree, w, hotspot)
+    })
   }
 
   /** An internal cache of [[checkPolynomialComponent]] method's result. */

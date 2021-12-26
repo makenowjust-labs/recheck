@@ -6,6 +6,7 @@ import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.common.ReDoSException
 import codes.quine.labo.recheck.common.TimeoutException
+import codes.quine.labo.recheck.common.UnexpectedException
 import codes.quine.labo.recheck.common.UnsupportedException
 
 /** Diagnostics ia an analysis result. */
@@ -71,6 +72,7 @@ object Diagnostics {
         case _: CancelException         => ErrorKind.Cancel
         case ex: UnsupportedException   => ErrorKind.Unsupported(ex.getMessage)
         case ex: InvalidRegExpException => ErrorKind.InvalidRegExp(ex.getMessage)
+        case ex: UnexpectedException    => ErrorKind.Unexpected(ex.getMessage)
       }
       Unknown(source, flags, kind, ex.checker)
     }
@@ -100,6 +102,11 @@ object Diagnostics {
     /** InvalidRegExp is the RegExp pattern is invalid on parsing or semantics. */
     final case class InvalidRegExp(message: String) extends ErrorKind {
       override def toString: String = s"invalid RegExp ($message)"
+    }
+
+    /** Unexpected is a unexpected error. */
+    final case class Unexpected(message: String) extends ErrorKind {
+      override def toString: String = s"unexpected ($message)"
     }
   }
 }

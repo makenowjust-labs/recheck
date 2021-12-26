@@ -9,10 +9,13 @@ import codes.quine.labo.recheck.common.AccelerationMode
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.common.Seeder
+import codes.quine.labo.recheck.common.UnexpectedException
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Hotspot
 import codes.quine.labo.recheck.fuzz.FuzzChecker._
+import codes.quine.labo.recheck.recall.RecallResult
+import codes.quine.labo.recheck.recall.RecallValidator
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.unicode.ICharSet
 import codes.quine.labo.recheck.unicode.UString
@@ -29,6 +32,8 @@ object FuzzChecker {
 
   /** Checks whether RegExp is ReDoS vulnerable or not. */
   def check(
+      source: String,
+      flags: String,
       pattern: Pattern,
       fuzz: FuzzProgram,
       random: Random = new Random(Parameters.RandomSeed),
@@ -49,10 +54,15 @@ object FuzzChecker {
       maxIteration: Int = Parameters.MaxIteration,
       maxDegree: Int = Parameters.MaxDegree,
       heatRatio: Double = Parameters.HeatRatio,
-      accelerationMode: AccelerationMode = Parameters.AccelerationMode
+      accelerationMode: AccelerationMode = Parameters.AccelerationMode,
+      maxRecallStringSize: Int = Parameters.MaxRecallStringSize,
+      recallLimit: Int = Parameters.RecallLimit,
+      recallTimeout: Duration = Parameters.RecallTimeout
   )(implicit ctx: Context): Option[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)] =
     ctx.interrupt {
       new FuzzChecker(
+        source,
+        flags,
         pattern,
         fuzz,
         random,
@@ -73,7 +83,10 @@ object FuzzChecker {
         maxIteration,
         maxDegree,
         heatRatio,
-        accelerationMode
+        accelerationMode,
+        maxRecallStringSize,
+        recallLimit,
+        recallTimeout
       ).check()
     }
 
@@ -96,6 +109,8 @@ object FuzzChecker {
 
 /** FuzzChecker is a ReDoS vulnerable RegExp checker based on fuzzing. */
 private[fuzz] final class FuzzChecker(
+    val source: String,
+    val flags: String,
     val pattern: Pattern,
     val fuzz: FuzzProgram,
     val random: Random,
@@ -116,7 +131,10 @@ private[fuzz] final class FuzzChecker(
     val maxIteration: Int,
     val maxDegree: Int,
     val heatRatio: Double,
-    val accelerationMode: AccelerationMode
+    val accelerationMode: AccelerationMode,
+    val maxRecallStringSize: Int,
+    val recallLimit: Int,
+    val recallTimeout: Duration
 )(implicit val ctx: Context) {
 
   import ctx._
@@ -359,7 +377,21 @@ private[fuzz] final class FuzzChecker(
 
   /** Construct an attack string. */
   def tryAttack(str: FString): Option[AttackResult] = interrupt {
-    tryAttackExponential(str).orElse((maxDegree to 2 by -1).iterator.flatMap(tryAttackPolynomial(str, _)).nextOption())
+    val exponential = tryAttackExponential(str).iterator
+    val polynomials = (maxDegree to 2 by -1).iterator.flatMap(tryAttackPolynomial(str, _))
+
+    (exponential ++ polynomials)
+      .map { case (complexity, pattern, hotspot) =>
+        val n = complexity match {
+          case AttackComplexity.Polynomial(degree, _) =>
+            RepeatUtil.polynomial(degree, recallLimit, str.fixedSize, str.repeatSize, maxRecallStringSize)
+          case AttackComplexity.Exponential(_) =>
+            RepeatUtil.exponential(recallLimit, str.fixedSize, str.repeatSize, maxRecallStringSize)
+        }
+        (complexity, pattern.copy(n = n), hotspot)
+      }
+      .filter { case (_, pattern, _) => checksRecall(pattern) }
+      .nextOption()
   }
 
   /** Construct an attack string on assuming the pattern is exponential. */
@@ -397,6 +429,14 @@ private[fuzz] final class FuzzChecker(
     }
     None
   }
+
+  /** Runs recall validation. */
+  def checksRecall(pattern: AttackPattern): Boolean =
+    RecallValidator.validate(source, flags, pattern, recallTimeout) match {
+      case RecallResult.Finish(_)      => false
+      case RecallResult.Timeout        => true
+      case RecallResult.Error(message) => throw new UnexpectedException(message)
+    }
 
   /** Population is a mutable generation on fuzzing. */
   final class Population(

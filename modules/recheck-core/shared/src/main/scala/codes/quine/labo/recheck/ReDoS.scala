@@ -14,11 +14,14 @@ import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.common.ReDoSException
+import codes.quine.labo.recheck.common.UnexpectedException
 import codes.quine.labo.recheck.common.UnsupportedException
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.Diagnostics
 import codes.quine.labo.recheck.fuzz.FuzzChecker
 import codes.quine.labo.recheck.fuzz.FuzzProgram
+import codes.quine.labo.recheck.recall.RecallResult
+import codes.quine.labo.recheck.recall.RecallValidator
 import codes.quine.labo.recheck.regexp.Parser
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.regexp.PatternExtensions._
@@ -75,7 +78,7 @@ object ReDoS {
         // When the pattern has no infinite repetition, then it is safe.
         if (pattern.isConstant) {
           ctx.log("automaton: constant pattern")
-          Success(None)
+          Success(Iterator.empty)
         } else
           for {
             _ <-
@@ -85,16 +88,26 @@ object ReDoS {
               } else Success(())
             epsNFA <- EpsNFABuilder.build(pattern)
             orderedNFA <- Try(epsNFA.toOrderedNFA(maxNFASize).rename.mapAlphabet(_.head))
-          } yield Some(AutomatonChecker.check(orderedNFA, maxNFASize))
+          } yield AutomatonChecker.check(orderedNFA, maxNFASize)
     } yield complexity
 
     result
-      .map {
-        case Some(vul: Complexity.Vulnerable[UChar]) =>
-          val attack = vul.buildAttackPattern(attackLimit, maxAttackStringSize)
-          Diagnostics.Vulnerable(source, flags, vul.toAttackComplexity, attack, vul.hotspot, Checker.Automaton)
-        case Some(safe: Complexity.Safe) => Diagnostics.Safe(source, flags, safe.toAttackComplexity, Checker.Automaton)
-        case None => Diagnostics.Safe(source, flags, AttackComplexity.Safe(false), Checker.Automaton)
+      .map { cs =>
+        cs.map {
+          case vul: Complexity.Vulnerable[UChar] =>
+            val attack = vul.buildAttackPattern(recallLimit, maxRecallStringSize)
+            Diagnostics.Vulnerable(source, flags, vul.toAttackComplexity, attack, vul.hotspot, Checker.Automaton)
+          case safe: Complexity.Safe => Diagnostics.Safe(source, flags, safe.toAttackComplexity, Checker.Automaton)
+        }.filter {
+          case d: Diagnostics.Vulnerable =>
+            RecallValidator.validate(source, flags, d.attack, recallTimeout) match {
+              case RecallResult.Finish(_)      => false
+              case RecallResult.Timeout        => true
+              case RecallResult.Error(message) => throw new UnexpectedException(message)
+            }
+          case _ => true
+        }.nextOption()
+          .getOrElse(Diagnostics.Safe(source, flags, AttackComplexity.Safe(false), Checker.Automaton))
       }
       .recoverWith { case ex: ReDoSException =>
         ex.checker = Some(Checker.Automaton)
@@ -111,6 +124,8 @@ object ReDoS {
 
     val result = FuzzProgram.from(pattern).map { fuzz =>
       FuzzChecker.check(
+        source,
+        flags,
         pattern,
         fuzz,
         random,
@@ -131,7 +146,10 @@ object ReDoS {
         maxIteration,
         maxDegree,
         heatRatio,
-        accelerationMode
+        accelerationMode,
+        maxRecallStringSize,
+        recallLimit,
+        recallTimeout
       )
     }
 

@@ -92,6 +92,7 @@ If the value is the positive infinite duration, the result never become a timeou
 If the `number` value is specified, it is parsed in milliseconds.
 If the value is `null`, it is parsed as the positive infinite duration.
 
+
 #### `logger`
 
 Type: `((message: string) => void) | null`
@@ -107,7 +108,6 @@ Logger to log an analysis execution.
 And, there are other parameters to specify detailed behavior.
 They are set to perform better as the default, so it is rare to specify them
 and it needs to know the checkers in depth to set the correct value.
-
 #### `maxAttackStringSize`
 
 Type: `number`
@@ -180,6 +180,7 @@ Upper limit of VM execution time during seeding.
 If the `number` value is specified, it is parsed in milliseconds.
 If the value is `null`, it is parsed as the positive infinite duration.
 
+
 #### `maxInitialGenerationSize`
 
 Type: `number`
@@ -206,6 +207,7 @@ Upper limit of VM execution time during incubation.
 
 If the `number` value is specified, it is parsed in milliseconds.
 If the value is `null`, it is parsed as the positive infinite duration.
+
 
 #### `maxGeneStringSize`
 
@@ -252,6 +254,7 @@ If the execution time exceeds this value, the result will be reported as a vulne
 If the `number` value is specified, it is parsed in milliseconds.
 If the value is `null`, it is parsed as the positive infinite duration.
 
+
 #### `maxDegree`
 
 Type: `number`
@@ -283,6 +286,40 @@ There are three mode:
   because back-reference makes VM acceleration slow sometimes.
 - `'on'`: The force **on** mode.
 - `'off'`: The force **off** mode.
+
+#### `maxRecallStringSize`
+
+Type: `number`
+
+Default: `300000`
+
+Maximum length of an attack string on the recall validation.
+
+#### `recallLimit`
+
+Type: `number`
+
+Default: `1500000000`
+
+Upper limit on the number of characters read on the recall validation.
+
+#### `recallTimeout`
+
+Type: `number | null`
+
+Default: `-1`
+
+Upper limit of recall validation time.
+
+If the recall validation time exceeds this value, the validation is succeeded.
+If the negative value is specified, the validation succeeds immediately.
+
+If the `number` value is specified, it is parsed in milliseconds.
+If the value is `null`, it is parsed as the positive infinite duration.
+
+Note that Scala.js does not support the recall validation for now.
+Please set negative value in this case.
+
 
 #### `maxRepeatCount`
 
