@@ -5,7 +5,7 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
 
 import codes.quine.labo.recheck.common.Context
-import codes.quine.labo.recheck.common.quine.labo.recheck.common.UnexpectedException
+import codes.quine.labo.recheck.common.UnexpectedException
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.unicode.UString
 

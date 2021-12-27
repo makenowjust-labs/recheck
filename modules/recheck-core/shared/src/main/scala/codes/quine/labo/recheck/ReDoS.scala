@@ -14,6 +14,7 @@ import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.common.ReDoSException
+import codes.quine.labo.recheck.common.UnsupportedException
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.Diagnostics
 import codes.quine.labo.recheck.fuzz.FuzzChecker
