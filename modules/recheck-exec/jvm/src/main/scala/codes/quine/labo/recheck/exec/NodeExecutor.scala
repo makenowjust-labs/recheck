@@ -1,16 +1,19 @@
-package codes.quine.labo.recheck.recall
+package codes.quine.labo.recheck.exec
+
 import scala.concurrent.duration.FiniteDuration
 import scala.io.Source
 
 import codes.quine.labo.recheck.common.Context
 
-/** Executor is the recall validation executor. */
-object Executor {
+/** NodeExecutor is the `node` command executor. */
+object NodeExecutor {
 
-  /** Executes a new process. */
-  private[recall] def exec(code: String, timeout: Option[FiniteDuration])(implicit
-      ctx: Context
-  ): (Int, String, String) = {
+  /** Executes `node` command.
+    *
+    * It returns `exitCode`, `out` and `err` in `Some` if execution is terminated in timeout. When the result is
+    * timeout, it returns `None`.
+    */
+  def exec(code: String, timeout: Option[FiniteDuration])(implicit ctx: Context): Option[(Int, String, String)] = {
     val builder = new ProcessBuilder().command("node", "-")
     val process = builder.start()
     ctx.log(s"recall: process (pid: ${process.pid()})")
@@ -29,8 +32,8 @@ object Executor {
       }
       if (finished) {
         val exitCode = process.exitValue()
-        val out = Source.fromInputStream(process.getInputStream).mkString
-        val err = Source.fromInputStream(process.getErrorStream).mkString
+        val out = Source.fromInputStream(process.getInputStream).mkString.trim
+        val err = Source.fromInputStream(process.getErrorStream).mkString.trim
         ctx.log {
           s"""|recall: finish
               |  exit code: ${exitCode}
@@ -38,10 +41,10 @@ object Executor {
               |        err: ${err}
               |""".stripMargin
         }
-        (exitCode, out, err)
+        Some((exitCode, out, err))
       } else {
         ctx.log("recall: timeout")
-        (-1, "", "")
+        None
       }
     } finally process.destroy()
   }

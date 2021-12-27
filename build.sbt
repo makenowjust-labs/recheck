@@ -46,7 +46,22 @@ lazy val root = project
     addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
   )
   .enablePlugins(MdocPlugin)
-  .aggregate(coreJVM, coreJS, commonJVM, commonJS, unicodeJVM, unicodeJS, parseJVM, parseJS, codecJVM, codecJS, js, cli)
+  .aggregate(
+    coreJVM,
+    coreJS,
+    commonJVM,
+    commonJS,
+    execJVM,
+    execJS,
+    unicodeJVM,
+    unicodeJS,
+    parseJVM,
+    parseJS,
+    codecJVM,
+    codecJS,
+    js,
+    cli
+  )
   .dependsOn(coreJVM)
 
 lazy val core = crossProject(JVMPlatform, JSPlatform)
@@ -60,6 +75,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labo.recheck._
       |import codes.quine.labo.recheck.automaton._
       |import codes.quine.labo.recheck.common._
+      |import codes.quine.labo.recheck.exec._
       |import codes.quine.labo.recheck.data._
       |import codes.quine.labo.recheck.diagnostics._
       |import codes.quine.labo.recheck.fuzz._
@@ -133,6 +149,14 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |  val pattern = parse(source, flags)
       |  time("seed")(StaticSeeder.seed(pattern, maxSimpleRepeatSize, maxInitialGenerationSize, limit))
       |}
+      |
+      |def validate(
+      |  source: String,
+      |  flags: String,
+      |  pattern: AttackPattern,
+      |  timeout: Duration = Duration(1, SECONDS)
+      |): RecallResult =
+      |  time("validate")(RecallValidator.validate(source, flags, pattern, timeout)(NodeExecutor.exec))
       |
       |def check(
       |    source: String,
@@ -210,7 +234,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
-  .dependsOn(common, unicode, parse)
+  .dependsOn(common, exec, unicode, parse)
 
 lazy val coreJVM = core.jvm
 lazy val coreJS = core.js
@@ -234,6 +258,25 @@ lazy val common = crossProject(JVMPlatform, JSPlatform)
 
 lazy val commonJVM = common.jvm
 lazy val commonJS = common.js
+
+lazy val exec = crossProject(JVMPlatform, JSPlatform)
+  .in(file("modules/recheck-exec"))
+  .settings(
+    name := "recheck-exec",
+    console / initialCommands := """
+      |import codes.quine.labo.recheck.exec._
+      |""".stripMargin,
+    Compile / console / scalacOptions -= "-Wunused",
+    Test / console / scalacOptions -= "-Wunused",
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
+    // Settings for test:
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
+    testFrameworks += new TestFramework("munit.Framework")
+  )
+  .dependsOn(common)
+
+lazy val execJVM = exec.jvm
+lazy val execJS = exec.js
 
 lazy val unicode = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/recheck-unicode"))

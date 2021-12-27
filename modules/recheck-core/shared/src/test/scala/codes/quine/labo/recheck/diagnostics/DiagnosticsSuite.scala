@@ -5,6 +5,7 @@ import codes.quine.labo.recheck.common.CancelException
 import codes.quine.labo.recheck.common.Checker
 import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.common.TimeoutException
+import codes.quine.labo.recheck.common.UnexpectedException
 import codes.quine.labo.recheck.common.UnsupportedException
 import codes.quine.labo.recheck.unicode.UString
 
@@ -67,6 +68,10 @@ class DiagnosticsSuite extends munit.FunSuite {
     assertEquals(
       Diagnostics.Unknown.from("", "", new UnsupportedException("foo")),
       Diagnostics.Unknown("", "", Diagnostics.ErrorKind.Unsupported("foo"), None)
+    )
+    assertEquals(
+      Diagnostics.Unknown.from("", "", new UnexpectedException("foo")),
+      Diagnostics.Unknown("", "", Diagnostics.ErrorKind.Unexpected("foo"), None)
     )
   }
 

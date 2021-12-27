@@ -17,6 +17,7 @@ import codes.quine.labo.recheck.common.ReDoSException
 import codes.quine.labo.recheck.common.UnsupportedException
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.Diagnostics
+import codes.quine.labo.recheck.exec.NodeExecutor
 import codes.quine.labo.recheck.fuzz.FuzzChecker
 import codes.quine.labo.recheck.fuzz.FuzzProgram
 import codes.quine.labo.recheck.recall.RecallValidator
@@ -99,8 +100,9 @@ object ReDoS {
             case safe: Complexity.Safe => Diagnostics.Safe(source, flags, safe.toAttackComplexity, Checker.Automaton)
           }
           .filter {
-            case d: Diagnostics.Vulnerable => RecallValidator.checks(source, flags, d.attack, recallTimeout)
-            case _                         => true
+            case d: Diagnostics.Vulnerable =>
+              RecallValidator.checks(source, flags, d.attack, recallTimeout)(NodeExecutor.exec)
+            case _ => true
           }
           .nextOption()
           .getOrElse(Diagnostics.Safe(source, flags, AttackComplexity.Safe(false), Checker.Automaton))

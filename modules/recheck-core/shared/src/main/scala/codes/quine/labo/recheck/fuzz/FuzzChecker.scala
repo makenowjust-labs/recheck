@@ -12,6 +12,7 @@ import codes.quine.labo.recheck.common.Seeder
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Hotspot
+import codes.quine.labo.recheck.exec.NodeExecutor
 import codes.quine.labo.recheck.fuzz.FuzzChecker._
 import codes.quine.labo.recheck.recall.RecallValidator
 import codes.quine.labo.recheck.regexp.Pattern
@@ -432,7 +433,7 @@ private[fuzz] final class FuzzChecker(
 
   /** Runs recall validation. */
   def checksRecall(pattern: AttackPattern): Boolean =
-    RecallValidator.checks(source, flags, pattern, recallTimeout)
+    RecallValidator.checks(source, flags, pattern, recallTimeout)(NodeExecutor.exec)
 
   /** Population is a mutable generation on fuzzing. */
   final class Population(
