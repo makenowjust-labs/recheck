@@ -6,6 +6,7 @@ import scala.concurrent.duration.MILLISECONDS
 import scala.concurrent.duration.SECONDS
 
 import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.UnexpectedException
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.unicode.UString
 
@@ -30,6 +31,10 @@ class RecallValidatorSuite extends munit.FunSuite {
       RecallValidator.checks("foo", "i", pattern, Duration.Inf)((_, _) => Some((0, "1", ""))),
       false
     )
+
+    interceptMessage[UnexpectedException]("foo") {
+      RecallValidator.checks("foo", "i", pattern, Duration.Inf)((_, _) => Some((1, "", "foo")))
+    }
   }
 
   test("RecallValidator.validate") {
