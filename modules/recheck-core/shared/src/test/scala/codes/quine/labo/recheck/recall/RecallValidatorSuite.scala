@@ -6,7 +6,6 @@ import scala.concurrent.duration.MILLISECONDS
 import scala.concurrent.duration.SECONDS
 
 import codes.quine.labo.recheck.common.Context
-import codes.quine.labo.recheck.common.TimeoutException
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.unicode.UString
 
@@ -61,14 +60,6 @@ class RecallValidatorSuite extends munit.FunSuite {
       RecallResult.Timeout
     )
     assertEquals(timeout3.exists(_ <= FiniteDuration(50, SECONDS)), true)
-
-    intercept[TimeoutException] {
-      val ctx50ms = Context(timeout = Duration(50, MILLISECONDS))
-      RecallValidator.validate("foo", "1", pattern, Duration(50, MILLISECONDS))((_, t) => {
-        Thread.sleep(t.get.toMillis)
-        None
-      })(ctx50ms)
-    }
   }
 
   test("RecallValidator.generate") {
