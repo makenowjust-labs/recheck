@@ -93,20 +93,23 @@ object ReDoS {
 
     result
       .map { cs =>
-        cs.map {
-          case vul: Complexity.Vulnerable[UChar] =>
-            val attack = vul.buildAttackPattern(recallLimit, maxRecallStringSize)
-            Diagnostics.Vulnerable(source, flags, vul.toAttackComplexity, attack, vul.hotspot, Checker.Automaton)
-          case safe: Complexity.Safe => Diagnostics.Safe(source, flags, safe.toAttackComplexity, Checker.Automaton)
-        }.filter {
-          case d: Diagnostics.Vulnerable =>
-            RecallValidator.validate(source, flags, d.attack, recallTimeout) match {
-              case RecallResult.Finish(_)      => false
-              case RecallResult.Timeout        => true
-              case RecallResult.Error(message) => throw new UnexpectedException(message)
-            }
-          case _ => true
-        }.nextOption()
+        cs.distinct
+          .map {
+            case vul: Complexity.Vulnerable[UChar] =>
+              val attack = vul.buildAttackPattern(recallLimit, maxRecallStringSize)
+              Diagnostics.Vulnerable(source, flags, vul.toAttackComplexity, attack, vul.hotspot, Checker.Automaton)
+            case safe: Complexity.Safe => Diagnostics.Safe(source, flags, safe.toAttackComplexity, Checker.Automaton)
+          }
+          .filter {
+            case d: Diagnostics.Vulnerable =>
+              RecallValidator.validate(source, flags, d.attack, recallTimeout) match {
+                case RecallResult.Finish(_)      => false
+                case RecallResult.Timeout        => true
+                case RecallResult.Error(message) => throw new UnexpectedException(message)
+              }
+            case _ => true
+          }
+          .nextOption()
           .getOrElse(Diagnostics.Safe(source, flags, AttackComplexity.Safe(false), Checker.Automaton))
       }
       .recoverWith { case ex: ReDoSException =>

@@ -102,7 +102,6 @@ object FuzzChecker {
   private[fuzz] final case class Generation(
       minRate: Double,
       traces: IndexedSeq[Trace],
-      inputs: Set[UString],
       covered: Set[CoverageItem]
   )
 }
@@ -138,6 +137,9 @@ private[fuzz] final class FuzzChecker(
 )(implicit val ctx: Context) {
 
   import ctx._
+
+  /** A set that holds strings once executed. */
+  val inputs: mutable.Set[UString] = mutable.Set.empty
 
   /** An alias to `fuzz.program`. */
   def program: Program = fuzz.program
@@ -196,7 +198,7 @@ private[fuzz] final class FuzzChecker(
     log(s"""|fuzz: seeding finish
             |  size: ${seed.size}""".stripMargin)
 
-    val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty, mutable.Set.empty)
+    val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty)
     for (str <- seed) {
       pop.execute(str) match {
         case Some(result) => return Right(result)
@@ -442,7 +444,6 @@ private[fuzz] final class FuzzChecker(
   final class Population(
       var minRate: Double,
       val set: mutable.Set[Trace],
-      val inputs: mutable.Set[UString],
       val visited: mutable.Set[CoverageItem]
   ) {
 
@@ -489,9 +490,8 @@ private[fuzz] final class FuzzChecker(
     def toGeneration: Generation = {
       val traces = set.toIndexedSeq.sortBy(-_.rate).slice(0, maxGenerationSize)
       val newMinRate = traces.map(_.rate).minOption.getOrElse(0.0)
-      val newInputs = traces.map(_.str.toUString).toSet
       val newCovered = traces.iterator.flatMap(_.coverage).toSet
-      Generation(newMinRate, traces, newInputs, newCovered)
+      Generation(newMinRate, traces, newCovered)
     }
   }
 
@@ -503,7 +503,6 @@ private[fuzz] final class FuzzChecker(
       new Population(
         gen.minRate,
         mutable.Set.from(gen.traces),
-        mutable.Set.from(gen.inputs),
         mutable.Set.from(gen.covered)
       )
   }

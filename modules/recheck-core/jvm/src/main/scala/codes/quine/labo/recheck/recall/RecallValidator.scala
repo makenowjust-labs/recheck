@@ -88,6 +88,7 @@ object RecallValidator {
     } finally process.destroy()
   }
 
+  /** Converts the execution triple to the result. */
   private[recall] def result(exitCode: Int, out: String, err: String)(implicit ctx: Context): RecallResult =
     ctx.interrupt {
       exitCode match {
