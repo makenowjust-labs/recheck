@@ -107,7 +107,7 @@ private[fuzz] class StaticSeeder[A, Q](
     reverseGraph.edges
       .groupMap(_._2) { case (q2, _, q1) => (q2, q1) }
       .view
-      .mapValues(_.groupMap(_._1)(_._2).filter(_._2.size >= 2))
+      .mapValues(_.groupMap(_._1)(_._2))
       .toMap
   }
 
