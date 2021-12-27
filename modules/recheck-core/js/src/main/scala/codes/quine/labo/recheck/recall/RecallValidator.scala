@@ -11,5 +11,8 @@ object RecallValidator {
   @nowarn
   def validate(source: String, flags: String, pattern: AttackPattern, timeout: Duration)(implicit
       ctx: Context
-  ): RecallResult = throw new UnexpectedException("recall validation is not supported.")
+  ): RecallResult = timeout match {
+    case d if d < Duration.Zero => RecallResult.Timeout
+    case _                      => throw new UnexpectedException("recall validation is not supported.")
+  }
 }
