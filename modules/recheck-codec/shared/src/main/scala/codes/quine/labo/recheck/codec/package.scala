@@ -101,6 +101,8 @@ package object codec {
       Json.obj("kind" := "unsupported", "message" := message)
     case ErrorKind.InvalidRegExp(message) =>
       Json.obj("kind" := "invalid", "message" := message)
+    case ErrorKind.Unexpected(message) =>
+      Json.obj("kind" := "unexpected", "message" := message)
   }
 
   /** An `Encoder` for `UString`. */
@@ -131,6 +133,9 @@ package object codec {
       maxDegree <- c.getOrElse[Int]("maxDegree")(Parameters.MaxDegree)
       heatRatio <- c.getOrElse[Double]("heatRatio")(Parameters.HeatRatio)
       accelerationMode <- c.getOrElse[AccelerationMode]("accelerationMode")(Parameters.AccelerationMode)
+      maxRecallStringSize <- c.getOrElse[Int]("maxRecallStringSize")(Parameters.MaxRecallStringSize)
+      recallLimit <- c.getOrElse[Int]("recallLimit")(Parameters.RecallLimit)
+      recallTimeout <- c.getOrElse[Duration]("recallTimeout")(Parameters.RecallTimeout)
       maxRepeatCount <- c.getOrElse[Int]("maxRepeatCount")(Parameters.MaxRepeatCount)
       maxNFASize <- c.getOrElse[Int]("maxNFASize")(Parameters.MaxNFASize)
       maxPatternSize <- c.getOrElse[Int]("maxPatternSize")(Parameters.MaxPatternSize)
@@ -157,6 +162,9 @@ package object codec {
       maxDegree,
       heatRatio,
       accelerationMode,
+      maxRecallStringSize,
+      recallLimit,
+      recallTimeout,
       maxRepeatCount,
       maxNFASize,
       maxPatternSize

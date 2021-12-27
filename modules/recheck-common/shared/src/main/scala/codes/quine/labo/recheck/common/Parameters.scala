@@ -111,6 +111,20 @@ import scala.concurrent.duration._
   *   - `'on'`: The force **on** mode.
   *   - `'off'`: The force **off** mode. (default: `common.AccelerationMode.Auto`)
   *
+  * @param maxRecallStringSize
+  *   Int Maximum length of an attack string on the recall validation. (default: `300000`)
+  *
+  * @param recallLimit
+  *   Int Upper limit on the number of characters read on the recall validation. (default: `1500000000`)
+  *
+  * @param recallTimeout
+  *   Duration Upper limit of recall validation time.
+  *
+  * If the recall validation time exceeds this value, the validation is succeeded. If the negative value is specified,
+  * the validation succeeds immediately.
+  *
+  * (default: `Duration(-1, MILLISECONDS)`)
+  *
   * @param maxRepeatCount
   *   Int Maximum number of sum of repeat counts.
   *
@@ -150,6 +164,9 @@ final case class Parameters(
     maxDegree: Int = Parameters.MaxDegree,
     heatRatio: Double = Parameters.HeatRatio,
     accelerationMode: AccelerationMode = Parameters.AccelerationMode,
+    maxRecallStringSize: Int = Parameters.MaxRecallStringSize,
+    recallLimit: Int = Parameters.RecallLimit,
+    recallTimeout: Duration = Parameters.RecallTimeout,
     maxRepeatCount: Int = Parameters.MaxRepeatCount,
     maxNFASize: Int = Parameters.MaxNFASize,
     maxPatternSize: Int = Parameters.MaxPatternSize
@@ -222,6 +239,15 @@ object Parameters {
 
   /** The default value of [[Parameters.accelerationMode]]. */
   val AccelerationMode: AccelerationMode = common.AccelerationMode.Auto
+
+  /** The default value of [[Parameters.maxRecallStringSize]]. */
+  val MaxRecallStringSize: Int = 300000
+
+  /** The default value of [[Parameters.recallLimit]]. */
+  val RecallLimit: Int = 1500000000
+
+  /** The default value of [[Parameters.recallTimeout]]. */
+  val RecallTimeout: Duration = Duration(-1, MILLISECONDS)
 
   /** The default value of [[Parameters.maxRepeatCount]]. */
   val MaxRepeatCount: Int = 30

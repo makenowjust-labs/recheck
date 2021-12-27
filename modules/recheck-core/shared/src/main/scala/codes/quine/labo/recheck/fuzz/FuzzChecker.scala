@@ -12,7 +12,9 @@ import codes.quine.labo.recheck.common.Seeder
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Hotspot
+import codes.quine.labo.recheck.exec.NodeExecutor
 import codes.quine.labo.recheck.fuzz.FuzzChecker._
+import codes.quine.labo.recheck.recall.RecallValidator
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.unicode.ICharSet
 import codes.quine.labo.recheck.unicode.UString
@@ -29,6 +31,8 @@ object FuzzChecker {
 
   /** Checks whether RegExp is ReDoS vulnerable or not. */
   def check(
+      source: String,
+      flags: String,
       pattern: Pattern,
       fuzz: FuzzProgram,
       random: Random = new Random(Parameters.RandomSeed),
@@ -49,10 +53,15 @@ object FuzzChecker {
       maxIteration: Int = Parameters.MaxIteration,
       maxDegree: Int = Parameters.MaxDegree,
       heatRatio: Double = Parameters.HeatRatio,
-      accelerationMode: AccelerationMode = Parameters.AccelerationMode
+      accelerationMode: AccelerationMode = Parameters.AccelerationMode,
+      maxRecallStringSize: Int = Parameters.MaxRecallStringSize,
+      recallLimit: Int = Parameters.RecallLimit,
+      recallTimeout: Duration = Parameters.RecallTimeout
   )(implicit ctx: Context): Option[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)] =
     ctx.interrupt {
       new FuzzChecker(
+        source,
+        flags,
         pattern,
         fuzz,
         random,
@@ -73,7 +82,10 @@ object FuzzChecker {
         maxIteration,
         maxDegree,
         heatRatio,
-        accelerationMode
+        accelerationMode,
+        maxRecallStringSize,
+        recallLimit,
+        recallTimeout
       ).check()
     }
 
@@ -89,13 +101,14 @@ object FuzzChecker {
   private[fuzz] final case class Generation(
       minRate: Double,
       traces: IndexedSeq[Trace],
-      inputs: Set[UString],
       covered: Set[CoverageItem]
   )
 }
 
 /** FuzzChecker is a ReDoS vulnerable RegExp checker based on fuzzing. */
 private[fuzz] final class FuzzChecker(
+    val source: String,
+    val flags: String,
     val pattern: Pattern,
     val fuzz: FuzzProgram,
     val random: Random,
@@ -116,10 +129,16 @@ private[fuzz] final class FuzzChecker(
     val maxIteration: Int,
     val maxDegree: Int,
     val heatRatio: Double,
-    val accelerationMode: AccelerationMode
+    val accelerationMode: AccelerationMode,
+    val maxRecallStringSize: Int,
+    val recallLimit: Int,
+    val recallTimeout: Duration
 )(implicit val ctx: Context) {
 
   import ctx._
+
+  /** A set that holds strings once executed. */
+  val inputs: mutable.Set[UString] = mutable.Set.empty
 
   /** An alias to `fuzz.program`. */
   def program: Program = fuzz.program
@@ -178,7 +197,7 @@ private[fuzz] final class FuzzChecker(
     log(s"""|fuzz: seeding finish
             |  size: ${seed.size}""".stripMargin)
 
-    val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty, mutable.Set.empty)
+    val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty)
     for (str <- seed) {
       pop.execute(str) match {
         case Some(result) => return Right(result)
@@ -359,7 +378,21 @@ private[fuzz] final class FuzzChecker(
 
   /** Construct an attack string. */
   def tryAttack(str: FString): Option[AttackResult] = interrupt {
-    tryAttackExponential(str).orElse((maxDegree to 2 by -1).iterator.flatMap(tryAttackPolynomial(str, _)).nextOption())
+    val exponential = tryAttackExponential(str).iterator
+    val polynomials = (maxDegree to 2 by -1).iterator.flatMap(tryAttackPolynomial(str, _))
+
+    (exponential ++ polynomials)
+      .map { case (complexity, pattern, hotspot) =>
+        val n = complexity match {
+          case AttackComplexity.Polynomial(degree, _) =>
+            RepeatUtil.polynomial(degree, recallLimit, str.fixedSize, str.repeatSize, maxRecallStringSize)
+          case AttackComplexity.Exponential(_) =>
+            RepeatUtil.exponential(recallLimit, str.fixedSize, str.repeatSize, maxRecallStringSize)
+        }
+        (complexity, pattern.copy(n = n), hotspot)
+      }
+      .filter { case (_, pattern, _) => checksRecall(pattern) }
+      .nextOption()
   }
 
   /** Construct an attack string on assuming the pattern is exponential. */
@@ -398,11 +431,14 @@ private[fuzz] final class FuzzChecker(
     None
   }
 
+  /** Runs recall validation. */
+  def checksRecall(pattern: AttackPattern): Boolean =
+    RecallValidator.checks(source, flags, pattern, recallTimeout)(NodeExecutor.exec)
+
   /** Population is a mutable generation on fuzzing. */
   final class Population(
       var minRate: Double,
       val set: mutable.Set[Trace],
-      val inputs: mutable.Set[UString],
       val visited: mutable.Set[CoverageItem]
   ) {
 
@@ -449,9 +485,8 @@ private[fuzz] final class FuzzChecker(
     def toGeneration: Generation = {
       val traces = set.toIndexedSeq.sortBy(-_.rate).slice(0, maxGenerationSize)
       val newMinRate = traces.map(_.rate).minOption.getOrElse(0.0)
-      val newInputs = traces.map(_.str.toUString).toSet
       val newCovered = traces.iterator.flatMap(_.coverage).toSet
-      Generation(newMinRate, traces, newInputs, newCovered)
+      Generation(newMinRate, traces, newCovered)
     }
   }
 
@@ -463,7 +498,6 @@ private[fuzz] final class FuzzChecker(
       new Population(
         gen.minRate,
         mutable.Set.from(gen.traces),
-        mutable.Set.from(gen.inputs),
         mutable.Set.from(gen.covered)
       )
   }

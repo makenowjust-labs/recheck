@@ -26,6 +26,8 @@ class FuzzCheckerSuite extends munit.FunSuite {
       }
       fuzz <- FuzzProgram.from(pattern)
     } yield FuzzChecker.check(
+      source,
+      flags,
       pattern,
       fuzz,
       random = random0,
@@ -72,6 +74,8 @@ class FuzzCheckerSuite extends munit.FunSuite {
         }
         fuzz <- FuzzProgram.from(pattern)
       } yield FuzzChecker.check(
+        "^(a?){50}a{50}$",
+        "",
         pattern,
         fuzz,
         random0,
@@ -91,6 +95,8 @@ class FuzzCheckerSuite extends munit.FunSuite {
         }
         fuzz <- FuzzProgram.from(pattern)
       } yield FuzzChecker.check(
+        "^(a|a)*$",
+        "",
         pattern,
         fuzz,
         random0,

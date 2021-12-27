@@ -27,7 +27,7 @@ class AutomatonCheckerSuite extends munit.FunSuite {
       }
       epsNFA <- EpsNFABuilder.build(pattern)
       nfa = epsNFA.toOrderedNFA.rename
-      result <- Try(AutomatonChecker.check(nfa))
+      result <- Try(AutomatonChecker.check(nfa).nextOption().getOrElse(Complexity.Constant))
     } yield result
 
   test("AutomatonChecker.check: constant") {

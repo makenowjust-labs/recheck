@@ -225,6 +225,37 @@ export type Parameters = {
   accelerationMode?: "auto" | "on" | "off";
 
   /**
+   * Maximum length of an attack string on the recall validation.
+   *
+   * (default: `300000`)
+   */
+  maxRecallStringSize?: number;
+
+  /**
+   * Upper limit on the number of characters read on the recall validation.
+   *
+   * (default: `1500000000`)
+   */
+  recallLimit?: number;
+
+  /**
+   * Upper limit of recall validation time.
+   *
+   * If the recall validation time exceeds this value, the validation is succeeded.
+   * If the negative value is specified, the validation succeeds immediately.
+   *
+   * If the `number` value is specified, it is parsed in milliseconds.
+   * If the value is `null`, it is parsed as the positive infinite duration.
+   *
+   * Note that Scala.js does not support the recall validation for now.
+   * Please set negative value in this case.
+   *
+   *
+   * (default: `-1`)
+   */
+  recallTimeout?: number | null;
+
+  /**
    * Maximum number of sum of repeat counts.
    *
    * If this value is exceeded, it switches to use the fuzzing checker.
@@ -359,7 +390,7 @@ export type Hotspot = {
 /**
  * Error is a possible error on analyzing.
  */
-export type Error = Timeout | Cancel | Unsupported | Invalid;
+export type Error = Timeout | Cancel | Unsupported | Invalid | Unexpected;
 
 /**
  * Timeout is a timeout error.
@@ -382,6 +413,13 @@ export type Unsupported = {
  */
 export type Invalid = {
   kind: "invalid";
+  message: string;
+};
+/**
+ * Unexpected is an error reported when unexpected error occurs.
+ */
+export type Unexpected = {
+  kind: "unexpected";
   message: string;
 };
 

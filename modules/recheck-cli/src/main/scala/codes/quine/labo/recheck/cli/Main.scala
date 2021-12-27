@@ -131,6 +131,21 @@ object Main {
       val accelerationMode = Opts
         .option[AccelerationMode](long = "acceleration-mode", help = "Mode of acceleration of VM execution.")
         .withDefault(Parameters.AccelerationMode)
+      val maxRecallStringSize = Opts
+        .option[Int](
+          long = "max-recall-string-size",
+          help = "Maximum length of an attack string on the recall validation."
+        )
+        .withDefault(Parameters.MaxRecallStringSize)
+      val recallLimit = Opts
+        .option[Int](
+          long = "recall-limit",
+          help = "Upper limit on the number of characters read on the recall validation."
+        )
+        .withDefault(Parameters.RecallLimit)
+      val recallTimeout = Opts
+        .option[Duration](long = "recall-timeout", help = "Upper limit of recall validation time.")
+        .withDefault(Parameters.RecallTimeout)
       val maxRepeatCount = Opts
         .option[Int](long = "max-repeat-count", help = "Maximum number of sum of repeat counts.")
         .withDefault(Parameters.MaxRepeatCount)
@@ -144,12 +159,12 @@ object Main {
         (
           checker,
           timeout,
-          logger
-        ).tupled,
-        (
+          logger,
           maxAttackStringSize,
           attackLimit,
-          randomSeed,
+          randomSeed
+        ).tupled,
+        (
           maxIteration,
           seeder,
           maxSimpleRepeatCount,
@@ -166,17 +181,17 @@ object Main {
           maxDegree,
           heatRatio,
           accelerationMode,
+          maxRecallStringSize,
+          recallLimit,
+          recallTimeout,
           maxRepeatCount,
           maxNFASize,
           maxPatternSize
         ).tupled
       ).mapN {
         case (
-              (checker, timeout, logger),
+              (checker, timeout, logger, maxAttackStringSize, attackLimit, randomSeed),
               (
-                maxAttackStringSize,
-                attackLimit,
-                randomSeed,
                 maxIteration,
                 seeder,
                 maxSimpleRepeatCount,
@@ -193,6 +208,9 @@ object Main {
                 maxDegree,
                 heatRatio,
                 accelerationMode,
+                maxRecallStringSize,
+                recallLimit,
+                recallTimeout,
                 maxRepeatCount,
                 maxNFASize,
                 maxPatternSize
@@ -221,6 +239,9 @@ object Main {
             maxDegree,
             heatRatio,
             accelerationMode,
+            maxRecallStringSize,
+            recallLimit,
+            recallTimeout,
             maxRepeatCount,
             maxNFASize,
             maxPatternSize

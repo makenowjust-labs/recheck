@@ -284,6 +284,39 @@ There are three mode:
 - `'on'`: The force **on** mode.
 - `'off'`: The force **off** mode.
 
+#### `maxRecallStringSize`
+
+Type: `number`
+
+Default: `300000`
+
+Maximum length of an attack string on the recall validation.
+
+#### `recallLimit`
+
+Type: `number`
+
+Default: `1500000000`
+
+Upper limit on the number of characters read on the recall validation.
+
+#### `recallTimeout`
+
+Type: `number | null`
+
+Default: `-1`
+
+Upper limit of recall validation time.
+
+If the recall validation time exceeds this value, the validation is succeeded.
+If the negative value is specified, the validation succeeds immediately.
+
+If the `number` value is specified, it is parsed in milliseconds.
+If the value is `null`, it is parsed as the positive infinite duration.
+
+Note that Scala.js does not support the recall validation for now.
+Please set negative value in this case.
+
 #### `maxRepeatCount`
 
 Type: `number`
