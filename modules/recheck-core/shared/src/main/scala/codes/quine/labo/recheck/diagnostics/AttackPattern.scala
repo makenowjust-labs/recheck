@@ -18,6 +18,12 @@ import codes.quine.labo.recheck.util.NumberFormat
   */
 final case class AttackPattern(pumps: Seq[(UString, UString, Int)], suffix: UString, n: Int) {
 
+  /** Returns a size number of sum of fixed parts. */
+  def fixedSize: Int = pumps.map(_._1.sizeAsString).sum + suffix.sizeAsString
+
+  /** Returns a size number of sum of repeat parts. */
+  def repeatSize: Int = pumps.map(_._2.sizeAsString).sum
+
   /** Returns the [[UString]]] represented by this. */
   def asUString: UString = {
     val str = new StringBuilder

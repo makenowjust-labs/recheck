@@ -1,5 +1,6 @@
 package codes.quine.labo.recheck
 
+import scala.concurrent.duration.Duration
 import scala.util.Failure
 import scala.util.Random
 import scala.util.Success
@@ -25,6 +26,7 @@ import codes.quine.labo.recheck.regexp.Parser
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.regexp.PatternExtensions._
 import codes.quine.labo.recheck.unicode.UChar
+import codes.quine.labo.recheck.util.RepeatUtil
 
 /** ReDoS is a ReDoS checker frontend. */
 object ReDoS {
@@ -92,21 +94,14 @@ object ReDoS {
 
     result
       .map { cs =>
-        cs.distinct
-          .map {
-            case vul: Complexity.Vulnerable[UChar] =>
-              val attack = vul.buildAttackPattern(recallLimit, maxRecallStringSize)
-              Diagnostics.Vulnerable(source, flags, vul.toAttackComplexity, attack, vul.hotspot, Checker.Automaton)
-            case safe: Complexity.Safe => Diagnostics.Safe(source, flags, safe.toAttackComplexity, Checker.Automaton)
-          }
-          .filter {
-            case d: Diagnostics.Vulnerable =>
-              RecallValidator.checks(source, flags, d.attack, recallTimeout)(NodeExecutor.exec)
-            case _ => true
-          }
-          .nextOption()
-          .getOrElse(Diagnostics.Safe(source, flags, AttackComplexity.Safe(false), Checker.Automaton))
+        cs.map {
+          case vul: Complexity.Vulnerable[UChar] =>
+            val attack = vul.buildAttackPattern(recallLimit, maxRecallStringSize)
+            Diagnostics.Vulnerable(source, flags, vul.toAttackComplexity, attack, vul.hotspot, Checker.Automaton)
+          case safe: Complexity.Safe => Diagnostics.Safe(source, flags, safe.toAttackComplexity, Checker.Automaton)
+        } ++ Iterator(Diagnostics.Safe(source, flags, AttackComplexity.Safe(false), Checker.Automaton))
       }
+      .map(recallValidation(source, flags, recallTimeout))
       .recoverWith { case ex: ReDoSException =>
         ex.checker = Some(Checker.Automaton)
         Failure(ex)
@@ -122,8 +117,6 @@ object ReDoS {
 
     val result = FuzzProgram.from(pattern).map { fuzz =>
       FuzzChecker.check(
-        source,
-        flags,
         pattern,
         fuzz,
         random,
@@ -144,19 +137,23 @@ object ReDoS {
         maxIteration,
         maxDegree,
         heatRatio,
-        accelerationMode,
-        maxRecallStringSize,
-        recallLimit,
-        recallTimeout
+        accelerationMode
       )
     }
 
     result
-      .map {
-        case Some((attack, complexity, hotspot)) =>
-          Diagnostics.Vulnerable(source, flags, attack, complexity, hotspot, Checker.Fuzz)
-        case None => Diagnostics.Safe(source, flags, AttackComplexity.Safe(true), Checker.Fuzz)
+      .map { rs =>
+        rs.map { case (complexity, attack, hotspot) =>
+          val n = complexity match {
+            case AttackComplexity.Polynomial(degree, _) =>
+              RepeatUtil.polynomial(degree, recallLimit, attack.fixedSize, attack.repeatSize, maxRecallStringSize)
+            case AttackComplexity.Exponential(_) =>
+              RepeatUtil.exponential(recallLimit, attack.fixedSize, attack.repeatSize, maxRecallStringSize)
+          }
+          Diagnostics.Vulnerable(source, flags, complexity, attack.copy(n = n), hotspot, Checker.Fuzz)
+        } ++ Iterator(Diagnostics.Safe(source, flags, AttackComplexity.Safe(true), Checker.Fuzz))
       }
+      .map(recallValidation(source, flags, recallTimeout))
       .recoverWith { case ex: ReDoSException =>
         ex.checker = Some(Checker.Fuzz)
         Failure(ex)
@@ -169,6 +166,16 @@ object ReDoS {
     checkAutomaton(source, flags, pattern, params).recoverWith { case _: UnsupportedException =>
       checkFuzz(source, flags, pattern, params)
     }
+
+  /** Runs recall validation against diagnostics, then returns validated diagnostics. */
+  private[recheck] def recallValidation(source: String, flags: String, timeout: Duration)(
+      ds: Iterator[Diagnostics]
+  )(implicit ctx: Context): Diagnostics =
+    ds.filter {
+      case d: Diagnostics.Vulnerable =>
+        RecallValidator.checks(source, flags, d.attack, timeout)(NodeExecutor.exec)
+      case _ => true
+    }.next()
 
   /** Gets a sum of repeat specifier counts. */
   private[recheck] def repeatCount(pattern: Pattern)(implicit ctx: Context): Int =

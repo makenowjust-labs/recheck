@@ -25,18 +25,18 @@ class FuzzCheckerSuite extends munit.FunSuite {
         case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
       }
       fuzz <- FuzzProgram.from(pattern)
-    } yield FuzzChecker.check(
-      source,
-      flags,
-      pattern,
-      fuzz,
-      random = random0,
-      maxGeneStringSize = if (quick) 400 else 4000,
-      maxAttackStringSize = if (quick) 400 else 4000,
-      seedingLimit = if (quick) 1_00 else 1_000,
-      incubationLimit = if (quick) 1_000 else 10_000,
-      attackLimit = if (quick) 10_000 else 100_000
-    )
+    } yield FuzzChecker
+      .check(
+        pattern,
+        fuzz,
+        random = random0,
+        maxGeneStringSize = if (quick) 400 else 4000,
+        maxAttackStringSize = if (quick) 400 else 4000,
+        seedingLimit = if (quick) 1_00 else 1_000,
+        incubationLimit = if (quick) 1_000 else 10_000,
+        attackLimit = if (quick) 10_000 else 100_000
+      )
+      .nextOption()
     result.get.isDefined
   }
 
@@ -73,16 +73,16 @@ class FuzzCheckerSuite extends munit.FunSuite {
           case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
         }
         fuzz <- FuzzProgram.from(pattern)
-      } yield FuzzChecker.check(
-        "^(a?){50}a{50}$",
-        "",
-        pattern,
-        fuzz,
-        random0,
-        seedingLimit = 10000,
-        incubationLimit = 10000,
-        attackLimit = 10000
-      )
+      } yield FuzzChecker
+        .check(
+          pattern,
+          fuzz,
+          random0,
+          seedingLimit = 10000,
+          incubationLimit = 10000,
+          attackLimit = 10000
+        )
+        .nextOption()
       result.get.isDefined
     }
 
@@ -94,17 +94,17 @@ class FuzzCheckerSuite extends munit.FunSuite {
           case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
         }
         fuzz <- FuzzProgram.from(pattern)
-      } yield FuzzChecker.check(
-        "^(a|a)*$",
-        "",
-        pattern,
-        fuzz,
-        random0,
-        incubationLimit = 100,
-        attackLimit = 100,
-        maxGeneStringSize = 5,
-        maxAttackStringSize = 5
-      )
+      } yield FuzzChecker
+        .check(
+          pattern,
+          fuzz,
+          random0,
+          incubationLimit = 100,
+          attackLimit = 100,
+          maxGeneStringSize = 5,
+          maxAttackStringSize = 5
+        )
+        .nextOption()
       result.get.isEmpty
     }
   }
