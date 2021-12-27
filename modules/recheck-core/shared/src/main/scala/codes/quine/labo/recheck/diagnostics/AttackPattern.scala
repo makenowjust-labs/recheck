@@ -3,6 +3,7 @@ package diagnostics
 
 import codes.quine.labo.recheck.unicode.UString
 import codes.quine.labo.recheck.util.NumberFormat
+import codes.quine.labo.recheck.util.RepeatUtil
 
 /** AttackPattern is an attack pattern string to ReDoS.
   *
@@ -23,6 +24,17 @@ final case class AttackPattern(pumps: Seq[(UString, UString, Int)], suffix: UStr
 
   /** Returns a size number of sum of repeat parts. */
   def repeatSize: Int = pumps.map(_._2.sizeAsString).sum
+
+  /** Adjusts repetition count in this string to the complexity. */
+  def adjust(complexity: AttackComplexity.Vulnerable, limit: Int, maxSize: Int): AttackPattern = {
+    val n = complexity match {
+      case AttackComplexity.Polynomial(degree, _) =>
+        RepeatUtil.polynomial(degree, limit, fixedSize, repeatSize, maxSize)
+      case AttackComplexity.Exponential(_) =>
+        RepeatUtil.exponential(limit, fixedSize, repeatSize, maxSize)
+    }
+    copy(n = n)
+  }
 
   /** Returns the [[UString]]] represented by this. */
   def asUString: UString = {

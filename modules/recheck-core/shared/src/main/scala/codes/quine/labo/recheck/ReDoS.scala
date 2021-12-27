@@ -26,7 +26,6 @@ import codes.quine.labo.recheck.regexp.Parser
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.regexp.PatternExtensions._
 import codes.quine.labo.recheck.unicode.UChar
-import codes.quine.labo.recheck.util.RepeatUtil
 
 /** ReDoS is a ReDoS checker frontend. */
 object ReDoS {
@@ -144,13 +143,8 @@ object ReDoS {
     result
       .map { rs =>
         rs.map { case (complexity, attack, hotspot) =>
-          val n = complexity match {
-            case AttackComplexity.Polynomial(degree, _) =>
-              RepeatUtil.polynomial(degree, recallLimit, attack.fixedSize, attack.repeatSize, maxRecallStringSize)
-            case AttackComplexity.Exponential(_) =>
-              RepeatUtil.exponential(recallLimit, attack.fixedSize, attack.repeatSize, maxRecallStringSize)
-          }
-          Diagnostics.Vulnerable(source, flags, complexity, attack.copy(n = n), hotspot, Checker.Fuzz)
+          val recallAttack = attack.adjust(complexity, recallLimit, maxRecallStringSize)
+          Diagnostics.Vulnerable(source, flags, complexity, recallAttack, hotspot, Checker.Fuzz)
         } ++ Iterator(Diagnostics.Safe(source, flags, AttackComplexity.Safe(true), Checker.Fuzz))
       }
       .map(recallValidation(source, flags, recallTimeout))
