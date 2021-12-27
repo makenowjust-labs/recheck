@@ -3,14 +3,22 @@ package codes.quine.labo.recheck.recall
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
-import scala.io.Source
 
 import codes.quine.labo.recheck.common.Context
+import codes.quine.labo.recheck.common.quine.labo.recheck.common.UnexpectedException
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.unicode.UString
 
 /** RecallValidator is the implementation of the recall validation. */
 object RecallValidator {
+
+  /** Checks the recall validation. */
+  def checks(source: String, flags: String, pattern: AttackPattern, timeout: Duration)(implicit ctx: Context): Boolean =
+    validate(source, flags, pattern, timeout) match {
+      case RecallResult.Finish(_)      => false
+      case RecallResult.Timeout        => true
+      case RecallResult.Error(message) => throw new UnexpectedException(message)
+    }
 
   /** Runs the recall validation. */
   def validate(source: String, flags: String, pattern: AttackPattern, timeout: Duration)(implicit
@@ -21,10 +29,11 @@ object RecallValidator {
 
     val (exitCode, out, err) = timeout match {
       case d if d < Duration.Zero => return RecallResult.Timeout
-      case _: Duration.Infinite   => exec(code, Some(ctx.deadline).map(_.timeLeft))
+      case _: Duration.Infinite   => Executor.exec(code, Some(ctx.deadline).map(_.timeLeft))
       case d: FiniteDuration =>
-        if ((ctx.deadline ne null) && ctx.deadline.timeLeft < d) exec(code, Some(ctx.deadline.timeLeft))
-        else exec(code, Some(d))
+        val newTimeout =
+          if ((ctx.deadline ne null) && ctx.deadline.timeLeft < d) ctx.deadline.timeLeft else d
+        Executor.exec(code, Some(newTimeout))
     }
 
     result(exitCode, out, err)
@@ -47,45 +56,6 @@ object RecallValidator {
     str.append("}")
 
     str.result()
-  }
-
-  /** Executes a new process. */
-  private[recall] def exec(code: String, timeout: Option[FiniteDuration])(implicit
-      ctx: Context
-  ): (Int, String, String) = {
-    val builder = new ProcessBuilder().command("node", "-")
-    val process = builder.start()
-    ctx.log(s"recall: process (pid: ${process.pid()})")
-
-    try {
-      process.getOutputStream.write(code.getBytes)
-      process.getOutputStream.close()
-      val finished = timeout match {
-        case Some(d) =>
-          ctx.log(s"recall: wait for ${d}")
-          process.waitFor(d.length, d.unit)
-        case None =>
-          ctx.log(s"recall: wait")
-          process.waitFor()
-          true
-      }
-      if (finished) {
-        val exitCode = process.exitValue()
-        val out = Source.fromInputStream(process.getInputStream).mkString
-        val err = Source.fromInputStream(process.getErrorStream).mkString
-        ctx.log {
-          s"""|recall: finish
-              |  exit code: ${exitCode}
-              |        out: ${out}
-              |        err: ${err}
-              |""".stripMargin
-        }
-        (exitCode, out, err)
-      } else {
-        ctx.log("recall: timeout")
-        (-1, "", "")
-      }
-    } finally process.destroy()
   }
 
   /** Converts the execution triple to the result. */

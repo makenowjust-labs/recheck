@@ -14,13 +14,10 @@ import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.InvalidRegExpException
 import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.common.ReDoSException
-import codes.quine.labo.recheck.common.UnexpectedException
-import codes.quine.labo.recheck.common.UnsupportedException
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.Diagnostics
 import codes.quine.labo.recheck.fuzz.FuzzChecker
 import codes.quine.labo.recheck.fuzz.FuzzProgram
-import codes.quine.labo.recheck.recall.RecallResult
 import codes.quine.labo.recheck.recall.RecallValidator
 import codes.quine.labo.recheck.regexp.Parser
 import codes.quine.labo.recheck.regexp.Pattern
@@ -101,13 +98,8 @@ object ReDoS {
             case safe: Complexity.Safe => Diagnostics.Safe(source, flags, safe.toAttackComplexity, Checker.Automaton)
           }
           .filter {
-            case d: Diagnostics.Vulnerable =>
-              RecallValidator.validate(source, flags, d.attack, recallTimeout) match {
-                case RecallResult.Finish(_)      => false
-                case RecallResult.Timeout        => true
-                case RecallResult.Error(message) => throw new UnexpectedException(message)
-              }
-            case _ => true
+            case d: Diagnostics.Vulnerable => RecallValidator.checks(source, flags, d.attack, recallTimeout)
+            case _                         => true
           }
           .nextOption()
           .getOrElse(Diagnostics.Safe(source, flags, AttackComplexity.Safe(false), Checker.Automaton))

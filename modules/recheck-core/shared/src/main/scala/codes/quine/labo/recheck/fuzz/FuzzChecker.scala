@@ -9,12 +9,10 @@ import codes.quine.labo.recheck.common.AccelerationMode
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.common.Seeder
-import codes.quine.labo.recheck.common.UnexpectedException
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Hotspot
 import codes.quine.labo.recheck.fuzz.FuzzChecker._
-import codes.quine.labo.recheck.recall.RecallResult
 import codes.quine.labo.recheck.recall.RecallValidator
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.unicode.ICharSet
@@ -434,11 +432,7 @@ private[fuzz] final class FuzzChecker(
 
   /** Runs recall validation. */
   def checksRecall(pattern: AttackPattern): Boolean =
-    RecallValidator.validate(source, flags, pattern, recallTimeout) match {
-      case RecallResult.Finish(_)      => false
-      case RecallResult.Timeout        => true
-      case RecallResult.Error(message) => throw new UnexpectedException(message)
-    }
+    RecallValidator.checks(source, flags, pattern, recallTimeout)
 
   /** Population is a mutable generation on fuzzing. */
   final class Population(
