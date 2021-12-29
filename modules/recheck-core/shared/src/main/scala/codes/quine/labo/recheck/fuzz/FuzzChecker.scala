@@ -12,9 +12,7 @@ import codes.quine.labo.recheck.common.Seeder
 import codes.quine.labo.recheck.diagnostics.AttackComplexity
 import codes.quine.labo.recheck.diagnostics.AttackPattern
 import codes.quine.labo.recheck.diagnostics.Hotspot
-import codes.quine.labo.recheck.exec.NodeExecutor
 import codes.quine.labo.recheck.fuzz.FuzzChecker._
-import codes.quine.labo.recheck.recall.RecallValidator
 import codes.quine.labo.recheck.regexp.Pattern
 import codes.quine.labo.recheck.unicode.ICharSet
 import codes.quine.labo.recheck.unicode.UString
@@ -31,8 +29,6 @@ object FuzzChecker {
 
   /** Checks whether RegExp is ReDoS vulnerable or not. */
   def check(
-      source: String,
-      flags: String,
       pattern: Pattern,
       fuzz: FuzzProgram,
       random: Random = new Random(Parameters.RandomSeed),
@@ -53,15 +49,10 @@ object FuzzChecker {
       maxIteration: Int = Parameters.MaxIteration,
       maxDegree: Int = Parameters.MaxDegree,
       heatRatio: Double = Parameters.HeatRatio,
-      accelerationMode: AccelerationMode = Parameters.AccelerationMode,
-      maxRecallStringSize: Int = Parameters.MaxRecallStringSize,
-      recallLimit: Int = Parameters.RecallLimit,
-      recallTimeout: Duration = Parameters.RecallTimeout
-  )(implicit ctx: Context): Option[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)] =
+      accelerationMode: AccelerationMode = Parameters.AccelerationMode
+  )(implicit ctx: Context): Iterator[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)] =
     ctx.interrupt {
       new FuzzChecker(
-        source,
-        flags,
         pattern,
         fuzz,
         random,
@@ -82,10 +73,7 @@ object FuzzChecker {
         maxIteration,
         maxDegree,
         heatRatio,
-        accelerationMode,
-        maxRecallStringSize,
-        recallLimit,
-        recallTimeout
+        accelerationMode
       ).check()
     }
 
@@ -107,8 +95,6 @@ object FuzzChecker {
 
 /** FuzzChecker is a ReDoS vulnerable RegExp checker based on fuzzing. */
 private[fuzz] final class FuzzChecker(
-    val source: String,
-    val flags: String,
     val pattern: Pattern,
     val fuzz: FuzzProgram,
     val random: Random,
@@ -129,10 +115,7 @@ private[fuzz] final class FuzzChecker(
     val maxIteration: Int,
     val maxDegree: Int,
     val heatRatio: Double,
-    val accelerationMode: AccelerationMode,
-    val maxRecallStringSize: Int,
-    val recallLimit: Int,
-    val recallTimeout: Duration
+    val accelerationMode: AccelerationMode
 )(implicit val ctx: Context) {
 
   import ctx._
@@ -156,26 +139,22 @@ private[fuzz] final class FuzzChecker(
   type AttackResult = (AttackComplexity.Vulnerable, AttackPattern, Hotspot)
 
   /** Runs this fuzzer. */
-  def check(): Option[AttackResult] = interrupt {
+  def check(): Iterator[AttackResult] = interrupt {
     log(s"fuzz: start (usesAcceleration: ${fuzz.usesAcceleration(accelerationMode)})")
 
-    var gen = init() match {
-      case Right(result) => return Some(result)
-      case Left(gen)     => gen
+    val (initResults, initPop) = init()
+    var pop = initPop
+    initResults ++ (1 to maxIteration).iterator.flatMap { i =>
+      // Because `Population` is mutable and `Iterator` is lazy, this `pop,toGeneration` is called after done of the
+      // previous iteration.
+      val (iterResults, iterPop) = iterate(i, pop.toGeneration)
+      pop = iterPop
+      iterResults
     }
-
-    for (i <- 1 to maxIteration) {
-      iterate(i, gen) match {
-        case Right(result) => return Some(result)
-        case Left(next)    => gen = next
-      }
-    }
-
-    None
   }
 
   /** Creates the initial generation from the seed set. */
-  def init(): Either[Generation, AttackResult] = interrupt {
+  def init(): (Iterator[AttackResult], Population) = interrupt {
     log(s"fuzz: seeding start (seeder: $seeder)")
     val seed: Set[FString] = seeder match {
       case Seeder.Static =>
@@ -194,23 +173,18 @@ private[fuzz] final class FuzzChecker(
       case Seeder.Dynamic =>
         DynamicSeeder.seed(fuzz, seedingLimit, seedingTimeout, maxInitialGenerationSize, accelerationMode)
     }
+
     log(s"""|fuzz: seeding finish
             |  size: ${seed.size}""".stripMargin)
 
     val pop = new Population(0.0, mutable.Set.empty, mutable.Set.empty)
-    for (str <- seed) {
-      pop.execute(str) match {
-        case Some(result) => return Right(result)
-        case None         => () // Skips
-      }
-    }
-
-    Left(pop.toGeneration)
+    (seed.iterator.flatMap(pop.execute), pop)
   }
 
   /** Iterates a generation. */
-  def iterate(i: Int, gen: Generation): Either[Generation, AttackResult] = interrupt {
-    if (gen.traces.isEmpty) return Left(gen)
+  def iterate(i: Int, gen: Generation): (Iterator[AttackResult], Population) = interrupt {
+    val next = Population.from(gen)
+    if (gen.traces.isEmpty) return (Iterator.empty, next)
 
     log {
       val max = gen.traces.maxBy(_.rate)
@@ -218,16 +192,15 @@ private[fuzz] final class FuzzChecker(
           |  traces: ${gen.traces.size}
           |     max: ${max.str} (steps: ${max.steps}, rate: ${max.rate})""".stripMargin
     }
-    val next = Population.from(gen)
 
     val crossovers = (1 to crossoverSize).iterator.flatMap(_ => cross(gen, next))
     val mutations = (1 to mutationSize).iterator.flatMap(_ => mutate(gen, next))
 
-    (crossovers ++ mutations).nextOption().fold(Left(next.toGeneration): Either[Generation, AttackResult])(Right(_))
+    ((crossovers ++ mutations), next)
   }
 
   /** Simulates a crossover. */
-  def cross(gen: Generation, next: Population): Option[AttackResult] = interrupt {
+  def cross(gen: Generation, next: Population): Iterator[AttackResult] = interrupt {
     val i1 = random.between(0, gen.traces.size)
     val i2 = random.between(0, gen.traces.size)
 
@@ -238,17 +211,17 @@ private[fuzz] final class FuzzChecker(
     val pos2 = random.between(0, t2.size + 1)
 
     val (s1, s2) = FString.cross(t1, t2, pos1, pos2)
-    Seq(s1, s2).iterator.flatMap(next.execute).nextOption()
+    Seq(s1, s2).iterator.flatMap(next.execute)
   }
 
   /** Simulates a mutation. */
-  def mutate(gen: Generation, next: Population): Option[AttackResult] = interrupt {
+  def mutate(gen: Generation, next: Population): Iterator[AttackResult] = interrupt {
     val i = random.nextInt(mutators.size)
     mutators(i)(gen, next)
   }
 
   /** Mutators list defined in this fuzzer. */
-  val mutators: IndexedSeq[(Generation, Population) => Option[AttackResult]] = IndexedSeq(
+  val mutators: IndexedSeq[(Generation, Population) => Iterator[AttackResult]] = IndexedSeq(
     mutateRepeat,
     mutateInsert,
     mutateInsertPart,
@@ -258,10 +231,10 @@ private[fuzz] final class FuzzChecker(
   )
 
   /** A mutator to update a base repeat number. */
-  def mutateRepeat(gen: Generation, next: Population): Option[AttackResult] = interrupt {
+  def mutateRepeat(gen: Generation, next: Population): Iterator[AttackResult] = interrupt {
     val i = random.between(0, gen.traces.size)
     val t = gen.traces(i).str
-    if (t.isConstant) return None
+    if (t.isConstant) return Iterator.empty
 
     val s = random.between(0, 2) match {
       case 0 =>
@@ -275,7 +248,7 @@ private[fuzz] final class FuzzChecker(
   }
 
   /** A mutator to insert a character or a repeat specifier. */
-  def mutateInsert(gen: Generation, next: Population): Option[AttackResult] = interrupt {
+  def mutateInsert(gen: Generation, next: Population): Iterator[AttackResult] = interrupt {
     val i = random.nextInt(gen.traces.size)
     val t = gen.traces(i).str
 
@@ -285,7 +258,7 @@ private[fuzz] final class FuzzChecker(
         val c = alphabet.pairs(idx)._1.head
         FString.Wrap(c)
       case 1 =>
-        if (t.isEmpty) return None
+        if (t.isEmpty) return Iterator.empty
         val m = random.between(0, 10)
         val size = random.between(0, t.size)
         FString.Repeat(m, size)
@@ -297,7 +270,7 @@ private[fuzz] final class FuzzChecker(
   }
 
   /** A mutator to insert a part of the pattern (with/without a repeat specifier). */
-  def mutateInsertPart(gen: Generation, next: Population): Option[AttackResult] = interrupt {
+  def mutateInsertPart(gen: Generation, next: Population): Iterator[AttackResult] = interrupt {
     // Falls back when there is no part in the pattern.
     if (parts.isEmpty) return mutateInsert(gen, next)
 
@@ -319,10 +292,10 @@ private[fuzz] final class FuzzChecker(
   }
 
   /** A mutator to update a character or a repeat specifier. */
-  def mutateUpdate(gen: Generation, next: Population): Option[AttackResult] = interrupt {
+  def mutateUpdate(gen: Generation, next: Population): Iterator[AttackResult] = interrupt {
     val i = random.nextInt(gen.traces.size)
     val t = gen.traces(i).str
-    if (t.isEmpty) return None
+    if (t.isEmpty) return Iterator.empty
 
     val pos = random.between(0, t.size)
     val fc = t(pos) match {
@@ -349,10 +322,10 @@ private[fuzz] final class FuzzChecker(
   }
 
   /** A mutator to copy a part of characters of a string. */
-  def mutateCopy(gen: Generation, next: Population): Option[AttackResult] = interrupt {
+  def mutateCopy(gen: Generation, next: Population): Iterator[AttackResult] = interrupt {
     val i = random.nextInt(gen.traces.size)
     val t = gen.traces(i).str
-    if (t.size < 2) return None
+    if (t.size < 2) return Iterator.empty
 
     val pos1 = random.between(0, t.size - 1)
     val size = random.between(1, t.size - pos1 + 1)
@@ -364,11 +337,11 @@ private[fuzz] final class FuzzChecker(
   }
 
   /** A mutator to delete a part of characters of a string. */
-  def mutateDelete(gen: Generation, next: Population): Option[AttackResult] = interrupt {
+  def mutateDelete(gen: Generation, next: Population): Iterator[AttackResult] = interrupt {
     val i = random.nextInt(gen.traces.size)
     val t = gen.traces(i).str
 
-    if (t.size < 2) return None
+    if (t.size < 2) return Iterator.empty
 
     val pos = random.between(0, t.size)
     val size = random.between(1, t.size - pos + 1)
@@ -377,22 +350,11 @@ private[fuzz] final class FuzzChecker(
   }
 
   /** Construct an attack string. */
-  def tryAttack(str: FString): Option[AttackResult] = interrupt {
+  def tryAttack(str: FString): Iterator[AttackResult] = interrupt {
     val exponential = tryAttackExponential(str).iterator
     val polynomials = (maxDegree to 2 by -1).iterator.flatMap(tryAttackPolynomial(str, _))
 
     (exponential ++ polynomials)
-      .map { case (complexity, pattern, hotspot) =>
-        val n = complexity match {
-          case AttackComplexity.Polynomial(degree, _) =>
-            RepeatUtil.polynomial(degree, recallLimit, str.fixedSize, str.repeatSize, maxRecallStringSize)
-          case AttackComplexity.Exponential(_) =>
-            RepeatUtil.exponential(recallLimit, str.fixedSize, str.repeatSize, maxRecallStringSize)
-        }
-        (complexity, pattern.copy(n = n), hotspot)
-      }
-      .filter { case (_, pattern, _) => checksRecall(pattern) }
-      .nextOption()
   }
 
   /** Construct an attack string on assuming the pattern is exponential. */
@@ -431,10 +393,6 @@ private[fuzz] final class FuzzChecker(
     None
   }
 
-  /** Runs recall validation. */
-  def checksRecall(pattern: AttackPattern): Boolean =
-    RecallValidator.checks(source, flags, pattern, recallTimeout)(NodeExecutor.exec)
-
   /** Population is a mutable generation on fuzzing. */
   final class Population(
       var minRate: Double,
@@ -443,11 +401,11 @@ private[fuzz] final class FuzzChecker(
   ) {
 
     /** Executes the string and adds its result. */
-    def execute(str: FString): Option[AttackResult] = {
-      if (str.countRepeat >= maxDegree) return None
+    def execute(str: FString): Iterator[AttackResult] = {
+      if (str.countRepeat >= maxDegree) return Iterator.empty
 
       val input = str.toUString
-      if (inputs.contains(input) || input.sizeAsString >= maxGeneStringSize) return None
+      if (inputs.contains(input) || input.sizeAsString >= maxGeneStringSize) return Iterator.empty
 
       val opts =
         Options(incubationLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode), needsCoverage = true)
@@ -461,7 +419,7 @@ private[fuzz] final class FuzzChecker(
         return tryAttack(str)
       }
 
-      None
+      Iterator.empty
     }
 
     /** Records the execution result. */

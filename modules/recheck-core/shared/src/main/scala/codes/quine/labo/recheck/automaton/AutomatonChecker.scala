@@ -89,7 +89,7 @@ private final class AutomatonChecker[A, Q](
       s"""|automaton: start
           |  scc size: ${scc.size}""".stripMargin
     }
-    checkExponential() ++ checkPolynomial()
+    (checkExponential() ++ checkPolynomial()).distinct
   }
 
   /** Finds an EDA structure in the graph. */

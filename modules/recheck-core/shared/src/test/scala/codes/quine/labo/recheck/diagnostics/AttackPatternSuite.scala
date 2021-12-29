@@ -4,6 +4,22 @@ package diagnostics
 import codes.quine.labo.recheck.unicode.UString
 
 class AttackPatternSuite extends munit.FunSuite {
+  test("AttackPattern#fixedSize") {
+    val attack = AttackPattern(Seq((UString("ab"), UString("cd"), 2)), UString("ef"), 1)
+    assertEquals(attack.fixedSize, 4)
+  }
+
+  test("AttackPattern#repeatSize") {
+    val attack = AttackPattern(Seq((UString("ab"), UString("cd"), 2)), UString("ef"), 1)
+    assertEquals(attack.repeatSize, 2)
+  }
+
+  test("AttackPattern#adjust") {
+    val attack = AttackPattern(Seq((UString("ab"), UString("cd"), 2)), UString("ef"), 1)
+    assertEquals(attack.adjust(AttackComplexity.Polynomial(2, true), 100, 1000).n, 10)
+    assertEquals(attack.adjust(AttackComplexity.Exponential(true), 100, 1000).n, 6)
+  }
+
   test("AttackPattern#asUString") {
     val attack = AttackPattern(Seq((UString("ab"), UString("cd"), 2)), UString("ef"), 1)
     assertEquals(attack.asUString, UString("abcdcdcdef"))
