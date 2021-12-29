@@ -20,7 +20,8 @@ Fixes:
 - Fix semaphore usage in test ([#230](https://github.com/MakeNowJust-Labo/recheck/pull/230))
 - Fix `sbt` file issues ([#231](https://github.com/MakeNowJust-Labo/recheck/pull/231))
 - Check integer overflow on matching steps ([#232](https://github.com/MakeNowJust-Labo/recheck/pull/232))
-- Fix loop detection in StaticSeeder ([#235](https://github.com/MakeNowJust-Labo/recheck/pull/235))
+- Fix loop detection in `StaticSeeder` ([#235](https://github.com/MakeNowJust-Labo/recheck/pull/235))
+- Returns iterator in `FuzzChecker`  ([#236](https://github.com/MakeNowJust-Labo/recheck/pull/236))
 
 # 4.1.1 (2021-12-04)
 
