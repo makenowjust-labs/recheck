@@ -204,7 +204,7 @@ private[vm] class ProgramBuilder(
     enterBlock(main)
 
     // Adds `.*` part if the pattern does not start with `^`.
-    if (pattern.needsSigmaStarAtBegin) {
+    if (!pattern.hasLineBeginAtBegin && !pattern.flagSet.sticky) {
       val loop = allocateLabel("loop")
       val cont = allocateLabel("cont")
 

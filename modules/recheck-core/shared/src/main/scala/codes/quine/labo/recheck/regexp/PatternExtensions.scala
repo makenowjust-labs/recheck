@@ -29,103 +29,35 @@ object PatternExtensions {
   implicit final class PatternOps(private val pattern: Pattern) extends AnyVal {
     import pattern._
 
-    /** Tests whether the pattern contains line assertion (`^` or `$`). */
-    def existsLineAssertion(implicit ctx: Context): Boolean = ctx.interrupt {
-      def loop(node: Node): Boolean = ctx.interrupt(node match {
-        case Disjunction(ns)         => ns.exists(loop)
-        case Sequence(ns)            => ns.exists(loop)
-        case Capture(_, n)           => loop(n)
-        case NamedCapture(_, _, n)   => loop(n)
-        case Group(n)                => loop(n)
-        case Repeat(_, n)            => loop(n)
-        case LookAhead(_, n)         => loop(n)
-        case LookBehind(_, n)        => loop(n)
-        case LineBegin() | LineEnd() => true
-        case _                       => false
-      })
-      loop(node)
-    }
+    /** Tests the pattern has line-begin assertion `^` at its begin position. */
+    def hasLineBeginAtBegin(implicit ctx: Context): Boolean =
+      ctx.interrupt {
+        def loop(node: Node): Boolean = ctx.interrupt(node match {
+          case Disjunction(ns)       => ns.forall(loop)
+          case Sequence(ns)          => ns.headOption.exists(loop)
+          case Capture(_, n)         => loop(n)
+          case NamedCapture(_, _, n) => loop(n)
+          case Group(n)              => loop(n)
+          case LineBegin()           => true
+          case _                     => false
+        })
+        !flagSet.multiline && loop(node)
+      }
 
-    /** Tests whether line begin assertion `^` (resp. line end assertion `$`) is placed not at begin point (resp. end
-      * point).
-      */
-    def existsLineAssertionInMiddle(implicit ctx: Context): Boolean = ctx.interrupt {
-      def loop(isBegin: Boolean, isEnd: Boolean, node: Node): Boolean = ctx.interrupt(node match {
-        case Disjunction(ns) => ns.exists(loop(isBegin, isEnd, _))
-        case Sequence(ns) =>
-          ns match {
-            case n1 +: ns :+ n2 =>
-              loop(isBegin, false, n1) || ns.exists(loop(false, false, _)) || loop(false, isEnd, n2)
-            case Seq(n) => loop(isBegin, isEnd, n)
-            case Seq()  => false
-          }
-        case Capture(_, n)         => loop(isBegin, isEnd, n)
-        case NamedCapture(_, _, n) => loop(isBegin, isEnd, n)
-        case Group(n)              => loop(isBegin, isEnd, n)
-        case LookAhead(_, n)       => loop(false, false, n)
-        case LookBehind(_, n)      => loop(false, false, n)
-        case LineBegin()           => !isBegin
-        case LineEnd()             => !isEnd
-        case _                     => false
-      })
-      loop(true, true, node)
-    }
-
-    /** Tests whether line begin assertion (`^`) is placed at every begin point. */
-    def everyBeginPointIsLineBegin(implicit ctx: Context): Boolean = ctx.interrupt {
-      def loop(node: Node): Boolean = ctx.interrupt(node match {
-        case Disjunction(ns)       => ns.forall(loop)
-        case Sequence(ns)          => ns.headOption.exists(loop)
-        case Capture(_, n)         => loop(n)
-        case NamedCapture(_, _, n) => loop(n)
-        case Group(n)              => loop(n)
-        case LineBegin()           => true
-        case _                     => false
-      })
-      loop(node)
-    }
-
-    /** Tests whether none of line begin assertion (`^`) is placed at every begin point. */
-    def everyBeginPointIsNotLineBegin(implicit ctx: Context): Boolean = ctx.interrupt {
-      def loop(node: Node): Boolean = ctx.interrupt(node match {
-        case Disjunction(ns)       => ns.forall(loop)
-        case Sequence(ns)          => ns.headOption.exists(loop)
-        case Capture(_, n)         => loop(n)
-        case NamedCapture(_, _, n) => loop(n)
-        case Group(n)              => loop(n)
-        case LineBegin()           => false
-        case _                     => true
-      })
-      loop(node)
-    }
-
-    /** Tests whether line end assertion (`^`) is placed at every end point. */
-    def everyEndPointIsLineEnd(implicit ctx: Context): Boolean = ctx.interrupt {
-      def loop(node: Node): Boolean = ctx.interrupt(node match {
-        case Disjunction(ns)       => ns.forall(loop)
-        case Sequence(ns)          => ns.lastOption.exists(loop)
-        case Capture(_, n)         => loop(n)
-        case NamedCapture(_, _, n) => loop(n)
-        case Group(n)              => loop(n)
-        case LineEnd()             => true
-        case _                     => false
-      })
-      loop(node)
-    }
-
-    /** Tests whether none of line end assertion (`^`) is placed at every end point. */
-    def everyEndPointIsNotLineEnd(implicit ctx: Context): Boolean = ctx.interrupt {
-      def loop(node: Node): Boolean = ctx.interrupt(node match {
-        case Disjunction(ns)       => ns.forall(loop)
-        case Sequence(ns)          => ns.lastOption.exists(loop)
-        case Capture(_, n)         => loop(n)
-        case NamedCapture(_, _, n) => loop(n)
-        case Group(n)              => loop(n)
-        case LineEnd()             => false
-        case _                     => true
-      })
-      loop(node)
-    }
+    /** Tests the pattern has line-end assertion `$` at its end position. */
+    def hasLineEndAtEnd(implicit ctx: Context): Boolean =
+      ctx.interrupt {
+        def loop(node: Node): Boolean = ctx.interrupt(node match {
+          case Disjunction(ns)       => ns.forall(loop)
+          case Sequence(ns)          => ns.lastOption.exists(loop)
+          case Capture(_, n)         => loop(n)
+          case NamedCapture(_, _, n) => loop(n)
+          case Group(n)              => loop(n)
+          case LineEnd()             => true
+          case _                     => false
+        })
+        !flagSet.multiline && loop(node)
+      }
 
     /** Tests the pattern has no infinite repetition. */
     def isConstant: Boolean = {
@@ -199,34 +131,25 @@ object PatternExtensions {
       }
 
     /** Tests whether the pattern needs line terminator distinction or not. */
-    def needsLineTerminatorDistinction(implicit ctx: Context): Boolean =
-      ctx.interrupt(flagSet.multiline && existsLineAssertion)
-
-    /** Tests whether the pattern nedds input terminator distinction or not. */
-    def needsInputTerminatorDistinction(implicit ctx: Context): Boolean = ctx.interrupt {
-      // When `^` or `$` exists and `m` flags is enabled, then the pattern needs input terminator distinction too.
-      if (needsLineTerminatorDistinction) return true
-      // When there is no line assertion, then the pattern does not need input terminator distinction.
-      if (!existsLineAssertion) return false
-      // When line assertion appears in middle part of the pattern, then the pattern needs input terminator distinction.
-      if (existsLineAssertionInMiddle) return true
-
-      // When line begin (resp. end) assertion appears at every begin (resp. end) point with consistency,
-      // then the pattern needs input terminator distinction.
-      (!everyBeginPointIsLineBegin && !everyBeginPointIsNotLineBegin) || (!everyEndPointIsLineEnd && !everyEndPointIsNotLineEnd)
+    private[regexp] def needsLineTerminatorDistinction: Boolean = {
+      def loop(node: Node): Boolean = node match {
+        case Disjunction(ns)         => ns.exists(loop)
+        case Sequence(ns)            => ns.exists(loop)
+        case Capture(_, n)           => loop(n)
+        case NamedCapture(_, _, n)   => loop(n)
+        case Group(n)                => loop(n)
+        case Repeat(_, n)            => loop(n)
+        case LookAhead(_, n)         => loop(n)
+        case LookBehind(_, n)        => loop(n)
+        case LineBegin() | LineEnd() => true
+        case _                       => false
+      }
+      flagSet.multiline && loop(node)
     }
 
-    /** Tests whether the pattern has implicit `.*?` at begin. */
-    def needsSigmaStarAtBegin(implicit ctx: Context): Boolean =
-      ctx.interrupt(!flagSet.sticky && (flagSet.multiline || !everyBeginPointIsLineBegin))
-
-    /** Tests whether the pattern has implicit `.*?` at end. */
-    def needsSigmaStarAtEnd(implicit ctx: Context): Boolean =
-      ctx.interrupt(!flagSet.sticky && (flagSet.multiline || !everyEndPointIsLineEnd))
-
     /** Tests whether the pattern needs word character distinction or not. */
-    def needsWordDistinction(implicit ctx: Context): Boolean = ctx.interrupt {
-      def loop(node: Node): Boolean = ctx.interrupt(node match {
+    private[regexp] def needsWordDistinction: Boolean = {
+      def loop(node: Node): Boolean = node match {
         case Disjunction(ns)       => ns.exists(loop)
         case Sequence(ns)          => ns.exists(loop)
         case Capture(_, n)         => loop(n)
@@ -237,7 +160,7 @@ object PatternExtensions {
         case LookBehind(_, n)      => loop(n)
         case WordBoundary(_)       => true
         case _                     => false
-      })
+      }
       loop(node)
     }
 
