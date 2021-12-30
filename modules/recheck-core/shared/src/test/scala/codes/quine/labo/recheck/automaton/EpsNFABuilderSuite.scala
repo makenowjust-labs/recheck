@@ -29,14 +29,15 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4),
+            Set(0, 1, 2, 3, 4, 5),
+            2,
             1,
-            0,
             Map(
-              1 -> Eps(Seq(4, 2)),
-              2 -> LoopEnter(0, 3),
-              3 -> Consume(Set((IChar.Any16, CharKind.Normal)), 1),
-              4 -> LoopExit(0, 0)
+              0 -> Assert(AssertKind.LineEnd, 1),
+              2 -> Eps(Seq(5, 3)),
+              3 -> LoopEnter(0, 4),
+              4 -> Consume(Set((IChar.Any16, CharKind.Normal)), 2),
+              5 -> LoopExit(0, 0)
             )
           )
         )
@@ -46,14 +47,15 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4),
+            Set(0, 1, 2, 3, 4, 5),
             0,
-            4,
+            5,
             Map(
-              0 -> Eps(Seq(3, 1)),
-              1 -> LoopEnter(0, 2),
-              2 -> Consume(Set((IChar.Any16, CharKind.Normal)), 0),
-              3 -> LoopExit(0, 4)
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(4, 2)),
+              2 -> LoopEnter(0, 3),
+              3 -> Consume(Set((IChar.Any16, CharKind.Normal)), 1),
+              4 -> LoopExit(0, 5)
             )
           )
         )
@@ -66,11 +68,13 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1),
+            Set(0, 1, 2, 3),
             0,
-            1,
+            3,
             Map(
-              0 -> Eps(Seq(1))
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(2)),
+              2 -> Assert(AssertKind.LineEnd, 3)
             )
           )
         )
@@ -80,12 +84,14 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1, 2),
+            Set(0, 1, 2, 3, 4),
             0,
-            2,
+            4,
             Map(
-              0 -> Eps(Seq(1)),
-              1 -> Eps(Seq(2))
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(2)),
+              2 -> Eps(Seq(3)),
+              3 -> Assert(AssertKind.LineEnd, 4)
             )
           )
         )
@@ -98,13 +104,15 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false).add(IChar.Word, CharKind.Word),
-            Set(0, 1, 2, 3),
+            Set(0, 1, 2, 3, 4, 5),
             0,
-            3,
+            5,
             Map(
-              0 -> Eps(Seq(1)),
-              1 -> Assert(AssertKind.WordBoundary, 2),
-              2 -> Eps(Seq(3))
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(2)),
+              2 -> Assert(AssertKind.WordBoundary, 3),
+              3 -> Eps(Seq(4)),
+              4 -> Assert(AssertKind.LineEnd, 5)
             )
           )
         )
@@ -114,13 +122,15 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false).add(IChar.Word, CharKind.Word),
-            Set(0, 1, 2, 3),
+            Set(0, 1, 2, 3, 4, 5),
             0,
-            3,
+            5,
             Map(
-              0 -> Eps(Seq(1)),
-              1 -> Assert(AssertKind.WordBoundaryNot, 2),
-              2 -> Eps(Seq(3))
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(2)),
+              2 -> Assert(AssertKind.WordBoundaryNot, 3),
+              3 -> Eps(Seq(4)),
+              4 -> Assert(AssertKind.LineEnd, 5)
             )
           )
         )
@@ -133,13 +143,15 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(true, false).add(IChar.canonicalize(IChar('a'), false)),
-            Set(0, 1, 2, 3),
+            Set(0, 1, 2, 3, 4, 5),
             0,
-            3,
+            5,
             Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(Set((IChar.canonicalize(IChar('a'), false), CharKind.Normal)), 2),
-              2 -> Eps(Seq(3))
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(2)),
+              2 -> Consume(Set((IChar.canonicalize(IChar('a'), false), CharKind.Normal)), 3),
+              3 -> Eps(Seq(4)),
+              4 -> Assert(AssertKind.LineEnd, 5)
             )
           )
         )
@@ -151,13 +163,15 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false).add(IChar('a')),
-            Set(0, 1, 2, 3),
+            Set(0, 1, 2, 3, 4, 5),
             0,
-            3,
+            5,
             Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(Set((IChar('a'), CharKind.Normal)), 2),
-              2 -> Eps(Seq(3))
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(2)),
+              2 -> Consume(Set((IChar('a'), CharKind.Normal)), 3),
+              3 -> Eps(Seq(4)),
+              4 -> Assert(AssertKind.LineEnd, 5)
             )
           )
         )
@@ -169,13 +183,15 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false).add(IChar('a')),
-            Set(0, 1, 2, 3),
+            Set(0, 1, 2, 3, 4, 5),
             0,
-            3,
+            5,
             Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(Set((IChar.Any16.diff(IChar('a')), CharKind.Normal)), 2),
-              2 -> Eps(Seq(3))
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(2)),
+              2 -> Consume(Set((IChar.Any16.diff(IChar('a')), CharKind.Normal)), 3),
+              3 -> Eps(Seq(4)),
+              4 -> Assert(AssertKind.LineEnd, 5)
             )
           )
         )
@@ -188,13 +204,15 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false).add(IChar.Any16.diff(IChar.LineTerminator)),
-            Set(0, 1, 2, 3),
+            Set(0, 1, 2, 3, 4, 5),
             0,
-            3,
+            5,
             Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(Set((IChar.Any16.diff(IChar.LineTerminator), CharKind.Normal)), 2),
-              2 -> Eps(Seq(3))
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(2)),
+              2 -> Consume(Set((IChar.Any16.diff(IChar.LineTerminator), CharKind.Normal)), 3),
+              3 -> Eps(Seq(4)),
+              4 -> Assert(AssertKind.LineEnd, 5)
             )
           )
         )
@@ -204,16 +222,18 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(true, false).add(IChar.canonicalize(IChar.Any16.diff(IChar.LineTerminator), false)),
-            Set(0, 1, 2, 3),
+            Set(0, 1, 2, 3, 4, 5),
             0,
-            3,
+            5,
             Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(2)),
+              2 -> Consume(
                 Set((IChar.canonicalize(IChar.Any16.diff(IChar.LineTerminator), false), CharKind.Normal)),
-                2
+                3
               ),
-              2 -> Eps(Seq(3))
+              3 -> Eps(Seq(4)),
+              4 -> Assert(AssertKind.LineEnd, 5)
             )
           )
         )
@@ -223,13 +243,15 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1, 2, 3),
+            Set(0, 1, 2, 3, 4, 5),
             0,
-            3,
+            5,
             Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(Set((IChar.Any16, CharKind.Normal)), 2),
-              2 -> Eps(Seq(3))
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(2)),
+              2 -> Consume(Set((IChar.Any16, CharKind.Normal)), 3),
+              3 -> Eps(Seq(4)),
+              4 -> Assert(AssertKind.LineEnd, 5)
             )
           )
         )
@@ -239,13 +261,15 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, true),
-            Set(0, 1, 2, 3),
+            Set(0, 1, 2, 3, 4, 5),
             0,
-            3,
+            5,
             Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(Set((IChar.Any, CharKind.Normal)), 2),
-              2 -> Eps(Seq(3))
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(2)),
+              2 -> Consume(Set((IChar.Any, CharKind.Normal)), 3),
+              3 -> Eps(Seq(4)),
+              4 -> Assert(AssertKind.LineEnd, 5)
             )
           )
         )
@@ -260,17 +284,19 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4, 5, 6, 7),
+            Set(0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
             0,
-            7,
+            9,
             Map(
-              0 -> Eps(Seq(5)),
-              5 -> Eps(Seq(1, 3)),
-              1 -> Consume(Set((IChar.Any16, CharKind.Normal)), 2),
-              2 -> Eps(Seq(6)),
-              3 -> Consume(Set((IChar.Any16, CharKind.Normal)), 4),
-              4 -> Eps(Seq(6)),
-              6 -> Eps(Seq(7))
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(6)),
+              6 -> Eps(Seq(2, 4)),
+              2 -> Consume(Set((IChar.Any16, CharKind.Normal)), 3),
+              3 -> Eps(Seq(7)),
+              4 -> Consume(Set((IChar.Any16, CharKind.Normal)), 5),
+              5 -> Eps(Seq(7)),
+              7 -> Eps(Seq(8)),
+              8 -> Assert(AssertKind.LineEnd, 9)
             )
           )
         )
@@ -285,17 +311,19 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4, 5, 6, 7),
+            Set(0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
             0,
-            7,
+            9,
             Map(
-              0 -> Eps(Seq(3)),
-              3 -> Eps(Seq(4, 5)),
-              4 -> LoopEnter(0, 1),
-              1 -> Consume(Set((IChar.Any16, CharKind.Normal)), 2),
-              2 -> Eps(Seq(3)),
-              5 -> LoopExit(0, 6),
-              6 -> Eps(Seq(7))
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(4)),
+              4 -> Eps(Seq(5, 6)),
+              5 -> LoopEnter(0, 2),
+              2 -> Consume(Set((IChar.Any16, CharKind.Normal)), 3),
+              3 -> Eps(Seq(4)),
+              6 -> LoopExit(0, 7),
+              7 -> Eps(Seq(8)),
+              8 -> Assert(AssertKind.LineEnd, 9)
             )
           )
         )
@@ -307,17 +335,19 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4, 5, 6, 7),
+            Set(0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
             0,
-            7,
+            9,
             Map(
-              0 -> Eps(Seq(3)),
-              3 -> Eps(Seq(5, 4)),
-              4 -> LoopEnter(0, 1),
-              1 -> Consume(Set((IChar.Any16, CharKind.Normal)), 2),
-              2 -> Eps(Seq(3)),
-              5 -> LoopExit(0, 6),
-              6 -> Eps(Seq(7))
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(4)),
+              4 -> Eps(Seq(6, 5)),
+              5 -> LoopEnter(0, 2),
+              2 -> Consume(Set((IChar.Any16, CharKind.Normal)), 3),
+              3 -> Eps(Seq(4)),
+              6 -> LoopExit(0, 7),
+              7 -> Eps(Seq(8)),
+              8 -> Assert(AssertKind.LineEnd, 9)
             )
           )
         )
@@ -332,16 +362,18 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4, 5, 6),
+            Set(0, 1, 2, 3, 4, 5, 6, 7, 8),
             0,
-            6,
+            8,
             Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(Set((IChar.Any16, CharKind.Normal)), 2),
-              2 -> Eps(Seq(3, 4)),
-              3 -> LoopEnter(0, 1),
-              4 -> LoopExit(0, 5),
-              5 -> Eps(Seq(6))
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(2)),
+              2 -> Consume(Set((IChar.Any16, CharKind.Normal)), 3),
+              3 -> Eps(Seq(4, 5)),
+              4 -> LoopEnter(0, 2),
+              5 -> LoopExit(0, 6),
+              6 -> Eps(Seq(7)),
+              7 -> Assert(AssertKind.LineEnd, 8)
             )
           )
         )
@@ -353,16 +385,18 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4, 5, 6),
+            Set(0, 1, 2, 3, 4, 5, 6, 7, 8),
             0,
-            6,
+            8,
             Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(Set((IChar.Any16, CharKind.Normal)), 2),
-              2 -> Eps(Seq(4, 3)),
-              3 -> LoopEnter(0, 1),
-              4 -> LoopExit(0, 5),
-              5 -> Eps(Seq(6))
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(2)),
+              2 -> Consume(Set((IChar.Any16, CharKind.Normal)), 3),
+              3 -> Eps(Seq(5, 4)),
+              4 -> LoopEnter(0, 2),
+              5 -> LoopExit(0, 6),
+              6 -> Eps(Seq(7)),
+              7 -> Assert(AssertKind.LineEnd, 8)
             )
           )
         )
@@ -377,14 +411,16 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4),
+            Set(0, 1, 2, 3, 4, 5, 6),
             0,
-            4,
+            6,
             Map(
-              0 -> Eps(Seq(3)),
-              3 -> Eps(Seq(1, 2)),
-              1 -> Consume(Set((IChar.Any16, CharKind.Normal)), 2),
-              2 -> Eps(Seq(4))
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(4)),
+              4 -> Eps(Seq(2, 3)),
+              2 -> Consume(Set((IChar.Any16, CharKind.Normal)), 3),
+              3 -> Eps(Seq(5)),
+              5 -> Assert(AssertKind.LineEnd, 6)
             )
           )
         )
@@ -396,14 +432,16 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         Success(
           EpsNFA(
             ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4),
+            Set(0, 1, 2, 3, 4, 5, 6),
             0,
-            4,
+            6,
             Map(
-              0 -> Eps(Seq(3)),
-              3 -> Eps(Seq(2, 1)),
-              1 -> Consume(Set((IChar.Any16, CharKind.Normal)), 2),
-              2 -> Eps(Seq(4))
+              0 -> Assert(AssertKind.LineBegin, 1),
+              1 -> Eps(Seq(4)),
+              4 -> Eps(Seq(3, 2)),
+              2 -> Consume(Set((IChar.Any16, CharKind.Normal)), 3),
+              3 -> Eps(Seq(5)),
+              5 -> Assert(AssertKind.LineEnd, 6)
             )
           )
         )
@@ -508,13 +546,15 @@ class EpsNFABuilderSuite extends munit.FunSuite {
     test("EpsNFABuilder.build: Capture, NamedCapture, Group") {
       val nfaA = EpsNFA(
         ICharSet.any(false, false).add(IChar('a')),
-        Set(0, 1, 2, 3),
+        Set(0, 1, 2, 3, 4, 5),
         0,
-        3,
+        5,
         Map(
-          0 -> Eps(Seq(1)),
-          1 -> Consume(Set((IChar('a'), CharKind.Normal)), 2),
-          2 -> Eps(Seq(3))
+          0 -> Assert(AssertKind.LineBegin, 1),
+          1 -> Eps(Seq(2)),
+          2 -> Consume(Set((IChar('a'), CharKind.Normal)), 3),
+          3 -> Eps(Seq(4)),
+          4 -> Assert(AssertKind.LineEnd, 5)
         )
       )
       assertEquals(

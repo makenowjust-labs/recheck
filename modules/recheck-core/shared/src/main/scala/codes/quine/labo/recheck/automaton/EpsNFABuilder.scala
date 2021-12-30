@@ -37,9 +37,6 @@ private class EpsNFABuilder(
 )(implicit ctx: Context) {
   import pattern.flagSet._
 
-  /** A cached result of `Pattern#needsInputTerminatorDistinction`. */
-  private[this] val needsInputTerminatorDistinction = pattern.needsInputTerminatorDistinction
-
   /** A next state counter. */
   private[this] var counterQ = 0
 
@@ -76,7 +73,7 @@ private class EpsNFABuilder(
   def build(): EpsNFA[Int] = {
     val (i0, a0) = buildNode(pattern.node)
 
-    val init = if (pattern.needsSigmaStarAtBegin) {
+    val init = if (!pattern.hasLineBeginAtBegin && !sticky) {
       val loop = nextLoop()
       val i1 = nextQ()
       val i2 = nextQ()
@@ -89,7 +86,7 @@ private class EpsNFABuilder(
       i1
     } else i0
 
-    val accept = if (pattern.needsSigmaStarAtEnd) {
+    val accept = if (!pattern.hasLineEndAtEnd) {
       val loop = nextLoop()
       val a1 = nextQ()
       val a2 = nextQ()
@@ -190,18 +187,14 @@ private class EpsNFABuilder(
       (i, a)
     case LineBegin() =>
       val i = nextQ()
-      if (needsInputTerminatorDistinction) {
-        val a = nextQ()
-        emit(i -> Assert(AssertKind.LineBegin, a))
-        (i, a)
-      } else (i, i)
+      val a = nextQ()
+      emit(i -> Assert(AssertKind.LineBegin, a))
+      (i, a)
     case LineEnd() =>
       val i = nextQ()
-      if (needsInputTerminatorDistinction) {
-        val a = nextQ()
-        emit(i -> Assert(AssertKind.LineEnd, a))
-        (i, a)
-      } else (i, i)
+      val a = nextQ()
+      emit(i -> Assert(AssertKind.LineEnd, a))
+      (i, a)
     case LookAhead(_, _)  => throw new UnsupportedException("look-ahead assertion")
     case LookBehind(_, _) => throw new UnsupportedException("look-behind assertion")
     case atom: AtomNode =>
