@@ -58,9 +58,13 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
   /** Converts this ε-NFA to ordered NFA with ε-elimination. */
   def toOrderedNFA(maxNFASize: Int)(implicit ctx: Context): OrderedNFA[IChar, (CharKind, Seq[Q])] =
     ctx.interrupt {
+      val hasLineAssertion = tau.values
+        .collect { case Assert(k, _) => k }
+        .exists(k => k == AssertKind.LineBegin || k == AssertKind.LineEnd)
+      val inputTerminatorKind = if (hasLineAssertion) CharKind.LineTerminator else CharKind.Normal
+
       // Obtains a set of possible character information.
-      // The last `CharKind.LineTerminator` means a beginning or ending marker.
-      val charInfoSet = alphabet.pairs.iterator.map(_._2).toSet ++ Set(CharKind.LineTerminator)
+      val charInfoSet = alphabet.pairs.iterator.map(_._2).toSet ++ Set(inputTerminatorKind)
 
       /** Skips ε-transitions from the state and collects not ε-transition or terminal state. */
       def buildClosure(k0: CharKind, ks: Set[CharKind], q: Q, loops: Set[Int]): Seq[(Q, Option[Consume[Q]])] =
@@ -81,7 +85,7 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
                 if (newChs.nonEmpty) Vector((q, Some(Consume(newChs, q1, pos))))
                 else Vector.empty
               case None =>
-                if (ks.contains(CharKind.LineTerminator)) Vector((q, None))
+                if (ks.contains(inputTerminatorKind)) Vector((q, None))
                 else Vector.empty
             }
         }
@@ -89,11 +93,11 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
       def closure(k0: CharKind, q: Q): Seq[(Q, Option[Consume[Q]])] =
         closureCache.getOrElseUpdate((k0, q), buildClosure(k0, charInfoSet, q, Set.empty))
 
-      val closureInit = closure(CharKind.LineTerminator, init)
+      val closureInit = closure(inputTerminatorKind, init)
 
       val queue = mutable.Queue.empty[(CharKind, Seq[(Q, Option[Consume[Q]])])]
       val newStateSet = mutable.Set.empty[(CharKind, Seq[Q])]
-      val newInits = Vector((CharKind.LineTerminator, closureInit.map(_._1)))
+      val newInits = Vector((inputTerminatorKind, closureInit.map(_._1)))
       val newAcceptSet = Set.newBuilder[(CharKind, Seq[Q])]
       val newDelta = Map.newBuilder[((CharKind, Seq[Q]), IChar), Seq[(CharKind, Seq[Q])]]
       val newSourcemap = mutable.Map
@@ -101,7 +105,7 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
         .withDefaultValue(Vector.empty)
       var deltaSize = 0
 
-      queue.enqueue((CharKind.LineTerminator, closureInit))
+      queue.enqueue((inputTerminatorKind, closureInit))
       newStateSet.addAll(newInits)
 
       while (queue.nonEmpty) ctx.interrupt {
