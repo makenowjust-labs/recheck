@@ -14,6 +14,7 @@ Changes:
 - Use JavaScript style representation for `AttackPattern#toString` ([#229](https://github.com/MakeNowJust-Labo/recheck/pull/229))
 - Apply look-ahead optimization to VM ([#233](https://github.com/MakeNowJust-Labo/recheck/pull/233))
 - Add recall validation ([#234](https://github.com/MakeNowJust-Labo/recheck/pull/234))
+- Simplify automaton without input terminator distinction ([#240](https://github.com/MakeNowJust-Labo/recheck/pull/240))
 
 Fixes:
 
