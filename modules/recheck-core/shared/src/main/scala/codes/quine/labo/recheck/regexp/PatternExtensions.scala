@@ -62,6 +62,7 @@ object PatternExtensions {
         case Capture(_, n)         => loop(isBegin, isEnd, n)
         case NamedCapture(_, _, n) => loop(isBegin, isEnd, n)
         case Group(n)              => loop(isBegin, isEnd, n)
+        case Repeat(_, n)          => loop(false, false, n)
         case LookAhead(_, n)       => loop(false, false, n)
         case LookBehind(_, n)      => loop(false, false, n)
         case LineBegin()           => !isBegin

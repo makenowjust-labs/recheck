@@ -144,6 +144,85 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(CaptureRange(Some((1, 1))).merge(CaptureRange(Some((2, 2)))), CaptureRange(Some((1, 2))))
   }
 
+  test("PatternExtensions.PatternOps#existsLineAssertion") {
+    val flagSet = FlagSet(false, false, false, false, false, false)
+    assertEquals(Pattern(Disjunction(Seq(Dot(), LineBegin())), flagSet).existsLineAssertion, true)
+    assertEquals(Pattern(Disjunction(Seq(LineBegin(), Dot())), flagSet).existsLineAssertion, true)
+    assertEquals(Pattern(Disjunction(Seq(Dot(), Dot())), flagSet).existsLineAssertion, false)
+    assertEquals(Pattern(Sequence(Seq(Dot(), LineBegin())), flagSet).existsLineAssertion, true)
+    assertEquals(Pattern(Sequence(Seq(LineBegin(), Dot())), flagSet).existsLineAssertion, true)
+    assertEquals(Pattern(Sequence(Seq(Dot(), Dot())), flagSet).existsLineAssertion, false)
+    assertEquals(Pattern(Capture(1, LineBegin()), flagSet).existsLineAssertion, true)
+    assertEquals(Pattern(Capture(1, Dot()), flagSet).existsLineAssertion, false)
+    assertEquals(Pattern(NamedCapture(1, "foo", LineBegin()), flagSet).existsLineAssertion, true)
+    assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet).existsLineAssertion, false)
+    assertEquals(Pattern(Group(LineBegin()), flagSet).existsLineAssertion, true)
+    assertEquals(Pattern(Group(Dot()), flagSet).existsLineAssertion, false)
+    assertEquals(Pattern(Repeat(Quantifier.Star(false), LineBegin()), flagSet).existsLineAssertion, true)
+    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet).existsLineAssertion, false)
+    assertEquals(Pattern(Repeat(Quantifier.Plus(false), LineBegin()), flagSet).existsLineAssertion, true)
+    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet).existsLineAssertion, false)
+    assertEquals(
+      Pattern(Repeat(Quantifier.Question(false), LineBegin()), flagSet).existsLineAssertion,
+      true
+    )
+    assertEquals(Pattern(Repeat(Quantifier.Question(false), Dot()), flagSet).existsLineAssertion, false)
+    assertEquals(
+      Pattern(Repeat(Quantifier.Exact(2, false), LineBegin()), flagSet).existsLineAssertion,
+      true
+    )
+    assertEquals(Pattern(Repeat(Quantifier.Exact(2, false), Dot()), flagSet).existsLineAssertion, false)
+    assertEquals(Pattern(LookAhead(false, LineBegin()), flagSet).existsLineAssertion, true)
+    assertEquals(Pattern(LookAhead(false, Dot()), flagSet).existsLineAssertion, false)
+    assertEquals(Pattern(LookBehind(false, LineBegin()), flagSet).existsLineAssertion, true)
+    assertEquals(Pattern(LookBehind(false, Dot()), flagSet).existsLineAssertion, false)
+    assertEquals(Pattern(LineBegin(), flagSet).existsLineAssertion, true)
+    assertEquals(Pattern(LineEnd(), flagSet).existsLineAssertion, true)
+    assertEquals(Pattern(WordBoundary(true), flagSet).existsLineAssertion, false)
+    assertEquals(Pattern(WordBoundary(false), flagSet).existsLineAssertion, false)
+    assertEquals(Pattern(Dot(), flagSet).existsLineAssertion, false)
+  }
+
+  test("PatternExtensions.PatternOps#existsLineAssertionInMiddle") {
+    val flagSet = FlagSet(false, false, false, false, false, false)
+    assertEquals(Pattern(Disjunction(Seq(Dot(), LineBegin())), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(Disjunction(Seq(LineBegin(), Dot())), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(Disjunction(Seq(Dot(), LineEnd())), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(Disjunction(Seq(LineEnd(), Dot())), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(Disjunction(Seq(Dot(), Dot())), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(Sequence(Seq(Dot(), LineBegin())), flagSet).existsLineAssertionInMiddle, true)
+    assertEquals(Pattern(Sequence(Seq(LineBegin(), Dot())), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(Sequence(Seq(Dot(), LineEnd())), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(Sequence(Seq(LineEnd(), Dot())), flagSet).existsLineAssertionInMiddle, true)
+    assertEquals(Pattern(Sequence(Seq(Dot(), Dot())), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(Capture(1, LineBegin()), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(Capture(1, LineEnd()), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(Capture(1, Dot()), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(NamedCapture(1, "foo", LineBegin()), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(NamedCapture(1, "foo", LineEnd()), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(Group(LineBegin()), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(Group(LineEnd()), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(Group(Dot()), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(Repeat(Quantifier.Star(false), LineBegin()), flagSet).existsLineAssertionInMiddle, true)
+    assertEquals(Pattern(Repeat(Quantifier.Star(false), LineEnd()), flagSet).existsLineAssertionInMiddle, true)
+    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(Repeat(Quantifier.Plus(false), LineBegin()), flagSet).existsLineAssertionInMiddle, true)
+    assertEquals(Pattern(Repeat(Quantifier.Plus(false), LineEnd()), flagSet).existsLineAssertionInMiddle, true)
+    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(LookAhead(false, LineBegin()), flagSet).existsLineAssertionInMiddle, true)
+    assertEquals(Pattern(LookAhead(false, LineEnd()), flagSet).existsLineAssertionInMiddle, true)
+    assertEquals(Pattern(LookAhead(false, Dot()), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(LookBehind(false, LineBegin()), flagSet).existsLineAssertionInMiddle, true)
+    assertEquals(Pattern(LookBehind(false, LineEnd()), flagSet).existsLineAssertionInMiddle, true)
+    assertEquals(Pattern(LookBehind(false, Dot()), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(LineBegin(), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(LineEnd(), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(WordBoundary(true), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(WordBoundary(false), flagSet).existsLineAssertionInMiddle, false)
+    assertEquals(Pattern(Dot(), flagSet).existsLineAssertionInMiddle, false)
+  }
+
   test("PatternExtensions.PatternOps#everyBeginPointIsLineBegin") {
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(LineBegin(), LineBegin())), flagSet).everyBeginPointIsLineBegin, true)
@@ -369,6 +448,21 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(LineBegin(), flagSet1).needsLineTerminatorDistinction, false)
   }
 
+  test("PatternExtension.PatternOps#needsInputTerminatorDistinction") {
+    val flagSet0 = FlagSet(false, false, true, false, false, false)
+    val flagSet1 = FlagSet(false, false, false, false, false, false)
+    assertEquals(Pattern(LineBegin(), flagSet0).needsInputTerminatorDistinction, true)
+    assertEquals(Pattern(LineEnd(), flagSet0).needsInputTerminatorDistinction, true)
+    assertEquals(Pattern(Dot(), flagSet0).needsInputTerminatorDistinction, false)
+    assertEquals(Pattern(Dot(), flagSet1).needsInputTerminatorDistinction, false)
+    assertEquals(Pattern(Sequence(Seq(Dot(), LineBegin())), flagSet1).needsInputTerminatorDistinction, true)
+    assertEquals(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet1).needsInputTerminatorDistinction, false)
+    assertEquals(Pattern(Sequence(Seq(LineBegin(), Dot())), flagSet1).needsInputTerminatorDistinction, false)
+    assertEquals(Pattern(Sequence(Seq(Dot(), LineEnd())), flagSet1).needsInputTerminatorDistinction, false)
+    assertEquals(Pattern(Disjunction(Seq(LineBegin(), Dot())), flagSet1).needsInputTerminatorDistinction, true)
+    assertEquals(Pattern(Disjunction(Seq(Dot(), LineEnd())), flagSet1).needsInputTerminatorDistinction, true)
+  }
+
   test("PatternExtensions.PatternOps#needsWordDistinction") {
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(Dot(), WordBoundary(false))), flagSet).needsWordDistinction, true)
@@ -400,6 +494,28 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(LineBegin(), flagSet).needsWordDistinction, false)
     assertEquals(Pattern(LineEnd(), flagSet).needsWordDistinction, false)
     assertEquals(Pattern(Dot(), flagSet).needsWordDistinction, false)
+  }
+
+  test("PatternExtension.PatternOps#needsSigmaStarAtBegin") {
+    val flagSet0 = FlagSet(false, false, true, false, false, false)
+    val flagSet1 = FlagSet(false, false, false, false, false, false)
+    val flagSet2 = FlagSet(false, false, false, false, false, true)
+    assertEquals(Pattern(Dot(), flagSet0).needsSigmaStarAtBegin, true)
+    assertEquals(Pattern(LineBegin(), flagSet0).needsSigmaStarAtBegin, true)
+    assertEquals(Pattern(Dot(), flagSet1).needsSigmaStarAtBegin, true)
+    assertEquals(Pattern(LineBegin(), flagSet1).needsSigmaStarAtBegin, false)
+    assertEquals(Pattern(Dot(), flagSet2).needsSigmaStarAtBegin, false)
+  }
+
+  test("PatternExtension.PatternOps#needsSigmaStarAtEnd") {
+    val flagSet0 = FlagSet(false, false, true, false, false, false)
+    val flagSet1 = FlagSet(false, false, false, false, false, false)
+    val flagSet2 = FlagSet(false, false, false, false, false, true)
+    assertEquals(Pattern(Dot(), flagSet0).needsSigmaStarAtEnd, true)
+    assertEquals(Pattern(LineEnd(), flagSet0).needsSigmaStarAtEnd, true)
+    assertEquals(Pattern(Dot(), flagSet1).needsSigmaStarAtEnd, true)
+    assertEquals(Pattern(LineEnd(), flagSet1).needsSigmaStarAtEnd, false)
+    assertEquals(Pattern(Dot(), flagSet2).needsSigmaStarAtEnd, false)
   }
 
   test("PatternExtensions.PatternOps#parts") {
