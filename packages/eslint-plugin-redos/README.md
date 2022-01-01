@@ -135,4 +135,4 @@ The default value is `'hybrid'`.
 
 MIT license.
 
-2020-2021 (C) TSUYUSATO "MakeNowJust" Kitsune
+2020-2022 (C) TSUYUSATO "MakeNowJust" Kitsune
