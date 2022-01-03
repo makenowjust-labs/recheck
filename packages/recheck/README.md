@@ -350,6 +350,40 @@ If this value is exceeded, it switches to use the fuzzing checker.
 
 </details>
 
+### Environment Variables
+
+`recheck` package recognizes the following environment variables:
+
+#### `RECHECK_BACKEND`
+
+Type: `'auto' | 'java' | 'native' | 'pure'`
+
+Default: `'auto'`
+
+This variable specifies the backend of the checker implementation.
+
+- `'auto'`: Tries `java` and `native` sequentially. If available implementation is found, it uses this.
+  Otherwise, it uses `pure` implementation as fallback.
+- `'java'`: Java implementation backend (`recheck-jar` package).
+- `'native'`: Native implementation backend (`recheck-${os}-${arch}` package).
+- `'pure'`: Pure JavaScript (Scala.js) implementation.
+
+#### `RECHECK_JAR`
+
+Type: `string | null`
+
+Default: `null`
+
+The path of `recheck.jar` archive. If it is `null` or empty string, it uses `recheck-jar` package.
+
+#### `RECHECK_BIN`
+
+Type: `string | null`
+
+Default: `null`
+
+The path of `recheck` (or `recheck.exe`) binary. If it is `null` or empty string, it uses `recheck-${os}-${arch}` package.
+
 ## License
 
 MIT License.

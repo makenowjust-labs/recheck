@@ -9,6 +9,7 @@ class AgentCommandSuite extends munit.FunSuite {
       """"method":"check","params":{"source":"(a|b|aba)*$","flags":"","params":{"checker":"fuzz","usesAcceleration":false}}"""
     val simpleLog = """"method":"check","params":{"source":"a","flags":"","params":{"logger":[]}}"""
     val in = Seq(
+      Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":0,"method":"ping","params":{}}"""),
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":1,$simple}"""),
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":2,$complex}"""),
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","method":"cancel","params":{"id":2}}"""),
@@ -43,6 +44,7 @@ class AgentCommandSuite extends munit.FunSuite {
     assertEquals(
       out.result().sorted, // Result ordering depends on scheduling.
       Seq(
+        """{"jsonrpc":"2.0+push","id":0,"result":{}}""",
         """{"jsonrpc":"2.0+push","id":1,"result":{"source":"a","flags":"","status":"safe","checker":"automaton","complexity":{"type":"safe","summary":"safe","isFuzz":false}}}""",
         """{"jsonrpc":"2.0+push","id":2,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"cancel"}}}""",
         """{"jsonrpc":"2.0+push","id":3,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"cancel"}}}""",

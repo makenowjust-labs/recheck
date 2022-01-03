@@ -1,53 +1,71 @@
-// This file provides the `check` function for Node.js.
-
-import { debuglog } from "util";
-
-import { check as fallbackCheck } from "./fallback";
-import { check as agentCheck, ensureAgent } from "./agent";
+import { check as checkAgent } from "./lib/agent";
+import * as env from "./lib/env";
+import * as java from "./lib/java";
+import * as native from "./lib/native";
+import * as pure from "./lib/pure";
 
 import type { Diagnostics, HasAbortSignal, Parameters } from "..";
+import type { Agent } from "./lib/agent";
 
-export { checkSync } from "./fallback";
+/** Exposes this to mock `agent`. */
+export const __mock__: { agent: Agent | null | undefined } = {
+  agent: undefined,
+};
 
-const debug = debuglog("recheck");
-
+/** `check` implementation. */
 export async function check(
   source: string,
   flags: string,
   params: Parameters & HasAbortSignal = {}
 ): Promise<Diagnostics> {
-  const RECHECK_MODE = process.env["RECHECK_MODE"] ?? "";
-  debug("`recheck` mode: %s", RECHECK_MODE);
-  switch (RECHECK_MODE) {
-    case "agent":
-      return await agentCheck(source, flags, params);
-    case "fallback":
-      return await fallbackCheck(source, flags, params);
+  const backend = env.RECHECK_BACKEND();
+  switch (backend) {
+    case 'auto':
+      if (__mock__.agent === undefined) {
+        try {
+          /* c8 ignore next 1 */
+          __mock__.agent = (await java.ensure()) ?? undefined;
+        } catch {
+          __mock__.agent = undefined;
+        }
+      }
+      if (__mock__.agent === undefined) {
+        try {
+          /* c8 ignore next 1 */
+          __mock__.agent = (await native.ensure()) ?? undefined;
+        } catch {
+          __mock__.agent = undefined;
+        }
+      }
+      if (__mock__.agent === undefined) {
+        __mock__.agent = null;
+      }
+      break;
+    case 'java':
+      if (__mock__.agent === undefined) {
+        __mock__.agent = await java.ensure();
+      }
+      break;
+    case 'native':
+      if (__mock__.agent === undefined) {
+        __mock__.agent = await native.ensure();
+      }
+      break;
+    case 'pure':
+      return pure.check(source, flags, params);
+    default:
+      throw new Error(`invalid backend: ${backend}`);
   }
 
-  const signal = params.signal ?? null;
-  if (signal) {
-    delete params.signal;
-  }
-
-  const agent = ensureAgent();
+  const agent = __mock__.agent;
   if (agent === null) {
-    return await fallbackCheck(source, flags, params);
+    if (backend !== 'auto') {
+      throw new Error('there is no available implementation');
+    }
+    return pure.check(source, flags, params);
   }
 
-  const logger = params.logger ?? ((message: string) => {});
-  if (params?.logger) {
-    params.logger = [] as any;
-  }
-
-  const { id, promise } = agent.request(
-    "check",
-    { source, flags, params },
-    logger
-  );
-  signal?.addEventListener("abort", () => {
-    agent.notify("cancel", { id });
-  });
-
-  return await promise;
+  return checkAgent(agent!, source, flags, params);
 }
+
+export const checkSync = pure.check;
