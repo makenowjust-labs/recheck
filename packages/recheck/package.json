@@ -18,8 +18,8 @@
   "scripts": {
     "build": "esbuild --bundle --platform=node --format=cjs src/index.ts --outfile=lib/main.js && esbuild --bundle --platform=browser --format=esm src/browser.ts --outfile=lib/browser.js",
     "clean": "rimraf lib",
-    "format": "prettier -w *.{js,json,md} src/**/*.ts index.d.ts",
-    "lint": "prettier --list-different *.{js,json,md} src/**/*.ts index.d.ts",
+    "format": "prettier -w '*.{js,json,md}' 'src/**/*.ts' index.d.ts",
+    "lint": "prettier --list-different '*.{js,json,md}' 'src/**/*.ts' index.d.ts",
     "test": "jest",
     "typecheck": "tsc --noEmit -p ."
   },

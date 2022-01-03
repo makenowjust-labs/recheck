@@ -3,9 +3,12 @@ package codes.quine.labo.recheck.cli
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import scala.annotation.nowarn
 import scala.collection.mutable
+
 import io.circe.Decoder
 import io.circe.generic.semiauto._
+
 import codes.quine.labo.recheck.ReDoS
 import codes.quine.labo.recheck.cli.AgentCommand._
 import codes.quine.labo.recheck.codec._
@@ -13,8 +16,6 @@ import codes.quine.labo.recheck.common.CancellationTokenSource
 import codes.quine.labo.recheck.common.Context
 import codes.quine.labo.recheck.common.Parameters
 import codes.quine.labo.recheck.diagnostics.Diagnostics
-
-import scala.annotation.nowarn
 
 /** `recheck agent` method types. */
 object AgentCommand {

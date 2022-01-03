@@ -20,7 +20,7 @@ export async function check(
 ): Promise<Diagnostics> {
   const backend = env.RECHECK_BACKEND();
   switch (backend) {
-    case 'auto':
+    case "auto":
       if (__mock__.agent === undefined) {
         try {
           /* c8 ignore next 1 */
@@ -41,17 +41,17 @@ export async function check(
         __mock__.agent = null;
       }
       break;
-    case 'java':
+    case "java":
       if (__mock__.agent === undefined) {
         __mock__.agent = await java.ensure();
       }
       break;
-    case 'native':
+    case "native":
       if (__mock__.agent === undefined) {
         __mock__.agent = await native.ensure();
       }
       break;
-    case 'pure':
+    case "pure":
       return pure.check(source, flags, params);
     default:
       throw new Error(`invalid backend: ${backend}`);
@@ -59,8 +59,8 @@ export async function check(
 
   const agent = __mock__.agent;
   if (agent === null) {
-    if (backend !== 'auto') {
-      throw new Error('there is no available implementation');
+    if (backend !== "auto") {
+      throw new Error("there is no available implementation");
     }
     return pure.check(source, flags, params);
   }
