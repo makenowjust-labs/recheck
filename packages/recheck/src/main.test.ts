@@ -1,4 +1,4 @@
-import * as index from "./index";
+import * as main from "./main";
 
 import * as env from "./lib/env";
 import * as java from "./lib/java";
@@ -12,12 +12,12 @@ jest.mock("./lib/java");
 jest.mock("./lib/native");
 
 beforeEach(() => {
-  index.__mock__.agent = undefined;
+  main.__mock__.agent = undefined;
 });
 
 afterEach(() => {
-  index.__mock__.agent?.kill();
-  index.__mock__.agent = undefined;
+  main.__mock__.agent?.kill();
+  main.__mock__.agent = undefined;
 });
 
 test("check: auto (java)", async () => {
@@ -28,7 +28,7 @@ test("check: auto (java)", async () => {
   const ensure = jest.spyOn(java, "ensure");
   ensure.mockImplementationOnce(jest.requireActual("./lib/java").ensure);
 
-  const diagnostics = await index.check("^(a|a)+$", "");
+  const diagnostics = await main.check("^(a|a)+$", "");
   expect(diagnostics.status).toBe("vulnerable");
   expect(ensure).toHaveBeenCalled();
 });
@@ -41,7 +41,7 @@ test("check: auto (pure)", async () => {
   const nativeEnsure = jest.spyOn(native, "ensure");
   nativeEnsure.mockResolvedValueOnce(null);
 
-  const diagnostics = await index.check("^(a|a)+$", "");
+  const diagnostics = await main.check("^(a|a)+$", "");
   expect(diagnostics.status).toBe("vulnerable");
   expect(javaEnsure).toHaveBeenCalled();
   expect(nativeEnsure).toHaveBeenCalled();
@@ -55,7 +55,7 @@ test("check: auto (pure, error)", async () => {
   const nativeEnsure = jest.spyOn(native, "ensure");
   nativeEnsure.mockRejectedValueOnce(new Error("native.ensure error"));
 
-  const diagnostics = await index.check("^(a|a)+$", "");
+  const diagnostics = await main.check("^(a|a)+$", "");
   expect(diagnostics.status).toBe("vulnerable");
   expect(javaEnsure).toHaveBeenCalled();
   expect(nativeEnsure).toHaveBeenCalled();
@@ -69,7 +69,7 @@ test("check: java (1)", async () => {
   const ensure = jest.spyOn(java, "ensure");
   ensure.mockImplementationOnce(jest.requireActual("./lib/java").ensure);
 
-  const diagnostics = await index.check("^(a|a)+$", "");
+  const diagnostics = await main.check("^(a|a)+$", "");
   expect(diagnostics.status).toBe("vulnerable");
   expect(ensure).toHaveBeenCalled();
 });
@@ -80,7 +80,7 @@ test("check: java (2)", async () => {
   const ensure = jest.spyOn(java, "ensure");
   ensure.mockResolvedValueOnce(null);
 
-  expect(index.check("^(a|a)+$", "")).rejects.toThrowError(
+  expect(main.check("^(a|a)+$", "")).rejects.toThrowError(
     "there is no available implementation"
   );
 });
@@ -94,7 +94,7 @@ test.skip("check: native (1)", async () => {
   const ensure = jest.spyOn(native, "ensure");
   ensure.mockImplementationOnce(jest.requireActual("./lib/native").ensure);
 
-  const diagnostics = await index.check("^(a|a)+$", "");
+  const diagnostics = await main.check("^(a|a)+$", "");
   expect(diagnostics.status).toBe("vulnerable");
   expect(ensure).toHaveBeenCalled();
 });
@@ -105,7 +105,7 @@ test("check: native (2)", async () => {
   const ensure = jest.spyOn(native, "ensure");
   ensure.mockResolvedValueOnce(null);
 
-  expect(index.check("^(a|a)+$", "")).rejects.toThrowError(
+  expect(main.check("^(a|a)+$", "")).rejects.toThrowError(
     "there is no available implementation"
   );
 });
@@ -114,7 +114,7 @@ test("check: pure", async () => {
   const backend = jest.spyOn(env, "RECHECK_BACKEND");
   backend.mockReturnValueOnce("pure");
 
-  const diagnostics = await index.check("^(a|a)+$", "");
+  const diagnostics = await main.check("^(a|a)+$", "");
   expect(diagnostics.status).toBe("vulnerable");
 });
 
@@ -122,12 +122,12 @@ test("check: pure", async () => {
   const backend = jest.spyOn(env, "RECHECK_BACKEND");
   backend.mockReturnValueOnce("invalid" as any);
 
-  expect(index.check("^(a|a)+$", "")).rejects.toThrowError(
+  expect(main.check("^(a|a)+$", "")).rejects.toThrowError(
     "invalid backend: invalid"
   );
 });
 
 test("checkSync", () => {
-  const diagnostics = index.checkSync("^(a|a)+$", "");
+  const diagnostics = main.checkSync("^(a|a)+$", "");
   expect(diagnostics.status).toBe("vulnerable");
 });
