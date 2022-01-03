@@ -12,6 +12,7 @@ jest.mock("./lib/java");
 jest.mock("./lib/native");
 
 beforeEach(() => {
+  jest.setTimeout(30 * 1000);
   main.__mock__.agent = undefined;
 });
 
