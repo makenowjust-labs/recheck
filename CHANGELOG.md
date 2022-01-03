@@ -15,6 +15,7 @@ Changes:
 - Apply look-ahead optimization to VM ([#233](https://github.com/MakeNowJust-Labo/recheck/pull/233))
 - Add recall validation ([#234](https://github.com/MakeNowJust-Labo/recheck/pull/234))
 - Simplify automaton without input terminator distinction ([#240](https://github.com/MakeNowJust-Labo/recheck/pull/240))
+- Add `recheck-jar` package ([#248](https://github.com/MakeNowJust-Labo/recheck/pull/248))
 
 Fixes:
 
@@ -23,6 +24,8 @@ Fixes:
 - Check integer overflow on matching steps ([#232](https://github.com/MakeNowJust-Labo/recheck/pull/232))
 - Fix loop detection in `StaticSeeder` ([#235](https://github.com/MakeNowJust-Labo/recheck/pull/235))
 - Returns iterator in `FuzzChecker`  ([#236](https://github.com/MakeNowJust-Labo/recheck/pull/236))
+- Rewrite `recheck` package implementation ([#248](https://github.com/MakeNowJust-Labo/recheck/pull/248))
+- Add `recheck` package test ([#248](https://github.com/MakeNowJust-Labo/recheck/pull/248))
 
 # 4.1.1 (2021-12-04)
 
