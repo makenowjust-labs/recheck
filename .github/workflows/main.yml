@@ -26,11 +26,15 @@ jobs:
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
       - name: Build
-        run: sbt compile js/fullLinkJS
+        run: sbt compile js/fullLinkJS cli/assembly
       - uses: actions/upload-artifact@v2
         with:
           path: modules/recheck-js/target/scala-2.13/recheck-js-opt/recheck.js
           name: recheck.js
+      - uses: actions/upload-artifact@v2
+        with:
+          path: modules/recheck-cli/target/scala-2.13/recheck.jar
+          name: recheck.jar
 
   scala-lint:
     needs: [build]
@@ -118,11 +122,16 @@ jobs:
         with:
           name: recheck.js
           path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
+      - uses: actions/download-artifact@v2
+        with:
+          name: recheck.jar
+          path: modules/recheck-cli/target/scala-2.13/
       - name: Build
         run: yarn workspace recheck build
       - name: Test
         run: |
           yarn workspace eslint-plugin-redos test --coverage
+          yarn workspace recheck test --coverage
       - uses: codecov/codecov-action@v2
 
   native-build:
@@ -254,6 +263,10 @@ jobs:
           path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
       - uses: actions/download-artifact@v2
         with:
+          name: recheck.jar
+          path: packages/recheck-jar/
+      - uses: actions/download-artifact@v2
+        with:
           name: recheck-darwin-x64
           path: packages/recheck-macos-x64/
       - uses: actions/download-artifact@v2
@@ -277,6 +290,10 @@ jobs:
       - uses: JS-DevTools/npm-publish@v1
         with:
           package: packages/recheck/package.json
+          token: ${{ secrets.NPM_TOKEN }}
+      - uses: JS-DevTools/npm-publish@v1
+        with:
+          package: packages/recheck-jar/package.json
           token: ${{ secrets.NPM_TOKEN }}
       - uses: JS-DevTools/npm-publish@v1
         with:

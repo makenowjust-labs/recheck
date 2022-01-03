@@ -3,6 +3,7 @@ package codes.quine.labo.recheck.cli
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import scala.annotation.nowarn
 import scala.collection.mutable
 
 import io.circe.Decoder
@@ -35,6 +36,13 @@ object AgentCommand {
 
   object CancelParams {
     implicit def decode: Decoder[CancelParams] = deriveDecoder
+  }
+
+  /** "ping" method parameter. */
+  final case class PingParams()
+
+  object PingParams {
+    implicit def decode: Decoder[PingParams] = deriveDecoder
   }
 
   /** A running execution token to cancel. */
@@ -89,6 +97,12 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio) {
     token.send(Right(Diagnostics.Unknown(token.source, token.flags, Diagnostics.ErrorKind.Cancel, None)))
   }
 
+  /** `"ping"` method implementation. */
+  @nowarn
+  def handlePing(id: RPC.ID, ping: PingParams, push: RPC.Push[Unit], send: RPC.Send[Unit]): Unit = {
+    send(Right(()))
+  }
+
   /** Enforces GC. */
   def gc(): Unit = {
     System.gc()
@@ -99,7 +113,8 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio) {
     try {
       RPC.run(io)(
         "check" -> RPC.RequestHandler(handleCheck),
-        "cancel" -> RPC.NotificationHandler(handleCancel)
+        "cancel" -> RPC.NotificationHandler(handleCancel),
+        "ping" -> RPC.RequestHandler(handlePing)
       )
     } finally {
       tokens.values.foreach(doCancel)

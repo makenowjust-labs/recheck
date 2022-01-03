@@ -1,82 +1,33 @@
-// This file provides the `recheck agent` wrapper implementation.
-
 import { spawn } from "child_process";
-import { debuglog } from "util";
 
 import type { ChildProcess } from "child_process";
 
-import type { Diagnostics, HasAbortSignal, Parameters } from "..";
+import type { Diagnostics, HasAbortSignal, Parameters } from "../..";
 
-const debug = debuglog("recheck-agent");
-
-/** A mapping from a supported platform (OS) name to the corresponding package name component. */
-const osNames: Record<string, string> = {
-  darwin: "macos",
-  linux: "linux",
-  win32: "windows",
-};
-
-/** A mapping from a supported architecture (CPU) name to the corresponding package name component. */
-const cpuNames: Record<string, string> = {
-  x64: "x64",
-};
-
-/** Returns a `recheck` CLI path if possible. */
-const getCLIPath = (): string | null => {
-  // If `RECHECK_PATH` environment variable is set, then it returns this immediately.
-  const RECHECK_PATH = process.env["RECHECK_PATH"] || null; // `||` is intentional for ignoring an empty string.
-  if (RECHECK_PATH !== null) {
-    return RECHECK_PATH;
-  }
-
-  // Fetches `os` and `cpu` name. If it is not supported, then it returns `null`.
-  const os = osNames[process.platform];
-  const cpu = cpuNames[process.arch];
-  const isWin32 = os === "windows";
-  if (!os || !cpu) {
-    return null;
-  }
-
-  try {
-    // Constructs a package name with a binary file name, and resolves this.
-    // If it is succeeded, we expect that the result path is `recheck` CLI.
-    const bin = isWin32 ? "recheck.exe" : "recheck";
-    const pkg = `recheck-${os}-${cpu}/${bin}`;
-    const path = require.resolve(pkg);
-    return path;
-  } catch (err: any) {
-    if (err && err.code == "MODULE_NOT_FOUND") {
-      return null;
-    }
-
-    throw err;
-  }
-};
-
-/** Ref is a pair of promise `resolve`/`reject` functions. */
+/** Ref is a pair of promise `resolve`/`reject` functions, and `subscribe` handler of request. */
 type Ref = {
   resolve: (value: any) => void;
   reject: (err: Error) => void;
-  subscribe: (message: any) => void;
+  subscribe: ((message: any) => void) | null;
 };
 
 /**
  * Agent is a shallow `recheck agent` command wrapper.
  * It is JSON-RPC client via `child` process's stdio.
  */
-class Agent {
+export class Agent {
   /** A child process of `recheck agent`. */
   private readonly child: ChildProcess;
 
   /** The next request ID number. */
-  private id: number;
+  private nextID: number;
 
   /** A mapping from request ID to corresponding promise reference. */
   private readonly refs: Map<number, Ref>;
 
   constructor(child: ChildProcess) {
     this.child = child;
-    this.id = 0;
+    this.nextID = 0;
     this.refs = new Map();
     this.handle();
   }
@@ -85,9 +36,9 @@ class Agent {
   public request(
     method: string,
     params: any,
-    subscribe: (message: any) => void
+    subscribe: ((message: any) => void) | null = null
   ): { id: number; promise: Promise<any> } {
-    const id = this.id++;
+    const id = this.nextID++;
     const promise = new Promise((resolve, reject) => {
       const object = {
         jsonrpc: "2.0+push",
@@ -96,7 +47,6 @@ class Agent {
         params,
       };
       const text = JSON.stringify(object) + "\n";
-      debug("Send a request: %s", text);
       this.child.stdin!.write(text);
       this.registerRef(id, { resolve, reject, subscribe });
     });
@@ -112,7 +62,6 @@ class Agent {
         params,
       };
       const text = JSON.stringify(object) + "\n";
-      debug("Send a notification: %s", text);
       this.child.stdin!.write(text);
       resolve();
     });
@@ -128,16 +77,14 @@ class Agent {
         return;
       }
 
-      debug("Handle a response line: %s", line);
       const { id, message, result } = JSON.parse(line);
       const ref = this.refs.get(id) ?? null;
       if (ref === null) {
-        debug("A promise reference is missing: %s", id);
         return;
       }
 
       if (message != undefined) {
-        ref.subscribe(message);
+        ref.subscribe?.(message);
         return;
       }
 
@@ -151,6 +98,7 @@ class Agent {
       const text = data.toString("utf-8");
       const lines = text.split("\n");
 
+      /* c8 ignore next 2 */
       const lastLine = lines.pop() ?? "";
       const firstLine = lines.shift() ?? "";
 
@@ -168,7 +116,6 @@ class Agent {
     this.refs.set(id, ref);
 
     if (this.refs.size === 1) {
-      debug("A agent process is referenced.");
       this.child.ref();
     }
   }
@@ -178,77 +125,89 @@ class Agent {
     this.refs.delete(id);
 
     if (this.refs.size === 0) {
-      debug("A agent process is unreferenced.");
       this.child.unref();
     }
   }
+
+  /** Kills the `agent` process. */
+  public kill(): void {
+    this.child.unref();
+    this.child.kill();
+  }
 }
 
-/** The running agent. */
-let agent: Agent | null = null;
+/** Starts `recheck agent` with the given command and command-line arguments. */
+export async function start(
+  command: string,
+  args: string[] = []
+): Promise<Agent> {
+  return await new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      windowsHide: true,
+      stdio: ["pipe", "pipe", "ignore"],
+    });
 
-/** Returns running agent if possible, or it returns `null`. */
-export function ensureAgent(): Agent | null {
-  if (agent !== null) {
-    debug("Running agent is found.");
-    return agent;
-  }
+    const onClose = () => reject(new Error("process is closed"));
+    child.on("error", reject);
+    child.on("close", onClose);
 
-  const cli = getCLIPath();
-  debug("`recheck` CLI path: %s", cli);
-  if (cli === null) {
-    return null;
-  }
+    // Remove references from the child process.
+    child.unref();
+    /* c8 ignore next 6 */
+    if ((child.stdin as any)?.unref) {
+      (child.stdin as any).unref();
+    }
+    if ((child.stdout as any)?.unref) {
+      (child.stdout as any).unref();
+    }
 
-  // TODO: Handle failures on process spawning.
-  debug("Run `%s agent`.", cli);
-  const child = spawn(cli, ["agent"], {
-    windowsHide: true,
-    stdio: ["pipe", "pipe", "inherit"],
+    // Waits `ping` method response.
+    const agent = new Agent(child);
+    agent
+      .request("ping", {})
+      .promise.then(() => {
+        child.off("error", reject);
+        child.off("close", onClose);
+        resolve(agent);
+      })
+      .catch(reject);
   });
-  debug("Agent PID: %d", child.pid);
-
-  // Remove references from the child process.
-  child.unref();
-  if ((child.stdin as any)?.unref) {
-    (child.stdin as any).unref();
-  }
-  if ((child.stdout as any)?.unref) {
-    (child.stdout as any).unref();
-  }
-
-  agent = new Agent(child);
-  return agent;
 }
 
 export async function check(
+  agent: Agent,
   source: string,
   flags: string,
   params: Parameters & HasAbortSignal = {}
 ): Promise<Diagnostics> {
+  // Drops `signal` parameter from `params`.
   const signal = params.signal ?? null;
   if (signal) {
     delete params.signal;
   }
 
-  const agent = ensureAgent();
-  if (agent === null) {
-    throw new Error("`recheck` command is missing.");
+  // Drops `logger` parameter from `params`.
+  const logger = params.logger ?? null;
+  if (logger) {
+    params.logger = {} as any;
   }
 
-  const logger = params.logger ?? ((message: string) => {});
-  if (params?.logger) {
-    params.logger = [] as any;
-  }
-
+  // Sends `'check'` method request.
   const { id, promise } = agent.request(
     "check",
     { source, flags, params },
     logger
   );
-  signal?.addEventListener("abort", () => {
+
+  if (signal?.aborted) {
+    // Sends `'cancel'` when the signal is already aborted.
     agent.notify("cancel", { id });
-  });
+  } else {
+    // Adds `'abort'` signal handler.
+    signal?.addEventListener("abort", () => {
+      agent.notify("cancel", { id });
+    });
+  }
 
   return await promise;
 }

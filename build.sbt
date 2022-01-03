@@ -407,6 +407,8 @@ lazy val cli = project
     NativeImage / name := "recheck",
     publish / skip := true,
     Compile / mainClass := Some("codes.quine.labo.recheck.cli.Main"),
+    assembly / mainClass := (Compile / mainClass).value,
+    assembly / assemblyJarName := "recheck.jar",
     nativeImageVersion := "21.3.0",
     nativeImageOptions ++= List(
       "--no-fallback",
