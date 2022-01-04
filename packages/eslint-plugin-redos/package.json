@@ -6,12 +6,12 @@
   "homepage": "https://makenowjust-labo.github.io/recheck/",
   "repository": "https://github.com/MakeNowJust-Labo/recheck.git",
   "version": "4.1.1",
-  "main": "lib/index.js",
+  "main": "lib/main.js",
   "files": [
     "lib"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "esbuild --bundle --platform=node --format=cjs src/main.ts --outfile=lib/main.js",
     "clean": "rimraf lib",
     "format": "prettier -w *.{json,md} src/**/*.ts",
     "lint": "prettier --list-different *.{json,md} src/**/*.ts",
@@ -27,11 +27,11 @@
   "devDependencies": {
     "@types/eslint": "8.2.1",
     "@types/node": "16.11.18",
+    "esbuild-jest": "0.5.0",
     "eslint": "8.6.0",
     "jest": "27.4.5",
     "prettier": "2.5.1",
     "rimraf": "3.0.2",
-    "ts-jest": "27.1.2",
     "typescript": "4.5.4"
   },
   "keywords": [
@@ -41,21 +41,5 @@
     "redos",
     "regexp",
     "security"
-  ],
-  "jest": {
-    "transform": {
-      "^.+\\.ts$": "ts-jest"
-    },
-    "testRegex": "(src/.*\\.test)\\.ts$",
-    "testPathIgnorePatterns": [
-      "/node_modules/",
-      "\\.d\\.ts$",
-      "lib/.*"
-    ],
-    "moduleFileExtensions": [
-      "js",
-      "ts",
-      "json"
-    ]
-  }
+  ]
 }
