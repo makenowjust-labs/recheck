@@ -412,7 +412,11 @@ lazy val cli = project
     nativeImageVersion := "21.3.0",
     nativeImageOptions ++= List(
       "--no-fallback",
-      "--initialize-at-build-time"
+      "--initialize-at-build-time=java",
+      "--initialize-at-build-time=scala",
+      "--initialize-at-build-time=cats",
+      "--initialize-at-build-time=io.circe",
+      "--initialize-at-build-time=codes.quine.labo.recheck"
     ),
     console / initialCommands := """
       |import io.circe._
