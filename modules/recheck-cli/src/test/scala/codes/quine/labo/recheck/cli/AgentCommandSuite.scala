@@ -13,7 +13,7 @@ class AgentCommandSuite extends munit.FunSuite {
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":1,$simple}"""),
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":2,$complex}"""),
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","method":"cancel","params":{"id":2}}"""),
-      Left(2),
+      Left(3),
       // Duplicated cancel does not effect.
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","method":"cancel","params":{"id":2}}"""),
       // Check the first request having duplicated ID is canceled.
