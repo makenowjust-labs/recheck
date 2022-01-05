@@ -40,12 +40,18 @@ object StaticSeeder {
     ctx.interrupt {
       val backRefs = extractBackRefs(pattern.node)
 
-      def loop(node: Node): Node = ctx.interrupt(node match {
-        case Disjunction(ns)          => Disjunction(ns.map(loop))
-        case Sequence(ns)             => Sequence(ns.map(loop))
-        case Capture(i, n)            => Capture(i, loop(n))
-        case NamedCapture(i, name, n) => NamedCapture(i, name, loop(n))
-        case Group(n)                 => Group(loop(n))
+      def loop(node: Node, prevIsRepeat: Boolean, nextIsRepeat: Boolean): Node = ctx.interrupt(node match {
+        case Disjunction(ns) => Disjunction(ns.map(loop(_, prevIsRepeat, nextIsRepeat)))
+        case Sequence(ns) =>
+          val children = ns.lift
+          Sequence(ns.zipWithIndex.map { case (c, i) =>
+            val prev = children(i - 1).map(_.isInstanceOf[Repeat]).getOrElse(prevIsRepeat)
+            val next = children(i + 1).map(_.isInstanceOf[Repeat]).getOrElse(nextIsRepeat)
+            loop(c, prev, next)
+          })
+        case Capture(i, n)            => Capture(i, loop(n, prevIsRepeat, nextIsRepeat))
+        case NamedCapture(i, name, n) => NamedCapture(i, name, loop(n, prevIsRepeat, nextIsRepeat))
+        case Group(n)                 => Group(loop(n, prevIsRepeat, nextIsRepeat))
         case Repeat(q, n) =>
           val (min, k) = q.normalized match {
             case Quantifier.Exact(n, _)          => (n, n)
@@ -53,17 +59,23 @@ object StaticSeeder {
             case Quantifier.Bounded(min, max, _) => (min, max)
           }
           if (k > maxSimpleRepeatSize) {
-            if (min == 0) Repeat(Quantifier.Star(q.isLazy), loop(n))
-            else Repeat(Quantifier.Plus(q.isLazy), loop(n))
-          } else Repeat(q, loop(n))
-        case LookAhead(_, n)          => Disjunction(Seq(loop(n), Sequence(Seq.empty)))
-        case LookBehind(_, n)         => Disjunction(Seq(loop(n), Sequence(Seq.empty)))
-        case BackReference(i)         => Disjunction(Seq(loop(backRefs(i)), Sequence(Seq.empty)))
-        case NamedBackReference(i, _) => Disjunction(Seq(loop(backRefs(i)), Sequence(Seq.empty)))
-        case n                        => n
+            if (min == 0) Repeat(Quantifier.Star(q.isLazy), loop(n, true, true))
+            else Repeat(Quantifier.Plus(q.isLazy), loop(n, true, true))
+          } else Repeat(q, loop(n, true, true))
+        case LookAhead(negative, n) =>
+          val c = loop(n, prevIsRepeat, nextIsRepeat)
+          if (!negative && nextIsRepeat) c else Disjunction(Seq(c, Sequence(Seq.empty)))
+        case LookBehind(negative, n) =>
+          val c = loop(n, prevIsRepeat, nextIsRepeat)
+          if (!negative && prevIsRepeat) c else Disjunction(Seq(c, Sequence(Seq.empty)))
+        case BackReference(i) =>
+          Disjunction(Seq(loop(backRefs(i), prevIsRepeat, nextIsRepeat), Sequence(Seq.empty)))
+        case NamedBackReference(i, _) =>
+          Disjunction(Seq(loop(backRefs(i), prevIsRepeat, nextIsRepeat), Sequence(Seq.empty)))
+        case n => n
       })
 
-      Pattern(loop(pattern.node), pattern.flagSet)
+      Pattern(loop(pattern.node, true, true), pattern.flagSet)
     }
 
   /** Extracts back-references inside the given node. */
