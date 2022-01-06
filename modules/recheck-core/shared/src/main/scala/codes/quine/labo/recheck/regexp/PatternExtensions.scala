@@ -196,7 +196,7 @@ object PatternExtensions {
           case _     => Vector.empty
         })
 
-        loop(node).foldLeft(set)(_.add(_))
+        loop(node).toSet.foldLeft(set)(_.add(_))
       }
 
     /** Tests whether the pattern needs line terminator distinction or not. */
