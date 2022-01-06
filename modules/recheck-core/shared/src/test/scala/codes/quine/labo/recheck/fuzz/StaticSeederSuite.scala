@@ -34,5 +34,8 @@ class StaticSeederSuite extends munit.FunSuite {
     assertEquals(seed("^a{11,}a{11,}$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
 
     assertEquals(seed("^(fizz)*(fizz)*$", ""), Set("'fizz'.repeat(112) + 'i'"))
+
+    assertEquals(seed("^a(?=a)$", ""), Set.empty[String])
+    assertEquals(seed("^a(?<=a)$", ""), Set.empty[String])
   }
 }
