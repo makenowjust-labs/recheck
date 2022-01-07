@@ -5,7 +5,7 @@
   "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
   "homepage": "https://makenowjust-labo.github.io/recheck/",
   "repository": "https://github.com/MakeNowJust-Labo/recheck.git",
-  "version": "4.1.1",
+  "version": "4.2.0",
   "main": "lib/main.js",
   "files": [
     "lib"
@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "recheck": "4.1.1"
+    "recheck": "4.2.0"
   },
   "peerDependencies": {
     "eslint": ">= 3"
