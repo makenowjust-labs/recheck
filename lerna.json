@@ -1,0 +1,13 @@
+{
+  "version": "4.2.0",
+  "npmClient": "yarn",
+  "useWorkspaces": true,
+  "command": {
+    "version": {
+      "forcePublish": true,
+      "exact": true,
+      "gitTagVersion": false,
+      "push": false
+    }
+  }
+}
