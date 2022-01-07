@@ -143,12 +143,17 @@ object IChar {
   def union(chars: Seq[IChar]): IChar =
     chars.foldLeft(IChar.empty)(_.union(_))
 
+  /** A cache for `canonicalize` method. */
+  private[this] val canonicalizeCache: LRUCache[(IChar, Boolean), IChar] =
+    new LRUCache(1000)
+
   /** Normalizes the code point interval set. */
-  def canonicalize(c: IChar, unicode: Boolean): IChar = {
-    val conversions = if (unicode) CaseMap.Fold else CaseMap.Upper
-    val set = conversions.foldLeft(c.set) { case (set, Conversion(dom, offset)) =>
-      set.mapIntersection(dom)(u => UChar(u.value + offset))
+  def canonicalize(c: IChar, unicode: Boolean): IChar =
+    canonicalizeCache.getOrElseUpdate((c, unicode)) {
+      val conversions = if (unicode) CaseMap.Fold else CaseMap.Upper
+      val set = conversions.foldLeft(c.set) { case (set, Conversion(dom, offset)) =>
+        set.mapIntersection(dom)(u => UChar(u.value + offset))
+      }
+      c.copy(set = set)
     }
-    c.copy(set = set)
-  }
 }

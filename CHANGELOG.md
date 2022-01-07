@@ -27,6 +27,7 @@ Fixes:
 - Returns iterator in `FuzzChecker`  ([#236](https://github.com/MakeNowJust-Labo/recheck/pull/236))
 - Rewrite `recheck` package implementation ([#248](https://github.com/MakeNowJust-Labo/recheck/pull/248))
 - Add `recheck` package test ([#248](https://github.com/MakeNowJust-Labo/recheck/pull/248))
+- Optimize alphabet construction ([#258](https://github.com/MakeNowJust-Labo/recheck/pull/258))
 
 # 4.1.1 (2021-12-04)
 

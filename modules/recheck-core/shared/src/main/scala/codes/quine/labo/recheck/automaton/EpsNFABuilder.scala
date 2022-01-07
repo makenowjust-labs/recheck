@@ -12,6 +12,7 @@ import codes.quine.labo.recheck.regexp.Pattern._
 import codes.quine.labo.recheck.regexp.PatternExtensions._
 import codes.quine.labo.recheck.unicode.IChar
 import codes.quine.labo.recheck.unicode.ICharSet
+import codes.quine.labo.recheck.unicode.ICharSet.CharKind
 
 /** ECMA-262 RegExp to ε-NFA Compiler. */
 object EpsNFABuilder {
@@ -42,6 +43,8 @@ private class EpsNFABuilder(
 
   /** A next state counter. */
   private[this] var counterQ = 0
+
+  private[this] val refineCache: mutable.Map[IChar, Set[(IChar, CharKind)]] = mutable.Map.empty
 
   /** Returns a next state number. */
   def nextQ(): Int = {
@@ -209,18 +212,19 @@ private class EpsNFABuilder(
       val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
       val chs = atom match {
         // CharacterClass's inversion should be done here.
-        case CharacterClass(invert, _) if invert => alphabet.refineInvert(ch)
-        case _                                   => alphabet.refine(ch)
+        case CharacterClass(invert, _) if invert =>
+          val chs0 = refineCache.getOrElseUpdate(ch, alphabet.refine(ch))
+          alphabet.any.diff(chs0)
+        case _ => refineCache.getOrElseUpdate(ch, alphabet.refine(ch))
       }
       val i = nextQ()
       val a = nextQ()
       emit(i -> Consume(chs, a, node.loc))
       (i, a)
     case Dot() =>
-      val dot = IChar.dot(ignoreCase, dotAll, unicode)
       val i = nextQ()
       val a = nextQ()
-      emit(i -> Consume(alphabet.refine(dot), a, node.loc))
+      emit(i -> Consume(if (dotAll) alphabet.any else alphabet.dot, a, node.loc))
       (i, a)
     case BackReference(_)         => throw new UnsupportedException("back-reference")
     case NamedBackReference(_, _) => throw new UnsupportedException("named back-reference")
