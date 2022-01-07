@@ -1,6 +1,10 @@
 {
   "private": true,
+  "name": "recheck",
   "workspaces": [
     "packages/*"
-  ]
+  ],
+  "devDependencies": {
+    "lerna": "4.0.0"
+  }
 }
