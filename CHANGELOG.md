@@ -1,3 +1,9 @@
+# dev
+
+Fixes:
+
+- Don't bundle recheck in eslint-plugin-redos ([#260](https://github.com/MakeNowJust-Labo/recheck/pull/260))
+
 # 4.2.0 (2022-01-08)
 
 Changes:

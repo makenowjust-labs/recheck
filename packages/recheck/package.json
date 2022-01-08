@@ -16,7 +16,7 @@
     "vulnerability"
   ],
   "scripts": {
-    "build": "esbuild --bundle --platform=node --format=cjs src/main.ts --outfile=lib/main.js && esbuild --bundle --platform=browser --format=esm src/browser.ts --outfile=lib/browser.js",
+    "build": "sucrase-node ./scripts/build.ts",
     "clean": "rimraf lib",
     "format": "prettier -w '*.{js,json,md}' 'src/**/*.ts' index.d.ts",
     "lint": "prettier --list-different '*.{js,json,md}' 'src/**/*.ts' index.d.ts",
@@ -42,6 +42,7 @@
     "jest": "27.4.7",
     "prettier": "2.5.1",
     "rimraf": "3.0.2",
+    "sucrase": "3.20.3",
     "typescript": "4.5.4"
   }
 }
