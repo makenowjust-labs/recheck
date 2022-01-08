@@ -5,7 +5,7 @@
   "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
   "homepage": "https://makenowjust-labo.github.io/recheck/",
   "repository": "https://github.com/MakeNowJust-Labo/recheck.git",
-  "version": "4.2.0",
+  "version": "4.2.1",
   "main": "lib/main.js",
   "browser": "lib/browser.js",
   "types": "index.d.ts",
@@ -28,10 +28,10 @@
     "index.d.ts"
   ],
   "optionalDependencies": {
-    "recheck-jar": "4.2.0",
-    "recheck-linux-x64": "4.2.0",
-    "recheck-macos-x64": "4.2.0",
-    "recheck-windows-x64": "4.2.0"
+    "recheck-jar": "4.2.1",
+    "recheck-linux-x64": "4.2.1",
+    "recheck-macos-x64": "4.2.1",
+    "recheck-windows-x64": "4.2.1"
   },
   "devDependencies": {
     "@babel/plugin-transform-modules-commonjs": "7.16.7",
