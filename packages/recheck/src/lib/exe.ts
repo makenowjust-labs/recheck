@@ -1,7 +1,7 @@
 import * as env from "./env";
 
 /** Exposes this to mock `require.resolve` on testing. */
-export const __mock__require = module.require;
+export const __mock__require = require;
 
 /** Returns `recheck.jar` file path, or `null` if it is not found. */
 export const jar: () => string | null = () => {

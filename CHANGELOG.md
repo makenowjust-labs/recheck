@@ -3,6 +3,7 @@
 Fixes:
 
 - Don't bundle recheck in eslint-plugin-redos ([#260](https://github.com/MakeNowJust-Labo/recheck/pull/260))
+- Use `require` directly instead of `module.require` ([#261](https://github.com/MakeNowJust-Labo/recheck/pull/261))
 
 # 4.2.0 (2022-01-08)
 
