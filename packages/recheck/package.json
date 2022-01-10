@@ -34,7 +34,7 @@
     "recheck-windows-x64": "4.2.1"
   },
   "devDependencies": {
-    "@babel/plugin-transform-modules-commonjs": "7.16.7",
+    "@babel/plugin-transform-modules-commonjs": "7.16.8",
     "@types/jest": "27.4.0",
     "@types/node": "16.11.19",
     "esbuild": "0.14.11",
