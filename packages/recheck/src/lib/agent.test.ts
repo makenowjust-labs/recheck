@@ -15,15 +15,15 @@ afterEach(() => {
 });
 
 test("start", async () => {
-  await expect(startAgent("node", [testAgent])).resolves.toBeInstanceOf(Agent);
+  await expect(start("node", [testAgent])).resolves.toBeInstanceOf(Agent);
 });
 
 test("start: invalid", async () => {
-  await expect(startAgent("node", [invalid])).rejects.toThrowError();
+  await expect(start("node", [invalid])).rejects.toThrowError();
 });
 
 test("Agent#request", async () => {
-  const agent = await startAgent("node", [testAgent]);
+  const agent = await start("node", [testAgent]);
   const { id, promise } = agent.request("test-request", {});
   expect(id).toBe(1);
   await expect(promise).resolves.toBe(0);
@@ -32,7 +32,7 @@ test("Agent#request", async () => {
 test("Agent#request: with message", async () => {
   expect.assertions(3);
 
-  const agent = await startAgent("node", [testAgent]);
+  const agent = await start("node", [testAgent]);
   const subscribe = (message: string) => expect(message).toBe("message");
   const { id, promise } = agent.request("test-request", {}, subscribe);
   expect(id).toBe(1);
@@ -40,43 +40,51 @@ test("Agent#request: with message", async () => {
 });
 
 test("Agent#notify", async () => {
-  const agent = await startAgent("node", [testAgent]);
+  const agent = await start("node", [testAgent]);
   await agent.notify("test-notify", {});
   await expect(agent.request("test-request", {}).promise).resolves.toBe(1);
 });
 
 test("check", async () => {
-  const agent = await startAgent("node", [testAgent]);
-  await expect(checkAgent(agent, "foo", "")).resolves.toEqual({
+  const agent = await start("node", [testAgent]);
+  await expect(checkAgent(agent, "test", "")).resolves.toEqual({
     status: "safe",
+  });
+});
+
+test("check: with large output", async () => {
+  const agent = await start("node", [testAgent]);
+  await expect(checkAgent(agent, "test-large", "")).resolves.toEqual({
+    status: "vulnerable",
+    attack: { string: "a".repeat(300_000) },
   });
 });
 
 test("check: with logger", async () => {
   expect.assertions(2);
 
-  const agent = await startAgent("node", [testAgent]);
+  const agent = await start("node", [testAgent]);
   const logger = (message: string) => expect(message).toBe("message");
-  await expect(checkAgent(agent, "foo", "", { logger })).resolves.toEqual({
+  await expect(checkAgent(agent, "test", "", { logger })).resolves.toEqual({
     status: "safe",
   });
 });
 
 test("check: with abort (1)", async () => {
-  const agent = await startAgent("node", [testAgent]);
+  const agent = await start("node", [testAgent]);
   const controller = new AbortController();
   const signal = controller.signal;
   controller.abort();
-  await expect(checkAgent(agent, "foo", "", { signal })).resolves.toEqual({
+  await expect(checkAgent(agent, "test", "", { signal })).resolves.toEqual({
     status: "unknown",
   });
 });
 
 test("check: with abort (2)", async () => {
-  const agent = await startAgent("node", [testAgent]);
+  const agent = await start("node", [testAgent]);
   const controller = new AbortController();
   const signal = controller.signal;
-  const run = checkAgent(agent, "foo", "", { signal });
+  const run = checkAgent(agent, "test", "", { signal });
   setTimeout(() => controller.abort(), 10);
   await expect(run).resolves.toEqual({ status: "unknown" });
 });

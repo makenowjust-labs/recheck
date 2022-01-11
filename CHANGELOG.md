@@ -1,3 +1,9 @@
+# dev
+
+Fixes:
+
+- Fix `handleLine` in `Agent` for large data ([#266](https://github.com/MakeNowJust-Labo/recheck/pull/266))
+
 # 4.2.1 (2022-01-08)
 
 Fixes:
