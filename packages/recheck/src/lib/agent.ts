@@ -94,20 +94,25 @@ export class Agent {
       }
     };
 
-    this.child.stdout!.on("data", (data) => {
+    this.child.stdout!.on("data", (data: Buffer) => {
       const text = data.toString("utf-8");
       const lines = text.split("\n");
+      const hasNewline = lines.length > 1;
 
-      /* c8 ignore next 2 */
+      /* c8 ignore next 1 */
       const lastLine = lines.pop() ?? "";
       const firstLine = lines.shift() ?? "";
 
-      handleLine(remainingLastLine + firstLine);
+      if (hasNewline) {
+        lines.unshift(remainingLastLine + firstLine)
+        remainingLastLine = '';
+      }
+
       for (const line of lines) {
         handleLine(line);
       }
 
-      remainingLastLine = lastLine;
+      remainingLastLine += lastLine;
     });
   }
 

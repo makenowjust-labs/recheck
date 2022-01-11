@@ -25,7 +25,15 @@ process.stdin.on('data', data => {
       case 'check':
         console.log(JSON.stringify({ jsonrpc: "2.0+push", id: json.id, message: 'message' }));
         checks[json.id] = setTimeout(() => {
-          console.log(JSON.stringify({ jsonrpc: "2.0+push", id: json.id, result: { status: 'safe' } }));
+          switch (json.params.source) {
+            case 'test-large':
+              const string = 'a'.repeat(300_000);
+              console.log(JSON.stringify({ jsonrpc: "2.0+push", id: json.id, result: { status: 'vulnerable', attack: { string } } }));
+              break;
+            default:
+              console.log(JSON.stringify({ jsonrpc: "2.0+push", id: json.id, result: { status: 'safe' } }));
+              break;
+          }
           delete checks[json.id];
         }, 100);
         break;
