@@ -56,7 +56,7 @@ test("check: with large output", async () => {
   const agent = await start("node", [testAgent]);
   await expect(checkAgent(agent, "test-large", "")).resolves.toEqual({
     status: "vulnerable",
-    attack: { string: 'a'.repeat(300_000) }
+    attack: { string: "a".repeat(300_000) },
   });
 });
 

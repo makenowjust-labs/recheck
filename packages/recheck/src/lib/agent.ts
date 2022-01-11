@@ -104,8 +104,8 @@ export class Agent {
       const firstLine = lines.shift() ?? "";
 
       if (hasNewline) {
-        lines.unshift(remainingLastLine + firstLine)
-        remainingLastLine = '';
+        lines.unshift(remainingLastLine + firstLine);
+        remainingLastLine = "";
       }
 
       for (const line of lines) {
