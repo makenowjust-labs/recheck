@@ -18,8 +18,8 @@
   "scripts": {
     "build": "sucrase-node ./scripts/build.ts",
     "clean": "rimraf lib",
-    "format": "prettier -w '*.{js,json,md}' 'src/**/*.ts' index.d.ts",
-    "lint": "prettier --list-different '*.{js,json,md}' 'src/**/*.ts' index.d.ts",
+    "format": "prettier -w '*.{js,json,md}' 'src/**/*.{js,ts}' index.d.ts",
+    "lint": "prettier --list-different '*.{js,json,md}' 'src/**/*.{js,ts}' index.d.ts",
     "test": "jest",
     "typecheck": "tsc --noEmit -p ."
   },
