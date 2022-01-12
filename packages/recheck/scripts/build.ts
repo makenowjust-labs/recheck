@@ -16,6 +16,7 @@ const main = async () => {
     entryPoints: ['src/main.ts'],
     bundle: true,
     format: 'cjs',
+    logLevel: 'error',
     platform: 'node',
     plugins: [makeAllPackagesExternalPlugin],
     outfile: 'lib/main.js'
@@ -24,6 +25,7 @@ const main = async () => {
     entryPoints: ['src/browser.ts'],
     bundle: true,
     format: 'esm',
+    logLevel: 'error',
     platform: 'browser',
     plugins: [makeAllPackagesExternalPlugin],
     outfile: 'lib/browser.js'
