@@ -75,7 +75,7 @@ jobs:
 
             let newDevSection = '# dev\n';
             for (const label of Object.keys(updateLists)) {
-              if (updateLists[label].length === 0) {
+              if (updateLists[label].updates.length === 0) {
                 continue;
               }
 
@@ -92,7 +92,7 @@ jobs:
             changelog = `${newDevSection}\n${changelog}`;
             await fs.writeFile('CHANGELOG.md', changelog);
       - name: Commit a new `CHANGELOG.md`
-        if: steps.changelog.has_update == true
+        if: steps.changelog.outputs.has_update == true
         run: |
           git config --local user.name "MakeNowJust bot"
           git config --local user.email "make.just.on@gmail.com"
