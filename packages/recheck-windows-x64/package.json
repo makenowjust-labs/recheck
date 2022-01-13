@@ -1,6 +1,6 @@
 {
   "name": "recheck-windows-x64",
-  "version": "4.2.1",
+  "version": "0.0.0-dev",
   "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
   "homepage": "https://makenowjust-labo.github.io/recheck/",
   "description": "The Windows 64-bit binary for recheck.",
