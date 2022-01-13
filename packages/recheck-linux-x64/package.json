@@ -14,6 +14,6 @@
     "x64"
   ],
   "scripts": {
-    "build": "chmod +x ./recheck || exit 0"
+    "build": "chmod +x ./recheck"
   }
 }

@@ -133,9 +133,10 @@ jobs:
           name: recheck.jar
           path: modules/recheck-cli/target/scala-2.13/
       - name: Build
-        run: yarn lerna run build
+        run: yarn lerna run --no-bail build
       - name: Test
-        run: yarn lerna run test -- --coverage
+        # It needs two `--` actually: one is for Yarn and the latter is for Lerna.
+        run: yarn lerna run test -- -- --coverage
       - uses: codecov/codecov-action@v2
 
   native-build:
