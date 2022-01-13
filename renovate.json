@@ -12,8 +12,8 @@
         "version=(?<currentValue>.*)\n"
       ],
       "datasourceTemplate": "maven",
-      "depName": "org.scalameta:scalafmt-core_2.13",
-      "depType": "scalafmt"
+      "depNameTemplate": "org.scalameta:scalafmt-core_2.13",
+      "depTypeTemplate": "scalafmt"
     },
     {
       "fileMatch": [
@@ -24,7 +24,7 @@
       ],
       "datasourceTemplate": "maven",
       "depNameTemplate": "{{{ orgName }}}:{{{ artifactName }}}_2.13",
-      "depType": "scalafix plugin"
+      "depTypeTemplate": "scalafix plugin"
     },
     {
       "fileMatch": [
@@ -35,7 +35,7 @@
       ],
       "datasourceTemplate": "maven",
       "depNameTemplate": "{{{ orgName }}}:{{{ artifactName }}}_2.13",
-      "depType": "compiler plugin"
+      "depTypeTemplate": "compiler plugin"
     }
   ]
 }
