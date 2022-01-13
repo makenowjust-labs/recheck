@@ -1,0 +1,92 @@
+name: Update CHANGELOG.md
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [closed]
+
+jobs:
+  update-changelog:
+    runs-on: ubuntu-latest
+    name: Update CHANGELOG.md
+    if: github.event.pull_request.merged == true
+    steps:
+      - uses: actions/checkout@v2
+      - name: Update CHANGELOG.md
+        id: changelog
+        uses: actions/github-script@v5
+        with:
+          script: |
+            // Fetches an issue (pull request) information.
+            const {promises: fs} = require('fs');
+            const issue = context.payload;
+            const {user, pull_request: pull} = issue.user;
+
+            // Reads the current `CHANGELOG.md`.
+            let changelog = await fs.readFile('CHANGELOG.md', 'utf-8');
+
+            // Exatracts `# dev` section from the `CHANGELOG.md`.
+            const devMatch = changelog.match(/^# dev\n\n([^]*?)(?=\n# )\n/);
+            let devSection = '';
+            if (devMatch !== null) {
+              changelog = changelog.slice(devMatch[0].length);
+              devSection = devMatch[0];
+            }
+
+            // Extracts each update subsection from `# dev` section.
+            const updateLists = {
+              feature: { category: 'New Features' },
+              change: { category: 'Changes' },
+              fix: { category: 'Fixes' },
+              misc: { category: 'Misc' },
+            };
+            for (const label of Object.keys(updateLists)) {
+              const subsection = `## ${updateLists[label].category}\n\n`;
+              const index = devSection.indexOf(subsection);
+              if (index === -1) {
+                updateLists[label].updates = [];
+                continue;
+              }
+
+              const endIndex = devSection.indexOf('\n\n', index + label.index);
+              updateLists[label].updates = devSection.slice(index + label.length, endIndex).split('\n');
+            }
+
+            // Inserts a new line for this update to the update list specified by a label.
+            const newLine = `- ${issue.title} ([#${issue.number}](${pull.html_url}), by [@${user.login}](user.html_url))`;
+            let hasUpdate = false;
+            for (const label of issue.labels) {
+              if (updateLists[label.name]) {
+                updateLists[label.name].updates.push(newLine);
+                hasUpdate = true;
+              }
+            }
+
+            core.setOutput('has_update', hasUpdate);
+            if (!hasUpdate) return false;
+
+            let newDevSection = '# dev\n';
+            for (const label of Object.keys(updateLists)) {
+              if (updateLists[label].length === 0) {
+                continue;
+              }
+
+              newDevSection += '\n';
+              newDevSection += `## ${updateLists[label].category}\n`;
+              newDevSection += `\n`;
+              for (const update of updateLists[label].updates) {
+                newDevSection += `${update}\n`;
+              }
+            }
+
+            // Updates the `CHANGELOG.md`.
+            changelog = `${newDevSection}\n${changelog}`;
+            await fs.writeFile('CHANGELOG.md', changelog);
+      - name: Commit a new `CHANGELOG.md`
+        if: steps.changelog.has_update == true
+        run: |
+          git config --local user.name "MakeNowJust bot"
+          git config --local user.email "make.just.on@gmail.com"
+          git add .
+          git commit -m "Update CHANGELOG.md"
