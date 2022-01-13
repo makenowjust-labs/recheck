@@ -47,7 +47,7 @@ jobs:
               misc: { category: 'Misc' },
             };
             for (const label of Object.keys(updateLists)) {
-              const subsection = `## ${updateLists[label].category}\n\n`;
+              const subsection = `\n${updateLists[label].category}:\n\n`;
               const index = devSection.indexOf(subsection);
               if (index === -1) {
                 updateLists[label].updates = [];
@@ -80,7 +80,7 @@ jobs:
               }
 
               newDevSection += '\n';
-              newDevSection += `## ${updateLists[label].category}\n`;
+              newDevSection += `${updateLists[label].category}:\n`;
               newDevSection += `\n`;
               for (const update of updateLists[label].updates) {
                 newDevSection += `${update}\n`;

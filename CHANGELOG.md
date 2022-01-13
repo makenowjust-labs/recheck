@@ -1,6 +1,6 @@
 # dev
 
-## Misc
+Misc:
 
 - Update `CHANGELOG.md` automatically by GitHub Actions ([#279](https://github.com/MakeNowJust-Labo/recheck/pull/279), by [@MakeNowJust](https://github.com/MakeNowJust))
 
