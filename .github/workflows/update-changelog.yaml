@@ -92,9 +92,10 @@ jobs:
             changelog = `${newDevSection}\n${changelog}`;
             await fs.writeFile('CHANGELOG.md', changelog);
       - name: Commit a new `CHANGELOG.md`
-        if: steps.changelog.outputs.has_update == true
+        if: steps.changelog.outputs.has_update == 'true'
         run: |
           git config --local user.name "MakeNowJust bot"
           git config --local user.email "make.just.on@gmail.com"
           git add .
           git commit -m "Update CHANGELOG.md"
+          git push origin main
