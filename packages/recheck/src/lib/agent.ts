@@ -99,7 +99,7 @@ export class Agent {
       const lines = text.split("\n");
       const hasNewline = lines.length > 1;
 
-      /* c8 ignore next 1 */
+      /* c8 ignore next */
       const lastLine = lines.pop() ?? "";
       const firstLine = lines.shift() ?? "";
 

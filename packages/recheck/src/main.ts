@@ -23,16 +23,16 @@ export async function check(
     case "auto":
       if (__mock__.agent === undefined) {
         try {
-          /* c8 ignore next 1 */
-          __mock__.agent = (await java.ensure()) ?? undefined;
+          /* c8 ignore next */
+          __mock__.agent = (await native.ensure()) ?? undefined;
         } catch {
           __mock__.agent = undefined;
         }
       }
       if (__mock__.agent === undefined) {
         try {
-          /* c8 ignore next 1 */
-          __mock__.agent = (await native.ensure()) ?? undefined;
+          /* c8 ignore next */
+          __mock__.agent = (await java.ensure()) ?? undefined;
         } catch {
           __mock__.agent = undefined;
         }
