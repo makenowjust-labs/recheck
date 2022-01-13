@@ -6,8 +6,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     name: Scala Build
+    outputs:
+      version: ${{ steps.save-version.outputs.version }}
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - uses: olafurpg/setup-scala@v13
         with:
           java-version: adopt@1.16
@@ -27,6 +31,10 @@ jobs:
           key: ${{ runner.os }}-build-${{ github.sha }}
       - name: Build
         run: sbt compile js/fullLinkJS cli/assembly
+      - id: save-version
+        name: Save Version
+        run: |
+          echo "::set-output version=$(sbt --error "print coreJVM/version")"
       - uses: actions/upload-artifact@v2
         with:
           path: modules/recheck-js/target/scala-2.13/recheck-js-opt/recheck.js
@@ -75,12 +83,10 @@ jobs:
         run: yarn install --frozen-lockfile
       - name: Lint
         run: |
-          yarn workspace eslint-plugin-redos lint
-          yarn workspace recheck lint
+          yarn lerna run lint
       - name: Type Check
         run: |
-          yarn workspace eslint-plugin-redos typecheck
-          yarn workspace recheck typecheck
+          yarn lerna run typecheck
 
   scala-test:
     runs-on: ubuntu-latest
@@ -107,7 +113,7 @@ jobs:
       - uses: codecov/codecov-action@v2
 
   node-test:
-    needs: [build]
+    needs: [build, node-lint]
     runs-on: ubuntu-latest
     name: Node Test
     steps:
@@ -127,11 +133,9 @@ jobs:
           name: recheck.jar
           path: modules/recheck-cli/target/scala-2.13/
       - name: Build
-        run: yarn workspace recheck build
+        run: yarn lerna run build
       - name: Test
-        run: |
-          yarn workspace eslint-plugin-redos test --coverage
-          yarn workspace recheck test --coverage
+        run: yarn lerna run test -- --coverage
       - uses: codecov/codecov-action@v2
 
   native-build:
@@ -154,6 +158,8 @@ jobs:
             local_path: modules/recheck-cli/target/native-image/recheck.exe
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - uses: olafurpg/setup-scala@v13
         with:
           java-version: adopt@1.16
@@ -171,7 +177,6 @@ jobs:
           path: |
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
-      - run: git fetch --unshallow
       - uses: nick-invision/retry@v2
         if: ${{ matrix.os != 'windows-latest' }}
         with:
@@ -193,7 +198,7 @@ jobs:
           name: ${{ matrix.artifact_filename }}
 
   maven-release:
-    needs: [build]
+    needs: [build, scala-test]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     name: Publish to Maven Central
@@ -228,12 +233,14 @@ jobs:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
 
   npm-release:
-    needs: [build, native-build]
+    needs: [build, native-build, node-test]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     name: Publish to NPM
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - uses: olafurpg/setup-scala@v13
         with:
           java-version: adopt@1.16
@@ -241,6 +248,7 @@ jobs:
         with:
           node-version: '17'
           cache: 'yarn'
+          registry-url: 'https://registry.npmjs.org'
       - name: Cache SBT
         uses: actions/cache@v2
         with:
@@ -278,35 +286,11 @@ jobs:
           name: recheck-win32-x64.exe
           path: packages/recheck-windows-x64/
       - name: Build
-        run: |
-          yarn workspace recheck build
-          yarn workspace eslint-plugin-redos build
-          chmod +x packages/recheck-macos-x64/recheck
-          chmod +x packages/recheck-linux-x64/recheck
-      - uses: JS-DevTools/npm-publish@v1
-        with:
-          package: packages/eslint-plugin-redos/package.json
-          token: ${{ secrets.NPM_TOKEN }}
-      - uses: JS-DevTools/npm-publish@v1
-        with:
-          package: packages/recheck/package.json
-          token: ${{ secrets.NPM_TOKEN }}
-      - uses: JS-DevTools/npm-publish@v1
-        with:
-          package: packages/recheck-jar/package.json
-          token: ${{ secrets.NPM_TOKEN }}
-      - uses: JS-DevTools/npm-publish@v1
-        with:
-          package: packages/recheck-macos-x64/package.json
-          token: ${{ secrets.NPM_TOKEN }}
-      - uses: JS-DevTools/npm-publish@v1
-        with:
-          package: packages/recheck-linux-x64/package.json
-          token: ${{ secrets.NPM_TOKEN }}
-      - uses: JS-DevTools/npm-publish@v1
-        with:
-          package: packages/recheck-windows-x64/package.json
-          token: ${{ secrets.NPM_TOKEN }}
+        run: yarn lerna run build
+      - name: Publish
+        run: yarn lerna publish ${{ needs.build.outputs.version }} --yes
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   gh-pages:
     needs: [build]

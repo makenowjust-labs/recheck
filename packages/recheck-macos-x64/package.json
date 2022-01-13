@@ -1,6 +1,6 @@
 {
   "name": "recheck-macos-x64",
-  "version": "4.2.1",
+  "version": "0.0.0-dev",
   "description": "The macOS 64-bit binary for recheck.",
   "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
   "homepage": "https://makenowjust-labo.github.io/recheck/",
@@ -12,5 +12,8 @@
   ],
   "cpu": [
     "x64"
-  ]
+  ],
+  "scripts": {
+    "build": "chmod +x ./recheck"
+  }
 }
