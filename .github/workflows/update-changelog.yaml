@@ -60,7 +60,7 @@ jobs:
             console.log(updateLists);
 
             // Inserts a new line for this update to the update list specified by a label.
-            const newLine = `- ${issue.title} ([#${issue.number}](${pull.html_url}), by [@${user.login}](user.html_url))`;
+            const newLine = `- ${issue.title} ([#${issue.number}](${pull.html_url}), by [@${user.login}](${user.html_url}))`;
             let hasUpdate = false;
             for (const label of issue.labels) {
               console.log(label);
@@ -75,7 +75,7 @@ jobs:
 
             let newDevSection = '# dev\n';
             for (const label of Object.keys(updateLists)) {
-              if (updateLists[label].length === 0) {
+              if (updateLists[label].updates.length === 0) {
                 continue;
               }
 
@@ -92,7 +92,7 @@ jobs:
             changelog = `${newDevSection}\n${changelog}`;
             await fs.writeFile('CHANGELOG.md', changelog);
       - name: Commit a new `CHANGELOG.md`
-        if: steps.changelog.has_update == true
+        if: steps.changelog.outputs.has_update == true
         run: |
           git config --local user.name "MakeNowJust bot"
           git config --local user.email "make.just.on@gmail.com"
