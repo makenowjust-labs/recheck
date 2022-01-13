@@ -24,6 +24,7 @@ jobs:
               ...context.repo,
               issue_number: context.issue.number,
             });
+            console.log(issue);
             const {user, pull_request: pull} = issue.user;
 
             // Reads the current `CHANGELOG.md`.
