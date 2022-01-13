@@ -34,7 +34,7 @@ jobs:
       - id: save-version
         name: Save Version
         run: |
-          echo "::set-output version=$(sbt --error "print coreJVM/version")"
+          echo "::set-output name=version::$(sbt --error "print coreJVM/version")"
       - uses: actions/upload-artifact@v2
         with:
           path: modules/recheck-js/target/scala-2.13/recheck-js-opt/recheck.js
