@@ -24,6 +24,7 @@ jobs:
               ...context.repo,
               issue_number: context.issue.number,
             });
+            console.log(issue);
             const {user, pull_request: pull} = issue;
 
             // Reads the current `CHANGELOG.md`.
@@ -36,6 +37,7 @@ jobs:
               changelog = changelog.slice(devMatch[0].length);
               devSection = devMatch[0];
             }
+            console.log(devSection);
 
             // Extracts each update subsection from `# dev` section.
             const updateLists = {
@@ -55,11 +57,13 @@ jobs:
               const endIndex = devSection.indexOf('\n\n', index + label.index);
               updateLists[label].updates = devSection.slice(index + label.length, endIndex).split('\n');
             }
+            console.log(updateLists);
 
             // Inserts a new line for this update to the update list specified by a label.
             const newLine = `- ${issue.title} ([#${issue.number}](${pull.html_url}), by [@${user.login}](user.html_url))`;
             let hasUpdate = false;
             for (const label of issue.labels) {
+              console.log(label);
               if (updateLists[label.name]) {
                 updateLists[label.name].updates.push(newLine);
                 hasUpdate = true;
@@ -67,7 +71,7 @@ jobs:
             }
 
             core.setOutput('has_update', hasUpdate);
-            if (!hasUpdate) return false;
+            if (!hasUpdate) return;
 
             let newDevSection = '# dev\n';
             for (const label of Object.keys(updateLists)) {
@@ -82,6 +86,7 @@ jobs:
                 newDevSection += `${update}\n`;
               }
             }
+            console.log(newDevSection);
 
             // Updates the `CHANGELOG.md`.
             changelog = `${newDevSection}\n${changelog}`;
