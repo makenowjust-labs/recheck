@@ -1,3 +1,9 @@
+# dev
+
+## Misc
+
+- Update `CHANGELOG.md` automatically by GitHub Actions ([#279](https://github.com/MakeNowJust-Labo/recheck/pull/279), by [@MakeNowJust](https://github.com/MakeNowJust))
+
 # 4.2.2 (2022-01-14)
 
 Fixes:
