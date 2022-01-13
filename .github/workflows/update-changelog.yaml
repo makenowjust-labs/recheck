@@ -20,7 +20,10 @@ jobs:
           script: |
             // Fetches an issue (pull request) information.
             const {promises: fs} = require('fs');
-            const issue = context.payload;
+            const issue = await github.rest.issues.get({
+              ...context.repo,
+              issue_number: context.issue.number,
+            });
             const {user, pull_request: pull} = issue.user;
 
             // Reads the current `CHANGELOG.md`.
