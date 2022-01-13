@@ -56,7 +56,7 @@ export const bin: () => string | null = () => {
   try {
     // Constructs a package name with a binary file name, and resolves this.
     // If it is succeeded, we expect that the result path is `recheck` CLI.
-    /* c8 ignore next 1 */
+    /* c8 ignore next */
     const bin = isWin32 ? "recheck.exe" : "recheck";
     const pkg = `recheck-${os}-${cpu}/package.json`;
     const exe = __mock__require

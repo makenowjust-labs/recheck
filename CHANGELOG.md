@@ -3,6 +3,7 @@
 Fixes:
 
 - Fix `handleLine` in `Agent` for large data ([#266](https://github.com/MakeNowJust-Labo/recheck/pull/266))
+- Prefer to use `native` backend on `RECHECK_BACKEND=auto` ([#268](https://github.com/MakeNowJust-Labo/recheck/pull/268))
 
 # 4.2.1 (2022-01-08)
 
