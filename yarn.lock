@@ -3061,7 +3061,7 @@ esbuild-freebsd-arm64@0.14.11:
   resolved "https://registry.yarnpkg.com/esbuild-freebsd-arm64/-/esbuild-freebsd-arm64-0.14.11.tgz#ae3e0b09173350b66cf8321583c9a1c1fcb8bb55"
   integrity sha512-y3Llu4wbs0bk4cwjsdAtVOesXb6JkdfZDLKMt+v1U3tOEPBdSu6w8796VTksJgPfqvpX22JmPLClls0h5p+L9w==
 
-esbuild-jest@0.5.0, esbuild-jest@^0.5.0:
+esbuild-jest@0.5.0:
   version "0.5.0"
   resolved "https://registry.yarnpkg.com/esbuild-jest/-/esbuild-jest-0.5.0.tgz#7a9964bfdecafca3b675a8aeb08193bcdba8b9d7"
   integrity sha512-AMZZCdEpXfNVOIDvURlqYyHwC8qC1/BFjgsrOiSL1eyiIArVtHL8YAC83Shhn16cYYoAWEW17yZn0W/RJKJKHQ==
@@ -3115,7 +3115,7 @@ esbuild-openbsd-64@0.14.11:
   resolved "https://registry.yarnpkg.com/esbuild-openbsd-64/-/esbuild-openbsd-64-0.14.11.tgz#caeff5f946f79a60ce7bcf88871ca4c71d3476e8"
   integrity sha512-l18TZDjmvwW6cDeR4fmizNoxndyDHamGOOAenwI4SOJbzlJmwfr0jUgjbaXCUuYVOA964siw+Ix+A+bhALWg8Q==
 
-esbuild-register@^3.3.2:
+esbuild-register@3.3.2:
   version "3.3.2"
   resolved "https://registry.yarnpkg.com/esbuild-register/-/esbuild-register-3.3.2.tgz#1c3dc7179cabb4c7bd640a393eb916b18b12a223"
   integrity sha512-jceAtTO6zxPmCfSD5cBb3rgIK1vmuqCKYwgylHiS1BF4pq0jJiJb4K2QMuqF4BEw7XDBRatYzip0upyTzfkgsQ==
@@ -3140,7 +3140,7 @@ esbuild-windows-arm64@0.14.11:
   resolved "https://registry.yarnpkg.com/esbuild-windows-arm64/-/esbuild-windows-arm64-0.14.11.tgz#e8edfdf1d712085e6dc3fba18a0c225aaae32b75"
   integrity sha512-dZp7Krv13KpwKklt9/1vBFBMqxEQIO6ri7Azf8C+ob4zOegpJmha2XY9VVWP/OyQ0OWk6cEeIzMJwInRZrzBUQ==
 
-esbuild@0.14.11, esbuild@^0.14.11:
+esbuild@0.14.11:
   version "0.14.11"
   resolved "https://registry.yarnpkg.com/esbuild/-/esbuild-0.14.11.tgz#ac4acb78907874832afb704c3afe58ad37715c27"
   integrity sha512-xZvPtVj6yecnDeFb3KjjCM6i7B5TCAQZT77kkW/CpXTMnd6VLnRPKrUB1XHI1pSq6a4Zcy3BGueQ8VljqjDGCg==
