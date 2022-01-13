@@ -24,7 +24,7 @@ jobs:
               ...context.repo,
               issue_number: context.issue.number,
             });
-            const {user, pull_request: pull} = issue.user;
+            const {user, pull_request: pull} = issue;
 
             // Reads the current `CHANGELOG.md`.
             let changelog = await fs.readFile('CHANGELOG.md', 'utf-8');
