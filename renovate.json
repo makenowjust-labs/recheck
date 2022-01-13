@@ -2,5 +2,40 @@
   "extends": [
     "config:base"
   ],
-  "automerge": true
+  "automerge": true,
+  "regexManagers": [
+    {
+      "fileMatch": [
+        "^.scalafmt.conf"
+      ],
+      "matchStrings": [
+        "version=(?<currentValue>.*)\n"
+      ],
+      "datasourceTemplate": "maven",
+      "depName": "org.scalameta:scalafmt-core_2.13",
+      "depType": "scalafmt"
+    },
+    {
+      "fileMatch": [
+        "\\.sbt$"
+      ],
+      "matchStrings": [
+        "scalafixDependencies\\s*\\+=\\s*\"(?<orgName>[^\"]*)\"\\s*%%\\s*\"(?<artifactName>[^\"]*)\"\\s*%\\s*\"(?<currentValue>[^\"]*)\""
+      ],
+      "datasourceTemplate": "maven",
+      "depNameTemplate": "{{{ orgName }}}:{{{ artifactName }}}_2.13",
+      "depType": "scalafix plugin"
+    },
+    {
+      "fileMatch": [
+        "\\.sbt$"
+      ],
+      "matchStrings": [
+        "addCompilerPlugin\\(\\s*\"(?<orgName>[^\"]*)\"\\s*%%\\s*\"(?<artifactName>[^\"]*)\"%\\s*\"(?<currentValue>[^\"]*)\"\\s*\\)"
+      ],
+      "datasourceTemplate": "maven",
+      "depNameTemplate": "{{{ orgName }}}:{{{ artifactName }}}_2.13",
+      "depType": "compiler plugin"
+    }
+  ]
 }
