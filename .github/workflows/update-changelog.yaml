@@ -54,7 +54,7 @@ jobs:
                 continue;
               }
 
-              const endIndex = devSection.indexOf('\n\n', index + subsection.index);
+              const endIndex = devSection.indexOf('\n\n', index + subsection.length);
               updateLists[label].updates = devSection.slice(index + subsection.length, endIndex).split('\n');
             }
             console.log(updateLists);
