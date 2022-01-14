@@ -2,10 +2,10 @@
 
 > [ESLint][] plugin for catching [ReDoS][] vulnerability.
 
+[![npm (scoped)](https://img.shields.io/npm/v/eslint-plugin-redos?logo=javascript&style=for-the-badge)](https://www.npmjs.com/package/eslint-plugin-redos)
+
 [eslint]: https://eslint.org
 [redos]: https://en.wikipedia.org/wiki/ReDoS
-
-[![npm (scoped)](https://img.shields.io/npm/v/eslint-plugin-redos?logo=javascript&style=for-the-badge)](https://www.npmjs.com/package/eslint-plugin-redos)
 
 ## Installation
 
@@ -25,6 +25,33 @@ Then, in your `.eslintrc.json`:
 ```
 
 This plugin contains the only rule `redos/no-vulnerable`.
+
+## Note
+
+[`recheck`](https://makenowjust-labo.github.io/recheck) is a ReDoS vulnerability checker used by this plugin. It is very optimized and faster enough, however it takes seconds in some cases. This time is essential because ReDoS detection is not so easy problem in computer science.
+
+Therefore, to reduce unnecessary computation time, we recommend adding such a following settings.
+
+```json
+{
+  "plugins": ["redos"],
+  "rules": {
+    "redos/no-vulnerable": "error"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.{js,ts}"],
+      "rules": {
+        "redos/no-vulnerable": "off"
+      }
+    }
+  ]
+}
+```
+
+The above settings disables the `redos/no-vulnerable` rule against test files. Since ReDoS vulnerabilities in test codes are not critical problems, it will be no problem in many cases.
+
+Alternatively, you can use rules that use lightweight (but imperfect) analysis methods such as [`regexp/no-super-linear-backtracking`](https://ota-meshi.github.io/eslint-plugin-regexp/rules/no-super-linear-backtracking.html) included in `eslint-plugin-regexp` during development, and use this plugin in CI.
 
 ---
 
