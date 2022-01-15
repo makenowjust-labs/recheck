@@ -435,4 +435,5 @@ export type AttackPattern = {
   suffix: string;
   base: number;
   string: string;
+  pattern: string;
 };
