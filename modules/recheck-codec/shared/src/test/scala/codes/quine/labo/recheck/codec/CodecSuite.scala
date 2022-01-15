@@ -66,7 +66,7 @@ class CodecSuite extends munit.FunSuite {
   }
 
   test("codec.encodeChecker") {
-    assertEquals(encodeChecker(Checker.Hybrid), "hybrid".asJson)
+    assertEquals(encodeChecker(Checker.Auto), "auto".asJson)
     assertEquals(encodeChecker(Checker.Fuzz), "fuzz".asJson)
     assertEquals(encodeChecker(Checker.Automaton), "automaton".asJson)
   }
@@ -200,7 +200,7 @@ class CodecSuite extends munit.FunSuite {
   }
 
   test("codec.decodeChecker") {
-    assertEquals(decodeChecker.decodeJson("hybrid".asJson), Right(Checker.Hybrid))
+    assertEquals(decodeChecker.decodeJson("auto".asJson), Right(Checker.Auto))
     assertEquals(decodeChecker.decodeJson("automaton".asJson), Right(Checker.Automaton))
     assertEquals(decodeChecker.decodeJson("fuzz".asJson), Right(Checker.Fuzz))
     assertEquals(decodeChecker.decodeJson("xxx".asJson), Left(DecodingFailure("Unknown checker: xxx", List.empty)))

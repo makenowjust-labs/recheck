@@ -141,9 +141,9 @@ class ReDoSSuite extends munit.FunSuite {
     }
   }
 
-  test("ReDoS.checkHybrid") {
+  test("ReDoS.checkAuto") {
     assertEquals(
-      ReDoS.checkHybrid(
+      ReDoS.checkAuto(
         "^(?:a|a)*$",
         "",
         Pattern(
@@ -170,7 +170,7 @@ class ReDoSSuite extends munit.FunSuite {
       )
     )
     assertEquals(
-      ReDoS.checkHybrid(
+      ReDoS.checkAuto(
         "^(?:a|a){5}$",
         "",
         Pattern(
@@ -188,7 +188,7 @@ class ReDoSSuite extends munit.FunSuite {
       Success(Diagnostics.Safe("^(?:a|a){5}$", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
     assertEquals(
-      ReDoS.checkHybrid(
+      ReDoS.checkAuto(
         "^(?:a|a){5}$",
         "",
         Pattern(
@@ -202,7 +202,7 @@ class ReDoSSuite extends munit.FunSuite {
       Success(Diagnostics.Safe("^(?:a|a){5}$", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
     assertEquals(
-      ReDoS.checkHybrid(
+      ReDoS.checkAuto(
         "^.*$",
         "",
         Pattern(

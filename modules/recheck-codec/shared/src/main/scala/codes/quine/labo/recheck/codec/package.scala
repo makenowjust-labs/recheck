@@ -56,7 +56,7 @@ package object codec {
 
   /** An `Encoder` for `Checker`. */
   implicit def encodeChecker: Encoder[Checker] = {
-    case Checker.Hybrid    => "hybrid".asJson
+    case Checker.Auto      => "auto".asJson
     case Checker.Automaton => "automaton".asJson
     case Checker.Fuzz      => "fuzz".asJson
   }
@@ -179,7 +179,7 @@ package object codec {
   /** A `Decoder` for `Checker`. */
   implicit def decodeChecker: Decoder[Checker] =
     Decoder[String].emap {
-      case "hybrid"    => Right(Checker.Hybrid)
+      case "auto"      => Right(Checker.Auto)
       case "automaton" => Right(Checker.Automaton)
       case "fuzz"      => Right(Checker.Fuzz)
       case s           => Left(s"Unknown checker: $s")

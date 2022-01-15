@@ -29,7 +29,7 @@ const worker = (() => {
 window.checker = () => ({
   state: 'init', // One of 'init', 'checking' or 'checked'.
   input: '/^(a|a)*$/',
-  checker: 'hybrid',
+  checker: 'auto',
   checkedInput: '',
   checkedTime: 0,
   checkedResult: null,

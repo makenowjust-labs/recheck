@@ -52,7 +52,7 @@ object ReDoS {
       diagnostics <- checker match {
         case Checker.Automaton => checkAutomaton(source, flags, pattern, params)
         case Checker.Fuzz      => checkFuzz(source, flags, pattern, params)
-        case Checker.Hybrid    => checkHybrid(source, flags, pattern, params)
+        case Checker.Auto      => checkAuto(source, flags, pattern, params)
       }
     } yield diagnostics
     result.recover { case ex: ReDoSException => Diagnostics.Unknown.from(source, flags, ex) }.get
@@ -65,13 +65,13 @@ object ReDoS {
       params: Parameters
   )(implicit ctx: Context): Try[Diagnostics] = {
     import params._
-    val maxNFASize = if (checker == Checker.Hybrid) params.maxNFASize else Int.MaxValue
+    val maxNFASize = if (checker == Checker.Auto) params.maxNFASize else Int.MaxValue
 
     val result = for {
       _ <- Try(()) // Ensures `Try` context.
       _ <-
-        if (checker == Checker.Hybrid && repeatCount(pattern) >= maxRepeatCount) {
-          ctx.log("hybrid: exceed maxRepeatCount")
+        if (checker == Checker.Auto && repeatCount(pattern) >= maxRepeatCount) {
+          ctx.log("auto: exceed maxRepeatCount")
           Failure(new UnsupportedException("The pattern contains too many repeat"))
         } else Success(())
       complexity <-
@@ -82,8 +82,8 @@ object ReDoS {
         } else
           for {
             _ <-
-              if (checker == Checker.Hybrid && pattern.size >= maxPatternSize) {
-                ctx.log("hybrid: exceed maxPatternSize")
+              if (checker == Checker.Auto && pattern.size >= maxPatternSize) {
+                ctx.log("auto: exceed maxPatternSize")
                 Failure(new UnsupportedException("The pattern is too large"))
               } else Success(())
             epsNFA <- EpsNFABuilder.build(pattern)
@@ -154,7 +154,7 @@ object ReDoS {
       }
   }
 
-  private[recheck] def checkHybrid(source: String, flags: String, pattern: Pattern, params: Parameters)(implicit
+  private[recheck] def checkAuto(source: String, flags: String, pattern: Pattern, params: Parameters)(implicit
       ctx: Context
   ): Try[Diagnostics] =
     checkAutomaton(source, flags, pattern, params).recoverWith { case _: UnsupportedException =>

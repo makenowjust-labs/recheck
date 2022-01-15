@@ -106,7 +106,7 @@ The following is the default configuration.
       "ignoreErrors": true,
       "permittableComplexities": [],
       "timeout": 10000,
-      "checker": "hybrid"
+      "checker": "auto"
     }
   ]
 }
@@ -146,9 +146,9 @@ The default value is `10000` (10 seconds).
 ### `checker`
 
 This option specifies a checker name to use.
-It is one of `'hybrid'`, `'automaton'` and `'fuzz'`.
+It is one of `'auto'`, `'automaton'` and `'fuzz'`.
 
-See [the `recheck` documentation](https://github.com/MakeNowJust-Labo/recheck/blob/main/packages/recheck/README.md) for the detailed information.
+See [the `recheck` documentation](https://github.com/MakeNowJust-Labo/recheck/blob/main/packages/recheck/README.md) for detailed informations.
 
 The default value is `'hybrid'`.
 

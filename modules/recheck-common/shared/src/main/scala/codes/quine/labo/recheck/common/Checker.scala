@@ -19,8 +19,8 @@ object Checker {
     override def toString: String = "fuzz"
   }
 
-  /** A hybrid checker. */
-  case object Hybrid extends Checker {
-    override def toString: String = "hybrid"
+  /** An auto checker. */
+  case object Auto extends Checker {
+    override def toString: String = "auto"
   }
 }

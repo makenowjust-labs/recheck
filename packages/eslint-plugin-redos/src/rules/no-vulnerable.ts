@@ -6,7 +6,7 @@ type Options = {
   ignoreErrors: boolean;
   permittableComplexities?: ("polynomial" | "exponential")[];
   timeout?: number | null;
-  checker?: "hybrid" | "automaton" | "fuzz";
+  checker?: "auto" | "automaton" | "fuzz";
 };
 
 const rule: Rule.RuleModule = {
@@ -35,7 +35,7 @@ const rule: Rule.RuleModule = {
           },
           checker: {
             type: "string",
-            enum: ["hybrid", "automaton", "fuzz"],
+            enum: ["auto", "automaton", "fuzz"],
           },
         },
         additionalProperties: false,
@@ -48,12 +48,12 @@ const rule: Rule.RuleModule = {
       ignoreErrors = true,
       permittableComplexities = [],
       timeout = 10000,
-      checker = "hybrid",
+      checker = "auto",
     } = options;
-    const config = { timeout: timeout ?? undefined, checker };
+    const params = { timeout: timeout ?? undefined, checker };
 
     const check = (node: ESTree.Node, source: string, flags: string) => {
-      const result = ReDoS.checkSync(source, flags, config);
+      const result = ReDoS.checkSync(source, flags, params);
       switch (result.status) {
         case "safe":
           break;
