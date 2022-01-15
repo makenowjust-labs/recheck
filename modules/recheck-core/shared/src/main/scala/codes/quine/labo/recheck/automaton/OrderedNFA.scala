@@ -109,7 +109,7 @@ final case class OrderedNFA[A, Q](
 
           deltaSize += qp2s.size
           if (deltaSize >= maxNFASize) {
-            ctx.log("hybrid: exceed maxNFASize on NFAwLA construction")
+            ctx.log("auto: exceed maxNFASize on NFAwLA construction")
             throw new UnsupportedException("NFAwLA size is too large")
           }
         }

@@ -33,15 +33,15 @@ export type Parameters = {
    *   It can detect ReDoS vulnerability against the all RegExp syntax including back-references
    *   and look-around assertions. However, it needs some seconds on average and it may cause false
    *   negative.
-   * - `'hybrid'`: A checker which combines the automaton checker and the fuzzing checker.
+   * - `'auto'`: A checker which combines the automaton checker and the fuzzing checker.
    *   If the RegExp is supported by the automaton checker and some thresholds are passed,
    *   it uses the automaton checker. Otherwise, it falls back to the fuzzing checker.
    *
-   * The hybrid checker performs better than others in many cases.
+   * The auto checker performs better than others in many cases.
    *
-   * (default: `'hybrid'`)
+   * (default: `'auto'`)
    */
-  checker?: "hybrid" | "fuzz" | "automaton";
+  checker?: "auto" | "fuzz" | "automaton";
 
   /**
    * Upper limit of analysis time.

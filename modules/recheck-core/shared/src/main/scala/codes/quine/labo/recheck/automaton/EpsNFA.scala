@@ -133,7 +133,7 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
         for ((ch, to) <- d) newDelta.addOne(((c0, qs0), ch) -> to)
         deltaSize += d.size
         if (deltaSize >= maxNFASize) {
-          ctx.log("hybrid: exceed maxNFASize on OrderedNFA construction")
+          ctx.log("auto: exceed maxNFASize on OrderedNFA construction")
           throw new UnsupportedException("OrderedNFA size is too large")
         }
       }
