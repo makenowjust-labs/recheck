@@ -4,6 +4,10 @@ Changes:
 
 - Rename `hybrid` to `auto` ([#283](https://github.com/MakeNowJust-Labo/recheck/pull/283), by [@MakeNowJust](https://github.com/MakeNowJust))
 
+Fixes:
+
+- Add missing field `AttackPattern#pattern` in TypeScript definition ([#284](https://github.com/MakeNowJust-Labo/recheck/pull/284), by [@MakeNowJust](https://github.com/MakeNowJust))
+
 Misc:
 
 - Update `CHANGELOG.md` automatically by GitHub Actions ([#279](https://github.com/MakeNowJust-Labo/recheck/pull/279), by [@MakeNowJust](https://github.com/MakeNowJust))
