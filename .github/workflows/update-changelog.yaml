@@ -60,7 +60,7 @@ jobs:
             console.log(updateLists);
 
             // Inserts a new line for this update to the update list specified by a label.
-            const newLine = `- ${issue.title} ([#${issue.number}](${pull.html_url}), by [@${user.login}](${user.html_url}))`;
+            const newLine = `- [#${issue.number}](${pull.html_url}) ${issue.title} ([@${user.login}](${user.html_url}))`;
             let hasUpdate = false;
             for (const label of issue.labels) {
               console.log(label);

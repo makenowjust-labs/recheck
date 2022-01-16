@@ -2,18 +2,18 @@
 
 Changes:
 
-- Rename `hybrid` to `auto` ([#283](https://github.com/MakeNowJust-Labo/recheck/pull/283), by [@MakeNowJust](https://github.com/MakeNowJust))
+- [#283](https://github.com/MakeNowJust-Labo/recheck/pull/283) Rename `hybrid` to `auto` ([@MakeNowJust](https://github.com/MakeNowJust))
 
 Fixes:
 
-- Add missing field `AttackPattern#pattern` in TypeScript definition ([#284](https://github.com/MakeNowJust-Labo/recheck/pull/284), by [@MakeNowJust](https://github.com/MakeNowJust))
+- [#284](https://github.com/MakeNowJust-Labo/recheck/pull/284) Add missing field `AttackPattern#pattern` in TypeScript definition ([@MakeNowJust](https://github.com/MakeNowJust))
 
 Misc:
 
-- Update `CHANGELOG.md` automatically by GitHub Actions ([#279](https://github.com/MakeNowJust-Labo/recheck/pull/279), by [@MakeNowJust](https://github.com/MakeNowJust))
-- Handle SBT deps by renovate correctly ([#280](https://github.com/MakeNowJust-Labo/recheck/pull/280), by [@MakeNowJust](https://github.com/MakeNowJust))
-- Update scala-library, scala-reflect to 2.13.8 ([#281](https://github.com/MakeNowJust-Labo/recheck/pull/281), by [@MakeNowJust](https://github.com/MakeNowJust))
-- Add note section to ESLint plugin document ([#282](https://github.com/MakeNowJust-Labo/recheck/pull/282), by [@MakeNowJust](https://github.com/MakeNowJust))
+- [#279](https://github.com/MakeNowJust-Labo/recheck/pull/279) Update `CHANGELOG.md` automatically by GitHub Actions ([@MakeNowJust](https://github.com/MakeNowJust))
+- [#280](https://github.com/MakeNowJust-Labo/recheck/pull/280) Handle SBT deps by renovate correctly ([@MakeNowJust](https://github.com/MakeNowJust))
+- [#281](https://github.com/MakeNowJust-Labo/recheck/pull/281) Update scala-library, scala-reflect to 2.13.8 ([@MakeNowJust](https://github.com/MakeNowJust))
+- [#282](https://github.com/MakeNowJust-Labo/recheck/pull/282) Add note section to ESLint plugin document ([@MakeNowJust](https://github.com/MakeNowJust))
 
 # 4.2.2 (2022-01-14)
 
