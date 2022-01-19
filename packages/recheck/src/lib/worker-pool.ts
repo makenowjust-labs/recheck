@@ -18,7 +18,6 @@ type Ref = {
 
 /** WorkerPool is a pool of checker workers. */
 export class WorkerPool {
-
   /** A maximum upper limit of running workers. */
   private readonly maxWorkerSize: number;
 
