@@ -14,11 +14,14 @@ jest.mock("./lib/native");
 beforeEach(() => {
   jest.setTimeout(30 * 1000);
   main.__mock__.agent = undefined;
+  main.__mock__.pool = null;
 });
 
 afterEach(() => {
   main.__mock__.agent?.kill();
   main.__mock__.agent = undefined;
+  main.__mock__.pool?.kill();
+  main.__mock__.pool = null;
 });
 
 test("check: auto (java)", async () => {
@@ -34,7 +37,7 @@ test("check: auto (java)", async () => {
   expect(ensure).toHaveBeenCalled();
 });
 
-test("check: auto (pure)", async () => {
+test("check: auto (fallback)", async () => {
   const backend = jest.spyOn(env, "RECHECK_BACKEND");
   backend.mockReturnValueOnce("auto");
   const javaEnsure = jest.spyOn(java, "ensure");
@@ -48,7 +51,7 @@ test("check: auto (pure)", async () => {
   expect(nativeEnsure).toHaveBeenCalled();
 });
 
-test("check: auto (pure, error)", async () => {
+test("check: auto (fallback, error)", async () => {
   const backend = jest.spyOn(env, "RECHECK_BACKEND");
   backend.mockReturnValueOnce("auto");
   const javaEnsure = jest.spyOn(java, "ensure");
@@ -111,6 +114,14 @@ test("check: native (2)", async () => {
   );
 });
 
+test("check: worker", async () => {
+  const backend = jest.spyOn(env, "RECHECK_BACKEND");
+  backend.mockReturnValueOnce("worker");
+
+  const diagnostics = await main.check("^(a|a)+$", "");
+  expect(diagnostics.status).toBe("vulnerable");
+});
+
 test("check: pure", async () => {
   const backend = jest.spyOn(env, "RECHECK_BACKEND");
   backend.mockReturnValueOnce("pure");
@@ -119,7 +130,7 @@ test("check: pure", async () => {
   expect(diagnostics.status).toBe("vulnerable");
 });
 
-test("check: pure", async () => {
+test("check: invalid", async () => {
   const backend = jest.spyOn(env, "RECHECK_BACKEND");
   backend.mockReturnValueOnce("invalid" as any);
 

@@ -13,8 +13,8 @@
   "scripts": {
     "build": "node -r esbuild-register ./scripts/build.ts",
     "clean": "rimraf lib",
-    "format": "prettier -w *.{json,md} src/**/*.ts",
-    "lint": "prettier --list-different *.{json,md} src/**/*.ts",
+    "format": "prettier -w *.{json,md} {scripts,src}/**/*.ts",
+    "lint": "prettier --check *.{json,md} {scripts,src}/**/*.ts",
     "test": "jest",
     "typecheck": "tsc --noEmit -p ."
   },

@@ -1,4 +1,4 @@
-export type Backend = "auto" | "java" | "native" | "pure";
+export type Backend = "auto" | "java" | "native" | "worker" | "pure";
 
 /** Returns `RECHECK_BACKEND` environment variable value, or `'auto'` as the default. */
 export const RECHECK_BACKEND: () => Backend = () =>

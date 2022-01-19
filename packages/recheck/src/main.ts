@@ -3,13 +3,21 @@ import * as env from "./lib/env";
 import * as java from "./lib/java";
 import * as native from "./lib/native";
 import * as pure from "./lib/pure";
+import { WorkerPool } from "./lib/worker-pool";
 
 import type { Diagnostics, HasAbortSignal, Parameters } from "..";
 import type { Agent } from "./lib/agent";
 
-/** Exposes this to mock `agent`. */
-export const __mock__: { agent: Agent | null | undefined } = {
+/** A collection of variables to mock. */
+type Mock = {
+  agent: Agent | null | undefined;
+  pool: WorkerPool | null;
+};
+
+/** Exposes this to mock `agent` and `pool`. */
+export const __mock__: Mock = {
   agent: undefined,
+  pool: null,
 };
 
 /** `check` implementation. */
@@ -51,6 +59,11 @@ export async function check(
         __mock__.agent = await native.ensure();
       }
       break;
+    case "worker":
+      if (__mock__.pool === null) {
+        __mock__.pool = new WorkerPool(1);
+      }
+      return __mock__.pool.check(source, flags, params);
     case "pure":
       return pure.check(source, flags, params);
     default:
@@ -62,10 +75,14 @@ export async function check(
     if (backend !== "auto") {
       throw new Error("there is no available implementation");
     }
-    return pure.check(source, flags, params);
+
+    if (__mock__.pool === null) {
+      __mock__.pool = new WorkerPool(1);
+    }
+    return __mock__.pool.check(source, flags, params);
   }
 
-  return checkAgent(agent!, source, flags, params);
+  return checkAgent(agent, source, flags, params);
 }
 
 export const checkSync = pure.check;
