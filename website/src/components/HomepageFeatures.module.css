@@ -1,0 +1,23 @@
+.features {
+  display: flex;
+  align-items: center;
+  padding: 2rem 0;
+  width: 100%;
+}
+
+.featureSvg {
+  height: 100px;
+  width: 100px;
+}
+
+.featureSvgGears path {
+  fill: var(--ifm-color-info);
+}
+
+.featureSvgMagicWandSparkles path {
+  fill: var(--ifm-color-warning);
+}
+
+.featureSvgBookOpen path {
+  fill: var(--ifm-color-danger);
+}

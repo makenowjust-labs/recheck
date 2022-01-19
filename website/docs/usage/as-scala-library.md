@@ -1,0 +1,74 @@
+---
+id: as-scala-library
+title: As Scala Library
+---
+
+Describes how to use `recheck` as a Scala library.
+
+## Install
+
+To install the Scala library of `recheck`, you should append the following line into your `build.sbt`.
+
+```scala title="build.sbt"
+libraryDependencies += "codes.quine.labo" %% "recheck-core" % "<latest version>"
+```
+
+## Usage
+
+`ReDoS.check` is the only entry point for checking the vulnerability of regular expression.
+
+```scala
+import codes.quine.labo.recheck.ReDoS
+
+ReDoS.check("^(a|a)*$", "")
+```
+
+The first argument of `ReDoS.check` is the `source` which is corresponding to [`RegExp.prototype.source`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/source).
+And, the second argument is the `flags` which is corresponding to [`RegExp.prototype.flags`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/flags) too.
+The third argument is the `params` to specify parameters for the checker behavior, and the fourth is the `token` to cancel the checking in the middle.
+
+:::info
+
+See [this page](parameters.md) for detailed information on `Parameters` value.
+
+:::
+
+The result of `ReDoS.check` is called `Diagnostics`.
+`Diagnostics` is a `sealed class`, and it has three child classes.
+
+- `Diagnostics.Safe` means the given regular expression seems safe at least in this checking.
+- `Diagnostics.Vulnerable` means vulnerability in the given regular expression is found.
+- `Diagnostics.Unknown` means something wrong happened in checking (timeout, cancel, or error).
+
+:::info
+
+See [this page](diagnostics.md) for detailed information on `Diagnostics` value.
+
+:::
+
+### Cancel
+
+The fourth argument of `ReDoS.check` is used to cancel the checking in the middle.
+This type is `CancellationToken` which is created by `CancellationTokenSource`.
+Noting that `ReDoS.check` blocks the process, you should use this with concurrent libraries like `scala.concurrent`or `[cats-effect](https://typelevel.org/cats-effect/)`.
+
+The following example is usage with `cats-effect`.
+
+```scala
+import codes.quine.labo.recheck.ReDoS
+import codes.quine.labo.recheck.common.CancellationTokenSource
+import codes.quine.labo.recheck.common.Parameters
+
+import scala.concurrent._
+import cats.effect._
+import cats.implicits._
+
+def cancelableCheck(source: String, flags: String)(implicit ec: ExecutionContext): IO[Diagnostics] =
+  IO.cancelable { cb =>
+    val source = new CancellationTokenSource
+    ec.run(() => {
+      cb(Right(ReDoS.check(source, flags, Parameters(), Some(source.token)))
+    })
+    IO(source.cancel()).void
+  }
+```

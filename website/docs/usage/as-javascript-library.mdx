@@ -1,0 +1,184 @@
+---
+id: as-javascript-library
+title: As JavaScript Library
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Describes how to use `recheck` as a JavaScript/TypeScript library.
+
+## Install
+
+The NPM package of `recheck` is named `recheck` simply. You can install the package with the following command.
+
+<Tabs>
+<TabItem value="npm" label="NPM">
+
+```bash
+npm install recheck
+```
+
+</TabItem>
+<TabItem value="yarb" label="Yarn">
+
+```bash
+yarn add recheck
+```
+
+</TabItem>
+</Tabs>
+
+Finished the installation, you are going to play with the `recheck`. 
+
+## Usage
+
+`recheck` exposes two methods: `check` and `checkSync`.
+`check` is an asynchronous version of the entry point of this library.
+`checkSync` is similar to `check`, but it is the synchronous version.
+As stated below, `check` invokes the external CLI command as backend if possible, so it is faster and more useful than the `checkSync`,
+thus we recommend using the `check`.
+
+See the below TypeScript API definition (The entire `d.ts` file is [here](https://github.com/MakeNowJust-Labo/recheck/blob/main/packages/recheck/index.d.ts)).
+
+```tsx
+export function check(
+  source: string,
+  flags: string,
+  params?: Parameters & HasAbortSignal,
+): Promise<Diagnostics>;
+
+export function checkSync(
+  source: string,
+  flags: string,
+  params?: Parameters,
+): Diagnostics;
+```
+
+The first argument `source` is a source string of `RegExp` (corresponding to [`RegExp.prototype.source`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/source) in JavaScript).
+And, the second argument `flags` is a flags string of `RegExp` (corresponding to [`RegExp.prototype.flags`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/flags) in JavaScript too).
+The third optional argument `params` is an object of parameters to specify checker behavior.
+
+To check the ReDoS vulnerability in `/^(a|a)*$/`, then you should use this library in such a following way.
+
+```tsx
+import { check } from 'recheck';
+
+await check('^(a|a)*$', '');
+```
+
+:::info
+
+See [this page](parameters.md) for detailed information on `Parameters` value.
+
+:::
+
+The result value of the `check` is called `Diagnostics`.
+Though it has many fields, the most important one is `status`. This field takes one of the three values.
+
+- `'safe'` means the given regular expression seems safe at least in this checking.
+- `'vulnerable'` means vulnerability in the given regular expression is found.
+- `'unknown'` means something wrong happened in checking (timeout, cancel, or error).
+
+:::info
+
+See [this page](diagnostics.md) for detailed information on `Diagnostics` value.
+
+:::
+
+### Cancel
+
+The third argument `check` has the `HasAbortSignal` type. This type has the following signature.
+
+```tsx
+export type HasAbortSignal = {
+  signal?: AbortSignal;
+};
+```
+
+`AbortSignal` is the standard Web API to abort some operations (If you don’t know this, please see [the MDN document](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal).) You can use this like in the standard way.
+
+```tsx
+import { check } from 'recheck';
+
+const controller = new AbortController();
+const signal = controller.signal;
+
+const sleep = (ms: number) =>
+  new Promise(resolve => setTimeout(resolve, ms));
+
+// Aborts `check` after 100 ms if it is not finished.
+await Promise.all([
+  check('^a+a+$', '', { signal }),
+  sleep(100).then(() => controller.abort()),
+]);
+```
+
+:::caution
+
+There is the `timeout` parameter to specify timeout seconds.
+Please use this instead of the manual way.
+
+:::
+
+:::note
+
+The `signal` parameter works only on the external CLI command backend.
+If you use pure JavaScript backend or for the same reason synchronous API, the `signal` parameter is ignored simply.
+
+:::
+
+## Backend
+
+The JavaScript library is just a wrapper for the `recheck` CLI and Scala.js build. You can specify the backend via the `RECHECK_BACKEND` environment variable. There are four options to the `RECHECK_BACKEND` value.
+
+- `RECHECK_BACKEND=auto` (default)
+
+  Tries `native` and `java` backends sequentially.
+  If there is a possible backend, it uses this. Otherwise, it uses `pure` backend as a fallback.
+
+- `RECHECK_BACKEND=native`
+
+  Uses the Graal `native-image` build contained by `recheck-${os}-${arch}` package. When the platform is not supported, it will be failed.
+  The following table shows supported platforms.
+
+  | package name        | OS      | CPU    |
+  | ------------------- | ------- | ------ |
+  | recheck-linux-x64   | Linux   | x86-64 |
+  | recheck-macos-x64   | macOS   | x86-64 |
+  | recheck-windows-x64 | Windows | x86-64 |
+
+  You can specify the binary path via the `RECHECK_BIN` environment variable manually.
+
+- `RECHECK_BACKEND=java`
+
+  Uses the JAR build contained by the `recheck-jar` package with the `java` command. When the system does not have the `java` command, it will be failed.
+
+  This backend is a bit slow for starting up, but the checking time is expected to be faster than other backends if the process lives a long time.
+
+  You can specify the archive path via the `RECHECK_JAR` environment variable manually.
+
+- `RECHECK_BACKEND=pure`
+
+  Uses the Scala.js build embedded in the `recheck` package. This is the last resort backend. We expect this backend works everywhere.
+
+The `java` and `native` backends are the external CLI command backend. They have some better features than the `pure` backend.
+
+- Supports the `signal` parameter to cancel checking.
+- Supports recall validation.
+- Checks in true asynchronous. Although the `pure` backend has asynchronous API, it blocks the process, unfortunately.
+- Works with multiple threads. On the external CLI command backend, it can check multiple regular expressions at once.
+
+:::note
+
+The synchronous API `checkSync` works on the `pure` backend at any time.
+
+:::
+
+## Use on Browser
+
+`recheck` package supports the browser environment of course. However, it only supports the `pure` backend due to browser limitations.
+
+The bundle for browsers is named `browser.js` in the `recheck` package, and `package.json` has the `browser` field. Most bundlers (`webpack`, `rollup`, `parcel`, etc) support this field, but additional configurations may be needed.
+
+If you want to work `recheck` in asynchronous on browser, [Web Workers API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API) may help you.

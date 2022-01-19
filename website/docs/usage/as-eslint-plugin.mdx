@@ -1,0 +1,167 @@
+---
+id: as-eslint-plugin
+title: As ESLint Plugin
+---
+
+Describes how to use `recheck` as an ESLint plugin.
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+## Install
+
+The ESLint plugin package is named `eslint-plugin-redos`.
+You can install the package with the following command.
+
+<Tabs>
+<TabItem value="npm" label="NPM">
+
+```bash
+npm install --save-dev eslint-plugin-redos
+```
+
+</TabItem>
+<TabItem value="yarb" label="Yarn">
+
+```bash
+yarn add --dev eslint-plugin-redos
+```
+
+</TabItem>
+</Tabs>
+
+:::note
+
+Because it is just an ESLint plugin, you should install `eslint` package of course.
+
+:::
+
+## Usage
+
+To enable the plugin, you should add such a following configuration to your `.eslintrc.json` for example.
+
+```json title=".eslintrc.json"
+{
+  "plugins": ["redos"],
+  "rules": {
+    "redos/no-vulnerable": "error"
+  }
+}
+```
+
+This plugin contains the only rule `redos/no-vulnerable`.
+
+:::note
+
+[`recheck`](https://makenowjust-labo.github.io/recheck) is a ReDoS vulnerability checker used by this plugin.
+It is very optimized and fast enough, however it takes seconds in some cases.
+This time is essential because ReDoS detection is not so easy problem in computer science.
+
+Therefore, to reduce unnecessary computation time, we recommend adding such a following settings.
+
+```json title=".eslintrc.json"
+{
+  "plugins": ["redos"],
+  "rules": {
+    "redos/no-vulnerable": "error"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.js"],
+      "rules": {
+        "redos/no-vulnerable": "off"
+      }
+    }
+  ]
+}
+```
+
+The above settings disables the `redos/no-vulnerable` rule against test files.
+Since ReDoS vulnerabilities in test codes are not critical problems, it will be no problem in many cases.
+
+Alternatively, you can use rules that use lightweight (but imperfect) analysis methods such as [`regexp/no-super-linear-backtracking`](https://ota-meshi.github.io/eslint-plugin-regexp/rules/no-super-linear-backtracking.html) included in `eslint-plugin-regexp` during development,
+and use this plugin in CI.
+
+:::
+
+### Examples
+
+:-1: Examples of **incorrect** code for this rule:
+
+```jsx
+/*eslint redos/no-vulnerable: "error"*/
+
+// Exponential times backtracking examples:
+/^(a*)*$/;
+/^(a|a)*$/;
+/^(a|b|ab)*$/;
+
+// Polynomial times backtracking examples:
+/^a*a*$/;
+/^[\s\u200c]+|[\s\u200c]+$/; // See https://stackstatus.net/post/147710624694/outage-postmortem-july-20-2016.
+```
+
+:+1: Examples of **correct** code for this rule:
+
+```jsx
+/*eslint redos/no-vulnerable: "error"*/
+
+// Fixed times backtracking examples:
+/^a$/;
+/^foo$/;
+
+// Linear times backtracking examples;
+/foo/;
+/(a*)*/;
+```
+
+### Options
+
+The following is the default configuration.
+
+```json
+{
+  "redos/no-vulnerable": [
+    "error",
+    {
+      "ignoreErrors": true,
+      "permittableComplexities": [],
+      "timeout": 10000,
+      "checker": "auto"
+    }
+  ]
+}
+```
+
+#### `ignoreErrors`
+
+This flag is used to determine to ignore errors on ReDoS vulnerable detection.
+
+Errors on ReDoS vulnerable detection are:
+
+- the pattern is invalid.
+- the pattern is not supported.
+- checking is timeout.
+
+They are ignored because they are noisy usually.
+
+#### `permittableComplexity`
+
+This array option controls permittable matching complexity. It allows the following values.
+
+- `'polynomial'`
+- `'exponential'`
+
+We strongly recommend considering `'polynomial'` matching complexity RegExp as ReDoS vulnerable. However, this option can disable it.
+
+#### `timeout`
+
+This option specifies a time-out limit for ReDoS analyzing. A time unit is milliseconds. If `null` is specified, it means unlimited time-out.
+
+The default value is `10000` (10 seconds).
+
+#### `checker`
+
+This option specifies a checker name to use. It is one of `'auto'`, `'automaton'` and `'fuzz'`.
+
+The default value is `'auto'`.
