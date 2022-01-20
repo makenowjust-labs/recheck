@@ -6,7 +6,7 @@
   "homepage": "https://makenowjust-labo.github.io/recheck/",
   "repository": "https://github.com/MakeNowJust-Labo/recheck.git",
   "version": "0.0.0-dev",
-  "main": "lib/main.js",
+  "main": "index.js",
   "browser": "lib/browser.js",
   "types": "index.d.ts",
   "keywords": [
@@ -18,15 +18,17 @@
   "scripts": {
     "build": "node -r esbuild-register ./scripts/build.ts",
     "clean": "rimraf lib",
-    "format": "prettier -w '*.{js,json,md}' 'src/**/*.{js,ts}' index.d.ts",
-    "lint": "prettier --list-different '*.{js,json,md}' 'src/**/*.{js,ts}' index.d.ts",
+    "format": "prettier -w '*.{js,json,md}' '{scripts,src}/**/*.{js,ts}' index.d.ts",
+    "lint": "prettier --check '*.{js,json,md}' '{scripts,src}/**/*.{js,ts}' index.d.ts",
     "test": "jest",
     "typecheck": "tsc --noEmit -p ."
   },
   "files": [
     "lib",
-    "index.d.ts"
+    "index.d.ts",
+    "index.js"
   ],
+  "sideEffects": false,
   "optionalDependencies": {
     "recheck-jar": "0.0.0-dev",
     "recheck-linux-x64": "0.0.0-dev",

@@ -179,28 +179,31 @@ export async function start(
   });
 }
 
+/** Checks a given regular expression on the `agent`. */
 export async function check(
   agent: Agent,
   source: string,
   flags: string,
   params: Parameters & HasAbortSignal = {}
 ): Promise<Diagnostics> {
-  // Drops `signal` parameter from `params`.
-  const signal = params.signal ?? null;
+  const newParams = { ...params };
+
+  // Drops `signal` parameter from `newParams`.
+  const signal = newParams.signal ?? null;
   if (signal) {
-    delete params.signal;
+    delete newParams.signal;
   }
 
-  // Drops `logger` parameter from `params`.
-  const logger = params.logger ?? null;
+  // Drops `logger` parameter from `newParams`.
+  const logger = newParams.logger ?? null;
   if (logger) {
-    params.logger = {} as any;
+    newParams.logger = {} as any;
   }
 
   // Sends `'check'` method request.
   const { id, promise } = agent.request(
     "check",
-    { source, flags, params },
+    { source, flags, params: newParams },
     logger
   );
 

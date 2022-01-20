@@ -1,8 +1,17 @@
-module.exports = {
-  roots: ["<rootDir>/src"],
-  testMatch: ["**/?(*.)+(spec|test).+(js|ts|tsx)"],
-  transform: {
-    "^.+\\.(js|ts|tsx)$": ["esbuild-jest", { sourcemap: true }],
-  },
-  coverageProvider: "v8",
-};
+// @ts-check
+
+module.exports =
+  /** @type {import('@jest/types').Config} */
+  ({
+    roots: ["<rootDir>/src"],
+    testMatch: ["**/?(*.)test.+(js|ts)"],
+    moduleNameMapper: {
+      ".*/worker$": "<rootDir>/src/lib/__test__/test-worker.js",
+    },
+    transform: {
+      "\\.(?:js|ts)$": ["esbuild-jest", { sourcemap: true }],
+    },
+    coverageProvider: "v8",
+    coveragePathIgnorePatterns: ["/node_modules/", "/__test__/"],
+    verbose: true,
+  });
