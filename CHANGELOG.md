@@ -1,5 +1,9 @@
 # dev
 
+New Features:
+
+- [#289](https://github.com/MakeNowJust-Labo/recheck/pull/289) Add `worker` backend to the NPM package ([@MakeNowJust](https://github.com/MakeNowJust))
+
 Changes:
 
 - [#283](https://github.com/MakeNowJust-Labo/recheck/pull/283) Rename `hybrid` to `auto` ([@MakeNowJust](https://github.com/MakeNowJust))
