@@ -10,21 +10,21 @@
   },
   "dependencies": {
     "@docusaurus/core": "2.0.0-beta.14",
-    "@docusaurus/module-type-aliases": "^2.0.0-beta.14",
-    "@docusaurus/plugin-ideal-image": "^2.0.0-beta.14",
+    "@docusaurus/module-type-aliases": "2.0.0-beta.14",
+    "@docusaurus/plugin-ideal-image": "2.0.0-beta.14",
     "@docusaurus/preset-classic": "2.0.0-beta.14",
-    "@mdx-js/react": "^1.6.21",
-    "@tsconfig/docusaurus": "^1.0.4",
-    "clsx": "^1.1.1",
+    "@mdx-js/react": "1.6.22",
+    "@tsconfig/docusaurus": "1.0.4",
+    "clsx": "1.1.1",
     "hast-util-is-element": "1.1.0",
-    "prism-react-renderer": "^1.2.1",
-    "react": "^17.0.1",
-    "react-dom": "^17.0.1",
-    "react-hook-form": "^7.24.2",
-    "react-loading": "^2.0.3",
+    "prism-react-renderer": "1.2.1",
+    "react": "17.0.2",
+    "react-dom": "17.0.2",
+    "react-hook-form": "7.24.2",
+    "react-loading": "2.0.3",
     "recheck": "0.0.0-dev",
-    "rehype-katex": "4",
-    "remark-math": "3"
+    "rehype-katex": "4.0.0",
+    "remark-math": "3.0.1"
   },
   "browserslist": {
     "production": [
