@@ -1,0 +1,95 @@
+---
+id: background
+title: Background on Automata Theory
+---
+
+import Image from "@theme/IdealImage";
+
+Describies the background knowlede on automata theory.
+
+## Ambiguity of Regular Expression
+
+Before the discussion on the matching time complexity of regular expression, we recall the ambiguity of regular expression. Inaccurately speaking, a regular expression is ambiguous if there are multiple matching processes for one string. For example, `/^(a|ab)(bc|c)$/` is ambiguous because there are two matching processes for the string `'abc'`.
+
+Of course, the fact that a regular expression is ambiguous does not immediately mean that it is ReDoS vulnerable. Even in the previous example, it is obvious that the matching time will not explode because it has only finite ambiguity. However, there is a deep relationship between ReDoS vulnerability and ambiguity of regular expression.
+
+Let's enclose an ambiguous regular expression with a repetition quantifier. For example, `/^((a|ab)(bc|c))*$/`. Now, the regular expression is ReDoS vulnerable. Specifically, giving the string `'abc'.repeat(30) + 'a'` can invoke a very long matching time. In fact, the matching time complexity of the regular expression is exponential.
+
+In other words, for a regular expression to be ReDoS vulnerable, it is important that the regular expression has partially infinite ambiguity. And, it involves repetition and ambiguity of regular expression.
+
+## EDA and IDA
+
+From now on, we will proceed with NFA which is equivalent to the regular expression. However, we assume that the NFA is converted to reflect the regular expression structure exactly. (Think of the NFA constructed by Thompson construction without any determinization or minimization.)
+
+The ambiguity of a regular expression means that there are multiple ways to transition from one state to another in a given string on the NFA.
+
+<p className="text--center">
+  <Image
+    img={require("/img/docs/internals/background/ambiguous-transition.png")}
+    max={400}
+    width="400px"
+  />
+</p>
+
+Suppose that the ambiguous transition is in a loop of the NFA transition diagram. In this case, there are two transitions to return to the same state with the same string $w$, as shown in the following figure. This means that the regular expression has infinite ambiguity. The reason is that for a string $w^n$ with $w$ in $n$ order, there are $2^n$ ways to transition, depending on whether it chooses the above or the bottom transition for each $w$.
+
+<p className="text--center">
+  <Image
+    img={require("/img/docs/internals/background/eda.png")}
+    max={300}
+    width="300px"
+  />
+</p>
+
+Such a structure in the transition diagram of NFA is called EDA (Exponential Degree Ambiguity) structure, and it is the cause of cases where the matching time becomes exponential.
+
+It is not only in the presence of EDA that regular expressions have infinite ambiguity. Suppose that there is an ambiguous transition across two loops, as shown in the following figure. In other words, the same string $w$ can transition around the first loop and the next loop, and can also transition between the first states of the two loops.
+
+<p className="text--center">
+  <Image
+    img={require("/img/docs/internals/background/ida.png")}
+    max={500}
+    width="500px"
+  />
+</p>
+
+In this case, for the string $w^n$, there are $n$ transitions between the two loops with $w$, so there are $n$ different ways to transition. This also means that the regular expression has infinite ambiguity.
+
+Such a structure in the transition diagram of NFA is called IDA (Infinite Degree Ambiguity) structure, and it is the cause of cases where the matching time is polynomial of the second or higher degree.
+
+As a matter of fact, we can state the following theorems on EDA and IDA structures [[1]](#ref-wustholz-2017).
+
+:::info Theorem (EDA necessiity and sufficiency)
+
+The worst-case matching time complexity of a regular expression is exponential, if and only if, there exists an EDA structure in the NFA equivalent to the regular expression.
+
+:::
+
+:::info Theorem (IDA necessiity and sufficiency)
+
+The worst-case matching time complexity of a regular expression is polynomial of the second or higher degree, if and only if, there exists an IDA structure in the NFA equivalent to the regular expression.
+
+:::
+
+From these theorems, we can conclude that the detection of ReDoS vulnerabilities based on automata theory is to find EDA and IDA structures in equivalent NFA.
+
+## Notes
+
+- The practical regular expression has matching precedence. To handle this correctly, we can use tree transducers with regular look-ahead [[2]](#ref-sugiyama-2014).
+- In order to efficiently search for EDA and IDA structures from transition diagrams, it is useful to perform strongly connected component decomposition using pairs of states [[3]](#ref-weber-1991).
+
+## References
+
+- <a id="ref-wustholz-2017">[1]</a> Wüstholz, Valentin, et al. "Static detection
+  of DoS vulnerabilities in programs that use regular expressions." <em>
+    International Conference on Tools and Algorithms for the Construction and
+    Analysis of Systems
+  </em>
+  . Springer, Berlin, Heidelberg, 2017.
+- <a id="ref-sugiyama-2014">[2]</a> Sugiyama, Satoshi, and Yasuhiko Minamide. "Checking
+  time linearity of regular expression matching based on backtracking." <em>
+    Information and Media Technologies
+  </em> 9.3 (2014): 222-232.
+- <a id="ref-weber-1991">[3]</a> Weber, Andreas, and Helmut Seidl. "On the degree
+  of ambiguity of finite automata." <em>Theoretical Computer Science</em> 88.2 (1991):
+  325-349.

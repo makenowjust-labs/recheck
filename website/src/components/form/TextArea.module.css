@@ -1,0 +1,16 @@
+.textArea {
+  display: block;
+  max-width: 100%;
+  min-width: 100%;
+  padding: var(--ifm-global-spacing);
+  resize: vertical;
+  font-family: var(--ifm-font-family-monospace);
+  border: 1px solid;
+  border-radius: var(--ifm-global-radius);
+  background: var(--ifm-code-background);
+}
+
+.textArea:focus {
+  outline: none;
+  border-color: var(--ifm-color-info);
+}

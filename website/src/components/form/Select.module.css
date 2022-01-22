@@ -1,0 +1,44 @@
+.select {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  width: 100%;
+  z-index: 1;
+  background: var(--ifm-code-background);
+  border: 1px solid;
+  border-radius: var(--ifm-global-radius);
+  height: 2.5em;
+  vertical-align: top;
+}
+
+.select::after {
+  position: absolute;
+  content: "";
+  width: 0.5em;
+  height: 0.5em;
+  right: 0.8em;
+  top: 50%;
+  transform: translateY(-50%) rotate(45deg);
+  border-bottom: 2px solid;
+  border-right: 2px solid;
+  z-index: -1;
+}
+
+.selectSelect {
+  appearance: none;
+  -moz-appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: none;
+  display: block;
+  font-size: 1em;
+  max-width: 100%;
+  width: 100%;
+  cursor: pointer;
+  height: 2.5em;
+  line-height: 1.5;
+  font-size: 1em;
+  padding: 0.5em 0.75em;
+  padding-right: 2em;
+  position: relative;
+}

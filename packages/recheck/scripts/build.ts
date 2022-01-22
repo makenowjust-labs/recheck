@@ -32,10 +32,10 @@ const inlineWorkerPlugin: Plugin = {
         ...initialOptions,
         entryPoints: [args.path],
         inject: [`src/inject/worker-${initialOptions.platform}.ts`],
-        format: "cjs",
+        format: "iife",
         write: false,
         plugins: plugins?.filter((plugin) => plugin !== inlineWorkerPlugin),
-        sourcemap: "inline",
+        sourcemap: isProduction ? false : "inline",
       });
       const workerCode = result.outputFiles![0].text;
 
@@ -75,7 +75,7 @@ const main = async () => {
     entryPoints: ["src/browser.ts"],
     bundle: true,
     minify: isProduction,
-    format: "esm",
+    format: "cjs",
     logLevel: "error",
     platform: "browser",
     plugins: [makeAllPackagesExternalPlugin, inlineWorkerPlugin],

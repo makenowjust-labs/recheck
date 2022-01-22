@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="800" height="800" viewBox="0 0 800 800">
+	<path fill="#F55D5D" fill-opacity="0.87450981" d="M0 0L0 800L100 700L0 0Z"/>
+	<path fill="#F55D5D" fill-opacity="0.74901962" d="M0 0L100 700L200 600L0 0Z"/>
+	<path fill="#F55D5D" fill-opacity="0.62352943" d="M0 0L200 600L300 500L0 0Z"/>
+	<path fill="#F55D5D" fill-opacity="0.50196081" d="M0 0L300 500L400 400L0 0Z"/>
+	<path fill="#F55D5D" fill-opacity="0.3764706" d="M0 0L400 400L500 300L0 0Z"/>
+	<path fill="#F55D5D" fill-opacity="0.25098041" d="M0 0L500 300L600 200L0 0Z"/>
+	<path fill="#F55D5D" fill-opacity="0.1254902" d="M0 0L600 200L700 100L0 0Z"/>
+	<path fill="#F55D5D" fill-opacity="0.87450981" d="M800 800L800 0L700 100L800 800Z"/>
+	<path fill="#F55D5D" fill-opacity="0.74901962" d="M800 800L700 100L600 200L800 800Z"/>
+	<path fill="#F55D5D" fill-opacity="0.62352943" d="M800 800L600 200L500 300L800 800Z"/>
+	<path fill="#F55D5D" fill-opacity="0.50196081" d="M800 800L500 300L400 400L800 800Z"/>
+	<path fill="#F55D5D" fill-opacity="0.3764706" d="M800 800L400 400L300 500L800 800Z"/>
+	<path fill="#F55D5D" fill-opacity="0.25098041" d="M800 800L300 500L200 600L800 800Z"/>
+	<path fill="#F55D5D" fill-opacity="0.1254902" d="M800 800L200 600L100 700L800 800Z"/>
+	<path fill="#F55D5D" fill-opacity="0.87450981" d="M400 0L0 400L100 400L400 0Z"/>
+	<path fill="#F55D5D" fill-opacity="0.74901962" d="M400 0L100 400L200 400L400 0Z"/>
+	<path fill="#F55D5D" fill-opacity="0.62352943" d="M400 0L200 400L300 400L400 0Z"/>
+	<path fill="#F55D5D" fill-opacity="0.50196081" d="M400 0L300 400L400 400L400 0Z"/>
+	<path fill="#F55D5D" fill-opacity="0.3764706" d="M400 0L400 400L500 400L400 0Z"/>
+	<path fill="#F55D5D" fill-opacity="0.25098041" d="M400 0L500 400L600 400L400 0Z"/>
+	<path fill="#F55D5D" fill-opacity="0.1254902" d="M400 0L600 400L700 400L400 0Z"/>
+	<path fill="#F55D5D" fill-opacity="0.87450981" d="M400 800L800 400L700 400L400 800Z"/>
+	<path fill="#F55D5D" fill-opacity="0.74901962" d="M400 800L700 400L600 400L400 800Z"/>
+	<path fill="#F55D5D" fill-opacity="0.62352943" d="M400 800L600 400L500 400L400 800Z"/>
+	<path fill="#F55D5D" fill-opacity="0.50196081" d="M400 800L500 400L400 400L400 800Z"/>
+	<path fill="#F55D5D" fill-opacity="0.3764706" d="M400 800L400 400L300 400L400 800Z"/>
+	<path fill="#F55D5D" fill-opacity="0.25098041" d="M400 800L300 400L200 400L400 800Z"/>
+	<path fill="#F55D5D" fill-opacity="0.1254902" d="M400 800L200 400L100 400L400 800Z"/>
+</svg>

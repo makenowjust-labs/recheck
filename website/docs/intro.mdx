@@ -1,0 +1,66 @@
+---
+id: intro
+title: Introduction
+---
+
+import Image from "@theme/IdealImage";
+
+## What is ReDoS vulnerability?
+
+A regular expression is the most known text processing utility for programmers.
+There are many tools to use regular expression: `grep`, `awk`, and `perl` for example.
+Besides, a regular expression is used for other fields than text processing: bioinformatics and security for example.
+There are two known ways to implement regular expression matching.
+One uses deterministic finite automaton (DFA), and another uses backtracking.
+Recent implementations like Go’s `regexp` or Rust’s `regex` use DFA like approach.
+However, implementations on many programming languages use the backtracking approach.
+
+When the regular expression matching is implemented based on the backtracking,
+it may take exponential or superlinear time complexity against an input string length.
+In other words, a short string may invoke a long matching time to a regular expression.
+See the following figure. It is a chart about the relation between matching times against `/^(a|a)*$/` and input string lengths.
+It shows extremely increasing matching time against input string length.
+
+<p className="text--center">
+  <Image
+    img={require("/img/docs/intro/exponential-chart.png")}
+    max={600}
+    width="600px"
+  />
+</p>
+
+[**ReDoS**](https://en.wikipedia.org/wiki/ReDoS) (_Regular expression Denials of Services_) is a computation complexity attack using this fact.
+In 2016, [StackOverflow downs due to ReDoS](https://stackstatus.net/post/147710624694/outage-postmortem-july-20-2016) for one example.
+It is caused by the regular expression to truncate whitespace in the front and the back of a string.
+In 2019, [Cloudflare downs due to ReDoS](https://blog.cloudflare.com/details-of-the-cloudflare-outage-on-july-2-2019/) for another example.
+This reason is the regular expression in WAF configuration.
+According to recent research [[1]](#ref-davis-2020), 10% of regular expressions of real uses have ReDoS vulnerability potentially.
+
+As seen above, ReDoS is one of the most important security concerns recently.
+And, the importance of checking ReDoS vulnerability statically is increasing.
+
+## What is `recheck`?
+
+`recheck` is a library to check ReDoS vulnerability in the given regular expression.
+Using `recheck`, you can find vulnerabilities in the given regular expression and can obtain an attack string to the vulnerability.
+
+The following is an incomplete list of `recheck` features.
+
+- Implements the state-of-the-art algorithm to detect ReDoS vulnerability.
+  The implementation contains fuzzing with static analysis, and criteria to decide which algorithm is better to use against a regular expression,
+  the algorithm based on automata theory or the fuzzing algorithm.
+- Supports practical regular expression including backreferences and look-around operations.
+  Especially, it follows ECMA-262 (as known as JavaScript) specification.
+- Integrated recall validation.
+  It can validate ReDoS vulnerability using the real interpreter when the candidate of the vulnerability is found.
+- Published as a library in JavaScript and Scala.
+  You can embed `recheck` into your application easily.
+- Provides ESLint plugin.
+  You can start to check ReDoS vulnerability for your application code in a minute.
+
+## References
+
+- <a id="ref-davis-2020">[1]</a> Davis, James Collins. <em>
+    On the Impact and Defeat of Regular Expression Denial of Service
+  </em>
+  . Diss. Virginia Tech, 2020.APA

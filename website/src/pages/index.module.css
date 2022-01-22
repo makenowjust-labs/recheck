@@ -1,0 +1,26 @@
+.heroBanner {
+  padding: 4rem 0;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.heroBannerText {
+  font-family: "Cutive Mono", monospace;
+}
+
+.heroBannerLogo {
+  width: 300px;
+  height: 300px;
+}
+
+@media screen and (max-width: 966px) {
+  .heroBanner {
+    padding: 2rem;
+  }
+
+  .heroBannerLogo {
+    width: 250px;
+    height: 250px;
+  }
+}
