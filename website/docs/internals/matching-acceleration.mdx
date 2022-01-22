@@ -3,7 +3,7 @@ id: matching-acceleration
 title: Matching VM Acceleration
 ---
 
-import Image from '@theme/IdealImage';
+import Image from "@theme/IdealImage";
 
 Describes how to accelerate regular expression matching.
 
@@ -25,8 +25,12 @@ When matching by NFA backtracking, if it memoizes the results from the confluenc
 
 :::
 
-<p style={{textAlign: "center"}}>
-  <Image img={require('/img/docs/internals/matching-acceleration/confluence.png')} max={300} width="300px" />
+<p style={{ textAlign: "center" }}>
+  <Image
+    img={require("/img/docs/internals/matching-acceleration/confluence.png")}
+    max={300}
+    width="300px"
+  />
 </p>
 
 By using this theorem, the time taken for regular expression matching can be made linear to the length of the input string in most cases. Furthermore, since it actually performs backtracking matching, it can mimic the behavior of exact backtracking by recording the number of times a character is read from the confluence until the matching fails, and adding it when it reaches the confluence again.
@@ -40,4 +44,8 @@ However, since the implementation of regular expression matching in `recheck` is
 
 # References
 
-- <a id="davis-2021">[1]</a> Davis, James C., Francisco Servant, and Dongyoon Lee. "Using selective memoization to defeat regular expression denial of service (ReDoS)." <em>2021 IEEE Symposium on Security and Privacy (SP), Los Alamitos, CA, USA</em>. 2021.
+- <a id="davis-2021">[1]</a> Davis, James C., Francisco Servant, and Dongyoon Lee.
+  "Using selective memoization to defeat regular expression denial of service (ReDoS)." <em>
+    2021 IEEE Symposium on Security and Privacy (SP), Los Alamitos, CA, USA
+  </em>
+  . 2021.

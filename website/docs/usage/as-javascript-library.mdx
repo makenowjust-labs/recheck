@@ -3,8 +3,8 @@ id: as-javascript-library
 title: As JavaScript Library
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
 
 Describes how to use `recheck` as a JavaScript/TypeScript library.
 
@@ -29,7 +29,7 @@ yarn add recheck
 </TabItem>
 </Tabs>
 
-Finished the installation, you are going to play with the `recheck`. 
+Finished the installation, you are going to play with the `recheck`.
 
 ## Usage
 
@@ -45,13 +45,13 @@ See the below TypeScript API definition (The entire `d.ts` file is [here](https:
 export function check(
   source: string,
   flags: string,
-  params?: Parameters & HasAbortSignal,
+  params?: Parameters & HasAbortSignal
 ): Promise<Diagnostics>;
 
 export function checkSync(
   source: string,
   flags: string,
-  params?: Parameters,
+  params?: Parameters
 ): Diagnostics;
 ```
 
@@ -62,9 +62,9 @@ The third optional argument `params` is an object of parameters to specify check
 To check the ReDoS vulnerability in `/^(a|a)*$/`, then you should use this library in such a following way.
 
 ```tsx
-import { check } from 'recheck';
+import { check } from "recheck";
 
-await check('^(a|a)*$', '');
+await check("^(a|a)*$", "");
 ```
 
 :::info
@@ -99,17 +99,16 @@ export type HasAbortSignal = {
 `AbortSignal` is the standard Web API to abort some operations (If you don’t know this, please see [the MDN document](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal).) You can use this like in the standard way.
 
 ```tsx
-import { check } from 'recheck';
+import { check } from "recheck";
 
 const controller = new AbortController();
 const signal = controller.signal;
 
-const sleep = (ms: number) =>
-  new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Aborts `check` after 100 ms if it is not finished.
 await Promise.all([
-  check('^a+a+$', '', { signal }),
+  check("^a+a+$", "", { signal }),
   sleep(100).then(() => controller.abort()),
 ]);
 ```

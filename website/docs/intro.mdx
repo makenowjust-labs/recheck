@@ -3,7 +3,7 @@ id: intro
 title: Introduction
 ---
 
-import Image from '@theme/IdealImage';
+import Image from "@theme/IdealImage";
 
 ## What is ReDoS vulnerability?
 
@@ -21,11 +21,15 @@ In other words, a short string may invoke a long matching time to a regular expr
 See the following figure. It is a chart about the relation between matching times against `/^(a|a)*$/` and input string lengths.
 It shows extremely increasing matching time against input string length.
 
-<p style={{textAlign: "center"}}>
-  <Image img={require('/img/docs/intro/exponential-chart.png')} max={600} width="600px" />
+<p style={{ textAlign: "center" }}>
+  <Image
+    img={require("/img/docs/intro/exponential-chart.png")}
+    max={600}
+    width="600px"
+  />
 </p>
 
-[**ReDoS**](https://en.wikipedia.org/wiki/ReDoS) (*Regular expression Denials of Services*) is a computation complexity attack using this fact.
+[**ReDoS**](https://en.wikipedia.org/wiki/ReDoS) (_Regular expression Denials of Services_) is a computation complexity attack using this fact.
 In 2016, [StackOverflow downs due to ReDoS](https://stackstatus.net/post/147710624694/outage-postmortem-july-20-2016) for one example.
 It is caused by the regular expression to truncate whitespace in the front and the back of a string.
 In 2019, [Cloudflare downs due to ReDoS](https://blog.cloudflare.com/details-of-the-cloudflare-outage-on-july-2-2019/) for another example.

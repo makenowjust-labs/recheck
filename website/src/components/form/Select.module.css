@@ -13,7 +13,7 @@
 
 .select::after {
   position: absolute;
-  content: '';
+  content: "";
   width: 0.5em;
   height: 0.5em;
   right: 0.8em;

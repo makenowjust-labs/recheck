@@ -3,7 +3,7 @@ id: criteria
 title: Criteria to Decide Algorithm
 ---
 
-import Image from '@theme/IdealImage';
+import Image from "@theme/IdealImage";
 
 Describes the criteria to decide which algorithm is better to use.
 
@@ -41,8 +41,12 @@ If it is likely to be detected correctly by the algorithm based on automata theo
 
 In practice, as shown in the following flowchart, the algorithm is assumed to be based on automata theory at first and performs NFA conversion, etc., and then falls back to the fuzzing if the size of the NFA exceeds the threshold.
 
-<p style={{textAlign: "center"}}>
-  <Image img={require('/img/docs/internals/criteria/criteria.png')} max={900} width="900px" />
+<p style={{ textAlign: "center" }}>
+  <Image
+    img={require("/img/docs/internals/criteria/criteria.png")}
+    max={900}
+    width="900px"
+  />
 </p>
 
 ## Notes

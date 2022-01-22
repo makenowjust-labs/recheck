@@ -3,9 +3,9 @@ id: background
 title: Background on Automata Theory
 ---
 
-import Image from '@theme/IdealImage';
+import Image from "@theme/IdealImage";
 
-Describies the background knowlede on automata theory. 
+Describies the background knowlede on automata theory.
 
 ## Ambiguity of Regular Expression
 
@@ -23,22 +23,34 @@ From now on, we will proceed with NFA which is equivalent to the regular express
 
 The ambiguity of a regular expression means that there are multiple ways to transition from one state to another in a given string on the NFA.
 
-<p style={{textAlign: "center"}}>
-  <Image img={require('/img/docs/internals/background/ambiguous-transition.png')} max={400} width="400px" />
+<p style={{ textAlign: "center" }}>
+  <Image
+    img={require("/img/docs/internals/background/ambiguous-transition.png")}
+    max={400}
+    width="400px"
+  />
 </p>
 
 Suppose that the ambiguous transition is in a loop of the NFA transition diagram. In this case, there are two transitions to return to the same state with the same string $w$, as shown in the following figure. This means that the regular expression has infinite ambiguity. The reason is that for a string $w^n$ with $w$ in $n$ order, there are $2^n$ ways to transition, depending on whether it chooses the above or the bottom transition for each $w$.
 
-<p style={{textAlign: "center"}}>
-  <Image img={require('/img/docs/internals/background/eda.png')} max={300} width="300px" />
+<p style={{ textAlign: "center" }}>
+  <Image
+    img={require("/img/docs/internals/background/eda.png")}
+    max={300}
+    width="300px"
+  />
 </p>
 
 Such a structure in the transition diagram of NFA is called EDA (Exponential Degree Ambiguity) structure, and it is the cause of cases where the matching time becomes exponential.
 
 It is not only in the presence of EDA that regular expressions have infinite ambiguity. Suppose that there is an ambiguous transition across two loops, as shown in the following figure. In other words, the same string $w$ can transition around the first loop and the next loop, and can also transition between the first states of the two loops.
 
-<p style={{textAlign: "center"}}>
-  <Image img={require('/img/docs/internals/background/ida.png')} max={500} width="500px" />
+<p style={{ textAlign: "center" }}>
+  <Image
+    img={require("/img/docs/internals/background/ida.png")}
+    max={500}
+    width="500px"
+  />
 </p>
 
 In this case, for the string $w^n$, there are $n$ transitions between the two loops with $w$, so there are $n$ different ways to transition. This also means that the regular expression has infinite ambiguity.
@@ -68,6 +80,16 @@ From these theorems, we can conclude that the detection of ReDoS vulnerabilities
 
 ## References
 
-- <a id="ref-wustholz-2017">[1]</a> Wüstholz, Valentin, et al. "Static detection of DoS vulnerabilities in programs that use regular expressions." <em>International Conference on Tools and Algorithms for the Construction and Analysis of Systems</em>. Springer, Berlin, Heidelberg, 2017.
-- <a id="ref-sugiyama-2014">[2]</a> Sugiyama, Satoshi, and Yasuhiko Minamide. "Checking time linearity of regular expression matching based on backtracking." <em>Information and Media Technologies</em> 9.3 (2014): 222-232.
-- <a id="ref-weber-1991">[3]</a> Weber, Andreas, and Helmut Seidl. "On the degree of ambiguity of finite automata." <em>Theoretical Computer Science</em> 88.2 (1991): 325-349.
+- <a id="ref-wustholz-2017">[1]</a> Wüstholz, Valentin, et al. "Static detection
+  of DoS vulnerabilities in programs that use regular expressions." <em>
+    International Conference on Tools and Algorithms for the Construction and
+    Analysis of Systems
+  </em>
+  . Springer, Berlin, Heidelberg, 2017.
+- <a id="ref-sugiyama-2014">[2]</a> Sugiyama, Satoshi, and Yasuhiko Minamide. "Checking
+  time linearity of regular expression matching based on backtracking." <em>
+    Information and Media Technologies
+  </em> 9.3 (2014): 222-232.
+- <a id="ref-weber-1991">[3]</a> Weber, Andreas, and Helmut Seidl. "On the degree
+  of ambiguity of finite automata." <em>Theoretical Computer Science</em> 88.2 (1991):
+  325-349.

@@ -3,7 +3,7 @@ id: fuzzing
 title: Fuzzing with Static Analysis
 ---
 
-import Image from '@theme/IdealImage';
+import Image from "@theme/IdealImage";
 
 Describes the fuzzing algorithm with static analysis.
 
@@ -15,8 +15,12 @@ One of the features of fuzzing is that [evolutionary computation](https://en.wik
 
 There is previous research by Shen et al [[1]](#ref-shen-2018). that used fuzzing to detect ReDoS. In Shen et al.'s research, fuzzing was performed in the following three steps. The implementation of `recheck` follows the same general flow, but the details are completely different.
 
-<p style={{textAlign: "center"}}>
-  <Image img={require('/img/docs/internals/fuzzing/flow.png')} max={800} width="800px" />
+<p style={{ textAlign: "center" }}>
+  <Image
+    img={require("/img/docs/internals/fuzzing/flow.png")}
+    max={800}
+    width="800px"
+  />
 </p>
 
 - Seeding is the step where the initial generation of the genetic algorithm is determined from the given regular expression.
@@ -35,8 +39,12 @@ Let's go back to the previous page and observe the EDA and IDA structures. You w
 - $q_1$ and $q_2$ can be transitioned with the same letter $b$.
 - $q_2$ can transition with the letter $a$.
 
-<p style={{textAlign: "center"}}>
-  <Image img={require('/img/docs/internals/fuzzing/ltp.png')} max={400} width="400px" />
+<p style={{ textAlign: "center" }}>
+  <Image
+    img={require("/img/docs/internals/fuzzing/ltp.png")}
+    max={400}
+    width="400px"
+  />
 </p>
 
 In a way, this pair of states is like a seed of IDA or EDA structure. Adding a repeated string on the string between these two states to the initial generation, we expect the fuzzing to efficiently increase the matching time.
@@ -48,11 +56,10 @@ The idea of statically analyzing regular expressions to obtain strings that may 
 <summary>Seeding with Dynamic Analysis (Legacy)</summary>
 
 This section briefly describes seeding using dynamic analysis, which was once used in `recheck`. This method can also be used by configuration.
-    
+
 In the dynamic analysis, we first input an empty string and record the characters that fail to match. Then, we append the character to the empty string and input it again, and again record the characters that fail to match. By repeating this process of matching and appending failed characters, the strings are collected so that they can be reached everywhere in the regular expression, which is the initial generation of the genetic algorithm.
 
 </details>
-
 
 ## Incubation
 
@@ -79,6 +86,18 @@ First, assuming that the matching time increases exponentially, we try to match 
 
 ## References
 
-- <a id="ref-shen-2018">[1]</a> Shen, Yuju, et al. "ReScue: crafting regular expression DoS attacks." <em>2018 33rd IEEE/ACM International Conference on Automated Software Engineering (ASE)</em>. IEEE, 2018.
-- <a id="ref-li-2021">[2]</a> Li, Yeting, et al. "ReDoSHunter: A Combined Static and Dynamic Approach for Regular Expression DoS Detection." <em>30th USENIX Security Symposium (USENIX Security 21)</em>. 2021.
-- <a id="ref-chida-2020">[3]</a> Chida, Nariyoshi, and Tachio Terauchi. "Automatic repair of vulnerable regular expressions." <em>arXiv preprint arXiv:2010.12450</em> (2020).
+- <a id="ref-shen-2018">[1]</a> Shen, Yuju, et al. "ReScue: crafting regular expression
+  DoS attacks." <em>
+    2018 33rd IEEE/ACM International Conference on Automated Software
+    Engineering (ASE)
+  </em>
+  . IEEE, 2018.
+- <a id="ref-li-2021">[2]</a> Li, Yeting, et al. "ReDoSHunter: A Combined Static
+  and Dynamic Approach for Regular Expression DoS Detection." <em>
+    30th USENIX Security Symposium (USENIX Security 21)
+  </em>
+  . 2021.
+- <a id="ref-chida-2020">[3]</a> Chida, Nariyoshi, and Tachio Terauchi. "Automatic
+  repair of vulnerable regular expressions." <em>
+    arXiv preprint arXiv:2010.12450
+  </em> (2020).
