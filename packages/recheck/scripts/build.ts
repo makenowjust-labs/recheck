@@ -35,7 +35,7 @@ const inlineWorkerPlugin: Plugin = {
         format: "iife",
         write: false,
         plugins: plugins?.filter((plugin) => plugin !== inlineWorkerPlugin),
-        sourcemap: "inline",
+        sourcemap: isProduction ? false : "inline",
       });
       const workerCode = result.outputFiles![0].text;
 
