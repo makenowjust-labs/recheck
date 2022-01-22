@@ -7,7 +7,7 @@ module.exports = function createWorker() {
       thread.on("message", (data) => callback({ data }));
     },
     postMessage(message) {
-      thread.postMessage(JSON.stringify(message));
+      thread.postMessage(message);
     },
     terminate() {
       thread.terminate();

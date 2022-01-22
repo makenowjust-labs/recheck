@@ -1,0 +1,13 @@
+.demoResultHotspotHeat {
+  color: var(--ifm-color-white);
+  background: var(--ifm-color-danger);
+}
+
+.demoResultHotspotNormal {
+  color: var(--ifm-color-white);
+  background: var(--ifm-color-warning);
+}
+
+.demoResultLoading {
+  display: inline-block;
+}

@@ -1,15 +1,16 @@
-import React from 'react';
 import clsx from 'clsx';
+import React from 'react';
+
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import useThemeContext from '@theme/hooks/useThemeContext';
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+
 import styles from './index.module.css';
 import HomepageFeatures from '../components/HomepageFeatures';
+import LogoLight from '../../static/img/logo-light.svg';
+import LogoDark from '../../static/img/logo-dark.svg';
 
-import LogoLight from '/img/logo-light.svg';
-import LogoDark from '/img/logo-dark.svg';
-
-function HomepageHeader() {
+function HomeHeader() {
   const { siteConfig } = useDocusaurusContext();
   const { isDarkTheme } = useThemeContext();
   const Logo = isDarkTheme ? LogoDark : LogoLight;
@@ -30,7 +31,7 @@ export default function Home() {
     <Layout
       title=""
       description={`${siteConfig.title}: ${siteConfig.tagline}`}>
-      <HomepageHeader />
+      <HomeHeader />
       <main>
         <HomepageFeatures />
       </main>

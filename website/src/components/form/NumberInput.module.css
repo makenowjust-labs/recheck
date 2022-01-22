@@ -1,0 +1,17 @@
+.numberInput {
+  display: inline-block;
+  max-width: 100%;
+  width: 100%;
+  padding: 0.25em;
+  background: var(--ifm-code-background);
+  border: 1px solid;
+  border-radius: var(--ifm-global-radius);
+  font-size: 1em;
+  height: 2.5em;
+  padding: 0.5em 0.75em;
+}
+
+.numberInput:focus {
+  border-color: var(--ifm-color-info);
+  outline: none;
+}

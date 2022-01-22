@@ -225,7 +225,7 @@ The upper limit of matching time on the recall validation.
 
 If this value is negative, then the recall validation is skipped.
 
-## `maxAttackStringSize`
+## `maxRecallStringSize`
 
 - Type: `number` (TypeScript), `Int` (Scala)
 - Default: `300000`

@@ -55,6 +55,11 @@ const config = {
             label: 'Docs',
           },
           {
+            to: 'playground',
+            position: 'left',
+            label: 'Playground',
+          },
+          {
             href: 'https://github.com/MakeNowJust-Labo/recheck',
             label: 'GitHub',
             position: 'right',
@@ -82,11 +87,11 @@ const config = {
             ],
           },
           {
-            title: 'Community',
+            title: 'Try',
             items: [
               {
-                label: 'Twitter',
-                href: 'https://twitter.com/make_now_just',
+                label: 'Playground',
+                to: '/playground',
               },
             ],
           },
@@ -94,13 +99,17 @@ const config = {
             title: 'More',
             items: [
               {
-                label: 'GitHub',
+                label: 'GitHub Repository',
                 href: 'https://github.com/MakeNowJust-Labo/recheck',
+              },
+              {
+                label: '@MakeNowJust-Labo',
+                href: 'https://github.com/MakeNowJust-Labo',
               },
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} TSUYUSATO "MakeNowJust" Kitsune. Built with Docusaurus.`,
+        copyright: `Copyright © 2020-2022 TSUYUSATO "MakeNowJust" Kitsune. Built with Docusaurus.`,
       },
       prism: {
         theme: lightCodeTheme,

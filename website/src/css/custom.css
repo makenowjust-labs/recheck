@@ -1,16 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Cutive+Mono&display=swap');
 
-:root {
-  --ifm-color-primary: rgb(245, 93, 93);
-  --ifm-color-primary-dark: hsl(0, 88.4%, 59.6%);
-  --ifm-color-primary-darker: hsl(0, 88.4%, 53%);
-  --ifm-color-primary-darkest: hsl(0, 88.4%, 46.4%);
-  --ifm-color-primary-light: hsl(0, 88.4%, 72.9%);
-  --ifm-color-primary-lighter: hsl(0, 88.4%, 79.5%);
-  --ifm-color-primary-lightest: hsl(0, 88.4%, 86.2%);
-  --ifm-code-font-size: 95%;
-}
-
 .docusaurus-highlight-code-line {
   background-color: rgba(0, 0, 0, 0.1);
   display: block;

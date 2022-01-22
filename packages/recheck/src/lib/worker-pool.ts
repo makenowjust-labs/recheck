@@ -126,12 +126,12 @@ export class WorkerPool {
       ref.worker = worker;
 
       // Posts a check request.
-      worker.postMessage({
+      worker.postMessage(JSON.stringify({
         id: ref.id,
         source: ref.source,
         flags: ref.flags,
         params: ref.params,
-      });
+      }));
 
       // Registers an `abort` handler.
       if (ref.signal) {
