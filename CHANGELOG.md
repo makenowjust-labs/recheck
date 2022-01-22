@@ -19,6 +19,7 @@ Misc:
 - [#281](https://github.com/MakeNowJust-Labo/recheck/pull/281) Update scala-library, scala-reflect to 2.13.8 ([@MakeNowJust](https://github.com/MakeNowJust))
 - [#282](https://github.com/MakeNowJust-Labo/recheck/pull/282) Add note section to ESLint plugin document ([@MakeNowJust](https://github.com/MakeNowJust))
 - [#286](https://github.com/MakeNowJust-Labo/recheck/pull/286) Update `CHANGELOG.md` format ([@MakeNowJust](https://github.com/MakeNowJust))
+- [#295](https://github.com/MakeNowJust-Labo/recheck/pull/295) Renew document website powered by Docusaurus ([@MakeNowJust](https://github.com/MakeNowJust))
 
 # 4.2.2 (2022-01-14)
 
