@@ -15,7 +15,7 @@ One of the features of fuzzing is that [evolutionary computation](https://en.wik
 
 There is previous research by Shen et al [[1]](#ref-shen-2018). that used fuzzing to detect ReDoS. In Shen et al.'s research, fuzzing was performed in the following three steps. The implementation of `recheck` follows the same general flow, but the details are completely different.
 
-<p style={{ textAlign: "center" }}>
+<p className="text--center">
   <Image
     img={require("/img/docs/internals/fuzzing/flow.png")}
     max={800}
@@ -39,7 +39,7 @@ Let's go back to the previous page and observe the EDA and IDA structures. You w
 - $q_1$ and $q_2$ can be transitioned with the same letter $b$.
 - $q_2$ can transition with the letter $a$.
 
-<p style={{ textAlign: "center" }}>
+<p className="text--center">
   <Image
     img={require("/img/docs/internals/fuzzing/ltp.png")}
     max={400}

@@ -21,7 +21,7 @@ In other words, a short string may invoke a long matching time to a regular expr
 See the following figure. It is a chart about the relation between matching times against `/^(a|a)*$/` and input string lengths.
 It shows extremely increasing matching time against input string length.
 
-<p style={{ textAlign: "center" }}>
+<p className="text--center">
   <Image
     img={require("/img/docs/intro/exponential-chart.png")}
     max={600}
@@ -34,7 +34,7 @@ In 2016, [StackOverflow downs due to ReDoS](https://stackstatus.net/post/1477106
 It is caused by the regular expression to truncate whitespace in the front and the back of a string.
 In 2019, [Cloudflare downs due to ReDoS](https://blog.cloudflare.com/details-of-the-cloudflare-outage-on-july-2-2019/) for another example.
 This reason is the regular expression in WAF configuration.
-According to [recent research](https://people.cs.vt.edu/~davisjam/downloads/publications/DavisCoghlanServantLee-EcosystemREDOS-ESECFSE18.pdf), 10% of regular expressions of real uses have ReDoS vulnerability potentially.
+According to recent research [[1]](#ref-davis-2020), 10% of regular expressions of real uses have ReDoS vulnerability potentially.
 
 As seen above, ReDoS is one of the most important security concerns recently.
 And, the importance of checking ReDoS vulnerability statically is increasing.
@@ -57,3 +57,10 @@ The following is an incomplete list of `recheck` features.
   You can embed `recheck` into your application easily.
 - Provides ESLint plugin.
   You can start to check ReDoS vulnerability for your application code in a minute.
+
+## References
+
+- <a id="ref-davis-2020">[1]</a> Davis, James Collins. <em>
+    On the Impact and Defeat of Regular Expression Denial of Service
+  </em>
+  . Diss. Virginia Tech, 2020.APA

@@ -23,7 +23,7 @@ From now on, we will proceed with NFA which is equivalent to the regular express
 
 The ambiguity of a regular expression means that there are multiple ways to transition from one state to another in a given string on the NFA.
 
-<p style={{ textAlign: "center" }}>
+<p className="text--center">
   <Image
     img={require("/img/docs/internals/background/ambiguous-transition.png")}
     max={400}
@@ -33,7 +33,7 @@ The ambiguity of a regular expression means that there are multiple ways to tran
 
 Suppose that the ambiguous transition is in a loop of the NFA transition diagram. In this case, there are two transitions to return to the same state with the same string $w$, as shown in the following figure. This means that the regular expression has infinite ambiguity. The reason is that for a string $w^n$ with $w$ in $n$ order, there are $2^n$ ways to transition, depending on whether it chooses the above or the bottom transition for each $w$.
 
-<p style={{ textAlign: "center" }}>
+<p className="text--center">
   <Image
     img={require("/img/docs/internals/background/eda.png")}
     max={300}
@@ -45,7 +45,7 @@ Such a structure in the transition diagram of NFA is called EDA (Exponential Deg
 
 It is not only in the presence of EDA that regular expressions have infinite ambiguity. Suppose that there is an ambiguous transition across two loops, as shown in the following figure. In other words, the same string $w$ can transition around the first loop and the next loop, and can also transition between the first states of the two loops.
 
-<p style={{ textAlign: "center" }}>
+<p className="text--center">
   <Image
     img={require("/img/docs/internals/background/ida.png")}
     max={500}
