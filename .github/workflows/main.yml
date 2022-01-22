@@ -291,7 +291,7 @@ jobs:
           name: recheck-win32-x64.exe
           path: packages/recheck-windows-x64/
       - name: Build
-        run: yarn lerna run build
+        run: NODE_ENV=production yarn lerna run build
       - name: Publish
         run: yarn lerna publish ${{ needs.build.outputs.version }} --yes
         env:
@@ -335,11 +335,10 @@ jobs:
       - name: Build
         run: |
           sbt mdoc
-          mkdir -p site/assets/js/lib/
-          cp modules/recheck-js/target/scala-2.13/recheck-js-opt/* site/assets/js/lib/
-          hugo -s site --minify
+          NODE_ENV=production yarn workspace recheck build
+          yarn workspace website build
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: site/public
+          publish_dir: website/build
