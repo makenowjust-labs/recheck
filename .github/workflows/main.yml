@@ -304,37 +304,18 @@ jobs:
     name: Deploy to GitHub Pages
     steps:
       - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
         with:
-          fetch-depth: 0
-      - uses: olafurpg/setup-scala@v13
-        with:
-          java-version: adopt@1.16
-      - name: Cache SBT
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.ivy2/cache
-            ~/.cache/coursier
-            ~/.sbt
-          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
-      - name: Cache Build Files
-        uses: actions/cache@v2
-        with:
-          path: |
-            **/target
-          key: ${{ runner.os }}-build-${{ github.sha }}
+          node-version: '17'
+          cache: 'yarn'
       - uses: actions/download-artifact@v2
         with:
           name: recheck.js
           path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
-      - name: Setup Hugo
-        uses: peaceiris/actions-hugo@v2
-        with:
-          hugo-version: '0.89.4'
-          extended: true
+      - name: Install
+        run: yarn install --frozen-lockfile
       - name: Build
         run: |
-          sbt mdoc
           NODE_ENV=production yarn workspace recheck build
           yarn workspace website build
       - name: Deploy
