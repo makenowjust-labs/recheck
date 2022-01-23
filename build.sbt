@@ -30,22 +30,19 @@ ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 ThisBuild / scalafixDependencies += "com.github.liancheng" %% "organize-imports" % "0.6.0"
 ThisBuild / scalafixDependencies += "com.github.vovapolu" %% "scaluzzi" % "0.1.21"
 
+val releaseVersion = taskKey[String]("A release version")
+ThisBuild / releaseVersion := {
+  if (version.value.endsWith("-SNAPSHOT")) previousStableVersion.value.getOrElse("0.0.0")
+  else version.value
+}
+
 lazy val root = project
   .in(file("."))
   .settings(
     sonatypeProfileName := "codes.quine",
     publish / skip := true,
     coverageEnabled := false,
-    mdocVariables := Map(
-      "VERSION" -> {
-        if (version.value.endsWith("-SNAPSHOT")) previousStableVersion.value.getOrElse("0.0.0")
-        else version.value
-      }
-    ),
-    mdocOut := baseDirectory.value / "site" / "content",
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
   )
-  .enablePlugins(MdocPlugin)
   .aggregate(
     coreJVM,
     coreJS,
@@ -62,7 +59,6 @@ lazy val root = project
     js,
     cli
   )
-  .dependsOn(coreJVM)
 
 lazy val core = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/recheck-core"))

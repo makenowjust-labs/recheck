@@ -3,15 +3,25 @@ id: as-scala-library
 title: As Scala Library
 ---
 
+import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
+import CodeBlock from "@theme/CodeBlock";
+
+export const SBTInstallCodeBlock = () => {
+  const version = useDocusaurusContext().siteConfig.customFields.version;
+  return (
+    <CodeBlock title="build.sbt" className="language-scala">
+      libraryDependencies += "codes.quine.labo" %% "recheck-core" % "{version}"
+    </CodeBlock>
+  );
+};
+
 Describes how to use `recheck` as a Scala library.
 
 ## Install
 
 To install the Scala library of `recheck`, you should append the following line into your `build.sbt`.
 
-```scala title="build.sbt"
-libraryDependencies += "codes.quine.labo" %% "recheck-core" % "<latest version>"
-```
+<SBTInstallCodeBlock />
 
 ## Usage
 

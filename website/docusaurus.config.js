@@ -127,6 +127,10 @@ const config = {
       crossorigin: "anonymous",
     },
   ],
+
+  customFields: {
+    version: process.env["RECHECK_VERSION"] ?? "0.0.0-dev",
+  },
 };
 
 module.exports = config;
