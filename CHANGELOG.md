@@ -20,6 +20,7 @@ Misc:
 - [#282](https://github.com/MakeNowJust-Labo/recheck/pull/282) Add note section to ESLint plugin document ([@MakeNowJust](https://github.com/MakeNowJust))
 - [#286](https://github.com/MakeNowJust-Labo/recheck/pull/286) Update `CHANGELOG.md` format ([@MakeNowJust](https://github.com/MakeNowJust))
 - [#295](https://github.com/MakeNowJust-Labo/recheck/pull/295) Renew document website powered by Docusaurus ([@MakeNowJust](https://github.com/MakeNowJust))
+- [#313](https://github.com/MakeNowJust-Labo/recheck/pull/313) Remove `mdoc` to build the document ([@MakeNowJust](https://github.com/MakeNowJust))
 
 # 4.2.2 (2022-01-14)
 
