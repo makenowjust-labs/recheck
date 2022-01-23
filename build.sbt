@@ -41,7 +41,7 @@ lazy val root = project
   .settings(
     sonatypeProfileName := "codes.quine",
     publish / skip := true,
-    coverageEnabled := false,
+    coverageEnabled := false
   )
   .aggregate(
     coreJVM,
