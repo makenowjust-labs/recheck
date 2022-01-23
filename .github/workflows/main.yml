@@ -38,7 +38,7 @@ jobs:
       - id: save-version
         name: Save Version
         run: |
-          echo "::set-output name=version::$(sbt --error "print coreJVM/version")"
+          echo "::set-output name=version::$(sbt --error "print coreJVM/releaseVersion")"
       - uses: actions/upload-artifact@v2
         with:
           path: modules/recheck-js/target/scala-2.13/recheck-js-opt/recheck.js
@@ -317,7 +317,7 @@ jobs:
       - name: Build
         run: |
           NODE_ENV=production yarn workspace recheck build
-          yarn workspace website build
+          RECHECK_VERSION=${{ needs.build.outputs.version }} yarn workspace website build
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
