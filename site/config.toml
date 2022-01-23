@@ -1,9 +1,0 @@
-baseURL = "https://makenowjust-labo.github.io/recheck/"
-languageCode = "en-us"
-title = "recheck | MakeNowJust-Labo"
-copyright = "2020-2022 (C) TSUYUSATO \"MakeNowJust\" Kitsune"
-
-[params]
-name = "recheck"
-description = "A vulnerable RegExp (ReDoS) checker."
-github = "MakeNowJust-Labo/recheck"
