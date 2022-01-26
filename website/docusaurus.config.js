@@ -42,9 +42,9 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       navbar: {
-        title: "Recheck",
+        title: "recheck",
         logo: {
-          alt: "Recheck Logo",
+          alt: "recheck logo",
           src: "img/logo-light.svg",
           srcDark: "img/logo-dark.svg",
         },
