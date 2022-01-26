@@ -9,11 +9,6 @@
   font-family: "Cutive Mono", monospace;
 }
 
-.heroBannerLogo {
-  width: 300px;
-  height: 300px;
-}
-
 @media screen and (max-width: 966px) {
   .heroBanner {
     padding: 2rem;
