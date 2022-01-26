@@ -23,6 +23,7 @@ Misc:
 - [#313](https://github.com/MakeNowJust-Labo/recheck/pull/313) Remove `mdoc` to build the document ([@MakeNowJust](https://github.com/MakeNowJust))
 - [#314](https://github.com/MakeNowJust-Labo/recheck/pull/314) Don't ignore to build website on CI test ([@MakeNowJust](https://github.com/MakeNowJust))
 - [#318](https://github.com/MakeNowJust-Labo/recheck/pull/318) Fix logo style ([@MakeNowJust](https://github.com/MakeNowJust))
+- [#320](https://github.com/MakeNowJust-Labo/recheck/pull/320) Improve documentation ([@MakeNowJust](https://github.com/MakeNowJust))
 
 # 4.2.2 (2022-01-14)
 
