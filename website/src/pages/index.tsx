@@ -5,12 +5,9 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import ThemedImage from '@theme/ThemedImage';
-import useThemeContext from '@theme/hooks/useThemeContext';
 
 import styles from './index.module.css';
 import HomepageFeatures from '../components/HomepageFeatures';
-import LogoLight from '../../static/img/logo-light.svg';
-import LogoDark from '../../static/img/logo-dark.svg';
 
 function HomeHeader() {
   const { siteConfig } = useDocusaurusContext();
