@@ -25,7 +25,7 @@ const config = {
         docs: {
           sidebarPath: require.resolve("./sidebars.js"),
           editUrl:
-            "https://github.com/MakeNowJust-Labo/recheck/tree/main/website/docs",
+            "https://github.com/MakeNowJust-Labo/recheck/tree/main/website",
           remarkPlugins: [math],
           rehypePlugins: [katex],
         },
@@ -62,8 +62,9 @@ const config = {
           },
           {
             href: "https://github.com/MakeNowJust-Labo/recheck",
-            label: "GitHub",
             position: "right",
+            className: "header-github-link",
+            "aria-label": "GitHub repository",
           },
         ],
       },
@@ -117,6 +118,7 @@ const config = {
         darkTheme: darkCodeTheme,
         additionalLanguages: ["java", "scala"],
       },
+      image: "img/social.png",
     }),
 
   stylesheets: [

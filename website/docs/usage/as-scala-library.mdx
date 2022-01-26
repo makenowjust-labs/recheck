@@ -19,6 +19,8 @@ Describes how to use `recheck` as a Scala library.
 
 ## Install
 
+[![Maven Central](https://img.shields.io/maven-central/v/codes.quine.labo/recheck-core_2.13?logo=scala&style=for-the-badge)](https://search.maven.org/artifact/codes.quine.labo/recheck-core_2.13)
+
 To install the Scala library of `recheck`, you should append the following line into your `build.sbt`.
 
 <SBTInstallCodeBlock />
@@ -60,25 +62,79 @@ See [this page](diagnostics.md) for detailed information on `Diagnostics` value.
 
 The fourth argument of `ReDoS.check` is used to cancel the checking in the middle.
 This type is `CancellationToken` which is created by `CancellationTokenSource`.
-Noting that `ReDoS.check` blocks the process, you should use this with concurrent libraries like `scala.concurrent`or `[cats-effect](https://typelevel.org/cats-effect/)`.
+Noting that `ReDoS.check` blocks the process, you should use this with concurrent libraries like `scala.concurrent`or [`cats-effect`](https://typelevel.org/cats-effect/).
 
 The following example is usage with `cats-effect`.
 
 ```scala
+import scala.concurrent.duration._
+
+import cats.effect._
+import cats.effect.unsafe.implicits.global
+
 import codes.quine.labo.recheck.ReDoS
 import codes.quine.labo.recheck.common.CancellationTokenSource
 import codes.quine.labo.recheck.common.Parameters
+import codes.quine.labo.recheck.diagnostics.Diagnostics
 
-import scala.concurrent._
-import cats.effect._
-import cats.implicits._
+val cancellation = new CancellationTokenSource
 
-def cancelableCheck(source: String, flags: String)(implicit ec: ExecutionContext): IO[Diagnostics] =
-  IO.cancelable { cb =>
-    val source = new CancellationTokenSource
-    ec.run(() => {
-      cb(Right(ReDoS.check(source, flags, Parameters(), Some(source.token)))
-    })
-    IO(source.cancel()).void
-  }
+val io = for {
+  fiber <- IO(ReDoS.check("^a+a+$", "", Parameters(), Some(cancellation.token))).start
+  _ <- (IO.sleep(100.millisecond) *> IO(cancellation.cancel())).start
+  diagnostics <- fiber.joinWithNever
+  _ <- IO.println(diagnostics)
+} yield ()
+
+io.unsafeRunSync()
 ```
+
+:::caution
+
+There is the `timeout` parameter to specify timeout seconds.
+Please use this instead of the manual way.
+
+:::
+
+:::note
+
+The above example does not work with `cats-effect` better actually, because `fiber` has `cancel` method and it does not work with this method.
+
+To fix this problem, we can use `IO.async`. The following is the complete example. However, by `cats-effect` restriction, it will lose a result diagnostics when a fiber is cancelled.
+
+```scala
+import scala.concurrent.duration._
+
+import cats.effect._
+import cats.effect.unsafe.implicits.global
+
+import codes.quine.labo.recheck.ReDoS
+import codes.quine.labo.recheck.common.CancellationTokenSource
+import codes.quine.labo.recheck.common.Parameters
+import codes.quine.labo.recheck.diagnostics.Diagnostics
+
+def cancelableCheck(source: String, flags: String, params: Parameters): IO[Diagnostics] =
+  IO.executionContext.flatMap { ec =>
+    IO.async { cb =>
+      IO {
+        val cancellation = new CancellationTokenSource
+        ec.execute(() => {
+          val diagnostics = ReDoS.check(source, flags, params, Some(cancellation.token))
+          cb(Right(diagnostics))
+        })
+        Some(IO(cancellation.cancel()))
+      }
+    }
+  }
+
+val io = for {
+  fiber <- cancelableCheck("^a+a+$", "", Parameters()).start
+  _ <- (IO.sleep(100.millisecond) *> fiber.cancel).start
+  diagnostics <- fiber.join
+  _ <- IO.println(diagnostics)
+} yield ()
+
+io.unsafeRunSync()
+```
+
+:::

@@ -1,6 +1,6 @@
 {
   "name": "eslint-plugin-redos",
-  "description": "ESLint plugin for catching ReDoS vulnerability.",
+  "description": "ESLint plugin for catching ReDoS vulnerability",
   "license": "MIT",
   "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
   "homepage": "https://makenowjust-labo.github.io/recheck/",

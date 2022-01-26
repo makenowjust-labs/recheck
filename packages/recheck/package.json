@@ -1,6 +1,6 @@
 {
   "name": "recheck",
-  "description": "A vulnerable RegExp (ReDoS) checker for JavaScript (ECMA-262) RegExp.",
+  "description": "The trustworthy ReDoS checker",
   "license": "MIT",
   "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
   "homepage": "https://makenowjust-labo.github.io/recheck/",
