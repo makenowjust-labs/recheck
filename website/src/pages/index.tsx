@@ -24,8 +24,8 @@ function HomeHeader() {
         <p className={clsx('hero__subtitle', styles.heroBannerText)}>{siteConfig.tagline}</p>
         <div className="container">
           <div className="row row--no-gutters">
-            <div className="col col--3 col--offset-3 margin-vert--sm"><Link className="button button--lg button--outline button--secondary" to="/docs/intro">Get Started</Link></div>
-            <div className="col col--3 margin-vert--sm"><Link className="button button--lg button--outline button--secondary" to="/playground">Playground</Link></div>
+            <div className="col col--3 col--offset-3 margin-vert--sm"><Link className="button button--lg button--outline button--primary" to="/docs/intro">Get Started</Link></div>
+            <div className="col col--3 margin-vert--sm"><Link className="button button--lg button--outline button--primary" to="/playground">Playground</Link></div>
           </div>
         </div>
       </div>
