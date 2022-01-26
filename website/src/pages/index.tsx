@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import React from 'react';
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
+import Link from "@docusaurus/Link";
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import ThemedImage from '@theme/ThemedImage';
@@ -18,9 +19,15 @@ function HomeHeader() {
   return (
     <header className={clsx('hero', styles.heroBanner)}>
       <div className="container">
-        <ThemedImage sources={sources} width={300} height={300} title={'recheck logo'} />
+        <ThemedImage sources={sources} width={250} height={250} title={'recheck logo'} />
         <h1 className={clsx('hero__title', styles.heroBannerText)}>{siteConfig.title}</h1>
         <p className={clsx('hero__subtitle', styles.heroBannerText)}>{siteConfig.tagline}</p>
+        <div className="container">
+          <div className="row row--no-gutters">
+            <div className="col col--3 col--offset-3 margin-vert--sm"><Link className="button button--lg button--outline button--secondary" to="/docs/intro">Get Started</Link></div>
+            <div className="col col--3 margin-vert--sm"><Link className="button button--lg button--outline button--secondary" to="/playground">Playground</Link></div>
+          </div>
+        </div>
       </div>
     </header>
   );
