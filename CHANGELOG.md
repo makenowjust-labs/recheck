@@ -2,93 +2,93 @@
 
 New Features:
 
-- [#289](https://github.com/MakeNowJust-Labo/recheck/pull/289) Add `worker` backend to the NPM package ([@MakeNowJust](https://github.com/MakeNowJust))
+- [#289](https://github.com/makenowjust-labs/recheck/pull/289) Add `worker` backend to the NPM package ([@makenowjust](https://github.com/makenowjust))
 
 Changes:
 
-- [#283](https://github.com/MakeNowJust-Labo/recheck/pull/283) Rename `hybrid` to `auto` ([@MakeNowJust](https://github.com/MakeNowJust))
+- [#283](https://github.com/makenowjust-labs/recheck/pull/283) Rename `hybrid` to `auto` ([@makenowjust](https://github.com/makenowjust))
 
 Fixes:
 
-- [#284](https://github.com/MakeNowJust-Labo/recheck/pull/284) Add missing field `AttackPattern#pattern` in TypeScript definition ([@MakeNowJust](https://github.com/MakeNowJust))
+- [#284](https://github.com/makenowjust-labs/recheck/pull/284) Add missing field `AttackPattern#pattern` in TypeScript definition ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
-- [#279](https://github.com/MakeNowJust-Labo/recheck/pull/279) Update `CHANGELOG.md` automatically by GitHub Actions ([@MakeNowJust](https://github.com/MakeNowJust))
-- [#280](https://github.com/MakeNowJust-Labo/recheck/pull/280) Handle SBT deps by renovate correctly ([@MakeNowJust](https://github.com/MakeNowJust))
-- [#281](https://github.com/MakeNowJust-Labo/recheck/pull/281) Update scala-library, scala-reflect to 2.13.8 ([@MakeNowJust](https://github.com/MakeNowJust))
-- [#282](https://github.com/MakeNowJust-Labo/recheck/pull/282) Add note section to ESLint plugin document ([@MakeNowJust](https://github.com/MakeNowJust))
-- [#286](https://github.com/MakeNowJust-Labo/recheck/pull/286) Update `CHANGELOG.md` format ([@MakeNowJust](https://github.com/MakeNowJust))
-- [#295](https://github.com/MakeNowJust-Labo/recheck/pull/295) Renew document website powered by Docusaurus ([@MakeNowJust](https://github.com/MakeNowJust))
-- [#313](https://github.com/MakeNowJust-Labo/recheck/pull/313) Remove `mdoc` to build the document ([@MakeNowJust](https://github.com/MakeNowJust))
-- [#314](https://github.com/MakeNowJust-Labo/recheck/pull/314) Don't ignore to build website on CI test ([@MakeNowJust](https://github.com/MakeNowJust))
-- [#318](https://github.com/MakeNowJust-Labo/recheck/pull/318) Fix logo style ([@MakeNowJust](https://github.com/MakeNowJust))
-- [#320](https://github.com/MakeNowJust-Labo/recheck/pull/320) Improve documentation ([@MakeNowJust](https://github.com/MakeNowJust))
+- [#279](https://github.com/makenowjust-labs/recheck/pull/279) Update `CHANGELOG.md` automatically by GitHub Actions ([@makenowjust](https://github.com/makenowjust))
+- [#280](https://github.com/makenowjust-labs/recheck/pull/280) Handle SBT deps by renovate correctly ([@makenowjust](https://github.com/makenowjust))
+- [#281](https://github.com/makenowjust-labs/recheck/pull/281) Update scala-library, scala-reflect to 2.13.8 ([@makenowjust](https://github.com/makenowjust))
+- [#282](https://github.com/makenowjust-labs/recheck/pull/282) Add note section to ESLint plugin document ([@makenowjust](https://github.com/makenowjust))
+- [#286](https://github.com/makenowjust-labs/recheck/pull/286) Update `CHANGELOG.md` format ([@makenowjust](https://github.com/makenowjust))
+- [#295](https://github.com/makenowjust-labs/recheck/pull/295) Renew document website powered by Docusaurus ([@makenowjust](https://github.com/makenowjust))
+- [#313](https://github.com/makenowjust-labs/recheck/pull/313) Remove `mdoc` to build the document ([@makenowjust](https://github.com/makenowjust))
+- [#314](https://github.com/makenowjust-labs/recheck/pull/314) Don't ignore to build website on CI test ([@makenowjust](https://github.com/makenowjust))
+- [#318](https://github.com/makenowjust-labs/recheck/pull/318) Fix logo style ([@makenowjust](https://github.com/makenowjust))
+- [#320](https://github.com/makenowjust-labs/recheck/pull/320) Improve documentation ([@makenowjust](https://github.com/makenowjust))
 
 # 4.2.2 (2022-01-14)
 
 Fixes:
 
-- Fix `handleLine` in `Agent` for large data ([#266](https://github.com/MakeNowJust-Labo/recheck/pull/266))
-- Prefer to use `native` backend on `RECHECK_BACKEND=auto` ([#268](https://github.com/MakeNowJust-Labo/recheck/pull/268))
+- Fix `handleLine` in `Agent` for large data ([#266](https://github.com/makenowjust-labs/recheck/pull/266))
+- Prefer to use `native` backend on `RECHECK_BACKEND=auto` ([#268](https://github.com/makenowjust-labs/recheck/pull/268))
 
 # 4.2.1 (2022-01-08)
 
 Fixes:
 
-- Don't bundle recheck in eslint-plugin-redos ([#260](https://github.com/MakeNowJust-Labo/recheck/pull/260))
-- Use `require` directly instead of `module.require` ([#261](https://github.com/MakeNowJust-Labo/recheck/pull/261))
+- Don't bundle recheck in eslint-plugin-redos ([#260](https://github.com/makenowjust-labs/recheck/pull/260))
+- Use `require` directly instead of `module.require` ([#261](https://github.com/makenowjust-labs/recheck/pull/261))
 
 # 4.2.0 (2022-01-08)
 
 Changes:
 
-- Split `common` package into another module `recheck-common` ([#202](https://github.com/MakeNowJust-Labo/recheck/pull/202))
-- Increase default parameter values ([#202](https://github.com/MakeNowJust-Labo/recheck/pull/202))
-- Restrict repeats contained in gene ([#202](https://github.com/MakeNowJust-Labo/recheck/pull/202))
-- Add `Parameters` as immutable version of `Config` ([#202](https://github.com/MakeNowJust-Labo/recheck/pull/202))
-- Add `accelerationMode` parameter to specify acceleration mode behavior ([#211](https://github.com/MakeNowJust-Labo/recheck/pull/211))
-- Rename default parameter constant names ([#211](https://github.com/MakeNowJust-Labo/recheck/pull/211))
-- Add the new default seeder named `StaticSeeder` ([#227](https://github.com/MakeNowJust-Labo/recheck/pull/227))
-- Decrease some parameters default values ([#227](https://github.com/MakeNowJust-Labo/recheck/pull/227))
-- Improve repetition count estimation ([#227](https://github.com/MakeNowJust-Labo/recheck/pull/227))
-- Use JavaScript style representation for `AttackPattern#toString` ([#229](https://github.com/MakeNowJust-Labo/recheck/pull/229))
-- Apply look-ahead optimization to VM ([#233](https://github.com/MakeNowJust-Labo/recheck/pull/233))
-- Add recall validation ([#234](https://github.com/MakeNowJust-Labo/recheck/pull/234))
-- Simplify automaton without input terminator distinction ([#240](https://github.com/MakeNowJust-Labo/recheck/pull/240))
-- Add `recheck-jar` package ([#248](https://github.com/MakeNowJust-Labo/recheck/pull/248))
-- Improve `StaticSeeding.simplify` against look-around near by repeat ([#255](https://github.com/MakeNowJust-Labo/recheck/pull/255))
+- Split `common` package into another module `recheck-common` ([#202](https://github.com/makenowjust-labs/recheck/pull/202))
+- Increase default parameter values ([#202](https://github.com/makenowjust-labs/recheck/pull/202))
+- Restrict repeats contained in gene ([#202](https://github.com/makenowjust-labs/recheck/pull/202))
+- Add `Parameters` as immutable version of `Config` ([#202](https://github.com/makenowjust-labs/recheck/pull/202))
+- Add `accelerationMode` parameter to specify acceleration mode behavior ([#211](https://github.com/makenowjust-labs/recheck/pull/211))
+- Rename default parameter constant names ([#211](https://github.com/makenowjust-labs/recheck/pull/211))
+- Add the new default seeder named `StaticSeeder` ([#227](https://github.com/makenowjust-labs/recheck/pull/227))
+- Decrease some parameters default values ([#227](https://github.com/makenowjust-labs/recheck/pull/227))
+- Improve repetition count estimation ([#227](https://github.com/makenowjust-labs/recheck/pull/227))
+- Use JavaScript style representation for `AttackPattern#toString` ([#229](https://github.com/makenowjust-labs/recheck/pull/229))
+- Apply look-ahead optimization to VM ([#233](https://github.com/makenowjust-labs/recheck/pull/233))
+- Add recall validation ([#234](https://github.com/makenowjust-labs/recheck/pull/234))
+- Simplify automaton without input terminator distinction ([#240](https://github.com/makenowjust-labs/recheck/pull/240))
+- Add `recheck-jar` package ([#248](https://github.com/makenowjust-labs/recheck/pull/248))
+- Improve `StaticSeeding.simplify` against look-around near by repeat ([#255](https://github.com/makenowjust-labs/recheck/pull/255))
 
 Fixes:
 
-- Fix semaphore usage in test ([#230](https://github.com/MakeNowJust-Labo/recheck/pull/230))
-- Fix `sbt` file issues ([#231](https://github.com/MakeNowJust-Labo/recheck/pull/231))
-- Check integer overflow on matching steps ([#232](https://github.com/MakeNowJust-Labo/recheck/pull/232))
-- Fix loop detection in `StaticSeeder` ([#235](https://github.com/MakeNowJust-Labo/recheck/pull/235))
-- Returns iterator in `FuzzChecker`  ([#236](https://github.com/MakeNowJust-Labo/recheck/pull/236))
-- Rewrite `recheck` package implementation ([#248](https://github.com/MakeNowJust-Labo/recheck/pull/248))
-- Add `recheck` package test ([#248](https://github.com/MakeNowJust-Labo/recheck/pull/248))
-- Optimize alphabet construction ([#258](https://github.com/MakeNowJust-Labo/recheck/pull/258))
+- Fix semaphore usage in test ([#230](https://github.com/makenowjust-labs/recheck/pull/230))
+- Fix `sbt` file issues ([#231](https://github.com/makenowjust-labs/recheck/pull/231))
+- Check integer overflow on matching steps ([#232](https://github.com/makenowjust-labs/recheck/pull/232))
+- Fix loop detection in `StaticSeeder` ([#235](https://github.com/makenowjust-labs/recheck/pull/235))
+- Returns iterator in `FuzzChecker`  ([#236](https://github.com/makenowjust-labs/recheck/pull/236))
+- Rewrite `recheck` package implementation ([#248](https://github.com/makenowjust-labs/recheck/pull/248))
+- Add `recheck` package test ([#248](https://github.com/makenowjust-labs/recheck/pull/248))
+- Optimize alphabet construction ([#258](https://github.com/makenowjust-labs/recheck/pull/258))
 
 # 4.1.1 (2021-12-04)
 
 Fixes:
 
-- Add `index.d.ts` file to the package ([#184](https://github.com/MakeNowJust-Labo/recheck/pull/184))
-- Fix `optionalDependencies` in `recheck` package ([#185](https://github.com/MakeNowJust-Labo/recheck/pull/185))
+- Add `index.d.ts` file to the package ([#184](https://github.com/makenowjust-labs/recheck/pull/184))
+- Fix `optionalDependencies` in `recheck` package ([#185](https://github.com/makenowjust-labs/recheck/pull/185))
 
 # 4.1.0 (2021-12-04)
 
 Changes:
 
-- Add `checkSync` function to NPM package ([#156](https://github.com/MakeNowJust-Labo/recheck/pull/156))
-- Add `eslint-plugin-redos` package ([#160](https://github.com/MakeNowJust-Labo/recheck/pull/160))
+- Add `checkSync` function to NPM package ([#156](https://github.com/makenowjust-labs/recheck/pull/156))
+- Add `eslint-plugin-redos` package ([#160](https://github.com/makenowjust-labs/recheck/pull/160))
 
 Fixes:
 
-- Set default value to check config ([#143](https://github.com/MakeNowJust-Labo/recheck/issues/143))
-- Rewrite `recheck` package in TypeScript ([#149](https://github.com/MakeNowJust-Labo/recheck/pull/149))
-- Call `subprocess.ref()`/`unref()` correctly ([#181](https://github.com/MakeNowJust-Labo/recheck/pull/181))
+- Set default value to check config ([#143](https://github.com/makenowjust-labs/recheck/issues/143))
+- Rewrite `recheck` package in TypeScript ([#149](https://github.com/makenowjust-labs/recheck/pull/149))
+- Call `subprocess.ref()`/`unref()` correctly ([#181](https://github.com/makenowjust-labs/recheck/pull/181))
 
 # 4.0.2 (2021-11-23)
 
@@ -102,25 +102,25 @@ A test release.
 
 Changes:
 
-- Move unicode related types into new `recheck-unicode` module ([#77](https://github.com/MakeNowJust-Labo/recheck/pull/77))
-- Move `RegExp` parser into new `recheck-parse` module ([#78](https://github.com/MakeNowJust-Labo/recheck/pull/78))
-- Move JS binding into new `recheck-js` module ([#79](https://github.com/MakeNowJust-Labo/recheck/pull/79))
-- Add `recheck` CLI ([#83](https://github.com/MakeNowJust-Labo/recheck/pull/83))
+- Move unicode related types into new `recheck-unicode` module ([#77](https://github.com/makenowjust-labs/recheck/pull/77))
+- Move `RegExp` parser into new `recheck-parse` module ([#78](https://github.com/makenowjust-labs/recheck/pull/78))
+- Move JS binding into new `recheck-js` module ([#79](https://github.com/makenowjust-labs/recheck/pull/79))
+- Add `recheck` CLI ([#83](https://github.com/makenowjust-labs/recheck/pull/83))
 - Build `recheck` CLI by using Graal `native-image`
-- Move circe codes into `recheck-codec` module ([#91](https://github.com/MakeNowJust-Labo/recheck/pull/91))
-- Rename `recheck` module to `recheck-core` ([#92](https://github.com/MakeNowJust-Labo/recheck/pull/92))
-- Add `ErrorKind.Cancel` for canceled execution ([#93](https://github.com/MakeNowJust-Labo/recheck/pull/93))
-- Rename `EpsNFABuilder.compile` to `.build` ([#94](https://github.com/MakeNowJust-Labo/recheck/pull/94))
-- Improve AST node structure ([#138](https://github.com/MakeNowJust-Labo/recheck/pull/138))
-- Rename `batch` subcommand to `agent` ([#139](https://github.com/MakeNowJust-Labo/recheck/pull/139))
-- Add `recheck-${os}-${cpu}` packages to distribute binaries ([#141](https://github.com/MakeNowJust-Labo/recheck/pull/139))
-- Rename `@makenowjust-labo/recheck` package to `recheck` ([#141](https://github.com/MakeNowJust-Labo/recheck/pull/139))
+- Move circe codes into `recheck-codec` module ([#91](https://github.com/makenowjust-labs/recheck/pull/91))
+- Rename `recheck` module to `recheck-core` ([#92](https://github.com/makenowjust-labs/recheck/pull/92))
+- Add `ErrorKind.Cancel` for canceled execution ([#93](https://github.com/makenowjust-labs/recheck/pull/93))
+- Rename `EpsNFABuilder.compile` to `.build` ([#94](https://github.com/makenowjust-labs/recheck/pull/94))
+- Improve AST node structure ([#138](https://github.com/makenowjust-labs/recheck/pull/138))
+- Rename `batch` subcommand to `agent` ([#139](https://github.com/makenowjust-labs/recheck/pull/139))
+- Add `recheck-${os}-${cpu}` packages to distribute binaries ([#141](https://github.com/makenowjust-labs/recheck/pull/139))
+- Rename `@makenowjust-labs/recheck` package to `recheck` ([#141](https://github.com/makenowjust-labs/recheck/pull/139))
 
 Fixes:
 
-- Update `sourcecode` to 0.2.7 ([#72](https://github.com/MakeNowJust-Labo/recheck/pull/72))
+- Update `sourcecode` to 0.2.7 ([#72](https://github.com/makenowjust-labs/recheck/pull/72))
 - Update Scala version to 2.13.6
-- Run `recheck batch` requests in asynchronous ([#89](https://github.com/MakeNowJust-Labo/recheck/pull/89))
+- Run `recheck batch` requests in asynchronous ([#89](https://github.com/makenowjust-labs/recheck/pull/89))
 - Update Scala version tp 2.13.7
 
 # 3.1.0 (2021-05-14)

@@ -1,12 +1,12 @@
 Global / onChangedBuildSource := ReloadOnSourceChanges
 Global / excludeLintKeys += nativeImageVersion
 
-ThisBuild / organization := "codes.quine.labo"
-ThisBuild / homepage := Some(url("https://github.com/MakeNowJust-Labo/recheck"))
+ThisBuild / organization := "codes.quine.labs"
+ThisBuild / homepage := Some(url("https://github.com/makenowjust-labs/recheck"))
 ThisBuild / licenses := Seq("MIT" -> url("http://opensource.org/licenses/MIT"))
 ThisBuild / developers := List(
   Developer(
-    "MakeNowJust",
+    "makenowjust",
     "TSUYUSATO Kitsune",
     "make.just.on@gmail.com",
     url("https://quine.codes/")
@@ -68,18 +68,18 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |import scala.concurrent.duration._
       |import scala.util.{Failure, Random, Success, Try}
       |
-      |import codes.quine.labo.recheck._
-      |import codes.quine.labo.recheck.automaton._
-      |import codes.quine.labo.recheck.common._
-      |import codes.quine.labo.recheck.exec._
-      |import codes.quine.labo.recheck.data._
-      |import codes.quine.labo.recheck.diagnostics._
-      |import codes.quine.labo.recheck.fuzz._
-      |import codes.quine.labo.recheck.recall._
-      |import codes.quine.labo.recheck.regexp._
-      |import codes.quine.labo.recheck.unicode._
-      |import codes.quine.labo.recheck.util._
-      |import codes.quine.labo.recheck.vm._
+      |import codes.quine.labs.recheck._
+      |import codes.quine.labs.recheck.automaton._
+      |import codes.quine.labs.recheck.common._
+      |import codes.quine.labs.recheck.exec._
+      |import codes.quine.labs.recheck.data._
+      |import codes.quine.labs.recheck.diagnostics._
+      |import codes.quine.labs.recheck.fuzz._
+      |import codes.quine.labs.recheck.recall._
+      |import codes.quine.labs.recheck.regexp._
+      |import codes.quine.labs.recheck.unicode._
+      |import codes.quine.labs.recheck.util._
+      |import codes.quine.labs.recheck.vm._
       |
       |def logger: Context.Logger = (message: String) => {
       |  val date = java.time.LocalDateTime.now()
@@ -240,7 +240,7 @@ lazy val common = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "recheck-common",
     console / initialCommands := """
-      |import codes.quine.labo.recheck.common._
+      |import codes.quine.labs.recheck.common._
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
@@ -260,7 +260,7 @@ lazy val exec = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "recheck-exec",
     console / initialCommands := """
-      |import codes.quine.labo.recheck.exec._
+      |import codes.quine.labs.recheck.exec._
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
@@ -279,7 +279,7 @@ lazy val unicode = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "recheck-unicode",
     console / initialCommands := """
-      |import codes.quine.labo.recheck.unicode._
+      |import codes.quine.labs.recheck.unicode._
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
@@ -295,8 +295,8 @@ lazy val unicode = crossProject(JVMPlatform, JSPlatform)
             "CaseMapDataGen.scala" -> CaseMapDataGen,
             "PropertyDataGen.scala" -> PropertyDataGen
           )
-          val pkg = "codes.quine.labo.recheck.unicode"
-          val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labo" / "recheck" / "unicode"
+          val pkg = "codes.quine.labs.recheck.unicode"
+          val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labs" / "recheck" / "unicode"
           val changes = generateUnicodeData.inputFileChanges
           val updatedPaths = changes.created ++ changes.modified
           for (path <- updatedPaths) {
@@ -324,7 +324,7 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "recheck-parse",
     console / initialCommands := """
-      |import codes.quine.labo.recheck.regexp._
+      |import codes.quine.labs.recheck.regexp._
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
@@ -352,7 +352,7 @@ lazy val codec = crossProject(JVMPlatform, JSPlatform)
       |import io.circe._
       |import io.circe.syntax._
       |
-      |import codes.quine.labo.recheck.codec._
+      |import codes.quine.labs.recheck.codec._
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
@@ -379,7 +379,7 @@ lazy val js = project
     name := "recheck-js",
     publish / skip := true,
     console / initialCommands := """
-      |import codes.quine.labo.recheck._
+      |import codes.quine.labs.recheck._
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
@@ -402,7 +402,7 @@ lazy val cli = project
     name := "recheck-cli",
     NativeImage / name := "recheck",
     publish / skip := true,
-    Compile / mainClass := Some("codes.quine.labo.recheck.cli.Main"),
+    Compile / mainClass := Some("codes.quine.labs.recheck.cli.Main"),
     assembly / mainClass := (Compile / mainClass).value,
     assembly / assemblyJarName := "recheck.jar",
     nativeImageVersion := "21.3.0",
@@ -412,14 +412,14 @@ lazy val cli = project
       "--initialize-at-build-time=scala",
       "--initialize-at-build-time=cats",
       "--initialize-at-build-time=io.circe",
-      "--initialize-at-build-time=codes.quine.labo.recheck"
+      "--initialize-at-build-time=codes.quine.labs.recheck"
     ),
     console / initialCommands := """
       |import io.circe._
       |import io.circe.parser._
       |import io.circe.syntax._
       |
-      |import codes.quine.labo.recheck.cli._
+      |import codes.quine.labs.recheck.cli._
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",

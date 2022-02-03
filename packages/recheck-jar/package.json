@@ -2,9 +2,9 @@
   "name": "recheck-jar",
   "version": "0.0.0-dev",
   "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
-  "homepage": "https://makenowjust-labo.github.io/recheck/",
+  "homepage": "https://makenowjust-labs.github.io/recheck/",
   "description": "The JAR archive for recheck.",
-  "repository": "https://github.com/MakeNowJust-Labo/recheck",
+  "repository": "https://github.com/makenowjust-labs/recheck",
   "license": "MIT",
   "preferUnplugged": false
 }

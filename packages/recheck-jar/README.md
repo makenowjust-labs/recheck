@@ -2,4 +2,4 @@
 
 > The JAR archive for recheck.
 
-See [MakeNowJust-Labo/recheck](https://github.com/MakeNowJust-Labo/recheck) for details.
+See [makenowjust-labs/recheck](https://github.com/makenowjust-labs/recheck) for details.

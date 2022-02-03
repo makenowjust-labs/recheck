@@ -7,7 +7,7 @@ title: Parameters
 It has many parameters.
 But, few parameters are useful to users, and the others are not needed to be set manually.
 
-You can look at the whole type definition [here](https://github.com/MakeNowJust-Labo/recheck/blob/main/packages/recheck/index.d.ts) (TypeScript) or [here](https://github.com/MakeNowJust-Labo/recheck/blob/main/modules/recheck-common/shared/src/main/scala/codes/quine/labo/recheck/common/Parameters.scala) (Scala).
+You can look at the whole type definition [here](https://github.com/makenowjust-labs/recheck/blob/main/packages/recheck/index.d.ts) (TypeScript) or [here](https://github.com/makenowjust-labs/recheck/blob/main/modules/recheck-common/shared/src/main/scala/codes/quine/labs/recheck/common/Parameters.scala) (Scala).
 
 ## `checker`
 
