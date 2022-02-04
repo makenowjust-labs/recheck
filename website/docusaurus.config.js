@@ -101,11 +101,11 @@ const config = {
             title: "More",
             items: [
               {
-                label: "GitHub Repository",
-                href: "https://github.com/makenowjust-Labs/recheck",
+                label: "Repository",
+                href: "https://github.com/makenowjust-labs/recheck",
               },
               {
-                label: "makenowjust-labs",
+                label: "Labs",
                 href: "https://github.com/makenowjust-labs",
               },
             ],
