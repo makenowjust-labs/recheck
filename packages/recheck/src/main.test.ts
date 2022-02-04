@@ -7,6 +7,8 @@ import * as native from "./lib/native";
 const RECHECK_JAR = `${__dirname}/../../../modules/recheck-cli/target/scala-2.13/recheck.jar`;
 const RECHECK_BIN = `${__dirname}/../../../modules/recheck-cli/target/native-image/recheck`;
 
+jest.setTimeout(10000);
+
 jest.mock("./lib/env");
 jest.mock("./lib/java");
 jest.mock("./lib/native");
