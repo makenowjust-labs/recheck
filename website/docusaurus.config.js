@@ -29,6 +29,13 @@ const config = {
           remarkPlugins: [math],
           rehypePlugins: [katex],
         },
+        blog: {
+          path: "blog",
+          editUrl:
+            "https://github.com/makenowjust-labs/recheck/tree/main/website/blog",
+          remarkPlugins: [math],
+          rehypePlugins: [katex],
+        },
         theme: {
           customCss: require.resolve("./src/css/custom.css"),
         },
@@ -59,6 +66,11 @@ const config = {
             to: "playground",
             position: "left",
             label: "Playground",
+          },
+          {
+            to: "blog",
+            position: "left",
+            label: "Blog",
           },
           {
             href: "https://github.com/makenowjust-labs/recheck",
