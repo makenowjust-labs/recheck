@@ -1,3 +1,9 @@
+# dev
+
+Misc:
+
+- [#337](https://github.com/makenowjust-labs/recheck/pull/337) Increase timeout on `main.ts` test ([@makenowjust](https://github.com/makenowjust))
+
 # 4.3.0 (2022-02-05)
 
 New Features:
