@@ -182,21 +182,12 @@ jobs:
           path: |
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
-      - uses: nick-invision/retry@v2
-        if: ${{ matrix.os != 'windows-latest' }}
-        with:
-          timeout_minutes: 15
-          max_attempts: 3
-          command: sbt cli/nativeImage
-      - uses: nick-invision/retry@v2
-        name: sbt cli/nativeImage
-        if: ${{ matrix.os == 'windows-latest' }}
-        with:
-          timeout_minutes: 15
-          max_attempts: 3
-          shell: cmd
-          command: >-
-            "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && sbt cli/nativeImage
+      - if: ${{ matrix.os != 'windows-latest' }}
+        run: sbt cli/nativeImage
+      - name: sbt cli/nativeImage
+        shell: cmd
+        run: >-
+          "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && sbt cli/nativeImage
       - uses: actions/upload-artifact@v2
         with:
           path: ${{ matrix.local_path }}
