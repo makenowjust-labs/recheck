@@ -10,7 +10,7 @@ export const SBTInstallCodeBlock = () => {
   const version = useDocusaurusContext().siteConfig.customFields.version;
   return (
     <CodeBlock title="build.sbt" className="language-scala">
-      libraryDependencies += "codes.quine.labo" %% "recheck-core" % "{version}"
+      libraryDependencies += "codes.quine.labs" %% "recheck-core" % "{version}"
     </CodeBlock>
   );
 };
@@ -19,7 +19,7 @@ Describes how to use `recheck` as a Scala library.
 
 ## Install
 
-[![Maven Central](https://img.shields.io/maven-central/v/codes.quine.labo/recheck-core_2.13?logo=scala&style=for-the-badge)](https://search.maven.org/artifact/codes.quine.labo/recheck-core_2.13)
+[![Maven Central](https://img.shields.io/maven-central/v/codes.quine.labs/recheck-core_2.13?logo=scala&style=for-the-badge)](https://search.maven.org/artifact/codes.quine.labs/recheck-core_2.13)
 
 To install the Scala library of `recheck`, you should append the following line into your `build.sbt`.
 
@@ -30,7 +30,7 @@ To install the Scala library of `recheck`, you should append the following line 
 `ReDoS.check` is the only entry point for checking the vulnerability of regular expression.
 
 ```scala
-import codes.quine.labo.recheck.ReDoS
+import codes.quine.labs.recheck.ReDoS
 
 ReDoS.check("^(a|a)*$", "")
 ```
@@ -72,10 +72,10 @@ import scala.concurrent.duration._
 import cats.effect._
 import cats.effect.unsafe.implicits.global
 
-import codes.quine.labo.recheck.ReDoS
-import codes.quine.labo.recheck.common.CancellationTokenSource
-import codes.quine.labo.recheck.common.Parameters
-import codes.quine.labo.recheck.diagnostics.Diagnostics
+import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.common.CancellationTokenSource
+import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.diagnostics.Diagnostics
 
 val cancellation = new CancellationTokenSource
 
@@ -108,10 +108,10 @@ import scala.concurrent.duration._
 import cats.effect._
 import cats.effect.unsafe.implicits.global
 
-import codes.quine.labo.recheck.ReDoS
-import codes.quine.labo.recheck.common.CancellationTokenSource
-import codes.quine.labo.recheck.common.Parameters
-import codes.quine.labo.recheck.diagnostics.Diagnostics
+import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.common.CancellationTokenSource
+import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.diagnostics.Diagnostics
 
 def cancelableCheck(source: String, flags: String, params: Parameters): IO[Diagnostics] =
   IO.executionContext.flatMap { ec =>

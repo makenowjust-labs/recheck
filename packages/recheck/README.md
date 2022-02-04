@@ -2,4 +2,4 @@
 
 > The trustworthy ReDoS checker
 
-See [the official documentation](https://makenowjust-labo.github.io/recheck/docs/usage/as-javascript-library) for details.
+See [the official documentation](https://makenowjust-labs.github.io/recheck/docs/usage/as-javascript-library) for details.

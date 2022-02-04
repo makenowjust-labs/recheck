@@ -9,12 +9,12 @@ const darkCodeTheme = require("prism-react-renderer/themes/dracula");
 const config = {
   title: "recheck",
   tagline: "The trustworthy ReDoS checker",
-  url: "https://makenowjust-labo.github.io",
+  url: "https://makenowjust-labs.github.io",
   baseUrl: "/recheck/",
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
   favicon: "img/favicon.png",
-  organizationName: "MakeNowJust-Labo",
+  organizationName: "makenowjust-labs",
   projectName: "recheck",
 
   presets: [
@@ -25,7 +25,7 @@ const config = {
         docs: {
           sidebarPath: require.resolve("./sidebars.js"),
           editUrl:
-            "https://github.com/MakeNowJust-Labo/recheck/tree/main/website",
+            "https://github.com/makenowjust-labs/recheck/tree/main/website",
           remarkPlugins: [math],
           rehypePlugins: [katex],
         },
@@ -61,7 +61,7 @@ const config = {
             label: "Playground",
           },
           {
-            href: "https://github.com/MakeNowJust-Labo/recheck",
+            href: "https://github.com/makenowjust-labs/recheck",
             position: "right",
             className: "header-github-link",
             "aria-label": "GitHub repository",
@@ -102,11 +102,11 @@ const config = {
             items: [
               {
                 label: "GitHub Repository",
-                href: "https://github.com/MakeNowJust-Labo/recheck",
+                href: "https://github.com/makenowjust-Labs/recheck",
               },
               {
-                label: "@MakeNowJust-Labo",
-                href: "https://github.com/MakeNowJust-Labo",
+                label: "makenowjust-labs",
+                href: "https://github.com/makenowjust-labs",
               },
             ],
           },

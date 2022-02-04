@@ -3,8 +3,8 @@
   "description": "ESLint plugin for catching ReDoS vulnerability",
   "license": "MIT",
   "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
-  "homepage": "https://makenowjust-labo.github.io/recheck/",
-  "repository": "https://github.com/MakeNowJust-Labo/recheck.git",
+  "homepage": "https://makenowjust-labs.github.io/recheck/",
+  "repository": "https://github.com/makenowjust-labs/recheck.git",
   "version": "0.0.0-dev",
   "main": "lib/main.js",
   "files": [

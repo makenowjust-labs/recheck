@@ -3,8 +3,8 @@
   "version": "0.0.0-dev",
   "description": "The macOS 64-bit binary for recheck.",
   "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
-  "homepage": "https://makenowjust-labo.github.io/recheck/",
-  "repository": "https://github.com/MakeNowJust-Labo/recheck",
+  "homepage": "https://makenowjust-labs.github.io/recheck/",
+  "repository": "https://github.com/makenowjust-labs/recheck",
   "license": "MIT",
   "preferUnplugged": false,
   "os": [
