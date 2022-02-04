@@ -7,6 +7,7 @@ New Features:
 Changes:
 
 - [#283](https://github.com/makenowjust-labs/recheck/pull/283) Rename `hybrid` to `auto` ([@makenowjust](https://github.com/makenowjust))
+- [#332](https://github.com/makenowjust-labs/recheck/pull/332) Rename `labo` to `labs` ([@makenowjust](https://github.com/makenowjust))
 
 Fixes:
 
