@@ -182,9 +182,10 @@ jobs:
           path: |
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
-      - if: ${{ matrix.os != 'windows-latest' }}
+      - if: matrix.os != 'windows-latest'
         run: sbt cli/nativeImage
-      - name: sbt cli/nativeImage
+      - if: matrix.os == 'windows-latest'
+        name: Run sbt cli/nativeImage
         shell: cmd
         run: >-
           "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && sbt cli/nativeImage
