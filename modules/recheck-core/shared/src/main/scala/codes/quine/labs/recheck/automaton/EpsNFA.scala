@@ -55,7 +55,7 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
   /** Converts this ε-NFA to ordered NFA with ε-elimination. */
   def toOrderedNFA(implicit ctx: Context): OrderedNFA[IChar, (CharKind, Seq[(Q, Set[CharKind])])] =
     toOrderedNFA(Int.MaxValue)
-  
+
   /** Converts this ε-NFA to ordered NFA with ε-elimination. */
   def toOrderedNFA(maxNFASize: Int)(implicit ctx: Context): OrderedNFA[IChar, (CharKind, Seq[(Q, Set[CharKind])])] =
     ctx.interrupt {
