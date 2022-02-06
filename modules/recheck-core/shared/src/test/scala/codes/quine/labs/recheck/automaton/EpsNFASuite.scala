@@ -86,16 +86,17 @@ class EpsNFASuite extends munit.FunSuite {
         5 -> LoopExit(0, 6)
       )
     )
+    val q36: Seq[(Int, Set[CharKind])] = Seq((3, Set(CharKind.LineTerminator, CharKind.Normal)), (6, Set.empty))
     assertEquals(
       nfa1.toOrderedNFA,
-      OrderedNFA[IChar, (CharKind, Seq[Int])](
+      OrderedNFA[IChar, (CharKind, Seq[(Int, Set[CharKind])])](
         Set(IChar('\n'), IChar('\n').complement(false)),
-        Set((CharKind.LineTerminator, Seq(3, 6))),
-        Vector((CharKind.LineTerminator, Seq(3, 6))),
-        Set((CharKind.LineTerminator, Seq(3, 6))),
+        Set((CharKind.LineTerminator, q36)),
+        Vector((CharKind.LineTerminator, q36)),
+        Set((CharKind.LineTerminator, q36)),
         Map(
-          ((CharKind.LineTerminator, Seq(3, 6)), IChar('\n')) -> Vector(
-            (CharKind.LineTerminator, Seq(3, 6))
+          ((CharKind.LineTerminator, q36), IChar('\n')) -> Vector(
+            (CharKind.LineTerminator, q36)
           )
         )
       )
@@ -118,33 +119,44 @@ class EpsNFASuite extends munit.FunSuite {
         9 -> Assert(AssertKind.WordBoundary, 10)
       )
     )
+    val q4: Seq[(Int, Set[CharKind])] = Seq((4, Set(CharKind.LineTerminator)))
+    val q45: Seq[(Int, Set[CharKind])] = Seq(
+      (4, Set(CharKind.LineTerminator, CharKind.Word, CharKind.Normal)),
+      (5, Set(CharKind.LineTerminator, CharKind.Word, CharKind.Normal))
+    )
+    val q54510: Seq[(Int, Set[CharKind])] = Seq(
+      (5, Set(CharKind.Word)),
+      (4, Set(CharKind.LineTerminator, CharKind.Word, CharKind.Normal)),
+      (5, Set(CharKind.LineTerminator, CharKind.Word, CharKind.Normal)),
+      (10, Set.empty)
+    )
     assertEquals(
       nfa2.toOrderedNFA,
       OrderedNFA(
         Set(IChar('\n'), IChar('a'), IChar('a').union(IChar('\n')).complement(false)),
         Set(
-          (CharKind.LineTerminator, Seq(4)),
-          (CharKind.LineTerminator, Seq(4, 5)),
-          (CharKind.Word, Seq(5, 4, 5, 10))
+          (CharKind.LineTerminator, q4),
+          (CharKind.LineTerminator, q45),
+          (CharKind.Word, q54510)
         ),
-        Vector((CharKind.LineTerminator, Seq(4))),
-        Set((CharKind.Word: CharKind, Seq(5, 4, 5, 10))),
+        Vector((CharKind.LineTerminator, q4)),
+        Set((CharKind.Word: CharKind, q54510)),
         Map(
-          ((CharKind.LineTerminator, Seq(4)), IChar('\n')) -> Vector(
-            (CharKind.LineTerminator, Seq(4, 5))
+          ((CharKind.LineTerminator, q4), IChar('\n')) -> Vector(
+            (CharKind.LineTerminator, q45)
           ),
-          ((CharKind.LineTerminator, Seq(4, 5)), IChar('a')) -> Vector(
-            (CharKind.Word, Seq(5, 4, 5, 10))
+          ((CharKind.LineTerminator, q45), IChar('a')) -> Vector(
+            (CharKind.Word, q54510)
           ),
-          ((CharKind.LineTerminator, Seq(4, 5)), IChar('\n')) -> Vector(
-            (CharKind.LineTerminator, Seq(4, 5))
+          ((CharKind.LineTerminator, q45), IChar('\n')) -> Vector(
+            (CharKind.LineTerminator, q45)
           ),
-          ((CharKind.Word, Seq(5, 4, 5, 10)), IChar('\n')) -> Vector(
-            (CharKind.LineTerminator, Seq(4, 5))
+          ((CharKind.Word, q54510), IChar('\n')) -> Vector(
+            (CharKind.LineTerminator, q45)
           ),
-          ((CharKind.Word, Seq(5, 4, 5, 10)), IChar('a')) -> Vector(
-            (CharKind.Word, Seq(5, 4, 5, 10)),
-            (CharKind.Word, Seq(5, 4, 5, 10))
+          ((CharKind.Word, q54510), IChar('a')) -> Vector(
+            (CharKind.Word, q54510),
+            (CharKind.Word, q54510)
           )
         )
       )
