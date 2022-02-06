@@ -13,7 +13,7 @@
     "@docusaurus/module-type-aliases": "2.0.0-beta.15",
     "@docusaurus/plugin-ideal-image": "2.0.0-beta.15",
     "@docusaurus/preset-classic": "2.0.0-beta.15",
-    "@mdx-js/react": "1.6.22",
+    "@mdx-js/react": "2.0.0",
     "@tsconfig/docusaurus": "1.0.4",
     "clsx": "1.1.1",
     "hast-util-is-element": "1.1.0",
