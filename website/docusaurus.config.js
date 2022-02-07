@@ -131,6 +131,11 @@ const config = {
         additionalLanguages: ["java", "scala"],
       },
       image: "img/social.png",
+      algolia: {
+        appId: "G4MPILTIZG",
+        apiKey: "6945fba829f095a830d2aaf08e253c0a",
+        indexName: "recheck",
+      },
     }),
 
   stylesheets: [
