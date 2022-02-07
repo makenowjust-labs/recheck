@@ -7,6 +7,7 @@ Fixes:
 Misc:
 
 - [#337](https://github.com/makenowjust-labs/recheck/pull/337) Increase timeout on `main.ts` test ([@makenowjust](https://github.com/makenowjust))
+- [#343](https://github.com/makenowjust-labs/recheck/pull/343) Enable Algolia DocSearch ([@makenowjust](https://github.com/makenowjust))
 
 # 4.3.0 (2022-02-05)
 
