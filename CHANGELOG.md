@@ -1,5 +1,9 @@
 # dev
 
+Fixes:
+
+- [#341](https://github.com/makenowjust-labs/recheck/pull/341) Fix zero-width assertion in `automaton` checker ([@makenowjust](https://github.com/makenowjust))
+
 Misc:
 
 - [#337](https://github.com/makenowjust-labs/recheck/pull/337) Increase timeout on `main.ts` test ([@makenowjust](https://github.com/makenowjust))
