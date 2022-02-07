@@ -53,21 +53,24 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
   }
 
   /** Converts this ε-NFA to ordered NFA with ε-elimination. */
-  def toOrderedNFA(implicit ctx: Context): OrderedNFA[IChar, (CharKind, Seq[Q])] = toOrderedNFA(Int.MaxValue)
+  def toOrderedNFA(implicit ctx: Context): OrderedNFA[IChar, (CharKind, Seq[(Q, Set[CharKind])])] =
+    toOrderedNFA(Int.MaxValue)
 
   /** Converts this ε-NFA to ordered NFA with ε-elimination. */
-  def toOrderedNFA(maxNFASize: Int)(implicit ctx: Context): OrderedNFA[IChar, (CharKind, Seq[Q])] =
+  def toOrderedNFA(maxNFASize: Int)(implicit ctx: Context): OrderedNFA[IChar, (CharKind, Seq[(Q, Set[CharKind])])] =
     ctx.interrupt {
       val hasLineAssertion = tau.values
         .collect { case Assert(k, _) => k }
         .exists(k => k == AssertKind.LineBegin || k == AssertKind.LineEnd)
       val inputTerminatorKind = if (hasLineAssertion) CharKind.LineTerminator else CharKind.Normal
 
-      // Obtains a set of possible character information.
-      val charInfoSet = alphabet.pairs.iterator.map(_._2).toSet ++ Set(inputTerminatorKind)
+      // Obtains a set of possible character kinds.
+      val charKindSet = alphabet.pairs.iterator.map(_._2).toSet ++ Set(inputTerminatorKind)
+
+      type P = (Q, Set[CharKind])
 
       /** Skips ε-transitions from the state and collects not ε-transition or terminal state. */
-      def buildClosure(k0: CharKind, ks: Set[CharKind], q: Q, loops: Set[Int]): Seq[(Q, Option[Consume[Q]])] =
+      def buildClosure(k0: CharKind, ks: Set[CharKind], q: Q, loops: Set[Int]): Seq[(P, Option[Consume[Q]])] =
         ctx.interrupt {
           if (ks.isEmpty) Vector.empty
           else
@@ -82,26 +85,26 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
                 else buildClosure(k0, ks, q1, loops)
               case Some(Consume(chs, q1, pos)) =>
                 val newChs = chs.filter { case (_, k) => ks.contains(k) }
-                if (newChs.nonEmpty) Vector((q, Some(Consume(newChs, q1, pos))))
+                if (newChs.nonEmpty) Vector(((q, ks), Some(Consume(newChs, q1, pos))))
                 else Vector.empty
               case None =>
-                if (ks.contains(inputTerminatorKind)) Vector((q, None))
+                if (ks.contains(inputTerminatorKind)) Vector(((q, Set.empty), None))
                 else Vector.empty
             }
         }
-      val closureCache = mutable.Map.empty[(CharKind, Q), Seq[(Q, Option[Consume[Q]])]]
-      def closure(k0: CharKind, q: Q): Seq[(Q, Option[Consume[Q]])] =
-        closureCache.getOrElseUpdate((k0, q), buildClosure(k0, charInfoSet, q, Set.empty))
+      val closureCache = mutable.Map.empty[(CharKind, Q), Seq[(P, Option[Consume[Q]])]]
+      def closure(k0: CharKind, q: Q): Seq[(P, Option[Consume[Q]])] =
+        closureCache.getOrElseUpdate((k0, q), buildClosure(k0, charKindSet, q, Set.empty))
 
       val closureInit = closure(inputTerminatorKind, init)
 
-      val queue = mutable.Queue.empty[(CharKind, Seq[(Q, Option[Consume[Q]])])]
-      val newStateSet = mutable.Set.empty[(CharKind, Seq[Q])]
+      val queue = mutable.Queue.empty[(CharKind, Seq[(P, Option[Consume[Q]])])]
+      val newStateSet = mutable.Set.empty[(CharKind, Seq[P])]
       val newInits = Vector((inputTerminatorKind, closureInit.map(_._1)))
-      val newAcceptSet = Set.newBuilder[(CharKind, Seq[Q])]
-      val newDelta = Map.newBuilder[((CharKind, Seq[Q]), IChar), Seq[(CharKind, Seq[Q])]]
+      val newAcceptSet = Set.newBuilder[(CharKind, Seq[P])]
+      val newDelta = Map.newBuilder[((CharKind, Seq[P]), IChar), Seq[(CharKind, Seq[P])]]
       val newSourcemap = mutable.Map
-        .empty[((CharKind, Seq[Q]), IChar, (CharKind, Seq[Q])), Seq[Location]]
+        .empty[((CharKind, Seq[P]), IChar, (CharKind, Seq[P])), Seq[Location]]
         .withDefaultValue(Vector.empty)
       var deltaSize = 0
 
@@ -111,8 +114,8 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
       while (queue.nonEmpty) ctx.interrupt {
         val (c0, qps) = queue.dequeue()
         val qs0 = qps.map(_._1)
-        if (qs0.contains(accept)) newAcceptSet.addOne((c0, qs0))
-        val d = mutable.Map.empty[IChar, Seq[(CharKind, Seq[Q])]].withDefaultValue(Vector.empty)
+        if (qs0.map(_._1).contains(accept)) newAcceptSet.addOne((c0, qs0))
+        val d = mutable.Map.empty[IChar, Seq[(CharKind, Seq[P])]].withDefaultValue(Vector.empty)
         for ((_, p) <- qps) {
           p match {
             case Some(Consume(chs, q1, loc)) =>
