@@ -16,6 +16,7 @@ const config = {
   favicon: "img/favicon.png",
   organizationName: "makenowjust-labs",
   projectName: "recheck",
+  trailingSlash: true,
 
   presets: [
     [
@@ -133,8 +134,9 @@ const config = {
       image: "img/social.png",
       algolia: {
         appId: "G4MPILTIZG",
-        apiKey: "6945fba829f095a830d2aaf08e253c0a",
+        apiKey: "5cd3ac1c5965dcb57033451f3bd12ed8",
         indexName: "recheck",
+        contextualSearch: false,
       },
     }),
 
