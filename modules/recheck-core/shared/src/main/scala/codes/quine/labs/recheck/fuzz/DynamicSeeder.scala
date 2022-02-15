@@ -24,10 +24,10 @@ object DynamicSeeder {
   /** Computes an initial generation of the program. */
   def seed(
       fuzz: FuzzProgram,
-      limit: Int = Parameters.SeedingLimit,
-      timeout: Duration = Parameters.SeedingTimeout,
-      maxInitialGenerationSize: Int = Parameters.MaxInitialGenerationSize,
-      accelerationMode: AccelerationMode = Parameters.AccelerationMode
+      limit: Int = Parameters.DefaultSeedingLimit,
+      timeout: Duration = Parameters.DefaultSeedingTimeout,
+      maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
+      accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode
   )(implicit ctx: Context): Set[FString] =
     ctx.interrupt {
       import ctx._

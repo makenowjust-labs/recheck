@@ -15,10 +15,10 @@ object StaticSeeder {
   /** Computes an initial generation of the pattern. */
   def seed(
       pattern: Pattern,
-      maxSimpleRepeatSize: Int = Parameters.MaxSimpleRepeatCount,
-      maxInitialGenerationSize: Int = Parameters.MaxInitialGenerationSize,
-      limit: Int = Parameters.IncubationLimit,
-      maxSize: Int = Parameters.MaxGeneStringSize
+      maxSimpleRepeatSize: Int = Parameters.DefaultMaxSimpleRepeatCount,
+      maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
+      limit: Int = Parameters.DefaultIncubationLimit,
+      maxSize: Int = Parameters.DefaultMaxGeneStringSize
   )(implicit
       ctx: Context
   ): Set[FString] = ctx.interrupt {
