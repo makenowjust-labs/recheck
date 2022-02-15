@@ -3,6 +3,7 @@
 Changes:
 
 - [#357](https://github.com/makenowjust-labs/recheck/pull/357) Add `Default` prefix to default parameter values ([@makenowjust](https://github.com/makenowjust))
+- [#358](https://github.com/makenowjust-labs/recheck/pull/358) Sort `Parameters` names in lexicographic order ([@makenowjust](https://github.com/makenowjust))
 
 Fixes:
 
