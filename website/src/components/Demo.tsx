@@ -103,15 +103,9 @@ const DemoInput: React.VFC<DemoInputProps> = ({ check, cancel, status }) => {
       }
     },
     {
-      "name": "timeout",
-      "title": "Timeout",
-      "defaultValue": 10000,
-      "type": "duration"
-    },
-    {
       "name": "logger",
       "title": "Logger",
-      "defaultValue": "off",
+      "defaultValue": null,
       "type": {
         "select": [
           "on",
@@ -120,87 +114,22 @@ const DemoInput: React.VFC<DemoInputProps> = ({ check, cancel, status }) => {
       }
     },
     {
-      "name": "randomSeed",
-      "title": "Random Seed",
-      "defaultValue": 0,
-      "type": "integer"
+      "name": "timeout",
+      "title": "Timeout",
+      "defaultValue": 10000,
+      "type": "duration"
     },
     {
-      "name": "maxIteration",
-      "title": "Max Iteration",
-      "defaultValue": 10,
-      "type": "integer"
-    },
-    {
-      "name": "seeder",
-      "title": "Seeder",
-      "defaultValue": "static",
+      "name": "accelerationMode",
+      "title": "Acceleration Mode",
+      "defaultValue": "auto",
       "type": {
         "select": [
-          "static",
-          "dynamic"
+          "auto",
+          "on",
+          "off"
         ]
       }
-    },
-    {
-      "name": "maxSimpleRepeatCount",
-      "title": "Max Simple Repeat Count",
-      "defaultValue": 30,
-      "type": "integer"
-    },
-    {
-      "name": "seedingLimit",
-      "title": "Seeding Limit",
-      "defaultValue": 1000,
-      "type": "integer"
-    },
-    {
-      "name": "seedingTimeout",
-      "title": "Seeding Timeout",
-      "defaultValue": 100,
-      "type": "duration"
-    },
-    {
-      "name": "maxInitialGenerationSize",
-      "title": "Max Initial Generation Size",
-      "defaultValue": 500,
-      "type": "integer"
-    },
-    {
-      "name": "incubationLimit",
-      "title": "Incubation Limit",
-      "defaultValue": 25000,
-      "type": "integer"
-    },
-    {
-      "name": "incubationTimeout",
-      "title": "Incubation Timeout",
-      "defaultValue": 250,
-      "type": "duration"
-    },
-    {
-      "name": "maxGeneStringSize",
-      "title": "Max Gene String Size",
-      "defaultValue": 2400,
-      "type": "integer"
-    },
-    {
-      "name": "maxGenerationSize",
-      "title": "Max Generation Size",
-      "defaultValue": 100,
-      "type": "integer"
-    },
-    {
-      "name": "crossoverSize",
-      "title": "Crossover Size",
-      "defaultValue": 25,
-      "type": "integer"
-    },
-    {
-      "name": "mutationSize",
-      "title": "Mutation Size",
-      "defaultValue": 50,
-      "type": "integer"
     },
     {
       "name": "attackLimit",
@@ -212,6 +141,30 @@ const DemoInput: React.VFC<DemoInputProps> = ({ check, cancel, status }) => {
       "name": "attackTimeout",
       "title": "Attack Timeout",
       "defaultValue": 1000,
+      "type": "duration"
+    },
+    {
+      "name": "crossoverSize",
+      "title": "Crossover Size",
+      "defaultValue": 25,
+      "type": "integer"
+    },
+    {
+      "name": "heatRatio",
+      "title": "Heat Ratio",
+      "defaultValue": 0.001,
+      "type": "float"
+    },
+    {
+      "name": "incubationLimit",
+      "title": "Incubation Limit",
+      "defaultValue": 25000,
+      "type": "integer"
+    },
+    {
+      "name": "incubationTimeout",
+      "title": "Incubation Timeout",
+      "defaultValue": 250,
       "type": "duration"
     },
     {
@@ -227,27 +180,33 @@ const DemoInput: React.VFC<DemoInputProps> = ({ check, cancel, status }) => {
       "type": "integer"
     },
     {
-      "name": "heatRatio",
-      "title": "Heat Ratio",
-      "defaultValue": 0.001,
-      "type": "float"
+      "name": "maxGeneStringSize",
+      "title": "Max Gene String Size",
+      "defaultValue": 2400,
+      "type": "integer"
     },
     {
-      "name": "accelerationMode",
-      "title": "Acceleration Mode",
-      "defaultValue": "auto",
-      "type": {
-        "select": [
-          "auto",
-          "on",
-          "off"
-        ]
-      }
+      "name": "maxGenerationSize",
+      "title": "Max Generation Size",
+      "defaultValue": 100,
+      "type": "integer"
     },
     {
-      "name": "maxRepeatCount",
-      "title": "Max Repeat Count",
-      "defaultValue": 30,
+      "name": "maxInitialGenerationSize",
+      "title": "Max Initial Generation Size",
+      "defaultValue": 500,
+      "type": "integer"
+    },
+    {
+      "name": "maxIteration",
+      "title": "Max Iteration",
+      "defaultValue": 10,
+      "type": "integer"
+    },
+    {
+      "name": "maxNFASize",
+      "title": "Max NFA Size",
+      "defaultValue": 35000,
       "type": "integer"
     },
     {
@@ -257,9 +216,33 @@ const DemoInput: React.VFC<DemoInputProps> = ({ check, cancel, status }) => {
       "type": "integer"
     },
     {
-      "name": "maxNFASize",
-      "title": "Max NFA Size",
-      "defaultValue": 35000,
+      "name": "maxRecallStringSize",
+      "title": "Max Recall String Size",
+      "defaultValue": 300000,
+      "type": "integer"
+    },
+    {
+      "name": "maxRepeatCount",
+      "title": "Max Repeat Count",
+      "defaultValue": 30,
+      "type": "integer"
+    },
+    {
+      "name": "maxSimpleRepeatCount",
+      "title": "Max Simple Repeat Count",
+      "defaultValue": 30,
+      "type": "integer"
+    },
+    {
+      "name": "mutationSize",
+      "title": "Mutation Size",
+      "defaultValue": 50,
+      "type": "integer"
+    },
+    {
+      "name": "randomSeed",
+      "title": "Random Seed",
+      "defaultValue": 0,
       "type": "integer"
     },
     {
@@ -275,10 +258,27 @@ const DemoInput: React.VFC<DemoInputProps> = ({ check, cancel, status }) => {
       "type": "duration"
     },
     {
-      "name": "maxRecallStringSize",
-      "title": "Max Recall String Size",
-      "defaultValue": 300000,
+      "name": "seeder",
+      "title": "Seeder",
+      "defaultValue": "static",
+      "type": {
+        "select": [
+          "static",
+          "dynamic"
+        ]
+      }
+    },
+    {
+      "name": "seedingLimit",
+      "title": "Seeding Limit",
+      "defaultValue": 1000,
       "type": "integer"
+    },
+    {
+      "name": "seedingTimeout",
+      "title": "Seeding Timeout",
+      "defaultValue": 100,
+      "type": "duration"
     }
   ];
 

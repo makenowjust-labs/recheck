@@ -111,65 +111,65 @@ package object codec {
   /** A `Decoder` for `Parameters`. */
   implicit def decodeParameters(implicit decodeLogger: Decoder[Context.Logger]): Decoder[Parameters] = (c: HCursor) =>
     for {
+      accelerationMode <- c.getOrElse[AccelerationMode]("accelerationMode")(Parameters.DefaultAccelerationMode)
+      attackLimit <- c.getOrElse[Int]("attackLimit")(Parameters.DefaultAttackLimit)
+      attackTimeout <- c.getOrElse[Duration]("attackTimeout")(Parameters.DefaultAttackTimeout)
       checker <- c.getOrElse[Checker]("checker")(Parameters.DefaultChecker)
-      timeout <- c.getOrElse[Duration]("timeout")(Parameters.DefaultTimeout)
+      crossoverSize <- c.getOrElse[Int]("crossoverSize")(Parameters.DefaultCrossoverSize)
+      heatRatio <- c.getOrElse[Double]("heatRatio")(Parameters.DefaultHeatRatio)
+      incubationLimit <- c.getOrElse[Int]("incubationLimit")(Parameters.DefaultIncubationLimit)
+      incubationTimeout <- c.getOrElse[Duration]("incubationTimeout")(Parameters.DefaultIncubationTimeout)
       logger <- c.getOrElse[Option[Context.Logger]]("logger")(Parameters.DefaultLogger)
-      randomSeed <- c.getOrElse[Long]("randomSeed")(Parameters.DefaultRandomSeed)
-      maxIteration <- c.getOrElse[Int]("maxIteration")(Parameters.DefaultMaxIteration)
-      seeder <- c.getOrElse[Seeder]("seeder")(Parameters.DefaultSeeder)
-      maxSimpleRepeatCount <- c.getOrElse[Int]("maxSimpleRepeatCount")(Parameters.DefaultMaxSimpleRepeatCount)
-      seedingLimit <- c.getOrElse[Int]("seedingLimit")(Parameters.DefaultSeedingLimit)
-      seedingTimeout <- c.getOrElse[Duration]("seedingTimeout")(Parameters.DefaultSeedingTimeout)
+      maxAttackStringSize <- c.getOrElse[Int]("maxAttackStringSize")(Parameters.DefaultMaxAttackStringSize)
+      maxDegree <- c.getOrElse[Int]("maxDegree")(Parameters.DefaultMaxDegree)
+      maxGeneStringSize <- c.getOrElse[Int]("maxGeneStringSize")(Parameters.DefaultMaxGeneStringSize)
+      maxGenerationSize <- c.getOrElse[Int]("maxGenerationSize")(Parameters.DefaultMaxGenerationSize)
       maxInitialGenerationSize <- c.getOrElse[Int]("maxInitialGenerationSize")(
         Parameters.DefaultMaxInitialGenerationSize
       )
-      incubationLimit <- c.getOrElse[Int]("incubationLimit")(Parameters.DefaultIncubationLimit)
-      incubationTimeout <- c.getOrElse[Duration]("incubationTimeout")(Parameters.DefaultIncubationTimeout)
-      maxGeneStringSize <- c.getOrElse[Int]("maxGeneStringSize")(Parameters.DefaultMaxGeneStringSize)
-      maxGenerationSize <- c.getOrElse[Int]("maxGenerationSize")(Parameters.DefaultMaxGenerationSize)
-      crossoverSize <- c.getOrElse[Int]("crossoverSize")(Parameters.DefaultCrossoverSize)
-      mutationSize <- c.getOrElse[Int]("mutationSize")(Parameters.DefaultMutationSize)
-      attackLimit <- c.getOrElse[Int]("attackLimit")(Parameters.DefaultAttackLimit)
-      attackTimeout <- c.getOrElse[Duration]("attackTimeout")(Parameters.DefaultAttackTimeout)
-      maxAttackStringSize <- c.getOrElse[Int]("maxAttackStringSize")(Parameters.DefaultMaxAttackStringSize)
-      maxDegree <- c.getOrElse[Int]("maxDegree")(Parameters.DefaultMaxDegree)
-      heatRatio <- c.getOrElse[Double]("heatRatio")(Parameters.DefaultHeatRatio)
-      accelerationMode <- c.getOrElse[AccelerationMode]("accelerationMode")(Parameters.DefaultAccelerationMode)
-      maxRepeatCount <- c.getOrElse[Int]("maxRepeatCount")(Parameters.DefaultMaxRepeatCount)
-      maxPatternSize <- c.getOrElse[Int]("maxPatternSize")(Parameters.DefaultMaxPatternSize)
+      maxIteration <- c.getOrElse[Int]("maxIteration")(Parameters.DefaultMaxIteration)
       maxNFASize <- c.getOrElse[Int]("maxNFASize")(Parameters.DefaultMaxNFASize)
+      maxPatternSize <- c.getOrElse[Int]("maxPatternSize")(Parameters.DefaultMaxPatternSize)
+      maxRecallStringSize <- c.getOrElse[Int]("maxRecallStringSize")(Parameters.DefaultMaxRecallStringSize)
+      maxRepeatCount <- c.getOrElse[Int]("maxRepeatCount")(Parameters.DefaultMaxRepeatCount)
+      maxSimpleRepeatCount <- c.getOrElse[Int]("maxSimpleRepeatCount")(Parameters.DefaultMaxSimpleRepeatCount)
+      mutationSize <- c.getOrElse[Int]("mutationSize")(Parameters.DefaultMutationSize)
+      randomSeed <- c.getOrElse[Long]("randomSeed")(Parameters.DefaultRandomSeed)
       recallLimit <- c.getOrElse[Int]("recallLimit")(Parameters.DefaultRecallLimit)
       recallTimeout <- c.getOrElse[Duration]("recallTimeout")(Parameters.DefaultRecallTimeout)
-      maxRecallStringSize <- c.getOrElse[Int]("maxRecallStringSize")(Parameters.DefaultMaxRecallStringSize)
+      seeder <- c.getOrElse[Seeder]("seeder")(Parameters.DefaultSeeder)
+      seedingLimit <- c.getOrElse[Int]("seedingLimit")(Parameters.DefaultSeedingLimit)
+      seedingTimeout <- c.getOrElse[Duration]("seedingTimeout")(Parameters.DefaultSeedingTimeout)
+      timeout <- c.getOrElse[Duration]("timeout")(Parameters.DefaultTimeout)
     } yield Parameters(
-      checker,
-      timeout,
-      logger,
-      randomSeed,
-      maxIteration,
-      seeder,
-      maxSimpleRepeatCount,
-      seedingLimit,
-      seedingTimeout,
-      maxInitialGenerationSize,
-      incubationLimit,
-      incubationTimeout,
-      maxGeneStringSize,
-      maxGenerationSize,
-      crossoverSize,
-      mutationSize,
+      accelerationMode,
       attackLimit,
       attackTimeout,
+      checker,
+      crossoverSize,
+      heatRatio,
+      incubationLimit,
+      incubationTimeout,
+      logger,
       maxAttackStringSize,
       maxDegree,
-      heatRatio,
-      accelerationMode,
-      maxRepeatCount,
-      maxPatternSize,
+      maxGeneStringSize,
+      maxGenerationSize,
+      maxInitialGenerationSize,
+      maxIteration,
       maxNFASize,
+      maxPatternSize,
+      maxRecallStringSize,
+      maxRepeatCount,
+      maxSimpleRepeatCount,
+      mutationSize,
+      randomSeed,
       recallLimit,
       recallTimeout,
-      maxRecallStringSize
+      seeder,
+      seedingLimit,
+      seedingTimeout,
+      timeout
     )
 
   /** A `Decoder` for `Duration`. */
