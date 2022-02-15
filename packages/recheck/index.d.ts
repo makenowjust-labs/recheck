@@ -22,135 +22,17 @@ export function checkSync(
  */
 export type Parameters = {
   /**
-   * The type of checker to be used.
+   * The type of acceleration mode strategy on fuzzing.
    *
-   * There are three checker types.
+   * There are three acceleration mode strategies.
    *
-   * - `auto` checker uses the criteria to decide which algorithm is better to use against a regular expression, the algorithm based on automata theory or the fuzzing algorithm.
-   * - `fuzz` checker uses the fuzzing algorithm with static analysis.
-   * - `automaton` checker uses the algorithm based on automata theory.
+   * - `auto` uses acceleration mode as default. However, if the regular expression has backreferences, it turns off the acceleration mode.
+   * - `on` turns on the acceleration mode.
+   * - `off` turns off the acceleration mode.
    *
    * (default: `'auto'`)
    */
-  checker?: "auto" | "fuzz" | "automaton";
-
-  /**
-   * The upper limit of checking time.
-   *
-   * If the checking time exceeds this limit, the result will be reported as `timeout`. If the value is positive infinite in Scala or `null` in TypeScript, the result never becomes `timeout`.
-   *
-   * The `timeout` time begins to be measured as soon as the check starts. Note that the `timeout` does not occur while the input is in the queue waiting to be checked.
-   *
-   * In TypeScript, a number value is treated as in milliseconds.
-   *
-   * (default: `10000`)
-   */
-  timeout?: number | null;
-
-  /**
-   * The logger function to record execution traces.
-   *
-   * To disable the logging, `null` in TypeScript or `None` in Scala should be passed.
-   *
-   * (default: `null`)
-   */
-  logger?: (message: string) => void;
-
-  /**
-   * The PRNG seed number.
-   *
-   * (default: `0`)
-   */
-  randomSeed?: number;
-
-  /**
-   * The maximum number of fuzzing iteration.
-   *
-   * (default: `10`)
-   */
-  maxIteration?: number;
-
-  /**
-   * The type of seeder to be used in fuzzing.
-   *
-   * There are two seeders.
-   *
-   * - `static` seeder uses the seeding algorithm based on the automata theory.
-   * - `dynamic` seeder uses the seeding algorithm with dynamic analysis.
-   *
-   * (default: `'static'`)
-   */
-  seeder?: "static" | "dynamic";
-
-  /**
-   * The maximum number of each repetition quantifier’s repeat count on `static` seeding.
-   *
-   * (default: `30`)
-   */
-  maxSimpleRepeatCount?: number;
-
-  /**
-   * The upper limit on the number of characters read by VM on `dynamic` seeding.
-   *
-   * (default: `1000`)
-   */
-  seedingLimit?: number;
-
-  /**
-   * The upper limit of matching time on `dynamic` seeding.
-   *
-   * (default: `100`)
-   */
-  seedingTimeout?: number | null;
-
-  /**
-   * The maximum size of the initial generation on fuzzing.
-   *
-   * (default: `500`)
-   */
-  maxInitialGenerationSize?: number;
-
-  /**
-   * The upper limit on the number of characters read by VM on incubation.
-   *
-   * (default: `25000`)
-   */
-  incubationLimit?: number;
-
-  /**
-   * The upper limit of matching time on incubation.
-   *
-   * (default: `250`)
-   */
-  incubationTimeout?: number | null;
-
-  /**
-   * The maximum length of the gene string on fuzzing.
-   *
-   * (default: `2400`)
-   */
-  maxGeneStringSize?: number;
-
-  /**
-   * The maximum size of each generation on fuzzing.
-   *
-   * (default: `100`)
-   */
-  maxGenerationSize?: number;
-
-  /**
-   * The number of crossover on each generation.
-   *
-   * (default: `25`)
-   */
-  crossoverSize?: number;
-
-  /**
-   * The number of mutation on each generation.
-   *
-   * (default: `50`)
-   */
-  mutationSize?: number;
+  accelerationMode?: "auto" | "on" | "off";
 
   /**
    * The upper limit on the number of characters read by VM on the attack.
@@ -167,6 +49,56 @@ export type Parameters = {
   attackTimeout?: number | null;
 
   /**
+   * The type of checker to be used.
+   *
+   * There are three checker types.
+   *
+   * - `auto` checker uses the criteria to decide which algorithm is better to use against a regular expression, the algorithm based on automata theory or the fuzzing algorithm.
+   * - `fuzz` checker uses the fuzzing algorithm with static analysis.
+   * - `automaton` checker uses the algorithm based on automata theory.
+   *
+   * (default: `'auto'`)
+   */
+  checker?: "auto" | "fuzz" | "automaton";
+
+  /**
+   * The number of crossover on each generation.
+   *
+   * (default: `25`)
+   */
+  crossoverSize?: number;
+
+  /**
+   * The ratio of the number of characters read to the maximum number to be considered as a hot spot.
+   *
+   * (default: `0.001`)
+   */
+  heatRatio?: number;
+
+  /**
+   * The upper limit on the number of characters read by VM on incubation.
+   *
+   * (default: `25000`)
+   */
+  incubationLimit?: number;
+
+  /**
+   * The upper limit of matching time on incubation.
+   *
+   * (default: `250`)
+   */
+  incubationTimeout?: number | null;
+
+  /**
+   * The logger function to record execution traces.
+   *
+   * To disable the logging, `null` in TypeScript or `None` in Scala should be passed.
+   *
+   * (default: `null`)
+   */
+  logger?: (message: string) => void;
+
+  /**
    * The maximum length of the attack string on fuzzing.
    *
    * (default: `300000`)
@@ -181,31 +113,39 @@ export type Parameters = {
   maxDegree?: number;
 
   /**
-   * The ratio of the number of characters read to the maximum number to be considered as a hot spot.
+   * The maximum length of the gene string on fuzzing.
    *
-   * (default: `0.001`)
+   * (default: `2400`)
    */
-  heatRatio?: number;
+  maxGeneStringSize?: number;
 
   /**
-   * The type of acceleration mode strategy on fuzzing.
+   * The maximum size of each generation on fuzzing.
    *
-   * There are three acceleration mode strategies.
-   *
-   * - `auto` uses acceleration mode as default. However, if the regular expression has backreferences, it turns off the acceleration mode.
-   * - `on` turns on the acceleration mode.
-   * - `off` turns off the acceleration mode.
-   *
-   * (default: `'auto'`)
+   * (default: `100`)
    */
-  accelerationMode?: "auto" | "on" | "off";
+  maxGenerationSize?: number;
 
   /**
-   * The maximum number of sum of repetition quantifier’s repeat counts to determine which algorithm is used.
+   * The maximum size of the initial generation on fuzzing.
    *
-   * (default: `30`)
+   * (default: `500`)
    */
-  maxRepeatCount?: number;
+  maxInitialGenerationSize?: number;
+
+  /**
+   * The maximum number of fuzzing iteration.
+   *
+   * (default: `10`)
+   */
+  maxIteration?: number;
+
+  /**
+   * The maximum size of NFA to determine which algorithm is used.
+   *
+   * (default: `35000`)
+   */
+  maxNFASize?: number;
 
   /**
    * The maximum size of the regular expression pattern to determine which algorithm is used.
@@ -215,11 +155,39 @@ export type Parameters = {
   maxPatternSize?: number;
 
   /**
-   * The maximum size of NFA to determine which algorithm is used.
+   * The maximum length of the attack string on recall validation.
    *
-   * (default: `35000`)
+   * (default: `300000`)
    */
-  maxNFASize?: number;
+  maxRecallStringSize?: number;
+
+  /**
+   * The maximum number of sum of repetition quantifier’s repeat counts to determine which algorithm is used.
+   *
+   * (default: `30`)
+   */
+  maxRepeatCount?: number;
+
+  /**
+   * The maximum number of each repetition quantifier’s repeat count on `static` seeding.
+   *
+   * (default: `30`)
+   */
+  maxSimpleRepeatCount?: number;
+
+  /**
+   * The number of mutation on each generation.
+   *
+   * (default: `50`)
+   */
+  mutationSize?: number;
+
+  /**
+   * The PRNG seed number.
+   *
+   * (default: `0`)
+   */
+  randomSeed?: number;
 
   /**
    * The upper limit on the number of characters read by VM on the recall validation.
@@ -238,11 +206,43 @@ export type Parameters = {
   recallTimeout?: number | null;
 
   /**
-   * The maximum length of the attack string on recall validation.
+   * The type of seeder to be used in fuzzing.
    *
-   * (default: `300000`)
+   * There are two seeders.
+   *
+   * - `static` seeder uses the seeding algorithm based on the automata theory.
+   * - `dynamic` seeder uses the seeding algorithm with dynamic analysis.
+   *
+   * (default: `'static'`)
    */
-  maxRecallStringSize?: number;
+  seeder?: "static" | "dynamic";
+
+  /**
+   * The upper limit on the number of characters read by VM on `dynamic` seeding.
+   *
+   * (default: `1000`)
+   */
+  seedingLimit?: number;
+
+  /**
+   * The upper limit of matching time on `dynamic` seeding.
+   *
+   * (default: `100`)
+   */
+  seedingTimeout?: number | null;
+
+  /**
+   * The upper limit of checking time.
+   *
+   * If the checking time exceeds this limit, the result will be reported as `timeout`. If the value is positive infinite in Scala or `null` in TypeScript, the result never becomes `timeout`.
+   *
+   * The `timeout` time begins to be measured as soon as the check starts. Note that the `timeout` does not occur while the input is in the queue waiting to be checked.
+   *
+   * In TypeScript, a number value is treated as in milliseconds.
+   *
+   * (default: `10000`)
+   */
+  timeout?: number | null;
 };
 
 /**
