@@ -1,5 +1,9 @@
 # dev
 
+Changes:
+
+- [#357](https://github.com/makenowjust-labs/recheck/pull/357) Add `Default` prefix to default parameter values ([@makenowjust](https://github.com/makenowjust))
+
 Fixes:
 
 - [#341](https://github.com/makenowjust-labs/recheck/pull/341) Fix zero-width assertion in `automaton` checker ([@makenowjust](https://github.com/makenowjust))
