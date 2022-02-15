@@ -22,266 +22,227 @@ export function checkSync(
  */
 export type Parameters = {
   /**
-   * Type of checker used for analysis.
+   * The type of checker to be used.
    *
-   * There are three checkers:
+   * There are three checker types.
    *
-   * - `'automaton'`: A checker which works based on automaton theory.
-   *   It can analyze ReDoS vulnerability of the RegExp without false positive,
-   *   however, it needs some minutes against some RegExp and it does not support some syntax.
-   * - `'fuzz'`: A checker based on fuzzing.
-   *   It can detect ReDoS vulnerability against the all RegExp syntax including back-references
-   *   and look-around assertions. However, it needs some seconds on average and it may cause false
-   *   negative.
-   * - `'auto'`: A checker which combines the automaton checker and the fuzzing checker.
-   *   If the RegExp is supported by the automaton checker and some thresholds are passed,
-   *   it uses the automaton checker. Otherwise, it falls back to the fuzzing checker.
-   *
-   * The auto checker performs better than others in many cases.
+   * - `auto` checker uses the criteria to decide which algorithm is better to use against a regular expression, the algorithm based on automata theory or the fuzzing algorithm.
+   * - `fuzz` checker uses the fuzzing algorithm with static analysis.
+   * - `automaton` checker uses the algorithm based on automata theory.
    *
    * (default: `'auto'`)
    */
   checker?: "auto" | "fuzz" | "automaton";
 
   /**
-   * Upper limit of analysis time.
+   * The upper limit of checking time.
    *
-   * If the analysis time exceeds this value, the result will be reported as a timeout.
-   * If the value is the positive infinite duration, the result never become a timeout.
+   * If the checking time exceeds this limit, the result will be reported as `timeout`. If the value is positive infinite in Scala or `null` in TypeScript, the result never becomes `timeout`.
    *
-   * If the `number` value is specified, it is parsed in milliseconds.
-   * If the value is `null`, it is parsed as the positive infinite duration.
+   * The `timeout` time begins to be measured as soon as the check starts. Note that the `timeout` does not occur while the input is in the queue waiting to be checked.
    *
+   * In TypeScript, a number value is treated as in milliseconds.
    *
    * (default: `10000`)
    */
   timeout?: number | null;
 
   /**
-   * Logger to log an analysis execution.
+   * The logger function to record execution traces.
+   *
+   * To disable the logging, `null` in TypeScript or `None` in Scala should be passed.
    *
    * (default: `null`)
    */
-  logger?: ((message: string) => void) | null;
+  logger?: (message: string) => void;
 
   /**
-   * Maximum length of an attack string.
-   *
-   * (default: `300000`)
-   */
-  maxAttackStringSize?: number;
-
-  /**
-   * Upper limit on the number of characters read by the VM during attack string construction.
-   *
-   * (default: `1500000000`)
-   */
-  attackLimit?: number;
-
-  /**
-   * Seed value for PRNG used by fuzzing.
+   * The PRNG seed number.
    *
    * (default: `0`)
    */
   randomSeed?: number;
 
   /**
-   * Maximum number of iterations of genetic algorithm.
+   * The maximum number of fuzzing iteration.
    *
    * (default: `10`)
    */
   maxIteration?: number;
 
   /**
-   * Type of seeder used for constructing the initial generation of fuzzing.
+   * The type of seeder to be used in fuzzing.
    *
-   * There are two seeders:
+   * There are two seeders.
    *
-   * - `'static'`: Seeder to construct the initial generation by using static analysis to the given pattern.
-   * - `'dynamic'`: Seeder to construct the initial generation by using dynamic analysis to the given pattern.
+   * - `static` seeder uses the seeding algorithm based on the automata theory.
+   * - `dynamic` seeder uses the seeding algorithm with dynamic analysis.
    *
    * (default: `'static'`)
    */
   seeder?: "static" | "dynamic";
 
   /**
-   * Maximum number of sum of repeat counts for static seeder.
+   * The maximum number of each repetition quantifier’s repeat count on `static` seeding.
    *
    * (default: `30`)
    */
   maxSimpleRepeatCount?: number;
 
   /**
-   * Upper limit on the number of characters read by the VM during seeding.
+   * The upper limit on the number of characters read by VM on `dynamic` seeding.
    *
    * (default: `1000`)
    */
   seedingLimit?: number;
 
   /**
-   * Upper limit of VM execution time during seeding.
-   *
-   * If the `number` value is specified, it is parsed in milliseconds.
-   * If the value is `null`, it is parsed as the positive infinite duration.
-   *
+   * The upper limit of matching time on `dynamic` seeding.
    *
    * (default: `100`)
    */
   seedingTimeout?: number | null;
 
   /**
-   * Maximum population at the initial generation.
+   * The maximum size of the initial generation on fuzzing.
    *
    * (default: `500`)
    */
   maxInitialGenerationSize?: number;
 
   /**
-   * Upper limit on the number of characters read by the VM during incubation.
+   * The upper limit on the number of characters read by VM on incubation.
    *
    * (default: `25000`)
    */
   incubationLimit?: number;
 
   /**
-   * Upper limit of VM execution time during incubation.
-   *
-   * If the `number` value is specified, it is parsed in milliseconds.
-   * If the value is `null`, it is parsed as the positive infinite duration.
-   *
+   * The upper limit of matching time on incubation.
    *
    * (default: `250`)
    */
   incubationTimeout?: number | null;
 
   /**
-   * Maximum length of an attack string on genetic algorithm iterations.
+   * The maximum length of the gene string on fuzzing.
    *
    * (default: `2400`)
    */
   maxGeneStringSize?: number;
 
   /**
-   * Maximum population at a single generation.
+   * The maximum size of each generation on fuzzing.
    *
    * (default: `100`)
    */
   maxGenerationSize?: number;
 
   /**
-   * Number of crossovers in a single generation.
+   * The number of crossover on each generation.
    *
    * (default: `25`)
    */
   crossoverSize?: number;
 
   /**
-   * Number of mutations in a single generation.
+   * The number of mutation on each generation.
    *
    * (default: `50`)
    */
   mutationSize?: number;
 
   /**
-   * The upper limit of the VM execution time when constructing a attack string.
+   * The upper limit on the number of characters read by VM on the attack.
    *
-   * If the execution time exceeds this value, the result will be reported as a vulnerable.
-   *
-   * If the `number` value is specified, it is parsed in milliseconds.
-   * If the value is `null`, it is parsed as the positive infinite duration.
-   *
+   * (default: `1500000000`)
+   */
+  attackLimit?: number;
+
+  /**
+   * The upper limit of matching time on the attack.
    *
    * (default: `1000`)
    */
   attackTimeout?: number | null;
 
   /**
-   * Maximum degree for constructing attack string.
+   * The maximum length of the attack string on fuzzing.
+   *
+   * (default: `300000`)
+   */
+  maxAttackStringSize?: number;
+
+  /**
+   * The maximum degree to be considered in fuzzing.
    *
    * (default: `4`)
    */
   maxDegree?: number;
 
   /**
-   * Ratio of the number of characters read to the maximum number to be considered a hotspot.
+   * The ratio of the number of characters read to the maximum number to be considered as a hot spot.
    *
    * (default: `0.001`)
    */
   heatRatio?: number;
 
   /**
-   * Mode of acceleration of VM execution.
+   * The type of acceleration mode strategy on fuzzing.
    *
-   * There are three mode:
+   * There are three acceleration mode strategies.
    *
-   * - `'auto'`: The automatic mode.
-   *   When it is specified, VM acceleration is used for regular expressions contains no back-reference,
-   *   because back-reference makes VM acceleration slow sometimes.
-   * - `'on'`: The force **on** mode.
-   * - `'off'`: The force **off** mode.
+   * - `auto` uses acceleration mode as default. However, if the regular expression has backreferences, it turns off the acceleration mode.
+   * - `on` turns on the acceleration mode.
+   * - `off` turns off the acceleration mode.
    *
    * (default: `'auto'`)
    */
   accelerationMode?: "auto" | "on" | "off";
 
   /**
-   * Maximum length of an attack string on the recall validation.
-   *
-   * (default: `300000`)
-   */
-  maxRecallStringSize?: number;
-
-  /**
-   * Upper limit on the number of characters read on the recall validation.
-   *
-   * (default: `1500000000`)
-   */
-  recallLimit?: number;
-
-  /**
-   * Upper limit of recall validation time.
-   *
-   * If the recall validation time exceeds this value, the validation is succeeded.
-   * If the negative value is specified, the validation succeeds immediately.
-   *
-   * If the `number` value is specified, it is parsed in milliseconds.
-   * If the value is `null`, it is parsed as the positive infinite duration.
-   *
-   * Note that Scala.js does not support the recall validation for now.
-   * Please set negative value in this case.
-   *
-   *
-   * (default: `-1`)
-   */
-  recallTimeout?: number | null;
-
-  /**
-   * Maximum number of sum of repeat counts.
-   *
-   * If this value is exceeded, it switches to use the fuzzing checker.
+   * The maximum number of sum of repetition quantifier’s repeat counts to determine which algorithm is used.
    *
    * (default: `30`)
    */
   maxRepeatCount?: number;
 
   /**
-   * Maximum transition size of NFA to use the automaton checker.
+   * The maximum size of the regular expression pattern to determine which algorithm is used.
    *
-   * If transition size of NFA (and also DFA because it is larger in general) exceeds this value,
-   * it switches to use the fuzzing checker.
+   * (default: `1500`)
+   */
+  maxPatternSize?: number;
+
+  /**
+   * The maximum size of NFA to determine which algorithm is used.
    *
    * (default: `35000`)
    */
   maxNFASize?: number;
 
   /**
-   * Maximum pattern size to use the automaton checker.
+   * The upper limit on the number of characters read by VM on the recall validation.
    *
-   * If this value is exceeded, it switches to use the fuzzing checker.
-   *
-   * (default: `1500`)
+   * (default: `1500000000`)
    */
-  maxPatternSize?: number;
+  recallLimit?: number;
+
+  /**
+   * The upper limit of matching time on the recall validation.
+   *
+   * If this value is negative, then the recall validation is skipped.
+   *
+   * (default: `-1000`)
+   */
+  recallTimeout?: number | null;
+
+  /**
+   * The maximum length of the attack string on recall validation.
+   *
+   * (default: `300000`)
+   */
+  maxRecallStringSize?: number;
 };
 
 /**
