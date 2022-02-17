@@ -11,3 +11,8 @@
 .demoResultLoading {
   display: inline-block;
 }
+
+.demoResultLog {
+  max-height: 10em;
+  overflow-y: auto;
+}
