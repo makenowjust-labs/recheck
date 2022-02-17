@@ -105,7 +105,7 @@ const DemoInput: React.VFC<DemoInputProps> = ({ check, cancel, status }) => {
     {
       "name": "logger",
       "title": "Logger",
-      "defaultValue": null,
+      "defaultValue": "off",
       "type": {
         "select": [
           "on",
@@ -322,9 +322,14 @@ type DemoResultProps = {
 };
 
 const DemoResult: React.VFC<DemoResultProps> = ({ status, log, diagnostics, time }) => {
+  const logBottomRef = React.useRef<HTMLDivElement>();
+  React.useEffect(() => {
+    logBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [log]);
+
   if (!diagnostics) {
     if (status === 'init') {
-      return <></>;
+      return null;
     }
 
     return (
@@ -337,6 +342,17 @@ const DemoResult: React.VFC<DemoResultProps> = ({ status, log, diagnostics, time
                 <ReactLoading type="bars" width={128} color={'var(--ifm-font-color-base)'} className={styles.demoResultLoading} />
               </div>
             </div>
+            {log.length > 0 ? (
+              <div className="row">
+                <div className="col col--3"><h4>Log</h4></div>
+                <div className="col col--9">
+                  <pre className={styles.demoResultLog}>
+                    {log.join('\n')}
+                    <div ref={logBottomRef} />
+                  </pre>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -362,6 +378,14 @@ const DemoResult: React.VFC<DemoResultProps> = ({ status, log, diagnostics, time
                 <div className="col col--3"><h4>Status</h4></div>
                 <div className="col col--9"><p><span className="badge badge--secondary">invalid</span></p></div>
               </div>
+              {log.length > 0 ? (
+                <div className="row">
+                  <div className="col col--3"><h4>Log</h4></div>
+                  <div className="col col--9">
+                    <pre className={styles.demoResultLog}>{log.join('\n')}</pre>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -410,6 +434,14 @@ const DemoResult: React.VFC<DemoResultProps> = ({ status, log, diagnostics, time
                   </div>
                 ) : null
               }
+              {log.length > 0 ? (
+                <div className="row">
+                  <div className="col col--3"><h4>Log</h4></div>
+                  <div className="col col--9">
+                    <pre className={styles.demoResultLog}>{log.join('\n')}</pre>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -441,6 +473,14 @@ const DemoResult: React.VFC<DemoResultProps> = ({ status, log, diagnostics, time
                 <p><span className="badge badge--secondary">{diagnostics.checker}</span></p>
               </div>
             </div>
+            {log.length > 0 ? (
+              <div className="row">
+                <div className="col col--3"><h4>Log</h4></div>
+                <div className="col col--9">
+                  <pre className={styles.demoResultLog}>{log.join('\n')}</pre>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -500,6 +540,14 @@ const DemoResult: React.VFC<DemoResultProps> = ({ status, log, diagnostics, time
               <p><span className="badge badge--secondary">{diagnostics.checker}</span></p>
             </div>
           </div>
+          {log.length > 0 ? (
+            <div className="row">
+              <div className="col col--3"><h4>Log</h4></div>
+              <div className="col col--9">
+                <pre className={styles.demoResultLog}>{log.join('\n')}</pre>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -548,6 +596,7 @@ const Demo: React.VFC<{}> = () => {
 
     if (params.logger === 'on') {
       params.logger = (message: string) => {
+        console.log(message);
         setLog(log => log.concat(message));
       };
     } else {
