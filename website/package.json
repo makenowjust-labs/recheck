@@ -9,10 +9,10 @@
     "lint": "prettier --check '*.{js,json}' 'src/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'"
   },
   "dependencies": {
-    "@docusaurus/core": "2.0.0-beta.15",
-    "@docusaurus/module-type-aliases": "2.0.0-beta.15",
-    "@docusaurus/plugin-ideal-image": "2.0.0-beta.15",
-    "@docusaurus/preset-classic": "2.0.0-beta.15",
+    "@docusaurus/core": "2.0.0-beta.16",
+    "@docusaurus/module-type-aliases": "2.0.0-beta.16",
+    "@docusaurus/plugin-ideal-image": "2.0.0-beta.16",
+    "@docusaurus/preset-classic": "2.0.0-beta.16",
     "@mdx-js/react": "1.6.22",
     "@tsconfig/docusaurus": "1.0.4",
     "clsx": "1.1.1",
