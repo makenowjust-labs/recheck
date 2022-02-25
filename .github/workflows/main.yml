@@ -79,7 +79,7 @@ jobs:
     name: Node Lint
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - uses: actions/setup-node@v3
         with:
           node-version: '17'
           cache: 'yarn'
@@ -100,7 +100,7 @@ jobs:
       - uses: olafurpg/setup-scala@v13
         with:
           java-version: adopt@1.16
-      - uses: actions/setup-node@v2
+      - uses: actions/setup-node@v3
         with:
           node-version: '17'
           cache: 'yarn'
@@ -122,7 +122,7 @@ jobs:
     name: Node Test
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - uses: actions/setup-node@v3
         with:
           node-version: '17'
           cache: 'yarn'
@@ -241,7 +241,7 @@ jobs:
       - uses: olafurpg/setup-scala@v13
         with:
           java-version: adopt@1.16
-      - uses: actions/setup-node@v2
+      - uses: actions/setup-node@v3
         with:
           node-version: '17'
           cache: 'yarn'
@@ -296,7 +296,7 @@ jobs:
     name: Deploy to GitHub Pages
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - uses: actions/setup-node@v3
         with:
           node-version: '17'
           cache: 'yarn'
