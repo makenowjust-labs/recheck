@@ -324,7 +324,7 @@ type DemoResultProps = {
 const DemoResult: React.VFC<DemoResultProps> = ({ status, log, diagnostics, time }) => {
   const logBottomRef = React.useRef<HTMLDivElement>();
   React.useEffect(() => {
-    logBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    logBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
   }, [log]);
 
   if (!diagnostics) {
