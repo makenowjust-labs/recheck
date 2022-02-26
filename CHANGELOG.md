@@ -15,6 +15,7 @@ Misc:
 - [#343](https://github.com/makenowjust-labs/recheck/pull/343) Enable Algolia DocSearch ([@makenowjust](https://github.com/makenowjust))
 - [#360](https://github.com/makenowjust-labs/recheck/pull/360) Enable log on playground ([@makenowjust](https://github.com/makenowjust))
 - [#369](https://github.com/makenowjust-labs/recheck/pull/369) Fix Windows build ([@makenowjust](https://github.com/makenowjust))
+- [#368](https://github.com/makenowjust-labs/recheck/pull/368) Fix log scroll ([@makenowjust](https://github.com/makenowjust))
 
 # 4.3.0 (2022-02-05)
 
