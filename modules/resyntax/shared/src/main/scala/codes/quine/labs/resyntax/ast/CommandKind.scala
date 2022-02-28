@@ -15,6 +15,8 @@ package codes.quine.labs.resyntax.ast
   *   "?{" Code "}"
   *   "??{" Code "}"
   *   "?|" Sequence ("|" Sequence)*
+  *   "?" ConditionalTest Node ("|" Node)?
+  *   "*" BacktrackControl (":" Name)?
   * }}}
   */
 sealed abstract class CommandKind extends Product with Serializable
@@ -65,4 +67,10 @@ object CommandKind {
 
   /** BranchReset is a branch reset group (e.g. `(?|...)`). */
   final case class BranchReset(nodes: Seq[Node]) extends CommandKind
+
+  /** Conditional is a conditional group (e.g. `(?(x)...|...)`). */
+  final case class Conditional(test: ConditionalTest, yes: Node, no: Option[Node]) extends CommandKind
+
+  /** BacktrackControl is a backtrack control command (e.g. `(*COMMIT)`). */
+  final case class BacktrackControl(kind: BacktrackControlKind, name: Option[String]) extends CommandKind
 }
