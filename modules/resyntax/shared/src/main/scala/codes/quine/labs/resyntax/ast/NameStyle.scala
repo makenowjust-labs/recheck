@@ -13,4 +13,7 @@ object NameStyle {
 
   /** Curly is a name wrapped around curly brackets (e.g. `{foo}`). */
   case object Curly extends NameStyle
+
+  /** Bare is a name without any quote (e.g.`foo`). */
+  case object Bare extends NameStyle
 }
