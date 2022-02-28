@@ -1,9 +1,8 @@
-package codes.quine.labs.resyntax
+package codes.quine.labs.resyntax.parser
 
 import scala.annotation.switch
 import scala.collection.mutable
 
-import codes.quine.labs.resyntax.Parser.ParsingContext
 import codes.quine.labs.resyntax.ast.AssertNameStyle
 import codes.quine.labs.resyntax.ast.BacktrackControlKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
@@ -17,6 +16,7 @@ import codes.quine.labs.resyntax.ast.NameStyle
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ast.SourceLocation
+import codes.quine.labs.resyntax.parser.Parser.ParsingContext
 
 object Parser {
   final case class ParsingContext(
@@ -1001,7 +1001,7 @@ final class Parser(
       return false
     }
     reset(offset + command.length)
-    if (!isEnd) {
+    if (isEnd) {
       fail("Invalid group")
     }
 
@@ -1010,10 +1010,10 @@ final class Parser(
         next()
         val name = parseID()
         pushCommand(stack, CommandKind.BacktrackControl(kind, Some(name)), start)
-        return true
+        true
       case ')' =>
         pushCommand(stack, CommandKind.BacktrackControl(kind, None), start)
-        return true
+        true
       case _ =>
         fail("Invalid group")
     }

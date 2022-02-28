@@ -1,4 +1,4 @@
-package codes.quine.labs.resyntax
+package codes.quine.labs.resyntax.parser
 
 import scala.annotation.switch
 

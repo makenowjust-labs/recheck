@@ -1,4 +1,4 @@
-package codes.quine.labs.resyntax
+package codes.quine.labs.resyntax.parser
 
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
