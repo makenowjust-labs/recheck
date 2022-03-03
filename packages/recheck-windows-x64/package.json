@@ -1,16 +1,22 @@
 {
   "name": "recheck-windows-x64",
-  "version": "0.0.0-dev",
-  "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
-  "homepage": "https://makenowjust-labs.github.io/recheck/",
+  "version": "0.0.0",
   "description": "The Windows 64-bit binary for recheck.",
-  "repository": "https://github.com/makenowjust-labs/recheck",
   "license": "MIT",
-  "preferUnplugged": false,
+  "author": {
+    "name": "TSUYUSATO Kitsune",
+    "email": "make.just.on@gmail.com"
+  },
+  "homepage": "https://makenowjust-labs.github.io/recheck/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/makenowjust-labs/recheck"
+  },
   "os": [
     "win32"
   ],
   "cpu": [
     "x64"
-  ]
+  ],
+  "preferUnplugged": false
 }

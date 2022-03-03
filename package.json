@@ -1,5 +1,7 @@
 {
   "private": true,
+  "name": "recheck",
+  "version": "0.0.0",
   "workspaces": [
     "packages/*",
     "website"
