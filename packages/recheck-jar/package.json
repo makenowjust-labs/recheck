@@ -1,10 +1,16 @@
 {
   "name": "recheck-jar",
-  "version": "0.0.0-dev",
-  "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
-  "homepage": "https://makenowjust-labs.github.io/recheck/",
+  "version": "0.0.0",
   "description": "The JAR archive for recheck.",
-  "repository": "https://github.com/makenowjust-labs/recheck",
   "license": "MIT",
+  "author": {
+    "name": "TSUYUSATO Kitsune",
+    "email": "make.just.on@gmail.com"
+  },
+  "homepage": "https://makenowjust-labs.github.io/recheck/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/makenowjust-labs/recheck"
+  },
   "preferUnplugged": false
 }

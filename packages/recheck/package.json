@@ -1,19 +1,22 @@
 {
   "name": "recheck",
+  "version": "0.0.0",
   "description": "The trustworthy ReDoS checker",
   "license": "MIT",
-  "author": "TSUYUSATO Kitsune <make.just.on@gmail.com>",
+  "author": {
+    "name": "TSUYUSATO Kitsune",
+    "email": "make.just.on@gmail.com"
+  },
   "homepage": "https://makenowjust-labs.github.io/recheck/",
-  "repository": "https://github.com/makenowjust-labs/recheck.git",
-  "version": "0.0.0-dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/makenowjust-labs/recheck.git"
+  },
   "main": "index.js",
   "browser": "lib/browser.js",
-  "types": "index.d.ts",
-  "keywords": [
-    "redos",
-    "regexp",
-    "security",
-    "vulnerability"
+  "files": [
+    "index.d.ts",
+    "lib"
   ],
   "scripts": {
     "build": "node -r esbuild-register ./scripts/build.ts",
@@ -23,17 +26,13 @@
     "test": "jest",
     "typecheck": "tsc --noEmit -p ."
   },
-  "files": [
-    "lib",
-    "index.d.ts",
-    "index.js"
-  ],
   "sideEffects": false,
+  "types": "index.d.ts",
   "optionalDependencies": {
-    "recheck-jar": "0.0.0-dev",
-    "recheck-linux-x64": "0.0.0-dev",
-    "recheck-macos-x64": "0.0.0-dev",
-    "recheck-windows-x64": "0.0.0-dev"
+    "recheck-jar": "0.0.0",
+    "recheck-linux-x64": "0.0.0",
+    "recheck-macos-x64": "0.0.0",
+    "recheck-windows-x64": "0.0.0"
   },
   "devDependencies": {
     "@types/jest": "27.4.1",
@@ -45,5 +44,11 @@
     "prettier": "2.5.1",
     "rimraf": "3.0.2",
     "typescript": "4.6.2"
-  }
+  },
+  "keywords": [
+    "redos",
+    "regexp",
+    "security",
+    "vulnerability"
+  ]
 }

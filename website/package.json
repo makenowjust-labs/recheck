@@ -1,12 +1,12 @@
 {
-  "name": "website",
-  "version": "0.0.0-dev",
   "private": true,
+  "name": "website",
+  "version": "0.0.0",
   "scripts": {
-    "start": "docusaurus start",
     "build": "docusaurus build",
     "format": "prettier -w '*.{js,json}' 'src/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
-    "lint": "prettier --check '*.{js,json}' 'src/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'"
+    "lint": "prettier --check '*.{js,json}' 'src/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
+    "start": "docusaurus start"
   },
   "dependencies": {
     "@docusaurus/core": "2.0.0-beta.16",
@@ -22,7 +22,7 @@
     "react-dom": "17.0.2",
     "react-hook-form": "7.27.1",
     "react-loading": "2.0.3",
-    "recheck": "0.0.0-dev",
+    "recheck": "0.0.0",
     "rehype-katex": "4.0.0",
     "remark-math": "3.0.1"
   },
