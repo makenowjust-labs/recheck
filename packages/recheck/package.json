@@ -38,7 +38,7 @@
   "devDependencies": {
     "@types/jest": "27.4.1",
     "@types/node": "16.11.26",
-    "esbuild": "0.14.23",
+    "esbuild": "0.14.24",
     "esbuild-jest": "0.5.0",
     "esbuild-register": "3.3.2",
     "jest": "27.5.1",
