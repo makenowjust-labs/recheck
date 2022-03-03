@@ -39,11 +39,11 @@ jobs:
         name: Save Version
         run: |
           echo "::set-output name=version::$(sbt --error "print coreJVM/releaseVersion")"
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           path: modules/recheck-js/target/scala-2.13/recheck-js-opt/recheck.js
           name: recheck.js
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           path: modules/recheck-cli/target/scala-2.13/recheck.jar
           name: recheck.jar
@@ -189,7 +189,7 @@ jobs:
         shell: cmd
         run: >-
           "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && sbt cli/nativeImage
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           path: ${{ matrix.local_path }}
           name: ${{ matrix.artifact_filename }}
