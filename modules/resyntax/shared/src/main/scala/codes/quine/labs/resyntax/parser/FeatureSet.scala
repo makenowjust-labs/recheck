@@ -15,6 +15,8 @@ final case class FeatureSet(
     // .NET, Java, JavaScript, PCRE, Perl, Python
     allowsMeaninglessBacktrackStrategy: Boolean,
     // Ruby
+    allowsNestedRepeat: Boolean,
+    // Ruby
     allowsZeroWidthAssertRepeat: Boolean,
     // Ruby
     hasAbsenceOperator: Boolean,
@@ -126,13 +128,15 @@ object FeatureSet {
       // .NET, Java, JavaScript, PCRE, Perl, Python
       allowsMeaninglessBacktrackStrategy = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isPython,
       // Ruby
+      allowsNestedRepeat = isRuby,
+      // Ruby
       allowsZeroWidthAssertRepeat = isRuby,
       // Ruby
       hasAbsenceOperator = isRuby,
       // PCRE, Perl
       hasAlphabeticGroup = isPCRE || isPerl,
       // .NET, Java, JavaScript, PCRE, Perl, Ruby
-      hasAngleNamedCapture = isDotNet || isJava || isJavaScript || isPCRE || isPerl,
+      hasAngleNamedCapture = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isRuby,
       // .NET, Java, PCRE, Perl, Ruby
       hasAtomicGroup = isDotNet || isJava || isPCRE || isPerl || isRuby,
       // .NET
@@ -146,7 +150,7 @@ object FeatureSet {
       // PCRE
       hasCallout = isPCRE,
       // .NET, PCRE, Perl, Python, Ruby
-      hasConditional = isDotNet || isPCRE || isPython || isRuby,
+      hasConditional = isDotNet || isPCRE || isPerl || isPython || isRuby,
       // PCRE, Perl
       hasDefineTest = isPCRE || isPerl,
       // Perl, Python, Ruby

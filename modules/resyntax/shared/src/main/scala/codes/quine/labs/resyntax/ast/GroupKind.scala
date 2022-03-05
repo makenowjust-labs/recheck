@@ -79,9 +79,4 @@ object GroupKind {
 
   /** Absence is a kind of absence operator (e.g. `(?~...)`). */
   case object Absence extends GroupKind
-
-  /** Opaque is a special group kind. It does not mean a correct group kind, and it is used for mark a group without
-    * parenthesis.
-    */
-  case object Opaque extends GroupKind
 }
