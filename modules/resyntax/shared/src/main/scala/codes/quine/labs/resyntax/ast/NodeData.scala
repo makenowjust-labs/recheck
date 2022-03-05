@@ -77,6 +77,22 @@ object NodeData {
     */
   final case class Command(kind: CommandKind) extends NodeData
 
+  /** Caret is a caret pattern node.
+    *
+    * {{{
+    * Caret ::= "^"
+    * }}}
+    */
+  case object Caret extends NodeData
+
+  /** Dollar is a dollar pattern node.
+    *
+    * {{{
+    * Dollar ::= "$"
+    * }}}
+    */
+  case object Dollar extends NodeData
+
   /** Dot is a dot pattern node.
     *
     * {{{
