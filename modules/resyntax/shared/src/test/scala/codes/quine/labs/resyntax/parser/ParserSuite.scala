@@ -90,6 +90,8 @@ class ParserSuite extends munit.FunSuite {
   error("$*", "", DotNet, Java, JavaScript, PCRE, Perl, Python)("Nothing to repeat at 1")
   error("(?=a)*", "u", JavaScript)("Nothing to repeat at 5")
   error("(?<=a)*", "", JavaScript)("Nothing to repeat at 6")
+  check("}", "", All: _*)(Literal('}'))
+  error("}", "u", JavaScript)("Incomplete quantifier at 0")
 
   // Group
   check("(?:a)", "", All: _*)(Group(NonCapture, Literal('a')))
@@ -250,6 +252,13 @@ class ParserSuite extends munit.FunSuite {
   )
   check("(?x:a)", "", DotNet, Java, PCRE, Perl, Python, Ruby)(
     Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)), Literal('a'))
+  )
+  check(" (?x: a ) ", "", DotNet, Java, PCRE, Perl, Python, Ruby)(
+    Sequence(
+      Literal(' '),
+      Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)), Literal('a')),
+      Literal(' ')
+    )
   )
   check("(?x-i)", "", DotNet, Java, PCRE, Perl, Python, Ruby)(
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), Some(FlagSet(ignoreCase = true)))))

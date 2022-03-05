@@ -240,7 +240,7 @@ private[parser] final class Parser(
   }
 
   private def resetBracket(stack: mutable.Stack[Node], save: Int): Unit = {
-    if (!featureSet.allowsBrokenBracket) {
+    if (!featureSet.allowsBrokenCurly) {
       fail("Incomplete quantifier", save)
     }
     reset(save)
@@ -1022,7 +1022,13 @@ private[parser] final class Parser(
 
   private def parseClass(stack: mutable.Stack[Node]): Unit = ???
 
-  private def parseCloseCurly(stack: mutable.Stack[Node]): Unit = ???
+  private def parseCloseCurly(stack: mutable.Stack[Node]): Unit = {
+    assert(featureSet.allowsBrokenCloseCurly, "Incomplete quantifier")
+    val start = offset
+    next()
+    val end = offset
+    stack.push(Node(NodeData.Literal('}'), SourceLocation(start, end)))
+  }
 
   private def parseCloseBracket(stack: mutable.Stack[Node]): Unit = ???
 

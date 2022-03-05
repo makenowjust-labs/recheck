@@ -4,8 +4,10 @@ import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 
 final case class FeatureSet(
+    // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
+    allowsBrokenCloseCurly: Boolean,
     // .NET, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
-    allowsBrokenBracket: Boolean,
+    allowsBrokenCurly: Boolean,
     // .NET
     allowsInvalidIdentifier: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -118,7 +120,9 @@ object FeatureSet {
     val isUnicode = flagSet.unicode || flagSet.unicodeSets
 
     FeatureSet(
-      allowsBrokenBracket = isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
+      allowsBrokenCloseCurly =
+        isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
+      allowsBrokenCurly = isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
       allowsInvalidIdentifier = isDotNet,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsLookAheadRepeat =
