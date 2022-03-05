@@ -52,6 +52,8 @@ lazy val root = project
     unicodeJS,
     parseJVM,
     parseJS,
+    resyntaxJVM,
+    resyntaxJVM,
     codecJVM,
     codecJS,
     js,
