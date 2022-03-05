@@ -24,6 +24,7 @@ object CodePointUtil {
       case 0x000d => true
       case 0x2028 => true
       case 0x2029 => true
+      case _      => false
     }
 
   def isDigit(codePoint: Int): Boolean =

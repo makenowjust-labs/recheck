@@ -14,16 +14,17 @@ import codes.quine.labs.resyntax.ast.FlagSetDiff
 import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.NameStyle
 import codes.quine.labs.resyntax.ast.Node
+import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.parser.Parser.ParsingContext
 
 object Parser {
-  final case class ParsingContext(
+  private[parser] final case class ParsingContext(
       skipsComment: Boolean
   )
 
-  object ParsingContext {
+  private[parser] object ParsingContext {
     def from(featureSet: FeatureSet): ParsingContext = ParsingContext(
       skipsComment = featureSet.skipsComment
     )
@@ -36,7 +37,7 @@ object Parser {
   }
 }
 
-final class Parser(
+private[parser] final class Parser(
     private[this] val source: String,
     private[this] val featureSet: FeatureSet
 ) {
@@ -58,7 +59,7 @@ final class Parser(
     node
   }
 
-  def parseDisjunction(): Node = {
+  private def parseDisjunction(): Node = {
     val start = offset
     val builder = Seq.newBuilder[Node]
     builder.addOne(parseSequence())
@@ -73,11 +74,11 @@ final class Parser(
       nodes.head
     } else {
       val end = offset
-      Node.Disjunction(nodes, Some(SourceLocation(start, end)))
+      Node(NodeData.Disjunction(nodes), SourceLocation(start, end))
     }
   }
 
-  def parseSequence(): Node = {
+  private def parseSequence(): Node = {
     val start = offset
     val stack = mutable.Stack.empty[Node]
 
@@ -102,6 +103,8 @@ final class Parser(
             parseCaret(stack)
           case '$' =>
             parseDollar(stack)
+          case '.' =>
+            parseDot(stack)
           case '\\' =>
             parseBackslash(stack)
           case '[' =>
@@ -119,11 +122,11 @@ final class Parser(
       nodes.head
     } else {
       val end = offset
-      Node.Sequence(nodes.reverse, Some(SourceLocation(start, end)))
+      Node(NodeData.Sequence(nodes.reverse), SourceLocation(start, end))
     }
   }
 
-  def parseSimpleRepeat(stack: mutable.Stack[Node], buildQuantifier: BacktrackStrategy => Quantifier): Unit = {
+  private def parseSimpleRepeat(stack: mutable.Stack[Node], buildQuantifier: BacktrackStrategy => Quantifier): Unit = {
     val node = popRepeatable(stack)
     next()
     val strategy = parseBacktrackStrategy(exact = false)
@@ -131,93 +134,90 @@ final class Parser(
     pushRepeat(stack, node, quantifier)
   }
 
-  def parseCurlyQuantifier(stack: mutable.Stack[Node]): Unit = {
+  private def parseCurlyQuantifier(stack: mutable.Stack[Node]): Unit = {
     val save = offset
     next()
     parseIntOption() match {
       case Some(min) =>
-        if (!isEnd && currentChar == '}') {
-          next()
-          val strategy = parseBacktrackStrategy(exact = true)
-          val quantifier = Quantifier.Exact(min, strategy)
-          pushRepeat(stack, popRepeatable(stack), quantifier)
-        } else if (!isEnd && currentChar == ',') {
-          next()
-          if (!isEnd && currentChar == '}') {
+        (currentChar: @switch) match {
+          case '}' =>
             next()
-            val strategy = parseBacktrackStrategy(exact = false)
-            val quantifier = Quantifier.Unbounded(min, strategy)
+            val strategy = parseBacktrackStrategy(exact = true)
+            val quantifier = Quantifier.Exact(min, strategy)
             pushRepeat(stack, popRepeatable(stack), quantifier)
-          } else {
-            parseIntOption() match {
-              case Some(max) =>
-                if (!isEnd && currentChar == '}') {
-                  next()
-                  val strategy = parseBacktrackStrategy(exact = false)
-                  val quantifier = Quantifier.Bounded(min, max, strategy)
-                  pushRepeat(stack, popRepeatable(stack), quantifier)
-                } else {
-                  resetBracket(stack, save)
-                }
-              case None =>
-                resetBracket(stack, save)
-            }
-          }
-        } else {
-          resetBracket(stack, save)
-        }
-      case _ =>
-        if (!isEnd && currentChar == ',' && featureSet.hasMaxBounded) {
-          next()
-          parseIntOption() match {
-            case Some(max) =>
-              if (!isEnd && currentChar == '}') {
+          case ',' =>
+            next()
+            (currentChar: @switch) match {
+              case '}' =>
                 next()
                 val strategy = parseBacktrackStrategy(exact = false)
-                val quantifier = Quantifier.MaxBounded(max, strategy)
+                val quantifier = Quantifier.Unbounded(min, strategy)
                 pushRepeat(stack, popRepeatable(stack), quantifier)
-              } else {
-                resetBracket(stack, save)
-              }
-            case None =>
-              resetBracket(stack, save)
-          }
-        } else {
+              case _ =>
+                parseIntOption() match {
+                  case Some(max) =>
+                    if (currentChar != '}') {
+                      resetBracket(stack, save)
+                      return
+                    }
+                    next()
+                    val strategy = parseBacktrackStrategy(exact = false)
+                    val quantifier = Quantifier.Bounded(min, max, strategy)
+                    pushRepeat(stack, popRepeatable(stack), quantifier)
+                  case None =>
+                    resetBracket(stack, save)
+                }
+            }
+          case _ =>
+            resetBracket(stack, save)
+        }
+      case None =>
+        if (!featureSet.hasMaxBounded || currentChar != ',') {
           resetBracket(stack, save)
+          return
+        }
+        next()
+        parseIntOption() match {
+          case Some(max) =>
+            if (currentChar != '}') {
+              resetBracket(stack, save)
+            }
+            next()
+            val strategy = parseBacktrackStrategy(exact = false)
+            val quantifier = Quantifier.MaxBounded(max, strategy)
+            pushRepeat(stack, popRepeatable(stack), quantifier)
+          case None =>
+            resetBracket(stack, save)
         }
     }
   }
 
-  def popRepeatable(stack: mutable.Stack[Node]): Node = {
-    if (stack.isEmpty) {
-      fail("Nothing to repeat")
-    }
+  private def popRepeatable(stack: mutable.Stack[Node]): Node = {
+    assert(stack.nonEmpty, "Nothing to repeat")
     val node = stack.pop()
     assertRepeatable(node)
     node
   }
 
-  def assertRepeatable(node: Node): Unit =
-    node match {
-      case Node.Group(_: GroupKind.PositiveLookAhead | _: GroupKind.NegativeLookAhead, _, _) =>
-        if (!featureSet.allowsLookAheadRepeat) {
-          fail("Invalid quantifier", node.loc.map(_.start).getOrElse(offset))
-        }
-      case Node.Group(_: GroupKind.PositiveLookBehind | _: GroupKind.NegativeLookBehind, _, _) =>
-        if (!featureSet.allowsLookBehindRepeat) {
-          fail("Invalid quantifier", node.loc.map(_.start).getOrElse(offset))
-        }
+  private def assertRepeatable(node: Node): Unit =
+    node.data match {
+      case NodeData.Group(_: GroupKind.PositiveLookAhead | _: GroupKind.NegativeLookAhead, _) =>
+        assert(featureSet.allowsLookAheadRepeat, "Nothing to repeat")
+      case NodeData.Group(_: GroupKind.PositiveLookBehind | _: GroupKind.NegativeLookBehind, _) =>
+        assert(featureSet.allowsLookBehindRepeat, "Nothing to repeat")
+      case NodeData.Repeat(_, _) =>
+        assert(featureSet.allowsNestedRepeat, "Nested quantifier")
       case _ =>
         // TODO: backslash and other assertion
         ()
     }
 
-  def pushRepeat(stack: mutable.Stack[Node], node: Node, quantifier: Quantifier): Unit = {
+  private def pushRepeat(stack: mutable.Stack[Node], node: Node, quantifier: Quantifier): Unit = {
     val end = offset
-    stack.push(Node.Repeat(node, quantifier, node.loc.map(_.copy(end = end))))
+    stack.push(Node(NodeData.Repeat(node, quantifier), node.loc.copy(end = end)))
   }
 
-  def parseBacktrackStrategy(exact: Boolean): BacktrackStrategy = {
+  private def parseBacktrackStrategy(exact: Boolean): BacktrackStrategy = {
     if (isEnd || exact && !featureSet.allowsMeaninglessBacktrackStrategy) {
       return BacktrackStrategy.Greedy
     }
@@ -227,7 +227,7 @@ final class Parser(
       return BacktrackStrategy.Lazy
     }
 
-    if (currentChar == '+' && featureSet.hasPossessiveBacktrackStrategy) {
+    if (featureSet.hasPossessiveBacktrackStrategy && currentChar == '+') {
       next()
       return BacktrackStrategy.Possessive
     }
@@ -235,22 +235,18 @@ final class Parser(
     BacktrackStrategy.Greedy
   }
 
-  def resetBracket(stack: mutable.Stack[Node], save: Int): Unit = {
+  private def resetBracket(stack: mutable.Stack[Node], save: Int): Unit = {
     if (!featureSet.allowsBrokenBracket) {
       fail("Incomplete quantifier", save)
     }
     reset(save)
-    stack.push(Node.Literal('{', Some(SourceLocation(save, save + 1))))
+    stack.push(Node(NodeData.Literal('{'), SourceLocation(save, save + 1)))
     next()
   }
 
-  def parseGroup(stack: mutable.Stack[Node]): Unit = {
+  private def parseGroup(stack: mutable.Stack[Node]): Unit = {
     val start = offset
     next()
-    if (isEnd) {
-      fail("Invalid")
-    }
-
     (currentChar: @switch) match {
       case '?' =>
         parseExtendedGroup(stack, start)
@@ -261,12 +257,8 @@ final class Parser(
     }
   }
 
-  def parseExtendedGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseExtendedGroup(stack: mutable.Stack[Node], start: Int): Unit = {
     next()
-    if (isEnd) {
-      fail("Invalid group")
-    }
-
     (currentChar: @switch) match {
       case ':' =>
         parseNonCaptureGroup(stack, start)
@@ -315,43 +307,37 @@ final class Parser(
     }
   }
 
-  def parseNonCaptureGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseNonCaptureGroup(stack: mutable.Stack[Node], start: Int): Unit = {
     next()
     parseGroupBody(stack, GroupKind.NonCapture, start)
   }
 
-  def parseBranchResetGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasBranchReset) {
-      fail("Invalid group")
-    }
+  private def parseBranchResetGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasBranchReset, "Invalid group")
     next()
     protectContext {
       val node = parseDisjunction()
       closeGroup()
-      val nodes = node match {
-        case Node.Disjunction(nodes, _) => nodes
-        case _                          => Seq(node)
+      val nodes = node.data match {
+        case NodeData.Disjunction(nodes) => nodes
+        case _                           => Seq(node)
       }
-      stack.push(Node.Command(CommandKind.BranchReset(nodes), Some(SourceLocation(start, offset))))
+      stack.push(Node(NodeData.Command(CommandKind.BranchReset(nodes)), SourceLocation(start, offset)))
     }
   }
 
-  def parsePositiveLookAheadGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parsePositiveLookAheadGroup(stack: mutable.Stack[Node], start: Int): Unit = {
     next()
     parseGroupBody(stack, GroupKind.PositiveLookAhead(AssertNameStyle.Symbolic), start)
   }
 
-  def parseNegativeLookAheadGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseNegativeLookAheadGroup(stack: mutable.Stack[Node], start: Int): Unit = {
     next()
     parseGroupBody(stack, GroupKind.NegativeLookAhead(AssertNameStyle.Symbolic), start)
   }
 
-  def parseAngleGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseAngleGroup(stack: mutable.Stack[Node], start: Int): Unit = {
     next()
-    if (isEnd) {
-      fail("Invalid group")
-    }
-
     (currentChar: @switch) match {
       case '=' =>
         parsePositiveLookBehindGroup(stack, start)
@@ -364,53 +350,49 @@ final class Parser(
     }
   }
 
-  def parsePositiveLookBehindGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parsePositiveLookBehindGroup(stack: mutable.Stack[Node], start: Int): Unit = {
     next()
     parseGroupBody(stack, GroupKind.PositiveLookBehind(AssertNameStyle.Symbolic), start)
   }
 
-  def parseNegativeLookBehindGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseNegativeLookBehindGroup(stack: mutable.Stack[Node], start: Int): Unit = {
     next()
     parseGroupBody(stack, GroupKind.NegativeLookBehind(AssertNameStyle.Symbolic), start)
   }
 
-  def parseNonAtomicPositiveLookBehindGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasNonAtomicLookAround) {
-      fail("Invalid group")
-    }
+  private def parseNonAtomicPositiveLookBehindGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasNonAtomicLookAround, "Invalid group")
     next()
     parseGroupBody(stack, GroupKind.NonAtomicPositiveLookBehind(AssertNameStyle.Symbolic), start)
   }
 
-  def parseAtomicGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasAtomicGroup) {
-      fail("Invalid group")
-    }
+  private def parseAtomicGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasAtomicGroup, "Invalid group")
     next()
     parseGroupBody(stack, GroupKind.Atomic(AssertNameStyle.Symbolic), start)
   }
 
-  def parseNonAtomicPositiveLookAheadGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasNonAtomicLookAround) {
-      fail("Invalid group")
-    }
+  private def parseNonAtomicPositiveLookAheadGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasNonAtomicLookAround, "Invalid group")
     next()
     parseGroupBody(stack, GroupKind.NonAtomicPositiveLookAhead(AssertNameStyle.Symbolic), start)
   }
 
-  def parseAbsenceGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasAbsenceOperator) {
-      fail("Invalid group")
-    }
+  private def parseAbsenceGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasAbsenceOperator, "Invalid group")
     next()
     parseGroupBody(stack, GroupKind.Absence, start)
   }
 
-  def parseConditionalGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasConditional) {
-      fail("Invalod group")
-    }
+  private[this] val LookAroundTests = Seq(
+    ("?=", "*positive_lookahead:", "*pla:", GroupKind.PositiveLookAhead),
+    ("?!", "*negative_lookahead:", "*nla:", GroupKind.NegativeLookAhead),
+    ("?<=", "*positive_lookbehind:", "*plb:", GroupKind.PositiveLookBehind),
+    ("?<!", "*negative_lookbehind:", "*nlb:", GroupKind.NegativeLookBehind)
+  )
 
+  private def parseConditionalGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasConditional, "Invalid group")
     next()
 
     for (n <- parseIntOption()) {
@@ -419,7 +401,7 @@ final class Parser(
       return
     }
 
-    if (!isEnd && currentChar == '<' && featureSet.hasNamedCaptureTest) {
+    if (featureSet.hasNamedCaptureTest && currentChar == '<') {
       next()
       val name = parseName(end = '>')
       closeCondition()
@@ -427,7 +409,7 @@ final class Parser(
       return
     }
 
-    if (!isEnd && currentChar == '\'' && featureSet.hasNamedCaptureTest) {
+    if (featureSet.hasNamedCaptureTest && currentChar == '\'') {
       next()
       val name = parseName(end = '\'')
       closeCondition()
@@ -435,41 +417,27 @@ final class Parser(
       return
     }
 
-    if (source.startsWith("DEFINE", offset) && featureSet.hasDefineTest) {
-      reset(offset + "DEFINE".length)
+    if (featureSet.hasDefineTest && startWith("DEFINE")) {
       closeCondition()
       parseConditionalGroupBody(stack, ConditionalTest.Define, start)
       return
     }
 
-    if (source.startsWith("VERSION", offset) && featureSet.hasVersionTest) {
-      reset(offset + "VERSION".length)
+    if (featureSet.hasVersionTest && startWith("VERSION")) {
       val lt = !isEnd && currentChar == '>'
       if (lt) {
         next()
       }
-      if (isEnd || currentChar != '=') {
-        fail("Invalid condition")
-      }
-      next()
-      val major = parseIntOption() match {
-        case Some(n) => n
-        case None    => fail("Invalid condition")
-      }
-      if (isEnd || currentChar != '.') {
-        fail("Invalid condition")
-      }
-      next()
-      val minor = parseIntOption() match {
-        case Some(n) => n
-        case None    => fail("Invalid condition")
-      }
+      expect('=', "Invalid condition")
+      val major = parseIntOption().getOrElse(fail("Invalid condition"))
+      expect('.', "Invalid condition")
+      val minor = parseIntOption().getOrElse(fail("Invalid condition"))
       closeCondition()
       parseConditionalGroupBody(stack, ConditionalTest.Version(lt, major, minor), start)
       return
     }
 
-    if (!isEnd && currentChar == 'R' && featureSet.hasRecursionTest) {
+    if (currentChar == 'R' && featureSet.hasRecursionTest) {
       next()
       (currentChar: @switch) match {
         case ')' =>
@@ -481,18 +449,14 @@ final class Parser(
           closeCondition()
           parseConditionalGroupBody(stack, ConditionalTest.NamedRecursion(name), start)
         case _ =>
-          parseIntOption() match {
-            case Some(n) =>
-              closeCondition()
-              parseConditionalGroupBody(stack, ConditionalTest.IndexedRecursion(n), start)
-            case None =>
-              fail("Invalid group")
-          }
+          val n = parseIntOption().getOrElse(fail("Invalid group"))
+          closeCondition()
+          parseConditionalGroupBody(stack, ConditionalTest.IndexedRecursion(n), start)
       }
       return
     }
 
-    if (isIDStart && featureSet.hasBareNamedCaptureTest) {
+    if (featureSet.hasBareNamedCaptureTest && isIDStart) {
       val name = parseID()
       closeCondition()
       parseConditionalGroupBody(stack, ConditionalTest.Named(NameStyle.Bare, name), start)
@@ -500,11 +464,12 @@ final class Parser(
     }
 
     val isRelative = !isEnd && (currentChar == '+' || currentChar == '-')
-    if (isRelative && featureSet.hasRelativeIndexedCaptureTest) {
+    if (featureSet.hasRelativeIndexedCaptureTest && isRelative) {
       val minus = currentChar == '-'
       next()
       parseIntOption() match {
         case Some(n) =>
+          closeCondition()
           parseConditionalGroupBody(stack, ConditionalTest.Relative(if (minus) -n else n), start)
           return
         case None =>
@@ -513,20 +478,10 @@ final class Parser(
     }
 
     if (featureSet.hasLookAroundTest) {
-      if (parseLookAroundTest(stack, GroupKind.PositiveLookAhead, start)("?=", "*positive_lookahead:", "*pla:")) {
-        return
-      }
-
-      if (parseLookAroundTest(stack, GroupKind.NegativeLookAhead, start)("?!", "*negative_lookahead:", "*nla:")) {
-        return
-      }
-
-      if (parseLookAroundTest(stack, GroupKind.PositiveLookBehind, start)("?<=", "*positive_lookbehind:", "*plb:")) {
-        return
-      }
-
-      if (parseLookAroundTest(stack, GroupKind.NegativeLookBehind, start)("?<!", "*negative_lookbehind:", "*nlb:")) {
-        return
+      for ((symbolic, alphabetic, abbrev, la) <- LookAroundTests) {
+        if (parseLookAroundTest(stack, start, symbolic, alphabetic, abbrev, la)) {
+          return
+        }
       }
 
       parseLookAroundConditional(stack, None, start)
@@ -536,14 +491,11 @@ final class Parser(
     fail("Invalid condition")
   }
 
-  def closeCondition(): Unit = {
-    if (isEnd || currentChar != ')') {
-      fail("Invalid condition")
-    }
-    next()
+  private def closeCondition(): Unit = {
+    expect(')', "Invalid condition")
   }
 
-  def parseConditionalGroupBody(stack: mutable.Stack[Node], test: ConditionalTest, start: Int): Unit = {
+  private def parseConditionalGroupBody(stack: mutable.Stack[Node], test: ConditionalTest, start: Int): Unit = {
     protectContext {
       val yes = protectContext(parseSequence())
       val no = Option.when(!isEnd && currentChar == '|') {
@@ -552,29 +504,29 @@ final class Parser(
       }
       closeGroup()
       val end = offset
-      stack.push(Node.Command(CommandKind.Conditional(test, yes, no), Some(SourceLocation(start, end))))
+      stack.push(Node(NodeData.Command(CommandKind.Conditional(test, yes, no)), SourceLocation(start, end)))
     }
   }
 
-  def parseLookAroundTest(stack: mutable.Stack[Node], la: AssertNameStyle => GroupKind.LookAround, start: Int)(
+  private def parseLookAroundTest(
+      stack: mutable.Stack[Node],
+      start: Int,
       symbolic: String,
       alphabetic: String,
-      abbrev: String
+      abbrev: String,
+      la: AssertNameStyle => GroupKind.LookAround
   ): Boolean = {
-    if (source.startsWith(symbolic, offset)) {
-      reset(offset + symbolic.length)
+    if (startWith(symbolic)) {
       parseLookAroundConditional(stack, Some(la(AssertNameStyle.Symbolic)), start)
       return true
     }
 
-    if (source.startsWith(alphabetic, offset) && featureSet.hasAlphabeticGroup) {
-      reset(offset + alphabetic.length)
+    if (featureSet.hasAlphabeticGroup && startWith(alphabetic)) {
       parseLookAroundConditional(stack, Some(la(AssertNameStyle.Alphabetic)), start)
       return true
     }
 
-    if (source.startsWith(abbrev, offset) && featureSet.hasAlphabeticGroup) {
-      reset(offset + abbrev.length)
+    if (featureSet.hasAlphabeticGroup && startWith(abbrev)) {
       parseLookAroundConditional(stack, Some(la(AssertNameStyle.Abbrev)), start)
       return true
     }
@@ -582,77 +534,77 @@ final class Parser(
     false
   }
 
-  def parseLookAroundConditional(stack: mutable.Stack[Node], kind: Option[GroupKind.LookAround], start: Int): Unit = {
+  private def parseLookAroundConditional(
+      stack: mutable.Stack[Node],
+      kind: Option[GroupKind.LookAround],
+      start: Int
+  ): Unit = {
     val node = protectContext(parseDisjunction())
     closeCondition()
     parseConditionalGroupBody(stack, ConditionalTest.LookAround(kind, node), start)
   }
 
-  def parseAngleNamedCaptureGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasAngleNamedCapture) {
-      fail("Invalid group")
-    }
+  private def parseAngleNamedCaptureGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasAngleNamedCapture, "Invalid group")
     parseNamedCaptureGroup(stack, '>', NameStyle.Angle, start)
   }
 
-  def parseQuoteNamedCaptureGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasQuoteNamedCapture) {
-      fail("Invalid group")
-    }
+  private def parseQuoteNamedCaptureGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasQuoteNamedCapture, "Invalid group")
     next()
     parseNamedCaptureGroup(stack, '\'', NameStyle.Quote, start)
   }
 
-  def parseNamedCaptureGroup(stack: mutable.Stack[Node], end: Char, style: NameStyle, start: Int): Unit = {
+  private def parseNamedCaptureGroup(stack: mutable.Stack[Node], end: Char, style: NameStyle, start: Int): Unit = {
     if (featureSet.hasBalanceGroup) {
       parseBalanceGroup(stack, end, style, start)
-    } else {
-      val name = parseName(end = end)
-      parseGroupBody(stack, GroupKind.NamedCapture(style, name), start)
+      return
     }
+
+    val name = parseName(end = end)
+    parseGroupBody(stack, GroupKind.NamedCapture(style, name), start)
   }
 
-  def parseBalanceGroup(stack: mutable.Stack[Node], end: Char, style: NameStyle, start: Int): Unit = {
-    if (!isEnd && currentChar == '-') {
+  private def parseBalanceGroup(stack: mutable.Stack[Node], end: Char, style: NameStyle, start: Int): Unit = {
+    if (currentChar == '-') {
       next()
       val test = parseName(end = end)
       parseGroupBody(stack, GroupKind.Balance(style, None, test), start)
-    } else {
-      val name = parseID()
-      if (!isEnd && currentChar == '-') {
-        next()
-        val test = parseName(end = end)
-        parseGroupBody(stack, GroupKind.Balance(style, Some(name), test), start)
-      } else if (!isEnd && currentChar == end) {
-        next()
-        parseGroupBody(stack, GroupKind.NamedCapture(style, name), start)
-      } else {
-        fail("Invalid identifier")
-      }
+      return
     }
+
+    val name = parseID()
+    if (currentChar == end) {
+      next()
+      parseGroupBody(stack, GroupKind.NamedCapture(style, name), start)
+      return
+    }
+
+    if (currentChar == '-') {
+      next()
+      val test = parseName(end = end)
+      parseGroupBody(stack, GroupKind.Balance(style, Some(name), test), start)
+      return
+    }
+
+    fail("Invalid identifier")
   }
 
-  def parsePGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasPGroup) {
-      fail("Invalid group")
-    }
+  private def parsePGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasPGroup, "Invalid group")
     next()
-    if (isEnd) {
-      fail("Invalid group")
-    }
-
     (currentChar: @switch) match {
       case '<' =>
         next()
         val name = parseName(end = '>')
         parseGroupBody(stack, GroupKind.PNamedCapture(name), start)
       case '=' =>
+        next()
         val name = parseID()
         pushCommand(stack, CommandKind.PBackReference(name), start)
       case '>' =>
-        if (!featureSet.hasPCall) {
-          fail("Invalid group")
-        }
+        assert(featureSet.hasPCall, "Invalid group")
+        next()
         val name = parseID()
         pushCommand(stack, CommandKind.PNamedCall(name), start)
       case _ =>
@@ -660,66 +612,43 @@ final class Parser(
     }
   }
 
-  def parseRGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasRCall) {
-      fail("Invalid group")
-    }
+  private def parseRGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasRCall, "Invalid group")
     next()
     pushCommand(stack, CommandKind.RCall, start)
   }
 
-  def parseNamedCallGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasCallCommand) {
-      fail("Invalid group")
-    }
+  private def parseNamedCallGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasCallCommand, "Invalid group")
     next()
     val name = parseID()
     pushCommand(stack, CommandKind.NamedCall(name), start)
   }
 
-  def parseIndexedCallGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasCallCommand) {
-      fail("Invalid group")
-    }
-    parseIntOption() match {
-      case Some(n) =>
-        pushCommand(stack, CommandKind.IndexedCall(n), start)
-      case None =>
-        fail("Invalid group")
-    }
+  private def parseIndexedCallGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasCallCommand, "Invalid group")
+    val n = parseIntOption().getOrElse(fail("Invalid group"))
+    pushCommand(stack, CommandKind.IndexedCall(n), start)
   }
 
-  def parsePlusGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasCallCommand) {
-      fail("Invalid group")
-    }
+  private def parsePlusGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasCallCommand, "Invalid group")
+    next()
+    val n = parseIntOption().getOrElse(fail("Invalid group"))
+    pushCommand(stack, CommandKind.RelativeCall(n), start)
+  }
+
+  private def parseMinusGroup(stack: mutable.Stack[Node], start: Int): Unit = {
     next()
     parseIntOption() match {
       case Some(n) =>
-        pushCommand(stack, CommandKind.RelativeCall(n), start)
-      case None =>
-        fail("Invalid group")
-    }
-  }
-
-  def parseMinusGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    next()
-    parseIntOption() match {
-      case Some(n) =>
-        if (!featureSet.hasCallCommand) {
-          fail("Invalid group")
-        }
+        assert(featureSet.hasCallCommand, "Invalid group")
         pushCommand(stack, CommandKind.RelativeCall(-n), start)
       case None =>
-        if (!featureSet.hasInlineFlag) {
-          fail("Invalid group")
-        }
+        assert(featureSet.hasInlineFlag, "Invalid group")
         val added = FlagSet()
         val removed = parseFlagSet()
         val diff = FlagSetDiff(added, Some(removed))
-        if (isEnd) {
-          fail("Invalid group")
-        }
         (currentChar: @switch) match {
           case ')' =>
             pushCommand(stack, CommandKind.InlineFlag(FlagSetDiff(added, Some(removed))), start)
@@ -735,15 +664,10 @@ final class Parser(
     }
   }
 
-  def parseResetFlagGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasResetFlag) {
-      fail("Invalid group")
-    }
+  private def parseResetFlagGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasResetFlag, "Invalid group")
     next()
     val flagSet = parseFlagSet()
-    if (isEnd) {
-      fail("Invalid group")
-    }
     (currentChar: @switch) match {
       case ')' =>
         pushCommand(stack, CommandKind.ResetFlag(flagSet), start)
@@ -758,13 +682,11 @@ final class Parser(
     }
   }
 
-  def parseCommentGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasInlineComment) {
-      fail("Invalid group")
-    }
+  private def parseCommentGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasInlineComment, "Invalid group")
     next()
     val textStart = offset
-    while (isEnd || currentChar != ')') {
+    while (!isEnd && currentChar != ')') {
       if (featureSet.processBackslashInCommentGroup && currentChar == '\\') {
         next()
         if (!isEnd) {
@@ -774,43 +696,30 @@ final class Parser(
         next()
       }
     }
-    if (isEnd) {
-      fail("Invalid group")
-    }
+    assert(!isEnd, "Invalid group")
     val end = offset
     val text = source.slice(textStart, end)
     pushCommand(stack, CommandKind.Comment(text), start)
   }
 
-  def parseInlineCodeGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasInlineCode) {
-      fail("Invalid group")
-    }
+  private def parseInlineCodeGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasInlineCode, "Invalid group")
     next()
     val code = parseCode(end = '}')
     pushCommand(stack, CommandKind.InlineCode(code), start)
   }
 
-  def parseEmbedCodeGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasInlineCode) {
-      fail("Invalid group")
-    }
+  private def parseEmbedCodeGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasInlineCode, "Invalid group")
     next()
-    if (isEnd || currentChar != '{') {
-      fail("Invalid group")
-    }
+    expect('{', "Invalid group")
     val code = parseCode(end = '}')
     pushCommand(stack, CommandKind.EmbedCode(code), start)
   }
 
-  def parseCalloutGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasCallout) {
-      fail("Invalid group")
-    }
+  private def parseCalloutGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasCallout, "Invalid group")
     next()
-    if (isEnd) {
-      fail("Invalid group")
-    }
     (currentChar: @switch) match {
       case '`' | '\'' | '"' | '^' | '%' | '#' | '$' =>
         val delim = currentChar
@@ -831,39 +740,33 @@ final class Parser(
     }
   }
 
-  def parseCode(end: Char, escapeDouble: Boolean = false): String = {
+  private def parseCode(end: Char, escapeDouble: Boolean = false): String = {
     val start = offset
     while (
-      isEnd || !(currentChar == end && !(escapeDouble && offset + 1 < source.length && source.charAt(
-        offset + 1
-      ) == end))
+      !isEnd &&
+      !(currentChar == end && !(escapeDouble && offset + 1 < source.length && source.charAt(offset + 1) == end))
     ) {
+      if (currentChar == end && escapeDouble && offset + 1 < source.length && source.charAt(offset + 1) == end) {
+        next()
+      }
       next()
     }
-    if (isEnd) {
-      fail("Invalid group")
-    }
+    assert(!isEnd, "Invalid group")
     val code = source.slice(start, offset)
     next()
     code
   }
 
-  def parseInlineFlagGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasInlineFlag) {
-      fail("Invalid group")
-    }
+  private def parseInlineFlagGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasInlineFlag, "Invalid group")
+
     val added = parseFlagSet()
-    if (isEnd) {
-      fail("Invalid group")
-    }
+
     (currentChar: @switch) match {
       case '-' =>
         next()
         val removed = parseFlagSet()
         val diff = FlagSetDiff(added, Some(removed))
-        if (isEnd) {
-          fail("Invalid group")
-        }
         (currentChar: @switch) match {
           case ':' =>
             next()
@@ -889,7 +792,7 @@ final class Parser(
     }
   }
 
-  def pushInlineFlagCommand(stack: mutable.Stack[Node], diff: FlagSetDiff, start: Int): Unit = {
+  private def pushInlineFlagCommand(stack: mutable.Stack[Node], diff: FlagSetDiff, start: Int): Unit = {
     pushCommand(stack, CommandKind.InlineFlag(diff), start)
     if (featureSet.hasIncomprehensiveInlineFlag) {
       parseOpaqueDisjunction(stack, diff)
@@ -898,142 +801,106 @@ final class Parser(
     }
   }
 
-  def parseOpaqueDisjunction(stack: mutable.Stack[Node], diff: FlagSetDiff): Unit = {
+  private def parseOpaqueDisjunction(stack: mutable.Stack[Node], diff: FlagSetDiff): Unit = {
     applyFlagSetDiffWith(diff) {
-      val start = offset
       val node = parseDisjunction()
-      val end = offset
-      stack.push(Node.Group(GroupKind.Opaque, node, Some(SourceLocation(start, end))))
+      node.data match {
+        case s: NodeData.Sequence =>
+          if (s.nodes.isEmpty) {
+            return
+          }
+        case _ => ()
+      }
+      stack.push(node)
     }
   }
 
-  def parseAlphabeticGroup(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasAlphabeticGroup) {
-      fail("Invalid group")
-    }
+  private[this] val BacktrackControls = Seq(
+    ("ACCEPT", BacktrackControlKind.Accept),
+    ("FAIL", BacktrackControlKind.Fail),
+    ("MARK", BacktrackControlKind.Mark),
+    ("COMMIT", BacktrackControlKind.Commit),
+    ("PRUNE", BacktrackControlKind.Prune),
+    ("SKIP", BacktrackControlKind.Skip),
+    ("THEN", BacktrackControlKind.Then)
+  )
+
+  private[this] val AlphabeticGroups = Seq(
+    ("positive_lookahead:", "pla:", GroupKind.PositiveLookAhead),
+    ("negative_lookahead:", "nla:", GroupKind.NegativeLookAhead),
+    ("positive_lookbehind:", "plb:", GroupKind.PositiveLookBehind),
+    ("negative_lookbehind:", "nlb:", GroupKind.NegativeLookBehind),
+    ("atomic:", "", GroupKind.Atomic),
+    ("script_run:", "sr:", GroupKind.ScriptRun),
+    ("atomic_script_run:", "asr:", GroupKind.AtomicScriptRun)
+  ) ++ {
+    if (featureSet.hasNonAtomicLookAround) {
+      Seq(
+        ("non_atomic_positive_lookahead:", "napla:", GroupKind.NonAtomicPositiveLookAhead),
+        ("non_atomic_positive_lookbehind:", "naplb:", GroupKind.NonAtomicPositiveLookBehind)
+      )
+    } else Seq.empty
+  }
+
+  private def parseAlphabeticGroup(stack: mutable.Stack[Node], start: Int): Unit = {
+    assert(featureSet.hasAlphabeticGroup, "Invalid group")
 
     next()
 
-    if (parseBacktrackControl(stack, start)("ACCEPT", BacktrackControlKind.Accept)) {
-      return
-    }
-
-    if (parseBacktrackControl(stack, start)("FAIL", BacktrackControlKind.Fail)) {
-      return
-    }
-
-    if (parseBacktrackControl(stack, start)("MARK", BacktrackControlKind.Mark)) {
-      return
-    }
-
-    if (parseBacktrackControl(stack, start)("COMMIT", BacktrackControlKind.Commit)) {
-      return
-    }
-
-    if (parseBacktrackControl(stack, start)("PRUNE", BacktrackControlKind.Prune)) {
-      return
-    }
-
-    if (parseBacktrackControl(stack, start)("SKIP", BacktrackControlKind.Skip)) {
-      return
-    }
-
-    if (parseBacktrackControl(stack, start)("THEN", BacktrackControlKind.Then)) {
-      return
-    }
-
-    if (parseAlphabetic(stack, start, "positive_lookahead:", "pla:", GroupKind.PositiveLookAhead)) {
-      return
-    }
-
-    if (parseAlphabetic(stack, start, "negative_lookahead:", "nla:", GroupKind.NegativeLookAhead)) {
-      return
-    }
-
-    if (parseAlphabetic(stack, start, "positive_lookbehind:", "plb:", GroupKind.PositiveLookBehind)) {
-      return
-    }
-
-    if (parseAlphabetic(stack, start, "negative_lookbehind:", "nlb:", GroupKind.NegativeLookBehind)) {
-      return
-    }
-
-    if (parseAlphabetic(stack, start, "atomic:", GroupKind.Atomic)) {
-      return
-    }
-
-    if (parseAlphabetic(stack, start, "script_run:", "sr:", GroupKind.ScriptRun)) {
-      return
-    }
-
-    if (parseAlphabetic(stack, start, "atomic_script_run:", "asr:", GroupKind.AtomicScriptRun)) {
-      return
-    }
-
-    if (featureSet.hasNonAtomicLookAround) {
-      if (
-        parseAlphabetic(stack, start, "non_atomic_positive_lookahead:", "napla:", GroupKind.NonAtomicPositiveLookAhead)
-      ) {
-        return
-      }
-
-      if (
-        parseAlphabetic(
-          stack,
-          start,
-          "non_atomic_positive_lookbehind:",
-          "naplb:",
-          GroupKind.NonAtomicPositiveLookBehind
-        )
-      ) {
+    for ((command, kind) <- BacktrackControls) {
+      if (parseBacktrackControl(stack, start, command, kind)) {
         return
       }
     }
 
-    fail("Invalid group")
+    for ((alphabetic, abbrev, kind) <- AlphabeticGroups) {
+      if (parseAlphabetic(stack, start, alphabetic, abbrev, kind)) {
+        return
+      }
+    }
+
+    expect(':', "Invalid group")
+    val name = parseID()
+    pushCommand(stack, CommandKind.BacktrackControl(None, Some(name)), start)
   }
 
-  def parseBacktrackControl(
+  private def parseBacktrackControl(
       stack: mutable.Stack[Node],
-      start: Int
-  )(command: String, kind: BacktrackControlKind): Boolean = {
-    if (!source.startsWith(command, offset)) {
+      start: Int,
+      command: String,
+      kind: BacktrackControlKind
+  ): Boolean = {
+    if (!startWith(command)) {
       return false
-    }
-    reset(offset + command.length)
-    if (isEnd) {
-      fail("Invalid group")
     }
 
     (currentChar: @switch) match {
       case ':' =>
         next()
         val name = parseID()
-        pushCommand(stack, CommandKind.BacktrackControl(kind, Some(name)), start)
+        pushCommand(stack, CommandKind.BacktrackControl(Some(kind), Some(name)), start)
         true
       case ')' =>
-        pushCommand(stack, CommandKind.BacktrackControl(kind, None), start)
+        pushCommand(stack, CommandKind.BacktrackControl(Some(kind), None), start)
         true
       case _ =>
         fail("Invalid group")
     }
   }
 
-  def parseAlphabetic(
+  private def parseAlphabetic(
       stack: mutable.Stack[Node],
       start: Int,
       alphabetic: String,
       abbrev: String,
       k: AssertNameStyle => GroupKind
   ): Boolean = {
-    if (source.startsWith(alphabetic, offset)) {
-      reset(offset + alphabetic.length)
+    if (startWith(alphabetic)) {
       parseGroupBody(stack, k(AssertNameStyle.Alphabetic), start)
       return true
     }
 
-    if (source.startsWith(abbrev, offset)) {
-      reset(offset + abbrev.length)
+    if (abbrev.nonEmpty && startWith(abbrev)) {
       parseGroupBody(stack, k(AssertNameStyle.Abbrev), start)
       return true
     }
@@ -1041,42 +908,24 @@ final class Parser(
     false
   }
 
-  def parseAlphabetic(
-      stack: mutable.Stack[Node],
-      start: Int,
-      alphabetic: String,
-      k: AssertNameStyle => GroupKind
-  ): Boolean = {
-    if (source.startsWith(alphabetic, offset)) {
-      reset(offset + alphabetic.length)
-      parseGroupBody(stack, k(AssertNameStyle.Alphabetic), start)
-      return true
-    }
-
-    false
-  }
-
-  def parseGroupBody(stack: mutable.Stack[Node], kind: GroupKind, start: Int): Unit = {
+  private def parseGroupBody(stack: mutable.Stack[Node], kind: GroupKind, start: Int): Unit = {
     val node = protectContext(parseDisjunction())
     closeGroup()
     val end = offset
-    stack.push(Node.Group(kind, node, Some(SourceLocation(start, end))))
+    stack.push(Node(NodeData.Group(kind, node), SourceLocation(start, end)))
   }
 
-  def pushCommand(stack: mutable.Stack[Node], kind: CommandKind, start: Int): Unit = {
+  private def pushCommand(stack: mutable.Stack[Node], kind: CommandKind, start: Int): Unit = {
     closeGroup()
     val end = offset
-    stack.push(Node.Command(kind, Some(SourceLocation(start, end))))
+    stack.push(Node(NodeData.Command(kind), SourceLocation(start, end)))
   }
 
-  def closeGroup(): Unit = {
-    if (isEnd || currentChar != ')') {
-      fail("Unclosed group")
-    }
-    next()
+  private def closeGroup(): Unit = {
+    expect(')', "Unclosed group")
   }
 
-  def parseFlagSet(): FlagSet = {
+  private def parseFlagSet(): FlagSet = {
     var flagSet = FlagSet()
     while (!isEnd) {
       (currentChar: @switch) match {
@@ -1144,35 +993,37 @@ final class Parser(
     flagSet
   }
 
-  def parseCaret(stack: mutable.Stack[Node]): Unit = ???
+  private def parseCaret(stack: mutable.Stack[Node]): Unit = ???
 
-  def parseDollar(stack: mutable.Stack[Node]): Unit = ???
+  private def parseDollar(stack: mutable.Stack[Node]): Unit = ???
 
-  def parseBackslash(stack: mutable.Stack[Node]): Unit = ???
+  private def parseDot(stack: mutable.Stack[Node]): Unit = ???
 
-  def parseClass(stack: mutable.Stack[Node]): Unit = ???
+  private def parseBackslash(stack: mutable.Stack[Node]): Unit = ???
 
-  def parseCloseCurly(stack: mutable.Stack[Node]): Unit = ???
+  private def parseClass(stack: mutable.Stack[Node]): Unit = ???
 
-  def parseCloseBracket(stack: mutable.Stack[Node]): Unit = ???
+  private def parseCloseCurly(stack: mutable.Stack[Node]): Unit = ???
 
-  def parseLiteral(stack: mutable.Stack[Node]): Unit = {
+  private def parseCloseBracket(stack: mutable.Stack[Node]): Unit = ???
+
+  private def parseLiteral(stack: mutable.Stack[Node]): Unit = {
     val value =
       if (featureSet.readsAsUnicode) currentCodePoint else currentChar.toInt
     val start = offset
     nextCodePoint(value)
     val end = offset
-    stack.push(Node.Literal(value, Some(SourceLocation(start, end))))
+    stack.push(Node(NodeData.Literal(value), SourceLocation(start, end)))
   }
 
-  def protectContext[A](body: => A): A = {
+  private def protectContext[A](body: => A): A = {
     val savedContext = context
     val value = body
     context = savedContext
     value
   }
 
-  def applyFlagSetDiff(diff: FlagSetDiff): Unit = {
+  private def applyFlagSetDiff(diff: FlagSetDiff): Unit = {
     if (diff.added.verbose) {
       context = context.copy(skipsComment = true)
     }
@@ -1181,44 +1032,39 @@ final class Parser(
     }
   }
 
-  def applyFlagSetDiffWith(diff: FlagSetDiff)(body: => Unit): Unit = {
+  private def applyFlagSetDiffWith(diff: FlagSetDiff)(body: => Unit): Unit = {
     protectContext {
       applyFlagSetDiff(diff)
       body
     }
   }
 
-  def applyResetFlag(flagSet: FlagSet): Unit = {
+  private def applyResetFlag(flagSet: FlagSet): Unit = {
     context = context.copy(skipsComment = false)
     if (flagSet.verbose) {
       context = context.copy(skipsComment = true)
     }
   }
 
-  def applyResetFlagWith(flagSet: FlagSet)(body: => Unit): Unit = {
+  private def applyResetFlagWith(flagSet: FlagSet)(body: => Unit): Unit = {
     protectContext {
       applyResetFlag(flagSet)
       body
     }
   }
 
-  def parseName(end: Char): String = {
-    val start = offset
+  private def parseName(end: Char): String = {
     val name = parseID()
-    if (isEnd || currentChar != end) {
-      fail("Invalid identifier", start)
-    }
+    assert(!isEnd && currentChar == end, "Invalid identifier")
     next()
     name
   }
 
-  def parseID(): String = {
+  private def parseID(): String = {
     val start = offset
 
     if (!featureSet.allowsInvalidIdentifier) {
-      if (!isIDStart) {
-        fail("Invalid identifier")
-      }
+      assert(isIDStart, "Invalid identifier")
       next()
     }
     while (isIDContinue) {
@@ -1226,14 +1072,12 @@ final class Parser(
     }
 
     val end = offset
-    if (start == end) {
-      fail("Invalid identifier")
-    }
+    assert(start < end, "Invalid identifier")
 
     source.slice(start, end)
   }
 
-  def parseIntOption(): Option[Int] = {
+  private def parseIntOption(): Option[Int] = {
     if (!isDigit) {
       return None
     }
@@ -1245,13 +1089,10 @@ final class Parser(
     val end = offset
 
     val str = source.slice(start, end)
-    str.toIntOption match {
-      case Some(n) => Some(n)
-      case None    => fail("Invalid integer", start)
-    }
+    str.toIntOption.orElse(fail("Invalid integer", start))
   }
 
-  def skipComment(): Boolean = {
+  private def skipComment(): Boolean = {
     var skipped = false
 
     var continue = true
@@ -1267,7 +1108,7 @@ final class Parser(
       }
 
       if (!isEnd && currentChar == '#') {
-        while (!isNewline) {
+        while (!isEnd && !isNewline) {
           if (featureSet.processBackslashInLineComment && !isEnd && currentChar == '\\') {
             next()
             if (!isEnd) {
@@ -1285,17 +1126,17 @@ final class Parser(
     skipped
   }
 
-  def next(): Unit = reset(offset + 1)
+  private def next(): Unit = reset(offset + 1)
 
-  def nextCodePoint(codePoint: Int): Unit =
+  private def nextCodePoint(codePoint: Int): Unit =
     reset(if (codePoint >= 0x10000) offset + 2 else offset + 1)
 
-  def reset(save: Int): Unit = {
+  private def reset(save: Int): Unit = {
     offset = save
     currentChar = if (offset >= source.length) '\u0000' else source.charAt(offset)
   }
 
-  def currentCodePoint: Int = {
+  private def currentCodePoint: Int = {
     val codePoint1 = currentChar.toInt
     if (CodePointUtil.isHighSurrogate(codePoint1) && offset + 1 < source.length) {
       val codePoint2 = source.charAt(offset + 1).toInt
@@ -1309,29 +1150,48 @@ final class Parser(
     }
   }
 
-  def isEnd: Boolean = offset >= source.length
+  private def expect(c: Char, message: String): Unit = {
+    if (isEnd || currentChar != c) {
+      fail(message)
+    }
+    next()
+  }
 
-  def isSequenceStop: Boolean =
+  private def startWith(s: String): Boolean = {
+    if (source.startsWith(s, offset)) {
+      reset(offset + s.length)
+      true
+    } else {
+      false
+    }
+  }
+
+  private def isEnd: Boolean = offset >= source.length
+
+  private def isSequenceStop: Boolean =
     isEnd || currentChar == '|' || currentChar == ')'
 
-  def isSpace: Boolean =
+  private def isSpace: Boolean =
     !isEnd && CodePointUtil.isSpace(currentChar.toInt)
 
-  def isNewline: Boolean =
+  private def isNewline: Boolean =
     !isEnd && CodePointUtil.isNewline(currentChar.toInt)
 
-  def isDigit: Boolean =
+  private def isDigit: Boolean =
     !isEnd && CodePointUtil.isDigit(currentChar.toInt)
 
-  def isIDStart: Boolean =
+  private def isIDStart: Boolean =
     !isEnd && CodePointUtil.isIDStart(currentChar.toInt)
 
-  def isIDContinue: Boolean =
+  private def isIDContinue: Boolean =
     !isEnd && CodePointUtil.isIDContinue(currentChar.toInt)
 
-  def extend(loc: Option[SourceLocation], end: Int): Option[SourceLocation] =
-    loc.map(_.copy(end = end))
+  private def assert(condition: Boolean, message: String): Unit = {
+    if (!condition) {
+      fail(message)
+    }
+  }
 
-  def fail(message: String, pos: Int = offset): Nothing =
+  private def fail(message: String, pos: Int = offset): Nothing =
     throw new ParsingException(message, Some(pos))
 }

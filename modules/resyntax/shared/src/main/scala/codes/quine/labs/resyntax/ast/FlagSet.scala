@@ -1,5 +1,8 @@
 package codes.quine.labs.resyntax.ast
 
+import scala.annotation.switch
+import scala.collection.mutable
+
 /** FlagSet is a set of flag characters.
   *
   * Each value are corresponding to just one letter without duplication, so their namings are not matched in some
@@ -57,3 +60,101 @@ final case class FlagSet(
     // `y` (JavaScript)
     sticky: Boolean = false
 )
+
+object FlagSet {
+  def parse(flags: String, dialect: Dialect): FlagSet = {
+    val allowsDuplicatedFlag = dialect != Dialect.JavaScript
+
+    var flagSet = FlagSet()
+    val counts = mutable.Map.empty[Char, Int].withDefaultValue(0)
+    for ((c, offset) <- flags.toCharArray.zipWithIndex) {
+      def check(dialects: Dialect*): Unit = {
+        if (!dialects.contains(dialect)) {
+          throw new FlagSetException("Unsupported flag", Some(offset))
+        }
+      }
+      counts(c) += 1
+      if (counts(c) >= 2 && !allowsDuplicatedFlag) {
+        throw new FlagSetException("Duplicated flag", Some(offset))
+      }
+
+      (c: @switch) match {
+        case 'A' =>
+          check(Dialect.PCRE)
+          flagSet = flagSet.copy(anchored = true)
+        case 'D' =>
+          check(Dialect.PCRE)
+          flagSet = flagSet.copy(dollarEndOnly = true)
+        case 'J' =>
+          check(Dialect.PCRE)
+          flagSet = flagSet.copy(dupNames = true)
+        case 'L' =>
+          check(Dialect.Python)
+          flagSet = flagSet.copy(localeUpper = true)
+        case 'S' =>
+          check(Dialect.PCRE)
+          flagSet = flagSet.copy(analyze = true)
+        case 'U' =>
+          check(Dialect.Java, Dialect.PCRE)
+          flagSet = flagSet.copy(ungreedy = true)
+        case 'X' =>
+          check(Dialect.PCRE)
+          flagSet = flagSet.copy(extra = true)
+        case 'a' =>
+          check(Dialect.Perl, Dialect.Python, Dialect.Ruby)
+          flagSet = flagSet.copy(ascii = true)
+        case 'b' =>
+          check(Dialect.Python)
+          flagSet = flagSet.copy(bytes = true)
+        case 'c' =>
+          check(Dialect.Perl)
+          flagSet = flagSet.copy(continue = true)
+        case 'd' =>
+          check(Dialect.Java, Dialect.JavaScript, Dialect.Perl, Dialect.Ruby)
+          flagSet = flagSet.copy(hasIndices = true)
+        case 'e' =>
+          check(Dialect.Perl)
+          flagSet = flagSet.copy(evaluate = true)
+        case 'g' =>
+          check(Dialect.JavaScript, Dialect.Perl)
+          flagSet = flagSet.copy(global = true)
+        case 'i' =>
+          flagSet = flagSet.copy(ignoreCase = true)
+        case 'l' =>
+          check(Dialect.Perl)
+          flagSet = flagSet.copy(localeLower = true)
+        case 'm' =>
+          flagSet = flagSet.copy(multiline = true)
+        case 'n' =>
+          check(Dialect.DotNet, Dialect.Perl, Dialect.Ruby)
+          flagSet = flagSet.copy(explicitCapture = true)
+        case 'o' =>
+          check(Dialect.Perl, Dialect.Ruby)
+          flagSet = flagSet.copy(once = true)
+        case 'p' =>
+          check(Dialect.Perl)
+          flagSet = flagSet.copy(preserve = true)
+        case 'r' =>
+          check(Dialect.Perl)
+          flagSet = flagSet.copy(nonDestructive = true)
+        case 's' =>
+          check(Dialect.DotNet, Dialect.Java, Dialect.JavaScript, Dialect.PCRE, Dialect.Perl, Dialect.Python)
+          flagSet = flagSet.copy(dotAll = true)
+        case 'u' =>
+          check(Dialect.Java, Dialect.JavaScript, Dialect.PCRE, Dialect.Perl, Dialect.Python, Dialect.Ruby)
+          flagSet = flagSet.copy(unicode = true)
+        case 'v' =>
+          check(Dialect.JavaScript)
+          flagSet = flagSet.copy(unicodeSets = true)
+        case 'x' =>
+          check(Dialect.DotNet, Dialect.Java, Dialect.PCRE, Dialect.Perl, Dialect.Python, Dialect.Ruby)
+          flagSet = flagSet.copy(verbose = true)
+        case 'y' =>
+          check(Dialect.JavaScript)
+          flagSet = flagSet.copy(sticky = true)
+      }
+    }
+
+    flagSet
+  }
+}
