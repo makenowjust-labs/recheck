@@ -77,6 +77,14 @@ object NodeData {
     */
   final case class Command(kind: CommandKind) extends NodeData
 
+  /** Dot is a dot pattern node.
+    *
+    * {{{
+    * Dot ::= "."
+    * }}}
+    */
+  case object Dot extends NodeData
+
   /** Literal is a character literal node. */
   final case class Literal(value: Int) extends NodeData
 }
