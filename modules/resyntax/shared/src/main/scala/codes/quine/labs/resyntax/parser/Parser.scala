@@ -51,10 +51,8 @@ private[parser] final class Parser(
   def parse(): Node = {
     val node = parseDisjunction()
     if (!isEnd) {
-      currentChar match {
-        case ')' => fail("Unmatched ')'")
-        case _   => fail("Unexpected end")
-      }
+      assert(currentChar == ')', "Unexpected")
+      fail("Unmatched ')'")
     }
     node
   }
@@ -71,11 +69,11 @@ private[parser] final class Parser(
 
     val nodes = builder.result()
     if (nodes.size == 1) {
-      nodes.head
-    } else {
-      val end = offset
-      Node(NodeData.Disjunction(nodes), SourceLocation(start, end))
+      return nodes.head
     }
+
+    val end = offset
+    Node(NodeData.Disjunction(nodes), SourceLocation(start, end))
   }
 
   private def parseSequence(): Node = {
@@ -83,46 +81,50 @@ private[parser] final class Parser(
     val stack = mutable.Stack.empty[Node]
 
     while (!isSequenceStop) {
-      if (context.skipsComment && skipComment()) {
-        // If comment is skipped, we should go to next loop.
-      } else {
-        (currentChar: @switch) match {
-          case '*' =>
-            parseSimpleRepeat(stack, Quantifier.Star)
-          case '+' =>
-            parseSimpleRepeat(stack, Quantifier.Plus)
-          case '?' =>
-            parseSimpleRepeat(stack, Quantifier.Question)
-          case '{' =>
-            parseCurlyQuantifier(stack)
-          case '}' =>
-            parseCloseCurly(stack)
-          case '(' =>
-            parseGroup(stack)
-          case '^' =>
-            parseCaret(stack)
-          case '$' =>
-            parseDollar(stack)
-          case '.' =>
-            parseDot(stack)
-          case '\\' =>
-            parseBackslash(stack)
-          case '[' =>
-            parseClass(stack)
-          case ']' =>
-            parseCloseBracket(stack)
-          case _ =>
-            parseLiteral(stack)
-        }
-      }
+      parseSequenceItem(stack)
     }
 
     val nodes = stack.toSeq
     if (nodes.size == 1) {
-      nodes.head
-    } else {
-      val end = offset
-      Node(NodeData.Sequence(nodes.reverse), SourceLocation(start, end))
+      return nodes.head
+    }
+
+    val end = offset
+    Node(NodeData.Sequence(nodes.reverse), SourceLocation(start, end))
+  }
+
+  private def parseSequenceItem(stack: mutable.Stack[Node]): Unit = {
+    if (context.skipsComment && skipComment()) {
+      return
+    }
+
+    (currentChar: @switch) match {
+      case '*' =>
+        parseSimpleRepeat(stack, Quantifier.Star)
+      case '+' =>
+        parseSimpleRepeat(stack, Quantifier.Plus)
+      case '?' =>
+        parseSimpleRepeat(stack, Quantifier.Question)
+      case '{' =>
+        parseCurlyQuantifier(stack)
+      case '}' =>
+        parseCloseCurly(stack)
+      case '(' =>
+        parseGroup(stack)
+      case '^' =>
+        parseCaret(stack)
+      case '$' =>
+        parseDollar(stack)
+      case '.' =>
+        parseDot(stack)
+      case '\\' =>
+        parseBackslash(stack)
+      case '[' =>
+        parseClass(stack)
+      case ']' =>
+        parseCloseBracket(stack)
+      case _ =>
+        parseLiteral(stack)
     }
   }
 
@@ -997,7 +999,12 @@ private[parser] final class Parser(
 
   private def parseDollar(stack: mutable.Stack[Node]): Unit = ???
 
-  private def parseDot(stack: mutable.Stack[Node]): Unit = ???
+  private def parseDot(stack: mutable.Stack[Node]): Unit = {
+    val start = offset
+    next()
+    val end = offset
+    stack.push(Node(NodeData.Dot, SourceLocation(start, end)))
+  }
 
   private def parseBackslash(stack: mutable.Stack[Node]): Unit = ???
 

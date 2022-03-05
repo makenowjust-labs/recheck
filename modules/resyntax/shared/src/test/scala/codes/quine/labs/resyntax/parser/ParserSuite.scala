@@ -42,6 +42,9 @@ class ParserSuite extends munit.FunSuite {
 
   val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl, Python, Ruby)
 
+  // Top
+  error(")", "", All: _*)("Unmatched ')' at 0")
+
   // Comment
   check(" ", "x", DotNet, Java, PCRE, Perl, Python, Ruby)(Sequence())
   check("# foo", "x", DotNet, Java, PCRE, Perl, Python, Ruby)(Sequence())
@@ -151,6 +154,7 @@ class ParserSuite extends munit.FunSuite {
   check("(?(*nlb:a)b)", "", PCRE, Perl)(
     Command(Conditional(LookAround(NegativeLookBehind(Abbrev), Literal('a')), Literal('b')))
   )
+  check("(?(.)b)", "", DotNet, PCRE, Perl)(Command(Conditional(LookAround(Dot), Literal('b'))))
   check("(?'x'a)", "", DotNet, PCRE, Perl, Ruby)(Group(NamedCapture(Quote, "x"), Literal('a')))
   check("(?'x-y'a)", "", DotNet)(Group(Balance(Quote, Some("x"), "y"), Literal('a')))
   check("(?'-y'a)", "", DotNet)(Group(Balance(Quote, None, "y"), Literal('a')))
@@ -285,4 +289,7 @@ class ParserSuite extends munit.FunSuite {
   check("(*:x)", "", PCRE, Perl)(Command(BacktrackControl(None, Some("x"))))
   check("(a)", "", All: _*)(Group(IndexedCapture, Literal('a')))
   error("(", "", All: _*)("Unclosed group at 1")
+
+  // Dot
+  check(".", "", All: _*)(Dot)
 }
