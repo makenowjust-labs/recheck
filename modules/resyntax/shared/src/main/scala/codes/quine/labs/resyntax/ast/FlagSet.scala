@@ -70,12 +70,12 @@ object FlagSet {
     for ((c, offset) <- flags.toCharArray.zipWithIndex) {
       def check(dialects: Dialect*): Unit = {
         if (!dialects.contains(dialect)) {
-          throw new FlagSetException("Unsupported flag", Some(offset))
+          throw new FlagSetException(s"Unknown flag '$c'", Some(offset))
         }
       }
       counts(c) += 1
       if (counts(c) >= 2 && !allowsDuplicatedFlag) {
-        throw new FlagSetException("Duplicated flag", Some(offset))
+        throw new FlagSetException(s"Duplicated flag '$c'", Some(offset))
       }
 
       (c: @switch) match {
@@ -152,6 +152,14 @@ object FlagSet {
         case 'y' =>
           check(Dialect.JavaScript)
           flagSet = flagSet.copy(sticky = true)
+        case _ =>
+          check()
+      }
+    }
+
+    if (dialect == Dialect.Python) {
+      if (flagSet.bytes && flagSet.unicode) {
+        throw new FlagSetException("Incompatible flags 'b' and 'u'", None)
       }
     }
 

@@ -11,6 +11,14 @@ class FlagSetSuite extends munit.FunSuite {
     }
   }
 
+  def error(s: String, dialects: Dialect*)(message: String)(implicit loc: munit.Location): Unit = {
+    for (dialect <- dialects) {
+      test(s"FlagSet.parse: parse \"$s\" in $dialect with message \"$message\"") {
+        interceptMessage[FlagSetException](message)(FlagSet.parse(s, dialect))
+      }
+    }
+  }
+
   check("A", PCRE)(_.anchored)
   check("D", PCRE)(_.dollarEndOnly)
   check("J", PCRE)(_.dupNames)
@@ -36,4 +44,8 @@ class FlagSetSuite extends munit.FunSuite {
   check("v", JavaScript)(_.unicodeSets)
   check("x", DotNet, Java, PCRE, Perl, Python, Ruby)(_.verbose)
   check("y", JavaScript)(_.sticky)
+
+  error("ii", JavaScript)("Duplicated flag 'i' at 1")
+  error("z", DotNet, Java, JavaScript, PCRE, Perl, Python, Ruby)("Unknown flag 'z' at 0")
+  error("bu", Python)("Incompatible flags 'b' and 'u'")
 }
