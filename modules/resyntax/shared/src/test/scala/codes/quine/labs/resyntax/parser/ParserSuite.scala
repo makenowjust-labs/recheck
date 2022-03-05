@@ -86,7 +86,8 @@ class ParserSuite extends munit.FunSuite {
   error("*", "", All: _*)("Nothing to repeat at 0")
   check("a**", "", Ruby)(Repeat(Repeat(Literal('a'), Star(Greedy)), Star(Greedy)))
   error("a**", "", DotNet, Java, JavaScript, PCRE, Perl, Python)("Nested quantifier at 2")
-  // error("^*", "u", DotNet, Java, JavaScript, PCRE, Perl, Python)("Nothing to repeat at 1")
+  error("^*", "", DotNet, Java, JavaScript, PCRE, Perl, Python)("Nothing to repeat at 1")
+  error("$*", "", DotNet, Java, JavaScript, PCRE, Perl, Python)("Nothing to repeat at 1")
   error("(?=a)*", "u", JavaScript)("Nothing to repeat at 5")
   error("(?<=a)*", "", JavaScript)("Nothing to repeat at 6")
 
@@ -289,6 +290,12 @@ class ParserSuite extends munit.FunSuite {
   check("(*:x)", "", PCRE, Perl)(Command(BacktrackControl(None, Some("x"))))
   check("(a)", "", All: _*)(Group(IndexedCapture, Literal('a')))
   error("(", "", All: _*)("Unclosed group at 1")
+
+  // Caret
+  check("^", "", All: _*)(Caret)
+
+  // Dollar
+  check("$", "", All: _*)(Dollar)
 
   // Dot
   check(".", "", All: _*)(Dot)

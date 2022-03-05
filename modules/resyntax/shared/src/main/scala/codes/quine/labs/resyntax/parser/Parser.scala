@@ -207,10 +207,12 @@ private[parser] final class Parser(
         assert(featureSet.allowsLookAheadRepeat, "Nothing to repeat")
       case NodeData.Group(_: GroupKind.PositiveLookBehind | _: GroupKind.NegativeLookBehind, _) =>
         assert(featureSet.allowsLookBehindRepeat, "Nothing to repeat")
+      case NodeData.Caret | NodeData.Dollar =>
+        assert(featureSet.allowsZeroWidthAssertRepeat, "Nothing to repeat")
       case NodeData.Repeat(_, _) =>
         assert(featureSet.allowsNestedRepeat, "Nested quantifier")
       case _ =>
-        // TODO: backslash and other assertion
+        // TODO: backslash assertion
         ()
     }
 
@@ -995,9 +997,19 @@ private[parser] final class Parser(
     flagSet
   }
 
-  private def parseCaret(stack: mutable.Stack[Node]): Unit = ???
+  private def parseCaret(stack: mutable.Stack[Node]): Unit = {
+    val start = offset
+    next()
+    val end = offset
+    stack.push(Node(NodeData.Caret, SourceLocation(start, end)))
+  }
 
-  private def parseDollar(stack: mutable.Stack[Node]): Unit = ???
+  private def parseDollar(stack: mutable.Stack[Node]): Unit = {
+    val start = offset
+    next()
+    val end = offset
+    stack.push(Node(NodeData.Dollar, SourceLocation(start, end)))
+  }
 
   private def parseDot(stack: mutable.Stack[Node]): Unit = {
     val start = offset
