@@ -1,13 +1,20 @@
 package codes.quine.labs.resyntax.parser
 
+import codes.quine.labs.resyntax.ast.AssertKind._
 import codes.quine.labs.resyntax.ast.AssertNameStyle._
+import codes.quine.labs.resyntax.ast.BackReferenceStyle._
+import codes.quine.labs.resyntax.ast.BackslashKind._
 import codes.quine.labs.resyntax.ast.BacktrackControlKind._
 import codes.quine.labs.resyntax.ast.BacktrackStrategy._
+import codes.quine.labs.resyntax.ast.BoundaryModifier._
+import codes.quine.labs.resyntax.ast.CaseCommandKind._
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.CommandKind._
 import codes.quine.labs.resyntax.ast.ConditionalTest._
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect._
+import codes.quine.labs.resyntax.ast.EscapeClassKind._
+import codes.quine.labs.resyntax.ast.EscapeStyle._
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetDiff
 import codes.quine.labs.resyntax.ast.GroupKind
@@ -17,6 +24,7 @@ import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.NodeData._
 import codes.quine.labs.resyntax.ast.Quantifier._
+import codes.quine.labs.resyntax.ast.Reference._
 
 class ParserSuite extends munit.FunSuite {
   def check(s: String, flags: String, dialects: Dialect*)(expected: NodeData)(implicit loc: munit.Location): Unit = {
@@ -308,4 +316,157 @@ class ParserSuite extends munit.FunSuite {
 
   // Dot
   check(".", "", All: _*)(Dot)
+
+  // Backslash
+  check("\\a", "", DotNet, Java, PCRE, Perl, Python, Ruby)(Backslash(Escape(Single('a'), 0x07)))
+  check("\\b", "", All: _*)(Backslash(Assert(Boundary(None))))
+  check("\\b{g}", "", Java, Perl)(Backslash(Assert(Boundary(Some(GModifier)))))
+  check("\\b{gcb}", "", Perl)(Backslash(Assert(Boundary(Some(GcbModifier)))))
+  check("\\b{lb}", "", Perl)(Backslash(Assert(Boundary(Some(LbModifier)))))
+  check("\\b{sb}", "", Perl)(Backslash(Assert(Boundary(Some(SbModifier)))))
+  check("\\b{wb}", "", Perl)(Backslash(Assert(Boundary(Some(WbModifier)))))
+  check("\\cA", "", DotNet, Java, JavaScript, PCRE, Perl, Ruby)(Backslash(Escape(Control('A'), 0x01)))
+  check("\\cz", "", DotNet, Java, JavaScript, PCRE, Perl, Ruby)(Backslash(Escape(Control('z'), 0x1a)))
+  check("\\c@", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(Escape(Control('@'), 0x00)))
+  check("\\c_", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(Escape(Control('_'), 0x1f)))
+  check("\\d", "", All: _*)(Backslash(EscapeClass(Digit)))
+  check("\\e", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(Escape(Single('e'), 0x1b)))
+  check("\\f", "", All: _*)(Backslash(Escape(Single('f'), 0x0c)))
+  check("\\g1", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Bare), IndexedReference(1))))
+  check("\\g+1", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Bare), RelativeReference(1))))
+  check("\\g-1", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Bare), RelativeReference(-1))))
+  check("\\g{1}", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Curly), IndexedReference(1))))
+  check("\\g{+1}", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Curly), RelativeReference(1))))
+  check("\\g{-1}", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Curly), RelativeReference(-1))))
+  check("\\g{foo}", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Curly), NamedReference("foo"))))
+  check("\\g<1>", "", PCRE, Ruby)(Backslash(EscapeCall(Angle, IndexedReference(1))))
+  check("\\g<+1>", "", PCRE, Ruby)(Backslash(EscapeCall(Angle, RelativeReference(1))))
+  check("\\g<-1>", "", PCRE, Ruby)(Backslash(EscapeCall(Angle, RelativeReference(-1))))
+  check("\\g<foo>", "", PCRE, Ruby)(Backslash(EscapeCall(Angle, NamedReference("foo"))))
+  check("\\g'1'", "", PCRE, Ruby)(Backslash(EscapeCall(Quote, IndexedReference(1))))
+  check("\\g'+1'", "", PCRE, Ruby)(Backslash(EscapeCall(Quote, RelativeReference(1))))
+  check("\\g'-1'", "", PCRE, Ruby)(Backslash(EscapeCall(Quote, RelativeReference(-1))))
+  check("\\g'foo'", "", PCRE, Ruby)(Backslash(EscapeCall(Quote, NamedReference("foo"))))
+  check("\\h", "", Java, PCRE, Perl)(Backslash(EscapeClass(Horizontal)))
+  check("\\h", "", Ruby)(Backslash(EscapeClass(HexDigit)))
+  check("\\k<foo>", "", DotNet, Java, PCRE, Perl, Ruby)(
+    Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("foo")))
+  )
+  check("\\k<1>", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), IndexedReference(1))))
+  check("\\k<+1>", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), RelativeReference(1))))
+  check("\\k<-1>", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), RelativeReference(-1))))
+  check("\\k<1+0>", "", Ruby)(
+    Backslash(EscapeBackReference(KBackReference(Angle), LeveledReference(IndexedReference(1), 0)))
+  )
+  check("\\k<1-1>", "", Ruby)(
+    Backslash(EscapeBackReference(KBackReference(Angle), LeveledReference(IndexedReference(1), -1)))
+  )
+  check("\\k<x>", "", JavaScript)(Sequence(Backslash(Unknown('k')), Literal('<'), Literal('x'), Literal('>')))
+  check("(?<foo>)\\k<foo>", "", JavaScript)(
+    Sequence(
+      Group(NamedCapture(Angle, "foo"), Sequence()),
+      Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("foo")))
+    )
+  )
+  check("\\k'foo'", "", DotNet, PCRE, Perl, Ruby)(
+    Backslash(EscapeBackReference(KBackReference(Quote), NamedReference("foo")))
+  )
+  check("\\k'1'", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Quote), IndexedReference(1))))
+  check("\\k'+1'", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Quote), RelativeReference(1))))
+  check("\\k'-1'", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Quote), RelativeReference(-1))))
+  check("\\k'1+0'", "", Ruby)(
+    Backslash(EscapeBackReference(KBackReference(Quote), LeveledReference(IndexedReference(1), 0)))
+  )
+  check("\\k'1-1'", "", Ruby)(
+    Backslash(EscapeBackReference(KBackReference(Quote), LeveledReference(IndexedReference(1), -1)))
+  )
+  check("\\l", "", Perl)(Backslash(CaseCommand(SingleLowerCaseCommand)))
+  check("\\n", "", All: _*)(Backslash(Escape(Single('n'), 0x0a)))
+  check("\\o{010}", "", PCRE, Perl)(Backslash(Escape(Octal, 0x08)))
+  check("\\p{Letter}", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(EscapeClass(UnicodeProperty("Letter"))))
+  check("\\p{Letter}", "u", JavaScript)(Backslash(EscapeClass(UnicodeProperty("Letter"))))
+  check("\\p{Script=Hira}", "", DotNet, Java, PCRE, Perl, Ruby)(
+    Backslash(EscapeClass(UnicodePropertyValue("Script", "Hira")))
+  )
+  check("\\p{Script=Hira}", "u", JavaScript)(Backslash(EscapeClass(UnicodePropertyValue("Script", "Hira"))))
+  check("\\pL", "", Java, PCRE, Perl)(Backslash(EscapeClass(UnicodeBareProperty("L"))))
+  check("\\r", "", All: _*)(Backslash(Escape(Single('r'), 0x0d)))
+  check("\\s", "", All: _*)(Backslash(EscapeClass(Space)))
+  check("\\t", "", All: _*)(Backslash(Escape(Single('t'), 0x09)))
+  check("\\u", "", Perl)(Backslash(CaseCommand(SingleUpperCaseCommand)))
+  check("\\uABCD", "", DotNet, Java, JavaScript, Python, Ruby)(Backslash(Escape(UnicodeHex4, 0xabcd)))
+  check("\\u{ABCDE}", "u", JavaScript)(Backslash(Escape(UnicodeBracket, 0xabcde)))
+  check("\\uA", "", JavaScript, Ruby)(Sequence(Backslash(Unknown('u')), Literal('A')))
+  check("\\v", "", Java, PCRE, Perl)(Backslash(EscapeClass(Vertical)))
+  check("\\v", "", DotNet, JavaScript, Python, Ruby)(Backslash(Escape(Single('v'), 0x0b)))
+  check("\\w", "", All: _*)(Backslash(EscapeClass(Word)))
+  check("\\xAB", "", All: _*)(Backslash(Escape(Hex2, 0xab)))
+  check("\\xA", "", PCRE, Perl, Ruby)(Backslash(Escape(Hex1, 0x0a)))
+  check("\\x{ABCD}", "", Java, PCRE, Perl)(Backslash(Escape(HexBracket, 0xabcd)))
+  check("\\z", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(Assert(LowerEnd)))
+  check("\\B", "", All: _*)(Backslash(Assert(NonBoundary(None))))
+  check("\\B{g}", "", Perl)(Backslash(Assert(NonBoundary(Some(GModifier)))))
+  check("\\B{gcb}", "", Perl)(Backslash(Assert(NonBoundary(Some(GcbModifier)))))
+  check("\\B{lb}", "", Perl)(Backslash(Assert(NonBoundary(Some(LbModifier)))))
+  check("\\B{wb}", "", Perl)(Backslash(Assert(NonBoundary(Some(WbModifier)))))
+  check("\\B{sb}", "", Perl)(Backslash(Assert(NonBoundary(Some(SbModifier)))))
+  check("\\D", "", All: _*)(Backslash(EscapeClass(NonDigit)))
+  check("\\E", "", Java, PCRE, Perl)(Backslash(CaseCommand(EndCaseCommand)))
+  check("\\F", "", Perl)(Backslash(CaseCommand(FoldCaseCommand)))
+  check("\\G", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(Assert(Sticky)))
+  check("\\H", "", Java, PCRE, Perl)(Backslash(EscapeClass(NonHorizontal)))
+  check("\\H", "", Ruby)(Backslash(EscapeClass(NonHexDigit)))
+  check("\\K", "", PCRE, Perl, Ruby)(Backslash(Assert(Cut)))
+  check("\\L", "", Perl)(Backslash(CaseCommand(LowerCaseCommand)))
+  check("\\P{Letter}", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(EscapeClass(NonUnicodeProperty("Letter"))))
+  check("\\P{Letter}", "u", JavaScript)(Backslash(EscapeClass(NonUnicodeProperty("Letter"))))
+  check("\\P{Script=Hira}", "", DotNet, Java, PCRE, Perl, Ruby)(
+    Backslash(EscapeClass(NonUnicodePropertyValue("Script", "Hira")))
+  )
+  check("\\P{Script=Hira}", "u", JavaScript)(Backslash(EscapeClass(NonUnicodePropertyValue("Script", "Hira"))))
+  check("\\PL", "", Java, PCRE, Perl)(Backslash(EscapeClass(NonUnicodeBareProperty("L"))))
+  check("\\Qab\\E", "", Java, PCRE, Perl)(
+    Sequence(
+      Backslash(CaseCommand(QuoteCommand)),
+      Literal('a'),
+      Literal('b'),
+      Backslash(CaseCommand(EndCaseCommand))
+    )
+  )
+  check("\\Qab", "", Java, PCRE, Perl)(
+    Sequence(
+      Backslash(CaseCommand(QuoteCommand)),
+      Literal('a'),
+      Literal('b')
+    )
+  )
+  check("\\Q\\\\\\E", "", Java, PCRE, Perl)(
+    Sequence(
+      Backslash(CaseCommand(QuoteCommand)),
+      Literal('\\'),
+      Literal('\\'),
+      Backslash(CaseCommand(EndCaseCommand))
+    )
+  )
+  check("\\R", "", Java, PCRE, Perl, Ruby)(Backslash(EscapeClass(GeneralNewline)))
+  check("\\S", "", All: _*)(Backslash(EscapeClass(NonSpace)))
+  check("\\U000ABCDE", "", Python)(Backslash(Escape(UnicodeHex8, 0xabcde)))
+  check("\\V", "", Java, PCRE, Perl)(Backslash(EscapeClass(NonVertical)))
+  check("\\W", "", All: _*)(Backslash(EscapeClass(NonWord)))
+  check("\\X", "", Java, PCRE, Perl)(Backslash(EscapeClass(GraphemeCluster)))
+  check("\\Z", "", DotNet, Java, PCRE, Perl, Python, Ruby)(Backslash(Assert(UpperEnd)))
+  check("\\010", "", All: _*)(Backslash(Escape(BareOctal, 8)))
+  check("\\412", "", JavaScript)(Sequence(Backslash(Escape(BareOctal, 33)), Literal('2')))
+  check("()\\1", "", All: _*)(
+    Sequence(Group(IndexedCapture, Sequence()), Backslash(EscapeBackReference(BareBackReference, IndexedReference(1))))
+  )
+  check("\\1", "", DotNet, Java, PCRE, Perl, Python, Ruby)(
+    Backslash(EscapeBackReference(BareBackReference, IndexedReference(1)))
+  )
+  check("\\1", "u", JavaScript)(Backslash(EscapeBackReference(BareBackReference, IndexedReference(1))))
+  for (c <- "/|+*?{}()^$.\\[]") {
+    check(s"\\$c", "", All: _*)(Backslash(Escape(Single(c), c.toInt)))
+  }
+  check("\\y", "", JavaScript, Perl, Ruby)(Backslash(Unknown('y')))
+  check("\\:", "", All: _*)(Backslash(Unknown(':')))
 }

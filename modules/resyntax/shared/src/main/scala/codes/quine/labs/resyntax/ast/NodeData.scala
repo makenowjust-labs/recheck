@@ -58,7 +58,15 @@ object NodeData {
   /** Group is a group pattern node.
     *
     * {{{
-    * Group ::= "(" GroupKind Disjunction ")"
+    * Group ::=
+    *   "(" GroupKind Disjunction ")"
+    *   Command
+    *   Caret
+    *   Dollar
+    *   Dot
+    *   Backslash
+    *   Class
+    *   Literal
     * }}}
     */
   final case class Group(kind: GroupKind, node: Node) extends NodeData
@@ -100,6 +108,8 @@ object NodeData {
     * }}}
     */
   case object Dot extends NodeData
+
+  final case class Backslash(kind: BackslashKind) extends NodeData
 
   /** Literal is a character literal node. */
   final case class Literal(value: Int) extends NodeData
