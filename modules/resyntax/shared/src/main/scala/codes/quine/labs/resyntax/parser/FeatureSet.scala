@@ -4,6 +4,8 @@ import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 
 final case class FeatureSet(
+    // JavaScript (without `uv`), Perl, Ruby
+    allowsAlphabeticUnknownBackslash: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     allowsBrokenCloseCurly: Boolean,
     // .NET, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -18,8 +20,12 @@ final case class FeatureSet(
     allowsMeaninglessBacktrackStrategy: Boolean,
     // Ruby
     allowsNestedRepeat: Boolean,
+    // PCRE, Perl, Ruby
+    allowsNonNameBaseRef: Boolean,
     // Ruby
     allowsZeroWidthAssertRepeat: Boolean,
+    // JavaScript (without `uv`)
+    checksValidBackReference: Boolean,
     // Ruby
     hasAbsenceOperator: Boolean,
     // PCRE, Perl
@@ -28,8 +34,74 @@ final case class FeatureSet(
     hasAngleNamedCapture: Boolean,
     // .NET, Java, PCRE, Perl, Ruby
     hasAtomicGroup: Boolean,
+    // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
+    hasBackslashBareOctal: Boolean,
+    // .NET, Java, PCRE, Perl, Python, Ruby
+    hasBackslashBegin: Boolean,
+    // .NET, Java, PCRE, Perl, Python, Ruby
+    hasBackslashBell: Boolean,
+    // Perl
+    hasBackslashCaseCommand: Boolean,
+    // .NET, Java, JavaScript, PCRE, Perl, Ruby
+    hasBackslashControl: Boolean,
+    // .NET, Java, PCRE, Perl, Ruby
+    hasBackslashControlExtra: Boolean,
+    // PCRE, Perl, Ruby
+    hasBackslashCut: Boolean,
+    // .NET, Java, PCRE, Perl, Ruby
+    hasBackslashEscape: Boolean,
+    // .NET, Java, PCRE, Perl, Ruby
+    hasBackslashEnd: Boolean,
+    // PCRE, Perl
+    hasBackslashGBackReference: Boolean,
+    // PCRE, Ruby
+    hasBackslashGCall: Boolean,
+    // Java, PCRE, Perl, Ruby
+    hasBackslashGeneralNewline: Boolean,
+    // Java, PCRE, Perl
+    hasBackslashGraphemeCluster: Boolean,
+    // Java, PCRE, Perl
+    hasBackslashHorizontalSpace: Boolean,
+    // Ruby
+    hasBackslashHexDigit: Boolean,
+    // .NET, Java, JavaScript (with named capture), PCRE, Perl, Ruby
+    hasBackslashKBackReference: Boolean,
+    // .NET, PCRE, Perl, Ruby
+    hasBackslashKBackReferenceQuote: Boolean,
+    // PCRE, Perl
+    hasBackslashNonNewline: Boolean,
+    // PCRE, Perl
+    hasBackslashOctal: Boolean,
+    // Java, PCRE, Perl
+    hasBackslashQuoteCommand: Boolean,
+    // .NET, Java, PCRE, Perl, Ruby
+    hasBackslashStickyAssert: Boolean,
+    // JavaScript (with `uv`)
+    hasBackslashUnicodeBracket: Boolean,
+    // .NET, Java, JavaScript, Python, Ruby
+    hasBackslashUnicodeHex: Boolean,
+    // Python
+    hasBackslashUnicodeHex8: Boolean,
+    // .NET, Java, JavaScript (with `uv`), PCRE. Perl, Ruby
+    hasBackslashUnicodeProperty: Boolean,
+    // Java, PCRE, Perl
+    hasBackslashUnicodePropertyBare: Boolean,
+    // .NET, Java, PCRE, Perl, Python, Ruby
+    hasBackslashUpperEnd: Boolean,
+    // Java, PCRE, Perl
+    hasBackslashVerticalSpace: Boolean,
+    // .NET, JavaScript, Python, Ruby
+    hasBackslashVerticalTab: Boolean,
+    // Java, PCRE, Perl
+    hasBackslashXBracket: Boolean,
+    // PCRE, Perl, Ruby
+    hasBackslashXHex1: Boolean,
     // .NET
     hasBalanceGroup: Boolean,
+    // Java, Perl,
+    hasBoundaryGModifier: Boolean,
+    // Perl
+    hasBoundaryModifier: Boolean,
     // PCRE, Python
     hasBareNamedCaptureTest: Boolean,
     // PCRE, Perl
@@ -70,6 +142,8 @@ final case class FeatureSet(
     hasInlineComment: Boolean,
     // Ruby
     hasIncomprehensiveInlineFlag: Boolean,
+    // Ruby
+    hasLeveledBackReference: Boolean,
     // .NET, PCRE, Perl
     hasLookAroundTest: Boolean,
     // Perl, Python, Ruby
@@ -107,7 +181,7 @@ final case class FeatureSet(
 )
 
 object FeatureSet {
-  def from(dialect: Dialect, flagSet: FlagSet): FeatureSet = {
+  def from(analysis: QuickAnalysis, dialect: Dialect, flagSet: FlagSet): FeatureSet = {
     val isDotNet = dialect == Dialect.DotNet
     val isJava = dialect == Dialect.Java
     val isJavaScript = dialect == Dialect.JavaScript
@@ -120,9 +194,14 @@ object FeatureSet {
     val isUnicode = flagSet.unicode || flagSet.unicodeSets
 
     FeatureSet(
+      // JavaScript (without `uv`), Perl, Ruby
+      allowsAlphabeticUnknownBackslash = (isJavaScript && !isUnicode) || isPerl || isRuby,
+      // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsBrokenCloseCurly =
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
+      // .NET, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsBrokenCurly = isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
+      // .NET
       allowsInvalidIdentifier = isDotNet,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsLookAheadRepeat =
@@ -133,8 +212,12 @@ object FeatureSet {
       allowsMeaninglessBacktrackStrategy = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isPython,
       // Ruby
       allowsNestedRepeat = isRuby,
+      // PCRE, Perl, Ruby
+      allowsNonNameBaseRef = isPCRE || isPerl || isRuby,
       // Ruby
       allowsZeroWidthAssertRepeat = isRuby,
+      // JavaScript (without `uv`)
+      checksValidBackReference = isJavaScript && !isUnicode,
       // Ruby
       hasAbsenceOperator = isRuby,
       // PCRE, Perl
@@ -143,10 +226,78 @@ object FeatureSet {
       hasAngleNamedCapture = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isRuby,
       // .NET, Java, PCRE, Perl, Ruby
       hasAtomicGroup = isDotNet || isJava || isPCRE || isPerl || isRuby,
+      // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
+      hasBackslashBareOctal =
+        isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
+      // .NET, Java, PCRE, Perl, Python, Ruby
+      hasBackslashBegin = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
+      // .NET, Java, PCRE, Perl, Python, Ruby
+      hasBackslashBell = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
+      // Perl
+      hasBackslashCaseCommand = isPerl,
+      // .NET, Java, JavaScript, PCRE, Perl, Ruby
+      hasBackslashControl = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isRuby,
+      // .NET, Java, PCRE, Perl, Ruby
+      hasBackslashControlExtra = isDotNet || isJava || isPCRE || isPerl || isRuby,
+      // PCRE, Perl, Ruby
+      hasBackslashCut = isPCRE || isPerl || isRuby,
+      // .NET, Java, PCRE, Perl, Ruby
+      hasBackslashEnd = isDotNet || isJava || isPCRE || isPerl || isRuby,
+      // .NET, Java, PCRE, Perl, Ruby
+      hasBackslashEscape = isDotNet || isJava || isPCRE || isPerl || isRuby,
+      // PCRE, Perl
+      hasBackslashGBackReference = isPCRE || isPerl,
+      // PCRE, Ruby
+      hasBackslashGCall = isPCRE || isRuby,
+      // Java, PCRE, Perl, Ruby
+      hasBackslashGeneralNewline = isJava || isPCRE || isPerl || isRuby,
+      // Java, PCRE, Perl
+      hasBackslashGraphemeCluster = isJava || isPCRE || isPerl,
+      // Java, PCRE, Perl
+      hasBackslashHorizontalSpace = isJava || isPCRE || isPerl,
+      // Ruby
+      hasBackslashHexDigit = isRuby,
+      // .NET, Java, JavaScript (with named capture), PCRE, Perl, Ruby
+      hasBackslashKBackReference =
+        isDotNet || isJava || (isJavaScript && analysis.containsNamedCapture) || isPCRE || isPerl || isRuby,
+      // .NET, PCRE, Perl, Ruby
+      hasBackslashKBackReferenceQuote = isDotNet || isPCRE || isPerl || isRuby,
+      // PCRE, Perl
+      hasBackslashNonNewline = isPCRE || isPerl,
+      // PCRE, Perl
+      hasBackslashOctal = isPCRE || isPerl,
+      // Java, PCRE, Perl
+      hasBackslashQuoteCommand = isJava || isPCRE || isPerl,
+      // .NET, Java, PCRE, Perl, Ruby
+      hasBackslashStickyAssert = isDotNet || isJava || isPCRE || isPerl || isRuby,
+      // JavaScript (with `uv`)
+      hasBackslashUnicodeBracket = isJavaScript && isUnicode,
+      // .NET, Java, JavaScript, Python, Ruby
+      hasBackslashUnicodeHex = isDotNet || isJava || isJavaScript || isPython || isRuby,
+      // Python
+      hasBackslashUnicodeHex8 = isPython,
+      // .NET, Java, JavaScript (with `uv`), PCRE. Perl, Ruby
+      hasBackslashUnicodeProperty = isDotNet || isJava || (isJavaScript && isUnicode) || isPCRE || isPerl || isRuby,
+      // Java, PCRE. Perl
+      hasBackslashUnicodePropertyBare = isJava || isPCRE || isPerl,
+      // .NET, Java, PCRE, Perl, Python, Ruby
+      hasBackslashUpperEnd = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
+      // Java, PCRE, Perl
+      hasBackslashVerticalSpace = isJava || isPCRE || isPerl,
+      // .NET, JavaScript, Python, Ruby
+      hasBackslashVerticalTab = isDotNet || isJavaScript || isPython || isRuby,
+      // Java, PCRE, Perl
+      hasBackslashXBracket = isJava || isPCRE || isPerl,
+      // PCRE, Perl, Ruby
+      hasBackslashXHex1 = isPCRE || isPerl || isRuby,
       // .NET
       hasBalanceGroup = isDotNet,
       // PCRE, Python
       hasBareNamedCaptureTest = isPCRE || isPython,
+      // Java, Perl,
+      hasBoundaryGModifier = isJava || isPerl,
+      // Perl
+      hasBoundaryModifier = isPerl,
       // PCRE, Perl
       hasBranchReset = isPCRE || isPerl,
       // PCRE, Perl
@@ -185,6 +336,8 @@ object FeatureSet {
       hasInlineComment = isDotNet || isPCRE || isPerl || isPython || isRuby,
       // Ruby
       hasIncomprehensiveInlineFlag = isRuby,
+      // Ruby
+      hasLeveledBackReference = isRuby,
       // .NET, PCRE, Perl
       hasLookAroundTest = isDotNet || isPCRE || isPerl,
       // Perl, Python, Ruby

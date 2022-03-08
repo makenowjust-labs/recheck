@@ -30,6 +30,12 @@ object CodePointUtil {
   def isDigit(codePoint: Int): Boolean =
     codePoint >= '0' && codePoint <= '9'
 
+  def isOctalDigit(codePoint: Int): Boolean =
+    codePoint >= '0' && codePoint <= '7'
+
+  def isHexDigit(codePoint: Int): Boolean =
+    codePoint >= '0' && codePoint <= '9' || codePoint >= 'a' && codePoint <= 'f' || codePoint >= 'A' && codePoint <= 'F'
+
   def isIDStart(codePoint: Int): Boolean =
     codePoint == '_' || codePoint == '$' ||
       codePoint >= 'A' && codePoint <= 'Z' ||
