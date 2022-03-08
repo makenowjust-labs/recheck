@@ -446,17 +446,24 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   /** Runs a given `read` instruction. */
   private def instRead(frame: Frame, inst: Inst.Read): Boolean = inst match {
     case Inst.Read(kind @ ReadKind.Ref(index), loc) =>
-      val s = frame.capture(index) match {
-        case Some(s) => s
-        case None    => UString.empty
-      }
-      val ok = s == input.substring(frame.pos, frame.pos + s.sizeAsString)
+      val s = frame.capture(index).getOrElse(UString.empty)
+      val ss = s.asString
+      val is = input.asString
+
+      var count = 0
+      while (
+        count < ss.length &&
+        frame.pos + count < is.length &&
+        ss.charAt(count) == is.charAt(frame.pos + count)
+      ) count += 1
+      val ok = count == s.sizeAsString
+      steps = Math.addExact(steps, count)
+
       if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if (ok) {
         if (options.needsHeatmap && loc.isDefined) {
           heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
         }
-        steps = Math.addExact(steps, 1)
         frame.pos += s.sizeAsString
         true
       } else {
@@ -474,7 +481,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         if (options.needsHeatmap && loc.isDefined) {
           heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
         }
-        steps = Math.addExact(steps, 1)
+        steps = Math.addExact(steps, c.map(_.size).getOrElse(0))
         frame.pos += c.size
         true
       } else {
@@ -489,17 +496,24 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   /** Runs a given `read-back` instruction. */
   private def instReadBack(frame: Frame, inst: Inst.ReadBack): Boolean = inst match {
     case Inst.ReadBack(kind @ ReadKind.Ref(index), loc) =>
-      val s = frame.capture(index) match {
-        case Some(s) => s
-        case None    => UString.empty
-      }
-      val ok = s == input.substring(frame.pos - s.sizeAsString, frame.pos)
+      val s = frame.capture(index).getOrElse(UString.empty)
+      val ss = s.asString
+      val is = input.asString
+
+      var count = 0
+      while (
+        count < ss.length &&
+        frame.pos - count - 1 >= 0 &&
+        ss.charAt(ss.length - count - 1) == is.charAt(frame.pos - count - 1)
+      ) count += 1
+      val ok = count == s.sizeAsString
+      steps = Math.addExact(steps, count)
+
       if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if (ok) {
         if (options.needsHeatmap && loc.isDefined) {
           heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
         }
-        steps = Math.addExact(steps, 1)
         frame.pos -= s.sizeAsString
         true
       } else {
@@ -517,7 +531,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         if (options.needsHeatmap && loc.isDefined) {
           heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
         }
-        steps = Math.addExact(steps, 1)
+        steps = Math.addExact(steps, c.map(_.size).getOrElse(0))
         frame.pos -= c.size
         true
       } else {
