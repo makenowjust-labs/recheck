@@ -17,6 +17,7 @@ Misc:
 - [#369](https://github.com/makenowjust-labs/recheck/pull/369) Fix Windows build ([@makenowjust](https://github.com/makenowjust))
 - [#368](https://github.com/makenowjust-labs/recheck/pull/368) Fix log scroll ([@makenowjust](https://github.com/makenowjust))
 - [#374](https://github.com/makenowjust-labs/recheck/pull/374) Format `package.json` by using https://devina.io/package-json-formatter ([@makenowjust](https://github.com/makenowjust))
+- [#379](https://github.com/makenowjust-labs/recheck/pull/379) Fix `coreJVM/initialCommands` to run ([@makenowjust](https://github.com/makenowjust))
 
 # 4.3.0 (2022-02-05)
 
