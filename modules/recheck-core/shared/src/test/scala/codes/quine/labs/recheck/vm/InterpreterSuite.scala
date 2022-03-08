@@ -76,7 +76,7 @@ class InterpreterSuite extends munit.FunSuite {
       Result(
         Status.Ok,
         Some(Seq(0, 4, 0, 2, 2, 4)),
-        10,
+        14,
         Seq((0, 4), (1, 2), (2, 3), (3, 4)),
         Set(
           FailedPoint(CoverageLocation(6, Vector.empty), 4, ReadKind.Char('a'), None),
