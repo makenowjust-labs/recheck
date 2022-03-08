@@ -8,6 +8,7 @@ Changes:
 Fixes:
 
 - [#341](https://github.com/makenowjust-labs/recheck/pull/341) Fix zero-width assertion in `automaton` checker ([@makenowjust](https://github.com/makenowjust))
+- [#380](https://github.com/makenowjust-labs/recheck/pull/380) Correct to increase steps on back-reference ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
