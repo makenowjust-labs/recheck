@@ -5,8 +5,16 @@ sealed abstract class BackslashKind extends Product with Serializable
 
 object BackslashKind {
 
+  /** BackslashValue is backslash escape having a literal value. */
+  sealed abstract class BackslashValue extends BackslashKind {
+    def value: Int
+  }
+
   /** Unknown is an unknown backslash. */
-  final case class Unknown(value: Int) extends BackslashKind
+  final case class Unknown(value: Int) extends BackslashValue
+
+  /** Escape is a backslash escape. */
+  final case class Escape(style: EscapeStyle, value: Int) extends BackslashValue
 
   /** EscapeClass is a backslash escape class. */
   final case class EscapeClass(kind: EscapeClassKind) extends BackslashKind
@@ -16,9 +24,6 @@ object BackslashKind {
 
   /** EscapeCall is `\g<x>` escape. */
   final case class EscapeCall(style: NameStyle, ref: Reference.BaseReference) extends BackslashKind
-
-  /** Escape is a backslash escape. */
-  final case class Escape(style: EscapeStyle, value: Int) extends BackslashKind
 
   /** Assert is an assertion backslash. */
   final case class Assert(kind: AssertKind) extends BackslashKind

@@ -8,8 +8,20 @@ final case class FeatureSet(
     allowsAlphabeticUnknownBackslash: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     allowsBrokenCloseCurly: Boolean,
+    // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
+    allowsBrokenCloseBracket: Boolean,
     // .NET, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     allowsBrokenCurly: Boolean,
+    // JavaScript (with `v`)
+    allowsClassDiff: Boolean,
+    // JavaScript
+    allowsClassEmpty: Boolean,
+    // Java, JavaScript (with `v`), Ruby
+    allowsClassIntersection: Boolean,
+    // Java, JavaScript (with `v`), Ruby
+    allowsClassNest: Boolean,
+    // PCRE, Perl, Ruby
+    allowsClassPosix: Boolean,
     // .NET
     allowsInvalidIdentifier: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -74,6 +86,8 @@ final case class FeatureSet(
     hasBackslashOctal: Boolean,
     // Java, PCRE, Perl
     hasBackslashQuoteCommand: Boolean,
+    // JavaScript (with `v`)
+    hasBackslashQuoteSet: Boolean,
     // .NET, Java, PCRE, Perl, Ruby
     hasBackslashStickyAssert: Boolean,
     // JavaScript (with `uv`)
@@ -201,6 +215,18 @@ object FeatureSet {
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
       // .NET, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsBrokenCurly = isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
+      // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
+      allowsBrokenCloseBracket = isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
+      // JavaScript (with `v`)
+      allowsClassDiff = isJavaScript && flagSet.unicodeSets,
+      // JavaScript
+      allowsClassEmpty = isJavaScript,
+      // Java, JavaScript (with `v`), Ruby
+      allowsClassIntersection = isJava || isJavaScript && flagSet.unicodeSets || isRuby,
+      // Java, JavaScript (with `v`), Ruby
+      allowsClassNest = isJava || isJavaScript && flagSet.unicodeSets || isRuby,
+      // PCRE, Perl, Ruby
+      allowsClassPosix = isPCRE || isPerl || isRuby,
       // .NET
       allowsInvalidIdentifier = isDotNet,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -268,6 +294,8 @@ object FeatureSet {
       hasBackslashOctal = isPCRE || isPerl,
       // Java, PCRE, Perl
       hasBackslashQuoteCommand = isJava || isPCRE || isPerl,
+      // JavaScript (with `v`)
+      hasBackslashQuoteSet = isJavaScript && flagSet.unicodeSets,
       // .NET, Java, PCRE, Perl, Ruby
       hasBackslashStickyAssert = isDotNet || isJava || isPCRE || isPerl || isRuby,
       // JavaScript (with `uv`)
