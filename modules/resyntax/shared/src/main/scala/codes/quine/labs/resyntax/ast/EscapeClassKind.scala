@@ -67,4 +67,7 @@ object EscapeClassKind {
 
   /** NonUnicodePropertyValue is `\P{XXX=YYY}` class. */
   final case class NonUnicodePropertyValue(name: String, value: String) extends EscapeClassKind
+
+  /** QuoteSet is `\q{}` */
+  final case class QuoteSet(strings: Seq[Seq[QuoteLiteral]]) extends EscapeClassKind
 }

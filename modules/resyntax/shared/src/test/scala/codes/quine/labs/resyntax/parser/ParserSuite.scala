@@ -8,6 +8,7 @@ import codes.quine.labs.resyntax.ast.BacktrackControlKind._
 import codes.quine.labs.resyntax.ast.BacktrackStrategy._
 import codes.quine.labs.resyntax.ast.BoundaryModifier._
 import codes.quine.labs.resyntax.ast.CaseCommandKind._
+import codes.quine.labs.resyntax.ast.ClassItemData._
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.CommandKind._
 import codes.quine.labs.resyntax.ast.ConditionalTest._
@@ -24,14 +25,19 @@ import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.NodeData._
 import codes.quine.labs.resyntax.ast.Quantifier._
+import codes.quine.labs.resyntax.ast.QuoteLiteral._
 import codes.quine.labs.resyntax.ast.Reference._
 
 class ParserSuite extends munit.FunSuite {
   def check(s: String, flags: String, dialects: Dialect*)(expected: NodeData)(implicit loc: munit.Location): Unit = {
     for (dialect <- dialects) {
-      test(s"Parser.parse: \"$s\" in $dialect") {
+      test(s"Parser.parse: /$s/$flags in $dialect") {
         val flagSet = FlagSet.parse(flags, dialect)
         val result = Parser.parse(s, flagSet, dialect)
+        if (!result.equalsWithoutLoc(Node(expected))) {
+          println(result)
+          println(Node(expected))
+        }
         assert(result.equalsWithoutLoc(Node(expected)))
       }
     }
@@ -39,7 +45,7 @@ class ParserSuite extends munit.FunSuite {
 
   def error(s: String, flags: String, dialects: Dialect*)(message: String)(implicit loc: munit.Location): Unit = {
     for (dialect <- dialects) {
-      test(s"Parser.parse: \"$s\" in $dialect with error \"$message\"") {
+      test(s"Parser.parse: /$s/$flags in $dialect with error \"$message\"") {
         val flagSet = FlagSet.parse(flags, dialect)
         interceptMessage[ParsingException](message) {
           Parser.parse(s, flagSet, dialect)
@@ -469,4 +475,85 @@ class ParserSuite extends munit.FunSuite {
   }
   check("\\y", "", JavaScript, Perl, Ruby)(Backslash(Unknown('y')))
   check("\\:", "", All: _*)(Backslash(Unknown(':')))
+
+  // Class
+  check("[a]", "", All: _*)(Class(false, ClassLiteral('a')))
+  check("[^a]", "", All: _*)(Class(true, ClassLiteral('a')))
+  check("[a-z]", "", All: _*)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  check("[a-]", "", All: _*)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'))))
+  check("[-z]", "", All: _*)(Class(false, ClassUnion(ClassLiteral('-'), ClassLiteral('z'))))
+  check("[\\n-\\r]", "", All: _*)(
+    Class(
+      false,
+      ClassRange(ClassBackslashValue(Escape(Single('n'), '\n')), ClassBackslashValue(Escape(Single('r'), '\r')))
+    )
+  )
+  check("[a-\\w]", "", All: _*)(
+    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassBackslashClass(Word)))
+  )
+  check("[\\w-z]", "", All: _*)(
+    Class(false, ClassUnion(ClassBackslashClass(Word), ClassLiteral('-'), ClassLiteral('z')))
+  )
+  check("[\\b]", "", All: _*)(Class(false, ClassBackslashValue(Escape(Single('b'), 0x08))))
+  check("[]", "", JavaScript)(Class(false, ClassUnion()))
+  check("[[:alnum:]]", "", PCRE, Perl, Ruby)(Class(false, ClassPosix(false, "alnum")))
+  check("[[:^alnum:]]", "", PCRE, Perl, Ruby)(Class(false, ClassPosix(true, "alnum")))
+  check("[[a]]", "", Java, Ruby)(Class(false, ClassNest(false, ClassLiteral('a'))))
+  check("[[a]]", "v", JavaScript)(Class(false, ClassNest(false, ClassLiteral('a'))))
+  check("[[^a]]", "", Java, Ruby)(Class(false, ClassNest(true, ClassLiteral('a'))))
+  check("[[^a]]", "v", JavaScript)(Class(false, ClassNest(true, ClassLiteral('a'))))
+  check("[[a-z]&&[a-c]]", "", Java, Ruby)(
+    Class(
+      false,
+      ClassIntersection(
+        ClassNest(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))),
+        ClassNest(false, ClassRange(ClassLiteral('a'), ClassLiteral('c')))
+      )
+    )
+  )
+  check("[[a-z]&&[a-c]]", "v", JavaScript)(
+    Class(
+      false,
+      ClassIntersection(
+        ClassNest(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))),
+        ClassNest(false, ClassRange(ClassLiteral('a'), ClassLiteral('c')))
+      )
+    )
+  )
+  check("[[a-z]--[a-c]]", "v", JavaScript)(
+    Class(
+      false,
+      ClassDiff(
+        ClassNest(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))),
+        ClassNest(false, ClassRange(ClassLiteral('a'), ClassLiteral('c')))
+      )
+    )
+  )
+  check("[\\q{abc|def}]", "v", JavaScript)(
+    Class(
+      false,
+      ClassBackslashClass(
+        QuoteSet(
+          Seq(
+            Seq(QuoteValue('a'), QuoteValue('b'), QuoteValue('c')),
+            Seq(QuoteValue('d'), QuoteValue('e'), QuoteValue('f'))
+          )
+        )
+      )
+    )
+  )
+  check("[\\q{\\n}]", "v", JavaScript)(
+    Class(
+      false,
+      ClassBackslashClass(
+        QuoteSet(
+          Seq(
+            Seq(QuoteBackslash(Escape(Single('n'), 0x0a)))
+          )
+        )
+      )
+    )
+  )
+  error("[", "", All: _*)("Unclosed ']' at 1")
+  error("]", "u", JavaScript)("Unclosed ']' at 0")
 }

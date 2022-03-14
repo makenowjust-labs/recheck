@@ -13,6 +13,8 @@ sealed abstract class NodeData extends Product with Serializable {
       kl == kr && l.equalsWithoutLoc(r)
     case (NodeData.Command(kl), NodeData.Command(kr)) =>
       kl.equalsWithoutLoc(kr)
+    case (NodeData.Class(li, l), NodeData.Class(ri, r)) =>
+      li == ri && l.equalsWithoutLoc(r)
     case (l, r) => l == r
   }
 }
@@ -109,7 +111,20 @@ object NodeData {
     */
   case object Dot extends NodeData
 
+  /** Backslash is a backslash pattern node. */
   final case class Backslash(kind: BackslashKind) extends NodeData
+
+  /** Class is a class pattern node.
+    *
+    * {{{
+    * Class = "[" "^"? ClassItem "]"
+    * }}}
+    */
+  final case class Class(invert: Boolean, item: ClassItem) extends NodeData
+
+  object Class {
+    def apply(invert: Boolean, item: ClassItemData): Class = Class(invert, ClassItem(item))
+  }
 
   /** Literal is a character literal node. */
   final case class Literal(value: Int) extends NodeData

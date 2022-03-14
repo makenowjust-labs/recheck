@@ -12,6 +12,8 @@ import codes.quine.labs.resyntax.ast.BacktrackControlKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.ast.BoundaryModifier
 import codes.quine.labs.resyntax.ast.CaseCommandKind
+import codes.quine.labs.resyntax.ast.ClassItem
+import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.ConditionalTest
 import codes.quine.labs.resyntax.ast.Dialect
@@ -24,19 +26,20 @@ import codes.quine.labs.resyntax.ast.NameStyle
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.Quantifier
+import codes.quine.labs.resyntax.ast.QuoteLiteral
 import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.parser.Parser.ParsingContext
 
 object Parser {
   private[parser] final case class ParsingContext(
-      hasBackslashBackslash: Boolean,
+      inClass: Boolean,
       skipsComment: Boolean
   )
 
   private[parser] object ParsingContext {
     def from(featureSet: FeatureSet): ParsingContext = ParsingContext(
-      hasBackslashBackslash = false,
+      inClass = false,
       skipsComment = featureSet.skipsComment
     )
   }
@@ -1034,81 +1037,97 @@ private[parser] final class Parser(
   private def parseBackslash(stack: mutable.Stack[Node]): Unit = {
     val start = offset
     next()
+    val backslash = parseBackslashKind()
+    val end = offset
+    stack.push(Node(NodeData.Backslash(backslash), SourceLocation(start, end)))
+
+    if (backslash != BackslashKind.CaseCommand(CaseCommandKind.QuoteCommand)) {
+      return
+    }
+
+    while (!isEnd && !source.startsWith("\\E", offset)) {
+      parseLiteral(stack)
+    }
+
+    val eStart = offset
+    if (startWith("\\E")) {
+      val backslash = NodeData.Backslash(BackslashKind.CaseCommand(CaseCommandKind.EndCaseCommand))
+      val eEnd = offset
+      stack.push(Node(backslash, SourceLocation(eStart, eEnd)))
+    }
+  }
+
+  private def parseBackslashKind(): BackslashKind =
     (currentChar: @switch) match {
-      case 'a' => parseBackslashLowerA(stack, start)
-      case 'b' => parseBackslashLowerB(stack, start)
-      case 'c' => parseBackslashLowerC(stack, start)
-      case 'd' => parseBackslashLowerD(stack, start)
-      case 'e' => parseBackslashLowerE(stack, start)
-      case 'f' => parseBackslashLowerF(stack, start)
-      case 'g' => parseBackslashLowerG(stack, start)
-      case 'h' => parseBackslashLowerH(stack, start)
-      case 'k' => parseBackslashLowerK(stack, start)
-      case 'l' => parseBackslashLowerL(stack, start)
-      case 'n' => parseBackslashLowerN(stack, start)
-      case 'o' => parseBackslashLowerO(stack, start)
-      case 'p' => parseBackslashLowerP(stack, start)
-      case 'r' => parseBackslashLowerR(stack, start)
-      case 's' => parseBackslashLowerS(stack, start)
-      case 't' => parseBackslashLowerT(stack, start)
-      case 'u' => parseBackslashLowerU(stack, start)
-      case 'v' => parseBackslashLowerV(stack, start)
-      case 'w' => parseBackslashLowerW(stack, start)
-      case 'x' => parseBackslashLowerX(stack, start)
-      case 'z' => parseBackslashLowerZ(stack, start)
-      case 'A' => parseBackslashUpperA(stack, start)
-      case 'B' => parseBackslashUpperB(stack, start)
-      case 'D' => parseBackslashUpperD(stack, start)
-      case 'E' => parseBackslashUpperE(stack, start)
-      case 'F' => parseBackslashUpperF(stack, start)
-      case 'G' => parseBackslashUpperG(stack, start)
-      case 'H' => parseBackslashUpperH(stack, start)
-      case 'K' => parseBackslashUpperK(stack, start)
-      case 'L' => parseBackslashUpperL(stack, start)
-      case 'N' => parseBackslashUpperN(stack, start)
-      case 'P' => parseBackslashUpperP(stack, start)
-      case 'Q' => parseBackslashUpperQ(stack, start)
-      case 'R' => parseBackslashUpperR(stack, start)
-      case 'S' => parseBackslashUpperS(stack, start)
-      case 'U' => parseBackslashUpperU(stack, start)
-      case 'V' => parseBackslashUpperV(stack, start)
-      case 'W' => parseBackslashUpperW(stack, start)
-      case 'X' => parseBackslashUpperX(stack, start)
-      case 'Z' => parseBackslashUpperZ(stack, start)
-      case '/' | '|' | '+' | '*' | '?' | '{' | '}' | '(' | ')' | '^' | '$' | '.' | '\\' | '[' | ']' =>
-        parseBackslashEscape(stack, start)
-      case '0' =>
-        parseBackslashOctal(stack, start)
+      case 'a' => parseBackslashLowerA()
+      case 'b' => parseBackslashLowerB()
+      case 'c' => parseBackslashLowerC()
+      case 'd' => parseBackslashLowerD()
+      case 'e' => parseBackslashLowerE()
+      case 'f' => parseBackslashLowerF()
+      case 'g' => parseBackslashLowerG()
+      case 'h' => parseBackslashLowerH()
+      case 'k' => parseBackslashLowerK()
+      case 'l' => parseBackslashLowerL()
+      case 'n' => parseBackslashLowerN()
+      case 'o' => parseBackslashLowerO()
+      case 'p' => parseBackslashLowerP()
+      case 'q' => parseBackslashLowerQ()
+      case 'r' => parseBackslashLowerR()
+      case 's' => parseBackslashLowerS()
+      case 't' => parseBackslashLowerT()
+      case 'u' => parseBackslashLowerU()
+      case 'v' => parseBackslashLowerV()
+      case 'w' => parseBackslashLowerW()
+      case 'x' => parseBackslashLowerX()
+      case 'z' => parseBackslashLowerZ()
+      case 'A' => parseBackslashUpperA()
+      case 'B' => parseBackslashUpperB()
+      case 'D' => parseBackslashUpperD()
+      case 'E' => parseBackslashUpperE()
+      case 'F' => parseBackslashUpperF()
+      case 'G' => parseBackslashUpperG()
+      case 'H' => parseBackslashUpperH()
+      case 'K' => parseBackslashUpperK()
+      case 'L' => parseBackslashUpperL()
+      case 'N' => parseBackslashUpperN()
+      case 'P' => parseBackslashUpperP()
+      case 'Q' => parseBackslashUpperQ()
+      case 'R' => parseBackslashUpperR()
+      case 'S' => parseBackslashUpperS()
+      case 'U' => parseBackslashUpperU()
+      case 'V' => parseBackslashUpperV()
+      case 'W' => parseBackslashUpperW()
+      case 'X' => parseBackslashUpperX()
+      case 'Z' => parseBackslashUpperZ()
+      case '0' => parseBackslashOctal()
       case '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
-        parseBackslashBackReference(stack, start)
-      case _ => parseBackslashUnknown(stack, start)
+        parseBackslashBackReference()
+      case '/' | '|' | '+' | '*' | '?' | '{' | '}' | '(' | ')' | '^' | '$' | '.' | '\\' | '[' | ']' | '&' =>
+        parseBackslashEscape()
+      case _ => parseBackslashUnknown()
     }
-  }
 
-  private def parseBackslashLowerA(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerA(): BackslashKind = {
     if (!featureSet.hasBackslashBell) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
+
     next()
-    val backslash = NodeData.Backslash(BackslashKind.Escape(EscapeStyle.Single('a'), 0x0007))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Escape(EscapeStyle.Single('a'), 0x0007)
   }
 
-  private def parseBackslashLowerB(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (context.hasBackslashBackslash) {
-      parseBackslashBackslash(stack, start)
-      return
+  private def parseBackslashLowerB(): BackslashKind = {
+    if (context.inClass) {
+      return parseBackslashBackslash()
     }
-    parseBackslashBoundary(stack, start)
+
+    parseBackslashBoundary()
   }
 
-  private def parseBackslashBackslash(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashBackslash(): BackslashKind = {
     next()
-    val backslash = NodeData.Backslash(BackslashKind.Escape(EscapeStyle.Single('b'), 0x0008))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Escape(EscapeStyle.Single('b'), 0x0008)
   }
 
   private[this] val BoundaryModifiers = Seq(
@@ -1118,154 +1137,115 @@ private[parser] final class Parser(
     ("{wb}", BoundaryModifier.WbModifier)
   )
 
-  private def parseBackslashBoundary(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashBoundary(): BackslashKind = {
     next()
 
     if (featureSet.hasBoundaryGModifier && startWith("{g}")) {
-      val backslash = NodeData.Backslash(BackslashKind.Assert(AssertKind.Boundary(Some(BoundaryModifier.GModifier))))
-      val end = offset
-      stack.push(Node(backslash, SourceLocation(start, end)))
-      return
+      return BackslashKind.Assert(AssertKind.Boundary(Some(BoundaryModifier.GModifier)))
     }
 
     if (featureSet.hasBoundaryModifier) {
       for ((name, modifier) <- BoundaryModifiers) {
         if (startWith(name)) {
-          val backslash = NodeData.Backslash(BackslashKind.Assert(AssertKind.Boundary(Some(modifier))))
-          val end = offset
-          stack.push(Node(backslash, SourceLocation(start, end)))
-          return
+          return BackslashKind.Assert(AssertKind.Boundary(Some(modifier)))
         }
       }
     }
 
-    val backslash = NodeData.Backslash(BackslashKind.Assert(AssertKind.Boundary(None)))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Assert(AssertKind.Boundary(None))
   }
 
-  private def parseBackslashLowerC(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerC(): BackslashKind = {
     if (!featureSet.hasBackslashControl) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
     if (!isControl) {
       assert(featureSet.allowsAlphabeticUnknownBackslash, "Invalid backslash escape")
-      val backslash = NodeData.Backslash(BackslashKind.Unknown('c'))
-      val end = offset
-      stack.push(Node(backslash, SourceLocation(start, end)))
-      return
+      return BackslashKind.Unknown('c')
     }
 
     val char = currentChar
     next()
 
     val value = char.toInt % 32
-    val backslash = NodeData.Backslash(BackslashKind.Escape(EscapeStyle.Control(char), value))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Escape(EscapeStyle.Control(char), value)
   }
 
-  private def parseBackslashLowerD(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerD(): BackslashKind = {
     next()
-    val backslash = NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.Digit))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.EscapeClass(EscapeClassKind.Digit)
   }
 
-  private def parseBackslashLowerE(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerE(): BackslashKind = {
     if (!featureSet.hasBackslashEscape) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
+
     next()
-    val backslash = NodeData.Backslash(BackslashKind.Escape(EscapeStyle.Single('e'), 0x1b))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Escape(EscapeStyle.Single('e'), 0x1b)
   }
 
-  private def parseBackslashLowerF(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerF(): BackslashKind = {
     next()
-    val backslash = NodeData.Backslash(BackslashKind.Escape(EscapeStyle.Single('f'), 0x0c))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Escape(EscapeStyle.Single('f'), 0x0c)
   }
 
-  private def parseBackslashLowerG(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerG(): BackslashKind = {
     if (!(featureSet.hasBackslashGBackReference || featureSet.hasBackslashGCall)) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
-
     (currentChar: @switch) match {
       case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
         assert(featureSet.hasBackslashGBackReference, "Invalid backslash escape")
         val index = parseIntOption().getOrElse(fail("Invalid backslash escape"))
-        val backslash = NodeData.Backslash(
-          BackslashKind.EscapeBackReference(
-            BackReferenceStyle.GBackReference(NameStyle.Bare),
-            Reference.IndexedReference(index)
-          )
+        BackslashKind.EscapeBackReference(
+          BackReferenceStyle.GBackReference(NameStyle.Bare),
+          Reference.IndexedReference(index)
         )
-        val end = offset
-        stack.push(Node(backslash, SourceLocation(start, end)))
       case '+' | '-' =>
         assert(featureSet.hasBackslashGBackReference, "Invalid backslash escape")
         val sign = if (currentChar == '-') -1 else 1
         next()
         val n = parseIntOption().getOrElse(fail("Invalid backslash escape"))
-        val backslash = NodeData.Backslash(
-          BackslashKind.EscapeBackReference(
-            BackReferenceStyle.GBackReference(NameStyle.Bare),
-            Reference.RelativeReference(sign * n)
-          )
+        BackslashKind.EscapeBackReference(
+          BackReferenceStyle.GBackReference(NameStyle.Bare),
+          Reference.RelativeReference(sign * n)
         )
-        val end = offset
-        stack.push(Node(backslash, SourceLocation(start, end)))
       case '{' =>
         assert(featureSet.hasBackslashGBackReference, "Invalid backslash escape")
         next()
         val ref = parseBaseRef()
         expect('}', "Invalid backslash escape")
-        val backslash =
-          NodeData.Backslash(BackslashKind.EscapeBackReference(BackReferenceStyle.GBackReference(NameStyle.Curly), ref))
-        val end = offset
-        stack.push(Node(backslash, SourceLocation(start, end)))
+        BackslashKind.EscapeBackReference(BackReferenceStyle.GBackReference(NameStyle.Curly), ref)
       case '<' | '\'' =>
         assert(featureSet.hasBackslashGCall, "Invalid backslash escape")
         val style = if (currentChar == '<') NameStyle.Angle else NameStyle.Quote
         next()
         val ref = parseBaseRef()
         expect(if (style == NameStyle.Angle) '>' else '\'', "Invalid backslash escape")
-        val backslash = NodeData.Backslash(BackslashKind.EscapeCall(style, ref))
-        val end = offset
-        stack.push(Node(backslash, SourceLocation(start, end)))
+        BackslashKind.EscapeCall(style, ref)
       case _ =>
         fail("Invalid backslash escape")
     }
   }
 
-  private def parseBackslashLowerH(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerH(): BackslashKind = {
     if (!(featureSet.hasBackslashHorizontalSpace || featureSet.hasBackslashHexDigit)) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
     val klass = if (featureSet.hasBackslashHorizontalSpace) EscapeClassKind.Horizontal else EscapeClassKind.HexDigit
-    val backslash = NodeData.Backslash(BackslashKind.EscapeClass(klass))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.EscapeClass(klass)
   }
 
-  private def parseBackslashLowerK(stack: mutable.Stack[Node], start: Int): Unit = {
-    if (!featureSet.hasBackslashKBackReference) {
-      parseBackslashUnknown(stack, start)
-      return
+  private def parseBackslashLowerK(): BackslashKind = {
+    if (!featureSet.hasBackslashKBackReference || context.inClass) {
+      return parseBackslashUnknown()
     }
 
     next()
@@ -1274,19 +1254,13 @@ private[parser] final class Parser(
         next()
         val ref = parseRef()
         expect('>', "Invalid backslash escape")
-        val backslash =
-          NodeData.Backslash(BackslashKind.EscapeBackReference(BackReferenceStyle.KBackReference(NameStyle.Angle), ref))
-        val end = offset
-        stack.push(Node(backslash, SourceLocation(start, end)))
+        BackslashKind.EscapeBackReference(BackReferenceStyle.KBackReference(NameStyle.Angle), ref)
       case '\'' =>
         assert(featureSet.hasBackslashKBackReference, "Invalid backslash escape")
         next()
         val ref = parseRef()
         expect('\'', "Invalid backslash escape")
-        val backslash =
-          NodeData.Backslash(BackslashKind.EscapeBackReference(BackReferenceStyle.KBackReference(NameStyle.Quote), ref))
-        val end = offset
-        stack.push(Node(backslash, SourceLocation(start, end)))
+        BackslashKind.EscapeBackReference(BackReferenceStyle.KBackReference(NameStyle.Quote), ref)
       case _ =>
         fail("Invalid backslash escape")
     }
@@ -1330,29 +1304,23 @@ private[parser] final class Parser(
     }
   }
 
-  private def parseBackslashLowerL(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerL(): BackslashKind = {
     if (!featureSet.hasBackslashCaseCommand) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
-    val backslash = NodeData.Backslash(BackslashKind.CaseCommand(CaseCommandKind.SingleLowerCaseCommand))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.CaseCommand(CaseCommandKind.SingleLowerCaseCommand)
   }
 
-  private def parseBackslashLowerN(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerN(): BackslashKind = {
     next()
-    val backslash = NodeData.Backslash(BackslashKind.Escape(EscapeStyle.Single('n'), 0x0a))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Escape(EscapeStyle.Single('n'), 0x0a)
   }
 
-  private def parseBackslashLowerO(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerO(): BackslashKind = {
     if (!featureSet.hasBackslashOctal) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
@@ -1360,15 +1328,12 @@ private[parser] final class Parser(
     val value = parseOctalIntOption().getOrElse(fail("Invalid backslash escape"))
     expect('}', "Invalid backslash escape")
 
-    val backslash = NodeData.Backslash(BackslashKind.Escape(EscapeStyle.Octal, value))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Escape(EscapeStyle.Octal, value)
   }
 
-  private def parseBackslashLowerP(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerP(): BackslashKind = {
     if (!featureSet.hasBackslashUnicodeProperty) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
@@ -1376,7 +1341,7 @@ private[parser] final class Parser(
       case '{' =>
         next()
         val name = parseID()
-        val escape = if (currentChar == '=') {
+        val klass = if (currentChar == '=') {
           next()
           val value = parseID()
           EscapeClassKind.UnicodePropertyValue(name, value)
@@ -1384,45 +1349,76 @@ private[parser] final class Parser(
           EscapeClassKind.UnicodeProperty(name)
         }
         expect('}', "Invalid backslash escape")
-        val backslash = NodeData.Backslash(BackslashKind.EscapeClass(escape))
-        val end = offset
-        stack.push(Node(backslash, SourceLocation(start, end)))
+        BackslashKind.EscapeClass(klass)
       case _ =>
         assert(featureSet.hasBackslashUnicodePropertyBare, "Invalid backslash escape")
         assert(!isEnd, "Invalid backslash escape")
         val name = currentChar.toString
         next()
-        val backslash = NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.UnicodeBareProperty(name)))
-        val end = offset
-        stack.push(Node(backslash, SourceLocation(start, end)))
+        BackslashKind.EscapeClass(EscapeClassKind.UnicodeBareProperty(name))
     }
   }
 
-  private def parseBackslashLowerR(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerQ(): BackslashKind = {
+    if (!(featureSet.hasBackslashQuoteSet && context.inClass)) {
+      return parseBackslashUnknown()
+    }
+
     next()
-    val backslash = NodeData.Backslash(BackslashKind.Escape(EscapeStyle.Single('r'), 0x0d))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    expect('{', "Invalid backslash escape")
+    val strings = Seq.newBuilder[Seq[QuoteLiteral]]
+    strings.addOne(parseQuoteString())
+    while (!isEnd && currentChar == '|') {
+      next()
+      strings.addOne(parseQuoteString())
+    }
+    expect('}', "Invalid backslash escape")
+
+    BackslashKind.EscapeClass(EscapeClassKind.QuoteSet(strings.result()))
   }
 
-  private def parseBackslashLowerS(stack: mutable.Stack[Node], start: Int): Unit = {
-    next()
-    val backslash = NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.Space))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+  private def parseQuoteString(): Seq[QuoteLiteral] = {
+    val string = Seq.newBuilder[QuoteLiteral]
+
+    while (!(isEnd || currentChar == '|' || currentChar == '}')) {
+      if (currentChar == '\\') {
+        val save = offset
+        next()
+        val backslash = parseBackslashKind()
+        backslash match {
+          case kind: BackslashKind.BackslashValue =>
+            string.addOne(QuoteLiteral.QuoteBackslash(kind))
+          case _ =>
+            fail("Invalid backslash escape", save)
+        }
+      } else {
+        val value = if (featureSet.readsAsUnicode) currentCodePoint else currentChar
+        nextCodePoint(value)
+        string.addOne(QuoteLiteral.QuoteValue(value))
+      }
+    }
+
+    string.result()
   }
 
-  private def parseBackslashLowerT(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerR(): BackslashKind = {
     next()
-    val backslash = NodeData.Backslash(BackslashKind.Escape(EscapeStyle.Single('t'), 0x09))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Escape(EscapeStyle.Single('r'), 0x0d)
   }
 
-  private def parseBackslashLowerU(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerS(): BackslashKind = {
+    next()
+    BackslashKind.EscapeClass(EscapeClassKind.Space)
+  }
+
+  private def parseBackslashLowerT(): BackslashKind = {
+    next()
+    BackslashKind.Escape(EscapeStyle.Single('t'), 0x09)
+  }
+
+  private def parseBackslashLowerU(): BackslashKind = {
     if (!(featureSet.hasBackslashUnicodeHex || featureSet.hasBackslashCaseCommand)) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     val save = offset
@@ -1432,58 +1428,46 @@ private[parser] final class Parser(
       next()
       val value = parseHexIntOption().getOrElse(fail("Invalid backslash escape"))
       expect('}', "Invalid backslash escape")
-      val backslash = NodeData.Backslash(BackslashKind.Escape(EscapeStyle.UnicodeBracket, value))
-      val end = offset
-      stack.push(Node(backslash, SourceLocation(start, end)))
-      return
+      return BackslashKind.Escape(EscapeStyle.UnicodeBracket, value)
     }
 
     if (featureSet.hasBackslashCaseCommand) {
-      val backslash = NodeData.Backslash(BackslashKind.CaseCommand(CaseCommandKind.SingleUpperCaseCommand))
-      val end = offset
-      stack.push(Node(backslash, SourceLocation(start, end)))
-      return
+      return BackslashKind.CaseCommand(CaseCommandKind.SingleUpperCaseCommand)
     }
 
     for (_ <- 1 to 4) {
       if (!isHexDigit) {
         reset(save)
-        parseBackslashUnknown(stack, start)
-        return
+        return parseBackslashUnknown()
       }
       next()
     }
 
     val str = source.slice(offset - 4, offset)
     val value = Try(Integer.parseInt(str, 16)).toOption.getOrElse(fail("Invalid integer"))
-    val backslash = NodeData.Backslash(BackslashKind.Escape(EscapeStyle.UnicodeHex4, value))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Escape(EscapeStyle.UnicodeHex4, value)
   }
 
-  private def parseBackslashLowerV(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerV(): BackslashKind = {
     if (!(featureSet.hasBackslashVerticalSpace || featureSet.hasBackslashVerticalTab)) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
-    val kind =
-      if (featureSet.hasBackslashVerticalSpace) BackslashKind.EscapeClass(EscapeClassKind.Vertical)
-      else BackslashKind.Escape(EscapeStyle.Single('v'), 0x0b)
-    val backslash = NodeData.Backslash(kind)
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+
+    if (featureSet.hasBackslashVerticalSpace) {
+      return BackslashKind.EscapeClass(EscapeClassKind.Vertical)
+    }
+
+    BackslashKind.Escape(EscapeStyle.Single('v'), 0x0b)
   }
 
-  private def parseBackslashLowerW(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerW(): BackslashKind = {
     next()
-    val backslash = NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.Word))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.EscapeClass(EscapeClassKind.Word)
   }
 
-  private def parseBackslashLowerX(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerX(): BackslashKind = {
     val save = offset
     next()
 
@@ -1491,16 +1475,12 @@ private[parser] final class Parser(
       next()
       val value = parseHexIntOption().getOrElse(fail("Invalid backslash escape"))
       expect('}', "Invalid backslash escape")
-      val backslash = NodeData.Backslash(BackslashKind.Escape(EscapeStyle.HexBracket, value))
-      val end = offset
-      stack.push(Node(backslash, SourceLocation(start, end)))
-      return
+      return BackslashKind.Escape(EscapeStyle.HexBracket, value)
     }
 
     if (!isHexDigit) {
       reset(save)
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
@@ -1508,173 +1488,133 @@ private[parser] final class Parser(
     if (featureSet.hasBackslashXHex1 && !isHexDigit) {
       val str = source.slice(offset - 1, offset)
       val value = Try(Integer.parseInt(str, 16)).getOrElse(fail("Invalid backslash escape"))
-      val backslash = NodeData.Backslash(BackslashKind.Escape(EscapeStyle.Hex1, value))
-      val end = offset
-      stack.push(Node(backslash, SourceLocation(start, end)))
-      return
+      return BackslashKind.Escape(EscapeStyle.Hex1, value)
     }
 
     if (!isHexDigit) {
       reset(save)
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
     val str = source.slice(offset - 2, offset)
     val value = Try(Integer.parseInt(str, 16)).getOrElse(fail("Invalid backslash escape"))
-    val backslash = NodeData.Backslash(BackslashKind.Escape(EscapeStyle.Hex2, value))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Escape(EscapeStyle.Hex2, value)
   }
 
-  private def parseBackslashLowerZ(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashLowerZ(): BackslashKind = {
     if (!featureSet.hasBackslashEnd) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
-    val backslash = NodeData.Backslash(BackslashKind.Assert(AssertKind.LowerEnd))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Assert(AssertKind.LowerEnd)
   }
 
-  private def parseBackslashUpperA(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperA(): BackslashKind = {
     if (!featureSet.hasBackslashBegin) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
+
     next()
-    val backslash = NodeData.Backslash(BackslashKind.Assert(AssertKind.Begin))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Assert(AssertKind.Begin)
   }
 
-  private def parseBackslashUpperB(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperB(): BackslashKind = {
+    if (context.inClass) {
+      return parseBackslashUnknown()
+    }
+
     next()
 
     if (featureSet.hasBoundaryModifier) {
       if (startWith("{g}")) {
-        val backslash =
-          NodeData.Backslash(BackslashKind.Assert(AssertKind.NonBoundary(Some(BoundaryModifier.GModifier))))
-        val end = offset
-        stack.push(Node(backslash, SourceLocation(start, end)))
-        return
+        return BackslashKind.Assert(AssertKind.NonBoundary(Some(BoundaryModifier.GModifier)))
       }
 
       for ((name, modifier) <- BoundaryModifiers) {
         if (startWith(name)) {
-          val backslash = NodeData.Backslash(BackslashKind.Assert(AssertKind.NonBoundary(Some(modifier))))
-          val end = offset
-          stack.push(Node(backslash, SourceLocation(start, end)))
-          return
+          return BackslashKind.Assert(AssertKind.NonBoundary(Some(modifier)))
         }
       }
     }
 
-    val backslash = NodeData.Backslash(BackslashKind.Assert(AssertKind.NonBoundary(None)))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Assert(AssertKind.NonBoundary(None))
   }
 
-  private def parseBackslashUpperD(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperD(): BackslashKind = {
     next()
-    val backslash = NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.NonDigit))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.EscapeClass(EscapeClassKind.NonDigit)
   }
 
-  private def parseBackslashUpperE(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperE(): BackslashKind = {
     if (!(featureSet.hasBackslashCaseCommand || featureSet.hasBackslashQuoteCommand)) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
-    val backslash = NodeData.Backslash(BackslashKind.CaseCommand(CaseCommandKind.EndCaseCommand))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.CaseCommand(CaseCommandKind.EndCaseCommand)
   }
 
-  private def parseBackslashUpperF(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperF(): BackslashKind = {
     if (!featureSet.hasBackslashCaseCommand) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
-    val backslash = NodeData.Backslash(BackslashKind.CaseCommand(CaseCommandKind.FoldCaseCommand))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.CaseCommand(CaseCommandKind.FoldCaseCommand)
   }
 
-  private def parseBackslashUpperG(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperG(): BackslashKind = {
     if (!featureSet.hasBackslashStickyAssert) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
-    val backslash = NodeData.Backslash(BackslashKind.Assert(AssertKind.Sticky))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Assert(AssertKind.Sticky)
   }
 
-  private def parseBackslashUpperH(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperH(): BackslashKind = {
     if (!(featureSet.hasBackslashHorizontalSpace || featureSet.hasBackslashHexDigit)) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
     val klass =
       if (featureSet.hasBackslashHorizontalSpace) EscapeClassKind.NonHorizontal else EscapeClassKind.NonHexDigit
-    val backslash = NodeData.Backslash(BackslashKind.EscapeClass(klass))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.EscapeClass(klass)
   }
 
-  private def parseBackslashUpperK(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperK(): BackslashKind = {
     if (!featureSet.hasBackslashCut) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
-    val backslash = NodeData.Backslash(BackslashKind.Assert(AssertKind.Cut))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Assert(AssertKind.Cut)
   }
 
-  private def parseBackslashUpperL(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperL(): BackslashKind = {
     if (!featureSet.hasBackslashCaseCommand) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
-    val backslash = NodeData.Backslash(BackslashKind.CaseCommand(CaseCommandKind.LowerCaseCommand))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.CaseCommand(CaseCommandKind.LowerCaseCommand)
   }
 
-  private def parseBackslashUpperN(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperN(): BackslashKind = {
     if (!featureSet.hasBackslashNonNewline) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
-    val backslash = NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.NonNewline))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.EscapeClass(EscapeClassKind.NonNewline)
   }
 
-  private def parseBackslashUpperP(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperP(): BackslashKind = {
     if (!featureSet.hasBackslashUnicodeProperty) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
@@ -1682,7 +1622,7 @@ private[parser] final class Parser(
       case '{' =>
         next()
         val name = parseID()
-        val escape = if (currentChar == '=') {
+        val klass = if (currentChar == '=') {
           next()
           val value = parseID()
           EscapeClassKind.NonUnicodePropertyValue(name, value)
@@ -1690,75 +1630,48 @@ private[parser] final class Parser(
           EscapeClassKind.NonUnicodeProperty(name)
         }
         expect('}', "Invalid backslash escape")
-        val backslash = NodeData.Backslash(BackslashKind.EscapeClass(escape))
-        val end = offset
-        stack.push(Node(backslash, SourceLocation(start, end)))
+        BackslashKind.EscapeClass(klass)
       case _ =>
         assert(featureSet.hasBackslashUnicodePropertyBare, "Invalid backslash escape")
         assert(!isEnd, "Invalid backslash escape")
         val name = currentChar.toString
         next()
-        val backslash = NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.NonUnicodeBareProperty(name)))
-        val end = offset
-        stack.push(Node(backslash, SourceLocation(start, end)))
+        BackslashKind.EscapeClass(EscapeClassKind.NonUnicodeBareProperty(name))
     }
   }
 
-  private def parseBackslashUpperQ(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperQ(): BackslashKind = {
     if (!featureSet.hasBackslashQuoteCommand) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
-    val backslash = NodeData.Backslash(BackslashKind.CaseCommand(CaseCommandKind.QuoteCommand))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
-
-    while (!isEnd && !source.startsWith("\\E", offset)) {
-      parseLiteral(stack)
-    }
-
-    val eStart = offset
-    if (startWith("\\E")) {
-      val backslash = NodeData.Backslash(BackslashKind.CaseCommand(CaseCommandKind.EndCaseCommand))
-      val eEnd = offset
-      stack.push(Node(backslash, SourceLocation(eStart, eEnd)))
-    }
+    BackslashKind.CaseCommand(CaseCommandKind.QuoteCommand)
   }
 
-  private def parseBackslashUpperR(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperR(): BackslashKind = {
     if (!featureSet.hasBackslashGeneralNewline) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
-    val backslash = NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline)
   }
 
-  private def parseBackslashUpperS(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperS(): BackslashKind = {
     next()
-    val backslash = NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.NonSpace))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.EscapeClass(EscapeClassKind.NonSpace)
   }
 
-  private def parseBackslashUpperU(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperU(): BackslashKind = {
     if (!(featureSet.hasBackslashUnicodeHex8 || featureSet.hasBackslashCaseCommand)) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
 
     if (featureSet.hasBackslashCaseCommand) {
-      val backslash = NodeData.Backslash(BackslashKind.CaseCommand(CaseCommandKind.UpperCaseCommand))
-      val end = offset
-      stack.push(Node(backslash, SourceLocation(start, end)))
-      return
+      return BackslashKind.CaseCommand(CaseCommandKind.UpperCaseCommand)
     }
 
     for (_ <- 1 to 8) {
@@ -1768,55 +1681,42 @@ private[parser] final class Parser(
 
     val str = source.slice(offset - 8, offset)
     val value = Try(Integer.parseInt(str, 16)).toOption.getOrElse(fail("Invalid integer"))
-    val backslash = NodeData.Backslash(BackslashKind.Escape(EscapeStyle.UnicodeHex8, value))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Escape(EscapeStyle.UnicodeHex8, value)
   }
 
-  private def parseBackslashUpperV(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperV(): BackslashKind = {
     if (!featureSet.hasBackslashVerticalSpace) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
-    val backslash = NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.NonVertical))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.EscapeClass(EscapeClassKind.NonVertical)
   }
 
-  private def parseBackslashUpperW(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperW(): BackslashKind = {
     next()
-    val backslash = NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.NonWord))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.EscapeClass(EscapeClassKind.NonWord)
   }
 
-  private def parseBackslashUpperX(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperX(): BackslashKind = {
     if (!featureSet.hasBackslashGraphemeCluster) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
-    val backslash = NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.GraphemeCluster))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.EscapeClass(EscapeClassKind.GraphemeCluster)
   }
 
-  private def parseBackslashUpperZ(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUpperZ(): BackslashKind = {
     if (!featureSet.hasBackslashUpperEnd) {
-      parseBackslashUnknown(stack, start)
-      return
+      return parseBackslashUnknown()
     }
 
     next()
-    val backslash = NodeData.Backslash(BackslashKind.Assert(AssertKind.UpperEnd))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Assert(AssertKind.UpperEnd)
   }
 
-  private def parseBackslashOctal(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashOctal(): BackslashKind = {
     assert(featureSet.hasBackslashBareOctal, "Invalid backslash escape")
 
     val size = if ('0' <= currentChar && currentChar <= '3') 3 else 2
@@ -1826,38 +1726,36 @@ private[parser] final class Parser(
     }
     val str = source.slice(valueStart, offset)
     val value = Try(Integer.parseInt(str, 8)).getOrElse(fail("Invalid integer"))
-    val backslash = NodeData.Backslash(BackslashKind.Escape(EscapeStyle.BareOctal, value))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Escape(EscapeStyle.BareOctal, value)
   }
 
-  private def parseBackslashBackReference(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashBackReference(): BackslashKind = {
+    if (context.inClass) {
+      return parseBackslashOctal()
+    }
+
     val save = offset
     val n = parseIntOption().getOrElse(fail("Invalid backslash escape"))
+
     if (featureSet.checksValidBackReference && !(0 < n && n <= analysis.captureSize)) {
       reset(save)
       if (isOctalDigit) {
-        parseBackslashOctal(stack, start)
-      } else {
-        parseBackslashUnknown(stack, start)
+        return parseBackslashOctal()
       }
-      return
+
+      return parseBackslashUnknown()
     }
-    val backRef = BackslashKind.EscapeBackReference(BackReferenceStyle.BareBackReference, Reference.IndexedReference(n))
-    val backslash = NodeData.Backslash(backRef)
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+
+    BackslashKind.EscapeBackReference(BackReferenceStyle.BareBackReference, Reference.IndexedReference(n))
   }
 
-  private def parseBackslashEscape(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashEscape(): BackslashKind = {
     val value = currentChar
     next()
-    val backslash = NodeData.Backslash(BackslashKind.Escape(EscapeStyle.Single(value), value.toInt))
-    val end = offset
-    stack.push(Node(backslash, SourceLocation(start, end)))
+    BackslashKind.Escape(EscapeStyle.Single(value), value.toInt)
   }
 
-  private def parseBackslashUnknown(stack: mutable.Stack[Node], start: Int): Unit = {
+  private def parseBackslashUnknown(): BackslashKind = {
     if (isAlphabetic) {
       assert(featureSet.allowsAlphabeticUnknownBackslash, "Invalid backslash escape")
     }
@@ -1865,11 +1763,170 @@ private[parser] final class Parser(
     assert(!isEnd, "Invalid backslash escape")
     val value = currentCodePoint
     nextCodePoint(value)
-    val end = offset
-    stack.push(Node(NodeData.Backslash(BackslashKind.Unknown(value)), SourceLocation(start, end)))
+    BackslashKind.Unknown(value)
   }
 
-  private def parseClass(stack: mutable.Stack[Node]): Unit = ???
+  private def parseClass(stack: mutable.Stack[Node]): Unit = protectContext {
+    context = context.copy(inClass = true)
+
+    val start = offset
+
+    next()
+    val invert = currentChar == '^'
+    if (invert) {
+      next()
+    }
+
+    val item = parseClassItem(!featureSet.allowsClassEmpty)
+    expect(']', "Unclosed ']'")
+
+    val end = offset
+    stack.push(Node(NodeData.Class(invert, item), SourceLocation(start, end)))
+  }
+
+  private def parseClassItem(first: Boolean): ClassItem = {
+    val start = offset
+
+    var item = parseClassItemUnion(first)
+
+    var continue = true
+    while (continue) {
+      continue = false
+
+      if (featureSet.allowsClassIntersection && startWith("&&")) {
+        continue = true
+        val right = parseClassItemUnion(false)
+        val end = offset
+        item = ClassItem(ClassItemData.ClassIntersection(item, right), SourceLocation(start, end))
+      }
+
+      if (featureSet.allowsClassDiff && startWith("--")) {
+        continue = true
+        val right = parseClassItemUnion(false)
+        val end = offset
+        item = ClassItem(ClassItemData.ClassDiff(item, right), SourceLocation(start, end))
+      }
+    }
+
+    item
+  }
+
+  private def parseClassItemUnion(first: Boolean): ClassItem = {
+    val start = offset
+    val seq = Seq.newBuilder[ClassItem]
+
+    while ((first && start == offset && !isEnd) || !isClassItemStop) {
+      seq.addOne(parseClassItemAtom())
+    }
+
+    val end = offset
+    val items = seq.result()
+    if (items.size == 1) {
+      return items.head
+    }
+    ClassItem(ClassItemData.ClassUnion(items), SourceLocation(start, end))
+  }
+
+  private def isClassItemStop: Boolean =
+    isEnd ||
+      currentChar == ']' ||
+      featureSet.allowsClassIntersection && source.startsWith("&&", offset) ||
+      featureSet.allowsClassDiff && source.startsWith("--", offset)
+
+  private def parseClassItemAtom(): ClassItem = {
+    val start = offset
+    val begin = parseClassItemNonRange()
+
+    if (!isClassItemStop && currentChar == '-' && isValueClassItem(begin)) {
+      val save = offset
+      next()
+
+      if (isClassItemStop) {
+        reset(save)
+        return begin
+      }
+
+      if ((featureSet.allowsClassPosix || featureSet.allowsClassNest) && currentChar == '[') {
+        reset(save)
+        return begin
+      }
+
+      val end = parseClassItemNonRange()
+      val endOffset = offset
+      if (!isValueClassItem(end)) {
+        reset(save)
+        return begin
+      }
+
+      return ClassItem(
+        ClassItemData.ClassRange(begin.asInstanceOf[ClassItem.Value], end.asInstanceOf[ClassItem.Value]),
+        SourceLocation(start, endOffset)
+      )
+    }
+
+    begin
+  }
+
+  private def parseClassItemNonRange(): ClassItem = {
+    val start = offset
+
+    if (featureSet.allowsClassPosix && startWith("[:")) {
+      val invert = currentChar == '^'
+      if (invert) {
+        next()
+      }
+      val name = parseID()
+      if (startWith(":]")) {
+        val end = offset
+        return ClassItem(ClassItemData.ClassPosix(invert, name), SourceLocation(start, end))
+      }
+      reset(start)
+    }
+
+    if (featureSet.allowsClassNest && currentChar == '[') {
+      next()
+      val invert = currentChar == '^'
+      if (invert) {
+        next()
+      }
+      val item = parseClassItem(!featureSet.allowsClassEmpty)
+      if (currentChar == ']') {
+        next()
+        val end = offset
+        return ClassItem(ClassItemData.ClassNest(invert, item), SourceLocation(start, end))
+      }
+      assert(featureSet.allowsBrokenCloseBracket, "Unclosed ']'")
+      reset(start)
+    }
+
+    if (currentChar == '\\') {
+      next()
+      val backslash = parseBackslashKind()
+      val end = offset
+      backslash match {
+        case kind: BackslashKind.BackslashValue =>
+          return ClassItem.Value(ClassItemData.ClassBackslashValue(kind), SourceLocation(start, end))
+        case BackslashKind.EscapeClass(klass) =>
+          return ClassItem(ClassItemData.ClassBackslashClass(klass), SourceLocation(start, end))
+        case _ =>
+          fail("Invalid escape sequence", start)
+      }
+    }
+
+    parseClassItemLiteral()
+  }
+
+  private def parseClassItemLiteral(): ClassItem = {
+    val value =
+      if (featureSet.readsAsUnicode) currentCodePoint else currentChar.toInt
+    val start = offset
+    nextCodePoint(value)
+    val end = offset
+    ClassItem.Value(ClassItemData.ClassLiteral(value), SourceLocation(start, end))
+  }
+
+  private def isValueClassItem(item: ClassItem): Boolean =
+    item.isInstanceOf[ClassItem.Value]
 
   private def parseCloseCurly(stack: mutable.Stack[Node]): Unit = {
     assert(featureSet.allowsBrokenCloseCurly, "Incomplete quantifier")
@@ -1879,7 +1936,13 @@ private[parser] final class Parser(
     stack.push(Node(NodeData.Literal('}'), SourceLocation(start, end)))
   }
 
-  private def parseCloseBracket(stack: mutable.Stack[Node]): Unit = ???
+  private def parseCloseBracket(stack: mutable.Stack[Node]): Unit = {
+    assert(featureSet.allowsBrokenCloseBracket, "Unclosed ']'")
+    val start = offset
+    next()
+    val end = offset
+    stack.push(Node(NodeData.Literal(']'), SourceLocation(start, end)))
+  }
 
   private def parseLiteral(stack: mutable.Stack[Node]): Unit = {
     val value =
