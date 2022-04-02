@@ -38,7 +38,7 @@
     "esbuild-register": "3.3.2",
     "eslint": "8.12.0",
     "jest": "27.5.1",
-    "prettier": "2.6.1",
+    "prettier": "2.6.2",
     "rimraf": "3.0.2",
     "typescript": "4.6.3"
   },
