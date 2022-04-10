@@ -227,8 +227,8 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
-    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
-    Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
+    libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
+      .cross(CrossVersion.for3Use2_13)
   )
   .dependsOn(common, exec, unicode, parse)
 
@@ -251,6 +251,10 @@ lazy val common = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
+  .jsSettings(
+    libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
+      .cross(CrossVersion.for3Use2_13)
+  )
 
 lazy val commonJVM = common.jvm
 lazy val commonJS = common.js
@@ -268,6 +272,10 @@ lazy val exec = crossProject(JVMPlatform, JSPlatform)
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
+  )
+  .jsSettings(
+    libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
+      .cross(CrossVersion.for3Use2_13)
   )
   .dependsOn(common)
 
@@ -312,8 +320,8 @@ lazy val unicode = crossProject(JVMPlatform, JSPlatform)
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
-    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
-    Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
+    libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
+      .cross(CrossVersion.for3Use2_13)
   )
 
 lazy val unicodeJVM = unicode.jvm
@@ -336,8 +344,8 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
-    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
-    Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
+    libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
+      .cross(CrossVersion.for3Use2_13)
   )
   .dependsOn(unicode)
 
@@ -364,8 +372,8 @@ lazy val codec = crossProject(JVMPlatform, JSPlatform)
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
-    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
-    Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
+    libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
+      .cross(CrossVersion.for3Use2_13)
   )
   .dependsOn(core)
 
@@ -388,6 +396,8 @@ lazy val js = project
     addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
+    libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
+      .cross(CrossVersion.for3Use2_13),
     testFrameworks += new TestFramework("munit.Framework"),
     // ScalaJS config:
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
