@@ -9,6 +9,7 @@ Fixes:
 
 - [#341](https://github.com/makenowjust-labs/recheck/pull/341) Fix zero-width assertion in `automaton` checker ([@makenowjust](https://github.com/makenowjust))
 - [#380](https://github.com/makenowjust-labs/recheck/pull/380) Correct to increase steps on back-reference ([@makenowjust](https://github.com/makenowjust))
+- [#411](https://github.com/makenowjust-labs/recheck/pull/411) Update Scala.js to 1.10.0 ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
