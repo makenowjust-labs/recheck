@@ -12,10 +12,6 @@ sealed abstract class ClassItem extends Product with Serializable {
 
 object ClassItem {
 
-  def apply(data: ClassItemData): ClassItem = ClassItem(data, SourceLocation.Invalid)
-
-  def apply(data: ClassItemData, loc: SourceLocation): ClassItem = NonValue(data, loc)
-
   /** Value is a class item having value. */
   final case class Value(data: ClassItemData.ClassValue, loc: SourceLocation) extends ClassItem
 
@@ -25,4 +21,8 @@ object ClassItem {
 
   /** NonValue is a class item having no value. */
   final case class NonValue(data: ClassItemData, loc: SourceLocation) extends ClassItem
+
+  def apply(data: ClassItemData): ClassItem = ClassItem(data, SourceLocation.Invalid)
+
+  def apply(data: ClassItemData, loc: SourceLocation): ClassItem = NonValue(data, loc)
 }
