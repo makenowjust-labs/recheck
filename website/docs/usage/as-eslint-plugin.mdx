@@ -19,14 +19,14 @@ You can install the package with the following command.
 <TabItem value="npm" label="NPM">
 
 ```bash
-npm install --save-dev eslint-plugin-redos
+npm install --save-dev eslint eslint-plugin-redos
 ```
 
 </TabItem>
 <TabItem value="yarb" label="Yarn">
 
 ```bash
-yarn add --dev eslint-plugin-redos
+yarn add --dev eslint eslint-plugin-redos
 ```
 
 </TabItem>
@@ -135,6 +135,15 @@ The following is the default configuration.
 }
 ```
 
+:::info
+
+Note that the plugin accepts all parameter values listed in [this page](parameters.md).
+
+In addition, `ignoreErrors` and `premittableComplexities` are only available in ESLint plugin.
+They specify error reporting policiy.
+
+:::
+
 #### `ignoreErrors`
 
 This flag is used to determine to ignore errors on ReDoS vulnerable detection.
@@ -147,7 +156,7 @@ Errors on ReDoS vulnerable detection are:
 
 They are ignored because they are noisy usually.
 
-#### `permittableComplexity`
+#### `permittableComplexities`
 
 This array option controls permittable matching complexity. It allows the following values.
 
@@ -158,7 +167,7 @@ We strongly recommend considering `'polynomial'` matching complexity RegExp as R
 
 #### `timeout`
 
-This option specifies a time-out limit for ReDoS analyzing. A time unit is milliseconds. If `null` is specified, it means unlimited time-out.
+This option specifies a time-out limit for ReDoS analyzing. A time unit is milliseconds. If `null` is specified, it means unlimited time-out.
 
 The default value is `10000` (10 seconds).
 
