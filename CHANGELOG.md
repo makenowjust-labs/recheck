@@ -4,6 +4,7 @@ Changes:
 
 - [#357](https://github.com/makenowjust-labs/recheck/pull/357) Add `Default` prefix to default parameter values ([@makenowjust](https://github.com/makenowjust))
 - [#358](https://github.com/makenowjust-labs/recheck/pull/358) Sort `Parameters` names in lexicographic order ([@makenowjust](https://github.com/makenowjust))
+- [#448](https://github.com/makenowjust-labs/recheck/pull/448) Allow all parameters to ESLint plugin options ([@makenowjust](https://github.com/makenowjust))
 
 Fixes:
 
