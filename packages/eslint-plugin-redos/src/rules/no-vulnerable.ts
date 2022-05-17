@@ -5,9 +5,7 @@ import * as ReDoS from "recheck";
 type Options = {
   ignoreErrors: boolean;
   permittableComplexities?: ("polynomial" | "exponential")[];
-  timeout?: number | null;
-  checker?: "auto" | "automaton" | "fuzz";
-};
+} & Omit<ReDoS.Parameters, "logger">;
 
 const rule: Rule.RuleModule = {
   meta: {
@@ -29,13 +27,89 @@ const rule: Rule.RuleModule = {
             additionalItems: false,
             uniqueItems: true,
           },
-          timeout: {
+          accelerationMode: {
+            type: "string",
+            enum: ["auto", "on", "off"],
+          },
+          attackLimit: {
+            type: "number",
+          },
+          attackTimeout: {
             type: ["number", "null"],
-            minimum: 0,
           },
           checker: {
             type: "string",
             enum: ["auto", "automaton", "fuzz"],
+          },
+          crossoverSize: {
+            type: "number",
+          },
+          heatRatio: {
+            type: "number",
+          },
+          incubationLimit: {
+            type: "number",
+          },
+          incubationTimeout: {
+            type: ["number", "null"],
+          },
+          maxAttackStringSize: {
+            type: "number",
+          },
+          maxDegree: {
+            type: "number",
+          },
+          maxGeneStringSize: {
+            type: "number",
+          },
+          maxGenerationSize: {
+            type: "number",
+          },
+          maxInitialGenerationSize: {
+            type: "number",
+          },
+          maxIteration: {
+            type: "number",
+          },
+          maxNFASize: {
+            type: "number",
+          },
+          maxPatternSize: {
+            type: "number",
+          },
+          maxRecallStringSize: {
+            type: "number",
+          },
+          maxRepeatCount: {
+            type: "number",
+          },
+          maxSimpleRepeatCount: {
+            type: "number",
+          },
+          mutationSize: {
+            type: "number",
+          },
+          randomSeed: {
+            type: "number",
+          },
+          recallLimit: {
+            type: "number",
+          },
+          recallTimeout: {
+            type: ["number", "null"],
+          },
+          seeder: {
+            type: "string",
+            enum: ["static", "dynamic"],
+          },
+          seedingLimit: {
+            type: "number",
+          },
+          seedingTimeout: {
+            type: ["number", "null"],
+          },
+          timeout: {
+            type: ["number", "null"],
           },
         },
         additionalProperties: false,
@@ -48,12 +122,11 @@ const rule: Rule.RuleModule = {
       ignoreErrors = true,
       permittableComplexities = [],
       timeout = 10000,
-      checker = "auto",
+      ...params
     } = options;
-    const params = { timeout: timeout ?? undefined, checker };
 
     const check = (node: ESTree.Node, source: string, flags: string) => {
-      const result = ReDoS.checkSync(source, flags, params);
+      const result = ReDoS.checkSync(source, flags, { timeout, ...params });
       switch (result.status) {
         case "safe":
           break;
