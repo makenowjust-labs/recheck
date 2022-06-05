@@ -95,7 +95,7 @@ class RPCSuite extends munit.FunSuite {
     assertEquals(
       out.result(),
       Seq(
-        s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":null,"error":{"code":-32700,"message":"Attempt to decode value on failed cursor: DownField(jsonrpc)"}}""",
+        s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":null,"error":{"code":-32700,"message":"Missing required field: DownField(jsonrpc)"}}""",
         s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":1,"error":{"code":-32600,"message":"invalid JSON-RPC version"}}""",
         s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":1,"message":"foo"}""",
         s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":1,"result":{}}"""
@@ -123,7 +123,7 @@ class RPCSuite extends munit.FunSuite {
     )
     assertEquals(
       RPC.read("""{}"""),
-      RPC.Result.raise(RPC.ErrorResponse.ParseError("Attempt to decode value on failed cursor: DownField(jsonrpc)"))
+      RPC.Result.raise(RPC.ErrorResponse.ParseError("Missing required field: DownField(jsonrpc)"))
     )
   }
 
@@ -169,7 +169,9 @@ class RPCSuite extends munit.FunSuite {
     assertEquals(handler.doDecodeParams(RPC.IntID(1), Json.obj()).asInstanceOf[RPC.Result[Any]], RPC.Result.ok(()))
     assertEquals(
       handler.doDecodeParams(RPC.IntID(1), 1.asJson).asInstanceOf[RPC.Result[Any]],
-      RPC.Result.raise(RPC.ErrorResponse.InvalidParams(RPC.IntID(1), "Unit"))
+      RPC.Result.raise(
+        RPC.ErrorResponse.InvalidParams(RPC.IntID(1), "Got value '1' with wrong type, expecting 'null' or '[]' or '{}'")
+      )
     )
   }
 
