@@ -63,10 +63,12 @@ object ClassItemData {
   /** ClassBackslashClass is backslash escape class in class. */
   final case class ClassBackslashClass(klass: EscapeClassKind) extends ClassItemData
 
+  /** ClassValue is value in a class. */
   sealed abstract class ClassValue extends ClassItemData {
     def value: Int
   }
 
+  /** ClassBackslashValue is backslash escape in a class. */
   final case class ClassBackslashValue(kind: BackslashKind.BackslashValue) extends ClassValue {
     def value: Int = kind.value
   }

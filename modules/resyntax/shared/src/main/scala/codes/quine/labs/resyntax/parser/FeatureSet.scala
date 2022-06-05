@@ -3,6 +3,10 @@ package codes.quine.labs.resyntax.parser
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 
+/** FeatureSet is a set of feature flags.
+  *
+  * It is used for changing the parsing behavior.
+  */
 final case class FeatureSet(
     // JavaScript (without `uv`), Perl, Ruby
     allowsAlphabeticUnknownBackslash: Boolean,
@@ -195,6 +199,8 @@ final case class FeatureSet(
 )
 
 object FeatureSet {
+
+  /** Computes a feature set from a quick analysis result, the given dialect and the given flag set. */
   def from(analysis: QuickAnalysis, dialect: Dialect, flagSet: FlagSet): FeatureSet = {
     val isDotNet = dialect == Dialect.DotNet
     val isJava = dialect == Dialect.Java
