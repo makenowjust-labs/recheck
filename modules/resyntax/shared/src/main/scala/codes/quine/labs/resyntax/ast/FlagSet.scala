@@ -62,6 +62,8 @@ final case class FlagSet(
 )
 
 object FlagSet {
+
+  /** Returns parsed flag set object from the given flag set string on the dialect. */
   def parse(flags: String, dialect: Dialect): FlagSet = {
     val allowsDuplicatedFlag = dialect != Dialect.JavaScript
 
