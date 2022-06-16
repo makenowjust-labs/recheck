@@ -135,6 +135,24 @@ class CodecSuite extends munit.FunSuite {
     assertEquals(
       decodeParameters.decodeJson(
         Json.obj(
+          "attackTimeout" := Json.Null,
+          "incubationTimeout" := Json.Null,
+          "recallTimeout" := Json.Null,
+          "seedingTimeout" := Json.Null
+        )
+      ),
+      Right(
+        Parameters(
+          attackTimeout = Duration.Inf,
+          incubationTimeout = Duration.Inf,
+          recallTimeout = Duration.Inf,
+          seedingTimeout = Duration.Inf
+        )
+      )
+    )
+    assertEquals(
+      decodeParameters.decodeJson(
+        Json.obj(
           "checker" := "fuzz",
           "timeout" := 123,
           "logger" := Json.arr(),
