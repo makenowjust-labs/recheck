@@ -1,3 +1,9 @@
+# dev
+
+Fixes:
+
+- [#491](https://github.com/makenowjust-labs/recheck/pull/491) Fix `Duration` and `Parameter` decoder for missing keys and `null` ([@makenowjust](https://github.com/makenowjust))
+
 # 4.4.0 (2022-05-17)
 
 Changes:
