@@ -4,6 +4,8 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.duration.MILLISECONDS
 
 import io.circe.Decoder
+import io.circe.DecodingFailure
+import io.circe.DecodingFailure.Reason.MissingField
 import io.circe.Encoder
 import io.circe.HCursor
 import io.circe.Json
@@ -109,38 +111,47 @@ package object codec {
   implicit def encodeUString: Encoder[UString] = _.asString.asJson
 
   /** A `Decoder` for `Parameters`. */
-  implicit def decodeParameters(implicit decodeLogger: Decoder[Context.Logger]): Decoder[Parameters] = (c: HCursor) =>
+  implicit def decodeParameters(implicit decodeLogger: Decoder[Context.Logger]): Decoder[Parameters] = (c: HCursor) => {
+
+    /** Returns a decoded result if `key` is found, or returns the given fallback value as a result if key is missing.
+      *
+      * It is almost similar to `HCursor#getOrElse`. However, it only falls back on missing key (not on `null` case).
+      */
+    def getOrElse[A: Decoder](key: String)(fallback: A): Decoder.Result[A] =
+      c.get[A](key) match {
+        case Left(failure) if failure.reason == MissingField => Right(fallback)
+        case result                                          => result
+      }
+
     for {
-      accelerationMode <- c.getOrElse[AccelerationMode]("accelerationMode")(Parameters.DefaultAccelerationMode)
-      attackLimit <- c.getOrElse[Int]("attackLimit")(Parameters.DefaultAttackLimit)
-      attackTimeout <- c.getOrElse[Duration]("attackTimeout")(Parameters.DefaultAttackTimeout)
-      checker <- c.getOrElse[Checker]("checker")(Parameters.DefaultChecker)
-      crossoverSize <- c.getOrElse[Int]("crossoverSize")(Parameters.DefaultCrossoverSize)
-      heatRatio <- c.getOrElse[Double]("heatRatio")(Parameters.DefaultHeatRatio)
-      incubationLimit <- c.getOrElse[Int]("incubationLimit")(Parameters.DefaultIncubationLimit)
-      incubationTimeout <- c.getOrElse[Duration]("incubationTimeout")(Parameters.DefaultIncubationTimeout)
-      logger <- c.getOrElse[Option[Context.Logger]]("logger")(Parameters.DefaultLogger)
-      maxAttackStringSize <- c.getOrElse[Int]("maxAttackStringSize")(Parameters.DefaultMaxAttackStringSize)
-      maxDegree <- c.getOrElse[Int]("maxDegree")(Parameters.DefaultMaxDegree)
-      maxGeneStringSize <- c.getOrElse[Int]("maxGeneStringSize")(Parameters.DefaultMaxGeneStringSize)
-      maxGenerationSize <- c.getOrElse[Int]("maxGenerationSize")(Parameters.DefaultMaxGenerationSize)
-      maxInitialGenerationSize <- c.getOrElse[Int]("maxInitialGenerationSize")(
-        Parameters.DefaultMaxInitialGenerationSize
-      )
-      maxIteration <- c.getOrElse[Int]("maxIteration")(Parameters.DefaultMaxIteration)
-      maxNFASize <- c.getOrElse[Int]("maxNFASize")(Parameters.DefaultMaxNFASize)
-      maxPatternSize <- c.getOrElse[Int]("maxPatternSize")(Parameters.DefaultMaxPatternSize)
-      maxRecallStringSize <- c.getOrElse[Int]("maxRecallStringSize")(Parameters.DefaultMaxRecallStringSize)
-      maxRepeatCount <- c.getOrElse[Int]("maxRepeatCount")(Parameters.DefaultMaxRepeatCount)
-      maxSimpleRepeatCount <- c.getOrElse[Int]("maxSimpleRepeatCount")(Parameters.DefaultMaxSimpleRepeatCount)
-      mutationSize <- c.getOrElse[Int]("mutationSize")(Parameters.DefaultMutationSize)
-      randomSeed <- c.getOrElse[Long]("randomSeed")(Parameters.DefaultRandomSeed)
-      recallLimit <- c.getOrElse[Int]("recallLimit")(Parameters.DefaultRecallLimit)
-      recallTimeout <- c.getOrElse[Duration]("recallTimeout")(Parameters.DefaultRecallTimeout)
-      seeder <- c.getOrElse[Seeder]("seeder")(Parameters.DefaultSeeder)
-      seedingLimit <- c.getOrElse[Int]("seedingLimit")(Parameters.DefaultSeedingLimit)
-      seedingTimeout <- c.getOrElse[Duration]("seedingTimeout")(Parameters.DefaultSeedingTimeout)
-      timeout <- c.getOrElse[Duration]("timeout")(Parameters.DefaultTimeout)
+      accelerationMode <- getOrElse[AccelerationMode]("accelerationMode")(Parameters.DefaultAccelerationMode)
+      attackLimit <- getOrElse[Int]("attackLimit")(Parameters.DefaultAttackLimit)
+      attackTimeout <- getOrElse[Duration]("attackTimeout")(Parameters.DefaultAttackTimeout)
+      checker <- getOrElse[Checker]("checker")(Parameters.DefaultChecker)
+      crossoverSize <- getOrElse[Int]("crossoverSize")(Parameters.DefaultCrossoverSize)
+      heatRatio <- getOrElse[Double]("heatRatio")(Parameters.DefaultHeatRatio)
+      incubationLimit <- getOrElse[Int]("incubationLimit")(Parameters.DefaultIncubationLimit)
+      incubationTimeout <- getOrElse[Duration]("incubationTimeout")(Parameters.DefaultIncubationTimeout)
+      logger <- getOrElse[Option[Context.Logger]]("logger")(Parameters.DefaultLogger)
+      maxAttackStringSize <- getOrElse[Int]("maxAttackStringSize")(Parameters.DefaultMaxAttackStringSize)
+      maxDegree <- getOrElse[Int]("maxDegree")(Parameters.DefaultMaxDegree)
+      maxGeneStringSize <- getOrElse[Int]("maxGeneStringSize")(Parameters.DefaultMaxGeneStringSize)
+      maxGenerationSize <- getOrElse[Int]("maxGenerationSize")(Parameters.DefaultMaxGenerationSize)
+      maxInitialGenerationSize <- getOrElse[Int]("maxInitialGenerationSize")(Parameters.DefaultMaxInitialGenerationSize)
+      maxIteration <- getOrElse[Int]("maxIteration")(Parameters.DefaultMaxIteration)
+      maxNFASize <- getOrElse[Int]("maxNFASize")(Parameters.DefaultMaxNFASize)
+      maxPatternSize <- getOrElse[Int]("maxPatternSize")(Parameters.DefaultMaxPatternSize)
+      maxRecallStringSize <- getOrElse[Int]("maxRecallStringSize")(Parameters.DefaultMaxRecallStringSize)
+      maxRepeatCount <- getOrElse[Int]("maxRepeatCount")(Parameters.DefaultMaxRepeatCount)
+      maxSimpleRepeatCount <- getOrElse[Int]("maxSimpleRepeatCount")(Parameters.DefaultMaxSimpleRepeatCount)
+      mutationSize <- getOrElse[Int]("mutationSize")(Parameters.DefaultMutationSize)
+      randomSeed <- getOrElse[Long]("randomSeed")(Parameters.DefaultRandomSeed)
+      recallLimit <- getOrElse[Int]("recallLimit")(Parameters.DefaultRecallLimit)
+      recallTimeout <- getOrElse[Duration]("recallTimeout")(Parameters.DefaultRecallTimeout)
+      seeder <- getOrElse[Seeder]("seeder")(Parameters.DefaultSeeder)
+      seedingLimit <- getOrElse[Int]("seedingLimit")(Parameters.DefaultSeedingLimit)
+      seedingTimeout <- getOrElse[Duration]("seedingTimeout")(Parameters.DefaultSeedingTimeout)
+      timeout <- getOrElse[Duration]("timeout")(Parameters.DefaultTimeout)
     } yield Parameters(
       accelerationMode,
       attackLimit,
@@ -171,12 +182,16 @@ package object codec {
       seedingTimeout,
       timeout
     )
+  }
 
   /** A `Decoder` for `Duration`. */
-  implicit def decodeDuration: Decoder[Duration] = Decoder[Option[Int]].map {
-    case Some(d) => Duration(d, MILLISECONDS)
-    case None    => Duration.Inf
-  }
+  implicit def decodeDuration: Decoder[Duration] = (c: HCursor) =>
+    if (c.value.isNull) Right(Duration.Inf)
+    else if (c.value.isNumber) c.value.asNumber.flatMap(_.toInt) match {
+      case Some(d) => Right(Duration(d, MILLISECONDS))
+      case None    => Left(DecodingFailure("Duration", c.history))
+    }
+    else Left(DecodingFailure("Duration", c.history))
 
   /** A `Decoder` for `Checker`. */
   implicit def decodeChecker: Decoder[Checker] =
