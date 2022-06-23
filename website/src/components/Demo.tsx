@@ -1,7 +1,7 @@
 import React from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import ReactLoading from 'react-loading';
-import * as recheck from 'recheck';
+import * as recheck from 'recheck/lib/browser';
 
 import styles from './Demo.module.css';
 import NumberInput from './form/NumberInput';
@@ -22,6 +22,199 @@ type Param = {
   defaultValue: any;
   type: ParamType;
 };
+
+const params: Param[] = [
+  {
+    "name": "checker",
+    "title": "Checker",
+    "defaultValue": "auto",
+    "type": {
+      "select": [
+        "auto",
+        "automaton",
+        "fuzz"
+      ]
+    }
+  },
+  {
+    "name": "logger",
+    "title": "Logger",
+    "defaultValue": "off",
+    "type": {
+      "select": [
+        "on",
+        "off"
+      ]
+    }
+  },
+  {
+    "name": "timeout",
+    "title": "Timeout",
+    "defaultValue": 10000,
+    "type": "duration"
+  },
+  {
+    "name": "accelerationMode",
+    "title": "Acceleration Mode",
+    "defaultValue": "auto",
+    "type": {
+      "select": [
+        "auto",
+        "on",
+        "off"
+      ]
+    }
+  },
+  {
+    "name": "attackLimit",
+    "title": "Attack Limit",
+    "defaultValue": 1500000000,
+    "type": "integer"
+  },
+  {
+    "name": "attackTimeout",
+    "title": "Attack Timeout",
+    "defaultValue": 1000,
+    "type": "duration"
+  },
+  {
+    "name": "crossoverSize",
+    "title": "Crossover Size",
+    "defaultValue": 25,
+    "type": "integer"
+  },
+  {
+    "name": "heatRatio",
+    "title": "Heat Ratio",
+    "defaultValue": 0.001,
+    "type": "float"
+  },
+  {
+    "name": "incubationLimit",
+    "title": "Incubation Limit",
+    "defaultValue": 25000,
+    "type": "integer"
+  },
+  {
+    "name": "incubationTimeout",
+    "title": "Incubation Timeout",
+    "defaultValue": 250,
+    "type": "duration"
+  },
+  {
+    "name": "maxAttackStringSize",
+    "title": "Max Attack String Size",
+    "defaultValue": 300000,
+    "type": "integer"
+  },
+  {
+    "name": "maxDegree",
+    "title": "Max Degree",
+    "defaultValue": 4,
+    "type": "integer"
+  },
+  {
+    "name": "maxGeneStringSize",
+    "title": "Max Gene String Size",
+    "defaultValue": 2400,
+    "type": "integer"
+  },
+  {
+    "name": "maxGenerationSize",
+    "title": "Max Generation Size",
+    "defaultValue": 100,
+    "type": "integer"
+  },
+  {
+    "name": "maxInitialGenerationSize",
+    "title": "Max Initial Generation Size",
+    "defaultValue": 500,
+    "type": "integer"
+  },
+  {
+    "name": "maxIteration",
+    "title": "Max Iteration",
+    "defaultValue": 10,
+    "type": "integer"
+  },
+  {
+    "name": "maxNFASize",
+    "title": "Max NFA Size",
+    "defaultValue": 35000,
+    "type": "integer"
+  },
+  {
+    "name": "maxPatternSize",
+    "title": "Max Pattern Size",
+    "defaultValue": 1500,
+    "type": "integer"
+  },
+  {
+    "name": "maxRecallStringSize",
+    "title": "Max Recall String Size",
+    "defaultValue": 300000,
+    "type": "integer"
+  },
+  {
+    "name": "maxRepeatCount",
+    "title": "Max Repeat Count",
+    "defaultValue": 30,
+    "type": "integer"
+  },
+  {
+    "name": "maxSimpleRepeatCount",
+    "title": "Max Simple Repeat Count",
+    "defaultValue": 30,
+    "type": "integer"
+  },
+  {
+    "name": "mutationSize",
+    "title": "Mutation Size",
+    "defaultValue": 50,
+    "type": "integer"
+  },
+  {
+    "name": "randomSeed",
+    "title": "Random Seed",
+    "defaultValue": 0,
+    "type": "integer"
+  },
+  {
+    "name": "recallLimit",
+    "title": "Recall Limit",
+    "defaultValue": 1500000000,
+    "type": "integer"
+  },
+  {
+    "name": "recallTimeout",
+    "title": "Recall Timeout",
+    "defaultValue": -1000,
+    "type": "duration"
+  },
+  {
+    "name": "seeder",
+    "title": "Seeder",
+    "defaultValue": "static",
+    "type": {
+      "select": [
+        "static",
+        "dynamic"
+      ]
+    }
+  },
+  {
+    "name": "seedingLimit",
+    "title": "Seeding Limit",
+    "defaultValue": 1000,
+    "type": "integer"
+  },
+  {
+    "name": "seedingTimeout",
+    "title": "Seeding Timeout",
+    "defaultValue": 100,
+    "type": "duration"
+  }
+];
 
 type DemoParamsProps = {
   params: Param[];
@@ -89,199 +282,6 @@ type DemoInputProps = {
 }
 
 const DemoInput: React.VFC<DemoInputProps> = ({ check, cancel, status }) => {
-  const params: Param[] = [
-    {
-      "name": "checker",
-      "title": "Checker",
-      "defaultValue": "auto",
-      "type": {
-        "select": [
-          "auto",
-          "automaton",
-          "fuzz"
-        ]
-      }
-    },
-    {
-      "name": "logger",
-      "title": "Logger",
-      "defaultValue": "off",
-      "type": {
-        "select": [
-          "on",
-          "off"
-        ]
-      }
-    },
-    {
-      "name": "timeout",
-      "title": "Timeout",
-      "defaultValue": 10000,
-      "type": "duration"
-    },
-    {
-      "name": "accelerationMode",
-      "title": "Acceleration Mode",
-      "defaultValue": "auto",
-      "type": {
-        "select": [
-          "auto",
-          "on",
-          "off"
-        ]
-      }
-    },
-    {
-      "name": "attackLimit",
-      "title": "Attack Limit",
-      "defaultValue": 1500000000,
-      "type": "integer"
-    },
-    {
-      "name": "attackTimeout",
-      "title": "Attack Timeout",
-      "defaultValue": 1000,
-      "type": "duration"
-    },
-    {
-      "name": "crossoverSize",
-      "title": "Crossover Size",
-      "defaultValue": 25,
-      "type": "integer"
-    },
-    {
-      "name": "heatRatio",
-      "title": "Heat Ratio",
-      "defaultValue": 0.001,
-      "type": "float"
-    },
-    {
-      "name": "incubationLimit",
-      "title": "Incubation Limit",
-      "defaultValue": 25000,
-      "type": "integer"
-    },
-    {
-      "name": "incubationTimeout",
-      "title": "Incubation Timeout",
-      "defaultValue": 250,
-      "type": "duration"
-    },
-    {
-      "name": "maxAttackStringSize",
-      "title": "Max Attack String Size",
-      "defaultValue": 300000,
-      "type": "integer"
-    },
-    {
-      "name": "maxDegree",
-      "title": "Max Degree",
-      "defaultValue": 4,
-      "type": "integer"
-    },
-    {
-      "name": "maxGeneStringSize",
-      "title": "Max Gene String Size",
-      "defaultValue": 2400,
-      "type": "integer"
-    },
-    {
-      "name": "maxGenerationSize",
-      "title": "Max Generation Size",
-      "defaultValue": 100,
-      "type": "integer"
-    },
-    {
-      "name": "maxInitialGenerationSize",
-      "title": "Max Initial Generation Size",
-      "defaultValue": 500,
-      "type": "integer"
-    },
-    {
-      "name": "maxIteration",
-      "title": "Max Iteration",
-      "defaultValue": 10,
-      "type": "integer"
-    },
-    {
-      "name": "maxNFASize",
-      "title": "Max NFA Size",
-      "defaultValue": 35000,
-      "type": "integer"
-    },
-    {
-      "name": "maxPatternSize",
-      "title": "Max Pattern Size",
-      "defaultValue": 1500,
-      "type": "integer"
-    },
-    {
-      "name": "maxRecallStringSize",
-      "title": "Max Recall String Size",
-      "defaultValue": 300000,
-      "type": "integer"
-    },
-    {
-      "name": "maxRepeatCount",
-      "title": "Max Repeat Count",
-      "defaultValue": 30,
-      "type": "integer"
-    },
-    {
-      "name": "maxSimpleRepeatCount",
-      "title": "Max Simple Repeat Count",
-      "defaultValue": 30,
-      "type": "integer"
-    },
-    {
-      "name": "mutationSize",
-      "title": "Mutation Size",
-      "defaultValue": 50,
-      "type": "integer"
-    },
-    {
-      "name": "randomSeed",
-      "title": "Random Seed",
-      "defaultValue": 0,
-      "type": "integer"
-    },
-    {
-      "name": "recallLimit",
-      "title": "Recall Limit",
-      "defaultValue": 1500000000,
-      "type": "integer"
-    },
-    {
-      "name": "recallTimeout",
-      "title": "Recall Timeout",
-      "defaultValue": -1000,
-      "type": "duration"
-    },
-    {
-      "name": "seeder",
-      "title": "Seeder",
-      "defaultValue": "static",
-      "type": {
-        "select": [
-          "static",
-          "dynamic"
-        ]
-      }
-    },
-    {
-      "name": "seedingLimit",
-      "title": "Seeding Limit",
-      "defaultValue": 1000,
-      "type": "integer"
-    },
-    {
-      "name": "seedingTimeout",
-      "title": "Seeding Timeout",
-      "defaultValue": 100,
-      "type": "duration"
-    }
-  ];
-
   return (
     <div className="card margin-vert--lg">
       <div className="card__header"><h3>RegExp</h3></div>
@@ -577,15 +577,15 @@ const Demo: React.VFC<{}> = () => {
 
   const methods = useForm();
 
-  const check = methods.handleSubmit(async (params) => {
+  const check = methods.handleSubmit(async (p) => {
     setStatus('running');
     setDiagnostics(null);
     setLog([]);
     setTime(0);
     abortControllerRef.current = null;
 
-    const input = params.input;
-    delete params.input;
+    const input = p.input;
+    delete p.input;
 
     const extracted = extract(input);
     if (extracted === null) {
@@ -594,21 +594,28 @@ const Demo: React.VFC<{}> = () => {
     }
     const { source, flags } = extracted;
 
-    if (params.logger === 'on') {
-      params.logger = (message: string) => {
+    for (const param of params) {
+      if (param.type === 'duration') {
+        p[param.name] = Number.parseInt(p[param.name]);
+        break;
+      }
+    }
+
+    if (p.logger === 'on') {
+      p.logger = (message: string) => {
         console.log(message);
         setLog(log => log.concat(message));
       };
     } else {
-      params.logger = null;
+      p.logger = null;
     }
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    params.signal = controller.signal;
+    p.signal = controller.signal;
 
     const start = Date.now();
-    const diagnostics = await recheck.check(source, flags, params);
+    const diagnostics = await recheck.check(source, flags, p);
     const time = (Date.now() - start) / 1000;
 
     setStatus('done');
