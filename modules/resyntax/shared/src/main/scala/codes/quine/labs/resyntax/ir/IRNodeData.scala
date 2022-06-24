@@ -12,6 +12,9 @@ sealed abstract class IRNodeData extends Product with Serializable {
 
 object IRNodeData {
 
+  /** Empty is an empty string pattern. */
+  case object Empty extends IRNodeData
+
   /** Assert is a simple zero-width assertion. */
   final case class Assert(kind: IRAssertKind) extends IRNodeData
 
