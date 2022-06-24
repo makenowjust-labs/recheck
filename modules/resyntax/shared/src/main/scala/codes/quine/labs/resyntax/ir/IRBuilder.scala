@@ -16,6 +16,9 @@ object IRBuilder {
   ) {
     def update(diff: FlagSetDiff): BuildingContext =
       copy(multiline = (multiline || diff.added.multiline) && !diff.removed.exists(_.multiline))
+
+    def reset(flagSet: FlagSet): BuildingContext =
+      copy(multiline = flagSet.multiline)
   }
 
   object BuildingContext {
@@ -67,38 +70,44 @@ private[ir] class IRBuilder(
     case GroupKind.IndexedCapture                 => ???
     case GroupKind.NonCapture                     => ???
     case GroupKind.NamedCapture(_, _)             => ???
-    case GroupKind.Balance(_, _, _)               => ???
+    case GroupKind.Balance(_, _, _)               => Left(buildBalanceGroup(node))
     case GroupKind.PNamedCapture(_)               => ???
     case _: GroupKind.LookAround                  => ???
-    case GroupKind.Atomic(_)                      => Left(buildAtomic(node))
-    case GroupKind.NonAtomicPositiveLookAhead(_)  => Left(buildNonAtomicPositiveLookAhead(node))
-    case GroupKind.NonAtomicPositiveLookBehind(_) => Left(buildNonAtomicPositiveLookBehind(node))
-    case GroupKind.ScriptRun(_)                   => Left(buildScriptRun(node))
-    case GroupKind.AtomicScriptRun(_)             => Left(buildAtomicScriptRun(node))
+    case GroupKind.Atomic(_)                      => Left(buildAtomicGroup(node))
+    case GroupKind.NonAtomicPositiveLookAhead(_)  => Left(buildNonAtomicPositiveLookAheadGroup(node))
+    case GroupKind.NonAtomicPositiveLookBehind(_) => Left(buildNonAtomicPositiveLookBehindGroup(node))
+    case GroupKind.ScriptRun(_)                   => Left(buildScriptRunGroup(node))
+    case GroupKind.AtomicScriptRun(_)             => Left(buildAtomicScriptRunGroup(node))
     case GroupKind.InlineFlag(diff)               => Right(buildInlineFlagGroup(diff, child))
-    case GroupKind.ResetFlag(_)                   => ???
-    case GroupKind.Absence                        => Left(buildAbsence(node))
+    case GroupKind.ResetFlag(flagSet)             => Right(buildResetFlagGroup(flagSet, child))
+    case GroupKind.Absence                        => Left(buildAbsenceGroup(node))
   }
 
-  def buildAtomic(node: Node): IRNodeData =
+  def buildBalanceGroup(node: Node): IRNodeData =
     IRNodeData.Unsupported(node.data)
 
-  def buildNonAtomicPositiveLookAhead(node: Node): IRNodeData =
+  def buildAtomicGroup(node: Node): IRNodeData =
     IRNodeData.Unsupported(node.data)
 
-  def buildNonAtomicPositiveLookBehind(node: Node): IRNodeData =
+  def buildNonAtomicPositiveLookAheadGroup(node: Node): IRNodeData =
     IRNodeData.Unsupported(node.data)
 
-  def buildScriptRun(node: Node): IRNodeData =
+  def buildNonAtomicPositiveLookBehindGroup(node: Node): IRNodeData =
     IRNodeData.Unsupported(node.data)
 
-  def buildAtomicScriptRun(node: Node): IRNodeData =
+  def buildScriptRunGroup(node: Node): IRNodeData =
+    IRNodeData.Unsupported(node.data)
+
+  def buildAtomicScriptRunGroup(node: Node): IRNodeData =
     IRNodeData.Unsupported(node.data)
 
   def buildInlineFlagGroup(diff: FlagSetDiff, child: Node): IRNode =
     withContext(_.update(diff))(build(child))
 
-  def buildAbsence(node: Node): IRNodeData =
+  def buildResetFlagGroup(flagSet: FlagSet, child: Node): IRNode =
+    withContext(_.reset(flagSet))(build(child))
+
+  def buildAbsenceGroup(node: Node): IRNodeData =
     IRNodeData.Unsupported(node.data)
 
   def buildCaret(): IRNodeData =
