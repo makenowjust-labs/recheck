@@ -26,17 +26,17 @@ object IRBuilder {
   }
 
   /** Returns an IR node built from the given AST. */
-  def build(dialect: Dialect, node: Node, flagSet: FlagSet): IRNode = {
-    val featureSet = IRFeatureSet.from(dialect, flagSet)
-    val builder = new IRBuilder(dialect, node, flagSet, featureSet)
+  def build(node: Node, flagSet: FlagSet, dialect: Dialect): IRNode = {
+    val featureSet = IRFeatureSet.from(flagSet, dialect)
+    val builder = new IRBuilder(node, flagSet, dialect, featureSet)
     builder.build()
   }
 }
 
 private[ir] class IRBuilder(
-    private[this] val dialect: Dialect,
     private[this] val node: Node,
     private[this] val flagSet: FlagSet,
+    private[this] val dialect: Dialect,
     private[this] val featureSet: IRFeatureSet
 ) {
   var context: BuildingContext = BuildingContext.from(flagSet, featureSet)
@@ -45,17 +45,17 @@ private[ir] class IRBuilder(
 
   def build(node: Node): IRNode = {
     val result = node.data match {
-      case NodeData.Disjunction(_)    => ???
-      case NodeData.Sequence(_)       => ???
-      case NodeData.Repeat(_, _)      => ???
-      case NodeData.Group(kind, node) => buildGroup(kind, node)
-      case NodeData.Command(_)        => ???
-      case NodeData.Caret             => Left(buildCaret())
-      case NodeData.Dollar            => Left(buildDollar())
-      case NodeData.Dot               => ???
-      case NodeData.Backslash(_)      => ???
-      case NodeData.Class(_, _)       => ???
-      case NodeData.Literal(_)        => ???
+      case NodeData.Disjunction(_)     => ???
+      case NodeData.Sequence(_)        => ???
+      case NodeData.Repeat(_, _)       => ???
+      case NodeData.Group(kind, child) => buildGroup(node, kind, child)
+      case NodeData.Command(_)         => ???
+      case NodeData.Caret              => Left(buildCaret())
+      case NodeData.Dollar             => Left(buildDollar())
+      case NodeData.Dot                => ???
+      case NodeData.Backslash(_)       => ???
+      case NodeData.Class(_, _)        => ???
+      case NodeData.Literal(_)         => ???
     }
     result match {
       case Left(data) => IRNode(data, node.loc)
@@ -63,7 +63,7 @@ private[ir] class IRBuilder(
     }
   }
 
-  def buildGroup(kind: GroupKind, node: Node): Either[IRNodeData, IRNode] = kind match {
+  def buildGroup(node: Node, kind: GroupKind, child: Node): Either[IRNodeData, IRNode] = kind match {
     case GroupKind.IndexedCapture                 => ???
     case GroupKind.NonCapture                     => ???
     case GroupKind.NamedCapture(_, _)             => ???
@@ -75,7 +75,7 @@ private[ir] class IRBuilder(
     case GroupKind.NonAtomicPositiveLookBehind(_) => Left(buildNonAtomicPositiveLookBehind(node))
     case GroupKind.ScriptRun(_)                   => Left(buildScriptRun(node))
     case GroupKind.AtomicScriptRun(_)             => Left(buildAtomicScriptRun(node))
-    case GroupKind.InlineFlag(diff)               => Right(buildInlineFlagGroup(diff))
+    case GroupKind.InlineFlag(diff)               => Right(buildInlineFlagGroup(diff, child))
     case GroupKind.ResetFlag(_)                   => ???
     case GroupKind.Absence                        => Left(buildAbsence(node))
   }
@@ -95,8 +95,8 @@ private[ir] class IRBuilder(
   def buildAtomicScriptRun(node: Node): IRNodeData =
     IRNodeData.Unsupported(node.data)
 
-  def buildInlineFlagGroup(diff: FlagSetDiff): IRNode =
-    withContext(_.update(diff))(build(node))
+  def buildInlineFlagGroup(diff: FlagSetDiff, child: Node): IRNode =
+    withContext(_.update(diff))(build(child))
 
   def buildAbsence(node: Node): IRNodeData =
     IRNodeData.Unsupported(node.data)

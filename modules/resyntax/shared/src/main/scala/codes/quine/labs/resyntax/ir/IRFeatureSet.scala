@@ -14,7 +14,7 @@ final case class IRFeatureSet(
 )
 
 object IRFeatureSet {
-  def from(dialect: Dialect, flagSet: FlagSet): IRFeatureSet = {
+  def from(flagSet: FlagSet, dialect: Dialect): IRFeatureSet = {
     val isDotNet = dialect == Dialect.DotNet
     val isJava = dialect == Dialect.Java
     // val isJavaScript = dialect == Dialect.JavaScript

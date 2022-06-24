@@ -34,10 +34,6 @@ class ParserSuite extends munit.FunSuite {
       test(s"Parser.parse: /$s/$flags in $dialect") {
         val flagSet = FlagSet.parse(flags, dialect)
         val result = Parser.parse(s, flagSet, dialect)
-        if (!result.equalsWithoutLoc(Node(expected))) {
-          println(result)
-          println(Node(expected))
-        }
         assert(result.equalsWithoutLoc(Node(expected)))
       }
     }
