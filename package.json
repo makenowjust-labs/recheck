@@ -7,6 +7,6 @@
     "website"
   ],
   "devDependencies": {
-    "lerna": "5.4.0"
+    "lerna": "5.4.1"
   }
 }
