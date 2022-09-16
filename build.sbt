@@ -365,7 +365,7 @@ lazy val codec = crossProject(JVMPlatform, JSPlatform)
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
-    libraryDependencies += "io.circe" %%% "circe-core" % "0.14.2",
+    libraryDependencies += "io.circe" %%% "circe-core" % "0.14.3",
     addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
@@ -392,7 +392,7 @@ lazy val js = project
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
-    libraryDependencies += "io.circe" %%% "circe-scalajs" % "0.14.2",
+    libraryDependencies += "io.circe" %%% "circe-scalajs" % "0.14.3",
     addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
@@ -435,9 +435,9 @@ lazy val cli = project
     Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "com.monovore" %% "decline" % "2.3.0",
-    libraryDependencies += "io.circe" %% "circe-core" % "0.14.2",
-    libraryDependencies += "io.circe" %% "circe-generic" % "0.14.2",
-    libraryDependencies += "io.circe" %% "circe-parser" % "0.14.2",
+    libraryDependencies += "io.circe" %% "circe-core" % "0.14.3",
+    libraryDependencies += "io.circe" %% "circe-generic" % "0.14.3",
+    libraryDependencies += "io.circe" %% "circe-parser" % "0.14.3",
     addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
