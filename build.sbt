@@ -435,7 +435,7 @@ lazy val cli = project
     Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "com.monovore" %% "decline" % "2.3.0",
-    libraryDependencies += "io.circe" %% "circe-core" % "0.14.2",
+    libraryDependencies += "io.circe" %% "circe-core" % "0.14.3",
     libraryDependencies += "io.circe" %% "circe-generic" % "0.14.2",
     libraryDependencies += "io.circe" %% "circe-parser" % "0.14.2",
     addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
