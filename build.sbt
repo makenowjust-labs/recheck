@@ -434,7 +434,7 @@ lazy val cli = project
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
-    libraryDependencies += "com.monovore" %% "decline" % "2.3.0",
+    libraryDependencies += "com.monovore" %% "decline" % "2.3.1",
     libraryDependencies += "io.circe" %% "circe-core" % "0.14.3",
     libraryDependencies += "io.circe" %% "circe-generic" % "0.14.3",
     libraryDependencies += "io.circe" %% "circe-parser" % "0.14.3",
