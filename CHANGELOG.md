@@ -3,6 +3,7 @@
 Misc:
 
 - [#501](https://github.com/makenowjust-labs/recheck/pull/501) Convert duration params to integer explicitly on playground ([@makenowjust](https://github.com/makenowjust))
+- [#609](https://github.com/makenowjust-labs/recheck/pull/609) Update Node.js to v18 ([@makenowjust](https://github.com/makenowjust))
 
 # 4.4.1 (2022-06-17)
 
