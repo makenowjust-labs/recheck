@@ -33,7 +33,7 @@
   "devDependencies": {
     "@types/eslint": "8.4.10",
     "@types/node": "18.11.9",
-    "esbuild": "0.15.13",
+    "esbuild": "0.15.14",
     "esbuild-jest": "0.5.0",
     "esbuild-register": "3.4.1",
     "eslint": "8.27.0",
