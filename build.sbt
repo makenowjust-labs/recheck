@@ -342,6 +342,7 @@ lazy val resyntax = crossProject(JVMPlatform, JSPlatform)
     console / initialCommands := """
       |import codes.quine.labs.resyntax._
       |import codes.quine.labs.resyntax.ast._
+      |import codes.quine.labs.resyntax.ir._
       |import codes.quine.labs.resyntax.parser._
       |""".stripMargin,
     Compile / console / scalacOptions -= "-Wunused",
