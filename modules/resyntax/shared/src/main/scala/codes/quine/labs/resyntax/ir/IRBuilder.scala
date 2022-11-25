@@ -74,7 +74,7 @@ private[ir] class IRBuilder(
     children match {
       case Seq()      => Left(IRNodeData.Empty)
       case Seq(child) => Right(build(child))
-      case _          => ???
+      case children   => Left(IRNodeData.Sequence(children.map(build)))
     }
 
   def buildCommand(node: Node, kind: CommandKind): Either[IRNodeData, IRNode] = kind match {
