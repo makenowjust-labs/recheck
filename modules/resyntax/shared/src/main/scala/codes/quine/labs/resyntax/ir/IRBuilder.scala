@@ -45,12 +45,15 @@ private[ir] class IRBuilder(
 ) {
   var context: BuildingContext = BuildingContext.from(flagSet, featureSet)
 
+  var nextIndex: Int = 1
+  var names: Map[String, Int] = Map.empty
+
   def build(): IRNode = build(node)
 
   def build(node: Node): IRNode = {
     val result = node.data match {
       case NodeData.Disjunction(_)     => ???
-      case NodeData.Sequence(_)        => ???
+      case NodeData.Sequence(children) => buildSequence(node, children)
       case NodeData.Repeat(_, _)       => ???
       case NodeData.Group(kind, child) => buildGroup(node, kind, child)
       case NodeData.Command(kind)      => buildCommand(node, kind)
@@ -66,6 +69,13 @@ private[ir] class IRBuilder(
       case Right(ir)  => ir
     }
   }
+
+  def buildSequence(node: Node, children: Seq[Node]): Either[IRNodeData, IRNode] =
+    children match {
+      case Seq()      => Left(IRNodeData.Empty)
+      case Seq(child) => Right(build(child))
+      case _          => ???
+    }
 
   def buildCommand(node: Node, kind: CommandKind): Either[IRNodeData, IRNode] = kind match {
     case CommandKind.InlineFlag(_)          => ???
@@ -129,11 +139,11 @@ private[ir] class IRBuilder(
     IRNodeData.Unsupported(node.data)
 
   def buildGroup(node: Node, kind: GroupKind, child: Node): Either[IRNodeData, IRNode] = kind match {
-    case GroupKind.IndexedCapture                 => ???
-    case GroupKind.NonCapture                     => ???
-    case GroupKind.NamedCapture(_, _)             => ???
+    case GroupKind.IndexedCapture                 => Left(buildIndexedCapture(child))
+    case GroupKind.NonCapture                     => Right(buildNonCapture(child))
+    case GroupKind.NamedCapture(_, name)          => Left(buildNamedCapture(name, child))
     case GroupKind.Balance(_, _, _)               => Left(buildBalanceGroup(node))
-    case GroupKind.PNamedCapture(_)               => ???
+    case GroupKind.PNamedCapture(name)            => Left(buildPNamedCapture(name, child))
     case _: GroupKind.LookAround                  => ???
     case GroupKind.Atomic(_)                      => Left(buildAtomicGroup(node))
     case GroupKind.NonAtomicPositiveLookAhead(_)  => Left(buildNonAtomicPositiveLookAheadGroup(node))
@@ -143,6 +153,29 @@ private[ir] class IRBuilder(
     case GroupKind.InlineFlag(diff)               => Right(buildInlineFlagGroup(diff, child))
     case GroupKind.ResetFlag(flagSet)             => Right(buildResetFlagGroup(flagSet, child))
     case GroupKind.Absence                        => Left(buildAbsenceGroup(node))
+  }
+
+  def buildIndexedCapture(child: Node): IRNodeData = {
+    val index = nextIndex
+    nextIndex += 1
+    IRNodeData.Capture(index, build(child))
+  }
+
+  def buildNonCapture(child: Node): IRNode =
+    build(child)
+
+  def buildNamedCapture(name: String, child: Node): IRNodeData = {
+    val index = nextIndex
+    nextIndex += 1
+    names += name -> index
+    IRNodeData.Capture(index, build(child))
+  }
+
+  def buildPNamedCapture(name: String, child: Node): IRNodeData = {
+    val index = nextIndex
+    nextIndex += 1
+    names += name -> index
+    IRNodeData.Capture(index, build(child))
   }
 
   def buildBalanceGroup(node: Node): IRNodeData =
