@@ -28,12 +28,18 @@ class IRBuilderSuite extends munit.FunSuite {
 
   val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl, Python, Ruby)
 
-  // Command
+  // Sequence
+  check("", "", All: _*)(Empty)
+  check("(?:)(?:)", "", All: _*)(Sequence(Empty, Empty))
+
+  // Group
   check("()", "", All: _*)(Capture(1, Empty))
   check("(?:)", "", All: _*)(Empty)
   check("(?<x>)", "", DotNet, Java, JavaScript, PCRE, Perl, Ruby)(Capture(1, Empty))
   check("(?'x')", "", DotNet, PCRE, Perl, Ruby)(Capture(1, Empty))
   check("(?P<x>)", "", PCRE, Perl, Python)(Capture(1, Empty))
+
+  // Command
   check("(?R)", "", PCRE, Perl)(Unsupported(NodeData.Command(CommandKind.RCall)))
   check("(?1)", "", PCRE, Perl)(Unsupported(NodeData.Command(CommandKind.IndexedCall(1))))
   check("(?-1)", "", PCRE, Perl)(Unsupported(NodeData.Command(CommandKind.RelativeCall(-1))))

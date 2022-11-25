@@ -5,8 +5,10 @@ import codes.quine.labs.resyntax.ast.NodeData
 /** IRNodeData is a data of internal representation node. */
 sealed abstract class IRNodeData extends Product with Serializable {
   def equalsWithoutLoc(that: IRNodeData): Boolean = (this, that) match {
-    case (IRNodeData.Unsupported(l), IRNodeData.Unsupported(r)) => l.equalsWithoutLoc(r)
+    case (IRNodeData.Sequence(ls), IRNodeData.Sequence(rs)) =>
+      ls.length == rs.length && ls.zip(rs).forall { case (l, r) => l.equalsWithoutLoc(r) }
     case (IRNodeData.Capture(li, l), IRNodeData.Capture(ri, r)) => li == ri && l.equalsWithoutLoc(r)
+    case (IRNodeData.Unsupported(l), IRNodeData.Unsupported(r)) => l.equalsWithoutLoc(r)
     case (l, r)                                                 => l == r
   }
 }
@@ -15,6 +17,14 @@ object IRNodeData {
 
   /** Empty is an empty string pattern. */
   case object Empty extends IRNodeData
+
+  /** Sequence is a sequence of nodes. */
+  final case class Sequence(nodes: Seq[IRNode]) extends IRNodeData
+
+  object Sequence {
+    def apply(nodes: IRNodeData*): IRNodeData =
+      Sequence(nodes.map(IRNode(_)))
+  }
 
   /** Assert is a simple zero-width assertion. */
   final case class Assert(kind: IRAssertKind) extends IRNodeData
@@ -27,6 +37,6 @@ object IRNodeData {
       Capture(index, IRNode(data))
   }
 
-  /** Unsupported is a wrapper of AST node. */
+  /** Unsupported is a wrapper of unsupported AST node. */
   final case class Unsupported(data: NodeData) extends IRNodeData
 }
