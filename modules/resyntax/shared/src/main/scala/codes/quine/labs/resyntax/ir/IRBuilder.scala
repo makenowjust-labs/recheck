@@ -51,17 +51,17 @@ private[ir] class IRBuilder(
 
   def build(node: Node): IRNode = {
     val result = node.data match {
-      case NodeData.Disjunction(_)     => ???
-      case NodeData.Sequence(children) => buildSequence(node, children)
-      case NodeData.Repeat(_, _)       => ???
-      case NodeData.Group(kind, child) => buildGroup(node, kind, child)
-      case NodeData.Command(kind)      => buildCommand(node, kind)
-      case NodeData.Caret              => Left(buildCaret())
-      case NodeData.Dollar             => Left(buildDollar())
-      case NodeData.Dot                => ???
-      case NodeData.Backslash(_)       => ???
-      case NodeData.Class(_, _)        => ???
-      case NodeData.Literal(_)         => ???
+      case NodeData.Disjunction(children) => buildDisjunction(children)
+      case NodeData.Sequence(children)    => buildSequence(children)
+      case NodeData.Repeat(_, _)          => ???
+      case NodeData.Group(kind, child)    => buildGroup(node, kind, child)
+      case NodeData.Command(kind)         => buildCommand(node, kind)
+      case NodeData.Caret                 => Left(buildCaret())
+      case NodeData.Dollar                => Left(buildDollar())
+      case NodeData.Dot                   => ???
+      case NodeData.Backslash(_)          => ???
+      case NodeData.Class(_, _)           => ???
+      case NodeData.Literal(_)            => ???
     }
     result match {
       case Left(data) => IRNode(data, node.loc)
@@ -69,11 +69,13 @@ private[ir] class IRBuilder(
     }
   }
 
-  def buildSequence(node: Node, children: Seq[Node]): Either[IRNodeData, IRNode] =
+  def buildDisjunction(children: Seq[Node]): Either[IRNodeData, IRNode] =
+    Left(IRNodeData.Disjunction(children.map(build)))
+
+  def buildSequence(children: Seq[Node]): Either[IRNodeData, IRNode] =
     children match {
-      case Seq()      => Left(IRNodeData.Empty)
-      case Seq(child) => Right(build(child))
-      case children   => Left(IRNodeData.Sequence(children.map(build)))
+      case Seq()    => Left(IRNodeData.Empty)
+      case children => Left(IRNodeData.Sequence(children.map(build)))
     }
 
   def buildCommand(node: Node, kind: CommandKind): Either[IRNodeData, IRNode] = kind match {

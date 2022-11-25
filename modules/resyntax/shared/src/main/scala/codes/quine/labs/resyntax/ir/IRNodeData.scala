@@ -5,6 +5,8 @@ import codes.quine.labs.resyntax.ast.NodeData
 /** IRNodeData is a data of internal representation node. */
 sealed abstract class IRNodeData extends Product with Serializable {
   def equalsWithoutLoc(that: IRNodeData): Boolean = (this, that) match {
+    case (IRNodeData.Disjunction(ls), IRNodeData.Disjunction(rs)) =>
+      ls.length == rs.length && ls.zip(rs).forall { case (l, r) => l.equalsWithoutLoc(r) }
     case (IRNodeData.Sequence(ls), IRNodeData.Sequence(rs)) =>
       ls.length == rs.length && ls.zip(rs).forall { case (l, r) => l.equalsWithoutLoc(r) }
     case (IRNodeData.Capture(li, ln, l), IRNodeData.Capture(ri, rn, r)) =>
@@ -25,6 +27,14 @@ object IRNodeData {
   object Sequence {
     def apply(nodes: IRNodeData*): IRNodeData =
       Sequence(nodes.map(IRNode(_)))
+  }
+
+  /** Disjunction is a disjuncyion of nodes. */
+  final case class Disjunction(nodes: Seq[IRNode]) extends IRNodeData
+
+  object Disjunction {
+    def apply(nodes: IRNodeData*): IRNodeData =
+      Disjunction(nodes.map(IRNode(_)))
   }
 
   /** Assert is a simple zero-width assertion. */
