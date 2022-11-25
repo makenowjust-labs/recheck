@@ -7,6 +7,7 @@ import codes.quine.labs.resyntax.ast.FlagSetDiff
 import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
+import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ir.IRBuilder.BuildingContext
 
 /** IRBuilder is a builder from AST node to IR. */
@@ -23,7 +24,7 @@ object IRBuilder {
   }
 
   object BuildingContext {
-    def from(flagSet: FlagSet, featureSet: IRFeatureSet): BuildingContext =
+    def from(flagSet: FlagSet): BuildingContext =
       BuildingContext(
         multiline = flagSet.multiline
       )
@@ -43,7 +44,7 @@ private[ir] class IRBuilder(
     private[this] val dialect: Dialect,
     private[this] val featureSet: IRFeatureSet
 ) {
-  var context: BuildingContext = BuildingContext.from(flagSet, featureSet)
+  var context: BuildingContext = BuildingContext.from(flagSet)
 
   var nextIndex: Int = 1
 
@@ -51,17 +52,17 @@ private[ir] class IRBuilder(
 
   def build(node: Node): IRNode = {
     val result = node.data match {
-      case NodeData.Disjunction(children) => buildDisjunction(children)
-      case NodeData.Sequence(children)    => buildSequence(children)
-      case NodeData.Repeat(_, _)          => ???
-      case NodeData.Group(kind, child)    => buildGroup(node, kind, child)
-      case NodeData.Command(kind)         => buildCommand(node, kind)
-      case NodeData.Caret                 => Left(buildCaret())
-      case NodeData.Dollar                => Left(buildDollar())
-      case NodeData.Dot                   => ???
-      case NodeData.Backslash(_)          => ???
-      case NodeData.Class(_, _)           => ???
-      case NodeData.Literal(_)            => ???
+      case NodeData.Disjunction(children)     => buildDisjunction(children)
+      case NodeData.Sequence(children)        => buildSequence(children)
+      case NodeData.Repeat(child, quantifier) => Left(buildRepeat(child, quantifier))
+      case NodeData.Group(kind, child)        => buildGroup(node, kind, child)
+      case NodeData.Command(kind)             => buildCommand(node, kind)
+      case NodeData.Caret                     => Left(buildCaret())
+      case NodeData.Dollar                    => Left(buildDollar())
+      case NodeData.Dot                       => ???
+      case NodeData.Backslash(_)              => ???
+      case NodeData.Class(_, _)               => ???
+      case NodeData.Literal(_)                => ???
     }
     result match {
       case Left(data) => IRNode(data, node.loc)
@@ -77,6 +78,21 @@ private[ir] class IRBuilder(
       case Seq()    => Left(IRNodeData.Empty)
       case children => Left(IRNodeData.Sequence(children.map(build)))
     }
+
+  def buildRepeat(child: Node, quantifier: Quantifier): IRNodeData = {
+    val q = quantifier match {
+      case Quantifier.Star(strategy)                     => IRQuantifier.Unbounded(0, strategy)
+      case Quantifier.Plus(strategy)                     => IRQuantifier.Unbounded(1, strategy)
+      case Quantifier.Question(strategy)                 => IRQuantifier.Bounded(0, 1, strategy)
+      case Quantifier.Exact(n, _)                        => IRQuantifier.Exact(n)
+      case Quantifier.Bounded(min, max, _) if min == max => IRQuantifier.Exact(min)
+      case Quantifier.Bounded(min, max, strategy)        => IRQuantifier.Bounded(min, max, strategy)
+      case Quantifier.MaxBounded(0, _)                   => IRQuantifier.Exact(0)
+      case Quantifier.MaxBounded(max, strategy)          => IRQuantifier.Bounded(0, max, strategy)
+      case Quantifier.Unbounded(min, strategy)           => IRQuantifier.Unbounded(min, strategy)
+    }
+    IRNodeData.Repeat(build(child), q)
+  }
 
   def buildCommand(node: Node, kind: CommandKind): Either[IRNodeData, IRNode] = kind match {
     case CommandKind.InlineFlag(_)          => ???

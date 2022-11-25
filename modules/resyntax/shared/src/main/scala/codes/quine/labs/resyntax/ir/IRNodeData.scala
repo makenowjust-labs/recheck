@@ -9,6 +9,8 @@ sealed abstract class IRNodeData extends Product with Serializable {
       ls.length == rs.length && ls.zip(rs).forall { case (l, r) => l.equalsWithoutLoc(r) }
     case (IRNodeData.Sequence(ls), IRNodeData.Sequence(rs)) =>
       ls.length == rs.length && ls.zip(rs).forall { case (l, r) => l.equalsWithoutLoc(r) }
+    case (IRNodeData.Repeat(l, lq), IRNodeData.Repeat(r, rq)) =>
+      lq == rq && l.equalsWithoutLoc(r)
     case (IRNodeData.Capture(li, ln, l), IRNodeData.Capture(ri, rn, r)) =>
       li == ri && ln == rn && l.equalsWithoutLoc(r)
     case (IRNodeData.Unsupported(l), IRNodeData.Unsupported(r)) => l.equalsWithoutLoc(r)
@@ -29,12 +31,20 @@ object IRNodeData {
       Sequence(nodes.map(IRNode(_)))
   }
 
-  /** Disjunction is a disjuncyion of nodes. */
+  /** Disjunction is a disjunction of nodes. */
   final case class Disjunction(nodes: Seq[IRNode]) extends IRNodeData
 
   object Disjunction {
     def apply(nodes: IRNodeData*): IRNodeData =
       Disjunction(nodes.map(IRNode(_)))
+  }
+
+  /** Repeat is a repetition node. */
+  final case class Repeat(node: IRNode, quantifier: IRQuantifier) extends IRNodeData
+
+  object Repeat {
+    def apply(node: IRNodeData, quantifier: IRQuantifier): IRNodeData =
+      Repeat(IRNode(node), quantifier)
   }
 
   /** Assert is a simple zero-width assertion. */
