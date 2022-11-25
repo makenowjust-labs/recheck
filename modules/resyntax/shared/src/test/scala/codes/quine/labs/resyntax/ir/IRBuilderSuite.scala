@@ -33,11 +33,11 @@ class IRBuilderSuite extends munit.FunSuite {
   check("(?:)(?:)", "", All: _*)(Sequence(Empty, Empty))
 
   // Group
-  check("()", "", All: _*)(Capture(1, Empty))
+  check("()", "", All: _*)(Capture(1, None, Empty))
   check("(?:)", "", All: _*)(Empty)
-  check("(?<x>)", "", DotNet, Java, JavaScript, PCRE, Perl, Ruby)(Capture(1, Empty))
-  check("(?'x')", "", DotNet, PCRE, Perl, Ruby)(Capture(1, Empty))
-  check("(?P<x>)", "", PCRE, Perl, Python)(Capture(1, Empty))
+  check("(?<x>)", "", DotNet, Java, JavaScript, PCRE, Perl, Ruby)(Capture(1, Some("x"), Empty))
+  check("(?'x')", "", DotNet, PCRE, Perl, Ruby)(Capture(1, Some("x"), Empty))
+  check("(?P<x>)", "", PCRE, Perl, Python)(Capture(1, Some("x"), Empty))
 
   // Command
   check("(?R)", "", PCRE, Perl)(Unsupported(NodeData.Command(CommandKind.RCall)))

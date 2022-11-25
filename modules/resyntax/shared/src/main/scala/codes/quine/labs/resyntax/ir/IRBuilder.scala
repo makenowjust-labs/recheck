@@ -46,7 +46,6 @@ private[ir] class IRBuilder(
   var context: BuildingContext = BuildingContext.from(flagSet, featureSet)
 
   var nextIndex: Int = 1
-  var names: Map[String, Int] = Map.empty
 
   def build(): IRNode = build(node)
 
@@ -158,7 +157,7 @@ private[ir] class IRBuilder(
   def buildIndexedCapture(child: Node): IRNodeData = {
     val index = nextIndex
     nextIndex += 1
-    IRNodeData.Capture(index, build(child))
+    IRNodeData.Capture(index, None, build(child))
   }
 
   def buildNonCapture(child: Node): IRNode =
@@ -167,15 +166,13 @@ private[ir] class IRBuilder(
   def buildNamedCapture(name: String, child: Node): IRNodeData = {
     val index = nextIndex
     nextIndex += 1
-    names += name -> index
-    IRNodeData.Capture(index, build(child))
+    IRNodeData.Capture(index, Some(name), build(child))
   }
 
   def buildPNamedCapture(name: String, child: Node): IRNodeData = {
     val index = nextIndex
     nextIndex += 1
-    names += name -> index
-    IRNodeData.Capture(index, build(child))
+    IRNodeData.Capture(index, Some(name), build(child))
   }
 
   def buildBalanceGroup(node: Node): IRNodeData =

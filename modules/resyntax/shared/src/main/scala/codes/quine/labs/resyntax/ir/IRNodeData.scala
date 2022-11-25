@@ -7,7 +7,8 @@ sealed abstract class IRNodeData extends Product with Serializable {
   def equalsWithoutLoc(that: IRNodeData): Boolean = (this, that) match {
     case (IRNodeData.Sequence(ls), IRNodeData.Sequence(rs)) =>
       ls.length == rs.length && ls.zip(rs).forall { case (l, r) => l.equalsWithoutLoc(r) }
-    case (IRNodeData.Capture(li, l), IRNodeData.Capture(ri, r)) => li == ri && l.equalsWithoutLoc(r)
+    case (IRNodeData.Capture(li, ln, l), IRNodeData.Capture(ri, rn, r)) =>
+      li == ri && ln == rn && l.equalsWithoutLoc(r)
     case (IRNodeData.Unsupported(l), IRNodeData.Unsupported(r)) => l.equalsWithoutLoc(r)
     case (l, r)                                                 => l == r
   }
@@ -30,11 +31,11 @@ object IRNodeData {
   final case class Assert(kind: IRAssertKind) extends IRNodeData
 
   /** Capture is a capture group. */
-  final case class Capture(index: Int, node: IRNode) extends IRNodeData
+  final case class Capture(index: Int, name: Option[String], node: IRNode) extends IRNodeData
 
   object Capture {
-    def apply(index: Int, data: IRNodeData): IRNodeData =
-      Capture(index, IRNode(data))
+    def apply(index: Int, name: Option[String], data: IRNodeData): IRNodeData =
+      Capture(index, name, IRNode(data))
   }
 
   /** Unsupported is a wrapper of unsupported AST node. */
