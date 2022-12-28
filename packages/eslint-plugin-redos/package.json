@@ -35,7 +35,7 @@
     "@types/node": "18.11.9",
     "esbuild": "0.16.12",
     "esbuild-jest": "0.5.0",
-    "esbuild-register": "3.4.1",
+    "esbuild-register": "3.4.2",
     "eslint": "8.30.0",
     "jest": "29.3.1",
     "prettier": "2.8.1",

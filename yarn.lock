@@ -7664,10 +7664,10 @@ esbuild-jest@0.5.0:
     "@babel/plugin-transform-modules-commonjs" "^7.12.13"
     babel-jest "^26.6.3"
 
-esbuild-register@3.4.1:
-  version "3.4.1"
-  resolved "https://registry.yarnpkg.com/esbuild-register/-/esbuild-register-3.4.1.tgz#fe10cd774b56471db47365ce41d607ab5bdeb713"
-  integrity sha512-iCgs88/1wA5dIRx4i65eSjbkgrQQQJGpY6Z1eD2XPlzrSjbgNtfkw2/rfSMzJ4dTtlOD8EZTxrIA3fyYp0FsMA==
+esbuild-register@3.4.2:
+  version "3.4.2"
+  resolved "https://registry.yarnpkg.com/esbuild-register/-/esbuild-register-3.4.2.tgz#1e39ee0a77e8f320a9790e68c64c3559620b9175"
+  integrity sha512-kG/XyTDyz6+YDuyfB9ZoSIOOmgyFCH+xPRtsCa8W85HLRV5Csp+o3jWVbOSHgSLfyLc5DmP+KFDNwty4mEjC+Q==
   dependencies:
     debug "^4.3.4"
 
