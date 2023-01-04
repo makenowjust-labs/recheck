@@ -1,3 +1,9 @@
+# dev
+
+Misc:
+
+- [#700](https://github.com/makenowjust-labs/recheck/pull/700) Update workflow for using coursier/setup-action ([@makenowjust](https://github.com/makenowjust))
+
 # 4.4.2 (2023-01-05)
 
 New Features:
