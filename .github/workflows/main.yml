@@ -16,9 +16,9 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - uses: olafurpg/setup-scala@v13
+      - uses: coursier/setup-action@v1
         with:
-          java-version: adopt@1.16
+          jvm: adoptium:1.19.0.1
       - name: Cache SBT
         uses: actions/cache@v3
         with:
@@ -54,9 +54,9 @@ jobs:
     name: Scala Lint
     steps:
       - uses: actions/checkout@v3
-      - uses: olafurpg/setup-scala@v13
+      - uses: coursier/setup-action@v1
         with:
-          java-version: adopt@1.16
+          jvm: adoptium:1.19.0.1
       - name: Cache SBT
         uses: actions/cache@v3
         with:
@@ -97,9 +97,9 @@ jobs:
     name: Scala Test
     steps:
       - uses: actions/checkout@v3
-      - uses: olafurpg/setup-scala@v13
+      - uses: coursier/setup-action@v1
         with:
-          java-version: adopt@1.16
+          jvm: adoptium:1.19.0.1
       - uses: actions/setup-node@v3
         with:
           node-version: '18'
@@ -165,9 +165,9 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - uses: olafurpg/setup-scala@v13
+      - uses: coursier/setup-action@v1
         with:
-          java-version: adopt@1.16
+          jvm: adoptium:1.19.0.1
       - name: Cache SBT
         uses: actions/cache@v3
         with:
@@ -204,9 +204,9 @@ jobs:
         with:
           fetch-depth: 0
       - uses: olafurpg/setup-gpg@v3
-      - uses: olafurpg/setup-scala@v13
+      - uses: coursier/setup-action@v1
         with:
-          java-version: adopt@1.16
+          jvm: adoptium:1.19.0.1
       - name: Cache SBT
         uses: actions/cache@v3
         with:
@@ -238,9 +238,9 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - uses: olafurpg/setup-scala@v13
+      - uses: coursier/setup-action@v1
         with:
-          java-version: adopt@1.16
+          jvm: adoptium:1.19.0.1
       - uses: actions/setup-node@v3
         with:
           node-version: '18'
@@ -299,19 +299,15 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: recheck.jar
-          path: packages/recheck-jar/
       - uses: actions/download-artifact@v3
         with:
           name: recheck-darwin-x64
-          path: packages/recheck-macos-x64/
       - uses: actions/download-artifact@v3
         with:
           name: recheck-linux-x64
-          path: packages/recheck-linux-x64/
       - uses: actions/download-artifact@v3
         with:
           name: recheck-win32-x64.exe
-          path: packages/recheck-windows-x64/
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
