@@ -40,7 +40,15 @@ Because it is just an ESLint plugin, you should install `eslint` package of cour
 
 ## Usage
 
-To enable the plugin, you should add such a following configuration to your `.eslintrc.json` for example.
+To enable the plugin, you should add the following configuration to your `.eslintrc.json`.
+
+```json title=".eslintrc.json"
+{
+  "extends": ["plugin:redos/recommended"]
+}
+```
+
+Or, you could add the following manual configuration.
 
 ```json title=".eslintrc.json"
 {
@@ -51,7 +59,7 @@ To enable the plugin, you should add such a following configuration to your `.es
 }
 ```
 
-This plugin contains the only rule `redos/no-vulnerable`.
+This plugin contains the only one rule **`redos/no-vulnerable`**.
 
 :::note
 
@@ -63,10 +71,7 @@ Therefore, to reduce unnecessary computation time, we recommend adding such a fo
 
 ```json title=".eslintrc.json"
 {
-  "plugins": ["redos"],
-  "rules": {
-    "redos/no-vulnerable": "error"
-  },
+  "extends": ["plugin:redos/recommended"]
   "overrides": [
     {
       "files": ["**/*.test.js"],
