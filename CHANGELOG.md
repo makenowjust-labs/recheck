@@ -1,5 +1,9 @@
 # dev
 
+New Features:
+
+- [#698](https://github.com/makenowjust-labs/recheck/pull/698) Add `recommended` config to the ESLint plugin ([@makenowjust](https://github.com/makenowjust))
+
 Misc:
 
 - [#501](https://github.com/makenowjust-labs/recheck/pull/501) Convert duration params to integer explicitly on playground ([@makenowjust](https://github.com/makenowjust))
