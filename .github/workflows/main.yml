@@ -289,6 +289,38 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+  release:
+    needs: [maven-release, npm-release]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    name: Publish GitHub Release
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          name: recheck.jar
+          path: packages/recheck-jar/
+      - uses: actions/download-artifact@v3
+        with:
+          name: recheck-darwin-x64
+          path: packages/recheck-macos-x64/
+      - uses: actions/download-artifact@v3
+        with:
+          name: recheck-linux-x64
+          path: packages/recheck-linux-x64/
+      - uses: actions/download-artifact@v3
+        with:
+          name: recheck-win32-x64.exe
+          path: packages/recheck-windows-x64/
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            recheck.jar
+            recheck-darwin-x64
+            recheck-linux-x64
+            recheck-win32-x64.exe
+
   gh-pages:
     needs: [build]
     if: github.ref_name == 'main'
