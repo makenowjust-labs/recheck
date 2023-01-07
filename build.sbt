@@ -1,5 +1,6 @@
 Global / onChangedBuildSource := ReloadOnSourceChanges
 Global / excludeLintKeys += nativeImageVersion
+Global / excludeLintKeys += nativeImageJvm
 
 ThisBuild / organization := "codes.quine.labs"
 ThisBuild / homepage := Some(url("https://github.com/makenowjust-labs/recheck"))
@@ -415,7 +416,8 @@ lazy val cli = project
     Compile / mainClass := Some("codes.quine.labs.recheck.cli.Main"),
     assembly / mainClass := (Compile / mainClass).value,
     assembly / assemblyJarName := "recheck.jar",
-    nativeImageVersion := "21.3.0",
+    nativeImageVersion := "22.3.0",
+    nativeImageJvm := "graalvm-java17",
     nativeImageOptions ++= List(
       "--no-fallback",
       "--initialize-at-build-time=java",
