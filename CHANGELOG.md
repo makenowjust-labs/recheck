@@ -4,6 +4,7 @@ Misc:
 
 - [#700](https://github.com/makenowjust-labs/recheck/pull/700) Update workflow for using coursier/setup-action ([@makenowjust](https://github.com/makenowjust))
 - [#705](https://github.com/makenowjust-labs/recheck/pull/705) Update GraalVM version ([@makenowjust](https://github.com/makenowjust))
+- [#711](https://github.com/makenowjust-labs/recheck/pull/711) Update copyright year 2022 -> 2023 ([@makenowjust](https://github.com/makenowjust))
 
 # 4.4.2 (2023-01-05)
 
