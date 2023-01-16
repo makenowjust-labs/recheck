@@ -3,7 +3,7 @@
   "name": "website",
   "version": "0.0.0",
   "scripts": {
-    "build": "docusaurus build",
+    "doc": "docusaurus build",
     "format": "prettier -w '*.{js,json}' 'src/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
     "lint": "prettier --check '*.{js,json}' 'src/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
     "start": "docusaurus start"

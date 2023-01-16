@@ -19,6 +19,7 @@ const main = async () => {
     entryPoints: ["src/main.ts"],
     bundle: true,
     format: "cjs",
+    target: "es2016",
     platform: "node",
     plugins: [makeAllPackagesExternalPlugin],
     outfile: "lib/main.js",
