@@ -119,12 +119,15 @@ jobs:
   node-test:
     needs: [build, node-lint]
     runs-on: ubuntu-latest
-    name: Node Test
+    strategy:
+      matrix:
+        node: [ 14, 16, 18 ]
+    name: Node v${{ matrix.node }} Test
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: ${{ matrix.node }}
           cache: 'yarn'
       - name: Install
         run: yarn install --frozen-lockfile
