@@ -1,5 +1,9 @@
 # dev
 
+Fixes:
+
+- [#720](https://github.com/makenowjust-labs/recheck/pull/720) Correctly fix `esbuild` config for Node v14 ([@makenowjust](https://github.com/makenowjust))
+
 Misc:
 
 - [#700](https://github.com/makenowjust-labs/recheck/pull/700) Update workflow for using coursier/setup-action ([@makenowjust](https://github.com/makenowjust))
