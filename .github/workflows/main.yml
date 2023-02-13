@@ -38,7 +38,7 @@ jobs:
       - id: save-version
         name: Save Version
         run: |
-          version="$(sbt --error "print coreJVM/releaseVersion" | head -c -1)"
+          version="$(sbt --error "print coreJVM/releaseVersion" | head -n1)"
           echo -n "version=$version"
           echo -n "version=$version" >> $GITHUB_OUTPUT
       - uses: actions/upload-artifact@v3
