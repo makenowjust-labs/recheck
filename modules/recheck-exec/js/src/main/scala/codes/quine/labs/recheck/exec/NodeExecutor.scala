@@ -1,6 +1,4 @@
 package codes.quine.labs.recheck.exec
-
-import scala.annotation.nowarn
 import scala.concurrent.duration.FiniteDuration
 
 import codes.quine.labs.recheck.common.Context
