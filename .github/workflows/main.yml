@@ -309,23 +309,33 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: recheck.jar
+          path: packages/recheck-jar/
       - uses: actions/download-artifact@v3
         with:
           name: recheck-darwin-x64
+          path: packages/recheck-macos-x64/
       - uses: actions/download-artifact@v3
         with:
           name: recheck-linux-x64
+          path: packages/recheck-linux-x64/
       - uses: actions/download-artifact@v3
         with:
           name: recheck-win32-x64.exe
+          path: packages/recheck-windows-x64/
+      - name: Rename files
+        run: |
+          mv packages/recheck-jar/recheck.jar recheck.jar
+          mv packages/recheck-macos-x64/recheck recheck-macos-x64
+          mv packages/recheck-linux-x64/recheck recheck-linux-x64
+          mv packages/recheck-windows-x64/recheck.exe recheck-windows-x64.exe
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             recheck.jar
-            recheck-darwin-x64
+            recheck-macos-x64
             recheck-linux-x64
-            recheck-win32-x64.exe
+            recheck-windows-x64.exe
 
   gh-pages:
     needs: [build]
