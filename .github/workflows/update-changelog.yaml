@@ -8,7 +8,7 @@ on:
 
 jobs:
   update-changelog:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Update CHANGELOG.md
     if: github.event.pull_request.merged == true
     steps:

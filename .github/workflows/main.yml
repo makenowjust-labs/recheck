@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Scala Build
     outputs:
       version: ${{ steps.save-version.outputs.version }}
@@ -50,7 +50,7 @@ jobs:
 
   scala-lint:
     needs: [build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Scala Lint
     steps:
       - uses: actions/checkout@v3
@@ -75,7 +75,7 @@ jobs:
         run: sbt scalafmtCheckAll scalafmtSbtCheck 'scalafixAll --check'
 
   node-lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Node Lint
     steps:
       - uses: actions/checkout@v3
@@ -93,7 +93,7 @@ jobs:
           yarn lerna run typecheck
 
   scala-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Scala Test
     steps:
       - uses: actions/checkout@v3
@@ -118,7 +118,7 @@ jobs:
 
   node-test:
     needs: [build, node-lint]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
         node: [ 14, 16, 18 ]
@@ -158,15 +158,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macOS-latest, ubuntu-latest, windows-latest]
+        os: [macos-12, ubuntu-20.04, windows-2022]
         include:
-          - os: macOS-latest
+          - os: macos-12
             artifact_filename: recheck-darwin-x64
             local_path: modules/recheck-cli/target/native-image/recheck
-          - os: ubuntu-latest
+          - os: ubuntu-20.04
             artifact_filename: recheck-linux-x64
             local_path: modules/recheck-cli/target/native-image/recheck
-          - os: windows-latest
+          - os: windows-2022
             artifact_filename: recheck-win32-x64.exe
             local_path: modules/recheck-cli/target/native-image/recheck.exe
     steps:
@@ -190,9 +190,9 @@ jobs:
           path: |
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
-      - if: matrix.os != 'windows-latest'
+      - if: matrix.os != 'windows-2022'
         run: sbt cli/nativeImage
-      - if: matrix.os == 'windows-latest'
+      - if: matrix.os == 'windows-2022'
         name: Run sbt cli/nativeImage
         shell: cmd
         run: >-
@@ -205,7 +205,7 @@ jobs:
   maven-release:
     needs: [build, scala-test]
     if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Publish to Maven Central
     steps:
       - uses: actions/checkout@v3
@@ -240,7 +240,7 @@ jobs:
   npm-release:
     needs: [build, native-build, node-test]
     if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Publish to NPM
     steps:
       - uses: actions/checkout@v3
@@ -300,7 +300,7 @@ jobs:
   release:
     needs: [maven-release, npm-release]
     if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Publish GitHub Release
     steps:
       - uses: actions/checkout@v3
@@ -328,7 +328,7 @@ jobs:
   gh-pages:
     needs: [build]
     if: github.ref_name == 'main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Deploy to GitHub Pages
     steps:
       - uses: actions/checkout@v3
