@@ -4,6 +4,10 @@ Fixes:
 
 - [#760](https://github.com/makenowjust-labs/recheck/pull/760) Pin the version of the CI environments for preventing GLIBC version warning ([@makenowjust](https://github.com/makenowjust))
 
+Misc:
+
+- [#761](https://github.com/makenowjust-labs/recheck/pull/761) Use `$GITHUB_OUTPUT` instead of `set-output` ([@makenowjust](https://github.com/makenowjust))
+
 # 4.4.3 (2023-01-23)
 
 Fixes:
