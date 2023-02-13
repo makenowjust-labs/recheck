@@ -3,6 +3,7 @@
 Fixes:
 
 - [#760](https://github.com/makenowjust-labs/recheck/pull/760) Pin the version of the CI environments for preventing GLIBC version warning ([@makenowjust](https://github.com/makenowjust))
+- [#764](https://github.com/makenowjust-labs/recheck/pull/764) Remove deprecated `System.runFinalizer` call ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
