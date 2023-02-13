@@ -14,7 +14,7 @@ class ReDoSJSSuite extends munit.FunSuite {
       ReDoSJS.check("^foo$", "", js.Dynamic.literal(checker = "fuzz")).asInstanceOf[js.Dictionary[String]]("status"),
       "safe"
     )
-    interceptMessage[DecodingFailure]("Unknown checker: invalid: DownField(checker)") {
+    interceptMessage[DecodingFailure]("DecodingFailure at .checker: Unknown checker: invalid") {
       ReDoSJS.check("^foo$", "", js.Dynamic.literal(checker = "invalid"))
     }
 
