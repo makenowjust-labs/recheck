@@ -7,6 +7,7 @@ Fixes:
 Misc:
 
 - [#761](https://github.com/makenowjust-labs/recheck/pull/761) Use `$GITHUB_OUTPUT` instead of `set-output` ([@makenowjust](https://github.com/makenowjust))
+- [#753](https://github.com/makenowjust-labs/recheck/pull/753) Update circe-core, circe-generic, ... to 0.14.4 ([@makenowjust](https://github.com/makenowjust))
 
 # 4.4.3 (2023-01-23)
 
