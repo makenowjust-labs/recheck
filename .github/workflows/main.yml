@@ -38,7 +38,9 @@ jobs:
       - id: save-version
         name: Save Version
         run: |
-          echo "version=$(sbt --error "print coreJVM/releaseVersion")" >> $GITHUB_OUTPUT
+          echo "version<<EOF" >> $GITHUB_OUTPUT
+          echo "$(sbt --error "print coreJVM/releaseVersion")" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       - uses: actions/upload-artifact@v3
         with:
           path: modules/recheck-js/target/scala-2.13/recheck-js-opt/recheck.js
