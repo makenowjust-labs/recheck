@@ -8,7 +8,7 @@ on:
 
 jobs:
   scala-steward:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Scala Steward
     steps:
       - name: Launch Scala Steward
