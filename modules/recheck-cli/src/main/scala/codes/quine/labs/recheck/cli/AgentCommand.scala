@@ -106,7 +106,6 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio) {
   /** Enforces GC. */
   def gc(): Unit = {
     System.gc()
-    System.runFinalization()
   }
 
   def run(): Unit =
