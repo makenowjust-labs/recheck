@@ -211,32 +211,32 @@ jobs:
     name: Publish to Maven Central
     steps:
       - uses: actions/checkout@v3
-#        with:
-#          fetch-depth: 0
-#      - uses: coursier/setup-action@v1
-#        with:
-#          jvm: adoptium:1.19.0.1
-#      - name: Cache SBT
-#        uses: actions/cache@v3
-#        with:
-#          path: |
-#            ~/.ivy2/cache
-#            ~/.cache/coursier
-#            ~/.sbt
-#          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
-#      - name: Cache Build Files
-#        uses: actions/cache@v3
-#        with:
-#          path: |
-#            **/target
-#          key: ${{ runner.os }}-build-${{ github.sha }}
-#      - name: Publish
-#        run: sbt ci-release
-#        env:
-#          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
-#          PGP_SECRET: ${{ secrets.PGP_SECRET }}
-#          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-#          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+        with:
+          fetch-depth: 0
+      - uses: coursier/setup-action@v1
+        with:
+          jvm: adoptium:1.19.0.1
+      - name: Cache SBT
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.cache/coursier
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
+      - name: Cache Build Files
+        uses: actions/cache@v3
+        with:
+          path: |
+            **/target
+          key: ${{ runner.os }}-build-${{ github.sha }}
+      - name: Publish
+        run: sbt ci-release
+        env:
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+          PGP_SECRET: ${{ secrets.PGP_SECRET }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
 
   npm-release:
     needs: [build, native-build, node-test]
@@ -245,58 +245,58 @@ jobs:
     name: Publish to NPM
     steps:
       - uses: actions/checkout@v3
-#        with:
-#          fetch-depth: 0
-#      - uses: coursier/setup-action@v1
-#        with:
-#          jvm: adoptium:1.19.0.1
-#      - uses: actions/setup-node@v3
-#        with:
-#          node-version: '18'
-#          cache: 'yarn'
-#          registry-url: 'https://registry.npmjs.org'
-#      - name: Cache SBT
-#        uses: actions/cache@v3
-#        with:
-#          path: |
-#            ~/.ivy2/cache
-#            ~/.cache/coursier
-#            ~/.sbt
-#          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
-#      - name: Cache Build Files
-#        uses: actions/cache@v3
-#        with:
-#          path: |
-#            **/target
-#          key: ${{ runner.os }}-build-${{ github.sha }}
-#      - name: Install
-#        run: yarn install --frozen-lockfile
-#      - uses: actions/download-artifact@v3
-#        with:
-#          name: recheck.js
-#          path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
-#      - uses: actions/download-artifact@v3
-#        with:
-#          name: recheck.jar
-#          path: packages/recheck-jar/
-#      - uses: actions/download-artifact@v3
-#        with:
-#          name: recheck-darwin-x64
-#          path: packages/recheck-macos-x64/
-#      - uses: actions/download-artifact@v3
-#        with:
-#          name: recheck-linux-x64
-#          path: packages/recheck-linux-x64/
-#      - uses: actions/download-artifact@v3
-#        with:
-#          name: recheck-win32-x64.exe
-#          path: packages/recheck-windows-x64/
-#      - name: Build
-#        run: NODE_ENV=production yarn lerna run build
-#      - name: Publish
-#        run: yarn lerna publish ${{ needs.build.outputs.version }} --yes
-#        env:
-#          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        with:
+          fetch-depth: 0
+      - uses: coursier/setup-action@v1
+        with:
+          jvm: adoptium:1.19.0.1
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'yarn'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Cache SBT
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.cache/coursier
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
+      - name: Cache Build Files
+        uses: actions/cache@v3
+        with:
+          path: |
+            **/target
+          key: ${{ runner.os }}-build-${{ github.sha }}
+      - name: Install
+        run: yarn install --frozen-lockfile
+      - uses: actions/download-artifact@v3
+        with:
+          name: recheck.js
+          path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
+      - uses: actions/download-artifact@v3
+        with:
+          name: recheck.jar
+          path: packages/recheck-jar/
+      - uses: actions/download-artifact@v3
+        with:
+          name: recheck-darwin-x64
+          path: packages/recheck-macos-x64/
+      - uses: actions/download-artifact@v3
+        with:
+          name: recheck-linux-x64
+          path: packages/recheck-linux-x64/
+      - uses: actions/download-artifact@v3
+        with:
+          name: recheck-win32-x64.exe
+          path: packages/recheck-windows-x64/
+      - name: Build
+        run: NODE_ENV=production yarn lerna run build
+      - name: Publish
+        run: yarn lerna publish ${{ needs.build.outputs.version }} --yes
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   release:
     needs: [maven-release, npm-release]
