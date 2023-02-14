@@ -1,5 +1,9 @@
 # dev
 
+Fixes:
+
+- [#768](https://github.com/makenowjust-labs/recheck/pull/768) Show `stderr` output of agent processes ([@makenowjust](https://github.com/makenowjust))
+
 Misc:
 
 - [#767](https://github.com/makenowjust-labs/recheck/pull/767) Fix links in doc comments ([@makenowjust](https://github.com/makenowjust))
