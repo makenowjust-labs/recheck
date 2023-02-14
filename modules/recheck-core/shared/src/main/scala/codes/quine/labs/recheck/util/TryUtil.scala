@@ -5,7 +5,7 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-/** Utilities for [[scala.util.Try]]. */
+/** Utilities for `Try`. */
 object TryUtil {
 
   /** Applies sequence values to a function and collects the results. */

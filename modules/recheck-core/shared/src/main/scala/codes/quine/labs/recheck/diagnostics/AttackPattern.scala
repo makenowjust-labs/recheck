@@ -36,7 +36,7 @@ final case class AttackPattern(pumps: Seq[(UString, UString, Int)], suffix: UStr
     copy(n = n)
   }
 
-  /** Returns the [[UString]]] represented by this. */
+  /** Returns the `UString` represented by this. */
   def asUString: UString = {
     val str = new StringBuilder
 
