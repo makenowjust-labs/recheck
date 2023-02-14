@@ -149,7 +149,7 @@ export async function start(
   return await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       windowsHide: true,
-      stdio: ["pipe", "pipe", "ignore"],
+      stdio: ["pipe", "pipe", "inherit"],
     });
 
     const onClose = () => reject(new Error("process is closed"));
