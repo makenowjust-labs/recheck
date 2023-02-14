@@ -1,3 +1,9 @@
+# dev
+
+Misc:
+
+- [#767](https://github.com/makenowjust-labs/recheck/pull/767) Fix links in doc comments ([@makenowjust](https://github.com/makenowjust))
+
 # 4.4.4 (2023-02-14)
 
 Fixes:
