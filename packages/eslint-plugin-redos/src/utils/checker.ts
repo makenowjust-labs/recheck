@@ -53,6 +53,9 @@ export const createCachedCheck = (
 
       // Purge the cache if it is invalidated.
       if (!util.isDeepStrictEqual(cacheData.settings, settings)) {
+        try {
+          fs.rmSync(cacheFile);
+        } catch {}
         cacheData = {
           settings,
           results: {},
@@ -90,6 +93,7 @@ export const createCachedCheck = (
 
     if (cacheFile) {
       cacheData.results[key] = result;
+      // TODO: Delay the writing out the cache.
       fs.writeFileSync(cacheFile, JSON.stringify(cacheData));
     }
 

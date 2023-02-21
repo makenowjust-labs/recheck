@@ -31,23 +31,17 @@ const rule: Rule.RuleModule = {
             uniqueItems: true,
           },
           cache: {
-            oneOf: [
-              {
-                type: "boolean",
+            type: ["boolean", "object"],
+            properties: {
+              location: {
+                type: "string",
               },
-              {
-                properties: {
-                  location: {
-                    type: "string",
-                  },
-                  strategy: {
-                    type: "string",
-                    enum: ["aggressive", "conservative"],
-                  },
-                },
-                additionalProperties: false,
+              strategy: {
+                type: "string",
+                enum: ["aggressive", "conservative"],
               },
-            ],
+            },
+            additionalProperties: false,
           },
           accelerationMode: {
             type: "string",
