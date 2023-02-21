@@ -86,8 +86,16 @@ Therefore, to reduce unnecessary computation time, we recommend adding such a fo
 The above settings disables the `redos/no-vulnerable` rule against test files.
 Since ReDoS vulnerabilities in test codes are not critical problems, it will be no problem in many cases.
 
-Alternatively, you can use rules that use lightweight (but imperfect) analysis methods such as [`regexp/no-super-linear-backtracking`](https://ota-meshi.github.io/eslint-plugin-regexp/rules/no-super-linear-backtracking.html) included in `eslint-plugin-regexp` during development,
-and use this plugin in CI.
+Alternatively, it is useful to set `cache` option. It makes the second run faster, so it improves responces of a linting on editor for example.
+
+```json title=".eslintrc.json"
+{
+  "plugins": ["redos"],
+  "rules": {
+    "redos/no-vulnerable": ["error", { "cache": true }]
+  }
+}
+```
 
 :::
 
@@ -134,6 +142,7 @@ The following is the default configuration.
       "ignoreErrors": true,
       "permittableComplexities": [],
       "timeout": 10000,
+      "cache": false,
       "checker": "auto"
     }
   ]
@@ -144,8 +153,8 @@ The following is the default configuration.
 
 Note that the plugin accepts all parameter values listed in [this page](parameters.md).
 
-In addition, `ignoreErrors` and `premittableComplexities` are only available in ESLint plugin.
-They specify error reporting policiy.
+In addition, `ignoreErrors`, `premittableComplexities` and `cache` are only available in ESLint plugin.
+They specify error reporting and caching policiy.
 
 :::
 
@@ -175,6 +184,23 @@ We strongly recommend considering `'polynomial'` matching complexity RegExp as R
 This option specifies a time-out limit for ReDoS analyzing. A time unit is milliseconds. If `null` is specified, it means unlimited time-out.
 
 The default value is `10000` (10 seconds).
+
+#### `cache`
+
+This flag/option is used to determine to cache results of the ReDoS checker.
+This can take a boolean value or an object value.
+The boolean value enables/disables the caching feature, and caching options are default in this case.
+The object value enables the caching feature, and it specifies following caching options:
+
+- `cache.location`:
+  A location of cache file. (Default: `node_modules/.cache/eslint-plugin-redos/recheck-cache.json`)
+- `cache.strategy`:
+  A strategy to cache results. The following values are available.
+
+  - `'aggressive'` (default): Cache all results. Some checker (e.g. fuzzing checker) cause false-negative, so it is a bit unsafe.
+  - `'conservative'`: Cache only correct results. In other words, only results reported by the automaton checker are cached.
+
+When the parameters for `recheck` or the version of `recheck` is updated, cached results are invalidated.
 
 #### `checker`
 
