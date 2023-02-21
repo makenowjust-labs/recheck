@@ -2,9 +2,12 @@ import { Rule } from "eslint";
 import type ESTree from "estree";
 import * as ReDoS from "recheck";
 
+import { CacheOptions, createCachedCheck } from "../utils/checker";
+
 type Options = {
-  ignoreErrors: boolean;
+  ignoreErrors?: boolean;
   permittableComplexities?: ("polynomial" | "exponential")[];
+  cache?: boolean | CacheOptions;
 } & Omit<ReDoS.Parameters, "logger">;
 
 const rule: Rule.RuleModule = {
@@ -26,6 +29,25 @@ const rule: Rule.RuleModule = {
             },
             additionalItems: false,
             uniqueItems: true,
+          },
+          cache: {
+            oneOf: [
+              {
+                type: "boolean",
+              },
+              {
+                properties: {
+                  location: {
+                    type: "string",
+                  },
+                  strategy: {
+                    type: "string",
+                    enum: ["aggressive", "conservative"],
+                  },
+                },
+                additionalProperties: false,
+              },
+            ],
           },
           accelerationMode: {
             type: "string",
@@ -122,11 +144,13 @@ const rule: Rule.RuleModule = {
       ignoreErrors = true,
       permittableComplexities = [],
       timeout = 10000,
+      cache = false,
       ...params
     } = options;
+    const cachedCheck = createCachedCheck(cache, timeout, params);
 
     const check = (node: ESTree.Node, source: string, flags: string) => {
-      const result = ReDoS.checkSync(source, flags, { timeout, ...params });
+      const result = cachedCheck(source, flags);
       switch (result.status) {
         case "safe":
           break;
