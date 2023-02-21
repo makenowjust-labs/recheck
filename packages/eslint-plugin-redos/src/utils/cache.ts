@@ -2,11 +2,20 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
-import findCacheDir from "find-cache-dir";
-
 const findDefaultCacheFile = (): string => {
-  const cacheDir =
-    findCacheDir({ name: "eslint-plugin-redos", create: true }) || os.tmpdir();
+  let cacheDir: string | null = null;
+  try {
+    const nodeModuleDir = path.join(
+      require.resolve("eslint-plugin-redos/package.json"),
+      "../.."
+    );
+    cacheDir = path.join(nodeModuleDir, ".cache/eslint-plugin-redos");
+    fs.mkdirSync(cacheDir, { recursive: true });
+  } catch {
+    cacheDir = null;
+  }
+  cacheDir ??= os.tmpdir();
+
   const cacheFile = path.join(cacheDir, "recheck-cache.json");
   return cacheFile;
 };
