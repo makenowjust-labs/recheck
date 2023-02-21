@@ -1,3 +1,9 @@
+# dev
+
+Misc:
+
+- [#776](https://github.com/makenowjust-labs/recheck/pull/776) Fix heading in blog articles ([@makenowjust](https://github.com/makenowjust))
+
 # 4.4.5 (2023-02-15)
 
 Fixes:
