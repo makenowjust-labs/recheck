@@ -1,5 +1,9 @@
 # dev
 
+New Features:
+
+- [#775](https://github.com/makenowjust-labs/recheck/pull/775) Add `cache` option to `eslint-plugin-redos` ([@makenowjust](https://github.com/makenowjust))
+
 Misc:
 
 - [#776](https://github.com/makenowjust-labs/recheck/pull/776) Fix heading in blog articles ([@makenowjust](https://github.com/makenowjust))
