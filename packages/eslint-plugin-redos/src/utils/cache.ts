@@ -5,8 +5,11 @@ import * as path from "path";
 const findDefaultCacheFile = (): string => {
   let cacheDir: string | null = null;
   try {
-    const nodeModuleDir = path.join(require.resolve('eslint-plugin-redos/package.json'), '../..');
-    cacheDir = path.join(nodeModuleDir, '.cache/eslint-plugin-redos');
+    const nodeModuleDir = path.join(
+      require.resolve("eslint-plugin-redos/package.json"),
+      "../.."
+    );
+    cacheDir = path.join(nodeModuleDir, ".cache/eslint-plugin-redos");
     fs.mkdirSync(cacheDir, { recursive: true });
   } catch {
     cacheDir = null;
