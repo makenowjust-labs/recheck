@@ -1,10 +1,9 @@
 name: Scala Steward
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: '0 0 * * 5'
-  repository_dispatch:
-    types: [scala-steward]
 
 jobs:
   scala-steward:
