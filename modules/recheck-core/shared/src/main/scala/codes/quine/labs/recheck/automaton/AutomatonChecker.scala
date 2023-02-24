@@ -24,7 +24,7 @@ object AutomatonChecker {
 private final class AutomatonChecker[A, Q](
     private[this] val nfa: OrderedNFA[A, Q],
     val maxNFASize: Int
-)(implicit private[this] implicit val ctx: Context) {
+)(implicit private[this] val ctx: Context) {
 
   // Introduces `ctx` methods into the scope.
   import ctx._
