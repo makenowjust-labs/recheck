@@ -11,6 +11,7 @@ Fixes:
 Misc:
 
 - [#776](https://github.com/makenowjust-labs/recheck/pull/776) Fix heading in blog articles ([@makenowjust](https://github.com/makenowjust))
+- [#781](https://github.com/makenowjust-labs/recheck/pull/781) Fix OS version of scala-steward CI for `GLIBC` version problem ([@makenowjust](https://github.com/makenowjust))
 
 # 4.4.5 (2023-02-15)
 
