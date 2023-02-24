@@ -1,14 +1,13 @@
 name: Scala Steward
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: '0 0 * * 5'
-  repository_dispatch:
-    types: [scala-steward]
 
 jobs:
   scala-steward:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     name: Scala Steward
     steps:
       - name: Launch Scala Steward
