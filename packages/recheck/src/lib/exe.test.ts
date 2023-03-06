@@ -1,7 +1,7 @@
 import * as exe from "./exe";
 
 const isSupported =
-  typeof exe.osNames[process.platform] !== "undefined" ||
+  typeof exe.osNames[process.platform] !== "undefined" &&
   typeof exe.cpuNames[process.arch] !== "undefined";
 
 beforeEach(() => {
