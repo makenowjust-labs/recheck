@@ -14,7 +14,7 @@ afterEach(() => {
 
 test("strategy: default", () => {
   const checker = createCachedCheck({ location: cacheFile }, null, {
-    checker: "fuzz",
+    checker: "automaton",
   });
   const result = checker("^a$", "");
   expect(JSON.parse(fs.readFileSync(cacheFile, "utf-8")).results).toEqual({
