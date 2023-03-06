@@ -145,7 +145,7 @@ export class Agent {
 export async function start(
   command: string,
   args: string[] = [],
-  stdio: (StdioPipe | StdioNull)[] = ["pipe", "pipe", "inherit"],
+  stdio: (StdioPipe | StdioNull)[] = ["pipe", "pipe", "inherit"]
 ): Promise<Agent> {
   return await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
