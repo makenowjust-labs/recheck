@@ -33,7 +33,7 @@ export const createCachedCheck = (
 ): Checker => {
   const {
     location: cacheLocation = undefined,
-    strategy: cacheStrategy = "aggressive",
+    strategy: cacheStrategy = "conservative",
   } = typeof cache === "boolean" ? {} : cache;
   const cacheFile = cache ? findCacheFile(cacheLocation) : null;
 
