@@ -1,11 +1,12 @@
+import { StdioNull, StdioPipe } from "child_process";
 import { check as checkAgent, start as startAgent, Agent } from "./agent";
 
 const invalid = `${__dirname}/__test__/invalid.js`;
 const testAgent = `${__dirname}/__test__/test-agent.js`;
 
 let agent: Agent | null = null;
-const start = async (command: string, args: string[] = []) => {
-  agent = await startAgent(command, args);
+const start = async (command: string, args: string[] = [], stdio: (StdioPipe | StdioNull)[] = ["pipe", "pipe", "inherit"]) => {
+  agent = await startAgent(command, args, stdio);
   return agent;
 };
 
@@ -19,7 +20,7 @@ test("start", async () => {
 });
 
 test("start: invalid", async () => {
-  await expect(start("node", [invalid])).rejects.toThrowError();
+  await expect(start("node", [invalid], ["pipe", "pipe", "ignore"])).rejects.toThrowError();
 });
 
 test("Agent#request", async () => {
