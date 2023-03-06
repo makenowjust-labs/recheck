@@ -84,6 +84,17 @@ const main = async () => {
     plugins: [makeAllPackagesExternalPlugin, inlineWorkerPlugin],
     outfile: "lib/browser.js",
   });
+  await esbuild({
+    entryPoints: ["src/synckit-worker.ts"],
+    bundle: false,
+    minify: isProduction,
+    format: "cjs",
+    target: "es2016",
+    logLevel: "error",
+    platform: "node",
+    plugins: [makeAllPackagesExternalPlugin],
+    outfile: "lib/synckit-worker.js",
+  });
 };
 
 main().catch((err) => {

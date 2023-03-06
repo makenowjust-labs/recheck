@@ -25,14 +25,14 @@ export const jar: () => string | null = () => {
 };
 
 /** A mapping from a supported platform (OS) name to the corresponding package name component. */
-const osNames: Record<string, string> = {
+export const osNames: Record<string, string> = {
   darwin: "macos",
   linux: "linux",
   win32: "windows",
 };
 
 /** A mapping from a supported architecture (CPU) name to the corresponding package name component. */
-const cpuNames: Record<string, string> = {
+export const cpuNames: Record<string, string> = {
   x64: "x64",
 };
 
