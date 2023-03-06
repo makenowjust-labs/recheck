@@ -1,6 +1,7 @@
 import { runAsWorker } from "synckit";
 
-import { check } from "./main";
+/* @ts-expect-error */
+import { check } from "./lib/main.js";
 import type { Diagnostics, Parameters } from "..";
 
 runAsWorker(
