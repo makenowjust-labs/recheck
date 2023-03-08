@@ -9,6 +9,7 @@ Fixes:
 
 - [#777](https://github.com/makenowjust-labs/recheck/pull/777) Fix up cache implementation ([@makenowjust](https://github.com/makenowjust))
 - [#800](https://github.com/makenowjust-labs/recheck/pull/800) Set `'conservative'` as default `cache.strategy` ([@makenowjust](https://github.com/makenowjust))
+- [#805](https://github.com/makenowjust-labs/recheck/pull/805) Fix to decode `Duration` for `String` ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
