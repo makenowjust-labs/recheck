@@ -3,6 +3,7 @@
 New Features:
 
 - [#775](https://github.com/makenowjust-labs/recheck/pull/775) Add `cache` option to `eslint-plugin-redos` ([@makenowjust](https://github.com/makenowjust))
+- [#799](https://github.com/makenowjust-labs/recheck/pull/799) Introduce `synckit` for speed-up `checkSync` ([@makenowjust](https://github.com/makenowjust))
 
 Fixes:
 
