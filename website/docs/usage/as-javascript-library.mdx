@@ -131,6 +131,8 @@ If you use pure JavaScript backend or for the same reason synchronous API, the `
 
 ## Backend
 
+### `RECHECK_BACKEND`
+
 The JavaScript library is just a wrapper for the `recheck` CLI and Scala.js build. You can specify the backend via the `RECHECK_BACKEND` environment variable. There are four options to the `RECHECK_BACKEND` value.
 
 - `RECHECK_BACKEND=auto` (default)
@@ -178,13 +180,20 @@ The `java` and `native` backends are the external CLI command backend. They have
 - Checks in true asynchronous. Although we can use the `pure` as a backend of the asynchronous API, it blocks the process, unfortunately. However, `worker` does not.
 - Works with multiple threads. On the external CLI command backend, it can check multiple regular expressions at once.
 
-:::note
+### `RECHECK_SYNC_BACKEND`
 
-The synchronous API `checkSync` works on the `pure` backend at any time.
+Similarly, `RECHECK_SYNC_BACKEND` specifies the backend of synchronous API `checkSync`.
 
-:::
+- `RECHECK_SYNC_BACKEND=synckit`
 
-## Use on Browser
+  Uses [`synckit`](https://github.com/un-ts/synckit) for working asynchronous `check` as synchronous.
+  `RECHECK_BACKEND` is also used in forked thread.
+
+- `RECHECK_SYNC_BACKEND=pure`
+
+  Same as the `RECHECK_BACKEND` one.
+
+### Use on Browser
 
 `recheck` package supports the browser environment of course. It only supports the `worker` and `pure` backend because browsers cannot spawn the external command.
 

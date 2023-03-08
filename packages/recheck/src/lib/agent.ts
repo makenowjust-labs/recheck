@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { spawn, StdioNull, StdioPipe } from "child_process";
 
 import type { ChildProcess } from "child_process";
 
@@ -144,12 +144,13 @@ export class Agent {
 /** Starts `recheck agent` with the given command and command-line arguments. */
 export async function start(
   command: string,
-  args: string[] = []
+  args: string[] = [],
+  stdio: (StdioPipe | StdioNull)[] = ["pipe", "pipe", "inherit"]
 ): Promise<Agent> {
   return await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       windowsHide: true,
-      stdio: ["pipe", "pipe", "inherit"],
+      stdio,
     });
 
     const onClose = () => reject(new Error("process is closed"));

@@ -1,3 +1,5 @@
+import { createSyncFn } from "synckit";
+
 import { check as checkAgent } from "./lib/agent";
 import * as env from "./lib/env";
 import * as java from "./lib/java";
@@ -85,4 +87,28 @@ export async function check(
   return checkAgent(agent, source, flags, params);
 }
 
-export const checkSync = pure.check;
+let syncFnCache: typeof pure.check | null = null;
+
+export const checkSync = (
+  source: string,
+  flags: string,
+  params: Parameters = {}
+): Diagnostics => {
+  let syncFn: typeof pure.check | null = null;
+  const backend = env.RECHECK_SYNC_BACKEND();
+  switch (backend) {
+    case "synckit":
+      if (syncFnCache === null) {
+        syncFnCache = createSyncFn(require.resolve("./synckit-worker"));
+      }
+      syncFn = syncFnCache;
+    case "pure":
+      syncFn = pure.check;
+      break;
+  }
+  if (syncFn === null) {
+    throw new Error(`invalid sync backend: ${backend}`);
+  }
+
+  return syncFn(source, flags, params);
+};

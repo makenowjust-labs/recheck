@@ -141,7 +141,27 @@ test("check: invalid", async () => {
   );
 });
 
-test("checkSync", () => {
+test("checkSync: synckit", () => {
+  const backend = jest.spyOn(env, "RECHECK_SYNC_BACKEND");
+  backend.mockReturnValueOnce("synckit" as any);
+
   const diagnostics = main.checkSync("^(a|a)+$", "");
   expect(diagnostics.status).toBe("vulnerable");
+});
+
+test("checkSync: pure", () => {
+  const backend = jest.spyOn(env, "RECHECK_SYNC_BACKEND");
+  backend.mockReturnValueOnce("pure" as any);
+
+  const diagnostics = main.checkSync("^(a|a)+$", "");
+  expect(diagnostics.status).toBe("vulnerable");
+});
+
+test("checkSync: invalid", () => {
+  const backend = jest.spyOn(env, "RECHECK_SYNC_BACKEND");
+  backend.mockReturnValueOnce("invalid" as any);
+
+  expect(() => main.checkSync("^(a|a)+$", "")).toThrowError(
+    "invalid sync backend: invalid"
+  );
 });

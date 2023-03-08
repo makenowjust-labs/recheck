@@ -1,5 +1,9 @@
 import * as exe from "./exe";
 
+const isSupported =
+  typeof exe.osNames[process.platform] !== "undefined" &&
+  typeof exe.cpuNames[process.arch] !== "undefined";
+
 beforeEach(() => {
   delete process.env["RECHECK_BIN"];
   delete process.env["RECHECK_JAR"];
@@ -39,13 +43,19 @@ test("jar: invalid resolve (2)", () => {
 });
 
 test("bin", () => {
-  expect(exe.bin()).toMatch(/recheck-\w+-\w+\/recheck(?:\.exe)?$/);
+  if (isSupported) {
+    expect(exe.bin()).toMatch(/recheck-\w+-\w+\/recheck(?:\.exe)?$/);
+  }
 
   process.env["RECHECK_BIN"] = "x";
   expect(exe.bin()).toBe("x");
 });
 
 test("bin: invalid resolve (1)", () => {
+  if (!isSupported) {
+    return;
+  }
+
   const resolve = jest.spyOn(exe.__mock__require, "resolve");
   resolve.mockImplementationOnce(() => {
     const err: any = new Error("module not found");
@@ -57,6 +67,10 @@ test("bin: invalid resolve (1)", () => {
 });
 
 test("bin: invalid resolve (2)", () => {
+  if (!isSupported) {
+    return;
+  }
+
   const resolve = jest.spyOn(exe.__mock__require, "resolve");
   resolve.mockImplementationOnce(() => {
     const err: any = new Error("unknown error");

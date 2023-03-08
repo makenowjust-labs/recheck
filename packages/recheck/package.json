@@ -23,11 +23,14 @@
     "clean": "rimraf lib",
     "format": "prettier -w '*.{js,json,md}' '{scripts,src}/**/*.{js,ts}' index.d.ts",
     "lint": "prettier --check '*.{js,json,md}' '{scripts,src}/**/*.{js,ts}' index.d.ts",
-    "test": "jest",
+    "test": "SYNCKIT_TS_RUNNER=esbuild-register jest",
     "typecheck": "tsc --noEmit -p ."
   },
   "sideEffects": false,
   "types": "index.d.ts",
+  "dependencies": {
+    "synckit": "0.8.5"
+  },
   "optionalDependencies": {
     "recheck-jar": "0.0.0",
     "recheck-linux-x64": "0.0.0",
