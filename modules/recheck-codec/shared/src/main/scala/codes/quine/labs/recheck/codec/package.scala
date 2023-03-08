@@ -187,11 +187,8 @@ package object codec {
   /** A `Decoder` for `Duration`. */
   implicit def decodeDuration: Decoder[Duration] = (c: HCursor) =>
     if (c.value.isNull) Right(Duration.Inf)
-    else if (c.value.isNumber) c.value.asNumber.flatMap(_.toInt) match {
-      case Some(d) => Right(Duration(d, MILLISECONDS))
-      case None    => Left(DecodingFailure("Duration", c.history))
-    }
-    else Left(DecodingFailure("Duration", c.history))
+    else
+      Decoder[Int].tryDecode(c).map(t => Duration(t, MILLISECONDS)).orElse(Left(DecodingFailure("Duration", c.history)))
 
   /** A `Decoder` for `Checker`. */
   implicit def decodeChecker: Decoder[Checker] =
