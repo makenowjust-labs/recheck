@@ -13,6 +13,7 @@ ThisBuild / developers := List(
     url("https://quine.codes/")
   )
 )
+ThisBuild / versionScheme := Some("early-semver")
 
 ThisBuild / scalaVersion := "2.13.10"
 ThisBuild / scalacOptions ++= Seq(
