@@ -293,7 +293,13 @@ jobs:
           path: packages/recheck-windows-x64/
       - name: Build
         run: NODE_ENV=production yarn lerna run build
+      - name: Publish (beta)
+        if: contains(github.ref, '-beta')
+        run: yarn lerna publish --dist-tag next ${{ needs.build.outputs.version }} --yes
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish
+        if: "!contains(github.ref, '-beta')"
         run: yarn lerna publish ${{ needs.build.outputs.version }} --yes
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
