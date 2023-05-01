@@ -19,7 +19,7 @@ const main = async () => {
     entryPoints: ["src/main.ts"],
     bundle: true,
     format: "cjs",
-    target: "es2016",
+    target: "es2020",
     platform: "node",
     plugins: [makeAllPackagesExternalPlugin],
     outfile: "lib/main.js",

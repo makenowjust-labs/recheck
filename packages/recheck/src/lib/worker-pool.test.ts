@@ -28,12 +28,6 @@ test("check: with logger", async () => {
 });
 
 test("check: with abort (1)", async () => {
-  // Skip if `AbortController` is not defined.
-  // (Node v14 does not have `AbortController`.)
-  if (typeof AbortController === "undefined") {
-    return;
-  }
-
   const pool = start();
 
   const controller = new AbortController();
@@ -44,12 +38,6 @@ test("check: with abort (1)", async () => {
 });
 
 test("check: with abort (2)", async () => {
-  // Skip if `AbortController` is not defined.
-  // (Node v14 does not have `AbortController`.)
-  if (typeof AbortController === "undefined") {
-    return;
-  }
-
   const pool = start();
 
   const controller = new AbortController();
