@@ -102,6 +102,7 @@ export const checkSync = (
         syncFnCache = createSyncFn(require.resolve("./synckit-worker"));
       }
       syncFn = syncFnCache;
+      break;
     case "pure":
       syncFn = pure.check;
       break;
