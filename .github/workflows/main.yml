@@ -123,7 +123,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        node: [ 14, 16, 18 ]
+        node: [ 16, 18, 20 ]
     name: Node v${{ matrix.node }} Test
     steps:
       - uses: actions/checkout@v3
@@ -132,12 +132,7 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: 'yarn'
       - name: Install
-        if: matrix.node != 14
         run: yarn install --frozen-lockfile
-      - name: Install (Node v14)
-        if: matrix.node == 14
-        # `--ignore-engines` is necessarly because Docusaurus does not support Node v14.
-        run: yarn install --frozen-lockfile --ignore-engines
       - uses: actions/download-artifact@v3
         with:
           name: recheck.js

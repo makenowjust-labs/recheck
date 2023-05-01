@@ -78,12 +78,6 @@ test("check: with logger", async () => {
 });
 
 test("check: with abort (1)", async () => {
-  // Skip if `AbortController` is not defined.
-  // (Node v14 does not have `AbortController`.)
-  if (typeof AbortController === "undefined") {
-    return;
-  }
-
   const agent = await start("node", [testAgent]);
   const controller = new AbortController();
   const signal = controller.signal;
@@ -94,12 +88,6 @@ test("check: with abort (1)", async () => {
 });
 
 test("check: with abort (2)", async () => {
-  // Skip if `AbortController` is not defined.
-  // (Node v14 does not have `AbortController`.)
-  if (typeof AbortController === "undefined") {
-    return;
-  }
-
   const agent = await start("node", [testAgent]);
   const controller = new AbortController();
   const signal = controller.signal;
