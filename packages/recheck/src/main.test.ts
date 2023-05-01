@@ -1,3 +1,5 @@
+import * as synckit from "synckit";
+
 import * as main from "./main";
 
 import * as env from "./lib/env";
@@ -9,6 +11,7 @@ const RECHECK_BIN = `${__dirname}/../../../modules/recheck-cli/target/native-ima
 
 jest.setTimeout(10000);
 
+jest.mock("synckit");
 jest.mock("./lib/env");
 jest.mock("./lib/java");
 jest.mock("./lib/native");
@@ -144,9 +147,12 @@ test("check: invalid", async () => {
 test("checkSync: synckit", () => {
   const backend = jest.spyOn(env, "RECHECK_SYNC_BACKEND");
   backend.mockReturnValueOnce("synckit" as any);
+  const createSyncFn = jest.spyOn(synckit, "createSyncFn");
+  createSyncFn.mockReturnValueOnce(() => ({ status: "vulnerable" }));
 
   const diagnostics = main.checkSync("^(a|a)+$", "");
   expect(diagnostics.status).toBe("vulnerable");
+  expect(createSyncFn).toHaveBeenCalled();
 });
 
 test("checkSync: pure", () => {
