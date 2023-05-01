@@ -16,6 +16,7 @@ Misc:
 - [#776](https://github.com/makenowjust-labs/recheck/pull/776) Fix heading in blog articles ([@makenowjust](https://github.com/makenowjust))
 - [#781](https://github.com/makenowjust-labs/recheck/pull/781) Fix OS version of scala-steward CI for `GLIBC` version problem ([@makenowjust](https://github.com/makenowjust))
 - [#780](https://github.com/makenowjust-labs/recheck/pull/780) Update dependency org.scalameta:scalafmt-core_2.13 to v3.7.2 ([@renovate[bot]](https://github.com/apps/renovate))
+- [#873](https://github.com/makenowjust-labs/recheck/pull/873) Fix React version to v17 ([@makenowjust](https://github.com/makenowjust))
 
 # 4.4.5 (2023-02-15)
 
