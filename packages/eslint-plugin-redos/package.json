@@ -34,7 +34,7 @@
     "@types/eslint": "8.40.2",
     "@types/find-cache-dir": "3.2.1",
     "@types/jest": "29.5.2",
-    "@types/node": "18.16.18",
+    "@types/node": "18.16.19",
     "esbuild": "0.18.10",
     "esbuild-jest": "0.5.0",
     "esbuild-register": "3.4.2",
