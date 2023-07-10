@@ -38,7 +38,7 @@
     "recheck-windows-x64": "0.0.0"
   },
   "devDependencies": {
-    "@types/jest": "29.5.2",
+    "@types/jest": "29.5.3",
     "@types/node": "18.16.19",
     "esbuild": "0.18.11",
     "esbuild-jest": "0.5.0",
