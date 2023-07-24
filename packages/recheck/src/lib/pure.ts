@@ -7,7 +7,7 @@ import type { Diagnostics, Parameters } from "../..";
 export function check(
   source: string,
   flags: string,
-  params: Parameters = {}
+  params: Parameters = {},
 ): Diagnostics {
   return bundle.check(source, flags, params);
 }

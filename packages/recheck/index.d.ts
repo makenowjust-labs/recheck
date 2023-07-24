@@ -5,7 +5,7 @@
 export function check(
   source: string,
   flags: string,
-  params?: Parameters & HasAbortSignal
+  params?: Parameters & HasAbortSignal,
 ): Promise<Diagnostics>;
 
 /**
@@ -14,7 +14,7 @@ export function check(
 export function checkSync(
   source: string,
   flags: string,
-  params?: Parameters
+  params?: Parameters,
 ): Diagnostics;
 
 /**

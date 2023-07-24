@@ -185,7 +185,7 @@ const rule: Rule.RuleModule = {
     };
 
     const isCallOrNewRegExp = (
-      node: ESTree.NewExpression | ESTree.CallExpression
+      node: ESTree.NewExpression | ESTree.CallExpression,
     ) => {
       // Tests `RegExp(...)` or `new RegExp(...)`?
       if (
@@ -201,7 +201,7 @@ const rule: Rule.RuleModule = {
       // Tests `RegExp('...', '...')`?
       if (
         !node.arguments.every(
-          (arg) => arg.type === "Literal" && typeof arg.value === "string"
+          (arg) => arg.type === "Literal" && typeof arg.value === "string",
         )
       ) {
         return false;
@@ -226,7 +226,7 @@ const rule: Rule.RuleModule = {
         }
 
         const [source, flags = ""] = node.arguments.map(
-          (arg) => (arg as ESTree.Literal).value as string
+          (arg) => (arg as ESTree.Literal).value as string,
         );
         check(node, source, flags);
       },
@@ -236,7 +236,7 @@ const rule: Rule.RuleModule = {
         }
 
         const [source, flags = ""] = node.arguments.map(
-          (arg) => (arg as ESTree.Literal).value as string
+          (arg) => (arg as ESTree.Literal).value as string,
         );
         check(node, source, flags);
       },

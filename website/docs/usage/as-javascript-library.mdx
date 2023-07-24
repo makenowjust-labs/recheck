@@ -47,13 +47,13 @@ See the below TypeScript API definition (The entire `d.ts` file is [here](https:
 export function check(
   source: string,
   flags: string,
-  params?: Parameters & HasAbortSignal
+  params?: Parameters & HasAbortSignal,
 ): Promise<Diagnostics>;
 
 export function checkSync(
   source: string,
   flags: string,
-  params?: Parameters
+  params?: Parameters,
 ): Diagnostics;
 ```
 

@@ -36,7 +36,7 @@ export class Agent {
   public request(
     method: string,
     params: any,
-    subscribe: ((message: any) => void) | null = null
+    subscribe: ((message: any) => void) | null = null,
   ): { id: number; promise: Promise<any> } {
     const id = this.nextID++;
     const promise = new Promise((resolve, reject) => {
@@ -145,7 +145,7 @@ export class Agent {
 export async function start(
   command: string,
   args: string[] = [],
-  stdio: (StdioPipe | StdioNull)[] = ["pipe", "pipe", "inherit"]
+  stdio: (StdioPipe | StdioNull)[] = ["pipe", "pipe", "inherit"],
 ): Promise<Agent> {
   return await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -185,7 +185,7 @@ export async function check(
   agent: Agent,
   source: string,
   flags: string,
-  params: Parameters & HasAbortSignal = {}
+  params: Parameters & HasAbortSignal = {},
 ): Promise<Diagnostics> {
   const newParams = { ...params };
 
@@ -205,7 +205,7 @@ export async function check(
   const { id, promise } = agent.request(
     "check",
     { source, flags, params: newParams },
-    logger
+    logger,
   );
 
   if (signal?.aborted) {

@@ -8,8 +8,8 @@ runAsWorker(
   async (
     source: string,
     flags: string,
-    params: Parameters
+    params: Parameters,
   ): Promise<Diagnostics> => {
     return check(source, flags, params);
-  }
+  },
 );

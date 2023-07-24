@@ -42,7 +42,7 @@ export class WorkerPool {
   public check(
     source: string,
     flags: string,
-    params: Parameters & HasAbortSignal = {}
+    params: Parameters & HasAbortSignal = {},
   ): Promise<Diagnostics> {
     const id = this.nextID++;
 
@@ -132,7 +132,7 @@ export class WorkerPool {
           source: ref.source,
           flags: ref.flags,
           params: ref.params,
-        })
+        }),
       );
 
       // Registers an `abort` handler.
