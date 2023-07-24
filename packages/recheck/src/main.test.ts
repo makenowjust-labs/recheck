@@ -90,7 +90,7 @@ test("check: java (2)", async () => {
   ensure.mockResolvedValueOnce(null);
 
   expect(main.check("^(a|a)+$", "")).rejects.toThrowError(
-    "there is no available implementation"
+    "there is no available implementation",
   );
 });
 
@@ -115,7 +115,7 @@ test("check: native (2)", async () => {
   ensure.mockResolvedValueOnce(null);
 
   expect(main.check("^(a|a)+$", "")).rejects.toThrowError(
-    "there is no available implementation"
+    "there is no available implementation",
   );
 });
 
@@ -140,7 +140,7 @@ test("check: invalid", async () => {
   backend.mockReturnValueOnce("invalid" as any);
 
   expect(main.check("^(a|a)+$", "")).rejects.toThrowError(
-    "invalid backend: invalid"
+    "invalid backend: invalid",
   );
 });
 
@@ -168,6 +168,6 @@ test("checkSync: invalid", () => {
   backend.mockReturnValueOnce("invalid" as any);
 
   expect(() => main.checkSync("^(a|a)+$", "")).toThrowError(
-    "invalid sync backend: invalid"
+    "invalid sync backend: invalid",
   );
 });

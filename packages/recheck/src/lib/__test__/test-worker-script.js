@@ -31,7 +31,7 @@ parentPort.on("message", (message) => {
             { start: 4, end: 5, temperature: "heat" },
           ],
         },
-      })
+      }),
     );
   }, 100);
 });

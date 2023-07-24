@@ -8,7 +8,7 @@ let pool: WorkerPool | null = null;
 export async function check(
   source: string,
   flags: string,
-  params: Parameters & HasAbortSignal = {}
+  params: Parameters & HasAbortSignal = {},
 ): Promise<Diagnostics> {
   if (pool === null) {
     pool = new WorkerPool(1);

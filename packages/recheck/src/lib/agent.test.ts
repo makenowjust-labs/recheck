@@ -8,7 +8,7 @@ let agent: Agent | null = null;
 const start = async (
   command: string,
   args: string[] = [],
-  stdio: (StdioPipe | StdioNull)[] = ["pipe", "pipe", "inherit"]
+  stdio: (StdioPipe | StdioNull)[] = ["pipe", "pipe", "inherit"],
 ) => {
   agent = await startAgent(command, args, stdio);
   return agent;
@@ -25,7 +25,7 @@ test("start", async () => {
 
 test("start: invalid", async () => {
   await expect(
-    start("node", [invalid], ["pipe", "pipe", "ignore"])
+    start("node", [invalid], ["pipe", "pipe", "ignore"]),
   ).rejects.toThrowError();
 });
 

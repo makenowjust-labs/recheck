@@ -7,7 +7,7 @@ const findDefaultCacheFile = (): string => {
   try {
     const nodeModuleDir = path.join(
       require.resolve("eslint-plugin-redos/package.json"),
-      "../.."
+      "../..",
     );
     cacheDir = path.join(nodeModuleDir, ".cache/eslint-plugin-redos");
     fs.mkdirSync(cacheDir, { recursive: true });

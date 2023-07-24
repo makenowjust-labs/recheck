@@ -29,7 +29,7 @@ export type Checker = (source: string, flags: string) => ReDoS.Diagnostics;
 export const createCachedCheck = (
   cache: CacheOptions | boolean,
   timeout: number | null,
-  params: ReDoS.Parameters
+  params: ReDoS.Parameters,
 ): Checker => {
   const {
     location: cacheLocation = undefined,

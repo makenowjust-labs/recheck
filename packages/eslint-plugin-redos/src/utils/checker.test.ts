@@ -26,7 +26,7 @@ test("strategy: aggressive", () => {
   const checker = createCachedCheck(
     { location: cacheFile, strategy: "aggressive" },
     null,
-    { checker: "fuzz" }
+    { checker: "fuzz" },
   );
   const result = checker("^a$", "");
   expect(JSON.parse(fs.readFileSync(cacheFile, "utf-8")).results).toEqual({
@@ -38,7 +38,7 @@ test("strategy: conservative", () => {
   const checker = createCachedCheck(
     { location: cacheFile, strategy: "conservative" },
     null,
-    { checker: "fuzz" }
+    { checker: "fuzz" },
   );
   const result = checker("^a$", "");
   expect(fs.existsSync(cacheFile)).toBe(false);

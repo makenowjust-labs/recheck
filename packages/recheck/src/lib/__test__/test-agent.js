@@ -10,11 +10,11 @@ process.stdin.on("data", (data) => {
         // Tests to ignore unexpected inputs.
         console.log();
         console.log(
-          JSON.stringify({ jsonrpc: "2.0+push", id: json.id - 1, result: {} })
+          JSON.stringify({ jsonrpc: "2.0+push", id: json.id - 1, result: {} }),
         );
 
         console.log(
-          JSON.stringify({ jsonrpc: "2.0+push", id: json.id, result: {} })
+          JSON.stringify({ jsonrpc: "2.0+push", id: json.id, result: {} }),
         );
         break;
       case "test-request":
@@ -23,10 +23,10 @@ process.stdin.on("data", (data) => {
             jsonrpc: "2.0+push",
             id: json.id,
             message: "message",
-          })
+          }),
         );
         console.log(
-          JSON.stringify({ jsonrpc: "2.0+push", id: json.id, result: count })
+          JSON.stringify({ jsonrpc: "2.0+push", id: json.id, result: count }),
         );
         break;
       case "test-notify":
@@ -40,7 +40,7 @@ process.stdin.on("data", (data) => {
             jsonrpc: "2.0+push",
             id: json.id,
             message: "message",
-          })
+          }),
         );
         checks[json.id] = setTimeout(() => {
           switch (json.params.source) {
@@ -51,7 +51,7 @@ process.stdin.on("data", (data) => {
                   jsonrpc: "2.0+push",
                   id: json.id,
                   result: { status: "vulnerable", attack: { string } },
-                })
+                }),
               );
               break;
             default:
@@ -60,7 +60,7 @@ process.stdin.on("data", (data) => {
                   jsonrpc: "2.0+push",
                   id: json.id,
                   result: { status: "safe" },
-                })
+                }),
               );
               break;
           }
@@ -73,7 +73,7 @@ process.stdin.on("data", (data) => {
             jsonrpc: "2.0+push",
             id: json.params.id,
             result: { status: "unknown" },
-          })
+          }),
         );
         clearTimeout(checks[json.params.id]);
         delete checks[json.params.id];
