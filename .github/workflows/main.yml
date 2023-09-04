@@ -13,7 +13,7 @@ jobs:
     outputs:
       version: ${{ steps.save-version.outputs.version }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: coursier/setup-action@v1
@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-22.04
     name: Scala Lint
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: coursier/setup-action@v1
         with:
           jvm: adoptium:1.19.0.1
@@ -80,7 +80,7 @@ jobs:
     runs-on: ubuntu-22.04
     name: Node Lint
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v3
         with:
           node-version: '18'
@@ -98,7 +98,7 @@ jobs:
     runs-on: ubuntu-22.04
     name: Scala Test
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: coursier/setup-action@v1
         with:
           jvm: adoptium:1.19.0.1
@@ -126,7 +126,7 @@ jobs:
         node: [ 16, 18, 20 ]
     name: Node v${{ matrix.node }} Test
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node }}
@@ -167,7 +167,7 @@ jobs:
             artifact_filename: recheck-win32-x64.exe
             local_path: modules/recheck-cli/target/native-image/recheck.exe
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: coursier/setup-action@v1
@@ -205,7 +205,7 @@ jobs:
     runs-on: ubuntu-22.04
     name: Publish to Maven Central
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: coursier/setup-action@v1
@@ -239,7 +239,7 @@ jobs:
     runs-on: ubuntu-22.04
     name: Publish to NPM
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: coursier/setup-action@v1
@@ -305,7 +305,7 @@ jobs:
     runs-on: ubuntu-22.04
     name: Publish GitHub Release
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v3
         with:
           name: recheck.jar
@@ -343,7 +343,7 @@ jobs:
     runs-on: ubuntu-22.04
     name: Deploy to GitHub Pages
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v3
         with:
           node-version: '18'
