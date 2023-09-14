@@ -116,7 +116,7 @@ jobs:
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
       - name: Test
         run: sbt coverage test coverageAggregate
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
 
   node-test:
     needs: [build, node-lint]
@@ -146,7 +146,7 @@ jobs:
       - name: Test
         # It needs two `--` actually: one is for Yarn and the latter is for Lerna.
         run: yarn lerna run test -- -- --coverage
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
 
   native-build:
     needs: [build]
