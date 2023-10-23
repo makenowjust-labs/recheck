@@ -81,7 +81,7 @@ jobs:
     name: Node Lint
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'yarn'
@@ -102,7 +102,7 @@ jobs:
       - uses: coursier/setup-action@v1
         with:
           jvm: adoptium:1.19.0.1
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'yarn'
@@ -127,7 +127,7 @@ jobs:
     name: Node v${{ matrix.node }} Test
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
           cache: 'yarn'
@@ -245,7 +245,7 @@ jobs:
       - uses: coursier/setup-action@v1
         with:
           jvm: adoptium:1.19.0.1
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'yarn'
@@ -344,7 +344,7 @@ jobs:
     name: Deploy to GitHub Pages
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'yarn'
