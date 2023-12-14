@@ -49,7 +49,7 @@ final case class AttackPattern(pumps: Seq[(UString, UString, Int)], suffix: UStr
     UString(str.result())
   }
 
-  /** Returns the string reperesentation of this. */
+  /** Returns the string representation of this. */
   def toString(style: AttackPattern.Style): String = {
     val seq = Seq.newBuilder[String]
 
