@@ -169,14 +169,14 @@ const rule: Rule.RuleModule = {
           switch (result.error.kind) {
             case "timeout":
               context.report({
-                message: `Error on ReDoS vulnerablity check: timeout`,
+                message: `Error on ReDoS vulnerability check: timeout`,
                 node,
               });
               break;
             case "invalid":
             case "unsupported":
               context.report({
-                message: `Error on ReDoS vulnerablity check: ${result.error.message} (${result.error.kind})`,
+                message: `Error on ReDoS vulnerability check: ${result.error.message} (${result.error.kind})`,
                 node,
               });
               break;
