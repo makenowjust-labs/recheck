@@ -90,7 +90,7 @@ tester.run("no-vulnerable", rule, {
       errors: [
         {
           message:
-            "Error on ReDoS vulnerablity check: look-ahead assertion (unsupported)",
+            "Error on ReDoS vulnerability check: look-ahead assertion (unsupported)",
         },
       ],
     },
@@ -100,7 +100,7 @@ tester.run("no-vulnerable", rule, {
       errors: [
         {
           message:
-            "Error on ReDoS vulnerablity check: parsing failure (at 1) (invalid)",
+            "Error on ReDoS vulnerability check: parsing failure (at 1) (invalid)",
         },
       ],
     },
@@ -123,7 +123,7 @@ tester.run("no-vulnerable", rule, {
     {
       code: `const x = /^.*$/;`,
       options: [{ timeout: 0, ignoreErrors: false }],
-      errors: [{ message: "Error on ReDoS vulnerablity check: timeout" }],
+      errors: [{ message: "Error on ReDoS vulnerability check: timeout" }],
     },
   ],
 });

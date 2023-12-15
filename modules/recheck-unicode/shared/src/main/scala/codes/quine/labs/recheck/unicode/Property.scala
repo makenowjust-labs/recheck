@@ -67,13 +67,13 @@ private[unicode] object Property {
   lazy val BinaryPropertyNames: Set[String] =
     Set("ASCII", "Any", "Assigned") ++ PropertyData.BinaryPropertyMap.keySet
 
-  /** An interval set of "ASCII" binrary property code points. */
+  /** An interval set of "ASCII" binary property code points. */
   private lazy val ASCII = IntervalSet((UChar(0), UChar(0x80)))
 
-  /** An interval set of "Any" binrary property code points. */
+  /** An interval set of "Any" binary property code points. */
   private lazy val Any = IntervalSet((UChar(0), UChar(0x110000)))
 
-  /** An interval set of "Assigned" binrary property code points. */
+  /** An interval set of "Assigned" binary property code points. */
   private lazy val Assigned = Any.diff(PropertyData.GeneralCategoryMap("Unassigned"))
 
   /** A map from "General_Category" value alias to canonical value name.

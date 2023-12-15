@@ -183,7 +183,7 @@ export class WorkerPool {
     return worker;
   }
 
-  /** Cancels the given refernece. */
+  /** Cancels the given reference. */
   private cancelRef(ref: Ref): void {
     ref.resolve({
       source: ref.source,
