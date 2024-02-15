@@ -133,11 +133,11 @@ jobs:
           cache: 'yarn'
       - name: Install
         run: yarn install --frozen-lockfile
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck.js
           path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck.jar
           path: modules/recheck-cli/target/scala-2.13/
@@ -266,23 +266,23 @@ jobs:
           key: ${{ runner.os }}-build-${{ github.sha }}
       - name: Install
         run: yarn install --frozen-lockfile
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck.js
           path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck.jar
           path: packages/recheck-jar/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck-darwin-x64
           path: packages/recheck-macos-x64/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck-linux-x64
           path: packages/recheck-linux-x64/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck-win32-x64.exe
           path: packages/recheck-windows-x64/
@@ -306,19 +306,19 @@ jobs:
     name: Publish GitHub Release
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck.jar
           path: packages/recheck-jar/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck-darwin-x64
           path: packages/recheck-macos-x64/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck-linux-x64
           path: packages/recheck-linux-x64/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck-win32-x64.exe
           path: packages/recheck-windows-x64/
@@ -348,7 +348,7 @@ jobs:
         with:
           node-version: '18'
           cache: 'yarn'
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck.js
           path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
