@@ -41,11 +41,11 @@ jobs:
           version="$(sbt --error "print coreJVM/releaseVersion" | head -n1)"
           echo -n "version=$version"
           echo -n "version=$version" >> $GITHUB_OUTPUT
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           path: modules/recheck-js/target/scala-2.13/recheck-js-opt/recheck.js
           name: recheck.js
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           path: modules/recheck-cli/target/scala-2.13/recheck.jar
           name: recheck.jar
@@ -133,11 +133,11 @@ jobs:
           cache: 'yarn'
       - name: Install
         run: yarn install --frozen-lockfile
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck.js
           path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck.jar
           path: modules/recheck-cli/target/scala-2.13/
@@ -194,7 +194,7 @@ jobs:
         shell: cmd
         run: >-
           "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && sbt cli/nativeImage
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           path: ${{ matrix.local_path }}
           name: ${{ matrix.artifact_filename }}
@@ -266,23 +266,23 @@ jobs:
           key: ${{ runner.os }}-build-${{ github.sha }}
       - name: Install
         run: yarn install --frozen-lockfile
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck.js
           path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck.jar
           path: packages/recheck-jar/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck-darwin-x64
           path: packages/recheck-macos-x64/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck-linux-x64
           path: packages/recheck-linux-x64/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck-win32-x64.exe
           path: packages/recheck-windows-x64/
@@ -306,19 +306,19 @@ jobs:
     name: Publish GitHub Release
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck.jar
           path: packages/recheck-jar/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck-darwin-x64
           path: packages/recheck-macos-x64/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck-linux-x64
           path: packages/recheck-linux-x64/
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck-win32-x64.exe
           path: packages/recheck-windows-x64/
@@ -348,7 +348,7 @@ jobs:
         with:
           node-version: '18'
           cache: 'yarn'
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: recheck.js
           path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
