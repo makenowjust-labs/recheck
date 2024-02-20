@@ -1,0 +1,25 @@
+{
+  "name": "recheck-macos-arm64",
+  "version": "0.0.0",
+  "description": "The macOS 64-bit (M1) binary for recheck.",
+  "license": "MIT",
+  "author": {
+    "name": "TSUYUSATO Kitsune",
+    "email": "make.just.on@gmail.com"
+  },
+  "homepage": "https://makenowjust-labs.github.io/recheck/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/makenowjust-labs/recheck"
+  },
+  "scripts": {
+    "build": "chmod +x ./recheck || exit 0"
+  },
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "preferUnplugged": false
+}
