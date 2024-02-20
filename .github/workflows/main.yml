@@ -19,6 +19,7 @@ jobs:
       - uses: coursier/setup-action@v1
         with:
           jvm: adoptium:1.21.0.2
+          apps: sbt
       - name: Cache SBT
         uses: actions/cache@v4
         with:
@@ -59,6 +60,7 @@ jobs:
       - uses: coursier/setup-action@v1
         with:
           jvm: adoptium:1.21.0.2
+          apps: sbt
       - name: Cache SBT
         uses: actions/cache@v4
         with:
@@ -102,6 +104,7 @@ jobs:
       - uses: coursier/setup-action@v1
         with:
           jvm: adoptium:1.21.0.2
+          apps: sbt
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -173,6 +176,7 @@ jobs:
       - uses: coursier/setup-action@v1
         with:
           jvm: adoptium:1.21.0.2
+          apps: sbt
       - name: Cache SBT
         uses: actions/cache@v4
         with:
@@ -211,6 +215,7 @@ jobs:
       - uses: coursier/setup-action@v1
         with:
           jvm: adoptium:1.21.0.2
+          apps: sbt
       - name: Cache SBT
         uses: actions/cache@v4
         with:
@@ -245,6 +250,7 @@ jobs:
       - uses: coursier/setup-action@v1
         with:
           jvm: adoptium:1.21.0.2
+          apps: sbt
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
