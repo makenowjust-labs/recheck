@@ -6,6 +6,9 @@ on:
       - main
     types: [closed]
 
+concurrency:
+  group: update-changelog
+
 jobs:
   update-changelog:
     runs-on: ubuntu-22.04
