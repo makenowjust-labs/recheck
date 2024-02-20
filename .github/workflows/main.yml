@@ -361,11 +361,11 @@ jobs:
             recheck-linux-x64
             recheck-windows-x64.exe
 
-  gh-pages:
+  gh-pages-build:
     needs: [build]
     if: github.ref_name == 'main'
     runs-on: ubuntu-22.04
-    name: Deploy to GitHub Pages
+    name: Build website
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -382,8 +382,22 @@ jobs:
         run: |
           NODE_ENV=production yarn workspace recheck build
           RECHECK_VERSION=${{ needs.build.outputs.version }} yarn workspace website doc
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: website/build
+          path: website/build
+
+  gh-pages-deploy:
+    needs: [gh-pages-build]
+    name: Deploy to GitHub Pages
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
