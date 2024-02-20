@@ -29,8 +29,6 @@ ThisBuild / scalacOptions ++= Seq(
 ThisBuild / scalafixScalaBinaryVersion := "2.13"
 ThisBuild / semanticdbEnabled := true
 ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
-ThisBuild / scalafixDependencies += "com.github.liancheng" %% "organize-imports" % "0.6.0"
-ThisBuild / scalafixDependencies += "com.github.vovapolu" %% "scaluzzi" % "0.1.23"
 
 val releaseVersion = taskKey[String]("A release version")
 ThisBuild / releaseVersion := {
