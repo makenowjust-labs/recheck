@@ -34,11 +34,11 @@ jobs:
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
       - name: Build
-        run: sbt compile js/fullLinkJS cli/assembly
+        run: sbtn compile js/fullLinkJS cli/assembly
       - id: save-version
         name: Save Version
         run: |
-          version="$(sbt --error "print coreJVM/releaseVersion" | head -n1)"
+          version="$(sbtn --error "print coreJVM/releaseVersion" | head -n1)"
           echo -n "version=$version"
           echo -n "version=$version" >> $GITHUB_OUTPUT
       - uses: actions/upload-artifact@v4
@@ -74,7 +74,7 @@ jobs:
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
       - name: Lint
-        run: sbt scalafmtCheckAll scalafmtSbtCheck 'scalafixAll --check'
+        run: sbtn scalafmtCheckAll scalafmtSbtCheck 'scalafixAll --check'
 
   node-lint:
     runs-on: ubuntu-22.04
@@ -115,7 +115,7 @@ jobs:
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
       - name: Test
-        run: sbt coverage test coverageAggregate
+        run: sbtn coverage test coverageAggregate
       - uses: codecov/codecov-action@v4
 
   node-test:
@@ -188,12 +188,12 @@ jobs:
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
       - if: matrix.os != 'windows-2022'
-        run: sbt cli/nativeImage
+        run: sbtn cli/nativeImage
       - if: matrix.os == 'windows-2022'
         name: Run sbt cli/nativeImage
         shell: cmd
         run: >-
-          "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && sbt cli/nativeImage
+          "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && sbtn cli/nativeImage
       - uses: actions/upload-artifact@v4
         with:
           path: ${{ matrix.local_path }}
@@ -226,7 +226,7 @@ jobs:
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
       - name: Publish
-        run: sbt ci-release
+        run: sbtn ci-release
         env:
           PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
           PGP_SECRET: ${{ secrets.PGP_SECRET }}
