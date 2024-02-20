@@ -22,6 +22,7 @@ Misc:
 - [#874](https://github.com/makenowjust-labs/recheck/pull/874) Drop Node `v14` support, and add Node `v20` support ([@makenowjust](https://github.com/makenowjust))
 - [#1140](https://github.com/makenowjust-labs/recheck/pull/1140) Update dependency synckit to v0.9.0 ([@renovate[bot]](https://github.com/apps/renovate))
 - [#1084](https://github.com/makenowjust-labs/recheck/pull/1084) Update docusaurus monorepo to v3 (major) ([@renovate[bot]](https://github.com/apps/renovate))
+- [#1177](https://github.com/makenowjust-labs/recheck/pull/1177) Update JVM to use on CI ([@makenowjust](https://github.com/makenowjust))
 
 # 4.4.5 (2023-02-15)
 
