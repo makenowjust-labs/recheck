@@ -125,6 +125,8 @@ jobs:
       - name: Test
         run: sbt coverage test coverageAggregate
       - uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   node-test:
     needs: [build, node-lint]
@@ -155,6 +157,8 @@ jobs:
         # It needs two `--` actually: one is for Yarn and the latter is for Lerna.
         run: yarn lerna run test -- -- --coverage
       - uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   native-build:
     needs: [build]
