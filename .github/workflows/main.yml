@@ -155,12 +155,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12, ubuntu-20.04, windows-2022]
+        os: [macos-12, macos-14, ubuntu-22.04, windows-2022]
         include:
           - os: macos-12
             artifact_filename: recheck-darwin-x64
             local_path: modules/recheck-cli/target/native-image/recheck
-          - os: ubuntu-20.04
+          - os: macos-14
+            artifact_filename: recheck-darwin-arm64
+            local_path: modules/recheck-cli/target/native-image/recheck
+          - os: ubuntu-22.04
             artifact_filename: recheck-linux-x64
             local_path: modules/recheck-cli/target/native-image/recheck
           - os: windows-2022
@@ -280,6 +283,10 @@ jobs:
           path: packages/recheck-macos-x64/
       - uses: actions/download-artifact@v4
         with:
+          name: recheck-darwin-arm64
+          path: packages/recheck-macos-arm64/
+      - uses: actions/download-artifact@v4
+        with:
           name: recheck-linux-x64
           path: packages/recheck-linux-x64/
       - uses: actions/download-artifact@v4
@@ -316,6 +323,10 @@ jobs:
           path: packages/recheck-macos-x64/
       - uses: actions/download-artifact@v4
         with:
+          name: recheck-darwin-arm64
+          path: packages/recheck-macos-arm64/
+      - uses: actions/download-artifact@v4
+        with:
           name: recheck-linux-x64
           path: packages/recheck-linux-x64/
       - uses: actions/download-artifact@v4
@@ -326,6 +337,7 @@ jobs:
         run: |
           mv packages/recheck-jar/recheck.jar recheck.jar
           mv packages/recheck-macos-x64/recheck recheck-macos-x64
+          mv packages/recheck-macos-arm64/recheck recheck-macos-arm64
           mv packages/recheck-linux-x64/recheck recheck-linux-x64
           mv packages/recheck-windows-x64/recheck.exe recheck-windows-x64.exe
       - name: Release
@@ -334,6 +346,7 @@ jobs:
           files: |
             recheck.jar
             recheck-macos-x64
+            recheck-macos-arm64
             recheck-linux-x64
             recheck-windows-x64.exe
 

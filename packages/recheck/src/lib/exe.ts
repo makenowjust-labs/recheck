@@ -34,6 +34,7 @@ export const osNames: Record<string, string> = {
 /** A mapping from a supported architecture (CPU) name to the corresponding package name component. */
 export const cpuNames: Record<string, string> = {
   x64: "x64",
+  arm64: "arm64",
 };
 
 /** Returns `recheck` (or `recheck.exe`) binary file path, or `null` if it is not found. */
