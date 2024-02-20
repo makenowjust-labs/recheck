@@ -19,6 +19,7 @@ Misc:
 - [#780](https://github.com/makenowjust-labs/recheck/pull/780) Update dependency org.scalameta:scalafmt-core_2.13 to v3.7.2 ([@renovate[bot]](https://github.com/apps/renovate))
 - [#873](https://github.com/makenowjust-labs/recheck/pull/873) Fix React version to v17 ([@makenowjust](https://github.com/makenowjust))
 - [#874](https://github.com/makenowjust-labs/recheck/pull/874) Drop Node `v14` support, and add Node `v20` support ([@makenowjust](https://github.com/makenowjust))
+- [#1140](https://github.com/makenowjust-labs/recheck/pull/1140) Update dependency synckit to v0.9.0 ([@renovate[bot]](https://github.com/apps/renovate))
 
 # 4.4.5 (2023-02-15)
 
