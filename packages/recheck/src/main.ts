@@ -99,7 +99,9 @@ export const checkSync = (
   switch (backend) {
     case "synckit":
       if (syncFnCache === null) {
-        syncFnCache = createSyncFn<typeof check>(require.resolve("./synckit-worker"));
+        syncFnCache = createSyncFn<typeof check>(
+          require.resolve("./synckit-worker"),
+        );
       }
       syncFn = syncFnCache;
       break;
