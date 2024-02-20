@@ -25,6 +25,7 @@ Misc:
 - [#1084](https://github.com/makenowjust-labs/recheck/pull/1084) Update docusaurus monorepo to v3 (major) ([@renovate[bot]](https://github.com/apps/renovate))
 - [#1177](https://github.com/makenowjust-labs/recheck/pull/1177) Update JVM to use on CI ([@makenowjust](https://github.com/makenowjust))
 - [#1181](https://github.com/makenowjust-labs/recheck/pull/1181) Enable Google Analytics for website ([@makenowjust](https://github.com/makenowjust))
+- [#1184](https://github.com/makenowjust-labs/recheck/pull/1184) Add `recheck-macos-arm64` to `recheck`'s `optionalDeps` ([@makenowjust](https://github.com/makenowjust))
 
 # 4.4.5 (2023-02-15)
 
