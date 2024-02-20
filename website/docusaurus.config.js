@@ -124,7 +124,7 @@ const config = {
             ],
           },
         ],
-        copyright: `Copyright © 2020-2023 TSUYUSATO "MakeNowJust" Kitsune. Built with Docusaurus.`,
+        copyright: `Copyright © 2020-2024 TSUYUSATO "MakeNowJust" Kitsune. Built with Docusaurus.`,
       },
       prism: {
         theme: lightCodeTheme,
