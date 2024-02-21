@@ -12,11 +12,46 @@ afterEach(() => {
   } catch {}
 });
 
-test("strategy: default", () => {
+test("strategy: default (automaton)", () => {
   const checker = createCachedCheck({ location: cacheFile }, null, {
     checker: "automaton",
   });
-  const result = checker("^a$", "");
+
+  const result1 = checker("^a$", "");
+  expect(JSON.parse(fs.readFileSync(cacheFile, "utf-8")).results).toEqual({
+    "/^a$/": result1,
+  });
+
+  expect(checker("^a$", "")).toEqual(result1);
+  const result2 = checker("^b$", "");
+  expect(JSON.parse(fs.readFileSync(cacheFile, "utf-8")).results).toEqual({
+    "/^a$/": result1,
+    "/^b$/": result2,
+  });
+});
+
+test("strategy: default (fuzz)", () => {
+  const checker = createCachedCheck({ location: cacheFile }, null, {
+    checker: "fuzz",
+  });
+
+  checker("^a$", "");
+  expect(fs.existsSync(cacheFile)).toBe(false);
+});
+
+test("strategy: default (reuse)", () => {
+  const checker1 = createCachedCheck({ location: cacheFile }, null, {
+    checker: "automaton",
+  });
+  const result = checker1("^a$", "");
+  expect(JSON.parse(fs.readFileSync(cacheFile, "utf-8")).results).toEqual({
+    "/^a$/": result,
+  });
+
+  const checker2 = createCachedCheck({ location: cacheFile }, null, {
+    checker: "automaton",
+  });
+  expect(checker2("^a$", "")).toEqual(result);
   expect(JSON.parse(fs.readFileSync(cacheFile, "utf-8")).results).toEqual({
     "/^a$/": result,
   });
@@ -28,9 +63,17 @@ test("strategy: aggressive", () => {
     null,
     { checker: "fuzz" },
   );
-  const result = checker("^a$", "");
+
+  const result1 = checker("^a$", "");
   expect(JSON.parse(fs.readFileSync(cacheFile, "utf-8")).results).toEqual({
-    "/^a$/": result,
+    "/^a$/": result1,
+  });
+
+  expect(checker("^a$", "")).toEqual(result1);
+  const result2 = checker("^b$", "");
+  expect(JSON.parse(fs.readFileSync(cacheFile, "utf-8")).results).toEqual({
+    "/^a$/": result1,
+    "/^b$/": result2,
   });
 });
 
@@ -40,6 +83,7 @@ test("strategy: conservative", () => {
     null,
     { checker: "fuzz" },
   );
-  const result = checker("^a$", "");
+
+  checker("^a$", "");
   expect(fs.existsSync(cacheFile)).toBe(false);
 });

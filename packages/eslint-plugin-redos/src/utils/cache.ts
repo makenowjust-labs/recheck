@@ -2,19 +2,28 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
+/** A collection of variables to mock. */
+type Mock = {
+  nodeModuleDir: string;
+};
+
+/** Exposes this to mock `nodeModuleDir`. */
+export const __mock__: Mock = {
+  nodeModuleDir: path.join(
+    require.resolve("eslint-plugin-redos/package.json"),
+    "../..",
+  ),
+};
+
 const findDefaultCacheFile = (): string => {
   let cacheDir: string | null = null;
   try {
-    const nodeModuleDir = path.join(
-      require.resolve("eslint-plugin-redos/package.json"),
-      "../..",
-    );
-    cacheDir = path.join(nodeModuleDir, ".cache/eslint-plugin-redos");
+    cacheDir = path.join(__mock__.nodeModuleDir, ".cache/eslint-plugin-redos");
     fs.mkdirSync(cacheDir, { recursive: true });
+    /* c8 ignore next 3 */
   } catch {
-    cacheDir = null;
+    cacheDir = os.tmpdir();
   }
-  cacheDir ??= os.tmpdir();
 
   const cacheFile = path.join(cacheDir, "recheck-cache.json");
   return cacheFile;

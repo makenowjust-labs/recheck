@@ -62,6 +62,7 @@ export const createCachedCheck = (
         };
       }
     }
+    /* c8 ignore next 3 */
   } catch (error) {
     throw new Error(`Invalid cache: ${error}`);
   }
