@@ -14,6 +14,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     name: Scala Build
     outputs:
       version: ${{ steps.save-version.outputs.version }}
@@ -59,6 +60,7 @@ jobs:
   scala-lint:
     needs: [build]
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     name: Scala Lint
     steps:
       - uses: actions/checkout@v4
@@ -85,6 +87,7 @@ jobs:
 
   node-lint:
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     name: Node Lint
     steps:
       - uses: actions/checkout@v4
@@ -103,6 +106,7 @@ jobs:
 
   scala-test:
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     name: Scala Test
     steps:
       - uses: actions/checkout@v4
@@ -131,6 +135,7 @@ jobs:
   node-test:
     needs: [build, node-lint]
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     strategy:
       matrix:
         node: [ 18, 20, 21 ]
@@ -163,7 +168,6 @@ jobs:
   native-build:
     needs: [build]
     if: github.ref_name == 'main' || startsWith(github.ref, 'refs/tags/')
-    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -181,6 +185,9 @@ jobs:
           - os: windows-2022
             artifact_filename: recheck-win32-x64.exe
             local_path: modules/recheck-cli/target/native-image/recheck.exe
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    name: Scala Build (Native Binary)
     steps:
       - uses: actions/checkout@v4
         with:
@@ -219,6 +226,7 @@ jobs:
     needs: [build, scala-test]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     name: Publish to Maven Central
     steps:
       - uses: actions/checkout@v4
@@ -254,6 +262,7 @@ jobs:
     needs: [build, native-build, node-test]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     name: Publish to NPM
     steps:
       - uses: actions/checkout@v4
@@ -325,6 +334,7 @@ jobs:
     needs: [maven-release, npm-release]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     name: Publish GitHub Release
     steps:
       - uses: actions/checkout@v4
@@ -369,6 +379,7 @@ jobs:
     needs: [build]
     if: github.ref_name == 'main'
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     name: Build website
     steps:
       - uses: actions/checkout@v4
@@ -393,14 +404,15 @@ jobs:
 
   gh-pages-deploy:
     needs: [gh-pages-build]
-    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
     permissions:
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    name: Deploy to GitHub Pages
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
