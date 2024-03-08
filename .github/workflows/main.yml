@@ -366,7 +366,7 @@ jobs:
           mv packages/recheck-linux-x64/recheck recheck-linux-x64
           mv packages/recheck-windows-x64/recheck.exe recheck-windows-x64.exe
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             recheck.jar
