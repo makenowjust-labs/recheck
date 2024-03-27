@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@tsconfig/docusaurus": "2.0.2",
-    "typescript": "5.4.2"
+    "typescript": "5.4.3"
   },
   "browserslist": {
     "production": [
