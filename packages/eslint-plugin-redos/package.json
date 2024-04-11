@@ -31,7 +31,7 @@
     "eslint": ">= 3"
   },
   "devDependencies": {
-    "@types/eslint": "8.56.7",
+    "@types/eslint": "8.56.8",
     "@types/find-cache-dir": "5.0.0",
     "@types/jest": "29.5.12",
     "@types/node": "20.12.7",
