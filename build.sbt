@@ -337,7 +337,7 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
-    libraryDependencies += "com.lihaoyi" %%% "fastparse" % "3.0.2",
+    libraryDependencies += "com.lihaoyi" %%% "fastparse" % "3.1.0",
     addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
