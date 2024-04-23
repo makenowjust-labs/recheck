@@ -15,7 +15,7 @@
     "@docusaurus/plugin-ideal-image": "3.2.1",
     "@docusaurus/preset-classic": "3.2.1",
     "@mdx-js/react": "3.0.1",
-    "clsx": "2.1.0",
+    "clsx": "2.1.1",
     "hast-util-is-element": "1.1.0",
     "prism-react-renderer": "2.3.1",
     "prop-types": "15.8.1",
