@@ -3858,10 +3858,10 @@
     "@types/qs" "*"
     "@types/serve-static" "*"
 
-"@types/find-cache-dir@5.0.0":
-  version "5.0.0"
-  resolved "https://registry.yarnpkg.com/@types/find-cache-dir/-/find-cache-dir-5.0.0.tgz#3b3b6c48e907b5fcba2220fc6b0a1b13d5a0c2f5"
-  integrity sha512-9sbmWy0peTRfIMgHRwaeat9euvI+lAQQXIiAH8Sivd1ESFR5aIC+cbFsOnyH0UYhBd6sOUB6r426wbEbN+18fA==
+"@types/find-cache-dir@5.0.2":
+  version "5.0.2"
+  resolved "https://registry.yarnpkg.com/@types/find-cache-dir/-/find-cache-dir-5.0.2.tgz#5c5fdac0a261a927fafe01b27ea232d104acc167"
+  integrity sha512-pIpWpRaCpj/TH4XSRlBhbqgEkka/2UGCBQ1+aYX2yMLAnMc4YMvP11YrspgoN9mF4q0+AtWRdbTv4Zda4lpEew==
   dependencies:
     find-cache-dir "*"
 
