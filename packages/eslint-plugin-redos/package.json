@@ -32,7 +32,7 @@
   },
   "devDependencies": {
     "@types/eslint": "8.56.12",
-    "@types/find-cache-dir": "5.0.0",
+    "@types/find-cache-dir": "5.0.2",
     "@types/jest": "29.5.13",
     "@types/node": "20.16.11",
     "esbuild": "0.24.0",
