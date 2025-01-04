@@ -4727,10 +4727,10 @@
   dependencies:
     undici-types "~5.26.4"
 
-"@types/node@20.17.9":
-  version "20.17.9"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-20.17.9.tgz#5f141d4b7ee125cdee5faefe28de095398865bab"
-  integrity sha512-0JOXkRyLanfGPE2QRCwgxhzlBAvaRdCNMcvbd7jFfpmD4eEXll7LRwy5ymJmyeZqk7Nh7eD2LeUyQ68BbndmXw==
+"@types/node@20.17.11":
+  version "20.17.11"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-20.17.11.tgz#2c05215fc37316b1596df7fbdba52151eaf83c50"
+  integrity sha512-Ept5glCK35R8yeyIeYlRIZtX6SLRyqMhOFTgj5SOkMpLTdw3SEHI9fHx60xaUZ+V1aJxQJODE+7/j5ocZydYTg==
   dependencies:
     undici-types "~6.19.2"
 
