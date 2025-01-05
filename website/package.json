@@ -9,7 +9,7 @@
     "start": "docusaurus start"
   },
   "dependencies": {
-    "@algolia/client-search": "^4.17.0",
+    "@algolia/client-search": "^5.0.0",
     "@docusaurus/core": "3.7.0",
     "@docusaurus/module-type-aliases": "3.7.0",
     "@docusaurus/plugin-ideal-image": "3.7.0",
