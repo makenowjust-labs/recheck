@@ -28,6 +28,19 @@ export async function check(
   flags: string,
   params: Parameters & HasAbortSignal = {},
 ): Promise<Diagnostics> {
+  /* c8 ignore start */
+  if (typeof source !== "string") {
+    throw new TypeError(
+      `Expected 'source' to be a string, but got ${typeof source}`,
+    );
+  }
+  if (typeof flags !== "string") {
+    throw new TypeError(
+      `Expected 'flags' to be a string, but got ${typeof flags}`,
+    );
+  }
+  /* c8 ignore stop */
+
   const backend = env.RECHECK_BACKEND();
   switch (backend) {
     case "auto":
@@ -94,6 +107,19 @@ export const checkSync = (
   flags: string,
   params: Parameters = {},
 ): Diagnostics => {
+  /* c8 ignore start */
+  if (typeof source !== "string") {
+    throw new TypeError(
+      `Expected 'source' to be a string, but got ${typeof source}`,
+    );
+  }
+  if (typeof flags !== "string") {
+    throw new TypeError(
+      `Expected 'flags' to be a string, but got ${typeof flags}`,
+    );
+  }
+  /* c8 ignore stop */
+
   let syncFn: typeof pure.check | null = null;
   const backend = env.RECHECK_SYNC_BACKEND();
   switch (backend) {
