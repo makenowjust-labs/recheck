@@ -28,6 +28,7 @@ Misc:
 - [#1184](https://github.com/makenowjust-labs/recheck/pull/1184) Add `recheck-macos-arm64` to `recheck`'s `optionalDeps` ([@makenowjust](https://github.com/makenowjust))
 - [#1185](https://github.com/makenowjust-labs/recheck/pull/1185) Add a test for `RECHECK_SYNC_BACKEND` env ([@makenowjust](https://github.com/makenowjust))
 - [#1195](https://github.com/makenowjust-labs/recheck/pull/1195) Add `timeout-minutes` to workflow ([@makenowjust](https://github.com/makenowjust))
+- [#1386](https://github.com/makenowjust-labs/recheck/pull/1386) Update Scala/Scala library/SBT plugin versions ([@makenowjust](https://github.com/makenowjust))
 
 # 4.4.5 (2023-02-15)
 
