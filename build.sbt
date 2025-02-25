@@ -15,7 +15,7 @@ ThisBuild / developers := List(
 )
 ThisBuild / versionScheme := Some("early-semver")
 
-ThisBuild / scalaVersion := "2.13.13"
+ThisBuild / scalaVersion := "2.13.16"
 ThisBuild / scalacOptions ++= Seq(
   "-encoding",
   "UTF-8",
@@ -26,7 +26,6 @@ ThisBuild / scalacOptions ++= Seq(
 )
 
 // Scalafix config:
-ThisBuild / scalafixScalaBinaryVersion := "2.13"
 ThisBuild / semanticdbEnabled := true
 ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 
