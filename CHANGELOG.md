@@ -30,6 +30,7 @@ Misc:
 - [#1195](https://github.com/makenowjust-labs/recheck/pull/1195) Add `timeout-minutes` to workflow ([@makenowjust](https://github.com/makenowjust))
 - [#1386](https://github.com/makenowjust-labs/recheck/pull/1386) Update Scala/Scala library/SBT plugin versions ([@makenowjust](https://github.com/makenowjust))
 - [#1389](https://github.com/makenowjust-labs/recheck/pull/1389) Update JS deps ([@makenowjust](https://github.com/makenowjust))
+- [#1390](https://github.com/makenowjust-labs/recheck/pull/1390) Update dependency @algolia/client-search to v5.20.3 ([@renovate[bot]](https://github.com/apps/renovate))
 
 # 4.4.5 (2023-02-15)
 
