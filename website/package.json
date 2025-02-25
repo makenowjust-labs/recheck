@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@tsconfig/docusaurus": "2.0.3",
+    "prettier": "3.5.2",
     "typescript": "5.7.3"
   },
   "browserslist": {
