@@ -25,7 +25,7 @@ export const __mock__: Mock = {
 /** `check` implementation. */
 export async function check(
   source: string,
-  flags: string,
+  flags: string = "",
   params: Parameters & HasAbortSignal = {},
 ): Promise<Diagnostics> {
   const backend = env.RECHECK_BACKEND();
@@ -91,7 +91,7 @@ let syncFnCache: typeof pure.check | null = null;
 
 export const checkSync = (
   source: string,
-  flags: string,
+  flags: string = "",
   params: Parameters = {},
 ): Diagnostics => {
   let syncFn: typeof pure.check | null = null;
