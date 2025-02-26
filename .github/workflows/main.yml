@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     name: Scala Build
     outputs:
@@ -59,7 +59,7 @@ jobs:
 
   scala-lint:
     needs: [build]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     name: Scala Lint
     steps:
@@ -86,7 +86,7 @@ jobs:
         run: sbt scalafmtCheckAll scalafmtSbtCheck 'scalafixAll --check'
 
   node-lint:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     name: Node Lint
     steps:
@@ -105,7 +105,7 @@ jobs:
           yarn lerna run typecheck
 
   scala-test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     name: Scala Test
     steps:
@@ -134,7 +134,7 @@ jobs:
 
   node-test:
     needs: [build, node-lint]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     strategy:
       matrix:
@@ -225,7 +225,7 @@ jobs:
   maven-release:
     needs: [build, scala-test]
     if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     name: Publish to Maven Central
     steps:
@@ -261,7 +261,7 @@ jobs:
   npm-release:
     needs: [build, native-build, node-test]
     if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     name: Publish to NPM
     steps:
@@ -333,7 +333,7 @@ jobs:
   release:
     needs: [maven-release, npm-release]
     if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     name: Publish GitHub Release
     steps:
@@ -378,7 +378,7 @@ jobs:
   gh-pages-build:
     needs: [build]
     if: github.ref_name == 'main'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     name: Build website
     steps:

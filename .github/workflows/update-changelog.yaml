@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   update-changelog:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: Update CHANGELOG.md
     if: github.event.pull_request.merged == true
     steps:
