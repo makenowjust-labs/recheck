@@ -2,7 +2,11 @@ import { RuleTester } from "eslint";
 
 import rule from "./no-vulnerable";
 
-const tester = new RuleTester({ parserOptions: { ecmaVersion: 2015 } });
+const tester = new RuleTester({
+  languageOptions: {
+    parserOptions: { ecmaVersion: 2015 },
+  },
+});
 
 tester.run("no-vulnerable", rule, {
   valid: [
