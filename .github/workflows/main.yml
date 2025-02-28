@@ -171,9 +171,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12, macos-14, ubuntu-22.04, windows-2022]
+        os: [macos-13, macos-14, ubuntu-22.04, windows-2022]
         include:
-          - os: macos-12
+          - os: macos-13
             artifact_filename: recheck-darwin-x64
             local_path: modules/recheck-cli/target/native-image/recheck
           - os: macos-14
