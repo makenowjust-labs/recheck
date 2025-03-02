@@ -35,6 +35,7 @@ Misc:
 - [#1391](https://github.com/makenowjust-labs/recheck/pull/1391) Update dependency lerna to v8.2.0 ([@renovate[bot]](https://github.com/apps/renovate))
 - [#1395](https://github.com/makenowjust-labs/recheck/pull/1395) Use ESLint v9 ([@makenowjust](https://github.com/makenowjust))
 - [#1404](https://github.com/makenowjust-labs/recheck/pull/1404) Pin react-dom version ([@makenowjust](https://github.com/makenowjust))
+- [#1405](https://github.com/makenowjust-labs/recheck/pull/1405) Update copyright year 2024 -> 2025 ([@makenowjust](https://github.com/makenowjust))
 
 # 4.4.5 (2023-02-15)
 
