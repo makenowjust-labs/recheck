@@ -13,6 +13,7 @@ Fixes:
 - [#805](https://github.com/makenowjust-labs/recheck/pull/805) Fix to decode `Duration` for `String` ([@makenowjust](https://github.com/makenowjust))
 - [#872](https://github.com/makenowjust-labs/recheck/pull/872) Fix to work `RECHECK_SYNC_BACKEND` correctly ([@makenowjust](https://github.com/makenowjust))
 - [#1175](https://github.com/makenowjust-labs/recheck/pull/1175) Update supported Node.js version ([@makenowjust](https://github.com/makenowjust))
+- [#1402](https://github.com/makenowjust-labs/recheck/pull/1402) Use React v18 for website ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
