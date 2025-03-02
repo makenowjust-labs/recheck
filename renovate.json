@@ -38,5 +38,5 @@
       "depTypeTemplate": "compiler plugin"
     }
   ],
-  "ignoreDeps": ["hast-util-is-element", "rehype-katex", "remark-math"]
+  "ignoreDeps": ["hast-util-is-element", "react", "rehype-katex", "remark-math"]
 }
