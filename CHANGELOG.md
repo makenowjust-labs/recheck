@@ -34,6 +34,7 @@ Misc:
 - [#1390](https://github.com/makenowjust-labs/recheck/pull/1390) Update dependency @algolia/client-search to v5.20.3 ([@renovate[bot]](https://github.com/apps/renovate))
 - [#1391](https://github.com/makenowjust-labs/recheck/pull/1391) Update dependency lerna to v8.2.0 ([@renovate[bot]](https://github.com/apps/renovate))
 - [#1395](https://github.com/makenowjust-labs/recheck/pull/1395) Use ESLint v9 ([@makenowjust](https://github.com/makenowjust))
+- [#1404](https://github.com/makenowjust-labs/recheck/pull/1404) Pin react-dom version ([@makenowjust](https://github.com/makenowjust))
 
 # 4.4.5 (2023-02-15)
 
