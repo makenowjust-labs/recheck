@@ -11,4 +11,4 @@
 
 MIT License.
 
-2020-2024 (C) TSUYUSATO "MakeNowJust" Kitsune
+2020-2025 (C) TSUYUSATO "MakeNowJust" Kitsune
