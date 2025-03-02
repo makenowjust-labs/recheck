@@ -14,6 +14,7 @@ Fixes:
 - [#872](https://github.com/makenowjust-labs/recheck/pull/872) Fix to work `RECHECK_SYNC_BACKEND` correctly ([@makenowjust](https://github.com/makenowjust))
 - [#1175](https://github.com/makenowjust-labs/recheck/pull/1175) Update supported Node.js version ([@makenowjust](https://github.com/makenowjust))
 - [#1402](https://github.com/makenowjust-labs/recheck/pull/1402) Use React v18 for website ([@makenowjust](https://github.com/makenowjust))
+- [#1406](https://github.com/makenowjust-labs/recheck/pull/1406) Drop Node v18 support ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
