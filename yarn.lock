@@ -13566,10 +13566,10 @@ svgo@^3.0.2, svgo@^3.2.0:
     csso "^5.0.5"
     picocolors "^1.0.0"
 
-synckit@0.10.2:
-  version "0.10.2"
-  resolved "https://registry.yarnpkg.com/synckit/-/synckit-0.10.2.tgz#000b87488453b7943edd7ee5c3028057c4490af0"
-  integrity sha512-cSGiaCPhFzeFIQY8KKEacv46LclENY4d60jgkwCrKomvRkIjtMyss1dPkHLp/62c1leuOjEedB1+lWcwqTJSvA==
+synckit@0.10.3:
+  version "0.10.3"
+  resolved "https://registry.yarnpkg.com/synckit/-/synckit-0.10.3.tgz#940aea2c7b6d141a4f74dbdebc81e0958c331a4b"
+  integrity sha512-R1urvuyiTaWfeCggqEvpDJwAlDVdsT9NM+IP//Tk2x7qHCkSvBk/fwFgw/TLAHzZlrAnnazMcRw0ZD8HlYFTEQ==
   dependencies:
     "@pkgr/core" "^0.2.0"
     tslib "^2.8.1"
