@@ -436,7 +436,7 @@ lazy val cli = project
     // Dependencies:
     libraryDependencies += "com.monovore" %% "decline" % "2.5.0",
     libraryDependencies += "io.circe" %% "circe-core" % "0.14.13",
-    libraryDependencies += "io.circe" %% "circe-generic" % "0.14.12",
+    libraryDependencies += "io.circe" %% "circe-generic" % "0.14.13",
     libraryDependencies += "io.circe" %% "circe-parser" % "0.14.12",
     addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
