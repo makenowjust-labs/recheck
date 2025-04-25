@@ -391,7 +391,7 @@ lazy val js = project
     Compile / console / scalacOptions -= "-Wunused",
     Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
-    libraryDependencies += "io.circe" %%% "circe-scalajs" % "0.14.10",
+    libraryDependencies += "io.circe" %%% "circe-scalajs" % "0.14.13",
     addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "1.1.0" % Test,
