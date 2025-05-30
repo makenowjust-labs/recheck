@@ -29,7 +29,7 @@
   "sideEffects": false,
   "types": "index.d.ts",
   "dependencies": {
-    "synckit": "0.11.6"
+    "synckit": "0.11.8"
   },
   "optionalDependencies": {
     "recheck-jar": "0.0.0",
