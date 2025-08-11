@@ -15,7 +15,7 @@ jobs:
     name: Update CHANGELOG.md
     if: github.event.pull_request.merged == true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Update CHANGELOG.md
         id: changelog
         uses: actions/github-script@v7

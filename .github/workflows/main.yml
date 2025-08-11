@@ -19,7 +19,7 @@ jobs:
     outputs:
       version: ${{ steps.save-version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: coursier/setup-action@v1
@@ -63,7 +63,7 @@ jobs:
     timeout-minutes: 5
     name: Scala Lint
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: coursier/setup-action@v1
         with:
           jvm: adoptium:1.21.0.2
@@ -90,7 +90,7 @@ jobs:
     timeout-minutes: 5
     name: Node Lint
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -109,7 +109,7 @@ jobs:
     timeout-minutes: 5
     name: Scala Test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: coursier/setup-action@v1
         with:
           jvm: adoptium:1.21.0.2
@@ -141,7 +141,7 @@ jobs:
         node: [ 20, 22, 23 ]
     name: Node v${{ matrix.node }} Test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
@@ -189,7 +189,7 @@ jobs:
     timeout-minutes: 5
     name: Scala Build (Native Binary)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: coursier/setup-action@v1
@@ -229,7 +229,7 @@ jobs:
     timeout-minutes: 5
     name: Publish to Maven Central
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: coursier/setup-action@v1
@@ -265,7 +265,7 @@ jobs:
     timeout-minutes: 5
     name: Publish to NPM
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: coursier/setup-action@v1
@@ -337,7 +337,7 @@ jobs:
     timeout-minutes: 5
     name: Publish GitHub Release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/download-artifact@v5
         with:
           name: recheck.jar
@@ -382,7 +382,7 @@ jobs:
     timeout-minutes: 5
     name: Build website
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
