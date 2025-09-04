@@ -398,7 +398,7 @@ jobs:
           NODE_ENV=production yarn workspace recheck build
           RECHECK_VERSION=${{ needs.build.outputs.version }} yarn workspace website doc
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: website/build
 
