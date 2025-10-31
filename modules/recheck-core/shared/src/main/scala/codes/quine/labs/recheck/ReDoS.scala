@@ -182,7 +182,7 @@ object ReDoS {
         case Capture(_, n)         => loop(n)
         case NamedCapture(_, _, n) => loop(n)
         case Group(n)              => loop(n)
-        case Repeat(q, n) =>
+        case Repeat(q, n)          =>
           val count = loop(n)
           q match {
             case Quantifier.Exact(n, _)        => count + n

@@ -32,7 +32,7 @@ object RecallValidator {
     val output = timeout match {
       case d if d < Duration.Zero => return RecallResult.Timeout
       case _: Duration.Infinite   => exec(code, Option(ctx.deadline).map(_.timeLeft))
-      case d: FiniteDuration =>
+      case d: FiniteDuration      =>
         val newTimeout =
           if ((ctx.deadline ne null) && ctx.deadline.timeLeft < d) ctx.deadline.timeLeft else d
         exec(code, Some(newTimeout))

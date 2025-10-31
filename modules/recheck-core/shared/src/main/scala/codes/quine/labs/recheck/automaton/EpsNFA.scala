@@ -75,8 +75,8 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
           if (ks.isEmpty) Vector.empty
           else
             tau.get(q) match {
-              case Some(Eps(qs))       => qs.flatMap(buildClosure(k0, ks, _, loops))
-              case Some(Assert(k, q1)) => buildClosure(k0, ks & k.toCharKindSet(k0), q1, loops)
+              case Some(Eps(qs))             => qs.flatMap(buildClosure(k0, ks, _, loops))
+              case Some(Assert(k, q1))       => buildClosure(k0, ks & k.toCharKindSet(k0), q1, loops)
               case Some(LoopEnter(loop, q1)) =>
                 if (loops.contains(loop)) Vector.empty // An ε-loop is detected.
                 else buildClosure(k0, ks, q1, loops ++ Set(loop))

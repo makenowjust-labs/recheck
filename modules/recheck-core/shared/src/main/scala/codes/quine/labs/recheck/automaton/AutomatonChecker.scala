@@ -143,8 +143,8 @@ private final class AutomatonChecker[A, Q](
   private[this] def checkPolynomial(): Seq[Complexity[A]] = {
     log("automaton: find IDA")
     interrupt(scc.map(checkPolynomialComponent).sortBy(-_._1).map {
-      case (0, _) => Constant
-      case (1, _) => Linear
+      case (0, _)          => Constant
+      case (1, _)          => Linear
       case (degree, pumps) =>
         val (w, hotspot) = witness(pumps)
         Polynomial(degree, w, hotspot)

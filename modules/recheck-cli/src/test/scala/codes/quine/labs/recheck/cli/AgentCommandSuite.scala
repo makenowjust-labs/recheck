@@ -30,7 +30,7 @@ class AgentCommandSuite extends munit.FunSuite {
       def read(): Iterator[String] =
         in.iterator.flatMap {
           case Right(line) => Iterator(line)
-          case Left(n) =>
+          case Left(n)     =>
             sem.acquire(n)
             Iterator.empty
         }
