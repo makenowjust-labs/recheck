@@ -27,7 +27,7 @@ object Parser {
         fastparse.parse(source, new Parser(flagSet.unicode, additional, hasNamedCapture, captures).Source(_))
       node <- (result match {
         case Parsed.Success(node, _) => Right(node)
-        case fail: Parsed.Failure =>
+        case fail: Parsed.Failure    =>
           Left(new ParsingException(s"parsing failure", Some(Pattern.Location(fail.index, fail.index))))
       }).map(assignCaptureIndex)
         .flatMap(assignBackReferenceIndex(_, captures))
@@ -102,7 +102,7 @@ object Parser {
     def loop(node: Node): Node = node match {
       case Disjunction(ns) => Disjunction(ns.map(loop)).withLoc(node)
       case Sequence(ns)    => Sequence(ns.map(loop)).withLoc(node)
-      case Capture(_, n) =>
+      case Capture(_, n)   =>
         currentIndex += 1
         Capture(currentIndex, loop(n)).withLoc(node)
       case NamedCapture(_, name, n) =>
@@ -127,9 +127,9 @@ object Parser {
     import Pattern._
 
     def collect(names: Map[String, Int], node: Node): Map[String, Int] = node match {
-      case Disjunction(ns) => ns.foldLeft(names)(collect)
-      case Sequence(ns)    => ns.foldLeft(names)(collect)
-      case Capture(_, n)   => collect(names, n)
+      case Disjunction(ns)              => ns.foldLeft(names)(collect)
+      case Sequence(ns)                 => ns.foldLeft(names)(collect)
+      case Capture(_, n)                => collect(names, n)
       case NamedCapture(index, name, n) =>
         if (names.contains(name)) throw new ParsingException("duplicated name", node.loc)
         collect(names ++ Map(name -> index), n)
@@ -149,7 +149,7 @@ object Parser {
       case Repeat(q, n)                 => Repeat(q, loop(names, n)).withLoc(node)
       case LookAhead(negative, n)       => LookAhead(negative, loop(names, n)).withLoc(node)
       case LookBehind(negative, n)      => LookBehind(negative, loop(names, n)).withLoc(node)
-      case BackReference(index) =>
+      case BackReference(index)         =>
         if (index < 1 || captures < index) throw new ParsingException("invalid back-reference", node.loc)
         BackReference(index).withLoc(node)
       case NamedBackReference(_, name) =>
@@ -223,7 +223,7 @@ object Parser {
       case Capture(_, n)         => loop(n)
       case NamedCapture(_, _, n) => loop(n)
       case Group(n)              => loop(n)
-      case Repeat(q, n) =>
+      case Repeat(q, n)          =>
         q.normalized match {
           case Quantifier.Bounded(min, max, _) if min > max =>
             throw new ParsingException("out of order in {} quantifier", q.loc)
@@ -306,7 +306,7 @@ private[regexp] final class Parser(
         case node: Pattern.WordBoundary             => Pass(node)
         case node: Pattern.LineBegin                => Pass(node)
         case node: Pattern.LineEnd                  => Pass(node)
-        case node =>
+        case node                                   =>
           Quantifier.map(q => Pattern.Repeat(q, node)) | Pass(node)
       }
     })
@@ -396,7 +396,7 @@ private[regexp] final class Parser(
         case (Right(node), false)                          => Pass(node)
         case (Right(node), true) if additional && !unicode => Pass(node)
         case (Right(_), true)                              => Fail
-        case (Left(c), true) if additional && !unicode =>
+        case (Left(c), true) if additional && !unicode     =>
           &("-" ~ EscapeClass) ~ Pass(Pattern.Character(c)) |
             ("-" ~ ClassCharacter).map(Pattern.ClassRange(c, _))
         case (Left(c), true) =>

@@ -42,7 +42,7 @@ object StaticSeeder {
 
       def loop(node: Node, prevIsRepeat: Boolean, nextIsRepeat: Boolean): Node = ctx.interrupt(node match {
         case Disjunction(ns) => Disjunction(ns.map(loop(_, prevIsRepeat, nextIsRepeat)))
-        case Sequence(ns) =>
+        case Sequence(ns)    =>
           val children = ns.lift
           Sequence(ns.zipWithIndex.map { case (c, i) =>
             val prev = children(i - 1).map(_.isInstanceOf[Repeat]).getOrElse(prevIsRepeat)
@@ -52,7 +52,7 @@ object StaticSeeder {
         case Capture(i, n)            => Capture(i, loop(n, prevIsRepeat, nextIsRepeat))
         case NamedCapture(i, name, n) => NamedCapture(i, name, loop(n, prevIsRepeat, nextIsRepeat))
         case Group(n)                 => Group(loop(n, prevIsRepeat, nextIsRepeat))
-        case Repeat(q, n) =>
+        case Repeat(q, n)             =>
           val (min, k) = q.normalized match {
             case Quantifier.Exact(n, _)          => (n, n)
             case Quantifier.Unbounded(min, _)    => (min, min)
@@ -181,7 +181,7 @@ private[fuzz] class StaticSeeder[A, Q](
   def deadPath(q: Q): Option[Seq[A]] =
     interrupt(alphabet.diff(graph.neighbors(q).map(_._1).toSet)).headOption match {
       case Some(c) => Some(Seq(c))
-      case None =>
+      case None    =>
         interrupt(reverseGraph.path(stateSet.diff(acceptSet), q).map(_._1.map(_._2).reverse))
     }
 

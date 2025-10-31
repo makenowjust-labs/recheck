@@ -42,7 +42,7 @@ object Interpreter {
     timeout match {
       case d if d < Duration.Zero => Result(Status.Timeout, None, 0, Seq.empty, Set.empty, Set.empty, Map.empty)
       case _: Duration.Infinite   => run(program, input, pos, options)
-      case d =>
+      case d                      =>
         if ((ctx.deadline ne null) && ctx.deadline.timeLeft < d) run(program, input, pos, options)
         val newCtx = Context(d, Option(ctx.token))
 
@@ -279,7 +279,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
       val failed = memoized || !block(frame, frame.label.block) ||
         (frame.label.block.terminator match {
-          case Inst.Ok => return result(Status.Ok, Some(frame.captures))
+          case Inst.Ok        => return result(Status.Ok, Some(frame.captures))
           case Inst.Jmp(next) =>
             frame.label = next
             false
@@ -430,8 +430,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         }
         if (options.needsCoverage) coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
         ok
-      case read: Inst.Read     => instRead(frame, read)
-      case read: Inst.ReadBack => instReadBack(frame, read)
+      case read: Inst.Read      => instRead(frame, read)
+      case read: Inst.ReadBack  => instReadBack(frame, read)
       case Inst.CapBegin(index) =>
         frame.capBegin(index)
         true

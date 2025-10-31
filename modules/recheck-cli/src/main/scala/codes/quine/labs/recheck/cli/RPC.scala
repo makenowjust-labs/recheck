@@ -218,7 +218,7 @@ object RPC {
   private[cli] def find(handlerMap: Map[String, Handler], optID: Option[ID], method: String): Result[Handler] =
     handlerMap.get(method) match {
       case Some(handler) => Result.ok(handler)
-      case None =>
+      case None          =>
         Result.raiseIf(optID.isDefined)(ErrorResponse.MethodNotFound(optID.get, s"method '$method' is not found"))
     }
 
