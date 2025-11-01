@@ -29,7 +29,7 @@
     "remark-math": "3.0.1"
   },
   "devDependencies": {
-    "@tsconfig/docusaurus": "2.0.4",
+    "@tsconfig/docusaurus": "2.0.5",
     "prettier": "3.5.3",
     "typescript": "5.9.3"
   },
