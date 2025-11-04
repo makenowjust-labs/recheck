@@ -38,7 +38,6 @@ ThisBuild / releaseVersion := {
 lazy val root = project
   .in(file("."))
   .settings(
-    sonatypeProfileName := "codes.quine",
     publish / skip := true,
     coverageEnabled := false
   )
