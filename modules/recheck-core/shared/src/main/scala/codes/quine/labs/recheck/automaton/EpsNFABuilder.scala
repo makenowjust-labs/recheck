@@ -207,7 +207,7 @@ private class EpsNFABuilder(
       } else (i, i)
     case LookAhead(_, _)  => throw new UnsupportedException("look-ahead assertion")
     case LookBehind(_, _) => throw new UnsupportedException("look-behind assertion")
-    case atom: AtomNode =>
+    case atom: AtomNode   =>
       val ch0 = atom.toIChar(unicode)
       val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
       val chs = atom match {

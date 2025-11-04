@@ -240,7 +240,7 @@ private[vm] class ProgramBuilder(
     case LookAhead(true, child)   => wrapLookAhead(buildNegativeLookAround(child))
     case LookBehind(false, child) => wrapLookBehind(buildPositiveLookAround(child))
     case LookBehind(true, child)  => wrapLookBehind(buildNegativeLookAround(child))
-    case Character(c0) =>
+    case Character(c0)            =>
       val c = if (ignoreCase) UChar.canonicalize(c0, unicode) else c0
       emitRead(ReadKind.Char(c), node.loc)
     case node @ CharacterClass(invert, _) =>

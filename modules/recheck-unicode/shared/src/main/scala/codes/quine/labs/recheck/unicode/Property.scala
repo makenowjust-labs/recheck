@@ -310,9 +310,9 @@ private[unicode] object Property {
 
   /** Returns an interval set corresponding to the binary property. */
   def binary(name: String): Option[IntervalSet[UChar]] = BinaryPropertyAliases.getOrElse(name, name) match {
-    case "ASCII"    => Some(ASCII)
-    case "Any"      => Some(Any)
-    case "Assigned" => Some(Assigned)
+    case "ASCII"                                    => Some(ASCII)
+    case "Any"                                      => Some(Any)
+    case "Assigned"                                 => Some(Assigned)
     case name if BinaryPropertyNames.contains(name) =>
       Some(PropertyData.BinaryPropertyMap(name))
     case _ => None

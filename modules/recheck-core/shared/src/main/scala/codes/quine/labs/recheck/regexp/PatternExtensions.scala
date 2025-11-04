@@ -52,7 +52,7 @@ object PatternExtensions {
     def existsLineAssertionInMiddle(implicit ctx: Context): Boolean = ctx.interrupt {
       def loop(isBegin: Boolean, isEnd: Boolean, node: Node): Boolean = ctx.interrupt(node match {
         case Disjunction(ns) => ns.exists(loop(isBegin, isEnd, _))
-        case Sequence(ns) =>
+        case Sequence(ns)    =>
           ns match {
             case n1 +: ns :+ n2 =>
               loop(isBegin, false, n1) || ns.exists(loop(false, false, _)) || loop(false, isEnd, n2)
@@ -136,7 +136,7 @@ object PatternExtensions {
         case Capture(_, n)         => loop(n)
         case NamedCapture(_, _, n) => loop(n)
         case Group(n)              => loop(n)
-        case Repeat(q, n) =>
+        case Repeat(q, n)          =>
           q.normalized match {
             case Quantifier.Unbounded(_, _) => false
             case _                          => loop(n)
@@ -189,7 +189,7 @@ object PatternExtensions {
           case Repeat(_, n)          => loop(n)
           case LookAhead(_, n)       => loop(n)
           case LookBehind(_, n)      => loop(n)
-          case atom: AtomNode =>
+          case atom: AtomNode        =>
             val ch = atom.toIChar(unicode)
             Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch)
           case Dot() => Vector(IChar.dot(ignoreCase, dotAll, unicode))
@@ -296,7 +296,7 @@ object PatternExtensions {
       case Capture(_, n)         => n.canMatchEmpty
       case NamedCapture(_, _, n) => n.canMatchEmpty
       case Group(n)              => n.canMatchEmpty
-      case Repeat(q, n) =>
+      case Repeat(q, n)          =>
         q.normalized match {
           case Quantifier.Exact(m, _)      => m == 0 || n.canMatchEmpty
           case Quantifier.Unbounded(m, _)  => m == 0 || n.canMatchEmpty
@@ -313,7 +313,7 @@ object PatternExtensions {
 
     /** Converts this pattern to a corresponding interval set. */
     def toIChar(unicode: Boolean): IChar = atom match {
-      case Character(c) => IChar(c)
+      case Character(c)                 => IChar(c)
       case SimpleEscapeClass(invert, k) =>
         val char = k match {
           case EscapeClassKind.Digit => IChar.Digit
