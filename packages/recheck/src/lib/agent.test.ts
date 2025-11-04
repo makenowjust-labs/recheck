@@ -26,7 +26,7 @@ test("start", async () => {
 test("start: invalid", async () => {
   await expect(
     start("node", [invalid], ["pipe", "pipe", "ignore"]),
-  ).rejects.toThrowError();
+  ).rejects.toThrow();
 });
 
 test("Agent#request", async () => {

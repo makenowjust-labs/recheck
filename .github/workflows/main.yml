@@ -138,7 +138,7 @@ jobs:
     timeout-minutes: 5
     strategy:
       matrix:
-        node: [ 20, 22, 23 ]
+        node: [ 20, 22, 24 ]
     name: Node v${{ matrix.node }} Test
     steps:
       - uses: actions/checkout@v5
