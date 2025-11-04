@@ -4,6 +4,7 @@ Misc:
 
 - [#1583](https://github.com/makenowjust-labs/recheck/pull/1583) Update circe-generic to 0.14.15 ([@makenowjust](https://github.com/makenowjust))
 - [#1577](https://github.com/makenowjust-labs/recheck/pull/1577) Update circe-scalajs to 0.14.15 ([@makenowjust](https://github.com/makenowjust))
+- [#1576](https://github.com/makenowjust-labs/recheck/pull/1576) Update circe-core, circe-generic, ... to 0.14.15 ([@makenowjust](https://github.com/makenowjust))
 
 # 4.5.0 (2025-03-02)
 
