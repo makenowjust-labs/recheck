@@ -226,7 +226,7 @@ jobs:
     needs: [build, scala-test]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     name: Publish to Maven Central
     steps:
       - uses: actions/checkout@v5
