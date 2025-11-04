@@ -40,7 +40,21 @@ Because it is just an ESLint plugin, you should install `eslint` package of cour
 
 ## Usage
 
-To enable the plugin, you should add the following configuration to your `.eslintrc.json`.
+To enable the plugin, you should add the following configuration to your `eslint.config.js` (ESlint v9 or later) or `.eslintrc.json` (ESLint v8 or earlier).
+
+<Tabs groupId="eslint-config">
+<TabItem value="eslint.config.js" label="eslint.config.js (ESLint v9 or later)">
+
+```js title="eslint.config.js"
+import { defineConfig } from "eslint/config";
+import redosPlugin from "eslint-plugin-redos";
+
+export default defineConfig([redosPlugin.configs.flat.recommended]);
+```
+
+</TabItem>
+
+<TabItem value=".eslintrc.json" label=".eslintrc.json (ESLint v8 or earlier)">
 
 ```json title=".eslintrc.json"
 {
@@ -48,7 +62,32 @@ To enable the plugin, you should add the following configuration to your `.eslin
 }
 ```
 
+</TabItem>
+</Tabs>
+
 Or, you could add the following manual configuration.
+
+<Tabs groupId="eslint-config">
+<TabItem value="eslint.config.js" label="eslint.config.js (ESLint v9 or later)">
+
+```js title="eslint.config.js"
+import { defineConfig } from "eslint/config";
+import redosPlugin from "eslint-plugin-redos";
+
+export default defineConfig([
+  {
+    plugins: {
+      redos: redosPlugin,
+    },
+    rules: {
+      "redos/no-vulnerable": "error",
+    },
+  },
+]);
+```
+
+</TabItem>
+<TabItem value=".eslintrc.json" label=".eslintrc.json (ESLint v8 or earlier)">
 
 ```json title=".eslintrc.json"
 {
@@ -58,6 +97,9 @@ Or, you could add the following manual configuration.
   }
 }
 ```
+
+</TabItem>
+</Tabs>
 
 This plugin contains the only one rule **`redos/no-vulnerable`**.
 

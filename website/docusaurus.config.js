@@ -13,11 +13,17 @@ const config = {
   url: "https://makenowjust-labs.github.io",
   baseUrl: "/recheck/",
   onBrokenLinks: "throw",
-  onBrokenMarkdownLinks: "warn",
   favicon: "img/favicon.png",
   organizationName: "makenowjust-labs",
   projectName: "recheck",
   trailingSlash: true,
+
+  markdown: {
+    hooks: {
+      onBrokenMarkdownImages: "warn",
+      onBrokenMarkdownLinks: "warn",
+    },
+  },
 
   presets: [
     [

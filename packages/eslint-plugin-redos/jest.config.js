@@ -1,7 +1,7 @@
 // @ts-check
 
 module.exports =
-  /** @type {import('@jest/types').Config} */
+  /** @type {import("jest").Config} */
   ({
     roots: ["<rootDir>/src"],
     testMatch: ["**/?(*.)test.+(js|ts|tsx)"],
