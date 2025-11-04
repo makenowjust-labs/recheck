@@ -196,7 +196,6 @@ The object value enables the caching feature, and it specifies following caching
   A location of cache file. (Default: `node_modules/.cache/eslint-plugin-redos/recheck-cache.json`)
 - `cache.strategy`:
   A strategy to cache results. The following values are available.
-
   - `'aggressive'`: Cache all results. Some checker (e.g. fuzzing checker) cause false-negative, so it is a bit unsafe.
   - `'conservative'` (default): Cache only correct results. In other words, only results reported by the automaton checker are cached.
 
