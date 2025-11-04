@@ -8,6 +8,7 @@ Misc:
 - [#1582](https://github.com/makenowjust-labs/recheck/pull/1582) Update sbt-scalafix to 0.14.4 ([@makenowjust](https://github.com/makenowjust))
 - [#1544](https://github.com/makenowjust-labs/recheck/pull/1544) Update sbt-ci-release to 1.11.2 ([@makenowjust](https://github.com/makenowjust))
 - [#1501](https://github.com/makenowjust-labs/recheck/pull/1501) Update jest monorepo to v30 (major) ([@renovate[bot]](https://github.com/apps/renovate))
+- [#1510](https://github.com/makenowjust-labs/recheck/pull/1510) Update dependency prettier to v3.6.2 ([@renovate[bot]](https://github.com/apps/renovate))
 
 # 4.5.0 (2025-03-02)
 
