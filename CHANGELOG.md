@@ -6,6 +6,7 @@ Misc:
 - [#1577](https://github.com/makenowjust-labs/recheck/pull/1577) Update circe-scalajs to 0.14.15 ([@makenowjust](https://github.com/makenowjust))
 - [#1576](https://github.com/makenowjust-labs/recheck/pull/1576) Update circe-core, circe-generic, ... to 0.14.15 ([@makenowjust](https://github.com/makenowjust))
 - [#1582](https://github.com/makenowjust-labs/recheck/pull/1582) Update sbt-scalafix to 0.14.4 ([@makenowjust](https://github.com/makenowjust))
+- [#1544](https://github.com/makenowjust-labs/recheck/pull/1544) Update sbt-ci-release to 1.11.2 ([@makenowjust](https://github.com/makenowjust))
 
 # 4.5.0 (2025-03-02)
 
