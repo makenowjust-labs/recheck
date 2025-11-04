@@ -39,7 +39,7 @@ test("jar: invalid resolve (2)", () => {
     throw err;
   });
 
-  expect(() => exe.jar()).toThrowError();
+  expect(() => exe.jar()).toThrow();
 });
 
 test("bin", () => {
@@ -77,5 +77,5 @@ test("bin: invalid resolve (2)", () => {
     throw err;
   });
 
-  expect(() => exe.bin()).toThrowError();
+  expect(() => exe.bin()).toThrow();
 });

@@ -89,7 +89,7 @@ test("check: java (2)", async () => {
   const ensure = jest.spyOn(java, "ensure");
   ensure.mockResolvedValueOnce(null);
 
-  expect(main.check("^(a|a)+$", "")).rejects.toThrowError(
+  expect(main.check("^(a|a)+$", "")).rejects.toThrow(
     "there is no available implementation",
   );
 });
@@ -114,7 +114,7 @@ test("check: native (2)", async () => {
   const ensure = jest.spyOn(native, "ensure");
   ensure.mockResolvedValueOnce(null);
 
-  expect(main.check("^(a|a)+$", "")).rejects.toThrowError(
+  expect(main.check("^(a|a)+$", "")).rejects.toThrow(
     "there is no available implementation",
   );
 });
@@ -139,7 +139,7 @@ test("check: invalid", async () => {
   const backend = jest.spyOn(env, "RECHECK_BACKEND");
   backend.mockReturnValueOnce("invalid" as any);
 
-  expect(main.check("^(a|a)+$", "")).rejects.toThrowError(
+  expect(main.check("^(a|a)+$", "")).rejects.toThrow(
     "invalid backend: invalid",
   );
 });
@@ -167,7 +167,7 @@ test("checkSync: invalid", () => {
   const backend = jest.spyOn(env, "RECHECK_SYNC_BACKEND");
   backend.mockReturnValueOnce("invalid" as any);
 
-  expect(() => main.checkSync("^(a|a)+$", "")).toThrowError(
+  expect(() => main.checkSync("^(a|a)+$", "")).toThrow(
     "invalid sync backend: invalid",
   );
 });
