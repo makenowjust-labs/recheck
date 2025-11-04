@@ -1,3 +1,9 @@
+# dev
+
+Misc:
+
+- [#1583](https://github.com/makenowjust-labs/recheck/pull/1583) Update circe-generic to 0.14.15 ([@makenowjust](https://github.com/makenowjust))
+
 # 4.5.0 (2025-03-02)
 
 New Features:
