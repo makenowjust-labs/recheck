@@ -13,7 +13,7 @@ export const jar: () => string | null = () => {
   try {
     const exe = __mock__require
       .resolve("recheck-jar/package.json")
-      .replace(/\/package\.json$/, "/recheck.jar");
+      .replace(/package\.json$/, "recheck.jar");
     return exe;
   } catch (err: any) {
     if (err && err.code == "MODULE_NOT_FOUND") {
@@ -60,9 +60,7 @@ export const bin: () => string | null = () => {
     /* c8 ignore next */
     const bin = isWin32 ? "recheck.exe" : "recheck";
     const pkg = `recheck-${os}-${cpu}/package.json`;
-    const exe = __mock__require
-      .resolve(pkg)
-      .replace(/\/package\.json$/, `/${bin}`);
+    const exe = __mock__require.resolve(pkg).replace(/package\.json$/, bin);
     return exe;
   } catch (err: any) {
     if (err && err.code == "MODULE_NOT_FOUND") {

@@ -15,7 +15,7 @@ afterEach(() => {
 });
 
 test("jar", () => {
-  expect(exe.jar()).toMatch(/recheck-jar\/recheck\.jar$/);
+  expect(exe.jar()).toMatch(/recheck-jar[/\\]recheck\.jar$/);
 
   process.env["RECHECK_JAR"] = "x";
   expect(exe.jar()).toBe("x");
@@ -44,7 +44,7 @@ test("jar: invalid resolve (2)", () => {
 
 test("bin", () => {
   if (isSupported) {
-    expect(exe.bin()).toMatch(/recheck-\w+-\w+\/recheck(?:\.exe)?$/);
+    expect(exe.bin()).toMatch(/recheck-\w+-\w+[/\\]recheck(?:\.exe)?$/);
   }
 
   process.env["RECHECK_BIN"] = "x";
