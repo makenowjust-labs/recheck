@@ -14,7 +14,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 5
     name: Scala Build
     outputs:
       version: ${{ steps.save-version.outputs.version }}
@@ -60,7 +60,7 @@ jobs:
   scala-lint:
     needs: [build]
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 5
     name: Scala Lint
     steps:
       - uses: actions/checkout@v5
@@ -87,7 +87,7 @@ jobs:
 
   node-lint:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 5
     name: Node Lint
     steps:
       - uses: actions/checkout@v5
@@ -106,7 +106,7 @@ jobs:
 
   scala-test:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 5
     name: Scala Test
     steps:
       - uses: actions/checkout@v5
@@ -135,7 +135,7 @@ jobs:
   node-test:
     needs: [build, node-lint]
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 5
     strategy:
       matrix:
         node: [ 20, 22, 24 ]
@@ -171,18 +171,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-13, macos-14, ubuntu-22.04, windows-2022]
+        os: [macos-15-intel, macos-15, ubuntu-24.04, windows-2025]
         include:
-          - os: macos-13
+          - os: macos-15-intel
             artifact_filename: recheck-darwin-x64
             local_path: modules/recheck-cli/target/native-image/recheck
-          - os: macos-14
+          - os: macos-15
             artifact_filename: recheck-darwin-arm64
             local_path: modules/recheck-cli/target/native-image/recheck
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             artifact_filename: recheck-linux-x64
             local_path: modules/recheck-cli/target/native-image/recheck
-          - os: windows-2022
+          - os: windows-2025
             artifact_filename: recheck-win32-x64.exe
             local_path: modules/recheck-cli/target/native-image/recheck.exe
     runs-on: ${{ matrix.os }}
@@ -210,9 +210,9 @@ jobs:
           path: |
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
-      - if: matrix.os != 'windows-2022'
+      - if: matrix.os != 'windows-2025'
         run: sbt cli/nativeImage
-      - if: matrix.os == 'windows-2022'
+      - if: matrix.os == 'windows-2025'
         name: Run sbt cli/nativeImage
         shell: cmd
         run: >-
@@ -379,7 +379,7 @@ jobs:
     needs: [build]
     if: github.ref_name == 'main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 5
     name: Build website
     steps:
       - uses: actions/checkout@v5
@@ -404,14 +404,14 @@ jobs:
 
   gh-pages-deploy:
     needs: [gh-pages-build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    timeout-minutes: 15
     name: Deploy to GitHub Pages
     steps:
       - name: Deploy to GitHub Pages
