@@ -29,7 +29,7 @@ test("jar", () => {
 test("jar: not found", () => {
   const existsSync = jest.spyOn(require("fs"), "existsSync");
   existsSync.mockReturnValueOnce(false);
-  
+
   expect(exe.jar()).toBeNull();
 });
 
