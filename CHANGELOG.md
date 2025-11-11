@@ -15,6 +15,7 @@ Misc:
 - [#1501](https://github.com/makenowjust-labs/recheck/pull/1501) Update jest monorepo to v30 (major) ([@renovate[bot]](https://github.com/apps/renovate))
 - [#1510](https://github.com/makenowjust-labs/recheck/pull/1510) Update dependency prettier to v3.6.2 ([@renovate[bot]](https://github.com/apps/renovate))
 - [#1622](https://github.com/makenowjust-labs/recheck/pull/1622) Update GH action timeout to 15 min ([@makenowjust](https://github.com/makenowjust))
+- [#1625](https://github.com/makenowjust-labs/recheck/pull/1625) Update timeout and runners to build ([@makenowjust](https://github.com/makenowjust))
 
 # 4.5.0 (2025-03-02)
 
