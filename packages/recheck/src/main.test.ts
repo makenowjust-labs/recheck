@@ -9,7 +9,7 @@ import * as native from "./lib/native";
 const RECHECK_JAR = `${__dirname}/../../../modules/recheck-cli/target/scala-2.13/recheck.jar`;
 const RECHECK_BIN = `${__dirname}/../../../modules/recheck-cli/target/native-image/recheck`;
 
-jest.setTimeout(10000);
+jest.setTimeout(30 * 1000);
 
 jest.mock("synckit");
 jest.mock("./lib/env");
@@ -17,7 +17,6 @@ jest.mock("./lib/java");
 jest.mock("./lib/native");
 
 beforeEach(() => {
-  jest.setTimeout(30 * 1000);
   main.__mock__.agent = undefined;
   main.__mock__.pool = null;
 });

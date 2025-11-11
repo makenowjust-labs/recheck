@@ -1,5 +1,7 @@
 import * as exe from "./exe";
 
+jest.mock("fs");
+
 const isSupported =
   typeof exe.osNames[process.platform] !== "undefined" &&
   typeof exe.cpuNames[process.arch] !== "undefined";
@@ -15,10 +17,20 @@ afterEach(() => {
 });
 
 test("jar", () => {
+  const existsSync = jest.spyOn(require("fs"), "existsSync");
+  existsSync.mockReturnValueOnce(true);
+
   expect(exe.jar()).toMatch(/recheck-jar[/\\]recheck\.jar$/);
 
   process.env["RECHECK_JAR"] = "x";
   expect(exe.jar()).toBe("x");
+});
+
+test("jar: not found", () => {
+  const existsSync = jest.spyOn(require("fs"), "existsSync");
+  existsSync.mockReturnValueOnce(false);
+  
+  expect(exe.jar()).toBeNull();
 });
 
 test("jar: invalid resolve (1)", () => {
@@ -43,6 +55,9 @@ test("jar: invalid resolve (2)", () => {
 });
 
 test("bin", () => {
+  const existsSync = jest.spyOn(require("fs"), "existsSync");
+  existsSync.mockReturnValueOnce(true);
+
   if (isSupported) {
     expect(exe.bin()).toMatch(/recheck-\w+-\w+[/\\]recheck(?:\.exe)?$/);
   }
