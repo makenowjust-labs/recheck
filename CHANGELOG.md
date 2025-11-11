@@ -18,6 +18,7 @@ Misc:
 - [#1625](https://github.com/makenowjust-labs/recheck/pull/1625) Update timeout and runners to build ([@makenowjust](https://github.com/makenowjust))
 - [#1626](https://github.com/makenowjust-labs/recheck/pull/1626) Run the `native-build` task on a `schedule` event ([@makenowjust](https://github.com/makenowjust))
 - [#1627](https://github.com/makenowjust-labs/recheck/pull/1627) Add the `--detectOpenHandles` option to run test ([@makenowjust](https://github.com/makenowjust))
+- [#1628](https://github.com/makenowjust-labs/recheck/pull/1628) Enable `--forceExit` option of Jest ([@makenowjust](https://github.com/makenowjust))
 
 # 4.5.0 (2025-03-02)
 
