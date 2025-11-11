@@ -161,8 +161,8 @@ jobs:
       - name: Build
         run: yarn lerna run build
       - name: Test
-        # It needs two `--` actually: one is for Yarn and the latter is for Lerna.
-        run: yarn lerna run test -- -- --coverage
+        # It needs two `--`. One is for Yarn and the latter is for Lerna.
+        run: yarn lerna run test -- -- --coverage --detectOpenHandles
       - uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
