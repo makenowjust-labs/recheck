@@ -1,3 +1,4 @@
+import { existsSync } from "fs";
 import * as env from "./env";
 
 /** Exposes this to mock `require.resolve` on testing. */
@@ -14,6 +15,13 @@ export const jar: () => string | null = () => {
     const exe = __mock__require
       .resolve("recheck-jar/package.json")
       .replace(/package\.json$/, "recheck.jar");
+
+    // On development or CI environments, the jar file may not exist.
+    /* c8 ignore next 3 */
+    if (!existsSync(exe)) {
+      return null;
+    }
+
     return exe;
   } catch (err: any) {
     if (err && err.code == "MODULE_NOT_FOUND") {
@@ -61,6 +69,13 @@ export const bin: () => string | null = () => {
     const bin = isWin32 ? "recheck.exe" : "recheck";
     const pkg = `recheck-${os}-${cpu}/package.json`;
     const exe = __mock__require.resolve(pkg).replace(/package\.json$/, bin);
+
+    // On development or CI environments, the binary file may not exist.
+    /* c8 ignore next 3 */
+    if (!existsSync(exe)) {
+      return null;
+    }
+
     return exe;
   } catch (err: any) {
     if (err && err.code == "MODULE_NOT_FOUND") {

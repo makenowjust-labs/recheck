@@ -159,12 +159,15 @@ export async function start(
 
     // Remove references from the child process.
     child.unref();
-    /* c8 ignore next 6 */
+    /* c8 ignore next 9 */
     if ((child.stdin as any)?.unref) {
       (child.stdin as any).unref();
     }
     if ((child.stdout as any)?.unref) {
       (child.stdout as any).unref();
+    }
+    if ((child.stderr as any)?.unref) {
+      (child.stderr as any).unref();
     }
 
     // Waits `ping` method response.
