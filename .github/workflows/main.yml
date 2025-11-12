@@ -169,7 +169,7 @@ jobs:
       - name: Build
         run: pnpm -r run build
       - name: Test
-        run: pnpm -r test --coverage --forceExit --detectOpenHandles
+        run: pnpm exec lerna run test -- --coverage --forceExit --detectOpenHandles
       - uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
