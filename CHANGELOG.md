@@ -4,6 +4,7 @@ Fixes:
 
 - [#1615](https://github.com/makenowjust-labs/recheck/pull/1615) Support ESLint flat config ([@makenowjust](https://github.com/makenowjust))
 - [#1620](https://github.com/makenowjust-labs/recheck/pull/1620) Fix #1616: resolve the windows path issue ([@makenowjust](https://github.com/makenowjust))
+- [#1631](https://github.com/makenowjust-labs/recheck/pull/1631) Switch to pnpm ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
