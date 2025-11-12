@@ -32,7 +32,7 @@
     "synckit": "0.11.11"
   },
   "optionalDependencies": {
-    "recheck-jar": "0.0.0",
+    "recheck-jar": "4.5.0",
     "recheck-linux-x64": "0.0.0",
     "recheck-macos-x64": "0.0.0",
     "recheck-macos-arm64": "0.0.0",

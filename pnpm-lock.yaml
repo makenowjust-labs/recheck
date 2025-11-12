@@ -90,8 +90,8 @@ importers:
         version: 5.9.3
     optionalDependencies:
       recheck-jar:
-        specifier: 0.0.0
-        version: link:../recheck-jar
+        specifier: 4.5.0
+        version: 4.5.0
       recheck-linux-x64:
         specifier: 0.0.0
         version: link:../recheck-linux-x64
@@ -7122,6 +7122,9 @@ packages:
   readdirp@3.6.0:
     resolution: {integrity: sha512-hOS089on8RduqdbhvQ5Z37A0ESjsqz6qnRcffsMU3495FuTdqSm+7bhJ29JvIOsBDEEnan5DPu9t3To9VRlMzA==}
     engines: {node: '>=8.10.0'}
+
+  recheck-jar@4.5.0:
+    resolution: {integrity: sha512-Ad7oCQmY8cQLzd3QVNXjzZ+S6MbImGhR4AaW2yiGzteOfMV45522rt6nSzFyt8p3mCEaMcm/4MoZrMSxUcCbrA==}
 
   recma-build-jsx@1.0.0:
     resolution: {integrity: sha512-8GtdyqaBcDfva+GUKDr3nev3VpKAhup1+RvkMvUxURHpW7QyIvk9F5wz7Vzo06CEMSilw6uArgRqhpiUcWp8ew==}
@@ -17509,6 +17512,9 @@ snapshots:
   readdirp@3.6.0:
     dependencies:
       picomatch: 2.3.1
+
+  recheck-jar@4.5.0:
+    optional: true
 
   recma-build-jsx@1.0.0:
     dependencies:
