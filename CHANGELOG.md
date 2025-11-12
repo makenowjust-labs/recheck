@@ -1,5 +1,9 @@
 # dev
 
+New Features:
+
+- [#1636](https://github.com/makenowjust-labs/recheck/pull/1636) Add a Linux ARM64 build ([@makenowjust](https://github.com/makenowjust))
+
 Fixes:
 
 - [#1615](https://github.com/makenowjust-labs/recheck/pull/1615) Support ESLint flat config ([@makenowjust](https://github.com/makenowjust))
