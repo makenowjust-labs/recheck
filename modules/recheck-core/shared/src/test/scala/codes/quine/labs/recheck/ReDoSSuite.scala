@@ -171,35 +171,35 @@ class ReDoSSuite extends munit.FunSuite {
     )
     assertEquals(
       ReDoS.checkAuto(
-        "^(?:a|a){5}$",
+        "^(?:a|a){3}$",
         "",
         Pattern(
           Sequence(
             Seq(
               LineBegin(),
-              Repeat(Quantifier.Exact(5, false), Group(Disjunction(Seq(Character('a'), Character('a'))))),
+              Repeat(Quantifier.Exact(3, false), Group(Disjunction(Seq(Character('a'), Character('a'))))),
               LineEnd()
             )
           ),
           FlagSet(false, false, false, false, false, false)
         ),
-        Parameters(randomSeed = 0, maxRepeatCount = 5, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
+        Parameters(randomSeed = 0, maxRepeatCount = 3, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
       ),
-      Success(Diagnostics.Safe("^(?:a|a){5}$", "", AttackComplexity.Safe(true), Checker.Fuzz))
+      Success(Diagnostics.Safe("^(?:a|a){3}$", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
     assertEquals(
       ReDoS.checkAuto(
-        "^(?:a|a){5}$",
+        "^(?:a|a){3}$",
         "",
         Pattern(
           Sequence(
-            Seq(LineBegin(), Repeat(Quantifier.Unbounded(5, false), Disjunction(Seq(Character('a'), Character('a')))))
+            Seq(LineBegin(), Repeat(Quantifier.Unbounded(3, false), Disjunction(Seq(Character('a'), Character('a')))))
           ),
           FlagSet(false, false, false, false, false, false)
         ),
-        Parameters(randomSeed = 0, maxNFASize = 5, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
+        Parameters(randomSeed = 0, maxNFASize = 3, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
       ),
-      Success(Diagnostics.Safe("^(?:a|a){5}$", "", AttackComplexity.Safe(true), Checker.Fuzz))
+      Success(Diagnostics.Safe("^(?:a|a){3}$", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
     assertEquals(
       ReDoS.checkAuto(
