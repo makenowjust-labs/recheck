@@ -1,5 +1,5 @@
-# `recheck-macos-arm64`
+# recheck-linux-x64
 
-> The macOS 64-bit (ARM) binary for recheck.
+> The Linux 64-bit (ARM) binary for recheck.
 
 See [makenowjust-labs/recheck](https://github.com/makenowjust-labs/recheck) for details.

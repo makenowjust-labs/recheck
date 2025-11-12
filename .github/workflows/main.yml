@@ -180,7 +180,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15-intel, macos-15, ubuntu-24.04, windows-2025]
+        os: [macos-15-intel, macos-15, ubuntu-24.04, ubuntu-24.04-arm, windows-2025]
         include:
           - os: macos-15-intel
             artifact_filename: recheck-darwin-x64
@@ -190,6 +190,9 @@ jobs:
             local_path: modules/recheck-cli/target/native-image/recheck
           - os: ubuntu-24.04
             artifact_filename: recheck-linux-x64
+            local_path: modules/recheck-cli/target/native-image/recheck
+          - os: ubuntu-24.04-arm
+            artifact_filename: recheck-linux-arm64
             local_path: modules/recheck-cli/target/native-image/recheck
           - os: windows-2025
             artifact_filename: recheck-win32-x64.exe
@@ -326,6 +329,10 @@ jobs:
         with:
           name: recheck-linux-x64
           path: packages/recheck-linux-x64/
+      - uses: actions/download-artifact@v6
+        with:
+          name: recheck-linux-arm64
+          path: packages/recheck-linux-arm64/
       - uses: actions/download-artifact@v6
         with:
           name: recheck-win32-x64.exe
