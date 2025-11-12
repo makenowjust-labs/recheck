@@ -1,0 +1,13 @@
+packages:
+  - packages/*
+  - website
+
+linkWorkspacePackages: true
+
+onlyBuiltDependencies:
+  - core-js
+  - core-js-pure
+  - esbuild
+  - nx
+  - sharp
+  - unrs-resolver
