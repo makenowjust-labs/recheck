@@ -92,6 +92,9 @@ importers:
       recheck-jar:
         specifier: 0.0.0
         version: link:../recheck-jar
+      recheck-linux-arm64:
+        specifier: 0.0.0
+        version: link:../recheck-linux-arm64
       recheck-linux-x64:
         specifier: 0.0.0
         version: link:../recheck-linux-x64
@@ -106,6 +109,8 @@ importers:
         version: link:../recheck-windows-x64
 
   packages/recheck-jar: {}
+
+  packages/recheck-linux-arm64: {}
 
   packages/recheck-linux-x64: {}
 
