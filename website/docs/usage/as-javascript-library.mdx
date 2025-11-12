@@ -133,12 +133,13 @@ If you use pure JavaScript backend or for the same reason synchronous API, the `
 
 ### `RECHECK_BACKEND`
 
-The JavaScript library is just a wrapper for the `recheck` CLI and Scala.js build. You can specify the backend via the `RECHECK_BACKEND` environment variable. There are four options to the `RECHECK_BACKEND` value.
+The JavaScript library is just a wrapper for the `recheck` CLI and Scala.js build. You can specify the backend via the `RECHECK_BACKEND` environment variable.
+There are four options to the `RECHECK_BACKEND` value.
 
 - `RECHECK_BACKEND=auto` (default)
 
   Tries `native` and `java` backends sequentially.
-  If there is a possible backend, it uses this. Otherwise, it uses `worker` backend as a fallback.
+  If a possible backend is found, it is used. Otherwise, the `worker` backend is used as a fallback.
 
 - `RECHECK_BACKEND=native`
 
@@ -148,7 +149,9 @@ The JavaScript library is just a wrapper for the `recheck` CLI and Scala.js buil
   | package name        | OS      | CPU    |
   | ------------------- | ------- | ------ |
   | recheck-linux-x64   | Linux   | x86-64 |
+  | recheck-linux-arm64 | Linux   | ARM64  |
   | recheck-macos-x64   | macOS   | x86-64 |
+  | recheck-macos-arm64 | macOS   | ARM64  |
   | recheck-windows-x64 | Windows | x86-64 |
 
   You can specify the binary path via the `RECHECK_BIN` environment variable manually.

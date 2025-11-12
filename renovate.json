@@ -38,5 +38,18 @@
       "depTypeTemplate": "compiler plugin"
     }
   ],
-  "ignoreDeps": ["hast-util-is-element", "react", "react-dom", "rehype-katex", "remark-math", "recheck", "recheck-jar"]
+  "ignoreDeps": [
+    "hast-util-is-element",
+    "react",
+    "react-dom",
+    "rehype-katex",
+    "remark-math",
+    "recheck",
+    "recheck-jar",
+    "recheck-linux-arm64",
+    "recheck-linux-x64",
+    "recheck-macos-arm64",
+    "recheck-macos-x64",
+    "recheck-windows-x64"
+  ]
 }

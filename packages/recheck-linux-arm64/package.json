@@ -1,7 +1,7 @@
 {
-  "name": "recheck-macos-arm64",
+  "name": "recheck-linux-arm64",
   "version": "0.0.0",
-  "description": "The macOS 64-bit (ARM) binary for recheck.",
+  "description": "The Linux 64-bit (ARM) binary for recheck.",
   "license": "MIT",
   "author": {
     "name": "TSUYUSATO Kitsune",
@@ -16,7 +16,7 @@
     "build": "chmod +x ./recheck || exit 0"
   },
   "os": [
-    "darwin"
+    "linux"
   ],
   "cpu": [
     "arm64"
