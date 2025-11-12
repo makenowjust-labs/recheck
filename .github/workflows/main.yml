@@ -93,18 +93,22 @@ jobs:
     name: Node Lint
     steps:
       - uses: actions/checkout@v5
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: '10'
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'yarn'
+          cache: 'pnpm'
       - name: Install
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Lint
         run: |
-          yarn lerna run lint
+          pnpm -r run lint
       - name: Type Check
         run: |
-          yarn lerna run typecheck
+          pnpm -r run typecheck
 
   scala-test:
     runs-on: ubuntu-24.04
@@ -116,10 +120,10 @@ jobs:
         with:
           jvm: adoptium:1.21.0.2
           apps: sbt
+      # This Node.js is needed for Scala tests, so we don't need to install dependencies.
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'yarn'
       - name: Cache SBT
         uses: actions/cache@v4
         with:
@@ -144,12 +148,16 @@ jobs:
     name: Node v${{ matrix.node }} Test
     steps:
       - uses: actions/checkout@v5
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: '10'
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node }}
-          cache: 'yarn'
+          cache: 'pnpm'
       - name: Install
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v6
         with:
           name: recheck.js
@@ -159,10 +167,9 @@ jobs:
           name: recheck.jar
           path: modules/recheck-cli/target/scala-2.13/
       - name: Build
-        run: yarn lerna run build
+        run: pnpm -r run build
       - name: Test
-        # It needs two `--`. One is for Yarn and the latter is for Lerna.
-        run: yarn lerna run test -- -- --coverage --forceExit --detectOpenHandles
+        run: pnpm -r test --coverage --forceExit --detectOpenHandles
       - uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -274,10 +281,14 @@ jobs:
         with:
           jvm: adoptium:1.21.0.2
           apps: sbt
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: '10'
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'yarn'
+          cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
       - name: Cache SBT
         uses: actions/cache@v4
@@ -294,7 +305,7 @@ jobs:
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
       - name: Install
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v6
         with:
           name: recheck.js
@@ -320,15 +331,15 @@ jobs:
           name: recheck-win32-x64.exe
           path: packages/recheck-windows-x64/
       - name: Build
-        run: NODE_ENV=production yarn lerna run build
+        run: NODE_ENV=production pnpm -r run build
       - name: Publish (beta)
         if: contains(github.ref, '-beta')
-        run: yarn lerna publish --dist-tag next ${{ needs.build.outputs.version }} --yes
+        run: pnpm exec lerna publish --dist-tag next ${{ needs.build.outputs.version }} --yes
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish
         if: "!contains(github.ref, '-beta')"
-        run: yarn lerna publish ${{ needs.build.outputs.version }} --yes
+        run: pnpm exec lerna publish ${{ needs.build.outputs.version }} --yes
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -385,20 +396,24 @@ jobs:
     name: Build website
     steps:
       - uses: actions/checkout@v5
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: '10'
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'yarn'
+          cache: 'pnpm'
       - uses: actions/download-artifact@v6
         with:
           name: recheck.js
           path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
       - name: Install
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Build
         run: |
-          NODE_ENV=production yarn workspace recheck build
-          RECHECK_VERSION=${{ needs.build.outputs.version }} yarn workspace website doc
+          NODE_ENV=production pnpm --filter recheck run build
+          RECHECK_VERSION=${{ needs.build.outputs.version }} pnpm --filter website run doc
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
