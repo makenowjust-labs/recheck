@@ -52,6 +52,8 @@ lazy val root = project
     unicodeJS,
     parseJVM,
     parseJS,
+    resyntaxJVM,
+    resyntaxJVM,
     codecJVM,
     codecJS,
     js,
@@ -349,6 +351,33 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
 
 lazy val parseJVM = parse.jvm
 lazy val parseJS = parse.js
+
+lazy val resyntax = crossProject(JVMPlatform, JSPlatform)
+  .in(file("modules/resyntax"))
+  .settings(
+    name := "resyntax",
+    fork := true,
+    console / initialCommands := """
+      |import codes.quine.labs.resyntax._
+      |import codes.quine.labs.resyntax.ast._
+      |import codes.quine.labs.resyntax.ir._
+      |import codes.quine.labs.resyntax.parser._
+      |""".stripMargin,
+    Compile / console / scalacOptions -= "-Wunused",
+    Test / console / scalacOptions -= "-Wunused",
+    // Dependencies:
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
+    // Settings for test:
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
+    testFrameworks += new TestFramework("munit.Framework")
+  )
+  .jsSettings(
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
+    Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
+  )
+
+lazy val resyntaxJVM = resyntax.jvm
+lazy val resyntaxJS = resyntax.js
 
 lazy val codec = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/recheck-codec"))
