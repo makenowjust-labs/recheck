@@ -376,6 +376,10 @@ jobs:
           path: packages/recheck-linux-x64/
       - uses: actions/download-artifact@v6
         with:
+          name: recheck-linux-arm64
+          path: packages/recheck-linux-arm64/
+      - uses: actions/download-artifact@v6
+        with:
           name: recheck-win32-x64.exe
           path: packages/recheck-windows-x64/
       - name: Rename files
@@ -384,6 +388,7 @@ jobs:
           mv packages/recheck-macos-x64/recheck recheck-macos-x64
           mv packages/recheck-macos-arm64/recheck recheck-macos-arm64
           mv packages/recheck-linux-x64/recheck recheck-linux-x64
+          mv packages/recheck-linux-arm64/recheck recheck-linux-arm64
           mv packages/recheck-windows-x64/recheck.exe recheck-windows-x64.exe
       - name: Release
         uses: softprops/action-gh-release@v2
@@ -393,6 +398,7 @@ jobs:
             recheck-macos-x64
             recheck-macos-arm64
             recheck-linux-x64
+            recheck-linux-arm64
             recheck-windows-x64.exe
 
   gh-pages-build:
