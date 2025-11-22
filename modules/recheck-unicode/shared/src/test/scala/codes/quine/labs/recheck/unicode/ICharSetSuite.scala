@@ -1,9 +1,9 @@
 package codes.quine.labs.recheck.unicode
 
-import codes.quine.labs.recheck.unicode.ICharSet._
+import codes.quine.labs.recheck.unicode.ICharSet.*
 
-class ICharSetSuite extends munit.FunSuite {
-  test("ICharSet.any") {
+class ICharSetSuite extends munit.FunSuite:
+  test("ICharSet.any"):
     assertEquals(ICharSet.any(false, true).pairs, Seq((IChar.Any, CharKind.Normal)))
     assertEquals(ICharSet.any(false, false).pairs, Seq((IChar.Any16, CharKind.Normal)))
 
@@ -12,9 +12,8 @@ class ICharSetSuite extends munit.FunSuite {
 
     assert(ICharSet.any(true, true).pairs.head._1.contains(UChar('s')))
     assert(!ICharSet.any(true, true).pairs.head._1.contains(UChar(0x017f)))
-  }
 
-  test("ICharSet#add") {
+  test("ICharSet#add"):
     assertEquals(
       ICharSet.any(false, false).add(IChar(IntervalSet((UChar('A'), UChar('B'))))),
       ICharSet(
@@ -24,9 +23,8 @@ class ICharSetSuite extends munit.FunSuite {
         )
       )
     )
-  }
 
-  test("ICharSet#refine") {
+  test("ICharSet#refine"):
     val set = ICharSet
       .any(false, false)
       .add(IChar(IntervalSet((UChar('A'), UChar('Z' + 1)))), CharKind.Word)
@@ -38,9 +36,8 @@ class ICharSetSuite extends munit.FunSuite {
         (IChar(IntervalSet((UChar('B'), UChar('Z' + 1)))), CharKind.Word)
       )
     )
-  }
 
-  test("ICharSet#refineInvert") {
+  test("ICharSet#refineInvert"):
     val set = ICharSet
       .any(false, false)
       .add(IChar(IntervalSet((UChar('A'), UChar('Z' + 1)))), CharKind.Word)
@@ -51,9 +48,8 @@ class ICharSetSuite extends munit.FunSuite {
         (IChar(IntervalSet((UChar(0x00), UChar('A')), (UChar('Z' + 1), UChar(0x10000)))), CharKind.Normal: CharKind)
       )
     )
-  }
 
-  test("ICharSet#any") {
+  test("ICharSet#any"):
     val set = ICharSet
       .any(false, false)
       .add(IChar(IntervalSet((UChar('A'), UChar('B')))))
@@ -64,12 +60,9 @@ class ICharSetSuite extends munit.FunSuite {
         (IChar(IntervalSet((UChar(0), UChar('A')), (UChar('B'), UChar(0x10000)))), CharKind.Normal)
       )
     )
-  }
 
-  test("ICharSet#dot") {
+  test("ICharSet#dot"):
     val set = ICharSet
       .any(false, false)
       .add(IChar.LineTerminator)
     assertEquals(set.dot, set.refineInvert(IChar.LineTerminator))
-  }
-}

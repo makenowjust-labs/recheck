@@ -54,7 +54,7 @@ object CaseMapDataGen extends UnicodeDataGen {
     sb.append("\n")
     sb.append("import CaseMap.Conversion\n")
     sb.append("\n")
-    sb.append("private[unicode] object CaseMapData {\n")
+    sb.append("private[unicode] object CaseMapData:\n")
 
     sb.append("  lazy val Upper = Seq(\n")
     for ((offset, domain) <- Upper) sb.append(s"    Conversion(IntervalSet.from($domain).map(UChar(_)), $offset),\n")
@@ -64,7 +64,6 @@ object CaseMapDataGen extends UnicodeDataGen {
     sb.append("  lazy val Fold = Seq(\n")
     for ((offset, domain) <- Fold) sb.append(s"    Conversion(IntervalSet.from($domain).map(UChar(_)), $offset),\n")
     sb.append("  )\n")
-    sb.append("}\n")
 
     sb.result()
   }

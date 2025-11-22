@@ -278,9 +278,6 @@ lazy val unicode = crossProject(JVMPlatform, JSPlatform)
     console / initialCommands := """
       |import codes.quine.labs.recheck.unicode._
       |""".stripMargin,
-    Compile / console / scalacOptions -= "-Wunused",
-    Test / console / scalacOptions -= "-Wunused",
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Generators:
     {
       val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
