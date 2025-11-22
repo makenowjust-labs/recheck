@@ -1,6 +1,6 @@
 package codes.quine.labs.recheck.common
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class ContextSuite extends munit.FunSuite:
   test("Context.apply"):

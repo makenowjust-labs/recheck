@@ -1,6 +1,6 @@
 package codes.quine.labs.recheck.common
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 /** Parameters is an immutable representation of parameters.
   *
