@@ -1,17 +1,13 @@
 package codes.quine.labs.recheck.common
 
 /** Seeder is an enum values to specify a seeder to be used. */
-sealed abstract class Seeder extends Product with Serializable
-
-object Seeder {
-
+enum Seeder:
   /** A seeder by using static analysis. */
-  case object Static extends Seeder {
-    override def toString: String = "static"
-  }
+  case Static
 
   /** A seeder by using dynamic analysis. */
-  case object Dynamic extends Seeder {
-    override def toString: String = "dynamic"
-  }
-}
+  case Dynamic
+
+  override def toString: String = this match
+    case Static  => "static"
+    case Dynamic => "dynamic"

@@ -1,26 +1,22 @@
 package codes.quine.labs.recheck.common
 
 /** Checker is an enum values to specify a checker to be used. */
-sealed abstract class Checker extends Product with Serializable
-
-/** Checker types. */
-object Checker {
-
-  /** Used is a checker to be used in analysis. */
-  sealed abstract class Used extends Checker
-
-  /** A automaton theory based checker. */
-  case object Automaton extends Used {
-    override def toString: String = "automaton"
-  }
+enum Checker:
+  /** An automaton theory based checker. */
+  case Automaton
 
   /** A fuzzing based checker. */
-  case object Fuzz extends Used {
-    override def toString: String = "fuzz"
-  }
+  case Fuzz
 
-  /** An auto checker. */
-  case object Auto extends Checker {
-    override def toString: String = "auto"
-  }
-}
+  /** A checker to automatically select the appropriate checker. */
+  case Auto
+
+  override def toString: String = this match
+    case Automaton => "automaton"
+    case Fuzz      => "fuzz"
+    case Auto      => "auto"
+
+object Checker:
+
+  /** Used is a type union of used checkers. */
+  type Used = Automaton.type | Fuzz.type

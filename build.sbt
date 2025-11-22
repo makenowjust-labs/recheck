@@ -15,14 +15,12 @@ ThisBuild / developers := List(
 )
 ThisBuild / versionScheme := Some("early-semver")
 
-ThisBuild / scalaVersion := "2.13.18"
+ThisBuild / scalaVersion := "3.7.4"
 ThisBuild / scalacOptions ++= Seq(
   "-encoding",
   "UTF-8",
   "-feature",
   "-deprecation",
-  "-Wunused",
-  "-P:bm4:implicit-patterns:n"
 )
 
 // Scalafix config:
@@ -240,11 +238,6 @@ lazy val common = crossProject(JVMPlatform, JSPlatform)
     console / initialCommands := """
       |import codes.quine.labs.recheck.common._
       |""".stripMargin,
-    Compile / console / scalacOptions -= "-Wunused",
-    Test / console / scalacOptions -= "-Wunused",
-    // Dependencies:
-    libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value % Provided,
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "1.2.1" % Test,
     testFrameworks += new TestFramework("munit.Framework")
