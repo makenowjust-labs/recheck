@@ -257,9 +257,6 @@ lazy val exec = crossProject(JVMPlatform, JSPlatform)
     console / initialCommands := """
       |import codes.quine.labs.recheck.exec._
       |""".stripMargin,
-    Compile / console / scalacOptions -= "-Wunused",
-    Test / console / scalacOptions -= "-Wunused",
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "1.2.1" % Test,
     testFrameworks += new TestFramework("munit.Framework")
