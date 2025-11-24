@@ -2,18 +2,17 @@ package codes.quine.labs.recheck.regexp
 
 import scala.collection.mutable
 
-import codes.quine.labs.recheck.regexp.Pattern._
+import codes.quine.labs.recheck.regexp.Pattern.*
 import codes.quine.labs.recheck.unicode.IChar
 import codes.quine.labs.recheck.unicode.UChar
 
 /** Pattern is ECMA-262 `RegExp` pattern. */
-final case class Pattern(node: Node, flagSet: FlagSet) {
+final case class Pattern(node: Node, flagSet: FlagSet):
   override def toString: String =
     s"/${showNode(node)}/${showFlagSet(flagSet)}"
-}
 
 /** Pattern nodes and utilities. */
-object Pattern {
+object Pattern:
 
   /** FlagSet is a set of flag of pattern.
     *
@@ -37,7 +36,7 @@ object Pattern {
   final case class Location(start: Int, end: Int)
 
   /** HasLocation is a base class having a location. */
-  trait HasLocation extends Cloneable {
+  trait HasLocation extends Cloneable:
 
     /** A internal field of the position of this node. */
     private var _loc: Option[Location] = None
@@ -46,25 +45,21 @@ object Pattern {
     def loc: Option[Location] = _loc
 
     /** Returns a new node with the given position. */
-    private[regexp] def withLoc(start: Int, end: Int): this.type = {
+    private[regexp] def withLoc(start: Int, end: Int): this.type =
       // If the position is already set, it returns `this` immediately, for avoiding allocation.
-      if (loc.exists { case Location(s, e) => s == start && e == end }) this
-      else {
-        val cloned = clone().asInstanceOf[this.type]
+      if loc.exists { case Location(s, e) => s == start && e == end } then this
+      else
+        val cloned = clone().asInstanceOf[HasLocation]
         cloned._loc = Some(Location(start, end))
-        cloned
-      }
-    }
+        cloned.asInstanceOf[this.type]
 
     /** Copies the location from the given node if possible. */
     private[regexp] def withLoc(node: HasLocation): this.type =
-      node.loc match {
+      node.loc match
         case Some(Location(start, end)) => withLoc(start, end)
         case None                       => this
-      }
 
     override protected def clone(): AnyRef = super.clone()
-  }
 
   /** Node is a node of pattern [[https://en.wikipedia.org/wiki/Abstract_syntax_tree AST (abstract syntax tree)]]. */
   sealed abstract class Node extends HasLocation with Serializable with Product
@@ -149,7 +144,7 @@ object Pattern {
   sealed abstract class EscapeClassKind extends Serializable with Product
 
   /** EscapeClassKind values. */
-  object EscapeClassKind {
+  object EscapeClassKind:
 
     /** Digit is a `\d` escape class. */
     case object Digit extends EscapeClassKind
@@ -161,21 +156,19 @@ object Pattern {
     case object Space extends EscapeClassKind
 
     /** Show an escape class as a pattern. */
-    private[Pattern] def showEscapeClassKind(kind: EscapeClassKind): String = kind match {
+    private[Pattern] def showEscapeClassKind(kind: EscapeClassKind): String = kind match
       case Digit => "\\d"
       case Word  => "\\w"
       case Space => "\\s"
-    }
-  }
 
   /** Quantifier is a repetition quantifier. */
-  sealed abstract class Quantifier extends HasLocation with Serializable with Product {
+  sealed abstract class Quantifier extends HasLocation with Serializable with Product:
 
     /** Checks backtracking strategy of this quantifier is lazy. */
     def isLazy: Boolean
 
     /** Returns a normalized version of this quantifier. */
-    def normalized: NormalizedQuantifier = this match {
+    def normalized: NormalizedQuantifier = this match
       case Quantifier.Star(isLazy)                            => Quantifier.Unbounded(0, isLazy).withLoc(this)
       case Quantifier.Plus(isLazy)                            => Quantifier.Unbounded(1, isLazy).withLoc(this)
       case Quantifier.Question(isLazy)                        => Quantifier.Bounded(0, 1, isLazy).withLoc(this)
@@ -183,13 +176,11 @@ object Pattern {
       case q: Quantifier.Unbounded                            => q
       case Quantifier.Bounded(min, max, isLazy) if min == max => Quantifier.Exact(min, isLazy).withLoc(this)
       case q: Quantifier.Bounded                              => q
-    }
-  }
 
   /** NormalizedQuantifier is a normalized version of [[Quantifier]]. */
   sealed abstract class NormalizedQuantifier extends Quantifier
 
-  object Quantifier {
+  object Quantifier:
 
     /** Star is a star quantifier `*`. */
     final case class Star(isLazy: Boolean) extends Quantifier
@@ -208,10 +199,9 @@ object Pattern {
 
     /** Bounded is a bonded repetition quantifier `{min,max}`. */
     final case class Bounded(min: Int, max: Int, isLazy: Boolean) extends NormalizedQuantifier
-  }
 
   /** Shows a [[Node]] as a pattern. */
-  private[regexp] def showNode(node: Node): String = node match {
+  private[regexp] def showNode(node: Node): String = node match
     case Disjunction(ns)                      => ns.map(showNodeInDisjunction).mkString("|")
     case Sequence(ns)                         => ns.map(showNodeInSequence).mkString
     case Capture(_, n)                        => s"(${showNode(n)})"
@@ -238,50 +228,45 @@ object Pattern {
     case Dot()                                => "."
     case BackReference(i)                     => s"\\$i"
     case NamedBackReference(_, name)          => s"\\k<$name>"
-  }
 
   /** Shows a node as a [[Disjunction]] child.
     *
     * It wraps a node by parentheses if needed.
     */
   private def showNodeInDisjunction(node: Node): String =
-    node match {
+    node match
       case _: Disjunction => s"(?:${showNode(node)})"
       case _              => showNode(node)
-    }
 
   /** Shows a node as a [[Sequence]] child.
     *
     * It wraps a node by parentheses if needed.
     */
   private def showNodeInSequence(node: Node): String =
-    node match {
+    node match
       case _: Disjunction | _: Sequence => s"(?:${showNode(node)})"
       case _                            => showNode(node)
-    }
 
   /** Shows a node as a [[Repeat]] and similar classes child.
     *
     * It wraps a node by parentheses if needed.
     */
   private def showNodeInRepeat(node: Node): String =
-    node match {
+    node match
       case _: Disjunction | _: Sequence | _: Repeat | _: WordBoundary | _: LineBegin | _: LineEnd | _: LookAhead |
           _: LookBehind =>
         s"(?:${showNode(node)})"
       case _ => showNode(node)
-    }
 
   /** Shows a [[ClassNode]] as a pattern. */
   private def showClassNode(node: ClassNode): String =
-    node match {
+    node match
       case Character(u)       => showUCharInClass(u)
       case ClassRange(u1, u2) => s"${showUCharInClass(u1)}-${showUCharInClass(u2)}"
       case node: Node         => showNode(node)
-    }
 
   /** Shows a [[FlagSet]] as a pattern. */
-  private[regexp] def showFlagSet(flagSet: FlagSet): String = {
+  private[regexp] def showFlagSet(flagSet: FlagSet): String =
     val sb = new mutable.StringBuilder
     if (flagSet.global) sb.append('g')
     if (flagSet.ignoreCase) sb.append('i')
@@ -290,28 +275,24 @@ object Pattern {
     if (flagSet.unicode) sb.append('u')
     if (flagSet.sticky) sb.append('y')
     sb.result()
-  }
 
   /** Shows a [[Quantifier]] as a pattern. */
-  private[regexp] def showQuantifier(quantifier: Quantifier): String = {
-    val s = quantifier match {
+  private[regexp] def showQuantifier(quantifier: Quantifier): String =
+    val s = quantifier match
       case Quantifier.Star(_)              => "*"
       case Quantifier.Plus(_)              => "+"
       case Quantifier.Question(_)          => "?"
       case Quantifier.Exact(n, _)          => s"{$n}"
       case Quantifier.Unbounded(min, _)    => s"{$min,}"
       case Quantifier.Bounded(min, max, _) => s"{$min,$max}"
-    }
-    if (quantifier.isLazy) s"$s?" else s
-  }
+    if quantifier.isLazy then s"$s?" else s
 
   /** Shows a character as a pattern. */
   private def showUChar(u: UChar): String =
-    if (u.value.isValidChar && "^$\\.*+?()[]{}|/".contains(u.value.toChar)) s"\\${u.value.toChar}"
+    if u.value.isValidChar && "^$\\.*+?()[]{}|/".contains(u.value.toChar) then s"\\${u.value.toChar}"
     else u.toString
 
   /** Shows a character as a class in pattern. */
   private def showUCharInClass(u: UChar): String =
-    if (u.value.isValidChar && "[^-]".contains(u.value.toChar)) s"\\${u.value.toChar}"
+    if u.value.isValidChar && "[^-]".contains(u.value.toChar) then s"\\${u.value.toChar}"
     else u.toString
-}

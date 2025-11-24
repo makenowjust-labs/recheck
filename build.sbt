@@ -320,11 +320,8 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
     console / initialCommands := """
       |import codes.quine.labs.recheck.regexp._
       |""".stripMargin,
-    Compile / console / scalacOptions -= "-Wunused",
-    Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "com.lihaoyi" %%% "fastparse" % "3.1.1",
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "1.2.1" % Test,
     testFrameworks += new TestFramework("munit.Framework")

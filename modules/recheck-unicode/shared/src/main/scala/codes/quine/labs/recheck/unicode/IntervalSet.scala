@@ -34,8 +34,8 @@ final case class IntervalSet[@specialized A](intervals: IndexedSeq[(A, A)]):
 
   /** Computes `this intersect that`, `this diff that` and `that diff this` at once. */
   infix def partition(that: IntervalSet[A])(using A: Ordering[A]): Partition[IntervalSet[A]] =
-    val lefts = intervals.flatMap { case (x, y) => Vector(Left(x), Left(y)) }
-    val rights = that.intervals.flatMap { case (x, y) => Vector(Right(x), Right(y)) }
+    val lefts = intervals.flatMap((x, y) => Vector(Left(x), Left(y)))
+    val rights = that.intervals.flatMap((x, y) => Vector(Right(x), Right(y)))
 
     val optA = Option.empty[A]
     val seqAA = IndexedSeq.empty[(A, A)]
@@ -65,7 +65,7 @@ final case class IntervalSet[@specialized A](intervals: IndexedSeq[(A, A)]):
     * Note that the mapping `f` must be monotonic on each interval.
     */
   def map[B](f: A => B)(using B: Ordering[B]): IntervalSet[B] =
-    from(intervals.map { case (x, y) => (f(x), f(y)) })
+    from(intervals.map((x, y) => (f(x), f(y))))
 
   /** Merges the mapped intersection and the difference.
     *
@@ -77,7 +77,7 @@ final case class IntervalSet[@specialized A](intervals: IndexedSeq[(A, A)]):
 
   /** Returns a string representation of this interval set. */
   override def toString: String =
-    intervals.map { case (x, y) => s"($x, $y)" }.mkString("IntervalSet(", ", ", ")")
+    intervals.map((x, y) => s"($x, $y)").mkString("IntervalSet(", ", ", ")")
 
 /** IntervalSet utilities. */
 object IntervalSet:

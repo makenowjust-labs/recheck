@@ -118,7 +118,7 @@ object IChar:
   def empty: IChar = IChar(IntervalSet.empty[UChar])
 
   /** Creates an interval set contains any code points. */
-  def any(unicode: Boolean): IChar = if (unicode) IChar.Any else IChar.Any16
+  def any(unicode: Boolean): IChar = if unicode then IChar.Any else IChar.Any16
 
   /** Creates an interval set for the dot pattern. */
   def dot(ignoreCase: Boolean, dotAll: Boolean, unicode: Boolean): IChar =

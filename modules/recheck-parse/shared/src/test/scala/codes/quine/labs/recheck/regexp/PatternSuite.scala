@@ -1,10 +1,12 @@
 package codes.quine.labs.recheck.regexp
 
-import codes.quine.labs.recheck.regexp.Pattern._
+import scala.language.implicitConversions
 
-class PatternSuite extends munit.FunSuite {
+import codes.quine.labs.recheck.regexp.Pattern.*
 
-  test("Pattern.Node#withLoc") {
+class PatternSuite extends munit.FunSuite:
+
+  test("Pattern.Node#withLoc"):
     val node1 = Character('x')
     val node2 = node1.withLoc(0, 1)
     val node3 = Character('y').withLoc(node2)
@@ -12,9 +14,8 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(node2.loc, Some(Location(0, 1)))
     assertEquals(node3.loc, Some(Location(0, 1)))
     assert(clue(node2.withLoc(0, 1)) eq clue(node2))
-  }
 
-  test("Pattern.Quantifier#normalized") {
+  test("Pattern.Quantifier#normalized"):
     assertEquals(Quantifier.Star(false).normalized, Quantifier.Unbounded(0, false))
     assertEquals(Quantifier.Star(true).normalized, Quantifier.Unbounded(0, true))
     assertEquals(Quantifier.Plus(false).normalized, Quantifier.Unbounded(1, false))
@@ -29,9 +30,8 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(Quantifier.Bounded(1, 1, true).normalized, Quantifier.Exact(1, true))
     assertEquals(Quantifier.Bounded(1, 2, false).normalized, Quantifier.Bounded(1, 2, false))
     assertEquals(Quantifier.Bounded(1, 2, true).normalized, Quantifier.Bounded(1, 2, true))
-  }
 
-  test("Pattern.showNode") {
+  test("Pattern.showNode"):
     val x = Character('x')
     assertEquals(showNode(Disjunction(Seq(Disjunction(Seq(x, x)), x))), "(?:x|x)|x")
     assertEquals(showNode(Disjunction(Seq(x, x, x))), "x|x|x")
@@ -90,17 +90,13 @@ class PatternSuite extends munit.FunSuite {
     assertEquals(showNode(Dot()), ".")
     assertEquals(showNode(BackReference(1)), "\\1")
     assertEquals(showNode(NamedBackReference(1, "foo")), "\\k<foo>")
-  }
 
-  test("Pattern.showFlagSet") {
+  test("Pattern.showFlagSet"):
     assertEquals(showFlagSet(FlagSet(false, false, false, false, false, false)), "")
     assertEquals(showFlagSet(FlagSet(true, true, true, true, true, true)), "gimsuy")
-  }
 
-  test("Pattern#toString") {
+  test("Pattern#toString"):
     assertEquals(
       Pattern(Character('x'), FlagSet(true, true, false, false, false, false)).toString,
       "/x/gi"
     )
-  }
-}
