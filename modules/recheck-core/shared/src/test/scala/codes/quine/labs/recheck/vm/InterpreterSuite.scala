@@ -20,7 +20,7 @@ import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
 
 class InterpreterSuite extends munit.FunSuite:
-  implicit val ctx: Context = Context()
+  given ctx: Context = Context()
 
   def matches(source: String, flags: String, input: String, pos: Int, opts: Options): Result =
     val t = for

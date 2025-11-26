@@ -29,11 +29,11 @@ class FuzzCheckerSuite extends munit.FunSuite:
         pattern,
         fuzz,
         random = random0,
-        maxGeneStringSize = if (quick) 400 else 4000,
-        maxAttackStringSize = if (quick) 400 else 4000,
-        seedingLimit = if (quick) 1_00 else 1_000,
-        incubationLimit = if (quick) 1_000 else 10_000,
-        attackLimit = if (quick) 10_000 else 100_000
+        maxGeneStringSize = if quick then 400 else 4000,
+        maxAttackStringSize = if quick then 400 else 4000,
+        seedingLimit = if quick then 1_00 else 1_000,
+        incubationLimit = if quick then 1_000 else 10_000,
+        attackLimit = if quick then 10_000 else 100_000
       )
       .nextOption()
     result.get.isDefined

@@ -49,11 +49,11 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
     sb.result()
 
   /** Converts this ε-NFA to ordered NFA with ε-elimination. */
-  def toOrderedNFA(implicit ctx: Context): OrderedNFA[IChar, (CharKind, Seq[(Q, Set[CharKind])])] =
+  def toOrderedNFA(using ctx: Context): OrderedNFA[IChar, (CharKind, Seq[(Q, Set[CharKind])])] =
     toOrderedNFA(Int.MaxValue)
 
   /** Converts this ε-NFA to ordered NFA with ε-elimination. */
-  def toOrderedNFA(maxNFASize: Int)(implicit ctx: Context): OrderedNFA[IChar, (CharKind, Seq[(Q, Set[CharKind])])] =
+  def toOrderedNFA(maxNFASize: Int)(using ctx: Context): OrderedNFA[IChar, (CharKind, Seq[(Q, Set[CharKind])])] =
     ctx.interrupt:
       val hasLineAssertion = tau.values
         .collect:
@@ -111,7 +111,7 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
         ctx.interrupt:
           val (c0, qps) = queue.dequeue()
           val qs0 = qps.map(_._1)
-          if (qs0.map(_._1).contains(accept)) newAcceptSet.addOne((c0, qs0))
+          if qs0.map(_._1).contains(accept) then newAcceptSet.addOne((c0, qs0))
           val d = mutable.Map.empty[IChar, Seq[(CharKind, Seq[P])]].withDefaultValue(Vector.empty)
           for (_, p) <- qps do
             p match

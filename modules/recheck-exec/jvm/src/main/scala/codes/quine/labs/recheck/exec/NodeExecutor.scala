@@ -13,7 +13,7 @@ object NodeExecutor:
     * It returns `exitCode`, `out` and `err` in `Some` if execution is terminated in timeout. When the result is
     * timeout, it returns `None`.
     */
-  def exec(code: String, timeout: Option[FiniteDuration])(implicit ctx: Context): Option[(Int, String, String)] =
+  def exec(code: String, timeout: Option[FiniteDuration])(using ctx: Context): Option[(Int, String, String)] =
     val builder = new ProcessBuilder().command("node", "-")
     val process = builder.start()
     ctx.log(s"recall: process (pid: ${process.pid()})")

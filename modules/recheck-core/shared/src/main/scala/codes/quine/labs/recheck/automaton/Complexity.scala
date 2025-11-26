@@ -26,7 +26,7 @@ object Complexity:
     def witness: Witness[A]
 
     /** Builds an attack string pattern of this. */
-    def buildAttackPattern(attackLimit: Int, maxSize: Int)(implicit ev: A =:= UChar): AttackPattern
+    def buildAttackPattern(attackLimit: Int, maxSize: Int)(using ev: A =:= UChar): AttackPattern
 
     /** Converts this into a diagnostics complexity. */
     def toAttackComplexity: AttackComplexity.Vulnerable
@@ -47,7 +47,7 @@ object Complexity:
       extends Vulnerable[A]:
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Polynomial(degree, false)
 
-    def buildAttackPattern(attackLimit: Int, maxSize: Int)(implicit ev: A =:= UChar): AttackPattern =
+    def buildAttackPattern(attackLimit: Int, maxSize: Int)(using ev: A =:= UChar): AttackPattern =
       val bestRepeatCount = RepeatUtil.polynomial(degree, attackLimit, witness.fixedSize, witness.repeatSize, maxSize)
       witness.buildAttackPattern(bestRepeatCount)
 
@@ -55,6 +55,6 @@ object Complexity:
   final case class Exponential[A](witness: Witness[A], hotspot: Hotspot = Hotspot.empty) extends Vulnerable[A]:
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Exponential(false)
 
-    def buildAttackPattern(attackLimit: Int, maxSize: Int)(implicit ev: A =:= UChar): AttackPattern =
+    def buildAttackPattern(attackLimit: Int, maxSize: Int)(using ev: A =:= UChar): AttackPattern =
       val bestRepeatCount = RepeatUtil.exponential(attackLimit, witness.fixedSize, witness.repeatSize, maxSize)
       witness.buildAttackPattern(bestRepeatCount)

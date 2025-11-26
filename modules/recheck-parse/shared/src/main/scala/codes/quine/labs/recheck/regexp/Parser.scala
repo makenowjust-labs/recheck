@@ -120,7 +120,7 @@ object Parser:
       case Sequence(ns)                 => ns.foldLeft(names)(collect)
       case Capture(_, n)                => collect(names, n)
       case NamedCapture(index, name, n) =>
-        if (names.contains(name)) throw new ParsingException("duplicated name", node.loc)
+        if names.contains(name) then throw new ParsingException("duplicated name", node.loc)
         collect(names ++ Map(name -> index), n)
       case Group(n)         => collect(names, n)
       case Repeat(_, n)     => collect(names, n)
@@ -138,10 +138,10 @@ object Parser:
       case LookAhead(negative, n)       => LookAhead(negative, loop(names, n)).withLoc(node)
       case LookBehind(negative, n)      => LookBehind(negative, loop(names, n)).withLoc(node)
       case BackReference(index)         =>
-        if index < 1 || captures < index then throw new ParsingException("invalid back-reference", node.loc)
+        if index < 1 || captures < index then throw ParsingException("invalid back-reference", node.loc)
         BackReference(index).withLoc(node)
       case NamedBackReference(_, name) =>
-        if !names.contains(name) then throw new ParsingException("invalid named back-reference", node.loc)
+        if !names.contains(name) then throw ParsingException("invalid named back-reference", node.loc)
         NamedBackReference(names(name), name).withLoc(node)
       case _ => node
 
@@ -174,16 +174,16 @@ object Parser:
       case UnicodeProperty(invert, name, _) =>
         val contents = IChar.UnicodeProperty(name) match
           case Some(char) => if invert then char.complement(unicode = true) else char
-          case None       => throw new ParsingException(s"unknown Unicode property: $name", node.loc)
+          case None       => throw ParsingException(s"unknown Unicode property: $name", node.loc)
         UnicodeProperty(invert, name, contents).withLoc(node)
       case UnicodePropertyValue(invert, name, value, _) =>
         val contents = IChar.UnicodePropertyValue(name, value) match
           case Some(char) => if invert then char.complement(unicode = true) else char
-          case None       => throw new ParsingException(s"unknown Unicode property-value: $name=$value", node.loc)
+          case None       => throw ParsingException(s"unknown Unicode property-value: $name=$value", node.loc)
         UnicodePropertyValue(invert, name, value, contents).withLoc(node)
       case ClassRange(b, e) =>
         val char = IChar.range(b, e)
-        if (char.isEmpty) throw new ParsingException("an empty range", node.loc)
+        if char.isEmpty then throw ParsingException("an empty range", node.loc)
         else node
       case _ => node
 
@@ -387,7 +387,7 @@ private[regexp] final class Parser(
   def Escape[X: P]: P[Node] = P:
     WithLoc:
       WordBoundary |
-        (if (hasNamedCapture) NamedBackReference else Fail) |
+        (if hasNamedCapture then NamedBackReference else Fail) |
         BackReference |
         EscapeClass |
         EscapeCharacter.map(Pattern.Character(_))
@@ -528,7 +528,7 @@ private[regexp] final class Parser(
     else if additional then
       P:
         "\\" ~ &("c") ~ Pass(UChar(0x5c)) |
-          "\\" ~ (if (hasNamedCapture) CharPred(_ != 'k') else AnyChar).!.map(s => UChar(s.charAt(0).toInt))
+          "\\" ~ (if hasNamedCapture then CharPred(_ != 'k') else AnyChar).!.map(s => UChar(s.charAt(0).toInt))
     else "\\" ~ CharPred(c => !Parser.IDContinue.contains(UChar(c))).!.map(s => UChar(s.charAt(0).toInt))
 
   /** {{{

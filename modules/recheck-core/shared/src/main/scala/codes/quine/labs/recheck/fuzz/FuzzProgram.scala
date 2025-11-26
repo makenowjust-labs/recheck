@@ -23,7 +23,7 @@ final case class FuzzProgram(program: Program, alphabet: ICharSet, parts: Set[US
 object FuzzProgram:
 
   /** Builds a program from the pattern. */
-  def from(pattern: Pattern)(implicit ctx: Context): Try[FuzzProgram] =
+  def from(pattern: Pattern)(using ctx: Context): Try[FuzzProgram] =
     Try:
       ctx.interrupt:
         for

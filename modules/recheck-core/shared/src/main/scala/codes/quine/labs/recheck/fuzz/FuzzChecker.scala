@@ -224,7 +224,7 @@ private[fuzz] final class FuzzChecker(
   def mutateRepeat(gen: Generation, next: Population): Iterator[AttackResult] = interrupt:
     val i = random.between(0, gen.traces.size)
     val t = gen.traces(i).str
-    if (t.isConstant) return Iterator.empty
+    if t.isConstant then return Iterator.empty
 
     val s = random.between(0, 2) match
       case 0 =>
@@ -246,7 +246,7 @@ private[fuzz] final class FuzzChecker(
         val c = alphabet.pairs(idx)._1.head
         FString.Wrap(c)
       case 1 =>
-        if (t.isEmpty) return Iterator.empty
+        if t.isEmpty then return Iterator.empty
         val m = random.between(0, 10)
         val size = random.between(0, t.size)
         FString.Repeat(m, size)

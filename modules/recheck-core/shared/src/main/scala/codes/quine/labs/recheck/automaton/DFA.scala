@@ -27,7 +27,7 @@ final case class DFA[A, Q](
     sb.append("digraph {\n")
     sb.append(s"  ${escape("")} [shape=point];\n")
     sb.append(s"  ${escape("")} -> ${escape(init)};\n")
-    for q <- stateSet do sb.append(s"  ${escape(q)} [shape=${if (acceptSet.contains(q)) "double" else ""}circle];\n")
+    for q <- stateSet do sb.append(s"  ${escape(q)} [shape=${if acceptSet.contains(q) then "double" else ""}circle];\n")
     for ((q0, a), q1) <- delta do sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(a)}];\n")
     sb.append("}")
 

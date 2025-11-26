@@ -21,7 +21,7 @@ final case class Witness[A](pumps: Seq[(Seq[A], Seq[A])], suffix: Seq[A]):
     pumps.flatMap { case (pre, pump) => pre ++ Vector.fill(n)(pump).flatten } ++ suffix
 
   /** Builds an attack pattern string with `n` times repetition. */
-  def buildAttackPattern(n: Int)(implicit ev: A =:= UChar): AttackPattern =
+  def buildAttackPattern(n: Int)(using ev: A =:= UChar): AttackPattern =
     val pumps = this.pumps.map:
       case (s, t) => (UString.from(s.map(ev)), UString.from(t.map(ev)), 0)
     val suffix = UString.from(this.suffix.map(ev))

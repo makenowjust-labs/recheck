@@ -38,7 +38,7 @@ private final class AutomatonChecker[A, Q](
   private val scc = graph.scc
 
   /** A map from a state of [[nfaWLA]] to SCC. */
-  private val sccMap = interrupt((for (sc <- scc; q <- sc) yield q -> sc).toMap)
+  private val sccMap = interrupt((for sc <- scc; q <- sc yield q -> sc).toMap)
 
   /** A graph with transitions between SCCs. */
   private val sccGraph = interrupt:

@@ -106,7 +106,7 @@ object PatternExtensions:
       loop(pattern.node)
 
     /** Tests whether none of line end assertion (`^`) is placed at every end point. */
-    def everyEndPointIsNotLineEnd(implicit ctx: Context): Boolean = ctx.interrupt:
+    def everyEndPointIsNotLineEnd(using ctx: Context): Boolean = ctx.interrupt:
       def loop(node: Node): Boolean = ctx.interrupt:
         node match
           case Disjunction(ns)       => ns.forall(loop)
@@ -177,7 +177,7 @@ object PatternExtensions:
             case LookBehind(_, n)      => loop(n)
             case atom: AtomNode        =>
               val ch = atom.toIChar(unicode)
-              Vector(if (ignoreCase) IChar.canonicalize(ch, unicode) else ch)
+              Vector(if ignoreCase then IChar.canonicalize(ch, unicode) else ch)
             case Dot() => Vector(IChar.dot(ignoreCase, dotAll, unicode))
             case _     => Vector.empty
 
@@ -297,7 +297,7 @@ object PatternExtensions:
           case EscapeClassKind.Digit => IChar.Digit
           case EscapeClassKind.Word  => IChar.Word
           case EscapeClassKind.Space => IChar.Space
-        if (invert) char.complement(unicode) else char
+        if invert then char.complement(unicode) else char
       case UnicodeProperty(_, _, contents)         => contents
       case UnicodePropertyValue(_, _, _, contents) => contents
       case CharacterClass(_, ns)                   => IChar.union(ns.map(_.toIChar(unicode)))

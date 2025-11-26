@@ -268,12 +268,12 @@ object Pattern:
   /** Shows a [[FlagSet]] as a pattern. */
   private[regexp] def showFlagSet(flagSet: FlagSet): String =
     val sb = new mutable.StringBuilder
-    if (flagSet.global) sb.append('g')
-    if (flagSet.ignoreCase) sb.append('i')
-    if (flagSet.multiline) sb.append('m')
-    if (flagSet.dotAll) sb.append('s')
-    if (flagSet.unicode) sb.append('u')
-    if (flagSet.sticky) sb.append('y')
+    if flagSet.global then sb.append('g')
+    if flagSet.ignoreCase then sb.append('i')
+    if flagSet.multiline then sb.append('m')
+    if flagSet.dotAll then sb.append('s')
+    if flagSet.unicode then sb.append('u')
+    if flagSet.sticky then sb.append('y')
     sb.result()
 
   /** Shows a [[Quantifier]] as a pattern. */

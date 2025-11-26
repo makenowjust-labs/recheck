@@ -126,7 +126,7 @@ final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]):
         val v1 = queue.dequeue()
         val es = neighbors(v1)
         val vs = es.map(_._2)
-        if (es.nonEmpty) newEdges.addOne(v1 -> es)
+        if es.nonEmpty then newEdges.addOne(v1 -> es)
         queue.enqueueAll(vs.filterNot(reachable.contains))
         reachable.addAll(vs)
 
@@ -136,7 +136,7 @@ final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]):
     *
     * Note that it causes a stack overflow when this graph has a cycle.
     */
-  def reachableMap(implicit ctx: Context): Map[V, Set[V]] = ctx.interrupt:
+  def reachableMap(using ctx: Context): Map[V, Set[V]] = ctx.interrupt:
     val map = mutable.Map.empty[V, Set[V]]
     def dfs(v1: V): Set[V] = ctx.interrupt:
       map.getOrElseUpdate(v1, Set(v1) ++ neighbors(v1).flatMap { case (_, v) => dfs(v) }.toSet)

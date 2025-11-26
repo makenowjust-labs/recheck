@@ -40,7 +40,7 @@ final case class AttackPattern(pumps: Seq[(UString, UString, Int)], suffix: UStr
 
     for (s, t, m) <- pumps do
       str.append(s.asString)
-      for (_ <- 1 to (n + m)) str.append(t.asString)
+      for _ <- 1 to (n + m) do str.append(t.asString)
     str.append(suffix.asString)
 
     UString(str.result())

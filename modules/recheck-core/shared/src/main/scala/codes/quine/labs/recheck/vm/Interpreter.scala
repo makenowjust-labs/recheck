@@ -150,7 +150,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
     /** Converts this frame into a corresponding state. */
     def toState: MatchState =
-      Interpreter.MatchState(label.index, pos, counters, if (program.meta.hasRef) Some(captures) else None)
+      Interpreter.MatchState(label.index, pos, counters, if program.meta.hasRef then Some(captures) else None)
 
     override def clone(): Frame =
       new Frame(label, pos, captures, counters, canaries, rollback, fallback, junctions)
@@ -329,7 +329,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                     val builder = Map.newBuilder[Location, Int]
                     for (loc, n) <- heatmap do
                       val m = jxHeatmap(loc)
-                      if (n != m) builder.addOne(loc -> (n - m))
+                      if n != m then builder.addOne(loc -> (n - m))
                     builder.result()
                   memoTable(jx.state) = Diff(steps - jx.steps, diffHeatmap)
               frame = fallback
@@ -342,7 +342,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   /** Runs a given block. */
   private def block(frame: Frame, block: Block): Boolean =
     val it = block.insts.iterator
-    while it.hasNext do if (!inst(frame, it.next())) return false
+    while it.hasNext do if !inst(frame, it.next()) then return false
     true
 
   /** Runs a given instruction. */

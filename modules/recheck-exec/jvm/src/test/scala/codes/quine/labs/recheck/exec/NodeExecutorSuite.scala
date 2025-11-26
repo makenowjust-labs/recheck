@@ -8,7 +8,7 @@ import codes.quine.labs.recheck.common.Context
 class NodeExecutorSuite extends munit.FunSuite:
 
   /** A default context. */
-  implicit def ctx: Context = Context()
+  given ctx: Context = Context()
 
   test("NodeExecutor.exec"):
     assertEquals(

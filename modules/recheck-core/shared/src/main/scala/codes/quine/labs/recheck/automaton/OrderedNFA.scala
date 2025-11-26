@@ -44,7 +44,7 @@ final case class OrderedNFA[A, Q](
     )
 
   /** Exports this transition function as a graph. */
-  def toGraph(implicit ctx: Context): Graph[Q, A] =
+  def toGraph(using ctx: Context): Graph[Q, A] =
     ctx.interrupt:
       Graph.from(delta.iterator.flatMap { case (q1, a) -> qs =>
         qs.iterator.map((q1, a, _))
@@ -54,7 +54,7 @@ final case class OrderedNFA[A, Q](
     *
     * This method loses priorities, so the result type is usual [[NFA]].
     */
-  def reverse(implicit ctx: Context): NFA[A, Q] =
+  def reverse(using ctx: Context): NFA[A, Q] =
     ctx.interrupt:
       val reverseDelta = mutable.Map.empty[(Q, A), Set[Q]].withDefaultValue(Set.empty)
       for ((q1, a) -> qs) <- delta; q2 <- qs do
@@ -63,10 +63,10 @@ final case class OrderedNFA[A, Q](
       NFA(alphabet, stateSet, acceptSet, inits.toSet, reverseDelta.toMap)
 
   /** Converts this into [[NFAwLA]]. */
-  def toNFAwLA(implicit ctx: Context): NFAwLA[A, Q] = toNFAwLA(Int.MaxValue)
+  def toNFAwLA(using ctx: Context): NFAwLA[A, Q] = toNFAwLA(Int.MaxValue)
 
   /** Converts this into [[NFAwLA]]. */
-  def toNFAwLA(maxNFASize: Int)(implicit ctx: Context): NFAwLA[A, Q] =
+  def toNFAwLA(maxNFASize: Int)(using ctx: Context): NFAwLA[A, Q] =
     ctx.interrupt:
       val reverseDFA = reverse.toDFA
       val reverseDelta = ctx.interrupt:
@@ -76,8 +76,8 @@ final case class OrderedNFA[A, Q](
 
       val newAlphabet = Set.newBuilder[(A, Set[Q])]
       val newStateSet = Set.newBuilder[(Q, Set[Q])]
-      val newInits = ctx.interrupt(MultiSet.from(for (q <- inits; p <- reverseDFA.stateSet) yield (q, p)))
-      val newAcceptSet = ctx.interrupt(for (q <- acceptSet) yield (q, reverseDFA.init))
+      val newInits = ctx.interrupt(MultiSet.from(for q <- inits; p <- reverseDFA.stateSet yield (q, p)))
+      val newAcceptSet = ctx.interrupt(for q <- acceptSet yield (q, reverseDFA.init))
       val newSourcemap =
         mutable.Map.empty[((Q, Set[Q]), (A, Set[Q]), (Q, Set[Q])), Seq[Location]].withDefaultValue(Vector.empty)
 
@@ -130,7 +130,7 @@ final case class OrderedNFA[A, Q](
     sb.append("digraph {\n")
     sb.append(s"  ${escape("")} [shape=point];\n")
     for (init, i) <- inits.zipWithIndex do sb.append(s"  ${escape("")} -> ${escape(init)} [label=$i];\n")
-    for q <- stateSet do sb.append(s"  ${escape(q)} [shape=${if (acceptSet.contains(q)) "double" else ""}circle];\n")
+    for q <- stateSet do sb.append(s"  ${escape(q)} [shape=${if acceptSet.contains(q) then "double" else ""}circle];\n")
     for ((q0, a), qs) <- delta; (q1, i) <- qs.zipWithIndex do
       sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(s"${i}, ${a}")}];\n")
     sb.append("}")

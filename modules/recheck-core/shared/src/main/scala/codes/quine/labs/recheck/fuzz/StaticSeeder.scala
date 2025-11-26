@@ -117,7 +117,7 @@ private[fuzz] class StaticSeeder[A, Q](
       .toMap
 
   /** Generates the initial generation. */
-  def seed(maxInitialGenerationSize: Int, limit: Int, maxSize: Int)(implicit ev: A =:= UChar): Set[FString] =
+  def seed(maxInitialGenerationSize: Int, limit: Int, maxSize: Int)(using ev: A =:= UChar): Set[FString] =
     outsMap.iterator
       .filter(_._2.nonEmpty)
       .flatMap:
@@ -178,7 +178,7 @@ private[fuzz] class StaticSeeder[A, Q](
         interrupt(reverseGraph.path(stateSet.diff(acceptSet), q).map(_._1.map(_._2).reverse))
 
   /** Constructs a FString from an EDA/IDA triple. */
-  def construct(t: (Seq[A], Seq[A], Seq[A]), f: (Int, Int) => Int)(implicit ev: A =:= UChar): FString =
+  def construct(t: (Seq[A], Seq[A], Seq[A]), f: (Int, Int) => Int)(using ev: A =:= UChar): FString =
     val w1 = t._1.map(u => FString.Wrap(ev(u))).toIndexedSeq
     val w2 = t._2.map(u => FString.Wrap(ev(u))).toIndexedSeq
     val w3 = t._3.map(u => FString.Wrap(ev(u))).toIndexedSeq

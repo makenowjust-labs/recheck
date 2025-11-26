@@ -12,7 +12,7 @@ final case class Hotspot(spots: Seq[Spot]):
   def highlight(source: String): String =
     val (str, i) = spots.foldLeft(("", 0)):
       case ((acc, i), Spot(s, e, t)) =>
-        val color = if (t == Heat) RED_B else GREEN_B
+        val color = if t == Heat then RED_B else GREEN_B
         (acc + source.substring(i, s) + color + source.substring(s, e) + RESET, e)
     str + source.substring(i)
 

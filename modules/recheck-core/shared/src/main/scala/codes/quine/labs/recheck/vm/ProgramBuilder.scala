@@ -236,7 +236,7 @@ private[vm] class ProgramBuilder(
         val ch = if ignoreCase then IChar.canonicalize(ch0, unicode) else ch0
         emitRead(ReadKind.Class(ch), node.loc)
       case Dot() =>
-        emitRead(if (dotAll) ReadKind.Any else ReadKind.Dot, node.loc)
+        emitRead(if dotAll then ReadKind.Any else ReadKind.Dot, node.loc)
       case BackReference(index)         => emitRead(ReadKind.Ref(index), node.loc)
       case NamedBackReference(index, _) => emitRead(ReadKind.Ref(index), node.loc)
 
@@ -265,9 +265,9 @@ private[vm] class ProgramBuilder(
 
   /** A builder for a capture node. */
   def buildCapture(index: Int, children: Node): Unit =
-    emitInst(if (back) Inst.CapEnd(index) else Inst.CapBegin(index))
+    emitInst(if back then Inst.CapEnd(index) else Inst.CapBegin(index))
     build(children)
-    emitInst(if (back) Inst.CapBegin(index) else Inst.CapEnd(index))
+    emitInst(if back then Inst.CapBegin(index) else Inst.CapEnd(index))
 
   /** A builder for `x*` node. */
   def buildStar(isLazy: Boolean, child: Node): Unit =
@@ -291,7 +291,7 @@ private[vm] class ProgramBuilder(
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
 
-    emitTerminator(if (isLazy) Inst.Try(cont, main) else Inst.Try(main, cont))
+    emitTerminator(if isLazy then Inst.Try(cont, main) else Inst.Try(main, cont))
 
     enterBlock(main)
     build(child)
@@ -350,7 +350,7 @@ private[vm] class ProgramBuilder(
 
   /** Emits a loop block entering instructions. */
   def enterLoopBlock(isLazy: Boolean, loop: Label, cont: Label): Unit =
-    emitTerminator(if (isLazy) Inst.Try(cont, loop) else Inst.Try(loop, cont))
+    emitTerminator(if isLazy then Inst.Try(cont, loop) else Inst.Try(loop, cont))
     enterBlock(loop)
 
   /** Emits a loop block closing instructions. */

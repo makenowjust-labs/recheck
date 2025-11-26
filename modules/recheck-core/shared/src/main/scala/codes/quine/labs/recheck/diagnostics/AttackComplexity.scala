@@ -16,7 +16,7 @@ object AttackComplexity:
 
   /** Safe is a common class for safe complexity. */
   sealed abstract class Safe(val isFuzz: Boolean) extends AttackComplexity:
-    override def toString: String = s"safe${if (isFuzz) " (fuzz)" else ""}"
+    override def toString: String = s"safe${if isFuzz then " (fuzz)" else ""}"
 
   /** Safe utilities. */
   object Safe:
@@ -41,8 +41,8 @@ object AttackComplexity:
   /** RegExp can check a match in a polynomial time. */
   final case class Polynomial(degree: Int, isFuzz: Boolean) extends Vulnerable:
     override def toString: String =
-      s"${NumberFormat.ordinalize(degree)} degree polynomial${if (isFuzz) " (fuzz)" else ""}"
+      s"${NumberFormat.ordinalize(degree)} degree polynomial${if isFuzz then " (fuzz)" else ""}"
 
   /** RegExp can check a match in an exponential time. */
   final case class Exponential(isFuzz: Boolean) extends Vulnerable:
-    override def toString: String = s"exponential${if (isFuzz) " (fuzz)" else ""}"
+    override def toString: String = s"exponential${if isFuzz then " (fuzz)" else ""}"

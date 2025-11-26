@@ -26,7 +26,7 @@ class ParserSuite extends munit.FunSuite:
   /** Parses the input by using the given parser. It accepts only a node parser, and it checks location is set
     * correctly.
     */
-  def parse[T <: Node](input: String, parser: P[?] => P[T])(implicit loc: munit.Location): Parsed[T] =
+  def parse[T <: Node](input: String, parser: P[?] => P[T])(using loc: munit.Location): Parsed[T] =
     val result = parse0(input, parser)
     // Checks that location is set correctly.
     result match

@@ -25,14 +25,14 @@ final case class NFA[A, Q](
     sb.append("digraph {\n")
     sb.append(s"  ${escape("")} [shape=point];\n")
     for init <- initSet do sb.append(s"  ${escape("")} -> ${escape(init)};\n")
-    for q <- stateSet do sb.append(s"  ${escape(q)} [shape=${if (acceptSet.contains(q)) "double" else ""}circle];\n")
+    for q <- stateSet do sb.append(s"  ${escape(q)} [shape=${if acceptSet.contains(q) then "double" else ""}circle];\n")
     for ((q0, a), qs) <- delta; q1 <- qs do sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(a)}];\n")
     sb.append("}")
 
     sb.result()
 
   /** Determinizes this NFA. */
-  def toDFA(implicit ctx: Context): DFA[A, Set[Q]] = ctx.interrupt:
+  def toDFA(using ctx: Context): DFA[A, Set[Q]] = ctx.interrupt:
     val queue = mutable.Queue.empty[Set[Q]]
     val newStateSet = mutable.Set.empty[Set[Q]]
     val newAcceptSet = Set.newBuilder[Set[Q]]

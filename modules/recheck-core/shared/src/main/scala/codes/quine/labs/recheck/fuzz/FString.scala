@@ -200,7 +200,7 @@ object FString:
     while pos < fs.size do
       fs.seq(pos) match
         case Wrap(c) =>
-          if (repeat > 0) repeat -= 1
+          if repeat > 0 then repeat -= 1
           pos += 1
           seq.addOne(Wrap(c))
         case Repeat(m, size) =>
