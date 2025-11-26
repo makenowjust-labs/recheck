@@ -9,8 +9,8 @@ import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.unicode.UString
 
-class DiagnosticsSuite extends munit.FunSuite {
-  test("Diagnostics#toString") {
+class DiagnosticsSuite extends munit.FunSuite:
+  test("Diagnostics#toString"):
     assertEquals(
       Diagnostics.Safe("", "", AttackComplexity.Constant, Checker.Automaton).toString,
       s"""|Input     : //
@@ -50,9 +50,8 @@ class DiagnosticsSuite extends munit.FunSuite {
           |Error  : timeout
           |Checker: (none)""".stripMargin
     )
-  }
 
-  test("Diagnostics.Unknown.from") {
+  test("Diagnostics.Unknown.from"):
     assertEquals(
       Diagnostics.Unknown.from("", "", new TimeoutException("foo")),
       Diagnostics.Unknown("", "", Diagnostics.ErrorKind.Timeout, None)
@@ -73,12 +72,9 @@ class DiagnosticsSuite extends munit.FunSuite {
       Diagnostics.Unknown.from("", "", new UnexpectedException("foo")),
       Diagnostics.Unknown("", "", Diagnostics.ErrorKind.Unexpected("foo"), None)
     )
-  }
 
-  test("Diagnostics.ErrorKind#toString") {
+  test("Diagnostics.ErrorKind#toString"):
     assertEquals(Diagnostics.ErrorKind.Timeout.toString, "timeout")
     assertEquals(Diagnostics.ErrorKind.Cancel.toString, "cancel")
     assertEquals(Diagnostics.ErrorKind.Unsupported("foo").toString, "unsupported (foo)")
     assertEquals(Diagnostics.ErrorKind.InvalidRegExp("foo").toString, "invalid RegExp (foo)")
-  }
-}

@@ -1,6 +1,6 @@
 package codes.quine.labs.recheck.diagnostics
 
-import scala.io.AnsiColor._
+import scala.io.AnsiColor.*
 
 import codes.quine.labs.recheck.regexp.Pattern.Location
 

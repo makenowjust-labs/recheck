@@ -5,12 +5,12 @@ import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.data.MultiSet
 
-class OrderedNFASuite extends munit.FunSuite {
+class OrderedNFASuite extends munit.FunSuite:
 
   /** A default context. */
-  implicit def ctx: Context = Context()
+  given ctx: Context = Context()
 
-  test("OrderedNFA#toNFAwLA") {
+  test("OrderedNFA#toNFAwLA"):
     val nfa = OrderedNFA(
       Set('a', 'b'),
       Set(0, 1),
@@ -43,27 +43,23 @@ class OrderedNFASuite extends munit.FunSuite {
     interceptMessage[UnsupportedException]("NFAwLA size is too large") {
       nfa.toNFAwLA(maxNFASize = 1)
     }
-  }
 
-  test("OrderedNFA#rename") {
+  test("OrderedNFA#rename"):
     val nfa = OrderedNFA(Set('a', 'b'), Set('p', 'q'), Seq('p'), Set('q'), Map(('p', 'a') -> Seq('q')))
     assertEquals(nfa.rename, OrderedNFA(Set('a', 'b'), Set(0, 1), Seq(0), Set(1), Map((0, 'a') -> Seq(1))))
-  }
 
-  test("OrderedNFA#mapAlphabet") {
+  test("OrderedNFA#mapAlphabet"):
     val nfa = OrderedNFA(Set('a', 'b'), Set(0, 1), Seq(0), Set(1), Map((0, 'a') -> Seq(1)))
     assertEquals(
       nfa.mapAlphabet(_.toString),
       OrderedNFA(Set("a", "b"), Set(0, 1), Seq(0), Set(1), Map((0, "a") -> Seq(1)))
     )
-  }
 
-  test("OrderedNFA#reverse") {
+  test("OrderedNFA#reverse"):
     val nfa = OrderedNFA(Set('a', 'b'), Set(0, 1), Seq(0), Set(1), Map((0, 'a') -> Seq(1)))
     assertEquals(nfa.reverse, NFA(Set('a', 'b'), Set(0, 1), Set(1), Set(0), Map((1, 'a') -> Set(0))))
-  }
 
-  test("OrderedNFA#toGraphviz") {
+  test("OrderedNFA#toGraphviz"):
     val nfa = OrderedNFA(
       Set('a', 'b'),
       Set(0, 1, 2),
@@ -94,5 +90,3 @@ class OrderedNFASuite extends munit.FunSuite {
          |  "1" -> "2" [label="1, b"];
          |}""".stripMargin
     )
-  }
-}

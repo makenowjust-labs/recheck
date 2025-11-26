@@ -10,12 +10,12 @@ import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.unicode.UString
 
-class RecallValidatorSuite extends munit.FunSuite {
+class RecallValidatorSuite extends munit.FunSuite:
 
   /** A default context. */
-  implicit def ctx: Context = Context()
+  given ctx: Context = Context()
 
-  test("RecallValidator.checks") {
+  test("RecallValidator.checks"):
     val pattern = AttackPattern(Seq((UString("x"), UString("y"), 0)), UString("z"), 2)
     assertEquals(
       RecallValidator.checks("foo", "i", pattern, Duration.MinusInf)((_, _) => fail("unreachable")),
@@ -35,9 +35,8 @@ class RecallValidatorSuite extends munit.FunSuite {
     interceptMessage[UnexpectedException]("foo") {
       RecallValidator.checks("foo", "i", pattern, Duration.Inf)((_, _) => Some((1, "", "foo")))
     }
-  }
 
-  test("RecallValidator.validate") {
+  test("RecallValidator.validate"):
     val pattern = AttackPattern(Seq((UString("x"), UString("y"), 0)), UString("z"), 2)
     assertEquals(
       RecallValidator.validate("foo", "i", pattern, Duration.MinusInf)((_, _) => fail("unreachable")),
@@ -61,13 +60,14 @@ class RecallValidatorSuite extends munit.FunSuite {
     var timeout3: Option[FiniteDuration] = null
     val ctx50s = Context(timeout = Duration(50, SECONDS))
     assertEquals(
-      RecallValidator.validate("foo", "i", pattern, Duration(100, SECONDS))((_, t) => { timeout3 = t; None })(ctx50s),
+      RecallValidator.validate("foo", "i", pattern, Duration(100, SECONDS))((_, t) => { timeout3 = t; None })(using
+        ctx50s
+      ),
       RecallResult.Timeout
     )
     assertEquals(timeout3.exists(_ <= FiniteDuration(50, SECONDS)), true)
-  }
 
-  test("RecallValidator.generate") {
+  test("RecallValidator.generate"):
     assertEquals(
       RecallValidator.generate("foo", "i", AttackPattern(Seq((UString("x"), UString("y"), 0)), UString("z"), 2)),
       """|const re = new RegExp('foo', 'i');
@@ -78,11 +78,8 @@ class RecallValidatorSuite extends munit.FunSuite {
          |console.log(Number(end - start).toString());
          |""".stripMargin
     )
-  }
 
-  test("RecallValidator.result") {
+  test("RecallValidator.result"):
     assertEquals(RecallValidator.result(Some((0, "1", ""))), RecallResult.Finish(FiniteDuration(1L, MILLISECONDS)))
     assertEquals(RecallValidator.result(Some((1, "", "error"))), RecallResult.Error("error"))
     assertEquals(RecallValidator.result(None), RecallResult.Timeout)
-  }
-}

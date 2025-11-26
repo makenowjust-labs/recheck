@@ -16,55 +16,45 @@ final case class NFA[A, Q](
     initSet: Set[Q],
     acceptSet: Set[Q],
     delta: Map[(Q, A), Set[Q]]
-) {
+):
 
   /** Converts to Graphviz format text. */
-  def toGraphviz: String = {
+  def toGraphviz: String =
     val sb = new mutable.StringBuilder
 
     sb.append("digraph {\n")
     sb.append(s"  ${escape("")} [shape=point];\n")
-    for (init <- initSet) sb.append(s"  ${escape("")} -> ${escape(init)};\n")
-    for (q <- stateSet) sb.append(s"  ${escape(q)} [shape=${if (acceptSet.contains(q)) "double" else ""}circle];\n")
-    for (((q0, a), qs) <- delta; q1 <- qs)
-      sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(a)}];\n")
+    for init <- initSet do sb.append(s"  ${escape("")} -> ${escape(init)};\n")
+    for q <- stateSet do sb.append(s"  ${escape(q)} [shape=${if (acceptSet.contains(q)) "double" else ""}circle];\n")
+    for ((q0, a), qs) <- delta; q1 <- qs do sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(a)}];\n")
     sb.append("}")
 
     sb.result()
-  }
 
   /** Determinizes this NFA. */
-  def toDFA(implicit ctx: Context): DFA[A, Set[Q]] =
-    ctx.interrupt {
-      val queue = mutable.Queue.empty[Set[Q]]
-      val newStateSet = mutable.Set.empty[Set[Q]]
-      val newAcceptSet = Set.newBuilder[Set[Q]]
-      val newDelta = Map.newBuilder[(Set[Q], A), Set[Q]]
+  def toDFA(implicit ctx: Context): DFA[A, Set[Q]] = ctx.interrupt:
+    val queue = mutable.Queue.empty[Set[Q]]
+    val newStateSet = mutable.Set.empty[Set[Q]]
+    val newAcceptSet = Set.newBuilder[Set[Q]]
+    val newDelta = Map.newBuilder[(Set[Q], A), Set[Q]]
 
-      queue.enqueue(initSet)
-      newStateSet.add(initSet)
+    queue.enqueue(initSet)
+    newStateSet.add(initSet)
 
-      while (queue.nonEmpty) ctx.interrupt {
+    while queue.nonEmpty do
+      ctx.interrupt:
         val qs = queue.dequeue()
-        if ((qs & acceptSet).nonEmpty) {
-          newAcceptSet.addOne(qs)
-        }
-        for (a <- alphabet) {
+        if (qs & acceptSet).nonEmpty then newAcceptSet.addOne(qs)
+        for a <- alphabet do
           val qs2 = qs.flatMap(q => delta.getOrElse((q, a), Set.empty))
           newDelta.addOne((qs, a) -> qs2)
-          if (!newStateSet.contains(qs2)) {
+          if !newStateSet.contains(qs2) then
             queue.enqueue(qs2)
             newStateSet.add(qs2)
-          }
-        }
-      }
 
-      val dfa = DFA(alphabet, newStateSet.toSet, initSet, newAcceptSet.result(), newDelta.result())
-      ctx.log {
-        s"""|automaton: DFA construction
+    val dfa = DFA(alphabet, newStateSet.toSet, initSet, newAcceptSet.result(), newDelta.result())
+    ctx.log:
+      s"""|automaton: DFA construction
             |     state size: ${dfa.stateSet.size}
             |  alphabet size: ${dfa.alphabet.size}""".stripMargin
-      }
-      dfa
-    }
-}
+    dfa

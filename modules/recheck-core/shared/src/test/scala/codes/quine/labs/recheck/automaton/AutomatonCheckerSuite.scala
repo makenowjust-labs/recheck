@@ -1,51 +1,49 @@
 package codes.quine.labs.recheck
 package automaton
 
+import scala.language.implicitConversions
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-import codes.quine.labs.recheck.automaton.Complexity._
+import codes.quine.labs.recheck.automaton.Complexity.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.diagnostics.Hotspot
-import codes.quine.labs.recheck.diagnostics.Hotspot._
+import codes.quine.labs.recheck.diagnostics.Hotspot.*
 import codes.quine.labs.recheck.regexp.Parser
 import codes.quine.labs.recheck.unicode.IChar
 
-class AutomatonCheckerSuite extends munit.FunSuite {
+class AutomatonCheckerSuite extends munit.FunSuite:
 
   /** A default context. */
-  implicit def ctx: Context = Context()
+  given ctx: Context = Context()
 
   /** Runs a checker against the RegExp. */
   def check(source: String, flags: String): Try[Complexity[IChar]] =
-    for {
-      pattern <- Parser.parse(source, flags) match {
+    for
+      pattern <- Parser.parse(source, flags) match
         case Right(pattern) => Success(pattern)
         case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
-      }
       epsNFA <- EpsNFABuilder.build(pattern)
       nfa = epsNFA.toOrderedNFA.rename
       result <- Try(AutomatonChecker.check(nfa).nextOption().getOrElse(Complexity.Constant))
-    } yield result
+    yield result
 
-  test("AutomatonChecker.check: constant") {
+  test("AutomatonChecker.check: constant"):
     assertEquals(check("^$", ""), Success(Constant))
     assertEquals(check("^foo$", ""), Success(Constant))
     assertEquals(check("^((fi|bu)z{2}){1,2}$", ""), Success(Constant))
-  }
 
-  test("AutomatonChecker.check: linear") {
+  test("AutomatonChecker.check: linear"):
     assertEquals(check("a*", ""), Success(Linear))
     assertEquals(check("(a*)*", ""), Success(Linear))
     assertEquals(check("^([a:]|\\b)*$", ""), Success(Linear))
     assertEquals(check("^(\\w|\\W)*$", "i"), Success(Linear))
     assertEquals(check("^(a()*a)*$", ""), Success(Linear))
     assertEquals(check("^(a(\\b)*:)*$", ""), Success(Linear))
-  }
 
-  test("AutomatonChecker.check: polynomial") {
+  test("AutomatonChecker.check: polynomial"):
     val a = IChar('a')
     val at = IChar('@')
     val other1 = a.complement(false)
@@ -86,9 +84,8 @@ class AutomatonCheckerSuite extends munit.FunSuite {
         )
       )
     )
-  }
 
-  test("AutomatonChecker.check: exponential") {
+  test("AutomatonChecker.check: exponential"):
     val a = IChar('a')
     val b = IChar('b')
     val other1 = IChar('a').complement(false)
@@ -121,5 +118,3 @@ class AutomatonCheckerSuite extends munit.FunSuite {
         )
       )
     )
-  }
-}

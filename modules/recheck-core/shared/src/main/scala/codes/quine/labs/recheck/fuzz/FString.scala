@@ -2,12 +2,12 @@ package codes.quine.labs.recheck
 package fuzz
 
 import codes.quine.labs.recheck.diagnostics.AttackPattern
-import codes.quine.labs.recheck.fuzz.FString._
+import codes.quine.labs.recheck.fuzz.FString.*
 import codes.quine.labs.recheck.unicode.UChar
 import codes.quine.labs.recheck.unicode.UString
 
 /** FString is a string with a repetition structure for fuzzing. */
-final case class FString(n: Int, seq: IndexedSeq[FChar]) {
+final case class FString(n: Int, seq: IndexedSeq[FChar]):
 
   /** Tests whether this string is constant or not. */
   def isConstant: Boolean = seq.forall(_.isInstanceOf[Wrap])
@@ -58,11 +58,11 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
     FString(Math.max(f(n), 1), seq)
 
   /** Builds a UString instance from this. */
-  def toUString: UString = {
+  def toUString: UString =
     val str = new StringBuilder
     var pos = 0
-    while (pos < seq.size) {
-      seq(pos) match {
+    while pos < seq.size do
+      seq(pos) match
         case Wrap(u) =>
           pos += 1
           str.append(u.asString)
@@ -70,100 +70,85 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]) {
           pos += 1
           val part = seq
             .slice(pos, pos + size)
-            .map {
+            .map:
               case Wrap(u)      => u.asString
               case Repeat(_, _) => throw new IllegalArgumentException
-            }
             .mkString
           val repeat = n + m
-          for (_ <- 1 to repeat) str.append(part)
+          for _ <- 1 to repeat do str.append(part)
           pos += size
-      }
-    }
     UString(str.result())
-  }
 
   /** Builds an attack pattern string from this. */
-  def toAttackPattern: AttackPattern = {
+  def toAttackPattern: AttackPattern =
     val pumps = Seq.newBuilder[(UString, UString, Int)]
 
     val str = new StringBuilder
     var pos = 0
 
-    while (pos < seq.size) {
-      seq(pos) match {
+    while pos < seq.size do
+      seq(pos) match
         case Wrap(u) =>
           pos += 1
           str.append(u.asString)
         case Repeat(m, size) =>
           pos += 1
           val repeat = n + m
-          if (repeat > 1) {
+          if repeat > 1 then
             val s = UString(str.result())
             str.clear()
             val pump = seq
               .slice(pos, pos + size)
-              .map {
+              .map:
                 case Wrap(u)      => u.asString
                 case Repeat(_, _) => throw new IllegalArgumentException
-              }
               .mkString
             val t = UString(pump)
             pumps.addOne((s, t, m))
             pos += size
-          }
-      }
-    }
 
     val suffix = UString(str.result())
     AttackPattern(pumps.result(), suffix, n)
-  }
 
   /** Returns the string representation of this string. */
-  def toString(style: AttackPattern.Style): String = {
-    if (seq.isEmpty) return "''"
+  def toString(style: AttackPattern.Style): String =
+    if seq.isEmpty then return "''"
 
     val parts = Seq.newBuilder[String]
 
     val str = new StringBuilder
     var pos = 0
 
-    while (pos < seq.size) {
-      seq(pos) match {
+    while pos < seq.size do
+      seq(pos) match
         case Wrap(u) =>
           pos += 1
           str.append(u.asString)
         case Repeat(m, size) =>
           pos += 1
           val repeat = n + m
-          if (repeat > 1) {
+          if repeat > 1 then
             val s = UString(str.result())
             str.clear()
-            if (s.nonEmpty) parts.addOne(s.toString)
+            if s.nonEmpty then parts.addOne(s.toString)
             val part = seq
               .slice(pos, pos + size)
-              .map {
+              .map:
                 case Wrap(u)      => u.asString
                 case Repeat(_, _) => throw new IllegalArgumentException
-              }
               .mkString
             parts.addOne(s"${UString(part)}${style.repeat(repeat)}")
             pos += size
-          }
-      }
-    }
 
     val s = UString(str.result())
-    if (s.nonEmpty) parts.addOne(s.toString)
+    if s.nonEmpty then parts.addOne(s.toString)
 
     parts.result().mkString(style.join)
-  }
 
   override def toString: String = toString(AttackPattern.JavaScript)
-}
 
 /** FString types and utilities. */
-object FString {
+object FString:
 
   /** FChar is a character of FString. */
   sealed abstract class FChar extends Serializable with Product
@@ -175,62 +160,52 @@ object FString {
   final case class Repeat(m: Int, size: Int) extends FChar
 
   /** Builds a FString from a string. */
-  def apply(input: UString, unicode: Boolean): FString = FString(1, input.iterator(unicode).map(Wrap).toIndexedSeq)
+  def apply(input: UString, unicode: Boolean): FString = FString(1, input.iterator(unicode).map(Wrap(_)).toIndexedSeq)
 
   /** Builds a FString from a string with a loop analysis information. */
-  def build(input: UString, loops: Seq[(Int, Int)], unicode: Boolean): FString = {
+  def build(input: UString, loops: Seq[(Int, Int)], unicode: Boolean): FString =
     val repeats = loops.iterator.collect { case (start, end) if start != end => (start, end - start) }.toMap
 
     val str = IndexedSeq.newBuilder[FChar]
     var pos = 0
-    while (pos < input.sizeAsString) {
-      repeats.get(pos) match {
+    while pos < input.sizeAsString do
+      repeats.get(pos) match
         case Some(size) =>
           val part = input.substring(pos, pos + size)
           pos += size
           // Compresses a repetition.
           var m = 0
-          while (pos < input.sizeAsString && part == input.substring(pos, pos + size)) {
+          while pos < input.sizeAsString && part == input.substring(pos, pos + size) do
             m += 1
             pos += size
-          }
-          str.addOne(Repeat(m, size)).addAll(part.iterator(unicode).map(Wrap))
+          str.addOne(Repeat(m, size)).addAll(part.iterator(unicode).map(Wrap(_)))
         case None =>
           str.addOne(Wrap(input.getAt(pos, unicode).get))
           pos += 1
-      }
-    }
 
     FString(1, str.result())
-  }
 
   /** Computes a crossing of two FString. */
-  def cross(fs1: FString, fs2: FString, n1: Int, n2: Int): (FString, FString) = {
+  def cross(fs1: FString, fs2: FString, n1: Int, n2: Int): (FString, FString) =
     val n = (fs1.n + fs2.n) / 2
     val seq1 = fs1.seq.slice(0, n1) ++ fs2.seq.slice(n2, fs2.seq.size)
     val seq2 = fs2.seq.slice(0, n2) ++ fs1.seq.slice(n1, fs1.seq.size)
     (fix(FString(n, seq1)), fix(FString(n, seq2)))
-  }
 
   /** Fixes a FString sequence. */
-  private[fuzz] def fix(fs: FString): FString = {
+  private[fuzz] def fix(fs: FString): FString =
     val seq = IndexedSeq.newBuilder[FChar]
     var repeat = 0
     var pos = 0
-    while (pos < fs.size) {
-      fs.seq(pos) match {
+    while pos < fs.size do
+      fs.seq(pos) match
         case Wrap(c) =>
           if (repeat > 0) repeat -= 1
           pos += 1
           seq.addOne(Wrap(c))
         case Repeat(m, size) =>
-          if (repeat == 0) {
+          if repeat == 0 then
             repeat = Math.max(0, Math.min(fs.size - pos - 1, size))
-            if (repeat > 0) seq.addOne(Repeat(m, size))
-          }
+            if repeat > 0 then seq.addOne(Repeat(m, size))
           pos += 1
-      }
-    }
     FString(fs.n, seq.result())
-  }
-}

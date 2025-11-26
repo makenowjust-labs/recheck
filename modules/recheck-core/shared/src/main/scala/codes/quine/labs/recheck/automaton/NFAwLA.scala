@@ -24,33 +24,28 @@ final case class NFAwLA[A, Q](
     lookAheadDFA: DFA[A, Set[Q]],
     sourcemap: Map[((Q, Set[Q]), (A, Set[Q]), (Q, Set[Q])), Seq[Location]] =
       Map.empty[((Q, Set[Q]), (A, Set[Q]), (Q, Set[Q])), Seq[Location]]
-) {
+):
 
   /** Exports this transition function as a graph. */
   def toGraph(implicit ctx: Context): Graph[(Q, Set[Q]), (A, Set[Q])] =
-    ctx.interrupt {
+    ctx.interrupt:
       Graph.from(delta.iterator.flatMap { case (q1, a) -> qs =>
         qs.iterator.map((q1, a, _))
       }.toIndexedSeq)
-    }
 
   /** Converts to Graphviz format text. */
-  def toGraphviz: String = {
+  def toGraphviz: String =
     val sb = new mutable.StringBuilder
 
-    def showQ(qps: (Q, Set[Q])): String = {
+    def showQ(qps: (Q, Set[Q])): String =
       val (q, ps) = qps
       escape(s"($q, ${ps.map(_.toString).toSeq.sorted.mkString("{", ",", "}")})")
-    }
 
     sb.append("digraph {\n")
     sb.append(s"  ${escape("")} [shape=point];\n")
-    for (init <- initSet) sb.append(s"  ${escape("")} -> ${showQ(init)};\n")
-    for (q <- stateSet) sb.append(s"  ${showQ(q)} [shape=${if (acceptSet.contains(q)) "double" else ""}circle];\n")
-    for (((q0, a), qs) <- delta; q1 <- qs)
-      sb.append(s"  ${showQ(q0)} -> ${showQ(q1)} [label=${escape(a._1)}];\n")
+    for init <- initSet do sb.append(s"  ${escape("")} -> ${showQ(init)};\n")
+    for q <- stateSet do sb.append(s"  ${showQ(q)} [shape=${if (acceptSet.contains(q)) "double" else ""}circle];\n")
+    for ((q0, a), qs) <- delta; q1 <- qs do sb.append(s"  ${showQ(q0)} -> ${showQ(q1)} [label=${escape(a._1)}];\n")
     sb.append("}")
 
     sb.result()
-  }
-}

@@ -13,7 +13,7 @@ import codes.quine.labs.recheck.common.UnsupportedException
 sealed abstract class Diagnostics extends Product with Serializable
 
 /** Diagnostics types. */
-object Diagnostics {
+object Diagnostics:
 
   /** Safe is a analysis result against a safe RegExp. */
   final case class Safe(
@@ -21,13 +21,12 @@ object Diagnostics {
       flags: String,
       complexity: AttackComplexity.Safe,
       checker: Checker
-  ) extends Diagnostics {
+  ) extends Diagnostics:
     override def toString: String =
       s"""|Input     : /$source/$flags
           |Status    : safe
           |Complexity: $complexity
           |Checker   : $checker""".stripMargin
-  }
 
   /** Vulnerable is an analysis result against a vulnerable RegExp. */
   final case class Vulnerable(
@@ -37,7 +36,7 @@ object Diagnostics {
       attack: AttackPattern,
       hotspot: Hotspot,
       checker: Checker
-  ) extends Diagnostics {
+  ) extends Diagnostics:
     override def toString: String =
       s"""|Input        : /$source/$flags
           |Status       : vulnerable
@@ -45,7 +44,6 @@ object Diagnostics {
           |Attack string: $attack
           |Hotspot      : /${hotspot.highlight(source)}/$flags
           |Checker      : $checker""".stripMargin
-  }
 
   /** Unknown is an analysis result against a RegExp in which vulnerability is unknown for some reason. */
   final case class Unknown(
@@ -53,60 +51,48 @@ object Diagnostics {
       flags: String,
       error: ErrorKind,
       checker: Option[Checker]
-  ) extends Diagnostics {
+  ) extends Diagnostics:
     override def toString: String =
       s"""|Input  : /$source/$flags
           |Status : unknown
           |Error  : $error
           |Checker: ${checker.map(_.toString).getOrElse("(none)")}""".stripMargin
 
-  }
-
   /** Unknown utilities. */
-  object Unknown {
+  object Unknown:
 
     /** Creates a diagnostics from the exception. */
-    def from(source: String, flags: String, ex: ReDoSException): Diagnostics = {
-      val kind = ex match {
+    def from(source: String, flags: String, ex: ReDoSException): Diagnostics =
+      val kind = ex match
         case _: TimeoutException        => ErrorKind.Timeout
         case _: CancelException         => ErrorKind.Cancel
         case ex: UnsupportedException   => ErrorKind.Unsupported(ex.getMessage)
         case ex: InvalidRegExpException => ErrorKind.InvalidRegExp(ex.getMessage)
         case ex: UnexpectedException    => ErrorKind.Unexpected(ex.getMessage)
-      }
       Unknown(source, flags, kind, ex.checker)
-    }
-  }
 
   /** ErrorKind is a reason of an unknown diagnostics. */
   sealed abstract class ErrorKind extends Serializable with Product
 
   /** ErrorKind types. */
-  object ErrorKind {
+  object ErrorKind:
 
     /** Timeout is a timeout on RegExp analyzing. */
-    case object Timeout extends ErrorKind {
+    case object Timeout extends ErrorKind:
       override def toString: String = "timeout"
-    }
 
     /** Cancel is a cancel on RegExp analyzing. */
-    case object Cancel extends ErrorKind {
+    case object Cancel extends ErrorKind:
       override def toString: String = "cancel"
-    }
 
     /** Unsupported is the RegExp pattern is not supported yet. */
-    final case class Unsupported(message: String) extends ErrorKind {
+    final case class Unsupported(message: String) extends ErrorKind:
       override def toString: String = s"unsupported ($message)"
-    }
 
     /** InvalidRegExp is the RegExp pattern is invalid on parsing or semantics. */
-    final case class InvalidRegExp(message: String) extends ErrorKind {
+    final case class InvalidRegExp(message: String) extends ErrorKind:
       override def toString: String = s"invalid RegExp ($message)"
-    }
 
     /** Unexpected is a unexpected error. */
-    final case class Unexpected(message: String) extends ErrorKind {
+    final case class Unexpected(message: String) extends ErrorKind:
       override def toString: String = s"unexpected ($message)"
-    }
-  }
-}
