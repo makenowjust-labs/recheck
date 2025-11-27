@@ -14,6 +14,7 @@
     "@docusaurus/module-type-aliases": "3.9.2",
     "@docusaurus/plugin-ideal-image": "3.9.2",
     "@docusaurus/preset-classic": "3.9.2",
+    "@docusaurus/theme-classic": "3.9.2",
     "@mdx-js/react": "3.1.1",
     "clsx": "2.1.1",
     "hast-util-is-element": "1.1.0",
@@ -30,6 +31,7 @@
   },
   "devDependencies": {
     "@tsconfig/docusaurus": "2.0.7",
+    "@types/node": "24.10.1",
     "prettier": "3.6.2",
     "typescript": "5.9.3"
   },
