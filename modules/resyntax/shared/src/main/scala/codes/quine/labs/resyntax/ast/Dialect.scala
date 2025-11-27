@@ -3,7 +3,7 @@ package codes.quine.labs.resyntax.ast
 /** Dialect is a regular expression dialect specifier. */
 sealed abstract class Dialect extends Product with Serializable
 
-object Dialect {
+object Dialect:
 
   /** DotNet specifies .NET dialect. */
   case object DotNet extends Dialect
@@ -25,4 +25,3 @@ object Dialect {
 
   /** Ruby specifies Ruby dialect. */
   case object Ruby extends Dialect
-}

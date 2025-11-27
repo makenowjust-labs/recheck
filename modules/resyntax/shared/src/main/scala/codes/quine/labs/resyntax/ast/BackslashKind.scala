@@ -3,12 +3,11 @@ package codes.quine.labs.resyntax.ast
 /** BackslashKind is a kind of backslash node. */
 sealed abstract class BackslashKind extends Product with Serializable
 
-object BackslashKind {
+object BackslashKind:
 
   /** BackslashValue is backslash escape having a literal value. */
-  sealed abstract class BackslashValue extends BackslashKind {
+  sealed abstract class BackslashValue extends BackslashKind:
     def value: Int
-  }
 
   /** Unknown is an unknown backslash. */
   final case class Unknown(value: Int) extends BackslashValue
@@ -30,4 +29,3 @@ object BackslashKind {
 
   /** CaseCommand is a case command backslash. */
   final case class CaseCommand(kind: CaseCommandKind) extends BackslashKind
-}

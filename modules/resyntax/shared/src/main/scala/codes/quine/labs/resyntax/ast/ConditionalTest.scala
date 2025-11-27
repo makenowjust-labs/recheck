@@ -16,15 +16,13 @@ package codes.quine.labs.resyntax.ast
   *   "(" Node ")"
   * }}}
   */
-sealed abstract class ConditionalTest extends Product with Serializable {
-  def equalsWithoutLoc(that: ConditionalTest): Boolean = (this, that) match {
+sealed abstract class ConditionalTest extends Product with Serializable:
+  def equalsWithoutLoc(that: ConditionalTest): Boolean = (this, that) match
     case (ConditionalTest.LookAround(kl, l), ConditionalTest.LookAround(kr, r)) =>
       kl == kr && l.equalsWithoutLoc(r)
     case (l, r) => l == r
-  }
-}
 
-object ConditionalTest {
+object ConditionalTest:
 
   /** Indexed is an indexed capture test (e.g. `(1)`). */
   final case class Indexed(n: Int) extends ConditionalTest
@@ -53,9 +51,7 @@ object ConditionalTest {
   /** LookAhead is a look-around test (e.g. `(foo)`). */
   final case class LookAround(kind: Option[GroupKind.LookAround], node: Node) extends ConditionalTest
 
-  object LookAround {
+  object LookAround:
     def apply(kind: GroupKind.LookAround, data: NodeData): LookAround = LookAround(Some(kind), Node(data))
 
     def apply(data: NodeData): LookAround = LookAround(None, Node(data))
-  }
-}

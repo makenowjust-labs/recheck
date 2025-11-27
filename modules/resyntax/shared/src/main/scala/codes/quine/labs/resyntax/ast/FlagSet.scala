@@ -61,26 +61,21 @@ final case class FlagSet(
     sticky: Boolean = false
 )
 
-object FlagSet {
+object FlagSet:
 
   /** Returns parsed flag set object from the given flag set string on the dialect. */
-  def parse(flags: String, dialect: Dialect): FlagSet = {
+  def parse(flags: String, dialect: Dialect): FlagSet =
     val allowsDuplicatedFlag = dialect != Dialect.JavaScript
 
     var flagSet = FlagSet()
     val counts = mutable.Map.empty[Char, Int].withDefaultValue(0)
-    for ((c, offset) <- flags.toCharArray.zipWithIndex) {
-      def check(dialects: Dialect*): Unit = {
-        if (!dialects.contains(dialect)) {
-          throw new FlagSetException(s"Unknown flag '$c'", Some(offset))
-        }
-      }
+    for (c, offset) <- flags.toCharArray.zipWithIndex do
+      def check(dialects: Dialect*): Unit =
+        if !dialects.contains(dialect) then throw new FlagSetException(s"Unknown flag '$c'", Some(offset))
       counts(c) += 1
-      if (counts(c) >= 2 && !allowsDuplicatedFlag) {
-        throw new FlagSetException(s"Duplicated flag '$c'", Some(offset))
-      }
+      if counts(c) >= 2 && !allowsDuplicatedFlag then throw new FlagSetException(s"Duplicated flag '$c'", Some(offset))
 
-      (c: @switch) match {
+      (c: @switch) match
         case 'A' =>
           check(Dialect.PCRE)
           flagSet = flagSet.copy(anchored = true)
@@ -156,15 +151,8 @@ object FlagSet {
           flagSet = flagSet.copy(sticky = true)
         case _ =>
           check()
-      }
-    }
 
-    if (dialect == Dialect.Python) {
-      if (flagSet.bytes && flagSet.unicode) {
-        throw new FlagSetException("Incompatible flags 'b' and 'u'", None)
-      }
-    }
+    if dialect == Dialect.Python then
+      if flagSet.bytes && flagSet.unicode then throw new FlagSetException("Incompatible flags 'b' and 'u'", None)
 
     flagSet
-  }
-}

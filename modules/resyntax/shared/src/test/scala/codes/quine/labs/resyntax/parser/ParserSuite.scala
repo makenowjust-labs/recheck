@@ -1,59 +1,52 @@
 package codes.quine.labs.resyntax.parser
 
-import codes.quine.labs.resyntax.ast.AssertKind._
-import codes.quine.labs.resyntax.ast.AssertNameStyle._
-import codes.quine.labs.resyntax.ast.BackReferenceStyle._
-import codes.quine.labs.resyntax.ast.BackslashKind._
-import codes.quine.labs.resyntax.ast.BacktrackControlKind._
-import codes.quine.labs.resyntax.ast.BacktrackStrategy._
-import codes.quine.labs.resyntax.ast.BoundaryModifier._
-import codes.quine.labs.resyntax.ast.CaseCommandKind._
-import codes.quine.labs.resyntax.ast.ClassItemData._
+import codes.quine.labs.resyntax.ast.AssertKind.*
+import codes.quine.labs.resyntax.ast.AssertNameStyle.*
+import codes.quine.labs.resyntax.ast.BackReferenceStyle.*
+import codes.quine.labs.resyntax.ast.BackslashKind.*
+import codes.quine.labs.resyntax.ast.BacktrackControlKind.*
+import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
+import codes.quine.labs.resyntax.ast.BoundaryModifier.*
+import codes.quine.labs.resyntax.ast.CaseCommandKind.*
+import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.CommandKind
-import codes.quine.labs.resyntax.ast.CommandKind._
-import codes.quine.labs.resyntax.ast.ConditionalTest._
+import codes.quine.labs.resyntax.ast.CommandKind.*
+import codes.quine.labs.resyntax.ast.ConditionalTest.*
 import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.Dialect._
-import codes.quine.labs.resyntax.ast.EscapeClassKind._
-import codes.quine.labs.resyntax.ast.EscapeStyle._
+import codes.quine.labs.resyntax.ast.Dialect.*
+import codes.quine.labs.resyntax.ast.EscapeClassKind.*
+import codes.quine.labs.resyntax.ast.EscapeStyle.*
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetDiff
 import codes.quine.labs.resyntax.ast.GroupKind
-import codes.quine.labs.resyntax.ast.GroupKind._
-import codes.quine.labs.resyntax.ast.NameStyle._
+import codes.quine.labs.resyntax.ast.GroupKind.*
+import codes.quine.labs.resyntax.ast.NameStyle.*
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
-import codes.quine.labs.resyntax.ast.NodeData._
-import codes.quine.labs.resyntax.ast.Quantifier._
-import codes.quine.labs.resyntax.ast.QuoteLiteral._
-import codes.quine.labs.resyntax.ast.Reference._
+import codes.quine.labs.resyntax.ast.NodeData.*
+import codes.quine.labs.resyntax.ast.Quantifier.*
+import codes.quine.labs.resyntax.ast.QuoteLiteral.*
+import codes.quine.labs.resyntax.ast.Reference.*
 
-class ParserSuite extends munit.FunSuite {
-  def check(s: String, flags: String, dialects: Dialect*)(expected: NodeData)(implicit loc: munit.Location): Unit = {
-    for (dialect <- dialects) {
-      test(s"Parser.parse: /$s/$flags in $dialect") {
+class ParserSuite extends munit.FunSuite:
+  def check(s: String, flags: String, dialects: Dialect*)(expected: NodeData)(implicit loc: munit.Location): Unit =
+    for dialect <- dialects do
+      test(s"Parser.parse: /$s/$flags in $dialect"):
         val flagSet = FlagSet.parse(flags, dialect)
         val result = Parser.parse(s, flagSet, dialect)
         assert(result.equalsWithoutLoc(Node(expected)))
-      }
-    }
-  }
 
-  def error(s: String, flags: String, dialects: Dialect*)(message: String)(implicit loc: munit.Location): Unit = {
-    for (dialect <- dialects) {
-      test(s"Parser.parse: /$s/$flags in $dialect with error \"$message\"") {
+  def error(s: String, flags: String, dialects: Dialect*)(message: String)(implicit loc: munit.Location): Unit =
+    for dialect <- dialects do
+      test(s"Parser.parse: /$s/$flags in $dialect with error \"$message\""):
         val flagSet = FlagSet.parse(flags, dialect)
-        interceptMessage[ParsingException](message) {
+        interceptMessage[ParsingException](message):
           Parser.parse(s, flagSet, dialect)
-        }
-      }
-    }
-  }
 
   val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl, Python, Ruby)
 
   // Top
-  error(")", "", All: _*)("Unmatched ')' at 0")
+  error(")", "", All*)("Unmatched ')' at 0")
 
   // Comment
   check(" ", "x", DotNet, Java, PCRE, Perl, Python, Ruby)(Sequence())
@@ -61,31 +54,31 @@ class ParserSuite extends munit.FunSuite {
   check("# \\\nfoo", "x", Python)(Sequence())
 
   // Disjunction:
-  check("a|b", "", All: _*)(Disjunction(Literal('a'), Literal('b')))
+  check("a|b", "", All*)(Disjunction(Literal('a'), Literal('b')))
 
   // Sequence:
-  check("ab", "", All: _*)(Sequence(Literal('a'), Literal('b')))
+  check("ab", "", All*)(Sequence(Literal('a'), Literal('b')))
 
   // Repeat:
-  check("a*", "", All: _*)(Repeat(Literal('a'), Star(Greedy)))
-  check("a*?", "", All: _*)(Repeat(Literal('a'), Star(Lazy)))
+  check("a*", "", All*)(Repeat(Literal('a'), Star(Greedy)))
+  check("a*?", "", All*)(Repeat(Literal('a'), Star(Lazy)))
   check("a*+", "", Java, PCRE, Perl, Ruby)(Repeat(Literal('a'), Star(Possessive)))
-  check("a+", "", All: _*)(Repeat(Literal('a'), Plus(Greedy)))
-  check("a+?", "", All: _*)(Repeat(Literal('a'), Plus(Lazy)))
+  check("a+", "", All*)(Repeat(Literal('a'), Plus(Greedy)))
+  check("a+?", "", All*)(Repeat(Literal('a'), Plus(Lazy)))
   check("a++", "", Java, PCRE, Perl, Ruby)(Repeat(Literal('a'), Plus(Possessive)))
-  check("a?", "", All: _*)(Repeat(Literal('a'), Question(Greedy)))
-  check("a??", "", All: _*)(Repeat(Literal('a'), Question(Lazy)))
+  check("a?", "", All*)(Repeat(Literal('a'), Question(Greedy)))
+  check("a??", "", All*)(Repeat(Literal('a'), Question(Lazy)))
   check("a?+", "", Java, PCRE, Perl, Ruby)(Repeat(Literal('a'), Question(Possessive)))
-  check("a{2}", "", All: _*)(Repeat(Literal('a'), Exact(2, Greedy)))
+  check("a{2}", "", All*)(Repeat(Literal('a'), Exact(2, Greedy)))
   check("a{2}?", "", DotNet, Java, JavaScript, PCRE, Perl, Python)(Repeat(Literal('a'), Exact(2, Lazy)))
   check("a{2}?", "", Ruby)(Repeat(Repeat(Literal('a'), Exact(2, Greedy)), Question(Greedy)))
   check("a{2}+", "", Java, PCRE, Perl)(Repeat(Literal('a'), Exact(2, Possessive)))
   check("a{2}+", "", Ruby)(Repeat(Repeat(Literal('a'), Exact(2, Greedy)), Plus(Greedy)))
-  check("a{2,}", "", All: _*)(Repeat(Literal('a'), Unbounded(2, Greedy)))
-  check("a{2,}?", "", All: _*)(Repeat(Literal('a'), Unbounded(2, Lazy)))
+  check("a{2,}", "", All*)(Repeat(Literal('a'), Unbounded(2, Greedy)))
+  check("a{2,}?", "", All*)(Repeat(Literal('a'), Unbounded(2, Lazy)))
   check("a{2,}+", "", Java, PCRE, Perl, Ruby)(Repeat(Literal('a'), Unbounded(2, Possessive)))
-  check("a{2,3}", "", All: _*)(Repeat(Literal('a'), Bounded(2, 3, Greedy)))
-  check("a{2,3}?", "", All: _*)(Repeat(Literal('a'), Bounded(2, 3, Lazy)))
+  check("a{2,3}", "", All*)(Repeat(Literal('a'), Bounded(2, 3, Greedy)))
+  check("a{2,3}?", "", All*)(Repeat(Literal('a'), Bounded(2, 3, Lazy)))
   check("a{2,3}+", "", Java, PCRE, Perl, Ruby)(Repeat(Literal('a'), Bounded(2, 3, Possessive)))
   check("a{,3}", "", Perl, Python, Ruby)(Repeat(Literal('a'), MaxBounded(3, Greedy)))
   check("a{,3}?", "", Perl, Python, Ruby)(Repeat(Literal('a'), MaxBounded(3, Lazy)))
@@ -93,24 +86,24 @@ class ParserSuite extends munit.FunSuite {
   check("a{", "", DotNet, JavaScript, PCRE, Perl, Python, Ruby)(Sequence(Literal('a'), Literal('{')))
   error("a{", "", Java)("Incomplete quantifier at 1")
   error("a{", "u", JavaScript)("Incomplete quantifier at 1")
-  error("*", "", All: _*)("Nothing to repeat at 0")
+  error("*", "", All*)("Nothing to repeat at 0")
   check("a**", "", Ruby)(Repeat(Repeat(Literal('a'), Star(Greedy)), Star(Greedy)))
   error("a**", "", DotNet, Java, JavaScript, PCRE, Perl, Python)("Nested quantifier at 2")
   error("^*", "", DotNet, Java, JavaScript, PCRE, Perl, Python)("Nothing to repeat at 1")
   error("$*", "", DotNet, Java, JavaScript, PCRE, Perl, Python)("Nothing to repeat at 1")
   error("(?=a)*", "u", JavaScript)("Nothing to repeat at 5")
   error("(?<=a)*", "", JavaScript)("Nothing to repeat at 6")
-  check("}", "", All: _*)(Literal('}'))
+  check("}", "", All*)(Literal('}'))
   error("}", "u", JavaScript)("Incomplete quantifier at 0")
 
   // Group
-  check("(?:a)", "", All: _*)(Group(NonCapture, Literal('a')))
+  check("(?:a)", "", All*)(Group(NonCapture, Literal('a')))
   check("(?|a)", "", PCRE, Perl)(Command(BranchReset(Literal('a'))))
   check("(?|a|b)", "", PCRE, Perl)(Command(BranchReset(Literal('a'), Literal('b'))))
-  check("(?=a)", "", All: _*)(Group(PositiveLookAhead(Symbolic), Literal('a')))
-  check("(?!a)", "", All: _*)(Group(NegativeLookAhead(Symbolic), Literal('a')))
-  check("(?<=a)", "", All: _*)(Group(PositiveLookBehind(Symbolic), Literal('a')))
-  check("(?<!a)", "", All: _*)(Group(NegativeLookBehind(Symbolic), Literal('a')))
+  check("(?=a)", "", All*)(Group(PositiveLookAhead(Symbolic), Literal('a')))
+  check("(?!a)", "", All*)(Group(NegativeLookAhead(Symbolic), Literal('a')))
+  check("(?<=a)", "", All*)(Group(PositiveLookBehind(Symbolic), Literal('a')))
+  check("(?<!a)", "", All*)(Group(NegativeLookBehind(Symbolic), Literal('a')))
   check("(?<*a)", "", PCRE)(Group(NonAtomicPositiveLookBehind(Symbolic), Literal('a')))
   check("(?<x>a)", "", DotNet, Java, JavaScript, PCRE, Perl, Ruby)(Group(NamedCapture(Angle, "x"), Literal('a')))
   check("(?<x-y>a)", "", DotNet)(Group(Balance(Angle, Some("x"), "y"), Literal('a')))
@@ -195,9 +188,8 @@ class ParserSuite extends munit.FunSuite {
   check("(?C1)", "", PCRE)(Command(CalloutInt(1)))
   check("(?C{x})", "", PCRE)(Command(CalloutString('{', '}', "x")))
   check("(?C{x{{y}}z})", "", PCRE)(Command(CalloutString('{', '}', "x{{y}}z")))
-  for (delim <- Seq('`', '\'', '"', '^', '%', '#', '$')) {
+  for delim <- Seq('`', '\'', '"', '^', '%', '#', '$') do
     check(s"(?C${delim}x$delim)", "", PCRE)(Command(CalloutString(delim, delim, "x")))
-  }
   check("(?i)", "", DotNet, Java, PCRE, Perl, Python, Ruby)(
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None)))
   )
@@ -307,21 +299,21 @@ class ParserSuite extends munit.FunSuite {
   check("(*non_atomic_positive_lookbehind:a)", "", PCRE)(Group(NonAtomicPositiveLookBehind(Alphabetic), Literal('a')))
   check("(*naplb:a)", "", PCRE)(Group(NonAtomicPositiveLookBehind(Abbrev), Literal('a')))
   check("(*:x)", "", PCRE, Perl)(Command(BacktrackControl(None, Some("x"))))
-  check("(a)", "", All: _*)(Group(IndexedCapture, Literal('a')))
-  error("(", "", All: _*)("Unclosed group at 1")
+  check("(a)", "", All*)(Group(IndexedCapture, Literal('a')))
+  error("(", "", All*)("Unclosed group at 1")
 
   // Caret
-  check("^", "", All: _*)(Caret)
+  check("^", "", All*)(Caret)
 
   // Dollar
-  check("$", "", All: _*)(Dollar)
+  check("$", "", All*)(Dollar)
 
   // Dot
-  check(".", "", All: _*)(Dot)
+  check(".", "", All*)(Dot)
 
   // Backslash
   check("\\a", "", DotNet, Java, PCRE, Perl, Python, Ruby)(Backslash(Escape(Single('a'), 0x07)))
-  check("\\b", "", All: _*)(Backslash(Assert(Boundary(None))))
+  check("\\b", "", All*)(Backslash(Assert(Boundary(None))))
   check("\\b{g}", "", Java, Perl)(Backslash(Assert(Boundary(Some(GModifier)))))
   check("\\b{gcb}", "", Perl)(Backslash(Assert(Boundary(Some(GcbModifier)))))
   check("\\b{lb}", "", Perl)(Backslash(Assert(Boundary(Some(LbModifier)))))
@@ -331,9 +323,9 @@ class ParserSuite extends munit.FunSuite {
   check("\\cz", "", DotNet, Java, JavaScript, PCRE, Perl, Ruby)(Backslash(Escape(Control('z'), 0x1a)))
   check("\\c@", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(Escape(Control('@'), 0x00)))
   check("\\c_", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(Escape(Control('_'), 0x1f)))
-  check("\\d", "", All: _*)(Backslash(EscapeClass(Digit)))
+  check("\\d", "", All*)(Backslash(EscapeClass(Digit)))
   check("\\e", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(Escape(Single('e'), 0x1b)))
-  check("\\f", "", All: _*)(Backslash(Escape(Single('f'), 0x0c)))
+  check("\\f", "", All*)(Backslash(Escape(Single('f'), 0x0c)))
   check("\\g1", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Bare), IndexedReference(1))))
   check("\\g+1", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Bare), RelativeReference(1))))
   check("\\g-1", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Bare), RelativeReference(-1))))
@@ -383,7 +375,7 @@ class ParserSuite extends munit.FunSuite {
     Backslash(EscapeBackReference(KBackReference(Quote), LeveledReference(IndexedReference(1), -1)))
   )
   check("\\l", "", Perl)(Backslash(CaseCommand(SingleLowerCaseCommand)))
-  check("\\n", "", All: _*)(Backslash(Escape(Single('n'), 0x0a)))
+  check("\\n", "", All*)(Backslash(Escape(Single('n'), 0x0a)))
   check("\\o{010}", "", PCRE, Perl)(Backslash(Escape(Octal, 0x08)))
   check("\\p{Letter}", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(EscapeClass(UnicodeProperty("Letter"))))
   check("\\p{Letter}", "u", JavaScript)(Backslash(EscapeClass(UnicodeProperty("Letter"))))
@@ -392,27 +384,27 @@ class ParserSuite extends munit.FunSuite {
   )
   check("\\p{Script=Hira}", "u", JavaScript)(Backslash(EscapeClass(UnicodePropertyValue("Script", "Hira"))))
   check("\\pL", "", Java, PCRE, Perl)(Backslash(EscapeClass(UnicodeBareProperty("L"))))
-  check("\\r", "", All: _*)(Backslash(Escape(Single('r'), 0x0d)))
-  check("\\s", "", All: _*)(Backslash(EscapeClass(Space)))
-  check("\\t", "", All: _*)(Backslash(Escape(Single('t'), 0x09)))
+  check("\\r", "", All*)(Backslash(Escape(Single('r'), 0x0d)))
+  check("\\s", "", All*)(Backslash(EscapeClass(Space)))
+  check("\\t", "", All*)(Backslash(Escape(Single('t'), 0x09)))
   check("\\u", "", Perl)(Backslash(CaseCommand(SingleUpperCaseCommand)))
   check("\\uABCD", "", DotNet, Java, JavaScript, Python, Ruby)(Backslash(Escape(UnicodeHex4, 0xabcd)))
   check("\\u{ABCDE}", "u", JavaScript)(Backslash(Escape(UnicodeBracket, 0xabcde)))
   check("\\uA", "", JavaScript, Ruby)(Sequence(Backslash(Unknown('u')), Literal('A')))
   check("\\v", "", Java, PCRE, Perl)(Backslash(EscapeClass(Vertical)))
   check("\\v", "", DotNet, JavaScript, Python, Ruby)(Backslash(Escape(Single('v'), 0x0b)))
-  check("\\w", "", All: _*)(Backslash(EscapeClass(Word)))
-  check("\\xAB", "", All: _*)(Backslash(Escape(Hex2, 0xab)))
+  check("\\w", "", All*)(Backslash(EscapeClass(Word)))
+  check("\\xAB", "", All*)(Backslash(Escape(Hex2, 0xab)))
   check("\\xA", "", PCRE, Perl, Ruby)(Backslash(Escape(Hex1, 0x0a)))
   check("\\x{ABCD}", "", Java, PCRE, Perl)(Backslash(Escape(HexBracket, 0xabcd)))
   check("\\z", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(Assert(LowerEnd)))
-  check("\\B", "", All: _*)(Backslash(Assert(NonBoundary(None))))
+  check("\\B", "", All*)(Backslash(Assert(NonBoundary(None))))
   check("\\B{g}", "", Perl)(Backslash(Assert(NonBoundary(Some(GModifier)))))
   check("\\B{gcb}", "", Perl)(Backslash(Assert(NonBoundary(Some(GcbModifier)))))
   check("\\B{lb}", "", Perl)(Backslash(Assert(NonBoundary(Some(LbModifier)))))
   check("\\B{wb}", "", Perl)(Backslash(Assert(NonBoundary(Some(WbModifier)))))
   check("\\B{sb}", "", Perl)(Backslash(Assert(NonBoundary(Some(SbModifier)))))
-  check("\\D", "", All: _*)(Backslash(EscapeClass(NonDigit)))
+  check("\\D", "", All*)(Backslash(EscapeClass(NonDigit)))
   check("\\E", "", Java, PCRE, Perl)(Backslash(CaseCommand(EndCaseCommand)))
   check("\\F", "", Perl)(Backslash(CaseCommand(FoldCaseCommand)))
   check("\\G", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(Assert(Sticky)))
@@ -451,46 +443,44 @@ class ParserSuite extends munit.FunSuite {
     )
   )
   check("\\R", "", Java, PCRE, Perl, Ruby)(Backslash(EscapeClass(GeneralNewline)))
-  check("\\S", "", All: _*)(Backslash(EscapeClass(NonSpace)))
+  check("\\S", "", All*)(Backslash(EscapeClass(NonSpace)))
   check("\\U000ABCDE", "", Python)(Backslash(Escape(UnicodeHex8, 0xabcde)))
   check("\\V", "", Java, PCRE, Perl)(Backslash(EscapeClass(NonVertical)))
-  check("\\W", "", All: _*)(Backslash(EscapeClass(NonWord)))
+  check("\\W", "", All*)(Backslash(EscapeClass(NonWord)))
   check("\\X", "", Java, PCRE, Perl)(Backslash(EscapeClass(GraphemeCluster)))
   check("\\Z", "", DotNet, Java, PCRE, Perl, Python, Ruby)(Backslash(Assert(UpperEnd)))
-  check("\\010", "", All: _*)(Backslash(Escape(BareOctal, 8)))
+  check("\\010", "", All*)(Backslash(Escape(BareOctal, 8)))
   check("\\412", "", JavaScript)(Sequence(Backslash(Escape(BareOctal, 33)), Literal('2')))
-  check("()\\1", "", All: _*)(
+  check("()\\1", "", All*)(
     Sequence(Group(IndexedCapture, Sequence()), Backslash(EscapeBackReference(BareBackReference, IndexedReference(1))))
   )
   check("\\1", "", DotNet, Java, PCRE, Perl, Python, Ruby)(
     Backslash(EscapeBackReference(BareBackReference, IndexedReference(1)))
   )
   check("\\1", "u", JavaScript)(Backslash(EscapeBackReference(BareBackReference, IndexedReference(1))))
-  for (c <- "/|+*?{}()^$.\\[]") {
-    check(s"\\$c", "", All: _*)(Backslash(Escape(Single(c), c.toInt)))
-  }
+  for c <- "/|+*?{}()^$.\\[]" do check(s"\\$c", "", All*)(Backslash(Escape(Single(c), c.toInt)))
   check("\\y", "", JavaScript, Perl, Ruby)(Backslash(Unknown('y')))
-  check("\\:", "", All: _*)(Backslash(Unknown(':')))
+  check("\\:", "", All*)(Backslash(Unknown(':')))
 
   // Class
-  check("[a]", "", All: _*)(Class(false, ClassLiteral('a')))
-  check("[^a]", "", All: _*)(Class(true, ClassLiteral('a')))
-  check("[a-z]", "", All: _*)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
-  check("[a-]", "", All: _*)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'))))
-  check("[-z]", "", All: _*)(Class(false, ClassUnion(ClassLiteral('-'), ClassLiteral('z'))))
-  check("[\\n-\\r]", "", All: _*)(
+  check("[a]", "", All*)(Class(false, ClassLiteral('a')))
+  check("[^a]", "", All*)(Class(true, ClassLiteral('a')))
+  check("[a-z]", "", All*)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  check("[a-]", "", All*)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'))))
+  check("[-z]", "", All*)(Class(false, ClassUnion(ClassLiteral('-'), ClassLiteral('z'))))
+  check("[\\n-\\r]", "", All*)(
     Class(
       false,
       ClassRange(ClassBackslashValue(Escape(Single('n'), '\n')), ClassBackslashValue(Escape(Single('r'), '\r')))
     )
   )
-  check("[a-\\w]", "", All: _*)(
+  check("[a-\\w]", "", All*)(
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassBackslashClass(Word)))
   )
-  check("[\\w-z]", "", All: _*)(
+  check("[\\w-z]", "", All*)(
     Class(false, ClassUnion(ClassBackslashClass(Word), ClassLiteral('-'), ClassLiteral('z')))
   )
-  check("[\\b]", "", All: _*)(Class(false, ClassBackslashValue(Escape(Single('b'), 0x08))))
+  check("[\\b]", "", All*)(Class(false, ClassBackslashValue(Escape(Single('b'), 0x08))))
   check("[]", "", JavaScript)(Class(false, ClassUnion()))
   check("[[:alnum:]]", "", PCRE, Perl, Ruby)(Class(false, ClassPosix(false, "alnum")))
   check("[[:^alnum:]]", "", PCRE, Perl, Ruby)(Class(false, ClassPosix(true, "alnum")))
@@ -550,6 +540,5 @@ class ParserSuite extends munit.FunSuite {
       )
     )
   )
-  error("[", "", All: _*)("Unclosed ']' at 1")
+  error("[", "", All*)("Unclosed ']' at 1")
   error("]", "u", JavaScript)("Unclosed ']' at 0")
-}

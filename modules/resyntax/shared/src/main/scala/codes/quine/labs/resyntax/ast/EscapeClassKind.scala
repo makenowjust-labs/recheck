@@ -3,7 +3,7 @@ package codes.quine.labs.resyntax.ast
 /** EscapeClassKind is a kind of backslash escape class. */
 sealed abstract class EscapeClassKind extends Product with Serializable
 
-object EscapeClassKind {
+object EscapeClassKind:
 
   /** Digit is `\d` class. */
   case object Digit extends EscapeClassKind
@@ -70,4 +70,3 @@ object EscapeClassKind {
 
   /** QuoteSet is `\q{}` */
   final case class QuoteSet(strings: Seq[Seq[QuoteLiteral]]) extends EscapeClassKind
-}

@@ -13,8 +13,8 @@ final case class IRFeatureSet(
     dollarIsChompTextEnd: Boolean
 )
 
-object IRFeatureSet {
-  def from(flagSet: FlagSet, dialect: Dialect): IRFeatureSet = {
+object IRFeatureSet:
+  def from(flagSet: FlagSet, dialect: Dialect): IRFeatureSet =
     val isDotNet = dialect == Dialect.DotNet
     val isJava = dialect == Dialect.Java
     // val isJavaScript = dialect == Dialect.JavaScript
@@ -31,5 +31,3 @@ object IRFeatureSet {
       // .NET, Java, PCRE (without `D`), Perl, Python, Ruby
       dollarIsChompTextEnd = isDotNet || isJava || isPCRE && !flagSet.dollarEndOnly || isPerl || isPython || isRuby
     )
-  }
-}

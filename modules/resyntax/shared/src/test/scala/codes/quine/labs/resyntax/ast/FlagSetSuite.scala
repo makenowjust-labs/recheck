@@ -1,23 +1,17 @@
 package codes.quine.labs.resyntax.ast
 
-import codes.quine.labs.resyntax.ast.Dialect._
+import codes.quine.labs.resyntax.ast.Dialect.*
 
-class FlagSetSuite extends munit.FunSuite {
-  def check(s: String, dialects: Dialect*)(cond: FlagSet => Boolean)(implicit loc: munit.Location): Unit = {
-    for (dialect <- dialects) {
-      test(s"FlagSet.parse: parse \"$s\" in $dialect") {
+class FlagSetSuite extends munit.FunSuite:
+  def check(s: String, dialects: Dialect*)(cond: FlagSet => Boolean)(implicit loc: munit.Location): Unit =
+    for dialect <- dialects do
+      test(s"FlagSet.parse: parse \"$s\" in $dialect"):
         assert(cond(FlagSet.parse(s, dialect)))
-      }
-    }
-  }
 
-  def error(s: String, dialects: Dialect*)(message: String)(implicit loc: munit.Location): Unit = {
-    for (dialect <- dialects) {
-      test(s"FlagSet.parse: parse \"$s\" in $dialect with message \"$message\"") {
+  def error(s: String, dialects: Dialect*)(message: String)(implicit loc: munit.Location): Unit =
+    for dialect <- dialects do
+      test(s"FlagSet.parse: parse \"$s\" in $dialect with message \"$message\""):
         interceptMessage[FlagSetException](message)(FlagSet.parse(s, dialect))
-      }
-    }
-  }
 
   check("A", PCRE)(_.anchored)
   check("D", PCRE)(_.dollarEndOnly)
@@ -48,4 +42,3 @@ class FlagSetSuite extends munit.FunSuite {
   error("ii", JavaScript)("Duplicated flag 'i' at 1")
   error("z", DotNet, Java, JavaScript, PCRE, Perl, Python, Ruby)("Unknown flag 'z' at 0")
   error("bu", Python)("Incompatible flags 'b' and 'u'")
-}

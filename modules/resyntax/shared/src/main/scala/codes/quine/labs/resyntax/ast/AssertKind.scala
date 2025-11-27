@@ -3,7 +3,7 @@ package codes.quine.labs.resyntax.ast
 /** AssertKind is a kind of backslash assertion. */
 sealed abstract class AssertKind extends Product with Serializable
 
-object AssertKind {
+object AssertKind:
 
   /** Boundary is a boundary assertion (e.g. `\b`). */
   final case class Boundary(modifier: Option[BoundaryModifier]) extends AssertKind
@@ -25,4 +25,3 @@ object AssertKind {
 
   /** UpperEnd is an end assertion (e.g. `\Z`). */
   case object UpperEnd extends AssertKind
-}

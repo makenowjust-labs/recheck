@@ -11,7 +11,7 @@ package codes.quine.labs.resyntax.ast
   */
 sealed abstract class BacktrackStrategy extends Product with Serializable
 
-object BacktrackStrategy {
+object BacktrackStrategy:
 
   /** Greedy is the default backtracking strategy. */
   case object Greedy extends BacktrackStrategy
@@ -21,4 +21,3 @@ object BacktrackStrategy {
 
   /** Possessive is a possessive backtracking strategy (e.g. `*+`). */
   case object Possessive extends BacktrackStrategy
-}

@@ -3,7 +3,7 @@ package codes.quine.labs.resyntax.ast
 /** BoundaryModifier is a kind of boundary modifier. */
 sealed abstract class BoundaryModifier extends Product with Serializable
 
-object BoundaryModifier {
+object BoundaryModifier:
 
   /** GModifier is a modifier of `\b{g}`. */
   case object GModifier extends BoundaryModifier
@@ -19,4 +19,3 @@ object BoundaryModifier {
 
   /** WbModifier is a modifier of `\b{wb}`. */
   case object WbModifier extends BoundaryModifier
-}

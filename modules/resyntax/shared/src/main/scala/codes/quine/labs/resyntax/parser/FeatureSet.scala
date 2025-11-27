@@ -198,10 +198,10 @@ final case class FeatureSet(
     skipsComment: Boolean
 )
 
-object FeatureSet {
+object FeatureSet:
 
   /** Computes a feature set from a quick analysis result, the given dialect and the given flag set. */
-  def from(analysis: QuickAnalysis, dialect: Dialect, flagSet: FlagSet): FeatureSet = {
+  def from(analysis: QuickAnalysis, dialect: Dialect, flagSet: FlagSet): FeatureSet =
     val isDotNet = dialect == Dialect.DotNet
     val isJava = dialect == Dialect.Java
     val isJavaScript = dialect == Dialect.JavaScript
@@ -408,5 +408,3 @@ object FeatureSet {
       // .NET (with `x`), Java (with `x`), PCRE (with `x`), Perl (with `x`), Python (with `x`), Ruby (with `x`)
       skipsComment = flagSet.verbose
     )
-  }
-}

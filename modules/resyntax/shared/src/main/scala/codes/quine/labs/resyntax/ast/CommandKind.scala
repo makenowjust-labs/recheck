@@ -19,17 +19,15 @@ package codes.quine.labs.resyntax.ast
   *   "*" BacktrackControl? (":" Name)?
   * }}}
   */
-sealed abstract class CommandKind extends Product with Serializable {
-  def equalsWithoutLoc(that: CommandKind): Boolean = (this, that) match {
+sealed abstract class CommandKind extends Product with Serializable:
+  def equalsWithoutLoc(that: CommandKind): Boolean = (this, that) match
     case (CommandKind.BranchReset(ls), CommandKind.BranchReset(rs)) =>
       ls.length == rs.length && ls.zip(rs).forall { case (l, r) => l.equalsWithoutLoc(r) }
     case (CommandKind.Conditional(tl, yl, nl), CommandKind.Conditional(tr, yr, nr)) =>
       tl.equalsWithoutLoc(tr) && yl.equalsWithoutLoc(yr) && nl.zip(nr).forall { case (l, r) => l.equalsWithoutLoc(r) }
     case (l, r) => l == r
-  }
-}
 
-object CommandKind {
+object CommandKind:
 
   /** InlineFlag is an inline flag command (e.g. `(?im-x)`). */
   final case class InlineFlag(diff: FlagSetDiff) extends CommandKind
@@ -76,21 +74,18 @@ object CommandKind {
   /** BranchReset is a branch reset group (e.g. `(?|...)`). */
   final case class BranchReset(nodes: Seq[Node]) extends CommandKind
 
-  object BranchReset {
+  object BranchReset:
     def apply(dataSeq: NodeData*)(implicit dummy: DummyImplicit): BranchReset = BranchReset(dataSeq.map(Node(_)))
-  }
 
   /** Conditional is a conditional group (e.g. `(?(x)...|...)`). */
   final case class Conditional(test: ConditionalTest, yes: Node, no: Option[Node]) extends CommandKind
 
-  object Conditional {
+  object Conditional:
     def apply(test: ConditionalTest, yes: NodeData): Conditional =
       Conditional(test, Node(yes), None)
 
     def apply(test: ConditionalTest, yes: NodeData, no: NodeData): Conditional =
       Conditional(test, Node(yes), Some(Node(no)))
-  }
 
   /** BacktrackControl is a backtrack control command (e.g. `(*COMMIT)`). */
   final case class BacktrackControl(kind: Option[BacktrackControlKind], name: Option[String]) extends CommandKind
-}

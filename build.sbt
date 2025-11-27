@@ -340,22 +340,19 @@ lazy val resyntax = crossProject(JVMPlatform, JSPlatform)
     name := "resyntax",
     fork := true,
     console / initialCommands := """
-      |import codes.quine.labs.resyntax._
-      |import codes.quine.labs.resyntax.ast._
-      |import codes.quine.labs.resyntax.ir._
-      |import codes.quine.labs.resyntax.parser._
+      |import codes.quine.labs.resyntax.*
+      |import codes.quine.labs.resyntax.ast.*
+      |import codes.quine.labs.resyntax.ir.*
+      |import codes.quine.labs.resyntax.parser.*
       |""".stripMargin,
-    Compile / console / scalacOptions -= "-Wunused",
-    Test / console / scalacOptions -= "-Wunused",
-    // Dependencies:
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
-    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
-    Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
+    coverageEnabled := false,
+    libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
+      .cross(CrossVersion.for3Use2_13)
   )
 
 lazy val resyntaxJVM = resyntax.jvm

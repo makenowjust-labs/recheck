@@ -1,8 +1,8 @@
 package codes.quine.labs.resyntax.ast
 
 /** Node is a AST (abstract syntax tree) node for regular expression pattern. */
-sealed abstract class NodeData extends Product with Serializable {
-  def equalsWithoutLoc(that: NodeData): Boolean = (this, that) match {
+sealed abstract class NodeData extends Product with Serializable:
+  def equalsWithoutLoc(that: NodeData): Boolean = (this, that) match
     case (NodeData.Disjunction(ls), NodeData.Disjunction(rs)) =>
       ls.length == rs.length && ls.zip(rs).forall { case (l, r) => l.equalsWithoutLoc(r) }
     case (NodeData.Sequence(ls), NodeData.Sequence(rs)) =>
@@ -16,10 +16,8 @@ sealed abstract class NodeData extends Product with Serializable {
     case (NodeData.Class(li, l), NodeData.Class(ri, r)) =>
       li == ri && l.equalsWithoutLoc(r)
     case (l, r) => l == r
-  }
-}
 
-object NodeData {
+object NodeData:
 
   /** Disjunction is a disjunction pattern node.
     *
@@ -29,9 +27,8 @@ object NodeData {
     */
   final case class Disjunction(nodes: Seq[Node]) extends NodeData
 
-  object Disjunction {
+  object Disjunction:
     def apply(dataSeq: NodeData*)(implicit dummy: DummyImplicit): Disjunction = Disjunction(dataSeq.map(Node(_)))
-  }
 
   /** Sequence is a sequence pattern node.
     *
@@ -41,9 +38,8 @@ object NodeData {
     */
   final case class Sequence(nodes: Seq[Node]) extends NodeData
 
-  object Sequence {
+  object Sequence:
     def apply(dataSeq: NodeData*)(implicit dummy: DummyImplicit): Sequence = Sequence(dataSeq.map(Node(_)))
-  }
 
   /** Repeat is a repetition pattern node.
     *
@@ -53,9 +49,8 @@ object NodeData {
     */
   final case class Repeat(node: Node, quantifier: Quantifier) extends NodeData
 
-  object Repeat {
+  object Repeat:
     def apply(data: NodeData, quantifier: Quantifier): Repeat = Repeat(Node(data), quantifier)
-  }
 
   /** Group is a group pattern node.
     *
@@ -73,9 +68,8 @@ object NodeData {
     */
   final case class Group(kind: GroupKind, node: Node) extends NodeData
 
-  object Group {
+  object Group:
     def apply(kind: GroupKind, data: NodeData): Group = Group(kind, Node(data))
-  }
 
   /** Command is a command pattern node.
     *
@@ -122,10 +116,8 @@ object NodeData {
     */
   final case class Class(invert: Boolean, item: ClassItem) extends NodeData
 
-  object Class {
+  object Class:
     def apply(invert: Boolean, item: ClassItemData): Class = Class(invert, ClassItem(item))
-  }
 
   /** Literal is a character literal node. */
   final case class Literal(value: Int) extends NodeData
-}

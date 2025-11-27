@@ -1,5 +1,7 @@
 package codes.quine.labs.resyntax.ir
 
+import scala.annotation.nowarn
+
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
@@ -11,47 +13,44 @@ import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ir.IRBuilder.BuildingContext
 
 /** IRBuilder is a builder from AST node to IR. */
-object IRBuilder {
+object IRBuilder:
 
   final case class BuildingContext(
       multiline: Boolean
-  ) {
+  ):
     def update(diff: FlagSetDiff): BuildingContext =
       copy(multiline = (multiline || diff.added.multiline) && !diff.removed.exists(_.multiline))
 
     def reset(flagSet: FlagSet): BuildingContext =
       copy(multiline = flagSet.multiline)
-  }
 
-  object BuildingContext {
+  object BuildingContext:
     def from(flagSet: FlagSet): BuildingContext =
       BuildingContext(
         multiline = flagSet.multiline
       )
-  }
 
   /** Returns an IR node built from the given AST. */
-  def build(node: Node, flagSet: FlagSet, dialect: Dialect): IRNode = {
+  def build(node: Node, flagSet: FlagSet, dialect: Dialect): IRNode =
     val featureSet = IRFeatureSet.from(flagSet, dialect)
     val builder = new IRBuilder(node, flagSet, dialect, featureSet)
     builder.build()
-  }
-}
 
 private[ir] class IRBuilder(
-    private[this] val node: Node,
-    private[this] val flagSet: FlagSet,
-    private[this] val dialect: Dialect,
-    private[this] val featureSet: IRFeatureSet
-) {
+    private val node: Node,
+    private val flagSet: FlagSet,
+    @nowarn("msg=unused private member")
+    private val dialect: Dialect,
+    private val featureSet: IRFeatureSet
+):
   var context: BuildingContext = BuildingContext.from(flagSet)
 
   var nextIndex: Int = 1
 
   def build(): IRNode = build(node)
 
-  def build(node: Node): IRNode = {
-    val result = node.data match {
+  def build(node: Node): IRNode =
+    val result = node.data match
       case NodeData.Disjunction(children)     => buildDisjunction(children)
       case NodeData.Sequence(children)        => buildSequence(children)
       case NodeData.Repeat(child, quantifier) => Left(buildRepeat(child, quantifier))
@@ -63,24 +62,20 @@ private[ir] class IRBuilder(
       case NodeData.Backslash(_)              => ???
       case NodeData.Class(_, _)               => ???
       case NodeData.Literal(_)                => ???
-    }
-    result match {
+    result match
       case Left(data) => IRNode(data, node.loc)
       case Right(ir)  => ir
-    }
-  }
 
   def buildDisjunction(children: Seq[Node]): Either[IRNodeData, IRNode] =
     Left(IRNodeData.Disjunction(children.map(build)))
 
   def buildSequence(children: Seq[Node]): Either[IRNodeData, IRNode] =
-    children match {
+    children match
       case Seq()    => Left(IRNodeData.Empty)
       case children => Left(IRNodeData.Sequence(children.map(build)))
-    }
 
-  def buildRepeat(child: Node, quantifier: Quantifier): IRNodeData = {
-    val q = quantifier match {
+  def buildRepeat(child: Node, quantifier: Quantifier): IRNodeData =
+    val q = quantifier match
       case Quantifier.Star(strategy)                     => IRQuantifier.Unbounded(0, strategy)
       case Quantifier.Plus(strategy)                     => IRQuantifier.Unbounded(1, strategy)
       case Quantifier.Question(strategy)                 => IRQuantifier.Bounded(0, 1, strategy)
@@ -90,11 +85,9 @@ private[ir] class IRBuilder(
       case Quantifier.MaxBounded(0, _)                   => IRQuantifier.Exact(0)
       case Quantifier.MaxBounded(max, strategy)          => IRQuantifier.Bounded(0, max, strategy)
       case Quantifier.Unbounded(min, strategy)           => IRQuantifier.Unbounded(min, strategy)
-    }
     IRNodeData.Repeat(build(child), q)
-  }
 
-  def buildCommand(node: Node, kind: CommandKind): Either[IRNodeData, IRNode] = kind match {
+  def buildCommand(node: Node, kind: CommandKind): Either[IRNodeData, IRNode] = kind match
     case CommandKind.InlineFlag(_)          => ???
     case CommandKind.ResetFlag(_)           => ???
     case CommandKind.PBackReference(_)      => ???
@@ -112,7 +105,6 @@ private[ir] class IRBuilder(
     case CommandKind.BranchReset(_)         => Left(buildBranchResetCommand(node))
     case CommandKind.Conditional(_, _, _)   => Left(buildConditionalCommand(node))
     case CommandKind.BacktrackControl(_, _) => Left(buildBacktrackControlCommand(node))
-  }
 
   def buildRCallCommand(node: Node): IRNodeData =
     IRNodeData.Unsupported(node.data)
@@ -155,7 +147,7 @@ private[ir] class IRBuilder(
   def buildBacktrackControlCommand(node: Node): IRNodeData =
     IRNodeData.Unsupported(node.data)
 
-  def buildGroup(node: Node, kind: GroupKind, child: Node): Either[IRNodeData, IRNode] = kind match {
+  def buildGroup(node: Node, kind: GroupKind, child: Node): Either[IRNodeData, IRNode] = kind match
     case GroupKind.IndexedCapture                 => Left(buildIndexedCapture(child))
     case GroupKind.NonCapture                     => Right(buildNonCapture(child))
     case GroupKind.NamedCapture(_, name)          => Left(buildNamedCapture(name, child))
@@ -170,28 +162,24 @@ private[ir] class IRBuilder(
     case GroupKind.InlineFlag(diff)               => Right(buildInlineFlagGroup(diff, child))
     case GroupKind.ResetFlag(flagSet)             => Right(buildResetFlagGroup(flagSet, child))
     case GroupKind.Absence                        => Left(buildAbsenceGroup(node))
-  }
 
-  def buildIndexedCapture(child: Node): IRNodeData = {
+  def buildIndexedCapture(child: Node): IRNodeData =
     val index = nextIndex
     nextIndex += 1
     IRNodeData.Capture(index, None, build(child))
-  }
 
   def buildNonCapture(child: Node): IRNode =
     build(child)
 
-  def buildNamedCapture(name: String, child: Node): IRNodeData = {
+  def buildNamedCapture(name: String, child: Node): IRNodeData =
     val index = nextIndex
     nextIndex += 1
     IRNodeData.Capture(index, Some(name), build(child))
-  }
 
-  def buildPNamedCapture(name: String, child: Node): IRNodeData = {
+  def buildPNamedCapture(name: String, child: Node): IRNodeData =
     val index = nextIndex
     nextIndex += 1
     IRNodeData.Capture(index, Some(name), build(child))
-  }
 
   def buildBalanceGroup(node: Node): IRNodeData =
     IRNodeData.Unsupported(node.data)
@@ -221,20 +209,17 @@ private[ir] class IRBuilder(
     IRNodeData.Unsupported(node.data)
 
   def buildCaret(): IRNodeData =
-    if (featureSet.caretIsLineBegin || context.multiline) IRNodeData.Assert(IRAssertKind.LineBegin)
+    if featureSet.caretIsLineBegin || context.multiline then IRNodeData.Assert(IRAssertKind.LineBegin)
     else IRNodeData.Assert(IRAssertKind.TextBegin)
 
   def buildDollar(): IRNodeData =
-    if (featureSet.dollarIsLineEnd || context.multiline) IRNodeData.Assert(IRAssertKind.LineEnd)
-    else if (featureSet.dollarIsChompTextEnd) IRNodeData.Assert(IRAssertKind.ChompTextEnd)
+    if featureSet.dollarIsLineEnd || context.multiline then IRNodeData.Assert(IRAssertKind.LineEnd)
+    else if featureSet.dollarIsChompTextEnd then IRNodeData.Assert(IRAssertKind.ChompTextEnd)
     else IRNodeData.Assert(IRAssertKind.TextEnd)
 
-  def withContext[A](update: BuildingContext => BuildingContext)(x: => A): A = {
+  def withContext[A](update: BuildingContext => BuildingContext)(x: => A): A =
     val oldContext = context
     context = update(context)
     try x
-    finally {
+    finally
       context = oldContext
-    }
-  }
-}

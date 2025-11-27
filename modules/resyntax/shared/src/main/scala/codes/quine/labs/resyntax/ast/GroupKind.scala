@@ -24,7 +24,7 @@ package codes.quine.labs.resyntax.ast
   */
 sealed abstract class GroupKind extends Product with Serializable
 
-object GroupKind {
+object GroupKind:
 
   /** IndexedCapture is a kind of indexed capture node (e.g. `(...)`). */
   case object IndexedCapture extends GroupKind
@@ -79,4 +79,3 @@ object GroupKind {
 
   /** Absence is a kind of absence operator (e.g. `(?~...)`). */
   case object Absence extends GroupKind
-}

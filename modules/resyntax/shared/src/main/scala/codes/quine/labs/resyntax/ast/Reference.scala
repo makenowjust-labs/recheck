@@ -3,7 +3,7 @@ package codes.quine.labs.resyntax.ast
 /** Reference is a capture reference for back-reference. */
 sealed abstract class Reference extends Product with Serializable
 
-object Reference {
+object Reference:
 
   /** BaseReference is a base class for a base reference of leveled reference. */
   sealed abstract class BaseReference extends Reference
@@ -19,4 +19,3 @@ object Reference {
 
   /** LeveledReference is `\g{1+1}` style reference. */
   final case class LeveledReference(base: BaseReference, level: Int) extends Reference
-}

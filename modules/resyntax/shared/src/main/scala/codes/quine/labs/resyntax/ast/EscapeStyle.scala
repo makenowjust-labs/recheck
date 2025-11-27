@@ -3,7 +3,7 @@ package codes.quine.labs.resyntax.ast
 /** EscapeStyle is a backslash escape style. */
 sealed abstract class EscapeStyle extends Product with Serializable
 
-object EscapeStyle {
+object EscapeStyle:
 
   /** Single is a single character escape sequence `\n`. */
   final case class Single(char: Char) extends EscapeStyle
@@ -34,4 +34,3 @@ object EscapeStyle {
 
   /** HexBracket is `\x{XXXX}` escape sequence. */
   case object HexBracket extends EscapeStyle
-}

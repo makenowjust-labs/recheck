@@ -2,9 +2,9 @@ package codes.quine.labs.resyntax.parser
 
 import scala.annotation.switch
 
-object CodePointUtil {
+object CodePointUtil:
   def isSpace(codePoint: Int): Boolean =
-    (codePoint: @switch) match {
+    (codePoint: @switch) match
       case 0x0009 => true
       case 0x000a => true
       case 0x000b => true
@@ -16,16 +16,14 @@ object CodePointUtil {
       case 0x2029 => true
       case 0xfeff => true
       case _      => false
-    }
 
   def isNewline(codePoint: Int): Boolean =
-    (codePoint: @switch) match {
+    (codePoint: @switch) match
       case 0x000a => true
       case 0x000d => true
       case 0x2028 => true
       case 0x2029 => true
       case _      => false
-    }
 
   def isDigit(codePoint: Int): Boolean =
     codePoint >= '0' && codePoint <= '9'
@@ -52,4 +50,3 @@ object CodePointUtil {
 
   def decodeSurrogatePair(codePoint1: Int, codePoint2: Int): Int =
     0x10000 + (codePoint1 - 0xd800) * 0x400 + (codePoint2 - 0xdc00)
-}

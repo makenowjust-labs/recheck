@@ -13,11 +13,10 @@ package codes.quine.labs.resyntax.ast
   *   "{," Int "}" BacktrackStrategy
   * }}}
   */
-sealed abstract class Quantifier extends Product with Serializable {
+sealed abstract class Quantifier extends Product with Serializable:
   def strategy: BacktrackStrategy
-}
 
-object Quantifier {
+object Quantifier:
 
   /** Star is a star quantifier (e.g. `*`). */
   final case class Star(strategy: BacktrackStrategy) extends Quantifier
@@ -39,4 +38,3 @@ object Quantifier {
 
   /** Unbounded is a unbounded quantifier (e.g. `{2,}`). */
   final case class Unbounded(min: Int, strategy: BacktrackStrategy) extends Quantifier
-}

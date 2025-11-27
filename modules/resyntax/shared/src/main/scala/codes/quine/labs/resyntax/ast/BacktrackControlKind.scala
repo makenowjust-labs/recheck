@@ -15,7 +15,7 @@ package codes.quine.labs.resyntax.ast
   */
 sealed abstract class BacktrackControlKind extends Product with Serializable
 
-object BacktrackControlKind {
+object BacktrackControlKind:
 
   /** Accept is `ACCEPT` command. */
   case object Accept extends BacktrackControlKind
@@ -37,4 +37,3 @@ object BacktrackControlKind {
 
   /** Then is `THEN` command. */
   case object Then extends BacktrackControlKind
-}
