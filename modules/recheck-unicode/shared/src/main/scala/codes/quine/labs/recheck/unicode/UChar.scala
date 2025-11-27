@@ -1,12 +1,10 @@
 package codes.quine.labs.recheck.unicode
 
-import scala.language.implicitConversions
-
 /** UChar is a Unicode code point. */
-final case class UChar(value: Int) extends Ordered[UChar] {
+final case class UChar(value: Int) extends Ordered[UChar]:
 
   /** Returns the size of the character. */
-  def size: Int = if (value >= 0x10000) 2 else 1
+  def size: Int = if value >= 0x10000 then 2 else 1
 
   /** Checks this code point is valid or not. */
   def isValidCodePoint: Boolean = 0 <= value && value <= 0x10ffff
@@ -20,19 +18,18 @@ final case class UChar(value: Int) extends Ordered[UChar] {
 
   /** Converts to a UTF-16 characters. */
   def toChars: Array[Char] =
-    if (value <= 0xffff) Array(value.toChar)
-    else {
+    if value <= 0xffff then Array(value.toChar)
+    else
       val c1 = (value >> 16) & 0xffff
       val c2 = value & 0xffff
       val d1 = (0xd800 | ((c1 - 1) << 6) | (c2 >> 10)).toChar
       val d2 = (0xdc00 | (c2 & 0x3ff)).toChar
       Array(d1, d2)
-    }
 
   /** Gets this Unicode code point value as a string. */
   def asString: String = String.valueOf(toChars)
 
-  override def toString: String = value match {
+  override def toString: String = value match
     case 0x09                         => "\\t"
     case 0x0a                         => "\\n"
     case 0x0b                         => "\\v"
@@ -44,21 +41,17 @@ final case class UChar(value: Int) extends Ordered[UChar] {
     case c if c < 0x100               => f"\\x$c%02X"
     case c if c < 0x10000             => f"\\u$c%04X"
     case c                            => f"\\u{$c%X}"
-  }
-}
 
 /** UChar utilities. */
-object UChar {
+object UChar:
 
   /** A implicit conversion from the char to a code point. */
-  implicit def charToUChar(c: Char): UChar = UChar(c.toInt)
+  given charToUChar: Conversion[Char, UChar] with
+    def apply(c: Char): UChar = UChar(c.toInt)
 
   /** Does canonicalization to the code point. */
-  def canonicalize(c: UChar, unicode: Boolean): UChar = {
-    val convs = if (unicode) CaseMap.Fold else CaseMap.Upper
-    convs.find(_.domain.contains(c)) match {
+  def canonicalize(c: UChar, unicode: Boolean): UChar =
+    val convs = if unicode then CaseMap.Fold else CaseMap.Upper
+    convs.find(_.domain.contains(c)) match
       case Some(conv) => UChar(c.value + conv.offset)
       case None       => c
-    }
-  }
-}

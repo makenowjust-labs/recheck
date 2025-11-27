@@ -1,6 +1,6 @@
 package codes.quine.labs.recheck.common
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 /** Parameters is an immutable representation of parameters.
   *
@@ -234,7 +234,7 @@ final case class Parameters(
     timeout: Duration = Parameters.DefaultTimeout
 )
 
-object Parameters {
+object Parameters:
   // $COVERAGE-OFF$
 
   /** The default value of [[Parameters.accelerationMode]]. */
@@ -322,4 +322,3 @@ object Parameters {
   val DefaultTimeout: Duration = Duration(10, SECONDS)
 
   // $COVERAGE-ON$
-}

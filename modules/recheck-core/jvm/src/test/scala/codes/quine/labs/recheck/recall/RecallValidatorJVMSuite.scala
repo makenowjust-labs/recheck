@@ -8,16 +8,13 @@ import codes.quine.labs.recheck.common.TimeoutException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.unicode.UString
 
-class RecallValidatorJVMSuite extends munit.FunSuite {
-  test("RecallValidator.validate: JVM") {
+class RecallValidatorJVMSuite extends munit.FunSuite:
+  test("RecallValidator.validate: JVM"):
     val pattern = AttackPattern(Seq((UString("x"), UString("y"), 0)), UString("z"), 2)
 
-    intercept[TimeoutException] {
+    intercept[TimeoutException]:
       val ctx50ms = Context(timeout = Duration(50, MILLISECONDS))
-      RecallValidator.validate("foo", "1", pattern, Duration(50, MILLISECONDS))((_, _) => {
-        Thread.sleep(50)
+      RecallValidator.validate("foo", "1", pattern, Duration(50, MILLISECONDS))((_, _) =>
+        Thread.sleep(100)
         None
-      })(ctx50ms)
-    }
-  }
-}
+      )(using ctx50ms)

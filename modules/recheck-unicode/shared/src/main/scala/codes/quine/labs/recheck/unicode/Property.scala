@@ -1,7 +1,7 @@
 package codes.quine.labs.recheck.unicode
 
 /** Utilities for Unicode properties. */
-private[unicode] object Property {
+private[unicode] object Property:
 
   /** A map from non-binary property alias to canonical name.
     *
@@ -309,42 +309,36 @@ private[unicode] object Property {
   lazy val ScriptValues: Set[String] = PropertyData.ScriptMap.keySet
 
   /** Returns an interval set corresponding to the binary property. */
-  def binary(name: String): Option[IntervalSet[UChar]] = BinaryPropertyAliases.getOrElse(name, name) match {
+  def binary(name: String): Option[IntervalSet[UChar]] = BinaryPropertyAliases.getOrElse(name, name) match
     case "ASCII"                                    => Some(ASCII)
     case "Any"                                      => Some(Any)
     case "Assigned"                                 => Some(Assigned)
     case name if BinaryPropertyNames.contains(name) =>
       Some(PropertyData.BinaryPropertyMap(name))
     case _ => None
-  }
 
   /** Returns an interval set corresponding to the "General_Category" property value. */
-  def generalCategory(value: String): Option[IntervalSet[UChar]] = {
+  def generalCategory(value: String): Option[IntervalSet[UChar]] =
     val canonical = GeneralCategoryValueAliases.getOrElse(value, value)
-    if (GeneralCategoryValueGroups.contains(canonical))
+    if GeneralCategoryValueGroups.contains(canonical) then
       Some(GeneralCategoryValueGroups(canonical).foldLeft(IntervalSet.empty[UChar]) { (set, v) =>
         set.union(PropertyData.GeneralCategoryMap(v))
       })
-    else if (GeneralCategoryValues.contains(canonical))
-      Some(PropertyData.GeneralCategoryMap(canonical))
+    else if GeneralCategoryValues.contains(canonical) then Some(PropertyData.GeneralCategoryMap(canonical))
     else None
-  }
 
   /** Returns an interval set corresponding to the "Script" property value. */
-  def script(value: String): Option[IntervalSet[UChar]] = {
+  def script(value: String): Option[IntervalSet[UChar]] =
     val canonical = ScriptValueAliases.getOrElse(value, value)
-    if (ScriptValues.contains(canonical)) Some(PropertyData.ScriptMap(canonical))
+    if ScriptValues.contains(canonical) then Some(PropertyData.ScriptMap(canonical))
     else None
-  }
 
   /** Returns an interval set corresponding to the "Script_Extensions" property value. */
-  def scriptExtensions(value: String): Option[IntervalSet[UChar]] = {
+  def scriptExtensions(value: String): Option[IntervalSet[UChar]] =
     val canonical = ScriptValueAliases.getOrElse(value, value)
-    if (ScriptValues.contains(canonical)) Some(PropertyData.ScriptExtensionsMap(canonical))
+    if ScriptValues.contains(canonical) then Some(PropertyData.ScriptExtensionsMap(canonical))
     else None
-  }
 
   /** Tests whether the character is printable or not. */
   def isPrintable(ch: Int): Boolean =
     !GeneralCategoryValueGroups("Other").exists(PropertyData.GeneralCategoryMap(_).contains(UChar(ch)))
-}

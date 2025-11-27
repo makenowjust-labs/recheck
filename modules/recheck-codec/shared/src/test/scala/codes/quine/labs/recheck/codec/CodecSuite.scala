@@ -6,7 +6,7 @@ import scala.concurrent.duration.MILLISECONDS
 import io.circe.Decoder
 import io.circe.DecodingFailure
 import io.circe.Json
-import io.circe.syntax._
+import io.circe.syntax.*
 
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Checker
@@ -20,8 +20,8 @@ import codes.quine.labs.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.unicode.UString
 
-class CodecSuite extends munit.FunSuite {
-  test("codec.encodeDiagnostics") {
+class CodecSuite extends munit.FunSuite:
+  test("codec.encodeDiagnostics"):
     assertEquals(
       encodeDiagnostics(Diagnostics.Safe("a", "", AttackComplexity.Linear, Checker.Fuzz)),
       Json.obj(
@@ -63,15 +63,13 @@ class CodecSuite extends munit.FunSuite {
         "error" := ErrorKind.InvalidRegExp("unknown flag").asInstanceOf[ErrorKind]
       )
     )
-  }
 
-  test("codec.encodeChecker") {
+  test("codec.encodeChecker"):
     assertEquals(encodeChecker(Checker.Auto), "auto".asJson)
     assertEquals(encodeChecker(Checker.Fuzz), "fuzz".asJson)
     assertEquals(encodeChecker(Checker.Automaton), "automaton".asJson)
-  }
 
-  test("codec.encodeAttackComplexity") {
+  test("codec.encodeAttackComplexity"):
     assertEquals(
       encodeAttackComplexity(AttackComplexity.Constant),
       Json.obj("type" := "constant", "summary" := "constant", "isFuzz" := false)
@@ -92,9 +90,8 @@ class CodecSuite extends munit.FunSuite {
       encodeAttackComplexity(AttackComplexity.Exponential(false)),
       Json.obj("type" := "exponential", "summary" := "exponential", "isFuzz" := false)
     )
-  }
 
-  test("codec.encodeAttackPattern") {
+  test("codec.encodeAttackPattern"):
     assertEquals(
       encodeAttackPattern(AttackPattern(Seq((UString("a"), UString("b"), 2)), UString("c"), 0)),
       Json.obj(
@@ -105,30 +102,26 @@ class CodecSuite extends munit.FunSuite {
         "pattern" := "'a' + 'b'.repeat(2) + 'c'"
       )
     )
-  }
 
-  test("codec.encodeHotspot") {
+  test("codec.encodeHotspot"):
     assertEquals(
       encodeHotspot(Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat)))),
       Json.arr(Json.obj("start" := 1, "end" := 2, "temperature" := "heat"))
     )
-  }
 
-  test("codec.encodeErrorKind") {
+  test("codec.encodeErrorKind"):
     assertEquals(encodeErrorKind(ErrorKind.Timeout), Json.obj("kind" := "timeout"))
     assertEquals(encodeErrorKind(ErrorKind.Cancel), Json.obj("kind" := "cancel"))
     assertEquals(encodeErrorKind(ErrorKind.Unsupported("foo")), Json.obj("kind" := "unsupported", "message" := "foo"))
     assertEquals(encodeErrorKind(ErrorKind.InvalidRegExp("foo")), Json.obj("kind" := "invalid", "message" := "foo"))
     assertEquals(encodeErrorKind(ErrorKind.Unexpected("foo")), Json.obj("kind" := "unexpected", "message" := "foo"))
-  }
 
-  test("codec.encodeUString") {
+  test("codec.encodeUString"):
     assertEquals(encodeUString(UString("foo")), Json.fromString("foo"))
-  }
 
-  test("codec.decodeParameters") {
+  test("codec.decodeParameters"):
 
-    implicit val decodeLogger: Decoder[Context.Logger] =
+    given decodeLogger: Decoder[Context.Logger] =
       Decoder.decodeUnit.map(_ => null.asInstanceOf[Context.Logger])
 
     assertEquals(decodeParameters.decodeJson(Json.obj()), Right(Parameters()))
@@ -210,25 +203,22 @@ class CodecSuite extends munit.FunSuite {
         )
       )
     )
-  }
 
-  test("codec.decodeDuration") {
+  test("codec.decodeDuration"):
     assertEquals(decodeDuration.decodeJson(Json.Null), Right(Duration.Inf))
     assertEquals(decodeDuration.decodeJson(100.asJson), Right(Duration(100, MILLISECONDS)))
     assertEquals(decodeDuration.decodeJson("100".asJson), Right(Duration(100, MILLISECONDS)))
     assertEquals(decodeDuration.decodeJson(Json.True), Left(DecodingFailure("Duration", List.empty)))
     assertEquals(decodeDuration.decodeJson(123.456.asJson), Left(DecodingFailure("Duration", List.empty)))
     assertEquals(decodeDuration.decodeJson("123.456".asJson), Left(DecodingFailure("Duration", List.empty)))
-  }
 
-  test("codec.decodeChecker") {
+  test("codec.decodeChecker"):
     assertEquals(decodeChecker.decodeJson("auto".asJson), Right(Checker.Auto))
     assertEquals(decodeChecker.decodeJson("automaton".asJson), Right(Checker.Automaton))
     assertEquals(decodeChecker.decodeJson("fuzz".asJson), Right(Checker.Fuzz))
     assertEquals(decodeChecker.decodeJson("xxx".asJson), Left(DecodingFailure("Unknown checker: xxx", List.empty)))
-  }
 
-  test("codec.decodeAccelerationMode") {
+  test("codec.decodeAccelerationMode"):
     assertEquals(decodeAccelerationMode.decodeJson("auto".asJson), Right(AccelerationMode.Auto))
     assertEquals(decodeAccelerationMode.decodeJson("on".asJson), Right(AccelerationMode.On))
     assertEquals(decodeAccelerationMode.decodeJson("off".asJson), Right(AccelerationMode.Off))
@@ -236,11 +226,8 @@ class CodecSuite extends munit.FunSuite {
       decodeAccelerationMode.decodeJson("xxx".asJson),
       Left(DecodingFailure("Unknown acceleration mode: xxx", List.empty))
     )
-  }
 
-  test("codec.decodeSeeder") {
+  test("codec.decodeSeeder"):
     assertEquals(decodeSeeder.decodeJson("static".asJson), Right(Seeder.Static))
     assertEquals(decodeSeeder.decodeJson("dynamic".asJson), Right(Seeder.Dynamic))
     assertEquals(decodeSeeder.decodeJson("xxx".asJson), Left(DecodingFailure("Unknown seeder: xxx", List.empty)))
-  }
-}

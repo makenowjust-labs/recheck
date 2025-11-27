@@ -1,6 +1,7 @@
 package codes.quine.labs.recheck
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
+import scala.language.implicitConversions
 import scala.util.Success
 
 import codes.quine.labs.recheck.common.Checker
@@ -12,15 +13,15 @@ import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.regexp.Pattern
-import codes.quine.labs.recheck.regexp.Pattern._
+import codes.quine.labs.recheck.regexp.Pattern.*
 import codes.quine.labs.recheck.unicode.UString
 
-class ReDoSSuite extends munit.FunSuite {
+class ReDoSSuite extends munit.FunSuite:
 
   /** A default context. */
-  implicit def ctx: Context = Context()
+  given ctx: Context = Context()
 
-  test("ReDoS.check") {
+  test("ReDoS.check"):
     assertEquals(
       ReDoS.check("^foo$", ""),
       Diagnostics.Safe("^foo$", "", AttackComplexity.Safe(false), Checker.Automaton)
@@ -42,9 +43,8 @@ class ReDoSSuite extends munit.FunSuite {
       ReDoS.check("^foo$", "", Parameters(timeout = -1.second)),
       Diagnostics.Unknown("^foo$", "", Diagnostics.ErrorKind.Timeout, None)
     )
-  }
 
-  test("ReDoS.checkAutomaton") {
+  test("ReDoS.checkAutomaton"):
     assertEquals(
       ReDoS.checkAutomaton(
         "^(?:a|a)*$",
@@ -96,9 +96,8 @@ class ReDoSSuite extends munit.FunSuite {
       ),
       Success(Diagnostics.Safe("^.$", "", AttackComplexity.Safe(false), Checker.Automaton))
     )
-  }
 
-  test("ReDoS.checkFuzz") {
+  test("ReDoS.checkFuzz"):
     val result = ReDoS
       .checkFuzz(
         "^(?:a|a)*$",
@@ -128,7 +127,7 @@ class ReDoSSuite extends munit.FunSuite {
       Success(Diagnostics.Safe(".", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
     interceptMessage[TimeoutException](
-      "timeout at modules/recheck-core/shared/src/main/scala/codes/quine/labs/recheck/fuzz/FuzzProgram.scala:30"
+      "timeout at modules/recheck-core/shared/src/main/scala/codes/quine/labs/recheck/fuzz/FuzzProgram.scala:28"
     ) {
       val ctx = Context(timeout = -1.second)
       val result = ReDoS.checkFuzz(
@@ -136,12 +135,11 @@ class ReDoSSuite extends munit.FunSuite {
         "",
         Pattern(Dot(), FlagSet(false, false, false, false, false, false)),
         Parameters(timeout = -1.second)
-      )(ctx)
+      )(using ctx)
       result.get
     }
-  }
 
-  test("ReDoS.checkAuto") {
+  test("ReDoS.checkAuto"):
     assertEquals(
       ReDoS.checkAuto(
         "^(?:a|a)*$",
@@ -213,9 +211,8 @@ class ReDoSSuite extends munit.FunSuite {
       ),
       Success(Diagnostics.Safe("^.*$", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
-  }
 
-  test("ReDoS.repeatCount") {
+  test("ReDoS.repeatCount"):
     val flagSet = FlagSet(false, false, false, false, false, false)
     val repeat4 = Repeat(Quantifier.Exact(4, false), Dot())
     val repeat5 = Repeat(Quantifier.Unbounded(5, false), Dot())
@@ -235,5 +232,3 @@ class ReDoSSuite extends munit.FunSuite {
     assertEquals(ReDoS.repeatCount(Pattern(Repeat(Quantifier.Exact(10, false), repeat5), flagSet)), 15)
     assertEquals(ReDoS.repeatCount(Pattern(LookAhead(false, repeat5), flagSet)), 5)
     assertEquals(ReDoS.repeatCount(Pattern(LookBehind(false, repeat5), flagSet)), 5)
-  }
-}

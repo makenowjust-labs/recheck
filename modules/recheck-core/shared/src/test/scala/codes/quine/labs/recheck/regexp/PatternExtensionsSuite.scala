@@ -1,19 +1,21 @@
 package codes.quine.labs.recheck.regexp
 
+import scala.language.implicitConversions
+
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.regexp.Pattern._
-import codes.quine.labs.recheck.regexp.PatternExtensions._
+import codes.quine.labs.recheck.regexp.Pattern.*
+import codes.quine.labs.recheck.regexp.PatternExtensions.*
 import codes.quine.labs.recheck.unicode.IChar
 import codes.quine.labs.recheck.unicode.ICharSet
 import codes.quine.labs.recheck.unicode.ICharSet.CharKind
 import codes.quine.labs.recheck.unicode.UString
 
-class PatternExtensionsSuite extends munit.FunSuite {
+class PatternExtensionsSuite extends munit.FunSuite:
 
   /** A default context. */
-  implicit def ctx: Context = Context()
+  given ctx: Context = Context()
 
-  test("PatternExtensions.AtomNodeOps#toIChar") {
+  test("PatternExtensions.AtomNodeOps#toIChar"):
     assertEquals(Character('x').toIChar(false), IChar('x'))
     assertEquals(SimpleEscapeClass(false, EscapeClassKind.Word).toIChar(false), IChar.Word)
     assertEquals(
@@ -66,9 +68,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     )
     assertEquals(ClassRange('a', 'a').toIChar(false), IChar('a'))
     assertEquals(ClassRange('a', 'z').toIChar(false), IChar.range('a', 'z'))
-  }
 
-  test("PatternExtensions.NodeOps#captureRange") {
+  test("PatternExtensions.NodeOps#captureRange"):
     assertEquals(Sequence(Seq(Capture(1, Dot()), Capture(2, Dot()))).captureRange, CaptureRange(Some((1, 2))))
     assertEquals(Disjunction(Seq(Capture(1, Dot()), Capture(2, Dot()))).captureRange, CaptureRange(Some((1, 2))))
     assertEquals(Capture(1, Dot()).captureRange, CaptureRange(Some((1, 1))))
@@ -90,9 +91,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Dot().captureRange, CaptureRange(None))
     assertEquals(BackReference(1).captureRange, CaptureRange(None))
     assertEquals(NamedBackReference(1, "foo").captureRange, CaptureRange(None))
-  }
 
-  test("PatternExtensions.NodeOps#isEmpty") {
+  test("PatternExtensions.NodeOps#isEmpty"):
     assertEquals(Sequence(Seq(Dot(), Dot())).canMatchEmpty, false)
     assertEquals(Sequence(Seq.empty).canMatchEmpty, true)
     assertEquals(Disjunction(Seq(Dot(), Dot())).canMatchEmpty, false)
@@ -135,16 +135,14 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Dot().canMatchEmpty, false)
     assertEquals(BackReference(1).canMatchEmpty, true)
     assertEquals(NamedBackReference(1, "foo").canMatchEmpty, true)
-  }
 
-  test("PatternExtensions.CaptureRange#merge") {
+  test("PatternExtensions.CaptureRange#merge"):
     assertEquals(CaptureRange(None).merge(CaptureRange(None)), CaptureRange(None))
     assertEquals(CaptureRange(Some((1, 1))).merge(CaptureRange(None)), CaptureRange(Some((1, 1))))
     assertEquals(CaptureRange(None).merge(CaptureRange(Some((2, 2)))), CaptureRange(Some((2, 2))))
     assertEquals(CaptureRange(Some((1, 1))).merge(CaptureRange(Some((2, 2)))), CaptureRange(Some((1, 2))))
-  }
 
-  test("PatternExtensions.PatternOps#existsLineAssertion") {
+  test("PatternExtensions.PatternOps#existsLineAssertion"):
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(Dot(), LineBegin())), flagSet).existsLineAssertion, true)
     assertEquals(Pattern(Disjunction(Seq(LineBegin(), Dot())), flagSet).existsLineAssertion, true)
@@ -181,9 +179,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(WordBoundary(true), flagSet).existsLineAssertion, false)
     assertEquals(Pattern(WordBoundary(false), flagSet).existsLineAssertion, false)
     assertEquals(Pattern(Dot(), flagSet).existsLineAssertion, false)
-  }
 
-  test("PatternExtensions.PatternOps#existsLineAssertionInMiddle") {
+  test("PatternExtensions.PatternOps#existsLineAssertionInMiddle"):
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(Dot(), LineBegin())), flagSet).existsLineAssertionInMiddle, false)
     assertEquals(Pattern(Disjunction(Seq(LineBegin(), Dot())), flagSet).existsLineAssertionInMiddle, false)
@@ -221,9 +218,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(WordBoundary(true), flagSet).existsLineAssertionInMiddle, false)
     assertEquals(Pattern(WordBoundary(false), flagSet).existsLineAssertionInMiddle, false)
     assertEquals(Pattern(Dot(), flagSet).existsLineAssertionInMiddle, false)
-  }
 
-  test("PatternExtensions.PatternOps#everyBeginPointIsLineBegin") {
+  test("PatternExtensions.PatternOps#everyBeginPointIsLineBegin"):
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(LineBegin(), LineBegin())), flagSet).everyBeginPointIsLineBegin, true)
     assertEquals(Pattern(Disjunction(Seq(Dot(), LineBegin())), flagSet).everyBeginPointIsLineBegin, false)
@@ -241,9 +237,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(LineBegin(), flagSet).everyBeginPointIsLineBegin, true)
     assertEquals(Pattern(LineEnd(), flagSet).everyBeginPointIsLineBegin, false)
     assertEquals(Pattern(Dot(), flagSet).everyBeginPointIsLineBegin, false)
-  }
 
-  test("PatternExtensions.PatternOps#everyBeginPointIsNotLineBegin") {
+  test("PatternExtensions.PatternOps#everyBeginPointIsNotLineBegin"):
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(LineBegin(), LineBegin())), flagSet).everyBeginPointIsNotLineBegin, false)
     assertEquals(Pattern(Disjunction(Seq(Dot(), LineBegin())), flagSet).everyBeginPointIsNotLineBegin, false)
@@ -261,9 +256,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(LineBegin(), flagSet).everyBeginPointIsNotLineBegin, false)
     assertEquals(Pattern(LineEnd(), flagSet).everyBeginPointIsNotLineBegin, true)
     assertEquals(Pattern(Dot(), flagSet).everyBeginPointIsNotLineBegin, true)
-  }
 
-  test("PatternExtensions.PatternOps#everyEndPointIsLineEnd") {
+  test("PatternExtensions.PatternOps#everyEndPointIsLineEnd"):
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(LineEnd(), LineEnd())), flagSet).everyEndPointIsLineEnd, true)
     assertEquals(Pattern(Disjunction(Seq(Dot(), LineEnd())), flagSet).everyEndPointIsLineEnd, false)
@@ -281,9 +275,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(LineBegin(), flagSet).everyEndPointIsLineEnd, false)
     assertEquals(Pattern(LineEnd(), flagSet).everyEndPointIsLineEnd, true)
     assertEquals(Pattern(Dot(), flagSet).everyEndPointIsLineEnd, false)
-  }
 
-  test("PatternExtensions.PatternOps#everyEndPointIsNotLineEnd") {
+  test("PatternExtensions.PatternOps#everyEndPointIsNotLineEnd"):
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(LineEnd(), LineEnd())), flagSet).everyEndPointIsNotLineEnd, false)
     assertEquals(Pattern(Disjunction(Seq(Dot(), LineEnd())), flagSet).everyEndPointIsNotLineEnd, false)
@@ -301,9 +294,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(LineBegin(), flagSet).everyEndPointIsNotLineEnd, true)
     assertEquals(Pattern(LineEnd(), flagSet).everyEndPointIsNotLineEnd, false)
     assertEquals(Pattern(Dot(), flagSet).everyEndPointIsNotLineEnd, true)
-  }
 
-  test("PatternExtensions.PatternOps#isConstant") {
+  test("PatternExtensions.PatternOps#isConstant"):
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(Dot(), Dot())), flagSet).isConstant, true)
     assertEquals(Pattern(Disjunction(Seq(Repeat(Quantifier.Star(false), Dot()), Dot())), flagSet).isConstant, false)
@@ -327,9 +319,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(LookAhead(false, Repeat(Quantifier.Star(false), Dot())), flagSet).isConstant, false)
     assertEquals(Pattern(LookBehind(false, Dot()), flagSet).isConstant, true)
     assertEquals(Pattern(LookBehind(false, Repeat(Quantifier.Star(false), Dot())), flagSet).isConstant, false)
-  }
 
-  test("PatternExtensions.PatternOps#size") {
+  test("PatternExtensions.PatternOps#size"):
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(Dot(), Dot())), flagSet).size, 3)
     assertEquals(Pattern(Sequence(Seq(Dot(), Dot())), flagSet).size, 2)
@@ -345,9 +336,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(LookAhead(false, Dot()), flagSet).size, 2)
     assertEquals(Pattern(LookBehind(false, Dot()), flagSet).size, 2)
     assertEquals(Pattern(Dot(), flagSet).size, 1)
-  }
 
-  test("PatternExtensions.PatternOps#alphabet") {
+  test("PatternExtensions.PatternOps#alphabet"):
     val flagSet0 = FlagSet(false, false, false, false, false, false)
     val flagSet1 = FlagSet(false, false, true, false, false, false)
     val flagSet2 = FlagSet(false, false, false, true, false, false)
@@ -405,9 +395,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
       Pattern(Dot(), flagSet4).alphabet,
       ICharSet.any(true, true).add(IChar.canonicalize(dot, true))
     )
-  }
 
-  test("PatternExtensions.PatternOps#needsLineTerminatorDistinction") {
+  test("PatternExtensions.PatternOps#needsLineTerminatorDistinction"):
     val flagSet0 = FlagSet(false, false, true, false, false, false)
     val flagSet1 = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(Dot(), LineBegin())), flagSet0).needsLineTerminatorDistinction, true)
@@ -446,9 +435,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(WordBoundary(false), flagSet0).needsLineTerminatorDistinction, false)
     assertEquals(Pattern(Dot(), flagSet0).needsLineTerminatorDistinction, false)
     assertEquals(Pattern(LineBegin(), flagSet1).needsLineTerminatorDistinction, false)
-  }
 
-  test("PatternExtension.PatternOps#needsInputTerminatorDistinction") {
+  test("PatternExtension.PatternOps#needsInputTerminatorDistinction"):
     val flagSet0 = FlagSet(false, false, true, false, false, false)
     val flagSet1 = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(LineBegin(), flagSet0).needsInputTerminatorDistinction, true)
@@ -461,9 +449,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(Sequence(Seq(Dot(), LineEnd())), flagSet1).needsInputTerminatorDistinction, false)
     assertEquals(Pattern(Disjunction(Seq(LineBegin(), Dot())), flagSet1).needsInputTerminatorDistinction, true)
     assertEquals(Pattern(Disjunction(Seq(Dot(), LineEnd())), flagSet1).needsInputTerminatorDistinction, true)
-  }
 
-  test("PatternExtensions.PatternOps#needsWordDistinction") {
+  test("PatternExtensions.PatternOps#needsWordDistinction"):
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(Dot(), WordBoundary(false))), flagSet).needsWordDistinction, true)
     assertEquals(Pattern(Disjunction(Seq(WordBoundary(false), Dot())), flagSet).needsWordDistinction, true)
@@ -494,9 +481,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(LineBegin(), flagSet).needsWordDistinction, false)
     assertEquals(Pattern(LineEnd(), flagSet).needsWordDistinction, false)
     assertEquals(Pattern(Dot(), flagSet).needsWordDistinction, false)
-  }
 
-  test("PatternExtension.PatternOps#needsSigmaStarAtBegin") {
+  test("PatternExtension.PatternOps#needsSigmaStarAtBegin"):
     val flagSet0 = FlagSet(false, false, true, false, false, false)
     val flagSet1 = FlagSet(false, false, false, false, false, false)
     val flagSet2 = FlagSet(false, false, false, false, false, true)
@@ -505,9 +491,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(Dot(), flagSet1).needsSigmaStarAtBegin, true)
     assertEquals(Pattern(LineBegin(), flagSet1).needsSigmaStarAtBegin, false)
     assertEquals(Pattern(Dot(), flagSet2).needsSigmaStarAtBegin, false)
-  }
 
-  test("PatternExtension.PatternOps#needsSigmaStarAtEnd") {
+  test("PatternExtension.PatternOps#needsSigmaStarAtEnd"):
     val flagSet0 = FlagSet(false, false, true, false, false, false)
     val flagSet1 = FlagSet(false, false, false, false, false, false)
     val flagSet2 = FlagSet(false, false, false, false, false, true)
@@ -516,9 +501,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(Dot(), flagSet1).needsSigmaStarAtEnd, true)
     assertEquals(Pattern(LineEnd(), flagSet1).needsSigmaStarAtEnd, false)
     assertEquals(Pattern(Dot(), flagSet2).needsSigmaStarAtEnd, false)
-  }
 
-  test("PatternExtensions.PatternOps#parts") {
+  test("PatternExtensions.PatternOps#parts"):
     val flagSet = FlagSet(false, false, false, false, false, false)
     val seq = Sequence(Seq(Character('x'), Character('y'), Character('z')))
     assertEquals(
@@ -545,9 +529,8 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(LookBehind(false, seq), flagSet).parts, Set(UString("xyz")))
     assertEquals(Pattern(Dot(), flagSet).parts, Set.empty[UString])
     assertEquals(Pattern(Character('x'), flagSet).parts, Set.empty[UString])
-  }
 
-  test("PatternExtensions.PatternOps#capturesSize") {
+  test("PatternExtensions.PatternOps#capturesSize"):
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(Capture(1, Dot()), Capture(2, Dot()))), flagSet).capturesSize, 2)
     assertEquals(Pattern(Sequence(Seq(Capture(1, Dot()), Capture(2, Dot()))), flagSet).capturesSize, 2)
@@ -563,5 +546,3 @@ class PatternExtensionsSuite extends munit.FunSuite {
     assertEquals(Pattern(LookAhead(false, Dot()), flagSet).capturesSize, 0)
     assertEquals(Pattern(LookBehind(false, Dot()), flagSet).capturesSize, 0)
     assertEquals(Pattern(Dot(), flagSet).capturesSize, 0)
-  }
-}

@@ -15,14 +15,13 @@ ThisBuild / developers := List(
 )
 ThisBuild / versionScheme := Some("early-semver")
 
-ThisBuild / scalaVersion := "2.13.18"
+ThisBuild / scalaVersion := "3.7.4"
 ThisBuild / scalacOptions ++= Seq(
   "-encoding",
   "UTF-8",
   "-feature",
   "-deprecation",
-  "-Wunused",
-  "-P:bm4:implicit-patterns:n"
+  "-Wunused:all"
 )
 
 // Scalafix config:
@@ -63,47 +62,43 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "recheck-core",
     console / initialCommands := """
-      |import scala.concurrent.duration._
+      |import scala.concurrent.duration.*
       |import scala.util.{Failure, Random, Success, Try}
       |
-      |import codes.quine.labs.recheck._
-      |import codes.quine.labs.recheck.automaton._
-      |import codes.quine.labs.recheck.common._
-      |import codes.quine.labs.recheck.exec._
-      |import codes.quine.labs.recheck.data._
-      |import codes.quine.labs.recheck.diagnostics._
-      |import codes.quine.labs.recheck.fuzz._
-      |import codes.quine.labs.recheck.recall._
-      |import codes.quine.labs.recheck.regexp._
-      |import codes.quine.labs.recheck.unicode._
-      |import codes.quine.labs.recheck.util._
-      |import codes.quine.labs.recheck.vm._
+      |import codes.quine.labs.recheck.*
+      |import codes.quine.labs.recheck.automaton.*
+      |import codes.quine.labs.recheck.common.*
+      |import codes.quine.labs.recheck.exec.*
+      |import codes.quine.labs.recheck.data.*
+      |import codes.quine.labs.recheck.diagnostics.*
+      |import codes.quine.labs.recheck.fuzz.*
+      |import codes.quine.labs.recheck.recall.*
+      |import codes.quine.labs.recheck.regexp.*
+      |import codes.quine.labs.recheck.unicode.*
+      |import codes.quine.labs.recheck.util.*
+      |import codes.quine.labs.recheck.vm.*
       |
-      |def logger: Context.Logger = (message: String) => {
+      |def logger: Context.Logger = (message: String) =>
       |  val date = java.time.LocalDateTime.now()
       |  Console.out.println(s"[$date] $message")
-      |}
       |
-      |implicit def ctx: Context = Context(timeout = 10.seconds, logger = Some(logger))
+      |given ctx: Context = Context(timeout = 10.seconds, logger = Some(logger))
       |
-      |def time[A](name: String)(body: => A): A = {
+      |def time[A](name: String)(body: => A): A =
       |  val start = System.nanoTime()
       |  try body
-      |  finally {
+      |  finally
       |    println(s"$name: ${(System.nanoTime() - start) / 1e9} s")
-      |  }
-      |}
       |
       |def parse(source: String, flags: String): Pattern =
-      |  time("parse")(Parser.parse(source, flags) match {
-      |    case Right(pattern) => pattern
-      |    case Left(ex)       => throw new InvalidRegExpException(ex.getMessage)
-      |  })
+      |  time("parse"):
+      |    Parser.parse(source, flags) match
+      |      case Right(pattern) => pattern
+      |      case Left(ex)       => throw new InvalidRegExpException(ex.getMessage)
       |
-      |def compile(source: String, flags: String): Program = {
+      |def compile(source: String, flags: String): Program =
       |  val pattern = parse(source, flags)
       |  time("compile")(ProgramBuilder.build(pattern).get)
-      |}
       |
       |def run(
       |    source: String,
@@ -116,12 +111,12 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |    needsFailedPoints: Boolean = false,
       |    needsCoverage: Boolean = false,
       |    needsHeatmap: Boolean = false
-      |)(implicit ctx: Context): Interpreter.Result = {
+      |)(using ctx: Context): Interpreter.Result =
       |  val pattern = parse(source, flags)
       |  val flagSet = pattern.flagSet
       |  val program = time("compile")(ProgramBuilder.build(pattern).get)
       |  val uinput0 = UString(input)
-      |  val uinput = if (flagSet.ignoreCase) UString.canonicalize(uinput0, flagSet.unicode) else uinput0
+      |  val uinput = if flagSet.ignoreCase then UString.canonicalize(uinput0, flagSet.unicode) else uinput0
       |  val opts = Interpreter.Options(
       |    limit = limit,
       |    usesAcceleration = usesAcceleration,
@@ -130,8 +125,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |    needsCoverage = needsCoverage,
       |    needsHeatmap = needsHeatmap
       |  )
-      |  time("run")(Interpreter.run(program, uinput, 0, opts))
-      |}
+      |  time("run")(Interpreter.run(program, uinput, pos, opts))
       |
       |def seed(
       |    source: String,
@@ -139,17 +133,16 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |    maxSimpleRepeatSize: Int = Parameters.DefaultMaxSimpleRepeatCount,
       |    maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
       |    limit: Int = Parameters.DefaultIncubationLimit
-      |)(implicit ctx: Context): Set[FString] = {
+      |)(using ctx: Context): Set[FString] =
       |  val pattern = parse(source, flags)
       |  time("seed")(StaticSeeder.seed(pattern, maxSimpleRepeatSize, maxInitialGenerationSize, limit))
-      |}
       |
       |def validate(
       |  source: String,
       |  flags: String,
       |  pattern: AttackPattern,
       |  timeout: Duration = Duration(1, SECONDS)
-      |): RecallResult =
+      |)(using ctx: Context): RecallResult =
       |  time("validate")(RecallValidator.validate(source, flags, pattern, timeout)(NodeExecutor.exec))
       |
       |def check(
@@ -183,7 +176,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |    seedingLimit: Int = Parameters.DefaultSeedingLimit,
       |    seedingTimeout: Duration = Parameters.DefaultSeedingTimeout,
       |    timeout: Duration = Parameters.DefaultTimeout,
-      |): Diagnostics = {
+      |): Diagnostics =
       |  val params = Parameters(
       |    accelerationMode,
       |    attackLimit,
@@ -215,16 +208,13 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |    timeout,
       |  )
       |  time("check")(ReDoS.check(source, flags, params))
-      |}
       |""".stripMargin,
-    Compile / console / scalacOptions -= "-Wunused",
-    Test / console / scalacOptions -= "-Wunused",
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "1.2.1" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
+    coverageEnabled := false,
     libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
@@ -238,18 +228,16 @@ lazy val common = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "recheck-common",
     console / initialCommands := """
-      |import codes.quine.labs.recheck.common._
+      |import codes.quine.labs.recheck.common.*
       |""".stripMargin,
-    Compile / console / scalacOptions -= "-Wunused",
-    Test / console / scalacOptions -= "-Wunused",
-    // Dependencies:
-    libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value % Provided,
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "1.2.1" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
+    // `coverage` is not supported in Scala.js with Scala 3 yet.
+    // See https://github.com/scoverage/sbt-scoverage/issues/629.
+    coverageEnabled := false,
     libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
@@ -264,14 +252,12 @@ lazy val exec = crossProject(JVMPlatform, JSPlatform)
     console / initialCommands := """
       |import codes.quine.labs.recheck.exec._
       |""".stripMargin,
-    Compile / console / scalacOptions -= "-Wunused",
-    Test / console / scalacOptions -= "-Wunused",
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "1.2.1" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
+    coverageEnabled := false,
     libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
@@ -285,11 +271,8 @@ lazy val unicode = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "recheck-unicode",
     console / initialCommands := """
-      |import codes.quine.labs.recheck.unicode._
+      |import codes.quine.labs.recheck.unicode.*
       |""".stripMargin,
-    Compile / console / scalacOptions -= "-Wunused",
-    Test / console / scalacOptions -= "-Wunused",
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Generators:
     {
       val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
@@ -318,6 +301,7 @@ lazy val unicode = crossProject(JVMPlatform, JSPlatform)
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
+    coverageEnabled := false,
     libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
@@ -330,18 +314,16 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "recheck-parse",
     console / initialCommands := """
-      |import codes.quine.labs.recheck.regexp._
+      |import codes.quine.labs.recheck.regexp.*
       |""".stripMargin,
-    Compile / console / scalacOptions -= "-Wunused",
-    Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "com.lihaoyi" %%% "fastparse" % "3.1.1",
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "1.2.1" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
+    coverageEnabled := false,
     libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
@@ -355,21 +337,19 @@ lazy val codec = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "recheck-codec",
     console / initialCommands := """
-      |import io.circe._
-      |import io.circe.syntax._
+      |import io.circe.*
+      |import io.circe.syntax.*
       |
-      |import codes.quine.labs.recheck.codec._
+      |import codes.quine.labs.recheck.codec.{*, given}
       |""".stripMargin,
-    Compile / console / scalacOptions -= "-Wunused",
-    Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "io.circe" %%% "circe-core" % "0.14.15",
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "1.2.1" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
+    coverageEnabled := false,
     libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
@@ -385,19 +365,17 @@ lazy val js = project
     name := "recheck-js",
     publish / skip := true,
     console / initialCommands := """
-      |import codes.quine.labs.recheck._
+      |import codes.quine.labs.recheck.*
       |""".stripMargin,
-    Compile / console / scalacOptions -= "-Wunused",
-    Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "io.circe" %%% "circe-scalajs" % "0.14.15",
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "1.2.1" % Test,
     libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13),
     testFrameworks += new TestFramework("munit.Framework"),
     // ScalaJS config:
+    coverageEnabled := false,
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
@@ -424,20 +402,17 @@ lazy val cli = project
       "--initialize-at-build-time=codes.quine.labs.recheck"
     ),
     console / initialCommands := """
-      |import io.circe._
-      |import io.circe.parser._
-      |import io.circe.syntax._
+      |import io.circe.*
+      |import io.circe.parser.*
+      |import io.circe.syntax.*
       |
-      |import codes.quine.labs.recheck.cli._
+      |import codes.quine.labs.recheck.cli.*
       |""".stripMargin,
-    Compile / console / scalacOptions -= "-Wunused",
-    Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "com.monovore" %% "decline" % "2.5.0",
     libraryDependencies += "io.circe" %% "circe-core" % "0.14.15",
     libraryDependencies += "io.circe" %% "circe-generic" % "0.14.15",
     libraryDependencies += "io.circe" %% "circe-parser" % "0.14.15",
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %% "munit" % "1.2.1" % Test,
     testFrameworks += new TestFramework("munit.Framework")

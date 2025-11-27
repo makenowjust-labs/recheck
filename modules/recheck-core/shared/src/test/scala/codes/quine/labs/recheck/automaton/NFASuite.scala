@@ -3,12 +3,12 @@ package automaton
 
 import codes.quine.labs.recheck.common.Context
 
-class NFASuite extends munit.FunSuite {
+class NFASuite extends munit.FunSuite:
 
   /** A default context. */
-  implicit def ctx: Context = Context()
+  given ctx: Context = Context()
 
-  test("NFA#toGraphviz") {
+  test("NFA#toGraphviz"):
     val nfa = NFA(
       Set('a', 'b'),
       Set(0, 1, 2),
@@ -39,9 +39,8 @@ class NFASuite extends munit.FunSuite {
          |  "1" -> "2" [label="b"];
          |}""".stripMargin
     )
-  }
 
-  test("NFA#toDFA") {
+  test("NFA#toDFA"):
     val nfa = NFA(
       Set('a', 'b'),
       Set(0, 1, 2),
@@ -71,5 +70,3 @@ class NFASuite extends munit.FunSuite {
         )
       )
     )
-  }
-}

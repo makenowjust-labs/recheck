@@ -5,12 +5,12 @@ import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.data.Graph
 import codes.quine.labs.recheck.data.MultiSet
 
-class NFAwLASuite extends munit.FunSuite {
+class NFAwLASuite extends munit.FunSuite:
 
   /** A default context. */
-  implicit def ctx: Context = Context()
+  given ctx: Context = Context()
 
-  test("NFAwLA#toGraph") {
+  test("NFAwLA#toGraph"):
     val nfa = NFAwLA[Char, Int](
       Set(('a', Set(0)), ('b', Set(0))),
       Set((0, Set(0)), (1, Set(0))),
@@ -35,9 +35,8 @@ class NFAwLASuite extends munit.FunSuite {
       )
     )
     assertEquals(nfa.toGraph, g)
-  }
 
-  test("MultiNFA#toGraphviz") {
+  test("MultiNFA#toGraphviz"):
     val nfa = NFAwLA[Char, Int](
       Set(('a', Set(0)), ('b', Set(0))),
       Set((0, Set(0)), (1, Set(0))),
@@ -67,5 +66,3 @@ class NFAwLASuite extends munit.FunSuite {
          |  "(1, {0})" -> "(1, {0})" [label="b"];
          |}""".stripMargin
     )
-  }
-}

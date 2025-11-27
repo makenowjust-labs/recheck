@@ -1,12 +1,14 @@
 package codes.quine.labs.recheck
 package fuzz
 
+import scala.language.implicitConversions
+
 import codes.quine.labs.recheck.diagnostics.AttackPattern
-import codes.quine.labs.recheck.fuzz.FString._
+import codes.quine.labs.recheck.fuzz.FString.*
 import codes.quine.labs.recheck.unicode.UString
 
-class FStringSuite extends munit.FunSuite {
-  test("FString.cross") {
+class FStringSuite extends munit.FunSuite:
+  test("FString.cross"):
     val fs1 = FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c')))
     val fs2 = FString(4, IndexedSeq(Wrap('d'), Repeat(0, 1), Wrap('e')))
     assertEquals(
@@ -16,9 +18,8 @@ class FStringSuite extends munit.FunSuite {
         FString(3, IndexedSeq(Wrap('d'), Wrap('c')))
       )
     )
-  }
 
-  test("FString.fix") {
+  test("FString.fix"):
     assertEquals(
       FString.fix(
         FString(
@@ -28,84 +29,70 @@ class FStringSuite extends munit.FunSuite {
       ),
       FString(2, IndexedSeq(Wrap('a'), Repeat(0, 2), Wrap('b'), Wrap('c')))
     )
-  }
 
-  test("FString#isConstant") {
+  test("FString#isConstant"):
     assert(FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c'))).isConstant)
     assert(!FString(2, IndexedSeq(Wrap('a'), Repeat(0, 1), Wrap('b'))).isConstant)
-  }
 
-  test("FString#isEmpty") {
+  test("FString#isEmpty"):
     assert(FString(2, IndexedSeq.empty).isEmpty)
     assert(!FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c'))).isEmpty)
-  }
 
-  test("FString#nonEmpty") {
+  test("FString#nonEmpty"):
     assert(!FString(2, IndexedSeq.empty).nonEmpty)
     assert(FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c'))).nonEmpty)
-  }
 
-  test("FString#size") {
+  test("FString#size"):
     assertEquals(FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c'))).size, 3)
-  }
 
-  test("FString#fixedSize") {
+  test("FString#fixedSize"):
     assertEquals(FString(2, IndexedSeq(Wrap('a'), Repeat(0, 1), Wrap('b'), Wrap('c'))).fixedSize, 2)
-  }
 
-  test("FString#repeatSize") {
+  test("FString#repeatSize"):
     assertEquals(FString(2, IndexedSeq(Wrap('a'), Repeat(0, 1), Wrap('b'), Wrap('c'))).repeatSize, 1)
-  }
 
-  test("FString#apply") {
+  test("FString#apply"):
     assertEquals(FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c')))(1), Wrap('b'))
-  }
 
-  test("FString#delete") {
+  test("FString#delete"):
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c'), Wrap('d'))).delete(1, 2),
       FString(2, IndexedSeq(Wrap('a'), Wrap('d')))
     )
-  }
 
-  test("FString#insertAt") {
+  test("FString#insertAt"):
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Wrap('b'))).insertAt(1, Wrap('c')),
       FString(2, IndexedSeq(Wrap('a'), Wrap('c'), Wrap('b')))
     )
-  }
 
-  test("FString#insert") {
+  test("FString#insert"):
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Wrap('b'))).insert(1, IndexedSeq(Wrap('c'), Wrap('d'))),
       FString(2, IndexedSeq(Wrap('a'), Wrap('c'), Wrap('d'), Wrap('b')))
     )
-  }
 
-  test("FString#replaceAt") {
+  test("FString#replaceAt"):
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c')))
         .replaceAt(1, Wrap('d')),
       FString(2, IndexedSeq(Wrap('a'), Wrap('d'), Wrap('c')))
     )
-  }
 
-  test("FString#replace") {
+  test("FString#replace"):
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c'), Wrap('d')))
         .replace(1, 2, IndexedSeq(Wrap('e'), Wrap('f'))),
       FString(2, IndexedSeq(Wrap('a'), Wrap('e'), Wrap('f'), Wrap('d')))
     )
-  }
 
-  test("FString#mapN") {
+  test("FString#mapN"):
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'))).mapN(_ + 3),
       FString(5, IndexedSeq(Wrap('a')))
     )
-  }
 
-  test("FString#toUString") {
+  test("FString#toUString"):
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toUString,
       UString("abcbcbcd")
@@ -113,9 +100,8 @@ class FStringSuite extends munit.FunSuite {
     intercept[IllegalArgumentException] {
       FString(1, IndexedSeq(Repeat(0, 2), Wrap('a'), Repeat(0, 1))).toUString
     }
-  }
 
-  test("FString#toAttackPattern") {
+  test("FString#toAttackPattern"):
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toAttackPattern,
       AttackPattern(Seq((UString("a"), UString("bc"), 1)), UString("d"), 2)
@@ -127,9 +113,8 @@ class FStringSuite extends munit.FunSuite {
     intercept[IllegalArgumentException] {
       FString(1, IndexedSeq(Repeat(1, 2), Wrap('a'), Repeat(1, 1))).toAttackPattern
     }
-  }
 
-  test("FString#toString") {
+  test("FString#toString"):
     assertEquals(FString(2, IndexedSeq.empty).toString(AttackPattern.JavaScript), "''")
     assertEquals(FString(2, IndexedSeq.empty).toString(AttackPattern.Superscript), "''")
     assertEquals(
@@ -165,5 +150,3 @@ class FStringSuite extends munit.FunSuite {
       FString(2, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toString,
       "'a' + 'bc'.repeat(3) + 'd'"
     )
-  }
-}

@@ -5,12 +5,12 @@ import scala.concurrent.duration.MILLISECONDS
 
 import codes.quine.labs.recheck.common.Context
 
-class NodeExecutorSuite extends munit.FunSuite {
+class NodeExecutorSuite extends munit.FunSuite:
 
   /** A default context. */
-  implicit def ctx: Context = Context()
+  given ctx: Context = Context()
 
-  test("NodeExecutor.exec") {
+  test("NodeExecutor.exec"):
     assertEquals(
       NodeExecutor.exec("console.log('foo');", None),
       Some((0, "foo", ""))
@@ -23,5 +23,3 @@ class NodeExecutorSuite extends munit.FunSuite {
       NodeExecutor.exec("setTimeout(() => {}, 1000);", Some(FiniteDuration(100, MILLISECONDS))),
       None
     )
-  }
-}

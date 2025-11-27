@@ -1,14 +1,11 @@
 package codes.quine.labs.recheck.common
 
-class CancellationsSuite extends munit.FunSuite {
-  test("CancellationTokenSource#cancel") {
+class CancellationsSuite extends munit.FunSuite:
+  test("CancellationTokenSource#cancel"):
     val source = new CancellationTokenSource
     assertEquals(source.token.isCancelled(), false)
     source.cancel()
     assertEquals(source.token.isCancelled(), true)
-  }
 
-  test("CancellationToken.cancelled") {
+  test("CancellationToken.cancelled"):
     assertEquals(CancellationToken.cancelled.isCancelled(), true)
-  }
-}

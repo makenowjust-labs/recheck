@@ -3,8 +3,8 @@ package automaton
 
 import codes.quine.labs.recheck.data.Graph
 
-class DFASuite extends munit.FunSuite {
-  test("DFA#toGraph") {
+class DFASuite extends munit.FunSuite:
+  test("DFA#toGraph"):
     val dfa = DFA(
       Set('a', 'b'),
       Set(1, 2),
@@ -19,9 +19,8 @@ class DFASuite extends munit.FunSuite {
     )
     val g = Graph.from(IndexedSeq((1, 'a', 1), (1, 'b', 2), (2, 'a', 2), (2, 'b', 1)))
     assertEquals(dfa.toGraph, g)
-  }
 
-  test("DFA#toGraphviz") {
+  test("DFA#toGraphviz"):
     val dfa = DFA(
       Set('a', 'b'),
       Set(1, 2),
@@ -47,5 +46,3 @@ class DFASuite extends munit.FunSuite {
          |  "2" -> "1" [label="b"];
          |}""".stripMargin
     )
-  }
-}

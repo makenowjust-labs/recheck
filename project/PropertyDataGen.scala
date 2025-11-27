@@ -266,7 +266,7 @@ object PropertyDataGen extends UnicodeDataGen {
 
     sb.append(s"package $pkg\n")
     sb.append("\n")
-    sb.append("private[unicode] object PropertyData {\n")
+    sb.append("private[unicode] object PropertyData:\n")
 
     sb.append("  lazy val BinaryPropertyMap: Map[String, IntervalSet[UChar]] = Map(\n")
     for (name <- BinaryPropertyNames) {
@@ -277,7 +277,7 @@ object PropertyDataGen extends UnicodeDataGen {
     for (name <- BinaryPropertyNames) {
       val prop = UCharacter.getPropertyEnum(name)
       val uset = new UnicodeSet().applyIntPropertyValue(prop, 1)
-      sb.append(s"  private[this] lazy val BinaryProperty_$name = IntervalSet.from(${build(uset)}).map(UChar(_))\n")
+      sb.append(s"  private lazy val BinaryProperty_$name = IntervalSet.from(${build(uset)}).map(UChar(_))\n")
     }
     sb.append("\n")
 
@@ -290,7 +290,7 @@ object PropertyDataGen extends UnicodeDataGen {
     for (value <- GeneralCategoryValues) {
       val enum = UCharacter.getPropertyValueEnum(UProperty.GENERAL_CATEGORY, value)
       val uset = new UnicodeSet().applyIntPropertyValue(UProperty.GENERAL_CATEGORY, enum)
-      sb.append(s"  private[this] lazy val GeneralCategory_$value = IntervalSet.from(${build(uset)}).map(UChar(_))\n")
+      sb.append(s"  private lazy val GeneralCategory_$value = IntervalSet.from(${build(uset)}).map(UChar(_))\n")
     }
     sb.append("\n")
 
@@ -303,7 +303,7 @@ object PropertyDataGen extends UnicodeDataGen {
     for (value <- ScriptValues) {
       val enum = UCharacter.getPropertyValueEnum(UProperty.SCRIPT, value)
       val uset = new UnicodeSet().applyIntPropertyValue(UProperty.SCRIPT, enum)
-      sb.append(s"  private[this] lazy val Script_$value = IntervalSet.from(${build(uset)}).map(UChar(_))\n")
+      sb.append(s"  private lazy val Script_$value = IntervalSet.from(${build(uset)}).map(UChar(_))\n")
     }
     sb.append("\n")
 
@@ -316,9 +316,8 @@ object PropertyDataGen extends UnicodeDataGen {
     for (value <- ScriptValues) {
       val enum = UCharacter.getPropertyValueEnum(UProperty.SCRIPT, value)
       val uset = new UnicodeSet().applyIntPropertyValue(UProperty.SCRIPT_EXTENSIONS, enum)
-      sb.append(s"  private[this] lazy val ScriptExtensions_$value = IntervalSet.from(${build(uset)}).map(UChar(_))\n")
+      sb.append(s"  private lazy val ScriptExtensions_$value = IntervalSet.from(${build(uset)}).map(UChar(_))\n")
     }
-    sb.append("}\n")
 
     sb.result()
   }

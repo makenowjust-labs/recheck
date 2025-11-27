@@ -1,29 +1,30 @@
 package codes.quine.labs.recheck
 package automaton
 
+import scala.language.implicitConversions
 import scala.util.Success
 
-import codes.quine.labs.recheck.automaton.EpsNFA._
+import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.regexp.Pattern
-import codes.quine.labs.recheck.regexp.Pattern._
+import codes.quine.labs.recheck.regexp.Pattern.*
 import codes.quine.labs.recheck.unicode.IChar
 import codes.quine.labs.recheck.unicode.ICharSet
 import codes.quine.labs.recheck.unicode.ICharSet.CharKind
 
-class EpsNFABuilderSuite extends munit.FunSuite {
+class EpsNFABuilderSuite extends munit.FunSuite:
 
   /** A default context. */
-  implicit def ctx: Context = Context()
+  given ctx: Context = Context()
 
-  locally {
+  locally:
     val flagSet0 = FlagSet(false, false, false, false, false, false)
     val flagSet1 = FlagSet(false, true, false, false, false, false)
     val flagSet2 = FlagSet(false, false, false, true, false, false)
     val flagSet3 = FlagSet(false, false, false, true, true, false)
 
-    test("EpsNFABuilder.build: submatch") {
+    test("EpsNFABuilder.build: submatch"):
       assertEquals(
         EpsNFABuilder.build(Pattern(LineEnd(), flagSet0)),
         Success(
@@ -58,9 +59,8 @@ class EpsNFABuilderSuite extends munit.FunSuite {
           )
         )
       )
-    }
 
-    test("EpsNFABuilder.build: LineBegin, LineEnd, Sequence") {
+    test("EpsNFABuilder.build: LineBegin, LineEnd, Sequence"):
       assertEquals(
         EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), LineEnd())), flagSet0)),
         Success(
@@ -90,9 +90,8 @@ class EpsNFABuilderSuite extends munit.FunSuite {
           )
         )
       )
-    }
 
-    test("EpsNFABuilder.build: WordBoundary") {
+    test("EpsNFABuilder.build: WordBoundary"):
       assertEquals(
         EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), WordBoundary(false), LineEnd())), flagSet0)),
         Success(
@@ -125,9 +124,8 @@ class EpsNFABuilderSuite extends munit.FunSuite {
           )
         )
       )
-    }
 
-    test("EpsNFABuilder.build: Character, CharacterClass") {
+    test("EpsNFABuilder.build: Character, CharacterClass"):
       assertEquals(
         EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), Character('a'), LineEnd())), flagSet1)),
         Success(
@@ -180,9 +178,8 @@ class EpsNFABuilderSuite extends munit.FunSuite {
           )
         )
       )
-    }
 
-    test("EpsNFABuilder.build: Dot") {
+    test("EpsNFABuilder.build: Dot"):
       assertEquals(
         EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet0)),
         Success(
@@ -250,9 +247,8 @@ class EpsNFABuilderSuite extends munit.FunSuite {
           )
         )
       )
-    }
 
-    test("EpsNFABuilder.build: Disjunction") {
+    test("EpsNFABuilder.build: Disjunction"):
       assertEquals(
         EpsNFABuilder.build(
           Pattern(Sequence(Seq(LineBegin(), Disjunction(Seq(Dot(), Dot())), LineEnd())), flagSet2)
@@ -275,9 +271,8 @@ class EpsNFABuilderSuite extends munit.FunSuite {
           )
         )
       )
-    }
 
-    test("EpsNFABuilder.build: Star") {
+    test("EpsNFABuilder.build: Star"):
       assertEquals(
         EpsNFABuilder.build(
           Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Star(false), Dot()), LineEnd())), flagSet2)
@@ -322,9 +317,8 @@ class EpsNFABuilderSuite extends munit.FunSuite {
           )
         )
       )
-    }
 
-    test("EpsNFABuilder.build: Plus") {
+    test("EpsNFABuilder.build: Plus"):
       assertEquals(
         EpsNFABuilder.build(
           Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Plus(false), Dot()), LineEnd())), flagSet2)
@@ -367,9 +361,8 @@ class EpsNFABuilderSuite extends munit.FunSuite {
           )
         )
       )
-    }
 
-    test("EpsNFABuilder.build: Question") {
+    test("EpsNFABuilder.build: Question"):
       assertEquals(
         EpsNFABuilder.build(
           Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Question(false), Dot()), LineEnd())), flagSet2)
@@ -408,9 +401,8 @@ class EpsNFABuilderSuite extends munit.FunSuite {
           )
         )
       )
-    }
 
-    test("EpsNFABuilder.build: Repeat") {
+    test("EpsNFABuilder.build: Repeat"):
       assertEquals(
         EpsNFABuilder.build(
           Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Exact(1, false), Dot()), LineEnd())), flagSet2)
@@ -503,9 +495,8 @@ class EpsNFABuilderSuite extends munit.FunSuite {
           )
         )
       )
-    }
 
-    test("EpsNFABuilder.build: Capture, NamedCapture, Group") {
+    test("EpsNFABuilder.build: Capture, NamedCapture, Group"):
       val nfaA = EpsNFA(
         ICharSet.any(false, false).add(IChar('a')),
         Set(0, 1, 2, 3),
@@ -535,21 +526,13 @@ class EpsNFABuilderSuite extends munit.FunSuite {
         EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), Group(Character('a')), LineEnd())), flagSet0)),
         Success(nfaA)
       )
-    }
 
-    test("EpsNFABuilder.build: LookAhead, LookBehind, BackReference, NamedBackreference") {
-      interceptMessage[UnsupportedException]("look-ahead assertion") {
+    test("EpsNFABuilder.build: LookAhead, LookBehind, BackReference, NamedBackreference"):
+      interceptMessage[UnsupportedException]("look-ahead assertion"):
         EpsNFABuilder.build(Pattern(LookAhead(false, Dot()), flagSet0)).get
-      }
-      interceptMessage[UnsupportedException]("look-behind assertion") {
+      interceptMessage[UnsupportedException]("look-behind assertion"):
         EpsNFABuilder.build(Pattern(LookBehind(false, Dot()), flagSet0)).get
-      }
-      interceptMessage[UnsupportedException]("back-reference") {
+      interceptMessage[UnsupportedException]("back-reference"):
         EpsNFABuilder.build(Pattern(BackReference(1), flagSet0)).get
-      }
-      interceptMessage[UnsupportedException]("named back-reference") {
+      interceptMessage[UnsupportedException]("named back-reference"):
         EpsNFABuilder.build(Pattern(NamedBackReference(1, "foo"), flagSet0)).get
-      }
-    }
-  }
-}

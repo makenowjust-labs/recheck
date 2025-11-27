@@ -1,12 +1,13 @@
 package codes.quine.labs.recheck.vm
 
 import scala.collection.mutable
+import scala.compiletime.uninitialized
 import scala.util.Try
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.regexp.Pattern
-import codes.quine.labs.recheck.regexp.Pattern._
-import codes.quine.labs.recheck.regexp.PatternExtensions._
+import codes.quine.labs.recheck.regexp.Pattern.*
+import codes.quine.labs.recheck.regexp.PatternExtensions.*
 import codes.quine.labs.recheck.unicode.IChar
 import codes.quine.labs.recheck.unicode.UChar
 import codes.quine.labs.recheck.vm.Inst.AssertKind
@@ -14,117 +15,109 @@ import codes.quine.labs.recheck.vm.Inst.ReadKind
 import codes.quine.labs.recheck.vm.Program.Meta
 
 /** ProgramBuilder is a builder of a program from a RegExp pattern. */
-object ProgramBuilder {
+object ProgramBuilder:
 
   /** Builds a corresponding program from the RegExp pattern. */
-  def build(pattern: Pattern)(implicit ctx: Context): Try[Program] =
-    for {
+  def build(pattern: Pattern)(using ctx: Context): Try[Program] =
+    for
       _ <- Try(())
       capturesSize = pattern.capturesSize
       builder = new ProgramBuilder(pattern, capturesSize)
       program <- Try(builder.build())
-    } yield program
-}
+    yield program
 
 private[vm] class ProgramBuilder(
-    private[this] val pattern: Pattern,
-    private[this] val capturesSize: Int
-)(implicit ctx: Context) {
+    private val pattern: Pattern,
+    private val capturesSize: Int
+)(using ctx: Context):
   import ctx._
   import pattern._
   import flagSet._
 
   /** A buffer of created counter registers. */
-  private[this] val counters: mutable.Buffer[CounterReg] = mutable.Buffer.empty
+  private val counters: mutable.Buffer[CounterReg] = mutable.Buffer.empty
 
   /** A pool of free counter registers. */
-  private[this] val countersPool: mutable.Stack[CounterReg] = mutable.Stack.empty
+  private val countersPool: mutable.Stack[CounterReg] = mutable.Stack.empty
 
   /** A buffer of created canary registers. */
-  private[this] val canaries: mutable.Buffer[CanaryReg] = mutable.Buffer.empty
+  private val canaries: mutable.Buffer[CanaryReg] = mutable.Buffer.empty
 
   /** A pool of free canary registers. */
-  private[this] val canariesPool: mutable.Stack[CanaryReg] = mutable.Stack.empty
+  private val canariesPool: mutable.Stack[CanaryReg] = mutable.Stack.empty
 
   /** A buffer collecting predecessors of a block. */
-  private[this] val predecessorsBuffer: mutable.Buffer[mutable.Set[Label]] = mutable.Buffer.empty
+  private val predecessorsBuffer: mutable.Buffer[mutable.Set[Label]] = mutable.Buffer.empty
 
   /** A next instruction ID. */
-  private[this] var nextInstID: Int = 0
+  private var nextInstID: Int = 0
 
   /** A buffer of processed labels. */
-  private[this] val labelsBuffer: mutable.Buffer[Label] = mutable.Buffer.empty
+  private val labelsBuffer: mutable.Buffer[Label] = mutable.Buffer.empty
 
   /** Current processing block's label. It may be `null` when a block is not entered. */
-  private[this] var currentLabel: Label = _
+  private var currentLabel: Label = uninitialized
 
   /** A buffer of current processing block's instructions. */
-  private[this] val instsBuffer: mutable.Buffer[Inst.NonTerminator] = mutable.Buffer.empty
+  private val instsBuffer: mutable.Buffer[Inst.NonTerminator] = mutable.Buffer.empty
 
   /** A program has a back reference information. */
-  private[this] var hasRef: Boolean = false
+  private var hasRef: Boolean = false
 
   /** Whether a matching direction is backward or not. */
-  private[this] var back: Boolean = false
+  private var back: Boolean = false
 
   /** Allocates a new counter register, or reuses a free register. */
   def allocateCounter(): CounterReg =
-    if (countersPool.nonEmpty) countersPool.pop()
-    else {
+    if countersPool.nonEmpty then countersPool.pop()
+    else
       val index = counters.size
       val reg = CounterReg(index)
       counters.append(reg)
       reg
-    }
 
   /** Marks the counter register is free. */
-  def freeCounter(reg: CounterReg): Unit = {
+  def freeCounter(reg: CounterReg): Unit =
     countersPool.push(reg)
-  }
 
   /** Allocates a new canary register, or reuses a free register. */
   def allocateCanary(): CanaryReg =
-    if (canariesPool.nonEmpty) canariesPool.pop()
-    else {
+    if canariesPool.nonEmpty then canariesPool.pop()
+    else
       val index = canaries.size
       val reg = CanaryReg(index)
       canaries.append(reg)
       reg
-    }
 
   /** Marks the canary register is free. */
-  def freeCanary(reg: CanaryReg): Unit = {
+  def freeCanary(reg: CanaryReg): Unit =
     canariesPool.push(reg)
-  }
 
   /** Allocates a new label with an unique ID. */
-  def allocateLabel(name: String): Label = {
+  def allocateLabel(name: String): Label =
     val index = predecessorsBuffer.size
     predecessorsBuffer.append(mutable.Set.empty)
     Label(name, index)
-  }
 
   /** Starts a block of the label. */
-  def enterBlock(label: Label): Unit = {
+  def enterBlock(label: Label): Unit =
     // $COVERAGE-OFF$
-    if ((currentLabel ne null) || instsBuffer.nonEmpty) throw new IllegalStateException("unterminated block is found")
-    if (label.block ne null) throw new IllegalStateException("a block cannot be re-entered")
+    if (currentLabel ne null) || instsBuffer.nonEmpty then throw IllegalStateException("unterminated block is found")
+    if label.block ne null then throw IllegalStateException("a block cannot be re-entered")
     // $COVERAGE-ON$
 
     currentLabel = label
-  }
 
   /** Adds an instruction to a block. */
-  def emitInst(inst: Inst.NonTerminator): Unit = {
+  def emitInst(inst: Inst.NonTerminator): Unit =
     // $COVERAGE-OFF$
-    if (currentLabel eq null) throw new IllegalStateException("block is not entered")
+    if currentLabel eq null then throw IllegalStateException("block is not entered")
     // $COVERAGE-ON$
 
     // Updates a meta information.
-    inst match {
+    inst match
       case Inst.Read(ReadKind.Ref(_), _) => hasRef = true
       case _                             => // Nothing to do
-    }
 
     instsBuffer.append(inst)
 
@@ -132,16 +125,15 @@ private[vm] class ProgramBuilder(
     val id = nextInstID
     nextInstID += 1
     inst.id = id
-  }
 
   /** Adds a terminator instruction to a block, and finishes the block. */
-  def emitTerminator(inst: Inst.Terminator): Unit = {
+  def emitTerminator(inst: Inst.Terminator): Unit =
     // $COVERAGE-OFF$
-    if (currentLabel eq null) throw new IllegalStateException("block is not entered")
+    if currentLabel eq null then throw IllegalStateException("block is not entered")
     // $COVERAGE-ON$
 
     // Updates a predecessor information.
-    for (successor <- inst.successors) predecessorsBuffer(successor.index).add(currentLabel)
+    for successor <- inst.successors do predecessorsBuffer(successor.index).add(currentLabel)
 
     val block = Block(instsBuffer.toSeq, inst)
     currentLabel.block = block
@@ -154,30 +146,28 @@ private[vm] class ProgramBuilder(
     val id = nextInstID
     nextInstID += 1
     inst.id = id
-  }
 
   /** Allocates a new label, or reuses the current label if it is empty.
     *
     * It is an utility for an entrance label of a loop, with reducing a label allocation.
     */
   def allocateEntrance(name: String): Label =
-    if (instsBuffer.isEmpty) currentLabel
-    else {
+    if instsBuffer.isEmpty then currentLabel
+    else
       val label = allocateLabel(name)
       emitTerminator(Inst.Jmp(label))
       enterBlock(label)
       label
-    }
 
   /** Returns a built program. */
-  def result(): Program = {
-    for (label <- labelsBuffer) {
+  def result(): Program =
+    for label <- labelsBuffer do
       val block = label.block
-      block.terminator match {
+      block.terminator match
         case t: Inst.Try =>
           val next = t.next
-          if (predecessorsBuffer(next.index) == Set(label)) {
-            next.block.insts.headOption match {
+          if predecessorsBuffer(next.index) == Set(label) then
+            next.block.insts.headOption match
               case Some(read: Inst.Read) =>
                 label.block = Block(block.insts, Inst.TryLA(read, t.next, t.fallback))
                 next.block = Block(next.block.insts.tail, next.block.terminator)
@@ -185,26 +175,21 @@ private[vm] class ProgramBuilder(
                 label.block = Block(block.insts, Inst.TryLB(read, t.next, t.fallback))
                 next.block = Block(next.block.insts.tail, next.block.terminator)
               case _ => () // nothing to do
-            }
-          }
         case _ => () // nothing to do
-      }
-    }
 
     val blocks = labelsBuffer.iterator.map(label => (label, label.block)).toVector
     val predecessors = predecessorsBuffer.iterator.map(_.toSet).toVector
     val meta = Meta(ignoreCase, unicode, hasRef, capturesSize, counters.size, canaries.size, predecessors)
 
     Program(blocks, meta)
-  }
 
   /** Builds a program from the RegExp pattern. */
-  def build(): Program = {
+  def build(): Program =
     val main = allocateLabel("main")
     enterBlock(main)
 
     // Adds `.*` part if the pattern does not start with `^`.
-    if (pattern.needsSigmaStarAtBegin) {
+    if pattern.needsSigmaStarAtBegin then
       val loop = allocateLabel("loop")
       val cont = allocateLabel("cont")
 
@@ -215,7 +200,6 @@ private[vm] class ProgramBuilder(
       emitTerminator(Inst.Jmp(main))
 
       enterBlock(cont)
-    }
 
     emitInst(Inst.CapBegin(0))
     build(pattern.node)
@@ -223,46 +207,45 @@ private[vm] class ProgramBuilder(
     emitTerminator(Inst.Ok)
 
     result()
-  }
 
   /** Builds a program from a node. */
-  def build(node: Node): Unit = interrupt(node match {
-    case Disjunction(children)         => buildDisjunction(children)
-    case Sequence(children)            => buildSequence(children)
-    case Capture(index, child)         => buildCapture(index, child)
-    case NamedCapture(index, _, child) => buildCapture(index, child)
-    case Group(child)                  => build(child)
-    case Repeat(q, child)              => buildRepeat(q.normalized, child)
-    case WordBoundary(invert)     => emitAssert(if (invert) AssertKind.WordBoundaryNot else AssertKind.WordBoundary)
-    case LineBegin()              => emitAssert(if (multiline) AssertKind.LineBegin else AssertKind.InputBegin)
-    case LineEnd()                => emitAssert(if (multiline) AssertKind.LineEnd else AssertKind.InputEnd)
-    case LookAhead(false, child)  => wrapLookAhead(buildPositiveLookAround(child))
-    case LookAhead(true, child)   => wrapLookAhead(buildNegativeLookAround(child))
-    case LookBehind(false, child) => wrapLookBehind(buildPositiveLookAround(child))
-    case LookBehind(true, child)  => wrapLookBehind(buildNegativeLookAround(child))
-    case Character(c0)            =>
-      val c = if (ignoreCase) UChar.canonicalize(c0, unicode) else c0
-      emitRead(ReadKind.Char(c), node.loc)
-    case node @ CharacterClass(invert, _) =>
-      val ch0 = node.toIChar(unicode)
-      val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
-      emitRead(if (invert) ReadKind.ClassNot(ch) else ReadKind.Class(ch), node.loc)
-    case node: AtomNode =>
-      val ch0 = node.toIChar(unicode)
-      val ch = if (ignoreCase) IChar.canonicalize(ch0, unicode) else ch0
-      emitRead(ReadKind.Class(ch), node.loc)
-    case Dot() =>
-      emitRead(if (dotAll) ReadKind.Any else ReadKind.Dot, node.loc)
-    case BackReference(index)         => emitRead(ReadKind.Ref(index), node.loc)
-    case NamedBackReference(index, _) => emitRead(ReadKind.Ref(index), node.loc)
-  })
+  def build(node: Node): Unit = interrupt:
+    node match
+      case Disjunction(children)         => buildDisjunction(children)
+      case Sequence(children)            => buildSequence(children)
+      case Capture(index, child)         => buildCapture(index, child)
+      case NamedCapture(index, _, child) => buildCapture(index, child)
+      case Group(child)                  => build(child)
+      case Repeat(q, child)              => buildRepeat(q.normalized, child)
+      case WordBoundary(invert)    => emitAssert(if invert then AssertKind.WordBoundaryNot else AssertKind.WordBoundary)
+      case LineBegin()             => emitAssert(if multiline then AssertKind.LineBegin else AssertKind.InputBegin)
+      case LineEnd()               => emitAssert(if multiline then AssertKind.LineEnd else AssertKind.InputEnd)
+      case LookAhead(false, child) => wrapLookAhead(buildPositiveLookAround(child))
+      case LookAhead(true, child)  => wrapLookAhead(buildNegativeLookAround(child))
+      case LookBehind(false, child) => wrapLookBehind(buildPositiveLookAround(child))
+      case LookBehind(true, child)  => wrapLookBehind(buildNegativeLookAround(child))
+      case Character(c0)            =>
+        val c = if ignoreCase then UChar.canonicalize(c0, unicode) else c0
+        emitRead(ReadKind.Char(c), node.loc)
+      case node @ CharacterClass(invert, _) =>
+        val ch0 = node.toIChar(unicode)
+        val ch = if ignoreCase then IChar.canonicalize(ch0, unicode) else ch0
+        emitRead(if invert then ReadKind.ClassNot(ch) else ReadKind.Class(ch), node.loc)
+      case node: AtomNode =>
+        val ch0 = node.toIChar(unicode)
+        val ch = if ignoreCase then IChar.canonicalize(ch0, unicode) else ch0
+        emitRead(ReadKind.Class(ch), node.loc)
+      case Dot() =>
+        emitRead(if dotAll then ReadKind.Any else ReadKind.Dot, node.loc)
+      case BackReference(index)         => emitRead(ReadKind.Ref(index), node.loc)
+      case NamedBackReference(index, _) => emitRead(ReadKind.Ref(index), node.loc)
 
   /** A builder for a disjunction node. */
-  def buildDisjunction(children: Seq[Node]): Unit = {
+  def buildDisjunction(children: Seq[Node]): Unit =
     val labels = children.init.map(_ => (allocateLabel("left"), allocateLabel("right")))
     val cont = allocateLabel("cont")
 
-    for ((n, (l, r)) <- children.init.zip(labels)) {
+    for (n, (l, r)) <- children.init.zip(labels) do
       emitTerminator(Inst.Try(l, r))
 
       enterBlock(l)
@@ -270,28 +253,24 @@ private[vm] class ProgramBuilder(
       emitTerminator(Inst.Jmp(cont))
 
       enterBlock(r)
-    }
 
     build(children.last)
     emitTerminator(Inst.Jmp(cont))
 
     enterBlock(cont)
-  }
 
   /** A builder for a sequence of nodes. */
-  def buildSequence(children: Seq[Node]): Unit = {
-    for (n <- if (back) children.reverse else children) build(n)
-  }
+  def buildSequence(children: Seq[Node]): Unit =
+    for n <- if back then children.reverse else children do build(n)
 
   /** A builder for a capture node. */
-  def buildCapture(index: Int, children: Node): Unit = {
-    emitInst(if (back) Inst.CapEnd(index) else Inst.CapBegin(index))
+  def buildCapture(index: Int, children: Node): Unit =
+    emitInst(if back then Inst.CapEnd(index) else Inst.CapBegin(index))
     build(children)
-    emitInst(if (back) Inst.CapBegin(index) else Inst.CapEnd(index))
-  }
+    emitInst(if back then Inst.CapBegin(index) else Inst.CapEnd(index))
 
   /** A builder for `x*` node. */
-  def buildStar(isLazy: Boolean, child: Node): Unit = {
+  def buildStar(isLazy: Boolean, child: Node): Unit =
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
     val cont = allocateLabel("cont")
@@ -301,31 +280,28 @@ private[vm] class ProgramBuilder(
     emitTerminator(Inst.Jmp(begin))
 
     enterBlock(cont)
-  }
 
   /** A builder for `x+` node. */
-  def buildPlus(isLazy: Boolean, child: Node): Unit = {
+  def buildPlus(isLazy: Boolean, child: Node): Unit =
     build(child)
     buildStar(isLazy, child)
-  }
 
   /** A builder for `x?` node. */
-  def buildQuestion(isLazy: Boolean, child: Node): Unit = {
+  def buildQuestion(isLazy: Boolean, child: Node): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
 
-    emitTerminator(if (isLazy) Inst.Try(cont, main) else Inst.Try(main, cont))
+    emitTerminator(if isLazy then Inst.Try(cont, main) else Inst.Try(main, cont))
 
     enterBlock(main)
     build(child)
     emitTerminator(Inst.Jmp(cont))
 
     enterBlock(cont)
-  }
 
   /** A builder for `x{n,m}` node. */
   def buildRepeat(quantifier: NormalizedQuantifier, child: Node): Unit =
-    quantifier match {
+    quantifier match
       case Quantifier.Exact(0, _)          => // nothing to do
       case Quantifier.Exact(1, _)          => build(child)
       case Quantifier.Exact(n, _)          => buildRepeatN(n, child)
@@ -348,10 +324,9 @@ private[vm] class ProgramBuilder(
       case Quantifier.Bounded(n, m, isLazy) =>
         buildRepeatN(n, child)
         buildRepeatAtMostN(isLazy, m - n, child)
-    }
 
   /** A builder for `x{n}` node. */
-  def buildRepeatN(n: Int, child: Node): Unit = {
+  def buildRepeatN(n: Int, child: Node): Unit =
     val loop = allocateEntrance("loop")
     val cont = allocateLabel("cont")
 
@@ -360,10 +335,9 @@ private[vm] class ProgramBuilder(
     // Note that `wrapCanary` is not needed.
     wrapReset(child)(build(child))
     closeLoopBlock(reg, n, loop, cont)
-  }
 
   /** A builder for `x{0,n}` node. */
-  def buildRepeatAtMostN(isLazy: Boolean, n: Int, child: Node): Unit = {
+  def buildRepeatAtMostN(isLazy: Boolean, n: Int, child: Node): Unit =
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
     val cont = allocateLabel("cont")
@@ -373,16 +347,14 @@ private[vm] class ProgramBuilder(
     enterLoopBlock(isLazy, loop, cont)
     wrapCanary(child)(wrapReset(child)(build(child)))
     closeLoopBlock(reg, n, begin, cont)
-  }
 
   /** Emits a loop block entering instructions. */
-  def enterLoopBlock(isLazy: Boolean, loop: Label, cont: Label): Unit = {
-    emitTerminator(if (isLazy) Inst.Try(cont, loop) else Inst.Try(loop, cont))
+  def enterLoopBlock(isLazy: Boolean, loop: Label, cont: Label): Unit =
+    emitTerminator(if isLazy then Inst.Try(cont, loop) else Inst.Try(loop, cont))
     enterBlock(loop)
-  }
 
   /** Emits a loop block closing instructions. */
-  def closeLoopBlock(reg: CounterReg, n: Int, begin: Label, cont: Label): Unit = {
+  def closeLoopBlock(reg: CounterReg, n: Int, begin: Label, cont: Label): Unit =
     emitInst(Inst.Inc(reg))
     emitTerminator(Inst.Cmp(reg, n, begin, cont))
 
@@ -390,27 +362,24 @@ private[vm] class ProgramBuilder(
     emitInst(Inst.Reset(reg)) // A counter should be reset after the loop for working memoization well.
 
     freeCounter(reg)
-  }
 
   /** Inserts a canary around a loop body if needed. */
-  def wrapCanary(child: Node)(run: => Unit): Unit = {
-    if (child.canMatchEmpty) {
+  def wrapCanary(child: Node)(run: => Unit): Unit =
+    if child.canMatchEmpty then
       val reg = allocateCanary()
       emitInst(Inst.SetCanary(reg))
       run
       emitInst(Inst.CheckCanary(reg))
       freeCanary(reg)
-    } else run
-  }
+    else run
 
   /** Emits a `cap-reset`, then execute a `run`. */
-  def wrapReset(child: Node)(run: => Unit): Unit = {
-    for ((min, max) <- child.captureRange.range) emitInst(Inst.CapReset(min, max))
+  def wrapReset(child: Node)(run: => Unit): Unit =
+    for (min, max) <- child.captureRange.range do emitInst(Inst.CapReset(min, max))
     run
-  }
 
   /** A builder for positive look-around assertion. */
-  def buildPositiveLookAround(child: Node): Unit = {
+  def buildPositiveLookAround(child: Node): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
 
@@ -421,10 +390,9 @@ private[vm] class ProgramBuilder(
     emitTerminator(Inst.Rollback)
 
     enterBlock(cont)
-  }
 
   /** A builder for negative look-around assertion. */
-  def buildNegativeLookAround(child: Node): Unit = {
+  def buildNegativeLookAround(child: Node): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
 
@@ -435,31 +403,25 @@ private[vm] class ProgramBuilder(
     emitTerminator(Inst.Rollback)
 
     enterBlock(cont)
-  }
 
   /** Sets a matching direction fot look-ahead assertion. */
-  def wrapLookAhead(run: => Unit): Unit = {
+  def wrapLookAhead(run: => Unit): Unit =
     val oldBack = back
     back = false
     run
     back = oldBack
-  }
 
   /** Sets a matching direction fot look-behind assertion. */
-  def wrapLookBehind(run: => Unit): Unit = {
+  def wrapLookBehind(run: => Unit): Unit =
     val oldBack = back
     back = true
     run
     back = oldBack
-  }
 
   /** Adds an `assert` instruction. */
-  def emitAssert(kind: AssertKind): Unit = {
+  def emitAssert(kind: AssertKind): Unit =
     emitInst(Inst.Assert(kind))
-  }
 
   /** Adds a `read` (or `read_back`) instruction. */
-  def emitRead(kind: ReadKind, loc: Option[Location]): Unit = {
-    emitInst(if (back) Inst.ReadBack(kind, loc) else Inst.Read(kind, loc))
-  }
-}
+  def emitRead(kind: ReadKind, loc: Option[Location]): Unit =
+    emitInst(if back then Inst.ReadBack(kind, loc) else Inst.Read(kind, loc))

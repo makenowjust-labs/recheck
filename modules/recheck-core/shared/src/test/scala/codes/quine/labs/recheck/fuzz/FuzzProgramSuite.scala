@@ -4,17 +4,17 @@ import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.regexp.Parser
 
-class FuzzProgramSuite extends munit.FunSuite {
+class FuzzProgramSuite extends munit.FunSuite:
 
   /** A default context. */
-  implicit def ctx: Context = Context()
+  given ctx: Context = Context()
 
-  test("FuzzProgram#usesAcceleration") {
+  test("FuzzProgram#usesAcceleration"):
     def from(source: String, flags: String): FuzzProgram =
-      (for {
+      (for
         pattern <- Parser.parse(source, flags).toTry
         fuzz <- FuzzProgram.from(pattern)
-      } yield fuzz).get
+      yield fuzz).get
 
     val fuzz1 = from("foo", "")
     val fuzz2 = from("(foo)\\1", "")
@@ -24,5 +24,3 @@ class FuzzProgramSuite extends munit.FunSuite {
     assertEquals(fuzz2.usesAcceleration(AccelerationMode.On), true)
     assertEquals(fuzz1.usesAcceleration(AccelerationMode.Off), false)
     assertEquals(fuzz2.usesAcceleration(AccelerationMode.Off), false)
-  }
-}

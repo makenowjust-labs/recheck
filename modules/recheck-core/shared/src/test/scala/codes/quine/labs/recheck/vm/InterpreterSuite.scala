@@ -2,6 +2,7 @@ package codes.quine.labs.recheck.vm
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.MILLISECONDS
+import scala.language.implicitConversions
 import scala.util.Failure
 import scala.util.Success
 
@@ -18,30 +19,27 @@ import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
 
-class InterpreterSuite extends munit.FunSuite {
-  implicit val ctx: Context = Context()
+class InterpreterSuite extends munit.FunSuite:
+  given ctx: Context = Context()
 
-  def matches(source: String, flags: String, input: String, pos: Int, opts: Options): Result = {
-    val t = for {
-      pattern <- Parser.parse(source, flags) match {
+  def matches(source: String, flags: String, input: String, pos: Int, opts: Options): Result =
+    val t = for
+      pattern <- Parser.parse(source, flags) match
         case Right(pattern) => Success(pattern)
         case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
-      }
       program <- ProgramBuilder.build(pattern)
       result = Interpreter.run(program, UString(input), pos, opts)
-    } yield result
+    yield result
     t.get
-  }
 
-  def assertMatches(source: String, flags: String, input: String, pos: Int)(implicit loc: munit.Location): Unit = {
+  def assertMatches(source: String, flags: String, input: String, pos: Int)(using loc: munit.Location): Unit =
     val opts = Options()
     assertEquals(matches(source, flags, input, pos, opts).status, Status.Ok)
     assertEquals(matches(source, flags, input, pos, opts.copy(usesAcceleration = true)).status, Status.Ok)
-  }
 
-  def assertCaptures(source: String, flags: String, input: String, pos: Int)(captures: Seq[Int])(implicit
+  def assertCaptures(source: String, flags: String, input: String, pos: Int)(captures: Seq[Int])(using
       loc: munit.Location
-  ): Unit = {
+  ): Unit =
     val opts = Options()
     val result1 = matches(source, flags, input, pos, opts)
     assertEquals(result1.status, Status.Ok)
@@ -49,20 +47,17 @@ class InterpreterSuite extends munit.FunSuite {
     val result2 = matches(source, flags, input, pos, opts.copy(usesAcceleration = true))
     assertEquals(result2.status, Status.Ok)
     assertEquals(result2.captures, Some(captures))
-  }
 
-  def assertNotMatches(source: String, flags: String, input: String, pos: Int)(implicit loc: munit.Location): Unit = {
+  def assertNotMatches(source: String, flags: String, input: String, pos: Int)(using loc: munit.Location): Unit =
     val opts = Options()
     assertEquals(matches(source, flags, input, pos, opts).status, Status.Fail)
     assertEquals(matches(source, flags, input, pos, opts.copy(usesAcceleration = true)).status, Status.Fail)
-  }
 
-  def assertLimit(source: String, flags: String, input: String, pos: Int)(implicit loc: munit.Location): Unit = {
+  def assertLimit(source: String, flags: String, input: String, pos: Int)(using loc: munit.Location): Unit =
     val opts = Options(usesAcceleration = true)
     assertEquals(matches(source, flags, input, pos, opts).status, Status.Limit)
-  }
 
-  test("Interpreter.run: result") {
+  test("Interpreter.run: result"):
     val opts = Options(
       usesAcceleration = true,
       needsLoopAnalysis = true,
@@ -109,9 +104,8 @@ class InterpreterSuite extends munit.FunSuite {
         )
       )
     )
-  }
 
-  test("Interpreter.run: matches/not matches") {
+  test("Interpreter.run: matches/not matches"):
     assertMatches("^a$", "", "a", 0)
     assertNotMatches("^a$", "", "a", 1)
     assertNotMatches("^a$", "", "b", 0)
@@ -268,9 +262,8 @@ class InterpreterSuite extends munit.FunSuite {
     assertNotMatches("(?<!ab)$", "", "ab", 2)
 
     assertLimit("^(a|a)*$", "", "a" * 32 + "b", 0)
-  }
 
-  test("Interpreter.run: captures") {
+  test("Interpreter.run: captures"):
     assertCaptures("a", "", "a", 0)(Seq(0, 1))
     assertCaptures("a", "", "bab", 0)(Seq(1, 2))
     assertCaptures("^(?:(a)|(b))*$", "", "aba", 0)(Seq(0, 3, 2, 3, -1, -1))
@@ -287,9 +280,8 @@ class InterpreterSuite extends munit.FunSuite {
     assertCaptures("^(a*?)(a*?)$", "", "aaa", 0)(Seq(0, 3, 0, 0, 0, 3))
     assertCaptures("^(?:(a)|(b)){2}$", "", "ba", 0)(Seq(0, 2, 1, 2, -1, -1))
     assertCaptures("^(?:(a)|(b)){2}$", "", "ab", 0)(Seq(0, 2, -1, -1, 1, 2))
-  }
 
-  test("Interpreter.runWithTimeout") {
+  test("Interpreter.runWithTimeout"):
     def matchesWithTimeout(
         source: String,
         flags: String,
@@ -297,17 +289,15 @@ class InterpreterSuite extends munit.FunSuite {
         pos: Int,
         opts: Options,
         timeout: Duration
-    )(implicit ctx: Context): Result = {
-      val t = for {
-        pattern <- Parser.parse(source, flags) match {
+    )(using ctx: Context): Result =
+      val t = for
+        pattern <- Parser.parse(source, flags) match
           case Right(pattern) => Success(pattern)
           case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
-        }
         program <- ProgramBuilder.build(pattern)
         result = Interpreter.runWithTimeout(program, UString(input), pos, opts, timeout)
-      } yield result
+      yield result
       t.get
-    }
 
     assertEquals(matchesWithTimeout("^.*$", "", "xx", 0, Options(), Duration.Inf).status, Status.Ok)
     assertEquals(matchesWithTimeout("^.*$", "", "xx", 0, Options(), Duration.MinusInf).status, Status.Timeout)
@@ -320,17 +310,14 @@ class InterpreterSuite extends munit.FunSuite {
       Status.Timeout
     )
     assertEquals(
-      matchesWithTimeout("^.*$", "", "xx", 0, Options(), Duration(1000, MILLISECONDS))(
+      matchesWithTimeout("^.*$", "", "xx", 0, Options(), Duration(1000, MILLISECONDS))(using
         Context(Duration(100, MILLISECONDS))
       ).status,
       Status.Ok
     )
-  }
 
-  test("Interpreter.Status#toString") {
+  test("Interpreter.Status#toString"):
     assertEquals(Interpreter.Status.Ok.toString, "ok")
     assertEquals(Interpreter.Status.Fail.toString, "fail")
     assertEquals(Interpreter.Status.Limit.toString, "limit")
     assertEquals(Interpreter.Status.Timeout.toString, "timeout")
-  }
-}

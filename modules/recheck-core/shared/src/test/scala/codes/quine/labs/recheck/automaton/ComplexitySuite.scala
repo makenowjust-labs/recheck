@@ -1,7 +1,7 @@
 package codes.quine.labs.recheck
 package automaton
 
-import codes.quine.labs.recheck.automaton.Complexity._
+import codes.quine.labs.recheck.automaton.Complexity.*
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.unicode.UChar
 

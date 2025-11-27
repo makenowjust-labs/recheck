@@ -15,24 +15,20 @@ final case class DFA[A, Q](
     init: Q,
     acceptSet: Set[Q],
     delta: Map[(Q, A), Q]
-) {
+):
 
   /** Exports this transition function as a grapg. */
   def toGraph: Graph[Q, A] = Graph.from(delta.iterator.map { case (q1, a) -> q2 => (q1, a, q2) }.toIndexedSeq)
 
   /** Converts to Graphviz format text. */
-  def toGraphviz: String = {
+  def toGraphviz: String =
     val sb = new mutable.StringBuilder
 
     sb.append("digraph {\n")
     sb.append(s"  ${escape("")} [shape=point];\n")
     sb.append(s"  ${escape("")} -> ${escape(init)};\n")
-    for (q <- stateSet)
-      sb.append(s"  ${escape(q)} [shape=${if (acceptSet.contains(q)) "double" else ""}circle];\n")
-    for (((q0, a), q1) <- delta)
-      sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(a)}];\n")
+    for q <- stateSet do sb.append(s"  ${escape(q)} [shape=${if acceptSet.contains(q) then "double" else ""}circle];\n")
+    for ((q0, a), q1) <- delta do sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(a)}];\n")
     sb.append("}")
 
     sb.result()
-  }
-}

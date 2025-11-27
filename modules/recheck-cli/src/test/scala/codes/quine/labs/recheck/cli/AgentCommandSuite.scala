@@ -2,8 +2,8 @@ package codes.quine.labs.recheck.cli
 
 import java.util.concurrent.Semaphore
 
-class AgentCommandSuite extends munit.FunSuite {
-  test("AgentCommand.run") {
+class AgentCommandSuite extends munit.FunSuite:
+  test("AgentCommand.run"):
     val simple = """"method":"check","params":{"source":"a","flags":"","params":{}}"""
     val complex =
       """"method":"check","params":{"source":"(a|b|aba)*$","flags":"","params":{"checker":"fuzz","usesAcceleration":false}}"""
@@ -26,19 +26,16 @@ class AgentCommandSuite extends munit.FunSuite {
     )
     val out = Seq.newBuilder[String]
     val sem = new Semaphore(0)
-    val io = new RPC.IO {
+    val io = new RPC.IO:
       def read(): Iterator[String] =
-        in.iterator.flatMap {
+        in.iterator.flatMap:
           case Right(line) => Iterator(line)
           case Left(n)     =>
             sem.acquire(n)
             Iterator.empty
-        }
-      def write(line: String): Unit = {
+      def write(line: String): Unit =
         sem.release()
         out.addOne(line)
-      }
-    }
 
     new AgentCommand(2, io).run()
     assertEquals(
@@ -56,5 +53,3 @@ class AgentCommandSuite extends munit.FunSuite {
         """{"jsonrpc":"2.0+push","id":5,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"cancel"}}}"""
       )
     )
-  }
-}

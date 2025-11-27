@@ -2,20 +2,21 @@ package codes.quine.labs.recheck
 package automaton
 
 import scala.collection.immutable
+import scala.language.implicitConversions
 
-import codes.quine.labs.recheck.automaton.EpsNFA._
+import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.unicode.IChar
 import codes.quine.labs.recheck.unicode.ICharSet
 import codes.quine.labs.recheck.unicode.ICharSet.CharKind
 
-class EpsNFASuite extends munit.FunSuite {
+class EpsNFASuite extends munit.FunSuite:
 
   /** A default context. */
-  implicit def ctx: Context = Context()
+  given ctx: Context = Context()
 
-  test("EpsNFA.AssertKind#toCharKindSet") {
+  test("EpsNFA.AssertKind#toCharKindSet"):
     val Normal: CharKind = CharKind.Normal
     val LineTerminator: CharKind = CharKind.LineTerminator
     val Word: CharKind = CharKind.Word
@@ -31,9 +32,8 @@ class EpsNFASuite extends munit.FunSuite {
     assertEquals(AssertKind.WordBoundaryNot.toCharKindSet(Normal), Set(Normal, LineTerminator))
     assertEquals(AssertKind.WordBoundaryNot.toCharKindSet(LineTerminator), Set(Normal, LineTerminator))
     assertEquals(AssertKind.WordBoundaryNot.toCharKindSet(Word), Set(Word))
-  }
 
-  test("EpsNFA#toGraphviz") {
+  test("EpsNFA#toGraphviz"):
     val nfa = EpsNFA(
       ICharSet.any(false, false).add(IChar('a')),
       immutable.SortedSet(0, 1, 2, 3, 4, 5, 6),
@@ -69,9 +69,8 @@ class EpsNFASuite extends munit.FunSuite {
          |  "6" [shape=doublecircle];
          |}""".stripMargin
     )
-  }
 
-  test("EpsNFA#toOrderedNFA") {
+  test("EpsNFA#toOrderedNFA"):
     val nfa1 = EpsNFA(
       ICharSet.any(false, false).add(IChar('\n'), CharKind.LineTerminator),
       Set(0, 1, 2, 3, 4, 5, 6),
@@ -161,8 +160,5 @@ class EpsNFASuite extends munit.FunSuite {
         )
       )
     )
-    interceptMessage[UnsupportedException]("OrderedNFA size is too large") {
+    interceptMessage[UnsupportedException]("OrderedNFA size is too large"):
       nfa1.toOrderedNFA(maxNFASize = 1)
-    }
-  }
-}

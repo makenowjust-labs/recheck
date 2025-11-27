@@ -1,12 +1,14 @@
 package codes.quine.labs.recheck.vm
 
+import scala.language.implicitConversions
+
 import codes.quine.labs.recheck.regexp.Pattern.Location
 import codes.quine.labs.recheck.unicode.IChar
 import codes.quine.labs.recheck.vm.Inst.AssertKind
 import codes.quine.labs.recheck.vm.Inst.ReadKind
 
-class InstSuite extends munit.FunSuite {
-  test("Inst#toString") {
+class InstSuite extends munit.FunSuite:
+  test("Inst#toString"):
     assertEquals(Inst.Ok.toString, "ok")
     assertEquals(Inst.Jmp(Label("x", 0)).toString, "jmp #x@0")
     assertEquals(Inst.Try(Label("x", 0), Label("y", 1)).toString, "try #x@0 #y@1")
@@ -35,9 +37,8 @@ class InstSuite extends munit.FunSuite {
     assertEquals(Inst.CapBegin(0).toString, "cap_begin 0")
     assertEquals(Inst.CapEnd(0).toString, "cap_end 0")
     assertEquals(Inst.CapReset(0, 1).toString, "cap_reset 0 1")
-  }
 
-  test("Inst.Terminator#successors") {
+  test("Inst.Terminator#successors"):
     assertEquals(Inst.Ok.successors, Set.empty[Label])
     assertEquals(Inst.Jmp(Label("x", 0)).successors, Set(Label("x", 0)))
     assertEquals(Inst.Try(Label("x", 0), Label("y", 1)).successors, Set(Label("x", 0), Label("y", 1)))
@@ -54,23 +55,19 @@ class InstSuite extends munit.FunSuite {
     assertEquals(Inst.Tx(Label("x", 0), None, None).successors, Set(Label("x", 0)))
     assertEquals(Inst.Tx(Label("x", 0), Some(Label("y", 1)), None).successors, Set(Label("x", 0), Label("y", 1)))
     assertEquals(Inst.Tx(Label("x", 0), None, Some(Label("y", 1))).successors, Set(Label("x", 0), Label("y", 1)))
-  }
 
-  test("Inst.AssertKind#toString") {
+  test("Inst.AssertKind#toString"):
     assertEquals(AssertKind.WordBoundary.toString, "word_boundary")
     assertEquals(AssertKind.WordBoundaryNot.toString, "word_boundary_not")
     assertEquals(AssertKind.LineBegin.toString, "line_begin")
     assertEquals(AssertKind.LineEnd.toString, "line_end")
     assertEquals(AssertKind.InputBegin.toString, "input_begin")
     assertEquals(AssertKind.InputEnd.toString, "input_end")
-  }
 
-  test("Inst.ReadKind#toString") {
+  test("Inst.ReadKind#toString"):
     assertEquals(ReadKind.Any.toString, "any")
     assertEquals(ReadKind.Dot.toString, "dot")
     assertEquals(ReadKind.Char('a').toString, "char 'a'")
     assertEquals(ReadKind.Class(IChar.Word).toString, "class [0-9A-Z_a-z]")
     assertEquals(ReadKind.ClassNot(IChar.Word).toString, "class_not [0-9A-Z_a-z]")
     assertEquals(ReadKind.Ref(0).toString, "ref 0")
-  }
-}
