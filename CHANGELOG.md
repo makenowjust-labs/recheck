@@ -29,6 +29,7 @@ Misc:
 - [#1629](https://github.com/makenowjust-labs/recheck/pull/1629) Unref stderr and work test on CI env correctly ([@makenowjust](https://github.com/makenowjust))
 - [#1637](https://github.com/makenowjust-labs/recheck/pull/1637) Use `lerna run test` instead of `pnpm test` ([@makenowjust](https://github.com/makenowjust))
 - [#1650](https://github.com/makenowjust-labs/recheck/pull/1650) Add dependencies for types explicitly ([@makenowjust](https://github.com/makenowjust))
+- [#1652](https://github.com/makenowjust-labs/recheck/pull/1652) Update dependency prettier to v3.7.0 ([@renovate[bot]](https://github.com/apps/renovate))
 
 # 4.5.0 (2025-03-02)
 
