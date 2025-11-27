@@ -10,6 +10,7 @@ Fixes:
 - [#1620](https://github.com/makenowjust-labs/recheck/pull/1620) Fix #1616: resolve the windows path issue ([@makenowjust](https://github.com/makenowjust))
 - [#1631](https://github.com/makenowjust-labs/recheck/pull/1631) Switch to pnpm ([@makenowjust](https://github.com/makenowjust))
 - [#1638](https://github.com/makenowjust-labs/recheck/pull/1638) Fix `ReDoS.checkAuto` test for preventing flaky test ([@makenowjust](https://github.com/makenowjust))
+- [#1651](https://github.com/makenowjust-labs/recheck/pull/1651) Update sources to Scala 3 ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
