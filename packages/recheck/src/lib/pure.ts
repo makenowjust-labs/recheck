@@ -1,5 +1,5 @@
 // @ts-expect-error
-import * as bundle from "../../../../modules/recheck-js/target/scala-2.13/recheck-js-opt/recheck.js";
+import * as bundle from "../../../../modules/recheck-js/target/scala-3.7.4/recheck-js-opt/recheck.js";
 
 import type { Diagnostics, Parameters } from "../..";
 

@@ -52,11 +52,11 @@ jobs:
           echo -n "version=$version" >> $GITHUB_OUTPUT
       - uses: actions/upload-artifact@v5
         with:
-          path: modules/recheck-js/target/scala-2.13/recheck-js-opt/recheck.js
+          path: modules/recheck-js/target/scala-3.7.4/recheck-js-opt/recheck.js
           name: recheck.js
       - uses: actions/upload-artifact@v5
         with:
-          path: modules/recheck-cli/target/scala-2.13/recheck.jar
+          path: modules/recheck-cli/target/scala-3.7.4/recheck.jar
           name: recheck.jar
 
   scala-lint:
@@ -161,11 +161,11 @@ jobs:
       - uses: actions/download-artifact@v6
         with:
           name: recheck.js
-          path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
+          path: modules/recheck-js/target/scala-3.7.4/recheck-js-opt/
       - uses: actions/download-artifact@v6
         with:
           name: recheck.jar
-          path: modules/recheck-cli/target/scala-2.13/
+          path: modules/recheck-cli/target/scala-3.7.4/
       - name: Build
         run: pnpm -r run build
       - name: Test
@@ -312,7 +312,7 @@ jobs:
       - uses: actions/download-artifact@v6
         with:
           name: recheck.js
-          path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
+          path: modules/recheck-js/target/scala-3.7.4/recheck-js-opt/
       - uses: actions/download-artifact@v6
         with:
           name: recheck.jar
@@ -420,7 +420,7 @@ jobs:
       - uses: actions/download-artifact@v6
         with:
           name: recheck.js
-          path: modules/recheck-js/target/scala-2.13/recheck-js-opt/
+          path: modules/recheck-js/target/scala-3.7.4/recheck-js-opt/
       - name: Install
         run: pnpm install --frozen-lockfile
       - name: Build
