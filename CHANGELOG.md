@@ -30,6 +30,7 @@ Misc:
 - [#1637](https://github.com/makenowjust-labs/recheck/pull/1637) Use `lerna run test` instead of `pnpm test` ([@makenowjust](https://github.com/makenowjust))
 - [#1650](https://github.com/makenowjust-labs/recheck/pull/1650) Add dependencies for types explicitly ([@makenowjust](https://github.com/makenowjust))
 - [#1652](https://github.com/makenowjust-labs/recheck/pull/1652) Update dependency prettier to v3.7.0 ([@renovate[bot]](https://github.com/apps/renovate))
+- [#1653](https://github.com/makenowjust-labs/recheck/pull/1653) Apply `-rewrite -new-syntax` and `-rewrite -indent` ([@makenowjust](https://github.com/makenowjust))
 
 # 4.5.0 (2025-03-02)
 
