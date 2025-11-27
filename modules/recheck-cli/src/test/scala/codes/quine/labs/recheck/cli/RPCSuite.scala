@@ -131,7 +131,7 @@ class RPCSuite extends munit.FunSuite:
 
   test("RPC.RequestHandler#handle"):
     val handler = RPC.RequestHandler { (_, x: Boolean, _: RPC.Push[Unit], send: RPC.Send[Unit]) =>
-      send(if (x) Right(()) else Left(RPC.Error(RPC.Error.InternalErrorCode, "foo")))
+      send(if x then Right(()) else Left(RPC.Error(RPC.Error.InternalErrorCode, "foo")))
     }
     def cheat(f: (RPC.ResponsePush, RPC.ResponseSend) => Unit): Either[RPC.ErrorResponse, RPC.ResultResponse] = {
       var result: Either[RPC.ErrorResponse, RPC.ResultResponse] = null

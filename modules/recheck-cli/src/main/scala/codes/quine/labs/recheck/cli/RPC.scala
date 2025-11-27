@@ -57,7 +57,7 @@ object RPC:
   case object NullID extends ID:
     given encode: Encoder[NullID.type] = _ => Json.Null
     given decode: Decoder[NullID.type] =
-      (c: HCursor) => if (c.value.isNull) Right(NullID) else Left(DecodingFailure("null is expected", c.history))
+      (c: HCursor) => if c.value.isNull then Right(NullID) else Left(DecodingFailure("null is expected", c.history))
 
   /** Request is JSON-RPC request object. */
   final case class Request(jsonrpc: String, id: Option[ID], method: String, params: Json)
@@ -67,7 +67,7 @@ object RPC:
       for
         jsonrpc <- c.get[String]("jsonrpc")
         // If the field `id` exists, it must be a valid ID. In other case, ID is missing.
-        id <- if (c.downField("id").succeeded) c.get[ID]("id").map(Some(_)) else Right(None)
+        id <- if c.downField("id").succeeded then c.get[ID]("id").map(Some(_)) else Right(None)
         method <- c.get[String]("method")
         params <- c.get[Json]("params")
       yield Request(jsonrpc, id, method, params)
