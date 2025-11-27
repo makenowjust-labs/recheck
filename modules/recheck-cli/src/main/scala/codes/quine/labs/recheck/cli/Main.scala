@@ -234,7 +234,7 @@ object Main:
           maxSimpleRepeatCount
         ).tupled,
         (mutationSize, randomSeed, recallLimit, recallTimeout, seeder, seedingLimit, seedingTimeout, timeout).tupled
-      ).mapN {
+      ).mapN:
         case (
               (
                 accelerationMode,
@@ -292,7 +292,6 @@ object Main:
             seedingTimeout,
             timeout
           )
-      }
 
       val pattern = Opts.argument[InputPattern](metavar = "pattern")
       val check: Opts[Action] = (pattern, params).mapN(CheckAction(_, _))

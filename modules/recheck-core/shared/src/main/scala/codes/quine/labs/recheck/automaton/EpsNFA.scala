@@ -168,11 +168,10 @@ object EpsNFA:
   final case class LoopExit[Q](loop: Int, to: Q) extends Transition[Q]
 
   /** AssertKind is assertion kind of this ε-NFA transition. */
-  sealed abstract class AssertKind extends Serializable with Product {
+  sealed abstract class AssertKind extends Serializable with Product:
 
     /** Returns a set of next possible character information from the previous character information. */
     def toCharKindSet(prev: CharKind): Set[CharKind]
-  }
 
   /** AssertKind values and utilities. */
   object AssertKind:

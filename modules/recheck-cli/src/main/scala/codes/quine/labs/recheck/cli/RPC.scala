@@ -125,18 +125,16 @@ object RPC:
     /** Writes a line to output. */
     def write(line: String): Unit
 
-    def write[A: Encoder](value: A): Unit = {
+    def write[A: Encoder](value: A): Unit =
       write(value.asJson.noSpaces)
-    }
 
   object IO:
     def stdio: IO = new IO:
       def read(): Iterator[String] = Iterator.continually(Console.in.readLine()).takeWhile(_ ne null)
-      def write(line: String): Unit = synchronized {
+      def write(line: String): Unit = synchronized:
         Console.out.print(line)
         Console.out.print("\n")
         Console.out.flush()
-      }
 
   /** Starts RPC server. It blocks the process until input stream are closed. */
   def run(io: IO)(handlers: (String, Handler)*): Unit =
