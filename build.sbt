@@ -227,7 +227,7 @@ lazy val common = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "recheck-common",
     console / initialCommands := """
-      |import codes.quine.labs.recheck.common._
+      |import codes.quine.labs.recheck.common.*
       |""".stripMargin,
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "1.2.1" % Test,
@@ -266,7 +266,7 @@ lazy val unicode = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "recheck-unicode",
     console / initialCommands := """
-      |import codes.quine.labs.recheck.unicode._
+      |import codes.quine.labs.recheck.unicode.*
       |""".stripMargin,
     // Generators:
     {
@@ -308,7 +308,7 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "recheck-parse",
     console / initialCommands := """
-      |import codes.quine.labs.recheck.regexp._
+      |import codes.quine.labs.recheck.regexp.*
       |""".stripMargin,
     // Dependencies:
     libraryDependencies += "com.lihaoyi" %%% "fastparse" % "3.1.1",
@@ -330,16 +330,13 @@ lazy val codec = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "recheck-codec",
     console / initialCommands := """
-      |import io.circe._
-      |import io.circe.syntax._
+      |import io.circe.*
+      |import io.circe.syntax.*
       |
-      |import codes.quine.labs.recheck.codec._
+      |import codes.quine.labs.recheck.codec.{*, given}
       |""".stripMargin,
-    Compile / console / scalacOptions -= "-Wunused",
-    Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "io.circe" %%% "circe-core" % "0.14.15",
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "1.2.1" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -360,13 +357,10 @@ lazy val js = project
     name := "recheck-js",
     publish / skip := true,
     console / initialCommands := """
-      |import codes.quine.labs.recheck._
+      |import codes.quine.labs.recheck.*
       |""".stripMargin,
-    Compile / console / scalacOptions -= "-Wunused",
-    Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "io.circe" %%% "circe-scalajs" % "0.14.15",
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "1.2.1" % Test,
     libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
@@ -399,20 +393,17 @@ lazy val cli = project
       "--initialize-at-build-time=codes.quine.labs.recheck"
     ),
     console / initialCommands := """
-      |import io.circe._
-      |import io.circe.parser._
-      |import io.circe.syntax._
+      |import io.circe.*
+      |import io.circe.parser.*
+      |import io.circe.syntax.*
       |
-      |import codes.quine.labs.recheck.cli._
+      |import codes.quine.labs.recheck.cli.*
       |""".stripMargin,
-    Compile / console / scalacOptions -= "-Wunused",
-    Test / console / scalacOptions -= "-Wunused",
     // Dependencies:
     libraryDependencies += "com.monovore" %% "decline" % "2.5.0",
     libraryDependencies += "io.circe" %% "circe-core" % "0.14.15",
     libraryDependencies += "io.circe" %% "circe-generic" % "0.14.15",
     libraryDependencies += "io.circe" %% "circe-parser" % "0.14.15",
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
     // Settings for test:
     libraryDependencies += "org.scalameta" %% "munit" % "1.2.1" % Test,
     testFrameworks += new TestFramework("munit.Framework")

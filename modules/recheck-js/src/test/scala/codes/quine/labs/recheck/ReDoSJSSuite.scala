@@ -4,8 +4,8 @@ import scala.scalajs.js
 
 import io.circe.DecodingFailure
 
-class ReDoSJSSuite extends munit.FunSuite {
-  test("ReDoSJS.check") {
+class ReDoSJSSuite extends munit.FunSuite:
+  test("ReDoSJS.check"):
     assertEquals(
       ReDoSJS.check("^foo$", "", ()).asInstanceOf[js.Dictionary[String]]("status"),
       "safe"
@@ -25,5 +25,3 @@ class ReDoSJSSuite extends munit.FunSuite {
       "safe"
     )
     assertEquals(seq.result().nonEmpty, true)
-  }
-}
