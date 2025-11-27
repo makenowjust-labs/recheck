@@ -27,6 +27,7 @@ Misc:
 - [#1628](https://github.com/makenowjust-labs/recheck/pull/1628) Enable `--forceExit` option of Jest ([@makenowjust](https://github.com/makenowjust))
 - [#1629](https://github.com/makenowjust-labs/recheck/pull/1629) Unref stderr and work test on CI env correctly ([@makenowjust](https://github.com/makenowjust))
 - [#1637](https://github.com/makenowjust-labs/recheck/pull/1637) Use `lerna run test` instead of `pnpm test` ([@makenowjust](https://github.com/makenowjust))
+- [#1650](https://github.com/makenowjust-labs/recheck/pull/1650) Add dependencies for types explicitly ([@makenowjust](https://github.com/makenowjust))
 
 # 4.5.0 (2025-03-02)
 
