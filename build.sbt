@@ -21,7 +21,7 @@ ThisBuild / scalacOptions ++= Seq(
   "UTF-8",
   "-feature",
   "-deprecation",
-  "-Wunused:all",
+  "-Wunused:all"
 )
 
 // Scalafix config:
