@@ -29,7 +29,7 @@ jobs:
           jvm: adoptium:1.21.0.2
           apps: sbt
       - name: Cache SBT
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.ivy2/cache
@@ -37,7 +37,7 @@ jobs:
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
       - name: Cache Build Files
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             **/target
@@ -71,7 +71,7 @@ jobs:
           jvm: adoptium:1.21.0.2
           apps: sbt
       - name: Cache SBT
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.ivy2/cache
@@ -79,7 +79,7 @@ jobs:
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
       - name: Cache Build Files
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             **/target
@@ -125,7 +125,7 @@ jobs:
         with:
           node-version: '24'
       - name: Cache SBT
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.ivy2/cache
@@ -209,7 +209,7 @@ jobs:
           jvm: adoptium:1.21.0.2
           apps: sbt
       - name: Cache SBT
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.ivy2/cache
@@ -217,7 +217,7 @@ jobs:
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
       - name: Cache Build Files
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             **/target
@@ -249,7 +249,7 @@ jobs:
           jvm: adoptium:1.21.0.2
           apps: sbt
       - name: Cache SBT
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.ivy2/cache
@@ -257,7 +257,7 @@ jobs:
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
       - name: Cache Build Files
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             **/target
@@ -294,7 +294,7 @@ jobs:
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
       - name: Cache SBT
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.ivy2/cache
@@ -302,7 +302,7 @@ jobs:
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
       - name: Cache Build Files
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             **/target
