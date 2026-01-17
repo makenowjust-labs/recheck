@@ -58,6 +58,8 @@ private[parser] final class Parser(
   private var offset: Int = 0
 
   private var currentChar: Char =
+    // Note that `\u0000` does not indicate the end of source.
+    // If we need to check the end, use the `isEnd` method.
     if source.isEmpty then '\u0000' else source.charAt(offset)
 
   private var context: ParsingContext = ParsingContext.from(featureSet)

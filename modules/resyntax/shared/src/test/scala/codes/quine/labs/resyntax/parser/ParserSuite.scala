@@ -124,42 +124,30 @@ class ParserSuite extends munit.FunSuite:
   check("(?(x)a)", "", PCRE, Python)(Command(Conditional(Named(Bare, "x"), Literal('a'))))
   check("(?(+1)a)", "", PCRE)(Command(Conditional(Relative(1), Literal('a'))))
   check("(?(-1)a)", "", PCRE)(Command(Conditional(Relative(-1), Literal('a'))))
-  check("(?(?=a)b)", "", DotNet, PCRE, Perl)(
+  check("(?(?=a)b)", "", DotNet, PCRE, Perl):
     Command(Conditional(LookAround(PositiveLookAhead(Symbolic), Literal('a')), Literal('b')))
-  )
-  check("(?(*positive_lookahead:a)b)", "", PCRE, Perl)(
+  check("(?(*positive_lookahead:a)b)", "", PCRE, Perl):
     Command(Conditional(LookAround(PositiveLookAhead(Alphabetic), Literal('a')), Literal('b')))
-  )
-  check("(?(*pla:a)b)", "", PCRE, Perl)(
+  check("(?(*pla:a)b)", "", PCRE, Perl):
     Command(Conditional(LookAround(PositiveLookAhead(Abbrev), Literal('a')), Literal('b')))
-  )
-  check("(?(?!a)b)", "", DotNet, PCRE, Perl)(
+  check("(?(?!a)b)", "", DotNet, PCRE, Perl):
     Command(Conditional(LookAround(NegativeLookAhead(Symbolic), Literal('a')), Literal('b')))
-  )
-  check("(?(*negative_lookahead:a)b)", "", PCRE, Perl)(
+  check("(?(*negative_lookahead:a)b)", "", PCRE, Perl):
     Command(Conditional(LookAround(NegativeLookAhead(Alphabetic), Literal('a')), Literal('b')))
-  )
-  check("(?(*nla:a)b)", "", PCRE, Perl)(
+  check("(?(*nla:a)b)", "", PCRE, Perl):
     Command(Conditional(LookAround(NegativeLookAhead(Abbrev), Literal('a')), Literal('b')))
-  )
-  check("(?(?<=a)b)", "", DotNet, PCRE, Perl)(
+  check("(?(?<=a)b)", "", DotNet, PCRE, Perl):
     Command(Conditional(LookAround(PositiveLookBehind(Symbolic), Literal('a')), Literal('b')))
-  )
-  check("(?(*positive_lookbehind:a)b)", "", PCRE, Perl)(
+  check("(?(*positive_lookbehind:a)b)", "", PCRE, Perl):
     Command(Conditional(LookAround(PositiveLookBehind(Alphabetic), Literal('a')), Literal('b')))
-  )
-  check("(?(*plb:a)b)", "", PCRE, Perl)(
+  check("(?(*plb:a)b)", "", PCRE, Perl):
     Command(Conditional(LookAround(PositiveLookBehind(Abbrev), Literal('a')), Literal('b')))
-  )
-  check("(?(?<!a)b)", "", DotNet, PCRE, Perl)(
+  check("(?(?<!a)b)", "", DotNet, PCRE, Perl):
     Command(Conditional(LookAround(NegativeLookBehind(Symbolic), Literal('a')), Literal('b')))
-  )
-  check("(?(*negative_lookbehind:a)b)", "", PCRE, Perl)(
+  check("(?(*negative_lookbehind:a)b)", "", PCRE, Perl):
     Command(Conditional(LookAround(NegativeLookBehind(Alphabetic), Literal('a')), Literal('b')))
-  )
-  check("(?(*nlb:a)b)", "", PCRE, Perl)(
+  check("(?(*nlb:a)b)", "", PCRE, Perl):
     Command(Conditional(LookAround(NegativeLookBehind(Abbrev), Literal('a')), Literal('b')))
-  )
   check("(?(.)b)", "", DotNet, PCRE, Perl)(Command(Conditional(LookAround(Dot), Literal('b'))))
   check("(?'x'a)", "", DotNet, PCRE, Perl, Ruby)(Group(NamedCapture(Quote, "x"), Literal('a')))
   check("(?'x-y'a)", "", DotNet)(Group(Balance(Quote, Some("x"), "y"), Literal('a')))
@@ -172,12 +160,10 @@ class ParserSuite extends munit.FunSuite:
   check("(?1)", "", PCRE, Perl)(Command(IndexedCall(1)))
   check("(?+1)", "", PCRE, Perl)(Command(RelativeCall(1)))
   check("(?-1)", "", PCRE, Perl)(Command(RelativeCall(-1)))
-  check("(?-x)", "", DotNet, Java, PCRE, Perl, Python, Ruby)(
+  check("(?-x)", "", DotNet, Java, PCRE, Perl, Python, Ruby):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(verbose = true)))))
-  )
-  check("(?-x:a)", "", DotNet, Java, PCRE, Perl, Python, Ruby)(
+  check("(?-x:a)", "", DotNet, Java, PCRE, Perl, Python, Ruby):
     Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(verbose = true)))), Literal('a'))
-  )
   check("(?^x)", "", PCRE, Perl)(Command(CommandKind.ResetFlag(FlagSet(verbose = true))))
   check("(?^x:a)", "", PCRE, Perl)(Group(GroupKind.ResetFlag(FlagSet(verbose = true)), Literal('a')))
   check("(?#x)", "", DotNet, PCRE, Perl, Python, Ruby)(Command(Comment("x")))
@@ -190,84 +176,65 @@ class ParserSuite extends munit.FunSuite:
   check("(?C{x{{y}}z})", "", PCRE)(Command(CalloutString('{', '}', "x{{y}}z")))
   for delim <- Seq('`', '\'', '"', '^', '%', '#', '$') do
     check(s"(?C${delim}x$delim)", "", PCRE)(Command(CalloutString(delim, delim, "x")))
-  check("(?i)", "", DotNet, Java, PCRE, Perl, Python, Ruby)(
+  check("(?i)", "", DotNet, Java, PCRE, Perl, Python, Ruby):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None)))
-  )
-  check("(?m)", "", DotNet, Java, PCRE, Perl, Python, Ruby)(
+  check("(?m)", "", DotNet, Java, PCRE, Perl, Python, Ruby):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(multiline = true), None)))
-  )
-  check("(?x)", "", DotNet, Java, PCRE, Perl, Python, Ruby)(
+  check("(?x)", "", DotNet, Java, PCRE, Perl, Python, Ruby):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)))
-  )
-  check("(?J)", "", PCRE)(
+  check("(?J)", "", PCRE):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(dupNames = true), None)))
-  )
   error("(?J)", "", DotNet, Java, Perl, Python, Ruby)("Invalid flag at 2")
-  check("(?L)", "b", Python)(
+  check("(?L)", "b", Python):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(localeUpper = true), None)))
-  )
   error("(?L)", "", DotNet, Java, PCRE, Perl, Python, Ruby)("Invalid flag at 2")
-  check("(?U)", "", Java)(
+  check("(?U)", "", Java):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ungreedy = true), None)))
-  )
   error("(?U)", "", DotNet, PCRE, Perl, Python, Ruby)("Invalid flag at 2")
-  check("(?a)", "", Perl, Python, Ruby)(
+  check("(?a)", "", Perl, Python, Ruby):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true), None)))
-  )
   error("(?a)", "", DotNet, Java, PCRE)("Invalid flag at 2")
-  check("(?d)", "", Java, Perl, Ruby)(
+  check("(?d)", "", Java, Perl, Ruby):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(hasIndices = true), None)))
-  )
   error("(?d)", "", DotNet, PCRE, Python)("Invalid flag at 2")
-  check("(?l)", "", Perl)(
+  check("(?l)", "", Perl):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(localeLower = true), None)))
-  )
   error("(?l)", "", DotNet, Java, PCRE, Python, Ruby)("Invalid flag at 2")
-  check("(?n)", "", DotNet, PCRE, Perl)(
+  check("(?n)", "", DotNet, PCRE, Perl):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(explicitCapture = true), None)))
-  )
   error("(?n)", "", Java, Python, Ruby)("Invalid flag at 2")
-  check("(?p)", "", Perl)(
+  check("(?p)", "", Perl):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(preserve = true), None)))
-  )
   error("(?p)", "", DotNet, Java, PCRE, Python, Ruby)("Invalid flag at 2")
-  check("(?s)", "", DotNet, Java, PCRE, Perl, Python)(
+  check("(?s)", "", DotNet, Java, PCRE, Perl, Python):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(dotAll = true), None)))
-  )
   error("(?s)", "", Ruby)("Invalid flag at 2")
-  check("(?u)", "", Java, Perl, Python, Ruby)(
+  check("(?u)", "", Java, Perl, Python, Ruby):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(unicode = true), None)))
-  )
   error("(?u)", "", DotNet, PCRE)("Invalid flag at 2")
-  check("a(?x)b|c", "", DotNet, Java, PCRE, Perl, Python)(
+  check("a(?x)b|c", "", DotNet, Java, PCRE, Perl, Python):
     Disjunction(
       Sequence(Literal('a'), Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None))), Literal('b')),
       Literal('c')
     )
-  )
-  check("a(?x)b|c", "", Ruby)(
+  check("a(?x)b|c", "", Ruby):
     Sequence(
       Literal('a'),
       Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None))),
       Disjunction(Literal('b'), Literal('c'))
     )
-  )
-  check("(?x:a)", "", DotNet, Java, PCRE, Perl, Python, Ruby)(
+  check("(?x:a)", "", DotNet, Java, PCRE, Perl, Python, Ruby):
     Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)), Literal('a'))
-  )
-  check(" (?x: a ) ", "", DotNet, Java, PCRE, Perl, Python, Ruby)(
+  check(" (?x: a ) ", "", DotNet, Java, PCRE, Perl, Python, Ruby):
     Sequence(
       Literal(' '),
       Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)), Literal('a')),
       Literal(' ')
     )
-  )
-  check("(?x-i)", "", DotNet, Java, PCRE, Perl, Python, Ruby)(
+  check("(?x-i)", "", DotNet, Java, PCRE, Perl, Python, Ruby):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), Some(FlagSet(ignoreCase = true)))))
-  )
-  check("(?x-i:a)", "", DotNet, Java, PCRE, Perl, Python, Ruby)(
+  check("(?x-i:a)", "", DotNet, Java, PCRE, Perl, Python, Ruby):
     Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), Some(FlagSet(ignoreCase = true)))), Literal('a'))
-  )
   check("(*ACCEPT)", "", PCRE, Perl)(Command(BacktrackControl(Some(Accept), None)))
   check("(*ACCEPT:x)", "", PCRE, Perl)(Command(BacktrackControl(Some(Accept), Some("x"))))
   check("(*FAIL)", "", PCRE, Perl)(Command(BacktrackControl(Some(Fail), None)))
@@ -343,45 +310,37 @@ class ParserSuite extends munit.FunSuite:
   check("\\g'foo'", "", PCRE, Ruby)(Backslash(EscapeCall(Quote, NamedReference("foo"))))
   check("\\h", "", Java, PCRE, Perl)(Backslash(EscapeClass(Horizontal)))
   check("\\h", "", Ruby)(Backslash(EscapeClass(HexDigit)))
-  check("\\k<foo>", "", DotNet, Java, PCRE, Perl, Ruby)(
+  check("\\k<foo>", "", DotNet, Java, PCRE, Perl, Ruby):
     Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("foo")))
-  )
   check("\\k<1>", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), IndexedReference(1))))
   check("\\k<+1>", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), RelativeReference(1))))
   check("\\k<-1>", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), RelativeReference(-1))))
-  check("\\k<1+0>", "", Ruby)(
+  check("\\k<1+0>", "", Ruby):
     Backslash(EscapeBackReference(KBackReference(Angle), LeveledReference(IndexedReference(1), 0)))
-  )
-  check("\\k<1-1>", "", Ruby)(
+  check("\\k<1-1>", "", Ruby):
     Backslash(EscapeBackReference(KBackReference(Angle), LeveledReference(IndexedReference(1), -1)))
-  )
   check("\\k<x>", "", JavaScript)(Sequence(Backslash(Unknown('k')), Literal('<'), Literal('x'), Literal('>')))
-  check("(?<foo>)\\k<foo>", "", JavaScript)(
+  check("(?<foo>)\\k<foo>", "", JavaScript):
     Sequence(
       Group(NamedCapture(Angle, "foo"), Sequence()),
       Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("foo")))
     )
-  )
-  check("\\k'foo'", "", DotNet, PCRE, Perl, Ruby)(
+  check("\\k'foo'", "", DotNet, PCRE, Perl, Ruby):
     Backslash(EscapeBackReference(KBackReference(Quote), NamedReference("foo")))
-  )
   check("\\k'1'", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Quote), IndexedReference(1))))
   check("\\k'+1'", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Quote), RelativeReference(1))))
   check("\\k'-1'", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Quote), RelativeReference(-1))))
-  check("\\k'1+0'", "", Ruby)(
+  check("\\k'1+0'", "", Ruby):
     Backslash(EscapeBackReference(KBackReference(Quote), LeveledReference(IndexedReference(1), 0)))
-  )
-  check("\\k'1-1'", "", Ruby)(
+  check("\\k'1-1'", "", Ruby):
     Backslash(EscapeBackReference(KBackReference(Quote), LeveledReference(IndexedReference(1), -1)))
-  )
   check("\\l", "", Perl)(Backslash(CaseCommand(SingleLowerCaseCommand)))
   check("\\n", "", All*)(Backslash(Escape(Single('n'), 0x0a)))
   check("\\o{010}", "", PCRE, Perl)(Backslash(Escape(Octal, 0x08)))
   check("\\p{Letter}", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(EscapeClass(UnicodeProperty("Letter"))))
   check("\\p{Letter}", "u", JavaScript)(Backslash(EscapeClass(UnicodeProperty("Letter"))))
-  check("\\p{Script=Hira}", "", DotNet, Java, PCRE, Perl, Ruby)(
+  check("\\p{Script=Hira}", "", DotNet, Java, PCRE, Perl, Ruby):
     Backslash(EscapeClass(UnicodePropertyValue("Script", "Hira")))
-  )
   check("\\p{Script=Hira}", "u", JavaScript)(Backslash(EscapeClass(UnicodePropertyValue("Script", "Hira"))))
   check("\\pL", "", Java, PCRE, Perl)(Backslash(EscapeClass(UnicodeBareProperty("L"))))
   check("\\r", "", All*)(Backslash(Escape(Single('r'), 0x0d)))
@@ -414,34 +373,30 @@ class ParserSuite extends munit.FunSuite:
   check("\\L", "", Perl)(Backslash(CaseCommand(LowerCaseCommand)))
   check("\\P{Letter}", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(EscapeClass(NonUnicodeProperty("Letter"))))
   check("\\P{Letter}", "u", JavaScript)(Backslash(EscapeClass(NonUnicodeProperty("Letter"))))
-  check("\\P{Script=Hira}", "", DotNet, Java, PCRE, Perl, Ruby)(
+  check("\\P{Script=Hira}", "", DotNet, Java, PCRE, Perl, Ruby):
     Backslash(EscapeClass(NonUnicodePropertyValue("Script", "Hira")))
-  )
   check("\\P{Script=Hira}", "u", JavaScript)(Backslash(EscapeClass(NonUnicodePropertyValue("Script", "Hira"))))
   check("\\PL", "", Java, PCRE, Perl)(Backslash(EscapeClass(NonUnicodeBareProperty("L"))))
-  check("\\Qab\\E", "", Java, PCRE, Perl)(
+  check("\\Qab\\E", "", Java, PCRE, Perl):
     Sequence(
       Backslash(CaseCommand(QuoteCommand)),
       Literal('a'),
       Literal('b'),
       Backslash(CaseCommand(EndCaseCommand))
     )
-  )
-  check("\\Qab", "", Java, PCRE, Perl)(
+  check("\\Qab", "", Java, PCRE, Perl):
     Sequence(
       Backslash(CaseCommand(QuoteCommand)),
       Literal('a'),
       Literal('b')
     )
-  )
-  check("\\Q\\\\\\E", "", Java, PCRE, Perl)(
+  check("\\Q\\\\\\E", "", Java, PCRE, Perl):
     Sequence(
       Backslash(CaseCommand(QuoteCommand)),
       Literal('\\'),
       Literal('\\'),
       Backslash(CaseCommand(EndCaseCommand))
     )
-  )
   check("\\R", "", Java, PCRE, Perl, Ruby)(Backslash(EscapeClass(GeneralNewline)))
   check("\\S", "", All*)(Backslash(EscapeClass(NonSpace)))
   check("\\U000ABCDE", "", Python)(Backslash(Escape(UnicodeHex8, 0xabcde)))
@@ -451,12 +406,10 @@ class ParserSuite extends munit.FunSuite:
   check("\\Z", "", DotNet, Java, PCRE, Perl, Python, Ruby)(Backslash(Assert(UpperEnd)))
   check("\\010", "", All*)(Backslash(Escape(BareOctal, 8)))
   check("\\412", "", JavaScript)(Sequence(Backslash(Escape(BareOctal, 33)), Literal('2')))
-  check("()\\1", "", All*)(
+  check("()\\1", "", All*):
     Sequence(Group(IndexedCapture, Sequence()), Backslash(EscapeBackReference(BareBackReference, IndexedReference(1))))
-  )
-  check("\\1", "", DotNet, Java, PCRE, Perl, Python, Ruby)(
+  check("\\1", "", DotNet, Java, PCRE, Perl, Python, Ruby):
     Backslash(EscapeBackReference(BareBackReference, IndexedReference(1)))
-  )
   check("\\1", "u", JavaScript)(Backslash(EscapeBackReference(BareBackReference, IndexedReference(1))))
   for c <- "/|+*?{}()^$.\\[]" do check(s"\\$c", "", All*)(Backslash(Escape(Single(c), c.toInt)))
   check("\\y", "", JavaScript, Perl, Ruby)(Backslash(Unknown('y')))
@@ -468,18 +421,15 @@ class ParserSuite extends munit.FunSuite:
   check("[a-z]", "", All*)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
   check("[a-]", "", All*)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'))))
   check("[-z]", "", All*)(Class(false, ClassUnion(ClassLiteral('-'), ClassLiteral('z'))))
-  check("[\\n-\\r]", "", All*)(
+  check("[\\n-\\r]", "", All*):
     Class(
       false,
       ClassRange(ClassBackslashValue(Escape(Single('n'), '\n')), ClassBackslashValue(Escape(Single('r'), '\r')))
     )
-  )
-  check("[a-\\w]", "", All*)(
+  check("[a-\\w]", "", All*):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassBackslashClass(Word)))
-  )
-  check("[\\w-z]", "", All*)(
+  check("[\\w-z]", "", All*):
     Class(false, ClassUnion(ClassBackslashClass(Word), ClassLiteral('-'), ClassLiteral('z')))
-  )
   check("[\\b]", "", All*)(Class(false, ClassBackslashValue(Escape(Single('b'), 0x08))))
   check("[]", "", JavaScript)(Class(false, ClassUnion()))
   check("[[:alnum:]]", "", PCRE, Perl, Ruby)(Class(false, ClassPosix(false, "alnum")))
@@ -488,7 +438,7 @@ class ParserSuite extends munit.FunSuite:
   check("[[a]]", "v", JavaScript)(Class(false, ClassNest(false, ClassLiteral('a'))))
   check("[[^a]]", "", Java, Ruby)(Class(false, ClassNest(true, ClassLiteral('a'))))
   check("[[^a]]", "v", JavaScript)(Class(false, ClassNest(true, ClassLiteral('a'))))
-  check("[[a-z]&&[a-c]]", "", Java, Ruby)(
+  check("[[a-z]&&[a-c]]", "", Java, Ruby):
     Class(
       false,
       ClassIntersection(
@@ -496,8 +446,7 @@ class ParserSuite extends munit.FunSuite:
         ClassNest(false, ClassRange(ClassLiteral('a'), ClassLiteral('c')))
       )
     )
-  )
-  check("[[a-z]&&[a-c]]", "v", JavaScript)(
+  check("[[a-z]&&[a-c]]", "v", JavaScript):
     Class(
       false,
       ClassIntersection(
@@ -505,8 +454,7 @@ class ParserSuite extends munit.FunSuite:
         ClassNest(false, ClassRange(ClassLiteral('a'), ClassLiteral('c')))
       )
     )
-  )
-  check("[[a-z]--[a-c]]", "v", JavaScript)(
+  check("[[a-z]--[a-c]]", "v", JavaScript):
     Class(
       false,
       ClassDiff(
@@ -514,8 +462,7 @@ class ParserSuite extends munit.FunSuite:
         ClassNest(false, ClassRange(ClassLiteral('a'), ClassLiteral('c')))
       )
     )
-  )
-  check("[\\q{abc|def}]", "v", JavaScript)(
+  check("[\\q{abc|def}]", "v", JavaScript):
     Class(
       false,
       ClassBackslashClass(
@@ -527,8 +474,7 @@ class ParserSuite extends munit.FunSuite:
         )
       )
     )
-  )
-  check("[\\q{\\n}]", "v", JavaScript)(
+  check("[\\q{\\n}]", "v", JavaScript):
     Class(
       false,
       ClassBackslashClass(
@@ -539,6 +485,5 @@ class ParserSuite extends munit.FunSuite:
         )
       )
     )
-  )
   error("[", "", All*)("Unclosed ']' at 1")
   error("]", "u", JavaScript)("Unclosed ']' at 0")
