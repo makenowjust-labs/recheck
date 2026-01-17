@@ -11,6 +11,7 @@ Fixes:
 - [#1631](https://github.com/makenowjust-labs/recheck/pull/1631) Switch to pnpm ([@makenowjust](https://github.com/makenowjust))
 - [#1638](https://github.com/makenowjust-labs/recheck/pull/1638) Fix `ReDoS.checkAuto` test for preventing flaky test ([@makenowjust](https://github.com/makenowjust))
 - [#1651](https://github.com/makenowjust-labs/recheck/pull/1651) Update sources to Scala 3 ([@makenowjust](https://github.com/makenowjust))
+- [#1697](https://github.com/makenowjust-labs/recheck/pull/1697) Add `d.ts` to the ESLint plugin ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
