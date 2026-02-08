@@ -409,7 +409,7 @@ lazy val cli = project
       |import codes.quine.labs.recheck.cli.*
       |""".stripMargin,
     // Dependencies:
-    libraryDependencies += "com.monovore" %% "decline" % "2.5.0",
+    libraryDependencies += "com.monovore" %% "decline" % "2.6.0",
     libraryDependencies += "io.circe" %% "circe-core" % "0.14.15",
     libraryDependencies += "io.circe" %% "circe-generic" % "0.14.15",
     libraryDependencies += "io.circe" %% "circe-parser" % "0.14.15",
