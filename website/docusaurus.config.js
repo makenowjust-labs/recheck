@@ -142,6 +142,9 @@ const config = {
         darkTheme: darkCodeTheme,
         additionalLanguages: ["java", "scala"],
       },
+      colorMode: {
+        respectPrefersColorScheme: true,
+      },
       image: "img/social.png",
       algolia: {
         appId: "G4MPILTIZG",
