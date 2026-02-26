@@ -210,7 +210,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |  time("check")(ReDoS.check(source, flags, params))
       |""".stripMargin,
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "1.2.2" % Test,
+    libraryDependencies += "org.scalameta" %%% "munit" % "1.2.3" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
@@ -231,7 +231,7 @@ lazy val common = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.recheck.common.*
       |""".stripMargin,
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "1.2.2" % Test,
+    libraryDependencies += "org.scalameta" %%% "munit" % "1.2.3" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
@@ -253,7 +253,7 @@ lazy val exec = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.recheck.exec._
       |""".stripMargin,
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "1.2.2" % Test,
+    libraryDependencies += "org.scalameta" %%% "munit" % "1.2.3" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
@@ -297,7 +297,7 @@ lazy val unicode = crossProject(JVMPlatform, JSPlatform)
       )
     },
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "1.2.2" % Test,
+    libraryDependencies += "org.scalameta" %%% "munit" % "1.2.3" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
@@ -319,7 +319,7 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
     // Dependencies:
     libraryDependencies += "com.lihaoyi" %%% "fastparse" % "3.1.1",
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "1.2.2" % Test,
+    libraryDependencies += "org.scalameta" %%% "munit" % "1.2.3" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
@@ -345,7 +345,7 @@ lazy val codec = crossProject(JVMPlatform, JSPlatform)
     // Dependencies:
     libraryDependencies += "io.circe" %%% "circe-core" % "0.14.15",
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "1.2.2" % Test,
+    libraryDependencies += "org.scalameta" %%% "munit" % "1.2.3" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
@@ -370,7 +370,7 @@ lazy val js = project
     // Dependencies:
     libraryDependencies += "io.circe" %%% "circe-scalajs" % "0.14.15",
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "1.2.2" % Test,
+    libraryDependencies += "org.scalameta" %%% "munit" % "1.2.3" % Test,
     libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13),
     testFrameworks += new TestFramework("munit.Framework"),
@@ -414,7 +414,7 @@ lazy val cli = project
     libraryDependencies += "io.circe" %% "circe-generic" % "0.14.15",
     libraryDependencies += "io.circe" %% "circe-parser" % "0.14.15",
     // Settings for test:
-    libraryDependencies += "org.scalameta" %% "munit" % "1.2.2" % Test,
+    libraryDependencies += "org.scalameta" %% "munit" % "1.2.3" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .dependsOn(coreJVM, codecJVM)
