@@ -51,6 +51,8 @@ lazy val root = project
     unicodeJS,
     parseJVM,
     parseJS,
+    resyntaxJVM,
+    resyntaxJVM,
     codecJVM,
     codecJS,
     js,
@@ -331,6 +333,30 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
 
 lazy val parseJVM = parse.jvm
 lazy val parseJS = parse.js
+
+lazy val resyntax = crossProject(JVMPlatform, JSPlatform)
+  .in(file("modules/resyntax"))
+  .settings(
+    name := "resyntax",
+    fork := true,
+    console / initialCommands := """
+      |import codes.quine.labs.resyntax.*
+      |import codes.quine.labs.resyntax.ast.*
+      |import codes.quine.labs.resyntax.ir.*
+      |import codes.quine.labs.resyntax.parser.*
+      |""".stripMargin,
+    // Settings for test:
+    libraryDependencies += "org.scalameta" %%% "munit" % "0.7.29" % Test,
+    testFrameworks += new TestFramework("munit.Framework")
+  )
+  .jsSettings(
+    coverageEnabled := false,
+    libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
+      .cross(CrossVersion.for3Use2_13)
+  )
+
+lazy val resyntaxJVM = resyntax.jvm
+lazy val resyntaxJS = resyntax.js
 
 lazy val codec = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/recheck-codec"))
