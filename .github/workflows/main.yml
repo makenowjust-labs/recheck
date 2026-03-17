@@ -94,7 +94,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           version: '10'
       - uses: actions/setup-node@v6
@@ -149,7 +149,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           version: '10'
       - uses: actions/setup-node@v6
@@ -285,7 +285,7 @@ jobs:
           jvm: adoptium:1.21.0.2
           apps: sbt
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           version: '10'
       - uses: actions/setup-node@v6
@@ -410,7 +410,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           version: '10'
       - uses: actions/setup-node@v6
