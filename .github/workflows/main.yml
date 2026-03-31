@@ -134,7 +134,7 @@ jobs:
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
       - name: Test
         run: sbt coverage test coverageAggregate
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -170,7 +170,7 @@ jobs:
         run: pnpm -r run build
       - name: Test
         run: pnpm exec lerna run test -- --coverage --forceExit --detectOpenHandles
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
