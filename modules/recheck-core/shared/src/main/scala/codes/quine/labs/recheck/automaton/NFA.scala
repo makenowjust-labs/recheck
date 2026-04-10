@@ -31,7 +31,13 @@ final case class NFA[A, Q](
 
     sb.result()
 
-  /** Determinizes this NFA. */
+  private val MaxDFASize: Int = 100_000
+
+  /** Determinizes this NFA.
+    *
+    * @throws codes.quine.labs.recheck.common.TimeoutException
+    *   when the DFA state count exceeds [[MaxDFASize]]
+    */
   def toDFA(using ctx: Context): DFA[A, Set[Q]] = ctx.interrupt:
     val queue = mutable.Queue.empty[Set[Q]]
     val newStateSet = mutable.Set.empty[Set[Q]]
@@ -43,6 +49,10 @@ final case class NFA[A, Q](
 
     while queue.nonEmpty do
       ctx.interrupt:
+        if newStateSet.size > MaxDFASize then
+          throw new codes.quine.labs.recheck.common.TimeoutException(
+            s"NFA.toDFA: DFA state count exceeded limit ($MaxDFASize)"
+          )
         val qs = queue.dequeue()
         if (qs & acceptSet).nonEmpty then newAcceptSet.addOne(qs)
         for a <- alphabet do
