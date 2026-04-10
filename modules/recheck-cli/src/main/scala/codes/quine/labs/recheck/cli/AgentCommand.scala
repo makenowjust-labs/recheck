@@ -36,6 +36,9 @@ object AgentCommand:
   object CancelParams:
     given decode: Decoder[CancelParams] = deriveDecoder
 
+  /** Maximum number of concurrent check requests to prevent resource exhaustion. */
+  val MaxConcurrentRequests: Int = 64
+
   /** "ping" method parameter. */
   final case class PingParams()
 
@@ -53,23 +56,43 @@ object AgentCommand:
 /** `recheck agent` command implementation. */
 class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio):
 
+  import AgentCommand.MaxConcurrentRequests
+
   /** A thread pool used by checking. */
   val executor: ExecutorService = Executors.newFixedThreadPool(threadSize)
 
   /** A map from current running request IDs to their tokens. */
   val tokens: mutable.Map[RPC.ID, Token] = mutable.Map.empty
 
+  /** Clamps parameters to safe server-side bounds to prevent resource exhaustion. */
+  private def clampParams(params: Parameters): Parameters =
+    import scala.concurrent.duration.*
+    val maxTimeout = Duration(60, SECONDS)
+    val clampedTimeout = params.timeout match
+      case d: FiniteDuration if d > maxTimeout => maxTimeout
+      case _: Duration.Infinite                => maxTimeout
+      case d                                   => d
+    params.copy(
+      timeout = clampedTimeout,
+      maxNFASize = math.min(params.maxNFASize, Parameters.DefaultMaxNFASize * 4),
+      maxPatternSize = math.min(params.maxPatternSize, Parameters.DefaultMaxPatternSize * 4)
+    )
+
   /** `"check"` method implementation. */
   def handleCheck(id: RPC.ID, check: CheckParams, push: RPC.Push[String], send: RPC.Send[Diagnostics]): Unit =
     val token = synchronized:
+      if tokens.size >= MaxConcurrentRequests then
+        send(Right(Diagnostics.Unknown(check.source, check.flags, Diagnostics.ErrorKind.Cancel, None)))
+        return
       val source = new CancellationTokenSource
       tokens.remove(id).foreach(doCancel)
       tokens.update(id, Token(check.source, check.flags, send, source))
       source.token
     executor.execute: () =>
+      val clamped = clampParams(check.params)
       val params =
-        if check.params.logger.isDefined then check.params.copy(logger = Some(message => push(message)))
-        else check.params
+        if clamped.logger.isDefined then clamped.copy(logger = Some(message => push(message)))
+        else clamped
       val diagnostics = ReDoS.check(check.source, check.flags, params, Some(token))
       synchronized:
         send(Right(diagnostics))
