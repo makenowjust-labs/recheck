@@ -96,7 +96,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: '10'
+          version: '11'
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
@@ -151,7 +151,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: '10'
+          version: '11'
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node }}
@@ -287,7 +287,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: '10'
+          version: '11'
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
@@ -412,7 +412,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: '10'
+          version: '11'
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
