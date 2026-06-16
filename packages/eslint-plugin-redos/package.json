@@ -12,6 +12,9 @@
     "type": "git",
     "url": "https://github.com/makenowjust-labs/recheck.git"
   },
+  "bugs": {
+    "url": "https://github.com/makenowjust-labs/recheck/issues"
+  },
   "main": "lib/main.js",
   "types": "index.d.ts",
   "files": [
