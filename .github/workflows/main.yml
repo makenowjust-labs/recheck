@@ -21,7 +21,7 @@ jobs:
     outputs:
       version: ${{ steps.save-version.outputs.version }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: coursier/setup-action@v3
@@ -65,7 +65,7 @@ jobs:
     timeout-minutes: 5
     name: Scala Lint
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: coursier/setup-action@v3
         with:
           jvm: adoptium:1.21.0.2
@@ -92,7 +92,7 @@ jobs:
     timeout-minutes: 5
     name: Node Lint
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
@@ -115,7 +115,7 @@ jobs:
     timeout-minutes: 5
     name: Scala Test
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: coursier/setup-action@v3
         with:
           jvm: adoptium:1.21.0.2
@@ -147,7 +147,7 @@ jobs:
         node: [ 20, 22, 24 ]
     name: Node v${{ matrix.node }} Test
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
@@ -201,7 +201,7 @@ jobs:
     timeout-minutes: 15
     name: Scala Build (Native Binary)
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: coursier/setup-action@v3
@@ -241,7 +241,7 @@ jobs:
     timeout-minutes: 15
     name: Publish to Maven Central
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: coursier/setup-action@v3
@@ -277,7 +277,7 @@ jobs:
     timeout-minutes: 15
     name: Publish to NPM
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: coursier/setup-action@v3
@@ -357,7 +357,7 @@ jobs:
     timeout-minutes: 15
     name: Publish GitHub Release
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           name: recheck.jar
@@ -408,7 +408,7 @@ jobs:
     timeout-minutes: 5
     name: Build website
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
