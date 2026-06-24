@@ -343,7 +343,7 @@ lazy val codec = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.recheck.codec.{*, given}
       |""".stripMargin,
     // Dependencies:
-    libraryDependencies += "io.circe" %%% "circe-core" % "0.14.15",
+    libraryDependencies += "io.circe" %%% "circe-core" % "0.14.16",
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "1.3.3" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -410,7 +410,7 @@ lazy val cli = project
       |""".stripMargin,
     // Dependencies:
     libraryDependencies += "com.monovore" %% "decline" % "2.6.2",
-    libraryDependencies += "io.circe" %% "circe-core" % "0.14.15",
+    libraryDependencies += "io.circe" %% "circe-core" % "0.14.16",
     libraryDependencies += "io.circe" %% "circe-generic" % "0.14.15",
     libraryDependencies += "io.circe" %% "circe-parser" % "0.14.15",
     // Settings for test:
