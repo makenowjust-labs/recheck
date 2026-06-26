@@ -368,7 +368,7 @@ lazy val js = project
       |import codes.quine.labs.recheck.*
       |""".stripMargin,
     // Dependencies:
-    libraryDependencies += "io.circe" %%% "circe-scalajs" % "0.14.15",
+    libraryDependencies += "io.circe" %%% "circe-scalajs" % "0.14.16",
     // Settings for test:
     libraryDependencies += "org.scalameta" %%% "munit" % "1.3.3" % Test,
     libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
