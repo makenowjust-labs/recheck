@@ -34,7 +34,7 @@
     "@tsconfig/docusaurus": "2.0.9",
     "@types/node": "24.13.3",
     "prettier": "3.8.5",
-    "typescript": "5.9.3"
+    "typescript": "7.0.2"
   },
   "browserslist": {
     "production": [
