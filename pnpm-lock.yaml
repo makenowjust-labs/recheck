@@ -40,8 +40,8 @@ importers:
         specifier: 3.6.0
         version: 3.6.0(esbuild@0.28.1)(supports-color@8.1.1)
       eslint:
-        specifier: 10.8.0
-        version: 10.8.0(jiti@1.21.7)(supports-color@8.1.1)
+        specifier: 10.8.1
+        version: 10.8.1(jiti@1.21.7)(supports-color@8.1.1)
       jest:
         specifier: 30.4.2
         version: 30.4.2(@types/node@24.13.3)(esbuild-register@3.6.0(esbuild@0.28.1)(supports-color@8.1.1))(supports-color@8.1.1)
@@ -4187,8 +4187,8 @@ packages:
     resolution: {integrity: sha512-tD40eHxA35h0PEIZNeIjkHoDR4YjjJp34biM0mDvplBe//mB+IHCqHDGV7pxF+7MklTvighcCPPZC7ynWyjdTA==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
-  eslint@10.8.0:
-    resolution: {integrity: sha512-nuKKvN+oIBO0koN7Tm7dlkmnkc21mtt0QJLwAKzjLq14y6lRTdVG36MZHJ8eQHwdJMwZbQNMlPOYedMq/oVJvQ==}
+  eslint@10.8.1:
+    resolution: {integrity: sha512-wqA7W2jbsC/BnV9Iv1UZpKVFkO1AdNoSmYW8NWG4HNOBbkAMvIqDZ27pI2f07dqn583NcIC44ckjAcOXDL1QbQ==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
     hasBin: true
     peerDependencies:
@@ -5878,10 +5878,6 @@ packages:
 
   minimalistic-assert@1.0.1:
     resolution: {integrity: sha512-UtJcAD4yEaGtjPezWuO9wC4nwUnVH/8/Im3yEHQP4b67cXlD/Qr9hdITCU1xDbSEXg2XKNaP8jsReV7vQd00/A==}
-
-  minimatch@10.2.4:
-    resolution: {integrity: sha512-oRjTw/97aTBN0RHbYCdtF1MQfvusSIBQM0IZEgzl6426+8jSC0nF1a/GmnVLpfB9yyr6g6FTqWqiZVbxrtaCIg==}
-    engines: {node: 18 || 20 || >=22}
 
   minimatch@10.2.5:
     resolution: {integrity: sha512-MULkVLfKGYDFYejP07QOurDLLQpcjk7Fw+7jXS2R2czRQzR56yHRveU5NDJEOviH+hETZKSkIk5c+T23GjFUMg==}
@@ -10787,9 +10783,9 @@ snapshots:
   '@esbuild/win32-x64@0.28.1':
     optional: true
 
-  '@eslint-community/eslint-utils@4.9.0(eslint@10.8.0(jiti@1.21.7)(supports-color@8.1.1))':
+  '@eslint-community/eslint-utils@4.9.0(eslint@10.8.1(jiti@1.21.7)(supports-color@8.1.1))':
     dependencies:
-      eslint: 10.8.0(jiti@1.21.7)(supports-color@8.1.1)
+      eslint: 10.8.1(jiti@1.21.7)(supports-color@8.1.1)
       eslint-visitor-keys: 3.4.3
 
   '@eslint-community/regexpp@4.12.2': {}
@@ -10798,7 +10794,7 @@ snapshots:
     dependencies:
       '@eslint/object-schema': 3.0.5
       debug: 4.4.3(supports-color@8.1.1)
-      minimatch: 10.2.4
+      minimatch: 10.2.5
     transitivePeerDependencies:
       - supports-color
 
@@ -13594,9 +13590,9 @@ snapshots:
 
   eslint-visitor-keys@5.0.1: {}
 
-  eslint@10.8.0(jiti@1.21.7)(supports-color@8.1.1):
+  eslint@10.8.1(jiti@1.21.7)(supports-color@8.1.1):
     dependencies:
-      '@eslint-community/eslint-utils': 4.9.0(eslint@10.8.0(jiti@1.21.7)(supports-color@8.1.1))
+      '@eslint-community/eslint-utils': 4.9.0(eslint@10.8.1(jiti@1.21.7)(supports-color@8.1.1))
       '@eslint-community/regexpp': 4.12.2
       '@eslint/config-array': 0.23.5(supports-color@8.1.1)
       '@eslint/config-helpers': 0.7.0
@@ -14113,7 +14109,7 @@ snapshots:
 
   glob@13.0.3:
     dependencies:
-      minimatch: 10.2.4
+      minimatch: 10.2.5
       minipass: 7.1.2
       path-scurry: 2.0.1
 
@@ -16060,10 +16056,6 @@ snapshots:
       webpack: 5.106.2(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.6))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(postcss@8.5.6)(uglify-js@3.19.3)
 
   minimalistic-assert@1.0.1: {}
-
-  minimatch@10.2.4:
-    dependencies:
-      brace-expansion: 5.0.8
 
   minimatch@10.2.5:
     dependencies:
