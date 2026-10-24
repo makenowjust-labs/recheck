@@ -1,4 +1,6 @@
 package codes.quine.labs.recheck.cli
+import java.io.InputStreamReader
+import java.nio.charset.StandardCharsets
 import java.time.LocalDateTime
 import scala.concurrent.duration.Duration
 
@@ -307,7 +309,11 @@ object Main:
 
   // $COVERAGE-OFF$
   /** An entrypoint of `recheck` command. */
-  def main(args: Array[String]): Unit = new Main().run(args)
+  def main(args: Array[String]): Unit =
+    // It reads the standard input as UTF-8 to be independent of the platform's default charset (#1910).
+    // For example, a native image on Windows uses the ANSI code page as the default charset.
+    Console.withIn(new InputStreamReader(System.in, StandardCharsets.UTF_8)):
+      new Main().run(args)
   // $COVERAGE-ON$
 
 class Main:

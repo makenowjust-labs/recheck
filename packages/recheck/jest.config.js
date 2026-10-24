@@ -5,6 +5,7 @@ module.exports =
   ({
     roots: ["<rootDir>/src"],
     testMatch: ["**/?(*.)test.+(js|ts)"],
+    testPathIgnorePatterns: ["/node_modules/", "e2e\\.test\\.(?:js|ts)$"],
     moduleNameMapper: {
       "./worker$": "<rootDir>/src/lib/__test__/test-worker.js",
     },
