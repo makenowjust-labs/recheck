@@ -14,7 +14,8 @@ const isProduction = process.env["NODE_ENV"] === "production";
 const makeAllPackagesExternalPlugin: Plugin = {
   name: "make-all-packages-external",
   setup(build: PluginBuild) {
-    const filter = /^[^./]|^\.[^./]|^\.\.[^/]/; // Must not start with "/" or "./" or "../"
+    // Must not start with "/" or "./" or "../" or a drive letter like "D:\"
+    const filter = /^[^./](?:[^:]|$)|^\.[^./]|^\.\.[^/]/;
     build.onResolve({ filter }, (args: OnResolveArgs) => ({
       path: args.path,
       external: true,
@@ -26,7 +27,7 @@ const inlineWorkerPlugin: Plugin = {
   name: "inline-worker",
   setup(build: PluginBuild) {
     const { plugins, ...initialOptions } = build.initialOptions;
-    const filter = /[./]worker\.(?:js|ts)$/;
+    const filter = /[./\\]worker\.(?:js|ts)$/;
     build.onLoad({ filter }, async (args: OnLoadArgs) => {
       const result = await esbuild({
         ...initialOptions,
