@@ -1,4 +1,5 @@
 package codes.quine.labs.recheck.cli
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicBoolean
 
 import cats.syntax.functor.*
@@ -131,11 +132,17 @@ object RPC:
       write(value.asJson.noSpaces)
 
   object IO:
+    /** Returns an IO via the standard input/output.
+      *
+      * Note that it expects `Console.in` to be encoded as UTF-8 (see `Main.main` and #1910).
+      */
     def stdio: IO = new IO:
       def read(): Iterator[String] = Iterator.continually(Console.in.readLine()).takeWhile(_ ne null)
       def write(line: String): Unit = synchronized:
-        Console.out.print(line)
-        Console.out.print("\n")
+        // It writes UTF-8 bytes directly to be independent of the platform's default charset (#1910).
+        val bytes = line.getBytes(StandardCharsets.UTF_8)
+        Console.out.write(bytes, 0, bytes.length)
+        Console.out.write('\n')
         Console.out.flush()
 
   /** Starts RPC server. It blocks the process until input stream are closed. */

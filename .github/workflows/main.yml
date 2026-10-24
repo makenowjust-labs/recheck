@@ -6,8 +6,6 @@ on:
     tags: [v*]
   pull_request: {}
   workflow_dispatch: {}
-  schedule:
-    - cron: '0 0 * * 5'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -174,9 +172,46 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  node-test-e2e:
+    needs: [build, node-lint]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [pure, worker, java]
+    name: Node E2E Test (${{ matrix.backend }})
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: '10'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        with:
+          name: recheck.js
+          path: modules/recheck-js/target/scala-3.7.4/recheck-js-opt/
+      - uses: actions/download-artifact@v8
+        with:
+          name: recheck.jar
+          path: modules/recheck-cli/target/scala-3.7.4/
+      - name: Build
+        run: pnpm --filter recheck run build
+      - name: Test
+        run: pnpm --filter recheck run test:e2e
+        env:
+          RECHECK_BACKEND: ${{ matrix.backend }}
+          RECHECK_JAR: ${{ github.workspace }}/modules/recheck-cli/target/scala-3.7.4/recheck.jar
+
   native-build:
     needs: [build]
-    if: github.event.schedule == '0 0 * * 5' || startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') || github.ref_name == 'main'
     strategy:
       fail-fast: false
       matrix:
@@ -234,6 +269,63 @@ jobs:
           path: ${{ matrix.local_path }}
           name: ${{ matrix.artifact_filename }}
 
+  node-test-e2e-native:
+    needs: [build, node-lint, native-build]
+    if: startsWith(github.ref, 'refs/tags/') || github.ref_name == 'main'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15-intel, macos-15, ubuntu-24.04, ubuntu-24.04-arm, windows-2025]
+        include:
+          - os: macos-15-intel
+            artifact_filename: recheck-darwin-x64
+            bin: recheck
+          - os: macos-15
+            artifact_filename: recheck-darwin-arm64
+            bin: recheck
+          - os: ubuntu-24.04
+            artifact_filename: recheck-linux-x64
+            bin: recheck
+          - os: ubuntu-24.04-arm
+            artifact_filename: recheck-linux-arm64
+            bin: recheck
+          - os: windows-2025
+            artifact_filename: recheck-win32-x64.exe
+            bin: recheck.exe
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    name: Node E2E Test (native)
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: '10'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        with:
+          name: recheck.js
+          path: modules/recheck-js/target/scala-3.7.4/recheck-js-opt/
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix.artifact_filename }}
+          path: modules/recheck-cli/target/native-image/
+      - if: runner.os != 'Windows'
+        name: Make the binary executable
+        run: chmod +x modules/recheck-cli/target/native-image/${{ matrix.bin }}
+      - name: Build
+        run: pnpm --filter recheck run build
+      - name: Test
+        run: pnpm --filter recheck run test:e2e
+        env:
+          RECHECK_BACKEND: native
+          RECHECK_BIN: ${{ github.workspace }}/modules/recheck-cli/target/native-image/${{ matrix.bin }}
+
   maven-release:
     needs: [build, scala-test]
     if: startsWith(github.ref, 'refs/tags/')
@@ -271,7 +363,7 @@ jobs:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
 
   npm-release:
-    needs: [build, native-build, node-test]
+    needs: [build, native-build, node-test, node-test-e2e, node-test-e2e-native]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-26.04
     timeout-minutes: 15
