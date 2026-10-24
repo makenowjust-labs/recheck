@@ -215,12 +215,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15-intel, macos-15, ubuntu-24.04, ubuntu-24.04-arm, windows-2025]
+        os: [macos-26-intel, macos-26, ubuntu-24.04, ubuntu-24.04-arm, windows-2025]
         include:
-          - os: macos-15-intel
+          - os: macos-26-intel
             artifact_filename: recheck-darwin-x64
             local_path: modules/recheck-cli/target/native-image/recheck
-          - os: macos-15
+          - os: macos-26
             artifact_filename: recheck-darwin-arm64
             local_path: modules/recheck-cli/target/native-image/recheck
           - os: ubuntu-24.04
@@ -274,12 +274,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15-intel, macos-15, ubuntu-24.04, ubuntu-24.04-arm, windows-2025]
+        os: [macos-26-intel, macos-26, ubuntu-24.04, ubuntu-24.04-arm, windows-2025]
         include:
-          - os: macos-15-intel
+          - os: macos-26-intel
             artifact_filename: recheck-darwin-x64
             bin: recheck
-          - os: macos-15
+          - os: macos-26
             artifact_filename: recheck-darwin-arm64
             bin: recheck
           - os: ubuntu-24.04

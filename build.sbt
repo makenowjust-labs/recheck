@@ -398,6 +398,12 @@ lazy val cli = project
     nativeImageJvm := "graalvm-community",
     nativeImageVersion := "25.0.1",
     nativeImageOptions += "--no-fallback",
+    // The minimum macOS version of the binary is the build machine's version by default.
+    nativeImageOptions ++= {
+      if (scala.util.Properties.isMac)
+        Seq("-H:+UnlockExperimentalVMOptions", "-H:NativeLinkerOption=-mmacosx-version-min=15.0")
+      else Seq.empty
+    },
     console / initialCommands := """
       |import io.circe.*
       |import io.circe.parser.*
