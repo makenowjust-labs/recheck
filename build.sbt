@@ -377,7 +377,9 @@ lazy val js = project
     // ScalaJS config:
     coverageEnabled := false,
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
-    Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
+    Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) },
+    // Output `recheck.js` to a path independent of the Scala version.
+    Compile / fullLinkJS / scalaJSLinkerOutputDirectory := target.value / "recheck-js-opt"
   )
   .dependsOn(coreJS, codecJS)
 
@@ -391,6 +393,8 @@ lazy val cli = project
     Compile / mainClass := Some("codes.quine.labs.recheck.cli.Main"),
     assembly / mainClass := (Compile / mainClass).value,
     assembly / assemblyJarName := "recheck.jar",
+    // Output `recheck.jar` to a path independent of the Scala version.
+    assembly / assemblyOutputPath := target.value / (assembly / assemblyJarName).value,
     nativeImageVersion := "22.3.0",
     nativeImageJvm := "graalvm-java17",
     nativeImageOptions ++= List(
