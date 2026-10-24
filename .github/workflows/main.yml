@@ -174,7 +174,7 @@ jobs:
 
   node-test-e2e:
     needs: [build, node-lint]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     strategy:
       fail-fast: false
@@ -196,18 +196,18 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: recheck.js
-          path: modules/recheck-js/target/scala-3.7.4/recheck-js-opt/
+          path: modules/recheck-js/target/recheck-js-opt/
       - uses: actions/download-artifact@v8
         with:
           name: recheck.jar
-          path: modules/recheck-cli/target/scala-3.7.4/
+          path: modules/recheck-cli/target/
       - name: Build
         run: pnpm --filter recheck run build
       - name: Test
         run: pnpm --filter recheck run test:e2e
         env:
           RECHECK_BACKEND: ${{ matrix.backend }}
-          RECHECK_JAR: ${{ github.workspace }}/modules/recheck-cli/target/scala-3.7.4/recheck.jar
+          RECHECK_JAR: ${{ github.workspace }}/modules/recheck-cli/target/recheck.jar
 
   native-build:
     needs: [build]
@@ -310,7 +310,7 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: recheck.js
-          path: modules/recheck-js/target/scala-3.7.4/recheck-js-opt/
+          path: modules/recheck-js/target/recheck-js-opt/
       - uses: actions/download-artifact@v8
         with:
           name: ${{ matrix.artifact_filename }}

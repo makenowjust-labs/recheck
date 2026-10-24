@@ -24,6 +24,7 @@
     "format": "prettier -w '*.{js,json,md}' '{scripts,src}/**/*.{js,ts}' index.d.ts",
     "lint": "prettier --check '*.{js,json,md}' '{scripts,src}/**/*.{js,ts}' index.d.ts",
     "test": "SYNCKIT_TS_RUNNER=esbuild-register jest",
+    "test:e2e": "jest -c jest.e2e.config.js --forceExit",
     "typecheck": "tsc --noEmit -p ."
   },
   "sideEffects": false,
