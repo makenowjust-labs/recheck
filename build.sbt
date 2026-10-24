@@ -398,6 +398,8 @@ lazy val cli = project
     nativeImageJvm := "graalvm-community",
     nativeImageVersion := "25.0.1",
     nativeImageOptions += "--no-fallback",
+    // `scala.runtime.LazyVals` uses `sun.misc.Unsafe`, and JDK 24+ warns on its first use (JEP 471).
+    nativeImageOptions += "-Dsun.misc.unsafe.memory.access=allow",
     // The minimum macOS version of the binary is the build machine's version by default.
     nativeImageOptions ++= {
       if (scala.util.Properties.isMac)
