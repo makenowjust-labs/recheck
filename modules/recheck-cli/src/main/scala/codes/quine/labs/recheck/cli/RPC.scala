@@ -20,7 +20,8 @@ import io.circe.syntax.*
   */
 object RPC:
 
-  // $COVERAGE-OFF$ `final val` constant is inlined.
+  // `final val` constant is inlined.
+  // $COVERAGE-OFF$
   /** The supported JSON-RPC version string. */
   final val JsonRPCVersion = "2.0+push"
   // $COVERAGE-ON$
@@ -106,7 +107,8 @@ object RPC:
   final case class Error(code: Int, message: String)
 
   object Error:
-    // $COVERAGE-OFF$ `final val` constant is inlined.
+    // `final val` constant is inlined.
+    // $COVERAGE-OFF$
     final val ParseErrorCode = -32700
     final val InvalidRequestCode = -32600
     final val MethodNotFoundCode = -32601
@@ -272,7 +274,7 @@ object RPC:
         _ <- validateID(optID)
         params <- doDecodeParams(paramsJson)
         () = apply(params)
-      yield None
+      yield ()
 
     private[cli] def validateID(optID: Option[ID]): Result[Unit] =
       optID match
