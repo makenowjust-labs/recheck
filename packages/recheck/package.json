@@ -12,19 +12,55 @@
     "type": "git",
     "url": "https://github.com/makenowjust-labs/recheck.git"
   },
+  "type": "commonjs",
   "main": "index.js",
   "browser": "lib/browser.js",
+  "exports": {
+    ".": {
+      "browser": {
+        "import": {
+          "types": "./index.d.mts",
+          "default": "./lib/browser.mjs"
+        },
+        "default": {
+          "types": "./index.d.ts",
+          "default": "./lib/browser.js"
+        }
+      },
+      "import": {
+        "types": "./index.d.mts",
+        "default": "./index.mjs"
+      },
+      "default": {
+        "types": "./index.d.ts",
+        "default": "./index.js"
+      }
+    },
+    "./lib/browser": {
+      "import": {
+        "types": "./index.d.mts",
+        "default": "./lib/browser.mjs"
+      },
+      "default": {
+        "types": "./index.d.ts",
+        "default": "./lib/browser.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
+    "index.d.mts",
     "index.d.ts",
+    "index.mjs",
     "lib"
   ],
   "scripts": {
     "build": "node -r esbuild-register ./scripts/build.ts",
     "clean": "rimraf lib",
-    "format": "prettier -w '*.{js,json,md}' '{scripts,src}/**/*.{js,ts}' index.d.ts",
-    "lint": "prettier --check '*.{js,json,md}' '{scripts,src}/**/*.{js,ts}' index.d.ts",
+    "format": "prettier -w '*.{js,json,md,mjs}' '{scripts,src}/**/*.{js,ts}' index.d.ts index.d.mts",
+    "lint": "prettier --check '*.{js,json,md,mjs}' '{scripts,src}/**/*.{js,ts}' index.d.ts index.d.mts",
     "test": "SYNCKIT_TS_RUNNER=esbuild-register jest",
-    "test:e2e": "jest -c jest.e2e.config.js --forceExit",
+    "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js -c jest.e2e.config.js --forceExit",
     "typecheck": "tsc --noEmit -p ."
   },
   "sideEffects": false,

@@ -1,15 +1,21 @@
 // End-to-end tests against a real backend.
 //
-// Unlike the other tests, this file tests the built package (`lib/main.js`) without mocking.
+// Unlike the other tests, this file tests the built package through both entry points (`index.js` and `index.mjs`) without mocking.
 // The backend is specified by the `RECHECK_BACKEND` environment variable.
 // It is run by `pnpm run test:e2e` on CI for each backend (`pure`, `worker`, `java` and `native`).
 //
 // For `java` and `native` backends, the `RECHECK_JAR` or `RECHECK_BIN` environment variable should point to the corresponding artifact.
 
-import { check, checkSync } from "..";
+import * as cjs from "../index.js";
+import * as esm from "../index.mjs";
 import * as env from "./lib/env";
 
 import type { Diagnostics } from "..";
+
+const entries = [
+  ["index.js", cjs],
+  ["index.mjs", esm],
+] as const;
 
 const backends: env.Backend[] = ["pure", "worker", "java", "native"];
 const backend = env.RECHECK_BACKEND();
@@ -18,8 +24,6 @@ if (!backends.includes(backend)) {
     `RECHECK_BACKEND must be one of ${backends.join(", ")} (got: ${backend})`,
   );
 }
-
-jest.setTimeout(60 * 1000);
 
 type Case = {
   source: string;
@@ -67,22 +71,25 @@ const expectDiagnostics = (diagnostics: Diagnostics, expected: Case): void => {
   }
 };
 
-describe(`backend: ${backend}`, () => {
-  for (const expected of cases) {
-    const title = `/${expected.source}/${expected.flags}`;
+describe.each(entries)(
+  `backend: ${backend}, entry: %s`,
+  (_, { check, checkSync }) => {
+    for (const expected of cases) {
+      const title = `/${expected.source}/${expected.flags}`;
 
-    test(`check: ${title}`, async () => {
-      const diagnostics = await check(expected.source, expected.flags, {
-        checker: "automaton",
+      test(`check: ${title}`, async () => {
+        const diagnostics = await check(expected.source, expected.flags, {
+          checker: "automaton",
+        });
+        expectDiagnostics(diagnostics, expected);
       });
-      expectDiagnostics(diagnostics, expected);
-    });
 
-    test(`checkSync: ${title}`, () => {
-      const diagnostics = checkSync(expected.source, expected.flags, {
-        checker: "automaton",
+      test(`checkSync: ${title}`, () => {
+        const diagnostics = checkSync(expected.source, expected.flags, {
+          checker: "automaton",
+        });
+        expectDiagnostics(diagnostics, expected);
       });
-      expectDiagnostics(diagnostics, expected);
-    });
-  }
-});
+    }
+  },
+);
