@@ -3,14 +3,14 @@ Global / excludeLintKeys += nativeImageVersion
 Global / excludeLintKeys += nativeImageJvm
 
 ThisBuild / organization := "codes.quine.labs"
-ThisBuild / homepage := Some(url("https://github.com/makenowjust-labs/recheck"))
-ThisBuild / licenses := Seq("MIT" -> url("http://opensource.org/licenses/MIT"))
+ThisBuild / homepage := Some(uri("https://github.com/makenowjust-labs/recheck"))
+ThisBuild / licenses := Seq(License.MIT)
 ThisBuild / developers := List(
   Developer(
     "makenowjust",
     "TSUYUSATO Kitsune",
     "make.just.on@gmail.com",
-    url("https://quine.codes/")
+    uri("https://quine.codes/")
   )
 )
 ThisBuild / versionScheme := Some("early-semver")
