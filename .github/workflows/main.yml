@@ -45,7 +45,7 @@ jobs:
       - id: save-version
         name: Save Version
         run: |
-          version="$(sbt --error "print coreJVM/releaseVersion" | head -n1)"
+          version="$(sbt --server --error "print coreJVM/releaseVersion")"
           echo -n "version=$version"
           echo -n "version=$version" >> $GITHUB_OUTPUT
       - uses: actions/upload-artifact@v7
@@ -355,7 +355,14 @@ jobs:
           path: |
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
+      - id: check-published
+        name: Check whether the version is already published
+        run: |
+          if curl -sfI "https://repo1.maven.org/maven2/codes/quine/labs/recheck-core_3/${{ needs.build.outputs.version }}/" > /dev/null; then
+            echo "published=true" >> $GITHUB_OUTPUT
+          fi
       - name: Publish
+        if: steps.check-published.outputs.published != 'true'
         run: sbt ci-release
         env:
           PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
