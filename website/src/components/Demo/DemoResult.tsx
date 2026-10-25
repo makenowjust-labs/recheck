@@ -80,7 +80,7 @@ const Hotspot: React.FC<{ diagnostics: Extract<DiagnosticsSnapshot, { status: 'v
 };
 
 type Props = {
-  title: string;
+  recorded?: boolean;
   result: DiagnosticsSnapshot | null;
   time: number;
   log: string[];
@@ -90,7 +90,7 @@ type Props = {
   children?: React.ReactNode;
 };
 
-const DemoResult: React.FC<Props> = ({ title, result, time, log, build, date, permalink, children }) => {
+const DemoResult: React.FC<Props> = ({ recorded = false, result, time, log, build, date, permalink, children }) => {
   const logBottomRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     logBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
@@ -212,7 +212,14 @@ const DemoResult: React.FC<Props> = ({ title, result, time, log, build, date, pe
   return (
     <div className="card margin-vert--lg">
       <div className="card__header">
-        <h3>{title}</h3>
+        <h3>
+          Result{' '}
+          {recorded ? (
+            <span className="badge badge--secondary" title="Shown from the permalink">
+              recorded
+            </span>
+          ) : null}
+        </h3>
       </div>
       <div className="card__body">
         <div className="container">

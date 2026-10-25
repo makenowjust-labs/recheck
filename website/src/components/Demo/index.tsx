@@ -128,7 +128,6 @@ const Demo: React.FC = () => {
 
         {running || current !== null ? (
           <DemoResult
-            title={recorded !== null ? 'Current Result' : 'Result'}
             result={current?.result ?? null}
             time={current?.time ?? 0}
             log={log}
@@ -150,7 +149,7 @@ const Demo: React.FC = () => {
 
         {recorded !== null ? (
           <DemoResult
-            title="Recorded Result"
+            recorded
             result={recorded.result}
             time={recorded.time}
             log={[]}

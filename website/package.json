@@ -4,10 +4,11 @@
   "version": "0.0.0",
   "scripts": {
     "doc": "docusaurus build",
-    "format": "prettier -w '*.{js,json}' 'src/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
-    "lint": "prettier --check '*.{js,json}' 'src/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
+    "format": "prettier -w '*.{js,json,ts}' '{src,e2e}/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
+    "lint": "prettier --check '*.{js,json,ts}' '{src,e2e}/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
     "start": "docusaurus start",
     "test": "jest",
+    "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
@@ -32,6 +33,7 @@
     "remark-math": "6.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@types/jest": "30.0.0",
     "@types/node": "24.19.2",
     "@types/react": "19.2.17",
