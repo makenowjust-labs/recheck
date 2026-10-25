@@ -1,12 +1,14 @@
 {
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:base"
+    "config:recommended"
   ],
   "automerge": true,
-  "regexManagers": [
+  "customManagers": [
     {
-      "fileMatch": [
-        "^.scalafmt.conf"
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^.scalafmt.conf/"
       ],
       "matchStrings": [
         "version=(?<currentValue>.*)\n"
@@ -16,8 +18,9 @@
       "depTypeTemplate": "scalafmt"
     },
     {
-      "fileMatch": [
-        "\\.sbt$"
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/\\.sbt$/"
       ],
       "matchStrings": [
         "scalafixDependencies\\s*\\+=\\s*\"(?<orgName>[^\"]*)\"\\s*%%\\s*\"(?<artifactName>[^\"]*)\"\\s*%\\s*\"(?<currentValue>[^\"]*)\""
@@ -27,8 +30,9 @@
       "depTypeTemplate": "scalafix plugin"
     },
     {
-      "fileMatch": [
-        "\\.sbt$"
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/\\.sbt$/"
       ],
       "matchStrings": [
         "addCompilerPlugin\\s*\\(\\s*\"(?<orgName>[^\"]*)\"\\s*%%\\s*\"(?<artifactName>[^\"]*)\"\\s*%\\s*\"(?<currentValue>[^\"]*)\"\\s*\\)"
@@ -36,6 +40,30 @@
       "datasourceTemplate": "maven",
       "depNameTemplate": "{{{ orgName }}}:{{{ artifactName }}}_2.13",
       "depTypeTemplate": "compiler plugin"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/\\.sbt$/"
+      ],
+      "matchStrings": [
+        "\"(?<orgName>[^\"]*)\"\\s*%%\\s*\"(?<artifactName>circe-scalajs)\"\\s*%\\s*\"(?<currentValue>[^\"]*)\""
+      ],
+      "datasourceTemplate": "maven",
+      "depNameTemplate": "{{{ orgName }}}:{{{ artifactName }}}_sjs1_3",
+      "depTypeTemplate": "Scala.js library"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/\\.sbt$/"
+      ],
+      "matchStrings": [
+        "\"(?<orgName>[^\"]*)\"\\s*%%\\s*\"(?<artifactName>scalajs-java-securerandom)\"\\s*%\\s*\"(?<currentValue>[^\"]*)\""
+      ],
+      "datasourceTemplate": "maven",
+      "depNameTemplate": "{{{ orgName }}}:{{{ artifactName }}}_sjs1_2.13",
+      "depTypeTemplate": "Scala.js library"
     }
   ]
 }
