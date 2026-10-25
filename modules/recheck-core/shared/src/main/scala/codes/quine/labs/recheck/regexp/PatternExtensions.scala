@@ -210,7 +210,7 @@ object PatternExtensions:
     /** Tests whether the pattern has implicit `.*?` at end. */
     def needsSigmaStarAtEnd(using ctx: Context): Boolean =
       import pattern.*
-      ctx.interrupt(!flagSet.sticky && (flagSet.multiline || !everyEndPointIsLineEnd))
+      ctx.interrupt(flagSet.multiline || !everyEndPointIsLineEnd)
 
     /** Tests whether the pattern needs word character distinction or not. */
     def needsWordDistinction(using ctx: Context): Boolean = ctx.interrupt:
