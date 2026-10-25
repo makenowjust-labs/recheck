@@ -1,6 +1,5 @@
 import React from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
-import ReactLoading from 'react-loading';
 import * as recheck from 'recheck/lib/browser';
 
 import styles from './Demo.module.css';
@@ -339,7 +338,9 @@ const DemoResult: React.VFC<DemoResultProps> = ({ status, log, diagnostics, time
           <div className="container">
             <div className="row">
               <div className="col col--12 text--center">
-                <ReactLoading type="bars" width={128} color={'var(--ifm-font-color-base)'} className={styles.demoResultLoading} />
+                <div className={styles.demoResultLoading} role="status" aria-label="Loading">
+                  <span /><span /><span /><span />
+                </div>
               </div>
             </div>
             {log.length > 0 ? (
