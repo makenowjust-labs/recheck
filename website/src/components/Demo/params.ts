@@ -1,6 +1,6 @@
-import type { Parameters } from 'recheck';
+import type { Parameters } from "recheck";
 
-export type ParamType = 'duration' | 'float' | 'integer' | { select: string[] };
+export type ParamType = "duration" | "float" | "integer" | { select: string[] };
 
 export type Param = {
   title: string;
@@ -11,177 +11,177 @@ export type Param = {
 
 export const params: Param[] = [
   {
-    name: 'checker',
-    title: 'Checker',
-    defaultValue: 'auto',
-    type: { select: ['auto', 'automaton', 'fuzz'] },
+    name: "checker",
+    title: "Checker",
+    defaultValue: "auto",
+    type: { select: ["auto", "automaton", "fuzz"] },
   },
   {
-    name: 'logger',
-    title: 'Logger',
-    defaultValue: 'off',
-    type: { select: ['on', 'off'] },
+    name: "logger",
+    title: "Logger",
+    defaultValue: "off",
+    type: { select: ["on", "off"] },
   },
   {
-    name: 'timeout',
-    title: 'Timeout',
+    name: "timeout",
+    title: "Timeout",
     defaultValue: 10000,
-    type: 'duration',
+    type: "duration",
   },
   {
-    name: 'accelerationMode',
-    title: 'Acceleration Mode',
-    defaultValue: 'auto',
-    type: { select: ['auto', 'on', 'off'] },
+    name: "accelerationMode",
+    title: "Acceleration Mode",
+    defaultValue: "auto",
+    type: { select: ["auto", "on", "off"] },
   },
   {
-    name: 'attackLimit',
-    title: 'Attack Limit',
+    name: "attackLimit",
+    title: "Attack Limit",
     defaultValue: 1500000000,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'attackTimeout',
-    title: 'Attack Timeout',
+    name: "attackTimeout",
+    title: "Attack Timeout",
     defaultValue: 1000,
-    type: 'duration',
+    type: "duration",
   },
   {
-    name: 'crossoverSize',
-    title: 'Crossover Size',
+    name: "crossoverSize",
+    title: "Crossover Size",
     defaultValue: 25,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'heatRatio',
-    title: 'Heat Ratio',
+    name: "heatRatio",
+    title: "Heat Ratio",
     defaultValue: 0.001,
-    type: 'float',
+    type: "float",
   },
   {
-    name: 'incubationLimit',
-    title: 'Incubation Limit',
+    name: "incubationLimit",
+    title: "Incubation Limit",
     defaultValue: 25000,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'incubationTimeout',
-    title: 'Incubation Timeout',
+    name: "incubationTimeout",
+    title: "Incubation Timeout",
     defaultValue: 250,
-    type: 'duration',
+    type: "duration",
   },
   {
-    name: 'maxAttackStringSize',
-    title: 'Max Attack String Size',
+    name: "maxAttackStringSize",
+    title: "Max Attack String Size",
     defaultValue: 300000,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'maxDegree',
-    title: 'Max Degree',
+    name: "maxDegree",
+    title: "Max Degree",
     defaultValue: 4,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'maxGeneStringSize',
-    title: 'Max Gene String Size',
+    name: "maxGeneStringSize",
+    title: "Max Gene String Size",
     defaultValue: 2400,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'maxGenerationSize',
-    title: 'Max Generation Size',
+    name: "maxGenerationSize",
+    title: "Max Generation Size",
     defaultValue: 100,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'maxInitialGenerationSize',
-    title: 'Max Initial Generation Size',
+    name: "maxInitialGenerationSize",
+    title: "Max Initial Generation Size",
     defaultValue: 500,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'maxIteration',
-    title: 'Max Iteration',
+    name: "maxIteration",
+    title: "Max Iteration",
     defaultValue: 10,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'maxNFASize',
-    title: 'Max NFA Size',
+    name: "maxNFASize",
+    title: "Max NFA Size",
     defaultValue: 35000,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'maxPatternSize',
-    title: 'Max Pattern Size',
+    name: "maxPatternSize",
+    title: "Max Pattern Size",
     defaultValue: 1500,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'maxRecallStringSize',
-    title: 'Max Recall String Size',
+    name: "maxRecallStringSize",
+    title: "Max Recall String Size",
     defaultValue: 300000,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'maxRepeatCount',
-    title: 'Max Repeat Count',
+    name: "maxRepeatCount",
+    title: "Max Repeat Count",
     defaultValue: 30,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'maxSimpleRepeatCount',
-    title: 'Max Simple Repeat Count',
+    name: "maxSimpleRepeatCount",
+    title: "Max Simple Repeat Count",
     defaultValue: 30,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'mutationSize',
-    title: 'Mutation Size',
+    name: "mutationSize",
+    title: "Mutation Size",
     defaultValue: 50,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'randomSeed',
-    title: 'Random Seed',
+    name: "randomSeed",
+    title: "Random Seed",
     defaultValue: 0,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'recallLimit',
-    title: 'Recall Limit',
+    name: "recallLimit",
+    title: "Recall Limit",
     defaultValue: 1500000000,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'recallTimeout',
-    title: 'Recall Timeout',
+    name: "recallTimeout",
+    title: "Recall Timeout",
     defaultValue: -1000,
-    type: 'duration',
+    type: "duration",
   },
   {
-    name: 'seeder',
-    title: 'Seeder',
-    defaultValue: 'static',
-    type: { select: ['static', 'dynamic'] },
+    name: "seeder",
+    title: "Seeder",
+    defaultValue: "static",
+    type: { select: ["static", "dynamic"] },
   },
   {
-    name: 'seedingLimit',
-    title: 'Seeding Limit',
+    name: "seedingLimit",
+    title: "Seeding Limit",
     defaultValue: 1000,
-    type: 'integer',
+    type: "integer",
   },
   {
-    name: 'seedingTimeout',
-    title: 'Seeding Timeout',
+    name: "seedingTimeout",
+    title: "Seeding Timeout",
     defaultValue: 100,
-    type: 'duration',
+    type: "duration",
   },
 ];
 
 /** `logger` is a Playground option rather than a `recheck` parameter. */
-export type CheckParams = Parameters & { logger: 'on' | 'off' };
+export type CheckParams = Parameters & { logger: "on" | "off" };
 
 /** Converts the form values, where numbers are strings, to the parameters. */
 export const parseParams = (values: Record<string, unknown>): CheckParams => {
@@ -189,11 +189,11 @@ export const parseParams = (values: Record<string, unknown>): CheckParams => {
   for (const { name, type, defaultValue } of params) {
     const value = values[name] ?? defaultValue;
     switch (type) {
-      case 'duration':
-      case 'integer':
+      case "duration":
+      case "integer":
         parsed[name] = Number.parseInt(String(value), 10);
         break;
-      case 'float':
+      case "float":
         parsed[name] = Number.parseFloat(String(value));
         break;
       default:
@@ -203,10 +203,12 @@ export const parseParams = (values: Record<string, unknown>): CheckParams => {
   return parsed as CheckParams;
 };
 
-export const extract = (input: string): { source: string; flags: string } | null => {
-  if (!input.startsWith('/')) return null;
+export const extract = (
+  input: string,
+): { source: string; flags: string } | null => {
+  if (!input.startsWith("/")) return null;
 
-  const lastSlashPos = input.lastIndexOf('/');
+  const lastSlashPos = input.lastIndexOf("/");
   if (lastSlashPos === 0) return null;
 
   return {

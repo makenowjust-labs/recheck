@@ -18,9 +18,9 @@ const buildOf = (customFields: Record<string, unknown>): Build => {
 const summarize = (result: Snapshot['result']): string =>
   result.status === 'vulnerable' ? `${result.status} (${result.complexity.summary})` : result.status;
 
-const Demo: React.VFC = () => {
+const Demo: React.FC = () => {
   const { siteConfig } = useDocusaurusContext();
-  const build = buildOf(siteConfig.customFields);
+  const build = buildOf(siteConfig.customFields ?? {});
 
   const methods = useForm();
   const [running, setRunning] = React.useState(false);
@@ -62,7 +62,7 @@ const Demo: React.VFC = () => {
                 console.log(message);
                 setLog((log) => log.concat(message));
               }
-            : null,
+            : undefined,
         signal: controller.signal,
       });
       abortControllerRef.current = null;

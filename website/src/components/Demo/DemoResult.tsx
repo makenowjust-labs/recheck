@@ -8,7 +8,7 @@ import type { Build, Snapshot } from './permalink';
 export const REPORTS_URL = 'https://github.com/makenowjust-labs/recheck/discussions/categories/reports';
 export const REPORTS_EMAIL = 'make.just.on@gmail.com';
 
-const Row: React.FC<{ title: string }> = ({ title, children }) => (
+const Row: React.FC<{ title: string; children?: React.ReactNode }> = ({ title, children }) => (
   <div className="row">
     <div className="col col--3">
       <h4>{title}</h4>
@@ -17,13 +17,13 @@ const Row: React.FC<{ title: string }> = ({ title, children }) => (
   </div>
 );
 
-const Badge: React.VFC<{ kind: string; children: string }> = ({ kind, children }) => (
+const Badge: React.FC<{ kind: string; children: string }> = ({ kind, children }) => (
   <p>
     <span className={`badge badge--${kind}`}>{children}</span>
   </p>
 );
 
-export const CopyButton: React.VFC<{ text: string }> = ({ text }) => {
+export const CopyButton: React.FC<{ text: string }> = ({ text }) => {
   const [copied, setCopied] = React.useState(false);
   const copy = async () => {
     await navigator.clipboard.writeText(text);
@@ -37,7 +37,7 @@ export const CopyButton: React.VFC<{ text: string }> = ({ text }) => {
   );
 };
 
-const Loading: React.VFC = () => (
+const Loading: React.FC = () => (
   <div className="row">
     <div className="col col--12 text--center">
       <div className={styles.demoResultLoading} role="status" aria-label="Loading">
@@ -50,7 +50,7 @@ const Loading: React.VFC = () => (
   </div>
 );
 
-const Hotspot: React.VFC<{ diagnostics: Extract<Snapshot['result'], { status: 'vulnerable' }> }> = ({
+const Hotspot: React.FC<{ diagnostics: Extract<Snapshot['result'], { status: 'vulnerable' }> }> = ({
   diagnostics,
 }) => {
   const spots = [];
@@ -89,7 +89,7 @@ const reportSnippet = (
     `Attack string: ${diagnostics.attack.pattern}`,
   ].join('\n');
 
-const Report: React.VFC<{
+const Report: React.FC<{
   diagnostics: Extract<Snapshot['result'], { status: 'vulnerable' }>;
   build: Build;
   permalink: string;
@@ -121,6 +121,7 @@ type Props = {
   build: Build;
   date: string | null;
   permalink: string | null;
+  children?: React.ReactNode;
 };
 
 const DemoResult: React.FC<Props> = ({ title, result, time, log, build, date, permalink, children }) => {

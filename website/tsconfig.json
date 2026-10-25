@@ -1,4 +1,23 @@
 {
-  "extends": "@tsconfig/docusaurus/tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "esModuleInterop": true,
+    "jsx": "preserve",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "paths": {
+      "@site/*": ["./*"]
+    },
+    "types": [
+      "node",
+      "@docusaurus/module-type-aliases",
+      "@docusaurus/theme-classic"
+    ],
+    "strict": true,
+    "skipLibCheck": true
+  },
   "include": ["src/"]
 }

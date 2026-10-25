@@ -6,7 +6,8 @@
     "doc": "docusaurus build",
     "format": "prettier -w '*.{js,json}' 'src/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
     "lint": "prettier --check '*.{js,json}' 'src/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
-    "start": "docusaurus start"
+    "start": "docusaurus start",
+    "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
     "@algolia/client-search": "^5.0.0",
@@ -30,8 +31,9 @@
     "remark-math": "6.0.0"
   },
   "devDependencies": {
-    "@tsconfig/docusaurus": "2.0.9",
     "@types/node": "24.19.2",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
     "prettier": "3.9.10",
     "typescript": "7.0.2"
   },

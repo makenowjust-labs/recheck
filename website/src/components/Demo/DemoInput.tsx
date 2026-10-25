@@ -7,7 +7,7 @@ import { params } from './params';
 
 import type { Param } from './params';
 
-const ParamInput: React.VFC<Param> = ({ name, defaultValue, type }) => {
+const ParamInput: React.FC<Param> = ({ name, defaultValue, type }) => {
   if (type === 'duration') {
     return <NumberInput name={name} defaultValue={defaultValue} step={100} />;
   }
@@ -20,7 +20,7 @@ const ParamInput: React.VFC<Param> = ({ name, defaultValue, type }) => {
   return <Select name={name} values={type.select} defaultValue={String(defaultValue)} />;
 };
 
-const DemoParams: React.VFC = () => (
+const DemoParams: React.FC = () => (
   <details>
     <summary>Parameters</summary>
 
@@ -45,7 +45,7 @@ type Props = {
   running: boolean;
 };
 
-const DemoInput: React.VFC<Props> = ({ check, cancel, running }) => (
+const DemoInput: React.FC<Props> = ({ check, cancel, running }) => (
   <div className="card margin-vert--lg">
     <div className="card__header">
       <h3>RegExp</h3>

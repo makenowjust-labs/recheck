@@ -5,11 +5,12 @@ import { useController, useFormContext } from 'react-hook-form';
 import styles from './Select.module.css';
 
 type Props = {
+  name: string;
   values: string[];
   defaultValue: string;
 } & React.SelectHTMLAttributes<HTMLSelectElement>;
 
-const Select: React.VFC<Props> = ({ name, values, defaultValue, className, ...props }) => {
+const Select: React.FC<Props> = ({ name, values, defaultValue, className, ...props }) => {
   const { control } = useFormContext();
   const { field } = useController({
     control,
