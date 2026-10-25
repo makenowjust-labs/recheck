@@ -241,7 +241,7 @@ jobs:
           fetch-depth: 0
       - uses: coursier/setup-action@v3
         with:
-          jvm: adoptium:1.21.0.2
+          jvm: graalvm-community:25.0.1
           apps: sbt
       - name: Cache SBT
         uses: actions/cache@v6
@@ -263,6 +263,8 @@ jobs:
         with:
           arch: x64
       - run: sbt cli/nativeImage
+        env:
+          NATIVE_IMAGE_INSTALLED: true
       - uses: actions/upload-artifact@v7
         with:
           path: ${{ matrix.local_path }}
