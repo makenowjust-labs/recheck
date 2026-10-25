@@ -36,6 +36,28 @@
       "datasourceTemplate": "maven",
       "depNameTemplate": "{{{ orgName }}}:{{{ artifactName }}}_2.13",
       "depTypeTemplate": "compiler plugin"
+    },
+    {
+      "fileMatch": [
+        "\\.sbt$"
+      ],
+      "matchStrings": [
+        "\"(?<orgName>[^\"]*)\"\\s*%%\\s*\"(?<artifactName>circe-scalajs)\"\\s*%\\s*\"(?<currentValue>[^\"]*)\""
+      ],
+      "datasourceTemplate": "maven",
+      "depNameTemplate": "{{{ orgName }}}:{{{ artifactName }}}_sjs1_3",
+      "depTypeTemplate": "Scala.js library"
+    },
+    {
+      "fileMatch": [
+        "\\.sbt$"
+      ],
+      "matchStrings": [
+        "\"(?<orgName>[^\"]*)\"\\s*%%\\s*\"(?<artifactName>scalajs-java-securerandom)\"\\s*%\\s*\"(?<currentValue>[^\"]*)\""
+      ],
+      "datasourceTemplate": "maven",
+      "depNameTemplate": "{{{ orgName }}}:{{{ artifactName }}}_sjs1_2.13",
+      "depTypeTemplate": "Scala.js library"
     }
   ]
 }
