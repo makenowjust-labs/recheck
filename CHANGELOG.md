@@ -1,5 +1,9 @@
 # dev
 
+New Features:
+
+- [#1931](https://github.com/makenowjust-labs/recheck/pull/1931) Fix #1831: add permalinks to the Playground  ([@makenowjust](https://github.com/makenowjust))
+
 Misc:
 
 - [#1930](https://github.com/makenowjust-labs/recheck/pull/1930) Improve CI cache ([@makenowjust](https://github.com/makenowjust))
