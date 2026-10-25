@@ -37,12 +37,5 @@
       "depNameTemplate": "{{{ orgName }}}:{{{ artifactName }}}_2.13",
       "depTypeTemplate": "compiler plugin"
     }
-  ],
-  "ignoreDeps": [
-    "hast-util-is-element",
-    "react",
-    "react-dom",
-    "rehype-katex",
-    "remark-math"
   ]
 }

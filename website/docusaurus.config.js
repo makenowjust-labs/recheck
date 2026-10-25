@@ -1,8 +1,8 @@
 // @ts-check
 
-const math = require("remark-math");
-const katex = require("rehype-katex");
-const { themes } = require("prism-react-renderer");
+import { themes } from "prism-react-renderer";
+import katex from "rehype-katex";
+import math from "remark-math";
 
 const { github: lightCodeTheme, dracula: darkCodeTheme } = themes;
 
@@ -31,7 +31,7 @@ const config = {
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
         docs: {
-          sidebarPath: require.resolve("./sidebars.js"),
+          sidebarPath: "./sidebars.js",
           editUrl:
             "https://github.com/makenowjust-labs/recheck/tree/main/website",
           remarkPlugins: [math],
@@ -45,7 +45,7 @@ const config = {
           rehypePlugins: [katex],
         },
         theme: {
-          customCss: require.resolve("./src/css/custom.css"),
+          customCss: "./src/css/custom.css",
         },
         gtag: {
           trackingID: "G-GY3CQZBPM2",
@@ -156,9 +156,9 @@ const config = {
 
   stylesheets: [
     {
-      href: "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css",
+      href: "https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/katex.min.css",
       integrity:
-        "sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV",
+        "sha384-nH0MfJ44wi1dd7w6jinlyBgljjS8EJAh2JBoRad8a3VDw2K69vfaaqm4WnR+gXtA",
       crossorigin: "anonymous",
     },
   ],
@@ -168,4 +168,4 @@ const config = {
   },
 };
 
-module.exports = config;
+export default config;
