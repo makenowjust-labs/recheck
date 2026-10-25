@@ -30,6 +30,38 @@ test("strategy: default (automaton)", () => {
   });
 });
 
+test("broken cache file is ignored", () => {
+  fs.writeFileSync(cacheFile, '{"settings":');
+  const checker = createCachedCheck({ location: cacheFile }, null, {
+    checker: "automaton",
+  });
+
+  const result = checker("^a$", "");
+  expect(JSON.parse(fs.readFileSync(cacheFile, "utf-8")).results).toEqual({
+    "/^a$/": result,
+  });
+});
+
+test("cache file with different settings is replaced", () => {
+  const checker1 = createCachedCheck({ location: cacheFile }, null, {
+    checker: "automaton",
+  });
+  checker1("^a$", "");
+
+  const checker2 = createCachedCheck({ location: cacheFile }, 1000, {
+    checker: "automaton",
+  });
+  const result = checker2("^b$", "");
+  expect(JSON.parse(fs.readFileSync(cacheFile, "utf-8")).results).toEqual({
+    "/^b$/": result,
+  });
+  expect(
+    fs
+      .readdirSync(cacheDir)
+      .filter((name) => name.startsWith(path.basename(cacheFile) + ".")),
+  ).toEqual([]);
+});
+
 test("strategy: default (fuzz)", () => {
   const checker = createCachedCheck({ location: cacheFile }, null, {
     checker: "fuzz",
