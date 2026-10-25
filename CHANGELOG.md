@@ -36,6 +36,7 @@ Misc:
 - [#1682](https://github.com/makenowjust-labs/recheck/pull/1682) Update icu4j to 78.2 ([@makenowjust](https://github.com/makenowjust))
 - [#1913](https://github.com/makenowjust-labs/recheck/pull/1913) Update scala to 3.8.4 ([@makenowjust](https://github.com/makenowjust))
 - [#1914](https://github.com/makenowjust-labs/recheck/pull/1914) Fix test on Windows CI and update CI macos version ([@makenowjust](https://github.com/makenowjust))
+- [#1916](https://github.com/makenowjust-labs/recheck/pull/1916) Update website dependencies and use the workspace protocol ([@makenowjust](https://github.com/makenowjust))
 
 # 4.5.0 (2025-03-02)
 
