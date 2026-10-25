@@ -8,7 +8,6 @@ import math from "remark-math";
 
 const { github: lightCodeTheme, dracula: darkCodeTheme } = themes;
 
-// The stylesheet is resolved from `rehype-katex` so that it always matches the KaTeX version used for rendering.
 const katexCss = createRequire(
   createRequire(import.meta.url).resolve("rehype-katex"),
 ).resolve("katex/dist/katex.min.css");
