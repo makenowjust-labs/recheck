@@ -167,7 +167,7 @@ jobs:
       - name: Build
         run: pnpm -r run build
       - name: Test
-        run: pnpm exec lerna run test -- --coverage --forceExit --detectOpenHandles
+        run: pnpm -r run test --coverage --forceExit --detectOpenHandles
       - uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -442,7 +442,7 @@ jobs:
       - name: Build
         run: NODE_ENV=production pnpm -r run build
       - name: Version
-        run: pnpm exec lerna version ${{ needs.build.outputs.version }} --yes
+        run: pnpm -r version ${{ needs.build.outputs.version }}
       # The version bump above is never committed, so the git checks cannot pass.
       - name: Publish (beta)
         if: contains(github.ref, '-beta')

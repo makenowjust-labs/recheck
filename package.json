@@ -1,8 +1,5 @@
 {
   "private": true,
   "name": "recheck",
-  "version": "0.0.0",
-  "devDependencies": {
-    "lerna": "10.1.1"
-  }
+  "version": "0.0.0"
 }
