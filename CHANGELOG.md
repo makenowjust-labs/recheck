@@ -1,9 +1,3 @@
-# dev
-
-Misc:
-
-- [#1928](https://github.com/makenowjust-labs/recheck/pull/1928) Publish only the packages missing from npm ([@makenowjust](https://github.com/makenowjust))
-
 # 4.6.1 (2026-10-25)
 
 New Features:
@@ -14,6 +8,7 @@ Misc:
 
 - [#1925](https://github.com/makenowjust-labs/recheck/pull/1925) Add codecov.yml ([@makenowjust](https://github.com/makenowjust))
 - [#1926](https://github.com/makenowjust-labs/recheck/pull/1926) Retire scala steward ([@makenowjust](https://github.com/makenowjust))
+- [#1928](https://github.com/makenowjust-labs/recheck/pull/1928) Publish only the packages missing from npm ([@makenowjust](https://github.com/makenowjust))
 
 # 4.6.0 (2026-10-25)
 
