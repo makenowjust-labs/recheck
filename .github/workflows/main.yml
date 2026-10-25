@@ -41,7 +41,7 @@ jobs:
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
       - name: Build
-        run: sbt compile js/fullLinkJS cli/assembly
+        run: sbt "compile; js/fullLinkJS; cli/assembly"
       - id: save-version
         name: Save Version
         run: |
@@ -50,11 +50,11 @@ jobs:
           echo -n "version=$version" >> $GITHUB_OUTPUT
       - uses: actions/upload-artifact@v7
         with:
-          path: modules/recheck-js/target/recheck-js-opt/recheck.js
+          path: target/recheck-js-opt/recheck.js
           name: recheck.js
       - uses: actions/upload-artifact@v7
         with:
-          path: modules/recheck-cli/target/recheck.jar
+          path: target/recheck.jar
           name: recheck.jar
 
   scala-lint:
@@ -83,7 +83,7 @@ jobs:
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
       - name: Lint
-        run: sbt scalafmtCheckAll scalafmtSbtCheck 'scalafixAll --check'
+        run: sbt "scalafmtCheckAll; scalafmtSbtCheck; scalafixAll --check"
 
   node-lint:
     runs-on: ubuntu-26.04
@@ -131,7 +131,7 @@ jobs:
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
       - name: Test
-        run: sbt coverage test coverageAggregate
+        run: sbt "coverage; test; coverageAggregate"
       - uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -159,11 +159,11 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: recheck.js
-          path: modules/recheck-js/target/recheck-js-opt/
+          path: target/recheck-js-opt/
       - uses: actions/download-artifact@v8
         with:
           name: recheck.jar
-          path: modules/recheck-cli/target/
+          path: target/
       - name: Build
         run: pnpm -r run build
       - name: Test
@@ -196,18 +196,18 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: recheck.js
-          path: modules/recheck-js/target/recheck-js-opt/
+          path: target/recheck-js-opt/
       - uses: actions/download-artifact@v8
         with:
           name: recheck.jar
-          path: modules/recheck-cli/target/
+          path: target/
       - name: Build
         run: pnpm --filter recheck run build
       - name: Test
         run: pnpm --filter recheck run test:e2e
         env:
           RECHECK_BACKEND: ${{ matrix.backend }}
-          RECHECK_JAR: ${{ github.workspace }}/modules/recheck-cli/target/recheck.jar
+          RECHECK_JAR: ${{ github.workspace }}/target/recheck.jar
 
   native-build:
     needs: [build]
@@ -219,19 +219,19 @@ jobs:
         include:
           - os: macos-26-intel
             artifact_filename: recheck-darwin-x64
-            local_path: modules/recheck-cli/target/native-image/recheck
+            local_path: target/native-image/recheck
           - os: macos-26
             artifact_filename: recheck-darwin-arm64
-            local_path: modules/recheck-cli/target/native-image/recheck
+            local_path: target/native-image/recheck
           - os: ubuntu-24.04
             artifact_filename: recheck-linux-x64
-            local_path: modules/recheck-cli/target/native-image/recheck
+            local_path: target/native-image/recheck
           - os: ubuntu-24.04-arm
             artifact_filename: recheck-linux-arm64
-            local_path: modules/recheck-cli/target/native-image/recheck
+            local_path: target/native-image/recheck
           - os: windows-2025
             artifact_filename: recheck-win32-x64.exe
-            local_path: modules/recheck-cli/target/native-image/recheck.exe
+            local_path: target/native-image/recheck.exe
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     name: Scala Build (Native Binary)
@@ -241,7 +241,7 @@ jobs:
           fetch-depth: 0
       - uses: coursier/setup-action@v3
         with:
-          jvm: adoptium:1.21.0.2
+          jvm: graalvm-community:25.0.1
           apps: sbt
       - name: Cache SBT
         uses: actions/cache@v6
@@ -263,6 +263,8 @@ jobs:
         with:
           arch: x64
       - run: sbt cli/nativeImage
+        env:
+          NATIVE_IMAGE_INSTALLED: true
       - uses: actions/upload-artifact@v7
         with:
           path: ${{ matrix.local_path }}
@@ -309,21 +311,21 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: recheck.js
-          path: modules/recheck-js/target/recheck-js-opt/
+          path: target/recheck-js-opt/
       - uses: actions/download-artifact@v8
         with:
           name: ${{ matrix.artifact_filename }}
-          path: modules/recheck-cli/target/native-image/
+          path: target/native-image/
       - if: runner.os != 'Windows'
         name: Make the binary executable
-        run: chmod +x modules/recheck-cli/target/native-image/${{ matrix.bin }}
+        run: chmod +x target/native-image/${{ matrix.bin }}
       - name: Build
         run: pnpm --filter recheck run build
       - name: Test
         run: pnpm --filter recheck run test:e2e
         env:
           RECHECK_BACKEND: native
-          RECHECK_BIN: ${{ github.workspace }}/modules/recheck-cli/target/native-image/${{ matrix.bin }}
+          RECHECK_BIN: ${{ github.workspace }}/target/native-image/${{ matrix.bin }}
 
   maven-release:
     needs: [build, scala-test]
@@ -403,7 +405,7 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: recheck.js
-          path: modules/recheck-js/target/recheck-js-opt/
+          path: target/recheck-js-opt/
       - uses: actions/download-artifact@v8
         with:
           name: recheck.jar
@@ -511,7 +513,7 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: recheck.js
-          path: modules/recheck-js/target/recheck-js-opt/
+          path: target/recheck-js-opt/
       - name: Install
         run: pnpm install --frozen-lockfile
       - name: Build

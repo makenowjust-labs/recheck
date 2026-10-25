@@ -1,5 +1,5 @@
 // @ts-expect-error
-import * as bundle from "../../../../modules/recheck-js/target/recheck-js-opt/recheck.js";
+import * as bundle from "../../../../target/recheck-js-opt/recheck.js";
 
 import type { Diagnostics, Parameters } from "../..";
 

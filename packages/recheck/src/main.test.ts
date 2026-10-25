@@ -6,8 +6,8 @@ import * as env from "./lib/env";
 import * as java from "./lib/java";
 import * as native from "./lib/native";
 
-const RECHECK_JAR = `${__dirname}/../../../modules/recheck-cli/target/recheck.jar`;
-const RECHECK_BIN = `${__dirname}/../../../modules/recheck-cli/target/native-image/recheck`;
+const RECHECK_JAR = `${__dirname}/../../../target/recheck.jar`;
+const RECHECK_BIN = `${__dirname}/../../../target/native-image/recheck`;
 
 jest.setTimeout(30 * 1000);
 

@@ -15,7 +15,7 @@ ThisBuild / developers := List(
 )
 ThisBuild / versionScheme := Some("early-semver")
 
-ThisBuild / scalaVersion := "3.8.4"
+ThisBuild / scalaVersion := "3.10.0"
 ThisBuild / scalacOptions ++= Seq(
   "-encoding",
   "UTF-8",
@@ -210,12 +210,12 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |  time("check")(ReDoS.check(source, flags, params))
       |""".stripMargin,
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "1.3.6" % Test,
+    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
     coverageEnabled := false,
-    libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
+    libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
   .dependsOn(common, exec, unicode, parse)
@@ -231,14 +231,14 @@ lazy val common = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.recheck.common.*
       |""".stripMargin,
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "1.3.6" % Test,
+    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
     // `coverage` is not supported in Scala.js with Scala 3 yet.
     // See https://github.com/scoverage/sbt-scoverage/issues/629.
     coverageEnabled := false,
-    libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
+    libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
 
@@ -253,12 +253,12 @@ lazy val exec = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.recheck.exec._
       |""".stripMargin,
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "1.3.6" % Test,
+    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
     coverageEnabled := false,
-    libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
+    libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
   .dependsOn(common)
@@ -278,31 +278,29 @@ lazy val unicode = crossProject(JVMPlatform, JSPlatform)
       val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
       Seq(
         Compile / sourceGenerators += generateUnicodeData.taskValue,
-        generateUnicodeData / fileInputs += baseDirectory.value.toGlob / ".." / ".." / ".." / "project" / "*DataGen.scala",
-        generateUnicodeData := {
+        generateUnicodeData := Def.uncached {
           val gens = Map[String, UnicodeDataGen](
             "CaseMapDataGen.scala" -> CaseMapDataGen,
             "PropertyDataGen.scala" -> PropertyDataGen
           )
           val pkg = "codes.quine.labs.recheck.unicode"
           val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labs" / "recheck" / "unicode"
-          val changes = generateUnicodeData.inputFileChanges
-          val updatedPaths = changes.created ++ changes.modified
-          for (path <- updatedPaths) {
-            val fileName = path.getFileName.toString
-            gens.get(fileName).foreach(_.gen(pkg, dir))
+          val projectDir = (ThisBuild / baseDirectory).value / "project"
+          for ((fileName, gen) <- gens) {
+            val output = gen.file(dir)
+            if (!output.exists() || (projectDir / fileName).lastModified() > output.lastModified()) gen.gen(pkg, dir)
           }
-          gens.map(_._2.file(dir)).toSeq
+          gens.values.map(_.file(dir)).toSeq
         }
       )
     },
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "1.3.6" % Test,
+    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
     coverageEnabled := false,
-    libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
+    libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
 
@@ -317,14 +315,14 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.recheck.regexp.*
       |""".stripMargin,
     // Dependencies:
-    libraryDependencies += "com.lihaoyi" %%% "fastparse" % "3.1.1",
+    libraryDependencies += "com.lihaoyi" %% "fastparse" % "3.1.1",
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "1.3.6" % Test,
+    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
     coverageEnabled := false,
-    libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
+    libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
   .dependsOn(unicode)
@@ -343,14 +341,14 @@ lazy val codec = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.recheck.codec.{*, given}
       |""".stripMargin,
     // Dependencies:
-    libraryDependencies += "io.circe" %%% "circe-core" % "0.14.17",
+    libraryDependencies += "io.circe" %% "circe-core" % "0.14.17",
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "1.3.6" % Test,
+    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
   .jsSettings(
     coverageEnabled := false,
-    libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
+    libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
   .dependsOn(core)
@@ -368,10 +366,10 @@ lazy val js = project
       |import codes.quine.labs.recheck.*
       |""".stripMargin,
     // Dependencies:
-    libraryDependencies += "io.circe" %%% "circe-scalajs" % "0.14.17",
+    libraryDependencies += "io.circe" %% "circe-scalajs" % "0.14.17",
     // Settings for test:
-    libraryDependencies += "org.scalameta" %%% "munit" % "1.3.6" % Test,
-    libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
+    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
+    libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13),
     testFrameworks += new TestFramework("munit.Framework"),
     // ScalaJS config:
@@ -379,7 +377,7 @@ lazy val js = project
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) },
     // Output `recheck.js` to a path independent of the Scala version.
-    Compile / fullLinkJS / scalaJSLinkerOutputDirectory := target.value / "recheck-js-opt"
+    Compile / fullLinkJS / scalaJSLinkerOutputDirectory := (ThisBuild / baseDirectory).value / "target" / "recheck-js-opt"
   )
   .dependsOn(coreJS, codecJS)
 
@@ -394,7 +392,8 @@ lazy val cli = project
     assembly / mainClass := (Compile / mainClass).value,
     assembly / assemblyJarName := "recheck.jar",
     // Output `recheck.jar` to a path independent of the Scala version.
-    assembly / assemblyOutputPath := target.value / (assembly / assemblyJarName).value,
+    assembly / assemblyOutputPath := (ThisBuild / baseDirectory).value / "target" / (assembly / assemblyJarName).value,
+    NativeImage / target := (ThisBuild / baseDirectory).value / "target" / "native-image",
     nativeImageJvm := "graalvm-community",
     nativeImageVersion := "25.0.1",
     nativeImageOptions += "--no-fallback",

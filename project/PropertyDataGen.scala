@@ -288,8 +288,8 @@ object PropertyDataGen extends UnicodeDataGen {
     }
     sb.append("  )\n")
     for (value <- GeneralCategoryValues) {
-      val enum = UCharacter.getPropertyValueEnum(UProperty.GENERAL_CATEGORY, value)
-      val uset = new UnicodeSet().applyIntPropertyValue(UProperty.GENERAL_CATEGORY, enum)
+      val valueEnum = UCharacter.getPropertyValueEnum(UProperty.GENERAL_CATEGORY, value)
+      val uset = new UnicodeSet().applyIntPropertyValue(UProperty.GENERAL_CATEGORY, valueEnum)
       sb.append(s"  private lazy val GeneralCategory_$value = IntervalSet.from(${build(uset)}).map(UChar(_))\n")
     }
     sb.append("\n")
@@ -301,8 +301,8 @@ object PropertyDataGen extends UnicodeDataGen {
     }
     sb.append("  )\n")
     for (value <- ScriptValues) {
-      val enum = UCharacter.getPropertyValueEnum(UProperty.SCRIPT, value)
-      val uset = new UnicodeSet().applyIntPropertyValue(UProperty.SCRIPT, enum)
+      val valueEnum = UCharacter.getPropertyValueEnum(UProperty.SCRIPT, value)
+      val uset = new UnicodeSet().applyIntPropertyValue(UProperty.SCRIPT, valueEnum)
       sb.append(s"  private lazy val Script_$value = IntervalSet.from(${build(uset)}).map(UChar(_))\n")
     }
     sb.append("\n")
@@ -314,8 +314,8 @@ object PropertyDataGen extends UnicodeDataGen {
     }
     sb.append("  )\n")
     for (value <- ScriptValues) {
-      val enum = UCharacter.getPropertyValueEnum(UProperty.SCRIPT, value)
-      val uset = new UnicodeSet().applyIntPropertyValue(UProperty.SCRIPT_EXTENSIONS, enum)
+      val valueEnum = UCharacter.getPropertyValueEnum(UProperty.SCRIPT, value)
+      val uset = new UnicodeSet().applyIntPropertyValue(UProperty.SCRIPT_EXTENSIONS, valueEnum)
       sb.append(s"  private lazy val ScriptExtensions_$value = IntervalSet.from(${build(uset)}).map(UChar(_))\n")
     }
 

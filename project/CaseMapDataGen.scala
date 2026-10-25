@@ -24,7 +24,7 @@ object CaseMapDataGen extends UnicodeDataGen {
         }
       }
     }
-    map.groupBy(_._2).mapValues(_.keys.toSeq)
+    map.groupBy(_._2).map((d, m) => d -> m.keys.toSeq)
   }
 
   /** Upper case conversion mappings. */
