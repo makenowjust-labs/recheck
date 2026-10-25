@@ -32,9 +32,6 @@ importers:
       esbuild-jest:
         specifier: 0.5.0
         version: 0.5.0(esbuild@0.28.2)(supports-color@8.1.1)
-      esbuild-register:
-        specifier: 3.6.0
-        version: 3.6.0(esbuild@0.28.2)(supports-color@8.1.1)
       eslint:
         specifier: 10.13.0
         version: 10.13.0(jiti@1.21.7)(supports-color@8.1.1)
@@ -69,9 +66,6 @@ importers:
       esbuild-jest:
         specifier: 0.5.0
         version: 0.5.0(esbuild@0.28.2)(supports-color@8.1.1)
-      esbuild-register:
-        specifier: 3.6.0
-        version: 3.6.0(esbuild@0.28.2)(supports-color@8.1.1)
       jest:
         specifier: 30.5.2
         version: 30.5.2(@types/node@24.19.2)(esbuild-register@3.6.0(esbuild@0.28.2)(supports-color@8.1.1))(supports-color@8.1.1)
@@ -12094,6 +12088,7 @@ snapshots:
       esbuild: 0.28.2
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   esbuild@0.28.2:
     optionalDependencies:
