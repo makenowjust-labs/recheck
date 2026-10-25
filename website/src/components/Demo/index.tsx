@@ -7,9 +7,9 @@ import { loadChecker } from './checker';
 import DemoInput from './DemoInput';
 import DemoResult from './DemoResult';
 import { extract, parseParams } from './params';
-import { decode, encode, sameRequest, summarize } from './permalink';
+import { decode, encode, sameRequest, summarize, toResult } from './permalink';
 
-import type { Snapshot } from './permalink';
+import type { Result, Snapshot } from './permalink';
 
 const Demo: React.FC = () => {
   const { siteConfig } = useDocusaurusContext();
@@ -60,24 +60,26 @@ const Demo: React.FC = () => {
     }
 
     const start = Date.now();
-    let result: Snapshot['result'];
+    let result: Result;
     if (extracted === null) {
       result = { input, status: 'invalid' };
     } else {
       const { logger, ...checkParams } = params;
       const controller = new AbortController();
       abortControllerRef.current = controller;
-      result = await checker.check(extracted.source, extracted.flags, {
-        ...checkParams,
-        logger:
-          logger === 'on'
-            ? (message: string) => {
-                console.log(message);
-                setLog((log) => log.concat(message));
-              }
-            : undefined,
-        signal: controller.signal,
-      });
+      result = toResult(
+        await checker.check(extracted.source, extracted.flags, {
+          ...checkParams,
+          logger:
+            logger === 'on'
+              ? (message: string) => {
+                  console.log(message);
+                  setLog((log) => log.concat(message));
+                }
+              : undefined,
+          signal: controller.signal,
+        }),
+      );
       abortControllerRef.current = null;
     }
 

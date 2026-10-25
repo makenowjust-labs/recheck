@@ -4,7 +4,7 @@ import { formatBuild } from './builds';
 import styles from './Demo.module.css';
 
 import type { Build } from './builds';
-import type { Snapshot } from './permalink';
+import type { Result } from './permalink';
 
 const REPORTS_URL = 'https://github.com/makenowjust-labs/recheck/discussions/categories/reports';
 const REPORTS_EMAIL = 'make.just.on@gmail.com';
@@ -52,7 +52,7 @@ const Loading: React.FC = () => (
   </div>
 );
 
-const Hotspot: React.FC<{ diagnostics: Extract<Snapshot['result'], { status: 'vulnerable' }> }> = ({
+const Hotspot: React.FC<{ diagnostics: Extract<Result, { status: 'vulnerable' }> }> = ({
   diagnostics,
 }) => {
   const spots = [];
@@ -81,7 +81,7 @@ const Hotspot: React.FC<{ diagnostics: Extract<Snapshot['result'], { status: 'vu
 
 type Props = {
   title: string;
-  result: Snapshot['result'] | null;
+  result: Result | null;
   time: number;
   log: string[];
   build: Build;
