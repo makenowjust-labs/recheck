@@ -1,3 +1,9 @@
+# dev
+
+Misc:
+
+- [#1928](https://github.com/makenowjust-labs/recheck/pull/1928) Publish only the packages missing from npm ([@makenowjust](https://github.com/makenowjust))
+
 # 4.6.1 (2026-10-25)
 
 New Features:
