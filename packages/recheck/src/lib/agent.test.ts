@@ -1,8 +1,13 @@
-import { StdioNull, StdioPipe } from "child_process";
+import { fileURLToPath } from "node:url";
+
 import { check as checkAgent, start as startAgent, Agent } from "./agent";
 
-const invalid = `${__dirname}/__test__/invalid.js`;
-const testAgent = `${__dirname}/__test__/test-agent.js`;
+import type { StdioNull, StdioPipe } from "child_process";
+
+const invalid = fileURLToPath(new URL("__test__/invalid.js", import.meta.url));
+const testAgent = fileURLToPath(
+  new URL("__test__/test-agent.js", import.meta.url),
+);
 
 let agent: Agent | null = null;
 const start = async (

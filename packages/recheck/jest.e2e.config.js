@@ -8,10 +8,8 @@ module.exports =
   ({
     roots: ["<rootDir>/src"],
     testMatch: ["**/?(*.)e2e.test.+(js|ts)"],
+    transform: {},
     extensionsToTreatAsEsm: [".ts"],
-    transform: {
-      "\\.ts$": ["esbuild-jest", { sourcemap: true, format: "esm" }],
-    },
     testTimeout: 60 * 1000,
     verbose: true,
   });

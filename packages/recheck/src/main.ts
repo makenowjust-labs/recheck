@@ -2,6 +2,7 @@ import { createSyncFn } from "synckit";
 
 import { check as checkAgent } from "./lib/agent";
 import * as env from "./lib/env";
+import { nodeRequire } from "./require";
 import * as java from "./lib/java";
 import * as native from "./lib/native";
 import * as pure from "./lib/pure";
@@ -126,7 +127,7 @@ export const checkSync = (
     case "synckit":
       if (syncFnCache === null) {
         syncFnCache = createSyncFn<typeof check>(
-          require.resolve("./synckit-worker"),
+          nodeRequire.resolve("./synckit-worker"),
         );
       }
       syncFn = syncFnCache;

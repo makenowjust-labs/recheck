@@ -1,6 +1,6 @@
-import { spawn, StdioNull, StdioPipe } from "child_process";
+import { spawn } from "child_process";
 
-import type { ChildProcess } from "child_process";
+import type { ChildProcess, StdioNull, StdioPipe } from "child_process";
 
 import type { Diagnostics, HasAbortSignal, Parameters } from "../..";
 
