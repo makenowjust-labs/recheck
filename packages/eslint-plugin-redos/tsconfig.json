@@ -4,6 +4,7 @@
     "module": "commonjs",
     "resolveJsonModule": true,
     "esModuleInterop": true,
+    "types": ["jest", "node"],
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
