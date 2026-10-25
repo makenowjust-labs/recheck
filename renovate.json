@@ -43,13 +43,6 @@
     "react",
     "react-dom",
     "rehype-katex",
-    "remark-math",
-    "recheck",
-    "recheck-jar",
-    "recheck-linux-arm64",
-    "recheck-linux-x64",
-    "recheck-macos-arm64",
-    "recheck-macos-x64",
-    "recheck-windows-x64"
+    "remark-math"
   ]
 }

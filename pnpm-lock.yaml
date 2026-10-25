@@ -15,7 +15,7 @@ importers:
   packages/eslint-plugin-redos:
     dependencies:
       recheck:
-        specifier: 0.0.0
+        specifier: workspace:*
         version: link:../recheck
     devDependencies:
       '@types/eslint':
@@ -90,22 +90,22 @@ importers:
         version: 7.0.2
     optionalDependencies:
       recheck-jar:
-        specifier: 0.0.0
+        specifier: workspace:*
         version: link:../recheck-jar
       recheck-linux-arm64:
-        specifier: 0.0.0
+        specifier: workspace:*
         version: link:../recheck-linux-arm64
       recheck-linux-x64:
-        specifier: 0.0.0
+        specifier: workspace:*
         version: link:../recheck-linux-x64
       recheck-macos-arm64:
-        specifier: 0.0.0
+        specifier: workspace:*
         version: link:../recheck-macos-arm64
       recheck-macos-x64:
-        specifier: 0.0.0
+        specifier: workspace:*
         version: link:../recheck-macos-x64
       recheck-windows-x64:
-        specifier: 0.0.0
+        specifier: workspace:*
         version: link:../recheck-windows-x64
 
   packages/recheck-jar: {}
@@ -174,7 +174,7 @@ importers:
         specifier: 2.0.3
         version: 2.0.3(prop-types@15.8.1)(react@18.3.1)
       recheck:
-        specifier: 0.0.0
+        specifier: workspace:*
         version: link:../packages/recheck
       rehype-katex:
         specifier: 4.0.0

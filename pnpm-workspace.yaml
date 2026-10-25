@@ -2,8 +2,6 @@ packages:
   - packages/*
   - website
 
-linkWorkspacePackages: true
-
 allowBuilds:
   "@parcel/watcher": false
   core-js: true
