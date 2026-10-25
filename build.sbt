@@ -395,16 +395,17 @@ lazy val cli = project
     assembly / assemblyJarName := "recheck.jar",
     // Output `recheck.jar` to a path independent of the Scala version.
     assembly / assemblyOutputPath := target.value / (assembly / assemblyJarName).value,
-    nativeImageVersion := "22.3.0",
-    nativeImageJvm := "graalvm-java17",
-    nativeImageOptions ++= List(
-      "--no-fallback",
-      "--initialize-at-build-time=java",
-      "--initialize-at-build-time=scala",
-      "--initialize-at-build-time=cats",
-      "--initialize-at-build-time=io.circe",
-      "--initialize-at-build-time=codes.quine.labs.recheck"
-    ),
+    nativeImageJvm := "graalvm-community",
+    nativeImageVersion := "25.0.1",
+    nativeImageOptions += "--no-fallback",
+    // `scala.runtime.LazyVals` uses `sun.misc.Unsafe`, and JDK 24+ warns on its first use (JEP 471).
+    nativeImageOptions += "-Dsun.misc.unsafe.memory.access=allow",
+    // The minimum macOS version of the binary is the build machine's version by default.
+    nativeImageOptions ++= {
+      if (scala.util.Properties.isMac)
+        Seq("-H:+UnlockExperimentalVMOptions", "-H:NativeLinkerOption=-mmacosx-version-min=15.0")
+      else Seq.empty
+    },
     console / initialCommands := """
       |import io.circe.*
       |import io.circe.parser.*
