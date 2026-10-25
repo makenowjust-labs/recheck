@@ -377,7 +377,7 @@ lazy val js = project
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
     Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) },
     // Output `recheck.js` to a path independent of the Scala version.
-    Compile / fullLinkJS / scalaJSLinkerOutputDirectory := target.value / "recheck-js-opt"
+    Compile / fullLinkJS / scalaJSLinkerOutputDirectory := (ThisBuild / baseDirectory).value / "target" / "recheck-js-opt"
   )
   .dependsOn(coreJS, codecJS)
 
@@ -392,7 +392,8 @@ lazy val cli = project
     assembly / mainClass := (Compile / mainClass).value,
     assembly / assemblyJarName := "recheck.jar",
     // Output `recheck.jar` to a path independent of the Scala version.
-    assembly / assemblyOutputPath := target.value / (assembly / assemblyJarName).value,
+    assembly / assemblyOutputPath := (ThisBuild / baseDirectory).value / "target" / (assembly / assemblyJarName).value,
+    NativeImage / target := (ThisBuild / baseDirectory).value / "target" / "native-image",
     nativeImageJvm := "graalvm-community",
     nativeImageVersion := "25.0.1",
     nativeImageOptions += "--no-fallback",
