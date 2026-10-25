@@ -1,3 +1,9 @@
+# dev
+
+Misc:
+
+- [#1924](https://github.com/makenowjust-labs/recheck/pull/1924) Fix the release version passed to lerna and skip Maven publishing of a published version ([@makenowjust](https://github.com/makenowjust))
+
 # 4.6.0 (2026-10-25)
 
 New Features:
