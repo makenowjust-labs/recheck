@@ -42,12 +42,12 @@
     "esbuild-register": "3.6.0",
     "eslint": "10.13.0",
     "jest": "30.5.2",
-    "prettier": "3.8.5",
+    "prettier": "3.9.10",
     "rimraf": "6.1.3",
-    "typescript": "5.9.3"
+    "typescript": "7.0.2"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "keywords": [
     "eslint",

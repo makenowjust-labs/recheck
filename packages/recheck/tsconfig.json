@@ -3,6 +3,7 @@
     "target": "es2020",
     "module": "commonjs",
     "esModuleInterop": true,
+    "types": ["jest", "node"],
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
