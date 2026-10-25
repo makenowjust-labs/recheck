@@ -1,6 +1,22 @@
-import { formatBuild } from "./permalink";
+/** Identifies the `recheck` build that produced a result. */
+export type Build =
+  | { type: "release"; version: string }
+  | { type: "head"; commit: string }
+  | { type: "dev" };
 
-import type { Build } from "./permalink";
+export const formatBuild = (build: Build): string => {
+  switch (build.type) {
+    case "release":
+      return `v${build.version}`;
+    case "head":
+      return `HEAD (${build.commit.slice(0, 7)})`;
+    case "dev":
+      return "development build";
+  }
+};
+
+export const sameBuild = (a: Build, b: Build): boolean =>
+  formatBuild(a) === formatBuild(b);
 
 /** The first release that ships `lib/browser.mjs`. */
 export const FIRST_ESM_VERSION = "4.6.1";

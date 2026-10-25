@@ -3,12 +3,12 @@ import React from 'react';
 import NumberInput from '../form/NumberInput';
 import Select from '../form/Select';
 import TextArea from '../form/TextArea';
+import { formatBuild } from './builds';
 import styles from './Demo.module.css';
 import { params } from './params';
-import { formatBuild } from './permalink';
 
+import type { Build } from './builds';
 import type { Param } from './params';
-import type { Build } from './permalink';
 
 const ParamInput: React.FC<Param> = ({ name, defaultValue, type }) => {
   if (type === 'duration') {

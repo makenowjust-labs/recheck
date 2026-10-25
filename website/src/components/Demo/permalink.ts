@@ -4,13 +4,8 @@ import {
 } from "lz-string";
 
 import type { Diagnostics } from "recheck";
+import type { Build } from "./builds";
 import type { CheckParams } from "./params";
-
-/** Identifies the `recheck` build that produced a result. */
-export type Build =
-  | { type: "release"; version: string }
-  | { type: "head"; commit: string }
-  | { type: "dev" };
 
 export type InvalidDiagnostics = { input: string; status: "invalid" };
 
@@ -27,20 +22,6 @@ export type Snapshot = {
 
 const PREFIX = "r=";
 
-export const formatBuild = (build: Build): string => {
-  switch (build.type) {
-    case "release":
-      return `v${build.version}`;
-    case "head":
-      return `HEAD (${build.commit.slice(0, 7)})`;
-    case "dev":
-      return "development build";
-  }
-};
-
-export const sameBuild = (a: Build, b: Build): boolean =>
-  formatBuild(a) === formatBuild(b);
-
 /** Whether the snapshot was recorded for the given input and parameters. */
 export const sameRequest = (
   snapshot: Snapshot,
@@ -55,7 +36,7 @@ export const summarize = (result: Snapshot["result"]): string =>
     ? `${result.status} (${result.complexity.summary})`
     : result.status;
 
-/** The expanded attack string can be hundreds of kilobytes, and it is derivable from the other fields. */
+// The expanded attack string can be hundreds of kilobytes, and it is derivable from the other fields.
 const stripAttackString = (result: Snapshot["result"]): Snapshot["result"] =>
   result.status === "vulnerable"
     ? { ...result, attack: { ...result.attack, string: "" } }

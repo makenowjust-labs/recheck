@@ -180,7 +180,7 @@ export const params: Param[] = [
   },
 ];
 
-/** `logger` is a Playground option rather than a `recheck` parameter. */
+// `logger` is a Playground option rather than a `recheck` parameter.
 export type CheckParams = Parameters & { logger: "on" | "off" };
 
 /** Converts the form values, where numbers are strings, to the parameters. */

@@ -1,9 +1,10 @@
 import React from 'react';
 
+import { formatBuild } from './builds';
 import styles from './Demo.module.css';
-import { formatBuild } from './permalink';
 
-import type { Build, Snapshot } from './permalink';
+import type { Build } from './builds';
+import type { Snapshot } from './permalink';
 
 const REPORTS_URL = 'https://github.com/makenowjust-labs/recheck/discussions/categories/reports';
 const REPORTS_EMAIL = 'make.just.on@gmail.com';

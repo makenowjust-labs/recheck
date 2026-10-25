@@ -2,12 +2,12 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import React from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 
-import { availableBuilds, findBuild } from './builds';
+import { availableBuilds, findBuild, formatBuild, sameBuild } from './builds';
 import { loadChecker } from './checker';
 import DemoInput from './DemoInput';
 import DemoResult from './DemoResult';
 import { extract, parseParams } from './params';
-import { decode, encode, formatBuild, sameBuild, sameRequest, summarize } from './permalink';
+import { decode, encode, sameRequest, summarize } from './permalink';
 
 import type { Snapshot } from './permalink';
 

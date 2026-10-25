@@ -2,9 +2,37 @@ import {
   availableBuilds,
   bundledBuild,
   findBuild,
+  formatBuild,
   moduleUrl,
   releaseVersions,
+  sameBuild,
 } from "./builds";
+
+import type { Build } from "./builds";
+
+const build: Build = { type: "release", version: "4.6.1" };
+
+describe("formatBuild and sameBuild", () => {
+  test("formats each kind of build", () => {
+    expect(formatBuild(build)).toBe("v4.6.1");
+    expect(
+      formatBuild({ type: "head", commit: "0123456789abcdef0123456789abcdef" }),
+    ).toBe("HEAD (0123456)");
+    expect(formatBuild({ type: "dev" })).toBe("development build");
+  });
+
+  test("compares builds by their identity", () => {
+    expect(sameBuild(build, { type: "release", version: "4.6.1" })).toBe(true);
+    expect(sameBuild(build, { type: "release", version: "4.6.0" })).toBe(false);
+    expect(sameBuild(build, { type: "dev" })).toBe(false);
+    expect(
+      sameBuild(
+        { type: "head", commit: "abc" },
+        { type: "head", commit: "abd" },
+      ),
+    ).toBe(false);
+  });
+});
 
 describe("releaseVersions", () => {
   test("keeps stable releases from 4.6.1 on, newest first", () => {
