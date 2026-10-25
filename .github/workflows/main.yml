@@ -442,12 +442,14 @@ jobs:
           path: packages/recheck-windows-x64/
       - name: Build
         run: NODE_ENV=production pnpm -r run build
+      - name: Version
+        run: pnpm exec lerna version ${{ needs.build.outputs.version }} --yes
       - name: Publish (beta)
         if: contains(github.ref, '-beta')
-        run: pnpm exec lerna publish --dist-tag next ${{ needs.build.outputs.version }} --yes
+        run: pnpm exec lerna publish from-package --dist-tag next --yes
       - name: Publish
         if: "!contains(github.ref, '-beta')"
-        run: pnpm exec lerna publish ${{ needs.build.outputs.version }} --yes
+        run: pnpm exec lerna publish from-package --yes
 
   release:
     needs: [maven-release, npm-release]
