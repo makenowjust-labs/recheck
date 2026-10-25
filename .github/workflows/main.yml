@@ -235,15 +235,25 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     name: Scala Build (Native Binary)
+    env:
+      GRAALVM_VERSION: 25.0.1
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: coursier/setup-action@v3
+      # The CLI embeds no version string, so the binary depends only on the sources, the build definition and the GraalVM version.
+      - id: restore-binary
+        uses: actions/cache/restore@v6
         with:
-          jvm: graalvm-community:25.0.1
+          path: ${{ matrix.local_path }}
+          key: native-${{ runner.os }}-${{ runner.arch }}-graalvm-${{ env.GRAALVM_VERSION }}-${{ hashFiles('modules/**/src/main/**', 'build.sbt', 'project/**') }}
+      - if: steps.restore-binary.outputs.cache-hit != 'true'
+        uses: coursier/setup-action@v3
+        with:
+          jvm: graalvm-community:${{ env.GRAALVM_VERSION }}
           apps: sbt
-      - name: Cache SBT
+      - if: steps.restore-binary.outputs.cache-hit != 'true'
+        name: Cache SBT
         uses: actions/cache@v6
         with:
           path: |
@@ -251,20 +261,27 @@ jobs:
             ~/.cache/coursier
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
-      - name: Cache Build Files
+      - if: steps.restore-binary.outputs.cache-hit != 'true'
+        name: Cache Build Files
         uses: actions/cache@v6
         with:
           path: |
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
-      - if: runner.os == 'Windows'
+      - if: steps.restore-binary.outputs.cache-hit != 'true' && runner.os == 'Windows'
         name: Set up MSVC environment
         uses: TheMrMilchmann/setup-msvc-dev@v4
         with:
           arch: x64
-      - run: sbt cli/nativeImage
+      - if: steps.restore-binary.outputs.cache-hit != 'true'
+        run: sbt cli/nativeImage
         env:
           NATIVE_IMAGE_INSTALLED: true
+      - if: steps.restore-binary.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ matrix.local_path }}
+          key: ${{ steps.restore-binary.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v7
         with:
           path: ${{ matrix.local_path }}
