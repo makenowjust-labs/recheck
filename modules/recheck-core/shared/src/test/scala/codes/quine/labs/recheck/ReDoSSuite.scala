@@ -36,6 +36,10 @@ class ReDoSSuite extends munit.FunSuite:
     )
     assertEquals(ReDoS.check("^.*$", ""), Diagnostics.Safe("^.*$", "", AttackComplexity.Linear, Checker.Automaton))
     assertEquals(
+      ReDoS.check("(?:a|a|a)*", "y"),
+      Diagnostics.Safe("(?:a|a|a)*", "y", AttackComplexity.Linear, Checker.Automaton)
+    )
+    assertEquals(
       ReDoS.check("", "x"),
       Diagnostics.Unknown("", "x", Diagnostics.ErrorKind.InvalidRegExp("unknown flag"), None)
     )
