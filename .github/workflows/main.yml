@@ -369,6 +369,9 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     name: Publish to NPM
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -435,13 +438,9 @@ jobs:
       - name: Publish (beta)
         if: contains(github.ref, '-beta')
         run: pnpm exec lerna publish --dist-tag next ${{ needs.build.outputs.version }} --yes
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish
         if: "!contains(github.ref, '-beta')"
         run: pnpm exec lerna publish ${{ needs.build.outputs.version }} --yes
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   release:
     needs: [maven-release, npm-release]
