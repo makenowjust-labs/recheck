@@ -214,6 +214,36 @@ jobs:
           RECHECK_BACKEND: ${{ matrix.backend }}
           RECHECK_JAR: ${{ github.workspace }}/target/recheck.jar
 
+  website-test:
+    needs: [build, node-lint]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    name: Website Test
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-tags: true
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: '12'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        with:
+          name: recheck.js
+          path: target/recheck-js-opt/
+      - name: Build
+        run: |
+          NODE_ENV=production pnpm --filter recheck run build
+          RECHECK_LATEST_VERSION=${{ needs.build.outputs.version }} RECHECK_COMMIT=${{ github.sha }} pnpm --filter website run doc
+      - name: Test
+        run: pnpm --filter website run test:e2e
+
   native-build:
     needs: [build]
     if: startsWith(github.ref, 'refs/tags/') || github.ref_name == 'main' || github.event_name == 'workflow_dispatch'
@@ -531,6 +561,8 @@ jobs:
     name: Build website
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-tags: true
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
@@ -548,7 +580,7 @@ jobs:
       - name: Build
         run: |
           NODE_ENV=production pnpm --filter recheck run build
-          RECHECK_VERSION=${{ needs.build.outputs.version }} pnpm --filter website run doc
+          RECHECK_LATEST_VERSION=${{ needs.build.outputs.version }} RECHECK_COMMIT=${{ github.sha }} pnpm --filter website run doc
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:

@@ -4,9 +4,12 @@
   "version": "0.0.0",
   "scripts": {
     "doc": "docusaurus build",
-    "format": "prettier -w '*.{js,json}' 'src/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
-    "lint": "prettier --check '*.{js,json}' 'src/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
-    "start": "docusaurus start"
+    "format": "prettier -w '*.{js,json,ts}' '{src,e2e}/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
+    "lint": "prettier --check '*.{js,json,ts}' '{src,e2e}/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
+    "start": "docusaurus start",
+    "test": "jest",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
     "@algolia/client-search": "^5.0.0",
@@ -18,6 +21,7 @@
     "@docusaurus/theme-classic": "3.10.2",
     "@mdx-js/react": "3.1.1",
     "clsx": "2.1.1",
+    "lz-string": "1.5.0",
     "prism-react-renderer": "2.4.1",
     "prop-types": "15.8.1",
     "react": "19.3.1",
@@ -29,8 +33,14 @@
     "remark-math": "6.0.0"
   },
   "devDependencies": {
-    "@tsconfig/docusaurus": "2.0.9",
+    "@playwright/test": "1.64.1",
+    "@types/jest": "30.0.0",
     "@types/node": "24.19.2",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "esbuild": "0.28.2",
+    "esbuild-jest": "0.5.0",
+    "jest": "30.5.2",
     "prettier": "3.9.10",
     "typescript": "7.0.2"
   },
