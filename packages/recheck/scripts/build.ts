@@ -61,30 +61,43 @@ const inlineWorkerPlugin: Plugin = {
   },
 };
 
+const formats = [
+  { format: "cjs", extension: "js" },
+  { format: "esm", extension: "mjs" },
+] as const;
+
+// `require` is used to resolve the paths of the worker and the optional packages.
+const esmBanner = {
+  js: 'import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);',
+};
+
 const main = async () => {
-  await esbuild({
-    entryPoints: ["src/main.ts"],
-    inject: ["src/inject/main.ts"],
-    bundle: true,
-    minify: isProduction,
-    format: "cjs",
-    target: "es2020",
-    logLevel: "error",
-    platform: "node",
-    plugins: [makeAllPackagesExternalPlugin, inlineWorkerPlugin],
-    outfile: "lib/main.js",
-  });
-  await esbuild({
-    entryPoints: ["src/browser.ts"],
-    bundle: true,
-    minify: isProduction,
-    format: "cjs",
-    target: "es2020",
-    logLevel: "error",
-    platform: "browser",
-    plugins: [makeAllPackagesExternalPlugin, inlineWorkerPlugin],
-    outfile: "lib/browser.js",
-  });
+  for (const { format, extension } of formats) {
+    await esbuild({
+      entryPoints: ["src/main.ts"],
+      inject: ["src/inject/main.ts"],
+      bundle: true,
+      minify: isProduction,
+      format,
+      target: "es2020",
+      logLevel: "error",
+      platform: "node",
+      plugins: [makeAllPackagesExternalPlugin, inlineWorkerPlugin],
+      outfile: `lib/main.${extension}`,
+      banner: format === "esm" ? esmBanner : undefined,
+    });
+    await esbuild({
+      entryPoints: ["src/browser.ts"],
+      bundle: true,
+      minify: isProduction,
+      format,
+      target: "es2020",
+      logLevel: "error",
+      platform: "browser",
+      plugins: [makeAllPackagesExternalPlugin, inlineWorkerPlugin],
+      outfile: `lib/browser.${extension}`,
+    });
+  }
   await esbuild({
     entryPoints: ["src/synckit-worker.ts"],
     bundle: false,
