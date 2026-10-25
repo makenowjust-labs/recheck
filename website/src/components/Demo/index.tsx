@@ -6,7 +6,7 @@ import * as recheck from 'recheck/lib/browser';
 import DemoInput from './DemoInput';
 import DemoResult from './DemoResult';
 import { extract, parseParams } from './params';
-import { decode, encode, formatBuild, sameBuild } from './permalink';
+import { decode, encode, formatBuild, sameBuild, sameRequest, summarize } from './permalink';
 
 import type { Build, Snapshot } from './permalink';
 
@@ -14,9 +14,6 @@ const buildOf = (customFields: Record<string, unknown>): Build => {
   const commit = customFields['commit'];
   return typeof commit === 'string' && commit !== '' ? { type: 'head', commit } : { type: 'dev' };
 };
-
-const summarize = (result: Snapshot['result']): string =>
-  result.status === 'vulnerable' ? `${result.status} (${result.complexity.summary})` : result.status;
 
 const Demo: React.FC = () => {
   const { siteConfig } = useDocusaurusContext();
@@ -46,10 +43,7 @@ const Demo: React.FC = () => {
     const params = parseParams(values);
     const extracted = extract(input);
 
-    if (
-      recorded !== null &&
-      (recorded.input !== input || JSON.stringify(recorded.params) !== JSON.stringify(params))
-    ) {
+    if (recorded !== null && !sameRequest(recorded, input, params)) {
       setRecorded(null);
     }
 

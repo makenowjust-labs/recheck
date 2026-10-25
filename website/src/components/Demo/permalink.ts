@@ -41,6 +41,20 @@ export const formatBuild = (build: Build): string => {
 export const sameBuild = (a: Build, b: Build): boolean =>
   formatBuild(a) === formatBuild(b);
 
+/** Whether the snapshot was recorded for the given input and parameters. */
+export const sameRequest = (
+  snapshot: Snapshot,
+  input: string,
+  params: CheckParams,
+): boolean =>
+  snapshot.input === input &&
+  JSON.stringify(snapshot.params) === JSON.stringify(params);
+
+export const summarize = (result: Snapshot["result"]): string =>
+  result.status === "vulnerable"
+    ? `${result.status} (${result.complexity.summary})`
+    : result.status;
+
 /** The expanded attack string can be hundreds of kilobytes, and it is derivable from the other fields. */
 const stripAttackString = (result: Snapshot["result"]): Snapshot["result"] =>
   result.status === "vulnerable"
