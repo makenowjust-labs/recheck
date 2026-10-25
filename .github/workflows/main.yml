@@ -45,7 +45,7 @@ jobs:
       - id: save-version
         name: Save Version
         run: |
-          version="$(sbt --server --error "print coreJVM/releaseVersion")"
+          version="$(sbt --server --error "print coreJVM/releaseVersion" | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | grep -E '^[0-9]' | tail -n1)"
           echo -n "version=$version"
           echo -n "version=$version" >> $GITHUB_OUTPUT
       - uses: actions/upload-artifact@v7
