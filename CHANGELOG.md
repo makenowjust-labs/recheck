@@ -43,6 +43,7 @@ Misc:
 - [#1918](https://github.com/makenowjust-labs/recheck/pull/1918) Update the copyright year to 2026 ([@makenowjust](https://github.com/makenowjust))
 - [#1921](https://github.com/makenowjust-labs/recheck/pull/1921) Run the native E2E tests on Ubuntu 26.04 ([@makenowjust](https://github.com/makenowjust))
 - [#1922](https://github.com/makenowjust-labs/recheck/pull/1922) Use `uri` and `License.MIT` in build.sbt ([@makenowjust](https://github.com/makenowjust))
+- [#1923](https://github.com/makenowjust-labs/recheck/pull/1923) Publish to npm with trusted publishing ([@makenowjust](https://github.com/makenowjust))
 
 # 4.5.0 (2025-03-02)
 
