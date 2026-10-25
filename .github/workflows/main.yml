@@ -548,7 +548,7 @@ jobs:
       - name: Build
         run: |
           NODE_ENV=production pnpm --filter recheck run build
-          RECHECK_VERSION=${{ needs.build.outputs.version }} pnpm --filter website run doc
+          RECHECK_LATEST_VERSION=${{ needs.build.outputs.version }} RECHECK_COMMIT=${{ github.sha }} pnpm --filter website run doc
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:

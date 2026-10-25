@@ -53,10 +53,6 @@ const config = {
         theme: {
           customCss: ["./src/css/custom.css", katexCss],
         },
-        gtag: {
-          trackingID: "G-GY3CQZBPM2",
-          anonymizeIP: true,
-        },
       }),
     ],
   ],
@@ -161,7 +157,8 @@ const config = {
     }),
 
   customFields: {
-    version: process.env["RECHECK_VERSION"] ?? "0.0.0-dev",
+    latestVersion: process.env["RECHECK_LATEST_VERSION"] ?? "0.0.0-dev",
+    commit: process.env["RECHECK_COMMIT"] ?? "",
   },
 };
 

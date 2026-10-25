@@ -7,7 +7,7 @@ import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
 import CodeBlock from "@theme/CodeBlock";
 
 export const SBTInstallCodeBlock = () => {
-  const version = useDocusaurusContext().siteConfig.customFields.version;
+  const version = useDocusaurusContext().siteConfig.customFields.latestVersion;
   return (
     <CodeBlock title="build.sbt" className="language-scala">
       libraryDependencies += "codes.quine.labs" %% "recheck-core" % "{version}"
