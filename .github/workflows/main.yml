@@ -41,7 +41,7 @@ jobs:
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
       - name: Build
-        run: sbt compile js/fullLinkJS cli/assembly
+        run: sbt "compile; js/fullLinkJS; cli/assembly"
       - id: save-version
         name: Save Version
         run: |
@@ -83,7 +83,7 @@ jobs:
             **/target
           key: ${{ runner.os }}-build-${{ github.sha }}
       - name: Lint
-        run: sbt scalafmtCheckAll scalafmtSbtCheck 'scalafixAll --check'
+        run: sbt "scalafmtCheckAll; scalafmtSbtCheck; scalafixAll --check"
 
   node-lint:
     runs-on: ubuntu-26.04
@@ -131,7 +131,7 @@ jobs:
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
       - name: Test
-        run: sbt coverage test coverageAggregate
+        run: sbt "coverage; test; coverageAggregate"
       - uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
