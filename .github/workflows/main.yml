@@ -19,6 +19,7 @@ jobs:
     outputs:
       version: ${{ steps.save-settings.outputs.version }}
       graalvm: ${{ steps.save-settings.outputs.graalvm }}
+      all-platforms: ${{ startsWith(github.ref, 'refs/tags/') || github.ref_name == 'main' || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -246,27 +247,10 @@ jobs:
 
   native-build:
     needs: [build]
-    if: startsWith(github.ref, 'refs/tags/') || github.ref_name == 'main' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-26-intel, macos-26, ubuntu-24.04, ubuntu-24.04-arm, windows-2025]
-        include:
-          - os: macos-26-intel
-            artifact_filename: recheck-darwin-x64
-            local_path: target/native-image/recheck
-          - os: macos-26
-            artifact_filename: recheck-darwin-arm64
-            local_path: target/native-image/recheck
-          - os: ubuntu-24.04
-            artifact_filename: recheck-linux-x64
-            local_path: target/native-image/recheck
-          - os: ubuntu-24.04-arm
-            artifact_filename: recheck-linux-arm64
-            local_path: target/native-image/recheck
-          - os: windows-2025
-            artifact_filename: recheck-win32-x64.exe
-            local_path: target/native-image/recheck.exe
+        os: ${{ fromJSON(needs.build.outputs.all-platforms == 'true' && '["macos-26-intel", "macos-26", "ubuntu-24.04", "ubuntu-24.04-arm", "windows-2025"]' || '["ubuntu-24.04"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     name: Scala Build (Native Binary)
@@ -274,11 +258,24 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - id: binary
+        name: Name the binary
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            Linux) platform=linux ;;
+            macOS) platform=darwin ;;
+            Windows) platform=win32 ;;
+          esac
+          arch=$([[ "$RUNNER_ARCH" == ARM64 ]] && echo arm64 || echo x64)
+          ext=$([[ "$RUNNER_OS" == Windows ]] && echo .exe || echo)
+          echo "artifact=recheck-$platform-$arch$ext" >> "$GITHUB_OUTPUT"
+          echo "path=target/native-image/recheck$ext" >> "$GITHUB_OUTPUT"
       - if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         id: restore-binary
         uses: actions/cache/restore@v6
         with:
-          path: ${{ matrix.local_path }}
+          path: ${{ steps.binary.outputs.path }}
           key: native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('modules/**/src/main/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
       - if: steps.restore-binary.outputs.cache-hit != 'true'
         uses: coursier/setup-action@v3
@@ -314,41 +311,37 @@ jobs:
       - if: steps.restore-binary.outcome == 'success' && steps.restore-binary.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
-          path: ${{ matrix.local_path }}
+          path: ${{ steps.binary.outputs.path }}
           key: ${{ steps.restore-binary.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v7
         with:
-          path: ${{ matrix.local_path }}
-          name: ${{ matrix.artifact_filename }}
+          path: ${{ steps.binary.outputs.path }}
+          name: ${{ steps.binary.outputs.artifact }}
 
   node-test-e2e-native:
     needs: [build, node-lint, native-build]
-    if: startsWith(github.ref, 'refs/tags/') || github.ref_name == 'main' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-26-intel, macos-26, ubuntu-26.04, ubuntu-26.04-arm, windows-2025]
-        include:
-          - os: macos-26-intel
-            artifact_filename: recheck-darwin-x64
-            bin: recheck
-          - os: macos-26
-            artifact_filename: recheck-darwin-arm64
-            bin: recheck
-          - os: ubuntu-26.04
-            artifact_filename: recheck-linux-x64
-            bin: recheck
-          - os: ubuntu-26.04-arm
-            artifact_filename: recheck-linux-arm64
-            bin: recheck
-          - os: windows-2025
-            artifact_filename: recheck-win32-x64.exe
-            bin: recheck.exe
+        os: ${{ fromJSON(needs.build.outputs.all-platforms == 'true' && '["macos-26-intel", "macos-26", "ubuntu-26.04", "ubuntu-26.04-arm", "windows-2025"]' || '["ubuntu-26.04"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     name: Node E2E Test (native)
     steps:
       - uses: actions/checkout@v7
+      - id: binary
+        name: Name the binary
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            Linux) platform=linux ;;
+            macOS) platform=darwin ;;
+            Windows) platform=win32 ;;
+          esac
+          arch=$([[ "$RUNNER_ARCH" == ARM64 ]] && echo arm64 || echo x64)
+          ext=$([[ "$RUNNER_OS" == Windows ]] && echo .exe || echo)
+          echo "artifact=recheck-$platform-$arch$ext" >> "$GITHUB_OUTPUT"
+          echo "bin=recheck$ext" >> "$GITHUB_OUTPUT"
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
@@ -365,18 +358,18 @@ jobs:
           path: target/recheck-js-opt/
       - uses: actions/download-artifact@v8
         with:
-          name: ${{ matrix.artifact_filename }}
+          name: ${{ steps.binary.outputs.artifact }}
           path: target/native-image/
       - if: runner.os != 'Windows'
         name: Make the binary executable
-        run: chmod +x target/native-image/${{ matrix.bin }}
+        run: chmod +x target/native-image/${{ steps.binary.outputs.bin }}
       - name: Build
         run: pnpm --filter recheck run build
       - name: Test
         run: pnpm --filter recheck run test:e2e
         env:
           RECHECK_BACKEND: native
-          RECHECK_BIN: ${{ github.workspace }}/target/native-image/${{ matrix.bin }}
+          RECHECK_BIN: ${{ github.workspace }}/target/native-image/${{ steps.binary.outputs.bin }}
 
   maven-release:
     needs: [build, scala-test]
@@ -554,7 +547,7 @@ jobs:
             recheck-windows-x64.exe
 
   gh-pages-build:
-    needs: [build]
+    needs: [build, node-test, website-test]
     if: github.ref_name == 'main'
     runs-on: ubuntu-26.04
     timeout-minutes: 5
