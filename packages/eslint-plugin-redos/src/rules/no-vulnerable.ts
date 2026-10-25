@@ -188,9 +188,9 @@ const rule: Rule.RuleModule = {
       node: ESTree.NewExpression | ESTree.CallExpression,
     ) => {
       // Tests `RegExp(...)` or `new RegExp(...)`?
-      if (
-        !(node.callee.type === "Identifier" && node.callee.name === "RegExp")
-      ) {
+      if (!(
+        node.callee.type === "Identifier" && node.callee.name === "RegExp"
+      )) {
         return false;
       }
       // Tests `RegExp(...)`, `RegExp(..., ...)`?
