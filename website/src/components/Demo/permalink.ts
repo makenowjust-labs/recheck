@@ -46,7 +46,7 @@ export type Snapshot = {
 
 const PREFIX = "r=";
 
-const snapshotDiagnostics = (
+const makeSnapshotDiagnostics = (
   input: string,
   result: Diagnostics | InvalidInput,
 ): DiagnosticsSnapshot => {
@@ -110,7 +110,7 @@ export const makeSnapshot = ({
   build,
   input,
   params,
-  result: snapshotDiagnostics(input, result),
+  result: makeSnapshotDiagnostics(input, result),
   time,
   date,
 });

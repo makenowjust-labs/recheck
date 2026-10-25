@@ -70,6 +70,17 @@ describe("makeSnapshot", () => {
     expect(snapshot("/^(a|a)*$/", diagnostics)).toEqual(vulnerable);
   });
 
+  test("keeps the source, the flags and the checker of a safe result", () => {
+    const diagnostics: Diagnostics = {
+      source: "a",
+      flags: "",
+      status: "safe",
+      checker: "automaton",
+      complexity: { type: "safe", summary: "safe", isFuzz: false },
+    };
+    expect(snapshot("/a/", diagnostics)).toEqual(safe);
+  });
+
   test("keeps the input of an invalid request", () => {
     expect(snapshot("a", { status: "invalid" }).result).toEqual({
       status: "invalid",
