@@ -237,22 +237,20 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     name: Scala Build (Native Binary)
-    env:
-      GRAALVM_VERSION: 25.0.1
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      # The CLI embeds no version string, so the binary depends only on the sources, the build definition and the GraalVM version.
-      - id: restore-binary
+      - if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        id: restore-binary
         uses: actions/cache/restore@v6
         with:
           path: ${{ matrix.local_path }}
-          key: native-${{ runner.os }}-${{ runner.arch }}-graalvm-${{ env.GRAALVM_VERSION }}-${{ hashFiles('modules/**/src/main/**', 'build.sbt', 'project/**') }}
+          key: native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('modules/**/src/main/**', 'build.sbt', 'project/**') }}
       - if: steps.restore-binary.outputs.cache-hit != 'true'
         uses: coursier/setup-action@v3
         with:
-          jvm: graalvm-community:${{ env.GRAALVM_VERSION }}
+          jvm: graalvm-community:25.0.1
           apps: sbt
       - if: steps.restore-binary.outputs.cache-hit != 'true'
         name: Cache SBT
@@ -280,7 +278,7 @@ jobs:
         run: sbt cli/nativeImage
         env:
           NATIVE_IMAGE_INSTALLED: true
-      - if: steps.restore-binary.outputs.cache-hit != 'true'
+      - if: steps.restore-binary.outcome == 'success' && steps.restore-binary.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: ${{ matrix.local_path }}
