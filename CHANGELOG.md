@@ -1,5 +1,9 @@
 # dev
 
+New Features:
+
+- [#1927](https://github.com/makenowjust-labs/recheck/pull/1927) Fix #1619: provide ES modules of the `recheck` package ([@makenowjust](https://github.com/makenowjust))
+
 Misc:
 
 - [#1925](https://github.com/makenowjust-labs/recheck/pull/1925) Add codecov.yml ([@makenowjust](https://github.com/makenowjust))
