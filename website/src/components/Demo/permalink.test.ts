@@ -1,55 +1,53 @@
 import { compressToEncodedURIComponent } from "lz-string";
 
 import { parseParams } from "./params";
-import { decode, encode, sameRequest, summarize, toResult } from "./permalink";
+import {
+  decode,
+  encode,
+  makeSnapshot,
+  sameRequest,
+  summarize,
+} from "./permalink";
 
-import type { Diagnostics, SafeDiagnostics } from "recheck";
+import type { Diagnostics } from "recheck";
 import type { Build } from "./builds";
 import type { Snapshot } from "./permalink";
 
 const build: Build = { type: "release", version: "4.6.1" };
-
-const safeDiagnostics: SafeDiagnostics = {
-  source: "a",
-  flags: "",
-  status: "safe",
-  checker: "automaton",
-  complexity: { type: "safe", summary: "safe", isFuzz: false },
-};
+const params = parseParams({});
+const date = "2026-10-25T00:00:00.000Z";
 
 const safe: Snapshot = {
   v: 1,
   build,
   input: "/a/",
-  params: parseParams({}),
-  result: safeDiagnostics,
+  params,
+  result: { status: "safe", source: "a", flags: "", checker: "automaton" },
   time: 12,
-  date: "2026-10-25T00:00:00.000Z",
-};
-
-const attack = {
-  pumps: [{ prefix: "", pump: "a", bias: 0 }],
-  suffix: "\x00",
-  base: 1000,
-  pattern: "'a'.repeat(1000) + '\\x00'",
+  date,
 };
 
 const vulnerable: Snapshot = {
   ...safe,
   input: "/^(a|a)*$/",
   result: {
+    status: "vulnerable",
     source: "^(a|a)*$",
     flags: "",
-    status: "vulnerable",
     checker: "automaton",
-    complexity: { type: "exponential", summary: "exponential", isFuzz: false },
-    attack,
-    hotspot: [],
+    complexity: { type: "exponential", summary: "exponential" },
+    attackPattern: "'a'.repeat(1000) + '\\x00'",
+    hotspot: [{ start: 2, end: 5, temperature: "heat" }],
   },
 };
 
-describe("toResult", () => {
-  test("drops the attack string but keeps the attack pattern", () => {
+describe("makeSnapshot", () => {
+  const snapshot = (
+    input: string,
+    result: Diagnostics | { status: "invalid" },
+  ) => makeSnapshot({ build, input, params, result, time: 12, date });
+
+  test("records only what the result card shows", () => {
     const diagnostics: Diagnostics = {
       source: "^(a|a)*$",
       flags: "",
@@ -60,15 +58,51 @@ describe("toResult", () => {
         summary: "exponential",
         isFuzz: false,
       },
-      attack: { ...attack, string: "a".repeat(1000) + "\x00" },
-      hotspot: [],
+      attack: {
+        pumps: [{ prefix: "", pump: "a", bias: 0 }],
+        suffix: "\x00",
+        base: 1000,
+        string: "a".repeat(1000) + "\x00",
+        pattern: "'a'.repeat(1000) + '\\x00'",
+      },
+      hotspot: [{ start: 2, end: 5, temperature: "heat" }],
     };
-    expect(toResult(diagnostics)).toEqual(vulnerable.result);
-    expect(toResult(diagnostics)).not.toHaveProperty("attack.string");
+    expect(snapshot("/^(a|a)*$/", diagnostics)).toEqual(vulnerable);
   });
 
-  test("keeps the other diagnostics as they are", () => {
-    expect(toResult(safeDiagnostics)).toBe(safeDiagnostics);
+  test("keeps the input of an invalid request", () => {
+    expect(snapshot("a", { status: "invalid" }).result).toEqual({
+      status: "invalid",
+      input: "a",
+    });
+  });
+
+  test("keeps the error message only when there is one", () => {
+    const unknown: Diagnostics = {
+      source: "a",
+      flags: "",
+      status: "unknown",
+      error: { kind: "timeout" },
+    };
+    expect(snapshot("/a/", unknown).result).toEqual({
+      status: "unknown",
+      source: "a",
+      flags: "",
+      error: { kind: "timeout" },
+    });
+    expect(
+      snapshot("/a/", {
+        ...unknown,
+        checker: "fuzz",
+        error: { kind: "unsupported", message: "lookbehind" },
+      }).result,
+    ).toEqual({
+      status: "unknown",
+      source: "a",
+      flags: "",
+      checker: "fuzz",
+      error: { kind: "unsupported", message: "lookbehind" },
+    });
   });
 });
 
@@ -96,8 +130,8 @@ describe("encode and decode", () => {
 
 describe("sameRequest", () => {
   test("requires the same input and parameters", () => {
-    expect(sameRequest(safe, safe.input, parseParams({}))).toBe(true);
-    expect(sameRequest(safe, "/b/", parseParams({}))).toBe(false);
+    expect(sameRequest(safe, safe.input, params)).toBe(true);
+    expect(sameRequest(safe, "/b/", params)).toBe(false);
     expect(
       sameRequest(safe, safe.input, parseParams({ checker: "fuzz" })),
     ).toBe(false);
@@ -108,6 +142,6 @@ describe("summarize", () => {
   test("includes the complexity only for vulnerable results", () => {
     expect(summarize(safe.result)).toBe("safe");
     expect(summarize(vulnerable.result)).toBe("vulnerable (exponential)");
-    expect(summarize({ input: "a", status: "invalid" })).toBe("invalid");
+    expect(summarize({ status: "invalid", input: "a" })).toBe("invalid");
   });
 });

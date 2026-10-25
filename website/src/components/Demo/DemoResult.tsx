@@ -4,7 +4,7 @@ import { formatBuild } from './builds';
 import styles from './Demo.module.css';
 
 import type { Build } from './builds';
-import type { Result } from './permalink';
+import type { DiagnosticsSnapshot } from './permalink';
 
 const REPORTS_URL = 'https://github.com/makenowjust-labs/recheck/discussions/categories/reports';
 const REPORTS_EMAIL = 'make.just.on@gmail.com';
@@ -52,7 +52,7 @@ const Loading: React.FC = () => (
   </div>
 );
 
-const Hotspot: React.FC<{ diagnostics: Extract<Result, { status: 'vulnerable' }> }> = ({
+const Hotspot: React.FC<{ diagnostics: Extract<DiagnosticsSnapshot, { status: 'vulnerable' }> }> = ({
   diagnostics,
 }) => {
   const spots = [];
@@ -81,7 +81,7 @@ const Hotspot: React.FC<{ diagnostics: Extract<Result, { status: 'vulnerable' }>
 
 type Props = {
   title: string;
-  result: Result | null;
+  result: DiagnosticsSnapshot | null;
   time: number;
   log: string[];
   build: Build;
@@ -135,7 +135,7 @@ const DemoResult: React.FC<Props> = ({ title, result, time, log, build, date, pe
             <p>{result.error.kind}</p>
           </Row>,
         );
-        if ('message' in result.error) {
+        if (result.error.message !== undefined) {
           rows.push(
             <Row title="Error Message" key="error-message">
               <p>{result.error.message}</p>
@@ -172,7 +172,7 @@ const DemoResult: React.FC<Props> = ({ title, result, time, log, build, date, pe
           </Row>,
           <Row title="Attack String" key="attack">
             <pre>
-              <code>{result.attack.pattern}</code>
+              <code>{result.attackPattern}</code>
             </pre>
           </Row>,
           <Row title="Hotspot" key="hotspot">

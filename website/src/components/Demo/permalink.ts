@@ -3,23 +3,35 @@ import {
   decompressFromEncodedURIComponent,
 } from "lz-string";
 
-import type {
-  AttackPattern,
-  Diagnostics,
-  VulnerableDiagnostics,
-} from "recheck";
+import type { Diagnostics } from "recheck";
 import type { Build } from "./builds";
 import type { CheckParams } from "./params";
 
-export type InvalidDiagnostics = { input: string; status: "invalid" };
+export type InvalidInput = { status: "invalid" };
 
-// The expanded attack string can be hundreds of kilobytes, and it is derivable from the other fields.
-export type Result =
-  | Exclude<Diagnostics, VulnerableDiagnostics>
-  | (Omit<VulnerableDiagnostics, "attack"> & {
-      attack: Omit<AttackPattern, "string">;
-    })
-  | InvalidDiagnostics;
+type Checker = "automaton" | "fuzz";
+
+// Only what the result card shows is recorded.
+// It keeps the permalink format apart from changes of `Diagnostics` and leaves out the expanded attack string.
+export type DiagnosticsSnapshot =
+  | { status: "invalid"; input: string }
+  | { status: "safe"; source: string; flags: string; checker: Checker }
+  | {
+      status: "vulnerable";
+      source: string;
+      flags: string;
+      checker: Checker;
+      complexity: { type: "polynomial" | "exponential"; summary: string };
+      attackPattern: string;
+      hotspot: { start: number; end: number; temperature: "heat" | "normal" }[];
+    }
+  | {
+      status: "unknown";
+      source: string;
+      flags: string;
+      checker?: Checker;
+      error: { kind: string; message?: string };
+    };
 
 /** A result and everything needed to reproduce it, as stored in a permalink. */
 export type Snapshot = {
@@ -27,18 +39,81 @@ export type Snapshot = {
   build: Build;
   input: string;
   params: CheckParams;
-  result: Result;
+  result: DiagnosticsSnapshot;
   time: number;
   date: string;
 };
 
 const PREFIX = "r=";
 
-export const toResult = (diagnostics: Diagnostics): Result => {
-  if (diagnostics.status !== "vulnerable") return diagnostics;
-  const { string: _string, ...attack } = diagnostics.attack;
-  return { ...diagnostics, attack };
+const snapshotDiagnostics = (
+  input: string,
+  result: Diagnostics | InvalidInput,
+): DiagnosticsSnapshot => {
+  switch (result.status) {
+    case "invalid":
+      return { status: "invalid", input };
+    case "safe":
+      return {
+        status: "safe",
+        source: result.source,
+        flags: result.flags,
+        checker: result.checker,
+      };
+    case "vulnerable":
+      return {
+        status: "vulnerable",
+        source: result.source,
+        flags: result.flags,
+        checker: result.checker,
+        complexity: {
+          type: result.complexity.type,
+          summary: result.complexity.summary,
+        },
+        attackPattern: result.attack.pattern,
+        hotspot: result.hotspot.map(({ start, end, temperature }) => ({
+          start,
+          end,
+          temperature,
+        })),
+      };
+    case "unknown":
+      return {
+        status: "unknown",
+        source: result.source,
+        flags: result.flags,
+        checker: result.checker,
+        error:
+          "message" in result.error
+            ? { kind: result.error.kind, message: result.error.message }
+            : { kind: result.error.kind },
+      };
+  }
 };
+
+export const makeSnapshot = ({
+  build,
+  input,
+  params,
+  result,
+  time,
+  date,
+}: {
+  build: Build;
+  input: string;
+  params: CheckParams;
+  result: Diagnostics | InvalidInput;
+  time: number;
+  date: string;
+}): Snapshot => ({
+  v: 1,
+  build,
+  input,
+  params,
+  result: snapshotDiagnostics(input, result),
+  time,
+  date,
+});
 
 /** Whether the snapshot was recorded for the given input and parameters. */
 export const sameRequest = (
@@ -49,7 +124,7 @@ export const sameRequest = (
   snapshot.input === input &&
   JSON.stringify(snapshot.params) === JSON.stringify(params);
 
-export const summarize = (result: Result): string =>
+export const summarize = (result: DiagnosticsSnapshot): string =>
   result.status === "vulnerable"
     ? `${result.status} (${result.complexity.summary})`
     : result.status;

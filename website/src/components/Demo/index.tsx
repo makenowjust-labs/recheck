@@ -7,9 +7,10 @@ import { loadChecker } from './checker';
 import DemoInput from './DemoInput';
 import DemoResult from './DemoResult';
 import { extract, parseParams } from './params';
-import { decode, encode, sameRequest, summarize, toResult } from './permalink';
+import { decode, encode, makeSnapshot, sameRequest, summarize } from './permalink';
 
-import type { Result, Snapshot } from './permalink';
+import type { Diagnostics } from 'recheck';
+import type { InvalidInput, Snapshot } from './permalink';
 
 const Demo: React.FC = () => {
   const { siteConfig } = useDocusaurusContext();
@@ -60,38 +61,35 @@ const Demo: React.FC = () => {
     }
 
     const start = Date.now();
-    let result: Result;
+    let result: Diagnostics | InvalidInput;
     if (extracted === null) {
-      result = { input, status: 'invalid' };
+      result = { status: 'invalid' };
     } else {
       const { logger, ...checkParams } = params;
       const controller = new AbortController();
       abortControllerRef.current = controller;
-      result = toResult(
-        await checker.check(extracted.source, extracted.flags, {
-          ...checkParams,
-          logger:
-            logger === 'on'
-              ? (message: string) => {
-                  console.log(message);
-                  setLog((log) => log.concat(message));
-                }
-              : undefined,
-          signal: controller.signal,
-        }),
-      );
+      result = await checker.check(extracted.source, extracted.flags, {
+        ...checkParams,
+        logger:
+          logger === 'on'
+            ? (message: string) => {
+                console.log(message);
+                setLog((log) => log.concat(message));
+              }
+            : undefined,
+        signal: controller.signal,
+      });
       abortControllerRef.current = null;
     }
 
-    const snapshot: Snapshot = {
-      v: 1,
+    const snapshot = makeSnapshot({
       build,
       input,
       params,
       result,
       time: Date.now() - start,
       date: new Date().toISOString(),
-    };
+    });
     window.history.replaceState(null, '', `#${encode(snapshot)}`);
     setCurrent(snapshot);
     setRunning(false);
