@@ -34,12 +34,14 @@ jobs:
             ~/.cache/coursier
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
+      # The key covers everything sbt compiles, so an unchanged tree reuses the build and a changed one continues from the latest build.
       - name: Cache Build Files
         uses: actions/cache@v6
         with:
           path: |
             **/target
-          key: ${{ runner.os }}-build-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ hashFiles('modules/**', 'build.sbt', 'project/**') }}
+          restore-keys: ${{ runner.os }}-build-
       - name: Build
         run: sbt "compile; js/fullLinkJS; cli/assembly"
       - id: save-version
@@ -81,7 +83,7 @@ jobs:
         with:
           path: |
             **/target
-          key: ${{ runner.os }}-build-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ hashFiles('modules/**', 'build.sbt', 'project/**') }}
       - name: Lint
         run: sbt "scalafmtCheckAll; scalafmtSbtCheck; scalafixAll --check"
 
@@ -267,7 +269,8 @@ jobs:
         with:
           path: |
             **/target
-          key: ${{ runner.os }}-build-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ hashFiles('modules/**', 'build.sbt', 'project/**') }}
+          restore-keys: ${{ runner.os }}-build-
       - if: steps.restore-binary.outputs.cache-hit != 'true' && runner.os == 'Windows'
         name: Set up MSVC environment
         uses: TheMrMilchmann/setup-msvc-dev@v4
@@ -371,7 +374,7 @@ jobs:
         with:
           path: |
             **/target
-          key: ${{ runner.os }}-build-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ hashFiles('modules/**', 'build.sbt', 'project/**') }}
       - id: check-published
         name: Check whether the version is already published
         run: |
@@ -425,7 +428,7 @@ jobs:
         with:
           path: |
             **/target
-          key: ${{ runner.os }}-build-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ hashFiles('modules/**', 'build.sbt', 'project/**') }}
       - name: Install
         run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v8
