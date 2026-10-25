@@ -1,3 +1,9 @@
+# dev
+
+Misc:
+
+- [#1929](https://github.com/makenowjust-labs/recheck/pull/1929) Replace lerna with pnpm's own commands ([@makenowjust](https://github.com/makenowjust))
+
 # 4.6.1 (2026-10-25)
 
 New Features:
