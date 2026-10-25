@@ -3,6 +3,6 @@
   "name": "recheck",
   "version": "0.0.0",
   "devDependencies": {
-    "lerna": "10.0.1"
+    "lerna": "10.1.1"
   }
 }
