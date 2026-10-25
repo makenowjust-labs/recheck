@@ -34,7 +34,6 @@ jobs:
             ~/.cache/coursier
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
-      # The key covers everything sbt compiles, so an unchanged tree reuses the build and a changed one continues from the latest build.
       - name: Cache Build Files
         uses: actions/cache@v6
         with:
