@@ -40,7 +40,7 @@ jobs:
         with:
           path: |
             **/target
-          key: ${{ runner.os }}-build-${{ hashFiles('modules/**', 'build.sbt', 'project/**') }}
+          key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
           restore-keys: ${{ runner.os }}-build-
       - name: Build
         run: sbt "compile; js/fullLinkJS; cli/assembly"
@@ -86,7 +86,7 @@ jobs:
         with:
           path: |
             **/target
-          key: ${{ runner.os }}-build-${{ hashFiles('modules/**', 'build.sbt', 'project/**') }}
+          key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
       - name: Lint
         run: sbt "scalafmtCheckAll; scalafmtSbtCheck; scalafixAll --check"
 
@@ -249,7 +249,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ${{ matrix.local_path }}
-          key: native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('modules/**/src/main/**', 'build.sbt', 'project/**') }}
+          key: native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('modules/**/src/main/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
       - if: steps.restore-binary.outputs.cache-hit != 'true'
         uses: coursier/setup-action@v3
         with:
@@ -270,7 +270,7 @@ jobs:
         with:
           path: |
             **/target
-          key: ${{ runner.os }}-build-${{ hashFiles('modules/**', 'build.sbt', 'project/**') }}
+          key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
           restore-keys: ${{ runner.os }}-build-
       - if: steps.restore-binary.outputs.cache-hit != 'true' && runner.os == 'Windows'
         name: Set up MSVC environment
@@ -375,7 +375,7 @@ jobs:
         with:
           path: |
             **/target
-          key: ${{ runner.os }}-build-${{ hashFiles('modules/**', 'build.sbt', 'project/**') }}
+          key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
       - id: check-published
         name: Check whether the version is already published
         run: |
@@ -429,7 +429,7 @@ jobs:
         with:
           path: |
             **/target
-          key: ${{ runner.os }}-build-${{ hashFiles('modules/**', 'build.sbt', 'project/**') }}
+          key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
       - name: Install
         run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v8
