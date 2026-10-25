@@ -3,6 +3,7 @@ import React from 'react';
 import NumberInput from '../form/NumberInput';
 import Select from '../form/Select';
 import TextArea from '../form/TextArea';
+import styles from './Demo.module.css';
 import { params } from './params';
 
 import type { Param } from './params';
@@ -39,6 +40,31 @@ const DemoParams: React.FC = () => (
   </details>
 );
 
+const LOCAL_NOTE = 'Everything runs in your browser. The regular expression and the results are never sent to a server.';
+
+const LocalNote: React.FC = () => {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div className={styles.localNote}>
+      <span className={styles.localNoteText}>{LOCAL_NOTE}</span>
+      <button
+        type="button"
+        className={styles.localNoteIcon}
+        aria-label={LOCAL_NOTE}
+        aria-expanded={open}
+        onClick={() => setOpen((open) => !open)}
+      >
+        i
+      </button>
+      {open ? (
+        <div className={styles.localNotePopover} role="tooltip">
+          {LOCAL_NOTE}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 type Props = {
   check: () => void;
   cancel: () => void;
@@ -58,8 +84,9 @@ const DemoInput: React.FC<Props> = ({ check, cancel, running }) => (
           </div>
         </div>
 
-        <div className="row margin-top--sm row--no-gutters">
-          <div className="col col--12 text--right">
+        <div className={`margin-top--sm ${styles.actions}`}>
+          <LocalNote />
+          <div>
             {running ? (
               <button className="button button--secondary" onClick={() => cancel()}>
                 Cancel

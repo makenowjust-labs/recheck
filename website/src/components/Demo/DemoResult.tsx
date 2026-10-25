@@ -5,8 +5,9 @@ import { formatBuild } from './permalink';
 
 import type { Build, Snapshot } from './permalink';
 
-export const REPORTS_URL = 'https://github.com/makenowjust-labs/recheck/discussions/categories/reports';
-export const REPORTS_EMAIL = 'make.just.on@gmail.com';
+const REPORTS_URL = 'https://github.com/makenowjust-labs/recheck/discussions/categories/reports';
+const REPORTS_EMAIL = 'make.just.on@gmail.com';
+const SPONSORS_URL = 'https://github.com/sponsors/makenowjust';
 
 const Row: React.FC<{ title: string; children?: React.ReactNode }> = ({ title, children }) => (
   <div className="row">
@@ -23,7 +24,7 @@ const Badge: React.FC<{ kind: string; children: string }> = ({ kind, children })
   </p>
 );
 
-export const CopyButton: React.FC<{ text: string }> = ({ text }) => {
+const CopyButton: React.FC<{ text: string }> = ({ text }) => {
   const [copied, setCopied] = React.useState(false);
   const copy = async () => {
     await navigator.clipboard.writeText(text);
@@ -74,42 +75,6 @@ const Hotspot: React.FC<{ diagnostics: Extract<Snapshot['result'], { status: 'vu
     <pre>
       <code>/{spots}/</code>
     </pre>
-  );
-};
-
-const reportSnippet = (
-  diagnostics: Extract<Snapshot['result'], { status: 'vulnerable' }>,
-  build: Build,
-  permalink: string,
-): string =>
-  [
-    `Detected by recheck ${formatBuild(build)}: ${permalink}`,
-    `RegExp: /${diagnostics.source}/${diagnostics.flags}`,
-    `Complexity: ${diagnostics.complexity.summary} (${diagnostics.checker})`,
-    `Attack string: ${diagnostics.attack.pattern}`,
-  ].join('\n');
-
-const Report: React.FC<{
-  diagnostics: Extract<Snapshot['result'], { status: 'vulnerable' }>;
-  build: Build;
-  permalink: string;
-}> = ({ diagnostics, build, permalink }) => {
-  const snippet = reportSnippet(diagnostics, build, permalink);
-  return (
-    <Row title="Report">
-      <pre>
-        <code>{snippet}</code>
-      </pre>
-      <p>
-        <CopyButton text={snippet} />
-      </p>
-      <p>
-        Found a ReDoS vulnerability with recheck? Please share it in the{' '}
-        <a href={REPORTS_URL}>Reports</a> discussions, or by email to{' '}
-        <a href={`mailto:${REPORTS_EMAIL}`}>{REPORTS_EMAIL}</a> if it cannot be public yet. Mentioning recheck and
-        this permalink in your advisory also helps the project.
-      </p>
-    </Row>
   );
 };
 
@@ -218,18 +183,6 @@ const DemoResult: React.FC<Props> = ({ title, result, time, log, build, date, pe
         );
         break;
     }
-    rows.push(
-      <Row title="Build" key="build">
-        <p>{formatBuild(build)}</p>
-      </Row>,
-    );
-    if (date !== null) {
-      rows.push(
-        <Row title="Date" key="date">
-          <p>{new Date(date).toLocaleString()}</p>
-        </Row>,
-      );
-    }
     if (permalink !== null) {
       rows.push(
         <Row title="Permalink" key="permalink">
@@ -237,11 +190,21 @@ const DemoResult: React.FC<Props> = ({ title, result, time, log, build, date, pe
             <a href={permalink}>{permalink.length > 80 ? `${permalink.slice(0, 80)}…` : permalink}</a>{' '}
             <CopyButton text={permalink} />
           </p>
+          {result.status === 'vulnerable' ? (
+            <div className="alert alert--info margin-top--sm" role="note">
+              <p>
+                This permalink records the result and the parameters, so you can cite it in a vulnerability report.
+                Once the vulnerability is fixed and disclosed, please let us know in <a href={REPORTS_URL}>Reports</a>{' '}
+                or by email to <a href={`mailto:${REPORTS_EMAIL}`}>{REPORTS_EMAIL}</a>. We are going to list projects
+                using recheck and vulnerabilities found with it on this site.
+              </p>
+              <p className="margin-bottom--none">
+                If recheck helped you, consider supporting it on <a href={SPONSORS_URL}>GitHub Sponsors</a>.
+              </p>
+            </div>
+          ) : null}
         </Row>,
       );
-      if (result.status === 'vulnerable') {
-        rows.push(<Report key="report" diagnostics={result} build={build} permalink={permalink} />);
-      }
     }
   }
 
@@ -257,6 +220,12 @@ const DemoResult: React.FC<Props> = ({ title, result, time, log, build, date, pe
           {logRow}
         </div>
       </div>
+      {result !== null ? (
+        <div className={`card__footer ${styles.demoResultMeta}`}>
+          recheck {formatBuild(build)}
+          {date !== null ? ` · ${new Date(date).toLocaleString()}` : null}
+        </div>
+      ) : null}
     </div>
   );
 };

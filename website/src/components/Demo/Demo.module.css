@@ -51,3 +51,62 @@
   max-height: 10em;
   overflow-y: auto;
 }
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+.localNote {
+  position: relative;
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  color: var(--ifm-color-emphasis-700);
+}
+
+.localNoteIcon {
+  display: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.localNotePopover {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 10;
+  width: max-content;
+  max-width: 20rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--ifm-global-radius);
+  background: var(--ifm-background-surface-color);
+  box-shadow: var(--ifm-global-shadow-md);
+}
+
+@media (max-width: 996px) {
+  .localNoteText {
+    display: none;
+  }
+
+  .localNoteIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.demoResultMeta {
+  font-size: 0.75rem;
+  color: var(--ifm-color-emphasis-600);
+  text-align: right;
+}

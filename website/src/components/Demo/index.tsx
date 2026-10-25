@@ -91,16 +91,12 @@ const Demo: React.FC = () => {
   return (
     <FormProvider {...methods}>
       <div className="container">
-        <div className="alert alert--info margin-vert--lg" role="note">
-          <p>
-            Everything runs in your browser. The regular expression and the results are never sent to a server.
-          </p>
-          <p className="margin-bottom--none">
-            {build.type === 'head'
-              ? `This Playground runs recheck built from commit ${build.commit.slice(0, 7)} of the main branch. Results may change between builds, so a permalink records the build it was produced with.`
-              : `This Playground runs recheck ${formatBuild(build)}.`}
-          </p>
-        </div>
+        {build.type === 'head' ? (
+          <div className="alert alert--info margin-vert--lg" role="note">
+            This Playground runs recheck built from commit {build.commit.slice(0, 7)} of the main branch. Results may
+            change between builds, so a permalink records the build it was produced with.
+          </div>
+        ) : null}
 
         {recorded !== null && !sameBuild(recorded.build, build) ? (
           <div className="alert alert--warning margin-vert--lg" role="alert">
@@ -110,18 +106,6 @@ const Demo: React.FC = () => {
         ) : null}
 
         <DemoInput running={running} check={check} cancel={cancel} />
-
-        {recorded !== null ? (
-          <DemoResult
-            title="Recorded Result"
-            result={recorded.result}
-            time={recorded.time}
-            log={[]}
-            build={recorded.build}
-            date={recorded.date}
-            permalink={permalink}
-          />
-        ) : null}
 
         {running || current !== null ? (
           <DemoResult
@@ -143,6 +127,18 @@ const Demo: React.FC = () => {
               )
             ) : null}
           </DemoResult>
+        ) : null}
+
+        {recorded !== null ? (
+          <DemoResult
+            title="Recorded Result"
+            result={recorded.result}
+            time={recorded.time}
+            log={[]}
+            build={recorded.build}
+            date={recorded.date}
+            permalink={permalink}
+          />
         ) : null}
       </div>
     </FormProvider>
