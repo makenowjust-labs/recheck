@@ -17,7 +17,8 @@ jobs:
     timeout-minutes: 5
     name: Scala Build
     outputs:
-      version: ${{ steps.save-version.outputs.version }}
+      version: ${{ steps.save-settings.outputs.version }}
+      graalvm: ${{ steps.save-settings.outputs.graalvm }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -39,15 +40,19 @@ jobs:
         with:
           path: |
             **/target
-          key: ${{ runner.os }}-build-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
+          restore-keys: ${{ runner.os }}-build-
       - name: Build
         run: sbt "compile; js/fullLinkJS; cli/assembly"
-      - id: save-version
-        name: Save Version
+      - id: save-settings
+        name: Save Settings
         run: |
-          version="$(sbt --server --error "print coreJVM/releaseVersion" | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | grep -E '^[0-9]' | tail -n1)"
-          echo -n "version=$version"
-          echo -n "version=$version" >> $GITHUB_OUTPUT
+          setting() { sbt --server --error "print $1" | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | grep -v '^\s*$' | grep -v '^\[' | tail -n1; }
+          version="$(setting coreJVM/releaseVersion)"
+          graalvm="$(setting cli/nativeImageJvm):$(setting cli/nativeImageVersion)"
+          echo "version=$version"
+          echo "graalvm=$graalvm"
+          { echo "version=$version"; echo "graalvm=$graalvm"; } >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v7
         with:
           path: target/recheck-js-opt/recheck.js
@@ -81,7 +86,7 @@ jobs:
         with:
           path: |
             **/target
-          key: ${{ runner.os }}-build-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
       - name: Lint
         run: sbt "scalafmtCheckAll; scalafmtSbtCheck; scalafixAll --check"
 
@@ -239,11 +244,19 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: coursier/setup-action@v3
+      - if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        id: restore-binary
+        uses: actions/cache/restore@v6
         with:
-          jvm: graalvm-community:25.0.1
+          path: ${{ matrix.local_path }}
+          key: native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('modules/**/src/main/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
+      - if: steps.restore-binary.outputs.cache-hit != 'true'
+        uses: coursier/setup-action@v3
+        with:
+          jvm: ${{ needs.build.outputs.graalvm }}
           apps: sbt
-      - name: Cache SBT
+      - if: steps.restore-binary.outputs.cache-hit != 'true'
+        name: Cache SBT
         uses: actions/cache@v6
         with:
           path: |
@@ -251,20 +264,28 @@ jobs:
             ~/.cache/coursier
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
-      - name: Cache Build Files
+      - if: steps.restore-binary.outputs.cache-hit != 'true'
+        name: Cache Build Files
         uses: actions/cache@v6
         with:
           path: |
             **/target
-          key: ${{ runner.os }}-build-${{ github.sha }}
-      - if: runner.os == 'Windows'
+          key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
+          restore-keys: ${{ runner.os }}-build-
+      - if: steps.restore-binary.outputs.cache-hit != 'true' && runner.os == 'Windows'
         name: Set up MSVC environment
         uses: TheMrMilchmann/setup-msvc-dev@v4
         with:
           arch: x64
-      - run: sbt cli/nativeImage
+      - if: steps.restore-binary.outputs.cache-hit != 'true'
+        run: sbt cli/nativeImage
         env:
           NATIVE_IMAGE_INSTALLED: true
+      - if: steps.restore-binary.outcome == 'success' && steps.restore-binary.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ matrix.local_path }}
+          key: ${{ steps.restore-binary.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v7
         with:
           path: ${{ matrix.local_path }}
@@ -354,7 +375,7 @@ jobs:
         with:
           path: |
             **/target
-          key: ${{ runner.os }}-build-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
       - id: check-published
         name: Check whether the version is already published
         run: |
@@ -408,7 +429,7 @@ jobs:
         with:
           path: |
             **/target
-          key: ${{ runner.os }}-build-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
       - name: Install
         run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v8
