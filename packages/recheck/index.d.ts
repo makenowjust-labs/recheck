@@ -265,9 +265,7 @@ export type HasAbortSignal = {
  *   As a result, it is unknown whether the RegExp is safe or vulnerable.
  */
 export type Diagnostics =
-  | SafeDiagnostics
-  | VulnerableDiagnostics
-  | UnknownDiagnostics;
+  SafeDiagnostics | VulnerableDiagnostics | UnknownDiagnostics;
 
 /**
  * SafeDiagnostics is a diagnostics against a safe RegExp.
