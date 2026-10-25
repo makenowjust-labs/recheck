@@ -13,6 +13,7 @@ Fixes:
 - [#1651](https://github.com/makenowjust-labs/recheck/pull/1651) Update sources to Scala 3 ([@makenowjust](https://github.com/makenowjust))
 - [#1697](https://github.com/makenowjust-labs/recheck/pull/1697) Add `d.ts` to the ESLint plugin ([@makenowjust](https://github.com/makenowjust))
 - [#1912](https://github.com/makenowjust-labs/recheck/pull/1912) Fix #1910: explicitly set the stdio encoding to UTF-8 ([@makenowjust](https://github.com/makenowjust))
+- [#1919](https://github.com/makenowjust-labs/recheck/pull/1919) Fix #1741: do not anchor the end of a sticky pattern ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
