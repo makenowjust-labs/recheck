@@ -46,6 +46,13 @@ const Demo: React.FC = () => {
     const params = parseParams(values);
     const extracted = extract(input);
 
+    if (
+      recorded !== null &&
+      (recorded.input !== input || JSON.stringify(recorded.params) !== JSON.stringify(params))
+    ) {
+      setRecorded(null);
+    }
+
     const start = Date.now();
     let result: Snapshot['result'];
     if (extracted === null) {
@@ -122,7 +129,7 @@ const Demo: React.FC = () => {
                 <div className="alert alert--success margin-bottom--md">The result matches the recorded one.</div>
               ) : (
                 <div className="alert alert--warning margin-bottom--md">
-                  The result differs from the recorded one ({summarize(recorded.result)}).
+                  The result differs from the recorded one: {summarize(recorded.result)}
                 </div>
               )
             ) : null}
