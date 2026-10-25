@@ -33,12 +33,12 @@
     "synckit": "0.12.3"
   },
   "optionalDependencies": {
-    "recheck-jar": "0.0.0",
-    "recheck-linux-arm64": "0.0.0",
-    "recheck-linux-x64": "0.0.0",
-    "recheck-macos-x64": "0.0.0",
-    "recheck-macos-arm64": "0.0.0",
-    "recheck-windows-x64": "0.0.0"
+    "recheck-jar": "workspace:*",
+    "recheck-linux-arm64": "workspace:*",
+    "recheck-linux-x64": "workspace:*",
+    "recheck-macos-x64": "workspace:*",
+    "recheck-macos-arm64": "workspace:*",
+    "recheck-windows-x64": "workspace:*"
   },
   "devDependencies": {
     "@types/jest": "30.0.0",

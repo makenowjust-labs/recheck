@@ -27,7 +27,7 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "recheck": "0.0.0"
+    "recheck": "workspace:*"
   },
   "peerDependencies": {
     "eslint": ">= 3"

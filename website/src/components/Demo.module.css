@@ -9,7 +9,42 @@
 }
 
 .demoResultLoading {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 128px;
+  height: 128px;
+}
+
+.demoResultLoading > span {
+  width: 16px;
+  height: 64px;
+  background: var(--ifm-font-color-base);
+  animation: demoResultLoadingBar 1s ease-in-out infinite;
+}
+
+.demoResultLoading > span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.demoResultLoading > span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.demoResultLoading > span:nth-child(4) {
+  animation-delay: 0.45s;
+}
+
+@keyframes demoResultLoadingBar {
+  0%,
+  100% {
+    transform: scaleY(0.5);
+  }
+
+  50% {
+    transform: scaleY(1);
+  }
 }
 
 .demoResultLog {
