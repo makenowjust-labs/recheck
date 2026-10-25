@@ -1,10 +1,17 @@
 // @ts-check
 
+import { createRequire } from "node:module";
+
 import { themes } from "prism-react-renderer";
 import katex from "rehype-katex";
 import math from "remark-math";
 
 const { github: lightCodeTheme, dracula: darkCodeTheme } = themes;
+
+// The stylesheet is resolved from `rehype-katex` so that it always matches the KaTeX version used for rendering.
+const katexCss = createRequire(
+  createRequire(import.meta.url).resolve("rehype-katex"),
+).resolve("katex/dist/katex.min.css");
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
@@ -45,7 +52,7 @@ const config = {
           rehypePlugins: [katex],
         },
         theme: {
-          customCss: "./src/css/custom.css",
+          customCss: ["./src/css/custom.css", katexCss],
         },
         gtag: {
           trackingID: "G-GY3CQZBPM2",
@@ -153,15 +160,6 @@ const config = {
         contextualSearch: false,
       },
     }),
-
-  stylesheets: [
-    {
-      href: "https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/katex.min.css",
-      integrity:
-        "sha384-nH0MfJ44wi1dd7w6jinlyBgljjS8EJAh2JBoRad8a3VDw2K69vfaaqm4WnR+gXtA",
-      crossorigin: "anonymous",
-    },
-  ],
 
   customFields: {
     version: process.env["RECHECK_VERSION"] ?? "0.0.0-dev",
