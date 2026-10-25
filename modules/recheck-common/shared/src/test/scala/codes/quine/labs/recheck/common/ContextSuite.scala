@@ -6,7 +6,7 @@ class ContextSuite extends munit.FunSuite:
   test("Context.apply"):
     assertEquals(Context().isInterrupted(), false)
     assertEquals(Context(timeout = 1.second).isInterrupted(), false)
-    assertEquals(Context(timeout = -1.second).isInterrupted(), true)
+    assertEquals(Context(timeout = (-1).second).isInterrupted(), true)
     assertEquals(Context(timeout = Duration.Inf).isInterrupted(), false)
     assertEquals(Context(timeout = Duration.MinusInf).isInterrupted(), true)
 
@@ -44,7 +44,7 @@ class ContextSuite extends munit.FunSuite:
     interceptMessage[TimeoutException](
       "timeout at modules/recheck-common/shared/src/test/scala/codes/quine/labs/recheck/common/ContextSuite.scala:47"
     ):
-      Context(timeout = -1.second).interrupt:
+      Context(timeout = (-1).second).interrupt:
         called = true
         42
     assertEquals(called, false)
