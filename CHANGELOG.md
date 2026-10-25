@@ -3,6 +3,7 @@
 Misc:
 
 - [#1925](https://github.com/makenowjust-labs/recheck/pull/1925) Add codecov.yml ([@makenowjust](https://github.com/makenowjust))
+- [#1926](https://github.com/makenowjust-labs/recheck/pull/1926) Retire scala steward ([@makenowjust](https://github.com/makenowjust))
 
 # 4.6.0 (2026-10-25)
 
