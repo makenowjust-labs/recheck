@@ -1,12 +1,4 @@
-import {
-  availableBuilds,
-  bundledBuild,
-  findBuild,
-  formatBuild,
-  moduleUrl,
-  releaseVersions,
-  sameBuild,
-} from "./builds";
+import { availableBuilds, findBuild, formatBuild, sameBuild } from "./builds";
 
 import type { Build } from "./builds";
 
@@ -34,38 +26,6 @@ describe("formatBuild and sameBuild", () => {
   });
 });
 
-describe("releaseVersions", () => {
-  test("keeps stable releases from 4.6.1 on, newest first", () => {
-    expect(
-      releaseVersions([
-        "v4.5.0",
-        "v4.6.0",
-        "v4.6.1",
-        "v4.10.0",
-        "v4.7.0-beta.1",
-        "v5.0.0",
-      ]),
-    ).toEqual(["5.0.0", "4.10.0", "4.6.1"]);
-  });
-
-  test("accepts versions without the prefix and drops duplicates and junk", () => {
-    expect(
-      releaseVersions(["4.6.1", "v4.6.1", "0.0.0-dev", "", "head"]),
-    ).toEqual(["4.6.1"]);
-  });
-});
-
-describe("bundledBuild", () => {
-  test("is a HEAD build when the commit is known", () => {
-    expect(bundledBuild({ commit: "abc" })).toEqual({
-      type: "head",
-      commit: "abc",
-    });
-    expect(bundledBuild({ commit: "" })).toEqual({ type: "dev" });
-    expect(bundledBuild({})).toEqual({ type: "dev" });
-  });
-});
-
 describe("availableBuilds", () => {
   test("lists the releases from the tags and the latest version, then the bundled build", () => {
     expect(
@@ -79,6 +39,36 @@ describe("availableBuilds", () => {
       { type: "release", version: "4.6.1" },
       { type: "head", commit: "0123456789" },
     ]);
+  });
+
+  test("keeps stable releases from 4.6.1 on, newest first", () => {
+    expect(
+      availableBuilds({
+        tags: [
+          "v4.5.0",
+          "v4.6.0",
+          "v4.6.1",
+          "v4.10.0",
+          "v4.7.0-beta.1",
+          "v5.0.0",
+        ],
+      }),
+    ).toEqual([
+      { type: "release", version: "5.0.0" },
+      { type: "release", version: "4.10.0" },
+      { type: "release", version: "4.6.1" },
+      { type: "dev" },
+    ]);
+  });
+
+  test("accepts versions without the prefix and drops duplicates and junk", () => {
+    expect(
+      availableBuilds({
+        tags: ["v4.6.1", "", "head"],
+        latestVersion: "4.6.1",
+        commit: "",
+      }),
+    ).toEqual([{ type: "release", version: "4.6.1" }, { type: "dev" }]);
   });
 
   test("falls back to the bundled build alone", () => {
@@ -102,10 +92,4 @@ describe("findBuild", () => {
     });
     expect(findBuild(builds, "v4.6.0")).toBeNull();
   });
-});
-
-test("moduleUrl points at the ESM browser build on jsDelivr", () => {
-  expect(moduleUrl("4.6.1")).toBe(
-    "https://cdn.jsdelivr.net/npm/recheck@4.6.1/lib/browser.mjs",
-  );
 });

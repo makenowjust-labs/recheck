@@ -19,7 +19,7 @@ export const sameBuild = (a: Build, b: Build): boolean =>
   formatBuild(a) === formatBuild(b);
 
 /** The first release that ships `lib/browser.mjs`. */
-export const FIRST_ESM_VERSION = "4.6.1";
+const FIRST_ESM_VERSION = "4.6.1";
 
 type Version = [number, number, number];
 
@@ -34,7 +34,7 @@ const compareVersions = (a: Version, b: Version): number =>
   a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 
 /** Stable release versions the Playground can load, newest first. */
-export const releaseVersions = (candidates: readonly string[]): string[] => {
+const releaseVersions = (candidates: readonly string[]): string[] => {
   const first = parseVersion(FIRST_ESM_VERSION)!;
   const versions = new Map<string, Version>();
   for (const candidate of candidates) {
@@ -49,7 +49,7 @@ export const releaseVersions = (candidates: readonly string[]): string[] => {
 };
 
 /** The build compiled into this site. */
-export const bundledBuild = (customFields: Record<string, unknown>): Build => {
+const bundledBuild = (customFields: Record<string, unknown>): Build => {
   const commit = customFields["commit"];
   return typeof commit === "string" && commit !== ""
     ? { type: "head", commit }
@@ -73,9 +73,6 @@ export const availableBuilds = (
     bundledBuild(customFields),
   ];
 };
-
-export const moduleUrl = (version: string): string =>
-  `https://cdn.jsdelivr.net/npm/recheck@${version}/lib/browser.mjs`;
 
 /** Finds the build shown with the given label in the version selector. */
 export const findBuild = (

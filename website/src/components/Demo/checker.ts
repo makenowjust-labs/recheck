@@ -1,11 +1,13 @@
 import * as bundled from "recheck/lib/browser";
 
-import { moduleUrl } from "./builds";
 import { importModule } from "./importModule";
 
 import type { Build } from "./builds";
 
 export type Checker = Pick<typeof bundled, "check">;
+
+const moduleUrl = (version: string): string =>
+  `https://cdn.jsdelivr.net/npm/recheck@${version}/lib/browser.mjs`;
 
 const loading = new Map<string, Promise<Checker>>();
 
