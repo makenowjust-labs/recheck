@@ -1,0 +1,83 @@
+import {
+  availableBuilds,
+  bundledBuild,
+  findBuild,
+  moduleUrl,
+  releaseVersions,
+} from "./builds";
+
+describe("releaseVersions", () => {
+  test("keeps stable releases from 4.6.1 on, newest first", () => {
+    expect(
+      releaseVersions([
+        "v4.5.0",
+        "v4.6.0",
+        "v4.6.1",
+        "v4.10.0",
+        "v4.7.0-beta.1",
+        "v5.0.0",
+      ]),
+    ).toEqual(["5.0.0", "4.10.0", "4.6.1"]);
+  });
+
+  test("accepts versions without the prefix and drops duplicates and junk", () => {
+    expect(
+      releaseVersions(["4.6.1", "v4.6.1", "0.0.0-dev", "", "head"]),
+    ).toEqual(["4.6.1"]);
+  });
+});
+
+describe("bundledBuild", () => {
+  test("is a HEAD build when the commit is known", () => {
+    expect(bundledBuild({ commit: "abc" })).toEqual({
+      type: "head",
+      commit: "abc",
+    });
+    expect(bundledBuild({ commit: "" })).toEqual({ type: "dev" });
+    expect(bundledBuild({})).toEqual({ type: "dev" });
+  });
+});
+
+describe("availableBuilds", () => {
+  test("lists the releases from the tags and the latest version, then the bundled build", () => {
+    expect(
+      availableBuilds({
+        tags: ["v4.6.0", "v4.6.1"],
+        latestVersion: "4.6.2",
+        commit: "0123456789",
+      }),
+    ).toEqual([
+      { type: "release", version: "4.6.2" },
+      { type: "release", version: "4.6.1" },
+      { type: "head", commit: "0123456789" },
+    ]);
+  });
+
+  test("falls back to the bundled build alone", () => {
+    expect(availableBuilds({ latestVersion: "0.0.0-dev" })).toEqual([
+      { type: "dev" },
+    ]);
+  });
+});
+
+describe("findBuild", () => {
+  const builds = availableBuilds({ tags: ["v4.6.1"], commit: "0123456789" });
+
+  test("maps a selector label back to its build", () => {
+    expect(findBuild(builds, "v4.6.1")).toEqual({
+      type: "release",
+      version: "4.6.1",
+    });
+    expect(findBuild(builds, "HEAD (0123456)")).toEqual({
+      type: "head",
+      commit: "0123456789",
+    });
+    expect(findBuild(builds, "v4.6.0")).toBeNull();
+  });
+});
+
+test("moduleUrl points at the ESM browser build on jsDelivr", () => {
+  expect(moduleUrl("4.6.1")).toBe(
+    "https://cdn.jsdelivr.net/npm/recheck@4.6.1/lib/browser.mjs",
+  );
+});

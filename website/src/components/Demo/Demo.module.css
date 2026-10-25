@@ -59,6 +59,10 @@
   gap: 1rem;
 }
 
+.version {
+  flex: none;
+}
+
 .localNote {
   position: relative;
   display: flex;

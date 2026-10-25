@@ -1,5 +1,6 @@
 // @ts-check
 
+import { execSync } from "node:child_process";
 import { createRequire } from "node:module";
 
 import { themes } from "prism-react-renderer";
@@ -11,6 +12,17 @@ const { github: lightCodeTheme, dracula: darkCodeTheme } = themes;
 const katexCss = createRequire(
   createRequire(import.meta.url).resolve("rehype-katex"),
 ).resolve("katex/dist/katex.min.css");
+
+/** Release tags the Playground offers as selectable versions. */
+const releaseTags = () => {
+  try {
+    return execSync("git tag --list 'v*'", { encoding: "utf8" })
+      .split("\n")
+      .filter((tag) => tag !== "");
+  } catch {
+    return [];
+  }
+};
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
@@ -159,6 +171,7 @@ const config = {
   customFields: {
     latestVersion: process.env["RECHECK_LATEST_VERSION"] ?? "0.0.0-dev",
     commit: process.env["RECHECK_COMMIT"] ?? "",
+    tags: releaseTags(),
   },
 };
 

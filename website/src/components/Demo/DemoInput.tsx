@@ -5,8 +5,10 @@ import Select from '../form/Select';
 import TextArea from '../form/TextArea';
 import styles from './Demo.module.css';
 import { params } from './params';
+import { formatBuild } from './permalink';
 
 import type { Param } from './params';
+import type { Build } from './permalink';
 
 const ParamInput: React.FC<Param> = ({ name, defaultValue, type }) => {
   if (type === 'duration') {
@@ -69,9 +71,11 @@ type Props = {
   check: () => void;
   cancel: () => void;
   running: boolean;
+  builds: Build[];
+  defaultBuild: Build;
 };
 
-const DemoInput: React.FC<Props> = ({ check, cancel, running }) => (
+const DemoInput: React.FC<Props> = ({ check, cancel, running, builds, defaultBuild }) => (
   <div className="card margin-vert--lg">
     <div className="card__header">
       <h3>RegExp</h3>
@@ -86,6 +90,15 @@ const DemoInput: React.FC<Props> = ({ check, cancel, running }) => (
 
         <div className={`margin-top--sm ${styles.actions}`}>
           <LocalNote />
+          <div className={styles.version}>
+            <Select
+              name="version"
+              values={builds.map(formatBuild)}
+              defaultValue={formatBuild(defaultBuild)}
+              aria-label="recheck version"
+              disabled={running}
+            />
+          </div>
           <div>
             {running ? (
               <button className="button button--secondary" onClick={() => cancel()}>

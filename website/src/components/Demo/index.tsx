@@ -1,36 +1,37 @@
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import React from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
-import * as recheck from 'recheck/lib/browser';
 
+import { availableBuilds, findBuild } from './builds';
+import { loadChecker } from './checker';
 import DemoInput from './DemoInput';
 import DemoResult from './DemoResult';
 import { extract, parseParams } from './params';
 import { decode, encode, formatBuild, sameBuild, sameRequest, summarize } from './permalink';
 
-import type { Build, Snapshot } from './permalink';
-
-const buildOf = (customFields: Record<string, unknown>): Build => {
-  const commit = customFields['commit'];
-  return typeof commit === 'string' && commit !== '' ? { type: 'head', commit } : { type: 'dev' };
-};
+import type { Snapshot } from './permalink';
 
 const Demo: React.FC = () => {
   const { siteConfig } = useDocusaurusContext();
-  const build = buildOf(siteConfig.customFields ?? {});
+  const builds = React.useMemo(() => availableBuilds(siteConfig.customFields ?? {}), [siteConfig.customFields]);
+  const defaultBuild = builds[0]!;
 
   const methods = useForm();
   const [running, setRunning] = React.useState(false);
   const [current, setCurrent] = React.useState<Snapshot | null>(null);
   const [log, setLog] = React.useState<string[]>([]);
   const [recorded, setRecorded] = React.useState<Snapshot | null>(null);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
   const abortControllerRef = React.useRef<AbortController | null>(null);
+
+  const build = findBuild(builds, String(methods.watch('version'))) ?? defaultBuild;
 
   React.useEffect(() => {
     const snapshot = decode(window.location.hash);
     if (snapshot !== null) {
       setRecorded(snapshot);
-      methods.reset({ input: snapshot.input, ...snapshot.params });
+      const recordedBuild = findBuild(builds, formatBuild(snapshot.build)) ?? defaultBuild;
+      methods.reset({ input: snapshot.input, ...snapshot.params, version: formatBuild(recordedBuild) });
     }
   }, []);
 
@@ -38,13 +39,24 @@ const Demo: React.FC = () => {
     setRunning(true);
     setCurrent(null);
     setLog([]);
+    setLoadError(null);
 
     const input = String(values['input']);
     const params = parseParams(values);
     const extracted = extract(input);
+    const build = findBuild(builds, String(values['version'])) ?? defaultBuild;
 
     if (recorded !== null && !sameRequest(recorded, input, params)) {
       setRecorded(null);
+    }
+
+    let checker;
+    try {
+      checker = await loadChecker(build);
+    } catch (error) {
+      setLoadError(`Failed to load recheck ${formatBuild(build)}: ${error instanceof Error ? error.message : error}`);
+      setRunning(false);
+      return;
     }
 
     const start = Date.now();
@@ -55,7 +67,7 @@ const Demo: React.FC = () => {
       const { logger, ...checkParams } = params;
       const controller = new AbortController();
       abortControllerRef.current = controller;
-      result = await recheck.check(extracted.source, extracted.flags, {
+      result = await checker.check(extracted.source, extracted.flags, {
         ...checkParams,
         logger:
           logger === 'on'
@@ -94,8 +106,14 @@ const Demo: React.FC = () => {
       <div className="container">
         {build.type === 'head' ? (
           <div className="alert alert--info margin-vert--lg" role="note">
-            This Playground runs recheck built from commit {build.commit.slice(0, 7)} of the main branch. Results may
-            change between builds, so a permalink records the build it was produced with.
+            HEAD is recheck built from commit {build.commit.slice(0, 7)} of the main branch. Its results may change
+            between builds, so a permalink records the build that produced them.
+          </div>
+        ) : null}
+
+        {loadError !== null ? (
+          <div className="alert alert--danger margin-vert--lg" role="alert">
+            {loadError}
           </div>
         ) : null}
 
@@ -106,7 +124,7 @@ const Demo: React.FC = () => {
           </div>
         ) : null}
 
-        <DemoInput running={running} check={check} cancel={cancel} />
+        <DemoInput running={running} check={check} cancel={cancel} builds={builds} defaultBuild={defaultBuild} />
 
         {running || current !== null ? (
           <DemoResult
@@ -114,7 +132,7 @@ const Demo: React.FC = () => {
             result={current?.result ?? null}
             time={current?.time ?? 0}
             log={log}
-            build={build}
+            build={current?.build ?? build}
             date={current?.date ?? null}
             permalink={current === null ? null : permalink}
           >
