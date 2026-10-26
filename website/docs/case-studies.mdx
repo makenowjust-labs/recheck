@@ -1,0 +1,65 @@
+---
+id: case-studies
+title: Case Studies
+---
+
+This page collects vulnerabilities found with `recheck` and projects that use it.
+If `recheck` helped you to find a vulnerability or you use it in your project, please tell us in the [Reports](https://github.com/makenowjust-labs/recheck/discussions/categories/reports) discussion category.
+
+## Vulnerabilities found with recheck
+
+| Date    | Project                                                      | Advisory                                                                                             | Note                                                                                     |
+| ------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| 2022-01 | [markdown-it](https://github.com/markdown-it/markdown-it)    | [CVE-2022-21670](https://github.com/markdown-it/markdown-it/security/advisories/GHSA-6vfc-qv3f-vr6c) | Reported by the author of `recheck`.                                                     |
+| 2022-01 | [marked](https://github.com/markedjs/marked)                 | [CVE-2022-21680](https://github.com/markedjs/marked/security/advisories/GHSA-rrrm-qjm4-v8hf)         | Cubic backtracking. Reported by the author of `recheck`.                                 |
+| 2022-01 | [marked](https://github.com/markedjs/marked)                 | [CVE-2022-21681](https://github.com/markedjs/marked/security/advisories/GHSA-5v2h-r2cx-5xgj)         | Exponential backtracking. Reported by the author of `recheck`.                           |
+| 2025-11 | [Valibot](https://github.com/open-circle/valibot)            | [CVE-2025-66020](https://github.com/open-circle/valibot/security/advisories/GHSA-vqpr-j7v3-hqw9)     | `EMOJI_REGEX`. Reported by the author of `recheck`.                                      |
+| 2026-03 | [path-to-regexp](https://github.com/pillarjs/path-to-regexp) | [CVE-2026-4923](https://github.com/advisories/GHSA-27v5-c462-wpq7)                                   | The advisory analyzes the regular expression with `recheck` and links to the Playground. |
+| 2026-09 | [highlight.js](https://github.com/highlightjs/highlight.js)  | [#4529](https://github.com/highlightjs/highlight.js/issues/4529)                                     | 17 regular expressions in 15 grammars, found with `recheck`.                             |
+
+## Projects using recheck
+
+### Testing their own regular expressions
+
+- [Zod](https://github.com/colinhacks/zod) runs `checkSync` over every regular expression it ships in its test suite, including the parameterized ones.
+- [marked](https://github.com/markedjs/marked) has a `test:redos` script that checks every tokenizer rule with `check` and prints the vulnerable ones.
+- [path-to-regexp](https://github.com/pillarjs/path-to-regexp) asserts in its tests that the regular expressions it generates are reported as safe.
+
+### Guarding regular expressions built at runtime
+
+- [Civitai](https://github.com/civitai/civitai) rejects a `pattern` in a submitted settings manifest unless `check` reports it as safe.
+- [Condo](https://github.com/open-condo-software/condo) checks the keys of a message template with `checkSync` before turning them into regular expressions.
+- [pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter), an MCP adapter for the Pi coding agent, rejects a regular expression query from the agent unless `checkSync` reports it as safe.
+
+### Linting with eslint-plugin-redos
+
+- [core-js](https://github.com/zloirock/core-js) enables `redos/no-vulnerable` as an error over its whole code base, and marks the few regular expressions it disables the rule for as safe in the source.
+- [markdownlint](https://github.com/DavidAnson/markdownlint) enables `redos/no-vulnerable` as an error with a long `timeout`.
+- [pjax-api](https://github.com/falsandtru/pjax-api) enables it as an error with `ignoreErrors: false`, so that even an unknown result fails the lint.
+- [Crosshare](https://github.com/crosshare-org/crosshare) enables it in the ESLint configuration of its app and its cloud functions.
+- [better-auth-harmony](https://github.com/GeKorm/better-auth-harmony) turns the recommended configuration on with an environment variable, so that the slower check runs on demand.
+- [Mailflow](https://github.com/maathimself/mailflow) keeps a separate audit configuration to run before adding a new text-processing regular expression.
+
+### Services and other tools
+
+- [devina.io ReDoS Checker](https://devina.io/redos-checker) is an online checker powered by `recheck`.
+- [Gixy-Next](https://github.com/dvershinin/gixy), a scanner for nginx configurations, checks the regular expressions in `location` directives through [`recheck-http-api`](https://github.com/MegaManSec/recheck-http-api). Its author compared ReDoS checkers and [found `recheck` to be the strongest](https://joshua.hu/regex-redos-recheck-nginx-gixy).
+- The Datadog static analysis rule [`typescript-browser-security/regexp-non-literal`](https://docs.datadoghq.com/code_analysis/static_analysis_rules/typescript-browser-security/regexp-non-literal/) recommends `recheck` for checking regular expressions built at runtime.
+
+As of October 2026, the `recheck` package is downloaded more than two million times a month from npm, and `eslint-plugin-redos` appears in the `package.json` of more than a hundred public repositories on GitHub.
+
+## Tools built on recheck
+
+- [recheck-cli](https://github.com/ndom91/recheck-cli) scans files for regular expressions and checks them.
+- [redos-scanner](https://github.com/mizdra/redos-scanner) scans a GitHub repository.
+- [gorecheck](https://github.com/hachi8833/gorecheck) is a command-line tool written in Go.
+- [recheck-http-api](https://github.com/MegaManSec/recheck-http-api) exposes `recheck` as an HTTP endpoint.
+- [recheck-esm](https://github.com/Regex-Radar/recheck-esm) repackaged `recheck` as ES modules before 4.6.1 shipped them.
+
+## Talks
+
+The author presented `recheck` in the following talks (in Japanese).
+
+- [ハイブリッド型 ReDoS 検出プログラムの実装 (A Hybrid Approach to Detect ReDoS)](https://speakerdeck.com/makenowjust/prosym62-a-hybrid-approach-to-detect-redos), the 62nd Programming Symposium, January 2021.
+- [ReDoS 検出プログラム recheck の開発 (recheck: ReDoS check program)](https://speakerdeck.com/makenowjust/recheck-redos-check-program), the 63rd Programming Symposium, January 2022.
+- [ReDoS 検出の最先端 recheck の紹介 (State of the Art of ReDoS Detection)](https://speakerdeck.com/makenowjust/state-of-the-art-of-redos-detection-241e16d2-ad8e-462c-8c0e-b6a95a735d59), YAPC::Japan::Online 2022, March 2022.
