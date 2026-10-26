@@ -18,24 +18,27 @@ class FuzzCheckerSuite extends munit.FunSuite:
   def random0: Random = new Random(0)
 
   /** Tests the pattern is vulnerable or not. */
-  def check(source: String, flags: String, quick: Boolean = false): Boolean =
+  def check(source: String, flags: String, quick: Boolean = false, defaults: Boolean = false): Boolean =
     val result = for
       pattern <- Parser.parse(source, flags) match
         case Right(pattern) => Success(pattern)
         case Left(ex)       => Failure(InvalidRegExpException(ex.getMessage))
       fuzz <- FuzzProgram.from(pattern)
-    yield FuzzChecker
-      .check(
-        pattern,
-        fuzz,
-        random = random0,
-        maxGeneStringSize = if quick then 400 else 4000,
-        maxAttackStringSize = if quick then 400 else 4000,
-        seedingLimit = if quick then 1_00 else 1_000,
-        incubationLimit = if quick then 1_000 else 10_000,
-        attackLimit = if quick then 10_000 else 100_000
-      )
-      .nextOption()
+    yield
+      val results =
+        if defaults then FuzzChecker.check(pattern, fuzz, random = random0)
+        else
+          FuzzChecker.check(
+            pattern,
+            fuzz,
+            random = random0,
+            maxGeneStringSize = if quick then 400 else 4000,
+            maxAttackStringSize = if quick then 400 else 4000,
+            seedingLimit = if quick then 1_00 else 1_000,
+            incubationLimit = if quick then 1_000 else 10_000,
+            attackLimit = if quick then 10_000 else 100_000
+          )
+      results.nextOption()
     result.get.isDefined
 
   test("FuzzChecker.check: constant"):
@@ -46,6 +49,11 @@ class FuzzCheckerSuite extends munit.FunSuite:
   test("FuzzChecker.check: linear"):
     assert(!check("(a|a)*", ""))
     assert(!check("(a*)*", ""))
+
+    // Its attack string is long and slow enough to run over `attackTimeout` (#1865), which is not an attack by itself.
+    val phone =
+      """(?:^|\s|\()((?:\+?\d{1,3}[\-\s]?)?(?:\(\d{3}\)[\-\s]?)?(?:(?:\d{3,}(?!\d)[\-\s]?){2,}|\d{7,10}))(?:$|\s|\.|,|\))"""
+    assert(!check(phone, "gm", defaults = true))
 
   test("FuzzChecker.check: polynomial"):
     assert(check("\\s*$", "", quick = true))
