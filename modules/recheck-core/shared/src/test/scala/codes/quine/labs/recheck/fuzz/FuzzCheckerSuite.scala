@@ -7,9 +7,6 @@ import scala.util.Success
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.InvalidRegExpException
-import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.fuzz.FString.Repeat
-import codes.quine.labs.recheck.fuzz.FString.Wrap
 import codes.quine.labs.recheck.regexp.Parser
 
 class FuzzCheckerSuite extends munit.FunSuite:
@@ -21,53 +18,28 @@ class FuzzCheckerSuite extends munit.FunSuite:
   def random0: Random = new Random(0)
 
   /** Tests the pattern is vulnerable or not. */
-  def check(source: String, flags: String, quick: Boolean = false): Boolean =
+  def check(source: String, flags: String, quick: Boolean = false, defaults: Boolean = false): Boolean =
     val result = for
       pattern <- Parser.parse(source, flags) match
         case Right(pattern) => Success(pattern)
         case Left(ex)       => Failure(InvalidRegExpException(ex.getMessage))
       fuzz <- FuzzProgram.from(pattern)
-    yield FuzzChecker
-      .check(
-        pattern,
-        fuzz,
-        random = random0,
-        maxGeneStringSize = if quick then 400 else 4000,
-        maxAttackStringSize = if quick then 400 else 4000,
-        seedingLimit = if quick then 1_00 else 1_000,
-        incubationLimit = if quick then 1_000 else 10_000,
-        attackLimit = if quick then 10_000 else 100_000
-      )
-      .nextOption()
+    yield
+      val results =
+        if defaults then FuzzChecker.check(pattern, fuzz, random = random0)
+        else
+          FuzzChecker.check(
+            pattern,
+            fuzz,
+            random = random0,
+            maxGeneStringSize = if quick then 400 else 4000,
+            maxAttackStringSize = if quick then 400 else 4000,
+            seedingLimit = if quick then 1_00 else 1_000,
+            incubationLimit = if quick then 1_000 else 10_000,
+            attackLimit = if quick then 10_000 else 100_000
+          )
+      results.nextOption()
     result.get.isDefined
-
-  /** Creates a checker with the default parameters. */
-  def checker(source: String, flags: String): FuzzChecker =
-    val pattern = Parser.parse(source, flags).toOption.get
-    val fuzz = FuzzProgram.from(pattern).get
-    new FuzzChecker(
-      pattern,
-      fuzz,
-      random0,
-      Parameters.DefaultSeeder,
-      Parameters.DefaultMaxSimpleRepeatCount,
-      Parameters.DefaultSeedingLimit,
-      Parameters.DefaultSeedingTimeout,
-      Parameters.DefaultIncubationLimit,
-      Parameters.DefaultIncubationTimeout,
-      Parameters.DefaultMaxGeneStringSize,
-      Parameters.DefaultAttackLimit,
-      Parameters.DefaultAttackTimeout,
-      Parameters.DefaultCrossoverSize,
-      Parameters.DefaultMutationSize,
-      Parameters.DefaultMaxAttackStringSize,
-      Parameters.DefaultMaxInitialGenerationSize,
-      Parameters.DefaultMaxGenerationSize,
-      Parameters.DefaultMaxIteration,
-      Parameters.DefaultMaxDegree,
-      Parameters.DefaultHeatRatio,
-      Parameters.DefaultAccelerationMode
-    )
 
   test("FuzzChecker.check: constant"):
     assert(!check("^foo$", ""))
@@ -77,6 +49,11 @@ class FuzzCheckerSuite extends munit.FunSuite:
   test("FuzzChecker.check: linear"):
     assert(!check("(a|a)*", ""))
     assert(!check("(a*)*", ""))
+
+    // Its attack string is long and slow enough to run over `attackTimeout` (#1865), which is not an attack by itself.
+    val phone =
+      """(?:^|\s|\()((?:\+?\d{1,3}[\-\s]?)?(?:\(\d{3}\)[\-\s]?)?(?:(?:\d{3,}(?!\d)[\-\s]?){2,}|\d{7,10}))(?:$|\s|\.|,|\))"""
+    assert(!check(phone, "gm", defaults = true))
 
   test("FuzzChecker.check: polynomial"):
     assert(check("\\s*$", "", quick = true))
@@ -130,10 +107,3 @@ class FuzzCheckerSuite extends munit.FunSuite:
         )
         .nextOption()
       result.get.isEmpty
-
-  test("FuzzChecker.growsAsExpected"):
-    val str = FString(1, IndexedSeq(Repeat(0, 1), Wrap('a'), Wrap('b')))
-    assert(!checker("^a*$", "").growsAsExpected(str, 2))
-    assert(checker("^a*aa*$", "").growsAsExpected(str, 2))
-    assert(!checker("^a*aa*$", "").growsAsExpected(str, 3))
-    assert(checker("^(a|a)*$", "").growsAsExpected(str, 2))

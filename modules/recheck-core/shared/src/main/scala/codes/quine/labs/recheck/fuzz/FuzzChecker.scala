@@ -339,7 +339,7 @@ private[fuzz] final class FuzzChecker(
     log("fuzz: attack (exponential)")
     val n = RepeatUtil.exponential(attackLimit, str.fixedSize, str.repeatSize, maxAttackStringSize)
     val attack = str.copy(n = n)
-    tryAttackExecute(attack).map:
+    tryAttackExecute(attack, None).map:
       case (pattern, hotspot) => (AttackComplexity.Exponential(true), pattern, hotspot)
 
   /** Construct an attack string on assuming the pattern is polynomial. */
@@ -347,19 +347,19 @@ private[fuzz] final class FuzzChecker(
     log(s"fuzz: attack (polynomial: $degree)")
     val n = RepeatUtil.polynomial(degree, attackLimit, str.fixedSize, str.repeatSize, maxAttackStringSize)
     val attack = str.copy(n = n)
-    tryAttackExecute(attack, degree).map:
+    tryAttackExecute(attack, Some(degree)).map:
       case (pattern, hotspot) => (AttackComplexity.Polynomial(degree, true), pattern, hotspot)
 
   /** Executes the string to construct attack string.
     *
-    * `degree` is the assumed polynomial degree, or `0` for exponential. A timeout of a long polynomial attack string
+    * `degree` is the assumed polynomial degree, or `None` for exponential. A timeout of a long polynomial attack string
     * alone proves nothing, because a linear but slow pattern also runs over `attackTimeout`, so the growth is measured
     * first on strings small enough to finish. An exponential attack string is short, so a timeout on it is a blow-up
     * and it runs as is.
     */
-  def tryAttackExecute(str: FString, degree: Int = 0): Option[(AttackPattern, Hotspot)] = interrupt:
+  def tryAttackExecute(str: FString, degree: Option[Int]): Option[(AttackPattern, Hotspot)] = interrupt:
     val input = str.toUString
-    if input.sizeAsString <= maxAttackStringSize && (degree == 0 || growsAsExpected(str, degree)) then
+    if input.sizeAsString <= maxAttackStringSize && degree.forall(growsAsExpected(str, _)) then
       val usesAcceleration = fuzz.usesAcceleration(accelerationMode)
       val opts = Options(attackLimit, usesAcceleration = usesAcceleration, needsHeatmap = true)
       val result = Interpreter.runWithTimeout(program, input, 0, opts, attackTimeout)
