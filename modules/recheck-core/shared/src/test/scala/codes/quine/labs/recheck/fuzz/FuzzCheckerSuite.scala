@@ -1,6 +1,7 @@
 package codes.quine.labs.recheck
 package fuzz
 
+import scala.concurrent.duration.*
 import scala.util.Failure
 import scala.util.Random
 import scala.util.Success
@@ -23,7 +24,8 @@ class FuzzCheckerSuite extends munit.FunSuite:
       source: String,
       flags: String,
       quick: Boolean = false,
-      maxIteration: Int = Parameters.DefaultMaxIteration
+      maxIteration: Int = Parameters.DefaultMaxIteration,
+      attackTimeout: Duration = Parameters.DefaultAttackTimeout
   ): Boolean =
     val result = for
       pattern <- Parser.parse(source, flags) match
@@ -40,6 +42,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
         seedingLimit = if quick then 1_00 else 1_000,
         incubationLimit = if quick then 1_000 else 10_000,
         attackLimit = if quick then 10_000 else Parameters.DefaultAttackLimit,
+        attackTimeout = attackTimeout,
         maxIteration = maxIteration
       )
       .nextOption()
@@ -56,7 +59,8 @@ class FuzzCheckerSuite extends munit.FunSuite:
     assert(!check("^(a\\1)$", ""))
 
     // Linear, but with so many steps per character that its attack string runs over `attackTimeout` (#1865).
-    assert(!check("(?:a{9}b|a{9}c|a{9}d|a{9}e|a{9}f|a{9}g)", "", maxIteration = 0))
+    // The exponential attack string is not measured first, so it needs a timeout a slow CI runner cannot exceed.
+    assert(!check("(?:a{9}b|a{9}c|a{9}d|a{9}e|a{9}f|a{9}g)", "", maxIteration = 0, attackTimeout = 10.seconds))
 
   test("FuzzChecker.check: polynomial"):
     assert(check("\\s*$", "", quick = true))
