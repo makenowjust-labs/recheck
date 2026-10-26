@@ -7,6 +7,9 @@ import scala.util.Success
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.InvalidRegExpException
+import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.fuzz.FString.Repeat
+import codes.quine.labs.recheck.fuzz.FString.Wrap
 import codes.quine.labs.recheck.regexp.Parser
 
 class FuzzCheckerSuite extends munit.FunSuite:
@@ -37,6 +40,34 @@ class FuzzCheckerSuite extends munit.FunSuite:
       )
       .nextOption()
     result.get.isDefined
+
+  /** Creates a checker with the default parameters. */
+  def checker(source: String, flags: String): FuzzChecker =
+    val pattern = Parser.parse(source, flags).toOption.get
+    val fuzz = FuzzProgram.from(pattern).get
+    new FuzzChecker(
+      pattern,
+      fuzz,
+      random0,
+      Parameters.DefaultSeeder,
+      Parameters.DefaultMaxSimpleRepeatCount,
+      Parameters.DefaultSeedingLimit,
+      Parameters.DefaultSeedingTimeout,
+      Parameters.DefaultIncubationLimit,
+      Parameters.DefaultIncubationTimeout,
+      Parameters.DefaultMaxGeneStringSize,
+      Parameters.DefaultAttackLimit,
+      Parameters.DefaultAttackTimeout,
+      Parameters.DefaultCrossoverSize,
+      Parameters.DefaultMutationSize,
+      Parameters.DefaultMaxAttackStringSize,
+      Parameters.DefaultMaxInitialGenerationSize,
+      Parameters.DefaultMaxGenerationSize,
+      Parameters.DefaultMaxIteration,
+      Parameters.DefaultMaxDegree,
+      Parameters.DefaultHeatRatio,
+      Parameters.DefaultAccelerationMode
+    )
 
   test("FuzzChecker.check: constant"):
     assert(!check("^foo$", ""))
@@ -99,3 +130,11 @@ class FuzzCheckerSuite extends munit.FunSuite:
         )
         .nextOption()
       result.get.isEmpty
+
+  test("FuzzChecker.growsAsExpected"):
+    val str = FString(1, IndexedSeq(Repeat(0, 1), Wrap('a'), Wrap('b')))
+    assert(!checker("^a*$", "").growsAsExpected(str, Some(2)))
+    assert(checker("^a*aa*$", "").growsAsExpected(str, Some(2)))
+    assert(!checker("^a*aa*$", "").growsAsExpected(str, Some(3)))
+    assert(!checker("^a*aa*$", "").growsAsExpected(str, None))
+    assert(checker("^(a|a)*$", "").growsAsExpected(str, None))
