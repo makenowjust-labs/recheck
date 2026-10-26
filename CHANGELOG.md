@@ -4,6 +4,10 @@ New Features:
 
 - [#1946](https://github.com/makenowjust-labs/recheck/pull/1946) Add a case studies page to the website ([@makenowjust](https://github.com/makenowjust))
 
+Fixes:
+
+- [#1948](https://github.com/makenowjust-labs/recheck/pull/1948) Give the #1865 fuzz test a long attack timeout ([@makenowjust](https://github.com/makenowjust))
+
 Misc:
 
 - [#1945](https://github.com/makenowjust-labs/recheck/pull/1945) Add CITATION.cff ([@makenowjust](https://github.com/makenowjust))
