@@ -7,9 +7,20 @@ authors:
 
 The [Playground](/playground) now records a check in a permalink, so that a vulnerability report can cite it.
 The website also has a new [Case Studies](/docs/case-studies) page, which collects the vulnerabilities found with recheck and the projects using it.
-This post describes both.
+This post describes both, after a short note on the v4.6 releases.
 
 <!-- truncate -->
+
+## recheck v4.6
+
+Before the main topics, a word on the releases.
+v4.6.0 came out this month, more than a year and a half after v4.5.0, and v4.6.1 and v4.6.2 followed within two days.
+Many changes had been waiting on the `main` branch for a long time, and the release was overdue.
+Sorry for the wait.
+
+The highlights are the ESLint flat config support in `eslint-plugin-redos`, ES modules in the `recheck` package, a Linux ARM64 native binary, and a fix to the fuzz checker that could report a linear regular expression as vulnerable when its attack string merely ran over `attackTimeout` ([#1865](https://github.com/makenowjust-labs/recheck/issues/1865)).
+Under the hood, the sources moved to Scala 3 and the build to sbt 2.
+See the CHANGELOG of [v4.6.0](https://github.com/makenowjust-labs/recheck/releases/tag/v4.6.0), [v4.6.1](https://github.com/makenowjust-labs/recheck/releases/tag/v4.6.1) and [v4.6.2](https://github.com/makenowjust-labs/recheck/releases/tag/v4.6.2) for the details.
 
 ## Playground permalinks
 
