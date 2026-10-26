@@ -3,6 +3,7 @@
 New Features:
 
 - [#1946](https://github.com/makenowjust-labs/recheck/pull/1946) Add a case studies page to the website ([@makenowjust](https://github.com/makenowjust))
+- [#1947](https://github.com/makenowjust-labs/recheck/pull/1947) Add a blog article about v4.6, playground, and case studies ([@makenowjust](https://github.com/makenowjust))
 
 Fixes:
 
