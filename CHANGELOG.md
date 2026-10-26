@@ -9,6 +9,7 @@ Misc:
 - [#1930](https://github.com/makenowjust-labs/recheck/pull/1930) Improve CI cache ([@makenowjust](https://github.com/makenowjust))
 - [#1934](https://github.com/makenowjust-labs/recheck/pull/1934) Add FUNDING.yml ([@makenowjust](https://github.com/makenowjust))
 - [#1933](https://github.com/makenowjust-labs/recheck/pull/1933) Point the Maven Central badge at the Scala 3 artifact ([@makenowjust](https://github.com/makenowjust))
+- [#1936](https://github.com/makenowjust-labs/recheck/pull/1936) Build and test the native binary for pull requests on Linux ([@makenowjust](https://github.com/makenowjust))
 
 # 4.6.1 (2026-10-25)
 
