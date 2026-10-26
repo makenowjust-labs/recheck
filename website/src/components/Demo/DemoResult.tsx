@@ -1,3 +1,4 @@
+import Link from '@docusaurus/Link';
 import React from 'react';
 
 import { formatBuild } from './builds';
@@ -196,8 +197,8 @@ const DemoResult: React.FC<Props> = ({ recorded = false, result, time, log, buil
               <p>
                 This permalink records the result and the parameters, so you can cite it in a vulnerability report.
                 Once the vulnerability is fixed and disclosed, please let us know in <a href={REPORTS_URL}>Reports</a>{' '}
-                or by email to <a href={`mailto:${REPORTS_EMAIL}`}>{REPORTS_EMAIL}</a>. We are going to list projects
-                using recheck and vulnerabilities found with it on this site.
+                or by email to <a href={`mailto:${REPORTS_EMAIL}`}>{REPORTS_EMAIL}</a>. We list projects using recheck
+                and vulnerabilities found with it in <Link to="/docs/case-studies">Case Studies</Link>.
               </p>
               <p className="margin-bottom--none">
                 If recheck helped you, consider supporting it on <a href={SPONSORS_URL}>GitHub Sponsors</a>.

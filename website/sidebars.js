@@ -4,6 +4,7 @@
 const sidebars = {
   docs: [
     "intro",
+    "case-studies",
     {
       type: "category",
       label: "Usage",

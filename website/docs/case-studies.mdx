@@ -1,0 +1,96 @@
+---
+id: case-studies
+title: Case Studies
+---
+
+This page collects vulnerabilities found with `recheck` and projects that use it.
+If `recheck` helped you to find a vulnerability or you use it in your project, please tell us in the [Reports](https://github.com/makenowjust-labs/recheck/discussions/categories/reports) discussion category.
+An issue or a pull request that adds an entry to this page is welcome, too.
+
+## Vulnerabilities found with recheck
+
+### JavaScript
+
+| Date    | Project                                                           | Advisory                                                                                             | Note                                                                                                                                          |
+| ------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2022-01 | [markdown-it](https://github.com/markdown-it/markdown-it)         | [CVE-2022-21670](https://github.com/markdown-it/markdown-it/security/advisories/GHSA-6vfc-qv3f-vr6c) | Reported by the author of `recheck`.                                                                                                          |
+| 2022-01 | [marked](https://github.com/markedjs/marked)                      | [CVE-2022-21680](https://github.com/markedjs/marked/security/advisories/GHSA-rrrm-qjm4-v8hf)         | Cubic backtracking. Reported by the author of `recheck`.                                                                                      |
+| 2022-01 | [marked](https://github.com/markedjs/marked)                      | [CVE-2022-21681](https://github.com/markedjs/marked/security/advisories/GHSA-5v2h-r2cx-5xgj)         | Exponential backtracking. Reported by the author of `recheck`.                                                                                |
+| 2025-11 | [Valibot](https://github.com/open-circle/valibot)                 | [CVE-2025-66020](https://github.com/open-circle/valibot/security/advisories/GHSA-vqpr-j7v3-hqw9)     | `EMOJI_REGEX`. Reported by the author of `recheck`.                                                                                           |
+| 2025-12 | [three.js](https://github.com/mrdoob/three.js)                    | [#32622](https://github.com/mrdoob/three.js/pull/32622)                                              | `VTKLoader`. Found with `recheck` by the authors of [Revisiting ReDoS Attacks](https://mwlik.github.io/2026-04-15-revisiting-redos-attacks/). |
+| 2026-02 | [firebase-admin](https://github.com/firebase/firebase-admin-node) | [#3061](https://github.com/firebase/firebase-admin-node/pull/3061)                                   | `isURL`. Found with `recheck` by the authors of [Revisiting ReDoS Attacks](https://mwlik.github.io/2026-04-15-revisiting-redos-attacks/).     |
+| 2026-03 | [path-to-regexp](https://github.com/pillarjs/path-to-regexp)      | [CVE-2026-4923](https://github.com/advisories/GHSA-27v5-c462-wpq7)                                   | The advisory analyzes the regular expression with `recheck` and links to the Playground.                                                      |
+| 2026-09 | [highlight.js](https://github.com/highlightjs/highlight.js)       | [#4529](https://github.com/highlightjs/highlight.js/issues/4529)                                     | 17 regular expressions in 15 grammars, found with `recheck`.                                                                                  |
+
+### Ruby
+
+[ooooooo_q](https://github.com/ooooooo-q) collected the regular expressions that Ruby web applications compile at runtime, translated them into JavaScript syntax, checked them with `recheck`, and reported the vulnerable ones.
+The method is described in [an article](https://zenn.dev/ooooooo_q/articles/detect_redos_ruby) (in Japanese), and the reports led to the following advisories.
+
+| Date    | Project                                                               | Advisory                                                            | Note                           |
+| ------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------ |
+| 2022-04 | [Nokogiri](https://github.com/sparklemotion/nokogiri)                 | [CVE-2022-24836](https://github.com/advisories/GHSA-crjr-9rc5-ghw8) | HTML encoding detection.       |
+| 2022-05 | [Rack](https://github.com/rack/rack)                                  | [CVE-2022-30122](https://github.com/advisories/GHSA-hxqx-xwvh-44m2) | Multipart parsing.             |
+| 2022-12 | [rails-html-sanitizer](https://github.com/rails/rails-html-sanitizer) | [CVE-2022-23517](https://github.com/advisories/GHSA-5x79-w82f-gw8w) |                                |
+| 2023-01 | [Rack](https://github.com/rack/rack)                                  | [CVE-2022-44570](https://github.com/advisories/GHSA-65f5-mfpf-vfhj) | `Range` header parsing.        |
+| 2023-01 | [Rack](https://github.com/rack/rack)                                  | [CVE-2022-44571](https://github.com/advisories/GHSA-93pm-5p5f-3ghx) | `Content-Disposition` parsing. |
+| 2023-01 | [Rack](https://github.com/rack/rack)                                  | [CVE-2022-44572](https://github.com/advisories/GHSA-rqv2-275x-2jq5) | Multipart parsing.             |
+| 2023-01 | [Rails](https://github.com/rails/rails)                               | [CVE-2023-22792](https://github.com/advisories/GHSA-p84v-45xj-wwqj) | Action Dispatch.               |
+| 2023-01 | [Rails](https://github.com/rails/rails)                               | [CVE-2023-22796](https://github.com/advisories/GHSA-j6gc-792m-qgm2) | Active Support `underscore`.   |
+| 2023-01 | [GlobalID](https://github.com/rails/globalid)                         | [CVE-2023-22799](https://github.com/advisories/GHSA-23c2-gwp5-pxw9) |                                |
+| 2023-03 | [Rack](https://github.com/rack/rack)                                  | [CVE-2023-27539](https://github.com/advisories/GHSA-c6qg-cjj8-47qp) | Header parsing.                |
+| 2023-03 | [Ruby `time`](https://github.com/ruby/time)                           | [CVE-2023-28756](https://github.com/advisories/GHSA-fg7x-g82r-94qc) |                                |
+| 2023-06 | [Ruby `uri`](https://github.com/ruby/uri)                             | [CVE-2023-36617](https://github.com/advisories/GHSA-hww2-5g85-429m) |                                |
+| 2024-10 | [Rails](https://github.com/rails/rails)                               | [CVE-2024-47888](https://github.com/advisories/GHSA-wwhv-wxv9-rpgw) | Action Text.                   |
+
+## Projects using recheck
+
+[![recheck downloads](https://img.shields.io/npm/dm/recheck?label=recheck&logo=javascript&style=for-the-badge)](https://www.npmjs.com/package/recheck)
+[![eslint-plugin-redos downloads](https://img.shields.io/npm/dm/eslint-plugin-redos?label=eslint-plugin-redos&logo=javascript&style=for-the-badge)](https://www.npmjs.com/package/eslint-plugin-redos)
+
+As of October 2026, `eslint-plugin-redos` appears in the `package.json` of more than a hundred public repositories on GitHub.
+
+### Testing their own regular expressions
+
+- [Zod](https://github.com/colinhacks/zod) runs `checkSync` over every regular expression it ships in its test suite, including the parameterized ones.
+- [marked](https://github.com/markedjs/marked) has a `test:redos` script that checks every tokenizer rule with `check` and prints the vulnerable ones.
+- [path-to-regexp](https://github.com/pillarjs/path-to-regexp) asserts in its tests that the regular expressions it generates are reported as safe.
+
+### Guarding regular expressions built at runtime
+
+- [Civitai](https://github.com/civitai/civitai) rejects a `pattern` in a submitted settings manifest unless `check` reports it as safe.
+- [Condo](https://github.com/open-condo-software/condo) checks the keys of a message template with `checkSync` before turning them into regular expressions.
+- [pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter), an MCP adapter for the Pi coding agent, rejects a regular expression query from the agent unless `checkSync` reports it as safe.
+
+### Linting with eslint-plugin-redos
+
+- [core-js](https://github.com/zloirock/core-js) enables `redos/no-vulnerable` as an error over its whole code base, and marks the few regular expressions it disables the rule for as safe in the source.
+- [markdownlint](https://github.com/DavidAnson/markdownlint) enables `redos/no-vulnerable` as an error with a long `timeout`.
+- [pjax-api](https://github.com/falsandtru/pjax-api) enables it as an error with `ignoreErrors: false`, so that even an unknown result fails the lint.
+- [Crosshare](https://github.com/crosshare-org/crosshare) enables it in the ESLint configuration of its app and its cloud functions.
+- [better-auth-harmony](https://github.com/GeKorm/better-auth-harmony) turns the recommended configuration on with an environment variable, so that the slower check runs on demand.
+- [Mailflow](https://github.com/maathimself/mailflow) keeps a separate audit configuration to run before adding a new text-processing regular expression.
+- [editorconfig-core-js](https://github.com/editorconfig/editorconfig-core-js) gets `redos/no-vulnerable` as an error from the shared configuration [`@cto.af/eslint-config`](https://github.com/cto-af/eslint-config), which turns it on for every project of its author.
+
+### Services and other tools
+
+- [devina.io ReDoS Checker](https://devina.io/redos-checker) is an online checker powered by `recheck`.
+- [Gixy-Next](https://github.com/dvershinin/gixy), a scanner for nginx configurations, checks the regular expressions in `location` directives through [`recheck-http-api`](https://github.com/MegaManSec/recheck-http-api). Its author compared ReDoS checkers and [found `recheck` to be the strongest](https://joshua.hu/regex-redos-recheck-nginx-gixy).
+- The Datadog static analysis rule [`typescript-browser-security/regexp-non-literal`](https://docs.datadoghq.com/code_analysis/static_analysis_rules/typescript-browser-security/regexp-non-literal/) recommends `recheck` for checking regular expressions built at runtime.
+
+## Tools built on recheck
+
+- [recheck-cli](https://github.com/ndom91/recheck-cli) scans files for regular expressions and checks them.
+- [redos-scanner](https://github.com/mizdra/redos-scanner) scans a GitHub repository.
+- [gorecheck](https://github.com/hachi8833/gorecheck) is a command-line tool written in Go.
+- [recheck-http-api](https://github.com/MegaManSec/recheck-http-api) exposes `recheck` as an HTTP endpoint.
+- [recheck-esm](https://github.com/Regex-Radar/recheck-esm) repackaged `recheck` as ES modules before 4.6.1 shipped them.
+- [ReDoSDetector](https://github.com/raise-isayan/ReDoSDetector) is a Burp Suite extension built on `recheck-core` from Maven Central, and it also works as a standalone GUI and command-line tool.
+
+## Talks
+
+The author presented `recheck` in the following talks (in Japanese).
+
+- [ハイブリッド型 ReDoS 検出プログラムの実装 (A Hybrid Approach to Detect ReDoS)](https://speakerdeck.com/makenowjust/prosym62-a-hybrid-approach-to-detect-redos), the 62nd Programming Symposium, January 2021.
+- [ReDoS 検出プログラム recheck の開発 (recheck: ReDoS check program)](https://speakerdeck.com/makenowjust/recheck-redos-check-program), the 63rd Programming Symposium, January 2022.
+- [ReDoS 検出の最先端 recheck の紹介 (State of the Art of ReDoS Detection)](https://speakerdeck.com/makenowjust/state-of-the-art-of-redos-detection-241e16d2-ad8e-462c-8c0e-b6a95a735d59), YAPC::Japan::Online 2022, March 2022.
