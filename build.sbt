@@ -273,6 +273,7 @@ lazy val unicode = crossProject(JVMPlatform, JSPlatform)
     console / initialCommands := """
       |import codes.quine.labs.recheck.unicode.*
       |""".stripMargin,
+    coverageExcludedFiles := ".*[/\\\\]src_managed[/\\\\].*",
     // Generators:
     {
       val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
