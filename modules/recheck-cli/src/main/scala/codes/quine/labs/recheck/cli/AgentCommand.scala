@@ -105,7 +105,8 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio):
         "ping" -> RPC.RequestHandler(handlePing)
       )
     finally
-      tokens.values.foreach(doCancel)
-      tokens.clear()
+      synchronized:
+        tokens.values.foreach(doCancel)
+        tokens.clear()
       executor.shutdown()
       executor.awaitTermination(Long.MaxValue, TimeUnit.NANOSECONDS)
