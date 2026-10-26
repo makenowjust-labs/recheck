@@ -133,8 +133,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
 
   test("FuzzChecker.growsAsExpected"):
     val str = FString(1, IndexedSeq(Repeat(0, 1), Wrap('a'), Wrap('b')))
-    assert(!checker("^a*$", "").growsAsExpected(str, Some(2)))
-    assert(checker("^a*aa*$", "").growsAsExpected(str, Some(2)))
-    assert(!checker("^a*aa*$", "").growsAsExpected(str, Some(3)))
-    assert(!checker("^a*aa*$", "").growsAsExpected(str, None))
-    assert(checker("^(a|a)*$", "").growsAsExpected(str, None))
+    assert(!checker("^a*$", "").growsAsExpected(str, 2))
+    assert(checker("^a*aa*$", "").growsAsExpected(str, 2))
+    assert(!checker("^a*aa*$", "").growsAsExpected(str, 3))
+    assert(checker("^(a|a)*$", "").growsAsExpected(str, 2))

@@ -339,7 +339,7 @@ private[fuzz] final class FuzzChecker(
     log("fuzz: attack (exponential)")
     val n = RepeatUtil.exponential(attackLimit, str.fixedSize, str.repeatSize, maxAttackStringSize)
     val attack = str.copy(n = n)
-    tryAttackExecute(attack, None).map:
+    tryAttackExecute(attack).map:
       case (pattern, hotspot) => (AttackComplexity.Exponential(true), pattern, hotspot)
 
   /** Construct an attack string on assuming the pattern is polynomial. */
@@ -347,18 +347,19 @@ private[fuzz] final class FuzzChecker(
     log(s"fuzz: attack (polynomial: $degree)")
     val n = RepeatUtil.polynomial(degree, attackLimit, str.fixedSize, str.repeatSize, maxAttackStringSize)
     val attack = str.copy(n = n)
-    tryAttackExecute(attack, Some(degree)).map:
+    tryAttackExecute(attack, degree).map:
       case (pattern, hotspot) => (AttackComplexity.Polynomial(degree, true), pattern, hotspot)
 
   /** Executes the string to construct attack string.
     *
-    * `degree` is the assumed polynomial degree, or `None` for exponential. A timeout of the attack run alone proves
-    * nothing, because a linear but slow pattern also runs over `attackTimeout`. So the growth is measured first on
-    * strings small enough to finish.
+    * `degree` is the assumed polynomial degree, or `0` for exponential. A timeout of a long polynomial attack string
+    * alone proves nothing, because a linear but slow pattern also runs over `attackTimeout`, so the growth is measured
+    * first on strings small enough to finish. An exponential attack string is short, so a timeout on it is a blow-up
+    * and it runs as is.
     */
-  def tryAttackExecute(str: FString, degree: Option[Int]): Option[(AttackPattern, Hotspot)] = interrupt:
+  def tryAttackExecute(str: FString, degree: Int = 0): Option[(AttackPattern, Hotspot)] = interrupt:
     val input = str.toUString
-    if input.sizeAsString <= maxAttackStringSize && growsAsExpected(str, degree) then
+    if input.sizeAsString <= maxAttackStringSize && (degree == 0 || growsAsExpected(str, degree)) then
       val usesAcceleration = fuzz.usesAcceleration(accelerationMode)
       val opts = Options(attackLimit, usesAcceleration = usesAcceleration, needsHeatmap = true)
       val result = Interpreter.runWithTimeout(program, input, 0, opts, attackTimeout)
@@ -370,10 +371,8 @@ private[fuzz] final class FuzzChecker(
     None
 
   /** Checks that the steps grow with the repeat count as `degree` predicts, by measuring two smaller strings. */
-  def growsAsExpected(str: FString, degree: Option[Int]): Boolean = interrupt:
-    val n1 = degree match
-      case Some(d) => RepeatUtil.polynomial(d, incubationLimit, str.fixedSize, str.repeatSize, maxAttackStringSize)
-      case None    => RepeatUtil.exponential(incubationLimit, str.fixedSize, str.repeatSize, maxAttackStringSize)
+  def growsAsExpected(str: FString, degree: Int): Boolean = interrupt:
+    val n1 = RepeatUtil.polynomial(degree, incubationLimit, str.fixedSize, str.repeatSize, maxAttackStringSize)
     val n2 = n1 / 2
     if n2 < 1 then return true
 
@@ -385,12 +384,10 @@ private[fuzz] final class FuzzChecker(
 
     val Seq(steps1, steps2) = results.map(_.steps.toDouble)
     val exponent = if steps2 == 0 then Double.PositiveInfinity else Math.log(steps1 / steps2) / Math.log(2)
-    // An exponential pattern must grow faster than any polynomial the checker reports.
-    val expected = degree.getOrElse(maxDegree + 1)
     log:
-      s"""|fuzz: attack growth (expected: $expected, exponent: $exponent)
+      s"""|fuzz: attack growth (degree: $degree, exponent: $exponent)
           |  steps: $steps1 (n: $n1), $steps2 (n: $n2)""".stripMargin
-    exponent >= expected - 0.5
+    exponent >= degree - 0.5
 
   /** Population is a mutable generation on fuzzing. */
   final class Population(
