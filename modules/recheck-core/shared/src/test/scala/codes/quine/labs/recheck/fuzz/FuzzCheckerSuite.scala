@@ -46,6 +46,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
   test("FuzzChecker.check: linear"):
     assert(!check("(a|a)*", ""))
     assert(!check("(a*)*", ""))
+    assert(!check("^(a\\1)$", ""))
 
   test("FuzzChecker.check: polynomial"):
     assert(check("\\s*$", "", quick = true))
