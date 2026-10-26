@@ -27,4 +27,4 @@ Object.assign(plugin.configs, {
   },
 });
 
-export = plugin as ESLint.Plugin;
+export default plugin as ESLint.Plugin;

@@ -66,11 +66,6 @@ const formats = [
   { format: "esm", extension: "mjs" },
 ] as const;
 
-// `require` is used to resolve the paths of the worker and the optional packages.
-const esmBanner = {
-  js: 'import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);',
-};
-
 const main = async () => {
   for (const { format, extension } of formats) {
     await esbuild({
@@ -84,7 +79,6 @@ const main = async () => {
       platform: "node",
       plugins: [makeAllPackagesExternalPlugin, inlineWorkerPlugin],
       outfile: `lib/main.${extension}`,
-      banner: format === "esm" ? esmBanner : undefined,
     });
     await esbuild({
       entryPoints: ["src/browser.ts"],

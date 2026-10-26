@@ -55,11 +55,11 @@
     "lib"
   ],
   "scripts": {
-    "build": "node -r esbuild-register ./scripts/build.ts",
+    "build": "node ./scripts/build.mts",
     "clean": "rimraf lib",
-    "format": "prettier -w '*.{js,json,md,mjs}' '{scripts,src}/**/*.{js,ts}' index.d.ts index.d.mts",
-    "lint": "prettier --check '*.{js,json,md,mjs}' '{scripts,src}/**/*.{js,ts}' index.d.ts index.d.mts",
-    "test": "SYNCKIT_TS_RUNNER=esbuild-register jest",
+    "format": "prettier -w '*.{js,json,md,mjs}' '{scripts,src}/**/*.{js,ts,mts}' index.d.ts index.d.mts",
+    "lint": "prettier --check '*.{js,json,md,mjs}' '{scripts,src}/**/*.{js,ts,mts}' index.d.ts index.d.mts",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js -c jest.e2e.config.js --forceExit",
     "typecheck": "tsc --noEmit -p ."
   },
@@ -77,11 +77,10 @@
     "recheck-windows-x64": "workspace:*"
   },
   "devDependencies": {
+    "@jest/globals": "30.5.2",
     "@types/jest": "30.0.0",
     "@types/node": "24.19.2",
     "esbuild": "0.28.2",
-    "esbuild-jest": "0.5.0",
-    "esbuild-register": "3.6.0",
     "jest": "30.5.2",
     "prettier": "3.9.10",
     "rimraf": "6.1.3",

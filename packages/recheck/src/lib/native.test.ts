@@ -1,28 +1,28 @@
-import * as agent from "./agent";
-import * as exe from "./exe";
+import { expect, jest, test } from "@jest/globals";
 
-import * as native from "./native";
+jest.unstable_mockModule("./agent", () => ({
+  start: jest.fn(),
+  check: jest.fn(),
+}));
+jest.unstable_mockModule("./exe", () => ({ jar: jest.fn(), bin: jest.fn() }));
 
-jest.mock("./agent");
-jest.mock("./exe");
+const agent = await import("./agent");
+const exe = await import("./exe");
+const native = await import("./native");
 
-test("ensure: bin === null", () => {
-  const bin = jest.spyOn(exe, "bin");
-  bin.mockReturnValueOnce(null);
+test("ensure: bin === null", async () => {
+  jest.mocked(exe.bin).mockReturnValueOnce(null);
 
-  expect(native.ensure()).resolves.toBeNull();
-  expect(bin).toHaveBeenCalled();
+  await expect(native.ensure()).resolves.toBeNull();
+  expect(exe.bin).toHaveBeenCalled();
 });
 
-test("ensure: jar !== null", () => {
-  const bin = jest.spyOn(exe, "bin");
-  bin.mockReturnValueOnce("x");
-
-  const start = jest.spyOn(agent, "start");
+test("ensure: bin !== null", async () => {
+  jest.mocked(exe.bin).mockReturnValueOnce("x");
   const fake: any = Symbol();
-  start.mockReturnValueOnce(fake);
+  jest.mocked(agent.start).mockReturnValueOnce(fake);
 
-  expect(native.ensure()).resolves.toBe(fake);
-  expect(bin).toHaveBeenCalled();
-  expect(start).toHaveBeenCalledWith("x", ["agent"]);
+  await expect(native.ensure()).resolves.toBe(fake);
+  expect(exe.bin).toHaveBeenCalled();
+  expect(agent.start).toHaveBeenCalledWith("x", ["agent"]);
 });

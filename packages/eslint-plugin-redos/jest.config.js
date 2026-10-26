@@ -1,16 +1,13 @@
 // @ts-check
 
+// Jest strips the types itself when no transformer claims a `.ts` file, so the tests run as ES modules (`--experimental-vm-modules`).
 module.exports =
   /** @type {import("jest").Config} */
   ({
     roots: ["<rootDir>/src"],
     testMatch: ["**/?(*.)test.+(js|ts|tsx)"],
-    transform: {
-      "\\.(js|ts)$": ["esbuild-jest", { sourcemap: true }],
-    },
-    transformIgnorePatterns: [
-      'node_modules/(?!(?:.+/)?(?:find-cache-dir|find-up|locate-path|p-limit|p-locate|path-exists|pkg-dir|yocto-queue)/)',
-    ],
+    transform: {},
+    extensionsToTreatAsEsm: [".ts"],
     coverageProvider: "v8",
-    verbose: true
+    verbose: true,
   });
