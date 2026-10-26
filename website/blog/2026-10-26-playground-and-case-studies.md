@@ -18,8 +18,8 @@ v4.6.0 came out this month, more than a year and a half after v4.5.0, and v4.6.1
 Many changes had been waiting on the `main` branch for a long time, and the release was overdue.
 Sorry for the wait.
 
-The highlights are the ESLint flat config support in `eslint-plugin-redos`, ES modules in the `recheck` package, a Linux ARM64 native binary, and a fix to the fuzz checker that could report a linear regular expression as vulnerable when its attack string merely ran over `attackTimeout` ([#1865](https://github.com/makenowjust-labs/recheck/issues/1865)).
-Under the hood, the sources moved to Scala 3 and the build to sbt 2.
+The highlights are the ESLint flat config support in `eslint-plugin-redos` ([#1615](https://github.com/makenowjust-labs/recheck/pull/1615)), ES modules in the `recheck` package ([#1927](https://github.com/makenowjust-labs/recheck/pull/1927)), a Linux ARM64 native binary ([#1636](https://github.com/makenowjust-labs/recheck/pull/1636)), and a fix to the fuzz checker that could report a linear regular expression as vulnerable when its attack string merely ran over `attackTimeout` ([#1939](https://github.com/makenowjust-labs/recheck/pull/1939)).
+Under the hood, the sources moved to Scala 3 ([#1651](https://github.com/makenowjust-labs/recheck/pull/1651)) and the build to sbt 2 ([#1917](https://github.com/makenowjust-labs/recheck/pull/1917)).
 See the CHANGELOG of [v4.6.0](https://github.com/makenowjust-labs/recheck/releases/tag/v4.6.0), [v4.6.1](https://github.com/makenowjust-labs/recheck/releases/tag/v4.6.1) and [v4.6.2](https://github.com/makenowjust-labs/recheck/releases/tag/v4.6.2) for the details.
 
 ## Playground permalinks
@@ -37,8 +37,8 @@ A reader of the report sees exactly what was checked, and reproduces it with one
 The [path-to-regexp advisory](https://github.com/advisories/GHSA-27v5-c462-wpq7) links to the Playground to show its analysis, for example.
 Such a link had only the input before, but now it carries the result as well.
 
-To make the reproduction reliable, the Playground can run any release since v4.6.1, which is loaded from a CDN as ES modules, in addition to the build of the current `main` branch.
-A permalink preselects the version it was recorded with.
+To make the reproduction reliable, the Playground can run any release since v4.6.1, which is loaded from a CDN as ES modules, in addition to the build of the current `HEAD`.
+The latest release is used by default, and a permalink switches to the version it was recorded with.
 
 ## Case Studies
 
@@ -57,11 +57,6 @@ The [Case Studies](/docs/case-studies) page collects them in one place.
 The page is surely incomplete.
 If recheck helped you to find a vulnerability or you use it in your project, please tell us in the [Reports](https://github.com/makenowjust-labs/recheck/discussions/categories/reports) discussion category.
 An issue or a pull request that adds an entry to the page is welcome, too.
-
-## Citing recheck
-
-For the same reason, each release is now archived on Zenodo.
-The concept DOI [10.5281/zenodo.23660268](https://doi.org/10.5281/zenodo.23660268) always resolves to the latest release, and the repository has a `CITATION.cff`, so that a paper or a report can cite recheck in a stable way.
 
 ## P.S.
 
