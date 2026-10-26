@@ -73,7 +73,10 @@ The method is described in [an article](https://zenn.dev/ooooooo_q/articles/dete
 - [Gixy-Next](https://github.com/dvershinin/gixy), a scanner for nginx configurations, checks the regular expressions in `location` directives through [`recheck-http-api`](https://github.com/MegaManSec/recheck-http-api). Its author compared ReDoS checkers and [found `recheck` to be the strongest](https://joshua.hu/regex-redos-recheck-nginx-gixy).
 - The Datadog static analysis rule [`typescript-browser-security/regexp-non-literal`](https://docs.datadoghq.com/code_analysis/static_analysis_rules/typescript-browser-security/regexp-non-literal/) recommends `recheck` for checking regular expressions built at runtime.
 
-As of October 2026, the `recheck` package is downloaded more than two million times a month from npm, and `eslint-plugin-redos` appears in the `package.json` of more than a hundred public repositories on GitHub.
+[![recheck downloads](https://img.shields.io/npm/dm/recheck?label=recheck&logo=javascript&style=for-the-badge)](https://www.npmjs.com/package/recheck)
+[![eslint-plugin-redos downloads](https://img.shields.io/npm/dm/eslint-plugin-redos?label=eslint-plugin-redos&logo=javascript&style=for-the-badge)](https://www.npmjs.com/package/eslint-plugin-redos)
+
+As of October 2026, `eslint-plugin-redos` appears in the `package.json` of more than a hundred public repositories on GitHub.
 
 ## Tools built on recheck
 
