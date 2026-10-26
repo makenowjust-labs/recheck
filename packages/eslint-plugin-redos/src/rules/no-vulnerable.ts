@@ -1,10 +1,10 @@
 import type { Rule } from "eslint";
 import type ESTree from "estree";
+import type { CacheOptions } from "../utils/checker";
+
 import * as ReDoS from "recheck";
 
 import { createCachedCheck } from "../utils/checker";
-
-import type { CacheOptions } from "../utils/checker";
 
 type Options = {
   ignoreErrors?: boolean;
