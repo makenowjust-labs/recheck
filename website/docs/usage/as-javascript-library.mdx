@@ -117,10 +117,11 @@ await Promise.all([
 ]);
 ```
 
-:::caution
+:::note
 
-There is the `timeout` parameter to specify timeout seconds.
-Please use this instead of the manual way.
+The `timeout` parameter, in milliseconds, is usually all you need to bound a check, and it also works with the synchronous API.
+`signal` is for cancelling a running check from outside, for example when a user gives up waiting.
+A timer alone, without `timeout` or `signal`, cannot stop a check, so the check keeps consuming the CPU.
 
 :::
 
