@@ -1,3 +1,9 @@
+# dev
+
+Misc:
+
+- [#1945](https://github.com/makenowjust-labs/recheck/pull/1945) Add CITATION.cff ([@makenowjust](https://github.com/makenowjust))
+
 # 4.6.2 (2026-10-26)
 
 New Features:
