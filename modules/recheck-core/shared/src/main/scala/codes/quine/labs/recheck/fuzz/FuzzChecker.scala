@@ -372,6 +372,7 @@ private[fuzz] final class FuzzChecker(
 
   /** Checks that the steps grow with the repeat count as `degree` predicts, by measuring two smaller strings. */
   def growsAsExpected(str: FString, degree: Int): Boolean = interrupt:
+    // TODO: `incubationLimit` is only the closest existing value; the size of these probes deserves its own parameter.
     val n1 = RepeatUtil.polynomial(degree, incubationLimit, str.fixedSize, str.repeatSize, maxAttackStringSize)
     val n2 = n1 / 2
     if n2 < 1 then return true
