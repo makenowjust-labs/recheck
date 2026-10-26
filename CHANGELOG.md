@@ -7,6 +7,7 @@ New Features:
 Misc:
 
 - [#1930](https://github.com/makenowjust-labs/recheck/pull/1930) Improve CI cache ([@makenowjust](https://github.com/makenowjust))
+- [#1934](https://github.com/makenowjust-labs/recheck/pull/1934) Add FUNDING.yml ([@makenowjust](https://github.com/makenowjust))
 
 # 4.6.1 (2026-10-25)
 
