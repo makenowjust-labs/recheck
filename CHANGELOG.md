@@ -1,4 +1,4 @@
-# dev
+# 4.6.2 (2026-10-26)
 
 New Features:
 
@@ -15,6 +15,7 @@ Misc:
 - [#1930](https://github.com/makenowjust-labs/recheck/pull/1930) Improve CI cache ([@makenowjust](https://github.com/makenowjust))
 - [#1934](https://github.com/makenowjust-labs/recheck/pull/1934) Add FUNDING.yml ([@makenowjust](https://github.com/makenowjust))
 - [#1933](https://github.com/makenowjust-labs/recheck/pull/1933) Point the Maven Central badge at the Scala 3 artifact ([@makenowjust](https://github.com/makenowjust))
+- [#1935](https://github.com/makenowjust-labs/recheck/pull/1935) Register the reference anchors with Docusaurus ([@makenowjust](https://github.com/makenowjust))
 - [#1936](https://github.com/makenowjust-labs/recheck/pull/1936) Build and test the native binary for pull requests on Linux ([@makenowjust](https://github.com/makenowjust))
 - [#1937](https://github.com/makenowjust-labs/recheck/pull/1937) Run TypeScript with Node's type stripping ([@makenowjust](https://github.com/makenowjust))
 - [#1938](https://github.com/makenowjust-labs/recheck/pull/1938) Update docs ([@makenowjust](https://github.com/makenowjust))
