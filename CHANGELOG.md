@@ -8,6 +8,7 @@ Fixes:
 
 - [#1939](https://github.com/makenowjust-labs/recheck/pull/1939) Check the step growth before executing an attack string ([@makenowjust](https://github.com/makenowjust))
 - [#1940](https://github.com/makenowjust-labs/recheck/pull/1940) Stop the fuzz seeder from expanding a back-reference to an enclosing capture ([@makenowjust](https://github.com/makenowjust))
+- [#1943](https://github.com/makenowjust-labs/recheck/pull/1943) Reproduce #1865 with a synthetic linear pattern in the fuzz test ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
