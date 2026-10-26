@@ -8,6 +8,8 @@ If `recheck` helped you to find a vulnerability or you use it in your project, p
 
 ## Vulnerabilities found with recheck
 
+### JavaScript
+
 | Date    | Project                                                      | Advisory                                                                                             | Note                                                                                     |
 | ------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | 2022-01 | [markdown-it](https://github.com/markdown-it/markdown-it)    | [CVE-2022-21670](https://github.com/markdown-it/markdown-it/security/advisories/GHSA-6vfc-qv3f-vr6c) | Reported by the author of `recheck`.                                                     |
@@ -16,6 +18,27 @@ If `recheck` helped you to find a vulnerability or you use it in your project, p
 | 2025-11 | [Valibot](https://github.com/open-circle/valibot)            | [CVE-2025-66020](https://github.com/open-circle/valibot/security/advisories/GHSA-vqpr-j7v3-hqw9)     | `EMOJI_REGEX`. Reported by the author of `recheck`.                                      |
 | 2026-03 | [path-to-regexp](https://github.com/pillarjs/path-to-regexp) | [CVE-2026-4923](https://github.com/advisories/GHSA-27v5-c462-wpq7)                                   | The advisory analyzes the regular expression with `recheck` and links to the Playground. |
 | 2026-09 | [highlight.js](https://github.com/highlightjs/highlight.js)  | [#4529](https://github.com/highlightjs/highlight.js/issues/4529)                                     | 17 regular expressions in 15 grammars, found with `recheck`.                             |
+
+### Ruby
+
+[ooooooo_q](https://zenn.dev/ooooooo_q) collected the regular expressions that Ruby web applications compile at runtime, translated them into JavaScript syntax, checked them with `recheck`, and reported the vulnerable ones.
+The method is described in [a Zenn article](https://zenn.dev/ooooooo_q/articles/detect_redos_ruby) (in Japanese), and the reports led to the following advisories.
+
+| Date    | Project                                                               | Advisory                                                            | Note                           |
+| ------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------ |
+| 2022-04 | [Nokogiri](https://github.com/sparklemotion/nokogiri)                 | [CVE-2022-24836](https://github.com/advisories/GHSA-crjr-9rc5-ghw8) | HTML encoding detection.       |
+| 2022-05 | [Rack](https://github.com/rack/rack)                                  | [CVE-2022-30122](https://github.com/advisories/GHSA-hxqx-xwvh-44m2) | Multipart parsing.             |
+| 2022-12 | [rails-html-sanitizer](https://github.com/rails/rails-html-sanitizer) | [CVE-2022-23517](https://github.com/advisories/GHSA-5x79-w82f-gw8w) |                                |
+| 2023-01 | [Rack](https://github.com/rack/rack)                                  | [CVE-2022-44570](https://github.com/advisories/GHSA-65f5-mfpf-vfhj) | `Range` header parsing.        |
+| 2023-01 | [Rack](https://github.com/rack/rack)                                  | [CVE-2022-44571](https://github.com/advisories/GHSA-93pm-5p5f-3ghx) | `Content-Disposition` parsing. |
+| 2023-01 | [Rack](https://github.com/rack/rack)                                  | [CVE-2022-44572](https://github.com/advisories/GHSA-rqv2-275x-2jq5) | Multipart parsing.             |
+| 2023-01 | [Rails](https://github.com/rails/rails)                               | [CVE-2023-22792](https://github.com/advisories/GHSA-p84v-45xj-wwqj) | Action Dispatch.               |
+| 2023-01 | [Rails](https://github.com/rails/rails)                               | [CVE-2023-22796](https://github.com/advisories/GHSA-j6gc-792m-qgm2) | Active Support `underscore`.   |
+| 2023-01 | [GlobalID](https://github.com/rails/globalid)                         | [CVE-2023-22799](https://github.com/advisories/GHSA-23c2-gwp5-pxw9) |                                |
+| 2023-03 | [Rack](https://github.com/rack/rack)                                  | [CVE-2023-27539](https://github.com/advisories/GHSA-c6qg-cjj8-47qp) | Header parsing.                |
+| 2023-03 | [Ruby `time`](https://github.com/ruby/time)                           | [CVE-2023-28756](https://github.com/advisories/GHSA-fg7x-g82r-94qc) |                                |
+| 2023-06 | [Ruby `uri`](https://github.com/ruby/uri)                             | [CVE-2023-36617](https://github.com/advisories/GHSA-hww2-5g85-429m) |                                |
+| 2024-10 | [Rails](https://github.com/rails/rails)                               | [CVE-2024-47888](https://github.com/advisories/GHSA-wwhv-wxv9-rpgw) | Action Text.                   |
 
 ## Projects using recheck
 
