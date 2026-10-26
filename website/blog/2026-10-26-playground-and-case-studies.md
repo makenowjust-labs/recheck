@@ -30,11 +30,12 @@ When you wrote a vulnerability report, you had to copy the result into the repor
 
 Now each check has a permalink.
 It records the input, the parameters, the result, and the version of recheck that produced it.
-Open the link, and the Playground shows the recorded result with a `recorded` badge, runs the check again with the same version, and tells whether the new result matches the recorded one.
+Open the link, and the Playground shows the recorded result, runs the check again with the same version, and tells whether the new result matches the recorded one.
 
 The permalink is meant to be cited in a vulnerability report.
 A reader of the report sees exactly what was checked, and reproduces it with one click, even after recheck changes.
-The [path-to-regexp advisory](https://github.com/advisories/GHSA-27v5-c462-wpq7) already links to the Playground this way, and we would like to see more.
+The [path-to-regexp advisory](https://github.com/advisories/GHSA-27v5-c462-wpq7) links to the Playground to show its analysis, for example.
+Such a link had only the input before, but now it carries the result as well.
 
 To make the reproduction reliable, the Playground can run any release since v4.6.1, which is loaded from a CDN as ES modules, in addition to the build of the current `main` branch.
 A permalink preselects the version it was recorded with.
