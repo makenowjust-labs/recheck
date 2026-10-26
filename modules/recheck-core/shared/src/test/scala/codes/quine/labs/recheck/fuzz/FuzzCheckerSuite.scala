@@ -49,6 +49,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
   test("FuzzChecker.check: linear"):
     assert(!check("(a|a)*", ""))
     assert(!check("(a*)*", ""))
+    assert(!check("^(a\\1)$", ""))
 
     // Its attack string is long and slow enough to run over `attackTimeout` (#1865), which is not an attack by itself.
     val phone =

@@ -39,9 +39,9 @@ object StaticSeeder:
     ctx.interrupt:
       val backRefs = extractBackRefs(pattern.node)
 
-      def loop(node: Node, prevIsRepeat: Boolean, nextIsRepeat: Boolean): Node = ctx.interrupt:
+      def loop(node: Node, prevIsRepeat: Boolean, nextIsRepeat: Boolean, inside: Set[Int]): Node = ctx.interrupt:
         node match
-          case Disjunction(ns) => Disjunction(ns.map(loop(_, prevIsRepeat, nextIsRepeat)))
+          case Disjunction(ns) => Disjunction(ns.map(loop(_, prevIsRepeat, nextIsRepeat, inside)))
           case Sequence(ns)    =>
             val children = ns.lift
             Sequence:
@@ -49,32 +49,34 @@ object StaticSeeder:
                 case (c, i) =>
                   val prev = children(i - 1).map(_.isInstanceOf[Repeat]).getOrElse(prevIsRepeat)
                   val next = children(i + 1).map(_.isInstanceOf[Repeat]).getOrElse(nextIsRepeat)
-                  loop(c, prev, next)
-          case Capture(i, n)            => Capture(i, loop(n, prevIsRepeat, nextIsRepeat))
-          case NamedCapture(i, name, n) => NamedCapture(i, name, loop(n, prevIsRepeat, nextIsRepeat))
-          case Group(n)                 => Group(loop(n, prevIsRepeat, nextIsRepeat))
+                  loop(c, prev, next, inside)
+          case Capture(i, n)            => Capture(i, loop(n, prevIsRepeat, nextIsRepeat, inside + i))
+          case NamedCapture(i, name, n) => NamedCapture(i, name, loop(n, prevIsRepeat, nextIsRepeat, inside + i))
+          case Group(n)                 => Group(loop(n, prevIsRepeat, nextIsRepeat, inside))
           case Repeat(q, n)             =>
             val (min, k) = q.normalized match
               case Quantifier.Exact(n, _)          => (n, n)
               case Quantifier.Unbounded(min, _)    => (min, min)
               case Quantifier.Bounded(min, max, _) => (min, max)
             if k > maxSimpleRepeatSize then
-              if min == 0 then Repeat(Quantifier.Star(q.isLazy), loop(n, true, true))
-              else Repeat(Quantifier.Plus(q.isLazy), loop(n, true, true))
-            else Repeat(q, loop(n, true, true))
+              if min == 0 then Repeat(Quantifier.Star(q.isLazy), loop(n, true, true, inside))
+              else Repeat(Quantifier.Plus(q.isLazy), loop(n, true, true, inside))
+            else Repeat(q, loop(n, true, true, inside))
           case LookAhead(negative, n) =>
-            val c = loop(n, prevIsRepeat, nextIsRepeat)
+            val c = loop(n, prevIsRepeat, nextIsRepeat, inside)
             if !negative && nextIsRepeat then c else Disjunction(Seq(c, Sequence(Seq.empty)))
           case LookBehind(negative, n) =>
-            val c = loop(n, prevIsRepeat, nextIsRepeat)
+            val c = loop(n, prevIsRepeat, nextIsRepeat, inside)
             if !negative && prevIsRepeat then c else Disjunction(Seq(c, Sequence(Seq.empty)))
-          case BackReference(i) =>
-            Disjunction(Seq(loop(backRefs(i), prevIsRepeat, nextIsRepeat), Sequence(Seq.empty)))
-          case NamedBackReference(i, _) =>
-            Disjunction(Seq(loop(backRefs(i), prevIsRepeat, nextIsRepeat), Sequence(Seq.empty)))
-          case n => n
+          case BackReference(i)         => backRef(i, prevIsRepeat, nextIsRepeat, inside)
+          case NamedBackReference(i, _) => backRef(i, prevIsRepeat, nextIsRepeat, inside)
+          case n                        => n
 
-      Pattern(loop(pattern.node, true, true), pattern.flagSet)
+      def backRef(i: Int, prevIsRepeat: Boolean, nextIsRepeat: Boolean, inside: Set[Int]): Node =
+        if inside.contains(i) then Sequence(Seq.empty)
+        else Disjunction(Seq(loop(backRefs(i), prevIsRepeat, nextIsRepeat, inside + i), Sequence(Seq.empty)))
+
+      Pattern(loop(pattern.node, true, true, Set.empty), pattern.flagSet)
 
   /** Extracts back-references inside the given node. */
   private[fuzz] def extractBackRefs(node: Node): Map[Int, Node] = node match
