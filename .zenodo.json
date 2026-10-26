@@ -1,0 +1,26 @@
+{
+  "title": "recheck: The trustworthy ReDoS checker",
+  "upload_type": "software",
+  "description": "recheck is a ReDoS (regular expression denial of service) checker. It combines automata-based static analysis with fuzzing to detect regular expressions whose matching time grows super-linearly, reports the matching time complexity together with an attack string, and is available as a Scala library, a JavaScript library, an ESLint plugin and a command-line tool.",
+  "creators": [
+    {
+      "name": "Fujinami, Hiroya"
+    }
+  ],
+  "license": "MIT",
+  "access_right": "open",
+  "keywords": [
+    "ReDoS",
+    "regular expression",
+    "static analysis",
+    "fuzzing",
+    "security"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://makenowjust-labs.github.io/recheck/",
+      "relation": "isDocumentedBy",
+      "resource_type": "publication-softwaredocumentation"
+    }
+  ]
+}
