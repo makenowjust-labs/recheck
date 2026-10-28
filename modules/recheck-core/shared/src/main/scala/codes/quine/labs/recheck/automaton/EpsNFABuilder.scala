@@ -14,6 +14,7 @@ import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.dialect.LineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRAssertKind
 import codes.quine.labs.resyntax.ir.IRBacktrackControl
+import codes.quine.labs.resyntax.ir.IRLookBehindMatch
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
 import codes.quine.labs.resyntax.ir.IRNotEmpty
@@ -231,8 +232,9 @@ private class EpsNFABuilder(
         emit(i -> LookAheadAssert(negative, i0, a))
         emit(a0 -> LookAroundAccept())
         (i, a)
-      case IRNodeData.NonAtomicLookAhead(_)      => throw new UnsupportedException("look-ahead assertion")
-      case IRNodeData.LookBehind(negative, n, _) =>
+      case IRNodeData.NonAtomicLookAhead(_)             => throw new UnsupportedException("look-ahead assertion")
+      case IRNodeData.LookBehind(negative, n, matching) =>
+        validateLookBehindInner(n, matching)
         val wasBackward = isBackward
         isBackward = true
         val (i0, a0) = buildNode(reverseLookBehindInner(n))
@@ -381,27 +383,38 @@ private class EpsNFABuilder(
     * A nested look-behind assertion reads the input in the same direction as the inner expression, so it is a
     * look-ahead assertion of the reversed one.
     *
-    * It throws [[UnsupportedException]] on an unbounded repetition or a look-ahead assertion in the inner expression.
+    * It throws [[UnsupportedException]] on a look-ahead assertion in the inner expression.
     */
   private def reverseLookBehindInner(node: IRNode): IRNode = ctx.interrupt:
     // An engine may match the inner expression forward from its starts (Java, PCRE, Perl and Python).
     // That succeeds exactly when matching it backward does, because the starts are those of its widths.
-    // The automaton checker does not count the cost of the inner expression, so it must be bounded.
     node.data match
       case IRNodeData.Disjunction(ns) => node.copy(data = IRNodeData.Disjunction(ns.map(reverseLookBehindInner)))
       case IRNodeData.Sequence(ns)    => node.copy(data = IRNodeData.Sequence(ns.reverse.map(reverseLookBehindInner)))
       case IRNodeData.Capture(i, name, n) => node.copy(data = IRNodeData.Capture(i, name, reverseLookBehindInner(n)))
-      case IRNodeData.Repeat(n, q)        =>
-        q match
-          case IRQuantifier.Unbounded(_, _) => throw new UnsupportedException("look-behind assertion")
-          case _                            => node.copy(data = IRNodeData.Repeat(reverseLookBehindInner(n), q))
-      case IRNodeData.Strings(set) =>
+      case IRNodeData.Repeat(n, q)        => node.copy(data = IRNodeData.Repeat(reverseLookBehindInner(n), q))
+      case IRNodeData.Strings(set)        =>
         val strings = set.strings.map(s => UString.from(s.iterator.toSeq.reverse))
         node.copy(data = IRNodeData.Strings(ClassSet(set.chars, strings)))
       case IRNodeData.LookAhead(_, _) => throw new UnsupportedException("look-ahead assertion in look-behind assertion")
-      case IRNodeData.LookBehind(negative, n, _) =>
+      case IRNodeData.LookBehind(negative, n, matching) =>
+        validateLookBehindInner(n, matching)
         node.copy(data = IRNodeData.LookAhead(negative, reverseLookBehindInner(n)))
       case _ => node
+
+  /** Throws [[UnsupportedException]] unless the automaton checker supports the inner expression of a look-behind that
+    * the engine matches as `matching`.
+    *
+    * An unbounded inner expression matched forward is unsupported (e.g. Java's `(?<=a*b)`).
+    */
+  private def validateLookBehindInner(n: IRNode, matching: IRLookBehindMatch): Unit =
+    // The engine tries it from each start in turn, which no backward path of the reversed one counts.
+    // Its cost at a position is bounded if the inner expression is.
+    val unbounded = n.exists:
+      case IRNodeData.Repeat(_, _: IRQuantifier.Unbounded) => true
+      case _                                               => false
+    if unbounded && matching != IRLookBehindMatch.Backward then
+      throw new UnsupportedException("unbounded look-behind assertion matched forward")
 
   private def epsilon(): (Int, Int) =
     val i = nextQ()

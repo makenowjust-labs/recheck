@@ -14,22 +14,71 @@ object AutomatonChecker:
 
   /** Checks a match time complexity of the NFA. */
   def check[A, Q](nfa: OrderedNFA[A, Q], maxNFASize: Int)(using ctx: Context): Iterator[Complexity[A]] =
-    ctx.interrupt(new AutomatonChecker(nfa, maxNFASize).check())
+    ctx.interrupt:
+      val nfaWLA = nfa.toNFAwLA(maxNFASize)
+      val complexities = new AutomatonChecker(nfaWLA, false).check()
+      nfa.lookBehind match
+        case None             => complexities
+        case Some(lookBehind) =>
+          val product = LookBehindProduct.build(nfaWLA, lookBehind, maxNFASize)
+          val lookBehindComplexities = new AutomatonChecker(product, true).check().map(dropInputEnds)
+          merge(complexities, lookBehindComplexities).distinct
 
-/** AutomatonChecker is a ReDoS vulnerable RegExp checker based on automata theory. */
-private final class AutomatonChecker[A, Q](
-    private val nfa: OrderedNFA[A, Q],
-    val maxNFASize: Int
+  /** Merges the complexities, each ordered from the worst as [[AutomatonChecker#check]] gives them, into one ordered
+    * from the worst, where `xs` comes first on a tie.
+    */
+  private def merge[A](xs: Iterator[Complexity[A]], ys: Iterator[Complexity[A]]): Iterator[Complexity[A]] =
+    val bx = xs.buffered
+    val by = ys.buffered
+    Iterator
+      .continually(())
+      .takeWhile(_ => bx.hasNext || by.hasNext)
+      .map: _ =>
+        if !by.hasNext || bx.hasNext && complexityOrder(bx.head) <= complexityOrder(by.head) then bx.next()
+        else by.next()
+
+  /** Orders complexities from the worst. */
+  private def complexityOrder(c: Complexity[?]): Int = c match
+    case _: Exponential[?]   => Int.MinValue
+    case p: Polynomial[?]    => -p.degree
+    case Complexity.Linear   => -1
+    case Complexity.Constant => 0
+
+  /** Drops the end-of-input markers from the witness of the complexity. */
+  private def dropInputEnds[A](c: Complexity[Option[A]]): Complexity[A] =
+    def dropFromWitness[B <: Option[A]](w: Witness[B]): Witness[A] =
+      Witness(w.pumps.map((pre, pump) => (pre.flatten[A], pump.flatten[A])), w.suffix.flatten[A])
+
+    c match
+      case Exponential(witness, hotspot)        => Exponential(dropFromWitness(witness), hotspot)
+      case Polynomial(degree, witness, hotspot) => Polynomial(degree, dropFromWitness(witness), hotspot)
+      case safe: Safe                           => safe
+
+/** AutomatonChecker is a ReDoS vulnerable RegExp checker based on automata theory.
+  *
+  * Without `countsAcceptedPaths`, it counts the paths over all prefixes, which is the backtracking cost. With it, it
+  * counts the paths into the accepting states, where every state of the NFA must reach them.
+  */
+private final class AutomatonChecker[A, Q, P](
+    private val nfaWLA: NFAwLA[A, Q, P],
+    private val countsAcceptedPaths: Boolean
 )(using private val ctx: Context):
 
   // Introduces `ctx` methods into the scope.
   import ctx.*
 
-  /** An NFA with look-ahead constructed from [[nfa]]. */
-  private val nfaWLA = nfa.toNFAwLA(maxNFASize)
-
   /** A [[nfaWLA]] transition graph. */
-  private val graph = nfaWLA.toGraph.reachable(nfaWLA.initSet.toSet)
+  private val graph = interrupt(nfaWLA.toGraph.reachable(nfaWLA.initSet.toSet))
+
+  /** The number of the components of an IDA chain minus the degree that it gives.
+    *
+    * An IDA chain of `n` components gives `n` degrees on counting the paths over all prefixes, and `n - 1` on counting
+    * the paths into the accepting states.
+    */
+  private val degreeOffset = if countsAcceptedPaths then 1 else 0
+
+  /** The states where a witness stops following the transitions, after which it follows the look-ahead DFA. */
+  private val witnessEnds = if countsAcceptedPaths then nfaWLA.acceptSet else nfaWLA.stateSet
 
   /** A [[nfaWLA]] transition graph's SCCs. */
   private val scc = graph.scc
@@ -42,7 +91,7 @@ private final class AutomatonChecker[A, Q](
     val edges = graph.edges.iterator
       .map { case (q1, _, q2) => (sccMap(q1), (), sccMap(q2)) }
       .filter { case (sc1, _, sc2) => sc1 != sc2 }
-    val edgeSet = mutable.LinkedHashSet.empty[(IndexedSeq[(Q, Set[Q])], Unit, IndexedSeq[(Q, Set[Q])])]
+    val edgeSet = mutable.LinkedHashSet.empty[(IndexedSeq[(Q, P)], Unit, IndexedSeq[(Q, P)])]
     for edge <- edges do interrupt(edgeSet.addOne(edge))
     Graph.from(edgeSet.toIndexedSeq)
 
@@ -65,10 +114,10 @@ private final class AutomatonChecker[A, Q](
   private val sccLookaheadMap = scc.map { sc => sc -> sc.map(_._2).toSet }.toMap
 
   /** A type of [[nfaWLA]] state. */
-  private type R = (Q, Set[Q])
+  private type R = (Q, P)
 
   /** A type of [[nfaWLA]] alphabet. */
-  private type B = (A, Set[Q])
+  private type B = (A, P)
 
   /** A type of a pair of pumps of witness and hotspots. */
   private type Pump = (R, Seq[B], R, Seq[SourceLocation])
@@ -138,10 +187,11 @@ private final class AutomatonChecker[A, Q](
       scc
         .map(findIDAChain)
         .sortBy(-_._1)
+        .map((degree, pumps) => (degree - degreeOffset, pumps))
         .map:
-          case (0, _)          => Constant
-          case (1, _)          => Linear
-          case (degree, pumps) =>
+          case (degree, _) if degree <= 0 => Constant
+          case (1, _)                     => Linear
+          case (degree, pumps)            =>
             val (w, hotspot) = witness(pumps)
             Polynomial(degree, w, hotspot)
 
@@ -230,8 +280,10 @@ private final class AutomatonChecker[A, Q](
           val newSpots = spots ++ pos.map { case SourceLocation(s, e) => Hotspot.Spot(s, e, Hotspot.Hot) } ++
             this.spots(prefix, q1).map { case SourceLocation(s, e) => Hotspot.Spot(s, e, Hotspot.Warm) }
           (pumpPaths :+ (prefix.map(_._2._1), path.map(_._1)), Set(q2), newSpots)
-    val suffix = nfaWLA.lookAheadDFA.toGraph.path(Set(nfaWLA.lookAheadDFA.init), qs.head._2).get._1.map(_._2).reverse
-    (Witness(pumpPaths, suffix), Hotspot(spots))
+    val (tail, last) = graph.path(qs, witnessEnds).get
+    val tailSpots = this.spots(tail, last).map { case SourceLocation(s, e) => Hotspot.Spot(s, e, Hotspot.Warm) }
+    val suffix = nfaWLA.lookAheadDFA.toGraph.path(Set(nfaWLA.lookAheadDFA.init), last._2).get._1.map(_._2).reverse
+    (Witness(pumpPaths, tail.map(_._2._1) ++ suffix), Hotspot(spots ++ tailSpots))
 
   /** Gets hotspots positions from a path. */
   private def spots(path: Seq[(R, B)], last: R): Seq[SourceLocation] =

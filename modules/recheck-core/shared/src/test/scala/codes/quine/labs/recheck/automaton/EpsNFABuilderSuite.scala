@@ -280,7 +280,6 @@ class EpsNFABuilderSuite extends munit.FunSuite:
         )
       )
     )
-    interceptMessage[UnsupportedException]("look-behind assertion")(build("(?<=.*)"))
     interceptMessage[UnsupportedException]("look-ahead assertion in look-behind assertion")(build("(?<=(?=.))"))
     // The inner expression of a look-behind reads the input backward, where the assertions can look only at the kinds of characters.
     interceptMessage[UnsupportedException]("assertion in look-behind assertion")(build("(?<=a$)", "", Dialect.DotNet))
@@ -401,6 +400,17 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     assert(!matches("(?<=a|bc)d", "", Dialect.Perl(), "cd"))
     assert(matches("(?<=ab)c", "", Dialect.Python(), "abc"))
     assert(!matches("(?<=ab)c", "", Dialect.Python(), "bc"))
+    // Java allows an unbounded inner expression, which the engine tries from each start in turn.
+    interceptMessage[UnsupportedException]("unbounded look-behind assertion matched forward")(
+      build("(?<=a*b)c", "", Dialect.Java)
+    )
+
+  test("EpsNFABuilder.build: LookBehind after assertions guessing what follows"):
+    // Whether Ruby's `\Z` holds before `\n` depends on what follows, so does whether the inner expression is tried.
+    val ruby = Dialect.Ruby()
+    assert(matches("a\\Z(?<=a)", "", ruby, "a"))
+    assert(matches("a\\Z(?<=a)", "", ruby, "a\n"))
+    assert(!matches("a\\Z(?<=a)", "", ruby, "a\nb"))
 
   test("EpsNFABuilder.build: LookAhead with assertions guessing what follows"):
     // Python's `$` in the middle matches before a final line terminator, which the states guess.

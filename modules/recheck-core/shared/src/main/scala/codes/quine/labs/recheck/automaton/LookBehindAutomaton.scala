@@ -6,12 +6,16 @@ import codes.quine.labs.resyntax.ir.alphabet.CharKind
 
 /** LookBehindAutomaton tells whether the inner expressions of look-behinds succeed before a position.
   *
-  * `dfa` is the look-ahead DFA of the ordered NFA of the inner expressions, which read the input backward, so it reads
-  * the input forward, and its state after a prefix of the input is the set of the states of the NFA that succeed on the
-  * prefix. `inits` are the initial states of the NFA by the starts of the inner expressions and the kinds of the
-  * characters after the position.
+  * `nfa` is the ordered NFA of the inner expressions, which reads the input backward. `dfa` is its look-ahead DFA,
+  * which reads the input forward, and its state after a prefix of the input is the set of the states of `nfa` that
+  * succeed on the prefix. `inits` are the initial states of `nfa` by the starts of the inner expressions and the kinds
+  * of the characters after the position.
   */
-final case class LookBehindAutomaton[Q](dfa: DFA[CharSet, Set[Int]], inits: Map[(Q, CharKind), Int]):
+final case class LookBehindAutomaton[Q](
+    nfa: OrderedNFA[CharSet, Int],
+    dfa: DFA[CharSet, Set[Int]],
+    inits: Map[(Q, CharKind), Int]
+):
 
   /** The state of the DFA at the begin of the input. */
   def init: Set[Int] = dfa.init

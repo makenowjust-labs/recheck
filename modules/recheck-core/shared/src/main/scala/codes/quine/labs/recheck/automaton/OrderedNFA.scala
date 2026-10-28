@@ -17,6 +17,8 @@ import codes.quine.labs.resyntax.ast.SourceLocation
   *
   * When the input cannot be any string, `inputStates` are the states accepting exactly the strings that the input can
   * be, which the initial states do not reach (see [[restrictInputs]]).
+  *
+  * `lookBehind` has the inner expressions of the look-behind assertions, if any.
   */
 final case class OrderedNFA[A, Q](
     alphabet: Set[A],
@@ -25,7 +27,8 @@ final case class OrderedNFA[A, Q](
     acceptSet: Set[Q],
     delta: Map[(Q, A), Branch[Q]],
     sourcemap: Map[(Q, A, Q), Seq[SourceLocation]] = Map.empty[(Q, A, Q), Seq[SourceLocation]],
-    inputStates: Set[Q] = Set.empty[Q]
+    inputStates: Set[Q] = Set.empty[Q],
+    lookBehind: Option[OrderedNFA.LookBehind[A, Q]] = None
 ):
 
   /** Renames its states as integers. */
@@ -40,7 +43,8 @@ final case class OrderedNFA[A, Q](
       acceptSet.map(f),
       delta.map { case (q1, a) -> b => (f(q1), a) -> b.map(f) },
       sourcemap.map { case ((q1, a, q2), pos) => (f(q1), a, f(q2)) -> pos },
-      inputStates.map(f)
+      inputStates.map(f),
+      lookBehind.map(_.mapState(f))
     )
 
   /** Converts this NFA's alphabet by the function. */
@@ -52,7 +56,8 @@ final case class OrderedNFA[A, Q](
       acceptSet,
       delta.map { case ((q1, a), q2) => ((q1, f(a)), q2) },
       sourcemap.map { case ((q1, a, q2), pos) => ((q1, f(a), q2), pos) },
-      inputStates
+      inputStates,
+      lookBehind.map(_.mapAlphabet(f))
     )
 
   /** Restricts the input to the strings in which no character of `seconds` follows one of `firsts` (e.g. a low
@@ -128,7 +133,7 @@ final case class OrderedNFA[A, Q](
     *
     * With [[inputStates]], a look-ahead that none of them has is of no input, which the result does not have.
     */
-  def toNFAwLA(maxNFASize: Int)(using ctx: Context): NFAwLA[A, Q] =
+  def toNFAwLA(maxNFASize: Int)(using ctx: Context): NFAwLA[A, Q, Set[Q]] =
     ctx.interrupt:
       val lookAheadDFA = toLookAheadDFA
       def isInput(p: Set[Q]): Boolean = inputStates.isEmpty || p.exists(inputStates.contains)
@@ -167,7 +172,7 @@ final case class OrderedNFA[A, Q](
               ctx.log("auto: exceed maxNFASize on NFAwLA construction")
               throw new UnsupportedException("NFAwLA size is too large")
 
-      val nfaWLA = NFAwLA[A, Q](
+      val nfaWLA = NFAwLA[A, Q, Set[Q]](
         newAlphabet.result(),
         newStateSet.result(),
         newInits,
@@ -195,3 +200,31 @@ final case class OrderedNFA[A, Q](
     sb.append("}")
 
     sb.result()
+
+/** OrderedNFA types. */
+object OrderedNFA:
+
+  /** LookBehind is what [[LookBehindProduct]] needs to count the costs of the inner expressions of look-behinds. */
+  final case class LookBehind[A, Q](
+      /** The ordered NFA of the inner expressions, which reads the input backward. */
+      inner: OrderedNFA[A, Int],
+      /** The states of `inner` that succeed on the input read so far, by the states. */
+      successSets: Map[Q, Set[Int]],
+      /** The initial state of `inner` that a transition into the state tries at the position before the transition. */
+      attempts: Map[Q, Int],
+      /** The initial states of `inner` that the state tries at the end of the input. */
+      attemptsAtEnd: Map[Q, Seq[Int]]
+  ):
+
+    /** Renames the states by the injective function. */
+    def mapState[R](f: Q => R): LookBehind[A, R] =
+      LookBehind(
+        inner,
+        successSets.map((q, d) => f(q) -> d),
+        attempts.map((q, b) => f(q) -> b),
+        attemptsAtEnd.map((q, bs) => f(q) -> bs)
+      )
+
+    /** Converts the alphabet by the function. */
+    def mapAlphabet[B](f: A => B): LookBehind[B, Q] =
+      LookBehind(inner.mapAlphabet(f), successSets, attempts, attemptsAtEnd)

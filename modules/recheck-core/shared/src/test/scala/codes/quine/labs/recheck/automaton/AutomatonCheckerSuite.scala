@@ -19,9 +19,9 @@ class AutomatonCheckerSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
   /** Runs a checker against the RegExp. */
-  def check(source: String, flags: String): Try[Complexity[CharSet]] =
+  def check(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): Try[Complexity[CharSet]] =
     for
-      ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
+      ir <- Try(ReDoS.parse(source, flags, dialect))
       epsNFA = EpsNFABuilder.build(ir)
       nfa = epsNFA.toOrderedNFA.rename
       result <- Try(AutomatonChecker.check(nfa, Int.MaxValue).nextOption().getOrElse(Complexity.Constant))
@@ -44,7 +44,10 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     assertEquals(check("^(?=.*a)(?=.*b).*$", ""), Success(Linear))
     assertEquals(check("^(?:a|b)*(?=c)", ""), Success(Linear))
     assertEquals(check("^(?:(?<=a)b|a)*$", ""), Success(Linear))
+    assertEquals(check("^a*$(?<=a*)", ""), Success(Linear))
     assertEquals(check("^(?:(?<=^|\\s)\\w+\\s*)*$", ""), Success(Linear))
+    // .NET's `\Z` holds only before the final `\n`, so the look-behind is explored once though `\n` repeats.
+    assertEquals(check("\\A(?:[a\\n]|\\Z(?<=[a\\n]*))*x", "", Dialect.DotNet), Success(Linear))
 
   test("AutomatonChecker.check: polynomial"):
     val a = CharSet.single('a')
@@ -101,6 +104,41 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       )
     )
     assertEquals(
+      check("^(?:a(?<=^a*))*$", ""),
+      Success(
+        Polynomial(
+          2,
+          Witness(Seq((Seq(a), Seq(a)), (Seq.empty, Seq(a))), Seq(other1)),
+          Hotspot(Seq(Spot(4, 5, Hot), Spot(10, 11, Hot)))
+        )
+      )
+    )
+    assertEquals(
+      check("c?a+(?<=ba*)$", ""),
+      Success(
+        Polynomial(
+          3,
+          Witness(Seq((Seq.empty, Seq(a)), (Seq.empty, Seq(a)), (Seq.empty, Seq(a))), Seq(a)),
+          Hotspot(Seq(Spot(2, 3, Hot), Spot(9, 10, Hot)))
+        )
+      )
+    )
+    // The chain ends before `bc` of the inner expression, which the witness reads to the accepting state.
+    val notABCOrLine =
+      CharSet
+        .union(Seq(CharSet.range('a', 'c'), CharSet.single('\n'), CharSet.single('\r'), CharSet.range(0x2028, 0x2029)))
+        .complement(UnitMode.UTF16)
+    assertEquals(
+      check("^.*$(?<=^a*a*bc)", ""),
+      Success(
+        Polynomial(
+          2,
+          Witness(Seq((Seq(notABCOrLine), Seq(a)), (Seq.empty, Seq(a))), Seq(b, CharSet.single('c'))),
+          Hotspot(Seq(Spot(1, 2, Hot), Spot(9, 10, Hot), Spot(11, 12, Hot), Spot(13, 15, Warm)))
+        )
+      )
+    )
+    assertEquals(
       check("^a*(?=a*$)", ""),
       Success(
         Polynomial(2, Witness(Seq((Seq(a), Seq(a))), Seq(other1)), Hotspot(Seq(Spot(1, 2, Hot), Spot(6, 7, Hot))))
@@ -116,6 +154,18 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       check("^(a|a)*$", ""),
       Success(
         Exponential(Witness(Seq((Seq.empty, Seq(a))), Seq(other1)), Hotspot(Seq(Spot(2, 3, Hot), Spot(4, 5, Hot))))
+      )
+    )
+    // The pump ends before `bc` of the inner expression, which the witness reads to the accepting state.
+    val c = CharSet.single('c')
+    val d = CharSet.single('d')
+    assertEquals(
+      check("^.*(?<=^(?:a|a)*bc)d", ""),
+      Success(
+        Exponential(
+          Witness(Seq((Seq(b, a), Seq(a))), Seq(b, c, d, c, d)),
+          Hotspot(Seq(Spot(1, 2, Hot), Spot(11, 12, Hot), Spot(13, 14, Hot), Spot(16, 18, Warm)))
+        )
       )
     )
     assertEquals(
