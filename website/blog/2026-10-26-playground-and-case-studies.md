@@ -47,7 +47,7 @@ Still, it was hard to answer what it has been used for, because the reports are 
 The [Case Studies](/docs/case-studies) page collects them in one place.
 
 - **Vulnerabilities found with recheck.**
-  From markdown-it and marked in 2022, to the thirteen CVEs in Ruby, Rack, Rails and other gems that [ooooooo_q](https://github.com/ooooooo-q) reported after checking the regular expressions of Ruby applications with recheck, to the findings of the recent [Revisiting ReDoS Attacks](https://mwlik.github.io/2026-04-15-revisiting-redos-attacks/) post.
+  From markdown-it and marked in 2022, to the fourteen CVEs in Ruby, Rack, Rails and other gems that [ooooooo_q](https://github.com/ooooooo-q) reported after checking the regular expressions of Ruby applications with recheck, to the findings of the recent [Revisiting ReDoS Attacks](https://mwlik.github.io/2026-04-15-revisiting-redos-attacks/) post.
 - **Projects using recheck.**
   Zod tests every regular expression it ships, Civitai and pi-mcp-adapter guard regular expressions built at runtime, and core-js and markdownlint lint with `eslint-plugin-redos`.
   Gixy-Next checks nginx configurations through recheck, and a Datadog static analysis rule recommends it.
