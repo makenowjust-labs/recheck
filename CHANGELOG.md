@@ -16,6 +16,7 @@ Misc:
 - [#1944](https://github.com/makenowjust-labs/recheck/pull/1944) Remove .yarnrc ([@makenowjust](https://github.com/makenowjust))
 - [#1950](https://github.com/makenowjust-labs/recheck/pull/1950) Remove `.git-blame-ignore-revs` ([@makenowjust](https://github.com/makenowjust))
 - [#1951](https://github.com/makenowjust-labs/recheck/pull/1951) Add Loofah CVE-2022-23514 to Case Studies ([@makenowjust](https://github.com/makenowjust))
+- [#1829](https://github.com/makenowjust-labs/recheck/pull/1829) Update dependency sbt/sbt to v2.0.12 ([@renovate[bot]](https://github.com/apps/renovate))
 
 # 4.6.2 (2026-10-26)
 
