@@ -9,6 +9,8 @@ import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.ClassSet
+import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.dialect.LineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRAssertKind
 import codes.quine.labs.resyntax.ir.IRBacktrackControl
@@ -50,10 +52,16 @@ private class EpsNFABuilder(
   def nextQ(): Int =
     val q = counterQ
     counterQ += 1
+    if isBackward then innerStates.add(q)
     q
 
-  /** Returns a state set from the current state counter. */
-  def stateSet(): Set[Int] = (0 until counterQ).toSet
+  /** The states of the inner expressions of the look-behinds. */
+  private val innerStates: mutable.Set[Int] = mutable.Set.empty
+
+  /** The states that the copies for `(*NOTEMPTY)` keep for the inner expressions of the look-behinds, which they share
+    * instead.
+    */
+  private val unusedStates: mutable.Set[Int] = mutable.Set.empty
 
   /** A next loop counter. */
   private var counterLoop = 0
@@ -67,12 +75,15 @@ private class EpsNFABuilder(
   /** A transition function. */
   private val tau: mutable.Map[Int, Transition[Int]] = mutable.Map.empty
 
+  /** A transition function of the inner expressions of the look-behinds. */
+  private val innerTau: mutable.Map[Int, Transition[Int]] = mutable.Map.empty
+
   /** The states of `\K`, each of which has an ε-transition. */
   private val resetMatchStarts: mutable.Set[Int] = mutable.Set.empty
 
   /** Emits a transition. */
   def emit(t: (Int, Transition[Int])): Unit =
-    tau.addOne(t)
+    if isBackward then innerTau.addOne(t) else tau.addOne(t)
 
   /** Builds EpsNFA for the pattern. */
   def build(): EpsNFA[Int] =
@@ -113,7 +124,8 @@ private class EpsNFABuilder(
       a4
     else a0
 
-    EpsNFA(alphabet, stateSet(), init, accept, tau.toMap)
+    val lookBehind = Option.when(innerStates.nonEmpty)(LookBehind(innerStates.toSet, innerTau.toMap))
+    EpsNFA(alphabet, (0 until counterQ).toSet -- innerStates -- unusedStates, init, accept, tau.toMap, lookBehind)
 
   /** Makes the pattern's states between `start` and the current counter reject an empty match, as PCRE's `(*NOTEMPTY)`
     * and `(*NOTEMPTY_ATSTART)` do, and returns the initial states of the search at the start and after it, and the
@@ -131,15 +143,18 @@ private class EpsNFABuilder(
         val shift = end - start
         counterQ += shift
         def moved(q: Int): Int = q + shift
+        // The copies share the inner expressions of the look-behinds, which reject nothing.
+        unusedStates.addAll((start until end).filter(innerStates.contains).map(moved))
 
         def retarget(t: Transition[Int], f: Int => Int): Transition[Int] = t match
-          case Eps(qs)                            => Eps(qs.map(f))
-          case Assert(kind, q)                    => Assert(kind, f(q))
-          case Consume(set, q, loc)               => Consume(set, f(q), loc)
-          case LoopEnter(loop, q)                 => LoopEnter(loop, f(q))
-          case LoopExit(loop, q)                  => LoopExit(loop, f(q))
-          case LookAheadAssert(negative, init, q) => LookAheadAssert(negative, f(init), f(q))
-          case LookAroundAccept()                 => LookAroundAccept()
+          case Eps(qs)                             => Eps(qs.map(f))
+          case Assert(kind, q)                     => Assert(kind, f(q))
+          case Consume(set, q, loc)                => Consume(set, f(q), loc)
+          case LoopEnter(loop, q)                  => LoopEnter(loop, f(q))
+          case LoopExit(loop, q)                   => LoopExit(loop, f(q))
+          case LookAheadAssert(negative, init, q)  => LookAheadAssert(negative, f(init), f(q))
+          case LookBehindAssert(negative, init, q) => LookBehindAssert(negative, init, f(q))
+          case LookAroundAccept()                  => LookAroundAccept()
 
         for q <- start until end; t <- tau.get(q) do
           // `\K` returns to the first copy for `(*NOTEMPTY)`, which sees the reported match.
@@ -216,12 +231,21 @@ private class EpsNFABuilder(
         emit(i -> LookAheadAssert(negative, i0, a))
         emit(a0 -> LookAroundAccept())
         (i, a)
-      case IRNodeData.NonAtomicLookAhead(_) => throw new UnsupportedException("look-ahead assertion")
-      case IRNodeData.LookBehind(_, _, _) | IRNodeData.NonAtomicLookBehind(_, _) =>
-        throw new UnsupportedException("look-behind assertion")
-      case IRNodeData.Atomic(_)              => throw new UnsupportedException("atomic group")
-      case IRNodeData.BackReference(_, _, _) => throw new UnsupportedException("back-reference")
-      case IRNodeData.Unsupported(_)         => throw new UnsupportedException(node.unsupportedMessage)
+      case IRNodeData.NonAtomicLookAhead(_)      => throw new UnsupportedException("look-ahead assertion")
+      case IRNodeData.LookBehind(negative, n, _) =>
+        val wasBackward = isBackward
+        isBackward = true
+        val (i0, a0) = buildNode(reverseLookBehindInner(n))
+        emit(a0 -> LookAroundAccept())
+        isBackward = wasBackward
+        val i = nextQ()
+        val a = nextQ()
+        emit(i -> LookBehindAssert(negative, i0, a))
+        (i, a)
+      case IRNodeData.NonAtomicLookBehind(_, _) => throw new UnsupportedException("look-behind assertion")
+      case IRNodeData.Atomic(_)                 => throw new UnsupportedException("atomic group")
+      case IRNodeData.BackReference(_, _, _)    => throw new UnsupportedException("back-reference")
+      case IRNodeData.Unsupported(_)            => throw new UnsupportedException(node.unsupportedMessage)
 
   /** Builds EpsNFA transitions for a repetition.
     *
@@ -343,10 +367,41 @@ private class EpsNFABuilder(
       case IRAssertKind.NotBetweenCRLF => assert(AssertKind.NotBetweenCRLF)
 
   private def assert(kind: AssertKind): (Int, Int) =
+    if isBackward && !kind.looksOnlyAtKinds then throw new UnsupportedException("assertion in look-behind assertion")
     val i = nextQ()
     val a = nextQ()
     emit(i -> Assert(kind, a))
     (i, a)
+
+  /** Whether the builder builds the inner expression of a look-behind, which reads the input backward. */
+  private var isBackward = false
+
+  /** Reverses the inner expression of a look-behind, so that its ε-NFA reads the input backward.
+    *
+    * A nested look-behind assertion reads the input in the same direction as the inner expression, so it is a
+    * look-ahead assertion of the reversed one.
+    *
+    * It throws [[UnsupportedException]] on an unbounded repetition or a look-ahead assertion in the inner expression.
+    */
+  private def reverseLookBehindInner(node: IRNode): IRNode = ctx.interrupt:
+    // An engine may match the inner expression forward from its starts (Java, PCRE, Perl and Python).
+    // That succeeds exactly when matching it backward does, because the starts are those of its widths.
+    // The automaton checker does not count the cost of the inner expression, so it must be bounded.
+    node.data match
+      case IRNodeData.Disjunction(ns) => node.copy(data = IRNodeData.Disjunction(ns.map(reverseLookBehindInner)))
+      case IRNodeData.Sequence(ns)    => node.copy(data = IRNodeData.Sequence(ns.reverse.map(reverseLookBehindInner)))
+      case IRNodeData.Capture(i, name, n) => node.copy(data = IRNodeData.Capture(i, name, reverseLookBehindInner(n)))
+      case IRNodeData.Repeat(n, q)        =>
+        q match
+          case IRQuantifier.Unbounded(_, _) => throw new UnsupportedException("look-behind assertion")
+          case _                            => node.copy(data = IRNodeData.Repeat(reverseLookBehindInner(n), q))
+      case IRNodeData.Strings(set) =>
+        val strings = set.strings.map(s => UString.from(s.iterator.toSeq.reverse))
+        node.copy(data = IRNodeData.Strings(ClassSet(set.chars, strings)))
+      case IRNodeData.LookAhead(_, _) => throw new UnsupportedException("look-ahead assertion in look-behind assertion")
+      case IRNodeData.LookBehind(negative, n, _) =>
+        node.copy(data = IRNodeData.LookAhead(negative, reverseLookBehindInner(n)))
+      case _ => node
 
   private def epsilon(): (Int, Int) =
     val i = nextQ()

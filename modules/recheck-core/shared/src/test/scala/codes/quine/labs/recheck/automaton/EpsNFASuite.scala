@@ -81,6 +81,14 @@ class EpsNFASuite extends munit.FunSuite:
     assert(markBoundary.accepts(mark.copy(based = 1), normal) && !markBoundary.accepts(mark, normal))
     assert(!markBoundary.accepts(boundary, mark) && AssertKind.NotMarkWordBoundary(0, 0).accepts(boundary, mark))
 
+  test("EpsNFA.AssertKind#looksOnlyAtKinds"):
+    assert(lineBegin.looksOnlyAtKinds && lineEnd.looksOnlyAtKinds && wordBoundary.looksOnlyAtKinds)
+    assert(!AssertKind.LineBegin(0, IRLineBeginAtEnd.InputBegin, true, false).looksOnlyAtKinds)
+    assert(!AssertKind.LineEnd(0, true, false).looksOnlyAtKinds)
+    assert(!AssertKind.ChompTextEnd(0, false, false).looksOnlyAtKinds)
+    assert(!AssertKind.MarkWordBoundary(0, 0).looksOnlyAtKinds)
+    assert(!AssertKind.NotMarkWordBoundary(0, 0).looksOnlyAtKinds)
+
   test("EpsNFA.AssertKind#treatsBoundaryAsLineTerminator"):
     val kinds = Seq(CharKind.Normal, CharKind.LineTerminator, CharKind(words = 1))
     assert(lineBegin.treatsBoundaryAsLineTerminator(kinds))
@@ -147,6 +155,28 @@ class EpsNFASuite extends munit.FunSuite:
          |}""".stripMargin
     )
 
+    // The states of the inner expressions of the look-behinds follow the pattern's.
+    val lookBehind = EpsNFA(
+      buildAlphabet(Seq(CharSet.single('a'))),
+      immutable.SortedSet(0, 2),
+      0,
+      2,
+      Map(0 -> LookBehindAssert(false, 1, 2)),
+      Some(LookBehind(Set(1), Map(1 -> LookAroundAccept())))
+    )
+    assertEquals(
+      lookBehind.toGraphviz,
+      """|digraph {
+         |  "" [shape=point];
+         |  "" -> "0";
+         |  "0" [shape=diamond];
+         |  "0" -> "1" [label="?<="];
+         |  "0" -> "2";
+         |  "2" [shape=doublecircle];
+         |  "1" [shape=doubleoctagon];
+         |}""".stripMargin
+    )
+
   test("EpsNFA#toOrderedNFA"):
     val normal = CharKindState(CharKind.Normal)
     val terminator = CharKindState(CharKind.LineTerminator)
@@ -165,17 +195,18 @@ class EpsNFASuite extends munit.FunSuite:
         5 -> LoopExit(0, 6)
       )
     )
+    val d0 = Set.empty[Int]
     val q36: Branch[Stop[Int]] =
       Branch.Choice(Seq(Branch.Leaf(Stop.Read(3, Set(terminator, normal))), Branch.Leaf(Stop.End)))
     assertEquals(
       nfa1.toOrderedNFA,
-      OrderedNFA[CharSet, (CharKindState, Branch[Stop[Int]])](
+      OrderedNFA[CharSet, (CharKindState, Branch[Stop[Int]], Set[Int])](
         Set(CharSet.single('\n'), CharSet.single('\n').complement(UnitMode.UTF16)),
-        Set((terminator, q36)),
-        Vector((terminator, q36)),
-        Set((terminator, q36)),
+        Set((terminator, q36, d0)),
+        Vector((terminator, q36, d0)),
+        Set((terminator, q36, d0)),
         Map(
-          ((terminator, q36), CharSet.single('\n')) -> Branch.Leaf((terminator, q36))
+          ((terminator, q36, d0), CharSet.single('\n')) -> Branch.Leaf((terminator, q36, d0))
         )
       )
     )
@@ -221,19 +252,19 @@ class EpsNFASuite extends munit.FunSuite:
           CharSet.single('a').union(CharSet.single('\n')).complement(UnitMode.UTF16)
         ),
         Set(
-          (terminator, q4),
-          (terminator, q45),
-          (word, q54510)
+          (terminator, q4, d0),
+          (terminator, q45, d0),
+          (word, q54510, d0)
         ),
-        Vector((terminator, q4)),
-        Set((word, q54510)),
+        Vector((terminator, q4, d0)),
+        Set((word, q54510, d0)),
         Map(
-          ((terminator, q4), CharSet.single('\n')) -> Branch.Leaf((terminator, q45)),
-          ((terminator, q45), CharSet.single('a')) -> Branch.Leaf((word, q54510)),
-          ((terminator, q45), CharSet.single('\n')) -> Branch.Leaf((terminator, q45)),
-          ((word, q54510), CharSet.single('\n')) -> Branch.Leaf((terminator, q45)),
-          ((word, q54510), CharSet.single('a')) -> Branch.Choice(
-            Seq(Branch.Leaf((word, q54510)), Branch.Leaf((word, q54510)))
+          ((terminator, q4, d0), CharSet.single('\n')) -> Branch.Leaf((terminator, q45, d0)),
+          ((terminator, q45, d0), CharSet.single('a')) -> Branch.Leaf((word, q54510, d0)),
+          ((terminator, q45, d0), CharSet.single('\n')) -> Branch.Leaf((terminator, q45, d0)),
+          ((word, q54510, d0), CharSet.single('\n')) -> Branch.Leaf((terminator, q45, d0)),
+          ((word, q54510, d0), CharSet.single('a')) -> Branch.Choice(
+            Seq(Branch.Leaf((word, q54510, d0)), Branch.Leaf((word, q54510, d0)))
           )
         )
       )

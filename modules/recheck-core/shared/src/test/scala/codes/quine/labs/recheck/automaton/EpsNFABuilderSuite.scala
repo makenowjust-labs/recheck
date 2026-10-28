@@ -22,10 +22,15 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   /** Builds an ε-NFA from the source, without the locations of transitions. */
   def build(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): EpsNFA[Int] =
     val nfa = EpsNFABuilder.build(ReDoS.parse(source, flags, dialect))
-    nfa.copy(tau = nfa.tau.view.mapValues {
-      case t: Consume[Int] => t.copy(loc = None)
-      case t               => t
-    }.toMap)
+    def withoutLocations(tau: Map[Int, Transition[Int]]): Map[Int, Transition[Int]] =
+      tau.view.mapValues {
+        case t: Consume[Int] => t.copy(loc = None)
+        case t               => t
+      }.toMap
+    nfa.copy(
+      tau = withoutLocations(nfa.tau),
+      lookBehind = nfa.lookBehind.map(lb => lb.copy(tau = withoutLocations(lb.tau)))
+    )
 
   val utf16: UnitMode = UnitMode.UTF16
   val any16: CharSet = utf16.universe
@@ -249,8 +254,38 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       )
     )
 
+  test("EpsNFABuilder.build: LookBehind"):
+    assertEquals(
+      build("^(?<!ab)$"),
+      EpsNFA(
+        buildAlphabet(utf16, Seq(CharSet.single('a'), CharSet.single('b'))),
+        Set(0, 5, 6, 7),
+        0,
+        7,
+        Map(
+          0 -> Eps(Seq(5)),
+          5 -> LookBehindAssert(true, 1, 6),
+          6 -> Eps(Seq(7))
+        ),
+        Some(
+          LookBehind(
+            Set(1, 2, 3, 4),
+            Map(
+              1 -> Consume(Set((CharSet.single('b'), CharKind.Normal)), 2),
+              2 -> Eps(Seq(3)),
+              3 -> Consume(Set((CharSet.single('a'), CharKind.Normal)), 4),
+              4 -> LookAroundAccept()
+            )
+          )
+        )
+      )
+    )
+    interceptMessage[UnsupportedException]("look-behind assertion")(build("(?<=.*)"))
+    interceptMessage[UnsupportedException]("look-ahead assertion in look-behind assertion")(build("(?<=(?=.))"))
+    // The inner expression of a look-behind reads the input backward, where the assertions can look only at the kinds of characters.
+    interceptMessage[UnsupportedException]("assertion in look-behind assertion")(build("(?<=a$)", "", Dialect.DotNet))
+
   test("EpsNFABuilder.build: unsupported"):
-    interceptMessage[UnsupportedException]("look-behind assertion")(build("(?<=.)"))
     interceptMessage[UnsupportedException]("back-reference")(build("(.)\\1"))
     interceptMessage[UnsupportedException]("back-reference")(build("(?<foo>.)\\k<foo>"))
     interceptMessage[UnsupportedException]("atomic group")(build("(?>a)", "", Dialect.Java))
@@ -326,6 +361,47 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     val p = units.reverse.foldLeft(dfa.init)((p, c) => dfa.delta((p, nfa.alphabet.find(_.contains(c)).get)))
     nfa.inits.exists(p.contains)
 
+  test("EpsNFABuilder.build: LookBehind with assertions"):
+    // The inner expression of a look-behind reads the input backward, so its assertions see the characters the other way around.
+    val js = Dialect.JavaScript
+    assert(matches("(?<=^a)b", "", js, "ab"))
+    assert(!matches("(?<=^a)b", "", js, "cab"))
+    assert(matches("(?<=^a)b", "m", js, "c\nab"))
+    assert(matches("(?<=a$)", "", js, "ba"))
+    assert(!matches("(?<=a$)", "", js, "ab"))
+    assert(matches("(?<=a$)", "m", js, "a\nb"))
+    assert(matches("(?<=a\\b)!", "", js, "a!"))
+    assert(!matches("(?<=a\\b)b", "", js, "ab"))
+    assert(matches("(?<=a\\B)b", "", js, "ab"))
+    assert(!matches("(?<!^)a", "", js, "a"))
+    assert(matches("(?<!^)a", "", js, "ba"))
+    assert(matches("(?<=(?<=a)b)c", "", js, "abc"))
+    assert(!matches("(?<=(?<=a)b)c", "", js, "bbc"))
+    // With `u`, the inner expression of a look-behind does not end between a high and a low surrogate.
+    assert(!matches("(?<=\\uD83D)\\uDE00", "u", js, "\uD83D\uDE00"))
+    assert(matches("(?<=\\uD83D)\\uDE00", "", js, "\uD83D\uDE00"))
+    assert(matches("(?<=\\uD83D)x", "u", js, "\uD83Dx"))
+
+  test("EpsNFABuilder.build: LookBehind with captures and strings"):
+    val js = Dialect.JavaScript
+    assert(matches("(?<=(ab))c", "", js, "abc"))
+    assert(!matches("(?<=(ab))c", "", js, "bbc"))
+    assert(matches("(?<=[\\q{ab}])c", "v", js, "abc"))
+    assert(!matches("(?<=[\\q{ab}])c", "v", js, "bac"))
+
+  test("EpsNFABuilder.build: LookBehind matched forward"):
+    // The engine matches the inner expression forward from the starts of its widths, which succeeds as matching it backward.
+    assert(matches("(?<=ab|b)c", "", Dialect.Java, "abc"))
+    assert(matches("(?<=ab|b)c", "", Dialect.Java, "xbc"))
+    assert(!matches("(?<=ab|b)c", "", Dialect.Java, "xc"))
+    assert(matches("(?<=a|bc)d", "", Dialect.PCRE, "bcd"))
+    assert(matches("(?<=a|bc)d", "", Dialect.PCRE, "ad"))
+    assert(!matches("(?<=a|bc)d", "", Dialect.PCRE, "cd"))
+    assert(matches("(?<=a|bc)d", "", Dialect.Perl(), "bcd"))
+    assert(!matches("(?<=a|bc)d", "", Dialect.Perl(), "cd"))
+    assert(matches("(?<=ab)c", "", Dialect.Python(), "abc"))
+    assert(!matches("(?<=ab)c", "", Dialect.Python(), "bc"))
+
   test("EpsNFABuilder.build: LookAhead with assertions guessing what follows"):
     // Python's `$` in the middle matches before a final line terminator, which the states guess.
     val python = Dialect.Python()
@@ -358,6 +434,9 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     // The look-aheads are copied with the other states.
     assert(!matches("(*NOTEMPTY)(?=a)", "", Dialect.PCRE, "a"))
     assert(matches("(*NOTEMPTY)(?=a)a", "", Dialect.PCRE, "a"))
+    // The copy after a character has the look-behinds too.
+    assert(matches("(*NOTEMPTY)(?<=a)b", "", Dialect.PCRE, "ab"))
+    assert(!matches("(*NOTEMPTY)(?<=c)b", "", Dialect.PCRE, "ab"))
 
   test("EpsNFABuilder.build: line, text and word boundary assertions"):
     for c <- AssertionCases.cases; dialect <- c.dialects do

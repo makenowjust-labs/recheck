@@ -29,11 +29,13 @@ final case class OrderedNFA[A, Q](
 ):
 
   /** Renames its states as integers. */
-  def rename: OrderedNFA[A, Int] =
-    val f = stateSet.zipWithIndex.toMap
+  def rename: OrderedNFA[A, Int] = mapState(stateSet.zipWithIndex.toMap)
+
+  /** Renames its states by the injective function. */
+  def mapState[R](f: Q => R): OrderedNFA[A, R] =
     OrderedNFA(
       alphabet,
-      f.values.toSet,
+      stateSet.map(f),
       inits.map(f),
       acceptSet.map(f),
       delta.map { case (q1, a) -> b => (f(q1), a) -> b.map(f) },
