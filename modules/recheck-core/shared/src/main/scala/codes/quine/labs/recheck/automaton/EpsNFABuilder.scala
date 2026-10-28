@@ -133,11 +133,13 @@ private class EpsNFABuilder(
         def moved(q: Int): Int = q + shift
 
         def retarget(t: Transition[Int], f: Int => Int): Transition[Int] = t match
-          case Eps(qs)              => Eps(qs.map(f))
-          case Assert(kind, q)      => Assert(kind, f(q))
-          case Consume(set, q, loc) => Consume(set, f(q), loc)
-          case LoopEnter(loop, q)   => LoopEnter(loop, f(q))
-          case LoopExit(loop, q)    => LoopExit(loop, f(q))
+          case Eps(qs)                            => Eps(qs.map(f))
+          case Assert(kind, q)                    => Assert(kind, f(q))
+          case Consume(set, q, loc)               => Consume(set, f(q), loc)
+          case LoopEnter(loop, q)                 => LoopEnter(loop, f(q))
+          case LoopExit(loop, q)                  => LoopExit(loop, f(q))
+          case LookAheadAssert(negative, init, q) => LookAheadAssert(negative, f(init), f(q))
+          case LookAroundAccept()                 => LookAroundAccept()
 
         for q <- start until end; t <- tau.get(q) do
           // `\K` returns to the first copy for `(*NOTEMPTY)`, which sees the reported match.
@@ -205,10 +207,16 @@ private class EpsNFABuilder(
         resetMatchStarts.add(i)
         (i, a)
       case IRNodeData.BacktrackControl(_: IRBacktrackControl.Mark) => epsilon()
-      case IRNodeData.BacktrackControl(_)  => throw new UnsupportedException("backtracking control verb")
-      case IRNodeData.Conditional(_, _, _) => throw new UnsupportedException("conditional")
-      case IRNodeData.LookAhead(_, _) | IRNodeData.NonAtomicLookAhead(_) =>
-        throw new UnsupportedException("look-ahead assertion")
+      case IRNodeData.BacktrackControl(_)    => throw new UnsupportedException("backtracking control verb")
+      case IRNodeData.Conditional(_, _, _)   => throw new UnsupportedException("conditional")
+      case IRNodeData.LookAhead(negative, n) =>
+        val (i0, a0) = buildNode(n)
+        val i = nextQ()
+        val a = nextQ()
+        emit(i -> LookAheadAssert(negative, i0, a))
+        emit(a0 -> LookAroundAccept())
+        (i, a)
+      case IRNodeData.NonAtomicLookAhead(_) => throw new UnsupportedException("look-ahead assertion")
       case IRNodeData.LookBehind(_, _, _) | IRNodeData.NonAtomicLookBehind(_, _) =>
         throw new UnsupportedException("look-behind assertion")
       case IRNodeData.Atomic(_)              => throw new UnsupportedException("atomic group")

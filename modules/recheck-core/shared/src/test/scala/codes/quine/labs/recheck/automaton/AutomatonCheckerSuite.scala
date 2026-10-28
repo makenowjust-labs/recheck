@@ -39,9 +39,14 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     assertEquals(check("^(\\w|\\W)*$", "i"), Success(Linear))
     assertEquals(check("^(a()*a)*$", ""), Success(Linear))
     assertEquals(check("^(a(\\b)*:)*$", ""), Success(Linear))
+    assertEquals(check("^(?:(?=a)a)*$", ""), Success(Linear))
+    assertEquals(check("^(?:(?!ab).)*$", ""), Success(Linear))
+    assertEquals(check("^(?=.*a)(?=.*b).*$", ""), Success(Linear))
+    assertEquals(check("^(?:a|b)*(?=c)", ""), Success(Linear))
 
   test("AutomatonChecker.check: polynomial"):
     val a = CharSet.single('a')
+    val b = CharSet.single('b')
     val at = CharSet.single('@')
     val other1 = a.complement(UnitMode.UTF16)
     val word =
@@ -83,6 +88,16 @@ class AutomatonCheckerSuite extends munit.FunSuite:
         )
       )
     )
+    assertEquals(
+      check("^a+(?!a*b)", ""),
+      Success(Polynomial(2, Witness(Seq((Seq(a), Seq(a))), Seq(b)), Hotspot(Seq(Spot(1, 2, Hot), Spot(6, 7, Hot)))))
+    )
+    assertEquals(
+      check("^a*(?=a*$)", ""),
+      Success(
+        Polynomial(2, Witness(Seq((Seq(a), Seq(a))), Seq(other1)), Hotspot(Seq(Spot(1, 2, Hot), Spot(6, 7, Hot))))
+      )
+    )
 
   test("AutomatonChecker.check: exponential"):
     val a = CharSet.single('a')
@@ -116,4 +131,14 @@ class AutomatonCheckerSuite extends munit.FunSuite:
           Hotspot(Seq(Spot(2, 4, Hot), Spot(5, 6, Hot), Spot(7, 10, Hot)))
         )
       )
+    )
+    assertEquals(
+      check("^(?=(?:a|a)*$)", ""),
+      Success(
+        Exponential(Witness(Seq((Seq(a), Seq(a))), Seq(other1)), Hotspot(Seq(Spot(7, 8, Hot), Spot(9, 10, Hot))))
+      )
+    )
+    assertEquals(
+      check("^(?!(?:a|a)*b)", ""),
+      Success(Exponential(Witness(Seq((Seq(a), Seq(a))), Seq.empty), Hotspot(Seq(Spot(7, 8, Hot), Spot(9, 10, Hot)))))
     )

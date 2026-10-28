@@ -280,7 +280,7 @@ class ReDoSSuite extends munit.FunSuite:
   test("ReDoS.check: non-atomic look-arounds"):
     // Backtracking enters the look-ahead again (0.45 s at n = 22), which an atomic one does not (0.004 ms).
     assertVulnerable(check("^(?*(?:a|a)*)c", PCRE), AttackComplexity.Exponential(true), Checker.Fuzz)
-    assertSafe(check("^(?=(?:a|a)*)c", PCRE), Checker.Fuzz)
+    assertSafe(check("^(?=(?:a|a)*)c", PCRE), Checker.Automaton)
 
   test("ReDoS.check: (*NOTEMPTY)"):
     // An empty match is rejected, so the engine backtracks into the other alternative (0.71 s at n = 22).

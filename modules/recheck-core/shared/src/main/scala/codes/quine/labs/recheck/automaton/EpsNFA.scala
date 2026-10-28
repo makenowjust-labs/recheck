@@ -45,6 +45,12 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
         case Some(LoopExit(loop, q1)) =>
           sb.append(s"  ${escape(q0)} [shape=circle];\n")
           sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(s"Exit($loop)")}];\n")
+        case Some(LookAheadAssert(negative, init, q1)) =>
+          sb.append(s"  ${escape(q0)} [shape=diamond];\n")
+          sb.append(s"  ${escape(q0)} -> ${escape(init)} [label=${escape(if negative then "?!" else "?=")}];\n")
+          sb.append(s"  ${escape(q0)} -> ${escape(q1)};\n")
+        case Some(LookAroundAccept()) =>
+          sb.append(s"  ${escape(q0)} [shape=doubleoctagon];\n")
         case None =>
           sb.append(s"  ${escape(q0)} [shape=doublecircle];\n")
     sb.append("}")
@@ -115,6 +121,9 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
               case Some(LoopExit(loop, q1)) =>
                 if loops.contains(loop) then Branch.Fail // An ε-loop is detected.
                 else buildClosure(s0, ss, q1, loops)
+              case Some(LookAheadAssert(negative, init, q1)) =>
+                Branch.lookAhead(negative, buildClosure(s0, ss, init, loops), buildClosure(s0, ss, q1, loops))
+              case Some(LookAroundAccept()) => Branch.Leaf(Stop.InnerEnd(ss))
               case Some(Consume(chs, _, _)) =>
                 if chs.exists((_, k) => advance(s0, k).exists(ss.contains)) then Branch.Leaf(Stop.Read(q, ss))
                 else Branch.Fail
@@ -129,11 +138,34 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
       type R = (CharKindState, Branch[Stop[Q]])
 
       val consumes = tau.collect { case (q, c @ Consume(_, _, _)) => q -> c }
+      val charKinds = alphabet.any.toMap
+      val newAlphabet = charKinds.keySet
+
+      // A success before a character of the kind, where `ss` are the next states that the assertions allow.
+      // It is pending if the states of the character guess differently and the assertions allow only some of them,
+      // and then the next state is an end of an inner expression, which the rest of the input confirms.
+      def successBefore(s0: CharKindState, ss: Set[CharKindState], k: CharKind): Branch[(R, Option[SourceLocation])] =
+        val next = advance(s0, k)
+        val allowed = next.filter(ss.contains)
+        if allowed.isEmpty then Branch.Fail
+        else if allowed.size == next.size then Branch.Succeed
+        else
+          Branch.choice(allowed.map: s =>
+            val s1 = s.forgetMarks
+            Branch.Leaf(((s1, Branch.Leaf(Stop.InnerEnd(nextStates(s1)))), None)))
+
+      // Tests whether the leaf succeeds at the end of the input.
+      def succeedsAtEnd(stop: Stop[Q]): Boolean = stop match
+        case Stop.Read(_, _)   => false
+        case Stop.InnerEnd(ss) => ss.contains(inputTerminator)
+        case Stop.End          => true
 
       // The characters on which the leaf may have a transition.
       def charsOf(stop: Stop[Q]): Set[CharSet] = stop match
         case Stop.Read(q, _) => consumes(q).set.map(_._1)
-        case Stop.End        => Set.empty
+        // An end of an inner expression succeeds without consuming a character.
+        case Stop.InnerEnd(_) => newAlphabet
+        case Stop.End         => Set.empty
 
       // The transition of the leaf on the character, as a branch of the next states with the locations read there.
       def step(s0: CharKindState, ch: CharSet)(stop: Stop[Q]): Branch[(R, Option[SourceLocation])] = stop match
@@ -144,7 +176,8 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
             yield
               val s1 = s.forgetMarks
               Branch.Leaf(((s1, closure(s1, q1)), loc))
-        case Stop.End => Branch.Fail
+        case Stop.InnerEnd(ss) => successBefore(s0, ss, charKinds(ch))
+        case Stop.End          => Branch.Fail
 
       val newInits = Vector((inputTerminator, closure(inputTerminator, init)))
       val queue = mutable.Queue.from(newInits)
@@ -164,7 +197,7 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
       while queue.nonEmpty do
         ctx.interrupt:
           val r0 @ (s0, stops) = queue.dequeue()
-          if stops.succeeds(_ == Stop.End) then newAcceptSet.addOne(r0)
+          if stops.succeeds(succeedsAtEnd) then newAcceptSet.addOne(r0)
           for ch <- stops.leaves.flatMap(charsOf).distinct do
             val b = stops.flatMap(step(s0, ch))
             if b != Branch.Fail then
@@ -175,7 +208,7 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
             throw new UnsupportedException("OrderedNFA size is too large")
 
       val orderedNFA = OrderedNFA(
-        alphabet.any.map(_._1),
+        newAlphabet,
         newStateSet.toSet,
         newInits,
         newAcceptSet.result(),
@@ -210,11 +243,20 @@ object EpsNFA:
   /** LoopExit is an ε-NFA transition with consuming no character and marking the exit from the loop. */
   final case class LoopExit[Q](loop: Int, to: Q) extends Transition[Q]
 
-  /** Stop is a leaf of an ε-closure, where the matching reads a character or ends. */
+  /** LookAheadAssert is an ε-NFA transition with a look-ahead assertion whose inner expression starts from `init`. */
+  final case class LookAheadAssert[Q](negative: Boolean, init: Q, to: Q) extends Transition[Q]
+
+  /** LookAroundAccept is an end of the inner expression of a look-around. */
+  final case class LookAroundAccept[Q]() extends Transition[Q]
+
+  /** Stop is a leaf of an ε-closure, where the matching reads a character, ends an inner expression, or ends. */
   enum Stop[+Q]:
 
     /** Read is a state reading a character, with the next states that the assertions on the way allow. */
     case Read(q: Q, allowed: Set[CharKindState])
+
+    /** InnerEnd is an end of the inner expression of a look-around, with the next states that the assertions allow. */
+    case InnerEnd(allowed: Set[CharKindState])
 
     /** End is the end of the pattern. */
     case End

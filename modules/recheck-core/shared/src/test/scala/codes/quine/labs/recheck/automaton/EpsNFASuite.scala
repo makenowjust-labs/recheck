@@ -127,6 +127,26 @@ class EpsNFASuite extends munit.FunSuite:
          |}""".stripMargin
     )
 
+    val lookAhead = EpsNFA(
+      buildAlphabet(Seq(CharSet.single('a'))),
+      immutable.SortedSet(0, 1, 2),
+      0,
+      2,
+      Map(0 -> LookAheadAssert(true, 1, 2), 1 -> LookAroundAccept())
+    )
+    assertEquals(
+      lookAhead.toGraphviz,
+      """|digraph {
+         |  "" [shape=point];
+         |  "" -> "0";
+         |  "0" [shape=diamond];
+         |  "0" -> "1" [label="?!"];
+         |  "0" -> "2";
+         |  "1" [shape=doubleoctagon];
+         |  "2" [shape=doublecircle];
+         |}""".stripMargin
+    )
+
   test("EpsNFA#toOrderedNFA"):
     val normal = CharKindState(CharKind.Normal)
     val terminator = CharKindState(CharKind.LineTerminator)

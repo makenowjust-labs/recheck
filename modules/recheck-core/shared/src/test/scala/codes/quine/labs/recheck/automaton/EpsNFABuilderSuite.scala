@@ -231,8 +231,25 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     // Strings are tried from the longest, and then the characters.
     assertEquals(build("^[\\q{ab|c}d]$", "v"), build("^(?:ab|[cd])$", "u"))
 
+  test("EpsNFABuilder.build: LookAhead"):
+    assertEquals(
+      build("^(?!a)$"),
+      EpsNFA(
+        buildAlphabet(utf16, Seq(CharSet.single('a'))),
+        Set(0, 1, 2, 3, 4, 5),
+        0,
+        5,
+        Map(
+          0 -> Eps(Seq(3)),
+          1 -> Consume(Set((CharSet.single('a'), CharKind.Normal)), 2),
+          2 -> LookAroundAccept(),
+          3 -> LookAheadAssert(true, 1, 4),
+          4 -> Eps(Seq(5))
+        )
+      )
+    )
+
   test("EpsNFABuilder.build: unsupported"):
-    interceptMessage[UnsupportedException]("look-ahead assertion")(build("(?=.)"))
     interceptMessage[UnsupportedException]("look-behind assertion")(build("(?<=.)"))
     interceptMessage[UnsupportedException]("back-reference")(build("(.)\\1"))
     interceptMessage[UnsupportedException]("back-reference")(build("(?<foo>.)\\k<foo>"))
@@ -300,6 +317,25 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       qs.flatMap(q => nfa.delta.collect { case ((p, a), ps) if p == q && a.contains(c) => ps.leaves }.flatten)
     last.exists(nfa.acceptSet.contains)
 
+  /** Tests whether the automaton of the source accepts the input with its look-ahead assertions, by its look-ahead DFA.
+    */
+  def matches(source: String, flags: String, dialect: Dialect, input: String): Boolean =
+    val nfa = build(source, flags, dialect).toOrderedNFA
+    val dfa = nfa.toLookAheadDFA
+    val units = ReDoS.parse(source, flags, dialect).mode.decode(input).iterator.toSeq
+    val p = units.reverse.foldLeft(dfa.init)((p, c) => dfa.delta((p, nfa.alphabet.find(_.contains(c)).get)))
+    nfa.inits.exists(p.contains)
+
+  test("EpsNFABuilder.build: LookAhead with assertions guessing what follows"):
+    // Python's `$` in the middle matches before a final line terminator, which the states guess.
+    val python = Dialect.Python()
+    assert(matches("(?=a$)", "", python, "a"))
+    assert(matches("(?=a$)", "", python, "ba\n"))
+    assert(!matches("(?=a$)", "", python, "a\nb"))
+    assert(!matches("(?=a$)", "", python, "a\n\n"))
+    assert(!matches("(?!a$)a", "", python, "a\n"))
+    assert(matches("(?!a$)a", "", python, "a\nb"))
+
   test("EpsNFABuilder.build: verbs and assertions without effect on the language"):
     assert(!searches("a(*FAIL)|(*F)", "", Dialect.PCRE, "a"))
     assert(searches("a(*MARK:x)b", "", Dialect.PCRE, "ab"))
@@ -319,6 +355,9 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     assert(searches("(*NOTEMPTY)a\\Kb", "", Dialect.PCRE, "ab"))
     assert(searches("(*NOTEMPTY_ATSTART)a\\K", "", Dialect.PCRE, "a"))
     assert(!searches("(*NOTEMPTY_ATSTART)\\Ka*", "", Dialect.PCRE, ""))
+    // The look-aheads are copied with the other states.
+    assert(!matches("(*NOTEMPTY)(?=a)", "", Dialect.PCRE, "a"))
+    assert(matches("(*NOTEMPTY)(?=a)a", "", Dialect.PCRE, "a"))
 
   test("EpsNFABuilder.build: line, text and word boundary assertions"):
     for c <- AssertionCases.cases; dialect <- c.dialects do
