@@ -63,16 +63,14 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
       nfa.restrictInputs(highs, lows, free, free + 1)
 
   /** Converts this ε-NFA to ordered NFA with ε-elimination. */
-  def toOrderedNFA(using ctx: Context): OrderedNFA[CharSet, (CharKindState, Seq[(Q, Set[CharKindState])])] =
+  def toOrderedNFA(using ctx: Context): OrderedNFA[CharSet, (CharKindState, Branch[Stop[Q]])] =
     toOrderedNFA(Int.MaxValue)
 
   /** Converts this ε-NFA to ordered NFA with ε-elimination.
     *
-    * Its state is a [[CharKindState]] and the ε-NFA's states, each with the next states that its assertions allow.
+    * Its state is a [[CharKindState]] and an ε-closure, whose leaves are the [[Stop]]s that the ε-transitions reach.
     */
-  def toOrderedNFA(maxNFASize: Int)(using
-      ctx: Context
-  ): OrderedNFA[CharSet, (CharKindState, Seq[(Q, Set[CharKindState])])] =
+  def toOrderedNFA(maxNFASize: Int)(using ctx: Context): OrderedNFA[CharSet, (CharKindState, Branch[Stop[Q]])] =
     ctx.interrupt:
       val kinds = tau.values.collect { case Assert(k, _) => k }.toSet
       val afterCRLF = kinds.exists:
@@ -103,68 +101,75 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
       def nextStates(s: CharKindState): Set[CharKindState] =
         nextStatesCache.getOrElseUpdate(s, (baseKinds.flatMap(advance(s, _)) + inputTerminator).filter(s.admits))
 
-      type P = (Q, Set[CharKindState])
-
-      type Step = (Set[(CharSet, CharKindState)], Q, Option[SourceLocation])
-
       // Skips ε-transitions from the state and collects not ε-transition or terminal state.
-      def buildClosure(s0: CharKindState, ss: Set[CharKindState], q: Q, loops: Set[Int]): Seq[(P, Option[Step])] =
+      def buildClosure(s0: CharKindState, ss: Set[CharKindState], q: Q, loops: Set[Int]): Branch[Stop[Q]] =
         ctx.interrupt:
-          if ss.isEmpty then Vector.empty
+          if ss.isEmpty then Branch.Fail
           else
             tau.get(q) match
-              case Some(Eps(qs))             => qs.flatMap(buildClosure(s0, ss, _, loops))
+              case Some(Eps(qs))             => Branch.choice(qs.map(buildClosure(s0, ss, _, loops)))
               case Some(Assert(k, q1))       => buildClosure(s0, ss.filter(k.accepts(s0, _)), q1, loops)
               case Some(LoopEnter(loop, q1)) =>
-                if loops.contains(loop) then Vector.empty // An ε-loop is detected.
+                if loops.contains(loop) then Branch.Fail // An ε-loop is detected.
                 else buildClosure(s0, ss, q1, loops ++ Set(loop))
               case Some(LoopExit(loop, q1)) =>
-                if loops.contains(loop) then Vector.empty // An ε-loop is detected.
+                if loops.contains(loop) then Branch.Fail // An ε-loop is detected.
                 else buildClosure(s0, ss, q1, loops)
-              case Some(Consume(chs, q1, loc)) =>
-                val next = chs.flatMap((ch, k) => advance(s0, k).filter(ss.contains).map((ch, _)))
-                if next.nonEmpty then Vector(((q, ss), Some((next, q1, loc))))
-                else Vector.empty
+              case Some(Consume(chs, _, _)) =>
+                if chs.exists((_, k) => advance(s0, k).exists(ss.contains)) then Branch.Leaf(Stop.Read(q, ss))
+                else Branch.Fail
               case None =>
-                if ss.contains(inputTerminator) then Vector(((q, Set.empty), None))
-                else Vector.empty
+                if ss.contains(inputTerminator) then Branch.Leaf(Stop.End)
+                else Branch.Fail
 
-      val closureCache = mutable.Map.empty[(CharKindState, Q), Seq[(P, Option[Step])]]
-      def closure(s0: CharKindState, q: Q): Seq[(P, Option[Step])] =
+      val closureCache = mutable.Map.empty[(CharKindState, Q), Branch[Stop[Q]]]
+      def closure(s0: CharKindState, q: Q): Branch[Stop[Q]] =
         closureCache.getOrElseUpdate((s0, q), buildClosure(s0, nextStates(s0), q, Set.empty))
 
-      val closureInit = closure(inputTerminator, init)
+      type R = (CharKindState, Branch[Stop[Q]])
 
-      val queue = mutable.Queue.empty[(CharKindState, Seq[(P, Option[Step])])]
-      val newStateSet = mutable.Set.empty[(CharKindState, Seq[P])]
-      val newInits = Vector((inputTerminator, closureInit.map(_._1)))
-      val newAcceptSet = Set.newBuilder[(CharKindState, Seq[P])]
-      val newDelta = Map.newBuilder[((CharKindState, Seq[P]), CharSet), Seq[(CharKindState, Seq[P])]]
-      val newSourcemap = mutable.Map
-        .empty[((CharKindState, Seq[P]), CharSet, (CharKindState, Seq[P])), Seq[SourceLocation]]
-        .withDefaultValue(Vector.empty)
+      val consumes = tau.collect { case (q, c @ Consume(_, _, _)) => q -> c }
+
+      // The characters on which the leaf may have a transition.
+      def charsOf(stop: Stop[Q]): Set[CharSet] = stop match
+        case Stop.Read(q, _) => consumes(q).set.map(_._1)
+        case Stop.End        => Set.empty
+
+      // The transition of the leaf on the character, as a branch of the next states with the locations read there.
+      def step(s0: CharKindState, ch: CharSet)(stop: Stop[Q]): Branch[(R, Option[SourceLocation])] = stop match
+        case Stop.Read(q, ss) =>
+          val Consume(chs, q1, loc) = consumes(q)
+          Branch.choice:
+            for (c, k) <- chs.toSeq if c == ch; s <- advance(s0, k) if ss.contains(s)
+            yield
+              val s1 = s.forgetMarks
+              Branch.Leaf(((s1, closure(s1, q1)), loc))
+        case Stop.End => Branch.Fail
+
+      val newInits = Vector((inputTerminator, closure(inputTerminator, init)))
+      val queue = mutable.Queue.from(newInits)
+      val newStateSet = mutable.Set.from(newInits)
+      val newAcceptSet = Set.newBuilder[R]
+      val newDelta = Map.newBuilder[(R, CharSet), Branch[R]]
+      val newSourcemap = mutable.Map.empty[(R, CharSet, R), Seq[SourceLocation]].withDefaultValue(Vector.empty)
       var deltaSize = 0
 
-      queue.enqueue((inputTerminator, closureInit))
-      newStateSet.addAll(newInits)
+      // Records the state that the character leads to, and returns it.
+      def visit(r0: R, ch: CharSet)(next: (R, Option[SourceLocation])): R =
+        val (r1, loc) = next
+        newSourcemap((r0, ch, r1)) ++= loc
+        if newStateSet.add(r1) then queue.enqueue(r1)
+        r1
 
       while queue.nonEmpty do
         ctx.interrupt:
-          val (s0, qps) = queue.dequeue()
-          val qs0 = qps.map(_._1)
-          if qs0.map(_._1).contains(accept) then newAcceptSet.addOne((s0, qs0))
-          val d = mutable.Map.empty[CharSet, Seq[(CharKindState, Seq[P])]].withDefaultValue(Vector.empty)
-          for (_, step) <- qps; (chs, q1, loc) <- step; (ch, s) <- chs do
-            val s1 = s.forgetMarks
-            val qps1 = closure(s1, q1)
-            val qs1 = qps1.map(_._1)
-            d(ch) = d(ch) :+ (s1, qs1)
-            newSourcemap(((s0, qs0), ch, (s1, qs1))) ++= loc
-            if !newStateSet.contains((s1, qs1)) then
-              queue.enqueue((s1, qps1))
-              newStateSet.addOne((s1, qs1))
-          for (ch, to) <- d do newDelta.addOne(((s0, qs0), ch) -> to)
-          deltaSize += d.size
+          val r0 @ (s0, stops) = queue.dequeue()
+          if stops.succeeds(_ == Stop.End) then newAcceptSet.addOne(r0)
+          for ch <- stops.leaves.flatMap(charsOf).distinct do
+            val b = stops.flatMap(step(s0, ch))
+            if b != Branch.Fail then
+              newDelta.addOne((r0, ch) -> b.map(visit(r0, ch)))
+              deltaSize += 1
           if deltaSize >= maxNFASize then
             ctx.log("auto: exceed maxNFASize on OrderedNFA construction")
             throw new UnsupportedException("OrderedNFA size is too large")
@@ -204,6 +209,15 @@ object EpsNFA:
 
   /** LoopExit is an ε-NFA transition with consuming no character and marking the exit from the loop. */
   final case class LoopExit[Q](loop: Int, to: Q) extends Transition[Q]
+
+  /** Stop is a leaf of an ε-closure, where the matching reads a character or ends. */
+  enum Stop[+Q]:
+
+    /** Read is a state reading a character, with the next states that the assertions on the way allow. */
+    case Read(q: Q, allowed: Set[CharKindState])
+
+    /** End is the end of the pattern. */
+    case End
 
   /** AssertKind is assertion kind of this ε-NFA transition. */
   sealed abstract class AssertKind extends Serializable with Product:

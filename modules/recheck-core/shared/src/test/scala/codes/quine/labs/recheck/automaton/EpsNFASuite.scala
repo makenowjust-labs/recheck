@@ -145,18 +145,17 @@ class EpsNFASuite extends munit.FunSuite:
         5 -> LoopExit(0, 6)
       )
     )
-    val q36: Seq[(Int, Set[CharKindState])] = Seq((3, Set(terminator, normal)), (6, Set.empty))
+    val q36: Branch[Stop[Int]] =
+      Branch.Choice(Seq(Branch.Leaf(Stop.Read(3, Set(terminator, normal))), Branch.Leaf(Stop.End)))
     assertEquals(
       nfa1.toOrderedNFA,
-      OrderedNFA[CharSet, (CharKindState, Seq[(Int, Set[CharKindState])])](
+      OrderedNFA[CharSet, (CharKindState, Branch[Stop[Int]])](
         Set(CharSet.single('\n'), CharSet.single('\n').complement(UnitMode.UTF16)),
         Set((terminator, q36)),
         Vector((terminator, q36)),
         Set((terminator, q36)),
         Map(
-          ((terminator, q36), CharSet.single('\n')) -> Vector(
-            (terminator, q36)
-          )
+          ((terminator, q36), CharSet.single('\n')) -> Branch.Leaf((terminator, q36))
         )
       )
     )
@@ -178,16 +177,20 @@ class EpsNFASuite extends munit.FunSuite:
         9 -> Assert(wordBoundary, 10)
       )
     )
-    val q4: Seq[(Int, Set[CharKindState])] = Seq((4, Set(terminator)))
-    val q45: Seq[(Int, Set[CharKindState])] = Seq(
-      (4, Set(terminator, word, normal)),
-      (5, Set(terminator, word, normal))
+    val q4: Branch[Stop[Int]] = Branch.Leaf(Stop.Read(4, Set(terminator)))
+    val q45: Branch[Stop[Int]] = Branch.Choice(
+      Seq(
+        Branch.Leaf(Stop.Read(4, Set(terminator, word, normal))),
+        Branch.Leaf(Stop.Read(5, Set(terminator, word, normal)))
+      )
     )
-    val q54510: Seq[(Int, Set[CharKindState])] = Seq(
-      (5, Set(word)),
-      (4, Set(terminator, word, normal)),
-      (5, Set(terminator, word, normal)),
-      (10, Set.empty)
+    val q54510: Branch[Stop[Int]] = Branch.Choice(
+      Seq(
+        Branch.Leaf(Stop.Read(5, Set(word))),
+        Branch.Leaf(Stop.Read(4, Set(terminator, word, normal))),
+        Branch.Leaf(Stop.Read(5, Set(terminator, word, normal))),
+        Branch.Leaf(Stop.End)
+      )
     )
     assertEquals(
       nfa2.toOrderedNFA,
@@ -205,21 +208,12 @@ class EpsNFASuite extends munit.FunSuite:
         Vector((terminator, q4)),
         Set((word, q54510)),
         Map(
-          ((terminator, q4), CharSet.single('\n')) -> Vector(
-            (terminator, q45)
-          ),
-          ((terminator, q45), CharSet.single('a')) -> Vector(
-            (word, q54510)
-          ),
-          ((terminator, q45), CharSet.single('\n')) -> Vector(
-            (terminator, q45)
-          ),
-          ((word, q54510), CharSet.single('\n')) -> Vector(
-            (terminator, q45)
-          ),
-          ((word, q54510), CharSet.single('a')) -> Vector(
-            (word, q54510),
-            (word, q54510)
+          ((terminator, q4), CharSet.single('\n')) -> Branch.Leaf((terminator, q45)),
+          ((terminator, q45), CharSet.single('a')) -> Branch.Leaf((word, q54510)),
+          ((terminator, q45), CharSet.single('\n')) -> Branch.Leaf((terminator, q45)),
+          ((word, q54510), CharSet.single('\n')) -> Branch.Leaf((terminator, q45)),
+          ((word, q54510), CharSet.single('a')) -> Branch.Choice(
+            Seq(Branch.Leaf((word, q54510)), Branch.Leaf((word, q54510)))
           )
         )
       )

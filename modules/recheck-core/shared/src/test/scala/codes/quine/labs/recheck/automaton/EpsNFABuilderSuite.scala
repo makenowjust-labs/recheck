@@ -297,7 +297,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       case s: String  => ReDoS.parse(source, flags, dialect).mode.decode(s).iterator.toSeq
       case u: UString => u.iterator.toSeq
     val last = units.foldLeft(nfa.inits.toSet): (qs, c) =>
-      qs.flatMap(q => nfa.delta.collect { case ((p, a), ps) if p == q && a.contains(c) => ps }.flatten)
+      qs.flatMap(q => nfa.delta.collect { case ((p, a), ps) if p == q && a.contains(c) => ps.leaves }.flatten)
     last.exists(nfa.acceptSet.contains)
 
   test("EpsNFABuilder.build: verbs and assertions without effect on the language"):
