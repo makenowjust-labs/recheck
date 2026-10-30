@@ -696,7 +696,7 @@ private[parser] final class Parser(
       case None =>
         assert(featureSet.hasInlineFlagGroup, "Invalid group")
         val removedStart = offset
-        val (removed, removedFlags) = parseFlagSet(removing = true)
+        val (removed, removedFlags) = parseRemovedFlagSet()
         checkInlineFlagRemoval("", removedFlags, removedStart)
         val diff = FlagSetDiff(FlagSet(), Some(removed))
         (currentChar: @switch) match
@@ -794,7 +794,7 @@ private[parser] final class Parser(
       case '-' =>
         next()
         val removedStart = offset
-        val (removed, removedFlags) = parseFlagSet(removing = true)
+        val (removed, removedFlags) = parseRemovedFlagSet()
         checkInlineFlagRemoval(addedFlags, removedFlags, removedStart)
         val diff = FlagSetDiff(added, Some(removed))
         (currentChar: @switch) match
@@ -849,6 +849,16 @@ private[parser] final class Parser(
         pushInlineFlagCommand(stack, diff, start)
       case _ =>
         fail("Invalid flag")
+
+  /** Parses inline flag letters to remove, and Ruby also accepts more `-` among them (e.g. `(?i-m-x)`). */
+  private def parseRemovedFlagSet(): (FlagSet, String) =
+    var (removed, removedFlags) = parseFlagSet(removing = true)
+    while featureSet.allowsRepeatedInlineFlagMinus && !isEnd && currentChar == '-' do
+      next()
+      val (flagSet, flags) = parseFlagSet(removing = true, initial = removed)
+      removed = flagSet
+      removedFlags += flags
+    (removed, removedFlags)
 
   private def checkInlineFlagRemoval(addedFlags: String, removedFlags: String, removedStart: Int): Unit =
     if removedFlags.isEmpty then

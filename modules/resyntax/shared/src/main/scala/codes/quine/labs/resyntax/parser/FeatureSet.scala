@@ -66,6 +66,8 @@ final case class FeatureSet(
     allowsEscapeInGroupName: Boolean,
     // .NET
     allowsInlineFlagSign: Boolean,
+    // Ruby
+    allowsRepeatedInlineFlagMinus: Boolean,
     // Perl
     allowsLooseBraceEscape: Boolean,
     // PCRE, Perl, Ruby
@@ -471,6 +473,8 @@ object FeatureSet:
       allowsEscapeInGroupName = isJavaScript,
       // .NET
       allowsInlineFlagSign = isDotNet,
+      // Ruby
+      allowsRepeatedInlineFlagMinus = isRuby,
       // Perl
       allowsLooseBraceEscape = isPerl,
       // PCRE, Perl, Ruby
