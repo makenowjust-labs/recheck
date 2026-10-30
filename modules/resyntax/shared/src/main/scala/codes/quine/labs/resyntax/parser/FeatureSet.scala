@@ -72,7 +72,7 @@ final case class FeatureSet(
     hasBackslashCut: Boolean,
     // .NET, Java, PCRE, Perl, Ruby
     hasBackslashEscape: Boolean,
-    // .NET, Java, PCRE, Perl, Ruby
+    // .NET, Java, PCRE, Perl, Python, Ruby
     hasBackslashEnd: Boolean,
     // PCRE, Perl
     hasBackslashGBackReference: Boolean,
@@ -291,8 +291,8 @@ object FeatureSet:
       hasBackslashControlExtra = isDotNet || isJava || isPCRE || isPerl || isRuby,
       // PCRE, Perl, Ruby
       hasBackslashCut = isPCRE || isPerl || isRuby,
-      // .NET, Java, PCRE, Perl, Ruby
-      hasBackslashEnd = isDotNet || isJava || isPCRE || isPerl || isRuby,
+      // .NET, Java, PCRE, Perl, Python, Ruby
+      hasBackslashEnd = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
       // .NET, Java, PCRE, Perl, Ruby
       hasBackslashEscape = isDotNet || isJava || isPCRE || isPerl || isRuby,
       // PCRE, Perl

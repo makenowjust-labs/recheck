@@ -397,7 +397,7 @@ class ParserSuite extends munit.FunSuite:
   check("\\xAB", "", All*)(Backslash(Escape(Hex2, 0xab)))
   check("\\xA", "", PCRE, Perl, Ruby)(Backslash(Escape(Hex1, 0x0a)))
   check("\\x{ABCD}", "", Java, PCRE, Perl)(Backslash(Escape(HexBracket, 0xabcd)))
-  check("\\z", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(Assert(LowerEnd)))
+  check("\\z", "", DotNet, Java, PCRE, Perl, Python, Ruby)(Backslash(Assert(LowerEnd)))
   check("\\B", "", All*)(Backslash(Assert(NonBoundary(None))))
   check("\\B{g}", "", Perl)(Backslash(Assert(NonBoundary(Some(GModifier)))))
   check("\\B{gcb}", "", Perl)(Backslash(Assert(NonBoundary(Some(GcbModifier)))))
