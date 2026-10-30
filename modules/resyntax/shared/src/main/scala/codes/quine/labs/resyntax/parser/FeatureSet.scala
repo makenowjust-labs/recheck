@@ -266,10 +266,6 @@ final case class FeatureSet(
     hasCallCommand: Boolean,
     // PCRE
     hasCallout: Boolean,
-    // Perl
-    hasClassPosixNameHeuristic: Boolean,
-    // Ruby
-    hasClassPosixNameLimit: Boolean,
     // PCRE
     hasClassPosixWordBoundary: Boolean,
     // .NET
@@ -397,7 +393,9 @@ final case class FeatureSet(
     // Perl, Ruby
     treatsNonClassBackslashInClassAsLiteral: Boolean,
     // .NET: 2147483647, Java: 2147483647, JavaScript: unlimited, PCRE: 65535, Perl: 2147483646, Python: 4294967294, Ruby: 100000
-    maxRepeatCount: Long
+    maxRepeatCount: Long,
+    // PCRE: every name, Perl: 3 to 14 characters without upper case letters and blanks, Ruby: up to 20 characters without `:`
+    classPosixNameRule: ClassPosixNameRule
 )
 
 object FeatureSet:
@@ -680,10 +678,6 @@ object FeatureSet:
       hasCallCommand = isPCRE || isPerl,
       // PCRE
       hasCallout = isPCRE,
-      // Perl
-      hasClassPosixNameHeuristic = isPerl,
-      // Ruby
-      hasClassPosixNameLimit = isRuby,
       // PCRE
       hasClassPosixWordBoundary = isPCRE,
       // .NET
@@ -819,5 +813,10 @@ object FeatureSet:
         case Dialect.PCRE       => 65535L
         case Dialect.Perl       => 2147483646L
         case Dialect.Python     => 4294967294L
-        case Dialect.Ruby       => 100000L
+        case Dialect.Ruby       => 100000L,
+      // PCRE: every name, Perl: 3 to 14 characters without upper case letters and blanks, Ruby: up to 20 characters without `:`
+      classPosixNameRule = dialect match
+        case Dialect.Perl => ClassPosixNameRule.Perl
+        case Dialect.Ruby => ClassPosixNameRule.Ruby
+        case _            => ClassPosixNameRule.Always
     )

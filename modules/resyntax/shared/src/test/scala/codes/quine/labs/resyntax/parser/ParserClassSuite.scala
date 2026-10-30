@@ -5,10 +5,14 @@ import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.EscapeClassKind.*
 import codes.quine.labs.resyntax.ast.EscapeStyle.*
+import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.QuoteLiteral.*
 
 class ParserClassSuite extends ParserSuiteBase:
+  def classPosixLiteral(name: String): NodeData =
+    Sequence(Class(false, ClassUnion(s"[:$name:".map(c => ClassLiteral(c))*)), Literal(']'))
+
   // Class
   check("[a]", "", All*)(Class(false, ClassLiteral('a')))
   check("[^a]", "", All*)(Class(true, ClassLiteral('a')))
@@ -147,6 +151,18 @@ class ParserClassSuite extends ParserSuiteBase:
       Literal(']')
     )
   error("[[:alpha:b:]]", "", PCRE, Perl, Ruby)("Unknown POSIX class at 1")
+  for name <- Seq("abc", "abcdefghijklmn", "fo_o", "a.b.c", "abcdefghijklm\u00e9") do
+    error(s"[[:$name:]]", "", PCRE, Perl, Ruby)("Unknown POSIX class at 1")
+  for name <- Seq("abcdefghijklmno", "a b", "a.b.c.d", "alphaxyzalphaxyzalphaxyz") do
+    error(s"[[:$name:]]", "", PCRE, Ruby)("Unknown POSIX class at 1")
+    check(s"[[:$name:]]", "", Perl)(classPosixLiteral(name))
+  for name <- Seq("al:pha", ":ab") do
+    error(s"[[:$name:]]", "", PCRE, Perl)("Unknown POSIX class at 1")
+    check(s"[[:$name:]]", "", Ruby)(classPosixLiteral(name))
+  error("[[:abcdefghijklmnopqrst:]]", "", PCRE, Ruby)("Unknown POSIX class at 1")
+  check("[[:abcdefghijklmnopqrst:]]", "", Perl)(classPosixLiteral("abcdefghijklmnopqrst"))
+  error("[[:abcdefghijklmnopqrstu:]]", "", PCRE)("Unknown POSIX class at 1")
+  check("[[:abcdefghijklmnopqrstu:]]", "", Perl, Ruby)(classPosixLiteral("abcdefghijklmnopqrstu"))
   check("[[:]]", "", Ruby)(Class(false, ClassNest(false, ClassLiteral(':'))))
   check("[[:]]", "", PCRE, Perl):
     Sequence(Class(false, ClassUnion(ClassLiteral('['), ClassLiteral(':'))), Literal(']'))

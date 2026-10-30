@@ -2429,10 +2429,7 @@ private[parser] final class Parser(
       reset(bodyEnd + 2)
       return Some(ClassItem(ClassItemData.ClassPosix(invert, name), SourceLocation(start, offset)))
 
-    if featureSet.hasClassPosixNameHeuristic && !isClassPosixLikeName(name) ||
-      featureSet.hasClassPosixNameLimit && !ClassPosixNames.exists(name.startsWith) &&
-      (name.length > 20 || name.exists(c => c == ':' || c == ']'))
-    then return Some(parseClassItemLiteral())
+    if !featureSet.classPosixNameRule.looksLikeName(name, ClassPosixNames) then return Some(parseClassItemLiteral())
 
     fail("Unknown POSIX class", start)
 
@@ -2452,11 +2449,6 @@ private[parser] final class Parser(
       else if c == terminator && d == ']' then return Some(i)
       i += 1
     None
-
-  // Perl reads the name as literals if it is surely not meant to be a POSIX class name.
-  private def isClassPosixLikeName(name: String): Boolean =
-    3 <= name.length && name.length <= 14 &&
-      !name.exists(c => c.isUpper || c.isWhitespace || c == '\\' || c == ']')
 
   private val ClassSetSyntaxCharacters: Set[Char] = "()[]{}/-\\|".toSet
 
