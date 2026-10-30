@@ -43,6 +43,18 @@ object CodePointUtil:
         true
       case _ => false)
 
+  // It approximates Perl's `isIDFIRST_uni` (`XID_Start` restricted to `\w`) by letters and letter numbers.
+  def isWordIDStart(codePoint: Int): Boolean =
+    Character.isLetter(codePoint) || Character.getType(codePoint) == Character.LETTER_NUMBER
+
+  // It approximates Perl's `isIDCONT_uni` (`XID_Continue` restricted to `\w`) in the same way.
+  def isWordIDContinue(codePoint: Int): Boolean =
+    isWordIDStart(codePoint) || codePoint == 0x200c || codePoint == 0x200d || (Character.getType(codePoint) match
+      case Character.NON_SPACING_MARK | Character.COMBINING_SPACING_MARK | Character.DECIMAL_DIGIT_NUMBER |
+          Character.CONNECTOR_PUNCTUATION =>
+        true
+      case _ => false)
+
   def isHexDigit(codePoint: Int): Boolean =
     codePoint >= '0' && codePoint <= '9' || codePoint >= 'a' && codePoint <= 'f' || codePoint >= 'A' && codePoint <= 'F'
 

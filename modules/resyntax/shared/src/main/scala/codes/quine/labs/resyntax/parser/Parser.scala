@@ -2348,6 +2348,9 @@ private[parser] final class Parser(
     else if featureSet.allowsUnicodeIdentifierGroupName then Character.isUnicodeIdentifierStart(c)
     else if featureSet.allowsUnicodeWordGroupName then
       (c < 0x10000 || featureSet.readsAsUnicode) && Character.isLetter(c)
+    else if featureSet.allowsWordClassGroupName then
+      (c < 0x10000 || featureSet.readsAsUnicode) && CodePointUtil.isWord(c)
+    else if featureSet.allowsWordIdentifierGroupName then CodePointUtil.isWordIDStart(c)
     else false
 
   private def isGroupNameContinue(c: Int): Boolean =
@@ -2355,6 +2358,9 @@ private[parser] final class Parser(
     else if featureSet.allowsUnicodeIdentifierGroupName then Character.isUnicodeIdentifierPart(c)
     else if featureSet.allowsUnicodeWordGroupName then
       (c < 0x10000 || featureSet.readsAsUnicode) && Character.isLetterOrDigit(c)
+    else if featureSet.allowsWordClassGroupName then
+      (c < 0x10000 || featureSet.readsAsUnicode) && CodePointUtil.isWord(c)
+    else if featureSet.allowsWordIdentifierGroupName then CodePointUtil.isWordIDContinue(c)
     else false
 
   private def parseID(): String =

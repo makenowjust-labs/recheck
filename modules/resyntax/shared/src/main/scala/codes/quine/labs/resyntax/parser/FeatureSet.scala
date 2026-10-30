@@ -114,8 +114,12 @@ final case class FeatureSet(
     allowsUnderscoreInGroupName: Boolean,
     // JavaScript, Python (without `b`)
     allowsUnicodeIdentifierGroupName: Boolean,
-    // .NET, PCRE (with `u`)
+    // PCRE (with `u`)
     allowsUnicodeWordGroupName: Boolean,
+    // .NET
+    allowsWordClassGroupName: Boolean,
+    // Perl
+    allowsWordIdentifierGroupName: Boolean,
     // .NET
     allowsZeroIndexedCaptureTest: Boolean,
     // Ruby
@@ -509,8 +513,12 @@ object FeatureSet:
       allowsUnderscoreInGroupName = isDotNet || isJavaScript || isPCRE || isPerl || isPython || isRuby,
       // JavaScript, Python (without `b`)
       allowsUnicodeIdentifierGroupName = isJavaScript || (isPython && !isByte),
-      // .NET, PCRE (with `u`)
-      allowsUnicodeWordGroupName = isDotNet || (isPCRE && isUnicode),
+      // PCRE (with `u`)
+      allowsUnicodeWordGroupName = isPCRE && isUnicode,
+      // .NET
+      allowsWordClassGroupName = isDotNet,
+      // Perl
+      allowsWordIdentifierGroupName = isPerl,
       // .NET
       allowsZeroIndexedCaptureTest = isDotNet,
       // Ruby
