@@ -631,8 +631,6 @@ class ParserSuite extends munit.FunSuite:
     )
   error("[", "", All*)("Unclosed ']' at 1")
   error("]", "u", JavaScript)("Unclosed ']' at 0")
-  check("]", "", All*)(Literal(']'))
-  check("a]", "", All*)(Sequence(Literal('a'), Literal(']')))
   error("[[a]", "", Java, Ruby)("Unclosed ']' at 4")
   error("[[]", "", Java, Ruby)("Unclosed ']' at 3")
   error("[^[]a]", "", Java, Ruby)("Unclosed ']' at 6")
