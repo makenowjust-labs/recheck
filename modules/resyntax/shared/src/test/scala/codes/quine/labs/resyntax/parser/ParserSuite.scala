@@ -188,6 +188,8 @@ class ParserSuite extends munit.FunSuite:
   check("(?<a-b>a)", "", Ruby)(Group(NamedCapture(Angle, "a-b"), Literal('a')))
   check("(?<\\w+[>a)", "", Ruby)(Group(NamedCapture(Angle, "\\w+["), Literal('a')))
   error("(?<-a>a)", "", Ruby)("Invalid identifier at 3")
+  error("(?<\u0661>a)", "", Ruby)("Invalid identifier at 3")
+  check("(?<a\u0661>a)", "", Ruby)(Group(NamedCapture(Angle, "a\u0661"), Literal('a')))
   error("(?<a)>a)", "", Ruby)("Invalid identifier at 4")
   check("(?<)>a)", "", Ruby)(Group(NamedCapture(Angle, ")"), Literal('a')))
   check(s"(?<${"a" * 128}>a)", "", PCRE)(Group(NamedCapture(Angle, "a" * 128), Literal('a')))

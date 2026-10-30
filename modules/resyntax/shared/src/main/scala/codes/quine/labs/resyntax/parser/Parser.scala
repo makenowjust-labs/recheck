@@ -2379,7 +2379,10 @@ private[parser] final class Parser(
     val start = offset
 
     if featureSet.allowsLooseGroupName then
-      assert(!isEnd && currentChar != end && currentChar != '-' && !isDigit, "Invalid identifier")
+      assert(
+        !isEnd && currentChar != end && currentChar != '-' && !Character.isDigit(currentCodePoint),
+        "Invalid identifier"
+      )
       next()
       while !isEnd && currentChar != end && !(levelable && (currentChar == '+' || currentChar == '-')) do
         assert(currentChar != ')', "Invalid identifier")
