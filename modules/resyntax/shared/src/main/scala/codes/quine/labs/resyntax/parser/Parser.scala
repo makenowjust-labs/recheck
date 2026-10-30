@@ -1183,11 +1183,18 @@ private[parser] final class Parser(
     BackslashKind.EscapeClass(klass)
 
   private def parseStrictProperty(): (Boolean, String, Option[String]) =
-    val name = parseID()
+    val name = parsePropertyName()
     val value = Option.when(!isEnd && currentChar == '='):
       next()
-      parseID()
+      parsePropertyName()
     (false, name, value)
+
+  private def parsePropertyName(): String =
+    if !featureSet.allowsRawPropertyName then return parseID()
+    val start = offset
+    while !isEnd && currentChar != '}' && currentChar != '=' do next()
+    assert(start < offset, "Invalid backslash escape")
+    source.slice(start, offset)
 
   // Perl, PCRE and Ruby ignore blanks, hyphens, underscores and cases in property names, so the name is kept as written.
   private def parseLooseProperty(): (Boolean, String, Option[String]) =

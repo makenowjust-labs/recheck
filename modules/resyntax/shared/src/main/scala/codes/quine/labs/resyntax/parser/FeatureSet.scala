@@ -44,6 +44,8 @@ final case class FeatureSet(
     allowsLooseBraceEscape: Boolean,
     // PCRE, Perl, Ruby
     allowsLoosePropertyName: Boolean,
+    // Java
+    allowsRawPropertyName: Boolean,
     // .NET
     allowsInvalidIdentifier: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -333,6 +335,8 @@ object FeatureSet:
       allowsLooseBraceEscape = isPerl,
       // PCRE, Perl, Ruby
       allowsLoosePropertyName = isPCRE || isPerl || isRuby,
+      // Java
+      allowsRawPropertyName = isJava,
       // .NET
       allowsInvalidIdentifier = isDotNet,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
