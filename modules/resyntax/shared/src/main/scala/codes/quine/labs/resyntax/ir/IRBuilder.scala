@@ -105,6 +105,7 @@ private[ir] class IRBuilder(
     case CommandKind.BranchReset(_)         => Left(buildBranchResetCommand(node))
     case CommandKind.Conditional(_, _, _)   => Left(buildConditionalCommand(node))
     case CommandKind.BacktrackControl(_, _) => Left(buildBacktrackControlCommand(node))
+    case CommandKind.StartOption(_, _)      => Left(buildStartOptionCommand(node))
 
   def buildRCallCommand(node: Node): IRNodeData =
     IRNodeData.Unsupported(node.data)
@@ -145,6 +146,9 @@ private[ir] class IRBuilder(
     IRNodeData.Unsupported(node.data)
 
   def buildBacktrackControlCommand(node: Node): IRNodeData =
+    IRNodeData.Unsupported(node.data)
+
+  def buildStartOptionCommand(node: Node): IRNodeData =
     IRNodeData.Unsupported(node.data)
 
   def buildGroup(node: Node, kind: GroupKind, child: Node): Either[IRNodeData, IRNode] = kind match

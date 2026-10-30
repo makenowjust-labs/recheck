@@ -10,6 +10,8 @@ import codes.quine.labs.resyntax.ast.FlagSet
 final case class FeatureSet(
     // JavaScript (without `uv`), Perl, Ruby
     allowsAlphabeticUnknownBackslash: Boolean,
+    // Perl
+    allowsBacktrackControlRepeat: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     allowsBrokenCloseCurly: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -246,6 +248,8 @@ final case class FeatureSet(
     hasQuoteNamedCapture: Boolean,
     // PCRE
     hasVersionTest: Boolean,
+    // PCRE
+    hasStartOption: Boolean,
     // Python
     processBackslashInLineComment: Boolean,
     // Python, Ruby
@@ -276,6 +280,8 @@ object FeatureSet:
     FeatureSet(
       // JavaScript (without `uv`), Perl, Ruby
       allowsAlphabeticUnknownBackslash = (isJavaScript && !isUnicode) || isPerl || isRuby,
+      // Perl
+      allowsBacktrackControlRepeat = isPerl,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsBrokenCloseCurly =
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
@@ -516,6 +522,8 @@ object FeatureSet:
       hasQuoteNamedCapture = isDotNet || isPCRE || isPerl || isRuby,
       // PCRE
       hasVersionTest = isPCRE,
+      // PCRE
+      hasStartOption = isPCRE,
       // Python
       processBackslashInLineComment = isPython,
       // Python, Ruby

@@ -6,6 +6,7 @@ package codes.quine.labs.resyntax.ast
   * BacktrackControlKind ::=
   *   "ACCEPT"
   *   "FAIL"
+  *   "F"
   *   "MARK"
   *   "COMMIT"
   *   "PRUNE"
@@ -22,6 +23,9 @@ object BacktrackControlKind:
 
   /** Fail is `FAIL` command. */
   case object Fail extends BacktrackControlKind
+
+  /** F is `F` command, an abbreviation of `FAIL`. */
+  case object F extends BacktrackControlKind
 
   /** Mark is `MARK` command. */
   case object Mark extends BacktrackControlKind

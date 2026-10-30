@@ -68,6 +68,8 @@ private[parser] final class Parser(
 
   private var sequenceStart: Int = 0
 
+  private var startOptionEnd: Int = 0
+
   private var disjunctionCount: Int = 0
 
   /** A list of (disjunction ID, alternative index, whether it is a branch reset) of enclosing alternatives. */
@@ -222,6 +224,16 @@ private[parser] final class Parser(
         assert(featureSet.allowsZeroWidthAssertRepeat, "Nothing to repeat")
       case NodeData.Repeat(_, _) =>
         assert(featureSet.allowsNestedRepeat, "Nested quantifier")
+      case NodeData.Command(
+            _: CommandKind.InlineFlag | _: CommandKind.ResetFlag | _: CommandKind.StartOption | CommandKind.Callout |
+            _: CommandKind.CalloutInt | _: CommandKind.CalloutString
+          ) =>
+        fail("Nothing to repeat")
+      case NodeData.Command(CommandKind.BacktrackControl(kind, _)) =>
+        assert(
+          featureSet.allowsBacktrackControlRepeat || kind == Some(BacktrackControlKind.Accept),
+          "Nothing to repeat"
+        )
       case _ =>
         // TODO: backslash assertion
         ()
@@ -695,6 +707,7 @@ private[parser] final class Parser(
       case _ =>
         parseIntOption() match
           case Some(value) =>
+            assert(value <= 255, "Invalid group")
             pushCommand(stack, CommandKind.CalloutInt(value), start)
           case None =>
             pushCommand(stack, CommandKind.Callout, start)
@@ -777,6 +790,7 @@ private[parser] final class Parser(
   private val BacktrackControls = Seq(
     ("ACCEPT", BacktrackControlKind.Accept),
     ("FAIL", BacktrackControlKind.Fail),
+    ("F", BacktrackControlKind.F),
     ("MARK", BacktrackControlKind.Mark),
     ("COMMIT", BacktrackControlKind.Commit),
     ("PRUNE", BacktrackControlKind.Prune),
@@ -807,6 +821,10 @@ private[parser] final class Parser(
     next()
 
     boundary:
+      if featureSet.hasStartOption && start == startOptionEnd && parseStartOption(stack, start) then
+        startOptionEnd = offset
+        boundary.break()
+
       for (command, kind) <- BacktrackControls do
         if parseBacktrackControl(stack, start, command, kind) then boundary.break()
 
@@ -814,8 +832,58 @@ private[parser] final class Parser(
         if parseAlphabetic(stack, start, alphabetic, abbrev, kind) then boundary.break()
 
       expect(':', "Invalid group")
-      val name = parseID()
+      val name = parseBacktrackControlName()
+      assert(name.nonEmpty, "Invalid group")
       pushCommand(stack, CommandKind.BacktrackControl(None, Some(name)), start)
+
+  private val StartOptions = Seq(
+    "UTF8",
+    "UTF",
+    "UCP",
+    "NO_AUTO_POSSESS",
+    "NO_DOTSTAR_ANCHOR",
+    "NO_JIT",
+    "NO_START_OPT",
+    "NOTEMPTY_ATSTART",
+    "NOTEMPTY",
+    "CASELESS_RESTRICT",
+    "TURKISH_CASING",
+    "CR",
+    "LF",
+    "CRLF",
+    "ANYCRLF",
+    "ANY",
+    "NUL",
+    "BSR_ANYCRLF",
+    "BSR_UNICODE"
+  )
+
+  private val LimitStartOptions = Seq("LIMIT_DEPTH", "LIMIT_HEAP", "LIMIT_MATCH", "LIMIT_RECURSION")
+
+  private def parseStartOption(stack: mutable.Stack[Node], start: Int): Boolean =
+    boundary:
+      for name <- StartOptions do
+        if source.startsWith(s"$name)", offset) then
+          // PCRE2 accepts `(*TURKISH_CASING)` only with `(*UTF)` among the leading options, even with the `u` flag.
+          if name == "TURKISH_CASING" then
+            val options = "^(?:\\(\\*[A-Z0-9_=]+\\))*".r.findPrefixOf(source).getOrElse("")
+            assert(options.contains("(*UTF)") || options.contains("(*UTF8)"), "Invalid group")
+          reset(offset + name.length)
+          pushCommand(stack, CommandKind.StartOption(name, None), start)
+          boundary.break(true)
+
+      for name <- LimitStartOptions do
+        if startWith(s"$name=") then
+          val value = parseIntOption().getOrElse(fail("Invalid group"))
+          pushCommand(stack, CommandKind.StartOption(name, Some(value)), start)
+          boundary.break(true)
+
+      false
+
+  private def parseBacktrackControlName(): String =
+    val start = offset
+    while !isEnd && currentChar != ')' do next()
+    source.slice(start, offset)
 
   private def parseBacktrackControl(
       stack: mutable.Stack[Node],
@@ -828,10 +896,12 @@ private[parser] final class Parser(
     (currentChar: @switch) match
       case ':' =>
         next()
-        val name = parseID()
+        val name = parseBacktrackControlName()
+        assert(name.nonEmpty || kind != BacktrackControlKind.Mark, "Invalid group")
         pushCommand(stack, CommandKind.BacktrackControl(Some(kind), Some(name)), start)
         true
       case ')' =>
+        assert(kind != BacktrackControlKind.Mark, "Invalid group")
         pushCommand(stack, CommandKind.BacktrackControl(Some(kind), None), start)
         true
       case _ =>

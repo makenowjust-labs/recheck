@@ -17,6 +17,7 @@ package codes.quine.labs.resyntax.ast
   *   "?|" Sequence ("|" Sequence)*
   *   "?" ConditionalTest Node ("|" Node)?
   *   "*" BacktrackControl? (":" Name)?
+  *   "*" StartOption ("=" Int)?
   * }}}
   */
 sealed abstract class CommandKind extends Product with Serializable:
@@ -89,3 +90,6 @@ object CommandKind:
 
   /** BacktrackControl is a backtrack control command (e.g. `(*COMMIT)`). */
   final case class BacktrackControl(kind: Option[BacktrackControlKind], name: Option[String]) extends CommandKind
+
+  /** StartOption is an option setting at the start of a pattern (e.g. `(*UTF)` or `(*LIMIT_MATCH=10)`). */
+  final case class StartOption(name: String, value: Option[Int]) extends CommandKind
