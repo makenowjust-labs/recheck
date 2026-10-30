@@ -373,9 +373,9 @@ class ParserSuite extends munit.FunSuite:
   check("\\h", "", Ruby)(Backslash(EscapeClass(HexDigit)))
   check("\\k<foo>", "", DotNet, Java, PCRE, Perl, Ruby):
     Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("foo")))
-  check("\\k<1>", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), IndexedReference(1))))
-  check("\\k<+1>", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), RelativeReference(1))))
-  check("\\k<-1>", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), RelativeReference(-1))))
+  check("\\k<1>", "", Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), IndexedReference(1))))
+  check("\\k<+1>", "", Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), RelativeReference(1))))
+  check("\\k<-1>", "", Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), RelativeReference(-1))))
   check("\\k<1+0>", "", Ruby):
     Backslash(EscapeBackReference(KBackReference(Angle), LeveledReference(IndexedReference(1), 0)))
   check("\\k<1-1>", "", Ruby):
@@ -388,13 +388,21 @@ class ParserSuite extends munit.FunSuite:
     )
   check("\\k'foo'", "", DotNet, PCRE, Perl, Ruby):
     Backslash(EscapeBackReference(KBackReference(Quote), NamedReference("foo")))
-  check("\\k'1'", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Quote), IndexedReference(1))))
-  check("\\k'+1'", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Quote), RelativeReference(1))))
-  check("\\k'-1'", "", PCRE, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Quote), RelativeReference(-1))))
+  check("\\k'1'", "", Ruby)(Backslash(EscapeBackReference(KBackReference(Quote), IndexedReference(1))))
+  check("\\k'+1'", "", Ruby)(Backslash(EscapeBackReference(KBackReference(Quote), RelativeReference(1))))
+  check("\\k'-1'", "", Ruby)(Backslash(EscapeBackReference(KBackReference(Quote), RelativeReference(-1))))
   check("\\k'1+0'", "", Ruby):
     Backslash(EscapeBackReference(KBackReference(Quote), LeveledReference(IndexedReference(1), 0)))
   check("\\k'1-1'", "", Ruby):
     Backslash(EscapeBackReference(KBackReference(Quote), LeveledReference(IndexedReference(1), -1)))
+  error("\\k<1>", "", PCRE, Perl)("Invalid identifier at 3")
+  check("\\k{ foo }", "", PCRE, Perl):
+    Backslash(EscapeBackReference(KBackReference(Curly), NamedReference("foo")))
+  error("\\k{foo}", "", DotNet, Java)("Invalid backslash escape at 2")
+  error("\\k'foo'", "", Java)("Invalid backslash escape at 2")
+  check("\\kx", "", Ruby)(Sequence(Backslash(Unknown('k')), Literal('x')))
+  check("\\g{ 1 }", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Curly), IndexedReference(1))))
+  check("\\g1", "", Ruby)(Sequence(Backslash(Unknown('g')), Literal('1')))
   check("\\l", "", Perl)(Backslash(CaseCommand(SingleLowerCaseCommand)))
   check("\\n", "", All*)(Backslash(Escape(Single('n'), 0x0a)))
   check("\\o{010}", "", PCRE, Perl)(Backslash(Escape(Octal, 0x08)))

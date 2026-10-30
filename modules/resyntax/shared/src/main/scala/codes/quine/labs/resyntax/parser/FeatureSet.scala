@@ -44,6 +44,8 @@ final case class FeatureSet(
     allowsLooseBraceEscape: Boolean,
     // PCRE, Perl, Ruby
     allowsLoosePropertyName: Boolean,
+    // Ruby
+    allowsNamelessBackslashKG: Boolean,
     // Java
     allowsRawPropertyName: Boolean,
     // .NET
@@ -74,6 +76,8 @@ final case class FeatureSet(
     allowsWordUnknownBackslash: Boolean,
     // PCRE, Perl, Ruby
     allowsNonNameBaseRef: Boolean,
+    // Ruby
+    allowsNonNameKBackReference: Boolean,
     // .NET, Java, Perl, Ruby
     allowsZeroWidthAssertRepeat: Boolean,
     // JavaScript (without `uv`)
@@ -146,6 +150,8 @@ final case class FeatureSet(
     hasBackslashKBackReference: Boolean,
     // .NET, PCRE, Perl, Ruby
     hasBackslashKBackReferenceQuote: Boolean,
+    // PCRE, Perl
+    hasBackslashKBackReferenceCurly: Boolean,
     // PCRE, Perl
     hasBackslashNonNewline: Boolean,
     // PCRE, Perl
@@ -335,6 +341,8 @@ object FeatureSet:
       allowsLooseBraceEscape = isPerl,
       // PCRE, Perl, Ruby
       allowsLoosePropertyName = isPCRE || isPerl || isRuby,
+      // Ruby
+      allowsNamelessBackslashKG = isRuby,
       // Java
       allowsRawPropertyName = isJava,
       // .NET
@@ -367,6 +375,8 @@ object FeatureSet:
       allowsWordUnknownBackslash = isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
       // PCRE, Perl, Ruby
       allowsNonNameBaseRef = isPCRE || isPerl || isRuby,
+      // Ruby
+      allowsNonNameKBackReference = isRuby,
       // .NET, Java, Perl, Ruby
       allowsZeroWidthAssertRepeat = isDotNet || isJava || isPerl || isRuby,
       // JavaScript (without `uv`)
@@ -440,6 +450,8 @@ object FeatureSet:
         isDotNet || isJava || (isJavaScript && analysis.containsNamedCapture) || isPCRE || isPerl || isRuby,
       // .NET, PCRE, Perl, Ruby
       hasBackslashKBackReferenceQuote = isDotNet || isPCRE || isPerl || isRuby,
+      // PCRE, Perl
+      hasBackslashKBackReferenceCurly = isPCRE || isPerl,
       // PCRE, Perl
       hasBackslashNonNewline = isPCRE || isPerl,
       // PCRE, Perl

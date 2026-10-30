@@ -1043,6 +1043,8 @@ private[parser] final class Parser(
 
   private def parseBackslashLowerG(): BackslashKind =
     if !(featureSet.hasBackslashGBackReference || featureSet.hasBackslashGCall) then return parseBackslashUnknown()
+    if featureSet.allowsNamelessBackslashKG && !source.lift(offset + 1).exists(c => c == '<' || c == '\'') then
+      return parseBackslashUnknown()
 
     next()
     (currentChar: @switch) match
@@ -1065,7 +1067,9 @@ private[parser] final class Parser(
       case '{' =>
         assert(featureSet.hasBackslashGBackReference, "Invalid backslash escape")
         next()
+        skipBraceBlank()
         val ref = parseBaseRef()
+        skipBraceBlank()
         expect('}', "Invalid backslash escape")
         BackslashKind.EscapeBackReference(BackReferenceStyle.GBackReference(NameStyle.Curly), ref)
       case '<' | '\'' =>
@@ -1087,22 +1091,35 @@ private[parser] final class Parser(
 
   private def parseBackslashLowerK(): BackslashKind =
     if !featureSet.hasBackslashKBackReference || context.inClass then return parseBackslashUnknown()
+    if featureSet.allowsNamelessBackslashKG && !source.lift(offset + 1).exists(c => c == '<' || c == '\'') then
+      return parseBackslashUnknown()
 
     next()
     (currentChar: @switch) match
       case '<' =>
         next()
-        val ref = parseRef()
+        val ref = parseKRef()
         expect('>', "Invalid backslash escape")
         BackslashKind.EscapeBackReference(BackReferenceStyle.KBackReference(NameStyle.Angle), ref)
       case '\'' =>
-        assert(featureSet.hasBackslashKBackReference, "Invalid backslash escape")
+        assert(featureSet.hasBackslashKBackReferenceQuote, "Invalid backslash escape")
         next()
-        val ref = parseRef()
+        val ref = parseKRef()
         expect('\'', "Invalid backslash escape")
         BackslashKind.EscapeBackReference(BackReferenceStyle.KBackReference(NameStyle.Quote), ref)
+      case '{' =>
+        assert(featureSet.hasBackslashKBackReferenceCurly, "Invalid backslash escape")
+        next()
+        skipBraceBlank()
+        val ref = parseKRef()
+        skipBraceBlank()
+        expect('}', "Invalid backslash escape")
+        BackslashKind.EscapeBackReference(BackReferenceStyle.KBackReference(NameStyle.Curly), ref)
       case _ =>
         fail("Invalid backslash escape")
+
+  private def parseKRef(): Reference =
+    if featureSet.allowsNonNameKBackReference then parseRef() else Reference.NamedReference(parseID())
 
   private def parseRef(): Reference =
     val ref = parseBaseRef()
