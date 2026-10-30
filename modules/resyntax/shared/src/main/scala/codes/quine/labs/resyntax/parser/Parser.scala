@@ -211,7 +211,7 @@ private[parser] final class Parser(
       return
 
     next()
-    val strategy = parseBacktrackStrategy(exact = false)
+    val strategy = parseBacktrackStrategy(exact = false, curly = true)
     val quantifier = (minOption, maxOption) match
       case (Some(min), Some(max)) =>
         if max < min && !featureSet.allowsReversedBoundedRepeat then fail("Numbers out of order in {} quantifier", save)
@@ -273,7 +273,7 @@ private[parser] final class Parser(
     val end = offset
     stack.push(Node(NodeData.Repeat(node, quantifier), node.loc.copy(end = end)))
 
-  private def parseBacktrackStrategy(exact: Boolean): BacktrackStrategy =
+  private def parseBacktrackStrategy(exact: Boolean, curly: Boolean = false): BacktrackStrategy =
     if isEnd || exact && !featureSet.allowsMeaninglessBacktrackStrategy then return BacktrackStrategy.Greedy
 
     val save = offset
@@ -283,7 +283,10 @@ private[parser] final class Parser(
       next()
       return BacktrackStrategy.Lazy
 
-    if featureSet.hasPossessiveBacktrackStrategy && !isEnd && currentChar == '+' then
+    // Ruby reads `+` after `{n,m}` as another repeat, so `a{2,3}+` is `(?:a{2,3})+`.
+    val hasPossessive =
+      if curly then featureSet.hasPossessiveCurlyBacktrackStrategy else featureSet.hasPossessiveBacktrackStrategy
+    if hasPossessive && !isEnd && currentChar == '+' then
       next()
       return BacktrackStrategy.Possessive
 
