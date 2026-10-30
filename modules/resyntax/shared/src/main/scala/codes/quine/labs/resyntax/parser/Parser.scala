@@ -303,6 +303,10 @@ private[parser] final class Parser(
         parseNamedCallGroup(stack, start)
       case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
         parseIndexedCallGroup(stack, start)
+      case '+' if featureSet.allowsInlineFlagSign =>
+        parseSignedInlineFlagGroup(stack, start)
+      case '-' if featureSet.allowsInlineFlagSign =>
+        parseSignedInlineFlagGroup(stack, start)
       case '+' =>
         parsePlusGroup(stack, start)
       case '-' =>
@@ -317,6 +321,8 @@ private[parser] final class Parser(
         parseEmbedCodeGroup(stack, start)
       case 'C' =>
         parseCalloutGroup(stack, start)
+      case _ if featureSet.allowsInlineFlagSign =>
+        parseSignedInlineFlagGroup(stack, start)
       case _ =>
         parseInlineFlagGroup(stack, start)
 
@@ -773,6 +779,38 @@ private[parser] final class Parser(
       case _ =>
         fail("Invalid flag")
 
+  /** Parses an inline flag group with any sequence of flags and signs (e.g. `(?i-m+s)`). */
+  private def parseSignedInlineFlagGroup(stack: mutable.Stack[Node], start: Int): Unit =
+    val flagsStart = offset
+    var added = FlagSet()
+    var removed: Option[FlagSet] = None
+    var removing = false
+    boundary:
+      while !isEnd do
+        if currentChar == '+' then
+          removing = false
+          next()
+        else if currentChar == '-' then
+          removing = true
+          if removed.isEmpty then removed = Some(FlagSet())
+          next()
+        else
+          val (flagSet, flags) = parseFlagSet(removing = removing, initial = if removing then removed.get else added)
+          if removing then removed = Some(flagSet) else added = flagSet
+          if flags.isEmpty then boundary.break()
+    assert(offset > flagsStart || featureSet.allowsEmptyInlineFlag, "Invalid flag")
+
+    val diff = FlagSetDiff(added, removed)
+    (currentChar: @switch) match
+      case ':' =>
+        next()
+        applyFlagSetDiffWith(diff):
+          parseGroupBody(stack, GroupKind.InlineFlag(diff), start)
+      case ')' =>
+        pushInlineFlagCommand(stack, diff, start)
+      case _ =>
+        fail("Invalid flag")
+
   private def checkInlineFlagRemoval(addedFlags: String, removedFlags: String, removedStart: Int): Unit =
     if removedFlags.isEmpty then
       if addedFlags.isEmpty then assert(featureSet.allowsEmptyInlineFlagDiff, "Invalid flag")
@@ -985,9 +1023,13 @@ private[parser] final class Parser(
     expect(')', "Unclosed group")
 
   /** Parses inline flag letters, and returns the flag set and the source string of the letters. */
-  private def parseFlagSet(removing: Boolean = false, resetting: Boolean = false): (FlagSet, String) =
+  private def parseFlagSet(
+      removing: Boolean = false,
+      resetting: Boolean = false,
+      initial: FlagSet = FlagSet()
+  ): (FlagSet, String) =
     val start = offset
-    var flagSet = FlagSet()
+    var flagSet = initial
     def result: (FlagSet, String) = (flagSet, source.slice(start, offset))
     while !isEnd do
       val c = if featureSet.ignoresInlineFlagCase then currentChar.toLower else currentChar
@@ -1906,13 +1948,15 @@ private[parser] final class Parser(
     else if c == '$' then featureSet.allowsDollarInGroupName
     else if c < 0x80 then false
     else if featureSet.allowsUnicodeIdentifierGroupName then Character.isUnicodeIdentifierStart(c)
-    else if featureSet.allowsUnicodeWordGroupName then Character.isLetter(c)
+    else if featureSet.allowsUnicodeWordGroupName then
+      (c < 0x10000 || featureSet.readsAsUnicode) && Character.isLetter(c)
     else false
 
   private def isGroupNameContinue(c: Int): Boolean =
     if c < 0x80 then CodePointUtil.isDigit(c) || isGroupNameStart(c)
     else if featureSet.allowsUnicodeIdentifierGroupName then Character.isUnicodeIdentifierPart(c)
-    else if featureSet.allowsUnicodeWordGroupName then Character.isLetterOrDigit(c)
+    else if featureSet.allowsUnicodeWordGroupName then
+      (c < 0x10000 || featureSet.readsAsUnicode) && Character.isLetterOrDigit(c)
     else false
 
   private def parseID(): String =

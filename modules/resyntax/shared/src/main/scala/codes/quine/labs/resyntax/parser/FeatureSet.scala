@@ -45,6 +45,8 @@ final case class FeatureSet(
     // JavaScript
     allowsEscapeInGroupName: Boolean,
     // .NET
+    allowsInlineFlagSign: Boolean,
+    // .NET
     allowsInvalidIdentifier: Boolean,
     // .NET, PCRE, Python, Ruby
     allowsLeadingZeroInCaptureTest: Boolean,
@@ -317,6 +319,8 @@ object FeatureSet:
       allowsEmptyInlineFlagRemoval = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isRuby,
       // JavaScript
       allowsEscapeInGroupName = isJavaScript,
+      // .NET
+      allowsInlineFlagSign = isDotNet,
       // .NET
       allowsInvalidIdentifier = isDotNet,
       // .NET, PCRE, Python, Ruby
