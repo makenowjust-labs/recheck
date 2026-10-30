@@ -1256,6 +1256,10 @@ private[parser] final class Parser(
           case _ =>
             fail("Invalid backslash escape", save)
       else
+        assert(!"()[]{/-".contains(currentChar), "Invalid set operation")
+        val isDouble =
+          "&!#$%*+,.:;<=>?@^`~".contains(currentChar) && source.startsWith(s"$currentChar$currentChar", offset)
+        assert(!isDouble, "Invalid set operation")
         val value = if featureSet.readsAsUnicode then currentCodePoint else currentChar.toInt
         nextCodePoint(value)
         string.addOne(QuoteLiteral.QuoteValue(value))

@@ -681,6 +681,15 @@ class ParserSuite extends munit.FunSuite:
         )
       )
     )
+  error("[\\q{(}]", "v", JavaScript)("Invalid set operation at 4")
+  error("[\\q{a!!}]", "v", JavaScript)("Invalid set operation at 5")
+  check("[\\q{\\0\\(}]", "v", JavaScript):
+    Class(
+      false,
+      ClassBackslashClass(
+        QuoteSet(Seq(Seq(QuoteBackslash(Escape(Single('0'), 0)), QuoteBackslash(Escape(Single('('), '(')))))
+      )
+    )
   error("[", "", All*)("Unclosed ']' at 1")
   check("]", "", All*)(Literal(']'))
   error("[[a]", "", Java)("Unclosed ']' at 4")
