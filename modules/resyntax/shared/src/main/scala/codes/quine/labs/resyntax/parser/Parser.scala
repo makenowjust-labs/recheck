@@ -1505,6 +1505,10 @@ private[parser] final class Parser(
 
     item
 
+  // Java skips whitespace and comments in a class in the comments mode.
+  private def skipClassComment(): Unit =
+    if context.skipsComment && featureSet.skipsCommentInClass then skipComment()
+
   private def isEmptyClassItem(item: ClassItem): Boolean =
     item.data == ClassItemData.ClassUnion(Seq.empty)
 
@@ -1543,8 +1547,13 @@ private[parser] final class Parser(
     val start = offset
     val seq = Seq.newBuilder[ClassItem]
 
-    while (first && start == offset && !isEnd && currentChar == ']') || !isClassItemStop(start) do
+    var count = 0
+
+    skipClassComment()
+    while (first && count == 0 && !isEnd && currentChar == ']') || !isClassItemStop(start) do
       parseClassItemAtom(seq, start)
+      count += 1
+      skipClassComment()
 
     val end = offset
     val items = seq.result()
@@ -1562,6 +1571,7 @@ private[parser] final class Parser(
     val start = offset
     val begin = parseClassItemNonRange()
 
+    skipClassComment()
     if isClassItemStop(unionStart) || currentChar != '-' then
       seq.addOne(begin)
       return
@@ -1574,6 +1584,7 @@ private[parser] final class Parser(
       seq.addOne(begin)
       return
 
+    skipClassComment()
     val end = parseClassItemNonRange()
     val endOffset = offset
 

@@ -217,7 +217,9 @@ final case class FeatureSet(
     // Java, JavaScript (with `uv`), Perl, PCRE (with `u`), Python (without `b`), Ruby
     readsAsUnicode: Boolean,
     // .NET (with `x`), Java (with `x`), PCRE (with `x`), Perl (with `x`), Python (with `x`), Ruby (with `x`)
-    skipsComment: Boolean
+    skipsComment: Boolean,
+    // Java
+    skipsCommentInClass: Boolean
 )
 
 object FeatureSet:
@@ -450,5 +452,7 @@ object FeatureSet:
       readsAsUnicode =
         isJava || (isJavaScript && isUnicode) || (isPCRE && isUnicode) || (isPython && !isByte) || isRuby,
       // .NET (with `x`), Java (with `x`), PCRE (with `x`), Perl (with `x`), Python (with `x`), Ruby (with `x`)
-      skipsComment = flagSet.verbose
+      skipsComment = flagSet.verbose,
+      // Java
+      skipsCommentInClass = isJava
     )
