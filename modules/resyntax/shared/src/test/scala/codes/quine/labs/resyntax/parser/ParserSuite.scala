@@ -554,6 +554,15 @@ class ParserSuite extends munit.FunSuite:
   check("[ ]]", "x", Java)(Class(false, ClassLiteral(']')))
   error("[ ]", "x", Java)("Unclosed ']' at 3")
   error("[a- ]", "x", Java)("Out of order class range at 1")
+  check("[a&&b]", "", DotNet, JavaScript, PCRE, Perl, Python):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('&'), ClassLiteral('&'), ClassLiteral('b')))
+  check("[[a]", "", DotNet, JavaScript, PCRE, Perl, Python)(
+    Class(false, ClassUnion(ClassLiteral('['), ClassLiteral('a')))
+  )
+  check("[!--b]", "", All*)(
+    Class(false, ClassUnion(ClassRange(ClassLiteral('!'), ClassLiteral('-')), ClassLiteral('b')))
+  )
+  error("[a--b]", "", All*)("Out of order class range at 1")
   check("[&&a]", "", Java, Ruby)(Class(false, ClassIntersection(ClassUnion(), ClassLiteral('a'))))
   check("[a&&]", "", Java, Ruby)(Class(false, ClassIntersection(ClassLiteral('a'), ClassUnion())))
   check("[&&]", "", Ruby)(Class(false, ClassIntersection(ClassUnion(), ClassUnion())))
