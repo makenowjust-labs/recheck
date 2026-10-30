@@ -44,6 +44,8 @@ final case class FeatureSet(
     allowsEscapeInGroupName: Boolean,
     // .NET
     allowsInvalidIdentifier: Boolean,
+    // .NET, PCRE, Python, Ruby
+    allowsLeadingZeroInCaptureTest: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     allowsLookAheadRepeat: Boolean,
     // .NET, Java, PCRE, Perl, Python, Ruby
@@ -66,6 +68,8 @@ final case class FeatureSet(
     allowsUnicodeIdentifierGroupName: Boolean,
     // .NET, PCRE (with `u`)
     allowsUnicodeWordGroupName: Boolean,
+    // .NET
+    allowsZeroIndexedCaptureTest: Boolean,
     // Ruby
     allowsZeroWidthAssertRepeat: Boolean,
     // Perl
@@ -154,6 +158,8 @@ final case class FeatureSet(
     hasBoundaryGModifier: Boolean,
     // Perl
     hasBoundaryModifier: Boolean,
+    // .NET
+    hasBareLookAroundTest: Boolean,
     // PCRE, Python
     hasBareNamedCaptureTest: Boolean,
     // PCRE, Perl
@@ -305,6 +311,8 @@ object FeatureSet:
       allowsEscapeInGroupName = isJavaScript,
       // .NET
       allowsInvalidIdentifier = isDotNet,
+      // .NET, PCRE, Python, Ruby
+      allowsLeadingZeroInCaptureTest = isDotNet || isPCRE || isPython || isRuby,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsLookAheadRepeat =
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
@@ -328,6 +336,8 @@ object FeatureSet:
       allowsUnicodeIdentifierGroupName = isJavaScript || (isPython && !isByte),
       // .NET, PCRE (with `u`)
       allowsUnicodeWordGroupName = isDotNet || (isPCRE && isUnicode),
+      // .NET
+      allowsZeroIndexedCaptureTest = isDotNet,
       // Ruby
       allowsZeroWidthAssertRepeat = isRuby,
       // Perl
@@ -414,6 +424,8 @@ object FeatureSet:
       hasBackslashXHex1 = isPCRE || isPerl || isRuby,
       // .NET
       hasBalanceGroup = isDotNet,
+      // .NET
+      hasBareLookAroundTest = isDotNet,
       // PCRE, Python
       hasBareNamedCaptureTest = isPCRE || isPython,
       // Java, Perl,

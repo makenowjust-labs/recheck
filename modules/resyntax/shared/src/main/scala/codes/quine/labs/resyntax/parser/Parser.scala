@@ -383,7 +383,14 @@ private[parser] final class Parser(
     next()
 
     boundary:
+      val indexStart = offset
       for n <- parseIntOption() do
+        assert(n != 0 || featureSet.allowsZeroIndexedCaptureTest, "Invalid condition", indexStart)
+        assert(
+          source.charAt(indexStart) != '0' || featureSet.allowsLeadingZeroInCaptureTest,
+          "Invalid condition",
+          indexStart
+        )
         closeCondition()
         parseConditionalGroupBody(stack, ConditionalTest.Indexed(n), start)
         boundary.break()
@@ -402,7 +409,8 @@ private[parser] final class Parser(
         parseConditionalGroupBody(stack, ConditionalTest.Named(NameStyle.Quote, name), start)
         boundary.break()
 
-      if featureSet.hasDefineTest && startWith("DEFINE") then
+      if featureSet.hasDefineTest && startWith("DEFINE)") then
+        reset(offset - 1)
         closeCondition()
         parseConditionalGroupBody(stack, ConditionalTest.Define, start)
         boundary.break()
@@ -412,13 +420,20 @@ private[parser] final class Parser(
         if lt then next()
         expect('=', "Invalid condition")
         val major = parseIntOption().getOrElse(fail("Invalid condition"))
-        expect('.', "Invalid condition")
-        val minor = parseIntOption().getOrElse(fail("Invalid condition"))
+        val minor =
+          if !isEnd && currentChar == '.' then
+            next()
+            parseIntOption().getOrElse(fail("Invalid condition"))
+          else 0
         closeCondition()
         parseConditionalGroupBody(stack, ConditionalTest.Version(lt, major, minor), start)
         boundary.break()
 
-      if currentChar == 'R' && featureSet.hasRecursionTest then
+      val isRecursionTest =
+        currentChar == 'R' && offset + 1 < source.length && (source.charAt(offset + 1) match
+          case ')' | '&' => true
+          case c         => CodePointUtil.isDigit(c))
+      if featureSet.hasRecursionTest && isRecursionTest then
         next()
         (currentChar: @switch) match
           case ')' =>
@@ -457,6 +472,7 @@ private[parser] final class Parser(
         for (symbolic, alphabetic, abbrev, la) <- LookAroundTests do
           if parseLookAroundTest(stack, start, symbolic, alphabetic, abbrev, la) then boundary.break()
 
+      if featureSet.hasBareLookAroundTest then
         parseLookAroundConditional(stack, None, start)
         boundary.break()
 
@@ -468,6 +484,7 @@ private[parser] final class Parser(
   private def parseConditionalGroupBody(stack: mutable.Stack[Node], test: ConditionalTest, start: Int): Unit =
     protectContext:
       val yes = protectContext(parseSequence())
+      if test == ConditionalTest.Define then assert(isEnd || currentChar != '|', "Invalid condition")
       val no = Option.when(!isEnd && currentChar == '|'):
         next()
         protectContext(parseSequence())
