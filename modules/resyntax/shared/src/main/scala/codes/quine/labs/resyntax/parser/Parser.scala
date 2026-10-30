@@ -373,14 +373,14 @@ private[parser] final class Parser(
 
       if featureSet.hasNamedCaptureTest && currentChar == '<' then
         next()
-        val name = parseName(end = '>')
+        val name = parseGroupName(end = '>')
         closeCondition()
         parseConditionalGroupBody(stack, ConditionalTest.Named(NameStyle.Angle, name), start)
         boundary.break()
 
       if featureSet.hasNamedCaptureTest && currentChar == '\'' then
         next()
-        val name = parseName(end = '\'')
+        val name = parseGroupName(end = '\'')
         closeCondition()
         parseConditionalGroupBody(stack, ConditionalTest.Named(NameStyle.Quote, name), start)
         boundary.break()
@@ -409,7 +409,7 @@ private[parser] final class Parser(
             parseConditionalGroupBody(stack, ConditionalTest.RRecursion, start)
           case '&' =>
             next()
-            val name = parseID()
+            val name = parseGroupNameBody()
             closeCondition()
             parseConditionalGroupBody(stack, ConditionalTest.NamedRecursion(name), start)
           case _ =>
@@ -418,8 +418,8 @@ private[parser] final class Parser(
             parseConditionalGroupBody(stack, ConditionalTest.IndexedRecursion(n), start)
         boundary.break()
 
-      if featureSet.hasBareNamedCaptureTest && isIDStart then
-        val name = parseID()
+      if featureSet.hasBareNamedCaptureTest && isGroupNameStart then
+        val name = parseGroupNameBody()
         closeCondition()
         parseConditionalGroupBody(stack, ConditionalTest.Named(NameStyle.Bare, name), start)
         boundary.break()
@@ -503,17 +503,17 @@ private[parser] final class Parser(
       parseBalanceGroup(stack, end, style, start)
       return
 
-    val name = parseName(end = end)
+    val name = parseGroupName(end = end)
     parseGroupBody(stack, GroupKind.NamedCapture(style, name), start)
 
   private def parseBalanceGroup(stack: mutable.Stack[Node], end: Char, style: NameStyle, start: Int): Unit =
     if currentChar == '-' then
       next()
-      val test = parseName(end = end)
+      val test = parseGroupName(end = end)
       parseGroupBody(stack, GroupKind.Balance(style, None, test), start)
       return
 
-    val name = parseID()
+    val name = parseGroupNameBody()
     if currentChar == end then
       next()
       parseGroupBody(stack, GroupKind.NamedCapture(style, name), start)
@@ -521,7 +521,7 @@ private[parser] final class Parser(
 
     if currentChar == '-' then
       next()
-      val test = parseName(end = end)
+      val test = parseGroupName(end = end)
       parseGroupBody(stack, GroupKind.Balance(style, Some(name), test), start)
       return
 
@@ -533,16 +533,16 @@ private[parser] final class Parser(
     (currentChar: @switch) match
       case '<' =>
         next()
-        val name = parseName(end = '>')
+        val name = parseGroupName(end = '>')
         parseGroupBody(stack, GroupKind.PNamedCapture(name), start)
       case '=' =>
         next()
-        val name = parseID()
+        val name = parseGroupNameBody()
         pushCommand(stack, CommandKind.PBackReference(name), start)
       case '>' =>
         assert(featureSet.hasPCall, "Invalid group")
         next()
-        val name = parseID()
+        val name = parseGroupNameBody()
         pushCommand(stack, CommandKind.PNamedCall(name), start)
       case _ =>
         fail("Invalid group")
@@ -555,7 +555,7 @@ private[parser] final class Parser(
   private def parseNamedCallGroup(stack: mutable.Stack[Node], start: Int): Unit =
     assert(featureSet.hasCallCommand, "Invalid group")
     next()
-    val name = parseID()
+    val name = parseGroupNameBody()
     pushCommand(stack, CommandKind.NamedCall(name), start)
 
   private def parseIndexedCallGroup(stack: mutable.Stack[Node], start: Int): Unit =
@@ -1663,11 +1663,92 @@ private[parser] final class Parser(
       applyResetFlag(flagSet)
       body
 
-  private def parseName(end: Char): String =
-    val name = parseID()
+  private def parseGroupName(end: Char): String =
+    val name = parseGroupNameBody(end)
     assert(!isEnd && currentChar == end, "Invalid identifier")
     next()
     name
+
+  /** Parses a group name, and returns the name with escape sequences decoded. */
+  private def parseGroupNameBody(end: Char = ')'): String =
+    val start = offset
+
+    if featureSet.allowsLooseGroupName then
+      assert(!isEnd && currentChar != end && currentChar != '-' && !isDigit, "Invalid identifier")
+      while !isEnd && currentChar != end do
+        assert(currentChar != ')', "Invalid identifier")
+        next()
+      return source.slice(start, offset)
+
+    if featureSet.allowsNumberGroupName && isDigit then
+      val n = parseIntOption().get
+      assert(n != 0, "Invalid identifier", start)
+      return source.slice(start, offset)
+
+    val name = new java.lang.StringBuilder
+    boundary:
+      while !isEnd do
+        val save = offset
+        val c =
+          if featureSet.allowsEscapeInGroupName && currentChar == '\\' then parseGroupNameEscape()
+          else
+            val c = currentCodePoint
+            nextCodePoint(c)
+            c
+        if c < 0 || !(if name.length == 0 then isGroupNameStart(c) else isGroupNameContinue(c)) then
+          reset(save)
+          boundary.break()
+        name.appendCodePoint(c)
+
+    assert(name.length > 0, "Invalid identifier", start)
+    if featureSet.limitsGroupNameLength then assert(offset - start <= 128, "Invalid identifier", start)
+    name.toString
+
+  /** Parses a `\\u` escape sequence in a group name, and returns its code point or `-1` if it is invalid. */
+  private def parseGroupNameEscape(): Int =
+    next()
+    if isEnd || currentChar != 'u' then return -1
+    next()
+    if !isEnd && currentChar == '{' then
+      next()
+      val value = parseHexIntOption().getOrElse(-1)
+      if value < 0 || value > 0x10ffff || isEnd || currentChar != '}' then return -1
+      next()
+      return value
+
+    val high = parseHex4()
+    if CodePointUtil.isHighSurrogate(high) && source.startsWith("\\u", offset) then
+      val save = offset
+      reset(offset + 2)
+      val low = parseHex4()
+      if CodePointUtil.isLowSurrogate(low) then return CodePointUtil.decodeSurrogatePair(high, low)
+      reset(save)
+    high
+
+  private def parseHex4(): Int =
+    val start = offset
+    for _ <- 1 to 4 do
+      if !isHexDigit then return -1
+      next()
+    Integer.parseInt(source.slice(start, offset), 16)
+
+  private def isGroupNameStart: Boolean =
+    !isEnd && isGroupNameStart(currentCodePoint)
+
+  private def isGroupNameStart(c: Int): Boolean =
+    if 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' then true
+    else if c == '_' then featureSet.allowsUnderscoreInGroupName
+    else if c == '$' then featureSet.allowsDollarInGroupName
+    else if c < 0x80 then false
+    else if featureSet.allowsUnicodeIdentifierGroupName then Character.isUnicodeIdentifierStart(c)
+    else if featureSet.allowsUnicodeWordGroupName then Character.isLetter(c)
+    else false
+
+  private def isGroupNameContinue(c: Int): Boolean =
+    if c < 0x80 then CodePointUtil.isDigit(c) || isGroupNameStart(c)
+    else if featureSet.allowsUnicodeIdentifierGroupName then Character.isUnicodeIdentifierPart(c)
+    else if featureSet.allowsUnicodeWordGroupName then Character.isLetterOrDigit(c)
+    else false
 
   private def parseID(): String =
     val start = offset
