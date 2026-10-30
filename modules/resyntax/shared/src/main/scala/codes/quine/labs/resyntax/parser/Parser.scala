@@ -948,7 +948,9 @@ private[parser] final class Parser(
     BackslashKind.Escape(EscapeStyle.Single('a'), 0x0007)
 
   private def parseBackslashLowerB(): BackslashKind =
-    if context.inClass then return parseBackslashBackslash()
+    if context.inClass then
+      assert(featureSet.hasBackslashBackspace, "Invalid backslash escape")
+      return parseBackslashBackslash()
 
     parseBackslashBoundary()
 
@@ -1287,6 +1289,7 @@ private[parser] final class Parser(
 
   private def parseBackslashUpperE(): BackslashKind =
     if !(featureSet.hasBackslashCaseCommand || featureSet.hasBackslashQuoteCommand) then return parseBackslashUnknown()
+    assert(featureSet.allowsUnpairedQuoteEnd, "Invalid backslash escape")
 
     next()
     BackslashKind.CaseCommand(CaseCommandKind.EndCaseCommand)
@@ -1475,16 +1478,27 @@ private[parser] final class Parser(
 
   private def parseBackslashEscape(): BackslashKind =
     val value = currentChar
+    if value == '&' then assertSymbolUnknownBackslash()
     next()
     BackslashKind.Escape(EscapeStyle.Single(value), value.toInt)
 
   private def parseBackslashUnknown(): BackslashKind =
-    if isAlphabetic then assert(featureSet.allowsAlphabeticUnknownBackslash, "Invalid backslash escape")
-
     assert(!isEnd, "Invalid backslash escape")
     val value = currentCodePoint
+
+    if isAlphabetic then assert(featureSet.allowsAlphabeticUnknownBackslash, "Invalid backslash escape")
+    else if CodePointUtil.isWord(value) then assert(featureSet.allowsWordUnknownBackslash, "Invalid backslash escape")
+    else assertSymbolUnknownBackslash()
+
     nextCodePoint(value)
     BackslashKind.Unknown(value)
+
+  private def assertSymbolUnknownBackslash(): Unit =
+    if featureSet.allowsSymbolUnknownBackslash then return
+    if context.inClass && currentChar == '-' then return
+    if featureSet.hasBackslashClassSetReservedPunctuator && context.inClass && "&-!#%,:;<=>@`~".contains(currentChar)
+    then return
+    fail("Invalid backslash escape")
 
   private def parseClass(stack: mutable.Stack[Node]): Unit = protectContext:
     context = context.copy(inClass = true)
@@ -1596,17 +1610,40 @@ private[parser] final class Parser(
 
     if currentChar == '\\' then
       next()
+      if isLiteralBackslashInClass then
+        val kind = BackslashKind.Unknown(currentChar.toInt)
+        next()
+        return ClassItem.Value(ClassItemData.ClassBackslashValue(kind), SourceLocation(start, offset))
       val backslash = parseBackslashKind()
       val end = offset
       backslash match
         case kind: BackslashKind.BackslashValue =>
           return ClassItem.Value(ClassItemData.ClassBackslashValue(kind), SourceLocation(start, end))
+        case BackslashKind.EscapeClass(
+              EscapeClassKind.GeneralNewline | EscapeClassKind.GraphemeCluster | EscapeClassKind.NonNewline
+            ) =>
+          fail("Invalid escape sequence", start)
         case BackslashKind.EscapeClass(klass) =>
           return ClassItem(ClassItemData.ClassBackslashClass(klass), SourceLocation(start, end))
+        case BackslashKind.CaseCommand(CaseCommandKind.QuoteCommand) =>
+          return parseClassQuote(start)
         case _ =>
           fail("Invalid escape sequence", start)
 
     parseClassItemLiteral()
+
+  private def isLiteralBackslashInClass: Boolean =
+    !isEnd && ((currentChar: @switch) match
+      case 'A' | 'z' | 'Z' | 'G' | 'K' | 'R' | 'X' => featureSet.treatsNonClassBackslashInClassAsLiteral
+      case 'g' | 'k'                               => featureSet.treatsBackReferenceBackslashInClassAsLiteral
+      case 'l' | 'u' | 'L' | 'U' | 'F' | 'E' | 'Q' => featureSet.hasBackslashCaseCommand
+      case _                                       => false)
+
+  private def parseClassQuote(start: Int): ClassItem =
+    val items = Seq.newBuilder[ClassItem]
+    while !isEnd && !source.startsWith("\\E", offset) do items.addOne(parseClassItemLiteral())
+    startWith("\\E")
+    ClassItem(ClassItemData.ClassUnion(items.result()), SourceLocation(start, offset))
 
   private def parseClassItemLiteral(): ClassItem =
     val value =

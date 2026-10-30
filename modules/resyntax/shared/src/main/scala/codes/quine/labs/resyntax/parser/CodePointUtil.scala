@@ -34,6 +34,15 @@ object CodePointUtil:
   def isAlphabetic(codePoint: Int): Boolean =
     codePoint >= 'a' && codePoint <= 'z' || codePoint >= 'A' && codePoint <= 'Z'
 
+  // It follows .NET's `RegexCharClass.IsBoundaryWordChar`.
+  def isWord(codePoint: Int): Boolean =
+    codePoint == '_' || codePoint == 0x200c || codePoint == 0x200d || (Character.getType(codePoint) match
+      case Character.UPPERCASE_LETTER | Character.LOWERCASE_LETTER | Character.TITLECASE_LETTER |
+          Character.MODIFIER_LETTER | Character.OTHER_LETTER | Character.NON_SPACING_MARK |
+          Character.DECIMAL_DIGIT_NUMBER | Character.CONNECTOR_PUNCTUATION =>
+        true
+      case _ => false)
+
   def isHexDigit(codePoint: Int): Boolean =
     codePoint >= '0' && codePoint <= '9' || codePoint >= 'a' && codePoint <= 'f' || codePoint >= 'A' && codePoint <= 'F'
 
