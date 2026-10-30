@@ -31,6 +31,9 @@ object CodePointUtil:
   def isOctalDigit(codePoint: Int): Boolean =
     codePoint >= '0' && codePoint <= '7'
 
+  def isAlphabetic(codePoint: Int): Boolean =
+    codePoint >= 'a' && codePoint <= 'z' || codePoint >= 'A' && codePoint <= 'Z'
+
   def isHexDigit(codePoint: Int): Boolean =
     codePoint >= '0' && codePoint <= '9' || codePoint >= 'a' && codePoint <= 'f' || codePoint >= 'A' && codePoint <= 'F'
 

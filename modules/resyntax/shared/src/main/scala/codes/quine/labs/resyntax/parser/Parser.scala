@@ -218,9 +218,16 @@ private[parser] final class Parser(
 
   private def resetBracket(stack: mutable.Stack[Node], save: Int): Unit =
     if !featureSet.allowsBrokenCurly then fail("Incomplete quantifier", save)
+    if !featureSet.allowsBrokenCurlyAfterAlphabeticBackslash && isAfterAlphabeticBackslash(stack, save) then
+      fail("Unescaped left brace", save)
     reset(save)
     stack.push(Node(NodeData.Literal('{'), SourceLocation(save, save + 1)))
     next()
+
+  private def isAfterAlphabeticBackslash(stack: mutable.Stack[Node], pos: Int): Boolean =
+    stack.headOption.exists: node =>
+      node.data.isInstanceOf[NodeData.Backslash] && node.loc.end == pos && node.loc.start + 2 == pos &&
+        CodePointUtil.isAlphabetic(source.charAt(pos - 1).toInt)
 
   private def parseGroup(stack: mutable.Stack[Node]): Unit =
     val start = offset

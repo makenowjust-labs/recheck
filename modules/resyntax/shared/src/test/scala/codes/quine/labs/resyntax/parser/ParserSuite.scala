@@ -109,6 +109,12 @@ class ParserSuite extends munit.FunSuite:
   check("a{ 2}", "", DotNet, JavaScript, Python, Ruby):
     Sequence(Literal('a'), Literal('{'), Literal(' '), Literal('2'), Literal('}'))
   error("a{", "", Java)("Incomplete quantifier at 1")
+  check("\\d{", "", DotNet, JavaScript, PCRE, Python, Ruby)(Sequence(Backslash(EscapeClass(Digit)), Literal('{')))
+  error("\\d{", "", Perl)("Unescaped left brace at 2")
+  error("\\E{x", "", Perl)("Unescaped left brace at 2")
+  check("\\x41{", "", Perl)(Sequence(Backslash(Escape(Hex2, 0x41)), Literal('{')))
+  check("\\-{", "", Perl)(Sequence(Backslash(Unknown('-')), Literal('{')))
+  check("\\d{2}", "", All*)(Repeat(Backslash(EscapeClass(Digit)), Exact(2, Greedy)))
   error("a{", "u", JavaScript)("Incomplete quantifier at 1")
   error("*", "", All*)("Nothing to repeat at 0")
   check("a**", "", Ruby)(Repeat(Repeat(Literal('a'), Star(Greedy)), Star(Greedy)))

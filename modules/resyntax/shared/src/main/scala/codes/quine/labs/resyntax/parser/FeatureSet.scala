@@ -16,6 +16,8 @@ final case class FeatureSet(
     allowsBrokenCloseBracket: Boolean,
     // .NET, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     allowsBrokenCurly: Boolean,
+    // .NET, JavaScript (without `uv`), PCRE, Python, Ruby
+    allowsBrokenCurlyAfterAlphabeticBackslash: Boolean,
     // PCRE, Perl
     allowsBlankInBrace: Boolean,
     // JavaScript (with `v`)
@@ -227,6 +229,9 @@ object FeatureSet:
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
       // .NET, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsBrokenCurly = isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
+      // .NET, JavaScript (without `uv`), PCRE, Python, Ruby
+      allowsBrokenCurlyAfterAlphabeticBackslash =
+        isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPython || isRuby,
       // PCRE, Perl
       allowsBlankInBrace = isPCRE || isPerl,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
