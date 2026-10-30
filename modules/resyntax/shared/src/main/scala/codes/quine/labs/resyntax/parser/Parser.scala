@@ -139,52 +139,42 @@ private[parser] final class Parser(
   private def parseCurlyQuantifier(stack: mutable.Stack[Node]): Unit =
     val save = offset
     next()
-    parseIntOption() match
-      case Some(min) =>
-        (currentChar: @switch) match
-          case '}' =>
-            next()
-            val strategy = parseBacktrackStrategy(exact = true)
-            val quantifier = Quantifier.Exact(min, strategy)
-            pushRepeat(stack, popRepeatable(stack), quantifier)
-          case ',' =>
-            next()
-            (currentChar: @switch) match
-              case '}' =>
-                next()
-                val strategy = parseBacktrackStrategy(exact = false)
-                val quantifier = Quantifier.Unbounded(min, strategy)
-                pushRepeat(stack, popRepeatable(stack), quantifier)
-              case _ =>
-                parseIntOption() match
-                  case Some(max) =>
-                    if currentChar != '}' then
-                      resetBracket(stack, save)
-                      return
-                    next()
-                    if max < min && !featureSet.allowsReversedBoundedRepeat then
-                      fail("Numbers out of order in {} quantifier", save)
-                    val strategy = parseBacktrackStrategy(exact = false)
-                    val quantifier = Quantifier.Bounded(min, max, strategy)
-                    pushRepeat(stack, popRepeatable(stack), quantifier)
-                  case None =>
-                    resetBracket(stack, save)
-          case _ =>
-            resetBracket(stack, save)
-      case None =>
-        if !featureSet.hasMaxBounded || currentChar != ',' then
-          resetBracket(stack, save)
-          return
-        next()
-        parseIntOption() match
-          case Some(max) =>
-            if currentChar != '}' then resetBracket(stack, save)
-            next()
-            val strategy = parseBacktrackStrategy(exact = false)
-            val quantifier = Quantifier.MaxBounded(max, strategy)
-            pushRepeat(stack, popRepeatable(stack), quantifier)
-          case None =>
-            resetBracket(stack, save)
+    skipBraceBlank()
+    val minOption = parseIntOption()
+    skipBraceBlank()
+
+    if minOption.isDefined && currentChar == '}' then
+      next()
+      val strategy = parseBacktrackStrategy(exact = true)
+      pushRepeat(stack, popRepeatable(stack), Quantifier.Exact(minOption.get, strategy))
+      return
+
+    if isEnd || currentChar != ',' || minOption.isEmpty && !featureSet.hasMaxBounded then
+      resetBracket(stack, save)
+      return
+
+    next()
+    skipBraceBlank()
+    val maxOption = parseIntOption()
+    skipBraceBlank()
+
+    if isEnd || currentChar != '}' || minOption.isEmpty && maxOption.isEmpty then
+      resetBracket(stack, save)
+      return
+
+    next()
+    val strategy = parseBacktrackStrategy(exact = false)
+    val quantifier = (minOption, maxOption) match
+      case (Some(min), Some(max)) =>
+        if max < min && !featureSet.allowsReversedBoundedRepeat then fail("Numbers out of order in {} quantifier", save)
+        Quantifier.Bounded(min, max, strategy)
+      case (Some(min), None) => Quantifier.Unbounded(min, strategy)
+      case (None, Some(max)) => Quantifier.MaxBounded(max, strategy)
+      case (None, None)      => throw new IllegalStateException("Unreachable")
+    pushRepeat(stack, popRepeatable(stack), quantifier)
+
+  private def skipBraceBlank(): Unit =
+    if featureSet.allowsBlankInBrace then while !isEnd && (currentChar == ' ' || currentChar == '\t') do next()
 
   private def popRepeatable(stack: mutable.Stack[Node]): Node =
     assert(stack.nonEmpty, "Nothing to repeat")

@@ -16,6 +16,8 @@ final case class FeatureSet(
     allowsBrokenCloseBracket: Boolean,
     // .NET, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     allowsBrokenCurly: Boolean,
+    // PCRE, Perl
+    allowsBlankInBrace: Boolean,
     // JavaScript (with `v`)
     allowsClassDiff: Boolean,
     // JavaScript
@@ -166,7 +168,7 @@ final case class FeatureSet(
     hasLeveledBackReference: Boolean,
     // .NET, PCRE, Perl
     hasLookAroundTest: Boolean,
-    // Perl, Python, Ruby
+    // PCRE, Perl, Python, Ruby
     hasMaxBounded: Boolean,
     // .NET, PCRE, Perl, Ruby
     hasNamedCaptureTest: Boolean,
@@ -223,6 +225,8 @@ object FeatureSet:
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
       // .NET, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsBrokenCurly = isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
+      // PCRE, Perl
+      allowsBlankInBrace = isPCRE || isPerl,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsBrokenCloseBracket = isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
       // JavaScript (with `v`)
@@ -378,8 +382,8 @@ object FeatureSet:
       hasLeveledBackReference = isRuby,
       // .NET, PCRE, Perl
       hasLookAroundTest = isDotNet || isPCRE || isPerl,
-      // Perl, Python, Ruby
-      hasMaxBounded = isPerl || isPython || isRuby,
+      // PCRE, Perl, Python, Ruby
+      hasMaxBounded = isPCRE || isPerl || isPython || isRuby,
       // .NET, PCRE, Perl, Ruby
       hasNamedCaptureTest = isDotNet || isPCRE || isPerl || isRuby,
       // PCRE
