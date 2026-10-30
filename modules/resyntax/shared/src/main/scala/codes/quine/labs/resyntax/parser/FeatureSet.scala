@@ -232,7 +232,8 @@ object FeatureSet:
       // .NET, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsBrokenCurly = isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
-      allowsBrokenCloseBracket = isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
+      allowsBrokenCloseBracket =
+        isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
       // JavaScript (with `v`)
       allowsClassDiff = isJavaScript && flagSet.unicodeSets,
       // JavaScript

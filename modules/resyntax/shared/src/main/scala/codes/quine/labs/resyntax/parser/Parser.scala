@@ -1536,12 +1536,9 @@ private[parser] final class Parser(
       val invert = currentChar == '^'
       if invert then next()
       val item = parseClassItem(!featureSet.allowsClassEmpty)
-      if currentChar == ']' then
-        next()
-        val end = offset
-        return ClassItem(ClassItemData.ClassNest(invert, item), SourceLocation(start, end))
-      assert(featureSet.allowsBrokenCloseBracket, "Unclosed ']'")
-      reset(start)
+      expect(']', "Unclosed ']'")
+      val end = offset
+      return ClassItem(ClassItemData.ClassNest(invert, item), SourceLocation(start, end))
 
     if currentChar == '\\' then
       next()
