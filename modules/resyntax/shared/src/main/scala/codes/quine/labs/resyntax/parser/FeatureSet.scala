@@ -44,6 +44,10 @@ final case class FeatureSet(
     allowsNonNameBaseRef: Boolean,
     // Ruby
     allowsZeroWidthAssertRepeat: Boolean,
+    // PCRE, Perl
+    checksClassPosixCollating: Boolean,
+    // PCRE
+    checksClassPosixOutsideClass: Boolean,
     // JavaScript (without `uv`)
     checksValidBackReference: Boolean,
     // JavaScript (without `uv`)
@@ -134,6 +138,12 @@ final case class FeatureSet(
     hasCallCommand: Boolean,
     // PCRE
     hasCallout: Boolean,
+    // Perl
+    hasClassPosixNameHeuristic: Boolean,
+    // Ruby
+    hasClassPosixNameLimit: Boolean,
+    // PCRE
+    hasClassPosixWordBoundary: Boolean,
     // .NET, PCRE, Perl, Python, Ruby
     hasConditional: Boolean,
     // PCRE, Perl
@@ -259,6 +269,10 @@ object FeatureSet:
       allowsNonNameBaseRef = isPCRE || isPerl || isRuby,
       // Ruby
       allowsZeroWidthAssertRepeat = isRuby,
+      // PCRE, Perl
+      checksClassPosixCollating = isPCRE || isPerl,
+      // PCRE
+      checksClassPosixOutsideClass = isPCRE,
       // JavaScript (without `uv`)
       checksValidBackReference = isJavaScript && !isUnicode,
       // JavaScript (without `uv`)
@@ -351,6 +365,12 @@ object FeatureSet:
       hasCallCommand = isPCRE || isPerl,
       // PCRE
       hasCallout = isPCRE,
+      // Perl
+      hasClassPosixNameHeuristic = isPerl,
+      // Ruby
+      hasClassPosixNameLimit = isRuby,
+      // PCRE
+      hasClassPosixWordBoundary = isPCRE,
       // .NET, PCRE, Perl, Python, Ruby
       hasConditional = isDotNet || isPCRE || isPerl || isPython || isRuby,
       // PCRE, Perl

@@ -460,6 +460,64 @@ class ParserSuite extends munit.FunSuite:
   check("[]", "", JavaScript)(Class(false, ClassUnion()))
   check("[[:alnum:]]", "", PCRE, Perl, Ruby)(Class(false, ClassPosix(false, "alnum")))
   check("[[:^alnum:]]", "", PCRE, Perl, Ruby)(Class(false, ClassPosix(true, "alnum")))
+  error("[[:foo:]]", "", PCRE, Perl, Ruby)("Unknown POSIX class at 1")
+  error("[[:^foo:]]", "", PCRE, Perl, Ruby)("Unknown POSIX class at 1")
+  error("[[:FOO:]]", "", PCRE, Ruby)("Unknown POSIX class at 1")
+  check("[[:FOO:]]", "", Perl):
+    Sequence(
+      Class(
+        false,
+        ClassUnion(
+          ClassLiteral('['),
+          ClassLiteral(':'),
+          ClassLiteral('F'),
+          ClassLiteral('O'),
+          ClassLiteral('O'),
+          ClassLiteral(':')
+        )
+      ),
+      Literal(']')
+    )
+  error("[[:ab:]]", "", PCRE, Ruby)("Unknown POSIX class at 1")
+  check("[[:ab:]]", "", Perl):
+    Sequence(
+      Class(
+        false,
+        ClassUnion(ClassLiteral('['), ClassLiteral(':'), ClassLiteral('a'), ClassLiteral('b'), ClassLiteral(':'))
+      ),
+      Literal(']')
+    )
+  error("[[:a:b:]]", "", PCRE, Perl)("Unknown POSIX class at 1")
+  check("[[:a:b:]]", "", Ruby):
+    Sequence(
+      Class(
+        false,
+        ClassUnion(
+          ClassLiteral('['),
+          ClassLiteral(':'),
+          ClassLiteral('a'),
+          ClassLiteral(':'),
+          ClassLiteral('b'),
+          ClassLiteral(':')
+        )
+      ),
+      Literal(']')
+    )
+  error("[[:alpha:b:]]", "", PCRE, Perl, Ruby)("Unknown POSIX class at 1")
+  check("[[:]]", "", Ruby)(Class(false, ClassNest(false, ClassLiteral(':'))))
+  check("[[:]]", "", PCRE, Perl):
+    Sequence(Class(false, ClassUnion(ClassLiteral('['), ClassLiteral(':'))), Literal(']'))
+  error("[[.a.]]", "", PCRE, Perl)("Unsupported POSIX collating element at 1")
+  error("[[=a=]]", "", PCRE, Perl)("Unsupported POSIX collating element at 1")
+  check("[[.a.]]", "", Ruby):
+    Class(false, ClassNest(false, ClassUnion(ClassLiteral('.'), ClassLiteral('a'), ClassLiteral('.'))))
+  error("[:alpha:]", "", PCRE)("POSIX class outside class at 0")
+  error("[.a.]", "", PCRE)("Unsupported POSIX collating element at 0")
+  check("[:a:]", "", DotNet, Java, JavaScript, Perl, Python, Ruby):
+    Class(false, ClassUnion(ClassLiteral(':'), ClassLiteral('a'), ClassLiteral(':')))
+  check("[[:<:]]", "", PCRE)(Class(false, ClassPosix(false, "<")))
+  check("[[:>:]]", "", PCRE)(Class(false, ClassPosix(false, ">")))
+  error("[[:<:]a]", "", PCRE)("Unknown POSIX class at 1")
   check("[[a]]", "", Java, Ruby)(Class(false, ClassNest(false, ClassLiteral('a'))))
   check("[[a]]", "v", JavaScript)(Class(false, ClassNest(false, ClassLiteral('a'))))
   check("[[^a]]", "", Java, Ruby)(Class(false, ClassNest(true, ClassLiteral('a'))))

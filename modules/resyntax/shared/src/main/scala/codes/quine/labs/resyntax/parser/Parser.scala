@@ -1435,7 +1435,20 @@ private[parser] final class Parser(
 
     val start = offset
 
+    if featureSet.hasClassPosixWordBoundary && (startWith("[[:<:]]") || startWith("[[:>:]]")) then
+      val name = source.slice(start + 3, start + 4)
+      val end = offset
+      val item = ClassItem(ClassItemData.ClassPosix(false, name), SourceLocation(start + 1, end - 1))
+      stack.push(Node(NodeData.Class(false, item), SourceLocation(start, end)))
+      return
+
     next()
+
+    if featureSet.checksClassPosixOutsideClass then
+      findClassPosixEnd(start).foreach: _ =>
+        if currentChar == ':' then fail("POSIX class outside class", start)
+        fail("Unsupported POSIX collating element", start)
+
     val invert = currentChar == '^'
     if invert then next()
 
@@ -1522,14 +1535,10 @@ private[parser] final class Parser(
   private def parseClassItemNonRange(): ClassItem =
     val start = offset
 
-    if featureSet.allowsClassPosix && startWith("[:") then
-      val invert = currentChar == '^'
-      if invert then next()
-      val name = parseID()
-      if startWith(":]") then
-        val end = offset
-        return ClassItem(ClassItemData.ClassPosix(invert, name), SourceLocation(start, end))
-      reset(start)
+    if featureSet.allowsClassPosix && currentChar == '[' then
+      parseClassPosixOption() match
+        case Some(item) => return item
+        case None       => ()
 
     if featureSet.allowsClassNest && currentChar == '[' then
       next()
@@ -1553,6 +1562,74 @@ private[parser] final class Parser(
           fail("Invalid escape sequence", start)
 
     parseClassItemLiteral()
+
+  private val ClassPosixNames: Set[String] = Set(
+    "alnum",
+    "alpha",
+    "ascii",
+    "blank",
+    "cntrl",
+    "digit",
+    "graph",
+    "lower",
+    "print",
+    "punct",
+    "space",
+    "upper",
+    "word",
+    "xdigit"
+  )
+
+  /** Parses a POSIX class like `[:alpha:]`.
+    *
+    * It returns `None` if the source does not look like a POSIX class, and it returns the `[` literal if the source
+    * looks like a POSIX class but the dialect reads it as literals.
+    */
+  private def parseClassPosixOption(): Option[ClassItem] =
+    val start = offset
+    val bodyStart = offset + 2
+    val bodyEnd = findClassPosixEnd(start) match
+      case Some(end) => end
+      case None      => return None
+
+    if source.charAt(start + 1) != ':' then fail("Unsupported POSIX collating element", start)
+
+    val body = source.slice(bodyStart, bodyEnd)
+    val invert = body.startsWith("^")
+    val name = if invert then body.drop(1) else body
+
+    if ClassPosixNames.contains(name) then
+      reset(bodyEnd + 2)
+      return Some(ClassItem(ClassItemData.ClassPosix(invert, name), SourceLocation(start, offset)))
+
+    if featureSet.hasClassPosixNameHeuristic && !isClassPosixLikeName(name) ||
+      featureSet.hasClassPosixNameLimit && !ClassPosixNames.exists(name.startsWith) &&
+      (name.length > 20 || name.exists(c => c == ':' || c == ']'))
+    then return Some(parseClassItemLiteral())
+
+    fail("Unknown POSIX class", start)
+
+  /** Finds the end of a POSIX class (or a POSIX collating element if it is supported) beginning at the given offset. */
+  private def findClassPosixEnd(start: Int): Option[Int] =
+    if start + 1 >= source.length then return None
+    val terminator = source.charAt(start + 1)
+    if !(terminator == ':' || featureSet.checksClassPosixCollating && (terminator == '.' || terminator == '=')) then
+      return None
+
+    var i = start + 2
+    while i + 1 < source.length do
+      val c = source.charAt(i)
+      val d = source.charAt(i + 1)
+      if c == '\\' && (d == ']' || d == '\\') then i += 1
+      else if c == '[' && d == terminator || c == ']' then return None
+      else if c == terminator && d == ']' then return Some(i)
+      i += 1
+    None
+
+  // Perl reads the name as literals if it is surely not meant to be a POSIX class name.
+  private def isClassPosixLikeName(name: String): Boolean =
+    3 <= name.length && name.length <= 14 &&
+      !name.exists(c => c.isUpper || c.isWhitespace || c == '\\' || c == ']')
 
   private def parseClassItemLiteral(): ClassItem =
     val value =
