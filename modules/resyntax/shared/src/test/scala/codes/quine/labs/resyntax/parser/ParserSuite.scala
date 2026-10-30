@@ -308,6 +308,10 @@ class ParserSuite extends munit.FunSuite:
   check("(?+)", "", DotNet)(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(), None))))
   error("(?i-m-s)", "", Java, PCRE, Perl, Ruby)("Invalid flag at 5")
   error("(?<\ud835\udc65>a)", "", DotNet)("Invalid identifier at 3")
+  check("(?xx)", "", PCRE, Perl):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true, verboseMore = true), None)))
+  check("(?xx)", "", DotNet, Java, Python, Ruby):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)))
   check("(?I)", "", DotNet):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None)))
   error("(?I)", "", Java, PCRE, Perl, Python, Ruby)("Invalid flag at 2")

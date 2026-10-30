@@ -1041,6 +1041,8 @@ private[parser] final class Parser(
         case 'x' =>
           if !featureSet.hasFlagX then return result
           flagSet = flagSet.copy(verbose = true)
+          if featureSet.hasFlagXX && source.slice(start, offset).contains('x') then
+            flagSet = flagSet.copy(verboseMore = true)
         case 'J' =>
           if !featureSet.hasFlagUpperJ then return result
           flagSet = flagSet.copy(dupNames = true)

@@ -37,6 +37,9 @@ class FlagSetSuite extends munit.FunSuite:
   check("u", Java, JavaScript, PCRE, Perl, Python, Ruby)(_.unicode)
   check("v", JavaScript)(_.unicodeSets)
   check("x", DotNet, Java, PCRE, Perl, Python, Ruby)(_.verbose)
+  check("x", Perl)(!_.verboseMore)
+  check("xx", Perl)(f => f.verbose && f.verboseMore)
+  check("xx", DotNet, Java, PCRE, Python, Ruby)(f => f.verbose && !f.verboseMore)
   check("y", JavaScript)(_.sticky)
 
   error("ii", JavaScript)("Duplicated flag 'i' at 1")

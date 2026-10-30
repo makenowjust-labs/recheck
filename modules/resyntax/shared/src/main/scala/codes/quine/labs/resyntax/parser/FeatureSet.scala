@@ -200,6 +200,8 @@ final case class FeatureSet(
     hasFlagU: Boolean,
     // .NET, Java, PCRE, Perl, Python, Ruby
     hasFlagX: Boolean,
+    // PCRE, Perl
+    hasFlagXX: Boolean,
     // PCRE
     hasFlagUpperJ: Boolean,
     // Python (with `b`)
@@ -478,6 +480,8 @@ object FeatureSet:
       hasFlagU = isJava || isPerl || (isPython && !isByte) || isRuby,
       // .NET, Java, PCRE, Perl, Python, Ruby
       hasFlagX = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
+      // PCRE, Perl
+      hasFlagXX = isPCRE || isPerl,
       // PCRE
       hasFlagUpperJ = isPCRE,
       // Python (with `b`)
