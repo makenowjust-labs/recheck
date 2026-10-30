@@ -23,6 +23,13 @@ class ParserCommandSuite extends ParserSuiteBase:
   check("(?('x')a)", "", PCRE, Perl, Ruby)(Command(Conditional(Named(Quote, "x"), Literal('a'))))
   check("(?(<x>)a)", "", DotNet):
     Command(Conditional(LookAround(Sequence(Literal('<'), Literal('x'), Literal('>'))), Literal('a')))
+  check("(?(<x+0>)a)", "", DotNet):
+    Command(
+      Conditional(
+        LookAround(Sequence(Literal('<'), Repeat(Literal('x'), Plus(Greedy)), Literal('0'), Literal('>'))),
+        Literal('a')
+      )
+    )
   check("(?(<1>)a|b)", "", Ruby):
     Command(Conditional(Referenced(Angle, IndexedReference(1)), Literal('a'), Literal('b')))
   check("(?('-1')a)", "", Ruby)(Command(Conditional(Referenced(Quote, RelativeReference(-1)), Literal('a'))))
