@@ -1454,6 +1454,7 @@ private[parser] final class Parser(
 
     val item = parseClassItem(!featureSet.allowsClassEmpty)
     expect(']', "Unclosed ']'")
+    checkNegatedClassSet(invert, item, start)
 
     val end = offset
     stack.push(Node(NodeData.Class(invert, item), SourceLocation(start, end)))
@@ -1462,6 +1463,8 @@ private[parser] final class Parser(
     val start = offset
 
     var item = parseClassItemUnion(first)
+    val operands = Seq.newBuilder[ClassItem]
+    val operators = mutable.Set.empty[String]
 
     var continue = true
     while continue do
@@ -1469,47 +1472,104 @@ private[parser] final class Parser(
 
       if featureSet.allowsClassIntersection && startWith("&&") then
         continue = true
+        if featureSet.checksClassSetSyntax then assert(isEnd || currentChar != '&', "Invalid class set character")
         val right = parseClassItemUnion(false)
         val end = offset
+        if !featureSet.allowsEmptyClassIntersection then
+          assert(!(isEmptyClassItem(item) && isEmptyClassItem(right)), "Invalid class set operation", start)
+        operands.addOne(item).addOne(right)
+        operators.add("&&")
         item = ClassItem(ClassItemData.ClassIntersection(item, right), SourceLocation(start, end))
 
       if featureSet.allowsClassDiff && startWith("--") then
         continue = true
         val right = parseClassItemUnion(false)
         val end = offset
+        operands.addOne(item).addOne(right)
+        operators.add("--")
         item = ClassItem(ClassItemData.ClassDiff(item, right), SourceLocation(start, end))
 
+      if featureSet.hasClassSubtraction && startWith("-[") then
+        val nestStart = offset - 1
+        val invert = currentChar == '^'
+        if invert then next()
+        val inner = parseClassItem(true)
+        expect(']', "Unclosed ']'")
+        val nest = ClassItem(ClassItemData.ClassNest(invert, inner), SourceLocation(nestStart, offset))
+        assert(isEnd || currentChar == ']', "Class subtraction must be last")
+        item = ClassItem(ClassItemData.ClassDiff(item, nest), SourceLocation(start, offset))
+
+    if featureSet.checksClassSetSyntax && operators.nonEmpty then
+      assert(operators.size == 1, "Invalid class set operation", start)
+      assert(operands.result().forall(isClassSetOperand), "Invalid class set operation", start)
+
     item
+
+  private def isEmptyClassItem(item: ClassItem): Boolean =
+    item.data == ClassItemData.ClassUnion(Seq.empty)
+
+  private def isClassSetOperand(item: ClassItem): Boolean =
+    item.data match
+      case ClassItemData.ClassUnion(_) | ClassItemData.ClassRange(_, _) => false
+      case _                                                            => true
+
+  private val PropertiesOfStrings: Set[String] = Set(
+    "Basic_Emoji",
+    "Emoji_Keycap_Sequence",
+    "RGI_Emoji_Modifier_Sequence",
+    "RGI_Emoji_Flag_Sequence",
+    "RGI_Emoji_Tag_Sequence",
+    "RGI_Emoji_ZWJ_Sequence",
+    "RGI_Emoji"
+  )
+
+  /** Tests whether the class item may contain strings (the `MayContainStrings` operation in the ECMAScript spec). */
+  private def mayContainStrings(item: ClassItem): Boolean =
+    item.data match
+      case ClassItemData.ClassUnion(items)              => items.exists(mayContainStrings)
+      case ClassItemData.ClassIntersection(left, right) => mayContainStrings(left) && mayContainStrings(right)
+      case ClassItemData.ClassDiff(left, _)             => mayContainStrings(left)
+      case ClassItemData.ClassNest(invert, item)        => !invert && mayContainStrings(item)
+      case ClassItemData.ClassBackslashClass(EscapeClassKind.QuoteSet(strings))     => strings.exists(_.size != 1)
+      case ClassItemData.ClassBackslashClass(EscapeClassKind.UnicodeProperty(name)) =>
+        PropertiesOfStrings.contains(name)
+      case _ => false
+
+  private def checkNegatedClassSet(invert: Boolean, item: ClassItem, start: Int): Unit =
+    if featureSet.checksClassSetSyntax && invert then
+      assert(!mayContainStrings(item), "Negated class may contain strings", start)
 
   private def parseClassItemUnion(first: Boolean): ClassItem =
     val start = offset
     val seq = Seq.newBuilder[ClassItem]
 
-    while (first && start == offset && !isEnd) || !isClassItemStop do parseClassItemAtom(seq)
+    while (first && start == offset && !isEnd && currentChar == ']') || !isClassItemStop(start) do
+      parseClassItemAtom(seq, start)
 
     val end = offset
     val items = seq.result()
     if items.size == 1 then return items.head
     ClassItem(ClassItemData.ClassUnion(items), SourceLocation(start, end))
 
-  private def isClassItemStop: Boolean =
+  private def isClassItemStop(start: Int): Boolean =
     isEnd ||
       currentChar == ']' ||
       featureSet.allowsClassIntersection && source.startsWith("&&", offset) ||
-      featureSet.allowsClassDiff && source.startsWith("--", offset)
+      featureSet.allowsClassDiff && source.startsWith("--", offset) ||
+      featureSet.hasClassSubtraction && start != offset && source.startsWith("-[", offset)
 
-  private def parseClassItemAtom(seq: mutable.Builder[ClassItem, Seq[ClassItem]]): Unit =
+  private def parseClassItemAtom(seq: mutable.Builder[ClassItem, Seq[ClassItem]], unionStart: Int): Unit =
     val start = offset
     val begin = parseClassItemNonRange()
 
-    if isClassItemStop || currentChar != '-' then
+    if isClassItemStop(unionStart) || currentChar != '-' then
       seq.addOne(begin)
       return
 
     val save = offset
     next()
 
-    if isClassItemStop then
+    if isClassItemStop(unionStart) then
       reset(save)
       seq.addOne(begin)
       return
@@ -1522,9 +1582,9 @@ private[parser] final class Parser(
         assert(begin.data.value <= end.data.value, "Out of order class range", start)
         seq.addOne(ClassItem(ClassItemData.ClassRange(begin, end), SourceLocation(start, endOffset)))
       case _ =>
-        if !isClassNestItem(begin) && !isClassNestItem(end) then
-          if !isValueClassItem(begin) then assert(featureSet.allowsBrokenClassRangeBegin, "Invalid class range", start)
-          else assert(featureSet.allowsBrokenClassRangeEnd, "Invalid class range", start)
+        if !isValueClassItem(begin) then
+          if !isClassNestItem(begin) then assert(featureSet.allowsBrokenClassRangeBegin, "Invalid class range", start)
+        else if !isClassNestItem(end) then assert(featureSet.allowsBrokenClassRangeEnd, "Invalid class range", start)
 
         seq.addOne(begin)
         if featureSet.consumesBrokenClassRange then
@@ -1546,6 +1606,7 @@ private[parser] final class Parser(
       if invert then next()
       val item = parseClassItem(!featureSet.allowsClassEmpty)
       expect(']', "Unclosed ']'")
+      checkNegatedClassSet(invert, item, start)
       val end = offset
       return ClassItem(ClassItemData.ClassNest(invert, item), SourceLocation(start, end))
 
@@ -1631,7 +1692,18 @@ private[parser] final class Parser(
     3 <= name.length && name.length <= 14 &&
       !name.exists(c => c.isUpper || c.isWhitespace || c == '\\' || c == ']')
 
+  private val ClassSetSyntaxCharacters: Set[Char] = "()[]{}/-\\|".toSet
+
+  private val ClassSetReservedDoublePunctuators: Set[Char] = "&!#$%*+,.:;<=>?@^`~".toSet
+
   private def parseClassItemLiteral(): ClassItem =
+    if featureSet.checksClassSetSyntax then
+      assert(!ClassSetSyntaxCharacters.contains(currentChar), "Invalid class set character")
+      assert(
+        !(ClassSetReservedDoublePunctuators
+          .contains(currentChar) && source.startsWith(s"$currentChar$currentChar", offset)),
+        "Invalid class set character"
+      )
     val value =
       if featureSet.readsAsUnicode then currentCodePoint else currentChar.toInt
     val start = offset

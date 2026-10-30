@@ -30,6 +30,8 @@ final case class FeatureSet(
     allowsClassNest: Boolean,
     // PCRE, Perl, Ruby
     allowsClassPosix: Boolean,
+    // Ruby
+    allowsEmptyClassIntersection: Boolean,
     // .NET
     allowsInvalidIdentifier: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -48,6 +50,8 @@ final case class FeatureSet(
     checksClassPosixCollating: Boolean,
     // PCRE
     checksClassPosixOutsideClass: Boolean,
+    // JavaScript (with `v`)
+    checksClassSetSyntax: Boolean,
     // JavaScript (without `uv`)
     checksValidBackReference: Boolean,
     // JavaScript (without `uv`)
@@ -144,6 +148,8 @@ final case class FeatureSet(
     hasClassPosixNameLimit: Boolean,
     // PCRE
     hasClassPosixWordBoundary: Boolean,
+    // .NET
+    hasClassSubtraction: Boolean,
     // .NET, PCRE, Perl, Python, Ruby
     hasConditional: Boolean,
     // PCRE, Perl
@@ -254,6 +260,8 @@ object FeatureSet:
       allowsClassNest = isJava || isJavaScript && flagSet.unicodeSets || isRuby,
       // PCRE, Perl, Ruby
       allowsClassPosix = isPCRE || isPerl || isRuby,
+      // Ruby
+      allowsEmptyClassIntersection = isRuby,
       // .NET
       allowsInvalidIdentifier = isDotNet,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -273,6 +281,8 @@ object FeatureSet:
       checksClassPosixCollating = isPCRE || isPerl,
       // PCRE
       checksClassPosixOutsideClass = isPCRE,
+      // JavaScript (with `v`)
+      checksClassSetSyntax = isJavaScript && flagSet.unicodeSets,
       // JavaScript (without `uv`)
       checksValidBackReference = isJavaScript && !isUnicode,
       // JavaScript (without `uv`)
@@ -371,6 +381,8 @@ object FeatureSet:
       hasClassPosixNameLimit = isRuby,
       // PCRE
       hasClassPosixWordBoundary = isPCRE,
+      // .NET
+      hasClassSubtraction = isDotNet,
       // .NET, PCRE, Perl, Python, Ruby
       hasConditional = isDotNet || isPCRE || isPerl || isPython || isRuby,
       // PCRE, Perl

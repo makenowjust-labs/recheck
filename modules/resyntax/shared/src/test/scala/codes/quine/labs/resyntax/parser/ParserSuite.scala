@@ -546,6 +546,66 @@ class ParserSuite extends munit.FunSuite:
         ClassNest(false, ClassRange(ClassLiteral('a'), ClassLiteral('c')))
       )
     )
+  check("[&&a]", "", Java, Ruby)(Class(false, ClassIntersection(ClassUnion(), ClassLiteral('a'))))
+  check("[a&&]", "", Java, Ruby)(Class(false, ClassIntersection(ClassLiteral('a'), ClassUnion())))
+  check("[&&]", "", Ruby)(Class(false, ClassIntersection(ClassUnion(), ClassUnion())))
+  error("[&&]", "", Java)("Invalid class set operation at 1")
+  check("[&&]", "", DotNet, JavaScript, PCRE, Perl, Python):
+    Class(false, ClassUnion(ClassLiteral('&'), ClassLiteral('&')))
+  check("[a-z-[aeiou]]", "", DotNet):
+    Class(
+      false,
+      ClassDiff(
+        ClassRange(ClassLiteral('a'), ClassLiteral('z')),
+        ClassNest(
+          false,
+          ClassUnion(ClassLiteral('a'), ClassLiteral('e'), ClassLiteral('i'), ClassLiteral('o'), ClassLiteral('u'))
+        )
+      )
+    )
+  check("[a-[^b]]", "", DotNet)(Class(false, ClassDiff(ClassLiteral('a'), ClassNest(true, ClassLiteral('b')))))
+  check("[\\w-[\\d]]", "", DotNet):
+    Class(false, ClassDiff(ClassBackslashClass(Word), ClassNest(false, ClassBackslashClass(Digit))))
+  check("[]-[a]]", "", DotNet)(Class(false, ClassDiff(ClassLiteral(']'), ClassNest(false, ClassLiteral('a')))))
+  check("[a-[b-[c]]]", "", DotNet):
+    Class(
+      false,
+      ClassDiff(ClassLiteral('a'), ClassNest(false, ClassDiff(ClassLiteral('b'), ClassNest(false, ClassLiteral('c')))))
+    )
+  check("[-[a]]", "", DotNet):
+    Sequence(Class(false, ClassUnion(ClassLiteral('-'), ClassLiteral('['), ClassLiteral('a'))), Literal(']'))
+  error("[a-z-[aeiou]b]", "", DotNet)("Class subtraction must be last at 12")
+  error("[\\w-[\\d]]", "", PCRE, Python, Ruby)("Invalid class range at 1")
+  check("[a&&b]", "v", JavaScript)(Class(false, ClassIntersection(ClassLiteral('a'), ClassLiteral('b'))))
+  check("[a--b--c]", "v", JavaScript):
+    Class(false, ClassDiff(ClassDiff(ClassLiteral('a'), ClassLiteral('b')), ClassLiteral('c')))
+  error("[ab&&c]", "v", JavaScript)("Invalid class set operation at 1")
+  error("[a&&bc]", "v", JavaScript)("Invalid class set operation at 1")
+  error("[a&&b--c]", "v", JavaScript)("Invalid class set operation at 1")
+  error("[a-z&&b]", "v", JavaScript)("Invalid class set operation at 1")
+  error("[&&a]", "v", JavaScript)("Invalid class set operation at 1")
+  error("[a--]", "v", JavaScript)("Invalid class set operation at 1")
+  error("[a&&&b]", "v", JavaScript)("Invalid class set character at 4")
+  error("[a!!b]", "v", JavaScript)("Invalid class set character at 2")
+  check("[a!b]", "v", JavaScript)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('!'), ClassLiteral('b'))))
+  error("[(]", "v", JavaScript)("Invalid class set character at 1")
+  error("[a-]", "v", JavaScript)("Invalid class set character at 2")
+  error("[-a]", "v", JavaScript)("Invalid class set character at 1")
+  error("[a-[b]]", "v", JavaScript)("Invalid class set character at 2")
+  error("[\\w-a]", "v", JavaScript)("Invalid class range at 1")
+  error("[^\\q{ab}]", "v", JavaScript)("Negated class may contain strings at 0")
+  error("[^[\\q{ab}]]", "v", JavaScript)("Negated class may contain strings at 0")
+  error("[[^\\q{ab}]]", "v", JavaScript)("Negated class may contain strings at 1")
+  error("[^\\p{RGI_Emoji}]", "v", JavaScript)("Negated class may contain strings at 0")
+  check("[^\\q{a}]", "v", JavaScript)(Class(true, ClassBackslashClass(QuoteSet(Seq(Seq(QuoteValue('a')))))))
+  check("[^\\q{ab}&&a]", "v", JavaScript):
+    Class(
+      true,
+      ClassIntersection(
+        ClassBackslashClass(QuoteSet(Seq(Seq(QuoteValue('a'), QuoteValue('b'))))),
+        ClassLiteral('a')
+      )
+    )
   check("[\\q{abc|def}]", "v", JavaScript):
     Class(
       false,
