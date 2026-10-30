@@ -200,6 +200,7 @@ class ParserSuite extends munit.FunSuite:
   check("(?(*nlb:a)b)", "", PCRE, Perl):
     Command(Conditional(LookAround(NegativeLookBehind(Abbrev), Literal('a')), Literal('b')))
   check("(?(.)b)", "", DotNet)(Command(Conditional(LookAround(Dot), Literal('b'))))
+  check("(?(?:.)b)", "", DotNet)(Command(Conditional(LookAround(Dot), Literal('b'))))
   error("(?(.)b)", "", PCRE, Perl)("Invalid condition at 3")
   check("(?(0)a)", "", DotNet)(Command(Conditional(Indexed(0), Literal('a'))))
   error("(?(0)a)", "", PCRE, Perl, Python, Ruby)("Invalid condition at 3")

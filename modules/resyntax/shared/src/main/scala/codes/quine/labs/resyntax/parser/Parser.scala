@@ -506,6 +506,8 @@ private[parser] final class Parser(
           if parseLookAroundTest(stack, start, symbolic, alphabetic, abbrev, la) then boundary.break()
 
       if featureSet.hasBareLookAroundTest then
+        // .NET reads `(?(?:x)...)` and `(?(?>x)...)` as `(?(x)...)` because the condition is a look-ahead.
+        if !startWith("?:") then startWith("?>")
         parseLookAroundConditional(stack, None, start)
         boundary.break()
 
