@@ -398,6 +398,15 @@ class ParserSuite extends munit.FunSuite:
   check("(*non_atomic_positive_lookbehind:a)", "", PCRE)(Group(NonAtomicPositiveLookBehind(Alphabetic), Literal('a')))
   check("(*naplb:a)", "", PCRE)(Group(NonAtomicPositiveLookBehind(Abbrev), Literal('a')))
   check("(*:x)", "", PCRE, Perl)(Command(BacktrackControl(None, Some("x"))))
+  check("(*scan_substring:(1)a)", "", PCRE)(Group(ScanSubstring(Alphabetic, Seq(IndexedReference(1))), Literal('a')))
+  check("(*scs:(-1,<x>,'y')a)", "", PCRE):
+    Group(
+      ScanSubstring(Abbrev, Seq(RelativeReference(-1), NamedReference("x"), NamedReference("y"))),
+      Literal('a')
+    )
+  error("(*scs:(x)a)", "", PCRE)("Invalid group at 7")
+  error("(*scs:(1,)a)", "", PCRE)("Invalid group at 9")
+  error("(*scs:(1)a)", "", Perl)("Invalid group at 2")
   check("(*:a b-c)", "", PCRE, Perl)(Command(BacktrackControl(None, Some("a b-c"))))
   error("(*:)", "", PCRE, Perl)("Invalid group at 3")
   error("(*MARK)", "", PCRE, Perl)("Invalid group at 6")

@@ -846,6 +846,14 @@ private[parser] final class Parser(
       for (alphabetic, abbrev, kind) <- AlphabeticGroups do
         if parseAlphabetic(stack, start, alphabetic, abbrev, kind) then boundary.break()
 
+      if featureSet.hasScanSubstring then
+        if startWith("scan_substring:") then
+          parseScanSubstringGroup(stack, AssertNameStyle.Alphabetic, start)
+          boundary.break()
+        if startWith("scs:") then
+          parseScanSubstringGroup(stack, AssertNameStyle.Abbrev, start)
+          boundary.break()
+
       expect(':', "Invalid group")
       val name = parseBacktrackControlName()
       assert(name.nonEmpty, "Invalid group")
@@ -894,6 +902,29 @@ private[parser] final class Parser(
           boundary.break(true)
 
       false
+
+  private def parseScanSubstringGroup(stack: mutable.Stack[Node], style: AssertNameStyle, start: Int): Unit =
+    expect('(', "Invalid group")
+    val refs = Seq.newBuilder[Reference.BaseReference]
+    refs.addOne(parseScanSubstringReference())
+    while !isEnd && currentChar == ',' do
+      next()
+      refs.addOne(parseScanSubstringReference())
+    expect(')', "Invalid group")
+    parseGroupBody(stack, GroupKind.ScanSubstring(style, refs.result()), start)
+
+  private def parseScanSubstringReference(): Reference.BaseReference =
+    (currentChar: @switch) match
+      case '<' | '\'' =>
+        val end = if currentChar == '<' then '>' else '\''
+        next()
+        Reference.NamedReference(parseGroupName(end))
+      case '+' | '-' =>
+        val sign = if currentChar == '-' then -1 else 1
+        next()
+        Reference.RelativeReference(sign * parseIntOption().getOrElse(fail("Invalid group")))
+      case _ =>
+        Reference.IndexedReference(parseIntOption().getOrElse(fail("Invalid group")))
 
   private def parseBacktrackControlName(): String =
     val start = offset

@@ -169,6 +169,7 @@ private[ir] class IRBuilder(
     case GroupKind.NonAtomicPositiveLookBehind(_) => Left(buildNonAtomicPositiveLookBehindGroup(node))
     case GroupKind.ScriptRun(_)                   => Left(buildScriptRunGroup(node))
     case GroupKind.AtomicScriptRun(_)             => Left(buildAtomicScriptRunGroup(node))
+    case GroupKind.ScanSubstring(_, _)            => Left(buildScanSubstringGroup(node))
     case GroupKind.InlineFlag(diff)               => Right(buildInlineFlagGroup(diff, child))
     case GroupKind.ResetFlag(flagSet)             => Right(buildResetFlagGroup(flagSet, child))
     case GroupKind.Absence                        => Left(buildAbsenceGroup(node))
@@ -204,6 +205,9 @@ private[ir] class IRBuilder(
     IRNodeData.Unsupported(node.data)
 
   def buildScriptRunGroup(node: Node): IRNodeData =
+    IRNodeData.Unsupported(node.data)
+
+  def buildScanSubstringGroup(node: Node): IRNodeData =
     IRNodeData.Unsupported(node.data)
 
   def buildAtomicScriptRunGroup(node: Node): IRNodeData =

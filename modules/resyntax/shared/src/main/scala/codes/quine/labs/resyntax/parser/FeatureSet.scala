@@ -249,6 +249,8 @@ final case class FeatureSet(
     // PCRE
     hasVersionTest: Boolean,
     // PCRE
+    hasScanSubstring: Boolean,
+    // PCRE
     hasStartOption: Boolean,
     // Python
     processBackslashInLineComment: Boolean,
@@ -522,6 +524,8 @@ object FeatureSet:
       hasQuoteNamedCapture = isDotNet || isPCRE || isPerl || isRuby,
       // PCRE
       hasVersionTest = isPCRE,
+      // PCRE
+      hasScanSubstring = isPCRE,
       // PCRE
       hasStartOption = isPCRE,
       // Python
