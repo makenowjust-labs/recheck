@@ -196,12 +196,11 @@ private[parser] final class Parser(
         assert(featureSet.allowsLookAheadRepeat, "Nothing to repeat")
       case NodeData.Group(_: GroupKind.PositiveLookBehind | _: GroupKind.NegativeLookBehind, _) =>
         assert(featureSet.allowsLookBehindRepeat, "Nothing to repeat")
-      case NodeData.Caret | NodeData.Dollar =>
+      case NodeData.Caret | NodeData.Dollar | NodeData.Backslash(_: BackslashKind.Assert) =>
         assert(featureSet.allowsZeroWidthAssertRepeat, "Nothing to repeat")
       case NodeData.Repeat(_, _) =>
         assert(featureSet.allowsNestedRepeat, "Nested quantifier")
       case _ =>
-        // TODO: backslash assertion
         ()
 
   private def pushRepeat(stack: mutable.Stack[Node], node: Node, quantifier: Quantifier): Unit =

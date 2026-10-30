@@ -38,7 +38,7 @@ final case class FeatureSet(
     allowsNestedRepeat: Boolean,
     // PCRE, Perl, Ruby
     allowsNonNameBaseRef: Boolean,
-    // Ruby
+    // .NET, Java, Perl, Ruby
     allowsZeroWidthAssertRepeat: Boolean,
     // JavaScript (without `uv`)
     checksValidBackReference: Boolean,
@@ -246,8 +246,8 @@ object FeatureSet:
       allowsNestedRepeat = isRuby,
       // PCRE, Perl, Ruby
       allowsNonNameBaseRef = isPCRE || isPerl || isRuby,
-      // Ruby
-      allowsZeroWidthAssertRepeat = isRuby,
+      // .NET, Java, Perl, Ruby
+      allowsZeroWidthAssertRepeat = isDotNet || isJava || isPerl || isRuby,
       // JavaScript (without `uv`)
       checksValidBackReference = isJavaScript && !isUnicode,
       // Ruby
