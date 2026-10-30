@@ -76,6 +76,9 @@ private[parser] final class Parser(
 
   private val groupNames: mutable.Map[String, Seq[List[(Int, Int, Boolean)]]] = mutable.Map.empty
 
+  /** The offset of the first reference by a group number, which Ruby rejects in a pattern with named captures. */
+  private var numberedReferenceOffset: Option[Int] = None
+
   // Ruby's `\u{X Y}` is read as the first code point, and the rest are kept here until the caller takes them.
   private var pendingCodePoints: List[Int] = Nil
 
@@ -84,6 +87,8 @@ private[parser] final class Parser(
     if !isEnd then
       assert(currentChar == ')', "Unexpected")
       fail("Unmatched ')'")
+    if featureSet.rejectsNumberedReferenceWithNamedCapture && groupNames.nonEmpty then
+      for pos <- numberedReferenceOffset do fail("Numbered reference with named capture", pos)
     node
 
   private def parseDisjunction(isBranchReset: Boolean = false): Node =
@@ -438,6 +443,7 @@ private[parser] final class Parser(
       val indexStart = offset
       for n <- parseIntOption() do
         assert(n != 0 || featureSet.allowsZeroIndexedCaptureTest, "Invalid condition", indexStart)
+        markNumberedReference(indexStart)
         assert(
           source.charAt(indexStart) != '0' || featureSet.allowsLeadingZeroInCaptureTest,
           "Invalid condition",
@@ -1399,6 +1405,7 @@ private[parser] final class Parser(
         val start = offset
         val index = parseIntOption().get
         assert(index != 0, "Invalid backslash escape", start)
+        markNumberedReference(start)
         Reference.IndexedReference(index)
       case '-' =>
         parseRelativeReference()
@@ -1420,7 +1427,9 @@ private[parser] final class Parser(
 
     (currentChar: @switch) match
       case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
+        val start = offset
         val index = parseIntOption().getOrElse(fail("Invalid backslash escape"))
+        if index != 0 then markNumberedReference(start)
         Reference.IndexedReference(index)
       case '+' if featureSet.allowsForwardRelativeReference =>
         parseRelativeReference()
@@ -1429,8 +1438,12 @@ private[parser] final class Parser(
       case _ =>
         Reference.NamedReference(parseGroupNameBody(end))
 
+  private def markNumberedReference(pos: Int): Unit =
+    if numberedReferenceOffset.isEmpty then numberedReferenceOffset = Some(pos)
+
   private def parseRelativeReference(): Reference.RelativeReference =
     assert(currentChar == '-' || featureSet.allowsForwardRelativeReference, "Invalid backslash escape")
+    markNumberedReference(offset)
     val sign = if currentChar == '-' then -1 else 1
     next()
     val start = offset
@@ -1885,6 +1898,7 @@ private[parser] final class Parser(
 
     if featureSet.rejectsInvalidBackReference && n > analysis.captureSize then fail("Invalid back-reference", save)
 
+    markNumberedReference(save)
     BackslashKind.EscapeBackReference(BackReferenceStyle.BareBackReference, Reference.IndexedReference(n))
 
   private def parseBoundedDigits(continues: Int => Boolean): Int =

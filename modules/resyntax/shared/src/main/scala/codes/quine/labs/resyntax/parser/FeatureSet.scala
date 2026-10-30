@@ -370,6 +370,8 @@ final case class FeatureSet(
     readsThreeOctalDigitsAsOctal: Boolean,
     // JavaScript (with `uv`)
     rejectsInvalidBackReference: Boolean,
+    // Ruby
+    rejectsNumberedReferenceWithNamedCapture: Boolean,
     // Python, Ruby
     processBackslashInCommentGroup: Boolean,
     // Java, JavaScript (with `uv`), Perl, PCRE (with `u`), Python (without `b`), Ruby
@@ -772,6 +774,8 @@ object FeatureSet:
       readsThreeOctalDigitsAsOctal = isPython,
       // JavaScript (with `uv`)
       rejectsInvalidBackReference = isJavaScript && isUnicode,
+      // Ruby
+      rejectsNumberedReferenceWithNamedCapture = isRuby,
       // Python, Ruby
       processBackslashInCommentGroup = isPython || isRuby,
       // Java, JavaScript (with `uv`), Perl, PCRE (with `u`), Python (without `b`), Ruby

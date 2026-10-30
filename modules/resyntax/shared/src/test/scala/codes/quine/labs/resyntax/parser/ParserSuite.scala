@@ -572,6 +572,26 @@ class ParserSuite extends munit.FunSuite:
   check("\\k<foo>", "", DotNet, Java, PCRE, Perl, Ruby):
     Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("foo")))
   check("\\k<1>", "", Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), IndexedReference(1))))
+  error("(?<n>a)\\1", "", Ruby)("Numbered reference with named capture at 8")
+  error("\\1(?'n'a)", "", Ruby)("Numbered reference with named capture at 1")
+  error("(?<n>a)\\k<1>", "", Ruby)("Numbered reference with named capture at 10")
+  error("(?<n>a)\\k'-1'", "", Ruby)("Numbered reference with named capture at 10")
+  error("(?<n>a)\\g<1>", "", Ruby)("Numbered reference with named capture at 10")
+  error("(?<n>a)\\g<+1>", "", Ruby)("Numbered reference with named capture at 10")
+  error("(?<n>a)(?(1)b)", "", Ruby)("Numbered reference with named capture at 10")
+  check("(?<n>a)\\g<0>", "", Ruby):
+    Sequence(Group(NamedCapture(Angle, "n"), Literal('a')), Backslash(EscapeCall(Angle, IndexedReference(0))))
+  check("(?<n>a)\\k<n+0>", "", Ruby):
+    Sequence(
+      Group(NamedCapture(Angle, "n"), Literal('a')),
+      Backslash(EscapeBackReference(KBackReference(Angle), LeveledReference(NamedReference("n"), 0)))
+    )
+  check("(?<n>a)(a)\\1", "", PCRE, Perl):
+    Sequence(
+      Group(NamedCapture(Angle, "n"), Literal('a')),
+      Group(IndexedCapture, Literal('a')),
+      Backslash(EscapeBackReference(BareBackReference, IndexedReference(1)))
+    )
   check("\\k<+1>", "", Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("+1"))))
   check("\\k<-1>", "", Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), RelativeReference(-1))))
   check("\\k<1+0>", "", Ruby):
