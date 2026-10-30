@@ -35,13 +35,15 @@ import codes.quine.labs.resyntax.parser.Parser.ParsingContext
 object Parser:
   private[parser] final case class ParsingContext(
       inClass: Boolean,
-      skipsComment: Boolean
+      skipsComment: Boolean,
+      allowsDuplicatedGroupName: Boolean
   )
 
   private[parser] object ParsingContext:
     def from(featureSet: FeatureSet): ParsingContext = ParsingContext(
       inClass = false,
-      skipsComment = featureSet.skipsComment
+      skipsComment = featureSet.skipsComment,
+      allowsDuplicatedGroupName = featureSet.allowsDuplicatedGroupName
     )
 
   def parse(source: String, flagSet: FlagSet, dialect: Dialect): Node =
@@ -64,6 +66,17 @@ private[parser] final class Parser(
 
   private var context: ParsingContext = ParsingContext.from(featureSet)
 
+  private var sequenceStart: Int = 0
+
+  private var startOptionEnd: Int = 0
+
+  private var disjunctionCount: Int = 0
+
+  /** A list of (disjunction ID, alternative index, whether it is a branch reset) of enclosing alternatives. */
+  private var alternativePath: List[(Int, Int, Boolean)] = Nil
+
+  private val groupNames: mutable.Map[String, Seq[List[(Int, Int, Boolean)]]] = mutable.Map.empty
+
   def parse(): Node =
     val node = parseDisjunction()
     if !isEnd then
@@ -71,14 +84,22 @@ private[parser] final class Parser(
       fail("Unmatched ')'")
     node
 
-  private def parseDisjunction(): Node =
+  private def parseDisjunction(isBranchReset: Boolean = false): Node =
     val start = offset
     val builder = Seq.newBuilder[Node]
+    val id = disjunctionCount
+    disjunctionCount += 1
+    val savedAlternativePath = alternativePath
+    var index = 0
+    alternativePath = (id, index, isBranchReset) :: savedAlternativePath
     builder.addOne(parseSequence())
 
     while !isEnd && currentChar == '|' do
       next()
+      index += 1
+      alternativePath = (id, index, isBranchReset) :: savedAlternativePath
       builder.addOne(parseSequence())
+    alternativePath = savedAlternativePath
 
     val nodes = builder.result()
     if nodes.size == 1 then return nodes.head
@@ -90,7 +111,10 @@ private[parser] final class Parser(
     val start = offset
     val stack = mutable.Stack.empty[Node]
 
+    val savedSequenceStart = sequenceStart
+    sequenceStart = start
     while !isSequenceStop do parseSequenceItem(stack)
+    sequenceStart = savedSequenceStart
 
     val nodes = stack.toSeq
     if nodes.size == 1 then return nodes.head
@@ -200,6 +224,16 @@ private[parser] final class Parser(
         assert(featureSet.allowsZeroWidthAssertRepeat, "Nothing to repeat")
       case NodeData.Repeat(_, _) =>
         assert(featureSet.allowsNestedRepeat, "Nested quantifier")
+      case NodeData.Command(
+            _: CommandKind.InlineFlag | _: CommandKind.ResetFlag | _: CommandKind.StartOption | CommandKind.Callout |
+            _: CommandKind.CalloutInt | _: CommandKind.CalloutString
+          ) =>
+        fail("Nothing to repeat")
+      case NodeData.Command(CommandKind.BacktrackControl(kind, _)) =>
+        assert(
+          featureSet.allowsBacktrackControlRepeat || kind == Some(BacktrackControlKind.Accept),
+          "Nothing to repeat"
+        )
       case _ =>
         // TODO: backslash assertion
         ()
@@ -269,6 +303,10 @@ private[parser] final class Parser(
         parseNamedCallGroup(stack, start)
       case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
         parseIndexedCallGroup(stack, start)
+      case '+' if featureSet.allowsInlineFlagSign =>
+        parseSignedInlineFlagGroup(stack, start)
+      case '-' if featureSet.allowsInlineFlagSign =>
+        parseSignedInlineFlagGroup(stack, start)
       case '+' =>
         parsePlusGroup(stack, start)
       case '-' =>
@@ -283,6 +321,8 @@ private[parser] final class Parser(
         parseEmbedCodeGroup(stack, start)
       case 'C' =>
         parseCalloutGroup(stack, start)
+      case _ if featureSet.allowsInlineFlagSign =>
+        parseSignedInlineFlagGroup(stack, start)
       case _ =>
         parseInlineFlagGroup(stack, start)
 
@@ -294,7 +334,7 @@ private[parser] final class Parser(
     assert(featureSet.hasBranchReset, "Invalid group")
     next()
     protectContext:
-      val node = parseDisjunction()
+      val node = parseDisjunction(isBranchReset = true)
       closeGroup()
       val nodes = node.data match
         case NodeData.Disjunction(nodes) => nodes
@@ -347,7 +387,22 @@ private[parser] final class Parser(
   private def parseAbsenceGroup(stack: mutable.Stack[Node], start: Int): Unit =
     assert(featureSet.hasAbsenceOperator, "Invalid group")
     next()
-    parseGroupBody(stack, GroupKind.Absence, start)
+    if isEnd || currentChar != '|' then
+      parseGroupBody(stack, GroupKind.Absence, start)
+      return
+
+    next()
+    if !isEnd && currentChar == ')' then
+      pushCommand(stack, CommandKind.AbsenceRangeClear, start)
+      return
+
+    protectContext:
+      val absent = protectContext(parseSequence())
+      if !isEnd && currentChar == '|' then
+        next()
+        val exp = protectContext(parseDisjunction())
+        pushCommand(stack, CommandKind.AbsenceExpression(absent, exp), start)
+      else pushCommand(stack, CommandKind.AbsenceStopper(absent), start)
 
   private val LookAroundTests: Seq[(String, String, String, AssertNameStyle => GroupKind.LookAround)] = Seq(
     ("?=", "*positive_lookahead:", "*pla:", GroupKind.PositiveLookAhead(_)),
@@ -361,26 +416,34 @@ private[parser] final class Parser(
     next()
 
     boundary:
+      val indexStart = offset
       for n <- parseIntOption() do
+        assert(n != 0 || featureSet.allowsZeroIndexedCaptureTest, "Invalid condition", indexStart)
+        assert(
+          source.charAt(indexStart) != '0' || featureSet.allowsLeadingZeroInCaptureTest,
+          "Invalid condition",
+          indexStart
+        )
         closeCondition()
         parseConditionalGroupBody(stack, ConditionalTest.Indexed(n), start)
         boundary.break()
 
       if featureSet.hasNamedCaptureTest && currentChar == '<' then
         next()
-        val name = parseName(end = '>')
+        val name = parseGroupName(end = '>')
         closeCondition()
         parseConditionalGroupBody(stack, ConditionalTest.Named(NameStyle.Angle, name), start)
         boundary.break()
 
       if featureSet.hasNamedCaptureTest && currentChar == '\'' then
         next()
-        val name = parseName(end = '\'')
+        val name = parseGroupName(end = '\'')
         closeCondition()
         parseConditionalGroupBody(stack, ConditionalTest.Named(NameStyle.Quote, name), start)
         boundary.break()
 
-      if featureSet.hasDefineTest && startWith("DEFINE") then
+      if featureSet.hasDefineTest && startWith("DEFINE)") then
+        reset(offset - 1)
         closeCondition()
         parseConditionalGroupBody(stack, ConditionalTest.Define, start)
         boundary.break()
@@ -390,13 +453,20 @@ private[parser] final class Parser(
         if lt then next()
         expect('=', "Invalid condition")
         val major = parseIntOption().getOrElse(fail("Invalid condition"))
-        expect('.', "Invalid condition")
-        val minor = parseIntOption().getOrElse(fail("Invalid condition"))
+        val minor =
+          if !isEnd && currentChar == '.' then
+            next()
+            parseIntOption().getOrElse(fail("Invalid condition"))
+          else 0
         closeCondition()
         parseConditionalGroupBody(stack, ConditionalTest.Version(lt, major, minor), start)
         boundary.break()
 
-      if currentChar == 'R' && featureSet.hasRecursionTest then
+      val isRecursionTest =
+        currentChar == 'R' && offset + 1 < source.length && (source.charAt(offset + 1) match
+          case ')' | '&' => true
+          case c         => CodePointUtil.isDigit(c))
+      if featureSet.hasRecursionTest && isRecursionTest then
         next()
         (currentChar: @switch) match
           case ')' =>
@@ -404,7 +474,7 @@ private[parser] final class Parser(
             parseConditionalGroupBody(stack, ConditionalTest.RRecursion, start)
           case '&' =>
             next()
-            val name = parseID()
+            val name = parseGroupNameBody()
             closeCondition()
             parseConditionalGroupBody(stack, ConditionalTest.NamedRecursion(name), start)
           case _ =>
@@ -413,8 +483,8 @@ private[parser] final class Parser(
             parseConditionalGroupBody(stack, ConditionalTest.IndexedRecursion(n), start)
         boundary.break()
 
-      if featureSet.hasBareNamedCaptureTest && isIDStart then
-        val name = parseID()
+      if featureSet.hasBareNamedCaptureTest && isGroupNameStart then
+        val name = parseGroupNameBody()
         closeCondition()
         parseConditionalGroupBody(stack, ConditionalTest.Named(NameStyle.Bare, name), start)
         boundary.break()
@@ -435,6 +505,9 @@ private[parser] final class Parser(
         for (symbolic, alphabetic, abbrev, la) <- LookAroundTests do
           if parseLookAroundTest(stack, start, symbolic, alphabetic, abbrev, la) then boundary.break()
 
+      if featureSet.hasBareLookAroundTest then
+        // .NET reads `(?(?:x)...)` and `(?(?>x)...)` as `(?(x)...)` because the condition is a look-ahead.
+        if !startWith("?:") then startWith("?>")
         parseLookAroundConditional(stack, None, start)
         boundary.break()
 
@@ -446,6 +519,7 @@ private[parser] final class Parser(
   private def parseConditionalGroupBody(stack: mutable.Stack[Node], test: ConditionalTest, start: Int): Unit =
     protectContext:
       val yes = protectContext(parseSequence())
+      if test == ConditionalTest.Define then assert(isEnd || currentChar != '|', "Invalid condition")
       val no = Option.when(!isEnd && currentChar == '|'):
         next()
         protectContext(parseSequence())
@@ -498,17 +572,18 @@ private[parser] final class Parser(
       parseBalanceGroup(stack, end, style, start)
       return
 
-    val name = parseName(end = end)
+    val name = parseGroupName(end = end)
+    addGroupName(name, start)
     parseGroupBody(stack, GroupKind.NamedCapture(style, name), start)
 
   private def parseBalanceGroup(stack: mutable.Stack[Node], end: Char, style: NameStyle, start: Int): Unit =
     if currentChar == '-' then
       next()
-      val test = parseName(end = end)
+      val test = parseGroupName(end = end)
       parseGroupBody(stack, GroupKind.Balance(style, None, test), start)
       return
 
-    val name = parseID()
+    val name = parseGroupNameBody()
     if currentChar == end then
       next()
       parseGroupBody(stack, GroupKind.NamedCapture(style, name), start)
@@ -516,7 +591,7 @@ private[parser] final class Parser(
 
     if currentChar == '-' then
       next()
-      val test = parseName(end = end)
+      val test = parseGroupName(end = end)
       parseGroupBody(stack, GroupKind.Balance(style, Some(name), test), start)
       return
 
@@ -528,19 +603,30 @@ private[parser] final class Parser(
     (currentChar: @switch) match
       case '<' =>
         next()
-        val name = parseName(end = '>')
+        val name = parseGroupName(end = '>')
+        addGroupName(name, start)
         parseGroupBody(stack, GroupKind.PNamedCapture(name), start)
       case '=' =>
         next()
-        val name = parseID()
+        val name = parseGroupNameBody()
         pushCommand(stack, CommandKind.PBackReference(name), start)
       case '>' =>
         assert(featureSet.hasPCall, "Invalid group")
         next()
-        val name = parseID()
+        val name = parseGroupNameBody()
         pushCommand(stack, CommandKind.PNamedCall(name), start)
       case _ =>
         fail("Invalid group")
+
+  private def addGroupName(name: String, start: Int): Unit =
+    val paths = groupNames.getOrElse(name, Seq.empty)
+    if !context.allowsDuplicatedGroupName then
+      for path <- paths do
+        val exclusive = path.exists: (id, index, isBranchReset) =>
+          (isBranchReset || featureSet.allowsDuplicatedGroupNameInAlternatives) &&
+            alternativePath.exists((id2, index2, _) => id == id2 && index != index2)
+        assert(exclusive, "Duplicated group name", start)
+    groupNames(name) = paths :+ alternativePath
 
   private def parseRGroup(stack: mutable.Stack[Node], start: Int): Unit =
     assert(featureSet.hasRCall, "Invalid group")
@@ -550,7 +636,7 @@ private[parser] final class Parser(
   private def parseNamedCallGroup(stack: mutable.Stack[Node], start: Int): Unit =
     assert(featureSet.hasCallCommand, "Invalid group")
     next()
-    val name = parseID()
+    val name = parseGroupNameBody()
     pushCommand(stack, CommandKind.NamedCall(name), start)
 
   private def parseIndexedCallGroup(stack: mutable.Stack[Node], start: Int): Unit =
@@ -571,25 +657,25 @@ private[parser] final class Parser(
         assert(featureSet.hasCallCommand, "Invalid group")
         pushCommand(stack, CommandKind.RelativeCall(-n), start)
       case None =>
-        assert(featureSet.hasInlineFlag, "Invalid group")
-        val added = FlagSet()
-        val removed = parseFlagSet()
-        val diff = FlagSetDiff(added, Some(removed))
+        assert(featureSet.hasInlineFlagGroup, "Invalid group")
+        val removedStart = offset
+        val (removed, removedFlags) = parseFlagSet(removing = true)
+        checkInlineFlagRemoval("", removedFlags, removedStart)
+        val diff = FlagSetDiff(FlagSet(), Some(removed))
         (currentChar: @switch) match
           case ')' =>
-            pushCommand(stack, CommandKind.InlineFlag(FlagSetDiff(added, Some(removed))), start)
-            applyFlagSetDiff(diff)
+            pushInlineFlagCommand(stack, diff, start)
           case ':' =>
             next()
             applyFlagSetDiffWith(diff):
-              parseGroupBody(stack, GroupKind.InlineFlag(FlagSetDiff(added, Some(removed))), start)
+              parseGroupBody(stack, GroupKind.InlineFlag(diff), start)
           case _ =>
             fail("Invalid group")
 
   private def parseResetFlagGroup(stack: mutable.Stack[Node], start: Int): Unit =
     assert(featureSet.hasResetFlag, "Invalid group")
     next()
-    val flagSet = parseFlagSet()
+    val (flagSet, _) = parseFlagSet(resetting = true)
     (currentChar: @switch) match
       case ')' =>
         pushCommand(stack, CommandKind.ResetFlag(flagSet), start)
@@ -644,6 +730,7 @@ private[parser] final class Parser(
       case _ =>
         parseIntOption() match
           case Some(value) =>
+            assert(value <= 255, "Invalid group")
             pushCommand(stack, CommandKind.CalloutInt(value), start)
           case None =>
             pushCommand(stack, CommandKind.Callout, start)
@@ -662,14 +749,16 @@ private[parser] final class Parser(
     code
 
   private def parseInlineFlagGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasInlineFlag, "Invalid group")
+    assert(featureSet.hasInlineFlagGroup, "Invalid group")
 
-    val added = parseFlagSet()
+    val (added, addedFlags) = parseFlagSet()
 
     (currentChar: @switch) match
       case '-' =>
         next()
-        val removed = parseFlagSet()
+        val removedStart = offset
+        val (removed, removedFlags) = parseFlagSet(removing = true)
+        checkInlineFlagRemoval(addedFlags, removedFlags, removedStart)
         val diff = FlagSetDiff(added, Some(removed))
         (currentChar: @switch) match
           case ':' =>
@@ -686,12 +775,59 @@ private[parser] final class Parser(
         applyFlagSetDiffWith(diff):
           parseGroupBody(stack, GroupKind.InlineFlag(diff), start)
       case ')' =>
+        assert(addedFlags.nonEmpty || featureSet.allowsEmptyInlineFlag, "Invalid flag")
         val diff = FlagSetDiff(added, None)
         pushInlineFlagCommand(stack, diff, start)
       case _ =>
         fail("Invalid flag")
 
+  /** Parses an inline flag group with any sequence of flags and signs (e.g. `(?i-m+s)`). */
+  private def parseSignedInlineFlagGroup(stack: mutable.Stack[Node], start: Int): Unit =
+    val flagsStart = offset
+    var added = FlagSet()
+    var removed: Option[FlagSet] = None
+    var removing = false
+    boundary:
+      while !isEnd do
+        if currentChar == '+' then
+          removing = false
+          next()
+        else if currentChar == '-' then
+          removing = true
+          if removed.isEmpty then removed = Some(FlagSet())
+          next()
+        else
+          val (flagSet, flags) = parseFlagSet(removing = removing, initial = if removing then removed.get else added)
+          if removing then removed = Some(flagSet) else added = flagSet
+          if flags.isEmpty then boundary.break()
+    assert(offset > flagsStart || featureSet.allowsEmptyInlineFlag, "Invalid flag")
+
+    val diff = FlagSetDiff(added, removed)
+    (currentChar: @switch) match
+      case ':' =>
+        next()
+        applyFlagSetDiffWith(diff):
+          parseGroupBody(stack, GroupKind.InlineFlag(diff), start)
+      case ')' =>
+        pushInlineFlagCommand(stack, diff, start)
+      case _ =>
+        fail("Invalid flag")
+
+  private def checkInlineFlagRemoval(addedFlags: String, removedFlags: String, removedStart: Int): Unit =
+    if removedFlags.isEmpty then
+      if addedFlags.isEmpty then assert(featureSet.allowsEmptyInlineFlagDiff, "Invalid flag")
+      else assert(featureSet.allowsEmptyInlineFlagRemoval, "Invalid flag")
+    if !featureSet.allowsToggledInlineFlag then
+      for (c, i) <- removedFlags.zipWithIndex do if addedFlags.contains(c) then fail("Invalid flag", removedStart + i)
+
   private def pushInlineFlagCommand(stack: mutable.Stack[Node], diff: FlagSetDiff, start: Int): Unit =
+    assert(featureSet.hasInlineFlag, "Invalid group", start)
+    if diff.removed.isDefined then assert(featureSet.hasInlineFlagRemovalCommand, "Invalid group", start)
+    if featureSet.requiresInlineFlagAtStart then
+      val atStart = sequenceStart == 0 && stack.forall:
+        case Node(NodeData.Command(_: CommandKind.InlineFlag | _: CommandKind.Comment), _) => true
+        case _                                                                             => false
+      assert(atStart, "Inline flag not at the start", start)
     pushCommand(stack, CommandKind.InlineFlag(diff), start)
     if featureSet.hasIncomprehensiveInlineFlag then parseOpaqueDisjunction(stack, diff)
     else applyFlagSetDiff(diff)
@@ -709,6 +845,7 @@ private[parser] final class Parser(
   private val BacktrackControls = Seq(
     ("ACCEPT", BacktrackControlKind.Accept),
     ("FAIL", BacktrackControlKind.Fail),
+    ("F", BacktrackControlKind.F),
     ("MARK", BacktrackControlKind.Mark),
     ("COMMIT", BacktrackControlKind.Commit),
     ("PRUNE", BacktrackControlKind.Prune),
@@ -739,15 +876,100 @@ private[parser] final class Parser(
     next()
 
     boundary:
+      if featureSet.hasStartOption && start == startOptionEnd && parseStartOption(stack, start) then
+        startOptionEnd = offset
+        boundary.break()
+
       for (command, kind) <- BacktrackControls do
         if parseBacktrackControl(stack, start, command, kind) then boundary.break()
 
       for (alphabetic, abbrev, kind) <- AlphabeticGroups do
         if parseAlphabetic(stack, start, alphabetic, abbrev, kind) then boundary.break()
 
+      if featureSet.hasScanSubstring then
+        if startWith("scan_substring:") then
+          parseScanSubstringGroup(stack, AssertNameStyle.Alphabetic, start)
+          boundary.break()
+        if startWith("scs:") then
+          parseScanSubstringGroup(stack, AssertNameStyle.Abbrev, start)
+          boundary.break()
+
       expect(':', "Invalid group")
-      val name = parseID()
+      val name = parseBacktrackControlName()
+      assert(name.nonEmpty, "Invalid group")
       pushCommand(stack, CommandKind.BacktrackControl(None, Some(name)), start)
+
+  private val StartOptions = Seq(
+    "UTF8",
+    "UTF",
+    "UCP",
+    "NO_AUTO_POSSESS",
+    "NO_DOTSTAR_ANCHOR",
+    "NO_JIT",
+    "NO_START_OPT",
+    "NOTEMPTY_ATSTART",
+    "NOTEMPTY",
+    "CASELESS_RESTRICT",
+    "TURKISH_CASING",
+    "CR",
+    "LF",
+    "CRLF",
+    "ANYCRLF",
+    "ANY",
+    "NUL",
+    "BSR_ANYCRLF",
+    "BSR_UNICODE"
+  )
+
+  private val LimitStartOptions = Seq("LIMIT_DEPTH", "LIMIT_HEAP", "LIMIT_MATCH", "LIMIT_RECURSION")
+
+  private def parseStartOption(stack: mutable.Stack[Node], start: Int): Boolean =
+    boundary:
+      for name <- StartOptions do
+        if source.startsWith(s"$name)", offset) then
+          // PCRE2 accepts `(*TURKISH_CASING)` only with `(*UTF)` among the leading options, even with the `u` flag.
+          if name == "TURKISH_CASING" then
+            val options = "^(?:\\(\\*[A-Z0-9_=]+\\))*".r.findPrefixOf(source).getOrElse("")
+            assert(options.contains("(*UTF)") || options.contains("(*UTF8)"), "Invalid group")
+          reset(offset + name.length)
+          pushCommand(stack, CommandKind.StartOption(name, None), start)
+          boundary.break(true)
+
+      for name <- LimitStartOptions do
+        if startWith(s"$name=") then
+          val value = parseIntOption().getOrElse(fail("Invalid group"))
+          pushCommand(stack, CommandKind.StartOption(name, Some(value)), start)
+          boundary.break(true)
+
+      false
+
+  private def parseScanSubstringGroup(stack: mutable.Stack[Node], style: AssertNameStyle, start: Int): Unit =
+    expect('(', "Invalid group")
+    val refs = Seq.newBuilder[Reference.BaseReference]
+    refs.addOne(parseScanSubstringReference())
+    while !isEnd && currentChar == ',' do
+      next()
+      refs.addOne(parseScanSubstringReference())
+    expect(')', "Invalid group")
+    parseGroupBody(stack, GroupKind.ScanSubstring(style, refs.result()), start)
+
+  private def parseScanSubstringReference(): Reference.BaseReference =
+    (currentChar: @switch) match
+      case '<' | '\'' =>
+        val end = if currentChar == '<' then '>' else '\''
+        next()
+        Reference.NamedReference(parseGroupName(end))
+      case '+' | '-' =>
+        val sign = if currentChar == '-' then -1 else 1
+        next()
+        Reference.RelativeReference(sign * parseIntOption().getOrElse(fail("Invalid group")))
+      case _ =>
+        Reference.IndexedReference(parseIntOption().getOrElse(fail("Invalid group")))
+
+  private def parseBacktrackControlName(): String =
+    val start = offset
+    while !isEnd && currentChar != ')' do next()
+    source.slice(start, offset)
 
   private def parseBacktrackControl(
       stack: mutable.Stack[Node],
@@ -760,10 +982,12 @@ private[parser] final class Parser(
     (currentChar: @switch) match
       case ':' =>
         next()
-        val name = parseID()
+        val name = parseBacktrackControlName()
+        assert(name.nonEmpty || kind != BacktrackControlKind.Mark, "Invalid group")
         pushCommand(stack, CommandKind.BacktrackControl(Some(kind), Some(name)), start)
         true
       case ')' =>
+        assert(kind != BacktrackControlKind.Mark, "Invalid group")
         pushCommand(stack, CommandKind.BacktrackControl(Some(kind), None), start)
         true
       case _ =>
@@ -800,50 +1024,88 @@ private[parser] final class Parser(
   private def closeGroup(): Unit =
     expect(')', "Unclosed group")
 
-  private def parseFlagSet(): FlagSet =
-    var flagSet = FlagSet()
+  /** Parses inline flag letters, and returns the flag set and the source string of the letters. */
+  private def parseFlagSet(
+      removing: Boolean = false,
+      resetting: Boolean = false,
+      initial: FlagSet = FlagSet()
+  ): (FlagSet, String) =
+    val start = offset
+    var flagSet = initial
+    def result: (FlagSet, String) = (flagSet, source.slice(start, offset))
     while !isEnd do
-      (currentChar: @switch) match
+      val c = if featureSet.ignoresInlineFlagCase then currentChar.toLower else currentChar
+      (c: @switch) match
         case 'i' =>
           flagSet = flagSet.copy(ignoreCase = true)
         case 'm' =>
           flagSet = flagSet.copy(multiline = true)
         case 'x' =>
+          if !featureSet.hasFlagX then return result
           flagSet = flagSet.copy(verbose = true)
+          if featureSet.hasFlagXX && source.slice(start, offset).contains('x') then
+            flagSet = flagSet.copy(verboseMore = true)
         case 'J' =>
-          if !featureSet.hasFlagUpperJ then return flagSet
+          if !featureSet.hasFlagUpperJ then return result
           flagSet = flagSet.copy(dupNames = true)
         case 'L' =>
-          if !featureSet.hasFlagUpperL then return flagSet
+          if !featureSet.hasFlagUpperL then return result
           flagSet = flagSet.copy(localeUpper = true)
         case 'U' =>
-          if !featureSet.hasFlagUpperU then return flagSet
+          if !featureSet.hasFlagUpperU then return result
           flagSet = flagSet.copy(ungreedy = true)
         case 'a' =>
-          if !featureSet.hasFlagA then return flagSet
+          if !featureSet.hasFlagA then return result
           flagSet = flagSet.copy(ascii = true)
+        case 'c' =>
+          if !featureSet.hasFlagC then return result
+          flagSet = flagSet.copy(continue = true)
         case 'd' =>
-          if !featureSet.hasFlagD then return flagSet
+          if !featureSet.hasFlagD then return result
           flagSet = flagSet.copy(hasIndices = true)
+        case 'g' =>
+          if !featureSet.hasFlagG then return result
+          flagSet = flagSet.copy(global = true)
         case 'l' =>
-          if !featureSet.hasFlagL then return flagSet
+          if !featureSet.hasFlagL then return result
           flagSet = flagSet.copy(localeLower = true)
         case 'n' =>
-          if !featureSet.hasFlagN then return flagSet
+          if !featureSet.hasFlagN then return result
           flagSet = flagSet.copy(explicitCapture = true)
+        case 'o' =>
+          if !featureSet.hasFlagO then return result
+          flagSet = flagSet.copy(once = true)
         case 'p' =>
-          if !featureSet.hasFlagP then return flagSet
+          if !featureSet.hasFlagP then return result
           flagSet = flagSet.copy(preserve = true)
+        case 'r' =>
+          if !featureSet.hasFlagR then return result
+          flagSet = flagSet.copy(nonDestructive = true)
         case 's' =>
-          if !featureSet.hasFlagS then return flagSet
+          if !featureSet.hasFlagS then return result
           flagSet = flagSet.copy(dotAll = true)
         case 'u' =>
-          if !featureSet.hasFlagU then return flagSet
+          if !featureSet.hasFlagU then return result
           flagSet = flagSet.copy(unicode = true)
         case _ =>
-          return flagSet
+          return result
+      checkFlag(c, source.slice(start, offset), removing, resetting)
       next()
-    flagSet
+    result
+
+  private val CharsetFlags = "adluL"
+
+  private def checkFlag(c: Char, previous: String, removing: Boolean, resetting: Boolean): Unit =
+    if !featureSet.allowsDuplicatedInlineFlag && previous.contains(c) then fail("Duplicated flag")
+    if !CharsetFlags.contains(c) then return
+    if removing && featureSet.checksCharsetInlineFlagRemoval then fail("Invalid flag")
+    // Perl rejects `(?^d)` because `d` is the default character set.
+    if resetting && c == 'd' then fail("Invalid flag")
+    if featureSet.checksCharsetInlineFlagConflict && previous.exists(p => CharsetFlags.contains(p) && p != c) then
+      fail("Invalid flag")
+    // Perl accepts `a` up to twice (`aa`), and the other character set flags only once.
+    if featureSet.checksCharsetInlineFlagCount && previous.count(_ == c) >= (if c == 'a' then 2 else 1) then
+      fail("Duplicated flag")
 
   private def parseCaret(stack: mutable.Stack[Node]): Unit =
     val start = offset
@@ -1750,6 +2012,8 @@ private[parser] final class Parser(
   private def applyFlagSetDiff(diff: FlagSetDiff): Unit =
     if diff.added.verbose then context = context.copy(skipsComment = true)
     if diff.removed.exists(_.verbose) then context = context.copy(skipsComment = false)
+    if diff.added.dupNames then context = context.copy(allowsDuplicatedGroupName = true)
+    if diff.removed.exists(_.dupNames) then context = context.copy(allowsDuplicatedGroupName = false)
 
   private def applyFlagSetDiffWith(diff: FlagSetDiff)(body: => Unit): Unit =
     protectContext:
@@ -1759,17 +2023,101 @@ private[parser] final class Parser(
   private def applyResetFlag(flagSet: FlagSet): Unit =
     context = context.copy(skipsComment = false)
     if flagSet.verbose then context = context.copy(skipsComment = true)
+    if flagSet.dupNames then context = context.copy(allowsDuplicatedGroupName = true)
 
   private def applyResetFlagWith(flagSet: FlagSet)(body: => Unit): Unit =
     protectContext:
       applyResetFlag(flagSet)
       body
 
-  private def parseName(end: Char): String =
-    val name = parseID()
+  private def parseGroupName(end: Char): String =
+    val name = parseGroupNameBody(end)
     assert(!isEnd && currentChar == end, "Invalid identifier")
     next()
     name
+
+  /** Parses a group name, and returns the name with escape sequences decoded. */
+  private def parseGroupNameBody(end: Char = ')'): String =
+    val start = offset
+
+    if featureSet.allowsLooseGroupName then
+      assert(!isEnd && currentChar != end && currentChar != '-' && !isDigit, "Invalid identifier")
+      while !isEnd && currentChar != end do
+        assert(currentChar != ')', "Invalid identifier")
+        next()
+      return source.slice(start, offset)
+
+    if featureSet.allowsNumberGroupName && isDigit then
+      val n = parseIntOption().get
+      assert(n != 0, "Invalid identifier", start)
+      return source.slice(start, offset)
+
+    val name = new java.lang.StringBuilder
+    boundary:
+      while !isEnd do
+        val save = offset
+        val c =
+          if featureSet.allowsEscapeInGroupName && currentChar == '\\' then parseGroupNameEscape()
+          else
+            val c = currentCodePoint
+            nextCodePoint(c)
+            c
+        if c < 0 || !(if name.length == 0 then isGroupNameStart(c) else isGroupNameContinue(c)) then
+          reset(save)
+          boundary.break()
+        name.appendCodePoint(c)
+
+    assert(name.length > 0, "Invalid identifier", start)
+    if featureSet.limitsGroupNameLength then assert(offset - start <= 128, "Invalid identifier", start)
+    name.toString
+
+  /** Parses a `\\u` escape sequence in a group name, and returns its code point or `-1` if it is invalid. */
+  private def parseGroupNameEscape(): Int =
+    next()
+    if isEnd || currentChar != 'u' then return -1
+    next()
+    if !isEnd && currentChar == '{' then
+      next()
+      val value = parseHexIntOption().getOrElse(-1)
+      if value < 0 || value > 0x10ffff || isEnd || currentChar != '}' then return -1
+      next()
+      return value
+
+    val high = parseHex4()
+    if CodePointUtil.isHighSurrogate(high) && source.startsWith("\\u", offset) then
+      val save = offset
+      reset(offset + 2)
+      val low = parseHex4()
+      if CodePointUtil.isLowSurrogate(low) then return CodePointUtil.decodeSurrogatePair(high, low)
+      reset(save)
+    high
+
+  private def parseHex4(): Int =
+    val start = offset
+    for _ <- 1 to 4 do
+      if !isHexDigit then return -1
+      next()
+    Integer.parseInt(source.slice(start, offset), 16)
+
+  private def isGroupNameStart: Boolean =
+    !isEnd && isGroupNameStart(currentCodePoint)
+
+  private def isGroupNameStart(c: Int): Boolean =
+    if 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' then true
+    else if c == '_' then featureSet.allowsUnderscoreInGroupName
+    else if c == '$' then featureSet.allowsDollarInGroupName
+    else if c < 0x80 then false
+    else if featureSet.allowsUnicodeIdentifierGroupName then Character.isUnicodeIdentifierStart(c)
+    else if featureSet.allowsUnicodeWordGroupName then
+      (c < 0x10000 || featureSet.readsAsUnicode) && Character.isLetter(c)
+    else false
+
+  private def isGroupNameContinue(c: Int): Boolean =
+    if c < 0x80 then CodePointUtil.isDigit(c) || isGroupNameStart(c)
+    else if featureSet.allowsUnicodeIdentifierGroupName then Character.isUnicodeIdentifierPart(c)
+    else if featureSet.allowsUnicodeWordGroupName then
+      (c < 0x10000 || featureSet.readsAsUnicode) && Character.isLetterOrDigit(c)
+    else false
 
   private def parseID(): String =
     val start = offset

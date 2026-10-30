@@ -17,6 +17,7 @@ package codes.quine.labs.resyntax.ast
   *   "?<*" | "*non_atomic_positive_lookbehind" | "*naplb"
   *   "*script_run" | "*sr"
   *   "*atomic_script_run" | "*asr"
+  *   ("*scan_substring" | "*scs") ":(" Reference ("," Reference)* ")"
   *   "?" FlagSetDiff ":"
   *   "?^" FlagSet ":"
   *   "?~"
@@ -70,6 +71,9 @@ object GroupKind:
 
   /** AtomicScriptRun is a kind of atomic script run group (e.g. `(*atomic_script_run:...)`). */
   final case class AtomicScriptRun(style: AssertNameStyle) extends GroupKind
+
+  /** ScanSubstring is a kind of scan substring group (e.g. `(*scan_substring:(1)...)`). */
+  final case class ScanSubstring(style: AssertNameStyle, refs: Seq[Reference.BaseReference]) extends GroupKind
 
   /** InlineFlag is a kind of inline flag group (e.g. `(?im-x:...)`). */
   final case class InlineFlag(diff: FlagSetDiff) extends GroupKind

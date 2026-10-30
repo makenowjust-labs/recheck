@@ -62,33 +62,35 @@ class ParserSuite extends munit.FunSuite:
   // Repeat:
   check("a*", "", All*)(Repeat(Literal('a'), Star(Greedy)))
   check("a*?", "", All*)(Repeat(Literal('a'), Star(Lazy)))
-  check("a*+", "", Java, PCRE, Perl, Ruby)(Repeat(Literal('a'), Star(Possessive)))
+  check("a*+", "", Java, PCRE, Perl, Python, Ruby)(Repeat(Literal('a'), Star(Possessive)))
   check("a+", "", All*)(Repeat(Literal('a'), Plus(Greedy)))
   check("a+?", "", All*)(Repeat(Literal('a'), Plus(Lazy)))
-  check("a++", "", Java, PCRE, Perl, Ruby)(Repeat(Literal('a'), Plus(Possessive)))
+  check("a++", "", Java, PCRE, Perl, Python, Ruby)(Repeat(Literal('a'), Plus(Possessive)))
   check("a?", "", All*)(Repeat(Literal('a'), Question(Greedy)))
   check("a??", "", All*)(Repeat(Literal('a'), Question(Lazy)))
-  check("a?+", "", Java, PCRE, Perl, Ruby)(Repeat(Literal('a'), Question(Possessive)))
+  check("a?+", "", Java, PCRE, Perl, Python, Ruby)(Repeat(Literal('a'), Question(Possessive)))
   check("a{2}", "", All*)(Repeat(Literal('a'), Exact(2, Greedy)))
   check("a{2}?", "", DotNet, Java, JavaScript, PCRE, Perl, Python)(Repeat(Literal('a'), Exact(2, Lazy)))
   check("a{2}?", "", Ruby)(Repeat(Repeat(Literal('a'), Exact(2, Greedy)), Question(Greedy)))
-  check("a{2}+", "", Java, PCRE, Perl)(Repeat(Literal('a'), Exact(2, Possessive)))
+  check("a{2}+", "", Java, PCRE, Perl, Python)(Repeat(Literal('a'), Exact(2, Possessive)))
   check("a{2}+", "", Ruby)(Repeat(Repeat(Literal('a'), Exact(2, Greedy)), Plus(Greedy)))
   check("a{2,}", "", All*)(Repeat(Literal('a'), Unbounded(2, Greedy)))
   check("a{2,}?", "", All*)(Repeat(Literal('a'), Unbounded(2, Lazy)))
-  check("a{2,}+", "", Java, PCRE, Perl, Ruby)(Repeat(Literal('a'), Unbounded(2, Possessive)))
+  check("a{2,}+", "", Java, PCRE, Perl, Python, Ruby)(Repeat(Literal('a'), Unbounded(2, Possessive)))
   check("a{2,3}", "", All*)(Repeat(Literal('a'), Bounded(2, 3, Greedy)))
   check("a{2,3}?", "", All*)(Repeat(Literal('a'), Bounded(2, 3, Lazy)))
-  check("a{2,3}+", "", Java, PCRE, Perl, Ruby)(Repeat(Literal('a'), Bounded(2, 3, Possessive)))
+  check("a{2,3}+", "", Java, PCRE, Perl, Python, Ruby)(Repeat(Literal('a'), Bounded(2, 3, Possessive)))
   check("a{,3}", "", Perl, Python, Ruby)(Repeat(Literal('a'), MaxBounded(3, Greedy)))
   check("a{,3}?", "", Perl, Python, Ruby)(Repeat(Literal('a'), MaxBounded(3, Lazy)))
-  check("a{,3}+", "", Perl, Ruby)(Repeat(Literal('a'), MaxBounded(3, Possessive)))
+  check("a{,3}+", "", Perl, Python, Ruby)(Repeat(Literal('a'), MaxBounded(3, Possessive)))
   check("a{", "", DotNet, JavaScript, PCRE, Perl, Python, Ruby)(Sequence(Literal('a'), Literal('{')))
   error("a{", "", Java)("Incomplete quantifier at 1")
   error("a{", "u", JavaScript)("Incomplete quantifier at 1")
   error("*", "", All*)("Nothing to repeat at 0")
   check("a**", "", Ruby)(Repeat(Repeat(Literal('a'), Star(Greedy)), Star(Greedy)))
   error("a**", "", DotNet, Java, JavaScript, PCRE, Perl, Python)("Nested quantifier at 2")
+  error("a*++", "", Java, PCRE, Perl, Python)("Nested quantifier at 3")
+  error("a*+", "", DotNet, JavaScript)("Nested quantifier at 2")
   error("^*", "", DotNet, Java, JavaScript, PCRE, Perl, Python)("Nothing to repeat at 1")
   error("$*", "", DotNet, Java, JavaScript, PCRE, Perl, Python)("Nothing to repeat at 1")
   error("(?=a)*", "u", JavaScript)("Nothing to repeat at 5")
@@ -106,11 +108,60 @@ class ParserSuite extends munit.FunSuite:
   check("(?<!a)", "", All*)(Group(NegativeLookBehind(Symbolic), Literal('a')))
   check("(?<*a)", "", PCRE)(Group(NonAtomicPositiveLookBehind(Symbolic), Literal('a')))
   check("(?<x>a)", "", DotNet, Java, JavaScript, PCRE, Perl, Ruby)(Group(NamedCapture(Angle, "x"), Literal('a')))
+  check("(?<a_1>a)", "", DotNet, JavaScript, PCRE, Perl, Ruby)(Group(NamedCapture(Angle, "a_1"), Literal('a')))
+  error("(?<a_1>a)", "", Java)("Invalid identifier at 4")
+  check("(?<_>a)", "", DotNet, JavaScript, PCRE, Perl, Ruby)(Group(NamedCapture(Angle, "_"), Literal('a')))
+  error("(?<_>a)", "", Java)("Invalid identifier at 3")
+  check("(?<$>a)", "", JavaScript, Ruby)(Group(NamedCapture(Angle, "$"), Literal('a')))
+  error("(?<$>a)", "", DotNet, Java, PCRE, Perl)("Invalid identifier at 3")
+  error("(?<1a>a)", "", Java, JavaScript, PCRE, Perl, Ruby)("Invalid identifier at 3")
+  error("(?<1a>a)", "", DotNet)("Invalid identifier at 4")
+  check("(?<1>a)", "", DotNet)(Group(NamedCapture(Angle, "1"), Literal('a')))
+  error("(?<0>a)", "", DotNet)("Invalid identifier at 3")
+  check("(?<é>a)", "", DotNet, JavaScript, Ruby)(Group(NamedCapture(Angle, "é"), Literal('a')))
+  check("(?<é>a)", "u", PCRE)(Group(NamedCapture(Angle, "é"), Literal('a')))
+  error("(?<é>a)", "", Java, PCRE, Perl)("Invalid identifier at 3")
+  check("(?<\\u{41}\\u0042>a)", "", JavaScript)(Group(NamedCapture(Angle, "AB"), Literal('a')))
+  check("(?<\\ud835\\udc65>a)", "", JavaScript)(Group(NamedCapture(Angle, "\ud835\udc65"), Literal('a')))
+  error("(?<\\u0031>a)", "", JavaScript)("Invalid identifier at 3")
+  check("(?<a-b>a)", "", Ruby)(Group(NamedCapture(Angle, "a-b"), Literal('a')))
+  check("(?<\\w+[>a)", "", Ruby)(Group(NamedCapture(Angle, "\\w+["), Literal('a')))
+  error("(?<-a>a)", "", Ruby)("Invalid identifier at 3")
+  error("(?<a)>a)", "", Ruby)("Invalid identifier at 4")
+  check(s"(?<${"a" * 128}>a)", "", PCRE)(Group(NamedCapture(Angle, "a" * 128), Literal('a')))
+  error(s"(?<${"a" * 129}>a)", "", PCRE)("Invalid identifier at 3")
+  check("(?P<é>a)", "", Python)(Group(PNamedCapture("é"), Literal('a')))
+  error("(?P<$>a)", "", PCRE, Perl, Python)("Invalid identifier at 4")
+  check("(?<x>a)(?<x>b)", "", DotNet, Perl, Ruby):
+    Sequence(Group(NamedCapture(Angle, "x"), Literal('a')), Group(NamedCapture(Angle, "x"), Literal('b')))
+  check("(?<x>a)(?<x>b)", "J", PCRE):
+    Sequence(Group(NamedCapture(Angle, "x"), Literal('a')), Group(NamedCapture(Angle, "x"), Literal('b')))
+  error("(?<x>a)(?<x>b)", "", Java, JavaScript, PCRE)("Duplicated group name at 7")
+  error("(?P<x>a)(?P<x>b)", "", PCRE, Python)("Duplicated group name at 8")
+  check("(?<x>a)(?J)(?<x>b)", "", PCRE):
+    Sequence(
+      Group(NamedCapture(Angle, "x"), Literal('a')),
+      Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(dupNames = true), None))),
+      Group(NamedCapture(Angle, "x"), Literal('b'))
+    )
+  error("(?J:(?<x>a))(?<x>b)", "", PCRE)("Duplicated group name at 12")
+  check("(?<x>a)|(?<x>b)", "", JavaScript):
+    Disjunction(Group(NamedCapture(Angle, "x"), Literal('a')), Group(NamedCapture(Angle, "x"), Literal('b')))
+  error("(?<x>a)|(?<x>b)", "", Java, PCRE)("Duplicated group name at 8")
+  error("(?:(?<x>a)|(?<x>b))(?<x>c)", "", JavaScript)("Duplicated group name at 19")
+  check("(?|(?<x>a)|(?<x>b))", "", PCRE, Perl):
+    Command(BranchReset(Group(NamedCapture(Angle, "x"), Literal('a')), Group(NamedCapture(Angle, "x"), Literal('b'))))
+  error("(?|(?<x>a)|(?<x>b))(?<x>c)", "", PCRE)("Duplicated group name at 19")
   check("(?<x-y>a)", "", DotNet)(Group(Balance(Angle, Some("x"), "y"), Literal('a')))
+  check("(?<x-1>a)", "", DotNet)(Group(Balance(Angle, Some("x"), "1"), Literal('a')))
   check("(?<-y>a)", "", DotNet)(Group(Balance(Angle, None, "y"), Literal('a')))
-  check("(?>a)", "", DotNet, Java, PCRE, Perl, Ruby)(Group(Atomic(Symbolic), Literal('a')))
+  check("(?>a)", "", DotNet, Java, PCRE, Perl, Python, Ruby)(Group(Atomic(Symbolic), Literal('a')))
   check("(?*a)", "", PCRE)(Group(NonAtomicPositiveLookAhead(Symbolic), Literal('a')))
   check("(?~a)", "", Ruby)(Group(Absence, Literal('a')))
+  check("(?~|a|b|c)", "", Ruby)(Command(AbsenceExpression(Literal('a'), Disjunction(Literal('b'), Literal('c')))))
+  check("(?~|a)", "", Ruby)(Command(AbsenceStopper(Literal('a'))))
+  check("(?~|)", "", Ruby)(Command(AbsenceRangeClear))
+  error("(?~|a)", "", DotNet, Java, JavaScript, PCRE, Perl, Python)("Invalid group at 2")
   check("(?(1)a)", "", DotNet, PCRE, Perl, Python, Ruby)(Command(Conditional(Indexed(1), Literal('a'))))
   check("(?(1)a|b)", "", DotNet, PCRE, Perl, Python, Ruby)(Command(Conditional(Indexed(1), Literal('a'), Literal('b'))))
   check("(?(<x>)a)", "", DotNet, PCRE, Perl, Ruby)(Command(Conditional(Named(Angle, "x"), Literal('a'))))
@@ -148,7 +199,19 @@ class ParserSuite extends munit.FunSuite:
     Command(Conditional(LookAround(NegativeLookBehind(Alphabetic), Literal('a')), Literal('b')))
   check("(?(*nlb:a)b)", "", PCRE, Perl):
     Command(Conditional(LookAround(NegativeLookBehind(Abbrev), Literal('a')), Literal('b')))
-  check("(?(.)b)", "", DotNet, PCRE, Perl)(Command(Conditional(LookAround(Dot), Literal('b'))))
+  check("(?(.)b)", "", DotNet)(Command(Conditional(LookAround(Dot), Literal('b'))))
+  check("(?(?:.)b)", "", DotNet)(Command(Conditional(LookAround(Dot), Literal('b'))))
+  error("(?(.)b)", "", PCRE, Perl)("Invalid condition at 3")
+  check("(?(0)a)", "", DotNet)(Command(Conditional(Indexed(0), Literal('a'))))
+  error("(?(0)a)", "", PCRE, Perl, Python, Ruby)("Invalid condition at 3")
+  check("(?(01)a)", "", DotNet, PCRE, Python, Ruby)(Command(Conditional(Indexed(1), Literal('a'))))
+  error("(?(01)a)", "", Perl)("Invalid condition at 3")
+  error("(?(DEFINE)a|b)", "", PCRE, Perl)("Invalid condition at 11")
+  check("(?(DEFINEx)a)", "", PCRE)(Command(Conditional(Named(Bare, "DEFINEx"), Literal('a'))))
+  check("(?(Rx)a)", "", PCRE)(Command(Conditional(Named(Bare, "Rx"), Literal('a'))))
+  error("(?(Rx)a)", "", Perl)("Invalid condition at 3")
+  check("(?(VERSION>=10)a)", "", PCRE)(Command(Conditional(Version(lt = true, 10, 0), Literal('a'))))
+  error("(?(VERSION>=10.)a)", "", PCRE)("Invalid condition at 15")
   check("(?'x'a)", "", DotNet, PCRE, Perl, Ruby)(Group(NamedCapture(Quote, "x"), Literal('a')))
   check("(?'x-y'a)", "", DotNet)(Group(Balance(Quote, Some("x"), "y"), Literal('a')))
   check("(?'-y'a)", "", DotNet)(Group(Balance(Quote, None, "y"), Literal('a')))
@@ -160,18 +223,28 @@ class ParserSuite extends munit.FunSuite:
   check("(?1)", "", PCRE, Perl)(Command(IndexedCall(1)))
   check("(?+1)", "", PCRE, Perl)(Command(RelativeCall(1)))
   check("(?-1)", "", PCRE, Perl)(Command(RelativeCall(-1)))
-  check("(?-x)", "", DotNet, Java, PCRE, Perl, Python, Ruby):
+  check("(?-x)", "", DotNet, Java, PCRE, Perl, Ruby):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(verbose = true)))))
+  error("(?-x)", "", Python)("Invalid group at 0")
   check("(?-x:a)", "", DotNet, Java, PCRE, Perl, Python, Ruby):
     Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(verbose = true)))), Literal('a'))
+  check("(?-i:a)", "", JavaScript):
+    Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(ignoreCase = true)))), Literal('a'))
+  error("(?-i)", "", JavaScript)("Invalid group at 0")
   check("(?^x)", "", PCRE, Perl)(Command(CommandKind.ResetFlag(FlagSet(verbose = true))))
   check("(?^x:a)", "", PCRE, Perl)(Group(GroupKind.ResetFlag(FlagSet(verbose = true)), Literal('a')))
+  check("(?^)", "", PCRE, Perl)(Command(CommandKind.ResetFlag(FlagSet())))
+  check("(?^aa)", "", PCRE, Perl)(Command(CommandKind.ResetFlag(FlagSet(ascii = true))))
+  error("(?^d)", "", Perl)("Invalid flag at 3")
+  error("(?^-i)", "", PCRE, Perl)("Invalid group at 3")
   check("(?#x)", "", DotNet, PCRE, Perl, Python, Ruby)(Command(Comment("x")))
   check("(?#x\\)y)", "", Python, Ruby)(Command(Comment("x\\)y")))
   check("(?{x})", "", Perl)(Command(InlineCode("x")))
   check("(??{x})", "", Perl)(Command(EmbedCode("x")))
   check("(?C)", "", PCRE)(Command(Callout))
   check("(?C1)", "", PCRE)(Command(CalloutInt(1)))
+  error("(?C256)", "", PCRE)("Invalid group at 6")
+  error("a(?C1)*", "", PCRE)("Nothing to repeat at 6")
   check("(?C{x})", "", PCRE)(Command(CalloutString('{', '}', "x")))
   check("(?C{x{{y}}z})", "", PCRE)(Command(CalloutString('{', '}', "x{{y}}z")))
   for delim <- Seq('`', '\'', '"', '^', '%', '#', '$') do
@@ -190,29 +263,101 @@ class ParserSuite extends munit.FunSuite:
   error("(?L)", "", DotNet, Java, PCRE, Perl, Python, Ruby)("Invalid flag at 2")
   check("(?U)", "", Java):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ungreedy = true), None)))
-  error("(?U)", "", DotNet, PCRE, Perl, Python, Ruby)("Invalid flag at 2")
-  check("(?a)", "", Perl, Python, Ruby):
+  check("(?U)", "", PCRE):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ungreedy = true), None)))
+  error("(?U)", "", DotNet, Perl, Python, Ruby)("Invalid flag at 2")
+  check("(?a)", "", PCRE, Perl, Python, Ruby):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true), None)))
-  error("(?a)", "", DotNet, Java, PCRE)("Invalid flag at 2")
+  error("(?a)", "", DotNet, Java)("Invalid flag at 2")
+  check("(?c)", "", Java, Perl):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(continue = true), None)))
+  error("(?c)", "", DotNet, PCRE, Python, Ruby)("Invalid flag at 2")
   check("(?d)", "", Java, Perl, Ruby):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(hasIndices = true), None)))
   error("(?d)", "", DotNet, PCRE, Python)("Invalid flag at 2")
+  check("(?g)", "", Perl):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(global = true), None)))
+  error("(?g)", "", DotNet, Java, PCRE, Python, Ruby)("Invalid flag at 2")
   check("(?l)", "", Perl):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(localeLower = true), None)))
   error("(?l)", "", DotNet, Java, PCRE, Python, Ruby)("Invalid flag at 2")
   check("(?n)", "", DotNet, PCRE, Perl):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(explicitCapture = true), None)))
   error("(?n)", "", Java, Python, Ruby)("Invalid flag at 2")
+  check("(?o)", "", Perl):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(once = true), None)))
+  error("(?o)", "", DotNet, Java, PCRE, Python, Ruby)("Invalid flag at 2")
   check("(?p)", "", Perl):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(preserve = true), None)))
   error("(?p)", "", DotNet, Java, PCRE, Python, Ruby)("Invalid flag at 2")
+  check("(?r)", "", PCRE):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(nonDestructive = true), None)))
+  error("(?r)", "", DotNet, Java, Perl, Python, Ruby)("Invalid flag at 2")
   check("(?s)", "", DotNet, Java, PCRE, Perl, Python):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(dotAll = true), None)))
   error("(?s)", "", Ruby)("Invalid flag at 2")
   check("(?u)", "", Java, Perl, Python, Ruby):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(unicode = true), None)))
   error("(?u)", "", DotNet, PCRE)("Invalid flag at 2")
-  check("a(?x)b|c", "", DotNet, Java, PCRE, Perl, Python):
+  error("(?u)", "b", Python)("Invalid flag at 2")
+  check("(?i-m+s-x)", "", DotNet):
+    Command(
+      CommandKind.InlineFlag(
+        FlagSetDiff(FlagSet(ignoreCase = true, dotAll = true), Some(FlagSet(multiline = true, verbose = true)))
+      )
+    )
+  check("(?+)", "", DotNet)(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(), None))))
+  error("(?i-m-s)", "", Java, PCRE, Perl, Ruby)("Invalid flag at 5")
+  error("(?<\ud835\udc65>a)", "", DotNet)("Invalid identifier at 3")
+  check("(?xx)", "", PCRE, Perl):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true, verboseMore = true), None)))
+  check("(?xx)", "", DotNet, Java, Python, Ruby):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)))
+  check("(?I)", "", DotNet):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None)))
+  error("(?I)", "", Java, PCRE, Perl, Python, Ruby)("Invalid flag at 2")
+  check("(?)", "", Java, PCRE, Perl)(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(), None))))
+  error("(?)", "", DotNet, Python, Ruby)("Invalid flag at 2")
+  check("(?-)", "", DotNet, Java, PCRE, Perl, Ruby):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet()))))
+  error("(?-:a)", "", JavaScript, Python)("Invalid flag at 3")
+  check("(?i-:a)", "", DotNet, Java, JavaScript, PCRE, Perl, Ruby):
+    Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), Some(FlagSet()))), Literal('a'))
+  error("(?i-:a)", "", Python)("Invalid flag at 4")
+  check("(?ii)", "", DotNet, Java, PCRE, Perl, Python, Ruby):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None)))
+  error("(?ii:a)", "", JavaScript)("Duplicated flag at 3")
+  check("(?i-i)", "", DotNet, Java, PCRE, Perl, Ruby):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), Some(FlagSet(ignoreCase = true)))))
+  error("(?i-i:a)", "", JavaScript, Python)("Invalid flag at 4")
+  check("(?aa)", "", PCRE, Perl, Python, Ruby):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true), None)))
+  error("(?aaa)", "", Perl)("Duplicated flag at 4")
+  error("(?uu)", "", Perl)("Duplicated flag at 3")
+  check("(?au)", "", Ruby):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true, unicode = true), None)))
+  error("(?au)", "", Perl, Python)("Invalid flag at 3")
+  check("(?-a:a)", "", PCRE):
+    Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(ascii = true)))), Literal('a'))
+  error("(?-a:a)", "", Perl, Python, Ruby)("Invalid flag at 3")
+  check("(?im-s:a)", "", JavaScript):
+    Group(
+      GroupKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true, multiline = true), Some(FlagSet(dotAll = true)))),
+      Literal('a')
+    )
+  error("(?x:a)", "", JavaScript)("Invalid flag at 2")
+  error("(?i)", "", JavaScript)("Invalid group at 0")
+  check("(?i)(?#x)(?m)a", "", Python):
+    Sequence(
+      Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None))),
+      Command(Comment("x")),
+      Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(multiline = true), None))),
+      Literal('a')
+    )
+  error("a(?i)", "", Python)("Inline flag not at the start at 1")
+  error("a|(?i)", "", Python)("Inline flag not at the start at 2")
+  error("((?i))", "", Python)("Inline flag not at the start at 1")
+  check("a(?x)b|c", "", DotNet, Java, PCRE, Perl):
     Disjunction(
       Sequence(Literal('a'), Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None))), Literal('b')),
       Literal('c')
@@ -231,8 +376,9 @@ class ParserSuite extends munit.FunSuite:
       Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)), Literal('a')),
       Literal(' ')
     )
-  check("(?x-i)", "", DotNet, Java, PCRE, Perl, Python, Ruby):
+  check("(?x-i)", "", DotNet, Java, PCRE, Perl, Ruby):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), Some(FlagSet(ignoreCase = true)))))
+  error("(?x-i)", "", Python)("Invalid group at 0")
   check("(?x-i:a)", "", DotNet, Java, PCRE, Perl, Python, Ruby):
     Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), Some(FlagSet(ignoreCase = true)))), Literal('a'))
   check("(*ACCEPT)", "", PCRE, Perl)(Command(BacktrackControl(Some(Accept), None)))
@@ -266,6 +412,34 @@ class ParserSuite extends munit.FunSuite:
   check("(*non_atomic_positive_lookbehind:a)", "", PCRE)(Group(NonAtomicPositiveLookBehind(Alphabetic), Literal('a')))
   check("(*naplb:a)", "", PCRE)(Group(NonAtomicPositiveLookBehind(Abbrev), Literal('a')))
   check("(*:x)", "", PCRE, Perl)(Command(BacktrackControl(None, Some("x"))))
+  check("(*scan_substring:(1)a)", "", PCRE)(Group(ScanSubstring(Alphabetic, Seq(IndexedReference(1))), Literal('a')))
+  check("(*scs:(-1,<x>,'y')a)", "", PCRE):
+    Group(
+      ScanSubstring(Abbrev, Seq(RelativeReference(-1), NamedReference("x"), NamedReference("y"))),
+      Literal('a')
+    )
+  error("(*scs:(x)a)", "", PCRE)("Invalid group at 7")
+  error("(*scs:(1,)a)", "", PCRE)("Invalid group at 9")
+  error("(*scs:(1)a)", "", Perl)("Invalid group at 2")
+  check("(*:a b-c)", "", PCRE, Perl)(Command(BacktrackControl(None, Some("a b-c"))))
+  error("(*:)", "", PCRE, Perl)("Invalid group at 3")
+  error("(*MARK)", "", PCRE, Perl)("Invalid group at 6")
+  error("(*MARK:)", "", PCRE, Perl)("Invalid group at 7")
+  check("(*F)", "", PCRE, Perl)(Command(BacktrackControl(Some(F), None)))
+  check("(*COMMIT:)", "", PCRE, Perl)(Command(BacktrackControl(Some(Commit), Some(""))))
+  check("(*ACCEPT)?", "", PCRE, Perl)(Repeat(Command(BacktrackControl(Some(Accept), None)), Question(Greedy)))
+  check("(*COMMIT)?", "", Perl)(Repeat(Command(BacktrackControl(Some(Commit), None)), Question(Greedy)))
+  error("(*COMMIT)?", "", PCRE)("Nothing to repeat at 9")
+  check("(*UTF)(*LIMIT_MATCH=10)a", "", PCRE):
+    Sequence(Command(StartOption("UTF", None)), Command(StartOption("LIMIT_MATCH", Some(10))), Literal('a'))
+  error("(*UTF)", "", Perl)("Invalid group at 2")
+  error("a(*UTF)", "", PCRE)("Invalid group at 3")
+  error("(?i)(*UTF)", "", PCRE)("Invalid group at 6")
+  error("(*UTF)*", "", PCRE)("Nothing to repeat at 6")
+  check("(*TURKISH_CASING)(*UTF)", "", PCRE):
+    Sequence(Command(StartOption("TURKISH_CASING", None)), Command(StartOption("UTF", None)))
+  error("(*TURKISH_CASING)", "", PCRE)("Invalid group at 2")
+  error("a(?i)*", "", DotNet, Java, PCRE, Perl)("Nothing to repeat at 5")
   check("(a)", "", All*)(Group(IndexedCapture, Literal('a')))
   error("(", "", All*)("Unclosed group at 1")
 

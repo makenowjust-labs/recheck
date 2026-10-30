@@ -23,11 +23,11 @@ final case class FlagSet(
     ungreedy: Boolean = false,
     // `X` (PCRE)
     extra: Boolean = false,
-    // `a` (Perl, Python, Ruby)
+    // `a` (PCRE, Perl, Python, Ruby)
     ascii: Boolean = false,
     // `b` (Python)
     bytes: Boolean = false,
-    // `c` (Perl)
+    // `c` (Java, Perl)
     continue: Boolean = false,
     // `d` (Java, JavaScript, Perl, Ruby)
     hasIndices: Boolean = false,
@@ -47,7 +47,7 @@ final case class FlagSet(
     once: Boolean = false,
     // `p` (Perl)
     preserve: Boolean = false,
-    // `r` (Perl)
+    // `r` (PCRE, Perl)
     nonDestructive: Boolean = false,
     // `s` (.NET, Java, JavaScript, PCRE, Perl, Python)
     dotAll: Boolean = false,
@@ -57,6 +57,8 @@ final case class FlagSet(
     unicodeSets: Boolean = false,
     // `x` (.NET, Java, PCRE, Perl, Python, Ruby)
     verbose: Boolean = false,
+    // `xx` (PCRE, Perl)
+    verboseMore: Boolean = false,
     // `y` (JavaScript)
     sticky: Boolean = false
 )
@@ -146,6 +148,7 @@ object FlagSet:
         case 'x' =>
           check(Dialect.DotNet, Dialect.Java, Dialect.PCRE, Dialect.Perl, Dialect.Python, Dialect.Ruby)
           flagSet = flagSet.copy(verbose = true)
+          if counts(c) >= 2 && dialect == Dialect.Perl then flagSet = flagSet.copy(verboseMore = true)
         case 'y' =>
           check(Dialect.JavaScript)
           flagSet = flagSet.copy(sticky = true)

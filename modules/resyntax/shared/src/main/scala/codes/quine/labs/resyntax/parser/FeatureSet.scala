@@ -10,6 +10,8 @@ import codes.quine.labs.resyntax.ast.FlagSet
 final case class FeatureSet(
     // JavaScript (without `uv`), Perl, Ruby
     allowsAlphabeticUnknownBackslash: Boolean,
+    // Perl
+    allowsBacktrackControlRepeat: Boolean,
     // .NET, Java, JavaScript (without `uv`), Perl
     allowsBrokenClassRangeBegin: Boolean,
     // JavaScript (without `uv`), Perl
@@ -30,10 +32,30 @@ final case class FeatureSet(
     allowsClassNest: Boolean,
     // PCRE, Perl, Ruby
     allowsClassPosix: Boolean,
+    // JavaScript
+    allowsDollarInGroupName: Boolean,
+    // .NET, PCRE (with `J`), Perl, Ruby
+    allowsDuplicatedGroupName: Boolean,
+    // JavaScript
+    allowsDuplicatedGroupNameInAlternatives: Boolean,
+    // .NET, Java, PCRE, Perl, Python, Ruby
+    allowsDuplicatedInlineFlag: Boolean,
     // Ruby
     allowsEmptyClassIntersection: Boolean,
+    // Java, PCRE, Perl
+    allowsEmptyInlineFlag: Boolean,
+    // .NET, Java, PCRE, Perl, Ruby
+    allowsEmptyInlineFlagDiff: Boolean,
+    // .NET, Java, JavaScript, PCRE, Perl, Ruby
+    allowsEmptyInlineFlagRemoval: Boolean,
+    // JavaScript
+    allowsEscapeInGroupName: Boolean,
+    // .NET
+    allowsInlineFlagSign: Boolean,
     // .NET
     allowsInvalidIdentifier: Boolean,
+    // .NET, PCRE, Python, Ruby
+    allowsLeadingZeroInCaptureTest: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     allowsLookAheadRepeat: Boolean,
     // .NET, Java, PCRE, Perl, Python, Ruby
@@ -41,11 +63,31 @@ final case class FeatureSet(
     // .NET, Java, JavaScript, PCRE, Perl, Python
     allowsMeaninglessBacktrackStrategy: Boolean,
     // Ruby
+    allowsLooseGroupName: Boolean,
+    // Ruby
     allowsNestedRepeat: Boolean,
     // PCRE, Perl, Ruby
     allowsNonNameBaseRef: Boolean,
+    // .NET
+    allowsNumberGroupName: Boolean,
+    // .NET, Java, PCRE, Perl, Ruby
+    allowsToggledInlineFlag: Boolean,
+    // .NET, JavaScript, PCRE, Perl, Python, Ruby
+    allowsUnderscoreInGroupName: Boolean,
+    // JavaScript, Python (without `b`)
+    allowsUnicodeIdentifierGroupName: Boolean,
+    // .NET, PCRE (with `u`)
+    allowsUnicodeWordGroupName: Boolean,
+    // .NET
+    allowsZeroIndexedCaptureTest: Boolean,
     // Ruby
     allowsZeroWidthAssertRepeat: Boolean,
+    // Perl, Python
+    checksCharsetInlineFlagConflict: Boolean,
+    // Perl
+    checksCharsetInlineFlagCount: Boolean,
+    // Perl, Python, Ruby
+    checksCharsetInlineFlagRemoval: Boolean,
     // PCRE, Perl
     checksClassPosixCollating: Boolean,
     // PCRE
@@ -62,7 +104,7 @@ final case class FeatureSet(
     hasAlphabeticGroup: Boolean,
     // .NET, Java, JavaScript, PCRE, Perl, Ruby
     hasAngleNamedCapture: Boolean,
-    // .NET, Java, PCRE, Perl, Ruby
+    // .NET, Java, PCRE, Perl, Python, Ruby
     hasAtomicGroup: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     hasBackslashBareOctal: Boolean,
@@ -134,6 +176,8 @@ final case class FeatureSet(
     hasBoundaryGModifier: Boolean,
     // Perl
     hasBoundaryModifier: Boolean,
+    // .NET
+    hasBareLookAroundTest: Boolean,
     // PCRE, Python
     hasBareNamedCaptureTest: Boolean,
     // PCRE, Perl
@@ -154,36 +198,56 @@ final case class FeatureSet(
     hasConditional: Boolean,
     // PCRE, Perl
     hasDefineTest: Boolean,
-    // Perl, Python, Ruby
+    // PCRE, Perl, Python, Ruby
     hasFlagA: Boolean,
+    // Java, Perl
+    hasFlagC: Boolean,
     // Java, Perl, Ruby
     hasFlagD: Boolean,
+    // Perl
+    hasFlagG: Boolean,
     // Perl
     hasFlagL: Boolean,
     // .NET, PCRE, Perl
     hasFlagN: Boolean,
     // Perl
+    hasFlagO: Boolean,
+    // Perl
     hasFlagP: Boolean,
-    // .NET, Java, PCRE, Perl, Python
+    // PCRE
+    hasFlagR: Boolean,
+    // .NET, Java, JavaScript, PCRE, Perl, Python
     hasFlagS: Boolean,
-    // Java, Perl, Python, Ruby
+    // Java, Perl, Python (without `b`), Ruby
     hasFlagU: Boolean,
+    // .NET, Java, PCRE, Perl, Python, Ruby
+    hasFlagX: Boolean,
+    // PCRE, Perl
+    hasFlagXX: Boolean,
     // PCRE
     hasFlagUpperJ: Boolean,
     // Python (with `b`)
     hasFlagUpperL: Boolean,
-    // Java
+    // Java, PCRE
     hasFlagUpperU: Boolean,
     // Perl
     hasInlineCode: Boolean,
     // .NET, Java, PCRE, Perl, Python, Ruby
     hasInlineFlag: Boolean,
+    // .NET, Java, JavaScript, PCRE, Perl, Python, Ruby
+    hasInlineFlagGroup: Boolean,
+    // .NET, Java, PCRE, Perl, Ruby
+    hasInlineFlagRemovalCommand: Boolean,
     // .NET, PCRE, Perl, Python, Ruby
     hasInlineComment: Boolean,
     // Ruby
     hasIncomprehensiveInlineFlag: Boolean,
     // Ruby
     hasLeveledBackReference: Boolean,
+    // .NET
+    ignoresInlineFlagCase: Boolean,
+    // PCRE
+    limitsGroupNameLength: Boolean,
     // .NET, PCRE, Perl
     hasLookAroundTest: Boolean,
     // Perl, Python, Ruby
@@ -196,7 +260,7 @@ final case class FeatureSet(
     hasPCall: Boolean,
     // PCRE, Perl, Python
     hasPGroup: Boolean,
-    // Java, PCRE, Perl, Ruby
+    // Java, PCRE, Perl, Python, Ruby
     hasPossessiveBacktrackStrategy: Boolean,
     // PCRE, Perl
     hasRecursionTest: Boolean,
@@ -210,12 +274,18 @@ final case class FeatureSet(
     hasQuoteNamedCapture: Boolean,
     // PCRE
     hasVersionTest: Boolean,
+    // PCRE
+    hasScanSubstring: Boolean,
+    // PCRE
+    hasStartOption: Boolean,
     // Python
     processBackslashInLineComment: Boolean,
     // Python, Ruby
     processBackslashInCommentGroup: Boolean,
     // Java, JavaScript (with `uv`), Perl, PCRE (with `u`), Python (without `b`), Ruby
     readsAsUnicode: Boolean,
+    // Python
+    requiresInlineFlagAtStart: Boolean,
     // .NET (with `x`), Java (with `x`), PCRE (with `x`), Perl (with `x`), Python (with `x`), Ruby (with `x`)
     skipsComment: Boolean,
     // Java
@@ -240,6 +310,8 @@ object FeatureSet:
     FeatureSet(
       // JavaScript (without `uv`), Perl, Ruby
       allowsAlphabeticUnknownBackslash = (isJavaScript && !isUnicode) || isPerl || isRuby,
+      // Perl
+      allowsBacktrackControlRepeat = isPerl,
       // .NET, Java, JavaScript (without `uv`), Perl
       allowsBrokenClassRangeBegin = isDotNet || isJava || (isJavaScript && !isUnicode) || isPerl,
       // JavaScript (without `uv`), Perl
@@ -261,10 +333,30 @@ object FeatureSet:
       allowsClassNest = isJava || isJavaScript && flagSet.unicodeSets || isRuby,
       // PCRE, Perl, Ruby
       allowsClassPosix = isPCRE || isPerl || isRuby,
+      // JavaScript
+      allowsDollarInGroupName = isJavaScript,
+      // .NET, PCRE (with `J`), Perl, Ruby
+      allowsDuplicatedGroupName = isDotNet || (isPCRE && flagSet.dupNames) || isPerl || isRuby,
+      // JavaScript
+      allowsDuplicatedGroupNameInAlternatives = isJavaScript,
+      // .NET, Java, PCRE, Perl, Python, Ruby
+      allowsDuplicatedInlineFlag = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
       // Ruby
       allowsEmptyClassIntersection = isRuby,
+      // Java, PCRE, Perl
+      allowsEmptyInlineFlag = isJava || isPCRE || isPerl,
+      // .NET, Java, PCRE, Perl, Ruby
+      allowsEmptyInlineFlagDiff = isDotNet || isJava || isPCRE || isPerl || isRuby,
+      // .NET, Java, JavaScript, PCRE, Perl, Ruby
+      allowsEmptyInlineFlagRemoval = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isRuby,
+      // JavaScript
+      allowsEscapeInGroupName = isJavaScript,
+      // .NET
+      allowsInlineFlagSign = isDotNet,
       // .NET
       allowsInvalidIdentifier = isDotNet,
+      // .NET, PCRE, Python, Ruby
+      allowsLeadingZeroInCaptureTest = isDotNet || isPCRE || isPython || isRuby,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsLookAheadRepeat =
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
@@ -273,11 +365,31 @@ object FeatureSet:
       // .NET, Java, JavaScript, PCRE, Perl, Python
       allowsMeaninglessBacktrackStrategy = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isPython,
       // Ruby
+      allowsLooseGroupName = isRuby,
+      // Ruby
       allowsNestedRepeat = isRuby,
       // PCRE, Perl, Ruby
       allowsNonNameBaseRef = isPCRE || isPerl || isRuby,
+      // .NET
+      allowsNumberGroupName = isDotNet,
+      // .NET, Java, PCRE, Perl, Ruby
+      allowsToggledInlineFlag = isDotNet || isJava || isPCRE || isPerl || isRuby,
+      // .NET, JavaScript, PCRE, Perl, Python, Ruby
+      allowsUnderscoreInGroupName = isDotNet || isJavaScript || isPCRE || isPerl || isPython || isRuby,
+      // JavaScript, Python (without `b`)
+      allowsUnicodeIdentifierGroupName = isJavaScript || (isPython && !isByte),
+      // .NET, PCRE (with `u`)
+      allowsUnicodeWordGroupName = isDotNet || (isPCRE && isUnicode),
+      // .NET
+      allowsZeroIndexedCaptureTest = isDotNet,
       // Ruby
       allowsZeroWidthAssertRepeat = isRuby,
+      // Perl, Python
+      checksCharsetInlineFlagConflict = isPerl || isPython,
+      // Perl
+      checksCharsetInlineFlagCount = isPerl,
+      // Perl, Python, Ruby
+      checksCharsetInlineFlagRemoval = isPerl || isPython || isRuby,
       // PCRE, Perl
       checksClassPosixCollating = isPCRE || isPerl,
       // PCRE
@@ -294,8 +406,8 @@ object FeatureSet:
       hasAlphabeticGroup = isPCRE || isPerl,
       // .NET, Java, JavaScript, PCRE, Perl, Ruby
       hasAngleNamedCapture = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isRuby,
-      // .NET, Java, PCRE, Perl, Ruby
-      hasAtomicGroup = isDotNet || isJava || isPCRE || isPerl || isRuby,
+      // .NET, Java, PCRE, Perl, Python, Ruby
+      hasAtomicGroup = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       hasBackslashBareOctal =
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
@@ -364,6 +476,8 @@ object FeatureSet:
       hasBackslashXHex1 = isPCRE || isPerl || isRuby,
       // .NET
       hasBalanceGroup = isDotNet,
+      // .NET
+      hasBareLookAroundTest = isDotNet,
       // PCRE, Python
       hasBareNamedCaptureTest = isPCRE || isPython,
       // Java, Perl,
@@ -388,36 +502,56 @@ object FeatureSet:
       hasConditional = isDotNet || isPCRE || isPerl || isPython || isRuby,
       // PCRE, Perl
       hasDefineTest = isPCRE || isPerl,
-      // Perl, Python, Ruby
-      hasFlagA = isPerl || isPython || isRuby,
+      // PCRE, Perl, Python, Ruby
+      hasFlagA = isPCRE || isPerl || isPython || isRuby,
+      // Java, Perl
+      hasFlagC = isJava || isPerl,
       // Java, Perl, Ruby
       hasFlagD = isJava || isPerl || isRuby,
+      // Perl
+      hasFlagG = isPerl,
       // Perl
       hasFlagL = isPerl,
       // .NET, PCRE, Perl
       hasFlagN = isDotNet || isPCRE || isPerl,
       // Perl
+      hasFlagO = isPerl,
+      // Perl
       hasFlagP = isPerl,
-      // .NET, Java, PCRE, Perl, Python
-      hasFlagS = isDotNet || isJava || isPCRE || isPerl || isPython,
-      // Java, Perl, Python, Ruby
-      hasFlagU = isJava || isPerl || isPython || isRuby,
+      // PCRE
+      hasFlagR = isPCRE,
+      // .NET, Java, JavaScript, PCRE, Perl, Python
+      hasFlagS = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isPython,
+      // Java, Perl, Python (without `b`), Ruby
+      hasFlagU = isJava || isPerl || (isPython && !isByte) || isRuby,
+      // .NET, Java, PCRE, Perl, Python, Ruby
+      hasFlagX = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
+      // PCRE, Perl
+      hasFlagXX = isPCRE || isPerl,
       // PCRE
       hasFlagUpperJ = isPCRE,
       // Python (with `b`)
       hasFlagUpperL = isPython && isByte,
-      // Java
-      hasFlagUpperU = isJava,
+      // Java, PCRE
+      hasFlagUpperU = isJava || isPCRE,
       // Perl
       hasInlineCode = isPerl,
       // .NET, Java, PCRE, Perl, Python, Ruby
       hasInlineFlag = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
+      // .NET, Java, JavaScript, PCRE, Perl, Python, Ruby
+      hasInlineFlagGroup = true,
+      // .NET, Java, PCRE, Perl, Ruby
+      hasInlineFlagRemovalCommand = isDotNet || isJava || isPCRE || isPerl || isRuby,
       // .NET, PCRE, Perl, Python, Ruby
       hasInlineComment = isDotNet || isPCRE || isPerl || isPython || isRuby,
       // Ruby
       hasIncomprehensiveInlineFlag = isRuby,
       // Ruby
       hasLeveledBackReference = isRuby,
+      // .NET
+      ignoresInlineFlagCase = isDotNet,
+      // PCRE
+      limitsGroupNameLength = isPCRE,
       // .NET, PCRE, Perl
       hasLookAroundTest = isDotNet || isPCRE || isPerl,
       // Perl, Python, Ruby
@@ -430,8 +564,8 @@ object FeatureSet:
       hasPCall = isPCRE || isPerl,
       // PCRE, Perl, Python
       hasPGroup = isPCRE || isPerl || isPython,
-      // Java, PCRE, Perl, Ruby
-      hasPossessiveBacktrackStrategy = isJava || isPCRE || isPerl || isRuby,
+      // Java, PCRE, Perl, Python, Ruby
+      hasPossessiveBacktrackStrategy = isJava || isPCRE || isPerl || isPython || isRuby,
       // PCRE, Perl
       hasRecursionTest = isPCRE || isPerl,
       // PCRE, Perl
@@ -444,6 +578,10 @@ object FeatureSet:
       hasQuoteNamedCapture = isDotNet || isPCRE || isPerl || isRuby,
       // PCRE
       hasVersionTest = isPCRE,
+      // PCRE
+      hasScanSubstring = isPCRE,
+      // PCRE
+      hasStartOption = isPCRE,
       // Python
       processBackslashInLineComment = isPython,
       // Python, Ruby
@@ -451,6 +589,8 @@ object FeatureSet:
       // Java, JavaScript (with `uv`), Perl, PCRE (with `u`), Python (without `b`), Ruby
       readsAsUnicode =
         isJava || (isJavaScript && isUnicode) || (isPCRE && isUnicode) || (isPython && !isByte) || isRuby,
+      // Python
+      requiresInlineFlagAtStart = isPython,
       // .NET (with `x`), Java (with `x`), PCRE (with `x`), Perl (with `x`), Python (with `x`), Ruby (with `x`)
       skipsComment = flagSet.verbose,
       // Java
