@@ -80,6 +80,17 @@ class ParserSuite extends munit.FunSuite:
   check("a{2,3}", "", All*)(Repeat(Literal('a'), Bounded(2, 3, Greedy)))
   check("a{2,3}?", "", All*)(Repeat(Literal('a'), Bounded(2, 3, Lazy)))
   check("a{2,3}+", "", Java, PCRE, Perl, Python, Ruby)(Repeat(Literal('a'), Bounded(2, 3, Possessive)))
+  check("a{65535}", "", All*)(Repeat(Literal('a'), Exact(65535, Greedy)))
+  error("a{65536}", "", PCRE)("Number too big in {} quantifier at 2")
+  check("a{,100000}", "", Ruby)(Repeat(Literal('a'), MaxBounded(100000, Greedy)))
+  error("a{,100001}", "", Ruby)("Number too big in {} quantifier at 3")
+  check("a{2147483646}", "", DotNet, Java, JavaScript, Perl, Python)(Repeat(Literal('a'), Exact(2147483646, Greedy)))
+  error("a{2147483647}", "", Perl)("Number too big in {} quantifier at 2")
+  check("a{1,2147483647}", "", DotNet, Java, JavaScript, Python)(Repeat(Literal('a'), Bounded(1, 2147483647, Greedy)))
+  error("a{1,2147483648}", "", DotNet, Java)("Number too big in {} quantifier at 4")
+  check("a{4294967294}", "", JavaScript, Python)(Repeat(Literal('a'), Exact(Int.MaxValue, Greedy)))
+  error("a{4294967295}", "", Python)("Number too big in {} quantifier at 2")
+  check("a{99999999999999999999}", "", JavaScript)(Repeat(Literal('a'), Exact(Int.MaxValue, Greedy)))
   check("a{3,2}", "", Perl)(Repeat(Literal('a'), Bounded(3, 2, Greedy)))
   error("a{3,2}", "", DotNet, Java, JavaScript, PCRE, Python, Ruby)("Numbers out of order in {} quantifier at 1")
   check("a{,3}", "", PCRE, Perl, Python, Ruby)(Repeat(Literal('a'), MaxBounded(3, Greedy)))
@@ -425,6 +436,22 @@ class ParserSuite extends munit.FunSuite:
   check("\\X", "", Java, PCRE, Perl)(Backslash(EscapeClass(GraphemeCluster)))
   check("\\Z", "", DotNet, Java, PCRE, Perl, Python, Ruby)(Backslash(Assert(UpperEnd)))
   check("\\010", "", All*)(Backslash(Escape(BareOctal, 8)))
+  check("\\2147483648", "", JavaScript):
+    Sequence(
+      Backslash(Escape(BareOctal, 0x8c)),
+      Literal('7'),
+      Literal('4'),
+      Literal('8'),
+      Literal('3'),
+      Literal('6'),
+      Literal('4'),
+      Literal('8')
+    )
+  check("()\\99999999999", "", Java, Ruby):
+    Sequence(
+      Group(IndexedCapture, Sequence()),
+      Backslash(EscapeBackReference(BareBackReference, IndexedReference(Int.MaxValue)))
+    )
   check("\\412", "", JavaScript)(Sequence(Backslash(Escape(BareOctal, 33)), Literal('2')))
   check("()\\1", "", All*):
     Sequence(Group(IndexedCapture, Sequence()), Backslash(EscapeBackReference(BareBackReference, IndexedReference(1))))

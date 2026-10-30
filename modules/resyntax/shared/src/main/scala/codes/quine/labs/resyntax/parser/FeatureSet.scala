@@ -199,7 +199,9 @@ final case class FeatureSet(
     // Java, JavaScript (with `uv`), Perl, PCRE (with `u`), Python (without `b`), Ruby
     readsAsUnicode: Boolean,
     // .NET (with `x`), Java (with `x`), PCRE (with `x`), Perl (with `x`), Python (with `x`), Ruby (with `x`)
-    skipsComment: Boolean
+    skipsComment: Boolean,
+    // .NET: 2147483647, Java: 2147483647, JavaScript: unlimited, PCRE: 65535, Perl: 2147483646, Python: 4294967294, Ruby: 100000
+    maxRepeatCount: Long
 )
 
 object FeatureSet:
@@ -414,5 +416,14 @@ object FeatureSet:
       readsAsUnicode =
         isJava || (isJavaScript && isUnicode) || (isPCRE && isUnicode) || (isPython && !isByte) || isRuby,
       // .NET (with `x`), Java (with `x`), PCRE (with `x`), Perl (with `x`), Python (with `x`), Ruby (with `x`)
-      skipsComment = flagSet.verbose
+      skipsComment = flagSet.verbose,
+      // .NET: 2147483647, Java: 2147483647, JavaScript: unlimited, PCRE: 65535, Perl: 2147483646, Python: 4294967294, Ruby: 100000
+      maxRepeatCount = dialect match
+        case Dialect.DotNet     => 2147483647L
+        case Dialect.Java       => 2147483647L
+        case Dialect.JavaScript => Long.MaxValue
+        case Dialect.PCRE       => 65535L
+        case Dialect.Perl       => 2147483646L
+        case Dialect.Python     => 4294967294L
+        case Dialect.Ruby       => 100000L
     )

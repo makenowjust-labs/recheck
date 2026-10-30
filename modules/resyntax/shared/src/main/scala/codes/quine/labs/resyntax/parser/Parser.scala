@@ -140,7 +140,7 @@ private[parser] final class Parser(
     val save = offset
     next()
     skipBraceBlank()
-    val minOption = parseIntOption()
+    val minOption = parseRepeatCountOption()
     skipBraceBlank()
 
     if minOption.isDefined && currentChar == '}' then
@@ -155,7 +155,7 @@ private[parser] final class Parser(
 
     next()
     skipBraceBlank()
-    val maxOption = parseIntOption()
+    val maxOption = parseRepeatCountOption()
     skipBraceBlank()
 
     if isEnd || currentChar != '}' || minOption.isEmpty && maxOption.isEmpty then
@@ -172,6 +172,10 @@ private[parser] final class Parser(
       case (None, Some(max)) => Quantifier.MaxBounded(max, strategy)
       case (None, None)      => throw new IllegalStateException("Unreachable")
     pushRepeat(stack, popRepeatable(stack), quantifier)
+
+  private def parseRepeatCountOption(): Option[Int] =
+    val start = offset
+    parseSaturatedIntOption(featureSet.maxRepeatCount, "Number too big in {} quantifier", start)
 
   private def skipBraceBlank(): Unit =
     if featureSet.allowsBlankInBrace then while !isEnd && (currentChar == ' ' || currentChar == '\t') do next()
@@ -1398,7 +1402,7 @@ private[parser] final class Parser(
     if context.inClass then return parseBackslashOctal()
 
     val save = offset
-    val n = parseIntOption().getOrElse(fail("Invalid backslash escape"))
+    val n = parseSaturatedIntOption(Long.MaxValue, "Invalid backslash escape", save).get
 
     if featureSet.checksValidBackReference && !(0 < n && n <= analysis.captureSize) then
       reset(save)
@@ -1628,6 +1632,17 @@ private[parser] final class Parser(
 
     val str = source.slice(start, end)
     str.toIntOption.orElse(fail("Invalid integer", start))
+
+  private def parseSaturatedIntOption(max: Long, message: String, pos: Int): Option[Int] =
+    if !isDigit then return None
+
+    var value = 0L
+    while isDigit do
+      value = if value > (Long.MaxValue - 9) / 10 then Long.MaxValue else value * 10 + (currentChar - '0')
+      next()
+
+    if value > max then fail(message, pos)
+    Some(value.min(Int.MaxValue).toInt)
 
   private def parseOctalIntOption(): Option[Int] =
     if !isOctalDigit then return None
