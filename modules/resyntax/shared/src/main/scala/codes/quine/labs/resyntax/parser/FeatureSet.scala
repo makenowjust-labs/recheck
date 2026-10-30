@@ -42,6 +42,8 @@ final case class FeatureSet(
     allowsClassPosix: Boolean,
     // Perl
     allowsLooseBraceEscape: Boolean,
+    // PCRE, Perl, Ruby
+    allowsLoosePropertyName: Boolean,
     // .NET
     allowsInvalidIdentifier: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -329,6 +331,8 @@ object FeatureSet:
       allowsClassPosix = isPCRE || isPerl || isRuby,
       // Perl
       allowsLooseBraceEscape = isPerl,
+      // PCRE, Perl, Ruby
+      allowsLoosePropertyName = isPCRE || isPerl || isRuby,
       // .NET
       allowsInvalidIdentifier = isDotNet,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby

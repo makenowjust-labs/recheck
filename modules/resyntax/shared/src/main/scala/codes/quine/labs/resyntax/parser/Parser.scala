@@ -1152,27 +1152,57 @@ private[parser] final class Parser(
     expect('{', "Invalid backslash escape")
     val value = parseBracedCodePoint(8)
     BackslashKind.Escape(EscapeStyle.Octal, value)
-  private def parseBackslashLowerP(): BackslashKind =
+  private def parseBackslashLowerP(): BackslashKind = parseBackslashProperty(invert = false)
+  private def parseBackslashProperty(invert: Boolean): BackslashKind =
     if !featureSet.hasBackslashUnicodeProperty then return parseBackslashUnknown()
 
+    if source.lift(offset + 1).forall(_ != '{') && !featureSet.hasBackslashUnicodePropertyBare &&
+      featureSet.allowsAlphabeticUnknownBackslash
+    then return parseBackslashUnknown()
+
     next()
-    (currentChar: @switch) match
-      case '{' =>
-        next()
-        val name = parseID()
-        val klass = if currentChar == '=' then
-          next()
-          val value = parseID()
-          EscapeClassKind.UnicodePropertyValue(name, value)
-        else EscapeClassKind.UnicodeProperty(name)
-        expect('}', "Invalid backslash escape")
-        BackslashKind.EscapeClass(klass)
-      case _ =>
-        assert(featureSet.hasBackslashUnicodePropertyBare, "Invalid backslash escape")
-        assert(!isEnd, "Invalid backslash escape")
-        val name = currentChar.toString
-        next()
-        BackslashKind.EscapeClass(EscapeClassKind.UnicodeBareProperty(name))
+    if isEnd || currentChar != '{' then
+      assert(featureSet.hasBackslashUnicodePropertyBare, "Invalid backslash escape")
+      assert(!isEnd, "Invalid backslash escape")
+      val name = currentChar.toString
+      next()
+      val klass =
+        if invert then EscapeClassKind.NonUnicodeBareProperty(name) else EscapeClassKind.UnicodeBareProperty(name)
+      return BackslashKind.EscapeClass(klass)
+
+    next()
+    val (negated, name, value) =
+      if featureSet.allowsLoosePropertyName then parseLooseProperty() else parseStrictProperty()
+    expect('}', "Invalid backslash escape")
+
+    val klass = (invert != negated, value) match
+      case (false, None)        => EscapeClassKind.UnicodeProperty(name)
+      case (false, Some(value)) => EscapeClassKind.UnicodePropertyValue(name, value)
+      case (true, None)         => EscapeClassKind.NonUnicodeProperty(name)
+      case (true, Some(value))  => EscapeClassKind.NonUnicodePropertyValue(name, value)
+    BackslashKind.EscapeClass(klass)
+
+  private def parseStrictProperty(): (Boolean, String, Option[String]) =
+    val name = parseID()
+    val value = Option.when(!isEnd && currentChar == '='):
+      next()
+      parseID()
+    (false, name, value)
+
+  // Perl, PCRE and Ruby ignore blanks, hyphens, underscores and cases in property names, so the name is kept as written.
+  private def parseLooseProperty(): (Boolean, String, Option[String]) =
+    skipBraceBlank(force = true)
+    val negated = !isEnd && currentChar == '^'
+    if negated then next()
+    val start = offset
+    while !isEnd && currentChar != '}' do next()
+    val body = source.slice(start, offset).trim
+    val separator = body.indexWhere(c => c == '=' || c == ':')
+    val (name, value) =
+      if separator < 0 then (body, None)
+      else (body.slice(0, separator).trim, Some(body.slice(separator + 1, body.length).trim))
+    assert(name.nonEmpty && value.forall(_.nonEmpty), "Invalid backslash escape")
+    (negated, name, value)
 
   private def parseBackslashLowerQ(): BackslashKind =
     if !(featureSet.hasBackslashQuoteSet && context.inClass) then return parseBackslashUnknown()
@@ -1428,28 +1458,7 @@ private[parser] final class Parser(
       body.exists(_.isDigit) && body.forall(c => c.isDigit || c == ',' || c == ' ' || c == '\t')
     }
 
-  private def parseBackslashUpperP(): BackslashKind =
-    if !featureSet.hasBackslashUnicodeProperty then return parseBackslashUnknown()
-
-    next()
-    (currentChar: @switch) match
-      case '{' =>
-        next()
-        val name = parseID()
-        val klass = if currentChar == '=' then
-          next()
-          val value = parseID()
-          EscapeClassKind.NonUnicodePropertyValue(name, value)
-        else EscapeClassKind.NonUnicodeProperty(name)
-        expect('}', "Invalid backslash escape")
-        BackslashKind.EscapeClass(klass)
-      case _ =>
-        assert(featureSet.hasBackslashUnicodePropertyBare, "Invalid backslash escape")
-        assert(!isEnd, "Invalid backslash escape")
-        val name = currentChar.toString
-        next()
-        BackslashKind.EscapeClass(EscapeClassKind.NonUnicodeBareProperty(name))
-
+  private def parseBackslashUpperP(): BackslashKind = parseBackslashProperty(invert = true)
   private def parseBackslashUpperQ(): BackslashKind =
     if !featureSet.hasBackslashQuoteCommand then return parseBackslashUnknown()
 
