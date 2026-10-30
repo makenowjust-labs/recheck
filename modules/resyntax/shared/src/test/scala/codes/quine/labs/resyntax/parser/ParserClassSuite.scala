@@ -1,5 +1,6 @@
 package codes.quine.labs.resyntax.parser
 import codes.quine.labs.resyntax.ast.BackslashKind.*
+import codes.quine.labs.resyntax.ast.CaseCommandKind.*
 import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.EscapeClassKind.*
@@ -61,18 +62,44 @@ class ParserClassSuite extends ParserSuiteBase:
   check("[\\g\\k]", "", PCRE, Perl, Ruby)(
     Class(false, ClassUnion(ClassBackslashValue(Unknown('g')), ClassBackslashValue(Unknown('k'))))
   )
-  check("[\\uA]", "", Perl)(Class(false, ClassUnion(ClassBackslashValue(Unknown('u')), ClassLiteral('A'))))
-  check("[\\Qa]\\E]", "", Java, PCRE)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral(']'))))
-  check("[a-\\Qz\\E]", "", Java, PCRE)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
-  check("[\\Qa\\E-z]", "", Java, PCRE)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
-  check("[\\Qxy\\E-\\Qza\\E]", "", Java, PCRE):
+  check("[\\uA]", "", Perl)(Class(false, ClassUnion(ClassCaseCommand(SingleUpperCaseCommand), ClassLiteral('A'))))
+  check("[\\Ua-z]", "", Perl):
+    Class(false, ClassUnion(ClassCaseCommand(UpperCaseCommand), ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  check("[\\Ux\\Ey]", "", Perl):
+    Class(
+      false,
+      ClassUnion(
+        ClassCaseCommand(UpperCaseCommand),
+        ClassLiteral('x'),
+        ClassCaseCommand(EndCaseCommand),
+        ClassLiteral('y')
+      )
+    )
+  check("[A-\\Lz]", "", Perl):
+    Class(false, ClassUnion(ClassRange(ClassLiteral('A'), ClassLiteral('z')), ClassCaseCommand(LowerCaseCommand)))
+  check("[A\\L-z]", "", Perl):
+    Class(false, ClassUnion(ClassRange(ClassLiteral('A'), ClassLiteral('z')), ClassCaseCommand(LowerCaseCommand)))
+  check("[\\E]a]", "", Perl):
+    Class(false, ClassUnion(ClassCaseCommand(EndCaseCommand), ClassLiteral(']'), ClassLiteral('a')))
+  error("[\\E]", "", Perl)("Unclosed ']' at 4")
+  check("[\\Qa]\\E]", "", Java, PCRE, Perl)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral(']'))))
+  check("[\\Q]\\E]", "", Java, PCRE, Perl)(Class(false, ClassUnion(ClassLiteral(']'))))
+  check("[\\Qa-c\\E]", "", Perl)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassLiteral('c'))))
+  check("[a-\\Qz\\E]", "", Java, PCRE, Perl)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  check("[\\Qa\\E-z]", "", Java, PCRE, Perl)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  check("[\\Qxy\\E-\\Qza\\E]", "", Java, PCRE, Perl):
     Class(false, ClassUnion(ClassLiteral('x'), ClassRange(ClassLiteral('y'), ClassLiteral('z')), ClassLiteral('a')))
-  error("[\\Qxz\\E-y]", "", Java, PCRE)("Out of order class range at 4")
-  check("[a-\\Q\\Ez]", "", Java, PCRE)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
-  check("[a-\\Q\\E]", "", Java, PCRE)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassUnion())))
-  check("[\\Q\\E-z]", "", Java, PCRE)(Class(false, ClassUnion(ClassUnion(), ClassLiteral('-'), ClassLiteral('z'))))
-  error("[a-\\Qz\\E]", "", Perl)("Out of order class range at 1")
-  check("[\\Q]", "", Perl)(Class(false, ClassBackslashValue(Unknown('Q'))))
+  error("[\\Qxz\\E-y]", "", Java, PCRE, Perl)("Out of order class range at 4")
+  check("[a-\\Q\\Ez]", "", Java, PCRE, Perl)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  check("[a-\\Q\\E]", "", Java, PCRE, Perl):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassUnion()))
+  check("[\\Q\\E-z]", "", Java, PCRE, Perl):
+    Class(false, ClassUnion(ClassUnion(), ClassLiteral('-'), ClassLiteral('z')))
+  check("[a\\Q\\E-z]", "", Java, PCRE, Perl)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  check("[\\Q\\E]a]", "", Java, PCRE, Perl):
+    Class(false, ClassUnion(ClassUnion(), ClassLiteral(']'), ClassLiteral('a')))
+  error("[\\Q\\E]", "", Java, PCRE, Perl)("Unclosed ']' at 6")
+  error("[\\Q]", "", Perl)("Unclosed ']' at 4")
   check("[]", "", JavaScript)(Class(false, ClassUnion()))
   check("[[:alnum:]]", "", PCRE, Perl, Ruby)(Class(false, ClassPosix(false, "alnum")))
   check("[[:^alnum:]]", "", PCRE, Perl, Ruby)(Class(false, ClassPosix(true, "alnum")))

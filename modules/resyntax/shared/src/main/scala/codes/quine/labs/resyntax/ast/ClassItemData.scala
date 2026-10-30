@@ -53,6 +53,9 @@ object ClassItemData:
     def apply(left: ClassItemData.ClassValue, right: ClassItemData.ClassValue): ClassRange =
       ClassRange(ClassItem.Value(left), ClassItem.Value(right))
 
+  /** ClassCaseCommand is a case command (e.g. `\\U`) in a class, which changes the case of the following text. */
+  final case class ClassCaseCommand(kind: CaseCommandKind) extends ClassItemData
+
   /** ClassBackslashClass is backslash escape class in class. */
   final case class ClassBackslashClass(klass: EscapeClassKind) extends ClassItemData
 

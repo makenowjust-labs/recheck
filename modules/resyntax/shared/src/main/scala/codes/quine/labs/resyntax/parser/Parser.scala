@@ -2225,18 +2225,19 @@ private[parser] final class Parser(
 
   private def parseClassItemUnion(first: Boolean): ClassItem =
     val start = offset
-    val seq = Seq.newBuilder[ClassItem]
+    val seq = mutable.ListBuffer.empty[ClassItem]
 
-    var count = 0
+    // A `]` after only empty quotes and case commands is still the first character (e.g. `[\E]]` in Perl).
+    var empty = true
 
     skipClassComment()
-    while (first && count == 0 && !isEnd && currentChar == ']') || !isClassItemStop(start) do
+    while (first && empty && !isEnd && currentChar == ']') || !isClassItemStop(start) do
       parseClassItemAtom(seq, start)
-      count += 1
+      if empty then empty = seq.forall(isSkippableInClassRange)
       skipClassComment()
 
     val end = offset
-    val items = seq.result()
+    val items = seq.toSeq
     if items.size == 1 then return items.head
     ClassItem(ClassItemData.ClassUnion(items), SourceLocation(start, end))
 
@@ -2250,10 +2251,14 @@ private[parser] final class Parser(
   private def parseClassItemAtom(seq: mutable.Builder[ClassItem, Seq[ClassItem]], unionStart: Int): Unit =
     val start = offset
     val item = parseClassItemNonRange()
+    if isSkippableInClassRange(item) then
+      seq.addOne(item)
+      return
 
     skipClassComment()
-    if isClassItemStop(unionStart) || currentChar != '-' || isEmptyClassQuote(item) then
-      seq.addOne(item)
+    val skippedBeforeHyphen = parseClassItemsSkippableInRange(unionStart)
+    if isClassItemStop(unionStart) || currentChar != '-' then
+      seq.addOne(item).addAll(skippedBeforeHyphen)
       return
 
     val save = offset
@@ -2261,7 +2266,7 @@ private[parser] final class Parser(
 
     if isClassItemStop(unionStart) then
       reset(save)
-      seq.addOne(item)
+      seq.addOne(item).addAll(skippedBeforeHyphen)
       return
 
     val begin = classQuoteLiterals(item) match
@@ -2272,12 +2277,14 @@ private[parser] final class Parser(
 
     skipClassComment()
     var endItem = parseClassItemNonRange()
-    while isEmptyClassQuote(endItem) && !isClassItemStop(unionStart) do
+    val skippedAfterHyphen = mutable.ListBuffer.empty[ClassItem]
+    while isSkippableInClassRange(endItem) && !isClassItemStop(unionStart) do
+      skippedAfterHyphen.addOne(endItem)
       skipClassComment()
       endItem = parseClassItemNonRange()
-    if isEmptyClassQuote(endItem) then
+    if isSkippableInClassRange(endItem) then
       reset(save)
-      seq.addOne(begin)
+      seq.addOne(begin).addAll(skippedBeforeHyphen)
       return
 
     val (end, rest) = classQuoteLiterals(endItem) match
@@ -2288,18 +2295,39 @@ private[parser] final class Parser(
       case (begin: ClassItem.Value, end: ClassItem.Value) =>
         assert(begin.data.value <= end.data.value, "Out of order class range", begin.loc.start)
         seq.addOne(ClassItem(ClassItemData.ClassRange(begin, end), SourceLocation(begin.loc.start, end.loc.end)))
+        // The case commands inside a range are kept after it, and the empty quotes are dropped.
+        seq.addAll((skippedBeforeHyphen ++ skippedAfterHyphen).filterNot(isEmptyClassQuote))
         seq.addAll(rest)
       case _ =>
         if !isValueClassItem(begin) then
           if !isClassNestItem(begin) then assert(featureSet.allowsBrokenClassRangeBegin, "Invalid class range", start)
         else if !isClassNestItem(end) then assert(featureSet.allowsBrokenClassRangeEnd, "Invalid class range", start)
 
-        seq.addOne(begin)
+        seq.addOne(begin).addAll(skippedBeforeHyphen)
         if featureSet.consumesBrokenClassRange then
           seq.addOne(ClassItem.Value(ClassItemData.ClassLiteral('-'), SourceLocation(save, save + 1)))
+          seq.addAll(skippedAfterHyphen)
           seq.addOne(end)
           seq.addAll(rest)
         else reset(save)
+
+  /** Parses the empty quotes and case commands between a range begin and its `-`, which do not break the range. */
+  private def parseClassItemsSkippableInRange(unionStart: Int): Seq[ClassItem] =
+    val items = mutable.ListBuffer.empty[ClassItem]
+    if !(featureSet.hasBackslashQuoteCommand || featureSet.hasBackslashCaseCommand) then return items.toSeq
+    boundary:
+      while !isClassItemStop(unionStart) && currentChar == '\\' do
+        val save = offset
+        val item = parseClassItemNonRange()
+        if !isSkippableInClassRange(item) then
+          reset(save)
+          boundary.break()
+        items.addOne(item)
+        skipClassComment()
+    items.toSeq
+
+  private def isSkippableInClassRange(item: ClassItem): Boolean =
+    isEmptyClassQuote(item) || item.data.isInstanceOf[ClassItemData.ClassCaseCommand]
 
   /** Returns the literals of a `\\Q...\\E` class item.
     *
@@ -2355,6 +2383,8 @@ private[parser] final class Parser(
           return ClassItem(ClassItemData.ClassBackslashClass(klass), SourceLocation(start, end))
         case BackslashKind.CaseCommand(CaseCommandKind.QuoteCommand) =>
           return parseClassQuote(start)
+        case BackslashKind.CaseCommand(kind) =>
+          return ClassItem(ClassItemData.ClassCaseCommand(kind), SourceLocation(start, end))
         case _ =>
           fail("Invalid escape sequence", start)
 
@@ -2434,10 +2464,10 @@ private[parser] final class Parser(
 
   private def isLiteralBackslashInClass: Boolean =
     !isEnd && ((currentChar: @switch) match
-      case 'A' | 'z' | 'Z' | 'G' | 'K' | 'R' | 'X'       => featureSet.treatsNonClassBackslashInClassAsLiteral
-      case 'g' | 'k'                                     => featureSet.treatsBackReferenceBackslashInClassAsLiteral
-      case 'l' | 'u' | 'L' | 'U' | 'F' | 'E' | 'Q' | 'C' => featureSet.hasBackslashCaseCommand
-      case _                                             => false)
+      case 'A' | 'z' | 'Z' | 'G' | 'K' | 'R' | 'X' => featureSet.treatsNonClassBackslashInClassAsLiteral
+      case 'g' | 'k'                               => featureSet.treatsBackReferenceBackslashInClassAsLiteral
+      case 'C'                                     => featureSet.hasBackslashCaseCommand
+      case _                                       => false)
 
   private def parseClassQuote(start: Int): ClassItem =
     val items = Seq.newBuilder[ClassItem]
