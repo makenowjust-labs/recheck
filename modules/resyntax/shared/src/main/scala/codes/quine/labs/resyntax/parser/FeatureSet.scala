@@ -122,6 +122,8 @@ final case class FeatureSet(
     allowsWordIdentifierGroupName: Boolean,
     // .NET
     allowsZeroIndexedCaptureTest: Boolean,
+    // PCRE, Ruby
+    allowsForwardRelativeReference: Boolean,
     // Ruby
     allowsNonNameKBackReference: Boolean,
     // .NET, Java, Perl, Ruby
@@ -521,6 +523,8 @@ object FeatureSet:
       allowsWordIdentifierGroupName = isPerl,
       // .NET
       allowsZeroIndexedCaptureTest = isDotNet,
+      // PCRE, Ruby
+      allowsForwardRelativeReference = isPCRE || isRuby,
       // Ruby
       allowsNonNameKBackReference = isRuby,
       // .NET, Java, Perl, Ruby

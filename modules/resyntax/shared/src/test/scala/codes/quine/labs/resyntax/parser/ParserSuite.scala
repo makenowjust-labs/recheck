@@ -184,6 +184,7 @@ class ParserSuite extends munit.FunSuite:
   check("(?<\\w+[>a)", "", Ruby)(Group(NamedCapture(Angle, "\\w+["), Literal('a')))
   error("(?<-a>a)", "", Ruby)("Invalid identifier at 3")
   error("(?<a)>a)", "", Ruby)("Invalid identifier at 4")
+  check("(?<)>a)", "", Ruby)(Group(NamedCapture(Angle, ")"), Literal('a')))
   check(s"(?<${"a" * 128}>a)", "", PCRE)(Group(NamedCapture(Angle, "a" * 128), Literal('a')))
   error(s"(?<${"a" * 129}>a)", "", PCRE)("Invalid identifier at 3")
   check("(?P<é>a)", "", Python)(Group(PNamedCapture("é"), Literal('a')))
@@ -544,12 +545,17 @@ class ParserSuite extends munit.FunSuite:
   check("\\e", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(Escape(Single('e'), 0x1b)))
   check("\\f", "", All*)(Backslash(Escape(Single('f'), 0x0c)))
   check("\\g1", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Bare), IndexedReference(1))))
-  check("\\g+1", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Bare), RelativeReference(1))))
+  check("\\g+1", "", PCRE)(Backslash(EscapeBackReference(GBackReference(Bare), RelativeReference(1))))
+  error("\\g+1", "", Perl)("Invalid backslash escape at 2")
+  error("\\g-0", "", PCRE, Perl)("Invalid backslash escape at 3")
   check("\\g-1", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Bare), RelativeReference(-1))))
   check("\\g{1}", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Curly), IndexedReference(1))))
-  check("\\g{+1}", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Curly), RelativeReference(1))))
+  check("\\g{+1}", "", PCRE)(Backslash(EscapeBackReference(GBackReference(Curly), RelativeReference(1))))
+  error("\\g{+1}", "", Perl)("Invalid identifier at 3")
+  error("\\g{-0}", "", PCRE, Perl)("Invalid backslash escape at 4")
   check("\\g{-1}", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Curly), RelativeReference(-1))))
   check("\\g{foo}", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Curly), NamedReference("foo"))))
+  check("\\g{é}", "", Perl)(Backslash(EscapeBackReference(GBackReference(Curly), NamedReference("é"))))
   check("\\g<1>", "", PCRE, Ruby)(Backslash(EscapeCall(Angle, IndexedReference(1))))
   check("\\g<+1>", "", PCRE, Ruby)(Backslash(EscapeCall(Angle, RelativeReference(1))))
   check("\\g<-1>", "", PCRE, Ruby)(Backslash(EscapeCall(Angle, RelativeReference(-1))))
@@ -558,27 +564,47 @@ class ParserSuite extends munit.FunSuite:
   check("\\g'+1'", "", PCRE, Ruby)(Backslash(EscapeCall(Quote, RelativeReference(1))))
   check("\\g'-1'", "", PCRE, Ruby)(Backslash(EscapeCall(Quote, RelativeReference(-1))))
   check("\\g'foo'", "", PCRE, Ruby)(Backslash(EscapeCall(Quote, NamedReference("foo"))))
+  check("\\g<a-b+1>", "", Ruby)(Backslash(EscapeCall(Angle, NamedReference("a-b+1"))))
+  error("\\g<+0>", "", PCRE, Ruby)("Invalid backslash escape at 4")
+  error("\\g<a)b>", "", Ruby)("Invalid identifier at 4")
   check("\\h", "", Java, PCRE, Perl)(Backslash(EscapeClass(Horizontal)))
   check("\\h", "", Ruby)(Backslash(EscapeClass(HexDigit)))
   check("\\k<foo>", "", DotNet, Java, PCRE, Perl, Ruby):
     Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("foo")))
   check("\\k<1>", "", Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), IndexedReference(1))))
-  check("\\k<+1>", "", Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), RelativeReference(1))))
+  check("\\k<+1>", "", Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("+1"))))
   check("\\k<-1>", "", Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), RelativeReference(-1))))
   check("\\k<1+0>", "", Ruby):
     Backslash(EscapeBackReference(KBackReference(Angle), LeveledReference(IndexedReference(1), 0)))
   check("\\k<1-1>", "", Ruby):
     Backslash(EscapeBackReference(KBackReference(Angle), LeveledReference(IndexedReference(1), -1)))
+  check("\\k<-1+0>", "", Ruby):
+    Backslash(EscapeBackReference(KBackReference(Angle), LeveledReference(RelativeReference(-1), 0)))
+  check("\\k<a.b+0>", "", Ruby):
+    Backslash(EscapeBackReference(KBackReference(Angle), LeveledReference(NamedReference("a.b"), 0)))
+  error("\\k<a-b>", "", Ruby)("Invalid backslash escape at 5")
+  error("\\k<0>", "", Ruby)("Invalid backslash escape at 3")
+  error("\\k<-0>", "", Ruby)("Invalid backslash escape at 4")
+  check("\\k<0>", "", DotNet)(Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("0"))))
+  error("\\k<1a>", "", DotNet)("Invalid backslash escape at 4")
+  error("\\k<a_b>", "", Java)("Invalid backslash escape at 4")
+  check("\\k<é>", "", DotNet, Perl, Ruby)(Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("é"))))
+  error("\\k<é>", "", Java, PCRE)("Invalid identifier at 3")
   check("\\k<x>", "", JavaScript)(Sequence(Backslash(Unknown('k')), Literal('<'), Literal('x'), Literal('>')))
   check("(?<foo>)\\k<foo>", "", JavaScript):
     Sequence(
       Group(NamedCapture(Angle, "foo"), Sequence()),
       Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("foo")))
     )
+  check("(?<AB>)\\k<\\u0041\\u{42}>", "", JavaScript):
+    Sequence(
+      Group(NamedCapture(Angle, "AB"), Sequence()),
+      Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("AB")))
+    )
   check("\\k'foo'", "", DotNet, PCRE, Perl, Ruby):
     Backslash(EscapeBackReference(KBackReference(Quote), NamedReference("foo")))
   check("\\k'1'", "", Ruby)(Backslash(EscapeBackReference(KBackReference(Quote), IndexedReference(1))))
-  check("\\k'+1'", "", Ruby)(Backslash(EscapeBackReference(KBackReference(Quote), RelativeReference(1))))
+  check("\\k'+1'", "", Ruby)(Backslash(EscapeBackReference(KBackReference(Quote), NamedReference("+1"))))
   check("\\k'-1'", "", Ruby)(Backslash(EscapeBackReference(KBackReference(Quote), RelativeReference(-1))))
   check("\\k'1+0'", "", Ruby):
     Backslash(EscapeBackReference(KBackReference(Quote), LeveledReference(IndexedReference(1), 0)))

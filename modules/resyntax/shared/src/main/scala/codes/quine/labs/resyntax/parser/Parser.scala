@@ -1325,27 +1325,22 @@ private[parser] final class Parser(
         )
       case '+' | '-' =>
         assert(featureSet.hasBackslashGBackReference, "Invalid backslash escape")
-        val sign = if currentChar == '-' then -1 else 1
-        next()
-        val n = parseIntOption().getOrElse(fail("Invalid backslash escape"))
-        BackslashKind.EscapeBackReference(
-          BackReferenceStyle.GBackReference(NameStyle.Bare),
-          Reference.RelativeReference(sign * n)
-        )
+        BackslashKind.EscapeBackReference(BackReferenceStyle.GBackReference(NameStyle.Bare), parseRelativeReference())
       case '{' =>
         assert(featureSet.hasBackslashGBackReference, "Invalid backslash escape")
         next()
         skipBraceBlank()
-        val ref = parseBaseRef()
+        val ref = parseBaseRef('}')
         skipBraceBlank()
         expect('}', "Invalid backslash escape")
         BackslashKind.EscapeBackReference(BackReferenceStyle.GBackReference(NameStyle.Curly), ref)
       case '<' | '\'' =>
         assert(featureSet.hasBackslashGCall, "Invalid backslash escape")
         val style = if currentChar == '<' then NameStyle.Angle else NameStyle.Quote
+        val end = if style == NameStyle.Angle then '>' else '\''
         next()
-        val ref = parseBaseRef()
-        expect(if style == NameStyle.Angle then '>' else '\'', "Invalid backslash escape")
+        val ref = parseBaseRef(end)
+        expect(end, "Invalid backslash escape")
         BackslashKind.EscapeCall(style, ref)
       case _ =>
         fail("Invalid backslash escape")
@@ -1366,31 +1361,49 @@ private[parser] final class Parser(
     (currentChar: @switch) match
       case '<' =>
         next()
-        val ref = parseKRef()
+        val ref = parseKRef('>')
         expect('>', "Invalid backslash escape")
         BackslashKind.EscapeBackReference(BackReferenceStyle.KBackReference(NameStyle.Angle), ref)
       case '\'' =>
         assert(featureSet.hasBackslashKBackReferenceQuote, "Invalid backslash escape")
         next()
-        val ref = parseKRef()
+        val ref = parseKRef('\'')
         expect('\'', "Invalid backslash escape")
         BackslashKind.EscapeBackReference(BackReferenceStyle.KBackReference(NameStyle.Quote), ref)
       case '{' =>
         assert(featureSet.hasBackslashKBackReferenceCurly, "Invalid backslash escape")
         next()
         skipBraceBlank()
-        val ref = parseKRef()
+        val ref = parseKRef('}')
         skipBraceBlank()
         expect('}', "Invalid backslash escape")
         BackslashKind.EscapeBackReference(BackReferenceStyle.KBackReference(NameStyle.Curly), ref)
       case _ =>
         fail("Invalid backslash escape")
 
-  private def parseKRef(): Reference =
-    if featureSet.allowsNonNameKBackReference then parseRef() else Reference.NamedReference(parseID())
+  private def parseKRef(end: Char): Reference =
+    if featureSet.allowsNonNameKBackReference then return parseRef(end)
+    // .NET accepts `\k<0>`, though it rejects `(?<0>...)`.
+    if featureSet.allowsNumberGroupName && isDigit then
+      val start = offset
+      parseIntOption()
+      return Reference.NamedReference(source.slice(start, offset))
+    Reference.NamedReference(parseGroupNameBody(end))
 
-  private def parseRef(): Reference =
-    val ref = parseBaseRef()
+  /** Parses a Ruby's `\\k` reference, where a name ends before a level (e.g. `\\k<x+1>`) and a leading `+` is a part of
+    * a name.
+    */
+  private def parseRef(end: Char): Reference =
+    val ref = (currentChar: @switch) match
+      case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
+        val start = offset
+        val index = parseIntOption().get
+        assert(index != 0, "Invalid backslash escape", start)
+        Reference.IndexedReference(index)
+      case '-' =>
+        parseRelativeReference()
+      case _ =>
+        Reference.NamedReference(parseGroupNameBody(end, levelable = true))
 
     if !featureSet.hasLeveledBackReference then return ref
 
@@ -1402,23 +1415,28 @@ private[parser] final class Parser(
         Reference.LeveledReference(ref, sign * level)
       case _ => ref
 
-  private def parseBaseRef(): Reference.BaseReference =
-    if !featureSet.allowsNonNameBaseRef then
-      val name = parseID()
-      return Reference.NamedReference(name)
+  private def parseBaseRef(end: Char): Reference.BaseReference =
+    if !featureSet.allowsNonNameBaseRef then return Reference.NamedReference(parseGroupNameBody(end))
 
     (currentChar: @switch) match
       case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
         val index = parseIntOption().getOrElse(fail("Invalid backslash escape"))
         Reference.IndexedReference(index)
-      case '+' | '-' =>
-        val sign = if currentChar == '-' then -1 else 1
-        next()
-        val n = parseIntOption().getOrElse(fail("Invalid backslash escape"))
-        Reference.RelativeReference(sign * n)
+      case '+' if featureSet.allowsForwardRelativeReference =>
+        parseRelativeReference()
+      case '-' =>
+        parseRelativeReference()
       case _ =>
-        val name = parseID()
-        Reference.NamedReference(name)
+        Reference.NamedReference(parseGroupNameBody(end))
+
+  private def parseRelativeReference(): Reference.RelativeReference =
+    assert(currentChar == '-' || featureSet.allowsForwardRelativeReference, "Invalid backslash escape")
+    val sign = if currentChar == '-' then -1 else 1
+    next()
+    val start = offset
+    val n = parseIntOption().getOrElse(fail("Invalid backslash escape"))
+    assert(n != 0, "Invalid backslash escape", start)
+    Reference.RelativeReference(sign * n)
 
   private def parseBackslashLowerL(): BackslashKind =
     if !featureSet.hasBackslashCaseCommand then return parseBackslashUnknown()
@@ -2273,13 +2291,17 @@ private[parser] final class Parser(
     next()
     name
 
-  /** Parses a group name, and returns the name with escape sequences decoded. */
-  private def parseGroupNameBody(end: Char = ')'): String =
+  /** Parses a group name, and returns the name with escape sequences decoded.
+    *
+    * If `levelable` is true, a loose name ends before `+` or `-` for a level.
+    */
+  private def parseGroupNameBody(end: Char = ')', levelable: Boolean = false): String =
     val start = offset
 
     if featureSet.allowsLooseGroupName then
       assert(!isEnd && currentChar != end && currentChar != '-' && !isDigit, "Invalid identifier")
-      while !isEnd && currentChar != end do
+      next()
+      while !isEnd && currentChar != end && !(levelable && (currentChar == '+' || currentChar == '-')) do
         assert(currentChar != ')', "Invalid identifier")
         next()
       return source.slice(start, offset)
