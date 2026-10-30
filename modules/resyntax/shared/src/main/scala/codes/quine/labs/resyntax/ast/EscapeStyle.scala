@@ -26,6 +26,9 @@ object EscapeStyle:
   /** UnicodeHex4 is `\uXXXX` escape sequence. */
   case object UnicodeHex4 extends EscapeStyle
 
+  /** UnicodeHex4Pair is `\uXXXX\uXXXX` escape sequence for a surrogate pair. */
+  case object UnicodeHex4Pair extends EscapeStyle
+
   /** UnicodeHex8 is `\UXXXXXXXX` escape sequence. */
   case object UnicodeHex8 extends EscapeStyle
 
@@ -37,6 +40,9 @@ object EscapeStyle:
 
   /** Hex1 is `\xX` escape sequence. */
   case object Hex1 extends EscapeStyle
+
+  /** Hex0 is `\x` escape sequence without digits. */
+  case object Hex0 extends EscapeStyle
 
   /** HexBracket is `\x{XXXX}` escape sequence. */
   case object HexBracket extends EscapeStyle

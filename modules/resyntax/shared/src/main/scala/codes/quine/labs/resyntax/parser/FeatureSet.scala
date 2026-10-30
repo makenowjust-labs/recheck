@@ -12,8 +12,12 @@ final case class FeatureSet(
     allowsAlphabeticUnknownBackslash: Boolean,
     // Java, PCRE, Ruby
     allowsBackslashControlCurly: Boolean,
+    // Perl
+    allowsBackslashXWithoutDigit: Boolean,
     // JavaScript (without `uv`)
     allowsBrokenBackslashControl: Boolean,
+    // JavaScript (without `uv`)
+    allowsBrokenBackslashHex: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     allowsBrokenCloseCurly: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -22,6 +26,8 @@ final case class FeatureSet(
     allowsBrokenCurly: Boolean,
     // .NET, JavaScript (without `uv`), PCRE, Python, Ruby
     allowsBrokenCurlyAfterAlphabeticBackslash: Boolean,
+    // Perl
+    allowsCodePointAbove10FFFF: Boolean,
     // PCRE, Perl
     allowsBlankInBrace: Boolean,
     // JavaScript (with `v`)
@@ -34,6 +40,8 @@ final case class FeatureSet(
     allowsClassNest: Boolean,
     // PCRE, Perl, Ruby
     allowsClassPosix: Boolean,
+    // Perl
+    allowsLooseBraceEscape: Boolean,
     // .NET
     allowsInvalidIdentifier: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -50,6 +58,8 @@ final case class FeatureSet(
     allowsOctalAbove0377: Boolean,
     // Perl
     allowsReversedBoundedRepeat: Boolean,
+    // .NET, Java, JavaScript, PCRE, Perl, Python
+    allowsSurrogateEscape: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     allowsSymbolUnknownBackslash: Boolean,
     // PCRE, Perl
@@ -64,6 +74,8 @@ final case class FeatureSet(
     allowsZeroWidthAssertRepeat: Boolean,
     // JavaScript (without `uv`)
     checksValidBackReference: Boolean,
+    // Java, JavaScript (with `uv`)
+    combinesSurrogatePairEscape: Boolean,
     // .NET, PCRE, Perl, Ruby
     fallsBackMultiDigitBackReferenceToOctal: Boolean,
     // Ruby
@@ -136,12 +148,14 @@ final case class FeatureSet(
     hasBackslashQuoteSet: Boolean,
     // .NET, Java, PCRE, Perl, Ruby
     hasBackslashStickyAssert: Boolean,
-    // JavaScript (with `uv`)
+    // JavaScript (with `uv`), Ruby
     hasBackslashUnicodeBracket: Boolean,
     // .NET, Java, JavaScript, Python, Ruby
     hasBackslashUnicodeHex: Boolean,
     // Python
     hasBackslashUnicodeHex8: Boolean,
+    // Ruby
+    hasBackslashUnicodeList: Boolean,
     // .NET, Java, JavaScript (with `uv`), PCRE. Perl, Ruby
     hasBackslashUnicodeProperty: Boolean,
     // Java, PCRE, Perl
@@ -232,6 +246,8 @@ final case class FeatureSet(
     hasVersionTest: Boolean,
     // Java
     ignoresCurlyAfterRepeat: Boolean,
+    // PCRE (without `u`)
+    limitsCodePointTo0xFF: Boolean,
     // JavaScript (without `uv`)
     limitsOctalTo0377ByDigits: Boolean,
     // Python
@@ -276,8 +292,12 @@ object FeatureSet:
       allowsAlphabeticUnknownBackslash = (isJavaScript && !isUnicode) || isPerl || isRuby,
       // Java, PCRE, Ruby
       allowsBackslashControlCurly = isJava || isPCRE || isRuby,
+      // Perl
+      allowsBackslashXWithoutDigit = isPerl,
       // JavaScript (without `uv`)
       allowsBrokenBackslashControl = isJavaScript && !isUnicode,
+      // JavaScript (without `uv`)
+      allowsBrokenBackslashHex = isJavaScript && !isUnicode,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsBrokenCloseCurly =
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
@@ -286,6 +306,8 @@ object FeatureSet:
       // .NET, JavaScript (without `uv`), PCRE, Python, Ruby
       allowsBrokenCurlyAfterAlphabeticBackslash =
         isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPython || isRuby,
+      // Perl
+      allowsCodePointAbove10FFFF = isPerl,
       // PCRE, Perl
       allowsBlankInBrace = isPCRE || isPerl,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -301,6 +323,8 @@ object FeatureSet:
       allowsClassNest = isJava || isJavaScript && flagSet.unicodeSets || isRuby,
       // PCRE, Perl, Ruby
       allowsClassPosix = isPCRE || isPerl || isRuby,
+      // Perl
+      allowsLooseBraceEscape = isPerl,
       // .NET
       allowsInvalidIdentifier = isDotNet,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -318,6 +342,8 @@ object FeatureSet:
       allowsOctalAbove0377 = isDotNet || (isPCRE && isUnicode) || isPerl,
       // Perl
       allowsReversedBoundedRepeat = isPerl,
+      // .NET, Java, JavaScript, PCRE, Perl, Python
+      allowsSurrogateEscape = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isPython,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsSymbolUnknownBackslash =
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
@@ -333,6 +359,8 @@ object FeatureSet:
       allowsZeroWidthAssertRepeat = isDotNet || isJava || isPerl || isRuby,
       // JavaScript (without `uv`)
       checksValidBackReference = isJavaScript && !isUnicode,
+      // Java, JavaScript (with `uv`)
+      combinesSurrogatePairEscape = isJava || (isJavaScript && isUnicode),
       // .NET, PCRE, Perl, Ruby
       fallsBackMultiDigitBackReferenceToOctal = isDotNet || isPCRE || isPerl || isRuby,
       // Ruby
@@ -406,12 +434,14 @@ object FeatureSet:
       hasBackslashQuoteSet = isJavaScript && flagSet.unicodeSets,
       // .NET, Java, PCRE, Perl, Ruby
       hasBackslashStickyAssert = isDotNet || isJava || isPCRE || isPerl || isRuby,
-      // JavaScript (with `uv`)
-      hasBackslashUnicodeBracket = isJavaScript && isUnicode,
+      // JavaScript (with `uv`), Ruby
+      hasBackslashUnicodeBracket = (isJavaScript && isUnicode) || isRuby,
       // .NET, Java, JavaScript, Python, Ruby
       hasBackslashUnicodeHex = isDotNet || isJava || isJavaScript || isPython || isRuby,
       // Python
       hasBackslashUnicodeHex8 = isPython,
+      // Ruby
+      hasBackslashUnicodeList = isRuby,
       // .NET, Java, JavaScript (with `uv`), PCRE. Perl, Ruby
       hasBackslashUnicodeProperty = isDotNet || isJava || (isJavaScript && isUnicode) || isPCRE || isPerl || isRuby,
       // Java, PCRE. Perl
@@ -502,6 +532,8 @@ object FeatureSet:
       hasVersionTest = isPCRE,
       // Java
       ignoresCurlyAfterRepeat = isJava,
+      // PCRE (without `u`)
+      limitsCodePointTo0xFF = isPCRE && !isUnicode,
       // JavaScript (without `uv`)
       limitsOctalTo0377ByDigits = isJavaScript && !isUnicode,
       // Python

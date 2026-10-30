@@ -2,7 +2,6 @@ package codes.quine.labs.resyntax.parser
 
 import scala.annotation.switch
 import scala.collection.mutable
-import scala.util.Try
 import scala.util.boundary
 
 import codes.quine.labs.resyntax.ast.AssertKind
@@ -63,6 +62,9 @@ private[parser] final class Parser(
     if source.isEmpty then '\u0000' else source.charAt(offset)
 
   private var context: ParsingContext = ParsingContext.from(featureSet)
+
+  // Ruby's `\u{X Y}` is read as the first code point, and the rest are kept here until the caller takes them.
+  private var pendingCodePoints: List[Int] = Nil
 
   def parse(): Node =
     val node = parseDisjunction()
@@ -186,8 +188,8 @@ private[parser] final class Parser(
     val start = offset
     parseSaturatedIntOption(featureSet.maxRepeatCount, "Number too big in {} quantifier", start)
 
-  private def skipBraceBlank(): Unit =
-    if featureSet.allowsBlankInBrace then while !isEnd && (currentChar == ' ' || currentChar == '\t') do next()
+  private def skipBraceBlank(force: Boolean = false): Unit =
+    if force || featureSet.allowsBlankInBrace then while !isEnd && (currentChar == ' ' || currentChar == '\t') do next()
 
   private def popRepeatable(stack: mutable.Stack[Node]): Node =
     assert(stack.nonEmpty, "Nothing to repeat")
@@ -881,6 +883,12 @@ private[parser] final class Parser(
     val end = offset
     stack.push(Node(NodeData.Backslash(backslash), SourceLocation(start, end)))
 
+    for value <- pendingCodePoints do
+      stack.push(
+        Node(NodeData.Backslash(BackslashKind.Escape(EscapeStyle.UnicodeBracket, value)), SourceLocation(start, end))
+      )
+    pendingCodePoints = Nil
+
     if backslash != BackslashKind.CaseCommand(CaseCommandKind.QuoteCommand) then return
 
     while !isEnd && !source.startsWith("\\E", offset) do parseLiteral(stack)
@@ -1142,11 +1150,8 @@ private[parser] final class Parser(
 
     next()
     expect('{', "Invalid backslash escape")
-    val value = parseOctalIntOption().getOrElse(fail("Invalid backslash escape"))
-    expect('}', "Invalid backslash escape")
-
+    val value = parseBracedCodePoint(8)
     BackslashKind.Escape(EscapeStyle.Octal, value)
-
   private def parseBackslashLowerP(): BackslashKind =
     if !featureSet.hasBackslashUnicodeProperty then return parseBackslashUnknown()
 
@@ -1223,23 +1228,44 @@ private[parser] final class Parser(
 
     if featureSet.hasBackslashUnicodeBracket && currentChar == '{' then
       next()
-      val value = parseHexIntOption().getOrElse(fail("Invalid backslash escape"))
-      expect('}', "Invalid backslash escape")
+      if featureSet.hasBackslashUnicodeList then return parseUnicodeList()
+      val value = parseBracedCodePoint(16)
       return BackslashKind.Escape(EscapeStyle.UnicodeBracket, value)
 
     if featureSet.hasBackslashCaseCommand then return BackslashKind.CaseCommand(CaseCommandKind.SingleUpperCaseCommand)
 
-    boundary:
-      for _ <- 1 to 4 do
-        if !isHexDigit then
-          reset(save)
-          boundary.break(parseBackslashUnknown())
-        next()
+    if !source.slice(offset, offset + 4).forall(CodePointUtil.isHexDigit(_)) || offset + 4 > source.length then
+      assert(featureSet.allowsBrokenBackslashHex, "Invalid backslash escape")
+      reset(save)
+      return parseBackslashUnknown()
 
-      val str = source.slice(offset - 4, offset)
-      val value = Try(Integer.parseInt(str, 16)).toOption.getOrElse(fail("Invalid integer"))
-      BackslashKind.Escape(EscapeStyle.UnicodeHex4, value)
+    val value = checkCodePoint(parseHexDigits(4), save)
 
+    val isHighSurrogate = CodePointUtil.isHighSurrogate(value)
+    if featureSet.combinesSurrogatePairEscape && isHighSurrogate && source.startsWith("\\u", offset) then
+      val low = source.slice(offset + 2, offset + 6)
+      if low.length == 4 && low.forall(CodePointUtil.isHexDigit(_)) then
+        val lowValue = Integer.parseInt(low, 16)
+        if CodePointUtil.isLowSurrogate(lowValue) then
+          reset(offset + 6)
+          val pairValue = CodePointUtil.decodeSurrogatePair(value, lowValue)
+          return BackslashKind.Escape(EscapeStyle.UnicodeHex4Pair, pairValue)
+
+    BackslashKind.Escape(EscapeStyle.UnicodeHex4, value)
+
+  private def parseUnicodeList(): BackslashKind =
+    skipBraceBlank(force = true)
+    val values = Seq.newBuilder[Int]
+    while !isEnd && isHexDigit do
+      val start = offset
+      values.addOne(checkCodePoint(parseHexDigits(Int.MaxValue), start))
+      skipBraceBlank(force = true)
+    expect('}', "Invalid backslash escape")
+    values.result() match
+      case Seq()         => fail("Invalid backslash escape")
+      case value +: rest =>
+        pendingCodePoints = rest.toList
+        BackslashKind.Escape(EscapeStyle.UnicodeBracket, value)
   private def parseBackslashLowerV(): BackslashKind =
     if !(featureSet.hasBackslashVerticalSpace || featureSet.hasBackslashVerticalTab) then return parseBackslashUnknown()
 
@@ -1259,30 +1285,23 @@ private[parser] final class Parser(
 
     if featureSet.hasBackslashXBracket && currentChar == '{' then
       next()
-      val value = parseHexIntOption().getOrElse(fail("Invalid backslash escape"))
-      expect('}', "Invalid backslash escape")
+      val value = parseBracedCodePoint(16)
       return BackslashKind.Escape(EscapeStyle.HexBracket, value)
 
     if !isHexDigit then
+      if featureSet.allowsBackslashXWithoutDigit then return BackslashKind.Escape(EscapeStyle.Hex0, 0x00)
+      assert(featureSet.allowsBrokenBackslashHex, "Invalid backslash escape")
       reset(save)
       return parseBackslashUnknown()
 
-    next()
+    val isHex2 = offset + 1 < source.length && CodePointUtil.isHexDigit(source.charAt(offset + 1).toInt)
+    if isHex2 then return BackslashKind.Escape(EscapeStyle.Hex2, parseHexDigits(2).toInt)
 
-    if featureSet.hasBackslashXHex1 && !isHexDigit then
-      val str = source.slice(offset - 1, offset)
-      val value = Try(Integer.parseInt(str, 16)).getOrElse(fail("Invalid backslash escape"))
-      return BackslashKind.Escape(EscapeStyle.Hex1, value)
+    if featureSet.hasBackslashXHex1 then return BackslashKind.Escape(EscapeStyle.Hex1, parseHexDigits(1).toInt)
 
-    if !isHexDigit then
-      reset(save)
-      return parseBackslashUnknown()
-
-    next()
-    val str = source.slice(offset - 2, offset)
-    val value = Try(Integer.parseInt(str, 16)).getOrElse(fail("Invalid backslash escape"))
-    BackslashKind.Escape(EscapeStyle.Hex2, value)
-
+    assert(featureSet.allowsBrokenBackslashHex, "Invalid backslash escape")
+    reset(save)
+    parseBackslashUnknown()
   private def parseBackslashLowerZ(): BackslashKind =
     if !featureSet.hasBackslashEnd then return parseBackslashUnknown()
 
@@ -1422,18 +1441,18 @@ private[parser] final class Parser(
   private def parseBackslashUpperU(): BackslashKind =
     if !(featureSet.hasBackslashUnicodeHex8 || featureSet.hasBackslashCaseCommand) then return parseBackslashUnknown()
 
+    val save = offset
     next()
 
     if featureSet.hasBackslashCaseCommand then return BackslashKind.CaseCommand(CaseCommandKind.UpperCaseCommand)
 
-    for _ <- 1 to 8 do
-      assert(isHexDigit, "Invalid backslash escape")
-      next()
+    for i <- 0 until 8 do
+      assert(
+        offset + i < source.length && CodePointUtil.isHexDigit(source.charAt(offset + i).toInt),
+        "Invalid backslash escape"
+      )
 
-    val str = source.slice(offset - 8, offset)
-    val value = Try(Integer.parseInt(str, 16)).toOption.getOrElse(fail("Invalid integer"))
-    BackslashKind.Escape(EscapeStyle.UnicodeHex8, value)
-
+    BackslashKind.Escape(EscapeStyle.UnicodeHex8, checkCodePoint(parseHexDigits(8), save))
   private def parseBackslashUpperV(): BackslashKind =
     if !featureSet.hasBackslashVerticalSpace then return parseBackslashUnknown()
 
@@ -1666,6 +1685,11 @@ private[parser] final class Parser(
       val backslash = parseBackslashKind()
       val end = offset
       backslash match
+        case kind: BackslashKind.BackslashValue if pendingCodePoints.nonEmpty =>
+          val values = (kind.value :: pendingCodePoints).map: value =>
+            ClassItem.Value(ClassItemData.ClassBackslashValue(BackslashKind.Escape(EscapeStyle.UnicodeBracket, value)))
+          pendingCodePoints = Nil
+          return ClassItem(ClassItemData.ClassUnion(values), SourceLocation(start, end))
         case kind: BackslashKind.BackslashValue =>
           return ClassItem.Value(ClassItemData.ClassBackslashValue(kind), SourceLocation(start, end))
         case BackslashKind.EscapeClass(
@@ -1683,10 +1707,10 @@ private[parser] final class Parser(
 
   private def isLiteralBackslashInClass: Boolean =
     !isEnd && ((currentChar: @switch) match
-      case 'A' | 'z' | 'Z' | 'G' | 'K' | 'R' | 'X' => featureSet.treatsNonClassBackslashInClassAsLiteral
-      case 'g' | 'k'                               => featureSet.treatsBackReferenceBackslashInClassAsLiteral
-      case 'l' | 'u' | 'L' | 'U' | 'F' | 'E' | 'Q' => featureSet.hasBackslashCaseCommand
-      case _                                       => false)
+      case 'A' | 'z' | 'Z' | 'G' | 'K' | 'R' | 'X'       => featureSet.treatsNonClassBackslashInClassAsLiteral
+      case 'g' | 'k'                                     => featureSet.treatsBackReferenceBackslashInClassAsLiteral
+      case 'l' | 'u' | 'L' | 'U' | 'F' | 'E' | 'Q' | 'C' => featureSet.hasBackslashCaseCommand
+      case _                                             => false)
 
   private def parseClassQuote(start: Int): ClassItem =
     val items = Seq.newBuilder[ClassItem]
@@ -1791,27 +1815,42 @@ private[parser] final class Parser(
     if value > max then fail(message, pos)
     Some(value.min(Int.MaxValue).toInt)
 
-  private def parseOctalIntOption(): Option[Int] =
-    if !isOctalDigit then return None
+  private def parseHexDigits(size: Int): Long =
+    var value = 0L
+    var count = 0
+    while count < size && isHexDigit do
+      value = (value * 16 + Character.digit(currentChar, 16)).min(Long.MaxValue / 16)
+      count += 1
+      next()
+    value
 
+  private def parseBracedCodePoint(radix: Int): Int =
+    skipBraceBlank()
     val start = offset
+    var value = 0L
+    var count = 0
+    while !isEnd && (if radix == 8 then isOctalDigit else isHexDigit) do
+      value = (value * radix + Character.digit(currentChar, radix)).min(Long.MaxValue / 16)
+      count += 1
+      next()
 
-    while isOctalDigit do next()
-    val end = offset
+    // Perl reads `\x{}` as `\x{0}`, but rejects `\o{}`.
+    if featureSet.allowsLooseBraceEscape && (count > 0 || radix == 16 || currentChar != '}') then
+      while !isEnd && currentChar != '}' do next()
+    else
+      assert(count > 0, "Invalid backslash escape")
+      skipBraceBlank()
+    expect('}', "Invalid backslash escape")
+    checkCodePoint(value, start)
 
-    val str = source.slice(start, end)
-    Try(Integer.parseInt(str, 8)).toOption.orElse(fail("Invalid integer"))
-
-  private def parseHexIntOption(): Option[Int] =
-    if !isHexDigit then return None
-
-    val start = offset
-
-    while isHexDigit do next()
-    val end = offset
-
-    val str = source.slice(start, end)
-    Try(Integer.parseInt(str, 16)).toOption.orElse(fail("Invalid integer"))
+  private def checkCodePoint(value: Long, pos: Int): Int =
+    val max: Long =
+      if featureSet.allowsCodePointAbove10FFFF then Long.MaxValue
+      else if featureSet.limitsCodePointTo0xFF then 0xff
+      else 0x10ffff
+    if value > max then fail("Code point too large", pos)
+    if !featureSet.allowsSurrogateEscape && 0xd800 <= value && value <= 0xdfff then fail("Invalid Unicode escape", pos)
+    value.min(Int.MaxValue).toInt
 
   private def skipComment(): Boolean =
     var skipped = false
