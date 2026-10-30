@@ -268,6 +268,8 @@ final case class FeatureSet(
     processBackslashInLineComment: Boolean,
     // Java
     readsBackReferenceDigitsWhileGroupExists: Boolean,
+    // Perl
+    readsLeadingCurlyAsLiteral: Boolean,
     // Python
     readsThreeOctalDigitsAsOctal: Boolean,
     // JavaScript (with `uv`)
@@ -568,6 +570,8 @@ object FeatureSet:
       processBackslashInLineComment = isPython,
       // Java
       readsBackReferenceDigitsWhileGroupExists = isJava,
+      // Perl
+      readsLeadingCurlyAsLiteral = isPerl,
       // Python
       readsThreeOctalDigitsAsOctal = isPython,
       // JavaScript (with `uv`)

@@ -140,6 +140,10 @@ private[parser] final class Parser(
 
   private def parseCurlyQuantifier(stack: mutable.Stack[Node]): Unit =
     val save = offset
+    if stack.isEmpty && featureSet.readsLeadingCurlyAsLiteral then
+      resetBracket(stack, save)
+      return
+
     next()
     skipBraceBlank()
     val minOption = parseRepeatCountOption()
@@ -177,10 +181,12 @@ private[parser] final class Parser(
 
   private def pushCurlyRepeat(stack: mutable.Stack[Node], quantifier: Quantifier): Unit =
     stack.headOption match
-      // Java ignores a curly quantifier following another quantifier: `a{2}{3}` matches `aa`.
+      // Java ignores a curly quantifier following another quantifier or nothing: `a{2}{3}` matches `aa`.
       case Some(node @ Node(NodeData.Repeat(_, _), _)) if featureSet.ignoresCurlyAfterRepeat =>
         stack.pop()
         stack.push(node.copy(loc = node.loc.copy(end = offset)))
+      case None if featureSet.ignoresCurlyAfterRepeat =>
+        ()
       case _ =>
         pushRepeat(stack, popRepeatable(stack), quantifier)
 
