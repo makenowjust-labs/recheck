@@ -18,6 +18,9 @@ package codes.quine.labs.resyntax.ast
   *   "?" ConditionalTest Node ("|" Node)?
   *   "*" BacktrackControl? (":" Name)?
   *   "*" StartOption ("=" Int)?
+  *   "?~|" Sequence "|" Node
+  *   "?~|" Sequence
+  *   "?~|"
   * }}}
   */
 sealed abstract class CommandKind extends Product with Serializable:
@@ -26,6 +29,10 @@ sealed abstract class CommandKind extends Product with Serializable:
       ls.length == rs.length && ls.zip(rs).forall { case (l, r) => l.equalsWithoutLoc(r) }
     case (CommandKind.Conditional(tl, yl, nl), CommandKind.Conditional(tr, yr, nr)) =>
       tl.equalsWithoutLoc(tr) && yl.equalsWithoutLoc(yr) && nl.zip(nr).forall { case (l, r) => l.equalsWithoutLoc(r) }
+    case (CommandKind.AbsenceExpression(al, el), CommandKind.AbsenceExpression(ar, er)) =>
+      al.equalsWithoutLoc(ar) && el.equalsWithoutLoc(er)
+    case (CommandKind.AbsenceStopper(l), CommandKind.AbsenceStopper(r)) =>
+      l.equalsWithoutLoc(r)
     case (l, r) => l == r
 
 object CommandKind:
@@ -90,6 +97,21 @@ object CommandKind:
 
   /** BacktrackControl is a backtrack control command (e.g. `(*COMMIT)`). */
   final case class BacktrackControl(kind: Option[BacktrackControlKind], name: Option[String]) extends CommandKind
+
+  /** AbsenceExpression is an absence expression (e.g. `(?~|foo|bar)`). */
+  final case class AbsenceExpression(absent: Node, exp: Node) extends CommandKind
+
+  object AbsenceExpression:
+    def apply(absent: NodeData, exp: NodeData): AbsenceExpression = AbsenceExpression(Node(absent), Node(exp))
+
+  /** AbsenceStopper is an absence stopper (e.g. `(?~|foo)`). */
+  final case class AbsenceStopper(absent: Node) extends CommandKind
+
+  object AbsenceStopper:
+    def apply(absent: NodeData): AbsenceStopper = AbsenceStopper(Node(absent))
+
+  /** AbsenceRangeClear is a range clear of absence stoppers (e.g. `(?~|)`). */
+  case object AbsenceRangeClear extends CommandKind
 
   /** StartOption is an option setting at the start of a pattern (e.g. `(*UTF)` or `(*LIMIT_MATCH=10)`). */
   final case class StartOption(name: String, value: Option[Int]) extends CommandKind

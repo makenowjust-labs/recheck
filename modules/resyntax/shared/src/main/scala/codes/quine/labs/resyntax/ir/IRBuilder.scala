@@ -88,24 +88,27 @@ private[ir] class IRBuilder(
     IRNodeData.Repeat(build(child), q)
 
   def buildCommand(node: Node, kind: CommandKind): Either[IRNodeData, IRNode] = kind match
-    case CommandKind.InlineFlag(_)          => ???
-    case CommandKind.ResetFlag(_)           => ???
-    case CommandKind.PBackReference(_)      => ???
-    case CommandKind.RCall                  => Left(buildRCallCommand(node))
-    case CommandKind.IndexedCall(_)         => Left(buildIndexedCallCommand(node))
-    case CommandKind.RelativeCall(_)        => Left(buildRelativeCallCommand(node))
-    case CommandKind.NamedCall(_)           => Left(buildNamedCallCommand(node))
-    case CommandKind.PNamedCall(_)          => Left(buildPNamedCallCommand(node))
-    case CommandKind.Comment(_)             => Left(buildCommentCommand())
-    case CommandKind.InlineCode(_)          => Left(buildInlineCodeCommand(node))
-    case CommandKind.EmbedCode(_)           => Left(buildEmbedCodeCommand(node))
-    case CommandKind.Callout                => Left(buildCalloutCommand(node))
-    case CommandKind.CalloutInt(_)          => Left(buildCalloutIntCommand(node))
-    case CommandKind.CalloutString(_, _, _) => Left(buildCalloutStringCommand(node))
-    case CommandKind.BranchReset(_)         => Left(buildBranchResetCommand(node))
-    case CommandKind.Conditional(_, _, _)   => Left(buildConditionalCommand(node))
-    case CommandKind.BacktrackControl(_, _) => Left(buildBacktrackControlCommand(node))
-    case CommandKind.StartOption(_, _)      => Left(buildStartOptionCommand(node))
+    case CommandKind.InlineFlag(_)           => ???
+    case CommandKind.ResetFlag(_)            => ???
+    case CommandKind.PBackReference(_)       => ???
+    case CommandKind.RCall                   => Left(buildRCallCommand(node))
+    case CommandKind.IndexedCall(_)          => Left(buildIndexedCallCommand(node))
+    case CommandKind.RelativeCall(_)         => Left(buildRelativeCallCommand(node))
+    case CommandKind.NamedCall(_)            => Left(buildNamedCallCommand(node))
+    case CommandKind.PNamedCall(_)           => Left(buildPNamedCallCommand(node))
+    case CommandKind.Comment(_)              => Left(buildCommentCommand())
+    case CommandKind.InlineCode(_)           => Left(buildInlineCodeCommand(node))
+    case CommandKind.EmbedCode(_)            => Left(buildEmbedCodeCommand(node))
+    case CommandKind.Callout                 => Left(buildCalloutCommand(node))
+    case CommandKind.CalloutInt(_)           => Left(buildCalloutIntCommand(node))
+    case CommandKind.CalloutString(_, _, _)  => Left(buildCalloutStringCommand(node))
+    case CommandKind.BranchReset(_)          => Left(buildBranchResetCommand(node))
+    case CommandKind.Conditional(_, _, _)    => Left(buildConditionalCommand(node))
+    case CommandKind.BacktrackControl(_, _)  => Left(buildBacktrackControlCommand(node))
+    case CommandKind.StartOption(_, _)       => Left(buildStartOptionCommand(node))
+    case CommandKind.AbsenceExpression(_, _) => Left(buildAbsenceCommand(node))
+    case CommandKind.AbsenceStopper(_)       => Left(buildAbsenceCommand(node))
+    case CommandKind.AbsenceRangeClear       => Left(buildAbsenceCommand(node))
 
   def buildRCallCommand(node: Node): IRNodeData =
     IRNodeData.Unsupported(node.data)
@@ -149,6 +152,9 @@ private[ir] class IRBuilder(
     IRNodeData.Unsupported(node.data)
 
   def buildStartOptionCommand(node: Node): IRNodeData =
+    IRNodeData.Unsupported(node.data)
+
+  def buildAbsenceCommand(node: Node): IRNodeData =
     IRNodeData.Unsupported(node.data)
 
   def buildGroup(node: Node, kind: GroupKind, child: Node): Either[IRNodeData, IRNode] = kind match

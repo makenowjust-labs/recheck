@@ -381,7 +381,22 @@ private[parser] final class Parser(
   private def parseAbsenceGroup(stack: mutable.Stack[Node], start: Int): Unit =
     assert(featureSet.hasAbsenceOperator, "Invalid group")
     next()
-    parseGroupBody(stack, GroupKind.Absence, start)
+    if isEnd || currentChar != '|' then
+      parseGroupBody(stack, GroupKind.Absence, start)
+      return
+
+    next()
+    if !isEnd && currentChar == ')' then
+      pushCommand(stack, CommandKind.AbsenceRangeClear, start)
+      return
+
+    protectContext:
+      val absent = protectContext(parseSequence())
+      if !isEnd && currentChar == '|' then
+        next()
+        val exp = protectContext(parseDisjunction())
+        pushCommand(stack, CommandKind.AbsenceExpression(absent, exp), start)
+      else pushCommand(stack, CommandKind.AbsenceStopper(absent), start)
 
   private val LookAroundTests: Seq[(String, String, String, AssertNameStyle => GroupKind.LookAround)] = Seq(
     ("?=", "*positive_lookahead:", "*pla:", GroupKind.PositiveLookAhead(_)),
