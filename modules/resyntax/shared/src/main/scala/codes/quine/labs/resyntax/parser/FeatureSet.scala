@@ -176,7 +176,7 @@ final case class FeatureSet(
     hasPCall: Boolean,
     // PCRE, Perl, Python
     hasPGroup: Boolean,
-    // Java, PCRE, Perl, Ruby
+    // Java, PCRE, Perl, Python, Ruby
     hasPossessiveBacktrackStrategy: Boolean,
     // PCRE, Perl
     hasRecursionTest: Boolean,
@@ -388,8 +388,8 @@ object FeatureSet:
       hasPCall = isPCRE || isPerl,
       // PCRE, Perl, Python
       hasPGroup = isPCRE || isPerl || isPython,
-      // Java, PCRE, Perl, Ruby
-      hasPossessiveBacktrackStrategy = isJava || isPCRE || isPerl || isRuby,
+      // Java, PCRE, Perl, Python, Ruby
+      hasPossessiveBacktrackStrategy = isJava || isPCRE || isPerl || isPython || isRuby,
       // PCRE, Perl
       hasRecursionTest = isPCRE || isPerl,
       // PCRE, Perl
