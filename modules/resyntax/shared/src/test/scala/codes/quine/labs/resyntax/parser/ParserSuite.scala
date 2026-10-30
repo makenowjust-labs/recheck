@@ -3,6 +3,7 @@ package codes.quine.labs.resyntax.parser
 import codes.quine.labs.resyntax.ast.AssertKind.*
 import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
+import codes.quine.labs.resyntax.ast.CommandKind.Comment
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.EscapeClassKind.*
 import codes.quine.labs.resyntax.ast.EscapeStyle.*
@@ -113,6 +114,26 @@ class ParserSuite extends ParserSuiteBase:
   error("(?<=a)*", "", JavaScript)("Nothing to repeat at 6")
   check("}", "", All*)(Literal('}'))
   error("}", "u", JavaScript)("Incomplete quantifier at 0")
+  check("a(?#x)*", "", DotNet, PCRE, Perl, Python, Ruby)(Repeat(Literal('a'), Star(Greedy)))
+  check("a(?#x)(?#y)+", "", DotNet, PCRE, Perl, Python, Ruby)(Repeat(Literal('a'), Plus(Greedy)))
+  check("a(?#x){2}", "", DotNet, PCRE, Perl, Python, Ruby)(Repeat(Literal('a'), Exact(2, Greedy)))
+  check("a(?#x)b", "", DotNet, PCRE, Perl, Python, Ruby)(Sequence(Literal('a'), Command(Comment("x")), Literal('b')))
+  error("(?#x)*", "", DotNet, PCRE, Perl, Python, Ruby)("Nothing to repeat at 5")
+  error("(?#x){2}", "", DotNet, PCRE, Python, Ruby)("Nothing to repeat at 8")
+  check("(?#x){2}", "", Perl)(Sequence(Command(Comment("x")), Literal('{'), Literal('2'), Literal('}')))
+  error("a(?i)(?#x)*", "", DotNet, PCRE, Perl, Ruby)("Nothing to repeat at 10")
+  check("a+(?#x)?", "", DotNet, PCRE, Perl, Ruby)(Repeat(Literal('a'), Plus(Lazy)))
+  error("a+(?#x)?", "", Python)("Nested quantifier at 7")
+  check("a+(?#x)+", "", PCRE, Perl, Ruby)(Repeat(Literal('a'), Plus(Possessive)))
+  error("a+(?#x)+", "", DotNet)("Nested quantifier at 7")
+  check("a{2}(?#x)?", "", DotNet, PCRE, Perl)(Repeat(Literal('a'), Exact(2, Lazy)))
+  check("a{2}(?#x)?", "", Ruby)(Repeat(Repeat(Literal('a'), Exact(2, Greedy)), Question(Greedy)))
+  error("a{2}(?#x)?", "", Python)("Nested quantifier at 9")
+  check("a+ ?", "x", DotNet, Java, PCRE, Perl)(Repeat(Literal('a'), Plus(Lazy)))
+  check("a+ #x\n?", "x", DotNet, Java, PCRE, Perl)(Repeat(Literal('a'), Plus(Lazy)))
+  check("a{1,2} ?", "x", DotNet, Java, PCRE, Perl)(Repeat(Literal('a'), Bounded(1, 2, Lazy)))
+  check("a+ ?", "x", Ruby)(Repeat(Repeat(Literal('a'), Plus(Greedy)), Question(Greedy)))
+  error("a+ ?", "x", Python)("Nested quantifier at 3")
 
   // Caret
   check("^", "", All*)(Caret)

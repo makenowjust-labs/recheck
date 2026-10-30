@@ -2,6 +2,7 @@ package codes.quine.labs.resyntax.parser
 import codes.quine.labs.resyntax.ast.AssertNameStyle.*
 import codes.quine.labs.resyntax.ast.BacktrackControlKind.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
+import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.CommandKind.*
 import codes.quine.labs.resyntax.ast.ConditionalTest.*
@@ -135,6 +136,41 @@ class ParserCommandSuite extends ParserSuiteBase:
   error("(?^-i)", "", PCRE, Perl)("Invalid group at 3")
   check("(?#x)", "", DotNet, PCRE, Perl, Python, Ruby)(Command(Comment("x")))
   check("(?#x\\)y)", "", Python, Ruby)(Command(Comment("x\\)y")))
+  check("(?#x)(?#y)a", "", DotNet, PCRE, Perl, Python, Ruby):
+    Sequence(Command(Comment("x")), Command(Comment("y")), Literal('a'))
+  check("a(?#x)|(?#y)", "", DotNet, PCRE, Perl, Python, Ruby):
+    Disjunction(Sequence(Literal('a'), Command(Comment("x"))), Command(Comment("y")))
+  check("((?#x))", "", DotNet, PCRE, Perl, Python, Ruby)(Group(IndexedCapture, Command(Comment("x"))))
+  error("(?#x", "", DotNet, PCRE, Perl, Python, Ruby)("Invalid group at 4")
+  check("(?(?#x)a)", "", Ruby)(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true), None))))
+  check("(?i(?#x)m)a", "", Ruby):
+    Sequence(
+      Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true, multiline = true), None))),
+      Literal('a')
+    )
+  check("a{1(?#x),2}", "", Ruby)(Repeat(Literal('a'), Bounded(1, 2, Greedy)))
+  check("(?<a(?#x)b>c)", "", Ruby)(Group(NamedCapture(Angle, "ab"), Literal('c')))
+  check("[(?#x)]", "", Ruby):
+    Class(
+      false,
+      ClassUnion(ClassLiteral('('), ClassLiteral('?'), ClassLiteral('#'), ClassLiteral('x'), ClassLiteral(')'))
+    )
+  check("[#(?#x)]", "x", Ruby):
+    Class(
+      false,
+      ClassUnion(
+        ClassLiteral('#'),
+        ClassLiteral('('),
+        ClassLiteral('?'),
+        ClassLiteral('#'),
+        ClassLiteral('x'),
+        ClassLiteral(')')
+      )
+    )
+  error("\\(?#x)", "", Ruby)("Unmatched ')' at 5")
+  error("(?x:#(?#\n))", "", Ruby)("Unmatched ')' at 10")
+  check("(?x:#\n)(?#y)", "", Ruby):
+    Sequence(Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)), Sequence()), Command(Comment("y")))
   check("(?{x})", "", Perl)(Command(InlineCode("x")))
   check("(??{x})", "", Perl)(Command(EmbedCode("x")))
   check("(?C)", "", PCRE)(Command(Callout))

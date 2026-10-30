@@ -82,6 +82,17 @@ private[parser] final class Parser(
   // Ruby's `\u{X Y}` is read as the first code point, and the rest are kept here until the caller takes them.
   private var pendingCodePoints: List[Int] = Nil
 
+  /** The `(?#...)` ranges that Ruby removes from the source before parsing, as maps from start to end and back. */
+  private val removedCommentEnds: Map[Int, Int] =
+    if featureSet.removesCommentGroup then scanRemovedComments().toMap else Map.empty
+
+  private val removedCommentStarts: Map[Int, Int] = removedCommentEnds.map(_.swap)
+
+  /** The end of the last removed comment that is already in the result. */
+  private var removedCommentEmittedEnd: Int = 0
+
+  reset(0)
+
   def parse(): Node =
     val node = parseDisjunction()
     if !isEnd then
@@ -121,6 +132,7 @@ private[parser] final class Parser(
     val savedSequenceStart = sequenceStart
     sequenceStart = start
     while !isSequenceStop do parseSequenceItem(stack)
+    pushRemovedComments(stack)
     sequenceStart = savedSequenceStart
 
     val nodes = stack.toSeq
@@ -130,6 +142,7 @@ private[parser] final class Parser(
     Node(NodeData.Sequence(nodes.reverse), SourceLocation(start, end))
 
   private def parseSequenceItem(stack: mutable.Stack[Node]): Unit =
+    pushRemovedComments(stack)
     if context.skipsComment && skipComment() then return
 
     (currentChar: @switch) match
@@ -169,7 +182,7 @@ private[parser] final class Parser(
 
   private def parseCurlyQuantifier(stack: mutable.Stack[Node]): Unit =
     val save = offset
-    if stack.isEmpty && featureSet.readsLeadingCurlyAsLiteral then
+    if stack.forall(isComment) && featureSet.readsLeadingCurlyAsLiteral then
       resetBracket(stack, save)
       return
 
@@ -227,6 +240,7 @@ private[parser] final class Parser(
     if force || featureSet.allowsBlankInBrace then while !isEnd && (currentChar == ' ' || currentChar == '\t') do next()
 
   private def popRepeatable(stack: mutable.Stack[Node]): Node =
+    while stack.headOption.exists(isComment) do stack.pop()
     assert(stack.nonEmpty, "Nothing to repeat")
     val node = stack.pop()
     assertRepeatable(node)
@@ -262,15 +276,35 @@ private[parser] final class Parser(
   private def parseBacktrackStrategy(exact: Boolean): BacktrackStrategy =
     if isEnd || exact && !featureSet.allowsMeaninglessBacktrackStrategy then return BacktrackStrategy.Greedy
 
-    if currentChar == '?' then
+    val save = offset
+    if featureSet.skipsCommentBeforeBacktrackStrategy then skipCommentBeforeBacktrackStrategy()
+
+    if !isEnd && currentChar == '?' then
       next()
       return BacktrackStrategy.Lazy
 
-    if featureSet.hasPossessiveBacktrackStrategy && currentChar == '+' then
+    if featureSet.hasPossessiveBacktrackStrategy && !isEnd && currentChar == '+' then
       next()
       return BacktrackStrategy.Possessive
 
+    reset(save)
     BacktrackStrategy.Greedy
+
+  /** Skips comments between a quantifier and its `?` or `+`, which some engines read as if they were not there. */
+  private def skipCommentBeforeBacktrackStrategy(): Unit =
+    var continue = true
+    while continue do
+      continue = context.skipsComment && skipComment()
+      if featureSet.hasInlineComment && source.startsWith("(?#", offset) then
+        val start = offset
+        reset(offset + 2)
+        parseCommentGroup(mutable.Stack.empty, start)
+        continue = true
+
+  private def isComment(node: Node): Boolean =
+    node.data match
+      case NodeData.Command(_: CommandKind.Comment) => true
+      case _                                        => false
 
   private def resetBracket(stack: mutable.Stack[Node], save: Int): Unit =
     if !featureSet.allowsBrokenCurly then fail("Incomplete quantifier", save)
@@ -753,6 +787,108 @@ private[parser] final class Parser(
     val text = source.slice(textStart, end)
     pushCommand(stack, CommandKind.Comment(text), start)
 
+  /** Pushes the removed comments that end right before the current position, which are at a sequence position. */
+  private def pushRemovedComments(stack: mutable.Stack[Node]): Unit =
+    if removedCommentStarts.isEmpty then return
+    var comments = List.empty[Node]
+    var end = offset
+    while end > removedCommentEmittedEnd && removedCommentStarts.contains(end) do
+      val start = removedCommentStarts(end)
+      comments ::= Node(
+        NodeData.Command(CommandKind.Comment(source.slice(start + 3, end - 1))),
+        SourceLocation(start, end)
+      )
+      end = start
+    if comments.nonEmpty then
+      comments.foreach(stack.push)
+      removedCommentEmittedEnd = offset
+
+  /** Finds the `(?#...)` ranges as Ruby's `unescape_nonascii0` in `re.c` does. */
+  private def scanRemovedComments(): Seq[(Int, Int)] =
+    val ranges = Seq.newBuilder[(Int, Int)]
+
+    def skipEscape(i: Int): Int =
+      source.charAt(i) match
+        case 'c' | 'C' | 'M'                             => skipControlEscape(i)
+        case c if CodePointUtil.isHighSurrogate(c.toInt) => i + 2
+        case _                                           => i + 1
+
+    // It follows `read_escaped_byte` because `\cX`, `\C-X` and `\M-X` consume `X` even if it is `(` or `[`.
+    def skipControlEscape(start: Int): Int =
+      var i = start
+      while i < source.length do
+        val c = source.charAt(i)
+        i += 1
+        if c == 'M' || c == 'C' then
+          if i >= source.length || source.charAt(i) != '-' then return i
+          i += 1
+        if c != 'M' && c != 'C' && c != 'c' || i >= source.length then return i
+        if source.charAt(i) != '\\' then return i + 1
+        i += 1
+      i
+
+    def scan(start: Int, initialExtended: Boolean, recurse: Boolean): Int =
+      var i = start
+      var inClass = 0
+      var parens = 1
+      var extended = initialExtended
+      while i < source.length do
+        val c = source.charAt(i)
+        i += 1
+        c match
+          case '\\' =>
+            if i < source.length then i = skipEscape(i)
+          case '#' if extended && inClass == 0 =>
+            while i < source.length && source.charAt(i) != '\n' do i += 1
+            if i < source.length then i += 1
+          case '[' =>
+            inClass += 1
+          case ']' =>
+            if inClass > 0 then inClass -= 1
+          case ')' =>
+            if inClass == 0 && recurse then
+              parens -= 1
+              if parens == 0 then return i
+          case '(' if inClass == 0 && i + 1 < source.length && source.charAt(i) == '?' =>
+            if source.charAt(i + 1) == '#' then
+              var j = i + 2
+              var closed = false
+              while !closed && j < source.length do
+                val d = source.charAt(j)
+                j += 1
+                if d == ')' then closed = true
+                else if d == '\\' && j < source.length then
+                  j += (if CodePointUtil.isHighSurrogate(source.charAt(j).toInt) then 2 else 1)
+              // An unterminated `(?#` is left as is, so it is a syntax error.
+              if closed then
+                ranges.addOne((i - 1, j))
+                i = j
+            else
+              if recurse then parens += 1
+              var invert = false
+              var localExtended = 0
+              var k = i + 1
+              boundary:
+                while k < source.length do
+                  source.charAt(k) match
+                    case 'x'                         => localExtended = if invert then -1 else 1
+                    case '-'                         => invert = true
+                    case 'i' | 'm' | 'a' | 'd' | 'u' => ()
+                    case d @ (':' | ')')             =>
+                      if localExtended != 0 && (localExtended == 1) != extended then
+                        if d == ':' then i = scan(i, localExtended == 1, recurse = true)
+                        else extended = localExtended == 1
+                      boundary.break()
+                    case _ => boundary.break()
+                  k += 1
+          case '(' =>
+            if inClass == 0 && recurse then parens += 1
+          case _ => ()
+      i
+
+    scan(0, featureSet.skipsComment, recurse = false)
+    ranges.result()
+
   private def parseInlineCodeGroup(stack: mutable.Stack[Node], start: Int): Unit =
     assert(featureSet.hasInlineCode, "Invalid group")
     next()
@@ -1034,7 +1170,7 @@ private[parser] final class Parser(
   private def parseBacktrackControlName(): String =
     val start = offset
     while !isEnd && currentChar != ')' do next()
-    source.slice(start, offset)
+    sliceSource(start, offset)
 
   private def parseBacktrackControl(
       stack: mutable.Stack[Node],
@@ -1097,7 +1233,7 @@ private[parser] final class Parser(
   ): (FlagSet, String) =
     val start = offset
     var flagSet = initial
-    def result: (FlagSet, String) = (flagSet, source.slice(start, offset))
+    def result: (FlagSet, String) = (flagSet, sliceSource(start, offset))
     while !isEnd do
       val flagStart = offset
       val c = if featureSet.ignoresInlineFlagCase then currentChar.toLower else currentChar
@@ -1109,7 +1245,7 @@ private[parser] final class Parser(
         case 'x' =>
           if !featureSet.hasFlagX then return result
           flagSet = flagSet.copy(verbose = true)
-          if featureSet.hasFlagXX && source.slice(start, offset).contains('x') then
+          if featureSet.hasFlagXX && sliceSource(start, offset).contains('x') then
             flagSet = flagSet.copy(verboseMore = true)
         case 'J' =>
           if !featureSet.hasFlagUpperJ then return result
@@ -1164,7 +1300,7 @@ private[parser] final class Parser(
           flagSet = flagSet.copy(unicode = true)
         case _ =>
           return result
-      checkFlag(c, source.slice(start, flagStart), removing, resetting)
+      checkFlag(c, sliceSource(start, flagStart), removing, resetting)
       next()
     result
 
@@ -1443,7 +1579,7 @@ private[parser] final class Parser(
     if featureSet.allowsNumberGroupName && isDigit then
       val start = offset
       parseIntOption()
-      return Reference.NamedReference(source.slice(start, offset))
+      return Reference.NamedReference(sliceSource(start, offset))
     Reference.NamedReference(parseGroupNameBody(end))
 
   /** Parses a Ruby's `\\k` reference, where a name ends before a level (e.g. `\\k<x+1>`) and a leading `+` is a part of
@@ -1560,7 +1696,7 @@ private[parser] final class Parser(
     val start = offset
     while !isEnd && currentChar != '}' && currentChar != '=' do next()
     assert(start < offset, "Invalid backslash escape")
-    source.slice(start, offset)
+    sliceSource(start, offset)
 
   // Perl, PCRE and Ruby ignore blanks, hyphens, underscores and cases in property names, so the name is kept as written.
   private def parseLooseProperty(): (Boolean, String, Option[String]) =
@@ -1569,7 +1705,7 @@ private[parser] final class Parser(
     if negated then next()
     val start = offset
     while !isEnd && currentChar != '}' do next()
-    val body = source.slice(start, offset).trim
+    val body = sliceSource(start, offset).trim
     val separator = body.indexWhere(c => c == '=' || c == ':')
     val (name, value) =
       if separator < 0 then (body, None)
@@ -1823,7 +1959,7 @@ private[parser] final class Parser(
     assert(featureSet.hasBackslashCharName, "Invalid backslash escape")
     val start = offset
     while !isEnd && currentChar != '}' do next()
-    val name = source.slice(start, offset)
+    val name = sliceSource(start, offset)
     assert(name.nonEmpty, "Invalid backslash escape")
     expect('}', "Invalid backslash escape")
     BackslashKind.EscapeClass(EscapeClassKind.CharName(name))
@@ -2401,12 +2537,12 @@ private[parser] final class Parser(
       while !isEnd && currentChar != end && !(levelable && (currentChar == '+' || currentChar == '-')) do
         assert(currentChar != ')', "Invalid identifier")
         next()
-      return source.slice(start, offset)
+      return sliceSource(start, offset)
 
     if featureSet.allowsNumberGroupName && isDigit then
       val n = parseIntOption().get
       assert(n != 0, "Invalid identifier", start)
-      return source.slice(start, offset)
+      return sliceSource(start, offset)
 
     val name = new java.lang.StringBuilder
     boundary:
@@ -2454,7 +2590,7 @@ private[parser] final class Parser(
     for _ <- 1 to 4 do
       if !isHexDigit then return -1
       next()
-    Integer.parseInt(source.slice(start, offset), 16)
+    Integer.parseInt(sliceSource(start, offset), 16)
 
   private def isGroupNameStart: Boolean =
     !isEnd && isGroupNameStart(currentCodePoint)
@@ -2493,7 +2629,7 @@ private[parser] final class Parser(
     val end = offset
     assert(start < end, "Invalid identifier")
 
-    source.slice(start, end)
+    sliceSource(start, end)
 
   private def parseIntOption(): Option[Int] =
     if !isDigit then return None
@@ -2502,7 +2638,7 @@ private[parser] final class Parser(
     while isDigit do next()
     val end = offset
 
-    val str = source.slice(start, end)
+    val str = sliceSource(start, end)
     str.toIntOption.orElse(fail("Invalid integer", start))
 
   private def parseSaturatedIntOption(max: Long, message: String, pos: Int): Option[Int] =
@@ -2576,6 +2712,19 @@ private[parser] final class Parser(
 
     skipped
 
+  /** Returns the source text in the given range without the comments Ruby removes. */
+  private def sliceSource(start: Int, end: Int): String =
+    if removedCommentEnds.isEmpty then return source.slice(start, end)
+    val builder = new java.lang.StringBuilder
+    var i = start
+    while i < end do
+      removedCommentEnds.get(i) match
+        case Some(commentEnd) => i = commentEnd
+        case None             =>
+          builder.append(source.charAt(i))
+          i += 1
+    builder.toString
+
   private def next(): Unit = reset(offset + 1)
 
   private def nextCodePoint(codePoint: Int): Unit =
@@ -2583,6 +2732,7 @@ private[parser] final class Parser(
 
   private def reset(save: Int): Unit =
     offset = save
+    while removedCommentEnds.contains(offset) do offset = removedCommentEnds(offset)
     currentChar = if offset >= source.length then '\u0000' else source.charAt(offset)
 
   private def currentCodePoint: Int =

@@ -378,6 +378,8 @@ final case class FeatureSet(
     rejectsInvalidBackReference: Boolean,
     // Ruby
     rejectsNumberedReferenceWithNamedCapture: Boolean,
+    // Ruby
+    removesCommentGroup: Boolean,
     // Python, Ruby
     processBackslashInCommentGroup: Boolean,
     // Java, JavaScript (with `uv`), Perl, PCRE (with `u`), Python (without `b`), Ruby
@@ -386,6 +388,8 @@ final case class FeatureSet(
     requiresInlineFlagAtStart: Boolean,
     // .NET (with `x`), Java (with `x`), PCRE (with `x`), Perl (with `x`), Python (with `x`), Ruby (with `x`)
     skipsComment: Boolean,
+    // .NET, Java, PCRE, Perl
+    skipsCommentBeforeBacktrackStrategy: Boolean,
     // Java
     skipsCommentInClass: Boolean,
     // PCRE, Perl, Ruby
@@ -788,6 +792,8 @@ object FeatureSet:
       rejectsInvalidBackReference = isJavaScript && isUnicode,
       // Ruby
       rejectsNumberedReferenceWithNamedCapture = isRuby,
+      // Ruby
+      removesCommentGroup = isRuby,
       // Python, Ruby
       processBackslashInCommentGroup = isPython || isRuby,
       // Java, JavaScript (with `uv`), Perl, PCRE (with `u`), Python (without `b`), Ruby
@@ -797,6 +803,8 @@ object FeatureSet:
       requiresInlineFlagAtStart = isPython,
       // .NET (with `x`), Java (with `x`), PCRE (with `x`), Perl (with `x`), Python (with `x`), Ruby (with `x`)
       skipsComment = flagSet.verbose,
+      // .NET, Java, PCRE, Perl
+      skipsCommentBeforeBacktrackStrategy = isDotNet || isJava || isPCRE || isPerl,
       // Java
       skipsCommentInClass = isJava,
       // PCRE, Perl, Ruby
