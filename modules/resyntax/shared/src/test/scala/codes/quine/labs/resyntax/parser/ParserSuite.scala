@@ -887,6 +887,12 @@ class ParserSuite extends munit.FunSuite:
   )
   check("[\\uA]", "", Perl)(Class(false, ClassUnion(ClassBackslashValue(Unknown('u')), ClassLiteral('A'))))
   check("[\\Qa]\\E]", "", Java, PCRE)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral(']'))))
+  check("[a-\\Qz\\E]", "", Java, PCRE)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  check("[\\Qa\\E-z]", "", Java, PCRE)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  check("[\\Qxy\\E-\\Qza\\E]", "", Java, PCRE):
+    Class(false, ClassUnion(ClassLiteral('x'), ClassRange(ClassLiteral('y'), ClassLiteral('z')), ClassLiteral('a')))
+  error("[\\Qxz\\E-y]", "", Java, PCRE)("Out of order class range at 4")
+  error("[a-\\Qz\\E]", "", Perl)("Out of order class range at 1")
   check("[\\Q]", "", Perl)(Class(false, ClassBackslashValue(Unknown('Q'))))
   check("[]", "", JavaScript)(Class(false, ClassUnion()))
   check("[[:alnum:]]", "", PCRE, Perl, Ruby)(Class(false, ClassPosix(false, "alnum")))

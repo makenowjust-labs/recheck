@@ -2063,11 +2063,11 @@ private[parser] final class Parser(
 
   private def parseClassItemAtom(seq: mutable.Builder[ClassItem, Seq[ClassItem]], unionStart: Int): Unit =
     val start = offset
-    val begin = parseClassItemNonRange()
+    val item = parseClassItemNonRange()
 
     skipClassComment()
     if isClassItemStop(unionStart) || currentChar != '-' then
-      seq.addOne(begin)
+      seq.addOne(item)
       return
 
     val save = offset
@@ -2075,17 +2075,26 @@ private[parser] final class Parser(
 
     if isClassItemStop(unionStart) then
       reset(save)
-      seq.addOne(begin)
+      seq.addOne(item)
       return
 
+    val begin = classQuoteLiterals(item) match
+      case Some(literals) if literals.nonEmpty =>
+        seq.addAll(literals.init)
+        literals.last
+      case _ => item
+
     skipClassComment()
-    val end = parseClassItemNonRange()
-    val endOffset = offset
+    val endItem = parseClassItemNonRange()
+    val (end, rest) = classQuoteLiterals(endItem) match
+      case Some(literals) if literals.nonEmpty => (literals.head, literals.tail)
+      case _                                   => (endItem, Seq.empty)
 
     (begin, end) match
       case (begin: ClassItem.Value, end: ClassItem.Value) =>
-        assert(begin.data.value <= end.data.value, "Out of order class range", start)
-        seq.addOne(ClassItem(ClassItemData.ClassRange(begin, end), SourceLocation(start, endOffset)))
+        assert(begin.data.value <= end.data.value, "Out of order class range", begin.loc.start)
+        seq.addOne(ClassItem(ClassItemData.ClassRange(begin, end), SourceLocation(begin.loc.start, end.loc.end)))
+        seq.addAll(rest)
       case _ =>
         if !isValueClassItem(begin) then
           if !isClassNestItem(begin) then assert(featureSet.allowsBrokenClassRangeBegin, "Invalid class range", start)
@@ -2095,7 +2104,14 @@ private[parser] final class Parser(
         if featureSet.consumesBrokenClassRange then
           seq.addOne(ClassItem.Value(ClassItemData.ClassLiteral('-'), SourceLocation(save, save + 1)))
           seq.addOne(end)
+          seq.addAll(rest)
         else reset(save)
+
+  /** Returns the literals of a `\\Q...\\E` class item, because Java and PCRE read them as unquoted for a range. */
+  private def classQuoteLiterals(item: ClassItem): Option[Seq[ClassItem]] =
+    item.data match
+      case ClassItemData.ClassUnion(items) if source.startsWith("\\Q", item.loc.start) => Some(items)
+      case _                                                                           => None
 
   private def parseClassItemNonRange(): ClassItem =
     val start = offset
