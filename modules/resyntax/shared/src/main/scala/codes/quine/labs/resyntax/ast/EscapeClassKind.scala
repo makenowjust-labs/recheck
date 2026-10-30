@@ -47,6 +47,9 @@ object EscapeClassKind:
   /** GeneralNewline is `\R` class. */
   case object GeneralNewline extends EscapeClassKind
 
+  /** CharName is `\N{name}` class; it is one character, but its value needs the Unicode name table. */
+  final case class CharName(name: String) extends EscapeClassKind
+
   /** CodeUnit is `\C` class. */
   case object CodeUnit extends EscapeClassKind
 

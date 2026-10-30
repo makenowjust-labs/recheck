@@ -493,6 +493,17 @@ class ParserSuite extends munit.FunSuite:
       Literal('\\'),
       Backslash(CaseCommand(EndCaseCommand))
     )
+  check("\\N", "", PCRE, Perl)(Backslash(EscapeClass(NonNewline)))
+  error("\\N", "", Java, Python)("Invalid backslash escape at 2")
+  check("\\N{2}", "", PCRE, Perl)(Repeat(Backslash(EscapeClass(NonNewline)), Exact(2, Greedy)))
+  check("\\N{U+41}", "", Perl)(Backslash(Escape(NamedHex, 0x41)))
+  check("\\N{U+41}", "u", PCRE)(Backslash(Escape(NamedHex, 0x41)))
+  error("\\N{U+41}", "", PCRE)("Invalid backslash escape at 3")
+  error("\\N{U+}", "", Perl)("Invalid backslash escape at 5")
+  check("\\N{LATIN SMALL LETTER A}", "", Java, Perl, Python)(Backslash(EscapeClass(CharName("LATIN SMALL LETTER A"))))
+  check("[\\N{LATIN SMALL LETTER A}]", "", Java, Perl, Python):
+    Class(false, ClassBackslashClass(CharName("LATIN SMALL LETTER A")))
+  error("\\N{}", "", Java, Perl, Python)("Invalid backslash escape at 3")
   check("\\R", "", Java, PCRE, Perl, Ruby)(Backslash(EscapeClass(GeneralNewline)))
   check("\\S", "", All*)(Backslash(EscapeClass(NonSpace)))
   check("\\U000ABCDE", "", Python)(Backslash(Escape(UnicodeHex8, 0xabcde)))

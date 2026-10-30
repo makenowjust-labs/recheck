@@ -100,6 +100,10 @@ final case class FeatureSet(
     hasBackslashBell: Boolean,
     // Perl
     hasBackslashCaseCommand: Boolean,
+    // Java, Perl, Python
+    hasBackslashCharName: Boolean,
+    // PCRE (with `u`), Perl
+    hasBackslashCharNameHex: Boolean,
     // PCRE
     hasBackslashCodeUnit: Boolean,
     // JavaScript (with `v`)
@@ -385,6 +389,10 @@ object FeatureSet:
       hasBackslashBell = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
       // Perl
       hasBackslashCaseCommand = isPerl,
+      // Java, Perl, Python
+      hasBackslashCharName = isJava || isPerl || isPython,
+      // PCRE (with `u`), Perl
+      hasBackslashCharNameHex = (isPCRE && isUnicode) || isPerl,
       // PCRE
       hasBackslashCodeUnit = isPCRE,
       // JavaScript (with `v`)

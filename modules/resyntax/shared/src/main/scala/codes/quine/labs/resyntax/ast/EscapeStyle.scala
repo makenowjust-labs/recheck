@@ -35,6 +35,9 @@ object EscapeStyle:
   /** UnicodeBracket is `\u{XXXX}` escape sequence. */
   case object UnicodeBracket extends EscapeStyle
 
+  /** NamedHex is `\N{U+XXXX}` escape sequence. */
+  case object NamedHex extends EscapeStyle
+
   /** Hex2 is `\xXX` escape sequence. */
   case object Hex2 extends EscapeStyle
 

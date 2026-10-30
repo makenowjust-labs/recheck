@@ -1395,10 +1395,38 @@ private[parser] final class Parser(
     BackslashKind.Escape(EscapeStyle.Meta, value | 0x80)
 
   private def parseBackslashUpperN(): BackslashKind =
-    if !featureSet.hasBackslashNonNewline then return parseBackslashUnknown()
+    if !(featureSet.hasBackslashNonNewline || featureSet.hasBackslashCharName || featureSet.hasBackslashCharNameHex)
+    then return parseBackslashUnknown()
 
     next()
-    BackslashKind.EscapeClass(EscapeClassKind.NonNewline)
+
+    val isCharName = !isEnd && currentChar == '{' && !(featureSet.hasBackslashNonNewline && isCurlyQuantifierAhead)
+    if !isCharName then
+      assert(featureSet.hasBackslashNonNewline, "Invalid backslash escape")
+      return BackslashKind.EscapeClass(EscapeClassKind.NonNewline)
+
+    next()
+    if featureSet.hasBackslashCharNameHex && startWith("U+") then
+      val start = offset
+      assert(isHexDigit, "Invalid backslash escape")
+      val value = checkCodePoint(parseHexDigits(Int.MaxValue), start)
+      expect('}', "Invalid backslash escape")
+      return BackslashKind.Escape(EscapeStyle.NamedHex, value)
+
+    assert(featureSet.hasBackslashCharName, "Invalid backslash escape")
+    val start = offset
+    while !isEnd && currentChar != '}' do next()
+    val name = source.slice(start, offset)
+    assert(name.nonEmpty, "Invalid backslash escape")
+    expect('}', "Invalid backslash escape")
+    BackslashKind.EscapeClass(EscapeClassKind.CharName(name))
+
+  private def isCurlyQuantifierAhead: Boolean =
+    val end = source.indexOf('}', offset)
+    end > 0 && {
+      val body = source.slice(offset + 1, end)
+      body.exists(_.isDigit) && body.forall(c => c.isDigit || c == ',' || c == ' ' || c == '\t')
+    }
 
   private def parseBackslashUpperP(): BackslashKind =
     if !featureSet.hasBackslashUnicodeProperty then return parseBackslashUnknown()
