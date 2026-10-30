@@ -36,6 +36,8 @@ final case class FeatureSet(
     allowsMeaninglessBacktrackStrategy: Boolean,
     // Ruby
     allowsNestedRepeat: Boolean,
+    // Perl
+    allowsReversedBoundedRepeat: Boolean,
     // PCRE, Perl, Ruby
     allowsNonNameBaseRef: Boolean,
     // .NET, Java, Perl, Ruby
@@ -244,6 +246,8 @@ object FeatureSet:
       allowsMeaninglessBacktrackStrategy = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isPython,
       // Ruby
       allowsNestedRepeat = isRuby,
+      // Perl
+      allowsReversedBoundedRepeat = isPerl,
       // PCRE, Perl, Ruby
       allowsNonNameBaseRef = isPCRE || isPerl || isRuby,
       // .NET, Java, Perl, Ruby

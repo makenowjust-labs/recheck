@@ -80,6 +80,8 @@ class ParserSuite extends munit.FunSuite:
   check("a{2,3}", "", All*)(Repeat(Literal('a'), Bounded(2, 3, Greedy)))
   check("a{2,3}?", "", All*)(Repeat(Literal('a'), Bounded(2, 3, Lazy)))
   check("a{2,3}+", "", Java, PCRE, Perl, Ruby)(Repeat(Literal('a'), Bounded(2, 3, Possessive)))
+  check("a{3,2}", "", Perl)(Repeat(Literal('a'), Bounded(3, 2, Greedy)))
+  error("a{3,2}", "", DotNet, Java, JavaScript, PCRE, Python, Ruby)("Numbers out of order in {} quantifier at 1")
   check("a{,3}", "", Perl, Python, Ruby)(Repeat(Literal('a'), MaxBounded(3, Greedy)))
   check("a{,3}?", "", Perl, Python, Ruby)(Repeat(Literal('a'), MaxBounded(3, Lazy)))
   check("a{,3}+", "", Perl, Ruby)(Repeat(Literal('a'), MaxBounded(3, Possessive)))

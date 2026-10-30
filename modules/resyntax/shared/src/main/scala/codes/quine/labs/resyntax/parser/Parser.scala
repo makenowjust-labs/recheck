@@ -162,6 +162,8 @@ private[parser] final class Parser(
                       resetBracket(stack, save)
                       return
                     next()
+                    if max < min && !featureSet.allowsReversedBoundedRepeat then
+                      fail("Numbers out of order in {} quantifier", save)
                     val strategy = parseBacktrackStrategy(exact = false)
                     val quantifier = Quantifier.Bounded(min, max, strategy)
                     pushRepeat(stack, popRepeatable(stack), quantifier)
