@@ -58,6 +58,8 @@ class ParserSuite extends munit.FunSuite:
 
   // Sequence:
   check("ab", "", All*)(Sequence(Literal('a'), Literal('b')))
+  check("\uD83D\uDE00", "", Java, Perl, Python, Ruby)(Literal(0x1f600))
+  check("\uD83D\uDE00", "", DotNet, JavaScript, PCRE)(Sequence(Literal(0xd83d), Literal(0xde00)))
 
   // Repeat:
   check("a*", "", All*)(Repeat(Literal('a'), Star(Greedy)))
