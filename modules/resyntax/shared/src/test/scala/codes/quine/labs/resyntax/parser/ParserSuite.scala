@@ -132,6 +132,26 @@ class ParserSuite extends munit.FunSuite:
   error(s"(?<${"a" * 129}>a)", "", PCRE)("Invalid identifier at 3")
   check("(?P<é>a)", "", Python)(Group(PNamedCapture("é"), Literal('a')))
   error("(?P<$>a)", "", PCRE, Perl, Python)("Invalid identifier at 4")
+  check("(?<x>a)(?<x>b)", "", DotNet, Perl, Ruby):
+    Sequence(Group(NamedCapture(Angle, "x"), Literal('a')), Group(NamedCapture(Angle, "x"), Literal('b')))
+  check("(?<x>a)(?<x>b)", "J", PCRE):
+    Sequence(Group(NamedCapture(Angle, "x"), Literal('a')), Group(NamedCapture(Angle, "x"), Literal('b')))
+  error("(?<x>a)(?<x>b)", "", Java, JavaScript, PCRE)("Duplicated group name at 7")
+  error("(?P<x>a)(?P<x>b)", "", PCRE, Python)("Duplicated group name at 8")
+  check("(?<x>a)(?J)(?<x>b)", "", PCRE):
+    Sequence(
+      Group(NamedCapture(Angle, "x"), Literal('a')),
+      Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(dupNames = true), None))),
+      Group(NamedCapture(Angle, "x"), Literal('b'))
+    )
+  error("(?J:(?<x>a))(?<x>b)", "", PCRE)("Duplicated group name at 12")
+  check("(?<x>a)|(?<x>b)", "", JavaScript):
+    Disjunction(Group(NamedCapture(Angle, "x"), Literal('a')), Group(NamedCapture(Angle, "x"), Literal('b')))
+  error("(?<x>a)|(?<x>b)", "", Java, PCRE)("Duplicated group name at 8")
+  error("(?:(?<x>a)|(?<x>b))(?<x>c)", "", JavaScript)("Duplicated group name at 19")
+  check("(?|(?<x>a)|(?<x>b))", "", PCRE, Perl):
+    Command(BranchReset(Group(NamedCapture(Angle, "x"), Literal('a')), Group(NamedCapture(Angle, "x"), Literal('b'))))
+  error("(?|(?<x>a)|(?<x>b))(?<x>c)", "", PCRE)("Duplicated group name at 19")
   check("(?<x-y>a)", "", DotNet)(Group(Balance(Angle, Some("x"), "y"), Literal('a')))
   check("(?<x-1>a)", "", DotNet)(Group(Balance(Angle, Some("x"), "1"), Literal('a')))
   check("(?<-y>a)", "", DotNet)(Group(Balance(Angle, None, "y"), Literal('a')))

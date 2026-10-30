@@ -35,13 +35,15 @@ import codes.quine.labs.resyntax.parser.Parser.ParsingContext
 object Parser:
   private[parser] final case class ParsingContext(
       inClass: Boolean,
-      skipsComment: Boolean
+      skipsComment: Boolean,
+      allowsDuplicatedGroupName: Boolean
   )
 
   private[parser] object ParsingContext:
     def from(featureSet: FeatureSet): ParsingContext = ParsingContext(
       inClass = false,
-      skipsComment = featureSet.skipsComment
+      skipsComment = featureSet.skipsComment,
+      allowsDuplicatedGroupName = featureSet.allowsDuplicatedGroupName
     )
 
   def parse(source: String, flagSet: FlagSet, dialect: Dialect): Node =
@@ -66,6 +68,13 @@ private[parser] final class Parser(
 
   private var sequenceStart: Int = 0
 
+  private var disjunctionCount: Int = 0
+
+  /** A list of (disjunction ID, alternative index, whether it is a branch reset) of enclosing alternatives. */
+  private var alternativePath: List[(Int, Int, Boolean)] = Nil
+
+  private val groupNames: mutable.Map[String, Seq[List[(Int, Int, Boolean)]]] = mutable.Map.empty
+
   def parse(): Node =
     val node = parseDisjunction()
     if !isEnd then
@@ -73,14 +82,22 @@ private[parser] final class Parser(
       fail("Unmatched ')'")
     node
 
-  private def parseDisjunction(): Node =
+  private def parseDisjunction(isBranchReset: Boolean = false): Node =
     val start = offset
     val builder = Seq.newBuilder[Node]
+    val id = disjunctionCount
+    disjunctionCount += 1
+    val savedAlternativePath = alternativePath
+    var index = 0
+    alternativePath = (id, index, isBranchReset) :: savedAlternativePath
     builder.addOne(parseSequence())
 
     while !isEnd && currentChar == '|' do
       next()
+      index += 1
+      alternativePath = (id, index, isBranchReset) :: savedAlternativePath
       builder.addOne(parseSequence())
+    alternativePath = savedAlternativePath
 
     val nodes = builder.result()
     if nodes.size == 1 then return nodes.head
@@ -299,7 +316,7 @@ private[parser] final class Parser(
     assert(featureSet.hasBranchReset, "Invalid group")
     next()
     protectContext:
-      val node = parseDisjunction()
+      val node = parseDisjunction(isBranchReset = true)
       closeGroup()
       val nodes = node.data match
         case NodeData.Disjunction(nodes) => nodes
@@ -504,6 +521,7 @@ private[parser] final class Parser(
       return
 
     val name = parseGroupName(end = end)
+    addGroupName(name, start)
     parseGroupBody(stack, GroupKind.NamedCapture(style, name), start)
 
   private def parseBalanceGroup(stack: mutable.Stack[Node], end: Char, style: NameStyle, start: Int): Unit =
@@ -534,6 +552,7 @@ private[parser] final class Parser(
       case '<' =>
         next()
         val name = parseGroupName(end = '>')
+        addGroupName(name, start)
         parseGroupBody(stack, GroupKind.PNamedCapture(name), start)
       case '=' =>
         next()
@@ -546,6 +565,16 @@ private[parser] final class Parser(
         pushCommand(stack, CommandKind.PNamedCall(name), start)
       case _ =>
         fail("Invalid group")
+
+  private def addGroupName(name: String, start: Int): Unit =
+    val paths = groupNames.getOrElse(name, Seq.empty)
+    if !context.allowsDuplicatedGroupName then
+      for path <- paths do
+        val exclusive = path.exists: (id, index, isBranchReset) =>
+          (isBranchReset || featureSet.allowsDuplicatedGroupNameInAlternatives) &&
+            alternativePath.exists((id2, index2, _) => id == id2 && index != index2)
+        assert(exclusive, "Duplicated group name", start)
+    groupNames(name) = paths :+ alternativePath
 
   private def parseRGroup(stack: mutable.Stack[Node], start: Int): Unit =
     assert(featureSet.hasRCall, "Invalid group")
@@ -1648,6 +1677,8 @@ private[parser] final class Parser(
   private def applyFlagSetDiff(diff: FlagSetDiff): Unit =
     if diff.added.verbose then context = context.copy(skipsComment = true)
     if diff.removed.exists(_.verbose) then context = context.copy(skipsComment = false)
+    if diff.added.dupNames then context = context.copy(allowsDuplicatedGroupName = true)
+    if diff.removed.exists(_.dupNames) then context = context.copy(allowsDuplicatedGroupName = false)
 
   private def applyFlagSetDiffWith(diff: FlagSetDiff)(body: => Unit): Unit =
     protectContext:
@@ -1657,6 +1688,7 @@ private[parser] final class Parser(
   private def applyResetFlag(flagSet: FlagSet): Unit =
     context = context.copy(skipsComment = false)
     if flagSet.verbose then context = context.copy(skipsComment = true)
+    if flagSet.dupNames then context = context.copy(allowsDuplicatedGroupName = true)
 
   private def applyResetFlagWith(flagSet: FlagSet)(body: => Unit): Unit =
     protectContext:

@@ -28,6 +28,10 @@ final case class FeatureSet(
     allowsClassPosix: Boolean,
     // JavaScript
     allowsDollarInGroupName: Boolean,
+    // .NET, PCRE (with `J`), Perl, Ruby
+    allowsDuplicatedGroupName: Boolean,
+    // JavaScript
+    allowsDuplicatedGroupNameInAlternatives: Boolean,
     // .NET, Java, PCRE, Perl, Python, Ruby
     allowsDuplicatedInlineFlag: Boolean,
     // Java, PCRE, Perl
@@ -285,6 +289,10 @@ object FeatureSet:
       allowsClassPosix = isPCRE || isPerl || isRuby,
       // JavaScript
       allowsDollarInGroupName = isJavaScript,
+      // .NET, PCRE (with `J`), Perl, Ruby
+      allowsDuplicatedGroupName = isDotNet || (isPCRE && flagSet.dupNames) || isPerl || isRuby,
+      // JavaScript
+      allowsDuplicatedGroupNameInAlternatives = isJavaScript,
       // .NET, Java, PCRE, Perl, Python, Ruby
       allowsDuplicatedInlineFlag = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
       // Java, PCRE, Perl
