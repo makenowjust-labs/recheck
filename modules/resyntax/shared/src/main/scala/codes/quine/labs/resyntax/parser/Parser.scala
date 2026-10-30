@@ -917,6 +917,7 @@ private[parser] final class Parser(
       case 'z'                                                 => parseBackslashLowerZ()
       case 'A'                                                 => parseBackslashUpperA()
       case 'B'                                                 => parseBackslashUpperB()
+      case 'C'                                                 => parseBackslashUpperC()
       case 'D'                                                 => parseBackslashUpperD()
       case 'E'                                                 => parseBackslashUpperE()
       case 'F'                                                 => parseBackslashUpperF()
@@ -924,6 +925,7 @@ private[parser] final class Parser(
       case 'H'                                                 => parseBackslashUpperH()
       case 'K'                                                 => parseBackslashUpperK()
       case 'L'                                                 => parseBackslashUpperL()
+      case 'M'                                                 => parseBackslashUpperM()
       case 'N'                                                 => parseBackslashUpperN()
       case 'P'                                                 => parseBackslashUpperP()
       case 'Q'                                                 => parseBackslashUpperQ()
@@ -982,15 +984,40 @@ private[parser] final class Parser(
     if !featureSet.hasBackslashControl then return parseBackslashUnknown()
 
     next()
+    if featureSet.hasBackslashMetaControl && !isEnd && currentChar == '\\' then
+      val value = parseMetaControlTarget()
+      return BackslashKind.Escape(EscapeStyle.Control('\\'), metaControlValue(value))
+
     if !isControl then
-      assert(featureSet.allowsAlphabeticUnknownBackslash, "Invalid backslash escape")
+      assert(featureSet.allowsBrokenBackslashControl, "Invalid backslash escape")
       return BackslashKind.Unknown('c')
 
     val char = currentChar
     next()
 
-    val value = char.toInt % 32
+    val value =
+      if featureSet.hasBackslashControlAny then char ^ 0x40
+      else if featureSet.hasBackslashMetaControl then metaControlValue(char)
+      else if CodePointUtil.isAlphabetic(char) || featureSet.hasBackslashControlDigitInClass then char % 32
+      else char ^ 0x40
     BackslashKind.Escape(EscapeStyle.Control(char), value)
+
+  private def metaControlValue(value: Int): Int =
+    if value == '?' then 0x7f else value & 0x9f
+
+  private def parseMetaControlTarget(): Int =
+    assert(!isEnd, "Invalid backslash escape")
+    if currentChar == '\\' then
+      val save = offset
+      next()
+      parseBackslashKind() match
+        case kind: BackslashKind.BackslashValue => kind.value
+        case _                                  => fail("Invalid backslash escape", save)
+    else
+      assert(currentChar < 0x80, "Invalid backslash escape")
+      val char = currentChar
+      next()
+      char.toInt
 
   private def parseBackslashLowerD(): BackslashKind =
     next()
@@ -1283,6 +1310,20 @@ private[parser] final class Parser(
 
       BackslashKind.Assert(AssertKind.NonBoundary(None))
 
+  private def parseBackslashUpperC(): BackslashKind =
+    if featureSet.hasBackslashCodeUnit && !context.inClass then
+      next()
+      return BackslashKind.EscapeClass(EscapeClassKind.CodeUnit)
+
+    if !featureSet.hasBackslashMetaControl then
+      assert(featureSet.allowsUnknownBackslashUpperC, "Invalid backslash escape")
+      return parseBackslashUnknown()
+
+    next()
+    expect('-', "Invalid backslash escape")
+    val value = parseMetaControlTarget()
+    BackslashKind.Escape(EscapeStyle.ControlDash, metaControlValue(value))
+
   private def parseBackslashUpperD(): BackslashKind =
     next()
     BackslashKind.EscapeClass(EscapeClassKind.NonDigit)
@@ -1325,6 +1366,14 @@ private[parser] final class Parser(
 
     next()
     BackslashKind.CaseCommand(CaseCommandKind.LowerCaseCommand)
+
+  private def parseBackslashUpperM(): BackslashKind =
+    if !featureSet.hasBackslashMetaControl then return parseBackslashUnknown()
+
+    next()
+    expect('-', "Invalid backslash escape")
+    val value = parseMetaControlTarget()
+    BackslashKind.Escape(EscapeStyle.Meta, value | 0x80)
 
   private def parseBackslashUpperN(): BackslashKind =
     if !featureSet.hasBackslashNonNewline then return parseBackslashUnknown()
@@ -1835,10 +1884,14 @@ private[parser] final class Parser(
     !isEnd && CodePointUtil.isOctalDigit(currentChar.toInt)
 
   private def isControl: Boolean =
-    !isEnd && (
-      ('a' <= currentChar && currentChar <= 'z' || 'A' <= currentChar && currentChar <= 'Z') ||
-        (featureSet.hasBackslashControlExtra && '@' <= currentChar && currentChar <= '_')
-    )
+    if isEnd then false
+    else if featureSet.hasBackslashControlAny then true
+    else if featureSet.hasBackslashControlPrintable then
+      0x20 <= currentChar && currentChar <= 0x7e && (currentChar != '{' || featureSet.allowsBackslashControlCurly)
+    else
+      CodePointUtil.isAlphabetic(currentChar.toInt) ||
+      featureSet.hasBackslashControlExtra && '@' <= currentChar && currentChar <= '_' ||
+      featureSet.hasBackslashControlDigitInClass && context.inClass && (isDigit || currentChar == '_')
 
   private def isAlphabetic: Boolean =
     !isEnd && ('a' <= currentChar && currentChar <= 'z' || 'A' <= currentChar && currentChar <= 'Z')

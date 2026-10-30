@@ -10,6 +10,10 @@ import codes.quine.labs.resyntax.ast.FlagSet
 final case class FeatureSet(
     // JavaScript (without `uv`), Perl, Ruby
     allowsAlphabeticUnknownBackslash: Boolean,
+    // Java, PCRE, Ruby
+    allowsBackslashControlCurly: Boolean,
+    // JavaScript (without `uv`)
+    allowsBrokenBackslashControl: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     allowsBrokenCloseCurly: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -50,6 +54,8 @@ final case class FeatureSet(
     allowsSymbolUnknownBackslash: Boolean,
     // PCRE, Perl
     allowsUnpairedQuoteEnd: Boolean,
+    // JavaScript (without `uv`)
+    allowsUnknownBackslashUpperC: Boolean,
     // Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     allowsWordUnknownBackslash: Boolean,
     // PCRE, Perl, Ruby
@@ -82,12 +88,20 @@ final case class FeatureSet(
     hasBackslashBell: Boolean,
     // Perl
     hasBackslashCaseCommand: Boolean,
+    // PCRE
+    hasBackslashCodeUnit: Boolean,
     // JavaScript (with `v`)
     hasBackslashClassSetReservedPunctuator: Boolean,
     // .NET, Java, JavaScript, PCRE, Perl, Ruby
     hasBackslashControl: Boolean,
+    // Java
+    hasBackslashControlAny: Boolean,
+    // JavaScript (without `uv`)
+    hasBackslashControlDigitInClass: Boolean,
     // .NET, Java, PCRE, Perl, Ruby
     hasBackslashControlExtra: Boolean,
+    // PCRE, Perl, Ruby
+    hasBackslashControlPrintable: Boolean,
     // PCRE, Perl, Ruby
     hasBackslashCut: Boolean,
     // .NET, Java, PCRE, Perl, Ruby
@@ -104,6 +118,8 @@ final case class FeatureSet(
     hasBackslashGraphemeCluster: Boolean,
     // Java, PCRE, Perl
     hasBackslashHorizontalSpace: Boolean,
+    // Ruby
+    hasBackslashMetaControl: Boolean,
     // Ruby
     hasBackslashHexDigit: Boolean,
     // .NET, Java, JavaScript (with named capture), PCRE, Perl, Ruby
@@ -258,6 +274,10 @@ object FeatureSet:
     FeatureSet(
       // JavaScript (without `uv`), Perl, Ruby
       allowsAlphabeticUnknownBackslash = (isJavaScript && !isUnicode) || isPerl || isRuby,
+      // Java, PCRE, Ruby
+      allowsBackslashControlCurly = isJava || isPCRE || isRuby,
+      // JavaScript (without `uv`)
+      allowsBrokenBackslashControl = isJavaScript && !isUnicode,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsBrokenCloseCurly =
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
@@ -303,6 +323,8 @@ object FeatureSet:
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
       // PCRE, Perl
       allowsUnpairedQuoteEnd = isPCRE || isPerl,
+      // JavaScript (without `uv`)
+      allowsUnknownBackslashUpperC = isJavaScript && !isUnicode,
       // Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsWordUnknownBackslash = isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
       // PCRE, Perl, Ruby
@@ -335,12 +357,20 @@ object FeatureSet:
       hasBackslashBell = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
       // Perl
       hasBackslashCaseCommand = isPerl,
+      // PCRE
+      hasBackslashCodeUnit = isPCRE,
       // JavaScript (with `v`)
       hasBackslashClassSetReservedPunctuator = isJavaScript && flagSet.unicodeSets,
       // .NET, Java, JavaScript, PCRE, Perl, Ruby
       hasBackslashControl = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isRuby,
+      // Java
+      hasBackslashControlAny = isJava,
+      // JavaScript (without `uv`)
+      hasBackslashControlDigitInClass = isJavaScript && !isUnicode,
       // .NET, Java, PCRE, Perl, Ruby
       hasBackslashControlExtra = isDotNet || isJava || isPCRE || isPerl || isRuby,
+      // PCRE, Perl, Ruby
+      hasBackslashControlPrintable = isPCRE || isPerl || isRuby,
       // PCRE, Perl, Ruby
       hasBackslashCut = isPCRE || isPerl || isRuby,
       // .NET, Java, PCRE, Perl, Python, Ruby
@@ -357,6 +387,8 @@ object FeatureSet:
       hasBackslashGraphemeCluster = isJava || isPCRE || isPerl,
       // Java, PCRE, Perl
       hasBackslashHorizontalSpace = isJava || isPCRE || isPerl,
+      // Ruby
+      hasBackslashMetaControl = isRuby,
       // Ruby
       hasBackslashHexDigit = isRuby,
       // .NET, Java, JavaScript (with named capture), PCRE, Perl, Ruby

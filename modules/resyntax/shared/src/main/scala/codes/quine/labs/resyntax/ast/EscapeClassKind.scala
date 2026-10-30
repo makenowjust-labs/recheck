@@ -47,6 +47,9 @@ object EscapeClassKind:
   /** GeneralNewline is `\R` class. */
   case object GeneralNewline extends EscapeClassKind
 
+  /** CodeUnit is `\C` class. */
+  case object CodeUnit extends EscapeClassKind
+
   /** GraphemeCluster is `\X` class. */
   case object GraphemeCluster extends EscapeClassKind
 

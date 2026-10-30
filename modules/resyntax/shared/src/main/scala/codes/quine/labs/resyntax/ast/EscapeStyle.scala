@@ -11,6 +11,12 @@ object EscapeStyle:
   /** Control is `\cX` escape sequence. */
   final case class Control(char: Char) extends EscapeStyle
 
+  /** ControlDash is `\C-X` escape sequence. */
+  case object ControlDash extends EscapeStyle
+
+  /** Meta is `\M-X` escape sequence. */
+  case object Meta extends EscapeStyle
+
   /** Octal is `\o{010}` escape sequence. */
   case object Octal extends EscapeStyle
 
