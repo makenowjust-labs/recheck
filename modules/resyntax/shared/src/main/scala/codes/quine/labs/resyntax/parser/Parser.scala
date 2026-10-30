@@ -1517,27 +1517,18 @@ private[parser] final class Parser(
       case ClassItemData.ClassUnion(_) | ClassItemData.ClassRange(_, _) => false
       case _                                                            => true
 
-  private val PropertiesOfStrings: Set[String] = Set(
-    "Basic_Emoji",
-    "Emoji_Keycap_Sequence",
-    "RGI_Emoji_Modifier_Sequence",
-    "RGI_Emoji_Flag_Sequence",
-    "RGI_Emoji_Tag_Sequence",
-    "RGI_Emoji_ZWJ_Sequence",
-    "RGI_Emoji"
-  )
-
-  /** Tests whether the class item may contain strings (the `MayContainStrings` operation in the ECMAScript spec). */
+  /** Tests whether the class item may contain strings (the `MayContainStrings` operation in the ECMAScript spec).
+    *
+    * Properties of strings are checked on building IR, where Unicode properties are resolved.
+    */
   private def mayContainStrings(item: ClassItem): Boolean =
     item.data match
       case ClassItemData.ClassUnion(items)              => items.exists(mayContainStrings)
       case ClassItemData.ClassIntersection(left, right) => mayContainStrings(left) && mayContainStrings(right)
       case ClassItemData.ClassDiff(left, _)             => mayContainStrings(left)
       case ClassItemData.ClassNest(invert, item)        => !invert && mayContainStrings(item)
-      case ClassItemData.ClassBackslashClass(EscapeClassKind.QuoteSet(strings))     => strings.exists(_.size != 1)
-      case ClassItemData.ClassBackslashClass(EscapeClassKind.UnicodeProperty(name)) =>
-        PropertiesOfStrings.contains(name)
-      case _ => false
+      case ClassItemData.ClassBackslashClass(EscapeClassKind.QuoteSet(strings)) => strings.exists(_.size != 1)
+      case _                                                                    => false
 
   private def checkNegatedClassSet(invert: Boolean, item: ClassItem, start: Int): Unit =
     if featureSet.checksClassSetSyntax && invert then

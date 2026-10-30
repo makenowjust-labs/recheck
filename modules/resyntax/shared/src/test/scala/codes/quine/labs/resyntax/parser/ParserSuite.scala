@@ -613,7 +613,6 @@ class ParserSuite extends munit.FunSuite:
   error("[^\\q{ab}]", "v", JavaScript)("Negated class may contain strings at 0")
   error("[^[\\q{ab}]]", "v", JavaScript)("Negated class may contain strings at 0")
   error("[[^\\q{ab}]]", "v", JavaScript)("Negated class may contain strings at 1")
-  error("[^\\p{RGI_Emoji}]", "v", JavaScript)("Negated class may contain strings at 0")
   check("[^\\q{a}]", "v", JavaScript)(Class(true, ClassBackslashClass(QuoteSet(Seq(Seq(QuoteValue('a')))))))
   check("[^\\q{ab}&&a]", "v", JavaScript):
     Class(
