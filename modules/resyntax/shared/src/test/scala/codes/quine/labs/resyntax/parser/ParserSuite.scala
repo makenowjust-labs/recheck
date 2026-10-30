@@ -3,6 +3,7 @@ package codes.quine.labs.resyntax.parser
 import codes.quine.labs.resyntax.ast.AssertKind.*
 import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
+import codes.quine.labs.resyntax.ast.CaseCommandKind.*
 import codes.quine.labs.resyntax.ast.CommandKind.Comment
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.EscapeClassKind.*
@@ -80,7 +81,10 @@ class ParserSuite extends ParserSuiteBase:
   error("a{", "", Java)("Incomplete quantifier at 1")
   check("\\d{", "", DotNet, JavaScript, PCRE, Python, Ruby)(Sequence(Backslash(EscapeClass(Digit)), Literal('{')))
   error("\\d{", "", Perl)("Unescaped left brace at 2")
-  error("\\E{x", "", Perl)("Unescaped left brace at 2")
+  check("\\E{x", "", Perl)(
+    Sequence(Backslash(CaseCommand(EndCaseCommand)), Literal('{'), Literal('x'))
+  )
+  check("\\u{", "", Perl)(Sequence(Backslash(CaseCommand(SingleUpperCaseCommand)), Literal('{')))
   error("\\\\p{x", "", Perl)("Unescaped left brace at 3")
   error("a\\c\\p{x", "", Perl)("Unescaped left brace at 5")
   check("\\\\pa{", "", Perl):

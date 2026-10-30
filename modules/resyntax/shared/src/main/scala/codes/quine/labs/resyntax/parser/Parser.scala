@@ -317,7 +317,9 @@ private[parser] final class Parser(
   private def isAfterAlphabeticBackslash(stack: mutable.Stack[Node], pos: Int): Boolean =
     stack.headOption.exists: node =>
       node.loc.end == pos && CodePointUtil.isAlphabetic(source.charAt(pos - 1).toInt) && (node.data match
-        case _: NodeData.Backslash => node.loc.start + 2 == pos
+        // Case commands are processed by Perl's lexer for a regex literal, so the regex compiler never sees them.
+        case NodeData.Backslash(_: BackslashKind.CaseCommand) => false
+        case _: NodeData.Backslash                            => node.loc.start + 2 == pos
         // Perl looks only at the source text, so it also rejects a letter after an escaped backslash (e.g. `\\p{`).
         case _: NodeData.Literal => node.loc.start + 1 == pos && pos >= 2 && source.charAt(pos - 2) == '\\'
         case _                   => false)
