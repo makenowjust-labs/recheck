@@ -228,8 +228,10 @@ class ParserSuite extends munit.FunSuite:
   error("(?~|a)", "", DotNet, Java, JavaScript, PCRE, Perl, Python)("Invalid group at 2")
   check("(?(1)a)", "", DotNet, PCRE, Perl, Python, Ruby)(Command(Conditional(Indexed(1), Literal('a'))))
   check("(?(1)a|b)", "", DotNet, PCRE, Perl, Python, Ruby)(Command(Conditional(Indexed(1), Literal('a'), Literal('b'))))
-  check("(?(<x>)a)", "", DotNet, PCRE, Perl, Ruby)(Command(Conditional(Named(Angle, "x"), Literal('a'))))
-  check("(?('x')a)", "", DotNet, PCRE, Perl, Ruby)(Command(Conditional(Named(Quote, "x"), Literal('a'))))
+  check("(?(<x>)a)", "", PCRE, Perl, Ruby)(Command(Conditional(Named(Angle, "x"), Literal('a'))))
+  check("(?('x')a)", "", PCRE, Perl, Ruby)(Command(Conditional(Named(Quote, "x"), Literal('a'))))
+  check("(?(<x>)a)", "", DotNet):
+    Command(Conditional(LookAround(Sequence(Literal('<'), Literal('x'), Literal('>'))), Literal('a')))
   check("(?(<1>)a|b)", "", Ruby):
     Command(Conditional(Referenced(Angle, IndexedReference(1)), Literal('a'), Literal('b')))
   check("(?('-1')a)", "", Ruby)(Command(Conditional(Referenced(Quote, RelativeReference(-1)), Literal('a'))))

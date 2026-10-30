@@ -334,7 +334,7 @@ final case class FeatureSet(
     hasLookAroundTest: Boolean,
     // PCRE, Perl, Python, Ruby
     hasMaxBounded: Boolean,
-    // .NET, PCRE, Perl, Ruby
+    // PCRE, Perl, Ruby
     hasNamedCaptureTest: Boolean,
     // PCRE
     hasNonAtomicLookAround: Boolean,
@@ -744,8 +744,8 @@ object FeatureSet:
       hasLookAroundTest = isDotNet || isPCRE || isPerl,
       // PCRE, Perl, Python, Ruby
       hasMaxBounded = isPCRE || isPerl || isPython || isRuby,
-      // .NET, PCRE, Perl, Ruby
-      hasNamedCaptureTest = isDotNet || isPCRE || isPerl || isRuby,
+      // PCRE, Perl, Ruby
+      hasNamedCaptureTest = isPCRE || isPerl || isRuby,
       // PCRE
       hasNonAtomicLookAround = isPCRE,
       // PCRE, Perl
