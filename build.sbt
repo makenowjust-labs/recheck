@@ -368,6 +368,29 @@ lazy val resyntaxCharset = crossProject(JVMPlatform, JSPlatform)
     console / initialCommands := """
       |import codes.quine.labs.resyntax.charset.*
       |""".stripMargin,
+    coverageExcludedFiles := ".*[/\\\\]src_managed[/\\\\].*",
+    // Generators:
+    {
+      val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
+      Seq(
+        Compile / sourceGenerators += generateUnicodeData.taskValue,
+        generateUnicodeData := Def.uncached {
+          val gens = Map[String, UnicodeDataGen](
+            "CharsetCaseDataGen.scala" -> CharsetCaseDataGen,
+            "CharsetPropertyDataGen.scala" -> CharsetPropertyDataGen
+          )
+          val pkg = "codes.quine.labs.resyntax.charset"
+          val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labs" / "resyntax" / "charset"
+          val projectDir = (ThisBuild / baseDirectory).value / "project"
+          for ((fileName, gen) <- gens) {
+            val output = gen.file(dir)
+            val inputs = Seq(projectDir / fileName, projectDir / "CharsetEncoder.scala")
+            if (!output.exists() || inputs.exists(_.lastModified() > output.lastModified())) gen.gen(pkg, dir)
+          }
+          gens.values.map(_.file(dir)).toSeq
+        }
+      )
+    },
     // Settings for test:
     libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
     testFrameworks += new TestFramework("munit.Framework")
