@@ -48,7 +48,7 @@ final case class FeatureSet(
     hasAlphabeticGroup: Boolean,
     // .NET, Java, JavaScript, PCRE, Perl, Ruby
     hasAngleNamedCapture: Boolean,
-    // .NET, Java, PCRE, Perl, Ruby
+    // .NET, Java, PCRE, Perl, Python, Ruby
     hasAtomicGroup: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     hasBackslashBareOctal: Boolean,
@@ -174,7 +174,7 @@ final case class FeatureSet(
     hasPCall: Boolean,
     // PCRE, Perl, Python
     hasPGroup: Boolean,
-    // Java, PCRE, Perl, Ruby
+    // Java, PCRE, Perl, Python, Ruby
     hasPossessiveBacktrackStrategy: Boolean,
     // PCRE, Perl
     hasRecursionTest: Boolean,
@@ -256,8 +256,8 @@ object FeatureSet:
       hasAlphabeticGroup = isPCRE || isPerl,
       // .NET, Java, JavaScript, PCRE, Perl, Ruby
       hasAngleNamedCapture = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isRuby,
-      // .NET, Java, PCRE, Perl, Ruby
-      hasAtomicGroup = isDotNet || isJava || isPCRE || isPerl || isRuby,
+      // .NET, Java, PCRE, Perl, Python, Ruby
+      hasAtomicGroup = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       hasBackslashBareOctal =
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
@@ -384,8 +384,8 @@ object FeatureSet:
       hasPCall = isPCRE || isPerl,
       // PCRE, Perl, Python
       hasPGroup = isPCRE || isPerl || isPython,
-      // Java, PCRE, Perl, Ruby
-      hasPossessiveBacktrackStrategy = isJava || isPCRE || isPerl || isRuby,
+      // Java, PCRE, Perl, Python, Ruby
+      hasPossessiveBacktrackStrategy = isJava || isPCRE || isPerl || isPython || isRuby,
       // PCRE, Perl
       hasRecursionTest = isPCRE || isPerl,
       // PCRE, Perl
