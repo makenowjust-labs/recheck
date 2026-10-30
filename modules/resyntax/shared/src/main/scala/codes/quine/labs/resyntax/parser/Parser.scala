@@ -64,6 +64,8 @@ private[parser] final class Parser(
 
   private var context: ParsingContext = ParsingContext.from(featureSet)
 
+  private var sequenceStart: Int = 0
+
   def parse(): Node =
     val node = parseDisjunction()
     if !isEnd then
@@ -90,7 +92,10 @@ private[parser] final class Parser(
     val start = offset
     val stack = mutable.Stack.empty[Node]
 
+    val savedSequenceStart = sequenceStart
+    sequenceStart = start
     while !isSequenceStop do parseSequenceItem(stack)
+    sequenceStart = savedSequenceStart
 
     val nodes = stack.toSeq
     if nodes.size == 1 then return nodes.head
@@ -571,25 +576,25 @@ private[parser] final class Parser(
         assert(featureSet.hasCallCommand, "Invalid group")
         pushCommand(stack, CommandKind.RelativeCall(-n), start)
       case None =>
-        assert(featureSet.hasInlineFlag, "Invalid group")
-        val added = FlagSet()
-        val removed = parseFlagSet()
-        val diff = FlagSetDiff(added, Some(removed))
+        assert(featureSet.hasInlineFlagGroup, "Invalid group")
+        val removedStart = offset
+        val (removed, removedFlags) = parseFlagSet(removing = true)
+        checkInlineFlagRemoval("", removedFlags, removedStart)
+        val diff = FlagSetDiff(FlagSet(), Some(removed))
         (currentChar: @switch) match
           case ')' =>
-            pushCommand(stack, CommandKind.InlineFlag(FlagSetDiff(added, Some(removed))), start)
-            applyFlagSetDiff(diff)
+            pushInlineFlagCommand(stack, diff, start)
           case ':' =>
             next()
             applyFlagSetDiffWith(diff):
-              parseGroupBody(stack, GroupKind.InlineFlag(FlagSetDiff(added, Some(removed))), start)
+              parseGroupBody(stack, GroupKind.InlineFlag(diff), start)
           case _ =>
             fail("Invalid group")
 
   private def parseResetFlagGroup(stack: mutable.Stack[Node], start: Int): Unit =
     assert(featureSet.hasResetFlag, "Invalid group")
     next()
-    val flagSet = parseFlagSet()
+    val (flagSet, _) = parseFlagSet(resetting = true)
     (currentChar: @switch) match
       case ')' =>
         pushCommand(stack, CommandKind.ResetFlag(flagSet), start)
@@ -662,14 +667,16 @@ private[parser] final class Parser(
     code
 
   private def parseInlineFlagGroup(stack: mutable.Stack[Node], start: Int): Unit =
-    assert(featureSet.hasInlineFlag, "Invalid group")
+    assert(featureSet.hasInlineFlagGroup, "Invalid group")
 
-    val added = parseFlagSet()
+    val (added, addedFlags) = parseFlagSet()
 
     (currentChar: @switch) match
       case '-' =>
         next()
-        val removed = parseFlagSet()
+        val removedStart = offset
+        val (removed, removedFlags) = parseFlagSet(removing = true)
+        checkInlineFlagRemoval(addedFlags, removedFlags, removedStart)
         val diff = FlagSetDiff(added, Some(removed))
         (currentChar: @switch) match
           case ':' =>
@@ -686,12 +693,27 @@ private[parser] final class Parser(
         applyFlagSetDiffWith(diff):
           parseGroupBody(stack, GroupKind.InlineFlag(diff), start)
       case ')' =>
+        assert(addedFlags.nonEmpty || featureSet.allowsEmptyInlineFlag, "Invalid flag")
         val diff = FlagSetDiff(added, None)
         pushInlineFlagCommand(stack, diff, start)
       case _ =>
         fail("Invalid flag")
 
+  private def checkInlineFlagRemoval(addedFlags: String, removedFlags: String, removedStart: Int): Unit =
+    if removedFlags.isEmpty then
+      if addedFlags.isEmpty then assert(featureSet.allowsEmptyInlineFlagDiff, "Invalid flag")
+      else assert(featureSet.allowsEmptyInlineFlagRemoval, "Invalid flag")
+    if !featureSet.allowsToggledInlineFlag then
+      for (c, i) <- removedFlags.zipWithIndex do if addedFlags.contains(c) then fail("Invalid flag", removedStart + i)
+
   private def pushInlineFlagCommand(stack: mutable.Stack[Node], diff: FlagSetDiff, start: Int): Unit =
+    assert(featureSet.hasInlineFlag, "Invalid group", start)
+    if diff.removed.isDefined then assert(featureSet.hasInlineFlagRemovalCommand, "Invalid group", start)
+    if featureSet.requiresInlineFlagAtStart then
+      val atStart = sequenceStart == 0 && stack.forall:
+        case Node(NodeData.Command(_: CommandKind.InlineFlag | _: CommandKind.Comment), _) => true
+        case _                                                                             => false
+      assert(atStart, "Inline flag not at the start", start)
     pushCommand(stack, CommandKind.InlineFlag(diff), start)
     if featureSet.hasIncomprehensiveInlineFlag then parseOpaqueDisjunction(stack, diff)
     else applyFlagSetDiff(diff)
@@ -800,50 +822,82 @@ private[parser] final class Parser(
   private def closeGroup(): Unit =
     expect(')', "Unclosed group")
 
-  private def parseFlagSet(): FlagSet =
+  /** Parses inline flag letters, and returns the flag set and the source string of the letters. */
+  private def parseFlagSet(removing: Boolean = false, resetting: Boolean = false): (FlagSet, String) =
+    val start = offset
     var flagSet = FlagSet()
+    def result: (FlagSet, String) = (flagSet, source.slice(start, offset))
     while !isEnd do
-      (currentChar: @switch) match
+      val c = if featureSet.ignoresInlineFlagCase then currentChar.toLower else currentChar
+      (c: @switch) match
         case 'i' =>
           flagSet = flagSet.copy(ignoreCase = true)
         case 'm' =>
           flagSet = flagSet.copy(multiline = true)
         case 'x' =>
+          if !featureSet.hasFlagX then return result
           flagSet = flagSet.copy(verbose = true)
         case 'J' =>
-          if !featureSet.hasFlagUpperJ then return flagSet
+          if !featureSet.hasFlagUpperJ then return result
           flagSet = flagSet.copy(dupNames = true)
         case 'L' =>
-          if !featureSet.hasFlagUpperL then return flagSet
+          if !featureSet.hasFlagUpperL then return result
           flagSet = flagSet.copy(localeUpper = true)
         case 'U' =>
-          if !featureSet.hasFlagUpperU then return flagSet
+          if !featureSet.hasFlagUpperU then return result
           flagSet = flagSet.copy(ungreedy = true)
         case 'a' =>
-          if !featureSet.hasFlagA then return flagSet
+          if !featureSet.hasFlagA then return result
           flagSet = flagSet.copy(ascii = true)
+        case 'c' =>
+          if !featureSet.hasFlagC then return result
+          flagSet = flagSet.copy(continue = true)
         case 'd' =>
-          if !featureSet.hasFlagD then return flagSet
+          if !featureSet.hasFlagD then return result
           flagSet = flagSet.copy(hasIndices = true)
+        case 'g' =>
+          if !featureSet.hasFlagG then return result
+          flagSet = flagSet.copy(global = true)
         case 'l' =>
-          if !featureSet.hasFlagL then return flagSet
+          if !featureSet.hasFlagL then return result
           flagSet = flagSet.copy(localeLower = true)
         case 'n' =>
-          if !featureSet.hasFlagN then return flagSet
+          if !featureSet.hasFlagN then return result
           flagSet = flagSet.copy(explicitCapture = true)
+        case 'o' =>
+          if !featureSet.hasFlagO then return result
+          flagSet = flagSet.copy(once = true)
         case 'p' =>
-          if !featureSet.hasFlagP then return flagSet
+          if !featureSet.hasFlagP then return result
           flagSet = flagSet.copy(preserve = true)
+        case 'r' =>
+          if !featureSet.hasFlagR then return result
+          flagSet = flagSet.copy(nonDestructive = true)
         case 's' =>
-          if !featureSet.hasFlagS then return flagSet
+          if !featureSet.hasFlagS then return result
           flagSet = flagSet.copy(dotAll = true)
         case 'u' =>
-          if !featureSet.hasFlagU then return flagSet
+          if !featureSet.hasFlagU then return result
           flagSet = flagSet.copy(unicode = true)
         case _ =>
-          return flagSet
+          return result
+      checkFlag(c, source.slice(start, offset), removing, resetting)
       next()
-    flagSet
+    result
+
+  private val CharsetFlags = "adluL"
+
+  private def checkFlag(c: Char, previous: String, removing: Boolean, resetting: Boolean): Unit =
+    if !featureSet.allowsDuplicatedInlineFlag && previous.contains(c) then fail("Duplicated flag")
+    if !CharsetFlags.contains(c) then return
+    if removing && featureSet.checksCharsetInlineFlagRemoval then fail("Invalid flag")
+    // Perl rejects `(?^d)` because `d` is the default character set.
+    if resetting && c == 'd' then fail("Invalid flag")
+    if featureSet.checksCharsetInlineFlagConflict && previous.exists(p => CharsetFlags.contains(p) && p != c) then
+      fail("Invalid flag")
+    // Perl accepts `a` up to twice (`aa`), and the other character set flags only once.
+    if featureSet.checksCharsetInlineFlagCount && previous.count(_ == c) >= (if c == 'a' then 2 else 1) then
+      fail("Duplicated flag")
 
   private def parseCaret(stack: mutable.Stack[Node]): Unit =
     val start = offset
@@ -1745,8 +1799,8 @@ private[parser] final class Parser(
   private def isIDContinue: Boolean =
     !isEnd && CodePointUtil.isIDContinue(currentChar.toInt)
 
-  private def assert(condition: Boolean, message: String): Unit =
-    if !condition then fail(message)
+  private def assert(condition: Boolean, message: String, pos: Int = offset): Unit =
+    if !condition then fail(message, pos)
 
   private def fail(message: String, pos: Int = offset): Nothing =
     throw new ParsingException(message, Some(pos))

@@ -23,11 +23,11 @@ final case class FlagSet(
     ungreedy: Boolean = false,
     // `X` (PCRE)
     extra: Boolean = false,
-    // `a` (Perl, Python, Ruby)
+    // `a` (PCRE, Perl, Python, Ruby)
     ascii: Boolean = false,
     // `b` (Python)
     bytes: Boolean = false,
-    // `c` (Perl)
+    // `c` (Java, Perl)
     continue: Boolean = false,
     // `d` (Java, JavaScript, Perl, Ruby)
     hasIndices: Boolean = false,
@@ -47,7 +47,7 @@ final case class FlagSet(
     once: Boolean = false,
     // `p` (Perl)
     preserve: Boolean = false,
-    // `r` (Perl)
+    // `r` (PCRE, Perl)
     nonDestructive: Boolean = false,
     // `s` (.NET, Java, JavaScript, PCRE, Perl, Python)
     dotAll: Boolean = false,

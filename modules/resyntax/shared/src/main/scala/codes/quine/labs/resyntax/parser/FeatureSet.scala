@@ -26,6 +26,14 @@ final case class FeatureSet(
     allowsClassNest: Boolean,
     // PCRE, Perl, Ruby
     allowsClassPosix: Boolean,
+    // .NET, Java, PCRE, Perl, Python, Ruby
+    allowsDuplicatedInlineFlag: Boolean,
+    // Java, PCRE, Perl
+    allowsEmptyInlineFlag: Boolean,
+    // .NET, Java, PCRE, Perl, Ruby
+    allowsEmptyInlineFlagDiff: Boolean,
+    // .NET, Java, JavaScript, PCRE, Perl, Ruby
+    allowsEmptyInlineFlagRemoval: Boolean,
     // .NET
     allowsInvalidIdentifier: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -38,8 +46,16 @@ final case class FeatureSet(
     allowsNestedRepeat: Boolean,
     // PCRE, Perl, Ruby
     allowsNonNameBaseRef: Boolean,
+    // .NET, Java, PCRE, Perl, Ruby
+    allowsToggledInlineFlag: Boolean,
     // Ruby
     allowsZeroWidthAssertRepeat: Boolean,
+    // Perl
+    checksCharsetInlineFlagCount: Boolean,
+    // Perl, Python
+    checksCharsetInlineFlagConflict: Boolean,
+    // Perl, Python, Ruby
+    checksCharsetInlineFlagRemoval: Boolean,
     // JavaScript (without `uv`)
     checksValidBackReference: Boolean,
     // Ruby
@@ -132,36 +148,52 @@ final case class FeatureSet(
     hasConditional: Boolean,
     // PCRE, Perl
     hasDefineTest: Boolean,
-    // Perl, Python, Ruby
+    // PCRE, Perl, Python, Ruby
     hasFlagA: Boolean,
+    // Java, Perl
+    hasFlagC: Boolean,
     // Java, Perl, Ruby
     hasFlagD: Boolean,
+    // Perl
+    hasFlagG: Boolean,
     // Perl
     hasFlagL: Boolean,
     // .NET, PCRE, Perl
     hasFlagN: Boolean,
     // Perl
+    hasFlagO: Boolean,
+    // Perl
     hasFlagP: Boolean,
-    // .NET, Java, PCRE, Perl, Python
+    // PCRE
+    hasFlagR: Boolean,
+    // .NET, Java, JavaScript, PCRE, Perl, Python
     hasFlagS: Boolean,
-    // Java, Perl, Python, Ruby
+    // Java, Perl, Python (without `b`), Ruby
     hasFlagU: Boolean,
+    // .NET, Java, PCRE, Perl, Python, Ruby
+    hasFlagX: Boolean,
     // PCRE
     hasFlagUpperJ: Boolean,
     // Python (with `b`)
     hasFlagUpperL: Boolean,
-    // Java
+    // Java, PCRE
     hasFlagUpperU: Boolean,
     // Perl
     hasInlineCode: Boolean,
     // .NET, Java, PCRE, Perl, Python, Ruby
     hasInlineFlag: Boolean,
+    // .NET, Java, JavaScript, PCRE, Perl, Python, Ruby
+    hasInlineFlagGroup: Boolean,
+    // .NET, Java, PCRE, Perl, Ruby
+    hasInlineFlagRemovalCommand: Boolean,
     // .NET, PCRE, Perl, Python, Ruby
     hasInlineComment: Boolean,
     // Ruby
     hasIncomprehensiveInlineFlag: Boolean,
     // Ruby
     hasLeveledBackReference: Boolean,
+    // .NET
+    ignoresInlineFlagCase: Boolean,
     // .NET, PCRE, Perl
     hasLookAroundTest: Boolean,
     // Perl, Python, Ruby
@@ -194,6 +226,8 @@ final case class FeatureSet(
     processBackslashInCommentGroup: Boolean,
     // Java, JavaScript (with `uv`), Perl, PCRE (with `u`), Python (without `b`), Ruby
     readsAsUnicode: Boolean,
+    // Python
+    requiresInlineFlagAtStart: Boolean,
     // .NET (with `x`), Java (with `x`), PCRE (with `x`), Perl (with `x`), Python (with `x`), Ruby (with `x`)
     skipsComment: Boolean
 )
@@ -233,6 +267,14 @@ object FeatureSet:
       allowsClassNest = isJava || isJavaScript && flagSet.unicodeSets || isRuby,
       // PCRE, Perl, Ruby
       allowsClassPosix = isPCRE || isPerl || isRuby,
+      // .NET, Java, PCRE, Perl, Python, Ruby
+      allowsDuplicatedInlineFlag = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
+      // Java, PCRE, Perl
+      allowsEmptyInlineFlag = isJava || isPCRE || isPerl,
+      // .NET, Java, PCRE, Perl, Ruby
+      allowsEmptyInlineFlagDiff = isDotNet || isJava || isPCRE || isPerl || isRuby,
+      // .NET, Java, JavaScript, PCRE, Perl, Ruby
+      allowsEmptyInlineFlagRemoval = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isRuby,
       // .NET
       allowsInvalidIdentifier = isDotNet,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -246,8 +288,16 @@ object FeatureSet:
       allowsNestedRepeat = isRuby,
       // PCRE, Perl, Ruby
       allowsNonNameBaseRef = isPCRE || isPerl || isRuby,
+      // .NET, Java, PCRE, Perl, Ruby
+      allowsToggledInlineFlag = isDotNet || isJava || isPCRE || isPerl || isRuby,
       // Ruby
       allowsZeroWidthAssertRepeat = isRuby,
+      // Perl
+      checksCharsetInlineFlagCount = isPerl,
+      // Perl, Python
+      checksCharsetInlineFlagConflict = isPerl || isPython,
+      // Perl, Python, Ruby
+      checksCharsetInlineFlagRemoval = isPerl || isPython || isRuby,
       // JavaScript (without `uv`)
       checksValidBackReference = isJavaScript && !isUnicode,
       // Ruby
@@ -342,36 +392,52 @@ object FeatureSet:
       hasConditional = isDotNet || isPCRE || isPerl || isPython || isRuby,
       // PCRE, Perl
       hasDefineTest = isPCRE || isPerl,
-      // Perl, Python, Ruby
-      hasFlagA = isPerl || isPython || isRuby,
+      // PCRE, Perl, Python, Ruby
+      hasFlagA = isPCRE || isPerl || isPython || isRuby,
+      // Java, Perl
+      hasFlagC = isJava || isPerl,
       // Java, Perl, Ruby
       hasFlagD = isJava || isPerl || isRuby,
+      // Perl
+      hasFlagG = isPerl,
       // Perl
       hasFlagL = isPerl,
       // .NET, PCRE, Perl
       hasFlagN = isDotNet || isPCRE || isPerl,
       // Perl
+      hasFlagO = isPerl,
+      // Perl
       hasFlagP = isPerl,
-      // .NET, Java, PCRE, Perl, Python
-      hasFlagS = isDotNet || isJava || isPCRE || isPerl || isPython,
-      // Java, Perl, Python, Ruby
-      hasFlagU = isJava || isPerl || isPython || isRuby,
+      // PCRE
+      hasFlagR = isPCRE,
+      // .NET, Java, JavaScript, PCRE, Perl, Python
+      hasFlagS = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isPython,
+      // Java, Perl, Python (without `b`), Ruby
+      hasFlagU = isJava || isPerl || (isPython && !isByte) || isRuby,
+      // .NET, Java, PCRE, Perl, Python, Ruby
+      hasFlagX = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
       // PCRE
       hasFlagUpperJ = isPCRE,
       // Python (with `b`)
       hasFlagUpperL = isPython && isByte,
-      // Java
-      hasFlagUpperU = isJava,
+      // Java, PCRE
+      hasFlagUpperU = isJava || isPCRE,
       // Perl
       hasInlineCode = isPerl,
       // .NET, Java, PCRE, Perl, Python, Ruby
       hasInlineFlag = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
+      // .NET, Java, JavaScript, PCRE, Perl, Python, Ruby
+      hasInlineFlagGroup = true,
+      // .NET, Java, PCRE, Perl, Ruby
+      hasInlineFlagRemovalCommand = isDotNet || isJava || isPCRE || isPerl || isRuby,
       // .NET, PCRE, Perl, Python, Ruby
       hasInlineComment = isDotNet || isPCRE || isPerl || isPython || isRuby,
       // Ruby
       hasIncomprehensiveInlineFlag = isRuby,
       // Ruby
       hasLeveledBackReference = isRuby,
+      // .NET
+      ignoresInlineFlagCase = isDotNet,
       // .NET, PCRE, Perl
       hasLookAroundTest = isDotNet || isPCRE || isPerl,
       // Perl, Python, Ruby
@@ -405,6 +471,8 @@ object FeatureSet:
       // Java, JavaScript (with `uv`), Perl, PCRE (with `u`), Python (without `b`), Ruby
       readsAsUnicode =
         isJava || (isJavaScript && isUnicode) || (isPCRE && isUnicode) || (isPython && !isByte) || isRuby,
+      // Python
+      requiresInlineFlagAtStart = isPython,
       // .NET (with `x`), Java (with `x`), PCRE (with `x`), Perl (with `x`), Python (with `x`), Ruby (with `x`)
       skipsComment = flagSet.verbose
     )
