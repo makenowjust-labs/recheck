@@ -455,16 +455,16 @@ private[parser] final class Parser(
 
       if featureSet.hasNamedCaptureTest && currentChar == '<' then
         next()
-        val name = parseGroupName(end = '>')
+        val test = parseNamedCaptureTest(NameStyle.Angle, '>')
         closeCondition()
-        parseConditionalGroupBody(stack, ConditionalTest.Named(NameStyle.Angle, name), start)
+        parseConditionalGroupBody(stack, test, start)
         boundary.break()
 
       if featureSet.hasNamedCaptureTest && currentChar == '\'' then
         next()
-        val name = parseGroupName(end = '\'')
+        val test = parseNamedCaptureTest(NameStyle.Quote, '\'')
         closeCondition()
-        parseConditionalGroupBody(stack, ConditionalTest.Named(NameStyle.Quote, name), start)
+        parseConditionalGroupBody(stack, test, start)
         boundary.break()
 
       if featureSet.hasDefineTest && startWith("DEFINE)") then
@@ -537,6 +537,18 @@ private[parser] final class Parser(
         boundary.break()
 
       fail("Invalid condition")
+
+  private def parseNamedCaptureTest(style: NameStyle, end: Char): ConditionalTest =
+    if !featureSet.allowsNonNameCaptureTest then return ConditionalTest.Named(style, parseGroupName(end))
+
+    // Ruby accepts `(?(<1>)...)` even in a pattern with named captures.
+    val savedNumberedReferenceOffset = numberedReferenceOffset
+    val ref = parseRef(end)
+    numberedReferenceOffset = savedNumberedReferenceOffset
+    expect(end, "Invalid identifier")
+    ref match
+      case Reference.NamedReference(name) => ConditionalTest.Named(style, name)
+      case ref                            => ConditionalTest.Referenced(style, ref)
 
   private def closeCondition(): Unit =
     expect(')', "Invalid condition")

@@ -223,6 +223,18 @@ class ParserSuite extends munit.FunSuite:
   check("(?(1)a|b)", "", DotNet, PCRE, Perl, Python, Ruby)(Command(Conditional(Indexed(1), Literal('a'), Literal('b'))))
   check("(?(<x>)a)", "", DotNet, PCRE, Perl, Ruby)(Command(Conditional(Named(Angle, "x"), Literal('a'))))
   check("(?('x')a)", "", DotNet, PCRE, Perl, Ruby)(Command(Conditional(Named(Quote, "x"), Literal('a'))))
+  check("(?(<1>)a|b)", "", Ruby):
+    Command(Conditional(Referenced(Angle, IndexedReference(1)), Literal('a'), Literal('b')))
+  check("(?('-1')a)", "", Ruby)(Command(Conditional(Referenced(Quote, RelativeReference(-1)), Literal('a'))))
+  check("(?(<x+0>)a)", "", Ruby):
+    Command(Conditional(Referenced(Angle, LeveledReference(NamedReference("x"), 0)), Literal('a')))
+  check("(?(<+1>)a)", "", Ruby)(Command(Conditional(Named(Angle, "+1"), Literal('a'))))
+  error("(?(<1>)a)", "", PCRE, Perl)("Invalid identifier at 4")
+  check("(?<n>a)(?(<1>)b)", "", Ruby):
+    Sequence(
+      Group(NamedCapture(Angle, "n"), Literal('a')),
+      Command(Conditional(Referenced(Angle, IndexedReference(1)), Literal('b')))
+    )
   check("(?(DEFINE)a)", "", PCRE, Perl)(Command(Conditional(Define, Literal('a'))))
   check("(?(VERSION>=1.2)a)", "", PCRE)(Command(Conditional(Version(lt = true, 1, 2), Literal('a'))))
   check("(?(VERSION=1.2)a)", "", PCRE)(Command(Conditional(Version(lt = false, 1, 2), Literal('a'))))

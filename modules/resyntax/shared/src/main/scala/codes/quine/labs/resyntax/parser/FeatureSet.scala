@@ -126,6 +126,8 @@ final case class FeatureSet(
     allowsForwardRelativeReference: Boolean,
     // Ruby
     allowsNonNameKBackReference: Boolean,
+    // Ruby
+    allowsNonNameCaptureTest: Boolean,
     // .NET, Java, Perl, Ruby
     allowsZeroWidthAssertRepeat: Boolean,
     // Perl, Python
@@ -531,6 +533,8 @@ object FeatureSet:
       allowsForwardRelativeReference = isPCRE || isRuby,
       // Ruby
       allowsNonNameKBackReference = isRuby,
+      // Ruby
+      allowsNonNameCaptureTest = isRuby,
       // .NET, Java, Perl, Ruby
       allowsZeroWidthAssertRepeat = isDotNet || isJava || isPerl || isRuby,
       // Perl, Python

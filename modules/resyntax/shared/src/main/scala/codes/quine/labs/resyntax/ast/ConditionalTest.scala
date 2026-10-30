@@ -8,6 +8,7 @@ package codes.quine.labs.resyntax.ast
   *   "(+" Int ")" | "(-" Int ")"
   *   "(" ID ")"
   *   "(" Name ")"
+  *   "(" Reference ")"
   *   "(R)"
   *   "(R" Int ")"
   *   "(R&" ID ")"
@@ -32,6 +33,9 @@ object ConditionalTest:
 
   /** Named is a named capture test (e.g. `(<foo>)`). */
   final case class Named(style: NameStyle, name: String) extends ConditionalTest
+
+  /** Referenced is a capture test by a back-reference other than a name (e.g. `(<1>)` and `(<foo+0>)` in Ruby). */
+  final case class Referenced(style: NameStyle, ref: Reference) extends ConditionalTest
 
   /** RRecursion is a full recursion test (e.g. `(R)`). */
   case object RRecursion extends ConditionalTest
