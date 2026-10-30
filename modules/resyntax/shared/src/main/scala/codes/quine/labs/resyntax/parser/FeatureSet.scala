@@ -194,6 +194,8 @@ final case class FeatureSet(
     hasQuoteNamedCapture: Boolean,
     // PCRE
     hasVersionTest: Boolean,
+    // Java
+    ignoresCurlyAfterRepeat: Boolean,
     // Python
     processBackslashInLineComment: Boolean,
     // Python, Ruby
@@ -235,7 +237,8 @@ object FeatureSet:
       // PCRE, Perl
       allowsBlankInBrace = isPCRE || isPerl,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
-      allowsBrokenCloseBracket = isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
+      allowsBrokenCloseBracket =
+        isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
       // JavaScript (with `v`)
       allowsClassDiff = isJavaScript && flagSet.unicodeSets,
       // JavaScript
@@ -413,6 +416,8 @@ object FeatureSet:
       hasQuoteNamedCapture = isDotNet || isPCRE || isPerl || isRuby,
       // PCRE
       hasVersionTest = isPCRE,
+      // Java
+      ignoresCurlyAfterRepeat = isJava,
       // Python
       processBackslashInLineComment = isPython,
       // Python, Ruby

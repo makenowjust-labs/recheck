@@ -146,7 +146,7 @@ private[parser] final class Parser(
     if minOption.isDefined && currentChar == '}' then
       next()
       val strategy = parseBacktrackStrategy(exact = true)
-      pushRepeat(stack, popRepeatable(stack), Quantifier.Exact(minOption.get, strategy))
+      pushCurlyRepeat(stack, Quantifier.Exact(minOption.get, strategy))
       return
 
     if isEnd || currentChar != ',' || minOption.isEmpty && !featureSet.hasMaxBounded then
@@ -171,7 +171,16 @@ private[parser] final class Parser(
       case (Some(min), None) => Quantifier.Unbounded(min, strategy)
       case (None, Some(max)) => Quantifier.MaxBounded(max, strategy)
       case (None, None)      => throw new IllegalStateException("Unreachable")
-    pushRepeat(stack, popRepeatable(stack), quantifier)
+    pushCurlyRepeat(stack, quantifier)
+
+  private def pushCurlyRepeat(stack: mutable.Stack[Node], quantifier: Quantifier): Unit =
+    stack.headOption match
+      // Java ignores a curly quantifier following another quantifier: `a{2}{3}` matches `aa`.
+      case Some(node @ Node(NodeData.Repeat(_, _), _)) if featureSet.ignoresCurlyAfterRepeat =>
+        stack.pop()
+        stack.push(node.copy(loc = node.loc.copy(end = offset)))
+      case _ =>
+        pushRepeat(stack, popRepeatable(stack), quantifier)
 
   private def parseRepeatCountOption(): Option[Int] =
     val start = offset
