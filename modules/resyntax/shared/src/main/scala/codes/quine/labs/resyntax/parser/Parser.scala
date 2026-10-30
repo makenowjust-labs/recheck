@@ -1472,7 +1472,7 @@ private[parser] final class Parser(
     val start = offset
     val seq = Seq.newBuilder[ClassItem]
 
-    while (first && start == offset && !isEnd) || !isClassItemStop do seq.addOne(parseClassItemAtom())
+    while (first && start == offset && !isEnd) || !isClassItemStop do parseClassItemAtom(seq)
 
     val end = offset
     val items = seq.result()
@@ -1485,34 +1485,39 @@ private[parser] final class Parser(
       featureSet.allowsClassIntersection && source.startsWith("&&", offset) ||
       featureSet.allowsClassDiff && source.startsWith("--", offset)
 
-  private def parseClassItemAtom(): ClassItem =
+  private def parseClassItemAtom(seq: mutable.Builder[ClassItem, Seq[ClassItem]]): Unit =
     val start = offset
     val begin = parseClassItemNonRange()
 
-    if !isClassItemStop && currentChar == '-' && isValueClassItem(begin) then
-      val save = offset
-      next()
+    if isClassItemStop || currentChar != '-' then
+      seq.addOne(begin)
+      return
 
-      if isClassItemStop then
-        reset(save)
-        return begin
+    val save = offset
+    next()
 
-      if (featureSet.allowsClassPosix || featureSet.allowsClassNest) && currentChar == '[' then
-        reset(save)
-        return begin
+    if isClassItemStop then
+      reset(save)
+      seq.addOne(begin)
+      return
 
-      val end = parseClassItemNonRange()
-      val endOffset = offset
-      if !isValueClassItem(end) then
-        reset(save)
-        return begin
+    val end = parseClassItemNonRange()
+    val endOffset = offset
 
-      return ClassItem(
-        ClassItemData.ClassRange(begin.asInstanceOf[ClassItem.Value], end.asInstanceOf[ClassItem.Value]),
-        SourceLocation(start, endOffset)
-      )
+    (begin, end) match
+      case (begin: ClassItem.Value, end: ClassItem.Value) =>
+        assert(begin.data.value <= end.data.value, "Out of order class range", start)
+        seq.addOne(ClassItem(ClassItemData.ClassRange(begin, end), SourceLocation(start, endOffset)))
+      case _ =>
+        if !isClassNestItem(begin) && !isClassNestItem(end) then
+          if !isValueClassItem(begin) then assert(featureSet.allowsBrokenClassRangeBegin, "Invalid class range", start)
+          else assert(featureSet.allowsBrokenClassRangeEnd, "Invalid class range", start)
 
-    begin
+        seq.addOne(begin)
+        if featureSet.consumesBrokenClassRange then
+          seq.addOne(ClassItem.Value(ClassItemData.ClassLiteral('-'), SourceLocation(save, save + 1)))
+          seq.addOne(end)
+        else reset(save)
 
   private def parseClassItemNonRange(): ClassItem =
     val start = offset
@@ -1562,6 +1567,9 @@ private[parser] final class Parser(
 
   private def isValueClassItem(item: ClassItem): Boolean =
     item.isInstanceOf[ClassItem.Value]
+
+  private def isClassNestItem(item: ClassItem): Boolean =
+    item.data.isInstanceOf[ClassItemData.ClassNest]
 
   private def parseCloseCurly(stack: mutable.Stack[Node]): Unit =
     assert(featureSet.allowsBrokenCloseCurly, "Incomplete quantifier")
@@ -1745,8 +1753,8 @@ private[parser] final class Parser(
   private def isIDContinue: Boolean =
     !isEnd && CodePointUtil.isIDContinue(currentChar.toInt)
 
-  private def assert(condition: Boolean, message: String): Unit =
-    if !condition then fail(message)
+  private def assert(condition: Boolean, message: String, pos: Int = offset): Unit =
+    if !condition then fail(message, pos)
 
   private def fail(message: String, pos: Int = offset): Nothing =
     throw new ParsingException(message, Some(pos))

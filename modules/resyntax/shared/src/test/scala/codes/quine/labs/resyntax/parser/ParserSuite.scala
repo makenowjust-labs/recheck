@@ -426,10 +426,36 @@ class ParserSuite extends munit.FunSuite:
       false,
       ClassRange(ClassBackslashValue(Escape(Single('n'), '\n')), ClassBackslashValue(Escape(Single('r'), '\r')))
     )
-  check("[a-\\w]", "", All*):
+  check("[a-\\w]", "", JavaScript, Perl):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassBackslashClass(Word)))
-  check("[\\w-z]", "", All*):
+  error("[a-\\w]", "", DotNet, Java, PCRE, Python, Ruby)("Invalid class range at 1")
+  error("[a-\\w]", "u", JavaScript)("Invalid class range at 1")
+  check("[\\w-z]", "", DotNet, Java, JavaScript, Perl):
     Class(false, ClassUnion(ClassBackslashClass(Word), ClassLiteral('-'), ClassLiteral('z')))
+  error("[\\w-z]", "", PCRE, Python, Ruby)("Invalid class range at 1")
+  error("[\\w-z]", "u", JavaScript)("Invalid class range at 1")
+  check("[\\d-a-c]", "", JavaScript):
+    Class(
+      false,
+      ClassUnion(ClassBackslashClass(Digit), ClassLiteral('-'), ClassLiteral('a'), ClassLiteral('-'), ClassLiteral('c'))
+    )
+  check("[\\d-a-c]", "", DotNet, Java, Perl):
+    Class(
+      false,
+      ClassUnion(ClassBackslashClass(Digit), ClassLiteral('-'), ClassRange(ClassLiteral('a'), ClassLiteral('c')))
+    )
+  check("[a-[:digit:]]", "", Perl):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassPosix(false, "digit")))
+  error("[a-[:digit:]]", "", PCRE, Ruby)("Invalid class range at 1")
+  check("[[:digit:]-z]", "", Perl):
+    Class(false, ClassUnion(ClassPosix(false, "digit"), ClassLiteral('-'), ClassLiteral('z')))
+  error("[[:digit:]-z]", "", PCRE, Ruby)("Invalid class range at 1")
+  check("[a-[b]]", "", Java, Ruby):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassNest(false, ClassLiteral('b'))))
+  check("[[a]-z]", "", Java, Ruby):
+    Class(false, ClassUnion(ClassNest(false, ClassLiteral('a')), ClassLiteral('-'), ClassLiteral('z')))
+  error("[z-a]", "", All*)("Out of order class range at 1")
+  error("[a-[b]]", "", JavaScript, PCRE, Perl, Python)("Out of order class range at 1")
   check("[\\b]", "", All*)(Class(false, ClassBackslashValue(Escape(Single('b'), 0x08))))
   check("[]", "", JavaScript)(Class(false, ClassUnion()))
   check("[[:alnum:]]", "", PCRE, Perl, Ruby)(Class(false, ClassPosix(false, "alnum")))

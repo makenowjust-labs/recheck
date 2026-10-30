@@ -10,6 +10,10 @@ import codes.quine.labs.resyntax.ast.FlagSet
 final case class FeatureSet(
     // JavaScript (without `uv`), Perl, Ruby
     allowsAlphabeticUnknownBackslash: Boolean,
+    // .NET, Java, JavaScript (without `uv`), Perl
+    allowsBrokenClassRangeBegin: Boolean,
+    // JavaScript (without `uv`), Perl
+    allowsBrokenClassRangeEnd: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     allowsBrokenCloseCurly: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -42,6 +46,8 @@ final case class FeatureSet(
     allowsZeroWidthAssertRepeat: Boolean,
     // JavaScript (without `uv`)
     checksValidBackReference: Boolean,
+    // JavaScript (without `uv`)
+    consumesBrokenClassRange: Boolean,
     // Ruby
     hasAbsenceOperator: Boolean,
     // PCRE, Perl
@@ -216,6 +222,10 @@ object FeatureSet:
     FeatureSet(
       // JavaScript (without `uv`), Perl, Ruby
       allowsAlphabeticUnknownBackslash = (isJavaScript && !isUnicode) || isPerl || isRuby,
+      // .NET, Java, JavaScript (without `uv`), Perl
+      allowsBrokenClassRangeBegin = isDotNet || isJava || (isJavaScript && !isUnicode) || isPerl,
+      // JavaScript (without `uv`), Perl
+      allowsBrokenClassRangeEnd = (isJavaScript && !isUnicode) || isPerl,
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsBrokenCloseCurly =
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
@@ -250,6 +260,8 @@ object FeatureSet:
       allowsZeroWidthAssertRepeat = isRuby,
       // JavaScript (without `uv`)
       checksValidBackReference = isJavaScript && !isUnicode,
+      // JavaScript (without `uv`)
+      consumesBrokenClassRange = isJavaScript && !isUnicode,
       // Ruby
       hasAbsenceOperator = isRuby,
       // PCRE, Perl
