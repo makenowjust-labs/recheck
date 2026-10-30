@@ -282,8 +282,11 @@ private[parser] final class Parser(
 
   private def isAfterAlphabeticBackslash(stack: mutable.Stack[Node], pos: Int): Boolean =
     stack.headOption.exists: node =>
-      node.data.isInstanceOf[NodeData.Backslash] && node.loc.end == pos && node.loc.start + 2 == pos &&
-        CodePointUtil.isAlphabetic(source.charAt(pos - 1).toInt)
+      node.loc.end == pos && CodePointUtil.isAlphabetic(source.charAt(pos - 1).toInt) && (node.data match
+        case _: NodeData.Backslash => node.loc.start + 2 == pos
+        // Perl looks only at the source text, so it also rejects a letter after an escaped backslash (e.g. `\\p{`).
+        case _: NodeData.Literal => node.loc.start + 1 == pos && pos >= 2 && source.charAt(pos - 2) == '\\'
+        case _                   => false)
 
   private def parseGroup(stack: mutable.Stack[Node]): Unit =
     val start = offset

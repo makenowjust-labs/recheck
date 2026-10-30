@@ -114,6 +114,11 @@ class ParserSuite extends munit.FunSuite:
   check("\\d{", "", DotNet, JavaScript, PCRE, Python, Ruby)(Sequence(Backslash(EscapeClass(Digit)), Literal('{')))
   error("\\d{", "", Perl)("Unescaped left brace at 2")
   error("\\E{x", "", Perl)("Unescaped left brace at 2")
+  error("\\\\p{x", "", Perl)("Unescaped left brace at 3")
+  error("a\\c\\p{x", "", Perl)("Unescaped left brace at 5")
+  check("\\\\pa{", "", Perl):
+    Sequence(Backslash(Escape(Single('\\'), '\\')), Literal('p'), Literal('a'), Literal('{'))
+  check("\\\\p{", "", PCRE)(Sequence(Backslash(Escape(Single('\\'), '\\')), Literal('p'), Literal('{')))
   check("\\x41{", "", Perl)(Sequence(Backslash(Escape(Hex2, 0x41)), Literal('{')))
   check("\\-{", "", Perl)(Sequence(Backslash(Unknown('-')), Literal('{')))
   check("\\d{2}", "", All*)(Repeat(Backslash(EscapeClass(Digit)), Exact(2, Greedy)))
