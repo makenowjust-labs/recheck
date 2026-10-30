@@ -1059,6 +1059,7 @@ private[parser] final class Parser(
     var flagSet = initial
     def result: (FlagSet, String) = (flagSet, source.slice(start, offset))
     while !isEnd do
+      val flagStart = offset
       val c = if featureSet.ignoresInlineFlagCase then currentChar.toLower else currentChar
       (c: @switch) match
         case 'i' =>
@@ -1081,7 +1082,16 @@ private[parser] final class Parser(
           flagSet = flagSet.copy(ungreedy = true)
         case 'a' =>
           if !featureSet.hasFlagA then return result
-          flagSet = flagSet.copy(ascii = true)
+          val subOption =
+            if featureSet.hasFlagASubOption then source.lift(offset + 1).filter("DPSTW".contains(_)) else None
+          flagSet = subOption match
+            case Some('D') => flagSet.copy(asciiDigit = true)
+            case Some('P') => flagSet.copy(asciiPosix = true)
+            case Some('S') => flagSet.copy(asciiSpace = true)
+            case Some('T') => flagSet.copy(asciiPosixDigit = true)
+            case Some('W') => flagSet.copy(asciiWord = true)
+            case _         => flagSet.copy(ascii = true)
+          if subOption.isDefined then next()
         case 'c' =>
           if !featureSet.hasFlagC then return result
           flagSet = flagSet.copy(continue = true)
@@ -1114,7 +1124,7 @@ private[parser] final class Parser(
           flagSet = flagSet.copy(unicode = true)
         case _ =>
           return result
-      checkFlag(c, source.slice(start, offset), removing, resetting)
+      checkFlag(c, source.slice(start, flagStart), removing, resetting)
       next()
     result
 

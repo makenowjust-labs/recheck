@@ -276,6 +276,8 @@ final case class FeatureSet(
     hasDefineTest: Boolean,
     // PCRE, Perl, Python, Ruby
     hasFlagA: Boolean,
+    // PCRE
+    hasFlagASubOption: Boolean,
     // Java, Perl
     hasFlagC: Boolean,
     // Java, Perl, Ruby
@@ -680,6 +682,8 @@ object FeatureSet:
       hasDefineTest = isPCRE || isPerl,
       // PCRE, Perl, Python, Ruby
       hasFlagA = isPCRE || isPerl || isPython || isRuby,
+      // PCRE
+      hasFlagASubOption = isPCRE,
       // Java, Perl
       hasFlagC = isJava || isPerl,
       // Java, Perl, Ruby

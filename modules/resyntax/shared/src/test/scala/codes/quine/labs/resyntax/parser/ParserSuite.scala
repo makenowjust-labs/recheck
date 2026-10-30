@@ -326,6 +326,22 @@ class ParserSuite extends munit.FunSuite:
   check("(?a)", "", PCRE, Perl, Python, Ruby):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true), None)))
   error("(?a)", "", DotNet, Java)("Invalid flag at 2")
+  check("(?aD)", "", PCRE)(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(asciiDigit = true), None))))
+  check("(?aP)", "", PCRE)(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(asciiPosix = true), None))))
+  check("(?aS)", "", PCRE)(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(asciiSpace = true), None))))
+  check("(?aT)", "", PCRE)(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(asciiPosixDigit = true), None))))
+  check("(?aW)", "", PCRE)(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(asciiWord = true), None))))
+  check("(?aDa)", "", PCRE):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true, asciiDigit = true), None)))
+  check("(?aU)", "", PCRE):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true, ungreedy = true), None)))
+  check("(?a-aD)", "", PCRE):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true), Some(FlagSet(asciiDigit = true)))))
+  check("(?-aW:a)", "", PCRE):
+    Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(asciiWord = true)))), Literal('a'))
+  check("(?^aS)", "", PCRE)(Command(CommandKind.ResetFlag(FlagSet(asciiSpace = true))))
+  error("(?aDS)", "", PCRE)("Invalid flag at 4")
+  error("(?aD)", "", Perl, Python, Ruby)("Invalid flag at 3")
   check("(?c)", "", Java, Perl):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(continue = true), None)))
   error("(?c)", "", DotNet, PCRE, Python, Ruby)("Invalid flag at 2")

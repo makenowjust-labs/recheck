@@ -25,6 +25,16 @@ final case class FlagSet(
     extra: Boolean = false,
     // `a` (PCRE, Perl, Python, Ruby)
     ascii: Boolean = false,
+    // `aD` (PCRE)
+    asciiDigit: Boolean = false,
+    // `aP` (PCRE)
+    asciiPosix: Boolean = false,
+    // `aS` (PCRE)
+    asciiSpace: Boolean = false,
+    // `aT` (PCRE)
+    asciiPosixDigit: Boolean = false,
+    // `aW` (PCRE)
+    asciiWord: Boolean = false,
     // `b` (Python)
     bytes: Boolean = false,
     // `c` (Java, Perl)
