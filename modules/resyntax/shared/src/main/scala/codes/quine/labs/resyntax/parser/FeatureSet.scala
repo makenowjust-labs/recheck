@@ -40,6 +40,10 @@ final case class FeatureSet(
     allowsMeaninglessBacktrackStrategy: Boolean,
     // Ruby
     allowsNestedRepeat: Boolean,
+    // JavaScript (without `uv`), PCRE, Perl, Ruby
+    allowsNonOctalDigitBackslash: Boolean,
+    // .NET, PCRE (with `u`), Perl
+    allowsOctalAbove0377: Boolean,
     // Perl
     allowsReversedBoundedRepeat: Boolean,
     // PCRE, Perl, Ruby
@@ -48,6 +52,8 @@ final case class FeatureSet(
     allowsZeroWidthAssertRepeat: Boolean,
     // JavaScript (without `uv`)
     checksValidBackReference: Boolean,
+    // .NET, PCRE, Perl, Ruby
+    fallsBackMultiDigitBackReferenceToOctal: Boolean,
     // Ruby
     hasAbsenceOperator: Boolean,
     // PCRE, Perl
@@ -56,8 +62,12 @@ final case class FeatureSet(
     hasAngleNamedCapture: Boolean,
     // .NET, Java, PCRE, Perl, Ruby
     hasAtomicGroup: Boolean,
-    // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
+    // .NET, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     hasBackslashBareOctal: Boolean,
+    // JavaScript (with `uv`)
+    hasBackslashNull: Boolean,
+    // Java
+    hasBackslashZeroOctal: Boolean,
     // .NET, Java, PCRE, Perl, Python, Ruby
     hasBackslashBegin: Boolean,
     // .NET, Java, PCRE, Perl, Python, Ruby
@@ -196,8 +206,16 @@ final case class FeatureSet(
     hasVersionTest: Boolean,
     // Java
     ignoresCurlyAfterRepeat: Boolean,
+    // JavaScript (without `uv`)
+    limitsOctalTo0377ByDigits: Boolean,
     // Python
     processBackslashInLineComment: Boolean,
+    // Java
+    readsBackReferenceDigitsWhileGroupExists: Boolean,
+    // Python
+    readsThreeOctalDigitsAsOctal: Boolean,
+    // JavaScript (with `uv`)
+    rejectsInvalidBackReference: Boolean,
     // Python, Ruby
     processBackslashInCommentGroup: Boolean,
     // Java, JavaScript (with `uv`), Perl, PCRE (with `u`), Python (without `b`), Ruby
@@ -260,6 +278,10 @@ object FeatureSet:
       allowsMeaninglessBacktrackStrategy = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isPython,
       // Ruby
       allowsNestedRepeat = isRuby,
+      // JavaScript (without `uv`), PCRE, Perl, Ruby
+      allowsNonOctalDigitBackslash = (isJavaScript && !isUnicode) || isPCRE || isPerl || isRuby,
+      // .NET, PCRE (with `u`), Perl
+      allowsOctalAbove0377 = isDotNet || (isPCRE && isUnicode) || isPerl,
       // Perl
       allowsReversedBoundedRepeat = isPerl,
       // PCRE, Perl, Ruby
@@ -268,6 +290,8 @@ object FeatureSet:
       allowsZeroWidthAssertRepeat = isDotNet || isJava || isPerl || isRuby,
       // JavaScript (without `uv`)
       checksValidBackReference = isJavaScript && !isUnicode,
+      // .NET, PCRE, Perl, Ruby
+      fallsBackMultiDigitBackReferenceToOctal = isDotNet || isPCRE || isPerl || isRuby,
       // Ruby
       hasAbsenceOperator = isRuby,
       // PCRE, Perl
@@ -276,9 +300,12 @@ object FeatureSet:
       hasAngleNamedCapture = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isRuby,
       // .NET, Java, PCRE, Perl, Ruby
       hasAtomicGroup = isDotNet || isJava || isPCRE || isPerl || isRuby,
-      // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
-      hasBackslashBareOctal =
-        isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
+      // .NET, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
+      hasBackslashBareOctal = isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
+      // JavaScript (with `uv`)
+      hasBackslashNull = isJavaScript && isUnicode,
+      // Java
+      hasBackslashZeroOctal = isJava,
       // .NET, Java, PCRE, Perl, Python, Ruby
       hasBackslashBegin = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
       // .NET, Java, PCRE, Perl, Python, Ruby
@@ -418,8 +445,16 @@ object FeatureSet:
       hasVersionTest = isPCRE,
       // Java
       ignoresCurlyAfterRepeat = isJava,
+      // JavaScript (without `uv`)
+      limitsOctalTo0377ByDigits = isJavaScript && !isUnicode,
       // Python
       processBackslashInLineComment = isPython,
+      // Java
+      readsBackReferenceDigitsWhileGroupExists = isJava,
+      // Python
+      readsThreeOctalDigitsAsOctal = isPython,
+      // JavaScript (with `uv`)
+      rejectsInvalidBackReference = isJavaScript && isUnicode,
       // Python, Ruby
       processBackslashInCommentGroup = isPython || isRuby,
       // Java, JavaScript (with `uv`), Perl, PCRE (with `u`), Python (without `b`), Ruby

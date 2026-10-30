@@ -1405,20 +1405,50 @@ private[parser] final class Parser(
     BackslashKind.Assert(AssertKind.UpperEnd)
 
   private def parseBackslashOctal(): BackslashKind =
-    assert(featureSet.hasBackslashBareOctal, "Invalid backslash escape")
+    if !featureSet.hasBackslashBareOctal then
+      if featureSet.hasBackslashZeroOctal && currentChar == '0' then return parseBackslashZeroOctal()
+      if featureSet.hasBackslashNull && currentChar == '0' && !source.lift(offset + 1).exists(_.isDigit) then
+        next()
+        return BackslashKind.Escape(EscapeStyle.Single('0'), 0x00)
+      fail("Invalid backslash escape")
 
-    val size = if '0' <= currentChar && currentChar <= '3' then 3 else 2
-    val valueStart = offset
-    for _ <- 1 to size; if isOctalDigit do next()
-    val str = source.slice(valueStart, offset)
-    val value = Try(Integer.parseInt(str, 8)).getOrElse(fail("Invalid integer"))
+    if !isOctalDigit then
+      assert(featureSet.allowsNonOctalDigitBackslash, "Invalid backslash escape")
+      return parseBackslashUnknown()
+
+    val size = if currentChar <= '3' || !featureSet.limitsOctalTo0377ByDigits then 3 else 2
+    val start = offset
+    val value = parseOctalDigits(size)
+    if value > 0xff && !featureSet.allowsOctalAbove0377 then fail("Octal escape value too large", start)
     BackslashKind.Escape(EscapeStyle.BareOctal, value)
+
+  private def parseBackslashZeroOctal(): BackslashKind =
+    next()
+    assert(isOctalDigit, "Invalid octal escape")
+    val size = if currentChar <= '3' then 3 else 2
+    BackslashKind.Escape(EscapeStyle.BareOctal, parseOctalDigits(size))
+
+  private def parseOctalDigits(size: Int): Int =
+    var value = 0
+    for _ <- 1 to size; if isOctalDigit do
+      value = value * 8 + (currentChar - '0')
+      next()
+    value
 
   private def parseBackslashBackReference(): BackslashKind =
     if context.inClass then return parseBackslashOctal()
 
     val save = offset
-    val n = parseSaturatedIntOption(Long.MaxValue, "Invalid backslash escape", save).get
+
+    if featureSet.readsThreeOctalDigitsAsOctal && source
+        .slice(offset, offset + 3)
+        .count(CodePointUtil.isOctalDigit(_)) == 3
+    then return parseBackslashOctal()
+
+    val n =
+      if featureSet.readsThreeOctalDigitsAsOctal then parseBoundedDigits(_ < 100)
+      else if featureSet.readsBackReferenceDigitsWhileGroupExists then parseBoundedDigits(_ <= analysis.captureSize)
+      else parseSaturatedIntOption(Long.MaxValue, "Invalid backslash escape", save).get
 
     if featureSet.checksValidBackReference && !(0 < n && n <= analysis.captureSize) then
       reset(save)
@@ -1426,7 +1456,22 @@ private[parser] final class Parser(
 
       return parseBackslashUnknown()
 
+    val isOctalStart = CodePointUtil.isOctalDigit(source.charAt(save).toInt)
+    if featureSet.fallsBackMultiDigitBackReferenceToOctal && n >= 10 && n > analysis.captureSize && isOctalStart then
+      reset(save)
+      return parseBackslashOctal()
+
+    if featureSet.rejectsInvalidBackReference && n > analysis.captureSize then fail("Invalid back-reference", save)
+
     BackslashKind.EscapeBackReference(BackReferenceStyle.BareBackReference, Reference.IndexedReference(n))
+
+  private def parseBoundedDigits(continues: Int => Boolean): Int =
+    var value = currentChar - '0'
+    next()
+    while isDigit && continues(value * 10 + (currentChar - '0')) do
+      value = value * 10 + (currentChar - '0')
+      next()
+    value
 
   private def parseBackslashEscape(): BackslashKind =
     val value = currentChar

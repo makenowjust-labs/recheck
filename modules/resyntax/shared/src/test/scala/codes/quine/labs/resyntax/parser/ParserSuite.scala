@@ -445,7 +445,36 @@ class ParserSuite extends munit.FunSuite:
   check("\\W", "", All*)(Backslash(EscapeClass(NonWord)))
   check("\\X", "", Java, PCRE, Perl)(Backslash(EscapeClass(GraphemeCluster)))
   check("\\Z", "", DotNet, Java, PCRE, Perl, Python, Ruby)(Backslash(Assert(UpperEnd)))
-  check("\\010", "", All*)(Backslash(Escape(BareOctal, 8)))
+  check("\\010", "", DotNet, Java, JavaScript, PCRE, Perl, Python, Ruby)(Backslash(Escape(BareOctal, 8)))
+  check("\\0", "", DotNet, JavaScript, PCRE, Perl, Python, Ruby)(Backslash(Escape(BareOctal, 0)))
+  error("\\0", "", Java)("Invalid octal escape at 2")
+  check("\\0", "u", JavaScript)(Backslash(Escape(Single('0'), 0)))
+  check("[\\0]", "v", JavaScript)(Class(false, ClassBackslashValue(Escape(Single('0'), 0))))
+  error("\\00", "u", JavaScript)("Invalid backslash escape at 1")
+  check("\\0477", "", Java)(Sequence(Backslash(Escape(BareOctal, 39)), Literal('7')))
+  check("\\0377", "", Java)(Backslash(Escape(BareOctal, 0xff)))
+  check("[\\8]", "", JavaScript, PCRE, Perl, Ruby)(Class(false, ClassBackslashValue(Unknown('8'))))
+  error("[\\8]", "", DotNet, Java, Python)("Invalid backslash escape at 2")
+  error("[\\1]", "", Java)("Invalid backslash escape at 2")
+  check("[\\1]", "", DotNet, JavaScript, PCRE, Perl, Python, Ruby)(
+    Class(false, ClassBackslashValue(Escape(BareOctal, 1)))
+  )
+  check("\\400", "", DotNet, Perl)(Backslash(Escape(BareOctal, 0x100)))
+  check("\\400", "u", PCRE)(Backslash(Escape(BareOctal, 0x100)))
+  error("\\400", "", PCRE, Python, Ruby)("Octal escape value too large at 1")
+  check("\\10", "", DotNet, PCRE, Perl, Ruby)(Backslash(Escape(BareOctal, 8)))
+  check("\\18", "", DotNet, PCRE, Perl, Ruby)(Sequence(Backslash(Escape(BareOctal, 1)), Literal('8')))
+  check("\\123", "", Python)(Backslash(Escape(BareOctal, 83)))
+  check("\\128", "", Python)(
+    Sequence(Backslash(EscapeBackReference(BareBackReference, IndexedReference(12))), Literal('8'))
+  )
+  check("()\\11", "", Java):
+    Sequence(
+      Group(IndexedCapture, Sequence()),
+      Backslash(EscapeBackReference(BareBackReference, IndexedReference(1))),
+      Literal('1')
+    )
+  error("()\\2", "u", JavaScript)("Invalid back-reference at 3")
   check("\\2147483648", "", JavaScript):
     Sequence(
       Backslash(Escape(BareOctal, 0x8c)),
@@ -457,7 +486,7 @@ class ParserSuite extends munit.FunSuite:
       Literal('4'),
       Literal('8')
     )
-  check("()\\99999999999", "", Java, Ruby):
+  check("()\\99999999999", "", Ruby):
     Sequence(
       Group(IndexedCapture, Sequence()),
       Backslash(EscapeBackReference(BareBackReference, IndexedReference(Int.MaxValue)))
@@ -467,7 +496,7 @@ class ParserSuite extends munit.FunSuite:
     Sequence(Group(IndexedCapture, Sequence()), Backslash(EscapeBackReference(BareBackReference, IndexedReference(1))))
   check("\\1", "", DotNet, Java, PCRE, Perl, Python, Ruby):
     Backslash(EscapeBackReference(BareBackReference, IndexedReference(1)))
-  check("\\1", "u", JavaScript)(Backslash(EscapeBackReference(BareBackReference, IndexedReference(1))))
+  error("\\1", "u", JavaScript)("Invalid back-reference at 1")
   for c <- "/|+*?{}()^$.\\[]" do check(s"\\$c", "", All*)(Backslash(Escape(Single(c), c.toInt)))
   check("\\y", "", JavaScript, Perl, Ruby)(Backslash(Unknown('y')))
   check("\\:", "", All*)(Backslash(Unknown(':')))
