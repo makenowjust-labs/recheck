@@ -269,6 +269,34 @@ class ParserSuite extends munit.FunSuite:
   check("(?(*nlb:a)b)", "", PCRE, Perl):
     Command(Conditional(LookAround(NegativeLookBehind(Abbrev), Literal('a')), Literal('b')))
   check("(?(.)b)", "", DotNet)(Command(Conditional(LookAround(Dot), Literal('b'))))
+  check("(?(?C1)(?=a)b)", "", PCRE):
+    Command(
+      Conditional(
+        CalloutLookAround(CommandKind.CalloutInt(1), LookAround(PositiveLookAhead(Symbolic), Literal('a'))),
+        Literal('b')
+      )
+    )
+  check("(?(?C{x})(*nlb:a)b|c)", "", PCRE):
+    Command(
+      Conditional(
+        CalloutLookAround(
+          CommandKind.CalloutString('{', '}', "x"),
+          LookAround(NegativeLookBehind(Abbrev), Literal('a'))
+        ),
+        Literal('b'),
+        Literal('c')
+      )
+    )
+  check("(?(?C) (?!a)b)", "x", PCRE):
+    Command(
+      Conditional(
+        CalloutLookAround(CommandKind.Callout, LookAround(NegativeLookAhead(Symbolic), Literal('a'))),
+        Literal('b')
+      )
+    )
+  error("(?(?C1) (?=a)b)", "", PCRE)("Invalid condition at 7")
+  error("(?(?C1)(?:a)b)", "", PCRE)("Invalid condition at 8")
+  error("(?(?C1)(?=a)b)", "", Perl)("Invalid condition at 3")
   check("(?(?:.)b)", "", DotNet)(Command(Conditional(LookAround(Dot), Literal('b'))))
   error("(?(.)b)", "", PCRE, Perl)("Invalid condition at 3")
   check("(?(0)a)", "", DotNet)(Command(Conditional(Indexed(0), Literal('a'))))

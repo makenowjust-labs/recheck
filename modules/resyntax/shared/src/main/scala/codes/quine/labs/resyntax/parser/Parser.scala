@@ -526,6 +526,15 @@ private[parser] final class Parser(
           case None =>
             fail("Invalid condition")
 
+      if featureSet.hasCallout && startWith("?C") then
+        val callout = parseCallout()
+        closeCondition()
+        if context.skipsComment then skipComment()
+        expect('(', "Invalid condition")
+        for (symbolic, alphabetic, abbrev, la) <- LookAroundTests do
+          if parseLookAroundTest(stack, start, symbolic, alphabetic, abbrev, la, Some(callout)) then boundary.break()
+        fail("Invalid condition")
+
       if featureSet.hasLookAroundTest then
         for (symbolic, alphabetic, abbrev, la) <- LookAroundTests do
           if parseLookAroundTest(stack, start, symbolic, alphabetic, abbrev, la) then boundary.break()
@@ -570,18 +579,19 @@ private[parser] final class Parser(
       symbolic: String,
       alphabetic: String,
       abbrev: String,
-      la: AssertNameStyle => GroupKind.LookAround
+      la: AssertNameStyle => GroupKind.LookAround,
+      callout: Option[CommandKind] = None
   ): Boolean =
     if startWith(symbolic) then
-      parseLookAroundConditional(stack, Some(la(AssertNameStyle.Symbolic)), start)
+      parseLookAroundConditional(stack, Some(la(AssertNameStyle.Symbolic)), start, callout)
       return true
 
     if featureSet.hasAlphabeticGroup && startWith(alphabetic) then
-      parseLookAroundConditional(stack, Some(la(AssertNameStyle.Alphabetic)), start)
+      parseLookAroundConditional(stack, Some(la(AssertNameStyle.Alphabetic)), start, callout)
       return true
 
     if featureSet.hasAlphabeticGroup && startWith(abbrev) then
-      parseLookAroundConditional(stack, Some(la(AssertNameStyle.Abbrev)), start)
+      parseLookAroundConditional(stack, Some(la(AssertNameStyle.Abbrev)), start, callout)
       return true
 
     false
@@ -589,11 +599,13 @@ private[parser] final class Parser(
   private def parseLookAroundConditional(
       stack: mutable.Stack[Node],
       kind: Option[GroupKind.LookAround],
-      start: Int
+      start: Int,
+      callout: Option[CommandKind] = None
   ): Unit =
     val node = protectContext(parseDisjunction())
     closeCondition()
-    parseConditionalGroupBody(stack, ConditionalTest.LookAround(kind, node), start)
+    val test = ConditionalTest.LookAround(kind, node)
+    parseConditionalGroupBody(stack, callout.fold(test)(ConditionalTest.CalloutLookAround(_, test)), start)
 
   private def parseAngleNamedCaptureGroup(stack: mutable.Stack[Node], start: Int): Unit =
     assert(featureSet.hasAngleNamedCapture, "Invalid group")
@@ -754,23 +766,26 @@ private[parser] final class Parser(
   private def parseCalloutGroup(stack: mutable.Stack[Node], start: Int): Unit =
     assert(featureSet.hasCallout, "Invalid group")
     next()
+    pushCommand(stack, parseCallout(), start)
+
+  private def parseCallout(): CommandKind =
     (currentChar: @switch) match
       case '`' | '\'' | '"' | '^' | '%' | '#' | '$' =>
         val delim = currentChar
         next()
         val value = parseCode(end = delim, escapeDouble = true)
-        pushCommand(stack, CommandKind.CalloutString(delim, delim, value), start)
+        CommandKind.CalloutString(delim, delim, value)
       case '{' =>
         next()
         val value = parseCode(end = '}', escapeDouble = true)
-        pushCommand(stack, CommandKind.CalloutString('{', '}', value), start)
+        CommandKind.CalloutString('{', '}', value)
       case _ =>
         parseIntOption() match
           case Some(value) =>
             assert(value <= 255, "Invalid group")
-            pushCommand(stack, CommandKind.CalloutInt(value), start)
+            CommandKind.CalloutInt(value)
           case None =>
-            pushCommand(stack, CommandKind.Callout, start)
+            CommandKind.Callout
 
   private def parseCode(end: Char, escapeDouble: Boolean = false): String =
     val start = offset

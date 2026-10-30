@@ -15,12 +15,15 @@ package codes.quine.labs.resyntax.ast
   *   "(DEFINE)"
   *   "(VERSION" ">"? "=" Int "." Int ")"
   *   "(" Node ")"
+  *   "(?C" Callout ")" "(" Node ")"
   * }}}
   */
 sealed abstract class ConditionalTest extends Product with Serializable:
   def equalsWithoutLoc(that: ConditionalTest): Boolean = (this, that) match
     case (ConditionalTest.LookAround(kl, l), ConditionalTest.LookAround(kr, r)) =>
       kl == kr && l.equalsWithoutLoc(r)
+    case (ConditionalTest.CalloutLookAround(cl, l), ConditionalTest.CalloutLookAround(cr, r)) =>
+      cl == cr && l.equalsWithoutLoc(r)
     case (l, r) => l == r
 
 object ConditionalTest:
@@ -59,3 +62,6 @@ object ConditionalTest:
     def apply(kind: GroupKind.LookAround, data: NodeData): LookAround = LookAround(Some(kind), Node(data))
 
     def apply(data: NodeData): LookAround = LookAround(None, Node(data))
+
+  /** CalloutLookAround is a look-around test following a callout (e.g. `(?C1)(?=foo)` in PCRE). */
+  final case class CalloutLookAround(callout: CommandKind, test: LookAround) extends ConditionalTest
