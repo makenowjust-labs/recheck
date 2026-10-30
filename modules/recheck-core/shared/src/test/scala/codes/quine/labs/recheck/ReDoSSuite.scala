@@ -36,11 +36,15 @@ class ReDoSSuite extends munit.FunSuite:
     )
     assertEquals(ReDoS.check("^.*$", ""), Diagnostics.Safe("^.*$", "", AttackComplexity.Linear, Checker.Automaton))
     assertEquals(
+      ReDoS.check("(?:a|a|a)*", "y"),
+      Diagnostics.Safe("(?:a|a|a)*", "y", AttackComplexity.Linear, Checker.Automaton)
+    )
+    assertEquals(
       ReDoS.check("", "x"),
       Diagnostics.Unknown("", "x", Diagnostics.ErrorKind.InvalidRegExp("unknown flag"), None)
     )
     assertEquals(
-      ReDoS.check("^foo$", "", Parameters(timeout = -1.second)),
+      ReDoS.check("^foo$", "", Parameters(timeout = Duration.MinusInf)),
       Diagnostics.Unknown("^foo$", "", Diagnostics.ErrorKind.Timeout, None)
     )
 
@@ -129,12 +133,12 @@ class ReDoSSuite extends munit.FunSuite:
     interceptMessage[TimeoutException](
       "timeout at modules/recheck-core/shared/src/main/scala/codes/quine/labs/recheck/fuzz/FuzzProgram.scala:28"
     ) {
-      val ctx = Context(timeout = -1.second)
+      val ctx = Context(timeout = Duration.MinusInf)
       val result = ReDoS.checkFuzz(
         ".",
         "",
         Pattern(Dot(), FlagSet(false, false, false, false, false, false)),
-        Parameters(timeout = -1.second)
+        Parameters(timeout = Duration.MinusInf)
       )(using ctx)
       result.get
     }

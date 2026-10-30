@@ -1,10 +1,28 @@
 // @ts-check
 
-const math = require("remark-math");
-const katex = require("rehype-katex");
-const { themes } = require("prism-react-renderer");
+import { execSync } from "node:child_process";
+import { createRequire } from "node:module";
+
+import { themes } from "prism-react-renderer";
+import katex from "rehype-katex";
+import math from "remark-math";
 
 const { github: lightCodeTheme, dracula: darkCodeTheme } = themes;
+
+const katexCss = createRequire(
+  createRequire(import.meta.url).resolve("rehype-katex"),
+).resolve("katex/dist/katex.min.css");
+
+/** Release tags the Playground offers as selectable versions. */
+const releaseTags = () => {
+  try {
+    return execSync("git tag --list 'v*'", { encoding: "utf8" })
+      .split("\n")
+      .filter((tag) => tag !== "");
+  } catch {
+    return [];
+  }
+};
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
@@ -31,7 +49,7 @@ const config = {
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
         docs: {
-          sidebarPath: require.resolve("./sidebars.js"),
+          sidebarPath: "./sidebars.js",
           editUrl:
             "https://github.com/makenowjust-labs/recheck/tree/main/website",
           remarkPlugins: [math],
@@ -45,11 +63,7 @@ const config = {
           rehypePlugins: [katex],
         },
         theme: {
-          customCss: require.resolve("./src/css/custom.css"),
-        },
-        gtag: {
-          trackingID: "G-GY3CQZBPM2",
-          anonymizeIP: true,
+          customCss: ["./src/css/custom.css", katexCss],
         },
       }),
     ],
@@ -135,12 +149,15 @@ const config = {
             ],
           },
         ],
-        copyright: `Copyright © 2020-2025 TSUYUSATO "MakeNowJust" Kitsune. Built with Docusaurus.`,
+        copyright: `Copyright © 2020-2026 TSUYUSATO "MakeNowJust" Kitsune. Built with Docusaurus.`,
       },
       prism: {
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme,
         additionalLanguages: ["java", "scala"],
+      },
+      colorMode: {
+        respectPrefersColorScheme: true,
       },
       image: "img/social.png",
       algolia: {
@@ -151,18 +168,11 @@ const config = {
       },
     }),
 
-  stylesheets: [
-    {
-      href: "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css",
-      integrity:
-        "sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV",
-      crossorigin: "anonymous",
-    },
-  ],
-
   customFields: {
-    version: process.env["RECHECK_VERSION"] ?? "0.0.0-dev",
+    latestVersion: process.env["RECHECK_LATEST_VERSION"] ?? "0.0.0-dev",
+    commit: process.env["RECHECK_COMMIT"] ?? "",
+    tags: releaseTags(),
   },
 };
 
-module.exports = config;
+export default config;

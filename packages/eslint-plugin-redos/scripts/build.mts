@@ -23,6 +23,8 @@ const main = async () => {
     platform: "node",
     plugins: [makeAllPackagesExternalPlugin],
     outfile: "lib/main.js",
+    // `require("eslint-plugin-redos")` must give the plugin itself, not `{ default }`.
+    footer: { js: "module.exports = module.exports.default;" },
   });
 };
 

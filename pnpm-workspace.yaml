@@ -2,12 +2,10 @@ packages:
   - packages/*
   - website
 
-linkWorkspacePackages: true
-
-onlyBuiltDependencies:
-  - core-js
-  - core-js-pure
-  - esbuild
-  - nx
-  - sharp
-  - unrs-resolver
+allowBuilds:
+  "@parcel/watcher": false
+  core-js: true
+  esbuild: true
+  nx: true
+  sharp: true
+  unrs-resolver: true

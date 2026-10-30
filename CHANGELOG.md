@@ -2,6 +2,64 @@
 
 New Features:
 
+- [#1946](https://github.com/makenowjust-labs/recheck/pull/1946) Add a case studies page to the website ([@makenowjust](https://github.com/makenowjust))
+- [#1947](https://github.com/makenowjust-labs/recheck/pull/1947) Add a blog article about v4.6, playground, and case studies ([@makenowjust](https://github.com/makenowjust))
+
+Fixes:
+
+- [#1948](https://github.com/makenowjust-labs/recheck/pull/1948) Give the #1865 fuzz test a long attack timeout ([@makenowjust](https://github.com/makenowjust))
+- [#1949](https://github.com/makenowjust-labs/recheck/pull/1949) Cancel the remaining checks under the lock when the agent input ends ([@makenowjust](https://github.com/makenowjust))
+
+Misc:
+
+- [#1945](https://github.com/makenowjust-labs/recheck/pull/1945) Add CITATION.cff ([@makenowjust](https://github.com/makenowjust))
+- [#1944](https://github.com/makenowjust-labs/recheck/pull/1944) Remove .yarnrc ([@makenowjust](https://github.com/makenowjust))
+- [#1950](https://github.com/makenowjust-labs/recheck/pull/1950) Remove `.git-blame-ignore-revs` ([@makenowjust](https://github.com/makenowjust))
+- [#1951](https://github.com/makenowjust-labs/recheck/pull/1951) Add Loofah CVE-2022-23514 to Case Studies ([@makenowjust](https://github.com/makenowjust))
+- [#1829](https://github.com/makenowjust-labs/recheck/pull/1829) Update dependency sbt/sbt to v2.0.12 ([@renovate[bot]](https://github.com/apps/renovate))
+- [#1952](https://github.com/makenowjust-labs/recheck/pull/1952) Update dependency node to v26 ([@renovate[bot]](https://github.com/apps/renovate))
+
+# 4.6.2 (2026-10-26)
+
+New Features:
+
+- [#1931](https://github.com/makenowjust-labs/recheck/pull/1931) Fix #1831: add permalinks to the Playground  ([@makenowjust](https://github.com/makenowjust))
+
+Fixes:
+
+- [#1939](https://github.com/makenowjust-labs/recheck/pull/1939) Check the step growth before executing an attack string ([@makenowjust](https://github.com/makenowjust))
+- [#1940](https://github.com/makenowjust-labs/recheck/pull/1940) Stop the fuzz seeder from expanding a back-reference to an enclosing capture ([@makenowjust](https://github.com/makenowjust))
+- [#1943](https://github.com/makenowjust-labs/recheck/pull/1943) Reproduce #1865 with a synthetic linear pattern in the fuzz test ([@makenowjust](https://github.com/makenowjust))
+
+Misc:
+
+- [#1930](https://github.com/makenowjust-labs/recheck/pull/1930) Improve CI cache ([@makenowjust](https://github.com/makenowjust))
+- [#1934](https://github.com/makenowjust-labs/recheck/pull/1934) Add FUNDING.yml ([@makenowjust](https://github.com/makenowjust))
+- [#1933](https://github.com/makenowjust-labs/recheck/pull/1933) Point the Maven Central badge at the Scala 3 artifact ([@makenowjust](https://github.com/makenowjust))
+- [#1935](https://github.com/makenowjust-labs/recheck/pull/1935) Register the reference anchors with Docusaurus ([@makenowjust](https://github.com/makenowjust))
+- [#1936](https://github.com/makenowjust-labs/recheck/pull/1936) Build and test the native binary for pull requests on Linux ([@makenowjust](https://github.com/makenowjust))
+- [#1937](https://github.com/makenowjust-labs/recheck/pull/1937) Run TypeScript with Node's type stripping ([@makenowjust](https://github.com/makenowjust))
+- [#1938](https://github.com/makenowjust-labs/recheck/pull/1938) Update docs ([@makenowjust](https://github.com/makenowjust))
+- [#1941](https://github.com/makenowjust-labs/recheck/pull/1941) Add .zenodo.json ([@makenowjust](https://github.com/makenowjust))
+- [#1942](https://github.com/makenowjust-labs/recheck/pull/1942) Leave the generated Unicode data out of coverage instrumentation ([@makenowjust](https://github.com/makenowjust))
+
+# 4.6.1 (2026-10-25)
+
+New Features:
+
+- [#1927](https://github.com/makenowjust-labs/recheck/pull/1927) Fix #1619: provide ES modules of the `recheck` package ([@makenowjust](https://github.com/makenowjust))
+
+Misc:
+
+- [#1925](https://github.com/makenowjust-labs/recheck/pull/1925) Add codecov.yml ([@makenowjust](https://github.com/makenowjust))
+- [#1926](https://github.com/makenowjust-labs/recheck/pull/1926) Retire scala steward ([@makenowjust](https://github.com/makenowjust))
+- [#1928](https://github.com/makenowjust-labs/recheck/pull/1928) Publish only the packages missing from npm ([@makenowjust](https://github.com/makenowjust))
+- [#1929](https://github.com/makenowjust-labs/recheck/pull/1929) Replace lerna with pnpm's own commands ([@makenowjust](https://github.com/makenowjust))
+
+# 4.6.0 (2026-10-25)
+
+New Features:
+
 - [#1636](https://github.com/makenowjust-labs/recheck/pull/1636) Add a Linux ARM64 build ([@makenowjust](https://github.com/makenowjust))
 
 Fixes:
@@ -11,6 +69,10 @@ Fixes:
 - [#1631](https://github.com/makenowjust-labs/recheck/pull/1631) Switch to pnpm ([@makenowjust](https://github.com/makenowjust))
 - [#1638](https://github.com/makenowjust-labs/recheck/pull/1638) Fix `ReDoS.checkAuto` test for preventing flaky test ([@makenowjust](https://github.com/makenowjust))
 - [#1651](https://github.com/makenowjust-labs/recheck/pull/1651) Update sources to Scala 3 ([@makenowjust](https://github.com/makenowjust))
+- [#1697](https://github.com/makenowjust-labs/recheck/pull/1697) Add `d.ts` to the ESLint plugin ([@makenowjust](https://github.com/makenowjust))
+- [#1912](https://github.com/makenowjust-labs/recheck/pull/1912) Fix #1910: explicitly set the stdio encoding to UTF-8 ([@makenowjust](https://github.com/makenowjust))
+- [#1919](https://github.com/makenowjust-labs/recheck/pull/1919) Fix #1741: do not anchor the end of a sticky pattern ([@makenowjust](https://github.com/makenowjust))
+- [#1920](https://github.com/makenowjust-labs/recheck/pull/1920) Fix #1546: make the cache file robust against concurrent writers ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
@@ -31,6 +93,16 @@ Misc:
 - [#1650](https://github.com/makenowjust-labs/recheck/pull/1650) Add dependencies for types explicitly ([@makenowjust](https://github.com/makenowjust))
 - [#1652](https://github.com/makenowjust-labs/recheck/pull/1652) Update dependency prettier to v3.7.0 ([@renovate[bot]](https://github.com/apps/renovate))
 - [#1653](https://github.com/makenowjust-labs/recheck/pull/1653) Apply `-rewrite -new-syntax` and `-rewrite -indent` ([@makenowjust](https://github.com/makenowjust))
+- [#1682](https://github.com/makenowjust-labs/recheck/pull/1682) Update icu4j to 78.2 ([@makenowjust](https://github.com/makenowjust))
+- [#1913](https://github.com/makenowjust-labs/recheck/pull/1913) Update scala to 3.8.4 ([@makenowjust](https://github.com/makenowjust))
+- [#1914](https://github.com/makenowjust-labs/recheck/pull/1914) Fix test on Windows CI and update CI macos version ([@makenowjust](https://github.com/makenowjust))
+- [#1916](https://github.com/makenowjust-labs/recheck/pull/1916) Update website dependencies and use the workspace protocol ([@makenowjust](https://github.com/makenowjust))
+- [#1917](https://github.com/makenowjust-labs/recheck/pull/1917) Update sbt to 2 and Scala to 3.10.0 ([@makenowjust](https://github.com/makenowjust))
+- [#1918](https://github.com/makenowjust-labs/recheck/pull/1918) Update the copyright year to 2026 ([@makenowjust](https://github.com/makenowjust))
+- [#1921](https://github.com/makenowjust-labs/recheck/pull/1921) Run the native E2E tests on Ubuntu 26.04 ([@makenowjust](https://github.com/makenowjust))
+- [#1922](https://github.com/makenowjust-labs/recheck/pull/1922) Use `uri` and `License.MIT` in build.sbt ([@makenowjust](https://github.com/makenowjust))
+- [#1923](https://github.com/makenowjust-labs/recheck/pull/1923) Publish to npm with trusted publishing ([@makenowjust](https://github.com/makenowjust))
+- [#1924](https://github.com/makenowjust-labs/recheck/pull/1924) Fix the release version passed to lerna and skip Maven publishing of a published version ([@makenowjust](https://github.com/makenowjust))
 
 # 4.5.0 (2025-03-02)
 

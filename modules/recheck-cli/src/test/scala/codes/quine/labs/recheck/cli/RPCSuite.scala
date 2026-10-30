@@ -1,6 +1,7 @@
 package codes.quine.labs.recheck.cli
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets
 
 import io.circe.DecodingFailure
@@ -59,8 +60,23 @@ class RPCSuite extends munit.FunSuite:
         io.write(42)
 
     newOut.close()
-    val nl = System.getProperty("line.separator")
-    assertEquals(newOut.toString(StandardCharsets.UTF_8), s"hello${nl}world${nl}42$nl")
+    assertEquals(newOut.toString(StandardCharsets.UTF_8), "hello\nworld\n42\n")
+
+  test("RPC.IO.stdio: non-ASCII characters are always UTF-8"):
+    // See #1910.
+    val pattern = "“[^”]*”"
+    val newIn = new ByteArrayInputStream(s"$pattern\n".getBytes(StandardCharsets.UTF_8))
+    val newOut = new ByteArrayOutputStream()
+
+    Console.withIn(new InputStreamReader(newIn, StandardCharsets.UTF_8)):
+      Console.withOut(newOut):
+        val io = RPC.IO.stdio
+        assertEquals(io.read().toSeq, Seq(pattern))
+        io.write(pattern)
+        io.write(pattern)
+
+    newOut.close()
+    assertEquals(newOut.toByteArray.toSeq, s"$pattern\n$pattern\n".getBytes(StandardCharsets.UTF_8).toSeq)
 
   test("RPC.run"):
     val in = Seq(

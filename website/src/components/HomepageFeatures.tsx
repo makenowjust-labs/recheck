@@ -3,7 +3,14 @@ import clsx from 'clsx';
 
 import styles from './HomepageFeatures.module.css';
 
-const FeatureList = [
+type Feature = {
+  title: string;
+  Svg: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  svgClass: string;
+  description: React.ReactNode;
+};
+
+const FeatureList: Feature[] = [
   {
     title: 'Practical Regular Expressions',
     Svg: require('../../static/img/fa-gears.svg').default,
@@ -37,11 +44,11 @@ const FeatureList = [
   },
 ];
 
-function Feature({ Svg, title, svgClass, description }) {
+function Feature({ Svg, title, svgClass, description }: Feature) {
   return (
     <div className={clsx('col col--4')}>
       <div className="text--center">
-        <Svg className={clsx(styles.featureSvg, svgClass)} alt={title} />
+        <Svg className={clsx(styles.featureSvg, svgClass)} role="img" aria-label={title} />
       </div>
       <div className="text--center padding-horiz--md">
         <h3>{title}</h3>

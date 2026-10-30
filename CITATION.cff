@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: If you use recheck in your research, please cite it as below.
+type: software
+title: "recheck: The trustworthy ReDoS checker"
+abstract: >-
+  recheck is a ReDoS (regular expression denial of service) checker. It combines
+  automata-based static analysis with fuzzing to detect regular expressions whose
+  matching time grows super-linearly, reports the matching time complexity
+  together with an attack string, and can be used as a library or as a
+  command-line tool.
+authors:
+  - family-names: Fujinami
+    given-names: Hiroya
+    alias: MakeNowJust
+    orcid: https://orcid.org/0009-0007-0794-5743
+doi: 10.5281/zenodo.23660268
+license: MIT
+repository-code: https://github.com/makenowjust-labs/recheck
+url: https://makenowjust-labs.github.io/recheck/
+keywords:
+  - ReDoS
+  - regular expression
+  - static analysis
+  - fuzzing
+  - security

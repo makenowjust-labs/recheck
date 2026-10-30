@@ -500,7 +500,8 @@ class PatternExtensionsSuite extends munit.FunSuite:
     assertEquals(Pattern(LineEnd(), flagSet0).needsSigmaStarAtEnd, true)
     assertEquals(Pattern(Dot(), flagSet1).needsSigmaStarAtEnd, true)
     assertEquals(Pattern(LineEnd(), flagSet1).needsSigmaStarAtEnd, false)
-    assertEquals(Pattern(Dot(), flagSet2).needsSigmaStarAtEnd, false)
+    assertEquals(Pattern(Dot(), flagSet2).needsSigmaStarAtEnd, true)
+    assertEquals(Pattern(LineEnd(), flagSet2).needsSigmaStarAtEnd, false)
 
   test("PatternExtensions.PatternOps#parts"):
     val flagSet = FlagSet(false, false, false, false, false, false)

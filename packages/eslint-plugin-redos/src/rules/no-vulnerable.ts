@@ -1,8 +1,10 @@
-import { Rule } from "eslint";
+import type { Rule } from "eslint";
 import type ESTree from "estree";
+import type { CacheOptions } from "../utils/checker";
+
 import * as ReDoS from "recheck";
 
-import { CacheOptions, createCachedCheck } from "../utils/checker";
+import { createCachedCheck } from "../utils/checker";
 
 type Options = {
   ignoreErrors?: boolean;
@@ -188,9 +190,9 @@ const rule: Rule.RuleModule = {
       node: ESTree.NewExpression | ESTree.CallExpression,
     ) => {
       // Tests `RegExp(...)` or `new RegExp(...)`?
-      if (
-        !(node.callee.type === "Identifier" && node.callee.name === "RegExp")
-      ) {
+      if (!(
+        node.callee.type === "Identifier" && node.callee.name === "RegExp"
+      )) {
         return false;
       }
       // Tests `RegExp(...)`, `RegExp(..., ...)`?
@@ -244,4 +246,4 @@ const rule: Rule.RuleModule = {
   },
 };
 
-export = rule;
+export default rule;

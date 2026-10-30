@@ -1,12 +1,14 @@
 package codes.quine.labs.recheck
 package fuzz
 
+import scala.concurrent.duration.*
 import scala.util.Failure
 import scala.util.Random
 import scala.util.Success
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.InvalidRegExpException
+import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.regexp.Parser
 
 class FuzzCheckerSuite extends munit.FunSuite:
@@ -18,7 +20,13 @@ class FuzzCheckerSuite extends munit.FunSuite:
   def random0: Random = new Random(0)
 
   /** Tests the pattern is vulnerable or not. */
-  def check(source: String, flags: String, quick: Boolean = false): Boolean =
+  def check(
+      source: String,
+      flags: String,
+      quick: Boolean = false,
+      maxIteration: Int = Parameters.DefaultMaxIteration,
+      attackTimeout: Duration = Parameters.DefaultAttackTimeout
+  ): Boolean =
     val result = for
       pattern <- Parser.parse(source, flags) match
         case Right(pattern) => Success(pattern)
@@ -30,10 +38,12 @@ class FuzzCheckerSuite extends munit.FunSuite:
         fuzz,
         random = random0,
         maxGeneStringSize = if quick then 400 else 4000,
-        maxAttackStringSize = if quick then 400 else 4000,
+        maxAttackStringSize = if quick then 400 else Parameters.DefaultMaxAttackStringSize,
         seedingLimit = if quick then 1_00 else 1_000,
         incubationLimit = if quick then 1_000 else 10_000,
-        attackLimit = if quick then 10_000 else 100_000
+        attackLimit = if quick then 10_000 else Parameters.DefaultAttackLimit,
+        attackTimeout = attackTimeout,
+        maxIteration = maxIteration
       )
       .nextOption()
     result.get.isDefined
@@ -46,6 +56,11 @@ class FuzzCheckerSuite extends munit.FunSuite:
   test("FuzzChecker.check: linear"):
     assert(!check("(a|a)*", ""))
     assert(!check("(a*)*", ""))
+    assert(!check("^(a\\1)$", ""))
+
+    // Linear, but with so many steps per character that its attack string runs over `attackTimeout` (#1865).
+    // The exponential attack string is not measured first, so it needs a timeout a slow CI runner cannot exceed.
+    assert(!check("(?:a{9}b|a{9}c|a{9}d|a{9}e|a{9}f|a{9}g)", "", maxIteration = 0, attackTimeout = 10.seconds))
 
   test("FuzzChecker.check: polynomial"):
     assert(check("\\s*$", "", quick = true))

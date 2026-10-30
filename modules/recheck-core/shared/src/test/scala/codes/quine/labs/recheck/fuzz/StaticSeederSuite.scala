@@ -28,6 +28,11 @@ class StaticSeederSuite extends munit.FunSuite:
     )
     assertEquals(seed("^a+(?=a+)$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
     assertEquals(seed("^a+(?<=a+)$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
+
+    // A back-reference to an enclosing capture, or to one being expanded, matches the empty string.
+    assertEquals(seed("^(a+\\1)$", ""), seed("^(a+)$", ""))
+    assertEquals(seed("^(?<x>a+\\k<x>)$", ""), seed("^(?<x>a+)$", ""))
+    assertEquals(seed("^(a+\\2)(b+\\1)$", ""), seed("^(a+(?:b+|))(b+(?:a+|))$", ""))
     assertEquals(seed("^a{11,}a{11,}$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
 
     assertEquals(seed("^(fizz)*(fizz)*$", ""), Set("'fizz'.repeat(112) + 'i'"))

@@ -141,6 +141,13 @@ Alternatively, it is useful to set `cache` option. It makes the second run faste
 
 :::
 
+:::note
+
+ESLint rules cannot be asynchronous ([eslint/eslint#15394](https://github.com/eslint/eslint/issues/15394)), so the plugin checks each regular expression with the synchronous `checkSync` API.
+This is why the `signal` parameter is not available and why a slow check blocks ESLint until `timeout` is reached.
+
+:::
+
 ### Examples
 
 :-1: Examples of **incorrect** code for this rule:

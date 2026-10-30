@@ -12,46 +12,82 @@
     "type": "git",
     "url": "https://github.com/makenowjust-labs/recheck.git"
   },
+  "type": "commonjs",
   "main": "index.js",
   "browser": "lib/browser.js",
+  "exports": {
+    ".": {
+      "browser": {
+        "import": {
+          "types": "./index.d.mts",
+          "default": "./lib/browser.mjs"
+        },
+        "default": {
+          "types": "./index.d.ts",
+          "default": "./lib/browser.js"
+        }
+      },
+      "import": {
+        "types": "./index.d.mts",
+        "default": "./index.mjs"
+      },
+      "default": {
+        "types": "./index.d.ts",
+        "default": "./index.js"
+      }
+    },
+    "./lib/browser": {
+      "import": {
+        "types": "./index.d.mts",
+        "default": "./lib/browser.mjs"
+      },
+      "default": {
+        "types": "./index.d.ts",
+        "default": "./lib/browser.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
+    "index.d.mts",
     "index.d.ts",
+    "index.mjs",
     "lib"
   ],
   "scripts": {
-    "build": "node -r esbuild-register ./scripts/build.ts",
+    "build": "node ./scripts/build.mts",
     "clean": "rimraf lib",
-    "format": "prettier -w '*.{js,json,md}' '{scripts,src}/**/*.{js,ts}' index.d.ts",
-    "lint": "prettier --check '*.{js,json,md}' '{scripts,src}/**/*.{js,ts}' index.d.ts",
-    "test": "SYNCKIT_TS_RUNNER=esbuild-register jest",
+    "format": "prettier -w '*.{js,json,md,mjs}' '{scripts,src}/**/*.{js,ts,mts}' index.d.ts index.d.mts",
+    "lint": "prettier --check '*.{js,json,md,mjs}' '{scripts,src}/**/*.{js,ts,mts}' index.d.ts index.d.mts",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js -c jest.e2e.config.js --forceExit",
     "typecheck": "tsc --noEmit -p ."
   },
   "sideEffects": false,
   "types": "index.d.ts",
   "dependencies": {
-    "synckit": "0.11.11"
+    "synckit": "0.12.3"
   },
   "optionalDependencies": {
-    "recheck-jar": "0.0.0",
-    "recheck-linux-arm64": "0.0.0",
-    "recheck-linux-x64": "0.0.0",
-    "recheck-macos-x64": "0.0.0",
-    "recheck-macos-arm64": "0.0.0",
-    "recheck-windows-x64": "0.0.0"
+    "recheck-jar": "workspace:*",
+    "recheck-linux-arm64": "workspace:*",
+    "recheck-linux-x64": "workspace:*",
+    "recheck-macos-x64": "workspace:*",
+    "recheck-macos-arm64": "workspace:*",
+    "recheck-windows-x64": "workspace:*"
   },
   "devDependencies": {
+    "@jest/globals": "30.5.2",
     "@types/jest": "30.0.0",
-    "@types/node": "24.10.1",
-    "esbuild": "0.27.0",
-    "esbuild-jest": "0.5.0",
-    "esbuild-register": "3.6.0",
-    "jest": "30.2.0",
-    "prettier": "3.7.0",
-    "rimraf": "6.1.2",
-    "typescript": "5.9.3"
+    "@types/node": "26.6.5",
+    "esbuild": "0.28.2",
+    "jest": "30.5.2",
+    "prettier": "3.9.10",
+    "rimraf": "6.1.3",
+    "typescript": "7.0.2"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "keywords": [
     "redos",

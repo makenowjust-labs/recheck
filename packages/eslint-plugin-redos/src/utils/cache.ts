@@ -2,6 +2,8 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
+import { nodeRequire } from "./require";
+
 /** A collection of variables to mock. */
 type Mock = {
   nodeModuleDir: string;
@@ -10,7 +12,7 @@ type Mock = {
 /** Exposes this to mock `nodeModuleDir`. */
 export const __mock__: Mock = {
   nodeModuleDir: path.join(
-    require.resolve("eslint-plugin-redos/package.json"),
+    nodeRequire.resolve("eslint-plugin-redos/package.json"),
     "../..",
   ),
 };

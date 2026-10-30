@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import * as fs from "fs";
 import * as util from "util";
 
@@ -44,27 +45,16 @@ export const createCachedCheck = (
     params,
   };
 
-  let cacheData: CacheData;
-  try {
-    if (cacheFile) {
-      cacheData = fs.existsSync(cacheFile)
-        ? JSON.parse(fs.readFileSync(cacheFile, "utf-8"))
-        : {};
+  let cacheData: CacheData = { settings, results: {} };
+  if (cacheFile) {
+    let loaded: Partial<CacheData> | null = null;
+    try {
+      loaded = JSON.parse(fs.readFileSync(cacheFile, "utf-8"));
+    } catch {}
 
-      // Purge the cache if it is invalidated.
-      if (!util.isDeepStrictEqual(cacheData.settings, settings)) {
-        try {
-          fs.rmSync(cacheFile);
-        } catch {}
-        cacheData = {
-          settings,
-          results: {},
-        };
-      }
+    if (loaded?.results && util.isDeepStrictEqual(loaded.settings, settings)) {
+      cacheData = loaded as CacheData;
     }
-    /* c8 ignore next 3 */
-  } catch (error) {
-    throw new Error(`Invalid cache: ${error}`);
   }
 
   const cachedCheck = (source: string, flags: string) => {
@@ -95,7 +85,9 @@ export const createCachedCheck = (
     if (cacheFile) {
       cacheData.results[key] = result;
       // TODO: Delay the writing out the cache.
-      fs.writeFileSync(cacheFile, JSON.stringify(cacheData));
+      const tmpFile = `${cacheFile}.${process.pid}.${randomUUID()}.tmp`;
+      fs.writeFileSync(tmpFile, JSON.stringify(cacheData));
+      fs.renameSync(tmpFile, cacheFile);
     }
 
     return result;

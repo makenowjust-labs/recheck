@@ -4,37 +4,43 @@
   "version": "0.0.0",
   "scripts": {
     "doc": "docusaurus build",
-    "format": "prettier -w '*.{js,json}' 'src/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
-    "lint": "prettier --check '*.{js,json}' 'src/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
-    "start": "docusaurus start"
+    "format": "prettier -w '*.{js,json,ts}' '{src,e2e}/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
+    "lint": "prettier --check '*.{js,json,ts}' '{src,e2e}/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
+    "start": "docusaurus start",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
     "@algolia/client-search": "^5.0.0",
-    "@docusaurus/core": "3.9.2",
-    "@docusaurus/module-type-aliases": "3.9.2",
+    "@docusaurus/core": "3.10.2",
+    "@docusaurus/module-type-aliases": "3.10.2",
     "@docusaurus/plugin-content-docs": "^3.9.2",
-    "@docusaurus/plugin-ideal-image": "3.9.2",
-    "@docusaurus/preset-classic": "3.9.2",
-    "@docusaurus/theme-classic": "3.9.2",
+    "@docusaurus/plugin-ideal-image": "3.10.2",
+    "@docusaurus/preset-classic": "3.10.2",
+    "@docusaurus/theme-classic": "3.10.2",
     "@mdx-js/react": "3.1.1",
     "clsx": "2.1.1",
-    "hast-util-is-element": "1.1.0",
+    "lz-string": "1.5.0",
     "prism-react-renderer": "2.4.1",
     "prop-types": "15.8.1",
-    "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "react-hook-form": "7.66.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-hook-form": "7.91.0",
     "react-loadable": "^5.5.0",
-    "react-loading": "2.0.3",
-    "recheck": "0.0.0",
-    "rehype-katex": "4.0.0",
-    "remark-math": "3.0.1"
+    "recheck": "workspace:*",
+    "rehype-katex": "7.0.1",
+    "remark-math": "6.0.0"
   },
   "devDependencies": {
-    "@tsconfig/docusaurus": "2.0.7",
-    "@types/node": "24.10.1",
-    "prettier": "3.7.0",
-    "typescript": "5.9.3"
+    "@playwright/test": "1.64.1",
+    "@types/jest": "30.0.0",
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "jest": "30.5.2",
+    "prettier": "3.9.10",
+    "typescript": "7.0.2"
   },
   "browserslist": {
     "production": [

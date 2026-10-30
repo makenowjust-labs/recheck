@@ -4,9 +4,9 @@ import { useController, useFormContext } from 'react-hook-form';
 
 import styles from './NumberInput.module.css';
 
-export type Props = React.InputHTMLAttributes<HTMLInputElement>;
+export type Props = { name: string } & React.InputHTMLAttributes<HTMLInputElement>;
 
-const NumberInput: React.VFC<Props> = ({ className, name, defaultValue, ...props }) => {
+const NumberInput: React.FC<Props> = ({ className, name, defaultValue, ...props }) => {
   const { control } = useFormContext();
   const { field } = useController({
     control,
