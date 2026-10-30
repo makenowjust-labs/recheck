@@ -2116,7 +2116,7 @@ private[parser] final class Parser(
     val item = parseClassItemNonRange()
 
     skipClassComment()
-    if isClassItemStop(unionStart) || currentChar != '-' then
+    if isClassItemStop(unionStart) || currentChar != '-' || isEmptyClassQuote(item) then
       seq.addOne(item)
       return
 
@@ -2135,7 +2135,15 @@ private[parser] final class Parser(
       case _ => item
 
     skipClassComment()
-    val endItem = parseClassItemNonRange()
+    var endItem = parseClassItemNonRange()
+    while isEmptyClassQuote(endItem) && !isClassItemStop(unionStart) do
+      skipClassComment()
+      endItem = parseClassItemNonRange()
+    if isEmptyClassQuote(endItem) then
+      reset(save)
+      seq.addOne(begin)
+      return
+
     val (end, rest) = classQuoteLiterals(endItem) match
       case Some(literals) if literals.nonEmpty => (literals.head, literals.tail)
       case _                                   => (endItem, Seq.empty)
@@ -2157,11 +2165,17 @@ private[parser] final class Parser(
           seq.addAll(rest)
         else reset(save)
 
-  /** Returns the literals of a `\\Q...\\E` class item, because Java and PCRE read them as unquoted for a range. */
+  /** Returns the literals of a `\\Q...\\E` class item.
+    *
+    * Java and PCRE read them as unquoted for a range, so an empty `\\Q\\E` is ignored (e.g. `[a-\\Q\\Ez]` is `[a-z]`).
+    */
   private def classQuoteLiterals(item: ClassItem): Option[Seq[ClassItem]] =
     item.data match
       case ClassItemData.ClassUnion(items) if source.startsWith("\\Q", item.loc.start) => Some(items)
       case _                                                                           => None
+
+  private def isEmptyClassQuote(item: ClassItem): Boolean =
+    classQuoteLiterals(item).exists(_.isEmpty)
 
   private def parseClassItemNonRange(): ClassItem =
     val start = offset
