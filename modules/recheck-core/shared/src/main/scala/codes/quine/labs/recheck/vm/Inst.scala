@@ -3,8 +3,11 @@ package codes.quine.labs.recheck.vm
 import scala.compiletime.uninitialized
 
 import codes.quine.labs.recheck.regexp.EcmaScriptChars
-import codes.quine.labs.recheck.regexp.Pattern.Location
+import codes.quine.labs.recheck.regexp.Location
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
+import codes.quine.labs.resyntax.ir.IRCaseEquivalence
+import codes.quine.labs.resyntax.ir.IRLineTerminators
 
 /** Inst is an instruction. */
 sealed abstract class Inst:
@@ -63,6 +66,14 @@ object Inst:
   case object Rollback extends Terminator:
     def successors: Set[Label] = Set.empty
     override def toString: String = "rollback"
+
+  /** `commit`: Terminates a transaction with keeping the current position, and drops the backtracking points in it.
+    *
+    * It jumps to the `rollback` block of the `tx` as `rollback` does, so it makes an atomic group.
+    */
+  case object Commit extends Terminator:
+    def successors: Set[Label] = Set.empty
+    override def toString: String = "commit"
 
   /** `tx`: Marks as a transaction point, then jumps a `next` block. When it is terminated with a rollback, it jumps to
     * a `rollback` block, and when it is failed, it jumps to a `fallback` block. `rollback` and `fallback` blocks are
@@ -131,20 +142,24 @@ object Inst:
 
   object AssertKind:
 
-    /** `\b` assertion. */
-    case object WordBoundary extends AssertKind:
+    /** `\b` assertion with the word characters. */
+    final case class WordBoundary(word: CharSet) extends AssertKind:
       override def toString: String = "word_boundary"
 
-    /** `\B` assertion. */
-    case object WordBoundaryNot extends AssertKind:
+    /** `\B` assertion with the word characters. */
+    final case class WordBoundaryNot(word: CharSet) extends AssertKind:
       override def toString: String = "word_boundary_not"
 
-    /** `^` assertion with `m` flag. */
-    case object LineBegin extends AssertKind:
+    /** `^` assertion with `m` flag.
+      *
+      * @param matchesAfterFinalTerminator
+      *   whether it matches after a line terminator at the end of the input
+      */
+    final case class LineBegin(terminators: IRLineTerminators, matchesAfterFinalTerminator: Boolean) extends AssertKind:
       override def toString: String = "line_begin"
 
     /** `$` assertion with `m` flag. */
-    case object LineEnd extends AssertKind:
+    final case class LineEnd(terminators: IRLineTerminators) extends AssertKind:
       override def toString: String = "line_end"
 
     /** `^` assertion. */
@@ -155,6 +170,10 @@ object Inst:
     case object InputEnd extends AssertKind:
       override def toString: String = "input_end"
 
+    /** `$` assertion matching also before a line terminator at the end (e.g. Python's `$`). */
+    final case class ChompInputEnd(terminators: IRLineTerminators) extends AssertKind:
+      override def toString: String = "chomp_input_end"
+
   /** ReadKind is an operand of `read` instruction. */
   sealed abstract class ReadKind
 
@@ -163,10 +182,6 @@ object Inst:
     /** `.` matching with `s` flag. */
     case object Any extends ReadKind:
       override def toString: String = "any"
-
-    /** `.` matching. */
-    case object Dot extends ReadKind:
-      override def toString: String = "dot"
 
     /** An usual character matching. */
     final case class Char(c: Int) extends ReadKind:
@@ -180,6 +195,18 @@ object Inst:
     final case class ClassNot(s: CharSet) extends ReadKind:
       override def toString: String = s"class_not ${EcmaScriptChars.showClass(s)}"
 
-    /** A capture reference matching. */
-    final case class Ref(index: Int) extends ReadKind:
-      override def toString: String = s"ref $index"
+    /** A capture reference matching.
+      *
+      * @param indices
+      *   the capture indices, which are more than one for a name shared by groups
+      * @param equivalence
+      *   the comparison of characters, which is not the identity for a case-insensitive reference
+      */
+    final case class Ref(
+        indices: Seq[Int],
+        semantics: IRBackReferenceSemantics,
+        equivalence: IRCaseEquivalence
+    ) extends ReadKind:
+      override def toString: String =
+        val i = if equivalence == IRCaseEquivalence.Identity then "" else " ignore_case"
+        s"ref ${indices.mkString(",")}$i"

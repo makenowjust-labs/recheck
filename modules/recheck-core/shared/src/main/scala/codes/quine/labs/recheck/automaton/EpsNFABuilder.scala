@@ -7,19 +7,24 @@ import scala.util.Try
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
-import codes.quine.labs.recheck.regexp.EcmaScriptChars
-import codes.quine.labs.recheck.regexp.Pattern
-import codes.quine.labs.recheck.regexp.Pattern.*
+import codes.quine.labs.recheck.regexp.Location
+import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.regexp.PatternAlphabet
 import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
 import codes.quine.labs.recheck.regexp.PatternExtensions.*
+import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.ir.IRAssertKind
+import codes.quine.labs.resyntax.ir.IRLineTerminators
+import codes.quine.labs.resyntax.ir.IRNode
+import codes.quine.labs.resyntax.ir.IRNodeData
+import codes.quine.labs.resyntax.ir.IRQuantifier
 
-/** ECMA-262 RegExp to ε-NFA Compiler. */
+/** RegExp IR to ε-NFA Compiler. */
 object EpsNFABuilder:
 
-  /** Compiles ECMA-262 RegExp into ε-NFA. */
-  def build(pattern: Pattern)(using ctx: Context): Try[EpsNFA[Int]] =
+  /** Compiles RegExp IR into ε-NFA. */
+  def build(pattern: ParsedPattern)(using ctx: Context): Try[EpsNFA[Int]] =
     ctx.interrupt:
       for
         _ <- Try(())
@@ -34,12 +39,11 @@ object EpsNFABuilder:
         epsNFA
 
 private class EpsNFABuilder(
-    private val pattern: Pattern,
+    private val pattern: ParsedPattern,
     private val alphabet: PatternAlphabet
 )(using ctx: Context):
-  import pattern.flagSet._
 
-  /** A cached result of `Pattern#needsInputTerminatorDistinction`. */
+  /** A cached result of `ParsedPattern#needsInputTerminatorDistinction`. */
   private val needsInputTerminatorDistinction = pattern.needsInputTerminatorDistinction
 
   /** A next state counter. */
@@ -75,6 +79,8 @@ private class EpsNFABuilder(
 
   /** Builds EpsNFA for the pattern. */
   def build(): EpsNFA[Int] =
+    checkAssertions()
+
     val (i0, a0) = buildNode(pattern.node)
 
     val init = if pattern.needsSigmaStarAtBegin then
@@ -105,32 +111,115 @@ private class EpsNFABuilder(
 
     EpsNFA(alphabet, stateSet(), init, accept, tau.result())
 
+  /** Checks that the assertions of the pattern fit the character kinds of the ε-NFA.
+    *
+    * The ε-NFA has one set of line terminators and one set of word characters, and the end of the input is a line
+    * terminator if there is a line assertion. Two simplifications are made, which only make more inputs accepted: `^`
+    * matching after a line terminator at the end, and `\r\n` being two line terminators for line assertions.
+    */
+  private def checkAssertions(): Unit =
+    val kinds = pattern.node.collect { case IRNodeData.Assert(kind) => kind }
+    val terminators = kinds.collect {
+      case IRAssertKind.LineBegin(t, _) => t
+      case IRAssertKind.LineEnd(t)      => t
+    }.distinct
+    if terminators.size >= 2 then throw new UnsupportedException("line assertions with different line terminators")
+    for t <- terminators do
+      if t.crlf == IRLineTerminators.CRLF.Sequence && !(t.chars.contains(0x0a) && t.chars.contains(0x0d)) then
+        throw new UnsupportedException("line assertion with the CRLF line terminator")
+      if kinds.exists(k => k == IRAssertKind.TextBegin || k == IRAssertKind.TextEnd) ||
+        kinds.exists(_.isInstanceOf[IRAssertKind.ChompTextEnd])
+      then throw new UnsupportedException("line assertions with text assertions")
+    val words = pattern.wordSets
+    if words.size >= 2 then throw new UnsupportedException("word boundary assertions with different word characters")
+    for w <- words; t <- terminators if t.chars.exists(w.contains) do
+      throw new UnsupportedException("word boundary assertion with line terminator word characters")
+    if existsChompTextEndInMiddle then throw new UnsupportedException("end assertion in the middle")
+
+  /** Tests whether a text end assertion before a final line terminator (e.g. Python's `$`) is not at an end point. */
+  private def existsChompTextEndInMiddle: Boolean =
+    def loop(isEnd: Boolean, node: IRNode): Boolean = ctx.interrupt:
+      node.data match
+        case IRNodeData.Disjunction(ns) => ns.exists(loop(isEnd, _))
+        case IRNodeData.Sequence(ns)    =>
+          ns.zipWithIndex.exists((n, i) => loop(isEnd && i == ns.size - 1, n))
+        case IRNodeData.Capture(_, _, n)                     => loop(isEnd, n)
+        case IRNodeData.Atomic(n)                            => loop(isEnd, n)
+        case IRNodeData.Assert(_: IRAssertKind.ChompTextEnd) => !isEnd
+        case _                                               => node.children.exists(loop(false, _))
+    loop(true, pattern.node)
+
+  /** Returns the pairs of the set. */
+  private def refine(set: CharSet): Set[(CharSet, CharKind)] =
+    refineCache.getOrElseUpdate(set, alphabet.refine(set))
+
+  /** Builds a transition consuming one of the pairs. */
+  private def consume(chs: Set[(CharSet, CharKind)], loc: Option[Location]): (Int, Int) =
+    val i = nextQ()
+    val a = nextQ()
+    emit(i -> Consume(chs, a, loc))
+    (i, a)
+
+  /** Builds an ε-NFA for a choice of the alternatives in the order. */
+  private def buildChoice(alternatives: Seq[() => (Int, Int)]): (Int, Int) =
+    val ss = alternatives.map(_())
+    val i = nextQ()
+    tau.addOne(i -> Eps(ss.map(_._1)))
+    val a = nextQ()
+    for (_, a0) <- ss do emit(a0 -> Eps(Vector(a)))
+    (i, a)
+
+  /** Builds an ε-NFA for the sequence of the builders. */
+  private def buildSequence(builders: Seq[() => (Int, Int)]): (Int, Int) =
+    val ss = builders.map(_())
+    ss
+      .reduceLeftOption[(Int, Int)]:
+        case ((i1, a1), (i2, a2)) =>
+          emit(a1 -> Eps(Vector(i2)))
+          (i1, a2)
+      .getOrElse:
+        val q = nextQ()
+        (q, q)
+
   /** Builds EpsNFA transitions for the node. The result pair is, the first is initial state, and the second is final
     * state of the node.
     */
-  def buildNode(node: Node): (Int, Int) = ctx.interrupt:
-    node match
-      case Disjunction(ns) =>
-        val ss = ns.map(buildNode)
-        val i = nextQ()
-        tau.addOne(i -> Eps(ss.map(_._1)))
-        val a = nextQ()
-        for (_, a0) <- ss do emit(a0 -> Eps(Vector(a)))
-        (i, a)
-      case Sequence(ns) =>
-        val ss = ns.map(buildNode)
-        ss
-          .reduceLeftOption[(Int, Int)]:
-            case ((i1, a1), (i2, a2)) =>
-              emit(a1 -> Eps(Vector(i2)))
-              (i1, a2)
-          .getOrElse:
-            val q = nextQ()
-            (q, q)
-      case Capture(_, n)                      => buildNode(n)
-      case NamedCapture(_, _, n)              => buildNode(n)
-      case Group(n)                           => buildNode(n)
-      case Repeat(Quantifier.Star(isLazy), n) =>
+  def buildNode(node: IRNode): (Int, Int) = ctx.interrupt:
+    node.data match
+      case IRNodeData.Disjunction(ns)  => buildChoice(ns.map(n => () => buildNode(n)))
+      case IRNodeData.Sequence(ns)     => buildSequence(ns.map(n => () => buildNode(n)))
+      case IRNodeData.Empty            => buildSequence(Seq.empty)
+      case IRNodeData.Capture(_, _, n) => buildNode(n)
+      case IRNodeData.Repeat(n, q)     => buildRepeat(node, n, q)
+      case IRNodeData.Assert(kind)     => buildAssert(kind)
+      case IRNodeData.Chars(set)       =>
+        val chs =
+          // A negated class is refined as its positive set, as it is written.
+          if pattern.isNegatedClass(node) then alphabet.any.diff(refine(set.complement(pattern.ir.mode)))
+          else refine(set)
+        consume(chs, Location.from(node.loc))
+      case IRNodeData.Strings(set) =>
+        val loc = Location.from(node.loc)
+        // The strings are tried from the longest, and then the characters.
+        val strings = set.strings.toSeq
+          .sortBy(-_.length)
+          .map: s =>
+            () => buildSequence(s.iterator.toSeq.map(c => () => consume(refine(CharSet.single(c)), loc)))
+        val chars = Option.when(set.chars.nonEmpty)(() => consume(refine(set.chars), loc))
+        buildChoice(strings ++ chars)
+      case IRNodeData.LookAhead(_, _)     => throw new UnsupportedException("look-ahead assertion")
+      case IRNodeData.LookBehind(_, _)    => throw new UnsupportedException("look-behind assertion")
+      case IRNodeData.Atomic(_)           => throw new UnsupportedException("atomic group")
+      case IRNodeData.BackReference(_, _) =>
+        if pattern.text(node).startsWith("\\k") then throw new UnsupportedException("named back-reference")
+        else throw new UnsupportedException("back-reference")
+      case IRNodeData.Unsupported(_) => throw new UnsupportedException(pattern.unsupportedMessage(node))
+
+  /** Builds EpsNFA transitions for a repetition. */
+  private def buildRepeat(node: IRNode, n: IRNode, q: IRQuantifier): (Int, Int) =
+    def repeat(quantifier: IRQuantifier): IRNode = IRNode(IRNodeData.Repeat(n, quantifier))
+    q match
+      case IRQuantifier.Unbounded(0, strategy) =>
         //      +---------------------+
         //      |                     |
         //  (i)-+->(i2)->[i0-->a0]-+  +->(a1)->(a)
@@ -142,13 +231,13 @@ private class EpsNFABuilder(
         val i2 = nextQ()
         val a1 = nextQ()
         val a = nextQ()
-        val t = if isLazy then Vector(a1, i2) else Vector(i2, a1)
+        val t = if strategy == BacktrackStrategy.Lazy then Vector(a1, i2) else Vector(i2, a1)
         emit(i -> Eps(t))
         emit(i2 -> LoopEnter(loop, i0))
         emit(a0 -> Eps(Vector(i)))
         emit(a1 -> LoopExit(loop, a))
         (i, a)
-      case Repeat(Quantifier.Plus(isLazy), n) =>
+      case IRQuantifier.Unbounded(1, strategy) if !pattern.isBraceRepeat(node) =>
         val (i, a0) = buildNode(n)
         // +----(i1)---+
         // |           |
@@ -157,73 +246,62 @@ private class EpsNFABuilder(
         val i1 = nextQ()
         val a1 = nextQ()
         val a = nextQ()
-        val t = if isLazy then Vector(a1, i1) else Vector(i1, a1)
+        val t = if strategy == BacktrackStrategy.Lazy then Vector(a1, i1) else Vector(i1, a1)
         emit(a0 -> Eps(t))
         emit(i1 -> LoopEnter(loop, i))
         emit(a1 -> LoopExit(loop, a))
         (i, a)
-      case Repeat(Quantifier.Question(isLazy), n) =>
+      case IRQuantifier.Bounded(0, 1, strategy) =>
         val (i0, a) = buildNode(n)
         //     +--------+
         //     |        v
         // (i)-+->[i0-->a]
         val i = nextQ()
-        val t = if isLazy then Vector(a, i0) else Vector(i0, a)
+        val t = if strategy == BacktrackStrategy.Lazy then Vector(a, i0) else Vector(i0, a)
         emit(i -> Eps(t))
         (i, a)
-      case Repeat(q, n) =>
-        q.normalized match
-          case Quantifier.Exact(m, _) =>
-            buildNode(Sequence(Vector.fill(m)(n)))
-          case Quantifier.Unbounded(min, isLazy) =>
-            buildNode(Sequence(Vector.fill(min)(n) :+ Repeat(Quantifier.Star(isLazy), n)))
-          case Quantifier.Bounded(min, max, isLazy) =>
-            val minN = Vector.fill(min)(n)
-            val maxN = Repeat(
-              Quantifier.Question(isLazy),
-              Vector
-                .fill(max - min)(n)
-                .reduceRight((l, r) => Sequence(Vector(l, Repeat(Quantifier.Question(isLazy), r))))
-            )
-            buildNode(Sequence(minN :+ maxN))
-      case WordBoundary(invert) =>
-        val i = nextQ()
-        val a = nextQ()
-        emit(i -> Assert(if invert then AssertKind.WordBoundaryNot else AssertKind.WordBoundary, a))
-        (i, a)
-      case LineBegin() =>
-        val i = nextQ()
-        if needsInputTerminatorDistinction then
-          val a = nextQ()
-          emit(i -> Assert(AssertKind.LineBegin, a))
-          (i, a)
-        else (i, i)
-      case LineEnd() =>
-        val i = nextQ()
-        if needsInputTerminatorDistinction then
-          val a = nextQ()
-          emit(i -> Assert(AssertKind.LineEnd, a))
-          (i, a)
-        else (i, i)
-      case LookAhead(_, _)  => throw new UnsupportedException("look-ahead assertion")
-      case LookBehind(_, _) => throw new UnsupportedException("look-behind assertion")
-      case atom: AtomNode   =>
-        val ch0 = atom.toCharSet(unicode)
-        val ch = if ignoreCase then EcmaScriptChars.canonicalize(ch0, unicode) else ch0
-        val chs = atom match
-          // CharacterClass's inversion should be done here.
-          case CharacterClass(invert, _) if invert =>
-            val chs0 = refineCache.getOrElseUpdate(ch, alphabet.refine(ch))
-            alphabet.any.diff(chs0)
-          case _ => refineCache.getOrElseUpdate(ch, alphabet.refine(ch))
-        val i = nextQ()
-        val a = nextQ()
-        emit(i -> Consume(chs, a, node.loc))
-        (i, a)
-      case Dot() =>
-        val i = nextQ()
-        val a = nextQ()
-        emit(i -> Consume(if dotAll then alphabet.any else alphabet.dot, a, node.loc))
-        (i, a)
-      case BackReference(_)         => throw new UnsupportedException("back-reference")
-      case NamedBackReference(_, _) => throw new UnsupportedException("named back-reference")
+      case IRQuantifier.Exact(m) =>
+        buildSequence(Vector.fill(m)(() => buildNode(n)))
+      case IRQuantifier.Unbounded(min, strategy) =>
+        val star = repeat(IRQuantifier.Unbounded(0, strategy))
+        buildSequence(Vector.fill(min)(() => buildNode(n)) :+ (() => buildNode(star)))
+      case IRQuantifier.Bounded(min, max, strategy) =>
+        def question(n: IRNode): IRNode = IRNode(IRNodeData.Repeat(n, IRQuantifier.Bounded(0, 1, strategy)))
+        val maxN = question(
+          Vector
+            .fill(max - min)(n)
+            .reduceRight((l, r) => IRNode(IRNodeData.Sequence(Vector(l, question(r)))))
+        )
+        buildSequence(Vector.fill(min)(() => buildNode(n)) :+ (() => buildNode(maxN)))
+
+  /** Builds EpsNFA transitions for an assertion. */
+  private def buildAssert(kind: IRAssertKind): (Int, Int) =
+    kind match
+      case IRAssertKind.WordBoundary(_)                       => assert(AssertKind.WordBoundary)
+      case IRAssertKind.NotWordBoundary(_)                    => assert(AssertKind.WordBoundaryNot)
+      case IRAssertKind.TextBegin | _: IRAssertKind.LineBegin =>
+        if needsInputTerminatorDistinction then assert(AssertKind.LineBegin) else epsilon()
+      case IRAssertKind.TextEnd | _: IRAssertKind.LineEnd =>
+        if needsInputTerminatorDistinction then assert(AssertKind.LineEnd) else epsilon()
+      case IRAssertKind.ChompTextEnd(t) =>
+        // At an end point, it is the end after an optional line terminator.
+        val chars = CharSet.of(t.chars.toSeq*)
+        val single = Option.when(chars.nonEmpty)(() => consume(refine(chars), None))
+        val crlf = Option.when(t.crlf != IRLineTerminators.CRLF.Ignored): () =>
+          buildSequence(
+            Seq(() => consume(refine(CharSet.single(0x0d)), None), () => consume(refine(CharSet.single(0x0a)), None))
+          )
+        val terminator = buildChoice(Seq(() => epsilon()) ++ single ++ crlf)
+        val end = if needsInputTerminatorDistinction then assert(AssertKind.LineEnd) else epsilon()
+        emit(terminator._2 -> Eps(Vector(end._1)))
+        (terminator._1, end._2)
+
+  private def assert(kind: AssertKind): (Int, Int) =
+    val i = nextQ()
+    val a = nextQ()
+    emit(i -> Assert(kind, a))
+    (i, a)
+
+  private def epsilon(): (Int, Int) =
+    val i = nextQ()
+    (i, i)

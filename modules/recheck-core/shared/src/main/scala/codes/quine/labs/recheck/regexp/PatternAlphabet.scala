@@ -33,40 +33,40 @@ final case class PatternAlphabet(pairs: IndexedSeq[(CharSet, CharKind)]):
   /** The pairs for a 'any' pattern. */
   def any: Set[(CharSet, CharKind)] = pairs.toSet
 
-  /** The pairs for a 'dot' pattern. */
-  def dot: Set[(CharSet, CharKind)] = any.diff(newline)
-
-  /** The pairs of the line terminator characters. */
-  def newline: Set[(CharSet, CharKind)] = refine(EcmaScriptChars.LineTerminator)
-
 /** PatternAlphabet utilities. */
 object PatternAlphabet:
 
-  /** Builds the coarsest alphabet of all characters such that each set is a union of atoms.
+  /** Builds the coarsest alphabet of all characters of the mode such that each set is a union of atoms.
     *
-    * With `ignoreCase`, all characters means the canonical ones. An atom in `lineTerminator` (resp. `word`) has the
-    * kind [[CharKind.LineTerminator]] (resp. [[CharKind.Word]]).
+    * An atom in `lineTerminator` (resp. `word`) has the kind [[CharKind.LineTerminator]] (resp. [[CharKind.Word]]).
+    *
+    * An atom is narrowed to its characters in `preferred` if any, so that its first character, which stands for the
+    * atom in generated strings, is a preferred one (e.g. a canonical character of JavaScript's ignore-case matching).
+    * Each set is still a union of the narrowed atoms intersecting it.
     *
     * The atoms are ordered as splitting all characters, `lineTerminator`, `word` and `sets` in turn: an atom of an
     * earlier set comes first, and a split atom puts the part in the set first.
     */
   def build(
-      ignoreCase: Boolean,
-      unicode: Boolean,
+      mode: UnitMode,
       sets: Seq[CharSet] = Seq.empty,
       lineTerminator: Option[CharSet] = None,
-      word: Option[CharSet] = None
+      word: Option[CharSet] = None,
+      preferred: Option[CharSet] = None
   ): PatternAlphabet =
-    val all = ((EcmaScriptChars.dot(ignoreCase, true, unicode) +: lineTerminator.toSeq) ++ word ++ sets.distinct)
+    val all = ((mode.universe +: lineTerminator.toSeq) ++ word ++ sets.distinct)
+      .map(_.restrict(mode))
       .filter(_.nonEmpty)
       .toIndexedSeq
+    def narrow(c: CharSet): CharSet =
+      preferred.map(c.intersect).filter(_.nonEmpty).getOrElse(c)
     def order(c: CharSet): Seq[Int] =
       val first = all.indexWhere(_.contains(c.head))
       first +: all.drop(first + 1).map(s => if s.contains(c.head) then 0 else 1)
     val pairs = Alphabet
-      .refine(EcmaScriptChars.mode(unicode), all)
+      .refine(mode, all)
       .atoms
-      .filter(c => all.exists(_.contains(c.head)))
+      .map(narrow)
       .map(c => (c, order(c)))
       .sortBy(_._2)(using Ordering.Implicits.seqOrdering)
       .map: (c, _) =>

@@ -13,7 +13,7 @@ import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.fuzz.FuzzChecker.*
-import codes.quine.labs.recheck.regexp.Pattern
+import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.regexp.PatternAlphabet
 import codes.quine.labs.recheck.util.RepeatUtil
 import codes.quine.labs.recheck.util.UStringUtil.*
@@ -30,7 +30,7 @@ object FuzzChecker:
 
   /** Checks whether RegExp is ReDoS vulnerable or not. */
   def check(
-      pattern: Pattern,
+      pattern: ParsedPattern,
       fuzz: FuzzProgram,
       random: Random = new Random(Parameters.DefaultRandomSeed),
       seeder: Seeder = Parameters.DefaultSeeder,
@@ -94,7 +94,7 @@ object FuzzChecker:
 
 /** FuzzChecker is a ReDoS vulnerable RegExp checker based on fuzzing. */
 private[fuzz] final class FuzzChecker(
-    val pattern: Pattern,
+    val pattern: ParsedPattern,
     val fuzz: FuzzProgram,
     val random: Random,
     val seeder: Seeder,

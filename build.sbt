@@ -47,8 +47,6 @@ lazy val root = project
     commonJS,
     execJVM,
     execJS,
-    parseJVM,
-    parseJS,
     resyntaxJVM,
     resyntaxJS,
     resyntaxCharsetJVM,
@@ -78,6 +76,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.recheck.regexp.*
       |import codes.quine.labs.recheck.util.*
       |import codes.quine.labs.recheck.vm.*
+      |import codes.quine.labs.resyntax.ast.Dialect
       |import codes.quine.labs.resyntax.charset.*
       |
       |def logger: Context.Logger = (message: String) =>
@@ -92,14 +91,11 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |  finally
       |    println(s"$name: ${(System.nanoTime() - start) / 1e9} s")
       |
-      |def parse(source: String, flags: String): Pattern =
-      |  time("parse"):
-      |    Parser.parse(source, flags) match
-      |      case Right(pattern) => pattern
-      |      case Left(ex)       => throw new InvalidRegExpException(ex.getMessage)
+      |def parse(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): ParsedPattern =
+      |  time("parse")(ParsedPattern.parse(source, flags, dialect).toTry.get)
       |
-      |def compile(source: String, flags: String): Program =
-      |  val pattern = parse(source, flags)
+      |def compile(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): Program =
+      |  val pattern = parse(source, flags, dialect)
       |  time("compile")(ProgramBuilder.build(pattern).get)
       |
       |def run(
@@ -112,13 +108,12 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |    needsLoopAnalysis: Boolean = false,
       |    needsFailedPoints: Boolean = false,
       |    needsCoverage: Boolean = false,
-      |    needsHeatmap: Boolean = false
+      |    needsHeatmap: Boolean = false,
+      |    dialect: Dialect = Dialect.JavaScript
       |)(using ctx: Context): Interpreter.Result =
-      |  val pattern = parse(source, flags)
-      |  val flagSet = pattern.flagSet
+      |  val pattern = parse(source, flags, dialect)
       |  val program = time("compile")(ProgramBuilder.build(pattern).get)
-      |  val uinput0 = UStringUtil.fromString(input)
-      |  val uinput = if flagSet.ignoreCase then UStringUtil.canonicalize(uinput0, flagSet.unicode) else uinput0
+      |  val uinput = UStringUtil.fromString(input)
       |  val opts = Interpreter.Options(
       |    limit = limit,
       |    usesAcceleration = usesAcceleration,
@@ -220,7 +215,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
-  .dependsOn(common, exec, resyntaxCharset, parse)
+  .dependsOn(common, exec, resyntaxCharset, resyntax)
 
 lazy val coreJVM = core.jvm
 lazy val coreJS = core.js
@@ -267,29 +262,6 @@ lazy val exec = crossProject(JVMPlatform, JSPlatform)
 
 lazy val execJVM = exec.jvm
 lazy val execJS = exec.js
-
-lazy val parse = crossProject(JVMPlatform, JSPlatform)
-  .in(file("modules/recheck-parse"))
-  .settings(
-    name := "recheck-parse",
-    console / initialCommands := """
-      |import codes.quine.labs.recheck.regexp.*
-      |""".stripMargin,
-    // Dependencies:
-    libraryDependencies += "com.lihaoyi" %% "fastparse" % "3.1.1",
-    // Settings for test:
-    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
-    testFrameworks += new TestFramework("munit.Framework")
-  )
-  .jsSettings(
-    coverageEnabled := false,
-    libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
-      .cross(CrossVersion.for3Use2_13)
-  )
-  .dependsOn(resyntaxCharset)
-
-lazy val parseJVM = parse.jvm
-lazy val parseJS = parse.js
 
 lazy val resyntax = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/resyntax"))

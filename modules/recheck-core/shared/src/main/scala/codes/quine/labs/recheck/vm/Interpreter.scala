@@ -5,9 +5,7 @@ import scala.concurrent.duration.Duration
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.TimeoutException
-import codes.quine.labs.recheck.regexp.EcmaScriptChars.LineTerminator
-import codes.quine.labs.recheck.regexp.EcmaScriptChars.Word
-import codes.quine.labs.recheck.regexp.Pattern.Location
+import codes.quine.labs.recheck.regexp.Location
 import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.recheck.vm.Inst.AssertKind
 import codes.quine.labs.recheck.vm.Inst.ReadKind
@@ -21,6 +19,9 @@ import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
+import codes.quine.labs.resyntax.ir.IRCaseEquivalence
+import codes.quine.labs.resyntax.ir.IRLineTerminators
 
 /** Interpreter executes a program on a input. */
 object Interpreter:
@@ -303,6 +304,16 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                   frame.fallback = fallback
                   true
               failed
+            case Inst.Commit =>
+              frame.rollback.get match
+                case Rollback.HasSuccessor(next, _, rollback, fallback) =>
+                  frame.label = next
+                  frame.rollback = rollback
+                  frame.fallback = fallback
+                  false
+                // $COVERAGE-OFF$
+                case Rollback.Fallback(_) => sys.error("unreachable")
+              // $COVERAGE-ON$
             case Inst.Tx(next, rollback, fallback) =>
               val nextRollback = rollback match
                 case Some(rollback) => Rollback.HasSuccessor(rollback, frame.pos, frame.rollback, frame.fallback)
@@ -361,28 +372,21 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         true
       case Inst.Assert(kind) =>
         val ok = kind match
-          case AssertKind.WordBoundary =>
-            val c1 = frame.previousChar
-            val c2 = frame.currentChar
-            val w1 = c1.exists(Word.contains)
-            val w2 = c2.exists(Word.contains)
-            w1 != w2
-          case AssertKind.WordBoundaryNot =>
-            val c1 = frame.previousChar
-            val c2 = frame.currentChar
-            val w1 = c1.exists(Word.contains)
-            val w2 = c2.exists(Word.contains)
-            w1 == w2
-          case AssertKind.LineBegin =>
-            val c1 = frame.previousChar
-            c1.forall(LineTerminator.contains)
-          case AssertKind.LineEnd =>
-            val c2 = frame.currentChar
-            c2.forall(LineTerminator.contains)
+          case AssertKind.WordBoundary(word) =>
+            frame.previousChar.exists(word.contains) != frame.currentChar.exists(word.contains)
+          case AssertKind.WordBoundaryNot(word) =>
+            frame.previousChar.exists(word.contains) == frame.currentChar.exists(word.contains)
+          case AssertKind.LineBegin(terminators, matchesAfterFinalTerminator) =>
+            frame.pos == 0 ||
+            (afterTerminator(frame.pos, terminators) && (matchesAfterFinalTerminator || frame.pos != input.length))
+          case AssertKind.LineEnd(terminators) =>
+            frame.pos == input.length || beforeTerminator(frame.pos, terminators).isDefined
           case AssertKind.InputBegin =>
             frame.pos == 0
           case AssertKind.InputEnd =>
             frame.pos == input.length
+          case AssertKind.ChompInputEnd(terminators) =>
+            frame.pos == input.length || beforeTerminator(frame.pos, terminators).contains(input.length)
         if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
         ok
       case read: Inst.Read      => instRead(frame, read)
@@ -397,30 +401,100 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         frame.capReset(from, to)
         true
 
+  /** Tests whether the position is after a line terminator. */
+  private def afterTerminator(pos: Int, terminators: IRLineTerminators): Boolean =
+    val c = input.getBefore(pos, program.meta.unicode)
+    val single = c.exists(terminators.chars.contains)
+    val crlf =
+      terminators.crlf != IRLineTerminators.CRLF.Ignored && c.contains(0x0a) && pos >= 2 && input(pos - 2) == 0x0d
+    (single || crlf) && !betweenCRLF(pos, terminators)
+
+  /** Returns the end position of a line terminator at the position, if any. */
+  private def beforeTerminator(pos: Int, terminators: IRLineTerminators): Option[Int] =
+    if betweenCRLF(pos, terminators) then None
+    else if terminators.crlf != IRLineTerminators.CRLF.Ignored && pos + 1 < input.length &&
+      input(pos) == 0x0d && input(pos + 1) == 0x0a
+    then Some(pos + 2)
+    else
+      input
+        .getAt(pos, program.meta.unicode)
+        .filter(terminators.chars.contains)
+        .map(c => pos + (if c >= 0x10000 then 2 else 1))
+
+  /** Tests whether the position is between `\r` and `\n`, where no line assertion matches with `CRLF.Atomic`. */
+  private def betweenCRLF(pos: Int, terminators: IRLineTerminators): Boolean =
+    terminators.crlf == IRLineTerminators.CRLF.Atomic && 0 < pos && pos < input.length &&
+      input(pos - 1) == 0x0d && input(pos) == 0x0a
+
+  /** Returns the captures that a back-reference compares in turn, where `None` matches the empty string. */
+  private def refCandidates(frame: Frame, ref: ReadKind.Ref): Seq[Option[UString]] =
+    val captures = ref.indices.flatMap(frame.capture)
+    ref.semantics.choice match
+      case IRBackReferenceChoice.FirstSet =>
+        captures.headOption match
+          case Some(s)                                 => Seq(Some(s))
+          case None if ref.semantics.unsetMatchesEmpty => Seq(None)
+          case None                                    => Seq.empty
+      case IRBackReferenceChoice.LastMatching =>
+        if captures.isEmpty && ref.semantics.unsetMatchesEmpty then Seq(None) else captures.reverse.map(Some(_))
+
+  /** Compares the capture with the input from the position forward (or backward), and returns the compared count and
+    * the matched width of the input if matched.
+    */
+  private def compare(s: UString, pos: Int, back: Boolean, equivalence: IRCaseEquivalence): (Int, Option[Int]) =
+    if equivalence == IRCaseEquivalence.Identity then
+      var count = 0
+      if back then
+        while count < s.length && pos - count - 1 >= 0 && s(s.length - count - 1) == input(pos - count - 1) do
+          count += 1
+      else while count < s.length && pos + count < input.length && s(count) == input(pos + count) do count += 1
+      (count, Option.when(count == s.length)(s.length))
+    else
+      val unicode = program.meta.unicode
+      def width(c: Int): Int = if unicode && c >= 0x10000 then 2 else 1
+      var i = 0
+      var j = 0
+      var continues = true
+      while continues && i < s.length do
+        val c1 = if back then s.getBefore(s.length - i, unicode) else s.getAt(i, unicode)
+        val c2 = if back then input.getBefore(pos - j, unicode) else input.getAt(pos + j, unicode)
+        (c1, c2) match
+          case (Some(c1), Some(c2)) if c1 == c2 || equivalence.equiv(c1, c2) =>
+            i += width(c1)
+            j += width(c2)
+          case _ => continues = false
+      (i, Option.when(i == s.length)(j))
+
+  /** Runs a `read` (or `read_back`) instruction of a back-reference. */
+  private def instReadRef(frame: Frame, inst: Inst, ref: ReadKind.Ref, loc: Option[Location], back: Boolean): Boolean =
+    val candidates = refCandidates(frame, ref)
+    var width: Option[Int] = None
+    val it = candidates.iterator
+    while width.isEmpty && it.hasNext do
+      it.next() match
+        case Some(s) =>
+          val (count, w) = compare(s, frame.pos, back, ref.equivalence)
+          steps = Math.addExact(steps, count)
+          width = w
+        case None => width = Some(0)
+    val ok = width.isDefined
+
+    if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
+    if ok then
+      if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
+      frame.pos += (if back then -width.get else width.get)
+      true
+    else
+      if options.needsFailedPoints then
+        val capture = candidates.headOption.flatten
+        val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, ref, capture)
+        failedPoints.add(point)
+      false
+
   /** Runs a given `read` instruction. */
   private def instRead(frame: Frame, inst: Inst.Read): Boolean = inst match
-    case Inst.Read(kind @ ReadKind.Ref(index), loc) =>
-      val s = frame.capture(index).getOrElse(UString.empty)
-
-      var count = 0
-      while count < s.length &&
-        frame.pos + count < input.length &&
-        s(count) == input(frame.pos + count)
-      do count += 1
-      val ok = count == s.length
-      steps = Math.addExact(steps, count)
-
-      if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
-      if ok then
-        if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        frame.pos += s.length
-        true
-      else
-        if options.needsFailedPoints then
-          val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, kind, Some(s))
-          failedPoints.add(point)
-        false
-    case Inst.Read(kind, loc) =>
+    case Inst.Read(ref: ReadKind.Ref, loc) => instReadRef(frame, inst, ref, loc, false)
+    case Inst.Read(kind, loc)              =>
       val c = frame.currentChar
       val ok = read(c, kind)
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
@@ -438,28 +512,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
   /** Runs a given `read-back` instruction. */
   private def instReadBack(frame: Frame, inst: Inst.ReadBack): Boolean = inst match
-    case Inst.ReadBack(kind @ ReadKind.Ref(index), loc) =>
-      val s = frame.capture(index).getOrElse(UString.empty)
-
-      var count = 0
-      while count < s.length &&
-        frame.pos - count - 1 >= 0 &&
-        s(s.length - count - 1) == input(frame.pos - count - 1)
-      do count += 1
-      val ok = count == s.length
-      steps = Math.addExact(steps, count)
-
-      if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
-      if ok then
-        if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        frame.pos -= s.length
-        true
-      else
-        if options.needsFailedPoints then
-          val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, kind, Some(s))
-          failedPoints.add(point)
-        false
-    case Inst.ReadBack(kind, loc) =>
+    case Inst.ReadBack(ref: ReadKind.Ref, loc) => instReadRef(frame, inst, ref, loc, true)
+    case Inst.ReadBack(kind, loc)              =>
       val c = frame.previousChar
       val ok = read(c, kind)
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
@@ -481,11 +535,10 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       case Some(c) =>
         kind match
           case ReadKind.Any         => true
-          case ReadKind.Dot         => !LineTerminator.contains(c)
           case ReadKind.Char(d)     => c == d
           case ReadKind.Class(s)    => s.contains(c)
           case ReadKind.ClassNot(s) => !s.contains(c)
-          case ReadKind.Ref(_)      =>
+          case _: ReadKind.Ref      =>
             // $COVERAGE-OFF$
             sys.error("unreachable")
           // $COVERAGE-ON$

@@ -1,142 +1,87 @@
 package codes.quine.labs.recheck.regexp
 
-import scala.language.implicitConversions
-
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.regexp.Pattern.*
 import codes.quine.labs.recheck.regexp.PatternExtensions.*
 import codes.quine.labs.recheck.util.UStringUtil
+import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.ir.IRLineTerminators
 
 class PatternExtensionsSuite extends munit.FunSuite:
 
   /** A default context. */
   given ctx: Context = Context()
 
-  test("PatternExtensions.AtomNodeOps#toCharSet"):
-    assertEquals(Character('x').toCharSet(false), CharSet.single('x'))
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Word).toCharSet(false), EcmaScriptChars.Word)
-    assertEquals(
-      SimpleEscapeClass(true, EscapeClassKind.Word).toCharSet(false),
-      EcmaScriptChars.Word.complement(UnitMode.Utf16)
-    )
-    assertEquals(
-      SimpleEscapeClass(true, EscapeClassKind.Word).toCharSet(true),
-      EcmaScriptChars.Word.complement(UnitMode.CodePoint)
-    )
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).toCharSet(false), EcmaScriptChars.Digit)
-    assertEquals(
-      SimpleEscapeClass(true, EscapeClassKind.Digit).toCharSet(false),
-      EcmaScriptChars.Digit.complement(UnitMode.Utf16)
-    )
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Space).toCharSet(false), EcmaScriptChars.Space)
-    assertEquals(
-      SimpleEscapeClass(true, EscapeClassKind.Space).toCharSet(false),
-      EcmaScriptChars.Space.complement(UnitMode.Utf16)
-    )
-    assertEquals(
-      UnicodeProperty(false, "ASCII", EcmaScriptChars.unicodeProperty("ASCII").get).toCharSet(false),
-      EcmaScriptChars.unicodeProperty("ASCII").get
-    )
-    assertEquals(
-      UnicodeProperty(true, "ASCII", EcmaScriptChars.unicodeProperty("ASCII").get.complement(UnitMode.CodePoint))
-        .toCharSet(true),
-      EcmaScriptChars.unicodeProperty("ASCII").get.complement(UnitMode.CodePoint)
-    )
-    assertEquals(
-      UnicodeProperty(false, "L", EcmaScriptChars.unicodeProperty("L").get).toCharSet(false),
-      EcmaScriptChars.unicodeProperty("L").get
-    )
-    assertEquals(
-      UnicodeProperty(true, "L", EcmaScriptChars.unicodeProperty("L").get.complement(UnitMode.CodePoint))
-        .toCharSet(true),
-      EcmaScriptChars.unicodeProperty("L").get.complement(UnitMode.CodePoint)
-    )
-    val Hira = EcmaScriptChars.unicodePropertyValue("sc", "Hira").get
-    assertEquals(UnicodePropertyValue(false, "sc", "Hira", Hira).toCharSet(false), Hira)
-    assertEquals(
-      UnicodePropertyValue(true, "sc", "Hira", Hira.complement(UnitMode.CodePoint)).toCharSet(true),
-      Hira.complement(UnitMode.CodePoint)
-    )
-    assertEquals(
-      CharacterClass(false, Seq(Character('a'), Character('A'))).toCharSet(false),
-      CharSet.single('a').union(CharSet.single('A'))
-    )
-    assertEquals(
-      CharacterClass(true, Seq(Character('a'), Character('A'))).toCharSet(false),
-      CharSet.single('a').union(CharSet.single('A')) // Not complemented is intentionally.
-    )
-    assertEquals(ClassRange('a', 'a').toCharSet(false), CharSet.single('a'))
-    assertEquals(ClassRange('a', 'z').toCharSet(false), CharSet.range('a', 'z'))
+  def parse(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): ParsedPattern =
+    ParsedPattern.parse(source, flags, dialect).toTry.get
+
+  /** Checks a property of patterns, given as pairs of a source and the expected value. */
+  def check[A](name: String, flags: String = "", dialect: Dialect = Dialect.JavaScript)(f: ParsedPattern => A)(
+      cases: (String, A)*
+  )(using loc: munit.Location): Unit =
+    test(s"PatternExtensions.$name${if flags.isEmpty then "" else s" /$flags"}${
+        if dialect == Dialect.JavaScript then "" else s" in $dialect"
+      }"):
+      for (source, expected) <- cases do assertEquals(f(parse(source, flags, dialect)), expected, source)
 
   test("PatternExtensions.NodeOps#captureRange"):
-    assertEquals(Sequence(Seq(Capture(1, Dot()), Capture(2, Dot()))).captureRange, CaptureRange(Some((1, 2))))
-    assertEquals(Disjunction(Seq(Capture(1, Dot()), Capture(2, Dot()))).captureRange, CaptureRange(Some((1, 2))))
-    assertEquals(Capture(1, Dot()).captureRange, CaptureRange(Some((1, 1))))
-    assertEquals(Capture(1, Capture(2, Dot())).captureRange, CaptureRange(Some((1, 2))))
-    assertEquals(NamedCapture(1, "x", Dot()).captureRange, CaptureRange(Some((1, 1))))
-    assertEquals(NamedCapture(1, "x", Capture(2, Dot())).captureRange, CaptureRange(Some((1, 2))))
-    assertEquals(Group(Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
-    assertEquals(Repeat(Quantifier.Exact(1, false), Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
-    assertEquals(WordBoundary(false).captureRange, CaptureRange(None))
-    assertEquals(LineBegin().captureRange, CaptureRange(None))
-    assertEquals(LineEnd().captureRange, CaptureRange(None))
-    assertEquals(LookAhead(false, Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
-    assertEquals(LookBehind(false, Capture(1, Dot())).captureRange, CaptureRange(Some((1, 1))))
-    assertEquals(Character('a').captureRange, CaptureRange(None))
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).captureRange, CaptureRange(None))
-    assertEquals(UnicodeProperty(false, "L", null).captureRange, CaptureRange(None))
-    assertEquals(UnicodePropertyValue(false, "sc", "Hira", null).captureRange, CaptureRange(None))
-    assertEquals(CharacterClass(false, Seq(Character('a'))).captureRange, CaptureRange(None))
-    assertEquals(Dot().captureRange, CaptureRange(None))
-    assertEquals(BackReference(1).captureRange, CaptureRange(None))
-    assertEquals(NamedBackReference(1, "foo").captureRange, CaptureRange(None))
+    def range(source: String): CaptureRange = parse(source).node.captureRange
+    assertEquals(range("(.)(.)"), CaptureRange(Some((1, 2))))
+    assertEquals(range("(.)|(.)"), CaptureRange(Some((1, 2))))
+    assertEquals(range("(.)"), CaptureRange(Some((1, 1))))
+    assertEquals(range("((.))"), CaptureRange(Some((1, 2))))
+    assertEquals(range("(?<x>.)"), CaptureRange(Some((1, 1))))
+    assertEquals(range("(?<x>(.))"), CaptureRange(Some((1, 2))))
+    assertEquals(range("(?:(.))"), CaptureRange(Some((1, 1))))
+    assertEquals(range("(.){1}"), CaptureRange(Some((1, 1))))
+    assertEquals(range("(?=(.))"), CaptureRange(Some((1, 1))))
+    assertEquals(range("(?<=(.))"), CaptureRange(Some((1, 1))))
+    for source <- Seq("\\b", "^", "$", "a", "\\d", "[a]", ".", "(?:a)\\1") do
+      assertEquals(range(source), CaptureRange(None), source)
+    assertEquals(parse("(?>(a))", dialect = Dialect.Java).node.captureRange, CaptureRange(Some((1, 1))))
 
-  test("PatternExtensions.NodeOps#isEmpty"):
-    assertEquals(Sequence(Seq(Dot(), Dot())).canMatchEmpty, false)
-    assertEquals(Sequence(Seq.empty).canMatchEmpty, true)
-    assertEquals(Disjunction(Seq(Dot(), Dot())).canMatchEmpty, false)
-    assertEquals(Disjunction(Seq(Sequence(Seq.empty), Dot())).canMatchEmpty, true)
-    assertEquals(Disjunction(Seq(Dot(), Sequence(Seq.empty))).canMatchEmpty, true)
-    assertEquals(Capture(1, Dot()).canMatchEmpty, false)
-    assertEquals(Capture(1, Sequence(Seq.empty)).canMatchEmpty, true)
-    assertEquals(NamedCapture(1, "x", Dot()).canMatchEmpty, false)
-    assertEquals(NamedCapture(1, "x", Sequence(Seq.empty)).canMatchEmpty, true)
-    assertEquals(Group(Dot()).canMatchEmpty, false)
-    assertEquals(Group(Sequence(Seq.empty)).canMatchEmpty, true)
-    assertEquals(Repeat(Quantifier.Star(false), Dot()).canMatchEmpty, true)
-    assertEquals(Repeat(Quantifier.Star(false), Sequence(Seq.empty)).canMatchEmpty, true)
-    assertEquals(Repeat(Quantifier.Plus(false), Dot()).canMatchEmpty, false)
-    assertEquals(Repeat(Quantifier.Plus(false), Sequence(Seq.empty)).canMatchEmpty, true)
-    assertEquals(Repeat(Quantifier.Question(false), Dot()).canMatchEmpty, true)
-    assertEquals(Repeat(Quantifier.Question(false), Sequence(Seq.empty)).canMatchEmpty, true)
-    assertEquals(Repeat(Quantifier.Exact(0, false), Dot()).canMatchEmpty, true)
-    assertEquals(Repeat(Quantifier.Exact(0, false), Sequence(Seq.empty)).canMatchEmpty, true)
-    assertEquals(Repeat(Quantifier.Exact(1, false), Dot()).canMatchEmpty, false)
-    assertEquals(Repeat(Quantifier.Exact(1, false), Sequence(Seq.empty)).canMatchEmpty, true)
-    assertEquals(Repeat(Quantifier.Unbounded(0, false), Dot()).canMatchEmpty, true)
-    assertEquals(Repeat(Quantifier.Unbounded(0, false), Sequence(Seq.empty)).canMatchEmpty, true)
-    assertEquals(Repeat(Quantifier.Unbounded(1, false), Dot()).canMatchEmpty, false)
-    assertEquals(Repeat(Quantifier.Unbounded(1, false), Sequence(Seq.empty)).canMatchEmpty, true)
-    assertEquals(Repeat(Quantifier.Bounded(0, 1, false), Dot()).canMatchEmpty, true)
-    assertEquals(Repeat(Quantifier.Bounded(0, 1, false), Sequence(Seq.empty)).canMatchEmpty, true)
-    assertEquals(Repeat(Quantifier.Bounded(1, 2, false), Dot()).canMatchEmpty, false)
-    assertEquals(Repeat(Quantifier.Bounded(1, 2, false), Sequence(Seq.empty)).canMatchEmpty, true)
-    assertEquals(WordBoundary(false).canMatchEmpty, true)
-    assertEquals(LineBegin().canMatchEmpty, true)
-    assertEquals(LineEnd().canMatchEmpty, true)
-    assertEquals(LookAhead(false, Dot()).canMatchEmpty, true)
-    assertEquals(LookBehind(false, Dot()).canMatchEmpty, true)
-    assertEquals(Character('a').canMatchEmpty, false)
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).canMatchEmpty, false)
-    assertEquals(UnicodeProperty(false, "L", null).canMatchEmpty, false)
-    assertEquals(UnicodePropertyValue(false, "sc", "Hira", null).canMatchEmpty, false)
-    assertEquals(CharacterClass(false, Seq(Character('a'))).canMatchEmpty, false)
-    assertEquals(Dot().canMatchEmpty, false)
-    assertEquals(BackReference(1).canMatchEmpty, true)
-    assertEquals(NamedBackReference(1, "foo").canMatchEmpty, true)
+  check("NodeOps#canMatchEmpty")(_.node.canMatchEmpty)(
+    ".." -> false,
+    "" -> true,
+    ".|." -> false,
+    "|." -> true,
+    ".|" -> true,
+    "(.)" -> false,
+    "()" -> true,
+    "(?<x>.)" -> false,
+    "(?<x>)" -> true,
+    "(?:.)" -> false,
+    ".*" -> true,
+    "(?:)*" -> true,
+    ".+" -> false,
+    "(?:)+" -> true,
+    ".?" -> true,
+    ".{0}" -> true,
+    ".{1}" -> false,
+    "(?:){1}" -> true,
+    ".{0,}" -> true,
+    ".{1,}" -> false,
+    ".{0,1}" -> true,
+    ".{1,2}" -> false,
+    "(?:){1,2}" -> true,
+    "\\b" -> true,
+    "^" -> true,
+    "$" -> true,
+    "(?=.)" -> true,
+    "(?<=.)" -> true,
+    "a" -> false,
+    "\\d" -> false,
+    "[a]" -> false,
+    "(.)\\1" -> false,
+    "(?:(.)|)\\1" -> true
+  )
+
+  check("NodeOps#canMatchEmpty", "v")(_.node.canMatchEmpty)(
+    "[\\q{ab|c}]" -> false,
+    "[\\q{ab|}]" -> true
+  )
 
   test("PatternExtensions.CaptureRange#merge"):
     assertEquals(CaptureRange(None).merge(CaptureRange(None)), CaptureRange(None))
@@ -144,418 +89,396 @@ class PatternExtensionsSuite extends munit.FunSuite:
     assertEquals(CaptureRange(None).merge(CaptureRange(Some((2, 2)))), CaptureRange(Some((2, 2))))
     assertEquals(CaptureRange(Some((1, 1))).merge(CaptureRange(Some((2, 2)))), CaptureRange(Some((1, 2))))
 
-  test("PatternExtensions.PatternOps#existsLineAssertion"):
-    val flagSet = FlagSet(false, false, false, false, false, false)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), LineBegin())), flagSet).existsLineAssertion, true)
-    assertEquals(Pattern(Disjunction(Seq(LineBegin(), Dot())), flagSet).existsLineAssertion, true)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), Dot())), flagSet).existsLineAssertion, false)
-    assertEquals(Pattern(Sequence(Seq(Dot(), LineBegin())), flagSet).existsLineAssertion, true)
-    assertEquals(Pattern(Sequence(Seq(LineBegin(), Dot())), flagSet).existsLineAssertion, true)
-    assertEquals(Pattern(Sequence(Seq(Dot(), Dot())), flagSet).existsLineAssertion, false)
-    assertEquals(Pattern(Capture(1, LineBegin()), flagSet).existsLineAssertion, true)
-    assertEquals(Pattern(Capture(1, Dot()), flagSet).existsLineAssertion, false)
-    assertEquals(Pattern(NamedCapture(1, "foo", LineBegin()), flagSet).existsLineAssertion, true)
-    assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet).existsLineAssertion, false)
-    assertEquals(Pattern(Group(LineBegin()), flagSet).existsLineAssertion, true)
-    assertEquals(Pattern(Group(Dot()), flagSet).existsLineAssertion, false)
-    assertEquals(Pattern(Repeat(Quantifier.Star(false), LineBegin()), flagSet).existsLineAssertion, true)
-    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet).existsLineAssertion, false)
-    assertEquals(Pattern(Repeat(Quantifier.Plus(false), LineBegin()), flagSet).existsLineAssertion, true)
-    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet).existsLineAssertion, false)
-    assertEquals(
-      Pattern(Repeat(Quantifier.Question(false), LineBegin()), flagSet).existsLineAssertion,
-      true
-    )
-    assertEquals(Pattern(Repeat(Quantifier.Question(false), Dot()), flagSet).existsLineAssertion, false)
-    assertEquals(
-      Pattern(Repeat(Quantifier.Exact(2, false), LineBegin()), flagSet).existsLineAssertion,
-      true
-    )
-    assertEquals(Pattern(Repeat(Quantifier.Exact(2, false), Dot()), flagSet).existsLineAssertion, false)
-    assertEquals(Pattern(LookAhead(false, LineBegin()), flagSet).existsLineAssertion, true)
-    assertEquals(Pattern(LookAhead(false, Dot()), flagSet).existsLineAssertion, false)
-    assertEquals(Pattern(LookBehind(false, LineBegin()), flagSet).existsLineAssertion, true)
-    assertEquals(Pattern(LookBehind(false, Dot()), flagSet).existsLineAssertion, false)
-    assertEquals(Pattern(LineBegin(), flagSet).existsLineAssertion, true)
-    assertEquals(Pattern(LineEnd(), flagSet).existsLineAssertion, true)
-    assertEquals(Pattern(WordBoundary(true), flagSet).existsLineAssertion, false)
-    assertEquals(Pattern(WordBoundary(false), flagSet).existsLineAssertion, false)
-    assertEquals(Pattern(Dot(), flagSet).existsLineAssertion, false)
+  check("PatternOps#existsLineAssertion")(_.existsLineAssertion)(
+    ".|^" -> true,
+    "^|." -> true,
+    ".|." -> false,
+    ".^" -> true,
+    "^." -> true,
+    ".." -> false,
+    "(^)" -> true,
+    "(.)" -> false,
+    "(?<foo>^)" -> true,
+    "(?:^)" -> true,
+    "(?:^)*" -> true,
+    ".*" -> false,
+    "(?:^)+" -> true,
+    "(?:^)?" -> true,
+    "(?:^){2}" -> true,
+    "(?=^)" -> true,
+    "(?=.)" -> false,
+    "(?<=^)" -> true,
+    "(?<=.)" -> false,
+    "^" -> true,
+    "$" -> true,
+    "\\B" -> false,
+    "\\b" -> false,
+    "." -> false
+  )
 
-  test("PatternExtensions.PatternOps#existsLineAssertionInMiddle"):
-    val flagSet = FlagSet(false, false, false, false, false, false)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), LineBegin())), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(Disjunction(Seq(LineBegin(), Dot())), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), LineEnd())), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(Disjunction(Seq(LineEnd(), Dot())), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), Dot())), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(Sequence(Seq(Dot(), LineBegin())), flagSet).existsLineAssertionInMiddle, true)
-    assertEquals(Pattern(Sequence(Seq(LineBegin(), Dot())), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(Sequence(Seq(Dot(), LineEnd())), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(Sequence(Seq(LineEnd(), Dot())), flagSet).existsLineAssertionInMiddle, true)
-    assertEquals(Pattern(Sequence(Seq(Dot(), Dot())), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(Capture(1, LineBegin()), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(Capture(1, LineEnd()), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(Capture(1, Dot()), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(NamedCapture(1, "foo", LineBegin()), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(NamedCapture(1, "foo", LineEnd()), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(Group(LineBegin()), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(Group(LineEnd()), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(Group(Dot()), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(Repeat(Quantifier.Star(false), LineBegin()), flagSet).existsLineAssertionInMiddle, true)
-    assertEquals(Pattern(Repeat(Quantifier.Star(false), LineEnd()), flagSet).existsLineAssertionInMiddle, true)
-    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(Repeat(Quantifier.Plus(false), LineBegin()), flagSet).existsLineAssertionInMiddle, true)
-    assertEquals(Pattern(Repeat(Quantifier.Plus(false), LineEnd()), flagSet).existsLineAssertionInMiddle, true)
-    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(LookAhead(false, LineBegin()), flagSet).existsLineAssertionInMiddle, true)
-    assertEquals(Pattern(LookAhead(false, LineEnd()), flagSet).existsLineAssertionInMiddle, true)
-    assertEquals(Pattern(LookAhead(false, Dot()), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(LookBehind(false, LineBegin()), flagSet).existsLineAssertionInMiddle, true)
-    assertEquals(Pattern(LookBehind(false, LineEnd()), flagSet).existsLineAssertionInMiddle, true)
-    assertEquals(Pattern(LookBehind(false, Dot()), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(LineBegin(), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(LineEnd(), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(WordBoundary(true), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(WordBoundary(false), flagSet).existsLineAssertionInMiddle, false)
-    assertEquals(Pattern(Dot(), flagSet).existsLineAssertionInMiddle, false)
+  check("PatternOps#existsLineAssertion", dialect = Dialect.Python)(_.existsLineAssertion)(
+    "\\A" -> true,
+    "\\Z" -> true,
+    "$" -> true,
+    "(?>^)" -> true
+  )
 
-  test("PatternExtensions.PatternOps#everyBeginPointIsLineBegin"):
-    val flagSet = FlagSet(false, false, false, false, false, false)
-    assertEquals(Pattern(Disjunction(Seq(LineBegin(), LineBegin())), flagSet).everyBeginPointIsLineBegin, true)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), LineBegin())), flagSet).everyBeginPointIsLineBegin, false)
-    assertEquals(Pattern(Disjunction(Seq(LineBegin(), Dot())), flagSet).everyBeginPointIsLineBegin, false)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), Dot())), flagSet).everyBeginPointIsLineBegin, false)
-    assertEquals(Pattern(Sequence(Seq(Dot(), LineBegin())), flagSet).everyBeginPointIsLineBegin, false)
-    assertEquals(Pattern(Sequence(Seq(LineBegin(), Dot())), flagSet).everyBeginPointIsLineBegin, true)
-    assertEquals(Pattern(Sequence(Seq(Dot(), Dot())), flagSet).everyBeginPointIsLineBegin, false)
-    assertEquals(Pattern(Capture(1, LineBegin()), flagSet).everyBeginPointIsLineBegin, true)
-    assertEquals(Pattern(Capture(1, Dot()), flagSet).everyBeginPointIsLineBegin, false)
-    assertEquals(Pattern(NamedCapture(1, "foo", LineBegin()), flagSet).everyBeginPointIsLineBegin, true)
-    assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet).everyBeginPointIsLineBegin, false)
-    assertEquals(Pattern(Group(LineBegin()), flagSet).everyBeginPointIsLineBegin, true)
-    assertEquals(Pattern(Group(Dot()), flagSet).everyBeginPointIsLineBegin, false)
-    assertEquals(Pattern(LineBegin(), flagSet).everyBeginPointIsLineBegin, true)
-    assertEquals(Pattern(LineEnd(), flagSet).everyBeginPointIsLineBegin, false)
-    assertEquals(Pattern(Dot(), flagSet).everyBeginPointIsLineBegin, false)
+  check("PatternOps#existsLineAssertionInMiddle")(_.existsLineAssertionInMiddle)(
+    ".|^" -> false,
+    "^|." -> false,
+    ".|$" -> false,
+    "$|." -> false,
+    ".|." -> false,
+    ".^" -> true,
+    "^." -> false,
+    ".$" -> false,
+    "$." -> true,
+    ".." -> false,
+    "(^)" -> false,
+    "($)" -> false,
+    "(?<foo>^)" -> false,
+    "(?:$)" -> false,
+    "(?:^)*" -> true,
+    "(?:$)*" -> true,
+    ".*" -> false,
+    "(?:^)+" -> true,
+    "(?=^)" -> true,
+    "(?=$)" -> true,
+    "(?=.)" -> false,
+    "(?<=^)" -> true,
+    "(?<=$)" -> true,
+    "^" -> false,
+    "$" -> false,
+    "\\b" -> false,
+    "." -> false
+  )
 
-  test("PatternExtensions.PatternOps#everyBeginPointIsNotLineBegin"):
-    val flagSet = FlagSet(false, false, false, false, false, false)
-    assertEquals(Pattern(Disjunction(Seq(LineBegin(), LineBegin())), flagSet).everyBeginPointIsNotLineBegin, false)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), LineBegin())), flagSet).everyBeginPointIsNotLineBegin, false)
-    assertEquals(Pattern(Disjunction(Seq(LineBegin(), Dot())), flagSet).everyBeginPointIsNotLineBegin, false)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), Dot())), flagSet).everyBeginPointIsNotLineBegin, true)
-    assertEquals(Pattern(Sequence(Seq(Dot(), LineBegin())), flagSet).everyBeginPointIsNotLineBegin, true)
-    assertEquals(Pattern(Sequence(Seq(LineBegin(), Dot())), flagSet).everyBeginPointIsNotLineBegin, false)
-    assertEquals(Pattern(Sequence(Seq(Dot(), Dot())), flagSet).everyBeginPointIsNotLineBegin, true)
-    assertEquals(Pattern(Capture(1, LineBegin()), flagSet).everyBeginPointIsNotLineBegin, false)
-    assertEquals(Pattern(Capture(1, Dot()), flagSet).everyBeginPointIsNotLineBegin, true)
-    assertEquals(Pattern(NamedCapture(1, "foo", LineBegin()), flagSet).everyBeginPointIsNotLineBegin, false)
-    assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet).everyBeginPointIsNotLineBegin, true)
-    assertEquals(Pattern(Group(LineBegin()), flagSet).everyBeginPointIsNotLineBegin, false)
-    assertEquals(Pattern(Group(Dot()), flagSet).everyBeginPointIsNotLineBegin, true)
-    assertEquals(Pattern(LineBegin(), flagSet).everyBeginPointIsNotLineBegin, false)
-    assertEquals(Pattern(LineEnd(), flagSet).everyBeginPointIsNotLineBegin, true)
-    assertEquals(Pattern(Dot(), flagSet).everyBeginPointIsNotLineBegin, true)
+  check("PatternOps#existsLineAssertionInMiddle", dialect = Dialect.Java)(_.existsLineAssertionInMiddle)(
+    "(?>^a)" -> false,
+    "a(?>^)" -> true,
+    "a\\Z" -> false,
+    "\\Za" -> true
+  )
 
-  test("PatternExtensions.PatternOps#everyEndPointIsLineEnd"):
-    val flagSet = FlagSet(false, false, false, false, false, false)
-    assertEquals(Pattern(Disjunction(Seq(LineEnd(), LineEnd())), flagSet).everyEndPointIsLineEnd, true)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), LineEnd())), flagSet).everyEndPointIsLineEnd, false)
-    assertEquals(Pattern(Disjunction(Seq(LineEnd(), Dot())), flagSet).everyEndPointIsLineEnd, false)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), Dot())), flagSet).everyEndPointIsLineEnd, false)
-    assertEquals(Pattern(Sequence(Seq(Dot(), LineEnd())), flagSet).everyEndPointIsLineEnd, true)
-    assertEquals(Pattern(Sequence(Seq(LineEnd(), Dot())), flagSet).everyEndPointIsLineEnd, false)
-    assertEquals(Pattern(Sequence(Seq(Dot(), Dot())), flagSet).everyEndPointIsLineEnd, false)
-    assertEquals(Pattern(Capture(1, LineEnd()), flagSet).everyEndPointIsLineEnd, true)
-    assertEquals(Pattern(Capture(1, Dot()), flagSet).everyEndPointIsLineEnd, false)
-    assertEquals(Pattern(NamedCapture(1, "foo", LineEnd()), flagSet).everyEndPointIsLineEnd, true)
-    assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet).everyEndPointIsLineEnd, false)
-    assertEquals(Pattern(Group(LineEnd()), flagSet).everyEndPointIsLineEnd, true)
-    assertEquals(Pattern(Group(Dot()), flagSet).everyEndPointIsLineEnd, false)
-    assertEquals(Pattern(LineBegin(), flagSet).everyEndPointIsLineEnd, false)
-    assertEquals(Pattern(LineEnd(), flagSet).everyEndPointIsLineEnd, true)
-    assertEquals(Pattern(Dot(), flagSet).everyEndPointIsLineEnd, false)
+  check("PatternOps#everyBeginPointIsLineBegin")(_.everyBeginPointIsLineBegin)(
+    "^|^" -> true,
+    ".|^" -> false,
+    "^|." -> false,
+    ".|." -> false,
+    ".^" -> false,
+    "^." -> true,
+    ".." -> false,
+    "(^)" -> true,
+    "(.)" -> false,
+    "(?<foo>^)" -> true,
+    "(?:^)" -> true,
+    "^" -> true,
+    "$" -> false,
+    "." -> false
+  )
 
-  test("PatternExtensions.PatternOps#everyEndPointIsNotLineEnd"):
-    val flagSet = FlagSet(false, false, false, false, false, false)
-    assertEquals(Pattern(Disjunction(Seq(LineEnd(), LineEnd())), flagSet).everyEndPointIsNotLineEnd, false)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), LineEnd())), flagSet).everyEndPointIsNotLineEnd, false)
-    assertEquals(Pattern(Disjunction(Seq(LineEnd(), Dot())), flagSet).everyEndPointIsNotLineEnd, false)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), Dot())), flagSet).everyEndPointIsNotLineEnd, true)
-    assertEquals(Pattern(Sequence(Seq(Dot(), LineEnd())), flagSet).everyEndPointIsNotLineEnd, false)
-    assertEquals(Pattern(Sequence(Seq(LineEnd(), Dot())), flagSet).everyEndPointIsNotLineEnd, true)
-    assertEquals(Pattern(Sequence(Seq(Dot(), Dot())), flagSet).everyEndPointIsNotLineEnd, true)
-    assertEquals(Pattern(Capture(1, LineEnd()), flagSet).everyEndPointIsNotLineEnd, false)
-    assertEquals(Pattern(Capture(1, Dot()), flagSet).everyEndPointIsNotLineEnd, true)
-    assertEquals(Pattern(NamedCapture(1, "foo", LineEnd()), flagSet).everyEndPointIsNotLineEnd, false)
-    assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet).everyEndPointIsNotLineEnd, true)
-    assertEquals(Pattern(Group(LineEnd()), flagSet).everyEndPointIsNotLineEnd, false)
-    assertEquals(Pattern(Group(Dot()), flagSet).everyEndPointIsNotLineEnd, true)
-    assertEquals(Pattern(LineBegin(), flagSet).everyEndPointIsNotLineEnd, true)
-    assertEquals(Pattern(LineEnd(), flagSet).everyEndPointIsNotLineEnd, false)
-    assertEquals(Pattern(Dot(), flagSet).everyEndPointIsNotLineEnd, true)
+  check("PatternOps#everyBeginPointIsNotLineBegin")(_.everyBeginPointIsNotLineBegin)(
+    "^|^" -> false,
+    ".|^" -> false,
+    "^|." -> false,
+    ".|." -> true,
+    ".^" -> true,
+    "^." -> false,
+    ".." -> true,
+    "(^)" -> false,
+    "(.)" -> true,
+    "(?<foo>^)" -> false,
+    "(?:.)" -> true,
+    "^" -> false,
+    "$" -> true,
+    "." -> true
+  )
 
-  test("PatternExtensions.PatternOps#isConstant"):
-    val flagSet = FlagSet(false, false, false, false, false, false)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), Dot())), flagSet).isConstant, true)
-    assertEquals(Pattern(Disjunction(Seq(Repeat(Quantifier.Star(false), Dot()), Dot())), flagSet).isConstant, false)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), Repeat(Quantifier.Star(false), Dot()))), flagSet).isConstant, false)
-    assertEquals(Pattern(Sequence(Seq(Dot(), Dot())), flagSet).isConstant, true)
-    assertEquals(Pattern(Sequence(Seq(Repeat(Quantifier.Star(false), Dot()), Dot())), flagSet).isConstant, false)
-    assertEquals(Pattern(Sequence(Seq(Dot(), Repeat(Quantifier.Star(false), Dot()))), flagSet).isConstant, false)
-    assertEquals(Pattern(Capture(1, Dot()), flagSet).isConstant, true)
-    assertEquals(Pattern(Capture(1, Repeat(Quantifier.Star(false), Dot())), flagSet).isConstant, false)
-    assertEquals(Pattern(NamedCapture(1, "x", Dot()), flagSet).isConstant, true)
-    assertEquals(Pattern(NamedCapture(1, "x", Repeat(Quantifier.Star(false), Dot())), flagSet).isConstant, false)
-    assertEquals(Pattern(Group(Dot()), flagSet).isConstant, true)
-    assertEquals(Pattern(Group(Repeat(Quantifier.Star(false), Dot())), flagSet).isConstant, false)
-    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet).isConstant, false)
-    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet).isConstant, false)
-    assertEquals(Pattern(Repeat(Quantifier.Question(false), Dot()), flagSet).isConstant, true)
-    assertEquals(Pattern(Repeat(Quantifier.Exact(1, false), Dot()), flagSet).isConstant, true)
-    assertEquals(Pattern(Repeat(Quantifier.Unbounded(1, false), Dot()), flagSet).isConstant, false)
-    assertEquals(Pattern(Repeat(Quantifier.Bounded(1, 2, false), Dot()), flagSet).isConstant, true)
-    assertEquals(Pattern(LookAhead(false, Dot()), flagSet).isConstant, true)
-    assertEquals(Pattern(LookAhead(false, Repeat(Quantifier.Star(false), Dot())), flagSet).isConstant, false)
-    assertEquals(Pattern(LookBehind(false, Dot()), flagSet).isConstant, true)
-    assertEquals(Pattern(LookBehind(false, Repeat(Quantifier.Star(false), Dot())), flagSet).isConstant, false)
+  check("PatternOps#everyEndPointIsLineEnd")(_.everyEndPointIsLineEnd)(
+    "$|$" -> true,
+    ".|$" -> false,
+    "$|." -> false,
+    ".|." -> false,
+    ".$" -> true,
+    "$." -> false,
+    ".." -> false,
+    "($)" -> true,
+    "(.)" -> false,
+    "(?<foo>$)" -> true,
+    "(?:$)" -> true,
+    "^" -> false,
+    "$" -> true,
+    "." -> false
+  )
 
-  test("PatternExtensions.PatternOps#size"):
-    val flagSet = FlagSet(false, false, false, false, false, false)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), Dot())), flagSet).size, 3)
-    assertEquals(Pattern(Sequence(Seq(Dot(), Dot())), flagSet).size, 2)
-    assertEquals(Pattern(Capture(1, Dot()), flagSet).size, 1)
-    assertEquals(Pattern(NamedCapture(1, "x", Dot()), flagSet).size, 1)
-    assertEquals(Pattern(Group(Dot()), flagSet).size, 1)
-    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet).size, 2)
-    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet).size, 2)
-    assertEquals(Pattern(Repeat(Quantifier.Question(false), Dot()), flagSet).size, 2)
-    assertEquals(Pattern(Repeat(Quantifier.Exact(2, false), Dot()), flagSet).size, 2)
-    assertEquals(Pattern(Repeat(Quantifier.Unbounded(2, false), Dot()), flagSet).size, 4)
-    assertEquals(Pattern(Repeat(Quantifier.Bounded(2, 3, false), Dot()), flagSet).size, 4)
-    assertEquals(Pattern(LookAhead(false, Dot()), flagSet).size, 2)
-    assertEquals(Pattern(LookBehind(false, Dot()), flagSet).size, 2)
-    assertEquals(Pattern(Dot(), flagSet).size, 1)
+  check("PatternOps#everyEndPointIsNotLineEnd")(_.everyEndPointIsNotLineEnd)(
+    "$|$" -> false,
+    ".|$" -> false,
+    "$|." -> false,
+    ".|." -> true,
+    ".$" -> false,
+    "$." -> true,
+    ".." -> true,
+    "($)" -> false,
+    "(.)" -> true,
+    "(?<foo>$)" -> false,
+    "(?:.)" -> true,
+    "^" -> true,
+    "$" -> false,
+    "." -> true
+  )
+
+  check("PatternOps#isConstant")(_.isConstant)(
+    ".|." -> true,
+    ".*|." -> false,
+    ".|.*" -> false,
+    ".." -> true,
+    ".*." -> false,
+    "..*" -> false,
+    "(.)" -> true,
+    "(.*)" -> false,
+    "(?<x>.)" -> true,
+    "(?<x>.*)" -> false,
+    "(?:.)" -> true,
+    "(?:.*)" -> false,
+    ".*" -> false,
+    ".+" -> false,
+    ".?" -> true,
+    ".{1}" -> true,
+    ".{1,}" -> false,
+    ".{1,2}" -> true,
+    "(?=.)" -> true,
+    "(?=.*)" -> false,
+    "(?<=.)" -> true,
+    "(?<=.*)" -> false,
+    "(.)\\1" -> true
+  )
+
+  check("PatternOps#isConstant", dialect = Dialect.Ruby)(_.isConstant)(
+    "(?>a)" -> true,
+    "(?>a+)" -> false,
+    "a++" -> false,
+    // An unsupported node may repeat infinitely (e.g. a recursion).
+    "(?~a)" -> false
+  )
+
+  check("PatternOps#size")(_.size)(
+    ".|." -> 3,
+    ".." -> 2,
+    "(.)" -> 1,
+    "(?<x>.)" -> 1,
+    "(?:.)" -> 1,
+    "" -> 0,
+    ".*" -> 2,
+    ".+" -> 2,
+    ".?" -> 2,
+    ".{2}" -> 2,
+    ".{0,}" -> 2,
+    ".{1,}" -> 3,
+    ".{2,}" -> 4,
+    ".{0,1}" -> 2,
+    ".{2,3}" -> 4,
+    "(?=.)" -> 2,
+    "(?<=.)" -> 2,
+    "." -> 1
+  )
+
+  check("PatternOps#size", dialect = Dialect.Java)(_.size)(
+    "(?>..)" -> 2,
+    ".*+" -> 2,
+    ".{1,}+" -> 3,
+    ".++" -> 2
+  )
+
+  check("PatternOps#repeatCount")(_.repeatCount)(
+    ".*" -> 0,
+    ".+" -> 0,
+    ".?" -> 0,
+    ".{2}" -> 2,
+    ".{2,2}" -> 2,
+    ".{0,}" -> 0,
+    ".{1,}" -> 1,
+    ".{0,1}" -> 1,
+    ".{2,3}" -> 3,
+    "(?:.{2}){3}" -> 5,
+    "(?=.{2})|.{3}" -> 5,
+    "(?:.{5,})*" -> 5,
+    "(?:.{5,}){10}" -> 15,
+    "(?<x>.{5,})?" -> 5,
+    "(?<=.{4,6})" -> 6,
+    "\\{2}" -> 0
+  )
 
   test("PatternExtensions.PatternOps#alphabet"):
-    val flagSet0 = FlagSet(false, false, false, false, false, false)
-    val flagSet1 = FlagSet(false, false, true, false, false, false)
-    val flagSet2 = FlagSet(false, false, false, true, false, false)
-    val flagSet3 = FlagSet(false, true, false, false, false, false)
-    val flagSet4 = FlagSet(false, true, false, false, true, false)
-    val word = EcmaScriptChars.Word
-    val lineTerminator = EcmaScriptChars.LineTerminator
-    val dot16 = EcmaScriptChars.any(false).diff(EcmaScriptChars.LineTerminator)
-    val dot = EcmaScriptChars.any(true).diff(EcmaScriptChars.LineTerminator)
-    assertEquals(Pattern(Sequence(Seq.empty), flagSet0).alphabet, PatternAlphabet.build(false, false))
-    assertEquals(Pattern(Dot(), flagSet0).alphabet, PatternAlphabet.build(false, false, Seq(dot16)))
+    val word = CharSet.fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))
+    val lineTerminator = CharSet.of(0x0a, 0x0d, 0x2028, 0x2029)
+    val dot16 = UnitMode.Utf16.universe.diff(lineTerminator)
+    val dot = UnitMode.CodePoint.universe.diff(lineTerminator)
+    val utf16 = UnitMode.Utf16
+    val canonical16 = EcmaScriptChars.canonicalize(utf16.universe, false)
+    assertEquals(parse("").alphabet, PatternAlphabet.build(utf16))
+    assertEquals(parse(".").alphabet, PatternAlphabet.build(utf16, Seq(dot16)))
+    assertEquals(parse(".", "u").alphabet, PatternAlphabet.build(UnitMode.CodePoint, Seq(dot)))
     assertEquals(
-      Pattern(Disjunction(Seq(Character('A'), Character('Z'))), flagSet0).alphabet,
-      PatternAlphabet.build(false, false, Seq(CharSet.single('A'), CharSet.single('Z')))
+      parse("A|Z").alphabet,
+      PatternAlphabet.build(utf16, Seq(CharSet.single('A'), CharSet.single('Z')))
     )
+    // A negated class takes part in the order as its positive set.
+    assertEquals(parse("[^a]").alphabet, PatternAlphabet.build(utf16, Seq(CharSet.single('a'))))
+    assertEquals(parse("\\b").alphabet, PatternAlphabet.build(utf16, word = Some(word)))
+    assertEquals(parse("^", "m").alphabet, PatternAlphabet.build(utf16, lineTerminator = Some(lineTerminator)))
     assertEquals(
-      Pattern(WordBoundary(false), flagSet0).alphabet,
-      PatternAlphabet.build(false, false, word = Some(word))
+      parse("^\\b", "m").alphabet,
+      PatternAlphabet.build(utf16, lineTerminator = Some(lineTerminator), word = Some(word))
     )
+    for source <- Seq("(.)", "(?<foo>.)", "(?:.)", ".*", ".+", ".?", ".{2}", "(?=.)", "(?<=.)", ".") do
+      assertEquals(parse(source, "s").alphabet, PatternAlphabet.build(utf16), source)
+    assertEquals(parse("", "i").alphabet, PatternAlphabet.build(utf16, preferred = Some(canonical16)))
     assertEquals(
-      Pattern(LineBegin(), flagSet1).alphabet,
-      PatternAlphabet.build(false, false, lineTerminator = Some(lineTerminator))
+      parse("a|z", "i").alphabet,
+      PatternAlphabet.build(utf16, Seq(CharSet.of('A', 'a'), CharSet.of('Z', 'z')), preferred = Some(canonical16))
     )
-    assertEquals(
-      Pattern(Sequence(Seq(LineBegin(), WordBoundary(false))), flagSet1).alphabet,
-      PatternAlphabet.build(false, false, lineTerminator = Some(lineTerminator), word = Some(word))
-    )
-    assertEquals(Pattern(Capture(1, Dot()), flagSet2).alphabet, PatternAlphabet.build(false, false))
-    assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet2).alphabet, PatternAlphabet.build(false, false))
-    assertEquals(Pattern(Group(Dot()), flagSet2).alphabet, PatternAlphabet.build(false, false))
-    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet2).alphabet, PatternAlphabet.build(false, false))
-    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet2).alphabet, PatternAlphabet.build(false, false))
-    assertEquals(
-      Pattern(Repeat(Quantifier.Question(false), Dot()), flagSet2).alphabet,
-      PatternAlphabet.build(false, false)
-    )
-    assertEquals(
-      Pattern(Repeat(Quantifier.Exact(2, false), Dot()), flagSet2).alphabet,
-      PatternAlphabet.build(false, false)
-    )
-    assertEquals(Pattern(LookAhead(false, Dot()), flagSet2).alphabet, PatternAlphabet.build(false, false))
-    assertEquals(Pattern(LookBehind(false, Dot()), flagSet2).alphabet, PatternAlphabet.build(false, false))
-    assertEquals(Pattern(Dot(), flagSet2).alphabet, PatternAlphabet.build(false, false))
-    assertEquals(Pattern(Sequence(Seq.empty), flagSet3).alphabet, PatternAlphabet.build(true, false))
-    assertEquals(
-      Pattern(Dot(), flagSet3).alphabet,
-      PatternAlphabet.build(true, false, Seq(EcmaScriptChars.canonicalize(dot16, false)))
-    )
-    assertEquals(
-      Pattern(Disjunction(Seq(Character('A'), Character('Z'))), flagSet3).alphabet,
-      PatternAlphabet.build(true, false, Seq(CharSet.single('A'), CharSet.single('Z')))
-    )
-    assertEquals(Pattern(Sequence(Seq.empty), flagSet4).alphabet, PatternAlphabet.build(true, true))
-    assertEquals(
-      Pattern(Dot(), flagSet4).alphabet,
-      PatternAlphabet.build(true, true, Seq(EcmaScriptChars.canonicalize(dot, true)))
-    )
+    // An atom stands for its canonical character.
+    assertEquals(parse("a", "i").alphabet.pairs.map(_._1.head), Vector('A'.toInt, 0))
+    assertEquals(parse("A", "iu").alphabet.pairs.map(_._1.head), Vector('a'.toInt, 0))
 
-  test("PatternExtensions.PatternOps#needsLineTerminatorDistinction"):
-    val flagSet0 = FlagSet(false, false, true, false, false, false)
-    val flagSet1 = FlagSet(false, false, false, false, false, false)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), LineBegin())), flagSet0).needsLineTerminatorDistinction, true)
-    assertEquals(Pattern(Disjunction(Seq(LineBegin(), Dot())), flagSet0).needsLineTerminatorDistinction, true)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), Dot())), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(Pattern(Sequence(Seq(Dot(), LineBegin())), flagSet0).needsLineTerminatorDistinction, true)
-    assertEquals(Pattern(Sequence(Seq(LineBegin(), Dot())), flagSet0).needsLineTerminatorDistinction, true)
-    assertEquals(Pattern(Sequence(Seq(Dot(), Dot())), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(Pattern(Capture(1, LineBegin()), flagSet0).needsLineTerminatorDistinction, true)
-    assertEquals(Pattern(Capture(1, Dot()), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(Pattern(NamedCapture(1, "foo", LineBegin()), flagSet0).needsLineTerminatorDistinction, true)
-    assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(Pattern(Group(LineBegin()), flagSet0).needsLineTerminatorDistinction, true)
-    assertEquals(Pattern(Group(Dot()), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(Pattern(Repeat(Quantifier.Star(false), LineBegin()), flagSet0).needsLineTerminatorDistinction, true)
-    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(Pattern(Repeat(Quantifier.Plus(false), LineBegin()), flagSet0).needsLineTerminatorDistinction, true)
-    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(
-      Pattern(Repeat(Quantifier.Question(false), LineBegin()), flagSet0).needsLineTerminatorDistinction,
-      true
-    )
-    assertEquals(Pattern(Repeat(Quantifier.Question(false), Dot()), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(
-      Pattern(Repeat(Quantifier.Exact(2, false), LineBegin()), flagSet0).needsLineTerminatorDistinction,
-      true
-    )
-    assertEquals(Pattern(Repeat(Quantifier.Exact(2, false), Dot()), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(Pattern(LookAhead(false, LineBegin()), flagSet0).needsLineTerminatorDistinction, true)
-    assertEquals(Pattern(LookAhead(false, Dot()), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(Pattern(LookBehind(false, LineBegin()), flagSet0).needsLineTerminatorDistinction, true)
-    assertEquals(Pattern(LookBehind(false, Dot()), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(Pattern(LineBegin(), flagSet0).needsLineTerminatorDistinction, true)
-    assertEquals(Pattern(LineEnd(), flagSet0).needsLineTerminatorDistinction, true)
-    assertEquals(Pattern(WordBoundary(true), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(Pattern(WordBoundary(false), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(Pattern(Dot(), flagSet0).needsLineTerminatorDistinction, false)
-    assertEquals(Pattern(LineBegin(), flagSet1).needsLineTerminatorDistinction, false)
+  test("PatternExtensions.PatternOps#alphabet: other dialects"):
+    val alphabet = parse("^a$", "m", Dialect.Python).alphabet
+    assertEquals(alphabet.refine(CharSet.single(0x0a)).map(_._2), Set(PatternAlphabet.CharKind.LineTerminator))
+    assertEquals(parse("a", "i", Dialect.PCRE).alphabet.pairs.map(_._1.head), Vector('A'.toInt, 0))
+    // Bytes are in the alphabet in byte mode.
+    assertEquals(parse("\\xff", "", Dialect.PCRE).alphabet.any.map(_._1).flatMap(_.iterator).max, 0xff)
+    // The line terminators of `$` before a final line terminator are distinguished.
+    assert(parse("a$", "", Dialect.Python).alphabet.pairs.exists(_._1 == CharSet.single(0x0a)))
 
-  test("PatternExtension.PatternOps#needsInputTerminatorDistinction"):
-    val flagSet0 = FlagSet(false, false, true, false, false, false)
-    val flagSet1 = FlagSet(false, false, false, false, false, false)
-    assertEquals(Pattern(LineBegin(), flagSet0).needsInputTerminatorDistinction, true)
-    assertEquals(Pattern(LineEnd(), flagSet0).needsInputTerminatorDistinction, true)
-    assertEquals(Pattern(Dot(), flagSet0).needsInputTerminatorDistinction, false)
-    assertEquals(Pattern(Dot(), flagSet1).needsInputTerminatorDistinction, false)
-    assertEquals(Pattern(Sequence(Seq(Dot(), LineBegin())), flagSet1).needsInputTerminatorDistinction, true)
-    assertEquals(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet1).needsInputTerminatorDistinction, false)
-    assertEquals(Pattern(Sequence(Seq(LineBegin(), Dot())), flagSet1).needsInputTerminatorDistinction, false)
-    assertEquals(Pattern(Sequence(Seq(Dot(), LineEnd())), flagSet1).needsInputTerminatorDistinction, false)
-    assertEquals(Pattern(Disjunction(Seq(LineBegin(), Dot())), flagSet1).needsInputTerminatorDistinction, true)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), LineEnd())), flagSet1).needsInputTerminatorDistinction, true)
+  check("PatternOps#needsLineTerminatorDistinction", "m")(_.needsLineTerminatorDistinction)(
+    ".|^" -> true,
+    "^|." -> true,
+    ".|." -> false,
+    ".^" -> true,
+    "(^)" -> true,
+    "(.)" -> false,
+    "(?<foo>^)" -> true,
+    "(?:^)*" -> true,
+    "(?:^){2}" -> true,
+    "(?=^)" -> true,
+    "(?<=^)" -> true,
+    "(?<=.)" -> false,
+    "^" -> true,
+    "$" -> true,
+    "\\B" -> false,
+    "\\b" -> false,
+    "." -> false
+  )
 
-  test("PatternExtensions.PatternOps#needsWordDistinction"):
-    val flagSet = FlagSet(false, false, false, false, false, false)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), WordBoundary(false))), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(Disjunction(Seq(WordBoundary(false), Dot())), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(Disjunction(Seq(Dot(), Dot())), flagSet).needsWordDistinction, false)
-    assertEquals(Pattern(Sequence(Seq(Dot(), WordBoundary(false))), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(Sequence(Seq(WordBoundary(false), Dot())), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(Sequence(Seq(Dot(), Dot())), flagSet).needsWordDistinction, false)
-    assertEquals(Pattern(Capture(1, WordBoundary(false)), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(Capture(1, Dot()), flagSet).needsWordDistinction, false)
-    assertEquals(Pattern(NamedCapture(1, "foo", WordBoundary(false)), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet).needsWordDistinction, false)
-    assertEquals(Pattern(Group(WordBoundary(false)), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(Group(Dot()), flagSet).needsWordDistinction, false)
-    assertEquals(Pattern(Repeat(Quantifier.Star(false), WordBoundary(false)), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet).needsWordDistinction, false)
-    assertEquals(Pattern(Repeat(Quantifier.Plus(false), WordBoundary(false)), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet).needsWordDistinction, false)
-    assertEquals(Pattern(Repeat(Quantifier.Question(false), WordBoundary(false)), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(Repeat(Quantifier.Question(false), Dot()), flagSet).needsWordDistinction, false)
-    assertEquals(Pattern(Repeat(Quantifier.Exact(2, false), WordBoundary(false)), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(Repeat(Quantifier.Exact(2, false), Dot()), flagSet).needsWordDistinction, false)
-    assertEquals(Pattern(LookAhead(false, WordBoundary(false)), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(LookAhead(false, Dot()), flagSet).needsWordDistinction, false)
-    assertEquals(Pattern(LookBehind(false, WordBoundary(false)), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(LookBehind(false, Dot()), flagSet).needsWordDistinction, false)
-    assertEquals(Pattern(WordBoundary(true), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(WordBoundary(false), flagSet).needsWordDistinction, true)
-    assertEquals(Pattern(LineBegin(), flagSet).needsWordDistinction, false)
-    assertEquals(Pattern(LineEnd(), flagSet).needsWordDistinction, false)
-    assertEquals(Pattern(Dot(), flagSet).needsWordDistinction, false)
+  check("PatternOps#needsLineTerminatorDistinction")(_.needsLineTerminatorDistinction)("^" -> false)
 
-  test("PatternExtension.PatternOps#needsSigmaStarAtBegin"):
-    val flagSet0 = FlagSet(false, false, true, false, false, false)
-    val flagSet1 = FlagSet(false, false, false, false, false, false)
-    val flagSet2 = FlagSet(false, false, false, false, false, true)
-    assertEquals(Pattern(Dot(), flagSet0).needsSigmaStarAtBegin, true)
-    assertEquals(Pattern(LineBegin(), flagSet0).needsSigmaStarAtBegin, true)
-    assertEquals(Pattern(Dot(), flagSet1).needsSigmaStarAtBegin, true)
-    assertEquals(Pattern(LineBegin(), flagSet1).needsSigmaStarAtBegin, false)
-    assertEquals(Pattern(Dot(), flagSet2).needsSigmaStarAtBegin, false)
+  check("PatternOps#needsInputTerminatorDistinction", "m")(_.needsInputTerminatorDistinction)(
+    "^" -> true,
+    "$" -> true,
+    "." -> false
+  )
 
-  test("PatternExtension.PatternOps#needsSigmaStarAtEnd"):
-    val flagSet0 = FlagSet(false, false, true, false, false, false)
-    val flagSet1 = FlagSet(false, false, false, false, false, false)
-    val flagSet2 = FlagSet(false, false, false, false, false, true)
-    assertEquals(Pattern(Dot(), flagSet0).needsSigmaStarAtEnd, true)
-    assertEquals(Pattern(LineEnd(), flagSet0).needsSigmaStarAtEnd, true)
-    assertEquals(Pattern(Dot(), flagSet1).needsSigmaStarAtEnd, true)
-    assertEquals(Pattern(LineEnd(), flagSet1).needsSigmaStarAtEnd, false)
-    assertEquals(Pattern(Dot(), flagSet2).needsSigmaStarAtEnd, true)
-    assertEquals(Pattern(LineEnd(), flagSet2).needsSigmaStarAtEnd, false)
+  check("PatternOps#needsInputTerminatorDistinction")(_.needsInputTerminatorDistinction)(
+    "." -> false,
+    ".^" -> true,
+    "^.$" -> false,
+    "^." -> false,
+    ".$" -> false,
+    "^|." -> true,
+    ".|$" -> true
+  )
 
-  test("PatternExtensions.PatternOps#parts"):
-    val flagSet = FlagSet(false, false, false, false, false, false)
-    val seq = Sequence(Seq(Character('x'), Character('y'), Character('z')))
-    assertEquals(
-      Pattern(Sequence(Seq(Character('x'), Character('y'), Character('z'), Dot(), Character('0'))), flagSet).parts,
-      Set(UStringUtil.fromString("xyz"))
-    )
-    assertEquals(
-      Pattern(
-        Sequence(Seq(Character('x'), Character('y'), Character('z'), Dot(), Character('0'))),
-        flagSet.copy(ignoreCase = true)
-      ).parts,
-      Set(UStringUtil.fromString("XYZ"))
-    )
-    assertEquals(Pattern(Sequence(Seq(seq)), flagSet).parts, Set(UStringUtil.fromString("xyz")))
-    assertEquals(Pattern(Disjunction(Seq(seq, Dot())), flagSet).parts, Set(UStringUtil.fromString("xyz")))
-    assertEquals(Pattern(Capture(1, seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
-    assertEquals(Pattern(NamedCapture(1, "x", seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
-    assertEquals(Pattern(Group(seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
-    assertEquals(Pattern(Repeat(Quantifier.Star(false), seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
-    assertEquals(Pattern(Repeat(Quantifier.Plus(false), seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
-    assertEquals(Pattern(Repeat(Quantifier.Question(false), seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
-    assertEquals(Pattern(Repeat(Quantifier.Exact(2, false), seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
-    assertEquals(Pattern(LookAhead(false, seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
-    assertEquals(Pattern(LookBehind(false, seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
-    assertEquals(Pattern(Dot(), flagSet).parts, Set.empty[UString])
-    assertEquals(Pattern(Character('x'), flagSet).parts, Set.empty[UString])
+  check("PatternOps#needsWordDistinction")(_.needsWordDistinction)(
+    ".|\\b" -> true,
+    "\\b|." -> true,
+    ".|." -> false,
+    ".\\b" -> true,
+    "\\b." -> true,
+    ".." -> false,
+    "(\\b)" -> true,
+    "(.)" -> false,
+    "(?<foo>\\b)" -> true,
+    "(?:\\b)" -> true,
+    "(?:\\b)*" -> true,
+    ".*" -> false,
+    "(?:\\b)+" -> true,
+    "(?:\\b)?" -> true,
+    "(?:\\b){2}" -> true,
+    "(?=\\b)" -> true,
+    "(?=.)" -> false,
+    "(?<=\\b)" -> true,
+    "\\B" -> true,
+    "\\b" -> true,
+    "^" -> false,
+    "$" -> false,
+    "." -> false
+  )
 
-    val ignoreCase = FlagSet(false, true, false, false, false, false)
-    assertEquals(
-      Pattern(Sequence(Seq(Character('a'), Character('\n'), Character('\\'), Character('b'))), ignoreCase).parts,
-      Set(UStringUtil.fromString("A\n\\B"))
-    )
-    assertEquals(
-      Pattern(Sequence(Seq(Character('a'), Character(0x1f600))), ignoreCase).parts,
-      Set(UStringUtil.fromString("A😀"))
-    )
+  check("PatternOps#needsSigmaStarAtBegin", "m")(_.needsSigmaStarAtBegin)("." -> true, "^" -> true)
+  check("PatternOps#needsSigmaStarAtBegin")(_.needsSigmaStarAtBegin)("." -> true, "^" -> false)
+  check("PatternOps#needsSigmaStarAtBegin", "y")(_.needsSigmaStarAtBegin)("." -> false)
+  check("PatternOps#needsSigmaStarAtBegin", "A", Dialect.PCRE)(_.needsSigmaStarAtBegin)("." -> false)
+  check("PatternOps#needsSigmaStarAtBegin", dialect = Dialect.Ruby)(_.needsSigmaStarAtBegin)(
+    "^" -> true,
+    "\\A" -> false
+  )
 
-  test("PatternExtensions.PatternOps#capturesSize"):
-    val flagSet = FlagSet(false, false, false, false, false, false)
-    assertEquals(Pattern(Disjunction(Seq(Capture(1, Dot()), Capture(2, Dot()))), flagSet).capturesSize, 2)
-    assertEquals(Pattern(Sequence(Seq(Capture(1, Dot()), Capture(2, Dot()))), flagSet).capturesSize, 2)
-    assertEquals(Pattern(Capture(1, Dot()), flagSet).capturesSize, 1)
-    assertEquals(Pattern(Capture(1, Capture(2, Dot())), flagSet).capturesSize, 2)
-    assertEquals(Pattern(NamedCapture(1, "x", Dot()), flagSet).capturesSize, 1)
-    assertEquals(Pattern(NamedCapture(1, "x", Capture(2, Dot())), flagSet).capturesSize, 2)
-    assertEquals(Pattern(Group(Dot()), flagSet).capturesSize, 0)
-    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet).capturesSize, 0)
-    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet).capturesSize, 0)
-    assertEquals(Pattern(Repeat(Quantifier.Question(false), Dot()), flagSet).capturesSize, 0)
-    assertEquals(Pattern(Repeat(Quantifier.Exact(2, false), Dot()), flagSet).capturesSize, 0)
-    assertEquals(Pattern(LookAhead(false, Dot()), flagSet).capturesSize, 0)
-    assertEquals(Pattern(LookBehind(false, Dot()), flagSet).capturesSize, 0)
-    assertEquals(Pattern(Dot(), flagSet).capturesSize, 0)
+  check("PatternOps#needsSigmaStarAtEnd", "m")(_.needsSigmaStarAtEnd)("." -> true, "$" -> true)
+  check("PatternOps#needsSigmaStarAtEnd")(_.needsSigmaStarAtEnd)("." -> true, "$" -> false)
+  check("PatternOps#needsSigmaStarAtEnd", "y")(_.needsSigmaStarAtEnd)("." -> true, "$" -> false)
+  check("PatternOps#needsSigmaStarAtEnd", dialect = Dialect.Python)(_.needsSigmaStarAtEnd)(
+    "a$" -> false,
+    "a\\Z" -> false,
+    "a" -> true
+  )
+
+  test("PatternExtensions.PatternOps#lineTerminators and wordSets"):
+    assertEquals(parse("^a$|\\b", "m").lineTerminators, Seq(IRLineTerminators.JavaScript))
+    assertEquals(parse("^a$", "").lineTerminators, Seq.empty)
+    assertEquals(parse("(?m:^)a$", "", Dialect.Java).lineTerminators, Seq(IRLineTerminators.Java))
+    assertEquals(parse("\\b(?a:\\b)", "", Dialect.Python).wordSets.size, 2)
+
+  check("PatternOps#parts")(_.parts)(
+    "xyz.0" -> Set(UStringUtil.fromString("xyz")),
+    "(?:xyz)" -> Set(UStringUtil.fromString("xyz")),
+    "xyz|." -> Set(UStringUtil.fromString("xyz")),
+    "(xyz)" -> Set(UStringUtil.fromString("xyz")),
+    "(?<x>xyz)" -> Set(UStringUtil.fromString("xyz")),
+    "(?:xyz)*" -> Set(UStringUtil.fromString("xyz")),
+    "(?:xyz)+" -> Set(UStringUtil.fromString("xyz")),
+    "(?:xyz)?" -> Set(UStringUtil.fromString("xyz")),
+    "(?:xyz){2}" -> Set(UStringUtil.fromString("xyz")),
+    "(?=xyz)" -> Set(UStringUtil.fromString("xyz")),
+    "(?<=xyz)" -> Set(UStringUtil.fromString("xyz")),
+    "." -> Set.empty[UString],
+    "x" -> Set.empty[UString],
+    "x[y]z\\d" -> Set.empty[UString],
+    "\\x41\\n" -> Set(UStringUtil.fromString("A\n")),
+    "😀" -> Set(UStringUtil.fromString("😀"))
+  )
+
+  check("PatternOps#parts", "i")(_.parts)(
+    "xyz.0" -> Set(UStringUtil.fromString("XYZ")),
+    "a\\n\\\\b" -> Set(UStringUtil.fromString("A\n\\B"))
+  )
+
+  check("PatternOps#parts", "iu")(_.parts)(
+    "a😀" -> Set(UStringUtil.fromString("a😀")),
+    "XYZ" -> Set(UStringUtil.fromString("xyz"))
+  )
+
+  check("PatternOps#parts", "i", Dialect.Python)(_.parts)("xyz" -> Set(UStringUtil.fromString("XYZ")))
+
+  check("PatternOps#capturesSize")(_.capturesSize)(
+    "(.)|(.)" -> 2,
+    "(.)(.)" -> 2,
+    "(.)" -> 1,
+    "((.))" -> 2,
+    "(?<x>.)" -> 1,
+    "(?<x>(.))" -> 2,
+    "(?:.)" -> 0,
+    ".*" -> 0,
+    "(?=.)" -> 0,
+    "." -> 0
+  )

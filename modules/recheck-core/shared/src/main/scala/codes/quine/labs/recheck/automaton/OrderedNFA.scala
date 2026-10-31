@@ -7,7 +7,7 @@ import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.data.Graph
 import codes.quine.labs.recheck.data.MultiSet
-import codes.quine.labs.recheck.regexp.Pattern.Location
+import codes.quine.labs.recheck.regexp.Location
 import codes.quine.labs.recheck.util.GraphvizUtil.escape
 
 /** OrderedNFA is a NFA, but its transitions has a priority in the order. */

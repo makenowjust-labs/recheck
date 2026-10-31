@@ -103,8 +103,9 @@ object DynamicSeeder:
     def build(failed: FailedPoint, alphabet: PatternAlphabet): Patch =
       failed.kind match
         case ReadKind.Any         => InsertChar(failed.pos, alphabet.any.map(_._1))
-        case ReadKind.Dot         => InsertChar(failed.pos, alphabet.dot.map(_._1))
         case ReadKind.Char(c)     => InsertChar(failed.pos, Set(CharSet.single(c)))
         case ReadKind.Class(s)    => InsertChar(failed.pos, alphabet.refine(s).map(_._1))
         case ReadKind.ClassNot(s) => InsertChar(failed.pos, alphabet.refineInvert(s).map(_._1))
-        case ReadKind.Ref(_)      => InsertString(failed.pos, failed.capture.get)
+        case _: ReadKind.Ref      =>
+          // A reference to an unset capture has nothing to insert.
+          failed.capture.fold(InsertChar(failed.pos, Set.empty))(InsertString(failed.pos, _))

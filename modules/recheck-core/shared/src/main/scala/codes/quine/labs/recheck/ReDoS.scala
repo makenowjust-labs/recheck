@@ -12,7 +12,6 @@ import codes.quine.labs.recheck.automaton.EpsNFABuilder
 import codes.quine.labs.recheck.common.CancellationToken
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.ReDoSException
 import codes.quine.labs.recheck.common.UnsupportedException
@@ -22,19 +21,28 @@ import codes.quine.labs.recheck.exec.NodeExecutor
 import codes.quine.labs.recheck.fuzz.FuzzChecker
 import codes.quine.labs.recheck.fuzz.FuzzProgram
 import codes.quine.labs.recheck.recall.RecallValidator
-import codes.quine.labs.recheck.regexp.Parser
-import codes.quine.labs.recheck.regexp.Pattern
+import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.regexp.PatternExtensions.*
+import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ir.IREncoding
 
 /** ReDoS is a ReDoS checker frontend. */
 object ReDoS:
 
-  /** Tests the given RegExp pattern causes ReDoS. */
+  /** Tests the given RegExp pattern causes ReDoS.
+    *
+    * @param dialect
+    *   the dialect of the pattern, which is not a public parameter yet
+    * @param encoding
+    *   the kind of strings of the dialect (see [[IREncoding]]), or `None` for the dialect's default
+    */
   def check(
       source: String,
       flags: String,
       params: Parameters = Parameters(),
-      token: Option[CancellationToken] = None
+      token: Option[CancellationToken] = None,
+      dialect: Dialect = Dialect.JavaScript,
+      encoding: Option[IREncoding] = None
   ): Diagnostics =
     import params._
 
@@ -43,10 +51,7 @@ object ReDoS:
     val result = for
       _ <- Try(()) // Ensures `Try` context.
       _ = ctx.log("parse: start")
-      pattern <- ctx.interrupt:
-        Parser.parse(source, flags) match
-          case Right(pattern) => Success(pattern)
-          case Left(ex)       => Failure(InvalidRegExpException(ex.getMessage))
+      pattern <- ctx.interrupt(ParsedPattern.parse(source, flags, dialect, encoding).toTry)
       _ = ctx.log(s"parse: finish\n  pattern: $pattern")
       diagnostics <- checker match
         case Checker.Automaton => checkAutomaton(source, flags, pattern, params)
@@ -61,7 +66,7 @@ object ReDoS:
   private[recheck] def checkAutomaton(
       source: String,
       flags: String,
-      pattern: Pattern,
+      pattern: ParsedPattern,
       params: Parameters
   )(using ctx: Context): Try[Diagnostics] =
     import params.*
@@ -70,7 +75,7 @@ object ReDoS:
     val result = for
       _ <- Try(()) // Ensures `Try` context.
       _ <-
-        if checker == Checker.Auto && repeatCount(pattern) >= maxRepeatCount then
+        if checker == Checker.Auto && pattern.repeatCount >= maxRepeatCount then
           ctx.log("auto: exceed maxRepeatCount")
           Failure(UnsupportedException("The pattern contains too many repeat"))
         else Success(())
@@ -99,13 +104,13 @@ object ReDoS:
             Diagnostics.Vulnerable(source, flags, vul.toAttackComplexity, attack, vul.hotspot, Checker.Automaton)
           case safe: Complexity.Safe => Diagnostics.Safe(source, flags, safe.toAttackComplexity, Checker.Automaton)
         ++ Iterator(Diagnostics.Safe(source, flags, AttackComplexity.Safe(false), Checker.Automaton))
-      .map(recallValidation(source, flags, recallTimeout))
+      .map(recallValidation(pattern, recallTimeout))
       .recoverWith:
         case ex: ReDoSException =>
           ex.checker = Some(Checker.Automaton)
           Failure(ex)
 
-  private[recheck] def checkFuzz(source: String, flags: String, pattern: Pattern, params: Parameters)(using
+  private[recheck] def checkFuzz(source: String, flags: String, pattern: ParsedPattern, params: Parameters)(using
       ctx: Context
   ): Try[Diagnostics] =
     import params._
@@ -146,50 +151,28 @@ object ReDoS:
             val recallAttack = attack.adjust(complexity, recallLimit, maxRecallStringSize)
             Diagnostics.Vulnerable(source, flags, complexity, recallAttack, hotspot, Checker.Fuzz)
         ++ Iterator(Diagnostics.Safe(source, flags, AttackComplexity.Safe(true), Checker.Fuzz))
-      .map(recallValidation(source, flags, recallTimeout))
+      .map(recallValidation(pattern, recallTimeout))
       .recoverWith:
         case ex: ReDoSException =>
           ex.checker = Some(Checker.Fuzz)
           Failure(ex)
 
-  private[recheck] def checkAuto(source: String, flags: String, pattern: Pattern, params: Parameters)(using
+  private[recheck] def checkAuto(source: String, flags: String, pattern: ParsedPattern, params: Parameters)(using
       ctx: Context
   ): Try[Diagnostics] =
     checkAutomaton(source, flags, pattern, params)
       .recoverWith:
         case _: UnsupportedException => checkFuzz(source, flags, pattern, params)
 
-  /** Runs recall validation against diagnostics, then returns validated diagnostics. */
-  private[recheck] def recallValidation(source: String, flags: String, timeout: Duration)(
+  /** Runs recall validation against diagnostics, then returns validated diagnostics.
+    *
+    * It runs only for JavaScript, by Node.js.
+    */
+  private[recheck] def recallValidation(pattern: ParsedPattern, timeout: Duration)(
       ds: Iterator[Diagnostics]
   )(using ctx: Context): Diagnostics =
     ds.filter:
-      case d: Diagnostics.Vulnerable =>
-        RecallValidator.checks(source, flags, d.attack, timeout)(NodeExecutor.exec)
+      case d: Diagnostics.Vulnerable if pattern.dialect == Dialect.JavaScript =>
+        RecallValidator.checks(pattern.source, pattern.flags, d.attack, timeout)(NodeExecutor.exec)
       case _ => true
     .next()
-
-  /** Gets a sum of repeat specifier counts. */
-  private[recheck] def repeatCount(pattern: Pattern)(using ctx: Context): Int =
-    ctx.interrupt:
-      import Pattern._
-
-      def loop(node: Node): Int = ctx.interrupt:
-        node match
-          case Disjunction(ns)       => ns.map(loop).sum
-          case Sequence(ns)          => ns.map(loop).sum
-          case Capture(_, n)         => loop(n)
-          case NamedCapture(_, _, n) => loop(n)
-          case Group(n)              => loop(n)
-          case Repeat(q, n)          =>
-            val count = loop(n)
-            q match
-              case Quantifier.Exact(n, _)        => count + n
-              case Quantifier.Unbounded(min, _)  => count + min
-              case Quantifier.Bounded(_, max, _) => count + max
-              case _                             => count
-          case LookAhead(_, n)  => loop(n)
-          case LookBehind(_, n) => loop(n)
-          case _                => 0
-
-      loop(pattern.node)

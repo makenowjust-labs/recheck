@@ -3,11 +3,17 @@ package codes.quine.labs.recheck.regexp
 import scala.annotation.tailrec
 
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.regexp.Pattern.*
 import codes.quine.labs.recheck.util.UStringUtil
-import codes.quine.labs.recheck.util.UStringUtil.*
+import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.ir.IRAssertKind
+import codes.quine.labs.resyntax.ir.IRLineTerminators
+import codes.quine.labs.resyntax.ir.IRNode
+import codes.quine.labs.resyntax.ir.IRNodeData
+import codes.quine.labs.resyntax.ir.IRNodeData.*
+import codes.quine.labs.resyntax.ir.IRQuantifier
 
 object PatternExtensions:
 
@@ -23,30 +29,28 @@ object PatternExtensions:
         case (None, Some((min, max))) => CaptureRange(Some((min, max)))
         case (None, None)             => CaptureRange(None)
 
-  extension (pattern: Pattern)
+  /** Checks whether the assertion is at a begin point (`^` or `\A`). */
+  def isBeginAssertion(kind: IRAssertKind): Boolean = kind match
+    case IRAssertKind.TextBegin | _: IRAssertKind.LineBegin => true
+    case _                                                  => false
 
-    /** Tests whether the pattern contains line assertion (`^` or `$`). */
+  /** Checks whether the assertion is at an end point (`$`, `\z` or `\Z`). */
+  def isEndAssertion(kind: IRAssertKind): Boolean = kind match
+    case IRAssertKind.TextEnd | _: IRAssertKind.LineEnd | _: IRAssertKind.ChompTextEnd => true
+    case _                                                                             => false
+
+  extension (pattern: ParsedPattern)
+
+    /** Tests whether the pattern contains a begin or end assertion (e.g. `^`, `$` or `\A`). */
     def existsLineAssertion(using ctx: Context): Boolean = ctx.interrupt:
-      def loop(node: Node): Boolean = ctx.interrupt:
-        node match
-          case Disjunction(ns)         => ns.exists(loop)
-          case Sequence(ns)            => ns.exists(loop)
-          case Capture(_, n)           => loop(n)
-          case NamedCapture(_, _, n)   => loop(n)
-          case Group(n)                => loop(n)
-          case Repeat(_, n)            => loop(n)
-          case LookAhead(_, n)         => loop(n)
-          case LookBehind(_, n)        => loop(n)
-          case LineBegin() | LineEnd() => true
-          case _                       => false
-      loop(pattern.node)
+      pattern.node.exists:
+        case Assert(kind) => isBeginAssertion(kind) || isEndAssertion(kind)
+        case _            => false
 
-    /** Tests whether line begin assertion `^` (resp. line end assertion `$`) is placed not at begin point (resp. end
-      * point).
-      */
+    /** Tests whether a begin assertion (resp. an end assertion) is placed not at begin point (resp. end point). */
     def existsLineAssertionInMiddle(using ctx: Context): Boolean = ctx.interrupt:
-      def loop(isBegin: Boolean, isEnd: Boolean, node: Node): Boolean = ctx.interrupt:
-        node match
+      def loop(isBegin: Boolean, isEnd: Boolean, node: IRNode): Boolean = ctx.interrupt:
+        node.data match
           case Disjunction(ns) => ns.exists(loop(isBegin, isEnd, _))
           case Sequence(ns)    =>
             ns match
@@ -54,138 +58,157 @@ object PatternExtensions:
                 loop(isBegin, false, n1) || ns.exists(loop(false, false, _)) || loop(false, isEnd, n2)
               case Seq(n) => loop(isBegin, isEnd, n)
               case Seq()  => false
-          case Capture(_, n)         => loop(isBegin, isEnd, n)
-          case NamedCapture(_, _, n) => loop(isBegin, isEnd, n)
-          case Group(n)              => loop(isBegin, isEnd, n)
-          case Repeat(_, n)          => loop(false, false, n)
-          case LookAhead(_, n)       => loop(false, false, n)
-          case LookBehind(_, n)      => loop(false, false, n)
-          case LineBegin()           => !isBegin
-          case LineEnd()             => !isEnd
-          case _                     => false
+          case Capture(_, _, n)                 => loop(isBegin, isEnd, n)
+          case Atomic(n)                        => loop(isBegin, isEnd, n)
+          case Repeat(n, _)                     => loop(false, false, n)
+          case LookAhead(_, n)                  => loop(false, false, n)
+          case LookBehind(_, n)                 => loop(false, false, n)
+          case Assert(k) if isBeginAssertion(k) => !isBegin
+          case Assert(k) if isEndAssertion(k)   => !isEnd
+          case _                                => false
       loop(true, true, pattern.node)
 
-    /** Tests whether line begin assertion (`^`) is placed at every begin point. */
-    def everyBeginPointIsLineBegin(using ctx: Context): Boolean = ctx.interrupt:
-      def loop(node: Node): Boolean = ctx.interrupt:
-        node match
-          case Disjunction(ns)       => ns.forall(loop)
-          case Sequence(ns)          => ns.headOption.exists(loop)
-          case Capture(_, n)         => loop(n)
-          case NamedCapture(_, _, n) => loop(n)
-          case Group(n)              => loop(n)
-          case LineBegin()           => true
-          case _                     => false
-      loop(pattern.node)
+    /** Tests whether a begin assertion is placed at every begin point. */
+    def everyBeginPointIsLineBegin(using ctx: Context): Boolean = everyBeginPointIs(isBeginAssertion)
 
-    /** Tests whether none of line begin assertion (`^`) is placed at every begin point. */
-    def everyBeginPointIsNotLineBegin(using ctx: Context): Boolean = ctx.interrupt:
-      def loop(node: Node): Boolean = ctx.interrupt:
-        node match
-          case Disjunction(ns)       => ns.forall(loop)
-          case Sequence(ns)          => ns.headOption.exists(loop)
-          case Capture(_, n)         => loop(n)
-          case NamedCapture(_, _, n) => loop(n)
-          case Group(n)              => loop(n)
-          case LineBegin()           => false
-          case _                     => true
-      loop(pattern.node)
+    /** Tests whether none of begin assertions is placed at every begin point. */
+    def everyBeginPointIsNotLineBegin(using ctx: Context): Boolean = everyBeginPointIs(!isBeginAssertion(_), true)
 
-    /** Tests whether line end assertion (`^`) is placed at every end point. */
-    def everyEndPointIsLineEnd(using ctx: Context): Boolean = ctx.interrupt:
-      def loop(node: Node): Boolean = ctx.interrupt:
-        node match
-          case Disjunction(ns)       => ns.forall(loop)
-          case Sequence(ns)          => ns.lastOption.exists(loop)
-          case Capture(_, n)         => loop(n)
-          case NamedCapture(_, _, n) => loop(n)
-          case Group(n)              => loop(n)
-          case LineEnd()             => true
-          case _                     => false
-      loop(pattern.node)
+    /** Tests whether an end assertion is placed at every end point. */
+    def everyEndPointIsLineEnd(using ctx: Context): Boolean = everyEndPointIs(isEndAssertion)
 
-    /** Tests whether none of line end assertion (`^`) is placed at every end point. */
-    def everyEndPointIsNotLineEnd(using ctx: Context): Boolean = ctx.interrupt:
-      def loop(node: Node): Boolean = ctx.interrupt:
-        node match
-          case Disjunction(ns)       => ns.forall(loop)
-          case Sequence(ns)          => ns.lastOption.exists(loop)
-          case Capture(_, n)         => loop(n)
-          case NamedCapture(_, _, n) => loop(n)
-          case Group(n)              => loop(n)
-          case LineEnd()             => false
-          case _                     => true
-      loop(pattern.node)
+    /** Tests whether none of end assertions is placed at every end point. */
+    def everyEndPointIsNotLineEnd(using ctx: Context): Boolean = everyEndPointIs(!isEndAssertion(_), true)
+
+    /** Tests whether an assertion satisfying `p` is placed at every begin point.
+      *
+      * A node other than an assertion is regarded as `otherwise`.
+      */
+    def everyBeginPointIs(p: IRAssertKind => Boolean, otherwise: Boolean = false)(using ctx: Context): Boolean =
+      ctx.interrupt:
+        def loop(node: IRNode): Boolean = ctx.interrupt:
+          node.data match
+            case Disjunction(ns)  => ns.forall(loop)
+            case Sequence(ns)     => ns.headOption.exists(loop)
+            case Capture(_, _, n) => loop(n)
+            case Atomic(n)        => loop(n)
+            case Assert(k)        => p(k)
+            case _                => otherwise
+        loop(pattern.node)
+
+    /** Tests whether an assertion satisfying `p` is placed at every end point.
+      *
+      * A node other than an assertion is regarded as `otherwise`.
+      */
+    def everyEndPointIs(p: IRAssertKind => Boolean, otherwise: Boolean = false)(using ctx: Context): Boolean =
+      ctx.interrupt:
+        def loop(node: IRNode): Boolean = ctx.interrupt:
+          node.data match
+            case Disjunction(ns)  => ns.forall(loop)
+            case Sequence(ns)     => ns.lastOption.exists(loop)
+            case Capture(_, _, n) => loop(n)
+            case Atomic(n)        => loop(n)
+            case Assert(k)        => p(k)
+            case _                => otherwise
+        loop(pattern.node)
 
     /** Tests the pattern has no infinite repetition. */
     def isConstant: Boolean =
-      def loop(node: Node): Boolean = node match
-        case Disjunction(ns)       => ns.forall(loop)
-        case Sequence(ns)          => ns.forall(loop)
-        case Capture(_, n)         => loop(n)
-        case NamedCapture(_, _, n) => loop(n)
-        case Group(n)              => loop(n)
-        case Repeat(q, n)          =>
-          q.normalized match
-            case Quantifier.Unbounded(_, _) => false
-            case _                          => loop(n)
-        case LookAhead(_, n)  => loop(n)
-        case LookBehind(_, n) => loop(n)
-        case _                => true
-      loop(pattern.node)
+      !pattern.node.exists:
+        case Repeat(_, _: IRQuantifier.Unbounded) => true
+        // An unsupported node may be a recursion.
+        case _: Unsupported => true
+        case _              => false
 
     /** Returns this pattern's size. */
     def size: Int =
-      def loop(node: Node): Int = node match
-        case Disjunction(ns)                        => ns.map(loop).sum + ns.size - 1
-        case Sequence(ns)                           => ns.map(loop).sum
-        case Capture(_, n)                          => loop(n)
-        case NamedCapture(_, _, n)                  => loop(n)
-        case Group(n)                               => loop(n)
-        case Repeat(Quantifier.Star(_), n)          => loop(n) + 1
-        case Repeat(Quantifier.Plus(_), n)          => loop(n) + 1
-        case Repeat(Quantifier.Question(_), n)      => loop(n) + 1
-        case Repeat(Quantifier.Exact(m, _), n)      => loop(n) * m
-        case Repeat(Quantifier.Unbounded(m, _), n)  => loop(n) * (m + 1) + 1
-        case Repeat(Quantifier.Bounded(m, l, _), n) => loop(n) * l + (l - m)
-        case LookAhead(_, n)                        => loop(n) + 1
-        case LookBehind(_, n)                       => loop(n) + 1
-        case _                                      => 1
+      def loop(node: IRNode): Int = node.data match
+        case Disjunction(ns)                                                         => ns.map(loop).sum + ns.size - 1
+        case Sequence(ns)                                                            => ns.map(loop).sum
+        case Empty                                                                   => 0
+        case Capture(_, _, n)                                                        => loop(n)
+        case Atomic(n)                                                               => loop(n)
+        case Repeat(n, IRQuantifier.Exact(m))                                        => loop(n) * m
+        case Repeat(n, IRQuantifier.Unbounded(1, _)) if !pattern.isBraceRepeat(node) => loop(n) + 1
+        case Repeat(n, IRQuantifier.Unbounded(m, _))                                 => loop(n) * (m + 1) + 1
+        case Repeat(n, IRQuantifier.Bounded(m, l, _))                                => loop(n) * l + (l - m)
+        case LookAhead(_, n)                                                         => loop(n) + 1
+        case LookBehind(_, n)                                                        => loop(n) + 1
+        case _                                                                       => 1
       loop(pattern.node)
+
+    /** Returns a sum of the counts of the repetitions written with braces (e.g. `{2,3}`). */
+    def repeatCount(using ctx: Context): Int = ctx.interrupt:
+      def loop(node: IRNode): Int = ctx.interrupt:
+        node.data match
+          case Repeat(n, q) =>
+            val count = loop(n)
+            q match
+              case IRQuantifier.Exact(m)                                          => count + m
+              case IRQuantifier.Unbounded(min, _) if pattern.isBraceRepeat(node)  => count + min
+              case IRQuantifier.Bounded(_, max, _) if pattern.isBraceRepeat(node) => count + max
+              case _                                                              => count
+          case _ => node.children.map(loop).sum
+      loop(pattern.node)
+
+    /** Returns the distinct line terminators of the assertions. */
+    def lineTerminators: Seq[IRLineTerminators] =
+      pattern.node
+        .collect:
+          case Assert(IRAssertKind.LineBegin(t, _)) => t
+          case Assert(IRAssertKind.LineEnd(t))      => t
+          case Assert(IRAssertKind.ChompTextEnd(t)) => t
+        .distinct
+
+    /** Returns the distinct word sets of the word boundary assertions. */
+    def wordSets: Seq[CharSet] =
+      pattern.node
+        .collect:
+          case Assert(IRAssertKind.WordBoundary(w))    => w
+          case Assert(IRAssertKind.NotWordBoundary(w)) => w
+        .distinct
+
+    /** The characters that JavaScript's ignore-case matching canonicalizes to, which stand for their cases. */
+    def preferredChars: Option[CharSet] =
+      Option.when(pattern.dialect == Dialect.JavaScript && pattern.flagSet.ignoreCase):
+        val unicode = pattern.ir.mode == UnitMode.CodePoint
+        EcmaScriptChars.canonicalize(pattern.ir.mode.universe, unicode)
+
+    /** Returns the character standing for the set of a literal, which may be closed under case-insensitivity. */
+    def representative(set: CharSet, preferred: Option[CharSet]): Int =
+      preferred.map(set.intersect).filter(_.nonEmpty).getOrElse(set).head
 
     /** Computes alphabet from this pattern. */
     def alphabet(using ctx: Context): PatternAlphabet =
       ctx.interrupt:
-        val FlagSet(_, ignoreCase, _, dotAll, unicode, _) = pattern.flagSet
+        def loop(node: IRNode): Seq[CharSet] = ctx.interrupt:
+          node.data match
+            case Chars(set) =>
+              // A negated class takes part in the order of atoms as its positive set.
+              Vector(if pattern.isNegatedClass(node) then set.complement(pattern.ir.mode) else set)
+            case Strings(set) =>
+              set.strings.toVector.flatMap(_.iterator.map(CharSet.single)) :+ set.chars
+            case _ => node.children.flatMap(loop)
 
-        def loop(node: Node): Seq[CharSet] = ctx.interrupt:
-          node match
-            case Disjunction(ns)       => ns.flatMap(loop)
-            case Sequence(ns)          => ns.flatMap(loop)
-            case Capture(_, n)         => loop(n)
-            case NamedCapture(_, _, n) => loop(n)
-            case Group(n)              => loop(n)
-            case Repeat(_, n)          => loop(n)
-            case LookAhead(_, n)       => loop(n)
-            case LookBehind(_, n)      => loop(n)
-            case atom: AtomNode        =>
-              val ch = atom.toCharSet(unicode)
-              Vector(if ignoreCase then EcmaScriptChars.canonicalize(ch, unicode) else ch)
-            case Dot() => Vector(EcmaScriptChars.dot(ignoreCase, dotAll, unicode))
-            case _     => Vector.empty
+        val terminators = lineTerminators
+        val terminatorSets = terminators.flatMap: t =>
+          val chars = CharSet.of(t.chars.toSeq*)
+          if t.crlf == IRLineTerminators.CRLF.Ignored then Seq(chars)
+          else Seq(chars, CharSet.of(0x0d), CharSet.of(0x0a))
+        val words = wordSets
+        val lineTerminator = Option
+          .when(needsLineTerminatorDistinction && terminators.size == 1)(CharSet.of(terminators.head.chars.toSeq*))
+          .filter(_.nonEmpty)
+        val word = Option.when(words.size == 1)(words.head)
+        val extra = terminatorSets.filterNot(lineTerminator.contains) ++ (if words.size >= 2 then words else Seq.empty)
 
-        PatternAlphabet.build(
-          ignoreCase,
-          unicode,
-          loop(pattern.node),
-          Option.when(needsLineTerminatorDistinction)(EcmaScriptChars.LineTerminator),
-          Option.when(needsWordDistinction)(EcmaScriptChars.Word)
-        )
+        PatternAlphabet.build(pattern.ir.mode, loop(pattern.node) ++ extra, lineTerminator, word, preferredChars)
 
     /** Tests whether the pattern needs line terminator distinction or not. */
-    def needsLineTerminatorDistinction(using ctx: Context): Boolean =
-      import pattern.*
-      ctx.interrupt(flagSet.multiline && existsLineAssertion)
+    def needsLineTerminatorDistinction(using ctx: Context): Boolean = ctx.interrupt:
+      pattern.node.exists:
+        case Assert(_: IRAssertKind.LineBegin | _: IRAssertKind.LineEnd) => true
+        case _                                                           => false
 
     /** Tests whether the pattern nedds input terminator distinction or not. */
     def needsInputTerminatorDistinction(using ctx: Context): Boolean = ctx.interrupt:
@@ -203,104 +226,84 @@ object PatternExtensions:
 
     /** Tests whether the pattern has implicit `.*?` at begin. */
     def needsSigmaStarAtBegin(using ctx: Context): Boolean =
-      import pattern.*
-      ctx.interrupt(!flagSet.sticky && (flagSet.multiline || !everyBeginPointIsLineBegin))
+      ctx.interrupt(!pattern.ir.anchored && !everyBeginPointIs(_ == IRAssertKind.TextBegin))
 
     /** Tests whether the pattern has implicit `.*?` at end. */
     def needsSigmaStarAtEnd(using ctx: Context): Boolean =
-      import pattern.*
-      ctx.interrupt(flagSet.multiline || !everyEndPointIsLineEnd)
+      ctx.interrupt:
+        !everyEndPointIs:
+          case IRAssertKind.TextEnd | _: IRAssertKind.ChompTextEnd => true
+          case _                                                   => false
 
     /** Tests whether the pattern needs word character distinction or not. */
-    def needsWordDistinction(using ctx: Context): Boolean = ctx.interrupt:
-      def loop(node: Node): Boolean = ctx.interrupt:
-        node match
-          case Disjunction(ns)       => ns.exists(loop)
-          case Sequence(ns)          => ns.exists(loop)
-          case Capture(_, n)         => loop(n)
-          case NamedCapture(_, _, n) => loop(n)
-          case Group(n)              => loop(n)
-          case Repeat(_, n)          => loop(n)
-          case LookAhead(_, n)       => loop(n)
-          case LookBehind(_, n)      => loop(n)
-          case WordBoundary(_)       => true
-          case _                     => false
-      loop(pattern.node)
+    def needsWordDistinction(using ctx: Context): Boolean = ctx.interrupt(wordSets.nonEmpty)
 
     /** Extracts parts within the pattern. */
     def parts: Set[UString] =
+      val preferred = preferredChars
+
+      def toUString(values: Seq[Int]): UString =
+        if pattern.ir.mode == UnitMode.CodePoint then UStringUtil.fromCodePoints(values) else UString.from(values)
+
+      def literal(node: IRNode): Option[Int] = node.data match
+        case Chars(set) if set.nonEmpty && pattern.isLiteral(node) => Some(representative(set, preferred))
+        case _                                                     => None
+
       @tailrec
-      def extract(ns: Seq[Node], set: Set[UString] = Set.empty): Set[UString] =
+      def extract(ns: Seq[IRNode], set: Set[UString] = Set.empty): Set[UString] =
         if ns.isEmpty then set
         else
-          val (pre, suf) = ns.span(_.isInstanceOf[Character])
-          val s = UStringUtil.fromCodePoints(pre.collect { case Character(c) => c })
+          val (pre, suf) = ns.span(literal(_).isDefined)
+          val s = toUString(pre.flatMap(literal))
           val newSet = set ++ (if s.length > 1 then Set(s) else Set.empty)
-          extract(suf.dropWhile(!_.isInstanceOf[Character]), newSet)
+          extract(suf.dropWhile(literal(_).isEmpty), newSet)
 
-      def loop(node: Node): Set[UString] = node match
-        case Disjunction(ns)       => ns.flatMap(loop).toSet
-        case Sequence(ns)          => extract(ns) ++ ns.flatMap(loop).toSet
-        case Capture(_, n)         => loop(n)
-        case NamedCapture(_, _, n) => loop(n)
-        case Group(n)              => loop(n)
-        case Repeat(_, n)          => loop(n)
-        case LookAhead(_, n)       => loop(n)
-        case LookBehind(_, n)      => loop(n)
-        case _                     => Set.empty
+      def loop(node: IRNode): Set[UString] = node.data match
+        case Sequence(ns) => extract(ns) ++ ns.flatMap(loop).toSet
+        case _            => node.children.flatMap(loop).toSet
 
-      val set = loop(pattern.node)
-      val unicode = pattern.flagSet.unicode
-      if pattern.flagSet.ignoreCase then
-        set.map(s => UStringUtil.fromCodePoints(s.chars(unicode).map(EcmaScriptChars.canonicalize(_, unicode))))
-      else set
+      loop(pattern.node)
 
     /** Returns a maximum capture index or `0`. */
-    def capturesSize: Int = pattern.node.captureRange.range.map(_._2).getOrElse(0)
+    def capturesSize: Int = pattern.ir.captureCount
 
-  extension (node: Node)
+  extension (node: IRNode)
+
+    /** Returns the child nodes. */
+    def children: Seq[IRNode] = node.data match
+      case Disjunction(ns)  => ns
+      case Sequence(ns)     => ns
+      case Repeat(n, _)     => Seq(n)
+      case Atomic(n)        => Seq(n)
+      case LookAhead(_, n)  => Seq(n)
+      case LookBehind(_, n) => Seq(n)
+      case Capture(_, _, n) => Seq(n)
+      case _                => Seq.empty
+
+    /** Checks whether the node or a descendant satisfies the predicate. */
+    def exists(p: IRNodeData => Boolean): Boolean =
+      p(node.data) || node.children.exists(_.exists(p))
+
+    /** Collects the values of the node and its descendants in the pre-order. */
+    def collect[A](pf: PartialFunction[IRNodeData, A]): Seq[A] =
+      pf.lift(node.data).toSeq ++ node.children.flatMap(_.collect(pf))
 
     /** Returns a capture range within this node. */
-    def captureRange: CaptureRange = node match
-      case Disjunction(ns)           => ns.map(_.captureRange).foldLeft(CaptureRange(None))(_.merge(_))
-      case Sequence(ns)              => ns.map(_.captureRange).foldLeft(CaptureRange(None))(_.merge(_))
-      case Capture(index, n)         => CaptureRange(Some((index, index))).merge(n.captureRange)
-      case NamedCapture(index, _, n) => CaptureRange(Some((index, index))).merge(n.captureRange)
-      case Group(n)                  => n.captureRange
-      case Repeat(_, n)              => n.captureRange
-      case LookAhead(_, n)           => n.captureRange
-      case LookBehind(_, n)          => n.captureRange
-      case _                         => CaptureRange(None)
+    def captureRange: CaptureRange = node.data match
+      case Capture(index, _, n) => CaptureRange(Some((index, index))).merge(n.captureRange)
+      case _                    => node.children.map(_.captureRange).foldLeft(CaptureRange(None))(_.merge(_))
 
     /** Checks this node can match an empty string. */
-    def canMatchEmpty: Boolean = node match
-      case Disjunction(ns)       => ns.exists(_.canMatchEmpty)
-      case Sequence(ns)          => ns.forall(_.canMatchEmpty)
-      case Capture(_, n)         => n.canMatchEmpty
-      case NamedCapture(_, _, n) => n.canMatchEmpty
-      case Group(n)              => n.canMatchEmpty
-      case Repeat(q, n)          =>
-        q.normalized match
-          case Quantifier.Exact(m, _)      => m == 0 || n.canMatchEmpty
-          case Quantifier.Unbounded(m, _)  => m == 0 || n.canMatchEmpty
-          case Quantifier.Bounded(m, _, _) => m == 0 || n.canMatchEmpty
-      case WordBoundary(_) | LineBegin() | LineEnd()   => true
-      case LookAhead(_, _) | LookBehind(_, _)          => true
-      case BackReference(_) | NamedBackReference(_, _) => true
-      case _                                           => false
-
-  extension (atom: AtomNode)
-
-    /** Converts this pattern to a corresponding character set. */
-    def toCharSet(unicode: Boolean): CharSet = atom match
-      case Character(c)                 => CharSet.single(c)
-      case SimpleEscapeClass(invert, k) =>
-        val set = k match
-          case EscapeClassKind.Digit => EcmaScriptChars.Digit
-          case EscapeClassKind.Word  => EcmaScriptChars.Word
-          case EscapeClassKind.Space => EcmaScriptChars.Space
-        if invert then set.complement(EcmaScriptChars.mode(unicode)) else set
-      case UnicodeProperty(_, _, contents)         => contents
-      case UnicodePropertyValue(_, _, _, contents) => contents
-      case CharacterClass(_, ns)                   => CharSet.union(ns.map(_.toCharSet(unicode)))
-      case ClassRange(b, e)                        => CharSet.range(b, e)
+    def canMatchEmpty: Boolean = node.data match
+      case Disjunction(ns)  => ns.exists(_.canMatchEmpty)
+      case Sequence(ns)     => ns.forall(_.canMatchEmpty)
+      case Capture(_, _, n) => n.canMatchEmpty
+      case Atomic(n)        => n.canMatchEmpty
+      case Repeat(n, q)     =>
+        q match
+          case IRQuantifier.Exact(m)         => m == 0 || n.canMatchEmpty
+          case IRQuantifier.Unbounded(m, _)  => m == 0 || n.canMatchEmpty
+          case IRQuantifier.Bounded(m, _, _) => m == 0 || n.canMatchEmpty
+      case Chars(_)     => false
+      case Strings(set) => set.strings.exists(_.isEmpty)
+      case _            => true

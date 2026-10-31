@@ -3,17 +3,23 @@ package codes.quine.labs.recheck.fuzz
 import codes.quine.labs.recheck.automaton.EpsNFABuilder
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.data.Graph
-import codes.quine.labs.recheck.regexp.Pattern
-import codes.quine.labs.recheck.regexp.Pattern.*
+import codes.quine.labs.recheck.regexp.ParsedPattern
+import codes.quine.labs.recheck.regexp.PatternExtensions.*
 import codes.quine.labs.recheck.util.RepeatUtil
+import codes.quine.labs.resyntax.ast.BacktrackStrategy
+import codes.quine.labs.resyntax.ir.IRNode
+import codes.quine.labs.resyntax.ir.IRNodeData
+import codes.quine.labs.resyntax.ir.IRNodeData.*
+import codes.quine.labs.resyntax.ir.IRQuantifier
 
 /** StaticSeeder computes an initial generation for the pattern with static analysis. */
 object StaticSeeder:
 
   /** Computes an initial generation of the pattern. */
   def seed(
-      pattern: Pattern,
+      pattern: ParsedPattern,
       maxSimpleRepeatSize: Int = Parameters.DefaultMaxSimpleRepeatCount,
       maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
       limit: Int = Parameters.DefaultIncubationLimit,
@@ -21,8 +27,13 @@ object StaticSeeder:
   )(using
       ctx: Context
   ): Set[FString] = ctx.interrupt:
-    val simplePattern = simplify(pattern, maxSimpleRepeatSize)
-    val epsNFA = EpsNFABuilder.build(simplePattern).get
+    val epsNFA = EpsNFABuilder
+      .build(simplify(pattern, maxSimpleRepeatSize))
+      .recoverWith:
+        // The assertions that the ε-NFA does not handle are dropped.
+        case _: UnsupportedException =>
+          EpsNFABuilder.build(simplify(pattern, maxSimpleRepeatSize, dropsAssertions = true))
+      .get
     val orderedNFA = epsNFA.toOrderedNFA.rename.mapAlphabet(_.head)
     val seeder = new StaticSeeder(
       orderedNFA.alphabet,
@@ -33,61 +44,63 @@ object StaticSeeder:
     )
     seeder.seed(maxInitialGenerationSize, limit, maxSize)
 
-  /** Returns a simplified pattern. */
-  private[fuzz] def simplify(pattern: Pattern, maxSimpleRepeatSize: Int)(using ctx: Context): Pattern =
+  /** Returns a simplified pattern, which the ε-NFA can handle. */
+  private[fuzz] def simplify(pattern: ParsedPattern, maxSimpleRepeatSize: Int, dropsAssertions: Boolean = false)(using
+      ctx: Context
+  ): ParsedPattern =
     ctx.interrupt:
       val backRefs = extractBackRefs(pattern.node)
+      val empty = IRNode(Empty)
 
-      def loop(node: Node, prevIsRepeat: Boolean, nextIsRepeat: Boolean, inside: Set[Int]): Node = ctx.interrupt:
-        node match
-          case Disjunction(ns) => Disjunction(ns.map(loop(_, prevIsRepeat, nextIsRepeat, inside)))
+      def isRepeat(node: IRNode): Boolean = node.data.isInstanceOf[Repeat]
+
+      def loop(node: IRNode, prevIsRepeat: Boolean, nextIsRepeat: Boolean, inside: Set[Int]): IRNode = ctx.interrupt:
+        def copy(data: IRNodeData): IRNode = node.copy(data = data)
+        node.data match
+          case Disjunction(ns) => copy(Disjunction(ns.map(loop(_, prevIsRepeat, nextIsRepeat, inside))))
           case Sequence(ns)    =>
             val children = ns.lift
-            Sequence:
-              ns.zipWithIndex.map:
-                case (c, i) =>
-                  val prev = children(i - 1).map(_.isInstanceOf[Repeat]).getOrElse(prevIsRepeat)
-                  val next = children(i + 1).map(_.isInstanceOf[Repeat]).getOrElse(nextIsRepeat)
-                  loop(c, prev, next, inside)
-          case Capture(i, n)            => Capture(i, loop(n, prevIsRepeat, nextIsRepeat, inside + i))
-          case NamedCapture(i, name, n) => NamedCapture(i, name, loop(n, prevIsRepeat, nextIsRepeat, inside + i))
-          case Group(n)                 => Group(loop(n, prevIsRepeat, nextIsRepeat, inside))
-          case Repeat(q, n)             =>
-            val (min, k) = q.normalized match
-              case Quantifier.Exact(n, _)          => (n, n)
-              case Quantifier.Unbounded(min, _)    => (min, min)
-              case Quantifier.Bounded(min, max, _) => (min, max)
+            copy:
+              Sequence:
+                ns.zipWithIndex.map:
+                  case (c, i) =>
+                    val prev = children(i - 1).map(isRepeat).getOrElse(prevIsRepeat)
+                    val next = children(i + 1).map(isRepeat).getOrElse(nextIsRepeat)
+                    loop(c, prev, next, inside)
+          case Capture(i, name, n) => copy(Capture(i, name, loop(n, prevIsRepeat, nextIsRepeat, inside + i)))
+          case Atomic(n)           => loop(n, prevIsRepeat, nextIsRepeat, inside)
+          case Repeat(n, q)        =>
+            val (min, k, strategy) = q match
+              case IRQuantifier.Exact(n)                    => (n, n, None)
+              case IRQuantifier.Unbounded(min, strategy)    => (min, min, Some(strategy))
+              case IRQuantifier.Bounded(min, max, strategy) => (min, max, Some(strategy))
             if k > maxSimpleRepeatSize then
-              if min == 0 then Repeat(Quantifier.Star(q.isLazy), loop(n, true, true, inside))
-              else Repeat(Quantifier.Plus(q.isLazy), loop(n, true, true, inside))
-            else Repeat(q, loop(n, true, true, inside))
+              val s = strategy.getOrElse(BacktrackStrategy.Greedy)
+              // The new repetition has no location, so that it is built as written by `*` or `+`.
+              IRNode(Repeat(loop(n, true, true, inside), IRQuantifier.Unbounded(if min == 0 then 0 else 1, s)))
+            else copy(Repeat(loop(n, true, true, inside), q))
           case LookAhead(negative, n) =>
             val c = loop(n, prevIsRepeat, nextIsRepeat, inside)
-            if !negative && nextIsRepeat then c else Disjunction(Seq(c, Sequence(Seq.empty)))
+            if !negative && nextIsRepeat then c else copy(Disjunction(Seq(c, empty)))
           case LookBehind(negative, n) =>
             val c = loop(n, prevIsRepeat, nextIsRepeat, inside)
-            if !negative && prevIsRepeat then c else Disjunction(Seq(c, Sequence(Seq.empty)))
-          case BackReference(i)         => backRef(i, prevIsRepeat, nextIsRepeat, inside)
-          case NamedBackReference(i, _) => backRef(i, prevIsRepeat, nextIsRepeat, inside)
-          case n                        => n
+            if !negative && prevIsRepeat then c else copy(Disjunction(Seq(c, empty)))
+          case BackReference(indices, _) =>
+            val captures = indices.filterNot(inside.contains).flatMap(i => backRefs.get(i).map((i, _)))
+            if captures.isEmpty then copy(Empty)
+            else
+              val cs = captures.map((i, n) => loop(n, prevIsRepeat, nextIsRepeat, inside + i))
+              copy(Disjunction(cs :+ empty))
+          case Assert(_) if dropsAssertions => copy(Empty)
+          case Unsupported(_)               => copy(Empty)
+          case _                            => node
 
-      def backRef(i: Int, prevIsRepeat: Boolean, nextIsRepeat: Boolean, inside: Set[Int]): Node =
-        if inside.contains(i) then Sequence(Seq.empty)
-        else Disjunction(Seq(loop(backRefs(i), prevIsRepeat, nextIsRepeat, inside + i), Sequence(Seq.empty)))
-
-      Pattern(loop(pattern.node, true, true, Set.empty), pattern.flagSet)
+      pattern.copy(ir = pattern.ir.copy(node = loop(pattern.node, true, true, Set.empty)))
 
   /** Extracts back-references inside the given node. */
-  private[fuzz] def extractBackRefs(node: Node): Map[Int, Node] = node match
-    case Disjunction(ns)       => ns.flatMap(extractBackRefs).toMap
-    case Sequence(ns)          => ns.flatMap(extractBackRefs).toMap
-    case Capture(i, n)         => Map(i -> n) ++ extractBackRefs(n)
-    case NamedCapture(i, _, n) => Map(i -> n) ++ extractBackRefs(n)
-    case Group(n)              => extractBackRefs(n)
-    case Repeat(_, n)          => extractBackRefs(n)
-    case LookAhead(_, n)       => extractBackRefs(n)
-    case LookBehind(_, n)      => extractBackRefs(n)
-    case _                     => Map.empty
+  private[fuzz] def extractBackRefs(node: IRNode): Map[Int, IRNode] = node.data match
+    case Capture(i, _, n) => Map(i -> n) ++ extractBackRefs(n)
+    case _                => node.children.flatMap(extractBackRefs).toMap
 
 private[fuzz] class StaticSeeder[A, Q](
     val alphabet: Set[A],

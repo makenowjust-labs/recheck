@@ -7,7 +7,7 @@ import codes.quine.labs.recheck.automaton.Complexity.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.data.Graph
 import codes.quine.labs.recheck.diagnostics.Hotspot
-import codes.quine.labs.recheck.regexp.Pattern.Location
+import codes.quine.labs.recheck.regexp.Location
 
 /** ReDoS vulnerable RegExp checker based on automata theory. */
 object AutomatonChecker:

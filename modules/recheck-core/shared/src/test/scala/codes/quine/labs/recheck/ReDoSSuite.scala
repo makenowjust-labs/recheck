@@ -12,14 +12,16 @@ import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Hotspot
-import codes.quine.labs.recheck.regexp.Pattern
-import codes.quine.labs.recheck.regexp.Pattern.*
+import codes.quine.labs.recheck.diagnostics.Hotspot.*
+import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.util.UStringUtil
 
 class ReDoSSuite extends munit.FunSuite:
 
   /** A default context. */
   given ctx: Context = Context()
+
+  def parse(source: String, flags: String = ""): ParsedPattern = ParsedPattern.parse(source, flags).toTry.get
 
   test("ReDoS.check"):
     assertEquals(
@@ -41,7 +43,7 @@ class ReDoSSuite extends munit.FunSuite:
     )
     assertEquals(
       ReDoS.check("", "x"),
-      Diagnostics.Unknown("", "x", Diagnostics.ErrorKind.InvalidRegExp("unknown flag"), None)
+      Diagnostics.Unknown("", "x", Diagnostics.ErrorKind.InvalidRegExp("Unknown flag 'x' at 0"), None)
     )
     assertEquals(
       ReDoS.check("^foo$", "", Parameters(timeout = Duration.MinusInf)),
@@ -50,21 +52,7 @@ class ReDoSSuite extends munit.FunSuite:
 
   test("ReDoS.checkAutomaton"):
     assertEquals(
-      ReDoS.checkAutomaton(
-        "^(?:a|a)*$",
-        "",
-        Pattern(
-          Sequence(
-            Seq(
-              LineBegin(),
-              Repeat(Quantifier.Star(false), Group(Disjunction(Seq(Character('a'), Character('a'))))),
-              LineEnd()
-            )
-          ),
-          FlagSet(false, false, false, false, false, false)
-        ),
-        Parameters(checker = Checker.Automaton)
-      ),
+      ReDoS.checkAutomaton("^(?:a|a)*$", "", parse("^(?:a|a)*$"), Parameters(checker = Checker.Automaton)),
       Success(
         Diagnostics.Vulnerable(
           "^(?:a|a)*$",
@@ -75,33 +63,17 @@ class ReDoSSuite extends munit.FunSuite:
             UStringUtil.fromString("\u0000"),
             31
           ),
-          Hotspot.empty,
+          Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))),
           Checker.Automaton
         )
       )
     )
     assertEquals(
-      ReDoS.checkAutomaton(
-        "^(?:.|.)*$",
-        "s",
-        Pattern(
-          Sequence(Seq(LineBegin(), Repeat(Quantifier.Star(false), Group(Disjunction(Seq(Dot(), Dot())))), LineEnd())),
-          FlagSet(false, false, false, true, false, false)
-        ),
-        Parameters(checker = Checker.Automaton)
-      ),
+      ReDoS.checkAutomaton("^(?:.|.)*$", "s", parse("^(?:.|.)*$", "s"), Parameters(checker = Checker.Automaton)),
       Success(Diagnostics.Safe("^(?:.|.)*$", "s", AttackComplexity.Linear, Checker.Automaton))
     )
     assertEquals(
-      ReDoS.checkAutomaton(
-        "^.$",
-        "",
-        Pattern(
-          Sequence(Seq(LineBegin(), Dot(), LineEnd())),
-          FlagSet(false, false, false, false, false, false)
-        ),
-        Parameters(checker = Checker.Automaton)
-      ),
+      ReDoS.checkAutomaton("^.$", "", parse("^.$"), Parameters(checker = Checker.Automaton)),
       Success(Diagnostics.Safe("^.$", "", AttackComplexity.Safe(false), Checker.Automaton))
     )
 
@@ -110,16 +82,7 @@ class ReDoSSuite extends munit.FunSuite:
       .checkFuzz(
         "^(?:a|a)*$",
         "",
-        Pattern(
-          Sequence(
-            Seq(
-              LineBegin(),
-              Repeat(Quantifier.Star(false), Group(Disjunction(Seq(Character('a'), Character('a'))))),
-              LineEnd()
-            )
-          ),
-          FlagSet(false, false, false, false, false, false)
-        ),
+        parse("^(?:a|a)*$"),
         Parameters(checker = Checker.Fuzz, randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
       )
       .get
@@ -129,7 +92,7 @@ class ReDoSSuite extends munit.FunSuite:
       ReDoS.checkFuzz(
         ".",
         "",
-        Pattern(Dot(), FlagSet(false, false, false, false, false, false)),
+        parse("."),
         Parameters(checker = Checker.Fuzz, randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
       ),
       Success(Diagnostics.Safe(".", "", AttackComplexity.Safe(true), Checker.Fuzz))
@@ -138,32 +101,13 @@ class ReDoSSuite extends munit.FunSuite:
       "timeout at modules/recheck-core/shared/src/main/scala/codes/quine/labs/recheck/fuzz/FuzzProgram.scala:28"
     ) {
       val ctx = Context(timeout = Duration.MinusInf)
-      val result = ReDoS.checkFuzz(
-        ".",
-        "",
-        Pattern(Dot(), FlagSet(false, false, false, false, false, false)),
-        Parameters(timeout = Duration.MinusInf)
-      )(using ctx)
+      val result = ReDoS.checkFuzz(".", "", parse("."), Parameters(timeout = Duration.MinusInf))(using ctx)
       result.get
     }
 
   test("ReDoS.checkAuto"):
     assertEquals(
-      ReDoS.checkAuto(
-        "^(?:a|a)*$",
-        "",
-        Pattern(
-          Sequence(
-            Seq(
-              LineBegin(),
-              Repeat(Quantifier.Star(false), Group(Disjunction(Seq(Character('a'), Character('a'))))),
-              LineEnd()
-            )
-          ),
-          FlagSet(false, false, false, false, false, false)
-        ),
-        Parameters(randomSeed = 0)
-      ),
+      ReDoS.checkAuto("^(?:a|a)*$", "", parse("^(?:a|a)*$"), Parameters(randomSeed = 0)),
       Success(
         Diagnostics.Vulnerable(
           "^(?:a|a)*$",
@@ -174,7 +118,7 @@ class ReDoSSuite extends munit.FunSuite:
             UStringUtil.fromString("\u0000"),
             31
           ),
-          Hotspot.empty,
+          Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))),
           Checker.Automaton
         )
       )
@@ -183,64 +127,26 @@ class ReDoSSuite extends munit.FunSuite:
       ReDoS.checkAuto(
         "^(?:a|a){3}$",
         "",
-        Pattern(
-          Sequence(
-            Seq(
-              LineBegin(),
-              Repeat(Quantifier.Exact(3, false), Group(Disjunction(Seq(Character('a'), Character('a'))))),
-              LineEnd()
-            )
-          ),
-          FlagSet(false, false, false, false, false, false)
-        ),
+        parse("^(?:a|a){3}$"),
         Parameters(randomSeed = 0, maxRepeatCount = 3, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
       ),
       Success(Diagnostics.Safe("^(?:a|a){3}$", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
     assertEquals(
       ReDoS.checkAuto(
-        "^(?:a|a){3}$",
+        "^(?:a|a){3,}",
         "",
-        Pattern(
-          Sequence(
-            Seq(LineBegin(), Repeat(Quantifier.Unbounded(3, false), Disjunction(Seq(Character('a'), Character('a')))))
-          ),
-          FlagSet(false, false, false, false, false, false)
-        ),
+        parse("^(?:a|a){3,}"),
         Parameters(randomSeed = 0, maxNFASize = 3, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
       ),
-      Success(Diagnostics.Safe("^(?:a|a){3}$", "", AttackComplexity.Safe(true), Checker.Fuzz))
+      Success(Diagnostics.Safe("^(?:a|a){3,}", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
     assertEquals(
       ReDoS.checkAuto(
         "^.*$",
         "",
-        Pattern(
-          Sequence(Seq(LineBegin(), Repeat(Quantifier.Star(false), Dot()), LineEnd())),
-          FlagSet(false, false, false, false, false, false)
-        ),
+        parse("^.*$"),
         Parameters(randomSeed = 0, maxPatternSize = 1, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
       ),
       Success(Diagnostics.Safe("^.*$", "", AttackComplexity.Safe(true), Checker.Fuzz))
     )
-
-  test("ReDoS.repeatCount"):
-    val flagSet = FlagSet(false, false, false, false, false, false)
-    val repeat4 = Repeat(Quantifier.Exact(4, false), Dot())
-    val repeat5 = Repeat(Quantifier.Unbounded(5, false), Dot())
-    val repeat6 = Repeat(Quantifier.Bounded(4, 6, false), Dot())
-    assertEquals(ReDoS.repeatCount(Pattern(Dot(), flagSet)), 0)
-    assertEquals(ReDoS.repeatCount(Pattern(repeat4, flagSet)), 4)
-    assertEquals(ReDoS.repeatCount(Pattern(repeat5, flagSet)), 5)
-    assertEquals(ReDoS.repeatCount(Pattern(repeat6, flagSet)), 6)
-    assertEquals(ReDoS.repeatCount(Pattern(Disjunction(Seq(repeat4, repeat6)), flagSet)), 10)
-    assertEquals(ReDoS.repeatCount(Pattern(Sequence(Seq(repeat4, repeat6)), flagSet)), 10)
-    assertEquals(ReDoS.repeatCount(Pattern(Capture(1, repeat5), flagSet)), 5)
-    assertEquals(ReDoS.repeatCount(Pattern(NamedCapture(1, "x", repeat5), flagSet)), 5)
-    assertEquals(ReDoS.repeatCount(Pattern(Group(repeat5), flagSet)), 5)
-    assertEquals(ReDoS.repeatCount(Pattern(Repeat(Quantifier.Star(false), repeat5), flagSet)), 5)
-    assertEquals(ReDoS.repeatCount(Pattern(Repeat(Quantifier.Plus(false), repeat5), flagSet)), 5)
-    assertEquals(ReDoS.repeatCount(Pattern(Repeat(Quantifier.Question(false), repeat5), flagSet)), 5)
-    assertEquals(ReDoS.repeatCount(Pattern(Repeat(Quantifier.Exact(10, false), repeat5), flagSet)), 15)
-    assertEquals(ReDoS.repeatCount(Pattern(LookAhead(false, repeat5), flagSet)), 5)
-    assertEquals(ReDoS.repeatCount(Pattern(LookBehind(false, repeat5), flagSet)), 5)

@@ -2,7 +2,7 @@ package codes.quine.labs.recheck.diagnostics
 
 import scala.io.AnsiColor.*
 
-import codes.quine.labs.recheck.regexp.Pattern.Location
+import codes.quine.labs.recheck.regexp.Location
 
 class HotspotSuite extends munit.FunSuite {
   test("Hotspot#highlight") {

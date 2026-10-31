@@ -9,7 +9,7 @@ import scala.util.Success
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.regexp.Parser
+import codes.quine.labs.recheck.regexp.ParsedPattern
 
 class FuzzCheckerSuite extends munit.FunSuite:
 
@@ -28,9 +28,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
       attackTimeout: Duration = Parameters.DefaultAttackTimeout
   ): Boolean =
     val result = for
-      pattern <- Parser.parse(source, flags) match
-        case Right(pattern) => Success(pattern)
-        case Left(ex)       => Failure(InvalidRegExpException(ex.getMessage))
+      pattern <- ParsedPattern.parse(source, flags).toTry
       fuzz <- FuzzProgram.from(pattern)
     yield FuzzChecker
       .check(
@@ -79,9 +77,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
     // The checker can find an attack string on seeding phase.
     assert:
       val result = for
-        pattern <- Parser.parse("^(a?){50}a{50}$", "") match
-          case Right(pattern) => Success(pattern)
-          case Left(ex)       => Failure(InvalidRegExpException(ex.getMessage))
+        pattern <- ParsedPattern.parse("^(a?){50}a{50}$", "").toTry
         fuzz <- FuzzProgram.from(pattern)
       yield FuzzChecker
         .check(
@@ -98,9 +94,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
     // The checker cannot find too small attack string
     assert:
       val result = for
-        pattern <- Parser.parse("^(a|a)*$", "") match
-          case Right(pattern) => Success(pattern)
-          case Left(ex)       => Failure(InvalidRegExpException(ex.getMessage))
+        pattern <- ParsedPattern.parse("^(a|a)*$", "").toTry
         fuzz <- FuzzProgram.from(pattern)
       yield FuzzChecker
         .check(

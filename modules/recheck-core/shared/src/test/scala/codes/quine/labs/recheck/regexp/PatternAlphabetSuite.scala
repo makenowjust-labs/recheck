@@ -2,50 +2,69 @@ package codes.quine.labs.recheck.regexp
 
 import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UnitMode
 
 class PatternAlphabetSuite extends munit.FunSuite:
-  test("PatternAlphabet.build"):
-    assertEquals(PatternAlphabet.build(false, true).pairs, IndexedSeq((EcmaScriptChars.any(true), CharKind.Normal)))
-    assertEquals(PatternAlphabet.build(false, false).pairs, IndexedSeq((EcmaScriptChars.any(false), CharKind.Normal)))
+  val Word: CharSet = CharSet.fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))
 
-    assert(PatternAlphabet.build(true, false).pairs.head._1.contains('A'))
-    assert(!PatternAlphabet.build(true, false).pairs.head._1.contains('a'))
-    assert(PatternAlphabet.build(true, true).pairs.head._1.contains('s'))
-    assert(!PatternAlphabet.build(true, true).pairs.head._1.contains(0x017f))
+  test("PatternAlphabet.build"):
+    assertEquals(
+      PatternAlphabet.build(UnitMode.CodePoint).pairs,
+      IndexedSeq((UnitMode.CodePoint.universe, CharKind.Normal))
+    )
+    assertEquals(PatternAlphabet.build(UnitMode.Utf16).pairs, IndexedSeq((UnitMode.Utf16.universe, CharKind.Normal)))
+    assertEquals(PatternAlphabet.build(UnitMode.Byte).pairs, IndexedSeq((UnitMode.Byte.universe, CharKind.Normal)))
 
     assertEquals(
-      PatternAlphabet.build(false, false, Seq(CharSet.single('A'))).pairs,
+      PatternAlphabet.build(UnitMode.Utf16, Seq(CharSet.single('A'))).pairs,
       IndexedSeq(
         (CharSet.single('A'), CharKind.Normal),
         (CharSet.range(0, 'A' - 1).union(CharSet.range('B', 0xffff)), CharKind.Normal)
       )
     )
     assertEquals(
-      PatternAlphabet
-        .build(false, false, Seq(CharSet.single('a'), CharSet.single('A')), word = Some(EcmaScriptChars.Word))
-        .pairs,
+      PatternAlphabet.build(UnitMode.Utf16, Seq(CharSet.single('a'), CharSet.single('A')), word = Some(Word)).pairs,
       IndexedSeq(
         (CharSet.single('a'), CharKind.Word),
         (CharSet.single('A'), CharKind.Word),
-        (EcmaScriptChars.Word.diff(CharSet.of('a', 'A')), CharKind.Word),
-        (EcmaScriptChars.any(false).diff(EcmaScriptChars.Word), CharKind.Normal)
+        (Word.diff(CharSet.of('a', 'A')), CharKind.Word),
+        (UnitMode.Utf16.universe.diff(Word), CharKind.Normal)
       )
     )
     assertEquals(
-      PatternAlphabet.build(false, false, Seq(CharSet.single('\n')), lineTerminator = Some(CharSet.single('\n'))).pairs,
+      PatternAlphabet
+        .build(UnitMode.Utf16, Seq(CharSet.single('\n')), lineTerminator = Some(CharSet.single('\n')))
+        .pairs,
       IndexedSeq(
         (CharSet.single('\n'), CharKind.LineTerminator),
-        (EcmaScriptChars.any(false).diff(CharSet.single('\n')), CharKind.Normal)
+        (UnitMode.Utf16.universe.diff(CharSet.single('\n')), CharKind.Normal)
       )
     )
-    // An atom outside all characters, such as a lowercase letter with ignore-case, follows them.
+    // A set outside the mode is restricted.
     assertEquals(
-      PatternAlphabet.build(true, false, word = Some(EcmaScriptChars.Word)).pairs.last,
-      (CharSet.range('a', 'z'), CharKind.Word)
+      PatternAlphabet.build(UnitMode.Byte, Seq(CharSet.range(0xf0, 0x10ffff))).pairs.map(_._1),
+      IndexedSeq(CharSet.range(0xf0, 0xff), CharSet.range(0, 0xef))
     )
 
+  test("PatternAlphabet.build: preferred"):
+    val canonical = CharSet.range(0, 'a' - 1).union(CharSet.range('z' + 1, 0xffff))
+    val alphabet =
+      PatternAlphabet.build(UnitMode.Utf16, Seq(CharSet.of('a', 'A'), CharSet.single('b')), preferred = Some(canonical))
+    // An atom is narrowed to its preferred characters, unless it has none.
+    assertEquals(
+      alphabet.pairs.map(_._1),
+      IndexedSeq(
+        CharSet.single('A'),
+        CharSet.single('b'),
+        UnitMode.Utf16.universe.diff(CharSet.of('a', 'b', 'A')).intersect(canonical)
+      )
+    )
+    assertEquals(alphabet.refine(CharSet.of('a', 'A')), Set((CharSet.single('A'), CharKind.Normal)))
+    assertEquals(alphabet.refine(CharSet.single('b')), Set((CharSet.single('b'), CharKind.Normal)))
+
   locally:
-    val alphabet = PatternAlphabet.build(false, false, Seq(CharSet.single('A')), word = Some(CharSet.range('A', 'Z')))
+    val alphabet =
+      PatternAlphabet.build(UnitMode.Utf16, Seq(CharSet.single('A')), word = Some(CharSet.range('A', 'Z')))
 
     test("PatternAlphabet#refine"):
       assertEquals(
@@ -62,8 +81,3 @@ class PatternAlphabetSuite extends munit.FunSuite:
 
     test("PatternAlphabet#any"):
       assertEquals(alphabet.any, alphabet.pairs.toSet)
-
-  test("PatternAlphabet#dot"):
-    val alphabet = PatternAlphabet.build(false, false, Seq(EcmaScriptChars.LineTerminator))
-    assertEquals(alphabet.dot, alphabet.refineInvert(EcmaScriptChars.LineTerminator))
-    assertEquals(alphabet.newline, alphabet.refine(EcmaScriptChars.LineTerminator))

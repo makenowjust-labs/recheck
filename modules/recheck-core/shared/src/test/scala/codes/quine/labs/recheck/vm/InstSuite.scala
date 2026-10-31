@@ -2,12 +2,18 @@ package codes.quine.labs.recheck.vm
 
 import scala.language.implicitConversions
 
-import codes.quine.labs.recheck.regexp.EcmaScriptChars
-import codes.quine.labs.recheck.regexp.Pattern.Location
+import codes.quine.labs.recheck.regexp.Location
 import codes.quine.labs.recheck.vm.Inst.AssertKind
 import codes.quine.labs.recheck.vm.Inst.ReadKind
+import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
+import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
+import codes.quine.labs.resyntax.ir.IRCaseEquivalence
+import codes.quine.labs.resyntax.ir.IRLineTerminators
 
 class InstSuite extends munit.FunSuite:
+  val Word: CharSet = CharSet.fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))
+
   test("Inst#toString"):
     assertEquals(Inst.Ok.toString, "ok")
     assertEquals(Inst.Jmp(Label("x", 0)).toString, "jmp #x@0")
@@ -22,6 +28,7 @@ class InstSuite extends munit.FunSuite:
     )
     assertEquals(Inst.Cmp(CounterReg(0), 1, Label("x", 2), Label("y", 3)).toString, "cmp %0 1 #x@2 #y@3")
     assertEquals(Inst.Rollback.toString, "rollback")
+    assertEquals(Inst.Commit.toString, "commit")
     assertEquals(Inst.Tx(Label("x", 0), None, None).toString, "tx #x@0 FAIL FAIL")
     assertEquals(Inst.Tx(Label("x", 0), Some(Label("y", 1)), None).toString, "tx #x@0 #y@1 FAIL")
     assertEquals(Inst.Tx(Label("x", 0), None, Some(Label("y", 1))).toString, "tx #x@0 FAIL #y@1")
@@ -52,22 +59,25 @@ class InstSuite extends munit.FunSuite:
     )
     assertEquals(Inst.Cmp(CounterReg(0), 1, Label("x", 2), Label("y", 3)).successors, Set(Label("x", 2), Label("y", 3)))
     assertEquals(Inst.Rollback.successors, Set.empty[Label])
+    assertEquals(Inst.Commit.successors, Set.empty[Label])
     assertEquals(Inst.Tx(Label("x", 0), None, None).successors, Set(Label("x", 0)))
     assertEquals(Inst.Tx(Label("x", 0), Some(Label("y", 1)), None).successors, Set(Label("x", 0), Label("y", 1)))
     assertEquals(Inst.Tx(Label("x", 0), None, Some(Label("y", 1))).successors, Set(Label("x", 0), Label("y", 1)))
 
   test("Inst.AssertKind#toString"):
-    assertEquals(AssertKind.WordBoundary.toString, "word_boundary")
-    assertEquals(AssertKind.WordBoundaryNot.toString, "word_boundary_not")
-    assertEquals(AssertKind.LineBegin.toString, "line_begin")
-    assertEquals(AssertKind.LineEnd.toString, "line_end")
+    assertEquals(AssertKind.WordBoundary(Word).toString, "word_boundary")
+    assertEquals(AssertKind.WordBoundaryNot(Word).toString, "word_boundary_not")
+    assertEquals(AssertKind.LineBegin(IRLineTerminators.JavaScript, true).toString, "line_begin")
+    assertEquals(AssertKind.LineEnd(IRLineTerminators.JavaScript).toString, "line_end")
     assertEquals(AssertKind.InputBegin.toString, "input_begin")
     assertEquals(AssertKind.InputEnd.toString, "input_end")
+    assertEquals(AssertKind.ChompInputEnd(IRLineTerminators.LF).toString, "chomp_input_end")
 
   test("Inst.ReadKind#toString"):
     assertEquals(ReadKind.Any.toString, "any")
-    assertEquals(ReadKind.Dot.toString, "dot")
     assertEquals(ReadKind.Char('a').toString, "char 'a'")
-    assertEquals(ReadKind.Class(EcmaScriptChars.Word).toString, "class [0-9A-Z_a-z]")
-    assertEquals(ReadKind.ClassNot(EcmaScriptChars.Word).toString, "class_not [0-9A-Z_a-z]")
-    assertEquals(ReadKind.Ref(0).toString, "ref 0")
+    assertEquals(ReadKind.Class(Word).toString, "class [0-9A-Z_a-z]")
+    assertEquals(ReadKind.ClassNot(Word).toString, "class_not [0-9A-Z_a-z]")
+    val semantics = IRBackReferenceSemantics(true, IRBackReferenceChoice.FirstSet)
+    assertEquals(ReadKind.Ref(Seq(0), semantics, IRCaseEquivalence.Identity).toString, "ref 0")
+    assertEquals(ReadKind.Ref(Seq(1, 2), semantics, IRCaseEquivalence.JavaAscii).toString, "ref 1,2 ignore_case")

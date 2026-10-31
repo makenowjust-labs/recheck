@@ -1,6 +1,7 @@
 package codes.quine.labs.recheck.vm
 
 import codes.quine.labs.recheck.vm.Program.Meta
+import codes.quine.labs.resyntax.charset.UnitMode
 
 /** Program is a compiled RegExp pattern. */
 final case class Program(blocks: Vector[(Label, Block)], meta: Meta):
@@ -14,13 +15,19 @@ final case class Program(blocks: Vector[(Label, Block)], meta: Meta):
 
 object Program:
 
-  /** Meta is a meta information of a program for matching and analysis. */
+  /** Meta is a meta information of a program for matching and analysis.
+    *
+    * @param mode
+    *   the unit of characters, where the input is UTF-16 code units for `Utf16` and `CodePoint`, and bytes for `Byte`
+    */
   final case class Meta(
-      ignoreCase: Boolean,
-      unicode: Boolean,
+      mode: UnitMode,
       hasRef: Boolean,
       capturesSize: Int,
       countersSize: Int,
       canariesSize: Int,
       predecessors: Vector[Set[Label]]
-  )
+  ):
+
+    /** Whether a surrogate pair of the input is read as one character. */
+    def unicode: Boolean = mode == UnitMode.CodePoint

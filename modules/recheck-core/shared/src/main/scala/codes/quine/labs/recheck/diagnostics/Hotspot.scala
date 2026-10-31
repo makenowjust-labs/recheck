@@ -3,7 +3,7 @@ package codes.quine.labs.recheck.diagnostics
 import scala.io.AnsiColor.*
 
 import codes.quine.labs.recheck.diagnostics.Hotspot.*
-import codes.quine.labs.recheck.regexp.Pattern.Location
+import codes.quine.labs.recheck.regexp.Location
 
 /** Hotspot is a collection of hotspots in the analyzed RegExp. */
 final case class Hotspot(spots: Seq[Spot]):

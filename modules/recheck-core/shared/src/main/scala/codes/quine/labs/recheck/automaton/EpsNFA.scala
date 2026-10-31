@@ -7,7 +7,7 @@ import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.regexp.EcmaScriptChars
-import codes.quine.labs.recheck.regexp.Pattern.Location
+import codes.quine.labs.recheck.regexp.Location
 import codes.quine.labs.recheck.regexp.PatternAlphabet
 import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
 import codes.quine.labs.recheck.util.GraphvizUtil.escape

@@ -9,7 +9,7 @@ import scala.util.Success
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.fuzz.DynamicSeeder.*
-import codes.quine.labs.recheck.regexp.Parser
+import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.charset.CharSet
 
@@ -21,9 +21,7 @@ class DynamicSeederSuite extends munit.FunSuite:
   test("DynamicSeeder.seed"):
     def seed(source: String, flags: String): Set[String] =
       val result = for
-        pattern <- Parser.parse(source, flags) match
-          case Right(pattern) => Success(pattern)
-          case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
+        pattern <- ParsedPattern.parse(source, flags).toTry
         fuzz <- FuzzProgram.from(pattern)
       yield DynamicSeeder.seed(fuzz, timeout = Duration.Inf)
       result.get.map(_.toString)

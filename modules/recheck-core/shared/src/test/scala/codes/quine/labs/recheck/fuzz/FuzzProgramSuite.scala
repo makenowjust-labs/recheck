@@ -2,7 +2,7 @@ package codes.quine.labs.recheck.fuzz
 
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.regexp.Parser
+import codes.quine.labs.recheck.regexp.ParsedPattern
 
 class FuzzProgramSuite extends munit.FunSuite:
 
@@ -12,7 +12,7 @@ class FuzzProgramSuite extends munit.FunSuite:
   test("FuzzProgram#usesAcceleration"):
     def from(source: String, flags: String): FuzzProgram =
       (for
-        pattern <- Parser.parse(source, flags).toTry
+        pattern <- ParsedPattern.parse(source, flags).toTry
         fuzz <- FuzzProgram.from(pattern)
       yield fuzz).get
 

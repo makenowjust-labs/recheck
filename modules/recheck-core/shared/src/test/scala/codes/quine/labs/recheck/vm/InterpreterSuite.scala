@@ -8,8 +8,8 @@ import scala.util.Success
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.InvalidRegExpException
-import codes.quine.labs.recheck.regexp.Parser
-import codes.quine.labs.recheck.regexp.Pattern.Location
+import codes.quine.labs.recheck.regexp.ParsedPattern
+import codes.quine.labs.recheck.regexp.Location
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.recheck.vm.Inst.ReadKind
 import codes.quine.labs.recheck.vm.Interpreter.CoverageItem
@@ -18,15 +18,20 @@ import codes.quine.labs.recheck.vm.Interpreter.FailedPoint
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
+import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
+import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
+import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 
 class InterpreterSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
+  /** A JavaScript back-reference to the index. */
+  def ref(index: Int): ReadKind.Ref =
+    ReadKind.Ref(Seq(index), IRBackReferenceSemantics(true, IRBackReferenceChoice.FirstSet), IRCaseEquivalence.Identity)
+
   def matches(source: String, flags: String, input: String, pos: Int, opts: Options): Result =
     val t = for
-      pattern <- Parser.parse(source, flags) match
-        case Right(pattern) => Success(pattern)
-        case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
+      pattern <- ParsedPattern.parse(source, flags).toTry
       program <- ProgramBuilder.build(pattern)
       result = Interpreter.run(program, UStringUtil.fromString(input), pos, opts)
     yield result
@@ -76,11 +81,11 @@ class InterpreterSuite extends munit.FunSuite:
         Set(
           FailedPoint(CoverageLocation(6, Vector.empty), 4, ReadKind.Char('a'), None),
           FailedPoint(CoverageLocation(9, Vector.empty), 4, ReadKind.Char('a'), None),
-          FailedPoint(CoverageLocation(12, Vector.empty), 3, ReadKind.Ref(1), Some(UStringUtil.fromString("aaa"))),
-          FailedPoint(CoverageLocation(12, Vector.empty), 4, ReadKind.Ref(1), Some(UStringUtil.fromString("aaaa"))),
+          FailedPoint(CoverageLocation(12, Vector.empty), 3, ref(1), Some(UStringUtil.fromString("aaa"))),
+          FailedPoint(CoverageLocation(12, Vector.empty), 4, ref(1), Some(UStringUtil.fromString("aaaa"))),
           FailedPoint(CoverageLocation(18, Vector.empty), 0, ReadKind.Char('a'), None),
-          FailedPoint(CoverageLocation(21, Vector.empty), 0, ReadKind.Ref(2), Some(UStringUtil.fromString("aaaa"))),
-          FailedPoint(CoverageLocation(21, Vector.empty), 1, ReadKind.Ref(2), Some(UStringUtil.fromString("aaa")))
+          FailedPoint(CoverageLocation(21, Vector.empty), 0, ref(2), Some(UStringUtil.fromString("aaaa"))),
+          FailedPoint(CoverageLocation(21, Vector.empty), 1, ref(2), Some(UStringUtil.fromString("aaa")))
         ),
         Set(
           CoverageItem(CoverageLocation(1, Vector.empty), true),
@@ -295,9 +300,7 @@ class InterpreterSuite extends munit.FunSuite:
         timeout: Duration
     )(using ctx: Context): Result =
       val t = for
-        pattern <- Parser.parse(source, flags) match
-          case Right(pattern) => Success(pattern)
-          case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
+        pattern <- ParsedPattern.parse(source, flags).toTry
         program <- ProgramBuilder.build(pattern)
         result = Interpreter.runWithTimeout(program, UStringUtil.fromString(input), pos, opts, timeout)
       yield result

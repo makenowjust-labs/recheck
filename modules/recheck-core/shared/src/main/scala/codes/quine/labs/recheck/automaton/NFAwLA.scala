@@ -6,7 +6,7 @@ import scala.collection.mutable
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.data.Graph
 import codes.quine.labs.recheck.data.MultiSet
-import codes.quine.labs.recheck.regexp.Pattern.Location
+import codes.quine.labs.recheck.regexp.Location
 import codes.quine.labs.recheck.util.GraphvizUtil.escape
 
 /** NFAwLA is a NFA with a look-ahead DFA.

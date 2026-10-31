@@ -4,7 +4,7 @@ import scala.util.Try
 
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.regexp.Pattern
+import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.regexp.PatternAlphabet
 import codes.quine.labs.recheck.regexp.PatternExtensions.*
 import codes.quine.labs.recheck.vm.Program
@@ -23,7 +23,7 @@ final case class FuzzProgram(program: Program, alphabet: PatternAlphabet, parts:
 object FuzzProgram:
 
   /** Builds a program from the pattern. */
-  def from(pattern: Pattern)(using ctx: Context): Try[FuzzProgram] =
+  def from(pattern: ParsedPattern)(using ctx: Context): Try[FuzzProgram] =
     Try:
       ctx.interrupt:
         for

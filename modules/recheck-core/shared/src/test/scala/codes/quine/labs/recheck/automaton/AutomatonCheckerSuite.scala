@@ -11,8 +11,7 @@ import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.Hotspot.*
-import codes.quine.labs.recheck.regexp.EcmaScriptChars
-import codes.quine.labs.recheck.regexp.Parser
+import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 
@@ -24,9 +23,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
   /** Runs a checker against the RegExp. */
   def check(source: String, flags: String): Try[Complexity[CharSet]] =
     for
-      pattern <- Parser.parse(source, flags) match
-        case Right(pattern) => Success(pattern)
-        case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
+      pattern <- ParsedPattern.parse(source, flags).toTry
       epsNFA <- EpsNFABuilder.build(pattern)
       nfa = epsNFA.toOrderedNFA.rename
       result <- Try(AutomatonChecker.check(nfa).nextOption().getOrElse(Complexity.Constant))
@@ -49,7 +46,10 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     val a = CharSet.single('a')
     val at = CharSet.single('@')
     val other1 = a.complement(UnitMode.Utf16)
-    val other2 = EcmaScriptChars.Word.union(at).complement(UnitMode.Utf16)
+    val other2 = CharSet
+      .fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))
+      .union(at)
+      .complement(UnitMode.Utf16)
     assertEquals(
       check("^.*a.*a$", "s"),
       Success(

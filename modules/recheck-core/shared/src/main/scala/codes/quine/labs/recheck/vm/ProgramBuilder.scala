@@ -5,19 +5,27 @@ import scala.compiletime.uninitialized
 import scala.util.Try
 
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.regexp.EcmaScriptChars
-import codes.quine.labs.recheck.regexp.Pattern
-import codes.quine.labs.recheck.regexp.Pattern.*
+import codes.quine.labs.recheck.common.UnsupportedException
+import codes.quine.labs.recheck.regexp.Location
+import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.regexp.PatternExtensions.*
 import codes.quine.labs.recheck.vm.Inst.AssertKind
 import codes.quine.labs.recheck.vm.Inst.ReadKind
 import codes.quine.labs.recheck.vm.Program.Meta
+import codes.quine.labs.resyntax.ast.BacktrackStrategy
+import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.ir.IRAssertKind
+import codes.quine.labs.resyntax.ir.IRBuilder
+import codes.quine.labs.resyntax.ir.IRNode
+import codes.quine.labs.resyntax.ir.IRNodeData
+import codes.quine.labs.resyntax.ir.IRQuantifier
 
 /** ProgramBuilder is a builder of a program from a RegExp pattern. */
 object ProgramBuilder:
 
   /** Builds a corresponding program from the RegExp pattern. */
-  def build(pattern: Pattern)(using ctx: Context): Try[Program] =
+  def build(pattern: ParsedPattern)(using ctx: Context): Try[Program] =
     for
       _ <- Try(())
       capturesSize = pattern.capturesSize
@@ -26,12 +34,16 @@ object ProgramBuilder:
     yield program
 
 private[vm] class ProgramBuilder(
-    private val pattern: Pattern,
+    private val pattern: ParsedPattern,
     private val capturesSize: Int
 )(using ctx: Context):
   import ctx._
-  import pattern._
-  import flagSet._
+
+  /** The unit mode of the pattern. */
+  private val mode = pattern.ir.mode
+
+  /** Whether captures in a repetition are reset on each iteration, which only JavaScript does. */
+  private val resetsCaptures = pattern.dialect == Dialect.JavaScript
 
   /** A buffer of created counter registers. */
   private val counters: mutable.Buffer[CounterReg] = mutable.Buffer.empty
@@ -115,7 +127,7 @@ private[vm] class ProgramBuilder(
 
     // Updates a meta information.
     inst match
-      case Inst.Read(ReadKind.Ref(_), _) => hasRef = true
+      case Inst.Read(_: ReadKind.Ref, _) => hasRef = true
       case _                             => // Nothing to do
 
     instsBuffer.append(inst)
@@ -178,7 +190,7 @@ private[vm] class ProgramBuilder(
 
     val blocks = labelsBuffer.iterator.map(label => (label, label.block)).toVector
     val predecessors = predecessorsBuffer.iterator.map(_.toSet).toVector
-    val meta = Meta(ignoreCase, unicode, hasRef, capturesSize, counters.size, canaries.size, predecessors)
+    val meta = Meta(mode, hasRef, capturesSize, counters.size, canaries.size, predecessors)
 
     Program(blocks, meta)
 
@@ -208,68 +220,92 @@ private[vm] class ProgramBuilder(
     result()
 
   /** Builds a program from a node. */
-  def build(node: Node): Unit = interrupt:
-    node match
-      case Disjunction(children)         => buildDisjunction(children)
-      case Sequence(children)            => buildSequence(children)
-      case Capture(index, child)         => buildCapture(index, child)
-      case NamedCapture(index, _, child) => buildCapture(index, child)
-      case Group(child)                  => build(child)
-      case Repeat(q, child)              => buildRepeat(q.normalized, child)
-      case WordBoundary(invert)    => emitAssert(if invert then AssertKind.WordBoundaryNot else AssertKind.WordBoundary)
-      case LineBegin()             => emitAssert(if multiline then AssertKind.LineBegin else AssertKind.InputBegin)
-      case LineEnd()               => emitAssert(if multiline then AssertKind.LineEnd else AssertKind.InputEnd)
-      case LookAhead(false, child) => wrapLookAhead(buildPositiveLookAround(child))
-      case LookAhead(true, child)  => wrapLookAhead(buildNegativeLookAround(child))
-      case LookBehind(false, child) => wrapLookBehind(buildPositiveLookAround(child))
-      case LookBehind(true, child)  => wrapLookBehind(buildNegativeLookAround(child))
-      case Character(c0)            =>
-        val c = if ignoreCase then EcmaScriptChars.canonicalize(c0, unicode) else c0
-        emitRead(ReadKind.Char(c), node.loc)
-      case node @ CharacterClass(invert, _) =>
-        val ch0 = node.toCharSet(unicode)
-        val ch = if ignoreCase then EcmaScriptChars.canonicalize(ch0, unicode) else ch0
-        emitRead(if invert then ReadKind.ClassNot(ch) else ReadKind.Class(ch), node.loc)
-      case node: AtomNode =>
-        val ch0 = node.toCharSet(unicode)
-        val ch = if ignoreCase then EcmaScriptChars.canonicalize(ch0, unicode) else ch0
-        emitRead(ReadKind.Class(ch), node.loc)
-      case Dot() =>
-        emitRead(if dotAll then ReadKind.Any else ReadKind.Dot, node.loc)
-      case BackReference(index)         => emitRead(ReadKind.Ref(index), node.loc)
-      case NamedBackReference(index, _) => emitRead(ReadKind.Ref(index), node.loc)
+  def build(node: IRNode): Unit = interrupt:
+    node.data match
+      case IRNodeData.Disjunction(children)    => buildDisjunction(children)
+      case IRNodeData.Sequence(children)       => buildSequence(children)
+      case IRNodeData.Empty                    => ()
+      case IRNodeData.Capture(index, _, child) => buildCapture(index, child)
+      case IRNodeData.Repeat(child, q)         => buildRepeat(q, child)
+      case IRNodeData.Atomic(child)            => buildAtomic(child)
+      case IRNodeData.Assert(kind)             => emitAssert(assertKind(kind))
+      case IRNodeData.LookAhead(false, child)  => wrapLookAhead(buildPositiveLookAround(child))
+      case IRNodeData.LookAhead(true, child)   => wrapLookAhead(buildNegativeLookAround(child))
+      case IRNodeData.LookBehind(false, child) => wrapLookBehind(buildPositiveLookAround(child))
+      case IRNodeData.LookBehind(true, child)  => wrapLookBehind(buildNegativeLookAround(child))
+      case IRNodeData.Chars(set)               => emitRead(readKind(node, set), Location.from(node.loc))
+      case IRNodeData.Strings(set)             =>
+        val loc = Location.from(node.loc)
+        // The strings are tried from the longest, and then the characters.
+        val strings = set.strings.toSeq
+          .sortBy(-_.length)
+          .map: s =>
+            () =>
+              for c <- if back then s.iterator.toSeq.reverse else s.iterator.toSeq do emitRead(ReadKind.Char(c), loc)
+        val chars = Option.when(set.chars.nonEmpty)(() => emitRead(charsKind(set.chars), loc))
+        buildAlternatives(strings ++ chars)
+      case IRNodeData.BackReference(indices, flags) =>
+        val equivalence = IRBuilder.caseEquivalence(pattern.dialect, mode, flags)
+        emitRead(ReadKind.Ref(indices, pattern.ir.backReference, equivalence), Location.from(node.loc))
+      case IRNodeData.Unsupported(_) => throw new UnsupportedException(pattern.unsupportedMessage(node))
+
+  /** Returns the read kind of a character node, following how it is written. */
+  def readKind(node: IRNode, set: CharSet): ReadKind =
+    val isDot = pattern.text(node) == "."
+    if isDot && set == mode.universe then ReadKind.Any
+    else if isDot || pattern.isNegatedClass(node) then ReadKind.ClassNot(set.complement(mode))
+    else if pattern.isLiteral(node) then charsKind(set)
+    else ReadKind.Class(set)
+
+  /** Returns the read kind of a set, which is a character if it has only one. */
+  def charsKind(set: CharSet): ReadKind =
+    if set.size == 1 then ReadKind.Char(set.head) else ReadKind.Class(set)
+
+  /** Returns the assertion kind. */
+  def assertKind(kind: IRAssertKind): AssertKind = kind match
+    case IRAssertKind.WordBoundary(word)    => AssertKind.WordBoundary(word)
+    case IRAssertKind.NotWordBoundary(word) => AssertKind.WordBoundaryNot(word)
+    case IRAssertKind.LineBegin(t, after)   => AssertKind.LineBegin(t, after)
+    case IRAssertKind.LineEnd(t)            => AssertKind.LineEnd(t)
+    case IRAssertKind.TextBegin             => AssertKind.InputBegin
+    case IRAssertKind.TextEnd               => AssertKind.InputEnd
+    case IRAssertKind.ChompTextEnd(t)       => AssertKind.ChompInputEnd(t)
 
   /** A builder for a disjunction node. */
-  def buildDisjunction(children: Seq[Node]): Unit =
-    val labels = children.init.map(_ => (allocateLabel("left"), allocateLabel("right")))
+  def buildDisjunction(children: Seq[IRNode]): Unit =
+    buildAlternatives(children.map(n => () => build(n)))
+
+  /** A builder for alternatives tried in the order. */
+  def buildAlternatives(alternatives: Seq[() => Unit]): Unit =
+    val labels = alternatives.init.map(_ => (allocateLabel("left"), allocateLabel("right")))
     val cont = allocateLabel("cont")
 
-    for (n, (l, r)) <- children.init.zip(labels) do
+    for (run, (l, r)) <- alternatives.init.zip(labels) do
       emitTerminator(Inst.Try(l, r))
 
       enterBlock(l)
-      build(n)
+      run()
       emitTerminator(Inst.Jmp(cont))
 
       enterBlock(r)
 
-    build(children.last)
+    alternatives.last()
     emitTerminator(Inst.Jmp(cont))
 
     enterBlock(cont)
 
   /** A builder for a sequence of nodes. */
-  def buildSequence(children: Seq[Node]): Unit =
+  def buildSequence(children: Seq[IRNode]): Unit =
     for n <- if back then children.reverse else children do build(n)
 
   /** A builder for a capture node. */
-  def buildCapture(index: Int, children: Node): Unit =
+  def buildCapture(index: Int, children: IRNode): Unit =
     emitInst(if back then Inst.CapEnd(index) else Inst.CapBegin(index))
     build(children)
     emitInst(if back then Inst.CapBegin(index) else Inst.CapEnd(index))
 
   /** A builder for `x*` node. */
-  def buildStar(isLazy: Boolean, child: Node): Unit =
+  def buildStar(isLazy: Boolean, child: IRNode): Unit =
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
     val cont = allocateLabel("cont")
@@ -281,12 +317,12 @@ private[vm] class ProgramBuilder(
     enterBlock(cont)
 
   /** A builder for `x+` node. */
-  def buildPlus(isLazy: Boolean, child: Node): Unit =
+  def buildPlus(isLazy: Boolean, child: IRNode): Unit =
     build(child)
     buildStar(isLazy, child)
 
   /** A builder for `x?` node. */
-  def buildQuestion(isLazy: Boolean, child: Node): Unit =
+  def buildQuestion(isLazy: Boolean, child: IRNode): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
 
@@ -299,33 +335,34 @@ private[vm] class ProgramBuilder(
     enterBlock(cont)
 
   /** A builder for `x{n,m}` node. */
-  def buildRepeat(quantifier: NormalizedQuantifier, child: Node): Unit =
+  def buildRepeat(quantifier: IRQuantifier, child: IRNode): Unit =
+    def isLazy(strategy: BacktrackStrategy): Boolean = strategy == BacktrackStrategy.Lazy
     quantifier match
-      case Quantifier.Exact(0, _)          => // nothing to do
-      case Quantifier.Exact(1, _)          => build(child)
-      case Quantifier.Exact(n, _)          => buildRepeatN(n, child)
-      case Quantifier.Unbounded(0, isLazy) => buildStar(isLazy, child)
-      case Quantifier.Unbounded(1, isLazy) => buildPlus(isLazy, child)
-      case Quantifier.Unbounded(n, isLazy) =>
+      case IRQuantifier.Exact(0)               => // nothing to do
+      case IRQuantifier.Exact(1)               => build(child)
+      case IRQuantifier.Exact(n)               => buildRepeatN(n, child)
+      case IRQuantifier.Unbounded(0, strategy) => buildStar(isLazy(strategy), child)
+      case IRQuantifier.Unbounded(1, strategy) => buildPlus(isLazy(strategy), child)
+      case IRQuantifier.Unbounded(n, strategy) =>
         buildRepeatN(n, child)
-        buildStar(isLazy, child)
-      case Quantifier.Bounded(0, 1, isLazy) => buildQuestion(isLazy, child)
-      case Quantifier.Bounded(0, n, isLazy) => buildRepeatAtMostN(isLazy, n, child)
-      case Quantifier.Bounded(1, 2, isLazy) =>
+        buildStar(isLazy(strategy), child)
+      case IRQuantifier.Bounded(0, 1, strategy) => buildQuestion(isLazy(strategy), child)
+      case IRQuantifier.Bounded(0, n, strategy) => buildRepeatAtMostN(isLazy(strategy), n, child)
+      case IRQuantifier.Bounded(1, 2, strategy) =>
         build(child)
-        buildQuestion(isLazy, child)
-      case Quantifier.Bounded(1, m, isLazy) =>
+        buildQuestion(isLazy(strategy), child)
+      case IRQuantifier.Bounded(1, m, strategy) =>
         build(child)
-        buildRepeatAtMostN(isLazy, m - 1, child)
-      case Quantifier.Bounded(n, m, isLazy) if m - n == 1 =>
+        buildRepeatAtMostN(isLazy(strategy), m - 1, child)
+      case IRQuantifier.Bounded(n, m, strategy) if m - n == 1 =>
         buildRepeatN(n, child)
-        buildQuestion(isLazy, child)
-      case Quantifier.Bounded(n, m, isLazy) =>
+        buildQuestion(isLazy(strategy), child)
+      case IRQuantifier.Bounded(n, m, strategy) =>
         buildRepeatN(n, child)
-        buildRepeatAtMostN(isLazy, m - n, child)
+        buildRepeatAtMostN(isLazy(strategy), m - n, child)
 
   /** A builder for `x{n}` node. */
-  def buildRepeatN(n: Int, child: Node): Unit =
+  def buildRepeatN(n: Int, child: IRNode): Unit =
     val loop = allocateEntrance("loop")
     val cont = allocateLabel("cont")
 
@@ -336,7 +373,7 @@ private[vm] class ProgramBuilder(
     closeLoopBlock(reg, n, loop, cont)
 
   /** A builder for `x{0,n}` node. */
-  def buildRepeatAtMostN(isLazy: Boolean, n: Int, child: Node): Unit =
+  def buildRepeatAtMostN(isLazy: Boolean, n: Int, child: IRNode): Unit =
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
     val cont = allocateLabel("cont")
@@ -363,7 +400,7 @@ private[vm] class ProgramBuilder(
     freeCounter(reg)
 
   /** Inserts a canary around a loop body if needed. */
-  def wrapCanary(child: Node)(run: => Unit): Unit =
+  def wrapCanary(child: IRNode)(run: => Unit): Unit =
     if child.canMatchEmpty then
       val reg = allocateCanary()
       emitInst(Inst.SetCanary(reg))
@@ -372,13 +409,26 @@ private[vm] class ProgramBuilder(
       freeCanary(reg)
     else run
 
-  /** Emits a `cap-reset`, then execute a `run`. */
-  def wrapReset(child: Node)(run: => Unit): Unit =
-    for (min, max) <- child.captureRange.range do emitInst(Inst.CapReset(min, max))
+  /** Emits a `cap-reset` if captures are reset on each iteration, then execute a `run`. */
+  def wrapReset(child: IRNode)(run: => Unit): Unit =
+    if resetsCaptures then for (min, max) <- child.captureRange.range do emitInst(Inst.CapReset(min, max))
     run
 
+  /** A builder for an atomic group, which commits the first match of the child. */
+  def buildAtomic(child: IRNode): Unit =
+    val main = allocateLabel("main")
+    val cont = allocateLabel("cont")
+
+    emitTerminator(Inst.Tx(main, Some(cont), None))
+
+    enterBlock(main)
+    build(child)
+    emitTerminator(Inst.Commit)
+
+    enterBlock(cont)
+
   /** A builder for positive look-around assertion. */
-  def buildPositiveLookAround(child: Node): Unit =
+  def buildPositiveLookAround(child: IRNode): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
 
@@ -391,7 +441,7 @@ private[vm] class ProgramBuilder(
     enterBlock(cont)
 
   /** A builder for negative look-around assertion. */
-  def buildNegativeLookAround(child: Node): Unit =
+  def buildNegativeLookAround(child: IRNode): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
 
