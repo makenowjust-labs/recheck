@@ -13,6 +13,15 @@ const makeAllPackagesExternalPlugin: Plugin = {
         ? undefined
         : { path: args.path, external: true },
     );
+    // `package.json` is read at run time, so the plugin reports the installed version.
+    // `lib/main.js` and `src/main.ts` are at the same depth, so `../package.json` points to the same file.
+    build.onResolve(
+      { filter: /^\.\.\/package\.json$/ },
+      (args: OnResolveArgs) => ({
+        path: args.path,
+        external: true,
+      }),
+    );
   },
 };
 
