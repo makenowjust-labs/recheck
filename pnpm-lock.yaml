@@ -212,12 +212,12 @@ importers:
       prettier:
         specifier: 3.9.10
         version: 3.9.10
+      recheck-parameters:
+        specifier: workspace:*
+        version: link:../packages/recheck-parameters
       typescript:
         specifier: 7.0.2
         version: 7.0.2
-      yaml:
-        specifier: 2.9.1
-        version: 2.9.1
 
 packages:
 

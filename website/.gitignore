@@ -3,5 +3,3 @@
 /.cache-loader
 /test-results
 /playwright-report
-# Generated from the schema of the parameters by `scripts/parameters.mts`.
-/src/data/parameters.schema.json

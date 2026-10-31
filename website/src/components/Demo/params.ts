@@ -1,7 +1,9 @@
 import type { Parameters } from "recheck";
+import type { Property } from "recheck-parameters";
+
+import { propertiesFor } from "recheck-parameters";
 
 import { isAtLeast } from "./builds";
-import schema from "../../data/parameters.schema.json";
 
 import type { Build } from "./builds";
 
@@ -23,18 +25,6 @@ export type Param = {
   since: string | null;
   /** The dialects that the parameter applies to, or `null` if it applies to every dialect. */
   dialects: string[] | null;
-};
-
-type Property = {
-  title: string;
-  type?: string | string[];
-  enum?: string[];
-  default?: unknown;
-  "x-unit"?: string;
-  "x-exclude"?: string[];
-  "x-since"?: string;
-  "x-dialects"?: string[];
-  "x-encodings"?: Record<string, string[]>;
 };
 
 const paramType = (property: Property): ParamType | null => {
@@ -60,24 +50,24 @@ const paramType = (property: Property): ParamType | null => {
 export const NULLABLE_BOOLEAN_VALUES = ["null", "true", "false"];
 
 /** The parameters of the form, read from the schema of the parameters. */
-const schemaParams: Param[] = Object.entries(
-  schema.properties as Record<string, Property>,
-).flatMap(([name, property]) => {
-  const type = paramType(property);
-  if (property["x-exclude"]?.includes("playground") || type === null) {
-    return [];
-  }
-  return [
-    {
-      name,
-      title: property.title,
-      defaultValue: (property.default ?? "null") as string | number,
-      type,
-      since: property["x-since"] ?? null,
-      dialects: property["x-dialects"] ?? null,
-    },
-  ];
-});
+const schemaParams: Param[] = propertiesFor("playground").flatMap(
+  ([name, property]) => {
+    const type = paramType(property);
+    if (type === null) {
+      return [];
+    }
+    return [
+      {
+        name,
+        title: property.title,
+        defaultValue: (property.default ?? "null") as string | number,
+        type,
+        since: property["x-since"] ?? null,
+        dialects: property["x-dialects"] ?? null,
+      },
+    ];
+  },
+);
 
 const loggerParam: Param = {
   name: "logger",

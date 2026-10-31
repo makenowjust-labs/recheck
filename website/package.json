@@ -3,13 +3,13 @@
   "name": "website",
   "version": "0.0.0",
   "scripts": {
-    "doc": "node ./scripts/parameters.mts && docusaurus build",
+    "doc": "docusaurus build",
     "format": "prettier -w '*.{js,json,ts}' '{src,e2e}/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
     "lint": "prettier --check '*.{js,json,ts}' '{src,e2e}/**/*.{css,md,ts}' '{blog,docs}/**/*.{md,mdx}'",
-    "start": "node ./scripts/parameters.mts && docusaurus start",
-    "test": "node ./scripts/parameters.mts && node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "start": "docusaurus start",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:e2e": "playwright test",
-    "typecheck": "node ./scripts/parameters.mts && tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
     "@algolia/client-search": "^5.0.0",
@@ -40,8 +40,8 @@
     "@types/react-dom": "19.3.0",
     "jest": "30.5.2",
     "prettier": "3.9.10",
-    "typescript": "7.0.2",
-    "yaml": "2.9.1"
+    "recheck-parameters": "workspace:*",
+    "typescript": "7.0.2"
   },
   "browserslist": {
     "production": [
