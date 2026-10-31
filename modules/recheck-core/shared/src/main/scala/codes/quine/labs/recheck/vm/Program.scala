@@ -19,10 +19,16 @@ object Program:
     *
     * @param mode
     *   the unit of characters, where the input is UTF-16 code units for `Utf16` and `CodePoint`, and bytes for `Byte`
+    * @param hasRef
+    *   whether the program reads the captures (back-references, capture tests and `check_not_empty`), which a matching
+    *   state includes then
+    * @param hasVerb
+    *   whether the program has `verb` instructions, which skip backtracking points, so memoization cannot be used
     */
   final case class Meta(
       mode: UnitMode,
       hasRef: Boolean,
+      hasVerb: Boolean,
       capturesSize: Int,
       countersSize: Int,
       canariesSize: Int,

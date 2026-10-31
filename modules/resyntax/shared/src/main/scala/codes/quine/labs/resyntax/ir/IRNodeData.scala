@@ -21,6 +21,10 @@ sealed abstract class IRNodeData extends Product with Serializable:
       ln == rn && l.equalsWithoutLoc(r)
     case (IRNodeData.Capture(li, ln, l), IRNodeData.Capture(ri, rn, r)) =>
       li == ri && ln == rn && l.equalsWithoutLoc(r)
+    case (IRNodeData.NonAtomicLookAhead(l), IRNodeData.NonAtomicLookAhead(r))     => l.equalsWithoutLoc(r)
+    case (IRNodeData.NonAtomicLookBehind(l), IRNodeData.NonAtomicLookBehind(r))   => l.equalsWithoutLoc(r)
+    case (IRNodeData.Conditional(lc, ly, ln), IRNodeData.Conditional(rc, ry, rn)) =>
+      lc.equalsWithoutLoc(rc) && ly.equalsWithoutLoc(ry) && ln.equalsWithoutLoc(rn)
     case (IRNodeData.Unsupported(l), IRNodeData.Unsupported(r)) => l.equalsWithoutLoc(r)
     case (l, r)                                                 => l == r
 
@@ -105,5 +109,86 @@ object IRNodeData:
     */
   final case class BackReference(indices: Seq[Int], flags: IRCharFlags) extends IRNodeData
 
+  /** NonAtomicLookAhead is a positive look-ahead assertion that backtracking can enter again (e.g. PCRE's
+    * `(*napla:...)`).
+    */
+  final case class NonAtomicLookAhead(node: IRNode) extends IRNodeData
+
+  /** NonAtomicLookBehind is a positive look-behind assertion that backtracking can enter again (e.g. PCRE's
+    * `(?<*...)`).
+    */
+  final case class NonAtomicLookBehind(node: IRNode) extends IRNodeData
+
+  /** Conditional matches `yes` if the condition holds at the position, and `no` otherwise (e.g. `(?(1)a|b)`).
+    *
+    * A condition that does not depend on the matching (e.g. `(DEFINE)` and PCRE's `(VERSION>=10.0)`) is resolved, and
+    * the IR has the chosen branch instead.
+    */
+  final case class Conditional(condition: IRCondition, yes: IRNode, no: IRNode) extends IRNodeData
+
+  object Conditional:
+    def apply(condition: IRCondition, yes: IRNodeData, no: IRNodeData): IRNodeData =
+      Conditional(condition, IRNode(yes), IRNode(no))
+
+  /** ResetMatchStart sets the start of the reported match to the position (`\K`). */
+  case object ResetMatchStart extends IRNodeData
+
+  /** BacktrackControl is a backtracking control verb (e.g. `(*COMMIT)`).
+    *
+    * `(*FAIL)` is not this but a [[Chars]] of the empty set.
+    */
+  final case class BacktrackControl(verb: IRBacktrackControl) extends IRNodeData
+
   /** Unsupported is a wrapper of unsupported AST node. */
   final case class Unsupported(data: NodeData) extends IRNodeData
+
+/** IRCondition is a condition of [[IRNodeData.Conditional]]. */
+sealed abstract class IRCondition extends Product with Serializable:
+  def equalsWithoutLoc(that: IRCondition): Boolean = (this, that) match
+    case (IRCondition.LookAhead(ln, l), IRCondition.LookAhead(rn, r))   => ln == rn && l.equalsWithoutLoc(r)
+    case (IRCondition.LookBehind(ln, l), IRCondition.LookBehind(rn, r)) => ln == rn && l.equalsWithoutLoc(r)
+    case (l, r)                                                         => l == r
+
+object IRCondition:
+
+  /** Captured holds if one of the captures of the indices is set. */
+  final case class Captured(indices: Seq[Int]) extends IRCondition
+
+  /** LookAhead holds if the look-ahead assertion succeeds, which is atomic. */
+  final case class LookAhead(negative: Boolean, node: IRNode) extends IRCondition
+
+  object LookAhead:
+    def apply(negative: Boolean, data: IRNodeData): IRCondition = LookAhead(negative, IRNode(data))
+
+  /** LookBehind holds if the look-behind assertion succeeds, which is atomic. */
+  final case class LookBehind(negative: Boolean, node: IRNode) extends IRCondition
+
+  object LookBehind:
+    def apply(negative: Boolean, data: IRNodeData): IRCondition = LookBehind(negative, IRNode(data))
+
+/** IRBacktrackControl is a backtracking control verb other than `(*FAIL)`.
+  *
+  * The names of the verbs other than `(*MARK)` and `(*SKIP)` only tell the engine's caller which path matched, so they
+  * are dropped.
+  */
+sealed abstract class IRBacktrackControl extends Product with Serializable
+
+object IRBacktrackControl:
+
+  /** Accept ends the match successfully (`(*ACCEPT)`). */
+  case object Accept extends IRBacktrackControl
+
+  /** Commit fails the whole search when backtracking reaches it (`(*COMMIT)`). */
+  case object Commit extends IRBacktrackControl
+
+  /** Prune fails the match at the starting position when backtracking reaches it (`(*PRUNE)`). */
+  case object Prune extends IRBacktrackControl
+
+  /** Skip is `(*PRUNE)` that retries from its position, or from the position of the mark of the name (`(*SKIP)`). */
+  final case class Skip(name: Option[String]) extends IRBacktrackControl
+
+  /** Then tries the next alternative when backtracking reaches it (`(*THEN)`). */
+  case object Then extends IRBacktrackControl
+
+  /** Mark records its position for `(*SKIP:NAME)` (`(*MARK:NAME)`). */
+  final case class Mark(name: String) extends IRBacktrackControl

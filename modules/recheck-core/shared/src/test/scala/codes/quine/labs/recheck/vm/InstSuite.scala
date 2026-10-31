@@ -48,6 +48,30 @@ class InstSuite extends munit.FunSuite:
     assertEquals(Inst.CapReset(0, 1).toString, "cap_reset 0 1")
     assertEquals(Inst.CapKeep(None).toString, "cap_keep")
     assertEquals(Inst.CapKeep(Some((1, 2))).toString, "cap_keep 1 2")
+    assertEquals(
+      Inst.Tx(Label("x", 0), None, Some(Label("y", 1)), Some(Inst.Barrier.Assertion(Some(2)))).toString,
+      "tx #x@0 FAIL #y@1 ; assertion 2"
+    )
+    assertEquals(
+      Inst.TryBarrier(Label("x", 0), Label("y", 1), Inst.Barrier.Search).toString,
+      "try_barrier #x@0 #y@1 ; search"
+    )
+    assertEquals(
+      Inst.TryBarrier(Label("x", 0), Label("y", 1), Inst.Barrier.Then(1)).toString,
+      "try_barrier #x@0 #y@1 ; then 1"
+    )
+    assertEquals(Inst.Leave.toString, "leave")
+    assertEquals(Inst.IfCap(Seq(1, 2), Label("x", 0), Label("y", 1)).toString, "if_cap 1,2 #x@0 #y@1")
+    assertEquals(Inst.Verb(Inst.VerbKind.Commit).toString, "verb commit")
+    assertEquals(Inst.Verb(Inst.VerbKind.Prune).toString, "verb prune")
+    assertEquals(Inst.Verb(Inst.VerbKind.Skip(None)).toString, "verb skip")
+    assertEquals(Inst.Verb(Inst.VerbKind.Skip(Some("x"))).toString, "verb skip x")
+    assertEquals(Inst.Verb(Inst.VerbKind.Then(None)).toString, "verb then")
+    assertEquals(Inst.Verb(Inst.VerbKind.Then(Some(1))).toString, "verb then 1")
+    assertEquals(Inst.Verb(Inst.VerbKind.Mark("x")).toString, "verb mark x")
+    assertEquals(Inst.CheckNotEmpty(false).toString, "check_not_empty")
+    assertEquals(Inst.CheckNotEmpty(true).toString, "check_not_empty at_start")
+    assertEquals(Inst.TxDrop.toString, "tx_drop")
 
   test("Inst.Terminator#successors"):
     assertEquals(Inst.Ok.successors, Set.empty[Label])
@@ -68,6 +92,12 @@ class InstSuite extends munit.FunSuite:
     assertEquals(Inst.Tx(Label("x", 0), None, None).successors, Set(Label("x", 0)))
     assertEquals(Inst.Tx(Label("x", 0), Some(Label("y", 1)), None).successors, Set(Label("x", 0), Label("y", 1)))
     assertEquals(Inst.Tx(Label("x", 0), None, Some(Label("y", 1))).successors, Set(Label("x", 0), Label("y", 1)))
+    assertEquals(
+      Inst.TryBarrier(Label("x", 0), Label("y", 1), Inst.Barrier.Search).successors,
+      Set(Label("x", 0), Label("y", 1))
+    )
+    assertEquals(Inst.Leave.successors, Set.empty[Label])
+    assertEquals(Inst.IfCap(Seq(1), Label("x", 0), Label("y", 1)).successors, Set(Label("x", 0), Label("y", 1)))
 
   test("Inst.AssertKind#toString"):
     assertEquals(AssertKind.WordBoundary(Word).toString, "word_boundary")

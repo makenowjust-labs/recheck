@@ -1,6 +1,8 @@
 package codes.quine.labs.recheck.vm
 
+import scala.annotation.tailrec
 import scala.collection.mutable
+import scala.compiletime.uninitialized
 import scala.concurrent.duration.Duration
 
 import codes.quine.labs.recheck.common.Context
@@ -8,7 +10,9 @@ import codes.quine.labs.recheck.common.TimeoutException
 import codes.quine.labs.recheck.regexp.Location
 import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.recheck.vm.Inst.AssertKind
+import codes.quine.labs.recheck.vm.Inst.Barrier
 import codes.quine.labs.recheck.vm.Inst.ReadKind
+import codes.quine.labs.recheck.vm.Inst.VerbKind
 import codes.quine.labs.recheck.vm.Interpreter.CoverageItem
 import codes.quine.labs.recheck.vm.Interpreter.CoverageLocation
 import codes.quine.labs.recheck.vm.Interpreter.Diff
@@ -127,6 +131,15 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     /** The largest index of the closed captures, which Perl uses to unset the captures on backtracking. */
     var lastParen: Int = 0
 
+    /** What this frame is to the backtracking control verbs as a fallback, or `null`. */
+    var barrier: Barrier = uninitialized
+
+    /** The label retrying the search, for a [[Barrier.Search]] frame. */
+    var restart: Label = uninitialized
+
+    /** The verb acting when backtracking reaches this frame, or `null` for a usual frame. */
+    var verb: VerbKind = uninitialized
+
     /** Gets a previous character. */
     def previousChar: Option[Int] = input.getBefore(pos, program.meta.unicode)
 
@@ -206,6 +219,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   /** The captures of the last failed matching, which `cap_keep` takes. */
   private var failedCaptures: Vector[Int] = Vector.empty
 
+  /** Whether it memoizes the failed states, which the verbs skipping backtracking points prevent. */
+  private val memoizes: Boolean = options.usesAcceleration && !program.meta.hasVerb
+
   /** Constructs a result of matching. */
   private[vm] def result(status: Status, captures: Option[Seq[Int]]): Result =
     val loops = this.loops.iterator
@@ -245,7 +261,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         // it tries to retrieve a result from memoization table, or adds a junction information.
         var memoized = false
         var memoizedCaptures: Option[Vector[Int]] = None
-        if options.usesAcceleration && program.meta.predecessors(frame.label.index).size >= 2 then
+        if memoizes && program.meta.predecessors(frame.label.index).size >= 2 then
           val state = frame.toState
           memoTable.get(state) match
             case Some(diff) =>
@@ -265,7 +281,12 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
         val failed = memoized || !block(frame, frame.label.block) ||
           (frame.label.block.terminator match
-            case Inst.Ok        => return result(Status.Ok, Some(frame.captures))
+            case Inst.Ok =>
+              // Ruby's `\K` in a look-ahead may set the start after the end, and Ruby reports the start as the end.
+              val captures =
+                if frame.captures(0) > frame.captures(1) then frame.captures.updated(0, frame.captures(1))
+                else frame.captures
+              return result(Status.Ok, Some(captures))
             case Inst.Jmp(next) =>
               frame.label = next
               false
@@ -275,6 +296,28 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
               frame.label = next
               frame.fallback = Some(fallbackFrame)
               false
+            case Inst.TryBarrier(next, fallback, barrier) =>
+              val fallbackFrame = frame.clone()
+              fallbackFrame.label = fallback
+              fallbackFrame.barrier = barrier
+              fallbackFrame.restart = frame.label
+              frame.label = next
+              frame.fallback = Some(fallbackFrame)
+              false
+            case Inst.IfCap(indices, yes, no) =>
+              val set = indices.exists(i => frame.captures(i * 2) >= 0 && frame.captures(i * 2 + 1) >= 0)
+              frame.label = if set then yes else no
+              false
+            case Inst.Leave =>
+              frame.rollback.get match
+                case Rollback.HasSuccessor(next, pos, rollback, _) =>
+                  frame.label = next
+                  frame.pos = pos
+                  frame.rollback = rollback
+                  false
+                // $COVERAGE-OFF$
+                case Rollback.Fallback(_) => sys.error("unreachable")
+              // $COVERAGE-ON$
             case Inst.TryLA(read, next, fallback) =>
               val oldPos = frame.pos
               if instRead(frame, read) then
@@ -329,7 +372,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                 // $COVERAGE-OFF$
                 case Rollback.Fallback(_) => sys.error("unreachable")
               // $COVERAGE-ON$
-            case Inst.Tx(next, rollback, fallback) =>
+            case Inst.Tx(next, rollback, fallback, barrier) =>
               val nextRollback = rollback match
                 case Some(rollback) => Rollback.HasSuccessor(rollback, frame.pos, frame.rollback, frame.fallback)
                 case None           => Rollback.Fallback(frame.fallback)
@@ -337,6 +380,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                 case Some(fallback) =>
                   val fallbackFrame = frame.clone()
                   fallbackFrame.label = fallback
+                  for b <- barrier do fallbackFrame.barrier = b
                   Some(fallbackFrame)
                 case None => frame.fallback
               frame.label = next
@@ -347,9 +391,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         if failed then
           val captures = memoizedCaptures.getOrElse(frame.captures)
           failedCaptures = captures
-          frame.fallback match
+          backtrack(frame.fallback) match
             case Some(fallback) =>
-              if options.usesAcceleration && frame.junctions.size > fallback.junctions.size then
+              if memoizes && frame.junctions.size > fallback.junctions.size then
                 val d = frame.junctions.size - fallback.junctions.size
                 for jx <- frame.junctions.take(d) do
                   val diffHeatmap = Option.when(options.needsHeatmap):
@@ -366,6 +410,57 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     // $COVERAGE-OFF$
     sys.error("unreachable")
     // $COVERAGE-ON$
+
+  /** Returns the frame that backtracking resumes from the fallback, where the frames of the verbs act. */
+  @tailrec
+  private def backtrack(fallback: Option[Frame]): Option[Frame] =
+    fallback match
+      case Some(f) if f.verb ne null =>
+        f.verb match
+          case VerbKind.Commit =>
+            find(f.fallback)(b => b == Barrier.Search || b.isInstanceOf[Barrier.Assertion])
+              .filter(_.barrier != Barrier.Search)
+          case VerbKind.Prune            => cut(f.fallback, None)
+          case VerbKind.Skip(None)       => cut(f.fallback, Some(f.pos))
+          case VerbKind.Skip(Some(name)) =>
+            // Without the mark of the name, `(*SKIP)` is ignored.
+            findMark(f.fallback, name) match
+              case Some(mark) => cut(f.fallback, Some(mark.pos))
+              case None       => backtrack(f.fallback)
+          case VerbKind.Then(Some(scope)) =>
+            find(f.fallback)(b => b == Barrier.Then(scope) || b == Barrier.Assertion(Some(scope)))
+          case VerbKind.Then(None) => cut(f.fallback, None)
+          case VerbKind.Mark(_)    => backtrack(f.fallback)
+      case fallback => fallback
+
+  /** Returns the nearest frame whose barrier satisfies the predicate. */
+  @tailrec
+  private def find(fallback: Option[Frame])(p: Barrier => Boolean): Option[Frame] =
+    fallback match
+      case Some(f) if (f.barrier ne null) && p(f.barrier) => Some(f)
+      case Some(f)                                        => find(f.fallback)(p)
+      case None                                           => None
+
+  /** Returns the nearest frame of the mark of the name. */
+  @tailrec
+  private def findMark(fallback: Option[Frame], name: String): Option[Frame] =
+    fallback match
+      case Some(f) if f.verb == VerbKind.Mark(name) => Some(f)
+      case Some(f)                                  => findMark(f.fallback, name)
+      case None                                     => None
+
+  /** Returns the frame failing the match at the starting position: the barrier of an assertion, or the retry of the
+    * search, from the position `skip` if it is after the starting position.
+    */
+  private def cut(fallback: Option[Frame], skip: Option[Int]): Option[Frame] =
+    find(fallback)(b => b == Barrier.Search || b.isInstanceOf[Barrier.Assertion]).map: f =>
+      skip.filter(f.barrier == Barrier.Search && _ > f.pos) match
+        case Some(pos) =>
+          val retry = f.clone()
+          retry.label = f.restart
+          retry.pos = pos
+          retry
+        case None => f
 
   /** Runs a given block. */
   private def block(frame: Frame, block: Block): Boolean =
@@ -421,12 +516,28 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       case Inst.CapReset(from, to) =>
         frame.capReset(from, to)
         true
+      case Inst.Verb(kind) =>
+        val verbFrame = frame.clone()
+        verbFrame.verb = kind
+        frame.fallback = Some(verbFrame)
+        true
+      case Inst.CheckNotEmpty(atStart) =>
+        frame.captures(0) != frame.pos || atStart && frame.pos != 0
+      case Inst.TxDrop =>
+        frame.rollback = frame.rollback.get match
+          case Rollback.HasSuccessor(_, _, rollback, _) => rollback
+          // $COVERAGE-OFF$
+          case Rollback.Fallback(_) => sys.error("unreachable")
+        // $COVERAGE-ON$
+        true
       case Inst.CapKeep(restore) =>
         val captures = if failedCaptures.isEmpty then frame.captures else failedCaptures
         frame.captures = Vector.tabulate(captures.size): i =>
           val index = i / 2
           // A capture above the last closed index is unset, but the beginning of an open capture remains.
-          if index > frame.lastParen then if i % 2 == 0 then frame.captures(i) else -1
+          // The whole match keeps its start, which `\K` sets.
+          if index == 0 then frame.captures(i)
+          else if index > frame.lastParen then if i % 2 == 0 then frame.captures(i) else -1
           else if restore.exists((from, to) => from <= index && index <= to) then frame.captures(i)
           else captures(i)
         true

@@ -10,6 +10,7 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRAssertKind
+import codes.quine.labs.resyntax.ir.IRCondition
 import codes.quine.labs.resyntax.ir.IRLineTerminators
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
@@ -75,11 +76,9 @@ object PatternExtensions:
           case Capture(_, _, n)                 => loop(isBegin, isEnd, n)
           case Atomic(n)                        => loop(isBegin, isEnd, n)
           case Repeat(n, _)                     => loop(false, false, n)
-          case LookAhead(_, n)                  => loop(false, false, n)
-          case LookBehind(_, n)                 => loop(false, false, n)
           case Assert(k) if isBeginAssertion(k) => !isBegin
           case Assert(k) if isEndAssertion(k)   => !isEnd
-          case _                                => false
+          case _                                => node.children.exists(loop(false, false, _))
       loop(true, true, pattern.node)
 
     /** Tests whether a begin assertion is placed at every begin point. */
@@ -147,6 +146,9 @@ object PatternExtensions:
         case Repeat(n, IRQuantifier.Bounded(m, l, _)) => loop(n) * l + (l - m)
         case LookAhead(_, n)                          => loop(n) + 1
         case LookBehind(_, n)                         => loop(n) + 1
+        case NonAtomicLookAhead(n)                    => loop(n) + 1
+        case NonAtomicLookBehind(n)                   => loop(n) + 1
+        case Conditional(_, _, _)                     => node.children.map(loop).sum + 1
         case _                                        => 1
       loop(pattern.node)
 
@@ -324,14 +326,21 @@ object PatternExtensions:
 
     /** Returns the child nodes. */
     def children: Seq[IRNode] = node.data match
-      case Disjunction(ns)  => ns
-      case Sequence(ns)     => ns
-      case Repeat(n, _)     => Seq(n)
-      case Atomic(n)        => Seq(n)
-      case LookAhead(_, n)  => Seq(n)
-      case LookBehind(_, n) => Seq(n)
-      case Capture(_, _, n) => Seq(n)
-      case _                => Seq.empty
+      case Disjunction(ns)                 => ns
+      case Sequence(ns)                    => ns
+      case Repeat(n, _)                    => Seq(n)
+      case Atomic(n)                       => Seq(n)
+      case LookAhead(_, n)                 => Seq(n)
+      case LookBehind(_, n)                => Seq(n)
+      case Capture(_, _, n)                => Seq(n)
+      case NonAtomicLookAhead(n)           => Seq(n)
+      case NonAtomicLookBehind(n)          => Seq(n)
+      case Conditional(condition, yes, no) =>
+        condition match
+          case IRCondition.LookAhead(_, n)  => Seq(n, yes, no)
+          case IRCondition.LookBehind(_, n) => Seq(n, yes, no)
+          case IRCondition.Captured(_)      => Seq(yes, no)
+      case _ => Seq.empty
 
     /** Checks whether the node or a descendant satisfies the predicate. */
     def exists(p: IRNodeData => Boolean): Boolean =
@@ -357,6 +366,7 @@ object PatternExtensions:
           case IRQuantifier.Exact(m)         => m == 0 || n.canMatchEmpty
           case IRQuantifier.Unbounded(m, _)  => m == 0 || n.canMatchEmpty
           case IRQuantifier.Bounded(m, _, _) => m == 0 || n.canMatchEmpty
-      case Chars(_)     => false
-      case Strings(set) => set.strings.exists(_.isEmpty)
-      case _            => true
+      case Conditional(_, yes, no) => yes.canMatchEmpty || no.canMatchEmpty
+      case Chars(_)                => false
+      case Strings(set)            => set.strings.exists(_.isEmpty)
+      case _                       => true

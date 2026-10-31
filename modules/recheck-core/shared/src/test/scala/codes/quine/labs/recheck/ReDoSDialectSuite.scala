@@ -58,6 +58,50 @@ class ReDoSDialectSuite extends munit.FunSuite:
     )
     assertVulnerable(check("^(?:(?>a|a)|a)*$", Java), AttackComplexity.Exponential(true), Checker.Fuzz)
 
+  def assertSafe(d: Diagnostics, checker: Checker.Used)(using loc: munit.Location): Unit =
+    d match
+      case s: Diagnostics.Safe => assertEquals(s.checker, checker)
+      case d                   => fail(s"not safe: $d")
+
+  // The following PCRE times are of PHP 8.5 (PCRE2 10.49) without JIT, with a large `pcre.backtrack_limit`, and with
+  // `(*NO_START_OPT)` where the start optimizations skip the attempts, on `'a'.repeat(n) + '!'`.
+
+  test("ReDoS.check: \\G and \\K"):
+    // PCRE2 doubles its time for each `a` on these (0.37 s and 0.18 s at n = 22).
+    assertVulnerable(check("\\G(?:a|a)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(check("^a\\K(?:a|a)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
+
+  test("ReDoS.check: conditionals"):
+    // PCRE2 doubles its time for each `a` (0.37 s at n = 22).
+    assertVulnerable(check("^(?(?=a)(?:a|a)*$|b)", PCRE), AttackComplexity.Exponential(true), Checker.Fuzz)
+    assertSafe(check("^(a)?(?(1)b+|c)$", Python), Checker.Fuzz)
+
+  test("ReDoS.check: backtracking control verbs"):
+    // `(*FAIL)` is the empty set, which makes the match fail after the repetition (0.35 s at n = 22).
+    assertVulnerable(check("^(?:a|a)*(*F)", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertSafe(check("^(?:a|a)*", PCRE), Checker.Automaton)
+    // The verbs cut the backtracking of an exponential pattern (0.36 s at n = 22 without them, and 0.01 ms with them).
+    assertVulnerable(check("^(?:a|a)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertSafe(check("^(?:a|a)*(*COMMIT)$", PCRE), Checker.Fuzz)
+    assertSafe(check("^(?:(?:a|a)(*PRUNE))*$", PCRE), Checker.Fuzz)
+    assertSafe(check("^(?:(?:a|a)*(*THEN)b|c)", PCRE), Checker.Fuzz)
+    assertSafe(check("(?:a|a)*(*SKIP)b", Perl), Checker.Fuzz)
+    assertVulnerable(check("(?:a|a)*b", Perl), AttackComplexity.Exponential(false), Checker.Automaton)
+
+  test("ReDoS.check: non-atomic look-arounds"):
+    // Backtracking enters the look-ahead again (0.45 s at n = 22), which an atomic one does not (0.004 ms).
+    assertVulnerable(check("^(?*(?:a|a)*)c", PCRE), AttackComplexity.Exponential(true), Checker.Fuzz)
+    assertSafe(check("^(?=(?:a|a)*)c", PCRE), Checker.Fuzz)
+
+  test("ReDoS.check: (*NOTEMPTY)"):
+    // An empty match is rejected, so the engine backtracks into the other alternative (0.71 s at n = 22).
+    assertVulnerable(
+      check("(*NOTEMPTY)(?:|(?:a|a)*c)", PCRE),
+      AttackComplexity.Exponential(false),
+      Checker.Automaton
+    )
+    assertSafe(check("(?:|(?:a|a)*c)", PCRE), Checker.Automaton)
+
   test("ReDoS.check: unsupported syntax"):
     assertEquals(
       check("^(a|a)*(?R)?$", PCRE),

@@ -243,6 +243,11 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(
       build("a(?R)?", "", Dialect.PCRE).get
     )
+    interceptMessage[UnsupportedException]("conditional")(build("(a)?(?(1)b|c)", "", Dialect.PCRE).get)
+    interceptMessage[UnsupportedException]("look-ahead assertion")(build("(?*a)", "", Dialect.PCRE).get)
+    interceptMessage[UnsupportedException]("look-behind assertion")(build("(?<*a)", "", Dialect.PCRE).get)
+    for verb <- Seq("ACCEPT", "COMMIT", "PRUNE", "SKIP", "SKIP:x", "THEN") do
+      interceptMessage[UnsupportedException]("backtracking control verb")(build(s"a(*$verb)b", "", Dialect.PCRE).get)
 
   test("EpsNFABuilder.build: assertions of other dialects"):
     // `$` before a final line terminator at an end point is the end after an optional line terminator.
@@ -286,6 +291,26 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     val last = input.foldLeft(nfa.inits.toSet): (qs, c) =>
       qs.flatMap(q => nfa.delta.collect { case ((p, a), ps) if p == q && a.contains(c) => ps }.flatten)
     last.exists(nfa.acceptSet.contains)
+
+  test("EpsNFABuilder.build: verbs and assertions without effect on the language"):
+    assert(!searches("a(*FAIL)|(*F)", "", Dialect.PCRE, "a"))
+    assert(searches("a(*MARK:x)b", "", Dialect.PCRE, "ab"))
+    assert(searches("a\\Kb", "", Dialect.PCRE, "ab"))
+    assert(searches("\\Ga", "", Dialect.PCRE, "ab"))
+    assert(!searches("\\Gb", "", Dialect.PCRE, "ab"))
+
+  test("EpsNFABuilder.build: (*NOTEMPTY) and (*NOTEMPTY_ATSTART)"):
+    assert(searches("a*", "", Dialect.PCRE, ""))
+    assert(!searches("(*NOTEMPTY)a*", "", Dialect.PCRE, "b"))
+    assert(searches("(*NOTEMPTY)a*", "", Dialect.PCRE, "ba"))
+    assert(!searches("(*NOTEMPTY_ATSTART)a*", "", Dialect.PCRE, ""))
+    assert(searches("(*NOTEMPTY_ATSTART)a*", "", Dialect.PCRE, "b"))
+    assert(!searches("(*NOTEMPTY_ATSTART)^a*", "", Dialect.PCRE, "b"))
+    // The match is the reported one, which starts at `\K`.
+    assert(!searches("(*NOTEMPTY)a\\K", "", Dialect.PCRE, "a"))
+    assert(searches("(*NOTEMPTY)a\\Kb", "", Dialect.PCRE, "ab"))
+    assert(searches("(*NOTEMPTY_ATSTART)a\\K", "", Dialect.PCRE, "a"))
+    assert(!searches("(*NOTEMPTY_ATSTART)\\Ka*", "", Dialect.PCRE, ""))
 
   test("EpsNFABuilder.build: line, text and word boundary assertions"):
     for c <- AssertionCases.cases; dialect <- c.dialects do

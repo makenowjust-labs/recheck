@@ -84,10 +84,54 @@ object Inst:
   /** `tx`: Marks as a transaction point, then jumps a `next` block. When it is terminated with a rollback, it jumps to
     * a `rollback` block, and when it is failed, it jumps to a `fallback` block. `rollback` and `fallback` blocks are
     * optional. When each of them is `None`, it means failed on jumping.
+    *
+    * The frame of the `fallback` block is the `barrier` for the backtracking control verbs.
     */
-  final case class Tx(next: Label, rollback: Option[Label], fallback: Option[Label]) extends Terminator:
+  final case class Tx(next: Label, rollback: Option[Label], fallback: Option[Label], barrier: Option[Barrier] = None)
+      extends Terminator:
     def successors: Set[Label] = Set(Some(next), rollback, fallback).flatten
-    override def toString: String = s"tx $next ${rollback.getOrElse("FAIL")} ${fallback.getOrElse("FAIL")}"
+    override def toString: String =
+      s"tx $next ${rollback.getOrElse("FAIL")} ${fallback.getOrElse("FAIL")}${barrier.fold("")(b => s" ; $b")}"
+
+  /** `try_barrier`: `try` whose fallback frame is the `barrier` for the backtracking control verbs. */
+  final case class TryBarrier(next: Label, fallback: Label, barrier: Barrier) extends Terminator:
+    def successors: Set[Label] = Set(next, fallback)
+    override def toString: String = s"try_barrier $next $fallback ; $barrier"
+
+  /** `leave`: Terminates a transaction as `rollback` does, but it keeps the backtracking points in it, so backtracking
+    * can enter it again (a non-atomic look-around).
+    */
+  case object Leave extends Terminator:
+    def successors: Set[Label] = Set.empty
+    override def toString: String = "leave"
+
+  /** `if_cap`: Jumps to a `yes` block if one of the captures of the indices is set, or to a `no` block. */
+  final case class IfCap(indices: Seq[Int], yes: Label, no: Label) extends Terminator:
+    def successors: Set[Label] = Set(yes, no)
+    override def toString: String = s"if_cap ${indices.mkString(",")} $yes $no"
+
+  /** Barrier is what the frame of a fallback is for the backtracking control verbs, which skip the frames to it. */
+  sealed abstract class Barrier
+
+  object Barrier:
+
+    /** Search is the fallback retrying the search at the next position.
+      *
+      * `(*COMMIT)` fails the whole search there, `(*PRUNE)` takes it, and `(*SKIP)` retries at its position.
+      */
+    case object Search extends Barrier:
+      override def toString: String = "search"
+
+    /** Assertion is the fallback of a negative look-around or a condition, which `(*COMMIT)`, `(*PRUNE)` and `(*SKIP)`
+      * take, and `(*THEN)` of the scope too.
+      */
+    final case class Assertion(scope: Option[Int]) extends Barrier:
+      override def toString: String = s"assertion${scope.fold("")(s => s" $s")}"
+
+    /** Then is the fallback that `(*THEN)` of the scope takes: the next alternative, or the end of the alternatives.
+      */
+    final case class Then(scope: Int) extends Barrier:
+      override def toString: String = s"then $scope"
 
   /** NonTerminator is a base class for non-terminal instructions. They appear in a basic block except its last.
     */
@@ -152,6 +196,45 @@ object Inst:
   /** `cap-reset`: Resets captures between `from` and `to`. */
   final case class CapReset(from: Int, to: Int) extends NonTerminator:
     override def toString: String = s"cap_reset $from $to"
+
+  /** `verb`: Pushes a backtracking point of a backtracking control verb, which acts when backtracking reaches it. */
+  final case class Verb(kind: VerbKind) extends NonTerminator:
+    override def toString: String = s"verb $kind"
+
+  /** `check_not_empty`: Fails if the match from the start of the capture `0` is empty, only at the start of the input
+    * with `atStart`.
+    */
+  final case class CheckNotEmpty(atStart: Boolean) extends NonTerminator:
+    override def toString: String = if atStart then "check_not_empty at_start" else "check_not_empty"
+
+  /** `tx_drop`: Drops the innermost transaction, which `(*ACCEPT)` leaves to end an outer one. */
+  case object TxDrop extends NonTerminator:
+    override def toString: String = "tx_drop"
+
+  /** VerbKind is an operand of `verb` instruction. */
+  sealed abstract class VerbKind
+
+  object VerbKind:
+
+    /** `(*COMMIT)` fails the whole search. */
+    case object Commit extends VerbKind:
+      override def toString: String = "commit"
+
+    /** `(*PRUNE)` fails the match at the current starting position. */
+    case object Prune extends VerbKind:
+      override def toString: String = "prune"
+
+    /** `(*SKIP)` retries the search at its position, or at the position of the mark of the name. */
+    final case class Skip(name: Option[String]) extends VerbKind:
+      override def toString: String = name.fold("skip")(n => s"skip $n")
+
+    /** `(*THEN)` takes the next alternative of the scope, or acts as `(*PRUNE)` without a scope. */
+    final case class Then(scope: Option[Int]) extends VerbKind:
+      override def toString: String = scope.fold("then")(s => s"then $s")
+
+    /** `(*MARK:NAME)` records its position for `(*SKIP:NAME)`. */
+    final case class Mark(name: String) extends VerbKind:
+      override def toString: String = s"mark $name"
 
   /** AssertKind is an operand of `assert` instruction. */
   sealed abstract class AssertKind

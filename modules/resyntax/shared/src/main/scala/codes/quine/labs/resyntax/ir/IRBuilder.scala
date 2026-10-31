@@ -2,9 +2,11 @@ package codes.quine.labs.resyntax.ir
 
 import codes.quine.labs.resyntax.ast.AssertKind
 import codes.quine.labs.resyntax.ast.BackslashKind
+import codes.quine.labs.resyntax.ast.BacktrackControlKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.CommandKind
+import codes.quine.labs.resyntax.ast.ConditionalTest
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.DialectOptions
 import codes.quine.labs.resyntax.ast.Encoding
@@ -64,14 +66,15 @@ object IRBuilder:
       new LookBehindChecker(table, resolver, featureSet, literalWidth(flagSet, dialect, perlUnicodeRules))
     val backReferences = new IRValidator(table, resolver, checker, featureSet).validate(node)
     val chars = new IRCharResolver(dialect, mode, perlUnicodeRules)
-    val builder = new IRBuilder(context, table, backReferences, chars, checker, resolveCharacter)
+    val builder = new IRBuilder(context, table, backReferences, chars, checker, resolveCharacter, hasCall(node))
     IRPattern(
       builder.build(node),
       table.count,
       table.names,
       IRBackReferenceSemantics(featureSet.unsetBackReferenceMatchesEmpty, featureSet.backReferenceChoice),
       featureSet.anchored,
-      mode
+      mode,
+      notEmpty(starts)
     )
 
   /** Returns the unit mode of a pattern from the dialect, the encoding and the flags.
@@ -150,10 +153,12 @@ object IRBuilder:
 
   /** Returns the names of PCRE's start options (e.g. `(*CRLF)`), which can appear only at the start. */
   private def startOptions(node: Node): Seq[String] =
-    val nodes = node.data match
-      case NodeData.Sequence(nodes) => nodes
-      case _                        => Seq(node)
-    nodes.iterator
+    // They are in the first alternative of the pattern (e.g. `(*NOTEMPTY)a|b`).
+    def leading(node: Node): Seq[Node] = node.data match
+      case NodeData.Sequence(nodes)         => nodes
+      case NodeData.Disjunction(first +: _) => leading(first)
+      case _                                => Seq(node)
+    leading(node).iterator
       .map(_.data)
       .takeWhile:
         case NodeData.Command(_: CommandKind.StartOption) => true
@@ -161,8 +166,26 @@ object IRBuilder:
       .collect { case NodeData.Command(CommandKind.StartOption(name, _)) => name }
       .toSeq
 
-  /** The start options that change whether a match is accepted, which the checkers do not handle. */
-  private val UnsupportedStartOptions: Set[String] = Set("NOTEMPTY", "NOTEMPTY_ATSTART")
+  /** Returns where an empty match is rejected by the start options, where `(*NOTEMPTY)` includes the other. */
+  private def notEmpty(startOptions: Seq[String]): IRNotEmpty =
+    if startOptions.contains("NOTEMPTY") then IRNotEmpty.Anywhere
+    else if startOptions.contains("NOTEMPTY_ATSTART") then IRNotEmpty.AtStart
+    else IRNotEmpty.Never
+
+  /** Checks whether the pattern calls a group or itself (e.g. `(?1)` and `\g<1>`). */
+  private def hasCall(node: Node): Boolean =
+    NodeKey.exists(node):
+      _.data match
+        case NodeData.Command(
+              CommandKind.RCall | _: CommandKind.IndexedCall | _: CommandKind.RelativeCall | _: CommandKind.NamedCall |
+              _: CommandKind.PNamedCall
+            ) =>
+          true
+        case NodeData.Backslash(_: BackslashKind.EscapeCall) => true
+        case _                                               => false
+
+  /** The version of PCRE2 that the PCRE dialect follows, which `(?(VERSION>=10.0)...)` compares with. */
+  val PCREVersion: (Int, Int) = (10, 49)
 
 private[ir] class IRBuilder(
     initial: BuildingContext,
@@ -170,7 +193,8 @@ private[ir] class IRBuilder(
     backReferences: Map[NodeKey, Seq[Int]],
     chars: IRCharResolver,
     checker: LookBehindChecker,
-    resolveCharacter: Option[(Node, IRCharFlags) => IRNodeData]
+    resolveCharacter: Option[(Node, IRCharFlags) => IRNodeData],
+    hasCall: Boolean
 ):
   private val dialect = initial.dialect
 
@@ -273,27 +297,96 @@ private[ir] class IRBuilder(
         nodes match
           case Seq(node) => Right(build(node))
           case nodes     => Left(IRNodeData.Disjunction(nodes.map(build)))
-    case CommandKind.Comment(_)              => Left(IRNodeData.Empty)
-    case CommandKind.StartOption(name, _)    => Left(buildStartOptionCommand(node, name))
-    case CommandKind.RCall                   => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.IndexedCall(_)          => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.RelativeCall(_)         => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.NamedCall(_)            => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.PNamedCall(_)           => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.InlineCode(_)           => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.EmbedCode(_)            => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.Callout                 => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.CalloutInt(_)           => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.CalloutString(_, _, _)  => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.Conditional(_, _, _)    => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.BacktrackControl(_, _)  => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.AbsenceExpression(_, _) => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.AbsenceStopper(_)       => Left(IRNodeData.Unsupported(node.data))
-    case CommandKind.AbsenceRangeClear       => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.Comment(_)                   => Left(IRNodeData.Empty)
+    case CommandKind.StartOption(name, _)         => Left(buildStartOptionCommand(node, name))
+    case CommandKind.RCall                        => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.IndexedCall(_)               => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.RelativeCall(_)              => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.NamedCall(_)                 => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.PNamedCall(_)                => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.InlineCode(_)                => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.EmbedCode(_)                 => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.Callout                      => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.CalloutInt(_)                => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.CalloutString(_, _, _)       => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.Conditional(test, yes, no)   => buildConditional(node, test, yes, no)
+    case CommandKind.BacktrackControl(kind, name) => Left(buildBacktrackControl(kind, name))
+    case CommandKind.AbsenceExpression(_, _)      => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.AbsenceStopper(_)            => Left(IRNodeData.Unsupported(node.data))
+    case CommandKind.AbsenceRangeClear            => Left(IRNodeData.Unsupported(node.data))
 
-  def buildStartOptionCommand(node: Node, name: String): IRNodeData =
-    if IRBuilder.UnsupportedStartOptions.contains(name) then IRNodeData.Unsupported(node.data)
-    else IRNodeData.Empty
+  // The start options are of the whole pattern, which `IRBuilder.build` reads.
+  def buildStartOptionCommand(node: Node, name: String): IRNodeData = IRNodeData.Empty
+
+  def buildConditional(node: Node, test: ConditionalTest, yes: Node, no: Option[Node]): Either[IRNodeData, IRNode] =
+    def branch(node: Option[Node]): IRNode = node.fold(IRNode(IRNodeData.Empty))(n => scoped(build(n)))
+    def captured(indices: Seq[Int]): Either[Boolean, IRCondition] =
+      // .NET's group `0` is the whole match, which is not set yet.
+      val set = indices.filter(_ != 0)
+      if set.isEmpty then Left(false)
+      // Ruby tests only the first group of a name shared by groups.
+      else if dialect == Dialect.Ruby then Right(IRCondition.Captured(set.take(1)))
+      else Right(IRCondition.Captured(set))
+    def resolved: Seq[Int] =
+      backReferences.getOrElse(NodeKey(node), throw new IllegalStateException(s"No resolved test: $node"))
+    // A recursion test is false out of a recursion, so it is constant without calls.
+    // PCRE reads `(R)` and `(R1)` as capture tests when a group has the name.
+    def recursion(name: Option[String]): Option[Either[Boolean, IRCondition]] =
+      name.filter(dialect == Dialect.PCRE && table.names.contains(_)) match
+        case Some(name) => Some(captured(table.names(name)))
+        case None       => Option.when(!hasCall)(Left(false))
+    val condition: Option[Either[Boolean, IRCondition]] = test match
+      case ConditionalTest.Indexed(_) | ConditionalTest.Relative(_) | ConditionalTest.Named(_, _) =>
+        Some(captured(resolved))
+      case ConditionalTest.Referenced(_, _: Reference.LeveledReference) => None
+      case ConditionalTest.Referenced(_, _)                             => Some(captured(resolved))
+      case ConditionalTest.RRecursion                                   => recursion(Some("R"))
+      case ConditionalTest.IndexedRecursion(n)                          => recursion(Some(s"R$n"))
+      case ConditionalTest.NamedRecursion(_)                            => recursion(None)
+      // `(DEFINE)` holds the groups for calls, and it is skipped otherwise.
+      case ConditionalTest.Define                    => Option.when(!hasCall)(Left(false))
+      case ConditionalTest.Version(ge, major, minor) =>
+        import scala.math.Ordering.Implicits.*
+        val version = IRBuilder.PCREVersion
+        Some(Left(if ge then version >= (major, minor) else version == (major, minor)))
+      case ConditionalTest.LookAround(kind, body)  => Some(Right(buildLookAroundCondition(kind, body)))
+      case ConditionalTest.CalloutLookAround(_, _) => None
+    condition match
+      case Some(Left(true))       => Right(branch(Some(yes)))
+      case Some(Left(false))      => Right(branch(no))
+      case Some(Right(condition)) => Left(IRNodeData.Conditional(condition, branch(Some(yes)), branch(no)))
+      case None                   => Left(IRNodeData.Unsupported(node.data))
+
+  /** Builds a look-around condition, where .NET reads a bare group name as a capture test (e.g. `(?(x)a|b)`). */
+  def buildLookAroundCondition(kind: Option[GroupKind.LookAround], body: Node): IRCondition =
+    def dotNetName: Option[String] = body.data match
+      case NodeData.Literal(c)      => Some(String(Character.toChars(c)))
+      case NodeData.Sequence(nodes) =>
+        val cs = nodes.collect { case Node(NodeData.Literal(c), _) => String(Character.toChars(c)) }
+        Option.when(cs.size == nodes.size)(cs.mkString)
+      case _ => None
+    kind match
+      case None =>
+        dotNetName.flatMap(table.names.get) match
+          case Some(indices) => IRCondition.Captured(indices)
+          case None          => IRCondition.LookAhead(false, scoped(build(body)))
+      case Some(_: GroupKind.PositiveLookAhead)  => IRCondition.LookAhead(false, scoped(build(body)))
+      case Some(_: GroupKind.NegativeLookAhead)  => IRCondition.LookAhead(true, scoped(build(body)))
+      case Some(_: GroupKind.PositiveLookBehind) => IRCondition.LookBehind(false, scoped(build(body)))
+      case Some(_: GroupKind.NegativeLookBehind) => IRCondition.LookBehind(true, scoped(build(body)))
+
+  def buildBacktrackControl(kind: Option[BacktrackControlKind], name: Option[String]): IRNodeData =
+    // An empty name is the same as no name.
+    val named = name.filter(_.nonEmpty)
+    kind match
+      case Some(BacktrackControlKind.Fail | BacktrackControlKind.F) => IRNodeData.Chars(CharSet.empty)
+      case Some(BacktrackControlKind.Accept)      => IRNodeData.BacktrackControl(IRBacktrackControl.Accept)
+      case Some(BacktrackControlKind.Commit)      => IRNodeData.BacktrackControl(IRBacktrackControl.Commit)
+      case Some(BacktrackControlKind.Prune)       => IRNodeData.BacktrackControl(IRBacktrackControl.Prune)
+      case Some(BacktrackControlKind.Skip)        => IRNodeData.BacktrackControl(IRBacktrackControl.Skip(named))
+      case Some(BacktrackControlKind.Then)        => IRNodeData.BacktrackControl(IRBacktrackControl.Then)
+      case Some(BacktrackControlKind.Mark) | None =>
+        IRNodeData.BacktrackControl(IRBacktrackControl.Mark(name.getOrElse("")))
 
   /** Builds a look-behind, where Java's one with `\X` tries the starts of its `TreeInfo` lengths, unlike the IR's one.
     *
@@ -328,8 +421,8 @@ private[ir] class IRBuilder(
         context = context.reset(flagSet)
         build(child))
     case GroupKind.Balance(_, _, _)               => Left(IRNodeData.Unsupported(node.data))
-    case GroupKind.NonAtomicPositiveLookAhead(_)  => Left(IRNodeData.Unsupported(node.data))
-    case GroupKind.NonAtomicPositiveLookBehind(_) => Left(IRNodeData.Unsupported(node.data))
+    case GroupKind.NonAtomicPositiveLookAhead(_)  => Left(IRNodeData.NonAtomicLookAhead(scoped(build(child))))
+    case GroupKind.NonAtomicPositiveLookBehind(_) => Left(IRNodeData.NonAtomicLookBehind(scoped(build(child))))
     case GroupKind.ScriptRun(_)                   => Left(IRNodeData.Unsupported(node.data))
     case GroupKind.AtomicScriptRun(_)             => Left(IRNodeData.Unsupported(node.data))
     case GroupKind.ScanSubstring(_, _)            => Left(IRNodeData.Unsupported(node.data))
@@ -363,7 +456,10 @@ private[ir] class IRBuilder(
     case AssertKind.UpperEnd          =>
       if featureSet.upperEndIsTextEnd then IRNodeData.Assert(IRAssertKind.TextEnd)
       else IRNodeData.Assert(IRAssertKind.ChompTextEnd(context.lineTerminators))
-    case AssertKind.Boundary(Some(_)) | AssertKind.NonBoundary(Some(_)) | AssertKind.Cut | AssertKind.Sticky =>
+    // `\G` is the start of the search, and the checkers search from the start of the input.
+    case AssertKind.Sticky                                              => IRNodeData.Assert(IRAssertKind.TextBegin)
+    case AssertKind.Cut                                                 => IRNodeData.ResetMatchStart
+    case AssertKind.Boundary(Some(_)) | AssertKind.NonBoundary(Some(_)) =>
       IRNodeData.Unsupported(node.data)
 
   def buildCaret(): IRNodeData =
