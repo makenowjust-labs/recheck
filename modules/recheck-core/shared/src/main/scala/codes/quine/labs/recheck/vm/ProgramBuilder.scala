@@ -46,7 +46,7 @@ private[vm] enum EmptyIteration:
   /** Ignore handles it as the others (PCRE's bounded repetition, which repeats copies of the node). */
   case Ignore
 
-  /** Reject fails an optional one (JavaScript, and Java's repetition of a single node or a group without branches). */
+  /** Reject fails an optional one (JavaScript). */
   case Reject
 
   /** ExitOptional ends the repetition with an optional one (Python). */
@@ -55,7 +55,7 @@ private[vm] enum EmptyIteration:
   /** ExitFromMin ends the repetition with the last mandatory one or an optional one (Perl, .NET, PCRE). */
   case ExitFromMin
 
-  /** ExitAll ends the repetition with any one, even before the minimum (Java's repetition of a group with branches). */
+  /** ExitAll ends the repetition with any one, even before the minimum (Java's `Loop`). */
   case ExitAll
 
 /** AcceptScope is what `(*ACCEPT)` ends successfully. */
@@ -536,7 +536,7 @@ private[vm] class ProgramBuilder(
   /** A builder for `x{n,m}` node. */
   def buildRepeat(quantifier: IRQuantifier, child: IRNode): Unit =
     def isLazy(strategy: BacktrackStrategy): Boolean = strategy == BacktrackStrategy.Lazy
-    val empty = if child.canMatchEmpty then emptyIteration(quantifier, child) else EmptyIteration.Ignore
+    val empty = if child.canMatchEmpty then emptyIteration(quantifier) else EmptyIteration.Ignore
     // An empty mandatory iteration ending the repetition jumps to `exit`.
     val exit = allocateLabel("exit")
     var exits = false
@@ -564,16 +564,10 @@ private[vm] class ProgramBuilder(
       emitTerminator(Inst.Jmp(exit))
       enterBlock(exit)
 
-  def emptyIteration(quantifier: IRQuantifier, child: IRNode): EmptyIteration = pattern.dialect match
+  def emptyIteration(quantifier: IRQuantifier): EmptyIteration = pattern.dialect match
     case Dialect.JavaScript => EmptyIteration.Reject
     case _: Dialect.Python  => EmptyIteration.ExitOptional
-    case Dialect.Java       =>
-      child.data match
-        case IRNodeData.Capture(_, _, node) if node.data.isInstanceOf[IRNodeData.Atomic] => EmptyIteration.Reject
-        case _: IRNodeData.Capture | _: IRNodeData.Sequence | _: IRNodeData.Disjunction | _: IRNodeData.Repeat |
-            IRNodeData.Empty | _: IRNodeData.Conditional =>
-          EmptyIteration.ExitAll
-        case _ => EmptyIteration.Reject
+    case Dialect.Java       => EmptyIteration.ExitAll
     // PCRE repeats copies of the node for a bounded repetition.
     case Dialect.PCRE =>
       quantifier match

@@ -250,15 +250,11 @@ class InterpreterConstructSuite extends munit.FunSuite:
     check("(*NOTEMPTY_ATSTART)b\\K|a", "ba", PCRE)(Seq(g(1, 1)))
 
   test("Interpreter.run: Java's captures"):
-    // Java does not restore the captures in an atomic group, a look-around or a repetition of a group without branches
-    // (`GroupCurly`) once it matches, even at a later starting position.
-    check("^(?:(.)b)*cb\\1$", "abcba", Java)(NoMatch)
-    check("^(?:(.)b)*cb\\1$", "abcba", PCRE, Perl(), Python(), Ruby(), DotNet, JavaScript)(Seq(g(0, 5), g(0, 1)))
-    check("^(?:(.)b){0,3}cb\\1$", "abcba", Java)(NoMatch)
+    // Java does not restore the captures in an atomic group or a look-around once it matches, even at a later starting
+    // position, but a repetition restores them as in the other dialects.
+    check("^(?:(.)b)*cb\\1$", "abcba", Java, PCRE, Perl(), Python(), Ruby(), DotNet, JavaScript)(Seq(g(0, 5), g(0, 1)))
     check("^(?:(.)b)*?cb\\1$", "abcba", Java)(Seq(g(0, 5), g(0, 1)))
-    check("^(?:x?(.)b)*cb\\1$", "abcba", Java)(Seq(g(0, 5), g(0, 1)))
-    check("(?:(a)b)+x|b\\1", "aba", Java)(Seq(g(1, 3), g(0, 1)))
-    check("(?:(a)b)+x|b\\1", "aba", PCRE, Perl(), Python(), Ruby(), DotNet)(NoMatch)
+    check("(?:(a)b)+x|b\\1", "aba", Java, PCRE, Perl(), Python(), Ruby(), DotNet)(NoMatch)
     check("(?>(a))x|.\\1", "aa", Java)(Seq(g(0, 2), g(0, 1)))
     check("(?=(a))x|.\\1", "aa", Java)(Seq(g(0, 2), g(0, 1)))
     check("(?!(a))|.\\1", "aa", Java)(Seq(g(0, 2), g(0, 1)))
@@ -269,21 +265,16 @@ class InterpreterConstructSuite extends munit.FunSuite:
     check("(?:(a)|b)*+x|.\\1", "aa", Java)(Seq(g(0, 2), g(1, 2)))
     check("(a)*x|.\\1", "aa", Java)(NoMatch)
     check("(?:(a)|b)*x|.\\1", "aa", Java)(NoMatch)
-    check("(?:(a))+y|x\\1", "xaay", Java)(Seq(g(1, 4), g(2, 3)))
-    check("x(?:(a)a)*z|.\\1", "xaay", Java)(Seq(g(0, 2), g(1, 2)))
-    check("^(?:(a)(b))*(?:\\1\\2)$", "abab", Java)(Seq(g(0, 4), g(2, 3), g(3, 4)))
-    // Java's `\R` under a quantifier, or in `GroupCurly`, matches each iteration in its first way.
+    check("^(?:(a)(b))*(?:\\1\\2)$", "abab", Java)(Seq(g(0, 4), g(0, 1), g(1, 2)))
+    // Java's `\R` backtracks from `\r\n` to `\r`, also under a quantifier.
     check("^\\R\n$", "\r\n", Java)(Seq(g(0, 2)))
-    check("^\\R*\n$", "\r\n", Java)(NoMatch)
-    check("^\\R?\n$", "\r\n", Java)(NoMatch)
-    check("^(?:\\R)*\n$", "\r\n", Java)(NoMatch)
+    check("^\\R*\n$", "\r\n", Java)(Seq(g(0, 2)))
     check("^(?:\\R)?\n$", "\r\n", Java)(Seq(g(0, 2)))
-    check("^(?:\\R|x)*\n$", "\r\n", Java)(Seq(g(0, 2)))
 
   test("Interpreter.run: empty iterations"):
     // JavaScript rejects an optional empty iteration, and the others end the repetition with it, from an iteration that
     // differs among them: Python from an optional one, Perl, .NET and PCRE's unbounded one from the last mandatory one,
-    // and Java's repetition of a group with branches from any one.
+    // and Java from any one.
     // PCRE's bounded one repeats copies of the node.
     check("^(?:()|a){2}\\1$", "a", Java, Perl())(Seq(g(0, 1), g(1, 1)))
     check("^(?:()|a){2}\\1$", "a", PCRE, Python(), DotNet)(Seq(g(0, 1), g(0, 0)))

@@ -77,8 +77,7 @@ object IRBuilder:
         chars,
         checker,
         resolveCharacter,
-        hasCall(node),
-        hasBackReference(node)
+        hasCall(node)
       )
     val root = builder.build(node)
     IRPattern(
@@ -282,13 +281,6 @@ object IRBuilder:
     else if startOptions.contains("NOTEMPTY_ATSTART") then IRNotEmpty.AtStart
     else IRNotEmpty.Never
 
-  private def hasBackReference(node: Node): Boolean =
-    NodeKey.exists(node):
-      _.data match
-        case NodeData.Backslash(_: BackslashKind.EscapeBackReference) => true
-        case NodeData.Command(_: CommandKind.PBackReference)          => true
-        case _                                                        => false
-
   private def hasCall(node: Node): Boolean =
     NodeKey.exists(node):
       _.data match
@@ -310,8 +302,7 @@ private[ir] class IRBuilder(
     chars: IRCharResolver,
     checker: LookBehindChecker,
     resolveCharacter: Option[(Node, IRCharFlags) => IRNodeData],
-    hasCall: Boolean,
-    hasBackReference: Boolean
+    hasCall: Boolean
 ):
   private val dialect = initial.dialect
 
@@ -378,12 +369,7 @@ private[ir] class IRBuilder(
           case nodes     => Left(IRNodeData.Sequence(nodes))
 
   def buildRepeat(node: Node, child: Node, quantifier: Quantifier): IRNodeData =
-    val ir = child.data match
-      // Java's `\R` under a quantifier matches each iteration in its first way, though `\R` alone backtracks.
-      case NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline)) if dialect.isJava =>
-        IRNode(IRNodeData.Atomic(build(child)), child.loc)
-      case _ if isJavaGroupCurly(child, quantifier) => javaGroupCurly(build(child))
-      case _                                        => build(child)
+    val ir = build(child)
     val strategy = quantifier.strategy match
       case BacktrackStrategy.Greedy if context.ungreedy => BacktrackStrategy.Lazy
       case BacktrackStrategy.Lazy if context.ungreedy   => BacktrackStrategy.Greedy
@@ -403,32 +389,6 @@ private[ir] class IRBuilder(
     // A possessive quantifier is an atomic group of the greedy one, even for an exact count (e.g. `(?:a|ab){1}+`).
     if quantifier.strategy == BacktrackStrategy.Possessive then IRNodeData.Atomic(IRNode(repeat, node.loc))
     else repeat
-
-  /** Checks whether Java repeats the group with `GroupCurly`, which matches each iteration in its first way, and keeps
-    * the captures in it over backtracking.
-    *
-    * It matters only for a group with `\R` (which has two ways), with captures in a pattern with back-references, or
-    * matching the empty string (whose iteration `GroupCurly` rejects).
-    */
-  def isJavaGroupCurly(child: Node, quantifier: Quantifier): Boolean =
-    def isGroup = child.data match
-      case NodeData.Group(GroupKind.IndexedCapture | GroupKind.NonCapture | _: GroupKind.NamedCapture, _) => true
-      case NodeData.Group(_: GroupKind.InlineFlag, _)                                                     => true
-      case _                                                                                              => false
-    def matters = checker.javaMinLength(child) == 0 || NodeKey.exists(child):
-      case Node(NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline)), _) => true
-      case node @ Node(NodeData.Group(_, _), _) => hasBackReference && node != child && table.indexOf(node).isDefined
-      case _                                    => false
-    val counted = quantifier match
-      case Quantifier.Question(_) => false
-      case _                      => quantifier.strategy != BacktrackStrategy.Possessive
-    dialect.isJava && counted && isGroup && checker.javaDeterministic(child) && matters
-
-  /** Makes the body of Java's `GroupCurly` atomic, which keeps the captures in it as Java's atomic group does. */
-  def javaGroupCurly(ir: IRNode): IRNode = ir.data match
-    case IRNodeData.Capture(index, name, body) =>
-      IRNode(IRNodeData.Capture(index, name, IRNode(IRNodeData.Atomic(body), body.loc)), ir.loc)
-    case _ => IRNode(IRNodeData.Atomic(ir), ir.loc)
 
   def buildCommand(node: Node, kind: CommandKind): Either[IRNodeData, IRNode] = kind match
     case CommandKind.InlineFlag(diff) =>

@@ -85,12 +85,6 @@ private[ir] final class LookBehindChecker(
       // Each top-level alternative of Ruby's look-behind has a fixed width, so matching it backward is the same.
       case IRLookBehindRule.Ruby => IRLookBehindMatch.Backward
 
-  /** Checks whether the group is deterministic for Java's `TreeInfo`, which makes a repetition of it `GroupCurly`. */
-  def javaDeterministic(group: Node): Boolean = java(List(group), JavaInfo.Initial).deterministic
-
-  /** Returns the minimum length of the node for Java's `TreeInfo`. */
-  def javaMinLength(node: Node): Int = java(List(node), JavaInfo.Initial).minLength
-
   /** Returns the width of the node for PCRE, Perl and Python, or `None` if it is unknown (e.g. a conditional).
     *
     * With `conditionals`, PCRE's conditional is the union of its branches, which its look-behind tries.
