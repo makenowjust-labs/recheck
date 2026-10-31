@@ -258,12 +258,12 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   private def escapeClass(kind: EscapeClassKind, flags: IRCharFlags, loc: SourceLocation): IRNodeData = kind match
     case EscapeClassKind.GeneralNewline =>
       val set = if flags.bsrAnyCRLF then CharSet.of(0x0a, 0x0d) else IRCharClasses.Vertical
-      IRNodeData.Atomic(
-        IRNodeData.Disjunction(
-          IRNodeData.Sequence(chars(CharSet.single(0x0d)), chars(CharSet.single(0x0a))),
-          chars(set)
-        )
+      val alternatives = IRNodeData.Disjunction(
+        IRNodeData.Sequence(chars(CharSet.single(0x0d)), chars(CharSet.single(0x0a))),
+        chars(set)
       )
+      // Java's `\R` backtracks into `\r` alone (`\R\n` matches `\r\n`), unlike the others.
+      if dialect == Dialect.Java then alternatives else IRNodeData.Atomic(alternatives)
     case EscapeClassKind.NonNewline if dialect == Dialect.PCRE => dot(flags.copy(dotAll = false))
     case _                                                     => output(escapeClassSet(kind, flags, loc), flags)
 

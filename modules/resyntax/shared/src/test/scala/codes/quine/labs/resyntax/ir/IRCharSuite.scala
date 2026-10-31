@@ -199,9 +199,10 @@ class IRCharSuite extends munit.FunSuite:
   chars("\\h", "", Perl)(IRCharClasses.pcreHorizontal.diff(of("᠎")))
   chars("\\v", "", Java, Perl)(IRCharClasses.Vertical)
   chars("\\N", "", Perl)(of("\n").complement(UnitMode.CodePoint))
-  check("\\R", "", Java, Perl, Ruby)(
+  check("\\R", "", Perl, Ruby)(
     Atomic(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical)))
   )
+  check("\\R", "", Java)(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical)))
   unsupported("\\X", "", Java, PCRE, Perl, Ruby)
   unsupported("\\N{LATIN SMALL LETTER A}", "", Perl, Python)
   chars("\\N{U+263A}", "", Perl)(of("☺"))
