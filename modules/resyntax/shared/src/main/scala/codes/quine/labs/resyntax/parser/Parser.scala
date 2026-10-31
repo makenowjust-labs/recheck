@@ -1433,10 +1433,10 @@ private[parser] final class Parser(
       case 'r'                                                 => parseBackslashLowerR()
       case 's'                                                 => parseBackslashLowerS()
       case 't'                                                 => parseBackslashLowerT()
-      case 'u'                                                 => parseBackslashLowerU()
+      case 'u'                                                 => withoutRemovedComment(parseBackslashLowerU())
       case 'v'                                                 => parseBackslashLowerV()
       case 'w'                                                 => parseBackslashLowerW()
-      case 'x'                                                 => parseBackslashLowerX()
+      case 'x'                                                 => withoutRemovedComment(parseBackslashLowerX())
       case 'z'                                                 => parseBackslashLowerZ()
       case 'A'                                                 => parseBackslashUpperA()
       case 'B'                                                 => parseBackslashUpperB()
@@ -1809,6 +1809,18 @@ private[parser] final class Parser(
   private def parseBackslashLowerT(): BackslashKind =
     next()
     BackslashKind.Escape(EscapeStyle.Single('t'), 0x09)
+
+  /** Parses an escape, which fails if it has a comment that Ruby removes, since Ruby reads `\x` and `\u` before.
+    *
+    * For example, `\x(?#x)41` and `\u{4(?#x)1}` are errors in Ruby, but `\x4(?#x)1` is `\x04` and `1`.
+    */
+  private def withoutRemovedComment(parse: => BackslashKind): BackslashKind =
+    val start = offset
+    val kind = parse
+    var end = offset
+    while removedCommentStarts.contains(end) do end = removedCommentStarts(end)
+    if removedCommentEnds.keysIterator.exists(s => start < s && s < end) then fail("Invalid backslash escape", start)
+    kind
 
   private def parseBackslashLowerU(): BackslashKind =
     if !featureSet.hasBackslashUnicodeHex then return parseBackslashUnknown()

@@ -2,11 +2,13 @@ package codes.quine.labs.resyntax.parser
 import codes.quine.labs.resyntax.ast.AssertNameStyle.*
 import codes.quine.labs.resyntax.ast.BacktrackControlKind.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
+import codes.quine.labs.resyntax.ast.BackslashKind
 import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.CommandKind.*
 import codes.quine.labs.resyntax.ast.ConditionalTest.*
 import codes.quine.labs.resyntax.ast.Dialect.*
+import codes.quine.labs.resyntax.ast.EscapeStyle
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetDiff
 import codes.quine.labs.resyntax.ast.GroupKind
@@ -158,6 +160,17 @@ class ParserCommandSuite extends ParserSuiteBase:
     )
   check("a{1(?#x),2}", "", Ruby)(Repeat(Literal('a'), Bounded(1, 2, Greedy)))
   check("(?<a(?#x)b>c)", "", Ruby)(Group(NamedCapture(Angle, "ab"), Literal('c')))
+  // Ruby reads `\x` and `\u` before removing comments, so a comment in them is an error.
+  error("\\x(?#x)41", "", Ruby)("Invalid backslash escape at 1")
+  error("\\u{4(?#x)1}", "", Ruby)("Invalid backslash escape at 1")
+  error("\\u{(?#x)41}", "", Ruby)("Invalid backslash escape at 1")
+  error("\\u{41(?#x)}", "", Ruby)("Invalid backslash escape at 1")
+  check("\\x4(?#x)1", "", Ruby)(
+    Sequence(Backslash(BackslashKind.Escape(EscapeStyle.Hex1, 0x04)), Command(Comment("x")), Literal('1'))
+  )
+  check("\\u0041(?#x)", "", Ruby)(
+    Sequence(Backslash(BackslashKind.Escape(EscapeStyle.UnicodeHex4, 0x41)), Command(Comment("x")))
+  )
   check("[(?#x)]", "", Ruby):
     Class(
       false,
