@@ -1,5 +1,7 @@
 package codes.quine.labs.recheck.exec
 
+import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermissions
 import scala.concurrent.duration.*
 
 import codes.quine.labs.recheck.common.CancelException
@@ -58,3 +60,63 @@ class ExecutorSuite extends munit.FunSuite:
   test("Executor.exec: missing command"):
     intercept[UnexpectedException]:
       Executor.exec(Command("recheck-missing-command"), "", None)
+
+  test("Executor.exec: source"):
+    val source =
+      Command.Source("recheck-test.js", "console.log(process.argv.length, require('fs').readFileSync(0, 'utf8'))")
+    val command = Command("node", Seq("--no-warnings"), source = Some(source))
+    try
+      assertEquals(Executor.exec(command, "foo", None), ExecResult.Exit(0, "2 foo\n", ""))
+      assertEquals(Executor.exec(command, "bar", None), ExecResult.Exit(0, "2 bar\n", ""))
+      assertEquals(command.toString, "node --no-warnings recheck-test.js")
+    finally Files.deleteIfExists(SourceFiles.path(source))
+
+  test("Executor.exec: shell"):
+    val dir = Files.createTempDirectory("recheck exec ")
+    val node = dir.resolve("my node")
+    try
+      Files.writeString(node, "#!/bin/sh\necho \"$# $*\"\n")
+      node.toFile.setExecutable(true)
+      val command = Command("node", Seq("-", "a b")).withShell(Executor.shell, s"'$node' --flag")
+      assertEquals(command.args.take(2), Seq("-c", s"'$node' --flag \"$$@\""))
+      assertEquals(Executor.exec(command, "", None), ExecResult.Exit(0, "3 --flag - a b\n", ""))
+    finally
+      Files.deleteIfExists(node)
+      Files.deleteIfExists(dir)
+
+  test("SourceFiles.path"):
+    val dir = Files.createTempDirectory("recheck-exec-")
+    try
+      val source = Command.Source("Foo.java", "class Foo {}")
+      val file = SourceFiles.path(dir, source)
+      assertEquals(file.getParent, dir)
+      assert(clue(file.getFileName.toString).matches("Foo-[0-9a-f]{16}\\.java"))
+      assertEquals(Files.readString(file), "class Foo {}")
+      val modified = Files.getLastModifiedTime(file)
+      assertEquals(SourceFiles.path(dir, source), file)
+      assertEquals(Files.getLastModifiedTime(file), modified)
+      // A changed file is written again.
+      Files.writeString(file, "broken")
+      assertEquals(SourceFiles.path(dir, source), file)
+      assertEquals(Files.readString(file), "class Foo {}")
+      assertNotEquals(SourceFiles.path(dir, source.copy(content = "class Foo { }")), file)
+      assertEquals(Files.list(dir).count(), 2L)
+    finally
+      Files.list(dir).forEach(Files.delete)
+      Files.delete(dir)
+
+  test("SourceFiles.sharedDirectory"):
+    val parent = Files.createTempDirectory("recheck-exec-")
+    try
+      val created = parent.resolve("new")
+      assertEquals(SourceFiles.sharedDirectory(created), Some(created))
+      assertEquals(Files.getPosixFilePermissions(created), PosixFilePermissions.fromString("rwx------"))
+      assertEquals(Files.list(created).count(), 0L)
+      assertEquals(SourceFiles.sharedDirectory(created), Some(created))
+      // A directory others can write is not used.
+      val open = Files.createDirectory(parent.resolve("open"))
+      Files.setPosixFilePermissions(open, PosixFilePermissions.fromString("rwxrwxrwx"))
+      assertEquals(SourceFiles.sharedDirectory(open), None)
+      val link = Files.createSymbolicLink(parent.resolve("link"), created)
+      assertEquals(SourceFiles.sharedDirectory(link), None)
+    finally Files.walk(parent).sorted(java.util.Comparator.reverseOrder()).forEach(Files.delete)

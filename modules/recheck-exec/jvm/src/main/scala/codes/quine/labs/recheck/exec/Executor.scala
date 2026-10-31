@@ -19,6 +19,9 @@ object Executor:
   /** Whether this platform can run commands. */
   val isAvailable: Boolean = true
 
+  /** The shell to run a command line, which Windows has only with a POSIX environment (e.g. Git for Windows). */
+  val shell: String = if System.getProperty("os.name", "").startsWith("Windows") then "sh" else "/bin/sh"
+
   /** The interval to check the interruption of the context while waiting. */
   private val PollMillis = 50L
 
@@ -26,11 +29,34 @@ object Executor:
     *
     * With a marker, the timeout counts from the time when the process prints the marker as a line, so that the startup
     * of the runtime is not counted. Waiting for the marker is limited only by the context.
+    *
+    * Until a run of a source file exits normally or times out in this process, its runs do not run concurrently.
     */
   def exec(command: Command, script: String, timeout: Option[FiniteDuration], marker: Option[String] = None)(using
       ctx: Context
   ): ExecResult =
-    val builder = new ProcessBuilder((command.program +: command.args).asJava)
+    val file = command.source.map(SourceFiles.path)
+    val lock = file.flatMap(SourceFiles.firstRunLock)
+    lock match
+      case Some(l) =>
+        while !l.tryLock(PollMillis, TimeUnit.MILLISECONDS) do ctx.interrupt(())
+        try
+          val result = run(command, file, script, timeout, marker)
+          result match
+            case ExecResult.Exit(0, _, _) | ExecResult.Timeout(_) => file.foreach(SourceFiles.markWarm)
+            case _                                                => ()
+          result
+        finally l.unlock()
+      case None => run(command, file, script, timeout, marker)
+
+  private def run(
+      command: Command,
+      file: Option[java.nio.file.Path],
+      script: String,
+      timeout: Option[FiniteDuration],
+      marker: Option[String]
+  )(using ctx: Context): ExecResult =
+    val builder = new ProcessBuilder((command.program +: (command.args ++ file.map(_.toString))).asJava)
     builder.environment().putAll(command.env.asJava)
     val process =
       try builder.start()
