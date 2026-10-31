@@ -21,12 +21,16 @@ object UStringUtil:
   def canonicalize(s: UString, unicode: Boolean): UString =
     fromCodePoints(s.chars(unicode).map(EcmaScriptChars.canonicalize(_, unicode)))
 
-  /** Shows the string as a JavaScript string literal. */
+  /** Shows the string as a JavaScript string literal.
+    *
+    * A control character uses `\xHH`, because `\cX` is not an escape in a string literal.
+    */
   def show(s: UString): String =
     s.chars(true)
       .map:
-        case 0x27 => "\\'"
-        case c    => EcmaScriptChars.showChar(c)
+        case 0x27                                       => "\\'"
+        case c if c < 0x20 && !(0x09 <= c && c <= 0x0d) => f"\\x$c%02X"
+        case c                                          => EcmaScriptChars.showChar(c)
       .mkString("'", "", "'")
 
   extension (s: UString)
