@@ -178,11 +178,11 @@ final case class FeatureSet(
     hasBackslashBackspace: Boolean,
     // .NET, Java, PCRE, Perl, Python, Ruby
     hasBackslashBell: Boolean,
-    // Java, Perl, Python
+    // Java, Perl, Python (without `b`)
     hasBackslashCharName: Boolean,
     // PCRE (with `u`), Perl
     hasBackslashCharNameHex: Boolean,
-    // PCRE
+    // PCRE (without `u`)
     hasBackslashCodeUnit: Boolean,
     // JavaScript (with `v`)
     hasBackslashClassSetReservedPunctuator: Boolean,
@@ -234,13 +234,13 @@ final case class FeatureSet(
     hasBackslashStickyAssert: Boolean,
     // JavaScript (with `uv`), Ruby
     hasBackslashUnicodeBracket: Boolean,
-    // .NET, Java, JavaScript, Python, Ruby
+    // .NET, Java, JavaScript, Python (without `b`), Ruby
     hasBackslashUnicodeHex: Boolean,
-    // Python
+    // Python (without `b`)
     hasBackslashUnicodeHex8: Boolean,
     // Ruby
     hasBackslashUnicodeList: Boolean,
-    // .NET, Java, JavaScript (with `uv`), PCRE. Perl, Ruby
+    // .NET, Java, JavaScript (with `uv`), PCRE, Perl, Ruby
     hasBackslashUnicodeProperty: Boolean,
     // Java, PCRE, Perl
     hasBackslashUnicodePropertyBare: Boolean,
@@ -256,7 +256,7 @@ final case class FeatureSet(
     hasBackslashXHex1: Boolean,
     // .NET
     hasBalanceGroup: Boolean,
-    // Java, Perl,
+    // Java, Perl
     hasBoundaryGModifier: Boolean,
     // Perl
     hasBoundaryModifier: Boolean,
@@ -681,9 +681,9 @@ object FeatureSet:
       hasBackslashUnicodeHex8 = isPython && !isByte,
       // Ruby
       hasBackslashUnicodeList = isRuby,
-      // .NET, Java, JavaScript (with `uv`), PCRE. Perl, Ruby
+      // .NET, Java, JavaScript (with `uv`), PCRE, Perl, Ruby
       hasBackslashUnicodeProperty = isDotNet || isJava || (isJavaScript && isUnicode) || isPCRE || isPerl || isRuby,
-      // Java, PCRE. Perl
+      // Java, PCRE, Perl
       hasBackslashUnicodePropertyBare = isJava || isPCRE || isPerl,
       // .NET, Java, PCRE, Perl, Python, Ruby
       hasBackslashUpperEnd = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
@@ -701,7 +701,7 @@ object FeatureSet:
       hasBareLookAroundTest = isDotNet,
       // PCRE, Python
       hasBareNamedCaptureTest = isPCRE || isPython,
-      // Java, Perl,
+      // Java, Perl
       hasBoundaryGModifier = isJava || isPerl,
       // Perl
       hasBoundaryModifier = isPerl,
