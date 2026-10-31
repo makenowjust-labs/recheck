@@ -47,8 +47,6 @@ lazy val root = project
     commonJS,
     execJVM,
     execJS,
-    unicodeJVM,
-    unicodeJS,
     parseJVM,
     parseJS,
     resyntaxJVM,
@@ -269,48 +267,6 @@ lazy val exec = crossProject(JVMPlatform, JSPlatform)
 
 lazy val execJVM = exec.jvm
 lazy val execJS = exec.js
-
-lazy val unicode = crossProject(JVMPlatform, JSPlatform)
-  .in(file("modules/recheck-unicode"))
-  .settings(
-    name := "recheck-unicode",
-    console / initialCommands := """
-      |import codes.quine.labs.recheck.unicode.*
-      |""".stripMargin,
-    coverageExcludedFiles := ".*[/\\\\]src_managed[/\\\\].*",
-    // Generators:
-    {
-      val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
-      Seq(
-        Compile / sourceGenerators += generateUnicodeData.taskValue,
-        generateUnicodeData := Def.uncached {
-          val gens = Map[String, UnicodeDataGen](
-            "CaseMapDataGen.scala" -> CaseMapDataGen,
-            "PropertyDataGen.scala" -> PropertyDataGen
-          )
-          val pkg = "codes.quine.labs.recheck.unicode"
-          val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labs" / "recheck" / "unicode"
-          val projectDir = (ThisBuild / baseDirectory).value / "project"
-          for ((fileName, gen) <- gens) {
-            val output = gen.file(dir)
-            if (!output.exists() || (projectDir / fileName).lastModified() > output.lastModified()) gen.gen(pkg, dir)
-          }
-          gens.values.map(_.file(dir)).toSeq
-        }
-      )
-    },
-    // Settings for test:
-    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
-    testFrameworks += new TestFramework("munit.Framework")
-  )
-  .jsSettings(
-    coverageEnabled := false,
-    libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
-      .cross(CrossVersion.for3Use2_13)
-  )
-
-lazy val unicodeJVM = unicode.jvm
-lazy val unicodeJS = unicode.js
 
 lazy val parse = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/recheck-parse"))
