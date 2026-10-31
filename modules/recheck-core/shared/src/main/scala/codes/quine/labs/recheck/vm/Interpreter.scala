@@ -488,9 +488,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     fallback match
       case Some(f) if f.verb ne null =>
         f.verb match
-          case VerbKind.Commit =>
-            find(f.fallback)(b => b == Barrier.Search || b.isInstanceOf[Barrier.Assertion])
-              .filter(_.barrier != Barrier.Search)
+          case VerbKind.Commit           => cut(f.fallback, None).filter(_.barrier != Barrier.Search)
           case VerbKind.Prune            => cut(f.fallback, None)
           case VerbKind.Skip(None)       => cut(f.fallback, Some(f.pos))
           case VerbKind.Skip(Some(name)) =>
