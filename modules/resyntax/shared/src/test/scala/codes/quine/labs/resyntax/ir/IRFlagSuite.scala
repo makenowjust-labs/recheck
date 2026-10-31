@@ -138,6 +138,9 @@ class IRFlagSuite extends IRSuiteBase:
   checkFlags("(?L)a", "b", Python())(d => Seq(flagsOf(d, "b").copy(charset = IRCharset.Locale)))
   error("a", "L", Python())("Cannot use LOCALE flag with a str pattern")
   error("a", "u", Python(Python.Type.Bytes))("Cannot use UNICODE flag with a bytes pattern")
+  // Ruby's character set options have no `Regexp` constant, and the last one wins: `/(?au)\w/` matches `é`.
+  checkFlags("a", "au", Ruby())(d => Seq(flagsOf(d).copy(charset = IRCharset.Unicode)))
+  checkFlags("(?au)a(?ud)b", "", Ruby())(d => Seq(flagsOf(d).copy(charset = IRCharset.Unicode), flagsOf(d)))
   // `(*UTF)(*UCP)(?a)(?^)\d` does not match `١`, so `(?^)` keeps `a` in PCRE, but not in Perl.
   checkFlags("(?a)(?^)a", "", PCRE)(d => Seq(flagsOf(d).copy(charset = IRCharset.Ascii.All)))
   checkFlags("(?a)(?^)a", "", Perl())(d => Seq(flagsOf(d)))

@@ -43,6 +43,10 @@ class FlagSetSuite extends munit.FunSuite:
   check("y", JavaScript)(_.sticky)
   // PHP skips spaces and line breaks in the modifiers: `/A/ i\n` matches `a`.
   check(" i\n\r", PCRE)(_ == FlagSet(ignoreCase = true))
+  // Ruby's last character set option wins: `/(?au)\w/` matches `é`.
+  check("au", Ruby())(f => f.unicode && !f.ascii)
+  check("ua", Ruby())(f => f.ascii && !f.unicode)
+  check("ud", Ruby())(f => f.hasIndices && !f.unicode)
   check("aa", Perl())(f => f.ascii && f.asciiRestrict)
 
   error("ii", JavaScript)("Duplicated flag 'i' at 1")

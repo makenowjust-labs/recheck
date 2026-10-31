@@ -98,6 +98,11 @@ class RecallProgramSuite extends munit.FunSuite:
     val utf8 = generate("é", "a", Dialect.Ruby(), nonAscii)
     assertEquals(line(utf8, "regex"), "regex = Regexp.new(\"(?a)\" + \"é\", 0)")
     assertEquals(line(utf8, "string"), "string = \"é\" * 3 + \"\\x00\"")
+    // The last character set option wins, as the inline options do.
+    assertEquals(
+      line(generate("a", "auid", Dialect.Ruby()), "regex"),
+      "regex = Regexp.new(\"(?d)\" + \"a\", Regexp::IGNORECASE)"
+    )
     // A pattern of bytes is the UTF-8 encoding of the source.
     val bytes = generate("é", "n", Dialect.Ruby(), nonAscii)
     assertEquals(line(bytes, "regex"), "regex = Regexp.new(\"\\xC3\\xA9\".b, Regexp::NOENCODING)")

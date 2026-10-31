@@ -80,6 +80,9 @@ object FlagSet:
   /** Returns parsed flag set object from the given flag set string on the dialect. */
   def parse(flags: String, dialect: Dialect): FlagSet =
     val allowsDuplicatedFlag = !dialect.isJavaScript
+    // Ruby's character set options have no API constant, and the last one wins as the inline options do.
+    def rubyCharset(flagSet: FlagSet): FlagSet =
+      if dialect.isRuby then flagSet.copy(ascii = false, hasIndices = false, unicode = false) else flagSet
 
     var flagSet = FlagSet()
     val counts = mutable.Map.empty[Char, Int].withDefaultValue(0)
@@ -113,7 +116,7 @@ object FlagSet:
           flagSet = flagSet.copy(extra = true)
         case 'a' =>
           check(dialect.isPerl || dialect.isPython || dialect.isRuby)
-          flagSet = flagSet.copy(ascii = true)
+          flagSet = rubyCharset(flagSet).copy(ascii = true)
           if counts(c) >= 2 && dialect.isPerl then flagSet = flagSet.copy(asciiRestrict = true)
         case 'b' =>
           check(dialect.isPython)
@@ -123,7 +126,7 @@ object FlagSet:
           flagSet = flagSet.copy(continue = true)
         case 'd' =>
           check(dialect.isJava || dialect.isJavaScript || dialect.isPerl || dialect.isRuby)
-          flagSet = flagSet.copy(hasIndices = true)
+          flagSet = rubyCharset(flagSet).copy(hasIndices = true)
         case 'e' =>
           check(dialect.isPerl)
           flagSet = flagSet.copy(evaluate = true)
@@ -158,7 +161,7 @@ object FlagSet:
           check(
             dialect.isJava || dialect.isJavaScript || dialect.isPCRE || dialect.isPerl || dialect.isPython || dialect.isRuby
           )
-          flagSet = flagSet.copy(unicode = true)
+          flagSet = rubyCharset(flagSet).copy(unicode = true)
         case 'v' =>
           check(dialect.isJavaScript)
           flagSet = flagSet.copy(unicodeSets = true)
