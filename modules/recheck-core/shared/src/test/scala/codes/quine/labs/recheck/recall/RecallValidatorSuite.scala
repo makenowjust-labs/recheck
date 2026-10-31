@@ -21,7 +21,7 @@ class RecallValidatorSuite extends munit.FunSuite:
   val attack: AttackPattern =
     AttackPattern(Seq((UString.fromString("x"), UString.fromString("y"), 0)), UString.fromString("z"), 2)
 
-  def parse(source: String, dialect: Dialect = Dialect.JavaScript): ParsedPattern =
+  def parse(source: String, dialect: Dialect = Dialect.Python): ParsedPattern =
     ParsedPattern.parse(source, "", dialect).toTry.get
 
   test("RecallValidator.validate"):
@@ -30,9 +30,9 @@ class RecallValidatorSuite extends munit.FunSuite:
       None
     )
     assertEquals(RecallValidator.validate(parse("foo"), attack, Duration.Zero)((_, _, _) => fail("unreachable")), None)
-    // A dialect without a runner is not run.
+    // A Perl pattern interpolating a variable is not run.
     assertEquals(
-      RecallValidator.validate(parse("foo", Dialect.Python), attack, 1.second)((_, _, _) => fail("unreachable")),
+      RecallValidator.validate(parse("a$x", Dialect.Perl), attack, 1.second)((_, _, _) => fail("unreachable")),
       None
     )
 
@@ -40,11 +40,11 @@ class RecallValidatorSuite extends munit.FunSuite:
     assertEquals(
       RecallValidator.validate(parse("foo"), attack, 1.second) { (c, _, _) =>
         command = c
-        ExecResult.Timeout("recheck:runtime node v26.11.1\nrecheck:start\n")
+        ExecResult.Timeout("recheck:runtime python 3.15.0\nrecheck:start\n")
       },
-      Some(RecallValidation("node v26.11.1", 1.second, RecallResult.Timeout))
+      Some(RecallValidation("python 3.15.0", 1.second, RecallResult.Timeout))
     )
-    assertEquals(command.program, "node")
+    assertEquals(command.program, "python3")
 
   test("RecallValidator.validate: timeout"):
     def limit(timeout: Duration)(using Context): Option[FiniteDuration] =

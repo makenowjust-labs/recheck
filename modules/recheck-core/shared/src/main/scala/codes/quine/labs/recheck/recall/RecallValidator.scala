@@ -31,12 +31,12 @@ object RecallValidator:
     * It returns `None` without running when the timeout is not positive, or the dialect or the pattern is not
     * supported. It throws [[UnexpectedException]] when the runtime fails to run the program.
     */
-  def validate(pattern: ParsedPattern, attack: AttackPattern, timeout: Duration)(exec: Exec)(using
-      ctx: Context
-  ): Option[RecallValidation] = ctx.interrupt:
+  def validate(pattern: ParsedPattern, attack: AttackPattern, timeout: Duration, perlLiteral: Boolean = true)(
+      exec: Exec
+  )(using ctx: Context): Option[RecallValidation] = ctx.interrupt:
     if timeout <= Duration.Zero then None
     else
-      RecallProgram.generate(pattern, attack) match
+      RecallProgram.generate(pattern, attack, perlLiteral) match
         case None =>
           ctx.log("recall: not supported")
           None
