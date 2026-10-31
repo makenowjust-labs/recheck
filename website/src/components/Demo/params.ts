@@ -84,7 +84,7 @@ const settingParams = (property: Property): Param[] => {
   });
 };
 
-export const BOOLEAN_VALUES = ["true", "false"];
+const BOOLEAN_VALUES = ["true", "false"];
 
 const schemaParams: Param[] = propertiesFor("playground").flatMap(
   ([name, property]) => {

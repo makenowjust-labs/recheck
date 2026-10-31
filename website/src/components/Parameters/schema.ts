@@ -19,7 +19,7 @@ export type Section = {
 /** TOCItem is an item of a page's table of contents, as Docusaurus takes it. */
 export type TOCItem = { value: string; id: string; level: number };
 
-export const scalaDefault = (property: Property): string => {
+const scalaDefault = (property: Property): string => {
   if (property["x-scala-default"] !== undefined) {
     return property["x-scala-default"];
   }

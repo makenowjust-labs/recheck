@@ -12,7 +12,7 @@ export type Block =
 
 const INLINE = /`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)/g;
 
-export const parseInline = (text: string): Inline[] => {
+const parseInline = (text: string): Inline[] => {
   const inlines: Inline[] = [];
   let last = 0;
   for (const match of text.matchAll(INLINE)) {
