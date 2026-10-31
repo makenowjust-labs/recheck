@@ -3,6 +3,7 @@ package codes.quine.labs.resyntax.ir
 import scala.collection.mutable
 
 import codes.quine.labs.resyntax.ast.BackslashKind
+import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.ast.ClassItem
 import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.Dialect
@@ -331,20 +332,10 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     * The engines take the longest cluster and do not backtrack into it. In byte mode, the bytes are Latin-1 characters.
     */
   private lazy val graphemeCluster: IRNodeData =
-    import IRQuantifier.Unbounded
-    import codes.quine.labs.resyntax.ast.BacktrackStrategy.Greedy
-    def gcb(names: String*): CharSet =
-      CharSet.union(names.map(Properties.GraphemeClusterBreak.value(_).get.set)).restrict(mode)
+    import Grammar.*
     def incb(name: String): CharSet = Properties.IndicConjunctBreak.value(name).get.set.restrict(mode)
     val extPict = Properties.binary("Extended_Pictographic").get.set.restrict(mode)
-    def c(set: CharSet): IRNode = IRNode(IRNodeData.Chars(set))
-    def star(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, Unbounded(0, Greedy)))
-    def plus(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, Unbounded(1, Greedy)))
-    def seq(nodes: IRNode*): IRNode = IRNode(IRNodeData.Sequence(nodes))
-    def alt(nodes: IRNode*): IRNode = IRNode(IRNodeData.Disjunction(nodes))
     val control = gcb("Control", "CR", "LF")
-    val Seq(l, v, t, lv, lvt) = Seq("L", "V", "T", "LV", "LVT").map(n => c(gcb(n)))
-    val hangul = alt(seq(star(l), alt(plus(v), seq(lv, star(v)), lvt), star(t)), plus(l), plus(t))
     val ri = seq(c(gcb("RI")), c(gcb("RI")))
     val xpicto = seq(c(extPict), star(seq(star(c(gcb("Extend"))), c(gcb("ZWJ")), c(extPict))))
     val linkers = star(c(incb("Extend").union(incb("Linker"))))
@@ -362,20 +353,8 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     * indicators before it in the input, which a look-behind tests.
     */
   private lazy val pcreGraphemeCluster: IRNodeData =
-    import IRQuantifier.Bounded
-    import IRQuantifier.Unbounded
-    import codes.quine.labs.resyntax.ast.BacktrackStrategy.Greedy
-    def gcb(names: String*): CharSet =
-      CharSet.union(names.map(Properties.GraphemeClusterBreak.value(_).get.set)).restrict(mode)
+    import Grammar.*
     val extPict = Properties.binary("Extended_Pictographic").get.set.restrict(mode).intersect(gcb("Other"))
-    def c(set: CharSet): IRNode = IRNode(IRNodeData.Chars(set))
-    def star(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, Unbounded(0, Greedy)))
-    def plus(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, Unbounded(1, Greedy)))
-    def opt(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, Bounded(0, 1, Greedy)))
-    def seq(nodes: IRNode*): IRNode = IRNode(IRNodeData.Sequence(nodes))
-    def alt(nodes: IRNode*): IRNode = IRNode(IRNodeData.Disjunction(nodes))
-    val Seq(l, v, t, lv, lvt) = Seq("L", "V", "T", "LV", "LVT").map(n => c(gcb(n)))
-    val hangul = alt(seq(star(l), alt(plus(v), seq(lv, star(v)), lvt), star(t)), plus(l), plus(t))
     val ri = c(gcb("RI"))
     val other = c(gcb("Other").diff(extPict))
     val extend = gcb("Extend", "ZWJ", "SpacingMark")
@@ -403,6 +382,14 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       plus(c(extend))
     )
     IRNodeData.Atomic(IRCharResolver.prune(cluster).getOrElse(IRNode(IRNodeData.Chars(CharSet.empty))))
+
+  private def gcb(names: String*): CharSet =
+    CharSet.union(names.map(Properties.GraphemeClusterBreak.value(_).get.set)).restrict(mode)
+
+  private def hangul: IRNode =
+    import Grammar.*
+    val Seq(l, v, t, lv, lvt) = Seq("L", "V", "T", "LV", "LVT").map(n => c(gcb(n)))
+    alt(seq(star(l), alt(plus(v), seq(lv, star(v)), lvt), star(t)), plus(l), plus(t))
 
   private def escapeClassSet(kind: EscapeClassKind, flags: IRCharFlags, loc: SourceLocation): ClassSet =
     def set(s: CharSet): ClassSet = ClassSet(s.restrict(mode))
@@ -737,6 +724,20 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         case _               => restricted
 
 private[ir] object IRCharResolver:
+
+  private object Grammar:
+    def c(set: CharSet): IRNode = IRNode(IRNodeData.Chars(set))
+    def star(node: IRNode): IRNode = IRNode(
+      IRNodeData.Repeat(node, IRQuantifier.Unbounded(0, BacktrackStrategy.Greedy))
+    )
+    def plus(node: IRNode): IRNode = IRNode(
+      IRNodeData.Repeat(node, IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy))
+    )
+    def opt(node: IRNode): IRNode = IRNode(
+      IRNodeData.Repeat(node, IRQuantifier.Bounded(0, 1, BacktrackStrategy.Greedy))
+    )
+    def seq(nodes: IRNode*): IRNode = IRNode(IRNodeData.Sequence(nodes))
+    def alt(nodes: IRNode*): IRNode = IRNode(IRNodeData.Disjunction(nodes))
 
   /** NotModeledException is thrown for a construct that IR cannot represent, which becomes `Unsupported`. */
   final class NotModeledException extends Exception("not modeled")
