@@ -266,14 +266,8 @@ class IRLookBehindSuite extends IRSuiteBase:
   matching("(?<=(a(*ACCEPT)b))", PCRE)(Longest(1, 1))
   matching("(?<=(?:a(*ACCEPT))bc)", Perl())(Longest(1, 3))
   matching("(?<=(?>a(*ACCEPT))bc)", Perl())(Longest(3, 3))
-  // Perl's case-insensitive `ss` may match `ß` (Unicode rules), so the minimum length lessens.
-  matching("(?iu)(?<=ass)", Perl())(Longest(2, 3))
-  matching("(?i)(?<=ass)", Perl())(Longest(2, 3))
-  matching("(?i)(?<=a\\x73\\x73)", Perl())(Longest(2, 3))
-  matching("(?iu)(?<=ass)", Perl(utf8 = false))(Longest(2, 3))
-  matching("(?ia)(?<=ass)", Perl(utf8 = false))(Longest(2, 3))
-  matching("(?i)(?<=ass)", Perl(utf8 = false))(Longest(3, 3))
-  matching("(?iaa)(?<=ass)", Perl())(Longest(3, 3))
+  // Perl's starts are of the lengths of the literals, even where case-insensitive `ss` may match `ß`.
+  matching("(?iu)(?<=ass)", Perl())(Longest(3, 3))
   // Java tries the starts of its `TreeInfo` lengths in code units, or in code points with a supplementary character after.
   matching("(?<=a|bc)", Java)(JavaStarts(1, 2, false))
   matching("(?<=a+)", Java)(JavaStarts(1, Int.MaxValue, false))

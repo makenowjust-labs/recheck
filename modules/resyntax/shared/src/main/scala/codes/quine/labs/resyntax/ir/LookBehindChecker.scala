@@ -22,9 +22,6 @@ import codes.quine.labs.resyntax.ir.LookBehindChecker.*
   * @param lastSupplementary
   *   the start of the last node with a supplementary character or a surrogate in the pattern, or `-1`, which makes
   *   Java's look-behinds before it count code points
-  * @param minSubtract
-  *   how much the minimum length of the nodes of a sequence lessens, for Perl's literals matching one character folded
-  *   to them (e.g. `ss` matching `ß`)
   * @param rubyClassWidths
   *   the widths of the alternatives that Ruby makes of a class matching the foldings of its characters (e.g. `[ßx]` is
   *   `[ßẞx]|ss|ss`), which are top-level alternatives as the body
@@ -35,7 +32,6 @@ private[ir] final class LookBehindChecker(
     featureSet: IRFeatureSet,
     charWidth: Seq[Node] => Width,
     lastSupplementary: Int,
-    minSubtract: Seq[Node] => Long,
     rubyClassWidths: Node => Option[Seq[Int]]
 ):
 
@@ -105,12 +101,9 @@ private[ir] final class LookBehindChecker(
     case NodeData.Sequence(nodes0) =>
       val nodes =
         if featureSet.lookBehindRule == IRLookBehindRule.PCRE then nodes0.takeWhile(!isAcceptOrFail(_)) else nodes0
-      nodes
-        .foldLeft(Option(Width(0, 0))) { (acc, node) =>
-          for w1 <- acc; w2 <- width(node, visiting, conditionals)
-          yield Width(add(w1.min, w2.min), add(w1.max, w2.max))
-        }
-        .map(w => if w.min == Inf then w else w.copy(min = (w.min - minSubtract(nodes)).max(0)))
+      nodes.foldLeft(Option(Width(0, 0))): (acc, node) =>
+        for w1 <- acc; w2 <- width(node, visiting, conditionals)
+        yield Width(add(w1.min, w2.min), add(w1.max, w2.max))
     case NodeData.Repeat(node, quantifier) =>
       val (min, max) = bounds(quantifier)
       // PCRE takes an unbounded repeat as unbounded even with a zero-width node (e.g. `(?<=(?:)*)`), except a look-ahead.

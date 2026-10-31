@@ -342,8 +342,8 @@ class InterpreterConstructSuite extends munit.FunSuite:
     check("(?(?<=(a|aa))b|x)", "aab", DotNet)(Seq(g(2, 3)))
     check("(a)?(?<=(?(1)a{4}))x", "aaaax", PCRE)(Seq(g(3, 5), g(3, 4)))
     check("(?<=(?:a(*THEN)x|ab))c", "abc", PCRE)(Seq(g(2, 3)))
-    // Perl's case-insensitive `ss` may match `ß`, which lessens the length.
-    check("(?iu)(?<=a(ss))x", "a\u00dfx", Perl())(Seq(g(2, 3), g(1, 2)))
+    // Perl's starts are of the lengths of the literals, so `ss` matching `ß` is too short there.
+    check("(?iu)(?<=a(ss))x", "a\u00dfx", Perl())(NoMatch)
     check("(?iu)(?<=(ass))x", "assx", Perl())(Seq(g(3, 4), g(0, 3)))
     // `(*ACCEPT)` ends a look-behind anywhere, and PCRE's length of a branch ends at it.
     check("(?<=(a)(*ACCEPT)b)c", "ac", PCRE, Perl())(Seq(g(1, 2), g(0, 1)))

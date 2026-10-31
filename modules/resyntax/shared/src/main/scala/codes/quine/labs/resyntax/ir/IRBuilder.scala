@@ -66,7 +66,6 @@ object IRBuilder:
         featureSet,
         charWidth(table, chars, dialect, mode, perlUtf8Pattern),
         supplementary,
-        if dialect.isPerl then perlMinSubtract(table, perlUnicodeRules) else _ => 0L,
         node => table.charFlagsOf(node).flatMap(chars.rubyClassWidths(node, _))
       )
     val backReferences = new IRValidator(table, resolver, checker, featureSet).validate(node)
@@ -138,38 +137,6 @@ object IRBuilder:
       case IRCharset.Locale   => value < 0x100 || hasAscii && value != 0x1e9e
       case _: IRCharset.Ascii => flags.caselessRestrict && hasAscii && value != 0xdf && value != 0x1e9e
     flags.ignoreCase && !one
-
-  /** Returns how much Perl lessens the minimum length of the nodes of a sequence, where literals may match one
-    * character folded to several ones (e.g. `ss` matches `ß`).
-    *
-    * Perl finds such literals from the left, the longest first, as `join_exact` does. It lessens the minimum also in a
-    * pattern that is not UTF-8, where the string decides the rules of `/d`, so it follows the rules at run time.
-    */
-  private def perlMinSubtract(table: CaptureTable, perlUnicodeRules: Boolean): Seq[Node] => Long =
-    lazy val folds = FullCaseFolding.multiCodePointFoldings().keySet
-    lazy val maxLength = folds.map(_.length).max
-    nodes =>
-      val chars = nodes.map: node =>
-        val value = node.data match
-          case NodeData.Literal(value)                                 => Some(value)
-          case NodeData.Backslash(value: BackslashKind.BackslashValue) => Some(value.value)
-          case _                                                       => None
-        (value, table.charFlagsOf(node)) match
-          case (Some(value), Some(flags)) if perlFoldsMulti(value, flags, perlUnicodeRules) =>
-            Some(FullCaseFolding(value)).filter(_.length == 1).map(_(0))
-          case _ => None
-      var subtract = 0L
-      var i = 0
-      while i < chars.length do
-        val found = (maxLength to 2 by -1).find: n =>
-          i + n <= chars.length && chars.slice(i, i + n).forall(_.isDefined) &&
-            folds.contains(UString(chars.slice(i, i + n).flatten*))
-        found match
-          case Some(n) =>
-            subtract += n - 1
-            i += n
-          case None => i += 1
-      subtract
 
   /** Returns the width of a literal, an escape or a class in a look-behind, where the dialects counting it differently
     * from one care.
