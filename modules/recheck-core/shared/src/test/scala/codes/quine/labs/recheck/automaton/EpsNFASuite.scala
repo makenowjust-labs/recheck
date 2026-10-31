@@ -49,6 +49,14 @@ class EpsNFASuite extends munit.FunSuite:
     assertEquals(AssertKind.WordBoundaryNot.toCharKindSet(LineTerminator), all - Word)
     assertEquals(AssertKind.WordBoundaryNot.toCharKindSet(Word), Set(Word))
 
+  test("EpsNFA.AssertKind#treatsBoundaryAsLineTerminator"):
+    assert(AssertKind.LineBegin().treatsBoundaryAsLineTerminator)
+    assert(AssertKind.LineEnd().treatsBoundaryAsLineTerminator)
+    assert(AssertKind.WordBoundary.treatsBoundaryAsLineTerminator)
+    assert(!AssertKind.LineBegin(IRLineBeginAtEnd.InputBegin).treatsBoundaryAsLineTerminator)
+    assert(!AssertKind.TextBegin.treatsBoundaryAsLineTerminator)
+    assert(!AssertKind.TextEnd.treatsBoundaryAsLineTerminator)
+
   test("EpsNFA#toGraphviz"):
     val nfa = EpsNFA(
       PatternAlphabet.build(UnitMode.Utf16, Seq(CharSet.single('a'))),
@@ -101,19 +109,18 @@ class EpsNFASuite extends munit.FunSuite:
         5 -> LoopExit(0, 6)
       )
     )
-    // The begin of the input is distinguished from a line terminator.
-    val q36: Seq[(Int, Set[CharKind])] =
-      Seq((3, Set(CharKind.LineTerminator, CharKind.Normal, CharKind.Boundary)), (6, Set.empty))
+    val q36: Seq[(Int, Set[CharKind])] = Seq((3, Set(CharKind.LineTerminator, CharKind.Normal)), (6, Set.empty))
     assertEquals(
       nfa1.toOrderedNFA,
       OrderedNFA[CharSet, (CharKind, Seq[(Int, Set[CharKind])])](
         Set(CharSet.single('\n'), CharSet.single('\n').complement(UnitMode.Utf16)),
-        Set((CharKind.Boundary, q36), (CharKind.LineTerminator, q36)),
-        Vector((CharKind.Boundary, q36)),
-        Set((CharKind.Boundary, q36), (CharKind.LineTerminator, q36)),
+        Set((CharKind.LineTerminator, q36)),
+        Vector((CharKind.LineTerminator, q36)),
+        Set((CharKind.LineTerminator, q36)),
         Map(
-          ((CharKind.Boundary, q36), CharSet.single('\n')) -> Vector((CharKind.LineTerminator, q36)),
-          ((CharKind.LineTerminator, q36), CharSet.single('\n')) -> Vector((CharKind.LineTerminator, q36))
+          ((CharKind.LineTerminator, q36), CharSet.single('\n')) -> Vector(
+            (CharKind.LineTerminator, q36)
+          )
         )
       )
     )
@@ -136,10 +143,17 @@ class EpsNFASuite extends munit.FunSuite:
         9 -> Assert(AssertKind.WordBoundary, 10)
       )
     )
-    val all = Set(CharKind.LineTerminator, CharKind.Word, CharKind.Normal, CharKind.Boundary)
-    val q4: Seq[(Int, Set[CharKind])] = Seq((4, Set(CharKind.LineTerminator, CharKind.Boundary)))
-    val q45: Seq[(Int, Set[CharKind])] = Seq((4, all), (5, all))
-    val q54510: Seq[(Int, Set[CharKind])] = Seq((5, Set(CharKind.Word)), (4, all), (5, all), (10, Set.empty))
+    val q4: Seq[(Int, Set[CharKind])] = Seq((4, Set(CharKind.LineTerminator)))
+    val q45: Seq[(Int, Set[CharKind])] = Seq(
+      (4, Set(CharKind.LineTerminator, CharKind.Word, CharKind.Normal)),
+      (5, Set(CharKind.LineTerminator, CharKind.Word, CharKind.Normal))
+    )
+    val q54510: Seq[(Int, Set[CharKind])] = Seq(
+      (5, Set(CharKind.Word)),
+      (4, Set(CharKind.LineTerminator, CharKind.Word, CharKind.Normal)),
+      (5, Set(CharKind.LineTerminator, CharKind.Word, CharKind.Normal)),
+      (10, Set.empty)
+    )
     assertEquals(
       nfa2.toOrderedNFA,
       OrderedNFA(
@@ -149,14 +163,14 @@ class EpsNFASuite extends munit.FunSuite:
           CharSet.single('a').union(CharSet.single('\n')).complement(UnitMode.Utf16)
         ),
         Set(
-          (CharKind.Boundary, q4),
+          (CharKind.LineTerminator, q4),
           (CharKind.LineTerminator, q45),
           (CharKind.Word, q54510)
         ),
-        Vector((CharKind.Boundary, q4)),
+        Vector((CharKind.LineTerminator, q4)),
         Set((CharKind.Word: CharKind, q54510)),
         Map(
-          ((CharKind.Boundary, q4), CharSet.single('\n')) -> Vector(
+          ((CharKind.LineTerminator, q4), CharSet.single('\n')) -> Vector(
             (CharKind.LineTerminator, q45)
           ),
           ((CharKind.LineTerminator, q45), CharSet.single('a')) -> Vector(
@@ -177,3 +191,6 @@ class EpsNFASuite extends munit.FunSuite:
     )
     interceptMessage[UnsupportedException]("OrderedNFA size is too large"):
       nfa1.toOrderedNFA(maxNFASize = 1)
+    // The begin of the input is distinguished from a line terminator for an assertion seeing the difference.
+    val nfa3 = nfa1.copy(tau = nfa1.tau.updated(4, Assert(AssertKind.LineBegin(IRLineBeginAtEnd.InputBegin), 0)))
+    assertEquals(nfa3.toOrderedNFA.inits.map(_._1), Vector(CharKind.Boundary))

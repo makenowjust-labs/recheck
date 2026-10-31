@@ -59,11 +59,13 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
   /** Converts this ε-NFA to ordered NFA with ε-elimination. */
   def toOrderedNFA(maxNFASize: Int)(using ctx: Context): OrderedNFA[CharSet, (CharKind, Seq[(Q, Set[CharKind])])] =
     ctx.interrupt:
-      // The begin and the end of the input are distinguished only for the assertions looking at them.
-      val needsBoundary = tau.values.exists:
-        case Assert(k, _) => k.seesBoundary
-        case _            => false
-      val inputTerminatorKind = if needsBoundary then CharKind.Boundary else CharKind.Normal
+      // The begin and the end of the input are distinguished only for the assertions looking at them, and they are
+      // line terminators if the assertions see no difference, which keeps the automaton smaller.
+      val kinds = tau.values.collect { case Assert(k, _) => k }.toSet
+      val inputTerminatorKind =
+        if !kinds.exists(_.seesBoundary) then CharKind.Normal
+        else if kinds.forall(_.treatsBoundaryAsLineTerminator) then CharKind.LineTerminator
+        else CharKind.Boundary
 
       // Obtains a set of possible character kinds.
       val charKindSet = alphabet.pairs.iterator.map(_._2).toSet ++ Set(inputTerminatorKind)
@@ -179,6 +181,11 @@ object EpsNFA:
 
     /** Whether the assertion distinguishes the begin and the end of the input from the characters. */
     def seesBoundary: Boolean = true
+
+    /** Whether the assertion tests the begin and the end of the input as a line terminator. */
+    def treatsBoundaryAsLineTerminator: Boolean =
+      val (b, t) = (CharKind.Boundary, CharKind.LineTerminator)
+      CharKind.values.forall(k => accepts(b, k) == accepts(t, k) && accepts(k, b) == accepts(k, t))
 
     /** Returns a set of next possible character information from the previous character information. */
     def toCharKindSet(prev: CharKind): Set[CharKind] = CharKind.values.iterator.filter(accepts(prev, _)).toSet
