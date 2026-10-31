@@ -222,7 +222,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
-  .dependsOn(common, exec, unicode, parse)
+  .dependsOn(common, exec, unicode, resyntaxCharset, parse)
 
 lazy val coreJVM = core.jvm
 lazy val coreJS = core.js
