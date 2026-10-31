@@ -95,6 +95,14 @@ private[ir] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlNati
       rubyWord
     case _ => word(flags)
 
+  /** The marks of Java's `\b` without `U`, where a non-spacing mark is a word character after a letter or a digit.
+    *
+    * `Pattern.hasBaseCharacter` steps back by UTF-16 code units, so the characters before a mark are of the BMP.
+    */
+  def javaWordMarks: IRWordMarks =
+    val bmp = CharSet.range(0, 0xffff)
+    IRWordMarks(gc("Mn"), gc("Mn").intersect(bmp), gc("L", "Nd").intersect(bmp))
+
   /** Perl's `[[:upper:]]` and `[[:lower:]]` under case-insensitivity: the cased characters. */
   def perlCased(flags: IRCharFlags): CharSet =
     pick(ruleOf(flags, _.posix), ascii('A' -> 'Z', 'a' -> 'z'), binary("Cased"))

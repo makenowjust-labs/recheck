@@ -17,7 +17,14 @@ final case class BuildingContext(flagSet: FlagSet, dialect: Dialect, featureSet:
   def update(diff: FlagSetDiff): BuildingContext =
     val base =
       if featureSet.hasExclusiveCharsetFlag && BuildingContext.hasCharsetFlag(diff.added) then
-        flagSet.copy(ascii = false, unicode = false, localeLower = false, localeUpper = false, hasIndices = false)
+        flagSet.copy(
+          ascii = false,
+          asciiRestrict = false,
+          unicode = false,
+          localeLower = false,
+          localeUpper = false,
+          hasIndices = false
+        )
       else flagSet
     val added = BuildingContext.combine(base, diff.added)(_ || _)
     copy(flagSet = diff.removed.fold(added)(BuildingContext.combine(added, _)(_ && !_)))
@@ -40,6 +47,7 @@ final case class BuildingContext(flagSet: FlagSet, dialect: Dialect, featureSet:
       case _ =>
         common.copy(
           ascii = reset.ascii,
+          asciiRestrict = reset.asciiRestrict,
           unicode = reset.unicode,
           localeLower = reset.localeLower,
           hasIndices = reset.hasIndices
@@ -85,7 +93,9 @@ final case class BuildingContext(flagSet: FlagSet, dialect: Dialect, featureSet:
       // PHP's `u` sets PCRE2_UCP as well as PCRE2_UTF.
       unicodeClass = isJava && f.ungreedy || isPCRE && (f.unicode || featureSet.ucp),
       charset = charset,
-      caselessRestrict = isPCRE && (f.nonDestructive || featureSet.caselessRestrict),
+      // Perl's `aa` forbids ASCII and non-ASCII characters to match case-insensitively, as PCRE's `r` does.
+      caselessRestrict = isPCRE && (f.nonDestructive || featureSet.caselessRestrict) ||
+        dialect.isPerl && f.asciiRestrict,
       turkishCasing = featureSet.turkishCasing,
       bsrAnyCRLF = featureSet.bsrAnyCRLF,
       canonicalEquivalence = isJava && f.continue

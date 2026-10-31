@@ -41,6 +41,8 @@ private[ir] final case class ReferenceSite(
   *   the indices of each name
   * @param inBranchReset
   *   the indices of the groups in a branch reset
+  * @param charFlags
+  *   the flags at each character-level node of a Perl or Ruby pattern, whose look-behind width depends on them
   */
 private[ir] final class CaptureTable(
     indices: Map[NodeKey, Int],
@@ -49,11 +51,15 @@ private[ir] final class CaptureTable(
     val defined: Set[Int],
     val names: Map[String, Seq[Int]],
     val groups: Map[Int, Seq[Node]],
-    val inBranchReset: Set[Int]
+    val inBranchReset: Set[Int],
+    charFlags: Map[NodeKey, IRCharFlags] = Map.empty
 ):
 
   /** Returns the index of the capture group node, or `None` if the node does not capture. */
   def indexOf(node: Node): Option[Int] = indices.get(NodeKey(node))
+
+  /** Returns the flags at the character-level node, if they are recorded. */
+  def charFlagsOf(node: Node): Option[IRCharFlags] = charFlags.get(NodeKey(node))
 
   /** Returns the site of the node referring to a group. */
   def siteOf(node: Node): ReferenceSite =
@@ -91,6 +97,10 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
 
   private val inBranchReset = mutable.Set.empty[Int]
 
+  private val charFlags = mutable.Map.empty[NodeKey, IRCharFlags]
+
+  private val recordsCharFlags = initial.dialect.isPerl || initial.dialect.isRuby
+
   private var branchResetDepth: Int = 0
 
   private val capturesUnnamed: Boolean =
@@ -105,7 +115,16 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
     val count = if allIndices.isEmpty then 0 else allIndices.max
     val defined = if featureSet.numbersNamedCaptureLast then allIndices else (1 to count).toSet
     val groups = indices.toSeq.groupMap(_._2)(_._1.node)
-    new CaptureTable(indices.toMap, sites.toMap, count, defined, nameIndices.toMap, groups, inBranchReset.toSet)
+    new CaptureTable(
+      indices.toMap,
+      sites.toMap,
+      count,
+      defined,
+      nameIndices.toMap,
+      groups,
+      inBranchReset.toSet,
+      charFlags.toMap
+    )
 
   private def walk(node: Node): Unit = node.data match
     case NodeData.Disjunction(nodes) => nodes.foreach(walk)
@@ -115,6 +134,9 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
     case NodeData.Command(kind)      => walkCommand(node, kind)
     case NodeData.Backslash(_: BackslashKind.EscapeBackReference | _: BackslashKind.EscapeCall) =>
       markSite(node)
+    case NodeData.Literal(_) | NodeData.Class(_, _) | NodeData.Backslash(_: BackslashKind.BackslashValue)
+        if recordsCharFlags =>
+      charFlags(NodeKey(node)) = context.charFlags
     case _ => ()
 
   private def walkGroup(node: Node, kind: GroupKind, child: Node): Unit = kind match

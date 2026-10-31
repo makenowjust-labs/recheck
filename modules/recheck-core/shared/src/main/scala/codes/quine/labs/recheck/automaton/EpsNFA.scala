@@ -97,6 +97,14 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
               case None =>
                 if ks.contains(inputTerminatorKind) then Vector(((q, Set.empty), None))
                 else Vector.empty
+      // A character tells the following ones only whether it is an extender after a base among its marks, so the other
+      // marks are dropped from the kinds of the states.
+      def asPrevious(k: CharKind): CharKind =
+        if k.marks == 0 then k
+        else
+          val extenders = (0 until guesses.marks).filter(i => k.isExtenderOf(i) && k.isBasedOf(i))
+          k.copy(marks = extenders.map(i => 1 << (3 * i + 1)).sum)
+
       val closureCache = mutable.Map.empty[(CharKind, Q), Seq[(P, Option[Consume[Q]])]]
       def closure(k0: CharKind, q: Q): Seq[(P, Option[Consume[Q]])] =
         closureCache.getOrElseUpdate((k0, q), buildClosure(k0, charKindSet.filter(guesses.valid(k0, _)), q, Set.empty))
@@ -125,7 +133,8 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
           for (_, p) <- qps do
             p match
               case Some(Consume(chs, q1, loc)) =>
-                for (ch, k1) <- chs do
+                for (ch, k) <- chs do
+                  val k1 = asPrevious(k)
                   val qps1 = closure(k1, q1)
                   val qs1 = qps1.map(_._1)
                   d(ch) = d(ch) :+ (k1, qs1)
@@ -188,11 +197,14 @@ object EpsNFA:
     * @param follow
     *   what follows `\r` (for [[AssertKind.LineEndOf]] before `\r\n` and [[AssertKind.ChompEnd]] before the final
     *   `\r\n`)
+    * @param marks
+    *   the number of the word marks, for each of which an extender guesses whether the text up to it has a base (for
+    *   [[AssertKind.MarkWordBoundaryOf]])
     */
-  final case class Guesses(last: Boolean, afterCR: Boolean, follow: Boolean):
+  final case class Guesses(last: Boolean, afterCR: Boolean, follow: Boolean, marks: Int = 0):
 
     /** Whether any guess is made. */
-    def any: Boolean = last || afterCR || follow
+    def any: Boolean = last || afterCR || follow || marks > 0
 
     /** Returns the kinds of the guesses on a character of the kind. */
     def variants(k: CharKind): Seq[CharKind] =
@@ -203,7 +215,13 @@ object EpsNFA:
         val follows =
           if follow && k.cr then (Seq(CRFollow.Other, CRFollow.LF) ++ Option.when(last)(CRFollow.FinalLF)).map(Some(_))
           else Seq(None)
-        for l <- lasts; a <- afterCRs; f <- follows yield k.copy(last = l, afterCR = a, follow = f)
+        // A base has its base, an extender may have one before it, and the others have none.
+        val baseds = (0 until marks).foldLeft(Seq(0)): (bs, i) =>
+          if k.isBaseOf(i) then bs.map(_ | (1 << i))
+          else if k.isExtenderOf(i) then bs.flatMap(b => Seq(b, b | (1 << i)))
+          else bs
+        for l <- lasts; a <- afterCRs; f <- follows; b <- baseds
+        yield k.copy(last = l, afterCR = a, follow = f, based = b)
 
     /** Checks the guesses between the kinds of adjacent characters (or the begin and the end of the input). */
     def valid(prev: CharKind, next: CharKind): Boolean =
@@ -213,7 +231,9 @@ object EpsNFA:
         case CRFollow.Other   => !next.lf
         case CRFollow.LF      => next.lf && !next.last.contains(true)
         case CRFollow.FinalLF => next.lf && next.last.contains(true)
-      lastOK && afterCROK && followOK
+      val basedOK = (0 until marks).forall: i =>
+        !next.isExtenderOf(i) || next.isBasedOf(i) == prev.isBasedOf(i)
+      lastOK && afterCROK && followOK && basedOK
 
   object Guesses:
 
@@ -227,7 +247,13 @@ object EpsNFA:
         case AssertKind.LineEndOf(_, beforeCRLF, _) => beforeCRLF
         case AssertKind.ChompEnd(_, crlf, _)        => crlf
         case _                                      => false
-      Guesses(last, afterCR, follow)
+      val marks = kinds
+        .collect:
+          case AssertKind.MarkWordBoundaryOf(_, m)    => m + 1
+          case AssertKind.MarkWordBoundaryNotOf(_, m) => m + 1
+        .maxOption
+        .getOrElse(0)
+      Guesses(last, afterCR, follow, marks)
 
   /** AssertKind is assertion kind of this ε-NFA transition. */
   sealed abstract class AssertKind extends Serializable with Product:
@@ -278,6 +304,30 @@ object EpsNFA:
     /** WordBoundaryNotOf is `\B` assertion of the `set`-th word set. */
     final case class WordBoundaryNotOf(set: Int) extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean = prev.isWordOf(set) == next.isWordOf(set)
+      override def seesBoundary: Boolean = false
+
+    /** Tests whether the character of the kind before a position is a word character of the `word`-th word set, or an
+      * extender of the `marks`-th word marks after a base.
+      */
+    private def isMarkWordBefore(prev: CharKind, word: Int, marks: Int): Boolean =
+      prev.isWordOf(word) || prev.isExtenderOf(marks) && prev.isBasedOf(marks)
+
+    /** Tests whether the character of the kind after a position is a word character of the `word`-th word set, or a
+      * mark of the `marks`-th word marks after a base.
+      */
+    private def isMarkWordAfter(prev: CharKind, next: CharKind, word: Int, marks: Int): Boolean =
+      next.isWordOf(word) || next.isMarkOf(marks) && prev.isBasedOf(marks)
+
+    /** MarkWordBoundaryOf is `\b` assertion of the `word`-th word set and the `marks`-th word marks. */
+    final case class MarkWordBoundaryOf(word: Int, marks: Int) extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean =
+        isMarkWordBefore(prev, word, marks) != isMarkWordAfter(prev, next, word, marks)
+      override def seesBoundary: Boolean = false
+
+    /** MarkWordBoundaryNotOf is `\B` assertion of the `word`-th word set and the `marks`-th word marks. */
+    final case class MarkWordBoundaryNotOf(word: Int, marks: Int) extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean =
+        isMarkWordBefore(prev, word, marks) == isMarkWordAfter(prev, next, word, marks)
       override def seesBoundary: Boolean = false
 
     /** InputBegin is `\A` assertion. */

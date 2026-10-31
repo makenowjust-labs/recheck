@@ -15,6 +15,7 @@ import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.ir.IRQuantifier
+import codes.quine.labs.resyntax.ir.IRWordMarks
 
 object PatternExtensions:
 
@@ -200,6 +201,7 @@ object PatternExtensions:
     /** Tests whether the character kinds tell `\r` and `\n`, for an assertion seeing `\r\n` as one line terminator. */
     def needsCRLFDistinction: Boolean =
       lineTerminators.exists(_.crlf == IRLineTerminators.CRLF.Atomic) ||
+        pattern.node.exists(_ == Assert(IRAssertKind.NotBetweenCRLF)) ||
         kindLineTerminators.exists(t =>
           t.crlf != IRLineTerminators.CRLF.Ignored && !(t.chars(0x0a) && t.chars(0x0d))
         ) ||
@@ -211,8 +213,18 @@ object PatternExtensions:
     def wordSets: Seq[CharSet] =
       pattern.node
         .collect:
-          case Assert(IRAssertKind.WordBoundary(w))    => w
-          case Assert(IRAssertKind.NotWordBoundary(w)) => w
+          case Assert(IRAssertKind.WordBoundary(w))           => w
+          case Assert(IRAssertKind.NotWordBoundary(w))        => w
+          case Assert(IRAssertKind.MarkWordBoundary(w, _))    => w
+          case Assert(IRAssertKind.NotMarkWordBoundary(w, _)) => w
+        .distinct
+
+    /** Returns the distinct marks of the word boundary assertions taking marks after a base as word characters. */
+    def wordMarks: Seq[IRWordMarks] =
+      pattern.node
+        .collect:
+          case Assert(IRAssertKind.MarkWordBoundary(_, m))    => m
+          case Assert(IRAssertKind.NotMarkWordBoundary(_, m)) => m
         .distinct
 
     /** The characters that JavaScript's ignore-case matching canonicalizes to, which stand for their cases. */
@@ -255,7 +267,8 @@ object PatternExtensions:
           preferredChars,
           needsCRLFDistinction,
           kinds.drop(1),
-          words.drop(1)
+          words.drop(1),
+          wordMarks
         )
 
     /** Tests whether the pattern needs line terminator distinction or not. */

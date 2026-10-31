@@ -13,6 +13,7 @@ import codes.quine.labs.recheck.regexp.PatternAlphabet
 import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 
@@ -288,7 +289,11 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   /** Tests whether the automaton of the source accepts the input, i.e. the source matches in the input. */
   def searches(source: String, flags: String, dialect: Dialect, input: String): Boolean =
     val nfa = build(source, flags, dialect).get.toOrderedNFA
-    val last = input.foldLeft(nfa.inits.toSet): (qs, c) =>
+    val units =
+      if ParsedPattern.parse(source, flags, dialect).toTry.get.ir.mode == UnitMode.CodePoint then
+        UString.fromString(input).iterator.toSeq
+      else input.map(_.toInt)
+    val last = units.foldLeft(nfa.inits.toSet): (qs, c) =>
       qs.flatMap(q => nfa.delta.collect { case ((p, a), ps) if p == q && a.contains(c) => ps }.flatten)
     last.exists(nfa.acceptSet.contains)
 

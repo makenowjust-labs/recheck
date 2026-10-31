@@ -51,7 +51,9 @@ object IRCaseEquivalence:
   case object JavaAscii extends IRCaseEquivalence:
     def closure(set: CharSet): CharSet = asciiFold.closure(set)
 
-  /** PCRERestrict is PCRE's caseless restrict (`r`), which folds no ASCII and non-ASCII characters together. */
+  /** PCRERestrict is PCRE's caseless restrict (`r`) and Perl's `aa`, which fold no ASCII and non-ASCII characters
+    * together.
+    */
   final case class PCRERestrict(mapping: CaseMapping, mode: UnitMode) extends IRCaseEquivalence:
     def closure(set: CharSet): CharSet =
       val ascii = set.intersect(Ascii)
@@ -116,10 +118,11 @@ object IRCaseEquivalence:
         case _: Dialect.Python if asciiOnly || mode == UnitMode.Byte => Keyed("ASCII", asciiFold, mode)
         case _: Dialect.Python                                       => Keyed("Python", pythonKey, mode)
         case _: Dialect.Ruby if mode == UnitMode.Byte                => Keyed("ASCII", asciiFold, mode)
-        case _: Dialect.Ruby                          => Keyed("simple folding", CaseMapping.SimpleFold, mode)
-        case _: Dialect.Perl if mode == UnitMode.Byte => Keyed("ASCII", asciiFold, mode)
-        case _: Dialect.Perl if perlNative            => PerlNative
-        case _: Dialect.Perl                          => Keyed("simple folding", CaseMapping.SimpleFold, mode)
+        case _: Dialect.Ruby                           => Keyed("simple folding", CaseMapping.SimpleFold, mode)
+        case _: Dialect.Perl if mode == UnitMode.Byte  => Keyed("ASCII", asciiFold, mode)
+        case _: Dialect.Perl if perlNative             => PerlNative
+        case _: Dialect.Perl if flags.caselessRestrict => PCRERestrict(CaseMapping.SimpleFold, mode)
+        case _: Dialect.Perl                           => Keyed("simple folding", CaseMapping.SimpleFold, mode)
         // PCRE folds non-ASCII characters only in UTF or UCP mode; PHP's `u` sets both.
         case Dialect.PCRE if mode == UnitMode.Byte && !flags.unicodeClass => Keyed("ASCII", asciiFold, mode)
         case Dialect.PCRE                                                 =>

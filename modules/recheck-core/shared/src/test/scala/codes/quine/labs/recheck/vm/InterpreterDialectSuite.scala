@@ -100,6 +100,15 @@ class InterpreterDialectSuite extends munit.FunSuite:
     accepts("^(a)(?i:\\1)$", PCRE, "aA")
     refutes("^(a)\\1$", PCRE, "aA")
 
+  test("Interpreter.run: Ruby's look-behind with a multi-character folding"):
+    accepts("(?i)(?<=ß)x", Ruby(), "ssx")
+    accepts("(?i)(?<=ß)x", Ruby(), "\u017fSx")
+    refutes("(?i)(?<=ß)x", Ruby(), "ßx")
+    refutes("(?<=a(?i:ß)b)x", Ruby(), "aßbx")
+    accepts("(?<=a(?i:ß)b)x", Ruby(), "aSsbx")
+    accepts("(?i)(?<=ß)x", Perl(), "ßx")
+    accepts("(?i)(?<=ß)x", Perl(), "ssx")
+
   test("Interpreter.run: line terminators"):
     for dialect <- Seq(Python(), Java, PCRE, Perl(), DotNet) do
       accepts("^a$", dialect, "a\n")

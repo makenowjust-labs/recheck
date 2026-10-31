@@ -25,6 +25,8 @@ final case class FlagSet(
     extra: Boolean = false,
     // `a` (PCRE, Perl, Python, Ruby)
     ascii: Boolean = false,
+    // `aa` (Perl)
+    asciiRestrict: Boolean = false,
     // `aD` (PCRE)
     asciiDigit: Boolean = false,
     // `aP` (PCRE)
@@ -112,6 +114,7 @@ object FlagSet:
         case 'a' =>
           check(dialect.isPerl || dialect.isPython || dialect.isRuby)
           flagSet = flagSet.copy(ascii = true)
+          if counts(c) >= 2 && dialect.isPerl then flagSet = flagSet.copy(asciiRestrict = true)
         case 'b' =>
           check(dialect.isPython)
           flagSet = flagSet.copy(bytes = true)

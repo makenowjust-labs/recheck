@@ -194,6 +194,17 @@ class IRCharSuite extends munit.FunSuite:
   chars("\\xb5", "i", Perl())(of("\u00b5\u039c\u03bc"))
   chars("é", "i", Perl())(of("éÉ"))
   chars("(?r)k", "iu", PCRE)(of("kK"))
+  // Perl's `aa` matches no ASCII and non-ASCII characters together, even by a multi-character folding.
+  chars("(?aa)k", "i", Perl())(of("kK"))
+  chars("(?aa)s", "i", Perl())(of("sS"))
+  chars("(?aa)ß", "i", Perl())(CaseMapping.SimpleFold.equivalents(0xdf))
+  check("(?aa)ss", "i", Perl())(Sequence(Chars(of("sS")), Chars(of("sS"))))
+  chars("(?a)k", "i", Perl())(of("kK\u212a"))
+  chars("(?aa)(?u)k", "i", Perl())(of("kK\u212a"))
+  chars("(?aa)(?^i)k", "", Perl())(of("kK\u212a"))
+  // `\N{U+...}` makes Perl's pattern use Unicode rules, as `\N{...}` does.
+  checkSet("[\\w\\N{U+41}]", "", Perl())(set => set.contains(0xe9))
+  checkSet("[\\w\\x{41}]", "", Perl())(set => !set.contains(0xe9))
   chars("(*TURKISH_CASING)i", "iu", PCRE)(of("i\u0130"))
   // Ruby and Perl fold plain literals to several characters (e.g. `ß` and `ss`), longest first.
   // Unicode 18 adds a character folded to `ß`, so the sets come from the tables.
@@ -208,6 +219,10 @@ class IRCharSuite extends munit.FunSuite:
   // Perl's `/d` rules fold no Latin-1 character in a native string, unless the pattern is in Unicode rules.
   check("ss", "iu", Perl())(sharpS)
   check("ff", "i", Ruby())(Disjunction(Sequence(Chars(of("fF")), Chars(of("fF"))), Chars(of("\ufb00"))))
+  // Ruby matches the folding in a look-behind as the folded string only (e.g. `(?<=ß)` matches `ss`, but not `ß`).
+  check("(?<=ß)", "i", Ruby())(LookBehind(false, Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f")))))
+  check("(?<=ss)", "i", Ruby())(LookBehind(false, Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f")))))
+  check("(?<=ß)", "i", Perl())(LookBehind(false, sharpS))
   // Folds with classes and escapes are intentionally not reproduced.
   chars("[ß]", "i", Ruby(), Perl())(sharpSs)
   check("\\x73s", "i", Ruby())(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))
@@ -232,9 +247,7 @@ class IRCharSuite extends munit.FunSuite:
   chars(".", "", PCRE)(of("\n").complement(UnitMode.Byte))
   chars(".", "", Python(), Perl(), Ruby())(of("\n").complement(UnitMode.CodePoint))
   chars(".", "m", Ruby())(UnitMode.CodePoint.universe)
-  check("(*CRLF).", "", PCRE)(
-    Sequence(LookAhead(true, Sequence(Chars(of("\r")), Chars(of("\n")))), Chars(UnitMode.Byte.universe))
-  )
+  check("(*CRLF).", "", PCRE)(Sequence(Chars(UnitMode.Byte.universe), Assert(IRAssertKind.NotBetweenCRLF)))
 
   // Escape classes
   chars("\\d", "", JavaScript, Java, PCRE, Ruby())(of("0123456789"))
@@ -272,6 +285,7 @@ class IRCharSuite extends munit.FunSuite:
     assertEquals(resolve("\u00e9", string), string.copy(utf8 = Some(true)))
     assertEquals(resolve("\\x{100}", string), string.copy(utf8 = Some(true)))
     assertEquals(resolve("\\p{L}", string), string.copy(utf8 = Some(true)))
+    assertEquals(resolve("\\N{U+DF}", string), string.copy(utf8 = Some(true)))
     assertEquals(resolve("\\xe9", string), string.copy(utf8 = Some(false)))
     assertEquals(resolve("\u00e9", Perl(Perl.Encoding.Bytes)), Perl(Perl.Encoding.Bytes, utf8 = Some(false)))
     assertEquals(resolve("a", string.copy(utf8 = Some(true))), string.copy(utf8 = Some(true)))
@@ -373,3 +387,29 @@ class IRCharSuite extends munit.FunSuite:
   error("(?<=ß{128})a", "i", Perl())("Look-behind longer than 255 at 0")
   test("IRBuilder.build: /(?<=ß{128})a/ in Perl"):
     build("(?<=ß{128})a", "", Perl())
+  // Perl counts the folding at the node's flags, of a literal, an escape and a class's characters but not its ranges.
+  for (body, flags, width) <- Seq(
+      ("(?i)ß", "", 2),
+      ("(?i:ß)", "", 2),
+      ("(?-i:ß)", "i", 1),
+      ("\\xDF", "i", 1),
+      ("\\xDF|\\x{100}", "i", 2),
+      ("\\N{U+DF}", "i", 2),
+      ("[aß]", "i", 2),
+      ("[ﬃa]", "i", 3),
+      ("[ß-ß]", "i", 2),
+      ("[ß-ẞ]", "i", 1),
+      ("[^ß]", "i", 1),
+      ("ſ", "i", 1),
+      ("(?a)ﬃ", "i", 3),
+      ("(?aa)ﬃ", "i", 1),
+      ("(?aa)İ", "i", 1),
+      ("(?aa)ß", "i", 2),
+      ("(?aa)ΐ", "i", 3),
+      ("(?u)ß", "i", 2)
+    )
+  do
+    val count = 255 / width
+    test(s"IRBuilder.build: /(?<=(?:$body){$count})/$flags in Perl"):
+      build(s"(?<=(?:$body){$count})", flags, Perl())
+    error(s"(?<=(?:$body){${count + 1}})", flags, Perl())("Look-behind longer than 255 at 0")

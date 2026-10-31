@@ -42,9 +42,14 @@ class ReDoSDialectSuite extends munit.FunSuite:
     assertVulnerable(check("^(?:a|a)*$\\n", Python()), AttackComplexity.Exponential(false), Checker.Automaton)
     assertVulnerable(check("(?m)^(?:a|a)*(?d:$)", Java), AttackComplexity.Exponential(false), Checker.Automaton)
     assertVulnerable(check("\\b(?:a|a)*(?a:\\b)", Python()), AttackComplexity.Exponential(false), Checker.Automaton)
+    // Java's `\B` holds between `a` and a non-spacing mark, which is a word character after a letter.
+    assertVulnerable(check("^a(?:\u0301|\\B\u0301)*$", Java), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertEquals(check("^a(?:\u0301|\\b\u0301)*$", Java).getClass, classOf[Diagnostics.Safe])
     // PCRE without `u` reads bytes; PCRE2 10.49 without JIT doubles its time for each `é`.
     assertVulnerable(check("^(?:é|é)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
     assertVulnerable(check("^(?:é|é)*$", PCRE, "u"), AttackComplexity.Exponential(false), Checker.Automaton)
+    // PCRE2's `.` with `(*CRLF)` fails only at `\r` before `\n` (0.38 s at n = 22 on `'a'.repeat(n) + '\r\nx'`).
+    assertVulnerable(check("(*CRLF)^(?:a|.)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
 
   test("ReDoS.check: atomic groups"):
     // Java 25 is linear on the first two (and Python 3.15 and PCRE2 10.49 on the second).
