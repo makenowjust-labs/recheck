@@ -13,6 +13,7 @@ All `Diagnostics` has the following fields.
 
 - `source` is the given regular expression’s source string.
 - `flags` is the given regular expression’s flags string.
+- `dialect` is the given [`dialect`](parameters.mdx#dialect) parameter, as an object of the name and every setting of the dialect.
 - `checker` is a checker type to be used (one of `fuzz` and `automaton`).
 
 ## Status
