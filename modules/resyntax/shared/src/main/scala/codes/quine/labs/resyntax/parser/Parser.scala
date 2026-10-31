@@ -60,7 +60,7 @@ object Parser:
     val bytes = if encoding == SourceEncoding.Utf8 then Rewritten.utf8(source) else None
     val text = bytes.fold(source)(_.text)
     val rewritten = dialect match
-      case Dialect.Perl(_, PerlSource.Literal, _) =>
+      case Dialect.Perl(_, PerlSource.Literal) =>
         PerlLiteralLexer.rewrite(text, flagSet.verbose, bytes = encoding == SourceEncoding.Utf8)
       case _ => None
     val rewrites = rewritten.toSeq ++ bytes.toSeq

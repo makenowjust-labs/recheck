@@ -426,15 +426,15 @@ object FeatureSet:
 
     // Python's bytes pattern
     val isByte = dialect match
-      case Dialect.Python(encoding) => flagSet.bytes || encoding == Dialect.Python.Encoding.Bytes
-      case _                        => false
+      case Dialect.Python(tpe) => flagSet.bytes || tpe == Dialect.Python.Type.Bytes
+      case _                   => false
     // Ruby's `n` is NOENCODING, which `FlagSet` keeps as `explicitCapture`.
     val isRubyByte = dialect match
       case Dialect.Ruby(encoding) => flagSet.explicitCapture || encoding == Dialect.Ruby.Encoding.Ascii8Bit
       case _                      => false
     val isPerlByte = dialect match
-      case Dialect.Perl(encoding, _, _) => encoding == Dialect.Perl.Encoding.Bytes
-      case _                            => false
+      case Dialect.Perl(utf8, _) => !utf8
+      case _                     => false
     // PCRE reads UTF-8 by `u` (PHP) or `(*UTF)`.
     val isUnicode = flagSet.unicode || flagSet.unicodeSets || (isPCRE && analysis.hasUtfStartOption)
 

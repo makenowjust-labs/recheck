@@ -14,6 +14,7 @@ import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
+import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ast.QuoteLiteral
 import codes.quine.labs.resyntax.ast.Reference
@@ -48,12 +49,17 @@ object IRBuilder:
     val context = BuildingContext.from(flagSet, dialect, featureSet)
     val table = CaptureAnalyzer.analyze(node, context)
     val resolver = new ReferenceResolver(table, dialect, featureSet)
-    val perlUnicodeRules = resolveDialect(node, dialect) match
-      case Dialect.Perl(_, _, utf8) => usesPerlUnicodeRules(node, utf8)
-      case _                        => false
+    val perlUnicodeRules = dialect match
+      case Dialect.Perl(utf8, _) => utf8 || usesPerlUnicodeSyntax(node)
+      case _                     => false
+    // Perl decides the widths in a look-behind on compiling the pattern, by whether the pattern itself is UTF-8.
+    val perlUtf8Pattern = dialect match
+      case Dialect.Perl(true, PerlSource.String) => true
+      case Dialect.Perl(utf8, _)                 => usesPerlUnicodeSyntax(node) || utf8 && hasNonAsciiLiteral(node)
+      case _                                     => false
     val chars = new IRCharResolver(dialect, mode, perlUnicodeRules)
     val checker =
-      new LookBehindChecker(table, resolver, featureSet, charWidth(table, chars, dialect, mode, perlUnicodeRules))
+      new LookBehindChecker(table, resolver, featureSet, charWidth(table, chars, dialect, mode, perlUtf8Pattern))
     val backReferences = new IRValidator(table, resolver, checker, featureSet).validate(node)
     val builder = new IRBuilder(context, table, backReferences, chars, checker, resolveCharacter, hasCall(node))
     IRPattern(
@@ -66,16 +72,6 @@ object IRBuilder:
       notEmpty(starts)
     )
 
-  /** Returns the dialect with the settings that the pattern decides, i.e. Perl's `utf8` if it is not given.
-    *
-    * A byte string has no `use utf8`, so it is not UTF-8. Otherwise, a code point above `U+00FF`, `\p{...}`, `\N{...}`
-    * and a non-ASCII literal make the pattern UTF-8.
-    */
-  def resolveDialect(node: Node, dialect: Dialect): Dialect = dialect match
-    case perl @ Dialect.Perl(encoding, _, None) =>
-      perl.copy(utf8 = Some(encoding != Dialect.Perl.Encoding.Bytes && usesPerlUnicodeSyntax(node, literals = true)))
-    case dialect => dialect
-
   /** Returns the unit mode of a pattern from the dialect and the flags.
     *
     * @param utf
@@ -86,17 +82,16 @@ object IRBuilder:
       case Dialect.JavaScript =>
         if flagSet.unicode || flagSet.unicodeSets then UnitMode.CodePoint else UnitMode.Utf16
       // Java matches code points, and reads a lone surrogate as a code point too.
-      case Dialect.Java             => UnitMode.CodePoint
-      case Dialect.DotNet           => UnitMode.Utf16
-      case Dialect.Python(encoding) =>
-        if flagSet.bytes || encoding == Dialect.Python.Encoding.Bytes then UnitMode.Byte else UnitMode.CodePoint
+      case Dialect.Java        => UnitMode.CodePoint
+      case Dialect.DotNet      => UnitMode.Utf16
+      case Dialect.Python(tpe) =>
+        if flagSet.bytes || tpe == Dialect.Python.Type.Bytes then UnitMode.Byte else UnitMode.CodePoint
       // Ruby's `n` is the encoding option (NOENCODING), which `FlagSet` keeps as `explicitCapture`.
       case Dialect.Ruby(encoding) =>
         if flagSet.explicitCapture || encoding == Dialect.Ruby.Encoding.Ascii8Bit then UnitMode.Byte
         else UnitMode.CodePoint
-      case Dialect.Perl(encoding, _, _) =>
-        if encoding == Dialect.Perl.Encoding.Bytes then UnitMode.Byte else UnitMode.CodePoint
-      case Dialect.PCRE => if flagSet.unicode || utf then UnitMode.CodePoint else UnitMode.Byte
+      case Dialect.Perl(utf8, _) => if utf8 then UnitMode.CodePoint else UnitMode.Byte
+      case Dialect.PCRE          => if flagSet.unicode || utf then UnitMode.CodePoint else UnitMode.Byte
 
   /** Returns the case equivalence of a back-reference with the flags in the dialect and the mode. */
   def caseEquivalence(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRCaseEquivalence =
@@ -118,18 +113,19 @@ object IRBuilder:
       chars: IRCharResolver,
       dialect: Dialect,
       mode: UnitMode,
-      perlUnicodeRules: Boolean
+      perlUtf8Pattern: Boolean
   ): Seq[Node] => LookBehindChecker.Width =
     import LookBehindChecker.Width
     def single(n: Int): Width = Width(n, n)
-    if mode != UnitMode.CodePoint then return nodes => single(nodes.size)
+    // Perl reads the bytes of a byte string as Latin-1 characters.
+    if mode != UnitMode.CodePoint && !dialect.isPerl then return nodes => single(nodes.size)
     dialect match
       case _: Dialect.Perl =>
         def fold(value: Int, flags: IRCharFlags): Int =
           val folded = FullCaseFolding(value)
           val hasAscii = folded.iterator.exists(_ < 0x80)
           val one = flags.charset match
-            case IRCharset.Default  => !perlUnicodeRules
+            case IRCharset.Default  => !perlUtf8Pattern
             case IRCharset.Unicode  => false
             case IRCharset.Locale   => value < 0x100 || hasAscii && value != 0x1e9e
             case _: IRCharset.Ascii => flags.caselessRestrict && hasAscii && value != 0xdf && value != 0x1e9e
@@ -179,22 +175,18 @@ object IRBuilder:
   /** The characters folded to several characters. */
   private lazy val multiFolded: CharSet = CharSet.union(FullCaseFolding.multiCodePointFoldings().values.toSeq)
 
-  /** Checks whether a Perl pattern uses Unicode rules under `/d` (perlre "Which character set modifier is in effect?").
+  /** Checks whether a Perl pattern switches `/d` to Unicode rules by itself (perlre "Which character set modifier is in
+    * effect?").
     *
-    * A UTF-8 pattern does, and a code point above `U+00FF`, `\p{...}` and `\N{...}` (including `\N{U+...}`) make the
-    * pattern UTF-8. Without `utf8`, a non-ASCII literal is taken as a sign of a UTF-8 pattern (with `use utf8`).
+    * `/d` uses Unicode rules when the pattern or the string is UTF-8, so a pattern of byte strings uses them only by a
+    * code point above `U+00FF`, `\p{...}`, `\N{...}` (including `\N{U+...}`) or `\b{...}`.
     */
-  private def usesPerlUnicodeRules(node: Node, utf8: Option[Boolean]): Boolean =
-    utf8.contains(true) || usesPerlUnicodeSyntax(node, literals = utf8.isEmpty)
-
-  private def usesPerlUnicodeSyntax(node: Node, literals: Boolean): Boolean =
+  private def usesPerlUnicodeSyntax(node: Node): Boolean =
     def check(x: Any): Boolean = x match
-      case NodeData.Literal(value)                       => literals && value >= 0x80
-      case ClassItemData.ClassLiteral(value)             => literals && value >= 0x80
-      case QuoteLiteral.QuoteValue(value)                => literals && value >= 0x80
-      case BackslashKind.Escape(EscapeStyle.NamedHex, _) => true
-      case BackslashKind.Escape(_, value)                => value > 0xff
-      case _: EscapeClassKind.CharName                   => true
+      case AssertKind.Boundary(Some(_)) | AssertKind.NonBoundary(Some(_)) => true
+      case BackslashKind.Escape(EscapeStyle.NamedHex, _)                  => true
+      case BackslashKind.Escape(_, value)                                 => value > 0xff
+      case _: EscapeClassKind.CharName                                    => true
       case _: EscapeClassKind.UnicodeProperty | _: EscapeClassKind.UnicodeBareProperty |
           _: EscapeClassKind.UnicodePropertyValue | _: EscapeClassKind.NonUnicodeProperty |
           _: EscapeClassKind.NonUnicodeBareProperty | _: EscapeClassKind.NonUnicodePropertyValue =>
@@ -205,6 +197,17 @@ object IRBuilder:
       case x: Product      => x.productIterator.exists(check)
       case _               => false
     check(node)
+
+  /** Checks whether a Perl pattern has a non-ASCII literal, which makes a regex literal UTF-8 with `use utf8`. */
+  private def hasNonAsciiLiteral(x: Any): Boolean = x match
+    case NodeData.Literal(value)           => value >= 0x80
+    case ClassItemData.ClassLiteral(value) => value >= 0x80
+    case QuoteLiteral.QuoteValue(value)    => value >= 0x80
+    case xs: Iterable[?]                   => xs.exists(hasNonAsciiLiteral)
+    case x: Option[?]                      => x.exists(hasNonAsciiLiteral)
+    case _: String                         => false
+    case x: Product                        => x.productIterator.exists(hasNonAsciiLiteral)
+    case _                                 => false
 
   /** Checks whether the node has `\X`. */
   private def hasGraphemeCluster(x: Any): Boolean = x match

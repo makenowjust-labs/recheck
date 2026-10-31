@@ -22,21 +22,13 @@ class DialectSuite extends munit.FunSuite:
     )
     for (dialect, i) <- All.zipWithIndex; (check, j) <- checks.zipWithIndex do
       assertEquals(check(dialect), i == j, dialect)
-    assert(Perl(Perl.Encoding.Bytes, PerlSource.String, Some(true)).isPerl)
+    assert(Perl(utf8 = false, source = PerlSource.String).isPerl)
 
-  test("Dialect encodings"):
-    assertEquals(Python.Encoding.values.toSeq.map(_.name), Seq("str", "bytes"))
+  test("Dialect settings"):
+    assertEquals(Python.Type.values.toSeq.map(_.name), Seq("str", "bytes"))
     assertEquals(Ruby.Encoding.values.toSeq.map(_.name), Seq("UTF-8", "ASCII-8BIT"))
-    assertEquals(Perl.Encoding.values.toSeq.map(_.name), Seq("characters", "bytes"))
-    assertEquals(Python.Encoding.of("bytes"), Some(Python.Encoding.Bytes))
+    assertEquals(Python.Type.of("bytes"), Some(Python.Type.Bytes))
     assertEquals(Ruby.Encoding.of("ASCII-8BIT"), Some(Ruby.Encoding.Ascii8Bit))
-    assertEquals(Perl.Encoding.of("characters"), Some(Perl.Encoding.Characters))
-    assertEquals(Perl.Encoding.of("str"), None)
-
-  test("Dialect#withPerlUtf8Of"):
-    assertEquals(Perl().withPerlUtf8Of("a"), Perl(utf8 = Some(false)))
-    assertEquals(Perl().withPerlUtf8Of("é"), Perl(utf8 = Some(true)))
-    assertEquals(Perl(utf8 = Some(false)).withPerlUtf8Of("é"), Perl(utf8 = Some(false)))
-    assertEquals(Perl(source = PerlSource.String).withPerlUtf8Of("é"), Perl(source = PerlSource.String))
-    assertEquals(Perl(Perl.Encoding.Bytes).withPerlUtf8Of("é"), Perl(Perl.Encoding.Bytes))
-    assertEquals(Ruby().withPerlUtf8Of("é"), Ruby())
+    assertEquals(Ruby.Encoding.of("str"), None)
+    assertEquals(Python(), Python(Python.Type.Str))
+    assertEquals(Perl(), Perl(utf8 = true, source = PerlSource.Literal))

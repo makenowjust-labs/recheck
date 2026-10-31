@@ -22,10 +22,10 @@ enum Dialect:
 
   /** Python specifies Python dialect.
     *
-    * @param encoding
-    *   the kind of the pattern and its input
+    * @param type
+    *   the string type of the pattern and its input
     */
-  case Python(encoding: Python.Encoding = Python.Encoding.Str)
+  case Python(`type`: Python.Type = Python.Type.Str)
 
   /** Ruby specifies Ruby dialect.
     *
@@ -36,19 +36,13 @@ enum Dialect:
 
   /** Perl specifies Perl dialect.
     *
-    * @param encoding
-    *   the kind of strings
+    * @param utf8
+    *   whether the program has `use utf8` and its strings are text with the UTF-8 flag (e.g. decoded input), which
+    *   match code points with Unicode rules; otherwise, they are byte strings, whose non-ASCII literals are UTF-8 bytes
     * @param source
     *   how the pattern is given
-    * @param utf8
-    *   whether the pattern string is UTF-8, which makes `/d` use Unicode rules; `None` decides it from the pattern (see
-    *   [[withPerlUtf8Of]] for a regex literal)
     */
-  case Perl(
-      encoding: Perl.Encoding = Perl.Encoding.Characters,
-      source: PerlSource = PerlSource.Literal,
-      utf8: Option[Boolean] = None
-  )
+  case Perl(utf8: Boolean = true, source: PerlSource = PerlSource.Literal)
 
   /** The name of the dialect's language. */
   def name: String = this match
@@ -87,17 +81,6 @@ enum Dialect:
     case _: Perl => true
     case _       => false
 
-  /** Returns the dialect with Perl's `utf8` decided from the source of a regex literal of character strings, unless it
-    * is already given.
-    *
-    * With `use utf8`, a literal is UTF-8 if its source has a non-ASCII character, even if `\U` and the like turn it
-    * into ASCII (e.g. `\Uß` becomes `SS`).
-    */
-  def withPerlUtf8Of(source: String): Dialect = this match
-    case perl @ Perl(Perl.Encoding.Characters, PerlSource.Literal, None) =>
-      perl.copy(utf8 = Some(source.exists(_ >= 0x80)))
-    case dialect => dialect
-
 object Dialect:
 
   /** The names of the dialects' languages. */
@@ -116,19 +99,19 @@ object Dialect:
 
   object Python:
 
-    /** Encoding is the kind of a Python pattern and its input. */
-    enum Encoding(val name: String):
+    /** Type is the string type of a Python pattern and its input. */
+    enum Type(val name: String):
 
       /** Str is a `str` pattern, which matches code points. */
-      case Str extends Encoding("str")
+      case Str extends Type("str")
 
       /** Bytes is a `bytes` pattern, which matches bytes. */
-      case Bytes extends Encoding("bytes")
+      case Bytes extends Type("bytes")
 
-    object Encoding:
+    object Type:
 
-      /** Returns the encoding with the name. */
-      def of(name: String): Option[Encoding] = values.find(_.name == name)
+      /** Returns the type with the name. */
+      def of(name: String): Option[Type] = values.find(_.name == name)
 
   object Ruby:
 
@@ -140,22 +123,6 @@ object Dialect:
 
       /** Ascii8Bit is ASCII-8BIT (as `n` makes), which matches bytes. */
       case Ascii8Bit extends Encoding("ASCII-8BIT")
-
-    object Encoding:
-
-      /** Returns the encoding with the name. */
-      def of(name: String): Option[Encoding] = values.find(_.name == name)
-
-  object Perl:
-
-    /** Encoding is the kind of Perl's strings. */
-    enum Encoding(val name: String):
-
-      /** Characters is character strings with `use utf8`, which match code points. */
-      case Characters extends Encoding("characters")
-
-      /** Bytes is byte strings, whose non-ASCII literals are UTF-8 bytes. */
-      case Bytes extends Encoding("bytes")
 
     object Encoding:
 

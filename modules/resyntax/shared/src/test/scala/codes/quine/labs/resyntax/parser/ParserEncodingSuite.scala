@@ -33,7 +33,7 @@ class ParserEncodingSuite extends munit.FunSuite:
   def bytes(s: String): Seq[NodeData] = s.getBytes("UTF-8").toSeq.map(b => Literal(b & 0xff))
 
   // Python's bytes pattern has no Unicode escape, and its characters are bytes of Latin-1.
-  val PythonBytes: Dialect = Python(Python.Encoding.Bytes)
+  val PythonBytes: Dialect = Python(Python.Type.Bytes)
   for (flags, dialect) <- Seq(("b", Python()), ("", PythonBytes)) do
     error("\\u0041", flags, dialect)("Invalid backslash escape at 1")
     error("[\\u0041]", flags, dialect)("Invalid backslash escape at 2")
@@ -101,7 +101,7 @@ class ParserEncodingSuite extends munit.FunSuite:
     interceptMessage[ParsingException]("Code point too large at 5")(parse("\u00e9\u00e9\\x{100}", "", PCRE))
 
   // Perl's byte strings are UTF-8 bytes.
-  val PerlBytes: Dialect = Perl(Perl.Encoding.Bytes)
+  val PerlBytes: Dialect = Perl(utf8 = false)
   check("\u00e9+", "", PerlBytes)(Sequence(Literal(0xc3), Repeat(Literal(0xa9), Plus(Greedy))))
   check("\u00e9+", "", Perl())(Repeat(Literal(0xe9), Plus(Greedy)))
   check("[\u00e9-\u00e0]", "", PerlBytes)(

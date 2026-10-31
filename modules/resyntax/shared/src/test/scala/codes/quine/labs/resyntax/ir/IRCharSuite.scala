@@ -82,12 +82,12 @@ class IRCharSuite extends munit.FunSuite:
       (PCRE, "", UnitMode.Byte),
       (PCRE, "u", UnitMode.CodePoint),
       (Python(), "", UnitMode.CodePoint),
-      (Python(Python.Encoding.Bytes), "", UnitMode.Byte),
+      (Python(Python.Type.Bytes), "", UnitMode.Byte),
       (Ruby(), "", UnitMode.CodePoint),
       (Ruby(), "n", UnitMode.Byte),
       (Ruby(Ruby.Encoding.Ascii8Bit), "", UnitMode.Byte),
       (Perl(), "", UnitMode.CodePoint),
-      (Perl(Perl.Encoding.Bytes), "", UnitMode.Byte)
+      (Perl(utf8 = false), "", UnitMode.Byte)
     )
   do
     test(s"IRBuilder.build: the unit mode of $dialect with /$flags/"):
@@ -121,17 +121,17 @@ class IRCharSuite extends munit.FunSuite:
     CharSet.of(0xf0, 0x9d, 0x8c, 0x88).union(CharSet.range(0x86, 0xf0)).union(CharSet.range('a', 'z'))
   )
   test("IRBuilder.build: Perl's byte strings"):
-    def set(s: String): CharSet = setOf(build(s, "", Perl(Perl.Encoding.Bytes)).node.data)
+    def set(s: String): CharSet = setOf(build(s, "", Perl(utf8 = false)).node.data)
     assertEquals(set("[é]"), CharSet.of(0xa9, 0xc3))
     assertEquals(set("\\x{100}"), CharSet.empty)
     assertEquals(set("[a\\x{100}]"), of("a"))
     assertEquals(set("[a-\\x{100}]"), CharSet.range('a', 0xff))
     assertEquals(set("\\xe9"), CharSet.single(0xe9))
     // Its non-ASCII literals are bytes, which do not make the pattern use Unicode rules.
-    val Sequence(nodes) = build("é\\w", "", Perl(Perl.Encoding.Bytes)).node.data: @unchecked
+    val Sequence(nodes) = build("é\\w", "", Perl(utf8 = false)).node.data: @unchecked
     assertEquals(nodes.last.data, Chars(IRCharClasses.AsciiPosix("word")))
-  // Perl reads the bytes of a byte string as Latin-1 characters, so the rules of `0x80..0xFF` follow the modifiers and
-  // the UTF-8 flag of the pattern as for code points (checked against Perl 5.44 with a downgraded string).
+  // Perl reads the bytes of a byte string as Latin-1 characters, so a pattern switching `/d` to Unicode rules (e.g. by
+  // `\x{100}`) has the rules of `0x80..0xFF` of the text strings (checked against Perl 5.44).
   for
     body <- Seq(
       "\\w",
@@ -145,31 +145,31 @@ class IRCharSuite extends munit.FunSuite:
       "(?i)\\xDF"
     )
     modifiers <- Seq("", "(?u)", "(?a)", "(?aa)", "(?l)", "(?d)")
-    utf8 <- Seq(false, true)
   do
     val source = s"$modifiers$body"
-    test(s"IRBuilder.build: /$source/ in Perl's byte strings with utf8 = $utf8"):
-      def lastSet(dialect: Dialect): CharSet = strip(build(source, "", dialect).node.data) match
+    test(s"IRBuilder.build: /(?:\\x{100})?$source/ in Perl's byte strings"):
+      def lastSet(s: String, dialect: Dialect): CharSet = strip(build(s, "", dialect).node.data) match
         case Sequence(nodes) => setOf(nodes.last.data)
         case data            => setOf(data)
-      val bytes = lastSet(Perl(Perl.Encoding.Bytes, PerlSource.String, Some(utf8)))
-      val chars = lastSet(Perl(Perl.Encoding.Characters, PerlSource.String, Some(utf8)))
-      assertEquals(bytes, chars.restrict(UnitMode.Byte))
+      val bytes = lastSet(s"(?:\\x{100})?$source", Perl(utf8 = false))
+      assertEquals(bytes, lastSet(source, Perl()).restrict(UnitMode.Byte))
   test("IRBuilder.build: Perl's byte strings with Unicode rules"):
-    def set(s: String, utf8: Boolean = false): CharSet =
-      strip(build(s, "", Perl(Perl.Encoding.Bytes, PerlSource.String, Some(utf8))).node.data) match
+    def set(s: String): CharSet =
+      strip(build(s, "", Perl(utf8 = false)).node.data) match
         case Sequence(nodes) => setOf(nodes.last.data)
         case data            => setOf(data)
     assert(!set("\\w").contains(0xe9))
     assert(set("(?u)\\w").contains(0xe9))
-    assert(set("\\w", utf8 = true).contains(0xe9))
-    assert(set("\\x{100}?\\w").contains(0xe9))
-    assert(!set("(?a)\\w", utf8 = true).contains(0xe9))
-    assert(!set("(?l)\\w", utf8 = true).contains(0xe9))
+    for switch <- Seq("\\x{100}?", "\\o{400}?", "\\p{L}?", "\\N{U+41}?", "\\N{LATIN SMALL LETTER A}?") do
+      assert(set(s"$switch\\w").contains(0xe9), switch)
+    assert(!set("\\xFF?\\w").contains(0xe9))
+    assert(!set("(?:(?u)a)?\\w").contains(0xe9))
+    assert(!set("\\x{100}?(?a)\\w").contains(0xe9))
+    assert(!set("\\x{100}?(?l)\\w").contains(0xe9))
     assertEquals(set("(?i)\\xC9"), CharSet.single(0xc9))
     assertEquals(set("(?iu)\\xC9"), CharSet.of(0xc9, 0xe9))
-    assertEquals(set("(?il)\\xC9", utf8 = true), CharSet.single(0xc9))
-  check("ss", "iu", Perl(Perl.Encoding.Bytes))(
+    assertEquals(set("\\x{100}?(?il)\\xC9"), CharSet.single(0xc9))
+  check("ss", "iu", Perl(utf8 = false))(
     Disjunction(Sequence(Chars(of("sS")), Chars(of("sS"))), Chars(CharSet.single(0xdf)))
   )
   // Python's bytes pattern is Latin-1.
@@ -232,7 +232,8 @@ class IRCharSuite extends munit.FunSuite:
   chars("µ", "i", DotNet, Java)(of("\u00b5"))
   chars("µ", "i", Perl(), Python(), Ruby())(of("\u00b5\u039c\u03bc"))
   chars("k", "ia", Python())(of("kK"))
-  chars("\\xe9", "i", Perl())(of("é"))
+  chars("\\xe9", "i", Perl(utf8 = false))(of("é"))
+  chars("\\xe9", "i", Perl())(of("éÉ"))
   chars("\\xb5", "i", Perl())(of("\u00b5\u039c\u03bc"))
   chars("é", "i", Perl())(of("éÉ"))
   chars("(?r)k", "iu", PCRE)(of("kK"))
@@ -245,8 +246,8 @@ class IRCharSuite extends munit.FunSuite:
   chars("(?aa)(?u)k", "i", Perl())(of("kK\u212a"))
   chars("(?aa)(?^i)k", "", Perl())(of("kK\u212a"))
   // `\N{U+...}` makes Perl's pattern use Unicode rules, as `\N{...}` does.
-  checkSet("[\\w\\N{U+41}]", "", Perl())(set => set.contains(0xe9))
-  checkSet("[\\w\\x{41}]", "", Perl())(set => !set.contains(0xe9))
+  checkSet("[\\w\\N{U+41}]", "", Perl(utf8 = false))(set => set.contains(0xe9))
+  checkSet("[\\w\\x{41}]", "", Perl(utf8 = false))(set => !set.contains(0xe9))
   chars("(*TURKISH_CASING)i", "iu", PCRE)(of("i\u0130"))
   // Ruby and Perl fold plain literals to several characters (e.g. `ß` and `ss`), longest first.
   // Unicode 18 adds a character folded to `ß`, so the sets come from the tables.
@@ -299,39 +300,24 @@ class IRCharSuite extends munit.FunSuite:
   chars("\\s", "", Java, PCRE, Ruby())(of(" \t\n\u000b\f\r"))
   checkSet("\\s", "", Python())(s => s.contains(0x1c) && s.contains(0x85) && !s.contains(0xfeff))
   checkSet("\\s", "", JavaScript)(s => s.contains(0xfeff) && !s.contains(0x85))
-  checkSet("\\s", "", Perl())(s => s.contains(0x2028) && !s.contains(0x85) && !s.contains(0xa0))
+  checkSet("\\s", "", Perl())(s => s.contains(0x2028) && s.contains(0x85) && s.contains(0xa0))
+  checkSet("\\s", "", Perl(utf8 = false))(s => !s.contains(0x85) && !s.contains(0xa0))
   checkSet("\\s", "u", Perl())(s => s.contains(0x85) && s.contains(0xa0))
   chars("\\w", "", JavaScript, Java, PCRE, Ruby())(IRCharClasses.AsciiWord)
   chars("\\w", "iu", JavaScript)(IRCharClasses.AsciiWord.union(of("\u017f\u212a")))
-  checkSet("\\w", "", Perl())(s => s.contains(0x100) && !s.contains(0xe9))
+  checkSet("\\w", "", Perl())(s => s.contains(0x100) && s.contains(0xe9))
+  checkSet("\\w", "", Perl(utf8 = false))(s => !s.contains(0xe9))
 
-  test("IRBuilder.build: Perl's /d follows whether the pattern string is UTF-8"):
+  test("IRBuilder.build: Perl's /d follows utf8"):
     def lastSet(s: String, dialect: Dialect): CharSet =
       strip(build(s, "", dialect).node.data) match
         case IRNodeData.Sequence(nodes) => setOf(nodes.last.data)
         case data                       => setOf(data)
-    val source = "\\U\u00df\\E\\w"
-    assert(!lastSet(source, Perl()).contains(0xe9))
-    assert(lastSet(source, Perl().withPerlUtf8Of(source)).contains(0xe9))
-    assert(lastSet("\u00e9\\w", Perl()).contains(0xe9))
-    assert(!lastSet("\u00e9\\w", Perl(utf8 = Some(false))).contains(0xe9))
-    assert(lastSet("\\x{100}\\w", Perl(utf8 = Some(false))).contains(0xe9))
-    assert(lastSet("a\\w", Perl(utf8 = Some(true))).contains(0xe9))
-    assertEquals(Perl(source = PerlSource.String).withPerlUtf8Of("\u00e9"), Perl(source = PerlSource.String))
-
-  test("IRBuilder.resolveDialect"):
-    def resolve(s: String, dialect: Dialect): Dialect =
-      IRBuilder.resolveDialect(Parser.parse(s, FlagSet.parse("", dialect), dialect), dialect)
-    val string = Perl(source = PerlSource.String)
-    assertEquals(resolve("a", string), string.copy(utf8 = Some(false)))
-    assertEquals(resolve("\u00e9", string), string.copy(utf8 = Some(true)))
-    assertEquals(resolve("\\x{100}", string), string.copy(utf8 = Some(true)))
-    assertEquals(resolve("\\p{L}", string), string.copy(utf8 = Some(true)))
-    assertEquals(resolve("\\N{U+DF}", string), string.copy(utf8 = Some(true)))
-    assertEquals(resolve("\\xe9", string), string.copy(utf8 = Some(false)))
-    assertEquals(resolve("\u00e9", Perl(Perl.Encoding.Bytes)), Perl(Perl.Encoding.Bytes, utf8 = Some(false)))
-    assertEquals(resolve("a", string.copy(utf8 = Some(true))), string.copy(utf8 = Some(true)))
-    assertEquals(resolve("\u00e9", Python()), Python())
+    assert(lastSet("a\\w", Perl()).contains(0xe9))
+    assert(lastSet("a\\w", Perl(source = PerlSource.String)).contains(0xe9))
+    assert(!lastSet("a\\w", Perl(utf8 = false)).contains(0xe9))
+    assert(!lastSet("\u00e9\\w", Perl(utf8 = false)).contains(0xe9))
+    assert(lastSet("\\x{100}\\w", Perl(utf8 = false)).contains(0xe9))
   checkSet("\\w", "", Python())(s => s.contains(0xe9) && s.contains(0xb2))
   checkSet("\\w", "U", Java)(s => s.contains(0xe9) && s.contains(0x200c))
   checkSet("(?u)\\w", "", Ruby())(s => s.contains(0xe9))

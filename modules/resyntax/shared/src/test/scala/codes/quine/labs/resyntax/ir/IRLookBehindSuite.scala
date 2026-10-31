@@ -2,6 +2,7 @@ package codes.quine.labs.resyntax.ir
 
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
+import codes.quine.labs.resyntax.ast.PerlSource
 
 /** IRLookBehindSuite is tests of look-behind restrictions, where each case is checked with the engines. */
 class IRLookBehindSuite extends IRSuiteBase:
@@ -56,6 +57,11 @@ class IRLookBehindSuite extends IRSuiteBase:
   error("(?<=a{300}|b)", "", Perl())("Look-behind longer than 255 at 0")
   error("(?<=(a)\\1)", "", Perl())("Look-behind longer than 255 at 0")
   error("(a)(?<=\\1)", "", Perl())("Look-behind longer than 255 at 3")
+  // Perl counts the folding on compiling the pattern, by whether the pattern itself is UTF-8 (checked against Perl 5.44).
+  valid("(?i)(?<=(?:\\xDF){255})", Perl(), Perl(utf8 = false))
+  error("(?i)(?<=(?:\\xDF){128})", "", Perl(source = PerlSource.String))("Look-behind longer than 255 at 4")
+  error("(?i)(?<=(?:\\xDF){128})é", "", Perl())("Look-behind longer than 255 at 4")
+  error("(?i)(?<=(?:\\xDF){128})\\x{100}", "", Perl(), Perl(utf8 = false))("Look-behind longer than 255 at 4")
   error("(?<=\\X)", "", Perl())("Look-behind longer than 255 at 0")
   error("(?<=(?<=a+)b)", "", Perl())("Look-behind longer than 255 at 4")
   error("(?(?<=a+)b|c)", "", Perl())("Look-behind longer than 255 at 0")
