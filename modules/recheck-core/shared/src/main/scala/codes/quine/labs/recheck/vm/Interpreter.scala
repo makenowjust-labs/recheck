@@ -52,11 +52,11 @@ object Interpreter:
       case _: Duration.Infinite   => run(program, input, pos, options)
       case d                      =>
         if (ctx.deadline ne null) && ctx.deadline.timeLeft < d then run(program, input, pos, options)
-        val newCtx = Context(d, Option(ctx.token))
-
-        val interpreter = new Interpreter(program, input, options)(using newCtx)
-        try interpreter.run(pos)
-        catch case _: TimeoutException => interpreter.result(Status.Timeout, None)
+        else
+          val newCtx = Context(d, Option(ctx.token))
+          val interpreter = new Interpreter(program, input, options)(using newCtx)
+          try interpreter.run(pos)
+          catch case _: TimeoutException => interpreter.result(Status.Timeout, None)
 
   /** Options is an options for running an interpreter. */
   final case class Options(
