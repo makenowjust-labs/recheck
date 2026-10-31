@@ -3,7 +3,9 @@ import type ESTree from "estree";
 import type { Parameters } from "../parameters";
 import type { CacheOptions } from "../utils/checker";
 
-import { parameterDefaults, parameterProperties } from "../parameters";
+import { defaults } from "recheck-parameters";
+
+import { parameterProperties } from "../parameters";
 import { createCachedCheck } from "../utils/checker";
 
 type Options = {
@@ -56,7 +58,7 @@ const rule: Rule.RuleModule = {
     const {
       ignoreErrors = true,
       permittableComplexities = [],
-      timeout = parameterDefaults.timeout,
+      timeout = defaults.timeout,
       cache = false,
       ...params
     } = options;
