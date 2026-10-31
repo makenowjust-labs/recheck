@@ -53,7 +53,7 @@ object IRBuilder:
     if dialect.isPython && mode == UnitMode.Byte && flagSet.unicode then
       throw new IRBuildingException("Cannot use UNICODE flag with a bytes pattern", SourceLocation.Invalid)
     if dialect.isPython then checkPythonGlobalFlags(node, flagSet)
-    val context = BuildingContext.from(flagSet, dialect, featureSet)
+    val context = BuildingContext(flagSet, dialect, featureSet)
     val table = CaptureAnalyzer.analyze(node, context)
     val resolver = new ReferenceResolver(table, dialect, featureSet)
     val perlUnicodeRules = dialect match
@@ -565,7 +565,8 @@ private[ir] class IRBuilder(
           case Seq(node) => Right(build(node))
           case nodes     => Left(IRNodeData.Disjunction(nodes.map(build)))
     case CommandKind.Comment(_)                   => Left(IRNodeData.Empty)
-    case CommandKind.StartOption(name, _)         => Left(buildStartOptionCommand(node, name))
+    // The start options are of the whole pattern, which `IRBuilder.build` reads.
+    case CommandKind.StartOption(_, _)            => Left(IRNodeData.Empty)
     case CommandKind.RCall                        => Left(IRNodeData.Unsupported(node.data))
     case CommandKind.IndexedCall(_)               => Left(IRNodeData.Unsupported(node.data))
     case CommandKind.RelativeCall(_)              => Left(IRNodeData.Unsupported(node.data))
@@ -581,9 +582,6 @@ private[ir] class IRBuilder(
     case CommandKind.AbsenceExpression(_, _)      => Left(IRNodeData.Unsupported(node.data))
     case CommandKind.AbsenceStopper(_)            => Left(IRNodeData.Unsupported(node.data))
     case CommandKind.AbsenceRangeClear            => Left(IRNodeData.Unsupported(node.data))
-
-  // The start options are of the whole pattern, which `IRBuilder.build` reads.
-  def buildStartOptionCommand(node: Node, name: String): IRNodeData = IRNodeData.Empty
 
   def buildConditional(node: Node, test: ConditionalTest, yes: Node, no: Option[Node]): Either[IRNodeData, IRNode] =
     def branch(node: Option[Node]): IRNode = node.fold(IRNode(IRNodeData.Empty))(n => scoped(build(n)))

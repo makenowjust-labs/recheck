@@ -63,7 +63,7 @@ private[ir] final class IRValidator(
       case NodeData.Backslash(BackslashKind.EscapeBackReference(_, ref)) =>
         backReferences(NodeKey(node)) = resolver.backReference(ref, table.siteOf(node), node.loc)
       case NodeData.Backslash(BackslashKind.EscapeCall(_, ref)) =>
-        resolver.call(ref, table.siteOf(node), node.loc, isCall = true)
+        resolver.escapeCall(ref, table.siteOf(node), node.loc)
       case NodeData.Backslash(BackslashKind.Assert(AssertKind.Cut)) =>
         if inLookAround && featureSet.rejectsCutInLookAround then
           throw new IRBuildingException("\\K is not allowed in a look-around", node.loc)

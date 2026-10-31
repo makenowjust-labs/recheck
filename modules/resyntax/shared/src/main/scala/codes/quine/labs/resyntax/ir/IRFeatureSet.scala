@@ -27,8 +27,6 @@ final case class IRFeatureSet(
     hasExclusiveCharsetFlag: Boolean,
     // .NET
     numbersNamedCaptureLast: Boolean,
-    // .NET
-    sharesIndexAmongSameNames: Boolean,
     // Ruby
     ignoresUnnamedCaptureWithNamedCapture: Boolean,
     // PCRE
@@ -146,8 +144,6 @@ object IRFeatureSet:
       hasExclusiveCharsetFlag = isPerl || isPython || isRuby,
       // .NET
       numbersNamedCaptureLast = isDotNet,
-      // .NET
-      sharesIndexAmongSameNames = isDotNet,
       // Ruby
       ignoresUnnamedCaptureWithNamedCapture = isRuby,
       // PCRE

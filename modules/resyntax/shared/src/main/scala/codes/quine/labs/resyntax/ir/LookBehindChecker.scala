@@ -33,10 +33,10 @@ private[ir] final class LookBehindChecker(
     table: CaptureTable,
     resolver: ReferenceResolver,
     featureSet: IRFeatureSet,
-    charWidth: Seq[Node] => Width = nodes => Width(nodes.size, nodes.size),
-    lastSupplementary: Int = -1,
-    minSubtract: Seq[Node] => Long = _ => 0,
-    rubyClassWidths: Node => Option[Seq[Int]] = _ => None
+    charWidth: Seq[Node] => Width,
+    lastSupplementary: Int,
+    minSubtract: Seq[Node] => Long,
+    rubyClassWidths: Node => Option[Seq[Int]]
 ):
 
   /** Checks the body of a look-behind, and throws an exception at the look-behind node if it is invalid. */

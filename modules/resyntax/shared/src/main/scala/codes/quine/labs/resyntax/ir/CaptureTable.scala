@@ -52,7 +52,7 @@ private[ir] final class CaptureTable(
     val names: Map[String, Seq[Int]],
     val groups: Map[Int, Seq[Node]],
     val inBranchReset: Set[Int],
-    charFlags: Map[NodeKey, IRCharFlags] = Map.empty
+    charFlags: Map[NodeKey, IRCharFlags]
 ):
 
   /** Returns the index of the capture group node, or `None` if the node does not capture. */

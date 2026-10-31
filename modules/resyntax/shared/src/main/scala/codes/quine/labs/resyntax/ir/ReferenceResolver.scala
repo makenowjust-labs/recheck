@@ -78,10 +78,10 @@ private[ir] final class ReferenceResolver(table: CaptureTable, dialect: Dialect,
       checkClosed(resolved, site, loc)
     else resolved
 
-  /** Resolves a call, where Ruby rejects a name shared by groups. */
-  def call(ref: Reference, site: ReferenceSite, loc: SourceLocation, isCall: Boolean): Seq[Int] =
+  /** Resolves a call by `\g<...>`, where Ruby rejects a name shared by groups. */
+  def escapeCall(ref: Reference, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
     val indices = call(ref, site, loc)
-    if isCall && featureSet.rejectsCallToSharedName && indices.size > 1 then
+    if featureSet.rejectsCallToSharedName && indices.size > 1 then
       fail("Call to a name shared by groups", loc)
     indices
 

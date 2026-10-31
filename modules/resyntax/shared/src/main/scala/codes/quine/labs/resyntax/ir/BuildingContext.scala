@@ -122,10 +122,6 @@ final case class BuildingContext(flagSet: FlagSet, dialect: Dialect, featureSet:
 
 object BuildingContext:
 
-  /** Returns the context of the start of a pattern. */
-  def from(flagSet: FlagSet, dialect: Dialect, featureSet: IRFeatureSet): BuildingContext =
-    BuildingContext(flagSet, dialect, featureSet)
-
   private def hasCharsetFlag(flagSet: FlagSet): Boolean =
     flagSet.ascii || flagSet.unicode || flagSet.localeLower || flagSet.localeUpper || flagSet.hasIndices
 
