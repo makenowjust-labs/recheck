@@ -87,14 +87,16 @@ enum Dialect:
     case _: Perl => true
     case _       => false
 
-  /** Returns the dialect with Perl's `utf8` decided from the source of a regex literal, unless it is already given.
+  /** Returns the dialect with Perl's `utf8` decided from the source of a regex literal of character strings, unless it
+    * is already given.
     *
     * With `use utf8`, a literal is UTF-8 if its source has a non-ASCII character, even if `\U` and the like turn it
     * into ASCII (e.g. `\Uß` becomes `SS`).
     */
   def withPerlUtf8Of(source: String): Dialect = this match
-    case perl @ Perl(_, PerlSource.Literal, None) => perl.copy(utf8 = Some(source.exists(_ >= 0x80)))
-    case dialect                                  => dialect
+    case perl @ Perl(Perl.Encoding.Characters, PerlSource.Literal, None) =>
+      perl.copy(utf8 = Some(source.exists(_ >= 0x80)))
+    case dialect => dialect
 
 object Dialect:
 

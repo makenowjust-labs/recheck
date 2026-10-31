@@ -151,7 +151,8 @@ class ReDoSDialectSuite extends munit.FunSuite:
     assertEquals(dialect("(\u00e9", Perl()), Perl(utf8 = Some(true)))
     assertEquals(dialect("(\u00e9", string), string.copy(utf8 = Some(true)))
     assertEquals(dialect("(\\x{100}", string), string.copy(utf8 = Some(false)))
-    assertEquals(dialect("(\u00e9", Perl(Perl.Encoding.Bytes)), Perl(Perl.Encoding.Bytes, utf8 = Some(true)))
+    assertEquals(dialect("(\u00e9", Perl(Perl.Encoding.Bytes)), Perl(Perl.Encoding.Bytes, utf8 = Some(false)))
+    assertEquals(dialect("^\u00e9$", Perl(Perl.Encoding.Bytes)), Perl(Perl.Encoding.Bytes, utf8 = Some(false)))
     assertEquals(
       dialect("(\u00e9", Perl(Perl.Encoding.Bytes, string.source)),
       string.copy(Perl.Encoding.Bytes, utf8 = Some(false))

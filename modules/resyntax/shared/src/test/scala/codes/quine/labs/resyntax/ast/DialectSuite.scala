@@ -38,4 +38,5 @@ class DialectSuite extends munit.FunSuite:
     assertEquals(Perl().withPerlUtf8Of("é"), Perl(utf8 = Some(true)))
     assertEquals(Perl(utf8 = Some(false)).withPerlUtf8Of("é"), Perl(utf8 = Some(false)))
     assertEquals(Perl(source = PerlSource.String).withPerlUtf8Of("é"), Perl(source = PerlSource.String))
+    assertEquals(Perl(Perl.Encoding.Bytes).withPerlUtf8Of("é"), Perl(Perl.Encoding.Bytes))
     assertEquals(Ruby().withPerlUtf8Of("é"), Ruby())

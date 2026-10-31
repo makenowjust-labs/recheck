@@ -60,10 +60,10 @@ object ReDoS:
 
   /** Returns the dialect of a diagnostics for the source that is not parsed.
     *
-    * Perl's `utf8` is decided from the source without the pattern: a regex literal is decided as on parsing (see
-    * [[Dialect.withPerlUtf8Of]]), a byte string is not UTF-8, and a string is UTF-8 if it has a non-ASCII character.
+    * Perl's `utf8` is decided from the source without the pattern: a byte string is not UTF-8, and the others are UTF-8
+    * if the source has a non-ASCII character (as [[Dialect.withPerlUtf8Of]] for a regex literal).
     */
-  def unparsedDialect(source: String, dialect: Dialect): Dialect = dialect.withPerlUtf8Of(source) match
+  def unparsedDialect(source: String, dialect: Dialect): Dialect = dialect match
     case perl @ Dialect.Perl(encoding, _, None) =>
       perl.copy(utf8 = Some(encoding != Dialect.Perl.Encoding.Bytes && source.exists(_ >= 0x80)))
     case dialect => dialect
