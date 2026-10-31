@@ -52,6 +52,7 @@ object IRBuilder:
       throw new IRBuildingException("Cannot use LOCALE flag with a str pattern", SourceLocation.Invalid)
     if dialect.isPython && mode == UnitMode.Byte && flagSet.unicode then
       throw new IRBuildingException("Cannot use UNICODE flag with a bytes pattern", SourceLocation.Invalid)
+    if dialect.isPython then checkPythonGlobalFlags(node, flagSet)
     val context = BuildingContext.from(flagSet, dialect, featureSet)
     val table = CaptureAnalyzer.analyze(node, context)
     val resolver = new ReferenceResolver(table, dialect, featureSet)
@@ -229,6 +230,18 @@ object IRBuilder:
                     case _ => single(1)
                 case _ => single(1)
       case _ => nodes => single(nodes.size)
+
+  /** Checks Python's flags with the global inline flags, which `re` checks together. */
+  private def checkPythonGlobalFlags(node: Node, flagSet: FlagSet): Unit =
+    def inline(node: Node): Seq[FlagSet] = node.data match
+      case NodeData.Command(CommandKind.InlineFlag(diff)) => Seq(diff.added)
+      case _                                              => NodeKey.children(node).flatMap(inline)
+    val flagSets = flagSet +: inline(node)
+    def has(p: FlagSet => Boolean): Boolean = flagSets.exists(p)
+    if has(_.ascii) && has(_.unicode) then
+      throw new IRBuildingException("ASCII and UNICODE flags are incompatible", SourceLocation.Invalid)
+    if has(_.ascii) && has(_.localeUpper) then
+      throw new IRBuildingException("ASCII and LOCALE flags are incompatible", SourceLocation.Invalid)
 
   /** The characters folded to several characters. */
   private lazy val multiFolded: CharSet = CharSet.union(FullCaseFolding.multiCodePointFoldings().values.toSeq)

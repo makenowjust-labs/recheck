@@ -138,6 +138,13 @@ class IRFlagSuite extends IRSuiteBase:
   checkFlags("(?L)a", "b", Python())(d => Seq(flagsOf(d, "b").copy(charset = IRCharset.Locale)))
   error("a", "L", Python())("Cannot use LOCALE flag with a str pattern")
   error("a", "u", Python(Python.Type.Bytes))("Cannot use UNICODE flag with a bytes pattern")
+  // `re` checks the flags with the global inline flags: `re.compile('(?a)x', re.U)` raises `ValueError`.
+  error("(?a)x", "u", Python())("ASCII and UNICODE flags are incompatible")
+  error("(?u)(?a)x", "", Python())("ASCII and UNICODE flags are incompatible")
+  error("(?L)x", "a", Python(Python.Type.Bytes))("ASCII and LOCALE flags are incompatible")
+  error("(?a)x", "L", Python(Python.Type.Bytes))("ASCII and LOCALE flags are incompatible")
+  // A scoped flag is not checked: `re.compile('(?a:x)', re.U)` is valid.
+  checkFlags("(?a:x)", "u", Python())(d => Seq(flagsOf(d, "u").copy(charset = IRCharset.Ascii.All)))
   // Ruby's character set options have no `Regexp` constant, and the last one wins: `/(?au)\w/` matches `é`.
   checkFlags("a", "au", Ruby())(d => Seq(flagsOf(d).copy(charset = IRCharset.Unicode)))
   checkFlags("(?au)a(?ud)b", "", Ruby())(d => Seq(flagsOf(d).copy(charset = IRCharset.Unicode), flagsOf(d)))
