@@ -7,7 +7,7 @@ Describes how `recheck` checks a regular expression of the `dotnet` dialect.
 
 ## Engine
 
-`recheck` follows .NET 10's `System.Text.RegularExpressions.Regex`.
+`recheck` follows the syntax and the semantics of .NET 10's `System.Text.RegularExpressions.Regex`.
 
 ## Settings
 
@@ -39,7 +39,7 @@ The `RegexOptions` that `recheck` does not take:
 - `ECMAScript`: not supported.
 - `NonBacktracking`: not supported (the engine does not backtrack, and it matches in linear time in the length of the input).
 
-## Syntax
+## Syntax Limitations
 
 The following constructs are not supported, and they are reported as `unsupported`.
 
@@ -48,11 +48,7 @@ The following constructs are not supported, and they are reported as `unsupporte
 
 ## Approximations
 
-- .NET 10 finishes `^(a|a)*$` against `'a'.repeat(n) + '!'` in less than 1 ms even for `n = 28`, and `recheck` does not model the optimizations making it fast.
-- A look-behind matches backward from the position.
-- An iteration matching the empty string ends the repetition when it is the last mandatory one or an optional one (e.g. `^(?:()|a){2}\1$` sets the group `1` at the start of `a` in .NET and Python, but at the end in Java and Perl).
-- The captures in a negative look-around condition are restored after it.
-- .NET does not capture the first unnamed group after a conditional with a look-around (e.g. `(?(?=(a))a)(b)` captures `b` as the group `1`, and the group `2` is never set), as its parser does.
+- .NET has optimizations that `recheck` does not model, so an attack that `recheck` reports may not work on .NET, and the recall validation checks whether it does.
 
 ## Recall Validation
 

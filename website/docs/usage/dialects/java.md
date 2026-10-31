@@ -7,7 +7,7 @@ Describes how `recheck` checks a regular expression of the `java` dialect.
 
 ## Engine
 
-`recheck` follows Java 25's `java.util.regex.Pattern`.
+`recheck` follows the syntax and the semantics of Java 25's `java.util.regex.Pattern`.
 
 ## Settings
 
@@ -21,35 +21,28 @@ The `java` dialect has no settings.
 
 The flags are the letters of the inline flags of `java.util.regex`.
 
-| Flag | `Pattern` flag            | Inline | Notes                                                  |
-| ---- | ------------------------- | ------ | ------------------------------------------------------ |
-| `c`  | `CANON_EQ`                | `(?c)` | Not supported (see [Syntax](#syntax)).                 |
-| `d`  | `UNIX_LINES`              | `(?d)` | Only `\n` is a line terminator for `.`, `^` and `$`.   |
-| `i`  | `CASE_INSENSITIVE`        | `(?i)` | Only between ASCII characters, unless with `u` or `U`. |
-| `m`  | `MULTILINE`               | `(?m)` |                                                        |
-| `s`  | `DOTALL`                  | `(?s)` |                                                        |
-| `u`  | `UNICODE_CASE`            | `(?u)` |                                                        |
-| `x`  | `COMMENTS`                | `(?x)` |                                                        |
-| `U`  | `UNICODE_CHARACTER_CLASS` | `(?U)` | It implies `UNICODE_CASE`.                             |
+| Flag | `Pattern` flag            | Inline | Notes                                                          |
+| ---- | ------------------------- | ------ | -------------------------------------------------------------- |
+| `c`  | `CANON_EQ`                | `(?c)` | Not supported (see [Syntax Limitations](#syntax-limitations)). |
+| `d`  | `UNIX_LINES`              | `(?d)` | Only `\n` is a line terminator for `.`, `^` and `$`.           |
+| `i`  | `CASE_INSENSITIVE`        | `(?i)` | Only between ASCII characters, unless with `u` or `U`.         |
+| `m`  | `MULTILINE`               | `(?m)` |                                                                |
+| `s`  | `DOTALL`                  | `(?s)` |                                                                |
+| `u`  | `UNICODE_CASE`            | `(?u)` |                                                                |
+| `x`  | `COMMENTS`                | `(?x)` |                                                                |
+| `U`  | `UNICODE_CHARACTER_CLASS` | `(?U)` | It implies `UNICODE_CASE`.                                     |
 
 The `Pattern` flags that `recheck` does not take:
 
 - `LITERAL`: not supported (it has no inline flag); `Pattern.quote` makes a pattern matching the same strings.
 
-## Syntax
+## Syntax Limitations
 
 The canonical equivalence (`(?c)`) is not supported, and it is reported as `unsupported`.
 
 ## Approximations
 
-- Java's optimizations of loops make some vulnerable patterns fast, and `recheck` does not model them.
-  Java 25 finishes `^(a|a)*$` against `'a'.repeat(n) + '!'` in less than 1 ms even for `n = 28`.
-- A look-behind matches forward from a start before the position, and the match must end at the position.
-  Java tries the starts from the nearest by the lengths that its `TreeInfo` computes, in UTF-16 code units, or in code points when the pattern has a supplementary character after the look-behind.
-- A look-behind with `\X` matches nowhere if its `TreeInfo` lengths leave no start to try (e.g. `(?<=\X)`).
-- Java does not restore the captures in an atomic group, a look-around or a repeated group without branches (e.g. `(?:(b)c)*`) once it matches, even when it backtracks to a later starting position (e.g. `(?:(a)b)+x|b\1` matches `ba` in `aba`), and it matches each iteration of such a group, or of `\R` under a quantifier, in its first way.
-- An optional iteration matching the empty string is rejected in a repetition of a single node or of a group without branches.
-  A repetition of a group with branches ends with any iteration matching the empty string, even before the minimum count (e.g. `^(?:()|a){2}\1$` sets the group `1` at the end of `a` in Java and Perl, but at the start in Python and .NET).
+- Java has optimizations of loops that `recheck` does not model, so an attack that `recheck` reports may not work on Java, and the recall validation checks whether it does.
 
 ## Recall Validation
 

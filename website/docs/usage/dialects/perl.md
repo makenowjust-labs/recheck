@@ -7,7 +7,7 @@ Describes how `recheck` checks a regular expression of the `perl` dialect.
 
 ## Engine
 
-`recheck` follows Perl 5.44's regular expressions.
+`recheck` follows the syntax and the semantics of Perl 5.44's regular expressions.
 
 ## Settings
 
@@ -66,13 +66,7 @@ The flags are the modifiers of `m//`, `qr//` and `s///`, and `recheck` takes all
 
 As in Perl, only one of `a` (or `aa`), `d`, `l` and `u` can be given.
 
-## Syntax
-
-- `\p{...}` has the enumerated properties of the Unicode data, such as `Line_Break`, `East_Asian_Width`, `Grapheme_Cluster_Break`, `Word_Break`, `Canonical_Combining_Class` (also by numbers, e.g. `\p{Ccc=230}`) and `Identifier_Type`.
-- `\p{Numeric_Value=...}` takes a value as Perl does.
-  A fraction is reduced (e.g. `2/4` is `1/2`), and a fraction of an integer value is an error (e.g. `6/2`).
-  A decimal number (also with a sign, an exponent or `_`, e.g. `-0.5`, `5e-1` and `1_000`) matches an integer value exactly (e.g. `3.0`, but `3.00001` is an error), and a fraction when both are rounded to 4 significant digits (e.g. `0.3333` and `0.33334` are `1/3`, but `0.333` and `0.3334` are errors).
-- A look-behind counts the folding of a character under `i` by whether the pattern itself is UTF-8 on compiling: a `string` pattern with `utf8`, a `literal` pattern having a non-ASCII character with `utf8`, or a pattern switching to the Unicode rules (e.g. `(?i)(?<=(?:\xDF){255})` is valid in an ASCII literal).
+## Syntax Limitations
 
 The following constructs are not supported.
 
@@ -81,26 +75,13 @@ The following constructs are not supported.
 
 ## Approximations
 
-- Perl's caches of the super-linear matching make some vulnerable patterns fast, and `recheck` does not model them.
-  Perl 5.44 finishes `^(a|a)*$` against `'a'.repeat(n) + '!'` in less than 1 ms even for `n = 28`.
-- Case-insensitive matching uses the simple case folding, and Perl also matches a character against its folding to several characters (e.g. `ß` against `ss`).
-  `recheck` handles it for a run of plain literals (e.g. `ß` matches `ss`, and `ss` matches `ß`) and for a character class.
-  A class matches a character, an escape or a range of one character folded to several characters only as its folding, which it tries first, the longest first, and then the other characters (e.g. `[ßx]` is `ss|[x]`, and `[ßẞ]` is `ss|ss`, so `[ßẞ]*` is ambiguous).
-  It does not fold a character of a range, a POSIX class or a property so (e.g. `[\xC0-\xFF]` does not match `ss`), nor does a negated class (e.g. `[^x]` does not match `ss`).
-  Perl does not fold a character so under `/d` against a native string, under `l` for a Latin-1 character or a folding with ASCII characters, or under `aa` for a folding with ASCII characters (e.g. `(?aa)[ßx]` does not match `ss`).
-- Whether several nodes together match a character folded to several characters depends on how Perl joins the nodes into a string on compiling, and `recheck` does not reproduce it.
+- Perl has caches of the super-linear matching that `recheck` does not model, so an attack that `recheck` reports may not work on Perl, and the recall validation checks whether it does.
+- Under `i`, Perl matches a character against its folding to several characters (e.g. `ß` against `ss`).
+  Whether several nodes together match such a character depends on how Perl joins the nodes into a string on compiling, and `recheck` does not reproduce it.
   A class of one character or of a character and its case variants, a non-capturing group and an escape join (e.g. `s[s]`, `[sS]s`, `(?:s)s` and `\x73s` match `ß`), and so does an escape alone (e.g. `\xDF` matches `ss`).
   A quantifier and a capturing group do not join (e.g. `s{2}`, `[s]{2}`, `s?s` and `(s)s` do not match `ß`).
-- A look-behind matches forward from a start before the position, and the match must end at the position (or at `(*ACCEPT)`).
-  Perl tries the starts from the farthest (e.g. `(?<=(a)|(aa))b` sets the group `2` on `aab` in Perl, but the group `1` in PCRE and Ruby).
-- A back-reference sees the captures as Perl keeps them over the iterations of a loop: Perl unsets the captures of a failed alternative and of a fixed-length repetition matching nothing (e.g. `^(?:(a)?b){2}\1$` does not match `abba` in Perl).
-- An iteration matching the empty string ends the repetition when it is the last mandatory one or an optional one (e.g. `^(?:()|a){2}\1$` sets the group `1` at the end of `a` in Perl and Java, but at the start in Python and .NET).
 - Perl backs off one character at a time from `\R` under a simple quantifier, which can split `\r\n` (e.g. `^\R?\n$` matches `"\r\n"` in Perl, but not in PCRE or Ruby), and `recheck` does not reproduce it.
-- The backtracking control verbs follow the PCRE2 documentation: `(*FAIL)` never matches, `(*ACCEPT)` ends the match (or the assertion), and `(*COMMIT)`, `(*PRUNE)`, `(*SKIP)`, `(*SKIP:NAME)` and `(*THEN)` cut the backtracking when it reaches them.
-  They can make a vulnerable pattern safe (e.g. `^(?:a|a)*(*COMMIT)$`), and the fuzz checker runs them.
-- `(*ACCEPT)` in an atomic group or a possessive repetition ends only the group, and `(*THEN)` goes beyond a look-around assertion to the enclosing alternation, as Perl does.
-- Perl compiles consecutive alternatives starting with a literal into a trie, and `(*THEN)` in one of them goes to the alternative after the trie (e.g. `aa(*THEN)b|a` matches `a` at `1` in `aac`, and at `0` in PCRE2), which `recheck` reproduces.
-- Perl skips the attempts that cannot match by its start-of-match optimizations, and `recheck` does not model them, as it does not model the other optimizations.
+- Perl skips the attempts that cannot match by its start-of-match optimizations, and `recheck` does not model them.
 
 ## Recall Validation
 
