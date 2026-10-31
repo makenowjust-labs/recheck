@@ -174,6 +174,38 @@ object PatternExtensions:
           case Assert(IRAssertKind.ChompTextEnd(t)) => t
         .distinct
 
+    /** Returns the text end assertions before a final line terminator (e.g. Python's `$`) not at an end point. */
+    def chompTextEndsInMiddle: Seq[IRNode] =
+      def loop(isEnd: Boolean, node: IRNode): Seq[IRNode] =
+        node.data match
+          case Disjunction(ns)  => ns.flatMap(loop(isEnd, _))
+          case Sequence(ns)     => ns.zipWithIndex.flatMap((n, i) => loop(isEnd && i == ns.size - 1, n))
+          case Capture(_, _, n) => loop(isEnd, n)
+          case Atomic(n)        => loop(isEnd, n)
+          case Assert(_: IRAssertKind.ChompTextEnd) => if isEnd then Seq.empty else Seq(node)
+          case _                                    => node.children.flatMap(loop(false, _))
+      loop(true, pattern.node)
+
+    /** Returns the distinct line terminators that the character kinds tell, which are of the line assertions and the
+      * text end assertions in the middle.
+      */
+    def kindLineTerminators: Seq[IRLineTerminators] =
+      val chomps = chompTextEndsInMiddle.collect { case IRNode(Assert(IRAssertKind.ChompTextEnd(t)), _) => t }
+      (pattern.node.collect {
+        case Assert(IRAssertKind.LineBegin(t, _)) => t
+        case Assert(IRAssertKind.LineEnd(t))      => t
+      } ++ chomps).distinct
+
+    /** Tests whether the character kinds tell `\r` and `\n`, for an assertion seeing `\r\n` as one line terminator. */
+    def needsCRLFDistinction: Boolean =
+      lineTerminators.exists(_.crlf == IRLineTerminators.CRLF.Atomic) ||
+        kindLineTerminators.exists(t =>
+          t.crlf != IRLineTerminators.CRLF.Ignored && !(t.chars(0x0a) && t.chars(0x0d))
+        ) ||
+        chompTextEndsInMiddle.exists:
+          case IRNode(Assert(IRAssertKind.ChompTextEnd(t)), _) => t.crlf != IRLineTerminators.CRLF.Ignored
+          case _                                               => false
+
     /** Returns the distinct word sets of the word boundary assertions. */
     def wordSets: Seq[CharSet] =
       pattern.node
@@ -210,14 +242,20 @@ object PatternExtensions:
           if t.crlf == IRLineTerminators.CRLF.Ignored then Seq(chars)
           else Seq(chars, CharSet.of(0x0d), CharSet.of(0x0a))
         val words = wordSets
-        val lineTerminator = Option
-          .when(needsLineTerminatorDistinction && terminators.size == 1)(CharSet.of(terminators.head.chars.toSeq*))
-          .filter(_.nonEmpty)
-        val word = Option.when(words.size == 1)(words.head)
-        val extra = terminatorSets.filterNot(lineTerminator.contains) ++ (if words.size >= 2 then words else Seq.empty)
+        val kinds = kindLineTerminators.map(t => CharSet.of(t.chars.toSeq*))
+        val lineTerminator = kinds.headOption.filter(_.nonEmpty)
+        val extra = terminatorSets.filterNot(kinds.contains)
 
-        val crlf = terminators.size == 1 && terminators.head.crlf == IRLineTerminators.CRLF.Atomic
-        PatternAlphabet.build(pattern.ir.mode, loop(pattern.node) ++ extra, lineTerminator, word, preferredChars, crlf)
+        PatternAlphabet.build(
+          pattern.ir.mode,
+          loop(pattern.node) ++ extra,
+          lineTerminator,
+          words.headOption,
+          preferredChars,
+          needsCRLFDistinction,
+          kinds.drop(1),
+          words.drop(1)
+        )
 
     /** Tests whether the pattern needs line terminator distinction or not. */
     def needsLineTerminatorDistinction(using ctx: Context): Boolean = ctx.interrupt:

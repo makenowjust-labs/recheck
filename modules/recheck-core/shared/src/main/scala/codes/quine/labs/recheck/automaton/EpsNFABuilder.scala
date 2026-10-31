@@ -15,6 +15,7 @@ import codes.quine.labs.recheck.regexp.PatternExtensions.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRAssertKind
+import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminators
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
@@ -79,8 +80,6 @@ private class EpsNFABuilder(
 
   /** Builds EpsNFA for the pattern. */
   def build(): EpsNFA[Int] =
-    checkAssertions()
-
     val (i0, a0) = buildNode(pattern.node)
 
     val init = if pattern.needsSigmaStarAtBegin then
@@ -110,40 +109,6 @@ private class EpsNFABuilder(
     else a0
 
     EpsNFA(alphabet, stateSet(), init, accept, tau.result())
-
-  /** Checks that the assertions of the pattern fit the character kinds of the ε-NFA.
-    *
-    * The ε-NFA has one set of line terminators and one set of word characters.
-    */
-  private def checkAssertions(): Unit =
-    val kinds = pattern.node.collect { case IRNodeData.Assert(kind) => kind }
-    if pattern.lineTerminators.size >= 2 then
-      throw new UnsupportedException("line assertions with different line terminators")
-    val terminators = kinds.collect {
-      case IRAssertKind.LineBegin(t, _) => t
-      case IRAssertKind.LineEnd(t)      => t
-    }.distinct
-    for t <- terminators do
-      if t.crlf == IRLineTerminators.CRLF.Sequence && !(t.chars.contains(0x0a) && t.chars.contains(0x0d)) then
-        throw new UnsupportedException("line assertion with the CRLF line terminator")
-    val words = pattern.wordSets
-    if words.size >= 2 then throw new UnsupportedException("word boundary assertions with different word characters")
-    for w <- words; t <- terminators if t.chars.exists(w.contains) do
-      throw new UnsupportedException("word boundary assertion with line terminator word characters")
-    if existsChompTextEndInMiddle then throw new UnsupportedException("end assertion in the middle")
-
-  /** Tests whether a text end assertion before a final line terminator (e.g. Python's `$`) is not at an end point. */
-  private def existsChompTextEndInMiddle: Boolean =
-    def loop(isEnd: Boolean, node: IRNode): Boolean = ctx.interrupt:
-      node.data match
-        case IRNodeData.Disjunction(ns) => ns.exists(loop(isEnd, _))
-        case IRNodeData.Sequence(ns)    =>
-          ns.zipWithIndex.exists((n, i) => loop(isEnd && i == ns.size - 1, n))
-        case IRNodeData.Capture(_, _, n)                     => loop(isEnd, n)
-        case IRNodeData.Atomic(n)                            => loop(isEnd, n)
-        case IRNodeData.Assert(_: IRAssertKind.ChompTextEnd) => !isEnd
-        case _                                               => node.children.exists(loop(false, _))
-    loop(true, pattern.node)
 
   /** Returns the pairs of the set. */
   private def refine(set: CharSet): Set[(CharSet, CharKind)] =
@@ -187,7 +152,7 @@ private class EpsNFABuilder(
       case IRNodeData.Empty            => buildSequence(Seq.empty)
       case IRNodeData.Capture(_, _, n) => buildNode(n)
       case IRNodeData.Repeat(n, q)     => buildRepeat(n, q)
-      case IRNodeData.Assert(kind)     => buildAssert(kind)
+      case IRNodeData.Assert(kind)     => buildAssert(node, kind)
       case IRNodeData.Chars(set)       => consume(refine(set), Location.from(node.loc))
       case IRNodeData.Strings(set)     =>
         val loc = Location.from(node.loc)
@@ -270,27 +235,49 @@ private class EpsNFABuilder(
     emit(i -> Eps(t))
     (i, a)
 
+  /** The line terminator sets that the character kinds tell, in the order of the bits. */
+  private val kindLineTerminators = pattern.kindLineTerminators
+
+  /** The word sets that the character kinds tell, in the order of the bits. */
+  private val wordSets = pattern.wordSets
+
+  /** The text end assertions before a final line terminator that are not at an end point. */
+  private val chompTextEndsInMiddle = pattern.chompTextEndsInMiddle.toSet
+
   /** Builds EpsNFA transitions for an assertion. */
-  private def buildAssert(kind: IRAssertKind): (Int, Int) =
+  private def buildAssert(node: IRNode, kind: IRAssertKind): (Int, Int) =
     def atomic(t: IRLineTerminators): Boolean = t.crlf == IRLineTerminators.CRLF.Atomic
+    def plain(t: IRLineTerminators): Boolean = t.crlf == IRLineTerminators.CRLF.Ignored
     def boundary(kind: AssertKind): (Int, Int) = if needsInputTerminatorDistinction then assert(kind) else epsilon()
     kind match
-      case IRAssertKind.WordBoundary(_)     => assert(AssertKind.WordBoundary)
-      case IRAssertKind.NotWordBoundary(_)  => assert(AssertKind.WordBoundaryNot)
-      case IRAssertKind.LineBegin(t, atEnd) => assert(AssertKind.LineBegin(atEnd, atomic(t)))
-      case IRAssertKind.LineEnd(t)          => assert(AssertKind.LineEnd(atomic(t)))
-      case IRAssertKind.TextBegin           => boundary(AssertKind.TextBegin)
-      case IRAssertKind.TextEnd             => boundary(AssertKind.TextEnd)
-      case IRAssertKind.ChompTextEnd(t)     =>
+      case IRAssertKind.WordBoundary(w) =>
+        val i = wordSets.indexOf(w)
+        assert(if i == 0 then AssertKind.WordBoundary else AssertKind.WordBoundaryOf(i))
+      case IRAssertKind.NotWordBoundary(w) =>
+        val i = wordSets.indexOf(w)
+        assert(if i == 0 then AssertKind.WordBoundaryNot else AssertKind.WordBoundaryNotOf(i))
+      case IRAssertKind.LineBegin(t, atEnd) =>
+        val i = kindLineTerminators.indexOf(t)
+        if i == 0 && plain(t) && atEnd == IRLineBeginAtEnd.AfterTerminator then assert(AssertKind.LineBegin)
+        else assert(AssertKind.LineBeginOf(i, atEnd, !plain(t) && !t.chars(0x0a), atomic(t)))
+      case IRAssertKind.LineEnd(t) =>
+        val i = kindLineTerminators.indexOf(t)
+        if i == 0 && plain(t) then assert(AssertKind.LineEnd)
+        else assert(AssertKind.LineEndOf(i, !plain(t) && !t.chars(0x0d), atomic(t)))
+      case IRAssertKind.TextBegin                                               => boundary(AssertKind.InputBegin)
+      case IRAssertKind.TextEnd                                                 => boundary(AssertKind.InputEnd)
+      case IRAssertKind.ChompTextEnd(t) if chompTextEndsInMiddle.contains(node) =>
+        assert(AssertKind.ChompEnd(kindLineTerminators.indexOf(t), !plain(t), atomic(t)))
+      case IRAssertKind.ChompTextEnd(t) =>
         // At an end point, it is the end after an optional line terminator.
         val chars = CharSet.of(t.chars.toSeq*)
         val single = Option.when(chars.nonEmpty)(() => consume(refine(chars), None))
-        val crlf = Option.when(t.crlf != IRLineTerminators.CRLF.Ignored): () =>
+        val crlf = Option.when(!plain(t)): () =>
           buildSequence(
             Seq(() => consume(refine(CharSet.single(0x0d)), None), () => consume(refine(CharSet.single(0x0a)), None))
           )
         val terminator = buildChoice(Seq(() => epsilon()) ++ single ++ crlf)
-        val end = boundary(AssertKind.TextEnd)
+        val end = boundary(AssertKind.InputEnd)
         emit(terminator._2 -> Eps(Vector(end._1)))
         if atomic(t) then
           val guard = assert(AssertKind.NotBetweenCRLF)

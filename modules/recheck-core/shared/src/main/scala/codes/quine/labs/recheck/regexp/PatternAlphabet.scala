@@ -1,5 +1,7 @@
 package codes.quine.labs.recheck.regexp
 
+import scala.util.hashing.MurmurHash3
+
 import codes.quine.labs.recheck.regexp.PatternAlphabet.*
 import codes.quine.labs.resyntax.charset.Alphabet
 import codes.quine.labs.resyntax.charset.CharSet
@@ -38,8 +40,9 @@ object PatternAlphabet:
 
   /** Builds the coarsest alphabet of all characters of the mode such that each set is a union of atoms.
     *
-    * An atom in `lineTerminator` (resp. `word`) has the kind [[CharKind.LineTerminator]] (resp. [[CharKind.Word]]).
-    * With `crlf`, `\r` and `\n` are atoms of the kinds [[CharKind.CarriageReturn]] and [[CharKind.LineFeed]].
+    * The kind of an atom tells which word sets (`word` first, then `moreWords`) and which line terminator sets
+    * (`lineTerminator` first, then `moreLineTerminators`) have it, and, with `crlf`, whether it is `\r` or `\n`, which
+    * are then atoms by themselves.
     *
     * An atom is narrowed to its characters in `preferred` if any, so that its first character, which stands for the
     * atom in generated strings, is a preferred one (e.g. a canonical character of JavaScript's ignore-case matching).
@@ -54,10 +57,14 @@ object PatternAlphabet:
       lineTerminator: Option[CharSet] = None,
       word: Option[CharSet] = None,
       preferred: Option[CharSet] = None,
-      crlf: Boolean = false
+      crlf: Boolean = false,
+      moreLineTerminators: Seq[CharSet] = Seq.empty,
+      moreWords: Seq[CharSet] = Seq.empty
   ): PatternAlphabet =
     val crlfSets = if crlf then Seq(CharSet.single(0x0d), CharSet.single(0x0a)) else Seq.empty
-    val all = ((mode.universe +: lineTerminator.toSeq) ++ word ++ (sets ++ crlfSets).distinct)
+    val terminators = lineTerminator.toSeq ++ moreLineTerminators
+    val words = word.toSeq ++ moreWords
+    val all = ((mode.universe +: terminators) ++ words ++ (sets ++ crlfSets).distinct)
       .map(_.restrict(mode))
       .filter(_.nonEmpty)
       .toIndexedSeq
@@ -66,6 +73,9 @@ object PatternAlphabet:
     def order(c: CharSet): Seq[Int] =
       val first = all.indexWhere(_.contains(c.head))
       first +: all.drop(first + 1).map(s => if s.contains(c.head) then 0 else 1)
+    // The bits are of the sets as given, even if `lineTerminator` (resp. `word`) is `None`.
+    def mask(first: Option[CharSet], more: Seq[CharSet], c: Int): Int =
+      (first +: more.map(Some(_))).zipWithIndex.collect { case (Some(t), i) if t.contains(c) => 1 << i }.sum
     val pairs = Alphabet
       .refine(mode, all)
       .atoms
@@ -73,35 +83,107 @@ object PatternAlphabet:
       .map(c => (c, order(c)))
       .sortBy(_._2)(using Ordering.Implicits.seqOrdering)
       .map: (c, _) =>
-        val kind =
-          if crlf && c.head == 0x0d then CharKind.CarriageReturn
-          else if crlf && c.head == 0x0a then CharKind.LineFeed
-          else if lineTerminator.exists(_.contains(c.head)) then CharKind.LineTerminator
-          else if word.exists(_.contains(c.head)) then CharKind.Word
-          else CharKind.Normal
+        val kind = CharKind(
+          words = mask(word, moreWords, c.head),
+          terminators = mask(lineTerminator, moreLineTerminators, c.head),
+          cr = crlf && c.head == 0x0d,
+          lf = crlf && c.head == 0x0a
+        )
         (c, kind)
     PatternAlphabet(pairs)
 
-  /** CharKind is a minimum character information for assertion check. */
-  enum CharKind:
+  /** CharKind is a minimum character information for assertion check.
+    *
+    * The last three are guesses on the context, which the automaton checks with the next (resp. previous) kind.
+    *
+    * @param words
+    *   the bits of the word sets having the character
+    * @param terminators
+    *   the bits of the line terminator sets having the character
+    * @param cr
+    *   whether it is `\r`, which is distinguished for `\r\n`
+    * @param lf
+    *   whether it is `\n`, which is distinguished for `\r\n`
+    * @param boundary
+    *   whether it is the begin or the end of the input instead of a character
+    * @param last
+    *   whether the character is the last of the input
+    * @param afterCR
+    *   whether `\r` precedes the `\n`
+    * @param follow
+    *   what follows the `\r`
+    */
+  final case class CharKind(
+      words: Int = 0,
+      terminators: Int = 0,
+      cr: Boolean = false,
+      lf: Boolean = false,
+      boundary: Boolean = false,
+      last: Option[Boolean] = None,
+      afterCR: Option[Boolean] = None,
+      follow: Option[CRFollow] = None
+  ):
+
+    /** Checks whether it is a character of the first word set. */
+    def word: Boolean = isWordOf(0)
+
+    /** Checks whether it is a character of the `i`-th word set. */
+    def isWordOf(i: Int): Boolean = (words & (1 << i)) != 0
+
+    /** Checks whether it is a character of a line terminator set. */
+    def isLineTerminator: Boolean = terminators != 0
+
+    /** Checks whether it is a character of the `i`-th line terminator set. */
+    def isLineTerminatorOf(i: Int): Boolean = (terminators & (1 << i)) != 0
+
+    // The named kinds hash by their names, as the enum values did, which keeps the orders of the automaton's states.
+    override def hashCode: Int = this match
+      case CharKind.Normal | CharKind.LineTerminator | CharKind.Word | CharKind.Boundary => toString.hashCode
+      case _ => MurmurHash3.productHash(this)
+
+    override def toString: String = this match
+      case CharKind.Normal         => "Normal"
+      case CharKind.LineTerminator => "LineTerminator"
+      case CharKind.Word           => "Word"
+      case CharKind.Boundary       => "Boundary"
+      case _                       =>
+        val flags = Seq(
+          Option.when(words != 0)(s"words=$words"),
+          Option.when(terminators != 0)(s"terminators=$terminators"),
+          Option.when(cr)("cr"),
+          Option.when(lf)("lf"),
+          Option.when(boundary)("boundary"),
+          last.map(l => s"last=$l"),
+          afterCR.map(a => s"afterCR=$a"),
+          follow.map(f => s"follow=$f")
+        ).flatten
+        flags.mkString("CharKind(", ",", ")")
+
+  object CharKind:
 
     /** A character kind for normal character. */
-    case Normal
+    val Normal: CharKind = CharKind()
 
-    /** A character kind for line terminator character. */
-    case LineTerminator
+    /** A character kind for line terminator character (of the first set). */
+    val LineTerminator: CharKind = CharKind(terminators = 1)
 
     /** A character kind for word character. */
-    case Word
-
-    /** A character kind for `\r`, a line terminator that makes `\r\n` one line terminator. */
-    case CarriageReturn
-
-    /** A character kind for `\n`, a line terminator that makes `\r\n` one line terminator. */
-    case LineFeed
+    val Word: CharKind = CharKind(words = 1)
 
     /** The kind of the begin and the end of the input, where there is no character. */
-    case Boundary
+    val Boundary: CharKind = CharKind(boundary = true)
 
-    /** Checks whether the kind is of a line terminator. */
-    def isLineTerminator: Boolean = this == LineTerminator || this == CarriageReturn || this == LineFeed
+    /** The basic kinds, which the original assertions tell about. */
+    val basic: Seq[CharKind] = Seq(Normal, LineTerminator, Word)
+
+  /** CRFollow is what follows `\r`. */
+  enum CRFollow:
+
+    /** Neither `\n` nor the end. */
+    case Other
+
+    /** `\n` that is not the last character. */
+    case LF
+
+    /** `\n` that is the last character. */
+    case FinalLF

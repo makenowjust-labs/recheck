@@ -14,6 +14,7 @@ import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 
 class EpsNFABuilderSuite extends munit.FunSuite:
 
@@ -253,20 +254,30 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     // Java's `$` before a final line terminator is guarded against the position between `\r` and `\n`.
     val java = build("^a$", "", Dialect.Java).get
     assert(java.tau.values.exists { case Assert(k, _) => k == AssertKind.NotBetweenCRLF; case _ => false })
-    assert(build("a\\Z|b", "", Dialect.Python).isSuccess)
-    // Line assertions are supported with one set of line terminators.
-    assert(build("^a$", "", Dialect.Ruby).isSuccess)
-    assert(build("^a$", "m", Dialect.Java).isSuccess)
-    interceptMessage[UnsupportedException]("end assertion in the middle")(build("a$\\n", "", Dialect.Python).get)
-    assert(build("\\A^a", "", Dialect.Ruby).isSuccess)
-    interceptMessage[UnsupportedException]("line assertions with different line terminators")(
-      build("^a(?d:^)", "m", Dialect.Java).get
+    // Each line, text and word boundary assertion has its kind.
+    def kinds(source: String, flags: String, dialect: Dialect): Set[AssertKind] =
+      build(source, flags, dialect).get.tau.values.collect { case Assert(k, _) => k }.toSet
+    import IRLineBeginAtEnd.*
+    assertEquals(kinds("^a$", "m", Dialect.JavaScript), Set[AssertKind](AssertKind.LineBegin, AssertKind.LineEnd))
+    assertEquals(
+      kinds("^a$", "", Dialect.Ruby),
+      Set[AssertKind](AssertKind.LineBeginOf(0, InputBegin, false, false), AssertKind.LineEnd)
     )
-    interceptMessage[UnsupportedException]("line assertion with the CRLF line terminator")(
-      build("(*CRLF)(?m)^a", "", Dialect.PCRE).get
+    assertEquals(
+      kinds("^a(?d:^)", "m", Dialect.Java),
+      Set[AssertKind](AssertKind.LineBeginOf(0, Never, false, true), AssertKind.LineBeginOf(1, Never, false, false))
     )
-    interceptMessage[UnsupportedException]("word boundary assertions with different word characters")(
-      build("\\b(?a:\\b)", "", Dialect.Python).get
+    assertEquals(
+      kinds("(*CRLF)(?m)^a$", "", Dialect.PCRE),
+      Set[AssertKind](AssertKind.LineBeginOf(0, InputBegin, true, false), AssertKind.LineEndOf(0, true, false))
+    )
+    assertEquals(kinds("\\Aa(?m:$)|b", "", Dialect.Ruby), Set[AssertKind](AssertKind.InputBegin, AssertKind.LineEnd))
+    assertEquals(kinds("a\\z|b", "", Dialect.Ruby), Set[AssertKind](AssertKind.InputEnd))
+    assertEquals(kinds("a$\\n", "", Dialect.Python), Set[AssertKind](AssertKind.ChompEnd(0, false, false)))
+    assertEquals(kinds("a$\\n", "", Dialect.Java), Set[AssertKind](AssertKind.ChompEnd(0, true, true)))
+    assertEquals(
+      kinds("\\b(?a:\\B)", "", Dialect.Python),
+      Set[AssertKind](AssertKind.WordBoundary, AssertKind.WordBoundaryNotOf(1))
     )
 
   /** Tests whether the automaton of the source accepts the input, i.e. the source matches in the input. */
@@ -276,7 +287,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       qs.flatMap(q => nfa.delta.collect { case ((p, a), ps) if p == q && a.contains(c) => ps }.flatten)
     last.exists(nfa.acceptSet.contains)
 
-  test("EpsNFABuilder.build: line assertions at line terminators and the ends of the input"):
-    for c <- LineAssertionCases.cases; dialect <- c.dialects do
+  test("EpsNFABuilder.build: line, text and word boundary assertions"):
+    for c <- AssertionCases.cases; dialect <- c.dialects do
       val message = s"/${c.source}/${c.flags} in $dialect on ${c.input}"
       assertEquals(searches(c.source, c.flags, dialect, c.input), c.matches.contains(dialect), message)

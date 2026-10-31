@@ -46,10 +46,30 @@ class PatternAlphabetSuite extends munit.FunSuite:
         .build(UnitMode.Utf16, lineTerminator = Some(CharSet.of(0x0a, 0x0d, 0x85)), crlf = true)
         .pairs,
       IndexedSeq(
-        (CharSet.single('\r'), CharKind.CarriageReturn),
-        (CharSet.single('\n'), CharKind.LineFeed),
+        (CharSet.single('\r'), CharKind(terminators = 1, cr = true)),
+        (CharSet.single('\n'), CharKind(terminators = 1, lf = true)),
         (CharSet.single(0x85), CharKind.LineTerminator),
         (UnitMode.Utf16.universe.diff(CharSet.of(0x0a, 0x0d, 0x85)), CharKind.Normal)
+      )
+    )
+    // The kinds tell the memberships of each line terminator set and each word set.
+    assertEquals(
+      PatternAlphabet
+        .build(
+          UnitMode.Utf16,
+          lineTerminator = Some(CharSet.single('\n')),
+          word = Some(CharSet.single('a')),
+          moreLineTerminators = Seq(CharSet.of('\n', '\r')),
+          moreWords = Seq(CharSet.of('a', 0xe9))
+        )
+        .pairs
+        .map(_._2),
+      IndexedSeq(
+        CharKind(terminators = 3),
+        CharKind(terminators = 2),
+        CharKind(words = 3),
+        CharKind(words = 2),
+        CharKind.Normal
       )
     )
     // A set outside the mode is restricted.

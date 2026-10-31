@@ -3,13 +3,14 @@ package codes.quine.labs.recheck
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 
-/** LineAssertionCases is a table of line assertions around line terminators and the ends of the input.
+/** AssertionCases is a table of line, text and word boundary assertions, around line terminators and the ends of the
+  * input.
   *
   * The results are of the engines (Node 26, Python 3.15, Ruby 4.0, Java 25, .NET 10, Perl 5.44 and PHP 8.5 with PCRE2
   * 10.49), where a pattern is searched in the input. Perl's `$` before `\n` is checked as `(?:$)\n`, since `$\` in a
   * literal is a variable.
   */
-object LineAssertionCases:
+object AssertionCases:
 
   /** A case of a search of the source in the input, which matches in the dialects of `matches` among `dialects`. */
   final case class Case(source: String, flags: String, input: String, dialects: Seq[Dialect], matches: Set[Dialect])
@@ -44,5 +45,39 @@ object LineAssertionCases:
     // Java's `d` (UNIX_LINES) has `\n` only.
     Case("(?d)a$", "", "a\r\n", Seq(Java), Set.empty),
     Case("(?md)\\r^\\n", "", "\r\n", Seq(Java), Set.empty),
-    Case("(?md)^", "", "", Seq(Java), Set.empty)
+    Case("(?md)^", "", "", Seq(Java), Set.empty),
+    // `$` (without `m`) and `\Z` in the middle, where Ruby's `$` is a line end (Perl's is checked as `\Z`).
+    Case("a$\\n", "", "a\n", noJS, noJS.toSet),
+    Case("a$\\n", "", "a\n\n", noJS, Set(Ruby)),
+    Case("a$\\nb", "", "a\nb", noJS, Set(Ruby)),
+    Case("(?:a$|b)\\n", "", "a\n", noJS, noJS.toSet),
+    Case("a\\Z\\n", "", "a\n", noJS.filter(_ != Python), Set(Ruby, Java, DotNet, Perl, PCRE)),
+    Case("a$\\r\\n", "", "a\r\n", noJS, Set(Java)),
+    Case("a\\r$\\n", "", "a\r\n", noJS, Set(Python, Ruby, DotNet, Perl, PCRE)),
+    Case("a$\\r", "", "a\r\n", noJS, Set(Java)),
+    // PCRE's `(*CRLF)` has only `\r\n`.
+    Case("(*CRLF)(?m)^a", "", "\r\na", Seq(PCRE), Set(PCRE)),
+    Case("(*CRLF)(?m)^a", "", "\na", Seq(PCRE), Set.empty),
+    Case("(*CRLF)(?m)^a", "", "\ra", Seq(PCRE), Set.empty),
+    Case("(*CRLF)(?m)\\r^\\na", "", "\r\na", Seq(PCRE), Set.empty),
+    Case("(*CRLF)(?m)a$", "", "a\r\nb", Seq(PCRE), Set(PCRE)),
+    Case("(*CRLF)(?m)a$", "", "a\rb", Seq(PCRE), Set.empty),
+    Case("(*CRLF)a$\\r\\n", "", "a\r\n", Seq(PCRE), Set(PCRE)),
+    Case("(*CRLF)a$\\n", "", "a\n", Seq(PCRE), Set.empty),
+    Case("(*CRLF)a\\r$\\n", "", "a\r\n", Seq(PCRE), Set.empty),
+    Case("(*ANYCRLF)a$\\r\\n", "", "a\r\n", Seq(PCRE), Set(PCRE)),
+    Case("(*ANYCRLF)a\\r$\\n", "", "a\r\n", Seq(PCRE), Set(PCRE)),
+    // Java's line assertions with and without `d` in a pattern.
+    Case("(?m)a(?d:$)\\r", "", "a\r", Seq(Java), Set.empty),
+    Case("(?m)a$\\r(?d:^)b", "", "a\rb", Seq(Java), Set.empty),
+    Case("(?m)a$\\n(?d:^)b", "", "a\nb", Seq(Java), Set(Java)),
+    Case("a(?d:$)\\r\\n", "", "a\r\n", Seq(Java), Set.empty),
+    // Word boundaries of different word sets in a pattern.
+    Case("(?a:\\B)é(?u:\\b)", "", "é", Seq(Ruby, Python, Perl), Set(Ruby, Python, Perl)),
+    Case("(?a:\\b)é(?u:\\b)", "", "é", Seq(Ruby, Python, Perl), Set.empty),
+    Case("(?a:\\B)é(?u:\\B)", "", "é", Seq(Ruby, Python, Perl), Set.empty),
+    Case("(?a:\\b)aé(?u:\\b)", "", "aé", Seq(Ruby, Python, Perl), Set(Ruby, Python, Perl)),
+    Case("\\Bé(?U)\\b", "", "é", Seq(Java), Set(Java)),
+    Case("\\bé(?U)\\b", "", "é", Seq(Java), Set.empty),
+    Case("(?U)\\bé(?-U)\\B", "", "é", Seq(Java), Set(Java))
   )
