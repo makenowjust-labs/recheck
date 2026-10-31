@@ -286,7 +286,7 @@ private[vm] class ProgramBuilder(
 
     val blocks = labelsBuffer.iterator.map(label => (label, label.block)).toVector
     val predecessors = predecessorsBuffer.iterator.map(_.toSet).toVector
-    val meta = Meta(mode, hasRef, hasVerb, capturesSize, counters.size, canaries.size, predecessors, hasLeave)
+    val meta = Meta(mode, hasRef, hasVerb, hasLeave, capturesSize, counters.size, canaries.size, predecessors)
 
     Program(blocks, meta)
 
