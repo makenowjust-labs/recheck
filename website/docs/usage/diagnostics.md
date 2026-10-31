@@ -55,20 +55,17 @@ The `attack` field also has these fields.
 
 - `string` is the actual string. Its characters are UTF-16 code units, or bytes as the characters of the same codes (as Latin-1) when the pattern matches bytes.
 - `pattern` is an expression that evaluates to the actual string in the host language of the [dialect](dialects.md).
-  It escapes quotes, backslashes, the starts of interpolations (`$`, `@`, `#{`), control characters, lone surrogates and the non-ASCII bytes of a bytes mode.
-  Other non-ASCII characters are written as they are, except in Perl, whose literals are ASCII so that they do not depend on `use utf8`.
-  Ruby cannot write a lone surrogate in a UTF-8 string, so it writes its UTF-8 bytes (e.g. `"\xED\xA0\x80"`).
   The attack string of `/^(a|a)*$/` looks like the following.
 
-| Dialect      | Language   | `attack.pattern`                                                               |
-| ------------ | ---------- | ------------------------------------------------------------------------------ |
-| `javascript` | JavaScript | `'a'.repeat(31) + '\x00'`                                                      |
-| `python`     | Python     | `'a' * 31 + '\x00'`, or `b'a' * 31 + b'\x00'` for `bytes`                      |
-| `ruby`       | Ruby       | `"a" + "a" * 31 + "\x00"`, or `"a".b + "a".b * 31 + "\x00".b` for `ASCII-8BIT` |
-| `java`       | Java       | `"a".repeat(31) + "\u0000"`                                                    |
-| `dotnet`     | C#         | `string.Concat(Enumerable.Repeat("a", 31)) + "\u0000"` (`System.Linq`)         |
-| `perl`       | Perl       | `"a" x 31 . "\x00"`                                                            |
-| `pcre`       | PHP        | `str_repeat('a', 31) . "\x00"`                                                 |
+  | Dialect      | Language   | `attack.pattern`                                                               |
+  | ------------ | ---------- | ------------------------------------------------------------------------------ |
+  | `javascript` | JavaScript | `'a'.repeat(31) + '\x00'`                                                      |
+  | `python`     | Python     | `'a' * 31 + '\x00'`, or `b'a' * 31 + b'\x00'` for `bytes`                      |
+  | `ruby`       | Ruby       | `"a" + "a" * 31 + "\x00"`, or `"a".b + "a".b * 31 + "\x00".b` for `ASCII-8BIT` |
+  | `java`       | Java       | `"a".repeat(31) + "\u0000"`                                                    |
+  | `dotnet`     | C#         | `string.Concat(Enumerable.Repeat("a", 31)) + "\u0000"` (`System.Linq`)         |
+  | `perl`       | Perl       | `"a" x 31 . "\x00"`                                                            |
+  | `pcre`       | PHP        | `str_repeat('a', 31) . "\x00"`                                                 |
 
 Noting that the attack string is computed in theoretical, because of the real matching implementation’s optimization, it may not invoke the matching time explosion.
 To prevent this case, you should use the recall validation.
