@@ -15,10 +15,12 @@ import codes.quine.labs.recheck.regexp.PatternExtensions.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRAssertKind
+import codes.quine.labs.resyntax.ir.IRBacktrackControl
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminators
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
+import codes.quine.labs.resyntax.ir.IRNotEmpty
 import codes.quine.labs.resyntax.ir.IRQuantifier
 
 /** RegExp IR to ε-NFA Compiler. */
@@ -70,9 +72,11 @@ private class EpsNFABuilder(
     counterLoop += 1
     loop
 
-  /** A builder of transition function. */
-  private val tau: mutable.Builder[(Int, Transition[Int]), Map[Int, Transition[Int]]] =
-    Map.newBuilder[Int, Transition[Int]]
+  /** A transition function. */
+  private val tau: mutable.Map[Int, Transition[Int]] = mutable.Map.empty
+
+  /** The states of `\K`, each of which has an ε-transition. */
+  private val resetMatchStarts: mutable.Set[Int] = mutable.Set.empty
 
   /** Emits a transition. */
   def emit(t: (Int, Transition[Int])): Unit =
@@ -80,7 +84,9 @@ private class EpsNFABuilder(
 
   /** Builds EpsNFA for the pattern. */
   def build(): EpsNFA[Int] =
-    val (i0, a0) = buildNode(pattern.node)
+    val start = counterQ
+    val (i0, a00) = buildNode(pattern.node)
+    val (first, later, a0) = rejectEmpty(start, i0, a00)
 
     val init = if pattern.needsSigmaStarAtBegin then
       val loop = nextLoop()
@@ -90,10 +96,17 @@ private class EpsNFABuilder(
       val i4 = nextQ()
       emit(i1 -> Eps(Vector(i4, i2)))
       emit(i2 -> LoopEnter(loop, i3))
-      emit(i3 -> Consume(alphabet.any, i1))
-      emit(i4 -> LoopExit(loop, i0))
+      emit(i4 -> LoopExit(loop, first))
+      if later == first then emit(i3 -> Consume(alphabet.any, i1))
+      else
+        // The search after the start enters the other copy of the pattern.
+        val j1 = nextQ()
+        val j4 = nextQ()
+        emit(i3 -> Consume(alphabet.any, j1))
+        emit(j1 -> Eps(Vector(j4, i2)))
+        emit(j4 -> LoopExit(loop, later))
       i1
-    else i0
+    else first
 
     val accept = if pattern.needsSigmaStarAtEnd then
       val loop = nextLoop()
@@ -108,7 +121,39 @@ private class EpsNFABuilder(
       a4
     else a0
 
-    EpsNFA(alphabet, stateSet(), init, accept, tau.result())
+    EpsNFA(alphabet, stateSet(), init, accept, tau.toMap)
+
+  /** Makes the pattern's states between `start` and the current counter reject an empty match, as PCRE's `(*NOTEMPTY)`
+    * and `(*NOTEMPTY_ATSTART)` do, and returns the initial states of the search at the start and after it, and the
+    * final state.
+    *
+    * The states are doubled into a copy before consuming a character and one after it (a product with a 2-state DFA),
+    * and only the latter accepts. It keeps the order of the transitions, so the engine backtracks from an empty match
+    * as the ε-NFA does from a dead state. `\K` returns to the first copy for `(*NOTEMPTY)`, which sees the reported
+    * match. For `(*NOTEMPTY_ATSTART)`, the search after the start begins in the second copy.
+    */
+  private def rejectEmpty(start: Int, i0: Int, a0: Int): (Int, Int, Int) =
+    pattern.ir.notEmpty match
+      case IRNotEmpty.Never => (i0, i0, a0)
+      case notEmpty         =>
+        val end = counterQ
+        val shift = end - start
+        counterQ += shift
+        def moved(q: Int): Int = q + shift
+        def retarget(t: Transition[Int], f: Int => Int): Transition[Int] = t match
+          case Eps(qs)              => Eps(qs.map(f))
+          case Assert(kind, q)      => Assert(kind, f(q))
+          case Consume(set, q, loc) => Consume(set, f(q), loc)
+          case LoopEnter(loop, q)   => LoopEnter(loop, f(q))
+          case LoopExit(loop, q)    => LoopExit(loop, f(q))
+        for q <- start until end; t <- tau.get(q) do
+          val reset = notEmpty == IRNotEmpty.Anywhere && resetMatchStarts.contains(q)
+          emit(moved(q) -> (if reset then t else retarget(t, moved)))
+          t match
+            case c: Consume[Int] => emit(q -> retarget(c, moved))
+            case _               => ()
+        emit(a0 -> Eps(Vector.empty))
+        (i0, if notEmpty == IRNotEmpty.AtStart then moved(i0) else i0, moved(a0))
 
   /** Returns the pairs of the set. */
   private def refine(set: CharSet): Set[(CharSet, CharKind)] =
@@ -163,8 +208,19 @@ private class EpsNFABuilder(
             () => buildSequence(s.iterator.toSeq.map(c => () => consume(refine(CharSet.single(c)), loc)))
         val chars = Option.when(set.chars.nonEmpty)(() => consume(refine(set.chars), loc))
         buildChoice(strings ++ chars)
-      case IRNodeData.LookAhead(_, _)     => throw new UnsupportedException("look-ahead assertion")
-      case IRNodeData.LookBehind(_, _)    => throw new UnsupportedException("look-behind assertion")
+      case IRNodeData.ResetMatchStart =>
+        val (i, a) = (nextQ(), nextQ())
+        emit(i -> Eps(Vector(a)))
+        resetMatchStarts.add(i)
+        (i, a)
+      // A mark has no effect on matching, and `(*SKIP:NAME)` is unsupported.
+      case IRNodeData.BacktrackControl(_: IRBacktrackControl.Mark) => epsilon()
+      case IRNodeData.BacktrackControl(_)  => throw new UnsupportedException("backtracking control verb")
+      case IRNodeData.Conditional(_, _, _) => throw new UnsupportedException("conditional")
+      case IRNodeData.LookAhead(_, _) | IRNodeData.NonAtomicLookAhead(_) =>
+        throw new UnsupportedException("look-ahead assertion")
+      case IRNodeData.LookBehind(_, _) | IRNodeData.NonAtomicLookBehind(_) =>
+        throw new UnsupportedException("look-behind assertion")
       case IRNodeData.Atomic(_)           => throw new UnsupportedException("atomic group")
       case IRNodeData.BackReference(_, _) => throw new UnsupportedException("back-reference")
       case IRNodeData.Unsupported(_)      => throw new UnsupportedException(pattern.unsupportedMessage(node))
