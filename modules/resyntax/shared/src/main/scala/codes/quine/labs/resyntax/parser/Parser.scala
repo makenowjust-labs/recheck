@@ -1694,7 +1694,9 @@ private[parser] final class Parser(
     expect('{', "Invalid backslash escape")
     val value = parseBracedCodePoint(8)
     BackslashKind.Escape(EscapeStyle.Octal, value)
+
   private def parseBackslashLowerP(): BackslashKind = parseBackslashProperty(invert = false)
+
   private def parseBackslashProperty(invert: Boolean): BackslashKind =
     if !featureSet.hasBackslashUnicodeProperty then return parseBackslashUnknown()
 
@@ -1866,6 +1868,7 @@ private[parser] final class Parser(
       case value +: rest =>
         pendingCodePoints = rest.toList
         BackslashKind.Escape(EscapeStyle.UnicodeBracket, value)
+
   private def parseBackslashLowerV(): BackslashKind =
     if !(featureSet.hasBackslashVerticalSpace || featureSet.hasBackslashVerticalTab) then return parseBackslashUnknown()
 
@@ -1902,6 +1905,7 @@ private[parser] final class Parser(
     assert(featureSet.allowsBrokenBackslashHex, "Invalid backslash escape")
     reset(save)
     parseBackslashUnknown()
+
   private def parseBackslashLowerZ(): BackslashKind =
     if !featureSet.hasBackslashEnd then return parseBackslashUnknown()
 
@@ -2017,6 +2021,7 @@ private[parser] final class Parser(
     }
 
   private def parseBackslashUpperP(): BackslashKind = parseBackslashProperty(invert = true)
+
   private def parseBackslashUpperQ(): BackslashKind =
     if !featureSet.hasBackslashQuoteCommand then return parseBackslashUnknown()
 
@@ -2046,6 +2051,7 @@ private[parser] final class Parser(
       )
 
     BackslashKind.Escape(EscapeStyle.UnicodeHex8, checkCodePoint(parseHexDigits(8), save))
+
   private def parseBackslashUpperV(): BackslashKind =
     if !featureSet.hasBackslashVerticalSpace then return parseBackslashUnknown()
 
