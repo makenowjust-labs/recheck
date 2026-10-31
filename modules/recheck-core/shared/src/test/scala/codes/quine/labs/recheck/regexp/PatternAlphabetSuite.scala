@@ -40,6 +40,18 @@ class PatternAlphabetSuite extends munit.FunSuite:
         (UnitMode.Utf16.universe.diff(CharSet.single('\n')), CharKind.Normal)
       )
     )
+    // `\r` and `\n` have their own kinds with `crlf`, where `\r\n` is one line terminator.
+    assertEquals(
+      PatternAlphabet
+        .build(UnitMode.Utf16, lineTerminator = Some(CharSet.of(0x0a, 0x0d, 0x85)), crlf = true)
+        .pairs,
+      IndexedSeq(
+        (CharSet.single('\r'), CharKind.CarriageReturn),
+        (CharSet.single('\n'), CharKind.LineFeed),
+        (CharSet.single(0x85), CharKind.LineTerminator),
+        (UnitMode.Utf16.universe.diff(CharSet.of(0x0a, 0x0d, 0x85)), CharKind.Normal)
+      )
+    )
     // A set outside the mode is restricted.
     assertEquals(
       PatternAlphabet.build(UnitMode.Byte, Seq(CharSet.range(0xf0, 0x10ffff))).pairs.map(_._1),
