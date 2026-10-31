@@ -20,6 +20,26 @@ The `dotnet` dialect has no settings.
 - Case-insensitive matching uses `ToLowerInvariant` between single characters.
   It follows the invariant culture, not the current culture (e.g. `(?i)i` does not match `İ` as it does in the Turkish culture).
 
+The flags are the letters of the inline options.
+
+| Flag | `RegexOptions`            | Inline | Notes                                 |
+| ---- | ------------------------- | ------ | ------------------------------------- |
+| `i`  | `IgnoreCase`              | `(?i)` | In the invariant culture (see above). |
+| `m`  | `Multiline`               | `(?m)` |                                       |
+| `n`  | `ExplicitCapture`         | `(?n)` |                                       |
+| `s`  | `Singleline`              | `(?s)` |                                       |
+| `x`  | `IgnorePatternWhitespace` | `(?x)` |                                       |
+
+The inline options also take upper case letters (e.g. `(?I)`), but the flags are lower case.
+
+The `RegexOptions` that `recheck` does not take:
+
+- `CultureInvariant`: always assumed, since `recheck` uses the invariant culture.
+- `Compiled`: no effect on matching.
+- `RightToLeft`: not supported.
+- `ECMAScript`: not supported.
+- `NonBacktracking`: not supported (the engine does not backtrack, and it matches in linear time in the length of the input).
+
 ## Syntax
 
 The following constructs are not supported, and they are reported as `unsupported`.

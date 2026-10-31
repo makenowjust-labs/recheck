@@ -23,6 +23,30 @@ The `pcre` dialect has no settings.
 - Without `u` or `(*UTF)`, the attack string is a bytes literal (e.g. `"\xC3\xA9"`).
 - The character set options such as `(?aD)` change the meaning of `\w`, `\d`, `\s`, `\b`, POSIX classes and case-insensitive matching in the same way as in PCRE2.
 
+The flags are PHP's pattern modifiers.
+
+| Flag | PCRE2 option                    | Inline         | Notes                                                                     |
+| ---- | ------------------------------- | -------------- | ------------------------------------------------------------------------- |
+| `i`  | `PCRE2_CASELESS`                | `(?i)`         |                                                                           |
+| `m`  | `PCRE2_MULTILINE`               | `(?m)`         |                                                                           |
+| `n`  | `PCRE2_NO_AUTO_CAPTURE`         | `(?n)`         | PHP 8.2 or later.                                                         |
+| `r`  | `PCRE2_EXTRA_CASELESS_RESTRICT` | `(?r)`         | PHP 8.4 or later.                                                         |
+| `s`  | `PCRE2_DOTALL`                  | `(?s)`         |                                                                           |
+| `u`  | `PCRE2_UTF` and `PCRE2_UCP`     | `(*UTF)(*UCP)` |                                                                           |
+| `x`  | `PCRE2_EXTENDED`                | `(?x)`         | `xx` is `x` too, while `(?xx)` is `PCRE2_EXTENDED_MORE`.                  |
+| `A`  | `PCRE2_ANCHORED`                |                | The match starts at the start of the input.                               |
+| `D`  | `PCRE2_DOLLAR_ENDONLY`          |                | `$` matches only at the end of the input, unless with `m`.                |
+| `J`  | `PCRE2_DUPNAMES`                | `(?J)`         |                                                                           |
+| `U`  | `PCRE2_UNGREEDY`                | `(?U)`         |                                                                           |
+| `S`  |                                 |                | No effect (PHP 7.3 or later).                                             |
+| `X`  |                                 |                | No effect (PHP 7.3 or later, where an unknown escape is always an error). |
+
+As PHP does, `recheck` skips spaces and line breaks (`\n` and `\r`) in the flags.
+
+The modifiers that `recheck` does not take:
+
+- `e`: removed in PHP 7.0 (PHP 8.5 reports it as an unknown modifier).
+
 ## Syntax
 
 The following constructs are not supported.

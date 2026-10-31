@@ -20,6 +20,23 @@ The `java` dialect has no settings.
 - The flags `U` (`UNICODE_CHARACTER_CLASS`) and `u` (`UNICODE_CASE`) change the meaning of `\w`, `\d`, `\s`, `\b`, POSIX classes and case-insensitive matching in the same way as in `java.util.regex`.
 - `\b` without `U` also takes a non-spacing mark after a letter or a digit as a word character (e.g. `\b` does not match between `a` and U+0301), as `java.util.regex` does.
 
+The flags are the letters of the inline flags of `java.util.regex`.
+
+| Flag | `Pattern` flag            | Inline | Notes                                                  |
+| ---- | ------------------------- | ------ | ------------------------------------------------------ |
+| `c`  | `CANON_EQ`                | `(?c)` | Not supported (see [Syntax](#syntax)).                 |
+| `d`  | `UNIX_LINES`              | `(?d)` | Only `\n` is a line terminator for `.`, `^` and `$`.   |
+| `i`  | `CASE_INSENSITIVE`        | `(?i)` | Only between ASCII characters, unless with `u` or `U`. |
+| `m`  | `MULTILINE`               | `(?m)` |                                                        |
+| `s`  | `DOTALL`                  | `(?s)` |                                                        |
+| `u`  | `UNICODE_CASE`            | `(?u)` |                                                        |
+| `x`  | `COMMENTS`                | `(?x)` |                                                        |
+| `U`  | `UNICODE_CHARACTER_CLASS` | `(?U)` | It implies `UNICODE_CASE`.                             |
+
+The `Pattern` flags that `recheck` does not take:
+
+- `LITERAL`: not supported (it has no inline flag); `Pattern.quote` makes a pattern matching the same strings.
+
 ## Syntax
 
 The canonical equivalence (`(?c)`) is not supported, and it is reported as `unsupported`.

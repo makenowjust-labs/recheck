@@ -18,6 +18,21 @@ The `javascript` dialect has no settings.
 
 A pattern matches UTF-16 code units, or code points with the `u` or `v` flag.
 
+The flags are the flags of `RegExp`.
+
+| Flag | `RegExp` property | Inline     | Notes                                                                  |
+| ---- | ----------------- | ---------- | ---------------------------------------------------------------------- |
+| `d`  | `hasIndices`      |            | No effect on matching.                                                 |
+| `g`  | `global`          |            | No effect on matching, since `recheck` models a search from the start. |
+| `i`  | `ignoreCase`      | `(?i:...)` |                                                                        |
+| `m`  | `multiline`       | `(?m:...)` |                                                                        |
+| `s`  | `dotAll`          | `(?s:...)` |                                                                        |
+| `u`  | `unicode`         |            | An error with `v`.                                                     |
+| `v`  | `unicodeSets`     |            | An error with `u`.                                                     |
+| `y`  | `sticky`          |            | The match starts at the start of the input (`lastIndex` is `0`).       |
+
+JavaScript has no other options.
+
 ## Syntax
 
 The syntax includes the ES2025 features: the `v` flag, the modifiers `(?i:...)` and duplicate named groups.
