@@ -7,9 +7,9 @@ import scala.concurrent.duration.Duration
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.unicode.IChar
-import codes.quine.labs.recheck.unicode.ICharSet
-import codes.quine.labs.recheck.unicode.UString
+import codes.quine.labs.recheck.regexp.PatternAlphabet
+import codes.quine.labs.recheck.util.UStringUtil
+import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.recheck.vm.Inst.ReadKind
 import codes.quine.labs.recheck.vm.Interpreter
 import codes.quine.labs.recheck.vm.Interpreter.CoverageItem
@@ -17,6 +17,8 @@ import codes.quine.labs.recheck.vm.Interpreter.CoverageLocation
 import codes.quine.labs.recheck.vm.Interpreter.FailedPoint
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Status
+import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UString
 
 /** DynamicSeeder computes an initial generation for the pattern with dynamic analysis. */
 object DynamicSeeder:
@@ -49,7 +51,7 @@ object DynamicSeeder:
     interrupt:
       queue.enqueue((UString.empty, None))
       for (ch, _) <- fuzz.alphabet.pairs do
-        val s = UString(ch.head.asString)
+        val s = UStringUtil.fromCodePoints(Iterator(ch.head))
         queue.enqueue((s, None))
         added.add(s)
 
@@ -88,7 +90,7 @@ object DynamicSeeder:
   private[fuzz] object Patch:
 
     /** InsertChar is a patch to insert (or replace) each characters at the `pos`. */
-    final case class InsertChar(pos: Int, chs: Set[IChar]) extends Patch:
+    final case class InsertChar(pos: Int, chs: Set[CharSet]) extends Patch:
       def apply(s: UString, unicode: Boolean): Seq[UString] =
         chs.toSeq.map(_.head).flatMap(c => Seq(s.insertAt(pos, c), s.replaceAt(pos, c, unicode)))
 
@@ -98,11 +100,11 @@ object DynamicSeeder:
         Seq(t.insert(pos, s))
 
     /** Builds a patch from a failed point. */
-    def build(failed: FailedPoint, alphabet: ICharSet): Patch =
+    def build(failed: FailedPoint, alphabet: PatternAlphabet): Patch =
       failed.kind match
         case ReadKind.Any         => InsertChar(failed.pos, alphabet.any.map(_._1))
         case ReadKind.Dot         => InsertChar(failed.pos, alphabet.dot.map(_._1))
-        case ReadKind.Char(c)     => InsertChar(failed.pos, Set(IChar(c)))
+        case ReadKind.Char(c)     => InsertChar(failed.pos, Set(CharSet.single(c)))
         case ReadKind.Class(s)    => InsertChar(failed.pos, alphabet.refine(s).map(_._1))
         case ReadKind.ClassNot(s) => InsertChar(failed.pos, alphabet.refineInvert(s).map(_._1))
         case ReadKind.Ref(_)      => InsertString(failed.pos, failed.capture.get)

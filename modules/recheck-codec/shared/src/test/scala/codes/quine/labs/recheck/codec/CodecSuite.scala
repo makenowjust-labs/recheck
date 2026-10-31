@@ -18,7 +18,7 @@ import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labs.recheck.diagnostics.Hotspot
-import codes.quine.labs.recheck.unicode.UString
+import codes.quine.labs.recheck.util.UStringUtil
 
 class CodecSuite extends munit.FunSuite:
   test("codec.encodeDiagnostics"):
@@ -38,7 +38,11 @@ class CodecSuite extends munit.FunSuite:
           "(a|a)*$",
           "",
           AttackComplexity.Exponential(false),
-          AttackPattern(Seq((UString(""), UString("a"), 0)), UString("\u0000"), 17),
+          AttackPattern(
+            Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
+            UStringUtil.fromString("\u0000"),
+            17
+          ),
           Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat), Hotspot.Spot(3, 4, Hotspot.Heat))),
           Checker.Automaton
         )
@@ -49,7 +53,11 @@ class CodecSuite extends munit.FunSuite:
         "status" := "vulnerable",
         "checker" := Checker.Automaton.asInstanceOf[Checker],
         "complexity" := AttackComplexity.Exponential(false).asInstanceOf[AttackComplexity],
-        "attack" := AttackPattern(Seq((UString(""), UString("a"), 0)), UString("\u0000"), 17),
+        "attack" := AttackPattern(
+          Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
+          UStringUtil.fromString("\u0000"),
+          17
+        ),
         "hotspot" := Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat), Hotspot.Spot(3, 4, Hotspot.Heat)))
       )
     )
@@ -93,7 +101,13 @@ class CodecSuite extends munit.FunSuite:
 
   test("codec.encodeAttackPattern"):
     assertEquals(
-      encodeAttackPattern(AttackPattern(Seq((UString("a"), UString("b"), 2)), UString("c"), 0)),
+      encodeAttackPattern(
+        AttackPattern(
+          Seq((UStringUtil.fromString("a"), UStringUtil.fromString("b"), 2)),
+          UStringUtil.fromString("c"),
+          0
+        )
+      ),
       Json.obj(
         "pumps" := Json.arr(Json.obj("prefix" := "a", "pump" := "b", "bias" := 2)),
         "suffix" := "c",
@@ -117,7 +131,7 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(encodeErrorKind(ErrorKind.Unexpected("foo")), Json.obj("kind" := "unexpected", "message" := "foo"))
 
   test("codec.encodeUString"):
-    assertEquals(encodeUString(UString("foo")), Json.fromString("foo"))
+    assertEquals(encodeUString(UStringUtil.fromString("foo")), Json.fromString("foo"))
 
   test("codec.decodeParameters"):
 

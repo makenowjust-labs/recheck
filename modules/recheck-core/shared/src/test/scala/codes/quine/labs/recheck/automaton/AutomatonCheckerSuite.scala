@@ -11,8 +11,10 @@ import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.Hotspot.*
+import codes.quine.labs.recheck.regexp.EcmaScriptChars
 import codes.quine.labs.recheck.regexp.Parser
-import codes.quine.labs.recheck.unicode.IChar
+import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UnitMode
 
 class AutomatonCheckerSuite extends munit.FunSuite:
 
@@ -20,7 +22,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
   /** Runs a checker against the RegExp. */
-  def check(source: String, flags: String): Try[Complexity[IChar]] =
+  def check(source: String, flags: String): Try[Complexity[CharSet]] =
     for
       pattern <- Parser.parse(source, flags) match
         case Right(pattern) => Success(pattern)
@@ -44,10 +46,10 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     assertEquals(check("^(a(\\b)*:)*$", ""), Success(Linear))
 
   test("AutomatonChecker.check: polynomial"):
-    val a = IChar('a')
-    val at = IChar('@')
-    val other1 = a.complement(false)
-    val other2 = IChar.Word.union(at).complement(false)
+    val a = CharSet.single('a')
+    val at = CharSet.single('@')
+    val other1 = a.complement(UnitMode.Utf16)
+    val other2 = EcmaScriptChars.Word.union(at).complement(UnitMode.Utf16)
     assertEquals(
       check("^.*a.*a$", "s"),
       Success(
@@ -86,10 +88,10 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     )
 
   test("AutomatonChecker.check: exponential"):
-    val a = IChar('a')
-    val b = IChar('b')
-    val other1 = IChar('a').complement(false)
-    val other2 = IChar.union(Seq(a, b)).complement(false)
+    val a = CharSet.single('a')
+    val b = CharSet.single('b')
+    val other1 = CharSet.single('a').complement(UnitMode.Utf16)
+    val other2 = CharSet.union(Seq(a, b)).complement(UnitMode.Utf16)
     assertEquals(
       check("^(a|a)*$", ""),
       Success(

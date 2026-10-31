@@ -2,9 +2,9 @@ package codes.quine.labs.recheck.vm
 
 import scala.compiletime.uninitialized
 
+import codes.quine.labs.recheck.regexp.EcmaScriptChars
 import codes.quine.labs.recheck.regexp.Pattern.Location
-import codes.quine.labs.recheck.unicode.IChar
-import codes.quine.labs.recheck.unicode.UChar
+import codes.quine.labs.resyntax.charset.CharSet
 
 /** Inst is an instruction. */
 sealed abstract class Inst:
@@ -169,16 +169,16 @@ object Inst:
       override def toString: String = "dot"
 
     /** An usual character matching. */
-    final case class Char(c: UChar) extends ReadKind:
-      override def toString: String = s"char '$c'"
+    final case class Char(c: Int) extends ReadKind:
+      override def toString: String = s"char '${EcmaScriptChars.showChar(c)}'"
 
     /** A character class matching. */
-    final case class Class(s: IChar) extends ReadKind:
-      override def toString: String = s"class $s"
+    final case class Class(s: CharSet) extends ReadKind:
+      override def toString: String = s"class ${EcmaScriptChars.showClass(s)}"
 
     /** An inverted character class matching. */
-    final case class ClassNot(s: IChar) extends ReadKind:
-      override def toString: String = s"class_not $s"
+    final case class ClassNot(s: CharSet) extends ReadKind:
+      override def toString: String = s"class_not ${EcmaScriptChars.showClass(s)}"
 
     /** A capture reference matching. */
     final case class Ref(index: Int) extends ReadKind:

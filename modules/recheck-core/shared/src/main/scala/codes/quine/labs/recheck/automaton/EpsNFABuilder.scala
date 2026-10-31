@@ -7,12 +7,13 @@ import scala.util.Try
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
+import codes.quine.labs.recheck.regexp.EcmaScriptChars
 import codes.quine.labs.recheck.regexp.Pattern
 import codes.quine.labs.recheck.regexp.Pattern.*
+import codes.quine.labs.recheck.regexp.PatternAlphabet
+import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
 import codes.quine.labs.recheck.regexp.PatternExtensions.*
-import codes.quine.labs.recheck.unicode.IChar
-import codes.quine.labs.recheck.unicode.ICharSet
-import codes.quine.labs.recheck.unicode.ICharSet.CharKind
+import codes.quine.labs.resyntax.charset.CharSet
 
 /** ECMA-262 RegExp to ε-NFA Compiler. */
 object EpsNFABuilder:
@@ -34,7 +35,7 @@ object EpsNFABuilder:
 
 private class EpsNFABuilder(
     private val pattern: Pattern,
-    private val alphabet: ICharSet
+    private val alphabet: PatternAlphabet
 )(using ctx: Context):
   import pattern.flagSet._
 
@@ -44,7 +45,7 @@ private class EpsNFABuilder(
   /** A next state counter. */
   private var counterQ = 0
 
-  private val refineCache: mutable.Map[IChar, Set[(IChar, CharKind)]] = mutable.Map.empty
+  private val refineCache: mutable.Map[CharSet, Set[(CharSet, CharKind)]] = mutable.Map.empty
 
   /** Returns a next state number. */
   def nextQ(): Int =
@@ -207,8 +208,8 @@ private class EpsNFABuilder(
       case LookAhead(_, _)  => throw new UnsupportedException("look-ahead assertion")
       case LookBehind(_, _) => throw new UnsupportedException("look-behind assertion")
       case atom: AtomNode   =>
-        val ch0 = atom.toIChar(unicode)
-        val ch = if ignoreCase then IChar.canonicalize(ch0, unicode) else ch0
+        val ch0 = atom.toCharSet(unicode)
+        val ch = if ignoreCase then EcmaScriptChars.canonicalize(ch0, unicode) else ch0
         val chs = atom match
           // CharacterClass's inversion should be done here.
           case CharacterClass(invert, _) if invert =>

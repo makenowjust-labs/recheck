@@ -78,9 +78,9 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.recheck.fuzz.*
       |import codes.quine.labs.recheck.recall.*
       |import codes.quine.labs.recheck.regexp.*
-      |import codes.quine.labs.recheck.unicode.*
       |import codes.quine.labs.recheck.util.*
       |import codes.quine.labs.recheck.vm.*
+      |import codes.quine.labs.resyntax.charset.*
       |
       |def logger: Context.Logger = (message: String) =>
       |  val date = java.time.LocalDateTime.now()
@@ -119,8 +119,8 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |  val pattern = parse(source, flags)
       |  val flagSet = pattern.flagSet
       |  val program = time("compile")(ProgramBuilder.build(pattern).get)
-      |  val uinput0 = UString(input)
-      |  val uinput = if flagSet.ignoreCase then UString.canonicalize(uinput0, flagSet.unicode) else uinput0
+      |  val uinput0 = UStringUtil.fromString(input)
+      |  val uinput = if flagSet.ignoreCase then UStringUtil.canonicalize(uinput0, flagSet.unicode) else uinput0
       |  val opts = Interpreter.Options(
       |    limit = limit,
       |    usesAcceleration = usesAcceleration,
@@ -222,7 +222,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
-  .dependsOn(common, exec, unicode, resyntaxCharset, parse)
+  .dependsOn(common, exec, resyntaxCharset, parse)
 
 lazy val coreJVM = core.jvm
 lazy val coreJS = core.js
@@ -330,7 +330,7 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
-  .dependsOn(unicode, resyntaxCharset)
+  .dependsOn(resyntaxCharset)
 
 lazy val parseJVM = parse.jvm
 lazy val parseJS = parse.js

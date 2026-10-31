@@ -3,8 +3,9 @@ package fuzz
 
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.fuzz.FString.*
-import codes.quine.labs.recheck.unicode.UChar
-import codes.quine.labs.recheck.unicode.UString
+import codes.quine.labs.recheck.util.UStringUtil
+import codes.quine.labs.recheck.util.UStringUtil.*
+import codes.quine.labs.resyntax.charset.UString
 
 /** FString is a string with a repetition structure for fuzzing. */
 final case class FString(n: Int, seq: IndexedSeq[FChar]):
@@ -59,55 +60,53 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]):
 
   /** Builds a UString instance from this. */
   def toUString: UString =
-    val str = new StringBuilder
+    val str = IndexedSeq.newBuilder[Int]
     var pos = 0
     while pos < seq.size do
       seq(pos) match
         case Wrap(u) =>
           pos += 1
-          str.append(u.asString)
+          str.addOne(u)
         case Repeat(m, size) =>
           pos += 1
           val part = seq
             .slice(pos, pos + size)
             .map:
-              case Wrap(u)      => u.asString
+              case Wrap(u)      => u
               case Repeat(_, _) => throw new IllegalArgumentException
-            .mkString
           val repeat = n + m
-          for _ <- 1 to repeat do str.append(part)
+          for _ <- 1 to repeat do str.addAll(part)
           pos += size
-    UString(str.result())
+    UStringUtil.fromCodePoints(str.result())
 
   /** Builds an attack pattern string from this. */
   def toAttackPattern: AttackPattern =
     val pumps = Seq.newBuilder[(UString, UString, Int)]
 
-    val str = new StringBuilder
+    val str = IndexedSeq.newBuilder[Int]
     var pos = 0
 
     while pos < seq.size do
       seq(pos) match
         case Wrap(u) =>
           pos += 1
-          str.append(u.asString)
+          str.addOne(u)
         case Repeat(m, size) =>
           pos += 1
           val repeat = n + m
           if repeat > 1 then
-            val s = UString(str.result())
+            val s = UStringUtil.fromCodePoints(str.result())
             str.clear()
             val pump = seq
               .slice(pos, pos + size)
               .map:
-                case Wrap(u)      => u.asString
+                case Wrap(u)      => u
                 case Repeat(_, _) => throw new IllegalArgumentException
-              .mkString
-            val t = UString(pump)
+            val t = UStringUtil.fromCodePoints(pump)
             pumps.addOne((s, t, m))
             pos += size
 
-    val suffix = UString(str.result())
+    val suffix = UStringUtil.fromCodePoints(str.result())
     AttackPattern(pumps.result(), suffix, n)
 
   /** Returns the string representation of this string. */
@@ -116,32 +115,31 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]):
 
     val parts = Seq.newBuilder[String]
 
-    val str = new StringBuilder
+    val str = IndexedSeq.newBuilder[Int]
     var pos = 0
 
     while pos < seq.size do
       seq(pos) match
         case Wrap(u) =>
           pos += 1
-          str.append(u.asString)
+          str.addOne(u)
         case Repeat(m, size) =>
           pos += 1
           val repeat = n + m
           if repeat > 1 then
-            val s = UString(str.result())
+            val s = UStringUtil.fromCodePoints(str.result())
             str.clear()
-            if s.nonEmpty then parts.addOne(s.toString)
+            if s.nonEmpty then parts.addOne(UStringUtil.show(s))
             val part = seq
               .slice(pos, pos + size)
               .map:
-                case Wrap(u)      => u.asString
+                case Wrap(u)      => u
                 case Repeat(_, _) => throw new IllegalArgumentException
-              .mkString
-            parts.addOne(s"${UString(part)}${style.repeat(repeat)}")
+            parts.addOne(s"${UStringUtil.show(UStringUtil.fromCodePoints(part))}${style.repeat(repeat)}")
             pos += size
 
-    val s = UString(str.result())
-    if s.nonEmpty then parts.addOne(s.toString)
+    val s = UStringUtil.fromCodePoints(str.result())
+    if s.nonEmpty then parts.addOne(UStringUtil.show(s))
 
     parts.result().mkString(style.join)
 
@@ -154,13 +152,13 @@ object FString:
   sealed abstract class FChar extends Serializable with Product
 
   /** Wrap is a wrapper of a unicode character in FString. */
-  final case class Wrap(u: UChar) extends FChar
+  final case class Wrap(u: Int) extends FChar
 
   /** Repeat is a repetition specifier in FString. */
   final case class Repeat(m: Int, size: Int) extends FChar
 
   /** Builds a FString from a string. */
-  def apply(input: UString, unicode: Boolean): FString = FString(1, input.iterator(unicode).map(Wrap(_)).toIndexedSeq)
+  def apply(input: UString, unicode: Boolean): FString = FString(1, input.chars(unicode).map(Wrap(_)).toIndexedSeq)
 
   /** Builds a FString from a string with a loop analysis information. */
   def build(input: UString, loops: Seq[(Int, Int)], unicode: Boolean): FString =
@@ -168,17 +166,17 @@ object FString:
 
     val str = IndexedSeq.newBuilder[FChar]
     var pos = 0
-    while pos < input.sizeAsString do
+    while pos < input.length do
       repeats.get(pos) match
         case Some(size) =>
-          val part = input.substring(pos, pos + size)
+          val part = input.slice(pos, pos + size)
           pos += size
           // Compresses a repetition.
           var m = 0
-          while pos < input.sizeAsString && part == input.substring(pos, pos + size) do
+          while pos < input.length && part == input.slice(pos, pos + size) do
             m += 1
             pos += size
-          str.addOne(Repeat(m, size)).addAll(part.iterator(unicode).map(Wrap(_)))
+          str.addOne(Repeat(m, size)).addAll(part.chars(unicode).map(Wrap(_)))
         case None =>
           str.addOne(Wrap(input.getAt(pos, unicode).get))
           pos += 1

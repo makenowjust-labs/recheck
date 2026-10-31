@@ -5,11 +5,10 @@ import scala.concurrent.duration.Duration
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.TimeoutException
+import codes.quine.labs.recheck.regexp.EcmaScriptChars.LineTerminator
+import codes.quine.labs.recheck.regexp.EcmaScriptChars.Word
 import codes.quine.labs.recheck.regexp.Pattern.Location
-import codes.quine.labs.recheck.unicode.IChar.LineTerminator
-import codes.quine.labs.recheck.unicode.IChar.Word
-import codes.quine.labs.recheck.unicode.UChar
-import codes.quine.labs.recheck.unicode.UString
+import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.recheck.vm.Inst.AssertKind
 import codes.quine.labs.recheck.vm.Inst.ReadKind
 import codes.quine.labs.recheck.vm.Interpreter.CoverageItem
@@ -21,6 +20,7 @@ import codes.quine.labs.recheck.vm.Interpreter.MatchState
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
+import codes.quine.labs.resyntax.charset.UString
 
 /** Interpreter executes a program on a input. */
 object Interpreter:
@@ -123,10 +123,10 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   ):
 
     /** Gets a previous character. */
-    def previousChar: Option[UChar] = input.getBefore(pos, program.meta.unicode)
+    def previousChar: Option[Int] = input.getBefore(pos, program.meta.unicode)
 
     /** Gets a current character. */
-    def currentChar: Option[UChar] = input.getAt(pos, program.meta.unicode)
+    def currentChar: Option[Int] = input.getAt(pos, program.meta.unicode)
 
     /** Captures a beginning position of the index. */
     def capBegin(index: Int): Unit =
@@ -146,7 +146,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     def capture(index: Int): Option[UString] =
       (captures(index * 2), captures(index * 2 + 1)) match
         case (b, e) if b == -1 || e == -1 => None
-        case (b, e)                       => Some(input.substring(b, e))
+        case (b, e)                       => Some(input.slice(b, e))
 
     /** Converts this frame into a corresponding state. */
     def toState: MatchState =
@@ -382,7 +382,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           case AssertKind.InputBegin =>
             frame.pos == 0
           case AssertKind.InputEnd =>
-            frame.pos == input.sizeAsString
+            frame.pos == input.length
         if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
         ok
       case read: Inst.Read      => instRead(frame, read)
@@ -401,21 +401,19 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   private def instRead(frame: Frame, inst: Inst.Read): Boolean = inst match
     case Inst.Read(kind @ ReadKind.Ref(index), loc) =>
       val s = frame.capture(index).getOrElse(UString.empty)
-      val ss = s.asString
-      val is = input.asString
 
       var count = 0
-      while count < ss.length &&
-        frame.pos + count < is.length &&
-        ss.charAt(count) == is.charAt(frame.pos + count)
+      while count < s.length &&
+        frame.pos + count < input.length &&
+        s(count) == input(frame.pos + count)
       do count += 1
-      val ok = count == s.sizeAsString
+      val ok = count == s.length
       steps = Math.addExact(steps, count)
 
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if ok then
         if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        frame.pos += s.sizeAsString
+        frame.pos += s.length
         true
       else
         if options.needsFailedPoints then
@@ -428,7 +426,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if ok then
         if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        steps = Math.addExact(steps, c.map(_.size).getOrElse(0))
+        steps = Math.addExact(steps, c.map(c => if c >= 0x10000 then 2 else 1).getOrElse(0))
         frame.pos += c.size
         true
       else
@@ -441,21 +439,19 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   private def instReadBack(frame: Frame, inst: Inst.ReadBack): Boolean = inst match
     case Inst.ReadBack(kind @ ReadKind.Ref(index), loc) =>
       val s = frame.capture(index).getOrElse(UString.empty)
-      val ss = s.asString
-      val is = input.asString
 
       var count = 0
-      while count < ss.length &&
+      while count < s.length &&
         frame.pos - count - 1 >= 0 &&
-        ss.charAt(ss.length - count - 1) == is.charAt(frame.pos - count - 1)
+        s(s.length - count - 1) == input(frame.pos - count - 1)
       do count += 1
-      val ok = count == s.sizeAsString
+      val ok = count == s.length
       steps = Math.addExact(steps, count)
 
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if ok then
         if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        frame.pos -= s.sizeAsString
+        frame.pos -= s.length
         true
       else
         if options.needsFailedPoints then
@@ -468,7 +464,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if ok then
         if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        steps = Math.addExact(steps, c.map(_.size).getOrElse(0))
+        steps = Math.addExact(steps, c.map(c => if c >= 0x10000 then 2 else 1).getOrElse(0))
         frame.pos -= c.size
         true
       else
@@ -478,7 +474,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         false
 
   /** Checks to match `read` instruction. */
-  private def read(c: Option[UChar], kind: ReadKind): Boolean =
+  private def read(c: Option[Int], kind: ReadKind): Boolean =
     c match
       case Some(c) =>
         kind match

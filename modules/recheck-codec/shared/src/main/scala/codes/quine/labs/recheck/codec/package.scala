@@ -22,7 +22,7 @@ import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labs.recheck.diagnostics.Hotspot
-import codes.quine.labs.recheck.unicode.UString
+import codes.quine.labs.resyntax.charset.UString
 
 /** Package `codec` provides recheck types `Decoder`/`Encoder` of circe. */
 package object codec

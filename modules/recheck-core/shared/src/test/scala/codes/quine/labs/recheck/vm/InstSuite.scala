@@ -2,8 +2,8 @@ package codes.quine.labs.recheck.vm
 
 import scala.language.implicitConversions
 
+import codes.quine.labs.recheck.regexp.EcmaScriptChars
 import codes.quine.labs.recheck.regexp.Pattern.Location
-import codes.quine.labs.recheck.unicode.IChar
 import codes.quine.labs.recheck.vm.Inst.AssertKind
 import codes.quine.labs.recheck.vm.Inst.ReadKind
 
@@ -68,6 +68,6 @@ class InstSuite extends munit.FunSuite:
     assertEquals(ReadKind.Any.toString, "any")
     assertEquals(ReadKind.Dot.toString, "dot")
     assertEquals(ReadKind.Char('a').toString, "char 'a'")
-    assertEquals(ReadKind.Class(IChar.Word).toString, "class [0-9A-Z_a-z]")
-    assertEquals(ReadKind.ClassNot(IChar.Word).toString, "class_not [0-9A-Z_a-z]")
+    assertEquals(ReadKind.Class(EcmaScriptChars.Word).toString, "class [0-9A-Z_a-z]")
+    assertEquals(ReadKind.ClassNot(EcmaScriptChars.Word).toString, "class_not [0-9A-Z_a-z]")
     assertEquals(ReadKind.Ref(0).toString, "ref 0")

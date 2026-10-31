@@ -6,8 +6,7 @@ import fastparse.P
 import fastparse.Parsed
 
 import codes.quine.labs.recheck.regexp.Pattern.*
-import codes.quine.labs.recheck.unicode.IChar
-import codes.quine.labs.recheck.unicode.UChar
+import codes.quine.labs.resyntax.charset.UnitMode
 
 class ParserSuite extends munit.FunSuite:
 
@@ -170,23 +169,30 @@ class ParserSuite extends munit.FunSuite:
   test("Parser.resolveUnicodeProperty"):
     assertEquals(
       Parser.resolveUnicodeProperty(UnicodeProperty(false, "ASCII", null)),
-      Right(UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get))
+      Right(UnicodeProperty(false, "ASCII", EcmaScriptChars.unicodeProperty("ASCII").get))
     )
     assertEquals(
       Parser.resolveUnicodeProperty(UnicodeProperty(true, "ASCII", null)),
-      Right(UnicodeProperty(true, "ASCII", IChar.UnicodeProperty("ASCII").get.complement(true)))
+      Right(UnicodeProperty(true, "ASCII", EcmaScriptChars.unicodeProperty("ASCII").get.complement(UnitMode.CodePoint)))
     )
     assertEquals(
       Parser.resolveUnicodeProperty(UnicodePropertyValue(false, "sc", "Hira", null)),
-      Right(UnicodePropertyValue(false, "sc", "Hira", IChar.UnicodePropertyValue("sc", "Hira").get))
+      Right(UnicodePropertyValue(false, "sc", "Hira", EcmaScriptChars.unicodePropertyValue("sc", "Hira").get))
     )
     assertEquals(
       Parser.resolveUnicodeProperty(UnicodePropertyValue(true, "sc", "Hira", null)),
-      Right(UnicodePropertyValue(true, "sc", "Hira", IChar.UnicodePropertyValue("sc", "Hira").get.complement(true)))
+      Right(
+        UnicodePropertyValue(
+          true,
+          "sc",
+          "Hira",
+          EcmaScriptChars.unicodePropertyValue("sc", "Hira").get.complement(UnitMode.CodePoint)
+        )
+      )
     )
     assertEquals(
       Parser.resolveUnicodeProperty(CharacterClass(false, Seq(UnicodeProperty(false, "ASCII", null)))),
-      Right(CharacterClass(false, Seq(UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get))))
+      Right(CharacterClass(false, Seq(UnicodeProperty(false, "ASCII", EcmaScriptChars.unicodeProperty("ASCII").get))))
     )
     assertEquals(
       Parser.resolveUnicodeProperty(CharacterClass(false, Seq(ClassRange('a', 'b')))),
@@ -197,35 +203,37 @@ class ParserSuite extends munit.FunSuite:
 
     assertEquals(
       Parser.resolveUnicodeProperty(Disjunction(Seq(Dot(), UnicodeProperty(false, "ASCII", null)))),
-      Right(Disjunction(Seq(Dot(), UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get))))
+      Right(Disjunction(Seq(Dot(), UnicodeProperty(false, "ASCII", EcmaScriptChars.unicodeProperty("ASCII").get))))
     )
     assertEquals(
       Parser.resolveUnicodeProperty(Sequence(Seq(Dot(), UnicodeProperty(false, "ASCII", null)))),
-      Right(Sequence(Seq(Dot(), UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get))))
+      Right(Sequence(Seq(Dot(), UnicodeProperty(false, "ASCII", EcmaScriptChars.unicodeProperty("ASCII").get))))
     )
     assertEquals(
       Parser.resolveUnicodeProperty(Capture(1, UnicodeProperty(false, "ASCII", null))),
-      Right(Capture(1, UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+      Right(Capture(1, UnicodeProperty(false, "ASCII", EcmaScriptChars.unicodeProperty("ASCII").get)))
     )
     assertEquals(
       Parser.resolveUnicodeProperty(NamedCapture(1, "x", UnicodeProperty(false, "ASCII", null))),
-      Right(NamedCapture(1, "x", UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+      Right(NamedCapture(1, "x", UnicodeProperty(false, "ASCII", EcmaScriptChars.unicodeProperty("ASCII").get)))
     )
     assertEquals(
       Parser.resolveUnicodeProperty(Group(UnicodeProperty(false, "ASCII", null))),
-      Right(Group(UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+      Right(Group(UnicodeProperty(false, "ASCII", EcmaScriptChars.unicodeProperty("ASCII").get)))
     )
     assertEquals(
       Parser.resolveUnicodeProperty(Repeat(Quantifier.Star(false), UnicodeProperty(false, "ASCII", null))),
-      Right(Repeat(Quantifier.Star(false), UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+      Right(
+        Repeat(Quantifier.Star(false), UnicodeProperty(false, "ASCII", EcmaScriptChars.unicodeProperty("ASCII").get))
+      )
     )
     assertEquals(
       Parser.resolveUnicodeProperty(LookAhead(false, UnicodeProperty(false, "ASCII", null))),
-      Right(LookAhead(false, UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+      Right(LookAhead(false, UnicodeProperty(false, "ASCII", EcmaScriptChars.unicodeProperty("ASCII").get)))
     )
     assertEquals(
       Parser.resolveUnicodeProperty(LookBehind(false, UnicodeProperty(false, "ASCII", null))),
-      Right(LookBehind(false, UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get)))
+      Right(LookBehind(false, UnicodeProperty(false, "ASCII", EcmaScriptChars.unicodeProperty("ASCII").get)))
     )
 
     interceptMessage[ParsingException]("unknown Unicode property: invalid (at 0:11)"):
@@ -374,13 +382,13 @@ class ParserSuite extends munit.FunSuite:
       parse0("\\w", P.ClassAtom(using _)),
       Parsed.Success(Right(SimpleEscapeClass(false, EscapeClassKind.Word)), 2)
     )
-    assertEquals(parse0("0", P.ClassAtom(using _)), Parsed.Success(Left(UChar('0')), 1))
+    assertEquals(parse0("0", P.ClassAtom(using _)), Parsed.Success(Left('0'.toInt), 1))
 
   test("Parser#ClassCharacter"):
-    assertEquals(parse0("\\-", P.ClassCharacter(using _)), Parsed.Success(UChar('-'), 2))
-    assertEquals(parse0("\\b", P.ClassCharacter(using _)), Parsed.Success(UChar(0x08), 2))
-    assertEquals(parse0("\\0", P.ClassCharacter(using _)), Parsed.Success(UChar(0), 2))
-    assertEquals(parse0("0", P.ClassCharacter(using _)), Parsed.Success(UChar('0'), 1))
+    assertEquals(parse0("\\-", P.ClassCharacter(using _)), Parsed.Success('-'.toInt, 2))
+    assertEquals(parse0("\\b", P.ClassCharacter(using _)), Parsed.Success(0x08, 2))
+    assertEquals(parse0("\\0", P.ClassCharacter(using _)), Parsed.Success(0, 2))
+    assertEquals(parse0("0", P.ClassCharacter(using _)), Parsed.Success('0'.toInt, 1))
 
   test("Parser#Escape"):
     assertEquals(parse("\\b", P.Escape(using _)), Parsed.Success(WordBoundary(false), 2))
@@ -454,49 +462,49 @@ class ParserSuite extends munit.FunSuite:
     assertEquals(parse0("123", P.UnicodePropertyValue(using _)), Parsed.Success("123", 3))
 
   test("Parser#EscapeCharacter"):
-    assertEquals(parse0("\\t", P.EscapeCharacter(using _)), Parsed.Success(UChar('\t'), 2))
-    assertEquals(parse0("\\n", P.EscapeCharacter(using _)), Parsed.Success(UChar('\n'), 2))
-    assertEquals(parse0("\\v", P.EscapeCharacter(using _)), Parsed.Success(UChar(0x0b), 2))
-    assertEquals(parse0("\\f", P.EscapeCharacter(using _)), Parsed.Success(UChar('\f'), 2))
-    assertEquals(parse0("\\r", P.EscapeCharacter(using _)), Parsed.Success(UChar('\r'), 2))
-    assertEquals(parse0("\\cA", P.EscapeCharacter(using _)), Parsed.Success(UChar(0x01), 3))
-    assertEquals(parse0("\\ca", P.EscapeCharacter(using _)), Parsed.Success(UChar(0x01), 3))
-    assertEquals(parse0("\\cZ", P.EscapeCharacter(using _)), Parsed.Success(UChar(0x1a), 3))
-    assertEquals(parse0("\\cz", P.EscapeCharacter(using _)), Parsed.Success(UChar(0x1a), 3))
-    assertEquals(parse0("\\x11", P.EscapeCharacter(using _)), Parsed.Success(UChar(0x11), 4))
-    assertEquals(parse0("\\0", P.EscapeCharacter(using _)), Parsed.Success(UChar(0), 2))
+    assertEquals(parse0("\\t", P.EscapeCharacter(using _)), Parsed.Success('\t'.toInt, 2))
+    assertEquals(parse0("\\n", P.EscapeCharacter(using _)), Parsed.Success('\n'.toInt, 2))
+    assertEquals(parse0("\\v", P.EscapeCharacter(using _)), Parsed.Success(0x0b, 2))
+    assertEquals(parse0("\\f", P.EscapeCharacter(using _)), Parsed.Success('\f'.toInt, 2))
+    assertEquals(parse0("\\r", P.EscapeCharacter(using _)), Parsed.Success('\r'.toInt, 2))
+    assertEquals(parse0("\\cA", P.EscapeCharacter(using _)), Parsed.Success(0x01, 3))
+    assertEquals(parse0("\\ca", P.EscapeCharacter(using _)), Parsed.Success(0x01, 3))
+    assertEquals(parse0("\\cZ", P.EscapeCharacter(using _)), Parsed.Success(0x1a, 3))
+    assertEquals(parse0("\\cz", P.EscapeCharacter(using _)), Parsed.Success(0x1a, 3))
+    assertEquals(parse0("\\x11", P.EscapeCharacter(using _)), Parsed.Success(0x11, 4))
+    assertEquals(parse0("\\0", P.EscapeCharacter(using _)), Parsed.Success(0, 2))
 
   test("Parser#UnicodeEscape"):
-    assertEquals(parse0("\\u1234", P.UnicodeEscape(using _)), Parsed.Success(UChar(0x1234), 6))
+    assertEquals(parse0("\\u1234", P.UnicodeEscape(using _)), Parsed.Success(0x1234, 6))
     assert(!parse0("\\u{1234}", P.UnicodeEscape(using _)).isSuccess)
-    assertEquals(parse0("\\u1234", PU.UnicodeEscape(using _)), Parsed.Success(UChar(0x1234), 6))
-    assertEquals(parse0("\\u{1234}", PU.UnicodeEscape(using _)), Parsed.Success(UChar(0x1234), 8))
-    assertEquals(parse0("\\ud83c\\udf63", PU.UnicodeEscape(using _)), Parsed.Success(UChar(0x1f363), 12))
-    assertEquals(parse0("\\ud83c\\u0041", PU.UnicodeEscape(using _)), Parsed.Success(UChar(0xd83c), 6))
+    assertEquals(parse0("\\u1234", PU.UnicodeEscape(using _)), Parsed.Success(0x1234, 6))
+    assertEquals(parse0("\\u{1234}", PU.UnicodeEscape(using _)), Parsed.Success(0x1234, 8))
+    assertEquals(parse0("\\ud83c\\udf63", PU.UnicodeEscape(using _)), Parsed.Success(0x1f363, 12))
+    assertEquals(parse0("\\ud83c\\u0041", PU.UnicodeEscape(using _)), Parsed.Success(0xd83c, 6))
 
   test("Parser#OctalEscape"):
     assert(!parse0("\\012", P.OctalEscape(using _)).isSuccess)
-    assertEquals(parse0("\\012", PA.OctalEscape(using _)), Parsed.Success(UChar(0x0a), 4))
-    assertEquals(parse0("\\12x", PA.OctalEscape(using _)), Parsed.Success(UChar(0x0a), 3))
-    assertEquals(parse0("\\404", PA.OctalEscape(using _)), Parsed.Success(UChar(0x20), 3))
+    assertEquals(parse0("\\012", PA.OctalEscape(using _)), Parsed.Success(0x0a, 4))
+    assertEquals(parse0("\\12x", PA.OctalEscape(using _)), Parsed.Success(0x0a, 3))
+    assertEquals(parse0("\\404", PA.OctalEscape(using _)), Parsed.Success(0x20, 3))
 
   test("Parser#IdenittyEscape"):
-    assertEquals(parse0("\\|", P.IdentityEscape(using _)), Parsed.Success(UChar('|'), 2))
-    assertEquals(parse0("\\=", P.IdentityEscape(using _)), Parsed.Success(UChar('='), 2))
+    assertEquals(parse0("\\|", P.IdentityEscape(using _)), Parsed.Success('|'.toInt, 2))
+    assertEquals(parse0("\\=", P.IdentityEscape(using _)), Parsed.Success('='.toInt, 2))
     assert(!parse0("\\w", P.IdentityEscape(using _)).isSuccess)
-    assertEquals(parse0("\\|", PU.IdentityEscape(using _)), Parsed.Success(UChar('|'), 2))
+    assertEquals(parse0("\\|", PU.IdentityEscape(using _)), Parsed.Success('|'.toInt, 2))
     assert(!parse0("\\=", PU.IdentityEscape(using _)).isSuccess)
     assert(!parse0("\\w", PU.IdentityEscape(using _)).isSuccess)
-    assertEquals(parse0("\\|", PA.IdentityEscape(using _)), Parsed.Success(UChar('|'), 2))
-    assertEquals(parse0("\\=", PA.IdentityEscape(using _)), Parsed.Success(UChar('='), 2))
-    assertEquals(parse0("\\c", PA.IdentityEscape(using _)), Parsed.Success(UChar('\\'), 1))
+    assertEquals(parse0("\\|", PA.IdentityEscape(using _)), Parsed.Success('|'.toInt, 2))
+    assertEquals(parse0("\\=", PA.IdentityEscape(using _)), Parsed.Success('='.toInt, 2))
+    assertEquals(parse0("\\c", PA.IdentityEscape(using _)), Parsed.Success('\\'.toInt, 1))
     assert(!parse0("\\k", PAN.IdentityEscape(using _)).isSuccess)
 
   test("Parser#Character"):
-    assertEquals(parse0("x", P.Character(using _)), Parsed.Success(UChar('x'), 1))
+    assertEquals(parse0("x", P.Character(using _)), Parsed.Success('x'.toInt, 1))
     assert(!parse0("\\u0041", P.Character(using _)).isSuccess)
-    assertEquals(parse0("x", PU.Character(using _)), Parsed.Success(UChar('x'), 1))
-    assertEquals(parse0("\ud83c\udf63", PU.Character(using _)), Parsed.Success(UChar(0x1f363), 2))
+    assertEquals(parse0("x", PU.Character(using _)), Parsed.Success('x'.toInt, 1))
+    assertEquals(parse0("\ud83c\udf63", PU.Character(using _)), Parsed.Success(0x1f363, 2))
     assert(!parse0("\\u0041", PU.Character(using _)).isSuccess)
 
   test("Parser#Paren"):
@@ -514,8 +522,8 @@ class ParserSuite extends munit.FunSuite:
     assert(!parse0("0", P.CaptureName(using _)).isSuccess)
 
   test("Parser#CaptureNameChar"):
-    assertEquals(parse0("x", P.CaptureNameChar(using _)), Parsed.Success(UChar('x'), 1))
-    assertEquals(parse0("\\u1234", P.CaptureNameChar(using _)), Parsed.Success(UChar(0x1234), 6))
+    assertEquals(parse0("x", P.CaptureNameChar(using _)), Parsed.Success('x'.toInt, 1))
+    assertEquals(parse0("\\u1234", P.CaptureNameChar(using _)), Parsed.Success(0x1234, 6))
 
   test("Parser#Digits"):
     assertEquals(parse0("0", P.Digits(using _)), Parsed.Success(0, 1))

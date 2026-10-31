@@ -1,9 +1,10 @@
 package codes.quine.labs.recheck
 package diagnostics
 
-import codes.quine.labs.recheck.unicode.UString
 import codes.quine.labs.recheck.util.NumberFormat
 import codes.quine.labs.recheck.util.RepeatUtil
+import codes.quine.labs.recheck.util.UStringUtil
+import codes.quine.labs.resyntax.charset.UString
 
 /** AttackPattern is an attack pattern string to ReDoS.
   *
@@ -20,10 +21,10 @@ import codes.quine.labs.recheck.util.RepeatUtil
 final case class AttackPattern(pumps: Seq[(UString, UString, Int)], suffix: UString, n: Int):
 
   /** Returns a size number of sum of fixed parts. */
-  def fixedSize: Int = pumps.map(_._1.sizeAsString).sum + suffix.sizeAsString
+  def fixedSize: Int = pumps.map(_._1.length).sum + suffix.length
 
   /** Returns a size number of sum of repeat parts. */
-  def repeatSize: Int = pumps.map(_._2.sizeAsString).sum
+  def repeatSize: Int = pumps.map(_._2.length).sum
 
   /** Adjusts repetition count in this string to the complexity. */
   def adjust(complexity: AttackComplexity.Vulnerable, limit: Int, maxSize: Int): AttackPattern =
@@ -36,23 +37,23 @@ final case class AttackPattern(pumps: Seq[(UString, UString, Int)], suffix: UStr
 
   /** Returns the `UString` represented by this. */
   def asUString: UString =
-    val str = new StringBuilder
+    val str = Array.newBuilder[Int]
 
     for (s, t, m) <- pumps do
-      str.append(s.asString)
-      for _ <- 1 to (n + m) do str.append(t.asString)
-    str.append(suffix.asString)
+      str.addAll(s.iterator)
+      for _ <- 1 to (n + m) do str.addAll(t.iterator)
+    str.addAll(suffix.iterator)
 
-    UString(str.result())
+    UString.from(str.result())
 
   /** Returns the string representation of this. */
   def toString(style: AttackPattern.Style): String =
     val seq = Seq.newBuilder[String]
 
     for (s, t, m) <- pumps do
-      if s.nonEmpty then seq.addOne(s.toString)
-      seq.addOne(s"${t}${style.repeat(n + m)}")
-    if suffix.nonEmpty then seq.addOne(suffix.toString)
+      if s.nonEmpty then seq.addOne(UStringUtil.show(s))
+      seq.addOne(s"${UStringUtil.show(t)}${style.repeat(n + m)}")
+    if suffix.nonEmpty then seq.addOne(UStringUtil.show(suffix))
 
     seq.result().mkString(style.join)
 

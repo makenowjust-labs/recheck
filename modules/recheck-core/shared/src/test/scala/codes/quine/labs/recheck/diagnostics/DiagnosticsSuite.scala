@@ -7,7 +7,7 @@ import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.TimeoutException
 import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.common.UnsupportedException
-import codes.quine.labs.recheck.unicode.UString
+import codes.quine.labs.recheck.util.UStringUtil
 
 class DiagnosticsSuite extends munit.FunSuite:
   test("Diagnostics#toString"):
@@ -24,7 +24,11 @@ class DiagnosticsSuite extends munit.FunSuite:
           "abbc",
           "",
           AttackComplexity.Exponential(false),
-          AttackPattern(Seq((UString("a"), UString("b"), 0)), UString("c"), 2),
+          AttackPattern(
+            Seq((UStringUtil.fromString("a"), UStringUtil.fromString("b"), 0)),
+            UStringUtil.fromString("c"),
+            2
+          ),
           Hotspot.empty,
           Checker.Automaton
         )

@@ -25,7 +25,6 @@ import codes.quine.labs.recheck.recall.RecallValidator
 import codes.quine.labs.recheck.regexp.Parser
 import codes.quine.labs.recheck.regexp.Pattern
 import codes.quine.labs.recheck.regexp.PatternExtensions.*
-import codes.quine.labs.recheck.unicode.UChar
 
 /** ReDoS is a ReDoS checker frontend. */
 object ReDoS:
@@ -95,7 +94,7 @@ object ReDoS:
     result
       .map: cs =>
         cs.map:
-          case vul: Complexity.Vulnerable[UChar] =>
+          case vul: Complexity.Vulnerable[Int] =>
             val attack = vul.buildAttackPattern(recallLimit, maxRecallStringSize)
             Diagnostics.Vulnerable(source, flags, vul.toAttackComplexity, attack, vul.hotspot, Checker.Automaton)
           case safe: Complexity.Safe => Diagnostics.Safe(source, flags, safe.toAttackComplexity, Checker.Automaton)

@@ -7,7 +7,7 @@ import scala.concurrent.duration.FiniteDuration
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
-import codes.quine.labs.recheck.unicode.UString
+import codes.quine.labs.recheck.util.UStringUtil
 
 /** RecallValidator is the implementation of recall validation. */
 object RecallValidator:
@@ -42,7 +42,9 @@ object RecallValidator:
   private[recall] def generate(source: String, flags: String, attack: AttackPattern): String =
     val str = new StringBuilder
 
-    str.append(s"const re = new RegExp(${UString(source)}, ${UString(flags)});\n")
+    str.append(
+      s"const re = new RegExp(${UStringUtil.show(UStringUtil.fromString(source))}, ${UStringUtil.show(UStringUtil.fromString(flags))});\n"
+    )
     str.append(s"const input = ${attack.toString(AttackPattern.JavaScript)};\n")
     str.append(s"const start = Date.now();\n")
     str.append(s"re.exec(input);\n")

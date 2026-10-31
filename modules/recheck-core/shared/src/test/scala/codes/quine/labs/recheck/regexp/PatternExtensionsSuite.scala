@@ -5,69 +5,71 @@ import scala.language.implicitConversions
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.regexp.Pattern.*
 import codes.quine.labs.recheck.regexp.PatternExtensions.*
-import codes.quine.labs.recheck.unicode.IChar
-import codes.quine.labs.recheck.unicode.ICharSet
-import codes.quine.labs.recheck.unicode.ICharSet.CharKind
-import codes.quine.labs.recheck.unicode.UString
+import codes.quine.labs.recheck.util.UStringUtil
+import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UnitMode
 
 class PatternExtensionsSuite extends munit.FunSuite:
 
   /** A default context. */
   given ctx: Context = Context()
 
-  test("PatternExtensions.AtomNodeOps#toIChar"):
-    assertEquals(Character('x').toIChar(false), IChar('x'))
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Word).toIChar(false), IChar.Word)
+  test("PatternExtensions.AtomNodeOps#toCharSet"):
+    assertEquals(Character('x').toCharSet(false), CharSet.single('x'))
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Word).toCharSet(false), EcmaScriptChars.Word)
     assertEquals(
-      SimpleEscapeClass(true, EscapeClassKind.Word).toIChar(false),
-      IChar.Word.complement(false)
+      SimpleEscapeClass(true, EscapeClassKind.Word).toCharSet(false),
+      EcmaScriptChars.Word.complement(UnitMode.Utf16)
     )
     assertEquals(
-      SimpleEscapeClass(true, EscapeClassKind.Word).toIChar(true),
-      IChar.Word.complement(true)
+      SimpleEscapeClass(true, EscapeClassKind.Word).toCharSet(true),
+      EcmaScriptChars.Word.complement(UnitMode.CodePoint)
     )
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).toIChar(false), IChar.Digit)
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Digit).toCharSet(false), EcmaScriptChars.Digit)
     assertEquals(
-      SimpleEscapeClass(true, EscapeClassKind.Digit).toIChar(false),
-      IChar.Digit.complement(false)
+      SimpleEscapeClass(true, EscapeClassKind.Digit).toCharSet(false),
+      EcmaScriptChars.Digit.complement(UnitMode.Utf16)
     )
-    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Space).toIChar(false), IChar.Space)
+    assertEquals(SimpleEscapeClass(false, EscapeClassKind.Space).toCharSet(false), EcmaScriptChars.Space)
     assertEquals(
-      SimpleEscapeClass(true, EscapeClassKind.Space).toIChar(false),
-      IChar.Space.complement(false)
-    )
-    assertEquals(
-      UnicodeProperty(false, "ASCII", IChar.UnicodeProperty("ASCII").get).toIChar(false),
-      IChar.UnicodeProperty("ASCII").get
+      SimpleEscapeClass(true, EscapeClassKind.Space).toCharSet(false),
+      EcmaScriptChars.Space.complement(UnitMode.Utf16)
     )
     assertEquals(
-      UnicodeProperty(true, "ASCII", IChar.UnicodeProperty("ASCII").get.complement(true)).toIChar(true),
-      IChar.UnicodeProperty("ASCII").get.complement(true)
+      UnicodeProperty(false, "ASCII", EcmaScriptChars.unicodeProperty("ASCII").get).toCharSet(false),
+      EcmaScriptChars.unicodeProperty("ASCII").get
     )
     assertEquals(
-      UnicodeProperty(false, "L", IChar.UnicodeProperty("L").get).toIChar(false),
-      IChar.UnicodeProperty("L").get
+      UnicodeProperty(true, "ASCII", EcmaScriptChars.unicodeProperty("ASCII").get.complement(UnitMode.CodePoint))
+        .toCharSet(true),
+      EcmaScriptChars.unicodeProperty("ASCII").get.complement(UnitMode.CodePoint)
     )
     assertEquals(
-      UnicodeProperty(true, "L", IChar.UnicodeProperty("L").get.complement(true)).toIChar(true),
-      IChar.UnicodeProperty("L").get.complement(true)
-    )
-    val Hira = IChar.UnicodePropertyValue("sc", "Hira").get
-    assertEquals(UnicodePropertyValue(false, "sc", "Hira", Hira).toIChar(false), Hira)
-    assertEquals(
-      UnicodePropertyValue(true, "sc", "Hira", Hira.complement(true)).toIChar(true),
-      Hira.complement(true)
+      UnicodeProperty(false, "L", EcmaScriptChars.unicodeProperty("L").get).toCharSet(false),
+      EcmaScriptChars.unicodeProperty("L").get
     )
     assertEquals(
-      CharacterClass(false, Seq(Character('a'), Character('A'))).toIChar(false),
-      IChar('a').union(IChar('A'))
+      UnicodeProperty(true, "L", EcmaScriptChars.unicodeProperty("L").get.complement(UnitMode.CodePoint))
+        .toCharSet(true),
+      EcmaScriptChars.unicodeProperty("L").get.complement(UnitMode.CodePoint)
+    )
+    val Hira = EcmaScriptChars.unicodePropertyValue("sc", "Hira").get
+    assertEquals(UnicodePropertyValue(false, "sc", "Hira", Hira).toCharSet(false), Hira)
+    assertEquals(
+      UnicodePropertyValue(true, "sc", "Hira", Hira.complement(UnitMode.CodePoint)).toCharSet(true),
+      Hira.complement(UnitMode.CodePoint)
     )
     assertEquals(
-      CharacterClass(true, Seq(Character('a'), Character('A'))).toIChar(false),
-      IChar('a').union(IChar('A')) // Not complemented is intentionally.
+      CharacterClass(false, Seq(Character('a'), Character('A'))).toCharSet(false),
+      CharSet.single('a').union(CharSet.single('A'))
     )
-    assertEquals(ClassRange('a', 'a').toIChar(false), IChar('a'))
-    assertEquals(ClassRange('a', 'z').toIChar(false), IChar.range('a', 'z'))
+    assertEquals(
+      CharacterClass(true, Seq(Character('a'), Character('A'))).toCharSet(false),
+      CharSet.single('a').union(CharSet.single('A')) // Not complemented is intentionally.
+    )
+    assertEquals(ClassRange('a', 'a').toCharSet(false), CharSet.single('a'))
+    assertEquals(ClassRange('a', 'z').toCharSet(false), CharSet.range('a', 'z'))
 
   test("PatternExtensions.NodeOps#captureRange"):
     assertEquals(Sequence(Seq(Capture(1, Dot()), Capture(2, Dot()))).captureRange, CaptureRange(Some((1, 2))))
@@ -343,57 +345,57 @@ class PatternExtensionsSuite extends munit.FunSuite:
     val flagSet2 = FlagSet(false, false, false, true, false, false)
     val flagSet3 = FlagSet(false, true, false, false, false, false)
     val flagSet4 = FlagSet(false, true, false, false, true, false)
-    val word = IChar.Word
-    val lineTerminator = IChar.LineTerminator
-    val dot16 = IChar.Any16.diff(IChar.LineTerminator)
-    val dot = IChar.Any.diff(IChar.LineTerminator)
-    assertEquals(Pattern(Sequence(Seq.empty), flagSet0).alphabet, ICharSet.any(false, false))
-    assertEquals(Pattern(Dot(), flagSet0).alphabet, ICharSet.any(false, false).add(dot16))
+    val word = EcmaScriptChars.Word
+    val lineTerminator = EcmaScriptChars.LineTerminator
+    val dot16 = EcmaScriptChars.any(false).diff(EcmaScriptChars.LineTerminator)
+    val dot = EcmaScriptChars.any(true).diff(EcmaScriptChars.LineTerminator)
+    assertEquals(Pattern(Sequence(Seq.empty), flagSet0).alphabet, PatternAlphabet.build(false, false))
+    assertEquals(Pattern(Dot(), flagSet0).alphabet, PatternAlphabet.build(false, false, Seq(dot16)))
     assertEquals(
       Pattern(Disjunction(Seq(Character('A'), Character('Z'))), flagSet0).alphabet,
-      ICharSet.any(false, false).add(IChar('A')).add(IChar('Z'))
+      PatternAlphabet.build(false, false, Seq(CharSet.single('A'), CharSet.single('Z')))
     )
     assertEquals(
       Pattern(WordBoundary(false), flagSet0).alphabet,
-      ICharSet.any(false, false).add(word, CharKind.Word)
+      PatternAlphabet.build(false, false, word = Some(word))
     )
     assertEquals(
       Pattern(LineBegin(), flagSet1).alphabet,
-      ICharSet.any(false, false).add(lineTerminator, CharKind.LineTerminator)
+      PatternAlphabet.build(false, false, lineTerminator = Some(lineTerminator))
     )
     assertEquals(
       Pattern(Sequence(Seq(LineBegin(), WordBoundary(false))), flagSet1).alphabet,
-      ICharSet.any(false, false).add(lineTerminator, CharKind.LineTerminator).add(word, CharKind.Word)
+      PatternAlphabet.build(false, false, lineTerminator = Some(lineTerminator), word = Some(word))
     )
-    assertEquals(Pattern(Capture(1, Dot()), flagSet2).alphabet, ICharSet.any(false, false))
-    assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet2).alphabet, ICharSet.any(false, false))
-    assertEquals(Pattern(Group(Dot()), flagSet2).alphabet, ICharSet.any(false, false))
-    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet2).alphabet, ICharSet.any(false, false))
-    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet2).alphabet, ICharSet.any(false, false))
+    assertEquals(Pattern(Capture(1, Dot()), flagSet2).alphabet, PatternAlphabet.build(false, false))
+    assertEquals(Pattern(NamedCapture(1, "foo", Dot()), flagSet2).alphabet, PatternAlphabet.build(false, false))
+    assertEquals(Pattern(Group(Dot()), flagSet2).alphabet, PatternAlphabet.build(false, false))
+    assertEquals(Pattern(Repeat(Quantifier.Star(false), Dot()), flagSet2).alphabet, PatternAlphabet.build(false, false))
+    assertEquals(Pattern(Repeat(Quantifier.Plus(false), Dot()), flagSet2).alphabet, PatternAlphabet.build(false, false))
     assertEquals(
       Pattern(Repeat(Quantifier.Question(false), Dot()), flagSet2).alphabet,
-      ICharSet.any(false, false)
+      PatternAlphabet.build(false, false)
     )
     assertEquals(
       Pattern(Repeat(Quantifier.Exact(2, false), Dot()), flagSet2).alphabet,
-      ICharSet.any(false, false)
+      PatternAlphabet.build(false, false)
     )
-    assertEquals(Pattern(LookAhead(false, Dot()), flagSet2).alphabet, ICharSet.any(false, false))
-    assertEquals(Pattern(LookBehind(false, Dot()), flagSet2).alphabet, ICharSet.any(false, false))
-    assertEquals(Pattern(Dot(), flagSet2).alphabet, ICharSet.any(false, false))
-    assertEquals(Pattern(Sequence(Seq.empty), flagSet3).alphabet, ICharSet.any(true, false))
+    assertEquals(Pattern(LookAhead(false, Dot()), flagSet2).alphabet, PatternAlphabet.build(false, false))
+    assertEquals(Pattern(LookBehind(false, Dot()), flagSet2).alphabet, PatternAlphabet.build(false, false))
+    assertEquals(Pattern(Dot(), flagSet2).alphabet, PatternAlphabet.build(false, false))
+    assertEquals(Pattern(Sequence(Seq.empty), flagSet3).alphabet, PatternAlphabet.build(true, false))
     assertEquals(
       Pattern(Dot(), flagSet3).alphabet,
-      ICharSet.any(true, false).add(IChar.canonicalize(dot16, false))
+      PatternAlphabet.build(true, false, Seq(EcmaScriptChars.canonicalize(dot16, false)))
     )
     assertEquals(
       Pattern(Disjunction(Seq(Character('A'), Character('Z'))), flagSet3).alphabet,
-      ICharSet.any(true, false).add(IChar('A')).add(IChar('Z'))
+      PatternAlphabet.build(true, false, Seq(CharSet.single('A'), CharSet.single('Z')))
     )
-    assertEquals(Pattern(Sequence(Seq.empty), flagSet4).alphabet, ICharSet.any(true, true))
+    assertEquals(Pattern(Sequence(Seq.empty), flagSet4).alphabet, PatternAlphabet.build(true, true))
     assertEquals(
       Pattern(Dot(), flagSet4).alphabet,
-      ICharSet.any(true, true).add(IChar.canonicalize(dot, true))
+      PatternAlphabet.build(true, true, Seq(EcmaScriptChars.canonicalize(dot, true)))
     )
 
   test("PatternExtensions.PatternOps#needsLineTerminatorDistinction"):
@@ -508,26 +510,26 @@ class PatternExtensionsSuite extends munit.FunSuite:
     val seq = Sequence(Seq(Character('x'), Character('y'), Character('z')))
     assertEquals(
       Pattern(Sequence(Seq(Character('x'), Character('y'), Character('z'), Dot(), Character('0'))), flagSet).parts,
-      Set(UString("xyz"))
+      Set(UStringUtil.fromString("xyz"))
     )
     assertEquals(
       Pattern(
         Sequence(Seq(Character('x'), Character('y'), Character('z'), Dot(), Character('0'))),
         flagSet.copy(ignoreCase = true)
       ).parts,
-      Set(UString("XYZ"))
+      Set(UStringUtil.fromString("XYZ"))
     )
-    assertEquals(Pattern(Sequence(Seq(seq)), flagSet).parts, Set(UString("xyz")))
-    assertEquals(Pattern(Disjunction(Seq(seq, Dot())), flagSet).parts, Set(UString("xyz")))
-    assertEquals(Pattern(Capture(1, seq), flagSet).parts, Set(UString("xyz")))
-    assertEquals(Pattern(NamedCapture(1, "x", seq), flagSet).parts, Set(UString("xyz")))
-    assertEquals(Pattern(Group(seq), flagSet).parts, Set(UString("xyz")))
-    assertEquals(Pattern(Repeat(Quantifier.Star(false), seq), flagSet).parts, Set(UString("xyz")))
-    assertEquals(Pattern(Repeat(Quantifier.Plus(false), seq), flagSet).parts, Set(UString("xyz")))
-    assertEquals(Pattern(Repeat(Quantifier.Question(false), seq), flagSet).parts, Set(UString("xyz")))
-    assertEquals(Pattern(Repeat(Quantifier.Exact(2, false), seq), flagSet).parts, Set(UString("xyz")))
-    assertEquals(Pattern(LookAhead(false, seq), flagSet).parts, Set(UString("xyz")))
-    assertEquals(Pattern(LookBehind(false, seq), flagSet).parts, Set(UString("xyz")))
+    assertEquals(Pattern(Sequence(Seq(seq)), flagSet).parts, Set(UStringUtil.fromString("xyz")))
+    assertEquals(Pattern(Disjunction(Seq(seq, Dot())), flagSet).parts, Set(UStringUtil.fromString("xyz")))
+    assertEquals(Pattern(Capture(1, seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
+    assertEquals(Pattern(NamedCapture(1, "x", seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
+    assertEquals(Pattern(Group(seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
+    assertEquals(Pattern(Repeat(Quantifier.Star(false), seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
+    assertEquals(Pattern(Repeat(Quantifier.Plus(false), seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
+    assertEquals(Pattern(Repeat(Quantifier.Question(false), seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
+    assertEquals(Pattern(Repeat(Quantifier.Exact(2, false), seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
+    assertEquals(Pattern(LookAhead(false, seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
+    assertEquals(Pattern(LookBehind(false, seq), flagSet).parts, Set(UStringUtil.fromString("xyz")))
     assertEquals(Pattern(Dot(), flagSet).parts, Set.empty[UString])
     assertEquals(Pattern(Character('x'), flagSet).parts, Set.empty[UString])
 

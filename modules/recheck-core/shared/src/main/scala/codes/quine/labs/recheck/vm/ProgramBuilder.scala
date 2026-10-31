@@ -5,11 +5,10 @@ import scala.compiletime.uninitialized
 import scala.util.Try
 
 import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.regexp.EcmaScriptChars
 import codes.quine.labs.recheck.regexp.Pattern
 import codes.quine.labs.recheck.regexp.Pattern.*
 import codes.quine.labs.recheck.regexp.PatternExtensions.*
-import codes.quine.labs.recheck.unicode.IChar
-import codes.quine.labs.recheck.unicode.UChar
 import codes.quine.labs.recheck.vm.Inst.AssertKind
 import codes.quine.labs.recheck.vm.Inst.ReadKind
 import codes.quine.labs.recheck.vm.Program.Meta
@@ -225,15 +224,15 @@ private[vm] class ProgramBuilder(
       case LookBehind(false, child) => wrapLookBehind(buildPositiveLookAround(child))
       case LookBehind(true, child)  => wrapLookBehind(buildNegativeLookAround(child))
       case Character(c0)            =>
-        val c = if ignoreCase then UChar.canonicalize(c0, unicode) else c0
+        val c = if ignoreCase then EcmaScriptChars.canonicalize(c0, unicode) else c0
         emitRead(ReadKind.Char(c), node.loc)
       case node @ CharacterClass(invert, _) =>
-        val ch0 = node.toIChar(unicode)
-        val ch = if ignoreCase then IChar.canonicalize(ch0, unicode) else ch0
+        val ch0 = node.toCharSet(unicode)
+        val ch = if ignoreCase then EcmaScriptChars.canonicalize(ch0, unicode) else ch0
         emitRead(if invert then ReadKind.ClassNot(ch) else ReadKind.Class(ch), node.loc)
       case node: AtomNode =>
-        val ch0 = node.toIChar(unicode)
-        val ch = if ignoreCase then IChar.canonicalize(ch0, unicode) else ch0
+        val ch0 = node.toCharSet(unicode)
+        val ch = if ignoreCase then EcmaScriptChars.canonicalize(ch0, unicode) else ch0
         emitRead(ReadKind.Class(ch), node.loc)
       case Dot() =>
         emitRead(if dotAll then ReadKind.Any else ReadKind.Dot, node.loc)

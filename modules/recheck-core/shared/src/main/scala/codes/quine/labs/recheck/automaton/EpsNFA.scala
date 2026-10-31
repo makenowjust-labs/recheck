@@ -6,14 +6,15 @@ import scala.collection.mutable
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
+import codes.quine.labs.recheck.regexp.EcmaScriptChars
 import codes.quine.labs.recheck.regexp.Pattern.Location
-import codes.quine.labs.recheck.unicode.IChar
-import codes.quine.labs.recheck.unicode.ICharSet
-import codes.quine.labs.recheck.unicode.ICharSet.CharKind
+import codes.quine.labs.recheck.regexp.PatternAlphabet
+import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
 import codes.quine.labs.recheck.util.GraphvizUtil.escape
+import codes.quine.labs.resyntax.charset.CharSet
 
 /** EpsNFA is an ordered ε-NFA on unicode code points. */
-final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept: Q, tau: Map[Q, Transition[Q]]):
+final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q, accept: Q, tau: Map[Q, Transition[Q]]):
 
   /** Converts to Graphviz format text. */
   def toGraphviz: String =
@@ -35,7 +36,9 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
           sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(k)}];\n")
         case Some(Consume(chs, q1, _)) =>
           sb.append(s"  ${escape(q0)} [shape=circle];\n")
-          sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(chs.mkString("{", ", ", "}"))}];\n")
+          sb.append(
+            s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(chs.map((c, k) => s"(${EcmaScriptChars.showClass(c)},$k)").mkString("{", ", ", "}"))}];\n"
+          )
         case Some(LoopEnter(loop, q1)) =>
           sb.append(s"  ${escape(q0)} [shape=circle];\n")
           sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(s"Enter($loop)")}];\n")
@@ -49,11 +52,11 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
     sb.result()
 
   /** Converts this ε-NFA to ordered NFA with ε-elimination. */
-  def toOrderedNFA(using ctx: Context): OrderedNFA[IChar, (CharKind, Seq[(Q, Set[CharKind])])] =
+  def toOrderedNFA(using ctx: Context): OrderedNFA[CharSet, (CharKind, Seq[(Q, Set[CharKind])])] =
     toOrderedNFA(Int.MaxValue)
 
   /** Converts this ε-NFA to ordered NFA with ε-elimination. */
-  def toOrderedNFA(maxNFASize: Int)(using ctx: Context): OrderedNFA[IChar, (CharKind, Seq[(Q, Set[CharKind])])] =
+  def toOrderedNFA(maxNFASize: Int)(using ctx: Context): OrderedNFA[CharSet, (CharKind, Seq[(Q, Set[CharKind])])] =
     ctx.interrupt:
       val hasLineAssertion = tau.values
         .collect:
@@ -98,9 +101,9 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
       val newStateSet = mutable.Set.empty[(CharKind, Seq[P])]
       val newInits = Vector((inputTerminatorKind, closureInit.map(_._1)))
       val newAcceptSet = Set.newBuilder[(CharKind, Seq[P])]
-      val newDelta = Map.newBuilder[((CharKind, Seq[P]), IChar), Seq[(CharKind, Seq[P])]]
+      val newDelta = Map.newBuilder[((CharKind, Seq[P]), CharSet), Seq[(CharKind, Seq[P])]]
       val newSourcemap = mutable.Map
-        .empty[((CharKind, Seq[P]), IChar, (CharKind, Seq[P])), Seq[Location]]
+        .empty[((CharKind, Seq[P]), CharSet, (CharKind, Seq[P])), Seq[Location]]
         .withDefaultValue(Vector.empty)
       var deltaSize = 0
 
@@ -112,7 +115,7 @@ final case class EpsNFA[Q](alphabet: ICharSet, stateSet: Set[Q], init: Q, accept
           val (c0, qps) = queue.dequeue()
           val qs0 = qps.map(_._1)
           if qs0.map(_._1).contains(accept) then newAcceptSet.addOne((c0, qs0))
-          val d = mutable.Map.empty[IChar, Seq[(CharKind, Seq[P])]].withDefaultValue(Vector.empty)
+          val d = mutable.Map.empty[CharSet, Seq[(CharKind, Seq[P])]].withDefaultValue(Vector.empty)
           for (_, p) <- qps do
             p match
               case Some(Consume(chs, q1, loc)) =>
@@ -159,7 +162,7 @@ object EpsNFA:
   final case class Assert[Q](kind: AssertKind, to: Q) extends Transition[Q]
 
   /** Consume is an ε-NFA transition with consuming a character. */
-  final case class Consume[Q](set: Set[(IChar, CharKind)], to: Q, loc: Option[Location] = None) extends Transition[Q]
+  final case class Consume[Q](set: Set[(CharSet, CharKind)], to: Q, loc: Option[Location] = None) extends Transition[Q]
 
   /** LoopEnter is an ε-NFA transition with consuming no character and marking a entering of the loop. */
   final case class LoopEnter[Q](loop: Int, to: Q) extends Transition[Q]

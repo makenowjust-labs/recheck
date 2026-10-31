@@ -2,8 +2,7 @@ package codes.quine.labs.recheck
 package automaton
 
 import codes.quine.labs.recheck.diagnostics.AttackPattern
-import codes.quine.labs.recheck.unicode.UChar
-import codes.quine.labs.recheck.unicode.UString
+import codes.quine.labs.recheck.util.UStringUtil
 
 /** Witness is a witness to the ReDoS attack, which is a pump string with a suffix.
   *
@@ -21,10 +20,10 @@ final case class Witness[A](pumps: Seq[(Seq[A], Seq[A])], suffix: Seq[A]):
     pumps.flatMap { case (pre, pump) => pre ++ Vector.fill(n)(pump).flatten } ++ suffix
 
   /** Builds an attack pattern string with `n` times repetition. */
-  def buildAttackPattern(n: Int)(using ev: A =:= UChar): AttackPattern =
+  def buildAttackPattern(n: Int)(using ev: A =:= Int): AttackPattern =
     val pumps = this.pumps.map:
-      case (s, t) => (UString.from(s.map(ev)), UString.from(t.map(ev)), 0)
-    val suffix = UString.from(this.suffix.map(ev))
+      case (s, t) => (UStringUtil.fromCodePoints(s.map(ev)), UStringUtil.fromCodePoints(t.map(ev)), 0)
+    val suffix = UStringUtil.fromCodePoints(this.suffix.map(ev))
     AttackPattern(pumps, suffix, n)
 
   /** A sum of a repeat part size. */

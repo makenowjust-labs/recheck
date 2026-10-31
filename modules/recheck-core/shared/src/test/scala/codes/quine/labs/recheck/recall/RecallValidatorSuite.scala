@@ -8,7 +8,7 @@ import scala.concurrent.duration.SECONDS
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
-import codes.quine.labs.recheck.unicode.UString
+import codes.quine.labs.recheck.util.UStringUtil
 
 class RecallValidatorSuite extends munit.FunSuite:
 
@@ -16,7 +16,8 @@ class RecallValidatorSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
   test("RecallValidator.checks"):
-    val pattern = AttackPattern(Seq((UString("x"), UString("y"), 0)), UString("z"), 2)
+    val pattern =
+      AttackPattern(Seq((UStringUtil.fromString("x"), UStringUtil.fromString("y"), 0)), UStringUtil.fromString("z"), 2)
     assertEquals(
       RecallValidator.checks("foo", "i", pattern, Duration.MinusInf)((_, _) => fail("unreachable")),
       true
@@ -37,7 +38,8 @@ class RecallValidatorSuite extends munit.FunSuite:
     }
 
   test("RecallValidator.validate"):
-    val pattern = AttackPattern(Seq((UString("x"), UString("y"), 0)), UString("z"), 2)
+    val pattern =
+      AttackPattern(Seq((UStringUtil.fromString("x"), UStringUtil.fromString("y"), 0)), UStringUtil.fromString("z"), 2)
     assertEquals(
       RecallValidator.validate("foo", "i", pattern, Duration.MinusInf)((_, _) => fail("unreachable")),
       RecallResult.Timeout
@@ -69,7 +71,15 @@ class RecallValidatorSuite extends munit.FunSuite:
 
   test("RecallValidator.generate"):
     assertEquals(
-      RecallValidator.generate("foo", "i", AttackPattern(Seq((UString("x"), UString("y"), 0)), UString("z"), 2)),
+      RecallValidator.generate(
+        "foo",
+        "i",
+        AttackPattern(
+          Seq((UStringUtil.fromString("x"), UStringUtil.fromString("y"), 0)),
+          UStringUtil.fromString("z"),
+          2
+        )
+      ),
       """|const re = new RegExp('foo', 'i');
          |const input = 'x' + 'y'.repeat(2) + 'z';
          |const start = Date.now();

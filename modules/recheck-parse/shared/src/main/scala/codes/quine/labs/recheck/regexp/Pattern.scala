@@ -3,8 +3,7 @@ package codes.quine.labs.recheck.regexp
 import scala.collection.mutable
 
 import codes.quine.labs.recheck.regexp.Pattern.*
-import codes.quine.labs.recheck.unicode.IChar
-import codes.quine.labs.recheck.unicode.UChar
+import codes.quine.labs.resyntax.charset.CharSet
 
 /** Pattern is ECMA-262 `RegExp` pattern. */
 final case class Pattern(node: Node, flagSet: FlagSet):
@@ -107,18 +106,18 @@ object Pattern:
   final case class LookBehind(negative: Boolean, child: Node) extends Node
 
   /** Character is a single character in pattern. (e.g. `/x/`) */
-  final case class Character(value: UChar) extends Node with ClassNode
+  final case class Character(value: Int) extends Node with ClassNode
 
   /** SimpleEscapeClass is an escape class. (e.g. `/\w/` or `/\s/`) */
   final case class SimpleEscapeClass(invert: Boolean, kind: EscapeClassKind) extends Node with ClassNode
 
   /** UnicodeProperty is an escape class of Unicode property. (e.g. `/\p{ASCII}/` or `/\P{L}/`) */
-  final case class UnicodeProperty(invert: Boolean, name: String, contents: IChar) extends Node with ClassNode
+  final case class UnicodeProperty(invert: Boolean, name: String, contents: CharSet) extends Node with ClassNode
 
   /** UnicodePropertyValue is an escape class of Unicode property and value. (e.g. `/\p{sc=Hira}/` or
     * `/\P{General_Category=No}/`)
     */
-  final case class UnicodePropertyValue(invert: Boolean, name: String, value: String, contents: IChar)
+  final case class UnicodePropertyValue(invert: Boolean, name: String, value: String, contents: CharSet)
       extends Node
       with ClassNode
 
@@ -126,11 +125,11 @@ object Pattern:
   final case class CharacterClass(invert: Boolean, children: Seq[ClassNode]) extends Node with AtomNode
 
   /** ClassRange is a character range pattern in a class. */
-  final case class ClassRange(begin: UChar, end: UChar) extends ClassNode
+  final case class ClassRange(begin: Int, end: Int) extends ClassNode
 
   /** Dot is any characters pattern. (e.g. `/./`)
     *
-    * This does not inherit `AtomNode` intentionally because this `toIChar` needs `dotAll` flag information.
+    * This does not inherit `AtomNode` intentionally because this `toCharSet` needs `dotAll` flag information.
     */
   final case class Dot() extends Node
 
@@ -216,7 +215,7 @@ object Pattern:
     case LookAhead(true, n)                   => s"(?!${showNode(n)})"
     case LookBehind(false, n)                 => s"(?<=${showNode(n)})"
     case LookBehind(true, n)                  => s"(?<!${showNode(n)})"
-    case Character(u)                         => showUChar(u)
+    case Character(c)                         => showChar(c)
     case CharacterClass(false, items)         => s"[${items.map(showClassNode).mkString}]"
     case CharacterClass(true, items)          => s"[^${items.map(showClassNode).mkString}]"
     case SimpleEscapeClass(false, k)          => EscapeClassKind.showEscapeClassKind(k)
@@ -261,8 +260,8 @@ object Pattern:
   /** Shows a [[ClassNode]] as a pattern. */
   private def showClassNode(node: ClassNode): String =
     node match
-      case Character(u)       => showUCharInClass(u)
-      case ClassRange(u1, u2) => s"${showUCharInClass(u1)}-${showUCharInClass(u2)}"
+      case Character(c)       => showCharInClass(c)
+      case ClassRange(c1, c2) => s"${showCharInClass(c1)}-${showCharInClass(c2)}"
       case node: Node         => showNode(node)
 
   /** Shows a [[FlagSet]] as a pattern. */
@@ -288,11 +287,11 @@ object Pattern:
     if quantifier.isLazy then s"$s?" else s
 
   /** Shows a character as a pattern. */
-  private def showUChar(u: UChar): String =
-    if u.value.isValidChar && "^$\\.*+?()[]{}|/".contains(u.value.toChar) then s"\\${u.value.toChar}"
-    else u.toString
+  private def showChar(c: Int): String =
+    if c.isValidChar && "^$\\.*+?()[]{}|/".contains(c.toChar) then s"\\${c.toChar}"
+    else EcmaScriptChars.showChar(c)
 
   /** Shows a character as a class in pattern. */
-  private def showUCharInClass(u: UChar): String =
-    if u.value.isValidChar && "[^-]".contains(u.value.toChar) then s"\\${u.value.toChar}"
-    else u.toString
+  private def showCharInClass(c: Int): String =
+    if c.isValidChar && "[^-]".contains(c.toChar) then s"\\${c.toChar}"
+    else EcmaScriptChars.showChar(c)

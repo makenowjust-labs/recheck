@@ -8,8 +8,9 @@ import fastparse.NoWhitespace.*
 import codes.quine.labs.recheck.regexp.Pattern.ClassNode
 import codes.quine.labs.recheck.regexp.Pattern.FlagSet
 import codes.quine.labs.recheck.regexp.Pattern.Node
-import codes.quine.labs.recheck.unicode.IChar
-import codes.quine.labs.recheck.unicode.UChar
+import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UnitMode
 
 /** ECMA-262 RegExp parser implementation. */
 object Parser:
@@ -172,18 +173,17 @@ object Parser:
 
     def classNode(node: ClassNode): ClassNode = node match
       case UnicodeProperty(invert, name, _) =>
-        val contents = IChar.UnicodeProperty(name) match
-          case Some(char) => if invert then char.complement(unicode = true) else char
-          case None       => throw ParsingException(s"unknown Unicode property: $name", node.loc)
+        val contents = EcmaScriptChars.unicodeProperty(name) match
+          case Some(set) => if invert then set.complement(UnitMode.CodePoint) else set
+          case None      => throw ParsingException(s"unknown Unicode property: $name", node.loc)
         UnicodeProperty(invert, name, contents).withLoc(node)
       case UnicodePropertyValue(invert, name, value, _) =>
-        val contents = IChar.UnicodePropertyValue(name, value) match
-          case Some(char) => if invert then char.complement(unicode = true) else char
-          case None       => throw ParsingException(s"unknown Unicode property-value: $name=$value", node.loc)
+        val contents = EcmaScriptChars.unicodePropertyValue(name, value) match
+          case Some(set) => if invert then set.complement(UnitMode.CodePoint) else set
+          case None      => throw ParsingException(s"unknown Unicode property-value: $name=$value", node.loc)
         UnicodePropertyValue(invert, name, value, contents).withLoc(node)
       case ClassRange(b, e) =>
-        val char = IChar.range(b, e)
-        if char.isEmpty then throw ParsingException("an empty range", node.loc)
+        if CharSet.range(b, e).isEmpty then throw ParsingException("an empty range", node.loc)
         else node
       case _ => node
 
@@ -215,10 +215,10 @@ object Parser:
     catch case ex: ParsingException => Left(ex)
 
   /** An interval set contains "ID_Start" code points. */
-  private lazy val IDStart = IChar.UnicodeProperty("ID_Start").get
+  private lazy val IDStart = EcmaScriptChars.unicodeProperty("ID_Start").get
 
   /** An interval set contains "ID_Continue" code points. */
-  private lazy val IDContinue = IChar.UnicodeProperty("ID_Continue").get
+  private lazy val IDContinue = EcmaScriptChars.unicodeProperty("ID_Continue").get
 
 /** Parser is a ECMA-262 RegExp parser.
   *
@@ -365,7 +365,7 @@ private[regexp] final class Parser(
     * ClassAtom :: EscapeClass | ClassCharacter
     * }}}
     */
-  def ClassAtom[X: P]: P[Either[UChar, ClassNode]] = P:
+  def ClassAtom[X: P]: P[Either[Int, ClassNode]] = P:
     EscapeClass.map(Right(_)) | ClassCharacter.map(Left(_))
 
   /** {{{
@@ -373,8 +373,8 @@ private[regexp] final class Parser(
     *                   | Character | EscapeCharacter
     * }}}
     */
-  def ClassCharacter[X: P]: P[UChar] = P:
-    ("\\-" ~ Pass(UChar(0x2d))) | ("\\b" ~ Pass(UChar(0x08))) | Character | EscapeCharacter
+  def ClassCharacter[X: P]: P[Int] = P:
+    ("\\-" ~ Pass(0x2d)) | ("\\b" ~ Pass(0x08)) | Character | EscapeCharacter
 
   /** {{{
     * Escape :: WordBoundary
@@ -469,16 +469,16 @@ private[regexp] final class Parser(
     *                   | OctalEscape | IdentityEscape
     * }}}
     */
-  def EscapeCharacter[X: P]: P[UChar] = P:
+  def EscapeCharacter[X: P]: P[Int] = P:
     UnicodeEscape |
-      ("\\t" ~ Pass(UChar(0x09))) |
-      ("\\n" ~ Pass(UChar(0x0a))) |
-      ("\\v" ~ Pass(UChar(0x0b))) |
-      ("\\f" ~ Pass(UChar(0x0c))) |
-      ("\\r" ~ Pass(UChar(0x0d))) |
-      ("\\c" ~ CharPred(isControl).!.map(s => UChar(s.charAt(0) % 32))) |
-      ("\\x" ~ HexDigit.rep(exactly = 2).!.map(s => UChar(Integer.parseInt(s, 16)))) |
-      ("\\0" ~ !CharPred(isDigit) ~ Pass(UChar(0))) |
+      ("\\t" ~ Pass(0x09)) |
+      ("\\n" ~ Pass(0x0a)) |
+      ("\\v" ~ Pass(0x0b)) |
+      ("\\f" ~ Pass(0x0c)) |
+      ("\\r" ~ Pass(0x0d)) |
+      ("\\c" ~ CharPred(isControl).!.map(s => s.charAt(0) % 32)) |
+      ("\\x" ~ HexDigit.rep(exactly = 2).!.map(Integer.parseInt(_, 16))) |
+      ("\\0" ~ !CharPred(isDigit) ~ Pass(0)) |
       OctalEscape |
       IdentityEscape
 
@@ -489,11 +489,11 @@ private[regexp] final class Parser(
     *             | HexDigits HexDigit
     * }}}
     */
-  def UnicodeEscape[X: P]: P[UChar] =
-    if !unicode then P("\\u" ~/ HexDigit.rep(exactly = 4).!.map(s => UChar(Integer.parseInt(s, 16))))
+  def UnicodeEscape[X: P]: P[Int] =
+    if !unicode then P("\\u" ~/ HexDigit.rep(exactly = 4).!.map(Integer.parseInt(_, 16)))
     else
       P:
-        "\\u{" ~/ HexDigit.rep(1).!.map(s => UChar(Integer.parseInt(s, 16))).filter(_.isValidCodePoint) ~/ "}" |
+        "\\u{" ~/ HexDigit.rep(1).!.map(Integer.parseInt(_, 16)).filter(c => 0 <= c && c <= 0x10ffff) ~/ "}" |
           "\\u" ~/ HexDigit
             .rep(exactly = 4)
             .!
@@ -502,45 +502,45 @@ private[regexp] final class Parser(
               case x if 0xd800 <= x && x <= 0xdbff =>
                 ("\\u" ~ (CharIn("dD") ~ CharIn("cdefCDEF") ~ HexDigit.rep(exactly = 2)).!.map: s =>
                   val y = Integer.parseInt(s, 16)
-                  UChar(0x10000 + (x - 0xd800) * 0x400 + (y - 0xdc00))
-                ) | Pass(UChar(x))
-              case x => Pass(UChar(x))
+                  0x10000 + (x - 0xd800) * 0x400 + (y - 0xdc00)
+                ) | Pass(x)
+              case x => Pass(x)
 
   /** {{{
     * OctalEscape :: "\\" [0-7] [0-7] [0-7]
     * }}}
     */
-  def OctalEscape[X: P]: P[UChar] =
+  def OctalEscape[X: P]: P[Int] =
     if additional && !unicode then
       P:
         "\\" ~ (
           CharIn("0123") ~ CharIn("01234567").rep(max = 2) |
             CharIn("4567") ~ CharIn("01234567").?
-        ).!.map(s => UChar(Integer.parseInt(s, 8)))
+        ).!.map(Integer.parseInt(_, 8))
     else Fail
 
   /** {{{
     * IdentityEscape :: "\\" [\^$\\.*+?()[]{}|/]
     * }}}
     */
-  def IdentityEscape[X: P]: P[UChar] =
-    if unicode then P("\\" ~ CharPred(isSyntax).!.map(s => UChar(s.charAt(0).toInt)))
+  def IdentityEscape[X: P]: P[Int] =
+    if unicode then P("\\" ~ CharPred(isSyntax).!.map(_.charAt(0).toInt))
     else if additional then
       P:
-        "\\" ~ &("c") ~ Pass(UChar(0x5c)) |
-          "\\" ~ (if hasNamedCapture then CharPred(_ != 'k') else AnyChar).!.map(s => UChar(s.charAt(0).toInt))
-    else "\\" ~ CharPred(c => !Parser.IDContinue.contains(UChar(c))).!.map(s => UChar(s.charAt(0).toInt))
+        "\\" ~ &("c") ~ Pass(0x5c) |
+          "\\" ~ (if hasNamedCapture then CharPred(_ != 'k') else AnyChar).!.map(_.charAt(0).toInt)
+    else "\\" ~ CharPred(c => !Parser.IDContinue.contains(c)).!.map(_.charAt(0).toInt)
 
   /** {{{
     * Character :: any character
     * }}}
     */
-  def Character[X: P]: P[UChar] =
+  def Character[X: P]: P[Int] =
     if unicode then
       P:
-        !"\\" ~ (CharPred(_.isHighSurrogate) ~ CharPred(_.isLowSurrogate)).!.map(s => UChar(s.codePointAt(0))) |
-          !"\\" ~ AnyChar.!.map(s => UChar(s.charAt(0).toInt))
-    else P(!"\\" ~ AnyChar.!.map(s => UChar(s.charAt(0).toInt)))
+        !"\\" ~ (CharPred(_.isHighSurrogate) ~ CharPred(_.isLowSurrogate)).!.map(_.codePointAt(0)) |
+          !"\\" ~ AnyChar.!.map(_.charAt(0).toInt)
+    else P(!"\\" ~ AnyChar.!.map(_.charAt(0).toInt))
 
   /** {{{
     * Paren :: "(" Disjunction ")"
@@ -570,13 +570,13 @@ private[regexp] final class Parser(
     */
   def CaptureName[X: P]: P[String] = P:
     (CaptureNameChar.filter(isIDStart) ~ CaptureNameChar.filter(isIDPart).rep).map:
-      case (x, xs) => String.valueOf((x +: xs).toArray.flatMap(_.toChars))
+      case (x, xs) => UString.from(x +: xs).asString
 
   /** {{{
     * CaptureNameChar :: UnicodeEscape | Character
     * }}}
     */
-  def CaptureNameChar[X: P]: P[UChar] = P(UnicodeEscape | Character)
+  def CaptureNameChar[X: P]: P[Int] = P(UnicodeEscape | Character)
 
   /** {{{
     * Digits :: [0-9]
@@ -622,9 +622,9 @@ private[regexp] final class Parser(
     isUnicodeProperty(c) || isDigit(c)
 
   /** Tests whether the character is valid as identifier start character or not. */
-  private def isIDStart(u: UChar): Boolean =
-    u == UChar('$') || u == UChar('_') || Parser.IDStart.contains(u)
+  private def isIDStart(c: Int): Boolean =
+    c == '$' || c == '_' || Parser.IDStart.contains(c)
 
   /** Tests whether the character is valid as identifier part character or not. */
-  private def isIDPart(u: UChar): Boolean =
-    u == UChar('$') || u == UChar(0x200c) || u == UChar(0x200d) || Parser.IDContinue.contains(u)
+  private def isIDPart(c: Int): Boolean =
+    c == '$' || c == 0x200c || c == 0x200d || Parser.IDContinue.contains(c)

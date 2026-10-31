@@ -14,7 +14,7 @@ import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.regexp.Pattern
 import codes.quine.labs.recheck.regexp.Pattern.*
-import codes.quine.labs.recheck.unicode.UString
+import codes.quine.labs.recheck.util.UStringUtil
 
 class ReDoSSuite extends munit.FunSuite:
 
@@ -70,7 +70,11 @@ class ReDoSSuite extends munit.FunSuite:
           "^(?:a|a)*$",
           "",
           AttackComplexity.Exponential(false),
-          AttackPattern(Seq((UString(""), UString("a"), 0)), UString("\u0000"), 31),
+          AttackPattern(
+            Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
+            UStringUtil.fromString("\u0000"),
+            31
+          ),
           Hotspot.empty,
           Checker.Automaton
         )
@@ -165,7 +169,11 @@ class ReDoSSuite extends munit.FunSuite:
           "^(?:a|a)*$",
           "",
           AttackComplexity.Exponential(false),
-          AttackPattern(Seq((UString(""), UString("a"), 0)), UString("\u0000"), 31),
+          AttackPattern(
+            Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
+            UStringUtil.fromString("\u0000"),
+            31
+          ),
           Hotspot.empty,
           Checker.Automaton
         )

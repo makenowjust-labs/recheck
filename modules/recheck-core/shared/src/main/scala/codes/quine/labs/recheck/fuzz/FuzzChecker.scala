@@ -14,15 +14,16 @@ import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.fuzz.FuzzChecker.*
 import codes.quine.labs.recheck.regexp.Pattern
-import codes.quine.labs.recheck.unicode.ICharSet
-import codes.quine.labs.recheck.unicode.UString
+import codes.quine.labs.recheck.regexp.PatternAlphabet
 import codes.quine.labs.recheck.util.RepeatUtil
+import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.recheck.vm.Interpreter
 import codes.quine.labs.recheck.vm.Interpreter.CoverageItem
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
 import codes.quine.labs.recheck.vm.Program
+import codes.quine.labs.resyntax.charset.UString
 
 /** ReDoS vulnerable RegExp checker based on fuzzing. */
 object FuzzChecker:
@@ -125,7 +126,7 @@ private[fuzz] final class FuzzChecker(
   def program: Program = fuzz.program
 
   /** An alias to `fuzz.alphabet`. */
-  def alphabet: ICharSet = fuzz.alphabet
+  def alphabet: PatternAlphabet = fuzz.alphabet
 
   /** An alias to `fuzz.program.meta.unicode` */
   def unicode: Boolean = fuzz.program.meta.unicode
@@ -264,7 +265,7 @@ private[fuzz] final class FuzzChecker(
     val t = gen.traces(i).str
 
     val idx = random.between(0, parts.size)
-    val part = parts(idx).iterator(unicode).map(FString.Wrap(_)).toIndexedSeq
+    val part = parts(idx).chars(unicode).map(FString.Wrap(_)).toIndexedSeq
     val fcs = random.between(0, 2) match
       case 0 => part
       case 1 =>
@@ -359,7 +360,7 @@ private[fuzz] final class FuzzChecker(
     */
   def tryAttackExecute(str: FString, degree: Option[Int]): Option[(AttackPattern, Hotspot)] = interrupt:
     val input = str.toUString
-    if input.sizeAsString <= maxAttackStringSize && degree.forall(growsAsExpected(str, _)) then
+    if input.length <= maxAttackStringSize && degree.forall(growsAsExpected(str, _)) then
       val usesAcceleration = fuzz.usesAcceleration(accelerationMode)
       val opts = Options(attackLimit, usesAcceleration = usesAcceleration, needsHeatmap = true)
       val result = Interpreter.runWithTimeout(program, input, 0, opts, attackTimeout)
@@ -402,7 +403,7 @@ private[fuzz] final class FuzzChecker(
       if str.countRepeat >= maxDegree then return Iterator.empty
 
       val input = str.toUString
-      if inputs.contains(input) || input.sizeAsString >= maxGeneStringSize then return Iterator.empty
+      if inputs.contains(input) || input.length >= maxGeneStringSize then return Iterator.empty
 
       val opts =
         Options(incubationLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode), needsCoverage = true)
@@ -420,7 +421,7 @@ private[fuzz] final class FuzzChecker(
     def add(str: FString, input: UString, result: Result): Unit =
       inputs.add(input)
 
-      val rate = if input.isEmpty then 0 else result.steps.toDouble / input.sizeAsString
+      val rate = if input.isEmpty then 0 else result.steps.toDouble / input.length
       val coverage = result.coverage
       val trace = Trace(str, rate, result.steps, coverage)
 

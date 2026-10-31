@@ -7,9 +7,10 @@ import scala.language.implicitConversions
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
-import codes.quine.labs.recheck.unicode.IChar
-import codes.quine.labs.recheck.unicode.ICharSet
-import codes.quine.labs.recheck.unicode.ICharSet.CharKind
+import codes.quine.labs.recheck.regexp.PatternAlphabet
+import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
+import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UnitMode
 
 class EpsNFASuite extends munit.FunSuite:
 
@@ -35,14 +36,14 @@ class EpsNFASuite extends munit.FunSuite:
 
   test("EpsNFA#toGraphviz"):
     val nfa = EpsNFA(
-      ICharSet.any(false, false).add(IChar('a')),
+      PatternAlphabet.build(false, false, Seq(CharSet.single('a'))),
       immutable.SortedSet(0, 1, 2, 3, 4, 5, 6),
       0,
       6,
       Map(
         0 -> Eps(Seq(1)),
         1 -> Eps(Seq(2, 3)),
-        2 -> Consume(Set((IChar('a'), CharKind.Normal)), 4),
+        2 -> Consume(Set((CharSet.single('a'), CharKind.Normal)), 4),
         3 -> Assert(AssertKind.LineBegin, 4),
         4 -> LoopEnter(0, 5),
         5 -> LoopExit(0, 6)
@@ -72,7 +73,7 @@ class EpsNFASuite extends munit.FunSuite:
 
   test("EpsNFA#toOrderedNFA"):
     val nfa1 = EpsNFA(
-      ICharSet.any(false, false).add(IChar('\n'), CharKind.LineTerminator),
+      PatternAlphabet.build(false, false, lineTerminator = Some(CharSet.single('\n'))),
       Set(0, 1, 2, 3, 4, 5, 6),
       0,
       6,
@@ -80,7 +81,7 @@ class EpsNFASuite extends munit.FunSuite:
         0 -> Eps(Seq(1, 5)),
         1 -> LoopEnter(0, 2),
         2 -> Eps(Seq(3, 4)),
-        3 -> Consume(Set((IChar('\n'), CharKind.LineTerminator)), 0),
+        3 -> Consume(Set((CharSet.single('\n'), CharKind.LineTerminator)), 0),
         4 -> Assert(AssertKind.LineEnd, 0),
         5 -> LoopExit(0, 6)
       )
@@ -88,20 +89,21 @@ class EpsNFASuite extends munit.FunSuite:
     val q36: Seq[(Int, Set[CharKind])] = Seq((3, Set(CharKind.LineTerminator, CharKind.Normal)), (6, Set.empty))
     assertEquals(
       nfa1.toOrderedNFA,
-      OrderedNFA[IChar, (CharKind, Seq[(Int, Set[CharKind])])](
-        Set(IChar('\n'), IChar('\n').complement(false)),
+      OrderedNFA[CharSet, (CharKind, Seq[(Int, Set[CharKind])])](
+        Set(CharSet.single('\n'), CharSet.single('\n').complement(UnitMode.Utf16)),
         Set((CharKind.LineTerminator, q36)),
         Vector((CharKind.LineTerminator, q36)),
         Set((CharKind.LineTerminator, q36)),
         Map(
-          ((CharKind.LineTerminator, q36), IChar('\n')) -> Vector(
+          ((CharKind.LineTerminator, q36), CharSet.single('\n')) -> Vector(
             (CharKind.LineTerminator, q36)
           )
         )
       )
     )
     val nfa2 = EpsNFA(
-      ICharSet.any(false, false).add(IChar('\n'), CharKind.LineTerminator).add(IChar('a'), CharKind.Word),
+      PatternAlphabet
+        .build(false, false, lineTerminator = Some(CharSet.single('\n')), word = Some(CharSet.single('a'))),
       Set(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
       0,
       10,
@@ -110,8 +112,8 @@ class EpsNFASuite extends munit.FunSuite:
         1 -> Eps(Seq(2, 8)),
         2 -> LoopEnter(0, 3),
         3 -> Eps(Seq(4, 5)),
-        4 -> Consume(Set((IChar('\n'), CharKind.LineTerminator)), 1),
-        5 -> Consume(Set((IChar('a'), CharKind.Word)), 6),
+        4 -> Consume(Set((CharSet.single('\n'), CharKind.LineTerminator)), 1),
+        5 -> Consume(Set((CharSet.single('a'), CharKind.Word)), 6),
         6 -> Eps(Seq(7, 1)),
         7 -> Assert(AssertKind.WordBoundaryNot, 1),
         8 -> LoopExit(0, 9),
@@ -132,7 +134,11 @@ class EpsNFASuite extends munit.FunSuite:
     assertEquals(
       nfa2.toOrderedNFA,
       OrderedNFA(
-        Set(IChar('\n'), IChar('a'), IChar('a').union(IChar('\n')).complement(false)),
+        Set(
+          CharSet.single('\n'),
+          CharSet.single('a'),
+          CharSet.single('a').union(CharSet.single('\n')).complement(UnitMode.Utf16)
+        ),
         Set(
           (CharKind.LineTerminator, q4),
           (CharKind.LineTerminator, q45),
@@ -141,19 +147,19 @@ class EpsNFASuite extends munit.FunSuite:
         Vector((CharKind.LineTerminator, q4)),
         Set((CharKind.Word: CharKind, q54510)),
         Map(
-          ((CharKind.LineTerminator, q4), IChar('\n')) -> Vector(
+          ((CharKind.LineTerminator, q4), CharSet.single('\n')) -> Vector(
             (CharKind.LineTerminator, q45)
           ),
-          ((CharKind.LineTerminator, q45), IChar('a')) -> Vector(
+          ((CharKind.LineTerminator, q45), CharSet.single('a')) -> Vector(
             (CharKind.Word, q54510)
           ),
-          ((CharKind.LineTerminator, q45), IChar('\n')) -> Vector(
+          ((CharKind.LineTerminator, q45), CharSet.single('\n')) -> Vector(
             (CharKind.LineTerminator, q45)
           ),
-          ((CharKind.Word, q54510), IChar('\n')) -> Vector(
+          ((CharKind.Word, q54510), CharSet.single('\n')) -> Vector(
             (CharKind.LineTerminator, q45)
           ),
-          ((CharKind.Word, q54510), IChar('a')) -> Vector(
+          ((CharKind.Word, q54510), CharSet.single('a')) -> Vector(
             (CharKind.Word, q54510),
             (CharKind.Word, q54510)
           )

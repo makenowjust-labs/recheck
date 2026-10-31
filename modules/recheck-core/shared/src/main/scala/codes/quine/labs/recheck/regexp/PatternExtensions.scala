@@ -1,14 +1,13 @@
 package codes.quine.labs.recheck.regexp
 
 import scala.annotation.tailrec
-import scala.util.chaining.*
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.regexp.Pattern.*
-import codes.quine.labs.recheck.unicode.IChar
-import codes.quine.labs.recheck.unicode.ICharSet
-import codes.quine.labs.recheck.unicode.ICharSet.CharKind
-import codes.quine.labs.recheck.unicode.UString
+import codes.quine.labs.recheck.util.UStringUtil
+import codes.quine.labs.recheck.util.UStringUtil.*
+import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UString
 
 object PatternExtensions:
 
@@ -155,17 +154,11 @@ object PatternExtensions:
       loop(pattern.node)
 
     /** Computes alphabet from this pattern. */
-    def alphabet(using ctx: Context): ICharSet =
+    def alphabet(using ctx: Context): PatternAlphabet =
       ctx.interrupt:
         val FlagSet(_, ignoreCase, _, dotAll, unicode, _) = pattern.flagSet
-        val set = ICharSet
-          .any(ignoreCase, unicode)
-          .pipe(set =>
-            if needsLineTerminatorDistinction then set.add(IChar.LineTerminator, CharKind.LineTerminator) else set
-          )
-          .pipe(set => if needsWordDistinction then set.add(IChar.Word, CharKind.Word) else set)
 
-        def loop(node: Node): Seq[IChar] = ctx.interrupt:
+        def loop(node: Node): Seq[CharSet] = ctx.interrupt:
           node match
             case Disjunction(ns)       => ns.flatMap(loop)
             case Sequence(ns)          => ns.flatMap(loop)
@@ -176,12 +169,18 @@ object PatternExtensions:
             case LookAhead(_, n)       => loop(n)
             case LookBehind(_, n)      => loop(n)
             case atom: AtomNode        =>
-              val ch = atom.toIChar(unicode)
-              Vector(if ignoreCase then IChar.canonicalize(ch, unicode) else ch)
-            case Dot() => Vector(IChar.dot(ignoreCase, dotAll, unicode))
+              val ch = atom.toCharSet(unicode)
+              Vector(if ignoreCase then EcmaScriptChars.canonicalize(ch, unicode) else ch)
+            case Dot() => Vector(EcmaScriptChars.dot(ignoreCase, dotAll, unicode))
             case _     => Vector.empty
 
-        loop(pattern.node).toSet.foldLeft(set)(_.add(_))
+        PatternAlphabet.build(
+          ignoreCase,
+          unicode,
+          loop(pattern.node),
+          Option.when(needsLineTerminatorDistinction)(EcmaScriptChars.LineTerminator),
+          Option.when(needsWordDistinction)(EcmaScriptChars.Word)
+        )
 
     /** Tests whether the pattern needs line terminator distinction or not. */
     def needsLineTerminatorDistinction(using ctx: Context): Boolean =
@@ -235,8 +234,8 @@ object PatternExtensions:
         if ns.isEmpty then set
         else
           val (pre, suf) = ns.span(_.isInstanceOf[Character])
-          val s = UString(pre.collect { case Character(c) => c.asString }.mkString)
-          val newSet = set ++ (if s.sizeAsString > 1 then Set(s) else Set.empty)
+          val s = UStringUtil.fromCodePoints(pre.collect { case Character(c) => c })
+          val newSet = set ++ (if s.length > 1 then Set(s) else Set.empty)
           extract(suf.dropWhile(!_.isInstanceOf[Character]), newSet)
 
       def loop(node: Node): Set[UString] = node match
@@ -251,7 +250,12 @@ object PatternExtensions:
         case _                     => Set.empty
 
       val set = loop(pattern.node)
-      if pattern.flagSet.ignoreCase then set.map(UString.canonicalize(_, pattern.flagSet.unicode)) else set
+      val unicode = pattern.flagSet.unicode
+      if pattern.flagSet.ignoreCase then
+        set.map: s =>
+          val shown = s.chars(unicode).map(c => EcmaScriptChars.showChar(EcmaScriptChars.canonicalize(c, unicode)))
+          UStringUtil.fromString(shown.mkString)
+      else set
 
     /** Returns a maximum capture index or `0`. */
     def capturesSize: Int = pattern.node.captureRange.range.map(_._2).getOrElse(0)
@@ -289,16 +293,16 @@ object PatternExtensions:
 
   extension (atom: AtomNode)
 
-    /** Converts this pattern to a corresponding interval set. */
-    def toIChar(unicode: Boolean): IChar = atom match
-      case Character(c)                 => IChar(c)
+    /** Converts this pattern to a corresponding character set. */
+    def toCharSet(unicode: Boolean): CharSet = atom match
+      case Character(c)                 => CharSet.single(c)
       case SimpleEscapeClass(invert, k) =>
-        val char = k match
-          case EscapeClassKind.Digit => IChar.Digit
-          case EscapeClassKind.Word  => IChar.Word
-          case EscapeClassKind.Space => IChar.Space
-        if invert then char.complement(unicode) else char
+        val set = k match
+          case EscapeClassKind.Digit => EcmaScriptChars.Digit
+          case EscapeClassKind.Word  => EcmaScriptChars.Word
+          case EscapeClassKind.Space => EcmaScriptChars.Space
+        if invert then set.complement(EcmaScriptChars.mode(unicode)) else set
       case UnicodeProperty(_, _, contents)         => contents
       case UnicodePropertyValue(_, _, _, contents) => contents
-      case CharacterClass(_, ns)                   => IChar.union(ns.map(_.toIChar(unicode)))
-      case ClassRange(b, e)                        => IChar.range(b, e)
+      case CharacterClass(_, ns)                   => CharSet.union(ns.map(_.toCharSet(unicode)))
+      case ClassRange(b, e)                        => CharSet.range(b, e)

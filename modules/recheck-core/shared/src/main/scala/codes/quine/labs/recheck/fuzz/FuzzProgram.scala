@@ -5,14 +5,14 @@ import scala.util.Try
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.regexp.Pattern
+import codes.quine.labs.recheck.regexp.PatternAlphabet
 import codes.quine.labs.recheck.regexp.PatternExtensions.*
-import codes.quine.labs.recheck.unicode.ICharSet
-import codes.quine.labs.recheck.unicode.UString
 import codes.quine.labs.recheck.vm.Program
 import codes.quine.labs.recheck.vm.ProgramBuilder
+import codes.quine.labs.resyntax.charset.UString
 
 /** FuzzProgram is a program wrapper for fuzzing. */
-final case class FuzzProgram(program: Program, alphabet: ICharSet, parts: Set[UString]):
+final case class FuzzProgram(program: Program, alphabet: PatternAlphabet, parts: Set[UString]):
 
   /** Whether or not it uses acceleration of VM execution. */
   def usesAcceleration(mode: AccelerationMode): Boolean = mode match
