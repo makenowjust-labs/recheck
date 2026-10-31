@@ -503,6 +503,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
             frame.pos == input.length
           case AssertKind.ChompInputEnd(terminators) =>
             frame.pos == input.length || beforeTerminator(frame.pos, terminators).contains(input.length)
+          case AssertKind.NotBetweenCRLF =>
+            !(0 < frame.pos && frame.pos < input.length && input(frame.pos - 1) == 0x0d && input(frame.pos) == 0x0a)
         if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
         ok
       case read: Inst.Read      => instRead(frame, read)

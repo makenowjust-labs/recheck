@@ -32,6 +32,12 @@ object IRAssertKind:
   /** NotWordBoundary is a non-word-boundary assertion with the word set. */
   final case class NotWordBoundary(word: CharSet) extends IRAssertKind
 
+  /** NotBetweenCRLF is an assertion that the position is not between `\r` and `\n`.
+    *
+    * PCRE's `.` with `(*CRLF)` has it after its character, which then is not `\r` before `\n`.
+    */
+  case object NotBetweenCRLF extends IRAssertKind
+
 /** IRLineBeginAtEnd is where a line begin assertion matches at the end of the input. */
 sealed abstract class IRLineBeginAtEnd extends Product with Serializable
 

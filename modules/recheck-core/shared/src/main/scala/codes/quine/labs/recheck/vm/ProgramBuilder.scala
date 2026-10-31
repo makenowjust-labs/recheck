@@ -355,6 +355,7 @@ private[vm] class ProgramBuilder(
     case IRAssertKind.TextBegin             => AssertKind.InputBegin
     case IRAssertKind.TextEnd               => AssertKind.InputEnd
     case IRAssertKind.ChompTextEnd(t)       => AssertKind.ChompInputEnd(t)
+    case IRAssertKind.NotBetweenCRLF        => AssertKind.NotBetweenCRLF
 
   /** A builder for a disjunction node.
     *

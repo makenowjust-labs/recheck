@@ -201,6 +201,7 @@ object PatternExtensions:
     /** Tests whether the character kinds tell `\r` and `\n`, for an assertion seeing `\r\n` as one line terminator. */
     def needsCRLFDistinction: Boolean =
       lineTerminators.exists(_.crlf == IRLineTerminators.CRLF.Atomic) ||
+        pattern.node.exists(_ == Assert(IRAssertKind.NotBetweenCRLF)) ||
         kindLineTerminators.exists(t =>
           t.crlf != IRLineTerminators.CRLF.Ignored && !(t.chars(0x0a) && t.chars(0x0d))
         ) ||

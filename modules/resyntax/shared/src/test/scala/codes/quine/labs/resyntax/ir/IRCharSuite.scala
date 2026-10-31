@@ -248,9 +248,7 @@ class IRCharSuite extends munit.FunSuite:
   chars(".", "", PCRE)(of("\n").complement(UnitMode.Byte))
   chars(".", "", Python, Perl, Ruby)(of("\n").complement(UnitMode.CodePoint))
   chars(".", "m", Ruby)(UnitMode.CodePoint.universe)
-  check("(*CRLF).", "", PCRE)(
-    Sequence(LookAhead(true, Sequence(Chars(of("\r")), Chars(of("\n")))), Chars(UnitMode.Byte.universe))
-  )
+  check("(*CRLF).", "", PCRE)(Sequence(Chars(UnitMode.Byte.universe), Assert(IRAssertKind.NotBetweenCRLF)))
 
   // Escape classes
   chars("\\d", "", JavaScript, Java, PCRE, Ruby)(of("0123456789"))

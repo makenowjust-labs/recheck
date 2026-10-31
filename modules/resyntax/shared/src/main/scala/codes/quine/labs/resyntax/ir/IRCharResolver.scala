@@ -265,10 +265,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       val set = complement(CharSet.of(terminators.chars.toSeq*))
       // PCRE's `(*CRLF)` makes `.` fail only at `\r` followed by `\n`.
       if terminators.crlf == IRLineTerminators.CRLF.Sequence && !terminators.chars.contains(0x0d) then
-        IRNodeData.Sequence(
-          IRNodeData.LookAhead(true, IRNodeData.Sequence(chars(CharSet.single(0x0d)), chars(CharSet.single(0x0a)))),
-          set
-        )
+        IRNodeData.Sequence(set, IRNodeData.Assert(IRAssertKind.NotBetweenCRLF))
       else set
 
   private def escapeClass(kind: EscapeClassKind, flags: IRCharFlags, loc: SourceLocation): IRNodeData = kind match

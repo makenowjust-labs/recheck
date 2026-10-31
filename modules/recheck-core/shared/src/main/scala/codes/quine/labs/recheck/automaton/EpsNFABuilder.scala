@@ -320,6 +320,7 @@ private class EpsNFABuilder(
         val i = kindLineTerminators.indexOf(t)
         if i == 0 && plain(t) then assert(AssertKind.LineEnd)
         else assert(AssertKind.LineEndOf(i, !plain(t) && !t.chars(0x0d), atomic(t)))
+      case IRAssertKind.NotBetweenCRLF                                          => assert(AssertKind.NotBetweenCRLF)
       case IRAssertKind.TextBegin                                               => boundary(AssertKind.InputBegin)
       case IRAssertKind.TextEnd                                                 => boundary(AssertKind.InputEnd)
       case IRAssertKind.ChompTextEnd(t) if chompTextEndsInMiddle.contains(node) =>

@@ -273,6 +273,10 @@ object Inst:
     final case class ChompInputEnd(terminators: IRLineTerminators) extends AssertKind:
       override def toString: String = "chomp_input_end"
 
+    /** An assertion that the position is not between `\r` and `\n` (e.g. after PCRE's `.` with `(*CRLF)`). */
+    case object NotBetweenCRLF extends AssertKind:
+      override def toString: String = "not_between_crlf"
+
   /** ReadKind is an operand of `read` instruction. */
   sealed abstract class ReadKind
 
