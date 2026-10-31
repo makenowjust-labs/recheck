@@ -11,7 +11,7 @@ import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 
 /** IRValidator checks a whole pattern for the errors that the parser cannot find, including the ones in unsupported
-  * nodes, and resolves the back-references.
+  * nodes, and resolves the back-references and the capture tests of conditionals.
   */
 private[ir] final class IRValidator(
     table: CaptureTable,
@@ -21,7 +21,9 @@ private[ir] final class IRValidator(
 ):
   private val backReferences = mutable.Map.empty[NodeKey, Seq[Int]]
 
-  /** Validates the pattern, and returns the resolved indices of each back-reference node. */
+  /** Validates the pattern, and returns the resolved indices of each back-reference node and each conditional node
+    * testing captures.
+    */
   def validate(root: Node): Map[NodeKey, Seq[Int]] =
     walk(root, inLookAround = false)
     backReferences.toMap
@@ -69,12 +71,18 @@ private[ir] final class IRValidator(
 
   private def walkTest(node: Node, test: ConditionalTest): Unit = test match
     case ConditionalTest.Indexed(n) =>
-      if featureSet.checksIndexedCaptureTest then
-        resolver.test(resolver.index(n, node.loc), table.siteOf(node), node.loc)
-    case ConditionalTest.Relative(n)    => resolver.relative(n, table.siteOf(node), node.loc)
+      backReferences(NodeKey(node)) =
+        if featureSet.checksIndexedCaptureTest then
+          resolver.test(resolver.index(n, node.loc), table.siteOf(node), node.loc)
+        // Perl accepts a test of a missing group, which never holds.
+        else Seq(n).filter(table.defined.contains)
+    case ConditionalTest.Relative(n) =>
+      backReferences(NodeKey(node)) = resolver.relative(n, table.siteOf(node), node.loc)
     case ConditionalTest.Named(_, name) =>
-      resolver.test(resolver.groupName(name, table.siteOf(node), node.loc), table.siteOf(node), node.loc)
-    case ConditionalTest.Referenced(_, ref)  => resolver.backReference(ref, table.siteOf(node), node.loc)
+      backReferences(NodeKey(node)) =
+        resolver.test(resolver.groupName(name, table.siteOf(node), node.loc), table.siteOf(node), node.loc)
+    case ConditionalTest.Referenced(_, ref) =>
+      backReferences(NodeKey(node)) = resolver.backReference(ref, table.siteOf(node), node.loc)
     case ConditionalTest.IndexedRecursion(n) =>
       if featureSet.checksIndexedRecursionTest then resolver.index(n, node.loc)
     case ConditionalTest.NamedRecursion(name)   => resolver.calledName(name, node.loc)

@@ -1,12 +1,7 @@
 package codes.quine.labs.resyntax.ir
 
-import codes.quine.labs.resyntax.ast.AssertNameStyle
-import codes.quine.labs.resyntax.ast.CommandKind
-import codes.quine.labs.resyntax.ast.ConditionalTest
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
-import codes.quine.labs.resyntax.ast.GroupKind
-import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 
 /** IRCaptureSuite is tests of capture numbering, where the comments show the engines' group spans. */
@@ -33,20 +28,10 @@ class IRCaptureSuite extends IRSuiteBase:
   captures("(?=(a))(?<=(b))", "", JavaScript)(2)
   captures("", "", All*)(0)
 
-  // Captures in unsupported nodes take indices, so `(?(1)(a)|b)(c)\2` refers to `c`.
+  // Captures in conditions and unsupported nodes take indices, so `(?(?=(a))b)(c)\2` refers to `c`.
   check("(?(?=(a))b)(c)", "", PCRE, Perl)(
     Sequence(
-      Unsupported(
-        NodeData.Command(
-          CommandKind.Conditional(
-            ConditionalTest.LookAround(
-              GroupKind.PositiveLookAhead(AssertNameStyle.Symbolic),
-              NodeData.Group(GroupKind.IndexedCapture, NodeData.Literal('a'))
-            ),
-            NodeData.Literal('b')
-          )
-        )
-      ),
+      Conditional(IRCondition.LookAhead(false, Capture(1, None, char('a'))), char('b'), Empty),
       Capture(2, None, char('c'))
     )
   )

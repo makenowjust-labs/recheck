@@ -16,6 +16,8 @@ import codes.quine.labs.resyntax.charset.UnitMode
   *   whether a match starts only at the starting position (JavaScript `y`, PCRE `A`)
   * @param mode
   *   the unit of the input, which the character sets of the nodes consist of
+  * @param notEmpty
+  *   where an empty match is rejected (PCRE's `(*NOTEMPTY)` and `(*NOTEMPTY_ATSTART)`)
   */
 final case class IRPattern(
     node: IRNode,
@@ -23,8 +25,26 @@ final case class IRPattern(
     captureNames: Map[String, Seq[Int]],
     backReference: IRBackReferenceSemantics,
     anchored: Boolean,
-    mode: UnitMode
+    mode: UnitMode,
+    notEmpty: IRNotEmpty = IRNotEmpty.Never
 )
+
+/** IRNotEmpty is where an empty match is rejected, which makes the engine backtrack further.
+  *
+  * The match is the reported one, which starts at the last `\K`.
+  */
+sealed abstract class IRNotEmpty extends Product with Serializable
+
+object IRNotEmpty:
+
+  /** Never rejects no match. */
+  case object Never extends IRNotEmpty
+
+  /** Anywhere rejects an empty match at any position (`(*NOTEMPTY)`). */
+  case object Anywhere extends IRNotEmpty
+
+  /** AtStart rejects an empty match at the start of the search (`(*NOTEMPTY_ATSTART)`). */
+  case object AtStart extends IRNotEmpty
 
 /** IRBackReferenceSemantics is how back-references behave, which differs among dialects.
   *

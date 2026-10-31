@@ -4,7 +4,6 @@ import codes.quine.labs.resyntax.ast.AssertKind
 import codes.quine.labs.resyntax.ast.AssertNameStyle
 import codes.quine.labs.resyntax.ast.BackReferenceStyle
 import codes.quine.labs.resyntax.ast.BackslashKind
-import codes.quine.labs.resyntax.ast.BacktrackControlKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
 import codes.quine.labs.resyntax.ast.BoundaryModifier
 import codes.quine.labs.resyntax.ast.CommandKind
@@ -96,12 +95,10 @@ class IRBuilderSuite extends IRSuiteBase:
       Unsupported(NodeData.Group(GroupKind.Balance(NameStyle.Angle, None, "x"), NodeData.Sequence()))
     )
   )
-  check("(?*)", "", PCRE)(
-    Unsupported(NodeData.Group(GroupKind.NonAtomicPositiveLookAhead(AssertNameStyle.Symbolic), NodeData.Sequence()))
-  )
-  check("(?<*)", "", PCRE)(
-    Unsupported(NodeData.Group(GroupKind.NonAtomicPositiveLookBehind(AssertNameStyle.Symbolic), NodeData.Sequence()))
-  )
+  check("(?*a)", "", PCRE)(NonAtomicLookAhead(IRNode(char('a'))))
+  check("(*napla:a)", "", PCRE)(NonAtomicLookAhead(IRNode(char('a'))))
+  check("(?<*a)", "", PCRE)(NonAtomicLookBehind(IRNode(char('a'))))
+  check("(*non_atomic_positive_lookbehind:a)", "", PCRE)(NonAtomicLookBehind(IRNode(char('a'))))
   check("(*script_run:)", "", PCRE, Perl)(
     Unsupported(NodeData.Group(GroupKind.ScriptRun(AssertNameStyle.Alphabetic), NodeData.Sequence()))
   )
@@ -140,20 +137,160 @@ class IRBuilderSuite extends IRSuiteBase:
   check("(?|(a)|(b)(c))", "", PCRE, Perl)(
     Disjunction(Capture(1, None, char('a')), Sequence(Capture(1, None, char('b')), Capture(2, None, char('c'))))
   )
-  check("()(?(1)|)", "", DotNet, PCRE, Perl, Python, Ruby)(
+
+  // Conditionals
+  check("()(?(1)a|b)", "", DotNet, PCRE, Perl, Python, Ruby)(
+    Sequence(Capture(1, None, Empty), Conditional(IRCondition.Captured(Seq(1)), char('a'), char('b')))
+  )
+  check("()(?(1)a)", "", DotNet, PCRE, Perl, Python, Ruby)(
+    Sequence(Capture(1, None, Empty), Conditional(IRCondition.Captured(Seq(1)), char('a'), Empty))
+  )
+  check("(?<n>)(?(<n>)a|b)", "", PCRE, Perl, Ruby)(
+    Sequence(Capture(1, Some("n"), Empty), Conditional(IRCondition.Captured(Seq(1)), char('a'), char('b')))
+  )
+  check("(?<n>)(?('n')a|b)", "", PCRE, Perl, Ruby)(
+    Sequence(Capture(1, Some("n"), Empty), Conditional(IRCondition.Captured(Seq(1)), char('a'), char('b')))
+  )
+  check("(?P<n>)(?(n)a|b)", "", PCRE, Python)(
+    Sequence(Capture(1, Some("n"), Empty), Conditional(IRCondition.Captured(Seq(1)), char('a'), char('b')))
+  )
+  check("()(?(-1)a|b)()(?(+1)c)()", "", PCRE)(
     Sequence(
       Capture(1, None, Empty),
-      Unsupported(NodeData.Command(CommandKind.Conditional(ConditionalTest.Indexed(1), NodeData.Sequence())))
+      Conditional(IRCondition.Captured(Seq(1)), char('a'), char('b')),
+      Capture(2, None, Empty),
+      Conditional(IRCondition.Captured(Seq(3)), char('c'), Empty),
+      Capture(3, None, Empty)
     )
   )
-  check("(*ACCEPT)", "", PCRE, Perl)(
-    Unsupported(NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Accept), None)))
+  check("()(?(<1>)a|b)", "", Ruby)(
+    Sequence(Capture(1, None, Empty), Conditional(IRCondition.Captured(Seq(1)), char('a'), char('b')))
   )
+  // A name shared by groups holds if one of them is set, but Ruby tests only the first one.
+  check("(?J)(?<n>)(?<n>)(?(<n>)a)", "", PCRE)(
+    Sequence(
+      Empty,
+      Capture(1, Some("n"), Empty),
+      Capture(2, Some("n"), Empty),
+      Conditional(IRCondition.Captured(Seq(1, 2)), char('a'), Empty)
+    )
+  )
+  check("(?<n>)(?<n>)(?(<n>)a)", "", Perl)(
+    Sequence(
+      Capture(1, Some("n"), Empty),
+      Capture(2, Some("n"), Empty),
+      Conditional(IRCondition.Captured(Seq(1, 2)), char('a'), Empty)
+    )
+  )
+  check("(?<n>)(?<n>)(?(<n>)a)", "", Ruby)(
+    Sequence(
+      Capture(1, Some("n"), Empty),
+      Capture(2, Some("n"), Empty),
+      Conditional(IRCondition.Captured(Seq(1)), char('a'), Empty)
+    )
+  )
+  // Perl's test of a missing group never holds, and .NET's group 0 is not set during the match.
+  check("(?(2)a|b)", "", Perl)(char('b'))
+  check("(?(0)a|b)", "", DotNet)(char('b'))
+  // .NET reads a group name as a capture test, and any other text as a look-ahead.
+  check("(?<x>)(?(x)a|b)", "", DotNet)(
+    Sequence(Capture(1, Some("x"), Empty), Conditional(IRCondition.Captured(Seq(1)), char('a'), char('b')))
+  )
+  check("(?(x)a|b)", "", DotNet)(Conditional(IRCondition.LookAhead(false, char('x')), char('a'), char('b')))
+  check("(?(?=x)a|b)", "", DotNet, PCRE, Perl)(
+    Conditional(IRCondition.LookAhead(false, char('x')), char('a'), char('b'))
+  )
+  check("(?(?!x)a|b)", "", DotNet, PCRE, Perl)(
+    Conditional(IRCondition.LookAhead(true, char('x')), char('a'), char('b'))
+  )
+  check("(?(?<=x)a|b)", "", DotNet, PCRE, Perl)(
+    Conditional(IRCondition.LookBehind(false, char('x')), char('a'), char('b'))
+  )
+  check("(?(*nlb:x)a|b)", "", PCRE, Perl)(
+    Conditional(IRCondition.LookBehind(true, char('x')), char('a'), char('b'))
+  )
+  check("(?(?C1)(?=x)a|b)", "", PCRE)(
+    Unsupported(
+      NodeData.Command(
+        CommandKind.Conditional(
+          ConditionalTest.CalloutLookAround(
+            CommandKind.CalloutInt(1),
+            ConditionalTest.LookAround(GroupKind.PositiveLookAhead(AssertNameStyle.Symbolic), NodeData.Literal('x'))
+          ),
+          NodeData.Literal('a'),
+          NodeData.Literal('b')
+        )
+      )
+    )
+  )
+  // A constant condition leaves the chosen branch: PCRE2 10.49 is the version.
+  check("(?(VERSION>=10.49)a|b)", "", PCRE)(char('a'))
+  check("(?(VERSION>=10.5)a|b)", "", PCRE)(char('a'))
+  check("(?(VERSION>=10.50)a|b)", "", PCRE)(char('b'))
+  check("(?(VERSION=10.49)a|b)", "", PCRE)(char('a'))
+  check("(?(VERSION=10)a|b)", "", PCRE)(char('b'))
+  check("(?(DEFINE)(a))b", "", PCRE, Perl)(Sequence(Empty, char('b')))
+  check("(?(R)a|b)", "", PCRE, Perl)(char('b'))
+  check("()(?(R1)a|b)", "", PCRE, Perl)(Sequence(Capture(1, None, Empty), char('b')))
+  check("(?<x>)(?(R&x)a|b)", "", PCRE, Perl)(Sequence(Capture(1, Some("x"), Empty), char('b')))
+  // PCRE reads `(R1)` as a capture test when a group has the name.
+  check("(?<R1>)(?(R1)a|b)", "", PCRE)(
+    Sequence(Capture(1, Some("R1"), Empty), Conditional(IRCondition.Captured(Seq(1)), char('a'), char('b')))
+  )
+  // Recursion tests and `(DEFINE)` depend on calls, which are unsupported.
+  check("(?(R)a|b)(?R)", "", PCRE)(
+    Sequence(
+      Unsupported(
+        NodeData.Command(
+          CommandKind.Conditional(ConditionalTest.RRecursion, NodeData.Literal('a'), NodeData.Literal('b'))
+        )
+      ),
+      Unsupported(NodeData.Command(CommandKind.RCall))
+    )
+  )
+  check("(?(DEFINE)(a))(?1)", "", PCRE)(
+    Sequence(
+      Unsupported(
+        NodeData.Command(
+          CommandKind
+            .Conditional(ConditionalTest.Define, NodeData.Group(GroupKind.IndexedCapture, NodeData.Literal('a')))
+        )
+      ),
+      Unsupported(NodeData.Command(CommandKind.IndexedCall(1)))
+    )
+  )
+  check("(?<x>)(?(<x+0>)a)", "", Ruby)(
+    Sequence(
+      Capture(1, Some("x"), Empty),
+      Unsupported(
+        NodeData.Command(
+          CommandKind.Conditional(
+            ConditionalTest.Referenced(NameStyle.Angle, Reference.LeveledReference(Reference.NamedReference("x"), 0)),
+            NodeData.Literal('a')
+          )
+        )
+      )
+    )
+  )
+
+  // Backtracking control verbs
+  check("(*FAIL)", "", PCRE, Perl)(Chars(CharSet.empty))
+  check("(*F)", "", PCRE, Perl)(Chars(CharSet.empty))
+  check("(*FAIL:x)", "", PCRE, Perl)(Chars(CharSet.empty))
+  check("(*ACCEPT)", "", PCRE, Perl)(BacktrackControl(IRBacktrackControl.Accept))
+  check("(*ACCEPT:x)", "", PCRE, Perl)(BacktrackControl(IRBacktrackControl.Accept))
+  check("(*COMMIT)", "", PCRE, Perl)(BacktrackControl(IRBacktrackControl.Commit))
+  check("(*PRUNE:x)", "", PCRE, Perl)(BacktrackControl(IRBacktrackControl.Prune))
+  check("(*SKIP)", "", PCRE, Perl)(BacktrackControl(IRBacktrackControl.Skip(None)))
+  check("(*SKIP:x)", "", PCRE, Perl)(BacktrackControl(IRBacktrackControl.Skip(Some("x"))))
+  check("(*THEN)", "", PCRE, Perl)(BacktrackControl(IRBacktrackControl.Then))
+  check("(*MARK:x)", "", PCRE, Perl)(BacktrackControl(IRBacktrackControl.Mark("x")))
+  check("(*:x)", "", PCRE, Perl)(BacktrackControl(IRBacktrackControl.Mark("x")))
   check("(?~|a|b)", "", Ruby)(
     Unsupported(NodeData.Command(CommandKind.AbsenceExpression(NodeData.Literal('a'), NodeData.Literal('b'))))
   )
   check("(*CRLF)(*UTF)(*LIMIT_MATCH=1)", "", PCRE)(Sequence(Empty, Empty, Empty))
-  check("(*NOTEMPTY)", "", PCRE)(Unsupported(NodeData.Command(CommandKind.StartOption("NOTEMPTY", None))))
+  check("(*NOTEMPTY)", "", PCRE)(Empty)
 
   // Caret
   check("^", "", DotNet, Java, JavaScript, PCRE, Perl, Python)(Assert(IRAssertKind.TextBegin))
@@ -178,10 +315,9 @@ class IRBuilderSuite extends IRSuiteBase:
   check("\\b{g}", "", Java)(
     Unsupported(NodeData.Backslash(BackslashKind.Assert(AssertKind.Boundary(Some(BoundaryModifier.GModifier)))))
   )
-  check("\\G", "", DotNet, Java, PCRE, Perl, Ruby)(
-    Unsupported(NodeData.Backslash(BackslashKind.Assert(AssertKind.Sticky)))
-  )
-  check("\\K", "", PCRE, Perl, Ruby)(Unsupported(NodeData.Backslash(BackslashKind.Assert(AssertKind.Cut))))
+  // The checkers search once from the start of the input, where `\G` is.
+  check("\\G", "", DotNet, Java, PCRE, Perl, Ruby)(Assert(IRAssertKind.TextBegin))
+  check("\\K", "", PCRE, Perl, Ruby)(ResetMatchStart)
 
   // Back-reference
   checkWith("(a)\\1", "", All*)(d => Sequence(Capture(1, None, char('a')), BackReference(Seq(1), flagsOf(d))))
@@ -216,6 +352,13 @@ class IRBuilderSuite extends IRSuiteBase:
     assertEquals(pattern.anchored, false)
   checkPattern("", "y", JavaScript)(pattern => assertEquals(pattern.anchored, true))
   checkPattern("", "A", PCRE)(pattern => assertEquals(pattern.anchored, true))
+  checkPattern("", "", All*)(pattern => assertEquals(pattern.notEmpty, IRNotEmpty.Never))
+  checkPattern("(*NOTEMPTY)", "", PCRE)(pattern => assertEquals(pattern.notEmpty, IRNotEmpty.Anywhere))
+  checkPattern("(*NOTEMPTY_ATSTART)", "", PCRE)(pattern => assertEquals(pattern.notEmpty, IRNotEmpty.AtStart))
+  checkPattern("(*NOTEMPTY)a|b", "", PCRE)(pattern => assertEquals(pattern.notEmpty, IRNotEmpty.Anywhere))
+  checkPattern("(*NOTEMPTY_ATSTART)(*NOTEMPTY)", "", PCRE)(pattern =>
+    assertEquals(pattern.notEmpty, IRNotEmpty.Anywhere)
+  )
   // `(?:(a)|b)\1c` matches `bc` only in JavaScript.
   checkPattern("", "", JavaScript): pattern =>
     assertEquals(pattern.backReference, IRBackReferenceSemantics(true, IRBackReferenceChoice.FirstSet))
