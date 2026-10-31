@@ -223,6 +223,20 @@ class IRCharSuite extends munit.FunSuite:
   chars("\\w", "", JavaScript, Java, PCRE, Ruby)(IRCharClasses.AsciiWord)
   chars("\\w", "iu", JavaScript)(IRCharClasses.AsciiWord.union(of("\u017f\u212a")))
   checkSet("\\w", "", Perl)(s => s.contains(0x100) && !s.contains(0xe9))
+
+  test("IRBuilder.build: Perl's /d follows whether the pattern string is UTF-8"):
+    def lastSet(s: String, options: DialectOptions): CharSet =
+      strip(build(s, "", Perl, options).node.data) match
+        case IRNodeData.Sequence(nodes) => setOf(nodes.last.data)
+        case data                       => setOf(data)
+    val source = "\\U\u00df\\E\\w"
+    assert(!lastSet(source, DialectOptions.Default).contains(0xe9))
+    assert(lastSet(source, DialectOptions.Default.withPerlUtf8Of(source)).contains(0xe9))
+    assert(lastSet("\u00e9\\w", DialectOptions.Default).contains(0xe9))
+    assert(!lastSet("\u00e9\\w", DialectOptions(perlUtf8 = Some(false))).contains(0xe9))
+    assert(lastSet("\\x{100}\\w", DialectOptions(perlUtf8 = Some(false))).contains(0xe9))
+    assert(lastSet("a\\w", DialectOptions(perlUtf8 = Some(true))).contains(0xe9))
+    assertEquals(DialectOptions(perlSource = PerlSource.String).withPerlUtf8Of("\u00e9").perlUtf8, None)
   checkSet("\\w", "", Python)(s => s.contains(0xe9) && s.contains(0xb2))
   checkSet("\\w", "U", Java)(s => s.contains(0xe9) && s.contains(0x200c))
   checkSet("(?u)\\w", "", Ruby)(s => s.contains(0xe9))

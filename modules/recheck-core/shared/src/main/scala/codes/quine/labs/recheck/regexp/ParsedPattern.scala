@@ -79,7 +79,7 @@ object ParsedPattern:
     try
       val flagSet = FlagSet.parse(flags, dialect)
       val node = Parser.parse(source, flagSet, dialect, options)
-      val ir = IRBuilder.build(node, flagSet, dialect, options)
+      val ir = IRBuilder.build(node, flagSet, dialect, options.withPerlUtf8Of(source))
       Right(ParsedPattern(source, flags, dialect, flagSet, ir))
     catch
       case ex: FlagSetException    => Left(new InvalidRegExpException(ex.getMessage))
