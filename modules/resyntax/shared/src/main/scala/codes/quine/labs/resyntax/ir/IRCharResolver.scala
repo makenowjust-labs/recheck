@@ -112,7 +112,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     *
     * They are resolved together for a surrogate pair read by code units and Ruby's UTF-8 bytes by escapes (e.g.
     * `\xC3\xA9`). Case-insensitivity is the dialect's one-to-one case equivalence, and Ruby's and Perl's simple
-    * multi-character folding of plain literals (e.g. `ß` and `ss`, see [[foldRun]]).
+    * multi-character folding of literals (e.g. `ß` and `ss`, see [[foldRun]]).
     *
     * @param inLookBehind
     *   whether the literals are in a look-behind, where Ruby matches a folding as the folded string only
@@ -142,7 +142,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     for (node, flags) <- run do
       node.data match
         case NodeData.Literal(value) =>
-          lits += Lit(value, true, None, flags, node.loc, plain = true)
+          lits += Lit(value, true, None, flags, node.loc)
         case NodeData.Backslash(BackslashKind.Unknown(value)) =>
           lits += Lit(value, true, None, flags, node.loc)
         case NodeData.Backslash(BackslashKind.Escape(style, value)) =>
@@ -173,22 +173,30 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
 
   /** Whether a literal takes part in Ruby's and Perl's multi-character case folding.
     *
-    * Only plain literals do: Onigmo does not fold an escape with its neighbors (e.g. `\x73s` does not match `ß`).
+    * Perl compiles an escape into the same node as the literals around it. Ruby passes an escape of an ASCII character
+    * to Onigmo as an escape, which is a node apart (e.g. `\x73s` and `\u0073s` do not match `ß`), but writes the others
+    * as the characters (e.g. `\u00DF` and `\xC3\x9F` are `ß`).
     */
   private def foldsMultiChar(u: Lit): Boolean =
-    u.plain && u.flags.ignoreCase && (dialect.isPerl || dialect.isRuby && mode == UnitMode.CodePoint)
+    u.flags.ignoreCase && u.value != NoUnit && (dialect match
+      case _: Dialect.Perl => true
+      case _: Dialect.Ruby => mode == UnitMode.CodePoint && (u.escape.isEmpty || u.value >= 0x80)
+      case _               => false)
 
-  /** Resolves a run of plain literals with the multi-character case folding of Ruby and Perl.
+  /** Resolves a run of literals with the multi-character case folding of Ruby and Perl.
     *
     * A literal folded to several characters (e.g. `ß` to `ss`) also matches them, and consecutive literals folded to
     * the folding of a character (e.g. `ss`) also match the character; both are alternations, longest first. The rest
-    * (escapes, Turkic `İ`, and folds across classes, groups or quantifiers) is not reproduced.
+    * (Turkic `İ`, and folds across literal boundaries, classes, groups or quantifiers) is not reproduced.
     */
   private def foldRun(units: Seq[Lit], inLookBehind: Boolean): Seq[IRNode] =
-    val eq = equivalence(units.head.flags)
-    val native = perlNative(units.head.flags)
-    // Perl's `aa` forbids a non-ASCII character to match a folding with ASCII characters (e.g. `ß` and `ss`).
-    val restrict = units.head.flags.caselessRestrict
+    val flags = units.head.flags
+    val eq = equivalence(flags)
+    val native = perlNative(flags)
+    // Perl's `aa` forbids a non-ASCII character to match a folding with ASCII characters (e.g. `ß` and `ss`), and `l`
+    // one with characters below `U+0100`.
+    val below =
+      if flags.caselessRestrict then 0x80 else if dialect.isPerl && flags.charset == IRCharset.Locale then 0x100 else 0
     val folded = mutable.ArrayBuffer.empty[(Int, Int)]
     for (u, i) <- units.zipWithIndex; c <- FullCaseFolding(u.value).iterator do folded += ((c, i))
     def char(i: Int, loc: SourceLocation): IRNode =
@@ -198,12 +206,15 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     val occurrences = for
       i <- folded.indices
       (key, set) <- multiFoldings
-      if !restrict || key.iterator.forall(_ >= 0x80)
+      if key.iterator.forall(_ >= below)
       if i + key.length <= folded.length && (0 until key.length).forall(k => folded(i + k)._1 == key(k))
       // A key must start and end at literal boundaries.
       if (i == 0 || folded(i - 1)._2 != folded(i)._2) &&
         (i + key.length == folded.length || folded(i + key.length)._2 != folded(i + key.length - 1)._2)
-    yield (i, key.length, (if native then set.diff(IRCharClasses.Latin1) else set).restrict(mode))
+      // A native string under Perl's `/d` has no character to match a Latin-1 character's folding (e.g. `\xDF`).
+      chars = (if native then set.diff(IRCharClasses.Latin1) else set).restrict(mode)
+      if chars.nonEmpty
+    yield (i, key.length, chars)
     if occurrences.isEmpty || occurrences.size > MaxMultiFoldings then units.map(closed)
     else
       val cuts = (0 to folded.length).filter(p => !occurrences.exists((s, len, _) => s < p && p < s + len))
@@ -218,7 +229,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
             else
               val single = char(i, loc) +: alternatives(i + 1)
               val multi = inside.collect:
-                case (s, len, set) if s == i && set.nonEmpty =>
+                case (s, len, set) if s == i =>
                   IRNode(IRNodeData.Chars(set), loc) +: alternatives(i + len)
               if multi.isEmpty then single
               else Seq(IRNode(IRNodeData.Disjunction((single +: multi).map(seq => IRNode(sequenceOf(seq), loc))), loc))
@@ -568,8 +579,8 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
 
   /** Returns the folding of a character that Perl matches in a class under the flags (e.g. `ss` of `ß`).
     *
-    * A native string under `/d`, a Latin-1 character or a folding with ASCII characters under `l`, and a folding with
-    * ASCII characters under `aa` do not match it.
+    * A native string under `/d`, a folding with a character below `U+0100` under `l`, and a folding with ASCII
+    * characters under `aa` do not match it.
     */
   private def perlMultiFolding(value: Int, flags: IRCharFlags): Option[UString] =
     multiFolding(value).filter: key =>
@@ -577,12 +588,12 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       flags.charset match
         case IRCharset.Default  => !perlNative(flags)
         case IRCharset.Unicode  => true
-        case IRCharset.Locale   => value >= 0x100 && !hasAscii
+        case IRCharset.Locale   => key.iterator.forall(_ >= 0x100)
         case _: IRCharset.Ascii => !(flags.caselessRestrict && hasAscii)
 
-  /** Resolves a folding as a run of plain literals, which is how Ruby and Perl match it. */
+  /** Resolves a folding as a run of literals, which is how Ruby and Perl match it. */
   private def foldString(key: UString, flags: IRCharFlags, loc: SourceLocation, inLookBehind: Boolean): IRNodeData =
-    sequenceOf(foldRun(key.iterator.map(c => Lit(c, true, None, flags, loc, plain = true)).toSeq, inLookBehind))
+    sequenceOf(foldRun(key.iterator.map(c => Lit(c, true, None, flags, loc)).toSeq, inLookBehind))
 
   /** Returns the complement of a class item. */
   private def negate(item: ClassItem, flags: IRCharFlags): ClassSet = item.data match
@@ -767,8 +778,7 @@ private[ir] object IRCharResolver:
       source: Boolean,
       escape: Option[EscapeStyle],
       flags: IRCharFlags,
-      loc: SourceLocation,
-      plain: Boolean = false
+      loc: SourceLocation
   )
 
   /** Checks whether the escape style gives a raw byte in Ruby (e.g. `\xFF`, `\377` and `\C-\M-a`). */
