@@ -71,8 +71,6 @@ The following constructs are not supported, and they are reported as `unsupporte
   A group and a class of several characters do not join (e.g. `(?:s)s` and `[sS]s` do not match `ß`).
 - Under `i`, Onigmo also matches some strings with the same folding as a run of literals whose characters split it differently, and `recheck` does not reproduce them.
   For example, `ßs` matches `"sß"`, since both fold to `sss`, and `ﬃ` matches `"ﬀi"`, since both fold to `ffi`, but `sß` does not match `"ßs"`.
-- Onigmo matches several literals against a character folded to them only when each of the literals folds to one character, so `ss` and `ſs` match `ß`, but `ﬀi` and `fﬁ` do not match `ﬃ`.
-  `recheck` does not check it, so `ﬀi` and `fﬁ` match `ﬃ` in `recheck`.
 - Under `i`, Onigmo turns a class of several characters into an alternation of the class and the foldings to several characters.
   It visits the characters in the order of code points, including the ones it adds to the class by case folding, and adds the folding of each.
   So `/[sß]/i` is like `/(?:[sSſßẞ]|ss|ss)/i`, where `ss` comes from `ß` and from the added `ẞ`, but `/[sẞ]/i` is like `/(?:[sSſßẞ]|ss)/i`, since the added `ß` comes before `ẞ`.

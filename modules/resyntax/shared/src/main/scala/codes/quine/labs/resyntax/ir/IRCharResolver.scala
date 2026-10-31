@@ -211,6 +211,9 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       // A key must start and end at literal boundaries.
       if (i == 0 || folded(i - 1)._2 != folded(i)._2) &&
         (i + key.length == folded.length || folded(i + key.length)._2 != folded(i + key.length - 1)._2)
+      // Onigmo joins several literals only when each of them folds to one character (e.g. `ﬀi` does not match `ﬃ`).
+      if !dialect.isRuby || folded(i)._2 == folded(i + key.length - 1)._2 ||
+        folded(i + key.length - 1)._2 - folded(i)._2 + 1 == key.length
       // A native string under Perl's `/d` has no character to match a Latin-1 character's folding (e.g. `\xDF`).
       chars = (if native then set.diff(IRCharClasses.Latin1) else set).restrict(mode)
       if chars.nonEmpty

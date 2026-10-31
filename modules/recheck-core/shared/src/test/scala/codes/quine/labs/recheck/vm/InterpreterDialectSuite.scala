@@ -134,6 +134,8 @@ class InterpreterDialectSuite extends munit.FunSuite:
     accepts("(?i)(?<=ß)x", Perl(), "ßx")
     accepts("(?i)(?<=ß)x", Perl(), "ssx")
     accepts("(?i)(?<=\\u00DF)x", Ruby(), "ssx")
+    accepts("(?i)(?<=ﬀi)x", Ruby(), "ffix")
+    refutes("(?i)(?<=ﬀi)x", Ruby(), "ﬃx")
     refutes("(?i)(?<=\\u00DF)x", Ruby(), "ßx")
     accepts("(?i)(?<=\\N{U+DF})x", Perl(), "ssx")
     // Perl counts `\xDF` of a pattern that is not UTF-8 as one character in a look-behind.
