@@ -199,6 +199,14 @@ class IRCharSuite extends munit.FunSuite:
   chars("\\xb5", "i", Perl)(of("\u00b5\u039c\u03bc"))
   chars("é", "i", Perl)(of("éÉ"))
   chars("(?r)k", "iu", PCRE)(of("kK"))
+  // Perl's `aa` matches no ASCII and non-ASCII characters together, even by a multi-character folding.
+  chars("(?aa)k", "i", Perl)(of("kK"))
+  chars("(?aa)s", "i", Perl)(of("sS"))
+  chars("(?aa)ß", "i", Perl)(CaseMapping.SimpleFold.equivalents(0xdf))
+  check("(?aa)ss", "i", Perl)(Sequence(Chars(of("sS")), Chars(of("sS"))))
+  chars("(?a)k", "i", Perl)(of("kK\u212a"))
+  chars("(?aa)(?u)k", "i", Perl)(of("kK\u212a"))
+  chars("(?aa)(?^i)k", "", Perl)(of("kK\u212a"))
   chars("(*TURKISH_CASING)i", "iu", PCRE)(of("i\u0130"))
   // Ruby and Perl fold plain literals to several characters (e.g. `ß` and `ss`), longest first.
   // Unicode 18 adds a character folded to `ß`, so the sets come from the tables.

@@ -159,11 +159,14 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   private def foldRun(units: Seq[Lit]): Seq[IRNode] =
     val eq = equivalence(units.head.flags)
     val native = perlNative(units.head.flags)
+    // Perl's `aa` forbids a non-ASCII character to match a folding with ASCII characters (e.g. `ß` and `ss`).
+    val restrict = units.head.flags.caselessRestrict
     val folded = mutable.ArrayBuffer.empty[(Int, Int)]
     for (u, i) <- units.zipWithIndex; c <- FullCaseFolding(u.value).iterator do folded += ((c, i))
     val occurrences = for
       i <- folded.indices
       (key, set) <- multiFoldings
+      if !restrict || key.iterator.forall(_ >= 0x80)
       if i + key.length <= folded.length && (0 until key.length).forall(k => folded(i + k)._1 == key(k))
       // A key must start and end at literal boundaries.
       if (i == 0 || folded(i - 1)._2 != folded(i)._2) &&

@@ -1322,6 +1322,8 @@ private[parser] final class Parser(
             case Some('W') => flagSet.copy(asciiWord = true)
             case _         => flagSet.copy(ascii = true)
           if subOption.isDefined then next()
+          else if featureSet.hasFlagAA && sliceSource(start, offset).contains('a') then
+            flagSet = flagSet.copy(asciiRestrict = true)
         case 'c' =>
           if !featureSet.hasFlagC then return result
           flagSet = flagSet.copy(continue = true)
