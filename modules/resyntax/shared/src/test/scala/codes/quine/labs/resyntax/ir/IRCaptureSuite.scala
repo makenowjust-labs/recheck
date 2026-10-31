@@ -84,17 +84,18 @@ class IRCaptureSuite extends IRSuiteBase:
   // A balancing group with a name captures (e.g. `(?<y-x>...)`).
   captures("(?<x>a)(?<y-x>b)", "", DotNet)(2, Map("x" -> Seq(1), "y" -> Seq(2)))
 
-  // Explicit capture: `(a)(?<x>b)(c)` with `n` gives only `x` in .NET and Perl.
-  check("(a)(?<x>b)(c)", "n", DotNet, Perl())(Sequence(char('a'), Capture(1, Some("x"), char('b')), char('c')))
+  // Explicit capture: `(a)(?<x>b)(c)` with `n` gives only `x` in .NET, PCRE (PHP's `n`) and Perl.
+  check("(a)(?<x>b)(c)", "n", DotNet, PCRE, Perl())(Sequence(char('a'), Capture(1, Some("x"), char('b')), char('c')))
   // `(a)(?n)(b)(c)` gives only 1 = `a`.
   check("(a)(?n)(b)(c)", "", DotNet, PCRE, Perl())(
     Sequence(Capture(1, None, char('a')), Empty, char('b'), char('c'))
   )
   // `(?n:(a))(b)` gives 1 = `b`, and `(?-n:(a))(b)` with `n` gives 1 = `a`.
   check("(?n:(a))(b)", "", DotNet, PCRE, Perl())(Sequence(char('a'), Capture(1, None, char('b'))))
-  check("(?-n:(a))(b)", "n", DotNet, Perl())(Sequence(Capture(1, None, char('a')), char('b')))
+  check("(?-n:(a))(b)", "n", DotNet, PCRE, Perl())(Sequence(Capture(1, None, char('a')), char('b')))
   // `(?^:(a))(b)` with `n` gives 1 = `a`, because `(?^)` resets `n`.
-  check("(?^:(a))(b)", "n", Perl())(Sequence(Capture(1, None, char('a')), char('b')))
+  check("(?^:(a))(b)", "n", PCRE, Perl())(Sequence(Capture(1, None, char('a')), char('b')))
+  error("(a)\\1", "n", DotNet, PCRE, Perl())("Reference to non-existent group at 3")
   // `(?n)(?<x>a)(?<2>b)(c)` gives 1 = `a` and 2 = `b`.
   check("(?n)(?<x>a)(?<2>b)(c)", "", DotNet)(
     Sequence(Empty, Capture(1, Some("x"), char('a')), Capture(2, None, char('b')), char('c'))

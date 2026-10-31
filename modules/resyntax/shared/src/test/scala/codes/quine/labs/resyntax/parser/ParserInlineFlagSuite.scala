@@ -119,8 +119,12 @@ class ParserInlineFlagSuite extends ParserSuiteBase:
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true, asciiRestrict = true), None)))
   error("(?aaa)", "", Perl())("Duplicated flag at 4")
   error("(?uu)", "", Perl())("Duplicated flag at 3")
-  check("(?au)", "", Ruby()):
-    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true, unicode = true), None)))
+  // Onigmo's last character set flag wins: `/(?au)\w/` matches `é`, but `/(?ua)\w/` does not.
+  check("(?au)", "", Ruby())(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(unicode = true), None))))
+  check("(?ua)", "", Ruby())(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true), None))))
+  check("(?ad)", "", Ruby())(Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(hasIndices = true), None))))
+  check("(?ia)", "", Ruby()):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true, ascii = true), None)))
   error("(?au)", "", Perl(), Python())("Invalid flag at 3")
   check("(?-a:a)", "", PCRE):
     Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(ascii = true)))), Literal('a'))

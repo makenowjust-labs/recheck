@@ -53,7 +53,7 @@ final case class FlagSet(
     localeLower: Boolean = false,
     // `m` (.NET, Java, JavaScript, PCRE, Perl, Python, Ruby)
     multiline: Boolean = false,
-    // `n` (.NET, Perl, Ruby)
+    // `n` (.NET, PCRE, Perl, Ruby)
     explicitCapture: Boolean = false,
     // `o` (Perl, Ruby)
     once: Boolean = false,
@@ -80,6 +80,9 @@ object FlagSet:
   /** Returns parsed flag set object from the given flag set string on the dialect. */
   def parse(flags: String, dialect: Dialect): FlagSet =
     val allowsDuplicatedFlag = !dialect.isJavaScript
+    // Ruby's character set options have no API constant, and the last one wins as the inline options do.
+    def rubyCharset(flagSet: FlagSet): FlagSet =
+      if dialect.isRuby then flagSet.copy(ascii = false, hasIndices = false, unicode = false) else flagSet
 
     var flagSet = FlagSet()
     val counts = mutable.Map.empty[Char, Int].withDefaultValue(0)
@@ -113,17 +116,17 @@ object FlagSet:
           flagSet = flagSet.copy(extra = true)
         case 'a' =>
           check(dialect.isPerl || dialect.isPython || dialect.isRuby)
-          flagSet = flagSet.copy(ascii = true)
+          flagSet = rubyCharset(flagSet).copy(ascii = true)
           if counts(c) >= 2 && dialect.isPerl then flagSet = flagSet.copy(asciiRestrict = true)
         case 'b' =>
           check(dialect.isPython)
           flagSet = flagSet.copy(bytes = true)
         case 'c' =>
-          check(dialect.isPerl)
+          check(dialect.isJava || dialect.isPerl)
           flagSet = flagSet.copy(continue = true)
         case 'd' =>
           check(dialect.isJava || dialect.isJavaScript || dialect.isPerl || dialect.isRuby)
-          flagSet = flagSet.copy(hasIndices = true)
+          flagSet = rubyCharset(flagSet).copy(hasIndices = true)
         case 'e' =>
           check(dialect.isPerl)
           flagSet = flagSet.copy(evaluate = true)
@@ -138,7 +141,7 @@ object FlagSet:
         case 'm' =>
           flagSet = flagSet.copy(multiline = true)
         case 'n' =>
-          check(dialect.isDotNet || dialect.isPerl || dialect.isRuby)
+          check(dialect.isDotNet || dialect.isPCRE || dialect.isPerl || dialect.isRuby)
           flagSet = flagSet.copy(explicitCapture = true)
         case 'o' =>
           check(dialect.isPerl || dialect.isRuby)
@@ -147,7 +150,7 @@ object FlagSet:
           check(dialect.isPerl)
           flagSet = flagSet.copy(preserve = true)
         case 'r' =>
-          check(dialect.isPerl)
+          check(dialect.isPCRE || dialect.isPerl)
           flagSet = flagSet.copy(nonDestructive = true)
         case 's' =>
           check(
@@ -158,7 +161,7 @@ object FlagSet:
           check(
             dialect.isJava || dialect.isJavaScript || dialect.isPCRE || dialect.isPerl || dialect.isPython || dialect.isRuby
           )
-          flagSet = flagSet.copy(unicode = true)
+          flagSet = rubyCharset(flagSet).copy(unicode = true)
         case 'v' =>
           check(dialect.isJavaScript)
           flagSet = flagSet.copy(unicodeSets = true)
@@ -171,10 +174,30 @@ object FlagSet:
         case 'y' =>
           check(dialect.isJavaScript)
           flagSet = flagSet.copy(sticky = true)
+        // PHP skips these characters in the modifiers.
+        case ' ' | '\n' | '\r' =>
+          check(dialect.isPCRE)
         case _ =>
           check(false)
+      if dialect.isPerl && PerlCharsets.contains(c) && counts(c) > (if c == 'a' then 2 else 1) then
+        throw new FlagSetException(s"Duplicated flag '$c'", Some(offset))
 
-    if dialect.isPython then
-      if flagSet.bytes && flagSet.unicode then throw new FlagSetException("Incompatible flags 'b' and 'u'", None)
+    def incompatible(c1: Char, c2: Char): Nothing =
+      throw new FlagSetException(s"Incompatible flags '$c1' and '$c2'", None)
+    dialect match
+      case Dialect.JavaScript =>
+        if flagSet.unicode && flagSet.unicodeSets then incompatible('u', 'v')
+      case _: Dialect.Python =>
+        if flagSet.bytes && flagSet.unicode then incompatible('b', 'u')
+        if flagSet.ascii && flagSet.unicode then incompatible('a', 'u')
+        if flagSet.ascii && flagSet.localeUpper then incompatible('a', 'L')
+      case _: Dialect.Perl =>
+        flags.filter(PerlCharsets.contains).distinct.toSeq match
+          case Seq(c1, c2, _*) => incompatible(c1, c2)
+          case _               => ()
+      case _ => ()
 
     flagSet
+
+  /** Perl's character set modifiers, which exclude each other. */
+  private val PerlCharsets: String = "adlu"

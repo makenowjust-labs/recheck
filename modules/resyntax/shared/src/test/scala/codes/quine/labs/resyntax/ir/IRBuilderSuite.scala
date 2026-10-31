@@ -415,6 +415,7 @@ class IRBuilderSuite extends IRSuiteBase:
 
   // Java's CANON_EQ makes a character-level node unsupported.
   check("a(?c)b", "", Java)(Sequence(char('a'), Empty, Unsupported(NodeData.Literal('b'))))
+  check("a", "c", Java)(Unsupported(NodeData.Literal('a')))
 
   // Pattern
   checkPattern("(a)", "", All*): pattern =>

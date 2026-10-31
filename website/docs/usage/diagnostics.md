@@ -9,26 +9,12 @@ However, they have the same information. We will describe this.
 
 ## Common Fields
 
-All `Diagnostics` has the following fields.
+Every `Diagnostics` has the following fields.
 
 - `source` is the given regular expression’s source string.
 - `flags` is the given regular expression’s flags string.
-- `dialect` is the dialect of the regular expression (see [Dialect](#dialect)).
+- `dialect` is the given [`dialect`](parameters.mdx#dialect) parameter, as an object of the name and every setting of the dialect.
 - `checker` is a checker type to be used (one of `fuzz` and `automaton`).
-
-## Dialect
-
-`dialect` is the [`dialect`](parameters.mdx#dialect) parameter as an object of the dialect's name and every setting of the dialect, where an omitted setting is the default.
-
-```json
-{ "name": "javascript" }
-{ "name": "java" }
-{ "name": "dotnet" }
-{ "name": "pcre" }
-{ "name": "python", "type": "str" }
-{ "name": "ruby", "encoding": "UTF-8" }
-{ "name": "perl", "utf8": true, "source": "literal" }
-```
 
 ## Status
 
@@ -58,9 +44,9 @@ It may invoke a matching time explosion against too little string (`length < 100
 
 ## Attack String
 
-`vulnerable` status diagnostics has the `attack` field. It contains the attack string obtained by this checking.
+A `vulnerable` diagnostics has the `attack` field. It contains the attack string found by the checking.
 
-The attack string is a string to invoke the matching time explosion as known as ReDoS vulnerability.
+The attack string is a string that causes the explosion of the matching time, also known as a ReDoS vulnerability.
 
 It is a string with a repetition structure. It consists of `pumps`, `suffix`, and the `base` repetition count.
 Each `pump` consists of `prefix`, `repeating` substrings, and the individual repetition count `n`. The actual string forms `prefix + repeating.repeat(base + n) + ... + suffix`.
@@ -69,27 +55,25 @@ The `attack` field also has these fields.
 
 - `string` is the actual string. Its characters are UTF-16 code units, or bytes as the characters of the same codes (as Latin-1) when the pattern matches bytes.
 - `pattern` is an expression that evaluates to the actual string in the host language of the [dialect](dialects.md).
-  It escapes quotes, backslashes, the starts of interpolations (`$`, `@`, `#{`), control characters, lone surrogates and the non-ASCII bytes of a bytes mode.
-  Other non-ASCII characters are written as they are, except in Perl, whose literals are ASCII so that they do not depend on `use utf8`.
-  Ruby cannot write a lone surrogate in a UTF-8 string, so it writes its UTF-8 bytes (e.g. `"\xED\xA0\x80"`).
   The attack string of `/^(a|a)*$/` looks like the following.
 
-| Dialect      | Language   | `attack.pattern`                                                               |
-| ------------ | ---------- | ------------------------------------------------------------------------------ |
-| `javascript` | JavaScript | `'a'.repeat(31) + '\x00'`                                                      |
-| `python`     | Python     | `'a' * 31 + '\x00'`, or `b'a' * 31 + b'\x00'` for `bytes`                      |
-| `ruby`       | Ruby       | `"a" + "a" * 31 + "\x00"`, or `"a".b + "a".b * 31 + "\x00".b` for `ASCII-8BIT` |
-| `java`       | Java       | `"a".repeat(31) + "\u0000"`                                                    |
-| `dotnet`     | C#         | `string.Concat(Enumerable.Repeat("a", 31)) + "\u0000"` (`System.Linq`)         |
-| `perl`       | Perl       | `"a" x 31 . "\x00"`                                                            |
-| `pcre`       | PHP        | `str_repeat('a', 31) . "\x00"`                                                 |
+  | Dialect      | Language   | `attack.pattern`                                                               |
+  | ------------ | ---------- | ------------------------------------------------------------------------------ |
+  | `javascript` | JavaScript | `'a'.repeat(31) + '\x00'`                                                      |
+  | `python`     | Python     | `'a' * 31 + '\x00'`, or `b'a' * 31 + b'\x00'` for `bytes`                      |
+  | `ruby`       | Ruby       | `"a" + "a" * 31 + "\x00"`, or `"a".b + "a".b * 31 + "\x00".b` for `ASCII-8BIT` |
+  | `java`       | Java       | `"a".repeat(31) + "\u0000"`                                                    |
+  | `dotnet`     | C#         | `string.Concat(Enumerable.Repeat("a", 31)) + "\u0000"` (`System.Linq`)         |
+  | `perl`       | Perl       | `"a" x 31 . "\x00"`                                                            |
+  | `pcre`       | PHP        | `str_repeat('a', 31) . "\x00"`                                                 |
 
-Noting that the attack string is computed in theoretical, because of the real matching implementation’s optimization, it may not invoke the matching time explosion.
-To prevent this case, you should use the recall validation.
+Note that the attack string is computed in theory, so it may not cause the explosion on the real engine because of the engine's optimizations.
+The recall validation checks it on the real engine.
 
 ## Recall Validation
 
-`vulnerable` status diagnostics has the `recallValidation` field.
+A `vulnerable` diagnostics has the `recallValidation` field.
+
 The recall validation runs the attack string on the real regex engine of the dialect (see [Recall Validation](recall-validation.md)), and this field records the run.
 It is `null` if the recall validation is not run: [`recallTimeout`](parameters.mdx#recalltimeout) is not positive (the default), or commands cannot run (e.g. in the browser).
 
@@ -105,9 +89,8 @@ It is `null` if the recall validation is not run: [`recallTimeout`](parameters.m
 
 When the recall validation fails, the check does not report the diagnostics, and it goes on to look for another attack string.
 If no attack succeeds, the result is `safe`.
-An attack string with the same complexity and hotspot as a failed one is skipped without the recall validation.
-When the recall validation fails [`maxRecallFailures`](parameters.mdx#maxrecallfailures) times, the check stops, and the result is `unknown` with the `recall-failure-limit` error.
-`checkAll` (`ReDoS.checkAll` in Scala) returns the failed diagnostics too, followed by the reported one.
+
+`checkAll` (`ReDoS.checkAll` in Scala) returns the recall-failed diagnostics too, followed by the reported one.
 
 ## Hotspot
 

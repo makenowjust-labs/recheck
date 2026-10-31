@@ -161,14 +161,14 @@ object RecallProgram:
     val bytes = pattern.ir.mode == UnitMode.Byte
     val style = AttackPattern.Ruby(bytes)
     val source = style.literal(sourceString(pattern.source, bytes))
-    // `a` and `d` have no `Regexp` option, but have the inline option of the same meaning.
-    val prefix = pattern.flags.distinct.filter(c => c == 'a' || c == 'd').map(c => s"(?$c)").mkString
+    // The character set options `a`, `d` and `u` have no `Regexp` option, but have the inline options, the last of
+    // which wins.
+    val prefix = pattern.flags.findLast(c => "adu".contains(c)).fold("")(c => s"(?$c)")
     val options = pattern.flags.distinct.collect:
       case 'i' => "Regexp::IGNORECASE"
       case 'm' => "Regexp::MULTILINE"
       case 'x' => "Regexp::EXTENDED"
       case 'n' => "Regexp::NOENCODING"
-      case 'u' => "Regexp::FIXEDENCODING"
     val regex = if prefix.isEmpty then source else s"${style.literal(UStringUtil.fromString(prefix))} + $source"
     val input = attack.toString(style)
     // `ruby -` reads the program in the encoding of the locale.
@@ -193,7 +193,7 @@ object RecallProgram:
 
   /** Returns the data for the Java program for `java` as a single-file source program, using `Matcher#find`. */
   private[recall] def java(pattern: ParsedPattern, attack: AttackPattern): RecallProgram =
-    val flags = pattern.flags.distinct.filter(c => "dimsuxU".contains(c))
+    val flags = pattern.flags.distinct.filter(c => "cdimsuxU".contains(c))
     RecallProgram(Command("java", Seq("--source", "17"), source = Some(JavaSource)), data(flags, pattern, attack))
 
   /** The Java program, which reads the data of [[data]] from the standard input. */
@@ -218,6 +218,7 @@ object RecallProgram:
         |    int flags = 0;
         |    for (char c : lines[0].toCharArray()) {
         |      flags |= switch (c) {
+        |        case 'c' -> Pattern.CANON_EQ;
         |        case 'd' -> Pattern.UNIX_LINES;
         |        case 'i' -> Pattern.CASE_INSENSITIVE;
         |        case 'm' -> Pattern.MULTILINE;

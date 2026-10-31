@@ -39,8 +39,6 @@ ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Python(Dialect.Python.T
 The CLI takes the settings by `--python-type`, `--ruby-encoding`, `--perl-utf8` and `--perl-source`, and an option of another dialect is an error.
 The Playground also has a selector of the dialect, and it shows the settings of the selected dialect.
 
-The diagnostics have the dialect as `dialect`, an object with every setting of the dialect (see [Diagnostics](diagnostics.md#dialect)).
-
 :::note
 
 The ESLint plugin (`eslint-plugin-redos`) checks JavaScript regular expressions only, so it has no `dialect` option.

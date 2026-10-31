@@ -330,6 +330,8 @@ final case class FeatureSet(
     ignoresInlineFlagCase: Boolean,
     // PCRE
     limitsGroupNameLength: Boolean,
+    // Ruby
+    overridesCharsetInlineFlag: Boolean,
     // .NET, PCRE, Perl
     hasLookAroundTest: Boolean,
     // PCRE, Perl, Python, Ruby
@@ -767,6 +769,8 @@ object FeatureSet:
       ignoresInlineFlagCase = isDotNet,
       // PCRE
       limitsGroupNameLength = isPCRE,
+      // Ruby
+      overridesCharsetInlineFlag = isRuby,
       // .NET, PCRE, Perl
       hasLookAroundTest = isDotNet || isPCRE || isPerl,
       // PCRE, Perl, Python, Ruby
