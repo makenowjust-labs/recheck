@@ -26,8 +26,11 @@ private[ir] final class ReferenceResolver(table: CaptureTable, dialect: Dialect,
   /** Resolves a back-reference by a name (e.g. `\k<x>`), where .NET reads a numeric name as an index. */
   def namedBackReference(name: String, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
     if CaptureAnalyzer.isNumericName(dialect, name) then
-      val n = name.toInt
-      if table.defined.contains(n) then Seq(n) else fail("Reference to non-existent group", loc)
+      name.toIntOption match
+        // .NET accepts `\k<0>`, which never matches because the whole match is not set yet (e.g. `a\k<0>` on `aa`).
+        case Some(0)                              => Seq.empty
+        case Some(n) if table.defined.contains(n) => Seq(n)
+        case _                                    => fail("Reference to non-existent group", loc)
     else
       val indices = groupName(name, site, loc)
       if featureSet.requiresClosedGroupReference then checkClosed(indices, site, loc) else indices
@@ -40,7 +43,8 @@ private[ir] final class ReferenceResolver(table: CaptureTable, dialect: Dialect,
 
   /** Resolves a name for a call, which can refer to a group defined later. */
   def calledName(name: String, loc: SourceLocation): Seq[Int] =
-    if CaptureAnalyzer.isNumericName(dialect, name) then index(name.toInt, loc)
+    if CaptureAnalyzer.isNumericName(dialect, name) then
+      index(name.toIntOption.getOrElse(fail("Reference to non-existent group", loc)), loc)
     else table.names.getOrElse(name, fail("Reference to non-existent named group", loc))
 
   /** Resolves an index for a call or a test, where `0` is the whole pattern. */

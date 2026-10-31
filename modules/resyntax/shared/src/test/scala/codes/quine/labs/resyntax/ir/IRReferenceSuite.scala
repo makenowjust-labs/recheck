@@ -42,6 +42,9 @@ class IRReferenceSuite extends IRSuiteBase:
   resolve("(?<x>a)\\1", "", DotNet)(1)
   resolve("(?<x>a)\\k<1>", "", DotNet)(1)
   resolve("(?<x>a)(b)\\k<2>", "", DotNet)(2)
+  // `a\k<0>` never matches `aa` in .NET.
+  resolve("a\\k<0>", "", DotNet)()
+  resolve("(?<2147483647>a)\\k<2147483647>", "", DotNet)(2147483647)
   error("(a)\\2", "", DotNet, PCRE, Perl, Ruby, Python)("Reference to non-existent group at 3")
   error("(a)(b)\\3", "", DotNet, PCRE, Perl, Ruby, Python)("Reference to non-existent group at 6")
   error("\\1", "", DotNet, PCRE, Perl, Ruby, Python)("Reference to non-existent group at 0")

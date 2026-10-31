@@ -171,8 +171,8 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
 
   private def namedCapture(node: Node, name: String, child: Node): Unit =
     if featureSet.numbersNamedCaptureLast then
-      if name.forall(_.isDigit) then
-        val index = name.toInt
+      if CaptureAnalyzer.isNumericName(initial.dialect, name) then
+        val index = name.toIntOption.getOrElse(throw new IRBuildingException("Group number is too large", node.loc))
         usedIndices.add(index)
         capture(node, index, child)
       else
