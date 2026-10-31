@@ -52,16 +52,17 @@
     "index.d.mts",
     "index.d.ts",
     "index.mjs",
-    "lib"
+    "lib",
+    "parameters.d.ts"
   ],
   "scripts": {
-    "build": "node ./scripts/build.mts",
+    "build": "node ./scripts/parameters.mts && node ./scripts/build.mts",
     "clean": "rimraf lib",
     "format": "prettier -w '*.{js,json,md,mjs}' '{scripts,src}/**/*.{js,ts,mts}' index.d.ts index.d.mts",
     "lint": "prettier --check '*.{js,json,md,mjs}' '{scripts,src}/**/*.{js,ts,mts}' index.d.ts index.d.mts",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js -c jest.e2e.config.js --forceExit",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "node ./scripts/parameters.mts && tsc --noEmit -p ."
   },
   "sideEffects": false,
   "types": "index.d.ts",
@@ -84,7 +85,8 @@
     "jest": "30.5.2",
     "prettier": "3.9.10",
     "rimraf": "6.1.3",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "yaml": "2.9.1"
   },
   "engines": {
     "node": ">=22"
