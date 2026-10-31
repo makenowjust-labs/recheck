@@ -278,8 +278,9 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       // Java's `\R` backtracks into `\r` alone (`\R\n` matches `\r\n`), unlike the others.
       if dialect == Dialect.Java then alternatives else IRNodeData.Atomic(alternatives)
     case EscapeClassKind.NonNewline if dialect == Dialect.PCRE => dot(flags.copy(dotAll = false))
-    case EscapeClassKind.GraphemeCluster                       => graphemeCluster
-    case _                                                     => output(escapeClassSet(kind, flags, loc), flags)
+    case EscapeClassKind.GraphemeCluster                       =>
+      if dialect == Dialect.PCRE then pcreGraphemeCluster else graphemeCluster
+    case _ => output(escapeClassSet(kind, flags, loc), flags)
 
   /** `\X`: an extended grapheme cluster by the regular expression of UAX #29 (Table 1b), in an atomic group.
     *
@@ -308,6 +309,55 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     val core = alt(hangul, ri, xpicto, conjunct, c(control.complement(mode)))
     val postcore = star(c(gcb("Extend", "ZWJ", "SpacingMark")))
     val cluster = alt(seq(c(gcb("CR")), c(gcb("LF"))), c(control), seq(star(c(gcb("Prepend"))), core, postcore))
+    IRNodeData.Atomic(IRCharResolver.prune(cluster).getOrElse(IRNode(IRNodeData.Chars(CharSet.empty))))
+
+  /** PCRE's `\X`: an extended grapheme cluster by PCRE2's own rules (`pcre2_extuni.c` of 10.49), in an atomic group.
+    *
+    * They differ from UAX #29: no GB9c, no extending character after a regional indicator or before an extended
+    * pictographic after a prepend, and a pair of regional indicators at the start needs an even number of regional
+    * indicators before it in the input, which a look-behind tests.
+    */
+  private lazy val pcreGraphemeCluster: IRNodeData =
+    import IRQuantifier.Bounded
+    import IRQuantifier.Unbounded
+    import codes.quine.labs.resyntax.ast.BacktrackStrategy.Greedy
+    def gcb(names: String*): CharSet =
+      CharSet.union(names.map(Properties.GraphemeClusterBreak.value(_).get.set)).restrict(mode)
+    val extPict = Properties.binary("Extended_Pictographic").get.set.restrict(mode).intersect(gcb("Other"))
+    def c(set: CharSet): IRNode = IRNode(IRNodeData.Chars(set))
+    def star(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, Unbounded(0, Greedy)))
+    def plus(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, Unbounded(1, Greedy)))
+    def opt(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, Bounded(0, 1, Greedy)))
+    def seq(nodes: IRNode*): IRNode = IRNode(IRNodeData.Sequence(nodes))
+    def alt(nodes: IRNode*): IRNode = IRNode(IRNodeData.Disjunction(nodes))
+    val Seq(l, v, t, lv, lvt) = Seq("L", "V", "T", "LV", "LVT").map(n => c(gcb(n)))
+    val hangul = alt(seq(star(l), alt(plus(v), seq(lv, star(v)), lvt), star(t)), plus(l), plus(t))
+    val ri = c(gcb("RI"))
+    val other = c(gcb("Other").diff(extPict))
+    val extend = gcb("Extend", "ZWJ", "SpacingMark")
+    val postcore = star(c(extend))
+    val evenBefore = IRNode(
+      IRNodeData.LookBehind(
+        false,
+        seq(IRNode(IRNodeData.LookBehind(true, ri)), star(seq(ri, ri)))
+      )
+    )
+    val xpicto = seq(c(extPict), star(seq(star(c(gcb("Extend"))), c(gcb("ZWJ")), c(extPict))), postcore)
+    val prepended = seq(
+      plus(c(gcb("Prepend"))),
+      alt(seq(hangul, postcore), seq(other, postcore), seq(ri, opt(ri)), postcore)
+    )
+    val cluster = alt(
+      seq(c(gcb("CR")), c(gcb("LF"))),
+      c(gcb("Control", "CR", "LF")),
+      prepended,
+      xpicto,
+      seq(evenBefore, ri, ri),
+      ri,
+      seq(hangul, postcore),
+      seq(other, postcore),
+      plus(c(extend))
+    )
     IRNodeData.Atomic(IRCharResolver.prune(cluster).getOrElse(IRNode(IRNodeData.Chars(CharSet.empty))))
 
   private def escapeClassSet(kind: EscapeClassKind, flags: IRCharFlags, loc: SourceLocation): ClassSet =

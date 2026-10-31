@@ -140,7 +140,7 @@ There are other deliberate approximations.
 - The Unicode data (properties, case mappings) is of Unicode 18.0, while the engines use Unicode 16 or 17.
 - `\X` is the extended grapheme cluster of the regular expression in UAX #29 (Table 1b) in an atomic group, as the engines match one cluster without backtracking into it.
   In a bytes mode, it reads each byte as the Latin-1 character.
-  PCRE2 10.49 does not implement the rule GB9c of Unicode 15.1 (e.g. `क्ष` is two clusters there), and does not join a regional indicator with a following mark.
+  PCRE's `\X` follows the rules of PCRE2 10.49 instead, which differ from UAX #29: no rule GB9c of Unicode 15.1 (e.g. `क्ष` is two clusters there), no join of a regional indicator with a following mark or of a prepended character with an extended pictographic, and two regional indicators join only after an even number of regional indicators in the input (e.g. `\X` matches one of three regional indicators from the second).
   Java's look-behind with `\X` matches nowhere if its `TreeInfo` lengths leave no start to try (e.g. `(?<=\X)`), and is unsupported otherwise.
 - For JavaScript's `v` flag, `recheck` follows the specification.
 - Look-arounds (including non-atomic ones), back-references, atomic groups, possessive quantifiers, conditionals and the backtracking control verbs other than `(*FAIL)` and `(*MARK)` are handled by the fuzz checker, not by the automaton checker.
