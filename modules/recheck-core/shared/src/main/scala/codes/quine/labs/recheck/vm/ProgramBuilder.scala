@@ -45,6 +45,24 @@ object ProgramBuilder:
   */
 private[vm] type Keep = Option[Option[(Int, Int)]]
 
+/** EmptyIteration is how a repetition handles an iteration matching the empty string, which differs among dialects. */
+private[vm] enum EmptyIteration:
+
+  /** Ignore handles it as the others (PCRE's bounded repetition, which repeats copies of the node). */
+  case Ignore
+
+  /** Reject fails an optional one (JavaScript, and Java's repetition of a single node or a group without branches). */
+  case Reject
+
+  /** ExitOptional ends the repetition with an optional one (Python). */
+  case ExitOptional
+
+  /** ExitFromMin ends the repetition with the last mandatory one or an optional one (Perl, .NET, PCRE). */
+  case ExitFromMin
+
+  /** ExitAll ends the repetition with any one, even before the minimum (Java's repetition of a group with branches). */
+  case ExitAll
+
 /** AcceptScope is what `(*ACCEPT)` ends successfully. */
 private[vm] enum AcceptScope:
 
@@ -521,24 +539,31 @@ private[vm] class ProgramBuilder(
     emitInst(if back then Inst.CapBegin(index) else Inst.CapEnd(index))
 
   /** A builder for `x*` node. */
-  def buildStar(isLazy: Boolean, child: IRNode, keep: Keep = None, barrier: Boolean = false): Unit =
+  def buildStar(
+      isLazy: Boolean,
+      child: IRNode,
+      keep: Keep = None,
+      barrier: Boolean = false,
+      empty: EmptyIteration = EmptyIteration.Reject
+  ): Unit =
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
     val cont = allocateLabel("cont")
 
     enterLoopBlock(isLazy, loop, cont, keep)
-    wrapCanary(child)(wrapReset(child)(buildIteration(child, isLazy && barrier)))
+    wrapCanary(child, empty, cont)(wrapReset(child)(buildIteration(child, isLazy && barrier)))
     emitTerminator(Inst.Jmp(begin))
 
     enterBlock(cont)
 
-  /** A builder for `x+` node. */
-  def buildPlus(isLazy: Boolean, child: IRNode, keep: Keep = None, barrier: Boolean = false): Unit =
-    buildIteration(child, barrier)
-    buildStar(isLazy, child, keep, barrier)
-
-  /** A builder for `x?` node. */
-  def buildQuestion(isLazy: Boolean, child: IRNode, keep: Keep = None, barrier: Boolean = false): Unit =
+  /** A builder for `x?` node, whose iteration is optional. */
+  def buildQuestion(
+      isLazy: Boolean,
+      child: IRNode,
+      keep: Keep = None,
+      barrier: Boolean = false,
+      empty: EmptyIteration = EmptyIteration.Ignore
+  ): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
 
@@ -547,7 +572,7 @@ private[vm] class ProgramBuilder(
     )
 
     enterBlock(main)
-    wrapReset(child)(buildIteration(child, isLazy && barrier))
+    wrapCanary(child, empty, cont)(wrapReset(child)(buildIteration(child, isLazy && barrier)))
     emitTerminator(Inst.Jmp(cont))
 
     enterBlock(cont)
@@ -564,43 +589,84 @@ private[vm] class ProgramBuilder(
       case IRQuantifier.Bounded(n, _, _) => n
     // Perl unsets the capture of a counted repetition matching nothing.
     for case Some(i) <- counted if min == 0 do emitInst(Inst.CapReset(i, i))
+    val empty = if child.canMatchEmpty then emptyIteration(quantifier, child) else EmptyIteration.Ignore
+    // An empty mandatory iteration ending the repetition jumps to `exit`.
+    val exit = allocateLabel("exit")
+    var exits = false
+    def mandatory(n: Int): Unit =
+      empty match
+        case EmptyIteration.ExitAll =>
+          exits = true
+          buildRepeatN(n, child, barrier, Some(exit))
+        case EmptyIteration.ExitFromMin if n > 0 =>
+          exits = true
+          buildRepeatN(n - 1, child, barrier)
+          wrapCanary(child, EmptyIteration.ExitFromMin, exit)(wrapReset(child)(buildIteration(child, barrier)))
+        case _ => buildRepeatN(n, child, barrier)
     quantifier match
-      case IRQuantifier.Exact(0)               => // nothing to do
-      case IRQuantifier.Exact(1)               => buildIteration(child, barrier)
-      case IRQuantifier.Exact(n)               => buildRepeatN(n, child, barrier)
-      case IRQuantifier.Unbounded(0, strategy) => buildStar(isLazy(strategy), child, keep, barrier)
-      case IRQuantifier.Unbounded(1, strategy) => buildPlus(isLazy(strategy), child, keep, barrier)
-      case IRQuantifier.Unbounded(n, strategy) =>
-        buildRepeatN(n, child, barrier)
-        buildStar(isLazy(strategy), child, keep, barrier)
-      case IRQuantifier.Bounded(0, 1, strategy) => buildQuestion(isLazy(strategy), child, keep, barrier)
-      case IRQuantifier.Bounded(0, n, strategy) => buildRepeatAtMostN(isLazy(strategy), n, child, keep, barrier)
-      case IRQuantifier.Bounded(1, 2, strategy) =>
-        buildIteration(child, barrier)
-        buildQuestion(isLazy(strategy), child, keep, barrier)
-      case IRQuantifier.Bounded(1, m, strategy) =>
-        buildIteration(child, barrier)
-        buildRepeatAtMostN(isLazy(strategy), m - 1, child, keep, barrier)
-      case IRQuantifier.Bounded(n, m, strategy) if m - n == 1 =>
-        buildRepeatN(n, child, barrier)
-        buildQuestion(isLazy(strategy), child, keep, barrier)
+      case IRQuantifier.Exact(n) if empty == EmptyIteration.ExitAll => mandatory(n)
+      case IRQuantifier.Exact(n)                                    => buildRepeatN(n, child, barrier)
+      case IRQuantifier.Unbounded(n, strategy)                      =>
+        mandatory(n)
+        buildStar(isLazy(strategy), child, keep, barrier, empty)
       case IRQuantifier.Bounded(n, m, strategy) =>
-        buildRepeatN(n, child, barrier)
-        buildRepeatAtMostN(isLazy(strategy), m - n, child, keep, barrier)
+        mandatory(n)
+        if m - n == 1 then buildQuestion(isLazy(strategy), child, keep, barrier, empty)
+        else buildRepeatAtMostN(isLazy(strategy), m - n, child, keep, barrier, empty)
+    if exits then
+      emitTerminator(Inst.Jmp(exit))
+      enterBlock(exit)
 
-  /** A builder for `x{n}` node. */
-  def buildRepeatN(n: Int, child: IRNode, barrier: Boolean = false): Unit =
-    val loop = allocateEntrance("loop")
-    val cont = allocateLabel("cont")
+  /** Returns how a repetition handles an empty iteration in the dialect. */
+  def emptyIteration(quantifier: IRQuantifier, child: IRNode): EmptyIteration = pattern.dialect match
+    case Dialect.JavaScript => EmptyIteration.Reject
+    case Dialect.Python     => EmptyIteration.ExitOptional
+    case Dialect.Java       =>
+      child.data match
+        case IRNodeData.Capture(_, _, node) if node.data.isInstanceOf[IRNodeData.Atomic] => EmptyIteration.Reject
+        case _: IRNodeData.Capture | _: IRNodeData.Sequence | _: IRNodeData.Disjunction | _: IRNodeData.Repeat |
+            IRNodeData.Empty | _: IRNodeData.Conditional =>
+          EmptyIteration.ExitAll
+        case _ => EmptyIteration.Reject
+    // PCRE repeats copies of the node for a bounded repetition.
+    case Dialect.PCRE =>
+      quantifier match
+        case _: IRQuantifier.Unbounded => EmptyIteration.ExitFromMin
+        case _                         => EmptyIteration.Ignore
+    case Dialect.Ruby => EmptyIteration.ExitOptional
+    case _            => EmptyIteration.ExitFromMin
 
-    val reg = allocateCounter()
+  /** A builder for `x{n}` node, where an empty iteration jumps to `exit` if it is given. */
+  def buildRepeatN(n: Int, child: IRNode, barrier: Boolean = false, exit: Option[Label] = None): Unit =
+    if n == 1 then
+      exit match
+        case Some(exit) =>
+          wrapCanary(child, EmptyIteration.ExitAll, exit)(wrapReset(child)(buildIteration(child, barrier)))
+        case None => buildIteration(child, barrier)
+    else if n > 1 then
+      val loop = allocateEntrance("loop")
+      val cont = allocateLabel("cont")
 
-    // Note that `wrapCanary` is not needed.
-    wrapReset(child)(buildIteration(child, barrier))
-    closeLoopBlock(reg, n, loop, cont)
+      val reg = allocateCounter()
+
+      exit match
+        case Some(exit) =>
+          // The counter is reset on leaving the loop.
+          val leave = allocateLabel("leave")
+          keepBlocks.append((leave, Seq(Inst.Reset(reg)), Inst.Jmp(exit)))
+          wrapCanary(child, EmptyIteration.ExitAll, leave)(wrapReset(child)(buildIteration(child, barrier)))
+        case None => wrapReset(child)(buildIteration(child, barrier))
+      closeLoopBlock(reg, n, loop, cont)
 
   /** A builder for `x{0,n}` node. */
-  def buildRepeatAtMostN(isLazy: Boolean, n: Int, child: IRNode, keep: Keep = None, barrier: Boolean = false): Unit =
+  def buildRepeatAtMostN(
+      isLazy: Boolean,
+      n: Int,
+      child: IRNode,
+      keep: Keep = None,
+      barrier: Boolean = false,
+      empty: EmptyIteration = EmptyIteration.Reject
+  ): Unit =
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
     val cont = allocateLabel("cont")
@@ -608,7 +674,7 @@ private[vm] class ProgramBuilder(
     val reg = allocateCounter()
 
     enterLoopBlock(isLazy, loop, cont, keep)
-    wrapCanary(child)(wrapReset(child)(buildIteration(child, isLazy && barrier)))
+    wrapCanary(child, empty, cont)(wrapReset(child)(buildIteration(child, isLazy && barrier)))
     closeLoopBlock(reg, n, begin, cont)
 
   /** Builds an iteration of a repetition, which Perl wraps to restore the captures when the iteration fails.
@@ -643,12 +709,17 @@ private[vm] class ProgramBuilder(
     freeCounter(reg)
 
   /** Inserts a canary around a loop body if needed. */
-  def wrapCanary(child: IRNode)(run: => Unit): Unit =
-    if child.canMatchEmpty then
+  /** Inserts a canary around an iteration if needed, where an empty iteration fails, or jumps to `exit`. */
+  def wrapCanary(child: IRNode, empty: EmptyIteration, exit: Label)(run: => Unit): Unit =
+    if child.canMatchEmpty && empty != EmptyIteration.Ignore then
       val reg = allocateCanary()
       emitInst(Inst.SetCanary(reg))
       run
-      emitInst(Inst.CheckCanary(reg))
+      if empty == EmptyIteration.Reject then emitInst(Inst.CheckCanary(reg))
+      else
+        val next = allocateLabel("next")
+        emitTerminator(Inst.CmpCanary(reg, exit, next))
+        enterBlock(next)
       freeCanary(reg)
     else run
 

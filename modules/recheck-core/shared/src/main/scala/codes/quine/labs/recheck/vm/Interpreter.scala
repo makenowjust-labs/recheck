@@ -105,8 +105,14 @@ object Interpreter:
   /** FailedPoint is a failed point on matching. */
   final case class FailedPoint(target: CoverageLocation, pos: Int, kind: ReadKind, capture: Option[UString])
 
-  /** MatchState is a state of matching. */
-  private[vm] final case class MatchState(blockID: Int, pos: Int, counters: Vector[Int], captures: Option[Vector[Int]])
+  /** MatchState is a state of matching, where `canaries` tells which canary registers hold the position. */
+  private[vm] final case class MatchState(
+      blockID: Int,
+      pos: Int,
+      counters: Vector[Int],
+      captures: Option[Vector[Int]],
+      canaries: Vector[Boolean]
+  )
 
   /** Junction is a state for a junction block, with the time reaching it. */
   private[vm] final case class Junction(state: MatchState, steps: Int, heatmap: Option[Map[Location, Int]], time: Long)
@@ -180,7 +186,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
     /** Converts this frame into a corresponding state. */
     def toState: MatchState =
-      Interpreter.MatchState(label.index, pos, counters, Option.when(program.meta.hasRef)(captures :+ lastParen))
+      val captureState = Option.when(program.meta.hasRef)(captures :+ lastParen)
+      Interpreter.MatchState(label.index, pos, counters, captureState, canaries.map(_ == pos))
 
     override def clone(): Frame =
       val frame = new Frame(label, pos, captures, counters, canaries, rollback, fallback, junctions)
@@ -385,6 +392,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                   frame.pos = first
                   false
                 case _ => true
+            case Inst.CmpCanary(reg, empty, advanced) =>
+              frame.label = if frame.canaries(reg.index) == frame.pos then empty else advanced
+              false
             case Inst.Cmp(reg, n, lt, ge) =>
               val r = frame.counters(reg.index)
               val next = if r < n then lt else ge

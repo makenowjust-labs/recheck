@@ -64,6 +64,13 @@ object Inst:
     def successors: Set[Label] = Set(lt, ge)
     override def toString: String = s"cmp $reg $n $lt $ge"
 
+  /** `cmp_canary`: Jumps to an `empty` block if current position is the one saved in the canary register, or to an
+    * `advanced` block.
+    */
+  final case class CmpCanary(reg: CanaryReg, empty: Label, advanced: Label) extends Terminator:
+    def successors: Set[Label] = Set(empty, advanced)
+    override def toString: String = s"cmp_canary $reg $empty $advanced"
+
   /** `fail`: Fails a matching, which backtracks. */
   case object Fail extends Terminator:
     def successors: Set[Label] = Set.empty

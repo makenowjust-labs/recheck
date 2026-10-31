@@ -276,6 +276,41 @@ class InterpreterConstructSuite extends munit.FunSuite:
     check("^(?:\\R)?\n$", "\r\n", Java)(Seq(g(0, 2)))
     check("^(?:\\R|x)*\n$", "\r\n", Java)(Seq(g(0, 2)))
 
+  test("Interpreter.run: empty iterations"):
+    // JavaScript rejects an optional empty iteration, and the others end the repetition with it, from an iteration that
+    // differs among them: Python from an optional one, Perl, .NET and PCRE's unbounded one from the last mandatory one,
+    // and Java's repetition of a group with branches from any one. PCRE's bounded one repeats copies of the node.
+    check("^(?:()|a){2}\\1$", "a", Java, Perl)(Seq(g(0, 1), g(1, 1)))
+    check("^(?:()|a){2}\\1$", "a", PCRE, Python, DotNet)(Seq(g(0, 1), g(0, 0)))
+    check("^(?:()|a){2}\\1$", "a", JavaScript)(Seq(g(0, 1)))
+    check("^(?:()|a){0,2}\\1$", "a", Java, Perl, Python, DotNet)(Seq(g(0, 1), g(1, 1)))
+    check("^(?:()|a){0,2}\\1$", "a", PCRE)(Seq(g(0, 1), g(0, 0)))
+    check("^(?:()|a){1,2}\\1$", "a", Java, Perl, DotNet)(Seq(g(0, 1), g(1, 1)))
+    check("^(?:()|a){1,2}\\1$", "a", PCRE, Python)(Seq(g(0, 1), g(0, 0)))
+    check("^(?:()|a){2,}\\1$", "a", Java, PCRE, Perl, Python, DotNet)(Seq(g(0, 1), g(1, 1)))
+    check("^(?:()|a)*?\\1$", "a", Java, PCRE, Perl, Python)(Seq(g(0, 1), g(1, 1)))
+    check("^(?:()|a)+\\1$", "a", Java, PCRE, Perl, Python, DotNet)(Seq(g(0, 1), g(1, 1)))
+    check("^(?:()|a)+\\1$", "a", JavaScript)(Seq(g(0, 1)))
+    check("^(?:()|a){3}\\1$", "aa", Java, Perl)(Seq(g(0, 2), g(2, 2)))
+    check("^(?:()|a){3}\\1$", "aa", PCRE, Python, DotNet)(Seq(g(0, 2), g(0, 0)))
+    check("^(?:()|a){1,3}\\1$", "aa", Java, Perl, DotNet)(Seq(g(0, 2), g(2, 2)))
+    check("^(?:()|a){1,3}\\1$", "aa", PCRE, Python)(Seq(g(0, 2), g(0, 0)))
+    check("(?:(a?))?\\1\\1$", "aa", Java, PCRE, Perl, Python, DotNet)(Seq(g(2, 2), g(2, 2)))
+    check("(?:(a?))?\\1\\1$", "aa", JavaScript)(Seq(g(2, 2)))
+    check("^(?:(a)*(a)?|(?:(a)|())|b?)?\\4", "b", Java, PCRE, Perl, Python, DotNet)(
+      Seq(g(0, 0), unset, unset, unset, g(0, 0))
+    )
+    check("^(?:(a)*(a)?|(?:(a)|())|b?)?\\4", "b", JavaScript)(Seq(g(0, 1)))
+    check("^(?:(a?)|()(a?))+\\3c", "cc", Java, PCRE, Perl, DotNet)(Seq(g(0, 1), unset, g(0, 0), g(0, 0)))
+    check("^(?:(a?)|()(a?))+\\3c", "cc", Python)(Seq(g(0, 1), g(0, 0), g(0, 0), g(0, 0)))
+    check("^(?:(a?)|()(a?))+\\3c", "cc", JavaScript)(Seq(g(0, 1), g(0, 0)))
+    check("(?:()(a?)|()(a?)){2}\\4\\1b", "bb", Java)(NoMatch)
+    check("(?:()(a?)|()(a?)){2}\\4\\1b", "bb", PCRE, Perl, Python, DotNet)(
+      Seq(g(0, 1), g(0, 0), g(0, 0), g(0, 0), g(0, 0))
+    )
+    check("^(?:b?(?:|(a))|b?)+", "aaca", Java, PCRE, Python, DotNet)(Seq(g(0, 0)))
+    check("^(?:b?(?:|(a))|b?)+", "aaca", JavaScript)(Seq(g(0, 2), g(1, 2)))
+
   test("Interpreter.run: look-behinds"):
     // .NET and JavaScript match a look-behind backward, and the others forward from the starts before the position.
     check("(?<=(a|aa))b", "aab", JavaScript, DotNet, Java)(Seq(g(2, 3), g(1, 2)))

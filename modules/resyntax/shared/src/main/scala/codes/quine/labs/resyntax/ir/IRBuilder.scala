@@ -326,14 +326,15 @@ private[ir] class IRBuilder(
   /** Checks whether Java repeats the group with `GroupCurly`, which matches each iteration in its first way, and keeps
     * the captures in it over backtracking.
     *
-    * It matters only for a group with `\R` (which has two ways), or with captures in a pattern with back-references.
+    * It matters only for a group with `\R` (which has two ways), with captures in a pattern with back-references, or
+    * matching the empty string (whose iteration `GroupCurly` rejects).
     */
   def isJavaGroupCurly(child: Node, quantifier: Quantifier): Boolean =
     def isGroup = child.data match
       case NodeData.Group(GroupKind.IndexedCapture | GroupKind.NonCapture | _: GroupKind.NamedCapture, _) => true
       case NodeData.Group(_: GroupKind.InlineFlag, _)                                                     => true
       case _                                                                                              => false
-    def matters = NodeKey.exists(child):
+    def matters = checker.javaMinLength(child) == 0 || NodeKey.exists(child):
       case Node(NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline)), _) => true
       case node @ Node(NodeData.Group(_, _), _) => hasBackReference && node != child && table.indexOf(node).isDefined
       case _                                    => false

@@ -150,7 +150,11 @@ There are other deliberate approximations.
 - Look-arounds (including non-atomic ones), back-references, atomic groups, possessive quantifiers, conditionals and the backtracking control verbs other than `(*FAIL)` and `(*MARK)` are handled by the fuzz checker, not by the automaton checker.
 - A back-reference sees the captures as the engine keeps them over the iterations of a loop: JavaScript resets them on each iteration, and Perl unsets the captures of a failed alternative and of a fixed-length repetition matching nothing (e.g. `^(?:(a)?b){2}\1$` does not match `abba` in Perl).
   Java does not restore the captures in an atomic group, a look-around or a repeated group without branches (e.g. `(?:(b)c)*`) once it matches, even when it backtracks to a later starting position (e.g. `(?:(a)b)+x|b\1` matches `ba` in `aba`), and it matches each iteration of such a group, or of `\R` under a quantifier, in its first way.
-  The engines differ on an iteration matching the empty string, which is not reproduced.
+- An iteration matching the empty string is handled as the engine does.
+  JavaScript rejects an optional one, and so does Java's repetition of a single node or of a group without branches.
+  The others end the repetition with it: Python with an optional one, Perl, .NET and PCRE with the last mandatory one or an optional one, and Java's repetition of a group with branches with any one, even before the minimum count (e.g. `^(?:()|a){2}\1$` sets the group `1` at the end of `a` in Java and Perl, but at the start in Python and .NET).
+  PCRE repeats copies of the node for a bounded repetition, where an empty iteration does not end it.
+  Ruby is not reproduced: Onigmo also repeats copies for a bounded repetition depending on the size of its compiled code, and it checks the captures in an empty iteration.
 
 ### Searches, Conditionals and Backtracking Control Verbs
 
