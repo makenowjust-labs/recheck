@@ -65,16 +65,10 @@ The following constructs are not supported, and they are reported as `unsupporte
 ## Approximations
 
 - Ruby has memoization (since Ruby 3.2) that `recheck` does not model, so an attack that `recheck` reports may not work on Ruby, and the recall validation checks whether it does.
-- Under `i`, Ruby matches a character against its folding to several characters (e.g. `ß` against `ss`).
-  Whether several nodes together match such a character depends on how Onigmo joins the nodes into a string on compiling, and `recheck` does not reproduce it.
-  A class of one character joins the literals after it (e.g. `[s]s` matches `ß`, but `s[s]` does not), and so does a quantifier of a fixed count (e.g. `s{2}`, `[s]{2}` and `ss{1}` match `ß`, but `s{1}s` does not).
-  A group and a class of several characters do not join (e.g. `(?:s)s` and `[sS]s` do not match `ß`).
-- Under `i`, Onigmo also matches some strings with the same folding as a run of literals whose characters split it differently, and `recheck` does not reproduce them.
-  For example, `ßs` matches `"sß"`, since both fold to `sss`, and `ﬃ` matches `"ﬀi"`, since both fold to `ffi`, but `sß` does not match `"ßs"`.
-- Under `i`, Onigmo turns a class of several characters into an alternation of the class and the foldings to several characters.
-  It visits the characters in the order of code points, including the ones it adds to the class by case folding, and adds the folding of each.
-  So `/[sß]/i` is like `/(?:[sSſßẞ]|ss|ss)/i`, where `ss` comes from `ß` and from the added `ẞ`, but `/[sẞ]/i` is like `/(?:[sSſßẞ]|ss)/i`, since the added `ß` comes before `ẞ`.
-  `recheck` adds the folding of each character of the case-folded class, as `/(?:[sSſßẞ]|ss|ss)/i` for both, so it can report more ambiguity than Ruby has (e.g. `[xẞ]*` is exponential against `ss` in `recheck`, but not in Ruby).
+- Under `i`, `recheck` does not reproduce Onigmo's bugs in matching a character folded to several characters (e.g. `ß` and `ss`).
+  For example, `(?<=ß)` and `(ß)\1` do not match `"ß"` and `"ßss"` in Ruby, but they do in `recheck`.
+  Also, `[s]s` and `ßs` match `"ß"` and `"sß"` in Ruby, but not in `recheck`.
+- Under `i`, `recheck` adds the folding of each character of a case-folded class, so `[sẞ]` tries `ss` twice, where Ruby tries it once.
 - A pattern of only ASCII characters has no fixed encoding: Ruby matches a string of only ASCII characters by the pattern compiled in `US-ASCII`, where no character is folded to several characters, and Ruby keeps the pattern compiled again in `UTF-8` after matching another string.
   So `/[[:alpha:]]/i` matches `ss` only after matching a non-ASCII string, and `/(?<=a[[:lower:]])y/i` raises `RegexpError` on a non-ASCII string.
   `recheck` takes such a pattern in `UTF-8` (e.g. it reports `(?<=a[[:lower:]])y` with `i` as invalid).

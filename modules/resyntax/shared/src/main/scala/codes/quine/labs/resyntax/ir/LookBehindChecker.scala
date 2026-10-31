@@ -87,18 +87,8 @@ private[ir] final class LookBehindChecker(
           case starts => starts
         IRLookBehindMatch.Forward(Seq(starts))
       case IRLookBehindRule.Python => IRLookBehindMatch.Forward(Seq(longest(body)))
-      // Onigmo divides the alternatives of different lengths into look-behinds of each.
-      case IRLookBehindRule.Ruby =>
-        def fixed(node: Node): IRLookBehindStarts = rubyWidth(node) match
-          case RubyWidth.Fixed(n) => IRLookBehindStarts.Longest(n.toInt, n.toInt)
-          case _                  => IRLookBehindStarts.Longest(0, 0)
-        val node = rubyUnwrap(body)
-        node.data match
-          case NodeData.Disjunction(nodes) => IRLookBehindMatch.Forward(nodes.map(fixed))
-          case _                           =>
-            rubyClassWidths(node) match
-              case Some(widths) => IRLookBehindMatch.Forward(widths.map(w => IRLookBehindStarts.Longest(w, w)))
-              case None         => IRLookBehindMatch.Forward(Seq(fixed(body)))
+      // Each top-level alternative of Ruby's look-behind has a fixed width, so matching it backward is the same.
+      case IRLookBehindRule.Ruby => IRLookBehindMatch.Backward
 
   /** Checks whether the group is deterministic for Java's `TreeInfo`, which makes a repetition of it `GroupCurly`. */
   def javaDeterministic(group: Node): Boolean = java(List(group), JavaInfo.Initial).deterministic

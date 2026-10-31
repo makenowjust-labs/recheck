@@ -99,16 +99,16 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     out.toSeq
 
   /** Resolves a character-level node. */
-  def resolve(node: Node, flags: IRCharFlags, inLookBehind: Boolean = false): IRNodeData =
+  def resolve(node: Node, flags: IRCharFlags): IRNodeData =
     try
       node.data match
         case NodeData.Dot                                        => dot(flags)
-        case NodeData.Class(invert, item)                        => klass(invert, item, flags, node.loc, inLookBehind)
+        case NodeData.Class(invert, item)                        => klass(invert, item, flags, node.loc)
         case NodeData.Backslash(BackslashKind.EscapeClass(kind)) =>
           val data = escapeClass(kind, flags, node.loc)
-          if isProperty(kind) then withRubyFoldings(data, flags, node.loc, inLookBehind) else data
+          if isProperty(kind) then withRubyFoldings(data, flags, node.loc) else data
         case _ =>
-          literals(Seq((node, flags)), inLookBehind) match
+          literals(Seq((node, flags))) match
             case Seq(ir) => ir.data
             case irs     => IRNodeData.Sequence(irs)
     catch case _: NotModeledException => IRNodeData.Unsupported(node.data)
@@ -121,31 +121,32 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     * They are resolved together for a surrogate pair read by code units and Ruby's UTF-8 bytes by escapes (e.g.
     * `\xC3\xA9`). Case-insensitivity is the dialect's one-to-one case equivalence, and Ruby's and Perl's simple
     * multi-character folding of literals (e.g. `ß` and `ss`, see [[foldRun]]).
-    *
-    * @param inLookBehind
-    *   whether the literals are in a look-behind, where Ruby matches a folding as the folded string only
     */
-  def literals(run: Seq[(Node, IRCharFlags)], inLookBehind: Boolean = false): Seq[IRNode] =
-    try resolveLiterals(run, inLookBehind)
+  def literals(run: Seq[(Node, IRCharFlags)]): Seq[IRNode] =
+    try resolveLiterals(run)
     catch
       case _: NotModeledException =>
         run.map((node, _) => IRNode(IRNodeData.Unsupported(node.data), node.loc))
 
   /** Returns the widths of the alternatives that Ruby makes of a class matching the foldings of its characters (e.g.
-    * `[ßx]` is `[ßẞx]|ss|ss`), or `None` for another node.
+    * `[ßx]` is `[ßẞx]|ss|ss`), or `None` for another node, which decide whether Ruby accepts a look-behind.
+    *
+    * Onigmo reads a class of one character as a literal (e.g. `[ß]` is as wide as `ss`).
     */
   def rubyClassWidths(node: Node, flags: IRCharFlags): Option[Seq[Int]] =
     if !rubyFolds(flags) then return None
     try
       val set = node.data match
-        case NodeData.Class(false, item) if rubyOneChar(item, flags).isEmpty => Some(classItem(item, flags).chars)
+        case NodeData.Class(false, item)
+            if classItem(item, flags.copy(ignoreCase = false)).chars.restrict(mode).size != 1 =>
+          Some(classItem(item, flags).chars)
         case NodeData.Backslash(BackslashKind.EscapeClass(kind)) if isProperty(kind) =>
           Some(escapeClassSet(kind, flags, node.loc).chars)
         case _ => None
       set.map(s => rubyFoldings(s.restrict(mode))).filter(_.nonEmpty).map(keys => 1 +: keys.map(_.length))
     catch case _: NotModeledException => None
 
-  private def resolveLiterals(run: Seq[(Node, IRCharFlags)], inLookBehind: Boolean): Seq[IRNode] =
+  private def resolveLiterals(run: Seq[(Node, IRCharFlags)]): Seq[IRNode] =
     val lits = mutable.ArrayBuffer.empty[Lit]
     for (node, flags) <- run do
       node.data match
@@ -168,7 +169,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       if foldsMultiChar(units(i)) then
         var j = i
         while j < units.length && foldsMultiChar(units(j)) && units(j).flags == units(i).flags do j += 1
-        out ++= foldRun(units.slice(i, j), inLookBehind)
+        out ++= foldRun(units.slice(i, j))
         i = j
       else
         out += closed(units(i))
@@ -197,7 +198,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     * the folding of a character (e.g. `ss`) also match the character; both are alternations, longest first. The rest
     * (Turkic `İ`, and folds across literal boundaries, classes, groups or quantifiers) is not reproduced.
     */
-  private def foldRun(units: Seq[Lit], inLookBehind: Boolean): Seq[IRNode] =
+  private def foldRun(units: Seq[Lit]): Seq[IRNode] =
     val flags = units.head.flags
     val eq = equivalence(flags)
     val native = perlNative(flags)
@@ -209,8 +210,6 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     for (u, i) <- units.zipWithIndex; c <- FullCaseFolding(u.value).iterator do folded += ((c, i))
     def char(i: Int, loc: SourceLocation): IRNode =
       IRNode(IRNodeData.Chars(eq.closure(CharSet.single(folded(i)._1))), loc)
-    // Onigmo matches a look-behind by its folded length, so a folding there matches only the folded string.
-    if inLookBehind && dialect.isRuby then return folded.indices.map(i => char(i, units(folded(i)._2).loc))
     val occurrences = for
       i <- folded.indices
       (key, set) <- multiFoldings
@@ -494,13 +493,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   // ---------------------------------------------------------------------------------------------------------------
   // Classes
 
-  private def klass(
-      invert: Boolean,
-      item: ClassItem,
-      flags: IRCharFlags,
-      loc: SourceLocation,
-      inLookBehind: Boolean
-  ): IRNodeData =
+  private def klass(invert: Boolean, item: ClassItem, flags: IRCharFlags, loc: SourceLocation): IRNodeData =
     item.data match
       // PCRE's `[[:<:]]` and `[[:>:]]` are the start and the end of a word (`\b(?=\w)` and `\b(?<=\w)`).
       case ClassItemData.ClassPosix(false, name @ ("<" | ">")) if dialect.isPCRE && !invert =>
@@ -514,39 +507,24 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     if invert && flags.unicodeSets && mayContainStrings(item) then
       throw new IRBuildingException("Negated character class may contain strings", loc)
     if invert then output(negate(item, flags), flags)
-    else if dialect.isPerl && flags.ignoreCase then perlClass(item, flags, loc, inLookBehind)
-    else if rubyFolds(flags) then
-      rubyOneChar(item, flags) match
-        case Some(key) => foldString(key, flags, loc, inLookBehind)
-        case None      => withRubyFoldings(output(classItem(item, flags), flags), flags, loc, inLookBehind)
+    else if dialect.isPerl && flags.ignoreCase then perlClass(item, flags, loc)
+    else if rubyFolds(flags) then withRubyFoldings(output(classItem(item, flags), flags), flags, loc)
     else output(classItem(item, flags), flags)
 
   /** Whether Ruby matches a class under the flags with the foldings of its characters to several characters. */
   private def rubyFolds(flags: IRCharFlags): Boolean =
     dialect.isRuby && mode == UnitMode.CodePoint && flags.ignoreCase
 
-  /** Returns the folding of the character of Ruby's class of one character folded to several characters, which Onigmo
-    * reads as a literal matching the folding (e.g. `[ß]` is `ß`, and `[ﬃ]` matches `ﬀi`).
-    */
-  private def rubyOneChar(item: ClassItem, flags: IRCharFlags): Option[UString] =
-    val set = classItem(item, flags.copy(ignoreCase = false)).chars.restrict(mode)
-    if set.size == 1 then multiFolding(set.head) else None
-
   /** Adds the foldings of the characters of Ruby's class to several characters after the class, as Onigmo tries them
     * (e.g. `[ßx]` is `[ßẞx]|ss|ss`).
     */
-  private def withRubyFoldings(
-      data: IRNodeData,
-      flags: IRCharFlags,
-      loc: SourceLocation,
-      inLookBehind: Boolean
-  ): IRNodeData =
+  private def withRubyFoldings(data: IRNodeData, flags: IRCharFlags, loc: SourceLocation): IRNodeData =
     data match
       case IRNodeData.Chars(set) if rubyFolds(flags) =>
         rubyFoldings(set) match
           case Seq() => data
           case keys  =>
-            val strings = keys.map(key => IRNode(foldString(key, flags, loc, inLookBehind), loc))
+            val strings = keys.map(key => IRNode(foldString(key, flags, loc), loc))
             IRNodeData.Disjunction(IRNode(data, loc) +: strings)
       case _ => data
 
@@ -565,7 +543,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     * Perl takes a character, an escape or a range of one character, but not a range, a POSIX class or a property, and
     * tries the foldings first, the longest first and the latest first among the same length.
     */
-  private def perlClass(item: ClassItem, flags: IRCharFlags, loc: SourceLocation, inLookBehind: Boolean): IRNodeData =
+  private def perlClass(item: ClassItem, flags: IRCharFlags, loc: SourceLocation): IRNodeData =
     val items = item.data match
       case ClassItemData.ClassUnion(items) => items
       case _                               => Seq(item)
@@ -580,7 +558,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       val strings = keys.zipWithIndex
         .collect { case (Some(key), i) => (key, i) }
         .sortBy((key, i) => (-key.length, -i))
-        .map((key, _) => IRNode(foldString(key, flags, loc, inLookBehind), loc))
+        .map((key, _) => IRNode(foldString(key, flags, loc), loc))
       val rest = items.zip(keys).collect { case (item, None) => item }
       val others = Option.when(rest.nonEmpty):
         IRNode(output(classItem(ClassItem(ClassItemData.ClassUnion(rest), item.loc), flags), flags), loc)
@@ -603,8 +581,8 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         case _: IRCharset.Ascii => !(flags.caselessRestrict && hasAscii)
 
   /** Resolves a folding as a run of literals, which is how Ruby and Perl match it. */
-  private def foldString(key: UString, flags: IRCharFlags, loc: SourceLocation, inLookBehind: Boolean): IRNodeData =
-    sequenceOf(foldRun(key.iterator.map(c => Lit(c, true, None, flags, loc)).toSeq, inLookBehind))
+  private def foldString(key: UString, flags: IRCharFlags, loc: SourceLocation): IRNodeData =
+    sequenceOf(foldRun(key.iterator.map(c => Lit(c, true, None, flags, loc)).toSeq))
 
   /** Returns the complement of a class item. */
   private def negate(item: ClassItem, flags: IRCharFlags): ClassSet = item.data match

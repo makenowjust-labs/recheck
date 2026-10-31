@@ -363,7 +363,7 @@ private[vm] class ProgramBuilder(
         buildAlternatives(strings ++ chars)
       case IRNodeData.BackReference(indices, flags) =>
         val equivalence = IRBuilder.caseEquivalence(pattern.dialect, mode, flags)
-        val folding = IRBuilder.backReferenceFolding(pattern.dialect, flags)
+        val folding = IRBuilder.backReferenceFolding(pattern.dialect, mode, flags)
         emitRead(ReadKind.Ref(indices, pattern.ir.backReference, equivalence, folding), Location.from(node.loc))
       case IRNodeData.Unsupported(_) => throw new UnsupportedException(pattern.unsupportedMessage(node))
 

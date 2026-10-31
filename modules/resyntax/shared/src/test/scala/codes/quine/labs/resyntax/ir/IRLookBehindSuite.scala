@@ -245,12 +245,11 @@ class IRLookBehindSuite extends IRSuiteBase:
   import IRLookBehindStarts.Java as JavaStarts
   import IRLookBehindStarts.Longest
 
-  // .NET and JavaScript match a look-behind backward, and the others forward from the starts before the position.
-  matching("(?<=a|bc)", DotNet, JavaScript)()
+  // .NET, JavaScript and Ruby match a look-behind backward, and the others forward from the starts before the position.
+  matching("(?<=a|bc)", DotNet, JavaScript, Ruby())()
   matching("(?<=a|bc)", Perl())(Longest(1, 2))
-  matching("(?<=a|bc)", PCRE, Ruby())(Longest(1, 1), Longest(2, 2))
+  matching("(?<=a|bc)", PCRE)(Longest(1, 1), Longest(2, 2))
   matching("(?<=(?:a|bc))", PCRE)(Longest(1, 2))
-  matching("(?<=(?:a|bc))", Ruby())(Longest(1, 1), Longest(2, 2))
   matching("(?<=ab|cd)", Python())(Longest(2, 2))
   matching("(?<=(?(1)a|bc))(a)", PCRE, Perl())(Longest(1, 2))
   matching("(?(?<=a|bc)x)", PCRE)(Longest(1, 1), Longest(2, 2))

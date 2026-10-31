@@ -84,7 +84,7 @@ object IRBackReferenceFolding:
   case object Simple extends IRBackReferenceFolding
 
   /** Full compares the full case foldings of the capture and the input, which must end at the end of a character of
-    * both (Perl, e.g. `(ß)\1` matches `"ßss"`, but `(s)\1` does not match `"sß"`).
+    * both (Perl and Ruby, e.g. `(ß)\1` matches `"ßss"`, but `(s)\1` does not match `"sß"`).
     *
     * @param below
     *   the smallest code value of a folding to several characters, which a character with another folding keeps instead

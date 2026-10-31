@@ -129,15 +129,19 @@ object IRBuilder:
   def caseEquivalence(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRCaseEquivalence =
     IRCaseEquivalence.of(dialect, mode, flags, perlNative = dialect.isPerl && flags.charset == IRCharset.Default)
 
-  /** Returns how a back-reference with the flags compares the capture with the input in the dialect. */
-  def backReferenceFolding(dialect: Dialect, flags: IRCharFlags): IRBackReferenceFolding =
-    if !dialect.isPerl || !flags.ignoreCase then IRBackReferenceFolding.Simple
+  /** Returns how a back-reference with the flags compares the capture with the input in the dialect and the mode. */
+  def backReferenceFolding(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRBackReferenceFolding =
+    if !flags.ignoreCase then IRBackReferenceFolding.Simple
     else
-      flags.charset match
-        case IRCharset.Default                            => IRBackReferenceFolding.Simple
-        case IRCharset.Locale                             => IRBackReferenceFolding.Full(0x100)
-        case _: IRCharset.Ascii if flags.caselessRestrict => IRBackReferenceFolding.Full(0x80)
-        case _                                            => IRBackReferenceFolding.Full(0)
+      dialect match
+        case _: Dialect.Ruby if mode == UnitMode.CodePoint => IRBackReferenceFolding.Full(0)
+        case _: Dialect.Perl                               =>
+          flags.charset match
+            case IRCharset.Default                            => IRBackReferenceFolding.Simple
+            case IRCharset.Locale                             => IRBackReferenceFolding.Full(0x100)
+            case _: IRCharset.Ascii if flags.caselessRestrict => IRBackReferenceFolding.Full(0x80)
+            case _                                            => IRBackReferenceFolding.Full(0)
+        case _ => IRBackReferenceFolding.Simple
 
   /** Returns the width of a literal, an escape or a class in a look-behind, where the dialects counting it differently
     * from one care.
@@ -382,9 +386,6 @@ private[ir] class IRBuilder(
 
   var context: BuildingContext = initial
 
-  /** Whether the current position is in a look-behind. */
-  var inLookBehind: Boolean = false
-
   def build(node: Node): IRNode =
     val result = node.data match
       case NodeData.Disjunction(children)                            => buildDisjunction(node, children)
@@ -408,7 +409,7 @@ private[ir] class IRBuilder(
     val flags = charFlags
     // Java's CANON_EQ matches canonically equivalent sequences, which the checkers do not handle.
     if flags.canonicalEquivalence then IRNodeData.Unsupported(node.data)
-    else resolveCharacter.fold(chars.resolve(node, flags, inLookBehind))(_(node, flags))
+    else resolveCharacter.fold(chars.resolve(node, flags))(_(node, flags))
 
   /** Builds consecutive literal characters together (e.g. for multi-character case folding). */
   def buildLiterals(nodes: Seq[Node]): Seq[IRNode] =
@@ -419,7 +420,7 @@ private[ir] class IRBuilder(
     else
       resolveCharacter match
         case Some(f) => run.map((node, flags) => IRNode(f(node, flags), node.loc))
-        case None    => chars.literals(run, inLookBehind)
+        case None    => chars.literals(run)
 
   /** Whether it finds the alternatives that Perl compiles into a trie, which matter only with `(*THEN)`. */
   var findsTries: Boolean = false
@@ -665,7 +666,7 @@ private[ir] class IRBuilder(
     checker.matching(child) match
       case IRLookBehindMatch.Forward(Seq(IRLookBehindStarts.Java(min, max, _))) if 0 <= max && max < min =>
         if negative then IRNodeData.Empty else IRNodeData.Chars(CharSet.empty)
-      case matching => IRNodeData.LookBehind(negative, lookBehind(scoped(build(child))), matching)
+      case matching => IRNodeData.LookBehind(negative, scoped(build(child)), matching)
 
   def buildGroup(node: Node, kind: GroupKind, child: Node): Either[IRNodeData, IRNode] = kind match
     case GroupKind.IndexedCapture =>
@@ -757,12 +758,6 @@ private[ir] class IRBuilder(
     else IRNodeData.Assert(IRAssertKind.TextEnd)
 
   /** Builds within a group, where the inline flags inside do not leak out. */
-  def lookBehind[A](x: => A): A =
-    val saved = inLookBehind
-    inLookBehind = true
-    try x
-    finally inLookBehind = saved
-
   def scoped[A](x: => A): A =
     val saved = context
     try x

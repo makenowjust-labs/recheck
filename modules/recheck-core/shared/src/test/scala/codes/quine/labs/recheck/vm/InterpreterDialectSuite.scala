@@ -125,18 +125,17 @@ class InterpreterDialectSuite extends munit.FunSuite:
       )
     do accepts(s"(?l)\\A$source\\z", Perl(), input, "i", matches)
 
-  test("Interpreter.run: Ruby's look-behind with a multi-character folding"):
-    accepts("(?i)(?<=ß)x", Ruby(), "ssx")
+  test("Interpreter.run: look-behinds with a multi-character folding"):
+    for dialect <- Seq(Ruby(), Perl()) do
+      accepts("(?i)(?<=ß)x", dialect, "ßx")
+      accepts("(?i)(?<=ß)x", dialect, "ssx")
     accepts("(?i)(?<=ß)x", Ruby(), "\u017fSx")
-    refutes("(?i)(?<=ß)x", Ruby(), "ßx")
-    refutes("(?<=a(?i:ß)b)x", Ruby(), "aßbx")
+    accepts("(?<=a(?i:ß)b)x", Ruby(), "aßbx")
     accepts("(?<=a(?i:ß)b)x", Ruby(), "aSsbx")
-    accepts("(?i)(?<=ß)x", Perl(), "ßx")
-    accepts("(?i)(?<=ß)x", Perl(), "ssx")
     accepts("(?i)(?<=\\u00DF)x", Ruby(), "ssx")
+    accepts("(?i)(?<=\\u00DF)x", Ruby(), "ßx")
     accepts("(?i)(?<=ﬀi)x", Ruby(), "ffix")
     refutes("(?i)(?<=ﬀi)x", Ruby(), "ﬃx")
-    refutes("(?i)(?<=\\u00DF)x", Ruby(), "ßx")
     accepts("(?i)(?<=\\N{U+DF})x", Perl(), "ssx")
     // Perl counts `\xDF` of a pattern that is not UTF-8 as one character in a look-behind.
     refutes("(?i)(?<=\\xDF)x", Perl(), "ssx")
@@ -169,12 +168,11 @@ class InterpreterDialectSuite extends munit.FunSuite:
     accepts("\\A[\\xDF\\p{L}]\\z", Perl(utf8 = false), "ss", "i")
     for dialect <- Seq(Ruby(), Perl()) do accepts("(?<=[ßx])y", dialect, "ssy", "i")
     for dialect <- Seq(JavaScript, Python(), Java, DotNet, PCRE) do refutes("(?<=[ßx])y", dialect, "ssy", "i")
-    // Ruby's look-behind matches the class or the folded string (e.g. `(?<=[ß])` does not match `ß`).
-    accepts("(?<=[ßx])y", Ruby(), "ßy", "i")
-    refutes("(?<=[ß])y", Ruby(), "ßy", "i")
-    accepts("(?<=[ß])y", Perl(), "ßy", "i")
+    for dialect <- Seq(Ruby(), Perl()) do
+      accepts("(?<=[ßx])y", dialect, "ßy", "i")
+      accepts("(?<=[ß])y", dialect, "ßy", "i")
 
-  test("Interpreter.run: Perl's case-insensitive back-references with full case folding"):
+  test("Interpreter.run: case-insensitive back-references with full case folding"):
     for (source, input, matches) <- Seq(
         ("(ß)\\1", "ßss", true),
         ("(ß)\\1", "ßſS", true),
@@ -191,9 +189,7 @@ class InterpreterDialectSuite extends munit.FunSuite:
         ("(ff)\\1i", "ffﬃ", false),
         ("(ﬃ)\\1", "ﬃff", false)
       )
-    do
-      accepts(s"\\A$source\\z", Perl(), input, "i", matches)
-      refutes(s"\\A$source\\z", Ruby(), input, "i")
+    do for dialect <- Seq(Perl(), Ruby()) do accepts(s"\\A$source\\z", dialect, input, "i", matches)
     accepts("\\A(ß)\\1\\z", Ruby(), "ßẞ", "i")
     // `aa` keeps a folding with ASCII characters, and `l` (the C locale) one with characters below `U+0100`.
     refutes("\\A(ß)\\1\\z", Perl(), "ßss", "iaa")
