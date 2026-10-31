@@ -43,7 +43,7 @@ object CommandKind:
   /** ResetFlag is a reset flag command (e.g. `(?^i)`). */
   final case class ResetFlag(flagSet: FlagSet) extends CommandKind
 
-  /** PBackRef is a named back-reference (e.g. `(?P=foo)`). */
+  /** PBackReference is a named back-reference (e.g. `(?P=foo)`). */
   final case class PBackReference(name: String) extends CommandKind
 
   /** RCall is a call command to whole regular expression (e.g. `(?R)`). */

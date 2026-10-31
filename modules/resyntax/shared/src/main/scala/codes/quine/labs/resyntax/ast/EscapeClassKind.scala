@@ -8,7 +8,7 @@ object EscapeClassKind:
   /** Digit is `\d` class. */
   case object Digit extends EscapeClassKind
 
-  /** Digit is `\d` class. */
+  /** NonDigit is `\D` class. */
   case object NonDigit extends EscapeClassKind
 
   /** Space is `\s` class. */
@@ -74,5 +74,5 @@ object EscapeClassKind:
   /** NonUnicodePropertyValue is `\P{XXX=YYY}` class. */
   final case class NonUnicodePropertyValue(name: String, value: String) extends EscapeClassKind
 
-  /** QuoteSet is `\q{}` */
+  /** QuoteSet is `\q{...}` class. */
   final case class QuoteSet(strings: Seq[Seq[QuoteLiteral]]) extends EscapeClassKind

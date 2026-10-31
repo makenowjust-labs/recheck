@@ -63,7 +63,7 @@ object GroupKind:
   /** NonAtomicPositiveLookAhead is a kind of non-atomic positive look-ahead group (e.g. `(?*...)`). */
   final case class NonAtomicPositiveLookAhead(style: AssertNameStyle) extends GroupKind
 
-  /** NonAtomicPositiveLookAhead is a kind of non-atomic positive look-ahead group (e.g. `(?<*...)`). */
+  /** NonAtomicPositiveLookBehind is a kind of non-atomic positive look-behind group (e.g. `(?<*...)`). */
   final case class NonAtomicPositiveLookBehind(style: AssertNameStyle) extends GroupKind
 
   /** ScriptRun is a kind of script run group (e.g. `(*script_run:...)`). */
