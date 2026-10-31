@@ -65,8 +65,8 @@ object IRCaseEquivalence:
     * A native (non-UTF-8) string uses ASCII rules for `U+0080..U+00FF`, and a code point above `U+00FF` makes the
     * string UTF-8, which uses Unicode rules.
     */
-  case object PerlNative extends IRCaseEquivalence:
-    def closure(set: CharSet): CharSet = set.union(CaseMapping.SimpleFold.closure(set).diff(Latin1))
+  final case class PerlNative(mode: UnitMode) extends IRCaseEquivalence:
+    def closure(set: CharSet): CharSet = set.union(CaseMapping.SimpleFold.closure(set).diff(Latin1)).restrict(mode)
 
   private val Ascii: CharSet = CharSet.range(0, 0x7f)
 
@@ -119,8 +119,7 @@ object IRCaseEquivalence:
         case _: Dialect.Python                                       => Keyed("Python", pythonKey, mode)
         case _: Dialect.Ruby if mode == UnitMode.Byte                => Keyed("ASCII", asciiFold, mode)
         case _: Dialect.Ruby                           => Keyed("simple folding", CaseMapping.SimpleFold, mode)
-        case _: Dialect.Perl if mode == UnitMode.Byte  => Keyed("ASCII", asciiFold, mode)
-        case _: Dialect.Perl if perlNative             => PerlNative
+        case _: Dialect.Perl if perlNative             => PerlNative(mode)
         case _: Dialect.Perl if flags.caselessRestrict => PCRERestrict(CaseMapping.SimpleFold, mode)
         case _: Dialect.Perl                           => Keyed("simple folding", CaseMapping.SimpleFold, mode)
         // PCRE folds non-ASCII characters only in UTF or UCP mode; PHP's `u` sets both.

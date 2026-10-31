@@ -109,6 +109,8 @@ In a bytes mode, it is a bytes literal (`b'\xc3\xa9'` in Python, `"\xC3\xA9".b` 
 
 The character set flags change the meaning of `\w`, `\d`, `\s`, `\b`, POSIX classes and case-insensitive matching in the same way as in the engine: for example, `a` (ASCII) and `u` (Unicode) of Python, Ruby and Perl, `aa` of Perl, `U` (`UNICODE_CHARACTER_CLASS`) and `u` (`UNICODE_CASE`) of Java, and PCRE's `(?aD)` and the like.
 Java's `\b` without `U` also takes a non-spacing mark after a letter or a digit as a word character (e.g. `\b` does not match between `a` and U+0301), as `java.util.regex` does.
+Perl reads a byte of a `bytes` string as the Latin-1 character, so `u` and a UTF-8 pattern give the Unicode rules to `0x80`–`0xFF` there too (e.g. `\w` matches `\xE9`).
+Perl's `l` follows the C locale, where `0x80`–`0xFF` follow the ASCII rules even in a UTF-8 pattern.
 
 ### Perl
 

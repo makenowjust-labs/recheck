@@ -36,12 +36,14 @@ private[ir] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlNati
           case _ if mode == UnitMode.Byte => Rule.Ascii
           case IRCharset.Unicode          => Rule.Unicode
           case _                          => Rule.Ascii
+      // Perl reads the bytes of a byte string as Latin-1 characters.
       case _: Dialect.Perl =>
         flags.charset match
-          case _ if mode == UnitMode.Byte => Rule.Ascii
-          case _: IRCharset.Ascii         => Rule.Ascii
-          case IRCharset.Unicode          => Rule.Unicode
-          case _                          => if perlNative then Rule.Native else Rule.Unicode
+          case _: IRCharset.Ascii => Rule.Ascii
+          case IRCharset.Unicode  => Rule.Unicode
+          // `/l` takes the C locale, which has no non-ASCII character in a class, even in a UTF-8 pattern.
+          case IRCharset.Locale => Rule.Native
+          case _                => if perlNative then Rule.Native else Rule.Unicode
       case Dialect.PCRE =>
         val restricted = flags.charset match
           case a: IRCharset.Ascii => asciiOf(a)

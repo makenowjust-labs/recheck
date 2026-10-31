@@ -130,6 +130,48 @@ class IRCharSuite extends munit.FunSuite:
     // Its non-ASCII literals are bytes, which do not make the pattern use Unicode rules.
     val Sequence(nodes) = build("é\\w", "", Perl(Perl.Encoding.Bytes)).node.data: @unchecked
     assertEquals(nodes.last.data, Chars(IRCharClasses.AsciiPosix("word")))
+  // Perl reads the bytes of a byte string as Latin-1 characters, so the rules of `0x80..0xFF` follow the modifiers and
+  // the UTF-8 flag of the pattern as for code points (checked against Perl 5.44 with a downgraded string).
+  for
+    body <- Seq(
+      "\\w",
+      "\\d",
+      "\\s",
+      "[[:alpha:]]",
+      "[[:upper:]]",
+      "[[:punct:]]",
+      "[[:print:]]",
+      "(?i)\\xC9",
+      "(?i)\\xDF"
+    )
+    modifiers <- Seq("", "(?u)", "(?a)", "(?aa)", "(?l)", "(?d)")
+    utf8 <- Seq(false, true)
+  do
+    val source = s"$modifiers$body"
+    test(s"IRBuilder.build: /$source/ in Perl's byte strings with utf8 = $utf8"):
+      def lastSet(dialect: Dialect): CharSet = strip(build(source, "", dialect).node.data) match
+        case Sequence(nodes) => setOf(nodes.last.data)
+        case data            => setOf(data)
+      val bytes = lastSet(Perl(Perl.Encoding.Bytes, PerlSource.String, Some(utf8)))
+      val chars = lastSet(Perl(Perl.Encoding.Characters, PerlSource.String, Some(utf8)))
+      assertEquals(bytes, chars.restrict(UnitMode.Byte))
+  test("IRBuilder.build: Perl's byte strings with Unicode rules"):
+    def set(s: String, utf8: Boolean = false): CharSet =
+      strip(build(s, "", Perl(Perl.Encoding.Bytes, PerlSource.String, Some(utf8))).node.data) match
+        case Sequence(nodes) => setOf(nodes.last.data)
+        case data            => setOf(data)
+    assert(!set("\\w").contains(0xe9))
+    assert(set("(?u)\\w").contains(0xe9))
+    assert(set("\\w", utf8 = true).contains(0xe9))
+    assert(set("\\x{100}?\\w").contains(0xe9))
+    assert(!set("(?a)\\w", utf8 = true).contains(0xe9))
+    assert(!set("(?l)\\w", utf8 = true).contains(0xe9))
+    assertEquals(set("(?i)\\xC9"), CharSet.single(0xc9))
+    assertEquals(set("(?iu)\\xC9"), CharSet.of(0xc9, 0xe9))
+    assertEquals(set("(?il)\\xC9", utf8 = true), CharSet.single(0xc9))
+  check("ss", "iu", Perl(Perl.Encoding.Bytes))(
+    Disjunction(Sequence(Chars(of("sS")), Chars(of("sS"))), Chars(CharSet.single(0xdf)))
+  )
   // Python's bytes pattern is Latin-1.
   chars("é", "b", Python())(CharSet.single(0xe9))
   // Ruby's ASCII-8BIT regexp has only the POSIX classes in ASCII as properties.

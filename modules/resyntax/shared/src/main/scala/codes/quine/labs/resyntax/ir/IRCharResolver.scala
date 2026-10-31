@@ -35,8 +35,8 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   private val readsUnits = mode != UnitMode.CodePoint
 
   private def perlNative(flags: IRCharFlags): Boolean =
-    dialect.isPerl && mode == UnitMode.CodePoint && !perlUnicodeRules &&
-      (flags.charset == IRCharset.Default || flags.charset == IRCharset.Locale)
+    dialect.isPerl &&
+      (flags.charset == IRCharset.Default && !perlUnicodeRules || flags.charset == IRCharset.Locale)
 
   /** Returns the case equivalence at the flags. */
   def equivalence(flags: IRCharFlags): IRCaseEquivalence =
@@ -160,7 +160,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     * Only plain literals do: Onigmo does not fold an escape with its neighbors (e.g. `\x73s` does not match `ß`).
     */
   private def foldsMultiChar(u: Lit): Boolean =
-    u.plain && u.flags.ignoreCase && mode == UnitMode.CodePoint && (dialect.isRuby || dialect.isPerl)
+    u.plain && u.flags.ignoreCase && (dialect.isPerl || dialect.isRuby && mode == UnitMode.CodePoint)
 
   /** Resolves a run of plain literals with the multi-character case folding of Ruby and Perl.
     *
@@ -187,7 +187,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       // A key must start and end at literal boundaries.
       if (i == 0 || folded(i - 1)._2 != folded(i)._2) &&
         (i + key.length == folded.length || folded(i + key.length)._2 != folded(i + key.length - 1)._2)
-    yield (i, key.length, if native then set.diff(IRCharClasses.Latin1) else set)
+    yield (i, key.length, (if native then set.diff(IRCharClasses.Latin1) else set).restrict(mode))
     if occurrences.isEmpty || occurrences.size > MaxMultiFoldings then units.map(closed)
     else
       val cuts = (0 to folded.length).filter(p => !occurrences.exists((s, len, _) => s < p && p < s + len))
