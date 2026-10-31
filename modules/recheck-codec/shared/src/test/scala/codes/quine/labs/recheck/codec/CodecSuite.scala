@@ -23,6 +23,8 @@ import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
+import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UnitMode
 
 class CodecSuite extends munit.FunSuite:
   test("codec.encodeDiagnostics"):
@@ -190,6 +192,34 @@ class CodecSuite extends munit.FunSuite:
 
   test("codec.encodeUString"):
     assertEquals(encodeUString(UStringUtil.fromString("foo")), Json.fromString("foo"))
+
+  test("codec.decodeUString"):
+    // Each mode decodes what `encodeUString` gives, including a lone surrogate.
+    for (mode, s) <- Seq(
+        UnitMode.Utf16 -> UString(0x61, 0xd83d, 0xde00, 0xd800),
+        UnitMode.CodePoint -> UString(0x61, 0x1f600, 0xd800),
+        UnitMode.Byte -> UString(0x61, 0xc3, 0xa9, 0xff)
+      )
+    do assertEquals(decodeUString(mode).decodeJson(encodeUString(s)), Right(s))
+    assert(clue(decodeUString(UnitMode.Byte).decodeJson("é".asJson)).isRight)
+    assertEquals(
+      decodeUString(UnitMode.Byte).decodeJson("\u0100".asJson).left.map(_.message),
+      Left("Invalid byte string: \u0100")
+    )
+
+  test("codec.decodeAttackPattern"):
+    val attack = AttackPattern(
+      Seq((UString.fromString("x"), UString(0x1f600), -1), (UString.empty, UString.fromString("y"), 2)),
+      UString(0),
+      17,
+      AttackPattern.Python()
+    )
+    val decoder = decodeAttackPattern(UnitMode.CodePoint, AttackPattern.Python())
+    assertEquals(decoder.decodeJson(encodeAttackPattern(attack)), Right(attack))
+    assertEquals(
+      decoder.decodeJson(Json.obj("pumps" := Json.arr(), "suffix" := "a")).left.map(_.pathToRootString),
+      Left(Some(".base"))
+    )
 
   test("codec.decodeParameters"):
 

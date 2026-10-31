@@ -46,13 +46,63 @@ object RecallProgram:
   /** Generates the program of the dialect, or returns `None` if the dialect or the pattern is not supported. */
   def generate(pattern: ParsedPattern, attack: AttackPattern): Option[RecallProgram] =
     pattern.dialect match
-      case Dialect.JavaScript         => Some(javascript(pattern, attack))
-      case _: Dialect.Python          => Some(python(pattern, attack))
-      case _: Dialect.Ruby            => Some(ruby(pattern, attack))
-      case Dialect.Java               => Some(java(pattern, attack))
-      case Dialect.DotNet             => Some(dotnet(pattern, attack))
-      case Dialect.Perl(_, source, _) => perl(pattern, attack, literal = source == PerlSource.Literal)
-      case Dialect.PCRE               => php(pattern, attack)
+      case Dialect.JavaScript        => Some(javascript(pattern, attack))
+      case _: Dialect.Python         => Some(python(pattern, attack))
+      case _: Dialect.Ruby           => Some(ruby(pattern, attack))
+      case Dialect.Java              => Some(java(pattern, attack))
+      case Dialect.DotNet            => Some(dotnet(pattern, attack))
+      case perlDialect: Dialect.Perl => perl(pattern, perlDialect, attack)
+      case Dialect.PCRE              => php(pattern, attack)
+
+  /** Script is a program of [[generate]] as a standalone file, which has the data of the program in itself.
+    *
+    * @param name
+    *   the file name that the command line takes
+    * @param command
+    *   the command line running the file
+    * @param content
+    *   the program, starting with a comment of the command line
+    */
+  final case class Script(name: String, command: String, content: String)
+
+  /** Generates the program of [[generate]] as a standalone file, or returns `None` as [[generate]] does. */
+  def script(pattern: ParsedPattern, attack: AttackPattern): Option[Script] =
+    generate(pattern, attack).map: program =>
+      val name = scriptName(pattern.dialect)
+      // The file takes the place of the standard input `-`.
+      val command = (program.command.program +: program.command.args.filterNot(_ == "-") :+ name).mkString(" ")
+      val php = "<?php\n"
+      val content = pattern.dialect match
+        case Dialect.Java       => s"// Run: $command\n" + javaProgram(javaString(program.script))
+        case Dialect.DotNet     => s"// Run: $command\n" + dotnetProgram(quote(program.script))
+        case Dialect.PCRE       => s"$php// Run: $command\n" + program.script.stripPrefix(php)
+        case Dialect.JavaScript => s"// Run: $command\n" + program.script
+        case _: Dialect.Python | _: Dialect.Ruby | _: Dialect.Perl => s"# Run: $command\n" + program.script
+      Script(name, command, content)
+
+  /** Returns the file name of the standalone program of the dialect. */
+  private def scriptName(dialect: Dialect): String = dialect match
+    case Dialect.JavaScript => "recall.cjs"
+    case _: Dialect.Python  => "recall.py"
+    case _: Dialect.Ruby    => "recall.rb"
+    case Dialect.Java       => "recall.java"
+    case Dialect.DotNet     => "recall.cs"
+    case _: Dialect.Perl    => "recall.pl"
+    case Dialect.PCRE       => "recall.php"
+
+  /** Returns a Java expression of the data.
+    *
+    * A string constant of Java has at most 65535 bytes, so a long data is a join of literals.
+    */
+  private[recall] def javaString(data: String): String =
+    val literals = data.grouped(JavaLiteralSize).map(quote).toSeq
+    if literals.sizeIs <= 1 then literals.headOption.getOrElse(quote(""))
+    else literals.mkString("String.join(\"\", ", ", ", ")")
+
+  private val JavaLiteralSize: Int = 10000
+
+  /** Returns a Java or C# literal of the data, whose only characters to escape are the line breaks. */
+  private def quote(data: String): String = "\"" + data.replace("\n", "\\n") + "\""
 
   /** Returns the JavaScript program for `node`. */
   private[recall] def javascript(pattern: ParsedPattern, attack: AttackPattern): RecallProgram =
@@ -144,8 +194,11 @@ object RecallProgram:
     RecallProgram(Command("java", Seq("--source", "17"), source = Some(JavaSource)), data(flags, pattern, attack))
 
   /** The Java program, which reads the data of [[data]] from the standard input. */
-  private[recall] val JavaSource: Command.Source = Command.Source(
-    "RecheckRecall.java",
+  private[recall] val JavaSource: Command.Source =
+    Command.Source("RecheckRecall.java", javaProgram("new String(System.in.readAllBytes(), StandardCharsets.US_ASCII)"))
+
+  /** Returns the Java program reading the data of [[data]] from the expression. */
+  private def javaProgram(data: String): String =
     s"""|import java.nio.charset.StandardCharsets;
         |import java.util.regex.Pattern;
         |
@@ -158,7 +211,7 @@ object RecallProgram:
         |
         |  public static void main(String[] args) throws Exception {
         |    System.out.println("$RuntimeLine java " + Runtime.version());
-        |    String[] lines = new String(System.in.readAllBytes(), StandardCharsets.US_ASCII).split("\\n");
+        |    String[] lines = $data.split("\\n");
         |    int flags = 0;
         |    for (char c : lines[0].toCharArray()) {
         |      flags |= switch (c) {
@@ -192,7 +245,6 @@ object RecallProgram:
         |  }
         |}
         |""".stripMargin
-  )
 
   /** Returns the data for the C# program for `dotnet run` (.NET 10 or later), using `Regex.Match`. */
   private[recall] def dotnet(pattern: ParsedPattern, attack: AttackPattern): RecallProgram =
@@ -201,8 +253,11 @@ object RecallProgram:
     RecallProgram(Command("dotnet", Seq("run"), env, Some(DotNetSource)), data(flags, pattern, attack))
 
   /** The C# program, which reads the data of [[data]] from the standard input. */
-  private[recall] val DotNetSource: Command.Source = Command.Source(
-    "RecheckRecall.cs",
+  private[recall] val DotNetSource: Command.Source =
+    Command.Source("RecheckRecall.cs", dotnetProgram("Console.In.ReadToEnd()"))
+
+  /** Returns the C# program reading the data of [[data]] from the expression. */
+  private def dotnetProgram(data: String): String =
     s"""|using System;
         |using System.Diagnostics;
         |using System.Text;
@@ -216,7 +271,7 @@ object RecallProgram:
         |}
         |
         |Console.WriteLine("$RuntimeLine .NET " + Environment.Version);
-        |var lines = Console.In.ReadToEnd().Split('\\n', StringSplitOptions.RemoveEmptyEntries);
+        |var lines = $data.Split('\\n', StringSplitOptions.RemoveEmptyEntries);
         |var options = RegexOptions.None;
         |foreach (var c in lines[0] == "-" ? "" : lines[0])
         |{
@@ -251,7 +306,6 @@ object RecallProgram:
         |}
         |Console.WriteLine("$TimeLine " + stopwatch.ElapsedMilliseconds);
         |""".stripMargin
-  )
 
   /** Returns the data of a pattern and an attack string for the programs reading it from the standard input.
     *
@@ -274,25 +328,32 @@ object RecallProgram:
     if attack.suffix.nonEmpty then lines.addOne(s"1:${units(attack.suffix.iterator)}")
     lines.result().mkString("", "\n", "\n")
 
-  /** Returns the Perl program for `perl`, or `None` if the pattern is not safe to put in the program.
+  /** Returns the Perl program for `perl`, or `None` if the pattern cannot be put in the program as the dialect tells.
     *
-    * @param literal
-    *   whether the pattern is a regex literal in the program (the default of recheck's Perl dialect), or a string
-    *   interpolated into `qr` at runtime
+    * A regex literal (the default of recheck's Perl dialect) is put in the program, and a string is interpolated into
+    * `qr` at runtime.
     */
-  private[recall] def perl(pattern: ParsedPattern, attack: AttackPattern, literal: Boolean): Option[RecallProgram] =
+  private[recall] def perl(
+      pattern: ParsedPattern,
+      dialect: Dialect.Perl,
+      attack: AttackPattern
+  ): Option[RecallProgram] =
     // `qr` takes only these modifiers, and the others do not change a match.
     val flags = pattern.flags.filter(c => "msixpodualn".contains(c))
     val bytes = pattern.ir.mode == UnitMode.Byte
+    val utf8 = dialect.utf8.contains(true)
     val regex =
-      if literal then
+      if dialect.source == PerlSource.Literal then
         for
           _ <- Option.when(isPerlSafe(pattern.source))(())
           delimiter <- PerlDelimiters.find(c => !pattern.source.contains(c))
         yield s"qr$delimiter${pattern.source}$delimiter$flags"
       else
         val source = AttackPattern.Perl.literal(sourceString(pattern.source, bytes))
-        Some(s"do { my $$pattern = $source; qr/$$pattern/$flags }")
+        // The UTF-8 flag of the string decides Perl's rules.
+        // A literal of escapes may not have the flag that `utf8` tells.
+        val upgrade = if utf8 then "utf8::upgrade($pattern)" else "utf8::downgrade($pattern, 1)"
+        Some(s"do { my $$pattern = $source; $upgrade; qr/$$pattern/$flags }")
     regex.map: regex =>
       val input = attack.toString(AttackPattern.Perl)
       val pragma = if bytes then "" else "use utf8;\n"
