@@ -726,16 +726,11 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
 private[ir] object IRCharResolver:
 
   private object Grammar:
+    import BacktrackStrategy.Greedy
     def c(set: CharSet): IRNode = IRNode(IRNodeData.Chars(set))
-    def star(node: IRNode): IRNode = IRNode(
-      IRNodeData.Repeat(node, IRQuantifier.Unbounded(0, BacktrackStrategy.Greedy))
-    )
-    def plus(node: IRNode): IRNode = IRNode(
-      IRNodeData.Repeat(node, IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy))
-    )
-    def opt(node: IRNode): IRNode = IRNode(
-      IRNodeData.Repeat(node, IRQuantifier.Bounded(0, 1, BacktrackStrategy.Greedy))
-    )
+    def star(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, IRQuantifier.Unbounded(0, Greedy)))
+    def plus(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, IRQuantifier.Unbounded(1, Greedy)))
+    def opt(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, IRQuantifier.Bounded(0, 1, Greedy)))
     def seq(nodes: IRNode*): IRNode = IRNode(IRNodeData.Sequence(nodes))
     def alt(nodes: IRNode*): IRNode = IRNode(IRNodeData.Disjunction(nodes))
 
