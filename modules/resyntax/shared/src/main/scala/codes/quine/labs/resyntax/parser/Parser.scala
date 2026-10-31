@@ -69,7 +69,6 @@ object Parser:
       case ex: ParsingException if rewrites.nonEmpty =>
         throw new ParsingException(ex.message, ex.pos.map(pos => rewrites.foldLeft(pos)((p, r) => r.position(p))))
 
-  /** Rejects a character that the source encoding cannot have. */
   private def checkEncoding(source: String, encoding: SourceEncoding): Unit =
     if encoding == SourceEncoding.Latin1 then
       val pos = source.indexWhere(_ > 0xff)
@@ -2248,7 +2247,6 @@ private[parser] final class Parser(
 
     item
 
-  // Java skips whitespace and comments in a class in the comments mode.
   private def skipClassComment(): Unit =
     if context.skipsComment && featureSet.skipsCommentInClass then skipComment()
 
@@ -2487,7 +2485,6 @@ private[parser] final class Parser(
 
     fail("Unknown POSIX class", start)
 
-  /** Finds the end of a POSIX class (or a POSIX collating element if it is supported) beginning at the given offset. */
   private def findClassPosixEnd(start: Int): Option[Int] =
     if start + 1 >= source.length then return None
     val terminator = source.charAt(start + 1)

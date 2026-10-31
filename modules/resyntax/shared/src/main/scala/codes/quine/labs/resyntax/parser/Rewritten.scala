@@ -68,7 +68,6 @@ private[parser] final class Rewritten(val text: String, starts: Array[Int], ends
     case ClassItemData.ClassRange(begin, end)  => ClassItemData.ClassRange(relocateValue(begin), relocateValue(end))
     case data                                  => data
 
-/** Rewritten utilities. */
 private[parser] object Rewritten:
 
   /** Returns the UTF-8 bytes of the source as a text of one byte per character, or `None` if the source is ASCII.
