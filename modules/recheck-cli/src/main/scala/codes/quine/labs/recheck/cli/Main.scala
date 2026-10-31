@@ -25,8 +25,12 @@ object Main:
   /** BatchAction holds `recheck batch` subcommand parameters. */
   final case class BatchAction(threadSize: Int) extends Action
 
-  /** CheckAction holds `recheck check` subcommand parameters. */
-  final case class CheckAction(pattern: InputPattern, params: Parameters) extends Action
+  /** CheckAction holds `recheck check` subcommand parameters.
+    *
+    * @param all
+    *   whether it shows all the diagnostics of `ReDoS.checkAll`
+    */
+  final case class CheckAction(pattern: InputPattern, params: Parameters, all: Boolean = false) extends Action
 
   /** A command-line definition of `recheck`. */
   def command: Command[Action] =
@@ -44,7 +48,13 @@ object Main:
       val params = ParametersOpts(logger)
 
       val pattern = Opts.argument[InputPattern](metavar = "pattern")
-      val check: Opts[Action] = (pattern, params).mapN(CheckAction(_, _))
+      val all = Opts
+        .flag(
+          long = "all",
+          help = "Show all the diagnostics, including the vulnerable ones whose recall validation failed."
+        )
+        .orFalse
+      val check: Opts[Action] = (pattern, params, all).mapN(CheckAction(_, _, _))
 
       val agent: Opts[Action] = Opts.subcommand(name = "agent", help = "Starts the batch mode."):
         val threadSize = Opts
@@ -76,9 +86,11 @@ class Main:
       exit(2)
 
     case Right(action: CheckAction) =>
-      val diagnostics = ReDoS.check(action.pattern.source, action.pattern.flags, action.params)
-      Console.out.println(diagnostics)
-      diagnostics match
+      val diagnostics =
+        if action.all then ReDoS.checkAll(action.pattern.source, action.pattern.flags, action.params)
+        else List(ReDoS.check(action.pattern.source, action.pattern.flags, action.params))
+      Console.out.println(diagnostics.mkString("\n\n"))
+      diagnostics.last match
         case _: Diagnostics.Safe                                => () // skip
         case _: Diagnostics.Vulnerable | _: Diagnostics.Unknown => exit(1)
 

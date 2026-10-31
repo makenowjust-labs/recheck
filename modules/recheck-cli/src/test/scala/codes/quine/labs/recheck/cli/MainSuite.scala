@@ -6,6 +6,8 @@ import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.SequenceInputStream
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
@@ -17,6 +19,25 @@ import codes.quine.labs.resyntax.ast.PerlSource
 
 class MainSuite extends munit.FunSuite:
   private class ExitException(val status: Int) extends SecurityException
+
+  def runMain(
+      args: Seq[String],
+      newIn: InputStream = InputStream.nullInputStream(),
+      newOut: ByteArrayOutputStream = new ByteArrayOutputStream()
+  ): (String, String, Int) =
+    val newErr = new ByteArrayOutputStream()
+
+    val main = new Main:
+      override def exit(exitCode: Int): Unit = throw new ExitException(exitCode)
+
+    // The input is read as UTF-8 like `Main.main`.
+    val newInReader = new InputStreamReader(newIn, StandardCharsets.UTF_8)
+    val status =
+      try
+        Console.withIn(newInReader)(Console.withOut(newOut)(Console.withErr(newErr)(main.run(args.toArray))))
+        0
+      catch case ex: ExitException => ex.status
+    (newOut.toString(StandardCharsets.UTF_8), newErr.toString(StandardCharsets.UTF_8), status)
 
   test("Main.command"):
     assert(clue(Main.command.parse(Seq.empty)).isLeft)
@@ -45,29 +66,14 @@ class MainSuite extends munit.FunSuite:
       Main.command.parse(Seq("/foo/", "--max-degree=2", "--timeout=1s")),
       Right(Main.CheckAction(InputPattern("foo", ""), Parameters(maxDegree = 2, timeout = Duration(1, SECONDS))))
     )
+    assertEquals(
+      Main.command.parse(Seq("--all", "/foo/")),
+      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(), all = true))
+    )
     assertEquals(Main.command.parse(Seq("agent", "--thread-size=2")), Right(Main.BatchAction(2)))
     assertEquals(Main.command.parse(Seq("agent")), Right(Main.BatchAction(sys.runtime.availableProcessors())))
 
   test("Main#run"):
-
-    def runMain(
-        args: Seq[String],
-        newIn: InputStream = InputStream.nullInputStream(),
-        newOut: ByteArrayOutputStream = new ByteArrayOutputStream()
-    ): (String, String, Int) =
-      val newErr = new ByteArrayOutputStream()
-
-      val main = new Main:
-        override def exit(exitCode: Int): Unit = throw new ExitException(exitCode)
-
-      // The input is read as UTF-8 like `Main.main`.
-      val newInReader = new InputStreamReader(newIn, StandardCharsets.UTF_8)
-      val status =
-        try
-          Console.withIn(newInReader)(Console.withOut(newOut)(Console.withErr(newErr)(main.run(args.toArray))))
-          0
-        catch case ex: ExitException => ex.status
-      (newOut.toString(StandardCharsets.UTF_8), newErr.toString(StandardCharsets.UTF_8), status)
 
     assertEquals(
       runMain(Seq.empty),
@@ -100,3 +106,24 @@ class MainSuite extends munit.FunSuite:
     assert(clue(out).contains(""""source":"“[^”]*”""""))
     assert(clue(out).contains(""""status":"vulnerable""""))
     assert(clue(out).contains(""""summary":"2nd degree polynomial""""))
+
+  test("Main#run: --all"):
+    // Without recall validation, it shows the same as `check`.
+    assertEquals(runMain(Seq("--all", "/(a|a)*$/")), runMain(Seq("/(a|a)*$/")))
+    assertEquals(runMain(Seq("--all", "/foo/"))._3, 0)
+
+  test("Main#run: --all with failed recall validation"):
+    assume(
+      sys.env.getOrElse("PATH", "").split(java.io.File.pathSeparatorChar).exists { dir =>
+        dir.nonEmpty && Files.isExecutable(Paths.get(dir, "ruby"))
+      },
+      "`ruby` is not in PATH"
+    )
+    // Ruby's memoization makes the attacks fail, and the last diagnostics is safe.
+    val (out, err, status) = runMain(Seq("--all", "--dialect=ruby", "--recall-timeout=1s", "/^(a|a)*$/"))
+    assertEquals(err, "")
+    assertEquals(status, 0)
+    val blocks = out.stripSuffix("\n").split("\n\n").toSeq
+    assert(clue(blocks).sizeIs >= 2)
+    blocks.init.foreach(b => assert(clue(b).contains("Status       : vulnerable")))
+    assert(clue(blocks.last).contains("Status    : safe"))
