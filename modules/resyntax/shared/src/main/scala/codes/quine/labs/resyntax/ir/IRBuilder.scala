@@ -17,8 +17,8 @@ import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ast.QuoteLiteral
 import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.ast.SourceLocation
+import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
-import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
 /** IRBuilder is a builder from AST node to IR. */
@@ -57,12 +57,14 @@ object IRBuilder:
     val context = BuildingContext.from(flagSet, dialect, featureSet)
     val table = CaptureAnalyzer.analyze(node, context)
     val resolver = new ReferenceResolver(table, dialect, featureSet)
-    val perlUnicodeRules = dialect == Dialect.Perl && usesPerlUnicodeRules(node, options.perlUtf8)
+    // A Perl byte string has no `use utf8`, so its non-ASCII literals are bytes.
+    val perlUtf8 = if mode == UnitMode.Byte then options.perlUtf8.orElse(Some(false)) else options.perlUtf8
+    val perlUnicodeRules = dialect == Dialect.Perl && usesPerlUnicodeRules(node, perlUtf8)
     val checker =
-      new LookBehindChecker(table, resolver, featureSet, literalWidth(dialect, mode, flagSet, perlUnicodeRules))
+      new LookBehindChecker(table, resolver, featureSet, literalWidth(flagSet, dialect, perlUnicodeRules))
     val backReferences = new IRValidator(table, resolver, checker, featureSet).validate(node)
     val chars = new IRCharResolver(dialect, mode, perlUnicodeRules)
-    val builder = new IRBuilder(context, table, backReferences, chars, resolveCharacter)
+    val builder = new IRBuilder(context, table, backReferences, chars, checker, resolveCharacter)
     IRPattern(
       builder.build(node),
       table.count,
@@ -99,27 +101,17 @@ object IRBuilder:
 
   /** Returns the width of a literal in a look-behind, where the dialects counting it differently from one care.
     *
-    * PCRE's byte mode counts the UTF-8 bytes of a non-ASCII literal (a surrogate of a pair is half of four bytes), and
     * Perl counts the folded length under `i` (e.g. `(?<=ß{128})` is too long). The flag `i` is the pattern's one here.
     */
   private def literalWidth(
-      dialect: Dialect,
-      mode: UnitMode,
       flagSet: FlagSet,
+      dialect: Dialect,
       perlUnicodeRules: Boolean
   ): Int => LookBehindChecker.Width =
     import LookBehindChecker.Width
-    dialect match
-      case Dialect.PCRE if mode == UnitMode.Byte =>
-        value =>
-          if value < 0x80 then Width(1, 1)
-          else if 0xd800 <= value && value <= 0xdfff then Width(2, 2)
-          else
-            val n = UString(value).encode(UnitMode.Byte).length.toLong
-            Width(n, n)
-      case Dialect.Perl if flagSet.ignoreCase && perlUnicodeRules =>
-        value => Width(1, FullCaseFolding(value).length.max(1).toLong)
-      case _ => _ => Width(1, 1)
+    if dialect == Dialect.Perl && flagSet.ignoreCase && perlUnicodeRules then
+      value => Width(1, FullCaseFolding(value).length.max(1).toLong)
+    else _ => Width(1, 1)
 
   /** Checks whether a Perl pattern uses Unicode rules under `/d` (perlre "Which character set modifier is in effect?").
     *
@@ -147,6 +139,15 @@ object IRBuilder:
       case _               => false
     check(node)
 
+  /** Checks whether the node has `\X`. */
+  private def hasGraphemeCluster(x: Any): Boolean = x match
+    case EscapeClassKind.GraphemeCluster => true
+    case xs: Iterable[?]                 => xs.exists(hasGraphemeCluster)
+    case x: Option[?]                    => x.exists(hasGraphemeCluster)
+    case _: String                       => false
+    case x: Product                      => x.productIterator.exists(hasGraphemeCluster)
+    case _                               => false
+
   /** Returns the names of PCRE's start options (e.g. `(*CRLF)`), which can appear only at the start. */
   private def startOptions(node: Node): Seq[String] =
     val nodes = node.data match
@@ -168,6 +169,7 @@ private[ir] class IRBuilder(
     table: CaptureTable,
     backReferences: Map[NodeKey, Seq[Int]],
     chars: IRCharResolver,
+    checker: LookBehindChecker,
     resolveCharacter: Option[(Node, IRCharFlags) => IRNodeData]
 ):
   private val dialect = initial.dialect
@@ -293,6 +295,17 @@ private[ir] class IRBuilder(
     if IRBuilder.UnsupportedStartOptions.contains(name) then IRNodeData.Unsupported(node.data)
     else IRNodeData.Empty
 
+  /** Builds a look-behind, where Java's one with `\X` tries the starts of its `TreeInfo` lengths, unlike the IR's one.
+    *
+    * It never matches if no start is tried, and is unsupported otherwise.
+    */
+  def buildLookBehind(node: Node, negative: Boolean, child: Node): IRNodeData =
+    if dialect == Dialect.Java && IRBuilder.hasGraphemeCluster(child) then
+      if !checker.javaNeverMatches(child) then IRNodeData.Unsupported(node.data)
+      else if negative then IRNodeData.Empty
+      else IRNodeData.Chars(CharSet.empty)
+    else IRNodeData.LookBehind(negative, scoped(build(child)))
+
   def buildGroup(node: Node, kind: GroupKind, child: Node): Either[IRNodeData, IRNode] = kind match
     case GroupKind.IndexedCapture =>
       table.indexOf(node) match
@@ -303,8 +316,8 @@ private[ir] class IRBuilder(
     case GroupKind.PNamedCapture(name)   => Left(buildNamedCapture(node, name, child))
     case GroupKind.PositiveLookAhead(_)  => Left(IRNodeData.LookAhead(false, scoped(build(child))))
     case GroupKind.NegativeLookAhead(_)  => Left(IRNodeData.LookAhead(true, scoped(build(child))))
-    case GroupKind.PositiveLookBehind(_) => Left(IRNodeData.LookBehind(false, scoped(build(child))))
-    case GroupKind.NegativeLookBehind(_) => Left(IRNodeData.LookBehind(true, scoped(build(child))))
+    case GroupKind.PositiveLookBehind(_) => Left(buildLookBehind(node, negative = false, child))
+    case GroupKind.NegativeLookBehind(_) => Left(buildLookBehind(node, negative = true, child))
     case GroupKind.Atomic(_)             => Left(IRNodeData.Atomic(scoped(build(child))))
     case GroupKind.InlineFlag(diff)      =>
       Right(scoped:

@@ -64,3 +64,36 @@ final class EnumeratedProperty private[charset] (
   def valuesAt(c: Int): Seq[PropertyValue] = valuesOf(c)
 
   override def toString: String = s"EnumeratedProperty($name)"
+
+/** NumericValue is a value of the `Numeric_Value` property: a rational number, or NaN for no numeric value. */
+final class NumericValue private[charset] (val numerator: Long, val denominator: Long, compute: => CharSet):
+
+  /** Checks whether this is NaN, the value of the code points without a numeric value. */
+  def isNaN: Boolean = denominator == 0
+
+  /** Returns this number as a double. */
+  def toDouble: Double = if isNaN then Double.NaN else numerator.toDouble / denominator
+
+  /** The code points having this value. */
+  lazy val set: CharSet = compute
+
+  override def toString: String =
+    if isNaN then "NumericValue(NaN)"
+    else if denominator == 1 then s"NumericValue($numerator)"
+    else s"NumericValue($numerator/$denominator)"
+
+/** NumericProperty is the `Numeric_Value` property, whose values are numbers instead of names. */
+final class NumericProperty private[charset] (
+    val names: IndexedSeq[String],
+    val shortName: String,
+    val values: IndexedSeq[NumericValue],
+    valueOf: Int => NumericValue
+) extends Property:
+
+  /** The value of the code points without a numeric value. */
+  def nan: NumericValue = values.find(_.isNaN).get
+
+  /** Returns the value of the code point. */
+  def valueAt(c: Int): NumericValue = valueOf(c)
+
+  override def toString: String = s"NumericProperty($name)"

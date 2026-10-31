@@ -2,8 +2,12 @@ package codes.quine.labs.resyntax.parser
 
 import scala.annotation.switch
 
-/** QuickAnalysis is an quick analysis result for parsing. */
-final case class QuickAnalysis(containsNamedCapture: Boolean, captureSize: Int)
+/** QuickAnalysis is an quick analysis result for parsing.
+  *
+  * @param hasUtfStartOption
+  *   whether the source starts with PCRE's start options including `(*UTF)` or `(*UTF8)`
+  */
+final case class QuickAnalysis(containsNamedCapture: Boolean, captureSize: Int, hasUtfStartOption: Boolean = false)
 
 object QuickAnalysis:
 
@@ -32,4 +36,8 @@ object QuickAnalysis:
               case _    => i += 1
         case '\\' => i += 2
         case _    => i += 1
-    QuickAnalysis(containsNamedCapture, captures)
+    val startOptions = StartOptions.findPrefixOf(source).getOrElse("")
+    val hasUtfStartOption = startOptions.contains("(*UTF)") || startOptions.contains("(*UTF8)")
+    QuickAnalysis(containsNamedCapture, captures, hasUtfStartOption)
+
+  private val StartOptions = """(?:\(\*[A-Z0-9_=]+\))*""".r

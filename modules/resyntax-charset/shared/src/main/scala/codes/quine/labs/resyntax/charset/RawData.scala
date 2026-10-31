@@ -12,8 +12,11 @@ private[charset] final case class RawBinary(names: String, set: String, strings:
   */
 private[charset] final case class RawEnumerated(names: String, values: String, runs: String, groups: String)
 
-/** RawCombined is the generated data of Script_Extensions, whose runs index the combinations of scripts. */
-private[charset] final case class RawCombined(names: String, runs: String, combos: String)
+/** RawCombined is the generated data of a multi-valued property, whose runs index the combinations of values.
+  *
+  * `values` is `;`-separated name fields, or empty for Script_Extensions, whose values are those of Script.
+  */
+private[charset] final case class RawCombined(names: String, values: String, runs: String, combos: String)
 
 /** RunTable maps code points to integer values by runs covering all code points. */
 private[charset] final class RunTable(starts: Array[Int], values: Array[Int]):

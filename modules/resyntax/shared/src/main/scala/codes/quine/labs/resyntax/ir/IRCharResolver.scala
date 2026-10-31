@@ -16,6 +16,7 @@ import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
+import codes.quine.labs.resyntax.charset.Properties
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRCharResolver.*
@@ -121,7 +122,10 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         case data => throw new IllegalArgumentException(s"Not a literal: $data")
     val merged =
       if dialect == Dialect.Ruby && mode == UnitMode.CodePoint then mergeRubyBytes(lits.toSeq) else lits.toSeq
-    val units = mergeSurrogates(merged).flatMap(lit => unitsOf(lit).map(u => lit.copy(value = u)))
+    val units = mergeSurrogates(merged).flatMap: lit =>
+      unitsOf(lit) match
+        case Seq() => Seq(lit.copy(value = NoUnit))
+        case us    => us.map(u => lit.copy(value = u))
     val out = Seq.newBuilder[IRNode]
     var i = 0
     while i < units.length do
@@ -136,7 +140,8 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     out.result()
 
   private def closed(u: Lit): IRNode =
-    IRNode(IRNodeData.Chars(equivalence(u.flags).closure(CharSet.single(u.value))), u.loc)
+    if u.value == NoUnit then IRNode(IRNodeData.Chars(CharSet.empty), u.loc)
+    else IRNode(IRNodeData.Chars(equivalence(u.flags).closure(CharSet.single(u.value))), u.loc)
 
   /** Whether a literal takes part in Ruby's and Perl's multi-character case folding.
     *
@@ -237,10 +242,10 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     case UnitMode.CodePoint => Seq(lit.value)
     case UnitMode.Utf16     => UString(lit.value).encode(UnitMode.Utf16).toSeq
     case UnitMode.Byte      =>
-      // A non-ASCII literal written in the pattern is its UTF-8 bytes, except in Python, whose bytes pattern is Latin-1.
-      if lit.source && lit.value >= 0x80 && dialect != Dialect.Python then
-        UString(lit.value).encode(UnitMode.Byte).toSeq
-      else if lit.value <= 0xff then Seq(lit.value)
+      // The parser reads a byte source by bytes, so only an escape can be above `0xFF`.
+      if lit.value <= 0xff then Seq(lit.value)
+      // Perl makes the pattern UTF-8 for it, and it never matches a byte string.
+      else if dialect == Dialect.Perl then Seq.empty
       else throw new IRBuildingException("Character value is too large in byte mode", lit.loc)
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -273,7 +278,37 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       // Java's `\R` backtracks into `\r` alone (`\R\n` matches `\r\n`), unlike the others.
       if dialect == Dialect.Java then alternatives else IRNodeData.Atomic(alternatives)
     case EscapeClassKind.NonNewline if dialect == Dialect.PCRE => dot(flags.copy(dotAll = false))
+    case EscapeClassKind.GraphemeCluster                       => graphemeCluster
     case _                                                     => output(escapeClassSet(kind, flags, loc), flags)
+
+  /** `\X`: an extended grapheme cluster by the regular expression of UAX #29 (Table 1b), in an atomic group.
+    *
+    * The engines take the longest cluster and do not backtrack into it. In byte mode, the bytes are Latin-1 characters.
+    */
+  private lazy val graphemeCluster: IRNodeData =
+    import IRQuantifier.Unbounded
+    import codes.quine.labs.resyntax.ast.BacktrackStrategy.Greedy
+    def gcb(names: String*): CharSet =
+      CharSet.union(names.map(Properties.GraphemeClusterBreak.value(_).get.set)).restrict(mode)
+    def incb(name: String): CharSet = Properties.IndicConjunctBreak.value(name).get.set.restrict(mode)
+    val extPict = Properties.binary("Extended_Pictographic").get.set.restrict(mode)
+    def c(set: CharSet): IRNode = IRNode(IRNodeData.Chars(set))
+    def star(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, Unbounded(0, Greedy)))
+    def plus(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, Unbounded(1, Greedy)))
+    def seq(nodes: IRNode*): IRNode = IRNode(IRNodeData.Sequence(nodes))
+    def alt(nodes: IRNode*): IRNode = IRNode(IRNodeData.Disjunction(nodes))
+    val control = gcb("Control", "CR", "LF")
+    val Seq(l, v, t, lv, lvt) = Seq("L", "V", "T", "LV", "LVT").map(n => c(gcb(n)))
+    val hangul = alt(seq(star(l), alt(plus(v), seq(lv, star(v)), lvt), star(t)), plus(l), plus(t))
+    val ri = seq(c(gcb("RI")), c(gcb("RI")))
+    val xpicto = seq(c(extPict), star(seq(star(c(gcb("Extend"))), c(gcb("ZWJ")), c(extPict))))
+    val linkers = star(c(incb("Extend").union(incb("Linker"))))
+    val conjunct =
+      seq(c(incb("Consonant")), plus(seq(linkers, c(incb("Linker")), linkers, c(incb("Consonant")))))
+    val core = alt(hangul, ri, xpicto, conjunct, c(control.complement(mode)))
+    val postcore = star(c(gcb("Extend", "ZWJ", "SpacingMark")))
+    val cluster = alt(seq(c(gcb("CR")), c(gcb("LF"))), c(control), seq(star(c(gcb("Prepend"))), core, postcore))
+    IRNodeData.Atomic(IRCharResolver.prune(cluster).getOrElse(IRNode(IRNodeData.Chars(CharSet.empty))))
 
   private def escapeClassSet(kind: EscapeClassKind, flags: IRCharFlags, loc: SourceLocation): ClassSet =
     def set(s: CharSet): ClassSet = ClassSet(s.restrict(mode))
@@ -326,7 +361,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       flags: IRCharFlags,
       loc: SourceLocation
   ): ClassSet =
-    IRProperties.resolve(dialect, name, value, flags) match
+    IRProperties.resolve(dialect, name, value, flags, mode) match
       case PropertyResult.Unknown              => throw new IRBuildingException("Unknown Unicode property name", loc)
       case PropertyResult.NotModeled           => throw new NotModeledException
       case PropertyResult.Found(set, caseKind) =>
@@ -515,10 +550,13 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   ): ClassSet =
     val b = valueUnits(begin, flags, loc)
     val e = valueUnits(end, flags, loc)
+    // Perl's range with an endpoint above `0xFF` is between code points, and a byte string has only its bytes.
+    if b.isEmpty || e.isEmpty then
+      if begin.value > end.value then throw new IRBuildingException("Range out of order in character class", loc)
+      return ClassSet(equivalence(flags).closeRange(CharSet.range(begin.value, end.value).restrict(mode)))
     // A range alone in a class has no neighbors to make a multibyte character with its byte escape.
     if dialect == Dialect.Ruby && mode == UnitMode.CodePoint && Seq(begin, end).exists(isRubyByteValue) then
       throw new IRBuildingException("Invalid multibyte escape", loc)
-    // In byte mode, the bytes of a non-ASCII literal around `-` are separate members and the range is between bytes.
     if b.last > e.head then throw new IRBuildingException("Range out of order in character class", loc)
     val eq = equivalence(flags)
     ClassSet(eq.closure(CharSet.of((b.init ++ e.tail)*)).union(eq.closeRange(CharSet.range(b.last, e.head))))
@@ -565,6 +603,9 @@ private[ir] object IRCharResolver:
       true
     case _ => false
 
+  /** The value of a literal that has no unit in the mode, which never matches. */
+  val NoUnit: Int = -1
+
   /** The largest number of multi-character foldings in a run; more of them leave the run to the one-to-one folding. */
   val MaxMultiFoldings: Int = 6
 
@@ -586,6 +627,27 @@ private[ir] object IRCharResolver:
     else if b < 0xf0 then 3
     else if b < 0xf5 then 4
     else 0
+
+  /** Removes the parts of a node that never match (an empty set, and what needs one), or returns `None` for all. */
+  def prune(node: IRNode): Option[IRNode] = node.data match
+    case IRNodeData.Chars(set)      => Option.when(set.nonEmpty)(node)
+    case IRNodeData.Sequence(nodes) =>
+      val pruned = nodes.map(prune)
+      Option.when(pruned.forall(_.isDefined))(node.copy(data = sequenceOf(pruned.flatten)))
+    case IRNodeData.Disjunction(nodes) =>
+      nodes.flatMap(prune) match
+        case Seq()     => None
+        case Seq(node) => Some(node)
+        case nodes     => Some(node.copy(data = IRNodeData.Disjunction(nodes)))
+    case IRNodeData.Repeat(inner, quantifier) =>
+      val min = quantifier match
+        case IRQuantifier.Exact(n)           => n
+        case IRQuantifier.Bounded(min, _, _) => min
+        case IRQuantifier.Unbounded(min, _)  => min
+      prune(inner) match
+        case Some(inner) => Some(node.copy(data = IRNodeData.Repeat(inner, quantifier)))
+        case None        => Option.when(min == 0)(node.copy(data = IRNodeData.Empty))
+    case _ => Some(node)
 
   /** Returns a node of the nodes in sequence. */
   def sequenceOf(nodes: Seq[IRNode]): IRNodeData = nodes match

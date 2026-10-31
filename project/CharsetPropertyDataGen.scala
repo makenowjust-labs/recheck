@@ -93,6 +93,42 @@ object CharsetPropertyDataGen extends UnicodeDataGen {
 
   private def field(names: Seq[String]): String = names.mkString(",")
 
+  /** The enumerated properties of ICU's integer properties, by their names in `UnicodeData` and `Properties`.
+    *
+    * The values of each property are the named ones and the ones that some code point has.
+    */
+  val IntProperties: Seq[(String, Int)] = Seq(
+    "BidiPairedBracketType" -> UProperty.BIDI_PAIRED_BRACKET_TYPE,
+    "CanonicalCombiningClass" -> UProperty.CANONICAL_COMBINING_CLASS,
+    "DecompositionType" -> UProperty.DECOMPOSITION_TYPE,
+    "EastAsianWidth" -> UProperty.EAST_ASIAN_WIDTH,
+    "GraphemeClusterBreak" -> UProperty.GRAPHEME_CLUSTER_BREAK,
+    "HangulSyllableType" -> UProperty.HANGUL_SYLLABLE_TYPE,
+    "IdentifierStatus" -> UProperty.IDENTIFIER_STATUS,
+    "IndicConjunctBreak" -> UProperty.INDIC_CONJUNCT_BREAK,
+    "IndicPositionalCategory" -> UProperty.INDIC_POSITIONAL_CATEGORY,
+    "IndicSyllabicCategory" -> UProperty.INDIC_SYLLABIC_CATEGORY,
+    "JoiningGroup" -> UProperty.JOINING_GROUP,
+    "JoiningType" -> UProperty.JOINING_TYPE,
+    "LineBreak" -> UProperty.LINE_BREAK,
+    "NFCQuickCheck" -> UProperty.NFC_QUICK_CHECK,
+    "NFDQuickCheck" -> UProperty.NFD_QUICK_CHECK,
+    "NFKCQuickCheck" -> UProperty.NFKC_QUICK_CHECK,
+    "NFKDQuickCheck" -> UProperty.NFKD_QUICK_CHECK,
+    "NumericType" -> UProperty.NUMERIC_TYPE,
+    "SentenceBreak" -> UProperty.SENTENCE_BREAK,
+    "VerticalOrientation" -> UProperty.VERTICAL_ORIENTATION,
+    "WordBreak" -> UProperty.WORD_BREAK
+  )
+
+  /** Returns the rational `numerator/denominator` (or an integer) of a numeric value of the Unicode data. */
+  def rational(v: Double): String = {
+    val d =
+      (1 to 100000).find(d => math.abs(v * d - math.rint(v * d)) < 1e-9 * d).getOrElse(sys.error(s"not rational: $v"))
+    val n = math.rint(v * d).toLong
+    if (d == 1) n.toString else s"$n/$d"
+  }
+
   private def enumerated(
       sb: StringBuilder,
       name: String,
@@ -208,8 +244,61 @@ object CharsetPropertyDataGen extends UnicodeDataGen {
     val combosField = CharsetEncoder.encode(combos.keys.toSeq.flatMap(combo => combo.size +: combo))
     sb.append("  lazy val ScriptExtensions: RawCombined = RawCombined(\n")
     sb.append(s"    ${CharsetEncoder.literal(field(propertyNames(UProperty.SCRIPT_EXTENSIONS)))},\n")
+    sb.append("    \"\",\n")
     sb.append(s"    ${CharsetEncoder.literal(encodeRuns(scxRuns))},\n")
     sb.append(s"    ${CharsetEncoder.literal(combosField)}\n")
+    sb.append("  )\n")
+
+    sb.append("\n")
+    for ((name, prop) <- IntProperties) {
+      val max = UCharacter.getIntPropertyMaxValue(prop)
+      val rs = runs(c => UCharacter.getIntPropertyValue(c, prop))
+      val used = rs.map(_._2).toSet
+      // Canonical_Combining_Class values are also named by their numbers (e.g. `230` for `Above`).
+      def names(v: Int): Seq[String] = {
+        val ns = valueNames(prop, v)
+        if (prop != UProperty.CANONICAL_COMBINING_CLASS) ns
+        else if (ns.head.isEmpty) Seq(v.toString, "")
+        else ns :+ v.toString
+      }
+      val kept = (0 to max).filter(v => used(v) || valueNames(prop, v).head.nonEmpty)
+      val dense = kept.zipWithIndex.toMap
+      enumerated(sb, name, propertyNames(prop), kept.map(names), rs.map { case (n, v) => (n, dense(v)) })
+    }
+
+    val nvMissing = UCharacter.NO_NUMERIC_VALUE
+    val nvValues = (0 to MaxCodePoint).map(UCharacter.getUnicodeNumericValue).distinct.filter(_ != nvMissing).sorted
+    val nvIndex = nvValues.zipWithIndex.toMap
+    val nvRuns = runs { c =>
+      val v = UCharacter.getUnicodeNumericValue(c)
+      if (v == nvMissing) 0 else nvIndex(v) + 1
+    }
+    // The values are not names, so `-1/2` and `1/2` are not checked by the loose matching.
+    sb.append("  lazy val NumericValue: RawEnumerated = RawEnumerated(\n")
+    sb.append(s"    ${CharsetEncoder.literal(field(propertyNames(UProperty.NUMERIC_VALUE)))},\n")
+    sb.append(s"    ${CharsetEncoder.literal(("NaN" +: nvValues.map(rational)).mkString(";"))},\n")
+    sb.append(s"    ${CharsetEncoder.literal(encodeRuns(nvRuns))},\n")
+    sb.append("    \"\"\n")
+    sb.append("  )\n\n")
+
+    // Identifier_Type is multi-valued, like Script_Extensions.
+    val idTypes = UCharacter.IdentifierType.values.toSeq
+    val idTypeValues = idTypes.map(t => valueNames(UProperty.IDENTIFIER_TYPE, t.ordinal))
+    for ((t, names) <- idTypes.zip(idTypeValues))
+      require(loose(names.head) == loose(t.name), s"Identifier_Type mismatch: ${t.name} ${names.head}")
+    checkLoose("Identifier_Type", idTypeValues)
+    val idTypeSet = java.util.EnumSet.noneOf(classOf[UCharacter.IdentifierType])
+    val idCombos = mutable.LinkedHashMap.empty[Seq[Int], Int]
+    val idRuns = runs { c =>
+      UCharacter.getIdentifierTypes(c, idTypeSet)
+      val combo = idTypeSet.asScala.toSeq.map(_.ordinal).sorted
+      idCombos.getOrElseUpdate(combo, idCombos.size)
+    }
+    sb.append("  lazy val IdentifierType: RawCombined = RawCombined(\n")
+    sb.append(s"    ${CharsetEncoder.literal(field(propertyNames(UProperty.IDENTIFIER_TYPE)))},\n")
+    sb.append(s"    ${CharsetEncoder.literal(idTypeValues.map(field).mkString(";"))},\n")
+    sb.append(s"    ${CharsetEncoder.literal(encodeRuns(idRuns))},\n")
+    sb.append(s"    ${CharsetEncoder.literal(CharsetEncoder.encode(idCombos.keys.toSeq.flatMap(c => c.size +: c)))}\n")
     sb.append("  )\n")
 
     val enumeratedProps = Seq(
@@ -218,8 +307,10 @@ object CharsetPropertyDataGen extends UnicodeDataGen {
       UProperty.SCRIPT_EXTENSIONS,
       UProperty.BLOCK,
       UProperty.BIDI_CLASS,
-      UProperty.AGE
-    )
+      UProperty.AGE,
+      UProperty.NUMERIC_VALUE,
+      UProperty.IDENTIFIER_TYPE
+    ) ++ IntProperties.map(_._2)
     checkLoose("properties", binaryNames ++ enumeratedProps.map(propertyNames) ++ DerivedBinaryNames.map(Seq(_)))
 
     sb.result()
