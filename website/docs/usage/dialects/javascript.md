@@ -1,0 +1,43 @@
+---
+id: javascript
+title: JavaScript
+---
+
+Describes how `recheck` checks a regular expression of the `javascript` dialect, which is the default.
+See [Dialects](../dialects.md) for what is common to all the dialects.
+
+## Engine
+
+`recheck` follows ECMAScript 2025 `RegExp`, as V8 implements it.
+
+## Settings
+
+The `javascript` dialect has no settings.
+
+## Flags and Units
+
+A pattern matches UTF-16 code units, or code points with the `u` or `v` flag.
+
+## Syntax
+
+The syntax includes the ES2025 features: the `v` flag, the modifiers `(?i:...)` and duplicate named groups.
+
+## Approximations
+
+- V8 (Node.js 26) takes exponential time on `^(a|a)*$` against `'a'.repeat(n) + '!'`: about 2 seconds for `n = 24`.
+- Case-insensitive matching uses JavaScript's `Canonicalize`.
+- For the `v` flag, `recheck` follows the specification.
+- A look-behind matches backward from the position.
+- A back-reference sees the captures as JavaScript resets them on each iteration of a loop.
+- An optional iteration matching the empty string is rejected.
+
+## Recall Validation
+
+- Command: `node -`, which reads the program from the standard input.
+- Matching: `RegExp.prototype.exec`.
+- Engine limits: none.
+- Engine errors: `RangeError` (e.g. V8 raises it for `/^(?:a|b)*$/` on 10,000,000 characters).
+- Environment variable: `RECHECK_NODE`.
+- Recall script: `node recall.cjs`.
+
+See [Recall Validation](../recall-validation.md) for how it works.

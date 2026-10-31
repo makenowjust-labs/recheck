@@ -38,7 +38,7 @@ ReDoS.check("^(a|a)*$", "")
 The first argument of `ReDoS.check` is the `source` which is corresponding to [`RegExp.prototype.source`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/source).
 And, the second argument is the `flags` which is corresponding to [`RegExp.prototype.flags`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/flags) too.
 The third argument is the `params` to specify parameters for the checker behavior, and the fourth is the `token` to cancel the checking in the middle.
-The `dialect` parameter (`Parameters(dialect = Dialect.Python)` with `codes.quine.labs.resyntax.ast.Dialect`) checks a regular expression of another language (see [Dialects](dialects.md)).
+The `dialect` parameter (e.g. `Parameters(dialect = Dialect.Python())` or `Parameters(dialect = Dialect.Python(Dialect.Python.Type.Bytes))` with `codes.quine.labs.resyntax.ast.Dialect`) checks a regular expression of another language (see [Dialects](dialects.md)).
 
 `ReDoS.checkAll` takes the same arguments, and returns a `List[Diagnostics]`: the `vulnerable` diagnostics whose [recall validation](diagnostics.md#recall-validation) failed, followed by the result of `ReDoS.check`.
 
