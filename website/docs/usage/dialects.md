@@ -65,14 +65,14 @@ A pattern having one of them is reported as `unknown` with an `unsupported` erro
 - Conditionals (e.g. `(?(1)a|b)`).
 - Backtracking control verbs (e.g. `(*SKIP)`, `(*FAIL)`) and PCRE's `(*NOTEMPTY)` and `(*NOTEMPTY_ATSTART)`.
 - Callouts (e.g. `(?C1)`) and embedded code (e.g. Perl's `(?{ ... })` and `(??{ ... })`).
-- `\G`, `\K`, `\R`, `\X`, `\N{name}`, and `\C` in a mode other than bytes.
+- `\G`, `\K`, `\R`, `\N{name}`, and `\C` in a mode other than bytes.
 - Word boundaries of a kind, such as `\b{wb}`.
 - Back-references with a nest level (e.g. Ruby's `\k<n+1>`).
 - .NET's balancing groups (e.g. `(?<close-open>...)`).
 - Ruby's absence operators (e.g. `(?~abc)`).
 - Non-atomic look-arounds (e.g. PCRE's `(*napla:...)`), PCRE's `(*scan_substring:...)`, and script runs (e.g. `(*sr:...)`).
 - Java's canonical equivalence (`(?c)`).
-- Unicode properties that `recheck` has no data for (e.g. Perl's `\p{Line_Break=...}`).
+- Perl's user-defined properties (e.g. `\p{IsFoo}`) and .NET's internal property names (e.g. `\p{_xmlI}`).
 
 Perl's and PCRE's extended bracketed character classes (`(?[ ... ])`) are not supported yet, and they are reported as `invalid`.
 
@@ -91,6 +91,14 @@ The dialects having the choice take the [`encoding`](parameters.mdx#encoding) pa
 
 An encoding that the dialect does not have makes the result `unknown` with an `invalid` error.
 
+The encoding also changes how the pattern is read, as the engine does.
+
+- A Python `bytes` pattern has no `\u`, `\U` and `\N{...}` escapes, and a character above `U+00FF` is an error (each character of the pattern is a byte, as Latin-1).
+- A PCRE pattern without `u` or `(*UTF)`, a Perl `bytes` pattern and a Ruby `ASCII-8BIT` pattern are read by the UTF-8 bytes of the pattern.
+  A quantifier after a non-ASCII literal repeats its last byte (e.g. `é+` is `\xC3\xA9+`), and a character class has the bytes (e.g. `[é-à]` is `[\xC3\xA9-\xC3\xA0]`, which is valid).
+  A Ruby `ASCII-8BIT` pattern is read as `Regexp.new(pattern.b, Regexp::NOENCODING)`: a `\u` escape above `U+007F` is an error, and its Unicode properties are only the POSIX classes in ASCII (e.g. `\p{Alpha}`).
+  A Perl `bytes` pattern can have a code point above `0xFF` by an escape (e.g. `\x{100}`), which never matches a byte.
+
 The attack string (`attack.pattern` of the diagnostics) is written in the JavaScript notation for every dialect, e.g. `'a'.repeat(31) + '\x00'`.
 In a bytes mode, each byte is shown as the character of the same code (as Latin-1), e.g. the UTF-8 bytes of `é` are `'Ã©'`.
 
@@ -105,6 +113,9 @@ Perl has two more parameters.
   `string` is a pattern from a string at runtime (e.g. `qr/$p/`), which the regex engine reads unchanged.
 - [`perlUtf8`](parameters.mdx#perlutf8) tells whether the pattern string is UTF-8, which makes the `/d` rules (the default) the Unicode rules.
   `null` (default) decides it from the pattern.
+
+Perl's `\p{...}` has the enumerated properties of the Unicode data, such as `Line_Break`, `East_Asian_Width`, `Grapheme_Cluster_Break`, `Word_Break`, `Canonical_Combining_Class` (also by numbers, e.g. `\p{Ccc=230}`) and `Identifier_Type`.
+`\p{Numeric_Value=...}` takes a reduced fraction (e.g. `1/2`), or a decimal number matching an integer value exactly or a fraction to 4 significant digits (e.g. `0.3333` for `1/3`), as Perl does.
 
 ## Approximations
 
@@ -127,6 +138,10 @@ There are other deliberate approximations.
   Ruby and Perl also match a character against several characters (e.g. `ß` against `ss`), but `recheck` handles it only for a run of plain literals.
   It does not handle a character class, a group or a quantifier taking part in such a match (e.g. `[s]s`).
 - The Unicode data (properties, case mappings) is of Unicode 18.0, while the engines use Unicode 16 or 17.
+- `\X` is the extended grapheme cluster of the regular expression in UAX #29 (Table 1b) in an atomic group, as the engines match one cluster without backtracking into it.
+  In a bytes mode, it reads each byte as the Latin-1 character.
+  PCRE2 10.49 does not implement the rule GB9c of Unicode 15.1 (e.g. `क्ष` is two clusters there), and does not join a regional indicator with a following mark.
+  Java's look-behind with `\X` matches nowhere if its `TreeInfo` lengths leave no start to try (e.g. `(?<=\X)`), and is unsupported otherwise.
 - For JavaScript's `v` flag, `recheck` follows the specification.
 - Look-arounds, back-references, atomic groups and possessive quantifiers are handled by the fuzz checker, not by the automaton checker.
 
