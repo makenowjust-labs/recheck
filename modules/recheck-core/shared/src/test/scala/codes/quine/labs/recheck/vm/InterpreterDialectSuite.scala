@@ -1,0 +1,116 @@
+package codes.quine.labs.recheck.vm
+
+import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.common.UnsupportedException
+import codes.quine.labs.recheck.regexp.ParsedPattern
+import codes.quine.labs.recheck.util.UStringUtil
+import codes.quine.labs.recheck.vm.Interpreter.Options
+import codes.quine.labs.recheck.vm.Interpreter.Status
+import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.Dialect.*
+import codes.quine.labs.resyntax.charset.UString
+
+/** The expected results are checked on the engines (Node 26, Python 3.15, Ruby 4.0, Java 25, PHP 8.5 with PCRE2). */
+class InterpreterDialectSuite extends munit.FunSuite:
+  given ctx: Context = Context()
+
+  def run(source: String, flags: String, dialect: Dialect, input: UString, usesAcceleration: Boolean): Status =
+    val program = ProgramBuilder.build(ParsedPattern.parse(source, flags, dialect).toTry.get).get
+    Interpreter.run(program, input, 0, Options(usesAcceleration = usesAcceleration)).status
+
+  def accepts(
+      source: String,
+      dialect: Dialect,
+      input: String | UString,
+      flags: String = "",
+      matches: Boolean = true
+  )(using loc: munit.Location): Unit =
+    val u = input match
+      case s: String  => UStringUtil.fromString(s)
+      case u: UString => u
+    val expected = if matches then Status.Ok else Status.Fail
+    for usesAcceleration <- Seq(false, true) do
+      assertEquals(run(source, flags, dialect, u, usesAcceleration), expected, s"/$source/ in $dialect on $input")
+
+  def refutes(source: String, dialect: Dialect, input: String | UString, flags: String = "")(using
+      loc: munit.Location
+  ): Unit =
+    accepts(source, dialect, input, flags, false)
+
+  test("Interpreter.run: atomic groups and possessive repeats"):
+    for dialect <- Seq(Java, Python, PCRE) do
+      refutes("^(?>a|ab)c$", dialect, "abc")
+      accepts("^(?>ab|a)c$", dialect, "abc")
+      refutes("^a++a$", dialect, "aa")
+      accepts("^a*+b", dialect, "aab")
+      refutes("^(?>a+)a", dialect, "aaa")
+    accepts("^(?:a|ab)c$", Java, "abc")
+    // An atomic group keeps the captures in it.
+    accepts("^(?>(a))\\1$", Java, "aa")
+
+  test("Interpreter.run: back-references to unset captures"):
+    accepts("^(?:(a)|b)\\1$", JavaScript, "b")
+    for dialect <- Seq(Java, Python, PCRE, Ruby, DotNet, Perl) do refutes("^(?:(a)|b)\\1$", dialect, "b")
+    // Only JavaScript resets the captures in a repetition on each iteration.
+    accepts("^(?:(a)?b){2}\\1$", JavaScript, "abb")
+    refutes("^(?:(a)?b){2}\\1$", JavaScript, "abba")
+    for dialect <- Seq(Java, Python, PCRE, Ruby, DotNet) do
+      accepts("^(?:(a)?b){2}\\1$", dialect, "abba")
+      refutes("^(?:(a)?b){2}\\1$", dialect, "abb")
+
+  test("Interpreter.run: back-references to duplicate names"):
+    accepts("^(?:(?<x>a)|(?<x>b))\\k<x>$", JavaScript, "bb")
+    accepts("(?J)^(?:(?<x>a)|(?<x>b))\\k<x>$", PCRE, "bb")
+    refutes("(?J)^(?:(?<x>a)|(?<x>b))\\k<x>$", PCRE, "ba")
+    // Ruby tries the captures from the last, and uses the first one that matches.
+    accepts("^(?<x>a)(?<x>b)\\k<x>$", Ruby, "abb")
+    accepts("^(?<x>a)(?<x>b)\\k<x>$", Ruby, "aba")
+    refutes("^(?<x>a)(?<x>b)\\k<x>$", Ruby, "abc")
+
+  test("Interpreter.run: case-insensitive back-references"):
+    accepts("(?i)^(a)\\1$", Python, "aA")
+    refutes("(?i)^(é)\\1$", Java, "éÉ")
+    accepts("(?iu)^(é)\\1$", Java, "éÉ")
+    accepts("^(a)(?i:\\1)$", PCRE, "aA")
+    refutes("^(a)\\1$", PCRE, "aA")
+
+  test("Interpreter.run: line terminators"):
+    for dialect <- Seq(Python, Java, PCRE, Perl, DotNet) do
+      accepts("^a$", dialect, "a\n")
+      refutes("^a$", dialect, "a\n\n")
+    refutes("^a$", JavaScript, "a\n")
+    accepts("^a\\Z", Python, "a")
+    refutes("^a\\Z", Python, "a\n")
+    // Ruby's `^` does not match after a line terminator at the end.
+    refutes("a\\n^", Ruby, "a\n")
+    accepts("a\\n^", Ruby, "a\nb")
+    // Java's `\r\n` is one line terminator.
+    refutes("(?m)\\r$", Java, "\r\n")
+    refutes("(?m)^\\n", Java, "\r\n")
+    accepts("(?m)a$", Java, "a\r\n")
+    accepts("(*CRLF)(?m)a$", PCRE, "a\r\nb")
+    refutes("(*CRLF)(?m)a$", PCRE, "a\nb")
+
+  test("Interpreter.run: word boundaries"):
+    accepts("^é\\b", Python, "é")
+    refutes("(?a)^é\\b", Python, "é")
+    refutes("^é\\b", JavaScript, "é")
+
+  test("Interpreter.run: strings of a class"):
+    accepts("^[\\q{abc|a}]c$", JavaScript, "abcc", "v")
+    accepts("^[\\q{abc|a}]c$", JavaScript, "ac", "v")
+    refutes("^[\\q{abc|a}]$", JavaScript, "ab", "v")
+
+  test("Interpreter.run: unit modes"):
+    accepts("^.$", Python, "😀")
+    accepts("^.$", Java, "😀")
+    refutes("^.$", DotNet, "😀")
+    // PCRE without `u` reads bytes, and a literal is its UTF-8 bytes.
+    accepts("^é$", PCRE, UString(0xc3, 0xa9))
+    refutes("^.$", PCRE, UString(0xc3, 0xa9))
+    accepts("^..$", PCRE, UString(0xc3, 0xa9))
+    accepts("(*UTF)^.$", PCRE, "é")
+
+  test("ProgramBuilder.build: unsupported"):
+    val pattern = ParsedPattern.parse("a(?R)?", "", PCRE).toTry.get
+    interceptMessage[UnsupportedException]("unsupported syntax (RCall): (?R) at 1")(ProgramBuilder.build(pattern).get)
