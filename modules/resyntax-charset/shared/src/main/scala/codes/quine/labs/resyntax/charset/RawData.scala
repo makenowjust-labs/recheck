@@ -21,17 +21,14 @@ private[charset] final case class RawCombined(names: String, values: String, run
 /** RunTable maps code points to integer values by runs covering all code points. */
 private[charset] final class RunTable(starts: Array[Int], values: Array[Int]):
 
-  /** Returns the value of the code point. */
   def valueAt(c: Int): Int = values(CharSet.countLessOrEqual(starts, c) - 1)
 
-  /** Returns the set of the code points whose values satisfy the predicate. */
   def setOf(p: Int => Boolean): CharSet =
     val builder = CharSet.newBuilder
     for i <- starts.indices if p(values(i)) do
       builder.addRange(starts(i), if i + 1 < starts.length then starts(i + 1) else UnitMode.CodePoint.limit)
     builder.result()
 
-/** RunTable utilities. */
 private[charset] object RunTable:
 
   /** Decodes runs encoded as pairs of a length and a value. */

@@ -15,10 +15,9 @@ final class Alphabet private (
     val atoms: IndexedSeq[CharSet]
 ):
 
-  /** The number of atoms. */
   def size: Int = atoms.size
 
-  /** Returns the index of the atom containing the code value, or `-1` if it is outside the mode. */
+  /** Returns `-1` for a code value outside the mode. */
   def atomOf(value: Int): Int =
     if !mode.contains(value) then -1
     else segmentAtoms(CharSet.countLessOrEqual(segmentStarts, value) - 1)
@@ -30,27 +29,20 @@ final class Alphabet private (
     */
   def atomsOf(set: CharSet): BitSet =
     val builder = BitSet.newBuilder
-    set
-      .restrict(mode)
-      .foreachIntervalWithin(0, mode.limit): (start, end) =>
-        var i = CharSet.countLessOrEqual(segmentStarts, start) - 1
-        while i < segmentStarts.length && segmentStarts(i) < end do
-          builder.addOne(segmentAtoms(i))
-          i += 1
+    set.foreachIntervalWithin(0, mode.limit): (start, end) =>
+      var i = CharSet.countLessOrEqual(segmentStarts, start) - 1
+      while i < segmentStarts.length && segmentStarts(i) < end do
+        builder.addOne(segmentAtoms(i))
+        i += 1
     builder.result()
 
-  /** Returns the union of the atoms. */
   def setOf(indices: IterableOnce[Int]): CharSet = CharSet.union(indices.iterator.map(atoms))
 
   override def toString: String = atoms.mkString(s"Alphabet($mode, ", ", ", ")")
 
-/** Alphabet utilities. */
 object Alphabet:
 
-  /** Builds the coarsest alphabet of the mode such that each set (restricted to the mode) is a union of atoms.
-    *
-    * The atoms are ordered by their smallest code values.
-    */
+  /** The sets are restricted to the mode, and the atoms are ordered by their smallest code values. */
   def refine(mode: UnitMode, sets: Iterable[CharSet]): Alphabet =
     val restricted = sets.iterator.map(_.restrict(mode)).filter(_.nonEmpty).toVector
 
@@ -76,8 +68,7 @@ object Alphabet:
         covered += j - i
       val segmentSpans =
         val s = spans.result()
-        if covered * 2 <= n then s
-        else (0 +: s :+ n).grouped(2).flatMap(xs => Iterator(xs(0), xs(1))).toArray
+        if covered * 2 <= n then s else 0 +: s :+ n
       val remap = mutable.HashMap.empty[Int, Int]
       var k = 0
       while k < segmentSpans.length do

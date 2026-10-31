@@ -87,10 +87,8 @@ object CharsetCaseDataGen extends UnicodeDataGen {
     }
   }
 
-  /** A file to generate. */
   def file(dir: File): File = dir / "CaseData.scala"
 
-  /** A generated source code. */
   def source(pkg: String): String = {
     val default = UCharacter.FOLD_CASE_DEFAULT
     val turkic = UCharacter.FOLD_CASE_EXCLUDE_SPECIAL_I

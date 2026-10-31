@@ -8,13 +8,10 @@ import scala.collection.mutable
   */
 private[charset] object Codec:
 
-  /** The number of terminal digits. */
   private val TerminalCount = 47
 
-  /** The number of continuation digits. */
   private val ContinuationCount = 46
 
-  /** The digit of each symbol (printable ASCII except `"` and `\`), or `-1`. */
   private val Digits: Array[Int] =
     val table = Array.fill(128)(-1)
     var digit = 0
@@ -23,7 +20,6 @@ private[charset] object Codec:
       digit += 1
     table
 
-  /** Decodes a sequence of non-negative integers. */
   def decode(s: String): Array[Int] =
     val out = mutable.ArrayBuilder.make[Int]
     var acc = 0
@@ -41,7 +37,6 @@ private[charset] object Codec:
       i += 1
     out.result()
 
-  /** Inverts the zigzag mapping of signed integers. */
   def unzigzag(v: Int): Int = (v >>> 1) ^ -(v & 1)
 
   /** Decodes intervals encoded as deltas of their boundaries. */

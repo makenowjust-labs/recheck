@@ -16,7 +16,6 @@ final class CaseMapping private (
 
   private def lastOf(i: Int): Int = starts(i) + (counts(i) - 1) * strides(i)
 
-  /** Maps the code value. */
   def apply(c: Int): Int =
     val i = CharSet.countLessOrEqual(starts, c) - 1
     if i < 0 then c
@@ -24,7 +23,6 @@ final class CaseMapping private (
       val offset = c - starts(i)
       if offset % strides(i) == 0 && offset / strides(i) < counts(i) then c + deltas(i) else c
 
-  /** Maps each code value of the string. */
   def apply(s: UString): UString = s.map(apply)
 
   /** Iterates the code values changed by this mapping with their images, in ascending order. */
@@ -41,7 +39,6 @@ final class CaseMapping private (
       else for k <- 0 until counts(i) do builder.addOne(starts(i) + k * strides(i))
     builder.result()
 
-  /** Computes the image `{ f(c) | c in set }`. */
   def image(set: CharSet): CharSet =
     val builder = CharSet.newBuilder.addAll(set.diff(domain))
     for i <- starts.indices if set.intersectsRange(starts(i), lastOf(i)) do
@@ -54,7 +51,6 @@ final class CaseMapping private (
           if set.contains(c) then builder.addOne(c + d)
     builder.result()
 
-  /** Computes the preimage `{ c | f(c) in set }`. */
   def preimage(set: CharSet): CharSet =
     val builder = CharSet.newBuilder.addAll(set.diff(domain))
     for i <- starts.indices if set.intersectsRange(starts(i) + deltas(i), lastOf(i) + deltas(i)) do
@@ -67,13 +63,10 @@ final class CaseMapping private (
           if set.contains(c + d) then builder.addOne(c)
     builder.result()
 
-  /** Closes the set under case-equivalence: it returns all code values mapped to the image of the set. */
   def closure(set: CharSet): CharSet = preimage(image(set))
 
-  /** Returns the code values case-equivalent to the code value (including itself). */
   def equivalents(c: Int): CharSet = closure(CharSet.single(c))
 
-  /** Returns this mapping with the mappings of the code values replaced. */
   def updated(overrides: IterableOnce[(Int, Int)]): CaseMapping =
     val map = mutable.SortedMap.from(entries)
     for (c, to) <- overrides.iterator do if c == to then map.remove(c) else map(c) = to
@@ -130,7 +123,6 @@ object CaseMapping:
       next = start + (count - 1) * stride + 1
     new CaseMapping(starts.result(), counts.result(), strides.result(), deltas.result())
 
-  /** The identity mapping. */
   val identity: CaseMapping = new CaseMapping(Array.empty, Array.empty, Array.empty, Array.empty)
 
   /** Simple case folding: the `C` and `S` mappings of CaseFolding.txt. */
@@ -152,9 +144,7 @@ object CaseMapping:
     */
   lazy val EcmaScriptUpper: CaseMapping = decode(CaseData.EcmaScriptUpper)
 
-  /** ECMAScript `Canonicalize` (ES2024 22.2.2.7.3): [[SimpleFold]] with the `u` or `v` flag, [[EcmaScriptUpper]]
-    * otherwise.
-    */
+  /** ECMAScript `Canonicalize` (ES2024 22.2.2.7.3). */
   def ecmaScriptCanonicalize(unicode: Boolean): CaseMapping = if unicode then SimpleFold else EcmaScriptUpper
 
 /** FullCaseFolding is full case folding (the `C` and `F` mappings of CaseFolding.txt), which may map a code point to
@@ -167,13 +157,11 @@ object FullCaseFolding:
   private lazy val turkicOverrides: Map[Int, UString] =
     fullOverrides ++ Codec.overrides(CaseData.FullFoldTurkic)
 
-  /** Folds the code point. */
   def apply(c: Int): UString = fullOverrides.getOrElse(c, UString(CaseMapping.SimpleFold(c)))
 
-  /** Folds the code point for Turkic languages (with the `T` mappings). */
+  /** Folds with the `T` mappings of CaseFolding.txt. */
   def turkic(c: Int): UString = turkicOverrides.getOrElse(c, UString(CaseMapping.SimpleFold(c)))
 
-  /** Folds each code point of the string. */
   def apply(s: UString, turkic: Boolean = false): UString =
     UString.from(s.iterator.flatMap(c => (if turkic then this.turkic(c) else apply(c)).iterator))
 
@@ -200,11 +188,9 @@ object FullCaseMapping:
 
   private lazy val titleOverrides: Map[Int, UString] = Codec.overrides(CaseData.FullTitle).toMap
 
-  /** Maps the code point to its uppercase. */
   def upper(c: Int): UString = upperOverrides.getOrElse(c, UString(CaseMapping.SimpleUpper(c)))
 
-  /** Maps the code point to its lowercase. */
   def lower(c: Int): UString = lowerOverrides.getOrElse(c, UString(CaseMapping.SimpleLower(c)))
 
-  /** Maps the code point to its titlecase (e.g. `U+01C6` to `U+01C5`, and `U+00DF` to `Ss`). */
+  /** Maps `U+01C6` to `U+01C5`, and `U+00DF` to `Ss`, for example. */
   def title(c: Int): UString = titleOverrides.getOrElse(c, upper(c))
