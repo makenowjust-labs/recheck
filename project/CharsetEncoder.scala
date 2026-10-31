@@ -9,10 +9,8 @@ object CharsetEncoder {
   /** Symbols of the encoding: printable ASCII except `"` and `\`, so a literal needs no escape and costs one byte. */
   val Symbols: IndexedSeq[Char] = (0x20 to 0x7e).map(_.toChar).filter(c => c != '"' && c != '\\')
 
-  /** The number of terminal digits. */
   val TerminalCount: Int = 47
 
-  /** The number of continuation digits. */
   val ContinuationCount: Int = Symbols.size - TerminalCount
 
   /** The maximum length of a single string literal; a JVM string constant must be under 65535 bytes in UTF-8. */
@@ -33,7 +31,6 @@ object CharsetEncoder {
     sb.result()
   }
 
-  /** Maps a signed integer to a non-negative one. */
   def zigzag(v: Int): Int = (v << 1) ^ (v >> 31)
 
   /** Encodes half-open intervals as deltas of their boundaries. */

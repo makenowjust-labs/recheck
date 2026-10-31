@@ -6,31 +6,22 @@ package codes.quine.labs.resyntax.charset
   */
 final class UString private (private val values: Array[Int]) extends Ordered[UString]:
 
-  /** The number of code values. */
   def length: Int = values.length
 
-  /** Checks whether this string is empty or not. */
   def isEmpty: Boolean = values.length == 0
 
-  /** Negates [[isEmpty]]. */
   def nonEmpty: Boolean = values.length != 0
 
-  /** Returns the `i`-th code value. */
   def apply(i: Int): Int = values(i)
 
-  /** The code values of this string. */
   def codeValues: IArray[Int] = IArray.unsafeFromArray(values)
 
-  /** Iterates the code values. */
   def iterator: Iterator[Int] = values.iterator
 
-  /** Concatenates two strings. */
   def ++(that: UString): UString = new UString(values ++ that.values)
 
-  /** Returns the substring of the code values in `[from, until)`. */
   def slice(from: Int, until: Int): UString = new UString(values.slice(from, until))
 
-  /** Applies the function to each code value. */
   def map(f: Int => Int): UString = new UString(values.map(f))
 
   /** Encodes the code points of this string as code units of the mode.
@@ -66,13 +57,12 @@ final class UString private (private val values: Array[Int]) extends Ordered[USt
           out.addOne(0x80 | (c & 0x3f))
       IArray.unsafeFromArray(out.result())
 
-  /** Converts the code points to a JVM/JavaScript string. */
   def asString: String =
     val sb = new java.lang.StringBuilder
     for c <- encode(UnitMode.Utf16) do sb.append(c.toChar)
     sb.toString
 
-  /** Compares two strings lexicographically by code values. */
+  /** Strings are ordered lexicographically by code values. */
   def compare(that: UString): Int =
     val n = math.min(length, that.length)
     var i = 0
@@ -88,19 +78,15 @@ final class UString private (private val values: Array[Int]) extends Ordered[USt
   override def toString: String =
     values.map(c => "U+" + Integer.toHexString(c).toUpperCase).mkString("UString(", " ", ")")
 
-/** UString utilities. */
 object UString:
 
-  /** The empty string. */
   val empty: UString = new UString(Array.empty)
 
-  /** Creates a string of the code values. */
   def apply(values: Int*): UString = new UString(values.toArray)
 
-  /** Creates a string of the code values. */
   def from(values: IterableOnce[Int]): UString = new UString(values.iterator.toArray)
 
-  /** Decodes a JVM/JavaScript string into code points; a lone surrogate becomes a code point of itself. */
+  /** A lone surrogate becomes a code point of itself. */
   def fromString(s: String): UString =
     val out = Array.newBuilder[Int]
     var i = 0
@@ -110,5 +96,5 @@ object UString:
       i += Character.charCount(c)
     new UString(out.result())
 
-  /** Creates a string of the code units of a JVM/JavaScript string, without combining surrogate pairs. */
+  /** Surrogate pairs are not combined. */
   def fromUtf16Units(s: String): UString = new UString(s.map(_.toInt).toArray)

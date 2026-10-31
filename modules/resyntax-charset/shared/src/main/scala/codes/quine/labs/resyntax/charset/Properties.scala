@@ -24,13 +24,11 @@ object Properties:
       )
     properties
 
-  /** The binary property `Any` of UTS #18: all code points. */
+  // UTS #18 defines `Any`, `ASCII` and `Assigned`, which are not in ICU4J's `UProperty`.
   lazy val Any: BinaryProperty = BinaryProperty(IndexedSeq("Any"), "Any", ClassSet(UnitMode.CodePoint.universe))
 
-  /** The binary property `ASCII` of UTS #18: `U+0000..U+007F`. */
   lazy val ASCII: BinaryProperty = BinaryProperty(IndexedSeq("ASCII"), "ASCII", ClassSet(CharSet.range(0, 0x7f)))
 
-  /** The binary property `Assigned` of UTS #18: the code points whose General_Category is not `Unassigned`. */
   lazy val Assigned: BinaryProperty =
     BinaryProperty(
       IndexedSeq("Assigned"),
@@ -38,95 +36,71 @@ object Properties:
       ClassSet(GeneralCategory.value("Cn").get.set.complement(UnitMode.CodePoint))
     )
 
-  /** All binary properties: [[icuBinaryProperties]], [[Any]], [[ASCII]] and [[Assigned]]. */
   lazy val binaryProperties: IndexedSeq[BinaryProperty] = icuBinaryProperties ++ IndexedSeq(Any, ASCII, Assigned)
 
-  /** The `General_Category` property, with the group values such as `L` and `LC`. */
+  /** It has the group values such as `L` and `LC`. */
   lazy val GeneralCategory: EnumeratedProperty = fromRaw(UnicodeData.GeneralCategory)
 
-  /** The `Script` property. */
   lazy val Script: EnumeratedProperty = fromRaw(UnicodeData.Script)
 
-  /** The `Script_Extensions` property, whose values are those of [[Script]]. */
   lazy val ScriptExtensions: EnumeratedProperty =
     fromCombined(UnicodeData.ScriptExtensions, Script.values.map(v => (v.names, v.shortName)))
 
-  /** The `Block` property. */
   lazy val Block: EnumeratedProperty = fromRaw(UnicodeData.Block)
 
-  /** The `Bidi_Class` property. */
   lazy val BidiClass: EnumeratedProperty = fromRaw(UnicodeData.BidiClass)
 
-  /** The `Age` property; its values are `Unassigned` (`NA`) and the versions such as `V1_1` (`1.1`) in order. */
+  /** Its values are `Unassigned` (`NA`) and the versions such as `V1_1` (`1.1`) in order. */
   lazy val Age: EnumeratedProperty = fromRaw(UnicodeData.Age)
 
-  /** The `Bidi_Paired_Bracket_Type` property. */
   lazy val BidiPairedBracketType: EnumeratedProperty = fromRaw(UnicodeData.BidiPairedBracketType)
 
-  /** The `Canonical_Combining_Class` property; its values are also named by their numbers (e.g. `230`). */
+  /** Its values are also named by their numbers (e.g. `230`). */
   lazy val CanonicalCombiningClass: EnumeratedProperty = fromRaw(UnicodeData.CanonicalCombiningClass)
 
-  /** The `Decomposition_Type` property. */
   lazy val DecompositionType: EnumeratedProperty = fromRaw(UnicodeData.DecompositionType)
 
-  /** The `East_Asian_Width` property. */
   lazy val EastAsianWidth: EnumeratedProperty = fromRaw(UnicodeData.EastAsianWidth)
 
-  /** The `Grapheme_Cluster_Break` property. */
   lazy val GraphemeClusterBreak: EnumeratedProperty = fromRaw(UnicodeData.GraphemeClusterBreak)
 
-  /** The `Hangul_Syllable_Type` property. */
   lazy val HangulSyllableType: EnumeratedProperty = fromRaw(UnicodeData.HangulSyllableType)
 
-  /** The `Identifier_Status` property of UTS #39. */
+  /** It is defined by UTS #39. */
   lazy val IdentifierStatus: EnumeratedProperty = fromRaw(UnicodeData.IdentifierStatus)
 
-  /** The `Identifier_Type` property of UTS #39, which gives a code point one or more values. */
+  /** A code point may have several values of it (UTS #39). */
   lazy val IdentifierType: EnumeratedProperty = fromCombined(UnicodeData.IdentifierType, IndexedSeq.empty)
 
-  /** The `Indic_Conjunct_Break` property. */
   lazy val IndicConjunctBreak: EnumeratedProperty = fromRaw(UnicodeData.IndicConjunctBreak)
 
-  /** The `Indic_Positional_Category` property. */
   lazy val IndicPositionalCategory: EnumeratedProperty = fromRaw(UnicodeData.IndicPositionalCategory)
 
-  /** The `Indic_Syllabic_Category` property. */
   lazy val IndicSyllabicCategory: EnumeratedProperty = fromRaw(UnicodeData.IndicSyllabicCategory)
 
-  /** The `Joining_Group` property. */
   lazy val JoiningGroup: EnumeratedProperty = fromRaw(UnicodeData.JoiningGroup)
 
-  /** The `Joining_Type` property. */
   lazy val JoiningType: EnumeratedProperty = fromRaw(UnicodeData.JoiningType)
 
-  /** The `Line_Break` property. */
   lazy val LineBreak: EnumeratedProperty = fromRaw(UnicodeData.LineBreak)
 
-  /** The `NFC_Quick_Check` property. */
   lazy val NFCQuickCheck: EnumeratedProperty = fromRaw(UnicodeData.NFCQuickCheck)
 
-  /** The `NFD_Quick_Check` property. */
   lazy val NFDQuickCheck: EnumeratedProperty = fromRaw(UnicodeData.NFDQuickCheck)
 
-  /** The `NFKC_Quick_Check` property. */
   lazy val NFKCQuickCheck: EnumeratedProperty = fromRaw(UnicodeData.NFKCQuickCheck)
 
-  /** The `NFKD_Quick_Check` property. */
   lazy val NFKDQuickCheck: EnumeratedProperty = fromRaw(UnicodeData.NFKDQuickCheck)
 
-  /** The `Numeric_Type` property. */
   lazy val NumericType: EnumeratedProperty = fromRaw(UnicodeData.NumericType)
 
-  /** The `Sentence_Break` property. */
   lazy val SentenceBreak: EnumeratedProperty = fromRaw(UnicodeData.SentenceBreak)
 
-  /** The `Vertical_Orientation` property. */
   lazy val VerticalOrientation: EnumeratedProperty = fromRaw(UnicodeData.VerticalOrientation)
 
-  /** The `Word_Break` property. */
   lazy val WordBreak: EnumeratedProperty = fromRaw(UnicodeData.WordBreak)
 
-  /** The `Numeric_Value` property; its values are NaN first, and then the numbers in ascending order. */
+  /** Its values are NaN first, and then the numbers in ascending order. */
   lazy val NumericValue: NumericProperty =
     val raw = UnicodeData.NumericValue
     val (names, short) = Codec.names(raw.names)
@@ -146,7 +120,6 @@ object Properties:
         new NumericValue(n, d, table.setOf(_ == i))
     NumericProperty(names, short, values, c => values(table.valueAt(c)))
 
-  /** The enumerated properties. */
   lazy val enumeratedProperties: IndexedSeq[EnumeratedProperty] =
     IndexedSeq(
       GeneralCategory,
@@ -179,20 +152,16 @@ object Properties:
       WordBreak
     )
 
-  /** All properties. */
   lazy val all: IndexedSeq[Property] = binaryProperties ++ enumeratedProperties :+ NumericValue
 
   private lazy val index = NameIndex(all.map(p => (p.names, p)))
 
-  /** Looks up a property by its name. */
   def lookup(name: String, matching: NameMatching = NameMatching.Exact): Option[Property] =
     index.get(name, matching)
 
-  /** Looks up a binary property by its name. */
   def binary(name: String, matching: NameMatching = NameMatching.Exact): Option[BinaryProperty] =
     lookup(name, matching).collect { case p: BinaryProperty => p }
 
-  /** Looks up an enumerated property by its name. */
   def enumerated(name: String, matching: NameMatching = NameMatching.Exact): Option[EnumeratedProperty] =
     lookup(name, matching).collect { case p: EnumeratedProperty => p }
 
@@ -213,7 +182,7 @@ object Properties:
     require(i >= 0, s"not an Age value: $age")
     CharSet.union(Age.values.slice(1, i + 1).map(_.set))
 
-  /** Builds a multi-valued property, whose values are the given names or those of the raw data. */
+  /** Builds a multi-valued property; `valueNames` are used when the raw data has no value names. */
   private def fromCombined(raw: RawCombined, valueNames: IndexedSeq[(IndexedSeq[String], String)]): EnumeratedProperty =
     val (names, short) = Codec.names(raw.names)
     lazy val table = RunTable.decode(raw.runs)

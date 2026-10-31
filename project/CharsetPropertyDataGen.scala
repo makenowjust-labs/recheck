@@ -11,13 +11,11 @@ import com.ibm.icu.lang.UScript
 /** CharsetPropertyDataGen is a generator for `UnicodeData.scala` of `resyntax-charset`. */
 object CharsetPropertyDataGen extends UnicodeDataGen {
 
-  /** The short names of the General_Category group values. */
   val GeneralCategoryGroups: Seq[String] = Seq("C", "L", "LC", "M", "N", "P", "S", "Z")
 
   /** The names of the derived binary properties defined in `Properties`. */
   val DerivedBinaryNames: Seq[String] = Seq("Any", "ASCII", "Assigned")
 
-  /** The last code point. */
   val MaxCodePoint: Int = 0x10ffff
 
   /** Collects names by ICU name choices until ICU rejects the choice. */
@@ -148,10 +146,8 @@ object CharsetPropertyDataGen extends UnicodeDataGen {
     sb.append("  )\n\n")
   }
 
-  /** A file to generate. */
   def file(dir: File): File = dir / "UnicodeData.scala"
 
-  /** A generated source code. */
   def source(pkg: String): String = {
     val sb = new StringBuilder
     val version = UCharacter.getUnicodeVersion
