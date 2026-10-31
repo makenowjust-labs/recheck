@@ -1,6 +1,8 @@
 package codes.quine.labs.resyntax.ir
 
 import codes.quine.labs.resyntax.ast.NodeData
+import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.ClassSet
 
 /** IRNodeData is a data of internal representation node. */
 sealed abstract class IRNodeData extends Product with Serializable:
@@ -26,6 +28,20 @@ object IRNodeData:
 
   /** Empty is an empty string pattern. */
   case object Empty extends IRNodeData
+
+  /** Chars matches one code value (a UTF-16 code unit, a code point or a byte, by the unit mode) in the set.
+    *
+    * Every character-level node (a literal, `.`, an escape class and a class) becomes this, after case-insensitivity is
+    * resolved into the set.
+    */
+  final case class Chars(set: CharSet) extends IRNodeData
+
+  /** Strings matches one of the strings of the class, or one code value in its characters.
+    *
+    * Only a class with strings becomes this (JavaScript `v`: `\q{...}` and properties of strings). The strings are
+    * tried from the longest, and then the characters, as in ECMAScript `CompileAtom`.
+    */
+  final case class Strings(set: ClassSet) extends IRNodeData
 
   /** Sequence is a sequence of nodes. */
   final case class Sequence(nodes: Seq[IRNode]) extends IRNodeData

@@ -16,6 +16,8 @@ import codes.quine.labs.resyntax.ast.NameStyle
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.Reference
+import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.ir.IRCharClasses.AsciiWord
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.ir.IRQuantifier.*
 
@@ -161,9 +163,10 @@ class IRBuilderSuite extends IRSuiteBase:
   check("\\z", "", DotNet, Java, PCRE, Perl, Ruby)(Assert(IRAssertKind.TextEnd))
   // `a\Z` does not match `a\n` in Python, where `\Z` is the end of the text.
   check("\\Z", "", Python)(Assert(IRAssertKind.TextEnd))
-  checkWith("\\b", "", All*)(d => Assert(IRAssertKind.WordBoundary(flagsOf(d))))
-  checkWith("\\B", "", All*)(d => Assert(IRAssertKind.NotWordBoundary(flagsOf(d))))
-  checkWith("\\b", "iu", JavaScript)(d => Assert(IRAssertKind.WordBoundary(flagsOf(d, "iu"))))
+  check("\\b", "", JavaScript, Java, PCRE)(Assert(IRAssertKind.WordBoundary(AsciiWord)))
+  check("\\B", "", JavaScript, Java, PCRE)(Assert(IRAssertKind.NotWordBoundary(AsciiWord)))
+  // ECMAScript's WordCharacters with `u` and `i` includes U+017F and U+212A, which fold to `s` and `k`.
+  check("\\b", "iu", JavaScript)(Assert(IRAssertKind.WordBoundary(AsciiWord.union(CharSet.of(0x17f, 0x212a)))))
   check("\\b{wb}", "", Perl)(
     Unsupported(NodeData.Backslash(BackslashKind.Assert(AssertKind.Boundary(Some(BoundaryModifier.WbModifier)))))
   )
@@ -231,5 +234,6 @@ class IRBuilderSuite extends IRSuiteBase:
           case data           => fail(s"Unexpected: $data")
       case data => fail(s"Unexpected: $data")
 
-  test("IRBuilder.build: leaves character-level nodes to the character resolution"):
-    intercept[NotImplementedError](IRBuilder.build(Node(NodeData.Literal('a')), FlagSet(), JavaScript))
+  test("IRBuilder.build: resolves character-level nodes into character sets"):
+    val pattern = IRBuilder.build(Node(NodeData.Literal('a')), FlagSet(), JavaScript)
+    assertEquals(pattern.node.data, Chars(CharSet.single('a')))
