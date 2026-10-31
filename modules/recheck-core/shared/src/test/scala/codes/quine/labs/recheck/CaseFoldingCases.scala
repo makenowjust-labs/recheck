@@ -24,6 +24,11 @@ object CaseFoldingCases:
     Case("^[ß]s$", "sss", all, folds),
     Case("^[ﬃx]$", "ﬀi", all, folds),
     Case("^[ﬃx]$", "fﬁ", all, folds),
+    // `İ` folds to `i` and U+0307 (the Turkic folding to `i` is another status of CaseFolding.txt).
+    Case("^[İx]$", "i\u0307", all, folds),
+    Case("^[İx]$", "I\u0307", all, folds),
+    Case("^İ$", "i\u0307", all, folds),
+    Case("^i\u0307$", "İ", all, folds),
     // A folding matches whole characters of the input.
     Case("^[ß]$", "s", all, Set.empty),
     Case("^[ßx]s$", "ss", all, Set.empty),
@@ -43,6 +48,11 @@ object CaseFoldingCases:
     Case("^\\u017Fs$", "ß", Seq(Ruby()), Set(Ruby())),
     Case("^f\\i$", "ﬁ", Seq(Ruby()), Set(Ruby())),
     Case("^j\\x{30C}$", "ǰ", Seq(Perl()), Set(Perl())),
+    Case("^\\x{130}$", "i\u0307", Seq(Perl()), Set(Perl())),
+    Case("^\\u0130$", "i\u0307", Seq(Ruby()), Set(Ruby())),
+    Case("^i\\x{307}$", "İ", Seq(Perl()), Set(Perl())),
+    Case("^i\\u0307$", "İ", Seq(Ruby()), Set(Ruby())),
+    Case("^\\u{69 307}$", "İ", Seq(Ruby()), Set.empty),
     // Ruby joins literals into a folding only when each of them folds to one character.
     Case("^ſs$", "ß", Seq(Ruby(), Perl()), Set(Ruby(), Perl())),
     Case("^ſt$", "ﬅ", Seq(Ruby(), Perl()), Set(Ruby(), Perl())),

@@ -195,8 +195,8 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   /** Resolves a run of literals with the multi-character case folding of Ruby and Perl.
     *
     * A literal folded to several characters (e.g. `ß` to `ss`) also matches them, and consecutive literals folded to
-    * the folding of a character (e.g. `ss`) also match the character; both are alternations, longest first. The rest
-    * (Turkic `İ`, and folds across literal boundaries, classes, groups or quantifiers) is not reproduced.
+    * the folding of a character (e.g. `ss`) also match the character; both are alternations, longest first. Folds
+    * across literal boundaries, classes, groups or quantifiers are not reproduced.
     */
   private def foldRun(units: Seq[Lit]): Seq[IRNode] =
     val flags = units.head.flags
@@ -783,18 +783,14 @@ private[ir] object IRCharResolver:
   /** The largest number of multi-character foldings in a run; more of them leave the run to the one-to-one folding. */
   val MaxMultiFoldings: Int = 6
 
-  /** The strings of two or more code points that some characters fold to (e.g. `ss` from `ß`), without the Turkic
-    * dotted `İ` (`i` and U+0307).
-    */
-  lazy val multiFoldings: Seq[(UString, CharSet)] =
-    FullCaseFolding.multiCodePointFoldings().toSeq.filterNot(_._1.iterator.contains(0x307)).sortBy(_._1)
+  /** The strings of two or more code points that some characters fold to (e.g. `ss` from `ß`). */
+  lazy val multiFoldings: Seq[(UString, CharSet)] = FullCaseFolding.multiCodePointFoldings().toSeq.sortBy(_._1)
 
   /** [[multiFoldings]] in the order of Onigmo's tables: by the length, and then by the folding. */
   lazy val rubyMultiFoldings: Seq[(UString, CharSet)] = multiFoldings.sortBy((key, _) => (key.length, key))
 
-  /** Returns the folding of a character to several characters (e.g. `ss` of `ß`), without the Turkic dotted `İ`. */
-  def multiFolding(c: Int): Option[UString] =
-    Some(FullCaseFolding(c)).filter(key => key.length >= 2 && !key.iterator.contains(0x307))
+  /** Returns the folding of a character to several characters (e.g. `ss` of `ß`). */
+  def multiFolding(c: Int): Option[UString] = Some(FullCaseFolding(c)).filter(_.length >= 2)
 
   /** Checks whether the escape class is a property, which is a class in Onigmo, but not a negated one. */
   def isProperty(kind: EscapeClassKind): Boolean = kind match

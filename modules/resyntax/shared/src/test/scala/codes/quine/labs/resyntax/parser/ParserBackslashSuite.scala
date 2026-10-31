@@ -171,8 +171,13 @@ class ParserBackslashSuite extends ParserSuiteBase:
   // .NET's block names have hyphens (e.g. `IsLatin-1Supplement`).
   check("\\p{IsLatin-1Supplement}", "", DotNet)(Backslash(EscapeClass(UnicodeProperty("IsLatin-1Supplement"))))
   check("\\p{block=Basic Latin}", "", Java)(Backslash(EscapeClass(UnicodePropertyValue("block", "Basic Latin"))))
-  check("\\p{ L& }", "", PCRE, Perl(), Ruby())(Backslash(EscapeClass(UnicodeProperty("L&"))))
+  check("\\p{ L& }", "", PCRE, Perl())(Backslash(EscapeClass(UnicodeProperty("L&"))))
   check("\\p{Bc:EN}", "", PCRE, Perl())(Backslash(EscapeClass(UnicodePropertyValue("Bc", "EN"))))
+  // Ruby reads a property name as it is, which only `=` separates, and IR rejects an unknown one.
+  check("\\p{ L& }", "", Ruby())(Backslash(EscapeClass(UnicodeProperty(" L& "))))
+  check("\\p{ ^L}", "", Ruby())(Backslash(EscapeClass(UnicodeProperty(" ^L"))))
+  check("\\p{^In CB = Linker}", "", Ruby())(Backslash(EscapeClass(NonUnicodePropertyValue("In CB ", " Linker"))))
+  check("\\p{Bc:EN}", "", Ruby())(Backslash(EscapeClass(UnicodeProperty("Bc:EN"))))
   error("\\p{}", "", PCRE, Perl(), Ruby())("Invalid backslash escape at 3")
   error("\\p{L", "", PCRE, Perl(), Ruby())("Invalid backslash escape at 4")
   check("\\r", "", All*)(Backslash(Escape(Single('r'), 0x0d)))
@@ -192,6 +197,15 @@ class ParserBackslashSuite extends ParserSuiteBase:
       false,
       ClassUnion(ClassBackslashValue(Escape(UnicodeBracket, 0x41)), ClassBackslashValue(Escape(UnicodeBracket, 0x42)))
     )
+  // Ruby separates the code points by ASCII spaces, and reads at most six digits for each.
+  check("\\u{\n41\t\r\u000b\f42\n}", "", Ruby()):
+    Sequence(Backslash(Escape(UnicodeBracket, 0x41)), Backslash(Escape(UnicodeBracket, 0x42)))
+  check("\\u{41\n42}", "x", Ruby()):
+    Sequence(Backslash(Escape(UnicodeBracket, 0x41)), Backslash(Escape(UnicodeBracket, 0x42)))
+  check("\\u{000041}", "", Ruby())(Backslash(Escape(UnicodeBracket, 0x41)))
+  error("\\u{0000041}", "", Ruby())("Invalid backslash escape at 3")
+  error("\\u{41\u00a042}", "", Ruby())("Invalid backslash escape at 5")
+  error("\\u{41\u001c42}", "", Ruby())("Invalid backslash escape at 5")
   error("\\u{}", "", Ruby())("Invalid backslash escape at 4")
   error("\\u{110000}", "u", JavaScript)("Code point too large at 3")
   error("\\u{110000}", "", Ruby())("Code point too large at 3")

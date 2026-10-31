@@ -1728,12 +1728,15 @@ private[parser] final class Parser(
       case (true, Some(value))  => EscapeClassKind.NonUnicodePropertyValue(name, value)
     BackslashKind.EscapeClass(klass)
 
+  // Ruby (Onigmo) looks up the whole name with `=` and the value, ignoring only spaces, hyphens, underscores and cases.
   private def parseStrictProperty(): (Boolean, String, Option[String]) =
+    val negated = featureSet.allowsNegatedRawPropertyName && !isEnd && currentChar == '^'
+    if negated then next()
     val name = parsePropertyName()
     val value = Option.when(!isEnd && currentChar == '='):
       next()
       parsePropertyName()
-    (false, name, value)
+    (negated, name, value)
 
   private def parsePropertyName(): String =
     if !featureSet.allowsRawPropertyName then return parseID()
@@ -1742,7 +1745,7 @@ private[parser] final class Parser(
     assert(start < offset, "Invalid backslash escape")
     sliceSource(start, offset)
 
-  // Perl, PCRE and Ruby ignore blanks, hyphens, underscores and cases in property names, so the name is kept as written.
+  // Perl and PCRE ignore blanks, hyphens, underscores and cases in property names, so the name is kept as written.
   private def parseLooseProperty(): (Boolean, String, Option[String]) =
     skipBraceBlank(force = true)
     val negated = !isEnd && currentChar == '^'
@@ -1850,13 +1853,17 @@ private[parser] final class Parser(
 
     BackslashKind.Escape(EscapeStyle.UnicodeHex4, value)
 
+  // Ruby separates the code points by ASCII spaces (`ISSPACE`, e.g. `\n`), and reads at most six digits for each.
   private def parseUnicodeList(): BackslashKind =
-    skipBraceBlank(force = true)
+    def skipSpaces(): Unit = while !isEnd && " \t\n\u000b\f\r".contains(currentChar) do next()
+    skipSpaces()
     val values = Seq.newBuilder[Int]
     while !isEnd && isHexDigit do
       val start = offset
-      values.addOne(checkCodePoint(parseHexDigits(Int.MaxValue), start))
-      skipBraceBlank(force = true)
+      val value = parseHexDigits(6)
+      assert(isEnd || !isHexDigit, "Invalid backslash escape", start)
+      values.addOne(checkCodePoint(value, start))
+      skipSpaces()
     expect('}', "Invalid backslash escape")
     values.result() match
       case Seq()         => fail("Invalid backslash escape")

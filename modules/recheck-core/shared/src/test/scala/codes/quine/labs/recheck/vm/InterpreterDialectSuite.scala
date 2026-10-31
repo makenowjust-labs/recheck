@@ -93,6 +93,9 @@ class InterpreterDialectSuite extends munit.FunSuite:
     accepts("^(?<x>a)(?<x>b)\\k<x>$", Ruby(), "abb")
     accepts("^(?<x>a)(?<x>b)\\k<x>$", Ruby(), "aba")
     refutes("^(?<x>a)(?<x>b)\\k<x>$", Ruby(), "abc")
+    // Ruby takes only the groups of the name opened before the reference.
+    refutes("^(?:(?<x>a)|\\k<x>x|(?<x>b))+$", Ruby(), "abbx")
+    accepts("^(?:(?<x>a)|\\k<x>x|(?<x>b))+$", Ruby(), "baax")
 
   test("Interpreter.run: case-insensitive back-references"):
     accepts("(?i)^(a)\\1$", Python(), "aA")
@@ -162,6 +165,8 @@ class InterpreterDialectSuite extends munit.FunSuite:
     refutes("(?aa)\\A[\\xDFx]\\z", Perl(), "ss", "i")
     accepts("(?aa)\\A[\\x{390}x]\\z", Perl(), "\u03b9\u0308\u0301", "i")
     refutes("(?l)\\A[\\xDFx]\\z", Perl(), "ss", "i")
+    refutes("(?aa)\\A[İx]\\z", Perl(), "i\u0307", "i")
+    refutes("(?l)\\A[İx]\\z", Perl(), "i\u0307", "i")
     accepts("(?l)\\A[\\x{390}x]\\z", Perl(), "\u03b9\u0308\u0301", "i")
     // A native string under `/d` does not match the folding of a Latin-1 character.
     refutes("\\A[\\xDFx]\\z", Perl(utf8 = false), "ss", "i")
@@ -182,6 +187,7 @@ class InterpreterDialectSuite extends munit.FunSuite:
         ("(.)\\1", "ﬃﬀi", true),
         ("(ﬃ)\\1", "ﬃfﬁ", true),
         ("(İ)\\1", "İi\u0307", true),
+        ("(İ)\\1", "i\u0307i\u0307", true),
         // The folding of a character matches whole.
         ("(s)\\1", "sß", false),
         ("(ß)\\1", "ßs", false),

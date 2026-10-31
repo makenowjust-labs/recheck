@@ -33,7 +33,9 @@ private[ir] final class ReferenceResolver(table: CaptureTable, dialect: Dialect,
         case _                                    => fail("Reference to non-existent group", loc)
     else
       val indices = groupName(name, site, loc)
-      if featureSet.requiresClosedGroupReference then checkClosed(indices, site, loc) else indices
+      // Ruby takes only the groups of the name opened before the reference (e.g. `\k<n>` of `(?<n>a)|\k<n>|(?<n>b)`).
+      val before = if featureSet.requiresNameDefinedBefore then indices.filter(_ <= site.opened) else indices
+      if featureSet.requiresClosedGroupReference then checkClosed(before, site, loc) else before
 
   /** Resolves a name for a back-reference or a conditional test. */
   def groupName(name: String, site: ReferenceSite, loc: SourceLocation): Seq[Int] =

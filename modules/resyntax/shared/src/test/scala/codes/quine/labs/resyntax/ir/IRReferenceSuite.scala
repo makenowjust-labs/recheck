@@ -101,6 +101,10 @@ class IRReferenceSuite extends IRSuiteBase:
 
   // Duplicated names: `(?:(?<n>a)|(?<n>b))\k<n>` matches `bb`.
   resolve("(?:(?<n>a)|(?<n>b))\\k<n>", "", JavaScript, Perl(), Ruby())(1, 2)
+  // Ruby takes only the groups of the name opened before the reference.
+  resolve("(?<n>a)\\k<n>(?<n>b)", "", Ruby())(1)
+  resolve("(?<n>a)\\k<n>(?<n>b)", "", Perl())(1, 2)
+  resolve("(?<n>a)(?<n>b\\k<n>)", "", Ruby())(1, 2)
   resolve("(?:(?<n>a)|(?<n>b))\\k<n>", "J", PCRE)(1, 2)
   resolve("(?:(?<n>a)|(?<n>b))\\k<n>", "", DotNet)(1)
   resolve("(?|(?<n>a)|(?<n>b))\\k<n>", "", PCRE, Perl())(1)

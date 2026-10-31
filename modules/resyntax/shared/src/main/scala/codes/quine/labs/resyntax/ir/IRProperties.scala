@@ -778,6 +778,7 @@ private[ir] object IRProperties:
     "Grapheme_Extend",
     "Grapheme_Link",
     "Hex_Digit",
+    "Hyphen",
     "IDS_Binary_Operator",
     "IDS_Trinary_Operator",
     "IDS_Unary_Operator",
@@ -812,14 +813,41 @@ private[ir] object IRProperties:
   private lazy val rubyBinaryIndex: Map[String, BinaryProperty] =
     index(RubyBinary.map(n => Properties.binary(n).get).map(p => (p.names, p)), rubyKey)
 
+  /** The contributory properties of PropList.txt (e.g. `Other_Alphabetic`), which the data of resyntax-charset lacks:
+    * the derived property without the other parts of its definition.
+    */
+  private lazy val rubyContributory: Map[String, CharSet] =
+    def other(derived: String, parts: CharSet): CharSet = binary(derived).diff(parts)
+    Seq(
+      Seq("Other_Alphabetic", "OAlpha") -> other("Alphabetic", gc("L", "Nl")),
+      Seq("Other_Default_Ignorable_Code_Point", "ODI") ->
+        other("Default_Ignorable_Code_Point", gc("Cf").union(binary("Variation_Selector"))),
+      Seq("Other_Grapheme_Extend", "OGr_Ext") -> other("Grapheme_Extend", gc("Me", "Mn")),
+      Seq("Other_ID_Continue", "OIDC") -> other("ID_Continue", binary("ID_Start").union(gc("Mn", "Mc", "Nd", "Pc"))),
+      Seq("Other_ID_Start", "OIDS") -> other("ID_Start", gc("L", "Nl")),
+      Seq("Other_Lowercase", "OLower") -> other("Lowercase", gc("Ll")),
+      Seq("Other_Math", "OMath") -> other("Math", gc("Sm")),
+      Seq("Other_Uppercase", "OUpper") -> other("Uppercase", gc("Lu"))
+    ).flatMap((names, set) => names.map(rubyKey(_) -> set)).toMap
+
   private lazy val rubyGeneralCategory = enumIndex(Properties.GeneralCategory, rubyKey)
 
-  private lazy val rubyScript = enumIndex(Properties.Script, rubyKey)
+  /** Onigmo has the scripts of Scripts.txt, which have some characters. */
+  private lazy val rubyScript = index(Properties.Script.values.filter(_.set.nonEmpty).map(v => (v.names, v)), rubyKey)
 
   /** Onigmo accepts only the long names of blocks (e.g. `In_Greek_and_Coptic`, not `InGreek`). */
   private lazy val rubyBlock = Properties.Block.values.map(v => rubyKey(v.name) -> v).toMap
 
-  private lazy val rubyAge = enumIndex(Properties.Age, rubyKey)
+  /** Onigmo's names with a value: `Age` by the version (e.g. `age=6.0`), and `Grapheme_Cluster_Break` and `InCB` by the
+    * long names of the values listed in the data files (e.g. `graphemeclusterbreak=regionalindicator`).
+    */
+  private lazy val rubyValues: Map[String, CharSet] =
+    def listed(name: String, property: EnumeratedProperty, default: String): Seq[(String, CharSet)] =
+      property.values.filter(v => v.name != default && v.set.nonEmpty).map(v => s"$name=${rubyKey(v.name)}" -> v.set)
+    val ages = Properties.Age.values.filter(_.shortName.matches("[0-9]+\\.[0-9]+"))
+    (ages.map(v => s"age=${v.shortName}" -> Properties.presentIn(v)) ++
+      listed("graphemeclusterbreak", Properties.GraphemeClusterBreak, "Other") ++
+      listed("incb", Properties.IndicConjunctBreak, "None")).toMap
 
   /** Onigmo's POSIX bracket classes in Unicode (Ruby's `tool/enc-unicode.rb`).
     *
@@ -857,20 +885,20 @@ private[ir] object IRProperties:
           .map(s => found(s.intersect(CharSet.range(0, 0x7f))))
       )
     value match
-      case Some(value) =>
-        if rubyKey(name) == "age" then fromOption(rubyAge.get(rubyKey(value)).map(v => found(Properties.presentIn(v))))
-        else Unknown
-      case None =>
+      case Some(value) => fromOption(rubyValues.get(s"${rubyKey(name)}=${rubyKey(value)}").map(found(_)))
+      case None        =>
         val key = rubyKey(name)
         fromOption(
           (key match
-            case "any"      => Some(found(unicodeUniverse.universe))
-            case "assigned" => Some(found(gc("Cn").complement(unicodeUniverse)))
-            case _          => rubyPosix(key, bracket = false).map(found(_))
+            case "any"         => Some(found(unicodeUniverse.universe))
+            case "assigned"    => Some(found(gc("Cn").complement(unicodeUniverse)))
+            case "xposixpunct" => rubyPosix("punct").map(found(_))
+            case _             => rubyPosix(key, bracket = false).map(found(_))
           )
             .orElse(rubyGeneralCategory.get(key).map(foundValue))
             .orElse(rubyScript.get(key).map(foundValue))
             .orElse(rubyBinaryIndex.get(key).map(foundBinary))
+            .orElse(rubyContributory.get(key).map(found(_)))
             .orElse(if key.startsWith("in") then rubyBlock.get(key.drop(2)).map(foundValue) else None)
         )
 
