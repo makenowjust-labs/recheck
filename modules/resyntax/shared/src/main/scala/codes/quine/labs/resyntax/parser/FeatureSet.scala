@@ -74,7 +74,7 @@ final case class FeatureSet(
     allowsLoosePropertyName: Boolean,
     // Ruby
     allowsNamelessBackslashKG: Boolean,
-    // Java
+    // .NET, Java
     allowsRawPropertyName: Boolean,
     // .NET
     allowsInvalidIdentifier: Boolean,
@@ -487,8 +487,8 @@ object FeatureSet:
       allowsLoosePropertyName = isPCRE || isPerl || isRuby,
       // Ruby
       allowsNamelessBackslashKG = isRuby,
-      // Java
-      allowsRawPropertyName = isJava,
+      // .NET, Java
+      allowsRawPropertyName = isDotNet || isJava,
       // .NET
       allowsInvalidIdentifier = isDotNet,
       // .NET, PCRE, Python, Ruby
