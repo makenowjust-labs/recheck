@@ -18,6 +18,8 @@ import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labs.recheck.diagnostics.Hotspot
+import codes.quine.labs.recheck.diagnostics.RecallResult
+import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.util.UStringUtil
 
 class CodecSuite extends munit.FunSuite:
@@ -58,8 +60,24 @@ class CodecSuite extends munit.FunSuite:
           UStringUtil.fromString("\u0000"),
           17
         ),
-        "hotspot" := Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat), Hotspot.Spot(3, 4, Hotspot.Heat)))
+        "hotspot" := Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat), Hotspot.Spot(3, 4, Hotspot.Heat))),
+        "recallValidation" := Json.Null
       )
+    )
+    val recall = RecallValidation("python 3.15.0", Duration(1000, MILLISECONDS), RecallResult.Timeout)
+    assertEquals(
+      encodeDiagnostics(
+        Diagnostics.Vulnerable(
+          "(a|a)*$",
+          "",
+          AttackComplexity.Exponential(false),
+          AttackPattern(Seq.empty, UStringUtil.fromString(""), 0),
+          Hotspot(Seq.empty),
+          Checker.Automaton,
+          Some(recall)
+        )
+      ).hcursor.downField("recallValidation").focus,
+      Some(encodeRecallValidation(recall))
     )
     assertEquals(
       encodeDiagnostics(Diagnostics.Unknown("", "#", ErrorKind.InvalidRegExp("unknown flag"), None)),
@@ -121,6 +139,32 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(
       encodeHotspot(Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat)))),
       Json.arr(Json.obj("start" := 1, "end" := 2, "temperature" := "heat"))
+    )
+
+  test("codec.encodeRecallValidation"):
+    assertEquals(
+      encodeRecallValidation(RecallValidation("node v26.11.1", Duration(1000, MILLISECONDS), RecallResult.Timeout)),
+      Json.obj(
+        "runtime" := "node v26.11.1",
+        "timeout" := 1000,
+        "result" := Json.obj("kind" := "timeout"),
+        "succeeded" := true
+      )
+    )
+    assertEquals(
+      encodeRecallValidation(
+        RecallValidation("ruby 4.0.7", Duration.Inf, RecallResult.Finish(Duration(3, MILLISECONDS)))
+      ),
+      Json.obj(
+        "runtime" := "ruby 4.0.7",
+        "timeout" := Json.Null,
+        "result" := Json.obj("kind" := "finish", "time" := 3),
+        "succeeded" := false
+      )
+    )
+    assertEquals(
+      encodeRecallResult(RecallResult.EngineError("Backtrack limit exhausted")),
+      Json.obj("kind" := "engine-error", "message" := "Backtrack limit exhausted")
     )
 
   test("codec.encodeErrorKind"):

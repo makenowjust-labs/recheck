@@ -1,0 +1,269 @@
+package codes.quine.labs.recheck.recall
+
+import codes.quine.labs.recheck.diagnostics.AttackPattern
+import codes.quine.labs.recheck.exec.Command
+import codes.quine.labs.recheck.regexp.ParsedPattern
+import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.DialectOptions
+import codes.quine.labs.resyntax.ast.Encoding
+import codes.quine.labs.resyntax.ast.PerlSource
+import codes.quine.labs.resyntax.charset.UString
+
+class RecallProgramSuite extends munit.FunSuite:
+
+  /** `'x' + 'y'.repeat(2) + 'z'` */
+  val attack: AttackPattern =
+    AttackPattern(Seq((UString.fromString("x"), UString.fromString("y"), 0)), UString.fromString("z"), 2)
+
+  /** `'é'.repeat(3) + '\0'` */
+  val nonAscii: AttackPattern =
+    AttackPattern(Seq((UString.empty, UString.fromString("é"), 1)), UString(0), 2)
+
+  def generate(source: String, flags: String, dialect: Dialect, attack: AttackPattern = attack): RecallProgram =
+    RecallProgram.generate(ParsedPattern.parse(source, flags, dialect).toTry.get, attack).get
+
+  /** Returns the line of the script starting with the prefix. */
+  def line(program: RecallProgram, prefix: String): String =
+    program.script.linesIterator.find(_.startsWith(prefix)).getOrElse(fail(s"no line: $prefix\n${program.script}"))
+
+  test("RecallProgram.generate: JavaScript"):
+    val program = generate("foo", "i", Dialect.JavaScript)
+    assertEquals(program.command, Command("node", Seq("-")))
+    assertEquals(
+      program.script,
+      """|const { writeSync } = require('node:fs');
+         |writeSync(1, 'recheck:runtime node ' + process.version + '\n');
+         |const re = new RegExp('foo', 'i');
+         |const input = 'x' + 'y'.repeat(2) + 'z';
+         |writeSync(1, 'recheck:start\n');
+         |const start = performance.now();
+         |try {
+         |  re.exec(input);
+         |} catch (e) {
+         |  if (!(e instanceof RangeError)) throw e;
+         |  writeSync(1, 'recheck:engine-error ' + e.message + '\n');
+         |  process.exit(0);
+         |}
+         |writeSync(1, 'recheck:time ' + Math.floor(performance.now() - start) + '\n');
+         |""".stripMargin
+    )
+
+  test("RecallProgram.generate: Python"):
+    val program = generate("f'o\\.", "im", Dialect.Python)
+    assertEquals(program.command, Command("python3", Seq("-I", "-")))
+    assertEquals(
+      program.script,
+      """|import platform, re, sys, time
+         |sys.stdout.write('recheck:runtime python ' + platform.python_version() + '\n')
+         |regex = re.compile('f\'o\\.', re.I | re.M)
+         |string = 'x' + 'y' * 2 + 'z'
+         |sys.stdout.write('recheck:start\n')
+         |sys.stdout.flush()
+         |start = time.perf_counter_ns()
+         |try:
+         |    regex.search(string)
+         |except (RecursionError, MemoryError) as e:
+         |    sys.stdout.write('recheck:engine-error ' + type(e).__name__ + '\n')
+         |    sys.exit(0)
+         |sys.stdout.write('recheck:time ' + str((time.perf_counter_ns() - start) // 1000000) + '\n')
+         |""".stripMargin
+    )
+    assertEquals(line(generate("x", "", Dialect.Python, nonAscii), "string"), "string = '\\xe9' * 3 + '\\x00'")
+    // A bytes pattern is the Latin-1 encoding of the source, and the input is bytes.
+    val bytes = generate("éa", "b", Dialect.Python, nonAscii)
+    assertEquals(line(bytes, "regex"), "regex = re.compile(b'\\xe9a', 0)")
+    assertEquals(line(bytes, "string"), "string = b'\\xe9' * 3 + b'\\x00'")
+
+  test("RecallProgram.generate: Ruby"):
+    val program = generate("a#{b}\"", "ix", Dialect.Ruby)
+    assertEquals(program.command, Command("ruby", Seq("-")))
+    assertEquals(
+      program.script,
+      """|$stdout.sync = true
+         |Regexp.timeout = nil if Regexp.respond_to?(:timeout=)
+         |puts "recheck:runtime ruby #{RUBY_VERSION}"
+         |regex = Regexp.new("a\#{b}\"", Regexp::IGNORECASE | Regexp::EXTENDED)
+         |string = "x" + "y" * 2 + "z"
+         |puts "recheck:start"
+         |start = Process.clock_gettime(Process::CLOCK_MONOTONIC, :millisecond)
+         |begin
+         |  regex.match?(string)
+         |rescue RegexpError, NoMemoryError, SystemStackError => e
+         |  puts "recheck:engine-error #{e.class}"
+         |  exit
+         |end
+         |puts "recheck:time #{Process.clock_gettime(Process::CLOCK_MONOTONIC, :millisecond) - start}"
+         |""".stripMargin
+    )
+    val utf8 = generate("é", "a", Dialect.Ruby, nonAscii)
+    assertEquals(line(utf8, "regex"), "regex = Regexp.new(\"(?a)\" + \"\\u{e9}\", 0)")
+    assertEquals(line(utf8, "string"), "string = \"\\u{e9}\" * 3 + \"\\u{0}\"")
+    // A pattern of bytes is the UTF-8 encoding of the source.
+    val bytes = generate("é", "n", Dialect.Ruby, nonAscii)
+    assertEquals(line(bytes, "regex"), "regex = Regexp.new(\"\\xc3\\xa9\".b, Regexp::NOENCODING)")
+    assertEquals(line(bytes, "string"), "string = \"\\xe9\".b * 3 + \"\\x00\".b")
+
+  test("RecallProgram.generate: Java"):
+    val program = generate("f\"oo\\d\r", "iU", Dialect.Java)
+    assertEquals(program.command, Command("java", Seq("--source", "17", "/dev/stdin")))
+    assertEquals(
+      program.script,
+      """|import java.util.regex.Pattern;
+         |
+         |class Recall {
+         |  public static void main(String[] args) {
+         |    System.out.println("recheck:runtime java " + Runtime.version());
+         |    Pattern pattern = Pattern.compile("f\"oo\\d\r", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS);
+         |    String input = "x" + "y".repeat(2) + "z";
+         |    System.out.println("recheck:start");
+         |    System.out.flush();
+         |    long start = System.nanoTime();
+         |    try {
+         |      pattern.matcher(input).find();
+         |    } catch (StackOverflowError | OutOfMemoryError e) {
+         |      System.out.println("recheck:engine-error " + e.getClass().getSimpleName());
+         |      return;
+         |    }
+         |    System.out.println("recheck:time " + (System.nanoTime() - start) / 1000000);
+         |  }
+         |}
+         |""".stripMargin
+    )
+    val astral = AttackPattern(Seq((UString.empty, UString.fromString("😀"), 0)), UString.empty, 2)
+    assertEquals(
+      line(generate("x", "", Dialect.Java, astral), "    String"),
+      "    String input = \"\\ud83d\\ude00\".repeat(2);"
+    )
+
+  test("RecallProgram.generate: .NET"):
+    val program = generate("foo", "in", Dialect.DotNet)
+    assertEquals(
+      program.command,
+      Command("dotnet", Seq("run", "-"), Map("DOTNET_NOLOGO" -> "1", "DOTNET_CLI_TELEMETRY_OPTOUT" -> "1"))
+    )
+    assertEquals(
+      program.script,
+      """|using System;
+         |using System.Diagnostics;
+         |using System.Linq;
+         |using System.Text.RegularExpressions;
+         |
+         |Console.WriteLine("recheck:runtime .NET " + Environment.Version);
+         |var regex = new Regex("foo", RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture);
+         |var input = "x" + string.Concat(Enumerable.Repeat("y", 2)) + "z";
+         |Console.WriteLine("recheck:start");
+         |var stopwatch = Stopwatch.StartNew();
+         |try
+         |{
+         |    regex.Match(input);
+         |}
+         |catch (Exception e) when (e is OutOfMemoryException or InsufficientExecutionStackException)
+         |{
+         |    Console.WriteLine("recheck:engine-error " + e.GetType().Name);
+         |    return;
+         |}
+         |Console.WriteLine("recheck:time " + stopwatch.ElapsedMilliseconds);
+         |""".stripMargin
+    )
+
+  test("RecallProgram.generate: Perl"):
+    val program = generate("f/o$", "ix", Dialect.Perl)
+    assertEquals(program.command, Command("perl", Seq("-")))
+    assertEquals(
+      program.script,
+      """|use utf8;
+         |use Time::HiRes ();
+         |$| = 1;
+         |print "recheck:runtime perl " . sprintf("%vd", $^V) . "\n";
+         |my $regex = qr!f/o$!ix;
+         |my $input = "x" . ("y" x 2) . "z";
+         |print "recheck:start\n";
+         |my $start = Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC());
+         |my $matched = $input =~ $regex;
+         |printf "recheck:time %d\n", (Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC()) - $start) * 1000;
+         |""".stripMargin
+    )
+    assertEquals(
+      line(generate("a", "", Dialect.Perl, nonAscii), "my $input"),
+      "my $input = (\"\\x{e9}\" x 3) . \"\\x{0}\";"
+    )
+    // Modifiers that `qr` does not take are dropped.
+    assertEquals(line(generate("a", "gi", Dialect.Perl), "my $regex"), "my $regex = qr/a/i;")
+
+  test("RecallProgram.generate: Perl unsafe patterns"):
+    def generate(source: String): Option[RecallProgram] =
+      RecallProgram.generate(ParsedPattern.parse(source, "", Dialect.Perl).toTry.get, attack)
+    assert(generate("a$|b$").isDefined)
+    assert(generate("(a$)\\$x\\@x").isDefined)
+    assertEquals(generate("a$x"), None)
+    assertEquals(generate("a@x"), None)
+    assertEquals(generate("/!,;~%&:=\"|^-"), None)
+
+  test("RecallProgram.generate: Perl string patterns"):
+    def generate(source: String, flags: String, encoding: Option[Encoding] = None): RecallProgram =
+      val options = DialectOptions(perlSource = PerlSource.String, encoding = encoding)
+      val pattern = ParsedPattern.parse(source, flags, Dialect.Perl, options).toTry.get
+      RecallProgram.generate(pattern, attack, perlLiteral = false).get
+    // A string pattern is not interpolated again, so any pattern can run.
+    assertEquals(
+      line(generate("a$x@y/é", "gi"), "my $regex"),
+      "my $regex = do { my $pattern = \"a\\$x\\@y/\\x{e9}\"; qr/$pattern/i };"
+    )
+    val bytes = generate("é", "", Some(Encoding.PerlBytes))
+    assertEquals(line(bytes, "my $regex"), "my $regex = do { my $pattern = \"\\x{c3}\\x{a9}\"; qr/$pattern/ };")
+    assert(!bytes.script.contains("use utf8"))
+
+  test("RecallProgram.isPerlSafe"):
+    assert(RecallProgram.isPerlSafe("a$"))
+    assert(RecallProgram.isPerlSafe("\\$x"))
+    assert(RecallProgram.isPerlSafe("a@-"))
+    assert(!RecallProgram.isPerlSafe("${x}"))
+    assert(!RecallProgram.isPerlSafe("@{[1]}"))
+    assert(!RecallProgram.isPerlSafe("(?{ 1 })"))
+    assert(!RecallProgram.isPerlSafe("(??{ 1 })"))
+    assert(!RecallProgram.isPerlSafe("(*{ 1 })"))
+
+  test("RecallProgram.generate: PCRE"):
+    val program = generate("/#é$", "iu", Dialect.PCRE)
+    assertEquals(program.command, Command("php"))
+    assertEquals(
+      program.script,
+      """|<?php
+         |echo "recheck:runtime php ", PHP_VERSION, " (PCRE2 ", PCRE_VERSION, ", pcre.jit=", ini_get('pcre.jit'), ", pcre.backtrack_limit=", ini_get('pcre.backtrack_limit'), ", pcre.recursion_limit=", ini_get('pcre.recursion_limit'), ")\n";
+         |$regex = "~/#\u{e9}\$~iu";
+         |$input = "x" . str_repeat("y", 2) . "z";
+         |if (@preg_match($regex, '') === false) {
+         |  fwrite(STDERR, (error_get_last()['message'] ?? preg_last_error_msg()) . "\n");
+         |  exit(1);
+         |}
+         |echo "recheck:start\n";
+         |$start = hrtime(true);
+         |$result = preg_match($regex, $input);
+         |$time = intdiv(hrtime(true) - $start, 1000000);
+         |if ($result === false) {
+         |  if (in_array(preg_last_error(), [PREG_BACKTRACK_LIMIT_ERROR, PREG_RECURSION_LIMIT_ERROR, PREG_JIT_STACKLIMIT_ERROR], true)) {
+         |    echo "recheck:engine-error ", preg_last_error_msg(), "\n";
+         |    exit(0);
+         |  }
+         |  fwrite(STDERR, preg_last_error_msg() . "\n");
+         |  exit(1);
+         |}
+         |echo "recheck:time ", $time, "\n";
+         |""".stripMargin
+    )
+    assertEquals(
+      line(generate("é", "u", Dialect.PCRE, nonAscii), "$input"),
+      "$input = str_repeat(\"\\u{e9}\", 3) . \"\\x00\";"
+    )
+    // Without `u`, the input is bytes.
+    assertEquals(
+      line(generate("é", "", Dialect.PCRE, nonAscii), "$input"),
+      "$input = str_repeat(\"\\xe9\", 3) . \"\\x00\";"
+    )
+    // It falls back to a control character for the delimiter.
+    assertEquals(line(generate("/#~!%@;,|=:", "", Dialect.PCRE), "$regex"), "$regex = \"\\x01/#~!%@;,|=:\\x01\";")
+
+  test("RecallProgram.generate: empty attack string"):
+    val empty = AttackPattern(Seq.empty, UString.empty, 0)
+    assertEquals(line(generate("a", "", Dialect.Python, empty), "string"), "string = ''")
+    assertEquals(line(generate("a", "", Dialect.PCRE, empty), "$input"), "$input = \"\";")

@@ -1,95 +1,81 @@
 package codes.quine.labs.recheck.recall
 
-import scala.concurrent.duration.Duration
-import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.duration.MILLISECONDS
-import scala.concurrent.duration.SECONDS
+import scala.concurrent.duration.*
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
-import codes.quine.labs.recheck.util.UStringUtil
+import codes.quine.labs.recheck.diagnostics.RecallResult
+import codes.quine.labs.recheck.diagnostics.RecallValidation
+import codes.quine.labs.recheck.exec.Command
+import codes.quine.labs.recheck.exec.ExecResult
+import codes.quine.labs.recheck.regexp.ParsedPattern
+import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.charset.UString
 
 class RecallValidatorSuite extends munit.FunSuite:
 
   /** A default context. */
   given ctx: Context = Context()
 
-  test("RecallValidator.checks"):
-    val pattern =
-      AttackPattern(Seq((UStringUtil.fromString("x"), UStringUtil.fromString("y"), 0)), UStringUtil.fromString("z"), 2)
-    assertEquals(
-      RecallValidator.checks("foo", "i", pattern, Duration.MinusInf)((_, _) => fail("unreachable")),
-      true
-    )
+  val attack: AttackPattern =
+    AttackPattern(Seq((UString.fromString("x"), UString.fromString("y"), 0)), UString.fromString("z"), 2)
 
-    assertEquals(
-      RecallValidator.checks("foo", "i", pattern, Duration.Inf)((_, _) => None),
-      true
-    )
-
-    assertEquals(
-      RecallValidator.checks("foo", "i", pattern, Duration.Inf)((_, _) => Some((0, "1", ""))),
-      false
-    )
-
-    interceptMessage[UnexpectedException]("foo") {
-      RecallValidator.checks("foo", "i", pattern, Duration.Inf)((_, _) => Some((1, "", "foo")))
-    }
+  def parse(source: String, dialect: Dialect = Dialect.Python): ParsedPattern =
+    ParsedPattern.parse(source, "", dialect).toTry.get
 
   test("RecallValidator.validate"):
-    val pattern =
-      AttackPattern(Seq((UStringUtil.fromString("x"), UStringUtil.fromString("y"), 0)), UStringUtil.fromString("z"), 2)
     assertEquals(
-      RecallValidator.validate("foo", "i", pattern, Duration.MinusInf)((_, _) => fail("unreachable")),
-      RecallResult.Timeout
+      RecallValidator.validate(parse("foo"), attack, Duration.MinusInf)((_, _, _) => fail("unreachable")),
+      None
+    )
+    assertEquals(RecallValidator.validate(parse("foo"), attack, Duration.Zero)((_, _, _) => fail("unreachable")), None)
+    // A Perl pattern interpolating a variable is not run.
+    assertEquals(
+      RecallValidator.validate(parse("a$x", Dialect.Perl), attack, 1.second)((_, _, _) => fail("unreachable")),
+      None
     )
 
-    var timeout1: Option[FiniteDuration] = null
+    var command: Command = null
     assertEquals(
-      RecallValidator.validate("foo", "i", pattern, Duration.Inf)((_, t) => { timeout1 = t; None }),
-      RecallResult.Timeout
+      RecallValidator.validate(parse("foo"), attack, 1.second) { (c, _, _) =>
+        command = c
+        ExecResult.Timeout("recheck:runtime python 3.15.0\nrecheck:start\n")
+      },
+      Some(RecallValidation("python 3.15.0", 1.second, RecallResult.Timeout))
     )
-    assertEquals(timeout1, None)
+    assertEquals(command.program, "python3")
 
-    var timeout2: Option[FiniteDuration] = null
-    assertEquals(
-      RecallValidator.validate("foo", "i", pattern, Duration(100, SECONDS))((_, t) => { timeout2 = t; None }),
-      RecallResult.Timeout
-    )
-    assertEquals(timeout2, Some(FiniteDuration(100, SECONDS)))
-
-    var timeout3: Option[FiniteDuration] = null
-    val ctx50s = Context(timeout = Duration(50, SECONDS))
-    assertEquals(
-      RecallValidator.validate("foo", "i", pattern, Duration(100, SECONDS))((_, t) => { timeout3 = t; None })(using
-        ctx50s
-      ),
-      RecallResult.Timeout
-    )
-    assertEquals(timeout3.exists(_ <= FiniteDuration(50, SECONDS)), true)
-
-  test("RecallValidator.generate"):
-    assertEquals(
-      RecallValidator.generate(
-        "foo",
-        "i",
-        AttackPattern(
-          Seq((UStringUtil.fromString("x"), UStringUtil.fromString("y"), 0)),
-          UStringUtil.fromString("z"),
-          2
-        )
-      ),
-      """|const re = new RegExp('foo', 'i');
-         |const input = 'x' + 'y'.repeat(2) + 'z';
-         |const start = Date.now();
-         |re.exec(input);
-         |const end = Date.now();
-         |console.log(Number(end - start).toString());
-         |""".stripMargin
-    )
+  test("RecallValidator.validate: timeout"):
+    def limit(timeout: Duration)(using Context): Option[FiniteDuration] =
+      var limit: Option[FiniteDuration] = null
+      RecallValidator.validate(parse("foo"), attack, timeout) { (_, _, t) =>
+        limit = t
+        ExecResult.Timeout("")
+      }
+      limit
+    assertEquals(limit(Duration.Inf), None)
+    assertEquals(limit(100.seconds), Some(100.seconds))
+    val ctx50s = Context(timeout = 50.seconds)
+    assert(limit(100.seconds)(using ctx50s).exists(_ <= 50.seconds))
+    assert(limit(Duration.Inf)(using ctx50s).exists(_ <= 50.seconds))
+    assertEquals(limit(1.second)(using ctx50s), Some(1.second))
 
   test("RecallValidator.result"):
-    assertEquals(RecallValidator.result(Some((0, "1", ""))), RecallResult.Finish(FiniteDuration(1L, MILLISECONDS)))
-    assertEquals(RecallValidator.result(Some((1, "", "error"))), RecallResult.Error("error"))
-    assertEquals(RecallValidator.result(None), RecallResult.Timeout)
+    val command = Command("python3")
+    def result(output: ExecResult): RecallValidation = RecallValidator.result(command, 1.second, output)
+    assertEquals(
+      result(ExecResult.Exit(0, "recheck:runtime python 3.15.0\nrecheck:start\nrecheck:time 12\n", "")),
+      RecallValidation("python 3.15.0", 1.second, RecallResult.Finish(12.millis))
+    )
+    assertEquals(
+      result(ExecResult.Exit(0, "recheck:runtime php 8.5\nrecheck:engine-error Backtrack limit exhausted\n", "")),
+      RecallValidation("php 8.5", 1.second, RecallResult.EngineError("Backtrack limit exhausted"))
+    )
+    // Without the runtime line, the runtime is the program name.
+    assertEquals(result(ExecResult.Timeout("")), RecallValidation("python3", 1.second, RecallResult.Timeout))
+    interceptMessage[UnexpectedException]("invalid recall validation output: foo")(
+      result(ExecResult.Exit(0, "foo\n", ""))
+    )
+    interceptMessage[UnexpectedException]("error")(result(ExecResult.Exit(1, "", "error\n")))
+    interceptMessage[UnexpectedException]("`python3` exited with 2")(result(ExecResult.Exit(2, "", "")))

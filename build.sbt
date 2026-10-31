@@ -139,8 +139,8 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |  flags: String,
       |  pattern: AttackPattern,
       |  timeout: Duration = Duration(1, SECONDS)
-      |)(using ctx: Context): RecallResult =
-      |  time("validate")(RecallValidator.validate(source, flags, pattern, timeout)(NodeExecutor.exec))
+      |)(using ctx: Context): Option[RecallValidation] =
+      |  time("validate")(RecallValidator.validate(parse(source, flags), pattern, timeout)(RecallValidator.defaultExec.get))
       |
       |def check(
       |    source: String,
