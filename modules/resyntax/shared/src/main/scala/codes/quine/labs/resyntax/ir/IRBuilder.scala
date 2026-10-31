@@ -27,18 +27,14 @@ import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
-/** IRBuilder is a builder from AST node to IR. */
 object IRBuilder:
 
-  /** Returns an IR pattern built from the given AST.
-    *
-    * It throws [[IRBuildingException]] for an error that needs the whole pattern (e.g. a reference to a non-existent
+  /** Throws [[IRBuildingException]] for an error that needs the whole pattern (e.g. a reference to a non-existent
     * group, or a look-behind that the dialect does not allow).
     */
   def build(node: Node, flagSet: FlagSet, dialect: Dialect): IRPattern =
     build(node, flagSet, dialect, None)
 
-  /** Returns an IR pattern built from the given AST, where `resolveCharacter` replaces the character resolution. */
   private[ir] def build(
       node: Node,
       flagSet: FlagSet,
@@ -53,7 +49,7 @@ object IRBuilder:
     if dialect.isPython && mode == UnitMode.Byte && flagSet.unicode then
       throw new IRBuildingException("Cannot use UNICODE flag with a bytes pattern", SourceLocation.Invalid)
     if dialect.isPython then checkPythonGlobalFlags(node, flagSet)
-    val context = BuildingContext.from(flagSet, dialect, featureSet)
+    val context = BuildingContext(flagSet, dialect, featureSet)
     val table = CaptureAnalyzer.analyze(node, context)
     val resolver = new ReferenceResolver(table, dialect, featureSet)
     val perlUnicodeRules = dialect match
@@ -101,9 +97,7 @@ object IRBuilder:
       builder.tries.toMap
     )
 
-  /** Returns the unit mode of a pattern from the dialect and the flags.
-    *
-    * @param utf
+  /** @param utf
     *   PCRE's `(*UTF)` start option
     */
   private def unitMode(dialect: Dialect, flagSet: FlagSet, utf: Boolean): UnitMode =
@@ -122,14 +116,11 @@ object IRBuilder:
       case Dialect.Perl(utf8, _) => if utf8 then UnitMode.CodePoint else UnitMode.Byte
       case Dialect.PCRE          => if flagSet.unicode || utf then UnitMode.CodePoint else UnitMode.Byte
 
-  /** Returns the case equivalence of a back-reference with the flags in the dialect and the mode.
-    *
-    * Perl's `/d` rules at a back-reference are the rules of a native string (see [[IRCharResolver.referenceFlags]]).
+  /** Perl's `/d` rules at a back-reference are the rules of a native string (see [[IRCharResolver.referenceFlags]]).
     */
   def caseEquivalence(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRCaseEquivalence =
     IRCaseEquivalence.of(dialect, mode, flags, perlNative = dialect.isPerl && flags.charset == IRCharset.Default)
 
-  /** Returns how a back-reference with the flags compares the capture with the input in the dialect and the mode. */
   def backReferenceFolding(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRBackReferenceFolding =
     if !flags.ignoreCase then IRBackReferenceFolding.Simple
     else
@@ -143,18 +134,7 @@ object IRBuilder:
             case _                                            => IRBackReferenceFolding.Full(0)
         case _ => IRBackReferenceFolding.Simple
 
-  /** Returns the width of a literal, an escape or a class in a look-behind, where the dialects counting it differently
-    * from one care.
-    *
-    * Perl counts the folded length of a character under `i` (e.g. `(?<=ß{128})` is too long), and a class counts its
-    * longest character but not its ranges (e.g. `[ßa]` is two, and `[ß-ẞ]` is one). The folding is one for a Latin-1
-    * character under `l`, and for one with ASCII characters under `aa` and `l`, except `ẞ` and, under `aa`, `ß`.
-    *
-    * Ruby (Onigmo) matches a character folded to several characters under `i` as the folding (e.g. `ß` as `ss`), and a
-    * class having such a character and another has a variable width (e.g. `[ßa]`, but `[ß]` is two). The nodes are
-    * Ruby's escapes of the bytes of a character (e.g. `\xC3\x9F`), or one node otherwise.
-    */
-  /** Checks whether Perl folds the character to several characters (e.g. `ß` to `ss`) under the flags. */
+  /** Checks whether Perl takes the full case folding of the character under the flags (e.g. `ß` as `ss`). */
   private def perlFoldsMulti(value: Int, flags: IRCharFlags, perlUnicodeRules: Boolean): Boolean =
     val hasAscii = FullCaseFolding(value).iterator.exists(_ < 0x80)
     val one = flags.charset match
@@ -196,6 +176,17 @@ object IRBuilder:
           case None => i += 1
       subtract
 
+  /** Returns the width of a literal, an escape or a class in a look-behind, where the dialects counting it differently
+    * from one care.
+    *
+    * Perl counts the folded length of a character under `i` (e.g. `(?<=ß{128})` is too long), and a class counts its
+    * longest character but not its ranges (e.g. `[ßa]` is two, and `[ß-ẞ]` is one). The folding is one for a Latin-1
+    * character under `l`, and for one with ASCII characters under `aa` and `l`, except `ẞ` and, under `aa`, `ß`.
+    *
+    * Ruby (Onigmo) counts a character folded to several characters under `i` by the folding (e.g. `ß` as two), and a
+    * class having such a character and another has a variable width (e.g. `[ßa]`, but `[ß]` is two). The nodes are
+    * Ruby's escapes of the bytes of a character (e.g. `\xC3\x9F`), or one node otherwise.
+    */
   private def charWidth(
       table: CaptureTable,
       chars: IRCharResolver,
@@ -229,8 +220,6 @@ object IRBuilder:
           Width(1, width.toLong)
       case _: Dialect.Ruby =>
         def fold(value: Int): Int = FullCaseFolding(value).length.max(1)
-        def decode(bytes: Seq[Int]): Int =
-          bytes.tail.foldLeft(bytes.head & (0xff >> (bytes.size + 1)))((c, b) => (c << 6) | (b & 0x3f))
         nodes =>
           val node = nodes.head
           table
@@ -239,8 +228,8 @@ object IRBuilder:
             .fold(single(1)): flags =>
               node.data match
                 case _ if nodes.size > 1 =>
-                  single(fold(decode(nodes.collect { case Node(NodeData.Backslash(BackslashKind.Escape(_, b)), _) =>
-                    b
+                  single(fold(IRCharResolver.decodeUtf8(nodes.collect {
+                    case Node(NodeData.Backslash(BackslashKind.Escape(_, b)), _) => b
                   })))
                 case NodeData.Literal(value)                                 => single(fold(value))
                 case NodeData.Backslash(value: BackslashKind.BackslashValue) => single(fold(value.value))
@@ -271,7 +260,7 @@ object IRBuilder:
     * code point above `U+00FF`, `\p{...}`, `\N{...}` (including `\N{U+...}`) or `\b{...}`.
     */
   private def usesPerlUnicodeSyntax(node: Node): Boolean =
-    def check(x: Any): Boolean = x match
+    deepExists(node):
       case AssertKind.Boundary(Some(_)) | AssertKind.NonBoundary(Some(_)) => true
       case BackslashKind.Escape(EscapeStyle.NamedHex, _)                  => true
       case BackslashKind.Escape(_, value)                                 => value > 0xff
@@ -280,40 +269,36 @@ object IRBuilder:
           _: EscapeClassKind.UnicodePropertyValue | _: EscapeClassKind.NonUnicodeProperty |
           _: EscapeClassKind.NonUnicodeBareProperty | _: EscapeClassKind.NonUnicodePropertyValue =>
         true
-      case xs: Iterable[?] => xs.exists(check)
-      case x: Option[?]    => x.exists(check)
-      case _: String       => false
-      case x: Product      => x.productIterator.exists(check)
-      case _               => false
-    check(node)
 
   /** Checks whether a Perl pattern has a non-ASCII literal, which makes a regex literal UTF-8 with `use utf8`. */
-  private def hasNonAsciiLiteral(x: Any): Boolean = x match
-    case NodeData.Literal(value)           => value >= 0x80
-    case ClassItemData.ClassLiteral(value) => value >= 0x80
-    case QuoteLiteral.QuoteValue(value)    => value >= 0x80
-    case xs: Iterable[?]                   => xs.exists(hasNonAsciiLiteral)
-    case x: Option[?]                      => x.exists(hasNonAsciiLiteral)
-    case _: String                         => false
-    case x: Product                        => x.productIterator.exists(hasNonAsciiLiteral)
-    case _                                 => false
+  private def hasNonAsciiLiteral(node: Node): Boolean =
+    deepExists(node):
+      case NodeData.Literal(value)           => value >= 0x80
+      case ClassItemData.ClassLiteral(value) => value >= 0x80
+      case QuoteLiteral.QuoteValue(value)    => value >= 0x80
 
   /** Returns the start of the last node with a supplementary character or a surrogate in the pattern text, or `-1`. */
   private def lastSupplementary(node: Node): Int =
     def isSupplementary(c: Int): Boolean = c >= 0x10000 || Character.isSurrogate(c.toChar) && c <= 0xffff
-    def hasSupplementary(x: Any): Boolean = x match
-      case ClassItemData.ClassLiteral(value) => isSupplementary(value)
-      case xs: Iterable[?]                   => xs.exists(hasSupplementary)
-      case x: Option[?]                      => x.exists(hasSupplementary)
-      case _: String                         => false
-      case x: Product                        => x.productIterator.exists(hasSupplementary)
-      case _                                 => false
     val self = node.data match
-      case NodeData.Literal(value)                     => isSupplementary(value)
-      case NodeData.Class(_, item)                     => hasSupplementary(item)
+      case NodeData.Literal(value) => isSupplementary(value)
+      case NodeData.Class(_, item) =>
+        deepExists(item) { case ClassItemData.ClassLiteral(value) => isSupplementary(value) }
       case NodeData.Command(CommandKind.Comment(text)) => UString.fromString(text).iterator.exists(isSupplementary)
       case _                                           => false
     NodeKey.children(node).map(lastSupplementary).foldLeft(if self then node.loc.start else -1)(_.max(_))
+
+  private def deepExists(x: Any)(p: PartialFunction[Any, Boolean]): Boolean =
+    p.applyOrElse(
+      x,
+      {
+        case xs: Iterable[?] => xs.exists(deepExists(_)(p))
+        case x: Option[?]    => x.exists(deepExists(_)(p))
+        case _: String       => false
+        case x: Product      => x.productIterator.exists(deepExists(_)(p))
+        case _               => false
+      }
+    )
 
   /** Returns the names of PCRE's start options (e.g. `(*CRLF)`), which can appear only at the start. */
   private def startOptions(node: Node): Seq[String] =
@@ -330,20 +315,17 @@ object IRBuilder:
       .collect { case NodeData.Command(CommandKind.StartOption(name, _)) => name }
       .toSeq
 
-  /** Returns where an empty match is rejected by the start options, where `(*NOTEMPTY)` includes the other. */
   private def notEmpty(startOptions: Seq[String]): IRNotEmpty =
     if startOptions.contains("NOTEMPTY") then IRNotEmpty.Anywhere
     else if startOptions.contains("NOTEMPTY_ATSTART") then IRNotEmpty.AtStart
     else IRNotEmpty.Never
 
-  /** Checks whether the pattern has `(*THEN)`. */
   private def hasThen(node: Node): Boolean =
     NodeKey.exists(node):
       _.data match
         case NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Then), _)) => true
         case _                                                                                  => false
 
-  /** Checks whether the pattern has a back-reference. */
   private def hasBackReference(node: Node): Boolean =
     NodeKey.exists(node):
       _.data match
@@ -351,7 +333,6 @@ object IRBuilder:
         case NodeData.Command(_: CommandKind.PBackReference)          => true
         case _                                                        => false
 
-  /** Checks whether the pattern calls a group or itself (e.g. `(?1)` and `\g<1>`). */
   private def hasCall(node: Node): Boolean =
     NodeKey.exists(node):
       _.data match
@@ -401,10 +382,8 @@ private[ir] class IRBuilder(
       case Left(data) => IRNode(data, node.loc)
       case Right(ir)  => ir
 
-  /** The flags that a character-level node at the current position needs. */
   def charFlags: IRCharFlags = context.charFlags
 
-  /** Builds a character-level node: `.`, a class, a literal, and a backslash producing characters (e.g. `\d`). */
   def buildCharacter(node: Node): IRNodeData =
     val flags = charFlags
     // Java's CANON_EQ matches canonically equivalent sequences, which the checkers do not handle.
@@ -414,7 +393,6 @@ private[ir] class IRBuilder(
   /** Builds consecutive literal characters together (e.g. for multi-character case folding). */
   def buildLiterals(nodes: Seq[Node]): Seq[IRNode] =
     val run = nodes.map(node => (node, charFlags))
-    // Java's CANON_EQ matches canonically equivalent sequences, which the checkers do not handle.
     if run.exists(_._2.canonicalEquivalence) then
       run.map((node, _) => IRNode(IRNodeData.Unsupported(node.data), node.loc))
     else
@@ -564,8 +542,9 @@ private[ir] class IRBuilder(
         nodes match
           case Seq(node) => Right(build(node))
           case nodes     => Left(IRNodeData.Disjunction(nodes.map(build)))
-    case CommandKind.Comment(_)                   => Left(IRNodeData.Empty)
-    case CommandKind.StartOption(name, _)         => Left(buildStartOptionCommand(node, name))
+    case CommandKind.Comment(_) => Left(IRNodeData.Empty)
+    // The start options are of the whole pattern, which `IRBuilder.build` reads.
+    case CommandKind.StartOption(_, _)            => Left(IRNodeData.Empty)
     case CommandKind.RCall                        => Left(IRNodeData.Unsupported(node.data))
     case CommandKind.IndexedCall(_)               => Left(IRNodeData.Unsupported(node.data))
     case CommandKind.RelativeCall(_)              => Left(IRNodeData.Unsupported(node.data))
@@ -581,9 +560,6 @@ private[ir] class IRBuilder(
     case CommandKind.AbsenceExpression(_, _)      => Left(IRNodeData.Unsupported(node.data))
     case CommandKind.AbsenceStopper(_)            => Left(IRNodeData.Unsupported(node.data))
     case CommandKind.AbsenceRangeClear            => Left(IRNodeData.Unsupported(node.data))
-
-  // The start options are of the whole pattern, which `IRBuilder.build` reads.
-  def buildStartOptionCommand(node: Node, name: String): IRNodeData = IRNodeData.Empty
 
   def buildConditional(node: Node, test: ConditionalTest, yes: Node, no: Option[Node]): Either[IRNodeData, IRNode] =
     def branch(node: Option[Node]): IRNode = node.fold(IRNode(IRNodeData.Empty))(n => scoped(build(n)))

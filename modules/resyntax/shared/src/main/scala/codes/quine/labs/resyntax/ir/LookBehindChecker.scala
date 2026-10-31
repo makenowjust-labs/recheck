@@ -33,13 +33,12 @@ private[ir] final class LookBehindChecker(
     table: CaptureTable,
     resolver: ReferenceResolver,
     featureSet: IRFeatureSet,
-    charWidth: Seq[Node] => Width = nodes => Width(nodes.size, nodes.size),
-    lastSupplementary: Int = -1,
-    minSubtract: Seq[Node] => Long = _ => 0,
-    rubyClassWidths: Node => Option[Seq[Int]] = _ => None
+    charWidth: Seq[Node] => Width,
+    lastSupplementary: Int,
+    minSubtract: Seq[Node] => Long,
+    rubyClassWidths: Node => Option[Seq[Int]]
 ):
 
-  /** Checks the body of a look-behind, and throws an exception at the look-behind node if it is invalid. */
   def check(lookBehind: Node, body: Node, negative: Boolean): Unit =
     featureSet.lookBehindRule match
       case IRLookBehindRule.Unrestricted => ()
@@ -299,8 +298,8 @@ private[ir] final class LookBehindChecker(
   /** Returns the widths of the nodes, where the escapes of the bytes of a character are together (e.g. `\xC3\xA9`). */
   private def rubyChars(nodes: Seq[Node]): Seq[RubyWidth] =
     def byte(node: Node): Option[Int] = node.data match
-      case NodeData.Backslash(BackslashKind.Escape(style, value)) if IRCharResolver.isRubyByteStyle(style) =>
-        Option.when(0x80 <= value && value <= 0xff)(value)
+      case NodeData.Backslash(BackslashKind.Escape(style, value)) if IRCharResolver.isRubyByte(style, value) =>
+        Some(value)
       case _ => None
     val out = Seq.newBuilder[RubyWidth]
     var i = 0
@@ -409,7 +408,6 @@ private[ir] final class LookBehindChecker(
 
 private[ir] object LookBehindChecker:
 
-  /** Inf is an unbounded width. */
   val Inf: Long = Long.MaxValue
 
   /** Lengths beyond this are unbounded, which are far beyond the dialects' limits. */
@@ -418,7 +416,6 @@ private[ir] object LookBehindChecker:
   /** JavaMaxReps is `Pattern.MAX_REPS`. */
   private val JavaMaxReps: Int = Int.MaxValue
 
-  /** Width is a pair of the minimum and maximum lengths. */
   final case class Width(min: Long, max: Long)
 
   /** RubyWidth is a length in Onigmo's look-behind check. */

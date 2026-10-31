@@ -3,6 +3,7 @@ package codes.quine.labs.resyntax.ir
 import scala.collection.mutable
 
 import codes.quine.labs.resyntax.ast.BackslashKind
+import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.ast.ClassItem
 import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.Dialect
@@ -24,8 +25,8 @@ import codes.quine.labs.resyntax.ir.IRCharResolver.*
 /** IRCharResolver resolves character-level nodes (literals, `.`, escapes and classes) into character sets.
   *
   * @param perlUnicodeRules
-  *   whether a Perl pattern uses Unicode rules even under `/d` (it has a non-ASCII literal, a code point above
-  *   `U+00FF`, `\p{...}` or `\N{...}`)
+  *   whether a Perl pattern uses Unicode rules even under `/d` (a UTF-8 pattern, or one with a code point above
+  *   `U+00FF`, `\p{...}`, `\N{...}` or `\b{...}`)
   */
 private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUnicodeRules: Boolean):
 
@@ -38,7 +39,6 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     dialect.isPerl &&
       (flags.charset == IRCharset.Default && !perlUnicodeRules || flags.charset == IRCharset.Locale)
 
-  /** Returns the case equivalence at the flags. */
   def equivalence(flags: IRCharFlags): IRCaseEquivalence =
     IRCaseEquivalence.of(dialect, mode, flags, perlNative(flags))
 
@@ -75,10 +75,8 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   def joinRubyByteRepeats(children: Seq[Node]): Seq[Node] =
     if !dialect.isRuby || mode != UnitMode.CodePoint then return children
     def byteOf(node: Node): Option[Int] = node.data match
-      case NodeData.Backslash(BackslashKind.Escape(style, value))
-          if isRubyByteStyle(style) && value >= 0x80 && value <= 0xff =>
-        Some(value)
-      case _ => None
+      case NodeData.Backslash(BackslashKind.Escape(style, value)) if isRubyByte(style, value) => Some(value)
+      case _                                                                                  => None
     val out = mutable.ArrayBuffer.empty[Node]
     for child <- children do
       child.data match
@@ -98,7 +96,6 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         case _ => out += child
     out.toSeq
 
-  /** Resolves a character-level node. */
   def resolve(node: Node, flags: IRCharFlags): IRNodeData =
     try
       node.data match
@@ -273,14 +270,13 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     var i = 0
     while i < lits.length do
       val lit = lits(i)
-      if isRubyByte(lit) then
+      if isRubyByteLit(lit) then
         val n = utf8Length(lit.value)
         if n < 2 || i + n > lits.length || !lits
             .slice(i + 1, i + n)
-            .forall(l => isRubyByte(l) && (l.value & 0xc0) == 0x80)
+            .forall(l => isRubyByteLit(l) && (l.value & 0xc0) == 0x80)
         then throw new IRBuildingException("Invalid multibyte escape", lit.loc)
-        val bytes = lits.slice(i, i + n).map(_.value)
-        val c = bytes.tail.foldLeft(bytes.head & (0xff >> (n + 1)))((c, b) => (c << 6) | (b & 0x3f))
+        val c = decodeUtf8(lits.slice(i, i + n).map(_.value))
         out += lit.copy(value = c, loc = SourceLocation(lit.loc.start, lits(i + n - 1).loc.end))
         i += n
       else
@@ -288,10 +284,8 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         i += 1
     out.toSeq
 
-  private def isRubyByte(lit: Lit): Boolean =
-    lit.escape.exists(isRubyByteStyle) && 0x80 <= lit.value && lit.value <= 0xff
+  private def isRubyByteLit(lit: Lit): Boolean = lit.escape.exists(isRubyByte(_, lit.value))
 
-  /** Returns the code values of a literal in the mode. */
   private def unitsOf(lit: Lit): Seq[Int] = mode match
     case UnitMode.CodePoint => Seq(lit.value)
     case UnitMode.Utf16     => UString(lit.value).encode(UnitMode.Utf16).toSeq
@@ -338,20 +332,10 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     * The engines take the longest cluster and do not backtrack into it. In byte mode, the bytes are Latin-1 characters.
     */
   private lazy val graphemeCluster: IRNodeData =
-    import IRQuantifier.Unbounded
-    import codes.quine.labs.resyntax.ast.BacktrackStrategy.Greedy
-    def gcb(names: String*): CharSet =
-      CharSet.union(names.map(Properties.GraphemeClusterBreak.value(_).get.set)).restrict(mode)
+    import Grammar.*
     def incb(name: String): CharSet = Properties.IndicConjunctBreak.value(name).get.set.restrict(mode)
     val extPict = Properties.binary("Extended_Pictographic").get.set.restrict(mode)
-    def c(set: CharSet): IRNode = IRNode(IRNodeData.Chars(set))
-    def star(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, Unbounded(0, Greedy)))
-    def plus(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, Unbounded(1, Greedy)))
-    def seq(nodes: IRNode*): IRNode = IRNode(IRNodeData.Sequence(nodes))
-    def alt(nodes: IRNode*): IRNode = IRNode(IRNodeData.Disjunction(nodes))
     val control = gcb("Control", "CR", "LF")
-    val Seq(l, v, t, lv, lvt) = Seq("L", "V", "T", "LV", "LVT").map(n => c(gcb(n)))
-    val hangul = alt(seq(star(l), alt(plus(v), seq(lv, star(v)), lvt), star(t)), plus(l), plus(t))
     val ri = seq(c(gcb("RI")), c(gcb("RI")))
     val xpicto = seq(c(extPict), star(seq(star(c(gcb("Extend"))), c(gcb("ZWJ")), c(extPict))))
     val linkers = star(c(incb("Extend").union(incb("Linker"))))
@@ -369,20 +353,8 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     * indicators before it in the input, which a look-behind tests.
     */
   private lazy val pcreGraphemeCluster: IRNodeData =
-    import IRQuantifier.Bounded
-    import IRQuantifier.Unbounded
-    import codes.quine.labs.resyntax.ast.BacktrackStrategy.Greedy
-    def gcb(names: String*): CharSet =
-      CharSet.union(names.map(Properties.GraphemeClusterBreak.value(_).get.set)).restrict(mode)
+    import Grammar.*
     val extPict = Properties.binary("Extended_Pictographic").get.set.restrict(mode).intersect(gcb("Other"))
-    def c(set: CharSet): IRNode = IRNode(IRNodeData.Chars(set))
-    def star(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, Unbounded(0, Greedy)))
-    def plus(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, Unbounded(1, Greedy)))
-    def opt(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, Bounded(0, 1, Greedy)))
-    def seq(nodes: IRNode*): IRNode = IRNode(IRNodeData.Sequence(nodes))
-    def alt(nodes: IRNode*): IRNode = IRNode(IRNodeData.Disjunction(nodes))
-    val Seq(l, v, t, lv, lvt) = Seq("L", "V", "T", "LV", "LVT").map(n => c(gcb(n)))
-    val hangul = alt(seq(star(l), alt(plus(v), seq(lv, star(v)), lvt), star(t)), plus(l), plus(t))
     val ri = c(gcb("RI"))
     val other = c(gcb("Other").diff(extPict))
     val extend = gcb("Extend", "ZWJ", "SpacingMark")
@@ -410,6 +382,14 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       plus(c(extend))
     )
     IRNodeData.Atomic(IRCharResolver.prune(cluster).getOrElse(IRNode(IRNodeData.Chars(CharSet.empty))))
+
+  private def gcb(names: String*): CharSet =
+    CharSet.union(names.map(Properties.GraphemeClusterBreak.value(_).get.set)).restrict(mode)
+
+  private def hangul: IRNode =
+    import Grammar.*
+    val Seq(l, v, t, lv, lvt) = Seq("L", "V", "T", "LV", "LVT").map(n => c(gcb(n)))
+    alt(seq(star(l), alt(plus(v), seq(lv, star(v)), lvt), star(t)), plus(l), plus(t))
 
   private def escapeClassSet(kind: EscapeClassKind, flags: IRCharFlags, loc: SourceLocation): ClassSet =
     def set(s: CharSet): ClassSet = ClassSet(s.restrict(mode))
@@ -453,7 +433,6 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         val single = CharSet.of(ss.filter(_.length == 1).map(_(0))*)
         ClassSet(eq.closure(single), ss.filter(_.length != 1))
 
-  /** Resolves a Unicode property. */
   private def property(
       name: String,
       value: Option[String],
@@ -584,14 +563,12 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   private def foldString(key: UString, flags: IRCharFlags, loc: SourceLocation): IRNodeData =
     sequenceOf(foldRun(key.iterator.map(c => Lit(c, true, None, flags, loc)).toSeq))
 
-  /** Returns the complement of a class item. */
   private def negate(item: ClassItem, flags: IRCharFlags): ClassSet = item.data match
     // .NET's `[^a-z-[aeiou]]` negates the base before the subtraction.
     case ClassItemData.ClassDiff(left, right) if dialect.isDotNet =>
       ClassSet(classItem(left, flags).chars.complement(mode)).diff(classItem(right, flags))
     case _ => ClassSet(classItem(item, flags).chars.complement(mode))
 
-  /** Returns the node of a class set: [[IRNodeData.Chars]], or a node with strings. */
   private def output(set: ClassSet, flags: IRCharFlags): IRNodeData =
     val chars = set.chars.restrict(mode)
     val eq = equivalence(flags)
@@ -620,12 +597,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         if invert then ClassSet(set.complement(mode)) else ClassSet(set)
       case ClassItemData.ClassRange(begin, end)    => range(begin.data, end.data, flags, item.loc)
       case ClassItemData.ClassCaseCommand(_)       => ClassSet.empty
-      case ClassItemData.ClassBackslashClass(kind) =>
-        kind match
-          case EscapeClassKind.GeneralNewline | EscapeClassKind.GraphemeCluster => throw new NotModeledException
-          case EscapeClassKind.NonNewline if dialect.isPCRE                     =>
-            ClassSet(CharSet.of(flags.lineTerminators.chars.toSeq*).restrict(mode).complement(mode))
-          case kind => escapeClassSet(kind, flags, item.loc)
+      case ClassItemData.ClassBackslashClass(kind) => escapeClassSet(kind, flags, item.loc)
       case value: ClassItemData.ClassValue
           if dialect.isRuby && mode == UnitMode.CodePoint &&
             isRubyByteValue(value) =>
@@ -639,15 +611,13 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     while i < items.length do
       val item = items(i)
       item.data match
-        case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, value))
-            if dialect.isRuby && mode == UnitMode.CodePoint && isRubyByteStyle(style) &&
-              value >= 0x80 && value <= 0xff =>
+        case value: ClassItemData.ClassValue
+            if dialect.isRuby && mode == UnitMode.CodePoint && isRubyByteValue(value) =>
           val bytes = items
             .drop(i)
             .takeWhile:
-              case ClassItem.Value(ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, value)), _) =>
-                isRubyByteStyle(style) && value >= 0x80 && value <= 0xff
-              case _ => false
+              case ClassItem.Value(value, _) => isRubyByteValue(value)
+              case _                         => false
           val lits = bytes.map: b =>
             val ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, value)) = b.data: @unchecked
             Lit(value, false, Some(style), flags, b.loc)
@@ -703,7 +673,6 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     val decoded = mergeRubyBytes(lits.take(n))
     if lits.length > n then decoded ++ mergeRubyBytesInClass(lits.drop(n)) else decoded
 
-  /** Returns the code values of a class value; a non-ASCII literal in byte mode is several bytes. */
   private def valueUnits(value: ClassItemData.ClassValue, flags: IRCharFlags, loc: SourceLocation): Seq[Int] =
     val lit = value match
       case ClassItemData.ClassLiteral(v)                                     => Lit(v, true, None, flags, loc)
@@ -737,9 +706,8 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     ClassSet(eq.closure(CharSet.of((b.init ++ e.tail)*)).union(eq.closeRange(CharSet.range(b.last, e.head))))
 
   private def isRubyByteValue(value: ClassItemData.ClassValue): Boolean = value match
-    case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v)) =>
-      isRubyByteStyle(style) && v >= 0x80 && v <= 0xff
-    case _ => false
+    case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v)) => isRubyByte(style, v)
+    case _                                                                 => false
 
   private def posix(name: String, flags: IRCharFlags, loc: SourceLocation): CharSet =
     val set = classes.posix(name, flags).getOrElse(throw new IRBuildingException("Unknown POSIX class name", loc))
@@ -755,8 +723,16 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         case _: Dialect.Ruby => equivalence(flags).closure(restricted)
         case _               => restricted
 
-/** IRCharResolver utilities. */
 private[ir] object IRCharResolver:
+
+  private object Grammar:
+    import BacktrackStrategy.Greedy
+    def c(set: CharSet): IRNode = IRNode(IRNodeData.Chars(set))
+    def star(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, IRQuantifier.Unbounded(0, Greedy)))
+    def plus(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, IRQuantifier.Unbounded(1, Greedy)))
+    def opt(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, IRQuantifier.Bounded(0, 1, Greedy)))
+    def seq(nodes: IRNode*): IRNode = IRNode(IRNodeData.Sequence(nodes))
+    def alt(nodes: IRNode*): IRNode = IRNode(IRNodeData.Disjunction(nodes))
 
   /** NotModeledException is thrown for a construct that IR cannot represent, which becomes `Unsupported`. */
   final class NotModeledException extends Exception("not modeled")
@@ -777,6 +753,8 @@ private[ir] object IRCharResolver:
       true
     case _ => false
 
+  def isRubyByte(style: EscapeStyle, value: Int): Boolean = isRubyByteStyle(style) && 0x80 <= value && value <= 0xff
+
   /** The value of a literal that has no unit in the mode, which never matches. */
   val NoUnit: Int = -1
 
@@ -789,7 +767,6 @@ private[ir] object IRCharResolver:
   /** [[multiFoldings]] in the order of Onigmo's tables: by the length, and then by the folding. */
   lazy val rubyMultiFoldings: Seq[(UString, CharSet)] = multiFoldings.sortBy((key, _) => (key.length, key))
 
-  /** Returns the folding of a character to several characters (e.g. `ss` of `ß`). */
   def multiFolding(c: Int): Option[UString] = Some(FullCaseFolding(c)).filter(_.length >= 2)
 
   /** Checks whether the escape class is a property, which is a class in Onigmo, but not a negated one. */
@@ -812,6 +789,9 @@ private[ir] object IRCharResolver:
     else if b < 0xf5 then 4
     else 0
 
+  def decodeUtf8(bytes: Seq[Int]): Int =
+    bytes.tail.foldLeft(bytes.head & (0xff >> (bytes.size + 1)))((c, b) => (c << 6) | (b & 0x3f))
+
   /** Removes the parts of a node that never match (an empty set, and what needs one), or returns `None` for all. */
   def prune(node: IRNode): Option[IRNode] = node.data match
     case IRNodeData.Chars(set)      => Option.when(set.nonEmpty)(node)
@@ -833,7 +813,6 @@ private[ir] object IRCharResolver:
         case None        => Option.when(min == 0)(node.copy(data = IRNodeData.Empty))
     case _ => Some(node)
 
-  /** Returns a node of the nodes in sequence. */
   def sequenceOf(nodes: Seq[IRNode]): IRNodeData = nodes match
     case Seq()     => IRNodeData.Empty
     case Seq(node) => node.data

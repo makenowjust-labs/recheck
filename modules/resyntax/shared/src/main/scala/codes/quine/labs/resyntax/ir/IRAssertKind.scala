@@ -7,20 +7,15 @@ sealed abstract class IRAssertKind extends Product with Serializable
 
 object IRAssertKind:
 
-  /** LineBegin is a line begin assertion.
-    *
-    * @param atEnd
+  /** @param atEnd
     *   where it matches at the end of the input
     */
   final case class LineBegin(terminators: IRLineTerminators, atEnd: IRLineBeginAtEnd) extends IRAssertKind
 
-  /** LineEnd is a line end assertion. */
   final case class LineEnd(terminators: IRLineTerminators) extends IRAssertKind
 
-  /** TextBegin is a text begin assertion. */
   case object TextBegin extends IRAssertKind
 
-  /** TextEnd is a text end assertion. */
   case object TextEnd extends IRAssertKind
 
   /** ChompTextEnd is a text end assertion that also matches before a line terminator at the end. */
@@ -29,7 +24,6 @@ object IRAssertKind:
   /** WordBoundary is a word boundary assertion between a code value in the word set and one not in it. */
   final case class WordBoundary(word: CharSet) extends IRAssertKind
 
-  /** NotWordBoundary is a non-word-boundary assertion with the word set. */
   final case class NotWordBoundary(word: CharSet) extends IRAssertKind
 
   /** MarkWordBoundary is a word boundary assertion where a mark after a base is a word character too (Java's `\b`
@@ -37,7 +31,6 @@ object IRAssertKind:
     */
   final case class MarkWordBoundary(word: CharSet, marks: IRWordMarks) extends IRAssertKind
 
-  /** NotMarkWordBoundary is a non-word-boundary assertion with the word set and the marks. */
   final case class NotMarkWordBoundary(word: CharSet, marks: IRWordMarks) extends IRAssertKind
 
   /** NotBetweenCRLF is an assertion that the position is not between `\r` and `\n`.

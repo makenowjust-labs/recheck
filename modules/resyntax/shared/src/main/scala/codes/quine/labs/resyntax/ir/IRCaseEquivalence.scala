@@ -20,7 +20,6 @@ sealed abstract class IRCaseEquivalence:
     */
   def closeRange(set: CharSet): CharSet = closure(set)
 
-  /** Checks whether two code values match case-insensitively. */
   def equiv(a: Int, b: Int): Boolean = closure(CharSet.single(a)).contains(b)
 
 object IRCaseEquivalence:
@@ -66,7 +65,8 @@ object IRCaseEquivalence:
     * string UTF-8, which uses Unicode rules.
     */
   final case class PerlNative(mode: UnitMode) extends IRCaseEquivalence:
-    def closure(set: CharSet): CharSet = set.union(CaseMapping.SimpleFold.closure(set).diff(Latin1)).restrict(mode)
+    def closure(set: CharSet): CharSet =
+      set.union(CaseMapping.SimpleFold.closure(set).diff(IRCharClasses.Latin1)).restrict(mode)
 
   /** PerlLocale is Perl's `/l` rules in the C locale.
     *
@@ -80,11 +80,8 @@ object IRCaseEquivalence:
 
   private val Ascii: CharSet = CharSet.range(0, 0x7f)
 
-  private val Latin1: CharSet = CharSet.range(0x80, 0xff)
-
   private val Byte: CharSet = CharSet.range(0, 0xff)
 
-  /** ASCII letter folding. */
   lazy val asciiFold: CaseMapping = CaseMapping.fromEntries(('A'.toInt to 'Z').map(c => (c, c + 0x20)))
 
   /** The characters that Java's `Pattern.single` folds under `UNICODE_CASE`: `toUpperCase(c)` differs from the key. */
@@ -111,9 +108,7 @@ object IRCaseEquivalence:
   /** .NET's key `ToLowerInvariant(c)`, where `U+0130` is not lower-cased to `i`. */
   lazy val dotNetKey: CaseMapping = CaseMapping.SimpleLower.updated(Seq(0x130 -> 0x130))
 
-  /** Returns the case equivalence of case-insensitive matching with the flags in the dialect and the mode.
-    *
-    * @param perlNative
+  /** @param perlNative
     *   Perl's `/d` rules without a reason to use Unicode rules (see [[PerlNative]])
     */
   def of(dialect: Dialect, mode: UnitMode, flags: IRCharFlags, perlNative: Boolean): IRCaseEquivalence =

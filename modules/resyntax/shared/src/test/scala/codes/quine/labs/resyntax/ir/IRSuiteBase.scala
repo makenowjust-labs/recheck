@@ -34,7 +34,7 @@ abstract class IRSuiteBase extends munit.FunSuite:
   /** Returns the flags at the start of a pattern without start options. */
   def flagsOf(dialect: Dialect, flags: String = ""): IRCharFlags =
     val flagSet = FlagSet.parse(flags, dialect)
-    BuildingContext.from(flagSet, dialect, IRFeatureSet.from(flagSet, dialect)).charFlags
+    BuildingContext(flagSet, dialect, IRFeatureSet.from(flagSet, dialect)).charFlags
 
   def check(s: String, flags: String, dialects: Dialect*)(expected: IRNodeData)(implicit loc: munit.Location): Unit =
     for dialect <- dialects do

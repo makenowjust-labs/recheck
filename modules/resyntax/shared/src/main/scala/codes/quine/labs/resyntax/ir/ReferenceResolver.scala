@@ -7,14 +7,12 @@ import codes.quine.labs.resyntax.ast.SourceLocation
 /** ReferenceResolver resolves group references to capture indices, and rejects the ones the dialect rejects. */
 private[ir] final class ReferenceResolver(table: CaptureTable, dialect: Dialect, featureSet: IRFeatureSet):
 
-  /** Resolves a back-reference. */
   def backReference(ref: Reference, site: ReferenceSite, loc: SourceLocation): Seq[Int] = ref match
     case Reference.IndexedReference(n)      => indexedBackReference(n, site, loc)
     case Reference.NamedReference(name)     => namedBackReference(name, site, loc)
     case Reference.RelativeReference(n)     => relative(n, site, loc)
     case Reference.LeveledReference(ref, _) => backReference(ref, site, loc)
 
-  /** Resolves a back-reference by an index (e.g. `\1`). */
   def indexedBackReference(n: Int, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
     if featureSet.requiresClosedGroupReference then
       if n > site.opened then fail("Reference to non-existent group", loc)
@@ -78,11 +76,10 @@ private[ir] final class ReferenceResolver(table: CaptureTable, dialect: Dialect,
       checkClosed(resolved, site, loc)
     else resolved
 
-  /** Resolves a call, where Ruby rejects a name shared by groups. */
-  def call(ref: Reference, site: ReferenceSite, loc: SourceLocation, isCall: Boolean): Seq[Int] =
+  /** Resolves a call by `\g<...>`, where Ruby rejects a name shared by groups. */
+  def escapeCall(ref: Reference, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
     val indices = call(ref, site, loc)
-    if isCall && featureSet.rejectsCallToSharedName && indices.size > 1 then
-      fail("Call to a name shared by groups", loc)
+    if featureSet.rejectsCallToSharedName && indices.size > 1 then fail("Call to a name shared by groups", loc)
     indices
 
   // Python rejects a reference to a group that is not closed, or that is in the same look-behind.
