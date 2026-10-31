@@ -27,13 +27,17 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.ir.IRNodeData
 
-/** Runs recall validation on the runtimes in `PATH`, skipping the missing ones.
+/** Runs recall validation on the runtimes in `PATH`, skipping the missing ones unless `RECHECK_REQUIRE_RUNTIMES=1`.
   *
   * The comments note the behavior of the versions at the time of writing.
   */
 class RecallRuntimeSuite extends munit.FunSuite:
 
   override val munitTimeout: Duration = 60.seconds
+
+  /** Fails instead of skipping when `RECHECK_REQUIRE_RUNTIMES=1`, as on CI. */
+  override def assume(cond: Boolean, clue: => Any)(implicit loc: munit.Location): Unit =
+    if sys.env.get("RECHECK_REQUIRE_RUNTIMES").contains("1") then assert(cond, clue) else super.assume(cond, clue)
 
   /** A default context. */
   given ctx: Context = Context()
