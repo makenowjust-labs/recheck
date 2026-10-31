@@ -968,11 +968,9 @@ private[parser] final class Parser(
 
   private def parseCode(end: Char, escapeDouble: Boolean = false): String =
     val start = offset
-    while !isEnd &&
-      !(currentChar == end && !(escapeDouble && offset + 1 < source.length && source.charAt(offset + 1) == end))
-    do
-      if currentChar == end && escapeDouble && offset + 1 < source.length && source.charAt(offset + 1) == end then
-        next()
+    def isDoubledEnd: Boolean = escapeDouble && source.startsWith(s"$end$end", offset)
+    while !isEnd && (currentChar != end || isDoubledEnd) do
+      if isDoubledEnd then next()
       next()
     assert(!isEnd, "Invalid group")
     val code = source.slice(start, offset)
