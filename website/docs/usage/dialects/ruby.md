@@ -30,12 +30,31 @@ await check("^(a|a)*$", "", {
 ## Flags and Units
 
 - `UTF-8` (default) matches code points, and `ASCII-8BIT` matches bytes.
-  The flag `n` also makes an `ASCII-8BIT` pattern.
 - An `ASCII-8BIT` pattern is read by the UTF-8 bytes of the pattern.
   A quantifier after a non-ASCII literal repeats its last byte (e.g. `é+` is `\xC3\xA9+`), and a character class has the bytes (e.g. `[é-à]` is `[\xC3\xA9-\xC3\xA0]`, which is valid).
 - An `ASCII-8BIT` pattern is read as `Regexp.new(pattern.b, Regexp::NOENCODING)`: a `\u` escape above `U+007F` is an error, and its Unicode properties are only the POSIX classes in ASCII (e.g. `\p{Alpha}`).
 - In `ASCII-8BIT`, the attack string is a bytes literal (e.g. `"\xC3\xA9".b`).
 - The character set flags `a` (ASCII) and `u` (Unicode) change the meaning of `\w`, `\d`, `\s`, `\b`, POSIX classes and case-insensitive matching in the same way as in Onigmo.
+
+The flags are the letters of the options of a regexp literal (e.g. `/.../i`) and of the inline options.
+
+| Flag | `Regexp` option      | Inline | Notes                                                                                                      |
+| ---- | -------------------- | ------ | ---------------------------------------------------------------------------------------------------------- |
+| `i`  | `Regexp::IGNORECASE` | `(?i)` |                                                                                                            |
+| `m`  | `Regexp::MULTILINE`  | `(?m)` | `.` matches a line break, as `s` does in the other dialects (`^` and `$` always match at line boundaries). |
+| `x`  | `Regexp::EXTENDED`   | `(?x)` |                                                                                                            |
+| `n`  | `Regexp::NOENCODING` |        | An `ASCII-8BIT` pattern (the literal `/n`), as `encoding: "ASCII-8BIT"` makes.                             |
+| `a`  |                      | `(?a)` | The ASCII character set.                                                                                   |
+| `d`  |                      | `(?d)` | The default character set.                                                                                 |
+| `u`  |                      | `(?u)` | The Unicode character set, which is not the literal `/u` (`Regexp::FIXEDENCODING`).                        |
+| `o`  |                      |        | The literal `/o`, no effect on matching.                                                                   |
+
+`a`, `d` and `u` have no `Regexp` option, and the last of them wins, as in the inline options (e.g. `au` is `u`).
+
+The options that `recheck` does not take:
+
+- `Regexp::FIXEDENCODING` (the literal `/u`): no effect on matching a `UTF-8` string (it makes a match against a string of another encoding an error).
+- The literal `/e` (EUC-JP) and `/s` (Windows-31J): not supported, since the encoding is `UTF-8` or `ASCII-8BIT`.
 
 ## Syntax
 

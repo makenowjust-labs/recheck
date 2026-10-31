@@ -46,6 +46,27 @@ await check("^(a|a)*$", "", {
 - Perl reads a byte of a string without `utf8` as the Latin-1 character, so `u` and a pattern switching to the Unicode rules give them to `0x80`–`0xFF` there too (e.g. `\w` matches `\xE9`).
 - `l` follows the C locale, where `0x80`–`0xFF` follow the ASCII rules even with `utf8`, whatever locale the environment has.
 
+The flags are the modifiers of `m//`, `qr//` and `s///`, and `recheck` takes all of them.
+
+| Flag      | Modifier    | Inline          | Notes                                                                                      |
+| --------- | ----------- | --------------- | ------------------------------------------------------------------------------------------ |
+| `a`       | `/a`        | `(?a)`          | The ASCII rules.                                                                           |
+| `aa`      | `/aa`       | `(?aa)`         | The ASCII rules, and no case-insensitive match between an ASCII and a non-ASCII character. |
+| `d`       | `/d`        | `(?d)`          | The default rules (see above).                                                             |
+| `l`       | `/l`        | `(?l)`          | The rules of the C locale (see above).                                                     |
+| `u`       | `/u`        | `(?u)`          | The Unicode rules.                                                                         |
+| `i`       | `/i`        | `(?i)`          |                                                                                            |
+| `m`       | `/m`        | `(?m)`          |                                                                                            |
+| `n`       | `/n`        | `(?n)`          |                                                                                            |
+| `s`       | `/s`        | `(?s)`          |                                                                                            |
+| `x`, `xx` | `/x`, `/xx` | `(?x)`, `(?xx)` |                                                                                            |
+| `p`       | `/p`        | `(?p)`          | No effect on matching.                                                                     |
+| `o`       | `/o`        |                 | No effect on matching.                                                                     |
+| `g`, `c`  | `/g`, `/c`  |                 | No effect on matching, since `recheck` models a search from the start.                     |
+| `e`, `r`  | `/e`, `/r`  |                 | The modifiers of `s///`, no effect on matching.                                            |
+
+As in Perl, only one of `a` (or `aa`), `d`, `l` and `u` can be given.
+
 ## Syntax
 
 - `\p{...}` has the enumerated properties of the Unicode data, such as `Line_Break`, `East_Asian_Width`, `Grapheme_Cluster_Break`, `Word_Break`, `Canonical_Combining_Class` (also by numbers, e.g. `\p{Ccc=230}`) and `Identifier_Type`.

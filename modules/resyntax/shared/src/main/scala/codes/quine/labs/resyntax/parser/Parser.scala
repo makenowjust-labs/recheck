@@ -1281,6 +1281,10 @@ private[parser] final class Parser(
     val start = offset
     var flagSet = initial
     def result: (FlagSet, String) = (flagSet, sliceSource(start, offset))
+    // Ruby's last character set flag wins (e.g. `(?au)` is `(?u)`).
+    def charset(flagSet: FlagSet): FlagSet =
+      if featureSet.overridesCharsetInlineFlag then flagSet.copy(ascii = false, hasIndices = false, unicode = false)
+      else flagSet
     while !isEnd do
       val flagStart = offset
       val c = if featureSet.ignoresInlineFlagCase then currentChar.toLower else currentChar
@@ -1313,7 +1317,7 @@ private[parser] final class Parser(
             case Some('S') => flagSet.copy(asciiSpace = true)
             case Some('T') => flagSet.copy(asciiPosixDigit = true)
             case Some('W') => flagSet.copy(asciiWord = true)
-            case _         => flagSet.copy(ascii = true)
+            case _         => charset(flagSet).copy(ascii = true)
           if subOption.isDefined then next()
           else if featureSet.hasFlagAA && sliceSource(start, offset).contains('a') then
             flagSet = flagSet.copy(asciiRestrict = true)
@@ -1322,7 +1326,7 @@ private[parser] final class Parser(
           flagSet = flagSet.copy(continue = true)
         case 'd' =>
           if !featureSet.hasFlagD then return result
-          flagSet = flagSet.copy(hasIndices = true)
+          flagSet = charset(flagSet).copy(hasIndices = true)
         case 'g' =>
           if !featureSet.hasFlagG then return result
           flagSet = flagSet.copy(global = true)
@@ -1346,7 +1350,7 @@ private[parser] final class Parser(
           flagSet = flagSet.copy(dotAll = true)
         case 'u' =>
           if !featureSet.hasFlagU then return result
-          flagSet = flagSet.copy(unicode = true)
+          flagSet = charset(flagSet).copy(unicode = true)
         case _ =>
           return result
       checkFlag(c, sliceSource(start, flagStart), removing, resetting)

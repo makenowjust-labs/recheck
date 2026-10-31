@@ -123,6 +123,8 @@ class IRFlagSuite extends IRSuiteBase:
     Seq(flagsOf(d).copy(caselessRestrict = true), flagsOf(d).copy(caselessRestrict = true))
   )
   checkFlags("a(?r)b", "", PCRE)(d => Seq(flagsOf(d), flagsOf(d).copy(caselessRestrict = true)))
+  // PHP's `r` is `(?r)`: `/k/iur` does not match the Kelvin sign, but `/(?-r)k/iur` does.
+  checkFlags("a(?-r)b", "r", PCRE)(d => Seq(flagsOf(d).copy(caselessRestrict = true), flagsOf(d)))
   // `(*UTF)(?r)(?^i)k` matches the Kelvin sign, so `(?^)` resets `r`.
   checkFlags("(?r)(?^i)a", "", PCRE)(d => Seq(flagsOf(d, "i")))
   checkFlags("(*BSR_UNICODE)(*BSR_ANYCRLF)a", "", PCRE)(d => Seq(flagsOf(d).copy(bsrAnyCRLF = true)))
@@ -134,6 +136,18 @@ class IRFlagSuite extends IRSuiteBase:
   checkFlags("(?l)a(?d)b", "", Perl())(d => Seq(flagsOf(d).copy(charset = IRCharset.Locale), flagsOf(d)))
   checkFlags("(?a)a", "", Python())(d => Seq(flagsOf(d).copy(charset = IRCharset.Ascii.All)))
   checkFlags("(?L)a", "b", Python())(d => Seq(flagsOf(d, "b").copy(charset = IRCharset.Locale)))
+  error("a", "L", Python())("Cannot use LOCALE flag with a str pattern")
+  error("a", "u", Python(Python.Type.Bytes))("Cannot use UNICODE flag with a bytes pattern")
+  // `re` checks the flags with the global inline flags: `re.compile('(?a)x', re.U)` raises `ValueError`.
+  error("(?a)x", "u", Python())("ASCII and UNICODE flags are incompatible")
+  error("(?u)(?a)x", "", Python())("ASCII and UNICODE flags are incompatible")
+  error("(?L)x", "a", Python(Python.Type.Bytes))("ASCII and LOCALE flags are incompatible")
+  error("(?a)x", "L", Python(Python.Type.Bytes))("ASCII and LOCALE flags are incompatible")
+  // A scoped flag is not checked: `re.compile('(?a:x)', re.U)` is valid.
+  checkFlags("(?a:x)", "u", Python())(d => Seq(flagsOf(d, "u").copy(charset = IRCharset.Ascii.All)))
+  // Ruby's character set options have no `Regexp` constant, and the last one wins: `/(?au)\w/` matches `é`.
+  checkFlags("a", "au", Ruby())(d => Seq(flagsOf(d).copy(charset = IRCharset.Unicode)))
+  checkFlags("(?au)a(?ud)b", "", Ruby())(d => Seq(flagsOf(d).copy(charset = IRCharset.Unicode), flagsOf(d)))
   // `(*UTF)(*UCP)(?a)(?^)\d` does not match `١`, so `(?^)` keeps `a` in PCRE, but not in Perl.
   checkFlags("(?a)(?^)a", "", PCRE)(d => Seq(flagsOf(d).copy(charset = IRCharset.Ascii.All)))
   checkFlags("(?a)(?^)a", "", Perl())(d => Seq(flagsOf(d)))

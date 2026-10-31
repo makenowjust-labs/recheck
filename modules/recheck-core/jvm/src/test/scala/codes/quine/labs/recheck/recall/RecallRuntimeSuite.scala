@@ -127,6 +127,12 @@ class RecallRuntimeSuite extends munit.FunSuite:
     val env = Map("RECHECK_RUBY" -> "env LC_ALL=C ruby")
     assertFinish(validate("^(?:é|é)*$", "", Dialect.Ruby(), attack("é", 3, "\u0000"), env = env))
 
+  runtimeTest("Ruby: the character set options", "ruby"):
+    // `u` is `(?u)`, not `/u` (FIXEDENCODING), so `\w` matches `é`, and a backreference turns off the memoization.
+    val pattern = "^(?:(\\w)|\\w)*\\1$"
+    assertEquals(validate(pattern, "u", Dialect.Ruby(), attack("é", 31, "!")).result, RecallResult.Timeout)
+    assertFinish(validate(pattern, "ua", Dialect.Ruby(), attack("é", 31, "!")))
+
   runtimeTest("Java", "java"):
     val r = validate("^(a|a)*$", "", Dialect.Java, attack("a", 31, "\u0000"))
     assertFinish(r)
@@ -210,6 +216,17 @@ class RecallRuntimeSuite extends munit.FunSuite:
       RecallResult.EngineLimit("Backtrack limit exhausted")
     )
     assertFinish(validate("^(?:é|é)*$", "u", Dialect.PCRE, attack("é", 3, "\u0000")))
+
+  runtimeTest("PCRE: the r modifier", "php"):
+    val probe = new ProcessBuilder("php", "-r", "exit(@preg_match('/a/r', 'a') === false ? 1 : 0);").start()
+    assume(probe.waitFor() == 0, "PHP before 8.4 has no r modifier")
+    // `r` (PCRE2_EXTRA_CASELESS_RESTRICT) keeps `k` from matching the Kelvin sign.
+    val kelvin = attack("\u212a", 31, "\u0000")
+    assertEquals(
+      validate("^(?:k|k)*$", "iu", Dialect.PCRE, kelvin).result,
+      RecallResult.EngineLimit("Backtrack limit exhausted")
+    )
+    assertFinish(validate("^(?:k|k)*$", "iur", Dialect.PCRE, kelvin))
 
   /** Runs the standalone program in a new directory, and returns the output. */
   def runScript(script: RecallProgram.Script): String =
