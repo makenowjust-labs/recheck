@@ -91,7 +91,7 @@ test("runs the input with the chosen build and records a permalink", async ({
 test("restores a permalink and compares a new run against it", async ({
   page,
 }) => {
-  const build: Build = { type: "release", version: "0.0.1" };
+  const build: Build = { type: "release", version: "4.5.9" };
   const recorded: Snapshot = {
     v: 1,
     build,
@@ -105,9 +105,9 @@ test("restores a permalink and compares a new run against it", async ({
   await expect(input(page)).toHaveValue("/a/");
   await expect(page.locator('select[name="checker"]')).toHaveValue("automaton");
   await expect(page.locator(".card__header .badge")).toHaveText("recorded");
-  await expect(footers(page)).toContainText("recheck v0.0.1");
+  await expect(footers(page)).toContainText("recheck v4.5.9");
   await expect(page.locator(".alert--warning")).toContainText(
-    "recorded with recheck v0.0.1",
+    "recorded with recheck v4.5.9",
   );
 
   await check(page);

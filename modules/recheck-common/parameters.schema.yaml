@@ -46,6 +46,7 @@ properties:
     x-scala-values: { "auto": "AccelerationMode.Auto", "on": "AccelerationMode.On", "off": "AccelerationMode.Off" }
     x-cli: "acceleration-mode"
     x-cli-metavar: "mode"
+    x-since: "4.2.0"
 
   attackLimit:
     title: "Attack Limit"
@@ -54,6 +55,7 @@ properties:
     default: 1500000000
     x-scala-type: "Int"
     x-cli: "attack-limit"
+    x-since: "1.0.0"
 
   attackTimeout:
     title: "Attack Timeout"
@@ -63,6 +65,7 @@ properties:
     x-unit: "milliseconds"
     x-scala-type: "Duration"
     x-cli: "attack-timeout"
+    x-since: "4.2.0"
 
   checker:
     title: "Checker"
@@ -80,6 +83,7 @@ properties:
     x-scala-type: "Checker"
     x-scala-values: { "auto": "Checker.Auto", "fuzz": "Checker.Fuzz", "automaton": "Checker.Automaton" }
     x-cli: "checker"
+    x-since: "1.0.0"
 
   crossoverSize:
     title: "Crossover Size"
@@ -88,6 +92,7 @@ properties:
     default: 25
     x-scala-type: "Int"
     x-cli: "crossover-size"
+    x-since: "4.2.0"
 
   dialect:
     title: "Dialect"
@@ -153,6 +158,7 @@ properties:
     default: 0.001
     x-scala-type: "Double"
     x-cli: "heat-ratio"
+    x-since: "4.2.0"
 
   incubationLimit:
     title: "Incubation Limit"
@@ -161,6 +167,7 @@ properties:
     default: 25000
     x-scala-type: "Int"
     x-cli: "incubation-limit"
+    x-since: "3.0.0"
 
   incubationTimeout:
     title: "Incubation Timeout"
@@ -170,6 +177,7 @@ properties:
     x-unit: "milliseconds"
     x-scala-type: "Duration"
     x-cli: "incubation-timeout"
+    x-since: "4.2.0"
 
   logger:
     title: "Logger"
@@ -182,6 +190,7 @@ properties:
     x-scala-type: "Option[Context.Logger]"
     x-typescript-type: "(message: string) => void"
     x-exclude: ["cli", "eslint-plugin", "playground"]
+    x-since: "4.2.0"
 
   maxAttackStringSize:
     title: "Max Attack String Size"
@@ -190,6 +199,7 @@ properties:
     default: 300000
     x-scala-type: "Int"
     x-cli: "max-attack-string-size"
+    x-since: "4.2.0"
 
   maxDegree:
     title: "Max Degree"
@@ -198,6 +208,7 @@ properties:
     default: 4
     x-scala-type: "Int"
     x-cli: "max-degree"
+    x-since: "1.1.0"
 
   maxGeneStringSize:
     title: "Max Gene String Size"
@@ -206,6 +217,7 @@ properties:
     default: 2400
     x-scala-type: "Int"
     x-cli: "max-gene-string-size"
+    x-since: "4.2.0"
 
   maxGenerationSize:
     title: "Max Generation Size"
@@ -214,6 +226,7 @@ properties:
     default: 100
     x-scala-type: "Int"
     x-cli: "max-generation-size"
+    x-since: "1.0.0"
 
   maxInitialGenerationSize:
     title: "Max Initial Generation Size"
@@ -222,6 +235,7 @@ properties:
     default: 500
     x-scala-type: "Int"
     x-cli: "max-initial-generation-size"
+    x-since: "4.2.0"
 
   maxIteration:
     title: "Max Iteration"
@@ -230,6 +244,7 @@ properties:
     default: 10
     x-scala-type: "Int"
     x-cli: "max-iteration"
+    x-since: "1.0.0"
 
   maxNFASize:
     title: "Max NFA Size"
@@ -238,6 +253,7 @@ properties:
     default: 35000
     x-scala-type: "Int"
     x-cli: "max-nfa-size"
+    x-since: "1.0.0"
 
   maxPatternSize:
     title: "Max Pattern Size"
@@ -246,6 +262,7 @@ properties:
     default: 1500
     x-scala-type: "Int"
     x-cli: "max-pattern-size"
+    x-since: "1.1.1"
 
   maxRecallStringSize:
     title: "Max Recall String Size"
@@ -254,6 +271,7 @@ properties:
     default: 300000
     x-scala-type: "Int"
     x-cli: "max-recall-string-size"
+    x-since: "4.2.0"
 
   maxRepeatCount:
     title: "Max Repeat Count"
@@ -262,6 +280,7 @@ properties:
     default: 30
     x-scala-type: "Int"
     x-cli: "max-repeat-count"
+    x-since: "1.0.0"
 
   maxSimpleRepeatCount:
     title: "Max Simple Repeat Count"
@@ -270,6 +289,7 @@ properties:
     default: 30
     x-scala-type: "Int"
     x-cli: "max-simple-repeat-count"
+    x-since: "4.2.0"
 
   mutationSize:
     title: "Mutation Size"
@@ -278,6 +298,7 @@ properties:
     default: 50
     x-scala-type: "Int"
     x-cli: "mutation-size"
+    x-since: "4.2.0"
 
   perlSource:
     title: "Perl Source"
@@ -321,6 +342,7 @@ properties:
     default: 0
     x-scala-type: "Long"
     x-cli: "random-seed"
+    x-since: "4.0.0"
 
   recallCommand:
     title: "Recall Command"
@@ -347,6 +369,7 @@ properties:
     default: 1500000000
     x-scala-type: "Int"
     x-cli: "recall-limit"
+    x-since: "4.2.0"
 
   recallTimeout:
     title: "Recall Timeout"
@@ -364,6 +387,7 @@ properties:
     x-unit: "milliseconds"
     x-scala-type: "Duration"
     x-cli: "recall-timeout"
+    x-since: "4.2.0"
 
   seeder:
     title: "Seeder"
@@ -380,6 +404,7 @@ properties:
     x-scala-type: "Seeder"
     x-scala-values: { "static": "Seeder.Static", "dynamic": "Seeder.Dynamic" }
     x-cli: "seeder"
+    x-since: "4.2.0"
 
   seedingLimit:
     title: "Seeding Limit"
@@ -388,6 +413,7 @@ properties:
     default: 1000
     x-scala-type: "Int"
     x-cli: "seeding-limit"
+    x-since: "4.2.0"
 
   seedingTimeout:
     title: "Seeding Timeout"
@@ -397,6 +423,7 @@ properties:
     x-unit: "milliseconds"
     x-scala-type: "Duration"
     x-cli: "seeding-timeout"
+    x-since: "4.2.0"
 
   timeout:
     title: "Timeout"
@@ -413,3 +440,4 @@ properties:
     x-unit: "milliseconds"
     x-scala-type: "Duration"
     x-cli: "timeout"
+    x-since: "1.0.0"
