@@ -29,13 +29,11 @@ final class Alphabet private (
     */
   def atomsOf(set: CharSet): BitSet =
     val builder = BitSet.newBuilder
-    set
-      .restrict(mode)
-      .foreachIntervalWithin(0, mode.limit): (start, end) =>
-        var i = CharSet.countLessOrEqual(segmentStarts, start) - 1
-        while i < segmentStarts.length && segmentStarts(i) < end do
-          builder.addOne(segmentAtoms(i))
-          i += 1
+    set.foreachIntervalWithin(0, mode.limit): (start, end) =>
+      var i = CharSet.countLessOrEqual(segmentStarts, start) - 1
+      while i < segmentStarts.length && segmentStarts(i) < end do
+        builder.addOne(segmentAtoms(i))
+        i += 1
     builder.result()
 
   def setOf(indices: IterableOnce[Int]): CharSet = CharSet.union(indices.iterator.map(atoms))
@@ -70,8 +68,7 @@ object Alphabet:
         covered += j - i
       val segmentSpans =
         val s = spans.result()
-        if covered * 2 <= n then s
-        else (0 +: s :+ n).grouped(2).flatMap(xs => Iterator(xs(0), xs(1))).toArray
+        if covered * 2 <= n then s else 0 +: s :+ n
       val remap = mutable.HashMap.empty[Int, Int]
       var k = 0
       while k < segmentSpans.length do
