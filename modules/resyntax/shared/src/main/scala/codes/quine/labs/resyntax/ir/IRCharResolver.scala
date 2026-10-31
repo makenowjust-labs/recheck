@@ -394,6 +394,10 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
           case EscapeClassKind.NonNewline if dialect == Dialect.PCRE            =>
             ClassSet(CharSet.of(flags.lineTerminators.chars.toSeq*).restrict(mode).complement(mode))
           case kind => escapeClassSet(kind, flags, item.loc)
+      case value: ClassItemData.ClassValue
+          if dialect == Dialect.Ruby && mode == UnitMode.CodePoint &&
+            isRubyByteValue(value) =>
+        throw new IRBuildingException("Invalid multibyte escape", item.loc)
       case value: ClassItemData.ClassValue => ClassSet(closeChars(valueUnits(value, flags, item.loc), flags))
 
   /** Evaluates a union, with Perl's case commands (e.g. `[\Ua]`) and Ruby's byte escapes (e.g. `[\xC3\xA9]`). */
@@ -424,15 +428,42 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
           val lits = bytes.map: b =>
             val ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, value)) = b.data: @unchecked
             Lit(value, false, Some(style), flags, b.loc)
+          // Bytes of a character continued into a range endpoint (e.g. `[\xC3\xA0-\xC3\xA9]`) are not modeled.
+          if rangeByteAt(items, i - 1, begin = false) || rangeByteAt(items, i + bytes.length, begin = true) then
+            throw new NotModeledException
           val decoded = mergeRubyBytesInClass(lits)
           result = result.union(ClassSet(closeChars(decoded.map(_.value), flags)))
           i += decoded.map(l => if l.value >= 0x80 then utf8Length(l.value) else 1).sum
+        case ClassItemData.ClassRange(begin, end)
+            if dialect == Dialect.Ruby && mode == UnitMode.CodePoint &&
+              (isRubyByteValue(begin.data) || isRubyByteValue(end.data)) =>
+          // Onigmo rejects a byte escape endpoint unless it is in a multibyte character with its neighbors.
+          val beginOk =
+            !isRubyByteValue(begin.data) || utf8Length(begin.data.value) == 0 && isRubyByteItem(items, i - 1)
+          val endOk = !isRubyByteValue(end.data) || utf8Length(end.data.value) >= 2 && isRubyByteItem(items, i + 1)
+          if !(beginOk && endOk) then throw new IRBuildingException("Invalid multibyte escape", item.loc)
+          throw new NotModeledException
         case _ =>
           val itemFlags = pending.fold(flags)(k => flags.copy(caseCommands = k :: flags.caseCommands))
           if pending.nonEmpty && isCaseTarget(item) then pending = None
           result = result.union(classItem(item, itemFlags))
           i += 1
     result
+
+  private def isRubyByteItem(items: Seq[ClassItem], i: Int): Boolean =
+    items
+      .lift(i)
+      .exists:
+        case ClassItem.Value(value, _) => isRubyByteValue(value)
+        case _                         => false
+
+  /** Checks whether the item is a range whose begin (or end) is a Ruby byte escape. */
+  private def rangeByteAt(items: Seq[ClassItem], i: Int, begin: Boolean): Boolean =
+    items
+      .lift(i)
+      .exists(_.data match
+        case ClassItemData.ClassRange(b, e) => isRubyByteValue(if begin then b.data else e.data)
+        case _                              => false)
 
   private def isCaseTarget(item: ClassItem): Boolean = item.data match
     case _: ClassItemData.ClassValue | _: ClassItemData.ClassRange => true
@@ -468,8 +499,9 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   ): ClassSet =
     val b = valueUnits(begin, flags, loc)
     val e = valueUnits(end, flags, loc)
+    // A range alone in a class has no neighbors to make a multibyte character with its byte escape.
     if dialect == Dialect.Ruby && mode == UnitMode.CodePoint && Seq(begin, end).exists(isRubyByteValue) then
-      throw new NotModeledException
+      throw new IRBuildingException("Invalid multibyte escape", loc)
     // In byte mode, the bytes of a non-ASCII literal around `-` are separate members and the range is between bytes.
     if b.last > e.head then throw new IRBuildingException("Range out of order in character class", loc)
     val eq = equivalence(flags)

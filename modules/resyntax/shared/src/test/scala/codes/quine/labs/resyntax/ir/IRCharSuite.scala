@@ -107,6 +107,10 @@ class IRCharSuite extends munit.FunSuite:
   chars("\\xC3\\xA9", "", Ruby)(of("é"))
   chars("[\\xC3\\xA9]", "", Ruby)(of("é"))
   error("\\xC3", "", Ruby)("Invalid multibyte escape at 0")
+  error("[\\xFF]", "", Ruby)("Invalid multibyte escape at 1")
+  error("[\\x00-\\xFF]", "", Ruby)("Invalid multibyte escape at 1")
+  error("[a\\xA1-\\uFFFF]", "", Ruby)("Invalid multibyte escape at 2")
+  unsupported("[\\xC3\\xA0-\\xC3\\xA9]", "", Ruby)
   chars("\\xC3", "n", Ruby)(CharSet.single(0xc3))
   // Perl's case commands.
   chars("\\Ua", "", Perl)(of("A"))
