@@ -283,7 +283,7 @@ object IRBuilder:
     val self = node.data match
       case NodeData.Literal(value)                     => isSupplementary(value)
       case NodeData.Class(_, item)                     => hasSupplementary(item)
-      case NodeData.Command(CommandKind.Comment(text)) => text.codePoints.anyMatch(isSupplementary)
+      case NodeData.Command(CommandKind.Comment(text)) => UString.fromString(text).iterator.exists(isSupplementary)
       case _                                           => false
     NodeKey.children(node).map(lastSupplementary).foldLeft(if self then node.loc.start else -1)(_.max(_))
 

@@ -1,8 +1,8 @@
 package codes.quine.labs.resyntax.ir
 
 import codes.quine.labs.resyntax.ast.AssertKind
-import codes.quine.labs.resyntax.ast.BacktrackControlKind
 import codes.quine.labs.resyntax.ast.BackslashKind
+import codes.quine.labs.resyntax.ast.BacktrackControlKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.EscapeClassKind
