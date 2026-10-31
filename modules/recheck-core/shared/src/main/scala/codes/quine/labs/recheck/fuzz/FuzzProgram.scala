@@ -14,10 +14,10 @@ import codes.quine.labs.resyntax.charset.UString
 /** FuzzProgram is a program wrapper for fuzzing. */
 final case class FuzzProgram(program: Program, alphabet: PatternAlphabet, parts: Set[UString]):
 
-  /** Whether or not it uses acceleration of VM execution. */
+  /** Whether or not it uses acceleration of VM execution, which the verbs skipping backtracking points prevent. */
   def usesAcceleration(mode: AccelerationMode): Boolean = mode match
-    case AccelerationMode.Auto => !program.meta.hasRef
-    case AccelerationMode.On   => true
+    case AccelerationMode.Auto => !program.meta.hasRef && !program.meta.hasVerb
+    case AccelerationMode.On   => !program.meta.hasVerb
     case AccelerationMode.Off  => false
 
 object FuzzProgram:
