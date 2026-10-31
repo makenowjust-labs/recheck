@@ -104,7 +104,7 @@ tester.run("no-vulnerable", rule, {
       errors: [
         {
           message:
-            "Error on ReDoS vulnerability check: parsing failure (at 1) (invalid)",
+            "Error on ReDoS vulnerability check: Unclosed group at 1 (invalid)",
         },
       ],
     },
