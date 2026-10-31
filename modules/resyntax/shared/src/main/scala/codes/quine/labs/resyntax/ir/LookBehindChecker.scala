@@ -55,7 +55,16 @@ private[ir] final class LookBehindChecker(
       }
     case NodeData.Repeat(node, quantifier) =>
       val (min, max) = bounds(quantifier)
-      width(node, visiting).map(w => Width(mul(w.min, min), if w.max == 0 then 0 else mul(w.max, max)))
+      // PCRE takes an unbounded repeat as unbounded even with a zero-width node (e.g. `(?<=(?:)*)`), except a look-ahead.
+      val zeroWidthIsBounded = featureSet.lookBehindRule != IRLookBehindRule.PCRE || (node.data match
+        case NodeData.Group(_: GroupKind.PositiveLookAhead | _: GroupKind.NegativeLookAhead, _) => true
+        case _                                                                                  => false)
+      width(node, visiting).map: w =>
+        val maxWidth =
+          if w.max != 0 then mul(w.max, max)
+          else if max == Inf && !zeroWidthIsBounded then Inf
+          else 0
+        Width(mul(w.min, min), maxWidth)
     case NodeData.Group(kind, node) =>
       kind match
         case _: GroupKind.LookAround | _: GroupKind.NonAtomicPositiveLookAhead |
@@ -71,7 +80,16 @@ private[ir] final class LookBehindChecker(
         case CommandKind.BranchReset(nodes)   => widthOfAlternatives(nodes, visiting)
         case CommandKind.PBackReference(name) =>
           backReferenceWidth(node, Reference.NamedReference(name), visiting)
-        case _ => None
+        // PCRE accepts `(?<=(?(1)a{300}))(a)`, so its rule for a conditional is unknown here.
+        case CommandKind.Conditional(_, yes, no) if featureSet.lookBehindRule != IRLookBehindRule.PCRE =>
+          widthOfAlternatives(yes +: no.toSeq, visiting).map(w => if no.isEmpty then w.copy(min = 0) else w)
+        case CommandKind.RCall            => Some(Width(0, Inf))
+        case CommandKind.IndexedCall(0)   => Some(Width(0, Inf))
+        case CommandKind.IndexedCall(n)   => callWidth(node, Reference.IndexedReference(n), visiting)
+        case CommandKind.RelativeCall(n)  => callWidth(node, Reference.RelativeReference(n), visiting)
+        case CommandKind.NamedCall(name)  => callWidth(node, Reference.NamedReference(name), visiting)
+        case CommandKind.PNamedCall(name) => callWidth(node, Reference.NamedReference(name), visiting)
+        case _                            => None
     case NodeData.Caret | NodeData.Dollar                          => Some(Width(0, 0))
     case NodeData.Dot | NodeData.Class(_, _) | NodeData.Literal(_) => Some(Width(1, 1))
     case NodeData.Backslash(kind)                                  =>
@@ -80,7 +98,8 @@ private[ir] final class LookBehindChecker(
         case BackslashKind.EscapeClass(EscapeClassKind.GraphemeCluster)     => Some(Width(1, Inf))
         case _: BackslashKind.BackslashValue | _: BackslashKind.EscapeClass => Some(Width(1, 1))
         case BackslashKind.EscapeBackReference(_, ref)                      => backReferenceWidth(node, ref, visiting)
-        case _: BackslashKind.EscapeCall                                    => None
+        case BackslashKind.EscapeCall(_, Reference.IndexedReference(0))     => Some(Width(0, Inf))
+        case BackslashKind.EscapeCall(_, ref)                               => callWidth(node, ref, visiting)
         case _: BackslashKind.Assert | _: BackslashKind.CaseCommand         => Some(Width(0, 0))
 
   private def widthOfAlternatives(nodes: Seq[Node], visiting: Set[Int]): Option[Width] =
@@ -94,14 +113,28 @@ private[ir] final class LookBehindChecker(
     ref match
       case _: Reference.LeveledReference => None
       case ref                           =>
-        val indices = resolver.backReference(ref, table.siteOf(node), node.loc)
-        if indices.isEmpty || indices.exists(visiting.contains) then Some(Width(0, Inf))
-        else
-          val widths = for index <- indices; group <- table.groups.getOrElse(index, Seq.empty) yield group.data match
-            case NodeData.Group(_, child) => width(child, visiting + index)
-            case _                        => None
-          if widths.exists(_.isEmpty) || widths.isEmpty then None
-          else Some(widths.flatten.reduce(union))
+        val site = table.siteOf(node)
+        val indices = resolver.backReference(ref, site, node.loc)
+        // A reference to a group enclosing it, to more than one group, or to a group in a branch reset is unbounded in
+        // PCRE (e.g. `(a(?<=\1))` and `(?|(a))(?<!\1)`).
+        if indices.isEmpty || indices.size > 1 || indices.exists(i => site.open.contains(i) || table.inBranchReset(i))
+        then Some(Width(0, Inf))
+        else groupWidth(indices, visiting)
+
+  // PCRE and Perl use the width of the called groups, where a recursion is unbounded.
+  private def callWidth(node: Node, ref: Reference, visiting: Set[Int]): Option[Width] =
+    val site = table.siteOf(node)
+    val indices = resolver.call(ref, site, node.loc)
+    if indices.exists(site.open.contains) then Some(Width(0, Inf)) else groupWidth(indices, visiting)
+
+  private def groupWidth(indices: Seq[Int], visiting: Set[Int]): Option[Width] =
+    if indices.exists(visiting.contains) then return Some(Width(0, Inf))
+    val widths = for index <- indices; group <- groupsOf(index) yield group.data match
+      case NodeData.Group(_, child) => width(child, visiting + index)
+      case _                        => None
+    if widths.isEmpty || widths.exists(_.isEmpty) then None else Some(widths.flatten.reduce(union))
+
+  private def groupsOf(index: Int): Seq[Node] = table.groups.getOrElse(index, Seq.empty)
 
   /** Checks Onigmo's restriction: each top-level alternative has a fixed length, and some nodes are forbidden. */
   private def ruby(body: Node, negative: Boolean): Boolean =

@@ -49,6 +49,10 @@ final case class IRFeatureSet(
     checksIndexedRecursionTest: Boolean,
     // PCRE, Perl
     rejectsCutInLookAround: Boolean,
+    // Ruby
+    rejectsCallToSharedName: Boolean,
+    // Perl
+    countsRelativeReferenceInSourceOrder: Boolean,
     // .NET, JavaScript: Unrestricted, Java: Java, PCRE: PCRE, Perl: Perl, Python: Python, Ruby: Ruby
     lookBehindRule: IRLookBehindRule,
     // JavaScript (with `y`), PCRE (with `A`)
@@ -161,6 +165,10 @@ object IRFeatureSet:
       checksIndexedRecursionTest = isPCRE,
       // PCRE, Perl
       rejectsCutInLookAround = isPCRE || isPerl,
+      // Ruby
+      rejectsCallToSharedName = isRuby,
+      // Perl
+      countsRelativeReferenceInSourceOrder = isPerl,
       // .NET, JavaScript: Unrestricted, Java: Java, PCRE: PCRE, Perl: Perl, Python: Python, Ruby: Ruby
       lookBehindRule = dialect match
         case Dialect.DotNet | Dialect.JavaScript => IRLookBehindRule.Unrestricted

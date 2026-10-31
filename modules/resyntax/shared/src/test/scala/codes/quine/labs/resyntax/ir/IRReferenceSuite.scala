@@ -68,6 +68,10 @@ class IRReferenceSuite extends IRSuiteBase:
   resolve("(a)(b\\k<-1>)", "", Ruby)(2)
   // Perl's relative reference in a branch reset never matches (e.g. `^(?|(a)|(b)\g{-1})$` on `bb`), unlike PCRE.
   resolve("(?|(a)|(b)\\g{-1})", "", PCRE)(1)
+  // Perl counts relative references in the source order, even in a branch reset.
+  resolve("(?|(a)|\\g{-1}b)", "", Perl)(1)
+  resolve("(?|(a)|(b)|\\g{-2}c)", "", Perl)(1)
+  error("(?|(a)|\\g{-1}b)", "", PCRE)("Reference to non-existent group at 7")
   error("\\g{-1}", "", PCRE, Perl)("Reference to non-existent group at 0")
   error("(a)\\g{-2}", "", PCRE, Perl)("Reference to non-existent group at 3")
   error("\\g{+1}", "", PCRE)("Reference to non-existent group at 0")
@@ -108,6 +112,10 @@ class IRReferenceSuite extends IRSuiteBase:
   error("(a)\\g<2>", "", PCRE, Ruby)("Reference to non-existent group at 3")
   error("\\g<-1>(a)", "", PCRE, Ruby)("Reference to non-existent group at 0")
   error("\\g<+1>", "", PCRE, Ruby)("Reference to non-existent group at 0")
+  // Ruby rejects a call to a name shared by groups, but PCRE calls the first one.
+  error("(?<x>a)(?<x>b)\\g<x>", "", Ruby)("Call to a name shared by groups at 14")
+  checkPattern("(?J)(?<x>a)(?<x>b)(?&x)", "", PCRE)(pattern => assertEquals(pattern.captureCount, 2))
+  checkPattern("(?<x>a)(?<x>b)(?&x)", "", Perl)(pattern => assertEquals(pattern.captureCount, 2))
   check("(?0)", "", PCRE, Perl)(Unsupported(NodeData.Command(CommandKind.IndexedCall(0))))
   check("\\g<x>(?<x>a)", "", Ruby)(
     Sequence(
@@ -131,6 +139,10 @@ class IRReferenceSuite extends IRSuiteBase:
   checkPattern("(?(+1)a)(b)", "", PCRE)(pattern => assertEquals(pattern.captureCount, 1))
   checkPattern("(?(<x>)a)(?<x>b)", "", PCRE, Perl)(pattern => assertEquals(pattern.captureCount, 1))
   checkPattern("(?P<x>(?(x)a))", "", Python)(pattern => assertEquals(pattern.captureCount, 1))
+  // Python checks a test in a look-behind like a back-reference.
+  error("(?<=(?(1)a|b))(a)", "", Python)("Reference to an open group at 4")
+  error("((?<=(?(1)a|b)))", "", Python)("Reference to an open group at 5")
+  checkPattern("(a)(?<=(?(1)a|b))", "", Python)(pattern => assertEquals(pattern.captureCount, 1))
   // .NET reads `(?(x)...)` as a look-ahead test when `x` is not a group.
   checkPattern("(?(x)a)", "", DotNet)(pattern => assertEquals(pattern.captureCount, 0))
 

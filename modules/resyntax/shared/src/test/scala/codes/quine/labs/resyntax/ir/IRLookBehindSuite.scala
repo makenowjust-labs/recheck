@@ -20,6 +20,8 @@ class IRLookBehindSuite extends IRSuiteBase:
   valid("(?<=a{255})", Python)
   valid("(?<=a{65535}b)", Python)
   valid("(?<=(?:ab|cd){2})", Python)
+  valid("(a)(?<=(?(1)a|b))", Python)
+  error("(a)(?<=(?(1)a|bc))", "", Python)("Look-behind requires fixed-width pattern at 3")
   valid("(a)(?<=\\1)", Python)
   valid("(?<=(?=ab+)a)", Python)
   valid("(?<=(?!a+)b)", Python)
@@ -57,6 +59,13 @@ class IRLookBehindSuite extends IRSuiteBase:
   error("(?<=\\X)", "", Perl)("Look-behind longer than 255 at 0")
   error("(?<=(?<=a+)b)", "", Perl)("Look-behind longer than 255 at 4")
   error("(?(?<=a+)b|c)", "", Perl)("Look-behind longer than 255 at 0")
+  // Perl uses the width of a called group and of the branches of a conditional.
+  valid("(?<=(?1))(a)", Perl)
+  valid("(a)(?<=(?1))", Perl)
+  valid("(?<=(?(1)a|bc))(a)", Perl)
+  error("(?<=(?R))", "", Perl)("Look-behind longer than 255 at 0")
+  error("(?<x>(?<=(?1)))", "", Perl)("Look-behind longer than 255 at 5")
+  error("(?<=(?(1)a{300}))(a)", "", Perl)("Look-behind longer than 255 at 0")
 
   // PCRE requires each top-level branch to be bounded, and at most 255 long if its length varies.
   valid("(?<=a|bc)", PCRE)
@@ -72,6 +81,14 @@ class IRLookBehindSuite extends IRSuiteBase:
   valid("(a)(?<=\\1)", PCRE)
   valid("(a|bc)(?<=\\1)", PCRE)
   valid("(?<=\\1)(a)", PCRE)
+  error("(a(?<=\\1))", "", PCRE)("Look-behind is not limited at 2")
+  error("(?<x>(?<!a\\k<x>))", "", PCRE)("Look-behind is not limited at 5")
+  error("(?|(a))(?<!\\1)", "", PCRE)("Look-behind is not limited at 7")
+  error("(?|(a)|(b))(?<!\\1)", "", PCRE)("Look-behind is not limited at 11")
+  valid("(a)(?<!(?1))", PCRE)
+  valid("(?<!(?1))(a)", PCRE)
+  valid("(?<=(?(1)a{300}))(a)", PCRE)
+  error("(a+)(?<!(?1))", "", PCRE)("Look-behind is not limited at 4")
   error("(?<=a+)", "", PCRE)("Look-behind is not limited at 0")
   error("(a+)(?<=\\1)", "", PCRE)("Look-behind is not limited at 4")
   error("(?<=\\X)", "", PCRE)("Look-behind is not limited at 0")
@@ -82,6 +99,14 @@ class IRLookBehindSuite extends IRSuiteBase:
   error("(?<=a{0,200}a{0,56})", "", PCRE)("Look-behind branch is too long at 0")
   error("(?<=a{65535}b)", "", PCRE)("Look-behind is too long at 0")
   error("(?<*a+)", "", PCRE)("Look-behind is not limited at 0")
+  // PCRE takes an unbounded repeat of a zero-width node as unbounded, except a look-ahead.
+  valid("(?<=(?=a)*)", PCRE)
+  valid("(?<=(?:){0,256})", PCRE)
+  valid("(?<=(?<!.){2})", PCRE)
+  error("(?<=(?:)*)", "", PCRE)("Look-behind is not limited at 0")
+  error("(?<=(?<!.)*)", "", PCRE)("Look-behind is not limited at 0")
+  error("(?<=(?<x>$)+)", "", PCRE)("Look-behind is not limited at 0")
+  valid("(?<=(?:)*)", Perl, Python, Java)
   error("(?(?<=a+)b|c)", "", PCRE)("Look-behind is not limited at 0")
 
   // Ruby requires a fixed length of each top-level alternative, and forbids some nodes.

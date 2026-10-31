@@ -20,12 +20,15 @@ import codes.quine.labs.resyntax.ast.NodeData
   *   the names of the groups opened before the node
   * @param lookBehindFrom
   *   the first index of the groups in the outermost look-behind enclosing the node
+  * @param openedInOrder
+  *   the indices of the groups opened before the node in the source order, which a branch reset does not rewind
   */
 private[ir] final case class ReferenceSite(
     opened: Int,
     open: Set[Int],
     namesBefore: Set[String],
-    lookBehindFrom: Option[Int]
+    lookBehindFrom: Option[Int],
+    openedInOrder: Vector[Int]
 )
 
 /** CaptureTable is the capture numbering of a pattern.
@@ -36,6 +39,8 @@ private[ir] final case class ReferenceSite(
   *   the defined indices, which can be sparse in .NET
   * @param names
   *   the indices of each name
+  * @param inBranchReset
+  *   the indices of the groups in a branch reset
   */
 private[ir] final class CaptureTable(
     indices: Map[NodeKey, Int],
@@ -43,7 +48,8 @@ private[ir] final class CaptureTable(
     val count: Int,
     val defined: Set[Int],
     val names: Map[String, Seq[Int]],
-    val groups: Map[Int, Seq[Node]]
+    val groups: Map[Int, Seq[Node]],
+    val inBranchReset: Set[Int]
 ):
 
   /** Returns the index of the capture group node, or `None` if the node does not capture. */
@@ -67,6 +73,8 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
 
   private var lookBehindFrom: Option[Int] = None
 
+  private var openedInOrder: Vector[Int] = Vector.empty
+
   private val indices = mutable.Map.empty[NodeKey, Int]
 
   private val sites = mutable.Map.empty[NodeKey, ReferenceSite]
@@ -81,6 +89,10 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
   /** The indices that .NET's unnamed and numbered groups use. */
   private val usedIndices = mutable.Set.empty[Int]
 
+  private val inBranchReset = mutable.Set.empty[Int]
+
+  private var branchResetDepth: Int = 0
+
   private val capturesUnnamed: Boolean =
     !(featureSet.ignoresUnnamedCaptureWithNamedCapture && NodeKey.exists(root)(_.data match
       case NodeData.Group(_: GroupKind.NamedCapture | _: GroupKind.PNamedCapture, _) => true
@@ -93,7 +105,7 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
     val count = if allIndices.isEmpty then 0 else allIndices.max
     val defined = if featureSet.numbersNamedCaptureLast then allIndices else (1 to count).toSet
     val groups = indices.toSeq.groupMap(_._2)(_._1.node)
-    new CaptureTable(indices.toMap, sites.toMap, count, defined, nameIndices.toMap, groups)
+    new CaptureTable(indices.toMap, sites.toMap, count, defined, nameIndices.toMap, groups, inBranchReset.toSet)
 
   private def walk(node: Node): Unit = node.data match
     case NodeData.Disjunction(nodes) => nodes.foreach(walk)
@@ -141,11 +153,13 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
     case CommandKind.BranchReset(nodes) =>
       val start = next
       var end = next
+      branchResetDepth += 1
       scoped:
         for node <- nodes do
           next = start
           walk(node)
           end = math.max(end, next)
+      branchResetDepth -= 1
       next = end
     case CommandKind.Conditional(test, yes, no) =>
       markSite(node)
@@ -187,6 +201,8 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
 
   private def capture(node: Node, index: Int, child: Node): Unit =
     indices(NodeKey(node)) = index
+    openedInOrder :+= index
+    if branchResetDepth > 0 then inBranchReset.add(index)
     scoped:
       open += index
       walk(child)
@@ -214,7 +230,7 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
     for (node, name) <- pendingNames do indices(NodeKey(node)) = assigned(name)
 
   private def markSite(node: Node): Unit =
-    sites(NodeKey(node)) = ReferenceSite(next - 1, open, namesBefore, lookBehindFrom)
+    sites(NodeKey(node)) = ReferenceSite(next - 1, open, namesBefore, lookBehindFrom, openedInOrder)
 
   private def lookBehind(body: => Unit): Unit =
     val saved = lookBehindFrom

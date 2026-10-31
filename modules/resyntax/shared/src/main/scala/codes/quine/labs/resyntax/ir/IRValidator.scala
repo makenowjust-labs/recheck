@@ -61,7 +61,7 @@ private[ir] final class IRValidator(
       case NodeData.Backslash(BackslashKind.EscapeBackReference(_, ref)) =>
         backReferences(NodeKey(node)) = resolver.backReference(ref, table.siteOf(node), node.loc)
       case NodeData.Backslash(BackslashKind.EscapeCall(_, ref)) =>
-        resolver.call(ref, table.siteOf(node), node.loc)
+        resolver.call(ref, table.siteOf(node), node.loc, isCall = true)
       case NodeData.Backslash(BackslashKind.Assert(AssertKind.Cut)) =>
         if inLookAround && featureSet.rejectsCutInLookAround then
           throw new IRBuildingException("\\K is not allowed in a look-around", node.loc)
@@ -69,9 +69,11 @@ private[ir] final class IRValidator(
 
   private def walkTest(node: Node, test: ConditionalTest): Unit = test match
     case ConditionalTest.Indexed(n) =>
-      if featureSet.checksIndexedCaptureTest then resolver.index(n, node.loc)
-    case ConditionalTest.Relative(n)         => resolver.relative(n, table.siteOf(node), node.loc)
-    case ConditionalTest.Named(_, name)      => resolver.groupName(name, table.siteOf(node), node.loc)
+      if featureSet.checksIndexedCaptureTest then
+        resolver.test(resolver.index(n, node.loc), table.siteOf(node), node.loc)
+    case ConditionalTest.Relative(n)    => resolver.relative(n, table.siteOf(node), node.loc)
+    case ConditionalTest.Named(_, name) =>
+      resolver.test(resolver.groupName(name, table.siteOf(node), node.loc), table.siteOf(node), node.loc)
     case ConditionalTest.Referenced(_, ref)  => resolver.backReference(ref, table.siteOf(node), node.loc)
     case ConditionalTest.IndexedRecursion(n) =>
       if featureSet.checksIndexedRecursionTest then resolver.index(n, node.loc)

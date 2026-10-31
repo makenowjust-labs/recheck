@@ -53,6 +53,11 @@ private[ir] final class ReferenceResolver(table: CaptureTable, dialect: Dialect,
 
   /** Resolves a relative reference (e.g. `\g{-1}`), where `-1` is the last group opened before the reference. */
   def relative(n: Int, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
+    // Perl counts the groups in the source order even in a branch reset (e.g. `(?|(a)|\g{-1}b)` is valid).
+    if featureSet.countsRelativeReferenceInSourceOrder && n < 0 then
+      return site.openedInOrder.lift(site.openedInOrder.size + n) match
+        case Some(index) => Seq(index)
+        case None        => fail("Reference to non-existent group", loc)
     val index = if n < 0 then site.opened + n + 1 else site.opened + n
     if index >= 1 && table.defined.contains(index) then Seq(index) else fail("Reference to non-existent group", loc)
 
@@ -62,6 +67,21 @@ private[ir] final class ReferenceResolver(table: CaptureTable, dialect: Dialect,
     case Reference.NamedReference(name)     => calledName(name, loc)
     case Reference.RelativeReference(n)     => relative(n, site, loc)
     case Reference.LeveledReference(ref, _) => call(ref, site, loc)
+
+  /** Resolves a conditional test, which Python checks like a back-reference only in a look-behind. */
+  def test(indices: => Seq[Int], site: ReferenceSite, loc: SourceLocation): Seq[Int] =
+    val resolved = indices
+    if featureSet.requiresClosedGroupReference && site.lookBehindFrom.isDefined then
+      if resolved.exists(_ > site.opened) then fail("Reference to an open group", loc)
+      checkClosed(resolved, site, loc)
+    else resolved
+
+  /** Resolves a call, where Ruby rejects a name shared by groups. */
+  def call(ref: Reference, site: ReferenceSite, loc: SourceLocation, isCall: Boolean): Seq[Int] =
+    val indices = call(ref, site, loc)
+    if isCall && featureSet.rejectsCallToSharedName && indices.size > 1 then
+      fail("Call to a name shared by groups", loc)
+    indices
 
   // Python rejects a reference to a group that is not closed, or that is in the same look-behind.
   private def checkClosed(indices: Seq[Int], site: ReferenceSite, loc: SourceLocation): Seq[Int] =
