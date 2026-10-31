@@ -38,8 +38,12 @@ export function checkAllSync(
   params?: Parameters,
 ): Diagnostics[];
 
-export type { Parameters } from "./parameters";
-export type { Dialect, DialectParameter, DialectSettings } from "./dialect";
+export type {
+  Dialect,
+  DialectParameter,
+  DialectSettings,
+  Parameters,
+} from "./parameters";
 
 /**
  * HasAbortSignal is a mix-in type for having `signal` field.

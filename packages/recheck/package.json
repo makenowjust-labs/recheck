@@ -52,7 +52,6 @@
     "index.d.mts",
     "index.d.ts",
     "index.mjs",
-    "dialect.d.ts",
     "lib",
     "parameters.d.ts"
   ],
