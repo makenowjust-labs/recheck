@@ -9,6 +9,7 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
+import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminators
 
 class InstSuite extends munit.FunSuite:
@@ -67,7 +68,10 @@ class InstSuite extends munit.FunSuite:
   test("Inst.AssertKind#toString"):
     assertEquals(AssertKind.WordBoundary(Word).toString, "word_boundary")
     assertEquals(AssertKind.WordBoundaryNot(Word).toString, "word_boundary_not")
-    assertEquals(AssertKind.LineBegin(IRLineTerminators.JavaScript, true).toString, "line_begin")
+    assertEquals(
+      AssertKind.LineBegin(IRLineTerminators.JavaScript, IRLineBeginAtEnd.AfterTerminator).toString,
+      "line_begin"
+    )
     assertEquals(AssertKind.LineEnd(IRLineTerminators.JavaScript).toString, "line_end")
     assertEquals(AssertKind.InputBegin.toString, "input_begin")
     assertEquals(AssertKind.InputEnd.toString, "input_end")

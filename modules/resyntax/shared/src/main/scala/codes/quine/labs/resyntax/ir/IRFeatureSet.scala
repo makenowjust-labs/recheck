@@ -13,8 +13,8 @@ final case class IRFeatureSet(
     dollarIsChompTextEnd: Boolean,
     // Python
     upperEndIsTextEnd: Boolean,
-    // .NET, JavaScript, Python
-    lineBeginMatchesAfterFinalTerminator: Boolean,
+    // .NET, JavaScript, Python: AfterTerminator, Java: Never, the others: InputBegin
+    lineBeginAtEnd: IRLineBeginAtEnd,
     // JavaScript: LineTerminator, Java: six characters with atomic `\r\n`, PCRE: `(*CR)` and so on, the others: `\n`
     lineTerminators: IRLineTerminators,
     // Java
@@ -125,8 +125,11 @@ object IRFeatureSet:
       dollarIsChompTextEnd = isDotNet || isJava || isPCRE && !flagSet.dollarEndOnly || isPerl || isPython || isRuby,
       // Python
       upperEndIsTextEnd = isPython,
-      // .NET, JavaScript, Python
-      lineBeginMatchesAfterFinalTerminator = isDotNet || isJavaScript || isPython,
+      // .NET, JavaScript, Python: AfterTerminator, Java: Never, the others: InputBegin
+      lineBeginAtEnd =
+        if isDotNet || isJavaScript || isPython then IRLineBeginAtEnd.AfterTerminator
+        else if isJava then IRLineBeginAtEnd.Never
+        else IRLineBeginAtEnd.InputBegin,
       // JavaScript: LineTerminator, Java: six characters with atomic `\r\n`, PCRE: `(*CR)` and so on, the others: `\n`
       lineTerminators =
         if isJavaScript then IRLineTerminators.JavaScript

@@ -263,7 +263,7 @@ private[vm] class ProgramBuilder(
   def assertKind(kind: IRAssertKind): AssertKind = kind match
     case IRAssertKind.WordBoundary(word)    => AssertKind.WordBoundary(word)
     case IRAssertKind.NotWordBoundary(word) => AssertKind.WordBoundaryNot(word)
-    case IRAssertKind.LineBegin(t, after)   => AssertKind.LineBegin(t, after)
+    case IRAssertKind.LineBegin(t, atEnd)   => AssertKind.LineBegin(t, atEnd)
     case IRAssertKind.LineEnd(t)            => AssertKind.LineEnd(t)
     case IRAssertKind.TextBegin             => AssertKind.InputBegin
     case IRAssertKind.TextEnd               => AssertKind.InputEnd

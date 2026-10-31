@@ -21,6 +21,7 @@ import codes.quine.labs.recheck.vm.Interpreter.Status
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
+import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminators
 
 /** Interpreter executes a program on a input. */
@@ -376,9 +377,13 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
             frame.previousChar.exists(word.contains) != frame.currentChar.exists(word.contains)
           case AssertKind.WordBoundaryNot(word) =>
             frame.previousChar.exists(word.contains) == frame.currentChar.exists(word.contains)
-          case AssertKind.LineBegin(terminators, matchesAfterFinalTerminator) =>
-            frame.pos == 0 ||
-            (afterTerminator(frame.pos, terminators) && (matchesAfterFinalTerminator || frame.pos != input.length))
+          case AssertKind.LineBegin(terminators, atEnd) =>
+            if frame.pos == input.length then
+              atEnd match
+                case IRLineBeginAtEnd.AfterTerminator => frame.pos == 0 || afterTerminator(frame.pos, terminators)
+                case IRLineBeginAtEnd.InputBegin      => frame.pos == 0
+                case IRLineBeginAtEnd.Never           => false
+            else frame.pos == 0 || afterTerminator(frame.pos, terminators)
           case AssertKind.LineEnd(terminators) =>
             frame.pos == input.length || beforeTerminator(frame.pos, terminators).isDefined
           case AssertKind.InputBegin =>

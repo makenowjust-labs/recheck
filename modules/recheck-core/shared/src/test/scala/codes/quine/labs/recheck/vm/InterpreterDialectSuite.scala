@@ -1,5 +1,6 @@
 package codes.quine.labs.recheck.vm
 
+import codes.quine.labs.recheck.LineAssertionCases
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.regexp.ParsedPattern
@@ -90,6 +91,10 @@ class InterpreterDialectSuite extends munit.FunSuite:
     accepts("(?m)a$", Java, "a\r\n")
     accepts("(*CRLF)(?m)a$", PCRE, "a\r\nb")
     refutes("(*CRLF)(?m)a$", PCRE, "a\nb")
+
+  test("Interpreter.run: line assertions at line terminators and the ends of the input"):
+    for c <- LineAssertionCases.cases; dialect <- c.dialects do
+      accepts(c.source, dialect, c.input, c.flags, c.matches.contains(dialect))
 
   test("Interpreter.run: word boundaries"):
     accepts("^é\\b", Python, "é")

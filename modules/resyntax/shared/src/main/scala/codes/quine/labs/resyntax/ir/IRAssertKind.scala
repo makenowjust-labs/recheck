@@ -9,10 +9,10 @@ object IRAssertKind:
 
   /** LineBegin is a line begin assertion.
     *
-    * @param matchesAfterFinalTerminator
-    *   whether it matches after a line terminator at the end of the input
+    * @param atEnd
+    *   where it matches at the end of the input
     */
-  final case class LineBegin(terminators: IRLineTerminators, matchesAfterFinalTerminator: Boolean) extends IRAssertKind
+  final case class LineBegin(terminators: IRLineTerminators, atEnd: IRLineBeginAtEnd) extends IRAssertKind
 
   /** LineEnd is a line end assertion. */
   final case class LineEnd(terminators: IRLineTerminators) extends IRAssertKind
@@ -31,3 +31,17 @@ object IRAssertKind:
 
   /** NotWordBoundary is a non-word-boundary assertion with the word set. */
   final case class NotWordBoundary(word: CharSet) extends IRAssertKind
+
+/** IRLineBeginAtEnd is where a line begin assertion matches at the end of the input. */
+sealed abstract class IRLineBeginAtEnd extends Product with Serializable
+
+object IRLineBeginAtEnd:
+
+  /** AfterTerminator matches there after a line terminator too, as elsewhere (.NET, JavaScript, Python). */
+  case object AfterTerminator extends IRLineBeginAtEnd
+
+  /** InputBegin matches there only at the begin of the input, i.e. in the empty input (PCRE, Perl, Ruby). */
+  case object InputBegin extends IRLineBeginAtEnd
+
+  /** Never matches there, even in the empty input (Java). */
+  case object Never extends IRLineBeginAtEnd

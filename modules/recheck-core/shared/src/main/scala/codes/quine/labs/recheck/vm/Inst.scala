@@ -7,6 +7,7 @@ import codes.quine.labs.recheck.regexp.Location
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
+import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminators
 
 /** Inst is an instruction. */
@@ -152,10 +153,10 @@ object Inst:
 
     /** `^` assertion with `m` flag.
       *
-      * @param matchesAfterFinalTerminator
-      *   whether it matches after a line terminator at the end of the input
+      * @param atEnd
+      *   where it matches at the end of the input
       */
-    final case class LineBegin(terminators: IRLineTerminators, matchesAfterFinalTerminator: Boolean) extends AssertKind:
+    final case class LineBegin(terminators: IRLineTerminators, atEnd: IRLineBeginAtEnd) extends AssertKind:
       override def toString: String = "line_begin"
 
     /** `$` assertion with `m` flag. */
