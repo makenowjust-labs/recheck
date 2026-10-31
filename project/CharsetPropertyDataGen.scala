@@ -247,17 +247,16 @@ object CharsetPropertyDataGen extends UnicodeDataGen {
 
     sb.append("\n")
     for ((name, prop) <- IntProperties) {
-      val max = UCharacter.getIntPropertyMaxValue(prop)
-      val rs = runs(c => UCharacter.getIntPropertyValue(c, prop))
+      val (values, rs) = intProperty(prop)
       val used = rs.map(_._2).toSet
       // Canonical_Combining_Class values are also named by their numbers (e.g. `230` for `Above`).
       def names(v: Int): Seq[String] = {
-        val ns = valueNames(prop, v)
+        val ns = values(v)
         if (prop != UProperty.CANONICAL_COMBINING_CLASS) ns
         else if (ns.head.isEmpty) Seq(v.toString, "")
         else ns :+ v.toString
       }
-      val kept = (0 to max).filter(v => used(v) || valueNames(prop, v).head.nonEmpty)
+      val kept = values.indices.filter(v => used(v) || values(v).head.nonEmpty)
       val dense = kept.zipWithIndex.toMap
       enumerated(sb, name, propertyNames(prop), kept.map(names), rs.map { case (n, v) => (n, dense(v)) })
     }
