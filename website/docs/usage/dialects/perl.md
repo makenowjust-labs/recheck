@@ -49,12 +49,14 @@ await check("^(a|a)*$", "", {
 ## Syntax
 
 - `\p{...}` has the enumerated properties of the Unicode data, such as `Line_Break`, `East_Asian_Width`, `Grapheme_Cluster_Break`, `Word_Break`, `Canonical_Combining_Class` (also by numbers, e.g. `\p{Ccc=230}`) and `Identifier_Type`.
-- `\p{Numeric_Value=...}` takes a reduced fraction (e.g. `1/2`), or a decimal number matching an integer value exactly or a fraction to 4 significant digits (e.g. `0.3333` for `1/3`), as Perl does.
+- `\p{Numeric_Value=...}` takes a value as Perl does.
+  A fraction is reduced (e.g. `2/4` is `1/2`), and a fraction of an integer value is an error (e.g. `6/2`).
+  A decimal number (also with a sign, an exponent or `_`, e.g. `-0.5`, `5e-1` and `1_000`) matches an integer value exactly (e.g. `3.0`, but `3.00001` is an error), and a fraction when both are rounded to 4 significant digits (e.g. `0.3333` and `0.33334` are `1/3`, but `0.333` and `0.3334` are errors).
 - A look-behind counts the folding of a character under `i` by whether the pattern itself is UTF-8 on compiling: a `string` pattern with `utf8`, a `literal` pattern having a non-ASCII character with `utf8`, or a pattern switching to the Unicode rules (e.g. `(?i)(?<=(?:\xDF){255})` is valid in an ASCII literal).
 
 The following constructs are not supported.
 
-- Embedded code (e.g. `(?{ ... })` and `(??{ ... })`) and user-defined properties (e.g. `\p{IsFoo}`) are reported as `unsupported`.
+- Embedded code (e.g. `(?{ ... })` and `(??{ ... })`), user-defined properties (e.g. `\p{IsFoo}`) and property wildcards (e.g. `\p{gc=/^L/}`) are reported as `unsupported`.
 - Extended bracketed character classes (`(?[ ... ])`) are not supported yet, and they are reported as `invalid`.
 
 ## Approximations
