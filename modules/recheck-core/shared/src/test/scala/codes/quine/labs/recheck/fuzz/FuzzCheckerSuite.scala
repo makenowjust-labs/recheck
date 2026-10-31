@@ -1,11 +1,15 @@
 package codes.quine.labs.recheck
 package fuzz
 
+import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.util.Random
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.diagnostics.AttackComplexity
+import codes.quine.labs.recheck.diagnostics.Hotspot
+import codes.quine.labs.recheck.fuzz.FuzzChecker.Trace
 import codes.quine.labs.recheck.regexp.ParsedPattern
 
 class FuzzCheckerSuite extends munit.FunSuite:
@@ -105,3 +109,41 @@ class FuzzCheckerSuite extends munit.FunSuite:
         )
         .nextOption()
       result.get.isEmpty
+
+  test("FuzzChecker#Population#toGeneration: failed strings rank last"):
+    import Parameters.*
+    val pattern = ParsedPattern.parse("^(a|a)*$", "").toTry.get
+    val failed = (c: AttackComplexity.Vulnerable, _: Hotspot) => c == AttackComplexity.Exponential(true)
+    val checker = new FuzzChecker(
+      pattern,
+      FuzzProgram.from(pattern).get,
+      random0,
+      DefaultSeeder,
+      DefaultMaxSimpleRepeatCount,
+      DefaultSeedingLimit,
+      DefaultSeedingTimeout,
+      DefaultIncubationLimit,
+      DefaultIncubationTimeout,
+      DefaultMaxGeneStringSize,
+      DefaultAttackLimit,
+      DefaultAttackTimeout,
+      DefaultCrossoverSize,
+      DefaultMutationSize,
+      DefaultMaxAttackStringSize,
+      DefaultMaxInitialGenerationSize,
+      2,
+      DefaultMaxIteration,
+      DefaultMaxDegree,
+      DefaultHeatRatio,
+      DefaultAccelerationMode,
+      failed
+    )
+    val strs = Seq(1, 2, 3).map(n => FString(n, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a'))))
+    val traces = strs.zip(Seq(3.0, 2.0, 1.0)).map((s, rate) => Trace(s, rate, 0, Set.empty))
+    val pop = new checker.Population(0, mutable.Set.from(traces), mutable.Set.empty)
+    checker.attacks(strs(0)) = List((AttackComplexity.Exponential(true), Hotspot.empty))
+    checker.attacks(strs(1)) = List((AttackComplexity.Polynomial(2, true), Hotspot.empty))
+    assertEquals(pop.toGeneration.traces.map(_.str), IndexedSeq(strs(1), strs(2)))
+    // A failed string remains when the generation has room.
+    val all = new checker.Population(0, mutable.Set.from(traces.take(1)), mutable.Set.empty)
+    assertEquals(all.toGeneration.traces.map(_.str), IndexedSeq(strs(0)))

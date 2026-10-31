@@ -94,7 +94,6 @@ describe("paramsOf", () => {
     expect(names).toContain("perlSource");
     expect(names).toContain("encoding");
     expect(names).toContain("perlUtf8");
-    expect(names).not.toContain("recallCommand");
     expect(params.find(({ name }) => name === "attackTimeout")?.type).toBe(
       "duration",
     );

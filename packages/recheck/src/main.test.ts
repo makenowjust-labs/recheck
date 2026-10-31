@@ -167,24 +167,26 @@ test("checkSync: invalid", () => {
   );
 });
 
-// A runtime command whose recall validation always finishes, so that every attack fails.
-const finishing = [
-  "sh",
-  "-c",
-  "echo recheck:runtime fake; echo recheck:start; echo recheck:time 0",
-  "sh",
-];
+// A runtime command line whose recall validation always finishes, so that every attack fails.
+const finishing =
+  "sh -c 'echo recheck:runtime fake; echo recheck:start; echo recheck:time 0' sh";
 
 test("checkAll: java", async () => {
   backend.mockReturnValueOnce("java");
+  // Jest's `process.env` does not reach child processes, so `env` sets the variable.
   javaEnsure.mockImplementationOnce(() =>
-    agent.start("java", ["-jar", RECHECK_JAR, "agent"]),
+    agent.start("env", [
+      `RECHECK_NODE=${finishing}`,
+      "java",
+      "-jar",
+      RECHECK_JAR,
+      "agent",
+    ]),
   );
 
   const diagnostics = await main.checkAll("^(a|a)*$", "", {
     checker: "automaton",
     recallTimeout: 1000,
-    recallCommand: finishing,
   });
   expect(diagnostics.map((d) => d.status)).toEqual(["vulnerable", "safe"]);
   expect(diagnostics[0]).toMatchObject({

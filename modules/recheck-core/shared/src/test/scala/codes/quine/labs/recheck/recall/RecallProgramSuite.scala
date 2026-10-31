@@ -105,66 +105,32 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.generate: Java"):
     val program = generate("f\"oo\\d\r", "iU", Dialect.Java)
-    assertEquals(program.command, Command("java", Seq("--source", "17", "/dev/stdin")))
-    assertEquals(
-      program.script,
-      """|import java.util.regex.Pattern;
-         |
-         |class Recall {
-         |  public static void main(String[] args) {
-         |    System.out.println("recheck:runtime java " + Runtime.version());
-         |    Pattern pattern = Pattern.compile("f\"oo\\d\r", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS);
-         |    String input = "x" + "y".repeat(2) + "z";
-         |    System.out.println("recheck:start");
-         |    System.out.flush();
-         |    long start = System.nanoTime();
-         |    try {
-         |      pattern.matcher(input).find();
-         |    } catch (StackOverflowError | OutOfMemoryError e) {
-         |      System.out.println("recheck:engine-error " + e.getClass().getSimpleName());
-         |      return;
-         |    }
-         |    System.out.println("recheck:time " + (System.nanoTime() - start) / 1000000);
-         |  }
-         |}
-         |""".stripMargin
-    )
-    val astral = AttackPattern(Seq((UString.empty, UString.fromString("😀"), 0)), UString.empty, 2)
-    assertEquals(
-      line(generate("x", "", Dialect.Java, astral), "    String"),
-      "    String input = \"\\ud83d\\ude00\".repeat(2);"
-    )
+    assertEquals(program.command, Command("java", Seq("--source", "17"), source = Some(RecallProgram.JavaSource)))
+    assertEquals(program.script, "iU\n00660022006f006f005c0064000d\n1:0078\n2:0079\n1:007a\n")
+    assert(RecallProgram.JavaSource.content.contains("catch (StackOverflowError | OutOfMemoryError e)"))
 
   test("RecallProgram.generate: .NET"):
     val program = generate("foo", "in", Dialect.DotNet)
     assertEquals(
       program.command,
-      Command("dotnet", Seq("run", "-"), Map("DOTNET_NOLOGO" -> "1", "DOTNET_CLI_TELEMETRY_OPTOUT" -> "1"))
+      Command(
+        "dotnet",
+        Seq("run"),
+        Map("DOTNET_NOLOGO" -> "1", "DOTNET_CLI_TELEMETRY_OPTOUT" -> "1"),
+        Some(RecallProgram.DotNetSource)
+      )
     )
-    assertEquals(
-      program.script,
-      """|using System;
-         |using System.Diagnostics;
-         |using System.Linq;
-         |using System.Text.RegularExpressions;
-         |
-         |Console.WriteLine("recheck:runtime .NET " + Environment.Version);
-         |var regex = new Regex("foo", RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture);
-         |var input = "x" + string.Concat(Enumerable.Repeat("y", 2)) + "z";
-         |Console.WriteLine("recheck:start");
-         |var stopwatch = Stopwatch.StartNew();
-         |try
-         |{
-         |    regex.Match(input);
-         |}
-         |catch (Exception e) when (e is OutOfMemoryException or InsufficientExecutionStackException)
-         |{
-         |    Console.WriteLine("recheck:engine-error " + e.GetType().Name);
-         |    return;
-         |}
-         |Console.WriteLine("recheck:time " + stopwatch.ElapsedMilliseconds);
-         |""".stripMargin
-    )
+    assertEquals(program.script, "in\n0066006f006f\n1:0078\n2:0079\n1:007a\n")
+
+  test("RecallProgram.data"):
+    def data(source: String, flags: String, attack: AttackPattern): String =
+      RecallProgram.data(flags, ParsedPattern.parse(source, "", Dialect.Java).toTry.get, attack)
+    val astral = AttackPattern(Seq((UString.empty, UString.fromString("😀"), 0)), UString.empty, 2)
+    assertEquals(data("😀", "", astral), "-\nd83dde00\n2:d83dde00\n")
+    assertEquals(data("", "", AttackPattern(Seq.empty, UString.empty, 0)), "-\n-\n")
+    // A negative repeat count is zero.
+    val negative = AttackPattern(Seq((UString.empty, UString.fromString("a"), -3)), UString.empty, 2)
+    assertEquals(data("a", "i", negative), "i\n0061\n0:0061\n")
 
   test("RecallProgram.generate: Perl"):
     val program = generate("f/o$", "ix", Dialect.Perl)
@@ -241,7 +207,11 @@ class RecallProgramSuite extends munit.FunSuite:
          |$result = preg_match($regex, $input);
          |$time = intdiv(hrtime(true) - $start, 1000000);
          |if ($result === false) {
-         |  if (in_array(preg_last_error(), [PREG_BACKTRACK_LIMIT_ERROR, PREG_RECURSION_LIMIT_ERROR, PREG_JIT_STACKLIMIT_ERROR], true)) {
+         |  if (preg_last_error() === PREG_BACKTRACK_LIMIT_ERROR) {
+         |    echo "recheck:engine-limit ", preg_last_error_msg(), "\n";
+         |    exit(0);
+         |  }
+         |  if (in_array(preg_last_error(), [PREG_RECURSION_LIMIT_ERROR, PREG_JIT_STACKLIMIT_ERROR], true)) {
          |    echo "recheck:engine-error ", preg_last_error_msg(), "\n";
          |    exit(0);
          |  }
@@ -263,15 +233,13 @@ class RecallProgramSuite extends munit.FunSuite:
     // It falls back to a control character for the delimiter.
     assertEquals(line(generate("/#~!%@;,|=:", "", Dialect.PCRE), "$regex"), "$regex = \"\\x01/#~!%@;,|=:\\x01\";")
 
+  test("RecallProgram.RuntimeVariables"):
+    val dialects =
+      Set[Dialect](Dialect.JavaScript, Dialect.Python, Dialect.Ruby, Dialect.Java, Dialect.DotNet, Dialect.Perl)
+    assertEquals(RecallProgram.RuntimeVariables.keySet, dialects + Dialect.PCRE)
+    assertEquals(RecallProgram.RuntimeVariables(Dialect.PCRE), "RECHECK_PHP")
+
   test("RecallProgram.generate: empty attack string"):
     val empty = AttackPattern(Seq.empty, UString.empty, 0)
     assertEquals(line(generate("a", "", Dialect.Python, empty), "string"), "string = ''")
     assertEquals(line(generate("a", "", Dialect.PCRE, empty), "$input"), "$input = \"\";")
-
-  test("RecallProgram#withRuntime"):
-    val program = RecallProgram(Command("dotnet", Seq("run", "-"), Map("A" -> "1")), "script")
-    assertEquals(
-      program.withRuntime(Seq("/opt/dotnet/dotnet", "--roll-forward")),
-      RecallProgram(Command("/opt/dotnet/dotnet", Seq("--roll-forward", "run", "-"), Map("A" -> "1")), "script")
-    )
-    intercept[IllegalArgumentException](program.withRuntime(Seq.empty))

@@ -22,6 +22,7 @@ Known that already, `Diagnostics` has three statuses.
 - `safe` means the given regular expression seems safe at least in this checking.
 - `vulnerable` means vulnerability in the given regular expression is found.
 - `unknown` means something wrong happened in checking (timeout, cancel, or error). It has the `error` field to describe the reason for this result.
+  Its `kind` is one of `timeout`, `cancel`, `unsupported`, `invalid`, `recall-failure-limit` (see [Recall Validation](#recall-validation)) and `unexpected`.
 
 ## Complexity
 
@@ -63,11 +64,15 @@ It is `null` if the recall validation is not run: [`recallTimeout`](parameters.m
 - `result` is the result of the matching. Its `kind` is one of the following.
   - `finish` means the matching finished in `time` milliseconds, so the attack is not effective there.
   - `timeout` means the matching did not finish in time.
-  - `engine-error` means the engine gave up with a resource error (e.g. PHP's backtrack limit or Java's `StackOverflowError`), which also shows that the attack is effective. It has `message`.
-- `succeeded` is whether the attack is effective on the engine (`timeout` or `engine-error`).
+  - `engine-limit` means the engine stopped on its limit of the matching steps (PHP's backtrack limit), which also shows that the attack is effective. It has `message`.
+  - `engine-error` means the engine gave up with an error on the stack depth or the memory (e.g. Java's `StackOverflowError` or JavaScript's `RangeError`). It has `message`.
+    Such an error may happen on a long string even if the matching takes linear time (e.g. V8 raises it for `/^(?:a|b)*$/` on 10,000,000 characters), so the attack is not considered effective.
+- `succeeded` is whether the attack is effective on the engine (`timeout` or `engine-limit`).
 
 When the recall validation fails, the check does not report the diagnostics, and it goes on to look for another attack string.
 If no attack succeeds, the result is `safe`.
+An attack string with the same complexity and hotspot as a failed one is skipped without the recall validation.
+When the recall validation fails [`maxRecallFailures`](parameters.mdx#maxrecallfailures) times, the check stops, and the result is `unknown` with the `recall-failure-limit` error.
 `checkAll` (`ReDoS.checkAll` in Scala) returns the failed diagnostics too, followed by the reported one.
 
 ## Hotspot

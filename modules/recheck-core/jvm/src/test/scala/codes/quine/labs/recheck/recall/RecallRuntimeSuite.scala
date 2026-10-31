@@ -1,7 +1,11 @@
 package codes.quine.labs.recheck.recall
 
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.Paths
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration.*
 
 import codes.quine.labs.recheck.ReDoS
@@ -9,6 +13,7 @@ import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.TimeoutException
+import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.RecallResult
@@ -47,10 +52,25 @@ class RecallRuntimeSuite extends munit.FunSuite:
       flags: String,
       dialect: Dialect,
       attack: AttackPattern,
-      timeout: Duration = 1.second
+      timeout: Duration = 1.second,
+      env: Map[String, String] = Map.empty
   ): RecallValidation =
     val pattern = ParsedPattern.parse(source, flags, dialect).toTry.get
-    RecallValidator.validate(pattern, attack, timeout)(RecallValidator.defaultExec.get).get
+    RecallValidator.validate(pattern, attack, timeout, env = env)(RecallValidator.defaultExec.get).get
+
+  /** Returns the path of the program in `PATH`. */
+  def which(program: String): Path =
+    sys.env("PATH").split(java.io.File.pathSeparatorChar).map(Paths.get(_, program)).find(Files.isExecutable).get
+
+  /** Creates a shell script in a new directory with a space in its name. */
+  def script(name: String, body: String): Path =
+    val dir = Files.createTempDirectory("recheck runtime ")
+    val file = dir.resolve(name)
+    Files.writeString(file, s"#!/bin/sh\n$body\n")
+    file.toFile.setExecutable(true)
+    file.toFile.deleteOnExit()
+    dir.toFile.deleteOnExit()
+    file
 
   /** Defines a test running only when the program is available. */
   def runtimeTest(name: String, program: String)(body: => Unit)(using munit.Location): Unit =
@@ -67,6 +87,10 @@ class RecallRuntimeSuite extends munit.FunSuite:
     assertEquals(r.result, RecallResult.Timeout)
     assert(clue(r.runtime).startsWith("node v"))
     assertFinish(validate("^(a|a)*$", "", Dialect.JavaScript, attack("a", 3, "\u0000")))
+    // V8 overflows its backtracking stack even on a linear matching.
+    val overflow = validate("^(?:a|b)*$", "", Dialect.JavaScript, attack("a", 10_000_000, "!"), 10.seconds)
+    assertEquals(overflow.result, RecallResult.EngineError("Maximum call stack size exceeded"))
+    assert(!overflow.succeeded)
 
   runtimeTest("Python", "python3"):
     // Python 3.15 doubles its time for each `a`.
@@ -87,17 +111,22 @@ class RecallRuntimeSuite extends munit.FunSuite:
     val r = validate("^(a|a)*$", "", Dialect.Java, attack("a", 31, "\u0000"))
     assertFinish(r)
     assert(clue(r.runtime).startsWith("java "))
-    // `java.util.regex` recurses on each iteration of a group.
-    assertEquals(
-      validate("^(?:a|b)*$", "", Dialect.Java, attack("a", 100000, "!")).result,
-      RecallResult.EngineError("StackOverflowError")
-    )
+    // `java.util.regex` recurses on each iteration of a group, which is not an effective attack.
+    val overflow = validate("^(?:a|b)*$", "", Dialect.Java, attack("a", 100000, "!"))
+    assertEquals(overflow.result, RecallResult.EngineError("StackOverflowError"))
+    assert(!overflow.succeeded)
+    // The data of the program keeps a character out of the BMP.
+    val astral = AttackPattern(Seq((UString.empty, UString.fromString("😀"), 0)), UString.fromString("!"), 3)
+    assertFinish(validate("^(?:😀)*!$", "", Dialect.Java, astral))
 
   runtimeTest(".NET", "dotnet"):
     // The first run of `dotnet run -` builds the program, which takes some seconds.
     val r = validate("^(a|a)*$", "", Dialect.DotNet, attack("a", 31, "\u0000"))
     assertFinish(r)
     assert(clue(r.runtime).startsWith(".NET "))
+    // The runs share the program, which the first run builds.
+    val rs = (1 to 4).map(_ => Future(validate("^(a|a)*$", "i", Dialect.DotNet, attack("A", 3, "\u0000"), 10.seconds)))
+    Await.result(Future.sequence(rs), 60.seconds).foreach(assertFinish)
 
   runtimeTest("Perl", "perl"):
     val r = validate("^(a|a)*$", "", Dialect.Perl, attack("é", 31, "\u0000"))
@@ -113,12 +142,12 @@ class RecallRuntimeSuite extends munit.FunSuite:
   runtimeTest("PCRE", "php"):
     // PHP's default `pcre.backtrack_limit` stops the match.
     val r = validate("^(?:é|é)*$", "", Dialect.PCRE, attack("Ã©", 31, "\u0000"))
-    assertEquals(r.result, RecallResult.EngineError("Backtrack limit exhausted"))
+    assertEquals(r.result, RecallResult.EngineLimit("Backtrack limit exhausted"))
     assert(r.succeeded)
     assert(clue(r.runtime).startsWith("php "))
     assertEquals(
       validate("^(?:é|é)*$", "u", Dialect.PCRE, attack("é", 31, "\u0000")).result,
-      RecallResult.EngineError("Backtrack limit exhausted")
+      RecallResult.EngineLimit("Backtrack limit exhausted")
     )
     assertFinish(validate("^(?:é|é)*$", "u", Dialect.PCRE, attack("é", 3, "\u0000")))
 
@@ -140,25 +169,43 @@ class RecallRuntimeSuite extends munit.FunSuite:
   runtimeTest("ReDoS.checkAll: PCRE", "php"):
     ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.PCRE)) match
       case List(d: Diagnostics.Vulnerable) =>
-        assertEquals(d.recallValidation.map(_.result), Some(RecallResult.EngineError("Backtrack limit exhausted")))
+        assertEquals(d.recallValidation.map(_.result), Some(RecallResult.EngineLimit("Backtrack limit exhausted")))
       case ds => fail(s"unexpected: $ds")
 
-  runtimeTest("ReDoS.check: recallCommand", "node"):
-    val node = sys.env("PATH").split(java.io.File.pathSeparatorChar).map(Paths.get(_, "node")).find(Files.isExecutable)
-    val wrapper = Seq("sh", "-c", "echo recheck:runtime wrapped; exec \"$@\"", "sh", node.get.toString)
-    ReDoS.check("^(a|a)*$", "", params.copy(recallCommand = Some(wrapper))) match
-      case d: Diagnostics.Vulnerable =>
-        assertEquals(d.recallValidation, Some(RecallValidation("wrapped", 1.second, RecallResult.Timeout)))
-      case d => fail(s"unexpected: $d")
-    assertEquals(
-      ReDoS.check("^(a|a)*$", "", params.copy(recallCommand = Some(Seq("sh", "-c", "exit 3")))),
-      Diagnostics.Unknown(
-        "^(a|a)*$",
-        "",
-        Diagnostics.ErrorKind.Unexpected("`sh -c exit 3 -` exited with 3"),
-        Some(Checker.Automaton)
-      )
+  runtimeTest("RECHECK_RUBY", "ruby"):
+    // The wrapper's runtime line comes first, and it shows the arguments.
+    val ruby = script("my ruby", s"echo recheck:runtime wrapped \"$$@\"; exec '${which("ruby")}' \"$$@\"")
+    val env = Map("RECHECK_RUBY" -> s"'$ruby' --disable-gems")
+    val r = validate("^(a|a)*$", "", Dialect.Ruby, attack("a", 3, "\u0000"), env = env)
+    assertEquals(r.runtime, "wrapped --disable-gems -")
+    assertFinish(r)
+
+  test("RECHECK_JAVA: a fake runtime"):
+    // A fake runtime reads the data of the program, and gets the path of the program as the last argument.
+    val java = script(
+      "fake java",
+      """|cat > /dev/null
+         |eval "file=\${$#}"
+         |test -f "$file" || exit 2
+         |echo "recheck:runtime fake $1 $2"
+         |echo recheck:start
+         |echo recheck:engine-error StackOverflowError""".stripMargin
     )
+    val r = validate("a", "", Dialect.Java, attack("a", 3, ""), env = Map("RECHECK_JAVA" -> s"\"$java\""))
+    assertEquals(r, RecallValidation("fake --source 17", 1.second, RecallResult.EngineError("StackOverflowError")))
+    interceptMessage[UnexpectedException]("`sh -c 'exit 3' --source 17 RecheckRecall.java` exited with 3"):
+      validate("a", "", Dialect.Java, attack("a", 3, ""), env = Map("RECHECK_JAVA" -> "sh -c 'exit 3'"))
+
+  test("ReDoS.iterator: environment variables"):
+    val node = script("node", "echo recheck:runtime fake; echo recheck:start; echo recheck:time 0")
+    val ds = ReDoS
+      .iterator("^(a|a)*$", "", params.copy(checker = Checker.Automaton), None, env = Map("RECHECK_NODE" -> s"'$node'"))
+      .toList
+    assertEquals(
+      ds.collect { case d: Diagnostics.Vulnerable => d.recallValidation },
+      List(Some(RecallValidation("fake", 1.second, RecallResult.Finish(0.millis))))
+    )
+    assert(clue(ds.last).isInstanceOf[Diagnostics.Safe])
 
   test("RecallValidator.validate: the deadline of the context"):
     val pattern = ParsedPattern.parse("foo", "", Dialect.JavaScript).toTry.get

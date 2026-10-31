@@ -33,8 +33,17 @@ enum RecallResult:
   /** Timeout is a matching not finished in time. */
   case Timeout
 
-  /** EngineError is a matching that the engine gave up with a resource error, e.g. PHP's backtrack limit or Java's
+  /** EngineLimit is a matching that the engine stopped on its limit of the matching steps, e.g. PHP's backtrack limit.
+    *
+    * The engine counts the steps of backtracking, so reaching the limit shows that the attack is effective.
+    */
+  case EngineLimit(message: String)
+
+  /** EngineError is a matching that the engine gave up with an error on the stack depth or the memory, e.g. Java's
     * `StackOverflowError`.
+    *
+    * The engine may raise it for a long string even if the matching takes linear time, so the attack is not considered
+    * effective.
     */
   case EngineError(message: String)
 
@@ -42,9 +51,11 @@ enum RecallResult:
   def succeeded: Boolean = this match
     case Finish(_)      => false
     case Timeout        => true
-    case EngineError(_) => true
+    case EngineLimit(_) => true
+    case EngineError(_) => false
 
   override def toString: String = this match
     case Finish(time)         => s"finished in ${time.toMillis} ms"
     case Timeout              => "timed out"
+    case EngineLimit(message) => s"engine limit: $message"
     case EngineError(message) => s"engine error: $message"

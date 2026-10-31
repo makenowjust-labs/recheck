@@ -38,13 +38,8 @@ class MainSuite extends munit.FunSuite:
       )
     )
     assertEquals(
-      Main.command.parse(Seq("/foo/", "--recall-command=/opt/ruby/bin/ruby --disable-gems")),
-      Right(
-        Main.CheckAction(
-          InputPattern("foo", ""),
-          Parameters(recallCommand = Some(Seq("/opt/ruby/bin/ruby", "--disable-gems")))
-        )
-      )
+      Main.command.parse(Seq("/foo/", "--max-recall-failures=3")),
+      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(maxRecallFailures = 3)))
     )
     assertEquals(
       Main.command.parse(Seq("/foo/", "--max-degree=2", "--timeout=1s")),

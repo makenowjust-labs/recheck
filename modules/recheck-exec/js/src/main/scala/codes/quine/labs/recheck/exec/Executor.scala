@@ -11,6 +11,9 @@ object Executor:
   /** Whether this platform can run commands. */
   val isAvailable: Boolean = false
 
+  /** The shell to run a command line. */
+  val shell: String = "/bin/sh"
+
   /** Runs the command, which is not supported on Scala.js. */
   def exec(command: Command, script: String, timeout: Option[FiniteDuration], marker: Option[String] = None)(using
       ctx: Context

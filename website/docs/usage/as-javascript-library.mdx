@@ -119,6 +119,7 @@ See [this page](diagnostics.md) for detailed information on `Diagnostics` value.
 When the [recall validation](diagnostics.md#recall-validation) is enabled, an attack string that does not work on the real regex engine is not reported, and the check goes on to look for another one.
 `checkAll` returns these failed `vulnerable` diagnostics as well, followed by the `Diagnostics` that `check` returns.
 So its last element is always the result of `check`, and the list is longer than one only when a recall validation fails.
+An attack with the same complexity and hotspot as a failed one is skipped, and the check stops with `unknown` after [`maxRecallFailures`](parameters.mdx#maxrecallfailures) failures (see [Failed Recall Validation](dialects.md#failed-recall-validation)).
 
 ```tsx
 import { checkAll } from "recheck";

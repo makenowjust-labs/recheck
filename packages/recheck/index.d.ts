@@ -104,7 +104,7 @@ export type RecallValidation = {
   timeout: number | null;
   result: RecallResult;
   /**
-   * Whether the attack is effective on the engine.
+   * Whether the attack is effective on the engine (`timeout` or `engine-limit`).
    * The vulnerable diagnostics is accepted only if it is `true`.
    */
   succeeded: boolean;
@@ -115,11 +115,14 @@ export type RecallValidation = {
  *
  * - `finish`: The matching finished in `time` milliseconds, so the attack is not effective.
  * - `timeout`: The matching did not finish in time.
- * - `engine-error`: The engine gave up with a resource error, e.g. PHP's backtrack limit or Java's `StackOverflowError`.
+ * - `engine-limit`: The engine stopped on its limit of the matching steps, e.g. PHP's backtrack limit, so the attack is effective.
+ * - `engine-error`: The engine gave up with an error on the stack depth or the memory, e.g. Java's `StackOverflowError`.
+ *   It may happen on a long string even if the matching takes linear time, so the attack is not considered effective.
  */
 export type RecallResult =
   | { kind: "finish"; time: number }
   | { kind: "timeout" }
+  | { kind: "engine-limit"; message: string }
   | { kind: "engine-error"; message: string };
 
 /**
@@ -180,7 +183,8 @@ export type Hotspot = {
 /**
  * Error is a possible error on analyzing.
  */
-export type Error = Timeout | Cancel | Unsupported | Invalid | Unexpected;
+export type Error =
+  Timeout | Cancel | Unsupported | Invalid | RecallFailureLimit | Unexpected;
 
 /**
  * Timeout is a timeout error.
@@ -205,6 +209,11 @@ export type Invalid = {
   kind: "invalid";
   message: string;
 };
+/**
+ * RecallFailureLimit is an error reported when the recall validation fails `maxRecallFailures` times.
+ */
+export type RecallFailureLimit = { kind: "recall-failure-limit" };
+
 /**
  * Unexpected is an error reported when unexpected error occurs.
  */

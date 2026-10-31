@@ -146,65 +146,79 @@ await check("^(a|a)*$", "", { dialect: "ruby", recallTimeout: 1000 });
 ```
 
 For each attack string, `recheck` generates a small program in the dialect's language, and runs it with the command in the table below.
-The program is given on the standard input.
+The program is given on the standard input, except for `java` and `dotnet`.
 The timeout counts from the start of the matching, so the startup of the runtime (e.g. compiling the program) is not counted.
 
-| `dialect`    | Command                       | Matching                              | Engine errors                                                    |
-| ------------ | ----------------------------- | ------------------------------------- | ---------------------------------------------------------------- |
-| `javascript` | `node -`                      | `RegExp.prototype.exec`               | `RangeError`                                                     |
-| `python`     | `python3 -I -`                | `re.search`                           | `RecursionError`, `MemoryError`                                  |
-| `ruby`       | `ruby -`                      | `Regexp#match?` (no `Regexp.timeout`) | `RegexpError`, `NoMemoryError`, `SystemStackError`               |
-| `java`       | `java --source 17 /dev/stdin` | `Matcher#find`                        | `StackOverflowError`, `OutOfMemoryError`                         |
-| `dotnet`     | `dotnet run -`                | `Regex.Match`                         | `OutOfMemoryException`, `InsufficientExecutionStackException`    |
-| `perl`       | `perl -`                      | `=~`                                  | none                                                             |
-| `pcre`       | `php`                         | `preg_match`                          | the backtrack limit, the recursion limit and the JIT stack limit |
+| `dialect`    | Command                                            | Matching                              | Engine limits       | Engine errors                                                 |
+| ------------ | -------------------------------------------------- | ------------------------------------- | ------------------- | ------------------------------------------------------------- |
+| `javascript` | `node -`                                           | `RegExp.prototype.exec`               | none                | `RangeError`                                                  |
+| `python`     | `python3 -I -`                                     | `re.search`                           | none                | `RecursionError`, `MemoryError`                               |
+| `ruby`       | `ruby -`                                           | `Regexp#match?` (no `Regexp.timeout`) | none                | `RegexpError`, `NoMemoryError`, `SystemStackError`            |
+| `java`       | `java --source 17 <dir>/RecheckRecall-<hash>.java` | `Matcher#find`                        | none                | `StackOverflowError`, `OutOfMemoryError`                      |
+| `dotnet`     | `dotnet run <dir>/RecheckRecall-<hash>.cs`         | `Regex.Match`                         | none                | `OutOfMemoryException`, `InsufficientExecutionStackException` |
+| `perl`       | `perl -`                                           | `=~`                                  | none                | none                                                          |
+| `pcre`       | `php`                                              | `preg_match`                          | the backtrack limit | the recursion limit and the JIT stack limit                   |
 
-When the engine gives up with one of the engine errors, the attack is considered effective, so the recall validation succeeds as with a timeout.
-The result records it as `engine-error` (see [Diagnostics](diagnostics.md#recall-validation)).
+An engine limit is a limit on the number of the matching steps.
+When the engine stops on it, the attack is considered effective, so the recall validation succeeds as with a timeout.
+The result records it as `engine-limit`.
+
+An engine error is an error on the stack depth or the memory.
+The engines may raise it on a long string even if the matching takes linear time (e.g. V8 raises `RangeError` for `/^(?:a|b)*$/` on 10,000,000 characters), so it does not show that the attack is effective, and the recall validation fails.
+The result records it as `engine-error` with the message (see [Diagnostics](diagnostics.md#recall-validation)).
 
 Notes on each dialect:
 
-- `java` runs the program as a single-file source program, which needs a JDK (17 or later).
-  It reads the program from `/dev/stdin`, so it does not work on Windows.
-- `dotnet` needs the .NET 10 SDK for `dotnet run -`.
-  It compiles each program on the first run, and caches it.
+- `java` runs a fixed program as a single-file source program, which needs a JDK (17 or later).
+  The program reads the pattern and the attack string from the standard input.
+- `dotnet` needs the .NET 10 SDK for `dotnet run` of a file.
+  It runs a fixed program reading the pattern and the attack string from the standard input, so `dotnet` builds and caches the program only once.
 - `perl` puts the pattern into the program as a `qr` literal with the `literal` [`perlSource`](parameters.mdx#perlsource).
   When the literal would interpolate a variable or run code (e.g. `$name`, `@{...}` or `(?{ ... })`), the recall validation is skipped and `recallValidation` is `null`.
   With the `string` source, the program builds the pattern from a string as `qr/$pattern/`.
 - `pcre` runs with PHP's default settings of `pcre.backtrack_limit`, `pcre.recursion_limit` and `pcre.jit`, and the runtime name in the result shows them.
-  With the default limits, an exponential match usually ends with the backtrack limit error.
+  With the default limits, an exponential match usually ends with the backtrack limit.
+  `pcre.recursion_limit` is PCRE2's depth limit, so it is an engine error.
+
+`recheck` writes the programs of `java` and `dotnet` once into the directory `recheck-<user>` in the temporary directory of the JVM (`java.io.tmpdir`), and it keeps them there.
+The directory must be owned only by the user (`rwx------`).
+If it is not, or the file system has no POSIX permissions (e.g. on Windows), `recheck` uses a new temporary directory, which it deletes on exit.
 
 When the command cannot run (e.g. the runtime is not installed), the result is `unknown` with an `unexpected` error.
 
 ### Runtime Command
 
 By default, the command is found by its name in `PATH`.
-The [`recallCommand`](parameters.mdx#recallcommand) parameter replaces the runtime program with another command, given as the program and its arguments.
-`recheck` appends the dialect's own arguments to read the program from the standard input (e.g. `-` for `ruby`, `-I -` for `python3`, and `run -` for `dotnet`).
+An environment variable of each dialect replaces the runtime program with a command line.
 
-```tsx
-import { check } from "recheck";
+| `dialect`    | Environment variable |
+| ------------ | -------------------- |
+| `javascript` | `RECHECK_NODE`       |
+| `python`     | `RECHECK_PYTHON`     |
+| `ruby`       | `RECHECK_RUBY`       |
+| `java`       | `RECHECK_JAVA`       |
+| `dotnet`     | `RECHECK_DOTNET`     |
+| `perl`       | `RECHECK_PERL`       |
+| `pcre`       | `RECHECK_PHP`        |
 
-// Runs `/opt/ruby-4.0/bin/ruby -`.
-await check("^(a|a)*$", "", {
-  dialect: "ruby",
-  recallTimeout: 1000,
-  recallCommand: ["/opt/ruby-4.0/bin/ruby"],
-});
-
-// Runs `docker run -i --rm ruby:4.0 ruby -`.
-await check("^(a|a)*$", "", {
-  dialect: "ruby",
-  recallTimeout: 1000,
-  recallCommand: ["docker", "run", "-i", "--rm", "ruby:4.0", "ruby"],
-});
-```
-
-The CLI takes the command as one string separated by spaces.
+The value is a command line run by `/bin/sh -c`, and `recheck` appends the dialect's own arguments to it (e.g. `-` for `ruby`, `-I -` for `python3`, and `run` and the program file for `dotnet`).
+So the shell splits the value on spaces, and a path with spaces needs quotes.
+An empty value is ignored.
 
 ```bash
-recheck --dialect=ruby --recall-timeout=1s --recall-command='/opt/ruby-4.0/bin/ruby --disable-gems' '/^(a|a)*$/'
+# Runs `/opt/ruby-4.0/bin/ruby --disable-gems -`.
+RECHECK_RUBY='/opt/ruby-4.0/bin/ruby --disable-gems' recheck --dialect=ruby --recall-timeout=1s '/^(a|a)*$/'
+
+# A path with spaces.
+RECHECK_RUBY='"/Applications/My Ruby/bin/ruby" --disable-gems' recheck --dialect=ruby --recall-timeout=1s '/^(a|a)*$/'
+
+# Runs Ruby in a container, which reads the program from the standard input.
+RECHECK_RUBY='docker run -i --rm ruby:4.0 ruby' recheck --dialect=ruby --recall-timeout=1s '/^(a|a)*$/'
 ```
+
+The JavaScript library and the ESLint plugin pass their environment to the `recheck` process, so the variables work there too.
+The command of `java` and `dotnet` must be able to read the program file in the temporary directory, so a container needs the directory mounted at the same path.
+On Windows, the variables need `sh` in `PATH` (e.g. from Git for Windows), and `recheck` has not been tested there.
 
 ### Failed Recall Validation
 
@@ -212,3 +226,10 @@ When the recall validation fails, `check` does not report the diagnostics, and i
 If no attack succeeds, the result is `safe`.
 `checkAll` returns the diagnostics whose recall validation failed too, followed by the reported one.
 This shows that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by the found attacks.
+
+The search avoids repeating a failed attack.
+
+- An attack with the same complexity (the type and the degree) and the same hotspot (the heat spots) as a failed one is skipped without running the recall validation, and it is not in the list of `checkAll`.
+- The fuzz checker gives the strings whose attacks failed a lower priority in the next generation, so that it looks into other structures of the pattern.
+- When the recall validation fails [`maxRecallFailures`](parameters.mdx#maxrecallfailures) times (10 by default), the checking stops, and the last diagnostics is `unknown` with the `recall-failure-limit` error.
+  So the list of `checkAll` has at most `maxRecallFailures + 1` diagnostics.
