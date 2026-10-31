@@ -109,39 +109,8 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]):
     val suffix = UStringUtil.fromCodePoints(str.result())
     AttackPattern(pumps.result(), suffix, n)
 
-  /** Returns the string representation of this string. */
-  def toString(style: AttackPattern.Style): String =
-    if seq.isEmpty then return "''"
-
-    val parts = Seq.newBuilder[String]
-
-    val str = IndexedSeq.newBuilder[Int]
-    var pos = 0
-
-    while pos < seq.size do
-      seq(pos) match
-        case Wrap(u) =>
-          pos += 1
-          str.addOne(u)
-        case Repeat(m, size) =>
-          pos += 1
-          val repeat = n + m
-          if repeat > 1 then
-            val s = UStringUtil.fromCodePoints(str.result())
-            str.clear()
-            if s.nonEmpty then parts.addOne(UStringUtil.show(s))
-            val part = seq
-              .slice(pos, pos + size)
-              .map:
-                case Wrap(u)      => u
-                case Repeat(_, _) => throw new IllegalArgumentException
-            parts.addOne(s"${UStringUtil.show(UStringUtil.fromCodePoints(part))}${style.repeat(repeat)}")
-            pos += size
-
-    val s = UStringUtil.fromCodePoints(str.result())
-    if s.nonEmpty then parts.addOne(UStringUtil.show(s))
-
-    parts.result().mkString(style.join)
+  /** Returns the string representation of this string in the style. */
+  def toString(style: AttackPattern.Style): String = toAttackPattern.toString(style)
 
   override def toString: String = toString(AttackPattern.JavaScript)
 
