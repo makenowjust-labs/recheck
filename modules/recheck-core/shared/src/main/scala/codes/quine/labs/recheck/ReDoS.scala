@@ -16,6 +16,7 @@ import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.ReDoSException
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
+import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.fuzz.FuzzChecker
@@ -165,7 +166,7 @@ object ReDoS:
 
     complexities.map:
       case vul: Complexity.Vulnerable[Int] =>
-        val attack = vul.buildAttackPattern(recallLimit, maxRecallStringSize)
+        val attack = vul.buildAttackPattern(recallLimit, maxRecallStringSize).copy(style = attackStyle(pattern))
         Diagnostics.Vulnerable(source, flags, vul.toAttackComplexity, attack, vul.hotspot, Checker.Automaton)
       case safe: Complexity.Safe => Diagnostics.Safe(source, flags, safe.toAttackComplexity, Checker.Automaton)
     ++ Iterator(Diagnostics.Safe(source, flags, AttackComplexity.Safe(false), Checker.Automaton))
@@ -213,7 +214,8 @@ object ReDoS:
 
     results.map:
       case (complexity, attack, hotspot) =>
-        val recallAttack = attack.adjust(complexity, recallLimit, maxRecallStringSize)
+        val recallAttack =
+          attack.adjust(complexity, recallLimit, maxRecallStringSize).copy(style = attackStyle(pattern))
         Diagnostics.Vulnerable(source, flags, complexity, recallAttack, hotspot, Checker.Fuzz)
     ++ Iterator(Diagnostics.Safe(source, flags, AttackComplexity.Safe(true), Checker.Fuzz))
 
@@ -227,6 +229,10 @@ object ReDoS:
   )(using ctx: Context): Iterator[Diagnostics] =
     recovering(checkAutomaton(source, flags, pattern, params)):
       case _: UnsupportedException => checkFuzz(source, flags, pattern, params, failed)
+
+  /** Returns the style of the attack strings of the pattern, which is the host language of its dialect. */
+  private[recheck] def attackStyle(pattern: ParsedPattern): AttackPattern.Style =
+    AttackPattern.Style.of(pattern.dialect, pattern.ir.mode)
 
   /** Runs recall validation against a vulnerable diagnostics, and records the result in it.
     *

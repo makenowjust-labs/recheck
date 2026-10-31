@@ -18,6 +18,7 @@ import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.recheck.recall.RecallValidator
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.util.UStringUtil
+import codes.quine.labs.resyntax.ast.Dialect
 
 class ReDoSSuite extends munit.FunSuite:
 
@@ -175,6 +176,23 @@ class ReDoSSuite extends munit.FunSuite:
       ReDoS.RecallKey(AttackComplexity.Polynomial(2, false), hotspot),
       ReDoS.RecallKey(AttackComplexity.Polynomial(3, false), hotspot)
     )
+
+  test("ReDoS.attackStyle"):
+    def attack(dialect: Dialect, flags: String, checker: Checker = Checker.Automaton): String =
+      val pattern = ParsedPattern.parse("^(?:a|a)*$", flags, dialect).toTry.get
+      val params = Parameters(checker = checker, dialect = dialect, randomSeed = 0)
+      val ds = if checker == Checker.Automaton then ReDoS.checkAutomaton("^(?:a|a)*$", flags, pattern, params)
+      else ReDoS.checkFuzz("^(?:a|a)*$", flags, pattern, params)
+      ds.next().asInstanceOf[Diagnostics.Vulnerable].attack.toString
+    assertEquals(attack(Dialect.JavaScript, ""), "'a'.repeat(31) + '\\x00'")
+    assertEquals(attack(Dialect.Python, ""), "'a' * 31 + '\\x00'")
+    assertEquals(attack(Dialect.Python, "b"), "b'a' * 31 + b'\\x00'")
+    assertEquals(attack(Dialect.Ruby, "n"), "\"a\".b + \"a\".b * 31 + \"\\x00\".b")
+    assertEquals(attack(Dialect.Java, ""), "\"a\".repeat(31) + \"\\u0000\"")
+    assertEquals(attack(Dialect.DotNet, ""), "new string('a', 31) + \"\\u0000\"")
+    assertEquals(attack(Dialect.Perl, ""), "\"a\" x 31 . \"\\x00\"")
+    assertEquals(attack(Dialect.PCRE, ""), "str_repeat('a', 31) . \"\\x00\"")
+    assert(clue(attack(Dialect.Python, "", Checker.Fuzz)).contains(" * "))
 
   test("ReDoS.checkAutomaton"):
     assertEquals(
