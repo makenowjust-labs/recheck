@@ -144,7 +144,7 @@ class IRCharSuite extends munit.FunSuite:
       "[[:punct:]]",
       "[[:print:]]",
       "(?i)\\xC9",
-      "(?i)\\xDF"
+      "(?i)\\xDE"
     )
     modifiers <- Seq("", "(?u)", "(?a)", "(?aa)", "(?l)", "(?d)")
   do
@@ -261,7 +261,7 @@ class IRCharSuite extends munit.FunSuite:
   checkSet("[\\w\\N{U+41}]", "", Perl(utf8 = false))(set => set.contains(0xe9))
   checkSet("[\\w\\x{41}]", "", Perl(utf8 = false))(set => !set.contains(0xe9))
   chars("(*TURKISH_CASING)i", "iu", PCRE)(of("i\u0130"))
-  // Ruby and Perl fold plain literals to several characters (e.g. `ß` and `ss`), longest first.
+  // Ruby and Perl fold literals to several characters (e.g. `ß` and `ss`), longest first.
   // Unicode 18 adds a character folded to `ß`, so the sets come from the tables.
   val sharpSs: CharSet = CaseMapping.SimpleFold.equivalents(0xdf)
   val sharpS: IRNodeData = Disjunction(
@@ -282,8 +282,34 @@ class IRCharSuite extends munit.FunSuite:
     LookBehind(false, Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))), Forward(Seq(Longest(2, 2))))
   )
   check("(?<=ß)", "i", Perl())(LookBehind(false, sharpS, Forward(Seq(Longest(1, 2)))))
-  // Folds with escapes and across classes are intentionally not reproduced.
+  // Escapes fold as the literals, but Ruby keeps an escape of an ASCII character apart.
+  check("\\xDF", "i", Perl())(sharpS)
+  check("\\x{DF}", "i", Perl())(sharpS)
+  check("\\N{U+DF}", "i", Perl())(sharpS)
+  check("\\337", "i", Perl())(sharpS)
+  check("\\o{337}", "i", Perl())(sharpS)
+  check("\\ß", "i", Perl(), Ruby())(sharpS)
+  check("\\x73\\x73", "i", Perl())(sharpS)
+  check("s\\x{17F}", "i", Perl())(sharpS)
+  check("\\u00DF", "i", Ruby())(sharpS)
+  check("\\u{DF}", "i", Ruby())(sharpS)
+  check("\\xC3\\x9F", "i", Ruby())(sharpS)
+  check("\\303\\237", "i", Ruby())(sharpS)
+  check("\\u017Fs", "i", Ruby())(sharpS)
   check("\\x73s", "i", Ruby())(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))
+  check("\\u0073s", "i", Ruby())(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))
+  check("(?<=\\u00DF)", "i", Ruby())(
+    LookBehind(false, Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))), Forward(Seq(Longest(2, 2))))
+  )
+  check("(?<=\\N{U+DF})", "i", Perl())(LookBehind(false, sharpS, Forward(Seq(Longest(1, 2)))))
+  // Perl counts `\xDF` of a pattern that is not UTF-8 as one character in a look-behind, so it does not match `ss` there.
+  check("(?<=\\xDF)", "i", Perl())(LookBehind(false, sharpS, Forward(Seq(Longest(1, 1)))))
+  // A native string under `/d` has no character to match the folding.
+  chars("\\xDF", "i", Perl(utf8 = false))(of("\u00df"))
+  check("\\xDF", "iu", Perl(utf8 = false))(
+    Disjunction(Sequence(Chars(of("sS")), Chars(of("sS"))), Chars(CharSet.single(0xdf)))
+  )
+  // Folds across classes are intentionally not reproduced.
   check("[s]s", "i", Ruby(), Perl())(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))
   // A class matches the foldings of its characters folded to several characters.
   // Ruby reads a class of one character as a literal, and tries the class first and then a folding for each character.

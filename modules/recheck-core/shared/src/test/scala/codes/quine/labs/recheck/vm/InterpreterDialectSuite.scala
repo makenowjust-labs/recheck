@@ -133,6 +133,12 @@ class InterpreterDialectSuite extends munit.FunSuite:
     accepts("(?<=a(?i:ß)b)x", Ruby(), "aSsbx")
     accepts("(?i)(?<=ß)x", Perl(), "ßx")
     accepts("(?i)(?<=ß)x", Perl(), "ssx")
+    accepts("(?i)(?<=\\u00DF)x", Ruby(), "ssx")
+    refutes("(?i)(?<=\\u00DF)x", Ruby(), "ßx")
+    accepts("(?i)(?<=\\N{U+DF})x", Perl(), "ssx")
+    // Perl counts `\xDF` of a pattern that is not UTF-8 as one character in a look-behind.
+    refutes("(?i)(?<=\\xDF)x", Perl(), "ssx")
+    accepts("(?i)(?<=\\xDF)x", Perl(), "ßx")
 
   test("Interpreter.run: classes folded to several characters"):
     for c <- CaseFoldingCases.cases; dialect <- c.dialects do

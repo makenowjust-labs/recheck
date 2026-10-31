@@ -158,8 +158,12 @@ object IRBuilder:
     lazy val maxLength = folds.map(_.length).max
     nodes =>
       val chars = nodes.map: node =>
-        (node.data, table.charFlagsOf(node)) match
-          case (NodeData.Literal(value), Some(flags)) if perlFoldsMulti(value, flags, perlUnicodeRules) =>
+        val value = node.data match
+          case NodeData.Literal(value)                                 => Some(value)
+          case NodeData.Backslash(value: BackslashKind.BackslashValue) => Some(value.value)
+          case _                                                       => None
+        (value, table.charFlagsOf(node)) match
+          case (Some(value), Some(flags)) if perlFoldsMulti(value, flags, perlUnicodeRules) =>
             Some(FullCaseFolding(value)).filter(_.length == 1).map(_(0))
           case _ => None
       var subtract = 0L
