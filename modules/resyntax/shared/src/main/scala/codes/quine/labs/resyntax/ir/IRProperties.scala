@@ -1,9 +1,5 @@
 package codes.quine.labs.resyntax.ir
 
-import java.math.BigDecimal
-import java.math.MathContext
-import java.math.RoundingMode
-
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.BinaryProperty
 import codes.quine.labs.resyntax.charset.CharSet
@@ -591,24 +587,56 @@ private[ir] object IRProperties:
     */
   private def perlNumericValue(value: String): Option[CharSet] =
     val nv = Properties.NumericValue
-    def rounded(d: Double): BigDecimal = new BigDecimal(d).round(new MathContext(4, RoundingMode.HALF_EVEN))
+    def gcd(a: Long, b: Long): Long = if b == 0 then a else gcd(b, a % b)
     value.trim match
       case v if lowerAscii(v) == "nan" => Some(nv.nan.set)
       case PerlFraction(sign, n, d)    =>
-        val (num, den) = (BigInt(n), BigInt(d))
-        if den == 0 then None
-        else
-          val g = num.gcd(den)
-          val (rn, rd) = ((if sign == "-" then -num else num) / g, den / g)
-          if rd == 1 then None
-          else nv.values.find(v => !v.isNaN && BigInt(v.numerator) == rn && BigInt(v.denominator) == rd).map(_.set)
+        for
+          num <- n.toLongOption
+          den <- d.toLongOption if den != 0
+          g = gcd(num, den)
+          rd = den / g if rd != 1
+          rn = (if sign == "-" then -num else num) / g
+          v <- nv.values.find(v => !v.isNaN && v.numerator == rn && v.denominator == rd)
+        yield v.set
       case v @ PerlDecimal() =>
         val d = v.filterNot(_ == '_').toDouble
         if d == math.rint(d) then nv.values.find(v => v.denominator == 1 && v.numerator.toDouble == d).map(_.set)
         else
-          val key = rounded(d)
-          nv.values.find(v => v.denominator > 1 && rounded(v.toDouble).compareTo(key) == 0).map(_.set)
+          // Perl's table has both roundings of a tie (e.g. `1.562` and `1.563` for `1/64`).
+          val key = roundSignificant(d, halfEven = true)
+          nv.values
+            .find: v =>
+              v.denominator > 1 &&
+                (roundSignificant(v.toDouble, halfEven = true) == key ||
+                  roundSignificant(v.toDouble, halfEven = false) == key)
+            .map(_.set)
       case _ => None
+
+  /** Returns the sign, the 4 significant digits rounded half to even (or up) and the exponent of a non-zero number, as
+    * Perl compares numeric values by `%.3e`.
+    *
+    * The digits come from the shortest representation of the double, which is exact for the ties of the Unicode data
+    * (e.g. `1/64`).
+    */
+  private def roundSignificant(d: Double, halfEven: Boolean): (Boolean, Long, Int) =
+    val s = math.abs(d).toString
+    val (mantissa, exp) = s.indexWhere(c => c == 'e' || c == 'E') match
+      case -1 => (s, 0)
+      case i  => (s.take(i), s.drop(i + 1).stripPrefix("+").toInt)
+    val point = mantissa.indexOf('.') match
+      case -1 => mantissa.length
+      case i  => i
+    val digits = mantissa.filter(_ != '.')
+    val lead = digits.indexWhere(_ != '0')
+    val significant = digits.drop(lead)
+    val head = significant.take(4).padTo(4, '0').toLong
+    val rest = significant.drop(4)
+    val up = rest.nonEmpty && (rest(0) > '5' || rest(0) == '5' && (!halfEven || rest
+      .drop(1)
+      .exists(_ != '0') || head % 2 == 1))
+    val e = point - lead - 1 + exp
+    if up && head == 9999 then (d < 0, 1000, e + 1) else (d < 0, if up then head + 1 else head, e)
 
   private def perlSpecial(key: String): Option[(CharSet, CaseKind)] =
     val u = unicodeUniverse

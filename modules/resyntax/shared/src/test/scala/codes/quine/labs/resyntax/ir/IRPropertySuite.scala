@@ -88,3 +88,9 @@ class IRPropertySuite extends munit.FunSuite:
   chars("\\p{nv=NaN}", "", Perl)(nv.nan.set)
   for v <- Seq("0.333", "0.3334", "3.0001", "1000.4", "0.0063", "0.06249", "3/1", "1/0", "12345", ".5", "0x10", "1__0")
   do error(s"\\p{nv=$v}", "", Perl)("Unknown Unicode property name at 0")
+  // `1/64` is `0.015625`, a tie of 4 significant digits, and Perl takes both `1.562` and `1.563`.
+  chars("\\p{nv=0.01562}", "", Perl)(nvSet(1, 64))
+  chars("\\p{nv=0.01563}", "", Perl)(nvSet(1, 64))
+  chars("\\p{nv=0.015625}", "", Perl)(nvSet(1, 64))
+  chars("\\p{nv=0.04688}", "", Perl)(nvSet(3, 64))
+  error("\\p{nv=0.04687}", "", Perl)("Unknown Unicode property name at 0")
