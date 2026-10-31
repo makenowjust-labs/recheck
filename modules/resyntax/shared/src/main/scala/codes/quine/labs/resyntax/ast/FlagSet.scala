@@ -53,7 +53,7 @@ final case class FlagSet(
     localeLower: Boolean = false,
     // `m` (.NET, Java, JavaScript, PCRE, Perl, Python, Ruby)
     multiline: Boolean = false,
-    // `n` (.NET, Perl, Ruby)
+    // `n` (.NET, PCRE, Perl, Ruby)
     explicitCapture: Boolean = false,
     // `o` (Perl, Ruby)
     once: Boolean = false,
@@ -119,7 +119,7 @@ object FlagSet:
           check(dialect.isPython)
           flagSet = flagSet.copy(bytes = true)
         case 'c' =>
-          check(dialect.isPerl)
+          check(dialect.isJava || dialect.isPerl)
           flagSet = flagSet.copy(continue = true)
         case 'd' =>
           check(dialect.isJava || dialect.isJavaScript || dialect.isPerl || dialect.isRuby)
@@ -138,7 +138,7 @@ object FlagSet:
         case 'm' =>
           flagSet = flagSet.copy(multiline = true)
         case 'n' =>
-          check(dialect.isDotNet || dialect.isPerl || dialect.isRuby)
+          check(dialect.isDotNet || dialect.isPCRE || dialect.isPerl || dialect.isRuby)
           flagSet = flagSet.copy(explicitCapture = true)
         case 'o' =>
           check(dialect.isPerl || dialect.isRuby)
@@ -147,7 +147,7 @@ object FlagSet:
           check(dialect.isPerl)
           flagSet = flagSet.copy(preserve = true)
         case 'r' =>
-          check(dialect.isPerl)
+          check(dialect.isPCRE || dialect.isPerl)
           flagSet = flagSet.copy(nonDestructive = true)
         case 's' =>
           check(
@@ -171,6 +171,9 @@ object FlagSet:
         case 'y' =>
           check(dialect.isJavaScript)
           flagSet = flagSet.copy(sticky = true)
+        // PHP skips these characters in the modifiers.
+        case ' ' | '\n' | '\r' =>
+          check(dialect.isPCRE)
         case _ =>
           check(false)
 

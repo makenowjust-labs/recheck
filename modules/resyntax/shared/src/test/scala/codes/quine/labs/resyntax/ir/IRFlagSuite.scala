@@ -123,6 +123,8 @@ class IRFlagSuite extends IRSuiteBase:
     Seq(flagsOf(d).copy(caselessRestrict = true), flagsOf(d).copy(caselessRestrict = true))
   )
   checkFlags("a(?r)b", "", PCRE)(d => Seq(flagsOf(d), flagsOf(d).copy(caselessRestrict = true)))
+  // PHP's `r` is `(?r)`: `/k/iur` does not match the Kelvin sign, but `/(?-r)k/iur` does.
+  checkFlags("a(?-r)b", "r", PCRE)(d => Seq(flagsOf(d).copy(caselessRestrict = true), flagsOf(d)))
   // `(*UTF)(?r)(?^i)k` matches the Kelvin sign, so `(?^)` resets `r`.
   checkFlags("(?r)(?^i)a", "", PCRE)(d => Seq(flagsOf(d, "i")))
   checkFlags("(*BSR_UNICODE)(*BSR_ANYCRLF)a", "", PCRE)(d => Seq(flagsOf(d).copy(bsrAnyCRLF = true)))

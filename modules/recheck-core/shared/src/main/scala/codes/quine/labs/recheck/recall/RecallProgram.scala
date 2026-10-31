@@ -193,7 +193,7 @@ object RecallProgram:
 
   /** Returns the data for the Java program for `java` as a single-file source program, using `Matcher#find`. */
   private[recall] def java(pattern: ParsedPattern, attack: AttackPattern): RecallProgram =
-    val flags = pattern.flags.distinct.filter(c => "dimsuxU".contains(c))
+    val flags = pattern.flags.distinct.filter(c => "cdimsuxU".contains(c))
     RecallProgram(Command("java", Seq("--source", "17"), source = Some(JavaSource)), data(flags, pattern, attack))
 
   /** The Java program, which reads the data of [[data]] from the standard input. */
@@ -218,6 +218,7 @@ object RecallProgram:
         |    int flags = 0;
         |    for (char c : lines[0].toCharArray()) {
         |      flags |= switch (c) {
+        |        case 'c' -> Pattern.CANON_EQ;
         |        case 'd' -> Pattern.UNIX_LINES;
         |        case 'i' -> Pattern.CASE_INSENSITIVE;
         |        case 'm' -> Pattern.MULTILINE;

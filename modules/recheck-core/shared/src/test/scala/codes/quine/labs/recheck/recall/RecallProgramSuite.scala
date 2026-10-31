@@ -108,6 +108,8 @@ class RecallProgramSuite extends munit.FunSuite:
     assertEquals(program.command, Command("java", Seq("--source", "17"), source = Some(RecallProgram.JavaSource)))
     assertEquals(program.script, "iU\n00660022006f006f005c0064000d\n1:0078\n2:0079\n1:007a\n")
     assert(RecallProgram.JavaSource.content.contains("catch (StackOverflowError | OutOfMemoryError e)"))
+    assertEquals(generate("", "cdimsuxU", Dialect.Java).script.linesIterator.next(), "cdimsuxU")
+    assert(RecallProgram.JavaSource.content.contains("case 'c' -> Pattern.CANON_EQ;"))
 
   test("RecallProgram.generate: .NET"):
     val program = generate("foo", "in", Dialect.DotNet)
@@ -254,6 +256,8 @@ class RecallProgramSuite extends munit.FunSuite:
       line(generate("é", "", Dialect.PCRE, nonAscii), "$input"),
       "$input = str_repeat(\"\\xE9\", 3) . \"\\x00\";"
     )
+    // The modifiers pass through.
+    assertEquals(line(generate("a", "ADJSUXimnrsux", Dialect.PCRE), "$regex"), "$regex = '/a/ADJSUXimnrsux';")
     // It falls back to a control character for the delimiter.
     assertEquals(line(generate("/#~!%@;,|=:", "", Dialect.PCRE), "$regex"), "$regex = \"\\x01/#~!%@;,|=:\\x01\";")
 
