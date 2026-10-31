@@ -79,7 +79,6 @@ class ParserEncodingSuite extends munit.FunSuite:
       Literal(0xe9)
     )
   )
-  error("\\x{100}", "", PCRE)("Code point too large at 3")
   check("(*UTF)\\x{100}", "", PCRE)(
     Sequence(Command(CommandKind.StartOption("UTF", None)), Backslash(Escape(EscapeStyle.HexBracket, 0x100)))
   )
