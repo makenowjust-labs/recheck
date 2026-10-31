@@ -611,7 +611,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           case Rollback.Fallback(_, _) => sys.error("unreachable")
         // $COVERAGE-ON$
         true
-      case Inst.CapKeep(restore) =>
+      case Inst.CapKeep =>
         val captures = if failedCaptures.isEmpty then frame.captures else failedCaptures
         frame.captures = Vector.tabulate(captures.size): i =>
           val index = i / 2
@@ -619,7 +619,6 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           // The whole match keeps its start, which `\K` sets.
           if index == 0 then frame.captures(i)
           else if index > frame.lastParen then if i % 2 == 0 then frame.captures(i) else -1
-          else if restore.exists((from, to) => from <= index && index <= to) then frame.captures(i)
           else captures(i)
         true
 
@@ -635,40 +634,6 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         k += 1
         if k >= min then builder.addOne(p)
       builder.result().reverse
-    // It follows `Behind` and `BehindS` of `java.util.regex.Pattern`, including the overflows as `int`.
-    case IRLookBehindStarts.Java(min, max, false) =>
-      val from = Math.max(pos - max, 0)
-      (pos - min).to(from, -1)
-    case IRLookBehindStarts.Java(min, max, true) =>
-      val from = Math.max(pos - javaCountChars(pos, -max), 0)
-      val builder = Seq.newBuilder[Int]
-      var j = pos - javaCountChars(pos, -min)
-      while j >= from do
-        builder.addOne(j)
-        j -= (if j > from then javaCountChars(j, -1) else 1)
-      builder.result()
-
-  /** Returns the number of UTF-16 code units of the code points from the index, as `Pattern.countChars` does. */
-  private def javaCountChars(index: Int, lengthInCodePoints: Int): Int =
-    def isHigh(i: Int): Boolean = Character.isHighSurrogate(input(i).toChar)
-    def isLow(i: Int): Boolean = Character.isLowSurrogate(input(i).toChar)
-    var x = index
-    if lengthInCodePoints == 1 && index >= 0 && index < input.length && !isHigh(index) then 1
-    else if lengthInCodePoints >= 0 then
-      var i = 0
-      while x < input.length && i < lengthInCodePoints do
-        x += 1
-        if isHigh(x - 1) && x < input.length && isLow(x) then x += 1
-        i += 1
-      x - index
-    else
-      val len = -lengthInCodePoints
-      var i = 0
-      while x > 0 && i < len do
-        x -= 1
-        if isLow(x) && x > 0 && isHigh(x - 1) then x -= 1
-        i += 1
-      index - x
 
   /** Tests whether the text before the position ends with a base and then any extenders of the marks. */
   private def hasBase(pos: Int, marks: IRWordMarks): Boolean =

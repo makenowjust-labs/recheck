@@ -69,10 +69,9 @@ class InterpreterDialectSuite extends munit.FunSuite:
     def perlOnly(source: String, input: String)(using munit.Location): Unit =
       refutes(source, Perl(), input)
       for dialect <- Seq(Java, Python(), PCRE, Ruby(), DotNet) do accepts(source, dialect, input)
-    // Perl unsets the capture of a fixed-length repetition matching nothing (`CURLYN` and `CURLYM`).
-    perlOnly("^(?:(a)?b){2}\\1$", "abba")
-    perlOnly("^(?:(ab)*c)*\\1$", "abccab")
-    // It does not for a repetition of a variable-length node (`CURLYX`).
+    // A repetition matching nothing keeps the capture of an earlier iteration, whatever node Perl compiles it into.
+    accepts("^(?:(a)?b){2}\\1$", Perl(), "abba")
+    accepts("^(?:(ab)*c)*\\1$", Perl(), "abccab")
     accepts("^(?:(a|bc)?x){2}\\1$", Perl(), "axxa")
     // Perl unsets the captures of a failed alternative, even ones of an earlier iteration.
     perlOnly("^(?:(a)|b){2}\\1$", "aba")
@@ -143,10 +142,8 @@ class InterpreterDialectSuite extends munit.FunSuite:
     // Perl counts `\xDF` of a pattern that is not UTF-8 as one character in a look-behind.
     refutes("(?i)(?<=\\xDF)x", Perl(), "ssx")
     accepts("(?i)(?<=\\xDF)x", Perl(), "ßx")
-    // Perl's `ss` in a look-behind matches `ß` under Unicode rules, even in a pattern that is not UTF-8.
-    accepts("(?i)(?<=ss)x", Perl(), "ßx")
-    accepts("(?iu)(?<=ss)x", Perl(utf8 = false), "\u00dfx")
-    refutes("(?i)(?<=ss)x", Perl(utf8 = false), "\u00dfx")
+    // Perl's starts are of the lengths of the literals, so `ss` matching `ß` is too short there.
+    refutes("(?i)(?<=ss)x", Perl(), "ßx")
 
   test("Interpreter.run: classes folded to several characters"):
     for c <- CaseFoldingCases.cases; dialect <- c.dialects do

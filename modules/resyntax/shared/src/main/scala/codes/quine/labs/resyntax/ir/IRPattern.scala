@@ -1,6 +1,5 @@
 package codes.quine.labs.resyntax.ir
 
-import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
@@ -21,9 +20,6 @@ import codes.quine.labs.resyntax.charset.UnitMode
   *   the unit of the input, which the character sets of the nodes consist of
   * @param notEmpty
   *   where an empty match is rejected (PCRE's `(*NOTEMPTY)` and `(*NOTEMPTY_ATSTART)`)
-  * @param tries
-  *   the runs of the alternatives (from and until the indices) that Perl compiles into a trie, by the location of the
-  *   alternation, where `(*THEN)` goes to the alternative after the run (found only with `(*THEN)`)
   */
 final case class IRPattern(
     node: IRNode,
@@ -32,8 +28,7 @@ final case class IRPattern(
     backReference: IRBackReferenceSemantics,
     anchored: Boolean,
     mode: UnitMode,
-    notEmpty: IRNotEmpty = IRNotEmpty.Never,
-    tries: Map[SourceLocation, Seq[(Int, Int)]] = Map.empty
+    notEmpty: IRNotEmpty = IRNotEmpty.Never
 )
 
 /** IRNotEmpty is where an empty match is rejected, which makes the engine backtrack further.

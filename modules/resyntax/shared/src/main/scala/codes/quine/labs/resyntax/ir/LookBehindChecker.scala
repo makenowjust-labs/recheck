@@ -19,12 +19,6 @@ import codes.quine.labs.resyntax.ir.LookBehindChecker.*
   *   the width of a literal, an escape or a class in the engine's units, which differs from one for Perl's and Ruby's
   *   multi-character case folding (e.g. `ß` up to two); Ruby's bytes of a character by escapes (e.g. `\xC3\xA9`) come
   *   together
-  * @param lastSupplementary
-  *   the start of the last node with a supplementary character or a surrogate in the pattern, or `-1`, which makes
-  *   Java's look-behinds before it count code points
-  * @param minSubtract
-  *   how much the minimum length of the nodes of a sequence lessens, for Perl's literals matching one character folded
-  *   to them (e.g. `ss` matching `ß`)
   * @param rubyClassWidths
   *   the widths of the alternatives that Ruby makes of a class matching the foldings of its characters (e.g. `[ßx]` is
   *   `[ßẞx]|ss|ss`), which are top-level alternatives as the body
@@ -34,8 +28,6 @@ private[ir] final class LookBehindChecker(
     resolver: ReferenceResolver,
     featureSet: IRFeatureSet,
     charWidth: Seq[Node] => Width,
-    lastSupplementary: Int,
-    minSubtract: Seq[Node] => Long,
     rubyClassWidths: Node => Option[Seq[Int]]
 ):
 
@@ -65,14 +57,11 @@ private[ir] final class LookBehindChecker(
   def matching(body: Node): IRLookBehindMatch =
     def longest(node: Node): IRLookBehindStarts =
       width(node, Set.empty, conditionals = true) match
-        case Some(w) => IRLookBehindStarts.Longest(w.min.toInt, w.max.toInt)
+        case Some(w) => IRLookBehindStarts.Longest(w.min.min(Int.MaxValue).toInt, w.max.min(Int.MaxValue).toInt)
         case None    => IRLookBehindStarts.Longest(0, 0)
     featureSet.lookBehindRule match
       case IRLookBehindRule.Unrestricted => IRLookBehindMatch.Backward
-      case IRLookBehindRule.Java         =>
-        val info = java(List(body), JavaInfo.Initial)
-        val codePoints = lastSupplementary >= body.loc.start
-        IRLookBehindMatch.Forward(Seq(IRLookBehindStarts.Java(info.minLength, info.maxLength, codePoints)))
+      case IRLookBehindRule.Java         => IRLookBehindMatch.Forward(Seq(longest(body)))
       // PCRE matches each alternative of the body from its own lengths.
       case IRLookBehindRule.PCRE =>
         body.data match
@@ -89,12 +78,6 @@ private[ir] final class LookBehindChecker(
       // Each top-level alternative of Ruby's look-behind has a fixed width, so matching it backward is the same.
       case IRLookBehindRule.Ruby => IRLookBehindMatch.Backward
 
-  /** Checks whether the group is deterministic for Java's `TreeInfo`, which makes a repetition of it `GroupCurly`. */
-  def javaDeterministic(group: Node): Boolean = java(List(group), JavaInfo.Initial).deterministic
-
-  /** Returns the minimum length of the node for Java's `TreeInfo`. */
-  def javaMinLength(node: Node): Int = java(List(node), JavaInfo.Initial).minLength
-
   /** Returns the width of the node for PCRE, Perl and Python, or `None` if it is unknown (e.g. a conditional).
     *
     * With `conditionals`, PCRE's conditional is the union of its branches, which its look-behind tries.
@@ -105,12 +88,9 @@ private[ir] final class LookBehindChecker(
     case NodeData.Sequence(nodes0) =>
       val nodes =
         if featureSet.lookBehindRule == IRLookBehindRule.PCRE then nodes0.takeWhile(!isAcceptOrFail(_)) else nodes0
-      nodes
-        .foldLeft(Option(Width(0, 0))) { (acc, node) =>
-          for w1 <- acc; w2 <- width(node, visiting, conditionals)
-          yield Width(add(w1.min, w2.min), add(w1.max, w2.max))
-        }
-        .map(w => if w.min == Inf then w else w.copy(min = (w.min - minSubtract(nodes)).max(0)))
+      nodes.foldLeft(Option(Width(0, 0))): (acc, node) =>
+        for w1 <- acc; w2 <- width(node, visiting, conditionals)
+        yield Width(add(w1.min, w2.min), add(w1.max, w2.max))
     case NodeData.Repeat(node, quantifier) =>
       val (min, max) = bounds(quantifier)
       // PCRE takes an unbounded repeat as unbounded even with a zero-width node (e.g. `(?<=(?:)*)`), except a look-ahead.
@@ -314,8 +294,8 @@ private[ir] final class LookBehindChecker(
         i += 1
     out.result()
 
-  /** Studies a node chain as `java.util.regex.Pattern`'s `TreeInfo`, where an alternation studies its continuation from
-    * scratch, and the lengths overflow as `int`.
+  /** Studies a node chain as `java.util.regex.Pattern`'s `TreeInfo` for the maximum length, where an alternation
+    * studies its continuation from scratch, and the length overflows as `int`.
     */
   private def java(chain: List[Node], info: JavaInfo): JavaInfo = chain match
     case Nil          => info
@@ -329,25 +309,18 @@ private[ir] final class LookBehindChecker(
         case NodeData.Repeat(child, quantifier)                       => javaRepeat(child, quantifier, rest, info)
         case NodeData.Backslash(_: BackslashKind.EscapeBackReference) => java(rest, info.copy(maxValid = false))
         case NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline)) =>
-          java(rest, info.copy(minLength = info.minLength + 1, maxLength = info.maxLength + 2))
+          java(rest, info.copy(maxLength = info.maxLength + 2))
         case NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.GraphemeCluster)) =>
-          java(rest, info.copy(minLength = info.minLength + 1, deterministic = false))
-        case _ if isJavaCharProperty(node) =>
-          java(rest, info.copy(minLength = info.minLength + 1, maxLength = info.maxLength + 1))
-        case _ => java(rest, info)
+          java(rest, info.copy(deterministic = false))
+        case _ if isJavaCharProperty(node) => java(rest, info.copy(maxLength = info.maxLength + 1))
+        case _                             => java(rest, info)
 
   private def javaBranch(nodes: Seq[Option[Node]], rest: List[Node], info: JavaInfo): JavaInfo =
     val alternatives = nodes.map(_.fold(JavaInfo.Initial)(node => java(List(node), JavaInfo.Initial)))
-    val minLength = info.minLength + alternatives.map(_.minLength).min
     val maxLength = info.maxLength + alternatives.map(_.maxLength).max
     val maxValid = info.maxValid && alternatives.forall(_.maxValid)
     val after = java(rest, JavaInfo.Initial)
-    JavaInfo(
-      after.minLength + minLength,
-      after.maxLength + maxLength,
-      after.maxValid && maxValid,
-      deterministic = false
-    )
+    JavaInfo(after.maxLength + maxLength, after.maxValid && maxValid, deterministic = false)
 
   private def javaRepeat(child: Node, quantifier: Quantifier, rest: List[Node], info: JavaInfo): JavaInfo =
     val isGroup = child.data match
@@ -357,30 +330,24 @@ private[ir] final class LookBehindChecker(
     quantifier match
       case Quantifier.Question(_) if isGroup && !possessive => javaBranch(Seq(Some(child), None), rest, info)
       case Quantifier.Question(_)                           =>
-        val after = java(List(child), info)
-        java(rest, after.copy(minLength = info.minLength, deterministic = false))
+        java(rest, java(List(child), info).copy(deterministic = false))
       case Quantifier.Star(BacktrackStrategy.Greedy) | Quantifier.Plus(BacktrackStrategy.Greedy)
           if isJavaCharProperty(child) =>
-        val minLength = info.minLength + bounds(quantifier)._1.toInt
         val maxLength = if info.maxValid then info.maxLength + JavaMaxReps else info.maxLength
-        java(rest, JavaInfo(minLength, maxLength, info.maxValid, deterministic = false))
+        java(rest, JavaInfo(maxLength, info.maxValid, deterministic = false))
       case _ =>
         val (min, max) = bounds(quantifier)
-        val cmin = min.toInt
         val cmax = if max == Inf then JavaMaxReps else max.toInt
         val atom = java(List(child), JavaInfo.Initial)
         // A group with a non-deterministic body becomes a `Loop` node, which has no maximum length.
-        if isGroup && !possessive && !atom.deterministic then
-          JavaInfo(info.minLength, info.maxLength, maxValid = false, false)
+        if isGroup && !possessive && !atom.deterministic then JavaInfo(info.maxLength, maxValid = false, false)
         else
-          val minTemp = atom.minLength * cmin + info.minLength
-          val minLength = if minTemp < info.minLength then 0xfffffff else minTemp
-          val deterministic = info.deterministic && atom.deterministic && cmin == cmax
+          val deterministic = info.deterministic && atom.deterministic && min == max
           val after =
             if info.maxValid && atom.maxValid then
               val temp = atom.maxLength * cmax + info.maxLength
-              JavaInfo(minLength, temp, temp >= info.maxLength, deterministic)
-            else JavaInfo(minLength, atom.maxLength, maxValid = false, deterministic)
+              JavaInfo(temp, temp >= info.maxLength, deterministic)
+            else JavaInfo(atom.maxLength, maxValid = false, deterministic)
           java(rest, after)
 
   private def isJavaGroup(kind: GroupKind): Boolean = kind match
@@ -426,11 +393,11 @@ private[ir] object LookBehindChecker:
     case object Variable extends RubyWidth
     case object Unknown extends RubyWidth
 
-  /** JavaInfo is `java.util.regex.Pattern.TreeInfo`. */
-  final case class JavaInfo(minLength: Int, maxLength: Int, maxValid: Boolean, deterministic: Boolean)
+  /** JavaInfo is `java.util.regex.Pattern.TreeInfo` without the minimum length. */
+  final case class JavaInfo(maxLength: Int, maxValid: Boolean, deterministic: Boolean)
 
   object JavaInfo:
-    val Initial: JavaInfo = JavaInfo(0, 0, maxValid = true, deterministic = true)
+    val Initial: JavaInfo = JavaInfo(0, maxValid = true, deterministic = true)
 
   private def union(l: Width, r: Width): Width = Width(l.min.min(r.min), l.max.max(r.max))
 

@@ -20,14 +20,11 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRCharClasses.AsciiWord
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch.Forward
-import codes.quine.labs.resyntax.ir.IRLookBehindStarts.Java as JavaStarts
 import codes.quine.labs.resyntax.ir.IRLookBehindStarts.Longest
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.ir.IRQuantifier.*
 
 class IRBuilderSuite extends IRSuiteBase:
-  val NotJava: Seq[Dialect] = All.filter(_ != Java)
-
   // Disjunction
   check("|", "", All*)(Disjunction(Empty, Empty))
 
@@ -37,56 +34,27 @@ class IRBuilderSuite extends IRSuiteBase:
   check("ab", "", All*)(Sequence(char('a'), char('b')))
 
   // Repeat
-  check("(?:)*", "", NotJava*)(Repeat(Empty, Unbounded(0, Greedy)))
-  check("(?:)*?", "", NotJava*)(Repeat(Empty, Unbounded(0, Lazy)))
+  check("(?:)*", "", All*)(Repeat(Empty, Unbounded(0, Greedy)))
+  check("(?:)*?", "", All*)(Repeat(Empty, Unbounded(0, Lazy)))
   check("(?:)*+", "", Java, PCRE, Perl(), Python(), Ruby())(Atomic(Repeat(Empty, Unbounded(0, Greedy))))
-  check("(?:)+", "", NotJava*)(Repeat(Empty, Unbounded(1, Greedy)))
-  check("(?:)+?", "", NotJava*)(Repeat(Empty, Unbounded(1, Lazy)))
+  check("(?:)+", "", All*)(Repeat(Empty, Unbounded(1, Greedy)))
+  check("(?:)+?", "", All*)(Repeat(Empty, Unbounded(1, Lazy)))
   check("(?:)++", "", Java, PCRE, Perl(), Python(), Ruby())(Atomic(Repeat(Empty, Unbounded(1, Greedy))))
   check("(?:)?", "", All*)(Repeat(Empty, Bounded(0, 1, Greedy)))
   check("(?:)??", "", All*)(Repeat(Empty, Bounded(0, 1, Lazy)))
   check("(?:)?+", "", Java, PCRE, Perl(), Python(), Ruby())(Atomic(Repeat(Empty, Bounded(0, 1, Greedy))))
-  check("(?:){4}", "", NotJava*)(Repeat(Empty, Exact(4)))
-  check("(?:){4}?", "", DotNet, JavaScript, PCRE, Perl(), Python())(Repeat(Empty, Exact(4)))
+  check("(?:){4}", "", All*)(Repeat(Empty, Exact(4)))
+  check("(?:){4}?", "", DotNet, Java, JavaScript, PCRE, Perl(), Python())(Repeat(Empty, Exact(4)))
   check("(?:){4}?", "", Ruby())(Repeat(Repeat(Empty, Exact(4)), Bounded(0, 1, Greedy)))
   // `^(?:a|ab){1}+c` does not match `abc` in Java, PCRE, Perl and Python, so a possessive exact count is atomic.
   check("(?:){4}+", "", Java, PCRE, Perl(), Python())(Atomic(Repeat(Empty, Exact(4))))
   check("(?:){4}+", "", Ruby())(Repeat(Repeat(Empty, Exact(4)), Unbounded(1, Greedy)))
-  check("(?:){2,3}", "", NotJava*)(Repeat(Empty, Bounded(2, 3, Greedy)))
-  check("(?:){2,2}", "", NotJava*)(Repeat(Empty, Exact(2)))
-  check("(?:){2,3}?", "", NotJava*)(Repeat(Empty, Bounded(2, 3, Lazy)))
-  check("(?:){2,2}?", "", NotJava*)(Repeat(Empty, Exact(2)))
+  check("(?:){2,3}", "", All*)(Repeat(Empty, Bounded(2, 3, Greedy)))
+  check("(?:){2,2}", "", All*)(Repeat(Empty, Exact(2)))
+  check("(?:){2,3}?", "", All*)(Repeat(Empty, Bounded(2, 3, Lazy)))
+  check("(?:){2,2}?", "", All*)(Repeat(Empty, Exact(2)))
   check("(?:){2,3}+", "", Java, PCRE, Perl(), Python())(Atomic(Repeat(Empty, Bounded(2, 3, Greedy))))
-  // Java's `GroupCurly` of a group that may match the empty string is atomic in IR (see below).
-  check("(?:)*", "", Java)(Repeat(Atomic(Empty), Unbounded(0, Greedy)))
-  check("(?:){2,3}?", "", Java)(Repeat(Atomic(Empty), Bounded(2, 3, Lazy)))
-  check("(?:){4}?", "", Java)(Repeat(Atomic(Empty), Exact(4)))
-  // Java's `GroupCurly` matches each iteration in its first way, and keeps the captures in it.
-  // It is atomic in IR only where it matters: with `\R`, with captures in a pattern with back-references, or matching
-  // the empty string, whose iteration `GroupCurly` rejects.
-  checkPattern("(?:(a)b)*\\1", "", Java): pattern =>
-    val Sequence(Seq(repeat, _)) = pattern.node.data: @unchecked
-    assert(
-      repeat.equalsWithoutLoc(
-        IRNode(Repeat(Atomic(Sequence(Capture(1, None, char('a')), char('b'))), Unbounded(0, Greedy)))
-      )
-    )
-  checkPattern("((a)b){2}\\1", "", Java): pattern =>
-    val Sequence(Seq(repeat, _)) = pattern.node.data: @unchecked
-    assert(
-      repeat.equalsWithoutLoc(
-        IRNode(Repeat(Capture(1, None, Atomic(Sequence(Capture(2, None, char('a')), char('b')))), Exact(2)))
-      )
-    )
-  check("(?:(a)b)*", "", Java)(Repeat(Sequence(Capture(1, None, char('a')), char('b')), Unbounded(0, Greedy)))
-  check("(?:a|(b))*", "", Java)(Repeat(Disjunction(char('a'), Capture(1, None, char('b'))), Unbounded(0, Greedy)))
-  checkPattern("(?:(a)|b)*\\1", "", Java): pattern =>
-    val Sequence(Seq(IRNode(Repeat(body, _), _), _)) = pattern.node.data: @unchecked
-    assert(body.data.isInstanceOf[Disjunction], body)
-  checkPattern("(?:(a)b)?\\1", "", Java): pattern =>
-    val Sequence(Seq(IRNode(Repeat(body, _), _), _)) = pattern.node.data: @unchecked
-    assert(body.data.isInstanceOf[Sequence], body)
-  checkPattern("(?:(a)b)*\\1", "", PCRE, Perl(), Python(), Ruby(), DotNet, JavaScript): pattern =>
+  checkPattern("(?:(a)b)*\\1", "", All*): pattern =>
     val Sequence(Seq(IRNode(Repeat(body, _), _), _)) = pattern.node.data: @unchecked
     assert(body.data.isInstanceOf[Sequence], body)
   // `^(?:a|ab){0,1}+c` matches `abc` in Ruby, so `+` after an interval is another repeat.
@@ -98,8 +66,8 @@ class IRBuilderSuite extends IRSuiteBase:
   check("(?:){,0}?", "", PCRE, Perl(), Python(), Ruby())(Repeat(Empty, Exact(0)))
   check("(?:){,1}+", "", PCRE, Perl(), Python())(Atomic(Repeat(Empty, Bounded(0, 1, Greedy))))
   check("(?:){,1}+", "", Ruby())(Repeat(Repeat(Empty, Bounded(0, 1, Greedy)), Unbounded(1, Greedy)))
-  check("(?:){2,}", "", NotJava*)(Repeat(Empty, Unbounded(2, Greedy)))
-  check("(?:){2,}?", "", NotJava*)(Repeat(Empty, Unbounded(2, Lazy)))
+  check("(?:){2,}", "", All*)(Repeat(Empty, Unbounded(2, Greedy)))
+  check("(?:){2,}?", "", All*)(Repeat(Empty, Unbounded(2, Lazy)))
   check("(?:){2,}+", "", Java, PCRE, Perl(), Python())(Atomic(Repeat(Empty, Unbounded(2, Greedy))))
 
   // PCRE's `U` swaps greedy and lazy: `^(?U)a+` matches `a` and `^(?U)a+?` matches `aaa` in `aaa`.
@@ -112,17 +80,7 @@ class IRBuilderSuite extends IRSuiteBase:
   // `^(?U)(?^)a+` matches `a` in `aaa`, so `(?^)` keeps `U`.
   check("(?U)(?^)(?:)*", "", PCRE)(Sequence(Empty, Empty, Repeat(Empty, Unbounded(0, Lazy))))
   // Java's `U` is UNICODE_CHARACTER_CLASS: `^a+` matches `aaa` with it.
-  check("(?:)*", "U", Java)(Repeat(Atomic(Empty), Unbounded(0, Greedy)))
-
-  // Perl's alternatives in a trie, which start with a literal of the same kind, are found only with `(*THEN)`.
-  def tries(s: String, dialect: Dialect)(expected: Seq[(Int, Int)]*)(implicit loc: munit.Location): Unit =
-    checkPattern(s, "", dialect): pattern =>
-      assertEquals(pattern.tries.values.toSeq.sortBy(_.head), expected)
-  tries("a(*THEN)b|ac|x+|ad|(?i)ae|af|g", Perl())(Seq((0, 2), (4, 6)))
-  tries("|a(*THEN)b|ac||b", Perl())(Seq((1, 5)))
-  tries("(?i:a(*THEN)b|ac|1|23)", Perl())(Seq((2, 4)))
-  tries("a(*THEN)b|ac", PCRE)()
-  tries("ab|ac", Perl())()
+  check("(?:)*", "U", Java)(Repeat(Empty, Unbounded(0, Greedy)))
 
   // Group
   check("()", "", All*)(Capture(1, None, Empty))
@@ -134,10 +92,10 @@ class IRBuilderSuite extends IRSuiteBase:
   check("(?!a)", "", All*)(LookAhead(true, char('a')))
   check("(?<=a)", "", DotNet, JavaScript, Ruby())(LookBehind(false, char('a')))
   check("(?<=a)", "", PCRE, Perl(), Python())(LookBehind(false, char('a'), Forward(Seq(Longest(1, 1)))))
-  check("(?<=a)", "", Java)(LookBehind(false, char('a'), Forward(Seq(JavaStarts(1, 1, false)))))
+  check("(?<=a)", "", Java)(LookBehind(false, char('a'), Forward(Seq(Longest(1, 1)))))
   check("(?<!a)", "", DotNet, JavaScript, Ruby())(LookBehind(true, char('a')))
   check("(?<!a)", "", PCRE, Perl(), Python())(LookBehind(true, char('a'), Forward(Seq(Longest(1, 1)))))
-  check("(?<!a)", "", Java)(LookBehind(true, char('a'), Forward(Seq(JavaStarts(1, 1, false)))))
+  check("(?<!a)", "", Java)(LookBehind(true, char('a'), Forward(Seq(Longest(1, 1)))))
   check("(*pla:a)", "", PCRE, Perl())(LookAhead(false, char('a')))
   check("(*negative_lookbehind:a)", "", PCRE, Perl())(LookBehind(true, char('a'), Forward(Seq(Longest(1, 1)))))
   check("(?>a)", "", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Atomic(char('a')))

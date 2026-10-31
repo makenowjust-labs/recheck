@@ -184,17 +184,9 @@ sealed abstract class IRLookBehindStarts extends Product with Serializable
 object IRLookBehindStarts:
 
   /** Longest tries the starts from `max` characters before the position down to `min` ones, skipping the ones before
-    * the input (PCRE, Perl and Python).
+    * the input (Java, PCRE, Perl and Python).
     */
   final case class Longest(min: Int, max: Int) extends IRLookBehindStarts
-
-  /** Java tries the starts of `java.util.regex.Pattern`'s look-behind with the lengths of its `TreeInfo`: from `min`
-    * UTF-16 code units before the position to `max` ones, where the lengths may overflow as `int`.
-    *
-    * With `codePoints`, they are code points (`BehindS`, when the pattern has a supplementary character from the
-    * look-behind on).
-    */
-  final case class Java(min: Int, max: Int, codePoints: Boolean) extends IRLookBehindStarts
 
 /** IRBacktrackControl is a backtracking control verb other than `(*FAIL)`.
   *

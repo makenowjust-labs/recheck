@@ -43,6 +43,12 @@ The canonical equivalence (`(?c)`) is not supported, and it is reported as `unsu
 ## Approximations
 
 - Java has optimizations of loops that `recheck` does not model, so an attack that `recheck` reports may not work on Java, and the recall validation checks whether it does.
+- Java compiles a repetition into a node that depends on its body (`Curly`, `GroupCurly` or `Loop`), and the nodes differ in captures, `\R` and empty iterations.
+  `recheck` does not reproduce the differences, and it repeats any node as `Loop` does.
+  For example, `^(?:(.)b)*cb\1$` does not match `"abcba"` in Java, since `GroupCurly` does not restore the capture on backtracking, and `^\R*\n$` does not match `"\r\n"`, since `Curly` does not backtrack into `\R`.
+- Java tries the starts of a look-behind from the shortest by the lengths that its `TreeInfo` computes, where `\X` adds nothing to the maximum and the lengths can overflow as `int`.
+  `recheck` does not reproduce them, and it tries the starts from the longest by the lengths of the body, as for PCRE.
+  For example, `(?<=\X)a` never matches in Java, and `(?<=(a|aa))b` captures `"a"` of `"aab"` in Java, but `"aa"` in `recheck`.
 
 ## Recall Validation
 

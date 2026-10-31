@@ -1,12 +1,9 @@
 package codes.quine.labs.resyntax.ir
 
-import scala.collection.mutable
-
 import codes.quine.labs.resyntax.ast.AssertKind
 import codes.quine.labs.resyntax.ast.BackslashKind
 import codes.quine.labs.resyntax.ast.BacktrackControlKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
-import codes.quine.labs.resyntax.ast.ClassItem
 import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.ConditionalTest
@@ -24,7 +21,6 @@ import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
-import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
 object IRBuilder:
@@ -61,15 +57,12 @@ object IRBuilder:
       case Dialect.Perl(utf8, _)                 => usesPerlUnicodeSyntax(node) || utf8 && hasNonAsciiLiteral(node)
       case _                                     => false
     val chars = new IRCharResolver(dialect, mode, perlUnicodeRules)
-    val supplementary = if dialect.isJava then lastSupplementary(node) else -1
     val checker =
       new LookBehindChecker(
         table,
         resolver,
         featureSet,
         charWidth(table, chars, dialect, mode, perlUtf8Pattern),
-        supplementary,
-        if dialect.isPerl then perlMinSubtract(table, perlUnicodeRules) else _ => 0L,
         node => table.charFlagsOf(node).flatMap(chars.rubyClassWidths(node, _))
       )
     val backReferences = new IRValidator(table, resolver, checker, featureSet).validate(node)
@@ -81,10 +74,8 @@ object IRBuilder:
         chars,
         checker,
         resolveCharacter,
-        hasCall(node),
-        hasBackReference(node)
+        hasCall(node)
       )
-    builder.findsTries = dialect.isPerl && hasThen(node)
     val root = builder.build(node)
     IRPattern(
       root,
@@ -93,8 +84,7 @@ object IRBuilder:
       IRBackReferenceSemantics(featureSet.unsetBackReferenceMatchesEmpty, featureSet.backReferenceChoice),
       featureSet.anchored,
       mode,
-      notEmpty(starts),
-      builder.tries.toMap
+      notEmpty(starts)
     )
 
   /** @param utf
@@ -143,38 +133,6 @@ object IRBuilder:
       case IRCharset.Locale   => value < 0x100 || hasAscii && value != 0x1e9e
       case _: IRCharset.Ascii => flags.caselessRestrict && hasAscii && value != 0xdf && value != 0x1e9e
     flags.ignoreCase && !one
-
-  /** Returns how much Perl lessens the minimum length of the nodes of a sequence, where literals may match one
-    * character folded to several ones (e.g. `ss` matches `ß`).
-    *
-    * Perl finds such literals from the left, the longest first, as `join_exact` does. It lessens the minimum also in a
-    * pattern that is not UTF-8, where the string decides the rules of `/d`, so it follows the rules at run time.
-    */
-  private def perlMinSubtract(table: CaptureTable, perlUnicodeRules: Boolean): Seq[Node] => Long =
-    lazy val folds = FullCaseFolding.multiCodePointFoldings().keySet
-    lazy val maxLength = folds.map(_.length).max
-    nodes =>
-      val chars = nodes.map: node =>
-        val value = node.data match
-          case NodeData.Literal(value)                                 => Some(value)
-          case NodeData.Backslash(value: BackslashKind.BackslashValue) => Some(value.value)
-          case _                                                       => None
-        (value, table.charFlagsOf(node)) match
-          case (Some(value), Some(flags)) if perlFoldsMulti(value, flags, perlUnicodeRules) =>
-            Some(FullCaseFolding(value)).filter(_.length == 1).map(_(0))
-          case _ => None
-      var subtract = 0L
-      var i = 0
-      while i < chars.length do
-        val found = (maxLength to 2 by -1).find: n =>
-          i + n <= chars.length && chars.slice(i, i + n).forall(_.isDefined) &&
-            folds.contains(UString(chars.slice(i, i + n).flatten*))
-        found match
-          case Some(n) =>
-            subtract += n - 1
-            i += n
-          case None => i += 1
-      subtract
 
   /** Returns the width of a literal, an escape or a class in a look-behind, where the dialects counting it differently
     * from one care.
@@ -277,17 +235,6 @@ object IRBuilder:
       case ClassItemData.ClassLiteral(value) => value >= 0x80
       case QuoteLiteral.QuoteValue(value)    => value >= 0x80
 
-  /** Returns the start of the last node with a supplementary character or a surrogate in the pattern text, or `-1`. */
-  private def lastSupplementary(node: Node): Int =
-    def isSupplementary(c: Int): Boolean = c >= 0x10000 || Character.isSurrogate(c.toChar) && c <= 0xffff
-    val self = node.data match
-      case NodeData.Literal(value) => isSupplementary(value)
-      case NodeData.Class(_, item) =>
-        deepExists(item) { case ClassItemData.ClassLiteral(value) => isSupplementary(value) }
-      case NodeData.Command(CommandKind.Comment(text)) => UString.fromString(text).iterator.exists(isSupplementary)
-      case _                                           => false
-    NodeKey.children(node).map(lastSupplementary).foldLeft(if self then node.loc.start else -1)(_.max(_))
-
   private def deepExists(x: Any)(p: PartialFunction[Any, Boolean]): Boolean =
     p.applyOrElse(
       x,
@@ -320,19 +267,6 @@ object IRBuilder:
     else if startOptions.contains("NOTEMPTY_ATSTART") then IRNotEmpty.AtStart
     else IRNotEmpty.Never
 
-  private def hasThen(node: Node): Boolean =
-    NodeKey.exists(node):
-      _.data match
-        case NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Then), _)) => true
-        case _                                                                                  => false
-
-  private def hasBackReference(node: Node): Boolean =
-    NodeKey.exists(node):
-      _.data match
-        case NodeData.Backslash(_: BackslashKind.EscapeBackReference) => true
-        case NodeData.Command(_: CommandKind.PBackReference)          => true
-        case _                                                        => false
-
   private def hasCall(node: Node): Boolean =
     NodeKey.exists(node):
       _.data match
@@ -347,10 +281,6 @@ object IRBuilder:
   /** The version of PCRE2 that the PCRE dialect follows, which `(?(VERSION>=10.0)...)` compares with. */
   val PCREVersion: (Int, Int) = (10, 49)
 
-/** PerlTrieWord is the kind of the literal starting an alternative, which Perl puts in a trie with the same kind. */
-private[ir] enum PerlTrieWord:
-  case Empty, Exact, Fold
-
 private[ir] class IRBuilder(
     initial: BuildingContext,
     table: CaptureTable,
@@ -358,8 +288,7 @@ private[ir] class IRBuilder(
     chars: IRCharResolver,
     checker: LookBehindChecker,
     resolveCharacter: Option[(Node, IRCharFlags) => IRNodeData],
-    hasCall: Boolean,
-    hasBackReference: Boolean
+    hasCall: Boolean
 ):
   private val dialect = initial.dialect
 
@@ -369,7 +298,7 @@ private[ir] class IRBuilder(
 
   def build(node: Node): IRNode =
     val result = node.data match
-      case NodeData.Disjunction(children)                            => buildDisjunction(node, children)
+      case NodeData.Disjunction(children)                            => Left(buildDisjunction(children))
       case NodeData.Sequence(children)                               => buildSequence(children)
       case NodeData.Repeat(child, quantifier)                        => Left(buildRepeat(node, child, quantifier))
       case NodeData.Group(kind, child)                               => buildGroup(node, kind, child)
@@ -400,60 +329,9 @@ private[ir] class IRBuilder(
         case Some(f) => run.map((node, flags) => IRNode(f(node, flags), node.loc))
         case None    => chars.literals(run)
 
-  /** Whether it finds the alternatives that Perl compiles into a trie, which matter only with `(*THEN)`. */
-  var findsTries: Boolean = false
-
-  /** The alternatives that Perl compiles into a trie, by the location of the alternation. */
-  val tries: mutable.Map[SourceLocation, Seq[(Int, Int)]] = mutable.Map.empty
-
-  def buildDisjunction(node: Node, children: Seq[Node]): Either[IRNodeData, IRNode] =
+  def buildDisjunction(children: Seq[Node]): IRNodeData =
     // The flags at an alternative are the ones after the previous alternatives, as `(?i)` reaches the next ones.
-    val nodes = children.map(child => (if findsTries then trieWord(child, context) else None, build(child)))
-    if findsTries then
-      val runs = trieRuns(nodes.map(_._1))
-      if runs.nonEmpty then tries(node.loc) = runs
-    Left(IRNodeData.Disjunction(nodes.map(_._2)))
-
-  /** Returns the kind of the literal that Perl starts the trie word of the alternative with, if it can be in a trie.
-    *
-    * A literal is `EXACT`, or `EXACTFU` for a case-insensitive one of two or more characters with case variants, and an
-    * empty alternative is a word of any kind.
-    */
-  def trieWord(node: Node, context: BuildingContext): Option[PerlTrieWord] =
-    def literal(node: Node): Boolean = node.data match
-      case NodeData.Literal(_) | NodeData.Backslash(_: BackslashKind.Escape)        => true
-      case NodeData.Class(false, ClassItem.Value(ClassItemData.ClassLiteral(_), _)) => true
-      case _                                                                        => false
-    def hasCases(node: Node, context: BuildingContext): Boolean =
-      chars.resolve(node, context.charFlags) match
-        case IRNodeData.Chars(set) => set.size > 1
-        case _                     => true
-    def sequence(nodes: List[Node], context: BuildingContext): Option[PerlTrieWord] = nodes match
-      case Nil                                                             => Some(PerlTrieWord.Empty)
-      case Node(NodeData.Command(_: CommandKind.Comment), _) :: rest       => sequence(rest, context)
-      case Node(NodeData.Command(CommandKind.InlineFlag(diff)), _) :: rest => sequence(rest, context.update(diff))
-      case Node(NodeData.Group(GroupKind.NonCapture, child), _) :: rest    => sequence(child :: rest, context)
-      case Node(NodeData.Sequence(children), _) :: rest                    => sequence(children.toList ++ rest, context)
-      case first :: _ if literal(first)                                    =>
-        val run = nodes.takeWhile(literal)
-        if !context.charFlags.ignoreCase || !run.exists(hasCases(_, context)) then Some(PerlTrieWord.Exact)
-        else Option.when(run.size >= 2)(PerlTrieWord.Fold)
-      case _ => None
-    sequence(List(node), context)
-
-  /** Returns the runs of two or more alternatives in a trie, which start with a literal of the same kind. */
-  def trieRuns(words: Seq[Option[PerlTrieWord]]): Seq[(Int, Int)] =
-    val runs = Seq.newBuilder[(Int, Int)]
-    var i = 0
-    while i < words.size do
-      words(i) match
-        case Some(kind) if kind != PerlTrieWord.Empty =>
-          var j = i + 1
-          while j < words.size && words(j).exists(w => w == kind || w == PerlTrieWord.Empty) do j += 1
-          if j - i >= 2 then runs.addOne((i, j))
-          i = j
-        case _ => i += 1
-    runs.result()
+    IRNodeData.Disjunction(children.map(build))
 
   def buildSequence(children: Seq[Node]): Either[IRNodeData, IRNode] =
     children match
@@ -477,12 +355,7 @@ private[ir] class IRBuilder(
           case nodes     => Left(IRNodeData.Sequence(nodes))
 
   def buildRepeat(node: Node, child: Node, quantifier: Quantifier): IRNodeData =
-    val ir = child.data match
-      // Java's `\R` under a quantifier matches each iteration in its first way, though `\R` alone backtracks.
-      case NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline)) if dialect.isJava =>
-        IRNode(IRNodeData.Atomic(build(child)), child.loc)
-      case _ if isJavaGroupCurly(child, quantifier) => javaGroupCurly(build(child))
-      case _                                        => build(child)
+    val ir = build(child)
     val strategy = quantifier.strategy match
       case BacktrackStrategy.Greedy if context.ungreedy => BacktrackStrategy.Lazy
       case BacktrackStrategy.Lazy if context.ungreedy   => BacktrackStrategy.Greedy
@@ -502,32 +375,6 @@ private[ir] class IRBuilder(
     // A possessive quantifier is an atomic group of the greedy one, even for an exact count (e.g. `(?:a|ab){1}+`).
     if quantifier.strategy == BacktrackStrategy.Possessive then IRNodeData.Atomic(IRNode(repeat, node.loc))
     else repeat
-
-  /** Checks whether Java repeats the group with `GroupCurly`, which matches each iteration in its first way, and keeps
-    * the captures in it over backtracking.
-    *
-    * It matters only for a group with `\R` (which has two ways), with captures in a pattern with back-references, or
-    * matching the empty string (whose iteration `GroupCurly` rejects).
-    */
-  def isJavaGroupCurly(child: Node, quantifier: Quantifier): Boolean =
-    def isGroup = child.data match
-      case NodeData.Group(GroupKind.IndexedCapture | GroupKind.NonCapture | _: GroupKind.NamedCapture, _) => true
-      case NodeData.Group(_: GroupKind.InlineFlag, _)                                                     => true
-      case _                                                                                              => false
-    def matters = checker.javaMinLength(child) == 0 || NodeKey.exists(child):
-      case Node(NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline)), _) => true
-      case node @ Node(NodeData.Group(_, _), _) => hasBackReference && node != child && table.indexOf(node).isDefined
-      case _                                    => false
-    val counted = quantifier match
-      case Quantifier.Question(_) => false
-      case _                      => quantifier.strategy != BacktrackStrategy.Possessive
-    dialect.isJava && counted && isGroup && checker.javaDeterministic(child) && matters
-
-  /** Makes the body of Java's `GroupCurly` atomic, which keeps the captures in it as Java's atomic group does. */
-  def javaGroupCurly(ir: IRNode): IRNode = ir.data match
-    case IRNodeData.Capture(index, name, body) =>
-      IRNode(IRNodeData.Capture(index, name, IRNode(IRNodeData.Atomic(body), body.loc)), ir.loc)
-    case _ => IRNode(IRNodeData.Atomic(ir), ir.loc)
 
   def buildCommand(node: Node, kind: CommandKind): Either[IRNodeData, IRNode] = kind match
     case CommandKind.InlineFlag(diff) =>
@@ -633,16 +480,8 @@ private[ir] class IRBuilder(
       case Some(BacktrackControlKind.Mark) | None =>
         IRNodeData.BacktrackControl(IRBacktrackControl.Mark(name.getOrElse("")))
 
-  /** Builds a look-behind, which never matches if the engine tries no start for it.
-    *
-    * Java's `TreeInfo` lengths can make it so (e.g. `(?<=\X)`, where `\X` counts one for the minimum and zero for the
-    * maximum).
-    */
   def buildLookBehind(negative: Boolean, child: Node): IRNodeData =
-    checker.matching(child) match
-      case IRLookBehindMatch.Forward(Seq(IRLookBehindStarts.Java(min, max, _))) if 0 <= max && max < min =>
-        if negative then IRNodeData.Empty else IRNodeData.Chars(CharSet.empty)
-      case matching => IRNodeData.LookBehind(negative, scoped(build(child)), matching)
+    IRNodeData.LookBehind(negative, scoped(build(child)), checker.matching(child))
 
   def buildGroup(node: Node, kind: GroupKind, child: Node): Either[IRNodeData, IRNode] = kind match
     case GroupKind.IndexedCapture =>

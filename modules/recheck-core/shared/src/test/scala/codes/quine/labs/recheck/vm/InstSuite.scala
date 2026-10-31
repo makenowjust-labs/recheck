@@ -47,8 +47,7 @@ class InstSuite extends munit.FunSuite:
     assertEquals(Inst.CapBegin(0).toString, "cap_begin 0")
     assertEquals(Inst.CapEnd(0).toString, "cap_end 0")
     assertEquals(Inst.CapReset(0, 1).toString, "cap_reset 0 1")
-    assertEquals(Inst.CapKeep(None).toString, "cap_keep")
-    assertEquals(Inst.CapKeep(Some((1, 2))).toString, "cap_keep 1 2")
+    assertEquals(Inst.CapKeep.toString, "cap_keep")
     assertEquals(Inst.CapHold(1, 2).toString, "cap_hold 1 2")
     assertEquals(Inst.CmpCanary(CanaryReg(0), Label("x", 0), Label("y", 1)).toString, "cmp_canary %%0 #x@0 #y@1")
     assertEquals(
