@@ -411,6 +411,15 @@ class IRCharSuite extends munit.FunSuite:
   // A name starting with `In` or `Is` may be a user-defined property in Perl.
   unsupported("\\p{IsFoo}", "", Perl())
   unsupported("\\p{Foo::IsBar}", "", Perl())
+  // Perl's property wildcards, delimited by a punctuation but `+`, `-`, `_` and the braces.
+  unsupported("\\p{nv=/\\A[0-5]\\z/}", "", Perl())
+  unsupported("\\P{gc=!^L$!}", "", Perl())
+  unsupported("\\p{gc=(^L$)}", "", Perl())
+  unsupported("\\p{gc:/^L$/}", "", Perl())
+  error("\\p{gc=/^L$}", "", Perl())("Unknown Unicode property name at 0")
+  error("\\p{gc=(^L$(}", "", Perl())("Unknown Unicode property name at 0")
+  error("\\p{Nv=.5}", "", Perl())("Unknown Unicode property name at 0")
+  chars("\\p{gc=-Lu}", "", Perl())(gc("Lu"))
   check("\\p{RGI_Emoji_Flag_Sequence}", "v", JavaScript)(
     Strings(Properties.binary("RGI_Emoji_Flag_Sequence").get.classSet)
   )

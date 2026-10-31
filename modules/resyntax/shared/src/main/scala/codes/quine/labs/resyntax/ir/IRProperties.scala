@@ -687,6 +687,7 @@ private[ir] object IRProperties:
     value match
       // The parser splits a package-qualified name (e.g. `Foo::IsBar`) at the first `:`.
       case Some(value) if value.startsWith(":") => perl(s"$name:$value", None)
+      case Some(value) if isPerlWildcard(value) => if isPerlWildcardTerminated(value) then NotModeled else Unknown
       case Some(value)                          =>
         val propertyKey = perlKey(name)
         val valueKey = perlKey(value)
@@ -725,6 +726,23 @@ private[ir] object IRProperties:
             // looks up at run time.
             val local = name.split("::").last
             if local.startsWith("In") || local.startsWith("Is") then NotModeled else Unknown
+
+  /** Checks whether the value is a wildcard (e.g. `\p{gc=/^L/}`), which starts with a delimiter. */
+  private def isPerlWildcard(value: String): Boolean =
+    value.trim.headOption.exists(c => c < 0x80 && isAsciiPunct(c) && !"+-_{}".contains(c))
+
+  /** Checks whether the wildcard ends with the closing delimiter of its opening one. */
+  private def isPerlWildcardTerminated(value: String): Boolean =
+    val v = value.trim
+    val close = v.head match
+      case '(' => ')'
+      case '[' => ']'
+      case '<' => '>'
+      case c   => c
+    v.head != '\\' && v.length >= 2 && v.last == close
+
+  private def isAsciiPunct(c: Char): Boolean =
+    ('!' <= c && c <= '/') || (':' <= c && c <= '@') || ('[' <= c && c <= '`') || ('{' <= c && c <= '~')
 
   // ---------------------------------------------------------------------------------------------------------------
   // Ruby
