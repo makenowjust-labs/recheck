@@ -230,6 +230,7 @@ The result records it as `engine-error` with the message (see [Diagnostics](diag
 
 Notes on each dialect:
 
+- `ruby -` reads a program in the encoding of the locale, so the program starts with the magic comment `# encoding: UTF-8`.
 - `java` runs a fixed program as a single-file source program, which needs a JDK (17 or later).
   The program reads the pattern and the attack string from the standard input.
 - `dotnet` needs the .NET 10 SDK for `dotnet run` of a file.

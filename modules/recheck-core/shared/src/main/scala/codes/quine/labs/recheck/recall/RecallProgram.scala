@@ -171,8 +171,10 @@ object RecallProgram:
       case 'u' => "Regexp::FIXEDENCODING"
     val regex = if prefix.isEmpty then source else s"${style.literal(UStringUtil.fromString(prefix))} + $source"
     val input = attack.toString(style)
+    // `ruby -` reads the program in the encoding of the locale.
     val script =
-      s"""|$$stdout.sync = true
+      s"""|# encoding: UTF-8
+          |$$stdout.sync = true
           |Regexp.timeout = nil if Regexp.respond_to?(:timeout=)
           |puts "$RuntimeLine ruby #{RUBY_VERSION}"
           |regex = Regexp.new($regex, ${union(options, "0")})

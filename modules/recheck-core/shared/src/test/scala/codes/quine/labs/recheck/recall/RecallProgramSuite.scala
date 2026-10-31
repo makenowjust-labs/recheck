@@ -78,7 +78,8 @@ class RecallProgramSuite extends munit.FunSuite:
     assertEquals(program.command, Command("ruby", Seq("-")))
     assertEquals(
       program.script,
-      """|$stdout.sync = true
+      """|# encoding: UTF-8
+         |$stdout.sync = true
          |Regexp.timeout = nil if Regexp.respond_to?(:timeout=)
          |puts "recheck:runtime ruby #{RUBY_VERSION}"
          |regex = Regexp.new("a\#{b}\"", Regexp::IGNORECASE | Regexp::EXTENDED)

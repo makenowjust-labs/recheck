@@ -122,6 +122,11 @@ class RecallRuntimeSuite extends munit.FunSuite:
     assert(clue(r.runtime).startsWith("ruby "))
     assertFinish(validate("^(?:é|é)*$", "n", Dialect.Ruby(), attack("Ã©", 31, "\u0000")))
 
+  runtimeTest("Ruby: the program in UTF-8", "ruby"):
+    // The C locale would read a non-ASCII character of the program as an invalid US-ASCII byte.
+    val env = Map("RECHECK_RUBY" -> "env LC_ALL=C ruby")
+    assertFinish(validate("^(?:é|é)*$", "", Dialect.Ruby(), attack("é", 3, "\u0000"), env = env))
+
   runtimeTest("Java", "java"):
     val r = validate("^(a|a)*$", "", Dialect.Java, attack("a", 31, "\u0000"))
     assertFinish(r)
