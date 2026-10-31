@@ -75,10 +75,8 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   def joinRubyByteRepeats(children: Seq[Node]): Seq[Node] =
     if !dialect.isRuby || mode != UnitMode.CodePoint then return children
     def byteOf(node: Node): Option[Int] = node.data match
-      case NodeData.Backslash(BackslashKind.Escape(style, value))
-          if isRubyByteStyle(style) && value >= 0x80 && value <= 0xff =>
-        Some(value)
-      case _ => None
+      case NodeData.Backslash(BackslashKind.Escape(style, value)) if isRubyByte(style, value) => Some(value)
+      case _                                                                                  => None
     val out = mutable.ArrayBuffer.empty[Node]
     for child <- children do
       child.data match
@@ -273,14 +271,13 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     var i = 0
     while i < lits.length do
       val lit = lits(i)
-      if isRubyByte(lit) then
+      if isRubyByteLit(lit) then
         val n = utf8Length(lit.value)
         if n < 2 || i + n > lits.length || !lits
             .slice(i + 1, i + n)
-            .forall(l => isRubyByte(l) && (l.value & 0xc0) == 0x80)
+            .forall(l => isRubyByteLit(l) && (l.value & 0xc0) == 0x80)
         then throw new IRBuildingException("Invalid multibyte escape", lit.loc)
-        val bytes = lits.slice(i, i + n).map(_.value)
-        val c = bytes.tail.foldLeft(bytes.head & (0xff >> (n + 1)))((c, b) => (c << 6) | (b & 0x3f))
+        val c = decodeUtf8(lits.slice(i, i + n).map(_.value))
         out += lit.copy(value = c, loc = SourceLocation(lit.loc.start, lits(i + n - 1).loc.end))
         i += n
       else
@@ -288,8 +285,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         i += 1
     out.toSeq
 
-  private def isRubyByte(lit: Lit): Boolean =
-    lit.escape.exists(isRubyByteStyle) && 0x80 <= lit.value && lit.value <= 0xff
+  private def isRubyByteLit(lit: Lit): Boolean = lit.escape.exists(isRubyByte(_, lit.value))
 
   /** Returns the code values of a literal in the mode. */
   private def unitsOf(lit: Lit): Seq[Int] = mode match
@@ -620,12 +616,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         if invert then ClassSet(set.complement(mode)) else ClassSet(set)
       case ClassItemData.ClassRange(begin, end)    => range(begin.data, end.data, flags, item.loc)
       case ClassItemData.ClassCaseCommand(_)       => ClassSet.empty
-      case ClassItemData.ClassBackslashClass(kind) =>
-        kind match
-          case EscapeClassKind.GeneralNewline | EscapeClassKind.GraphemeCluster => throw new NotModeledException
-          case EscapeClassKind.NonNewline if dialect.isPCRE                     =>
-            ClassSet(CharSet.of(flags.lineTerminators.chars.toSeq*).restrict(mode).complement(mode))
-          case kind => escapeClassSet(kind, flags, item.loc)
+      case ClassItemData.ClassBackslashClass(kind) => escapeClassSet(kind, flags, item.loc)
       case value: ClassItemData.ClassValue
           if dialect.isRuby && mode == UnitMode.CodePoint &&
             isRubyByteValue(value) =>
@@ -639,15 +630,13 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     while i < items.length do
       val item = items(i)
       item.data match
-        case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, value))
-            if dialect.isRuby && mode == UnitMode.CodePoint && isRubyByteStyle(style) &&
-              value >= 0x80 && value <= 0xff =>
+        case value: ClassItemData.ClassValue
+            if dialect.isRuby && mode == UnitMode.CodePoint && isRubyByteValue(value) =>
           val bytes = items
             .drop(i)
             .takeWhile:
-              case ClassItem.Value(ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, value)), _) =>
-                isRubyByteStyle(style) && value >= 0x80 && value <= 0xff
-              case _ => false
+              case ClassItem.Value(value, _) => isRubyByteValue(value)
+              case _                         => false
           val lits = bytes.map: b =>
             val ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, value)) = b.data: @unchecked
             Lit(value, false, Some(style), flags, b.loc)
@@ -737,9 +726,8 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     ClassSet(eq.closure(CharSet.of((b.init ++ e.tail)*)).union(eq.closeRange(CharSet.range(b.last, e.head))))
 
   private def isRubyByteValue(value: ClassItemData.ClassValue): Boolean = value match
-    case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v)) =>
-      isRubyByteStyle(style) && v >= 0x80 && v <= 0xff
-    case _ => false
+    case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v)) => isRubyByte(style, v)
+    case _                                                                 => false
 
   private def posix(name: String, flags: IRCharFlags, loc: SourceLocation): CharSet =
     val set = classes.posix(name, flags).getOrElse(throw new IRBuildingException("Unknown POSIX class name", loc))
@@ -777,6 +765,9 @@ private[ir] object IRCharResolver:
       true
     case _ => false
 
+  /** Checks whether the escape gives a raw byte of a multibyte character in Ruby. */
+  def isRubyByte(style: EscapeStyle, value: Int): Boolean = isRubyByteStyle(style) && 0x80 <= value && value <= 0xff
+
   /** The value of a literal that has no unit in the mode, which never matches. */
   val NoUnit: Int = -1
 
@@ -811,6 +802,9 @@ private[ir] object IRCharResolver:
     else if b < 0xf0 then 3
     else if b < 0xf5 then 4
     else 0
+
+  def decodeUtf8(bytes: Seq[Int]): Int =
+    bytes.tail.foldLeft(bytes.head & (0xff >> (bytes.size + 1)))((c, b) => (c << 6) | (b & 0x3f))
 
   /** Removes the parts of a node that never match (an empty set, and what needs one), or returns `None` for all. */
   def prune(node: IRNode): Option[IRNode] = node.data match

@@ -299,8 +299,8 @@ private[ir] final class LookBehindChecker(
   /** Returns the widths of the nodes, where the escapes of the bytes of a character are together (e.g. `\xC3\xA9`). */
   private def rubyChars(nodes: Seq[Node]): Seq[RubyWidth] =
     def byte(node: Node): Option[Int] = node.data match
-      case NodeData.Backslash(BackslashKind.Escape(style, value)) if IRCharResolver.isRubyByteStyle(style) =>
-        Option.when(0x80 <= value && value <= 0xff)(value)
+      case NodeData.Backslash(BackslashKind.Escape(style, value)) if IRCharResolver.isRubyByte(style, value) =>
+        Some(value)
       case _ => None
     val out = Seq.newBuilder[RubyWidth]
     var i = 0

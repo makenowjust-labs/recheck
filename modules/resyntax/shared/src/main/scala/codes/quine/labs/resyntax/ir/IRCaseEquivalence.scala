@@ -66,7 +66,8 @@ object IRCaseEquivalence:
     * string UTF-8, which uses Unicode rules.
     */
   final case class PerlNative(mode: UnitMode) extends IRCaseEquivalence:
-    def closure(set: CharSet): CharSet = set.union(CaseMapping.SimpleFold.closure(set).diff(Latin1)).restrict(mode)
+    def closure(set: CharSet): CharSet =
+      set.union(CaseMapping.SimpleFold.closure(set).diff(IRCharClasses.Latin1)).restrict(mode)
 
   /** PerlLocale is Perl's `/l` rules in the C locale.
     *
@@ -79,8 +80,6 @@ object IRCaseEquivalence:
       asciiFold.closure(set.intersect(Byte)).union(CaseMapping.SimpleFold.closure(above).diff(Byte)).restrict(mode)
 
   private val Ascii: CharSet = CharSet.range(0, 0x7f)
-
-  private val Latin1: CharSet = CharSet.range(0x80, 0xff)
 
   private val Byte: CharSet = CharSet.range(0, 0xff)
 

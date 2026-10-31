@@ -229,8 +229,6 @@ object IRBuilder:
           Width(1, width.toLong)
       case _: Dialect.Ruby =>
         def fold(value: Int): Int = FullCaseFolding(value).length.max(1)
-        def decode(bytes: Seq[Int]): Int =
-          bytes.tail.foldLeft(bytes.head & (0xff >> (bytes.size + 1)))((c, b) => (c << 6) | (b & 0x3f))
         nodes =>
           val node = nodes.head
           table
@@ -239,8 +237,8 @@ object IRBuilder:
             .fold(single(1)): flags =>
               node.data match
                 case _ if nodes.size > 1 =>
-                  single(fold(decode(nodes.collect { case Node(NodeData.Backslash(BackslashKind.Escape(_, b)), _) =>
-                    b
+                  single(fold(IRCharResolver.decodeUtf8(nodes.collect {
+                    case Node(NodeData.Backslash(BackslashKind.Escape(_, b)), _) => b
                   })))
                 case NodeData.Literal(value)                                 => single(fold(value))
                 case NodeData.Backslash(value: BackslashKind.BackslashValue) => single(fold(value.value))
@@ -271,7 +269,7 @@ object IRBuilder:
     * code point above `U+00FF`, `\p{...}`, `\N{...}` (including `\N{U+...}`) or `\b{...}`.
     */
   private def usesPerlUnicodeSyntax(node: Node): Boolean =
-    def check(x: Any): Boolean = x match
+    deepExists(node):
       case AssertKind.Boundary(Some(_)) | AssertKind.NonBoundary(Some(_)) => true
       case BackslashKind.Escape(EscapeStyle.NamedHex, _)                  => true
       case BackslashKind.Escape(_, value)                                 => value > 0xff
@@ -280,40 +278,36 @@ object IRBuilder:
           _: EscapeClassKind.UnicodePropertyValue | _: EscapeClassKind.NonUnicodeProperty |
           _: EscapeClassKind.NonUnicodeBareProperty | _: EscapeClassKind.NonUnicodePropertyValue =>
         true
-      case xs: Iterable[?] => xs.exists(check)
-      case x: Option[?]    => x.exists(check)
-      case _: String       => false
-      case x: Product      => x.productIterator.exists(check)
-      case _               => false
-    check(node)
 
   /** Checks whether a Perl pattern has a non-ASCII literal, which makes a regex literal UTF-8 with `use utf8`. */
-  private def hasNonAsciiLiteral(x: Any): Boolean = x match
-    case NodeData.Literal(value)           => value >= 0x80
-    case ClassItemData.ClassLiteral(value) => value >= 0x80
-    case QuoteLiteral.QuoteValue(value)    => value >= 0x80
-    case xs: Iterable[?]                   => xs.exists(hasNonAsciiLiteral)
-    case x: Option[?]                      => x.exists(hasNonAsciiLiteral)
-    case _: String                         => false
-    case x: Product                        => x.productIterator.exists(hasNonAsciiLiteral)
-    case _                                 => false
+  private def hasNonAsciiLiteral(node: Node): Boolean =
+    deepExists(node):
+      case NodeData.Literal(value)           => value >= 0x80
+      case ClassItemData.ClassLiteral(value) => value >= 0x80
+      case QuoteLiteral.QuoteValue(value)    => value >= 0x80
 
   /** Returns the start of the last node with a supplementary character or a surrogate in the pattern text, or `-1`. */
   private def lastSupplementary(node: Node): Int =
     def isSupplementary(c: Int): Boolean = c >= 0x10000 || Character.isSurrogate(c.toChar) && c <= 0xffff
-    def hasSupplementary(x: Any): Boolean = x match
-      case ClassItemData.ClassLiteral(value) => isSupplementary(value)
-      case xs: Iterable[?]                   => xs.exists(hasSupplementary)
-      case x: Option[?]                      => x.exists(hasSupplementary)
-      case _: String                         => false
-      case x: Product                        => x.productIterator.exists(hasSupplementary)
-      case _                                 => false
     val self = node.data match
-      case NodeData.Literal(value)                     => isSupplementary(value)
-      case NodeData.Class(_, item)                     => hasSupplementary(item)
+      case NodeData.Literal(value) => isSupplementary(value)
+      case NodeData.Class(_, item) =>
+        deepExists(item) { case ClassItemData.ClassLiteral(value) => isSupplementary(value) }
       case NodeData.Command(CommandKind.Comment(text)) => UString.fromString(text).iterator.exists(isSupplementary)
       case _                                           => false
     NodeKey.children(node).map(lastSupplementary).foldLeft(if self then node.loc.start else -1)(_.max(_))
+
+  private def deepExists(x: Any)(p: PartialFunction[Any, Boolean]): Boolean =
+    p.applyOrElse(
+      x,
+      {
+        case xs: Iterable[?] => xs.exists(deepExists(_)(p))
+        case x: Option[?]    => x.exists(deepExists(_)(p))
+        case _: String       => false
+        case x: Product      => x.productIterator.exists(deepExists(_)(p))
+        case _               => false
+      }
+    )
 
   /** Returns the names of PCRE's start options (e.g. `(*CRLF)`), which can appear only at the start. */
   private def startOptions(node: Node): Seq[String] =
@@ -564,7 +558,7 @@ private[ir] class IRBuilder(
         nodes match
           case Seq(node) => Right(build(node))
           case nodes     => Left(IRNodeData.Disjunction(nodes.map(build)))
-    case CommandKind.Comment(_)                   => Left(IRNodeData.Empty)
+    case CommandKind.Comment(_) => Left(IRNodeData.Empty)
     // The start options are of the whole pattern, which `IRBuilder.build` reads.
     case CommandKind.StartOption(_, _)            => Left(IRNodeData.Empty)
     case CommandKind.RCall                        => Left(IRNodeData.Unsupported(node.data))

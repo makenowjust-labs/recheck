@@ -5,9 +5,11 @@ import codes.quine.labs.resyntax.charset.BinaryProperty
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
 import codes.quine.labs.resyntax.charset.EnumeratedProperty
+import codes.quine.labs.resyntax.charset.NameMatching
 import codes.quine.labs.resyntax.charset.Properties
 import codes.quine.labs.resyntax.charset.PropertyValue
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.ir.IRCharClasses.AsciiPosix
 
 /** PropertyResult is a result of looking up a Unicode property in a dialect. */
 private[ir] enum PropertyResult:
@@ -207,7 +209,7 @@ private[ir] object IRProperties:
 
   private def javaGraph: CharSet = javaWhiteSpace.union(gc("Cc", "Cs", "Cn")).complement(unicodeUniverse)
 
-  private val unicodeUniverse = codes.quine.labs.resyntax.charset.UnitMode.CodePoint
+  private val unicodeUniverse = UnitMode.CodePoint
 
   /** `Character.isIdentifierIgnorable`. */
   private def javaIdentifierIgnorable: CharSet =
@@ -227,18 +229,18 @@ private[ir] object IRProperties:
       case "L1"                      => found(CharSet.range(0, 0xff))
       case "all"                     => found(unicodeUniverse.universe)
       case "ASCII"                   => found(CharSet.range(0, 0x7f))
-      case "Alnum"                   => found(ascii('0' -> '9', 'A' -> 'Z', 'a' -> 'z'))
-      case "Alpha"                   => found(ascii('A' -> 'Z', 'a' -> 'z'))
-      case "Blank"                   => found(of(" \t"))
-      case "Cntrl"                   => found(CharSet.range(0, 0x1f).union(CharSet.single(0x7f)))
-      case "Digit"                   => found(ascii('0' -> '9'))
-      case "Graph"                   => found(CharSet.range(0x21, 0x7e))
+      case "Alnum"                   => found(AsciiPosix("alnum"))
+      case "Alpha"                   => found(AsciiPosix("alpha"))
+      case "Blank"                   => found(AsciiPosix("blank"))
+      case "Cntrl"                   => found(AsciiPosix("cntrl"))
+      case "Digit"                   => found(AsciiPosix("digit"))
+      case "Graph"                   => found(AsciiPosix("graph"))
       case "Lower"                   => found(if ci then ascii('A' -> 'Z', 'a' -> 'z') else ascii('a' -> 'z'))
-      case "Print"                   => found(CharSet.range(0x20, 0x7e))
-      case "Punct"                   => found(ascii('!' -> '/', ':' -> '@', '[' -> '`', '{' -> '~'))
-      case "Space"                   => found(of(" \t\n\u000b\f\r"))
+      case "Print"                   => found(AsciiPosix("print"))
+      case "Punct"                   => found(AsciiPosix("punct"))
+      case "Space"                   => found(AsciiPosix("space"))
       case "Upper"                   => found(if ci then ascii('A' -> 'Z', 'a' -> 'z') else ascii('A' -> 'Z'))
-      case "XDigit"                  => found(ascii('0' -> '9', 'A' -> 'F', 'a' -> 'f'))
+      case "XDigit"                  => found(AsciiPosix("xdigit"))
       case "javaLowerCase"           => cased(binary("Lowercase"))
       case "javaUpperCase"           => cased(binary("Uppercase"))
       case "javaTitleCase"           => cased(gc("Lt"))
@@ -642,16 +644,13 @@ private[ir] object IRProperties:
     val u = unicodeUniverse
     def o(set: CharSet, kind: CaseKind = CaseKind.Other) = Some((set, kind))
     val space = binary("White_Space")
-    val horiz = space.diff(CharSet.range(0x0a, 0x0d)).diff(of("\u0085  "))
-    val word = binary("Alphabetic").union(gc("M", "Nd", "Pc")).union(binary("Join_Control"))
+    val horiz = space.diff(IRCharClasses.Vertical)
     val graph = space.union(gc("Cc", "Cn", "Cs")).complement(u)
-    val asciiPunct = ascii('!' -> '/', ':' -> '@', '[' -> '`', '{' -> '~')
     val punct = gc("P").union(of("$+<=>^`|~"))
-    val asciiSet = CharSet.range(0, 0x7f)
     key match
       case "any" | "all" | "unicode"                            => o(u.universe)
       case "assigned"                                           => o(gc("Cn").complement(u))
-      case "ascii"                                              => o(asciiSet)
+      case "ascii"                                              => o(AsciiPosix("ascii"))
       case "l&" | "l_" | "lc" | "casedletter"                   => o(gc("LC"), CaseKind.Category)
       case "alnum" | "xposixalnum"                              => o(binary("Alphabetic").union(gc("Nd")))
       case "alpha" | "xposixalpha"                              => o(binary("Alphabetic"))
@@ -665,23 +664,23 @@ private[ir] object IRProperties:
       case "space" | "xposixspace" | "spaceperl" | "xperlspace" => o(space)
       case "upper" | "xposixupper"                              => o(binary("Uppercase"), CaseKind.Cased)
       case "title" | "titlecase"                                => o(gc("Lt"), CaseKind.Cased)
-      case "word" | "xposixword"                                => o(word)
+      case "word" | "xposixword"                                => o(IRCharClasses.perlWord)
       case "xdigit" | "xposixxdigit"                            => o(binary("Hex_Digit"))
-      case "vertspace" | "v"                                    => o(CharSet.range(0x0a, 0x0d).union(of("\u0085  ")))
-      case "posixalnum"                                         => o(ascii('0' -> '9', 'A' -> 'Z', 'a' -> 'z'))
-      case "posixalpha"                                         => o(ascii('A' -> 'Z', 'a' -> 'z'))
-      case "posixblank"                                         => o(of(" \t"))
-      case "posixcntrl"                                         => o(CharSet.range(0, 0x1f).union(CharSet.single(0x7f)))
-      case "posixdigit"                                         => o(ascii('0' -> '9'))
-      case "posixgraph"                                         => o(CharSet.range(0x21, 0x7e))
-      case "posixlower"                                         => o(ascii('a' -> 'z'), CaseKind.Cased)
-      case "posixprint"                                         => o(CharSet.range(0x20, 0x7e))
-      case "posixpunct"                                         => o(asciiPunct)
-      case "posixspace" | "perlspace"                           => o(of(" \t\n\u000b\f\r"))
-      case "posixupper"                                         => o(ascii('A' -> 'Z'), CaseKind.Cased)
-      case "posixword" | "perlword" => o(ascii('0' -> '9', 'A' -> 'Z', 'a' -> 'z', '_' -> '_'))
-      case "posixxdigit"            => o(ascii('0' -> '9', 'A' -> 'F', 'a' -> 'f'))
-      case _                        => None
+      case "vertspace" | "v"                                    => o(IRCharClasses.Vertical)
+      case "posixalnum"                                         => o(AsciiPosix("alnum"))
+      case "posixalpha"                                         => o(AsciiPosix("alpha"))
+      case "posixblank"                                         => o(AsciiPosix("blank"))
+      case "posixcntrl"                                         => o(AsciiPosix("cntrl"))
+      case "posixdigit"                                         => o(AsciiPosix("digit"))
+      case "posixgraph"                                         => o(AsciiPosix("graph"))
+      case "posixlower"                                         => o(AsciiPosix("lower"), CaseKind.Cased)
+      case "posixprint"                                         => o(AsciiPosix("print"))
+      case "posixpunct"                                         => o(AsciiPosix("punct"))
+      case "posixspace" | "perlspace"                           => o(AsciiPosix("space"))
+      case "posixupper"                                         => o(AsciiPosix("upper"), CaseKind.Cased)
+      case "posixword" | "perlword"                             => o(AsciiPosix("word"))
+      case "posixxdigit"                                        => o(AsciiPosix("xdigit"))
+      case _                                                    => None
 
   def perl(name: String, value: Option[String]): PropertyResult =
     value match
@@ -704,7 +703,7 @@ private[ir] object IRProperties:
               case _                     =>
                 perlBinaryIndex.get(propertyKey) match
                   case Some(p) =>
-                    Properties.binaryValue(value, codes.quine.labs.resyntax.charset.NameMatching.Loose) match
+                    Properties.binaryValue(value, NameMatching.Loose) match
                       case Some(true)  => foundBinary(p)
                       case Some(false) => found(p.set.complement(unicodeUniverse))
                       case None        => Unknown

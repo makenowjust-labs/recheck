@@ -81,8 +81,7 @@ private[ir] final class ReferenceResolver(table: CaptureTable, dialect: Dialect,
   /** Resolves a call by `\g<...>`, where Ruby rejects a name shared by groups. */
   def escapeCall(ref: Reference, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
     val indices = call(ref, site, loc)
-    if featureSet.rejectsCallToSharedName && indices.size > 1 then
-      fail("Call to a name shared by groups", loc)
+    if featureSet.rejectsCallToSharedName && indices.size > 1 then fail("Call to a name shared by groups", loc)
     indices
 
   // Python rejects a reference to a group that is not closed, or that is in the same look-behind.
