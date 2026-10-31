@@ -869,6 +869,6 @@ private[ir] object IRProperties:
       case Dialect.Java       => java(name, value, flags)
       case Dialect.DotNet     => if value.isEmpty then dotNet(name) else Unknown
       case Dialect.PCRE       => pcre(name, value)
-      case Dialect.Perl       => perl(name, value)
-      case Dialect.Ruby       => ruby(name, value, mode == UnitMode.Byte)
-      case Dialect.Python     => Unknown
+      case _: Dialect.Perl    => perl(name, value)
+      case _: Dialect.Ruby    => ruby(name, value, mode == UnitMode.Byte)
+      case _: Dialect.Python  => Unknown

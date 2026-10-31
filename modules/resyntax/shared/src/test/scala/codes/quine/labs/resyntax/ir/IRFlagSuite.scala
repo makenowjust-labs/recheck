@@ -12,26 +12,26 @@ import codes.quine.labs.resyntax.ir.IRNodeData.Sequence
 class IRFlagSuite extends IRSuiteBase:
   // `\n^` with `m` matches `a\n` in .NET, JavaScript and Python, but not in Java, Perl, PCRE and Ruby.
   // `^` with `m` matches the empty string except in Java.
-  check("^", "m", DotNet, Python)(Assert(LineBegin(LT.LF, AfterTerminator)))
+  check("^", "m", DotNet, Python())(Assert(LineBegin(LT.LF, AfterTerminator)))
   check("^", "m", JavaScript)(Assert(LineBegin(LT.JavaScript, AfterTerminator)))
   check("^", "m", Java)(Assert(LineBegin(LT.Java, Never)))
-  check("^", "m", PCRE, Perl)(Assert(LineBegin(LT.LF, InputBegin)))
-  check("^", "", Ruby)(Assert(LineBegin(LT.LF, InputBegin)))
-  check("^", "m", Ruby)(Assert(LineBegin(LT.LF, InputBegin)))
+  check("^", "m", PCRE, Perl())(Assert(LineBegin(LT.LF, InputBegin)))
+  check("^", "", Ruby())(Assert(LineBegin(LT.LF, InputBegin)))
+  check("^", "m", Ruby())(Assert(LineBegin(LT.LF, InputBegin)))
 
   // `a$` matches `a\n` except in JavaScript; Java also before `\r\n`, `\r`, `\u0085` and ` ` at the end.
   check("$", "", JavaScript)(Assert(TextEnd))
-  check("$", "", DotNet, PCRE, Perl, Python)(Assert(ChompTextEnd(LT.LF)))
+  check("$", "", DotNet, PCRE, Perl(), Python())(Assert(ChompTextEnd(LT.LF)))
   check("$", "", Java)(Assert(ChompTextEnd(LT.Java)))
-  check("$", "", Ruby)(Assert(LineEnd(LT.LF)))
-  check("$", "m", DotNet, PCRE, Perl, Python, Ruby)(Assert(LineEnd(LT.LF)))
+  check("$", "", Ruby())(Assert(LineEnd(LT.LF)))
+  check("$", "m", DotNet, PCRE, Perl(), Python(), Ruby())(Assert(LineEnd(LT.LF)))
   check("$", "m", JavaScript)(Assert(LineEnd(LT.JavaScript)))
   check("$", "m", Java)(Assert(LineEnd(LT.Java)))
   // `a$` with `D` does not match `a\n`, but `(?m)a$` with `D` matches `a\nb`.
   check("$", "D", PCRE)(Assert(TextEnd))
   check("$", "mD", PCRE)(Assert(LineEnd(LT.LF)))
   // `\Z` is like `$` without `m`, except in Python.
-  check("\\Z", "", DotNet, PCRE, Perl, Ruby)(Assert(ChompTextEnd(LT.LF)))
+  check("\\Z", "", DotNet, PCRE, Perl(), Ruby())(Assert(ChompTextEnd(LT.LF)))
   check("\\Z", "D", PCRE)(Assert(ChompTextEnd(LT.LF)))
   check("\\Z", "", Java)(Assert(ChompTextEnd(LT.Java)))
 
@@ -55,39 +55,39 @@ class IRFlagSuite extends IRSuiteBase:
   // Inline flags apply to the rest of the enclosing group, including the following alternatives.
   checkWith("(?m:^)^", "", All*)(d =>
     val begin = d match
-      case JavaScript         => LineBegin(LT.JavaScript, AfterTerminator)
-      case DotNet | Python    => LineBegin(LT.LF, AfterTerminator)
-      case Java               => LineBegin(LT.Java, Never)
-      case PCRE | Perl | Ruby => LineBegin(LT.LF, InputBegin)
-    Sequence(Assert(begin), Assert(if d == Ruby then begin else TextBegin))
+      case JavaScript               => LineBegin(LT.JavaScript, AfterTerminator)
+      case DotNet | _: Python       => LineBegin(LT.LF, AfterTerminator)
+      case Java                     => LineBegin(LT.Java, Never)
+      case PCRE | _: Perl | _: Ruby => LineBegin(LT.LF, InputBegin)
+    Sequence(Assert(begin), Assert(if d == Ruby() then begin else TextBegin))
   )
   // `(?:(?m))^a` does not match `b\na`, but `(?:(?m)x|^)a` matches it.
-  check("(?:(?m))^", "", DotNet, PCRE, Perl)(Sequence(Empty, Assert(TextBegin)))
-  checkWith("(?:(?m)|^)", "", DotNet, Java, PCRE, Perl)(d =>
+  check("(?:(?m))^", "", DotNet, PCRE, Perl())(Sequence(Empty, Assert(TextBegin)))
+  checkWith("(?:(?m)|^)", "", DotNet, Java, PCRE, Perl())(d =>
     val begin = d match
       case DotNet => LineBegin(LT.LF, AfterTerminator)
       case Java   => LineBegin(LT.Java, Never)
       case _      => LineBegin(LT.LF, InputBegin)
     IRNodeData.Disjunction(Empty, Assert(begin))
   )
-  check("(?-m:^)", "m", DotNet, PCRE, Perl)(Assert(TextBegin))
-  check("(?-m:^)", "m", Ruby)(Assert(LineBegin(LT.LF, InputBegin)))
-  check("(?^m:^)", "", PCRE, Perl)(Assert(LineBegin(LT.LF, InputBegin)))
-  check("(?^:^)", "m", PCRE, Perl)(Assert(TextBegin))
-  check("(?m)^", "", Python)(Sequence(Empty, Assert(LineBegin(LT.LF, AfterTerminator))))
+  check("(?-m:^)", "m", DotNet, PCRE, Perl())(Assert(TextBegin))
+  check("(?-m:^)", "m", Ruby())(Assert(LineBegin(LT.LF, InputBegin)))
+  check("(?^m:^)", "", PCRE, Perl())(Assert(LineBegin(LT.LF, InputBegin)))
+  check("(?^:^)", "m", PCRE, Perl())(Assert(TextBegin))
+  check("(?m)^", "", Python())(Sequence(Empty, Assert(LineBegin(LT.LF, AfterTerminator))))
 
   // The flags of character-level nodes.
-  checkFlags("a(?i)b(?-i)c", "", DotNet, Java, PCRE, Perl)(d => Seq(flagsOf(d), flagsOf(d, "i"), flagsOf(d)))
+  checkFlags("a(?i)b(?-i)c", "", DotNet, Java, PCRE, Perl())(d => Seq(flagsOf(d), flagsOf(d, "i"), flagsOf(d)))
   checkFlags("a(?i:b)c", "", All*)(d => Seq(flagsOf(d), flagsOf(d, "i"), flagsOf(d)))
-  checkFlags("(?:a(?i)b|c)d", "", DotNet, Java, PCRE, Perl)(d =>
+  checkFlags("(?:a(?i)b|c)d", "", DotNet, Java, PCRE, Perl())(d =>
     Seq(flagsOf(d), flagsOf(d, "i"), flagsOf(d, "i"), flagsOf(d))
   )
-  checkFlags("(?i)a|b", "", Python)(d => Seq(flagsOf(d, "i"), flagsOf(d, "i")))
+  checkFlags("(?i)a|b", "", Python())(d => Seq(flagsOf(d, "i"), flagsOf(d, "i")))
   // Ruby's `m` is dot-all: `(?m:.)` matches `\n`.
-  checkFlags(".(?m:.)", "", Ruby)(d => Seq(flagsOf(d), flagsOf(d).copy(dotAll = true)))
-  checkFlags(".", "m", Ruby)(d => Seq(flagsOf(d).copy(dotAll = true)))
-  checkFlags(".", "s", DotNet, Java, JavaScript, PCRE, Perl, Python)(d => Seq(flagsOf(d).copy(dotAll = true)))
-  checkFlags(".", "m", DotNet, Java, JavaScript, PCRE, Perl, Python)(d => Seq(flagsOf(d)))
+  checkFlags(".(?m:.)", "", Ruby())(d => Seq(flagsOf(d), flagsOf(d).copy(dotAll = true)))
+  checkFlags(".", "m", Ruby())(d => Seq(flagsOf(d).copy(dotAll = true)))
+  checkFlags(".", "s", DotNet, Java, JavaScript, PCRE, Perl(), Python())(d => Seq(flagsOf(d).copy(dotAll = true)))
+  checkFlags(".", "m", DotNet, Java, JavaScript, PCRE, Perl(), Python())(d => Seq(flagsOf(d)))
   checkFlags(".(?d).", "", Java)(d => Seq(flagsOf(d), flagsOf(d).copy(lineTerminators = LT.LF)))
   checkFlags("(*ANY).", "", PCRE)(d => Seq(flagsOf(d).copy(lineTerminators = LT.PCREAny)))
 
@@ -109,11 +109,11 @@ class IRFlagSuite extends IRSuiteBase:
     // PHP's `u` sets UCP as well as UTF: `\w` with `u` matches `é`.
     assertEquals(flagsOf(PCRE, "u").unicode, true)
     assertEquals(flagsOf(PCRE, "u").unicodeClass, true)
-    assertEquals(flagsOf(Perl).unicode, true)
-    assertEquals(flagsOf(Python).unicode, true)
-    assertEquals(flagsOf(Python, "b").unicode, false)
-    assertEquals(flagsOf(Ruby).unicode, true)
-    assertEquals(flagsOf(Ruby, "n").unicode, false)
+    assertEquals(flagsOf(Perl()).unicode, true)
+    assertEquals(flagsOf(Python()).unicode, true)
+    assertEquals(flagsOf(Python(), "b").unicode, false)
+    assertEquals(flagsOf(Ruby()).unicode, true)
+    assertEquals(flagsOf(Ruby(), "n").unicode, false)
     for d <- All do
       assertEquals(flagsOf(d).charset, IRCharset.Default)
       assertEquals(flagsOf(d).ignoreCase, false)
@@ -128,15 +128,15 @@ class IRFlagSuite extends IRSuiteBase:
   checkFlags("(*BSR_UNICODE)(*BSR_ANYCRLF)a", "", PCRE)(d => Seq(flagsOf(d).copy(bsrAnyCRLF = true)))
 
   // Character set modifiers, where the last one wins in Perl, Python and Ruby: `(?a)\d(?u)\d` matches `1١`.
-  checkFlags("a(?a)b(?u)c", "", Perl, Ruby)(d =>
+  checkFlags("a(?a)b(?u)c", "", Perl(), Ruby())(d =>
     Seq(flagsOf(d), flagsOf(d).copy(charset = IRCharset.Ascii.All), flagsOf(d).copy(charset = IRCharset.Unicode))
   )
-  checkFlags("(?l)a(?d)b", "", Perl)(d => Seq(flagsOf(d).copy(charset = IRCharset.Locale), flagsOf(d)))
-  checkFlags("(?a)a", "", Python)(d => Seq(flagsOf(d).copy(charset = IRCharset.Ascii.All)))
-  checkFlags("(?L)a", "b", Python)(d => Seq(flagsOf(d, "b").copy(charset = IRCharset.Locale)))
+  checkFlags("(?l)a(?d)b", "", Perl())(d => Seq(flagsOf(d).copy(charset = IRCharset.Locale), flagsOf(d)))
+  checkFlags("(?a)a", "", Python())(d => Seq(flagsOf(d).copy(charset = IRCharset.Ascii.All)))
+  checkFlags("(?L)a", "b", Python())(d => Seq(flagsOf(d, "b").copy(charset = IRCharset.Locale)))
   // `(*UTF)(*UCP)(?a)(?^)\d` does not match `١`, so `(?^)` keeps `a` in PCRE, but not in Perl.
   checkFlags("(?a)(?^)a", "", PCRE)(d => Seq(flagsOf(d).copy(charset = IRCharset.Ascii.All)))
-  checkFlags("(?a)(?^)a", "", Perl)(d => Seq(flagsOf(d)))
+  checkFlags("(?a)(?^)a", "", Perl())(d => Seq(flagsOf(d)))
   checkFlags("(?aD)a(?aS)b", "", PCRE)(d =>
     Seq(
       flagsOf(d)
@@ -151,5 +151,5 @@ class IRFlagSuite extends IRSuiteBase:
   checkFlags("a(?c)b", "", Java)(d => Seq(flagsOf(d)))
 
   // Perl's case commands are applied to a regex literal before parsing, so they leave no flags.
-  checkFlags("\\Ua\\Eb", "", Perl)(d => Seq(flagsOf(d), flagsOf(d)))
-  checkFlags("\\Qa\\Eb", "", Perl)(d => Seq(flagsOf(d), flagsOf(d)))
+  checkFlags("\\Ua\\Eb", "", Perl())(d => Seq(flagsOf(d), flagsOf(d)))
+  checkFlags("\\Qa\\Eb", "", Perl())(d => Seq(flagsOf(d), flagsOf(d)))

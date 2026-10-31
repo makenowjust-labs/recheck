@@ -2,7 +2,6 @@ package codes.quine.labs.resyntax.parser
 
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
-import codes.quine.labs.resyntax.ast.DialectOptions
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
@@ -26,12 +25,14 @@ abstract class ParserSuiteBase extends munit.FunSuite:
   /** Checks a Perl pattern from a runtime string, which Perl's lexer does not rewrite. */
   def checkPerlString(s: String, flags: String)(expected: NodeData)(implicit loc: munit.Location): Unit =
     test(s"Parser.parse: /$s/$flags in Perl from a string"):
-      val result = Parser.parse(s, FlagSet.parse(flags, Perl), Perl, DialectOptions(perlSource = PerlSource.String))
+      val result = Parser.parse(s, FlagSet.parse(flags, PerlString), PerlString)
       assert(result.equalsWithoutLoc(Node(expected)), result)
 
   def errorPerlString(s: String, flags: String)(message: String)(implicit loc: munit.Location): Unit =
     test(s"Parser.parse: /$s/$flags in Perl from a string with error \"$message\""):
       interceptMessage[ParsingException](message):
-        Parser.parse(s, FlagSet.parse(flags, Perl), Perl, DialectOptions(perlSource = PerlSource.String))
+        Parser.parse(s, FlagSet.parse(flags, PerlString), PerlString)
 
-  val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl, Python, Ruby)
+  val PerlString: Dialect = Perl(source = PerlSource.String)
+
+  val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())

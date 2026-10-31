@@ -8,8 +8,6 @@ import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.ConditionalTest
 import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.DialectOptions
-import codes.quine.labs.resyntax.ast.Encoding
 import codes.quine.labs.resyntax.ast.EscapeClassKind
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.GroupKind
@@ -30,38 +28,28 @@ object IRBuilder:
     *
     * It throws [[IRBuildingException]] for an error that needs the whole pattern (e.g. a reference to a non-existent
     * group, or a look-behind that the dialect does not allow).
-    *
-    * @param options
-    *   the dialect's options, where IR uses the encoding
     */
-  def build(
-      node: Node,
-      flagSet: FlagSet,
-      dialect: Dialect,
-      options: DialectOptions = DialectOptions.Default
-  ): IRPattern =
-    build(node, flagSet, dialect, options, None)
+  def build(node: Node, flagSet: FlagSet, dialect: Dialect): IRPattern =
+    build(node, flagSet, dialect, None)
 
   /** Returns an IR pattern built from the given AST, where `resolveCharacter` replaces the character resolution. */
   private[ir] def build(
       node: Node,
       flagSet: FlagSet,
       dialect: Dialect,
-      options: DialectOptions,
       resolveCharacter: Option[(Node, IRCharFlags) => IRNodeData]
   ): IRPattern =
     val starts = startOptions(node)
     val featureSet = IRFeatureSet.from(flagSet, dialect, starts)
-    options.validate(dialect)
-    val mode = unitMode(dialect, options.encoding, flagSet, featureSet.utf)
-    if dialect == Dialect.Python && mode == UnitMode.CodePoint && flagSet.localeUpper then
+    val mode = unitMode(dialect, flagSet, featureSet.utf)
+    if dialect.isPython && mode == UnitMode.CodePoint && flagSet.localeUpper then
       throw new IRBuildingException("Cannot use LOCALE flag with a str pattern", SourceLocation.Invalid)
     val context = BuildingContext.from(flagSet, dialect, featureSet)
     val table = CaptureAnalyzer.analyze(node, context)
     val resolver = new ReferenceResolver(table, dialect, featureSet)
-    // A Perl byte string has no `use utf8`, so its non-ASCII literals are bytes.
-    val perlUtf8 = if mode == UnitMode.Byte then options.perlUtf8.orElse(Some(false)) else options.perlUtf8
-    val perlUnicodeRules = dialect == Dialect.Perl && usesPerlUnicodeRules(node, perlUtf8)
+    val perlUnicodeRules = resolveDialect(node, dialect) match
+      case Dialect.Perl(_, _, utf8) => usesPerlUnicodeRules(node, utf8)
+      case _                        => false
     val checker =
       new LookBehindChecker(table, resolver, featureSet, literalWidth(flagSet, dialect, perlUnicodeRules))
     val backReferences = new IRValidator(table, resolver, checker, featureSet).validate(node)
@@ -77,25 +65,36 @@ object IRBuilder:
       notEmpty(starts)
     )
 
-  /** Returns the unit mode of a pattern from the dialect, the encoding and the flags.
+  /** Returns the dialect with the settings that the pattern decides, i.e. Perl's `utf8` if it is not given.
+    *
+    * A byte string has no `use utf8`, so it is not UTF-8. Otherwise, a code point above `U+00FF`, `\p{...}`, `\N{...}`
+    * and a non-ASCII literal make the pattern UTF-8.
+    */
+  def resolveDialect(node: Node, dialect: Dialect): Dialect = dialect match
+    case perl @ Dialect.Perl(encoding, _, None) =>
+      perl.copy(utf8 = Some(encoding != Dialect.Perl.Encoding.Bytes && usesPerlUnicodeSyntax(node, literals = true)))
+    case dialect => dialect
+
+  /** Returns the unit mode of a pattern from the dialect and the flags.
     *
     * @param utf
     *   PCRE's `(*UTF)` start option
     */
-  private def unitMode(dialect: Dialect, encoding: Option[Encoding], flagSet: FlagSet, utf: Boolean): UnitMode =
+  private def unitMode(dialect: Dialect, flagSet: FlagSet, utf: Boolean): UnitMode =
     dialect match
       case Dialect.JavaScript =>
         if flagSet.unicode || flagSet.unicodeSets then UnitMode.CodePoint else UnitMode.Utf16
       // Java matches code points, and reads a lone surrogate as a code point too.
-      case Dialect.Java   => UnitMode.CodePoint
-      case Dialect.DotNet => UnitMode.Utf16
-      case Dialect.Python =>
-        if flagSet.bytes || encoding.contains(Encoding.PythonBytes) then UnitMode.Byte else UnitMode.CodePoint
+      case Dialect.Java             => UnitMode.CodePoint
+      case Dialect.DotNet           => UnitMode.Utf16
+      case Dialect.Python(encoding) =>
+        if flagSet.bytes || encoding == Dialect.Python.Encoding.Bytes then UnitMode.Byte else UnitMode.CodePoint
       // Ruby's `n` is the encoding option (NOENCODING), which `FlagSet` keeps as `explicitCapture`.
-      case Dialect.Ruby =>
-        if flagSet.explicitCapture || encoding.contains(Encoding.RubyAscii8Bit) then UnitMode.Byte
+      case Dialect.Ruby(encoding) =>
+        if flagSet.explicitCapture || encoding == Dialect.Ruby.Encoding.Ascii8Bit then UnitMode.Byte
         else UnitMode.CodePoint
-      case Dialect.Perl => if encoding.contains(Encoding.PerlBytes) then UnitMode.Byte else UnitMode.CodePoint
+      case Dialect.Perl(encoding, _, _) =>
+        if encoding == Dialect.Perl.Encoding.Bytes then UnitMode.Byte else UnitMode.CodePoint
       case Dialect.PCRE => if flagSet.unicode || utf then UnitMode.CodePoint else UnitMode.Byte
 
   /** Returns the case equivalence of a back-reference with the flags in the dialect and the mode. */
@@ -112,7 +111,7 @@ object IRBuilder:
       perlUnicodeRules: Boolean
   ): Int => LookBehindChecker.Width =
     import LookBehindChecker.Width
-    if dialect == Dialect.Perl && flagSet.ignoreCase && perlUnicodeRules then
+    if dialect.isPerl && flagSet.ignoreCase && perlUnicodeRules then
       value => Width(1, FullCaseFolding(value).length.max(1).toLong)
     else _ => Width(1, 1)
 
@@ -325,14 +324,14 @@ private[ir] class IRBuilder(
       val set = indices.filter(_ != 0)
       if set.isEmpty then Left(false)
       // Ruby tests only the first group of a name shared by groups.
-      else if dialect == Dialect.Ruby then Right(IRCondition.Captured(set.take(1)))
+      else if dialect.isRuby then Right(IRCondition.Captured(set.take(1)))
       else Right(IRCondition.Captured(set))
     def resolved: Seq[Int] =
       backReferences.getOrElse(NodeKey(node), throw new IllegalStateException(s"No resolved test: $node"))
     // A recursion test is false out of a recursion, so it is constant without calls.
     // PCRE reads `(R)` and `(R1)` as capture tests when a group has the name.
     def recursion(name: Option[String]): Option[Either[Boolean, IRCondition]] =
-      name.filter(dialect == Dialect.PCRE && table.names.contains(_)) match
+      name.filter(dialect.isPCRE && table.names.contains(_)) match
         case Some(name) => Some(captured(table.names(name)))
         case None       => Option.when(!hasCall)(Left(false))
     val condition: Option[Either[Boolean, IRCondition]] = test match
@@ -393,7 +392,7 @@ private[ir] class IRBuilder(
     * It never matches if no start is tried, and is unsupported otherwise.
     */
   def buildLookBehind(node: Node, negative: Boolean, child: Node): IRNodeData =
-    if dialect == Dialect.Java && IRBuilder.hasGraphemeCluster(child) then
+    if dialect.isJava && IRBuilder.hasGraphemeCluster(child) then
       if !checker.javaNeverMatches(child) then IRNodeData.Unsupported(node.data)
       else if negative then IRNodeData.Empty
       else IRNodeData.Chars(CharSet.empty)

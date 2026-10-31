@@ -65,22 +65,22 @@ final case class BuildingContext(flagSet: FlagSet, dialect: Dialect, featureSet:
   /** Returns the flags that a character-level node needs. */
   def charFlags: IRCharFlags =
     val f = flagSet
-    val isJava = dialect == Dialect.Java
-    val isPCRE = dialect == Dialect.PCRE
+    val isJava = dialect.isJava
+    val isPCRE = dialect.isPCRE
     IRCharFlags(
       ignoreCase = f.ignoreCase,
-      dotAll = if dialect == Dialect.Ruby then f.multiline else f.dotAll,
+      dotAll = if dialect.isRuby then f.multiline else f.dotAll,
       lineTerminators = lineTerminators,
       unicode = dialect match
-        case Dialect.DotNet              => false
-        case Dialect.Java | Dialect.Perl => true
-        case Dialect.JavaScript          => f.unicode || f.unicodeSets
-        case Dialect.PCRE                => f.unicode || featureSet.utf
-        case Dialect.Python              => !f.bytes
+        case Dialect.DotNet                 => false
+        case Dialect.Java | _: Dialect.Perl => true
+        case Dialect.JavaScript             => f.unicode || f.unicodeSets
+        case Dialect.PCRE                   => f.unicode || featureSet.utf
+        case _: Dialect.Python              => !f.bytes
         // Ruby's `n` is the encoding option (NOENCODING), not explicit capture.
-        case Dialect.Ruby => !f.explicitCapture
+        case _: Dialect.Ruby => !f.explicitCapture
       ,
-      unicodeSets = dialect == Dialect.JavaScript && f.unicodeSets,
+      unicodeSets = dialect.isJavaScript && f.unicodeSets,
       unicodeCase = !isJava || f.unicode || f.ungreedy,
       // PHP's `u` sets PCRE2_UCP as well as PCRE2_UTF.
       unicodeClass = isJava && f.ungreedy || isPCRE && (f.unicode || featureSet.ucp),
@@ -94,7 +94,7 @@ final case class BuildingContext(flagSet: FlagSet, dialect: Dialect, featureSet:
   private def charset: IRCharset =
     val f = flagSet
     dialect match
-      case Dialect.Perl | Dialect.Ruby | Dialect.Python =>
+      case _: Dialect.Perl | _: Dialect.Ruby | _: Dialect.Python =>
         if f.ascii then IRCharset.Ascii.All
         else if f.localeLower || f.localeUpper then IRCharset.Locale
         else if f.unicode then IRCharset.Unicode

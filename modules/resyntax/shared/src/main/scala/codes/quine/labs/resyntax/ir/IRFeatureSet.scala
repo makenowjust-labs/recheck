@@ -94,13 +94,13 @@ object IRLookBehindRule:
 
 object IRFeatureSet:
   def from(flagSet: FlagSet, dialect: Dialect, startOptions: Seq[String] = Seq.empty): IRFeatureSet =
-    val isDotNet = dialect == Dialect.DotNet
-    val isJava = dialect == Dialect.Java
-    val isJavaScript = dialect == Dialect.JavaScript
-    val isPCRE = dialect == Dialect.PCRE
-    val isPerl = dialect == Dialect.Perl
-    val isPython = dialect == Dialect.Python
-    val isRuby = dialect == Dialect.Ruby
+    val isDotNet = dialect.isDotNet
+    val isJava = dialect.isJava
+    val isJavaScript = dialect.isJavaScript
+    val isPCRE = dialect.isPCRE
+    val isPerl = dialect.isPerl
+    val isPython = dialect.isPython
+    val isRuby = dialect.isRuby
 
     // PCRE uses the last newline option.
     val newline = startOptions.reverseIterator.collectFirst {
@@ -177,9 +177,9 @@ object IRFeatureSet:
         case Dialect.DotNet | Dialect.JavaScript => IRLookBehindRule.Unrestricted
         case Dialect.Java                        => IRLookBehindRule.Java
         case Dialect.PCRE                        => IRLookBehindRule.PCRE
-        case Dialect.Perl                        => IRLookBehindRule.Perl
-        case Dialect.Python                      => IRLookBehindRule.Python
-        case Dialect.Ruby                        => IRLookBehindRule.Ruby,
+        case _: Dialect.Perl                     => IRLookBehindRule.Perl
+        case _: Dialect.Python                   => IRLookBehindRule.Python
+        case _: Dialect.Ruby                     => IRLookBehindRule.Ruby,
       // JavaScript (with `y`), PCRE (with `A`)
       anchored = isJavaScript && flagSet.sticky || isPCRE && flagSet.anchored,
       // PCRE (with `(*UTF)`)

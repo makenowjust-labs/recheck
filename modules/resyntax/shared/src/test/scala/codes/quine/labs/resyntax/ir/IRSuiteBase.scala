@@ -4,30 +4,23 @@ import scala.collection.mutable
 
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
-import codes.quine.labs.resyntax.ast.DialectOptions
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.parser.Parser
 
 abstract class IRSuiteBase extends munit.FunSuite:
-  val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl, Python, Ruby)
+  val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())
 
   /** Builds IR, where a character-level node stays as `Unsupported` of itself, and returns the flags of each one. */
-  def build(
-      s: String,
-      flags: String,
-      dialect: Dialect,
-      options: DialectOptions = DialectOptions.Default
-  ): (IRPattern, Seq[IRCharFlags]) =
+  def build(s: String, flags: String, dialect: Dialect): (IRPattern, Seq[IRCharFlags]) =
     val flagSet = FlagSet.parse(flags, dialect)
-    val node = Parser.parse(s, flagSet, dialect, options)
+    val node = Parser.parse(s, flagSet, dialect)
     val charFlags = mutable.ArrayBuffer.empty[IRCharFlags]
     val pattern = IRBuilder.build(
       node,
       flagSet,
       dialect,
-      options,
       Some((node: Node, flags: IRCharFlags) =>
         charFlags.addOne(flags)
         IRNodeData.Unsupported(node.data)

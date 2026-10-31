@@ -252,4 +252,4 @@ private[ir] object CaptureAnalyzer:
 
   /** Whether the dialect is .NET, whose numeric names (e.g. `(?<2>...)`) are indices. */
   def isNumericName(dialect: Dialect, name: String): Boolean =
-    dialect == Dialect.DotNet && name.nonEmpty && name.forall(_.isDigit)
+    dialect.isDotNet && name.nonEmpty && name.forall(_.isDigit)

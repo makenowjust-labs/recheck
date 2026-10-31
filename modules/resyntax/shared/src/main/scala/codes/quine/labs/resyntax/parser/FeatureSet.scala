@@ -1,8 +1,6 @@
 package codes.quine.labs.resyntax.parser
 
 import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.DialectOptions
-import codes.quine.labs.resyntax.ast.Encoding
 import codes.quine.labs.resyntax.ast.FlagSet
 
 /** FeatureSet is a set of feature flags.
@@ -411,24 +409,26 @@ final case class FeatureSet(
 object FeatureSet:
 
   /** Computes a feature set from a quick analysis result, the given dialect and the given flag set. */
-  def from(
-      analysis: QuickAnalysis,
-      dialect: Dialect,
-      flagSet: FlagSet,
-      options: DialectOptions = DialectOptions.Default
-  ): FeatureSet =
-    val isDotNet = dialect == Dialect.DotNet
-    val isJava = dialect == Dialect.Java
-    val isJavaScript = dialect == Dialect.JavaScript
-    val isPCRE = dialect == Dialect.PCRE
-    val isPerl = dialect == Dialect.Perl
-    val isPython = dialect == Dialect.Python
-    val isRuby = dialect == Dialect.Ruby
+  def from(analysis: QuickAnalysis, dialect: Dialect, flagSet: FlagSet): FeatureSet =
+    val isDotNet = dialect.isDotNet
+    val isJava = dialect.isJava
+    val isJavaScript = dialect.isJavaScript
+    val isPCRE = dialect.isPCRE
+    val isPerl = dialect.isPerl
+    val isPython = dialect.isPython
+    val isRuby = dialect.isRuby
 
     // Python's bytes pattern
-    val isByte = isPython && (flagSet.bytes || options.encoding.contains(Encoding.PythonBytes))
+    val isByte = dialect match
+      case Dialect.Python(encoding) => flagSet.bytes || encoding == Dialect.Python.Encoding.Bytes
+      case _                        => false
     // Ruby's `n` is NOENCODING, which `FlagSet` keeps as `explicitCapture`.
-    val isRubyByte = isRuby && (flagSet.explicitCapture || options.encoding.contains(Encoding.RubyAscii8Bit))
+    val isRubyByte = dialect match
+      case Dialect.Ruby(encoding) => flagSet.explicitCapture || encoding == Dialect.Ruby.Encoding.Ascii8Bit
+      case _                      => false
+    val isPerlByte = dialect match
+      case Dialect.Perl(encoding, _, _) => encoding == Dialect.Perl.Encoding.Bytes
+      case _                            => false
     // PCRE reads UTF-8 by `u` (PHP) or `(*UTF)`.
     val isUnicode = flagSet.unicode || flagSet.unicodeSets || (isPCRE && analysis.hasUtfStartOption)
 
@@ -836,18 +836,17 @@ object FeatureSet:
         case Dialect.Java       => 2147483647L
         case Dialect.JavaScript => Long.MaxValue
         case Dialect.PCRE       => 65535L
-        case Dialect.Perl       => 2147483646L
-        case Dialect.Python     => 4294967294L
-        case Dialect.Ruby       => 100000L,
+        case _: Dialect.Perl    => 2147483646L
+        case _: Dialect.Python  => 4294967294L
+        case _: Dialect.Ruby    => 100000L,
       // PCRE: every name, Perl: 3 to 14 characters without upper case letters and blanks, Ruby: up to 20 characters without `:`
       classPosixNameRule = dialect match
-        case Dialect.Perl => ClassPosixNameRule.Perl
-        case Dialect.Ruby => ClassPosixNameRule.Ruby
-        case _            => ClassPosixNameRule.Always,
+        case _: Dialect.Perl => ClassPosixNameRule.Perl
+        case _: Dialect.Ruby => ClassPosixNameRule.Ruby
+        case _               => ClassPosixNameRule.Always,
       // Python (with `b`): Latin-1, PCRE (without `u`), Perl (bytes), Ruby (ASCII-8BIT): UTF-8, the others: text
       sourceEncoding =
         if isByte then SourceEncoding.Latin1
-        else if (isPCRE && !isUnicode) || (isPerl && options.encoding.contains(Encoding.PerlBytes)) || isRubyByte then
-          SourceEncoding.Utf8
+        else if (isPCRE && !isUnicode) || isPerlByte || isRubyByte then SourceEncoding.Utf8
         else SourceEncoding.Text
     )

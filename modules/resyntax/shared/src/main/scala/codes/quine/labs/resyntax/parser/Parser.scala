@@ -17,7 +17,6 @@ import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.ConditionalTest
 import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.DialectOptions
 import codes.quine.labs.resyntax.ast.EscapeClassKind
 import codes.quine.labs.resyntax.ast.EscapeStyle
 import codes.quine.labs.resyntax.ast.FlagSet
@@ -49,27 +48,21 @@ object Parser:
 
   /** Parses the source in the dialect.
     *
-    * A Perl regex literal (the default of [[DialectOptions.perlSource]]) is rewritten as Perl's lexer does first, and
-    * the locations of the result point into the given source. A source that the engine reads as bytes (see
+    * A Perl regex literal (the default of [[Dialect.Perl.source]]) is rewritten as Perl's lexer does first, and the
+    * locations of the result point into the given source. A source that the engine reads as bytes (see
     * [[SourceEncoding]]) is read by its bytes, and the locations of a byte point to its character.
     */
-  def parse(
-      source: String,
-      flagSet: FlagSet,
-      dialect: Dialect,
-      options: DialectOptions = DialectOptions.Default
-  ): Node =
-    options.validate(dialect)
-    val encoding = FeatureSet.from(QuickAnalysis.from(source), dialect, flagSet, options).sourceEncoding
+  def parse(source: String, flagSet: FlagSet, dialect: Dialect): Node =
+    val encoding = FeatureSet.from(QuickAnalysis.from(source), dialect, flagSet).sourceEncoding
     checkEncoding(source, encoding)
     val bytes = if encoding == SourceEncoding.Utf8 then Rewritten.utf8(source) else None
     val text = bytes.fold(source)(_.text)
-    val rewritten =
-      if dialect == Dialect.Perl && options.perlSource == PerlSource.Literal then
+    val rewritten = dialect match
+      case Dialect.Perl(_, PerlSource.Literal, _) =>
         PerlLiteralLexer.rewrite(text, flagSet.verbose, bytes = encoding == SourceEncoding.Utf8)
-      else None
+      case _ => None
     val rewrites = rewritten.toSeq ++ bytes.toSeq
-    try rewrites.foldLeft(parseText(rewritten.fold(text)(_.text), flagSet, dialect, options))((n, r) => r.relocate(n))
+    try rewrites.foldLeft(parseText(rewritten.fold(text)(_.text), flagSet, dialect))((n, r) => r.relocate(n))
     catch
       case ex: ParsingException if rewrites.nonEmpty =>
         throw new ParsingException(ex.message, ex.pos.map(pos => rewrites.foldLeft(pos)((p, r) => r.position(p))))
@@ -80,9 +73,9 @@ object Parser:
       val pos = source.indexWhere(_ > 0xff)
       if pos >= 0 then throw new ParsingException("Non-Latin-1 character in bytes pattern", Some(pos))
 
-  private def parseText(source: String, flagSet: FlagSet, dialect: Dialect, options: DialectOptions): Node =
+  private def parseText(source: String, flagSet: FlagSet, dialect: Dialect): Node =
     val analysis = QuickAnalysis.from(source)
-    val featureSet = FeatureSet.from(analysis, dialect, flagSet, options)
+    val featureSet = FeatureSet.from(analysis, dialect, flagSet)
     val parser = new Parser(source, analysis, featureSet)
     parser.parse()
 
