@@ -93,6 +93,9 @@ class InterpreterDialectSuite extends munit.FunSuite:
     accepts("^(?<x>a)(?<x>b)\\k<x>$", Ruby(), "abb")
     accepts("^(?<x>a)(?<x>b)\\k<x>$", Ruby(), "aba")
     refutes("^(?<x>a)(?<x>b)\\k<x>$", Ruby(), "abc")
+    // Ruby takes only the groups of the name opened before the reference.
+    refutes("^(?:(?<x>a)|\\k<x>x|(?<x>b))+$", Ruby(), "abbx")
+    accepts("^(?:(?<x>a)|\\k<x>x|(?<x>b))+$", Ruby(), "baax")
 
   test("Interpreter.run: case-insensitive back-references"):
     accepts("(?i)^(a)\\1$", Python(), "aA")
