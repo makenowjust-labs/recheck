@@ -30,7 +30,7 @@ describe("sections", () => {
     });
     expect(dialect?.typescriptType).toContain('"javascript" | "java" |');
     expect(dialect?.typescriptType).toContain(
-      '{ name: "perl"; encoding?: "characters" | "bytes"; source?: "literal" | "string"; utf8?: boolean | null }',
+      '{ name: "perl"; utf8?: boolean; source?: "literal" | "string" }',
     );
   });
 

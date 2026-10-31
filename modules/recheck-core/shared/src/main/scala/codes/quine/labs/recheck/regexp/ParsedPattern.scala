@@ -44,10 +44,7 @@ final case class ParsedPattern(source: String, flags: String, dialect: Dialect, 
 
 object ParsedPattern:
 
-  /** Parses the source and the flags in the dialect, and builds the IR.
-    *
-    * The pattern has the dialect with the settings that the source decides (see [[IRBuilder.resolveDialect]]).
-    */
+  /** Parses the source and the flags in the dialect, and builds the IR. */
   def parse(
       source: String,
       flags: String,
@@ -56,9 +53,8 @@ object ParsedPattern:
     try
       val flagSet = FlagSet.parse(flags, dialect)
       val node = Parser.parse(source, flagSet, dialect)
-      val resolved = IRBuilder.resolveDialect(node, dialect.withPerlUtf8Of(source))
-      val ir = IRBuilder.build(node, flagSet, resolved)
-      Right(ParsedPattern(source, flags, resolved, flagSet, ir))
+      val ir = IRBuilder.build(node, flagSet, dialect)
+      Right(ParsedPattern(source, flags, dialect, flagSet, ir))
     catch
       case ex: FlagSetException    => Left(new InvalidRegExpException(ex.getMessage))
       case ex: ParsingException    => Left(new InvalidRegExpException(ex.getMessage))

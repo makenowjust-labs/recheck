@@ -84,8 +84,8 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio):
       val source = new CancellationTokenSource
       tokens.remove(id).foreach(doCancel)
       val sendCancel = () =>
-        val dialect = ReDoS.unparsedDialect(check.source, check.params.dialect)
-        val unknown = Diagnostics.Unknown(check.source, check.flags, dialect, Diagnostics.ErrorKind.Cancel, None)
+        val unknown =
+          Diagnostics.Unknown(check.source, check.flags, check.params.dialect, Diagnostics.ErrorKind.Cancel, None)
         send(Right(cancelled(unknown)))
       tokens.update(id, Token(source, sendCancel))
       source.token

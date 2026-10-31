@@ -18,20 +18,17 @@ All `Diagnostics` has the following fields.
 
 ## Dialect
 
-`dialect` is an object of the dialect's name and every setting of the dialect, in the same shape as the [`dialect`](parameters.mdx#dialect) parameter.
+`dialect` is the [`dialect`](parameters.mdx#dialect) parameter as an object of the dialect's name and every setting of the dialect, where an omitted setting is the default.
 
 ```json
 { "name": "javascript" }
 { "name": "java" }
 { "name": "dotnet" }
 { "name": "pcre" }
-{ "name": "python", "encoding": "str" }
+{ "name": "python", "type": "str" }
 { "name": "ruby", "encoding": "UTF-8" }
-{ "name": "perl", "encoding": "characters", "source": "literal", "utf8": false }
+{ "name": "perl", "utf8": true, "source": "literal" }
 ```
-
-Perl's `utf8` is the decided one: the given value, or the one decided from the pattern if the parameter does not give it.
-When the pattern cannot be parsed, it is decided from the source: a `literal` or `string` pattern is UTF-8 if the source has a non-ASCII character, and a `bytes` pattern is not.
 
 ## Status
 

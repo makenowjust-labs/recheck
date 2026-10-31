@@ -341,23 +341,17 @@ object RecallProgram:
     // `qr` takes only these modifiers, and the others do not change a match.
     val flags = pattern.flags.filter(c => "msixpodualn".contains(c))
     val bytes = pattern.ir.mode == UnitMode.Byte
-    val utf8 = dialect.utf8.contains(true)
+    // Character strings are UTF-8 and byte strings are not, which decides Perl's `/d` rules.
+    def flag(name: String): String = if bytes then s"utf8::downgrade($$$name, 1)" else s"utf8::upgrade($$$name)"
     val regex =
       if dialect.source == PerlSource.Literal then
-        // With `use utf8`, a literal is UTF-8 by a non-ASCII character, and `u` gives the rules of a UTF-8 pattern.
-        val literalUtf8 = !bytes && pattern.source.exists(_ >= 0x80)
-        val modifiers =
-          if utf8 && !literalUtf8 && !flags.exists("alu".contains(_)) then flags.filterNot(_ == 'd') + "u" else flags
         for
-          _ <- Option.when(isPerlSafe(pattern.source) && (utf8 || !literalUtf8))(())
+          _ <- Option.when(isPerlSafe(pattern.source))(())
           delimiter <- PerlDelimiters.find(c => !pattern.source.contains(c))
-        yield s"qr$delimiter${pattern.source}$delimiter$modifiers"
+        yield s"qr$delimiter${pattern.source}$delimiter$flags"
       else
         val source = AttackPattern.Perl.literal(sourceString(pattern.source, bytes))
-        // The UTF-8 flag of the string decides Perl's rules.
-        // A literal of escapes may not have the flag that `utf8` tells.
-        val upgrade = if utf8 then "utf8::upgrade($pattern)" else "utf8::downgrade($pattern, 1)"
-        Some(s"do { my $$pattern = $source; $upgrade; qr/$$pattern/$flags }")
+        Some(s"do { my $$pattern = $source; ${flag("pattern")}; qr/$$pattern/$flags }")
     regex.map: regex =>
       val input = attack.toString(AttackPattern.Perl)
       val pragma = if bytes then "" else "use utf8;\n"
@@ -367,6 +361,7 @@ object RecallProgram:
             |print "$RuntimeLine perl " . sprintf("%vd", $$^V) . "\\n";
             |my $$regex = $regex;
             |my $$input = $input;
+            |${flag("input")};
             |print "$StartLine\\n";
             |my $$start = Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC());
             |my $$matched = $$input =~ $$regex;

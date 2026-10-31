@@ -33,8 +33,6 @@ object Diagnostics:
 
   /** Vulnerable is an analysis result against a vulnerable RegExp.
     *
-    * @param dialect
-    *   the dialect with the settings that the pattern decides
     * @param recallValidation
     *   the run of the attack string on the real regex engine, or `None` if it is not run
     */
@@ -93,11 +91,10 @@ object Diagnostics:
   /** Returns the dialect with its settings on one line (e.g. `python (encoding: str)`). */
   private def show(dialect: Dialect): String =
     val settings = dialect match
-      case Dialect.Python(encoding)             => Seq(s"encoding: ${encoding.name}")
-      case Dialect.Ruby(encoding)               => Seq(s"encoding: ${encoding.name}")
-      case Dialect.Perl(encoding, source, utf8) =>
-        Seq(s"encoding: ${encoding.name}", s"source: ${source.name}") ++ utf8.map(u => s"utf8: $u")
-      case _ => Seq.empty
+      case Dialect.Python(tpe)        => Seq(s"type: ${tpe.name}")
+      case Dialect.Ruby(encoding)     => Seq(s"encoding: ${encoding.name}")
+      case Dialect.Perl(utf8, source) => Seq(s"utf8: $utf8", s"source: ${source.name}")
+      case _                          => Seq.empty
     if settings.isEmpty then dialect.name else settings.mkString(s"${dialect.name} (", ", ", ")")
 
   /** ErrorKind is a reason of an unknown diagnostics. */

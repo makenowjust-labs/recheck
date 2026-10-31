@@ -143,24 +143,23 @@ test("shows the parameters of the selected dialect", async ({ page }) => {
   const options = (name: string) =>
     select(name).locator("option").allTextContents();
   await expect(select("dialect")).toHaveValue("javascript");
-  await expect(select("dialectEncoding")).toHaveCount(0);
+  await expect(select("dialectType")).toHaveCount(0);
   await expect(select("dialectSource")).toHaveCount(0);
 
   await select("dialect").selectOption("perl");
-  expect(await options("dialectEncoding")).toEqual(["characters", "bytes"]);
+  expect(await options("dialectUtf8")).toEqual(["true", "false"]);
   await expect(select("dialectSource")).toHaveValue("literal");
-  expect(await options("dialectUtf8")).toEqual(["null", "true", "false"]);
+  await expect(select("dialectEncoding")).toHaveCount(0);
 
-  // An encoding of another dialect falls back to the default.
   await select("dialect").selectOption("ruby");
-  await select("dialectEncoding").selectOption("ASCII-8BIT");
+  expect(await options("dialectEncoding")).toEqual(["UTF-8", "ASCII-8BIT"]);
   await select("dialect").selectOption("python");
-  expect(await options("dialectEncoding")).toEqual(["str", "bytes"]);
-  await expect(select("dialectEncoding")).toHaveValue("str");
+  expect(await options("dialectType")).toEqual(["str", "bytes"]);
+  await expect(select("dialectType")).toHaveValue("str");
   await expect(select("dialectUtf8")).toHaveCount(0);
 
   await select("dialect").selectOption("perl");
-  await select("dialectEncoding").selectOption("bytes");
+  await select("dialectUtf8").selectOption("false");
   await input(page).fill("/^(?:é|é)*$/");
   await check(page);
   await expect(page.locator(".badge", { hasText: "vulnerable" })).toBeVisible();
@@ -169,6 +168,6 @@ test("shows the parameters of the selected dialect", async ({ page }) => {
   await page.reload();
   await page.waitForLoadState("networkidle");
   await expect(select("dialect")).toHaveValue("perl");
-  await expect(select("dialectEncoding")).toHaveValue("bytes");
-  await expect(select("dialectUtf8")).toHaveValue("null");
+  await expect(select("dialectUtf8")).toHaveValue("false");
+  await expect(select("dialectSource")).toHaveValue("literal");
 });

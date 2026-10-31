@@ -11,7 +11,7 @@ export type ParamType =
   | "duration"
   | "float"
   | "integer"
-  | "nullableBoolean"
+  | "boolean"
   | { select: string[] }
   /** A select whose values depend on the dialect, the first value being the default. */
   | { selectByDialect: Record<string, string[]> };
@@ -29,13 +29,6 @@ export type Param = {
   setting: string | null;
 };
 
-/** Returns whether the type is a nullable boolean, i.e. `["boolean", "null"]`. */
-const isNullableBoolean = (type: string | string[] | undefined): boolean =>
-  Array.isArray(type) &&
-  type.length === 2 &&
-  type.includes("boolean") &&
-  type.includes("null");
-
 const paramType = (property: Property): ParamType | null => {
   if (property.enum !== undefined) return { select: property.enum };
   // `dialect` is the name of the language or an object of the name and the settings.
@@ -44,7 +37,7 @@ const paramType = (property: Property): ParamType | null => {
   if (property["x-unit"] === "milliseconds") return "duration";
   if (property.type === "integer") return "integer";
   if (property.type === "number") return "float";
-  if (isNullableBoolean(property.type)) return "nullableBoolean";
+  if (property.type === "boolean") return "boolean";
   return null;
 };
 
@@ -64,24 +57,25 @@ const settingParams = (property: Property): Param[] => {
   }
   return [...settings].flatMap(([key, entries]) => {
     const [, first] = entries[0]!;
-    const type: ParamType | null = isNullableBoolean(first.type)
-      ? "nullableBoolean"
-      : first.enum !== undefined
-        ? {
-            selectByDialect: Object.fromEntries(
-              entries.map(([dialect, { enum: values = [], default: d }]) => [
-                dialect,
-                [String(d), ...values.filter((v) => v !== d)],
-              ]),
-            ),
-          }
-        : null;
+    const type: ParamType | null =
+      first.type === "boolean"
+        ? "boolean"
+        : first.enum !== undefined
+          ? {
+              selectByDialect: Object.fromEntries(
+                entries.map(([dialect, { enum: values = [], default: d }]) => [
+                  dialect,
+                  [String(d), ...values.filter((v) => v !== d)],
+                ]),
+              ),
+            }
+          : null;
     if (type === null) return [];
     return [
       {
         name: settingName(key),
         title: first.title ?? key,
-        defaultValue: String(first.default ?? "null"),
+        defaultValue: String(first.default),
         type,
         since: property["x-since"] ?? null,
         dialects: entries.map(([dialect]) => dialect),
@@ -91,8 +85,8 @@ const settingParams = (property: Property): Param[] => {
   });
 };
 
-/** The values of a nullable boolean in the form. */
-export const NULLABLE_BOOLEAN_VALUES = ["null", "true", "false"];
+/** The values of a boolean in the form. */
+export const BOOLEAN_VALUES = ["true", "false"];
 
 /** The parameters of the form, read from the schema of the parameters. */
 const schemaParams: Param[] = propertiesFor("playground").flatMap(
@@ -158,7 +152,7 @@ export const paramsOf = (
 /** The values of a select parameter for the dialect. */
 export const selectValues = (param: Param, dialect: string): string[] => {
   const { type } = param;
-  if (type === "nullableBoolean") return NULLABLE_BOOLEAN_VALUES;
+  if (type === "boolean") return BOOLEAN_VALUES;
   if (typeof type !== "object") return [];
   return "select" in type ? type.select : (type.selectByDialect[dialect] ?? []);
 };
@@ -205,8 +199,8 @@ const parseValue = (param: Param, value: unknown, dialect: string): unknown => {
       return Number.parseInt(String(value), 10);
     case "float":
       return Number.parseFloat(String(value));
-    case "nullableBoolean":
-      return value === "true" ? true : value === "false" ? false : null;
+    case "boolean":
+      return String(value) === "true";
     default:
       if (typeof type === "object" && "selectByDialect" in type) {
         // A value left by another dialect falls back to this dialect's default.

@@ -273,7 +273,7 @@ class CodecSuite extends munit.FunSuite:
           "maxRepeatCount" := 123,
           "maxNFASize" := 123,
           "maxPatternSize" := 123,
-          "dialect" := Json.obj("name" := "perl", "encoding" := "bytes", "source" := "string", "utf8" := true),
+          "dialect" := Json.obj("name" := "perl", "utf8" := false, "source" := "string"),
           "maxRecallFailures" := 123
         )
       ),
@@ -304,13 +304,13 @@ class CodecSuite extends munit.FunSuite:
           maxRepeatCount = 123,
           maxNFASize = 123,
           maxPatternSize = 123,
-          dialect = Dialect.Perl(Dialect.Perl.Encoding.Bytes, PerlSource.String, Some(true)),
+          dialect = Dialect.Perl(utf8 = false, source = PerlSource.String),
           maxRecallFailures = 123
         )
       )
     )
     assertEquals(
-      decodeParameters.decodeJson(Json.obj("dialect" := Json.obj("name" := "perl", "utf8" := Json.Null))),
+      decodeParameters.decodeJson(Json.obj("dialect" := Json.obj("name" := "perl", "source" := Json.Null))),
       Right(Parameters(dialect = Dialect.Perl()))
     )
     assert(decodeParameters.decodeJson(Json.obj("dialect" := "xxx")).isLeft)
@@ -353,8 +353,8 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(decodeDialect.decodeJson("xxx".asJson), Left(DecodingFailure("Unknown dialect: xxx", List.empty)))
     assertEquals(decodeDialect.decodeJson(Json.obj("name" := "java")), Right(Dialect.Java))
     assertEquals(
-      decodeDialect.decodeJson(Json.obj("name" := "python", "encoding" := "bytes")),
-      Right(Dialect.Python(Dialect.Python.Encoding.Bytes))
+      decodeDialect.decodeJson(Json.obj("name" := "python", "type" := "bytes")),
+      Right(Dialect.Python(Dialect.Python.Type.Bytes))
     )
     assertEquals(
       decodeDialect.decodeJson(Json.obj("name" := "ruby", "encoding" := "ASCII-8BIT")),
@@ -362,10 +362,10 @@ class CodecSuite extends munit.FunSuite:
     )
     assertEquals(
       decodeDialect.decodeJson(Json.obj("name" := "perl", "source" := "string", "utf8" := false)),
-      Right(Dialect.Perl(source = PerlSource.String, utf8 = Some(false)))
+      Right(Dialect.Perl(utf8 = false, source = PerlSource.String))
     )
     assertEquals(
-      decodeDialect.decodeJson(Json.obj("name" := "perl", "encoding" := Json.Null)),
+      decodeDialect.decodeJson(Json.obj("name" := "perl", "utf8" := Json.Null)),
       Right(Dialect.Perl())
     )
     assertEquals(
@@ -384,18 +384,26 @@ class CodecSuite extends munit.FunSuite:
       decodeDialect.decodeJson(Json.obj("name" := "javascript", "encoding" := "str")),
       Left(DecodingFailure("Unknown setting of javascript: encoding", List.empty))
     )
+    assertEquals(
+      decodeDialect.decodeJson(Json.obj("name" := "python", "encoding" := "str")),
+      Left(DecodingFailure("Unknown setting of python: encoding", List.empty))
+    )
+    assertEquals(
+      decodeDialect.decodeJson(Json.obj("name" := "perl", "encoding" := "bytes")),
+      Left(DecodingFailure("Unknown setting of perl: encoding", List.empty))
+    )
     assert(decodeDialect.decodeJson(Json.obj("encoding" := "str")).isLeft)
     assert(decodeDialect.decodeJson(Json.obj("name" := "perl", "utf8" := "yes")).isLeft)
 
   test("codec.encodeDialect"):
     assertEquals(encodeDialect(Dialect.JavaScript), Json.obj("name" := "javascript"))
     assertEquals(encodeDialect(Dialect.DotNet), Json.obj("name" := "dotnet"))
-    assertEquals(encodeDialect(Dialect.Python()), Json.obj("name" := "python", "encoding" := "str"))
+    assertEquals(encodeDialect(Dialect.Python()), Json.obj("name" := "python", "type" := "str"))
     assertEquals(
       encodeDialect(Dialect.Ruby(Dialect.Ruby.Encoding.Ascii8Bit)),
       Json.obj("name" := "ruby", "encoding" := "ASCII-8BIT")
     )
     assertEquals(
-      encodeDialect(Dialect.Perl(utf8 = Some(true))),
-      Json.obj("name" := "perl", "encoding" := "characters", "source" := "literal", "utf8" := true)
+      encodeDialect(Dialect.Perl(utf8 = false)),
+      Json.obj("name" := "perl", "utf8" := false, "source" := "literal")
     )

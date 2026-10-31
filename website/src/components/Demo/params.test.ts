@@ -46,36 +46,33 @@ describe("parseParams", () => {
   });
 
   test("parses the settings of the dialect into the dialect", () => {
-    expect(parseParams({ dialectUtf8: "true" }, dev).dialect).toEqual({
+    expect(parseParams({ dialectUtf8: "false" }, dev).dialect).toEqual({
       name: "javascript",
     });
     expect(
       parseParams(
-        { dialect: "perl", dialectEncoding: "bytes", dialectUtf8: "true" },
+        { dialect: "perl", dialectUtf8: "false", dialectSource: "string" },
         dev,
       ).dialect,
-    ).toEqual({
+    ).toEqual({ name: "perl", utf8: false, source: "string" });
+    expect(parseParams({ dialect: "perl" }, dev).dialect).toEqual({
       name: "perl",
-      encoding: "bytes",
-      source: "literal",
       utf8: true,
+      source: "literal",
     });
     expect(
-      parseParams({ dialect: "perl", dialectUtf8: "false" }, dev).dialect,
-    ).toMatchObject({ utf8: false });
-    expect(parseParams({ dialect: "perl" }, dev).dialect).toMatchObject({
-      utf8: null,
-    });
-    // An encoding of another dialect falls back to the default.
+      parseParams({ dialect: "python", dialectType: "bytes" }, dev).dialect,
+    ).toEqual({ name: "python", type: "bytes" });
+    expect(
+      parseParams({ dialect: "ruby", dialectEncoding: "ASCII-8BIT" }, dev)
+        .dialect,
+    ).toEqual({ name: "ruby", encoding: "ASCII-8BIT" });
+    // A value of another dialect's setting is not taken.
     expect(
       parseParams({ dialect: "ruby", dialectEncoding: "str" }, dev).dialect,
     ).toEqual({ name: "ruby", encoding: "UTF-8" });
-    expect(parseParams({ dialect: "python" }, dev).dialect).toEqual({
-      name: "python",
-      encoding: "str",
-    });
     expect(parseParams({ dialect: "python" }, dev)).not.toHaveProperty(
-      "dialectEncoding",
+      "dialectType",
     );
   });
 
@@ -95,10 +92,11 @@ describe("paramsOf", () => {
       "dialect",
     ]);
     const names = params.map(({ name }) => name);
-    expect(names.slice(4, 7)).toEqual([
+    expect(names.slice(4, 8)).toEqual([
+      "dialectType",
       "dialectEncoding",
-      "dialectSource",
       "dialectUtf8",
+      "dialectSource",
     ]);
     expect(params.find(({ name }) => name === "attackTimeout")?.type).toBe(
       "duration",
@@ -114,26 +112,27 @@ describe("paramsOf", () => {
     expect(parseParams({ dialect: "python" }, old)).not.toHaveProperty(
       "dialect",
     );
-    expect(paramsOf({ type: "release", version: "5.0.0" }, "perl")).toEqual(
-      params,
+    const perl = params.filter(
+      ({ dialects }) => dialects === null || dialects.includes("perl"),
     );
-    expect(paramsOf(dev, "perl")).toEqual(params);
+    expect(paramsOf({ type: "release", version: "5.0.0" }, "perl")).toEqual(
+      perl,
+    );
+    expect(paramsOf(dev, "perl")).toEqual(perl);
   });
 
   test("hides the parameters of the other dialects", () => {
     const names = (dialect?: string) =>
       paramsOf(dev, dialect).map(({ name }) => name);
-    expect(names()).not.toContain("dialectEncoding");
+    expect(names()).not.toContain("dialectType");
     expect(names()).not.toContain("dialectSource");
-    expect(names("python")).toContain("dialectEncoding");
-    expect(names("python")).not.toContain("dialectUtf8");
+    expect(names("python")).toContain("dialectType");
+    expect(names("python")).not.toContain("dialectEncoding");
+    expect(names("ruby")).toContain("dialectEncoding");
     expect(names("perl")).toEqual(
-      expect.arrayContaining([
-        "dialectEncoding",
-        "dialectSource",
-        "dialectUtf8",
-      ]),
+      expect.arrayContaining(["dialectUtf8", "dialectSource"]),
     );
+    expect(names("perl")).not.toContain("dialectEncoding");
   });
 });
 
@@ -154,12 +153,15 @@ describe("selectValues", () => {
       "ASCII-8BIT",
     ]);
     expect(selectValues(param("dialectEncoding"), "javascript")).toEqual([]);
+    expect(selectValues(param("dialectType"), "python")).toEqual([
+      "str",
+      "bytes",
+    ]);
     expect(selectValues(param("dialectSource"), "perl")).toEqual([
       "literal",
       "string",
     ]);
     expect(selectValues(param("dialectUtf8"), "perl")).toEqual([
-      "null",
       "true",
       "false",
     ]);
@@ -178,9 +180,8 @@ describe("formValues", () => {
     ).toMatchObject({
       dialect: "perl",
       timeout: 3000,
-      dialectEncoding: "characters",
+      dialectUtf8: "true",
       dialectSource: "literal",
-      dialectUtf8: "null",
     });
     expect(formValues({ dialect: "python" })).toEqual({ dialect: "python" });
   });

@@ -97,7 +97,7 @@ properties:
     description: |-
       The regular expression dialect of the pattern, with the dialect's settings.
 
-      It is the name of the dialect's language, which takes the default settings, or an object of the name and the settings, where an omitted setting takes the default (e.g. `"python"` or `{ "name": "python", "encoding": "bytes" }`).
+      It is the name of the dialect's language, which takes the default settings, or an object of the name and the settings, where an omitted setting takes the default (e.g. `"python"` or `{ "name": "python", "type": "bytes" }`).
       The flags are the dialect's flag letters (e.g. `imsx`), and the pattern is checked with the dialect's semantics.
 
       - `javascript` is ECMAScript's `RegExp`.
@@ -111,14 +111,13 @@ properties:
       JavaScript and .NET read UTF-16 code units (JavaScript reads code points with the `u` or `v` flag), Java reads code points, and PCRE reads UTF-8 with the `u` flag or `(*UTF)` and bytes otherwise.
       The other dialects have settings:
 
-      - `encoding` of `python`: the kind of the pattern and its input, `str` (default) or `bytes`.
+      - `type` of `python`: the string type of the pattern and its input, `str` (default) or `bytes`.
       - `encoding` of `ruby`: the encoding of the regexp, `UTF-8` (default) or `ASCII-8BIT` (as the `n` flag makes).
-      - `encoding` of `perl`: the kind of strings, `characters` (default), which are character strings with `use utf8`, or `bytes`, which are byte strings whose non-ASCII literals are UTF-8 bytes.
+      - `utf8` of `perl`: whether the program has `use utf8` and its strings are decoded text, which has the UTF-8 flag. `true` (default) matches code points, and `/d` uses the Unicode rules. `false` matches byte strings without the flag, whose non-ASCII literals are UTF-8 bytes, and `/d` uses the ASCII rules on `0x80`–`0xFF` unless the pattern has a code point of `\x{100}` or more, `\p`, `\N{...}` or `\b{...}`. A program reading text that is not decoded (e.g. Latin-1) is `false`.
       - `source` of `perl`: how the pattern is given. `literal` (default) is a regex literal written in Perl source (e.g. `qr/.../`), where Perl applies `\U`, `\L`, `\u`, `\l`, `\F`, `\Q` and `\E` to its text before the regex engine reads it. `string` is a pattern from a runtime string (e.g. `qr/$p/`), which the regex engine reads unchanged.
-      - `utf8` of `perl`: whether the pattern string is UTF-8, which makes the `/d` rules Unicode rules. `null` (default) decides it from the pattern: a `literal` pattern is UTF-8 if its source has a non-ASCII character (as with `use utf8`), and a `string` pattern is UTF-8 if it has a non-ASCII character, a code point of `\x{100}` or more, `\p` or `\N{...}`. A `bytes` pattern is not UTF-8.
 
-      The diagnostics have the dialect as an object with every setting, where `utf8` is decided.
-      The CLI takes the name by `--dialect` and the settings by `--encoding`, `--perl-source` and `--perl-utf8`.
+      The diagnostics have the given dialect as an object of the name and every setting.
+      The CLI takes the name by `--dialect` and the settings by `--python-type`, `--ruby-encoding`, `--perl-utf8` and `--perl-source`.
     oneOf:
       - type: string
         enum: ["javascript", "java", "dotnet", "pcre", "python", "ruby", "perl"]
@@ -145,21 +144,20 @@ properties:
       - type: object
         properties:
           name: { const: "python" }
-          encoding: { title: "Encoding", enum: ["str", "bytes"], default: "str" }
+          type: { title: "Python Type", enum: ["str", "bytes"], default: "str" }
         required: ["name"]
         additionalProperties: false
       - type: object
         properties:
           name: { const: "ruby" }
-          encoding: { title: "Encoding", enum: ["UTF-8", "ASCII-8BIT"], default: "UTF-8" }
+          encoding: { title: "Ruby Encoding", enum: ["UTF-8", "ASCII-8BIT"], default: "UTF-8" }
         required: ["name"]
         additionalProperties: false
       - type: object
         properties:
           name: { const: "perl" }
-          encoding: { title: "Encoding", enum: ["characters", "bytes"], default: "characters" }
+          utf8: { title: "Perl UTF-8", type: boolean, default: true }
           source: { title: "Perl Source", enum: ["literal", "string"], default: "literal" }
-          utf8: { title: "Perl UTF-8", type: ["boolean", "null"], default: null }
         required: ["name"]
         additionalProperties: false
     default: "javascript"

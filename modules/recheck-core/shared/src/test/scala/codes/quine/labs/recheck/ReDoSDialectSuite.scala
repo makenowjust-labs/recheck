@@ -134,31 +134,29 @@ class ReDoSDialectSuite extends munit.FunSuite:
 
   test("ReDoS.check: encodings"):
     assertVulnerable(
-      check("^(a|a)*$", Python(Python.Encoding.Bytes)),
+      check("^(a|a)*$", Python(Python.Type.Bytes)),
       AttackComplexity.Exponential(false),
       Checker.Automaton
     )
 
   test("ReDoS.check: the dialect of the diagnostics"):
-    def dialect(source: String, dialect: Dialect): Dialect = check(source, dialect) match
-      case d: Diagnostics.Safe       => d.dialect
-      case d: Diagnostics.Vulnerable => d.dialect
-      case d: Diagnostics.Unknown    => d.dialect
-    val string = Perl(source = PerlSource.String)
-    assertEquals(dialect("^a$", Ruby(Ruby.Encoding.Ascii8Bit)), Ruby(Ruby.Encoding.Ascii8Bit))
-    assertEquals(dialect("^a$", Perl()), Perl(utf8 = Some(false)))
-    assertEquals(dialect("^\u00e9$", Perl()), Perl(utf8 = Some(true)))
-    assertEquals(dialect("^\\x{100}$", string), string.copy(utf8 = Some(true)))
-    assertEquals(dialect("^\\xe9$", string), string.copy(utf8 = Some(false)))
-    assertEquals(dialect("^a$", string.copy(utf8 = Some(true))), string.copy(utf8 = Some(true)))
-    assertEquals(dialect("^(a|a)*$", Perl()), Perl(utf8 = Some(false)))
-    // A pattern that is not parsed decides `utf8` from its source.
-    assertEquals(dialect("(\u00e9", Perl()), Perl(utf8 = Some(true)))
-    assertEquals(dialect("(\u00e9", string), string.copy(utf8 = Some(true)))
-    assertEquals(dialect("(\\x{100}", string), string.copy(utf8 = Some(false)))
-    assertEquals(dialect("(\u00e9", Perl(Perl.Encoding.Bytes)), Perl(Perl.Encoding.Bytes, utf8 = Some(false)))
-    assertEquals(dialect("^\u00e9$", Perl(Perl.Encoding.Bytes)), Perl(Perl.Encoding.Bytes, utf8 = Some(false)))
-    assertEquals(
-      dialect("(\u00e9", Perl(Perl.Encoding.Bytes, string.source)),
-      string.copy(Perl.Encoding.Bytes, utf8 = Some(false))
+    // The diagnostics have the dialect as given, before and after parsing the pattern.
+    for
+      dialect <- Seq(Python(Python.Type.Bytes), Ruby(Ruby.Encoding.Ascii8Bit), Perl(), Perl(false, PerlSource.String))
+      source <- Seq("^a$", "^(a|a)*$", "(a")
+    do
+      val dialectOf = check(source, dialect) match
+        case d: Diagnostics.Safe       => d.dialect
+        case d: Diagnostics.Vulnerable => d.dialect
+        case d: Diagnostics.Unknown    => d.dialect
+      assertEquals(dialectOf, dialect)
+
+  test("ReDoS.check: Perl's /d follows utf8"):
+    // `^\w*!$` takes linear time, but `^(?:\w|é)*!$` takes exponential time if `\w` matches `é`.
+    assertVulnerable(check("^(?:\\w|\\xE9)*$", Perl()), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertSafe(check("^(?:\\w|\\xE9)*$", Perl(utf8 = false)), Checker.Automaton)
+    assertVulnerable(
+      check("^(?:\\w|\\xE9)*$\\x{100}?", Perl(utf8 = false)),
+      AttackComplexity.Exponential(false),
+      Checker.Automaton
     )

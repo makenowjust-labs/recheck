@@ -59,9 +59,8 @@ test("check: with abort (3)", async () => {
   });
   expect(diagnostics.dialect).toEqual({
     name: "perl",
-    encoding: "characters",
+    utf8: true,
     source: "string",
-    utf8: false,
   });
 });
 

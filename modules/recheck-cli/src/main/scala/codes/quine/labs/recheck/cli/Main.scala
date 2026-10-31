@@ -100,36 +100,43 @@ object Main:
 
   /** The options of the dialect's settings, which set them on the dialect of `--dialect`. */
   def dialectSettings: Opts[Dialect => ValidatedNel[String, Dialect]] =
-    val encoding = Opts
-      .option[String](long = "encoding", help = "The encoding of the dialect (python, ruby and perl).")
+    val pythonType = Opts.option[String](long = "python-type", help = "The string type (python).").orNone
+    val rubyEncoding = Opts.option[String](long = "ruby-encoding", help = "The encoding (ruby).").orNone
+    val perlUtf8 = Opts
+      .option[Boolean](long = "perl-utf8", help = "Whether the program has `use utf8` and decoded strings (perl).")
       .orNone
-    val source = Opts.option[PerlSource](long = "perl-source", help = "How the pattern is given (perl).").orNone
-    val utf8 = Opts.option[Boolean](long = "perl-utf8", help = "Whether the pattern string is UTF-8 (perl).").orNone
-    (encoding, source, utf8).mapN((encoding, source, utf8) => withSettings(_, encoding, source, utf8))
+    val perlSource = Opts.option[PerlSource](long = "perl-source", help = "How the pattern is given (perl).").orNone
+    (pythonType, rubyEncoding, perlUtf8, perlSource).mapN: (pythonType, rubyEncoding, perlUtf8, perlSource) =>
+      withSettings(_, pythonType, rubyEncoding, perlUtf8, perlSource)
 
   /** Returns the dialect with the settings, or an error if the dialect does not have a given setting. */
   def withSettings(
       dialect: Dialect,
-      encoding: Option[String],
-      source: Option[PerlSource],
-      utf8: Option[Boolean]
+      pythonType: Option[String],
+      rubyEncoding: Option[String],
+      perlUtf8: Option[Boolean],
+      perlSource: Option[PerlSource]
   ): ValidatedNel[String, Dialect] =
-    def invalid(option: String): ValidatedNel[String, Dialect] =
-      Validated.invalidNel(s"--$option is not an option of ${dialect.name}")
-    def encodingOf[A](of: String => Option[A], default: A): ValidatedNel[String, A] =
-      encoding.fold(Validated.validNel(default)): name =>
-        Validated.fromOption(of(name), s"unknown encoding of ${dialect.name}: $name").toValidatedNel
-    dialect match
-      case _ if !dialect.isPerl && source.isDefined => invalid("perl-source")
-      case _ if !dialect.isPerl && utf8.isDefined   => invalid("perl-utf8")
-      case python: Dialect.Python                   =>
-        encodingOf(Dialect.Python.Encoding.of, python.encoding).map(Dialect.Python(_))
-      case ruby: Dialect.Ruby => encodingOf(Dialect.Ruby.Encoding.of, ruby.encoding).map(Dialect.Ruby(_))
-      case perl: Dialect.Perl =>
-        encodingOf(Dialect.Perl.Encoding.of, perl.encoding)
-          .map(Dialect.Perl(_, source.getOrElse(perl.source), utf8.orElse(perl.utf8)))
-      case _ if encoding.isDefined => invalid("encoding")
-      case _                       => Validated.validNel(dialect)
+    val misplaced = Seq(
+      ("python-type", pythonType.isDefined, dialect.isPython),
+      ("ruby-encoding", rubyEncoding.isDefined, dialect.isRuby),
+      ("perl-utf8", perlUtf8.isDefined, dialect.isPerl),
+      ("perl-source", perlSource.isDefined, dialect.isPerl)
+    ).collectFirst { case (option, true, false) => option }
+    def named[A](option: String, value: Option[String], default: A)(of: String => Option[A]): ValidatedNel[String, A] =
+      value.fold(Validated.validNel(default)): name =>
+        Validated.fromOption(of(name), s"unknown value of --$option: $name").toValidatedNel
+    misplaced match
+      case Some(option) => Validated.invalidNel(s"--$option is not an option of ${dialect.name}")
+      case None         =>
+        dialect match
+          case python: Dialect.Python =>
+            named("python-type", pythonType, python.`type`)(Dialect.Python.Type.of).map(Dialect.Python(_))
+          case ruby: Dialect.Ruby =>
+            named("ruby-encoding", rubyEncoding, ruby.encoding)(Dialect.Ruby.Encoding.of).map(Dialect.Ruby(_))
+          case perl: Dialect.Perl =>
+            Validated.validNel(Dialect.Perl(perlUtf8.getOrElse(perl.utf8), perlSource.getOrElse(perl.source)))
+          case _ => Validated.validNel(dialect)
 
   // $COVERAGE-OFF$
   /** An entrypoint of `recheck` command. */

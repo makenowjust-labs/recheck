@@ -88,13 +88,13 @@ class DiagnosticsSuite extends munit.FunSuite:
         .Unknown(
           "",
           "",
-          Dialect.Perl(source = PerlSource.String, utf8 = Some(false)),
+          Dialect.Perl(utf8 = false, source = PerlSource.String),
           Diagnostics.ErrorKind.Timeout,
           None
         )
         .toString,
       s"""|Input  : //
-          |Dialect: perl (encoding: characters, source: string, utf8: false)
+          |Dialect: perl (utf8: false, source: string)
           |Status : unknown
           |Error  : timeout
           |Checker: (none)""".stripMargin

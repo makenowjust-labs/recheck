@@ -66,16 +66,15 @@ given encodeDiagnostics: Encoder[Diagnostics] with
 given encodeDialect: Encoder[Dialect] with
   def apply(d: Dialect): Json =
     val settings = d match
-      case Dialect.Python(encoding)             => Seq("encoding" := encoding.name)
-      case Dialect.Ruby(encoding)               => Seq("encoding" := encoding.name)
-      case Dialect.Perl(encoding, source, utf8) =>
-        Seq("encoding" := encoding.name, "source" := source.name, "utf8" := utf8)
-      case _ => Seq.empty
+      case Dialect.Python(tpe)        => Seq("type" := tpe.name)
+      case Dialect.Ruby(encoding)     => Seq("encoding" := encoding.name)
+      case Dialect.Perl(utf8, source) => Seq("utf8" := utf8, "source" := source.name)
+      case _                          => Seq.empty
     Json.obj(("name" := d.name) +: settings*)
 
 /** A `Decoder` for `Dialect`, which is the name of the language, or an object of the name and the settings.
   *
-  * An omitted setting takes the default, and Perl's `utf8` of `null` is decided from the pattern.
+  * An omitted or `null` setting takes the default.
   */
 given decodeDialect: Decoder[Dialect] with
   def apply(c: HCursor): Decoder.Result[Dialect] =
@@ -95,23 +94,23 @@ given decodeDialect: Decoder[Dialect] with
               case Some(dialect) =>
                 val keys = c.keys.toSeq.flatten.filter(_ != "name")
                 val allowed = dialect match
-                  case _: Dialect.Python | _: Dialect.Ruby => Seq("encoding")
-                  case _: Dialect.Perl                     => Seq("encoding", "source", "utf8")
-                  case _                                   => Seq.empty
+                  case _: Dialect.Python => Seq("type")
+                  case _: Dialect.Ruby   => Seq("encoding")
+                  case _: Dialect.Perl   => Seq("utf8", "source")
+                  case _                 => Seq.empty
                 keys.find(!allowed.contains(_)) match
                   case Some(key) => fail(s"Unknown setting of $name: $key")
                   case None      =>
                     dialect match
                       case python: Dialect.Python =>
-                        setting(python, "encoding", python.encoding)(Dialect.Python.Encoding.of).map(Dialect.Python(_))
+                        setting(python, "type", python.`type`)(Dialect.Python.Type.of).map(Dialect.Python(_))
                       case ruby: Dialect.Ruby =>
                         setting(ruby, "encoding", ruby.encoding)(Dialect.Ruby.Encoding.of).map(Dialect.Ruby(_))
                       case perl: Dialect.Perl =>
                         for
-                          encoding <- setting(perl, "encoding", perl.encoding)(Dialect.Perl.Encoding.of)
-                          source <- setting(perl, "source", perl.source)(PerlSource.of)
                           utf8 <- c.get[Option[Boolean]]("utf8")
-                        yield Dialect.Perl(encoding, source, utf8)
+                          source <- setting(perl, "source", perl.source)(PerlSource.of)
+                        yield Dialect.Perl(utf8.getOrElse(perl.utf8), source)
                       case dialect => Right(dialect)
 
 /** An `Encoder` for `Checker`. */

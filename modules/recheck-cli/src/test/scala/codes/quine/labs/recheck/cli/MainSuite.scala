@@ -51,17 +51,20 @@ class MainSuite extends munit.FunSuite:
     assertEquals(Main.command.parse(Seq("/foo/")), Right(Main.CheckAction(InputPattern("foo", ""), Parameters())))
     assertEquals(
       Main.command.parse(
-        Seq("/foo/", "--dialect=perl", "--encoding=bytes", "--perl-source=string", "--perl-utf8=true")
+        Seq("/foo/", "--dialect=perl", "--perl-utf8=false", "--perl-source=string")
       ),
       Right(
-        Main.CheckAction(
-          InputPattern("foo", ""),
-          Parameters(dialect = Dialect.Perl(Dialect.Perl.Encoding.Bytes, PerlSource.String, Some(true)))
-        )
+        Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Perl(false, PerlSource.String)))
       )
     )
     assertEquals(
-      Main.command.parse(Seq("/foo/", "--dialect=ruby", "--encoding=ASCII-8BIT")),
+      Main.command.parse(Seq("/foo/", "--dialect=python", "--python-type=bytes")),
+      Right(
+        Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Python(Dialect.Python.Type.Bytes)))
+      )
+    )
+    assertEquals(
+      Main.command.parse(Seq("/foo/", "--dialect=ruby", "--ruby-encoding=ASCII-8BIT")),
       Right(
         Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Ruby(Dialect.Ruby.Encoding.Ascii8Bit)))
       )
@@ -71,10 +74,12 @@ class MainSuite extends munit.FunSuite:
       Right(Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Python())))
     )
     for (args, message) <- Seq(
-        Seq("--encoding=str") -> "--encoding is not an option of javascript",
+        Seq("--python-type=str") -> "--python-type is not an option of javascript",
+        Seq("--dialect=perl", "--ruby-encoding=UTF-8") -> "--ruby-encoding is not an option of perl",
         Seq("--dialect=python", "--perl-source=string") -> "--perl-source is not an option of python",
         Seq("--dialect=ruby", "--perl-utf8=true") -> "--perl-utf8 is not an option of ruby",
-        Seq("--dialect=ruby", "--encoding=str") -> "unknown encoding of ruby: str"
+        Seq("--dialect=ruby", "--ruby-encoding=str") -> "unknown value of --ruby-encoding: str",
+        Seq("--dialect=python", "--python-type=bytez") -> "unknown value of --python-type: bytez"
       )
     do
       val result = Main.command.parse("/foo/" +: args)
@@ -114,7 +119,7 @@ class MainSuite extends munit.FunSuite:
     assertEquals(runMain(Seq("/foo/", "--enable-log"))._1.linesIterator.size, 9)
     assertEquals(
       runMain(Seq("/foo/", "--dialect=perl", "--perl-source=string"))._1.linesIterator.toSeq(1),
-      "Dialect   : perl (encoding: characters, source: string, utf8: false)"
+      "Dialect   : perl (utf8: true, source: string)"
     )
     assertEquals(runMain(Seq("/(a|a)*$/"))._3, 1)
     assertEquals(runMain(Seq("agent")), ("", "", 0))
@@ -170,12 +175,13 @@ class MainSuite extends munit.FunSuite:
       val (script, scriptErr, scriptStatus) = runMain(Seq("generate-recall-script", "-"), stdin)
       assertEquals((scriptErr, scriptStatus), ("", 0))
       script
-    val python = roundTrip("--dialect=python", "--encoding=bytes", "/^(a|a)*$/")
+    val python = roundTrip("--dialect=python", "--python-type=bytes", "/^(a|a)*$/")
     assert(clue(python).startsWith("# Run: python3 -I recall.py\n"))
     assert(clue(python).contains("string = b'a' * "))
-    val perl = roundTrip("--dialect=perl", "--perl-source=string", "--perl-utf8=true", "/^(a|a)*$x/")
+    val perl = roundTrip("--dialect=perl", "--perl-source=string", "--perl-utf8=false", "/^(a|a)*$x/")
     assert(clue(perl).startsWith("# Run: perl recall.pl\n"))
-    assert(clue(perl).contains("my $pattern = \"^(a|a)*\\$x\"; utf8::upgrade($pattern);"))
+    assert(clue(perl).contains("my $pattern = \"^(a|a)*\\$x\"; utf8::downgrade($pattern, 1);"))
+    assert(clue(perl).contains("utf8::downgrade($input, 1);"))
 
   test("Main#run: --all with failed recall validation"):
     assume(
@@ -215,7 +221,7 @@ class MainSuite extends munit.FunSuite:
 
     // The dialect comes from the `dialect` field.
     val python = diagnostics("^(a|a)*$", "", Parameters(dialect = Dialect.Python()))
-    val bytes = python.deepMerge(Json.obj("dialect" := Json.obj("name" := "python", "encoding" := "bytes")))
+    val bytes = python.deepMerge(Json.obj("dialect" := Json.obj("name" := "python", "type" := "bytes")))
     val (pythonOut, _, _) = runMain(Seq("generate-recall-script", file(bytes.noSpaces)))
     assert(clue(pythonOut).startsWith("# Run: python3 -I recall.py\n"))
     assert(clue(pythonOut).contains("string = b'a' * "))

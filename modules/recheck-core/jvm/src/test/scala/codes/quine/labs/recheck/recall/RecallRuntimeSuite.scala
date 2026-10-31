@@ -23,6 +23,7 @@ import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
+import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.ir.IRNodeData
 
@@ -142,48 +143,30 @@ class RecallRuntimeSuite extends munit.FunSuite:
     )
     assertFinish(string.get)
 
-  runtimeTest("Perl: the UTF-8 flag of a pattern", "perl"):
-    // `\w` matches `é` by the Unicode rules, which a UTF-8 pattern string has.
-    def matches(source: String, dialect: Dialect.Perl, flags: String = ""): Option[Boolean] =
-      val pattern = ParsedPattern.parse(source, flags, dialect).toTry.get
-      // recheck matches `é` as the IR does.
-      val modeled = pattern.node.data match
-        case IRNodeData.Chars(set)      => set.contains(0xe9)
-        case IRNodeData.Sequence(nodes) =>
-          nodes.last.data match
-            case IRNodeData.Chars(set) => set.contains(0xe9)
-            case data                  => fail(s"Unexpected: $data")
-        case data => fail(s"Unexpected: $data")
-      RecallProgram
-        .generate(pattern, attack("a", 1, ""))
-        .map: program =>
-          val regex = program.script.linesIterator.find(_.startsWith("my $regex = ")).get
-          val pragma = if program.script.startsWith("use utf8;") then "use utf8; " else ""
-          val script = s"""$pragma$regex print "\\xE9" =~ /\\A$$regex\\z/ ? "1" : "0";"""
-          val process = new ProcessBuilder("perl", "-e", script).start()
-          val result = new String(process.getInputStream.readAllBytes(), StandardCharsets.UTF_8) == "1"
-          assertEquals(result, modeled, s"$source in $dialect")
-          result
-    val string: Dialect.Perl = Dialect.Perl(source = PerlSource.String)
-    assertEquals(matches("\\w", string.copy(utf8 = Some(true))), Some(true))
-    assertEquals(matches("\\w", string.copy(utf8 = Some(false))), Some(false))
-    assertEquals(matches("\\w", string), Some(false))
-    assertEquals(matches("ü?\\w", string), Some(true))
-    assertEquals(matches("ü?\\w", string.copy(utf8 = Some(false))), Some(false))
-    // A regex literal takes `u` for `utf8` that the literal does not make, and it cannot be not UTF-8 by a non-ASCII
-    // character.
-    val literal: Dialect.Perl = Dialect.Perl()
-    assertEquals(matches("\\w", literal), Some(false))
-    assertEquals(matches("ü?\\w", literal), Some(true))
-    assertEquals(matches("\\w", literal.copy(utf8 = Some(true))), Some(true))
-    assertEquals(matches("\\w", literal.copy(utf8 = Some(true)), "d"), Some(true))
-    assertEquals(matches("\\w", literal.copy(utf8 = Some(true)), "a"), Some(false))
-    assertEquals(matches("ü?\\w", literal.copy(utf8 = Some(false))), None)
-    val bytes: Dialect.Perl = Dialect.Perl(Dialect.Perl.Encoding.Bytes)
-    assertEquals(matches("\\w", bytes), Some(false))
-    assertEquals(matches("\\w", bytes, "u"), Some(true))
-    assertEquals(matches("\\w", bytes.copy(utf8 = Some(true))), Some(true))
-    assertEquals(matches("\\w", bytes.copy(source = PerlSource.String, utf8 = Some(true))), Some(true))
+  runtimeTest("Perl: the character set rules of utf8", "perl"):
+    // The program matches `0x80..0xFF` as recheck's character sets have them.
+    def check(source: String, dialect: Dialect.Perl): Unit =
+      val pattern = ParsedPattern.parse(source, "", dialect).toTry.get
+      def last(data: IRNodeData): CharSet = data match
+        case IRNodeData.Chars(set)      => set
+        case IRNodeData.Sequence(nodes) => last(nodes.last.data)
+        case data                       => fail(s"Unexpected: $data")
+      val modeled = (0x80 to 0xff).filter(last(pattern.node.data).contains)
+      val program = RecallProgram.generate(pattern, attack("a", 1, "")).get
+      val lines = program.script.linesIterator.toSeq
+      val pragma = lines.filter(_ == "use utf8;")
+      val regex = lines.find(_.startsWith("my $regex = ")).get
+      val flag = lines.find(_.startsWith("utf8::")).get
+      val loop =
+        s"""for my $$b (0x80..0xFF) { my $$input = chr($$b); $flag print "$$b\\n" if $$input =~ /\\A$$regex\\z/ }"""
+      val process = new ProcessBuilder("perl", "-e", (pragma ++ Seq(regex, loop)).mkString("\n")).start()
+      val out = new String(process.getInputStream.readAllBytes(), StandardCharsets.UTF_8)
+      assertEquals(out.linesIterator.map(_.toInt).toSeq, modeled, s"$source in $dialect")
+    for
+      source <- Seq("\\w", "\\d", "\\s", "[[:alpha:]]", "(?i)\\xC9", "(?a)\\w", "(?u)\\w", "\\x{100}?\\w", "\\p{L}?\\w")
+      utf8 <- Seq(true, false)
+      perlSource <- Seq(PerlSource.Literal, PerlSource.String)
+    do check(source, Dialect.Perl(utf8, perlSource))
 
   runtimeTest("PCRE", "php"):
     // PHP's default `pcre.backtrack_limit` stops the match.

@@ -23,7 +23,6 @@ import codes.quine.labs.recheck.fuzz.FuzzProgram
 import codes.quine.labs.recheck.recall.RecallValidator
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.regexp.PatternExtensions.*
-import codes.quine.labs.resyntax.ast.Dialect
 
 /** ReDoS is a ReDoS checker frontend. */
 object ReDoS:
@@ -58,16 +57,6 @@ object ReDoS:
   ): List[Diagnostics] =
     iterator(source, flags, params, token).toList
 
-  /** Returns the dialect of a diagnostics for the source that is not parsed.
-    *
-    * Perl's `utf8` is decided from the source without the pattern: a byte string is not UTF-8, and the others are UTF-8
-    * if the source has a non-ASCII character (as [[Dialect.withPerlUtf8Of]] for a regex literal).
-    */
-  def unparsedDialect(source: String, dialect: Dialect): Dialect = dialect match
-    case perl @ Dialect.Perl(encoding, _, None) =>
-      perl.copy(utf8 = Some(encoding != Dialect.Perl.Encoding.Bytes && source.exists(_ >= 0x80)))
-    case dialect => dialect
-
   /** Iterates the diagnostics of [[checkAll]].
     *
     * @param exec
@@ -84,12 +73,10 @@ object ReDoS:
       env: Map[String, String] = sys.env
   ): Iterator[Diagnostics] =
     given ctx: Context = Context(params.timeout, token, params.logger)
-    var dialect = unparsedDialect(source, params.dialect)
 
     def ds: Iterator[Diagnostics] =
       ctx.log("parse: start")
       val pattern = ctx.interrupt(ParsedPattern.parse(source, flags, params.dialect).toTry.get)
-      dialect = pattern.dialect
       ctx.log(s"parse: finish\n  pattern: $pattern")
       val failures = mutable.Set.empty[RecallKey]
       val failed = (c: AttackComplexity.Vulnerable, h: Hotspot) => failures.contains(RecallKey(c, h))
@@ -112,12 +99,18 @@ object ReDoS:
               if failures.size < params.maxRecallFailures then Iterator(v)
               else
                 val limit =
-                  Diagnostics.Unknown(source, flags, dialect, Diagnostics.ErrorKind.RecallFailureLimit, Some(d.checker))
+                  Diagnostics.Unknown(
+                    source,
+                    flags,
+                    params.dialect,
+                    Diagnostics.ErrorKind.RecallFailureLimit,
+                    Some(d.checker)
+                  )
                 Iterator(v, limit)
         case d => Iterator(d)
 
     val all = recovering(ds):
-      case ex: ReDoSException => Iterator(Diagnostics.Unknown.from(source, flags, dialect, ex))
+      case ex: ReDoSException => Iterator(Diagnostics.Unknown.from(source, flags, params.dialect, ex))
     takeUntilAccepted(all)
 
   /** RecallKey identifies an attack on recall validation by the complexity and the hotspot.
@@ -166,15 +159,15 @@ object ReDoS:
         Diagnostics.Vulnerable(
           source,
           flags,
-          pattern.dialect,
+          params.dialect,
           vul.toAttackComplexity,
           attack,
           vul.hotspot,
           Checker.Automaton
         )
       case safe: Complexity.Safe =>
-        Diagnostics.Safe(source, flags, pattern.dialect, safe.toAttackComplexity, Checker.Automaton)
-    ++ Iterator(Diagnostics.Safe(source, flags, pattern.dialect, AttackComplexity.Safe(false), Checker.Automaton))
+        Diagnostics.Safe(source, flags, params.dialect, safe.toAttackComplexity, Checker.Automaton)
+    ++ Iterator(Diagnostics.Safe(source, flags, params.dialect, AttackComplexity.Safe(false), Checker.Automaton))
 
   /** Iterates the diagnostics of the fuzz checker, ending with the safe one.
     *
@@ -221,8 +214,8 @@ object ReDoS:
       case (complexity, attack, hotspot) =>
         val recallAttack =
           attack.adjust(complexity, recallLimit, maxRecallStringSize).copy(style = attackStyle(pattern))
-        Diagnostics.Vulnerable(source, flags, pattern.dialect, complexity, recallAttack, hotspot, Checker.Fuzz)
-    ++ Iterator(Diagnostics.Safe(source, flags, pattern.dialect, AttackComplexity.Safe(true), Checker.Fuzz))
+        Diagnostics.Vulnerable(source, flags, params.dialect, complexity, recallAttack, hotspot, Checker.Fuzz)
+    ++ Iterator(Diagnostics.Safe(source, flags, params.dialect, AttackComplexity.Safe(true), Checker.Fuzz))
 
   /** Iterates the diagnostics of the automaton checker, or of the fuzz checker if the automaton checker gives up. */
   private[recheck] def checkAuto(
