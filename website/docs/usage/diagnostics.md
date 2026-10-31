@@ -44,9 +44,9 @@ It may invoke a matching time explosion against too little string (`length < 100
 
 ## Attack String
 
-`vulnerable` status diagnostics has the `attack` field. It contains the attack string obtained by this checking.
+A `vulnerable` diagnostics has the `attack` field. It contains the attack string found by the checking.
 
-The attack string is a string to invoke the matching time explosion as known as ReDoS vulnerability.
+The attack string is a string that causes the explosion of the matching time, also known as a ReDoS vulnerability.
 
 It is a string with a repetition structure. It consists of `pumps`, `suffix`, and the `base` repetition count.
 Each `pump` consists of `prefix`, `repeating` substrings, and the individual repetition count `n`. The actual string forms `prefix + repeating.repeat(base + n) + ... + suffix`.
@@ -67,12 +67,12 @@ The `attack` field also has these fields.
   | `perl`       | Perl       | `"a" x 31 . "\x00"`                                                            |
   | `pcre`       | PHP        | `str_repeat('a', 31) . "\x00"`                                                 |
 
-Noting that the attack string is computed in theoretical, because of the real matching implementation’s optimization, it may not invoke the matching time explosion.
-To prevent this case, you should use the recall validation.
+Note that the attack string is computed in theory, so it may not cause the explosion on the real engine because of the engine's optimizations.
+The recall validation checks it on the real engine.
 
 ## Recall Validation
 
-`vulnerable` status diagnostics has the `recallValidation` field.
+A `vulnerable` diagnostics has the `recallValidation` field.
 
 The recall validation runs the attack string on the real regex engine of the dialect (see [Recall Validation](recall-validation.md)), and this field records the run.
 It is `null` if the recall validation is not run: [`recallTimeout`](parameters.mdx#recalltimeout) is not positive (the default), or commands cannot run (e.g. in the browser).
