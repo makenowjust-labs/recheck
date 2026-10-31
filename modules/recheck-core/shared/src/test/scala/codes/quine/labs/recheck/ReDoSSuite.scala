@@ -30,28 +30,37 @@ class ReDoSSuite extends munit.FunSuite:
   test("ReDoS.check"):
     assertEquals(
       ReDoS.check("^foo$", ""),
-      Diagnostics.Safe("^foo$", "", AttackComplexity.Safe(false), Checker.Automaton)
+      Diagnostics.Safe("^foo$", "", Dialect.JavaScript, AttackComplexity.Safe(false), Checker.Automaton)
     )
     assertEquals(
       ReDoS.check("^foo$", "", Parameters(checker = Checker.Automaton)),
-      Diagnostics.Safe("^foo$", "", AttackComplexity.Safe(false), Checker.Automaton)
+      Diagnostics.Safe("^foo$", "", Dialect.JavaScript, AttackComplexity.Safe(false), Checker.Automaton)
     )
     assertEquals(
       ReDoS.check("^foo$", "", Parameters(checker = Checker.Fuzz)),
-      Diagnostics.Safe("^foo$", "", AttackComplexity.Safe(true), Checker.Fuzz)
+      Diagnostics.Safe("^foo$", "", Dialect.JavaScript, AttackComplexity.Safe(true), Checker.Fuzz)
     )
-    assertEquals(ReDoS.check("^.*$", ""), Diagnostics.Safe("^.*$", "", AttackComplexity.Linear, Checker.Automaton))
+    assertEquals(
+      ReDoS.check("^.*$", ""),
+      Diagnostics.Safe("^.*$", "", Dialect.JavaScript, AttackComplexity.Linear, Checker.Automaton)
+    )
     assertEquals(
       ReDoS.check("(?:a|a|a)*", "y"),
-      Diagnostics.Safe("(?:a|a|a)*", "y", AttackComplexity.Linear, Checker.Automaton)
+      Diagnostics.Safe("(?:a|a|a)*", "y", Dialect.JavaScript, AttackComplexity.Linear, Checker.Automaton)
     )
     assertEquals(
       ReDoS.check("", "x"),
-      Diagnostics.Unknown("", "x", Diagnostics.ErrorKind.InvalidRegExp("Unknown flag 'x' at 0"), None)
+      Diagnostics.Unknown(
+        "",
+        "x",
+        Dialect.JavaScript,
+        Diagnostics.ErrorKind.InvalidRegExp("Unknown flag 'x' at 0"),
+        None
+      )
     )
     assertEquals(
       ReDoS.check("^foo$", "", Parameters(timeout = Duration.MinusInf)),
-      Diagnostics.Unknown("^foo$", "", Diagnostics.ErrorKind.Timeout, None)
+      Diagnostics.Unknown("^foo$", "", Dialect.JavaScript, Diagnostics.ErrorKind.Timeout, None)
     )
 
   test("ReDoS.check: a quantifier is checked by its meaning, not by how it is written"):
@@ -68,12 +77,13 @@ class ReDoSSuite extends munit.FunSuite:
     assertEquals(ReDoS.checkAll("^foo$", ""), List(ReDoS.check("^foo$", "")))
     assertEquals(
       ReDoS.checkAll("^foo$", "", Parameters(timeout = Duration.MinusInf)),
-      List(Diagnostics.Unknown("^foo$", "", Diagnostics.ErrorKind.Timeout, None))
+      List(Diagnostics.Unknown("^foo$", "", Dialect.JavaScript, Diagnostics.ErrorKind.Timeout, None))
     )
 
     val vulnerable = Diagnostics.Vulnerable(
       "^(?:a|a)*$",
       "",
+      Dialect.JavaScript,
       AttackComplexity.Exponential(false),
       AttackPattern(
         Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
@@ -110,12 +120,15 @@ class ReDoSSuite extends munit.FunSuite:
       checkAll(finish),
       List(
         vulnerable.copy(recallValidation = recall(RecallResult.Finish(1.millis))),
-        Diagnostics.Safe("^(?:a|a)*$", "", AttackComplexity.Linear, Checker.Automaton)
+        Diagnostics.Safe("^(?:a|a)*$", "", Dialect.JavaScript, AttackComplexity.Linear, Checker.Automaton)
       )
     )
     assertEquals(runs, 1)
     val fuzz = checkAll(finish, Checker.Fuzz)
-    assertEquals(fuzz.last, Diagnostics.Safe("^(?:a|a)*$", "", AttackComplexity.Safe(true), Checker.Fuzz))
+    assertEquals(
+      fuzz.last,
+      Diagnostics.Safe("^(?:a|a)*$", "", Dialect.JavaScript, AttackComplexity.Safe(true), Checker.Fuzz)
+    )
     assert(fuzz.init.nonEmpty)
     assert(fuzz.init.forall { case d: Diagnostics.Vulnerable => !d.isAccepted; case _ => false })
     assertEquals(runs, fuzz.size - 1)
@@ -128,13 +141,25 @@ class ReDoSSuite extends munit.FunSuite:
     assertEquals(limited.size, 2)
     assertEquals(
       limited.last,
-      Diagnostics.Unknown("^(?:a|a)*$", "", Diagnostics.ErrorKind.RecallFailureLimit, Some(Checker.Fuzz))
+      Diagnostics.Unknown(
+        "^(?:a|a)*$",
+        "",
+        Dialect.JavaScript,
+        Diagnostics.ErrorKind.RecallFailureLimit,
+        Some(Checker.Fuzz)
+      )
     )
     assertEquals(runs, 1)
     // A non-positive limit stops at the first failure.
     assertEquals(
       checkAll(finish, maxRecallFailures = 0).last,
-      Diagnostics.Unknown("^(?:a|a)*$", "", Diagnostics.ErrorKind.RecallFailureLimit, Some(Checker.Automaton))
+      Diagnostics.Unknown(
+        "^(?:a|a)*$",
+        "",
+        Dialect.JavaScript,
+        Diagnostics.ErrorKind.RecallFailureLimit,
+        Some(Checker.Automaton)
+      )
     )
 
     // It stops at the first accepted diagnostics.
@@ -152,12 +177,20 @@ class ReDoSSuite extends munit.FunSuite:
       checkAll(ExecResult.Exit(0, "recheck:runtime node v0\nrecheck:engine-error RangeError\n", "")),
       List(
         vulnerable.copy(recallValidation = recall(RecallResult.EngineError("RangeError"))),
-        Diagnostics.Safe("^(?:a|a)*$", "", AttackComplexity.Linear, Checker.Automaton)
+        Diagnostics.Safe("^(?:a|a)*$", "", Dialect.JavaScript, AttackComplexity.Linear, Checker.Automaton)
       )
     )
     assertEquals(
       checkAll(ExecResult.Exit(1, "", "error")),
-      List(Diagnostics.Unknown("^(?:a|a)*$", "", Diagnostics.ErrorKind.Unexpected("error"), Some(Checker.Automaton)))
+      List(
+        Diagnostics.Unknown(
+          "^(?:a|a)*$",
+          "",
+          Dialect.JavaScript,
+          Diagnostics.ErrorKind.Unexpected("error"),
+          Some(Checker.Automaton)
+        )
+      )
     )
     assertEquals(
       ReDoS
@@ -195,14 +228,14 @@ class ReDoSSuite extends munit.FunSuite:
       else ReDoS.checkFuzz("^(?:a|a)*$", flags, pattern, params)
       ds.next().asInstanceOf[Diagnostics.Vulnerable].attack.toString
     assertEquals(attack(Dialect.JavaScript, ""), "'a'.repeat(31) + '\\x00'")
-    assertEquals(attack(Dialect.Python, ""), "'a' * 31 + '\\x00'")
-    assertEquals(attack(Dialect.Python, "b"), "b'a' * 31 + b'\\x00'")
-    assertEquals(attack(Dialect.Ruby, "n"), "\"a\".b + \"a\".b * 31 + \"\\x00\".b")
+    assertEquals(attack(Dialect.Python(), ""), "'a' * 31 + '\\x00'")
+    assertEquals(attack(Dialect.Python(), "b"), "b'a' * 31 + b'\\x00'")
+    assertEquals(attack(Dialect.Ruby(), "n"), "\"a\".b + \"a\".b * 31 + \"\\x00\".b")
     assertEquals(attack(Dialect.Java, ""), "\"a\".repeat(31) + \"\\u0000\"")
     assertEquals(attack(Dialect.DotNet, ""), "string.Concat(Enumerable.Repeat(\"a\", 31)) + \"\\u0000\"")
-    assertEquals(attack(Dialect.Perl, ""), "\"a\" x 31 . \"\\x00\"")
+    assertEquals(attack(Dialect.Perl(), ""), "\"a\" x 31 . \"\\x00\"")
     assertEquals(attack(Dialect.PCRE, ""), "str_repeat('a', 31) . \"\\x00\"")
-    assert(clue(attack(Dialect.Python, "", Checker.Fuzz)).contains(" * "))
+    assert(clue(attack(Dialect.Python(), "", Checker.Fuzz)).contains(" * "))
 
   test("ReDoS.checkAutomaton"):
     assertEquals(
@@ -211,6 +244,7 @@ class ReDoSSuite extends munit.FunSuite:
         Diagnostics.Vulnerable(
           "^(?:a|a)*$",
           "",
+          Dialect.JavaScript,
           AttackComplexity.Exponential(false),
           AttackPattern(
             Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
@@ -224,11 +258,11 @@ class ReDoSSuite extends munit.FunSuite:
     )
     assertEquals(
       ReDoS.checkAutomaton("^(?:.|.)*$", "s", parse("^(?:.|.)*$", "s"), Parameters(checker = Checker.Automaton)).next(),
-      Diagnostics.Safe("^(?:.|.)*$", "s", AttackComplexity.Linear, Checker.Automaton)
+      Diagnostics.Safe("^(?:.|.)*$", "s", Dialect.JavaScript, AttackComplexity.Linear, Checker.Automaton)
     )
     assertEquals(
       ReDoS.checkAutomaton("^.$", "", parse("^.$"), Parameters(checker = Checker.Automaton)).toList,
-      List(Diagnostics.Safe("^.$", "", AttackComplexity.Safe(false), Checker.Automaton))
+      List(Diagnostics.Safe("^.$", "", Dialect.JavaScript, AttackComplexity.Safe(false), Checker.Automaton))
     )
 
   test("ReDoS.checkFuzz"):
@@ -251,7 +285,7 @@ class ReDoSSuite extends munit.FunSuite:
           Parameters(checker = Checker.Fuzz, randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
         )
         .toList,
-      List(Diagnostics.Safe(".", "", AttackComplexity.Safe(true), Checker.Fuzz))
+      List(Diagnostics.Safe(".", "", Dialect.JavaScript, AttackComplexity.Safe(true), Checker.Fuzz))
     )
     interceptMessage[TimeoutException](
       "timeout at modules/recheck-core/shared/src/main/scala/codes/quine/labs/recheck/fuzz/FuzzProgram.scala:28"
@@ -268,6 +302,7 @@ class ReDoSSuite extends munit.FunSuite:
         Diagnostics.Vulnerable(
           "^(?:a|a)*$",
           "",
+          Dialect.JavaScript,
           AttackComplexity.Exponential(false),
           AttackPattern(
             Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
@@ -288,7 +323,7 @@ class ReDoSSuite extends munit.FunSuite:
           Parameters(randomSeed = 0, maxRepeatCount = 3, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
         )
         .toList,
-      List(Diagnostics.Safe("^(?:a|a){3}$", "", AttackComplexity.Safe(true), Checker.Fuzz))
+      List(Diagnostics.Safe("^(?:a|a){3}$", "", Dialect.JavaScript, AttackComplexity.Safe(true), Checker.Fuzz))
     )
     assertEquals(
       ReDoS
@@ -299,7 +334,7 @@ class ReDoSSuite extends munit.FunSuite:
           Parameters(randomSeed = 0, maxNFASize = 3, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
         )
         .toList,
-      List(Diagnostics.Safe("^(?:a|a){3,}", "", AttackComplexity.Safe(true), Checker.Fuzz))
+      List(Diagnostics.Safe("^(?:a|a){3,}", "", Dialect.JavaScript, AttackComplexity.Safe(true), Checker.Fuzz))
     )
     assertEquals(
       ReDoS
@@ -310,5 +345,5 @@ class ReDoSSuite extends munit.FunSuite:
           Parameters(randomSeed = 0, maxPatternSize = 1, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
         )
         .toList,
-      List(Diagnostics.Safe("^.*$", "", AttackComplexity.Safe(true), Checker.Fuzz))
+      List(Diagnostics.Safe("^.*$", "", Dialect.JavaScript, AttackComplexity.Safe(true), Checker.Fuzz))
     )

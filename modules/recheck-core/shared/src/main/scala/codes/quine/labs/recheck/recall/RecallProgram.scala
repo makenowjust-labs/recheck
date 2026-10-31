@@ -5,6 +5,7 @@ import codes.quine.labs.recheck.exec.Command
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
@@ -32,31 +33,26 @@ object RecallProgram:
 
   val EngineErrorLine: String = "recheck:engine-error"
 
-  /** The environment variables of the runtime command lines of the dialects. */
-  val RuntimeVariables: Map[Dialect, String] = Map(
-    Dialect.JavaScript -> "RECHECK_NODE",
-    Dialect.Python -> "RECHECK_PYTHON",
-    Dialect.Ruby -> "RECHECK_RUBY",
-    Dialect.Java -> "RECHECK_JAVA",
-    Dialect.DotNet -> "RECHECK_DOTNET",
-    Dialect.Perl -> "RECHECK_PERL",
-    Dialect.PCRE -> "RECHECK_PHP"
-  )
+  /** Returns the environment variable of the runtime command line of the dialect. */
+  def runtimeVariable(dialect: Dialect): String = dialect match
+    case Dialect.JavaScript => "RECHECK_NODE"
+    case _: Dialect.Python  => "RECHECK_PYTHON"
+    case _: Dialect.Ruby    => "RECHECK_RUBY"
+    case Dialect.Java       => "RECHECK_JAVA"
+    case Dialect.DotNet     => "RECHECK_DOTNET"
+    case _: Dialect.Perl    => "RECHECK_PERL"
+    case Dialect.PCRE       => "RECHECK_PHP"
 
-  /** Generates the program of the dialect, or returns `None` if the dialect or the pattern is not supported.
-    *
-    * @param perlLiteral
-    *   whether a Perl pattern is a regex literal, or a string at runtime
-    */
-  def generate(pattern: ParsedPattern, attack: AttackPattern, perlLiteral: Boolean = true): Option[RecallProgram] =
+  /** Generates the program of the dialect, or returns `None` if the dialect or the pattern is not supported. */
+  def generate(pattern: ParsedPattern, attack: AttackPattern): Option[RecallProgram] =
     pattern.dialect match
-      case Dialect.JavaScript => Some(javascript(pattern, attack))
-      case Dialect.Python     => Some(python(pattern, attack))
-      case Dialect.Ruby       => Some(ruby(pattern, attack))
-      case Dialect.Java       => Some(java(pattern, attack))
-      case Dialect.DotNet     => Some(dotnet(pattern, attack))
-      case Dialect.Perl       => perl(pattern, attack, perlLiteral)
-      case Dialect.PCRE       => php(pattern, attack)
+      case Dialect.JavaScript        => Some(javascript(pattern, attack))
+      case _: Dialect.Python         => Some(python(pattern, attack))
+      case _: Dialect.Ruby           => Some(ruby(pattern, attack))
+      case Dialect.Java              => Some(java(pattern, attack))
+      case Dialect.DotNet            => Some(dotnet(pattern, attack))
+      case perlDialect: Dialect.Perl => perl(pattern, perlDialect, attack)
+      case Dialect.PCRE              => php(pattern, attack)
 
   /** Script is a program of [[generate]] as a standalone file, which has the data of the program in itself.
     *
@@ -70,9 +66,9 @@ object RecallProgram:
   final case class Script(name: String, command: String, content: String)
 
   /** Generates the program of [[generate]] as a standalone file, or returns `None` as [[generate]] does. */
-  def script(pattern: ParsedPattern, attack: AttackPattern, perlLiteral: Boolean = true): Option[Script] =
-    generate(pattern, attack, perlLiteral).map: program =>
-      val name = ScriptNames(pattern.dialect)
+  def script(pattern: ParsedPattern, attack: AttackPattern): Option[Script] =
+    generate(pattern, attack).map: program =>
+      val name = scriptName(pattern.dialect)
       // The file takes the place of the standard input `-`.
       val command = (program.command.program +: program.command.args.filterNot(_ == "-") :+ name).mkString(" ")
       val php = "<?php\n"
@@ -81,19 +77,18 @@ object RecallProgram:
         case Dialect.DotNet     => s"// Run: $command\n" + dotnetProgram(quote(program.script))
         case Dialect.PCRE       => s"$php// Run: $command\n" + program.script.stripPrefix(php)
         case Dialect.JavaScript => s"// Run: $command\n" + program.script
-        case Dialect.Python | Dialect.Ruby | Dialect.Perl => s"# Run: $command\n" + program.script
+        case _: Dialect.Python | _: Dialect.Ruby | _: Dialect.Perl => s"# Run: $command\n" + program.script
       Script(name, command, content)
 
-  /** The file names of the standalone programs. */
-  private val ScriptNames: Map[Dialect, String] = Map(
-    Dialect.JavaScript -> "recall.cjs",
-    Dialect.Python -> "recall.py",
-    Dialect.Ruby -> "recall.rb",
-    Dialect.Java -> "recall.java",
-    Dialect.DotNet -> "recall.cs",
-    Dialect.Perl -> "recall.pl",
-    Dialect.PCRE -> "recall.php"
-  )
+  /** Returns the file name of the standalone program of the dialect. */
+  private def scriptName(dialect: Dialect): String = dialect match
+    case Dialect.JavaScript => "recall.cjs"
+    case _: Dialect.Python  => "recall.py"
+    case _: Dialect.Ruby    => "recall.rb"
+    case Dialect.Java       => "recall.java"
+    case Dialect.DotNet     => "recall.cs"
+    case _: Dialect.Perl    => "recall.pl"
+    case Dialect.PCRE       => "recall.php"
 
   /** Returns a Java expression of the data.
     *
@@ -333,28 +328,30 @@ object RecallProgram:
     if attack.suffix.nonEmpty then lines.addOne(s"1:${units(attack.suffix.iterator)}")
     lines.result().mkString("", "\n", "\n")
 
-  /** Returns the Perl program for `perl`, or `None` if the pattern is not safe to put in the program.
+  /** Returns the Perl program for `perl`, or `None` if the pattern cannot be put in the program as the dialect tells.
     *
-    * @param literal
-    *   whether the pattern is a regex literal in the program (the default of recheck's Perl dialect), or a string
-    *   interpolated into `qr` at runtime
+    * A regex literal (the default of recheck's Perl dialect) is put in the program, and a string is interpolated into
+    * `qr` at runtime.
     */
-  private[recall] def perl(pattern: ParsedPattern, attack: AttackPattern, literal: Boolean): Option[RecallProgram] =
+  private[recall] def perl(
+      pattern: ParsedPattern,
+      dialect: Dialect.Perl,
+      attack: AttackPattern
+  ): Option[RecallProgram] =
     // `qr` takes only these modifiers, and the others do not change a match.
     val flags = pattern.flags.filter(c => "msixpodualn".contains(c))
     val bytes = pattern.ir.mode == UnitMode.Byte
+    // Character strings are UTF-8 and byte strings are not, which decides Perl's `/d` rules.
+    def flag(name: String): String = if bytes then s"utf8::downgrade($$$name, 1)" else s"utf8::upgrade($$$name)"
     val regex =
-      if literal then
+      if dialect.source == PerlSource.Literal then
         for
           _ <- Option.when(isPerlSafe(pattern.source))(())
           delimiter <- PerlDelimiters.find(c => !pattern.source.contains(c))
         yield s"qr$delimiter${pattern.source}$delimiter$flags"
       else
         val source = AttackPattern.Perl.literal(sourceString(pattern.source, bytes))
-        // The UTF-8 flag of the string decides Perl's rules.
-        // A literal of escapes may not have the flag that `perlUtf8` tells.
-        val utf8 = if pattern.perlUtf8 then "utf8::upgrade($pattern)" else "utf8::downgrade($pattern, 1)"
-        Some(s"do { my $$pattern = $source; $utf8; qr/$$pattern/$flags }")
+        Some(s"do { my $$pattern = $source; ${flag("pattern")}; qr/$$pattern/$flags }")
     regex.map: regex =>
       val input = attack.toString(AttackPattern.Perl)
       val pragma = if bytes then "" else "use utf8;\n"
@@ -364,6 +361,7 @@ object RecallProgram:
             |print "$RuntimeLine perl " . sprintf("%vd", $$^V) . "\\n";
             |my $$regex = $regex;
             |my $$input = $input;
+            |${flag("input")};
             |print "$StartLine\\n";
             |my $$start = Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC());
             |my $$matched = $$input =~ $$regex;

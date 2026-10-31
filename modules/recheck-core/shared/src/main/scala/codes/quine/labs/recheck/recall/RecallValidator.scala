@@ -32,26 +32,25 @@ object RecallValidator:
     * supported. It throws [[UnexpectedException]] when the runtime fails to run the program.
     *
     * @param env
-    *   the environment variables, whose [[RecallProgram.RuntimeVariables]] give the runtime command lines
+    *   the environment variables, whose [[RecallProgram.runtimeVariable]] gives the runtime command lines
     */
   def validate(
       pattern: ParsedPattern,
       attack: AttackPattern,
       timeout: Duration,
-      perlLiteral: Boolean = true,
       env: Map[String, String] = Map.empty
   )(
       exec: Exec
   )(using ctx: Context): Option[RecallValidation] = ctx.interrupt:
     if timeout <= Duration.Zero then None
     else
-      RecallProgram.generate(pattern, attack, perlLiteral) match
+      RecallProgram.generate(pattern, attack) match
         case None =>
           ctx.log("recall: not supported")
           None
         case Some(program) =>
           val runtime =
-            RecallProgram.RuntimeVariables.get(pattern.dialect).flatMap(env.get).map(_.trim).filter(_.nonEmpty)
+            env.get(RecallProgram.runtimeVariable(pattern.dialect)).map(_.trim).filter(_.nonEmpty)
           val command = runtime.fold(program.command)(program.command.withShell(Executor.shell, _))
           val name = runtime.getOrElse(program.command.program)
           val commandLine = (name +: (program.command.args ++ program.command.source.map(_.name))).mkString(" ")

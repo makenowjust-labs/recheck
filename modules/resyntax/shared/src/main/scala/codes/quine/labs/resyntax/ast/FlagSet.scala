@@ -79,96 +79,102 @@ object FlagSet:
 
   /** Returns parsed flag set object from the given flag set string on the dialect. */
   def parse(flags: String, dialect: Dialect): FlagSet =
-    val allowsDuplicatedFlag = dialect != Dialect.JavaScript
+    val allowsDuplicatedFlag = !dialect.isJavaScript
 
     var flagSet = FlagSet()
     val counts = mutable.Map.empty[Char, Int].withDefaultValue(0)
     for (c, offset) <- flags.toCharArray.zipWithIndex do
-      def check(dialects: Dialect*): Unit =
-        if !dialects.contains(dialect) then throw new FlagSetException(s"Unknown flag '$c'", Some(offset))
+      def check(accepted: Boolean): Unit =
+        if !accepted then throw new FlagSetException(s"Unknown flag '$c'", Some(offset))
       counts(c) += 1
       if counts(c) >= 2 && !allowsDuplicatedFlag then throw new FlagSetException(s"Duplicated flag '$c'", Some(offset))
 
       (c: @switch) match
         case 'A' =>
-          check(Dialect.PCRE)
+          check(dialect.isPCRE)
           flagSet = flagSet.copy(anchored = true)
         case 'D' =>
-          check(Dialect.PCRE)
+          check(dialect.isPCRE)
           flagSet = flagSet.copy(dollarEndOnly = true)
         case 'J' =>
-          check(Dialect.PCRE)
+          check(dialect.isPCRE)
           flagSet = flagSet.copy(dupNames = true)
         case 'L' =>
-          check(Dialect.Python)
+          check(dialect.isPython)
           flagSet = flagSet.copy(localeUpper = true)
         case 'S' =>
-          check(Dialect.PCRE)
+          check(dialect.isPCRE)
           flagSet = flagSet.copy(analyze = true)
         case 'U' =>
-          check(Dialect.Java, Dialect.PCRE)
+          check(dialect.isJava || dialect.isPCRE)
           flagSet = flagSet.copy(ungreedy = true)
         case 'X' =>
-          check(Dialect.PCRE)
+          check(dialect.isPCRE)
           flagSet = flagSet.copy(extra = true)
         case 'a' =>
-          check(Dialect.Perl, Dialect.Python, Dialect.Ruby)
+          check(dialect.isPerl || dialect.isPython || dialect.isRuby)
           flagSet = flagSet.copy(ascii = true)
-          if counts(c) >= 2 && dialect == Dialect.Perl then flagSet = flagSet.copy(asciiRestrict = true)
+          if counts(c) >= 2 && dialect.isPerl then flagSet = flagSet.copy(asciiRestrict = true)
         case 'b' =>
-          check(Dialect.Python)
+          check(dialect.isPython)
           flagSet = flagSet.copy(bytes = true)
         case 'c' =>
-          check(Dialect.Perl)
+          check(dialect.isPerl)
           flagSet = flagSet.copy(continue = true)
         case 'd' =>
-          check(Dialect.Java, Dialect.JavaScript, Dialect.Perl, Dialect.Ruby)
+          check(dialect.isJava || dialect.isJavaScript || dialect.isPerl || dialect.isRuby)
           flagSet = flagSet.copy(hasIndices = true)
         case 'e' =>
-          check(Dialect.Perl)
+          check(dialect.isPerl)
           flagSet = flagSet.copy(evaluate = true)
         case 'g' =>
-          check(Dialect.JavaScript, Dialect.Perl)
+          check(dialect.isJavaScript || dialect.isPerl)
           flagSet = flagSet.copy(global = true)
         case 'i' =>
           flagSet = flagSet.copy(ignoreCase = true)
         case 'l' =>
-          check(Dialect.Perl)
+          check(dialect.isPerl)
           flagSet = flagSet.copy(localeLower = true)
         case 'm' =>
           flagSet = flagSet.copy(multiline = true)
         case 'n' =>
-          check(Dialect.DotNet, Dialect.Perl, Dialect.Ruby)
+          check(dialect.isDotNet || dialect.isPerl || dialect.isRuby)
           flagSet = flagSet.copy(explicitCapture = true)
         case 'o' =>
-          check(Dialect.Perl, Dialect.Ruby)
+          check(dialect.isPerl || dialect.isRuby)
           flagSet = flagSet.copy(once = true)
         case 'p' =>
-          check(Dialect.Perl)
+          check(dialect.isPerl)
           flagSet = flagSet.copy(preserve = true)
         case 'r' =>
-          check(Dialect.Perl)
+          check(dialect.isPerl)
           flagSet = flagSet.copy(nonDestructive = true)
         case 's' =>
-          check(Dialect.DotNet, Dialect.Java, Dialect.JavaScript, Dialect.PCRE, Dialect.Perl, Dialect.Python)
+          check(
+            dialect.isDotNet || dialect.isJava || dialect.isJavaScript || dialect.isPCRE || dialect.isPerl || dialect.isPython
+          )
           flagSet = flagSet.copy(dotAll = true)
         case 'u' =>
-          check(Dialect.Java, Dialect.JavaScript, Dialect.PCRE, Dialect.Perl, Dialect.Python, Dialect.Ruby)
+          check(
+            dialect.isJava || dialect.isJavaScript || dialect.isPCRE || dialect.isPerl || dialect.isPython || dialect.isRuby
+          )
           flagSet = flagSet.copy(unicode = true)
         case 'v' =>
-          check(Dialect.JavaScript)
+          check(dialect.isJavaScript)
           flagSet = flagSet.copy(unicodeSets = true)
         case 'x' =>
-          check(Dialect.DotNet, Dialect.Java, Dialect.PCRE, Dialect.Perl, Dialect.Python, Dialect.Ruby)
+          check(
+            dialect.isDotNet || dialect.isJava || dialect.isPCRE || dialect.isPerl || dialect.isPython || dialect.isRuby
+          )
           flagSet = flagSet.copy(verbose = true)
-          if counts(c) >= 2 && dialect == Dialect.Perl then flagSet = flagSet.copy(verboseMore = true)
+          if counts(c) >= 2 && dialect.isPerl then flagSet = flagSet.copy(verboseMore = true)
         case 'y' =>
-          check(Dialect.JavaScript)
+          check(dialect.isJavaScript)
           flagSet = flagSet.copy(sticky = true)
         case _ =>
-          check()
+          check(false)
 
-    if dialect == Dialect.Python then
+    if dialect.isPython then
       if flagSet.bytes && flagSet.unicode then throw new FlagSetException("Incompatible flags 'b' and 'u'", None)
 
     flagSet

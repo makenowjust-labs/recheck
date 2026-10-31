@@ -21,6 +21,19 @@ describe("sections", () => {
     expect(toc.map(({ id }) => id)).toEqual(sections.map(({ id }) => id));
   });
 
+  test("show the dialect as a name or an object", () => {
+    const dialect = sections.find(({ name }) => name === "dialect");
+    expect(dialect).toMatchObject({
+      typescriptDefault: '"javascript"',
+      scalaDefault: "Dialect.JavaScript",
+      cli: "dialect",
+    });
+    expect(dialect?.typescriptType).toContain('"javascript" | "java" |');
+    expect(dialect?.typescriptType).toContain(
+      '{ name: "perl"; utf8?: boolean; source?: "literal" | "string" }',
+    );
+  });
+
   test("show the types and the defaults of both languages", () => {
     expect(
       sectionOf("checker", {

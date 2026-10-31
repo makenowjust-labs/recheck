@@ -23,77 +23,77 @@ class ParserClassSuite extends ParserSuiteBase:
       false,
       ClassRange(ClassBackslashValue(Escape(Single('n'), '\n')), ClassBackslashValue(Escape(Single('r'), '\r')))
     )
-  check("[a-\\w]", "", JavaScript, Perl):
+  check("[a-\\w]", "", JavaScript, Perl()):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassBackslashClass(Word)))
-  error("[a-\\w]", "", DotNet, Java, PCRE, Python, Ruby)("Invalid class range at 1")
+  error("[a-\\w]", "", DotNet, Java, PCRE, Python(), Ruby())("Invalid class range at 1")
   error("[a-\\w]", "u", JavaScript)("Invalid class range at 1")
-  check("[\\w-z]", "", DotNet, Java, JavaScript, Perl):
+  check("[\\w-z]", "", DotNet, Java, JavaScript, Perl()):
     Class(false, ClassUnion(ClassBackslashClass(Word), ClassLiteral('-'), ClassLiteral('z')))
-  error("[\\w-z]", "", PCRE, Python, Ruby)("Invalid class range at 1")
+  error("[\\w-z]", "", PCRE, Python(), Ruby())("Invalid class range at 1")
   error("[\\w-z]", "u", JavaScript)("Invalid class range at 1")
   check("[\\d-a-c]", "", JavaScript):
     Class(
       false,
       ClassUnion(ClassBackslashClass(Digit), ClassLiteral('-'), ClassLiteral('a'), ClassLiteral('-'), ClassLiteral('c'))
     )
-  check("[\\d-a-c]", "", DotNet, Java, Perl):
+  check("[\\d-a-c]", "", DotNet, Java, Perl()):
     Class(
       false,
       ClassUnion(ClassBackslashClass(Digit), ClassLiteral('-'), ClassRange(ClassLiteral('a'), ClassLiteral('c')))
     )
-  check("[a-[:digit:]]", "", Perl):
+  check("[a-[:digit:]]", "", Perl()):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassPosix(false, "digit")))
-  error("[a-[:digit:]]", "", PCRE, Ruby)("Invalid class range at 1")
-  check("[[:digit:]-z]", "", Perl):
+  error("[a-[:digit:]]", "", PCRE, Ruby())("Invalid class range at 1")
+  check("[[:digit:]-z]", "", Perl()):
     Class(false, ClassUnion(ClassPosix(false, "digit"), ClassLiteral('-'), ClassLiteral('z')))
-  error("[[:digit:]-z]", "", PCRE, Ruby)("Invalid class range at 1")
-  check("[a-[b]]", "", Java, Ruby):
+  error("[[:digit:]-z]", "", PCRE, Ruby())("Invalid class range at 1")
+  check("[a-[b]]", "", Java, Ruby()):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassNest(false, ClassLiteral('b'))))
-  check("[[a]-z]", "", Java, Ruby):
+  check("[[a]-z]", "", Java, Ruby()):
     Class(false, ClassUnion(ClassNest(false, ClassLiteral('a')), ClassLiteral('-'), ClassLiteral('z')))
   error("[z-a]", "", All*)("Out of order class range at 1")
-  error("[a-[b]]", "", JavaScript, PCRE, Perl, Python)("Out of order class range at 1")
-  check("[\\b]", "", DotNet, JavaScript, PCRE, Perl, Python, Ruby)(
+  error("[a-[b]]", "", JavaScript, PCRE, Perl(), Python())("Out of order class range at 1")
+  check("[\\b]", "", DotNet, JavaScript, PCRE, Perl(), Python(), Ruby())(
     Class(false, ClassBackslashValue(Escape(Single('b'), 0x08)))
   )
   error("[\\b]", "", Java)("Invalid backslash escape at 2")
-  check("[\\A\\z\\Z\\G\\K\\R\\X]", "", Perl, Ruby):
+  check("[\\A\\z\\Z\\G\\K\\R\\X]", "", Perl(), Ruby()):
     Class(false, ClassUnion("AzZGKRX".map(c => ClassBackslashValue(Unknown(c)))*))
-  error("[\\A]", "", DotNet, Java, PCRE, Python)("Invalid escape sequence at 1")
+  error("[\\A]", "", DotNet, Java, PCRE, Python())("Invalid escape sequence at 1")
   error("[\\R]", "", Java, PCRE)("Invalid escape sequence at 1")
-  error("[\\N]", "", PCRE, Perl)("Invalid escape sequence at 1")
-  check("[\\g\\k]", "", PCRE, Perl, Ruby)(
+  error("[\\N]", "", PCRE, Perl())("Invalid escape sequence at 1")
+  check("[\\g\\k]", "", PCRE, Perl(), Ruby())(
     Class(false, ClassUnion(ClassBackslashValue(Unknown('g')), ClassBackslashValue(Unknown('k'))))
   )
   // Perl's lexer applies the case commands of a regex literal to its text, even inside a class.
-  check("[\\uA]", "", Perl)(Class(false, ClassLiteral('A')))
-  check("[\\Ua-z]", "", Perl)(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('Z'))))
-  check("[\\Ux\\Ey]", "", Perl)(Class(false, ClassUnion(ClassLiteral('X'), ClassLiteral('y'))))
-  check("[A-\\Lz]", "", Perl)(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
-  check("[A-\\LZ]", "", Perl)(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
-  check("[A\\L-z]", "", Perl)(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
-  error("[a\\U-z]", "", Perl)("Out of order class range at 1")
-  error("[a-\\Uz]", "", Perl)("Out of order class range at 1")
-  check("[\\E]a]", "", Perl)(Class(false, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
-  error("[\\E]", "", Perl)("Unclosed ']' at 4")
-  check("[\\Qa-c\\E]", "", Perl):
+  check("[\\uA]", "", Perl())(Class(false, ClassLiteral('A')))
+  check("[\\Ua-z]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('Z'))))
+  check("[\\Ux\\Ey]", "", Perl())(Class(false, ClassUnion(ClassLiteral('X'), ClassLiteral('y'))))
+  check("[A-\\Lz]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
+  check("[A-\\LZ]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
+  check("[A\\L-z]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
+  error("[a\\U-z]", "", Perl())("Out of order class range at 1")
+  error("[a-\\Uz]", "", Perl())("Out of order class range at 1")
+  check("[\\E]a]", "", Perl())(Class(false, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
+  error("[\\E]", "", Perl())("Unclosed ']' at 4")
+  check("[\\Qa-c\\E]", "", Perl()):
     Class(false, ClassUnion(ClassLiteral('a'), ClassBackslashValue(Unknown('-')), ClassLiteral('c')))
-  error("[\\Q]", "", Perl)("Unclosed ']' at 4")
+  error("[\\Q]", "", Perl())("Unclosed ']' at 4")
   // Java and PCRE read `\Q...\E` as the regex syntax.
   check("[\\Qa]\\E]", "", Java, PCRE)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral(']'))))
   check("[\\Q]\\E]", "", Java, PCRE)(Class(false, ClassUnion(ClassLiteral(']'))))
-  check("[a-\\Qz\\E]", "", Java, PCRE, Perl)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
-  check("[\\Qa\\E-z]", "", Java, PCRE, Perl)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
-  check("[\\Qxy\\E-\\Qza\\E]", "", Java, PCRE, Perl):
+  check("[a-\\Qz\\E]", "", Java, PCRE, Perl())(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  check("[\\Qa\\E-z]", "", Java, PCRE, Perl())(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  check("[\\Qxy\\E-\\Qza\\E]", "", Java, PCRE, Perl()):
     Class(false, ClassUnion(ClassLiteral('x'), ClassRange(ClassLiteral('y'), ClassLiteral('z')), ClassLiteral('a')))
   error("[\\Qxz\\E-y]", "", Java, PCRE)("Out of order class range at 4")
-  error("[\\Qxz\\E-y]", "", Perl)("Out of order class range at 4")
-  check("[a-\\Q\\Ez]", "", Java, PCRE, Perl)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  error("[\\Qxz\\E-y]", "", Perl())("Out of order class range at 4")
+  check("[a-\\Q\\Ez]", "", Java, PCRE, Perl())(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
   check("[a-\\Q\\E]", "", Java, PCRE):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassUnion()))
   check("[\\Q\\E-z]", "", Java, PCRE):
     Class(false, ClassUnion(ClassUnion(), ClassLiteral('-'), ClassLiteral('z')))
-  check("[a\\Q\\E-z]", "", Java, PCRE, Perl)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  check("[a\\Q\\E-z]", "", Java, PCRE, Perl())(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
   check("[\\Q\\E]a]", "", Java, PCRE):
     Class(false, ClassUnion(ClassUnion(), ClassLiteral(']'), ClassLiteral('a')))
   error("[\\Q\\E]", "", Java, PCRE)("Unclosed ']' at 6")
@@ -115,12 +115,12 @@ class ParserClassSuite extends ParserSuiteBase:
   )
   checkPerlString("[\\C]", "")(Class(false, ClassBackslashValue(Unknown('C'))))
   check("[]", "", JavaScript)(Class(false, ClassUnion()))
-  check("[[:alnum:]]", "", PCRE, Perl, Ruby)(Class(false, ClassPosix(false, "alnum")))
-  check("[[:^alnum:]]", "", PCRE, Perl, Ruby)(Class(false, ClassPosix(true, "alnum")))
-  error("[[:foo:]]", "", PCRE, Perl, Ruby)("Unknown POSIX class at 1")
-  error("[[:^foo:]]", "", PCRE, Perl, Ruby)("Unknown POSIX class at 1")
-  error("[[:FOO:]]", "", PCRE, Ruby)("Unknown POSIX class at 1")
-  check("[[:FOO:]]", "", Perl):
+  check("[[:alnum:]]", "", PCRE, Perl(), Ruby())(Class(false, ClassPosix(false, "alnum")))
+  check("[[:^alnum:]]", "", PCRE, Perl(), Ruby())(Class(false, ClassPosix(true, "alnum")))
+  error("[[:foo:]]", "", PCRE, Perl(), Ruby())("Unknown POSIX class at 1")
+  error("[[:^foo:]]", "", PCRE, Perl(), Ruby())("Unknown POSIX class at 1")
+  error("[[:FOO:]]", "", PCRE, Ruby())("Unknown POSIX class at 1")
+  check("[[:FOO:]]", "", Perl()):
     Sequence(
       Class(
         false,
@@ -135,8 +135,8 @@ class ParserClassSuite extends ParserSuiteBase:
       ),
       Literal(']')
     )
-  error("[[:ab:]]", "", PCRE, Ruby)("Unknown POSIX class at 1")
-  check("[[:ab:]]", "", Perl):
+  error("[[:ab:]]", "", PCRE, Ruby())("Unknown POSIX class at 1")
+  check("[[:ab:]]", "", Perl()):
     Sequence(
       Class(
         false,
@@ -144,8 +144,8 @@ class ParserClassSuite extends ParserSuiteBase:
       ),
       Literal(']')
     )
-  error("[[:a:b:]]", "", PCRE, Perl)("Unknown POSIX class at 1")
-  check("[[:a:b:]]", "", Ruby):
+  error("[[:a:b:]]", "", PCRE, Perl())("Unknown POSIX class at 1")
+  check("[[:a:b:]]", "", Ruby()):
     Sequence(
       Class(
         false,
@@ -160,38 +160,38 @@ class ParserClassSuite extends ParserSuiteBase:
       ),
       Literal(']')
     )
-  error("[[:alpha:b:]]", "", PCRE, Perl, Ruby)("Unknown POSIX class at 1")
+  error("[[:alpha:b:]]", "", PCRE, Perl(), Ruby())("Unknown POSIX class at 1")
   for name <- Seq("abc", "abcdefghijklmn", "fo_o", "a.b.c", "abcdefghijklm\u00e9") do
-    error(s"[[:$name:]]", "", PCRE, Perl, Ruby)("Unknown POSIX class at 1")
+    error(s"[[:$name:]]", "", PCRE, Perl(), Ruby())("Unknown POSIX class at 1")
   for name <- Seq("abcdefghijklmno", "a b", "a.b.c.d", "alphaxyzalphaxyzalphaxyz") do
-    error(s"[[:$name:]]", "", PCRE, Ruby)("Unknown POSIX class at 1")
-    check(s"[[:$name:]]", "", Perl)(classPosixLiteral(name))
+    error(s"[[:$name:]]", "", PCRE, Ruby())("Unknown POSIX class at 1")
+    check(s"[[:$name:]]", "", Perl())(classPosixLiteral(name))
   for name <- Seq("al:pha", ":ab") do
-    error(s"[[:$name:]]", "", PCRE, Perl)("Unknown POSIX class at 1")
-    check(s"[[:$name:]]", "", Ruby)(classPosixLiteral(name))
-  error("[[:abcdefghijklmnopqrst:]]", "", PCRE, Ruby)("Unknown POSIX class at 1")
-  check("[[:abcdefghijklmnopqrst:]]", "", Perl)(classPosixLiteral("abcdefghijklmnopqrst"))
+    error(s"[[:$name:]]", "", PCRE, Perl())("Unknown POSIX class at 1")
+    check(s"[[:$name:]]", "", Ruby())(classPosixLiteral(name))
+  error("[[:abcdefghijklmnopqrst:]]", "", PCRE, Ruby())("Unknown POSIX class at 1")
+  check("[[:abcdefghijklmnopqrst:]]", "", Perl())(classPosixLiteral("abcdefghijklmnopqrst"))
   error("[[:abcdefghijklmnopqrstu:]]", "", PCRE)("Unknown POSIX class at 1")
-  check("[[:abcdefghijklmnopqrstu:]]", "", Perl, Ruby)(classPosixLiteral("abcdefghijklmnopqrstu"))
-  check("[[:]]", "", Ruby)(Class(false, ClassNest(false, ClassLiteral(':'))))
-  check("[[:]]", "", PCRE, Perl):
+  check("[[:abcdefghijklmnopqrstu:]]", "", Perl(), Ruby())(classPosixLiteral("abcdefghijklmnopqrstu"))
+  check("[[:]]", "", Ruby())(Class(false, ClassNest(false, ClassLiteral(':'))))
+  check("[[:]]", "", PCRE, Perl()):
     Sequence(Class(false, ClassUnion(ClassLiteral('['), ClassLiteral(':'))), Literal(']'))
-  error("[[.a.]]", "", PCRE, Perl)("Unsupported POSIX collating element at 1")
-  error("[[=a=]]", "", PCRE, Perl)("Unsupported POSIX collating element at 1")
-  check("[[.a.]]", "", Ruby):
+  error("[[.a.]]", "", PCRE, Perl())("Unsupported POSIX collating element at 1")
+  error("[[=a=]]", "", PCRE, Perl())("Unsupported POSIX collating element at 1")
+  check("[[.a.]]", "", Ruby()):
     Class(false, ClassNest(false, ClassUnion(ClassLiteral('.'), ClassLiteral('a'), ClassLiteral('.'))))
   error("[:alpha:]", "", PCRE)("POSIX class outside class at 0")
   error("[.a.]", "", PCRE)("Unsupported POSIX collating element at 0")
-  check("[:a:]", "", DotNet, Java, JavaScript, Perl, Python, Ruby):
+  check("[:a:]", "", DotNet, Java, JavaScript, Perl(), Python(), Ruby()):
     Class(false, ClassUnion(ClassLiteral(':'), ClassLiteral('a'), ClassLiteral(':')))
   check("[[:<:]]", "", PCRE)(Class(false, ClassPosix(false, "<")))
   check("[[:>:]]", "", PCRE)(Class(false, ClassPosix(false, ">")))
   error("[[:<:]a]", "", PCRE)("Unknown POSIX class at 1")
-  check("[[a]]", "", Java, Ruby)(Class(false, ClassNest(false, ClassLiteral('a'))))
+  check("[[a]]", "", Java, Ruby())(Class(false, ClassNest(false, ClassLiteral('a'))))
   check("[[a]]", "v", JavaScript)(Class(false, ClassNest(false, ClassLiteral('a'))))
-  check("[[^a]]", "", Java, Ruby)(Class(false, ClassNest(true, ClassLiteral('a'))))
+  check("[[^a]]", "", Java, Ruby())(Class(false, ClassNest(true, ClassLiteral('a'))))
   check("[[^a]]", "v", JavaScript)(Class(false, ClassNest(true, ClassLiteral('a'))))
-  check("[[a-z]&&[a-c]]", "", Java, Ruby):
+  check("[[a-z]&&[a-c]]", "", Java, Ruby()):
     Class(
       false,
       ClassIntersection(
@@ -216,27 +216,27 @@ class ParserClassSuite extends ParserSuiteBase:
       )
     )
   check("[a b]", "x", Java)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('b'))))
-  check("[a b]", "x", DotNet, PCRE, Perl, Python, Ruby):
+  check("[a b]", "x", DotNet, PCRE, Perl(), Python(), Ruby()):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral(' '), ClassLiteral('b')))
   check("[a - z]", "x", Java)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
   check("[a#x\nb]", "x", Java)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('b'))))
   check("[ ]]", "x", Java)(Class(false, ClassLiteral(']')))
   error("[ ]", "x", Java)("Unclosed ']' at 3")
   error("[a- ]", "x", Java)("Out of order class range at 1")
-  check("[a&&b]", "", DotNet, JavaScript, PCRE, Perl, Python):
+  check("[a&&b]", "", DotNet, JavaScript, PCRE, Perl(), Python()):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('&'), ClassLiteral('&'), ClassLiteral('b')))
-  check("[[a]", "", DotNet, JavaScript, PCRE, Perl, Python)(
+  check("[[a]", "", DotNet, JavaScript, PCRE, Perl(), Python())(
     Class(false, ClassUnion(ClassLiteral('['), ClassLiteral('a')))
   )
   check("[!--b]", "", All*)(
     Class(false, ClassUnion(ClassRange(ClassLiteral('!'), ClassLiteral('-')), ClassLiteral('b')))
   )
   error("[a--b]", "", All*)("Out of order class range at 1")
-  check("[&&a]", "", Java, Ruby)(Class(false, ClassIntersection(ClassUnion(), ClassLiteral('a'))))
-  check("[a&&]", "", Java, Ruby)(Class(false, ClassIntersection(ClassLiteral('a'), ClassUnion())))
-  check("[&&]", "", Ruby)(Class(false, ClassIntersection(ClassUnion(), ClassUnion())))
+  check("[&&a]", "", Java, Ruby())(Class(false, ClassIntersection(ClassUnion(), ClassLiteral('a'))))
+  check("[a&&]", "", Java, Ruby())(Class(false, ClassIntersection(ClassLiteral('a'), ClassUnion())))
+  check("[&&]", "", Ruby())(Class(false, ClassIntersection(ClassUnion(), ClassUnion())))
   error("[&&]", "", Java)("Invalid class set operation at 1")
-  check("[&&]", "", DotNet, JavaScript, PCRE, Perl, Python):
+  check("[&&]", "", DotNet, JavaScript, PCRE, Perl(), Python()):
     Class(false, ClassUnion(ClassLiteral('&'), ClassLiteral('&')))
   check("[a-z-[aeiou]]", "", DotNet):
     Class(
@@ -261,7 +261,7 @@ class ParserClassSuite extends ParserSuiteBase:
   check("[-[a]]", "", DotNet):
     Sequence(Class(false, ClassUnion(ClassLiteral('-'), ClassLiteral('['), ClassLiteral('a'))), Literal(']'))
   error("[a-z-[aeiou]b]", "", DotNet)("Class subtraction must be last at 12")
-  error("[\\w-[\\d]]", "", PCRE, Python, Ruby)("Invalid class range at 1")
+  error("[\\w-[\\d]]", "", PCRE, Python(), Ruby())("Invalid class range at 1")
   check("[a&&b]", "v", JavaScript)(Class(false, ClassIntersection(ClassLiteral('a'), ClassLiteral('b'))))
   check("[a--b--c]", "v", JavaScript):
     Class(false, ClassDiff(ClassDiff(ClassLiteral('a'), ClassLiteral('b')), ClassLiteral('c')))
@@ -327,7 +327,7 @@ class ParserClassSuite extends ParserSuiteBase:
   check("]", "", All*)(Literal(']'))
   error("[[a]", "", Java)("Unclosed ']' at 4")
   error("]", "u", JavaScript)("Unclosed ']' at 0")
-  error("[[a]", "", Java, Ruby)("Unclosed ']' at 4")
-  error("[[]", "", Java, Ruby)("Unclosed ']' at 3")
-  error("[^[]a]", "", Java, Ruby)("Unclosed ']' at 6")
+  error("[[a]", "", Java, Ruby())("Unclosed ']' at 4")
+  error("[[]", "", Java, Ruby())("Unclosed ']' at 3")
+  error("[^[]a]", "", Java, Ruby())("Unclosed ']' at 6")
   error("[[]", "v", JavaScript)("Unclosed ']' at 3")

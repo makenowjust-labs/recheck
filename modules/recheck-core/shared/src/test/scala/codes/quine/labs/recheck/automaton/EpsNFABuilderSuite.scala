@@ -252,7 +252,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
 
   test("EpsNFABuilder.build: assertions of other dialects"):
     // `$` before a final line terminator at an end point is the end after an optional line terminator.
-    assertEquals(build("^a$", "", Dialect.Python), build("^a(?:|\\n)\\Z", "", Dialect.Python))
+    assertEquals(build("^a$", "", Dialect.Python()), build("^a(?:|\\n)\\Z", "", Dialect.Python()))
     assertEquals(
       build("(*ANYCRLF)^a$", "", Dialect.PCRE),
       build("(*ANYCRLF)^a(?:|[\\n\\r]|\\r\\n)\\z", "", Dialect.PCRE)
@@ -266,7 +266,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     import IRLineBeginAtEnd.*
     assertEquals(kinds("^a$", "m", Dialect.JavaScript), Set[AssertKind](AssertKind.LineBegin, AssertKind.LineEnd))
     assertEquals(
-      kinds("^a$", "", Dialect.Ruby),
+      kinds("^a$", "", Dialect.Ruby()),
       Set[AssertKind](AssertKind.LineBeginOf(0, InputBegin, false, false), AssertKind.LineEnd)
     )
     assertEquals(
@@ -277,12 +277,12 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       kinds("(*CRLF)(?m)^a$", "", Dialect.PCRE),
       Set[AssertKind](AssertKind.LineBeginOf(0, InputBegin, true, false), AssertKind.LineEndOf(0, true, false))
     )
-    assertEquals(kinds("\\Aa(?m:$)|b", "", Dialect.Ruby), Set[AssertKind](AssertKind.InputBegin, AssertKind.LineEnd))
-    assertEquals(kinds("a\\z|b", "", Dialect.Ruby), Set[AssertKind](AssertKind.InputEnd))
-    assertEquals(kinds("a$\\n", "", Dialect.Python), Set[AssertKind](AssertKind.ChompEnd(0, false, false)))
+    assertEquals(kinds("\\Aa(?m:$)|b", "", Dialect.Ruby()), Set[AssertKind](AssertKind.InputBegin, AssertKind.LineEnd))
+    assertEquals(kinds("a\\z|b", "", Dialect.Ruby()), Set[AssertKind](AssertKind.InputEnd))
+    assertEquals(kinds("a$\\n", "", Dialect.Python()), Set[AssertKind](AssertKind.ChompEnd(0, false, false)))
     assertEquals(kinds("a$\\n", "", Dialect.Java), Set[AssertKind](AssertKind.ChompEnd(0, true, true)))
     assertEquals(
-      kinds("\\b(?a:\\B)", "", Dialect.Python),
+      kinds("\\b(?a:\\B)", "", Dialect.Python()),
       Set[AssertKind](AssertKind.WordBoundary, AssertKind.WordBoundaryNotOf(1))
     )
 

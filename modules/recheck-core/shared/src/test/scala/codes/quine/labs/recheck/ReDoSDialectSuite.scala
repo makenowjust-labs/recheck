@@ -6,6 +6,7 @@ import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
+import codes.quine.labs.resyntax.ast.PerlSource
 
 /** End-to-end checks of dialects other than JavaScript.
   *
@@ -16,8 +17,8 @@ class ReDoSDialectSuite extends munit.FunSuite:
 
   val params: Parameters = Parameters(randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
 
-  def check(source: String, dialect: Dialect, flags: String = "", encoding: Option[String] = None): Diagnostics =
-    ReDoS.check(source, flags, params.copy(dialect = dialect, encoding = encoding))
+  def check(source: String, dialect: Dialect, flags: String = ""): Diagnostics =
+    ReDoS.check(source, flags, params.copy(dialect = dialect))
 
   def assertVulnerable(d: Diagnostics, complexity: AttackComplexity.Vulnerable, checker: Checker.Used)(using
       loc: munit.Location
@@ -30,17 +31,17 @@ class ReDoSDialectSuite extends munit.FunSuite:
 
   test("ReDoS.check: exponential patterns"):
     // Python 3.15 doubles its time for each `a` of `'a'.repeat(N) + '!'` (0.36 s at N = 22).
-    assertVulnerable(check("^(a|a)*$", Python), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(check("^(a|a)*$", Python()), AttackComplexity.Exponential(false), Checker.Automaton)
     // Java 25 and Ruby 4.0 (memoization) are fast on these patterns.
     assertVulnerable(check("^(?:a|a)*$", Java), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertVulnerable(check("\\A(?:a|a)*\\z", Ruby), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(check("\\A(?:a|a)*\\z", Ruby()), AttackComplexity.Exponential(false), Checker.Automaton)
     // Ruby's `^` and `$` are line assertions, which the automaton handles with text assertions together.
-    assertVulnerable(check("^(a|a)*$", Ruby), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertVulnerable(check("\\A(?:a|a)*$", Ruby), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(check("^(a|a)*$", Ruby()), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(check("\\A(?:a|a)*$", Ruby()), AttackComplexity.Exponential(false), Checker.Automaton)
     // `$` in the middle, different line terminators and different word sets are also of the automaton.
-    assertVulnerable(check("^(?:a|a)*$\\n", Python), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(check("^(?:a|a)*$\\n", Python()), AttackComplexity.Exponential(false), Checker.Automaton)
     assertVulnerable(check("(?m)^(?:a|a)*(?d:$)", Java), AttackComplexity.Exponential(false), Checker.Automaton)
-    assertVulnerable(check("\\b(?:a|a)*(?a:\\b)", Python), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(check("\\b(?:a|a)*(?a:\\b)", Python()), AttackComplexity.Exponential(false), Checker.Automaton)
     // Java's `\B` holds between `a` and a non-spacing mark, which is a word character after a letter.
     assertVulnerable(check("^a(?:\u0301|\\B\u0301)*$", Java), AttackComplexity.Exponential(false), Checker.Automaton)
     assertEquals(check("^a(?:\u0301|\\b\u0301)*$", Java).getClass, classOf[Diagnostics.Safe])
@@ -55,11 +56,11 @@ class ReDoSDialectSuite extends munit.FunSuite:
     // Python and PCRE2 (without JIT) are exponential on the third, and Java is fast on it.
     assertEquals(
       check("^(?>a|a)*$", Java),
-      Diagnostics.Safe("^(?>a|a)*$", "", AttackComplexity.Safe(true), Checker.Fuzz)
+      Diagnostics.Safe("^(?>a|a)*$", "", Java, AttackComplexity.Safe(true), Checker.Fuzz)
     )
     assertEquals(
       check("^(?:a++)+$", Java),
-      Diagnostics.Safe("^(?:a++)+$", "", AttackComplexity.Safe(true), Checker.Fuzz)
+      Diagnostics.Safe("^(?:a++)+$", "", Java, AttackComplexity.Safe(true), Checker.Fuzz)
     )
     assertVulnerable(check("^(?:(?>a|a)|a)*$", Java), AttackComplexity.Exponential(true), Checker.Fuzz)
 
@@ -79,7 +80,7 @@ class ReDoSDialectSuite extends munit.FunSuite:
   test("ReDoS.check: conditionals"):
     // PCRE2 doubles its time for each `a` (0.37 s at n = 22).
     assertVulnerable(check("^(?(?=a)(?:a|a)*$|b)", PCRE), AttackComplexity.Exponential(true), Checker.Fuzz)
-    assertSafe(check("^(a)?(?(1)b+|c)$", Python), Checker.Fuzz)
+    assertSafe(check("^(a)?(?(1)b+|c)$", Python()), Checker.Fuzz)
 
   test("ReDoS.check: backtracking control verbs"):
     // `(*FAIL)` is the empty set, which makes the match fail after the repetition (0.35 s at n = 22).
@@ -90,8 +91,8 @@ class ReDoSDialectSuite extends munit.FunSuite:
     assertSafe(check("^(?:a|a)*(*COMMIT)$", PCRE), Checker.Fuzz)
     assertSafe(check("^(?:(?:a|a)(*PRUNE))*$", PCRE), Checker.Fuzz)
     assertSafe(check("^(?:(?:a|a)*(*THEN)b|c)", PCRE), Checker.Fuzz)
-    assertSafe(check("(?:a|a)*(*SKIP)b", Perl), Checker.Fuzz)
-    assertVulnerable(check("(?:a|a)*b", Perl), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertSafe(check("(?:a|a)*(*SKIP)b", Perl()), Checker.Fuzz)
+    assertVulnerable(check("(?:a|a)*b", Perl()), AttackComplexity.Exponential(false), Checker.Automaton)
 
   test("ReDoS.check: non-atomic look-arounds"):
     // Backtracking enters the look-ahead again (0.45 s at n = 22), which an atomic one does not (0.004 ms).
@@ -113,6 +114,7 @@ class ReDoSDialectSuite extends munit.FunSuite:
       Diagnostics.Unknown(
         "^(a|a)*(?R)?$",
         "",
+        PCRE,
         Diagnostics.ErrorKind.Unsupported("unsupported syntax (RCall) at 7"),
         Some(Checker.Fuzz)
       )
@@ -120,10 +122,11 @@ class ReDoSDialectSuite extends munit.FunSuite:
 
   test("ReDoS.check: invalid patterns"):
     assertEquals(
-      check("(?<=a+)", Python),
+      check("(?<=a+)", Python()),
       Diagnostics.Unknown(
         "(?<=a+)",
         "",
+        Python(),
         Diagnostics.ErrorKind.InvalidRegExp("Look-behind requires fixed-width pattern at 0"),
         None
       )
@@ -131,11 +134,29 @@ class ReDoSDialectSuite extends munit.FunSuite:
 
   test("ReDoS.check: encodings"):
     assertVulnerable(
-      check("^(a|a)*$", Python, encoding = Some("bytes")),
+      check("^(a|a)*$", Python(Python.Type.Bytes)),
       AttackComplexity.Exponential(false),
       Checker.Automaton
     )
-    assertEquals(
-      check("^a$", Python, encoding = Some("UTF-8")),
-      Diagnostics.Unknown("^a$", "", Diagnostics.ErrorKind.InvalidRegExp("Unknown encoding for Python: UTF-8"), None)
+
+  test("ReDoS.check: the dialect of the diagnostics"):
+    // The diagnostics have the dialect as given, before and after parsing the pattern.
+    for
+      dialect <- Seq(Python(Python.Type.Bytes), Ruby(Ruby.Encoding.Ascii8Bit), Perl(), Perl(false, PerlSource.String))
+      source <- Seq("^a$", "^(a|a)*$", "(a")
+    do
+      val dialectOf = check(source, dialect) match
+        case d: Diagnostics.Safe       => d.dialect
+        case d: Diagnostics.Vulnerable => d.dialect
+        case d: Diagnostics.Unknown    => d.dialect
+      assertEquals(dialectOf, dialect)
+
+  test("ReDoS.check: Perl's /d follows utf8"):
+    // `^\w*!$` takes linear time, but `^(?:\w|é)*!$` takes exponential time if `\w` matches `é`.
+    assertVulnerable(check("^(?:\\w|\\xE9)*$", Perl()), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertSafe(check("^(?:\\w|\\xE9)*$", Perl(utf8 = false)), Checker.Automaton)
+    assertVulnerable(
+      check("^(?:\\w|\\xE9)*$\\x{100}?", Perl(utf8 = false)),
+      AttackComplexity.Exponential(false),
+      Checker.Automaton
     )

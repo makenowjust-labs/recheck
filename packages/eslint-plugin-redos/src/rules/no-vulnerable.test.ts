@@ -138,13 +138,7 @@ test("no-vulnerable: the options exclude the logger and the dialect parameters",
   ];
   expect(options.properties).toHaveProperty("timeout");
   expect(options.properties).toHaveProperty("maxDegree");
-  for (const name of [
-    "logger",
-    "dialect",
-    "encoding",
-    "perlSource",
-    "perlUtf8",
-  ]) {
+  for (const name of ["logger", "dialect"]) {
     expect(options.properties).not.toHaveProperty(name);
   }
 });

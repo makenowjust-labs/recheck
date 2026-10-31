@@ -98,11 +98,11 @@ object AttackPattern:
       val bytes = mode == UnitMode.Byte
       dialect match
         case Dialect.JavaScript => JavaScript
-        case Dialect.Python     => Python(bytes)
-        case Dialect.Ruby       => Ruby(bytes)
+        case _: Dialect.Python  => Python(bytes)
+        case _: Dialect.Ruby    => Ruby(bytes)
         case Dialect.Java       => Java
         case Dialect.DotNet     => CSharp
-        case Dialect.Perl       => Perl
+        case _: Dialect.Perl    => Perl
         case Dialect.PCRE       => PHP(bytes)
 
   /** JavaScript is a JavaScript style specifier, e.g. `'a'.repeat(31) + '\x00'`. */

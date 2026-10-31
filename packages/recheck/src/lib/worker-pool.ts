@@ -1,6 +1,31 @@
 import createWorker from "./worker";
 
-import type { Diagnostics, HasAbortSignal, Parameters } from "../..";
+import type { Dialect, Diagnostics, HasAbortSignal, Parameters } from "../..";
+
+/** Returns the dialect of the parameter as the diagnostics have it, where an omitted setting is the default. */
+const dialectOf = (dialect: Parameters["dialect"] = "javascript"): Dialect => {
+  const given =
+    typeof dialect === "string"
+      ? ({ name: dialect } as Exclude<
+          Parameters["dialect"],
+          string | undefined
+        >)
+      : dialect;
+  switch (given.name) {
+    case "python":
+      return { name: "python", type: given.type ?? "str" };
+    case "ruby":
+      return { name: "ruby", encoding: given.encoding ?? "UTF-8" };
+    case "perl":
+      return {
+        name: "perl",
+        utf8: given.utf8 ?? true,
+        source: given.source ?? "literal",
+      };
+    default:
+      return { name: given.name };
+  }
+};
 
 /** Ref is an object contains a check information to resolve or to cancel. */
 type Ref = {
@@ -210,6 +235,7 @@ export class WorkerPool {
     const cancelled: Diagnostics = {
       source: ref.source,
       flags: ref.flags,
+      dialect: dialectOf(ref.params.dialect),
       status: "unknown",
       error: { kind: "cancel" },
     };

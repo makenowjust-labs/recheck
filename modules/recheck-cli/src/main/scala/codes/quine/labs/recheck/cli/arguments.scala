@@ -6,6 +6,9 @@ import cats.data.Validated
 import cats.data.ValidatedNel
 import com.monovore.decline.Argument
 
+import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.PerlSource
+
 /** The object `arguments` provides decline's `Argument` instances for this application. */
 object arguments:
 
@@ -18,6 +21,20 @@ object arguments:
       catch case _: NumberFormatException => Validated.invalidNel(s"invalid duration: $string")
 
     def defaultMetavar: String = "duration"
+
+  /** `Argument` instance for `Dialect`, which reads the name of the language with the default settings. */
+  given dialectArgument: Argument[Dialect] with
+    def read(string: String): ValidatedNel[String, Dialect] =
+      Dialect.of(string).fold(Validated.invalidNel(s"unknown dialect: $string"))(Validated.validNel)
+
+    def defaultMetavar: String = "dialect"
+
+  /** `Argument` instance for `PerlSource`. */
+  given perlSourceArgument: Argument[PerlSource] with
+    def read(string: String): ValidatedNel[String, PerlSource] =
+      PerlSource.of(string).fold(Validated.invalidNel(s"unknown perl source: $string"))(Validated.validNel)
+
+    def defaultMetavar: String = "source"
 
   /** `Argument` instance for `Boolean`. */
   given booleanArgument: Argument[Boolean] with

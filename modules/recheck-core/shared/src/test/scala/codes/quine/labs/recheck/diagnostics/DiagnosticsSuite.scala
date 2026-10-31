@@ -12,12 +12,15 @@ import codes.quine.labs.recheck.common.TimeoutException
 import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.util.UStringUtil
+import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.PerlSource
 
 class DiagnosticsSuite extends munit.FunSuite:
   test("Diagnostics#toString"):
     assertEquals(
-      Diagnostics.Safe("", "", AttackComplexity.Constant, Checker.Automaton).toString,
+      Diagnostics.Safe("", "", Dialect.JavaScript, AttackComplexity.Constant, Checker.Automaton).toString,
       s"""|Input     : //
+          |Dialect   : javascript
           |Status    : safe
           |Complexity: constant
           |Checker   : automaton""".stripMargin
@@ -27,6 +30,7 @@ class DiagnosticsSuite extends munit.FunSuite:
         .Vulnerable(
           "abbc",
           "",
+          Dialect.JavaScript,
           AttackComplexity.Exponential(false),
           AttackPattern(
             Seq((UStringUtil.fromString("a"), UStringUtil.fromString("b"), 0)),
@@ -38,6 +42,7 @@ class DiagnosticsSuite extends munit.FunSuite:
         )
         .toString,
       s"""|Input        : /abbc/
+          |Dialect      : javascript
           |Status       : vulnerable
           |Complexity   : exponential
           |Attack string: 'a' + 'b'.repeat(2) + 'c'
@@ -49,6 +54,7 @@ class DiagnosticsSuite extends munit.FunSuite:
         .Vulnerable(
           "a*a*$",
           "",
+          Dialect.Ruby(),
           AttackComplexity.Polynomial(2, false),
           AttackPattern(
             Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
@@ -61,6 +67,7 @@ class DiagnosticsSuite extends munit.FunSuite:
         )
         .toString,
       s"""|Input        : /a*a*$$/
+          |Dialect      : ruby (encoding: UTF-8)
           |Status       : vulnerable
           |Complexity   : 2nd degree polynomial
           |Attack string: 'a'.repeat(2) + '!'
@@ -69,15 +76,25 @@ class DiagnosticsSuite extends munit.FunSuite:
           |Recall       : failed (finished in 3 ms on ruby 4.0.7, timeout: 1000 ms)""".stripMargin
     )
     assertEquals(
-      Diagnostics.Unknown("", "", Diagnostics.ErrorKind.Timeout, Some(Checker.Automaton)).toString,
+      Diagnostics.Unknown("", "", Dialect.JavaScript, Diagnostics.ErrorKind.Timeout, Some(Checker.Automaton)).toString,
       s"""|Input  : //
+          |Dialect: javascript
           |Status : unknown
           |Error  : timeout
           |Checker: automaton""".stripMargin
     )
     assertEquals(
-      Diagnostics.Unknown("", "", Diagnostics.ErrorKind.Timeout, None).toString,
+      Diagnostics
+        .Unknown(
+          "",
+          "",
+          Dialect.Perl(utf8 = false, source = PerlSource.String),
+          Diagnostics.ErrorKind.Timeout,
+          None
+        )
+        .toString,
       s"""|Input  : //
+          |Dialect: perl (utf8: false, source: string)
           |Status : unknown
           |Error  : timeout
           |Checker: (none)""".stripMargin
@@ -103,24 +120,24 @@ class DiagnosticsSuite extends munit.FunSuite:
 
   test("Diagnostics.Unknown.from"):
     assertEquals(
-      Diagnostics.Unknown.from("", "", new TimeoutException("foo")),
-      Diagnostics.Unknown("", "", Diagnostics.ErrorKind.Timeout, None)
+      Diagnostics.Unknown.from("", "", Dialect.JavaScript, new TimeoutException("foo")),
+      Diagnostics.Unknown("", "", Dialect.JavaScript, Diagnostics.ErrorKind.Timeout, None)
     )
     assertEquals(
-      Diagnostics.Unknown.from("", "", new CancelException("foo")),
-      Diagnostics.Unknown("", "", Diagnostics.ErrorKind.Cancel, None)
+      Diagnostics.Unknown.from("", "", Dialect.JavaScript, new CancelException("foo")),
+      Diagnostics.Unknown("", "", Dialect.JavaScript, Diagnostics.ErrorKind.Cancel, None)
     )
     assertEquals(
-      Diagnostics.Unknown.from("", "", new InvalidRegExpException("foo")),
-      Diagnostics.Unknown("", "", Diagnostics.ErrorKind.InvalidRegExp("foo"), None)
+      Diagnostics.Unknown.from("", "", Dialect.JavaScript, new InvalidRegExpException("foo")),
+      Diagnostics.Unknown("", "", Dialect.JavaScript, Diagnostics.ErrorKind.InvalidRegExp("foo"), None)
     )
     assertEquals(
-      Diagnostics.Unknown.from("", "", new UnsupportedException("foo")),
-      Diagnostics.Unknown("", "", Diagnostics.ErrorKind.Unsupported("foo"), None)
+      Diagnostics.Unknown.from("", "", Dialect.JavaScript, new UnsupportedException("foo")),
+      Diagnostics.Unknown("", "", Dialect.JavaScript, Diagnostics.ErrorKind.Unsupported("foo"), None)
     )
     assertEquals(
-      Diagnostics.Unknown.from("", "", new UnexpectedException("foo")),
-      Diagnostics.Unknown("", "", Diagnostics.ErrorKind.Unexpected("foo"), None)
+      Diagnostics.Unknown.from("", "", Dialect.JavaScript, new UnexpectedException("foo")),
+      Diagnostics.Unknown("", "", Dialect.JavaScript, Diagnostics.ErrorKind.Unexpected("foo"), None)
     )
 
   test("Diagnostics.ErrorKind#toString"):

@@ -22,7 +22,7 @@ class RecallValidatorSuite extends munit.FunSuite:
   val attack: AttackPattern =
     AttackPattern(Seq((UString.fromString("x"), UString.fromString("y"), 0)), UString.fromString("z"), 2)
 
-  def parse(source: String, dialect: Dialect = Dialect.Python): ParsedPattern =
+  def parse(source: String, dialect: Dialect = Dialect.Python()): ParsedPattern =
     ParsedPattern.parse(source, "", dialect).toTry.get
 
   test("RecallValidator.validate"):
@@ -33,7 +33,7 @@ class RecallValidatorSuite extends munit.FunSuite:
     assertEquals(RecallValidator.validate(parse("foo"), attack, Duration.Zero)((_, _, _) => fail("unreachable")), None)
     // A Perl pattern interpolating a variable is not run.
     assertEquals(
-      RecallValidator.validate(parse("a$x", Dialect.Perl), attack, 1.second)((_, _, _) => fail("unreachable")),
+      RecallValidator.validate(parse("a$x", Dialect.Perl()), attack, 1.second)((_, _, _) => fail("unreachable")),
       None
     )
 

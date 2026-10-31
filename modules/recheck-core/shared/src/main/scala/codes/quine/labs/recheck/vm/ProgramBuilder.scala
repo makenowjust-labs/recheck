@@ -85,11 +85,11 @@ private[vm] class ProgramBuilder(
   private val mode = pattern.ir.mode
 
   /** Whether captures in a repetition are reset on each iteration, which only JavaScript does. */
-  private val resetsCaptures = pattern.dialect == Dialect.JavaScript
+  private val resetsCaptures = pattern.dialect.isJavaScript
 
   /** Whether captures follow Perl's backtracking, which back-references and capture tests only see. */
   private val perlCaptures =
-    pattern.dialect == Dialect.Perl && pattern.node.exists:
+    pattern.dialect.isPerl && pattern.node.exists:
       case _: IRNodeData.BackReference                           => true
       case IRNodeData.Conditional(_: IRCondition.Captured, _, _) => true
       case _                                                     => false
@@ -98,10 +98,10 @@ private[vm] class ProgramBuilder(
     * which back-references only see.
     */
   private val holdsCaptures =
-    pattern.dialect == Dialect.Java && pattern.node.exists(_.isInstanceOf[IRNodeData.BackReference])
+    pattern.dialect.isJava && pattern.node.exists(_.isInstanceOf[IRNodeData.BackReference])
 
   /** Whether `(*THEN)` ends at a look-around assertion or a condition, as in PCRE but not in Perl. */
-  private val assertionIsThenScope = pattern.dialect != Dialect.Perl
+  private val assertionIsThenScope = !pattern.dialect.isPerl
 
   /** Whether the pattern has the verbs skipping backtracking points, which need the barriers. */
   private val hasCut = pattern.node.exists:
@@ -649,7 +649,7 @@ private[vm] class ProgramBuilder(
   /** Returns how a repetition handles an empty iteration in the dialect. */
   def emptyIteration(quantifier: IRQuantifier, child: IRNode): EmptyIteration = pattern.dialect match
     case Dialect.JavaScript => EmptyIteration.Reject
-    case Dialect.Python     => EmptyIteration.ExitOptional
+    case _: Dialect.Python  => EmptyIteration.ExitOptional
     case Dialect.Java       =>
       child.data match
         case IRNodeData.Capture(_, _, node) if node.data.isInstanceOf[IRNodeData.Atomic] => EmptyIteration.Reject
@@ -662,8 +662,8 @@ private[vm] class ProgramBuilder(
       quantifier match
         case _: IRQuantifier.Unbounded => EmptyIteration.ExitFromMin
         case _                         => EmptyIteration.Ignore
-    case Dialect.Ruby => EmptyIteration.ExitOptional
-    case _            => EmptyIteration.ExitFromMin
+    case _: Dialect.Ruby => EmptyIteration.ExitOptional
+    case _               => EmptyIteration.ExitFromMin
 
   /** A builder for `x{n}` node, where an empty iteration jumps to `exit` if it is given. */
   def buildRepeatN(n: Int, child: IRNode, barrier: Boolean = false, exit: Option[Label] = None): Unit =
@@ -768,7 +768,7 @@ private[vm] class ProgramBuilder(
     emitTerminator(Inst.Tx(main, Some(cont), None))
 
     enterBlock(main)
-    if pattern.dialect == Dialect.Perl then withAcceptScope(AcceptScope.Atomic)(build(child))
+    if pattern.dialect.isPerl then withAcceptScope(AcceptScope.Atomic)(build(child))
     else
       atomicDepth += 1
       build(child)
@@ -861,7 +861,7 @@ private[vm] class ProgramBuilder(
     def buildTest(negative: Boolean, child: IRNode, body: IRNode => Unit): Unit =
       val main = allocateLabel("main")
       val scope = assertionThenScope(child)
-      val restores = negative && pattern.dialect == Dialect.DotNet
+      val restores = negative && pattern.dialect.isDotNet
       val (rollback, fallback) = if negative && !restores then (noLabel, yesLabel) else (yesLabel, noLabel)
       emitTerminator(Inst.Tx(main, Some(rollback), Some(fallback), Option.when(hasCut)(Barrier.Assertion(scope))))
       enterBlock(main)

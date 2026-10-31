@@ -109,7 +109,7 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
 
   private val charFlags = mutable.Map.empty[NodeKey, IRCharFlags]
 
-  private val recordsCharFlags = initial.dialect == Dialect.Perl || initial.dialect == Dialect.Ruby
+  private val recordsCharFlags = initial.dialect.isPerl || initial.dialect.isRuby
 
   private var branchResetDepth: Int = 0
 
@@ -202,7 +202,7 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
     case CommandKind.Conditional(test, yes, no) =>
       markSite(node)
       test match
-        case ConditionalTest.LookAround(Some(kind), node) if initial.dialect == Dialect.DotNet =>
+        case ConditionalTest.LookAround(Some(kind), node) if initial.dialect.isDotNet =>
           ignoresNextGroup = true
           walkTest(Some(kind), node)
         case ConditionalTest.LookAround(kind, node)                                       => walkTest(kind, node)
@@ -293,4 +293,4 @@ private[ir] object CaptureAnalyzer:
 
   /** Whether the dialect is .NET, whose numeric names (e.g. `(?<2>...)`) are indices. */
   def isNumericName(dialect: Dialect, name: String): Boolean =
-    dialect == Dialect.DotNet && name.nonEmpty && name.forall(_.isDigit)
+    dialect.isDotNet && name.nonEmpty && name.forall(_.isDigit)

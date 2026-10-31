@@ -63,11 +63,25 @@ export type Diagnostics =
   SafeDiagnostics | VulnerableDiagnostics | UnknownDiagnostics;
 
 /**
+ * Dialect is the dialect of a diagnostics as the parameter gives it, with every setting of the dialect.
+ * An omitted setting is the default.
+ */
+export type Dialect =
+  | { name: "javascript" }
+  | { name: "java" }
+  | { name: "dotnet" }
+  | { name: "pcre" }
+  | { name: "python"; type: "str" | "bytes" }
+  | { name: "ruby"; encoding: "UTF-8" | "ASCII-8BIT" }
+  | { name: "perl"; utf8: boolean; source: "literal" | "string" };
+
+/**
  * SafeDiagnostics is a diagnostics against a safe RegExp.
  */
 export type SafeDiagnostics = {
   source: string;
   flags: string;
+  dialect: Dialect;
   status: "safe";
   checker: "automaton" | "fuzz";
   complexity: SafeComplexity;
@@ -79,6 +93,7 @@ export type SafeDiagnostics = {
 export type VulnerableDiagnostics = {
   source: string;
   flags: string;
+  dialect: Dialect;
   status: "vulnerable";
   checker: "automaton" | "fuzz";
   attack: AttackPattern;
@@ -131,6 +146,7 @@ export type RecallResult =
 export type UnknownDiagnostics = {
   source: string;
   flags: string;
+  dialect: Dialect;
   status: "unknown";
   checker?: "automaton" | "fuzz";
   error: Error;

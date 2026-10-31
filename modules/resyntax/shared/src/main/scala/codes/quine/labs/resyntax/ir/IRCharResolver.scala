@@ -35,8 +35,8 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   private val readsUnits = mode != UnitMode.CodePoint
 
   private def perlNative(flags: IRCharFlags): Boolean =
-    dialect == Dialect.Perl && mode == UnitMode.CodePoint && !perlUnicodeRules &&
-      (flags.charset == IRCharset.Default || flags.charset == IRCharset.Locale)
+    dialect.isPerl &&
+      (flags.charset == IRCharset.Default && !perlUnicodeRules || flags.charset == IRCharset.Locale)
 
   /** Returns the case equivalence at the flags. */
   def equivalence(flags: IRCharFlags): IRCaseEquivalence =
@@ -50,7 +50,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     * Java's `\b` with `U` has the non-spacing marks in its word set already.
     */
   def wordMarks(flags: IRCharFlags): Option[IRWordMarks] =
-    Option.when(dialect == Dialect.Java && !flags.unicodeClass):
+    Option.when(dialect.isJava && !flags.unicodeClass):
       val marks = classes.javaWordMarks
       IRWordMarks(marks.marks.restrict(mode), marks.extenders.restrict(mode), marks.bases.restrict(mode))
 
@@ -65,7 +65,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     * The parser puts a quantifier on the last escape, but Onigmo reads the bytes of a character as one.
     */
   def joinRubyByteRepeats(children: Seq[Node]): Seq[Node] =
-    if dialect != Dialect.Ruby || mode != UnitMode.CodePoint then return children
+    if !dialect.isRuby || mode != UnitMode.CodePoint then return children
     def byteOf(node: Node): Option[Int] = node.data match
       case NodeData.Backslash(BackslashKind.Escape(style, value))
           if isRubyByteStyle(style) && value >= 0x80 && value <= 0xff =>
@@ -133,7 +133,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
           lits += Lit(value, false, Some(style), flags, node.loc)
         case data => throw new IllegalArgumentException(s"Not a literal: $data")
     val merged =
-      if dialect == Dialect.Ruby && mode == UnitMode.CodePoint then mergeRubyBytes(lits.toSeq) else lits.toSeq
+      if dialect.isRuby && mode == UnitMode.CodePoint then mergeRubyBytes(lits.toSeq) else lits.toSeq
     val units = mergeSurrogates(merged).flatMap: lit =>
       unitsOf(lit) match
         case Seq() => Seq(lit.copy(value = NoUnit))
@@ -160,7 +160,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     * Only plain literals do: Onigmo does not fold an escape with its neighbors (e.g. `\x73s` does not match `ß`).
     */
   private def foldsMultiChar(u: Lit): Boolean =
-    u.plain && u.flags.ignoreCase && mode == UnitMode.CodePoint && (dialect == Dialect.Ruby || dialect == Dialect.Perl)
+    u.plain && u.flags.ignoreCase && (dialect.isPerl || dialect.isRuby && mode == UnitMode.CodePoint)
 
   /** Resolves a run of plain literals with the multi-character case folding of Ruby and Perl.
     *
@@ -178,7 +178,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     def char(i: Int, loc: SourceLocation): IRNode =
       IRNode(IRNodeData.Chars(eq.closure(CharSet.single(folded(i)._1))), loc)
     // Onigmo matches a look-behind by its folded length, so a folding there matches only the folded string.
-    if inLookBehind && dialect == Dialect.Ruby then return folded.indices.map(i => char(i, units(folded(i)._2).loc))
+    if inLookBehind && dialect.isRuby then return folded.indices.map(i => char(i, units(folded(i)._2).loc))
     val occurrences = for
       i <- folded.indices
       (key, set) <- multiFoldings
@@ -187,7 +187,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       // A key must start and end at literal boundaries.
       if (i == 0 || folded(i - 1)._2 != folded(i)._2) &&
         (i + key.length == folded.length || folded(i + key.length)._2 != folded(i + key.length - 1)._2)
-    yield (i, key.length, if native then set.diff(IRCharClasses.Latin1) else set)
+    yield (i, key.length, (if native then set.diff(IRCharClasses.Latin1) else set).restrict(mode))
     if occurrences.isEmpty || occurrences.size > MaxMultiFoldings then units.map(closed)
     else
       val cuts = (0 to folded.length).filter(p => !occurrences.exists((s, len, _) => s < p && p < s + len))
@@ -262,7 +262,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       // The parser reads a byte source by bytes, so only an escape can be above `0xFF`.
       if lit.value <= 0xff then Seq(lit.value)
       // Perl makes the pattern UTF-8 for it, and it never matches a byte string.
-      else if dialect == Dialect.Perl then Seq.empty
+      else if dialect.isPerl then Seq.empty
       else throw new IRBuildingException("Character value is too large in byte mode", lit.loc)
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -290,10 +290,10 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         chars(set)
       )
       // Java's `\R` backtracks into `\r` alone (`\R\n` matches `\r\n`), unlike the others.
-      if dialect == Dialect.Java then alternatives else IRNodeData.Atomic(alternatives)
-    case EscapeClassKind.NonNewline if dialect == Dialect.PCRE => dot(flags.copy(dotAll = false))
-    case EscapeClassKind.GraphemeCluster                       =>
-      if dialect == Dialect.PCRE then pcreGraphemeCluster else graphemeCluster
+      if dialect.isJava then alternatives else IRNodeData.Atomic(alternatives)
+    case EscapeClassKind.NonNewline if dialect.isPCRE => dot(flags.copy(dotAll = false))
+    case EscapeClassKind.GraphemeCluster              =>
+      if dialect.isPCRE then pcreGraphemeCluster else graphemeCluster
     case _ => output(escapeClassSet(kind, flags, loc), flags)
 
   /** `\X`: an extended grapheme cluster by the regular expression of UAX #29 (Table 1b), in an atomic group.
@@ -391,13 +391,12 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       case EscapeClassKind.HexDigit      => set(classes.hexDigit)
       case EscapeClassKind.NonHexDigit   => not(classes.hexDigit)
       case EscapeClassKind.NonNewline    =>
-        if dialect == Dialect.PCRE then not(CharSet.of(flags.lineTerminators.chars.toSeq*))
+        if dialect.isPCRE then not(CharSet.of(flags.lineTerminators.chars.toSeq*))
         else not(CharSet.single(0x0a))
       case EscapeClassKind.CodeUnit =>
         if mode == UnitMode.Byte then set(mode.universe) else throw new NotModeledException
       // Java and Python look up a Unicode name, which starts with a letter and has letters, digits, spaces and hyphens.
-      case EscapeClassKind.CharName(name)
-          if (dialect == Dialect.Java || dialect == Dialect.Python) && !isUnicodeNameLike(name) =>
+      case EscapeClassKind.CharName(name) if (dialect.isJava || dialect.isPython) && !isUnicodeNameLike(name) =>
         throw new IRBuildingException("Unknown character name", loc)
       case EscapeClassKind.GeneralNewline | EscapeClassKind.GraphemeCluster | EscapeClassKind.CharName(_) =>
         throw new NotModeledException
@@ -435,10 +434,10 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         else
           val eq = equivalence(flags)
           def cased(s: CharSet): CharSet = (dialect, caseKind) match
-            case (Dialect.DotNet, CaseKind.Category)              => IRProperties.gc("Lu", "Ll", "Lt").restrict(mode)
-            case (Dialect.Perl | Dialect.PCRE, CaseKind.Category) => IRProperties.gc("LC").restrict(mode)
-            case (Dialect.Perl, CaseKind.Cased)                   => IRProperties.binary("Cased").restrict(mode)
-            case _                                                => s
+            case (Dialect.DotNet, CaseKind.Category)                 => IRProperties.gc("Lu", "Ll", "Lt").restrict(mode)
+            case (_: Dialect.Perl | Dialect.PCRE, CaseKind.Category) => IRProperties.gc("LC").restrict(mode)
+            case (_: Dialect.Perl, CaseKind.Cased)                   => IRProperties.binary("Cased").restrict(mode)
+            case _                                                   => s
           dialect match
             case Dialect.JavaScript if flags.unicodeSets =>
               val closed = ClassSet(eq.closure(restricted.chars), restricted.strings.map(CaseMapping.SimpleFold(_)))
@@ -447,7 +446,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
               val chars = if negated then restricted.chars.complement(mode) else restricted.chars
               ClassSet(eq.closure(chars), restricted.strings)
             // Onigmo negates the property after closing it under case folding.
-            case Dialect.Ruby =>
+            case _: Dialect.Ruby =>
               val closed = eq.closure(restricted.chars)
               ClassSet(if negated then closed.complement(mode) else closed)
             case _ =>
@@ -460,7 +459,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   private def klass(invert: Boolean, item: ClassItem, flags: IRCharFlags, loc: SourceLocation): IRNodeData =
     item.data match
       // PCRE's `[[:<:]]` and `[[:>:]]` are the start and the end of a word (`\b(?=\w)` and `\b(?<=\w)`).
-      case ClassItemData.ClassPosix(false, name @ ("<" | ">")) if dialect == Dialect.PCRE && !invert =>
+      case ClassItemData.ClassPosix(false, name @ ("<" | ">")) if dialect.isPCRE && !invert =>
         val word = classes.word(flags).restrict(mode)
         val boundary = IRNodeData.Assert(IRAssertKind.WordBoundary(wordSet(flags)))
         val look =
@@ -476,7 +475,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   /** Returns the complement of a class item. */
   private def negate(item: ClassItem, flags: IRCharFlags): ClassSet = item.data match
     // .NET's `[^a-z-[aeiou]]` negates the base before the subtraction.
-    case ClassItemData.ClassDiff(left, right) if dialect == Dialect.DotNet =>
+    case ClassItemData.ClassDiff(left, right) if dialect.isDotNet =>
       ClassSet(classItem(left, flags).chars.complement(mode)).diff(classItem(right, flags))
     case _ => ClassSet(classItem(item, flags).chars.complement(mode))
 
@@ -512,11 +511,11 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       case ClassItemData.ClassBackslashClass(kind) =>
         kind match
           case EscapeClassKind.GeneralNewline | EscapeClassKind.GraphemeCluster => throw new NotModeledException
-          case EscapeClassKind.NonNewline if dialect == Dialect.PCRE            =>
+          case EscapeClassKind.NonNewline if dialect.isPCRE                     =>
             ClassSet(CharSet.of(flags.lineTerminators.chars.toSeq*).restrict(mode).complement(mode))
           case kind => escapeClassSet(kind, flags, item.loc)
       case value: ClassItemData.ClassValue
-          if dialect == Dialect.Ruby && mode == UnitMode.CodePoint &&
+          if dialect.isRuby && mode == UnitMode.CodePoint &&
             isRubyByteValue(value) =>
         throw new IRBuildingException("Invalid multibyte escape", item.loc)
       case value: ClassItemData.ClassValue => ClassSet(closeChars(valueUnits(value, flags, item.loc), flags))
@@ -529,7 +528,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       val item = items(i)
       item.data match
         case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, value))
-            if dialect == Dialect.Ruby && mode == UnitMode.CodePoint && isRubyByteStyle(style) &&
+            if dialect.isRuby && mode == UnitMode.CodePoint && isRubyByteStyle(style) &&
               value >= 0x80 && value <= 0xff =>
           val bytes = items
             .drop(i)
@@ -549,7 +548,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
           result = result.union(ClassSet(closeChars(decoded.map(_.value), flags)))
           i += bytes.length
         case ClassItemData.ClassRange(begin, end)
-            if dialect == Dialect.Ruby && mode == UnitMode.CodePoint &&
+            if dialect.isRuby && mode == UnitMode.CodePoint &&
               (isRubyByteValue(begin.data) || isRubyByteValue(end.data)) =>
           // Onigmo rejects a byte escape endpoint unless it is in a multibyte character with its neighbors.
           val beginOk =
@@ -619,7 +618,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       if begin.value > end.value then throw new IRBuildingException("Range out of order in character class", loc)
       return ClassSet(equivalence(flags).closeRange(CharSet.range(begin.value, end.value).restrict(mode)))
     // A range alone in a class has no neighbors to make a multibyte character with its byte escape.
-    if dialect == Dialect.Ruby && mode == UnitMode.CodePoint && Seq(begin, end).exists(isRubyByteValue) then
+    if dialect.isRuby && mode == UnitMode.CodePoint && Seq(begin, end).exists(isRubyByteValue) then
       throw new IRBuildingException("Invalid multibyte escape", loc)
     if b.last > e.head then throw new IRBuildingException("Range out of order in character class", loc)
     val eq = equivalence(flags)
@@ -637,12 +636,12 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     else
       dialect match
         // Perl matches cased characters with `[:upper:]` and `[:lower:]` under case-insensitivity.
-        case Dialect.Perl if name == "upper" || name == "lower" => classes.perlCased(flags).restrict(mode)
+        case _: Dialect.Perl if name == "upper" || name == "lower" => classes.perlCased(flags).restrict(mode)
         // PCRE matches both cases with them in ASCII (not in UCP mode).
         case Dialect.PCRE if (name == "upper" || name == "lower") && restricted.last < 0x80 =>
           restricted.union(IRCharClasses.AsciiPosix(if name == "upper" then "lower" else "upper"))
-        case Dialect.Ruby => equivalence(flags).closure(restricted)
-        case _            => restricted
+        case _: Dialect.Ruby => equivalence(flags).closure(restricted)
+        case _               => restricted
 
 /** IRCharResolver utilities. */
 private[ir] object IRCharResolver:

@@ -22,9 +22,10 @@ import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.DialectOptions
 import codes.quine.labs.resyntax.ast.PerlSource
+import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.ir.IRNodeData
 
 /** Runs recall validation on the runtimes in `PATH`, skipping the missing ones.
   *
@@ -97,18 +98,18 @@ class RecallRuntimeSuite extends munit.FunSuite:
 
   runtimeTest("Python", "python3"):
     // Python 3.15 doubles its time for each `a`.
-    val r = validate("^(a|a)*$", "", Dialect.Python, attack("a", 31, "\u0000"))
+    val r = validate("^(a|a)*$", "", Dialect.Python(), attack("a", 31, "\u0000"))
     assertEquals(r.result, RecallResult.Timeout)
     assert(clue(r.runtime).startsWith("python 3."))
-    assertEquals(validate("^(?:é|é)*$", "b", Dialect.Python, attack("é", 31, "\u0000")).result, RecallResult.Timeout)
-    assertFinish(validate("^(?:é|é)*$", "b", Dialect.Python, attack("é", 3, "\u0000")))
+    assertEquals(validate("^(?:é|é)*$", "b", Dialect.Python(), attack("é", 31, "\u0000")).result, RecallResult.Timeout)
+    assertFinish(validate("^(?:é|é)*$", "b", Dialect.Python(), attack("é", 3, "\u0000")))
 
   runtimeTest("Ruby", "ruby"):
     // Ruby 4.0's memoization makes it fast.
-    val r = validate("^(a|a)*$", "", Dialect.Ruby, attack("a", 31, "\u0000"))
+    val r = validate("^(a|a)*$", "", Dialect.Ruby(), attack("a", 31, "\u0000"))
     assertFinish(r)
     assert(clue(r.runtime).startsWith("ruby "))
-    assertFinish(validate("^(?:é|é)*$", "n", Dialect.Ruby, attack("Ã©", 31, "\u0000")))
+    assertFinish(validate("^(?:é|é)*$", "n", Dialect.Ruby(), attack("Ã©", 31, "\u0000")))
 
   runtimeTest("Java", "java"):
     val r = validate("^(a|a)*$", "", Dialect.Java, attack("a", 31, "\u0000"))
@@ -132,30 +133,40 @@ class RecallRuntimeSuite extends munit.FunSuite:
     Await.result(Future.sequence(rs), 60.seconds).foreach(assertFinish)
 
   runtimeTest("Perl", "perl"):
-    val r = validate("^(a|a)*$", "", Dialect.Perl, attack("é", 31, "\u0000"))
+    val r = validate("^(a|a)*$", "", Dialect.Perl(), attack("é", 31, "\u0000"))
     assertFinish(r)
     assert(clue(r.runtime).startsWith("perl 5."))
     // A string pattern may contain `$`, which a regex literal would interpolate.
-    val pattern = ParsedPattern.parse("^(?:a|a)*$x", "", Dialect.Perl).toTry.get
-    val string = RecallValidator.validate(pattern, attack("a", 31, ""), 1.second, perlLiteral = false)(
+    val pattern = ParsedPattern.parse("^(?:a|a)*$x", "", Dialect.Perl(source = PerlSource.String)).toTry.get
+    val string = RecallValidator.validate(pattern, attack("a", 31, ""), 1.second)(
       RecallValidator.defaultExec.get
     )
     assertFinish(string.get)
 
-  runtimeTest("Perl: the UTF-8 flag of a string pattern", "perl"):
-    // `\w` matches `é` by the Unicode rules, which a UTF-8 pattern string has.
-    def matches(source: String, utf8: Option[Boolean]): Boolean =
-      val options = DialectOptions(perlSource = PerlSource.String, perlUtf8 = utf8)
-      val pattern = ParsedPattern.parse(source, "", Dialect.Perl, options).toTry.get
-      val program = RecallProgram.generate(pattern, attack("a", 1, ""), perlLiteral = false).get
-      val regex = program.script.linesIterator.find(_.startsWith("my $regex = ")).get
-      val process = new ProcessBuilder("perl", "-e", s"""$regex print "\\xE9" =~ $$regex ? "1" : "0";""").start()
-      new String(process.getInputStream.readAllBytes(), StandardCharsets.UTF_8) == "1"
-    assert(matches("\\w", Some(true)))
-    assert(!matches("\\w", Some(false)))
-    assert(!matches("\\w", None))
-    assert(matches("\\w|ü", None))
-    assert(!matches("\\w|ü", Some(false)))
+  runtimeTest("Perl: the character set rules of utf8", "perl"):
+    // The program matches `0x80..0xFF` as recheck's character sets have them.
+    def check(source: String, dialect: Dialect.Perl): Unit =
+      val pattern = ParsedPattern.parse(source, "", dialect).toTry.get
+      def last(data: IRNodeData): CharSet = data match
+        case IRNodeData.Chars(set)      => set
+        case IRNodeData.Sequence(nodes) => last(nodes.last.data)
+        case data                       => fail(s"Unexpected: $data")
+      val modeled = (0x80 to 0xff).filter(last(pattern.node.data).contains)
+      val program = RecallProgram.generate(pattern, attack("a", 1, "")).get
+      val lines = program.script.linesIterator.toSeq
+      val pragma = lines.filter(_ == "use utf8;")
+      val regex = lines.find(_.startsWith("my $regex = ")).get
+      val flag = lines.find(_.startsWith("utf8::")).get
+      val loop =
+        s"""for my $$b (0x80..0xFF) { my $$input = chr($$b); $flag print "$$b\\n" if $$input =~ /\\A$$regex\\z/ }"""
+      val process = new ProcessBuilder("perl", "-e", (pragma ++ Seq(regex, loop)).mkString("\n")).start()
+      val out = new String(process.getInputStream.readAllBytes(), StandardCharsets.UTF_8)
+      assertEquals(out.linesIterator.map(_.toInt).toSeq, modeled, s"$source in $dialect")
+    for
+      source <- Seq("\\w", "\\d", "\\s", "[[:alpha:]]", "(?i)\\xC9", "(?a)\\w", "(?u)\\w", "\\x{100}?\\w", "\\p{L}?\\w")
+      utf8 <- Seq(true, false)
+      perlSource <- Seq(PerlSource.Literal, PerlSource.String)
+    do check(source, Dialect.Perl(utf8, perlSource))
 
   runtimeTest("PCRE", "php"):
     // PHP's default `pcre.backtrack_limit` stops the match.
@@ -184,11 +195,11 @@ class RecallRuntimeSuite extends munit.FunSuite:
 
   for (dialect, program) <- Seq(
       Dialect.JavaScript -> "node",
-      Dialect.Python -> "python3",
-      Dialect.Ruby -> "ruby",
+      Dialect.Python() -> "python3",
+      Dialect.Ruby() -> "ruby",
       Dialect.Java -> "java",
       Dialect.DotNet -> "dotnet",
-      Dialect.Perl -> "perl",
+      Dialect.Perl() -> "perl",
       Dialect.PCRE -> "php"
     )
   do
@@ -201,16 +212,16 @@ class RecallRuntimeSuite extends munit.FunSuite:
 
   runtimeTest("ReDoS.checkAll: Ruby", "ruby"):
     // The failed recall validation is kept, and the checking continues to the safe result.
-    val ds = ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby))
+    val ds = ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby()))
     assert(clue(ds).size >= 2)
     ds.init.foreach:
       case d: Diagnostics.Vulnerable => assertFinish(d.recallValidation.get)
       case d                         => fail(s"not vulnerable: $d")
     assert(clue(ds.last).isInstanceOf[Diagnostics.Safe])
-    assertEquals(ReDoS.check("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby)), ds.last)
+    assertEquals(ReDoS.check("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby())), ds.last)
 
   runtimeTest("ReDoS.checkAll: Python", "python3"):
-    ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.Python)) match
+    ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.Python())) match
       case List(d: Diagnostics.Vulnerable) => assertEquals(d.recallValidation.map(_.result), Some(RecallResult.Timeout))
       case ds                              => fail(s"unexpected: $ds")
 
@@ -224,7 +235,7 @@ class RecallRuntimeSuite extends munit.FunSuite:
     // The wrapper's runtime line comes first, and it shows the arguments.
     val ruby = script("my ruby", s"echo recheck:runtime wrapped \"$$@\"; exec '${which("ruby")}' \"$$@\"")
     val env = Map("RECHECK_RUBY" -> s"'$ruby' --disable-gems")
-    val r = validate("^(a|a)*$", "", Dialect.Ruby, attack("a", 3, "\u0000"), env = env)
+    val r = validate("^(a|a)*$", "", Dialect.Ruby(), attack("a", 3, "\u0000"), env = env)
     assertEquals(r.runtime, "wrapped --disable-gems -")
     assertFinish(r)
 

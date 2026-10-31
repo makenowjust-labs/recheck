@@ -51,6 +51,7 @@ describe("makeSnapshot", () => {
     const diagnostics: Diagnostics = {
       source: "^(a|a)*$",
       flags: "",
+      dialect: { name: "javascript" },
       status: "vulnerable",
       checker: "automaton",
       complexity: {
@@ -75,6 +76,7 @@ describe("makeSnapshot", () => {
     const diagnostics: Diagnostics = {
       source: "a",
       flags: "",
+      dialect: { name: "javascript" },
       status: "safe",
       checker: "automaton",
       complexity: { type: "safe", summary: "safe", isFuzz: false },
@@ -93,6 +95,7 @@ describe("makeSnapshot", () => {
     const unknown: Diagnostics = {
       source: "a",
       flags: "",
+      dialect: { name: "javascript" },
       status: "unknown",
       error: { kind: "timeout" },
     };

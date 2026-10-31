@@ -26,22 +26,24 @@ private[ir] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlNati
       case Dialect.JavaScript => Rule.Ascii
       case Dialect.Java       => if flags.unicodeClass then Rule.Unicode else Rule.Ascii
       case Dialect.DotNet     => Rule.Unicode
-      case Dialect.Python     =>
+      case _: Dialect.Python  =>
         flags.charset match
           case _ if mode == UnitMode.Byte => Rule.Ascii
           case _: IRCharset.Ascii         => Rule.Ascii
           case _                          => Rule.Unicode
-      case Dialect.Ruby =>
+      case _: Dialect.Ruby =>
         flags.charset match
           case _ if mode == UnitMode.Byte => Rule.Ascii
           case IRCharset.Unicode          => Rule.Unicode
           case _                          => Rule.Ascii
-      case Dialect.Perl =>
+      // Perl reads the bytes of a byte string as Latin-1 characters.
+      case _: Dialect.Perl =>
         flags.charset match
-          case _ if mode == UnitMode.Byte => Rule.Ascii
-          case _: IRCharset.Ascii         => Rule.Ascii
-          case IRCharset.Unicode          => Rule.Unicode
-          case _                          => if perlNative then Rule.Native else Rule.Unicode
+          case _: IRCharset.Ascii => Rule.Ascii
+          case IRCharset.Unicode  => Rule.Unicode
+          // `/l` takes the C locale, which has no non-ASCII character in a class, even in a UTF-8 pattern.
+          case IRCharset.Locale => Rule.Native
+          case _                => if perlNative then Rule.Native else Rule.Unicode
       case Dialect.PCRE =>
         val restricted = flags.charset match
           case a: IRCharset.Ascii => asciiOf(a)
@@ -55,7 +57,7 @@ private[ir] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlNati
 
   /** `\d`. */
   def digit(flags: IRCharFlags): CharSet =
-    pick(ruleOf(flags, _.digit), AsciiDigit, if dialect == Dialect.JavaScript then AsciiDigit else gc("Nd"))
+    pick(ruleOf(flags, _.digit), AsciiDigit, if dialect.isJavaScript then AsciiDigit else gc("Nd"))
 
   /** `\s`. */
   def space(flags: IRCharFlags): CharSet = dialect match
@@ -63,10 +65,10 @@ private[ir] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlNati
     case Dialect.DotNet     => gc("Z").union(of("\f\n\r\t\u000b\u0085"))
     case _                  =>
       val unicode = dialect match
-        case Dialect.Java   => gc("Z").union(CharSet.range(0x09, 0x0d)).union(CharSet.single(0x85))
-        case Dialect.Python => pythonSpace
-        case Dialect.PCRE   => pcreHorizontal.union(Vertical)
-        case _              => binary("White_Space")
+        case Dialect.Java      => gc("Z").union(CharSet.range(0x09, 0x0d)).union(CharSet.single(0x85))
+        case _: Dialect.Python => pythonSpace
+        case Dialect.PCRE      => pcreHorizontal.union(Vertical)
+        case _                 => binary("White_Space")
       pick(ruleOf(flags, _.space), AsciiSpace, unicode)
 
   /** `\w`. */
@@ -78,11 +80,11 @@ private[ir] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlNati
     case Dialect.DotNet => dotNetWord
     case _              =>
       val unicode = dialect match
-        case Dialect.Java   => IRProperties.javaWord
-        case Dialect.Python => pythonWord
-        case Dialect.PCRE   => pcreWord
-        case Dialect.Ruby   => rubyWord
-        case _              => perlWord
+        case Dialect.Java      => IRProperties.javaWord
+        case _: Dialect.Python => pythonWord
+        case Dialect.PCRE      => pcreWord
+        case _: Dialect.Ruby   => rubyWord
+        case _                 => perlWord
       pick(ruleOf(flags, _.word), AsciiWord, unicode)
 
   /** The word characters of `\b` and `\B`. */
@@ -90,7 +92,7 @@ private[ir] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlNati
     // .NET's `RegexCharClass.IsBoundaryWordChar` adds ZWNJ and ZWJ.
     case Dialect.DotNet => dotNetWord.union(of("‌‍"))
     // Onigmo's `(?d)` uses Unicode for `\b` and `\B`, unlike `\w`.
-    case Dialect.Ruby
+    case _: Dialect.Ruby
         if mode == UnitMode.CodePoint && (flags.charset == IRCharset.Default || flags.charset == IRCharset.Locale) =>
       rubyWord
     case _ => word(flags)
@@ -109,8 +111,8 @@ private[ir] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlNati
 
   /** `\h` as a horizontal space (Java, PCRE and Perl). */
   def horizontal: CharSet = dialect match
-    case Dialect.Perl => pcreHorizontal.diff(of("᠎"))
-    case _            => pcreHorizontal
+    case _: Dialect.Perl => pcreHorizontal.diff(of("᠎"))
+    case _               => pcreHorizontal
 
   /** `\v` as a vertical space (Java, PCRE and Perl). */
   def vertical: CharSet = Vertical
@@ -122,7 +124,7 @@ private[ir] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlNati
   def posix(name: String, flags: IRCharFlags): Option[CharSet] =
     val asciiSet = AsciiPosix.get(name)
     dialect match
-      case Dialect.Ruby =>
+      case _: Dialect.Ruby =>
         val rule =
           if mode == UnitMode.Byte then Rule.Ascii
           else
@@ -130,8 +132,8 @@ private[ir] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlNati
               case _: IRCharset.Ascii => Rule.Ascii
               case _                  => Rule.Unicode
         IRProperties.rubyPosix(name).map(u => pick(rule, asciiSet.get, u))
-      case Dialect.Perl if name == "ascii" => asciiSet
-      case Dialect.Perl                    =>
+      case _: Dialect.Perl if name == "ascii" => asciiSet
+      case _: Dialect.Perl                    =>
         IRProperties.perl("XPosix" + name, None) match
           case PropertyResult.Found(set, _) => asciiSet.map(a => pick(ruleOf(flags, _.posix), a, set.chars))
           case _                            => None

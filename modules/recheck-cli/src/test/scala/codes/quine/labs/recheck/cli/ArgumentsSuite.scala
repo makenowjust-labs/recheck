@@ -45,7 +45,7 @@ class ArgumentsSuite extends munit.FunSuite:
     assertEquals(booleanArgument.defaultMetavar, "boolean")
 
   test("arguments.dialectArgument"):
-    assertEquals(dialectArgument.read("python"), Validated.validNel(Dialect.Python))
+    assertEquals(dialectArgument.read("python"), Validated.validNel(Dialect.Python()))
     assertEquals(dialectArgument.read("dotnet"), Validated.validNel(Dialect.DotNet))
     assertEquals(dialectArgument.read("xxx"), Validated.invalidNel("unknown dialect: xxx"))
     assertEquals(dialectArgument.defaultMetavar, "dialect")

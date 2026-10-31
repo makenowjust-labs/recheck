@@ -3,7 +3,6 @@ package codes.quine.labs.recheck.regexp
 import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.resyntax.ast.BackslashKind
 import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.DialectOptions
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetException
 import codes.quine.labs.resyntax.ast.NodeData
@@ -18,18 +17,8 @@ import codes.quine.labs.resyntax.parser.ParsingException
 /** ParsedPattern is a pattern source with its IR, which the checkers analyze.
   *
   * The checkers read only the IR; the source is kept for the output (e.g. diagnostics and recall programs).
-  *
-  * @param perlUtf8
-  *   whether a Perl pattern string is UTF-8 as the IR reads it, which is `false` for the other dialects
   */
-final case class ParsedPattern(
-    source: String,
-    flags: String,
-    dialect: Dialect,
-    flagSet: FlagSet,
-    ir: IRPattern,
-    perlUtf8: Boolean
-):
+final case class ParsedPattern(source: String, flags: String, dialect: Dialect, flagSet: FlagSet, ir: IRPattern):
 
   /** The root node of the IR. */
   def node: IRNode = ir.node
@@ -59,16 +48,13 @@ object ParsedPattern:
   def parse(
       source: String,
       flags: String,
-      dialect: Dialect = Dialect.JavaScript,
-      options: DialectOptions = DialectOptions.Default
+      dialect: Dialect = Dialect.JavaScript
   ): Either[InvalidRegExpException, ParsedPattern] =
     try
       val flagSet = FlagSet.parse(flags, dialect)
-      val node = Parser.parse(source, flagSet, dialect, options)
-      val irOptions = options.withPerlUtf8Of(source)
-      val ir = IRBuilder.build(node, flagSet, dialect, irOptions)
-      val perlUtf8 = dialect == Dialect.Perl && IRBuilder.perlUtf8(node, ir.mode, irOptions)
-      Right(ParsedPattern(source, flags, dialect, flagSet, ir, perlUtf8))
+      val node = Parser.parse(source, flagSet, dialect)
+      val ir = IRBuilder.build(node, flagSet, dialect)
+      Right(ParsedPattern(source, flags, dialect, flagSet, ir))
     catch
       case ex: FlagSetException    => Left(new InvalidRegExpException(ex.getMessage))
       case ex: ParsingException    => Left(new InvalidRegExpException(ex.getMessage))

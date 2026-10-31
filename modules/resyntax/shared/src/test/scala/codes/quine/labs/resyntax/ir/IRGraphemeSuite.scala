@@ -39,7 +39,7 @@ class IRGraphemeSuite extends munit.FunSuite:
     case data => fail(s"Unexpected: $data")
 
   /** Returns the length of the first `\X` from the position of the code points. */
-  def cluster(input: Seq[Int], dialect: Dialect = Perl, flags: String = "", pos: Int = 0): Option[Int] =
+  def cluster(input: Seq[Int], dialect: Dialect = Perl(), flags: String = "", pos: Int = 0): Option[Int] =
     ends(build("\\X", flags, dialect).node, input.toIndexedSeq, pos).headOption.map(_ - pos)
 
   def cp(s: String): Seq[Int] = UString.fromString(s).iterator.toSeq
@@ -100,10 +100,10 @@ class IRGraphemeSuite extends munit.FunSuite:
       assertEquals(cluster(cp(input)), Some(expected))
 
   test("IRBuilder.build: \\X is atomic"):
-    for (dialect, flags) <- Seq((Java, ""), (Perl, ""), (Ruby, ""), (PCRE, "u")) do
+    for (dialect, flags) <- Seq((Java, ""), (Perl(), ""), (Ruby(), ""), (PCRE, "u")) do
       val node = build("\\X", flags, dialect).node
       assert(node.data.isInstanceOf[IRNodeData.Atomic], node)
-    assertEquals(build("\\X", "", Java).node, build("\\X", "", Perl).node)
+    assertEquals(build("\\X", "", Java).node, build("\\X", "", Perl()).node)
 
   // PCRE2 10.49 has its own rules (`pcre2_extuni.c`), checked with PHP 8.5.
   val PCREProbes: Seq[(String, String, Int, Int)] = Seq(
@@ -132,7 +132,7 @@ class IRGraphemeSuite extends munit.FunSuite:
       assertEquals(cluster(cp(input), PCRE, "u", pos), Some(expected))
 
   test("IRBuilder.build: \\X in byte mode reads Latin-1 bytes"):
-    for (dialect, flags) <- Seq((PCRE, ""), (Ruby, "n")) do
+    for (dialect, flags) <- Seq((PCRE, ""), (Ruby(), "n")) do
       assertEquals(build("\\X", flags, dialect).mode, UnitMode.Byte)
       assertEquals(cluster(Seq(0x0d, 0x0a), dialect, flags), Some(2))
       assertEquals(cluster(Seq(0x65, 0xcc, 0x81), dialect, flags), Some(1))
@@ -157,11 +157,11 @@ class IRGraphemeSuite extends munit.FunSuite:
   test("IRBuilder.build: \\X in a look-behind is an error in the others"):
     for (dialect, flags, message) <- Seq(
         (PCRE, "u", "Look-behind is not limited at 0"),
-        (Perl, "", "Look-behind longer than 255 at 0"),
-        (Ruby, "", "Invalid pattern in look-behind at 0")
+        (Perl(), "", "Look-behind longer than 255 at 0"),
+        (Ruby(), "", "Invalid pattern in look-behind at 0")
       )
     do interceptMessage[IRBuildingException](message)(build("(?<=\\X)a", flags, dialect))
 
   test("IRBuilder.build: \\X does not depend on case-insensitivity"):
-    for dialect <- Seq(Java, Perl, Ruby) do
+    for dialect <- Seq(Java, Perl(), Ruby()) do
       assert(build("\\X", "i", dialect).node.equalsWithoutLoc(build("\\X", "", dialect).node))
