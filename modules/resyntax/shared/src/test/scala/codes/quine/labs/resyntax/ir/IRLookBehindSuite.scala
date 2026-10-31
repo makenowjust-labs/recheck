@@ -150,6 +150,14 @@ class IRLookBehindSuite extends IRSuiteBase:
   error("(?i)(?<=x(?:[ßa]|ab))y", "", Ruby())("Invalid pattern in look-behind at 4")
   error("(?i)(?<=x(?:ss|a))y", "", Ruby())("Invalid pattern in look-behind at 4")
   error("(?i)(?<=x(?:(?-i)ß|ab))y", "", Ruby())("Invalid pattern in look-behind at 4")
+  // Ruby's class matching the foldings of its characters is an alternation, which is valid only as the whole body.
+  valid("(?i)(?<=[ßa])y", Ruby())
+  valid("(?i)(?<=(?:[ßa]))y", Ruby())
+  valid("(?i)(?<!\\p{Ll})y", Ruby())
+  error("(?i)(?<=x[ßa])y", "", Ruby())("Invalid pattern in look-behind at 4")
+  error("(?i)(?<=[ßa]|b)y", "", Ruby())("Invalid pattern in look-behind at 4")
+  error("(?i)(?<=([ßa]))y", "", Ruby())("Invalid pattern in look-behind at 4")
+  error("(?i)(?<=x\\p{Ll})y", "", Ruby())("Invalid pattern in look-behind at 4")
   // Ruby's escapes of the bytes of a character are one character, unless the pattern is of bytes.
   valid("(?<=x(?:\\xC3\\xA9|a))y", Ruby())
   valid("(?i)(?<=x(?:\\xC3\\x9F|ab))y", Ruby())

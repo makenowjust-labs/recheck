@@ -51,6 +51,16 @@ class ReDoSDialectSuite extends munit.FunSuite:
     // PCRE2's `.` with `(*CRLF)` fails only at `\r` before `\n` (0.38 s at n = 22 on `'a'.repeat(n) + '\r\nx'`).
     assertVulnerable(check("(*CRLF)^(?:a|.)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
 
+  test("ReDoS.check: classes folded to several characters"):
+    // Ruby 4.0 (with a back-reference stopping the memoization) is exponential on `'ß'.repeat(n) + '!'` against
+    // `\A()[ßx]*\1\z` (3.6 s at n = 16), where `[ßx]` matches `ß` as the class and as the foldings of `ß` and `ẞ`.
+    assertVulnerable(check("\\A[ßx]*\\z", Ruby(), "i"), AttackComplexity.Exponential(false), Checker.Automaton)
+    // Perl 5.44 matches `[ßx]` as `ss|[x]`, which is unambiguous, and `[ßẞ]` as `ss|ss` (0.17 s at n = 20).
+    assertSafe(check("\\A[ßx]*\\z", Perl(), "i"), Checker.Automaton)
+    assertVulnerable(check("\\A[ßẞ]*\\z", Perl(), "i"), AttackComplexity.Exponential(false), Checker.Automaton)
+    for dialect <- Seq(Ruby(), Perl()) do
+      assertVulnerable(check("\\A(?:[ß]|ss)*\\z", dialect, "i"), AttackComplexity.Exponential(false), Checker.Automaton)
+
   test("ReDoS.check: atomic groups"):
     // Java 25 is linear on the first two (and Python 3.15 and PCRE2 10.49 on the second).
     // Python and PCRE2 (without JIT) are exponential on the third, and Java is fast on it.

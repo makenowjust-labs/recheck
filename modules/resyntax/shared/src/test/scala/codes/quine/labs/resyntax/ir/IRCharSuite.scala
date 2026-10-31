@@ -272,9 +272,35 @@ class IRCharSuite extends munit.FunSuite:
     LookBehind(false, Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))), Forward(Seq(Longest(2, 2))))
   )
   check("(?<=ß)", "i", Perl())(LookBehind(false, sharpS, Forward(Seq(Longest(1, 2)))))
-  // Folds with classes and escapes are intentionally not reproduced.
-  chars("[ß]", "i", Ruby(), Perl())(sharpSs)
+  // Folds with escapes and across classes are intentionally not reproduced.
   check("\\x73s", "i", Ruby())(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))
+  check("[s]s", "i", Ruby(), Perl())(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))
+  // A class matches the foldings of its characters folded to several characters.
+  // Ruby reads a class of one character as a literal, and tries the class first and then a folding for each character.
+  val ssCount: Int = FullCaseFolding.multiCodePointFoldings()(UString.fromString("ss")).intersect(sharpSs).size
+  check("[ß]", "i", Ruby(), Perl())(sharpS)
+  check("[ßx]", "i", Ruby())(Disjunction(Chars(sharpSs.union(of("xX"))) +: Seq.fill(ssCount)(sharpS)*))
+  check("(?<=[ßx])", "i", Ruby())(
+    LookBehind(
+      false,
+      Disjunction(
+        Chars(sharpSs.union(of("xX"))) +: Seq.fill(ssCount)(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))*
+      ),
+      Forward(Longest(1, 1) +: Seq.fill(ssCount)(Longest(2, 2)))
+    )
+  )
+  check("(?<=[ß])", "i", Ruby())(
+    LookBehind(false, Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))), Forward(Seq(Longest(2, 2))))
+  )
+  // Perl tries the foldings first, the longest first and the latest first, and then the class of the others.
+  check("[ßx]", "i", Perl())(Disjunction(sharpS, Chars(of("xX"))))
+  check("[ßﬀ]", "i", Perl())(
+    Disjunction(Disjunction(Sequence(Chars(of("fF")), Chars(of("fF"))), Chars(of("\ufb00"))), sharpS)
+  )
+  check("[\\xDF-\\xDF]", "i", Perl())(sharpS)
+  chars("[\\xDE-\\xDF]", "i", Perl())(sharpSs.union(of("\u00de\u00fe")))
+  chars("[\\xDFx]", "i", Perl(utf8 = false))(of("\u00dfxX"))
+  chars("(?aa)[ßx]", "i", Perl())(sharpSs.union(of("xX")))
   chars("ß", "i", Python(), DotNet)(of("\u00df\u1e9e"))
   chars("ß", "i", JavaScript)(of("\u00df"))
   // Java matches `ß` exactly, because its upper case is itself, but `ẞ` matches `ß`.

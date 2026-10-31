@@ -74,7 +74,8 @@ object IRBuilder:
         charWidth(table, chars, dialect, mode, perlUtf8Pattern),
         supplementary,
         if dialect.isPerl && mode == UnitMode.CodePoint then perlMinSubtract(table, perlUtf8Pattern)
-        else _ => 0L
+        else _ => 0L,
+        node => table.charFlagsOf(node).flatMap(chars.rubyClassWidths(node, _))
       )
     val backReferences = new IRValidator(table, resolver, checker, featureSet).validate(node)
     val builder =
@@ -224,10 +225,9 @@ object IRBuilder:
                 case NodeData.Backslash(value: BackslashKind.BackslashValue) => single(fold(value.value))
                 case NodeData.Class(false, _)                                =>
                   chars.resolve(node, flags.copy(ignoreCase = false)) match
-                    case IRNodeData.Chars(set) if set.size == 1                       => single(fold(set.head))
-                    case IRNodeData.Chars(set) if set.intersect(multiFolded).nonEmpty =>
-                      Width(1, set.intersect(multiFolded).iterator.map(fold).max.toLong)
-                    case _ => single(1)
+                    case IRNodeData.Chars(set) if set.size == 1 => single(fold(set.head))
+                    case _                                      =>
+                      chars.rubyClassWidths(node, flags).fold(single(1))(ws => Width(ws.min, ws.max.toLong))
                 case _ => single(1)
       case _ => nodes => single(nodes.size)
 
@@ -242,9 +242,6 @@ object IRBuilder:
       throw new IRBuildingException("ASCII and UNICODE flags are incompatible", SourceLocation.Invalid)
     if has(_.ascii) && has(_.localeUpper) then
       throw new IRBuildingException("ASCII and LOCALE flags are incompatible", SourceLocation.Invalid)
-
-  /** The characters folded to several characters. */
-  private lazy val multiFolded: CharSet = CharSet.union(FullCaseFolding.multiCodePointFoldings().values.toSeq)
 
   /** Checks whether a Perl pattern switches `/d` to Unicode rules by itself (perlre "Which character set modifier is in
     * effect?").

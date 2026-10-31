@@ -52,7 +52,7 @@ The flags are the letters of the options of a regexp literal (e.g. `/.../i`) and
 
 The options that `recheck` does not take:
 
-- `Regexp::FIXEDENCODING` (the literal `/u`): no effect on matching a `UTF-8` string (it makes a match against a string of another encoding an error).
+- `Regexp::FIXEDENCODING` (the literal `/u`): `recheck` reads a pattern in `UTF-8` anyway (see [Approximations](#approximations) for a pattern of only ASCII characters), and the option makes a match against a string of another encoding an error.
 - The literal `/e` (EUC-JP) and `/s` (Windows-31J): not supported, since the encoding is `UTF-8` or `ASCII-8BIT`.
 
 ## Syntax
@@ -66,10 +66,18 @@ The following constructs are not supported, and they are reported as `unsupporte
 
 - Ruby's memoization (since Ruby 3.2) makes some vulnerable patterns fast, and `recheck` does not model it.
   Ruby 4.0 finishes `^(a|a)*$` against `'a'.repeat(n) + '!'` in less than 1 ms even for `n = 28`.
-- Case-insensitive matching uses the simple case folding.
-  Ruby also matches a character against several characters (e.g. `ß` against `ss`), but `recheck` handles it only for a run of plain literals.
-  It does not handle a character class, a group or a quantifier taking part in such a match (e.g. `[s]s`).
-  In a look-behind, Ruby matches such a character only as its folding (e.g. `(?<=ß)` matches `ss`, but not `ß`), and so does `recheck` for plain literals.
+- Case-insensitive matching uses the simple case folding, and Ruby also matches a character against its folding to several characters (e.g. `ß` against `ss`).
+  `recheck` handles it for a run of plain literals (e.g. `ß` matches `ss`, and `ss` matches `ß`) and for a character class.
+  A class of one character is a literal (e.g. `[ß]`), and another class tries the class first and then the folding of each of its characters folded to several characters, even of a range, a POSIX class or a property (e.g. `[ßx]` is `[ßẞx]|ss|ss`, so `[ßx]*` is ambiguous).
+  A negated class matches one character (e.g. `[^x]` does not match `ss`).
+- In a look-behind, Ruby matches such a character only as its folding (e.g. `(?<=ß)` and `(?<=[ß])` match `ss`, but not `ß`), and so does `recheck`.
+  A class with such a character is valid only as the whole body (e.g. `(?<=[ßx])`, but not `(?<=a[ßx])` or `(?<=[ßx]|a)`).
+- Whether several nodes together match a character folded to several characters depends on how Onigmo joins the nodes into a string on compiling, and `recheck` does not reproduce it.
+  A class of one character joins the literals after it (e.g. `[s]s` matches `ß`, but `s[s]` does not), and so does a quantifier of a fixed count (e.g. `s{2}`, `[s]{2}` and `ss{1}` match `ß`, but `s{1}s` does not).
+  A group, an escape and a class of several characters do not join (e.g. `(?:s)s`, `\x73s` and `[sS]s` do not match `ß`).
+- A pattern of only ASCII characters has no fixed encoding: Ruby matches a string of only ASCII characters by the pattern compiled in `US-ASCII`, where no character is folded to several characters, and Ruby keeps the pattern compiled again in `UTF-8` after matching another string.
+  So `/[[:alpha:]]/i` matches `ss` only after matching a non-ASCII string, and `/(?<=a[[:lower:]])y/i` raises `RegexpError` on a non-ASCII string.
+  `recheck` takes such a pattern in `UTF-8` (e.g. it reports `(?<=a[[:lower:]])y` with `i` as invalid).
 - A look-behind matches forward from a start before the position, and the match must end at the position.
   Ruby tries the starts from the farthest, and it takes each alternative in turn (e.g. `(?<=(a)|(aa))b` sets the group `1` on `aab`, but the group `2` in Perl).
 - An iteration matching the empty string is not handled as Ruby does: Onigmo repeats copies of the node for a bounded repetition depending on the size of its compiled code, and it checks the captures in an empty iteration.
