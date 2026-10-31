@@ -74,6 +74,12 @@
   flex: none;
 }
 
+.dialectFlags {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  text-align: right;
+}
+
 .localNote {
   position: relative;
   display: flex;

@@ -1,3 +1,4 @@
+import Link from '@docusaurus/Link';
 import React from 'react';
 import { useFormContext } from 'react-hook-form';
 
@@ -62,21 +63,28 @@ const DemoParams: React.FC<{ build: Build }> = ({ build }) => {
 };
 
 const DemoDialect: React.FC<{ build: Build; disabled: boolean }> = ({ build, disabled }) => {
+  const { watch } = useFormContext();
   const param = paramsOf(build).find(({ name }) => name === 'dialect');
   if (param === undefined) return null;
+  const dialect = String(watch('dialect') ?? param.defaultValue);
   return (
-    <div className={`margin-top--sm ${styles.dialect}`}>
-      <label htmlFor="dialect">{param.title}</label>
-      <div className={styles.dialectSelect}>
-        <Select
-          id="dialect"
-          name="dialect"
-          values={selectValues(param, DEFAULT_DIALECT)}
-          defaultValue={String(param.defaultValue)}
-          disabled={disabled}
-        />
+    <>
+      <div className={`margin-top--sm ${styles.dialect}`}>
+        <label htmlFor="dialect">{param.title}</label>
+        <div className={styles.dialectSelect}>
+          <Select
+            id="dialect"
+            name="dialect"
+            values={selectValues(param, DEFAULT_DIALECT)}
+            defaultValue={String(param.defaultValue)}
+            disabled={disabled}
+          />
+        </div>
       </div>
-    </div>
+      <div className={styles.dialectFlags}>
+        <Link to={`/docs/usage/dialects/${dialect}#flags-and-units`}>Flags of {dialect}</Link>
+      </div>
+    </>
   );
 };
 
