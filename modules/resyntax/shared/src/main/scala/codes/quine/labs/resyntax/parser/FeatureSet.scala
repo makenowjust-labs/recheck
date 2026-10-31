@@ -152,6 +152,8 @@ final case class FeatureSet(
     combinesSurrogatePairEscape: Boolean,
     // JavaScript (without `uv`)
     consumesBrokenClassRange: Boolean,
+    // .NET (with `n`), PCRE (with `n`), Perl (with `n`)
+    explicitCapture: Boolean,
     // .NET, PCRE, Perl, Ruby
     fallsBackMultiDigitBackReferenceToOctal: Boolean,
     // Ruby
@@ -370,6 +372,8 @@ final case class FeatureSet(
     processBackslashInLineComment: Boolean,
     // Java
     readsBackReferenceDigitsWhileGroupExists: Boolean,
+    // Java, PCRE, Perl, Ruby
+    readsBackReferenceDigitsByPreviousGroups: Boolean,
     // Perl
     readsLeadingCurlyAsLiteral: Boolean,
     // Python
@@ -580,6 +584,8 @@ object FeatureSet:
       combinesSurrogatePairEscape = isJava || (isJavaScript && isUnicode),
       // JavaScript (without `uv`)
       consumesBrokenClassRange = isJavaScript && !isUnicode,
+      // .NET (with `n`), PCRE (with `n`), Perl (with `n`)
+      explicitCapture = (isDotNet || isPCRE || isPerl) && flagSet.explicitCapture,
       // .NET, PCRE, Perl, Ruby
       fallsBackMultiDigitBackReferenceToOctal = isDotNet || isPCRE || isPerl || isRuby,
       // Ruby
@@ -799,6 +805,8 @@ object FeatureSet:
       processBackslashInLineComment = isPython,
       // Java
       readsBackReferenceDigitsWhileGroupExists = isJava,
+      // Java, PCRE, Perl, Ruby
+      readsBackReferenceDigitsByPreviousGroups = isJava || isPCRE || isPerl || isRuby,
       // Perl
       readsLeadingCurlyAsLiteral = isPerl,
       // Python

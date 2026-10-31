@@ -7,9 +7,12 @@ import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
 import codes.quine.labs.resyntax.ast.BoundaryModifier.*
 import codes.quine.labs.resyntax.ast.CaseCommandKind.*
 import codes.quine.labs.resyntax.ast.ClassItemData.*
+import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.EscapeClassKind.*
 import codes.quine.labs.resyntax.ast.EscapeStyle.*
+import codes.quine.labs.resyntax.ast.FlagSet
+import codes.quine.labs.resyntax.ast.FlagSetDiff
 import codes.quine.labs.resyntax.ast.GroupKind.*
 import codes.quine.labs.resyntax.ast.NameStyle.*
 import codes.quine.labs.resyntax.ast.NodeData.*
@@ -316,6 +319,35 @@ class ParserBackslashSuite extends ParserSuiteBase:
       Backslash(EscapeBackReference(BareBackReference, IndexedReference(1))),
       Literal('1')
     )
+  // Java, PCRE, Perl and Ruby read `\10` by the capture groups opened before it, and .NET by all of them.
+  locally:
+    val empty = Group(IndexedCapture, Sequence())
+    val ref1 = Backslash(EscapeBackReference(BareBackReference, IndexedReference(1)))
+    val ref10 = Backslash(EscapeBackReference(BareBackReference, IndexedReference(10)))
+    val octal10 = Backslash(Escape(BareOctal, 8))
+    check("()" * 9 + "\\10()", "", PCRE, Perl, Ruby)(Sequence(Seq.fill(9)(empty) ++ Seq(octal10, empty)*))
+    check("()" * 9 + "\\10()", "", Java)(Sequence(Seq.fill(9)(empty) ++ Seq(ref1, Literal('0'), empty)*))
+    check("()" * 9 + "\\10()", "", DotNet)(Sequence(Seq.fill(9)(empty) ++ Seq(ref10, empty)*))
+    check("()" * 9 + "(\\10)", "", DotNet, Java, PCRE, Perl, Ruby)(
+      Sequence(Seq.fill(9)(empty) :+ Group(IndexedCapture, ref10)*)
+    )
+    check("(?<a>)" + "()" * 9 + "\\10", "", Java)(
+      Sequence(Group(NamedCapture(Angle, "a"), Sequence()) +: Seq.fill(9)(empty) :+ ref10*)
+    )
+    error("(?<a>)" + "()" * 9 + "\\10", "", Ruby)("Numbered reference with named capture at 25")
+    // A branch reset counts its alternative with the most groups, and a plain group does not count with `n`.
+    check("(?|()|()())" + "()" * 7 + "\\10", "", PCRE)(
+      Sequence(Command(CommandKind.BranchReset(empty, Sequence(empty, empty))) +: Seq.fill(7)(empty) :+ octal10*)
+    )
+    check("(?|()()|())" + "()" * 8 + "\\10", "", PCRE, Perl)(
+      Sequence(Command(CommandKind.BranchReset(Sequence(empty, empty), empty)) +: Seq.fill(8)(empty) :+ ref10*)
+    )
+    val enable = Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(explicitCapture = true), None)))
+    val disable = Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(explicitCapture = true)))))
+    check("(?n)" + "()" * 10 + "\\10", "", PCRE, Perl)(Sequence((enable +: Seq.fill(10)(empty) :+ octal10)*))
+    check("()" * 10 + "\\10", "n", Perl)(Sequence(Seq.fill(10)(empty) :+ octal10*))
+    check("(?n)" + "()" * 9 + "(?-n)()\\10", "", PCRE, Perl):
+      Sequence(((enable +: Seq.fill(9)(empty)) ++ Seq(disable, empty, octal10))*)
   error("()\\2", "u", JavaScript)("Invalid back-reference at 3")
   check("\\2147483648", "", JavaScript):
     Sequence(
