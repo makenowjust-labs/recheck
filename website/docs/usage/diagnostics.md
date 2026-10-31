@@ -56,7 +56,7 @@ To prevent this case, you should use the recall validation.
 
 `vulnerable` status diagnostics has the `recallValidation` field.
 The recall validation runs the attack string on the real regex engine of the dialect, and this field records the run.
-It is `null` if the recall validation is not run: [`recallTimeout`](parameters.md#recalltimeout) is not positive (the default), or commands cannot run (e.g. in the browser).
+It is `null` if the recall validation is not run: [`recallTimeout`](parameters.mdx#recalltimeout) is not positive (the default), or commands cannot run (e.g. in the browser).
 
 - `runtime` is the runtime name and version (e.g. `node v26.11.1`).
 - `timeout` is the timeout of the matching in milliseconds (`null` if it is infinite).

@@ -1,7 +1,7 @@
 import type { Parameters } from "recheck";
 
 import { isAtLeast } from "./builds";
-import schema from "./parameters.schema.json";
+import schema from "../../data/parameters.schema.json";
 
 import type { Build } from "./builds";
 
