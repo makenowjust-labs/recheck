@@ -4,7 +4,6 @@ import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.exec.Command
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.util.UStringUtil
-import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
@@ -85,15 +84,14 @@ object RecallProgram:
   /** Returns the Python program for `python3`, using `re.search`. */
   private[recall] def python(pattern: ParsedPattern, attack: AttackPattern): RecallProgram =
     val bytes = pattern.ir.mode == UnitMode.Byte
-    val lit: Iterator[Int] => String =
-      if bytes then cs => quote("b'", "'", cs)(pythonChar) else cs => quote("'", "'", cs)(pythonChar)
+    val style = AttackPattern.Python(bytes)
     // A bytes pattern is the Latin-1 encoding of the source.
     val source =
-      if bytes then lit(pattern.source.iterator.flatMap(c => if c <= 0xff then Iterator(c.toInt) else utf8(c.toInt)))
-      else lit(UString.fromString(pattern.source).iterator)
+      if bytes then style.literal(UString.from(pattern.source.iterator.flatMap(c => utf8OrLatin1(c.toInt))))
+      else style.literal(UStringUtil.fromString(pattern.source))
     val flags = pattern.flags.distinct.collect:
       case c @ ('i' | 'm' | 's' | 'x' | 'a' | 'u' | 'L') => s"re.${c.toUpper}"
-    val input = build(attack, s => lit(chars(s, pattern.ir.mode)), (s, n) => s"$s * $n", " + ")
+    val input = attack.toString(style)
     val script =
       s"""|import platform, re, sys, time
           |sys.stdout.write('$RuntimeLine python ' + platform.python_version() + '\\n')
@@ -114,12 +112,8 @@ object RecallProgram:
   /** Returns the Ruby program for `ruby`, using `Regexp#match?` without `Regexp.timeout`. */
   private[recall] def ruby(pattern: ParsedPattern, attack: AttackPattern): RecallProgram =
     val bytes = pattern.ir.mode == UnitMode.Byte
-    val lit: Iterator[Int] => String =
-      if bytes then cs => quote("\"", "\".b", cs)(rubyByte) else cs => quote("\"", "\"", cs)(rubyChar)
-    // A pattern of bytes is the UTF-8 encoding of the source.
-    val source =
-      if bytes then lit(UString.fromString(pattern.source).encode(UnitMode.Byte).iterator)
-      else lit(UString.fromString(pattern.source).iterator)
+    val style = AttackPattern.Ruby(bytes)
+    val source = style.literal(sourceString(pattern.source, bytes))
     // `a` and `d` have no `Regexp` option, but have the inline option of the same meaning.
     val prefix = pattern.flags.distinct.filter(c => c == 'a' || c == 'd').map(c => s"(?$c)").mkString
     val options = pattern.flags.distinct.collect:
@@ -128,8 +122,8 @@ object RecallProgram:
       case 'x' => "Regexp::EXTENDED"
       case 'n' => "Regexp::NOENCODING"
       case 'u' => "Regexp::FIXEDENCODING"
-    val regex = if prefix.isEmpty then source else s"${lit(prefix.iterator.map(_.toInt))} + $source"
-    val input = build(attack, s => lit(chars(s, pattern.ir.mode)), (s, n) => s"$s * $n", " + ")
+    val regex = if prefix.isEmpty then source else s"${style.literal(UStringUtil.fromString(prefix))} + $source"
+    val input = attack.toString(style)
     val script =
       s"""|$$stdout.sync = true
           |Regexp.timeout = nil if Regexp.respond_to?(:timeout=)
@@ -291,7 +285,6 @@ object RecallProgram:
     *   interpolated into `qr` at runtime
     */
   private[recall] def perl(pattern: ParsedPattern, attack: AttackPattern, literal: Boolean): Option[RecallProgram] =
-    val lit: Iterator[Int] => String = cs => quote("\"", "\"", cs)(perlChar)
     // `qr` takes only these modifiers, and the others do not change a match.
     val flags = pattern.flags.filter(c => "msixpodualn".contains(c))
     val bytes = pattern.ir.mode == UnitMode.Byte
@@ -302,12 +295,10 @@ object RecallProgram:
           delimiter <- PerlDelimiters.find(c => !pattern.source.contains(c))
         yield s"qr$delimiter${pattern.source}$delimiter$flags"
       else
-        // A pattern of bytes is the UTF-8 encoding of the source.
-        val source = UString.fromString(pattern.source)
-        val chars = if bytes then source.encode(UnitMode.Byte).iterator else source.iterator
-        Some(s"do { my $$pattern = ${lit(chars)}; qr/$$pattern/$flags }")
+        val source = AttackPattern.Perl.literal(sourceString(pattern.source, bytes))
+        Some(s"do { my $$pattern = $source; qr/$$pattern/$flags }")
     regex.map: regex =>
-      val input = build(attack, s => lit(this.chars(s, pattern.ir.mode)), (s, n) => s"($s x $n)", " . ")
+      val input = attack.toString(AttackPattern.Perl)
       val pragma = if bytes then "" else "use utf8;\n"
       val script =
         s"""|${pragma}use Time::HiRes ();
@@ -355,12 +346,8 @@ object RecallProgram:
       .map: delimiter =>
         val bytes = pattern.ir.mode == UnitMode.Byte
         val regex =
-          quote("\"", "\"", UString.fromString(s"$delimiter${pattern.source}$delimiter${pattern.flags}").iterator)(
-            phpChar
-          )
-        val lit: Iterator[Int] => String =
-          if bytes then cs => quote("\"", "\"", cs)(phpByte) else cs => quote("\"", "\"", cs)(phpChar)
-        val input = build(attack, s => lit(chars(s, pattern.ir.mode)), (s, n) => s"str_repeat($s, $n)", " . ")
+          AttackPattern.PHP().literal(UStringUtil.fromString(s"$delimiter${pattern.source}$delimiter${pattern.flags}"))
+        val input = attack.toString(AttackPattern.PHP(bytes))
         val script =
           s"""|<?php
               |echo "$RuntimeLine php ", PHP_VERSION, " (PCRE2 ", PCRE_VERSION, ", pcre.jit=", ini_get('pcre.jit'), ", pcre.backtrack_limit=", ini_get('pcre.backtrack_limit'), ", pcre.recursion_limit=", ini_get('pcre.recursion_limit'), ")\\n";
@@ -393,78 +380,17 @@ object RecallProgram:
   /** The delimiters of a PHP regex, preferring printable ones. */
   private val PhpDelimiters: Seq[Char] = "/#~!%@;,|=:".toSeq ++ ((1 to 8) ++ (14 to 31)).map(_.toChar)
 
-  /** Builds an expression of the attack string from the literals of the parts and their repetitions. */
-  private def build(
-      attack: AttackPattern,
-      lit: UString => String,
-      repeat: (String, Int) => String,
-      join: String
-  ): String =
-    val parts = Seq.newBuilder[String]
-    for (s, t, m) <- attack.pumps do
-      if s.nonEmpty then parts.addOne(lit(s))
-      parts.addOne(repeat(lit(t), math.max(0, attack.n + m)))
-    if attack.suffix.nonEmpty then parts.addOne(lit(attack.suffix))
-    val result = parts.result()
-    if result.isEmpty then lit(UString.empty) else result.mkString(join)
-
   /** Returns an expression of the union of the flags, or the default for no flags. */
   private def union(flags: Seq[String], none: String): String = if flags.isEmpty then none else flags.mkString(" | ")
 
-  /** Returns the characters of a part of an attack string: the code points, or the bytes in the byte mode. */
-  private def chars(s: UString, mode: UnitMode): Iterator[Int] =
-    if mode == UnitMode.Byte then s.iterator else s.chars(true)
+  /** Returns the source as a string of the code points, or of the UTF-8 bytes for a pattern of bytes. */
+  private def sourceString(source: String, bytes: Boolean): UString =
+    if bytes then UString.from(UString.fromString(source).encode(UnitMode.Byte)) else UStringUtil.fromString(source)
 
-  /** Returns the UTF-8 bytes of the code point. */
-  private def utf8(c: Int): Iterator[Int] = UString(c).encode(UnitMode.Byte).iterator
-
-  /** Returns a string literal of the characters, escaped by the function. */
-  private def quote(open: String, close: String, cs: Iterator[Int])(escape: Int => String): String =
-    cs.map(escape).mkString(open, "", close)
-
-  private def isPrintable(c: Int): Boolean = 0x20 <= c && c <= 0x7e
+  /** Returns the byte of a Latin-1 character, or the UTF-8 bytes of another character. */
+  private def utf8OrLatin1(c: Int): Iterator[Int] =
+    if c <= 0xff then Iterator(c) else UString(c).encode(UnitMode.Byte).iterator
 
   private def hex(c: Int, width: Int): String =
     val s = Integer.toHexString(c)
     "0" * (width - s.length) + s
-
-  private def pythonChar(c: Int): String = c match
-    case '\\'                => "\\\\"
-    case '\''                => "\\'"
-    case '\n'                => "\\n"
-    case c if isPrintable(c) => c.toChar.toString
-    case c if c <= 0xff      => s"\\x${hex(c, 2)}"
-    case c if c <= 0xffff    => s"\\u${hex(c, 4)}"
-    case c                   => s"\\U${hex(c, 8)}"
-
-  private def rubyChar(c: Int): String = c match
-    case '\\'                => "\\\\"
-    case '"'                 => "\\\""
-    case '#'                 => "\\#"
-    case '\n'                => "\\n"
-    case c if isPrintable(c) => c.toChar.toString
-    case c                   => s"\\u{${hex(c, 1)}}"
-
-  private def rubyByte(c: Int): String =
-    if isPrintable(c) || c == '\n' then rubyChar(c) else s"\\x${hex(c, 2)}"
-
-  private def perlChar(c: Int): String = c match
-    case '\\'                => "\\\\"
-    case '"'                 => "\\\""
-    case '$'                 => "\\$"
-    case '@'                 => "\\@"
-    case '\n'                => "\\n"
-    case c if isPrintable(c) => c.toChar.toString
-    case c                   => s"\\x{${hex(c, 1)}}"
-
-  private def phpChar(c: Int): String = c match
-    case '\\'                => "\\\\"
-    case '"'                 => "\\\""
-    case '$'                 => "\\$"
-    case '\n'                => "\\n"
-    case c if isPrintable(c) => c.toChar.toString
-    case c if c < 0x80       => s"\\x${hex(c, 2)}"
-    case c                   => s"\\u{${hex(c, 1)}}"
-
-  private def phpByte(c: Int): String =
-    if isPrintable(c) || c == '\n' then phpChar(c) else s"\\x${hex(c, 2)}"
