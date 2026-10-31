@@ -54,6 +54,16 @@ class ReDoSSuite extends munit.FunSuite:
       Diagnostics.Unknown("^foo$", "", Diagnostics.ErrorKind.Timeout, None)
     )
 
+  test("ReDoS.check: a quantifier is checked by its meaning, not by how it is written"):
+    def result(source: String): Option[(AttackComplexity, AttackPattern)] =
+      ReDoS.check(source, "") match
+        case d: Diagnostics.Vulnerable => Some((d.complexity, d.attack))
+        case _                         => None
+    for (written, normal) <- Seq("^(?:a|a){1,}$" -> "^(?:a|a)+$", "^(?:a|a){0,1}(?:b|b)*$" -> "^(?:a|a)?(?:b|b)*$")
+    do
+      assert(result(normal).isDefined, normal)
+      assertEquals(result(written), result(normal), written)
+
   test("ReDoS.checkAll"):
     assertEquals(ReDoS.checkAll("^foo$", ""), List(ReDoS.check("^foo$", "")))
     assertEquals(

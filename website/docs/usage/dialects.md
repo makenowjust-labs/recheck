@@ -59,7 +59,7 @@ For JavaScript, it includes the ES2025 features: the `v` flag, the modifiers `(?
 For Python, it includes atomic groups and possessive quantifiers (Python 3.11 or later).
 
 Some constructs are recognized, but the checkers do not handle them.
-A pattern having one of them is reported as `unknown` with an `unsupported` error naming the construct (e.g. `(a)?(?(1)b|c)` gives `unsupported syntax (Conditional): (?(1)b|c) at 4`).
+A pattern having one of them is reported as `unknown` with an `unsupported` error naming the construct (e.g. `(a)?(?(1)b|c)` gives `unsupported syntax (Conditional) at 4`).
 
 - Recursion and subroutine calls (e.g. `(?R)`, `(?1)`, `(?&name)`, `\g<name>`).
 - Conditionals (e.g. `(?(1)a|b)`).
@@ -130,6 +130,8 @@ There are other deliberate approximations.
 - The Unicode data (properties, case mappings) is of Unicode 18.0, while the engines use Unicode 16 or 17.
 - For JavaScript's `v` flag, `recheck` follows the specification.
 - Look-arounds, back-references, atomic groups and possessive quantifiers are handled by the fuzz checker, not by the automaton checker.
+- A back-reference sees the captures as the engine keeps them over the iterations of a loop: JavaScript resets them on each iteration, and Perl unsets the captures of a failed alternative and of a fixed-length repetition matching nothing (e.g. `^(?:(a)?b){2}\1$` does not match `abba` in Perl).
+  Two behaviors are not reproduced: Java does not restore the captures in a repeated group without branches (e.g. `(?:(b)c)*`) when the repetition backtracks, even at a later starting position, and the engines differ on an iteration matching the empty string.
 
 ## Recall Validation
 

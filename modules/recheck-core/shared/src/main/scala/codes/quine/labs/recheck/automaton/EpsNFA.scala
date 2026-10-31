@@ -9,9 +9,11 @@ import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.regexp.EcmaScriptChars
 import codes.quine.labs.recheck.regexp.Location
 import codes.quine.labs.recheck.regexp.PatternAlphabet
+import codes.quine.labs.recheck.regexp.PatternAlphabet.CRFollow
 import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
 import codes.quine.labs.recheck.util.GraphvizUtil.escape
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 
 /** EpsNFA is an ordered ε-NFA on unicode code points. */
 final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q, accept: Q, tau: Map[Q, Transition[Q]]):
@@ -58,14 +60,19 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
   /** Converts this ε-NFA to ordered NFA with ε-elimination. */
   def toOrderedNFA(maxNFASize: Int)(using ctx: Context): OrderedNFA[CharSet, (CharKind, Seq[(Q, Set[CharKind])])] =
     ctx.interrupt:
-      val hasLineAssertion = tau.values
-        .collect:
-          case Assert(k, _) => k
-        .exists(k => k == AssertKind.LineBegin || k == AssertKind.LineEnd)
-      val inputTerminatorKind = if hasLineAssertion then CharKind.LineTerminator else CharKind.Normal
+      val kinds = tau.values.collect { case Assert(k, _) => k }.toSet
+      val guesses = Guesses.of(kinds)
+      val baseKinds = alphabet.pairs.iterator.map(_._2).toSet
+
+      // The begin and the end of the input are distinguished only for the assertions looking at them, and they are
+      // line terminators if the assertions see no difference, which keeps the automaton smaller.
+      val inputTerminatorKind =
+        if !guesses.any && !kinds.exists(_.seesBoundary) then CharKind.Normal
+        else if !guesses.any && kinds.forall(_.treatsBoundaryAsLineTerminator(baseKinds)) then CharKind.LineTerminator
+        else CharKind.Boundary
 
       // Obtains a set of possible character kinds.
-      val charKindSet = alphabet.pairs.iterator.map(_._2).toSet ++ Set(inputTerminatorKind)
+      val charKindSet = baseKinds.flatMap(guesses.variants) ++ Set(inputTerminatorKind)
 
       type P = (Q, Set[CharKind])
 
@@ -76,7 +83,7 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
           else
             tau.get(q) match
               case Some(Eps(qs))             => qs.flatMap(buildClosure(k0, ks, _, loops))
-              case Some(Assert(k, q1))       => buildClosure(k0, ks & k.toCharKindSet(k0), q1, loops)
+              case Some(Assert(k, q1))       => buildClosure(k0, ks.filter(k.accepts(k0, _)), q1, loops)
               case Some(LoopEnter(loop, q1)) =>
                 if loops.contains(loop) then Vector.empty // An ε-loop is detected.
                 else buildClosure(k0, ks, q1, loops ++ Set(loop))
@@ -84,8 +91,7 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
                 if loops.contains(loop) then Vector.empty // An ε-loop is detected.
                 else buildClosure(k0, ks, q1, loops)
               case Some(Consume(chs, q1, pos)) =>
-                val newChs = chs.filter:
-                  case (_, k) => ks.contains(k)
+                val newChs = chs.flatMap((ch, k) => guesses.variants(k).filter(ks.contains).map((ch, _)))
                 if newChs.nonEmpty then Vector(((q, ks), Some(Consume(newChs, q1, pos))))
                 else Vector.empty
               case None =>
@@ -93,7 +99,7 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
                 else Vector.empty
       val closureCache = mutable.Map.empty[(CharKind, Q), Seq[(P, Option[Consume[Q]])]]
       def closure(k0: CharKind, q: Q): Seq[(P, Option[Consume[Q]])] =
-        closureCache.getOrElseUpdate((k0, q), buildClosure(k0, charKindSet, q, Set.empty))
+        closureCache.getOrElseUpdate((k0, q), buildClosure(k0, charKindSet.filter(guesses.valid(k0, _)), q, Set.empty))
 
       val closureInit = closure(inputTerminatorKind, init)
 
@@ -170,33 +176,165 @@ object EpsNFA:
   /** LoopExit is an ε-NFA transition with consuming no character and marking a exiting of the loop. */
   final case class LoopExit[Q](loop: Int, to: Q) extends Transition[Q]
 
+  /** Guesses is which guesses on the context the character kinds make (see [[CharKind]]).
+    *
+    * A guess makes a character have more than one kind, and the next (or the previous) kind checks it, so that only the
+    * right one survives.
+    *
+    * @param last
+    *   whether a line terminator, `\r` or `\n` is the last character (for [[AssertKind.ChompEnd]])
+    * @param afterCR
+    *   whether `\r` precedes `\n` (for [[AssertKind.LineBeginOf]] after `\r\n`)
+    * @param follow
+    *   what follows `\r` (for [[AssertKind.LineEndOf]] before `\r\n` and [[AssertKind.ChompEnd]] before the final
+    *   `\r\n`)
+    */
+  final case class Guesses(last: Boolean, afterCR: Boolean, follow: Boolean):
+
+    /** Whether any guess is made. */
+    def any: Boolean = last || afterCR || follow
+
+    /** Returns the kinds of the guesses on a character of the kind. */
+    def variants(k: CharKind): Seq[CharKind] =
+      if !any then Seq(k)
+      else
+        val lasts = if last && (k.isLineTerminator || k.cr || k.lf) then Seq(Some(false), Some(true)) else Seq(None)
+        val afterCRs = if afterCR && k.lf then Seq(Some(false), Some(true)) else Seq(None)
+        val follows =
+          if follow && k.cr then (Seq(CRFollow.Other, CRFollow.LF) ++ Option.when(last)(CRFollow.FinalLF)).map(Some(_))
+          else Seq(None)
+        for l <- lasts; a <- afterCRs; f <- follows yield k.copy(last = l, afterCR = a, follow = f)
+
+    /** Checks the guesses between the kinds of adjacent characters (or the begin and the end of the input). */
+    def valid(prev: CharKind, next: CharKind): Boolean =
+      val lastOK = prev.last.forall(_ == next.boundary)
+      val afterCROK = next.afterCR.forall(_ == prev.cr)
+      val followOK = prev.follow.forall:
+        case CRFollow.Other   => !next.lf
+        case CRFollow.LF      => next.lf && !next.last.contains(true)
+        case CRFollow.FinalLF => next.lf && next.last.contains(true)
+      lastOK && afterCROK && followOK
+
+  object Guesses:
+
+    /** Returns the guesses that the assertions need. */
+    def of(kinds: Set[AssertKind]): Guesses =
+      val last = kinds.exists(_.isInstanceOf[AssertKind.ChompEnd])
+      val afterCR = kinds.exists:
+        case AssertKind.LineBeginOf(_, _, afterCRLF, _) => afterCRLF
+        case _                                          => false
+      val follow = kinds.exists:
+        case AssertKind.LineEndOf(_, beforeCRLF, _) => beforeCRLF
+        case AssertKind.ChompEnd(_, crlf, _)        => crlf
+        case _                                      => false
+      Guesses(last, afterCR, follow)
+
   /** AssertKind is assertion kind of this ε-NFA transition. */
   sealed abstract class AssertKind extends Serializable with Product:
 
-    /** Returns a set of next possible character information from the previous character information. */
-    def toCharKindSet(prev: CharKind): Set[CharKind]
+    /** Tests the assertion between the kinds of the previous and the next characters. */
+    def accepts(prev: CharKind, next: CharKind): Boolean
+
+    /** Whether the assertion distinguishes the begin and the end of the input from the characters. */
+    def seesBoundary: Boolean = true
+
+    /** Whether the assertion tests the begin and the end of the input as a line terminator among the kinds. */
+    def treatsBoundaryAsLineTerminator(kinds: Iterable[CharKind]): Boolean =
+      val (b, t) = (CharKind.Boundary, CharKind.LineTerminator)
+      (kinds ++ Seq(b, t)).forall(k => accepts(b, k) == accepts(t, k) && accepts(k, b) == accepts(k, t))
+
+    /** Returns a set of next possible basic character kinds from the previous character kind. */
+    def toCharKindSet(prev: CharKind): Set[CharKind] = CharKind.basic.filter(accepts(prev, _)).toSet
 
   /** AssertKind values and utilities. */
   object AssertKind:
 
-    /** LineBegin is `^` assertion. */
+    /** Tests whether the position is between `\r` and `\n`. */
+    private def betweenCRLF(prev: CharKind, next: CharKind): Boolean = prev.cr && next.lf
+
+    /** LineBegin is `^` assertion, which matches after a line terminator of the first set or at the begin. */
     case object LineBegin extends AssertKind:
-      def toCharKindSet(prev: CharKind): Set[CharKind] =
-        if prev == CharKind.LineTerminator then Set(CharKind.Normal, CharKind.LineTerminator, CharKind.Word)
-        else Set.empty
+      def accepts(prev: CharKind, next: CharKind): Boolean = prev.boundary || prev.isLineTerminatorOf(0)
 
-    /** LineEnd is `$` assertion. */
+    /** LineEnd is `$` assertion, which matches before a line terminator of the first set or at the end. */
     case object LineEnd extends AssertKind:
-      def toCharKindSet(prev: CharKind): Set[CharKind] = Set(CharKind.LineTerminator)
+      def accepts(prev: CharKind, next: CharKind): Boolean = next.boundary || next.isLineTerminatorOf(0)
 
-    /** WordBoundary is `\b` assertion. */
+    /** WordBoundary is `\b` assertion of the first word set. */
     case object WordBoundary extends AssertKind:
-      def toCharKindSet(prev: CharKind): Set[CharKind] =
-        if prev == CharKind.Word then Set(CharKind.Normal, CharKind.LineTerminator)
-        else Set(CharKind.Word)
+      def accepts(prev: CharKind, next: CharKind): Boolean = prev.word != next.word
+      override def seesBoundary: Boolean = false
 
-    /** WordBoundaryNot is `\B` assertion. */
+    /** WordBoundaryNot is `\B` assertion of the first word set. */
     case object WordBoundaryNot extends AssertKind:
-      def toCharKindSet(prev: CharKind): Set[CharKind] =
-        if prev == CharKind.Word then Set(CharKind.Word)
-        else Set(CharKind.Normal, CharKind.LineTerminator)
+      def accepts(prev: CharKind, next: CharKind): Boolean = prev.word == next.word
+      override def seesBoundary: Boolean = false
+
+    /** WordBoundaryOf is `\b` assertion of the `set`-th word set. */
+    final case class WordBoundaryOf(set: Int) extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean = prev.isWordOf(set) != next.isWordOf(set)
+      override def seesBoundary: Boolean = false
+
+    /** WordBoundaryNotOf is `\B` assertion of the `set`-th word set. */
+    final case class WordBoundaryNotOf(set: Int) extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean = prev.isWordOf(set) == next.isWordOf(set)
+      override def seesBoundary: Boolean = false
+
+    /** InputBegin is `\A` assertion. */
+    case object InputBegin extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean = prev.boundary
+
+    /** InputEnd is `\z` assertion. */
+    case object InputEnd extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean = next.boundary
+
+    /** LineBeginOf is `^` assertion with the `set`-th line terminator set.
+      *
+      * @param atEnd
+      *   where it matches at the end of the input
+      * @param afterCRLF
+      *   whether it matches after `\r\n` too, where `\n` is not a line terminator by itself (PCRE's `(*CRLF)`)
+      * @param atomic
+      *   whether it does not match between `\r` and `\n` (Java)
+      */
+    final case class LineBeginOf(set: Int, atEnd: IRLineBeginAtEnd, afterCRLF: Boolean, atomic: Boolean)
+        extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean =
+        val afterTerminator = prev.isLineTerminatorOf(set) || (afterCRLF && prev.lf && prev.afterCR.contains(true))
+        (prev.boundary || afterTerminator) && !(atomic && betweenCRLF(prev, next)) &&
+        (!next.boundary || (atEnd match
+          case IRLineBeginAtEnd.AfterTerminator => true
+          case IRLineBeginAtEnd.InputBegin      => prev.boundary
+          case IRLineBeginAtEnd.Never           => false))
+
+    /** LineEndOf is `$` assertion with the `set`-th line terminator set.
+      *
+      * @param beforeCRLF
+      *   whether it matches before `\r\n` too, where `\r` is not a line terminator by itself (PCRE's `(*CRLF)`)
+      * @param atomic
+      *   whether it does not match between `\r` and `\n` (Java)
+      */
+    final case class LineEndOf(set: Int, beforeCRLF: Boolean, atomic: Boolean) extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean =
+        val beforeTerminator =
+          next.isLineTerminatorOf(set) || (beforeCRLF && next.cr && !next.follow.contains(CRFollow.Other))
+        (next.boundary || beforeTerminator) && !(atomic && betweenCRLF(prev, next))
+
+    /** ChompEnd is `\Z` assertion with the `set`-th line terminator set, which matches at the end or before a line
+      * terminator at the end.
+      *
+      * @param crlf
+      *   whether it matches before `\r\n` at the end too
+      * @param atomic
+      *   whether it does not match between `\r` and `\n` (Java)
+      */
+    final case class ChompEnd(set: Int, crlf: Boolean, atomic: Boolean) extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean =
+        val beforeFinal = (next.isLineTerminatorOf(set) && next.last.contains(true)) ||
+          (crlf && next.cr && next.follow.contains(CRFollow.FinalLF))
+        (next.boundary || beforeFinal) && !(atomic && betweenCRLF(prev, next))
+
+    /** NotBetweenCRLF is an assertion that the position is not between `\r` and `\n`. */
+    case object NotBetweenCRLF extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean = !betweenCRLF(prev, next)
+      override def seesBoundary: Boolean = false

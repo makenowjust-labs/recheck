@@ -76,8 +76,7 @@ object StaticSeeder:
               case IRQuantifier.Bounded(min, max, strategy) => (min, max, Some(strategy))
             if k > maxSimpleRepeatSize then
               val s = strategy.getOrElse(BacktrackStrategy.Greedy)
-              // The new repetition has no location, so that it is built as written by `*` or `+`.
-              IRNode(Repeat(loop(n, true, true, inside), IRQuantifier.Unbounded(if min == 0 then 0 else 1, s)))
+              copy(Repeat(loop(n, true, true, inside), IRQuantifier.Unbounded(if min == 0 then 0 else 1, s)))
             else copy(Repeat(loop(n, true, true, inside), q))
           case LookAhead(negative, n) =>
             val c = loop(n, prevIsRepeat, nextIsRepeat, inside)

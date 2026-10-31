@@ -8,9 +8,11 @@ import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.regexp.PatternAlphabet
+import codes.quine.labs.recheck.regexp.PatternAlphabet.CRFollow
 import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 
 class EpsNFASuite extends munit.FunSuite:
 
@@ -33,6 +35,68 @@ class EpsNFASuite extends munit.FunSuite:
     assertEquals(AssertKind.WordBoundaryNot.toCharKindSet(Normal), Set(Normal, LineTerminator))
     assertEquals(AssertKind.WordBoundaryNot.toCharKindSet(LineTerminator), Set(Normal, LineTerminator))
     assertEquals(AssertKind.WordBoundaryNot.toCharKindSet(Word), Set(Word))
+
+  test("EpsNFA.AssertKind#accepts"):
+    import CharKind.*
+    import IRLineBeginAtEnd.*
+    val cr = CharKind(terminators = 1, cr = true)
+    val lf = CharKind(terminators = 1, lf = true)
+    // Ruby's `^` does not match at the end after a line terminator, but does at the begin.
+    val ruby = AssertKind.LineBeginOf(0, InputBegin, false, false)
+    assert(ruby.accepts(LineTerminator, Normal) && !ruby.accepts(LineTerminator, Boundary))
+    assert(ruby.accepts(Boundary, Boundary) && !ruby.accepts(Normal, Normal))
+    // Java's `^` never matches at the end, nor between `\r` and `\n`.
+    val java = AssertKind.LineBeginOf(0, Never, false, true)
+    assert(!java.accepts(Boundary, Boundary) && java.accepts(Boundary, Normal))
+    assert(!java.accepts(cr, lf) && java.accepts(lf, cr) && java.accepts(cr, Normal))
+    // PCRE's `(*CRLF)` has only `\r\n`, which the kinds guess around.
+    val crlfBegin = AssertKind.LineBeginOf(0, InputBegin, true, false)
+    assert(crlfBegin.accepts(CharKind(lf = true, afterCR = Some(true)), Normal))
+    assert(!crlfBegin.accepts(CharKind(lf = true, afterCR = Some(false)), Normal))
+    val crlfEnd = AssertKind.LineEndOf(0, true, false)
+    assert(crlfEnd.accepts(Normal, CharKind(cr = true, follow = Some(CRFollow.LF))))
+    assert(!crlfEnd.accepts(Normal, CharKind(cr = true, follow = Some(CRFollow.Other))))
+    assert(!AssertKind.LineEndOf(1, false, false).accepts(Normal, LineTerminator))
+    assert(AssertKind.LineEndOf(1, false, false).accepts(Normal, CharKind(terminators = 2)))
+    // `\Z` matches before a final line terminator, which the kinds guess.
+    val chomp = AssertKind.ChompEnd(0, true, true)
+    assert(chomp.accepts(Normal, Boundary) && chomp.accepts(Normal, CharKind(terminators = 1, last = Some(true))))
+    assert(!chomp.accepts(Normal, CharKind(terminators = 1, last = Some(false))))
+    assert(chomp.accepts(Normal, cr.copy(follow = Some(CRFollow.FinalLF))))
+    assert(!chomp.accepts(cr, lf.copy(last = Some(true))))
+    assert(AssertKind.InputBegin.accepts(Boundary, Normal) && !AssertKind.InputBegin.accepts(LineTerminator, Normal))
+    assert(AssertKind.InputEnd.accepts(Normal, Boundary) && !AssertKind.InputEnd.accepts(Normal, LineTerminator))
+    assert(!AssertKind.NotBetweenCRLF.accepts(cr, lf) && AssertKind.NotBetweenCRLF.accepts(lf, cr))
+    // A word boundary of a word set other than the first.
+    assert(AssertKind.WordBoundaryOf(1).accepts(CharKind(words = 2), Word))
+    assert(!AssertKind.WordBoundaryOf(1).accepts(Word, Normal))
+    assert(AssertKind.WordBoundaryNotOf(1).accepts(Word, Normal))
+
+  test("EpsNFA.AssertKind#treatsBoundaryAsLineTerminator"):
+    val kinds = CharKind.basic
+    assert(AssertKind.LineBegin.treatsBoundaryAsLineTerminator(kinds))
+    assert(AssertKind.LineEnd.treatsBoundaryAsLineTerminator(kinds))
+    assert(AssertKind.WordBoundary.treatsBoundaryAsLineTerminator(kinds))
+    assert(!AssertKind.LineBeginOf(0, IRLineBeginAtEnd.InputBegin, false, false).treatsBoundaryAsLineTerminator(kinds))
+    assert(!AssertKind.InputBegin.treatsBoundaryAsLineTerminator(kinds))
+    assert(!AssertKind.InputEnd.treatsBoundaryAsLineTerminator(kinds))
+
+  test("EpsNFA.Guesses"):
+    val guesses = Guesses(last = true, afterCR = true, follow = true)
+    val lf = CharKind(terminators = 1, lf = true)
+    assertEquals(guesses.variants(CharKind.Normal), Seq(CharKind.Normal))
+    assertEquals(guesses.variants(lf).size, 4)
+    assertEquals(guesses.variants(CharKind(cr = true)).size, 6)
+    assert(guesses.valid(lf.copy(last = Some(true)), CharKind.Boundary))
+    assert(!guesses.valid(lf.copy(last = Some(true)), CharKind.Normal))
+    assert(!guesses.valid(lf.copy(last = Some(false)), CharKind.Boundary))
+    assert(guesses.valid(CharKind(cr = true), lf.copy(afterCR = Some(true))))
+    assert(!guesses.valid(CharKind.Normal, lf.copy(afterCR = Some(true))))
+    assert(guesses.valid(CharKind(cr = true, follow = Some(CRFollow.FinalLF)), lf.copy(last = Some(true))))
+    assert(!guesses.valid(CharKind(cr = true, follow = Some(CRFollow.LF)), lf.copy(last = Some(true))))
+    assert(!guesses.valid(CharKind(cr = true, follow = Some(CRFollow.Other)), lf))
+    assertEquals(Guesses.of(Set(AssertKind.LineBegin, AssertKind.LineEnd)).any, false)
+    assertEquals(Guesses.of(Set(AssertKind.ChompEnd(0, true, false))), Guesses(true, false, true))
 
   test("EpsNFA#toGraphviz"):
     val nfa = EpsNFA(
@@ -168,3 +232,7 @@ class EpsNFASuite extends munit.FunSuite:
     )
     interceptMessage[UnsupportedException]("OrderedNFA size is too large"):
       nfa1.toOrderedNFA(maxNFASize = 1)
+    // The begin of the input is distinguished from a line terminator for an assertion seeing the difference.
+    val begin = AssertKind.LineBeginOf(0, IRLineBeginAtEnd.InputBegin, false, false)
+    val nfa3 = nfa1.copy(tau = nfa1.tau.updated(4, Assert(begin, 0)))
+    assertEquals(nfa3.toOrderedNFA.inits.map(_._1), Vector(CharKind.Boundary))

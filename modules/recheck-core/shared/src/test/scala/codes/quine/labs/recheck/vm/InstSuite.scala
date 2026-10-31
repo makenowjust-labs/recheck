@@ -9,6 +9,7 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
+import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminators
 
 class InstSuite extends munit.FunSuite:
@@ -29,6 +30,7 @@ class InstSuite extends munit.FunSuite:
     assertEquals(Inst.Cmp(CounterReg(0), 1, Label("x", 2), Label("y", 3)).toString, "cmp %0 1 #x@2 #y@3")
     assertEquals(Inst.Rollback.toString, "rollback")
     assertEquals(Inst.Commit.toString, "commit")
+    assertEquals(Inst.Fail.toString, "fail")
     assertEquals(Inst.Tx(Label("x", 0), None, None).toString, "tx #x@0 FAIL FAIL")
     assertEquals(Inst.Tx(Label("x", 0), Some(Label("y", 1)), None).toString, "tx #x@0 #y@1 FAIL")
     assertEquals(Inst.Tx(Label("x", 0), None, Some(Label("y", 1))).toString, "tx #x@0 FAIL #y@1")
@@ -44,6 +46,8 @@ class InstSuite extends munit.FunSuite:
     assertEquals(Inst.CapBegin(0).toString, "cap_begin 0")
     assertEquals(Inst.CapEnd(0).toString, "cap_end 0")
     assertEquals(Inst.CapReset(0, 1).toString, "cap_reset 0 1")
+    assertEquals(Inst.CapKeep(None).toString, "cap_keep")
+    assertEquals(Inst.CapKeep(Some((1, 2))).toString, "cap_keep 1 2")
 
   test("Inst.Terminator#successors"):
     assertEquals(Inst.Ok.successors, Set.empty[Label])
@@ -60,6 +64,7 @@ class InstSuite extends munit.FunSuite:
     assertEquals(Inst.Cmp(CounterReg(0), 1, Label("x", 2), Label("y", 3)).successors, Set(Label("x", 2), Label("y", 3)))
     assertEquals(Inst.Rollback.successors, Set.empty[Label])
     assertEquals(Inst.Commit.successors, Set.empty[Label])
+    assertEquals(Inst.Fail.successors, Set.empty[Label])
     assertEquals(Inst.Tx(Label("x", 0), None, None).successors, Set(Label("x", 0)))
     assertEquals(Inst.Tx(Label("x", 0), Some(Label("y", 1)), None).successors, Set(Label("x", 0), Label("y", 1)))
     assertEquals(Inst.Tx(Label("x", 0), None, Some(Label("y", 1))).successors, Set(Label("x", 0), Label("y", 1)))
@@ -67,7 +72,10 @@ class InstSuite extends munit.FunSuite:
   test("Inst.AssertKind#toString"):
     assertEquals(AssertKind.WordBoundary(Word).toString, "word_boundary")
     assertEquals(AssertKind.WordBoundaryNot(Word).toString, "word_boundary_not")
-    assertEquals(AssertKind.LineBegin(IRLineTerminators.JavaScript, true).toString, "line_begin")
+    assertEquals(
+      AssertKind.LineBegin(IRLineTerminators.JavaScript, IRLineBeginAtEnd.AfterTerminator).toString,
+      "line_begin"
+    )
     assertEquals(AssertKind.LineEnd(IRLineTerminators.JavaScript).toString, "line_end")
     assertEquals(AssertKind.InputBegin.toString, "input_begin")
     assertEquals(AssertKind.InputEnd.toString, "input_end")

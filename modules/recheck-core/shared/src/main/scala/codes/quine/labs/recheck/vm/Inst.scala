@@ -7,6 +7,7 @@ import codes.quine.labs.recheck.regexp.Location
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
+import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminators
 
 /** Inst is an instruction. */
@@ -61,6 +62,11 @@ object Inst:
   final case class Cmp(reg: CounterReg, n: Int, lt: Label, ge: Label) extends Terminator:
     def successors: Set[Label] = Set(lt, ge)
     override def toString: String = s"cmp $reg $n $lt $ge"
+
+  /** `fail`: Fails a matching, which backtracks. */
+  case object Fail extends Terminator:
+    def successors: Set[Label] = Set.empty
+    override def toString: String = "fail"
 
   /** `rollback`: Terminates a matching with a rollback. */
   case object Rollback extends Terminator:
@@ -133,6 +139,16 @@ object Inst:
   final case class CapEnd(index: Int) extends NonTerminator:
     override def toString: String = s"cap_end $index"
 
+  /** `cap_keep`: Takes the captures of the last failed matching, as Perl does not restore them on backtracking.
+    *
+    * The captures between `from` and `to` of `restore` keep their values, and the captures above the last closed index
+    * of the current matching are unset.
+    */
+  final case class CapKeep(restore: Option[(Int, Int)]) extends NonTerminator:
+    override def toString: String = restore match
+      case Some((from, to)) => s"cap_keep $from $to"
+      case None             => "cap_keep"
+
   /** `cap-reset`: Resets captures between `from` and `to`. */
   final case class CapReset(from: Int, to: Int) extends NonTerminator:
     override def toString: String = s"cap_reset $from $to"
@@ -152,10 +168,10 @@ object Inst:
 
     /** `^` assertion with `m` flag.
       *
-      * @param matchesAfterFinalTerminator
-      *   whether it matches after a line terminator at the end of the input
+      * @param atEnd
+      *   where it matches at the end of the input
       */
-    final case class LineBegin(terminators: IRLineTerminators, matchesAfterFinalTerminator: Boolean) extends AssertKind:
+    final case class LineBegin(terminators: IRLineTerminators, atEnd: IRLineBeginAtEnd) extends AssertKind:
       override def toString: String = "line_begin"
 
     /** `$` assertion with `m` flag. */

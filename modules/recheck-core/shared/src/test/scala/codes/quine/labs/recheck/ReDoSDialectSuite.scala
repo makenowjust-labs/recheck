@@ -34,8 +34,13 @@ class ReDoSDialectSuite extends munit.FunSuite:
     // Java 25 and Ruby 4.0 (memoization) are fast on these patterns.
     assertVulnerable(check("^(?:a|a)*$", Java), AttackComplexity.Exponential(false), Checker.Automaton)
     assertVulnerable(check("\\A(?:a|a)*\\z", Ruby), AttackComplexity.Exponential(false), Checker.Automaton)
-    // Ruby's `^` and `$` are line assertions.
+    // Ruby's `^` and `$` are line assertions, which the automaton handles with text assertions together.
     assertVulnerable(check("^(a|a)*$", Ruby), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(check("\\A(?:a|a)*$", Ruby), AttackComplexity.Exponential(false), Checker.Automaton)
+    // `$` in the middle, different line terminators and different word sets are also of the automaton.
+    assertVulnerable(check("^(?:a|a)*$\\n", Python), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(check("(?m)^(?:a|a)*(?d:$)", Java), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(check("\\b(?:a|a)*(?a:\\b)", Python), AttackComplexity.Exponential(false), Checker.Automaton)
     // PCRE without `u` reads bytes; PCRE2 10.49 without JIT doubles its time for each `é`.
     assertVulnerable(check("^(?:é|é)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
     assertVulnerable(check("^(?:é|é)*$", PCRE, "u"), AttackComplexity.Exponential(false), Checker.Automaton)
@@ -59,7 +64,7 @@ class ReDoSDialectSuite extends munit.FunSuite:
       Diagnostics.Unknown(
         "^(a|a)*(?R)?$",
         "",
-        Diagnostics.ErrorKind.Unsupported("unsupported syntax (RCall): (?R) at 7"),
+        Diagnostics.ErrorKind.Unsupported("unsupported syntax (RCall) at 7"),
         Some(Checker.Fuzz)
       )
     )

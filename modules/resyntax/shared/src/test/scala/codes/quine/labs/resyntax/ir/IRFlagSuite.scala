@@ -2,6 +2,7 @@ package codes.quine.labs.resyntax.ir
 
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ir.IRAssertKind.*
+import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd.*
 import codes.quine.labs.resyntax.ir.IRLineTerminators as LT
 import codes.quine.labs.resyntax.ir.IRNodeData.Assert
 import codes.quine.labs.resyntax.ir.IRNodeData.Empty
@@ -10,12 +11,13 @@ import codes.quine.labs.resyntax.ir.IRNodeData.Sequence
 /** IRFlagSuite is tests of flag interpretation and scoping, where the comments show the engines' behavior. */
 class IRFlagSuite extends IRSuiteBase:
   // `\n^` with `m` matches `a\n` in .NET, JavaScript and Python, but not in Java, Perl, PCRE and Ruby.
-  check("^", "m", DotNet, Python)(Assert(LineBegin(LT.LF, true)))
-  check("^", "m", JavaScript)(Assert(LineBegin(LT.JavaScript, true)))
-  check("^", "m", Java)(Assert(LineBegin(LT.Java, false)))
-  check("^", "m", PCRE, Perl)(Assert(LineBegin(LT.LF, false)))
-  check("^", "", Ruby)(Assert(LineBegin(LT.LF, false)))
-  check("^", "m", Ruby)(Assert(LineBegin(LT.LF, false)))
+  // `^` with `m` matches the empty string except in Java.
+  check("^", "m", DotNet, Python)(Assert(LineBegin(LT.LF, AfterTerminator)))
+  check("^", "m", JavaScript)(Assert(LineBegin(LT.JavaScript, AfterTerminator)))
+  check("^", "m", Java)(Assert(LineBegin(LT.Java, Never)))
+  check("^", "m", PCRE, Perl)(Assert(LineBegin(LT.LF, InputBegin)))
+  check("^", "", Ruby)(Assert(LineBegin(LT.LF, InputBegin)))
+  check("^", "m", Ruby)(Assert(LineBegin(LT.LF, InputBegin)))
 
   // `a$` matches `a\n` except in JavaScript; Java also before `\r\n`, `\r`, `\u0085` and ` ` at the end.
   check("$", "", JavaScript)(Assert(TextEnd))
@@ -36,7 +38,7 @@ class IRFlagSuite extends IRSuiteBase:
   // Java's `d` (UNIX_LINES): `(?d)a$` does not match `a\r`.
   check("$", "d", Java)(Assert(ChompTextEnd(LT.LF)))
   check("(?d)^(?-d)^", "m", Java)(
-    Sequence(Empty, Assert(LineBegin(LT.LF, false)), Empty, Assert(LineBegin(LT.Java, false)))
+    Sequence(Empty, Assert(LineBegin(LT.LF, Never)), Empty, Assert(LineBegin(LT.Java, Never)))
   )
 
   // PCRE's newline options, where the last one wins: `(*LF)(*CR)a$` matches `a\r`.
@@ -45,7 +47,7 @@ class IRFlagSuite extends IRSuiteBase:
   // `(*CRLF)a$` matches `a\r\n`, but neither `a\n` nor `a\r`.
   check("(*CRLF)$", "", PCRE)(Sequence(Empty, Assert(ChompTextEnd(LT.PCRECRLF))))
   // `(*ANYCRLF)(?m)\r^` matches between `\r` and `\n`, so `\r\n` is not atomic.
-  check("(*ANYCRLF)^", "m", PCRE)(Sequence(Empty, Assert(LineBegin(LT.PCREAnyCRLF, false))))
+  check("(*ANYCRLF)^", "m", PCRE)(Sequence(Empty, Assert(LineBegin(LT.PCREAnyCRLF, InputBegin))))
   check("(*ANY)$", "m", PCRE)(Sequence(Empty, Assert(LineEnd(LT.PCREAny))))
   check("(*NUL)$", "", PCRE)(Sequence(Empty, Assert(ChompTextEnd(LT.NUL))))
   check("(*LF)(*CR)$", "", PCRE)(Sequence(Empty, Empty, Assert(ChompTextEnd(LT.CR))))
@@ -53,26 +55,26 @@ class IRFlagSuite extends IRSuiteBase:
   // Inline flags apply to the rest of the enclosing group, including the following alternatives.
   checkWith("(?m:^)^", "", All*)(d =>
     val begin = d match
-      case JavaScript         => LineBegin(LT.JavaScript, true)
-      case DotNet | Python    => LineBegin(LT.LF, true)
-      case Java               => LineBegin(LT.Java, false)
-      case PCRE | Perl | Ruby => LineBegin(LT.LF, false)
+      case JavaScript         => LineBegin(LT.JavaScript, AfterTerminator)
+      case DotNet | Python    => LineBegin(LT.LF, AfterTerminator)
+      case Java               => LineBegin(LT.Java, Never)
+      case PCRE | Perl | Ruby => LineBegin(LT.LF, InputBegin)
     Sequence(Assert(begin), Assert(if d == Ruby then begin else TextBegin))
   )
   // `(?:(?m))^a` does not match `b\na`, but `(?:(?m)x|^)a` matches it.
   check("(?:(?m))^", "", DotNet, PCRE, Perl)(Sequence(Empty, Assert(TextBegin)))
   checkWith("(?:(?m)|^)", "", DotNet, Java, PCRE, Perl)(d =>
     val begin = d match
-      case DotNet => LineBegin(LT.LF, true)
-      case Java   => LineBegin(LT.Java, false)
-      case _      => LineBegin(LT.LF, false)
+      case DotNet => LineBegin(LT.LF, AfterTerminator)
+      case Java   => LineBegin(LT.Java, Never)
+      case _      => LineBegin(LT.LF, InputBegin)
     IRNodeData.Disjunction(Empty, Assert(begin))
   )
   check("(?-m:^)", "m", DotNet, PCRE, Perl)(Assert(TextBegin))
-  check("(?-m:^)", "m", Ruby)(Assert(LineBegin(LT.LF, false)))
-  check("(?^m:^)", "", PCRE, Perl)(Assert(LineBegin(LT.LF, false)))
+  check("(?-m:^)", "m", Ruby)(Assert(LineBegin(LT.LF, InputBegin)))
+  check("(?^m:^)", "", PCRE, Perl)(Assert(LineBegin(LT.LF, InputBegin)))
   check("(?^:^)", "m", PCRE, Perl)(Assert(TextBegin))
-  check("(?m)^", "", Python)(Sequence(Empty, Assert(LineBegin(LT.LF, true))))
+  check("(?m)^", "", Python)(Sequence(Empty, Assert(LineBegin(LT.LF, AfterTerminator))))
 
   // The flags of character-level nodes.
   checkFlags("a(?i)b(?-i)c", "", DotNet, Java, PCRE, Perl)(d => Seq(flagsOf(d), flagsOf(d, "i"), flagsOf(d)))

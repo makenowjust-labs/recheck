@@ -15,6 +15,7 @@ import codes.quine.labs.recheck.regexp.PatternExtensions.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRAssertKind
+import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminators
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
@@ -79,8 +80,6 @@ private class EpsNFABuilder(
 
   /** Builds EpsNFA for the pattern. */
   def build(): EpsNFA[Int] =
-    checkAssertions()
-
     val (i0, a0) = buildNode(pattern.node)
 
     val init = if pattern.needsSigmaStarAtBegin then
@@ -110,44 +109,6 @@ private class EpsNFABuilder(
     else a0
 
     EpsNFA(alphabet, stateSet(), init, accept, tau.result())
-
-  /** Checks that the assertions of the pattern fit the character kinds of the ε-NFA.
-    *
-    * The ε-NFA has one set of line terminators and one set of word characters, and the end of the input is a line
-    * terminator if there is a line assertion. Two simplifications are made, which only make more inputs accepted: `^`
-    * matching after a line terminator at the end, and `\r\n` being two line terminators for line assertions.
-    */
-  private def checkAssertions(): Unit =
-    val kinds = pattern.node.collect { case IRNodeData.Assert(kind) => kind }
-    val terminators = kinds.collect {
-      case IRAssertKind.LineBegin(t, _) => t
-      case IRAssertKind.LineEnd(t)      => t
-    }.distinct
-    if terminators.size >= 2 then throw new UnsupportedException("line assertions with different line terminators")
-    for t <- terminators do
-      if t.crlf == IRLineTerminators.CRLF.Sequence && !(t.chars.contains(0x0a) && t.chars.contains(0x0d)) then
-        throw new UnsupportedException("line assertion with the CRLF line terminator")
-      if kinds.exists(k => k == IRAssertKind.TextBegin || k == IRAssertKind.TextEnd) ||
-        kinds.exists(_.isInstanceOf[IRAssertKind.ChompTextEnd])
-      then throw new UnsupportedException("line assertions with text assertions")
-    val words = pattern.wordSets
-    if words.size >= 2 then throw new UnsupportedException("word boundary assertions with different word characters")
-    for w <- words; t <- terminators if t.chars.exists(w.contains) do
-      throw new UnsupportedException("word boundary assertion with line terminator word characters")
-    if existsChompTextEndInMiddle then throw new UnsupportedException("end assertion in the middle")
-
-  /** Tests whether a text end assertion before a final line terminator (e.g. Python's `$`) is not at an end point. */
-  private def existsChompTextEndInMiddle: Boolean =
-    def loop(isEnd: Boolean, node: IRNode): Boolean = ctx.interrupt:
-      node.data match
-        case IRNodeData.Disjunction(ns) => ns.exists(loop(isEnd, _))
-        case IRNodeData.Sequence(ns)    =>
-          ns.zipWithIndex.exists((n, i) => loop(isEnd && i == ns.size - 1, n))
-        case IRNodeData.Capture(_, _, n)                     => loop(isEnd, n)
-        case IRNodeData.Atomic(n)                            => loop(isEnd, n)
-        case IRNodeData.Assert(_: IRAssertKind.ChompTextEnd) => !isEnd
-        case _                                               => node.children.exists(loop(false, _))
-    loop(true, pattern.node)
 
   /** Returns the pairs of the set. */
   private def refine(set: CharSet): Set[(CharSet, CharKind)] =
@@ -190,15 +151,10 @@ private class EpsNFABuilder(
       case IRNodeData.Sequence(ns)     => buildSequence(ns.map(n => () => buildNode(n)))
       case IRNodeData.Empty            => buildSequence(Seq.empty)
       case IRNodeData.Capture(_, _, n) => buildNode(n)
-      case IRNodeData.Repeat(n, q)     => buildRepeat(node, n, q)
-      case IRNodeData.Assert(kind)     => buildAssert(kind)
-      case IRNodeData.Chars(set)       =>
-        val chs =
-          // A negated class is refined as its positive set, as it is written.
-          if pattern.isNegatedClass(node) then alphabet.any.diff(refine(set.complement(pattern.ir.mode)))
-          else refine(set)
-        consume(chs, Location.from(node.loc))
-      case IRNodeData.Strings(set) =>
+      case IRNodeData.Repeat(n, q)     => buildRepeat(n, q)
+      case IRNodeData.Assert(kind)     => buildAssert(node, kind)
+      case IRNodeData.Chars(set)       => consume(refine(set), Location.from(node.loc))
+      case IRNodeData.Strings(set)     =>
         val loc = Location.from(node.loc)
         // The strings are tried from the longest, and then the characters.
         val strings = set.strings.toSeq
@@ -210,91 +166,124 @@ private class EpsNFABuilder(
       case IRNodeData.LookAhead(_, _)     => throw new UnsupportedException("look-ahead assertion")
       case IRNodeData.LookBehind(_, _)    => throw new UnsupportedException("look-behind assertion")
       case IRNodeData.Atomic(_)           => throw new UnsupportedException("atomic group")
-      case IRNodeData.BackReference(_, _) =>
-        if pattern.text(node).startsWith("\\k") then throw new UnsupportedException("named back-reference")
-        else throw new UnsupportedException("back-reference")
-      case IRNodeData.Unsupported(_) => throw new UnsupportedException(pattern.unsupportedMessage(node))
+      case IRNodeData.BackReference(_, _) => throw new UnsupportedException("back-reference")
+      case IRNodeData.Unsupported(_)      => throw new UnsupportedException(pattern.unsupportedMessage(node))
 
-  /** Builds EpsNFA transitions for a repetition. */
-  private def buildRepeat(node: IRNode, n: IRNode, q: IRQuantifier): (Int, Int) =
-    def repeat(quantifier: IRQuantifier): IRNode = IRNode(IRNodeData.Repeat(n, quantifier))
+  /** Builds EpsNFA transitions for a repetition.
+    *
+    * `x{n,}` is built as `n - 1` copies of `x` and `x+`, and `x{n,m}` as `n` copies of `x` and nested `(x(x)?)?`.
+    */
+  private def buildRepeat(n: IRNode, q: IRQuantifier): (Int, Int) =
     q match
-      case IRQuantifier.Unbounded(0, strategy) =>
-        //      +---------------------+
-        //      |                     |
-        //  (i)-+->(i2)->[i0-->a0]-+  +->(a1)->(a)
-        //   ^                     |
-        //   +---------------------+
-        val (i0, a0) = buildNode(n)
-        val loop = nextLoop()
-        val i = nextQ()
-        val i2 = nextQ()
-        val a1 = nextQ()
-        val a = nextQ()
-        val t = if strategy == BacktrackStrategy.Lazy then Vector(a1, i2) else Vector(i2, a1)
-        emit(i -> Eps(t))
-        emit(i2 -> LoopEnter(loop, i0))
-        emit(a0 -> Eps(Vector(i)))
-        emit(a1 -> LoopExit(loop, a))
-        (i, a)
-      case IRQuantifier.Unbounded(1, strategy) if !pattern.isBraceRepeat(node) =>
-        val (i, a0) = buildNode(n)
-        // +----(i1)---+
-        // |           |
-        // +->[i-->a0]-+->(a1)->(a)
-        val loop = nextLoop()
-        val i1 = nextQ()
-        val a1 = nextQ()
-        val a = nextQ()
-        val t = if strategy == BacktrackStrategy.Lazy then Vector(a1, i1) else Vector(i1, a1)
-        emit(a0 -> Eps(t))
-        emit(i1 -> LoopEnter(loop, i))
-        emit(a1 -> LoopExit(loop, a))
-        (i, a)
-      case IRQuantifier.Bounded(0, 1, strategy) =>
-        val (i0, a) = buildNode(n)
-        //     +--------+
-        //     |        v
-        // (i)-+->[i0-->a]
-        val i = nextQ()
-        val t = if strategy == BacktrackStrategy.Lazy then Vector(a, i0) else Vector(i0, a)
-        emit(i -> Eps(t))
-        (i, a)
+      case IRQuantifier.Unbounded(0, strategy)   => buildStar(n, strategy)
+      case IRQuantifier.Unbounded(min, strategy) =>
+        buildSequence(Vector.fill(min - 1)(() => buildNode(n)) :+ (() => buildPlus(n, strategy)))
       case IRQuantifier.Exact(m) =>
         buildSequence(Vector.fill(m)(() => buildNode(n)))
-      case IRQuantifier.Unbounded(min, strategy) =>
-        val star = repeat(IRQuantifier.Unbounded(0, strategy))
-        buildSequence(Vector.fill(min)(() => buildNode(n)) :+ (() => buildNode(star)))
       case IRQuantifier.Bounded(min, max, strategy) =>
         def question(n: IRNode): IRNode = IRNode(IRNodeData.Repeat(n, IRQuantifier.Bounded(0, 1, strategy)))
-        val maxN = question(
+        val maxN = Option.when(max > min):
           Vector
             .fill(max - min)(n)
             .reduceRight((l, r) => IRNode(IRNodeData.Sequence(Vector(l, question(r)))))
-        )
-        buildSequence(Vector.fill(min)(() => buildNode(n)) :+ (() => buildNode(maxN)))
+        buildSequence(Vector.fill(min)(() => buildNode(n)) ++ maxN.map(m => () => buildQuestion(m, strategy)))
+
+  /** Builds EpsNFA transitions for `x*`. */
+  private def buildStar(n: IRNode, strategy: BacktrackStrategy): (Int, Int) =
+    //      +---------------------+
+    //      |                     |
+    //  (i)-+->(i2)->[i0-->a0]-+  +->(a1)->(a)
+    //   ^                     |
+    //   +---------------------+
+    val (i0, a0) = buildNode(n)
+    val loop = nextLoop()
+    val i = nextQ()
+    val i2 = nextQ()
+    val a1 = nextQ()
+    val a = nextQ()
+    val t = if strategy == BacktrackStrategy.Lazy then Vector(a1, i2) else Vector(i2, a1)
+    emit(i -> Eps(t))
+    emit(i2 -> LoopEnter(loop, i0))
+    emit(a0 -> Eps(Vector(i)))
+    emit(a1 -> LoopExit(loop, a))
+    (i, a)
+
+  /** Builds EpsNFA transitions for `x+`. */
+  private def buildPlus(n: IRNode, strategy: BacktrackStrategy): (Int, Int) =
+    // +----(i1)---+
+    // |           |
+    // +->[i-->a0]-+->(a1)->(a)
+    val (i, a0) = buildNode(n)
+    val loop = nextLoop()
+    val i1 = nextQ()
+    val a1 = nextQ()
+    val a = nextQ()
+    val t = if strategy == BacktrackStrategy.Lazy then Vector(a1, i1) else Vector(i1, a1)
+    emit(a0 -> Eps(t))
+    emit(i1 -> LoopEnter(loop, i))
+    emit(a1 -> LoopExit(loop, a))
+    (i, a)
+
+  /** Builds EpsNFA transitions for `x?`. */
+  private def buildQuestion(n: IRNode, strategy: BacktrackStrategy): (Int, Int) =
+    //     +--------+
+    //     |        v
+    // (i)-+->[i0-->a]
+    val (i0, a) = buildNode(n)
+    val i = nextQ()
+    val t = if strategy == BacktrackStrategy.Lazy then Vector(a, i0) else Vector(i0, a)
+    emit(i -> Eps(t))
+    (i, a)
+
+  /** The line terminator sets that the character kinds tell, in the order of the bits. */
+  private val kindLineTerminators = pattern.kindLineTerminators
+
+  /** The word sets that the character kinds tell, in the order of the bits. */
+  private val wordSets = pattern.wordSets
+
+  /** The text end assertions before a final line terminator that are not at an end point. */
+  private val chompTextEndsInMiddle = pattern.chompTextEndsInMiddle.toSet
 
   /** Builds EpsNFA transitions for an assertion. */
-  private def buildAssert(kind: IRAssertKind): (Int, Int) =
+  private def buildAssert(node: IRNode, kind: IRAssertKind): (Int, Int) =
+    def atomic(t: IRLineTerminators): Boolean = t.crlf == IRLineTerminators.CRLF.Atomic
+    def plain(t: IRLineTerminators): Boolean = t.crlf == IRLineTerminators.CRLF.Ignored
+    def boundary(kind: AssertKind): (Int, Int) = if needsInputTerminatorDistinction then assert(kind) else epsilon()
     kind match
-      case IRAssertKind.WordBoundary(_)                       => assert(AssertKind.WordBoundary)
-      case IRAssertKind.NotWordBoundary(_)                    => assert(AssertKind.WordBoundaryNot)
-      case IRAssertKind.TextBegin | _: IRAssertKind.LineBegin =>
-        if needsInputTerminatorDistinction then assert(AssertKind.LineBegin) else epsilon()
-      case IRAssertKind.TextEnd | _: IRAssertKind.LineEnd =>
-        if needsInputTerminatorDistinction then assert(AssertKind.LineEnd) else epsilon()
+      case IRAssertKind.WordBoundary(w) =>
+        val i = wordSets.indexOf(w)
+        assert(if i == 0 then AssertKind.WordBoundary else AssertKind.WordBoundaryOf(i))
+      case IRAssertKind.NotWordBoundary(w) =>
+        val i = wordSets.indexOf(w)
+        assert(if i == 0 then AssertKind.WordBoundaryNot else AssertKind.WordBoundaryNotOf(i))
+      case IRAssertKind.LineBegin(t, atEnd) =>
+        val i = kindLineTerminators.indexOf(t)
+        if i == 0 && plain(t) && atEnd == IRLineBeginAtEnd.AfterTerminator then assert(AssertKind.LineBegin)
+        else assert(AssertKind.LineBeginOf(i, atEnd, !plain(t) && !t.chars(0x0a), atomic(t)))
+      case IRAssertKind.LineEnd(t) =>
+        val i = kindLineTerminators.indexOf(t)
+        if i == 0 && plain(t) then assert(AssertKind.LineEnd)
+        else assert(AssertKind.LineEndOf(i, !plain(t) && !t.chars(0x0d), atomic(t)))
+      case IRAssertKind.TextBegin                                               => boundary(AssertKind.InputBegin)
+      case IRAssertKind.TextEnd                                                 => boundary(AssertKind.InputEnd)
+      case IRAssertKind.ChompTextEnd(t) if chompTextEndsInMiddle.contains(node) =>
+        assert(AssertKind.ChompEnd(kindLineTerminators.indexOf(t), !plain(t), atomic(t)))
       case IRAssertKind.ChompTextEnd(t) =>
         // At an end point, it is the end after an optional line terminator.
         val chars = CharSet.of(t.chars.toSeq*)
         val single = Option.when(chars.nonEmpty)(() => consume(refine(chars), None))
-        val crlf = Option.when(t.crlf != IRLineTerminators.CRLF.Ignored): () =>
+        val crlf = Option.when(!plain(t)): () =>
           buildSequence(
             Seq(() => consume(refine(CharSet.single(0x0d)), None), () => consume(refine(CharSet.single(0x0a)), None))
           )
         val terminator = buildChoice(Seq(() => epsilon()) ++ single ++ crlf)
-        val end = if needsInputTerminatorDistinction then assert(AssertKind.LineEnd) else epsilon()
+        val end = boundary(AssertKind.InputEnd)
         emit(terminator._2 -> Eps(Vector(end._1)))
-        (terminator._1, end._2)
+        if atomic(t) then
+          val guard = assert(AssertKind.NotBetweenCRLF)
+          emit(guard._2 -> Eps(Vector(terminator._1)))
+          (guard._1, end._2)
+        else (terminator._1, end._2)
 
   private def assert(kind: AssertKind): (Int, Int) =
     val i = nextQ()

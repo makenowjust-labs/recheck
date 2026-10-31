@@ -355,9 +355,7 @@ private[ir] class IRBuilder(
 
   def buildCaret(): IRNodeData =
     if featureSet.caretIsLineBegin || context.multiline then
-      IRNodeData.Assert(
-        IRAssertKind.LineBegin(context.lineTerminators, featureSet.lineBeginMatchesAfterFinalTerminator)
-      )
+      IRNodeData.Assert(IRAssertKind.LineBegin(context.lineTerminators, featureSet.lineBeginAtEnd))
     else IRNodeData.Assert(IRAssertKind.TextBegin)
 
   def buildDollar(): IRNodeData =
