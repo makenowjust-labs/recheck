@@ -21,7 +21,6 @@ import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
-import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
 object IRBuilder:
@@ -58,14 +57,12 @@ object IRBuilder:
       case Dialect.Perl(utf8, _)                 => usesPerlUnicodeSyntax(node) || utf8 && hasNonAsciiLiteral(node)
       case _                                     => false
     val chars = new IRCharResolver(dialect, mode, perlUnicodeRules)
-    val supplementary = if dialect.isJava then lastSupplementary(node) else -1
     val checker =
       new LookBehindChecker(
         table,
         resolver,
         featureSet,
         charWidth(table, chars, dialect, mode, perlUtf8Pattern),
-        supplementary,
         node => table.charFlagsOf(node).flatMap(chars.rubyClassWidths(node, _))
       )
     val backReferences = new IRValidator(table, resolver, checker, featureSet).validate(node)
@@ -237,17 +234,6 @@ object IRBuilder:
       case NodeData.Literal(value)           => value >= 0x80
       case ClassItemData.ClassLiteral(value) => value >= 0x80
       case QuoteLiteral.QuoteValue(value)    => value >= 0x80
-
-  /** Returns the start of the last node with a supplementary character or a surrogate in the pattern text, or `-1`. */
-  private def lastSupplementary(node: Node): Int =
-    def isSupplementary(c: Int): Boolean = c >= 0x10000 || Character.isSurrogate(c.toChar) && c <= 0xffff
-    val self = node.data match
-      case NodeData.Literal(value) => isSupplementary(value)
-      case NodeData.Class(_, item) =>
-        deepExists(item) { case ClassItemData.ClassLiteral(value) => isSupplementary(value) }
-      case NodeData.Command(CommandKind.Comment(text)) => UString.fromString(text).iterator.exists(isSupplementary)
-      case _                                           => false
-    NodeKey.children(node).map(lastSupplementary).foldLeft(if self then node.loc.start else -1)(_.max(_))
 
   private def deepExists(x: Any)(p: PartialFunction[Any, Boolean]): Boolean =
     p.applyOrElse(
@@ -494,16 +480,8 @@ private[ir] class IRBuilder(
       case Some(BacktrackControlKind.Mark) | None =>
         IRNodeData.BacktrackControl(IRBacktrackControl.Mark(name.getOrElse("")))
 
-  /** Builds a look-behind, which never matches if the engine tries no start for it.
-    *
-    * Java's `TreeInfo` lengths can make it so (e.g. `(?<=\X)`, where `\X` counts one for the minimum and zero for the
-    * maximum).
-    */
   def buildLookBehind(negative: Boolean, child: Node): IRNodeData =
-    checker.matching(child) match
-      case IRLookBehindMatch.Forward(Seq(IRLookBehindStarts.Java(min, max, _))) if 0 <= max && max < min =>
-        if negative then IRNodeData.Empty else IRNodeData.Chars(CharSet.empty)
-      case matching => IRNodeData.LookBehind(negative, scoped(build(child)), matching)
+    IRNodeData.LookBehind(negative, scoped(build(child)), checker.matching(child))
 
   def buildGroup(node: Node, kind: GroupKind, child: Node): Either[IRNodeData, IRNode] = kind match
     case GroupKind.IndexedCapture =>

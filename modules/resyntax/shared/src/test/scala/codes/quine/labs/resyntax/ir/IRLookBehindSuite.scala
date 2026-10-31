@@ -248,7 +248,6 @@ class IRLookBehindSuite extends IRSuiteBase:
           if expected.isEmpty then IRLookBehindMatch.Backward else IRLookBehindMatch.Forward(expected)
         assertEquals(find(pattern.node), Some(expectedMatching))
 
-  import IRLookBehindStarts.Java as JavaStarts
   import IRLookBehindStarts.Longest
 
   // .NET, JavaScript and Ruby match a look-behind backward, and the others forward from the starts before the position.
@@ -268,12 +267,9 @@ class IRLookBehindSuite extends IRSuiteBase:
   matching("(?<=(?>a(*ACCEPT))bc)", Perl())(Longest(3, 3))
   // Perl's starts are of the lengths of the literals, even where case-insensitive `ss` may match `ß`.
   matching("(?iu)(?<=ass)", Perl())(Longest(3, 3))
-  // Java tries the starts of its `TreeInfo` lengths in code units, or in code points with a supplementary character after.
-  matching("(?<=a|bc)", Java)(JavaStarts(1, 2, false))
-  matching("(?<=a+)", Java)(JavaStarts(1, Int.MaxValue, false))
-  matching("(?<=ba*)", Java)(JavaStarts(1, Int.MinValue, false))
-  matching("(?<=(?:ab)?+c)", Java)(JavaStarts(1, 3, false))
-  matching("(?<=(?>ab)c)", Java)(JavaStarts(3, 3, false))
-  matching("(?<=\\R\\X)", Java)(JavaStarts(2, 2, false))
-  matching("(?<=a)😀", Java)(JavaStarts(1, 1, true))
-  matching("😀(?<=a)", Java)(JavaStarts(1, 1, false))
+  // Java's starts are of the lengths of the body, where an unbounded one tries all the starts before the position.
+  matching("(?<=a|bc)", Java)(Longest(1, 2))
+  matching("(?<=a+)", Java)(Longest(1, Int.MaxValue))
+  matching("(?<=ba*)", Java)(Longest(1, Int.MaxValue))
+  matching("(?<=(?:ab)?+c)", Java)(Longest(1, 3))
+  matching("(?<=\\R\\X)", Java)(Longest(2, Int.MaxValue))

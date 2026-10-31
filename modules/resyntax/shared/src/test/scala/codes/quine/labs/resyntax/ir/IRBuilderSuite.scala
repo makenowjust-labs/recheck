@@ -20,7 +20,6 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRCharClasses.AsciiWord
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch.Forward
-import codes.quine.labs.resyntax.ir.IRLookBehindStarts.Java as JavaStarts
 import codes.quine.labs.resyntax.ir.IRLookBehindStarts.Longest
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.ir.IRQuantifier.*
@@ -93,10 +92,10 @@ class IRBuilderSuite extends IRSuiteBase:
   check("(?!a)", "", All*)(LookAhead(true, char('a')))
   check("(?<=a)", "", DotNet, JavaScript, Ruby())(LookBehind(false, char('a')))
   check("(?<=a)", "", PCRE, Perl(), Python())(LookBehind(false, char('a'), Forward(Seq(Longest(1, 1)))))
-  check("(?<=a)", "", Java)(LookBehind(false, char('a'), Forward(Seq(JavaStarts(1, 1, false)))))
+  check("(?<=a)", "", Java)(LookBehind(false, char('a'), Forward(Seq(Longest(1, 1)))))
   check("(?<!a)", "", DotNet, JavaScript, Ruby())(LookBehind(true, char('a')))
   check("(?<!a)", "", PCRE, Perl(), Python())(LookBehind(true, char('a'), Forward(Seq(Longest(1, 1)))))
-  check("(?<!a)", "", Java)(LookBehind(true, char('a'), Forward(Seq(JavaStarts(1, 1, false)))))
+  check("(?<!a)", "", Java)(LookBehind(true, char('a'), Forward(Seq(Longest(1, 1)))))
   check("(*pla:a)", "", PCRE, Perl())(LookAhead(false, char('a')))
   check("(*negative_lookbehind:a)", "", PCRE, Perl())(LookBehind(true, char('a'), Forward(Seq(Longest(1, 1)))))
   check("(?>a)", "", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Atomic(char('a')))
