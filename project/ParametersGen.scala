@@ -16,7 +16,6 @@ object ParametersGen {
   /** The schema path relative to the repository root. */
   val SchemaPath: String = "modules/recheck-common/parameters.schema.yaml"
 
-  /** Param is a parameter of the schema. */
   final case class Param(
       name: String,
       title: String,
@@ -25,7 +24,6 @@ object ParametersGen {
       values: Seq[String],
       scalaType: String,
       scalaValues: Map[String, String],
-      unit: Option[String],
       cli: Option[String],
       cliMetavar: Option[String],
       scalaDefaultValue: Option[String],
@@ -38,9 +36,7 @@ object ParametersGen {
     def capitalName: String = name.capitalize
     def defaultName: String = s"Parameters.Default$capitalName"
 
-    /** The Scala expression of the default value. */
-    def scalaDefault: String = default match {
-      case _ if scalaDefaultValue.isDefined                   => scalaDefaultValue.get
+    def scalaDefault: String = scalaDefaultValue.getOrElse(default match {
       case null if isDuration                                 => "Duration.Inf"
       case null                                               => "None"
       case n: Number if isDuration && n.longValue % 1000 == 0 => s"Duration(${n.longValue / 1000}, SECONDS)"
@@ -49,7 +45,7 @@ object ParametersGen {
       case s: String                                          => s"Some(${literal(s)})"
       case b: java.lang.Boolean if isOption                   => s"Some($b)"
       case v                                                  => v.toString
-    }
+    })
 
     /** The first paragraph of the description on one line. */
     def summary: String = description.split("\n\n").head.replace('\n', ' ')
@@ -65,7 +61,6 @@ object ParametersGen {
     */
   final case class Variant(name: String, settings: Seq[(String, Seq[String], Any)])
 
-  /** The Scala imports of the types in the schema. */
   private val typeImports: Map[String, String] = Map(
     "AccelerationMode" -> "codes.quine.labs.recheck.common.AccelerationMode",
     "Checker" -> "codes.quine.labs.recheck.common.Checker",
@@ -73,7 +68,6 @@ object ParametersGen {
     "Dialect" -> "codes.quine.labs.resyntax.ast.Dialect"
   )
 
-  /** Reads the parameters of the schema. */
   def read(schema: File): Seq[Param] = {
     val yaml = new Yaml(new SafeConstructor(new LoaderOptions))
     val root = yaml.load[java.util.Map[String, Any]](IO.read(schema, StandardCharsets.UTF_8))
@@ -105,7 +99,6 @@ object ParametersGen {
         values = values,
         scalaType = string("x-scala-type").getOrElse(sys.error(s"$name has no x-scala-type")),
         scalaValues = scalaValues,
-        unit = string("x-unit"),
         cli = string("x-cli"),
         cliMetavar = string("x-cli-metavar"),
         scalaDefaultValue = string("x-scala-default"),
@@ -124,7 +117,6 @@ object ParametersGen {
     case object SchemaTest extends Target("ParametersSchema.scala", Seq("codes.quine.labs.recheck.common"))
   }
 
-  /** Generates the target in the directory, and returns the generated file. */
   def generate(target: Target, root: File, dir: File): File = {
     val params = read(root / SchemaPath)
     val source = target match {
@@ -142,7 +134,6 @@ object ParametersGen {
   private val header: String =
     s"// This file is generated from `$SchemaPath` by `project/ParametersGen.scala`. Do not edit it."
 
-  /** Returns a Scala string literal. */
   def literal(s: String): String =
     "\"" + s.flatMap {
       case '"'  => "\\\""
@@ -155,10 +146,8 @@ object ParametersGen {
 
   private def imports(names: Seq[String]): String = names.distinct.sorted.map(n => s"import $n").mkString("\n")
 
-  private def typeImportsOf(params: Seq[Param], exclude: String): Seq[String] =
-    params.flatMap(p => typeImports.get(p.scalaType)).filterNot(_.startsWith(exclude))
+  private def typeImportsOf(params: Seq[Param]): Seq[String] = params.flatMap(p => typeImports.get(p.scalaType))
 
-  /** Returns the Scaladoc lines of the description. */
   private def docLines(description: String, indent: String): String =
     description.linesIterator.map(l => if (l.isEmpty) s"$indent*" else s"$indent* $l").mkString("\n")
 
@@ -181,7 +170,7 @@ object ParametersGen {
         |
         |import scala.concurrent.duration.*
         |
-        |${imports(typeImportsOf(params, "codes.quine.labs.recheck.common."))}
+        |${imports(typeImportsOf(params).filterNot(_.startsWith("codes.quine.labs.recheck.common.")))}
         |
         |/** Parameters is an immutable representation of parameters.
         |  *
@@ -221,7 +210,7 @@ object ParametersGen {
       "io.circe.HCursor",
       "codes.quine.labs.recheck.common.Context",
       "codes.quine.labs.recheck.common.Parameters"
-    ) ++ typeImportsOf(params, "_")
+    ) ++ typeImportsOf(params)
     s"""|$header
         |${packages(Target.Codec)}
         |
@@ -284,7 +273,7 @@ object ParametersGen {
       "codes.quine.labs.recheck.common.Context",
       "codes.quine.labs.recheck.common.Parameters",
       "scala.concurrent.duration.Duration"
-    ) ++ typeImportsOf(params, "_")
+    ) ++ typeImportsOf(params)
     s"""|$header
         |${packages(Target.Cli)}
         |

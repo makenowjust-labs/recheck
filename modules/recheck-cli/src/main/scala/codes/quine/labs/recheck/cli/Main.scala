@@ -42,8 +42,6 @@ object Main:
     *
     * @param all
     *   whether it shows all the diagnostics of `ReDoS.checkAll`
-    * @param json
-    *   whether it shows the diagnostics in JSON
     */
   final case class CheckAction(pattern: InputPattern, params: Parameters, all: Boolean = false, json: Boolean = false)
       extends Action

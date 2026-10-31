@@ -4,11 +4,10 @@ import java.util.concurrent.Semaphore
 
 class AgentCommandSuite extends munit.FunSuite:
   test("AgentCommand.run"):
-    val simple = """"method":"check","params":{"source":"a","flags":"","dialect":{"name":"javascript"},"params":{}}"""
+    val simple = """"method":"check","params":{"source":"a","flags":"","params":{}}"""
     val complex =
-      """"method":"check","params":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"params":{"checker":"fuzz","usesAcceleration":false,"dialect":"perl"}}"""
-    val simpleLog =
-      """"method":"check","params":{"source":"a","flags":"","dialect":{"name":"javascript"},"params":{"logger":[]}}"""
+      """"method":"check","params":{"source":"(a|b|aba)*$","flags":"","params":{"checker":"fuzz","usesAcceleration":false,"dialect":"perl"}}"""
+    val simpleLog = """"method":"check","params":{"source":"a","flags":"","params":{"logger":[]}}"""
     val in = Seq(
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":0,"method":"ping","params":{}}"""),
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":1,$simple}"""),
