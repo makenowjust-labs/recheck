@@ -30,7 +30,6 @@ object ReDoSJS:
   def checkAll(source: String, flags: String, originalParams: js.UndefOr[js.Any]): js.Any =
     run(originalParams)(ReDoS.checkAll(source, flags, _))
 
-  /** Decodes the JavaScript parameters, runs the checking, and converts the result back to a JavaScript value. */
   private def run[A: Encoder](originalParams: js.UndefOr[js.Any])(check: Parameters => A): js.Any =
     decodeJs[Parameters](originalParams.getOrElse(js.Object())) match
       case Right(params) =>
