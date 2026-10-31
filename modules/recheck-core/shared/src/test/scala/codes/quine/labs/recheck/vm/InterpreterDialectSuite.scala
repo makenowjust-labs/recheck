@@ -55,9 +55,12 @@ class InterpreterDialectSuite extends munit.FunSuite:
     // Only JavaScript resets the captures in a repetition on each iteration.
     accepts("^(?:(a)?b){2}\\1$", JavaScript, "abb")
     refutes("^(?:(a)?b){2}\\1$", JavaScript, "abba")
+    accepts("^(?:(a)|b){1,2}\\1$", JavaScript, "ab")
+    refutes("^(?:(a)|b){1,2}\\1$", JavaScript, "aba")
     for dialect <- Seq(Java, Python, PCRE, Ruby, DotNet) do
       accepts("^(?:(a)?b){2}\\1$", dialect, "abba")
       refutes("^(?:(a)?b){2}\\1$", dialect, "abb")
+      accepts("^(?:(a)|b){1,2}\\1$", dialect, "aba")
 
   test("Interpreter.run: back-references to duplicate names"):
     accepts("^(?:(?<x>a)|(?<x>b))\\k<x>$", JavaScript, "bb")

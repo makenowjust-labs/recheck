@@ -327,7 +327,7 @@ private[vm] class ProgramBuilder(
     emitTerminator(if isLazy then Inst.Try(cont, main) else Inst.Try(main, cont))
 
     enterBlock(main)
-    build(child)
+    wrapReset(child)(build(child))
     emitTerminator(Inst.Jmp(cont))
 
     enterBlock(cont)
