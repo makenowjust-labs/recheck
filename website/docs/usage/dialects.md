@@ -163,7 +163,8 @@ There are other deliberate approximations.
   Ruby allows it in a look-around, and reports a start after the end as the end.
 - A conditional tests whether a group is set, or a look-around assertion, which is atomic.
   `(?(DEFINE)...)` is skipped, `(?(R)...)` and the other recursion tests are false (out of recursion), and PCRE's `(?(VERSION>=10.0)...)` compares with PCRE2 10.49.
-  The captures in a look-around condition remain after it, except in .NET, which drops them (`recheck` unsets them, though they may have had earlier values).
+  The captures in a look-around condition remain after it, even if it is negative, except that .NET restores them for a negative one.
+  .NET does not capture the first unnamed group after a conditional with a look-around (e.g. `(?(?=(a))a)(b)` captures `b` as the group `1`, and the group `2` is never set), as its parser does.
   A name shared by groups holds if one of them is set, but Ruby tests only the first group.
 - PCRE's non-atomic look-arounds (`(*napla:...)`, `(?*...)`, `(*naplb:...)` and `(?<*...)`) let backtracking enter them again, as the engine does.
 - PCRE's `(*NOTEMPTY)` and `(*NOTEMPTY_ATSTART)` reject an empty match (anywhere, or at the start of the input), and the engine backtracks further.

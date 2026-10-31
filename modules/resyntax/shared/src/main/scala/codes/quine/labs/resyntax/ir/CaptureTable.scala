@@ -91,6 +91,16 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
 
   private val inBranchReset = mutable.Set.empty[Int]
 
+  /** Whether .NET's next unnamed group does not capture, after a conditional with a look-around (e.g. `(?(?=a)b)`).
+    *
+    * .NET's parser ignores the next unnamed group to skip the parentheses of a conditional expression, and the
+    * look-around does not reset it, so it goes on to the next unnamed group, even after the conditional.
+    */
+  private var ignoresNextGroup: Boolean = false
+
+  /** The number of .NET's ignored unnamed groups, which still take the indices before the named groups. */
+  private var ignoredGroups: Int = 0
+
   private var branchResetDepth: Int = 0
 
   private val capturesUnnamed: Boolean =
@@ -102,8 +112,10 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
     walk(root)
     assignPendingNames()
     val allIndices = indices.values.toSet
-    val count = if allIndices.isEmpty then 0 else allIndices.max
-    val defined = if featureSet.numbersNamedCaptureLast then allIndices else (1 to count).toSet
+    // .NET's ignored groups make the indices after the unnamed groups defined, though no group captures there.
+    val ignored = (next until next + ignoredGroups).toSet
+    val count = (allIndices ++ ignored).maxOption.getOrElse(0)
+    val defined = if featureSet.numbersNamedCaptureLast then allIndices ++ ignored else (1 to count).toSet
     val groups = indices.toSeq.groupMap(_._2)(_._1.node)
     new CaptureTable(indices.toMap, sites.toMap, count, defined, nameIndices.toMap, groups, inBranchReset.toSet)
 
@@ -118,6 +130,10 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
     case _ => ()
 
   private def walkGroup(node: Node, kind: GroupKind, child: Node): Unit = kind match
+    case GroupKind.IndexedCapture if ignoresNextGroup =>
+      ignoresNextGroup = false
+      if !context.explicitCapture then ignoredGroups += 1
+      scoped(walk(child))
     case GroupKind.IndexedCapture =>
       if capturesUnnamed && !context.explicitCapture then
         val index = next
@@ -164,6 +180,9 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
     case CommandKind.Conditional(test, yes, no) =>
       markSite(node)
       test match
+        case ConditionalTest.LookAround(Some(kind), node) if initial.dialect == Dialect.DotNet =>
+          ignoresNextGroup = true
+          walkTest(Some(kind), node)
         case ConditionalTest.LookAround(kind, node)                                       => walkTest(kind, node)
         case ConditionalTest.CalloutLookAround(_, ConditionalTest.LookAround(kind, node)) => walkTest(kind, node)
         case _                                                                            => ()
@@ -220,7 +239,7 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
 
   private def assignPendingNames(): Unit =
     if pendingNames.isEmpty then return
-    var index = next
+    var index = next + ignoredGroups
     val assigned = mutable.Map.empty[String, Int]
     for name <- nameIndices.keys do
       while usedIndices.contains(index) do index += 1

@@ -749,9 +749,9 @@ private[vm] class ProgramBuilder(
 
   /** A builder for a conditional.
     *
-    * A look-around condition is atomic, and it keeps the captures in it even if it is negative (except in .NET). Its
-    * fallback is the barrier, so `(*COMMIT)`, `(*PRUNE)` and `(*SKIP)` in it make it false (or true for a negative
-    * one).
+    * A look-around condition is atomic, and it keeps the captures in it even if it is negative, except in .NET, which
+    * restores them as a negative look-around does. Its fallback is the barrier, so `(*COMMIT)`, `(*PRUNE)` and
+    * `(*SKIP)` in it make it false (or true for a negative one).
     */
   def buildConditional(condition: IRCondition, yes: IRNode, no: IRNode): Unit =
     val yesLabel = allocateLabel("yes")
@@ -761,36 +761,28 @@ private[vm] class ProgramBuilder(
     def buildTest(negative: Boolean, child: IRNode, body: IRNode => Unit): Unit =
       val main = allocateLabel("main")
       val scope = assertionThenScope(child)
-      val (rollback, fallback) = if negative then (noLabel, yesLabel) else (yesLabel, noLabel)
+      val restores = negative && pattern.dialect == Dialect.DotNet
+      val (rollback, fallback) = if negative && !restores then (noLabel, yesLabel) else (yesLabel, noLabel)
       emitTerminator(Inst.Tx(main, Some(rollback), Some(fallback), Option.when(hasCut)(Barrier.Assertion(scope))))
       enterBlock(main)
-      buildAssertion(child, scope, body)
+      if restores then buildNegativeLookAround(child, body) else buildAssertion(child, scope, body)
       emitTerminator(Inst.Rollback)
 
     // The register of the end of a look-behind matched forward, which is reset after the condition.
     var end: Option[CounterReg] = None
-    val test = condition match
-      case IRCondition.Captured(indices) =>
-        emitTerminator(Inst.IfCap(indices, yesLabel, noLabel))
-        None
-      case IRCondition.LookAhead(negative, n) =>
-        wrapLookAhead(buildTest(negative, n, build))
-        Some(n)
+    condition match
+      case IRCondition.Captured(indices)      => emitTerminator(Inst.IfCap(indices, yesLabel, noLabel))
+      case IRCondition.LookAhead(negative, n) => wrapLookAhead(buildTest(negative, n, build))
       case IRCondition.LookBehind(negative, n, IRLookBehindMatch.Backward) =>
         wrapLookBehind(buildTest(negative, n, build))
-        Some(n)
       case IRCondition.LookBehind(negative, n, IRLookBehindMatch.Forward(starts)) =>
         val reg = allocateCounter()
         end = Some(reg)
         wrapLookAhead(buildTest(negative, n, buildForwardBody(_, starts, reg)))
-        Some(n)
-    // .NET drops the captures of the condition, which are unset here though they may have had values before.
-    val dropped = test.filter(_ => pattern.dialect == Dialect.DotNet).flatMap(_.captureRange.range)
 
     for (label, branch) <- Seq((yesLabel, yes), (noLabel, no)) do
       enterBlock(label)
       for reg <- end do emitInst(Inst.Reset(reg))
-      for (from, to) <- dropped do emitInst(Inst.CapReset(from, to))
       build(branch)
       emitTerminator(Inst.Jmp(cont))
 

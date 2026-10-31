@@ -115,11 +115,21 @@ class InterpreterConstructSuite extends munit.FunSuite:
     check("a(?(?<!a)c|b)", "ab", PCRE, Perl, DotNet)(Seq(g(0, 2)))
     check("(?(?=a)ab|cd)", "cd", PCRE, Perl, DotNet)(Seq(g(0, 2)))
     check("(?(?!a)cd|ab)", "cd", PCRE, Perl, DotNet)(Seq(g(0, 2)))
-    // A look-around condition keeps its captures, but .NET drops them.
+    // A look-around condition keeps its captures, but .NET restores them for a negative one.
     check("^(?(?!(a)b)x|ab)\\1", "aba", PCRE, Perl)(Seq(g(0, 3), g(0, 1)))
-    check("^(?(?!(a)b)x|ab)\\1", "aba", DotNet)(NoMatch)
     check("^(?(?=(a)b)ab|x)\\1", "aba", PCRE, Perl)(Seq(g(0, 3), g(0, 1)))
+    check("^(?<x>a)(?(?=(?<x>b))b|c)\\k<x>", "aba", DotNet)(NoMatch)
+    check("^(?<x>a)(?(?=(?<x>b))b|c)", "aba", DotNet)(Seq(g(0, 2), g(1, 2)))
+    check("^(?<x>a)(?(?!(?<x>b))c|b)\\k<x>", "aba", DotNet)(Seq(g(0, 3), g(0, 1)))
+    check("^(a)(?(?!(?<1>b))c|b)\\1", "aba", DotNet)(Seq(g(0, 3), g(0, 1)))
+    check("^(a)?(?(?=a(?<1>b))a|x)", "aab", DotNet)(Seq(g(0, 2), g(2, 3)))
+    check("(?(?=(a)(?<x>.))a)\\k<x>", "ab", DotNet)(Seq(g(0, 2), unset, g(1, 2)))
+    // .NET does not capture the first unnamed group after a conditional with a look-around.
     check("^(?(?=(a)b)ab|x)\\1", "aba", DotNet)(NoMatch)
+    check("(?(?=(a))a)(b)", "ab", DotNet)(Seq(g(0, 2), g(1, 2)))
+    check("(?(?=(a))a)(b)\\2", "ab", DotNet)(NoMatch)
+    check("(?(?=((a)))a)a(b)", "aab", DotNet)(Seq(g(0, 3), g(0, 1), g(2, 3)))
+    check("(?(a(b))a)", "ab", DotNet)(Seq(g(0, 1), g(1, 2)))
     check("^.*?(?(?=a)a|b(*THEN)c)", "ba", PCRE, Perl)(NoMatch)
 
   test("Interpreter.run: backtracking control verbs"):
