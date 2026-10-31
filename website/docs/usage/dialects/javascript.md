@@ -32,10 +32,6 @@ The flags are the flags of `RegExp`.
 
 JavaScript has no other options.
 
-## Syntax Limitations
-
-No construct of JavaScript is reported as `unsupported`.
-
 ## Approximations
 
 - With the `y` flag, the match starts only at the start of the input, as with `lastIndex` of `0`.

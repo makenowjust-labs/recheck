@@ -54,10 +54,6 @@ The `re` flags that `recheck` does not take:
 
 `\N{...}` (e.g. `\N{EM DASH}`) is reported as `unsupported`, as in the other dialects having it.
 
-## Approximations
-
-The `python` dialect has no approximations of its own.
-
 ## Recall Validation
 
 - Command: `python3 -I -`, which reads the program from the standard input.
