@@ -21,6 +21,9 @@ export type Section = {
 export type TOCItem = { value: string; id: string; level: number };
 
 export const scalaDefault = (property: Property): string => {
+  if (property["x-scala-default"] !== undefined) {
+    return property["x-scala-default"];
+  }
   const value = property.default ?? null;
   if (property["x-unit"] === "milliseconds") {
     if (value === null) return "Duration.Inf";

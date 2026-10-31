@@ -9,6 +9,24 @@ export type Target = keyof Excluded;
 /** ParametersFor is the parameters that the target exposes. */
 export type ParametersFor<T extends Target> = Omit<Parameters, Excluded[T]>;
 
+/** Variant is an alternative of `oneOf` of a parameter: an enum of names, or an object of a name and its settings. */
+export type Variant = {
+  type: "string" | "object";
+  enum?: string[];
+  properties?: Record<string, Setting>;
+  required?: string[];
+  additionalProperties?: boolean;
+};
+
+/** Setting is a property of a variant object: `name` with `const`, or a setting with `enum` or `type`. */
+export type Setting = {
+  title?: string;
+  const?: string;
+  type?: string | string[];
+  enum?: string[];
+  default?: unknown;
+};
+
 /** Property is a parameter of the schema, with the annotations described in the schema. */
 export type Property = {
   title: string;
@@ -16,17 +34,17 @@ export type Property = {
   type?: string | string[];
   items?: { type: string };
   enum?: string[];
+  oneOf?: Variant[];
   default?: unknown;
   "x-scala-type": string;
   "x-scala-values"?: Record<string, string>;
+  "x-scala-default"?: string;
   "x-typescript-type"?: string;
   "x-unit"?: string;
   "x-cli"?: string;
   "x-cli-metavar"?: string;
   "x-exclude"?: string[];
   "x-since"?: string;
-  "x-dialects"?: string[];
-  "x-encodings"?: Record<string, string[]>;
 };
 
 /** Schema is the JSON Schema of the parameters. */

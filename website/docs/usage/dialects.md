@@ -9,6 +9,7 @@ Describes the regular expression dialects that `recheck` supports, and how each 
 
 `recheck` checks a regular expression in the syntax and the semantics of one dialect.
 The [`dialect`](parameters.mdx#dialect) parameter chooses it, and its default is `javascript`.
+It is the name of the dialect, or an object of the name and the dialect's settings (e.g. `{ "name": "python", "encoding": "bytes" }`), where an omitted setting takes the default.
 The flags are the dialect's own flag letters (e.g. `imsx`), not a JavaScript flags string.
 
 | `dialect`    | Engine that `recheck` follows                  | Matching unit                                      | Recall validation command     |
@@ -25,12 +26,14 @@ The following shows how to check a pattern in the Python dialect.
 
 ```bash
 recheck --dialect=python '/^(a|a)*$/'
+recheck --dialect=python --encoding=bytes '/^(a|a)*$/'
 ```
 
 ```tsx
 import { check } from "recheck";
 
 await check("^(a|a)*$", "", { dialect: "python" });
+await check("^(a|a)*$", "", { dialect: { name: "python", encoding: "bytes" } });
 ```
 
 ```scala
@@ -38,10 +41,14 @@ import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.resyntax.ast.Dialect
 
-ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Python))
+ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Python()))
+ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Python(Dialect.Python.Encoding.Bytes)))
 ```
 
-The Playground also has a selector of the dialect, and it shows `encoding`, `perlSource` and `perlUtf8` for the dialects having them.
+The CLI takes the settings by `--encoding`, `--perl-source` and `--perl-utf8`, and an option that the dialect does not have is an error.
+The Playground also has a selector of the dialect, and it shows the settings of the selected dialect.
+
+The diagnostics have the dialect as `dialect`, an object with every setting of the dialect (see [Diagnostics](diagnostics.md#dialect)).
 
 :::note
 
@@ -78,7 +85,7 @@ Perl's and PCRE's extended bracketed character classes (`(?[ ... ])`) are not su
 ## Units and Encodings
 
 A pattern matches a string of UTF-16 code units, of code points, or of bytes, which depends on the dialect.
-The dialects having the choice take the [`encoding`](parameters.mdx#encoding) parameter, and its values are the dialect's own words.
+The dialects having the choice take the `encoding` setting of the [`dialect`](parameters.mdx#dialect), and its values are the dialect's own words.
 
 - `javascript`: UTF-16 code units, or code points with the `u` or `v` flag. It has no `encoding`.
 - `python`: `str` (default) matches code points, and `bytes` matches bytes. The flag `b` also makes a `bytes` pattern.
@@ -87,8 +94,6 @@ The dialects having the choice take the [`encoding`](parameters.mdx#encoding) pa
 - `dotnet`: UTF-16 code units. It has no `encoding`.
 - `perl`: `characters` (default) matches code points as the character strings with `use utf8`, and `bytes` matches bytes, where a non-ASCII literal is its UTF-8 bytes.
 - `pcre`: bytes, or code points of UTF-8 with the `u` flag or `(*UTF)`, as in PHP. It has no `encoding`. As in PHP, `u` also makes `\d`, `\w` and the like Unicode classes.
-
-An encoding that the dialect does not have makes the result `unknown` with an `invalid` error.
 
 The encoding also changes how the pattern is read, as the engine does.
 
@@ -106,13 +111,13 @@ The character set flags change the meaning of `\w`, `\d`, `\s`, `\b`, POSIX clas
 
 ### Perl
 
-Perl has two more parameters.
+Perl has two more settings of the [`dialect`](parameters.mdx#dialect).
 
-- [`perlSource`](parameters.mdx#perlsource) tells how the pattern is given.
+- `source` tells how the pattern is given.
   `literal` (default) is a regular expression literal written in Perl source (e.g. `qr/.../`), where Perl applies `\U`, `\L`, `\u`, `\l`, `\F`, `\Q` and `\E` to the text before the regex engine reads it.
   `string` is a pattern from a string at runtime (e.g. `qr/$p/`), which the regex engine reads unchanged.
-- [`perlUtf8`](parameters.mdx#perlutf8) tells whether the pattern string is UTF-8, which makes the `/d` rules (the default) the Unicode rules.
-  `null` (default) decides it from the pattern.
+- `utf8` tells whether the pattern string is UTF-8, which makes the `/d` rules (the default) the Unicode rules.
+  `null` (default) decides it from the pattern, and the diagnostics have the decided value.
 
 Perl's `\p{...}` has the enumerated properties of the Unicode data, such as `Line_Break`, `East_Asian_Width`, `Grapheme_Cluster_Break`, `Word_Break`, `Canonical_Combining_Class` (also by numbers, e.g. `\p{Ccc=230}`) and `Identifier_Type`.
 `\p{Numeric_Value=...}` takes a reduced fraction (e.g. `1/2`), or a decimal number matching an integer value exactly or a fraction to 4 significant digits (e.g. `0.3333` for `1/3`), as Perl does.
@@ -212,7 +217,7 @@ Notes on each dialect:
   The program reads the pattern and the attack string from the standard input.
 - `dotnet` needs the .NET 10 SDK for `dotnet run` of a file.
   It runs a fixed program reading the pattern and the attack string from the standard input, so `dotnet` builds and caches the program only once.
-- `perl` puts the pattern into the program as a `qr` literal with the `literal` [`perlSource`](parameters.mdx#perlsource).
+- `perl` puts the pattern into the program as a `qr` literal with the `literal` source.
   When the literal would interpolate a variable or run code (e.g. `$name`, `@{...}` or `(?{ ... })`), the recall validation is skipped and `recallValidation` is `null`.
   With the `string` source, the program builds the pattern from a string as `qr/$pattern/`.
 - `pcre` runs with PHP's default settings of `pcre.backtrack_limit`, `pcre.recursion_limit` and `pcre.jit`, and the runtime name in the result shows them.

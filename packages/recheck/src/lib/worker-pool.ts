@@ -1,3 +1,4 @@
+import { unparsedDialect } from "./dialect";
 import createWorker from "./worker";
 
 import type { Diagnostics, HasAbortSignal, Parameters } from "../..";
@@ -210,6 +211,7 @@ export class WorkerPool {
     const cancelled: Diagnostics = {
       source: ref.source,
       flags: ref.flags,
+      dialect: unparsedDialect(ref.source, ref.params.dialect),
       status: "unknown",
       error: { kind: "cancel" },
     };

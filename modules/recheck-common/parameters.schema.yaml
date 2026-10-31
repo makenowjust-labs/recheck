@@ -118,6 +118,7 @@ properties:
       - `utf8` of `perl`: whether the pattern string is UTF-8, which makes the `/d` rules Unicode rules. `null` (default) decides it from the pattern: a `literal` pattern is UTF-8 if its source has a non-ASCII character (as with `use utf8`), and a `string` pattern is UTF-8 if it has a non-ASCII character, a code point of `\x{100}` or more, `\p` or `\N{...}`. A `bytes` pattern is not UTF-8.
 
       The diagnostics have the dialect as an object with every setting, where `utf8` is decided.
+      The CLI takes the name by `--dialect` and the settings by `--encoding`, `--perl-source` and `--perl-utf8`.
     oneOf:
       - type: string
         enum: ["javascript", "java", "dotnet", "pcre", "python", "ruby", "perl"]

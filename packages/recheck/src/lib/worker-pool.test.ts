@@ -47,6 +47,24 @@ test("check: with abort (2)", async () => {
   expect((await promise).status).toBe("unknown");
 });
 
+test("check: with abort (3)", async () => {
+  const pool = start();
+
+  const controller = new AbortController();
+  const signal = controller.signal;
+  controller.abort();
+  const diagnostics = await pool.check("^(a|a)*$", "", {
+    signal,
+    dialect: { name: "perl", source: "string" },
+  });
+  expect(diagnostics.dialect).toEqual({
+    name: "perl",
+    encoding: "characters",
+    source: "string",
+    utf8: false,
+  });
+});
+
 test("check: parallel", async () => {
   const pool = start(2);
 

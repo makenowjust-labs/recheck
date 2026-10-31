@@ -1,5 +1,5 @@
 import type { Parameters } from "recheck";
-import type { Property } from "recheck-parameters";
+import type { Property, Setting } from "recheck-parameters";
 
 import { propertiesFor } from "recheck-parameters";
 
@@ -25,25 +25,70 @@ export type Param = {
   since: string | null;
   /** The dialects that the parameter applies to, or `null` if it applies to every dialect. */
   dialects: string[] | null;
+  /** The key of a setting of the dialect, which goes into the `dialect` object, or `null` for a parameter. */
+  setting: string | null;
 };
+
+/** Returns whether the type is a nullable boolean, i.e. `["boolean", "null"]`. */
+const isNullableBoolean = (type: string | string[] | undefined): boolean =>
+  Array.isArray(type) &&
+  type.length === 2 &&
+  type.includes("boolean") &&
+  type.includes("null");
 
 const paramType = (property: Property): ParamType | null => {
   if (property.enum !== undefined) return { select: property.enum };
-  if (property["x-encodings"] !== undefined) {
-    return { selectByDialect: property["x-encodings"] };
-  }
+  // `dialect` is the name of the language or an object of the name and the settings.
+  const names = property.oneOf?.find(({ type }) => type === "string")?.enum;
+  if (names !== undefined) return { select: names };
   if (property["x-unit"] === "milliseconds") return "duration";
   if (property.type === "integer") return "integer";
   if (property.type === "number") return "float";
-  const types = Array.isArray(property.type) ? property.type : [];
-  if (
-    types.length === 2 &&
-    types.includes("boolean") &&
-    types.includes("null")
-  ) {
-    return "nullableBoolean";
-  }
+  if (isNullableBoolean(property.type)) return "nullableBoolean";
   return null;
+};
+
+/** The form name of a setting of the dialect, e.g. `dialectEncoding`. */
+const settingName = (key: string): string =>
+  `dialect${key[0]!.toUpperCase()}${key.slice(1)}`;
+
+/** The settings of the dialects in the `oneOf` of `dialect`, as the parameters of the form. */
+const settingParams = (property: Property): Param[] => {
+  const settings = new Map<string, [string, Setting][]>();
+  for (const variant of property.oneOf ?? []) {
+    const { name, ...rest } = variant.properties ?? {};
+    if (name?.const === undefined) continue;
+    for (const [key, setting] of Object.entries(rest)) {
+      settings.set(key, [...(settings.get(key) ?? []), [name.const, setting]]);
+    }
+  }
+  return [...settings].flatMap(([key, entries]) => {
+    const [, first] = entries[0]!;
+    const type: ParamType | null = isNullableBoolean(first.type)
+      ? "nullableBoolean"
+      : first.enum !== undefined
+        ? {
+            selectByDialect: Object.fromEntries(
+              entries.map(([dialect, { enum: values = [], default: d }]) => [
+                dialect,
+                [String(d), ...values.filter((v) => v !== d)],
+              ]),
+            ),
+          }
+        : null;
+    if (type === null) return [];
+    return [
+      {
+        name: settingName(key),
+        title: first.title ?? key,
+        defaultValue: String(first.default ?? "null"),
+        type,
+        since: property["x-since"] ?? null,
+        dialects: entries.map(([dialect]) => dialect),
+        setting: key,
+      },
+    ];
+  });
 };
 
 /** The values of a nullable boolean in the form. */
@@ -63,8 +108,10 @@ const schemaParams: Param[] = propertiesFor("playground").flatMap(
         defaultValue: (property.default ?? "null") as string | number,
         type,
         since: property["x-since"] ?? null,
-        dialects: property["x-dialects"] ?? null,
+        dialects: null,
+        setting: null,
       },
+      ...(name === "dialect" ? settingParams(property) : []),
     ];
   },
 );
@@ -76,22 +123,22 @@ const loggerParam: Param = {
   type: { select: ["on", "off"] },
   since: null,
   dialects: null,
+  setting: null,
 };
 
 /** The parameters shown first, in this order; the others follow in the schema order. */
 const FIRST = ["checker", "logger", "timeout", "dialect"];
 
-const order = (name: string): number => {
-  const index = FIRST.indexOf(name);
+// The settings of the dialect follow `dialect`.
+const order = ({ name, setting }: Param): number => {
+  const index = FIRST.indexOf(setting === null ? name : "dialect");
   return index === -1 ? FIRST.length : index;
 };
 
 /** All the parameters of the form, for the bundled build. */
 export const params: Param[] = [...schemaParams, loggerParam]
   .map((param, index) => ({ param, index }))
-  .sort(
-    (a, b) => order(a.param.name) - order(b.param.name) || a.index - b.index,
-  )
+  .sort((a, b) => order(a.param) - order(b.param) || a.index - b.index)
   .map(({ param }) => param);
 
 /** The default dialect, which is the only one of the builds without the `dialect` parameter. */
@@ -134,35 +181,40 @@ export const parseParams = (
   build: Build,
 ): CheckParams => {
   const parsed: Record<string, unknown> = {};
+  const settings: Record<string, unknown> = {};
   const dialect = dialectOf(values, build);
   for (const param of paramsOf(build, dialect)) {
-    const { name, type, defaultValue } = param;
+    const { name, defaultValue, setting } = param;
     const value = values[name] ?? defaultValue;
-    switch (type) {
-      case "duration":
-      case "integer":
-        parsed[name] = Number.parseInt(String(value), 10);
-        break;
-      case "float":
-        parsed[name] = Number.parseFloat(String(value));
-        break;
-      case "nullableBoolean":
-        parsed[name] =
-          value === "true" ? true : value === "false" ? false : null;
-        break;
-      default:
-        if (typeof type === "object" && "selectByDialect" in type) {
-          // A value left by another dialect falls back to this dialect's default.
-          const choices = selectValues(param, dialect);
-          parsed[name] = choices.includes(String(value))
-            ? String(value)
-            : choices[0];
-        } else {
-          parsed[name] = String(value);
-        }
+    if (setting !== null) {
+      settings[setting] = parseValue(param, value, dialect);
+      continue;
     }
+    parsed[name] = parseValue(param, value, dialect);
   }
+  if ("dialect" in parsed) parsed["dialect"] = { name: dialect, ...settings };
   return parsed as CheckParams;
+};
+
+/** Converts a form value to the parameter value. */
+const parseValue = (param: Param, value: unknown, dialect: string): unknown => {
+  const { type } = param;
+  switch (type) {
+    case "duration":
+    case "integer":
+      return Number.parseInt(String(value), 10);
+    case "float":
+      return Number.parseFloat(String(value));
+    case "nullableBoolean":
+      return value === "true" ? true : value === "false" ? false : null;
+    default:
+      if (typeof type === "object" && "selectByDialect" in type) {
+        // A value left by another dialect falls back to this dialect's default.
+        const choices = selectValues(param, dialect);
+        return choices.includes(String(value)) ? String(value) : choices[0];
+      }
+      return String(value);
+  }
 };
 
 /** Converts the parameters back to the form values, where every value is a string or a number. */
@@ -170,10 +222,26 @@ export const formValues = (
   params: Record<string, unknown>,
 ): Record<string, string | number> =>
   Object.fromEntries(
-    Object.entries(params).map(([name, value]) => [
-      name,
-      typeof value === "number" ? value : String(value),
-    ]),
+    Object.entries(params).flatMap(
+      ([name, value]): [string, string | number][] => {
+        if (name === "dialect" && typeof value === "object" && value !== null) {
+          const { name: dialect, ...settings } = value as Record<
+            string,
+            unknown
+          >;
+          return [
+            ["dialect", String(dialect)],
+            ...Object.entries(settings).map(
+              ([key, setting]): [string, string] => [
+                settingName(key),
+                String(setting),
+              ],
+            ),
+          ];
+        }
+        return [[name, typeof value === "number" ? value : String(value)]];
+      },
+    ),
   );
 
 export const extract = (

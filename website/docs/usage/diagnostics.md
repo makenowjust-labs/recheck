@@ -13,7 +13,25 @@ All `Diagnostics` has the following fields.
 
 - `source` is the given regular expression’s source string.
 - `flags` is the given regular expression’s flags string.
+- `dialect` is the dialect of the regular expression (see [Dialect](#dialect)).
 - `checker` is a checker type to be used (one of `fuzz` and `automaton`).
+
+## Dialect
+
+`dialect` is an object of the dialect's name and every setting of the dialect, in the same shape as the [`dialect`](parameters.mdx#dialect) parameter.
+
+```json
+{ "name": "javascript" }
+{ "name": "java" }
+{ "name": "dotnet" }
+{ "name": "pcre" }
+{ "name": "python", "encoding": "str" }
+{ "name": "ruby", "encoding": "UTF-8" }
+{ "name": "perl", "encoding": "characters", "source": "literal", "utf8": false }
+```
+
+Perl's `utf8` is the decided one: the given value, or the one decided from the pattern if the parameter does not give it.
+When the pattern cannot be parsed, it is decided from the source: a `literal` or `string` pattern is UTF-8 if the source has a non-ASCII character, and a `bytes` pattern is not.
 
 ## Status
 
