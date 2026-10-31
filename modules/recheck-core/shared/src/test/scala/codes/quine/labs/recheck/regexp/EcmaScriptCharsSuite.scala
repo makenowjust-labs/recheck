@@ -1,31 +1,22 @@
 package codes.quine.labs.recheck.regexp
 
 import codes.quine.labs.resyntax.charset.CharSet
-import codes.quine.labs.resyntax.charset.UnitMode
 
 class EcmaScriptCharsSuite extends munit.FunSuite:
-  test("EcmaScriptChars.mode"):
-    assertEquals(EcmaScriptChars.mode(false), UnitMode.Utf16)
-    assertEquals(EcmaScriptChars.mode(true), UnitMode.CodePoint)
-
-  test("EcmaScriptChars.canonicalize: character"):
-    assertEquals(EcmaScriptChars.canonicalize('a', false), 'A'.toInt)
-    assertEquals(EcmaScriptChars.canonicalize('A', false), 'A'.toInt)
-    assertEquals(EcmaScriptChars.canonicalize('a', true), 'a'.toInt)
-    assertEquals(EcmaScriptChars.canonicalize('A', true), 'a'.toInt)
+  test("EcmaScriptChars.canonicalize"):
+    assertEquals(EcmaScriptChars.canonicalize(CharSet.single('a'), false), CharSet.single('A'))
+    assertEquals(EcmaScriptChars.canonicalize(CharSet.single('A'), false), CharSet.single('A'))
+    assertEquals(EcmaScriptChars.canonicalize(CharSet.single('a'), true), CharSet.single('a'))
+    assertEquals(EcmaScriptChars.canonicalize(CharSet.single('A'), true), CharSet.single('a'))
+    assertEquals(EcmaScriptChars.canonicalize(CharSet.single('n'), false), CharSet.single('N'))
+    assertEquals(EcmaScriptChars.canonicalize(CharSet.single('N'), true), CharSet.single('n'))
 
     // U+FF21: FULLWIDTH LATIN CAPITAL LETTER A
     // U+FF41: FULLWIDTH LATIN SMALL LETTER A
-    assertEquals(EcmaScriptChars.canonicalize(0xff41, false), 0xff21)
-    assertEquals(EcmaScriptChars.canonicalize(0xff21, true), 0xff41)
+    assertEquals(EcmaScriptChars.canonicalize(CharSet.single(0xff41), false), CharSet.single(0xff21))
+    assertEquals(EcmaScriptChars.canonicalize(CharSet.single(0xff21), true), CharSet.single(0xff41))
 
     // U+017F: LATIN SMALL LETTER LONG S
-    assertEquals(EcmaScriptChars.canonicalize(0x017f, false), 0x017f)
-    assertEquals(EcmaScriptChars.canonicalize(0x017f, true), 's'.toInt)
-
-  test("EcmaScriptChars.canonicalize: set"):
-    assertEquals(EcmaScriptChars.canonicalize(CharSet.single('n'), false), CharSet.single('N'))
-    assertEquals(EcmaScriptChars.canonicalize(CharSet.single('N'), true), CharSet.single('n'))
     assertEquals(EcmaScriptChars.canonicalize(CharSet.single(0x017f), false), CharSet.single(0x017f))
     assertEquals(EcmaScriptChars.canonicalize(CharSet.single(0x017f), true), CharSet.single('s'))
 

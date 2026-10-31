@@ -14,10 +14,6 @@ class UStringUtilSuite extends munit.FunSuite:
     assertEquals(fromCodePoints("xyz".map(_.toInt)), fromString("xyz"))
     assertEquals(fromCodePoints(Seq(0x1f363)), fromString("🍣"))
 
-  test("UStringUtil.canonicalize"):
-    assertEquals(canonicalize(fromString("xyz"), false), fromString("XYZ"))
-    assertEquals(canonicalize(fromString("XYZ"), true), fromString("xyz"))
-
   test("UStringUtil.show"):
     assertEquals(show(fromString("")), "''")
     assertEquals(show(fromString("xyz")), "'xyz'")

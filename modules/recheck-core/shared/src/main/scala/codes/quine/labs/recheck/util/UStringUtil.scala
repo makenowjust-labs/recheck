@@ -17,10 +17,6 @@ object UStringUtil:
   def fromCodePoints(cs: IterableOnce[Int]): UString =
     UString.from(IArray.genericWrapArray(UString.from(cs).encode(UnitMode.Utf16)))
 
-  /** Canonicalizes each character of the string for ignore-case matching. */
-  def canonicalize(s: UString, unicode: Boolean): UString =
-    fromCodePoints(s.chars(unicode).map(EcmaScriptChars.canonicalize(_, unicode)))
-
   /** Shows the string as a JavaScript string literal.
     *
     * A control character uses `\xHH`, because `\cX` is not an escape in a string literal.
