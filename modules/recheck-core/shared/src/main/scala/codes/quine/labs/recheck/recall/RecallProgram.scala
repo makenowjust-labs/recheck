@@ -127,7 +127,7 @@ object RecallProgram:
           |""".stripMargin
     RecallProgram(Command("node", Seq("-")), script)
 
-  /** Returns the Python program for `python3`, using `re.search`. */
+  /** Returns the Python program for `python3`, using `re.search` in the C locale. */
   private[recall] def python(pattern: ParsedPattern, attack: AttackPattern): RecallProgram =
     val bytes = pattern.ir.mode == UnitMode.Byte
     val style = AttackPattern.Python(bytes)
@@ -139,7 +139,8 @@ object RecallProgram:
       case c @ ('i' | 'm' | 's' | 'x' | 'a' | 'u' | 'L') => s"re.${c.toUpper}"
     val input = attack.toString(style)
     val script =
-      s"""|import platform, re, sys, time
+      s"""|import locale, platform, re, sys, time
+          |locale.setlocale(locale.LC_ALL, 'C')
           |sys.stdout.write('$RuntimeLine python ' + platform.python_version() + '\\n')
           |regex = re.compile($source, ${union(flags, "0")})
           |string = $input
@@ -170,8 +171,10 @@ object RecallProgram:
       case 'u' => "Regexp::FIXEDENCODING"
     val regex = if prefix.isEmpty then source else s"${style.literal(UStringUtil.fromString(prefix))} + $source"
     val input = attack.toString(style)
+    // `ruby -` reads the program in the encoding of the locale.
     val script =
-      s"""|$$stdout.sync = true
+      s"""|# encoding: UTF-8
+          |$$stdout.sync = true
           |Regexp.timeout = nil if Regexp.respond_to?(:timeout=)
           |puts "$RuntimeLine ruby #{RUBY_VERSION}"
           |regex = Regexp.new($regex, ${union(options, "0")})
@@ -246,7 +249,9 @@ object RecallProgram:
         |}
         |""".stripMargin
 
-  /** Returns the data for the C# program for `dotnet run` (.NET 10 or later), using `Regex.Match`. */
+  /** Returns the data for the C# program for `dotnet run` (.NET 10 or later), using `Regex.Match` in the invariant
+    * culture.
+    */
   private[recall] def dotnet(pattern: ParsedPattern, attack: AttackPattern): RecallProgram =
     val flags = pattern.flags.distinct.filter(c => "imnsx".contains(c))
     val env = Map("DOTNET_NOLOGO" -> "1", "DOTNET_CLI_TELEMETRY_OPTOUT" -> "1")
@@ -260,6 +265,7 @@ object RecallProgram:
   private def dotnetProgram(data: String): String =
     s"""|using System;
         |using System.Diagnostics;
+        |using System.Globalization;
         |using System.Text;
         |using System.Text.RegularExpressions;
         |
@@ -270,6 +276,7 @@ object RecallProgram:
         |    return s.ToString();
         |}
         |
+        |CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
         |Console.WriteLine("$RuntimeLine .NET " + Environment.Version);
         |var lines = $data.Split('\\n', StringSplitOptions.RemoveEmptyEntries);
         |var options = RegexOptions.None;
@@ -328,7 +335,8 @@ object RecallProgram:
     if attack.suffix.nonEmpty then lines.addOne(s"1:${units(attack.suffix.iterator)}")
     lines.result().mkString("", "\n", "\n")
 
-  /** Returns the Perl program for `perl`, or `None` if the pattern cannot be put in the program as the dialect tells.
+  /** Returns the Perl program for `perl` in the C locale, or `None` if the pattern cannot be put in the program as the
+    * dialect tells.
     *
     * A regex literal (the default of recheck's Perl dialect) is put in the program, and a string is interpolated into
     * `qr` at runtime.
@@ -356,8 +364,10 @@ object RecallProgram:
       val input = attack.toString(AttackPattern.Perl)
       val pragma = if bytes then "" else "use utf8;\n"
       val script =
-        s"""|${pragma}use Time::HiRes ();
+        s"""|${pragma}use POSIX ();
+            |use Time::HiRes ();
             |$$| = 1;
+            |POSIX::setlocale(POSIX::LC_ALL(), "C");
             |print "$RuntimeLine perl " . sprintf("%vd", $$^V) . "\\n";
             |my $$regex = $regex;
             |my $$input = $input;
