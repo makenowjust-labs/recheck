@@ -6,7 +6,7 @@ import Select from '../form/Select';
 import TextArea from '../form/TextArea';
 import { formatBuild } from './builds';
 import styles from './Demo.module.css';
-import { dialectOf, paramsOf, selectValues } from './params';
+import { DEFAULT_DIALECT, dialectOf, paramsOf, selectValues } from './params';
 
 import type { Build } from './builds';
 import type { Param } from './params';
@@ -44,18 +44,39 @@ const DemoParams: React.FC<{ build: Build }> = ({ build }) => {
       <summary>Parameters</summary>
 
       <div className="container">
-        {paramsOf(build, dialect).map((param) => (
-          <div className="row margin-vert--sm" key={param.name}>
-            <div className="col col--3">
-              <h4>{`${param.title}${param.type === 'duration' ? ' (ms)' : ''}`}</h4>
+        {paramsOf(build, dialect)
+          .filter(({ name }) => name !== 'dialect')
+          .map((param) => (
+            <div className="row margin-vert--sm" key={param.name}>
+              <div className="col col--3">
+                <h4>{`${param.title}${param.type === 'duration' ? ' (ms)' : ''}`}</h4>
+              </div>
+              <div className="col col--2 col--offset-1">
+                <ParamInput param={param} dialect={dialect} />
+              </div>
             </div>
-            <div className="col col--2 col--offset-1">
-              <ParamInput param={param} dialect={dialect} />
-            </div>
-          </div>
-        ))}
+          ))}
       </div>
     </details>
+  );
+};
+
+const DemoDialect: React.FC<{ build: Build; disabled: boolean }> = ({ build, disabled }) => {
+  const param = paramsOf(build).find(({ name }) => name === 'dialect');
+  if (param === undefined) return null;
+  return (
+    <div className={`margin-top--sm ${styles.dialect}`}>
+      <label htmlFor="dialect">{param.title}</label>
+      <div className={styles.dialectSelect}>
+        <Select
+          id="dialect"
+          name="dialect"
+          values={selectValues(param, DEFAULT_DIALECT)}
+          defaultValue={String(param.defaultValue)}
+          disabled={disabled}
+        />
+      </div>
+    </div>
   );
 };
 
@@ -105,6 +126,8 @@ const DemoInput: React.FC<Props> = ({ check, cancel, running, builds, build, def
             <TextArea name="input" defaultValue="/^(a|a)*$/" placeholder="/^(a|a)*$/" />
           </div>
         </div>
+
+        <DemoDialect build={build} disabled={running} />
 
         <div className={`margin-top--sm ${styles.actions}`}>
           <LocalNote />

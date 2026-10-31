@@ -63,6 +63,17 @@
   flex: none;
 }
 
+.dialect {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.dialectSelect {
+  flex: none;
+}
+
 .localNote {
   position: relative;
   display: flex;

@@ -137,11 +137,13 @@ test("shows the parameters of the selected dialect", async ({ page }) => {
   const version = page.getByLabel("recheck version");
   const bundled = (await version.locator("option").allTextContents()).at(-1)!;
   await version.selectOption(bundled);
-  await page.getByText("Parameters", { exact: true }).click();
-
   const select = (name: string) => page.locator(`select[name="${name}"]`);
   const options = (name: string) =>
     select(name).locator("option").allTextContents();
+  // The dialect is chosen outside the parameters, and its settings are in them.
+  await expect(select("dialect")).toBeVisible();
+  await expect(page.locator('details select[name="dialect"]')).toHaveCount(0);
+  await page.getByText("Parameters", { exact: true }).click();
   await expect(select("dialect")).toHaveValue("javascript");
   await expect(select("dialectType")).toHaveCount(0);
   await expect(select("dialectSource")).toHaveCount(0);
