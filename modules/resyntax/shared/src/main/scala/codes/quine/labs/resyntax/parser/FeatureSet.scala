@@ -1,6 +1,8 @@
 package codes.quine.labs.resyntax.parser
 
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.DialectOptions
+import codes.quine.labs.resyntax.ast.Encoding
 import codes.quine.labs.resyntax.ast.FlagSet
 
 /** FeatureSet is a set of feature flags.
@@ -399,13 +401,20 @@ final case class FeatureSet(
     // .NET: 2147483647, Java: 2147483647, JavaScript: unlimited, PCRE: 65535, Perl: 2147483646, Python: 4294967294, Ruby: 100000
     maxRepeatCount: Long,
     // PCRE: every name, Perl: 3 to 14 characters without upper case letters and blanks, Ruby: up to 20 characters without `:`
-    classPosixNameRule: ClassPosixNameRule
+    classPosixNameRule: ClassPosixNameRule,
+    // Python (with `b`): Latin-1, PCRE (without `u`), Perl (bytes): UTF-8, Ruby (ASCII-8BIT): ASCII, the others: text
+    sourceEncoding: SourceEncoding
 )
 
 object FeatureSet:
 
   /** Computes a feature set from a quick analysis result, the given dialect and the given flag set. */
-  def from(analysis: QuickAnalysis, dialect: Dialect, flagSet: FlagSet): FeatureSet =
+  def from(
+      analysis: QuickAnalysis,
+      dialect: Dialect,
+      flagSet: FlagSet,
+      options: DialectOptions = DialectOptions.Default
+  ): FeatureSet =
     val isDotNet = dialect == Dialect.DotNet
     val isJava = dialect == Dialect.Java
     val isJavaScript = dialect == Dialect.JavaScript
@@ -414,8 +423,10 @@ object FeatureSet:
     val isPython = dialect == Dialect.Python
     val isRuby = dialect == Dialect.Ruby
 
-    val isByte = flagSet.bytes
-    val isUnicode = flagSet.unicode || flagSet.unicodeSets
+    // Python's bytes pattern
+    val isByte = isPython && (flagSet.bytes || options.encoding.contains(Encoding.PythonBytes))
+    // PCRE reads UTF-8 by `u` (PHP) or `(*UTF)`.
+    val isUnicode = flagSet.unicode || flagSet.unicodeSets || (isPCRE && analysis.hasUtfStartOption)
 
     FeatureSet(
       // JavaScript (without `uv`), Perl, Ruby
@@ -589,12 +600,12 @@ object FeatureSet:
       hasBackslashBackspace = isDotNet || isJavaScript || isPCRE || isPerl || isPython || isRuby,
       // .NET, Java, PCRE, Perl, Python, Ruby
       hasBackslashBell = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
-      // Java, Perl, Python
-      hasBackslashCharName = isJava || isPerl || isPython,
+      // Java, Perl, Python (without `b`)
+      hasBackslashCharName = isJava || isPerl || (isPython && !isByte),
       // PCRE (with `u`), Perl
       hasBackslashCharNameHex = (isPCRE && isUnicode) || isPerl,
-      // PCRE
-      hasBackslashCodeUnit = isPCRE,
+      // PCRE (without `u`: PHP rejects `\C` with it, but not with `(*UTF)`)
+      hasBackslashCodeUnit = isPCRE && !flagSet.unicode,
       // JavaScript (with `v`)
       hasBackslashClassSetReservedPunctuator = isJavaScript && flagSet.unicodeSets,
       // .NET, Java, JavaScript, PCRE, Perl, Ruby
@@ -646,10 +657,10 @@ object FeatureSet:
       hasBackslashStickyAssert = isDotNet || isJava || isPCRE || isPerl || isRuby,
       // JavaScript (with `uv`), Ruby
       hasBackslashUnicodeBracket = (isJavaScript && isUnicode) || isRuby,
-      // .NET, Java, JavaScript, Python, Ruby
-      hasBackslashUnicodeHex = isDotNet || isJava || isJavaScript || isPython || isRuby,
-      // Python
-      hasBackslashUnicodeHex8 = isPython,
+      // .NET, Java, JavaScript, Python (without `b`), Ruby
+      hasBackslashUnicodeHex = isDotNet || isJava || isJavaScript || (isPython && !isByte) || isRuby,
+      // Python (without `b`)
+      hasBackslashUnicodeHex8 = isPython && !isByte,
       // Ruby
       hasBackslashUnicodeList = isRuby,
       // .NET, Java, JavaScript (with `uv`), PCRE. Perl, Ruby
@@ -826,5 +837,13 @@ object FeatureSet:
       classPosixNameRule = dialect match
         case Dialect.Perl => ClassPosixNameRule.Perl
         case Dialect.Ruby => ClassPosixNameRule.Ruby
-        case _            => ClassPosixNameRule.Always
+        case _            => ClassPosixNameRule.Always,
+      // Python (with `b`): Latin-1, PCRE (without `u`), Perl (bytes): UTF-8, Ruby (ASCII-8BIT): ASCII, the others: text
+      sourceEncoding =
+        if isByte then SourceEncoding.Latin1
+        else if (isPCRE && !isUnicode) || (isPerl && options.encoding.contains(Encoding.PerlBytes)) then
+          SourceEncoding.Utf8
+        else if isRuby && (flagSet.explicitCapture || options.encoding.contains(Encoding.RubyAscii8Bit)) then
+          SourceEncoding.Ascii
+        else SourceEncoding.Text
     )

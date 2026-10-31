@@ -50,7 +50,8 @@ object Parser:
   /** Parses the source in the dialect.
     *
     * A Perl regex literal (the default of [[DialectOptions.perlSource]]) is rewritten as Perl's lexer does first, and
-    * the locations of the result point into the given source.
+    * the locations of the result point into the given source. A source that the engine reads as bytes (see
+    * [[SourceEncoding]]) is read by its bytes, and the locations of a byte point to its character.
     */
   def parse(
       source: String,
@@ -59,19 +60,32 @@ object Parser:
       options: DialectOptions = DialectOptions.Default
   ): Node =
     options.validate(dialect)
+    val encoding = FeatureSet.from(QuickAnalysis.from(source), dialect, flagSet, options).sourceEncoding
+    checkEncoding(source, encoding)
+    val bytes = if encoding == SourceEncoding.Utf8 then Rewritten.utf8(source) else None
+    val text = bytes.fold(source)(_.text)
     val rewritten =
       if dialect == Dialect.Perl && options.perlSource == PerlSource.Literal then
-        PerlLiteralLexer.rewrite(source, flagSet.verbose)
+        PerlLiteralLexer.rewrite(text, flagSet.verbose, bytes = encoding == SourceEncoding.Utf8)
       else None
-    rewritten match
-      case None    => parseText(source, flagSet, dialect)
-      case Some(r) =>
-        try r.relocate(parseText(r.text, flagSet, dialect))
-        catch case ex: ParsingException => throw new ParsingException(ex.message, ex.pos.map(r.position))
+    val rewrites = rewritten.toSeq ++ bytes.toSeq
+    try rewrites.foldLeft(parseText(rewritten.fold(text)(_.text), flagSet, dialect, options))((n, r) => r.relocate(n))
+    catch
+      case ex: ParsingException if rewrites.nonEmpty =>
+        throw new ParsingException(ex.message, ex.pos.map(pos => rewrites.foldLeft(pos)((p, r) => r.position(p))))
 
-  private def parseText(source: String, flagSet: FlagSet, dialect: Dialect): Node =
+  /** Rejects a character that the source encoding cannot have. */
+  private def checkEncoding(source: String, encoding: SourceEncoding): Unit =
+    val (limit, message) = encoding match
+      case SourceEncoding.Latin1 => (0xff, "Non-Latin-1 character in bytes pattern")
+      case SourceEncoding.Ascii  => (0x7f, "Non-ASCII character in ASCII-8BIT pattern")
+      case _                     => return
+    val pos = source.indexWhere(_ > limit)
+    if pos >= 0 then throw new ParsingException(message, Some(pos))
+
+  private def parseText(source: String, flagSet: FlagSet, dialect: Dialect, options: DialectOptions): Node =
     val analysis = QuickAnalysis.from(source)
-    val featureSet = FeatureSet.from(analysis, dialect, flagSet)
+    val featureSet = FeatureSet.from(analysis, dialect, flagSet, options)
     val parser = new Parser(source, analysis, featureSet)
     parser.parse()
 
@@ -2715,6 +2729,9 @@ private[parser] final class Parser(
       else if featureSet.limitsCodePointTo0xFF then 0xff
       else 0x10ffff
     if value > max then fail("Code point too large", pos)
+    // Ruby's `\u` escapes are Unicode, which an ASCII-8BIT regexp cannot have except ASCII.
+    if featureSet.sourceEncoding == SourceEncoding.Ascii && value >= 0x80 then
+      fail("Incompatible character encoding", pos)
     if !featureSet.allowsSurrogateEscape && 0xd800 <= value && value <= 0xdfff then fail("Invalid Unicode escape", pos)
     value.min(Int.MaxValue).toInt
 

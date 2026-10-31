@@ -11,6 +11,7 @@ import codes.quine.labs.resyntax.charset.ClassSet
 import codes.quine.labs.resyntax.charset.EnumeratedProperty
 import codes.quine.labs.resyntax.charset.Properties
 import codes.quine.labs.resyntax.charset.PropertyValue
+import codes.quine.labs.resyntax.charset.UnitMode
 
 /** PropertyResult is a result of looking up a Unicode property in a dialect. */
 private[ir] enum PropertyResult:
@@ -800,7 +801,15 @@ private[ir] object IRProperties:
       case "word"   => Some(binary("Alphabetic").union(gc("M", "Nd", "Pc")).union(binary("Join_Control")))
       case _        => None
 
-  def ruby(name: String, value: Option[String]): PropertyResult =
+  /** Looks up Ruby's property; an ASCII-8BIT regexp (`bytes`) has only the POSIX classes in ASCII. */
+  def ruby(name: String, value: Option[String], bytes: Boolean = false): PropertyResult =
+    if bytes then
+      return fromOption(
+        Option
+          .when(value.isEmpty)(rubyKey(name))
+          .flatMap(rubyPosix(_))
+          .map(s => found(s.intersect(CharSet.range(0, 0x7f))))
+      )
     value match
       case Some(value) =>
         if rubyKey(name) == "age" then fromOption(rubyAge.get(rubyKey(value)).map(v => found(Properties.presentIn(v))))
@@ -820,12 +829,18 @@ private[ir] object IRProperties:
         )
 
   /** Returns the property of the name and value in the dialect. */
-  def resolve(dialect: Dialect, name: String, value: Option[String], flags: IRCharFlags): PropertyResult =
+  def resolve(
+      dialect: Dialect,
+      name: String,
+      value: Option[String],
+      flags: IRCharFlags,
+      mode: UnitMode
+  ): PropertyResult =
     dialect match
       case Dialect.JavaScript => javaScript(name, value, flags.unicodeSets)
       case Dialect.Java       => java(name, value, flags)
       case Dialect.DotNet     => if value.isEmpty then dotNet(name) else Unknown
       case Dialect.PCRE       => pcre(name, value)
       case Dialect.Perl       => perl(name, value)
-      case Dialect.Ruby       => ruby(name, value)
+      case Dialect.Ruby       => ruby(name, value, mode == UnitMode.Byte)
       case Dialect.Python     => Unknown

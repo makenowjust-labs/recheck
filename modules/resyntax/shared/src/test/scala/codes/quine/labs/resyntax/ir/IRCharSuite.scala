@@ -113,6 +113,37 @@ class IRCharSuite extends munit.FunSuite:
   chars("é", "u", PCRE)(CharSet.single(0xe9))
   chars("[é]", "", PCRE)(CharSet.of(0xa9, 0xc3))
   chars("[à-é]", "", PCRE)(CharSet.range(0xa0, 0xc3).union(CharSet.single(0xa9)))
+  // A quantifier repeats the last byte of a non-ASCII literal.
+  check("é+", "", PCRE)(
+    Sequence(
+      Chars(CharSet.single(0xc3)),
+      Repeat(Chars(CharSet.single(0xa9)), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy))
+    )
+  )
+  check("(*UTF)é+", "", PCRE)(Repeat(Chars(of("é")), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy)))
+  chars("[𝌆-𝌈a-z]", "", PCRE)(
+    CharSet.of(0xf0, 0x9d, 0x8c, 0x88).union(CharSet.range(0x86, 0xf0)).union(CharSet.range('a', 'z'))
+  )
+  test("IRBuilder.build: Perl's byte strings"):
+    val options = DialectOptions(encoding = Some(Encoding.PerlBytes))
+    def set(s: String): CharSet = setOf(build(s, "", Perl, options).node.data)
+    assertEquals(set("[é]"), CharSet.of(0xa9, 0xc3))
+    assertEquals(set("\\x{100}"), CharSet.empty)
+    assertEquals(set("[a\\x{100}]"), of("a"))
+    assertEquals(set("[a-\\x{100}]"), CharSet.range('a', 0xff))
+    assertEquals(set("\\xe9"), CharSet.single(0xe9))
+    // Its non-ASCII literals are bytes, which do not make the pattern use Unicode rules.
+    val Sequence(nodes) = build("é\\w", "", Perl, options).node.data: @unchecked
+    assertEquals(nodes.last.data, Chars(IRCharClasses.AsciiPosix("word")))
+  // Python's bytes pattern is Latin-1.
+  chars("é", "b", Python)(CharSet.single(0xe9))
+  // Ruby's ASCII-8BIT regexp has only the POSIX classes in ASCII as properties.
+  chars("\\p{Alpha}", "n", Ruby)(CharSet.range('A', 'Z').union(CharSet.range('a', 'z')))
+  chars("\\p{Punct}", "n", Ruby)(IRCharClasses.AsciiPosix("punct"))
+  chars("\\P{Space}", "n", Ruby)(of(" \t\n\u000b\f\r").complement(UnitMode.Byte))
+  error("\\p{L}", "n", Ruby)("Unknown Unicode property name at 0")
+  error("\\p{Any}", "n", Ruby)("Unknown Unicode property name at 0")
+  error("\\p{Age=1.1}", "n", Ruby)("Unknown Unicode property name at 0")
   // Ruby reads byte escapes as the bytes of a UTF-8 character.
   chars("\\xC3\\xA9", "", Ruby)(of("é"))
   chars("[\\xC3\\xA9]", "", Ruby)(of("é"))
@@ -251,7 +282,6 @@ class IRCharSuite extends munit.FunSuite:
     Atomic(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical)))
   )
   check("\\R", "", Java)(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical)))
-  unsupported("\\X", "", Java, PCRE, Perl, Ruby)
   unsupported("\\N{LATIN SMALL LETTER A}", "", Perl, Python)
   error("\\N{U+41}", "", Java, Python)("Unknown character name at 0")
   error("\\p{RGI_Emoji}", "", Perl)("Unknown Unicode property name at 0")

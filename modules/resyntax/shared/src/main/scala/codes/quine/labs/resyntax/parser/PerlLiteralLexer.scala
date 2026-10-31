@@ -25,73 +25,15 @@ import codes.quine.labs.resyntax.charset.UString
   */
 private[parser] object PerlLiteralLexer:
 
-  /** Rewritten is a rewritten text, where each code unit keeps the range of the source that it comes from. */
-  final class Rewritten(val text: String, starts: Array[Int], ends: Array[Int], sourceLength: Int):
-
-    /** Returns the source position of a position in the text. */
-    def position(pos: Int): Int = if pos >= text.length then sourceLength else starts(pos)
-
-    /** Returns the source location of a location in the text.
-      *
-      * The removed commands at the start and the end belong to the nodes there, and the others to no node.
-      */
-    def location(loc: SourceLocation): SourceLocation =
-      if loc.start < 0 then loc
-      else
-        val start = if loc.start == 0 then 0 else position(loc.start)
-        val end =
-          if loc.end >= text.length then sourceLength else if loc.end > loc.start then ends(loc.end - 1) else start
-        SourceLocation(start, end)
-
-    /** Returns the node whose locations are moved to the source. */
-    def relocate(node: Node): Node = Node(relocateData(node.data), location(node.loc))
-
-    private def relocateData(data: NodeData): NodeData = data match
-      case NodeData.Disjunction(nodes)  => NodeData.Disjunction(nodes.map(relocate))
-      case NodeData.Sequence(nodes)     => NodeData.Sequence(nodes.map(relocate))
-      case NodeData.Repeat(node, q)     => NodeData.Repeat(relocate(node), q)
-      case NodeData.Group(kind, node)   => NodeData.Group(kind, relocate(node))
-      case NodeData.Command(kind)       => NodeData.Command(relocateCommand(kind))
-      case NodeData.Class(invert, item) => NodeData.Class(invert, relocateItem(item))
-      case data                         => data
-
-    private def relocateCommand(kind: CommandKind): CommandKind = kind match
-      case CommandKind.BranchReset(nodes)         => CommandKind.BranchReset(nodes.map(relocate))
-      case CommandKind.Conditional(test, yes, no) =>
-        CommandKind.Conditional(relocateTest(test), relocate(yes), no.map(relocate))
-      case CommandKind.AbsenceExpression(absent, exp) => CommandKind.AbsenceExpression(relocate(absent), relocate(exp))
-      case CommandKind.AbsenceStopper(absent)         => CommandKind.AbsenceStopper(relocate(absent))
-      case kind                                       => kind
-
-    private def relocateTest(test: ConditionalTest): ConditionalTest = test match
-      case test: ConditionalTest.LookAround           => relocateLookAround(test)
-      case ConditionalTest.CalloutLookAround(c, test) => ConditionalTest.CalloutLookAround(c, relocateLookAround(test))
-      case test                                       => test
-
-    private def relocateLookAround(test: ConditionalTest.LookAround): ConditionalTest.LookAround =
-      test.copy(node = relocate(test.node))
-
-    private def relocateItem(item: ClassItem): ClassItem = item match
-      case item: ClassItem.Value         => relocateValue(item)
-      case ClassItem.NonValue(data, loc) => ClassItem.NonValue(relocateItemData(data), location(loc))
-
-    private def relocateValue(item: ClassItem.Value): ClassItem.Value = item.copy(loc = location(item.loc))
-
-    private def relocateItemData(data: ClassItemData): ClassItemData = data match
-      case ClassItemData.ClassUnion(items)       => ClassItemData.ClassUnion(items.map(relocateItem))
-      case ClassItemData.ClassIntersection(l, r) => ClassItemData.ClassIntersection(relocateItem(l), relocateItem(r))
-      case ClassItemData.ClassDiff(l, r)         => ClassItemData.ClassDiff(relocateItem(l), relocateItem(r))
-      case ClassItemData.ClassNest(invert, item) => ClassItemData.ClassNest(invert, relocateItem(item))
-      case ClassItemData.ClassRange(begin, end)  => ClassItemData.ClassRange(relocateValue(begin), relocateValue(end))
-      case data                                  => data
-
   /** Rewrites the regex literal, or returns `None` if it has no command.
     *
     * @param extended
     *   whether the literal has the `x` flag, where the lexer skips `#` comments
+    * @param bytes
+    *   whether the literal is a byte string, whose non-ASCII bytes the case commands do not change
     */
-  def rewrite(source: String, extended: Boolean): Option[Rewritten] =
-    if !source.contains('\\') then None else new PerlLiteralLexer(source, extended).run()
+  def rewrite(source: String, extended: Boolean, bytes: Boolean = false): Option[Rewritten] =
+    if !source.contains('\\') then None else new PerlLiteralLexer(source, extended, bytes).run()
 
   /** The non-ASCII characters that `quotemeta` quotes in a UTF-8 string (perlfunc `quotemeta`). */
   private lazy val QuotedNonAscii: CharSet =
@@ -105,7 +47,7 @@ private[parser] object PerlLiteralLexer:
 
   private def isLUF(c: Char): Boolean = c == 'L' || c == 'U' || c == 'F'
 
-private final class PerlLiteralLexer(source: String, extended: Boolean):
+private final class PerlLiteralLexer(source: String, extended: Boolean, bytes: Boolean):
   import PerlLiteralLexer.*
 
   /** The source, where the lexer swaps `\L\u` and `\U\l` in place. */
@@ -208,9 +150,10 @@ private final class PerlLiteralLexer(source: String, extended: Boolean):
         case 'Q' =>
           if isQuoted(c) then out.add('\\', start, end)
           out.addCodePoints(UString(c), start, end)
-        case 'U' => out.addCodePoints(FullCaseMapping.upper(c), start, end)
-        case 'L' => out.addCodePoints(FullCaseMapping.lower(c), start, end)
-        case 'F' => out.addCodePoints(FullCaseFolding(c), start, end)
+        case _ if bytes && c >= 0x80 => out.addCodePoints(UString(c), start, end)
+        case 'U'                     => out.addCodePoints(FullCaseMapping.upper(c), start, end)
+        case 'L'                     => out.addCodePoints(FullCaseMapping.lower(c), start, end)
+        case 'F'                     => out.addCodePoints(FullCaseFolding(c), start, end)
         case 'u' => out.addCodePoints(if i == 0 then FullCaseMapping.title(c) else UString(c), start, end)
         case 'l' => out.addCodePoints(if i == 0 then FullCaseMapping.lower(c) else UString(c), start, end)
         case _   => throw new IllegalStateException(s"Unknown command: ${frame.command}")

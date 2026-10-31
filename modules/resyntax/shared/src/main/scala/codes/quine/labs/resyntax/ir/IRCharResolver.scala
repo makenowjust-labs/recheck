@@ -122,7 +122,10 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         case data => throw new IllegalArgumentException(s"Not a literal: $data")
     val merged =
       if dialect == Dialect.Ruby && mode == UnitMode.CodePoint then mergeRubyBytes(lits.toSeq) else lits.toSeq
-    val units = mergeSurrogates(merged).flatMap(lit => unitsOf(lit).map(u => lit.copy(value = u)))
+    val units = mergeSurrogates(merged).flatMap: lit =>
+      unitsOf(lit) match
+        case Seq() => Seq(lit.copy(value = NoUnit))
+        case us    => us.map(u => lit.copy(value = u))
     val out = Seq.newBuilder[IRNode]
     var i = 0
     while i < units.length do
@@ -137,7 +140,8 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     out.result()
 
   private def closed(u: Lit): IRNode =
-    IRNode(IRNodeData.Chars(equivalence(u.flags).closure(CharSet.single(u.value))), u.loc)
+    if u.value == NoUnit then IRNode(IRNodeData.Chars(CharSet.empty), u.loc)
+    else IRNode(IRNodeData.Chars(equivalence(u.flags).closure(CharSet.single(u.value))), u.loc)
 
   /** Whether a literal takes part in Ruby's and Perl's multi-character case folding.
     *
@@ -238,10 +242,10 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     case UnitMode.CodePoint => Seq(lit.value)
     case UnitMode.Utf16     => UString(lit.value).encode(UnitMode.Utf16).toSeq
     case UnitMode.Byte      =>
-      // A non-ASCII literal written in the pattern is its UTF-8 bytes, except in Python, whose bytes pattern is Latin-1.
-      if lit.source && lit.value >= 0x80 && dialect != Dialect.Python then
-        UString(lit.value).encode(UnitMode.Byte).toSeq
-      else if lit.value <= 0xff then Seq(lit.value)
+      // The parser reads a byte source by bytes, so only an escape can be above `0xFF`.
+      if lit.value <= 0xff then Seq(lit.value)
+      // Perl makes the pattern UTF-8 for it, and it never matches a byte string.
+      else if dialect == Dialect.Perl then Seq.empty
       else throw new IRBuildingException("Character value is too large in byte mode", lit.loc)
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -357,7 +361,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       flags: IRCharFlags,
       loc: SourceLocation
   ): ClassSet =
-    IRProperties.resolve(dialect, name, value, flags) match
+    IRProperties.resolve(dialect, name, value, flags, mode) match
       case PropertyResult.Unknown              => throw new IRBuildingException("Unknown Unicode property name", loc)
       case PropertyResult.NotModeled           => throw new NotModeledException
       case PropertyResult.Found(set, caseKind) =>
@@ -546,10 +550,13 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   ): ClassSet =
     val b = valueUnits(begin, flags, loc)
     val e = valueUnits(end, flags, loc)
+    // Perl's range with an endpoint above `0xFF` is between code points, and a byte string has only its bytes.
+    if b.isEmpty || e.isEmpty then
+      if begin.value > end.value then throw new IRBuildingException("Range out of order in character class", loc)
+      return ClassSet(equivalence(flags).closeRange(CharSet.range(begin.value, end.value).restrict(mode)))
     // A range alone in a class has no neighbors to make a multibyte character with its byte escape.
     if dialect == Dialect.Ruby && mode == UnitMode.CodePoint && Seq(begin, end).exists(isRubyByteValue) then
       throw new IRBuildingException("Invalid multibyte escape", loc)
-    // In byte mode, the bytes of a non-ASCII literal around `-` are separate members and the range is between bytes.
     if b.last > e.head then throw new IRBuildingException("Range out of order in character class", loc)
     val eq = equivalence(flags)
     ClassSet(eq.closure(CharSet.of((b.init ++ e.tail)*)).union(eq.closeRange(CharSet.range(b.last, e.head))))
@@ -595,6 +602,9 @@ private[ir] object IRCharResolver:
         EscapeStyle.ControlDash | EscapeStyle.Control(_) =>
       true
     case _ => false
+
+  /** The value of a literal that has no unit in the mode, which never matches. */
+  val NoUnit: Int = -1
 
   /** The largest number of multi-character foldings in a run; more of them leave the run to the one-to-one folding. */
   val MaxMultiFoldings: Int = 6

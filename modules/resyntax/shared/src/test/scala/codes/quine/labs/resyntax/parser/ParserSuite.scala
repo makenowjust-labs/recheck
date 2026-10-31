@@ -26,7 +26,9 @@ class ParserSuite extends ParserSuiteBase:
   // Sequence:
   check("ab", "", All*)(Sequence(Literal('a'), Literal('b')))
   check("\uD83D\uDE00", "", Java, Perl, Python, Ruby)(Literal(0x1f600))
-  check("\uD83D\uDE00", "", DotNet, JavaScript, PCRE)(Sequence(Literal(0xd83d), Literal(0xde00)))
+  check("\uD83D\uDE00", "", DotNet, JavaScript)(Sequence(Literal(0xd83d), Literal(0xde00)))
+  check("\uD83D\uDE00", "u", PCRE)(Literal(0x1f600))
+  check("\uD83D\uDE00", "", PCRE)(Sequence(Literal(0xf0), Literal(0x9f), Literal(0x98), Literal(0x80)))
 
   // Repeat:
   check("a*", "", All*)(Repeat(Literal('a'), Star(Greedy)))

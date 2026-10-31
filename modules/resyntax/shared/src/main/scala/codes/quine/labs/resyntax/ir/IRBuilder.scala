@@ -18,7 +18,6 @@ import codes.quine.labs.resyntax.ast.QuoteLiteral
 import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.FullCaseFolding
-import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
 /** IRBuilder is a builder from AST node to IR. */
@@ -57,9 +56,11 @@ object IRBuilder:
     val context = BuildingContext.from(flagSet, dialect, featureSet)
     val table = CaptureAnalyzer.analyze(node, context)
     val resolver = new ReferenceResolver(table, dialect, featureSet)
-    val perlUnicodeRules = dialect == Dialect.Perl && usesPerlUnicodeRules(node, options.perlUtf8)
+    // A Perl byte string has no `use utf8`, so its non-ASCII literals are bytes.
+    val perlUtf8 = if mode == UnitMode.Byte then options.perlUtf8.orElse(Some(false)) else options.perlUtf8
+    val perlUnicodeRules = dialect == Dialect.Perl && usesPerlUnicodeRules(node, perlUtf8)
     val checker =
-      new LookBehindChecker(table, resolver, featureSet, literalWidth(dialect, mode, flagSet, perlUnicodeRules))
+      new LookBehindChecker(table, resolver, featureSet, literalWidth(flagSet, dialect, perlUnicodeRules))
     val backReferences = new IRValidator(table, resolver, checker, featureSet).validate(node)
     val chars = new IRCharResolver(dialect, mode, perlUnicodeRules)
     val builder = new IRBuilder(context, table, backReferences, chars, resolveCharacter)
@@ -99,27 +100,17 @@ object IRBuilder:
 
   /** Returns the width of a literal in a look-behind, where the dialects counting it differently from one care.
     *
-    * PCRE's byte mode counts the UTF-8 bytes of a non-ASCII literal (a surrogate of a pair is half of four bytes), and
     * Perl counts the folded length under `i` (e.g. `(?<=ß{128})` is too long). The flag `i` is the pattern's one here.
     */
   private def literalWidth(
-      dialect: Dialect,
-      mode: UnitMode,
       flagSet: FlagSet,
+      dialect: Dialect,
       perlUnicodeRules: Boolean
   ): Int => LookBehindChecker.Width =
     import LookBehindChecker.Width
-    dialect match
-      case Dialect.PCRE if mode == UnitMode.Byte =>
-        value =>
-          if value < 0x80 then Width(1, 1)
-          else if 0xd800 <= value && value <= 0xdfff then Width(2, 2)
-          else
-            val n = UString(value).encode(UnitMode.Byte).length.toLong
-            Width(n, n)
-      case Dialect.Perl if flagSet.ignoreCase && perlUnicodeRules =>
-        value => Width(1, FullCaseFolding(value).length.max(1).toLong)
-      case _ => _ => Width(1, 1)
+    if dialect == Dialect.Perl && flagSet.ignoreCase && perlUnicodeRules then
+      value => Width(1, FullCaseFolding(value).length.max(1).toLong)
+    else _ => Width(1, 1)
 
   /** Checks whether a Perl pattern uses Unicode rules under `/d` (perlre "Which character set modifier is in effect?").
     *
