@@ -182,8 +182,8 @@ object Properties:
     require(i >= 0, s"not an Age value: $age")
     CharSet.union(Age.values.slice(1, i + 1).map(_.set))
 
-  /** Builds a multi-valued property; `valueNames` are used when the raw data has no value names. */
-  private def fromCombined(raw: RawCombined, valueNames: IndexedSeq[(IndexedSeq[String], String)]): EnumeratedProperty =
+  /** Builds a multi-valued property; `defaults` name the values when the raw data has no value names. */
+  private def fromCombined(raw: RawCombined, defaults: IndexedSeq[(IndexedSeq[String], String)]): EnumeratedProperty =
     val (names, short) = Codec.names(raw.names)
     lazy val table = RunTable.decode(raw.runs)
     lazy val combos: IndexedSeq[Set[Int]] =
@@ -194,7 +194,7 @@ object Properties:
         out += values.slice(i + 1, i + 1 + values(i)).toSet
         i += 1 + values(i)
       out.result()
-    val fields = if raw.values.isEmpty then valueNames else raw.values.split(";").toIndexedSeq.map(Codec.names)
+    val fields = if raw.values.isEmpty then defaults else raw.values.split(";").toIndexedSeq.map(Codec.names)
     lazy val values: IndexedSeq[PropertyValue] = fields.zipWithIndex.map:
       case ((valueNames, valueShort), i) =>
         PropertyValue(names.head, valueNames, valueShort, table.setOf(combos(_).contains(i)))
