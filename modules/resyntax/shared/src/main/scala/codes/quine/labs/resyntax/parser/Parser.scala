@@ -271,8 +271,7 @@ private[parser] final class Parser(
         pushRepeat(stack, popRepeatable(stack), quantifier)
 
   private def parseRepeatCountOption(): Option[Int] =
-    val start = offset
-    parseSaturatedIntOption(featureSet.maxRepeatCount, "Number too big in {} quantifier", start)
+    parseSaturatedIntOption(featureSet.maxRepeatCount, "Number too big in {} quantifier", offset)
 
   private def skipBraceBlank(force: Boolean = false): Unit =
     if force || featureSet.allowsBlankInBrace then while !isEnd && (currentChar == ' ' || currentChar == '\t') do next()
@@ -2860,7 +2859,7 @@ private[parser] final class Parser(
       featureSet.hasBackslashControlDigitInClass && context.inClass && (isDigit || currentChar == '_')
 
   private def isAlphabetic: Boolean =
-    !isEnd && ('a' <= currentChar && currentChar <= 'z' || 'A' <= currentChar && currentChar <= 'Z')
+    !isEnd && CodePointUtil.isAlphabetic(currentChar.toInt)
 
   private def isIDStart: Boolean =
     !isEnd && CodePointUtil.isIDStart(currentChar.toInt)
