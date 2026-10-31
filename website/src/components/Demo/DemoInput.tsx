@@ -80,15 +80,18 @@ const DemoDialect: React.FC<{ build: Build; disabled: boolean }> = ({ build, dis
         />
       </div>
       <Link
-        className={styles.dialectFlags}
-        to={`/docs/usage/dialects/${dialect}#flags-and-units`}
-        aria-label={`Flags of ${dialect}`}
-        title={`Flags of ${dialect}`}
+        className={styles.dialectDetails}
+        to={`/docs/usage/dialects/${dialect}`}
+        aria-label={`Details of ${dialect}`}
+        title={`Details of ${dialect}`}
         target="_blank"
         rel="noopener noreferrer"
       >
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-          <path d="M4 22V3M4 4h12l-2 4 2 4H4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+          <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 11v6M12 7.5v.01" />
+          </g>
         </svg>
       </Link>
     </div>

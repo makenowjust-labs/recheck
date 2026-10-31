@@ -149,23 +149,17 @@ test("shows the parameters of the selected dialect", async ({ page }) => {
   await expect(select("dialectSource")).toHaveCount(0);
 
   await expect(
-    page.getByRole("link", { name: "Flags of javascript" }),
-  ).toHaveAttribute(
-    "href",
-    "/recheck/docs/usage/dialects/javascript/#flags-and-units",
-  );
+    page.getByRole("link", { name: "Details of javascript" }),
+  ).toHaveAttribute("href", "/recheck/docs/usage/dialects/javascript/");
 
   await expect(
-    page.getByRole("link", { name: "Flags of javascript" }),
+    page.getByRole("link", { name: "Details of javascript" }),
   ).toHaveAttribute("target", "_blank");
 
   await select("dialect").selectOption("perl");
   await expect(
-    page.getByRole("link", { name: "Flags of perl" }),
-  ).toHaveAttribute(
-    "href",
-    "/recheck/docs/usage/dialects/perl/#flags-and-units",
-  );
+    page.getByRole("link", { name: "Details of perl" }),
+  ).toHaveAttribute("href", "/recheck/docs/usage/dialects/perl/");
   expect(await options("dialectUtf8")).toEqual(["true", "false"]);
   await expect(select("dialectSource")).toHaveValue("literal");
   await expect(select("dialectEncoding")).toHaveCount(0);

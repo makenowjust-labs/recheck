@@ -74,13 +74,13 @@
   flex: none;
 }
 
-.dialectFlags {
+.dialectDetails {
   display: inline-flex;
   align-items: center;
   color: var(--ifm-color-emphasis-700);
 }
 
-.dialectFlags:hover {
+.dialectDetails:hover {
   color: var(--ifm-color-primary);
 }
 
