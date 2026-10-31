@@ -230,7 +230,7 @@ class IRCharSuite extends munit.FunSuite:
   chars("Σ", "i", JavaScript, Python(), Ruby())(of("Σσς"))
   chars("İ", "i", Python())(of("Ii\u0130\u0131"))
   chars("İ", "iu", Java)(of("Ii\u0130\u0131"))
-  chars("İ", "i", DotNet, JavaScript, Perl(), Ruby())(of("\u0130"))
+  chars("İ", "i", DotNet, JavaScript)(of("\u0130"))
   chars("µ", "i", DotNet, Java)(of("\u00b5"))
   chars("µ", "i", Perl(), Python(), Ruby())(of("\u00b5\u039c\u03bc"))
   chars("k", "ia", Python())(of("kK"))
@@ -297,6 +297,19 @@ class IRCharSuite extends munit.FunSuite:
   check("(?<=\\N{U+DF})", "i", Perl())(LookBehind(false, sharpS, Forward(Seq(Longest(1, 2)))))
   // Perl counts `\xDF` of a pattern that is not UTF-8 as one character in a look-behind, so it does not match `ss` there.
   check("(?<=\\xDF)", "i", Perl())(LookBehind(false, sharpS, Forward(Seq(Longest(1, 1)))))
+  // `İ` folds to `i` and U+0307 by default (the Turkic folding to `i` is apart).
+  val dottedI: IRNodeData = Disjunction(Sequence(Chars(of("iI")), Chars(of("\u0307"))), Chars(of("\u0130")))
+  check("İ", "i", Ruby(), Perl())(dottedI)
+  check("i\u0307", "i", Ruby(), Perl())(dottedI)
+  check("\\u0130", "i", Ruby())(dottedI)
+  check("\\x{130}", "i", Perl())(dottedI)
+  check("i\\x{307}", "i", Perl())(dottedI)
+  check("[İ]", "i", Perl())(dottedI)
+  check("[İ]", "i", Ruby())(Disjunction(Chars(of("\u0130")), dottedI))
+  check("(?<=İ)", "i", Perl())(LookBehind(false, dottedI, Forward(Seq(Longest(1, 2)))))
+  // Perl's `aa` and `l` forbid it, because the folding has an ASCII character.
+  chars("İ", "iaa", Perl())(of("\u0130"))
+  chars("[İx]", "il", Perl())(of("\u0130xX"))
   // A native string under `/d` has no character to match the folding.
   chars("\\xDF", "i", Perl(utf8 = false))(of("\u00df"))
   check("\\xDF", "iu", Perl(utf8 = false))(
@@ -512,7 +525,9 @@ class IRCharSuite extends munit.FunSuite:
       ("ſ", "i", 1),
       ("(?a)ﬃ", "i", 3),
       ("(?aa)ﬃ", "i", 1),
+      ("İ", "i", 2),
       ("(?aa)İ", "i", 1),
+      ("(?l)İ", "i", 1),
       ("(?aa)ß", "i", 2),
       ("(?aa)ΐ", "i", 3),
       ("(?u)ß", "i", 2)
