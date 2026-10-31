@@ -3,21 +3,13 @@ package codes.quine.labs.recheck.regexp
 import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.Properties
-import codes.quine.labs.resyntax.charset.UnitMode
 
 /** EcmaScriptChars provides the character notation of ECMAScript, and its case canonicalization. */
 object EcmaScriptChars:
 
-  /** Returns the unit mode: code points with the `u` flag, UTF-16 code units otherwise. */
-  def mode(unicode: Boolean): UnitMode = if unicode then UnitMode.CodePoint else UnitMode.Utf16
-
-  /** Canonicalizes the character for ignore-case matching (ECMAScript `Canonicalize`). */
-  def canonicalize(c: Int, unicode: Boolean): Int = CaseMapping.ecmaScriptCanonicalize(unicode)(c)
-
-  /** Canonicalizes each character of the set. */
+  /** Canonicalizes each character of the set for ignore-case matching (ECMAScript `Canonicalize`). */
   def canonicalize(set: CharSet, unicode: Boolean): CharSet = CaseMapping.ecmaScriptCanonicalize(unicode).image(set)
 
-  /** Tests whether the character is printable or not. */
   def isPrintable(c: Int): Boolean = !Other.contains(c)
 
   /** Shows the character as a pattern. */

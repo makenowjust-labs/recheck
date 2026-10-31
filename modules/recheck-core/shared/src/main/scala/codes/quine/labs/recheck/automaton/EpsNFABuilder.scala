@@ -155,7 +155,6 @@ private class EpsNFABuilder(
         emit(a0 -> Eps(Vector.empty))
         (i0, if notEmpty == IRNotEmpty.AtStart then moved(i0) else i0, moved(a0))
 
-  /** Returns the pairs of the set. */
   private def refine(set: CharSet): Set[(CharSet, CharKind)] =
     refineCache.getOrElseUpdate(set, alphabet.refine(set))
 
@@ -170,12 +169,11 @@ private class EpsNFABuilder(
   private def buildChoice(alternatives: Seq[() => (Int, Int)]): (Int, Int) =
     val ss = alternatives.map(_())
     val i = nextQ()
-    tau.addOne(i -> Eps(ss.map(_._1)))
+    emit(i -> Eps(ss.map(_._1)))
     val a = nextQ()
     for (_, a0) <- ss do emit(a0 -> Eps(Vector(a)))
     (i, a)
 
-  /** Builds an ε-NFA for the sequence of the builders. */
   private def buildSequence(builders: Seq[() => (Int, Int)]): (Int, Int) =
     val ss = builders.map(_())
     ss
@@ -183,9 +181,7 @@ private class EpsNFABuilder(
         case ((i1, a1), (i2, a2)) =>
           emit(a1 -> Eps(Vector(i2)))
           (i1, a2)
-      .getOrElse:
-        val q = nextQ()
-        (q, q)
+      .getOrElse(epsilon())
 
   /** Builds EpsNFA transitions for the node. The result pair is, the first is initial state, and the second is final
     * state of the node.
@@ -194,7 +190,7 @@ private class EpsNFABuilder(
     node.data match
       case IRNodeData.Disjunction(ns)  => buildChoice(ns.map(n => () => buildNode(n)))
       case IRNodeData.Sequence(ns)     => buildSequence(ns.map(n => () => buildNode(n)))
-      case IRNodeData.Empty            => buildSequence(Seq.empty)
+      case IRNodeData.Empty            => epsilon()
       case IRNodeData.Capture(_, _, n) => buildNode(n)
       case IRNodeData.Repeat(n, q)     => buildRepeat(n, q)
       case IRNodeData.Assert(kind)     => buildAssert(node, kind)
@@ -303,7 +299,6 @@ private class EpsNFABuilder(
   /** The text end assertions before a final line terminator that are not at an end point. */
   private val chompTextEndsInMiddle = pattern.chompTextEndsInMiddle.toSet
 
-  /** Builds EpsNFA transitions for an assertion. */
   private def buildAssert(node: IRNode, kind: IRAssertKind): (Int, Int) =
     def atomic(t: IRLineTerminators): Boolean = t.crlf == IRLineTerminators.CRLF.Atomic
     def plain(t: IRLineTerminators): Boolean = t.crlf == IRLineTerminators.CRLF.Ignored

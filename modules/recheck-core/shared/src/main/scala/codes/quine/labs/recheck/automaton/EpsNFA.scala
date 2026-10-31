@@ -203,7 +203,6 @@ object EpsNFA:
     */
   final case class Guesses(last: Boolean, afterCR: Boolean, follow: Boolean, marks: Int = 0):
 
-    /** Whether any guess is made. */
     def any: Boolean = last || afterCR || follow || marks > 0
 
     /** Returns the kinds of the guesses on a character of the kind. */
@@ -275,7 +274,6 @@ object EpsNFA:
   /** AssertKind values and utilities. */
   object AssertKind:
 
-    /** Tests whether the position is between `\r` and `\n`. */
     private def betweenCRLF(prev: CharKind, next: CharKind): Boolean = prev.cr && next.lf
 
     /** LineBegin is `^` assertion, which matches after a line terminator of the first set or at the begin. */

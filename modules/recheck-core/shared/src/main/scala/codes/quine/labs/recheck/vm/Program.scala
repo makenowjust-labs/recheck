@@ -32,11 +32,11 @@ object Program:
       mode: UnitMode,
       hasRef: Boolean,
       hasVerb: Boolean,
+      hasLeave: Boolean,
       capturesSize: Int,
       countersSize: Int,
       canariesSize: Int,
-      predecessors: Vector[Set[Label]],
-      hasLeave: Boolean = false
+      predecessors: Vector[Set[Label]]
   ):
 
     /** Whether a surrogate pair of the input is read as one character. */

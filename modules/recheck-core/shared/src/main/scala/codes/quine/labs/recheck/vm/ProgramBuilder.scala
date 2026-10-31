@@ -81,7 +81,6 @@ private[vm] class ProgramBuilder(
 )(using ctx: Context):
   import ctx._
 
-  /** The unit mode of the pattern. */
   private val mode = pattern.ir.mode
 
   /** Whether captures in a repetition are reset on each iteration, which only JavaScript does. */
@@ -119,7 +118,6 @@ private[vm] class ProgramBuilder(
   /** The scope that `(*THEN)` at the current position takes, or `None` to act as `(*PRUNE)`. */
   private var thenScope: Option[Int] = None
 
-  /** A next scope ID of `(*THEN)`. */
   private var nextThenScope: Int = 0
 
   /** The scope that `(*ACCEPT)` at the current position ends. */
@@ -131,8 +129,8 @@ private[vm] class ProgramBuilder(
   /** The number of the atomic groups in [[acceptScope]], whose transactions `(*ACCEPT)` drops. */
   private var atomicDepth: Int = 0
 
-  /** The blocks emitted after the main blocks: the fallbacks keeping the captures in Perl, and the failing barriers. */
-  private val keepBlocks: mutable.Buffer[(Label, Seq[Inst.NonTerminator], Inst.Terminator)] = mutable.Buffer.empty
+  /** The blocks emitted after the main blocks, which the main flow only jumps or falls back to. */
+  private val trailingBlocks: mutable.Buffer[(Label, Seq[Inst.NonTerminator], Inst.Terminator)] = mutable.Buffer.empty
 
   /** A buffer of created counter registers. */
   private val counters: mutable.Buffer[CounterReg] = mutable.Buffer.empty
@@ -288,7 +286,7 @@ private[vm] class ProgramBuilder(
 
     val blocks = labelsBuffer.iterator.map(label => (label, label.block)).toVector
     val predecessors = predecessorsBuffer.iterator.map(_.toSet).toVector
-    val meta = Meta(mode, hasRef, hasVerb, capturesSize, counters.size, canaries.size, predecessors, hasLeave)
+    val meta = Meta(mode, hasRef, hasVerb, hasLeave, capturesSize, counters.size, canaries.size, predecessors)
 
     Program(blocks, meta)
 
@@ -314,7 +312,7 @@ private[vm] class ProgramBuilder(
     build(pattern.node)
     emitOk()
 
-    for (label, insts, terminator) <- keepBlocks do
+    for (label, insts, terminator) <- trailingBlocks do
       enterBlock(label)
       insts.foreach(emitInst)
       emitTerminator(terminator)
@@ -373,11 +371,9 @@ private[vm] class ProgramBuilder(
     else if prefersComplement(set, mode) then ReadKind.ClassNot(set.complement(mode))
     else charsKind(set)
 
-  /** Returns the read kind of a set, which is a character if it has only one. */
   def charsKind(set: CharSet): ReadKind =
     if set.size == 1 then ReadKind.Char(set.head) else ReadKind.Class(set)
 
-  /** Returns the assertion kind. */
   def assertKind(kind: IRAssertKind): AssertKind = kind match
     case IRAssertKind.WordBoundary(word)               => AssertKind.WordBoundary(word)
     case IRAssertKind.NotWordBoundary(word)            => AssertKind.WordBoundaryNot(word)
@@ -434,13 +430,11 @@ private[vm] class ProgramBuilder(
       if perlCaptures then buildPerlDisjunction(children, barrier, run)
       else buildAlternatives(children.indices.map(i => () => run(i)), barrier)
 
-  /** Returns a new scope ID of `(*THEN)`. */
   def newThenScope(): Int =
     val id = nextThenScope
     nextThenScope += 1
     id
 
-  /** Runs with the scope of `(*THEN)`. */
   def withThenScope(scope: Option[Int])(run: => Unit): Unit =
     val saved = thenScope
     thenScope = scope
@@ -450,7 +444,7 @@ private[vm] class ProgramBuilder(
   /** Allocates a block failing at once, for a barrier only skipped to. */
   def failLabel(): Label =
     val label = allocateLabel("fail")
-    keepBlocks.append((label, Seq.empty, Inst.Fail))
+    trailingBlocks.append((label, Seq.empty, Inst.Fail))
     label
 
   /** Checks whether the node has `(*THEN)` whose scope is the enclosing one, not in an inner alternation or assertion.
@@ -505,7 +499,6 @@ private[vm] class ProgramBuilder(
       case _                           => (None, child)
     Option.when(body.captureRange.range.isEmpty && fixedWidth(body).exists(_ > 0))(index)
 
-  /** Returns the width of the node if it is fixed. */
   def fixedWidth(node: IRNode): Option[Int] = node.data match
     case IRNodeData.Empty | _: IRNodeData.Assert | _: IRNodeData.LookAhead | _: IRNodeData.LookBehind => Some(0)
     case _: IRNodeData.Chars                                                                          => Some(1)
@@ -525,14 +518,13 @@ private[vm] class ProgramBuilder(
   def allocateKeep(restore: Option[(Int, Int)], reset: Option[(Int, Int)], next: Option[Label]): Label =
     val label = allocateLabel("keep")
     val insts = Inst.CapKeep(restore) +: reset.map((from, to) => Inst.CapReset(from, to)).toSeq
-    keepBlocks.append((label, insts, next.fold[Inst.Terminator](Inst.Fail)(Inst.Jmp(_))))
+    trailingBlocks.append((label, insts, next.fold[Inst.Terminator](Inst.Fail)(Inst.Jmp(_))))
     label
 
   /** Returns the fallback of a `try` to the label, which goes through a block keeping the captures in Perl. */
   def fallbackOf(label: Label, keep: Keep): Label =
     keep.fold(label)(restore => allocateKeep(restore, None, Some(label)))
 
-  /** Emits `try`, or `try_barrier` with the barrier. */
   def emitTry(next: Label, fallback: Label, barrier: Option[Barrier]): Unit =
     emitTerminator(barrier.fold(Inst.Try(next, fallback))(Inst.TryBarrier(next, fallback, _)))
 
@@ -572,9 +564,9 @@ private[vm] class ProgramBuilder(
   def buildStar(
       isLazy: Boolean,
       child: IRNode,
-      keep: Keep = None,
-      barrier: Boolean = false,
-      empty: EmptyIteration = EmptyIteration.Reject
+      keep: Keep,
+      barrier: Boolean,
+      empty: EmptyIteration
   ): Unit =
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
@@ -590,9 +582,9 @@ private[vm] class ProgramBuilder(
   def buildQuestion(
       isLazy: Boolean,
       child: IRNode,
-      keep: Keep = None,
-      barrier: Boolean = false,
-      empty: EmptyIteration = EmptyIteration.Ignore
+      keep: Keep,
+      barrier: Boolean,
+      empty: EmptyIteration
   ): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
@@ -647,7 +639,6 @@ private[vm] class ProgramBuilder(
       emitTerminator(Inst.Jmp(exit))
       enterBlock(exit)
 
-  /** Returns how a repetition handles an empty iteration in the dialect. */
   def emptyIteration(quantifier: IRQuantifier, child: IRNode): EmptyIteration = pattern.dialect match
     case Dialect.JavaScript => EmptyIteration.Reject
     case _: Dialect.Python  => EmptyIteration.ExitOptional
@@ -667,7 +658,7 @@ private[vm] class ProgramBuilder(
     case _               => EmptyIteration.ExitFromMin
 
   /** A builder for `x{n}` node, where an empty iteration jumps to `exit` if it is given. */
-  def buildRepeatN(n: Int, child: IRNode, barrier: Boolean = false, exit: Option[Label] = None): Unit =
+  def buildRepeatN(n: Int, child: IRNode, barrier: Boolean, exit: Option[Label] = None): Unit =
     if n == 1 then
       exit match
         case Some(exit) =>
@@ -681,9 +672,8 @@ private[vm] class ProgramBuilder(
 
       exit match
         case Some(exit) =>
-          // The counter is reset on leaving the loop.
           val leave = allocateLabel("leave")
-          keepBlocks.append((leave, Seq(Inst.Reset(reg)), Inst.Jmp(exit)))
+          trailingBlocks.append((leave, Seq(Inst.Reset(reg)), Inst.Jmp(exit)))
           wrapCanary(child, EmptyIteration.ExitAll, leave)(wrapReset(child)(buildIteration(child, barrier)))
         case None => wrapReset(child)(buildIteration(child, barrier))
       closeLoopBlock(reg, n, loop, cont)
@@ -693,9 +683,9 @@ private[vm] class ProgramBuilder(
       isLazy: Boolean,
       n: Int,
       child: IRNode,
-      keep: Keep = None,
-      barrier: Boolean = false,
-      empty: EmptyIteration = EmptyIteration.Reject
+      keep: Keep,
+      barrier: Boolean,
+      empty: EmptyIteration
   ): Unit =
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
@@ -722,7 +712,7 @@ private[vm] class ProgramBuilder(
     build(child)
 
   /** Emits a loop block entering instructions. */
-  def enterLoopBlock(isLazy: Boolean, loop: Label, cont: Label, keep: Keep = None): Unit =
+  def enterLoopBlock(isLazy: Boolean, loop: Label, cont: Label, keep: Keep): Unit =
     emitTerminator(
       if isLazy then Inst.Try(cont, fallbackOf(loop, keep)) else Inst.Try(loop, fallbackOf(cont, keep))
     )
@@ -738,7 +728,6 @@ private[vm] class ProgramBuilder(
 
     freeCounter(reg)
 
-  /** Inserts a canary around a loop body if needed. */
   /** Inserts a canary around an iteration if needed, where an empty iteration fails, or jumps to `exit`. */
   def wrapCanary(child: IRNode, empty: EmptyIteration, exit: Label)(run: => Unit): Unit =
     if child.canMatchEmpty && empty != EmptyIteration.Ignore then
@@ -783,7 +772,6 @@ private[vm] class ProgramBuilder(
   def emitHold(node: IRNode): Unit =
     if holdsCaptures then for (from, to) <- node.captureRange.range do emitInst(Inst.CapHold(from, to))
 
-  /** Runs with the scope of `(*ACCEPT)`. */
   def withAcceptScope(scope: AcceptScope)(run: => Unit): Unit =
     val saved = (acceptScope, openCaptures, atomicDepth)
     acceptScope = scope

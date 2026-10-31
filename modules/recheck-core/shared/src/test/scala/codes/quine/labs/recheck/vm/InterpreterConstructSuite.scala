@@ -294,7 +294,8 @@ class InterpreterConstructSuite extends munit.FunSuite:
   test("Interpreter.run: empty iterations"):
     // JavaScript rejects an optional empty iteration, and the others end the repetition with it, from an iteration that
     // differs among them: Python from an optional one, Perl, .NET and PCRE's unbounded one from the last mandatory one,
-    // and Java's repetition of a group with branches from any one. PCRE's bounded one repeats copies of the node.
+    // and Java's repetition of a group with branches from any one.
+    // PCRE's bounded one repeats copies of the node.
     check("^(?:()|a){2}\\1$", "a", Java, Perl())(Seq(g(0, 1), g(1, 1)))
     check("^(?:()|a){2}\\1$", "a", PCRE, Python(), DotNet)(Seq(g(0, 1), g(0, 0)))
     check("^(?:()|a){2}\\1$", "a", JavaScript)(Seq(g(0, 1)))

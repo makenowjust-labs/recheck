@@ -336,7 +336,6 @@ object PatternExtensions:
 
   extension (node: IRNode)
 
-    /** Returns the child nodes. */
     def children: Seq[IRNode] = node.data match
       case Disjunction(ns)                 => ns
       case Sequence(ns)                    => ns
