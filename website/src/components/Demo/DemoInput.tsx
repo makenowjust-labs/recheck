@@ -68,23 +68,30 @@ const DemoDialect: React.FC<{ build: Build; disabled: boolean }> = ({ build, dis
   if (param === undefined) return null;
   const dialect = String(watch('dialect') ?? param.defaultValue);
   return (
-    <>
-      <div className={`margin-top--sm ${styles.dialect}`}>
-        <label htmlFor="dialect">{param.title}</label>
-        <div className={styles.dialectSelect}>
-          <Select
-            id="dialect"
-            name="dialect"
-            values={selectValues(param, DEFAULT_DIALECT)}
-            defaultValue={String(param.defaultValue)}
-            disabled={disabled}
-          />
-        </div>
+    <div className={`margin-top--sm ${styles.dialect}`}>
+      <label htmlFor="dialect">{param.title}</label>
+      <div className={styles.dialectSelect}>
+        <Select
+          id="dialect"
+          name="dialect"
+          values={selectValues(param, DEFAULT_DIALECT)}
+          defaultValue={String(param.defaultValue)}
+          disabled={disabled}
+        />
       </div>
-      <div className={styles.dialectFlags}>
-        <Link to={`/docs/usage/dialects/${dialect}#flags-and-units`}>Flags of {dialect}</Link>
-      </div>
-    </>
+      <Link
+        className={styles.dialectFlags}
+        to={`/docs/usage/dialects/${dialect}#flags-and-units`}
+        aria-label={`Flags of ${dialect}`}
+        title={`Flags of ${dialect}`}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path d="M4 22V3M4 4h12l-2 4 2 4H4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+        </svg>
+      </Link>
+    </div>
   );
 };
 

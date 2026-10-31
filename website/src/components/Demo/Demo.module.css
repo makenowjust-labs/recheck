@@ -75,9 +75,13 @@
 }
 
 .dialectFlags {
-  margin-top: 0.25rem;
-  font-size: 0.75rem;
-  text-align: right;
+  display: inline-flex;
+  align-items: center;
+  color: var(--ifm-color-emphasis-700);
+}
+
+.dialectFlags:hover {
+  color: var(--ifm-color-primary);
 }
 
 .localNote {

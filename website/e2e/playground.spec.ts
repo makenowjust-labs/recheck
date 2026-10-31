@@ -155,6 +155,10 @@ test("shows the parameters of the selected dialect", async ({ page }) => {
     "/recheck/docs/usage/dialects/javascript/#flags-and-units",
   );
 
+  await expect(
+    page.getByRole("link", { name: "Flags of javascript" }),
+  ).toHaveAttribute("target", "_blank");
+
   await select("dialect").selectOption("perl");
   await expect(
     page.getByRole("link", { name: "Flags of perl" }),
