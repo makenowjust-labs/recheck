@@ -104,6 +104,17 @@ class RecallRuntimeSuite extends munit.FunSuite:
     assertEquals(validate("^(?:é|é)*$", "b", Dialect.Python(), attack("é", 31, "\u0000")).result, RecallResult.Timeout)
     assertFinish(validate("^(?:é|é)*$", "b", Dialect.Python(), attack("é", 3, "\u0000")))
 
+  runtimeTest("Python: the C locale", "python3"):
+    // `re.L` has no non-ASCII word byte in a UTF-8 locale, so it needs a Latin-1 locale to differ from the C locale.
+    val probe = new ProcessBuilder("python3", "-I", "-c", "import re; print(re.match(rb'\\w', b'\\xe9', re.L))")
+    probe.environment().put("LC_ALL", "en_US.ISO8859-1")
+    assume(new String(probe.start().getInputStream.readAllBytes()).trim != "None", "no en_US.ISO8859-1 locale")
+    val env = Map("RECHECK_PYTHON" -> "env LC_ALL=en_US.ISO8859-1 python3")
+    val bytes = Dialect.Python(Dialect.Python.Type.Bytes)
+    assertFinish(validate("^(\\w|\\w)*$", "L", bytes, attack("é", 31, "\u0000"), env = env))
+    val unicode = validate("^(\\w|\\w)*$", "", Dialect.Python(), attack("é", 31, "\u0000"), env = env)
+    assertEquals(unicode.result, RecallResult.Timeout)
+
   runtimeTest("Ruby", "ruby"):
     // Ruby 4.0's memoization makes it fast.
     val r = validate("^(a|a)*$", "", Dialect.Ruby(), attack("a", 31, "\u0000"))
@@ -132,6 +143,14 @@ class RecallRuntimeSuite extends munit.FunSuite:
     val rs = (1 to 4).map(_ => Future(validate("^(a|a)*$", "i", Dialect.DotNet, attack("A", 3, "\u0000"), 10.seconds)))
     Await.result(Future.sequence(rs), 60.seconds).foreach(assertFinish)
 
+  runtimeTest(".NET: the invariant culture", "dotnet"):
+    // The Turkish culture matches `i` with `İ` and `I` with `ı` under `IgnoreCase`.
+    val env = Map("RECHECK_DOTNET" -> "env LC_ALL=tr_TR.UTF-8 dotnet")
+    def validateTurkish(c: String): RecallValidation =
+      validate("^[ia]*[ib]*[ic]*$", "i", Dialect.DotNet, attack(c, 2000, "!"), env = env)
+    assertFinish(validateTurkish("İ"))
+    assertEquals(validateTurkish("I").result, RecallResult.Timeout)
+
   runtimeTest("Perl", "perl"):
     val r = validate("^(a|a)*$", "", Dialect.Perl(), attack("é", 31, "\u0000"))
     assertFinish(r)
@@ -142,6 +161,13 @@ class RecallRuntimeSuite extends munit.FunSuite:
       RecallValidator.defaultExec.get
     )
     assertFinish(string.get)
+
+  runtimeTest("Perl: the C locale", "perl"):
+    // Perl takes the locale of the environment, whose `\w` under `l` matches `é` in a UTF-8 locale.
+    val env = Map("RECHECK_PERL" -> "env LC_ALL=en_US.UTF-8 perl")
+    assertFinish(validate("^\\w*\\w*\\w*$", "l", Dialect.Perl(), attack("é", 3000, "\u0000"), env = env))
+    val unicode = validate("^\\w*\\w*\\w*$", "u", Dialect.Perl(), attack("é", 3000, "\u0000"), env = env)
+    assertEquals(unicode.result, RecallResult.Timeout)
 
   runtimeTest("Perl: the character set rules of utf8", "perl"):
     // The program matches `0x80..0xFF` as recheck's character sets have them.

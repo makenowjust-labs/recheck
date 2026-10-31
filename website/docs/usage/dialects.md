@@ -109,7 +109,8 @@ In a bytes mode, it is a bytes literal (`b'\xc3\xa9'` in Python, `"\xC3\xA9".b` 
 The character set flags change the meaning of `\w`, `\d`, `\s`, `\b`, POSIX classes and case-insensitive matching in the same way as in the engine: for example, `a` (ASCII) and `u` (Unicode) of Python, Ruby and Perl, `aa` of Perl, `U` (`UNICODE_CHARACTER_CLASS`) and `u` (`UNICODE_CASE`) of Java, and PCRE's `(?aD)` and the like.
 Java's `\b` without `U` also takes a non-spacing mark after a letter or a digit as a word character (e.g. `\b` does not match between `a` and U+0301), as `java.util.regex` does.
 Perl reads a byte of a string without `utf8` as the Latin-1 character, so `u` and a pattern switching to the Unicode rules give them to `0x80`–`0xFF` there too (e.g. `\w` matches `\xE9`).
-Perl's `l` follows the C locale, where `0x80`–`0xFF` follow the ASCII rules even with `utf8`.
+Perl's `l` and Python's `L` follow the C locale, where `0x80`–`0xFF` follow the ASCII rules (in Perl, even with `utf8`), whatever locale the environment has.
+Likewise, .NET's case-insensitive matching follows the invariant culture, not the current culture (e.g. `(?i)i` does not match `İ` as it does in the Turkish culture).
 Perl's look-behind counts the folding of a character under `i` by whether the pattern itself is UTF-8 on compiling: a `string` pattern with `utf8`, a `literal` pattern having a non-ASCII character with `utf8`, or a pattern switching to the Unicode rules (e.g. `(?i)(?<=(?:\xDF){255})` is valid in an ASCII literal).
 
 ### Perl
@@ -207,6 +208,7 @@ await check("^(a|a)*$", "", { dialect: "ruby", recallTimeout: 1000 });
 For each attack string, `recheck` generates a small program in the dialect's language, and runs it with the command in the table below.
 The program is given on the standard input, except for `java` and `dotnet`.
 The timeout counts from the start of the matching, so the startup of the runtime (e.g. compiling the program) is not counted.
+The program sets the locale that `recheck` assumes before compiling the pattern, so the result does not depend on the locale of the environment (e.g. `LC_ALL` or `LANG`): the C locale for `perl` and `python` (`POSIX::setlocale` and `locale.setlocale`), and the invariant culture for `dotnet` (`CultureInfo.CurrentCulture`).
 
 | `dialect`    | Command                                            | Matching                              | Engine limits       | Engine errors                                                 |
 | ------------ | -------------------------------------------------- | ------------------------------------- | ------------------- | ------------------------------------------------------------- |
@@ -313,6 +315,7 @@ python3 -I recall.py
 ```
 
 The first comment of the script shows the command to run it, which is the command of the recall validation with the script file.
+The script is the program of the recall validation, so it sets the locale in the same way.
 The script of `java` and `dotnet` has the pattern and the attack string in itself.
 
 | `dialect`    | Command                        |

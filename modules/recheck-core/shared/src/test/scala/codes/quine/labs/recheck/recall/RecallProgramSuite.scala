@@ -51,7 +51,8 @@ class RecallProgramSuite extends munit.FunSuite:
     assertEquals(program.command, Command("python3", Seq("-I", "-")))
     assertEquals(
       program.script,
-      """|import platform, re, sys, time
+      """|import locale, platform, re, sys, time
+         |locale.setlocale(locale.LC_ALL, 'C')
          |sys.stdout.write('recheck:runtime python ' + platform.python_version() + '\n')
          |regex = re.compile('f\'o\\.', re.I | re.M)
          |string = 'x' + 'y' * 2 + 'z'
@@ -119,6 +120,9 @@ class RecallProgramSuite extends munit.FunSuite:
       )
     )
     assertEquals(program.script, "in\n0066006f006f\n1:0078\n2:0079\n1:007a\n")
+    assert(
+      RecallProgram.DotNetSource.content.contains("\nCultureInfo.CurrentCulture = CultureInfo.InvariantCulture;\n")
+    )
 
   test("RecallProgram.data"):
     def data(source: String, flags: String, attack: AttackPattern): String =
@@ -136,8 +140,10 @@ class RecallProgramSuite extends munit.FunSuite:
     assertEquals(
       program.script,
       """|use utf8;
+         |use POSIX ();
          |use Time::HiRes ();
          |$| = 1;
+         |POSIX::setlocale(POSIX::LC_ALL(), "C");
          |print "recheck:runtime perl " . sprintf("%vd", $^V) . "\n";
          |my $regex = qr!f/o$!ix;
          |my $input = "x" . "y" x 2 . "z";
