@@ -68,7 +68,7 @@ It is `null` if the recall validation is not run: [`recallTimeout`](parameters.m
 
 When the recall validation fails, the check does not report the diagnostics, and it goes on to look for another attack string.
 If no attack succeeds, the result is `safe`.
-In Scala, `ReDoS.checkAll` returns the failed diagnostics too, followed by the reported one.
+`checkAll` (`ReDoS.checkAll` in Scala) returns the failed diagnostics too, followed by the reported one.
 
 ## Hotspot
 
