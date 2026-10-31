@@ -34,14 +34,13 @@ class ParserEncodingSuite extends munit.FunSuite:
 
   // Python's bytes pattern has no Unicode escape, and its characters are bytes of Latin-1.
   val PythonBytes: Dialect = Python(Python.Type.Bytes)
-  for (flags, dialect) <- Seq(("", PythonBytes)) do
-    error("\\u0041", flags, dialect)("Invalid backslash escape at 1")
-    error("[\\u0041]", flags, dialect)("Invalid backslash escape at 2")
-    error("\\U00000041", flags, dialect)("Invalid backslash escape at 1")
-    error("\\N{DIGIT ONE}", flags, dialect)("Invalid backslash escape at 1")
-    error("a\u0101", flags, dialect)("Non-Latin-1 character in bytes pattern at 1")
-    check("\u00e9+", flags, dialect)(Repeat(Literal(0xe9), Plus(Greedy)))
-    check("\\x41", flags, dialect)(Backslash(Escape(EscapeStyle.Hex2, 0x41)))
+  error("\\u0041", "", PythonBytes)("Invalid backslash escape at 1")
+  error("[\\u0041]", "", PythonBytes)("Invalid backslash escape at 2")
+  error("\\U00000041", "", PythonBytes)("Invalid backslash escape at 1")
+  error("\\N{DIGIT ONE}", "", PythonBytes)("Invalid backslash escape at 1")
+  error("a\u0101", "", PythonBytes)("Non-Latin-1 character in bytes pattern at 1")
+  check("\u00e9+", "", PythonBytes)(Repeat(Literal(0xe9), Plus(Greedy)))
+  check("\\x41", "", PythonBytes)(Backslash(Escape(EscapeStyle.Hex2, 0x41)))
   check("\\u0041", "", Python())(Backslash(Escape(EscapeStyle.UnicodeHex4, 0x41)))
   check("\u0101", "", Python())(Literal(0x101))
 
