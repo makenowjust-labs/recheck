@@ -64,5 +64,3 @@ The canonical equivalence (`(?c)`) is not supported, and it is reported as `unsu
 The program reads the pattern and the attack string from the standard input.
 `recheck` writes the program file once into its directory in the temporary directory (see [Program Files](../recall-validation.md#program-files)), so a command in a container needs the directory mounted at the same path.
 The recall script has the pattern and the attack string in itself.
-
-See [Recall Validation](../recall-validation.md) for how it works.

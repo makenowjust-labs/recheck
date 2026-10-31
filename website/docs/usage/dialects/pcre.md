@@ -84,5 +84,3 @@ The following constructs are not supported.
 The program runs with PHP's default settings of `pcre.backtrack_limit`, `pcre.recursion_limit` and `pcre.jit`, and the runtime name in the result shows them.
 With the default limits, an exponential match usually ends with the backtrack limit.
 `pcre.recursion_limit` is PCRE2's depth limit, so it is an engine error.
-
-See [Recall Validation](../recall-validation.md) for how it works.

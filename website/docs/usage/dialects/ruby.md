@@ -86,5 +86,3 @@ The following constructs are not supported, and they are reported as `unsupporte
 - Recall script: `ruby recall.rb`.
 
 `ruby -` reads a program in the encoding of the locale, so the program starts with the magic comment `# encoding: UTF-8`.
-
-See [Recall Validation](../recall-validation.md) for how it works.

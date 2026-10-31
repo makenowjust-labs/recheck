@@ -71,5 +71,3 @@ The syntax includes atomic groups and possessive quantifiers (Python 3.11 or lat
 - Recall script: `python3 -I recall.py`.
 
 The program sets the C locale by `locale.setlocale` before compiling the pattern, so the result does not depend on the locale of the environment (e.g. `LC_ALL` or `LANG`).
-
-See [Recall Validation](../recall-validation.md) for how it works.

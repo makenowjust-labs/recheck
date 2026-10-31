@@ -113,5 +113,3 @@ When the literal would interpolate a variable or run code (e.g. `$name`, `@{...}
 With the `string` source, the program builds the pattern from a string as `qr/$pattern/`.
 
 With `utf8`, the program has `use utf8`, and it sets the UTF-8 flag of the input string (and of a `string` pattern) by `utf8::upgrade`; without `utf8`, it has no `use utf8` and clears the flag by `utf8::downgrade`.
-
-See [Recall Validation](../recall-validation.md) for how it works.

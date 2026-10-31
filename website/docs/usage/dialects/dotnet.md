@@ -68,5 +68,3 @@ It runs a fixed program reading the pattern and the attack string from the stand
 `recheck` writes the program file once into its directory in the temporary directory (see [Program Files](../recall-validation.md#program-files)), so a command in a container needs the directory mounted at the same path.
 The program sets the invariant culture (`CultureInfo.CurrentCulture`) before compiling the pattern, so the result does not depend on the locale of the environment (e.g. `LC_ALL` or `LANG`).
 The recall script has the pattern and the attack string in itself.
-
-See [Recall Validation](../recall-validation.md) for how it works.

@@ -53,5 +53,3 @@ The syntax includes the ES2025 features: the `v` flag, the modifiers `(?i:...)` 
 - Engine errors: `RangeError` (e.g. V8 raises it for `/^(?:a|b)*$/` on 10,000,000 characters).
 - Environment variable: `RECHECK_NODE`.
 - Recall script: `node recall.cjs`.
-
-See [Recall Validation](../recall-validation.md) for how it works.
