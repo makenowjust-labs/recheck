@@ -113,6 +113,16 @@ class IRBuilderSuite extends IRSuiteBase:
   // Java's `U` is UNICODE_CHARACTER_CLASS: `^a+` matches `aaa` with it.
   check("(?:)*", "U", Java)(Repeat(Atomic(Empty), Unbounded(0, Greedy)))
 
+  // Perl's alternatives in a trie, which start with a literal of the same kind, are found only with `(*THEN)`.
+  def tries(s: String, dialect: Dialect)(expected: Seq[(Int, Int)]*)(implicit loc: munit.Location): Unit =
+    checkPattern(s, "", dialect): pattern =>
+      assertEquals(pattern.tries.values.toSeq.sortBy(_.head), expected)
+  tries("a(*THEN)b|ac|x+|ad|(?i)ae|af|g", Perl)(Seq((0, 2), (4, 6)))
+  tries("|a(*THEN)b|ac||b", Perl)(Seq((1, 5)))
+  tries("(?i:a(*THEN)b|ac|1|23)", Perl)(Seq((2, 4)))
+  tries("a(*THEN)b|ac", PCRE)()
+  tries("ab|ac", Perl)()
+
   // Group
   check("()", "", All*)(Capture(1, None, Empty))
   check("(?:)", "", All*)(Empty)

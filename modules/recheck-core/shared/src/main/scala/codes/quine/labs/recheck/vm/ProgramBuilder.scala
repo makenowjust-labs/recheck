@@ -333,7 +333,7 @@ private[vm] class ProgramBuilder(
   /** Builds a program from a node. */
   def build(node: IRNode): Unit = interrupt:
     node.data match
-      case IRNodeData.Disjunction(children)         => buildDisjunction(children)
+      case IRNodeData.Disjunction(children)         => buildDisjunction(children, triesOf(node))
       case IRNodeData.Sequence(children)            => buildSequence(children)
       case IRNodeData.Empty                         => ()
       case IRNodeData.Capture(index, _, child)      => buildCapture(index, child)
@@ -386,8 +386,33 @@ private[vm] class ProgramBuilder(
     case IRAssertKind.TextEnd               => AssertKind.InputEnd
     case IRAssertKind.ChompTextEnd(t)       => AssertKind.ChompInputEnd(t)
 
-  /** A builder for a disjunction node. */
-  def buildDisjunction(children: Seq[IRNode]): Unit = buildDisjunction(children, i => build(children(i)))
+  /** Returns the runs of the alternatives of the node that Perl compiles into a trie. */
+  def triesOf(node: IRNode): Seq[(Int, Int)] = pattern.ir.tries.getOrElse(node.loc, Seq.empty)
+
+  /** A builder for a disjunction node, where Perl puts the alternatives of each run of `tries` in a trie.
+    *
+    * `(*THEN)` in a trie goes to the alternative after it, so a trie is one alternative with the alternatives in it.
+    */
+  def buildDisjunction(children: Seq[IRNode], tries: Seq[(Int, Int)]): Unit =
+    val units = children.indices.foldLeft(Seq.empty[Seq[Int]]): (units, i) =>
+      if tries.exists((from, until) => from < i && i < until) then units.init :+ (units.last :+ i)
+      else units :+ Seq(i)
+    def alternatives(indices: Seq[Int]): Unit =
+      if perlCaptures then buildPerlDisjunction(indices.map(children), None, k => build(children(indices(k))))
+      else buildAlternatives(indices.map(i => () => build(children(i))))
+    if units.size == 1 && children.size > 1 then alternatives(children.indices)
+    else
+      // A trie stands for its alternatives here, for `(*THEN)` and the captures in them.
+      val nodes = units.map:
+        case Seq(i)  => children(i)
+        case indices => IRNode(IRNodeData.Sequence(indices.map(children)))
+      buildDisjunction(
+        nodes,
+        k =>
+          units(k) match
+            case Seq(i)  => build(children(i))
+            case indices => alternatives(indices)
+      )
 
   /** A builder for a disjunction node, where `run` builds the alternative of the index.
     *
@@ -428,7 +453,8 @@ private[vm] class ProgramBuilder(
     */
   def hasThen(node: IRNode): Boolean = node.data match
     case IRNodeData.BacktrackControl(IRBacktrackControl.Then) => true
-    case _: IRNodeData.Disjunction                            => false
+    // `(*THEN)` in Perl's trie of all the alternatives goes beyond it.
+    case IRNodeData.Disjunction(children) => triesOf(node) == Seq((0, children.size)) && children.exists(hasThen)
     case _: IRNodeData.LookAhead | _: IRNodeData.LookBehind | _: IRNodeData.NonAtomicLookAhead |
         _: IRNodeData.NonAtomicLookBehind =>
       !assertionIsThenScope && node.children.exists(hasThen)

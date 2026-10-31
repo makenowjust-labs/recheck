@@ -139,8 +139,22 @@ class InterpreterConstructSuite extends munit.FunSuite:
     check("aa(*PRUNE)b|a", "aac", PCRE, Perl)(Seq(g(1, 2)))
     check("aa(*SKIP)b|a", "aac", PCRE, Perl)(NoMatch)
     check("aa(*THEN)b|.", "aac", PCRE, Perl)(Seq(g(0, 1)))
-    // Perl gives `[1, 2]` for the next one, as its trie of the alternatives starting with `a` ignores `(*THEN)`.
+    // Perl compiles the alternatives starting with a literal into a trie, and `(*THEN)` in it goes beyond it.
     check("aa(*THEN)b|a", "aac", PCRE)(Seq(g(0, 1)))
+    check("aa(*THEN)b|a", "aac", Perl)(Seq(g(1, 2)))
+    check("aa(*THEN)b|x+|a", "aac", PCRE, Perl)(Seq(g(0, 1)))
+    check("(?i:aa(*THEN)b|a)", "aac", Perl)(Seq(g(0, 1)))
+    check("(?i:a(*THEN)b|a)", "aac", Perl)(Seq(g(0, 1)))
+    check("(?:|aa(*THEN)b|a)", "aac", Perl)(Seq(g(0, 0)))
+    check("(?:aa(*THEN)b||a)", "aac", Perl)(Seq(g(1, 1)))
+    check("(?:aa(*THEN)b||a)", "aac", PCRE)(Seq(g(0, 0)))
+    check("(?:[a]a(*THEN)b|a)", "aac", Perl)(Seq(g(1, 2)))
+    check("(?:a*a(*THEN)b|a)", "aac", Perl)(Seq(g(0, 1)))
+    check("(?:a(*THEN)x|ac|.)", "acd", PCRE)(Seq(g(0, 2)))
+    check("(?:a(*THEN)x|ac|.)", "acd", Perl)(Seq(g(0, 1)))
+    check("(?:ab|a(*THEN)x|z+|ac|ad)", "acd", PCRE, Perl)(Seq(g(0, 2)))
+    check("(?:a(*THEN)x|ac|(?i)ac|ad)", "acd", PCRE, Perl)(Seq(g(0, 2)))
+    check("(?:a(*THEN)x|(a)b)\\1", "abab", PCRE, Perl)(Seq(g(0, 3), g(0, 1)))
     check("aa(*COMMIT)b|a", "aaaac", PCRE, Perl)(NoMatch)
     check("aa(*PRUNE)b|a", "aaaac", PCRE, Perl)(Seq(g(3, 4)))
     check("aa(*SKIP)b|a", "aaaac", PCRE, Perl)(NoMatch)
@@ -152,8 +166,9 @@ class InterpreterConstructSuite extends munit.FunSuite:
     check("a(*MARK:Y)(*SKIP:X)(*F)|(.)", "abc", PCRE, Perl)(Seq(g(0, 1), g(0, 1)))
     check("a(*MARK:X)a(*SKIP:X)c|.", "aaab", PCRE, Perl)(Seq(g(2, 3)))
     check("a(b(*THEN)c)|.b", "abd", PCRE, Perl)(Seq(g(0, 2)))
-    // Perl gives `[0, 1]`, as its trie of the alternatives with the common prefix `b` ignores `(*THEN)`.
     check("a(?:b(*THEN)x|bd)|.", "abd", PCRE)(Seq(g(0, 3)))
+    check("a(?:b(*THEN)x|bd)|.", "abd", Perl)(Seq(g(0, 1)))
+    check("a(?:b(*THEN)x|bd|y)|.", "abd", Perl)(Seq(g(0, 1)))
     check("(?:a|aa)(*THEN)c", "aac", PCRE, Perl)(Seq(g(1, 3)))
     // `(*THEN)` ends at an assertion in PCRE, but goes beyond it in Perl.
     check("^a?(?=.(*THEN)c)", "aca", PCRE)(Seq(g(0, 0)))
@@ -347,6 +362,7 @@ class InterpreterConstructSuite extends munit.FunSuite:
     check("(?<=(?:a(*ACCEPT))bc)x", "ax", Perl)(Seq(g(1, 2)))
     // Java steps back by its `TreeInfo` lengths, in code units, or in code points with a supplementary character after.
     check("(?<=(.))x", "\uD83D\uDE00x", Java)(Seq(g(2, 3), g(1, 2)))
+    check("(?<=..)a", "x\uD83D\uDE00a", Java)(NoMatch)
     check("(?<=(.))x\uD83D\uDE00?", "\uD83D\uDE00x", Java)(Seq(g(2, 3), g(0, 2)))
     check("(?<=(?:\\X|bc))c", "abc", Java)(Seq(g(2, 3)))
     check("(?<=(\\X\\X))c", "abc", Java)(NoMatch)

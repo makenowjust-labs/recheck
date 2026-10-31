@@ -176,7 +176,7 @@ There are other deliberate approximations.
 - The backtracking control verbs of PCRE and Perl follow the PCRE2 documentation: `(*FAIL)` never matches, `(*ACCEPT)` ends the match (or the assertion), and `(*COMMIT)`, `(*PRUNE)`, `(*SKIP)`, `(*SKIP:NAME)` and `(*THEN)` cut the backtracking when it reaches them.
   They can make a vulnerable pattern safe (e.g. `^(?:a|a)*(*COMMIT)$`), and the fuzz checker runs them.
   For Perl, `(*ACCEPT)` in an atomic group or a possessive repetition ends only the group, and `(*THEN)` goes beyond a look-around assertion to the enclosing alternation, as Perl does.
-  Perl ignores `(*THEN)` in alternatives that it compiles into a trie (e.g. `aa(*THEN)b|a`), which `recheck` does not reproduce.
+  Perl compiles consecutive alternatives starting with a literal into a trie, and `(*THEN)` in one of them goes to the alternative after the trie (e.g. `aa(*THEN)b|a` matches `a` at `1` in `aac`, and at `0` in PCRE2), which `recheck` reproduces.
 - PCRE2 and Perl skip the attempts that cannot match by their start-of-match optimizations (e.g. `(*COMMIT)abc` matches `xyzabc` in PCRE2, unless the pattern starts with `(*NO_START_OPT)`), and `recheck` does not model them, as it does not model the other optimizations.
 
 ## Recall Validation
