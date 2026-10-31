@@ -9,7 +9,7 @@ However, they have the same information. We will describe this.
 
 ## Common Fields
 
-All `Diagnostics` has the following fields.
+Every `Diagnostics` has the following fields.
 
 - `source` is the given regular expression’s source string.
 - `flags` is the given regular expression’s flags string.
@@ -73,6 +73,7 @@ To prevent this case, you should use the recall validation.
 ## Recall Validation
 
 `vulnerable` status diagnostics has the `recallValidation` field.
+
 The recall validation runs the attack string on the real regex engine of the dialect (see [Recall Validation](recall-validation.md)), and this field records the run.
 It is `null` if the recall validation is not run: [`recallTimeout`](parameters.mdx#recalltimeout) is not positive (the default), or commands cannot run (e.g. in the browser).
 
@@ -88,9 +89,8 @@ It is `null` if the recall validation is not run: [`recallTimeout`](parameters.m
 
 When the recall validation fails, the check does not report the diagnostics, and it goes on to look for another attack string.
 If no attack succeeds, the result is `safe`.
-An attack string with the same complexity and hotspot as a failed one is skipped without the recall validation.
-When the recall validation fails [`maxRecallFailures`](parameters.mdx#maxrecallfailures) times, the check stops, and the result is `unknown` with the `recall-failure-limit` error.
-`checkAll` (`ReDoS.checkAll` in Scala) returns the failed diagnostics too, followed by the reported one.
+
+`checkAll` (`ReDoS.checkAll` in Scala) returns the recall-failed diagnostics too, followed by the reported one.
 
 ## Hotspot
 
