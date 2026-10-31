@@ -38,12 +38,8 @@ The syntax includes the ES2025 features: the `v` flag, the modifiers `(?i:...)` 
 
 ## Approximations
 
-- V8 (Node.js 26) takes exponential time on `^(a|a)*$` against `'a'.repeat(n) + '!'`: about 2 seconds for `n = 24`.
-- Case-insensitive matching uses JavaScript's `Canonicalize`.
-- For the `v` flag, `recheck` follows the specification.
-- A look-behind matches backward from the position.
-- A back-reference sees the captures as JavaScript resets them on each iteration of a loop.
-- An optional iteration matching the empty string is rejected.
+- With the `y` flag, the match starts only at the start of the input, as with `lastIndex` of `0`.
+  A match from a later `lastIndex` is not modeled, so `recheck` misses a pattern that is slow only there, where a look-behind, `\b`, `\B` or a multiline `^` sees the text before the starting position (e.g. `/(?<=a)(?:b|b)*$/y` with `lastIndex` of `1` on `'a' + 'b'.repeat(n) + '!'`).
 
 ## Recall Validation
 
