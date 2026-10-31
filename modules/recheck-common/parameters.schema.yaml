@@ -91,7 +91,7 @@ properties:
     description: |-
       The regular expression dialect of the pattern.
 
-      The flags are the dialect's flag letters (e.g. `imsx`), and the attack string is checked on the dialect's semantics.
+      The flags are the dialect's flag letters (e.g. `imsx`), and the pattern is checked with the dialect's semantics.
 
       - `javascript` is ECMAScript's `RegExp`.
       - `python` is Python's `re` module.
