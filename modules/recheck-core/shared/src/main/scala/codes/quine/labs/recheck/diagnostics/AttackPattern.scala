@@ -168,22 +168,18 @@ object AttackPattern:
       case c if isShown(c)          => codePoint(c)
       case c                        => utf16(c)
 
-  /** CSharp is a C# style specifier for .NET, e.g. `new string('a', 31) + "\u0000"`.
+  /** CSharp is a C# style specifier for .NET, e.g. `string.Concat(Enumerable.Repeat("a", 31)) + "\u0000"`.
     *
-    * A string of more than one UTF-16 code unit repeats as `string.Concat(Enumerable.Repeat("ab", 31))`, which needs
-    * `System.Linq`.
+    * `Enumerable.Repeat` needs `System.Linq`.
     */
   case object CSharp extends Style:
-    def literal(s: UString): String = s.chars(true).map(char('"')).mkString("\"", "", "\"")
-    def repeat(s: UString, n: Int): String =
-      val cs = s.chars(true).toSeq
-      if cs.sizeIs == 1 && cs.head <= 0xffff then s"new string('${char('\'')(cs.head)}', $n)"
-      else s"string.Concat(Enumerable.Repeat(${literal(s)}, $n))"
+    def literal(s: UString): String = s.chars(true).map(char).mkString("\"", "", "\"")
+    def repeat(s: UString, n: Int): String = s"string.Concat(Enumerable.Repeat(${literal(s)}, $n))"
     def join: String = " + "
 
-    private def char(quote: Char)(c: Int): String = c match
+    private def char(c: Int): String = c match
       case '\\'                     => "\\\\"
-      case c if c == quote          => s"\\$quote"
+      case '"'                      => "\\\""
       case Named(e)                 => e
       case c if isAsciiPrintable(c) => c.toChar.toString
       case c if isShown(c)          => codePoint(c)

@@ -70,7 +70,7 @@ class AttackPatternSuite extends munit.FunSuite:
     assertEquals(attack.toString(Ruby()), "\"x\" + \"a\" * 31 + \"\\x00\"")
     assertEquals(attack.toString(Ruby(bytes = true)), "\"x\".b + \"a\".b * 31 + \"\\x00\".b")
     assertEquals(attack.toString(Java), "\"x\" + \"a\".repeat(31) + \"\\u0000\"")
-    assertEquals(attack.toString(CSharp), "\"x\" + new string('a', 31) + \"\\u0000\"")
+    assertEquals(attack.toString(CSharp), "\"x\" + string.Concat(Enumerable.Repeat(\"a\", 31)) + \"\\u0000\"")
     assertEquals(attack.toString(Perl), "\"x\" . \"a\" x 31 . \"\\x00\"")
     assertEquals(attack.toString(PHP()), "'x' . str_repeat('a', 31) . \"\\x00\"")
 

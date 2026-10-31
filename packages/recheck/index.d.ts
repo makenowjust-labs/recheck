@@ -246,7 +246,7 @@ export type AttackPattern = {
    * - `python`: `'a' * 31 + '\x00'`, or `b'a' * 31 + b'\x00'` for `bytes`
    * - `ruby`: `"a" * 31 + "\x00"`, or `"a".b * 31 + "\x00".b` for `ASCII-8BIT`
    * - `java`: `"a".repeat(31) + "\u0000"`
-   * - `dotnet`: `new string('a', 31) + "\u0000"` (C#), or `string.Concat(Enumerable.Repeat("ab", 31))` for a longer repeat
+   * - `dotnet`: `string.Concat(Enumerable.Repeat("a", 31)) + "\u0000"` (C#, `System.Linq`)
    * - `perl`: `"a" x 31 . "\x00"`
    * - `pcre`: `str_repeat('a', 31) . "\x00"` (PHP)
    */

@@ -59,15 +59,15 @@ The `attack` field also has these fields.
   Ruby cannot write a lone surrogate in a UTF-8 string, so it writes its UTF-8 bytes (e.g. `"\xED\xA0\x80"`).
   The attack string of `/^(a|a)*$/` looks like the following.
 
-| Dialect      | Language   | `attack.pattern`                                                                                                  |
-| ------------ | ---------- | ----------------------------------------------------------------------------------------------------------------- |
-| `javascript` | JavaScript | `'a'.repeat(31) + '\x00'`                                                                                         |
-| `python`     | Python     | `'a' * 31 + '\x00'`, or `b'a' * 31 + b'\x00'` for `bytes`                                                         |
-| `ruby`       | Ruby       | `"a" + "a" * 31 + "\x00"`, or `"a".b + "a".b * 31 + "\x00".b` for `ASCII-8BIT`                                    |
-| `java`       | Java       | `"a".repeat(31) + "\u0000"`                                                                                       |
-| `dotnet`     | C#         | `new string('a', 31) + "\u0000"`; a longer repeat is `string.Concat(Enumerable.Repeat("ab", 31))` (`System.Linq`) |
-| `perl`       | Perl       | `"a" x 31 . "\x00"`                                                                                               |
-| `pcre`       | PHP        | `str_repeat('a', 31) . "\x00"`                                                                                    |
+| Dialect      | Language   | `attack.pattern`                                                               |
+| ------------ | ---------- | ------------------------------------------------------------------------------ |
+| `javascript` | JavaScript | `'a'.repeat(31) + '\x00'`                                                      |
+| `python`     | Python     | `'a' * 31 + '\x00'`, or `b'a' * 31 + b'\x00'` for `bytes`                      |
+| `ruby`       | Ruby       | `"a" + "a" * 31 + "\x00"`, or `"a".b + "a".b * 31 + "\x00".b` for `ASCII-8BIT` |
+| `java`       | Java       | `"a".repeat(31) + "\u0000"`                                                    |
+| `dotnet`     | C#         | `string.Concat(Enumerable.Repeat("a", 31)) + "\u0000"` (`System.Linq`)         |
+| `perl`       | Perl       | `"a" x 31 . "\x00"`                                                            |
+| `pcre`       | PHP        | `str_repeat('a', 31) . "\x00"`                                                 |
 
 Noting that the attack string is computed in theoretical, because of the real matching implementation’s optimization, it may not invoke the matching time explosion.
 To prevent this case, you should use the recall validation.
