@@ -122,9 +122,22 @@ object IRBuilder:
       case Dialect.Perl(utf8, _) => if utf8 then UnitMode.CodePoint else UnitMode.Byte
       case Dialect.PCRE          => if flagSet.unicode || utf then UnitMode.CodePoint else UnitMode.Byte
 
-  /** Returns the case equivalence of a back-reference with the flags in the dialect and the mode. */
+  /** Returns the case equivalence of a back-reference with the flags in the dialect and the mode.
+    *
+    * Perl's `/d` rules at a back-reference are the rules of a native string (see [[IRCharResolver.referenceFlags]]).
+    */
   def caseEquivalence(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRCaseEquivalence =
-    IRCaseEquivalence.of(dialect, mode, flags, perlNative = false)
+    IRCaseEquivalence.of(dialect, mode, flags, perlNative = dialect.isPerl && flags.charset == IRCharset.Default)
+
+  /** Returns how a back-reference with the flags compares the capture with the input in the dialect. */
+  def backReferenceFolding(dialect: Dialect, flags: IRCharFlags): IRBackReferenceFolding =
+    if !dialect.isPerl || !flags.ignoreCase then IRBackReferenceFolding.Simple
+    else
+      flags.charset match
+        case IRCharset.Default                            => IRBackReferenceFolding.Simple
+        case IRCharset.Locale                             => IRBackReferenceFolding.Full(0x100)
+        case _: IRCharset.Ascii if flags.caselessRestrict => IRBackReferenceFolding.Full(0x80)
+        case _                                            => IRBackReferenceFolding.Full(0)
 
   /** Returns the width of a literal, an escape or a class in a look-behind, where the dialects counting it differently
     * from one care.
@@ -702,7 +715,7 @@ private[ir] class IRBuilder(
       NodeKey(node),
       throw new IllegalStateException(s"No resolved back-reference: $node")
     )
-    IRNodeData.BackReference(indices, charFlags)
+    IRNodeData.BackReference(indices, chars.referenceFlags(charFlags))
 
   def buildAssert(node: Node, kind: AssertKind): IRNodeData = kind match
     case AssertKind.Boundary(None) =>

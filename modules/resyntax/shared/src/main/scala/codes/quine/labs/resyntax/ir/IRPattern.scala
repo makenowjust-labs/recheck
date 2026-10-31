@@ -1,6 +1,8 @@
 package codes.quine.labs.resyntax.ir
 
 import codes.quine.labs.resyntax.ast.SourceLocation
+import codes.quine.labs.resyntax.charset.FullCaseFolding
+import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
 /** IRPattern is a whole pattern in the internal representation.
@@ -72,3 +74,24 @@ object IRBackReferenceChoice:
     * backtracking to the others (Ruby).
     */
   case object LastMatching extends IRBackReferenceChoice
+
+/** IRBackReferenceFolding is how a case-insensitive back-reference compares the capture with the input. */
+sealed abstract class IRBackReferenceFolding extends Product with Serializable
+
+object IRBackReferenceFolding:
+
+  /** Simple compares them character by character with the case equivalence. */
+  case object Simple extends IRBackReferenceFolding
+
+  /** Full compares the full case foldings of the capture and the input, which must end at the end of a character of
+    * both (Perl, e.g. `(ß)\1` matches `"ßss"`, but `(s)\1` does not match `"sß"`).
+    *
+    * @param below
+    *   the smallest code value of a folding to several characters, which a character with another folding keeps instead
+    *   (`0x80` under `aa`, and `0x100` under `l`)
+    */
+  final case class Full(below: Int) extends IRBackReferenceFolding:
+
+    /** Returns the folding of a character to several characters, if any. */
+    def fold(c: Int): Option[UString] =
+      Some(FullCaseFolding(c)).filter(key => key.length >= 2 && key.iterator.forall(_ >= below))

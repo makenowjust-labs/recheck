@@ -174,6 +174,39 @@ class InterpreterDialectSuite extends munit.FunSuite:
     refutes("(?<=[ß])y", Ruby(), "ßy", "i")
     accepts("(?<=[ß])y", Perl(), "ßy", "i")
 
+  test("Interpreter.run: Perl's case-insensitive back-references with full case folding"):
+    for (source, input, matches) <- Seq(
+        ("(ß)\\1", "ßss", true),
+        ("(ß)\\1", "ßſS", true),
+        ("(ss)\\1", "ssß", true),
+        ("(ß)\\1s", "ßsss", true),
+        ("(sß)\\1", "sßßs", true),
+        ("(.)\\1", "ﬃﬀi", true),
+        ("(ﬃ)\\1", "ﬃfﬁ", true),
+        ("(İ)\\1", "İi\u0307", true),
+        // The folding of a character matches whole.
+        ("(s)\\1", "sß", false),
+        ("(ß)\\1", "ßs", false),
+        ("(ß)\\1s", "ßsß", false),
+        ("(ff)\\1i", "ffﬃ", false),
+        ("(ﬃ)\\1", "ﬃff", false)
+      )
+    do
+      accepts(s"\\A$source\\z", Perl(), input, "i", matches)
+      refutes(s"\\A$source\\z", Ruby(), input, "i")
+    accepts("\\A(ß)\\1\\z", Ruby(), "ßẞ", "i")
+    // `aa` keeps a folding with ASCII characters, and `l` (the C locale) one with characters below `U+0100`.
+    refutes("\\A(ß)\\1\\z", Perl(), "ßss", "iaa")
+    accepts("\\A(ß)\\1\\z", Perl(), "ßẞ", "iaa")
+    refutes("\\A(ß)\\1\\z", Perl(), "ßss", "il")
+    accepts("\\A(\\x{390})\\1\\z", Perl(), "\u0390\u03b9\u0308\u0301", "il")
+    accepts("\\A(ß)\\1\\z", Perl(), "ßss", "ia")
+    // A native string under `/d` uses ASCII rules, unless the pattern switches to Unicode rules.
+    refutes("\\A(\\xC9)\\1\\z", Perl(utf8 = false), "\u00c9\u00e9", "i")
+    refutes("\\A(\\xDF)\\1\\z", Perl(utf8 = false), "\u00dfss", "i")
+    accepts("\\A(\\xC9)\\1\\N{U+41}\\z", Perl(utf8 = false), "\u00c9\u00e9a", "i")
+    accepts("\\A(\\N{U+DF})\\1\\z", Perl(utf8 = false), "\u00dfss", "i")
+
   test("Interpreter.run: line terminators"):
     for dialect <- Seq(Python(), Java, PCRE, Perl(), DotNet) do
       accepts("^a$", dialect, "a\n")

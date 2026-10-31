@@ -5,6 +5,7 @@ import scala.compiletime.uninitialized
 import codes.quine.labs.recheck.regexp.EcmaScriptChars
 import codes.quine.labs.recheck.regexp.Location
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
@@ -342,11 +343,14 @@ object Inst:
       *   the capture indices, which are more than one for a name shared by groups
       * @param equivalence
       *   the comparison of characters, which is not the identity for a case-insensitive reference
+      * @param folding
+      *   how a case-insensitive reference compares the capture with the input
       */
     final case class Ref(
         indices: Seq[Int],
         semantics: IRBackReferenceSemantics,
-        equivalence: IRCaseEquivalence
+        equivalence: IRCaseEquivalence,
+        folding: IRBackReferenceFolding = IRBackReferenceFolding.Simple
     ) extends ReadKind:
       override def toString: String =
         val i = if equivalence == IRCaseEquivalence.Identity then "" else " ignore_case"

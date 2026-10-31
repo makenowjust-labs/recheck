@@ -42,6 +42,14 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   def equivalence(flags: IRCharFlags): IRCaseEquivalence =
     IRCaseEquivalence.of(dialect, mode, flags, perlNative(flags))
 
+  /** Returns the flags of a back-reference, where Perl's `/d` rules are `/u` with a reason to use Unicode rules, and
+    * otherwise the rules of a native string.
+    */
+  def referenceFlags(flags: IRCharFlags): IRCharFlags =
+    if dialect.isPerl && flags.charset == IRCharset.Default && perlUnicodeRules then
+      flags.copy(charset = IRCharset.Unicode)
+    else flags
+
   /** Returns the word characters of `\b` and `\B` at the flags. */
   def wordSet(flags: IRCharFlags): CharSet = classes.boundaryWord(flags).restrict(mode)
 

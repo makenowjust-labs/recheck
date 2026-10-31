@@ -390,9 +390,15 @@ class IRBuilderSuite extends IRSuiteBase:
   check("\\K", "", PCRE, Perl(), Ruby())(ResetMatchStart)
 
   // Back-reference
-  checkWith("(a)\\1", "", All*)(d => Sequence(Capture(1, None, char('a')), BackReference(Seq(1), flagsOf(d))))
+  // Perl's `/d` at a back-reference is `/u` under Unicode rules.
+  def referenceFlagsOf(d: Dialect, flags: String = ""): IRCharFlags =
+    if d.isPerl then flagsOf(d, flags).copy(charset = IRCharset.Unicode) else flagsOf(d, flags)
+  checkWith("(a)\\1", "", All*)(d => Sequence(Capture(1, None, char('a')), BackReference(Seq(1), referenceFlagsOf(d))))
   checkWith("(a)(?i)\\1", "", DotNet, Java, PCRE, Perl(), Ruby()): d =>
-    Sequence(Capture(1, None, char('a')), Empty, BackReference(Seq(1), flagsOf(d, "i")))
+    Sequence(Capture(1, None, char('a')), Empty, BackReference(Seq(1), referenceFlagsOf(d, "i")))
+  checkWith("(a)\\1", "", Perl(utf8 = false))(d =>
+    Sequence(Capture(1, None, char('a')), BackReference(Seq(1), flagsOf(d)))
+  )
   check("(?<x>a)\\k<x+0>", "", Ruby())(
     Sequence(
       Capture(1, Some("x"), char('a')),
