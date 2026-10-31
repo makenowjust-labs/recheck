@@ -16,6 +16,7 @@ const sidebars = {
         "usage/as-javascript-library",
         "usage/as-scala-library",
         "usage/as-eslint-plugin",
+        "usage/dialects",
         "usage/parameters",
         "usage/diagnostics",
       ],
