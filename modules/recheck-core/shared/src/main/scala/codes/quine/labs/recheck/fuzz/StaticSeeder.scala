@@ -30,7 +30,6 @@ object StaticSeeder:
     val epsNFA = EpsNFABuilder
       .build(simplify(pattern, maxSimpleRepeatSize))
       .recoverWith:
-        // The assertions that the ε-NFA does not handle are dropped.
         case _: UnsupportedException =>
           EpsNFABuilder.build(simplify(pattern, maxSimpleRepeatSize, dropsAssertions = true))
       .get
@@ -90,7 +89,6 @@ object StaticSeeder:
           case NonAtomicLookBehind(n, _) =>
             val c = loop(n, prevIsRepeat, nextIsRepeat, inside)
             if prevIsRepeat then c else copy(Disjunction(Seq(c, empty)))
-          // The condition is dropped, and either branch may be taken.
           case Conditional(_, yes, no) =>
             copy(Disjunction(Seq(yes, no).map(loop(_, prevIsRepeat, nextIsRepeat, inside))))
           case ResetMatchStart | BacktrackControl(_) => copy(Empty)

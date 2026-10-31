@@ -82,7 +82,6 @@ object AttackPattern:
     */
   sealed abstract class Style extends Product with Serializable:
 
-    /** Returns a literal of the string. */
     def literal(s: UString): String
 
     /** Returns an expression repeating the string `n` times. */

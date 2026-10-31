@@ -248,7 +248,6 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   /** The captures held by `cap_hold`, with the time holding them, by the index. */
   private val held: mutable.Map[Int, (Int, Int, Long)] = mutable.Map.empty
 
-  /** Advances the clock. */
   private def tick(): Long =
     clock += 1
     clock

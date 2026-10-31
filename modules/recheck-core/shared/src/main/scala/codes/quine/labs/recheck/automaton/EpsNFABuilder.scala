@@ -155,7 +155,6 @@ private class EpsNFABuilder(
         emit(a0 -> Eps(Vector.empty))
         (i0, if notEmpty == IRNotEmpty.AtStart then moved(i0) else i0, moved(a0))
 
-  /** Returns the pairs of the set. */
   private def refine(set: CharSet): Set[(CharSet, CharKind)] =
     refineCache.getOrElseUpdate(set, alphabet.refine(set))
 
@@ -175,7 +174,6 @@ private class EpsNFABuilder(
     for (_, a0) <- ss do emit(a0 -> Eps(Vector(a)))
     (i, a)
 
-  /** Builds an ε-NFA for the sequence of the builders. */
   private def buildSequence(builders: Seq[() => (Int, Int)]): (Int, Int) =
     val ss = builders.map(_())
     ss
@@ -301,7 +299,6 @@ private class EpsNFABuilder(
   /** The text end assertions before a final line terminator that are not at an end point. */
   private val chompTextEndsInMiddle = pattern.chompTextEndsInMiddle.toSet
 
-  /** Builds EpsNFA transitions for an assertion. */
   private def buildAssert(node: IRNode, kind: IRAssertKind): (Int, Int) =
     def atomic(t: IRLineTerminators): Boolean = t.crlf == IRLineTerminators.CRLF.Atomic
     def plain(t: IRLineTerminators): Boolean = t.crlf == IRLineTerminators.CRLF.Ignored

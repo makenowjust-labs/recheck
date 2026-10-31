@@ -20,7 +20,6 @@ import codes.quine.labs.resyntax.parser.ParsingException
   */
 final case class ParsedPattern(source: String, flags: String, dialect: Dialect, flagSet: FlagSet, ir: IRPattern):
 
-  /** The root node of the IR. */
   def node: IRNode = ir.node
 
   /** Returns the message of an unsupported node, which names the construct and its location. */

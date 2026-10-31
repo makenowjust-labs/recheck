@@ -81,7 +81,6 @@ private[vm] class ProgramBuilder(
 )(using ctx: Context):
   import ctx._
 
-  /** The unit mode of the pattern. */
   private val mode = pattern.ir.mode
 
   /** Whether captures in a repetition are reset on each iteration, which only JavaScript does. */
@@ -119,7 +118,6 @@ private[vm] class ProgramBuilder(
   /** The scope that `(*THEN)` at the current position takes, or `None` to act as `(*PRUNE)`. */
   private var thenScope: Option[Int] = None
 
-  /** A next scope ID of `(*THEN)`. */
   private var nextThenScope: Int = 0
 
   /** The scope that `(*ACCEPT)` at the current position ends. */
@@ -373,11 +371,9 @@ private[vm] class ProgramBuilder(
     else if prefersComplement(set, mode) then ReadKind.ClassNot(set.complement(mode))
     else charsKind(set)
 
-  /** Returns the read kind of a set, which is a character if it has only one. */
   def charsKind(set: CharSet): ReadKind =
     if set.size == 1 then ReadKind.Char(set.head) else ReadKind.Class(set)
 
-  /** Returns the assertion kind. */
   def assertKind(kind: IRAssertKind): AssertKind = kind match
     case IRAssertKind.WordBoundary(word)               => AssertKind.WordBoundary(word)
     case IRAssertKind.NotWordBoundary(word)            => AssertKind.WordBoundaryNot(word)
@@ -434,13 +430,11 @@ private[vm] class ProgramBuilder(
       if perlCaptures then buildPerlDisjunction(children, barrier, run)
       else buildAlternatives(children.indices.map(i => () => run(i)), barrier)
 
-  /** Returns a new scope ID of `(*THEN)`. */
   def newThenScope(): Int =
     val id = nextThenScope
     nextThenScope += 1
     id
 
-  /** Runs with the scope of `(*THEN)`. */
   def withThenScope(scope: Option[Int])(run: => Unit): Unit =
     val saved = thenScope
     thenScope = scope
@@ -505,7 +499,6 @@ private[vm] class ProgramBuilder(
       case _                           => (None, child)
     Option.when(body.captureRange.range.isEmpty && fixedWidth(body).exists(_ > 0))(index)
 
-  /** Returns the width of the node if it is fixed. */
   def fixedWidth(node: IRNode): Option[Int] = node.data match
     case IRNodeData.Empty | _: IRNodeData.Assert | _: IRNodeData.LookAhead | _: IRNodeData.LookBehind => Some(0)
     case _: IRNodeData.Chars                                                                          => Some(1)
@@ -532,7 +525,6 @@ private[vm] class ProgramBuilder(
   def fallbackOf(label: Label, keep: Keep): Label =
     keep.fold(label)(restore => allocateKeep(restore, None, Some(label)))
 
-  /** Emits `try`, or `try_barrier` with the barrier. */
   def emitTry(next: Label, fallback: Label, barrier: Option[Barrier]): Unit =
     emitTerminator(barrier.fold(Inst.Try(next, fallback))(Inst.TryBarrier(next, fallback, _)))
 
@@ -647,7 +639,6 @@ private[vm] class ProgramBuilder(
       emitTerminator(Inst.Jmp(exit))
       enterBlock(exit)
 
-  /** Returns how a repetition handles an empty iteration in the dialect. */
   def emptyIteration(quantifier: IRQuantifier, child: IRNode): EmptyIteration = pattern.dialect match
     case Dialect.JavaScript => EmptyIteration.Reject
     case _: Dialect.Python  => EmptyIteration.ExitOptional
@@ -781,7 +772,6 @@ private[vm] class ProgramBuilder(
   def emitHold(node: IRNode): Unit =
     if holdsCaptures then for (from, to) <- node.captureRange.range do emitInst(Inst.CapHold(from, to))
 
-  /** Runs with the scope of `(*ACCEPT)`. */
   def withAcceptScope(scope: AcceptScope)(run: => Unit): Unit =
     val saved = (acceptScope, openCaptures, atomicDepth)
     acceptScope = scope

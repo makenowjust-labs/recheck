@@ -34,7 +34,6 @@ object UStringUtil:
 
   extension (s: UString)
 
-    /** Returns the character at the index. */
     def getAt(n: Int, unicode: Boolean): Option[Int] =
       Option.when(0 <= n && n < s.length):
         val c = s(n)
@@ -42,7 +41,6 @@ object UStringUtil:
           Character.toCodePoint(c.toChar, s(n + 1).toChar)
         else c
 
-    /** Returns the character before the index. */
     def getBefore(n: Int, unicode: Boolean): Option[Int] =
       Option.when(0 < n && n <= s.length):
         val c = s(n - 1)
@@ -50,18 +48,14 @@ object UStringUtil:
           Character.toCodePoint(s(n - 2).toChar, c.toChar)
         else c
 
-    /** Inserts the character at the index. */
     def insertAt(n: Int, c: Int): UString = s.insert(n, fromCodePoints(Iterator(c)))
 
-    /** Inserts the string at the index. */
     def insert(n: Int, t: UString): UString = s.slice(0, n) ++ t ++ s.slice(n, s.length)
 
-    /** Replaces the character at the index. */
     def replaceAt(n: Int, c: Int, unicode: Boolean): UString =
       val skip = s.getAt(n, unicode).map(charWidth).getOrElse(0)
       s.slice(0, n) ++ fromCodePoints(Iterator(c)) ++ s.slice(n + skip, s.length)
 
-    /** Iterates the characters. */
     def chars(unicode: Boolean): Iterator[Int] =
       if unicode then
         Iterator.unfold(0): i =>

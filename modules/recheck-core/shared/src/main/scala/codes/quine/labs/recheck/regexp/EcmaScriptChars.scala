@@ -10,7 +10,6 @@ object EcmaScriptChars:
   /** Canonicalizes each character of the set for ignore-case matching (ECMAScript `Canonicalize`). */
   def canonicalize(set: CharSet, unicode: Boolean): CharSet = CaseMapping.ecmaScriptCanonicalize(unicode).image(set)
 
-  /** Tests whether the character is printable or not. */
   def isPrintable(c: Int): Boolean = !Other.contains(c)
 
   /** Shows the character as a pattern. */
