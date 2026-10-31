@@ -42,7 +42,6 @@ object GroupKind:
   /** PNamedCapture is a kind of alternative named capture node (e.g. `(?P<foo>...)`). */
   final case class PNamedCapture(name: String) extends GroupKind
 
-  /** LookAround is a kind of look-around groups. */
   sealed abstract class LookAround extends GroupKind
 
   /** PositiveLookAhead is a kind of positive look-ahead group (e.g. `(?=...)`). */

@@ -1,6 +1,5 @@
 package codes.quine.labs.resyntax.ast
 
-/** EscapeStyle is a backslash escape style. */
 sealed abstract class EscapeStyle extends Product with Serializable
 
 object EscapeStyle:

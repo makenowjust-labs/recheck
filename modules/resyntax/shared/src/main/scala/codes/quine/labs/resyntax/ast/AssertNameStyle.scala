@@ -1,6 +1,5 @@
 package codes.quine.labs.resyntax.ast
 
-/** AssertNameStyle is a style kind for some groups. */
 sealed abstract class AssertNameStyle extends Product with Serializable
 
 object AssertNameStyle:

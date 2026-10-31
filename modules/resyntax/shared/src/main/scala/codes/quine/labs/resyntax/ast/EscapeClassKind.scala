@@ -1,6 +1,5 @@
 package codes.quine.labs.resyntax.ast
 
-/** EscapeClassKind is a kind of backslash escape class. */
 sealed abstract class EscapeClassKind extends Product with Serializable
 
 object EscapeClassKind:

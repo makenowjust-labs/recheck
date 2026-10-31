@@ -3,11 +3,7 @@ package codes.quine.labs.resyntax.ast
 import scala.annotation.switch
 import scala.collection.mutable
 
-/** FlagSet is a set of flag characters.
-  *
-  * Each value are corresponding to just one letter without duplication, so their namings are not matched in some
-  * dialects.
-  */
+/** Each field corresponds to one flag letter, so its name may not match the flag's meaning in some dialects. */
 final case class FlagSet(
     // `A` (PCRE)
     anchored: Boolean = false,
@@ -75,7 +71,6 @@ final case class FlagSet(
 
 object FlagSet:
 
-  /** Returns parsed flag set object from the given flag set string on the dialect. */
   def parse(flags: String, dialect: Dialect): FlagSet =
     val allowsDuplicatedFlag = !dialect.isJavaScript
     // Ruby's character set options have no API constant, and the last one wins as the inline options do.
