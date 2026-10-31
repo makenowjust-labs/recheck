@@ -1,5 +1,6 @@
 package codes.quine.labs.recheck.recall
 
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -21,6 +22,8 @@ import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.DialectOptions
+import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
 
 /** Runs recall validation on the runtimes in `PATH`, skipping the missing ones.
@@ -139,6 +142,21 @@ class RecallRuntimeSuite extends munit.FunSuite:
     )
     assertFinish(string.get)
 
+  runtimeTest("Perl: the UTF-8 flag of a string pattern", "perl"):
+    // `\w` matches `é` by the Unicode rules, which a UTF-8 pattern string has.
+    def matches(source: String, utf8: Option[Boolean]): Boolean =
+      val options = DialectOptions(perlSource = PerlSource.String, perlUtf8 = utf8)
+      val pattern = ParsedPattern.parse(source, "", Dialect.Perl, options).toTry.get
+      val program = RecallProgram.generate(pattern, attack("a", 1, ""), perlLiteral = false).get
+      val regex = program.script.linesIterator.find(_.startsWith("my $regex = ")).get
+      val process = new ProcessBuilder("perl", "-e", s"""$regex print "\\xE9" =~ $$regex ? "1" : "0";""").start()
+      new String(process.getInputStream.readAllBytes(), StandardCharsets.UTF_8) == "1"
+    assert(matches("\\w", Some(true)))
+    assert(!matches("\\w", Some(false)))
+    assert(!matches("\\w", None))
+    assert(matches("\\w|ü", None))
+    assert(!matches("\\w|ü", Some(false)))
+
   runtimeTest("PCRE", "php"):
     // PHP's default `pcre.backtrack_limit` stops the match.
     val r = validate("^(?:é|é)*$", "", Dialect.PCRE, attack("Ã©", 31, "\u0000"))
@@ -150,6 +168,36 @@ class RecallRuntimeSuite extends munit.FunSuite:
       RecallResult.EngineLimit("Backtrack limit exhausted")
     )
     assertFinish(validate("^(?:é|é)*$", "u", Dialect.PCRE, attack("é", 3, "\u0000")))
+
+  /** Runs the standalone program in a new directory, and returns the output. */
+  def runScript(script: RecallProgram.Script): String =
+    val dir = Files.createTempDirectory("recheck script ")
+    val file = dir.resolve(script.name)
+    Files.writeString(file, script.content)
+    file.toFile.deleteOnExit()
+    dir.toFile.deleteOnExit()
+    val process = new ProcessBuilder(script.command.split(' ')*).directory(dir.toFile).redirectErrorStream(true).start()
+    process.getOutputStream.close()
+    val out = new String(process.getInputStream.readAllBytes(), StandardCharsets.UTF_8)
+    assertEquals(process.waitFor(), 0, out)
+    out
+
+  for (dialect, program) <- Seq(
+      Dialect.JavaScript -> "node",
+      Dialect.Python -> "python3",
+      Dialect.Ruby -> "ruby",
+      Dialect.Java -> "java",
+      Dialect.DotNet -> "dotnet",
+      Dialect.Perl -> "perl",
+      Dialect.PCRE -> "php"
+    )
+  do
+    runtimeTest(s"RecallProgram.script: $dialect", program):
+      val pattern = ParsedPattern.parse("^(?:a|é|😀)*$", "", dialect).toTry.get
+      val astral = AttackPattern(Seq((UString.fromString("é"), UString.fromString("😀a"), 0)), UString(0), 3)
+      val out = runScript(RecallProgram.script(pattern, astral).get)
+      val lines = out.linesIterator.map(_.takeWhile(_ != ' ')).toSeq
+      assertEquals(lines.filter(_.startsWith("recheck:")), Seq("recheck:runtime", "recheck:start", "recheck:time"))
 
   runtimeTest("ReDoS.checkAll: Ruby", "ruby"):
     // The failed recall validation is kept, and the checking continues to the safe result.

@@ -18,8 +18,18 @@ import codes.quine.labs.resyntax.parser.ParsingException
 /** ParsedPattern is a pattern source with its IR, which the checkers analyze.
   *
   * The checkers read only the IR; the source is kept for the output (e.g. diagnostics and recall programs).
+  *
+  * @param perlUtf8
+  *   whether a Perl pattern string is UTF-8 as the IR reads it, which is `false` for the other dialects
   */
-final case class ParsedPattern(source: String, flags: String, dialect: Dialect, flagSet: FlagSet, ir: IRPattern):
+final case class ParsedPattern(
+    source: String,
+    flags: String,
+    dialect: Dialect,
+    flagSet: FlagSet,
+    ir: IRPattern,
+    perlUtf8: Boolean
+):
 
   /** The root node of the IR. */
   def node: IRNode = ir.node
@@ -55,8 +65,10 @@ object ParsedPattern:
     try
       val flagSet = FlagSet.parse(flags, dialect)
       val node = Parser.parse(source, flagSet, dialect, options)
-      val ir = IRBuilder.build(node, flagSet, dialect, options.withPerlUtf8Of(source))
-      Right(ParsedPattern(source, flags, dialect, flagSet, ir))
+      val irOptions = options.withPerlUtf8Of(source)
+      val ir = IRBuilder.build(node, flagSet, dialect, irOptions)
+      val perlUtf8 = dialect == Dialect.Perl && IRBuilder.perlUtf8(node, ir.mode, irOptions)
+      Right(ParsedPattern(source, flags, dialect, flagSet, ir, perlUtf8))
     catch
       case ex: FlagSetException    => Left(new InvalidRegExpException(ex.getMessage))
       case ex: ParsingException    => Left(new InvalidRegExpException(ex.getMessage))
