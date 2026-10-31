@@ -42,5 +42,12 @@ object CaseFoldingCases:
     Case("^\\u0073s$", "ß", Seq(Ruby()), Set.empty),
     Case("^\\u017Fs$", "ß", Seq(Ruby()), Set(Ruby())),
     Case("^f\\i$", "ﬁ", Seq(Ruby()), Set(Ruby())),
-    Case("^j\\x{30C}$", "ǰ", Seq(Perl()), Set(Perl()))
+    Case("^j\\x{30C}$", "ǰ", Seq(Perl()), Set(Perl())),
+    // Ruby joins literals into a folding only when each of them folds to one character.
+    Case("^ſs$", "ß", Seq(Ruby(), Perl()), Set(Ruby(), Perl())),
+    Case("^ſt$", "ﬅ", Seq(Ruby(), Perl()), Set(Ruby(), Perl())),
+    Case("^ﬀi$", "ﬃ", Seq(Ruby(), Perl()), Set(Perl())),
+    Case("^fﬁ$", "ﬃ", Seq(Ruby(), Perl()), Set(Perl())),
+    Case("^ᾶι$", "ᾷ", Seq(Ruby(), Perl()), Set(Perl())),
+    Case("^ffi$", "ﬃ", Seq(Ruby(), Perl()), Set(Ruby(), Perl()))
   )

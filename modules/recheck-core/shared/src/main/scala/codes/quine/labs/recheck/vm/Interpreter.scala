@@ -25,6 +25,7 @@ import codes.quine.labs.recheck.vm.Interpreter.Status
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
+import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminators
@@ -729,7 +730,13 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   /** Compares the capture with the input from the position forward (or backward), and returns the compared count and
     * the matched width of the input if matched.
     */
-  private def compare(s: UString, pos: Int, back: Boolean, equivalence: IRCaseEquivalence): (Int, Option[Int]) =
+  private def compare(s: UString, pos: Int, back: Boolean, ref: ReadKind.Ref): (Int, Option[Int]) =
+    val equivalence = ref.equivalence
+    ref.folding match
+      case full: IRBackReferenceFolding.Full => compareFolded(s, pos, back, equivalence, full)
+      case IRBackReferenceFolding.Simple     => compareChars(s, pos, back, equivalence)
+
+  private def compareChars(s: UString, pos: Int, back: Boolean, equivalence: IRCaseEquivalence): (Int, Option[Int]) =
     if equivalence == IRCaseEquivalence.Identity then
       var count = 0
       if back then
@@ -753,6 +760,39 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           case _ => continues = false
       (i, Option.when(i == s.length)(j))
 
+  /** Compares the full case foldings of the capture and the input, where the input's characters must fold to the
+    * capture's folding exactly, and returns the compared width of the input and the matched width if matched.
+    */
+  private def compareFolded(
+      s: UString,
+      pos: Int,
+      back: Boolean,
+      equivalence: IRCaseEquivalence,
+      full: IRBackReferenceFolding.Full
+  ): (Int, Option[Int]) =
+    val unicode = program.meta.unicode
+    def width(c: Int): Int = if unicode && c >= 0x10000 then 2 else 1
+    def folded(c: Int): Seq[Int] = full.fold(c).map(_.iterator.toSeq).getOrElse(Seq(c))
+    val target =
+      val units = s.chars(unicode).flatMap(folded).toSeq
+      if back then units.reverse else units
+    var k = 0
+    var j = 0
+    var continues = true
+    while continues && k < target.length do
+      val c = if back then input.getBefore(pos - j, unicode) else input.getAt(pos + j, unicode)
+      c match
+        case Some(c) =>
+          val units = if back then folded(c).reverse else folded(c)
+          if k + units.length <= target.length &&
+            units.indices.forall(n => target(k + n) == units(n) || equivalence.equiv(target(k + n), units(n)))
+          then
+            k += units.length
+            j += width(c)
+          else continues = false
+        case None => continues = false
+    (j, Option.when(k == target.length)(j))
+
   /** Runs a `read` (or `read_back`) instruction of a back-reference. */
   private def instReadRef(frame: Frame, inst: Inst, ref: ReadKind.Ref, loc: Option[Location], back: Boolean): Boolean =
     val candidates = refCandidates(frame, ref)
@@ -761,7 +801,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     while width.isEmpty && it.hasNext do
       it.next() match
         case Some(s) =>
-          val (count, w) = compare(s, frame.pos, back, ref.equivalence)
+          val (count, w) = compare(s, frame.pos, back, ref)
           steps = Math.addExact(steps, count)
           width = w
         case None => width = Some(0)
