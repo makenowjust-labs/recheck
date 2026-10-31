@@ -611,7 +611,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           case Rollback.Fallback(_, _) => sys.error("unreachable")
         // $COVERAGE-ON$
         true
-      case Inst.CapKeep(restore) =>
+      case Inst.CapKeep =>
         val captures = if failedCaptures.isEmpty then frame.captures else failedCaptures
         frame.captures = Vector.tabulate(captures.size): i =>
           val index = i / 2
@@ -619,7 +619,6 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           // The whole match keeps its start, which `\K` sets.
           if index == 0 then frame.captures(i)
           else if index > frame.lastParen then if i % 2 == 0 then frame.captures(i) else -1
-          else if restore.exists((from, to) => from <= index && index <= to) then frame.captures(i)
           else captures(i)
         true
 

@@ -204,13 +204,10 @@ object Inst:
 
   /** `cap_keep`: Takes the captures of the last failed matching, as Perl does not restore them on backtracking.
     *
-    * The captures between `from` and `to` of `restore` keep their values, and the captures above the last closed index
-    * of the current matching are unset.
+    * The captures above the last closed index of the current matching are unset.
     */
-  final case class CapKeep(restore: Option[(Int, Int)]) extends NonTerminator:
-    override def toString: String = restore match
-      case Some((from, to)) => s"cap_keep $from $to"
-      case None             => "cap_keep"
+  case object CapKeep extends NonTerminator:
+    override def toString: String = "cap_keep"
 
   /** `cap_hold`: Holds the captures between `from` and `to` over backtracking, which takes their values now unless it
     * goes back after this.

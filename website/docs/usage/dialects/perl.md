@@ -89,6 +89,8 @@ The following constructs are not supported.
   `recheck` does not reproduce it, and `(*THEN)` takes the next alternative as in PCRE (matching the first `a`).
 - Under `i`, Perl lowers the minimum length of a look-behind by the literals that may match a shorter folded character, which comes from joining the literals on compiling (e.g. `(?<=ss)x` matches `"ßx"`).
   `recheck` steps back by the lengths of the literals, so it does not reproduce such a match.
+- Perl compiles a repetition of a fixed-length node with no captures inside (e.g. `(a)?`) into a counting node, which unsets the capture of the node when the repetition matches nothing (e.g. `^(?:(a)?b){2}\1$` does not match `"abba"`).
+  `recheck` does not reproduce it, and such a repetition keeps the capture of an earlier iteration as the other repetitions do.
 
 ## Recall Validation
 
