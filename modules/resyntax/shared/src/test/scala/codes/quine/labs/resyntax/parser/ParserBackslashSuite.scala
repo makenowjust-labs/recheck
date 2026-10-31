@@ -146,7 +146,8 @@ class ParserBackslashSuite extends ParserSuiteBase:
   check("\\kx", "", Ruby)(Sequence(Backslash(Unknown('k')), Literal('x')))
   check("\\g{ 1 }", "", PCRE, Perl)(Backslash(EscapeBackReference(GBackReference(Curly), IndexedReference(1))))
   check("\\g1", "", Ruby)(Sequence(Backslash(Unknown('g')), Literal('1')))
-  check("\\l", "", Perl)(Backslash(CaseCommand(SingleLowerCaseCommand)))
+  check("\\la", "", Perl)(Literal('a'))
+  checkPerlString("\\l", "")(Backslash(Unknown('l')))
   check("\\n", "", All*)(Backslash(Escape(Single('n'), 0x0a)))
   check("\\o{010}", "", PCRE, Perl)(Backslash(Escape(Octal, 0x08)))
   check("\\p{Letter}", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(EscapeClass(UnicodeProperty("Letter"))))
@@ -172,7 +173,8 @@ class ParserBackslashSuite extends ParserSuiteBase:
   check("\\r", "", All*)(Backslash(Escape(Single('r'), 0x0d)))
   check("\\s", "", All*)(Backslash(EscapeClass(Space)))
   check("\\t", "", All*)(Backslash(Escape(Single('t'), 0x09)))
-  check("\\u", "", Perl)(Backslash(CaseCommand(SingleUpperCaseCommand)))
+  check("\\ua", "", Perl)(Literal('A'))
+  checkPerlString("\\u", "")(Backslash(Unknown('u')))
   check("\\uABCD", "", DotNet, Java, JavaScript, Python, Ruby)(Backslash(Escape(UnicodeHex4, 0xabcd)))
   check("\\u{ABCDE}", "u", JavaScript)(Backslash(Escape(UnicodeBracket, 0xabcde)))
   check("\\uA", "", JavaScript)(Sequence(Backslash(Unknown('u')), Literal('A')))
@@ -225,39 +227,48 @@ class ParserBackslashSuite extends ParserSuiteBase:
   check("\\B{wb}", "", Perl)(Backslash(Assert(NonBoundary(Some(WbModifier)))))
   check("\\B{sb}", "", Perl)(Backslash(Assert(NonBoundary(Some(SbModifier)))))
   check("\\D", "", All*)(Backslash(EscapeClass(NonDigit)))
-  check("\\E", "", PCRE, Perl)(Backslash(CaseCommand(EndCaseCommand)))
-  check("\\F", "", Perl)(Backslash(CaseCommand(FoldCaseCommand)))
+  check("\\E", "", PCRE)(Backslash(CaseCommand(EndCaseCommand)))
+  check("a\\E", "", Perl)(Literal('a'))
+  checkPerlString("\\E", "")(Backslash(Unknown('E')))
+  check("\\FA", "", Perl)(Literal('a'))
+  checkPerlString("\\F", "")(Backslash(Unknown('F')))
   check("\\G", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(Assert(Sticky)))
   check("\\H", "", Java, PCRE, Perl)(Backslash(EscapeClass(NonHorizontal)))
   check("\\H", "", Ruby)(Backslash(EscapeClass(NonHexDigit)))
   check("\\K", "", PCRE, Perl, Ruby)(Backslash(Assert(Cut)))
-  check("\\L", "", Perl)(Backslash(CaseCommand(LowerCaseCommand)))
+  check("\\LA", "", Perl)(Literal('a'))
+  checkPerlString("\\L", "")(Backslash(Unknown('L')))
   check("\\P{Letter}", "", DotNet, Java, PCRE, Perl, Ruby)(Backslash(EscapeClass(NonUnicodeProperty("Letter"))))
   check("\\P{Letter}", "u", JavaScript)(Backslash(EscapeClass(NonUnicodeProperty("Letter"))))
   check("\\P{Script=Hira}", "", DotNet, Java, PCRE, Perl, Ruby):
     Backslash(EscapeClass(NonUnicodePropertyValue("Script", "Hira")))
   check("\\P{Script=Hira}", "u", JavaScript)(Backslash(EscapeClass(NonUnicodePropertyValue("Script", "Hira"))))
   check("\\PL", "", Java, PCRE, Perl)(Backslash(EscapeClass(NonUnicodeBareProperty("L"))))
-  check("\\Qab\\E", "", Java, PCRE, Perl):
+  check("\\Qab\\E", "", Java, PCRE):
     Sequence(
       Backslash(CaseCommand(QuoteCommand)),
       Literal('a'),
       Literal('b'),
       Backslash(CaseCommand(EndCaseCommand))
     )
-  check("\\Qab", "", Java, PCRE, Perl):
+  check("\\Qab", "", Java, PCRE):
     Sequence(
       Backslash(CaseCommand(QuoteCommand)),
       Literal('a'),
       Literal('b')
     )
-  check("\\Q\\\\\\E", "", Java, PCRE, Perl):
+  check("\\Q\\\\\\E", "", Java, PCRE):
     Sequence(
       Backslash(CaseCommand(QuoteCommand)),
       Literal('\\'),
       Literal('\\'),
       Backslash(CaseCommand(EndCaseCommand))
     )
+  check("\\Qa.\\E", "", Perl)(Sequence(Literal('a'), Backslash(Escape(Single('.'), '.'))))
+  check("\\Q\\d\\E", "", Perl)(Sequence(Backslash(Escape(Single('\\'), '\\')), Literal('d')))
+  check("\\U\\d", "", Perl)(Backslash(EscapeClass(NonDigit)))
+  checkPerlString("\\Qa.\\E", "")(Sequence(Backslash(Unknown('Q')), Literal('a'), Dot, Backslash(Unknown('E'))))
+  checkPerlString("\\U\\d", "")(Sequence(Backslash(Unknown('U')), Backslash(EscapeClass(Digit))))
   check("\\N", "", PCRE, Perl)(Backslash(EscapeClass(NonNewline)))
   error("\\N", "", Java, Python)("Invalid backslash escape at 2")
   check("\\N{2}", "", PCRE, Perl)(Repeat(Backslash(EscapeClass(NonNewline)), Exact(2, Greedy)))

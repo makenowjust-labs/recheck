@@ -26,6 +26,7 @@ import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.NameStyle
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
+import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ast.QuoteLiteral
 import codes.quine.labs.resyntax.ast.Reference
@@ -46,7 +47,11 @@ object Parser:
       allowsDuplicatedGroupName = featureSet.allowsDuplicatedGroupName
     )
 
-  /** Parses the source in the dialect. */
+  /** Parses the source in the dialect.
+    *
+    * A Perl regex literal (the default of [[DialectOptions.perlSource]]) is rewritten as Perl's lexer does first, and
+    * the locations of the result point into the given source.
+    */
   def parse(
       source: String,
       flagSet: FlagSet,
@@ -54,6 +59,17 @@ object Parser:
       options: DialectOptions = DialectOptions.Default
   ): Node =
     options.validate(dialect)
+    val rewritten =
+      if dialect == Dialect.Perl && options.perlSource == PerlSource.Literal then
+        PerlLiteralLexer.rewrite(source, flagSet.verbose)
+      else None
+    rewritten match
+      case None    => parseText(source, flagSet, dialect)
+      case Some(r) =>
+        try r.relocate(parseText(r.text, flagSet, dialect))
+        catch case ex: ParsingException => throw new ParsingException(ex.message, ex.pos.map(r.position))
+
+  private def parseText(source: String, flagSet: FlagSet, dialect: Dialect): Node =
     val analysis = QuickAnalysis.from(source)
     val featureSet = FeatureSet.from(analysis, dialect, flagSet)
     val parser = new Parser(source, analysis, featureSet)
@@ -328,9 +344,7 @@ private[parser] final class Parser(
   private def isAfterAlphabeticBackslash(stack: mutable.Stack[Node], pos: Int): Boolean =
     stack.headOption.exists: node =>
       node.loc.end == pos && CodePointUtil.isAlphabetic(source.charAt(pos - 1).toInt) && (node.data match
-        // Case commands are processed by Perl's lexer for a regex literal, so the regex compiler never sees them.
-        case NodeData.Backslash(_: BackslashKind.CaseCommand) => false
-        case _: NodeData.Backslash                            => node.loc.start + 2 == pos
+        case _: NodeData.Backslash => node.loc.start + 2 == pos
         // Perl looks only at the source text, so it also rejects a letter after an escaped backslash (e.g. `\\p{`).
         case _: NodeData.Literal => node.loc.start + 1 == pos && pos >= 2 && source.charAt(pos - 2) == '\\'
         case _                   => false)
@@ -1383,7 +1397,6 @@ private[parser] final class Parser(
       case 'g'                                                 => parseBackslashLowerG()
       case 'h'                                                 => parseBackslashLowerH()
       case 'k'                                                 => parseBackslashLowerK()
-      case 'l'                                                 => parseBackslashLowerL()
       case 'n'                                                 => parseBackslashLowerN()
       case 'o'                                                 => parseBackslashLowerO()
       case 'p'                                                 => parseBackslashLowerP()
@@ -1401,11 +1414,9 @@ private[parser] final class Parser(
       case 'C'                                                 => parseBackslashUpperC()
       case 'D'                                                 => parseBackslashUpperD()
       case 'E'                                                 => parseBackslashUpperE()
-      case 'F'                                                 => parseBackslashUpperF()
       case 'G'                                                 => parseBackslashUpperG()
       case 'H'                                                 => parseBackslashUpperH()
       case 'K'                                                 => parseBackslashUpperK()
-      case 'L'                                                 => parseBackslashUpperL()
       case 'M'                                                 => parseBackslashUpperM()
       case 'N'                                                 => parseBackslashUpperN()
       case 'P'                                                 => parseBackslashUpperP()
@@ -1650,12 +1661,6 @@ private[parser] final class Parser(
     assert(n != 0, "Invalid backslash escape", start)
     Reference.RelativeReference(sign * n)
 
-  private def parseBackslashLowerL(): BackslashKind =
-    if !featureSet.hasBackslashCaseCommand then return parseBackslashUnknown()
-
-    next()
-    BackslashKind.CaseCommand(CaseCommandKind.SingleLowerCaseCommand)
-
   private def parseBackslashLowerN(): BackslashKind =
     next()
     BackslashKind.Escape(EscapeStyle.Single('n'), 0x0a)
@@ -1777,7 +1782,7 @@ private[parser] final class Parser(
     BackslashKind.Escape(EscapeStyle.Single('t'), 0x09)
 
   private def parseBackslashLowerU(): BackslashKind =
-    if !(featureSet.hasBackslashUnicodeHex || featureSet.hasBackslashCaseCommand) then return parseBackslashUnknown()
+    if !featureSet.hasBackslashUnicodeHex then return parseBackslashUnknown()
 
     val save = offset
     next()
@@ -1787,8 +1792,6 @@ private[parser] final class Parser(
       if featureSet.hasBackslashUnicodeList then return parseUnicodeList()
       val value = parseBracedCodePoint(16)
       return BackslashKind.Escape(EscapeStyle.UnicodeBracket, value)
-
-    if featureSet.hasBackslashCaseCommand then return BackslashKind.CaseCommand(CaseCommandKind.SingleUpperCaseCommand)
 
     if !source.slice(offset, offset + 4).forall(CodePointUtil.isHexDigit(_)) || offset + 4 > source.length then
       assert(featureSet.allowsBrokenBackslashHex, "Invalid backslash escape")
@@ -1904,17 +1907,11 @@ private[parser] final class Parser(
     BackslashKind.EscapeClass(EscapeClassKind.NonDigit)
 
   private def parseBackslashUpperE(): BackslashKind =
-    if !(featureSet.hasBackslashCaseCommand || featureSet.hasBackslashQuoteCommand) then return parseBackslashUnknown()
+    if !featureSet.hasBackslashQuoteCommand then return parseBackslashUnknown()
     assert(featureSet.allowsUnpairedQuoteEnd, "Invalid backslash escape")
 
     next()
     BackslashKind.CaseCommand(CaseCommandKind.EndCaseCommand)
-
-  private def parseBackslashUpperF(): BackslashKind =
-    if !featureSet.hasBackslashCaseCommand then return parseBackslashUnknown()
-
-    next()
-    BackslashKind.CaseCommand(CaseCommandKind.FoldCaseCommand)
 
   private def parseBackslashUpperG(): BackslashKind =
     if !featureSet.hasBackslashStickyAssert then return parseBackslashUnknown()
@@ -1935,12 +1932,6 @@ private[parser] final class Parser(
 
     next()
     BackslashKind.Assert(AssertKind.Cut)
-
-  private def parseBackslashUpperL(): BackslashKind =
-    if !featureSet.hasBackslashCaseCommand then return parseBackslashUnknown()
-
-    next()
-    BackslashKind.CaseCommand(CaseCommandKind.LowerCaseCommand)
 
   private def parseBackslashUpperM(): BackslashKind =
     if !featureSet.hasBackslashMetaControl then return parseBackslashUnknown()
@@ -2002,12 +1993,10 @@ private[parser] final class Parser(
     BackslashKind.EscapeClass(EscapeClassKind.NonSpace)
 
   private def parseBackslashUpperU(): BackslashKind =
-    if !(featureSet.hasBackslashUnicodeHex8 || featureSet.hasBackslashCaseCommand) then return parseBackslashUnknown()
+    if !featureSet.hasBackslashUnicodeHex8 then return parseBackslashUnknown()
 
     val save = offset
     next()
-
-    if featureSet.hasBackslashCaseCommand then return BackslashKind.CaseCommand(CaseCommandKind.UpperCaseCommand)
 
     for i <- 0 until 8 do
       assert(
@@ -2245,7 +2234,7 @@ private[parser] final class Parser(
     val start = offset
     val seq = mutable.ListBuffer.empty[ClassItem]
 
-    // A `]` after only empty quotes and case commands is still the first character (e.g. `[\E]]` in Perl).
+    // A `]` after only empty quotes and `\E` is still the first character (e.g. `[\E]]` in PCRE).
     var empty = true
 
     skipClassComment()
@@ -2313,7 +2302,7 @@ private[parser] final class Parser(
       case (begin: ClassItem.Value, end: ClassItem.Value) =>
         assert(begin.data.value <= end.data.value, "Out of order class range", begin.loc.start)
         seq.addOne(ClassItem(ClassItemData.ClassRange(begin, end), SourceLocation(begin.loc.start, end.loc.end)))
-        // The case commands inside a range are kept after it, and the empty quotes are dropped.
+        // The `\E` inside a range is kept after it, and the empty quotes are dropped.
         seq.addAll((skippedBeforeHyphen ++ skippedAfterHyphen).filterNot(isEmptyClassQuote))
         seq.addAll(rest)
       case _ =>
@@ -2329,10 +2318,10 @@ private[parser] final class Parser(
           seq.addAll(rest)
         else reset(save)
 
-  /** Parses the empty quotes and case commands between a range begin and its `-`, which do not break the range. */
+  /** Parses the empty quotes and `\E` between a range begin and its `-`, which do not break the range. */
   private def parseClassItemsSkippableInRange(unionStart: Int): Seq[ClassItem] =
     val items = mutable.ListBuffer.empty[ClassItem]
-    if !(featureSet.hasBackslashQuoteCommand || featureSet.hasBackslashCaseCommand) then return items.toSeq
+    if !featureSet.hasBackslashQuoteCommand then return items.toSeq
     boundary:
       while !isClassItemStop(unionStart) && currentChar == '\\' do
         val save = offset
@@ -2476,7 +2465,7 @@ private[parser] final class Parser(
     !isEnd && ((currentChar: @switch) match
       case 'A' | 'z' | 'Z' | 'G' | 'K' | 'R' | 'X' => featureSet.treatsNonClassBackslashInClassAsLiteral
       case 'g' | 'k'                               => featureSet.treatsBackReferenceBackslashInClassAsLiteral
-      case 'C'                                     => featureSet.hasBackslashCaseCommand
+      case 'C'                                     => featureSet.treatsBackslashUpperCInClassAsLiteral
       case _                                       => false)
 
   private def parseClassQuote(start: Int): ClassItem =

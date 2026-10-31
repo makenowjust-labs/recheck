@@ -2,7 +2,6 @@ package codes.quine.labs.resyntax.ir
 
 import scala.deriving.Mirror
 
-import codes.quine.labs.resyntax.ast.CaseCommandKind
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetDiff
@@ -64,7 +63,7 @@ final case class BuildingContext(flagSet: FlagSet, dialect: Dialect, featureSet:
     if featureSet.hasUnixLinesFlag && flagSet.hasIndices then IRLineTerminators.LF else featureSet.lineTerminators
 
   /** Returns the flags that a character-level node needs. */
-  def charFlags(caseCommands: List[CaseCommandKind]): IRCharFlags =
+  def charFlags: IRCharFlags =
     val f = flagSet
     val isJava = dialect == Dialect.Java
     val isPCRE = dialect == Dialect.PCRE
@@ -89,8 +88,7 @@ final case class BuildingContext(flagSet: FlagSet, dialect: Dialect, featureSet:
       caselessRestrict = isPCRE && (f.nonDestructive || featureSet.caselessRestrict),
       turkishCasing = featureSet.turkishCasing,
       bsrAnyCRLF = featureSet.bsrAnyCRLF,
-      canonicalEquivalence = isJava && f.continue,
-      caseCommands = caseCommands
+      canonicalEquivalence = isJava && f.continue
     )
 
   private def charset: IRCharset =

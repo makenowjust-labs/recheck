@@ -1,6 +1,5 @@
 package codes.quine.labs.resyntax.ir
 
-import codes.quine.labs.resyntax.ast.CaseCommandKind.*
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ir.IRAssertKind.*
 import codes.quine.labs.resyntax.ir.IRLineTerminators as LT
@@ -116,7 +115,6 @@ class IRFlagSuite extends IRSuiteBase:
     for d <- All do
       assertEquals(flagsOf(d).charset, IRCharset.Default)
       assertEquals(flagsOf(d).ignoreCase, false)
-      assertEquals(flagsOf(d).caseCommands, Nil)
   checkFlags("(*UTF)(*UCP)a", "", PCRE)(d => Seq(flagsOf(d).copy(unicode = true, unicodeClass = true)))
   checkFlags("(*UTF)(*TURKISH_CASING)a", "", PCRE)(d => Seq(flagsOf(d).copy(unicode = true, turkishCasing = true)))
   checkFlags("(*CASELESS_RESTRICT)a(?r)b", "", PCRE)(d =>
@@ -150,15 +148,6 @@ class IRFlagSuite extends IRSuiteBase:
   // Java's CANON_EQ makes a character-level node unsupported, so it does not reach the resolution.
   checkFlags("a(?c)b", "", Java)(d => Seq(flagsOf(d)))
 
-  // Perl's case commands do not follow the group structure, and `\E` ends the innermost one.
-  checkFlags("\\Ua\\Eb", "", Perl)(d => Seq(flagsOf(d).copy(caseCommands = List(UpperCaseCommand)), flagsOf(d)))
-  checkFlags("\\uab", "", Perl)(d => Seq(flagsOf(d).copy(caseCommands = List(SingleUpperCaseCommand)), flagsOf(d)))
-  checkFlags("\\U(a\\Lb\\E)c\\Ed", "", Perl)(d =>
-    Seq(
-      flagsOf(d).copy(caseCommands = List(UpperCaseCommand)),
-      flagsOf(d).copy(caseCommands = List(LowerCaseCommand, UpperCaseCommand)),
-      flagsOf(d).copy(caseCommands = List(UpperCaseCommand)),
-      flagsOf(d)
-    )
-  )
+  // Perl's case commands are applied to a regex literal before parsing, so they leave no flags.
+  checkFlags("\\Ua\\Eb", "", Perl)(d => Seq(flagsOf(d), flagsOf(d)))
   checkFlags("\\Qa\\Eb", "", Perl)(d => Seq(flagsOf(d), flagsOf(d)))

@@ -1,7 +1,5 @@
 package codes.quine.labs.resyntax.ir
 
-import codes.quine.labs.resyntax.ast.CaseCommandKind
-
 /** IRCharFlags is a set of flags that a character-level node depends on, interpreted per dialect.
   *
   * It is computed at each position of a pattern, so it reflects inline flags and their scopes.
@@ -31,8 +29,6 @@ import codes.quine.labs.resyntax.ast.CaseCommandKind
   *   PCRE `(*BSR_ANYCRLF)`, which limits `\R` to `\r`, `\n` and `\r\n`
   * @param canonicalEquivalence
   *   Java `c` (CANON_EQ)
-  * @param caseCommands
-  *   Perl's active case commands (`\L`, `\U`, `\F`, and a pending `\l` or `\u`), innermost first
   */
 final case class IRCharFlags(
     ignoreCase: Boolean,
@@ -46,8 +42,7 @@ final case class IRCharFlags(
     caselessRestrict: Boolean,
     turkishCasing: Boolean,
     bsrAnyCRLF: Boolean,
-    canonicalEquivalence: Boolean,
-    caseCommands: List[CaseCommandKind]
+    canonicalEquivalence: Boolean
 )
 
 /** IRCharset is a character set modifier. */

@@ -1,6 +1,5 @@
 package codes.quine.labs.resyntax.parser
 import codes.quine.labs.resyntax.ast.BackslashKind.*
-import codes.quine.labs.resyntax.ast.CaseCommandKind.*
 import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.EscapeClassKind.*
@@ -66,44 +65,55 @@ class ParserClassSuite extends ParserSuiteBase:
   check("[\\g\\k]", "", PCRE, Perl, Ruby)(
     Class(false, ClassUnion(ClassBackslashValue(Unknown('g')), ClassBackslashValue(Unknown('k'))))
   )
-  check("[\\uA]", "", Perl)(Class(false, ClassUnion(ClassCaseCommand(SingleUpperCaseCommand), ClassLiteral('A'))))
-  check("[\\Ua-z]", "", Perl):
-    Class(false, ClassUnion(ClassCaseCommand(UpperCaseCommand), ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
-  check("[\\Ux\\Ey]", "", Perl):
-    Class(
-      false,
-      ClassUnion(
-        ClassCaseCommand(UpperCaseCommand),
-        ClassLiteral('x'),
-        ClassCaseCommand(EndCaseCommand),
-        ClassLiteral('y')
-      )
-    )
-  check("[A-\\Lz]", "", Perl):
-    Class(false, ClassUnion(ClassRange(ClassLiteral('A'), ClassLiteral('z')), ClassCaseCommand(LowerCaseCommand)))
-  check("[A\\L-z]", "", Perl):
-    Class(false, ClassUnion(ClassRange(ClassLiteral('A'), ClassLiteral('z')), ClassCaseCommand(LowerCaseCommand)))
-  check("[\\E]a]", "", Perl):
-    Class(false, ClassUnion(ClassCaseCommand(EndCaseCommand), ClassLiteral(']'), ClassLiteral('a')))
+  // Perl's lexer applies the case commands of a regex literal to its text, even inside a class.
+  check("[\\uA]", "", Perl)(Class(false, ClassLiteral('A')))
+  check("[\\Ua-z]", "", Perl)(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('Z'))))
+  check("[\\Ux\\Ey]", "", Perl)(Class(false, ClassUnion(ClassLiteral('X'), ClassLiteral('y'))))
+  check("[A-\\Lz]", "", Perl)(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
+  check("[A-\\LZ]", "", Perl)(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
+  check("[A\\L-z]", "", Perl)(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
+  error("[a\\U-z]", "", Perl)("Out of order class range at 1")
+  error("[a-\\Uz]", "", Perl)("Out of order class range at 1")
+  check("[\\E]a]", "", Perl)(Class(false, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
   error("[\\E]", "", Perl)("Unclosed ']' at 4")
-  check("[\\Qa]\\E]", "", Java, PCRE, Perl)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral(']'))))
-  check("[\\Q]\\E]", "", Java, PCRE, Perl)(Class(false, ClassUnion(ClassLiteral(']'))))
-  check("[\\Qa-c\\E]", "", Perl)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassLiteral('c'))))
+  check("[\\Qa-c\\E]", "", Perl):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassBackslashValue(Unknown('-')), ClassLiteral('c')))
+  error("[\\Q]", "", Perl)("Unclosed ']' at 4")
+  // Java and PCRE read `\Q...\E` as the regex syntax.
+  check("[\\Qa]\\E]", "", Java, PCRE)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral(']'))))
+  check("[\\Q]\\E]", "", Java, PCRE)(Class(false, ClassUnion(ClassLiteral(']'))))
   check("[a-\\Qz\\E]", "", Java, PCRE, Perl)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
   check("[\\Qa\\E-z]", "", Java, PCRE, Perl)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
   check("[\\Qxy\\E-\\Qza\\E]", "", Java, PCRE, Perl):
     Class(false, ClassUnion(ClassLiteral('x'), ClassRange(ClassLiteral('y'), ClassLiteral('z')), ClassLiteral('a')))
-  error("[\\Qxz\\E-y]", "", Java, PCRE, Perl)("Out of order class range at 4")
+  error("[\\Qxz\\E-y]", "", Java, PCRE)("Out of order class range at 4")
+  error("[\\Qxz\\E-y]", "", Perl)("Out of order class range at 4")
   check("[a-\\Q\\Ez]", "", Java, PCRE, Perl)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
-  check("[a-\\Q\\E]", "", Java, PCRE, Perl):
+  check("[a-\\Q\\E]", "", Java, PCRE):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassUnion()))
-  check("[\\Q\\E-z]", "", Java, PCRE, Perl):
+  check("[\\Q\\E-z]", "", Java, PCRE):
     Class(false, ClassUnion(ClassUnion(), ClassLiteral('-'), ClassLiteral('z')))
   check("[a\\Q\\E-z]", "", Java, PCRE, Perl)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
-  check("[\\Q\\E]a]", "", Java, PCRE, Perl):
+  check("[\\Q\\E]a]", "", Java, PCRE):
     Class(false, ClassUnion(ClassUnion(), ClassLiteral(']'), ClassLiteral('a')))
-  error("[\\Q\\E]", "", Java, PCRE, Perl)("Unclosed ']' at 6")
-  error("[\\Q]", "", Perl)("Unclosed ']' at 4")
+  error("[\\Q\\E]", "", Java, PCRE)("Unclosed ']' at 6")
+  // A pattern from a runtime string reads the commands as letters, which the regex engine passes through.
+  checkPerlString("[\\Ua-z]", "")(
+    Class(false, ClassUnion(ClassBackslashValue(Unknown('U')), ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  )
+  checkPerlString("[a\\U-z]", "")(
+    Class(false, ClassUnion(ClassLiteral('a'), ClassRange(ClassBackslashValue(Unknown('U')), ClassLiteral('z'))))
+  )
+  checkPerlString("[A-\\LZ]", "")(
+    Class(false, ClassUnion(ClassRange(ClassLiteral('A'), ClassBackslashValue(Unknown('L'))), ClassLiteral('Z')))
+  )
+  checkPerlString("[\\Q.\\E]", "")(
+    Class(false, ClassUnion(ClassBackslashValue(Unknown('Q')), ClassLiteral('.'), ClassBackslashValue(Unknown('E'))))
+  )
+  checkPerlString("[\\E-\\Q]", "")(
+    Class(false, ClassRange(ClassBackslashValue(Unknown('E')), ClassBackslashValue(Unknown('Q'))))
+  )
+  checkPerlString("[\\C]", "")(Class(false, ClassBackslashValue(Unknown('C'))))
   check("[]", "", JavaScript)(Class(false, ClassUnion()))
   check("[[:alnum:]]", "", PCRE, Perl, Ruby)(Class(false, ClassPosix(false, "alnum")))
   check("[[:^alnum:]]", "", PCRE, Perl, Ruby)(Class(false, ClassPosix(true, "alnum")))

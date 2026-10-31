@@ -27,5 +27,5 @@ object BackslashKind:
   /** Assert is an assertion backslash. */
   final case class Assert(kind: AssertKind) extends BackslashKind
 
-  /** CaseCommand is a case command backslash. */
+  /** CaseCommand is Java's and PCRE's quoting command (`\Q` or `\E`). */
   final case class CaseCommand(kind: CaseCommandKind) extends BackslashKind

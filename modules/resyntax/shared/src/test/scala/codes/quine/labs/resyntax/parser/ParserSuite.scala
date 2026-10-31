@@ -3,7 +3,6 @@ package codes.quine.labs.resyntax.parser
 import codes.quine.labs.resyntax.ast.AssertKind.*
 import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
-import codes.quine.labs.resyntax.ast.CaseCommandKind.*
 import codes.quine.labs.resyntax.ast.CommandKind.Comment
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.EscapeClassKind.*
@@ -84,10 +83,12 @@ class ParserSuite extends ParserSuiteBase:
   error("a{", "", Java)("Incomplete quantifier at 1")
   check("\\d{", "", DotNet, JavaScript, PCRE, Python, Ruby)(Sequence(Backslash(EscapeClass(Digit)), Literal('{')))
   error("\\d{", "", Perl)("Unescaped left brace at 2")
-  check("\\E{x", "", Perl)(
-    Sequence(Backslash(CaseCommand(EndCaseCommand)), Literal('{'), Literal('x'))
-  )
-  check("\\u{", "", Perl)(Sequence(Backslash(CaseCommand(SingleUpperCaseCommand)), Literal('{')))
+  // Perl's lexer removes the commands of a regex literal, so the regex compiler does not see them before `{`.
+  check("\\E{x", "", Perl)(Sequence(Literal('{'), Literal('x')))
+  check("\\u{", "", Perl)(Literal('{'))
+  check("a\\u{3}", "", Perl)(Repeat(Literal('a'), Exact(3, Greedy)))
+  errorPerlString("\\E{x", "")("Unescaped left brace at 2")
+  errorPerlString("\\u{", "")("Unescaped left brace at 2")
   error("\\\\p{x", "", Perl)("Unescaped left brace at 3")
   error("a\\c\\p{x", "", Perl)("Unescaped left brace at 5")
   check("\\\\pa{", "", Perl):

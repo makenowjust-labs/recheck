@@ -6,6 +6,7 @@ import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.DialectOptions
 import codes.quine.labs.resyntax.ast.Encoding
 import codes.quine.labs.resyntax.ast.FlagSet
+import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
@@ -47,6 +48,12 @@ class IRCharSuite extends munit.FunSuite:
 
   def chars(s: String, flags: String, dialects: Dialect*)(expected: CharSet)(implicit loc: munit.Location): Unit =
     check(s, flags, dialects*)(Chars(expected))
+
+  /** Checks the IR of a Perl pattern from a runtime string, which Perl's lexer does not rewrite. */
+  def checkPerlString(s: String, flags: String)(expected: IRNodeData)(implicit loc: munit.Location): Unit =
+    test(s"IRBuilder.build: /$s/$flags in Perl from a string"):
+      val node = IRNode(strip(build(s, flags, Perl, DialectOptions(perlSource = PerlSource.String)).node.data))
+      assert(node.equalsWithoutLoc(IRNode(expected)), node)
 
   /** Checks a set by a predicate, for a large set. */
   def checkSet(s: String, flags: String, dialects: Dialect*)(
@@ -118,12 +125,29 @@ class IRCharSuite extends munit.FunSuite:
   // Onigmo repeats the whole character of byte escapes.
   check("\\xC3\\xA9+", "", Ruby)(Repeat(Chars(of("\u00e9")), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy)))
   chars("\\xC3", "n", Ruby)(CharSet.single(0xc3))
-  // Perl's case commands.
+  // Perl's lexer applies the case commands to the text of a regex literal, even across a class and its ranges.
   chars("\\Ua", "", Perl)(of("A"))
   chars("\\u\\La", "", Perl)(of("A"))
   chars("[\\Ua]", "", Perl)(of("A"))
+  chars("[A\\L-z]", "", Perl)(CharSet.range('A', 'z'))
+  chars("[A-\\LZ]", "", Perl)(CharSet.range('A', 'z'))
+  chars("[\\Ua-z]", "", Perl)(CharSet.range('A', 'Z'))
+  check("[A\\L-z]B", "", Perl)(Sequence(Chars(CharSet.range('A', 'z')), Chars(of("b"))))
+  checkSet("\\U\\d", "", Perl)(set => set.contains('x') && !set.contains('1'))
   check("\\Fß", "", Perl)(Sequence(Chars(of("s")), Chars(of("s"))))
   check("\\uß", "", Perl)(Sequence(Chars(of("S")), Chars(of("s"))))
+  check("\\Uß", "", Perl)(Sequence(Chars(of("S")), Chars(of("S"))))
+  check("\\u\u01c6x", "", Perl)(Sequence(Chars(of("\u01c5")), Chars(of("x"))))
+  check("\\Ux\\L\\u\\Ey", "", Perl)(Sequence(Chars(of("X")), Chars(of("Y"))))
+  chars("\\Q.\\E", "", Perl)(of("."))
+  chars("[\\Q.\\E]", "", Perl)(of("."))
+  chars("[\\Qa-c\\E]", "", Perl)(of("a-c"))
+  chars("[a-\\Q\\Ez]", "", Perl)(CharSet.range('a', 'z'))
+  // A pattern from a runtime string reads the commands as letters, which the regex engine passes through.
+  checkPerlString("\\Ua", "")(Sequence(Chars(of("U")), Chars(of("a"))))
+  checkPerlString("[\\Q.\\E]", "")(Chars(of("Q.E")))
+  checkPerlString("[a\\U-z]", "")(Chars(of("a").union(CharSet.range('U', 'z'))))
+  checkPerlString("[A-\\LZ]", "")(Chars(CharSet.range('A', 'L').union(of("Z"))))
 
   // Case-insensitive literals
   chars("k", "i", JavaScript, Java, PCRE)(of("kK"))

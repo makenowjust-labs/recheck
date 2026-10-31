@@ -3,7 +3,6 @@ package codes.quine.labs.resyntax.ir
 import codes.quine.labs.resyntax.ast.AssertKind
 import codes.quine.labs.resyntax.ast.BackslashKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
-import codes.quine.labs.resyntax.ast.CaseCommandKind
 import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.Dialect
@@ -174,15 +173,6 @@ private[ir] class IRBuilder(
 
   var context: BuildingContext = initial
 
-  /** Perl's case commands (`\L`, `\U`, `\F` and `\Q`), innermost first.
-    *
-    * Perl's lexer processes them on the source text, so they do not follow the group structure.
-    */
-  private var caseCommands: List[CaseCommandKind] = Nil
-
-  /** Perl's `\l` or `\u` waiting for the next character. */
-  private var pendingCaseCommand: Option[CaseCommandKind] = None
-
   def build(node: Node): IRNode =
     val result = node.data match
       case NodeData.Disjunction(children)                            => buildDisjunction(children)
@@ -199,25 +189,18 @@ private[ir] class IRBuilder(
       case Right(ir)  => ir
 
   /** The flags that a character-level node at the current position needs. */
-  def charFlags: IRCharFlags =
-    context.charFlags(pendingCaseCommand.toList ++ caseCommands.filter(_ != CaseCommandKind.QuoteCommand))
+  def charFlags: IRCharFlags = context.charFlags
 
   /** Builds a character-level node: `.`, a class, a literal, and a backslash producing characters (e.g. `\d`). */
   def buildCharacter(node: Node): IRNodeData =
-    val flags = nextCharFlags()
+    val flags = charFlags
     // Java's CANON_EQ matches canonically equivalent sequences, which the checkers do not handle.
     if flags.canonicalEquivalence then IRNodeData.Unsupported(node.data)
     else resolveCharacter.fold(chars.resolve(node, flags))(_(node, flags))
 
-  /** Returns the flags of the next character, which consumes a pending `\l` or `\u`. */
-  def nextCharFlags(): IRCharFlags =
-    val flags = charFlags
-    pendingCaseCommand = None
-    flags
-
   /** Builds consecutive literal characters together (e.g. for multi-character case folding). */
   def buildLiterals(nodes: Seq[Node]): Seq[IRNode] =
-    val run = nodes.map(node => (node, nextCharFlags()))
+    val run = nodes.map(node => (node, charFlags))
     // Java's CANON_EQ matches canonically equivalent sequences, which the checkers do not handle.
     if run.exists(_._2.canonicalEquivalence) then
       run.map((node, _) => IRNode(IRNodeData.Unsupported(node.data), node.loc))
@@ -347,7 +330,7 @@ private[ir] class IRBuilder(
     case BackslashKind.EscapeBackReference(_, _)                             => buildBackReference(node)
     case BackslashKind.EscapeCall(_, _)                                      => IRNodeData.Unsupported(node.data)
     case BackslashKind.Assert(kind)                                          => buildAssert(node, kind)
-    case BackslashKind.CaseCommand(kind)                                     => buildCaseCommand(kind)
+    case BackslashKind.CaseCommand(_)                                        => IRNodeData.Empty
 
   def buildBackReference(node: Node): IRNodeData =
     val indices = backReferences.getOrElse(
@@ -366,14 +349,6 @@ private[ir] class IRBuilder(
       else IRNodeData.Assert(IRAssertKind.ChompTextEnd(context.lineTerminators))
     case AssertKind.Boundary(Some(_)) | AssertKind.NonBoundary(Some(_)) | AssertKind.Cut | AssertKind.Sticky =>
       IRNodeData.Unsupported(node.data)
-
-  def buildCaseCommand(kind: CaseCommandKind): IRNodeData =
-    kind match
-      case CaseCommandKind.SingleLowerCaseCommand | CaseCommandKind.SingleUpperCaseCommand =>
-        pendingCaseCommand = Some(kind)
-      case CaseCommandKind.EndCaseCommand => caseCommands = caseCommands.drop(1)
-      case kind                           => caseCommands = kind :: caseCommands
-    IRNodeData.Empty
 
   def buildCaret(): IRNodeData =
     if featureSet.caretIsLineBegin || context.multiline then

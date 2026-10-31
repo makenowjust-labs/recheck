@@ -201,9 +201,11 @@ class IRBuilderSuite extends IRSuiteBase:
     )
   )
 
-  // Case command
-  check("\\Ua\\E", "", Perl)(Sequence(Empty, char('a'), Empty))
-  check("\\Qa\\E", "", Java, PCRE, Perl)(Sequence(Empty, char('a'), Empty))
+  // Quoting command
+  check("\\Qa\\E", "", Java, PCRE)(Sequence(Empty, char('a'), Empty))
+  // Perl's lexer rewrites a regex literal, so its commands leave no nodes.
+  check("\\Ua\\E", "", Perl)(char('A'))
+  check("\\Qa\\E", "", Perl)(char('a'))
 
   // Java's CANON_EQ makes a character-level node unsupported.
   check("a(?c)b", "", Java)(Sequence(char('a'), Empty, Unsupported(NodeData.Literal('b'))))

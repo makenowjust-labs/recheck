@@ -3,7 +3,6 @@ package codes.quine.labs.resyntax.ir
 import scala.collection.mutable
 
 import codes.quine.labs.resyntax.ast.BackslashKind
-import codes.quine.labs.resyntax.ast.CaseCommandKind
 import codes.quine.labs.resyntax.ast.ClassItem
 import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.Dialect
@@ -17,7 +16,6 @@ import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
-import codes.quine.labs.resyntax.charset.Properties
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRCharResolver.*
@@ -115,7 +113,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     for (node, flags) <- run do
       node.data match
         case NodeData.Literal(value) =>
-          for c <- applyCaseCommands(value, flags) do lits += Lit(c, true, None, flags, node.loc, plain = true)
+          lits += Lit(value, true, None, flags, node.loc, plain = true)
         case NodeData.Backslash(BackslashKind.Unknown(value)) =>
           lits += Lit(value, true, None, flags, node.loc)
         case NodeData.Backslash(BackslashKind.Escape(style, value)) =>
@@ -188,26 +186,6 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
               else Seq(IRNode(IRNodeData.Disjunction((single +: multi).map(seq => IRNode(sequenceOf(seq), loc))), loc))
           out ++= alternatives(from)
       out.result()
-
-  /** Applies Perl's case commands (e.g. `\U`) to a literal character. */
-  private def applyCaseCommands(c: Int, flags: IRCharFlags): Seq[Int] =
-    if dialect != Dialect.Perl || flags.caseCommands.isEmpty then Seq(c) else caseCommand(c, flags.caseCommands)
-
-  /** Maps a character by the case commands, innermost first, where a pending `\u` or `\l` comes first. */
-  private def caseCommand(c: Int, commands: List[CaseCommandKind]): Seq[Int] =
-    val (single, rest) = commands match
-      case (k @ (CaseCommandKind.SingleUpperCaseCommand | CaseCommandKind.SingleLowerCaseCommand)) :: rest =>
-        (Some(k), rest)
-      case rest => (None, rest)
-    val mapped = rest.find(k => k != CaseCommandKind.QuoteCommand) match
-      case Some(CaseCommandKind.LowerCaseCommand) => fullLower(c)
-      case Some(CaseCommandKind.UpperCaseCommand) => fullUpper(c)
-      case Some(CaseCommandKind.FoldCaseCommand)  => FullCaseFolding(c).iterator.toSeq
-      case _                                      => Seq(c)
-    single match
-      case Some(CaseCommandKind.SingleUpperCaseCommand) => fullTitle(mapped.head) ++ mapped.tail
-      case Some(_)                                      => fullLower(mapped.head) ++ mapped.tail
-      case None                                         => mapped
 
   /** Joins a surrogate pair of literals, which the parser reads by code units, into a code point. */
   private def mergeSurrogates(lits: Seq[Lit]): Seq[Lit] =
@@ -444,22 +422,13 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         throw new IRBuildingException("Invalid multibyte escape", item.loc)
       case value: ClassItemData.ClassValue => ClassSet(closeChars(valueUnits(value, flags, item.loc), flags))
 
-  /** Evaluates a union, with Perl's case commands (e.g. `[\Ua]`) and Ruby's byte escapes (e.g. `[\xC3\xA9]`). */
-  private def classUnion(items: Seq[ClassItem], flags0: IRCharFlags): ClassSet =
-    var flags = flags0
-    var pending: Option[CaseCommandKind] = None
+  /** Evaluates a union, with Ruby's byte escapes (e.g. `[\xC3\xA9]`). */
+  private def classUnion(items: Seq[ClassItem], flags: IRCharFlags): ClassSet =
     var result = ClassSet.empty
     var i = 0
     while i < items.length do
       val item = items(i)
       item.data match
-        case ClassItemData.ClassCaseCommand(kind) =>
-          kind match
-            case CaseCommandKind.SingleLowerCaseCommand | CaseCommandKind.SingleUpperCaseCommand => pending = Some(kind)
-            case CaseCommandKind.EndCaseCommand                                                  =>
-              flags = flags.copy(caseCommands = flags.caseCommands.drop(1))
-            case kind => flags = flags.copy(caseCommands = kind :: flags.caseCommands)
-          i += 1
         case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, value))
             if dialect == Dialect.Ruby && mode == UnitMode.CodePoint && isRubyByteStyle(style) &&
               value >= 0x80 && value <= 0xff =>
@@ -490,9 +459,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
           if !(beginOk && endOk) then throw new IRBuildingException("Invalid multibyte escape", item.loc)
           throw new NotModeledException
         case _ =>
-          val itemFlags = pending.fold(flags)(k => flags.copy(caseCommands = k :: flags.caseCommands))
-          if pending.nonEmpty && isCaseTarget(item) then pending = None
-          result = result.union(classItem(item, itemFlags))
+          result = result.union(classItem(item, flags))
           i += 1
     result
 
@@ -510,10 +477,6 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       .exists(_.data match
         case ClassItemData.ClassRange(b, e) => isRubyByteValue(if begin then b.data else e.data)
         case _                              => false)
-
-  private def isCaseTarget(item: ClassItem): Boolean = item.data match
-    case _: ClassItemData.ClassValue | _: ClassItemData.ClassRange => true
-    case _                                                         => false
 
   /** Checks the bytes before a range, whose last character may continue into the range's begin. */
   private def checkRubyBytePrefix(lits: Seq[Lit]): Unit =
@@ -533,8 +496,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   /** Returns the code values of a class value; a non-ASCII literal in byte mode is several bytes. */
   private def valueUnits(value: ClassItemData.ClassValue, flags: IRCharFlags, loc: SourceLocation): Seq[Int] =
     val lit = value match
-      case ClassItemData.ClassLiteral(v) =>
-        return applyCaseCommands(v, flags).flatMap(c => unitsOf(Lit(c, true, None, flags, loc)))
+      case ClassItemData.ClassLiteral(v)                                     => Lit(v, true, None, flags, loc)
       case ClassItemData.ClassBackslashValue(BackslashKind.Unknown(v))       => Lit(v, true, None, flags, loc)
       case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v)) => Lit(v, false, Some(style), flags, loc)
     val units = unitsOf(lit)
@@ -583,22 +545,6 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
 /** IRCharResolver utilities. */
 private[ir] object IRCharResolver:
 
-  private def isUppercaseLetter(c: Int): Boolean = Properties.GeneralCategory.valuesAt(c).exists(_.shortName == "Lu")
-
-  /** The full uppercase mapping, approximated by the simple one and the full case folding (e.g. `ß` to `SS`). */
-  def fullUpper(c: Int): Seq[Int] =
-    val upper = CaseMapping.SimpleUpper(c)
-    if upper != c || !multiFoldChars.contains(c) || isUppercaseLetter(c) then Seq(upper)
-    else FullCaseFolding(c).iterator.map(CaseMapping.SimpleUpper(_)).toSeq
-
-  /** The full titlecase mapping, approximated like [[fullUpper]] (e.g. `ß` to `Ss`). */
-  def fullTitle(c: Int): Seq[Int] =
-    val upper = fullUpper(c)
-    upper.head +: upper.tail.map(CaseMapping.SimpleLower(_))
-
-  /** The full lowercase mapping, which differs from the simple one only for `U+0130` (to `i` and `U+0307`). */
-  def fullLower(c: Int): Seq[Int] = if c == 0x130 then Seq(0x69, 0x307) else Seq(CaseMapping.SimpleLower(c))
-
   /** NotModeledException is thrown for a construct that IR cannot represent, which becomes `Unsupported`. */
   final class NotModeledException extends Exception("not modeled")
 
@@ -627,9 +573,6 @@ private[ir] object IRCharResolver:
     */
   lazy val multiFoldings: Seq[(UString, CharSet)] =
     FullCaseFolding.multiCodePointFoldings().toSeq.filterNot(_._1.iterator.contains(0x307)).sortBy(_._1)
-
-  /** The characters folded to two or more code points (e.g. `ß`), for Perl's case commands. */
-  lazy val multiFoldChars: CharSet = CharSet.union(FullCaseFolding.multiCodePointFoldings().values)
 
   def isHigh(c: Int): Boolean = 0xd800 <= c && c <= 0xdbff
 

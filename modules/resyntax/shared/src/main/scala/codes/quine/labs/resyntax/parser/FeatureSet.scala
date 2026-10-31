@@ -100,7 +100,7 @@ final case class FeatureSet(
     allowsSurrogateEscape: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     allowsSymbolUnknownBackslash: Boolean,
-    // PCRE, Perl
+    // PCRE
     allowsUnpairedQuoteEnd: Boolean,
     // JavaScript (without `uv`)
     allowsUnknownBackslashUpperC: Boolean,
@@ -174,8 +174,6 @@ final case class FeatureSet(
     hasBackslashBackspace: Boolean,
     // .NET, Java, PCRE, Perl, Python, Ruby
     hasBackslashBell: Boolean,
-    // Perl
-    hasBackslashCaseCommand: Boolean,
     // Java, Perl, Python
     hasBackslashCharName: Boolean,
     // PCRE (with `u`), Perl
@@ -224,7 +222,7 @@ final case class FeatureSet(
     hasBackslashNonNewline: Boolean,
     // PCRE, Perl
     hasBackslashOctal: Boolean,
-    // Java, PCRE, Perl
+    // Java, PCRE
     hasBackslashQuoteCommand: Boolean,
     // JavaScript (with `v`)
     hasBackslashQuoteSet: Boolean,
@@ -394,6 +392,8 @@ final case class FeatureSet(
     skipsCommentInClass: Boolean,
     // PCRE, Perl, Ruby
     treatsBackReferenceBackslashInClassAsLiteral: Boolean,
+    // Perl
+    treatsBackslashUpperCInClassAsLiteral: Boolean,
     // Perl, Ruby
     treatsNonClassBackslashInClassAsLiteral: Boolean,
     // .NET: 2147483647, Java: 2147483647, JavaScript: unlimited, PCRE: 65535, Perl: 2147483646, Python: 4294967294, Ruby: 100000
@@ -515,8 +515,8 @@ object FeatureSet:
       // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsSymbolUnknownBackslash =
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
-      // PCRE, Perl
-      allowsUnpairedQuoteEnd = isPCRE || isPerl,
+      // PCRE
+      allowsUnpairedQuoteEnd = isPCRE,
       // JavaScript (without `uv`)
       allowsUnknownBackslashUpperC = isJavaScript && !isUnicode,
       // Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -589,8 +589,6 @@ object FeatureSet:
       hasBackslashBackspace = isDotNet || isJavaScript || isPCRE || isPerl || isPython || isRuby,
       // .NET, Java, PCRE, Perl, Python, Ruby
       hasBackslashBell = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
-      // Perl
-      hasBackslashCaseCommand = isPerl,
       // Java, Perl, Python
       hasBackslashCharName = isJava || isPerl || isPython,
       // PCRE (with `u`), Perl
@@ -640,8 +638,8 @@ object FeatureSet:
       hasBackslashNonNewline = isPCRE || isPerl,
       // PCRE, Perl
       hasBackslashOctal = isPCRE || isPerl,
-      // Java, PCRE, Perl
-      hasBackslashQuoteCommand = isJava || isPCRE || isPerl,
+      // Java, PCRE
+      hasBackslashQuoteCommand = isJava || isPCRE,
       // JavaScript (with `v`)
       hasBackslashQuoteSet = isJavaScript && flagSet.unicodeSets,
       // .NET, Java, PCRE, Perl, Ruby
@@ -811,6 +809,8 @@ object FeatureSet:
       skipsCommentInClass = isJava,
       // PCRE, Perl, Ruby
       treatsBackReferenceBackslashInClassAsLiteral = isPCRE || isPerl || isRuby,
+      // Perl
+      treatsBackslashUpperCInClassAsLiteral = isPerl,
       // Perl, Ruby
       treatsNonClassBackslashInClassAsLiteral = isPerl || isRuby,
       // .NET: 2147483647, Java: 2147483647, JavaScript: unlimited, PCRE: 65535, Perl: 2147483646, Python: 4294967294, Ruby: 100000
