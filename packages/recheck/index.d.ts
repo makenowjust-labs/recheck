@@ -39,6 +39,7 @@ export function checkAllSync(
 ): Diagnostics[];
 
 export type { Parameters } from "./parameters";
+export type { Dialect, DialectParameter, DialectSettings } from "./dialect";
 
 /**
  * HasAbortSignal is a mix-in type for having `signal` field.
@@ -61,19 +62,6 @@ export type HasAbortSignal = {
  */
 export type Diagnostics =
   SafeDiagnostics | VulnerableDiagnostics | UnknownDiagnostics;
-
-/**
- * Dialect is the dialect of a diagnostics as the parameter gives it, with every setting of the dialect.
- * An omitted setting is the default.
- */
-export type Dialect =
-  | { name: "javascript" }
-  | { name: "java" }
-  | { name: "dotnet" }
-  | { name: "pcre" }
-  | { name: "python"; type: "str" | "bytes" }
-  | { name: "ruby"; encoding: "UTF-8" | "ASCII-8BIT" }
-  | { name: "perl"; utf8: boolean; source: "literal" | "string" };
 
 /**
  * SafeDiagnostics is a diagnostics against a safe RegExp.

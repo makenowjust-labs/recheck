@@ -27,11 +27,8 @@ describe("sections", () => {
       typescriptDefault: '"javascript"',
       scalaDefault: "Dialect.JavaScript",
       cli: "dialect",
+      typescriptType: "DialectParameter",
     });
-    expect(dialect?.typescriptType).toContain('"javascript" | "java" |');
-    expect(dialect?.typescriptType).toContain(
-      '{ name: "perl"; utf8?: boolean; source?: "literal" | "string" }',
-    );
   });
 
   test("show the types and the defaults of both languages", () => {

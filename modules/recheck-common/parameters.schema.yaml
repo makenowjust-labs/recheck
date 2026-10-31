@@ -140,6 +140,7 @@ properties:
         additionalProperties: false
     default: "javascript"
     x-scala-type: "Dialect"
+    x-typescript-type: "DialectParameter"
     x-scala-default: "Dialect.JavaScript"
     x-cli: "dialect"
     x-exclude: ["eslint-plugin"]

@@ -1,16 +1,18 @@
 import createWorker from "./worker";
 
-import type { Dialect, Diagnostics, HasAbortSignal, Parameters } from "../..";
+import type {
+  Dialect,
+  DialectParameter,
+  DialectSettings,
+  Diagnostics,
+  HasAbortSignal,
+  Parameters,
+} from "../..";
 
 /** Returns the dialect of the parameter as the diagnostics have it, where an omitted setting is the default. */
-const dialectOf = (dialect: Parameters["dialect"] = "javascript"): Dialect => {
-  const given =
-    typeof dialect === "string"
-      ? ({ name: dialect } as Exclude<
-          Parameters["dialect"],
-          string | undefined
-        >)
-      : dialect;
+const dialectOf = (dialect: DialectParameter = "javascript"): Dialect => {
+  const given: DialectSettings =
+    typeof dialect === "string" ? { name: dialect } : dialect;
   switch (given.name) {
     case "python":
       return { name: "python", type: given.type ?? "str" };

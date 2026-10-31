@@ -1,6 +1,6 @@
-// `lib/parameters.d.ts` is self-contained because `recheck` publishes a copy of it.
+// `recheck` publishes copies of `lib/parameters.d.ts` and `lib/dialect.d.ts`, so they import nothing else.
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 import { parse } from "yaml";
 
@@ -43,6 +43,8 @@ const parametersDts = (schema: Schema): string => {
   });
   return [
     header,
+    "",
+    'import type { DialectParameter } from "./dialect.js";',
     "",
     comment([schema.description], ""),
     "export type Parameters = {",
@@ -90,4 +92,8 @@ writeFileSync(
   `${header}\n\nexport default ${JSON.stringify(schema, null, 2)};\n`,
 );
 writeFileSync(new URL("parameters.d.ts", libUrl), parametersDts(schema));
+copyFileSync(
+  new URL("../dialect.d.ts", import.meta.url),
+  new URL("dialect.d.ts", libUrl),
+);
 writeFileSync(new URL("types.d.ts", libUrl), typesDts(schema));
