@@ -289,7 +289,43 @@ export type VulnerableDiagnostics = {
   attack: AttackPattern;
   complexity: VulnerableComplexity;
   hotspot: Hotspot[];
+  /**
+   * The recall validation of the attack string, or `null` if it is not run.
+   */
+  recallValidation: RecallValidation | null;
 };
+
+/**
+ * RecallValidation is a run of the attack string on the real regex engine of the dialect.
+ */
+export type RecallValidation = {
+  /**
+   * The runtime name and version, e.g. `"node v26.11.1"`.
+   */
+  runtime: string;
+  /**
+   * The timeout of the matching in milliseconds, or `null` if it is infinite.
+   */
+  timeout: number | null;
+  result: RecallResult;
+  /**
+   * Whether the attack is effective on the engine.
+   * The vulnerable diagnostics is accepted only if it is `true`.
+   */
+  succeeded: boolean;
+};
+
+/**
+ * RecallResult is the result of matching the attack string on the real regex engine.
+ *
+ * - `finish`: The matching finished in `time` milliseconds, so the attack is not effective.
+ * - `timeout`: The matching did not finish in time.
+ * - `engine-error`: The engine gave up with a resource error, e.g. PHP's backtrack limit or Java's `StackOverflowError`.
+ */
+export type RecallResult =
+  | { kind: "finish"; time: number }
+  | { kind: "timeout" }
+  | { kind: "engine-error"; message: string };
 
 /**
  * UnknownDiagnostics is a diagnostics when an error is occurred on analyzing.
