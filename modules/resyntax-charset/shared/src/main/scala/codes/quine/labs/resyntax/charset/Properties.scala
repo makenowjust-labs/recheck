@@ -49,20 +49,7 @@ object Properties:
 
   /** The `Script_Extensions` property, whose values are those of [[Script]]. */
   lazy val ScriptExtensions: EnumeratedProperty =
-    val raw = UnicodeData.ScriptExtensions
-    val (names, short) = Codec.names(raw.names)
-    lazy val table = RunTable.decode(raw.runs)
-    lazy val combos: IndexedSeq[Set[Int]] =
-      val values = Codec.decode(raw.combos)
-      val out = IndexedSeq.newBuilder[Set[Int]]
-      var i = 0
-      while i < values.length do
-        out += values.slice(i + 1, i + 1 + values(i)).toSet
-        i += 1 + values(i)
-      out.result()
-    lazy val values: IndexedSeq[PropertyValue] = Script.values.zipWithIndex.map: (v, i) =>
-      PropertyValue(names.head, v.names, v.shortName, table.setOf(combos(_).contains(i)))
-    EnumeratedProperty(names, short, values, c => combos(table.valueAt(c)).toSeq.sorted.map(values))
+    fromCombined(UnicodeData.ScriptExtensions, Script.values.map(v => (v.names, v.shortName)))
 
   /** The `Block` property. */
   lazy val Block: EnumeratedProperty = fromRaw(UnicodeData.Block)
@@ -73,12 +60,127 @@ object Properties:
   /** The `Age` property; its values are `Unassigned` (`NA`) and the versions such as `V1_1` (`1.1`) in order. */
   lazy val Age: EnumeratedProperty = fromRaw(UnicodeData.Age)
 
+  /** The `Bidi_Paired_Bracket_Type` property. */
+  lazy val BidiPairedBracketType: EnumeratedProperty = fromRaw(UnicodeData.BidiPairedBracketType)
+
+  /** The `Canonical_Combining_Class` property; its values are also named by their numbers (e.g. `230`). */
+  lazy val CanonicalCombiningClass: EnumeratedProperty = fromRaw(UnicodeData.CanonicalCombiningClass)
+
+  /** The `Decomposition_Type` property. */
+  lazy val DecompositionType: EnumeratedProperty = fromRaw(UnicodeData.DecompositionType)
+
+  /** The `East_Asian_Width` property. */
+  lazy val EastAsianWidth: EnumeratedProperty = fromRaw(UnicodeData.EastAsianWidth)
+
+  /** The `Grapheme_Cluster_Break` property. */
+  lazy val GraphemeClusterBreak: EnumeratedProperty = fromRaw(UnicodeData.GraphemeClusterBreak)
+
+  /** The `Hangul_Syllable_Type` property. */
+  lazy val HangulSyllableType: EnumeratedProperty = fromRaw(UnicodeData.HangulSyllableType)
+
+  /** The `Identifier_Status` property of UTS #39. */
+  lazy val IdentifierStatus: EnumeratedProperty = fromRaw(UnicodeData.IdentifierStatus)
+
+  /** The `Identifier_Type` property of UTS #39, which gives a code point one or more values. */
+  lazy val IdentifierType: EnumeratedProperty = fromCombined(UnicodeData.IdentifierType, IndexedSeq.empty)
+
+  /** The `Indic_Conjunct_Break` property. */
+  lazy val IndicConjunctBreak: EnumeratedProperty = fromRaw(UnicodeData.IndicConjunctBreak)
+
+  /** The `Indic_Positional_Category` property. */
+  lazy val IndicPositionalCategory: EnumeratedProperty = fromRaw(UnicodeData.IndicPositionalCategory)
+
+  /** The `Indic_Syllabic_Category` property. */
+  lazy val IndicSyllabicCategory: EnumeratedProperty = fromRaw(UnicodeData.IndicSyllabicCategory)
+
+  /** The `Joining_Group` property. */
+  lazy val JoiningGroup: EnumeratedProperty = fromRaw(UnicodeData.JoiningGroup)
+
+  /** The `Joining_Type` property. */
+  lazy val JoiningType: EnumeratedProperty = fromRaw(UnicodeData.JoiningType)
+
+  /** The `Line_Break` property. */
+  lazy val LineBreak: EnumeratedProperty = fromRaw(UnicodeData.LineBreak)
+
+  /** The `NFC_Quick_Check` property. */
+  lazy val NFCQuickCheck: EnumeratedProperty = fromRaw(UnicodeData.NFCQuickCheck)
+
+  /** The `NFD_Quick_Check` property. */
+  lazy val NFDQuickCheck: EnumeratedProperty = fromRaw(UnicodeData.NFDQuickCheck)
+
+  /** The `NFKC_Quick_Check` property. */
+  lazy val NFKCQuickCheck: EnumeratedProperty = fromRaw(UnicodeData.NFKCQuickCheck)
+
+  /** The `NFKD_Quick_Check` property. */
+  lazy val NFKDQuickCheck: EnumeratedProperty = fromRaw(UnicodeData.NFKDQuickCheck)
+
+  /** The `Numeric_Type` property. */
+  lazy val NumericType: EnumeratedProperty = fromRaw(UnicodeData.NumericType)
+
+  /** The `Sentence_Break` property. */
+  lazy val SentenceBreak: EnumeratedProperty = fromRaw(UnicodeData.SentenceBreak)
+
+  /** The `Vertical_Orientation` property. */
+  lazy val VerticalOrientation: EnumeratedProperty = fromRaw(UnicodeData.VerticalOrientation)
+
+  /** The `Word_Break` property. */
+  lazy val WordBreak: EnumeratedProperty = fromRaw(UnicodeData.WordBreak)
+
+  /** The `Numeric_Value` property; its values are NaN first, and then the numbers in ascending order. */
+  lazy val NumericValue: NumericProperty =
+    val raw = UnicodeData.NumericValue
+    val (names, short) = Codec.names(raw.names)
+    lazy val table = RunTable.decode(raw.runs)
+    val values = raw.values
+      .split(";")
+      .toIndexedSeq
+      .zipWithIndex
+      .map: (value, i) =>
+        val (n, d) = value match
+          case "NaN" => (0L, 0L)
+          case _     =>
+            value.split("/") match
+              case Array(n)    => (n.toLong, 1L)
+              case Array(n, d) => (n.toLong, d.toLong)
+              case _           => throw new IllegalStateException(s"invalid numeric value: $value")
+        new NumericValue(n, d, table.setOf(_ == i))
+    NumericProperty(names, short, values, c => values(table.valueAt(c)))
+
   /** The enumerated properties. */
   lazy val enumeratedProperties: IndexedSeq[EnumeratedProperty] =
-    IndexedSeq(GeneralCategory, Script, ScriptExtensions, Block, BidiClass, Age)
+    IndexedSeq(
+      GeneralCategory,
+      Script,
+      ScriptExtensions,
+      Block,
+      BidiClass,
+      Age,
+      BidiPairedBracketType,
+      CanonicalCombiningClass,
+      DecompositionType,
+      EastAsianWidth,
+      GraphemeClusterBreak,
+      HangulSyllableType,
+      IdentifierStatus,
+      IdentifierType,
+      IndicConjunctBreak,
+      IndicPositionalCategory,
+      IndicSyllabicCategory,
+      JoiningGroup,
+      JoiningType,
+      LineBreak,
+      NFCQuickCheck,
+      NFDQuickCheck,
+      NFKCQuickCheck,
+      NFKDQuickCheck,
+      NumericType,
+      SentenceBreak,
+      VerticalOrientation,
+      WordBreak
+    )
 
   /** All properties. */
-  lazy val all: IndexedSeq[Property] = binaryProperties ++ enumeratedProperties
+  lazy val all: IndexedSeq[Property] = binaryProperties ++ enumeratedProperties :+ NumericValue
 
   private lazy val index = NameIndex(all.map(p => (p.names, p)))
 
@@ -110,6 +212,24 @@ object Properties:
     val i = Age.values.indexOf(age)
     require(i >= 0, s"not an Age value: $age")
     CharSet.union(Age.values.slice(1, i + 1).map(_.set))
+
+  /** Builds a multi-valued property, whose values are the given names or those of the raw data. */
+  private def fromCombined(raw: RawCombined, valueNames: IndexedSeq[(IndexedSeq[String], String)]): EnumeratedProperty =
+    val (names, short) = Codec.names(raw.names)
+    lazy val table = RunTable.decode(raw.runs)
+    lazy val combos: IndexedSeq[Set[Int]] =
+      val values = Codec.decode(raw.combos)
+      val out = IndexedSeq.newBuilder[Set[Int]]
+      var i = 0
+      while i < values.length do
+        out += values.slice(i + 1, i + 1 + values(i)).toSet
+        i += 1 + values(i)
+      out.result()
+    val fields = if raw.values.isEmpty then valueNames else raw.values.split(";").toIndexedSeq.map(Codec.names)
+    lazy val values: IndexedSeq[PropertyValue] = fields.zipWithIndex.map:
+      case ((valueNames, valueShort), i) =>
+        PropertyValue(names.head, valueNames, valueShort, table.setOf(combos(_).contains(i)))
+    EnumeratedProperty(names, short, values, c => combos(table.valueAt(c)).toSeq.sorted.map(values))
 
   private def fromRaw(raw: RawEnumerated): EnumeratedProperty =
     val (names, short) = Codec.names(raw.names)
