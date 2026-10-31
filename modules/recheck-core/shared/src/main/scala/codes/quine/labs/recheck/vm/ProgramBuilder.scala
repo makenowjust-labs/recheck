@@ -141,6 +141,9 @@ private[vm] class ProgramBuilder(
   /** A program has `verb` instructions. */
   private var hasVerb: Boolean = false
 
+  /** A program has `leave` instructions. */
+  private var hasLeave: Boolean = false
+
   /** Whether a matching direction is backward or not. */
   private var back: Boolean = false
 
@@ -213,6 +216,7 @@ private[vm] class ProgramBuilder(
     // Updates a predecessor information.
     for successor <- inst.successors do predecessorsBuffer(successor.index).add(currentLabel)
     if inst.isInstanceOf[Inst.IfCap] then hasRef = true
+    if inst == Inst.Leave then hasLeave = true
 
     val block = Block(instsBuffer.toSeq, inst)
     currentLabel.block = block
@@ -258,7 +262,7 @@ private[vm] class ProgramBuilder(
 
     val blocks = labelsBuffer.iterator.map(label => (label, label.block)).toVector
     val predecessors = predecessorsBuffer.iterator.map(_.toSet).toVector
-    val meta = Meta(mode, hasRef, hasVerb, capturesSize, counters.size, canaries.size, predecessors)
+    val meta = Meta(mode, hasRef, hasVerb, capturesSize, counters.size, canaries.size, predecessors, hasLeave)
 
     Program(blocks, meta)
 

@@ -286,6 +286,8 @@ class InterpreterSuite extends munit.FunSuite:
     assertCaptures("^(a*?)(a*?)$", "", "aaa", 0)(Seq(0, 3, 0, 0, 0, 3))
     assertCaptures("^(?:(a)|(b)){2}$", "", "ba", 0)(Seq(0, 2, 1, 2, -1, -1))
     assertCaptures("^(?:(a)|(b)){2}$", "", "ab", 0)(Seq(0, 2, -1, -1, 1, 2))
+    // A failure after an assertion does not memoize the states in it, which the assertion drops.
+    assertCaptures("(?<=(aa)|(a))b", "", "aab", 0)(Seq(2, 3, 0, 2, -1, -1))
 
   test("Interpreter.runWithTimeout"):
     def matchesWithTimeout(

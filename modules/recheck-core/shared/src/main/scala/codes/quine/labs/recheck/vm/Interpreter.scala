@@ -192,11 +192,12 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         next: Label,
         pos: Int,
         rollback: Option[Rollback],
-        fallback: Option[Frame]
+        fallback: Option[Frame],
+        junctions: Int
     ) extends Rollback
 
     /** Fallback is a fallback frame for rollback when `rollback` instruction has no rollback successor label. */
-    final case class Fallback(fallback: Option[Frame]) extends Rollback
+    final case class Fallback(fallback: Option[Frame], junctions: Int) extends Rollback
 
   /** A number of current execution step. */
   private var steps: Int = 0
@@ -219,8 +220,11 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   /** The captures of the last failed matching, which `cap_keep` takes. */
   private var failedCaptures: Vector[Int] = Vector.empty
 
-  /** Whether it memoizes the failed states, which the verbs skipping backtracking points prevent. */
-  private val memoizes: Boolean = options.usesAcceleration && !program.meta.hasVerb
+  /** Whether it memoizes the failed states, which the verbs skipping backtracking points prevent.
+    *
+    * So do non-atomic look-arounds, since the matching after one depends on its start, which a state does not have.
+    */
+  private val memoizes: Boolean = options.usesAcceleration && !program.meta.hasVerb && !program.meta.hasLeave
 
   /** Constructs a result of matching. */
   private[vm] def result(status: Status, captures: Option[Seq[Int]]): Result =
@@ -310,13 +314,13 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
               false
             case Inst.Leave =>
               frame.rollback.get match
-                case Rollback.HasSuccessor(next, pos, rollback, _) =>
+                case Rollback.HasSuccessor(next, pos, rollback, _, _) =>
                   frame.label = next
                   frame.pos = pos
                   frame.rollback = rollback
                   false
                 // $COVERAGE-OFF$
-                case Rollback.Fallback(_) => sys.error("unreachable")
+                case Rollback.Fallback(_, _) => sys.error("unreachable")
               // $COVERAGE-ON$
             case Inst.TryLA(read, next, fallback) =>
               val oldPos = frame.pos
@@ -352,30 +356,34 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
             case Inst.Fail     => true
             case Inst.Rollback =>
               val failed = frame.rollback.get match
-                case Rollback.HasSuccessor(next, pos, rollback, fallback) =>
+                case Rollback.HasSuccessor(next, pos, rollback, fallback, junctions) =>
                   frame.label = next
                   frame.pos = pos
                   frame.rollback = rollback
                   frame.fallback = fallback
+                  dropJunctions(frame, junctions)
                   false
-                case Rollback.Fallback(fallback) =>
+                case Rollback.Fallback(fallback, junctions) =>
                   frame.fallback = fallback
+                  dropJunctions(frame, junctions)
                   true
               failed
             case Inst.Commit =>
               frame.rollback.get match
-                case Rollback.HasSuccessor(next, _, rollback, fallback) =>
+                case Rollback.HasSuccessor(next, _, rollback, fallback, junctions) =>
                   frame.label = next
                   frame.rollback = rollback
                   frame.fallback = fallback
+                  dropJunctions(frame, junctions)
                   false
                 // $COVERAGE-OFF$
-                case Rollback.Fallback(_) => sys.error("unreachable")
+                case Rollback.Fallback(_, _) => sys.error("unreachable")
               // $COVERAGE-ON$
             case Inst.Tx(next, rollback, fallback, barrier) =>
               val nextRollback = rollback match
-                case Some(rollback) => Rollback.HasSuccessor(rollback, frame.pos, frame.rollback, frame.fallback)
-                case None           => Rollback.Fallback(frame.fallback)
+                case Some(rollback) =>
+                  Rollback.HasSuccessor(rollback, frame.pos, frame.rollback, frame.fallback, frame.junctions.size)
+                case None => Rollback.Fallback(frame.fallback, frame.junctions.size)
               val nextFallback = fallback match
                 case Some(fallback) =>
                   val fallbackFrame = frame.clone()
@@ -410,6 +418,13 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     // $COVERAGE-OFF$
     sys.error("unreachable")
     // $COVERAGE-ON$
+
+  /** Drops the junctions reached in a transaction that ends, keeping the `size` ones before it.
+    *
+    * The transaction drops the backtracking points in it, so a failure after it does not tell that they fail.
+    */
+  private def dropJunctions(frame: Frame, size: Int): Unit =
+    if frame.junctions.size > size then frame.junctions = frame.junctions.takeRight(size)
 
   /** Returns the frame that backtracking resumes from the fallback, where the frames of the verbs act. */
   @tailrec
@@ -525,9 +540,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         frame.captures(0) != frame.pos || atStart && frame.pos != 0
       case Inst.TxDrop =>
         frame.rollback = frame.rollback.get match
-          case Rollback.HasSuccessor(_, _, rollback, _) => rollback
+          case Rollback.HasSuccessor(_, _, rollback, _, _) => rollback
           // $COVERAGE-OFF$
-          case Rollback.Fallback(_) => sys.error("unreachable")
+          case Rollback.Fallback(_, _) => sys.error("unreachable")
         // $COVERAGE-ON$
         true
       case Inst.CapKeep(restore) =>
