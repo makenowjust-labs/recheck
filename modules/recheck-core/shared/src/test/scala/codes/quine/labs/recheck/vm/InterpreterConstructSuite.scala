@@ -200,6 +200,13 @@ class InterpreterConstructSuite extends munit.FunSuite:
     check("a(*COMMIT:X)b", "ab", PCRE, Perl)(Seq(g(0, 2)))
     check("a(*PRUNE:X)b", "ab", PCRE, Perl)(Seq(g(0, 2)))
 
+  test("Interpreter.run: verbs and conditionals with Perl's captures"):
+    // A back-reference makes Perl's captures on backtracking work.
+    check("(?:(a)(*THEN)x|(a)b)\\2", "abab", Perl)(Seq(g(0, 3), unset, g(0, 1)))
+    check("(a)(?:b(*COMMIT)x|b)|ab\\1?", "abab", Perl)(NoMatch)
+    check("(?(?=(a))a(*PRUNE)x|y)|(ab)\\2", "abab", Perl)(NoMatch)
+    check("^(?:(a)|b)(?(1)(*ACCEPT)|c)x", "abab", Perl)(Seq(g(0, 1), g(0, 1)))
+
   test("Interpreter.run: non-atomic look-arounds"):
     check("^(?*(a+))\\1ab", "aaab", PCRE)(Seq(g(0, 4), g(0, 2)))
     check("^(*napla:(a+))\\1ab", "aaab", PCRE)(Seq(g(0, 4), g(0, 2)))
