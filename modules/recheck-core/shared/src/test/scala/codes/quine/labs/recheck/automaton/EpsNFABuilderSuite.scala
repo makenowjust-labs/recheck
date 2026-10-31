@@ -13,6 +13,7 @@ import codes.quine.labs.recheck.regexp.PatternAlphabet
 import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 
@@ -290,7 +291,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     val nfa = build(source, flags, dialect).get.toOrderedNFA
     val units =
       if ParsedPattern.parse(source, flags, dialect).toTry.get.ir.mode == UnitMode.CodePoint then
-        input.codePoints.toArray.toSeq
+        UString.fromString(input).iterator.toSeq
       else input.map(_.toInt)
     val last = units.foldLeft(nfa.inits.toSet): (qs, c) =>
       qs.flatMap(q => nfa.delta.collect { case ((p, a), ps) if p == q && a.contains(c) => ps }.flatten)
