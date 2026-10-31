@@ -7,6 +7,8 @@ import { themes } from "prism-react-renderer";
 import katex from "rehype-katex";
 import math from "remark-math";
 
+import parameters from "./remark/parameters.mjs";
+
 const { github: lightCodeTheme, dracula: darkCodeTheme } = themes;
 
 const katexCss = createRequire(
@@ -52,6 +54,7 @@ const config = {
           sidebarPath: "./sidebars.js",
           editUrl:
             "https://github.com/makenowjust-labs/recheck/tree/main/website",
+          beforeDefaultRemarkPlugins: [parameters],
           remarkPlugins: [math],
           rehypePlugins: [katex],
         },

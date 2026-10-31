@@ -14,7 +14,7 @@ import type { Build } from "./builds";
 import type { Snapshot } from "./permalink";
 
 const build: Build = { type: "release", version: "4.6.1" };
-const params = parseParams({});
+const params = parseParams({}, build);
 const date = "2026-10-25T00:00:00.000Z";
 
 const safe: Snapshot = {
@@ -66,6 +66,7 @@ describe("makeSnapshot", () => {
         pattern: "'a'.repeat(1000) + '\\x00'",
       },
       hotspot: [{ start: 2, end: 5, temperature: "heat" }],
+      recallValidation: null,
     };
     expect(snapshot("/^(a|a)*$/", diagnostics)).toEqual(vulnerable);
   });
@@ -144,7 +145,7 @@ describe("sameRequest", () => {
     expect(sameRequest(safe, safe.input, params)).toBe(true);
     expect(sameRequest(safe, "/b/", params)).toBe(false);
     expect(
-      sameRequest(safe, safe.input, parseParams({ checker: "fuzz" })),
+      sameRequest(safe, safe.input, parseParams({ checker: "fuzz" }, build)),
     ).toBe(false);
   });
 });

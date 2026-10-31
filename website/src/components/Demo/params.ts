@@ -1,5 +1,10 @@
 import type { Parameters } from "recheck";
 
+import { isAtLeast } from "./builds";
+import schema from "./parameters.schema.json";
+
+import type { Build } from "./builds";
+
 export type ParamType = "duration" | "float" | "integer" | { select: string[] };
 
 export type Param = {
@@ -7,186 +12,85 @@ export type Param = {
   name: string;
   defaultValue: string | number;
   type: ParamType;
+  /** The first release having the parameter, or `null` if every release has it. */
+  since: string | null;
 };
 
-export const params: Param[] = [
-  {
-    name: "checker",
-    title: "Checker",
-    defaultValue: "auto",
-    type: { select: ["auto", "automaton", "fuzz"] },
-  },
-  {
-    name: "logger",
-    title: "Logger",
-    defaultValue: "off",
-    type: { select: ["on", "off"] },
-  },
-  {
-    name: "timeout",
-    title: "Timeout",
-    defaultValue: 10000,
-    type: "duration",
-  },
-  {
-    name: "accelerationMode",
-    title: "Acceleration Mode",
-    defaultValue: "auto",
-    type: { select: ["auto", "on", "off"] },
-  },
-  {
-    name: "attackLimit",
-    title: "Attack Limit",
-    defaultValue: 1500000000,
-    type: "integer",
-  },
-  {
-    name: "attackTimeout",
-    title: "Attack Timeout",
-    defaultValue: 1000,
-    type: "duration",
-  },
-  {
-    name: "crossoverSize",
-    title: "Crossover Size",
-    defaultValue: 25,
-    type: "integer",
-  },
-  {
-    name: "heatRatio",
-    title: "Heat Ratio",
-    defaultValue: 0.001,
-    type: "float",
-  },
-  {
-    name: "incubationLimit",
-    title: "Incubation Limit",
-    defaultValue: 25000,
-    type: "integer",
-  },
-  {
-    name: "incubationTimeout",
-    title: "Incubation Timeout",
-    defaultValue: 250,
-    type: "duration",
-  },
-  {
-    name: "maxAttackStringSize",
-    title: "Max Attack String Size",
-    defaultValue: 300000,
-    type: "integer",
-  },
-  {
-    name: "maxDegree",
-    title: "Max Degree",
-    defaultValue: 4,
-    type: "integer",
-  },
-  {
-    name: "maxGeneStringSize",
-    title: "Max Gene String Size",
-    defaultValue: 2400,
-    type: "integer",
-  },
-  {
-    name: "maxGenerationSize",
-    title: "Max Generation Size",
-    defaultValue: 100,
-    type: "integer",
-  },
-  {
-    name: "maxInitialGenerationSize",
-    title: "Max Initial Generation Size",
-    defaultValue: 500,
-    type: "integer",
-  },
-  {
-    name: "maxIteration",
-    title: "Max Iteration",
-    defaultValue: 10,
-    type: "integer",
-  },
-  {
-    name: "maxNFASize",
-    title: "Max NFA Size",
-    defaultValue: 35000,
-    type: "integer",
-  },
-  {
-    name: "maxPatternSize",
-    title: "Max Pattern Size",
-    defaultValue: 1500,
-    type: "integer",
-  },
-  {
-    name: "maxRecallStringSize",
-    title: "Max Recall String Size",
-    defaultValue: 300000,
-    type: "integer",
-  },
-  {
-    name: "maxRepeatCount",
-    title: "Max Repeat Count",
-    defaultValue: 30,
-    type: "integer",
-  },
-  {
-    name: "maxSimpleRepeatCount",
-    title: "Max Simple Repeat Count",
-    defaultValue: 30,
-    type: "integer",
-  },
-  {
-    name: "mutationSize",
-    title: "Mutation Size",
-    defaultValue: 50,
-    type: "integer",
-  },
-  {
-    name: "randomSeed",
-    title: "Random Seed",
-    defaultValue: 0,
-    type: "integer",
-  },
-  {
-    name: "recallLimit",
-    title: "Recall Limit",
-    defaultValue: 1500000000,
-    type: "integer",
-  },
-  {
-    name: "recallTimeout",
-    title: "Recall Timeout",
-    defaultValue: -1000,
-    type: "duration",
-  },
-  {
-    name: "seeder",
-    title: "Seeder",
-    defaultValue: "static",
-    type: { select: ["static", "dynamic"] },
-  },
-  {
-    name: "seedingLimit",
-    title: "Seeding Limit",
-    defaultValue: 1000,
-    type: "integer",
-  },
-  {
-    name: "seedingTimeout",
-    title: "Seeding Timeout",
-    defaultValue: 100,
-    type: "duration",
-  },
-];
+type Property = {
+  title: string;
+  type?: string | string[];
+  enum?: string[];
+  default?: unknown;
+  "x-unit"?: string;
+  "x-exclude"?: string[];
+  "x-since"?: string;
+};
+
+const paramType = (property: Property): ParamType | null => {
+  if (property.enum !== undefined) return { select: property.enum };
+  if (property["x-unit"] === "milliseconds") return "duration";
+  if (property.type === "integer") return "integer";
+  if (property.type === "number") return "float";
+  return null;
+};
+
+/** The parameters of the form, read from the schema of the parameters. */
+const schemaParams: Param[] = Object.entries(
+  schema.properties as Record<string, Property>,
+).flatMap(([name, property]) => {
+  const type = paramType(property);
+  if (property["x-exclude"]?.includes("playground") || type === null) {
+    return [];
+  }
+  return [
+    {
+      name,
+      title: property.title,
+      defaultValue: property.default as string | number,
+      type,
+      since: property["x-since"] ?? null,
+    },
+  ];
+});
+
+const loggerParam: Param = {
+  name: "logger",
+  title: "Logger",
+  defaultValue: "off",
+  type: { select: ["on", "off"] },
+  since: null,
+};
+
+/** The parameters shown first, in this order; the others follow in the schema order. */
+const FIRST = ["checker", "logger", "timeout", "dialect"];
+
+const order = (name: string): number => {
+  const index = FIRST.indexOf(name);
+  return index === -1 ? FIRST.length : index;
+};
+
+/** All the parameters of the form, for the bundled build. */
+export const params: Param[] = [...schemaParams, loggerParam]
+  .map((param, index) => ({ param, index }))
+  .sort(
+    (a, b) => order(a.param.name) - order(b.param.name) || a.index - b.index,
+  )
+  .map(({ param }) => param);
+
+/** The parameters of the form that the build has. */
+export const paramsOf = (build: Build): Param[] =>
+  params.filter(({ since }) => since === null || isAtLeast(build, since));
 
 // `logger` is a Playground option rather than a `recheck` parameter.
 export type CheckParams = Parameters & { logger: "on" | "off" };
 
 /** Converts the form values, where numbers are strings, to the parameters. */
-export const parseParams = (values: Record<string, unknown>): CheckParams => {
+export const parseParams = (
+  values: Record<string, unknown>,
+  build: Build,
+): CheckParams => {
   const parsed: Record<string, unknown> = {};
-  for (const { name, type, defaultValue } of params) {
+  for (const { name, type, defaultValue } of paramsOf(build)) {
     const value = values[name] ?? defaultValue;
     switch (type) {
       case "duration":

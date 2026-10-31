@@ -6,6 +6,7 @@ import { parseParams } from "../src/components/Demo/params";
 import { encode } from "../src/components/Demo/permalink";
 
 import type { Page } from "@playwright/test";
+import type { Build } from "../src/components/Demo/builds";
 import type { Snapshot } from "../src/components/Demo/permalink";
 
 const CDN_MODULE = "https://cdn.jsdelivr.net/npm/recheck@*/lib/browser.mjs";
@@ -90,11 +91,12 @@ test("runs the input with the chosen build and records a permalink", async ({
 test("restores a permalink and compares a new run against it", async ({
   page,
 }) => {
+  const build: Build = { type: "release", version: "0.0.1" };
   const recorded: Snapshot = {
     v: 1,
-    build: { type: "release", version: "0.0.1" },
+    build,
     input: "/a/",
-    params: parseParams({ checker: "automaton" }),
+    params: parseParams({ checker: "automaton" }, build),
     result: { status: "safe", source: "a", flags: "", checker: "automaton" },
     time: 1,
     date: "2026-10-25T00:00:00.000Z",

@@ -5,7 +5,7 @@ import Select from '../form/Select';
 import TextArea from '../form/TextArea';
 import { formatBuild } from './builds';
 import styles from './Demo.module.css';
-import { params } from './params';
+import { paramsOf } from './params';
 
 import type { Build } from './builds';
 import type { Param } from './params';
@@ -23,12 +23,12 @@ const ParamInput: React.FC<Param> = ({ name, defaultValue, type }) => {
   return <Select name={name} values={type.select} defaultValue={String(defaultValue)} />;
 };
 
-const DemoParams: React.FC = () => (
+const DemoParams: React.FC<{ build: Build }> = ({ build }) => (
   <details>
     <summary>Parameters</summary>
 
     <div className="container">
-      {params.map((param) => (
+      {paramsOf(build).map((param) => (
         <div className="row margin-vert--sm" key={param.name}>
           <div className="col col--3">
             <h4>{`${param.title}${param.type === 'duration' ? ' (ms)' : ''}`}</h4>
@@ -72,10 +72,11 @@ type Props = {
   cancel: () => void;
   running: boolean;
   builds: Build[];
+  build: Build;
   defaultBuild: Build;
 };
 
-const DemoInput: React.FC<Props> = ({ check, cancel, running, builds, defaultBuild }) => (
+const DemoInput: React.FC<Props> = ({ check, cancel, running, builds, build, defaultBuild }) => (
   <div className="card margin-vert--lg">
     <div className="card__header">
       <h3>RegExp</h3>
@@ -113,7 +114,7 @@ const DemoInput: React.FC<Props> = ({ check, cancel, running, builds, defaultBui
 
         <div className="row margin-top--sm row--no-gutters">
           <div className="col col--12">
-            <DemoParams />
+            <DemoParams build={build} />
           </div>
         </div>
       </div>

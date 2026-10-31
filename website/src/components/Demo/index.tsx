@@ -43,9 +43,9 @@ const Demo: React.FC = () => {
     setLoadError(null);
 
     const input = String(values['input']);
-    const params = parseParams(values);
-    const extracted = extract(input);
     const build = findBuild(builds, String(values['version'])) ?? defaultBuild;
+    const params = parseParams(values, build);
+    const extracted = extract(input);
 
     if (recorded !== null && !sameRequest(recorded, input, params)) {
       setRecorded(null);
@@ -124,7 +124,14 @@ const Demo: React.FC = () => {
           </div>
         ) : null}
 
-        <DemoInput running={running} check={check} cancel={cancel} builds={builds} defaultBuild={defaultBuild} />
+        <DemoInput
+          running={running}
+          check={check}
+          cancel={cancel}
+          builds={builds}
+          build={build}
+          defaultBuild={defaultBuild}
+        />
 
         {running || current !== null ? (
           <DemoResult
