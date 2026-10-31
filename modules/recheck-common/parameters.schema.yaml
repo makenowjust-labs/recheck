@@ -30,13 +30,11 @@ properties:
   accelerationMode:
     title: "Acceleration Mode"
     description: |-
-      The type of acceleration mode strategy on fuzzing.
+      The acceleration mode of the fuzzing.
 
-      There are three acceleration mode strategies.
-
-      - `auto` uses acceleration mode as default. However, if the regular expression has backreferences, it turns off the acceleration mode.
-      - `on` turns on the acceleration mode.
-      - `off` turns off the acceleration mode.
+      - `auto` turns it on, unless the pattern has back-references.
+      - `on` turns it on.
+      - `off` turns it off.
     type: string
     enum: ["auto", "on", "off"]
     default: "auto"
@@ -68,13 +66,11 @@ properties:
   checker:
     title: "Checker"
     description: |-
-      The type of checker to be used.
+      The checker to use.
 
-      There are three checker types.
-
-      - `auto` checker uses the criteria to decide which algorithm is better to use against a regular expression, the algorithm based on automata theory or the fuzzing algorithm.
-      - `fuzz` checker uses the fuzzing algorithm with static analysis.
-      - `automaton` checker uses the algorithm based on automata theory.
+      - `auto` chooses one of the two below by the criteria.
+      - `fuzz` uses the fuzzing with static analysis.
+      - `automaton` uses the algorithm based on automata theory.
     type: string
     enum: ["auto", "fuzz", "automaton"]
     default: "auto"
@@ -95,29 +91,11 @@ properties:
   dialect:
     title: "Dialect"
     description: |-
-      The regular expression dialect of the pattern, with the dialect's settings.
+      The regular expression dialect of the pattern, with its settings.
 
-      It is the name of the dialect's language, which takes the default settings, or an object of the name and the settings, where an omitted setting takes the default (e.g. `"python"` or `{ "name": "python", "type": "bytes" }`).
-      The flags are the dialect's flag letters (e.g. `imsx`), and the pattern is checked with the dialect's semantics.
-
-      - `javascript` is ECMAScript's `RegExp`.
-      - `java` is Java's `java.util.regex.Pattern`.
-      - `dotnet` is .NET's `System.Text.RegularExpressions.Regex`.
-      - `pcre` is PCRE2 as PHP's `preg_*` functions use it.
-      - `python` is Python's `re` module.
-      - `ruby` is Ruby's `Regexp`.
-      - `perl` is Perl's regular expressions.
-
-      JavaScript and .NET read UTF-16 code units (JavaScript reads code points with the `u` or `v` flag), Java reads code points, and PCRE reads UTF-8 with the `u` flag or `(*UTF)` and bytes otherwise.
-      The other dialects have settings:
-
-      - `type` of `python`: the string type of the pattern and its input, `str` (default) or `bytes`.
-      - `encoding` of `ruby`: the encoding of the regexp, `UTF-8` (default) or `ASCII-8BIT` (as the `n` flag makes).
-      - `utf8` of `perl`: whether the program has `use utf8` and its strings are decoded text, which has the UTF-8 flag. `true` (default) matches code points, and `/d` uses the Unicode rules. `false` matches byte strings without the flag, whose non-ASCII literals are UTF-8 bytes, and `/d` uses the ASCII rules on `0x80`–`0xFF` unless the pattern has a code point of `\x{100}` or more, `\p`, `\N{...}` or `\b{...}`. A program reading text that is not decoded (e.g. Latin-1) is `false`.
-      - `source` of `perl`: how the pattern is given. `literal` (default) is a regex literal written in Perl source (e.g. `qr/.../`), where Perl applies `\U`, `\L`, `\u`, `\l`, `\F`, `\Q` and `\E` to its text before the regex engine reads it. `string` is a pattern from a runtime string (e.g. `qr/$p/`), which the regex engine reads unchanged.
-
-      The diagnostics have the given dialect as an object of the name and every setting.
-      The CLI takes the name by `--dialect` and the settings by `--python-type`, `--ruby-encoding`, `--perl-utf8` and `--perl-source`.
+      It is the name of the dialect, which takes the default settings, or an object of the name and the settings (e.g. `"python"` or `{ "name": "python", "type": "bytes" }`).
+      The flags are the dialect's own flag letters.
+      See [Dialects](/docs/usage/dialects) for the dialects and their settings.
     oneOf:
       - type: string
         enum: ["javascript", "java", "dotnet", "pcre", "python", "ruby", "perl"]
@@ -200,7 +178,7 @@ properties:
     description: |-
       The logger function to record execution traces.
 
-      To disable the logging, `null` in TypeScript or `None` in Scala should be passed.
+      `null` in TypeScript or `None` in Scala disables the logging.
       The CLI enables it with `--enable-log`.
     default: null
     x-scala-type: "Option[Context.Logger]"
@@ -285,9 +263,7 @@ properties:
     description: |-
       The maximum number of failed recall validations.
 
-      When the recall validation of an attack string fails, the checking goes on to look for another attack string.
-      If it fails this number of times (at least once), the checking stops, and the result is `unknown` with the `recall-failure-limit` error.
-      An attack string with the same complexity and hotspot as a failed one is skipped without the recall validation, and it does not count.
+      When it is reached, the checking stops, and the result is `unknown` with the `recall-failure-limit` error.
     type: integer
     default: 10
     x-scala-type: "Int"
@@ -353,12 +329,9 @@ properties:
     description: |-
       The upper limit of matching time on the recall validation.
 
-      The recall validation runs the attack string on the real regex engine of the dialect, and records the result as `recallValidation` of the diagnostics.
-      The engine runs as a command found in `PATH` (`node`, `python3`, `ruby`, `java`, `dotnet`, `perl` or `php`), or as the command line given by the environment variable of the dialect (`RECHECK_NODE`, `RECHECK_PYTHON`, `RECHECK_RUBY`, `RECHECK_JAVA`, `RECHECK_DOTNET`, `RECHECK_PERL` or `RECHECK_PHP`).
-      If the attack does not take this time there, the diagnostics is not accepted and the checking goes on.
-
-      If this value is not positive, the recall validation is skipped.
-      It is skipped also where commands cannot run (e.g. in the browser).
+      The recall validation runs the attack string on the real engine of the dialect (see [Recall Validation](/docs/usage/recall-validation)).
+      An attack string that the engine matches within this time is not reported, and the checking goes on.
+      The recall validation is skipped if this value is not positive, or where commands cannot run (e.g. in the browser).
     type: [integer, "null"]
     default: -1000
     x-unit: "milliseconds"
@@ -369,12 +342,10 @@ properties:
   seeder:
     title: "Seeder"
     description: |-
-      The type of seeder to be used in fuzzing.
+      The seeder of the fuzzing.
 
-      There are two seeders.
-
-      - `static` seeder uses the seeding algorithm based on the automata theory.
-      - `dynamic` seeder uses the seeding algorithm with dynamic analysis.
+      - `static` uses the seeding based on automata theory.
+      - `dynamic` uses the seeding with dynamic analysis.
     type: string
     enum: ["static", "dynamic"]
     default: "static"
@@ -407,11 +378,10 @@ properties:
     description: |-
       The upper limit of checking time.
 
-      If the checking time exceeds this limit, the result will be reported as `timeout`. If the value is positive infinite in Scala or `null` in TypeScript, the result never becomes `timeout`.
-
-      The `timeout` time begins to be measured as soon as the check starts. Note that the `timeout` does not occur while the input is in the queue waiting to be checked.
-
-      In TypeScript, a number value is treated as in milliseconds.
+      When it is exceeded, the result is `unknown` with the `timeout` error.
+      It has no limit if it is infinite in Scala or `null` in TypeScript.
+      The time starts when the check starts, not while the check waits in a queue.
+      In TypeScript, it is in milliseconds.
     type: [integer, "null"]
     default: 10000
     x-unit: "milliseconds"
