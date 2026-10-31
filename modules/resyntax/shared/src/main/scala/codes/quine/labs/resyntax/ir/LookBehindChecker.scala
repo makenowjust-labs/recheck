@@ -15,8 +15,8 @@ import codes.quine.labs.resyntax.ir.LookBehindChecker.*
 /** LookBehindChecker checks the dialect's restriction on a look-behind body.
   *
   * @param literalWidth
-  *   the width of a literal in the engine's units, which differs from one for a non-ASCII literal in PCRE's byte mode
-  *   (its UTF-8 bytes) and for Perl's multi-character case folding (e.g. `ß` up to two)
+  *   the width of a literal in the engine's units, which differs from one for Perl's multi-character case folding (e.g.
+  *   `ß` up to two)
   */
 private[ir] final class LookBehindChecker(
     table: CaptureTable,
@@ -47,6 +47,14 @@ private[ir] final class LookBehindChecker(
           if w.min != w.max || w.max == Inf then fail("Look-behind requires fixed-width pattern", lookBehind)
       case IRLookBehindRule.Ruby =>
         if !ruby(body, negative) then fail("Invalid pattern in look-behind", lookBehind)
+
+  /** Checks whether Java's look-behind of the body never matches, where the body has `\X`.
+    *
+    * Java's `TreeInfo` counts `\X` as one for the minimum length and zero for the maximum, and the look-behind tries
+    * only the starts between them, so the body matches nowhere if its minimum is above its maximum (e.g. `(?<=\X)`).
+    */
+  def javaNeverMatches(body: Node): Boolean =
+    width(body, Set.empty).exists(_.min > java(List(body), JavaInfo.Initial).maxLength)
 
   /** Returns the width of the node for PCRE, Perl and Python, or `None` if it is unknown (e.g. a conditional). */
   private def width(node: Node, visiting: Set[Int]): Option[Width] = node.data match

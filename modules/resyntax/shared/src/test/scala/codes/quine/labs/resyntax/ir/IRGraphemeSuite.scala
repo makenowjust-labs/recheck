@@ -109,3 +109,26 @@ class IRGraphemeSuite extends munit.FunSuite:
       assertEquals(cluster(Seq(0x85, 0x41), dialect, flags), Some(1))
       assertEquals(cluster(Seq(0xa9, 0x41), dialect, flags), Some(1))
       assertEquals(cluster(Seq(), dialect, flags), None)
+
+  // Java's look-behind tries only the starts of its `TreeInfo` lengths, where `\X` is at most zero long.
+  test("IRBuilder.build: Java's look-behind with \\X"):
+    def first(s: String): IRNodeData =
+      val IRNodeData.Sequence(nodes) = build(s, "", Java).node.data: @unchecked
+      nodes.head.data
+    assertEquals(first("(?<=\\X)a"), IRNodeData.Chars(codes.quine.labs.resyntax.charset.CharSet.empty))
+    assertEquals(first("(?<=a\\X)b"), IRNodeData.Chars(codes.quine.labs.resyntax.charset.CharSet.empty))
+    assertEquals(first("(?<!\\X)a"), IRNodeData.Empty)
+    assert(first("(?<=(?:\\X|bc))a").isInstanceOf[IRNodeData.Unsupported])
+    assert(first("(?<=b)a").isInstanceOf[IRNodeData.LookBehind])
+
+  test("IRBuilder.build: \\X in a look-behind is an error in the others"):
+    for (dialect, flags, message) <- Seq(
+        (PCRE, "u", "Look-behind is not limited at 0"),
+        (Perl, "", "Look-behind longer than 255 at 0"),
+        (Ruby, "", "Invalid pattern in look-behind at 0")
+      )
+    do interceptMessage[IRBuildingException](message)(build("(?<=\\X)a", flags, dialect))
+
+  test("IRBuilder.build: \\X does not depend on case-insensitivity"):
+    for dialect <- Seq(Java, Perl, Ruby) do
+      assert(build("\\X", "i", dialect).node.equalsWithoutLoc(build("\\X", "", dialect).node))

@@ -17,6 +17,7 @@ import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ast.QuoteLiteral
 import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.ast.SourceLocation
+import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.UnitMode
 
@@ -63,7 +64,7 @@ object IRBuilder:
       new LookBehindChecker(table, resolver, featureSet, literalWidth(flagSet, dialect, perlUnicodeRules))
     val backReferences = new IRValidator(table, resolver, checker, featureSet).validate(node)
     val chars = new IRCharResolver(dialect, mode, perlUnicodeRules)
-    val builder = new IRBuilder(context, table, backReferences, chars, resolveCharacter)
+    val builder = new IRBuilder(context, table, backReferences, chars, checker, resolveCharacter)
     IRPattern(
       builder.build(node),
       table.count,
@@ -138,6 +139,15 @@ object IRBuilder:
       case _               => false
     check(node)
 
+  /** Checks whether the node has `\X`. */
+  private def hasGraphemeCluster(x: Any): Boolean = x match
+    case EscapeClassKind.GraphemeCluster => true
+    case xs: Iterable[?]                 => xs.exists(hasGraphemeCluster)
+    case x: Option[?]                    => x.exists(hasGraphemeCluster)
+    case _: String                       => false
+    case x: Product                      => x.productIterator.exists(hasGraphemeCluster)
+    case _                               => false
+
   /** Returns the names of PCRE's start options (e.g. `(*CRLF)`), which can appear only at the start. */
   private def startOptions(node: Node): Seq[String] =
     val nodes = node.data match
@@ -159,6 +169,7 @@ private[ir] class IRBuilder(
     table: CaptureTable,
     backReferences: Map[NodeKey, Seq[Int]],
     chars: IRCharResolver,
+    checker: LookBehindChecker,
     resolveCharacter: Option[(Node, IRCharFlags) => IRNodeData]
 ):
   private val dialect = initial.dialect
@@ -284,6 +295,17 @@ private[ir] class IRBuilder(
     if IRBuilder.UnsupportedStartOptions.contains(name) then IRNodeData.Unsupported(node.data)
     else IRNodeData.Empty
 
+  /** Builds a look-behind, where Java's one with `\X` tries the starts of its `TreeInfo` lengths, unlike the IR's one.
+    *
+    * It never matches if no start is tried, and is unsupported otherwise.
+    */
+  def buildLookBehind(node: Node, negative: Boolean, child: Node): IRNodeData =
+    if dialect == Dialect.Java && IRBuilder.hasGraphemeCluster(child) then
+      if !checker.javaNeverMatches(child) then IRNodeData.Unsupported(node.data)
+      else if negative then IRNodeData.Empty
+      else IRNodeData.Chars(CharSet.empty)
+    else IRNodeData.LookBehind(negative, scoped(build(child)))
+
   def buildGroup(node: Node, kind: GroupKind, child: Node): Either[IRNodeData, IRNode] = kind match
     case GroupKind.IndexedCapture =>
       table.indexOf(node) match
@@ -294,8 +316,8 @@ private[ir] class IRBuilder(
     case GroupKind.PNamedCapture(name)   => Left(buildNamedCapture(node, name, child))
     case GroupKind.PositiveLookAhead(_)  => Left(IRNodeData.LookAhead(false, scoped(build(child))))
     case GroupKind.NegativeLookAhead(_)  => Left(IRNodeData.LookAhead(true, scoped(build(child))))
-    case GroupKind.PositiveLookBehind(_) => Left(IRNodeData.LookBehind(false, scoped(build(child))))
-    case GroupKind.NegativeLookBehind(_) => Left(IRNodeData.LookBehind(true, scoped(build(child))))
+    case GroupKind.PositiveLookBehind(_) => Left(buildLookBehind(node, negative = false, child))
+    case GroupKind.NegativeLookBehind(_) => Left(buildLookBehind(node, negative = true, child))
     case GroupKind.Atomic(_)             => Left(IRNodeData.Atomic(scoped(build(child))))
     case GroupKind.InlineFlag(diff)      =>
       Right(scoped:
