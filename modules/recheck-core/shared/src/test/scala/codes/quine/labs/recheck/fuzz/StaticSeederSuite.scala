@@ -1,10 +1,5 @@
 package codes.quine.labs.recheck.fuzz
-
-import scala.util.Failure
-import scala.util.Success
-
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.regexp.ParsedPattern
 
 class StaticSeederSuite extends munit.FunSuite:

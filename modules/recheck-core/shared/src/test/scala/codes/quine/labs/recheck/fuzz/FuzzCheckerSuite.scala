@@ -2,12 +2,9 @@ package codes.quine.labs.recheck
 package fuzz
 
 import scala.concurrent.duration.*
-import scala.util.Failure
 import scala.util.Random
-import scala.util.Success
 
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.regexp.ParsedPattern
 

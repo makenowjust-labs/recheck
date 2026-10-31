@@ -2,13 +2,11 @@ package codes.quine.labs.recheck
 package automaton
 
 import scala.language.implicitConversions
-import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
 import codes.quine.labs.recheck.automaton.Complexity.*
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.Hotspot.*
 import codes.quine.labs.recheck.regexp.ParsedPattern

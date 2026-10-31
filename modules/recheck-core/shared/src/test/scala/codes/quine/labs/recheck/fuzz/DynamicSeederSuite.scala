@@ -3,11 +3,8 @@ package fuzz
 
 import scala.concurrent.duration.*
 import scala.language.implicitConversions
-import scala.util.Failure
-import scala.util.Success
 
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.fuzz.DynamicSeeder.*
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.util.UStringUtil
