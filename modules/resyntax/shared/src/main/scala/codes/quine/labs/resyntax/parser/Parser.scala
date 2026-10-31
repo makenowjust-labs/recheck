@@ -1170,9 +1170,7 @@ private[parser] final class Parser(
       for name <- StartOptions do
         if source.startsWith(s"$name)", offset) then
           // PCRE2 accepts `(*TURKISH_CASING)` only in UTF mode (in the 8-bit library), by `u` or `(*UTF)`.
-          if name == "TURKISH_CASING" then
-            val options = "^(?:\\(\\*[A-Z0-9_=]+\\))*".r.findPrefixOf(source).getOrElse("")
-            assert(featureSet.readsAsUnicode || Seq("(*UTF)", "(*UTF8)").exists(options.contains), "Invalid group")
+          if name == "TURKISH_CASING" then assert(featureSet.readsAsUnicode, "Invalid group")
           reset(offset + name.length)
           pushCommand(stack, CommandKind.StartOption(name, None), start)
           boundary.break(true)
