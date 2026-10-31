@@ -1853,13 +1853,17 @@ private[parser] final class Parser(
 
     BackslashKind.Escape(EscapeStyle.UnicodeHex4, value)
 
+  // Ruby separates the code points by ASCII spaces (`ISSPACE`, e.g. `\n`), and reads at most six digits for each.
   private def parseUnicodeList(): BackslashKind =
-    skipBraceBlank(force = true)
+    def skipSpaces(): Unit = while !isEnd && " \t\n\u000b\f\r".contains(currentChar) do next()
+    skipSpaces()
     val values = Seq.newBuilder[Int]
     while !isEnd && isHexDigit do
       val start = offset
-      values.addOne(checkCodePoint(parseHexDigits(Int.MaxValue), start))
-      skipBraceBlank(force = true)
+      val value = parseHexDigits(6)
+      assert(isEnd || !isHexDigit, "Invalid backslash escape", start)
+      values.addOne(checkCodePoint(value, start))
+      skipSpaces()
     expect('}', "Invalid backslash escape")
     values.result() match
       case Seq()         => fail("Invalid backslash escape")
