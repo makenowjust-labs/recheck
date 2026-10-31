@@ -112,7 +112,7 @@ final case class FeatureSet(
     allowsToggledInlineFlag: Boolean,
     // .NET, JavaScript, PCRE, Perl, Python, Ruby
     allowsUnderscoreInGroupName: Boolean,
-    // JavaScript, Python (without `b`)
+    // JavaScript, Python (`str`)
     allowsUnicodeIdentifierGroupName: Boolean,
     // PCRE (with `u`)
     allowsUnicodeWordGroupName: Boolean,
@@ -174,7 +174,7 @@ final case class FeatureSet(
     hasBackslashBackspace: Boolean,
     // .NET, Java, PCRE, Perl, Python, Ruby
     hasBackslashBell: Boolean,
-    // Java, Perl, Python (without `b`)
+    // Java, Perl, Python (`str`)
     hasBackslashCharName: Boolean,
     // PCRE (with `u`), Perl
     hasBackslashCharNameHex: Boolean,
@@ -230,9 +230,9 @@ final case class FeatureSet(
     hasBackslashStickyAssert: Boolean,
     // JavaScript (with `uv`), Ruby
     hasBackslashUnicodeBracket: Boolean,
-    // .NET, Java, JavaScript, Python (without `b`), Ruby
+    // .NET, Java, JavaScript, Python (`str`), Ruby
     hasBackslashUnicodeHex: Boolean,
-    // Python (without `b`)
+    // Python (`str`)
     hasBackslashUnicodeHex8: Boolean,
     // Ruby
     hasBackslashUnicodeList: Boolean,
@@ -298,7 +298,7 @@ final case class FeatureSet(
     hasFlagR: Boolean,
     // .NET, Java, JavaScript, PCRE, Perl, Python
     hasFlagS: Boolean,
-    // Java, Perl, Python (without `b`), Ruby
+    // Java, Perl, Python (`str`), Ruby
     hasFlagU: Boolean,
     // .NET, Java, PCRE, Perl, Python, Ruby
     hasFlagX: Boolean,
@@ -306,7 +306,7 @@ final case class FeatureSet(
     hasFlagXX: Boolean,
     // PCRE
     hasFlagUpperJ: Boolean,
-    // Python (with `b`)
+    // Python (`bytes`)
     hasFlagUpperL: Boolean,
     // Java, PCRE
     hasFlagUpperU: Boolean,
@@ -388,7 +388,7 @@ final case class FeatureSet(
     removesCommentGroup: Boolean,
     // Python, Ruby
     processBackslashInCommentGroup: Boolean,
-    // Java, JavaScript (with `uv`), Perl, PCRE (with `u`), Python (without `b`), Ruby
+    // Java, JavaScript (with `uv`), Perl, PCRE (with `u`), Python (`str`), Ruby
     readsAsUnicode: Boolean,
     // Python
     requiresInlineFlagAtStart: Boolean,
@@ -408,7 +408,7 @@ final case class FeatureSet(
     maxRepeatCount: Long,
     // PCRE: every name, Perl: 3 to 14 characters without upper case letters and blanks, Ruby: up to 20 characters without `:`
     classPosixNameRule: ClassPosixNameRule,
-    // Python (with `b`): Latin-1, PCRE (without `u`), Perl (bytes), Ruby (ASCII-8BIT): UTF-8, the others: text
+    // Python (`bytes`): Latin-1, PCRE (without `u`), Perl (without `utf8`), Ruby (ASCII-8BIT): UTF-8, the others: text
     sourceEncoding: SourceEncoding
 )
 
