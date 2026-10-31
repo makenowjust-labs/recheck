@@ -76,12 +76,9 @@ object Parser:
 
   /** Rejects a character that the source encoding cannot have. */
   private def checkEncoding(source: String, encoding: SourceEncoding): Unit =
-    val (limit, message) = encoding match
-      case SourceEncoding.Latin1 => (0xff, "Non-Latin-1 character in bytes pattern")
-      case SourceEncoding.Ascii  => (0x7f, "Non-ASCII character in ASCII-8BIT pattern")
-      case _                     => return
-    val pos = source.indexWhere(_ > limit)
-    if pos >= 0 then throw new ParsingException(message, Some(pos))
+    if encoding == SourceEncoding.Latin1 then
+      val pos = source.indexWhere(_ > 0xff)
+      if pos >= 0 then throw new ParsingException("Non-Latin-1 character in bytes pattern", Some(pos))
 
   private def parseText(source: String, flagSet: FlagSet, dialect: Dialect, options: DialectOptions): Node =
     val analysis = QuickAnalysis.from(source)
@@ -2730,8 +2727,7 @@ private[parser] final class Parser(
       else 0x10ffff
     if value > max then fail("Code point too large", pos)
     // Ruby's `\u` escapes are Unicode, which an ASCII-8BIT regexp cannot have except ASCII.
-    if featureSet.sourceEncoding == SourceEncoding.Ascii && value >= 0x80 then
-      fail("Incompatible character encoding", pos)
+    if featureSet.rejectsNonAsciiUnicodeEscape && value >= 0x80 then fail("Incompatible character encoding", pos)
     if !featureSet.allowsSurrogateEscape && 0xd800 <= value && value <= 0xdfff then fail("Invalid Unicode escape", pos)
     value.min(Int.MaxValue).toInt
 

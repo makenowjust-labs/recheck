@@ -117,13 +117,19 @@ class ParserEncodingSuite extends munit.FunSuite:
   // The case commands do not change non-ASCII bytes.
   check("\\U\u00e9a", "", Perl, PerlBytes)(Sequence((bytes("\u00e9") :+ Literal('A'))*))
 
-  // Ruby's ASCII-8BIT regexp from a UTF-8 string has only ASCII characters and escapes.
+  // Ruby's ASCII-8BIT regexp reads the UTF-8 bytes of the source (as `Regexp.new(source.b, Regexp::NOENCODING)`).
   val RubyBytes = Some(Encoding.RubyAscii8Bit)
   for (flags, encoding) <- Seq(("n", None), ("", RubyBytes)) do
-    error("a\u00e9", flags, Ruby, encoding)("Non-ASCII character in ASCII-8BIT pattern at 1")
-    error("(?#\u00e9)", flags, Ruby, encoding)("Non-ASCII character in ASCII-8BIT pattern at 3")
+    check("\u00e9+", flags, Ruby, encoding)(Sequence(Literal(0xc3), Repeat(Literal(0xa9), Plus(Greedy))))
+    check("[\u00e9-\u00e0]", flags, Ruby, encoding)(
+      Class(
+        false,
+        ClassUnion(ClassLiteral(0xc3), ClassRange(ClassLiteral(0xa9), ClassLiteral(0xc3)), ClassLiteral(0xa0))
+      )
+    )
     error("\\u00e9", flags, Ruby, encoding)("Incompatible character encoding at 1")
     error("\\u{41 e9}", flags, Ruby, encoding)("Incompatible character encoding at 6")
     check("\\u0041", flags, Ruby, encoding)(Backslash(Escape(EscapeStyle.UnicodeHex4, 0x41)))
     check("\\xff", flags, Ruby, encoding)(Backslash(Escape(EscapeStyle.Hex2, 0xff)))
   check("a\u00e9", "", Ruby)(Sequence(Literal('a'), Literal(0xe9)))
+  check("\\u00e9", "", Ruby)(Backslash(Escape(EscapeStyle.UnicodeHex4, 0xe9)))

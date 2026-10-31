@@ -376,6 +376,8 @@ final case class FeatureSet(
     readsThreeOctalDigitsAsOctal: Boolean,
     // JavaScript (with `uv`)
     rejectsInvalidBackReference: Boolean,
+    // Ruby (ASCII-8BIT)
+    rejectsNonAsciiUnicodeEscape: Boolean,
     // Ruby
     rejectsNumberedReferenceWithNamedCapture: Boolean,
     // Ruby
@@ -402,7 +404,7 @@ final case class FeatureSet(
     maxRepeatCount: Long,
     // PCRE: every name, Perl: 3 to 14 characters without upper case letters and blanks, Ruby: up to 20 characters without `:`
     classPosixNameRule: ClassPosixNameRule,
-    // Python (with `b`): Latin-1, PCRE (without `u`), Perl (bytes): UTF-8, Ruby (ASCII-8BIT): ASCII, the others: text
+    // Python (with `b`): Latin-1, PCRE (without `u`), Perl (bytes), Ruby (ASCII-8BIT): UTF-8, the others: text
     sourceEncoding: SourceEncoding
 )
 
@@ -425,6 +427,8 @@ object FeatureSet:
 
     // Python's bytes pattern
     val isByte = isPython && (flagSet.bytes || options.encoding.contains(Encoding.PythonBytes))
+    // Ruby's `n` is NOENCODING, which `FlagSet` keeps as `explicitCapture`.
+    val isRubyByte = isRuby && (flagSet.explicitCapture || options.encoding.contains(Encoding.RubyAscii8Bit))
     // PCRE reads UTF-8 by `u` (PHP) or `(*UTF)`.
     val isUnicode = flagSet.unicode || flagSet.unicodeSets || (isPCRE && analysis.hasUtfStartOption)
 
@@ -801,6 +805,8 @@ object FeatureSet:
       readsThreeOctalDigitsAsOctal = isPython,
       // JavaScript (with `uv`)
       rejectsInvalidBackReference = isJavaScript && isUnicode,
+      // Ruby (ASCII-8BIT)
+      rejectsNonAsciiUnicodeEscape = isRubyByte,
       // Ruby
       rejectsNumberedReferenceWithNamedCapture = isRuby,
       // Ruby
@@ -838,12 +844,10 @@ object FeatureSet:
         case Dialect.Perl => ClassPosixNameRule.Perl
         case Dialect.Ruby => ClassPosixNameRule.Ruby
         case _            => ClassPosixNameRule.Always,
-      // Python (with `b`): Latin-1, PCRE (without `u`), Perl (bytes): UTF-8, Ruby (ASCII-8BIT): ASCII, the others: text
+      // Python (with `b`): Latin-1, PCRE (without `u`), Perl (bytes), Ruby (ASCII-8BIT): UTF-8, the others: text
       sourceEncoding =
         if isByte then SourceEncoding.Latin1
-        else if (isPCRE && !isUnicode) || (isPerl && options.encoding.contains(Encoding.PerlBytes)) then
+        else if (isPCRE && !isUnicode) || (isPerl && options.encoding.contains(Encoding.PerlBytes)) || isRubyByte then
           SourceEncoding.Utf8
-        else if isRuby && (flagSet.explicitCapture || options.encoding.contains(Encoding.RubyAscii8Bit)) then
-          SourceEncoding.Ascii
         else SourceEncoding.Text
     )
