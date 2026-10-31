@@ -108,9 +108,7 @@ object IRCaseEquivalence:
   /** .NET's key `ToLowerInvariant(c)`, where `U+0130` is not lower-cased to `i`. */
   lazy val dotNetKey: CaseMapping = CaseMapping.SimpleLower.updated(Seq(0x130 -> 0x130))
 
-  /** Returns the case equivalence of case-insensitive matching with the flags in the dialect and the mode.
-    *
-    * @param perlNative
+  /** @param perlNative
     *   Perl's `/d` rules without a reason to use Unicode rules (see [[PerlNative]])
     */
   def of(dialect: Dialect, mode: UnitMode, flags: IRCharFlags, perlNative: Boolean): IRCaseEquivalence =

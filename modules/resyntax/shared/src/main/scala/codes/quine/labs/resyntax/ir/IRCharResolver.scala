@@ -758,7 +758,6 @@ private[ir] object IRCharResolver:
       true
     case _ => false
 
-  /** Checks whether the escape gives a raw byte of a multibyte character in Ruby. */
   def isRubyByte(style: EscapeStyle, value: Int): Boolean = isRubyByteStyle(style) && 0x80 <= value && value <= 0xff
 
   /** The value of a literal that has no unit in the mode, which never matches. */

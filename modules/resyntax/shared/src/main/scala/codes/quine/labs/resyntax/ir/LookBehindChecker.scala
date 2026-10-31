@@ -39,7 +39,6 @@ private[ir] final class LookBehindChecker(
     rubyClassWidths: Node => Option[Seq[Int]]
 ):
 
-  /** Checks the body of a look-behind, and throws an exception at the look-behind node if it is invalid. */
   def check(lookBehind: Node, body: Node, negative: Boolean): Unit =
     featureSet.lookBehindRule match
       case IRLookBehindRule.Unrestricted => ()
