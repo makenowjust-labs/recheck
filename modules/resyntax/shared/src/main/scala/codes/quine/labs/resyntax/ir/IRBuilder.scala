@@ -63,10 +63,10 @@ object IRBuilder:
     // A Perl byte string has no `use utf8`, so its non-ASCII literals are bytes.
     val perlUtf8 = if mode == UnitMode.Byte then options.perlUtf8.orElse(Some(false)) else options.perlUtf8
     val perlUnicodeRules = dialect == Dialect.Perl && usesPerlUnicodeRules(node, perlUtf8)
-    val checker =
-      new LookBehindChecker(table, resolver, featureSet, charWidth(table, dialect, mode, perlUnicodeRules))
-    val backReferences = new IRValidator(table, resolver, checker, featureSet).validate(node)
     val chars = new IRCharResolver(dialect, mode, perlUnicodeRules)
+    val checker =
+      new LookBehindChecker(table, resolver, featureSet, charWidth(table, chars, dialect, mode, perlUnicodeRules))
+    val backReferences = new IRValidator(table, resolver, checker, featureSet).validate(node)
     val builder = new IRBuilder(context, table, backReferences, chars, checker, resolveCharacter, hasCall(node))
     IRPattern(
       builder.build(node),
@@ -109,39 +109,67 @@ object IRBuilder:
     * Perl counts the folded length of a character under `i` (e.g. `(?<=ß{128})` is too long), and a class counts its
     * longest character but not its ranges (e.g. `[ßa]` is two, and `[ß-ẞ]` is one). The folding is one for a Latin-1
     * character under `l`, and for one with ASCII characters under `aa` and `l`, except `ẞ` and, under `aa`, `ß`.
+    *
+    * Ruby (Onigmo) matches a character folded to several characters under `i` as the folding (e.g. `ß` as `ss`), and a
+    * class having such a character and another has a variable width (e.g. `[ßa]`, but `[ß]` is two).
     */
   private def charWidth(
       table: CaptureTable,
+      chars: IRCharResolver,
       dialect: Dialect,
       mode: UnitMode,
       perlUnicodeRules: Boolean
   ): Node => LookBehindChecker.Width =
     import LookBehindChecker.Width
-    if dialect != Dialect.Perl || mode != UnitMode.CodePoint then return _ => Width(1, 1)
-    def fold(value: Int, flags: IRCharFlags): Int =
-      val folded = FullCaseFolding(value)
-      val hasAscii = folded.iterator.exists(_ < 0x80)
-      val single = flags.charset match
-        case IRCharset.Default  => !perlUnicodeRules
-        case IRCharset.Unicode  => false
-        case IRCharset.Locale   => value < 0x100 || hasAscii && value != 0x1e9e
-        case _: IRCharset.Ascii => flags.caselessRestrict && hasAscii && value != 0xdf && value != 0x1e9e
-      if !flags.ignoreCase || single then 1 else folded.length
-    def classWidth(data: ClassItemData, flags: IRCharFlags): Int = data match
-      case ClassItemData.ClassUnion(items) => items.map(i => classWidth(i.data, flags)).maxOption.getOrElse(1)
-      case value: ClassItemData.ClassValue => fold(value.value, flags)
-      case ClassItemData.ClassRange(b, e) if b.data.value == e.data.value => fold(b.data.value, flags)
-      case _                                                              => 1
-    node =>
-      val width = table
-        .charFlagsOf(node)
-        .fold(1): flags =>
-          node.data match
-            case NodeData.Literal(value)                                 => fold(value, flags)
-            case NodeData.Backslash(value: BackslashKind.BackslashValue) => fold(value.value, flags)
-            case NodeData.Class(false, item)                             => classWidth(item.data, flags)
-            case _                                                       => 1
-      Width(1, width.toLong)
+    def single(n: Int): Width = Width(n, n)
+    if mode != UnitMode.CodePoint then return _ => single(1)
+    dialect match
+      case Dialect.Perl =>
+        def fold(value: Int, flags: IRCharFlags): Int =
+          val folded = FullCaseFolding(value)
+          val hasAscii = folded.iterator.exists(_ < 0x80)
+          val one = flags.charset match
+            case IRCharset.Default  => !perlUnicodeRules
+            case IRCharset.Unicode  => false
+            case IRCharset.Locale   => value < 0x100 || hasAscii && value != 0x1e9e
+            case _: IRCharset.Ascii => flags.caselessRestrict && hasAscii && value != 0xdf && value != 0x1e9e
+          if !flags.ignoreCase || one then 1 else folded.length
+        def classWidth(data: ClassItemData, flags: IRCharFlags): Int = data match
+          case ClassItemData.ClassUnion(items) => items.map(i => classWidth(i.data, flags)).maxOption.getOrElse(1)
+          case value: ClassItemData.ClassValue => fold(value.value, flags)
+          case ClassItemData.ClassRange(b, e) if b.data.value == e.data.value => fold(b.data.value, flags)
+          case _                                                              => 1
+        node =>
+          val width = table
+            .charFlagsOf(node)
+            .fold(1): flags =>
+              node.data match
+                case NodeData.Literal(value)                                 => fold(value, flags)
+                case NodeData.Backslash(value: BackslashKind.BackslashValue) => fold(value.value, flags)
+                case NodeData.Class(false, item)                             => classWidth(item.data, flags)
+                case _                                                       => 1
+          Width(1, width.toLong)
+      case Dialect.Ruby =>
+        def fold(value: Int): Int = FullCaseFolding(value).length.max(1)
+        node =>
+          table
+            .charFlagsOf(node)
+            .filter(_.ignoreCase)
+            .fold(single(1)): flags =>
+              node.data match
+                case NodeData.Literal(value)                                 => single(fold(value))
+                case NodeData.Backslash(value: BackslashKind.BackslashValue) => single(fold(value.value))
+                case NodeData.Class(false, _)                                =>
+                  chars.resolve(node, flags.copy(ignoreCase = false)) match
+                    case IRNodeData.Chars(set) if set.size == 1                       => single(fold(set.head))
+                    case IRNodeData.Chars(set) if set.intersect(multiFolded).nonEmpty =>
+                      Width(1, set.intersect(multiFolded).iterator.map(fold).max.toLong)
+                    case _ => single(1)
+                case _ => single(1)
+      case _ => _ => single(1)
+
+  /** The characters folded to several characters. */
+  private lazy val multiFolded: CharSet = CharSet.union(FullCaseFolding.multiCodePointFoldings().values.toSeq)
 
   /** Checks whether a Perl pattern uses Unicode rules under `/d` (perlre "Which character set modifier is in effect?").
     *
@@ -230,6 +258,9 @@ private[ir] class IRBuilder(
 
   var context: BuildingContext = initial
 
+  /** Whether the current position is in a look-behind. */
+  var inLookBehind: Boolean = false
+
   def build(node: Node): IRNode =
     val result = node.data match
       case NodeData.Disjunction(children)                            => buildDisjunction(children)
@@ -253,7 +284,7 @@ private[ir] class IRBuilder(
     val flags = charFlags
     // Java's CANON_EQ matches canonically equivalent sequences, which the checkers do not handle.
     if flags.canonicalEquivalence then IRNodeData.Unsupported(node.data)
-    else resolveCharacter.fold(chars.resolve(node, flags))(_(node, flags))
+    else resolveCharacter.fold(chars.resolve(node, flags, inLookBehind))(_(node, flags))
 
   /** Builds consecutive literal characters together (e.g. for multi-character case folding). */
   def buildLiterals(nodes: Seq[Node]): Seq[IRNode] =
@@ -264,7 +295,7 @@ private[ir] class IRBuilder(
     else
       resolveCharacter match
         case Some(f) => run.map((node, flags) => IRNode(f(node, flags), node.loc))
-        case None    => chars.literals(run)
+        case None    => chars.literals(run, inLookBehind)
 
   def buildDisjunction(children: Seq[Node]): Either[IRNodeData, IRNode] =
     Left(IRNodeData.Disjunction(children.map(build)))
@@ -425,7 +456,7 @@ private[ir] class IRBuilder(
       if !checker.javaNeverMatches(child) then IRNodeData.Unsupported(node.data)
       else if negative then IRNodeData.Empty
       else IRNodeData.Chars(CharSet.empty)
-    else IRNodeData.LookBehind(negative, scoped(build(child)))
+    else IRNodeData.LookBehind(negative, lookBehind(scoped(build(child))))
 
   def buildGroup(node: Node, kind: GroupKind, child: Node): Either[IRNodeData, IRNode] = kind match
     case GroupKind.IndexedCapture =>
@@ -516,6 +547,12 @@ private[ir] class IRBuilder(
     else IRNodeData.Assert(IRAssertKind.TextEnd)
 
   /** Builds within a group, where the inline flags inside do not leak out. */
+  def lookBehind[A](x: => A): A =
+    val saved = inLookBehind
+    inLookBehind = true
+    try x
+    finally inLookBehind = saved
+
   def scoped[A](x: => A): A =
     val saved = context
     try x

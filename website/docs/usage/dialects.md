@@ -138,6 +138,7 @@ There are other deliberate approximations.
 - Case-insensitive matching uses each dialect's mapping between single characters (e.g. JavaScript's `Canonicalize`, .NET's `ToLowerInvariant`, and the simple case folding of Ruby, Perl and PCRE).
   Ruby and Perl also match a character against several characters (e.g. `ß` against `ss`), but `recheck` handles it only for a run of plain literals.
   It does not handle a character class, a group or a quantifier taking part in such a match (e.g. `[s]s`).
+  In a look-behind, Ruby matches such a character only as its folding (e.g. `(?<=ß)` matches `ss`, but not `ß`), and so does `recheck` for plain literals.
 - The Unicode data (properties, case mappings) is of Unicode 18.0, while the engines use Unicode 16 or 17.
 - `\X` is the extended grapheme cluster of the regular expression in UAX #29 (Table 1b) in an atomic group, as the engines match one cluster without backtracking into it.
   In a bytes mode, it reads each byte as the Latin-1 character.

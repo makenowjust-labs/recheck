@@ -91,14 +91,14 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     out.toSeq
 
   /** Resolves a character-level node. */
-  def resolve(node: Node, flags: IRCharFlags): IRNodeData =
+  def resolve(node: Node, flags: IRCharFlags, inLookBehind: Boolean = false): IRNodeData =
     try
       node.data match
         case NodeData.Dot                                        => dot(flags)
         case NodeData.Class(invert, item)                        => klass(invert, item, flags, node.loc)
         case NodeData.Backslash(BackslashKind.EscapeClass(kind)) => escapeClass(kind, flags, node.loc)
         case _                                                   =>
-          literals(Seq((node, flags))) match
+          literals(Seq((node, flags)), inLookBehind) match
             case Seq(ir) => ir.data
             case irs     => IRNodeData.Sequence(irs)
     catch case _: NotModeledException => IRNodeData.Unsupported(node.data)
@@ -111,14 +111,17 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     * They are resolved together for a surrogate pair read by code units and Ruby's UTF-8 bytes by escapes (e.g.
     * `\xC3\xA9`). Case-insensitivity is the dialect's one-to-one case equivalence, and Ruby's and Perl's simple
     * multi-character folding of plain literals (e.g. `ß` and `ss`, see [[foldRun]]).
+    *
+    * @param inLookBehind
+    *   whether the literals are in a look-behind, where Ruby matches a folding as the folded string only
     */
-  def literals(run: Seq[(Node, IRCharFlags)]): Seq[IRNode] =
-    try resolveLiterals(run)
+  def literals(run: Seq[(Node, IRCharFlags)], inLookBehind: Boolean = false): Seq[IRNode] =
+    try resolveLiterals(run, inLookBehind)
     catch
       case _: NotModeledException =>
         run.map((node, _) => IRNode(IRNodeData.Unsupported(node.data), node.loc))
 
-  private def resolveLiterals(run: Seq[(Node, IRCharFlags)]): Seq[IRNode] =
+  private def resolveLiterals(run: Seq[(Node, IRCharFlags)], inLookBehind: Boolean): Seq[IRNode] =
     val lits = mutable.ArrayBuffer.empty[Lit]
     for (node, flags) <- run do
       node.data match
@@ -141,7 +144,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       if foldsMultiChar(units(i)) then
         var j = i
         while j < units.length && foldsMultiChar(units(j)) && units(j).flags == units(i).flags do j += 1
-        out ++= foldRun(units.slice(i, j))
+        out ++= foldRun(units.slice(i, j), inLookBehind)
         i = j
       else
         out += closed(units(i))
@@ -165,13 +168,17 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     * the folding of a character (e.g. `ss`) also match the character; both are alternations, longest first. The rest
     * (classes, escapes, Turkic `İ`, and folds across groups or quantifiers) is not reproduced.
     */
-  private def foldRun(units: Seq[Lit]): Seq[IRNode] =
+  private def foldRun(units: Seq[Lit], inLookBehind: Boolean): Seq[IRNode] =
     val eq = equivalence(units.head.flags)
     val native = perlNative(units.head.flags)
     // Perl's `aa` forbids a non-ASCII character to match a folding with ASCII characters (e.g. `ß` and `ss`).
     val restrict = units.head.flags.caselessRestrict
     val folded = mutable.ArrayBuffer.empty[(Int, Int)]
     for (u, i) <- units.zipWithIndex; c <- FullCaseFolding(u.value).iterator do folded += ((c, i))
+    def char(i: Int, loc: SourceLocation): IRNode =
+      IRNode(IRNodeData.Chars(eq.closure(CharSet.single(folded(i)._1))), loc)
+    // Onigmo matches a look-behind by its folded length, so a folding there matches only the folded string.
+    if inLookBehind && dialect == Dialect.Ruby then return folded.indices.map(i => char(i, units(folded(i)._2).loc))
     val occurrences = for
       i <- folded.indices
       (key, set) <- multiFoldings
@@ -183,8 +190,6 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     yield (i, key.length, if native then set.diff(IRCharClasses.Latin1) else set)
     if occurrences.isEmpty || occurrences.size > MaxMultiFoldings then units.map(closed)
     else
-      def char(i: Int, loc: SourceLocation): IRNode =
-        IRNode(IRNodeData.Chars(eq.closure(CharSet.single(folded(i)._1))), loc)
       val cuts = (0 to folded.length).filter(p => !occurrences.exists((s, len, _) => s < p && p < s + len))
       val out = Seq.newBuilder[IRNode]
       for Seq(from, until) <- cuts.sliding(2) do

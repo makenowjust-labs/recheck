@@ -42,7 +42,7 @@ private[ir] final case class ReferenceSite(
   * @param inBranchReset
   *   the indices of the groups in a branch reset
   * @param charFlags
-  *   the flags at each character-level node of a Perl pattern, whose look-behind width depends on them
+  *   the flags at each character-level node of a Perl or Ruby pattern, whose look-behind width depends on them
   */
 private[ir] final class CaptureTable(
     indices: Map[NodeKey, Int],
@@ -99,7 +99,7 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
 
   private val charFlags = mutable.Map.empty[NodeKey, IRCharFlags]
 
-  private val recordsCharFlags = initial.dialect == Dialect.Perl
+  private val recordsCharFlags = initial.dialect == Dialect.Perl || initial.dialect == Dialect.Ruby
 
   private var branchResetDepth: Int = 0
 

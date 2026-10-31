@@ -224,6 +224,10 @@ class IRCharSuite extends munit.FunSuite:
   // Perl's `/d` rules fold no Latin-1 character in a native string, unless the pattern is in Unicode rules.
   check("ss", "iu", Perl)(sharpS)
   check("ff", "i", Ruby)(Disjunction(Sequence(Chars(of("fF")), Chars(of("fF"))), Chars(of("\ufb00"))))
+  // Ruby matches the folding in a look-behind as the folded string only (e.g. `(?<=ß)` matches `ss`, but not `ß`).
+  check("(?<=ß)", "i", Ruby)(LookBehind(false, Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f")))))
+  check("(?<=ss)", "i", Ruby)(LookBehind(false, Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f")))))
+  check("(?<=ß)", "i", Perl)(LookBehind(false, sharpS))
   // Folds with classes and escapes are intentionally not reproduced.
   chars("[ß]", "i", Ruby, Perl)(sharpSs)
   check("\\x73s", "i", Ruby)(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))

@@ -211,7 +211,10 @@ private[ir] final class LookBehindChecker(
     case NodeData.Caret | NodeData.Dollar                                     => RubyWidth.Fixed(0)
     case NodeData.Backslash(_: BackslashKind.Assert)                          => RubyWidth.Fixed(0)
     case NodeData.Backslash(_: BackslashKind.EscapeCall)                      => RubyWidth.Unknown
-    case _                                                                    => RubyWidth.Fixed(1)
+    case NodeData.Literal(_) | NodeData.Class(_, _) | NodeData.Backslash(_: BackslashKind.BackslashValue) =>
+      val w = charWidth(node)
+      if w.min == w.max then RubyWidth.Fixed(w.min) else RubyWidth.Variable
+    case _ => RubyWidth.Fixed(1)
 
   /** Studies a node chain as `java.util.regex.Pattern`'s `TreeInfo`, where an alternation studies its continuation from
     * scratch, and the lengths overflow as `int`.
