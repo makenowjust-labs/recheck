@@ -79,8 +79,10 @@ The following constructs are not supported.
 - Perl has caches of the super-linear matching that `recheck` does not model, so an attack that `recheck` reports may not work on Perl, and the recall validation checks whether it does.
 - Under `i`, Perl matches a character against its folding to several characters (e.g. `ß` against `ss`).
   Whether several nodes together match such a character depends on how Perl joins the nodes into a string on compiling, and `recheck` does not reproduce it.
-  A class of one character or of a character and its case variants, a non-capturing group and an escape join (e.g. `s[s]`, `[sS]s`, `(?:s)s` and `\x73s` match `ß`), and so does an escape alone (e.g. `\xDF` matches `ss`).
+  A non-capturing group and a class of one character or of a character and its case variants join (e.g. `(?:s)s`, `s[s]` and `[sS]s` match `ß`).
   A quantifier and a capturing group do not join (e.g. `s{2}`, `[s]{2}`, `s?s` and `(s)s` do not match `ß`).
+- Under `i`, Perl also matches a run of literals against a string with the same folding whose characters split it differently, and `recheck` does not reproduce it.
+  For example, `ßs` matches `"sß"`, since both fold to `sss`, and `ﬀi` matches `"fﬁ"` and `ﬃ` matches `"ﬀi"`, since all of them fold to `ffi`.
 - Perl backs off one character at a time from `\R` under a simple quantifier, which can split `\r\n` (e.g. `^\R?\n$` matches `"\r\n"` in Perl, but not in PCRE or Ruby), and `recheck` does not reproduce it.
 - Perl skips the attempts that cannot match by its start-of-match optimizations, and `recheck` does not model them.
 
