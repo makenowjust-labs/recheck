@@ -52,6 +52,24 @@ Each `pump` consists of `prefix`, `repeating` substrings, and the individual rep
 Noting that the attack string is computed in theoretical, because of the real matching implementation’s optimization, it may not invoke the matching time explosion.
 To prevent this case, you should use the recall validation.
 
+## Recall Validation
+
+`vulnerable` status diagnostics has the `recallValidation` field.
+The recall validation runs the attack string on the real regex engine of the dialect, and this field records the run.
+It is `null` if the recall validation is not run: [`recallTimeout`](parameters.md#recalltimeout) is not positive (the default), or commands cannot run (e.g. in the browser).
+
+- `runtime` is the runtime name and version (e.g. `node v26.11.1`).
+- `timeout` is the timeout of the matching in milliseconds (`null` if it is infinite).
+- `result` is the result of the matching. Its `kind` is one of the following.
+  - `finish` means the matching finished in `time` milliseconds, so the attack is not effective there.
+  - `timeout` means the matching did not finish in time.
+  - `engine-error` means the engine gave up with a resource error (e.g. PHP's backtrack limit or Java's `StackOverflowError`), which also shows that the attack is effective. It has `message`.
+- `succeeded` is whether the attack is effective on the engine (`timeout` or `engine-error`).
+
+When the recall validation fails, the check does not report the diagnostics, and it goes on to look for another attack string.
+If no attack succeeds, the result is `safe`.
+In Scala, `ReDoS.checkAll` returns the failed diagnostics too, followed by the reported one.
+
 ## Hotspot
 
 `hotspot` is another interesting field in `vulnerable` status diagnostics.
