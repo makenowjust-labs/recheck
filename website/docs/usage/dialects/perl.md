@@ -84,9 +84,14 @@ The following constructs are not supported.
 
 - Perl's caches of the super-linear matching make some vulnerable patterns fast, and `recheck` does not model them.
   Perl 5.44 finishes `^(a|a)*$` against `'a'.repeat(n) + '!'` in less than 1 ms even for `n = 28`.
-- Case-insensitive matching uses the simple case folding.
-  Perl also matches a character against several characters (e.g. `ß` against `ss`), but `recheck` handles it only for a run of plain literals.
-  It does not handle a character class, a group or a quantifier taking part in such a match (e.g. `[s]s`).
+- Case-insensitive matching uses the simple case folding, and Perl also matches a character against its folding to several characters (e.g. `ß` against `ss`).
+  `recheck` handles it for a run of plain literals (e.g. `ß` matches `ss`, and `ss` matches `ß`) and for a character class.
+  A class matches a character, an escape or a range of one character folded to several characters only as its folding, which it tries first, the longest first, and then the other characters (e.g. `[ßx]` is `ss|[x]`, and `[ßẞ]` is `ss|ss`, so `[ßẞ]*` is ambiguous).
+  It does not fold a character of a range, a POSIX class or a property so (e.g. `[\xC0-\xFF]` does not match `ss`), nor does a negated class (e.g. `[^x]` does not match `ss`).
+  Perl does not fold a character so under `/d` against a native string, under `l` for a Latin-1 character or a folding with ASCII characters, or under `aa` for a folding with ASCII characters (e.g. `(?aa)[ßx]` does not match `ss`).
+- Whether several nodes together match a character folded to several characters depends on how Perl joins the nodes into a string on compiling, and `recheck` does not reproduce it.
+  A class of one character or of a character and its case variants, a non-capturing group and an escape join (e.g. `s[s]`, `[sS]s`, `(?:s)s` and `\x73s` match `ß`), and so does an escape alone (e.g. `\xDF` matches `ss`).
+  A quantifier and a capturing group do not join (e.g. `s{2}`, `[s]{2}`, `s?s` and `(s)s` do not match `ß`).
 - A look-behind matches forward from a start before the position, and the match must end at the position (or at `(*ACCEPT)`).
   Perl tries the starts from the farthest (e.g. `(?<=(a)|(aa))b` sets the group `2` on `aab` in Perl, but the group `1` in PCRE and Ruby).
 - A back-reference sees the captures as Perl keeps them over the iterations of a loop: Perl unsets the captures of a failed alternative and of a fixed-length repetition matching nothing (e.g. `^(?:(a)?b){2}\1$` does not match `abba` in Perl).
