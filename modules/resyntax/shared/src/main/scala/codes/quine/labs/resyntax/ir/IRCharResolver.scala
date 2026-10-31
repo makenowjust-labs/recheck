@@ -45,6 +45,15 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   /** Returns the word characters of `\b` and `\B` at the flags. */
   def wordSet(flags: IRCharFlags): CharSet = classes.boundaryWord(flags).restrict(mode)
 
+  /** Returns the marks that `\b` and `\B` take as word characters after a base at the flags, if any.
+    *
+    * Java's `\b` with `U` has the non-spacing marks in its word set already.
+    */
+  def wordMarks(flags: IRCharFlags): Option[IRWordMarks] =
+    Option.when(dialect == Dialect.Java && !flags.unicodeClass):
+      val marks = classes.javaWordMarks
+      IRWordMarks(marks.marks.restrict(mode), marks.extenders.restrict(mode), marks.bases.restrict(mode))
+
   /** Checks whether the node is a literal character, which [[literals]] resolves with its neighbors. */
   def isLiteral(node: Node): Boolean = node.data match
     case NodeData.Literal(_)                                 => true

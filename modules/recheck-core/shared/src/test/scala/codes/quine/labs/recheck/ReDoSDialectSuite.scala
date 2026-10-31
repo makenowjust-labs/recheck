@@ -41,6 +41,9 @@ class ReDoSDialectSuite extends munit.FunSuite:
     assertVulnerable(check("^(?:a|a)*$\\n", Python), AttackComplexity.Exponential(false), Checker.Automaton)
     assertVulnerable(check("(?m)^(?:a|a)*(?d:$)", Java), AttackComplexity.Exponential(false), Checker.Automaton)
     assertVulnerable(check("\\b(?:a|a)*(?a:\\b)", Python), AttackComplexity.Exponential(false), Checker.Automaton)
+    // Java's `\B` holds between `a` and a non-spacing mark, which is a word character after a letter.
+    assertVulnerable(check("^a(?:\u0301|\\B\u0301)*$", Java), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertEquals(check("^a(?:\u0301|\\b\u0301)*$", Java).getClass, classOf[Diagnostics.Safe])
     // PCRE without `u` reads bytes; PCRE2 10.49 without JIT doubles its time for each `é`.
     assertVulnerable(check("^(?:é|é)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
     assertVulnerable(check("^(?:é|é)*$", PCRE, "u"), AttackComplexity.Exponential(false), Checker.Automaton)

@@ -477,11 +477,25 @@ private[ir] class IRBuilder(
     IRNodeData.BackReference(indices, charFlags)
 
   def buildAssert(node: Node, kind: AssertKind): IRNodeData = kind match
-    case AssertKind.Boundary(None)    => IRNodeData.Assert(IRAssertKind.WordBoundary(chars.wordSet(charFlags)))
-    case AssertKind.NonBoundary(None) => IRNodeData.Assert(IRAssertKind.NotWordBoundary(chars.wordSet(charFlags)))
-    case AssertKind.Begin             => IRNodeData.Assert(IRAssertKind.TextBegin)
-    case AssertKind.LowerEnd          => IRNodeData.Assert(IRAssertKind.TextEnd)
-    case AssertKind.UpperEnd          =>
+    case AssertKind.Boundary(None) =>
+      val word = chars.wordSet(charFlags)
+      IRNodeData.Assert(
+        chars
+          .wordMarks(charFlags)
+          .fold(IRAssertKind.WordBoundary(word)):
+            IRAssertKind.MarkWordBoundary(word, _)
+      )
+    case AssertKind.NonBoundary(None) =>
+      val word = chars.wordSet(charFlags)
+      IRNodeData.Assert(
+        chars
+          .wordMarks(charFlags)
+          .fold(IRAssertKind.NotWordBoundary(word)):
+            IRAssertKind.NotMarkWordBoundary(word, _)
+      )
+    case AssertKind.Begin    => IRNodeData.Assert(IRAssertKind.TextBegin)
+    case AssertKind.LowerEnd => IRNodeData.Assert(IRAssertKind.TextEnd)
+    case AssertKind.UpperEnd =>
       if featureSet.upperEndIsTextEnd then IRNodeData.Assert(IRAssertKind.TextEnd)
       else IRNodeData.Assert(IRAssertKind.ChompTextEnd(context.lineTerminators))
     // `\G` is the start of the search, and the checkers search from the start of the input.

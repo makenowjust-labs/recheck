@@ -22,11 +22,13 @@ import codes.quine.labs.recheck.vm.Interpreter.MatchState
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
+import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminators
+import codes.quine.labs.resyntax.ir.IRWordMarks
 
 /** Interpreter executes a program on a input. */
 object Interpreter:
@@ -488,6 +490,10 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
             frame.previousChar.exists(word.contains) != frame.currentChar.exists(word.contains)
           case AssertKind.WordBoundaryNot(word) =>
             frame.previousChar.exists(word.contains) == frame.currentChar.exists(word.contains)
+          case AssertKind.MarkWordBoundary(word, marks) =>
+            isMarkWordBefore(frame, word, marks) != isMarkWordAt(frame, word, marks)
+          case AssertKind.MarkWordBoundaryNot(word, marks) =>
+            isMarkWordBefore(frame, word, marks) == isMarkWordAt(frame, word, marks)
           case AssertKind.LineBegin(terminators, atEnd) =>
             if frame.pos == input.length then
               atEnd match
@@ -543,6 +549,23 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           else if restore.exists((from, to) => from <= index && index <= to) then frame.captures(i)
           else captures(i)
         true
+
+  /** Tests whether the text before the position ends with a base and then any extenders of the marks. */
+  private def hasBase(pos: Int, marks: IRWordMarks): Boolean =
+    var p = pos
+    var c = input.getBefore(p, program.meta.unicode)
+    while c.exists(marks.extenders.contains) do
+      p -= (if c.get >= 0x10000 then 2 else 1)
+      c = input.getBefore(p, program.meta.unicode)
+    c.exists(marks.bases.contains)
+
+  /** Tests whether the character before the position is a word character, or an extender of the marks after a base. */
+  private def isMarkWordBefore(frame: Frame, word: CharSet, marks: IRWordMarks): Boolean =
+    frame.previousChar.exists(c => word.contains(c) || marks.extenders.contains(c) && hasBase(frame.pos, marks))
+
+  /** Tests whether the character at the position is a word character, or a mark after a base. */
+  private def isMarkWordAt(frame: Frame, word: CharSet, marks: IRWordMarks): Boolean =
+    frame.currentChar.exists(c => word.contains(c) || marks.marks.contains(c) && hasBase(frame.pos, marks))
 
   /** Tests whether the position is after a line terminator. */
   private def afterTerminator(pos: Int, terminators: IRLineTerminators): Boolean =

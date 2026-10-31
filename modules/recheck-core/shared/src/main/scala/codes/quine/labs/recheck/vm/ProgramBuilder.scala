@@ -348,14 +348,16 @@ private[vm] class ProgramBuilder(
 
   /** Returns the assertion kind. */
   def assertKind(kind: IRAssertKind): AssertKind = kind match
-    case IRAssertKind.WordBoundary(word)    => AssertKind.WordBoundary(word)
-    case IRAssertKind.NotWordBoundary(word) => AssertKind.WordBoundaryNot(word)
-    case IRAssertKind.LineBegin(t, atEnd)   => AssertKind.LineBegin(t, atEnd)
-    case IRAssertKind.LineEnd(t)            => AssertKind.LineEnd(t)
-    case IRAssertKind.TextBegin             => AssertKind.InputBegin
-    case IRAssertKind.TextEnd               => AssertKind.InputEnd
-    case IRAssertKind.ChompTextEnd(t)       => AssertKind.ChompInputEnd(t)
-    case IRAssertKind.NotBetweenCRLF        => AssertKind.NotBetweenCRLF
+    case IRAssertKind.WordBoundary(word)               => AssertKind.WordBoundary(word)
+    case IRAssertKind.NotWordBoundary(word)            => AssertKind.WordBoundaryNot(word)
+    case IRAssertKind.MarkWordBoundary(word, marks)    => AssertKind.MarkWordBoundary(word, marks)
+    case IRAssertKind.NotMarkWordBoundary(word, marks) => AssertKind.MarkWordBoundaryNot(word, marks)
+    case IRAssertKind.LineBegin(t, atEnd)              => AssertKind.LineBegin(t, atEnd)
+    case IRAssertKind.LineEnd(t)                       => AssertKind.LineEnd(t)
+    case IRAssertKind.TextBegin                        => AssertKind.InputBegin
+    case IRAssertKind.TextEnd                          => AssertKind.InputEnd
+    case IRAssertKind.ChompTextEnd(t)                  => AssertKind.ChompInputEnd(t)
+    case IRAssertKind.NotBetweenCRLF                   => AssertKind.NotBetweenCRLF
 
   /** A builder for a disjunction node.
     *
