@@ -6,7 +6,6 @@ export type { Defaults, Parameters };
 /** Target is a consumer of the parameters that may leave some of them out by `x-exclude`. */
 export type Target = keyof Excluded;
 
-/** ParametersFor is the parameters that the target exposes. */
 export type ParametersFor<T extends Target> = Omit<Parameters, Excluded[T]>;
 
 /** Variant is an alternative of `oneOf` of a parameter: an enum of names, or an object of a name and its settings. */
@@ -27,7 +26,6 @@ export type Setting = {
   default?: unknown;
 };
 
-/** Property is a parameter of the schema, with the annotations described in the schema. */
 export type Property = {
   title: string;
   description: string;
@@ -47,7 +45,6 @@ export type Property = {
   "x-since"?: string;
 };
 
-/** Schema is the JSON Schema of the parameters. */
 export type Schema = {
   $schema: string;
   $id: string;
@@ -64,7 +61,7 @@ export declare const schema: Schema;
 /** The default value of each parameter, which is `null` if the schema has none. */
 export declare const defaults: Defaults;
 
-/** Returns the parameters that the target exposes, in the schema order. */
+/** The entries are in the schema order. */
 export declare const propertiesFor: <T extends Target>(
   target: T,
 ) => [keyof ParametersFor<T> & string, Property][];

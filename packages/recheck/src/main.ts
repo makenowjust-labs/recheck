@@ -25,13 +25,11 @@ export const __mock__: Mock = {
   syncFn: null,
 };
 
-/** Backend is what runs a check. */
 type Backend =
   | { type: "agent"; agent: Agent }
   | { type: "pool"; pool: WorkerPool }
   | { type: "pure" };
 
-/** Throws a `TypeError` if `source` or `flags` is not a string. */
 const validate = (source: unknown, flags: unknown): void => {
   /* c8 ignore start */
   if (typeof source !== "string") {
@@ -145,7 +143,6 @@ export async function checkAll(
   }
 }
 
-/** A synchronous function running a checking method of `RECHECK_BACKEND` in a worker. */
 type SyncFn = (
   method: "check" | "checkAll",
   source: string,
@@ -153,7 +150,6 @@ type SyncFn = (
   params: Parameters,
 ) => any;
 
-/** Returns the synchronous function of `RECHECK_SYNC_BACKEND`. */
 const syncFn = (): SyncFn => {
   const backend = env.RECHECK_SYNC_BACKEND();
   switch (backend) {
