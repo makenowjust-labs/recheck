@@ -14,15 +14,16 @@ import codes.quine.labs.resyntax.ir.LookBehindChecker.*
 
 /** LookBehindChecker checks the dialect's restriction on a look-behind body.
   *
-  * @param literalWidth
-  *   the width of a literal in the engine's units, which differs from one for Perl's multi-character case folding (e.g.
-  *   `ß` up to two)
+  * @param charWidth
+  *   the width of a literal, an escape or a class in the engine's units, which differs from one for Perl's and Ruby's
+  *   multi-character case folding (e.g. `ß` up to two); Ruby's bytes of a character by escapes (e.g. `\xC3\xA9`) come
+  *   together
   */
 private[ir] final class LookBehindChecker(
     table: CaptureTable,
     resolver: ReferenceResolver,
     featureSet: IRFeatureSet,
-    literalWidth: Int => Width = _ => Width(1, 1)
+    charWidth: Seq[Node] => Width = nodes => Width(nodes.size, nodes.size)
 ):
 
   /** Checks the body of a look-behind, and throws an exception at the look-behind node if it is invalid. */
@@ -100,18 +101,19 @@ private[ir] final class LookBehindChecker(
         case CommandKind.NamedCall(name)  => callWidth(node, Reference.NamedReference(name), visiting)
         case CommandKind.PNamedCall(name) => callWidth(node, Reference.NamedReference(name), visiting)
         case _                            => None
-    case NodeData.Caret | NodeData.Dollar    => Some(Width(0, 0))
-    case NodeData.Literal(value)             => Some(literalWidth(value))
-    case NodeData.Dot | NodeData.Class(_, _) => Some(Width(1, 1))
-    case NodeData.Backslash(kind)            =>
+    case NodeData.Caret | NodeData.Dollar           => Some(Width(0, 0))
+    case NodeData.Literal(_) | NodeData.Class(_, _) => Some(charWidth(Seq(node)))
+    case NodeData.Dot                               => Some(Width(1, 1))
+    case NodeData.Backslash(kind)                   =>
       kind match
-        case BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline)      => Some(Width(1, 2))
-        case BackslashKind.EscapeClass(EscapeClassKind.GraphemeCluster)     => Some(Width(1, Inf))
-        case _: BackslashKind.BackslashValue | _: BackslashKind.EscapeClass => Some(Width(1, 1))
-        case BackslashKind.EscapeBackReference(_, ref)                      => backReferenceWidth(node, ref, visiting)
-        case BackslashKind.EscapeCall(_, Reference.IndexedReference(0))     => Some(Width(0, Inf))
-        case BackslashKind.EscapeCall(_, ref)                               => callWidth(node, ref, visiting)
-        case _: BackslashKind.Assert | _: BackslashKind.CaseCommand         => Some(Width(0, 0))
+        case BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline)  => Some(Width(1, 2))
+        case BackslashKind.EscapeClass(EscapeClassKind.GraphemeCluster) => Some(Width(1, Inf))
+        case _: BackslashKind.BackslashValue                            => Some(charWidth(Seq(node)))
+        case _: BackslashKind.EscapeClass                               => Some(Width(1, 1))
+        case BackslashKind.EscapeBackReference(_, ref)                  => backReferenceWidth(node, ref, visiting)
+        case BackslashKind.EscapeCall(_, Reference.IndexedReference(0)) => Some(Width(0, Inf))
+        case BackslashKind.EscapeCall(_, ref)                           => callWidth(node, ref, visiting)
+        case _: BackslashKind.Assert | _: BackslashKind.CaseCommand     => Some(Width(0, 0))
 
   private def widthOfAlternatives(nodes: Seq[Node], visiting: Set[Int]): Option[Width] =
     val widths = nodes.map(width(_, visiting))
@@ -186,7 +188,7 @@ private[ir] final class LookBehindChecker(
       else if widths.distinct.size == 1 then widths.head
       else RubyWidth.Variable
     case NodeData.Sequence(nodes) =>
-      nodes.map(rubyWidth).foldLeft[RubyWidth](RubyWidth.Fixed(0)) {
+      rubyChars(nodes).foldLeft[RubyWidth](RubyWidth.Fixed(0)) {
         case (RubyWidth.Fixed(l), RubyWidth.Fixed(r))          => RubyWidth.Fixed(l + r)
         case (RubyWidth.Variable, _) | (_, RubyWidth.Variable) => RubyWidth.Variable
         case _                                                 => RubyWidth.Unknown
@@ -210,7 +212,32 @@ private[ir] final class LookBehindChecker(
     case NodeData.Caret | NodeData.Dollar                                     => RubyWidth.Fixed(0)
     case NodeData.Backslash(_: BackslashKind.Assert)                          => RubyWidth.Fixed(0)
     case NodeData.Backslash(_: BackslashKind.EscapeCall)                      => RubyWidth.Unknown
-    case _                                                                    => RubyWidth.Fixed(1)
+    case NodeData.Literal(_) | NodeData.Class(_, _) | NodeData.Backslash(_: BackslashKind.BackslashValue) =>
+      rubyCharWidth(Seq(node))
+    case _ => RubyWidth.Fixed(1)
+
+  private def rubyCharWidth(nodes: Seq[Node]): RubyWidth =
+    val w = charWidth(nodes)
+    if w.min == w.max then RubyWidth.Fixed(w.min) else RubyWidth.Variable
+
+  /** Returns the widths of the nodes, where the escapes of the bytes of a character are together (e.g. `\xC3\xA9`). */
+  private def rubyChars(nodes: Seq[Node]): Seq[RubyWidth] =
+    def byte(node: Node): Option[Int] = node.data match
+      case NodeData.Backslash(BackslashKind.Escape(style, value)) if IRCharResolver.isRubyByteStyle(style) =>
+        Option.when(0x80 <= value && value <= 0xff)(value)
+      case _ => None
+    val out = Seq.newBuilder[RubyWidth]
+    var i = 0
+    while i < nodes.length do
+      val n = byte(nodes(i)).map(IRCharResolver.utf8Length).filter(_ >= 2).getOrElse(1)
+      if n >= 2 && i + n <= nodes.length && nodes.slice(i + 1, i + n).forall(byte(_).exists(b => (b & 0xc0) == 0x80))
+      then
+        out += rubyCharWidth(nodes.slice(i, i + n))
+        i += n
+      else
+        out += rubyWidth(nodes(i))
+        i += 1
+    out.result()
 
   /** Studies a node chain as `java.util.regex.Pattern`'s `TreeInfo`, where an alternation studies its continuation from
     * scratch, and the lengths overflow as `int`.

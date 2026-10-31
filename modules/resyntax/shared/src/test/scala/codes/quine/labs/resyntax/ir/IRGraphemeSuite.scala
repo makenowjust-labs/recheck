@@ -21,9 +21,12 @@ class IRGraphemeSuite extends munit.FunSuite:
       if pos < input.length && set.contains(input(pos)) then LazyList(pos + 1) else LazyList()
     case IRNodeData.Sequence(nodes) =>
       nodes.foldLeft(LazyList(pos))((ps, n) => ps.flatMap(ends(n, input, _)))
-    case IRNodeData.Disjunction(nodes) => nodes.to(LazyList).flatMap(ends(_, input, pos))
-    case IRNodeData.Atomic(node)       => ends(node, input, pos).take(1)
-    case IRNodeData.Repeat(node, q)    =>
+    case IRNodeData.Disjunction(nodes)         => nodes.to(LazyList).flatMap(ends(_, input, pos))
+    case IRNodeData.Atomic(node)               => ends(node, input, pos).take(1)
+    case IRNodeData.LookBehind(negative, node) =>
+      val matches = (0 to pos).exists(start => ends(node, input, start).contains(pos))
+      if matches != negative then LazyList(pos) else LazyList()
+    case IRNodeData.Repeat(node, q) =>
       val (min, max, greedy) = q match
         case IRQuantifier.Exact(n)             => (n, n, true)
         case IRQuantifier.Bounded(min, max, s) => (min, max, s == BacktrackStrategy.Greedy)
@@ -35,13 +38,14 @@ class IRGraphemeSuite extends munit.FunSuite:
       loop(pos, 0)
     case data => fail(s"Unexpected: $data")
 
-  /** Returns the length of the first `\X` from the start of the code points. */
-  def cluster(input: Seq[Int], dialect: Dialect = Perl, flags: String = ""): Option[Int] =
-    ends(build("\\X", flags, dialect).node, input.toIndexedSeq, 0).headOption
+  /** Returns the length of the first `\X` from the position of the code points. */
+  def cluster(input: Seq[Int], dialect: Dialect = Perl, flags: String = "", pos: Int = 0): Option[Int] =
+    ends(build("\\X", flags, dialect).node, input.toIndexedSeq, pos).headOption.map(_ - pos)
 
   def cp(s: String): Seq[Int] = UString.fromString(s).iterator.toSeq
 
-  // The first cluster's length in the engines (Java 25, PCRE2 10.49, Perl 5.44, Ruby 4.0), where they agree.
+  // The first cluster's length in the engines (Java 25, PCRE2 10.49, Perl 5.44, Ruby 4.0), where they agree except
+  // PCRE2 on the conjuncts (see `PCREProbes`).
   val Probes: Seq[(String, String, Int)] = Seq(
     ("CRLF", "\r\ń", 2),
     ("LF and a mark", "\ń", 1),
@@ -96,10 +100,36 @@ class IRGraphemeSuite extends munit.FunSuite:
       assertEquals(cluster(cp(input)), Some(expected))
 
   test("IRBuilder.build: \\X is atomic"):
-    for dialect <- Seq(Java, Perl, Ruby) do
-      val node = build("\\X", "", dialect).node
+    for (dialect, flags) <- Seq((Java, ""), (Perl, ""), (Ruby, ""), (PCRE, "u")) do
+      val node = build("\\X", flags, dialect).node
       assert(node.data.isInstanceOf[IRNodeData.Atomic], node)
-      assertEquals(build("\\X", "u", PCRE).node, node)
+    assertEquals(build("\\X", "", Java).node, build("\\X", "", Perl).node)
+
+  // PCRE2 10.49 has its own rules (`pcre2_extuni.c`), checked with PHP 8.5.
+  val PCREProbes: Seq[(String, String, Int, Int)] = Seq(
+    ("a conjunct", "क्षx", 0, 2),
+    ("a conjunct with ZWJ", "क्‍षx", 0, 3),
+    ("a conjunct with a nukta", "क़्षx", 0, 3),
+    ("a conjunct with two viramas", "क््षx", 0, 3),
+    ("a Bengali conjunct", "ক্ষx", 0, 2),
+    ("a regional indicator and a mark", "🇯́", 0, 1),
+    ("a regional indicator and ZWJ", "🇯‍", 0, 1),
+    ("a regional indicator and a spacing mark", "🇯ः", 0, 1),
+    ("prepend and an extended pictographic", "؀😀", 0, 1),
+    ("prepend and regional indicators", "؀🇯🇵🇺", 0, 3),
+    ("a regional indicator after one", "🇯🇵🇺", 1, 1),
+    ("a regional indicator after two", "🇯🇵🇺🇸", 2, 2),
+    ("a regional indicator after three", "🇯🇵🇺🇸🇯", 3, 1),
+    ("a regional indicator after a mark", "á🇯🇵", 2, 2)
+  )
+
+  for (name, input, expected) <- Probes if !PCREProbes.exists(_._1 == name) do
+    test(s"IRBuilder.build: PCRE's \\X matches $name"):
+      assertEquals(cluster(cp(input), PCRE, "u"), Some(expected))
+
+  for (name, input, pos, expected) <- PCREProbes do
+    test(s"IRBuilder.build: PCRE's \\X matches $name"):
+      assertEquals(cluster(cp(input), PCRE, "u", pos), Some(expected))
 
   test("IRBuilder.build: \\X in byte mode reads Latin-1 bytes"):
     for (dialect, flags) <- Seq((PCRE, ""), (Ruby, "n")) do

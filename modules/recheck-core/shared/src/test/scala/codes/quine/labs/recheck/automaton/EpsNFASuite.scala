@@ -71,6 +71,25 @@ class EpsNFASuite extends munit.FunSuite:
     assert(AssertKind.WordBoundaryOf(1).accepts(CharKind(words = 2), Word))
     assert(!AssertKind.WordBoundaryOf(1).accepts(Word, Normal))
     assert(AssertKind.WordBoundaryNotOf(1).accepts(Word, Normal))
+    // A mark is a word character after a base, and so is an extender before the position.
+    val markBoundary = AssertKind.MarkWordBoundaryOf(0, 0)
+    val base = CharKind(marks = 4, based = 1)
+    val mark = CharKind(marks = 3)
+    assert(!markBoundary.accepts(base.copy(words = 1), mark) && markBoundary.accepts(base, mark))
+    assert(markBoundary.accepts(Normal.copy(words = 1), mark))
+    assert(markBoundary.accepts(mark.copy(based = 1), Normal) && !markBoundary.accepts(mark, Normal))
+    assert(!markBoundary.accepts(Boundary, mark) && AssertKind.MarkWordBoundaryNotOf(0, 0).accepts(Boundary, mark))
+
+  test("EpsNFA.Guesses: the base before an extender"):
+    val guesses = Guesses(false, false, false, marks = 1)
+    val base = CharKind(marks = 4)
+    val extender = CharKind(marks = 3)
+    assertEquals(guesses.variants(base), Seq(base.copy(based = 1)))
+    assertEquals(guesses.variants(extender), Seq(extender, extender.copy(based = 1)))
+    assertEquals(guesses.variants(CharKind.Word), Seq(CharKind.Word))
+    assert(guesses.valid(base.copy(based = 1), extender.copy(based = 1)))
+    assert(!guesses.valid(base.copy(based = 1), extender))
+    assert(guesses.valid(CharKind.Boundary, extender) && !guesses.valid(CharKind.Boundary, extender.copy(based = 1)))
 
   test("EpsNFA.AssertKind#treatsBoundaryAsLineTerminator"):
     val kinds = CharKind.basic

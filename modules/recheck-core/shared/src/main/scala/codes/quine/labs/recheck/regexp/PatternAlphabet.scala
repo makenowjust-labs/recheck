@@ -6,6 +6,7 @@ import codes.quine.labs.recheck.regexp.PatternAlphabet.*
 import codes.quine.labs.resyntax.charset.Alphabet
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.ir.IRWordMarks
 
 /** PatternAlphabet is a set of pairs of a disjoint character set (an atom) and a character kind. */
 final case class PatternAlphabet(pairs: IndexedSeq[(CharSet, CharKind)]):
@@ -41,8 +42,8 @@ object PatternAlphabet:
   /** Builds the coarsest alphabet of all characters of the mode such that each set is a union of atoms.
     *
     * The kind of an atom tells which word sets (`word` first, then `moreWords`) and which line terminator sets
-    * (`lineTerminator` first, then `moreLineTerminators`) have it, and, with `crlf`, whether it is `\r` or `\n`, which
-    * are then atoms by themselves.
+    * (`lineTerminator` first, then `moreLineTerminators`) have it, which sets of `wordMarks` have it, and, with `crlf`,
+    * whether it is `\r` or `\n`, which are then atoms by themselves.
     *
     * An atom is narrowed to its characters in `preferred` if any, so that its first character, which stands for the
     * atom in generated strings, is a preferred one (e.g. a canonical character of JavaScript's ignore-case matching).
@@ -59,12 +60,14 @@ object PatternAlphabet:
       preferred: Option[CharSet] = None,
       crlf: Boolean = false,
       moreLineTerminators: Seq[CharSet] = Seq.empty,
-      moreWords: Seq[CharSet] = Seq.empty
+      moreWords: Seq[CharSet] = Seq.empty,
+      wordMarks: Seq[IRWordMarks] = Seq.empty
   ): PatternAlphabet =
     val crlfSets = if crlf then Seq(CharSet.single(0x0d), CharSet.single(0x0a)) else Seq.empty
     val terminators = lineTerminator.toSeq ++ moreLineTerminators
     val words = word.toSeq ++ moreWords
-    val all = ((mode.universe +: terminators) ++ words ++ (sets ++ crlfSets).distinct)
+    val markSets = wordMarks.flatMap(m => Seq(m.marks, m.extenders, m.bases))
+    val all = ((mode.universe +: terminators) ++ words ++ markSets ++ (sets ++ crlfSets).distinct)
       .map(_.restrict(mode))
       .filter(_.nonEmpty)
       .toIndexedSeq
@@ -86,6 +89,7 @@ object PatternAlphabet:
         val kind = CharKind(
           words = mask(word, moreWords, c.head),
           terminators = mask(lineTerminator, moreLineTerminators, c.head),
+          marks = markSets.zipWithIndex.collect { case (s, i) if s.contains(c.head) => 1 << i }.sum,
           cr = crlf && c.head == 0x0d,
           lf = crlf && c.head == 0x0a
         )
@@ -100,6 +104,9 @@ object PatternAlphabet:
     *   the bits of the word sets having the character
     * @param terminators
     *   the bits of the line terminator sets having the character
+    * @param marks
+    *   the bits of the sets of the word marks having the character, three for each (the marks, the extenders and the
+    *   bases)
     * @param cr
     *   whether it is `\r`, which is distinguished for `\r\n`
     * @param lf
@@ -112,16 +119,20 @@ object PatternAlphabet:
     *   whether `\r` precedes the `\n`
     * @param follow
     *   what follows the `\r`
+    * @param based
+    *   the bits of the word marks whose base the text up to the character has
     */
   final case class CharKind(
       words: Int = 0,
       terminators: Int = 0,
+      marks: Int = 0,
       cr: Boolean = false,
       lf: Boolean = false,
       boundary: Boolean = false,
       last: Option[Boolean] = None,
       afterCR: Option[Boolean] = None,
-      follow: Option[CRFollow] = None
+      follow: Option[CRFollow] = None,
+      based: Int = 0
   ):
 
     /** Checks whether it is a character of the first word set. */
@@ -135,6 +146,18 @@ object PatternAlphabet:
 
     /** Checks whether it is a character of the `i`-th line terminator set. */
     def isLineTerminatorOf(i: Int): Boolean = (terminators & (1 << i)) != 0
+
+    /** Checks whether it is a mark of the `i`-th word marks. */
+    def isMarkOf(i: Int): Boolean = (marks & (1 << (3 * i))) != 0
+
+    /** Checks whether it is an extender of the `i`-th word marks. */
+    def isExtenderOf(i: Int): Boolean = (marks & (1 << (3 * i + 1))) != 0
+
+    /** Checks whether it is a base of the `i`-th word marks. */
+    def isBaseOf(i: Int): Boolean = (marks & (1 << (3 * i + 2))) != 0
+
+    /** Checks whether the text up to the character has a base of the `i`-th word marks. */
+    def isBasedOf(i: Int): Boolean = (based & (1 << i)) != 0
 
     // The named kinds hash by their names, as the enum values did, which keeps the orders of the automaton's states.
     override def hashCode: Int = this match
@@ -150,12 +173,14 @@ object PatternAlphabet:
         val flags = Seq(
           Option.when(words != 0)(s"words=$words"),
           Option.when(terminators != 0)(s"terminators=$terminators"),
+          Option.when(marks != 0)(s"marks=$marks"),
           Option.when(cr)("cr"),
           Option.when(lf)("lf"),
           Option.when(boundary)("boundary"),
           last.map(l => s"last=$l"),
           afterCR.map(a => s"afterCR=$a"),
-          follow.map(f => s"follow=$f")
+          follow.map(f => s"follow=$f"),
+          Option.when(based != 0)(s"based=$based")
         ).flatten
         flags.mkString("CharKind(", ",", ")")
 

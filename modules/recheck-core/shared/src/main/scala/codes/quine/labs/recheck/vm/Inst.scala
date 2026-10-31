@@ -9,6 +9,7 @@ import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminators
+import codes.quine.labs.resyntax.ir.IRWordMarks
 
 /** Inst is an instruction. */
 sealed abstract class Inst:
@@ -249,6 +250,14 @@ object Inst:
     final case class WordBoundaryNot(word: CharSet) extends AssertKind:
       override def toString: String = "word_boundary_not"
 
+    /** `\b` assertion with the word characters and the marks after a base (Java's `\b` without `U`). */
+    final case class MarkWordBoundary(word: CharSet, marks: IRWordMarks) extends AssertKind:
+      override def toString: String = "mark_word_boundary"
+
+    /** `\B` assertion with the word characters and the marks after a base. */
+    final case class MarkWordBoundaryNot(word: CharSet, marks: IRWordMarks) extends AssertKind:
+      override def toString: String = "mark_word_boundary_not"
+
     /** `^` assertion with `m` flag.
       *
       * @param atEnd
@@ -272,6 +281,10 @@ object Inst:
     /** `$` assertion matching also before a line terminator at the end (e.g. Python's `$`). */
     final case class ChompInputEnd(terminators: IRLineTerminators) extends AssertKind:
       override def toString: String = "chomp_input_end"
+
+    /** An assertion that the position is not between `\r` and `\n` (e.g. after PCRE's `.` with `(*CRLF)`). */
+    case object NotBetweenCRLF extends AssertKind:
+      override def toString: String = "not_between_crlf"
 
   /** ReadKind is an operand of `read` instruction. */
   sealed abstract class ReadKind

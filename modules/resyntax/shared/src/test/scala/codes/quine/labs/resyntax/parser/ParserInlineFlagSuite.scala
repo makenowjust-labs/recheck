@@ -113,8 +113,10 @@ class ParserInlineFlagSuite extends ParserSuiteBase:
   check("(?i-i)", "", DotNet, Java, PCRE, Perl, Ruby):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), Some(FlagSet(ignoreCase = true)))))
   error("(?i-i:a)", "", JavaScript, Python)("Invalid flag at 4")
-  check("(?aa)", "", PCRE, Perl, Python, Ruby):
+  check("(?aa)", "", PCRE, Python, Ruby):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true), None)))
+  check("(?aa)", "", Perl):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ascii = true, asciiRestrict = true), None)))
   error("(?aaa)", "", Perl)("Duplicated flag at 4")
   error("(?uu)", "", Perl)("Duplicated flag at 3")
   check("(?au)", "", Ruby):
