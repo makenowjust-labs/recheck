@@ -23,6 +23,11 @@ class UStringUtilSuite extends munit.FunSuite:
     assertEquals(show(fromString("🍣")), "'🍣'")
     assertEquals(show(fromString("\u0000\u0001\u0008\t\u000b\u001b\u007f")), "'\\x00\\x01\\x08\\t\\v\\x1B\\x7F'")
 
+  test("UStringUtil.charWidth"):
+    assertEquals(charWidth('x'), 1)
+    assertEquals(charWidth(0xffff), 1)
+    assertEquals(charWidth(0x1f363), 2)
+
   test("UStringUtil#getAt"):
     val s1 = fromString("xyz")
     val s2 = fromString("x🍣z")

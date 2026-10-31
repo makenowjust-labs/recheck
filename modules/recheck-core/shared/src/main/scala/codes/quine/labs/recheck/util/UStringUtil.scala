@@ -29,6 +29,9 @@ object UStringUtil:
         case c                                          => EcmaScriptChars.showChar(c)
       .mkString("'", "", "'")
 
+  /** Returns the number of the code units of the character, which is two only for a surrogate pair. */
+  def charWidth(c: Int): Int = if c >= 0x10000 then 2 else 1
+
   extension (s: UString)
 
     /** Returns the character at the index. */
@@ -55,14 +58,14 @@ object UStringUtil:
 
     /** Replaces the character at the index. */
     def replaceAt(n: Int, c: Int, unicode: Boolean): UString =
-      val skip = s.getAt(n, unicode).map(c => if c >= 0x10000 then 2 else 1).getOrElse(0)
+      val skip = s.getAt(n, unicode).map(charWidth).getOrElse(0)
       s.slice(0, n) ++ fromCodePoints(Iterator(c)) ++ s.slice(n + skip, s.length)
 
     /** Iterates the characters. */
     def chars(unicode: Boolean): Iterator[Int] =
       if unicode then
         Iterator.unfold(0): i =>
-          s.getAt(i, unicode).map(c => (c, i + (if c >= 0x10000 then 2 else 1)))
+          s.getAt(i, unicode).map(c => (c, i + charWidth(c)))
       else s.iterator
 
   private def isHighSurrogate(c: Int): Boolean = 0xd800 <= c && c <= 0xdbff

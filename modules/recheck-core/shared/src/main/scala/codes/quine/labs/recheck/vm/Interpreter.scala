@@ -634,7 +634,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       var p = pos
       var k = 0
       while k < max && p > 0 do
-        p -= input.getBefore(p, program.meta.unicode).fold(1)(c => if c >= 0x10000 then 2 else 1)
+        p -= input.getBefore(p, program.meta.unicode).fold(1)(charWidth)
         k += 1
         if k >= min then builder.addOne(p)
       builder.result().reverse
@@ -678,7 +678,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     var p = pos
     var c = input.getBefore(p, program.meta.unicode)
     while c.exists(marks.extenders.contains) do
-      p -= (if c.get >= 0x10000 then 2 else 1)
+      p -= charWidth(c.get)
       c = input.getBefore(p, program.meta.unicode)
     c.exists(marks.bases.contains)
 
@@ -708,7 +708,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       input
         .getAt(pos, program.meta.unicode)
         .filter(terminators.chars.contains)
-        .map(c => pos + (if c >= 0x10000 then 2 else 1))
+        .map(c => pos + charWidth(c))
 
   /** Tests whether the position is between `\r` and `\n`, where no line assertion matches with `CRLF.Atomic`. */
   private def betweenCRLF(pos: Int, terminators: IRLineTerminators): Boolean =
@@ -746,7 +746,6 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       (count, Option.when(count == s.length)(s.length))
     else
       val unicode = program.meta.unicode
-      def width(c: Int): Int = if unicode && c >= 0x10000 then 2 else 1
       var i = 0
       var j = 0
       var continues = true
@@ -755,8 +754,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         val c2 = if back then input.getBefore(pos - j, unicode) else input.getAt(pos + j, unicode)
         (c1, c2) match
           case (Some(c1), Some(c2)) if c1 == c2 || equivalence.equiv(c1, c2) =>
-            i += width(c1)
-            j += width(c2)
+            i += charWidth(c1)
+            j += charWidth(c2)
           case _ => continues = false
       (i, Option.when(i == s.length)(j))
 
@@ -771,7 +770,6 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       full: IRBackReferenceFolding.Full
   ): (Int, Option[Int]) =
     val unicode = program.meta.unicode
-    def width(c: Int): Int = if unicode && c >= 0x10000 then 2 else 1
     def folded(c: Int): Seq[Int] = full.fold(c).map(_.iterator.toSeq).getOrElse(Seq(c))
     val target =
       val units = s.chars(unicode).flatMap(folded).toSeq
@@ -788,7 +786,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
             units.indices.forall(n => target(k + n) == units(n) || equivalence.equiv(target(k + n), units(n)))
           then
             k += units.length
-            j += width(c)
+            j += charWidth(c)
           else continues = false
         case None => continues = false
     (j, Option.when(k == target.length)(j))
@@ -828,7 +826,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if ok then
         if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        val width = c.map(c => if c >= 0x10000 then 2 else 1).getOrElse(0)
+        val width = c.map(charWidth).getOrElse(0)
         steps = Math.addExact(steps, width)
         frame.pos += width
         true
@@ -847,7 +845,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if ok then
         if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        val width = c.map(c => if c >= 0x10000 then 2 else 1).getOrElse(0)
+        val width = c.map(charWidth).getOrElse(0)
         steps = Math.addExact(steps, width)
         frame.pos -= width
         true
