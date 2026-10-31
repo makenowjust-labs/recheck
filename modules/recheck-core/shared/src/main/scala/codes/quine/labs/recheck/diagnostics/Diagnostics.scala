@@ -28,22 +28,32 @@ object Diagnostics:
           |Complexity: $complexity
           |Checker   : $checker""".stripMargin
 
-  /** Vulnerable is an analysis result against a vulnerable RegExp. */
+  /** Vulnerable is an analysis result against a vulnerable RegExp.
+    *
+    * @param recallValidation
+    *   the run of the attack string on the real regex engine, or `None` if it is not run
+    */
   final case class Vulnerable(
       source: String,
       flags: String,
       complexity: AttackComplexity.Vulnerable,
       attack: AttackPattern,
       hotspot: Hotspot,
-      checker: Checker
+      checker: Checker,
+      recallValidation: Option[RecallValidation] = None
   ) extends Diagnostics:
+
+    /** Whether this result is accepted, i.e. recall validation is not run or succeeded. */
+    def isAccepted: Boolean = recallValidation.forall(_.succeeded)
+
     override def toString: String =
+      val recall = recallValidation.map(r => s"\nRecall       : $r").getOrElse("")
       s"""|Input        : /$source/$flags
           |Status       : vulnerable
           |Complexity   : $complexity
           |Attack string: $attack
           |Hotspot      : /${hotspot.highlight(source)}/$flags
-          |Checker      : $checker""".stripMargin
+          |Checker      : $checker""".stripMargin + recall
 
   /** Unknown is an analysis result against a RegExp in which vulnerability is unknown for some reason. */
   final case class Unknown(

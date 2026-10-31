@@ -162,7 +162,7 @@ import scala.concurrent.duration.*
   *
   * The upper limit of matching time on the recall validation.
   *
-  * If this value is negative, then the recall validation is skipped.
+  * If this value is not positive, then the recall validation is skipped.
   *
   * (default: `Duration(-1, SECONDS)`)
   *

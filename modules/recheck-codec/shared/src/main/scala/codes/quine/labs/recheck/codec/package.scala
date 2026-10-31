@@ -2,6 +2,7 @@ package codes.quine.labs.recheck
 package codec
 
 import scala.concurrent.duration.Duration
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.duration.MILLISECONDS
 
 import io.circe.Decoder
@@ -22,6 +23,8 @@ import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labs.recheck.diagnostics.Hotspot
+import codes.quine.labs.recheck.diagnostics.RecallResult
+import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.resyntax.charset.UString
 
 /** Package `codec` provides recheck types `Decoder`/`Encoder` of circe. */
@@ -38,7 +41,7 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "checker" := checker,
         "complexity" := complexity.asInstanceOf[AttackComplexity]
       )
-    case Diagnostics.Vulnerable(source, flags, complexity, attack, hotspot, checker) =>
+    case Diagnostics.Vulnerable(source, flags, complexity, attack, hotspot, checker, recallValidation) =>
       Json.obj(
         "source" := source,
         "flags" := flags,
@@ -46,7 +49,8 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "checker" := checker,
         "complexity" := complexity.asInstanceOf[AttackComplexity],
         "attack" := attack,
-        "hotspot" := hotspot
+        "hotspot" := hotspot,
+        "recallValidation" := recallValidation
       )
     case Diagnostics.Unknown(source, flags, error, checker) =>
       Json.obj(
@@ -97,6 +101,26 @@ given encodeHotspot: Encoder[Hotspot] with
     val spots = h.spots.map:
       case Hotspot.Spot(s, e, t) => Json.obj("start" := s, "end" := e, "temperature" := t.toString)
     Json.arr(spots*)
+
+/** An `Encoder` for `RecallValidation`. */
+given encodeRecallValidation: Encoder[RecallValidation] with
+  def apply(r: RecallValidation): Json =
+    val timeout = r.timeout match
+      case d: FiniteDuration => d.toMillis.asJson
+      case _                 => Json.Null
+    Json.obj(
+      "runtime" := r.runtime,
+      "timeout" := timeout,
+      "result" := r.result,
+      "succeeded" := r.succeeded
+    )
+
+/** An `Encoder` for `RecallResult`. */
+given encodeRecallResult: Encoder[RecallResult] with
+  def apply(r: RecallResult): Json = r match
+    case RecallResult.Finish(time)         => Json.obj("kind" := "finish", "time" := time.toMillis)
+    case RecallResult.Timeout              => Json.obj("kind" := "timeout")
+    case RecallResult.EngineError(message) => Json.obj("kind" := "engine-error", "message" := message)
 
 /** An `Encoder` for `ErrorKind`. */
 given encodeErrorKind: Encoder[ErrorKind] with

@@ -7,57 +7,64 @@ import scala.concurrent.duration.FiniteDuration
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
-import codes.quine.labs.recheck.util.UStringUtil
+import codes.quine.labs.recheck.diagnostics.RecallResult
+import codes.quine.labs.recheck.diagnostics.RecallValidation
+import codes.quine.labs.recheck.exec.Command
+import codes.quine.labs.recheck.exec.ExecResult
+import codes.quine.labs.recheck.exec.Executor
+import codes.quine.labs.recheck.regexp.ParsedPattern
 
 /** RecallValidator is the implementation of recall validation. */
 object RecallValidator:
 
-  /** Checks the recall validation. */
-  def checks(source: String, flags: String, pattern: AttackPattern, timeout: Duration)(
-      exec: (String, Option[FiniteDuration]) => Option[(Int, String, String)]
-  )(using ctx: Context): Boolean =
-    validate(source, flags, pattern, timeout)(exec) match
-      case RecallResult.Finish(_)      => false
-      case RecallResult.Timeout        => true
-      case RecallResult.Error(message) => throw new UnexpectedException(message)
+  /** Exec runs a command with a script on its standard input, counting the timeout from the start line. */
+  type Exec = (Command, String, Option[FiniteDuration]) => ExecResult
 
-  /** Runs the recall validation. */
-  def validate(source: String, flags: String, pattern: AttackPattern, timeout: Duration)(
-      exec: (String, Option[FiniteDuration]) => Option[(Int, String, String)]
-  )(using ctx: Context): RecallResult = ctx.interrupt:
-    val code = generate(source, flags, pattern)
-    ctx.log(s"recall: code\n${code}")
-
-    val output = timeout match
-      case d if d < Duration.Zero => return RecallResult.Timeout
-      case _: Duration.Infinite   => exec(code, Option(ctx.deadline).map(_.timeLeft))
-      case d: FiniteDuration      =>
-        val newTimeout =
-          if (ctx.deadline ne null) && ctx.deadline.timeLeft < d then ctx.deadline.timeLeft else d
-        exec(code, Some(newTimeout))
-
-    result(output)
-
-  /** Returns JavaScript source code. */
-  private[recall] def generate(source: String, flags: String, attack: AttackPattern): String =
-    val str = new StringBuilder
-
-    str.append(
-      s"const re = new RegExp(${UStringUtil.show(UStringUtil.fromString(source))}, ${UStringUtil.show(UStringUtil.fromString(flags))});\n"
+  /** The executor of this platform, or `None` if this platform cannot run commands. */
+  def defaultExec(using Context): Option[Exec] =
+    Option.when(Executor.isAvailable)((command, script, timeout) =>
+      Executor.exec(command, script, timeout, Some(RecallProgram.StartLine))
     )
-    str.append(s"const input = ${attack.toString(AttackPattern.JavaScript)};\n")
-    str.append(s"const start = Date.now();\n")
-    str.append(s"re.exec(input);\n")
-    str.append(s"const end = Date.now();\n")
-    str.append(s"console.log(Number(end - start).toString());\n")
 
-    str.result()
+  /** Runs the recall validation of the attack string on the runtime of the pattern's dialect.
+    *
+    * It returns `None` without running when the timeout is not positive, or the dialect or the pattern is not
+    * supported. It throws [[UnexpectedException]] when the runtime fails to run the program.
+    */
+  def validate(pattern: ParsedPattern, attack: AttackPattern, timeout: Duration)(exec: Exec)(using
+      ctx: Context
+  ): Option[RecallValidation] = ctx.interrupt:
+    if timeout <= Duration.Zero then None
+    else
+      RecallProgram.generate(pattern, attack) match
+        case None =>
+          ctx.log("recall: not supported")
+          None
+        case Some(program) =>
+          ctx.log(s"recall: command: ${program.command}\n${program.script}")
+          val limit = timeout match
+            case d: FiniteDuration if (ctx.deadline eq null) || d <= ctx.deadline.timeLeft => Some(d)
+            case _ => Option(ctx.deadline).map(_.timeLeft)
+          val output = exec(program.command, program.script, limit)
+          Some(result(program.command, timeout, output))
 
-  /** Converts the execution triple to the result. */
-  private[recall] def result(output: Option[(Int, String, String)])(using ctx: Context): RecallResult = ctx.interrupt:
+  /** Converts the execution result to the recall validation. */
+  private[recall] def result(command: Command, timeout: Duration, output: ExecResult)(using
+      ctx: Context
+  ): RecallValidation = ctx.interrupt:
+    def line(out: String, name: String): Option[String] =
+      out.linesIterator.collectFirst { case s if s.startsWith(s"$name ") => s.substring(name.length + 1) }
+    def runtime(out: String): String = line(out, RecallProgram.RuntimeLine).getOrElse(command.program)
+
     output match
-      case Some((0, out, _)) =>
-        val time = out.toLongOption.getOrElse(throw UnexpectedException("invalid recall validation output"))
-        RecallResult.Finish(FiniteDuration(time, TimeUnit.MILLISECONDS))
-      case Some((_, _, err)) => RecallResult.Error(err)
-      case None              => RecallResult.Timeout
+      case ExecResult.Timeout(out)    => RecallValidation(runtime(out), timeout, RecallResult.Timeout)
+      case ExecResult.Exit(0, out, _) =>
+        val result = line(out, RecallProgram.TimeLine).flatMap(_.toLongOption) match
+          case Some(time) => RecallResult.Finish(FiniteDuration(time, TimeUnit.MILLISECONDS))
+          case None       =>
+            line(out, RecallProgram.EngineErrorLine) match
+              case Some(message) => RecallResult.EngineError(message)
+              case None          => throw new UnexpectedException(s"invalid recall validation output: ${out.trim}")
+        RecallValidation(runtime(out), timeout, result)
+      case ExecResult.Exit(code, _, err) =>
+        throw new UnexpectedException(if err.trim.nonEmpty then err.trim else s"`$command` exited with $code")

@@ -1,6 +1,10 @@
 package codes.quine.labs.recheck
 package diagnostics
 
+import scala.concurrent.duration.Duration
+import scala.concurrent.duration.MILLISECONDS
+import scala.concurrent.duration.SECONDS
+
 import codes.quine.labs.recheck.common.CancelException
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.InvalidRegExpException
@@ -41,6 +45,30 @@ class DiagnosticsSuite extends munit.FunSuite:
           |Checker      : automaton""".stripMargin
     )
     assertEquals(
+      Diagnostics
+        .Vulnerable(
+          "a*a*$",
+          "",
+          AttackComplexity.Polynomial(2, false),
+          AttackPattern(
+            Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
+            UStringUtil.fromString("!"),
+            2
+          ),
+          Hotspot.empty,
+          Checker.Automaton,
+          Some(RecallValidation("ruby 4.0.7", Duration(1, SECONDS), RecallResult.Finish(Duration(3, MILLISECONDS))))
+        )
+        .toString,
+      s"""|Input        : /a*a*$$/
+          |Status       : vulnerable
+          |Complexity   : 2nd degree polynomial
+          |Attack string: 'a'.repeat(2) + '!'
+          |Hotspot      : /a*a*$$/
+          |Checker      : automaton
+          |Recall       : failed (finished in 3 ms on ruby 4.0.7, timeout: 1000 ms)""".stripMargin
+    )
+    assertEquals(
       Diagnostics.Unknown("", "", Diagnostics.ErrorKind.Timeout, Some(Checker.Automaton)).toString,
       s"""|Input  : //
           |Status : unknown
@@ -53,6 +81,20 @@ class DiagnosticsSuite extends munit.FunSuite:
           |Status : unknown
           |Error  : timeout
           |Checker: (none)""".stripMargin
+    )
+
+  test("RecallValidation#toString"):
+    assertEquals(
+      RecallValidation("python 3.15.0", Duration.Inf, RecallResult.Timeout).toString,
+      "succeeded (timed out on python 3.15.0, timeout: none)"
+    )
+    assertEquals(
+      RecallValidation(
+        "php 8.5.12",
+        Duration(1, SECONDS),
+        RecallResult.EngineError("Backtrack limit exhausted")
+      ).toString,
+      "succeeded (engine error: Backtrack limit exhausted on php 8.5.12, timeout: 1000 ms)"
     )
 
   test("Diagnostics.Unknown.from"):
