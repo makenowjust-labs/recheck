@@ -16,6 +16,9 @@
 # - `x-cli`: the long option name of the CLI, and `x-cli-metavar` its metavar when it differs from the title.
 # - `x-exclude`: the targets not exposing the parameter (`cli`, `eslint-plugin`, `playground`).
 # - `x-since`: the first release having the parameter, so that the Playground hides it on older releases.
+# - `x-dialects`: the dialects that the parameter applies to, so that the Playground hides it for the others.
+# - `x-encodings`: the values of `encoding` for each dialect, the default first.
+#   A test of `recheck-common` checks it and `x-dialects` against the dialects.
 #
 # String values are quoted because YAML 1.1 (SnakeYAML) reads `on` and `off` as booleans.
 
@@ -135,8 +138,13 @@ properties:
     default: null
     x-scala-type: "Option[String]"
     x-cli: "encoding"
-    x-exclude: ["eslint-plugin", "playground"]
+    x-exclude: ["eslint-plugin"]
     x-since: "5.0.0"
+    x-dialects: ["python", "ruby", "perl"]
+    x-encodings:
+      "python": ["str", "bytes"]
+      "ruby": ["UTF-8", "ASCII-8BIT"]
+      "perl": ["characters", "bytes"]
 
   heatRatio:
     title: "Heat Ratio"
@@ -287,6 +295,7 @@ properties:
     x-cli-metavar: "source"
     x-exclude: ["eslint-plugin"]
     x-since: "5.0.0"
+    x-dialects: ["perl"]
 
   perlUtf8:
     title: "Perl UTF-8"
@@ -301,8 +310,9 @@ properties:
     default: null
     x-scala-type: "Option[Boolean]"
     x-cli: "perl-utf8"
-    x-exclude: ["eslint-plugin", "playground"]
+    x-exclude: ["eslint-plugin"]
     x-since: "5.0.0"
+    x-dialects: ["perl"]
 
   randomSeed:
     title: "Random Seed"

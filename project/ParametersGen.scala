@@ -27,7 +27,9 @@ object ParametersGen {
       scalaValues: Map[String, String],
       unit: Option[String],
       cli: Option[String],
-      cliMetavar: Option[String]
+      cliMetavar: Option[String],
+      dialects: Seq[String],
+      encodings: Seq[(String, Seq[String])]
   ) {
     def isDuration: Boolean = scalaType == "Duration"
     def isLogger: Boolean = scalaType == "Option[Context.Logger]"
@@ -76,6 +78,11 @@ object ParametersGen {
         .map(_.asInstanceOf[java.util.Map[String, String]].asScala.toMap)
         .getOrElse(Map.empty[String, String])
       require(values.forall(scalaValues.contains), s"x-scala-values of $name must map every enum value")
+      val dialects = Option(p.get("x-dialects")).map(_.asInstanceOf[java.util.List[String]].asScala.toSeq)
+      val encodings = Option(p.get("x-encodings"))
+        .map(_.asInstanceOf[java.util.Map[String, java.util.List[String]]].asScala.toSeq.map { case (d, es) =>
+          (d, es.asScala.toSeq)
+        })
       Param(
         name = name,
         title = string("title").getOrElse(sys.error(s"$name has no title")),
@@ -86,7 +93,9 @@ object ParametersGen {
         scalaValues = scalaValues,
         unit = string("x-unit"),
         cli = string("x-cli"),
-        cliMetavar = string("x-cli-metavar")
+        cliMetavar = string("x-cli-metavar"),
+        dialects = dialects.getOrElse(Seq.empty),
+        encodings = encodings.getOrElse(Seq.empty)
       )
     }
   }
@@ -98,6 +107,7 @@ object ParametersGen {
     case object Parameters extends Target("Parameters.scala", Seq("codes.quine.labs.recheck.common"))
     case object Codec extends Target("ParametersCodec.scala", Seq("codes.quine.labs.recheck", "codec"))
     case object Cli extends Target("ParametersOpts.scala", Seq("codes.quine.labs.recheck.cli"))
+    case object SchemaTest extends Target("ParametersSchema.scala", Seq("codes.quine.labs.recheck.common"))
   }
 
   /** Generates the target in the directory, and returns the generated file. */
@@ -107,6 +117,7 @@ object ParametersGen {
       case Target.Parameters => parameters(params)
       case Target.Codec      => codec(params)
       case Target.Cli        => cli(params)
+      case Target.SchemaTest => schemaTest(params)
     }
     val file = target.pkg.flatMap(_.split('.')).foldLeft(dir)(_ / _) / target.fileName
     if (!file.exists() || IO.read(file, StandardCharsets.UTF_8) != source)
@@ -279,6 +290,41 @@ object ParametersGen {
         |object ParameterArguments:
         |
         |${arguments.mkString("\n\n")}
+        |""".stripMargin
+  }
+
+  /** Generates `ParametersSchema.scala` for the tests, the dialect annotations of the schema. */
+  def schemaTest(params: Seq[Param]): String = {
+    def seq(ss: Seq[String]): String = ss.map(literal).mkString("Seq(", ", ", ")")
+    val dialect = params.find(_.name == "dialect").getOrElse(sys.error("no dialect parameter"))
+    val dialectValues = dialect.values.map(v => s"    ${literal(v)} -> ${dialect.scalaValues(v)}")
+    val dialects = params.filter(_.dialects.nonEmpty).map(p => s"    ${literal(p.name)} -> ${seq(p.dialects)}")
+    val encodings = params.filter(_.encodings.nonEmpty).map { p =>
+      val entries = p.encodings.map { case (d, es) => s"${literal(d)} -> ${seq(es)}" }
+      s"    ${literal(p.name)} -> Map(${entries.mkString(", ")})"
+    }
+    s"""|$header
+        |${packages(Target.SchemaTest)}
+        |
+        |import codes.quine.labs.resyntax.ast.Dialect
+        |
+        |/** ParametersSchema is the dialect annotations of the schema, to test them against the dialects. */
+        |object ParametersSchema:
+        |
+        |  /** The dialect of each value of `dialect`. */
+        |  val dialectValues: Map[String, Dialect] = Map(
+        |${dialectValues.mkString(",\n")}
+        |  )
+        |
+        |  /** `x-dialects` of the parameters having it. */
+        |  val dialects: Map[String, Seq[String]] = Map(
+        |${dialects.mkString(",\n")}
+        |  )
+        |
+        |  /** `x-encodings` of the parameters having it. */
+        |  val encodings: Map[String, Map[String, Seq[String]]] = Map(
+        |${encodings.mkString(",\n")}
+        |  )
         |""".stripMargin
   }
 
