@@ -102,7 +102,8 @@ The attack string (`attack.pattern` of the diagnostics) is an expression in the 
 In a bytes mode, it is a bytes literal (`b'\xc3\xa9'` in Python, `"\xC3\xA9".b` in Ruby, `"\xC3\xA9"` in Perl and PHP).
 `attack.string` shows each byte as the character of the same code (as Latin-1), e.g. the UTF-8 bytes of `é` are `Ã©`.
 
-The character set flags change the meaning of `\w`, `\d`, `\s`, `\b`, POSIX classes and case-insensitive matching in the same way as in the engine: for example, `a` (ASCII) and `u` (Unicode) of Python, Ruby and Perl, `U` (`UNICODE_CHARACTER_CLASS`) and `u` (`UNICODE_CASE`) of Java, and PCRE's `(?aD)` and the like.
+The character set flags change the meaning of `\w`, `\d`, `\s`, `\b`, POSIX classes and case-insensitive matching in the same way as in the engine: for example, `a` (ASCII) and `u` (Unicode) of Python, Ruby and Perl, `aa` of Perl, `U` (`UNICODE_CHARACTER_CLASS`) and `u` (`UNICODE_CASE`) of Java, and PCRE's `(?aD)` and the like.
+Java's `\b` without `U` also takes a non-spacing mark after a letter or a digit as a word character (e.g. `\b` does not match between `a` and U+0301), as `java.util.regex` does.
 
 ### Perl
 
