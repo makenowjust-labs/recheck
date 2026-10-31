@@ -14,15 +14,15 @@ import codes.quine.labs.resyntax.ir.LookBehindChecker.*
 
 /** LookBehindChecker checks the dialect's restriction on a look-behind body.
   *
-  * @param literalWidth
-  *   the width of a literal in the engine's units, which differs from one for Perl's multi-character case folding (e.g.
-  *   `ß` up to two)
+  * @param charWidth
+  *   the width of a literal, an escape or a class in the engine's units, which differs from one for Perl's
+  *   multi-character case folding (e.g. `ß` up to two)
   */
 private[ir] final class LookBehindChecker(
     table: CaptureTable,
     resolver: ReferenceResolver,
     featureSet: IRFeatureSet,
-    literalWidth: Int => Width = _ => Width(1, 1)
+    charWidth: Node => Width = _ => Width(1, 1)
 ):
 
   /** Checks the body of a look-behind, and throws an exception at the look-behind node if it is invalid. */
@@ -100,18 +100,19 @@ private[ir] final class LookBehindChecker(
         case CommandKind.NamedCall(name)  => callWidth(node, Reference.NamedReference(name), visiting)
         case CommandKind.PNamedCall(name) => callWidth(node, Reference.NamedReference(name), visiting)
         case _                            => None
-    case NodeData.Caret | NodeData.Dollar    => Some(Width(0, 0))
-    case NodeData.Literal(value)             => Some(literalWidth(value))
-    case NodeData.Dot | NodeData.Class(_, _) => Some(Width(1, 1))
-    case NodeData.Backslash(kind)            =>
+    case NodeData.Caret | NodeData.Dollar           => Some(Width(0, 0))
+    case NodeData.Literal(_) | NodeData.Class(_, _) => Some(charWidth(node))
+    case NodeData.Dot                               => Some(Width(1, 1))
+    case NodeData.Backslash(kind)                   =>
       kind match
-        case BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline)      => Some(Width(1, 2))
-        case BackslashKind.EscapeClass(EscapeClassKind.GraphemeCluster)     => Some(Width(1, Inf))
-        case _: BackslashKind.BackslashValue | _: BackslashKind.EscapeClass => Some(Width(1, 1))
-        case BackslashKind.EscapeBackReference(_, ref)                      => backReferenceWidth(node, ref, visiting)
-        case BackslashKind.EscapeCall(_, Reference.IndexedReference(0))     => Some(Width(0, Inf))
-        case BackslashKind.EscapeCall(_, ref)                               => callWidth(node, ref, visiting)
-        case _: BackslashKind.Assert | _: BackslashKind.CaseCommand         => Some(Width(0, 0))
+        case BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline)  => Some(Width(1, 2))
+        case BackslashKind.EscapeClass(EscapeClassKind.GraphemeCluster) => Some(Width(1, Inf))
+        case _: BackslashKind.BackslashValue                            => Some(charWidth(node))
+        case _: BackslashKind.EscapeClass                               => Some(Width(1, 1))
+        case BackslashKind.EscapeBackReference(_, ref)                  => backReferenceWidth(node, ref, visiting)
+        case BackslashKind.EscapeCall(_, Reference.IndexedReference(0)) => Some(Width(0, Inf))
+        case BackslashKind.EscapeCall(_, ref)                           => callWidth(node, ref, visiting)
+        case _: BackslashKind.Assert | _: BackslashKind.CaseCommand     => Some(Width(0, 0))
 
   private def widthOfAlternatives(nodes: Seq[Node], visiting: Set[Int]): Option[Width] =
     val widths = nodes.map(width(_, visiting))

@@ -376,3 +376,29 @@ class IRCharSuite extends munit.FunSuite:
   error("(?<=ß{128})a", "i", Perl)("Look-behind longer than 255 at 0")
   test("IRBuilder.build: /(?<=ß{128})a/ in Perl"):
     build("(?<=ß{128})a", "", Perl)
+  // Perl counts the folding at the node's flags, of a literal, an escape and a class's characters but not its ranges.
+  for (body, flags, width) <- Seq(
+      ("(?i)ß", "", 2),
+      ("(?i:ß)", "", 2),
+      ("(?-i:ß)", "i", 1),
+      ("\\xDF", "i", 1),
+      ("\\xDF|\\x{100}", "i", 2),
+      ("\\N{U+DF}", "i", 2),
+      ("[aß]", "i", 2),
+      ("[ﬃa]", "i", 3),
+      ("[ß-ß]", "i", 2),
+      ("[ß-ẞ]", "i", 1),
+      ("[^ß]", "i", 1),
+      ("ſ", "i", 1),
+      ("(?a)ﬃ", "i", 3),
+      ("(?aa)ﬃ", "i", 1),
+      ("(?aa)İ", "i", 1),
+      ("(?aa)ß", "i", 2),
+      ("(?aa)ΐ", "i", 3),
+      ("(?u)ß", "i", 2)
+    )
+  do
+    val count = 255 / width
+    test(s"IRBuilder.build: /(?<=(?:$body){$count})/$flags in Perl"):
+      build(s"(?<=(?:$body){$count})", flags, Perl)
+    error(s"(?<=(?:$body){${count + 1}})", flags, Perl)("Look-behind longer than 255 at 0")

@@ -64,7 +64,7 @@ object IRBuilder:
     val perlUtf8 = if mode == UnitMode.Byte then options.perlUtf8.orElse(Some(false)) else options.perlUtf8
     val perlUnicodeRules = dialect == Dialect.Perl && usesPerlUnicodeRules(node, perlUtf8)
     val checker =
-      new LookBehindChecker(table, resolver, featureSet, literalWidth(flagSet, dialect, perlUnicodeRules))
+      new LookBehindChecker(table, resolver, featureSet, charWidth(table, dialect, mode, perlUnicodeRules))
     val backReferences = new IRValidator(table, resolver, checker, featureSet).validate(node)
     val chars = new IRCharResolver(dialect, mode, perlUnicodeRules)
     val builder = new IRBuilder(context, table, backReferences, chars, checker, resolveCharacter, hasCall(node))
@@ -103,19 +103,45 @@ object IRBuilder:
   def caseEquivalence(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRCaseEquivalence =
     IRCaseEquivalence.of(dialect, mode, flags, perlNative = false)
 
-  /** Returns the width of a literal in a look-behind, where the dialects counting it differently from one care.
+  /** Returns the width of a literal, an escape or a class in a look-behind, where the dialects counting it differently
+    * from one care.
     *
-    * Perl counts the folded length under `i` (e.g. `(?<=ß{128})` is too long). The flag `i` is the pattern's one here.
+    * Perl counts the folded length of a character under `i` (e.g. `(?<=ß{128})` is too long), and a class counts its
+    * longest character but not its ranges (e.g. `[ßa]` is two, and `[ß-ẞ]` is one). The folding is one for a Latin-1
+    * character under `l`, and for one with ASCII characters under `aa` and `l`, except `ẞ` and, under `aa`, `ß`.
     */
-  private def literalWidth(
-      flagSet: FlagSet,
+  private def charWidth(
+      table: CaptureTable,
       dialect: Dialect,
+      mode: UnitMode,
       perlUnicodeRules: Boolean
-  ): Int => LookBehindChecker.Width =
+  ): Node => LookBehindChecker.Width =
     import LookBehindChecker.Width
-    if dialect == Dialect.Perl && flagSet.ignoreCase && perlUnicodeRules then
-      value => Width(1, FullCaseFolding(value).length.max(1).toLong)
-    else _ => Width(1, 1)
+    if dialect != Dialect.Perl || mode != UnitMode.CodePoint then return _ => Width(1, 1)
+    def fold(value: Int, flags: IRCharFlags): Int =
+      val folded = FullCaseFolding(value)
+      val hasAscii = folded.iterator.exists(_ < 0x80)
+      val single = flags.charset match
+        case IRCharset.Default  => !perlUnicodeRules
+        case IRCharset.Unicode  => false
+        case IRCharset.Locale   => value < 0x100 || hasAscii && value != 0x1e9e
+        case _: IRCharset.Ascii => flags.caselessRestrict && hasAscii && value != 0xdf && value != 0x1e9e
+      if !flags.ignoreCase || single then 1 else folded.length
+    def classWidth(data: ClassItemData, flags: IRCharFlags): Int = data match
+      case ClassItemData.ClassUnion(items) => items.map(i => classWidth(i.data, flags)).maxOption.getOrElse(1)
+      case value: ClassItemData.ClassValue => fold(value.value, flags)
+      case ClassItemData.ClassRange(b, e) if b.data.value == e.data.value => fold(b.data.value, flags)
+      case _                                                              => 1
+    node =>
+      val width = table
+        .charFlagsOf(node)
+        .fold(1): flags =>
+          node.data match
+            case NodeData.Literal(value)                                 => fold(value, flags)
+            case NodeData.Backslash(value: BackslashKind.BackslashValue) => fold(value.value, flags)
+            case NodeData.Class(false, item)                             => classWidth(item.data, flags)
+            case _                                                       => 1
+      Width(1, width.toLong)
 
   /** Checks whether a Perl pattern uses Unicode rules under `/d` (perlre "Which character set modifier is in effect?").
     *
