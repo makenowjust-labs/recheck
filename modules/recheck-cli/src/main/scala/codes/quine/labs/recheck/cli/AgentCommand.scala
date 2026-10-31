@@ -72,7 +72,7 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio):
   ): Unit =
     submit(id, check, push, send)(ReDoS.checkAll)(List(_))
 
-  /** Runs a checking method on the thread pool, and sends its result unless it is cancelled.
+  /** Runs a checking method on the thread pool, and sends its result.
     *
     * @param cancelled
     *   converts the diagnostics of the cancellation to the method's result
