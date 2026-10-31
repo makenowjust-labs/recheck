@@ -179,7 +179,11 @@ class RecallRuntimeSuite extends munit.FunSuite:
     assertEquals(matches("\\w", literal.copy(utf8 = Some(true)), "d"), Some(true))
     assertEquals(matches("\\w", literal.copy(utf8 = Some(true)), "a"), Some(false))
     assertEquals(matches("ü?\\w", literal.copy(utf8 = Some(false))), None)
-    assertEquals(matches("\\w", Dialect.Perl(Dialect.Perl.Encoding.Bytes, utf8 = Some(true))), Some(false))
+    val bytes: Dialect.Perl = Dialect.Perl(Dialect.Perl.Encoding.Bytes)
+    assertEquals(matches("\\w", bytes), Some(false))
+    assertEquals(matches("\\w", bytes, "u"), Some(true))
+    assertEquals(matches("\\w", bytes.copy(utf8 = Some(true))), Some(true))
+    assertEquals(matches("\\w", bytes.copy(source = PerlSource.String, utf8 = Some(true))), Some(true))
 
   runtimeTest("PCRE", "php"):
     // PHP's default `pcre.backtrack_limit` stops the match.

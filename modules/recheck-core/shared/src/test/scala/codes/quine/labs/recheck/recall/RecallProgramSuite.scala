@@ -202,7 +202,7 @@ class RecallProgramSuite extends munit.FunSuite:
     assertEquals(regex("é\\w", "", Dialect.Perl(utf8 = Some(false))), None)
     assertEquals(
       regex("é\\w", "", Dialect.Perl(Dialect.Perl.Encoding.Bytes, utf8 = Some(true))),
-      Some("my $regex = qr/é\\w/;")
+      Some("my $regex = qr/é\\w/u;")
     )
 
   test("RecallProgram.isPerlSafe"):

@@ -223,7 +223,7 @@ Notes on each dialect:
   It runs a fixed program reading the pattern and the attack string from the standard input, so `dotnet` builds and caches the program only once.
 - `perl` puts the pattern into the program as a `qr` literal with the `literal` source.
   When the literal would interpolate a variable or run code (e.g. `$name`, `@{...}` or `(?{ ... })`), the recall validation is skipped and `recallValidation` is `null`.
-  The `u` modifier gives the Unicode rules of `utf8: true` to an ASCII literal, and a literal that is UTF-8 by a non-ASCII character with `utf8: false` is skipped as well.
+  The `u` modifier gives the Unicode rules of `utf8: true` to a literal that is not UTF-8 by itself (an ASCII one, or one of `bytes`), and a literal that is UTF-8 by a non-ASCII character with `utf8: false` is skipped as well.
   With the `string` source, the program builds the pattern from a string as `qr/$pattern/`.
   It sets the UTF-8 flag of the string by `utf8::upgrade` or `utf8::downgrade`, as `utf8` of the diagnostics' `dialect` tells, since the flag decides the character set rules.
 - `pcre` runs with PHP's default settings of `pcre.backtrack_limit`, `pcre.recursion_limit` and `pcre.jit`, and the runtime name in the result shows them.
