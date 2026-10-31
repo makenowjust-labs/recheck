@@ -115,60 +115,36 @@ object IRFeatureSet:
     }
 
     IRFeatureSet(
-      // Ruby
       caretIsLineBegin = isRuby,
-      // Ruby
       dollarIsLineEnd = isRuby,
-      // .NET, Java, PCRE (without `D`), Perl, Python, Ruby
       dollarIsChompTextEnd = isDotNet || isJava || isPCRE && !flagSet.dollarEndOnly || isPerl || isPython || isRuby,
-      // Python
       upperEndIsTextEnd = isPython,
-      // .NET, JavaScript, Python: AfterTerminator, Java: Never, the others: InputBegin
       lineBeginAtEnd =
         if isDotNet || isJavaScript || isPython then IRLineBeginAtEnd.AfterTerminator
         else if isJava then IRLineBeginAtEnd.Never
         else IRLineBeginAtEnd.InputBegin,
-      // JavaScript: LineTerminator, Java: six characters with atomic `\r\n`, PCRE: `(*CR)` and so on, the others: `\n`
       lineTerminators =
         if isJavaScript then IRLineTerminators.JavaScript
         else if isJava then IRLineTerminators.Java
         else if isPCRE then newline.getOrElse(IRLineTerminators.LF)
         else IRLineTerminators.LF,
-      // Java
       hasUnixLinesFlag = isJava,
-      // PCRE
       hasUngreedyFlag = isPCRE,
-      // .NET, PCRE, Perl
       hasExplicitCaptureFlag = isDotNet || isPCRE || isPerl,
-      // Perl, Python, Ruby
       hasExclusiveCharsetFlag = isPerl || isPython || isRuby,
-      // .NET
       numbersNamedCaptureLast = isDotNet,
-      // Ruby
       ignoresUnnamedCaptureWithNamedCapture = isRuby,
-      // PCRE
       checksSameNameAndIndex = isPCRE,
-      // JavaScript
       unsetBackReferenceMatchesEmpty = isJavaScript,
-      // Ruby: LastMatching, the others: FirstSet
       backReferenceChoice = if isRuby then IRBackReferenceChoice.LastMatching else IRBackReferenceChoice.FirstSet,
-      // Java
       allowsBackReferenceToMissingGroup = isJava,
-      // Python
       requiresClosedGroupReference = isPython,
-      // Java, Python, Ruby
       requiresNameDefinedBefore = isJava || isPython || isRuby,
-      // .NET, PCRE, Python, Ruby
       checksIndexedCaptureTest = isDotNet || isPCRE || isPython || isRuby,
-      // PCRE
       checksIndexedRecursionTest = isPCRE,
-      // PCRE, Perl
       rejectsCutInLookAround = isPCRE || isPerl,
-      // Ruby
       rejectsCallToSharedName = isRuby,
-      // Perl
       countsRelativeReferenceInSourceOrder = isPerl,
-      // .NET, JavaScript: Unrestricted, Java: Java, PCRE: PCRE, Perl: Perl, Python: Python, Ruby: Ruby
       lookBehindRule = dialect match
         case Dialect.DotNet | Dialect.JavaScript => IRLookBehindRule.Unrestricted
         case Dialect.Java                        => IRLookBehindRule.Java
@@ -176,16 +152,10 @@ object IRFeatureSet:
         case _: Dialect.Perl                     => IRLookBehindRule.Perl
         case _: Dialect.Python                   => IRLookBehindRule.Python
         case _: Dialect.Ruby                     => IRLookBehindRule.Ruby,
-      // JavaScript (with `y`), PCRE (with `A`)
       anchored = isJavaScript && flagSet.sticky || isPCRE && flagSet.anchored,
-      // PCRE (with `(*UTF)`)
       utf = isPCRE && startOptions.exists(o => o == "UTF" || o == "UTF8"),
-      // PCRE (with `(*UCP)`)
       ucp = isPCRE && startOptions.contains("UCP"),
-      // PCRE (with `(*CASELESS_RESTRICT)`)
       caselessRestrict = isPCRE && startOptions.contains("CASELESS_RESTRICT"),
-      // PCRE (with `(*TURKISH_CASING)`)
       turkishCasing = isPCRE && startOptions.contains("TURKISH_CASING"),
-      // PCRE (with `(*BSR_ANYCRLF)`)
       bsrAnyCRLF = isPCRE && bsr.getOrElse(false)
     )

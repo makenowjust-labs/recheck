@@ -4,7 +4,6 @@ import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
 
-/** IRNodeData is a data of internal representation node. */
 sealed abstract class IRNodeData extends Product with Serializable:
   def equalsWithoutLoc(that: IRNodeData): Boolean = (this, that) match
     case (IRNodeData.Disjunction(ls), IRNodeData.Disjunction(rs)) =>
@@ -31,7 +30,6 @@ sealed abstract class IRNodeData extends Product with Serializable:
 
 object IRNodeData:
 
-  /** Empty is an empty string pattern. */
   case object Empty extends IRNodeData
 
   /** Chars matches one code value (a UTF-16 code unit, a code point or a byte, by the unit mode) in the set.
@@ -48,37 +46,30 @@ object IRNodeData:
     */
   final case class Strings(set: ClassSet) extends IRNodeData
 
-  /** Sequence is a sequence of nodes. */
   final case class Sequence(nodes: Seq[IRNode]) extends IRNodeData
 
   object Sequence:
     def apply(nodes: IRNodeData*): IRNodeData =
       Sequence(nodes.map(IRNode(_)))
 
-  /** Disjunction is a disjunction of nodes. */
   final case class Disjunction(nodes: Seq[IRNode]) extends IRNodeData
 
   object Disjunction:
     def apply(nodes: IRNodeData*): IRNodeData =
       Disjunction(nodes.map(IRNode(_)))
 
-  /** Repeat is a repetition node.
-    *
-    * Its strategy is greedy or lazy; a possessive repetition is a repetition in [[Atomic]].
-    */
+  /** Its strategy is greedy or lazy; a possessive repetition is a repetition in [[Atomic]]. */
   final case class Repeat(node: IRNode, quantifier: IRQuantifier) extends IRNodeData
 
   object Repeat:
     def apply(node: IRNodeData, quantifier: IRQuantifier): IRNodeData =
       Repeat(IRNode(node), quantifier)
 
-  /** Atomic is an atomic group, which does not backtrack into its node once it matches. */
   final case class Atomic(node: IRNode) extends IRNodeData
 
   object Atomic:
     def apply(data: IRNodeData): IRNodeData = Atomic(IRNode(data))
 
-  /** LookAhead is a look-ahead assertion. */
   final case class LookAhead(negative: Boolean, node: IRNode) extends IRNodeData
 
   object LookAhead:
@@ -93,10 +84,8 @@ object IRNodeData:
     def apply(negative: Boolean, data: IRNodeData, matching: IRLookBehindMatch): IRNodeData =
       LookBehind(negative, IRNode(data), matching)
 
-  /** Assert is a simple zero-width assertion. */
   final case class Assert(kind: IRAssertKind) extends IRNodeData
 
-  /** Capture is a capture group. */
   final case class Capture(index: Int, name: Option[String], node: IRNode) extends IRNodeData
 
   object Capture:
@@ -144,7 +133,6 @@ object IRNodeData:
     */
   final case class BacktrackControl(verb: IRBacktrackControl) extends IRNodeData
 
-  /** Unsupported is a wrapper of unsupported AST node. */
   final case class Unsupported(data: NodeData) extends IRNodeData
 
 /** IRCondition is a condition of [[IRNodeData.Conditional]]. */

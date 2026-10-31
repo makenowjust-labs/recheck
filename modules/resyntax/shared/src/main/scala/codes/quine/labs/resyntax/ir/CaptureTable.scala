@@ -55,13 +55,10 @@ private[ir] final class CaptureTable(
     charFlags: Map[NodeKey, IRCharFlags]
 ):
 
-  /** Returns the index of the capture group node, or `None` if the node does not capture. */
   def indexOf(node: Node): Option[Int] = indices.get(NodeKey(node))
 
-  /** Returns the flags at the character-level node, if they are recorded. */
   def charFlagsOf(node: Node): Option[IRCharFlags] = charFlags.get(NodeKey(node))
 
-  /** Returns the site of the node referring to a group. */
   def siteOf(node: Node): ReferenceSite =
     sites.getOrElse(NodeKey(node), throw new IllegalArgumentException(s"No reference site: $node"))
 

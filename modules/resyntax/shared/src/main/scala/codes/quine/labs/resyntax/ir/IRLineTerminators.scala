@@ -11,7 +11,6 @@ final case class IRLineTerminators(chars: Set[Int], crlf: IRLineTerminators.CRLF
 
 object IRLineTerminators:
 
-  /** CRLF is a treatment of the `\r\n` sequence. */
   sealed abstract class CRLF extends Product with Serializable
 
   object CRLF:

@@ -13,7 +13,6 @@ import codes.quine.labs.resyntax.ast.FlagSetDiff
   */
 final case class BuildingContext(flagSet: FlagSet, dialect: Dialect, featureSet: IRFeatureSet):
 
-  /** Returns the context after an inline flag diff (e.g. `(?i-m)`). */
   def update(diff: FlagSetDiff): BuildingContext =
     val base =
       if featureSet.hasExclusiveCharsetFlag && BuildingContext.hasCharsetFlag(diff.added) then
@@ -54,23 +53,18 @@ final case class BuildingContext(flagSet: FlagSet, dialect: Dialect, featureSet:
         )
     copy(flagSet = result)
 
-  /** Whether `^` and `$` match at line boundaries. */
   def multiline: Boolean = flagSet.multiline
 
-  /** Whether unnamed groups do not capture (.NET, PCRE and Perl `n`). */
   def explicitCapture: Boolean = featureSet.hasExplicitCaptureFlag && flagSet.explicitCapture
 
-  /** Whether greedy and lazy quantifiers are swapped (PCRE `U`). */
   def ungreedy: Boolean = featureSet.hasUngreedyFlag && flagSet.ungreedy
 
-  /** Whether duplicated names are allowed (PCRE `J`). */
   def dupNames: Boolean = flagSet.dupNames
 
   /** The line terminators of `^`, `$` and `.`, where Java's `d` (UNIX_LINES) limits them to `\n`. */
   def lineTerminators: IRLineTerminators =
     if featureSet.hasUnixLinesFlag && flagSet.hasIndices then IRLineTerminators.LF else featureSet.lineTerminators
 
-  /** Returns the flags that a character-level node needs. */
   def charFlags: IRCharFlags =
     val f = flagSet
     val isJava = dialect.isJava

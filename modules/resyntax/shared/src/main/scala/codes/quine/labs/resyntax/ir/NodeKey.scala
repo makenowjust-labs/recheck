@@ -30,12 +30,10 @@ private[ir] object NodeKey:
         case _                                          => Seq.empty
     case _ => Seq.empty
 
-  /** Returns the child nodes of the conditional test. */
   def testNodes(test: ConditionalTest): Seq[Node] = test match
     case ConditionalTest.LookAround(_, node)                                       => Seq(node)
     case ConditionalTest.CalloutLookAround(_, ConditionalTest.LookAround(_, node)) => Seq(node)
     case _                                                                         => Seq.empty
 
-  /** Tests whether the node or its descendant satisfies the predicate. */
   def exists(node: Node)(p: Node => Boolean): Boolean =
     p(node) || children(node).exists(exists(_)(p))

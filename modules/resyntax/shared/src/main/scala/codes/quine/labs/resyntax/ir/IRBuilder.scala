@@ -27,18 +27,14 @@ import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
-/** IRBuilder is a builder from AST node to IR. */
 object IRBuilder:
 
-  /** Returns an IR pattern built from the given AST.
-    *
-    * It throws [[IRBuildingException]] for an error that needs the whole pattern (e.g. a reference to a non-existent
+  /** Throws [[IRBuildingException]] for an error that needs the whole pattern (e.g. a reference to a non-existent
     * group, or a look-behind that the dialect does not allow).
     */
   def build(node: Node, flagSet: FlagSet, dialect: Dialect): IRPattern =
     build(node, flagSet, dialect, None)
 
-  /** Returns an IR pattern built from the given AST, where `resolveCharacter` replaces the character resolution. */
   private[ir] def build(
       node: Node,
       flagSet: FlagSet,
@@ -101,9 +97,7 @@ object IRBuilder:
       builder.tries.toMap
     )
 
-  /** Returns the unit mode of a pattern from the dialect and the flags.
-    *
-    * @param utf
+  /** @param utf
     *   PCRE's `(*UTF)` start option
     */
   private def unitMode(dialect: Dialect, flagSet: FlagSet, utf: Boolean): UnitMode =
@@ -122,14 +116,11 @@ object IRBuilder:
       case Dialect.Perl(utf8, _) => if utf8 then UnitMode.CodePoint else UnitMode.Byte
       case Dialect.PCRE          => if flagSet.unicode || utf then UnitMode.CodePoint else UnitMode.Byte
 
-  /** Returns the case equivalence of a back-reference with the flags in the dialect and the mode.
-    *
-    * Perl's `/d` rules at a back-reference are the rules of a native string (see [[IRCharResolver.referenceFlags]]).
+  /** Perl's `/d` rules at a back-reference are the rules of a native string (see [[IRCharResolver.referenceFlags]]).
     */
   def caseEquivalence(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRCaseEquivalence =
     IRCaseEquivalence.of(dialect, mode, flags, perlNative = dialect.isPerl && flags.charset == IRCharset.Default)
 
-  /** Returns how a back-reference with the flags compares the capture with the input in the dialect and the mode. */
   def backReferenceFolding(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRBackReferenceFolding =
     if !flags.ignoreCase then IRBackReferenceFolding.Simple
     else
@@ -324,20 +315,17 @@ object IRBuilder:
       .collect { case NodeData.Command(CommandKind.StartOption(name, _)) => name }
       .toSeq
 
-  /** Returns where an empty match is rejected by the start options, where `(*NOTEMPTY)` includes the other. */
   private def notEmpty(startOptions: Seq[String]): IRNotEmpty =
     if startOptions.contains("NOTEMPTY") then IRNotEmpty.Anywhere
     else if startOptions.contains("NOTEMPTY_ATSTART") then IRNotEmpty.AtStart
     else IRNotEmpty.Never
 
-  /** Checks whether the pattern has `(*THEN)`. */
   private def hasThen(node: Node): Boolean =
     NodeKey.exists(node):
       _.data match
         case NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Then), _)) => true
         case _                                                                                  => false
 
-  /** Checks whether the pattern has a back-reference. */
   private def hasBackReference(node: Node): Boolean =
     NodeKey.exists(node):
       _.data match
@@ -345,7 +333,6 @@ object IRBuilder:
         case NodeData.Command(_: CommandKind.PBackReference)          => true
         case _                                                        => false
 
-  /** Checks whether the pattern calls a group or itself (e.g. `(?1)` and `\g<1>`). */
   private def hasCall(node: Node): Boolean =
     NodeKey.exists(node):
       _.data match
@@ -395,10 +382,8 @@ private[ir] class IRBuilder(
       case Left(data) => IRNode(data, node.loc)
       case Right(ir)  => ir
 
-  /** The flags that a character-level node at the current position needs. */
   def charFlags: IRCharFlags = context.charFlags
 
-  /** Builds a character-level node: `.`, a class, a literal, and a backslash producing characters (e.g. `\d`). */
   def buildCharacter(node: Node): IRNodeData =
     val flags = charFlags
     // Java's CANON_EQ matches canonically equivalent sequences, which the checkers do not handle.
@@ -408,7 +393,6 @@ private[ir] class IRBuilder(
   /** Builds consecutive literal characters together (e.g. for multi-character case folding). */
   def buildLiterals(nodes: Seq[Node]): Seq[IRNode] =
     val run = nodes.map(node => (node, charFlags))
-    // Java's CANON_EQ matches canonically equivalent sequences, which the checkers do not handle.
     if run.exists(_._2.canonicalEquivalence) then
       run.map((node, _) => IRNode(IRNodeData.Unsupported(node.data), node.loc))
     else

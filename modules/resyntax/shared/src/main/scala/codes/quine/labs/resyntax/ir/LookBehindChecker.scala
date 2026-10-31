@@ -409,7 +409,6 @@ private[ir] final class LookBehindChecker(
 
 private[ir] object LookBehindChecker:
 
-  /** Inf is an unbounded width. */
   val Inf: Long = Long.MaxValue
 
   /** Lengths beyond this are unbounded, which are far beyond the dialects' limits. */
@@ -418,7 +417,6 @@ private[ir] object LookBehindChecker:
   /** JavaMaxReps is `Pattern.MAX_REPS`. */
   private val JavaMaxReps: Int = Int.MaxValue
 
-  /** Width is a pair of the minimum and maximum lengths. */
   final case class Width(min: Long, max: Long)
 
   /** RubyWidth is a length in Onigmo's look-behind check. */

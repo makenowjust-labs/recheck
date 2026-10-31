@@ -38,7 +38,6 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     dialect.isPerl &&
       (flags.charset == IRCharset.Default && !perlUnicodeRules || flags.charset == IRCharset.Locale)
 
-  /** Returns the case equivalence at the flags. */
   def equivalence(flags: IRCharFlags): IRCaseEquivalence =
     IRCaseEquivalence.of(dialect, mode, flags, perlNative(flags))
 
@@ -96,7 +95,6 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         case _ => out += child
     out.toSeq
 
-  /** Resolves a character-level node. */
   def resolve(node: Node, flags: IRCharFlags): IRNodeData =
     try
       node.data match
@@ -287,7 +285,6 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
 
   private def isRubyByteLit(lit: Lit): Boolean = lit.escape.exists(isRubyByte(_, lit.value))
 
-  /** Returns the code values of a literal in the mode. */
   private def unitsOf(lit: Lit): Seq[Int] = mode match
     case UnitMode.CodePoint => Seq(lit.value)
     case UnitMode.Utf16     => UString(lit.value).encode(UnitMode.Utf16).toSeq
@@ -449,7 +446,6 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         val single = CharSet.of(ss.filter(_.length == 1).map(_(0))*)
         ClassSet(eq.closure(single), ss.filter(_.length != 1))
 
-  /** Resolves a Unicode property. */
   private def property(
       name: String,
       value: Option[String],
@@ -580,14 +576,12 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   private def foldString(key: UString, flags: IRCharFlags, loc: SourceLocation): IRNodeData =
     sequenceOf(foldRun(key.iterator.map(c => Lit(c, true, None, flags, loc)).toSeq))
 
-  /** Returns the complement of a class item. */
   private def negate(item: ClassItem, flags: IRCharFlags): ClassSet = item.data match
     // .NET's `[^a-z-[aeiou]]` negates the base before the subtraction.
     case ClassItemData.ClassDiff(left, right) if dialect.isDotNet =>
       ClassSet(classItem(left, flags).chars.complement(mode)).diff(classItem(right, flags))
     case _ => ClassSet(classItem(item, flags).chars.complement(mode))
 
-  /** Returns the node of a class set: [[IRNodeData.Chars]], or a node with strings. */
   private def output(set: ClassSet, flags: IRCharFlags): IRNodeData =
     val chars = set.chars.restrict(mode)
     val eq = equivalence(flags)
@@ -692,7 +686,6 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     val decoded = mergeRubyBytes(lits.take(n))
     if lits.length > n then decoded ++ mergeRubyBytesInClass(lits.drop(n)) else decoded
 
-  /** Returns the code values of a class value; a non-ASCII literal in byte mode is several bytes. */
   private def valueUnits(value: ClassItemData.ClassValue, flags: IRCharFlags, loc: SourceLocation): Seq[Int] =
     val lit = value match
       case ClassItemData.ClassLiteral(v)                                     => Lit(v, true, None, flags, loc)
@@ -743,7 +736,6 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         case _: Dialect.Ruby => equivalence(flags).closure(restricted)
         case _               => restricted
 
-/** IRCharResolver utilities. */
 private[ir] object IRCharResolver:
 
   /** NotModeledException is thrown for a construct that IR cannot represent, which becomes `Unsupported`. */
@@ -780,7 +772,6 @@ private[ir] object IRCharResolver:
   /** [[multiFoldings]] in the order of Onigmo's tables: by the length, and then by the folding. */
   lazy val rubyMultiFoldings: Seq[(UString, CharSet)] = multiFoldings.sortBy((key, _) => (key.length, key))
 
-  /** Returns the folding of a character to several characters (e.g. `ss` of `ß`). */
   def multiFolding(c: Int): Option[UString] = Some(FullCaseFolding(c)).filter(_.length >= 2)
 
   /** Checks whether the escape class is a property, which is a class in Onigmo, but not a negated one. */
@@ -827,7 +818,6 @@ private[ir] object IRCharResolver:
         case None        => Option.when(min == 0)(node.copy(data = IRNodeData.Empty))
     case _ => Some(node)
 
-  /** Returns a node of the nodes in sequence. */
   def sequenceOf(nodes: Seq[IRNode]): IRNodeData = nodes match
     case Seq()     => IRNodeData.Empty
     case Seq(node) => node.data

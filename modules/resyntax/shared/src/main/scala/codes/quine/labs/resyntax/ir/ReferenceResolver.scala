@@ -7,14 +7,12 @@ import codes.quine.labs.resyntax.ast.SourceLocation
 /** ReferenceResolver resolves group references to capture indices, and rejects the ones the dialect rejects. */
 private[ir] final class ReferenceResolver(table: CaptureTable, dialect: Dialect, featureSet: IRFeatureSet):
 
-  /** Resolves a back-reference. */
   def backReference(ref: Reference, site: ReferenceSite, loc: SourceLocation): Seq[Int] = ref match
     case Reference.IndexedReference(n)      => indexedBackReference(n, site, loc)
     case Reference.NamedReference(name)     => namedBackReference(name, site, loc)
     case Reference.RelativeReference(n)     => relative(n, site, loc)
     case Reference.LeveledReference(ref, _) => backReference(ref, site, loc)
 
-  /** Resolves a back-reference by an index (e.g. `\1`). */
   def indexedBackReference(n: Int, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
     if featureSet.requiresClosedGroupReference then
       if n > site.opened then fail("Reference to non-existent group", loc)

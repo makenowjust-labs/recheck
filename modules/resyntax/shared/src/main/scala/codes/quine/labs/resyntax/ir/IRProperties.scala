@@ -93,7 +93,6 @@ private[ir] object IRProperties:
 
   private def fromOption(r: Option[PropertyResult]): PropertyResult = r.getOrElse(Unknown)
 
-  /** Builds an index from the names normalized by the key function. */
   private def index[A](entries: Iterable[(Iterable[String], A)], key: String => String): Map[String, A] =
     entries.iterator.flatMap((names, a) => names.iterator.map(n => key(n) -> a)).toMap
 
@@ -170,7 +169,6 @@ private[ir] object IRProperties:
     "RGI_Emoji"
   )
 
-  /** Checks whether the name is a property of strings in ECMAScript. */
   def isJavaScriptStringProperty(name: String): Boolean = JavaScriptStringProperties.contains(name)
 
   def javaScript(name: String, value: Option[String], unicodeSets: Boolean): PropertyResult = value match
@@ -901,7 +899,6 @@ private[ir] object IRProperties:
             .orElse(if key.startsWith("in") then rubyBlock.get(key.drop(2)).map(foundValue) else None)
         )
 
-  /** Returns the property of the name and value in the dialect. */
   def resolve(
       dialect: Dialect,
       name: String,

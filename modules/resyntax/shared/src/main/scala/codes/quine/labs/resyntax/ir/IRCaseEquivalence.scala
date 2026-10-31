@@ -20,7 +20,6 @@ sealed abstract class IRCaseEquivalence:
     */
   def closeRange(set: CharSet): CharSet = closure(set)
 
-  /** Checks whether two code values match case-insensitively. */
   def equiv(a: Int, b: Int): Boolean = closure(CharSet.single(a)).contains(b)
 
 object IRCaseEquivalence:
@@ -83,7 +82,6 @@ object IRCaseEquivalence:
 
   private val Byte: CharSet = CharSet.range(0, 0xff)
 
-  /** ASCII letter folding. */
   lazy val asciiFold: CaseMapping = CaseMapping.fromEntries(('A'.toInt to 'Z').map(c => (c, c + 0x20)))
 
   /** The characters that Java's `Pattern.single` folds under `UNICODE_CASE`: `toUpperCase(c)` differs from the key. */
