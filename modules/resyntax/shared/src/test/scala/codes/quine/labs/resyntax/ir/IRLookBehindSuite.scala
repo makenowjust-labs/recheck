@@ -190,3 +190,47 @@ class IRLookBehindSuite extends IRSuiteBase:
   error("(?<=\\R*)", "", Java)("Look-behind group does not have an obvious maximum length at 0")
   error("(?<=(a)\\1)", "", Java)("Look-behind group does not have an obvious maximum length at 0")
   error("(a)(?<=\\1)", "", Java)("Look-behind group does not have an obvious maximum length at 3")
+
+  /** Checks how the engine matches the first look-behind of the pattern. */
+  def matching(s: String, dialects: Dialect*)(expected: IRLookBehindStarts*)(implicit loc: munit.Location): Unit =
+    for dialect <- dialects do
+      test(s"IRBuilder.build: the look-behind of /$s/ in $dialect"):
+        def find(node: IRNode): Option[IRLookBehindMatch] = node.data match
+          case IRNodeData.LookBehind(_, _, m)                                => Some(m)
+          case IRNodeData.NonAtomicLookBehind(_, m)                          => Some(m)
+          case IRNodeData.Conditional(IRCondition.LookBehind(_, _, m), _, _) => Some(m)
+          case IRNodeData.Sequence(nodes) => nodes.iterator.flatMap(find).nextOption()
+          case _                          => None
+        val (pattern, _) = build(s, "", dialect)
+        val expectedMatching =
+          if expected.isEmpty then IRLookBehindMatch.Backward else IRLookBehindMatch.Forward(expected)
+        assertEquals(find(pattern.node), Some(expectedMatching))
+
+  import IRLookBehindStarts.Java as JavaStarts
+  import IRLookBehindStarts.Longest
+
+  // .NET and JavaScript match a look-behind backward, and the others forward from the starts before the position.
+  matching("(?<=a|bc)", DotNet, JavaScript)()
+  matching("(?<=a|bc)", Perl)(Longest(1, 2))
+  matching("(?<=a|bc)", PCRE, Ruby)(Longest(1, 1), Longest(2, 2))
+  matching("(?<=(?:a|bc))", PCRE)(Longest(1, 2))
+  matching("(?<=(?:a|bc))", Ruby)(Longest(1, 1), Longest(2, 2))
+  matching("(?<=ab|cd)", Python)(Longest(2, 2))
+  matching("(?<=(?(1)a|bc))(a)", PCRE, Perl)(Longest(1, 2))
+  matching("(?(?<=a|bc)x)", PCRE)(Longest(1, 1), Longest(2, 2))
+  matching("(?<*a|bc)", PCRE)(Longest(1, 1), Longest(2, 2))
+  // PCRE's length of a branch ends at `(*ACCEPT)`, and Perl tries the starts to `(*ACCEPT)` too.
+  matching("(?<=a(*ACCEPT)b{0,300})", PCRE)(Longest(1, 1))
+  matching("(?<=(?:a(*ACCEPT))bc)", PCRE)(Longest(3, 3))
+  matching("(?<=(a(*ACCEPT)b))", PCRE)(Longest(1, 1))
+  matching("(?<=(?:a(*ACCEPT))bc)", Perl)(Longest(1, 3))
+  matching("(?<=(?>a(*ACCEPT))bc)", Perl)(Longest(3, 3))
+  // Java tries the starts of its `TreeInfo` lengths in code units, or in code points with a supplementary character after.
+  matching("(?<=a|bc)", Java)(JavaStarts(1, 2, false))
+  matching("(?<=a+)", Java)(JavaStarts(1, Int.MaxValue, false))
+  matching("(?<=ba*)", Java)(JavaStarts(1, Int.MinValue, false))
+  matching("(?<=(?:ab)?+c)", Java)(JavaStarts(1, 3, false))
+  matching("(?<=(?>ab)c)", Java)(JavaStarts(3, 3, false))
+  matching("(?<=\\R\\X)", Java)(JavaStarts(2, 2, false))
+  matching("(?<=a)😀", Java)(JavaStarts(1, 1, true))
+  matching("😀(?<=a)", Java)(JavaStarts(1, 1, false))

@@ -62,7 +62,6 @@ Some constructs are recognized, but the checkers do not handle them.
 A pattern having one of them is reported as `unknown` with an `unsupported` error naming the construct (e.g. `a(?R)?` gives `unsupported syntax (RCall) at 1`).
 
 - Recursion and subroutine calls (e.g. `(?R)`, `(?1)`, `(?&name)`, `\g<name>`), and the conditionals depending on them (`(?(R)...)`, and `(?(DEFINE)...)` in a pattern with calls).
-- `(*ACCEPT)` in a look-behind.
 - Callouts (e.g. `(?C1)`) and embedded code (e.g. Perl's `(?{ ... })` and `(??{ ... })`).
 - `\N{name}` and `\C` in a mode other than bytes.
 - Word boundaries of a kind, such as `\b{wb}`.
@@ -141,7 +140,12 @@ There are other deliberate approximations.
 - `\X` is the extended grapheme cluster of the regular expression in UAX #29 (Table 1b) in an atomic group, as the engines match one cluster without backtracking into it.
   In a bytes mode, it reads each byte as the Latin-1 character.
   PCRE2 10.49 does not implement the rule GB9c of Unicode 15.1 (e.g. `क्ष` is two clusters there), and does not join a regional indicator with a following mark.
-  Java's look-behind with `\X` matches nowhere if its `TreeInfo` lengths leave no start to try (e.g. `(?<=\X)`), and is unsupported otherwise.
+  Java's look-behind with `\X` matches nowhere if its `TreeInfo` lengths leave no start to try (e.g. `(?<=\X)`).
+- A look-behind matches as the engine does, which changes the captures, the chosen alternative and the steps.
+  JavaScript and .NET match it backward from the position.
+  The others match it forward from a start before the position, and the match must end at the position (or at `(*ACCEPT)`).
+  PCRE, Perl, Python and Ruby try the starts from the farthest, where PCRE and Ruby take each alternative in turn (e.g. `(?<=(a)|(aa))b` sets the group `1` on `aab`, but the group `2` in Perl).
+  Java tries the starts from the nearest by the lengths that its `TreeInfo` computes, in UTF-16 code units, or in code points when the pattern has a supplementary character after the look-behind.
 - For JavaScript's `v` flag, `recheck` follows the specification.
 - Look-arounds (including non-atomic ones), back-references, atomic groups, possessive quantifiers, conditionals and the backtracking control verbs other than `(*FAIL)` and `(*MARK)` are handled by the fuzz checker, not by the automaton checker.
 - A back-reference sees the captures as the engine keeps them over the iterations of a loop: JavaScript resets them on each iteration, and Perl unsets the captures of a failed alternative and of a fixed-length repetition matching nothing (e.g. `^(?:(a)?b){2}\1$` does not match `abba` in Perl).

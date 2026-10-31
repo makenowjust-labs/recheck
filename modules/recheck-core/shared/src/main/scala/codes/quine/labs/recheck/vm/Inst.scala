@@ -9,6 +9,7 @@ import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminators
+import codes.quine.labs.resyntax.ir.IRLookBehindStarts
 
 /** Inst is an instruction. */
 sealed abstract class Inst:
@@ -109,6 +110,15 @@ object Inst:
   final case class IfCap(indices: Seq[Int], yes: Label, no: Label) extends Terminator:
     def successors: Set[Label] = Set(yes, no)
     override def toString: String = s"if_cap ${indices.mkString(",")} $yes $no"
+
+  /** `step_back`: Saves the position to the `end` register, and jumps to a `next` block at each start of a look-behind
+    * matched forward, in the order of `starts`, as backtracking points.
+    *
+    * The register holds the end of the look-behind, so memoization tells the look-behinds at different positions apart.
+    */
+  final case class StepBack(end: CounterReg, starts: IRLookBehindStarts, next: Label) extends Terminator:
+    def successors: Set[Label] = Set(next)
+    override def toString: String = s"step_back $end $starts $next"
 
   /** Barrier is what the frame of a fallback is for the backtracking control verbs, which skip the frames to it. */
   sealed abstract class Barrier
@@ -272,6 +282,10 @@ object Inst:
     /** `$` assertion matching also before a line terminator at the end (e.g. Python's `$`). */
     final case class ChompInputEnd(terminators: IRLineTerminators) extends AssertKind:
       override def toString: String = "chomp_input_end"
+
+    /** The end of a look-behind matched forward, which the register holds. */
+    final case class LookBehindEnd(end: CounterReg) extends AssertKind:
+      override def toString: String = s"look_behind_end $end"
 
   /** ReadKind is an operand of `read` instruction. */
   sealed abstract class ReadKind

@@ -27,6 +27,7 @@ import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminators
+import codes.quine.labs.resyntax.ir.IRLookBehindStarts
 
 /** Interpreter executes a program on a input. */
 object Interpreter:
@@ -348,6 +349,19 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                 failedCaptures = frame.captures
                 frame.label = fallback
                 false
+            case Inst.StepBack(end, starts, next) =>
+              frame.counters = frame.counters.updated(end.index, frame.pos)
+              lookBehindStarts(frame.pos, starts) match
+                case first +: rest =>
+                  for pos <- rest.reverseIterator do
+                    val fallbackFrame = frame.clone()
+                    fallbackFrame.label = next
+                    fallbackFrame.pos = pos
+                    frame.fallback = Some(fallbackFrame)
+                  frame.label = next
+                  frame.pos = first
+                  false
+                case _ => true
             case Inst.Cmp(reg, n, lt, ge) =>
               val r = frame.counters(reg.index)
               val next = if r < n then lt else ge
@@ -518,6 +532,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
             frame.pos == input.length
           case AssertKind.ChompInputEnd(terminators) =>
             frame.pos == input.length || beforeTerminator(frame.pos, terminators).contains(input.length)
+          case AssertKind.LookBehindEnd(end) =>
+            frame.pos == frame.counters(end.index)
         if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
         ok
       case read: Inst.Read      => instRead(frame, read)
@@ -556,6 +572,53 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           else if restore.exists((from, to) => from <= index && index <= to) then frame.captures(i)
           else captures(i)
         true
+
+  /** Returns the starts of a look-behind at the position in the order that the engine tries them. */
+  private def lookBehindStarts(pos: Int, starts: IRLookBehindStarts): Seq[Int] = starts match
+    case IRLookBehindStarts.Longest(min, max) =>
+      val builder = Seq.newBuilder[Int]
+      if min == 0 then builder.addOne(pos)
+      var p = pos
+      var k = 0
+      while k < max && p > 0 do
+        p -= input.getBefore(p, program.meta.unicode).fold(1)(c => if c >= 0x10000 then 2 else 1)
+        k += 1
+        if k >= min then builder.addOne(p)
+      builder.result().reverse
+    // It follows `Behind` and `BehindS` of `java.util.regex.Pattern`, including the overflows as `int`.
+    case IRLookBehindStarts.Java(min, max, false) =>
+      val from = Math.max(pos - max, 0)
+      (pos - min).to(from, -1)
+    case IRLookBehindStarts.Java(min, max, true) =>
+      val from = Math.max(pos - javaCountChars(pos, -max), 0)
+      val builder = Seq.newBuilder[Int]
+      var j = pos - javaCountChars(pos, -min)
+      while j >= from do
+        builder.addOne(j)
+        j -= (if j > from then javaCountChars(j, -1) else 1)
+      builder.result()
+
+  /** Returns the number of UTF-16 code units of the code points from the index, as `Pattern.countChars` does. */
+  private def javaCountChars(index: Int, lengthInCodePoints: Int): Int =
+    def isHigh(i: Int): Boolean = Character.isHighSurrogate(input(i).toChar)
+    def isLow(i: Int): Boolean = Character.isLowSurrogate(input(i).toChar)
+    var x = index
+    if lengthInCodePoints == 1 && index >= 0 && index < input.length && !isHigh(index) then 1
+    else if lengthInCodePoints >= 0 then
+      var i = 0
+      while x < input.length && i < lengthInCodePoints do
+        x += 1
+        if isHigh(x - 1) && x < input.length && isLow(x) then x += 1
+        i += 1
+      x - index
+    else
+      val len = -lengthInCodePoints
+      var i = 0
+      while x > 0 && i < len do
+        x -= 1
+        if isLow(x) && x > 0 && isHigh(x - 1) then x -= 1
+        i += 1
+      index - x
 
   /** Tests whether the position is after a line terminator. */
   private def afterTerminator(pos: Int, terminators: IRLineTerminators): Boolean =

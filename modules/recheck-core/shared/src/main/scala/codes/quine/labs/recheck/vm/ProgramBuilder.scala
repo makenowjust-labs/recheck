@@ -21,6 +21,8 @@ import codes.quine.labs.resyntax.ir.IRAssertKind
 import codes.quine.labs.resyntax.ir.IRBacktrackControl
 import codes.quine.labs.resyntax.ir.IRBuilder
 import codes.quine.labs.resyntax.ir.IRCondition
+import codes.quine.labs.resyntax.ir.IRLookBehindMatch
+import codes.quine.labs.resyntax.ir.IRLookBehindStarts
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
 import codes.quine.labs.resyntax.ir.IRNotEmpty
@@ -307,23 +309,23 @@ private[vm] class ProgramBuilder(
   /** Builds a program from a node. */
   def build(node: IRNode): Unit = interrupt:
     node.data match
-      case IRNodeData.Disjunction(children)      => buildDisjunction(children)
-      case IRNodeData.Sequence(children)         => buildSequence(children)
-      case IRNodeData.Empty                      => ()
-      case IRNodeData.Capture(index, _, child)   => buildCapture(index, child)
-      case IRNodeData.Repeat(child, q)           => buildRepeat(q, child)
-      case IRNodeData.Atomic(child)              => buildAtomic(child)
-      case IRNodeData.Assert(kind)               => emitAssert(assertKind(kind))
-      case IRNodeData.LookAhead(false, child)    => wrapLookAhead(buildPositiveLookAround(child))
-      case IRNodeData.LookAhead(true, child)     => wrapLookAhead(buildNegativeLookAround(child))
-      case IRNodeData.LookBehind(false, child)   => wrapLookBehind(buildPositiveLookAround(child))
-      case IRNodeData.LookBehind(true, child)    => wrapLookBehind(buildNegativeLookAround(child))
-      case IRNodeData.NonAtomicLookAhead(child)  => wrapLookAhead(buildNonAtomicLookAround(child))
-      case IRNodeData.NonAtomicLookBehind(child) => wrapLookBehind(buildNonAtomicLookAround(child))
-      case IRNodeData.Conditional(cond, yes, no) => buildConditional(cond, yes, no)
+      case IRNodeData.Disjunction(children)         => buildDisjunction(children)
+      case IRNodeData.Sequence(children)            => buildSequence(children)
+      case IRNodeData.Empty                         => ()
+      case IRNodeData.Capture(index, _, child)      => buildCapture(index, child)
+      case IRNodeData.Repeat(child, q)              => buildRepeat(q, child)
+      case IRNodeData.Atomic(child)                 => buildAtomic(child)
+      case IRNodeData.Assert(kind)                  => emitAssert(assertKind(kind))
+      case IRNodeData.LookAhead(false, child)       => wrapLookAhead(buildPositiveLookAround(child))
+      case IRNodeData.LookAhead(true, child)        => wrapLookAhead(buildNegativeLookAround(child))
+      case IRNodeData.LookBehind(false, child, m)   => buildLookBehind(m)(buildPositiveLookAround(child, _))
+      case IRNodeData.LookBehind(true, child, m)    => buildLookBehind(m)(buildNegativeLookAround(child, _))
+      case IRNodeData.NonAtomicLookAhead(child)     => wrapLookAhead(buildNonAtomicLookAround(child))
+      case IRNodeData.NonAtomicLookBehind(child, m) => buildLookBehind(m)(buildNonAtomicLookAround(child, _))
+      case IRNodeData.Conditional(cond, yes, no)    => buildConditional(cond, yes, no)
       // `\K` sets the start of the whole match, which is the capture `0`.
       case IRNodeData.ResetMatchStart        => emitInst(Inst.CapBegin(0))
-      case IRNodeData.BacktrackControl(verb) => buildBacktrackControl(node, verb)
+      case IRNodeData.BacktrackControl(verb) => buildBacktrackControl(verb)
       case IRNodeData.Chars(set)             => emitRead(readKind(set), Location.from(node.loc))
       case IRNodeData.Strings(set)           =>
         val loc = Location.from(node.loc)
@@ -360,12 +362,15 @@ private[vm] class ProgramBuilder(
     case IRAssertKind.TextEnd               => AssertKind.InputEnd
     case IRAssertKind.ChompTextEnd(t)       => AssertKind.ChompInputEnd(t)
 
-  /** A builder for a disjunction node.
+  /** A builder for a disjunction node. */
+  def buildDisjunction(children: Seq[IRNode]): Unit = buildDisjunction(children, i => build(children(i)))
+
+  /** A builder for a disjunction node, where `run` builds the alternative of the index.
     *
     * When `(*THEN)` in it takes the next alternative, the fallback of each alternative is a barrier, and so is a
     * failing fallback before them, which `(*THEN)` in the last alternative takes.
     */
-  def buildDisjunction(children: Seq[IRNode]): Unit =
+  def buildDisjunction(children: Seq[IRNode], run: Int => Unit): Unit =
     val scope = Option.when(children.exists(hasThen))(newThenScope())
     for id <- scope do
       val next = allocateLabel("next")
@@ -373,8 +378,8 @@ private[vm] class ProgramBuilder(
       enterBlock(next)
     val barrier = scope.map(Barrier.Then(_))
     withThenScope(scope.orElse(thenScope)):
-      if perlCaptures then buildPerlDisjunction(children, barrier)
-      else buildAlternatives(children.map(n => () => build(n)), barrier)
+      if perlCaptures then buildPerlDisjunction(children, barrier, run)
+      else buildAlternatives(children.indices.map(i => () => run(i)), barrier)
 
   /** Returns a new scope ID of `(*THEN)`. */
   def newThenScope(): Int =
@@ -405,9 +410,9 @@ private[vm] class ProgramBuilder(
       !assertionIsThenScope && node.children.exists(hasThen)
     case IRNodeData.Conditional(condition, yes, no) =>
       val inCondition = condition match
-        case IRCondition.LookAhead(_, n)  => !assertionIsThenScope && hasThen(n)
-        case IRCondition.LookBehind(_, n) => !assertionIsThenScope && hasThen(n)
-        case IRCondition.Captured(_)      => false
+        case IRCondition.LookAhead(_, n)     => !assertionIsThenScope && hasThen(n)
+        case IRCondition.LookBehind(_, n, _) => !assertionIsThenScope && hasThen(n)
+        case IRCondition.Captured(_)         => false
       inCondition || hasThen(yes) || hasThen(no)
     case _ => node.children.exists(hasThen)
 
@@ -416,7 +421,7 @@ private[vm] class ProgramBuilder(
     Option.when(assertionIsThenScope && hasThen(child))(newThenScope())
 
   /** A builder for a disjunction node of Perl, which unsets the captures of an alternative when it fails. */
-  def buildPerlDisjunction(children: Seq[IRNode], barrier: Option[Barrier]): Unit =
+  def buildPerlDisjunction(children: Seq[IRNode], barrier: Option[Barrier], run: Int => Unit): Unit =
     val labels = children.map(_ => (allocateLabel("left"), allocateLabel("right")))
     val cont = allocateLabel("cont")
 
@@ -424,13 +429,13 @@ private[vm] class ProgramBuilder(
       val last = i == children.size - 1
       val captures = child.captureRange.range
       if last && captures.isEmpty then
-        build(child)
+        run(i)
         emitTerminator(Inst.Jmp(cont))
       else
         emitTry(l, allocateKeep(None, captures, Option.when(!last)(r)), barrier.filter(_ => !last))
 
         enterBlock(l)
-        build(child)
+        run(i)
         emitTerminator(Inst.Jmp(cont))
 
         if !last then enterBlock(r)
@@ -678,14 +683,14 @@ private[vm] class ProgramBuilder(
     atomicDepth = saved._3
 
   /** Builds the body of an assertion, which is the scope of `(*ACCEPT)` and maybe of `(*THEN)`. */
-  def buildAssertion(child: IRNode, scope: Option[Int]): Unit =
-    withThenScope(scope.orElse(thenScope))(withAcceptScope(AcceptScope.LookAround)(build(child)))
+  def buildAssertion(child: IRNode, scope: Option[Int], body: IRNode => Unit): Unit =
+    withThenScope(scope.orElse(thenScope))(withAcceptScope(AcceptScope.LookAround)(body(child)))
 
   /** A builder for positive look-around assertion.
     *
     * With `(*THEN)` in it, a failing fallback is the barrier, which makes the assertion fail.
     */
-  def buildPositiveLookAround(child: IRNode): Unit =
+  def buildPositiveLookAround(child: IRNode, body: IRNode => Unit = build): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
     val scope = assertionThenScope(child)
@@ -693,13 +698,13 @@ private[vm] class ProgramBuilder(
     emitTerminator(Inst.Tx(main, Some(cont), scope.map(_ => failLabel()), scope.map(Barrier.Then(_))))
 
     enterBlock(main)
-    buildAssertion(child, scope)
+    buildAssertion(child, scope, body)
     emitTerminator(Inst.Rollback)
 
     enterBlock(cont)
 
   /** A builder for negative look-around assertion, whose fallback makes the assertion succeed. */
-  def buildNegativeLookAround(child: IRNode): Unit =
+  def buildNegativeLookAround(child: IRNode, body: IRNode => Unit = build): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
     val scope = assertionThenScope(child)
@@ -707,7 +712,7 @@ private[vm] class ProgramBuilder(
     emitTerminator(Inst.Tx(main, None, Some(cont), Option.when(hasCut)(Barrier.Assertion(scope))))
 
     enterBlock(main)
-    buildAssertion(child, scope)
+    buildAssertion(child, scope, body)
     emitTerminator(Inst.Rollback)
 
     enterBlock(cont)
@@ -716,7 +721,7 @@ private[vm] class ProgramBuilder(
     *
     * `(*ACCEPT)` in it ends it atomically.
     */
-  def buildNonAtomicLookAround(child: IRNode): Unit =
+  def buildNonAtomicLookAround(child: IRNode, body: IRNode => Unit = build): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
     val scope = assertionThenScope(child)
@@ -724,7 +729,7 @@ private[vm] class ProgramBuilder(
     emitTerminator(Inst.Tx(main, Some(cont), scope.map(_ => failLabel()), scope.map(Barrier.Then(_))))
 
     enterBlock(main)
-    buildAssertion(child, scope)
+    buildAssertion(child, scope, body)
     emitTerminator(Inst.Leave)
 
     enterBlock(cont)
@@ -740,40 +745,48 @@ private[vm] class ProgramBuilder(
     val noLabel = allocateLabel("no")
     val cont = allocateLabel("cont")
 
-    def buildTest(negative: Boolean, child: IRNode, behind: Boolean): Unit =
+    def buildTest(negative: Boolean, child: IRNode, body: IRNode => Unit): Unit =
       val main = allocateLabel("main")
       val scope = assertionThenScope(child)
       val (rollback, fallback) = if negative then (noLabel, yesLabel) else (yesLabel, noLabel)
       emitTerminator(Inst.Tx(main, Some(rollback), Some(fallback), Option.when(hasCut)(Barrier.Assertion(scope))))
       enterBlock(main)
-      val test = () => buildAssertion(child, scope)
-      if behind then wrapLookBehind(test()) else wrapLookAhead(test())
+      buildAssertion(child, scope, body)
       emitTerminator(Inst.Rollback)
 
+    // The register of the end of a look-behind matched forward, which is reset after the condition.
+    var end: Option[CounterReg] = None
     val test = condition match
       case IRCondition.Captured(indices) =>
         emitTerminator(Inst.IfCap(indices, yesLabel, noLabel))
         None
       case IRCondition.LookAhead(negative, n) =>
-        buildTest(negative, n, false)
+        wrapLookAhead(buildTest(negative, n, build))
         Some(n)
-      case IRCondition.LookBehind(negative, n) =>
-        buildTest(negative, n, true)
+      case IRCondition.LookBehind(negative, n, IRLookBehindMatch.Backward) =>
+        wrapLookBehind(buildTest(negative, n, build))
+        Some(n)
+      case IRCondition.LookBehind(negative, n, IRLookBehindMatch.Forward(starts)) =>
+        val reg = allocateCounter()
+        end = Some(reg)
+        wrapLookAhead(buildTest(negative, n, buildForwardBody(_, starts, reg)))
         Some(n)
     // .NET drops the captures of the condition, which are unset here though they may have had values before.
     val dropped = test.filter(_ => pattern.dialect == Dialect.DotNet).flatMap(_.captureRange.range)
 
     for (label, branch) <- Seq((yesLabel, yes), (noLabel, no)) do
       enterBlock(label)
+      for reg <- end do emitInst(Inst.Reset(reg))
       for (from, to) <- dropped do emitInst(Inst.CapReset(from, to))
       build(branch)
       emitTerminator(Inst.Jmp(cont))
 
     enterBlock(cont)
+    end.foreach(freeCounter)
 
   /** A builder for a backtracking control verb. */
-  def buildBacktrackControl(node: IRNode, verb: IRBacktrackControl): Unit = verb match
-    case IRBacktrackControl.Accept     => buildAccept(node)
+  def buildBacktrackControl(verb: IRBacktrackControl): Unit = verb match
+    case IRBacktrackControl.Accept     => buildAccept()
     case IRBacktrackControl.Commit     => emitInst(Inst.Verb(VerbKind.Commit))
     case IRBacktrackControl.Prune      => emitInst(Inst.Verb(VerbKind.Prune))
     case IRBacktrackControl.Skip(name) => emitInst(Inst.Verb(VerbKind.Skip(name)))
@@ -783,13 +796,9 @@ private[vm] class ProgramBuilder(
 
   /** A builder for `(*ACCEPT)`, which closes the open captures and ends its scope successfully.
     *
-    * PCRE and Perl match a look-behind forward from the position its length before, so `(*ACCEPT)` in it is not
-    * supported, as the VM matches it backward.
+    * In a look-behind, which PCRE and Perl match forward, it ends the look-behind before reaching the position.
     */
-  def buildAccept(node: IRNode): Unit =
-    if back then
-      val at = Option.when(node.loc.start >= 0)(s" at ${node.loc.start}").getOrElse("")
-      throw new UnsupportedException(s"unsupported syntax (Accept in a look-behind)$at")
+  def buildAccept(): Unit =
     for index <- openCaptures do emitInst(Inst.CapEnd(index))
     acceptScope match
       case AcceptScope.Top        => emitOk()
@@ -808,6 +817,38 @@ private[vm] class ProgramBuilder(
     back = false
     run
     back = oldBack
+
+  /** Builds a look-behind with the builder of the assertion, which takes the builder of the body.
+    *
+    * The body matches backward, or forward from the starts that the engine tries before the position.
+    */
+  def buildLookBehind(matching: IRLookBehindMatch)(run: (IRNode => Unit) => Unit): Unit =
+    matching match
+      case IRLookBehindMatch.Backward        => wrapLookBehind(run(build))
+      case IRLookBehindMatch.Forward(starts) =>
+        val end = allocateCounter()
+        wrapLookAhead(run(buildForwardBody(_, starts, end)))
+        emitInst(Inst.Reset(end))
+        freeCounter(end)
+
+  /** Builds the body of a look-behind matched forward from each start, which must end at the position held by `end`.
+    *
+    * With the starts of each alternative, the body is a disjunction of them.
+    */
+  def buildForwardBody(child: IRNode, starts: Seq[IRLookBehindStarts], end: CounterReg): Unit =
+    def attempt(node: IRNode, starts: IRLookBehindStarts): Unit =
+      val start = allocateLabel("start")
+      emitTerminator(Inst.StepBack(end, starts, start))
+      enterBlock(start)
+      build(node)
+      emitAssert(AssertKind.LookBehindEnd(end))
+    (starts, child.data) match
+      case (Seq(s), _)                                                     => attempt(child, s)
+      case (_, IRNodeData.Disjunction(nodes)) if nodes.size == starts.size =>
+        buildDisjunction(nodes, i => attempt(nodes(i), starts(i)))
+      // $COVERAGE-OFF$
+      case _ => throw new IllegalStateException("look-behind starts do not match the alternatives")
+      // $COVERAGE-ON$
 
   /** Sets a matching direction fot look-behind assertion. */
   def wrapLookBehind(run: => Unit): Unit =

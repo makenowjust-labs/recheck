@@ -62,8 +62,15 @@ object IRBuilder:
     // A Perl byte string has no `use utf8`, so its non-ASCII literals are bytes.
     val perlUtf8 = if mode == UnitMode.Byte then options.perlUtf8.orElse(Some(false)) else options.perlUtf8
     val perlUnicodeRules = dialect == Dialect.Perl && usesPerlUnicodeRules(node, perlUtf8)
+    val supplementary = if dialect == Dialect.Java then lastSupplementary(node) else -1
     val checker =
-      new LookBehindChecker(table, resolver, featureSet, literalWidth(flagSet, dialect, perlUnicodeRules))
+      new LookBehindChecker(
+        table,
+        resolver,
+        featureSet,
+        literalWidth(flagSet, dialect, perlUnicodeRules),
+        supplementary
+      )
     val backReferences = new IRValidator(table, resolver, checker, featureSet).validate(node)
     val chars = new IRCharResolver(dialect, mode, perlUnicodeRules)
     val builder = new IRBuilder(context, table, backReferences, chars, checker, resolveCharacter, hasCall(node))
@@ -142,14 +149,22 @@ object IRBuilder:
       case _               => false
     check(node)
 
-  /** Checks whether the node has `\X`. */
-  private def hasGraphemeCluster(x: Any): Boolean = x match
-    case EscapeClassKind.GraphemeCluster => true
-    case xs: Iterable[?]                 => xs.exists(hasGraphemeCluster)
-    case x: Option[?]                    => x.exists(hasGraphemeCluster)
-    case _: String                       => false
-    case x: Product                      => x.productIterator.exists(hasGraphemeCluster)
-    case _                               => false
+  /** Returns the start of the last node with a supplementary character or a surrogate in the pattern text, or `-1`. */
+  private def lastSupplementary(node: Node): Int =
+    def isSupplementary(c: Int): Boolean = c >= 0x10000 || Character.isSurrogate(c.toChar) && c <= 0xffff
+    def hasSupplementary(x: Any): Boolean = x match
+      case ClassItemData.ClassLiteral(value) => isSupplementary(value)
+      case xs: Iterable[?]                   => xs.exists(hasSupplementary)
+      case x: Option[?]                      => x.exists(hasSupplementary)
+      case _: String                         => false
+      case x: Product                        => x.productIterator.exists(hasSupplementary)
+      case _                                 => false
+    val self = node.data match
+      case NodeData.Literal(value)                     => isSupplementary(value)
+      case NodeData.Class(_, item)                     => hasSupplementary(item)
+      case NodeData.Command(CommandKind.Comment(text)) => text.codePoints.anyMatch(isSupplementary)
+      case _                                           => false
+    NodeKey.children(node).map(lastSupplementary).foldLeft(if self then node.loc.start else -1)(_.max(_))
 
   /** Returns the names of PCRE's start options (e.g. `(*CRLF)`), which can appear only at the start. */
   private def startOptions(node: Node): Seq[String] =
@@ -372,8 +387,10 @@ private[ir] class IRBuilder(
           case None          => IRCondition.LookAhead(false, scoped(build(body)))
       case Some(_: GroupKind.PositiveLookAhead)  => IRCondition.LookAhead(false, scoped(build(body)))
       case Some(_: GroupKind.NegativeLookAhead)  => IRCondition.LookAhead(true, scoped(build(body)))
-      case Some(_: GroupKind.PositiveLookBehind) => IRCondition.LookBehind(false, scoped(build(body)))
-      case Some(_: GroupKind.NegativeLookBehind) => IRCondition.LookBehind(true, scoped(build(body)))
+      case Some(_: GroupKind.PositiveLookBehind) =>
+        IRCondition.LookBehind(false, scoped(build(body)), checker.matching(body))
+      case Some(_: GroupKind.NegativeLookBehind) =>
+        IRCondition.LookBehind(true, scoped(build(body)), checker.matching(body))
 
   def buildBacktrackControl(kind: Option[BacktrackControlKind], name: Option[String]): IRNodeData =
     // An empty name is the same as no name.
@@ -388,16 +405,16 @@ private[ir] class IRBuilder(
       case Some(BacktrackControlKind.Mark) | None =>
         IRNodeData.BacktrackControl(IRBacktrackControl.Mark(name.getOrElse("")))
 
-  /** Builds a look-behind, where Java's one with `\X` tries the starts of its `TreeInfo` lengths, unlike the IR's one.
+  /** Builds a look-behind, which never matches if the engine tries no start for it.
     *
-    * It never matches if no start is tried, and is unsupported otherwise.
+    * Java's `TreeInfo` lengths can make it so (e.g. `(?<=\X)`, where `\X` counts one for the minimum and zero for the
+    * maximum).
     */
-  def buildLookBehind(node: Node, negative: Boolean, child: Node): IRNodeData =
-    if dialect == Dialect.Java && IRBuilder.hasGraphemeCluster(child) then
-      if !checker.javaNeverMatches(child) then IRNodeData.Unsupported(node.data)
-      else if negative then IRNodeData.Empty
-      else IRNodeData.Chars(CharSet.empty)
-    else IRNodeData.LookBehind(negative, scoped(build(child)))
+  def buildLookBehind(negative: Boolean, child: Node): IRNodeData =
+    checker.matching(child) match
+      case IRLookBehindMatch.Forward(Seq(IRLookBehindStarts.Java(min, max, _))) if 0 <= max && max < min =>
+        if negative then IRNodeData.Empty else IRNodeData.Chars(CharSet.empty)
+      case matching => IRNodeData.LookBehind(negative, scoped(build(child)), matching)
 
   def buildGroup(node: Node, kind: GroupKind, child: Node): Either[IRNodeData, IRNode] = kind match
     case GroupKind.IndexedCapture =>
@@ -409,8 +426,8 @@ private[ir] class IRBuilder(
     case GroupKind.PNamedCapture(name)   => Left(buildNamedCapture(node, name, child))
     case GroupKind.PositiveLookAhead(_)  => Left(IRNodeData.LookAhead(false, scoped(build(child))))
     case GroupKind.NegativeLookAhead(_)  => Left(IRNodeData.LookAhead(true, scoped(build(child))))
-    case GroupKind.PositiveLookBehind(_) => Left(buildLookBehind(node, negative = false, child))
-    case GroupKind.NegativeLookBehind(_) => Left(buildLookBehind(node, negative = true, child))
+    case GroupKind.PositiveLookBehind(_) => Left(buildLookBehind(negative = false, child))
+    case GroupKind.NegativeLookBehind(_) => Left(buildLookBehind(negative = true, child))
     case GroupKind.Atomic(_)             => Left(IRNodeData.Atomic(scoped(build(child))))
     case GroupKind.InlineFlag(diff)      =>
       Right(scoped:
@@ -422,11 +439,12 @@ private[ir] class IRBuilder(
         build(child))
     case GroupKind.Balance(_, _, _)               => Left(IRNodeData.Unsupported(node.data))
     case GroupKind.NonAtomicPositiveLookAhead(_)  => Left(IRNodeData.NonAtomicLookAhead(scoped(build(child))))
-    case GroupKind.NonAtomicPositiveLookBehind(_) => Left(IRNodeData.NonAtomicLookBehind(scoped(build(child))))
-    case GroupKind.ScriptRun(_)                   => Left(IRNodeData.Unsupported(node.data))
-    case GroupKind.AtomicScriptRun(_)             => Left(IRNodeData.Unsupported(node.data))
-    case GroupKind.ScanSubstring(_, _)            => Left(IRNodeData.Unsupported(node.data))
-    case GroupKind.Absence                        => Left(IRNodeData.Unsupported(node.data))
+    case GroupKind.NonAtomicPositiveLookBehind(_) =>
+      Left(IRNodeData.NonAtomicLookBehind(scoped(build(child)), checker.matching(child)))
+    case GroupKind.ScriptRun(_)        => Left(IRNodeData.Unsupported(node.data))
+    case GroupKind.AtomicScriptRun(_)  => Left(IRNodeData.Unsupported(node.data))
+    case GroupKind.ScanSubstring(_, _) => Left(IRNodeData.Unsupported(node.data))
+    case GroupKind.Absence             => Left(IRNodeData.Unsupported(node.data))
 
   def buildNamedCapture(node: Node, name: String, child: Node): IRNodeData =
     val index = table.indexOf(node).getOrElse(throw new IllegalStateException(s"No capture index: $node"))

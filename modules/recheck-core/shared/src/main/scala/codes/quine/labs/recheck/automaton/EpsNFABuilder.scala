@@ -219,7 +219,7 @@ private class EpsNFABuilder(
       case IRNodeData.Conditional(_, _, _) => throw new UnsupportedException("conditional")
       case IRNodeData.LookAhead(_, _) | IRNodeData.NonAtomicLookAhead(_) =>
         throw new UnsupportedException("look-ahead assertion")
-      case IRNodeData.LookBehind(_, _) | IRNodeData.NonAtomicLookBehind(_) =>
+      case IRNodeData.LookBehind(_, _, _) | IRNodeData.NonAtomicLookBehind(_, _) =>
         throw new UnsupportedException("look-behind assertion")
       case IRNodeData.Atomic(_)           => throw new UnsupportedException("atomic group")
       case IRNodeData.BackReference(_, _) => throw new UnsupportedException("back-reference")

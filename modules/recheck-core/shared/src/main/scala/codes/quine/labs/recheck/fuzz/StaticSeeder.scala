@@ -81,13 +81,13 @@ object StaticSeeder:
           case LookAhead(negative, n) =>
             val c = loop(n, prevIsRepeat, nextIsRepeat, inside)
             if !negative && nextIsRepeat then c else copy(Disjunction(Seq(c, empty)))
-          case LookBehind(negative, n) =>
+          case LookBehind(negative, n, _) =>
             val c = loop(n, prevIsRepeat, nextIsRepeat, inside)
             if !negative && prevIsRepeat then c else copy(Disjunction(Seq(c, empty)))
           case NonAtomicLookAhead(n) =>
             val c = loop(n, prevIsRepeat, nextIsRepeat, inside)
             if nextIsRepeat then c else copy(Disjunction(Seq(c, empty)))
-          case NonAtomicLookBehind(n) =>
+          case NonAtomicLookBehind(n, _) =>
             val c = loop(n, prevIsRepeat, nextIsRepeat, inside)
             if prevIsRepeat then c else copy(Disjunction(Seq(c, empty)))
           // The condition is dropped, and either branch may be taken.

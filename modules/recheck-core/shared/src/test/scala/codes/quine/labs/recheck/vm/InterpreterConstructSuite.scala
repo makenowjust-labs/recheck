@@ -1,7 +1,6 @@
 package codes.quine.labs.recheck.vm
 
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.recheck.vm.Interpreter.Options
@@ -236,9 +235,45 @@ class InterpreterConstructSuite extends munit.FunSuite:
     check("(*NOTEMPTY_ATSTART)\\Ka|", "ba", PCRE)(Seq(g(1, 2)))
     check("(*NOTEMPTY_ATSTART)b\\K|a", "ba", PCRE)(Seq(g(1, 1)))
 
-  test("ProgramBuilder.build: (*ACCEPT) in a look-behind"):
-    // PCRE and Perl match a look-behind forward, so `(?<=(a)(*ACCEPT)b)c` matches `ac`.
-    val pattern = ParsedPattern.parse("(?<=(a)(*ACCEPT)b)c", "", PCRE).toTry.get
-    interceptMessage[UnsupportedException]("unsupported syntax (Accept in a look-behind) at 7")(
-      ProgramBuilder.build(pattern).get
-    )
+  test("Interpreter.run: look-behinds"):
+    // .NET and JavaScript match a look-behind backward, and the others forward from the starts before the position.
+    check("(?<=(a|aa))b", "aab", JavaScript, DotNet, Java)(Seq(g(2, 3), g(1, 2)))
+    check("(?<=(a|aa))b", "aab", PCRE, Perl)(Seq(g(2, 3), g(0, 2)))
+    check("(?<=(a)|(aa))b", "aab", JavaScript, DotNet, Java, PCRE, Ruby)(Seq(g(2, 3), g(1, 2)))
+    check("(?<=(a)|(aa))b", "aab", Perl)(Seq(g(2, 3), unset, g(0, 2)))
+    check("(?<=(aa)|(a))b", "aab", JavaScript, DotNet, PCRE, Perl, Ruby)(Seq(g(2, 3), g(0, 2)))
+    check("(?<=(aa)|(a))b", "aab", Java)(Seq(g(2, 3), unset, g(1, 2)))
+    check("(?<=(a{2})|(a))b", "aaab", JavaScript, DotNet, PCRE, Perl, Ruby)(Seq(g(3, 4), g(1, 3)))
+    check("(?<=(a{2})|(a))b", "aaab", Java)(Seq(g(3, 4), unset, g(2, 3)))
+    check("(?<=(a{1,3}?))b", "aaab", PCRE, Perl)(Seq(g(3, 4), g(0, 3)))
+    check("(?<=(a{1,3}?))b", "aaab", Java)(Seq(g(3, 4), g(2, 3)))
+    check("(?<=(b)c|(a)bc)d", "abcd", PCRE, Java, Ruby)(Seq(g(3, 4), g(1, 2)))
+    check("(?<=(b)c|(a)bc)d", "abcd", Perl)(Seq(g(3, 4), unset, g(0, 1)))
+    check("(?<=(a)bc|(b)c)d", "abcd", PCRE, Perl, Ruby)(Seq(g(3, 4), g(0, 1)))
+    check("(?<=(a)bc|(b)c)d", "abcd", Java)(Seq(g(3, 4), unset, g(1, 2)))
+    check("(?<=(a)\\1)b", "aab", JavaScript)(Seq(g(2, 3), g(1, 2)))
+    check("(?<=(a)\\1)b", "aab", PCRE)(Seq(g(2, 3), g(0, 1)))
+    check("(?<=(a)\\1)b", "aab", DotNet)(NoMatch)
+    // The match must end at the position.
+    check("(?<=ab?+)b", "ab", Java, PCRE, Perl)(NoMatch)
+    check("(?<=(?<=(a))(b))c", "abc", Java, PCRE, Perl, Python, Ruby)(Seq(g(2, 3), g(0, 1), g(1, 2)))
+    check("(?(?<=(a|aa))b|x)", "aab", PCRE, Perl)(Seq(g(2, 3), g(0, 2)))
+    check("(?(?<=(a|aa))b|x)", "aab", DotNet)(Seq(g(2, 3)))
+    check("(a)?(?<=(?(1)a{4}))x", "aaaax", PCRE)(Seq(g(3, 5), g(3, 4)))
+    check("(?<=(?:a(*THEN)x|ab))c", "abc", PCRE)(Seq(g(2, 3)))
+    // `(*ACCEPT)` ends a look-behind anywhere, and PCRE's length of a branch ends at it.
+    check("(?<=(a)(*ACCEPT)b)c", "ac", PCRE, Perl)(Seq(g(1, 2), g(0, 1)))
+    check("(?<=(a)(*ACCEPT)b)x", "aax", PCRE)(Seq(g(2, 3), g(1, 2)))
+    check("(?<=(a)(*ACCEPT)b)x", "aax", Perl)(Seq(g(2, 3), g(0, 1)))
+    check("(?<=(a(*ACCEPT)b))x", "abx", PCRE)(NoMatch)
+    check("(?<=(a(*ACCEPT)b))x", "abx", Perl)(Seq(g(2, 3), g(0, 1)))
+    check("(?<=(?:a(*ACCEPT))bc)x", "ax", PCRE)(NoMatch)
+    check("(?<=(?:a(*ACCEPT))bc)x", "ax", Perl)(Seq(g(1, 2)))
+    // Java steps back by its `TreeInfo` lengths, in code units, or in code points with a supplementary character after.
+    check("(?<=(.))x", "\uD83D\uDE00x", Java)(Seq(g(2, 3), g(1, 2)))
+    check("(?<=(.))x\uD83D\uDE00?", "\uD83D\uDE00x", Java)(Seq(g(2, 3), g(0, 2)))
+    check("(?<=(?:\\X|bc))c", "abc", Java)(Seq(g(2, 3)))
+    check("(?<=(\\X\\X))c", "abc", Java)(NoMatch)
+    check("(?<=(a?+a))b", "aaab", Java)(Seq(g(3, 4), g(1, 3)))
+    check("(?<=(a*))b", "aaab", Java)(Seq(g(3, 4), g(3, 3)))
+    check("(?<=xy(a*))b", "aaab", Java)(NoMatch)

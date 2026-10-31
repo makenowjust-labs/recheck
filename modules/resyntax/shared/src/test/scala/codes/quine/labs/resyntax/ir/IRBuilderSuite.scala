@@ -17,6 +17,9 @@ import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRCharClasses.AsciiWord
+import codes.quine.labs.resyntax.ir.IRLookBehindMatch.Forward
+import codes.quine.labs.resyntax.ir.IRLookBehindStarts.Java as JavaStarts
+import codes.quine.labs.resyntax.ir.IRLookBehindStarts.Longest
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.ir.IRQuantifier.*
 
@@ -83,10 +86,14 @@ class IRBuilderSuite extends IRSuiteBase:
   check("(?P<x>)", "", PCRE, Perl, Python)(Capture(1, Some("x"), Empty))
   check("(?=a)", "", All*)(LookAhead(false, char('a')))
   check("(?!a)", "", All*)(LookAhead(true, char('a')))
-  check("(?<=a)", "", All*)(LookBehind(false, char('a')))
-  check("(?<!a)", "", All*)(LookBehind(true, char('a')))
+  check("(?<=a)", "", DotNet, JavaScript)(LookBehind(false, char('a')))
+  check("(?<=a)", "", PCRE, Perl, Python, Ruby)(LookBehind(false, char('a'), Forward(Seq(Longest(1, 1)))))
+  check("(?<=a)", "", Java)(LookBehind(false, char('a'), Forward(Seq(JavaStarts(1, 1, false)))))
+  check("(?<!a)", "", DotNet, JavaScript)(LookBehind(true, char('a')))
+  check("(?<!a)", "", PCRE, Perl, Python, Ruby)(LookBehind(true, char('a'), Forward(Seq(Longest(1, 1)))))
+  check("(?<!a)", "", Java)(LookBehind(true, char('a'), Forward(Seq(JavaStarts(1, 1, false)))))
   check("(*pla:a)", "", PCRE, Perl)(LookAhead(false, char('a')))
-  check("(*negative_lookbehind:a)", "", PCRE, Perl)(LookBehind(true, char('a')))
+  check("(*negative_lookbehind:a)", "", PCRE, Perl)(LookBehind(true, char('a'), Forward(Seq(Longest(1, 1)))))
   check("(?>a)", "", DotNet, Java, PCRE, Perl, Python, Ruby)(Atomic(char('a')))
   check("(*atomic:a)", "", PCRE, Perl)(Atomic(char('a')))
   check("(?<x>)(?<-x>)", "", DotNet)(
@@ -97,8 +104,10 @@ class IRBuilderSuite extends IRSuiteBase:
   )
   check("(?*a)", "", PCRE)(NonAtomicLookAhead(IRNode(char('a'))))
   check("(*napla:a)", "", PCRE)(NonAtomicLookAhead(IRNode(char('a'))))
-  check("(?<*a)", "", PCRE)(NonAtomicLookBehind(IRNode(char('a'))))
-  check("(*non_atomic_positive_lookbehind:a)", "", PCRE)(NonAtomicLookBehind(IRNode(char('a'))))
+  check("(?<*a)", "", PCRE)(NonAtomicLookBehind(IRNode(char('a')), Forward(Seq(Longest(1, 1)))))
+  check("(*non_atomic_positive_lookbehind:a)", "", PCRE)(
+    NonAtomicLookBehind(IRNode(char('a')), Forward(Seq(Longest(1, 1))))
+  )
   check("(*script_run:)", "", PCRE, Perl)(
     Unsupported(NodeData.Group(GroupKind.ScriptRun(AssertNameStyle.Alphabetic), NodeData.Sequence()))
   )
@@ -203,11 +212,14 @@ class IRBuilderSuite extends IRSuiteBase:
   check("(?(?!x)a|b)", "", DotNet, PCRE, Perl)(
     Conditional(IRCondition.LookAhead(true, char('x')), char('a'), char('b'))
   )
-  check("(?(?<=x)a|b)", "", DotNet, PCRE, Perl)(
+  check("(?(?<=x)a|b)", "", DotNet)(
     Conditional(IRCondition.LookBehind(false, char('x')), char('a'), char('b'))
   )
+  check("(?(?<=x)a|b)", "", PCRE, Perl)(
+    Conditional(IRCondition.LookBehind(false, char('x'), Forward(Seq(Longest(1, 1)))), char('a'), char('b'))
+  )
   check("(?(*nlb:x)a|b)", "", PCRE, Perl)(
-    Conditional(IRCondition.LookBehind(true, char('x')), char('a'), char('b'))
+    Conditional(IRCondition.LookBehind(true, char('x'), Forward(Seq(Longest(1, 1)))), char('a'), char('b'))
   )
   check("(?(?C1)(?=x)a|b)", "", PCRE)(
     Unsupported(

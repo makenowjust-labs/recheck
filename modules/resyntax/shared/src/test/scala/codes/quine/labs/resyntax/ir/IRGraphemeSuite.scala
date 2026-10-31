@@ -110,7 +110,7 @@ class IRGraphemeSuite extends munit.FunSuite:
       assertEquals(cluster(Seq(0xa9, 0x41), dialect, flags), Some(1))
       assertEquals(cluster(Seq(), dialect, flags), None)
 
-  // Java's look-behind tries only the starts of its `TreeInfo` lengths, where `\X` is at most zero long.
+  // Java's look-behind tries only the starts of its `TreeInfo` lengths, where `\X` is one long at least and zero at most.
   test("IRBuilder.build: Java's look-behind with \\X"):
     def first(s: String): IRNodeData =
       val IRNodeData.Sequence(nodes) = build(s, "", Java).node.data: @unchecked
@@ -118,7 +118,10 @@ class IRGraphemeSuite extends munit.FunSuite:
     assertEquals(first("(?<=\\X)a"), IRNodeData.Chars(codes.quine.labs.resyntax.charset.CharSet.empty))
     assertEquals(first("(?<=a\\X)b"), IRNodeData.Chars(codes.quine.labs.resyntax.charset.CharSet.empty))
     assertEquals(first("(?<!\\X)a"), IRNodeData.Empty)
-    assert(first("(?<=(?:\\X|bc))a").isInstanceOf[IRNodeData.Unsupported])
+    first("(?<=(?:\\X|bc))a") match
+      case IRNodeData.LookBehind(false, _, matching) =>
+        assertEquals(matching, IRLookBehindMatch.Forward(Seq(IRLookBehindStarts.Java(1, 2, false))))
+      case data => fail(s"unexpected: $data")
     assert(first("(?<=b)a").isInstanceOf[IRNodeData.LookBehind])
 
   test("IRBuilder.build: \\X in a look-behind is an error in the others"):
