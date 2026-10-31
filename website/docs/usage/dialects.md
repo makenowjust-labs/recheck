@@ -129,6 +129,8 @@ There are other deliberate approximations.
 - The Unicode data (properties, case mappings) is of Unicode 18.0, while the engines use Unicode 16 or 17.
 - For JavaScript's `v` flag, `recheck` follows the specification.
 - Look-arounds, back-references, atomic groups and possessive quantifiers are handled by the fuzz checker, not by the automaton checker.
+- A back-reference sees the captures as the engine keeps them over the iterations of a loop: JavaScript resets them on each iteration, and Perl unsets the captures of a failed alternative and of a fixed-length repetition matching nothing (e.g. `^(?:(a)?b){2}\1$` does not match `abba` in Perl).
+  Two behaviors are not reproduced: Java does not restore the captures in a repeated group without branches (e.g. `(?:(b)c)*`) when the repetition backtracks, even at a later starting position, and the engines differ on an iteration matching the empty string.
 
 ## Recall Validation
 

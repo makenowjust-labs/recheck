@@ -11,7 +11,9 @@ import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.charset.UString
 
-/** The expected results are checked on the engines (Node 26, Python 3.15, Ruby 4.0, Java 25, PHP 8.5 with PCRE2). */
+/** The expected results are checked on the engines (Node 26, Python 3.15, Ruby 4.0, Java 25, .NET 10, Perl 5.44 and PHP
+  * 8.5 with PCRE2).
+  */
 class InterpreterDialectSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
@@ -61,6 +63,26 @@ class InterpreterDialectSuite extends munit.FunSuite:
       accepts("^(?:(a)?b){2}\\1$", dialect, "abba")
       refutes("^(?:(a)?b){2}\\1$", dialect, "abb")
       accepts("^(?:(a)|b){1,2}\\1$", dialect, "aba")
+
+  test("Interpreter.run: Perl's captures on backtracking"):
+    def perlOnly(source: String, input: String)(using munit.Location): Unit =
+      refutes(source, Perl, input)
+      for dialect <- Seq(Java, Python, PCRE, Ruby, DotNet) do accepts(source, dialect, input)
+    // Perl unsets the capture of a fixed-length repetition matching nothing (`CURLYN` and `CURLYM`).
+    perlOnly("^(?:(a)?b){2}\\1$", "abba")
+    perlOnly("^(?:(ab)*c)*\\1$", "abccab")
+    // It does not for a repetition of a variable-length node (`CURLYX`).
+    accepts("^(?:(a|bc)?x){2}\\1$", Perl, "axxa")
+    // Perl unsets the captures of a failed alternative, even ones of an earlier iteration.
+    perlOnly("^(?:(a)|b){2}\\1$", "aba")
+    perlOnly("^(?:(a)|b)*\\1$", "aba")
+    perlOnly("^(?:(?:(a)|b)(?:c|d)){2}\\1$", "acbda")
+    // Backtracking to an earlier alternation in the iteration does not restore them.
+    perlOnly("^(?:(?:xb|x)(?:b|(a)))*\\1$", "xaxba")
+    // A failed iteration of a repetition restores the captures before it.
+    accepts("^(?:x?(?:b|(a)))*\\1$", Perl, "axba")
+    accepts("^(?:x(a)(a)?|b)*?\\1c", Perl, "xaac")
+    accepts("^(?:x(a)(a)?|b){1,3}?\\1c", Perl, "xaac")
 
   test("Interpreter.run: back-references to duplicate names"):
     accepts("^(?:(?<x>a)|(?<x>b))\\k<x>$", JavaScript, "bb")

@@ -33,6 +33,11 @@ object ProgramBuilder:
       program <- Try(builder.build())
     yield program
 
+/** Keep is the captures that a fallback restores in Perl, where the others keep the values of the failed matching, or
+  * `None` for a fallback restoring all.
+  */
+private[vm] type Keep = Option[Option[(Int, Int)]]
+
 private[vm] class ProgramBuilder(
     private val pattern: ParsedPattern,
     private val capturesSize: Int
@@ -44,6 +49,13 @@ private[vm] class ProgramBuilder(
 
   /** Whether captures in a repetition are reset on each iteration, which only JavaScript does. */
   private val resetsCaptures = pattern.dialect == Dialect.JavaScript
+
+  /** Whether captures follow Perl's backtracking, which back-references only see. */
+  private val perlCaptures =
+    pattern.dialect == Dialect.Perl && pattern.node.exists(_.isInstanceOf[IRNodeData.BackReference])
+
+  /** The blocks of the fallbacks keeping the captures in Perl, which are emitted after the main blocks. */
+  private val keepBlocks: mutable.Buffer[(Label, Seq[Inst.NonTerminator], Inst.Terminator)] = mutable.Buffer.empty
 
   /** A buffer of created counter registers. */
   private val counters: mutable.Buffer[CounterReg] = mutable.Buffer.empty
@@ -217,6 +229,11 @@ private[vm] class ProgramBuilder(
     emitInst(Inst.CapEnd(0))
     emitTerminator(Inst.Ok)
 
+    for (label, insts, terminator) <- keepBlocks do
+      enterBlock(label)
+      insts.foreach(emitInst)
+      emitTerminator(terminator)
+
     result()
 
   /** Builds a program from a node. */
@@ -271,7 +288,66 @@ private[vm] class ProgramBuilder(
 
   /** A builder for a disjunction node. */
   def buildDisjunction(children: Seq[IRNode]): Unit =
-    buildAlternatives(children.map(n => () => build(n)))
+    if perlCaptures then buildPerlDisjunction(children)
+    else buildAlternatives(children.map(n => () => build(n)))
+
+  /** A builder for a disjunction node of Perl, which unsets the captures of an alternative when it fails. */
+  def buildPerlDisjunction(children: Seq[IRNode]): Unit =
+    val labels = children.map(_ => (allocateLabel("left"), allocateLabel("right")))
+    val cont = allocateLabel("cont")
+
+    for ((child, (l, r)), i) <- children.zip(labels).zipWithIndex do
+      val last = i == children.size - 1
+      val captures = child.captureRange.range
+      if last && captures.isEmpty then
+        build(child)
+        emitTerminator(Inst.Jmp(cont))
+      else
+        emitTerminator(Inst.Try(l, allocateKeep(None, captures, Option.when(!last)(r))))
+
+        enterBlock(l)
+        build(child)
+        emitTerminator(Inst.Jmp(cont))
+
+        if !last then enterBlock(r)
+
+    enterBlock(cont)
+
+  /** Returns how Perl repeats the node by counting (`CURLY`, `CURLYN` and `CURLYM`), if it is a fixed-length node
+    * without captures in it, with the index of the capture of the node itself.
+    */
+  def perlCountedRepeat(child: IRNode): Option[Option[Int]] =
+    val (index, body) = child.data match
+      case IRNodeData.Capture(i, _, n) => (Some(i), n)
+      case _                           => (None, child)
+    Option.when(body.captureRange.range.isEmpty && fixedWidth(body).exists(_ > 0))(index)
+
+  /** Returns the width of the node if it is fixed. */
+  def fixedWidth(node: IRNode): Option[Int] = node.data match
+    case IRNodeData.Empty | _: IRNodeData.Assert | _: IRNodeData.LookAhead | _: IRNodeData.LookBehind => Some(0)
+    case _: IRNodeData.Chars                                                                          => Some(1)
+    case IRNodeData.Sequence(ns)    => ns.foldLeft(Option(0))((w, n) => w.zip(fixedWidth(n)).map(_ + _))
+    case IRNodeData.Disjunction(ns) =>
+      ns.map(fixedWidth).distinct match
+        case Seq(w) => w
+        case _      => None
+    case IRNodeData.Capture(_, _, n)                 => fixedWidth(n)
+    case IRNodeData.Atomic(n)                        => fixedWidth(n)
+    case IRNodeData.Repeat(n, IRQuantifier.Exact(m)) => fixedWidth(n).map(_ * m)
+    case _                                           => None
+
+  /** Allocates a block for a fallback in Perl, which keeps the captures of the failed matching except `restore`, and
+    * unsets `reset`, then continues to `next` or fails.
+    */
+  def allocateKeep(restore: Option[(Int, Int)], reset: Option[(Int, Int)], next: Option[Label]): Label =
+    val label = allocateLabel("keep")
+    val insts = Inst.CapKeep(restore) +: reset.map((from, to) => Inst.CapReset(from, to)).toSeq
+    keepBlocks.append((label, insts, next.fold[Inst.Terminator](Inst.Fail)(Inst.Jmp(_))))
+    label
+
+  /** Returns the fallback of a `try` to the label, which goes through a block keeping the captures in Perl. */
+  def fallbackOf(label: Label, keep: Keep): Label =
+    keep.fold(label)(restore => allocateKeep(restore, None, Some(label)))
 
   /** A builder for alternatives tried in the order. */
   def buildAlternatives(alternatives: Seq[() => Unit]): Unit =
@@ -303,31 +379,33 @@ private[vm] class ProgramBuilder(
     emitInst(if back then Inst.CapBegin(index) else Inst.CapEnd(index))
 
   /** A builder for `x*` node. */
-  def buildStar(isLazy: Boolean, child: IRNode): Unit =
+  def buildStar(isLazy: Boolean, child: IRNode, keep: Keep = None, barrier: Boolean = false): Unit =
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
     val cont = allocateLabel("cont")
 
-    enterLoopBlock(isLazy, loop, cont)
-    wrapCanary(child)(wrapReset(child)(build(child)))
+    enterLoopBlock(isLazy, loop, cont, keep)
+    wrapCanary(child)(wrapReset(child)(buildIteration(child, isLazy && barrier)))
     emitTerminator(Inst.Jmp(begin))
 
     enterBlock(cont)
 
   /** A builder for `x+` node. */
-  def buildPlus(isLazy: Boolean, child: IRNode): Unit =
-    build(child)
-    buildStar(isLazy, child)
+  def buildPlus(isLazy: Boolean, child: IRNode, keep: Keep = None, barrier: Boolean = false): Unit =
+    buildIteration(child, barrier)
+    buildStar(isLazy, child, keep, barrier)
 
   /** A builder for `x?` node. */
-  def buildQuestion(isLazy: Boolean, child: IRNode): Unit =
+  def buildQuestion(isLazy: Boolean, child: IRNode, keep: Keep = None, barrier: Boolean = false): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
 
-    emitTerminator(if isLazy then Inst.Try(cont, main) else Inst.Try(main, cont))
+    emitTerminator(
+      if isLazy then Inst.Try(cont, fallbackOf(main, keep)) else Inst.Try(main, fallbackOf(cont, keep))
+    )
 
     enterBlock(main)
-    wrapReset(child)(build(child))
+    wrapReset(child)(buildIteration(child, isLazy && barrier))
     emitTerminator(Inst.Jmp(cont))
 
     enterBlock(cont)
@@ -335,56 +413,81 @@ private[vm] class ProgramBuilder(
   /** A builder for `x{n,m}` node. */
   def buildRepeat(quantifier: IRQuantifier, child: IRNode): Unit =
     def isLazy(strategy: BacktrackStrategy): Boolean = strategy == BacktrackStrategy.Lazy
+    val counted = if perlCaptures then perlCountedRepeat(child) else None
+    val keep = counted.map(_.map(i => (i, i)))
+    val barrier = perlCaptures && counted.isEmpty
+    val min = quantifier match
+      case IRQuantifier.Exact(n)         => n
+      case IRQuantifier.Unbounded(n, _)  => n
+      case IRQuantifier.Bounded(n, _, _) => n
+    // Perl unsets the capture of a counted repetition matching nothing.
+    for case Some(i) <- counted if min == 0 do emitInst(Inst.CapReset(i, i))
     quantifier match
       case IRQuantifier.Exact(0)               => // nothing to do
-      case IRQuantifier.Exact(1)               => build(child)
-      case IRQuantifier.Exact(n)               => buildRepeatN(n, child)
-      case IRQuantifier.Unbounded(0, strategy) => buildStar(isLazy(strategy), child)
-      case IRQuantifier.Unbounded(1, strategy) => buildPlus(isLazy(strategy), child)
+      case IRQuantifier.Exact(1)               => buildIteration(child, barrier)
+      case IRQuantifier.Exact(n)               => buildRepeatN(n, child, barrier)
+      case IRQuantifier.Unbounded(0, strategy) => buildStar(isLazy(strategy), child, keep, barrier)
+      case IRQuantifier.Unbounded(1, strategy) => buildPlus(isLazy(strategy), child, keep, barrier)
       case IRQuantifier.Unbounded(n, strategy) =>
-        buildRepeatN(n, child)
-        buildStar(isLazy(strategy), child)
-      case IRQuantifier.Bounded(0, 1, strategy) => buildQuestion(isLazy(strategy), child)
-      case IRQuantifier.Bounded(0, n, strategy) => buildRepeatAtMostN(isLazy(strategy), n, child)
+        buildRepeatN(n, child, barrier)
+        buildStar(isLazy(strategy), child, keep, barrier)
+      case IRQuantifier.Bounded(0, 1, strategy) => buildQuestion(isLazy(strategy), child, keep, barrier)
+      case IRQuantifier.Bounded(0, n, strategy) => buildRepeatAtMostN(isLazy(strategy), n, child, keep, barrier)
       case IRQuantifier.Bounded(1, 2, strategy) =>
-        build(child)
-        buildQuestion(isLazy(strategy), child)
+        buildIteration(child, barrier)
+        buildQuestion(isLazy(strategy), child, keep, barrier)
       case IRQuantifier.Bounded(1, m, strategy) =>
-        build(child)
-        buildRepeatAtMostN(isLazy(strategy), m - 1, child)
+        buildIteration(child, barrier)
+        buildRepeatAtMostN(isLazy(strategy), m - 1, child, keep, barrier)
       case IRQuantifier.Bounded(n, m, strategy) if m - n == 1 =>
-        buildRepeatN(n, child)
-        buildQuestion(isLazy(strategy), child)
+        buildRepeatN(n, child, barrier)
+        buildQuestion(isLazy(strategy), child, keep, barrier)
       case IRQuantifier.Bounded(n, m, strategy) =>
-        buildRepeatN(n, child)
-        buildRepeatAtMostN(isLazy(strategy), m - n, child)
+        buildRepeatN(n, child, barrier)
+        buildRepeatAtMostN(isLazy(strategy), m - n, child, keep, barrier)
 
   /** A builder for `x{n}` node. */
-  def buildRepeatN(n: Int, child: IRNode): Unit =
+  def buildRepeatN(n: Int, child: IRNode, barrier: Boolean = false): Unit =
     val loop = allocateEntrance("loop")
     val cont = allocateLabel("cont")
 
     val reg = allocateCounter()
 
     // Note that `wrapCanary` is not needed.
-    wrapReset(child)(build(child))
+    wrapReset(child)(buildIteration(child, barrier))
     closeLoopBlock(reg, n, loop, cont)
 
   /** A builder for `x{0,n}` node. */
-  def buildRepeatAtMostN(isLazy: Boolean, n: Int, child: IRNode): Unit =
+  def buildRepeatAtMostN(isLazy: Boolean, n: Int, child: IRNode, keep: Keep = None, barrier: Boolean = false): Unit =
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
     val cont = allocateLabel("cont")
 
     val reg = allocateCounter()
 
-    enterLoopBlock(isLazy, loop, cont)
-    wrapCanary(child)(wrapReset(child)(build(child)))
+    enterLoopBlock(isLazy, loop, cont, keep)
+    wrapCanary(child)(wrapReset(child)(buildIteration(child, isLazy && barrier)))
     closeLoopBlock(reg, n, begin, cont)
 
+  /** Builds an iteration of a repetition, which Perl wraps to restore the captures when the iteration fails.
+    *
+    * A greedy optional iteration needs no wrapping, since its fallback restores them.
+    */
+  def buildIteration(child: IRNode, barrier: Boolean): Unit =
+    if barrier then
+      val next = allocateLabel("next")
+      val restore = allocateLabel("restore")
+      emitTerminator(Inst.Try(next, restore))
+      enterBlock(restore)
+      emitTerminator(Inst.Fail)
+      enterBlock(next)
+    build(child)
+
   /** Emits a loop block entering instructions. */
-  def enterLoopBlock(isLazy: Boolean, loop: Label, cont: Label): Unit =
-    emitTerminator(if isLazy then Inst.Try(cont, loop) else Inst.Try(loop, cont))
+  def enterLoopBlock(isLazy: Boolean, loop: Label, cont: Label, keep: Keep = None): Unit =
+    emitTerminator(
+      if isLazy then Inst.Try(cont, fallbackOf(loop, keep)) else Inst.Try(loop, fallbackOf(cont, keep))
+    )
     enterBlock(loop)
 
   /** Emits a loop block closing instructions. */

@@ -106,8 +106,8 @@ object Interpreter:
   /** Junction is a state for a junction block. */
   private[vm] final case class Junction(state: MatchState, steps: Int, heatmap: Option[Map[Location, Int]])
 
-  /** Diff is a difference of state on matching. */
-  private[vm] final case class Diff(steps: Int, heatmap: Option[Map[Location, Int]])
+  /** Diff is a difference of state on matching, with the captures of the last failed matching. */
+  private[vm] final case class Diff(steps: Int, heatmap: Option[Map[Location, Int]], failedCaptures: Vector[Int])
 
 /** Interpreter is an interpreter of a program and an input. */
 private[vm] class Interpreter(program: Program, input: UString, options: Options)(using ctx: Context):
@@ -124,6 +124,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       var junctions: Vector[Junction]
   ):
 
+    /** The largest index of the closed captures, which Perl uses to unset the captures on backtracking. */
+    var lastParen: Int = 0
+
     /** Gets a previous character. */
     def previousChar: Option[Int] = input.getBefore(pos, program.meta.unicode)
 
@@ -137,6 +140,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     /** Captures an ending position of the index. */
     def capEnd(index: Int): Unit =
       captures = captures.updated(index * 2 + 1, pos)
+      lastParen = Math.max(lastParen, index)
 
     /** Resets captures between `from` and `to`. */
     def capReset(from: Int, to: Int): Unit =
@@ -152,10 +156,12 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
     /** Converts this frame into a corresponding state. */
     def toState: MatchState =
-      Interpreter.MatchState(label.index, pos, counters, if program.meta.hasRef then Some(captures) else None)
+      Interpreter.MatchState(label.index, pos, counters, Option.when(program.meta.hasRef)(captures :+ lastParen))
 
     override def clone(): Frame =
-      new Frame(label, pos, captures, counters, canaries, rollback, fallback, junctions)
+      val frame = new Frame(label, pos, captures, counters, canaries, rollback, fallback, junctions)
+      frame.lastParen = lastParen
+      frame
 
     override def toString: String =
       s"Frame($label, $pos, $captures, $counters, $canaries, $rollback, $fallback, $junctions)"
@@ -197,6 +203,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   /** A heatmap on matching. */
   private var heatmap: Map[Location, Int] = Map.empty[Location, Int].withDefaultValue(0)
 
+  /** The captures of the last failed matching, which `cap_keep` takes. */
+  private var failedCaptures: Vector[Int] = Vector.empty
+
   /** Constructs a result of matching. */
   private[vm] def result(status: Status, captures: Option[Seq[Int]]): Result =
     val loops = this.loops.iterator
@@ -235,11 +244,13 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         // When acceleration mode is enabled and current block is junction,
         // it tries to retrieve a result from memoization table, or adds a junction information.
         var memoized = false
+        var memoizedCaptures: Option[Vector[Int]] = None
         if options.usesAcceleration && program.meta.predecessors(frame.label.index).size >= 2 then
           val state = frame.toState
           memoTable.get(state) match
             case Some(diff) =>
               memoized = true
+              memoizedCaptures = Some(diff.failedCaptures)
               steps = Math.addExact(steps, diff.steps)
               if options.needsHeatmap then
                 for (loc, n) <- diff.heatmap.get do heatmap = heatmap.updated(loc, heatmap(loc) + n)
@@ -274,6 +285,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                 frame.fallback = Some(fallbackFrame)
                 false
               else
+                failedCaptures = frame.captures
                 frame.label = fallback
                 false
             case Inst.TryLB(read, next, fallback) =>
@@ -286,6 +298,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                 frame.fallback = Some(fallbackFrame)
                 false
               else
+                failedCaptures = frame.captures
                 frame.label = fallback
                 false
             case Inst.Cmp(reg, n, lt, ge) =>
@@ -293,6 +306,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
               val next = if r < n then lt else ge
               frame.label = next
               false
+            case Inst.Fail     => true
             case Inst.Rollback =>
               val failed = frame.rollback.get match
                 case Rollback.HasSuccessor(next, pos, rollback, fallback) =>
@@ -331,6 +345,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
               false)
 
         if failed then
+          val captures = memoizedCaptures.getOrElse(frame.captures)
+          failedCaptures = captures
           frame.fallback match
             case Some(fallback) =>
               if options.usesAcceleration && frame.junctions.size > fallback.junctions.size then
@@ -343,7 +359,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                       val m = jxHeatmap(loc)
                       if n != m then builder.addOne(loc -> (n - m))
                     builder.result()
-                  memoTable(jx.state) = Diff(steps - jx.steps, diffHeatmap)
+                  memoTable(jx.state) = Diff(steps - jx.steps, diffHeatmap, captures)
               frame = fallback
             case None => return result(Status.Fail, None)
 
@@ -404,6 +420,15 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         true
       case Inst.CapReset(from, to) =>
         frame.capReset(from, to)
+        true
+      case Inst.CapKeep(restore) =>
+        val captures = if failedCaptures.isEmpty then frame.captures else failedCaptures
+        frame.captures = Vector.tabulate(captures.size): i =>
+          val index = i / 2
+          // A capture above the last closed index is unset, but the beginning of an open capture remains.
+          if index > frame.lastParen then if i % 2 == 0 then frame.captures(i) else -1
+          else if restore.exists((from, to) => from <= index && index <= to) then frame.captures(i)
+          else captures(i)
         true
 
   /** Tests whether the position is after a line terminator. */

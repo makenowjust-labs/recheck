@@ -63,6 +63,11 @@ object Inst:
     def successors: Set[Label] = Set(lt, ge)
     override def toString: String = s"cmp $reg $n $lt $ge"
 
+  /** `fail`: Fails a matching, which backtracks. */
+  case object Fail extends Terminator:
+    def successors: Set[Label] = Set.empty
+    override def toString: String = "fail"
+
   /** `rollback`: Terminates a matching with a rollback. */
   case object Rollback extends Terminator:
     def successors: Set[Label] = Set.empty
@@ -133,6 +138,16 @@ object Inst:
   /** `cap_end`: Captures current position as an ending of a capture `index`. */
   final case class CapEnd(index: Int) extends NonTerminator:
     override def toString: String = s"cap_end $index"
+
+  /** `cap_keep`: Takes the captures of the last failed matching, as Perl does not restore them on backtracking.
+    *
+    * The captures between `from` and `to` of `restore` keep their values, and the captures above the last closed index
+    * of the current matching are unset.
+    */
+  final case class CapKeep(restore: Option[(Int, Int)]) extends NonTerminator:
+    override def toString: String = restore match
+      case Some((from, to)) => s"cap_keep $from $to"
+      case None             => "cap_keep"
 
   /** `cap-reset`: Resets captures between `from` and `to`. */
   final case class CapReset(from: Int, to: Int) extends NonTerminator:
