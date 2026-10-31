@@ -252,7 +252,12 @@ class MainSuite extends munit.FunSuite:
     val perl = js.mapObject(_.add("source", "^(a|a)*$x".asJson).add("dialect", "perl".asJson))
     assertEquals(
       error(perl.noSpaces),
-      ("", "The pattern cannot be a Perl regex literal, which would interpolate a variable or run code\n", 1)
+      (
+        "",
+        "The pattern cannot be a Perl regex literal, which would interpolate a variable, run code, " +
+          "or be UTF-8 against `utf8`\n",
+        1
+      )
     )
     val perlString = perl.mapObject(_.add("dialect", Json.obj("name" := "perl", "source" := "string")))
     assert(clue(error(perlString.noSpaces)._1).contains("my $pattern = \"^(a|a)*\\$x\";"))

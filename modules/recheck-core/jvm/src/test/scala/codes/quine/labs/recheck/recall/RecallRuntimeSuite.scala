@@ -142,7 +142,7 @@ class RecallRuntimeSuite extends munit.FunSuite:
     )
     assertFinish(string.get)
 
-  runtimeTest("Perl: the UTF-8 flag of a string pattern", "perl"):
+  runtimeTest("Perl: the UTF-8 flag of a pattern", "perl"):
     // `\w` matches `é` by the Unicode rules, which a UTF-8 pattern string has.
     def matches(source: String, dialect: Dialect.Perl, flags: String = ""): Option[Boolean] =
       val pattern = ParsedPattern.parse(source, flags, dialect).toTry.get
@@ -170,6 +170,16 @@ class RecallRuntimeSuite extends munit.FunSuite:
     assertEquals(matches("\\w", string), Some(false))
     assertEquals(matches("ü?\\w", string), Some(true))
     assertEquals(matches("ü?\\w", string.copy(utf8 = Some(false))), Some(false))
+    // A regex literal takes `u` for `utf8` that the literal does not make, and it cannot be not UTF-8 by a non-ASCII
+    // character.
+    val literal: Dialect.Perl = Dialect.Perl()
+    assertEquals(matches("\\w", literal), Some(false))
+    assertEquals(matches("ü?\\w", literal), Some(true))
+    assertEquals(matches("\\w", literal.copy(utf8 = Some(true))), Some(true))
+    assertEquals(matches("\\w", literal.copy(utf8 = Some(true)), "d"), Some(true))
+    assertEquals(matches("\\w", literal.copy(utf8 = Some(true)), "a"), Some(false))
+    assertEquals(matches("ü?\\w", literal.copy(utf8 = Some(false))), None)
+    assertEquals(matches("\\w", Dialect.Perl(Dialect.Perl.Encoding.Bytes, utf8 = Some(true))), Some(false))
 
   runtimeTest("PCRE", "php"):
     // PHP's default `pcre.backtrack_limit` stops the match.

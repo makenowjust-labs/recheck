@@ -189,6 +189,22 @@ class RecallProgramSuite extends munit.FunSuite:
     assert(line(generate("\\p{L}", ""), "my $regex").contains("utf8::upgrade($pattern);"))
     assert(line(generate("é", "", utf8 = Some(false)), "my $regex").contains("utf8::downgrade($pattern, 1);"))
 
+  test("RecallProgram.generate: Perl literal patterns with utf8"):
+    def regex(source: String, flags: String, dialect: Dialect): Option[String] =
+      val pattern = ParsedPattern.parse(source, flags, dialect).toTry.get
+      RecallProgram.generate(pattern, attack).map(line(_, "my $regex"))
+    val utf8 = Dialect.Perl(utf8 = Some(true))
+    assertEquals(regex("\\w", "", Dialect.Perl()), Some("my $regex = qr/\\w/;"))
+    assertEquals(regex("\\w", "", utf8), Some("my $regex = qr/\\w/u;"))
+    assertEquals(regex("\\w", "id", utf8), Some("my $regex = qr/\\w/iu;"))
+    assertEquals(regex("\\w", "a", utf8), Some("my $regex = qr/\\w/a;"))
+    assertEquals(regex("é\\w", "", utf8), Some("my $regex = qr/é\\w/;"))
+    assertEquals(regex("é\\w", "", Dialect.Perl(utf8 = Some(false))), None)
+    assertEquals(
+      regex("é\\w", "", Dialect.Perl(Dialect.Perl.Encoding.Bytes, utf8 = Some(true))),
+      Some("my $regex = qr/é\\w/;")
+    )
+
   test("RecallProgram.isPerlSafe"):
     assert(RecallProgram.isPerlSafe("a$"))
     assert(RecallProgram.isPerlSafe("\\$x"))

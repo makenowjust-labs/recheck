@@ -344,10 +344,16 @@ object RecallProgram:
     val utf8 = dialect.utf8.contains(true)
     val regex =
       if dialect.source == PerlSource.Literal then
+        // With `use utf8`, a literal is UTF-8 by a non-ASCII character, and `u` gives the rules of a UTF-8 pattern.
+        // recheck reads a byte string by ASCII rules, so it takes no `u`.
+        val literalUtf8 = !bytes && pattern.source.exists(_ >= 0x80)
+        val modifiers =
+          if utf8 && !bytes && !literalUtf8 && !flags.exists("alu".contains(_)) then flags.filterNot(_ == 'd') + "u"
+          else flags
         for
-          _ <- Option.when(isPerlSafe(pattern.source))(())
+          _ <- Option.when(isPerlSafe(pattern.source) && (utf8 || !literalUtf8))(())
           delimiter <- PerlDelimiters.find(c => !pattern.source.contains(c))
-        yield s"qr$delimiter${pattern.source}$delimiter$flags"
+        yield s"qr$delimiter${pattern.source}$delimiter$modifiers"
       else
         val source = AttackPattern.Perl.literal(sourceString(pattern.source, bytes))
         // The UTF-8 flag of the string decides Perl's rules.

@@ -37,6 +37,8 @@ object RecallScriptCommand:
     yield script
 
   private def unsupported(dialect: Dialect): String = dialect match
-    case _: Dialect.Perl => "The pattern cannot be a Perl regex literal, which would interpolate a variable or run code"
-    case Dialect.PCRE    => "The pattern cannot be a PHP regex, since it contains every delimiter"
-    case dialect         => s"The pattern cannot be put in a program of ${dialect.name}"
+    case _: Dialect.Perl =>
+      "The pattern cannot be a Perl regex literal, which would interpolate a variable, run code, " +
+        "or be UTF-8 against `utf8`"
+    case Dialect.PCRE => "The pattern cannot be a PHP regex, since it contains every delimiter"
+    case dialect      => s"The pattern cannot be put in a program of ${dialect.name}"
