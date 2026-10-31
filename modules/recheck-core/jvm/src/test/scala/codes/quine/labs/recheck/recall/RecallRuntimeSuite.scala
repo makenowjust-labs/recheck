@@ -169,6 +169,36 @@ class RecallRuntimeSuite extends munit.FunSuite:
     )
     assertFinish(validate("^(?:é|é)*$", "u", Dialect.PCRE, attack("é", 3, "\u0000")))
 
+  /** Runs the standalone program in a new directory, and returns the output. */
+  def runScript(script: RecallProgram.Script): String =
+    val dir = Files.createTempDirectory("recheck script ")
+    val file = dir.resolve(script.name)
+    Files.writeString(file, script.content)
+    file.toFile.deleteOnExit()
+    dir.toFile.deleteOnExit()
+    val process = new ProcessBuilder(script.command.split(' ')*).directory(dir.toFile).redirectErrorStream(true).start()
+    process.getOutputStream.close()
+    val out = new String(process.getInputStream.readAllBytes(), StandardCharsets.UTF_8)
+    assertEquals(process.waitFor(), 0, out)
+    out
+
+  for (dialect, program) <- Seq(
+      Dialect.JavaScript -> "node",
+      Dialect.Python -> "python3",
+      Dialect.Ruby -> "ruby",
+      Dialect.Java -> "java",
+      Dialect.DotNet -> "dotnet",
+      Dialect.Perl -> "perl",
+      Dialect.PCRE -> "php"
+    )
+  do
+    runtimeTest(s"RecallProgram.script: $dialect", program):
+      val pattern = ParsedPattern.parse("^(?:a|é|😀)*$", "", dialect).toTry.get
+      val astral = AttackPattern(Seq((UString.fromString("é"), UString.fromString("😀a"), 0)), UString(0), 3)
+      val out = runScript(RecallProgram.script(pattern, astral).get)
+      val lines = out.linesIterator.map(_.takeWhile(_ != ' ')).toSeq
+      assertEquals(lines.filter(_.startsWith("recheck:")), Seq("recheck:runtime", "recheck:start", "recheck:time"))
+
   runtimeTest("ReDoS.checkAll: Ruby", "ruby"):
     // The failed recall validation is kept, and the checking continues to the safe result.
     val ds = ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby))
