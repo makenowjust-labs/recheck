@@ -1,12 +1,9 @@
 package codes.quine.labs.resyntax.ir
 
-import scala.collection.mutable
-
 import codes.quine.labs.resyntax.ast.AssertKind
 import codes.quine.labs.resyntax.ast.BackslashKind
 import codes.quine.labs.resyntax.ast.BacktrackControlKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
-import codes.quine.labs.resyntax.ast.ClassItem
 import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.ConditionalTest
@@ -84,7 +81,6 @@ object IRBuilder:
         hasCall(node),
         hasBackReference(node)
       )
-    builder.findsTries = dialect.isPerl && hasThen(node)
     val root = builder.build(node)
     IRPattern(
       root,
@@ -93,8 +89,7 @@ object IRBuilder:
       IRBackReferenceSemantics(featureSet.unsetBackReferenceMatchesEmpty, featureSet.backReferenceChoice),
       featureSet.anchored,
       mode,
-      notEmpty(starts),
-      builder.tries.toMap
+      notEmpty(starts)
     )
 
   /** @param utf
@@ -320,12 +315,6 @@ object IRBuilder:
     else if startOptions.contains("NOTEMPTY_ATSTART") then IRNotEmpty.AtStart
     else IRNotEmpty.Never
 
-  private def hasThen(node: Node): Boolean =
-    NodeKey.exists(node):
-      _.data match
-        case NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Then), _)) => true
-        case _                                                                                  => false
-
   private def hasBackReference(node: Node): Boolean =
     NodeKey.exists(node):
       _.data match
@@ -347,10 +336,6 @@ object IRBuilder:
   /** The version of PCRE2 that the PCRE dialect follows, which `(?(VERSION>=10.0)...)` compares with. */
   val PCREVersion: (Int, Int) = (10, 49)
 
-/** PerlTrieWord is the kind of the literal starting an alternative, which Perl puts in a trie with the same kind. */
-private[ir] enum PerlTrieWord:
-  case Empty, Exact, Fold
-
 private[ir] class IRBuilder(
     initial: BuildingContext,
     table: CaptureTable,
@@ -369,7 +354,7 @@ private[ir] class IRBuilder(
 
   def build(node: Node): IRNode =
     val result = node.data match
-      case NodeData.Disjunction(children)                            => buildDisjunction(node, children)
+      case NodeData.Disjunction(children)                            => Left(buildDisjunction(children))
       case NodeData.Sequence(children)                               => buildSequence(children)
       case NodeData.Repeat(child, quantifier)                        => Left(buildRepeat(node, child, quantifier))
       case NodeData.Group(kind, child)                               => buildGroup(node, kind, child)
@@ -400,60 +385,9 @@ private[ir] class IRBuilder(
         case Some(f) => run.map((node, flags) => IRNode(f(node, flags), node.loc))
         case None    => chars.literals(run)
 
-  /** Whether it finds the alternatives that Perl compiles into a trie, which matter only with `(*THEN)`. */
-  var findsTries: Boolean = false
-
-  /** The alternatives that Perl compiles into a trie, by the location of the alternation. */
-  val tries: mutable.Map[SourceLocation, Seq[(Int, Int)]] = mutable.Map.empty
-
-  def buildDisjunction(node: Node, children: Seq[Node]): Either[IRNodeData, IRNode] =
+  def buildDisjunction(children: Seq[Node]): IRNodeData =
     // The flags at an alternative are the ones after the previous alternatives, as `(?i)` reaches the next ones.
-    val nodes = children.map(child => (if findsTries then trieWord(child, context) else None, build(child)))
-    if findsTries then
-      val runs = trieRuns(nodes.map(_._1))
-      if runs.nonEmpty then tries(node.loc) = runs
-    Left(IRNodeData.Disjunction(nodes.map(_._2)))
-
-  /** Returns the kind of the literal that Perl starts the trie word of the alternative with, if it can be in a trie.
-    *
-    * A literal is `EXACT`, or `EXACTFU` for a case-insensitive one of two or more characters with case variants, and an
-    * empty alternative is a word of any kind.
-    */
-  def trieWord(node: Node, context: BuildingContext): Option[PerlTrieWord] =
-    def literal(node: Node): Boolean = node.data match
-      case NodeData.Literal(_) | NodeData.Backslash(_: BackslashKind.Escape)        => true
-      case NodeData.Class(false, ClassItem.Value(ClassItemData.ClassLiteral(_), _)) => true
-      case _                                                                        => false
-    def hasCases(node: Node, context: BuildingContext): Boolean =
-      chars.resolve(node, context.charFlags) match
-        case IRNodeData.Chars(set) => set.size > 1
-        case _                     => true
-    def sequence(nodes: List[Node], context: BuildingContext): Option[PerlTrieWord] = nodes match
-      case Nil                                                             => Some(PerlTrieWord.Empty)
-      case Node(NodeData.Command(_: CommandKind.Comment), _) :: rest       => sequence(rest, context)
-      case Node(NodeData.Command(CommandKind.InlineFlag(diff)), _) :: rest => sequence(rest, context.update(diff))
-      case Node(NodeData.Group(GroupKind.NonCapture, child), _) :: rest    => sequence(child :: rest, context)
-      case Node(NodeData.Sequence(children), _) :: rest                    => sequence(children.toList ++ rest, context)
-      case first :: _ if literal(first)                                    =>
-        val run = nodes.takeWhile(literal)
-        if !context.charFlags.ignoreCase || !run.exists(hasCases(_, context)) then Some(PerlTrieWord.Exact)
-        else Option.when(run.size >= 2)(PerlTrieWord.Fold)
-      case _ => None
-    sequence(List(node), context)
-
-  /** Returns the runs of two or more alternatives in a trie, which start with a literal of the same kind. */
-  def trieRuns(words: Seq[Option[PerlTrieWord]]): Seq[(Int, Int)] =
-    val runs = Seq.newBuilder[(Int, Int)]
-    var i = 0
-    while i < words.size do
-      words(i) match
-        case Some(kind) if kind != PerlTrieWord.Empty =>
-          var j = i + 1
-          while j < words.size && words(j).exists(w => w == kind || w == PerlTrieWord.Empty) do j += 1
-          if j - i >= 2 then runs.addOne((i, j))
-          i = j
-        case _ => i += 1
-    runs.result()
+    IRNodeData.Disjunction(children.map(build))
 
   def buildSequence(children: Seq[Node]): Either[IRNodeData, IRNode] =
     children match

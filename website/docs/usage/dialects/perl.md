@@ -85,6 +85,8 @@ The following constructs are not supported.
   For example, `ßs` matches `"sß"`, since both fold to `sss`, and `ﬀi` matches `"fﬁ"` and `ﬃ` matches `"ﬀi"`, since all of them fold to `ffi`.
 - Perl backs off one character at a time from `\R` under a simple quantifier, which can split `\r\n` (e.g. `^\R?\n$` matches `"\r\n"` in Perl, but not in PCRE or Ruby), and `recheck` does not reproduce it.
 - Perl skips the attempts that cannot match by its start-of-match optimizations, and `recheck` does not model them.
+- Perl compiles alternatives starting with literals into a trie, and `(*THEN)` in the trie skips the other alternatives in it (e.g. `aa(*THEN)b|a` matches the second `a` of `"aac"`).
+  `recheck` does not reproduce it, and `(*THEN)` takes the next alternative as in PCRE (matching the first `a`).
 
 ## Recall Validation
 
