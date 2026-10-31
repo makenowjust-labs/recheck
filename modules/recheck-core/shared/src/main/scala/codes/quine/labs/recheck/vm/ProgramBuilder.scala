@@ -21,6 +21,8 @@ import codes.quine.labs.resyntax.ir.IRAssertKind
 import codes.quine.labs.resyntax.ir.IRBacktrackControl
 import codes.quine.labs.resyntax.ir.IRBuilder
 import codes.quine.labs.resyntax.ir.IRCondition
+import codes.quine.labs.resyntax.ir.IRLookBehindMatch
+import codes.quine.labs.resyntax.ir.IRLookBehindStarts
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
 import codes.quine.labs.resyntax.ir.IRNotEmpty
@@ -42,6 +44,24 @@ object ProgramBuilder:
   * `None` for a fallback restoring all.
   */
 private[vm] type Keep = Option[Option[(Int, Int)]]
+
+/** EmptyIteration is how a repetition handles an iteration matching the empty string, which differs among dialects. */
+private[vm] enum EmptyIteration:
+
+  /** Ignore handles it as the others (PCRE's bounded repetition, which repeats copies of the node). */
+  case Ignore
+
+  /** Reject fails an optional one (JavaScript, and Java's repetition of a single node or a group without branches). */
+  case Reject
+
+  /** ExitOptional ends the repetition with an optional one (Python). */
+  case ExitOptional
+
+  /** ExitFromMin ends the repetition with the last mandatory one or an optional one (Perl, .NET, PCRE). */
+  case ExitFromMin
+
+  /** ExitAll ends the repetition with any one, even before the minimum (Java's repetition of a group with branches). */
+  case ExitAll
 
 /** AcceptScope is what `(*ACCEPT)` ends successfully. */
 private[vm] enum AcceptScope:
@@ -73,6 +93,12 @@ private[vm] class ProgramBuilder(
       case _: IRNodeData.BackReference                           => true
       case IRNodeData.Conditional(_: IRCondition.Captured, _, _) => true
       case _                                                     => false
+
+  /** Whether the captures in an atomic group or a look-around are held over backtracking once it matches, as in Java,
+    * which back-references only see.
+    */
+  private val holdsCaptures =
+    pattern.dialect == Dialect.Java && pattern.node.exists(_.isInstanceOf[IRNodeData.BackReference])
 
   /** Whether `(*THEN)` ends at a look-around assertion or a condition, as in PCRE but not in Perl. */
   private val assertionIsThenScope = pattern.dialect != Dialect.Perl
@@ -140,6 +166,9 @@ private[vm] class ProgramBuilder(
 
   /** A program has `verb` instructions. */
   private var hasVerb: Boolean = false
+
+  /** A program has `leave` instructions. */
+  private var hasLeave: Boolean = false
 
   /** Whether a matching direction is backward or not. */
   private var back: Boolean = false
@@ -213,6 +242,7 @@ private[vm] class ProgramBuilder(
     // Updates a predecessor information.
     for successor <- inst.successors do predecessorsBuffer(successor.index).add(currentLabel)
     if inst.isInstanceOf[Inst.IfCap] then hasRef = true
+    if inst == Inst.Leave then hasLeave = true
 
     val block = Block(instsBuffer.toSeq, inst)
     currentLabel.block = block
@@ -258,7 +288,7 @@ private[vm] class ProgramBuilder(
 
     val blocks = labelsBuffer.iterator.map(label => (label, label.block)).toVector
     val predecessors = predecessorsBuffer.iterator.map(_.toSet).toVector
-    val meta = Meta(mode, hasRef, hasVerb, capturesSize, counters.size, canaries.size, predecessors)
+    val meta = Meta(mode, hasRef, hasVerb, capturesSize, counters.size, canaries.size, predecessors, hasLeave)
 
     Program(blocks, meta)
 
@@ -303,23 +333,23 @@ private[vm] class ProgramBuilder(
   /** Builds a program from a node. */
   def build(node: IRNode): Unit = interrupt:
     node.data match
-      case IRNodeData.Disjunction(children)      => buildDisjunction(children)
-      case IRNodeData.Sequence(children)         => buildSequence(children)
-      case IRNodeData.Empty                      => ()
-      case IRNodeData.Capture(index, _, child)   => buildCapture(index, child)
-      case IRNodeData.Repeat(child, q)           => buildRepeat(q, child)
-      case IRNodeData.Atomic(child)              => buildAtomic(child)
-      case IRNodeData.Assert(kind)               => emitAssert(assertKind(kind))
-      case IRNodeData.LookAhead(false, child)    => wrapLookAhead(buildPositiveLookAround(child))
-      case IRNodeData.LookAhead(true, child)     => wrapLookAhead(buildNegativeLookAround(child))
-      case IRNodeData.LookBehind(false, child)   => wrapLookBehind(buildPositiveLookAround(child))
-      case IRNodeData.LookBehind(true, child)    => wrapLookBehind(buildNegativeLookAround(child))
-      case IRNodeData.NonAtomicLookAhead(child)  => wrapLookAhead(buildNonAtomicLookAround(child))
-      case IRNodeData.NonAtomicLookBehind(child) => wrapLookBehind(buildNonAtomicLookAround(child))
-      case IRNodeData.Conditional(cond, yes, no) => buildConditional(cond, yes, no)
+      case IRNodeData.Disjunction(children)         => buildDisjunction(children, triesOf(node))
+      case IRNodeData.Sequence(children)            => buildSequence(children)
+      case IRNodeData.Empty                         => ()
+      case IRNodeData.Capture(index, _, child)      => buildCapture(index, child)
+      case IRNodeData.Repeat(child, q)              => buildRepeat(q, child)
+      case IRNodeData.Atomic(child)                 => buildAtomic(child)
+      case IRNodeData.Assert(kind)                  => emitAssert(assertKind(kind))
+      case IRNodeData.LookAhead(false, child)       => wrapLookAhead(buildPositiveLookAround(child))
+      case IRNodeData.LookAhead(true, child)        => wrapLookAhead(buildNegativeLookAround(child))
+      case IRNodeData.LookBehind(false, child, m)   => buildLookBehind(m)(buildPositiveLookAround(child, _))
+      case IRNodeData.LookBehind(true, child, m)    => buildLookBehind(m)(buildNegativeLookAround(child, _))
+      case IRNodeData.NonAtomicLookAhead(child)     => wrapLookAhead(buildNonAtomicLookAround(child))
+      case IRNodeData.NonAtomicLookBehind(child, m) => buildLookBehind(m)(buildNonAtomicLookAround(child, _))
+      case IRNodeData.Conditional(cond, yes, no)    => buildConditional(cond, yes, no)
       // `\K` sets the start of the whole match, which is the capture `0`.
       case IRNodeData.ResetMatchStart        => emitInst(Inst.CapBegin(0))
-      case IRNodeData.BacktrackControl(verb) => buildBacktrackControl(node, verb)
+      case IRNodeData.BacktrackControl(verb) => buildBacktrackControl(verb)
       case IRNodeData.Chars(set)             => emitRead(readKind(set), Location.from(node.loc))
       case IRNodeData.Strings(set)           =>
         val loc = Location.from(node.loc)
@@ -359,12 +389,40 @@ private[vm] class ProgramBuilder(
     case IRAssertKind.ChompTextEnd(t)                  => AssertKind.ChompInputEnd(t)
     case IRAssertKind.NotBetweenCRLF                   => AssertKind.NotBetweenCRLF
 
-  /** A builder for a disjunction node.
+  /** Returns the runs of the alternatives of the node that Perl compiles into a trie. */
+  def triesOf(node: IRNode): Seq[(Int, Int)] = pattern.ir.tries.getOrElse(node.loc, Seq.empty)
+
+  /** A builder for a disjunction node, where Perl puts the alternatives of each run of `tries` in a trie.
+    *
+    * `(*THEN)` in a trie goes to the alternative after it, so a trie is one alternative with the alternatives in it.
+    */
+  def buildDisjunction(children: Seq[IRNode], tries: Seq[(Int, Int)]): Unit =
+    val units = children.indices.foldLeft(Seq.empty[Seq[Int]]): (units, i) =>
+      if tries.exists((from, until) => from < i && i < until) then units.init :+ (units.last :+ i)
+      else units :+ Seq(i)
+    def alternatives(indices: Seq[Int]): Unit =
+      if perlCaptures then buildPerlDisjunction(indices.map(children), None, k => build(children(indices(k))))
+      else buildAlternatives(indices.map(i => () => build(children(i))))
+    if units.size == 1 && children.size > 1 then alternatives(children.indices)
+    else
+      // A trie stands for its alternatives here, for `(*THEN)` and the captures in them.
+      val nodes = units.map:
+        case Seq(i)  => children(i)
+        case indices => IRNode(IRNodeData.Sequence(indices.map(children)))
+      buildDisjunction(
+        nodes,
+        k =>
+          units(k) match
+            case Seq(i)  => build(children(i))
+            case indices => alternatives(indices)
+      )
+
+  /** A builder for a disjunction node, where `run` builds the alternative of the index.
     *
     * When `(*THEN)` in it takes the next alternative, the fallback of each alternative is a barrier, and so is a
     * failing fallback before them, which `(*THEN)` in the last alternative takes.
     */
-  def buildDisjunction(children: Seq[IRNode]): Unit =
+  def buildDisjunction(children: Seq[IRNode], run: Int => Unit): Unit =
     val scope = Option.when(children.exists(hasThen))(newThenScope())
     for id <- scope do
       val next = allocateLabel("next")
@@ -372,8 +430,8 @@ private[vm] class ProgramBuilder(
       enterBlock(next)
     val barrier = scope.map(Barrier.Then(_))
     withThenScope(scope.orElse(thenScope)):
-      if perlCaptures then buildPerlDisjunction(children, barrier)
-      else buildAlternatives(children.map(n => () => build(n)), barrier)
+      if perlCaptures then buildPerlDisjunction(children, barrier, run)
+      else buildAlternatives(children.indices.map(i => () => run(i)), barrier)
 
   /** Returns a new scope ID of `(*THEN)`. */
   def newThenScope(): Int =
@@ -398,15 +456,16 @@ private[vm] class ProgramBuilder(
     */
   def hasThen(node: IRNode): Boolean = node.data match
     case IRNodeData.BacktrackControl(IRBacktrackControl.Then) => true
-    case _: IRNodeData.Disjunction                            => false
+    // `(*THEN)` in Perl's trie of all the alternatives goes beyond it.
+    case IRNodeData.Disjunction(children) => triesOf(node) == Seq((0, children.size)) && children.exists(hasThen)
     case _: IRNodeData.LookAhead | _: IRNodeData.LookBehind | _: IRNodeData.NonAtomicLookAhead |
         _: IRNodeData.NonAtomicLookBehind =>
       !assertionIsThenScope && node.children.exists(hasThen)
     case IRNodeData.Conditional(condition, yes, no) =>
       val inCondition = condition match
-        case IRCondition.LookAhead(_, n)  => !assertionIsThenScope && hasThen(n)
-        case IRCondition.LookBehind(_, n) => !assertionIsThenScope && hasThen(n)
-        case IRCondition.Captured(_)      => false
+        case IRCondition.LookAhead(_, n)     => !assertionIsThenScope && hasThen(n)
+        case IRCondition.LookBehind(_, n, _) => !assertionIsThenScope && hasThen(n)
+        case IRCondition.Captured(_)         => false
       inCondition || hasThen(yes) || hasThen(no)
     case _ => node.children.exists(hasThen)
 
@@ -415,7 +474,7 @@ private[vm] class ProgramBuilder(
     Option.when(assertionIsThenScope && hasThen(child))(newThenScope())
 
   /** A builder for a disjunction node of Perl, which unsets the captures of an alternative when it fails. */
-  def buildPerlDisjunction(children: Seq[IRNode], barrier: Option[Barrier]): Unit =
+  def buildPerlDisjunction(children: Seq[IRNode], barrier: Option[Barrier], run: Int => Unit): Unit =
     val labels = children.map(_ => (allocateLabel("left"), allocateLabel("right")))
     val cont = allocateLabel("cont")
 
@@ -423,13 +482,13 @@ private[vm] class ProgramBuilder(
       val last = i == children.size - 1
       val captures = child.captureRange.range
       if last && captures.isEmpty then
-        build(child)
+        run(i)
         emitTerminator(Inst.Jmp(cont))
       else
         emitTry(l, allocateKeep(None, captures, Option.when(!last)(r)), barrier.filter(_ => !last))
 
         enterBlock(l)
-        build(child)
+        run(i)
         emitTerminator(Inst.Jmp(cont))
 
         if !last then enterBlock(r)
@@ -509,24 +568,31 @@ private[vm] class ProgramBuilder(
     emitInst(if back then Inst.CapBegin(index) else Inst.CapEnd(index))
 
   /** A builder for `x*` node. */
-  def buildStar(isLazy: Boolean, child: IRNode, keep: Keep = None, barrier: Boolean = false): Unit =
+  def buildStar(
+      isLazy: Boolean,
+      child: IRNode,
+      keep: Keep = None,
+      barrier: Boolean = false,
+      empty: EmptyIteration = EmptyIteration.Reject
+  ): Unit =
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
     val cont = allocateLabel("cont")
 
     enterLoopBlock(isLazy, loop, cont, keep)
-    wrapCanary(child)(wrapReset(child)(buildIteration(child, isLazy && barrier)))
+    wrapCanary(child, empty, cont)(wrapReset(child)(buildIteration(child, isLazy && barrier)))
     emitTerminator(Inst.Jmp(begin))
 
     enterBlock(cont)
 
-  /** A builder for `x+` node. */
-  def buildPlus(isLazy: Boolean, child: IRNode, keep: Keep = None, barrier: Boolean = false): Unit =
-    buildIteration(child, barrier)
-    buildStar(isLazy, child, keep, barrier)
-
-  /** A builder for `x?` node. */
-  def buildQuestion(isLazy: Boolean, child: IRNode, keep: Keep = None, barrier: Boolean = false): Unit =
+  /** A builder for `x?` node, whose iteration is optional. */
+  def buildQuestion(
+      isLazy: Boolean,
+      child: IRNode,
+      keep: Keep = None,
+      barrier: Boolean = false,
+      empty: EmptyIteration = EmptyIteration.Ignore
+  ): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
 
@@ -535,7 +601,7 @@ private[vm] class ProgramBuilder(
     )
 
     enterBlock(main)
-    wrapReset(child)(buildIteration(child, isLazy && barrier))
+    wrapCanary(child, empty, cont)(wrapReset(child)(buildIteration(child, isLazy && barrier)))
     emitTerminator(Inst.Jmp(cont))
 
     enterBlock(cont)
@@ -552,43 +618,84 @@ private[vm] class ProgramBuilder(
       case IRQuantifier.Bounded(n, _, _) => n
     // Perl unsets the capture of a counted repetition matching nothing.
     for case Some(i) <- counted if min == 0 do emitInst(Inst.CapReset(i, i))
+    val empty = if child.canMatchEmpty then emptyIteration(quantifier, child) else EmptyIteration.Ignore
+    // An empty mandatory iteration ending the repetition jumps to `exit`.
+    val exit = allocateLabel("exit")
+    var exits = false
+    def mandatory(n: Int): Unit =
+      empty match
+        case EmptyIteration.ExitAll =>
+          exits = true
+          buildRepeatN(n, child, barrier, Some(exit))
+        case EmptyIteration.ExitFromMin if n > 0 =>
+          exits = true
+          buildRepeatN(n - 1, child, barrier)
+          wrapCanary(child, EmptyIteration.ExitFromMin, exit)(wrapReset(child)(buildIteration(child, barrier)))
+        case _ => buildRepeatN(n, child, barrier)
     quantifier match
-      case IRQuantifier.Exact(0)               => // nothing to do
-      case IRQuantifier.Exact(1)               => buildIteration(child, barrier)
-      case IRQuantifier.Exact(n)               => buildRepeatN(n, child, barrier)
-      case IRQuantifier.Unbounded(0, strategy) => buildStar(isLazy(strategy), child, keep, barrier)
-      case IRQuantifier.Unbounded(1, strategy) => buildPlus(isLazy(strategy), child, keep, barrier)
-      case IRQuantifier.Unbounded(n, strategy) =>
-        buildRepeatN(n, child, barrier)
-        buildStar(isLazy(strategy), child, keep, barrier)
-      case IRQuantifier.Bounded(0, 1, strategy) => buildQuestion(isLazy(strategy), child, keep, barrier)
-      case IRQuantifier.Bounded(0, n, strategy) => buildRepeatAtMostN(isLazy(strategy), n, child, keep, barrier)
-      case IRQuantifier.Bounded(1, 2, strategy) =>
-        buildIteration(child, barrier)
-        buildQuestion(isLazy(strategy), child, keep, barrier)
-      case IRQuantifier.Bounded(1, m, strategy) =>
-        buildIteration(child, barrier)
-        buildRepeatAtMostN(isLazy(strategy), m - 1, child, keep, barrier)
-      case IRQuantifier.Bounded(n, m, strategy) if m - n == 1 =>
-        buildRepeatN(n, child, barrier)
-        buildQuestion(isLazy(strategy), child, keep, barrier)
+      case IRQuantifier.Exact(n) if empty == EmptyIteration.ExitAll => mandatory(n)
+      case IRQuantifier.Exact(n)                                    => buildRepeatN(n, child, barrier)
+      case IRQuantifier.Unbounded(n, strategy)                      =>
+        mandatory(n)
+        buildStar(isLazy(strategy), child, keep, barrier, empty)
       case IRQuantifier.Bounded(n, m, strategy) =>
-        buildRepeatN(n, child, barrier)
-        buildRepeatAtMostN(isLazy(strategy), m - n, child, keep, barrier)
+        mandatory(n)
+        if m - n == 1 then buildQuestion(isLazy(strategy), child, keep, barrier, empty)
+        else buildRepeatAtMostN(isLazy(strategy), m - n, child, keep, barrier, empty)
+    if exits then
+      emitTerminator(Inst.Jmp(exit))
+      enterBlock(exit)
 
-  /** A builder for `x{n}` node. */
-  def buildRepeatN(n: Int, child: IRNode, barrier: Boolean = false): Unit =
-    val loop = allocateEntrance("loop")
-    val cont = allocateLabel("cont")
+  /** Returns how a repetition handles an empty iteration in the dialect. */
+  def emptyIteration(quantifier: IRQuantifier, child: IRNode): EmptyIteration = pattern.dialect match
+    case Dialect.JavaScript => EmptyIteration.Reject
+    case Dialect.Python     => EmptyIteration.ExitOptional
+    case Dialect.Java       =>
+      child.data match
+        case IRNodeData.Capture(_, _, node) if node.data.isInstanceOf[IRNodeData.Atomic] => EmptyIteration.Reject
+        case _: IRNodeData.Capture | _: IRNodeData.Sequence | _: IRNodeData.Disjunction | _: IRNodeData.Repeat |
+            IRNodeData.Empty | _: IRNodeData.Conditional =>
+          EmptyIteration.ExitAll
+        case _ => EmptyIteration.Reject
+    // PCRE repeats copies of the node for a bounded repetition.
+    case Dialect.PCRE =>
+      quantifier match
+        case _: IRQuantifier.Unbounded => EmptyIteration.ExitFromMin
+        case _                         => EmptyIteration.Ignore
+    case Dialect.Ruby => EmptyIteration.ExitOptional
+    case _            => EmptyIteration.ExitFromMin
 
-    val reg = allocateCounter()
+  /** A builder for `x{n}` node, where an empty iteration jumps to `exit` if it is given. */
+  def buildRepeatN(n: Int, child: IRNode, barrier: Boolean = false, exit: Option[Label] = None): Unit =
+    if n == 1 then
+      exit match
+        case Some(exit) =>
+          wrapCanary(child, EmptyIteration.ExitAll, exit)(wrapReset(child)(buildIteration(child, barrier)))
+        case None => buildIteration(child, barrier)
+    else if n > 1 then
+      val loop = allocateEntrance("loop")
+      val cont = allocateLabel("cont")
 
-    // Note that `wrapCanary` is not needed.
-    wrapReset(child)(buildIteration(child, barrier))
-    closeLoopBlock(reg, n, loop, cont)
+      val reg = allocateCounter()
+
+      exit match
+        case Some(exit) =>
+          // The counter is reset on leaving the loop.
+          val leave = allocateLabel("leave")
+          keepBlocks.append((leave, Seq(Inst.Reset(reg)), Inst.Jmp(exit)))
+          wrapCanary(child, EmptyIteration.ExitAll, leave)(wrapReset(child)(buildIteration(child, barrier)))
+        case None => wrapReset(child)(buildIteration(child, barrier))
+      closeLoopBlock(reg, n, loop, cont)
 
   /** A builder for `x{0,n}` node. */
-  def buildRepeatAtMostN(isLazy: Boolean, n: Int, child: IRNode, keep: Keep = None, barrier: Boolean = false): Unit =
+  def buildRepeatAtMostN(
+      isLazy: Boolean,
+      n: Int,
+      child: IRNode,
+      keep: Keep = None,
+      barrier: Boolean = false,
+      empty: EmptyIteration = EmptyIteration.Reject
+  ): Unit =
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
     val cont = allocateLabel("cont")
@@ -596,7 +703,7 @@ private[vm] class ProgramBuilder(
     val reg = allocateCounter()
 
     enterLoopBlock(isLazy, loop, cont, keep)
-    wrapCanary(child)(wrapReset(child)(buildIteration(child, isLazy && barrier)))
+    wrapCanary(child, empty, cont)(wrapReset(child)(buildIteration(child, isLazy && barrier)))
     closeLoopBlock(reg, n, begin, cont)
 
   /** Builds an iteration of a repetition, which Perl wraps to restore the captures when the iteration fails.
@@ -631,12 +738,17 @@ private[vm] class ProgramBuilder(
     freeCounter(reg)
 
   /** Inserts a canary around a loop body if needed. */
-  def wrapCanary(child: IRNode)(run: => Unit): Unit =
-    if child.canMatchEmpty then
+  /** Inserts a canary around an iteration if needed, where an empty iteration fails, or jumps to `exit`. */
+  def wrapCanary(child: IRNode, empty: EmptyIteration, exit: Label)(run: => Unit): Unit =
+    if child.canMatchEmpty && empty != EmptyIteration.Ignore then
       val reg = allocateCanary()
       emitInst(Inst.SetCanary(reg))
       run
-      emitInst(Inst.CheckCanary(reg))
+      if empty == EmptyIteration.Reject then emitInst(Inst.CheckCanary(reg))
+      else
+        val next = allocateLabel("next")
+        emitTerminator(Inst.CmpCanary(reg, exit, next))
+        enterBlock(next)
       freeCanary(reg)
     else run
 
@@ -661,9 +773,14 @@ private[vm] class ProgramBuilder(
       atomicDepth += 1
       build(child)
       atomicDepth -= 1
+    emitHold(child)
     emitTerminator(Inst.Commit)
 
     enterBlock(cont)
+
+  /** Emits `cap_hold` of the captures in the node, if they are held over backtracking. */
+  def emitHold(node: IRNode): Unit =
+    if holdsCaptures then for (from, to) <- node.captureRange.range do emitInst(Inst.CapHold(from, to))
 
   /** Runs with the scope of `(*ACCEPT)`. */
   def withAcceptScope(scope: AcceptScope)(run: => Unit): Unit =
@@ -677,14 +794,14 @@ private[vm] class ProgramBuilder(
     atomicDepth = saved._3
 
   /** Builds the body of an assertion, which is the scope of `(*ACCEPT)` and maybe of `(*THEN)`. */
-  def buildAssertion(child: IRNode, scope: Option[Int]): Unit =
-    withThenScope(scope.orElse(thenScope))(withAcceptScope(AcceptScope.LookAround)(build(child)))
+  def buildAssertion(child: IRNode, scope: Option[Int], body: IRNode => Unit): Unit =
+    withThenScope(scope.orElse(thenScope))(withAcceptScope(AcceptScope.LookAround)(body(child)))
 
   /** A builder for positive look-around assertion.
     *
     * With `(*THEN)` in it, a failing fallback is the barrier, which makes the assertion fail.
     */
-  def buildPositiveLookAround(child: IRNode): Unit =
+  def buildPositiveLookAround(child: IRNode, body: IRNode => Unit = build): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
     val scope = assertionThenScope(child)
@@ -692,13 +809,14 @@ private[vm] class ProgramBuilder(
     emitTerminator(Inst.Tx(main, Some(cont), scope.map(_ => failLabel()), scope.map(Barrier.Then(_))))
 
     enterBlock(main)
-    buildAssertion(child, scope)
+    buildAssertion(child, scope, body)
+    emitHold(child)
     emitTerminator(Inst.Rollback)
 
     enterBlock(cont)
 
   /** A builder for negative look-around assertion, whose fallback makes the assertion succeed. */
-  def buildNegativeLookAround(child: IRNode): Unit =
+  def buildNegativeLookAround(child: IRNode, body: IRNode => Unit = build): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
     val scope = assertionThenScope(child)
@@ -706,7 +824,8 @@ private[vm] class ProgramBuilder(
     emitTerminator(Inst.Tx(main, None, Some(cont), Option.when(hasCut)(Barrier.Assertion(scope))))
 
     enterBlock(main)
-    buildAssertion(child, scope)
+    buildAssertion(child, scope, body)
+    emitHold(child)
     emitTerminator(Inst.Rollback)
 
     enterBlock(cont)
@@ -715,7 +834,7 @@ private[vm] class ProgramBuilder(
     *
     * `(*ACCEPT)` in it ends it atomically.
     */
-  def buildNonAtomicLookAround(child: IRNode): Unit =
+  def buildNonAtomicLookAround(child: IRNode, body: IRNode => Unit = build): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
     val scope = assertionThenScope(child)
@@ -723,56 +842,56 @@ private[vm] class ProgramBuilder(
     emitTerminator(Inst.Tx(main, Some(cont), scope.map(_ => failLabel()), scope.map(Barrier.Then(_))))
 
     enterBlock(main)
-    buildAssertion(child, scope)
+    buildAssertion(child, scope, body)
     emitTerminator(Inst.Leave)
 
     enterBlock(cont)
 
   /** A builder for a conditional.
     *
-    * A look-around condition is atomic, and it keeps the captures in it even if it is negative (except in .NET). Its
-    * fallback is the barrier, so `(*COMMIT)`, `(*PRUNE)` and `(*SKIP)` in it make it false (or true for a negative
-    * one).
+    * A look-around condition is atomic, and it keeps the captures in it even if it is negative, except in .NET, which
+    * restores them as a negative look-around does. Its fallback is the barrier, so `(*COMMIT)`, `(*PRUNE)` and
+    * `(*SKIP)` in it make it false (or true for a negative one).
     */
   def buildConditional(condition: IRCondition, yes: IRNode, no: IRNode): Unit =
     val yesLabel = allocateLabel("yes")
     val noLabel = allocateLabel("no")
     val cont = allocateLabel("cont")
 
-    def buildTest(negative: Boolean, child: IRNode, behind: Boolean): Unit =
+    def buildTest(negative: Boolean, child: IRNode, body: IRNode => Unit): Unit =
       val main = allocateLabel("main")
       val scope = assertionThenScope(child)
-      val (rollback, fallback) = if negative then (noLabel, yesLabel) else (yesLabel, noLabel)
+      val restores = negative && pattern.dialect == Dialect.DotNet
+      val (rollback, fallback) = if negative && !restores then (noLabel, yesLabel) else (yesLabel, noLabel)
       emitTerminator(Inst.Tx(main, Some(rollback), Some(fallback), Option.when(hasCut)(Barrier.Assertion(scope))))
       enterBlock(main)
-      val test = () => buildAssertion(child, scope)
-      if behind then wrapLookBehind(test()) else wrapLookAhead(test())
+      if restores then buildNegativeLookAround(child, body) else buildAssertion(child, scope, body)
       emitTerminator(Inst.Rollback)
 
-    val test = condition match
-      case IRCondition.Captured(indices) =>
-        emitTerminator(Inst.IfCap(indices, yesLabel, noLabel))
-        None
-      case IRCondition.LookAhead(negative, n) =>
-        buildTest(negative, n, false)
-        Some(n)
-      case IRCondition.LookBehind(negative, n) =>
-        buildTest(negative, n, true)
-        Some(n)
-    // .NET drops the captures of the condition, which are unset here though they may have had values before.
-    val dropped = test.filter(_ => pattern.dialect == Dialect.DotNet).flatMap(_.captureRange.range)
+    // The register of the end of a look-behind matched forward, which is reset after the condition.
+    var end: Option[CounterReg] = None
+    condition match
+      case IRCondition.Captured(indices)      => emitTerminator(Inst.IfCap(indices, yesLabel, noLabel))
+      case IRCondition.LookAhead(negative, n) => wrapLookAhead(buildTest(negative, n, build))
+      case IRCondition.LookBehind(negative, n, IRLookBehindMatch.Backward) =>
+        wrapLookBehind(buildTest(negative, n, build))
+      case IRCondition.LookBehind(negative, n, IRLookBehindMatch.Forward(starts)) =>
+        val reg = allocateCounter()
+        end = Some(reg)
+        wrapLookAhead(buildTest(negative, n, buildForwardBody(_, starts, reg)))
 
     for (label, branch) <- Seq((yesLabel, yes), (noLabel, no)) do
       enterBlock(label)
-      for (from, to) <- dropped do emitInst(Inst.CapReset(from, to))
+      for reg <- end do emitInst(Inst.Reset(reg))
       build(branch)
       emitTerminator(Inst.Jmp(cont))
 
     enterBlock(cont)
+    end.foreach(freeCounter)
 
   /** A builder for a backtracking control verb. */
-  def buildBacktrackControl(node: IRNode, verb: IRBacktrackControl): Unit = verb match
-    case IRBacktrackControl.Accept     => buildAccept(node)
+  def buildBacktrackControl(verb: IRBacktrackControl): Unit = verb match
+    case IRBacktrackControl.Accept     => buildAccept()
     case IRBacktrackControl.Commit     => emitInst(Inst.Verb(VerbKind.Commit))
     case IRBacktrackControl.Prune      => emitInst(Inst.Verb(VerbKind.Prune))
     case IRBacktrackControl.Skip(name) => emitInst(Inst.Verb(VerbKind.Skip(name)))
@@ -782,13 +901,9 @@ private[vm] class ProgramBuilder(
 
   /** A builder for `(*ACCEPT)`, which closes the open captures and ends its scope successfully.
     *
-    * PCRE and Perl match a look-behind forward from the position its length before, so `(*ACCEPT)` in it is not
-    * supported, as the VM matches it backward.
+    * In a look-behind, which PCRE and Perl match forward, it ends the look-behind before reaching the position.
     */
-  def buildAccept(node: IRNode): Unit =
-    if back then
-      val at = Option.when(node.loc.start >= 0)(s" at ${node.loc.start}").getOrElse("")
-      throw new UnsupportedException(s"unsupported syntax (Accept in a look-behind)$at")
+  def buildAccept(): Unit =
     for index <- openCaptures do emitInst(Inst.CapEnd(index))
     acceptScope match
       case AcceptScope.Top        => emitOk()
@@ -807,6 +922,38 @@ private[vm] class ProgramBuilder(
     back = false
     run
     back = oldBack
+
+  /** Builds a look-behind with the builder of the assertion, which takes the builder of the body.
+    *
+    * The body matches backward, or forward from the starts that the engine tries before the position.
+    */
+  def buildLookBehind(matching: IRLookBehindMatch)(run: (IRNode => Unit) => Unit): Unit =
+    matching match
+      case IRLookBehindMatch.Backward        => wrapLookBehind(run(build))
+      case IRLookBehindMatch.Forward(starts) =>
+        val end = allocateCounter()
+        wrapLookAhead(run(buildForwardBody(_, starts, end)))
+        emitInst(Inst.Reset(end))
+        freeCounter(end)
+
+  /** Builds the body of a look-behind matched forward from each start, which must end at the position held by `end`.
+    *
+    * With the starts of each alternative, the body is a disjunction of them.
+    */
+  def buildForwardBody(child: IRNode, starts: Seq[IRLookBehindStarts], end: CounterReg): Unit =
+    def attempt(node: IRNode, starts: IRLookBehindStarts): Unit =
+      val start = allocateLabel("start")
+      emitTerminator(Inst.StepBack(end, starts, start))
+      enterBlock(start)
+      build(node)
+      emitAssert(AssertKind.LookBehindEnd(end))
+    (starts, child.data) match
+      case (Seq(s), _)                                                     => attempt(child, s)
+      case (_, IRNodeData.Disjunction(nodes)) if nodes.size == starts.size =>
+        buildDisjunction(nodes, i => attempt(nodes(i), starts(i)))
+      // $COVERAGE-OFF$
+      case _ => throw new IllegalStateException("look-behind starts do not match the alternatives")
+      // $COVERAGE-ON$
 
   /** Sets a matching direction fot look-behind assertion. */
   def wrapLookBehind(run: => Unit): Unit =

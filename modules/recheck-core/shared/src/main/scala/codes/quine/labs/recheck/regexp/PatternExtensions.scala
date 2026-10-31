@@ -146,9 +146,9 @@ object PatternExtensions:
         case Repeat(n, IRQuantifier.Unbounded(m, _))  => loop(n) * Math.max(m, 1) + 1
         case Repeat(n, IRQuantifier.Bounded(m, l, _)) => loop(n) * l + (l - m)
         case LookAhead(_, n)                          => loop(n) + 1
-        case LookBehind(_, n)                         => loop(n) + 1
+        case LookBehind(_, n, _)                      => loop(n) + 1
         case NonAtomicLookAhead(n)                    => loop(n) + 1
-        case NonAtomicLookBehind(n)                   => loop(n) + 1
+        case NonAtomicLookBehind(n, _)                => loop(n) + 1
         case Conditional(_, _, _)                     => node.children.map(loop).sum + 1
         case _                                        => 1
       loop(pattern.node)
@@ -344,15 +344,15 @@ object PatternExtensions:
       case Repeat(n, _)                    => Seq(n)
       case Atomic(n)                       => Seq(n)
       case LookAhead(_, n)                 => Seq(n)
-      case LookBehind(_, n)                => Seq(n)
+      case LookBehind(_, n, _)             => Seq(n)
       case Capture(_, _, n)                => Seq(n)
       case NonAtomicLookAhead(n)           => Seq(n)
-      case NonAtomicLookBehind(n)          => Seq(n)
+      case NonAtomicLookBehind(n, _)       => Seq(n)
       case Conditional(condition, yes, no) =>
         condition match
-          case IRCondition.LookAhead(_, n)  => Seq(n, yes, no)
-          case IRCondition.LookBehind(_, n) => Seq(n, yes, no)
-          case IRCondition.Captured(_)      => Seq(yes, no)
+          case IRCondition.LookAhead(_, n)     => Seq(n, yes, no)
+          case IRCondition.LookBehind(_, n, _) => Seq(n, yes, no)
+          case IRCondition.Captured(_)         => Seq(yes, no)
       case _ => Seq.empty
 
     /** Checks whether the node or a descendant satisfies the predicate. */

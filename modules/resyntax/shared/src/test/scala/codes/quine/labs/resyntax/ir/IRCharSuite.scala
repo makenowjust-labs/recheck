@@ -14,6 +14,8 @@ import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.Properties
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.ir.IRLookBehindMatch.Forward
+import codes.quine.labs.resyntax.ir.IRLookBehindStarts.Longest
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.parser.Parser
 
@@ -225,9 +227,13 @@ class IRCharSuite extends munit.FunSuite:
   check("ss", "iu", Perl)(sharpS)
   check("ff", "i", Ruby)(Disjunction(Sequence(Chars(of("fF")), Chars(of("fF"))), Chars(of("\ufb00"))))
   // Ruby matches the folding in a look-behind as the folded string only (e.g. `(?<=ß)` matches `ss`, but not `ß`).
-  check("(?<=ß)", "i", Ruby)(LookBehind(false, Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f")))))
-  check("(?<=ss)", "i", Ruby)(LookBehind(false, Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f")))))
-  check("(?<=ß)", "i", Perl)(LookBehind(false, sharpS))
+  check("(?<=ß)", "i", Ruby)(
+    LookBehind(false, Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))), Forward(Seq(Longest(2, 2))))
+  )
+  check("(?<=ss)", "i", Ruby)(
+    LookBehind(false, Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))), Forward(Seq(Longest(2, 2))))
+  )
+  check("(?<=ß)", "i", Perl)(LookBehind(false, sharpS, Forward(Seq(Longest(1, 2)))))
   // Folds with classes and escapes are intentionally not reproduced.
   chars("[ß]", "i", Ruby, Perl)(sharpSs)
   check("\\x73s", "i", Ruby)(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))
@@ -295,6 +301,25 @@ class IRCharSuite extends munit.FunSuite:
     Atomic(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical)))
   )
   check("\\R", "", Java)(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical)))
+  // Java's `\R` under a quantifier matches each iteration in its first way.
+  check("\\R*", "", Java)(
+    Repeat(
+      Atomic(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical))),
+      IRQuantifier.Unbounded(0, BacktrackStrategy.Greedy)
+    )
+  )
+  check("(?:\\R)*", "", Java)(
+    Repeat(
+      Atomic(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical))),
+      IRQuantifier.Unbounded(0, BacktrackStrategy.Greedy)
+    )
+  )
+  check("(?:\\R)?", "", Java)(
+    Repeat(
+      Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical)),
+      IRQuantifier.Bounded(0, 1, BacktrackStrategy.Greedy)
+    )
+  )
   unsupported("\\N{LATIN SMALL LETTER A}", "", Perl, Python)
   error("\\N{U+41}", "", Java, Python)("Unknown character name at 0")
   error("\\p{RGI_Emoji}", "", Perl)("Unknown Unicode property name at 0")
