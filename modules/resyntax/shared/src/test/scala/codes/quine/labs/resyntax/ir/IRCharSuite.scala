@@ -247,6 +247,16 @@ class IRCharSuite extends munit.FunSuite:
   chars("(?a)k", "i", Perl())(of("kK\u212a"))
   chars("(?aa)(?u)k", "i", Perl())(of("kK\u212a"))
   chars("(?aa)(?^i)k", "", Perl())(of("kK\u212a"))
+  // Perl's `l` (the C locale) folds only ASCII letters below `U+0100` and no character across it.
+  chars("(?l)k", "i", Perl())(of("kK"))
+  chars("(?l)\u212a", "i", Perl())(of("\u212a"))
+  chars("(?l)\u017f", "i", Perl())(of("\u017f"))
+  chars("(?l)\u00df", "i", Perl())(of("\u00df"))
+  chars("(?l)\u00b5", "i", Perl())(of("\u00b5"))
+  chars("(?l)\u03bc", "i", Perl())(of("\u03bc\u039c"))
+  chars("(?l)[j-l]", "i", Perl())(of("jklJKL"))
+  check("(?l)ss", "i", Perl())(Sequence(Chars(of("sS")), Chars(of("sS"))))
+  chars("(?l)k", "i", Perl(utf8 = false))(of("kK"))
   // `\N{U+...}` makes Perl's pattern use Unicode rules, as `\N{...}` does.
   checkSet("[\\w\\N{U+41}]", "", Perl(utf8 = false))(set => set.contains(0xe9))
   checkSet("[\\w\\x{41}]", "", Perl(utf8 = false))(set => !set.contains(0xe9))

@@ -100,6 +100,30 @@ class InterpreterDialectSuite extends munit.FunSuite:
     accepts("(?iu)^(é)\\1$", Java, "éÉ")
     accepts("^(a)(?i:\\1)$", PCRE, "aA")
     refutes("^(a)\\1$", PCRE, "aA")
+    // Perl's `l` (the C locale) folds no character across `U+00FF` and `U+0100`.
+    accepts("(?il)^(.)\\1$", Perl(), "kK")
+    refutes("(?il)^(.)\\1$", Perl(), "k\u212a")
+    refutes("(?il)^(.)\\1$", Perl(), "éÉ")
+    accepts("(?il)^(.)\\1$", Perl(), "μΜ")
+    refutes("(?il)^(.)\\1$", Perl(), "μµ")
+
+  test("Interpreter.run: Perl's case-insensitive literals under /l"):
+    for (source, input, matches) <- Seq(
+        ("k", "\u212a", false),
+        ("\\x{212A}", "k", false),
+        ("ſ", "s", false),
+        ("ß", "ß", true),
+        ("ß", "ẞ", false),
+        ("ß", "ss", false),
+        ("ss", "ß", false),
+        ("µ", "μ", false),
+        ("Ÿ", "ÿ", false),
+        ("[a-z]", "\u212a", false),
+        ("[\\x{200}-\\x{3000}]", "\u212a", true),
+        ("\\x{FB00}", "ff", false),
+        ("ΐ", "\u03b9\u0308\u0301", true)
+      )
+    do accepts(s"(?l)\\A$source\\z", Perl(), input, "i", matches)
 
   test("Interpreter.run: Ruby's look-behind with a multi-character folding"):
     accepts("(?i)(?<=ß)x", Ruby(), "ssx")

@@ -185,10 +185,13 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     * (escapes, Turkic `İ`, and folds across classes, groups or quantifiers) is not reproduced.
     */
   private def foldRun(units: Seq[Lit], inLookBehind: Boolean): Seq[IRNode] =
-    val eq = equivalence(units.head.flags)
-    val native = perlNative(units.head.flags)
-    // Perl's `aa` forbids a non-ASCII character to match a folding with ASCII characters (e.g. `ß` and `ss`).
-    val restrict = units.head.flags.caselessRestrict
+    val flags = units.head.flags
+    val eq = equivalence(flags)
+    val native = perlNative(flags)
+    // Perl's `aa` forbids a non-ASCII character to match a folding with ASCII characters (e.g. `ß` and `ss`), and `l`
+    // one with characters below `U+0100`.
+    val below =
+      if flags.caselessRestrict then 0x80 else if dialect.isPerl && flags.charset == IRCharset.Locale then 0x100 else 0
     val folded = mutable.ArrayBuffer.empty[(Int, Int)]
     for (u, i) <- units.zipWithIndex; c <- FullCaseFolding(u.value).iterator do folded += ((c, i))
     def char(i: Int, loc: SourceLocation): IRNode =
@@ -198,7 +201,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     val occurrences = for
       i <- folded.indices
       (key, set) <- multiFoldings
-      if !restrict || key.iterator.forall(_ >= 0x80)
+      if key.iterator.forall(_ >= below)
       if i + key.length <= folded.length && (0 until key.length).forall(k => folded(i + k)._1 == key(k))
       // A key must start and end at literal boundaries.
       if (i == 0 || folded(i - 1)._2 != folded(i)._2) &&
@@ -568,8 +571,8 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
 
   /** Returns the folding of a character that Perl matches in a class under the flags (e.g. `ss` of `ß`).
     *
-    * A native string under `/d`, a Latin-1 character or a folding with ASCII characters under `l`, and a folding with
-    * ASCII characters under `aa` do not match it.
+    * A native string under `/d`, a folding with a character below `U+0100` under `l`, and a folding with ASCII
+    * characters under `aa` do not match it.
     */
   private def perlMultiFolding(value: Int, flags: IRCharFlags): Option[UString] =
     multiFolding(value).filter: key =>
@@ -577,7 +580,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       flags.charset match
         case IRCharset.Default  => !perlNative(flags)
         case IRCharset.Unicode  => true
-        case IRCharset.Locale   => value >= 0x100 && !hasAscii
+        case IRCharset.Locale   => key.iterator.forall(_ >= 0x100)
         case _: IRCharset.Ascii => !(flags.caselessRestrict && hasAscii)
 
   /** Resolves a folding as a run of plain literals, which is how Ruby and Perl match it. */

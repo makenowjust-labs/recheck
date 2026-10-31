@@ -68,9 +68,21 @@ object IRCaseEquivalence:
   final case class PerlNative(mode: UnitMode) extends IRCaseEquivalence:
     def closure(set: CharSet): CharSet = set.union(CaseMapping.SimpleFold.closure(set).diff(Latin1)).restrict(mode)
 
+  /** PerlLocale is Perl's `/l` rules in the C locale.
+    *
+    * Below `U+0100` only ASCII letters fold, and above it Unicode rules apply, but no character folds across them (e.g.
+    * `k` and `K`, or `ß` and `ẞ`).
+    */
+  final case class PerlLocale(mode: UnitMode) extends IRCaseEquivalence:
+    def closure(set: CharSet): CharSet =
+      val above = set.diff(Byte)
+      asciiFold.closure(set.intersect(Byte)).union(CaseMapping.SimpleFold.closure(above).diff(Byte)).restrict(mode)
+
   private val Ascii: CharSet = CharSet.range(0, 0x7f)
 
   private val Latin1: CharSet = CharSet.range(0x80, 0xff)
+
+  private val Byte: CharSet = CharSet.range(0, 0xff)
 
   /** ASCII letter folding. */
   lazy val asciiFold: CaseMapping = CaseMapping.fromEntries(('A'.toInt to 'Z').map(c => (c, c + 0x20)))
@@ -118,10 +130,11 @@ object IRCaseEquivalence:
         case _: Dialect.Python if asciiOnly || mode == UnitMode.Byte => Keyed("ASCII", asciiFold, mode)
         case _: Dialect.Python                                       => Keyed("Python", pythonKey, mode)
         case _: Dialect.Ruby if mode == UnitMode.Byte                => Keyed("ASCII", asciiFold, mode)
-        case _: Dialect.Ruby                           => Keyed("simple folding", CaseMapping.SimpleFold, mode)
-        case _: Dialect.Perl if perlNative             => PerlNative(mode)
-        case _: Dialect.Perl if flags.caselessRestrict => PCRERestrict(CaseMapping.SimpleFold, mode)
-        case _: Dialect.Perl                           => Keyed("simple folding", CaseMapping.SimpleFold, mode)
+        case _: Dialect.Ruby => Keyed("simple folding", CaseMapping.SimpleFold, mode)
+        case _: Dialect.Perl if flags.charset == IRCharset.Locale => PerlLocale(mode)
+        case _: Dialect.Perl if perlNative                        => PerlNative(mode)
+        case _: Dialect.Perl if flags.caselessRestrict            => PCRERestrict(CaseMapping.SimpleFold, mode)
+        case _: Dialect.Perl => Keyed("simple folding", CaseMapping.SimpleFold, mode)
         // PCRE folds non-ASCII characters only in UTF or UCP mode; PHP's `u` sets both.
         case Dialect.PCRE if mode == UnitMode.Byte && !flags.unicodeClass => Keyed("ASCII", asciiFold, mode)
         case Dialect.PCRE                                                 =>
