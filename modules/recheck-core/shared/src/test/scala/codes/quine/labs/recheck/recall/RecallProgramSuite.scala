@@ -166,18 +166,31 @@ class RecallProgramSuite extends munit.FunSuite:
     assertEquals(generate("/!,;~%&:=\"|^-"), None)
 
   test("RecallProgram.generate: Perl string patterns"):
-    def generate(source: String, flags: String, encoding: Option[Encoding] = None): RecallProgram =
-      val options = DialectOptions(perlSource = PerlSource.String, encoding = encoding)
+    def generate(
+        source: String,
+        flags: String,
+        encoding: Option[Encoding] = None,
+        utf8: Option[Boolean] = None
+    ): RecallProgram =
+      val options = DialectOptions(perlSource = PerlSource.String, encoding = encoding, perlUtf8 = utf8)
       val pattern = ParsedPattern.parse(source, flags, Dialect.Perl, options).toTry.get
       RecallProgram.generate(pattern, attack, perlLiteral = false).get
     // A string pattern is not interpolated again, so any pattern can run.
     assertEquals(
       line(generate("a$x@y/é", "gi"), "my $regex"),
-      "my $regex = do { my $pattern = \"a\\$x\\@y/\\xE9\"; qr/$pattern/i };"
+      "my $regex = do { my $pattern = \"a\\$x\\@y/\\xE9\"; utf8::upgrade($pattern); qr/$pattern/i };"
     )
     val bytes = generate("é", "", Some(Encoding.PerlBytes))
-    assertEquals(line(bytes, "my $regex"), "my $regex = do { my $pattern = \"\\xC3\\xA9\"; qr/$pattern/ };")
+    assertEquals(
+      line(bytes, "my $regex"),
+      "my $regex = do { my $pattern = \"\\xC3\\xA9\"; utf8::downgrade($pattern, 1); qr/$pattern/ };"
+    )
     assert(!bytes.script.contains("use utf8"))
+    // The UTF-8 flag of the string is `perlUtf8`, or what the pattern tells.
+    assert(line(generate("\\w", ""), "my $regex").contains("utf8::downgrade($pattern, 1);"))
+    assert(line(generate("\\w", "", utf8 = Some(true)), "my $regex").contains("utf8::upgrade($pattern);"))
+    assert(line(generate("\\p{L}", ""), "my $regex").contains("utf8::upgrade($pattern);"))
+    assert(line(generate("é", "", utf8 = Some(false)), "my $regex").contains("utf8::downgrade($pattern, 1);"))
 
   test("RecallProgram.isPerlSafe"):
     assert(RecallProgram.isPerlSafe("a$"))

@@ -1,5 +1,6 @@
 package codes.quine.labs.recheck.recall
 
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -21,6 +22,8 @@ import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.DialectOptions
+import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
 
 /** Runs recall validation on the runtimes in `PATH`, skipping the missing ones.
@@ -138,6 +141,21 @@ class RecallRuntimeSuite extends munit.FunSuite:
       RecallValidator.defaultExec.get
     )
     assertFinish(string.get)
+
+  runtimeTest("Perl: the UTF-8 flag of a string pattern", "perl"):
+    // `\w` matches `é` by the Unicode rules, which a UTF-8 pattern string has.
+    def matches(source: String, utf8: Option[Boolean]): Boolean =
+      val options = DialectOptions(perlSource = PerlSource.String, perlUtf8 = utf8)
+      val pattern = ParsedPattern.parse(source, "", Dialect.Perl, options).toTry.get
+      val program = RecallProgram.generate(pattern, attack("a", 1, ""), perlLiteral = false).get
+      val regex = program.script.linesIterator.find(_.startsWith("my $regex = ")).get
+      val process = new ProcessBuilder("perl", "-e", s"""$regex print "\\xE9" =~ $$regex ? "1" : "0";""").start()
+      new String(process.getInputStream.readAllBytes(), StandardCharsets.UTF_8) == "1"
+    assert(matches("\\w", Some(true)))
+    assert(!matches("\\w", Some(false)))
+    assert(!matches("\\w", None))
+    assert(matches("\\w|ü", None))
+    assert(!matches("\\w|ü", Some(false)))
 
   runtimeTest("PCRE", "php"):
     // PHP's default `pcre.backtrack_limit` stops the match.

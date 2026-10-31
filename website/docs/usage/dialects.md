@@ -215,6 +215,7 @@ Notes on each dialect:
 - `perl` puts the pattern into the program as a `qr` literal with the `literal` [`perlSource`](parameters.mdx#perlsource).
   When the literal would interpolate a variable or run code (e.g. `$name`, `@{...}` or `(?{ ... })`), the recall validation is skipped and `recallValidation` is `null`.
   With the `string` source, the program builds the pattern from a string as `qr/$pattern/`.
+  It sets the UTF-8 flag of the string by `utf8::upgrade` or `utf8::downgrade`, as [`perlUtf8`](parameters.mdx#perlutf8) tells (or as `recheck` decides it from the pattern), since the flag decides the character set rules.
 - `pcre` runs with PHP's default settings of `pcre.backtrack_limit`, `pcre.recursion_limit` and `pcre.jit`, and the runtime name in the result shows them.
   With the default limits, an exponential match usually ends with the backtrack limit.
   `pcre.recursion_limit` is PCRE2's depth limit, so it is an engine error.

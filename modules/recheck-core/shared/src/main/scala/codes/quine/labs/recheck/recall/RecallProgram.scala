@@ -296,7 +296,10 @@ object RecallProgram:
         yield s"qr$delimiter${pattern.source}$delimiter$flags"
       else
         val source = AttackPattern.Perl.literal(sourceString(pattern.source, bytes))
-        Some(s"do { my $$pattern = $source; qr/$$pattern/$flags }")
+        // The UTF-8 flag of the string decides Perl's rules.
+        // A literal of escapes may not have the flag that `perlUtf8` tells.
+        val utf8 = if pattern.perlUtf8 then "utf8::upgrade($pattern)" else "utf8::downgrade($pattern, 1)"
+        Some(s"do { my $$pattern = $source; $utf8; qr/$$pattern/$flags }")
     regex.map: regex =>
       val input = attack.toString(AttackPattern.Perl)
       val pragma = if bytes then "" else "use utf8;\n"

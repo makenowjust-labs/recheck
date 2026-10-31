@@ -98,6 +98,13 @@ object IRBuilder:
       case Dialect.Perl => if encoding.contains(Encoding.PerlBytes) then UnitMode.Byte else UnitMode.CodePoint
       case Dialect.PCRE => if flagSet.unicode || utf then UnitMode.CodePoint else UnitMode.Byte
 
+  /** Returns whether a Perl pattern string is UTF-8 as [[build]] reads it with the options.
+    *
+    * When the options do not tell it, it is the value giving the same character set rules as [[build]] decides.
+    */
+  def perlUtf8(node: Node, mode: UnitMode, options: DialectOptions): Boolean =
+    options.perlUtf8.getOrElse(mode != UnitMode.Byte && usesPerlUnicodeSyntax(node, literals = true))
+
   /** Returns the case equivalence of a back-reference with the flags in the dialect and the mode. */
   def caseEquivalence(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRCaseEquivalence =
     IRCaseEquivalence.of(dialect, mode, flags, perlNative = false)
