@@ -176,8 +176,25 @@ object FlagSet:
           check(dialect.isPCRE)
         case _ =>
           check(false)
+      if dialect.isPerl && PerlCharsets.contains(c) && counts(c) > (if c == 'a' then 2 else 1) then
+        throw new FlagSetException(s"Duplicated flag '$c'", Some(offset))
 
-    if dialect.isPython then
-      if flagSet.bytes && flagSet.unicode then throw new FlagSetException("Incompatible flags 'b' and 'u'", None)
+    def incompatible(c1: Char, c2: Char): Nothing =
+      throw new FlagSetException(s"Incompatible flags '$c1' and '$c2'", None)
+    dialect match
+      case Dialect.JavaScript =>
+        if flagSet.unicode && flagSet.unicodeSets then incompatible('u', 'v')
+      case _: Dialect.Python =>
+        if flagSet.bytes && flagSet.unicode then incompatible('b', 'u')
+        if flagSet.ascii && flagSet.unicode then incompatible('a', 'u')
+        if flagSet.ascii && flagSet.localeUpper then incompatible('a', 'L')
+      case _: Dialect.Perl =>
+        flags.filter(PerlCharsets.contains).distinct.toSeq match
+          case Seq(c1, c2, _*) => incompatible(c1, c2)
+          case _               => ()
+      case _ => ()
 
     flagSet
+
+  /** Perl's character set modifiers, which exclude each other. */
+  private val PerlCharsets: String = "adlu"

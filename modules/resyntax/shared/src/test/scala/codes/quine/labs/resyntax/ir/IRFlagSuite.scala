@@ -136,6 +136,8 @@ class IRFlagSuite extends IRSuiteBase:
   checkFlags("(?l)a(?d)b", "", Perl())(d => Seq(flagsOf(d).copy(charset = IRCharset.Locale), flagsOf(d)))
   checkFlags("(?a)a", "", Python())(d => Seq(flagsOf(d).copy(charset = IRCharset.Ascii.All)))
   checkFlags("(?L)a", "b", Python())(d => Seq(flagsOf(d, "b").copy(charset = IRCharset.Locale)))
+  error("a", "L", Python())("Cannot use LOCALE flag with a str pattern")
+  error("a", "u", Python(Python.Type.Bytes))("Cannot use UNICODE flag with a bytes pattern")
   // `(*UTF)(*UCP)(?a)(?^)\d` does not match `١`, so `(?^)` keeps `a` in PCRE, but not in Perl.
   checkFlags("(?a)(?^)a", "", PCRE)(d => Seq(flagsOf(d).copy(charset = IRCharset.Ascii.All)))
   checkFlags("(?a)(?^)a", "", Perl())(d => Seq(flagsOf(d)))

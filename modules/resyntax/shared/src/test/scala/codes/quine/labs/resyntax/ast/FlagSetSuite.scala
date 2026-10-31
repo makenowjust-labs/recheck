@@ -43,8 +43,20 @@ class FlagSetSuite extends munit.FunSuite:
   check("y", JavaScript)(_.sticky)
   // PHP skips spaces and line breaks in the modifiers: `/A/ i\n` matches `a`.
   check(" i\n\r", PCRE)(_ == FlagSet(ignoreCase = true))
+  check("aa", Perl())(f => f.ascii && f.asciiRestrict)
 
   error("ii", JavaScript)("Duplicated flag 'i' at 1")
   error("z", DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())("Unknown flag 'z' at 0")
   error(" ", DotNet, Java, JavaScript, Perl(), Python(), Ruby())("Unknown flag ' ' at 0")
+  // `new RegExp('a', 'uv')` is a `SyntaxError`.
+  error("uv", JavaScript)("Incompatible flags 'u' and 'v'")
   error("bu", Python())("Incompatible flags 'b' and 'u'")
+  // `re.compile('a', re.A | re.U)` and `re.compile(b'a', re.A | re.L)` raise `ValueError`.
+  error("au", Python())("Incompatible flags 'a' and 'u'")
+  error("La", Python())("Incompatible flags 'a' and 'L'")
+  // Perl's `/a`, `/d`, `/l` and `/u` are mutually exclusive, and only `/a` may appear twice.
+  error("au", Perl())("Incompatible flags 'a' and 'u'")
+  error("ld", Perl())("Incompatible flags 'l' and 'd'")
+  error("aua", Perl())("Incompatible flags 'a' and 'u'")
+  error("aaa", Perl())("Duplicated flag 'a' at 2")
+  error("uu", Perl())("Duplicated flag 'u' at 1")

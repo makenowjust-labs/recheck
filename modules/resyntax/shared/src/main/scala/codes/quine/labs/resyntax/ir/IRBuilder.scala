@@ -50,6 +50,8 @@ object IRBuilder:
     val mode = unitMode(dialect, flagSet, featureSet.utf)
     if dialect.isPython && mode == UnitMode.CodePoint && flagSet.localeUpper then
       throw new IRBuildingException("Cannot use LOCALE flag with a str pattern", SourceLocation.Invalid)
+    if dialect.isPython && mode == UnitMode.Byte && flagSet.unicode then
+      throw new IRBuildingException("Cannot use UNICODE flag with a bytes pattern", SourceLocation.Invalid)
     val context = BuildingContext.from(flagSet, dialect, featureSet)
     val table = CaptureAnalyzer.analyze(node, context)
     val resolver = new ReferenceResolver(table, dialect, featureSet)
