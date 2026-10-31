@@ -52,6 +52,36 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     case NodeData.Backslash(_: BackslashKind.BackslashValue) => true
     case _                                                   => false
 
+  /** Moves Ruby's byte escapes before a repeated byte escape into the repeat (e.g. `\xC3\xA9+` repeats `é`).
+    *
+    * The parser puts a quantifier on the last escape, but Onigmo reads the bytes of a character as one.
+    */
+  def joinRubyByteRepeats(children: Seq[Node]): Seq[Node] =
+    if dialect != Dialect.Ruby || mode != UnitMode.CodePoint then return children
+    def byteOf(node: Node): Option[Int] = node.data match
+      case NodeData.Backslash(BackslashKind.Escape(style, value))
+          if RubyByteEscapes.contains(style) && value >= 0x80 && value <= 0xff =>
+        Some(value)
+      case _ => None
+    val out = mutable.ArrayBuffer.empty[Node]
+    for child <- children do
+      child.data match
+        case NodeData.Repeat(inner, quantifier) if byteOf(inner).exists(b => (b & 0xc0) == 0x80) =>
+          var k = out.length
+          while k > 0 && byteOf(out(k - 1)).exists(b => (b & 0xc0) == 0x80) do k -= 1
+          val lead = if k > 0 then byteOf(out(k - 1)) else None
+          if lead.exists(b => utf8Length(b) == out.length - k + 2) then
+            val bytes = out.slice(k - 1, out.length).toSeq :+ inner
+            out.remove(k - 1, bytes.length - 1)
+            val loc = SourceLocation(bytes.head.loc.start, inner.loc.end)
+            out += Node(
+              NodeData.Repeat(Node(NodeData.Sequence(bytes), loc), quantifier),
+              SourceLocation(loc.start, child.loc.end)
+            )
+          else out += child
+        case _ => out += child
+    out.toSeq
+
   /** Resolves a character-level node. */
   def resolve(node: Node, flags: IRCharFlags): IRNodeData =
     try
@@ -347,6 +377,16 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   // Classes
 
   private def klass(invert: Boolean, item: ClassItem, flags: IRCharFlags, loc: SourceLocation): IRNodeData =
+    item.data match
+      // PCRE's `[[:<:]]` and `[[:>:]]` are the start and the end of a word (`\b(?=\w)` and `\b(?<=\w)`).
+      case ClassItemData.ClassPosix(false, name @ ("<" | ">")) if dialect == Dialect.PCRE && !invert =>
+        val word = classes.word(flags).restrict(mode)
+        val boundary = IRNodeData.Assert(IRAssertKind.WordBoundary(wordSet(flags)))
+        val look =
+          if name == "<" then IRNodeData.LookAhead(false, IRNodeData.Chars(word))
+          else IRNodeData.LookBehind(false, IRNodeData.Chars(word))
+        return IRNodeData.Sequence(boundary, look)
+      case _ => ()
     if invert && flags.unicodeSets && mayContainStrings(item) then
       throw new IRBuildingException("Negated character class may contain strings", loc)
     if invert then output(negate(item, flags), flags)
@@ -433,7 +473,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
             throw new NotModeledException
           val decoded = mergeRubyBytesInClass(lits)
           result = result.union(ClassSet(closeChars(decoded.map(_.value), flags)))
-          i += decoded.map(l => if l.value >= 0x80 then utf8Length(l.value) else 1).sum
+          i += bytes.length
         case ClassItemData.ClassRange(begin, end)
             if dialect == Dialect.Ruby && mode == UnitMode.CodePoint &&
               (isRubyByteValue(begin.data) || isRubyByteValue(end.data)) =>

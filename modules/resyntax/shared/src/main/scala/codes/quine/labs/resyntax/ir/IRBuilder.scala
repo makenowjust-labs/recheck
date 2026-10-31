@@ -202,8 +202,9 @@ private[ir] class IRBuilder(
 
   def buildSequence(children: Seq[Node]): Either[IRNodeData, IRNode] =
     children match
-      case Seq()    => Left(IRNodeData.Empty)
-      case children =>
+      case Seq()     => Left(IRNodeData.Empty)
+      case children0 =>
+        val children = chars.joinRubyByteRepeats(children0)
         val nodes = Seq.newBuilder[IRNode]
         var i = 0
         while i < children.length do

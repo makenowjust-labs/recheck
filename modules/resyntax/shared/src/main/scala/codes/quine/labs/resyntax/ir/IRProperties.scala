@@ -667,7 +667,9 @@ private[ir] object IRProperties:
 
   def perl(name: String, value: Option[String]): PropertyResult =
     value match
-      case Some(value) =>
+      // The parser splits a package-qualified name (e.g. `Foo::IsBar`) at the first `:`.
+      case Some(value) if value.startsWith(":") => perl(s"$name:$value", None)
+      case Some(value)                          =>
         val propertyKey = perlKey(name)
         val valueKey = perlKey(value)
         val values = propertyKey match
@@ -705,8 +707,10 @@ private[ir] object IRProperties:
           .orElse(if raw.startsWith("in") then perlBlock.get(raw.drop(2)).map(foundValue) else None)
           .orElse(perlBlock.get(key).filter(_ => raw.startsWith("in")).map(foundValue))
           .getOrElse:
-            // A name starting with `In` or `Is` may be a user-defined property, which Perl looks up at run time.
-            if name.startsWith("In") || name.startsWith("Is") then NotModeled else Unknown
+            // A name starting with `In` or `Is` (after a package name) may be a user-defined property, which Perl
+            // looks up at run time.
+            val local = name.split("::").last
+            if local.startsWith("In") || local.startsWith("Is") then NotModeled else Unknown
 
   // ---------------------------------------------------------------------------------------------------------------
   // Ruby

@@ -1,5 +1,6 @@
 package codes.quine.labs.resyntax.ir
 
+import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.FlagSet
@@ -111,6 +112,9 @@ class IRCharSuite extends munit.FunSuite:
   error("[\\x00-\\xFF]", "", Ruby)("Invalid multibyte escape at 1")
   error("[a\\xA1-\\uFFFF]", "", Ruby)("Invalid multibyte escape at 2")
   unsupported("[\\xC3\\xA0-\\xC3\\xA9]", "", Ruby)
+  chars("[\\xC3\\xBD\\xC3\\xBF]", "", Ruby)(of("\u00fd\u00ff"))
+  // Onigmo repeats the whole character of byte escapes.
+  check("\\xC3\\xA9+", "", Ruby)(Repeat(Chars(of("\u00e9")), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy)))
   chars("\\xC3", "n", Ruby)(CharSet.single(0xc3))
   // Perl's case commands.
   chars("\\Ua", "", Perl)(of("A"))
@@ -224,6 +228,12 @@ class IRCharSuite extends munit.FunSuite:
   checkSet("[[:alpha:]]", "", Ruby)(_ == Properties.binary("Alphabetic").get.set)
   checkSet("[[:alpha:]]", "u", PCRE)(_ == gc("L"))
   chars("[[:alpha:]]", "a", Perl)(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+  check("[[:<:]]", "", PCRE)(
+    Sequence(
+      Assert(IRAssertKind.WordBoundary(IRCharClasses.AsciiWord)),
+      LookAhead(false, Chars(IRCharClasses.AsciiWord))
+    )
+  )
   chars("[[:upper:]]", "i", PCRE)(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
 
   // Properties
@@ -252,6 +262,7 @@ class IRCharSuite extends munit.FunSuite:
   // A name starting with `In` or `Is` may be a user-defined property in Perl.
   unsupported("\\p{IsFoo}", "", Perl)
   unsupported("\\p{Line_Break=Alphabetic}", "", Perl)
+  unsupported("\\p{Foo::IsBar}", "", Perl)
   check("\\p{RGI_Emoji_Flag_Sequence}", "v", JavaScript)(
     Strings(Properties.binary("RGI_Emoji_Flag_Sequence").get.classSet)
   )
