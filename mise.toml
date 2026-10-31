@@ -1,0 +1,37 @@
+[tools]
+java = "temurin-25.0.2+10.0.LTS"
+sbt = "2.0.12"
+node = "26.11.1"
+pnpm = "12.16.1"
+python = "3.15.0"
+ruby = "4.0.7"
+dotnet = "10.0.403"
+perl = "5.44.0.0"
+
+# PHP bundles PCRE2 10.44 and Ubuntu has an older PCRE2, so PHP links PCRE2 10.49 built here.
+[tools."http:pcre2"]
+version = "10.49"
+url = "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-{{ version }}/pcre2-{{ version }}.tar.bz2"
+strip_components = 1
+bin_path = "bin"
+postinstall = '''
+cd "$MISE_TOOL_INSTALL_PATH" &&
+./configure --prefix="$MISE_TOOL_INSTALL_PATH" --disable-shared --enable-jit &&
+make -j"$(getconf _NPROCESSORS_ONLN)" install
+'''
+
+[tools."http:php"]
+version = "8.5.12"
+url = "https://www.php.net/distributions/php-{{ version }}.tar.xz"
+strip_components = 1
+bin_path = "bin"
+depends = ["http:pcre2"]
+postinstall = '''
+pcre2="$(pcre2-config --prefix)" &&
+cd "$MISE_TOOL_INSTALL_PATH" &&
+mkdir .src && find . -mindepth 1 -maxdepth 1 ! -name .src -exec mv {} .src \; && cd .src &&
+./configure --prefix="$MISE_TOOL_INSTALL_PATH" --disable-all --disable-cgi --disable-phpdbg --without-pear \
+  --with-external-pcre --with-pcre-jit PCRE2_CFLAGS="-I$pcre2/include" PCRE2_LIBS="-L$pcre2/lib -lpcre2-8" &&
+make -j"$(getconf _NPROCESSORS_ONLN)" install &&
+cd .. && rm -rf .src
+'''

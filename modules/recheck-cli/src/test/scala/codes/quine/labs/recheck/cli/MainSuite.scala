@@ -27,6 +27,10 @@ import codes.quine.labs.resyntax.ast.PerlSource
 class MainSuite extends munit.FunSuite:
   private class ExitException(val status: Int) extends SecurityException
 
+  /** Fails instead of skipping when `RECHECK_REQUIRE_RUNTIMES=1`, as on CI. */
+  override def assume(cond: Boolean, clue: => Any)(implicit loc: munit.Location): Unit =
+    if sys.env.get("RECHECK_REQUIRE_RUNTIMES").contains("1") then assert(cond, clue) else super.assume(cond, clue)
+
   def runMain(
       args: Seq[String],
       newIn: InputStream = InputStream.nullInputStream(),

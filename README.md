@@ -7,6 +7,16 @@
 [![npm](https://img.shields.io/npm/v/recheck?logo=javascript&style=for-the-badge)](https://www.npmjs.com/package/recheck)
 [![Codecov](https://img.shields.io/codecov/c/gh/makenowjust-labs/recheck?logo=codecov&style=for-the-badge)](https://codecov.io/gh/makenowjust-labs/recheck)
 
+## Development
+
+[mise](https://mise.jdx.dev) installs every tool to build and test recheck, including the runtimes that the recall validation tests run:
+
+```sh
+mise install
+```
+
+mise builds PHP from source, so this needs a C compiler.
+
 ## License
 
 MIT License.

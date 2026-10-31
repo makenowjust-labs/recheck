@@ -11,6 +11,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  MISE_RUBY_COMPILE: false
+
 jobs:
   build:
     runs-on: ubuntu-26.04
@@ -24,10 +27,10 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: coursier/setup-action@v3
+      - uses: jdx/mise-action@v5
         with:
-          jvm: adoptium:1.21.0.2
-          apps: sbt
+          version: 2026.10.25
+          install_args: java sbt
       - name: Cache SBT
         uses: actions/cache@v6
         with:
@@ -50,7 +53,7 @@ jobs:
         run: |
           setting() { sbt --server --error "print $1" | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | grep -v '^\s*$' | grep -v '^\[' | tail -n1; }
           version="$(setting coreJVM/releaseVersion)"
-          graalvm="$(setting cli/nativeImageJvm):$(setting cli/nativeImageVersion)"
+          graalvm="$(setting cli/nativeImageJvm)-$(setting cli/nativeImageVersion)"
           echo "version=$version"
           echo "graalvm=$graalvm"
           { echo "version=$version"; echo "graalvm=$graalvm"; } >> "$GITHUB_OUTPUT"
@@ -70,10 +73,10 @@ jobs:
     name: Scala Lint
     steps:
       - uses: actions/checkout@v7
-      - uses: coursier/setup-action@v3
+      - uses: jdx/mise-action@v5
         with:
-          jvm: adoptium:1.21.0.2
-          apps: sbt
+          version: 2026.10.25
+          install_args: java sbt
       - name: Cache SBT
         uses: actions/cache@v6
         with:
@@ -97,14 +100,20 @@ jobs:
     name: Node Lint
     steps:
       - uses: actions/checkout@v7
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
+      - uses: jdx/mise-action@v5
         with:
-          version: '12'
-      - uses: actions/setup-node@v7
+          version: 2026.10.25
+          install_args: node pnpm
+      - id: pnpm-store
+        name: Locate pnpm store
+        shell: bash
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+      - name: Cache pnpm
+        uses: actions/cache@v6
         with:
-          node-version: '26'
-          cache: 'pnpm'
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
       - name: Install
         run: pnpm install --frozen-lockfile
       - name: Lint
@@ -116,18 +125,17 @@ jobs:
 
   scala-test:
     runs-on: ubuntu-26.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     name: Scala Test
+    env:
+      RECHECK_REQUIRE_RUNTIMES: 1
     steps:
       - uses: actions/checkout@v7
-      - uses: coursier/setup-action@v3
+      - uses: jdx/mise-action@v5
         with:
-          jvm: adoptium:1.21.0.2
-          apps: sbt
-      # This Node.js is needed for Scala tests, so we don't need to install dependencies.
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '26'
+          version: 2026.10.25
+      - name: Generate the locales of the tests
+        run: sudo locale-gen en_US en_US.UTF-8 tr_TR.UTF-8
       - name: Cache SBT
         uses: actions/cache@v6
         with:
@@ -145,21 +153,29 @@ jobs:
   node-test:
     needs: [build, node-lint]
     runs-on: ubuntu-26.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     strategy:
       matrix:
         node: [ 22, 24, 26 ]
     name: Node v${{ matrix.node }} Test
+    env:
+      MISE_NODE_VERSION: ${{ matrix.node }}
     steps:
       - uses: actions/checkout@v7
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
+      - uses: jdx/mise-action@v5
         with:
-          version: '12'
-      - uses: actions/setup-node@v7
+          version: 2026.10.25
+          cache_key: "{{default}}-node${{ matrix.node }}"
+      - id: pnpm-store
+        name: Locate pnpm store
+        shell: bash
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+      - name: Cache pnpm
+        uses: actions/cache@v6
         with:
-          node-version: ${{ matrix.node }}
-          cache: 'pnpm'
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
       - name: Install
         run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v8
@@ -189,14 +205,20 @@ jobs:
     name: Node E2E Test (${{ matrix.backend }})
     steps:
       - uses: actions/checkout@v7
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
+      - uses: jdx/mise-action@v5
         with:
-          version: '12'
-      - uses: actions/setup-node@v7
+          version: 2026.10.25
+          install_args: java node pnpm
+      - id: pnpm-store
+        name: Locate pnpm store
+        shell: bash
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+      - name: Cache pnpm
+        uses: actions/cache@v6
         with:
-          node-version: '26'
-          cache: 'pnpm'
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
       - name: Install
         run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v8
@@ -224,14 +246,20 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-tags: true
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
+      - uses: jdx/mise-action@v5
         with:
-          version: '12'
-      - uses: actions/setup-node@v7
+          version: 2026.10.25
+          install_args: node pnpm
+      - id: pnpm-store
+        name: Locate pnpm store
+        shell: bash
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+      - name: Cache pnpm
+        uses: actions/cache@v6
         with:
-          node-version: '26'
-          cache: 'pnpm'
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
       - name: Install
         run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v8
@@ -254,6 +282,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     name: Scala Build (Native Binary)
+    env:
+      MISE_JAVA_VERSION: ${{ needs.build.outputs.graalvm }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -278,10 +308,11 @@ jobs:
           path: ${{ steps.binary.outputs.path }}
           key: native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('modules/**/src/main/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
       - if: steps.restore-binary.outputs.cache-hit != 'true'
-        uses: coursier/setup-action@v3
+        uses: jdx/mise-action@v5
         with:
-          jvm: ${{ needs.build.outputs.graalvm }}
-          apps: sbt
+          version: 2026.10.25
+          install_args: java sbt
+          cache_key: "{{default}}-${{ needs.build.outputs.graalvm }}"
       - if: steps.restore-binary.outputs.cache-hit != 'true'
         name: Cache SBT
         uses: actions/cache@v6
@@ -342,14 +373,20 @@ jobs:
           ext=$([[ "$RUNNER_OS" == Windows ]] && echo .exe || echo)
           echo "artifact=recheck-$platform-$arch$ext" >> "$GITHUB_OUTPUT"
           echo "bin=recheck$ext" >> "$GITHUB_OUTPUT"
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
+      - uses: jdx/mise-action@v5
         with:
-          version: '12'
-      - uses: actions/setup-node@v7
+          version: 2026.10.25
+          install_args: node pnpm
+      - id: pnpm-store
+        name: Locate pnpm store
+        shell: bash
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+      - name: Cache pnpm
+        uses: actions/cache@v6
         with:
-          node-version: '26'
-          cache: 'pnpm'
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
       - name: Install
         run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v8
@@ -381,10 +418,10 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: coursier/setup-action@v3
+      - uses: jdx/mise-action@v5
         with:
-          jvm: adoptium:1.21.0.2
-          apps: sbt
+          version: 2026.10.25
+          install_args: java sbt
       - name: Cache SBT
         uses: actions/cache@v6
         with:
@@ -427,18 +464,20 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: coursier/setup-action@v3
+      - uses: jdx/mise-action@v5
         with:
-          jvm: adoptium:1.21.0.2
-          apps: sbt
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
+          version: 2026.10.25
+          install_args: java sbt node pnpm
+      - id: pnpm-store
+        name: Locate pnpm store
+        shell: bash
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+      - name: Cache pnpm
+        uses: actions/cache@v6
         with:
-          version: '12'
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '26'
-          cache: 'pnpm'
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
       - name: Cache SBT
         uses: actions/cache@v6
         with:
@@ -556,14 +595,20 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-tags: true
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
+      - uses: jdx/mise-action@v5
         with:
-          version: '12'
-      - uses: actions/setup-node@v7
+          version: 2026.10.25
+          install_args: node pnpm
+      - id: pnpm-store
+        name: Locate pnpm store
+        shell: bash
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+      - name: Cache pnpm
+        uses: actions/cache@v6
         with:
-          node-version: '26'
-          cache: 'pnpm'
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
       - uses: actions/download-artifact@v8
         with:
           name: recheck.js

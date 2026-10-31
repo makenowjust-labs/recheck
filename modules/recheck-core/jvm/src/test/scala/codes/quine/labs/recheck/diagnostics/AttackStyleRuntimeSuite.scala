@@ -11,10 +11,16 @@ import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
-/** Evaluates the attack strings written in each style on the runtimes in `PATH`, skipping the missing ones. */
+/** Evaluates the attack strings written in each style on the runtimes in `PATH`, skipping the missing ones unless
+  * `RECHECK_REQUIRE_RUNTIMES=1`.
+  */
 class AttackStyleRuntimeSuite extends munit.FunSuite:
 
   override val munitTimeout: Duration = 120.seconds
+
+  /** Fails instead of skipping when `RECHECK_REQUIRE_RUNTIMES=1`, as on CI. */
+  override def assume(cond: Boolean, clue: => Any)(implicit loc: munit.Location): Unit =
+    if sys.env.get("RECHECK_REQUIRE_RUNTIMES").contains("1") then assert(cond, clue) else super.assume(cond, clue)
 
   def attack(pumps: Seq[(String, String, Int)], suffix: String, n: Int): AttackPattern =
     val ps = pumps.map((s, t, m) => (UStringUtil.fromString(s), UStringUtil.fromString(t), m))
