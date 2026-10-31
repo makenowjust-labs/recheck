@@ -116,7 +116,7 @@ The following are common to the dialects, and each dialect's page describes how 
 - Look-arounds (including non-atomic ones), back-references, atomic groups, possessive quantifiers, conditionals and the backtracking control verbs other than `(*FAIL)` and `(*MARK)` are handled by the fuzz checker, not by the automaton checker.
 - A back-reference sees the captures as the engine keeps them over the iterations of a loop.
 - An iteration matching the empty string is handled as the engine does.
-- `\R` is atomic, as `(?>\r\n|[\n\x0B\f\r\x85  ])`.
+- `\R` is atomic, as `(?>\r\n|[\n\x0B\f\r\x85\u2028\u2029])`.
 
 ### Searches
 
