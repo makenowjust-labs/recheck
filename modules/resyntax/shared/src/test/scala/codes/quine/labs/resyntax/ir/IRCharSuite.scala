@@ -305,7 +305,6 @@ class IRCharSuite extends munit.FunSuite:
   error("\\p{Hiragana}", "", DotNet)("Unknown Unicode property name at 0")
   // A name starting with `In` or `Is` may be a user-defined property in Perl.
   unsupported("\\p{IsFoo}", "", Perl)
-  unsupported("\\p{Line_Break=Alphabetic}", "", Perl)
   unsupported("\\p{Foo::IsBar}", "", Perl)
   check("\\p{RGI_Emoji_Flag_Sequence}", "v", JavaScript)(
     Strings(Properties.binary("RGI_Emoji_Flag_Sequence").get.classSet)

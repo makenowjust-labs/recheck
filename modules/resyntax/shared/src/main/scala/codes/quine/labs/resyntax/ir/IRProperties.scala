@@ -1,5 +1,9 @@
 package codes.quine.labs.resyntax.ir
 
+import java.math.BigDecimal
+import java.math.MathContext
+import java.math.RoundingMode
+
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.BinaryProperty
 import codes.quine.labs.resyntax.charset.CharSet
@@ -17,7 +21,7 @@ private[ir] enum PropertyResult:
   /** Unknown is a name that the engine rejects. */
   case Unknown
 
-  /** NotModeled is a name that the engine accepts, but IR has no data for (e.g. Perl's `\p{Line_Break=...}`). */
+  /** NotModeled is a name that the engine accepts, but IR has no data for (e.g. Perl's user-defined `\p{IsFoo}`). */
   case NotModeled
 
 /** CaseKind is a kind of property that some dialects change under case-insensitivity. */
@@ -561,65 +565,49 @@ private[ir] object IRProperties:
 
   private lazy val perlScriptExtensions = enumIndex(Properties.ScriptExtensions, perlKey)
 
-  private lazy val perlScript = enumIndex(Properties.Script, perlKey)
-
   private lazy val perlBlock = enumIndex(Properties.Block, perlKey)
-
-  private lazy val perlBidiClass = enumIndex(Properties.BidiClass, perlKey)
 
   private lazy val perlAge = enumIndex(Properties.Age, perlKey)
 
-  /** Perl's Unicode properties that IR has no data for, as loose names. */
-  private val PerlNotModeled: Set[String] = Set(
-    "bidipairedbrackettype",
-    "bpt",
-    "canonicalcombiningclass",
-    "ccc",
-    "decompositiontype",
-    "dt",
-    "eastasianwidth",
-    "ea",
-    "graphemeclusterbreak",
-    "gcb",
-    "hangulsyllabletype",
-    "hst",
-    "indicpositionalcategory",
-    "inpc",
-    "indicsyllabiccategory",
-    "insc",
-    "indicconjunctbreak",
-    "incb",
-    "joiningtype",
-    "jt",
-    "joininggroup",
-    "jg",
-    "linebreak",
-    "lb",
-    "nfcquickcheck",
-    "nfcqc",
-    "nfdquickcheck",
-    "nfdqc",
-    "nfkcquickcheck",
-    "nfkcqc",
-    "nfkdquickcheck",
-    "nfkdqc",
-    "numerictype",
-    "nt",
-    "numericvalue",
-    "nv",
-    "sentencebreak",
-    "sb",
-    "verticalorientation",
-    "vo",
-    "wordbreak",
-    "wb",
-    "identifierstatus",
-    "identifiertype",
-    "bidipairedbracket",
-    "bpb",
-    "equivalentunifiedideograph",
-    "eqideo"
-  )
+  /** The enumerated properties that Perl looks up by their names, except those with special values. */
+  private lazy val perlEnumerated: Map[String, Map[String, PropertyValue]] =
+    val special = Set(Properties.GeneralCategory, Properties.Age)
+    index(
+      Properties.enumeratedProperties.filterNot(special.contains).map(p => (p.names, enumIndex(p, perlKey))),
+      perlKey
+    )
+
+  /** Perl's number of `\p{Numeric_Value=...}`: a reduced fraction, a decimal number, or `NaN`. */
+  private val PerlFraction = """([-+]?)(\d+)/(\d+)""".r
+
+  private val PerlDecimal = """[-+]?_?\d+(?:_\d+)*(?:\.(?:\d+(?:_\d+)*)?)?(?:[eE][-+]?\d+)?""".r
+
+  /** Looks up Perl's `Numeric_Value`.
+    *
+    * A fraction must be reduced to a denominator other than 1 (`2/4` is `1/2`, and `3/1` is unknown). A decimal number
+    * is an integer value if it is integral, and otherwise matches a non-integer value with the same 4 significant
+    * digits (e.g. `0.3333` is `1/3`, and `0.333` is unknown).
+    */
+  private def perlNumericValue(value: String): Option[CharSet] =
+    val nv = Properties.NumericValue
+    def rounded(d: Double): BigDecimal = new BigDecimal(d).round(new MathContext(4, RoundingMode.HALF_EVEN))
+    value.trim match
+      case v if lowerAscii(v) == "nan" => Some(nv.nan.set)
+      case PerlFraction(sign, n, d)    =>
+        val (num, den) = (BigInt(n), BigInt(d))
+        if den == 0 then None
+        else
+          val g = num.gcd(den)
+          val (rn, rd) = ((if sign == "-" then -num else num) / g, den / g)
+          if rd == 1 then None
+          else nv.values.find(v => !v.isNaN && BigInt(v.numerator) == rn && BigInt(v.denominator) == rd).map(_.set)
+      case v @ PerlDecimal() =>
+        val d = v.filterNot(_ == '_').toDouble
+        if d == math.rint(d) then nv.values.find(v => v.denominator == 1 && v.numerator.toDouble == d).map(_.set)
+        else
+          val key = rounded(d)
+          nv.values.find(v => v.denominator > 1 && rounded(v.toDouble).compareTo(key) == 0).map(_.set)
+      case _ => None
 
   private def perlSpecial(key: String): Option[(CharSet, CaseKind)] =
     val u = unicodeUniverse
@@ -675,26 +663,22 @@ private[ir] object IRProperties:
         val valueKey = perlKey(value)
         val values = propertyKey match
           case "gc" | "generalcategory" | "category" => Some(perlGeneralCategory)
-          case "sc" | "script"                       => Some(perlScript)
-          case "scx" | "scriptextensions"            => Some(perlScriptExtensions)
-          case "blk" | "block"                       => Some(perlBlock)
-          case "bc" | "bidiclass"                    => Some(perlBidiClass)
-          case _                                     => None
+          case key                                   => perlEnumerated.get(key)
         values match
           case Some(values) => fromOption(values.get(valueKey).map(foundValue))
           case None         =>
             propertyKey match
-              case "age"              => fromOption(perlAge.get(valueKey).map(foundValue))
-              case "in" | "presentin" =>
-                fromOption(perlAge.get(valueKey).map(v => found(Properties.presentIn(v))))
-              case _ =>
+              case "age"                 => fromOption(perlAge.get(valueKey).map(foundValue))
+              case "in" | "presentin"    => fromOption(perlAge.get(valueKey).map(v => found(Properties.presentIn(v))))
+              case "nv" | "numericvalue" => fromOption(perlNumericValue(value).map(found(_)))
+              case _                     =>
                 perlBinaryIndex.get(propertyKey) match
                   case Some(p) =>
                     Properties.binaryValue(value, codes.quine.labs.resyntax.charset.NameMatching.Loose) match
                       case Some(true)  => foundBinary(p)
                       case Some(false) => found(p.set.complement(unicodeUniverse))
                       case None        => Unknown
-                  case None => if PerlNotModeled.contains(propertyKey) then NotModeled else Unknown
+                  case None => Unknown
       case None =>
         val raw = lowerAscii(name.filterNot(c => c == ' ' || c == '-' || c == '_' || c == '\t'))
         val key = perlKey(name)
