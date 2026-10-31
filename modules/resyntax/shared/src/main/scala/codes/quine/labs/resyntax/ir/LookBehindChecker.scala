@@ -25,6 +25,9 @@ import codes.quine.labs.resyntax.ir.LookBehindChecker.*
   * @param minSubtract
   *   how much the minimum length of the nodes of a sequence lessens, for Perl's literals matching one character folded
   *   to them (e.g. `ss` matching `ß`)
+  * @param rubyClassWidths
+  *   the widths of the alternatives that Ruby makes of a class matching the foldings of its characters (e.g. `[ßx]` is
+  *   `[ßẞx]|ss|ss`), which are top-level alternatives as the body
   */
 private[ir] final class LookBehindChecker(
     table: CaptureTable,
@@ -32,7 +35,8 @@ private[ir] final class LookBehindChecker(
     featureSet: IRFeatureSet,
     charWidth: Seq[Node] => Width = nodes => Width(nodes.size, nodes.size),
     lastSupplementary: Int = -1,
-    minSubtract: Seq[Node] => Long = _ => 0
+    minSubtract: Seq[Node] => Long = _ => 0,
+    rubyClassWidths: Node => Option[Seq[Int]] = _ => None
 ):
 
   /** Checks the body of a look-behind, and throws an exception at the look-behind node if it is invalid. */
@@ -88,9 +92,13 @@ private[ir] final class LookBehindChecker(
         def fixed(node: Node): IRLookBehindStarts = rubyWidth(node) match
           case RubyWidth.Fixed(n) => IRLookBehindStarts.Longest(n.toInt, n.toInt)
           case _                  => IRLookBehindStarts.Longest(0, 0)
-        rubyUnwrap(body).data match
+        val node = rubyUnwrap(body)
+        node.data match
           case NodeData.Disjunction(nodes) => IRLookBehindMatch.Forward(nodes.map(fixed))
-          case _                           => IRLookBehindMatch.Forward(Seq(fixed(body)))
+          case _                           =>
+            rubyClassWidths(node) match
+              case Some(widths) => IRLookBehindMatch.Forward(widths.map(w => IRLookBehindStarts.Longest(w, w)))
+              case None         => IRLookBehindMatch.Forward(Seq(fixed(body)))
 
   /** Checks whether the group is deterministic for Java's `TreeInfo`, which makes a repetition of it `GroupCurly`. */
   def javaDeterministic(group: Node): Boolean = java(List(group), JavaInfo.Initial).deterministic
@@ -226,9 +234,10 @@ private[ir] final class LookBehindChecker(
   /** Checks Onigmo's restriction: each top-level alternative has a fixed length, and some nodes are forbidden. */
   private def ruby(body: Node, negative: Boolean): Boolean =
     if NodeKey.exists(body)(rubyForbidden(_, negative)) then return false
-    rubyUnwrap(body).data match
+    val node = rubyUnwrap(body)
+    node.data match
       case NodeData.Disjunction(nodes) => nodes.forall(rubyWidth(_) != RubyWidth.Variable)
-      case _                           => rubyWidth(body) != RubyWidth.Variable
+      case _                           => rubyWidth(body) != RubyWidth.Variable || rubyClassWidths(node).isDefined
 
   private def rubyUnwrap(node: Node): Node = node.data match
     case NodeData.Group(GroupKind.NonCapture, child)                                    => rubyUnwrap(child)
@@ -289,6 +298,8 @@ private[ir] final class LookBehindChecker(
     case NodeData.Backslash(_: BackslashKind.EscapeCall)                      => RubyWidth.Unknown
     case NodeData.Literal(_) | NodeData.Class(_, _) | NodeData.Backslash(_: BackslashKind.BackslashValue) =>
       rubyCharWidth(Seq(node))
+    case NodeData.Backslash(_: BackslashKind.EscapeClass) =>
+      if rubyClassWidths(node).isDefined then RubyWidth.Variable else RubyWidth.Fixed(1)
     case _ => RubyWidth.Fixed(1)
 
   private def rubyCharWidth(nodes: Seq[Node]): RubyWidth =

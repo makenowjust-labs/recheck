@@ -1,6 +1,7 @@
 package codes.quine.labs.recheck.vm
 
 import codes.quine.labs.recheck.AssertionCases
+import codes.quine.labs.recheck.CaseFoldingCases
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.regexp.ParsedPattern
@@ -108,6 +109,34 @@ class InterpreterDialectSuite extends munit.FunSuite:
     accepts("(?<=a(?i:ß)b)x", Ruby(), "aSsbx")
     accepts("(?i)(?<=ß)x", Perl(), "ßx")
     accepts("(?i)(?<=ß)x", Perl(), "ssx")
+
+  test("Interpreter.run: classes folded to several characters"):
+    for c <- CaseFoldingCases.cases; dialect <- c.dialects do
+      accepts(c.source, dialect, c.input, "i", c.matches.contains(dialect))
+    // Ruby tries the class before the foldings, and Perl tries the foldings first, the longest first.
+    accepts("\\A(?>[ßs])s\\z", Ruby(), "ss", "i")
+    refutes("\\A(?>[ßs])s\\z", Perl(), "ss", "i")
+    accepts("\\A(?>[ﬀﬃ])i\\z", Ruby(), "ffi", "i")
+    refutes("\\A(?>[ﬀﬃ])i\\z", Perl(), "ffi", "i")
+    // Perl takes a character, an escape or a range of one character, but not a range, a POSIX class or a property.
+    accepts("\\A[\\xDF-\\xDF]\\z", Perl(), "ss", "i")
+    refutes("\\A[\\xC0-\\xFF]\\z", Perl(), "ss", "i")
+    refutes("\\A[[:alpha:]]\\z", Perl(), "ss", "i")
+    accepts("\\A[\\u00C0-\\u00FF]\\z", Ruby(), "ss", "i")
+    // Perl's `aa` forbids a folding with ASCII characters, and `l` (the C locale) a Latin-1 character's one.
+    refutes("(?aa)\\A[\\xDFx]\\z", Perl(), "ss", "i")
+    accepts("(?aa)\\A[\\x{390}x]\\z", Perl(), "\u03b9\u0308\u0301", "i")
+    refutes("(?l)\\A[\\xDFx]\\z", Perl(), "ss", "i")
+    accepts("(?l)\\A[\\x{390}x]\\z", Perl(), "\u03b9\u0308\u0301", "i")
+    // A native string under `/d` does not match the folding of a Latin-1 character.
+    refutes("\\A[\\xDFx]\\z", Perl(utf8 = false), "ss", "i")
+    accepts("\\A[\\xDF\\p{L}]\\z", Perl(utf8 = false), "ss", "i")
+    for dialect <- Seq(Ruby(), Perl()) do accepts("(?<=[ßx])y", dialect, "ssy", "i")
+    for dialect <- Seq(JavaScript, Python(), Java, DotNet, PCRE) do refutes("(?<=[ßx])y", dialect, "ssy", "i")
+    // Ruby's look-behind matches the class or the folded string (e.g. `(?<=[ß])` does not match `ß`).
+    accepts("(?<=[ßx])y", Ruby(), "ßy", "i")
+    refutes("(?<=[ß])y", Ruby(), "ßy", "i")
+    accepts("(?<=[ß])y", Perl(), "ßy", "i")
 
   test("Interpreter.run: line terminators"):
     for dialect <- Seq(Python(), Java, PCRE, Perl(), DotNet) do

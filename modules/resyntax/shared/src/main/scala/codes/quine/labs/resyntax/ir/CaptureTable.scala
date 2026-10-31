@@ -146,8 +146,8 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
     case NodeData.Command(kind)      => walkCommand(node, kind)
     case NodeData.Backslash(_: BackslashKind.EscapeBackReference | _: BackslashKind.EscapeCall) =>
       markSite(node)
-    case NodeData.Literal(_) | NodeData.Class(_, _) | NodeData.Backslash(_: BackslashKind.BackslashValue)
-        if recordsCharFlags =>
+    case NodeData.Literal(_) | NodeData.Class(_, _) |
+        NodeData.Backslash(_: BackslashKind.BackslashValue | _: BackslashKind.EscapeClass) if recordsCharFlags =>
       charFlags(NodeKey(node)) = context.charFlags
     case _ => ()
 

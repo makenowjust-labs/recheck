@@ -321,3 +321,8 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     for c <- AssertionCases.cases; dialect <- c.dialects do
       val message = s"/${c.source}/${c.flags} in $dialect on ${c.input}"
       assertEquals(searches(c.source, c.flags, dialect, c.input), c.matches.contains(dialect), message)
+
+  test("EpsNFABuilder.build: classes folded to several characters"):
+    for c <- CaseFoldingCases.cases; dialect <- c.dialects do
+      val message = s"/${c.source}/i in $dialect on ${c.input}"
+      assertEquals(searches(c.source, "i", dialect, c.input), c.matches.contains(dialect), message)
