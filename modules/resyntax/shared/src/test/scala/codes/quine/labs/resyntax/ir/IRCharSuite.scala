@@ -3,7 +3,6 @@ package codes.quine.labs.resyntax.ir
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.FlagSet
-import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
@@ -139,7 +138,7 @@ class IRCharSuite extends munit.FunSuite:
   // Ruby and Perl fold plain literals to several characters (e.g. `ß` and `ss`), longest first.
   // Unicode 18 adds a character folded to `ß`, so the sets come from the tables.
   val sharpSs: CharSet = CaseMapping.SimpleFold.equivalents(0xdf)
-  val sharpS = Disjunction(
+  val sharpS: IRNodeData = Disjunction(
     Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))),
     Chars(FullCaseFolding.multiCodePointFoldings()(UString.fromString("ss")))
   )

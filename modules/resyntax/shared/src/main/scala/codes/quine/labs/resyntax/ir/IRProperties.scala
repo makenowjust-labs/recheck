@@ -1,7 +1,5 @@
 package codes.quine.labs.resyntax.ir
 
-import java.util.Locale
-
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.BinaryProperty
 import codes.quine.labs.resyntax.charset.CharSet
@@ -37,6 +35,11 @@ private[ir] enum CaseKind:
 /** IRProperties resolves Unicode property names (`\p{...}`) by each dialect's rules. */
 private[ir] object IRProperties:
   import PropertyResult.*
+
+  // Scala.js has no `java.util.Locale`, and the names are ASCII.
+  private def lowerAscii(s: String): String = s.map(c => if 'A' <= c && c <= 'Z' then (c + 0x20).toChar else c)
+
+  private def upperAscii(s: String): String = s.map(c => if 'a' <= c && c <= 'z' then (c - 0x20).toChar else c)
 
   private def gcValue(name: String): PropertyValue = Properties.GeneralCategory.value(name).get
 
@@ -300,15 +303,15 @@ private[ir] object IRProperties:
     case _        => Unknown
 
   private def javaScriptName(name: String): PropertyResult =
-    val key = name.toUpperCase(Locale.ROOT)
+    val key = upperAscii(name)
     fromOption(
       Properties.Script.values
-        .find(v => v.name.toUpperCase(Locale.ROOT) == key || v.shortName.toUpperCase(Locale.ROOT) == key)
+        .find(v => upperAscii(v.name) == key || upperAscii(v.shortName) == key)
         .map(foundValue)
     )
 
   private def blockKey(name: String): String =
-    name.filterNot(c => c == ' ' || c == '_' || c == '-').toUpperCase(Locale.ROOT)
+    upperAscii(name.filterNot(c => c == ' ' || c == '_' || c == '-'))
 
   private lazy val javaBlocks: Map[String, PropertyValue] =
     index(Properties.Block.values.filter(_.shortName != "NB").map(v => (v.names, v)), blockKey)
@@ -319,7 +322,7 @@ private[ir] object IRProperties:
     val ci = flags.ignoreCase
     value match
       case Some(value) =>
-        name.toLowerCase(Locale.ENGLISH) match
+        lowerAscii(name) match
           case "sc" | "script"           => javaScriptName(value)
           case "blk" | "block"           => javaBlock(value)
           case "gc" | "general_category" => javaForProperty(value, ci)
@@ -327,11 +330,11 @@ private[ir] object IRProperties:
       case None if name.startsWith("In") => javaBlock(name.drop(2))
       case None if name.startsWith("Is") =>
         val short = name.drop(2)
-        javaUnicodePredicate(short.toUpperCase(Locale.ROOT), ci)
+        javaUnicodePredicate(upperAscii(short), ci)
           .orElse(javaForProperty(short, ci))
           .orElse(javaScriptName(short))
       case None =>
-        (if flags.unicodeClass then javaPosix(name.toUpperCase(Locale.ENGLISH), ci) else Unknown)
+        (if flags.unicodeClass then javaPosix(upperAscii(name), ci) else Unknown)
           .orElse(javaForProperty(name, ci))
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -431,7 +434,7 @@ private[ir] object IRProperties:
 
   /** PCRE2's loose name: lower-cased, without spaces, hyphens and underscores. */
   private def pcreKey(name: String): String =
-    name.filterNot(c => c == ' ' || c == '-' || c == '_').toLowerCase(Locale.ROOT)
+    lowerAscii(name.filterNot(c => c == ' ' || c == '-' || c == '_'))
 
   /** The binary properties of PCRE2 10.49 (`pcre2pattern`, "Binary (true/false) properties"). */
   private val PCREBinary: Seq[String] = Seq(
@@ -547,7 +550,7 @@ private[ir] object IRProperties:
 
   /** Perl's loose name (perlunicode "Properties accessible through \p{} and \P{}"). */
   private def perlKey(name: String): String =
-    val key = name.filterNot(c => c == ' ' || c == '-' || c == '_' || c == '\t').toLowerCase(Locale.ROOT)
+    val key = lowerAscii(name.filterNot(c => c == ' ' || c == '-' || c == '_' || c == '\t'))
     if key.startsWith("is") && key.length > 2 then key.drop(2) else key
 
   private lazy val perlBinaryIndex: Map[String, BinaryProperty] =
@@ -690,7 +693,7 @@ private[ir] object IRProperties:
                       case None        => Unknown
                   case None => if PerlNotModeled.contains(propertyKey) then NotModeled else Unknown
       case None =>
-        val raw = name.filterNot(c => c == ' ' || c == '-' || c == '_' || c == '\t').toLowerCase(Locale.ROOT)
+        val raw = lowerAscii(name.filterNot(c => c == ' ' || c == '-' || c == '_' || c == '\t'))
         val key = perlKey(name)
         perlSpecial(raw)
           .orElse(perlSpecial(key))
@@ -710,7 +713,7 @@ private[ir] object IRProperties:
 
   /** Onigmo's property name: lower-cased, without spaces, hyphens and underscores. */
   private def rubyKey(name: String): String =
-    name.filterNot(c => c == ' ' || c == '-' || c == '_').toLowerCase(Locale.ROOT)
+    lowerAscii(name.filterNot(c => c == ' ' || c == '-' || c == '_'))
 
   /** The binary properties of Onigmo (Ruby 4.0's `enc/unicode/.../name2ctype.h`). */
   private val RubyBinary: Seq[String] = Seq(
