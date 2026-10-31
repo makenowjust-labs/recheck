@@ -16,6 +16,7 @@ import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
+import codes.quine.labs.resyntax.charset.Properties
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRCharResolver.*
@@ -273,7 +274,37 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       // Java's `\R` backtracks into `\r` alone (`\R\n` matches `\r\n`), unlike the others.
       if dialect == Dialect.Java then alternatives else IRNodeData.Atomic(alternatives)
     case EscapeClassKind.NonNewline if dialect == Dialect.PCRE => dot(flags.copy(dotAll = false))
+    case EscapeClassKind.GraphemeCluster                       => graphemeCluster
     case _                                                     => output(escapeClassSet(kind, flags, loc), flags)
+
+  /** `\X`: an extended grapheme cluster by the regular expression of UAX #29 (Table 1b), in an atomic group.
+    *
+    * The engines take the longest cluster and do not backtrack into it. In byte mode, the bytes are Latin-1 characters.
+    */
+  private lazy val graphemeCluster: IRNodeData =
+    import IRQuantifier.Unbounded
+    import codes.quine.labs.resyntax.ast.BacktrackStrategy.Greedy
+    def gcb(names: String*): CharSet =
+      CharSet.union(names.map(Properties.GraphemeClusterBreak.value(_).get.set)).restrict(mode)
+    def incb(name: String): CharSet = Properties.IndicConjunctBreak.value(name).get.set.restrict(mode)
+    val extPict = Properties.binary("Extended_Pictographic").get.set.restrict(mode)
+    def c(set: CharSet): IRNode = IRNode(IRNodeData.Chars(set))
+    def star(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, Unbounded(0, Greedy)))
+    def plus(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, Unbounded(1, Greedy)))
+    def seq(nodes: IRNode*): IRNode = IRNode(IRNodeData.Sequence(nodes))
+    def alt(nodes: IRNode*): IRNode = IRNode(IRNodeData.Disjunction(nodes))
+    val control = gcb("Control", "CR", "LF")
+    val Seq(l, v, t, lv, lvt) = Seq("L", "V", "T", "LV", "LVT").map(n => c(gcb(n)))
+    val hangul = alt(seq(star(l), alt(plus(v), seq(lv, star(v)), lvt), star(t)), plus(l), plus(t))
+    val ri = seq(c(gcb("RI")), c(gcb("RI")))
+    val xpicto = seq(c(extPict), star(seq(star(c(gcb("Extend"))), c(gcb("ZWJ")), c(extPict))))
+    val linkers = star(c(incb("Extend").union(incb("Linker"))))
+    val conjunct =
+      seq(c(incb("Consonant")), plus(seq(linkers, c(incb("Linker")), linkers, c(incb("Consonant")))))
+    val core = alt(hangul, ri, xpicto, conjunct, c(control.complement(mode)))
+    val postcore = star(c(gcb("Extend", "ZWJ", "SpacingMark")))
+    val cluster = alt(seq(c(gcb("CR")), c(gcb("LF"))), c(control), seq(star(c(gcb("Prepend"))), core, postcore))
+    IRNodeData.Atomic(IRCharResolver.prune(cluster).getOrElse(IRNode(IRNodeData.Chars(CharSet.empty))))
 
   private def escapeClassSet(kind: EscapeClassKind, flags: IRCharFlags, loc: SourceLocation): ClassSet =
     def set(s: CharSet): ClassSet = ClassSet(s.restrict(mode))
@@ -586,6 +617,27 @@ private[ir] object IRCharResolver:
     else if b < 0xf0 then 3
     else if b < 0xf5 then 4
     else 0
+
+  /** Removes the parts of a node that never match (an empty set, and what needs one), or returns `None` for all. */
+  def prune(node: IRNode): Option[IRNode] = node.data match
+    case IRNodeData.Chars(set)      => Option.when(set.nonEmpty)(node)
+    case IRNodeData.Sequence(nodes) =>
+      val pruned = nodes.map(prune)
+      Option.when(pruned.forall(_.isDefined))(node.copy(data = sequenceOf(pruned.flatten)))
+    case IRNodeData.Disjunction(nodes) =>
+      nodes.flatMap(prune) match
+        case Seq()     => None
+        case Seq(node) => Some(node)
+        case nodes     => Some(node.copy(data = IRNodeData.Disjunction(nodes)))
+    case IRNodeData.Repeat(inner, quantifier) =>
+      val min = quantifier match
+        case IRQuantifier.Exact(n)           => n
+        case IRQuantifier.Bounded(min, _, _) => min
+        case IRQuantifier.Unbounded(min, _)  => min
+      prune(inner) match
+        case Some(inner) => Some(node.copy(data = IRNodeData.Repeat(inner, quantifier)))
+        case None        => Option.when(min == 0)(node.copy(data = IRNodeData.Empty))
+    case _ => Some(node)
 
   /** Returns a node of the nodes in sequence. */
   def sequenceOf(nodes: Seq[IRNode]): IRNodeData = nodes match
