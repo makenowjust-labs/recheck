@@ -14,10 +14,12 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.duration.SECONDS
 
 import io.circe.Json
+import io.circe.parser.parse
 import io.circe.syntax.*
 
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.codec.encodeDiagnostics
+import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
@@ -75,6 +77,10 @@ class MainSuite extends munit.FunSuite:
       Main.command.parse(Seq("--all", "/foo/")),
       Right(Main.CheckAction(InputPattern("foo", ""), Parameters(), all = true))
     )
+    assertEquals(
+      Main.command.parse(Seq("--json", "/foo/")),
+      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(), json = true))
+    )
     assertEquals(Main.command.parse(Seq("generate-recall-script", "-")), Right(Main.RecallScriptAction("-")))
     assert(clue(Main.command.parse(Seq("generate-recall-script"))).isLeft)
     assertEquals(Main.command.parse(Seq("agent", "--thread-size=2")), Right(Main.BatchAction(2)))
@@ -122,6 +128,21 @@ class MainSuite extends munit.FunSuite:
     // Without recall validation, it shows the same as `check`.
     assertEquals(runMain(Seq("--all", "/(a|a)*$/")), runMain(Seq("/(a|a)*$/")))
     assertEquals(runMain(Seq("--all", "/foo/"))._3, 0)
+
+  test("Main#run: --json"):
+    val params = Parameters(checker = Checker.Automaton)
+    val (out, err, status) = runMain(Seq("--json", "--checker=automaton", "/(a|a)*$/"))
+    assertEquals((err, status), ("", 1))
+    assertEquals(parse(out), Right(encodeDiagnostics(ReDoS.check("(a|a)*$", "", params))))
+    val (all, _, allStatus) = runMain(Seq("--all", "--json", "--checker=automaton", "/foo/"))
+    assertEquals(allStatus, 0)
+    assertEquals(parse(all), Right(Json.arr(encodeDiagnostics(ReDoS.check("foo", "", params)))))
+
+    // The output is the input of `generate-recall-script`.
+    val stdin = new ByteArrayInputStream(out.getBytes(StandardCharsets.UTF_8))
+    val (script, scriptErr, scriptStatus) = runMain(Seq("generate-recall-script", "-"), stdin)
+    assertEquals((scriptErr, scriptStatus), ("", 0))
+    assert(clue(script).startsWith("// Run: node recall.cjs\n"))
 
   test("Main#run: --all with failed recall validation"):
     assume(

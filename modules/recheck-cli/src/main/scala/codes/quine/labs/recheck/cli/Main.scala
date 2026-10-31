@@ -12,12 +12,14 @@ import cats.syntax.apply.*
 import cats.syntax.semigroupk.*
 import com.monovore.decline.Command
 import com.monovore.decline.Opts
+import io.circe.syntax.*
 
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.cli.Main.BatchAction
 import codes.quine.labs.recheck.cli.Main.CheckAction
 import codes.quine.labs.recheck.cli.Main.RecallScriptAction
 import codes.quine.labs.recheck.cli.Main.command
+import codes.quine.labs.recheck.codec.given
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.diagnostics.Diagnostics
@@ -35,8 +37,11 @@ object Main:
     *
     * @param all
     *   whether it shows all the diagnostics of `ReDoS.checkAll`
+    * @param json
+    *   whether it shows the diagnostics in JSON
     */
-  final case class CheckAction(pattern: InputPattern, params: Parameters, all: Boolean = false) extends Action
+  final case class CheckAction(pattern: InputPattern, params: Parameters, all: Boolean = false, json: Boolean = false)
+      extends Action
 
   /** RecallScriptAction holds `recheck generate-recall-script` subcommand parameters.
     *
@@ -67,7 +72,10 @@ object Main:
           help = "Show all the diagnostics, including the vulnerable ones whose recall validation failed."
         )
         .orFalse
-      val check: Opts[Action] = (pattern, params, all).mapN(CheckAction(_, _, _))
+      val json = Opts
+        .flag(long = "json", help = "Show the diagnostics in JSON, an array of them with `--all`.")
+        .orFalse
+      val check: Opts[Action] = (pattern, params, all, json).mapN(CheckAction(_, _, _, _))
 
       val agent: Opts[Action] = Opts.subcommand(name = "agent", help = "Starts the batch mode."):
         val threadSize = Opts
@@ -108,7 +116,9 @@ class Main:
       val diagnostics =
         if action.all then ReDoS.checkAll(action.pattern.source, action.pattern.flags, action.params)
         else List(ReDoS.check(action.pattern.source, action.pattern.flags, action.params))
-      Console.out.println(diagnostics.mkString("\n\n"))
+      if !action.json then Console.out.println(diagnostics.mkString("\n\n"))
+      else if action.all then Console.out.println(diagnostics.asJson.noSpaces)
+      else Console.out.println(diagnostics.head.asJson.noSpaces)
       diagnostics.last match
         case _: Diagnostics.Safe                                => () // skip
         case _: Diagnostics.Vulnerable | _: Diagnostics.Unknown => exit(1)

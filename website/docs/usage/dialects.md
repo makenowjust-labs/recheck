@@ -267,6 +267,7 @@ If no attack succeeds, the result is `safe`.
 `checkAll` returns the diagnostics whose recall validation failed too, followed by the reported one.
 This shows that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by the found attacks.
 The CLI shows them with the `--all` option, separated by a blank line, and its exit status follows the last one, as without the option (`0` for `safe`, and `1` otherwise).
+With the `--json` option, the CLI shows a diagnostics in JSON, or the array of them with `--all`.
 
 ```bash
 recheck --all --dialect=ruby --recall-timeout=1s '/^(a|a)*$/'
@@ -282,10 +283,11 @@ The search avoids repeating a failed attack.
 ### Recall Script
 
 The CLI's `generate-recall-script` subcommand writes the program that the recall validation runs as a standalone script, so that you can run the attack on the engine yourself.
-It takes a file of a `vulnerable` diagnostics in JSON (`-` reads the standard input), which is the result of the JavaScript library, or of the CLI's agent mode.
+It takes a file of a `vulnerable` diagnostics in JSON (`-` reads the standard input), which is the output of the CLI with `--json`, or the result of the JavaScript library or the CLI's agent mode.
 The dialect of the pattern comes from the `dialect` field of the diagnostics.
 
 ```bash
+recheck --json --dialect=python '/^(a|a)*$/' > diagnostics.json
 recheck generate-recall-script diagnostics.json > recall.py
 python3 -I recall.py
 ```
