@@ -1,5 +1,5 @@
 // Generates `src/parameters.ts`, the rule options of the recheck parameters, from the schema of the parameters.
-// The parameters excluded for `eslint-plugin` (the logger and the dialect ones) are not options of the rule.
+// The parameters excluded for `eslint-plugin` (the logger, the dialect ones and the recall command) are not options of the rule.
 // It also generates the `Parameters` type of `recheck` first, which the generated type extends.
 
 import { readFileSync, writeFileSync } from "node:fs";
