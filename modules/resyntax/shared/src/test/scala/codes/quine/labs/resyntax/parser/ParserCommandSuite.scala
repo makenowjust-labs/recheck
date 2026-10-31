@@ -248,5 +248,4 @@ class ParserCommandSuite extends ParserSuiteBase:
     Sequence(Command(StartOption("TURKISH_CASING", None)), Command(StartOption("UTF", None)))
   error("(*TURKISH_CASING)", "", PCRE)("Invalid group at 2")
   check("(*TURKISH_CASING)", "u", PCRE)(Command(StartOption("TURKISH_CASING", None)))
-  check("(*UCP)(*TURKISH_CASING)", "", PCRE):
-    Sequence(Command(StartOption("UCP", None)), Command(StartOption("TURKISH_CASING", None)))
+  error("(*UCP)(*TURKISH_CASING)", "", PCRE)("Invalid group at 8")
