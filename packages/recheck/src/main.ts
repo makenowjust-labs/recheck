@@ -1,6 +1,6 @@
 import { createSyncFn } from "synckit";
 
-import * as agent from "./lib/agent";
+import { check as checkAgent, checkAll as checkAllAgent } from "./lib/agent";
 import * as env from "./lib/env";
 import { nodeRequire } from "./require";
 import * as java from "./lib/java";
@@ -45,8 +45,7 @@ const validate = (source: unknown, flags: unknown): void => {
   /* c8 ignore stop */
 };
 
-/** Returns the worker pool, creating it on the first call. */
-const pool = (): Backend => {
+const poolBackend = (): Backend => {
   if (__mock__.pool === null) {
     __mock__.pool = new WorkerPool(1);
   }
@@ -89,7 +88,7 @@ async function backend(): Promise<Backend> {
       }
       break;
     case "worker":
-      return pool();
+      return poolBackend();
     case "pure":
       return { type: "pure" };
     default:
@@ -101,7 +100,7 @@ async function backend(): Promise<Backend> {
     if (name !== "auto") {
       throw new Error("there is no available implementation");
     }
-    return pool();
+    return poolBackend();
   }
 
   return { type: "agent", agent };
@@ -117,7 +116,7 @@ export async function check(
   const b = await backend();
   switch (b.type) {
     case "agent":
-      return agent.check(b.agent, source, flags, params);
+      return checkAgent(b.agent, source, flags, params);
     case "pool":
       return b.pool.check(source, flags, params);
     case "pure":
@@ -135,7 +134,7 @@ export async function checkAll(
   const b = await backend();
   switch (b.type) {
     case "agent":
-      return agent.checkAll(b.agent, source, flags, params);
+      return checkAllAgent(b.agent, source, flags, params);
     case "pool":
       return b.pool.checkAll(source, flags, params);
     case "pure":
@@ -151,8 +150,8 @@ type SyncFn = (
 ) => any;
 
 const syncFn = (): SyncFn => {
-  const backend = env.RECHECK_SYNC_BACKEND();
-  switch (backend) {
+  const name = env.RECHECK_SYNC_BACKEND();
+  switch (name) {
     case "synckit":
       if (__mock__.syncFn === null) {
         __mock__.syncFn = createSyncFn<SyncFn>(
@@ -166,7 +165,7 @@ const syncFn = (): SyncFn => {
           ? pure.checkAll(source, flags, params)
           : pure.check(source, flags, params);
   }
-  throw new Error(`invalid sync backend: ${backend}`);
+  throw new Error(`invalid sync backend: ${name}`);
 };
 
 export const checkSync = (
