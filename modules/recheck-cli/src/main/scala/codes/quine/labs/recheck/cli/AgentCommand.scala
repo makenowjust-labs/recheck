@@ -12,6 +12,7 @@ import io.circe.generic.semiauto.*
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.cli.AgentCommand.*
 import codes.quine.labs.recheck.codec.given
+import codes.quine.labs.recheck.common.CancellationToken
 import codes.quine.labs.recheck.common.CancellationTokenSource
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
@@ -24,7 +25,7 @@ object AgentCommand:
   given decodeLogger: Decoder[Context.Logger] =
     Decoder.decodeUnit.map(_ => null.asInstanceOf[Context.Logger])
 
-  /** `"check"` method parameter. */
+  /** `"check"` and `"checkAll"` method parameter. */
   final case class CheckParams(source: String, flags: String, params: Parameters)
 
   object CheckParams:
@@ -42,13 +43,12 @@ object AgentCommand:
   object PingParams:
     given decode: Decoder[PingParams] = deriveDecoder
 
-  /** A running execution token to cancel. */
-  private[cli] final case class Token(
-      source: String,
-      flags: String,
-      send: RPC.Send[Diagnostics],
-      cancellation: CancellationTokenSource
-  )
+  /** A running execution token to cancel.
+    *
+    * @param sendCancel
+    *   sends the result of the cancelled execution
+    */
+  private[cli] final case class Token(cancellation: CancellationTokenSource, sendCancel: () => Unit)
 
 /** `recheck agent` command implementation. */
 class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio):
@@ -61,18 +61,39 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio):
 
   /** `"check"` method implementation. */
   def handleCheck(id: RPC.ID, check: CheckParams, push: RPC.Push[String], send: RPC.Send[Diagnostics]): Unit =
+    submit(id, check, push, send)(ReDoS.check)(identity)
+
+  /** `"checkAll"` method implementation. */
+  def handleCheckAll(
+      id: RPC.ID,
+      check: CheckParams,
+      push: RPC.Push[String],
+      send: RPC.Send[List[Diagnostics]]
+  ): Unit =
+    submit(id, check, push, send)(ReDoS.checkAll)(List(_))
+
+  /** Runs a checking method on the thread pool, and sends its result unless it is cancelled.
+    *
+    * @param cancelled
+    *   converts the diagnostics of the cancellation to the method's result
+    */
+  private def submit[A](id: RPC.ID, check: CheckParams, push: RPC.Push[String], send: RPC.Send[A])(
+      run: (String, String, Parameters, Option[CancellationToken]) => A
+  )(cancelled: Diagnostics => A): Unit =
     val token = synchronized:
       val source = new CancellationTokenSource
       tokens.remove(id).foreach(doCancel)
-      tokens.update(id, Token(check.source, check.flags, send, source))
+      val sendCancel =
+        () => send(Right(cancelled(Diagnostics.Unknown(check.source, check.flags, Diagnostics.ErrorKind.Cancel, None))))
+      tokens.update(id, Token(source, sendCancel))
       source.token
     executor.execute: () =>
       val params =
         if check.params.logger.isDefined then check.params.copy(logger = Some(message => push(message)))
         else check.params
-      val diagnostics = ReDoS.check(check.source, check.flags, params, Some(token))
+      val result = run(check.source, check.flags, params, Some(token))
       synchronized:
-        send(Right(diagnostics))
+        send(Right(result))
         tokens.remove(id)
         // When there is no running execution, it enforces GC.
         if tokens.isEmpty then gc()
@@ -86,7 +107,7 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio):
   /** Cancels the given token execution. */
   def doCancel(token: Token): Unit =
     token.cancellation.cancel()
-    token.send(Right(Diagnostics.Unknown(token.source, token.flags, Diagnostics.ErrorKind.Cancel, None)))
+    token.sendCancel()
 
   /** `"ping"` method implementation. */
   @nowarn
@@ -101,6 +122,7 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio):
     try
       RPC.run(io)(
         "check" -> RPC.RequestHandler(handleCheck),
+        "checkAll" -> RPC.RequestHandler(handleCheckAll),
         "cancel" -> RPC.NotificationHandler(handleCancel),
         "ping" -> RPC.RequestHandler(handlePing)
       )

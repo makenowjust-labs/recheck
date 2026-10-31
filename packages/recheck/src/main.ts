@@ -1,6 +1,6 @@
 import { createSyncFn } from "synckit";
 
-import { check as checkAgent } from "./lib/agent";
+import * as agent from "./lib/agent";
 import * as env from "./lib/env";
 import { nodeRequire } from "./require";
 import * as java from "./lib/java";
@@ -15,20 +15,24 @@ import type { Agent } from "./lib/agent";
 type Mock = {
   agent: Agent | null | undefined;
   pool: WorkerPool | null;
+  syncFn: SyncFn | null;
 };
 
-/** Exposes this to mock `agent` and `pool`. */
+/** Exposes this to mock `agent`, `pool` and `syncFn`. */
 export const __mock__: Mock = {
   agent: undefined,
   pool: null,
+  syncFn: null,
 };
 
-/** `check` implementation. */
-export async function check(
-  source: string,
-  flags: string,
-  params: Parameters & HasAbortSignal = {},
-): Promise<Diagnostics> {
+/** Backend is what runs a check. */
+type Backend =
+  | { type: "agent"; agent: Agent }
+  | { type: "pool"; pool: WorkerPool }
+  | { type: "pure" };
+
+/** Throws a `TypeError` if `source` or `flags` is not a string. */
+const validate = (source: unknown, flags: unknown): void => {
   /* c8 ignore start */
   if (typeof source !== "string") {
     throw new TypeError(
@@ -41,9 +45,20 @@ export async function check(
     );
   }
   /* c8 ignore stop */
+};
 
-  const backend = env.RECHECK_BACKEND();
-  switch (backend) {
+/** Returns the worker pool, creating it on the first call. */
+const pool = (): Backend => {
+  if (__mock__.pool === null) {
+    __mock__.pool = new WorkerPool(1);
+  }
+  return { type: "pool", pool: __mock__.pool };
+};
+
+/** Returns the backend of `RECHECK_BACKEND`, starting the agent on the first call. */
+async function backend(): Promise<Backend> {
+  const name = env.RECHECK_BACKEND();
+  switch (name) {
     case "auto":
       if (__mock__.agent === undefined) {
         try {
@@ -76,69 +91,102 @@ export async function check(
       }
       break;
     case "worker":
-      if (__mock__.pool === null) {
-        __mock__.pool = new WorkerPool(1);
-      }
-      return __mock__.pool.check(source, flags, params);
+      return pool();
     case "pure":
-      return pure.check(source, flags, params);
+      return { type: "pure" };
     default:
-      throw new Error(`invalid backend: ${backend}`);
+      throw new Error(`invalid backend: ${name}`);
   }
 
   const agent = __mock__.agent;
   if (agent === null) {
-    if (backend !== "auto") {
+    if (name !== "auto") {
       throw new Error("there is no available implementation");
     }
-
-    if (__mock__.pool === null) {
-      __mock__.pool = new WorkerPool(1);
-    }
-    return __mock__.pool.check(source, flags, params);
+    return pool();
   }
 
-  return checkAgent(agent, source, flags, params);
+  return { type: "agent", agent };
 }
 
-let syncFnCache: typeof pure.check | null = null;
+/** `check` implementation. */
+export async function check(
+  source: string,
+  flags: string,
+  params: Parameters & HasAbortSignal = {},
+): Promise<Diagnostics> {
+  validate(source, flags);
+  const b = await backend();
+  switch (b.type) {
+    case "agent":
+      return agent.check(b.agent, source, flags, params);
+    case "pool":
+      return b.pool.check(source, flags, params);
+    case "pure":
+      return pure.check(source, flags, params);
+  }
+}
+
+/** `checkAll` implementation. */
+export async function checkAll(
+  source: string,
+  flags: string,
+  params: Parameters & HasAbortSignal = {},
+): Promise<Diagnostics[]> {
+  validate(source, flags);
+  const b = await backend();
+  switch (b.type) {
+    case "agent":
+      return agent.checkAll(b.agent, source, flags, params);
+    case "pool":
+      return b.pool.checkAll(source, flags, params);
+    case "pure":
+      return pure.checkAll(source, flags, params);
+  }
+}
+
+/** A synchronous function running a checking method of `RECHECK_BACKEND` in a worker. */
+type SyncFn = (
+  method: "check" | "checkAll",
+  source: string,
+  flags: string,
+  params: Parameters,
+) => any;
+
+/** Returns the synchronous function of `RECHECK_SYNC_BACKEND`. */
+const syncFn = (): SyncFn => {
+  const backend = env.RECHECK_SYNC_BACKEND();
+  switch (backend) {
+    case "synckit":
+      if (__mock__.syncFn === null) {
+        __mock__.syncFn = createSyncFn<SyncFn>(
+          nodeRequire.resolve("./synckit-worker"),
+        );
+      }
+      return __mock__.syncFn;
+    case "pure":
+      return (method, source, flags, params) =>
+        method === "checkAll"
+          ? pure.checkAll(source, flags, params)
+          : pure.check(source, flags, params);
+  }
+  throw new Error(`invalid sync backend: ${backend}`);
+};
 
 export const checkSync = (
   source: string,
   flags: string,
   params: Parameters = {},
 ): Diagnostics => {
-  /* c8 ignore start */
-  if (typeof source !== "string") {
-    throw new TypeError(
-      `Expected 'source' to be a string, but got ${typeof source}`,
-    );
-  }
-  if (typeof flags !== "string") {
-    throw new TypeError(
-      `Expected 'flags' to be a string, but got ${typeof flags}`,
-    );
-  }
-  /* c8 ignore stop */
+  validate(source, flags);
+  return syncFn()("check", source, flags, params);
+};
 
-  let syncFn: typeof pure.check | null = null;
-  const backend = env.RECHECK_SYNC_BACKEND();
-  switch (backend) {
-    case "synckit":
-      if (syncFnCache === null) {
-        syncFnCache = createSyncFn<typeof check>(
-          nodeRequire.resolve("./synckit-worker"),
-        );
-      }
-      syncFn = syncFnCache;
-      break;
-    case "pure":
-      syncFn = pure.check;
-      break;
-  }
-  if (syncFn === null) {
-    throw new Error(`invalid sync backend: ${backend}`);
-  }
-
-  return syncFn(source, flags, params);
+export const checkAllSync = (
+  source: string,
+  flags: string,
+  params: Parameters = {},
+): Diagnostics[] => {
+  validate(source, flags);
+  return syncFn()("checkAll", source, flags, params);
 };

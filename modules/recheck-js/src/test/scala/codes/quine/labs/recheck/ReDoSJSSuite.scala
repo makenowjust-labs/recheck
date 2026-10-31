@@ -25,3 +25,10 @@ class ReDoSJSSuite extends munit.FunSuite:
       "safe"
     )
     assertEquals(seq.result().nonEmpty, true)
+
+  test("ReDoSJS.checkAll"):
+    val ds = ReDoSJS.checkAll("^foo$", "", ()).asInstanceOf[js.Array[js.Dictionary[String]]]
+    assertEquals(ds.toSeq.map(_("status")), Seq("safe"))
+    interceptMessage[DecodingFailure]("DecodingFailure at .checker: Unknown checker: invalid") {
+      ReDoSJS.checkAll("^foo$", "", js.Dynamic.literal(checker = "invalid"))
+    }

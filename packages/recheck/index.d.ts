@@ -17,6 +17,27 @@ export function checkSync(
   params?: Parameters,
 ): Diagnostics;
 
+/**
+ * Checks whether the given RegExp pattern is ReDoS vulnerable or safe, and returns all the diagnostics found until the reported one.
+ *
+ * The list consists of the vulnerable diagnostics whose recall validation failed, followed by the diagnostics that `check` returns.
+ * It is longer than one only when the recall validation runs (see the `recallTimeout` parameter).
+ */
+export function checkAll(
+  source: string,
+  flags: string,
+  params?: Parameters & HasAbortSignal,
+): Promise<Diagnostics[]>;
+
+/**
+ * Synchronous version of `checkAll`. Take care that it will block the Node.js process.
+ */
+export function checkAllSync(
+  source: string,
+  flags: string,
+  params?: Parameters,
+): Diagnostics[];
+
 export type { Parameters } from "./parameters";
 
 /**

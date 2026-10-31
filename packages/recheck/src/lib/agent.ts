@@ -190,6 +190,27 @@ export async function check(
   flags: string,
   params: Parameters & HasAbortSignal = {},
 ): Promise<Diagnostics> {
+  return await run(agent, "check", source, flags, params);
+}
+
+/** Checks a given regular expression on the `agent`, and returns all the diagnostics until the accepted one. */
+export async function checkAll(
+  agent: Agent,
+  source: string,
+  flags: string,
+  params: Parameters & HasAbortSignal = {},
+): Promise<Diagnostics[]> {
+  return await run(agent, "checkAll", source, flags, params);
+}
+
+/** Sends a checking method request to the `agent`, and cancels it on the abort of the `signal`. */
+async function run(
+  agent: Agent,
+  method: "check" | "checkAll",
+  source: string,
+  flags: string,
+  params: Parameters & HasAbortSignal,
+): Promise<any> {
   const newParams = { ...params };
 
   // Drops `signal` parameter from `newParams`.
@@ -204,9 +225,8 @@ export async function check(
     newParams.logger = {} as any;
   }
 
-  // Sends `'check'` method request.
   const { id, promise } = agent.request(
-    "check",
+    method,
     { source, flags, params: newParams },
     logger,
   );

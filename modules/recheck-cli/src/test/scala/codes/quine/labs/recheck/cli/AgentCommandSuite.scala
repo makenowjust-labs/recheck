@@ -22,6 +22,11 @@ class AgentCommandSuite extends munit.FunSuite:
       Left(2), // Wait the above `check` execution.
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":4,$simpleLog}"""),
       Left(4), // Wait the above `check` execution.
+      Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":6,${simple.replace("\"check\"", "\"checkAll\"")}}"""),
+      Left(1),
+      Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":7,${complex.replace("\"check\"", "\"checkAll\"")}}"""),
+      Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","method":"cancel","params":{"id":7}}"""),
+      Left(1),
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":5,$complex}""")
     )
     val out = Seq.newBuilder[String]
@@ -50,6 +55,8 @@ class AgentCommandSuite extends munit.FunSuite:
         """{"jsonrpc":"2.0+push","id":4,"message":"parse: finish\n  pattern: /a/"}""",
         """{"jsonrpc":"2.0+push","id":4,"message":"parse: start"}""",
         """{"jsonrpc":"2.0+push","id":4,"result":{"source":"a","flags":"","status":"safe","checker":"automaton","complexity":{"type":"safe","summary":"safe","isFuzz":false}}}""",
-        """{"jsonrpc":"2.0+push","id":5,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"cancel"}}}"""
+        """{"jsonrpc":"2.0+push","id":5,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"cancel"}}}""",
+        """{"jsonrpc":"2.0+push","id":6,"result":[{"source":"a","flags":"","status":"safe","checker":"automaton","complexity":{"type":"safe","summary":"safe","isFuzz":false}}]}""",
+        """{"jsonrpc":"2.0+push","id":7,"result":[{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"cancel"}}]}"""
       )
     )

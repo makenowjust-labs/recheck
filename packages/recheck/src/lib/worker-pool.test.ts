@@ -68,3 +68,20 @@ test("kill", async () => {
   pool.kill();
   expect((await promise).status).toBe("unknown");
 });
+
+test("checkAll", async () => {
+  const pool = start();
+
+  const diagnostics = await pool.checkAll("^(a|a)*$", "");
+  expect(diagnostics.map((d) => d.status)).toEqual(["vulnerable"]);
+});
+
+test("checkAll: with abort", async () => {
+  const pool = start();
+
+  const controller = new AbortController();
+  const signal = controller.signal;
+  const promise = pool.checkAll("^(a|a)*$", "", { signal });
+  setTimeout(() => controller.abort(), 10);
+  expect((await promise).map((d) => d.status)).toEqual(["unknown"]);
+});

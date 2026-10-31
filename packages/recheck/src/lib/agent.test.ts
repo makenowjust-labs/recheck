@@ -1,6 +1,11 @@
 import { fileURLToPath } from "node:url";
 
-import { check as checkAgent, start as startAgent, Agent } from "./agent";
+import {
+  check as checkAgent,
+  checkAll as checkAllAgent,
+  start as startAgent,
+  Agent,
+} from "./agent";
 
 import type { StdioNull, StdioPipe } from "child_process";
 
@@ -99,4 +104,20 @@ test("check: with abort (2)", async () => {
   const run = checkAgent(agent, "test", "", { signal });
   setTimeout(() => controller.abort(), 10);
   await expect(run).resolves.toEqual({ status: "unknown" });
+});
+
+test("checkAll", async () => {
+  const agent = await start("node", [testAgent]);
+  await expect(checkAllAgent(agent, "test", "")).resolves.toEqual([
+    { status: "safe" },
+  ]);
+});
+
+test("checkAll: with abort", async () => {
+  const agent = await start("node", [testAgent]);
+  const controller = new AbortController();
+  const signal = controller.signal;
+  const run = checkAllAgent(agent, "test", "", { signal });
+  setTimeout(() => controller.abort(), 10);
+  await expect(run).resolves.toEqual([{ status: "unknown" }]);
 });
