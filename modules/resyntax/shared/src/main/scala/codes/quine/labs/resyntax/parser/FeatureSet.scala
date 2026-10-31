@@ -153,6 +153,8 @@ final case class FeatureSet(
     // .NET, PCRE, Perl, Ruby
     fallsBackMultiDigitBackReferenceToOctal: Boolean,
     // Ruby
+    fallsBackMultiDigitBackReferenceToLiteral: Boolean,
+    // Ruby
     hasAbsenceOperator: Boolean,
     // PCRE, Perl
     hasAlphabeticGroup: Boolean,
@@ -565,6 +567,8 @@ object FeatureSet:
       consumesBrokenClassRange = isJavaScript && !isUnicode,
       // .NET, PCRE, Perl, Ruby
       fallsBackMultiDigitBackReferenceToOctal = isDotNet || isPCRE || isPerl || isRuby,
+      // Ruby
+      fallsBackMultiDigitBackReferenceToLiteral = isRuby,
       // Ruby
       hasAbsenceOperator = isRuby,
       // PCRE, Perl

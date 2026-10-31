@@ -315,10 +315,9 @@ class ParserBackslashSuite extends ParserSuiteBase:
       Literal('8')
     )
   check("()\\99999999999", "", Ruby):
-    Sequence(
-      Group(IndexedCapture, Sequence()),
-      Backslash(EscapeBackReference(BareBackReference, IndexedReference(Int.MaxValue)))
-    )
+    Sequence(Group(IndexedCapture, Sequence()) +: Backslash(Unknown('9')) +: Seq.fill(10)(Literal('9'))*)
+  check("()\\89", "", Ruby)(Sequence(Group(IndexedCapture, Sequence()), Backslash(Unknown('8')), Literal('9')))
+  check("\\9", "", Ruby)(Backslash(EscapeBackReference(BareBackReference, IndexedReference(9))))
   check("\\412", "", JavaScript)(Sequence(Backslash(Escape(BareOctal, 33)), Literal('2')))
   check("()\\1", "", All*):
     Sequence(Group(IndexedCapture, Sequence()), Backslash(EscapeBackReference(BareBackReference, IndexedReference(1))))

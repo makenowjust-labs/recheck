@@ -2087,6 +2087,11 @@ private[parser] final class Parser(
       reset(save)
       return parseBackslashOctal()
 
+    // Ruby reads `\8` or `\9` followed by digits as a literal character when no such group exists.
+    if featureSet.fallsBackMultiDigitBackReferenceToLiteral && n >= 10 && n > analysis.captureSize then
+      reset(save)
+      return parseBackslashUnknown()
+
     if featureSet.rejectsInvalidBackReference && n > analysis.captureSize then fail("Invalid back-reference", save)
 
     markNumberedReference(save)
