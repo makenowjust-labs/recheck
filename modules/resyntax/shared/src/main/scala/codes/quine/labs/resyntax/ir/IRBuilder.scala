@@ -111,7 +111,8 @@ object IRBuilder:
     * character under `l`, and for one with ASCII characters under `aa` and `l`, except `ẞ` and, under `aa`, `ß`.
     *
     * Ruby (Onigmo) matches a character folded to several characters under `i` as the folding (e.g. `ß` as `ss`), and a
-    * class having such a character and another has a variable width (e.g. `[ßa]`, but `[ß]` is two).
+    * class having such a character and another has a variable width (e.g. `[ßa]`, but `[ß]` is two). The nodes are
+    * Ruby's escapes of the bytes of a character (e.g. `\xC3\x9F`), or one node otherwise.
     */
   private def charWidth(
       table: CaptureTable,
@@ -119,10 +120,10 @@ object IRBuilder:
       dialect: Dialect,
       mode: UnitMode,
       perlUnicodeRules: Boolean
-  ): Node => LookBehindChecker.Width =
+  ): Seq[Node] => LookBehindChecker.Width =
     import LookBehindChecker.Width
     def single(n: Int): Width = Width(n, n)
-    if mode != UnitMode.CodePoint then return _ => single(1)
+    if mode != UnitMode.CodePoint then return nodes => single(nodes.size)
     dialect match
       case Dialect.Perl =>
         def fold(value: Int, flags: IRCharFlags): Int =
@@ -139,7 +140,8 @@ object IRBuilder:
           case value: ClassItemData.ClassValue => fold(value.value, flags)
           case ClassItemData.ClassRange(b, e) if b.data.value == e.data.value => fold(b.data.value, flags)
           case _                                                              => 1
-        node =>
+        nodes =>
+          val node = nodes.head
           val width = table
             .charFlagsOf(node)
             .fold(1): flags =>
@@ -151,12 +153,19 @@ object IRBuilder:
           Width(1, width.toLong)
       case Dialect.Ruby =>
         def fold(value: Int): Int = FullCaseFolding(value).length.max(1)
-        node =>
+        def decode(bytes: Seq[Int]): Int =
+          bytes.tail.foldLeft(bytes.head & (0xff >> (bytes.size + 1)))((c, b) => (c << 6) | (b & 0x3f))
+        nodes =>
+          val node = nodes.head
           table
             .charFlagsOf(node)
             .filter(_.ignoreCase)
             .fold(single(1)): flags =>
               node.data match
+                case _ if nodes.size > 1 =>
+                  single(fold(decode(nodes.collect { case Node(NodeData.Backslash(BackslashKind.Escape(_, b)), _) =>
+                    b
+                  })))
                 case NodeData.Literal(value)                                 => single(fold(value))
                 case NodeData.Backslash(value: BackslashKind.BackslashValue) => single(fold(value.value))
                 case NodeData.Class(false, _)                                =>
@@ -166,7 +175,7 @@ object IRBuilder:
                       Width(1, set.intersect(multiFolded).iterator.map(fold).max.toLong)
                     case _ => single(1)
                 case _ => single(1)
-      case _ => _ => single(1)
+      case _ => nodes => single(nodes.size)
 
   /** The characters folded to several characters. */
   private lazy val multiFolded: CharSet = CharSet.union(FullCaseFolding.multiCodePointFoldings().values.toSeq)

@@ -144,6 +144,14 @@ class IRLookBehindSuite extends IRSuiteBase:
   error("(?i)(?<=x(?:[ßa]|ab))y", "", Ruby)("Invalid pattern in look-behind at 4")
   error("(?i)(?<=x(?:ss|a))y", "", Ruby)("Invalid pattern in look-behind at 4")
   error("(?i)(?<=x(?:(?-i)ß|ab))y", "", Ruby)("Invalid pattern in look-behind at 4")
+  // Ruby's escapes of the bytes of a character are one character, unless the pattern is of bytes.
+  valid("(?<=x(?:\\xC3\\xA9|a))y", Ruby)
+  valid("(?i)(?<=x(?:\\xC3\\x9F|ab))y", Ruby)
+  error("(?<=x(?:\\xC3\\xA9|ab))y", "", Ruby)("Invalid pattern in look-behind at 0")
+  error("(?i)(?<=x(?:\\xC3\\x9F|a))y", "", Ruby)("Invalid pattern in look-behind at 4")
+  test("IRBuilder.build: /(?<=x(?:\\xC3\\xA9|ab))y/n in Ruby is valid"):
+    build("(?<=x(?:\\xC3\\xA9|ab))y", "n", Ruby)
+  error("(?<=x(?:\\xC3\\xA9|a))y", "n", Ruby)("Invalid pattern in look-behind at 0")
   error("(?<=a(?:b|cd))", "", Ruby)("Invalid pattern in look-behind at 0")
   error("(?<=a|b(?:c|de))", "", Ruby)("Invalid pattern in look-behind at 0")
   error("(?<=(?:a|bc)|d)", "", Ruby)("Invalid pattern in look-behind at 0")
