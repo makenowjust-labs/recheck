@@ -330,7 +330,7 @@ lazy val parse = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
-  .dependsOn(unicode)
+  .dependsOn(unicode, resyntaxCharset)
 
 lazy val parseJVM = parse.jvm
 lazy val parseJS = parse.js
