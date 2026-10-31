@@ -46,6 +46,13 @@ class RecallValidatorSuite extends munit.FunSuite:
     )
     assertEquals(command.program, "python3")
 
+    RecallValidator.validate(parse("foo"), attack, 1.second, runtime = Some(Seq("/opt/python", "-X", "dev"))) {
+      (c, _, _) =>
+        command = c
+        ExecResult.Timeout("")
+    }
+    assertEquals(command, Command("/opt/python", Seq("-X", "dev", "-I", "-")))
+
   test("RecallValidator.validate: timeout"):
     def limit(timeout: Duration)(using Context): Option[FiniteDuration] =
       var limit: Option[FiniteDuration] = null

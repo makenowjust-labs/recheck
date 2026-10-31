@@ -17,7 +17,16 @@ import codes.quine.labs.resyntax.charset.UnitMode
   *   - [[RecallProgram.TimeLine]] with the matching time in milliseconds, or [[RecallProgram.EngineErrorLine]] with the
   *     message if the engine gives up with a resource error.
   */
-final case class RecallProgram(command: Command, script: String)
+final case class RecallProgram(command: Command, script: String):
+
+  /** Returns this program run by the given runtime command instead of the default one.
+    *
+    * The runtime command is the program and its leading arguments, and the default arguments to read the script from
+    * the standard input follow them.
+    */
+  def withRuntime(runtime: Seq[String]): RecallProgram =
+    require(runtime.nonEmpty, "the runtime command is empty")
+    copy(command = command.copy(program = runtime.head, args = runtime.tail ++ command.args))
 
 object RecallProgram:
 

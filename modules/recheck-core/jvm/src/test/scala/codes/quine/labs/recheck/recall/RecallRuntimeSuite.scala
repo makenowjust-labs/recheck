@@ -5,6 +5,7 @@ import java.nio.file.Paths
 import scala.concurrent.duration.*
 
 import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.TimeoutException
@@ -141,6 +142,23 @@ class RecallRuntimeSuite extends munit.FunSuite:
       case List(d: Diagnostics.Vulnerable) =>
         assertEquals(d.recallValidation.map(_.result), Some(RecallResult.EngineError("Backtrack limit exhausted")))
       case ds => fail(s"unexpected: $ds")
+
+  runtimeTest("ReDoS.check: recallCommand", "node"):
+    val node = sys.env("PATH").split(java.io.File.pathSeparatorChar).map(Paths.get(_, "node")).find(Files.isExecutable)
+    val wrapper = Seq("sh", "-c", "echo recheck:runtime wrapped; exec \"$@\"", "sh", node.get.toString)
+    ReDoS.check("^(a|a)*$", "", params.copy(recallCommand = Some(wrapper))) match
+      case d: Diagnostics.Vulnerable =>
+        assertEquals(d.recallValidation, Some(RecallValidation("wrapped", 1.second, RecallResult.Timeout)))
+      case d => fail(s"unexpected: $d")
+    assertEquals(
+      ReDoS.check("^(a|a)*$", "", params.copy(recallCommand = Some(Seq("sh", "-c", "exit 3")))),
+      Diagnostics.Unknown(
+        "^(a|a)*$",
+        "",
+        Diagnostics.ErrorKind.Unexpected("`sh -c exit 3 -` exited with 3"),
+        Some(Checker.Automaton)
+      )
+    )
 
   test("RecallValidator.validate: the deadline of the context"):
     val pattern = ParsedPattern.parse("foo", "", Dialect.JavaScript).toTry.get

@@ -312,6 +312,24 @@ properties:
     x-scala-type: "Long"
     x-cli: "random-seed"
 
+  recallCommand:
+    title: "Recall Command"
+    description: |-
+      The command to run the dialect's runtime on the recall validation, as the program and its arguments.
+
+      `null` runs the dialect's default command found in `PATH` (`node`, `python3`, `ruby`, `java`, `dotnet`, `perl` or `php`).
+      Recheck appends the arguments to read the validation program from the standard input (e.g. `-` of `ruby -`), so the command should end where the runtime takes them.
+      For example, `["/opt/ruby/bin/ruby", "--disable-gems"]` runs `/opt/ruby/bin/ruby --disable-gems -`, and `["docker", "run", "-i", "--rm", "ruby:4.0", "ruby"]` runs Ruby in a container.
+
+      The CLI takes the program and the arguments separated by spaces, e.g. `--recall-command='/opt/ruby/bin/ruby --disable-gems'`.
+    type: [array, "null"]
+    items: { type: string }
+    default: null
+    x-scala-type: "Option[Seq[String]]"
+    x-cli: "recall-command"
+    x-exclude: ["eslint-plugin", "playground"]
+    x-since: "5.0.0"
+
   recallLimit:
     title: "Recall Limit"
     description: "The upper limit on the number of characters read by VM on the recall validation."
@@ -326,7 +344,7 @@ properties:
       The upper limit of matching time on the recall validation.
 
       The recall validation runs the attack string on the real regex engine of the dialect, and records the result as `recallValidation` of the diagnostics.
-      The engine runs as a command found in `PATH` (`node`, `python3`, `ruby`, `java`, `dotnet`, `perl` or `php`).
+      The engine runs as a command found in `PATH` (`node`, `python3`, `ruby`, `java`, `dotnet`, `perl` or `php`), or as `recallCommand`.
       If the attack does not take this time there, the diagnostics is not accepted and the checking goes on.
 
       If this value is not positive, the recall validation is skipped.

@@ -234,7 +234,8 @@ class CodecSuite extends munit.FunSuite:
           "dialect" := "perl",
           "encoding" := "bytes",
           "perlSource" := "string",
-          "perlUtf8" := true
+          "perlUtf8" := true,
+          "recallCommand" := Json.arr("ruby".asJson, "--disable-gems".asJson)
         )
       ),
       Right(
@@ -267,7 +268,8 @@ class CodecSuite extends munit.FunSuite:
           dialect = Dialect.Perl,
           encoding = Some("bytes"),
           perlSource = PerlSource.String,
-          perlUtf8 = Some(true)
+          perlUtf8 = Some(true),
+          recallCommand = Some(Seq("ruby", "--disable-gems"))
         )
       )
     )

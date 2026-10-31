@@ -267,3 +267,11 @@ class RecallProgramSuite extends munit.FunSuite:
     val empty = AttackPattern(Seq.empty, UString.empty, 0)
     assertEquals(line(generate("a", "", Dialect.Python, empty), "string"), "string = ''")
     assertEquals(line(generate("a", "", Dialect.PCRE, empty), "$input"), "$input = \"\";")
+
+  test("RecallProgram#withRuntime"):
+    val program = RecallProgram(Command("dotnet", Seq("run", "-"), Map("A" -> "1")), "script")
+    assertEquals(
+      program.withRuntime(Seq("/opt/dotnet/dotnet", "--roll-forward")),
+      RecallProgram(Command("/opt/dotnet/dotnet", Seq("--roll-forward", "run", "-"), Map("A" -> "1")), "script")
+    )
+    intercept[IllegalArgumentException](program.withRuntime(Seq.empty))

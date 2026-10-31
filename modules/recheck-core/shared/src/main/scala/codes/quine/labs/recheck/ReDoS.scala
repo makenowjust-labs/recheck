@@ -89,7 +89,8 @@ object ReDoS:
         case Checker.Automaton => checkAutomaton(source, flags, pattern, params)
         case Checker.Fuzz      => checkFuzz(source, flags, pattern, params)
         case Checker.Auto      => checkAuto(source, flags, pattern, params)
-      candidates.map(recallValidation(pattern, options, params.recallTimeout, exec))
+      val runtime = params.recallCommand.filter(_.nonEmpty)
+      candidates.map(recallValidation(pattern, options, params.recallTimeout, runtime, exec))
 
     val all = recovering(ds):
       case ex: ReDoSException => Iterator(Diagnostics.Unknown.from(source, flags, ex))
@@ -181,6 +182,7 @@ object ReDoS:
       pattern: ParsedPattern,
       options: DialectOptions,
       timeout: Duration,
+      runtime: Option[Seq[String]],
       exec: Option[RecallValidator.Exec]
   )(
       d: Diagnostics
@@ -190,7 +192,9 @@ object ReDoS:
         case Some(exec) =>
           try
             d.copy(recallValidation =
-              RecallValidator.validate(pattern, d.attack, timeout, options.perlSource == PerlSource.Literal)(exec)
+              RecallValidator.validate(pattern, d.attack, timeout, options.perlSource == PerlSource.Literal, runtime)(
+                exec
+              )
             )
           catch
             case ex: ReDoSException =>

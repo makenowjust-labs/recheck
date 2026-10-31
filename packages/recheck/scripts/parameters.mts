@@ -7,6 +7,7 @@ import { parse } from "yaml";
 type Property = {
   description: string;
   type?: string | string[];
+  items?: { type: string };
   enum?: string[];
   default?: unknown;
   "x-typescript-type"?: string;
@@ -24,6 +25,14 @@ const schemaUrl = new URL(
 );
 const outputUrl = new URL("../parameters.d.ts", import.meta.url);
 
+const jsonType = (type: string, property: Property): string => {
+  if (type === "integer") return "number";
+  if (type === "array") {
+    return `${jsonType(property.items?.type ?? "unknown", property)}[]`;
+  }
+  return type;
+};
+
 const typeOf = (property: Property): string => {
   if (property["x-typescript-type"] !== undefined) {
     return property["x-typescript-type"];
@@ -32,9 +41,7 @@ const typeOf = (property: Property): string => {
     return property.enum.map((value) => JSON.stringify(value)).join(" | ");
   }
   const types = Array.isArray(property.type) ? property.type : [property.type];
-  return types
-    .map((type) => (type === "integer" ? "number" : String(type)))
-    .join(" | ");
+  return types.map((type) => jsonType(String(type), property)).join(" | ");
 };
 
 const comment = (lines: string[], indent: string): string =>

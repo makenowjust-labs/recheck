@@ -27,3 +27,11 @@ object arguments:
       case s       => Validated.invalidNel(s"invalid boolean: $s")
 
     def defaultMetavar: String = "boolean"
+
+  /** `Argument` instance for a command line, whose program and arguments are separated by spaces. */
+  given commandArgument: Argument[Seq[String]] with
+    def read(string: String): ValidatedNel[String, Seq[String]] =
+      val words = string.trim.split("\\s+").toSeq.filter(_.nonEmpty)
+      if words.isEmpty then Validated.invalidNel("empty command") else Validated.validNel(words)
+
+    def defaultMetavar: String = "command"
