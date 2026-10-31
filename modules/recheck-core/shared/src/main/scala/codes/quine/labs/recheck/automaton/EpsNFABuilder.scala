@@ -190,15 +190,10 @@ private class EpsNFABuilder(
       case IRNodeData.Sequence(ns)     => buildSequence(ns.map(n => () => buildNode(n)))
       case IRNodeData.Empty            => buildSequence(Seq.empty)
       case IRNodeData.Capture(_, _, n) => buildNode(n)
-      case IRNodeData.Repeat(n, q)     => buildRepeat(node, n, q)
+      case IRNodeData.Repeat(n, q)     => buildRepeat(n, q)
       case IRNodeData.Assert(kind)     => buildAssert(kind)
-      case IRNodeData.Chars(set)       =>
-        val chs =
-          // A negated class is refined as its positive set, as it is written.
-          if pattern.isNegatedClass(node) then alphabet.any.diff(refine(set.complement(pattern.ir.mode)))
-          else refine(set)
-        consume(chs, Location.from(node.loc))
-      case IRNodeData.Strings(set) =>
+      case IRNodeData.Chars(set)       => consume(refine(set), Location.from(node.loc))
+      case IRNodeData.Strings(set)     =>
         val loc = Location.from(node.loc)
         // The strings are tried from the longest, and then the characters.
         val strings = set.strings.toSeq
@@ -210,69 +205,74 @@ private class EpsNFABuilder(
       case IRNodeData.LookAhead(_, _)     => throw new UnsupportedException("look-ahead assertion")
       case IRNodeData.LookBehind(_, _)    => throw new UnsupportedException("look-behind assertion")
       case IRNodeData.Atomic(_)           => throw new UnsupportedException("atomic group")
-      case IRNodeData.BackReference(_, _) =>
-        if pattern.text(node).startsWith("\\k") then throw new UnsupportedException("named back-reference")
-        else throw new UnsupportedException("back-reference")
-      case IRNodeData.Unsupported(_) => throw new UnsupportedException(pattern.unsupportedMessage(node))
+      case IRNodeData.BackReference(_, _) => throw new UnsupportedException("back-reference")
+      case IRNodeData.Unsupported(_)      => throw new UnsupportedException(pattern.unsupportedMessage(node))
 
-  /** Builds EpsNFA transitions for a repetition. */
-  private def buildRepeat(node: IRNode, n: IRNode, q: IRQuantifier): (Int, Int) =
-    def repeat(quantifier: IRQuantifier): IRNode = IRNode(IRNodeData.Repeat(n, quantifier))
+  /** Builds EpsNFA transitions for a repetition.
+    *
+    * `x{n,}` is built as `n - 1` copies of `x` and `x+`, and `x{n,m}` as `n` copies of `x` and nested `(x(x)?)?`.
+    */
+  private def buildRepeat(n: IRNode, q: IRQuantifier): (Int, Int) =
     q match
-      case IRQuantifier.Unbounded(0, strategy) =>
-        //      +---------------------+
-        //      |                     |
-        //  (i)-+->(i2)->[i0-->a0]-+  +->(a1)->(a)
-        //   ^                     |
-        //   +---------------------+
-        val (i0, a0) = buildNode(n)
-        val loop = nextLoop()
-        val i = nextQ()
-        val i2 = nextQ()
-        val a1 = nextQ()
-        val a = nextQ()
-        val t = if strategy == BacktrackStrategy.Lazy then Vector(a1, i2) else Vector(i2, a1)
-        emit(i -> Eps(t))
-        emit(i2 -> LoopEnter(loop, i0))
-        emit(a0 -> Eps(Vector(i)))
-        emit(a1 -> LoopExit(loop, a))
-        (i, a)
-      case IRQuantifier.Unbounded(1, strategy) if !pattern.isBraceRepeat(node) =>
-        val (i, a0) = buildNode(n)
-        // +----(i1)---+
-        // |           |
-        // +->[i-->a0]-+->(a1)->(a)
-        val loop = nextLoop()
-        val i1 = nextQ()
-        val a1 = nextQ()
-        val a = nextQ()
-        val t = if strategy == BacktrackStrategy.Lazy then Vector(a1, i1) else Vector(i1, a1)
-        emit(a0 -> Eps(t))
-        emit(i1 -> LoopEnter(loop, i))
-        emit(a1 -> LoopExit(loop, a))
-        (i, a)
-      case IRQuantifier.Bounded(0, 1, strategy) =>
-        val (i0, a) = buildNode(n)
-        //     +--------+
-        //     |        v
-        // (i)-+->[i0-->a]
-        val i = nextQ()
-        val t = if strategy == BacktrackStrategy.Lazy then Vector(a, i0) else Vector(i0, a)
-        emit(i -> Eps(t))
-        (i, a)
+      case IRQuantifier.Unbounded(0, strategy)   => buildStar(n, strategy)
+      case IRQuantifier.Unbounded(min, strategy) =>
+        buildSequence(Vector.fill(min - 1)(() => buildNode(n)) :+ (() => buildPlus(n, strategy)))
       case IRQuantifier.Exact(m) =>
         buildSequence(Vector.fill(m)(() => buildNode(n)))
-      case IRQuantifier.Unbounded(min, strategy) =>
-        val star = repeat(IRQuantifier.Unbounded(0, strategy))
-        buildSequence(Vector.fill(min)(() => buildNode(n)) :+ (() => buildNode(star)))
       case IRQuantifier.Bounded(min, max, strategy) =>
         def question(n: IRNode): IRNode = IRNode(IRNodeData.Repeat(n, IRQuantifier.Bounded(0, 1, strategy)))
-        val maxN = question(
+        val maxN = Option.when(max > min):
           Vector
             .fill(max - min)(n)
             .reduceRight((l, r) => IRNode(IRNodeData.Sequence(Vector(l, question(r)))))
-        )
-        buildSequence(Vector.fill(min)(() => buildNode(n)) :+ (() => buildNode(maxN)))
+        buildSequence(Vector.fill(min)(() => buildNode(n)) ++ maxN.map(m => () => buildQuestion(m, strategy)))
+
+  /** Builds EpsNFA transitions for `x*`. */
+  private def buildStar(n: IRNode, strategy: BacktrackStrategy): (Int, Int) =
+    //      +---------------------+
+    //      |                     |
+    //  (i)-+->(i2)->[i0-->a0]-+  +->(a1)->(a)
+    //   ^                     |
+    //   +---------------------+
+    val (i0, a0) = buildNode(n)
+    val loop = nextLoop()
+    val i = nextQ()
+    val i2 = nextQ()
+    val a1 = nextQ()
+    val a = nextQ()
+    val t = if strategy == BacktrackStrategy.Lazy then Vector(a1, i2) else Vector(i2, a1)
+    emit(i -> Eps(t))
+    emit(i2 -> LoopEnter(loop, i0))
+    emit(a0 -> Eps(Vector(i)))
+    emit(a1 -> LoopExit(loop, a))
+    (i, a)
+
+  /** Builds EpsNFA transitions for `x+`. */
+  private def buildPlus(n: IRNode, strategy: BacktrackStrategy): (Int, Int) =
+    // +----(i1)---+
+    // |           |
+    // +->[i-->a0]-+->(a1)->(a)
+    val (i, a0) = buildNode(n)
+    val loop = nextLoop()
+    val i1 = nextQ()
+    val a1 = nextQ()
+    val a = nextQ()
+    val t = if strategy == BacktrackStrategy.Lazy then Vector(a1, i1) else Vector(i1, a1)
+    emit(a0 -> Eps(t))
+    emit(i1 -> LoopEnter(loop, i))
+    emit(a1 -> LoopExit(loop, a))
+    (i, a)
+
+  /** Builds EpsNFA transitions for `x?`. */
+  private def buildQuestion(n: IRNode, strategy: BacktrackStrategy): (Int, Int) =
+    //     +--------+
+    //     |        v
+    // (i)-+->[i0-->a]
+    val (i0, a) = buildNode(n)
+    val i = nextQ()
+    val t = if strategy == BacktrackStrategy.Lazy then Vector(a, i0) else Vector(i0, a)
+    emit(i -> Eps(t))
+    (i, a)
 
   /** Builds EpsNFA transitions for an assertion. */
   private def buildAssert(kind: IRAssertKind): (Int, Int) =

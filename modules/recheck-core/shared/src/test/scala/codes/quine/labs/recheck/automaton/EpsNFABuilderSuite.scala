@@ -115,10 +115,14 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   test("EpsNFABuilder.build: Dot"):
     val dot16 = any16.diff(lineTerminator)
     val canonical = EcmaScriptChars.canonicalize(any16, false)
-    assertEquals(build("^.$").get, single(PatternAlphabet.build(utf16, Seq(dot16)), dot16))
+    // `.` takes part in the order of atoms as its complement.
+    assertEquals(build("^.$").get, single(PatternAlphabet.build(utf16, Seq(lineTerminator)), dot16))
     assertEquals(
       build("^.$", "i").get,
-      single(PatternAlphabet.build(utf16, Seq(dot16), preferred = Some(canonical)), dot16.intersect(canonical))
+      single(
+        PatternAlphabet.build(utf16, Seq(lineTerminator), preferred = Some(canonical)),
+        dot16.intersect(canonical)
+      )
     )
     assertEquals(build("^.$", "s").get, single(PatternAlphabet.build(utf16), any16))
     assertEquals(
@@ -205,8 +209,10 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     val cases = Seq(
       "^.{1}$" -> "^.$",
       "^.{2}$" -> "^..$",
-      "^.{1,}$" -> "^..*$",
-      "^.{1,}?$" -> "^..*?$",
+      "^.{1,}$" -> "^.+$",
+      "^.{1,}?$" -> "^.+?$",
+      "^.{2,}$" -> "^..+$",
+      "^.{3,}?$" -> "^...+?$",
       "^.{1,1}$" -> "^.$",
       "^.{1,1}?$" -> "^.$",
       "^.{1,2}$" -> "^..?$",
@@ -230,10 +236,10 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     interceptMessage[UnsupportedException]("look-ahead assertion")(build("(?=.)").get)
     interceptMessage[UnsupportedException]("look-behind assertion")(build("(?<=.)").get)
     interceptMessage[UnsupportedException]("back-reference")(build("(.)\\1").get)
-    interceptMessage[UnsupportedException]("named back-reference")(build("(?<foo>.)\\k<foo>").get)
+    interceptMessage[UnsupportedException]("back-reference")(build("(?<foo>.)\\k<foo>").get)
     interceptMessage[UnsupportedException]("atomic group")(build("(?>a)", "", Dialect.Java).get)
     interceptMessage[UnsupportedException]("atomic group")(build("a++", "", Dialect.Java).get)
-    interceptMessage[UnsupportedException]("unsupported syntax (RCall): (?R) at 1")(
+    interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(
       build("a(?R)?", "", Dialect.PCRE).get
     )
 

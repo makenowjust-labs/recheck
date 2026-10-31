@@ -274,8 +274,8 @@ class PatternExtensionsSuite extends munit.FunSuite:
     ".?" -> 2,
     ".{2}" -> 2,
     ".{0,}" -> 2,
-    ".{1,}" -> 3,
-    ".{2,}" -> 4,
+    ".{1,}" -> 2,
+    ".{2,}" -> 3,
     ".{0,1}" -> 2,
     ".{2,3}" -> 4,
     "(?=.)" -> 2,
@@ -286,7 +286,7 @@ class PatternExtensionsSuite extends munit.FunSuite:
   check("PatternOps#size", dialect = Dialect.Java)(_.size)(
     "(?>..)" -> 2,
     ".*+" -> 2,
-    ".{1,}+" -> 3,
+    ".{1,}+" -> 2,
     ".++" -> 2
   )
 
@@ -297,8 +297,9 @@ class PatternExtensionsSuite extends munit.FunSuite:
     ".{2}" -> 2,
     ".{2,2}" -> 2,
     ".{0,}" -> 0,
-    ".{1,}" -> 1,
-    ".{0,1}" -> 1,
+    ".{1,}" -> 0,
+    ".{2,}" -> 2,
+    ".{0,1}" -> 0,
     ".{2,3}" -> 3,
     "(?:.{2}){3}" -> 5,
     "(?=.{2})|.{3}" -> 5,
@@ -312,18 +313,17 @@ class PatternExtensionsSuite extends munit.FunSuite:
   test("PatternExtensions.PatternOps#alphabet"):
     val word = CharSet.fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))
     val lineTerminator = CharSet.of(0x0a, 0x0d, 0x2028, 0x2029)
-    val dot16 = UnitMode.Utf16.universe.diff(lineTerminator)
-    val dot = UnitMode.CodePoint.universe.diff(lineTerminator)
     val utf16 = UnitMode.Utf16
     val canonical16 = EcmaScriptChars.canonicalize(utf16.universe, false)
     assertEquals(parse("").alphabet, PatternAlphabet.build(utf16))
-    assertEquals(parse(".").alphabet, PatternAlphabet.build(utf16, Seq(dot16)))
-    assertEquals(parse(".", "u").alphabet, PatternAlphabet.build(UnitMode.CodePoint, Seq(dot)))
+    // A set like a negated class (e.g. `.` and `[^a]`) takes part in the order as its complement.
+    assertEquals(parse(".").alphabet, PatternAlphabet.build(utf16, Seq(lineTerminator)))
+    assertEquals(parse(".", "u").alphabet, PatternAlphabet.build(UnitMode.CodePoint, Seq(lineTerminator)))
+    assertEquals(parse("[a-z]").alphabet, PatternAlphabet.build(utf16, Seq(CharSet.range('a', 'z'))))
     assertEquals(
       parse("A|Z").alphabet,
       PatternAlphabet.build(utf16, Seq(CharSet.single('A'), CharSet.single('Z')))
     )
-    // A negated class takes part in the order as its positive set.
     assertEquals(parse("[^a]").alphabet, PatternAlphabet.build(utf16, Seq(CharSet.single('a'))))
     assertEquals(parse("\\b").alphabet, PatternAlphabet.build(utf16, word = Some(word)))
     assertEquals(parse("^", "m").alphabet, PatternAlphabet.build(utf16, lineTerminator = Some(lineTerminator)))
@@ -453,7 +453,9 @@ class PatternExtensionsSuite extends munit.FunSuite:
     "(?<=xyz)" -> Set(UStringUtil.fromString("xyz")),
     "." -> Set.empty[UString],
     "x" -> Set.empty[UString],
-    "x[y]z\\d" -> Set.empty[UString],
+    // A set of one character is a literal however it is written.
+    "x[y]z\\d" -> Set(UStringUtil.fromString("xyz")),
+    "x[yz]" -> Set.empty[UString],
     "\\x41\\n" -> Set(UStringUtil.fromString("A\n")),
     "😀" -> Set(UStringUtil.fromString("😀"))
   )

@@ -113,4 +113,4 @@ class InterpreterDialectSuite extends munit.FunSuite:
 
   test("ProgramBuilder.build: unsupported"):
     val pattern = ParsedPattern.parse("a(?R)?", "", PCRE).toTry.get
-    interceptMessage[UnsupportedException]("unsupported syntax (RCall): (?R) at 1")(ProgramBuilder.build(pattern).get)
+    interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(ProgramBuilder.build(pattern).get)

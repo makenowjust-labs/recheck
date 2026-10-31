@@ -59,7 +59,7 @@ For JavaScript, it includes the ES2025 features: the `v` flag, the modifiers `(?
 For Python, it includes atomic groups and possessive quantifiers (Python 3.11 or later).
 
 Some constructs are recognized, but the checkers do not handle them.
-A pattern having one of them is reported as `unknown` with an `unsupported` error naming the construct (e.g. `(a)?(?(1)b|c)` gives `unsupported syntax (Conditional): (?(1)b|c) at 4`).
+A pattern having one of them is reported as `unknown` with an `unsupported` error naming the construct (e.g. `(a)?(?(1)b|c)` gives `unsupported syntax (Conditional) at 4`).
 
 - Recursion and subroutine calls (e.g. `(?R)`, `(?1)`, `(?&name)`, `\g<name>`).
 - Conditionals (e.g. `(?(1)a|b)`).

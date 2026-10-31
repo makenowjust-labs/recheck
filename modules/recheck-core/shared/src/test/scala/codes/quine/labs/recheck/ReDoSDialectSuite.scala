@@ -59,7 +59,7 @@ class ReDoSDialectSuite extends munit.FunSuite:
       Diagnostics.Unknown(
         "^(a|a)*(?R)?$",
         "",
-        Diagnostics.ErrorKind.Unsupported("unsupported syntax (RCall): (?R) at 7"),
+        Diagnostics.ErrorKind.Unsupported("unsupported syntax (RCall) at 7"),
         Some(Checker.Fuzz)
       )
     )

@@ -5,6 +5,7 @@ import scala.annotation.tailrec
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
@@ -28,6 +29,19 @@ object PatternExtensions:
         case (Some((min, max)), None) => CaptureRange(Some((min, max)))
         case (None, Some((min, max))) => CaptureRange(Some((min, max)))
         case (None, None)             => CaptureRange(None)
+
+  /** Checks whether the set is described more simply by its complement, as a negated class or `.` is. */
+  def prefersComplement(set: CharSet, mode: UnitMode): Boolean =
+    set.complement(mode).intervalCount < set.intervalCount
+
+  /** Checks whether the set is one character or the case variants of one character, as a literal is. */
+  def isOneCharUpToCase(set: CharSet): Boolean =
+    set.nonEmpty && (set.size == 1 || {
+      val c = CharSet.single(set.head)
+      val variants = CaseMapping.SimpleFold.closure(c) union CaseMapping.SimpleUpper.closure(c) union
+        CaseMapping.SimpleLower.closure(c)
+      set.subsetOf(variants)
+    })
 
   /** Checks whether the assertion is at a begin point (`^` or `\A`). */
   def isBeginAssertion(kind: IRAssertKind): Boolean = kind match
@@ -123,31 +137,31 @@ object PatternExtensions:
     /** Returns this pattern's size. */
     def size: Int =
       def loop(node: IRNode): Int = node.data match
-        case Disjunction(ns)                                                         => ns.map(loop).sum + ns.size - 1
-        case Sequence(ns)                                                            => ns.map(loop).sum
-        case Empty                                                                   => 0
-        case Capture(_, _, n)                                                        => loop(n)
-        case Atomic(n)                                                               => loop(n)
-        case Repeat(n, IRQuantifier.Exact(m))                                        => loop(n) * m
-        case Repeat(n, IRQuantifier.Unbounded(1, _)) if !pattern.isBraceRepeat(node) => loop(n) + 1
-        case Repeat(n, IRQuantifier.Unbounded(m, _))                                 => loop(n) * (m + 1) + 1
-        case Repeat(n, IRQuantifier.Bounded(m, l, _))                                => loop(n) * l + (l - m)
-        case LookAhead(_, n)                                                         => loop(n) + 1
-        case LookBehind(_, n)                                                        => loop(n) + 1
-        case _                                                                       => 1
+        case Disjunction(ns)                          => ns.map(loop).sum + ns.size - 1
+        case Sequence(ns)                             => ns.map(loop).sum
+        case Empty                                    => 0
+        case Capture(_, _, n)                         => loop(n)
+        case Atomic(n)                                => loop(n)
+        case Repeat(n, IRQuantifier.Exact(m))         => loop(n) * m
+        case Repeat(n, IRQuantifier.Unbounded(m, _))  => loop(n) * Math.max(m, 1) + 1
+        case Repeat(n, IRQuantifier.Bounded(m, l, _)) => loop(n) * l + (l - m)
+        case LookAhead(_, n)                          => loop(n) + 1
+        case LookBehind(_, n)                         => loop(n) + 1
+        case _                                        => 1
       loop(pattern.node)
 
-    /** Returns a sum of the counts of the repetitions written with braces (e.g. `{2,3}`). */
+    /** Returns a sum of the counts of the repetitions other than `*`, `+` and `?` (e.g. `{2,3}` counts `3`). */
     def repeatCount(using ctx: Context): Int = ctx.interrupt:
       def loop(node: IRNode): Int = ctx.interrupt:
         node.data match
           case Repeat(n, q) =>
             val count = loop(n)
             q match
-              case IRQuantifier.Exact(m)                                          => count + m
-              case IRQuantifier.Unbounded(min, _) if pattern.isBraceRepeat(node)  => count + min
-              case IRQuantifier.Bounded(_, max, _) if pattern.isBraceRepeat(node) => count + max
-              case _                                                              => count
+              case IRQuantifier.Exact(m)            => count + m
+              case IRQuantifier.Unbounded(0 | 1, _) => count
+              case IRQuantifier.Unbounded(min, _)   => count + min
+              case IRQuantifier.Bounded(0, 1, _)    => count
+              case IRQuantifier.Bounded(_, max, _)  => count + max
           case _ => node.children.map(loop).sum
       loop(pattern.node)
 
@@ -184,8 +198,8 @@ object PatternExtensions:
         def loop(node: IRNode): Seq[CharSet] = ctx.interrupt:
           node.data match
             case Chars(set) =>
-              // A negated class takes part in the order of atoms as its positive set.
-              Vector(if pattern.isNegatedClass(node) then set.complement(pattern.ir.mode) else set)
+              // A set like a negated class takes part in the order of atoms as its complement.
+              Vector(if prefersComplement(set, pattern.ir.mode) then set.complement(pattern.ir.mode) else set)
             case Strings(set) =>
               set.strings.toVector.flatMap(_.iterator.map(CharSet.single)) :+ set.chars
             case _ => node.children.flatMap(loop)
@@ -246,8 +260,8 @@ object PatternExtensions:
         if pattern.ir.mode == UnitMode.CodePoint then UStringUtil.fromCodePoints(values) else UString.from(values)
 
       def literal(node: IRNode): Option[Int] = node.data match
-        case Chars(set) if set.nonEmpty && pattern.isLiteral(node) => Some(representative(set, preferred))
-        case _                                                     => None
+        case Chars(set) if isOneCharUpToCase(set) => Some(representative(set, preferred))
+        case _                                    => None
 
       @tailrec
       def extract(ns: Seq[IRNode], set: Set[UString] = Set.empty): Set[UString] =

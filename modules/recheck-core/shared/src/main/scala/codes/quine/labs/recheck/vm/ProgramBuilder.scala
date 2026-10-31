@@ -233,7 +233,7 @@ private[vm] class ProgramBuilder(
       case IRNodeData.LookAhead(true, child)   => wrapLookAhead(buildNegativeLookAround(child))
       case IRNodeData.LookBehind(false, child) => wrapLookBehind(buildPositiveLookAround(child))
       case IRNodeData.LookBehind(true, child)  => wrapLookBehind(buildNegativeLookAround(child))
-      case IRNodeData.Chars(set)               => emitRead(readKind(node, set), Location.from(node.loc))
+      case IRNodeData.Chars(set)               => emitRead(readKind(set), Location.from(node.loc))
       case IRNodeData.Strings(set)             =>
         val loc = Location.from(node.loc)
         // The strings are tried from the longest, and then the characters.
@@ -249,13 +249,11 @@ private[vm] class ProgramBuilder(
         emitRead(ReadKind.Ref(indices, pattern.ir.backReference, equivalence), Location.from(node.loc))
       case IRNodeData.Unsupported(_) => throw new UnsupportedException(pattern.unsupportedMessage(node))
 
-  /** Returns the read kind of a character node, following how it is written. */
-  def readKind(node: IRNode, set: CharSet): ReadKind =
-    val isDot = pattern.text(node) == "."
-    if isDot && set == mode.universe then ReadKind.Any
-    else if isDot || pattern.isNegatedClass(node) then ReadKind.ClassNot(set.complement(mode))
-    else if pattern.isLiteral(node) then charsKind(set)
-    else ReadKind.Class(set)
+  /** Returns the read kind of a set of a character node. */
+  def readKind(set: CharSet): ReadKind =
+    if set == mode.universe then ReadKind.Any
+    else if prefersComplement(set, mode) then ReadKind.ClassNot(set.complement(mode))
+    else charsKind(set)
 
   /** Returns the read kind of a set, which is a character if it has only one. */
   def charsKind(set: CharSet): ReadKind =
