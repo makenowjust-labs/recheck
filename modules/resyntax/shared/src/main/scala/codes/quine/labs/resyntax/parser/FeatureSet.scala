@@ -3,10 +3,6 @@ package codes.quine.labs.resyntax.parser
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 
-/** FeatureSet is a set of feature flags.
-  *
-  * It is used for changing the parsing behavior.
-  */
 final case class FeatureSet(
     // JavaScript (without `uv`), Perl, Ruby
     allowsAlphabeticUnknownBackslash: Boolean,
@@ -418,7 +414,6 @@ final case class FeatureSet(
 
 object FeatureSet:
 
-  /** Computes a feature set from a quick analysis result, the given dialect and the given flag set. */
   def from(analysis: QuickAnalysis, dialect: Dialect, flagSet: FlagSet): FeatureSet =
     val isDotNet = dialect.isDotNet
     val isJava = dialect.isJava
@@ -428,7 +423,6 @@ object FeatureSet:
     val isPython = dialect.isPython
     val isRuby = dialect.isRuby
 
-    // Python's bytes pattern
     val isByte = dialect match
       case Dialect.Python(tpe) => tpe == Dialect.Python.Type.Bytes
       case _                   => false
@@ -439,418 +433,217 @@ object FeatureSet:
     val isPerlByte = dialect match
       case Dialect.Perl(utf8, _) => !utf8
       case _                     => false
-    // PCRE reads UTF-8 by `u` (PHP) or `(*UTF)`.
     val isUnicode = flagSet.unicode || flagSet.unicodeSets || (isPCRE && analysis.hasUtfStartOption)
 
     FeatureSet(
-      // JavaScript (without `uv`), Perl, Ruby
       allowsAlphabeticUnknownBackslash = (isJavaScript && !isUnicode) || isPerl || isRuby,
-      // Java, PCRE, Ruby
       allowsBackslashControlCurly = isJava || isPCRE || isRuby,
-      // Perl
       allowsBackslashXWithoutDigit = isPerl,
-      // Perl
       allowsBacktrackControlRepeat = isPerl,
-      // JavaScript (without `uv`)
       allowsBrokenBackslashControl = isJavaScript && !isUnicode,
-      // JavaScript (without `uv`)
       allowsBrokenBackslashHex = isJavaScript && !isUnicode,
-      // .NET, Java, JavaScript (without `uv`), Perl
       allowsBrokenClassRangeBegin = isDotNet || isJava || (isJavaScript && !isUnicode) || isPerl,
-      // JavaScript (without `uv`), Perl
       allowsBrokenClassRangeEnd = (isJavaScript && !isUnicode) || isPerl,
-      // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsBrokenCloseCurly =
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
-      // .NET, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsBrokenCurly = isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
-      // .NET, JavaScript (without `uv`), PCRE, Python, Ruby
       allowsBrokenCurlyAfterAlphabeticBackslash =
         isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPython || isRuby,
-      // Perl
       allowsCodePointAbove10FFFF = isPerl,
-      // PCRE, Perl
       allowsBlankInBrace = isPCRE || isPerl,
-      // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsBrokenCloseBracket =
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
-      // JavaScript (with `v`)
       allowsClassDiff = isJavaScript && flagSet.unicodeSets,
-      // JavaScript
       allowsClassEmpty = isJavaScript,
-      // Java, JavaScript (with `v`), Ruby
       allowsClassIntersection = isJava || isJavaScript && flagSet.unicodeSets || isRuby,
-      // Java, JavaScript (with `v`), Ruby
       allowsClassNest = isJava || isJavaScript && flagSet.unicodeSets || isRuby,
-      // PCRE, Perl, Ruby
       allowsClassPosix = isPCRE || isPerl || isRuby,
-      // JavaScript
       allowsDollarInGroupName = isJavaScript,
-      // .NET, PCRE (with `J`), Perl, Ruby
       allowsDuplicatedGroupName = isDotNet || (isPCRE && flagSet.dupNames) || isPerl || isRuby,
-      // JavaScript
       allowsDuplicatedGroupNameInAlternatives = isJavaScript,
-      // .NET, Java, PCRE, Perl, Python, Ruby
       allowsDuplicatedInlineFlag = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
-      // Ruby
       allowsEmptyClassIntersection = isRuby,
-      // Java, PCRE, Perl
       allowsEmptyInlineFlag = isJava || isPCRE || isPerl,
-      // .NET, Java, PCRE, Perl, Ruby
       allowsEmptyInlineFlagDiff = isDotNet || isJava || isPCRE || isPerl || isRuby,
-      // .NET, Java, JavaScript, PCRE, Perl, Ruby
       allowsEmptyInlineFlagRemoval = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isRuby,
-      // JavaScript
       allowsEscapeInGroupName = isJavaScript,
-      // .NET
       allowsInlineFlagSign = isDotNet,
-      // Ruby
       allowsRepeatedInlineFlagMinus = isRuby,
-      // Perl
       allowsLooseBraceEscape = isPerl,
-      // PCRE, Perl
       allowsLoosePropertyName = isPCRE || isPerl,
-      // Ruby
       allowsNamelessBackslashKG = isRuby,
-      // .NET, Java, Ruby
       allowsRawPropertyName = isDotNet || isJava || isRuby,
-      // Ruby
       allowsNegatedRawPropertyName = isRuby,
-      // .NET
       allowsInvalidIdentifier = isDotNet,
-      // .NET, PCRE, Python, Ruby
       allowsLeadingZeroInCaptureTest = isDotNet || isPCRE || isPython || isRuby,
-      // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsLookAheadRepeat =
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
-      // .NET, Java, PCRE, Perl, Python, Ruby
       allowsLookBehindRepeat = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
-      // .NET, Java, JavaScript, PCRE, Perl, Python
       allowsMeaninglessBacktrackStrategy = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isPython,
-      // Ruby
       allowsLooseGroupName = isRuby,
-      // Ruby
       allowsNestedRepeat = isRuby,
-      // JavaScript (without `uv`), PCRE, Perl, Ruby
       allowsNonOctalDigitBackslash = (isJavaScript && !isUnicode) || isPCRE || isPerl || isRuby,
-      // .NET, PCRE (with `u`), Perl
       allowsOctalAbove0377 = isDotNet || (isPCRE && isUnicode) || isPerl,
-      // Perl
       allowsReversedBoundedRepeat = isPerl,
-      // .NET, Java, JavaScript, PCRE, Perl, Python
       allowsSurrogateEscape = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isPython,
-      // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsSymbolUnknownBackslash =
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
-      // PCRE
       allowsUnpairedQuoteEnd = isPCRE,
-      // JavaScript (without `uv`)
       allowsUnknownBackslashUpperC = isJavaScript && !isUnicode,
-      // Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       allowsWordUnknownBackslash = isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
-      // PCRE, Perl, Ruby
       allowsNonNameBaseRef = isPCRE || isPerl || isRuby,
-      // .NET
       allowsNumberGroupName = isDotNet,
-      // .NET, Java, PCRE, Perl, Ruby
       allowsToggledInlineFlag = isDotNet || isJava || isPCRE || isPerl || isRuby,
-      // .NET, JavaScript, PCRE, Perl, Python, Ruby
       allowsUnderscoreInGroupName = isDotNet || isJavaScript || isPCRE || isPerl || isPython || isRuby,
-      // JavaScript, Python (without `b`)
       allowsUnicodeIdentifierGroupName = isJavaScript || (isPython && !isByte),
-      // PCRE (with `u`)
       allowsUnicodeWordGroupName = isPCRE && isUnicode,
-      // .NET
       allowsWordClassGroupName = isDotNet,
-      // Perl
       allowsWordIdentifierGroupName = isPerl,
-      // .NET
       allowsZeroIndexedCaptureTest = isDotNet,
-      // PCRE, Ruby
       allowsForwardRelativeReference = isPCRE || isRuby,
-      // Ruby
       allowsNonNameKBackReference = isRuby,
-      // Ruby
       allowsNonNameCaptureTest = isRuby,
-      // .NET, Java, Perl, Ruby
       allowsZeroWidthAssertRepeat = isDotNet || isJava || isPerl || isRuby,
-      // Perl, Python
       checksCharsetInlineFlagConflict = isPerl || isPython,
-      // Perl
       checksCharsetInlineFlagCount = isPerl,
-      // Perl, Python, Ruby
       checksCharsetInlineFlagRemoval = isPerl || isPython || isRuby,
-      // PCRE, Perl
       checksClassPosixCollating = isPCRE || isPerl,
-      // PCRE
       checksClassPosixOutsideClass = isPCRE,
-      // JavaScript (with `v`)
       checksClassSetSyntax = isJavaScript && flagSet.unicodeSets,
-      // JavaScript (without `uv`)
       checksValidBackReference = isJavaScript && !isUnicode,
-      // Java, JavaScript (with `uv`)
       combinesSurrogatePairEscape = isJava || (isJavaScript && isUnicode),
-      // JavaScript (without `uv`)
       consumesBrokenClassRange = isJavaScript && !isUnicode,
-      // .NET (with `n`), PCRE (with `n`), Perl (with `n`)
       explicitCapture = (isDotNet || isPCRE || isPerl) && flagSet.explicitCapture,
-      // .NET, PCRE, Perl, Ruby
       fallsBackMultiDigitBackReferenceToOctal = isDotNet || isPCRE || isPerl || isRuby,
-      // Ruby
       fallsBackMultiDigitBackReferenceToLiteral = isRuby,
-      // Ruby
       hasAbsenceOperator = isRuby,
-      // PCRE, Perl
       hasAlphabeticGroup = isPCRE || isPerl,
-      // .NET, Java, JavaScript, PCRE, Perl, Ruby
       hasAngleNamedCapture = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isRuby,
-      // .NET, Java, PCRE, Perl, Python, Ruby
       hasAtomicGroup = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
-      // .NET, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
       hasBackslashBareOctal = isDotNet || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
-      // JavaScript (with `uv`)
       hasBackslashNull = isJavaScript && isUnicode,
-      // Java
       hasBackslashZeroOctal = isJava,
-      // .NET, Java, PCRE, Perl, Python, Ruby
       hasBackslashBegin = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
-      // .NET, JavaScript, PCRE, Perl, Python, Ruby
       hasBackslashBackspace = isDotNet || isJavaScript || isPCRE || isPerl || isPython || isRuby,
-      // .NET, Java, PCRE, Perl, Python, Ruby
       hasBackslashBell = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
-      // Java, Perl, Python (without `b`)
       hasBackslashCharName = isJava || isPerl || (isPython && !isByte),
-      // PCRE (with `u`), Perl
       hasBackslashCharNameHex = (isPCRE && isUnicode) || isPerl,
-      // PCRE (without `u`: PHP rejects `\C` with it, but not with `(*UTF)`)
+      // PHP rejects `\C` with `u`, but not with `(*UTF)`.
       hasBackslashCodeUnit = isPCRE && !flagSet.unicode,
-      // JavaScript (with `v`)
       hasBackslashClassSetReservedPunctuator = isJavaScript && flagSet.unicodeSets,
-      // .NET, Java, JavaScript, PCRE, Perl, Ruby
       hasBackslashControl = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isRuby,
-      // Java
       hasBackslashControlAny = isJava,
-      // JavaScript (without `uv`)
       hasBackslashControlDigitInClass = isJavaScript && !isUnicode,
-      // .NET, Java, PCRE, Perl, Ruby
       hasBackslashControlExtra = isDotNet || isJava || isPCRE || isPerl || isRuby,
-      // PCRE, Perl, Ruby
       hasBackslashControlPrintable = isPCRE || isPerl || isRuby,
-      // PCRE, Perl, Ruby
       hasBackslashCut = isPCRE || isPerl || isRuby,
-      // .NET, Java, PCRE, Perl, Python, Ruby
       hasBackslashEnd = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
-      // .NET, Java, PCRE, Perl, Ruby
       hasBackslashEscape = isDotNet || isJava || isPCRE || isPerl || isRuby,
-      // PCRE, Perl
       hasBackslashGBackReference = isPCRE || isPerl,
-      // PCRE, Ruby
       hasBackslashGCall = isPCRE || isRuby,
-      // Java, PCRE, Perl, Ruby
       hasBackslashGeneralNewline = isJava || isPCRE || isPerl || isRuby,
-      // Java, PCRE, Perl, Ruby
       hasBackslashGraphemeCluster = isJava || isPCRE || isPerl || isRuby,
-      // Java, PCRE, Perl
       hasBackslashHorizontalSpace = isJava || isPCRE || isPerl,
-      // Ruby
       hasBackslashMetaControl = isRuby,
-      // Ruby
       hasBackslashHexDigit = isRuby,
-      // .NET, Java, JavaScript (with named capture), PCRE, Perl, Ruby
       hasBackslashKBackReference =
         isDotNet || isJava || (isJavaScript && analysis.containsNamedCapture) || isPCRE || isPerl || isRuby,
-      // .NET, PCRE, Perl, Ruby
       hasBackslashKBackReferenceQuote = isDotNet || isPCRE || isPerl || isRuby,
-      // PCRE, Perl
       hasBackslashKBackReferenceCurly = isPCRE || isPerl,
-      // PCRE, Perl
       hasBackslashNonNewline = isPCRE || isPerl,
-      // PCRE, Perl
       hasBackslashOctal = isPCRE || isPerl,
-      // Java, PCRE
       hasBackslashQuoteCommand = isJava || isPCRE,
-      // JavaScript (with `v`)
       hasBackslashQuoteSet = isJavaScript && flagSet.unicodeSets,
-      // .NET, Java, PCRE, Perl, Ruby
       hasBackslashStickyAssert = isDotNet || isJava || isPCRE || isPerl || isRuby,
-      // JavaScript (with `uv`), Ruby
       hasBackslashUnicodeBracket = (isJavaScript && isUnicode) || isRuby,
-      // .NET, Java, JavaScript, Python (without `b`), Ruby
       hasBackslashUnicodeHex = isDotNet || isJava || isJavaScript || (isPython && !isByte) || isRuby,
-      // Python (without `b`)
       hasBackslashUnicodeHex8 = isPython && !isByte,
-      // Ruby
       hasBackslashUnicodeList = isRuby,
-      // .NET, Java, JavaScript (with `uv`), PCRE, Perl, Ruby
       hasBackslashUnicodeProperty = isDotNet || isJava || (isJavaScript && isUnicode) || isPCRE || isPerl || isRuby,
-      // Java, PCRE, Perl
       hasBackslashUnicodePropertyBare = isJava || isPCRE || isPerl,
-      // .NET, Java, PCRE, Perl, Python, Ruby
       hasBackslashUpperEnd = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
-      // Java, PCRE, Perl
       hasBackslashVerticalSpace = isJava || isPCRE || isPerl,
-      // .NET, JavaScript, Python, Ruby
       hasBackslashVerticalTab = isDotNet || isJavaScript || isPython || isRuby,
-      // Java, PCRE, Perl
       hasBackslashXBracket = isJava || isPCRE || isPerl,
-      // PCRE, Perl, Ruby
       hasBackslashXHex1 = isPCRE || isPerl || isRuby,
-      // .NET
       hasBalanceGroup = isDotNet,
-      // .NET
       hasBareLookAroundTest = isDotNet,
-      // PCRE, Python
       hasBareNamedCaptureTest = isPCRE || isPython,
-      // Java, Perl
       hasBoundaryGModifier = isJava || isPerl,
-      // Perl
       hasBoundaryModifier = isPerl,
-      // PCRE, Perl
       hasBranchReset = isPCRE || isPerl,
-      // PCRE, Perl
       hasCallCommand = isPCRE || isPerl,
-      // PCRE
       hasCallout = isPCRE,
-      // PCRE
       hasClassPosixWordBoundary = isPCRE,
-      // .NET
       hasClassSubtraction = isDotNet,
-      // .NET, PCRE, Perl, Python, Ruby
       hasConditional = isDotNet || isPCRE || isPerl || isPython || isRuby,
-      // PCRE, Perl
       hasDefineTest = isPCRE || isPerl,
-      // PCRE, Perl, Python, Ruby
       hasFlagA = isPCRE || isPerl || isPython || isRuby,
-      // Perl
       hasFlagAA = isPerl,
-      // PCRE
       hasFlagASubOption = isPCRE,
-      // Java, Perl
       hasFlagC = isJava || isPerl,
-      // Java, Perl, Ruby
       hasFlagD = isJava || isPerl || isRuby,
-      // Perl
       hasFlagG = isPerl,
-      // Perl
       hasFlagL = isPerl,
-      // .NET, PCRE, Perl
       hasFlagN = isDotNet || isPCRE || isPerl,
-      // Perl
       hasFlagO = isPerl,
-      // Perl
       hasFlagP = isPerl,
-      // PCRE
       hasFlagR = isPCRE,
-      // .NET, Java, JavaScript, PCRE, Perl, Python
       hasFlagS = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isPython,
-      // Java, Perl, Python (without `b`), Ruby
       hasFlagU = isJava || isPerl || (isPython && !isByte) || isRuby,
-      // .NET, Java, PCRE, Perl, Python, Ruby
       hasFlagX = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
-      // PCRE, Perl
       hasFlagXX = isPCRE || isPerl,
-      // PCRE
       hasFlagUpperJ = isPCRE,
-      // Python (with `b`)
       hasFlagUpperL = isPython && isByte,
-      // Java, PCRE
       hasFlagUpperU = isJava || isPCRE,
-      // Perl
       hasInlineCode = isPerl,
-      // .NET, Java, PCRE, Perl, Python, Ruby
       hasInlineFlag = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
-      // .NET, Java, JavaScript, PCRE, Perl, Python, Ruby
       hasInlineFlagGroup = true,
-      // .NET, Java, PCRE, Perl, Ruby
       hasInlineFlagRemovalCommand = isDotNet || isJava || isPCRE || isPerl || isRuby,
-      // .NET, PCRE, Perl, Python, Ruby
       hasInlineComment = isDotNet || isPCRE || isPerl || isPython || isRuby,
-      // Ruby
       hasIncomprehensiveInlineFlag = isRuby,
-      // Ruby
       hasLeveledBackReference = isRuby,
-      // .NET
       ignoresInlineFlagCase = isDotNet,
-      // PCRE
       limitsGroupNameLength = isPCRE,
-      // Ruby
       overridesCharsetInlineFlag = isRuby,
-      // .NET, PCRE, Perl
       hasLookAroundTest = isDotNet || isPCRE || isPerl,
-      // PCRE, Perl, Python, Ruby
       hasMaxBounded = isPCRE || isPerl || isPython || isRuby,
-      // PCRE, Perl, Ruby
       hasNamedCaptureTest = isPCRE || isPerl || isRuby,
-      // PCRE
       hasNonAtomicLookAround = isPCRE,
-      // PCRE, Perl
       hasPCall = isPCRE || isPerl,
-      // PCRE, Perl, Python
       hasPGroup = isPCRE || isPerl || isPython,
-      // Java, PCRE, Perl, Python, Ruby
       hasPossessiveBacktrackStrategy = isJava || isPCRE || isPerl || isPython || isRuby,
-      // Java, PCRE, Perl, Python
       hasPossessiveCurlyBacktrackStrategy = isJava || isPCRE || isPerl || isPython,
-      // PCRE, Perl
       hasRecursionTest = isPCRE || isPerl,
-      // PCRE, Perl
       hasRCall = isPCRE || isPerl,
-      // PCRE
       hasRelativeIndexedCaptureTest = isPCRE,
-      // PCRE, Perl
       hasResetFlag = isPCRE || isPerl,
-      // .NET, PCRE, Perl, Ruby
       hasQuoteNamedCapture = isDotNet || isPCRE || isPerl || isRuby,
-      // PCRE
       hasVersionTest = isPCRE,
-      // PCRE
       hasScanSubstring = isPCRE,
-      // PCRE
       hasStartOption = isPCRE,
-      // Java
       ignoresCurlyAfterRepeat = isJava,
-      // PCRE (without `u`)
       limitsCodePointTo0xFF = isPCRE && !isUnicode,
-      // JavaScript (without `uv`)
       limitsOctalTo0377ByDigits = isJavaScript && !isUnicode,
-      // Python
       processBackslashInLineComment = isPython,
-      // Java
       readsBackReferenceDigitsWhileGroupExists = isJava,
-      // Java, PCRE, Perl, Ruby
       readsBackReferenceDigitsByPreviousGroups = isJava || isPCRE || isPerl || isRuby,
-      // Perl
       readsLeadingCurlyAsLiteral = isPerl,
-      // Python
       readsThreeOctalDigitsAsOctal = isPython,
-      // JavaScript (with `uv`)
       rejectsInvalidBackReference = isJavaScript && isUnicode,
-      // Ruby (ASCII-8BIT)
       rejectsNonAsciiUnicodeEscape = isRubyByte,
-      // Ruby
       rejectsNumberedReferenceWithNamedCapture = isRuby,
-      // Ruby
       removesCommentGroup = isRuby,
-      // Python, Ruby
       processBackslashInCommentGroup = isPython || isRuby,
-      // Java, JavaScript (with `uv`), Perl, PCRE (with `u`), Python (without `b`), Ruby
       readsAsUnicode =
         isJava || (isJavaScript && isUnicode) || (isPCRE && isUnicode) || isPerl || (isPython && !isByte) || isRuby,
-      // Python
       requiresInlineFlagAtStart = isPython,
-      // .NET (with `x`), Java (with `x`), PCRE (with `x`), Perl (with `x`), Python (with `x`), Ruby (with `x`)
       skipsComment = flagSet.verbose,
-      // .NET, Java, PCRE, Perl
       skipsCommentBeforeBacktrackStrategy = isDotNet || isJava || isPCRE || isPerl,
-      // Java
       skipsCommentInClass = isJava,
-      // PCRE, Perl, Ruby
       treatsBackReferenceBackslashInClassAsLiteral = isPCRE || isPerl || isRuby,
-      // Perl
       treatsBackslashUpperCInClassAsLiteral = isPerl,
-      // Perl, Ruby
       treatsNonClassBackslashInClassAsLiteral = isPerl || isRuby,
-      // .NET: 2147483647, Java: 2147483647, JavaScript: unlimited, PCRE: 65535, Perl: 2147483646, Python: 4294967294, Ruby: 100000
       maxRepeatCount = dialect match
         case Dialect.DotNet     => 2147483647L
         case Dialect.Java       => 2147483647L
@@ -859,12 +652,10 @@ object FeatureSet:
         case _: Dialect.Perl    => 2147483646L
         case _: Dialect.Python  => 4294967294L
         case _: Dialect.Ruby    => 100000L,
-      // PCRE: every name, Perl: 3 to 14 characters without upper case letters and blanks, Ruby: up to 20 characters without `:`
       classPosixNameRule = dialect match
         case _: Dialect.Perl => ClassPosixNameRule.Perl
         case _: Dialect.Ruby => ClassPosixNameRule.Ruby
         case _               => ClassPosixNameRule.Always,
-      // Python (with `b`): Latin-1, PCRE (without `u`), Perl (bytes), Ruby (ASCII-8BIT): UTF-8, the others: text
       sourceEncoding =
         if isByte then SourceEncoding.Latin1
         else if (isPCRE && !isUnicode) || isPerlByte || isRubyByte then SourceEncoding.Utf8
