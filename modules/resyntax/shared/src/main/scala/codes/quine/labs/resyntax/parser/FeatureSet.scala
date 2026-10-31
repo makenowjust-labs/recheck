@@ -70,12 +70,14 @@ final case class FeatureSet(
     allowsRepeatedInlineFlagMinus: Boolean,
     // Perl
     allowsLooseBraceEscape: Boolean,
-    // PCRE, Perl, Ruby
+    // PCRE, Perl
     allowsLoosePropertyName: Boolean,
     // Ruby
     allowsNamelessBackslashKG: Boolean,
-    // .NET, Java
+    // .NET, Java, Ruby
     allowsRawPropertyName: Boolean,
+    // Ruby
+    allowsNegatedRawPropertyName: Boolean,
     // .NET
     allowsInvalidIdentifier: Boolean,
     // .NET, PCRE, Python, Ruby
@@ -506,12 +508,14 @@ object FeatureSet:
       allowsRepeatedInlineFlagMinus = isRuby,
       // Perl
       allowsLooseBraceEscape = isPerl,
-      // PCRE, Perl, Ruby
-      allowsLoosePropertyName = isPCRE || isPerl || isRuby,
+      // PCRE, Perl
+      allowsLoosePropertyName = isPCRE || isPerl,
       // Ruby
       allowsNamelessBackslashKG = isRuby,
-      // .NET, Java
-      allowsRawPropertyName = isDotNet || isJava,
+      // .NET, Java, Ruby
+      allowsRawPropertyName = isDotNet || isJava || isRuby,
+      // Ruby
+      allowsNegatedRawPropertyName = isRuby,
       // .NET
       allowsInvalidIdentifier = isDotNet,
       // .NET, PCRE, Python, Ruby

@@ -1728,12 +1728,15 @@ private[parser] final class Parser(
       case (true, Some(value))  => EscapeClassKind.NonUnicodePropertyValue(name, value)
     BackslashKind.EscapeClass(klass)
 
+  // Ruby (Onigmo) looks up the whole name with `=` and the value, ignoring only spaces, hyphens, underscores and cases.
   private def parseStrictProperty(): (Boolean, String, Option[String]) =
+    val negated = featureSet.allowsNegatedRawPropertyName && !isEnd && currentChar == '^'
+    if negated then next()
     val name = parsePropertyName()
     val value = Option.when(!isEnd && currentChar == '='):
       next()
       parsePropertyName()
-    (false, name, value)
+    (negated, name, value)
 
   private def parsePropertyName(): String =
     if !featureSet.allowsRawPropertyName then return parseID()
@@ -1742,7 +1745,7 @@ private[parser] final class Parser(
     assert(start < offset, "Invalid backslash escape")
     sliceSource(start, offset)
 
-  // Perl, PCRE and Ruby ignore blanks, hyphens, underscores and cases in property names, so the name is kept as written.
+  // Perl and PCRE ignore blanks, hyphens, underscores and cases in property names, so the name is kept as written.
   private def parseLooseProperty(): (Boolean, String, Option[String]) =
     skipBraceBlank(force = true)
     val negated = !isEnd && currentChar == '^'

@@ -66,6 +66,49 @@ class IRPropertySuite extends munit.FunSuite:
   error("\\p{Lb=AL}", "u", PCRE)("Unknown Unicode property name at 0")
   error("\\p{Lb=AL}", "", Java, Ruby())("Unknown Unicode property name at 0")
 
+  // Ruby looks up the whole name without spaces, hyphens, underscores and cases, `=` and the value included.
+  chars("\\p{InCB=Linker}", "", Ruby())(value(Properties.IndicConjunctBreak, "Linker"))
+  chars("\\p{In CB = Linker}", "", Ruby())(value(Properties.IndicConjunctBreak, "Linker"))
+  chars("\\p{i-n-c-b=l-i-n-k-e-r}", "", Ruby())(value(Properties.IndicConjunctBreak, "Linker"))
+  chars("\\p{^InCB=Linker}", "", Ruby())(value(Properties.IndicConjunctBreak, "Linker").complement(UnitMode.CodePoint))
+  chars("\\P{^InCB=Consonant}", "", Ruby())(value(Properties.IndicConjunctBreak, "Consonant"))
+  chars("\\p{Grapheme_Cluster_Break=Extend}", "", Ruby())(value(Properties.GraphemeClusterBreak, "Extend"))
+  chars("\\p{GraphemeClusterBreak=RegionalIndicator}", "", Ruby())(
+    value(Properties.GraphemeClusterBreak, "Regional_Indicator")
+  )
+  chars("\\p{age = 6. 0}", "", Ruby())(Properties.presentIn(Properties.Age.value("6.0").get))
+  // Only the long names of the values listed in the data files, and no other property with a value.
+  for name <- Seq(
+      "Indic_Conjunct_Break=Linker",
+      "InCB=None",
+      "InCB:Linker",
+      "GCB=Extend",
+      "Grapheme_Cluster_Break=RI",
+      "Grapheme_Cluster_Break=Other",
+      "Grapheme_Cluster_Break=E_Base",
+      "Age=V6_0",
+      "Age=Unassigned",
+      "gc=L",
+      "sc=Latn",
+      "Script=Latin",
+      "scx=Latn",
+      "Block=Basic_Latin",
+      " ^L",
+      "L\t",
+      "L\u3000"
+    )
+  do error(s"\\p{$name}", "", Ruby())("Unknown Unicode property name at 0")
+  // Ruby has the properties of PropList.txt, but not the scripts without characters.
+  chars("\\p{Hyphen}", "", Ruby())(Properties.binary("Hyphen").get.set)
+  chars("\\p{OIDS}", "", Ruby())(CharSet.of(0x1885, 0x1886, 0x2118, 0x212e, 0x309b, 0x309c))
+  chars("\\p{Other_Uppercase}", "", Ruby())(
+    Properties.binary("Uppercase").get.set.diff(value(Properties.GeneralCategory, "Lu"))
+  )
+  chars("\\p{XPosixPunct}", "", Ruby())(
+    value(Properties.GeneralCategory, "P").union(CharSet.of("$+<=>^`|~".map(_.toInt)*))
+  )
+  error("\\p{Hrkt}", "", Ruby())("Unknown Unicode property name at 0")
+
   // Perl's Numeric_Value
   val nv = Properties.NumericValue
   def nvSet(n: Long, d: Long): CharSet = nv.values.find(v => v.numerator == n && v.denominator == d).get.set

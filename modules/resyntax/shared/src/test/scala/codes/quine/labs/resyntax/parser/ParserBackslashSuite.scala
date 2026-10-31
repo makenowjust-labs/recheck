@@ -171,8 +171,13 @@ class ParserBackslashSuite extends ParserSuiteBase:
   // .NET's block names have hyphens (e.g. `IsLatin-1Supplement`).
   check("\\p{IsLatin-1Supplement}", "", DotNet)(Backslash(EscapeClass(UnicodeProperty("IsLatin-1Supplement"))))
   check("\\p{block=Basic Latin}", "", Java)(Backslash(EscapeClass(UnicodePropertyValue("block", "Basic Latin"))))
-  check("\\p{ L& }", "", PCRE, Perl(), Ruby())(Backslash(EscapeClass(UnicodeProperty("L&"))))
+  check("\\p{ L& }", "", PCRE, Perl())(Backslash(EscapeClass(UnicodeProperty("L&"))))
   check("\\p{Bc:EN}", "", PCRE, Perl())(Backslash(EscapeClass(UnicodePropertyValue("Bc", "EN"))))
+  // Ruby reads a property name as it is, which only `=` separates, and IR rejects an unknown one.
+  check("\\p{ L& }", "", Ruby())(Backslash(EscapeClass(UnicodeProperty(" L& "))))
+  check("\\p{ ^L}", "", Ruby())(Backslash(EscapeClass(UnicodeProperty(" ^L"))))
+  check("\\p{^In CB = Linker}", "", Ruby())(Backslash(EscapeClass(NonUnicodePropertyValue("In CB ", " Linker"))))
+  check("\\p{Bc:EN}", "", Ruby())(Backslash(EscapeClass(UnicodeProperty("Bc:EN"))))
   error("\\p{}", "", PCRE, Perl(), Ruby())("Invalid backslash escape at 3")
   error("\\p{L", "", PCRE, Perl(), Ruby())("Invalid backslash escape at 4")
   check("\\r", "", All*)(Backslash(Escape(Single('r'), 0x0d)))
