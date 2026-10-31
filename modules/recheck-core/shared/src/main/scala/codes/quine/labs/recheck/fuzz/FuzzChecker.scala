@@ -28,7 +28,12 @@ import codes.quine.labs.resyntax.charset.UString
 /** ReDoS vulnerable RegExp checker based on fuzzing. */
 object FuzzChecker:
 
-  /** Checks whether RegExp is ReDoS vulnerable or not. */
+  /** Checks whether RegExp is ReDoS vulnerable or not.
+    *
+    * @param failed
+    *   whether an attack of the complexity and the hotspot is known to fail recall validation, which may change while
+    *   iterating the results. Strings whose attacks failed rank below the others in the next generation.
+    */
   def check(
       pattern: ParsedPattern,
       fuzz: FuzzProgram,
@@ -50,7 +55,8 @@ object FuzzChecker:
       maxIteration: Int = Parameters.DefaultMaxIteration,
       maxDegree: Int = Parameters.DefaultMaxDegree,
       heatRatio: Double = Parameters.DefaultHeatRatio,
-      accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode
+      accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode,
+      failed: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
   )(using ctx: Context): Iterator[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)] =
     ctx.interrupt:
       new FuzzChecker(
@@ -74,7 +80,8 @@ object FuzzChecker:
         maxIteration,
         maxDegree,
         heatRatio,
-        accelerationMode
+        accelerationMode,
+        failed
       ).check()
 
   /** Trace is a summary of IR execution. */
@@ -114,13 +121,20 @@ private[fuzz] final class FuzzChecker(
     val maxIteration: Int,
     val maxDegree: Int,
     val heatRatio: Double,
-    val accelerationMode: AccelerationMode
+    val accelerationMode: AccelerationMode,
+    val failed: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
 )(using val ctx: Context):
 
   import ctx._
 
   /** A set that holds strings once executed. */
   val inputs: mutable.Set[UString] = mutable.Set.empty
+
+  /** The complexities and the hotspots of the attacks from each string. */
+  val attacks: mutable.Map[FString, List[(AttackComplexity.Vulnerable, Hotspot)]] = mutable.Map.empty
+
+  /** Whether an attack from the string is known to fail recall validation. */
+  def isFailed(str: FString): Boolean = attacks.get(str).exists(_.exists(failed.tupled))
 
   /** An alias to `fuzz.program`. */
   def program: Program = fuzz.program
@@ -413,7 +427,10 @@ private[fuzz] final class FuzzChecker(
         log:
           s"""|fuzz: attack start (status: ${result.status})
               |  string: $str""".stripMargin
-        return tryAttack(str)
+        return tryAttack(str).map: r =>
+          val (complexity, _, hotspot) = r
+          attacks(str) = (complexity, hotspot) :: attacks.getOrElse(str, Nil)
+          r
 
       Iterator.empty
 
@@ -432,9 +449,9 @@ private[fuzz] final class FuzzChecker(
         set.add(trace)
         visited.addAll(coverage)
 
-    /** Converts this to [[Generation]]. */
+    /** Converts this to [[Generation]], in which strings whose attacks failed recall validation rank last. */
     def toGeneration: Generation =
-      val traces = set.toIndexedSeq.sortBy(-_.rate).slice(0, maxGenerationSize)
+      val traces = set.toIndexedSeq.sortBy(t => (isFailed(t.str), -t.rate)).slice(0, maxGenerationSize)
       val newMinRate = traces.map(_.rate).minOption.getOrElse(0.0)
       val newCovered = traces.iterator.flatMap(_.coverage).toSet
       Generation(newMinRate, traces, newCovered)
