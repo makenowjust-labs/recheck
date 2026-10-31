@@ -21,6 +21,7 @@ import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UnitMode
 
 /** Package `codec` provides recheck types `Decoder`/`Encoder` of circe. */
 package object codec
@@ -136,6 +137,33 @@ given encodeErrorKind: Encoder[ErrorKind] with
 
 /** An `Encoder` for `UString`. */
 given encodeUString: Encoder[UString] = _.asString.asJson
+
+/** Returns a `Decoder` for `UString` of the unit mode, which is the inverse of [[encodeUString]]. */
+def decodeUString(mode: UnitMode): Decoder[UString] = Decoder[String].emap: s =>
+  mode match
+    case UnitMode.Utf16     => Right(UString.fromUtf16Units(s))
+    case UnitMode.CodePoint => Right(UString.fromString(s))
+    case UnitMode.Byte      =>
+      if s.forall(_ <= 0xff) then Right(UString.fromUtf16Units(s)) else Left(s"Invalid byte string: $s")
+
+/** Returns a `Decoder` for `AttackPattern` of the unit mode in the style.
+  *
+  * It reads the fields of [[encodeAttackPattern]] except `string` and `pattern`, which are derived from the others.
+  */
+def decodeAttackPattern(mode: UnitMode, style: AttackPattern.Style): Decoder[AttackPattern] =
+  given Decoder[UString] = decodeUString(mode)
+  given Decoder[(UString, UString, Int)] = (c: HCursor) =>
+    for
+      prefix <- c.get[UString]("prefix")
+      pump <- c.get[UString]("pump")
+      bias <- c.get[Int]("bias")
+    yield (prefix, pump, bias)
+  (c: HCursor) =>
+    for
+      pumps <- c.get[Seq[(UString, UString, Int)]]("pumps")
+      suffix <- c.get[UString]("suffix")
+      n <- c.get[Int]("base")
+    yield AttackPattern(pumps, suffix, n, style)
 
 /** A `Decoder` for `Duration`. */
 given decodeDuration: Decoder[Duration] = (c: HCursor) =>
