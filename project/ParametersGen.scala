@@ -28,8 +28,8 @@ object ParametersGen {
       unit: Option[String],
       cli: Option[String],
       cliMetavar: Option[String],
-      dialects: Seq[String],
-      encodings: Seq[(String, Seq[String])]
+      scalaDefaultValue: Option[String],
+      variants: Seq[Variant]
   ) {
     def isDuration: Boolean = scalaType == "Duration"
     def isLogger: Boolean = scalaType == "Option[Context.Logger]"
@@ -40,6 +40,7 @@ object ParametersGen {
 
     /** The Scala expression of the default value. */
     def scalaDefault: String = default match {
+      case _ if scalaDefaultValue.isDefined                   => scalaDefaultValue.get
       case null if isDuration                                 => "Duration.Inf"
       case null                                               => "None"
       case n: Number if isDuration && n.longValue % 1000 == 0 => s"Duration(${n.longValue / 1000}, SECONDS)"
@@ -57,13 +58,19 @@ object ParametersGen {
     def label: String = title.toLowerCase
   }
 
+  /** Variant is an object of `oneOf` with the `name` constant, e.g. a dialect with its settings.
+    *
+    * @param settings
+    *   the properties other than `name`, with their `enum` values (empty for a non-enum) and default
+    */
+  final case class Variant(name: String, settings: Seq[(String, Seq[String], Any)])
+
   /** The Scala imports of the types in the schema. */
   private val typeImports: Map[String, String] = Map(
     "AccelerationMode" -> "codes.quine.labs.recheck.common.AccelerationMode",
     "Checker" -> "codes.quine.labs.recheck.common.Checker",
     "Seeder" -> "codes.quine.labs.recheck.common.Seeder",
-    "Dialect" -> "codes.quine.labs.resyntax.ast.Dialect",
-    "PerlSource" -> "codes.quine.labs.resyntax.ast.PerlSource"
+    "Dialect" -> "codes.quine.labs.resyntax.ast.Dialect"
   )
 
   /** Reads the parameters of the schema. */
@@ -78,11 +85,18 @@ object ParametersGen {
         .map(_.asInstanceOf[java.util.Map[String, String]].asScala.toMap)
         .getOrElse(Map.empty[String, String])
       require(values.forall(scalaValues.contains), s"x-scala-values of $name must map every enum value")
-      val dialects = Option(p.get("x-dialects")).map(_.asInstanceOf[java.util.List[String]].asScala.toSeq)
-      val encodings = Option(p.get("x-encodings"))
-        .map(_.asInstanceOf[java.util.Map[String, java.util.List[String]]].asScala.toSeq.map { case (d, es) =>
-          (d, es.asScala.toSeq)
-        })
+      val variants = Option(p.get("oneOf")).toSeq
+        .flatMap(_.asInstanceOf[java.util.List[java.util.Map[String, Any]]].asScala)
+        .flatMap(v => Option(v.get("properties")))
+        .map { ps =>
+          val properties = ps.asInstanceOf[java.util.Map[String, java.util.Map[String, Any]]].asScala.toSeq
+          val variantName = properties.collectFirst { case ("name", n) => n.get("const").toString }
+          val settings = properties.filter(_._1 != "name").map { case (key, setting) =>
+            val values = Option(setting.get("enum")).map(_.asInstanceOf[java.util.List[String]].asScala.toSeq)
+            (key, values.getOrElse(Seq.empty), setting.get("default"))
+          }
+          Variant(variantName.getOrElse(sys.error(s"$name has a variant without name")), settings)
+        }
       Param(
         name = name,
         title = string("title").getOrElse(sys.error(s"$name has no title")),
@@ -94,8 +108,8 @@ object ParametersGen {
         unit = string("x-unit"),
         cli = string("x-cli"),
         cliMetavar = string("x-cli-metavar"),
-        dialects = dialects.getOrElse(Seq.empty),
-        encodings = encodings.getOrElse(Seq.empty)
+        scalaDefaultValue = string("x-scala-default"),
+        variants = variants
       )
     }
   }
@@ -293,37 +307,30 @@ object ParametersGen {
         |""".stripMargin
   }
 
-  /** Generates `ParametersSchema.scala` for the tests, the dialect annotations of the schema. */
+  /** Generates `ParametersSchema.scala` for the tests, the dialects of the schema. */
   def schemaTest(params: Seq[Param]): String = {
     def seq(ss: Seq[String]): String = ss.map(literal).mkString("Seq(", ", ", ")")
+    def value(v: Any): String = v match {
+      case null      => "null"
+      case s: String => literal(s)
+      case v         => v.toString
+    }
     val dialect = params.find(_.name == "dialect").getOrElse(sys.error("no dialect parameter"))
-    val dialectValues = dialect.values.map(v => s"    ${literal(v)} -> ${dialect.scalaValues(v)}")
-    val dialects = params.filter(_.dialects.nonEmpty).map(p => s"    ${literal(p.name)} -> ${seq(p.dialects)}")
-    val encodings = params.filter(_.encodings.nonEmpty).map { p =>
-      val entries = p.encodings.map { case (d, es) => s"${literal(d)} -> ${seq(es)}" }
-      s"    ${literal(p.name)} -> Map(${entries.mkString(", ")})"
+    val variants = dialect.variants.map { v =>
+      val settings = v.settings.map { case (key, values, default) =>
+        s"(${literal(key)}, ${seq(values)}, ${value(default)})"
+      }
+      s"    ${literal(v.name)} -> Seq(${settings.mkString(", ")})"
     }
     s"""|$header
         |${packages(Target.SchemaTest)}
         |
-        |import codes.quine.labs.resyntax.ast.Dialect
-        |
-        |/** ParametersSchema is the dialect annotations of the schema, to test them against the dialects. */
+        |/** ParametersSchema is the dialects of the schema, to test them against `Dialect`. */
         |object ParametersSchema:
         |
-        |  /** The dialect of each value of `dialect`. */
-        |  val dialectValues: Map[String, Dialect] = Map(
-        |${dialectValues.mkString(",\n")}
-        |  )
-        |
-        |  /** `x-dialects` of the parameters having it. */
-        |  val dialects: Map[String, Seq[String]] = Map(
-        |${dialects.mkString(",\n")}
-        |  )
-        |
-        |  /** `x-encodings` of the parameters having it. */
-        |  val encodings: Map[String, Map[String, Seq[String]]] = Map(
-        |${encodings.mkString(",\n")}
+        |  /** The settings of each dialect: the key, the `enum` values (empty for a non-enum) and the default. */
+        |  val dialects: Seq[(String, Seq[(String, Seq[String], Any)])] = Seq(
+        |${variants.mkString(",\n")}
         |  )
         |""".stripMargin
   }

@@ -4,8 +4,6 @@ import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.exec.Command
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.DialectOptions
-import codes.quine.labs.resyntax.ast.Encoding
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
 
@@ -49,7 +47,7 @@ class RecallProgramSuite extends munit.FunSuite:
     )
 
   test("RecallProgram.generate: Python"):
-    val program = generate("f'o\\.", "im", Dialect.Python)
+    val program = generate("f'o\\.", "im", Dialect.Python())
     assertEquals(program.command, Command("python3", Seq("-I", "-")))
     assertEquals(
       program.script,
@@ -68,14 +66,14 @@ class RecallProgramSuite extends munit.FunSuite:
          |sys.stdout.write('recheck:time ' + str((time.perf_counter_ns() - start) // 1000000) + '\n')
          |""".stripMargin
     )
-    assertEquals(line(generate("x", "", Dialect.Python, nonAscii), "string"), "string = 'é' * 3 + '\\x00'")
+    assertEquals(line(generate("x", "", Dialect.Python(), nonAscii), "string"), "string = 'é' * 3 + '\\x00'")
     // A bytes pattern is the Latin-1 encoding of the source, and the input is bytes.
-    val bytes = generate("éa", "b", Dialect.Python, nonAscii)
+    val bytes = generate("éa", "b", Dialect.Python(), nonAscii)
     assertEquals(line(bytes, "regex"), "regex = re.compile(b'\\xe9a', 0)")
     assertEquals(line(bytes, "string"), "string = b'\\xe9' * 3 + b'\\x00'")
 
   test("RecallProgram.generate: Ruby"):
-    val program = generate("a#{b}\"", "ix", Dialect.Ruby)
+    val program = generate("a#{b}\"", "ix", Dialect.Ruby())
     assertEquals(program.command, Command("ruby", Seq("-")))
     assertEquals(
       program.script,
@@ -95,11 +93,11 @@ class RecallProgramSuite extends munit.FunSuite:
          |puts "recheck:time #{Process.clock_gettime(Process::CLOCK_MONOTONIC, :millisecond) - start}"
          |""".stripMargin
     )
-    val utf8 = generate("é", "a", Dialect.Ruby, nonAscii)
+    val utf8 = generate("é", "a", Dialect.Ruby(), nonAscii)
     assertEquals(line(utf8, "regex"), "regex = Regexp.new(\"(?a)\" + \"é\", 0)")
     assertEquals(line(utf8, "string"), "string = \"é\" * 3 + \"\\x00\"")
     // A pattern of bytes is the UTF-8 encoding of the source.
-    val bytes = generate("é", "n", Dialect.Ruby, nonAscii)
+    val bytes = generate("é", "n", Dialect.Ruby(), nonAscii)
     assertEquals(line(bytes, "regex"), "regex = Regexp.new(\"\\xC3\\xA9\".b, Regexp::NOENCODING)")
     assertEquals(line(bytes, "string"), "string = \"\\xE9\".b * 3 + \"\\x00\".b")
 
@@ -133,7 +131,7 @@ class RecallProgramSuite extends munit.FunSuite:
     assertEquals(data("a", "i", negative), "i\n0061\n0:0061\n")
 
   test("RecallProgram.generate: Perl"):
-    val program = generate("f/o$", "ix", Dialect.Perl)
+    val program = generate("f/o$", "ix", Dialect.Perl())
     assertEquals(program.command, Command("perl", Seq("-")))
     assertEquals(
       program.script,
@@ -150,15 +148,15 @@ class RecallProgramSuite extends munit.FunSuite:
          |""".stripMargin
     )
     assertEquals(
-      line(generate("a", "", Dialect.Perl, nonAscii), "my $input"),
+      line(generate("a", "", Dialect.Perl(), nonAscii), "my $input"),
       "my $input = \"\\xE9\" x 3 . \"\\x00\";"
     )
     // Modifiers that `qr` does not take are dropped.
-    assertEquals(line(generate("a", "gi", Dialect.Perl), "my $regex"), "my $regex = qr/a/i;")
+    assertEquals(line(generate("a", "gi", Dialect.Perl()), "my $regex"), "my $regex = qr/a/i;")
 
   test("RecallProgram.generate: Perl unsafe patterns"):
     def generate(source: String): Option[RecallProgram] =
-      RecallProgram.generate(ParsedPattern.parse(source, "", Dialect.Perl).toTry.get, attack)
+      RecallProgram.generate(ParsedPattern.parse(source, "", Dialect.Perl()).toTry.get, attack)
     assert(generate("a$|b$").isDefined)
     assert(generate("(a$)\\$x\\@x").isDefined)
     assertEquals(generate("a$x"), None)
@@ -166,16 +164,19 @@ class RecallProgramSuite extends munit.FunSuite:
     assertEquals(generate("/!,;~%&:=\"|^-"), None)
 
   test("RecallProgram.generate: Perl string patterns"):
-    def generate(source: String, flags: String, encoding: Option[Encoding] = None): RecallProgram =
-      val options = DialectOptions(perlSource = PerlSource.String, encoding = encoding)
-      val pattern = ParsedPattern.parse(source, flags, Dialect.Perl, options).toTry.get
-      RecallProgram.generate(pattern, attack, perlLiteral = false).get
+    def generate(
+        source: String,
+        flags: String,
+        encoding: Dialect.Perl.Encoding = Dialect.Perl.Encoding.Characters
+    ): RecallProgram =
+      val pattern = ParsedPattern.parse(source, flags, Dialect.Perl(encoding, PerlSource.String)).toTry.get
+      RecallProgram.generate(pattern, attack).get
     // A string pattern is not interpolated again, so any pattern can run.
     assertEquals(
       line(generate("a$x@y/é", "gi"), "my $regex"),
       "my $regex = do { my $pattern = \"a\\$x\\@y/\\xE9\"; qr/$pattern/i };"
     )
-    val bytes = generate("é", "", Some(Encoding.PerlBytes))
+    val bytes = generate("é", "", Dialect.Perl.Encoding.Bytes)
     assertEquals(line(bytes, "my $regex"), "my $regex = do { my $pattern = \"\\xC3\\xA9\"; qr/$pattern/ };")
     assert(!bytes.script.contains("use utf8"))
 
@@ -233,13 +234,22 @@ class RecallProgramSuite extends munit.FunSuite:
     // It falls back to a control character for the delimiter.
     assertEquals(line(generate("/#~!%@;,|=:", "", Dialect.PCRE), "$regex"), "$regex = \"\\x01/#~!%@;,|=:\\x01\";")
 
-  test("RecallProgram.RuntimeVariables"):
-    val dialects =
-      Set[Dialect](Dialect.JavaScript, Dialect.Python, Dialect.Ruby, Dialect.Java, Dialect.DotNet, Dialect.Perl)
-    assertEquals(RecallProgram.RuntimeVariables.keySet, dialects + Dialect.PCRE)
-    assertEquals(RecallProgram.RuntimeVariables(Dialect.PCRE), "RECHECK_PHP")
+  test("RecallProgram.runtimeVariable"):
+    val dialects = Seq(
+      Dialect.JavaScript,
+      Dialect.Python(Dialect.Python.Encoding.Bytes),
+      Dialect.Ruby(),
+      Dialect.Java,
+      Dialect.DotNet,
+      Dialect.Perl(source = PerlSource.String, utf8 = Some(true)),
+      Dialect.PCRE
+    )
+    assertEquals(
+      dialects.map(RecallProgram.runtimeVariable),
+      Seq("NODE", "PYTHON", "RUBY", "JAVA", "DOTNET", "PERL", "PHP").map("RECHECK_" + _)
+    )
 
   test("RecallProgram.generate: empty attack string"):
     val empty = AttackPattern(Seq.empty, UString.empty, 0)
-    assertEquals(line(generate("a", "", Dialect.Python, empty), "string"), "string = ''")
+    assertEquals(line(generate("a", "", Dialect.Python(), empty), "string"), "string = ''")
     assertEquals(line(generate("a", "", Dialect.PCRE, empty), "$input"), "$input = '';")

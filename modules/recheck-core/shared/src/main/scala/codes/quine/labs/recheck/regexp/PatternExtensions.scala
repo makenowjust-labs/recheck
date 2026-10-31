@@ -4,7 +4,6 @@ import scala.annotation.tailrec
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.util.UStringUtil
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
@@ -218,7 +217,7 @@ object PatternExtensions:
 
     /** The characters that JavaScript's ignore-case matching canonicalizes to, which stand for their cases. */
     def preferredChars: Option[CharSet] =
-      Option.when(pattern.dialect == Dialect.JavaScript && pattern.flagSet.ignoreCase):
+      Option.when(pattern.dialect.isJavaScript && pattern.flagSet.ignoreCase):
         val unicode = pattern.ir.mode == UnitMode.CodePoint
         EcmaScriptChars.canonicalize(pattern.ir.mode.universe, unicode)
 

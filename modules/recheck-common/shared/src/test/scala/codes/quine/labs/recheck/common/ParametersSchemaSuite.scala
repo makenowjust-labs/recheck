@@ -1,17 +1,18 @@
 package codes.quine.labs.recheck.common
 
-import codes.quine.labs.resyntax.ast.Encoding
+import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.PerlSource
 
 class ParametersSchemaSuite extends munit.FunSuite:
-  test("ParametersSchema.encodings"):
-    val encodings = ParametersSchema.encodings("encoding")
-    for (name, dialect) <- ParametersSchema.dialectValues do
-      val names = Encoding.values.toSeq.filter(_.dialect == dialect).map(_.name)
-      assertEquals(clue(encodings.getOrElse(name, Seq.empty)).toSet, clue(names).toSet)
-      assertEquals(encodings.get(name).map(_.head), Encoding.default(dialect).map(_.name))
-
   test("ParametersSchema.dialects"):
-    assertEquals(ParametersSchema.dialects("encoding").toSet, ParametersSchema.encodings("encoding").keySet)
-    assertEquals(ParametersSchema.dialects("perlSource"), Seq("perl"))
-    assertEquals(ParametersSchema.dialects("perlUtf8"), Seq("perl"))
-    assert(ParametersSchema.dialects.values.flatten.forall(ParametersSchema.dialectValues.contains))
+    assertEquals(ParametersSchema.dialects.map(_._1), Dialect.names)
+    val settings = Map[String, Seq[(String, Seq[String], Any)]](
+      "python" -> Seq(("encoding", Dialect.Python.Encoding.values.toSeq.map(_.name), Dialect.Python().encoding.name)),
+      "ruby" -> Seq(("encoding", Dialect.Ruby.Encoding.values.toSeq.map(_.name), Dialect.Ruby().encoding.name)),
+      "perl" -> Seq(
+        ("encoding", Dialect.Perl.Encoding.values.toSeq.map(_.name), Dialect.Perl().encoding.name),
+        ("source", PerlSource.values.toSeq.map(_.name), Dialect.Perl().source.name),
+        ("utf8", Seq.empty, null)
+      )
+    )
+    for (name, schema) <- ParametersSchema.dialects do assertEquals(clue(schema), settings.getOrElse(name, Seq.empty))

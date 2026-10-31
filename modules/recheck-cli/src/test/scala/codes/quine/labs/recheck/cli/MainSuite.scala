@@ -28,15 +28,29 @@ class MainSuite extends munit.FunSuite:
       Right(
         Main.CheckAction(
           InputPattern("foo", ""),
-          Parameters(
-            dialect = Dialect.Perl,
-            encoding = Some("bytes"),
-            perlSource = PerlSource.String,
-            perlUtf8 = Some(true)
-          )
+          Parameters(dialect = Dialect.Perl(Dialect.Perl.Encoding.Bytes, PerlSource.String, Some(true)))
         )
       )
     )
+    assertEquals(
+      Main.command.parse(Seq("/foo/", "--dialect=ruby", "--encoding=ASCII-8BIT")),
+      Right(
+        Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Ruby(Dialect.Ruby.Encoding.Ascii8Bit)))
+      )
+    )
+    assertEquals(
+      Main.command.parse(Seq("/foo/", "--dialect=python")),
+      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Python())))
+    )
+    for (args, message) <- Seq(
+        Seq("--encoding=str") -> "--encoding is not an option of javascript",
+        Seq("--dialect=python", "--perl-source=string") -> "--perl-source is not an option of python",
+        Seq("--dialect=ruby", "--perl-utf8=true") -> "--perl-utf8 is not an option of ruby",
+        Seq("--dialect=ruby", "--encoding=str") -> "unknown encoding of ruby: str"
+      )
+    do
+      val result = Main.command.parse("/foo/" +: args)
+      assert(clue(result).left.exists(_.errors == List(message)))
     assertEquals(
       Main.command.parse(Seq("/foo/", "--max-recall-failures=3")),
       Right(Main.CheckAction(InputPattern("foo", ""), Parameters(maxRecallFailures = 3)))
@@ -74,7 +88,11 @@ class MainSuite extends munit.FunSuite:
       ("", "Missing expected command (agent), or positional argument!\n\n" + Main.command.showHelp + "\n", 2)
     )
     assertEquals(runMain(Seq("/foo/"))._3, 0)
-    assertEquals(runMain(Seq("/foo/", "--enable-log"))._1.linesIterator.size, 8)
+    assertEquals(runMain(Seq("/foo/", "--enable-log"))._1.linesIterator.size, 9)
+    assertEquals(
+      runMain(Seq("/foo/", "--dialect=perl", "--perl-source=string"))._1.linesIterator.toSeq(1),
+      "Dialect   : perl (encoding: characters, source: string, utf8: false)"
+    )
     assertEquals(runMain(Seq("/(a|a)*$/"))._3, 1)
     assertEquals(runMain(Seq("agent")), ("", "", 0))
 

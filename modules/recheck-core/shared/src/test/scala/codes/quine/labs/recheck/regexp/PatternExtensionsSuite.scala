@@ -116,7 +116,7 @@ class PatternExtensionsSuite extends munit.FunSuite:
     "." -> false
   )
 
-  check("PatternOps#existsLineAssertion", dialect = Dialect.Python)(_.existsLineAssertion)(
+  check("PatternOps#existsLineAssertion", dialect = Dialect.Python())(_.existsLineAssertion)(
     "\\A" -> true,
     "\\Z" -> true,
     "$" -> true,
@@ -254,7 +254,7 @@ class PatternExtensionsSuite extends munit.FunSuite:
     "(.)\\1" -> true
   )
 
-  check("PatternOps#isConstant", dialect = Dialect.Ruby)(_.isConstant)(
+  check("PatternOps#isConstant", dialect = Dialect.Ruby())(_.isConstant)(
     "(?>a)" -> true,
     "(?>a+)" -> false,
     "a++" -> false,
@@ -343,13 +343,13 @@ class PatternExtensionsSuite extends munit.FunSuite:
     assertEquals(parse("A", "iu").alphabet.pairs.map(_._1.head), Vector('a'.toInt, 0))
 
   test("PatternExtensions.PatternOps#alphabet: other dialects"):
-    val alphabet = parse("^a$", "m", Dialect.Python).alphabet
+    val alphabet = parse("^a$", "m", Dialect.Python()).alphabet
     assertEquals(alphabet.refine(CharSet.single(0x0a)).map(_._2), Set(PatternAlphabet.CharKind.LineTerminator))
     assertEquals(parse("a", "i", Dialect.PCRE).alphabet.pairs.map(_._1.head), Vector('A'.toInt, 0))
     // Bytes are in the alphabet in byte mode.
     assertEquals(parse("\\xff", "", Dialect.PCRE).alphabet.any.map(_._1).flatMap(_.iterator).max, 0xff)
     // The line terminators of `$` before a final line terminator are distinguished.
-    assert(parse("a$", "", Dialect.Python).alphabet.pairs.exists(_._1 == CharSet.single(0x0a)))
+    assert(parse("a$", "", Dialect.Python()).alphabet.pairs.exists(_._1 == CharSet.single(0x0a)))
 
   check("PatternOps#needsLineTerminatorDistinction", "m")(_.needsLineTerminatorDistinction)(
     ".|^" -> true,
@@ -419,7 +419,7 @@ class PatternExtensionsSuite extends munit.FunSuite:
   check("PatternOps#needsSigmaStarAtBegin")(_.needsSigmaStarAtBegin)("." -> true, "^" -> false)
   check("PatternOps#needsSigmaStarAtBegin", "y")(_.needsSigmaStarAtBegin)("." -> false)
   check("PatternOps#needsSigmaStarAtBegin", "A", Dialect.PCRE)(_.needsSigmaStarAtBegin)("." -> false)
-  check("PatternOps#needsSigmaStarAtBegin", dialect = Dialect.Ruby)(_.needsSigmaStarAtBegin)(
+  check("PatternOps#needsSigmaStarAtBegin", dialect = Dialect.Ruby())(_.needsSigmaStarAtBegin)(
     "^" -> true,
     "\\A" -> false
   )
@@ -427,7 +427,7 @@ class PatternExtensionsSuite extends munit.FunSuite:
   check("PatternOps#needsSigmaStarAtEnd", "m")(_.needsSigmaStarAtEnd)("." -> true, "$" -> true)
   check("PatternOps#needsSigmaStarAtEnd")(_.needsSigmaStarAtEnd)("." -> true, "$" -> false)
   check("PatternOps#needsSigmaStarAtEnd", "y")(_.needsSigmaStarAtEnd)("." -> true, "$" -> false)
-  check("PatternOps#needsSigmaStarAtEnd", dialect = Dialect.Python)(_.needsSigmaStarAtEnd)(
+  check("PatternOps#needsSigmaStarAtEnd", dialect = Dialect.Python())(_.needsSigmaStarAtEnd)(
     "a$" -> false,
     "a\\Z" -> false,
     "a" -> true
@@ -437,7 +437,7 @@ class PatternExtensionsSuite extends munit.FunSuite:
     assertEquals(parse("^a$|\\b", "m").lineTerminators, Seq(IRLineTerminators.JavaScript))
     assertEquals(parse("^a$", "").lineTerminators, Seq.empty)
     assertEquals(parse("(?m:^)a$", "", Dialect.Java).lineTerminators, Seq(IRLineTerminators.Java))
-    assertEquals(parse("\\b(?a:\\b)", "", Dialect.Python).wordSets.size, 2)
+    assertEquals(parse("\\b(?a:\\b)", "", Dialect.Python()).wordSets.size, 2)
 
   check("PatternOps#parts")(_.parts)(
     "xyz.0" -> Set(UStringUtil.fromString("xyz")),
@@ -470,7 +470,7 @@ class PatternExtensionsSuite extends munit.FunSuite:
     "XYZ" -> Set(UStringUtil.fromString("xyz"))
   )
 
-  check("PatternOps#parts", "i", Dialect.Python)(_.parts)("xyz" -> Set(UStringUtil.fromString("XYZ")))
+  check("PatternOps#parts", "i", Dialect.Python())(_.parts)("xyz" -> Set(UStringUtil.fromString("XYZ")))
 
   check("PatternOps#capturesSize")(_.capturesSize)(
     "(.)|(.)" -> 2,

@@ -20,6 +20,8 @@ import codes.quine.labs.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
+import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
 
 /** Package `codec` provides recheck types `Decoder`/`Encoder` of circe. */
@@ -28,18 +30,20 @@ package object codec
 /** An `Encoder` for `Diagnostics`. */
 given encodeDiagnostics: Encoder[Diagnostics] with
   def apply(d: Diagnostics): Json = d match
-    case Diagnostics.Safe(source, flags, complexity, checker) =>
+    case Diagnostics.Safe(source, flags, dialect, complexity, checker) =>
       Json.obj(
         "source" := source,
         "flags" := flags,
+        "dialect" := dialect,
         "status" := "safe",
         "checker" := checker,
         "complexity" := complexity.asInstanceOf[AttackComplexity]
       )
-    case Diagnostics.Vulnerable(source, flags, complexity, attack, hotspot, checker, recallValidation) =>
+    case Diagnostics.Vulnerable(source, flags, dialect, complexity, attack, hotspot, checker, recallValidation) =>
       Json.obj(
         "source" := source,
         "flags" := flags,
+        "dialect" := dialect,
         "status" := "vulnerable",
         "checker" := checker,
         "complexity" := complexity.asInstanceOf[AttackComplexity],
@@ -47,14 +51,67 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "hotspot" := hotspot,
         "recallValidation" := recallValidation
       )
-    case Diagnostics.Unknown(source, flags, error, checker) =>
+    case Diagnostics.Unknown(source, flags, dialect, error, checker) =>
       Json.obj(
         "source" := source,
         "flags" := flags,
+        "dialect" := dialect,
         "status" := "unknown",
         "checker" := checker,
         "error" := error
       )
+
+/** An `Encoder` for `Dialect`, an object of the name and every setting. */
+given encodeDialect: Encoder[Dialect] with
+  def apply(d: Dialect): Json =
+    val settings = d match
+      case Dialect.Python(encoding)             => Seq("encoding" := encoding.name)
+      case Dialect.Ruby(encoding)               => Seq("encoding" := encoding.name)
+      case Dialect.Perl(encoding, source, utf8) =>
+        Seq("encoding" := encoding.name, "source" := source.name, "utf8" := utf8)
+      case _ => Seq.empty
+    Json.obj(("name" := d.name) +: settings*)
+
+/** A `Decoder` for `Dialect`, which is the name of the language, or an object of the name and the settings.
+  *
+  * An omitted setting takes the default, and Perl's `utf8` of `null` is decided from the pattern.
+  */
+given decodeDialect: Decoder[Dialect] with
+  def apply(c: HCursor): Decoder.Result[Dialect] =
+    def fail(message: String): Decoder.Result[Dialect] = Left(DecodingFailure(message, c.history))
+    def setting[A](dialect: Dialect, key: String, default: A)(of: String => Option[A]): Decoder.Result[A] =
+      c.get[Option[String]](key)
+        .flatMap:
+          case None       => Right(default)
+          case Some(name) => of(name).toRight(DecodingFailure(s"Unknown $key of ${dialect.name}: $name", c.history))
+    c.value.asString match
+      case Some(name) => Dialect.of(name).fold(fail(s"Unknown dialect: $name"))(Right(_))
+      case None       =>
+        c.get[String]("name")
+          .flatMap: name =>
+            Dialect.of(name) match
+              case None          => fail(s"Unknown dialect: $name")
+              case Some(dialect) =>
+                val keys = c.keys.toSeq.flatten.filter(_ != "name")
+                val allowed = dialect match
+                  case _: Dialect.Python | _: Dialect.Ruby => Seq("encoding")
+                  case _: Dialect.Perl                     => Seq("encoding", "source", "utf8")
+                  case _                                   => Seq.empty
+                keys.find(!allowed.contains(_)) match
+                  case Some(key) => fail(s"Unknown setting of $name: $key")
+                  case None      =>
+                    dialect match
+                      case python: Dialect.Python =>
+                        setting(python, "encoding", python.encoding)(Dialect.Python.Encoding.of).map(Dialect.Python(_))
+                      case ruby: Dialect.Ruby =>
+                        setting(ruby, "encoding", ruby.encoding)(Dialect.Ruby.Encoding.of).map(Dialect.Ruby(_))
+                      case perl: Dialect.Perl =>
+                        for
+                          encoding <- setting(perl, "encoding", perl.encoding)(Dialect.Perl.Encoding.of)
+                          source <- setting(perl, "source", perl.source)(PerlSource.of)
+                          utf8 <- c.get[Option[Boolean]]("utf8")
+                        yield Dialect.Perl(encoding, source, utf8)
+                      case dialect => Right(dialect)
 
 /** An `Encoder` for `Checker`. */
 given encodeChecker: Encoder[Checker] with

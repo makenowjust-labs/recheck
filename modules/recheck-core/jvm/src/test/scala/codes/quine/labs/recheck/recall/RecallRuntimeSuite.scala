@@ -21,6 +21,7 @@ import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
 
 /** Runs recall validation on the runtimes in `PATH`, skipping the missing ones.
@@ -94,18 +95,18 @@ class RecallRuntimeSuite extends munit.FunSuite:
 
   runtimeTest("Python", "python3"):
     // Python 3.15 doubles its time for each `a`.
-    val r = validate("^(a|a)*$", "", Dialect.Python, attack("a", 31, "\u0000"))
+    val r = validate("^(a|a)*$", "", Dialect.Python(), attack("a", 31, "\u0000"))
     assertEquals(r.result, RecallResult.Timeout)
     assert(clue(r.runtime).startsWith("python 3."))
-    assertEquals(validate("^(?:é|é)*$", "b", Dialect.Python, attack("é", 31, "\u0000")).result, RecallResult.Timeout)
-    assertFinish(validate("^(?:é|é)*$", "b", Dialect.Python, attack("é", 3, "\u0000")))
+    assertEquals(validate("^(?:é|é)*$", "b", Dialect.Python(), attack("é", 31, "\u0000")).result, RecallResult.Timeout)
+    assertFinish(validate("^(?:é|é)*$", "b", Dialect.Python(), attack("é", 3, "\u0000")))
 
   runtimeTest("Ruby", "ruby"):
     // Ruby 4.0's memoization makes it fast.
-    val r = validate("^(a|a)*$", "", Dialect.Ruby, attack("a", 31, "\u0000"))
+    val r = validate("^(a|a)*$", "", Dialect.Ruby(), attack("a", 31, "\u0000"))
     assertFinish(r)
     assert(clue(r.runtime).startsWith("ruby "))
-    assertFinish(validate("^(?:é|é)*$", "n", Dialect.Ruby, attack("Ã©", 31, "\u0000")))
+    assertFinish(validate("^(?:é|é)*$", "n", Dialect.Ruby(), attack("Ã©", 31, "\u0000")))
 
   runtimeTest("Java", "java"):
     val r = validate("^(a|a)*$", "", Dialect.Java, attack("a", 31, "\u0000"))
@@ -129,12 +130,12 @@ class RecallRuntimeSuite extends munit.FunSuite:
     Await.result(Future.sequence(rs), 60.seconds).foreach(assertFinish)
 
   runtimeTest("Perl", "perl"):
-    val r = validate("^(a|a)*$", "", Dialect.Perl, attack("é", 31, "\u0000"))
+    val r = validate("^(a|a)*$", "", Dialect.Perl(), attack("é", 31, "\u0000"))
     assertFinish(r)
     assert(clue(r.runtime).startsWith("perl 5."))
     // A string pattern may contain `$`, which a regex literal would interpolate.
-    val pattern = ParsedPattern.parse("^(?:a|a)*$x", "", Dialect.Perl).toTry.get
-    val string = RecallValidator.validate(pattern, attack("a", 31, ""), 1.second, perlLiteral = false)(
+    val pattern = ParsedPattern.parse("^(?:a|a)*$x", "", Dialect.Perl(source = PerlSource.String)).toTry.get
+    val string = RecallValidator.validate(pattern, attack("a", 31, ""), 1.second)(
       RecallValidator.defaultExec.get
     )
     assertFinish(string.get)
@@ -153,16 +154,16 @@ class RecallRuntimeSuite extends munit.FunSuite:
 
   runtimeTest("ReDoS.checkAll: Ruby", "ruby"):
     // The failed recall validation is kept, and the checking continues to the safe result.
-    val ds = ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby))
+    val ds = ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby()))
     assert(clue(ds).size >= 2)
     ds.init.foreach:
       case d: Diagnostics.Vulnerable => assertFinish(d.recallValidation.get)
       case d                         => fail(s"not vulnerable: $d")
     assert(clue(ds.last).isInstanceOf[Diagnostics.Safe])
-    assertEquals(ReDoS.check("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby)), ds.last)
+    assertEquals(ReDoS.check("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby())), ds.last)
 
   runtimeTest("ReDoS.checkAll: Python", "python3"):
-    ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.Python)) match
+    ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.Python())) match
       case List(d: Diagnostics.Vulnerable) => assertEquals(d.recallValidation.map(_.result), Some(RecallResult.Timeout))
       case ds                              => fail(s"unexpected: $ds")
 
@@ -176,7 +177,7 @@ class RecallRuntimeSuite extends munit.FunSuite:
     // The wrapper's runtime line comes first, and it shows the arguments.
     val ruby = script("my ruby", s"echo recheck:runtime wrapped \"$$@\"; exec '${which("ruby")}' \"$$@\"")
     val env = Map("RECHECK_RUBY" -> s"'$ruby' --disable-gems")
-    val r = validate("^(a|a)*$", "", Dialect.Ruby, attack("a", 3, "\u0000"), env = env)
+    val r = validate("^(a|a)*$", "", Dialect.Ruby(), attack("a", 3, "\u0000"), env = env)
     assertEquals(r.runtime, "wrapped --disable-gems -")
     assertFinish(r)
 

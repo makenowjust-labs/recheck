@@ -3,7 +3,6 @@ package codes.quine.labs.recheck.regexp
 import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.resyntax.ast.BackslashKind
 import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.DialectOptions
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetException
 import codes.quine.labs.resyntax.ast.NodeData
@@ -45,18 +44,21 @@ final case class ParsedPattern(source: String, flags: String, dialect: Dialect, 
 
 object ParsedPattern:
 
-  /** Parses the source and the flags in the dialect, and builds the IR. */
+  /** Parses the source and the flags in the dialect, and builds the IR.
+    *
+    * The pattern has the dialect with the settings that the source decides (see [[IRBuilder.resolveDialect]]).
+    */
   def parse(
       source: String,
       flags: String,
-      dialect: Dialect = Dialect.JavaScript,
-      options: DialectOptions = DialectOptions.Default
+      dialect: Dialect = Dialect.JavaScript
   ): Either[InvalidRegExpException, ParsedPattern] =
     try
       val flagSet = FlagSet.parse(flags, dialect)
-      val node = Parser.parse(source, flagSet, dialect, options)
-      val ir = IRBuilder.build(node, flagSet, dialect, options.withPerlUtf8Of(source))
-      Right(ParsedPattern(source, flags, dialect, flagSet, ir))
+      val node = Parser.parse(source, flagSet, dialect)
+      val resolved = IRBuilder.resolveDialect(node, dialect.withPerlUtf8Of(source))
+      val ir = IRBuilder.build(node, flagSet, resolved)
+      Right(ParsedPattern(source, flags, resolved, flagSet, ir))
     catch
       case ex: FlagSetException    => Left(new InvalidRegExpException(ex.getMessage))
       case ex: ParsingException    => Left(new InvalidRegExpException(ex.getMessage))

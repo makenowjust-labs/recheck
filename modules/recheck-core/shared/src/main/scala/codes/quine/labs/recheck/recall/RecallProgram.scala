@@ -5,6 +5,7 @@ import codes.quine.labs.recheck.exec.Command
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
@@ -32,31 +33,26 @@ object RecallProgram:
 
   val EngineErrorLine: String = "recheck:engine-error"
 
-  /** The environment variables of the runtime command lines of the dialects. */
-  val RuntimeVariables: Map[Dialect, String] = Map(
-    Dialect.JavaScript -> "RECHECK_NODE",
-    Dialect.Python -> "RECHECK_PYTHON",
-    Dialect.Ruby -> "RECHECK_RUBY",
-    Dialect.Java -> "RECHECK_JAVA",
-    Dialect.DotNet -> "RECHECK_DOTNET",
-    Dialect.Perl -> "RECHECK_PERL",
-    Dialect.PCRE -> "RECHECK_PHP"
-  )
+  /** Returns the environment variable of the runtime command line of the dialect. */
+  def runtimeVariable(dialect: Dialect): String = dialect match
+    case Dialect.JavaScript => "RECHECK_NODE"
+    case _: Dialect.Python  => "RECHECK_PYTHON"
+    case _: Dialect.Ruby    => "RECHECK_RUBY"
+    case Dialect.Java       => "RECHECK_JAVA"
+    case Dialect.DotNet     => "RECHECK_DOTNET"
+    case _: Dialect.Perl    => "RECHECK_PERL"
+    case Dialect.PCRE       => "RECHECK_PHP"
 
-  /** Generates the program of the dialect, or returns `None` if the dialect or the pattern is not supported.
-    *
-    * @param perlLiteral
-    *   whether a Perl pattern is a regex literal, or a string at runtime
-    */
-  def generate(pattern: ParsedPattern, attack: AttackPattern, perlLiteral: Boolean = true): Option[RecallProgram] =
+  /** Generates the program of the dialect, or returns `None` if the dialect or the pattern is not supported. */
+  def generate(pattern: ParsedPattern, attack: AttackPattern): Option[RecallProgram] =
     pattern.dialect match
-      case Dialect.JavaScript => Some(javascript(pattern, attack))
-      case Dialect.Python     => Some(python(pattern, attack))
-      case Dialect.Ruby       => Some(ruby(pattern, attack))
-      case Dialect.Java       => Some(java(pattern, attack))
-      case Dialect.DotNet     => Some(dotnet(pattern, attack))
-      case Dialect.Perl       => perl(pattern, attack, perlLiteral)
-      case Dialect.PCRE       => php(pattern, attack)
+      case Dialect.JavaScript         => Some(javascript(pattern, attack))
+      case _: Dialect.Python          => Some(python(pattern, attack))
+      case _: Dialect.Ruby            => Some(ruby(pattern, attack))
+      case Dialect.Java               => Some(java(pattern, attack))
+      case Dialect.DotNet             => Some(dotnet(pattern, attack))
+      case Dialect.Perl(_, source, _) => perl(pattern, attack, literal = source == PerlSource.Literal)
+      case Dialect.PCRE               => php(pattern, attack)
 
   /** Returns the JavaScript program for `node`. */
   private[recall] def javascript(pattern: ParsedPattern, attack: AttackPattern): RecallProgram =

@@ -27,10 +27,11 @@ import codes.quine.labs.resyntax.ast.PerlSource
 class CodecSuite extends munit.FunSuite:
   test("codec.encodeDiagnostics"):
     assertEquals(
-      encodeDiagnostics(Diagnostics.Safe("a", "", AttackComplexity.Linear, Checker.Fuzz)),
+      encodeDiagnostics(Diagnostics.Safe("a", "", Dialect.JavaScript, AttackComplexity.Linear, Checker.Fuzz)),
       Json.obj(
         "source" := "a",
         "flags" := "",
+        "dialect" := Json.obj("name" := "javascript"),
         "status" := "safe",
         "checker" := Checker.Fuzz.asInstanceOf[Checker],
         "complexity" := AttackComplexity.Linear.asInstanceOf[AttackComplexity]
@@ -41,6 +42,7 @@ class CodecSuite extends munit.FunSuite:
         Diagnostics.Vulnerable(
           "(a|a)*$",
           "",
+          Dialect.JavaScript,
           AttackComplexity.Exponential(false),
           AttackPattern(
             Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
@@ -54,6 +56,7 @@ class CodecSuite extends munit.FunSuite:
       Json.obj(
         "source" := "(a|a)*$",
         "flags" := "",
+        "dialect" := Json.obj("name" := "javascript"),
         "status" := "vulnerable",
         "checker" := Checker.Automaton.asInstanceOf[Checker],
         "complexity" := AttackComplexity.Exponential(false).asInstanceOf[AttackComplexity],
@@ -72,6 +75,7 @@ class CodecSuite extends munit.FunSuite:
         Diagnostics.Vulnerable(
           "(a|a)*$",
           "",
+          Dialect.JavaScript,
           AttackComplexity.Exponential(false),
           AttackPattern(Seq.empty, UStringUtil.fromString(""), 0),
           Hotspot(Seq.empty),
@@ -82,10 +86,13 @@ class CodecSuite extends munit.FunSuite:
       Some(encodeRecallValidation(recall))
     )
     assertEquals(
-      encodeDiagnostics(Diagnostics.Unknown("", "#", ErrorKind.InvalidRegExp("unknown flag"), None)),
+      encodeDiagnostics(
+        Diagnostics.Unknown("", "#", Dialect.JavaScript, ErrorKind.InvalidRegExp("unknown flag"), None)
+      ),
       Json.obj(
         "source" := "",
         "flags" := "#",
+        "dialect" := Json.obj("name" := "javascript"),
         "status" := "unknown",
         "checker" := None,
         "error" := ErrorKind.InvalidRegExp("unknown flag").asInstanceOf[ErrorKind]
@@ -236,10 +243,7 @@ class CodecSuite extends munit.FunSuite:
           "maxRepeatCount" := 123,
           "maxNFASize" := 123,
           "maxPatternSize" := 123,
-          "dialect" := "perl",
-          "encoding" := "bytes",
-          "perlSource" := "string",
-          "perlUtf8" := true,
+          "dialect" := Json.obj("name" := "perl", "encoding" := "bytes", "source" := "string", "utf8" := true),
           "maxRecallFailures" := 123
         )
       ),
@@ -270,17 +274,14 @@ class CodecSuite extends munit.FunSuite:
           maxRepeatCount = 123,
           maxNFASize = 123,
           maxPatternSize = 123,
-          dialect = Dialect.Perl,
-          encoding = Some("bytes"),
-          perlSource = PerlSource.String,
-          perlUtf8 = Some(true),
+          dialect = Dialect.Perl(Dialect.Perl.Encoding.Bytes, PerlSource.String, Some(true)),
           maxRecallFailures = 123
         )
       )
     )
     assertEquals(
-      decodeParameters.decodeJson(Json.obj("encoding" := Json.Null, "perlUtf8" := Json.Null)),
-      Right(Parameters())
+      decodeParameters.decodeJson(Json.obj("dialect" := Json.obj("name" := "perl", "utf8" := Json.Null))),
+      Right(Parameters(dialect = Dialect.Perl()))
     )
     assert(decodeParameters.decodeJson(Json.obj("dialect" := "xxx")).isLeft)
 
@@ -316,12 +317,55 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(decodeDialect.decodeJson("javascript".asJson), Right(Dialect.JavaScript))
     assertEquals(decodeDialect.decodeJson("dotnet".asJson), Right(Dialect.DotNet))
     assertEquals(decodeDialect.decodeJson("pcre".asJson), Right(Dialect.PCRE))
+    assertEquals(decodeDialect.decodeJson("python".asJson), Right(Dialect.Python()))
+    assertEquals(decodeDialect.decodeJson("ruby".asJson), Right(Dialect.Ruby()))
+    assertEquals(decodeDialect.decodeJson("perl".asJson), Right(Dialect.Perl()))
     assertEquals(decodeDialect.decodeJson("xxx".asJson), Left(DecodingFailure("Unknown dialect: xxx", List.empty)))
-
-  test("codec.decodePerlSource"):
-    assertEquals(decodePerlSource.decodeJson("literal".asJson), Right(PerlSource.Literal))
-    assertEquals(decodePerlSource.decodeJson("string".asJson), Right(PerlSource.String))
+    assertEquals(decodeDialect.decodeJson(Json.obj("name" := "java")), Right(Dialect.Java))
     assertEquals(
-      decodePerlSource.decodeJson("xxx".asJson),
-      Left(DecodingFailure("Unknown perl source: xxx", List.empty))
+      decodeDialect.decodeJson(Json.obj("name" := "python", "encoding" := "bytes")),
+      Right(Dialect.Python(Dialect.Python.Encoding.Bytes))
+    )
+    assertEquals(
+      decodeDialect.decodeJson(Json.obj("name" := "ruby", "encoding" := "ASCII-8BIT")),
+      Right(Dialect.Ruby(Dialect.Ruby.Encoding.Ascii8Bit))
+    )
+    assertEquals(
+      decodeDialect.decodeJson(Json.obj("name" := "perl", "source" := "string", "utf8" := false)),
+      Right(Dialect.Perl(source = PerlSource.String, utf8 = Some(false)))
+    )
+    assertEquals(
+      decodeDialect.decodeJson(Json.obj("name" := "perl", "encoding" := Json.Null)),
+      Right(Dialect.Perl())
+    )
+    assertEquals(
+      decodeDialect.decodeJson(Json.obj("name" := "xxx")),
+      Left(DecodingFailure("Unknown dialect: xxx", List.empty))
+    )
+    assertEquals(
+      decodeDialect.decodeJson(Json.obj("name" := "ruby", "encoding" := "str")),
+      Left(DecodingFailure("Unknown encoding of ruby: str", List.empty))
+    )
+    assertEquals(
+      decodeDialect.decodeJson(Json.obj("name" := "perl", "source" := "xxx")),
+      Left(DecodingFailure("Unknown source of perl: xxx", List.empty))
+    )
+    assertEquals(
+      decodeDialect.decodeJson(Json.obj("name" := "javascript", "encoding" := "str")),
+      Left(DecodingFailure("Unknown setting of javascript: encoding", List.empty))
+    )
+    assert(decodeDialect.decodeJson(Json.obj("encoding" := "str")).isLeft)
+    assert(decodeDialect.decodeJson(Json.obj("name" := "perl", "utf8" := "yes")).isLeft)
+
+  test("codec.encodeDialect"):
+    assertEquals(encodeDialect(Dialect.JavaScript), Json.obj("name" := "javascript"))
+    assertEquals(encodeDialect(Dialect.DotNet), Json.obj("name" := "dotnet"))
+    assertEquals(encodeDialect(Dialect.Python()), Json.obj("name" := "python", "encoding" := "str"))
+    assertEquals(
+      encodeDialect(Dialect.Ruby(Dialect.Ruby.Encoding.Ascii8Bit)),
+      Json.obj("name" := "ruby", "encoding" := "ASCII-8BIT")
+    )
+    assertEquals(
+      encodeDialect(Dialect.Perl(utf8 = Some(true))),
+      Json.obj("name" := "perl", "encoding" := "characters", "source" := "literal", "utf8" := true)
     )

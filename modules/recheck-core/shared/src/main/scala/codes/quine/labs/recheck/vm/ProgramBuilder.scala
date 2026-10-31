@@ -15,7 +15,6 @@ import codes.quine.labs.recheck.vm.Inst.ReadKind
 import codes.quine.labs.recheck.vm.Inst.VerbKind
 import codes.quine.labs.recheck.vm.Program.Meta
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRAssertKind
 import codes.quine.labs.resyntax.ir.IRBacktrackControl
@@ -65,17 +64,17 @@ private[vm] class ProgramBuilder(
   private val mode = pattern.ir.mode
 
   /** Whether captures in a repetition are reset on each iteration, which only JavaScript does. */
-  private val resetsCaptures = pattern.dialect == Dialect.JavaScript
+  private val resetsCaptures = pattern.dialect.isJavaScript
 
   /** Whether captures follow Perl's backtracking, which back-references and capture tests only see. */
   private val perlCaptures =
-    pattern.dialect == Dialect.Perl && pattern.node.exists:
+    pattern.dialect.isPerl && pattern.node.exists:
       case _: IRNodeData.BackReference                           => true
       case IRNodeData.Conditional(_: IRCondition.Captured, _, _) => true
       case _                                                     => false
 
   /** Whether `(*THEN)` ends at a look-around assertion or a condition, as in PCRE but not in Perl. */
-  private val assertionIsThenScope = pattern.dialect != Dialect.Perl
+  private val assertionIsThenScope = !pattern.dialect.isPerl
 
   /** Whether the pattern has the verbs skipping backtracking points, which need the barriers. */
   private val hasCut = pattern.node.exists:
@@ -653,7 +652,7 @@ private[vm] class ProgramBuilder(
     emitTerminator(Inst.Tx(main, Some(cont), None))
 
     enterBlock(main)
-    if pattern.dialect == Dialect.Perl then withAcceptScope(AcceptScope.Atomic)(build(child))
+    if pattern.dialect.isPerl then withAcceptScope(AcceptScope.Atomic)(build(child))
     else
       atomicDepth += 1
       build(child)
@@ -757,7 +756,7 @@ private[vm] class ProgramBuilder(
         buildTest(negative, n, true)
         Some(n)
     // .NET drops the captures of the condition, which are unset here though they may have had values before.
-    val dropped = test.filter(_ => pattern.dialect == Dialect.DotNet).flatMap(_.captureRange.range)
+    val dropped = test.filter(_ => pattern.dialect.isDotNet).flatMap(_.captureRange.range)
 
     for (label, branch) <- Seq((yesLabel, yes), (noLabel, no)) do
       enterBlock(label)

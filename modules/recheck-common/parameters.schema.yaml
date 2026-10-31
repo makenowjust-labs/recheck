@@ -16,9 +16,7 @@
 # - `x-cli`: the long option name of the CLI, and `x-cli-metavar` its metavar when it differs from the title.
 # - `x-exclude`: the targets not exposing the parameter (`cli`, `eslint-plugin`, `playground`).
 # - `x-since`: the first release having the parameter, so that the Playground hides it on older releases.
-# - `x-dialects`: the dialects that the parameter applies to, so that the Playground hides it for the others.
-# - `x-encodings`: the values of `encoding` for each dialect, the default first.
-#   A test of `recheck-common` checks it and `x-dialects` against the dialects.
+# - `x-scala-default`: the Scala value of the default when `x-scala-values` does not give it.
 #
 # String values are quoted because YAML 1.1 (SnakeYAML) reads `on` and `off` as booleans.
 
@@ -97,59 +95,78 @@ properties:
   dialect:
     title: "Dialect"
     description: |-
-      The regular expression dialect of the pattern.
+      The regular expression dialect of the pattern, with the dialect's settings.
 
+      It is the name of the dialect's language, which takes the default settings, or an object of the name and the settings, where an omitted setting takes the default (e.g. `"python"` or `{ "name": "python", "encoding": "bytes" }`).
       The flags are the dialect's flag letters (e.g. `imsx`), and the pattern is checked with the dialect's semantics.
 
       - `javascript` is ECMAScript's `RegExp`.
-      - `python` is Python's `re` module.
-      - `ruby` is Ruby's `Regexp`.
       - `java` is Java's `java.util.regex.Pattern`.
       - `dotnet` is .NET's `System.Text.RegularExpressions.Regex`.
-      - `perl` is Perl's regular expressions.
       - `pcre` is PCRE2 as PHP's `preg_*` functions use it.
-    type: string
-    enum: ["javascript", "python", "ruby", "java", "dotnet", "perl", "pcre"]
+      - `python` is Python's `re` module.
+      - `ruby` is Ruby's `Regexp`.
+      - `perl` is Perl's regular expressions.
+
+      JavaScript and .NET read UTF-16 code units (JavaScript reads code points with the `u` or `v` flag), Java reads code points, and PCRE reads UTF-8 with the `u` flag or `(*UTF)` and bytes otherwise.
+      The other dialects have settings:
+
+      - `encoding` of `python`: the kind of the pattern and its input, `str` (default) or `bytes`.
+      - `encoding` of `ruby`: the encoding of the regexp, `UTF-8` (default) or `ASCII-8BIT` (as the `n` flag makes).
+      - `encoding` of `perl`: the kind of strings, `characters` (default), which are character strings with `use utf8`, or `bytes`, which are byte strings whose non-ASCII literals are UTF-8 bytes.
+      - `source` of `perl`: how the pattern is given. `literal` (default) is a regex literal written in Perl source (e.g. `qr/.../`), where Perl applies `\U`, `\L`, `\u`, `\l`, `\F`, `\Q` and `\E` to its text before the regex engine reads it. `string` is a pattern from a runtime string (e.g. `qr/$p/`), which the regex engine reads unchanged.
+      - `utf8` of `perl`: whether the pattern string is UTF-8, which makes the `/d` rules Unicode rules. `null` (default) decides it from the pattern: a `literal` pattern is UTF-8 if its source has a non-ASCII character (as with `use utf8`), and a `string` pattern is UTF-8 if it has a non-ASCII character, a code point of `\x{100}` or more, `\p` or `\N{...}`. A `bytes` pattern is not UTF-8.
+
+      The diagnostics have the dialect as an object with every setting, where `utf8` is decided.
+    oneOf:
+      - type: string
+        enum: ["javascript", "java", "dotnet", "pcre", "python", "ruby", "perl"]
+      - type: object
+        properties:
+          name: { const: "javascript" }
+        required: ["name"]
+        additionalProperties: false
+      - type: object
+        properties:
+          name: { const: "java" }
+        required: ["name"]
+        additionalProperties: false
+      - type: object
+        properties:
+          name: { const: "dotnet" }
+        required: ["name"]
+        additionalProperties: false
+      - type: object
+        properties:
+          name: { const: "pcre" }
+        required: ["name"]
+        additionalProperties: false
+      - type: object
+        properties:
+          name: { const: "python" }
+          encoding: { title: "Encoding", enum: ["str", "bytes"], default: "str" }
+        required: ["name"]
+        additionalProperties: false
+      - type: object
+        properties:
+          name: { const: "ruby" }
+          encoding: { title: "Encoding", enum: ["UTF-8", "ASCII-8BIT"], default: "UTF-8" }
+        required: ["name"]
+        additionalProperties: false
+      - type: object
+        properties:
+          name: { const: "perl" }
+          encoding: { title: "Encoding", enum: ["characters", "bytes"], default: "characters" }
+          source: { title: "Perl Source", enum: ["literal", "string"], default: "literal" }
+          utf8: { title: "Perl UTF-8", type: ["boolean", "null"], default: null }
+        required: ["name"]
+        additionalProperties: false
     default: "javascript"
     x-scala-type: "Dialect"
-    x-scala-values:
-      "javascript": "Dialect.JavaScript"
-      "python": "Dialect.Python"
-      "ruby": "Dialect.Ruby"
-      "java": "Dialect.Java"
-      "dotnet": "Dialect.DotNet"
-      "perl": "Dialect.Perl"
-      "pcre": "Dialect.PCRE"
+    x-scala-default: "Dialect.JavaScript"
     x-cli: "dialect"
     x-exclude: ["eslint-plugin"]
     x-since: "5.0.0"
-
-  encoding:
-    title: "Encoding"
-    description: |-
-      The kind of strings that the pattern and its input are, for the dialects having the choice.
-
-      The values depend on the dialect, and `null` is the dialect's default.
-
-      - `python`: `str` (default) or `bytes`.
-      - `ruby`: `UTF-8` (default) or `ASCII-8BIT` (as the `n` flag makes).
-      - `perl`: `characters` (default), which are character strings with `use utf8`, or `bytes`, which are byte strings whose non-ASCII literals are UTF-8 bytes.
-
-      The other dialects take only `null`.
-      JavaScript and .NET read UTF-16 code units (JavaScript reads code points with the `u` or `v` flag), Java reads code points, and PCRE reads UTF-8 with the `u` flag or `(*UTF)` and bytes otherwise.
-
-      An encoding that the dialect does not have makes the result `unknown` with an `invalid` error.
-    type: [string, "null"]
-    default: null
-    x-scala-type: "Option[String]"
-    x-cli: "encoding"
-    x-exclude: ["eslint-plugin"]
-    x-since: "5.0.0"
-    x-dialects: ["python", "ruby", "perl"]
-    x-encodings:
-      "python": ["str", "bytes"]
-      "ruby": ["UTF-8", "ASCII-8BIT"]
-      "perl": ["characters", "bytes"]
 
   heatRatio:
     title: "Heat Ratio"
@@ -313,41 +330,6 @@ properties:
     x-scala-type: "Int"
     x-cli: "mutation-size"
     x-since: "4.2.0"
-
-  perlSource:
-    title: "Perl Source"
-    description: |-
-      How a Perl pattern is given, which is used only for the `perl` dialect.
-
-      - `literal` is a regex literal written in Perl source (e.g. `qr/.../`). Perl applies `\U`, `\L`, `\u`, `\l`, `\F`, `\Q` and `\E` to its text before the regex engine reads it.
-      - `string` is a pattern from a runtime string (e.g. `qr/$p/`), which the regex engine reads unchanged.
-    type: string
-    enum: ["literal", "string"]
-    default: "literal"
-    x-scala-type: "PerlSource"
-    x-scala-values: { "literal": "PerlSource.Literal", "string": "PerlSource.String" }
-    x-cli: "perl-source"
-    x-cli-metavar: "source"
-    x-exclude: ["eslint-plugin"]
-    x-since: "5.0.0"
-    x-dialects: ["perl"]
-
-  perlUtf8:
-    title: "Perl UTF-8"
-    description: |-
-      Whether a Perl pattern string is UTF-8, which is used only for the `perl` dialect.
-      A UTF-8 pattern makes the `/d` rules Unicode rules.
-
-      `null` decides it from the pattern.
-      A `literal` pattern is UTF-8 if its source has a non-ASCII character (as with `use utf8`).
-      A `string` pattern is UTF-8 if it has a code point of `\x{100}` or more, `\p` or `\N{...}`.
-    type: [boolean, "null"]
-    default: null
-    x-scala-type: "Option[Boolean]"
-    x-cli: "perl-utf8"
-    x-exclude: ["eslint-plugin"]
-    x-since: "5.0.0"
-    x-dialects: ["perl"]
 
   randomSeed:
     title: "Random Seed"
