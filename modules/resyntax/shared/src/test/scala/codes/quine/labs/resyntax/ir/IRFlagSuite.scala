@@ -111,7 +111,7 @@ class IRFlagSuite extends IRSuiteBase:
     assertEquals(flagsOf(PCRE, "u").unicodeClass, true)
     assertEquals(flagsOf(Perl()).unicode, true)
     assertEquals(flagsOf(Python()).unicode, true)
-    assertEquals(flagsOf(Python(), "b").unicode, false)
+    assertEquals(flagsOf(Python(Python.Type.Bytes), "").unicode, false)
     assertEquals(flagsOf(Ruby()).unicode, true)
     assertEquals(flagsOf(Ruby(), "n").unicode, false)
     for d <- All do
@@ -135,7 +135,7 @@ class IRFlagSuite extends IRSuiteBase:
   )
   checkFlags("(?l)a(?d)b", "", Perl())(d => Seq(flagsOf(d).copy(charset = IRCharset.Locale), flagsOf(d)))
   checkFlags("(?a)a", "", Python())(d => Seq(flagsOf(d).copy(charset = IRCharset.Ascii.All)))
-  checkFlags("(?L)a", "b", Python())(d => Seq(flagsOf(d, "b").copy(charset = IRCharset.Locale)))
+  checkFlags("(?L)a", "", Python(Python.Type.Bytes))(d => Seq(flagsOf(d, "").copy(charset = IRCharset.Locale)))
   error("a", "L", Python())("Cannot use LOCALE flag with a str pattern")
   error("a", "u", Python(Python.Type.Bytes))("Cannot use UNICODE flag with a bytes pattern")
   // `re` checks the flags with the global inline flags: `re.compile('(?a)x', re.U)` raises `ValueError`.

@@ -101,8 +101,11 @@ class RecallRuntimeSuite extends munit.FunSuite:
     val r = validate("^(a|a)*$", "", Dialect.Python(), attack("a", 31, "\u0000"))
     assertEquals(r.result, RecallResult.Timeout)
     assert(clue(r.runtime).startsWith("python 3."))
-    assertEquals(validate("^(?:é|é)*$", "b", Dialect.Python(), attack("é", 31, "\u0000")).result, RecallResult.Timeout)
-    assertFinish(validate("^(?:é|é)*$", "b", Dialect.Python(), attack("é", 3, "\u0000")))
+    assertEquals(
+      validate("^(?:é|é)*$", "", Dialect.Python(Dialect.Python.Type.Bytes), attack("é", 31, "\u0000")).result,
+      RecallResult.Timeout
+    )
+    assertFinish(validate("^(?:é|é)*$", "", Dialect.Python(Dialect.Python.Type.Bytes), attack("é", 3, "\u0000")))
 
   runtimeTest("Python: the C locale", "python3"):
     // `re.L` has no non-ASCII word byte in a UTF-8 locale, so it needs a Latin-1 locale to differ from the C locale.

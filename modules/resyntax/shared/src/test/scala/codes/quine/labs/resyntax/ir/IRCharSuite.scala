@@ -175,7 +175,7 @@ class IRCharSuite extends munit.FunSuite:
     Disjunction(Sequence(Chars(of("sS")), Chars(of("sS"))), Chars(CharSet.single(0xdf)))
   )
   // Python's bytes pattern is Latin-1.
-  chars("é", "b", Python())(CharSet.single(0xe9))
+  chars("é", "", Python(Python.Type.Bytes))(CharSet.single(0xe9))
   // Ruby's ASCII-8BIT regexp has only the POSIX classes in ASCII as properties.
   chars("\\p{Alpha}", "n", Ruby())(CharSet.range('A', 'Z').union(CharSet.range('a', 'z')))
   chars("\\p{Punct}", "n", Ruby())(IRCharClasses.AsciiPosix("punct"))
@@ -355,7 +355,7 @@ class IRCharSuite extends munit.FunSuite:
   checkSet("(?u)\\w", "", Ruby())(s => s.contains(0xe9))
   checkSet("\\w", "", DotNet)(s => s.contains(0xe9) && !s.contains(0x0903) && s.last <= 0xffff)
   chars("\\W", "", JavaScript)(IRCharClasses.AsciiWord.complement(UnitMode.Utf16))
-  chars("\\w", "b", Python())(IRCharClasses.AsciiWord)
+  chars("\\w", "", Python(Python.Type.Bytes))(IRCharClasses.AsciiWord)
   chars("\\h", "", Ruby())(of("0123456789abcdefABCDEF"))
   chars("\\h", "", Perl())(IRCharClasses.pcreHorizontal.diff(of("᠎")))
   chars("\\v", "", Java, Perl())(IRCharClasses.Vertical)

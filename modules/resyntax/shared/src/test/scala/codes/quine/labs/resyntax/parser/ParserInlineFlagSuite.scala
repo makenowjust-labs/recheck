@@ -17,7 +17,7 @@ class ParserInlineFlagSuite extends ParserSuiteBase:
   check("(?J)", "", PCRE):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(dupNames = true), None)))
   error("(?J)", "", DotNet, Java, Perl(), Python(), Ruby())("Invalid flag at 2")
-  check("(?L)", "b", Python()):
+  check("(?L)", "", Python(Python.Type.Bytes)):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(localeUpper = true), None)))
   error("(?L)", "", DotNet, Java, PCRE, Perl(), Python(), Ruby())("Invalid flag at 2")
   check("(?U)", "", Java):
@@ -74,7 +74,7 @@ class ParserInlineFlagSuite extends ParserSuiteBase:
   check("(?u)", "", Java, Perl(), Python(), Ruby()):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(unicode = true), None)))
   error("(?u)", "", DotNet, PCRE)("Invalid flag at 2")
-  error("(?u)", "b", Python())("Invalid flag at 2")
+  error("(?u)", "", Python(Python.Type.Bytes))("Invalid flag at 2")
   check("(?i-m+s-x)", "", DotNet):
     Command(
       CommandKind.InlineFlag(

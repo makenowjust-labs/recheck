@@ -34,7 +34,7 @@ class ParserEncodingSuite extends munit.FunSuite:
 
   // Python's bytes pattern has no Unicode escape, and its characters are bytes of Latin-1.
   val PythonBytes: Dialect = Python(Python.Type.Bytes)
-  for (flags, dialect) <- Seq(("b", Python()), ("", PythonBytes)) do
+  for (flags, dialect) <- Seq(("", PythonBytes)) do
     error("\\u0041", flags, dialect)("Invalid backslash escape at 1")
     error("[\\u0041]", flags, dialect)("Invalid backslash escape at 2")
     error("\\U00000041", flags, dialect)("Invalid backslash escape at 1")

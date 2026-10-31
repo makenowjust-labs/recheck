@@ -69,7 +69,7 @@ class RecallProgramSuite extends munit.FunSuite:
     )
     assertEquals(line(generate("x", "", Dialect.Python(), nonAscii), "string"), "string = 'é' * 3 + '\\x00'")
     // A bytes pattern is the Latin-1 encoding of the source, and the input is bytes.
-    val bytes = generate("éa", "b", Dialect.Python(), nonAscii)
+    val bytes = generate("éa", "", Dialect.Python(Dialect.Python.Type.Bytes), nonAscii)
     assertEquals(line(bytes, "regex"), "regex = re.compile(b'\\xe9a', 0)")
     assertEquals(line(bytes, "string"), "string = b'\\xe9' * 3 + b'\\x00'")
 

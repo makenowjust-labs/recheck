@@ -32,12 +32,11 @@ await check("^(a|a)*$", "", { dialect: { name: "python", type: "bytes" } });
 - The character set flags `a` (ASCII) and `u` (Unicode) change the meaning of `\w`, `\d`, `\s`, `\b` and case-insensitive matching in the same way as in `re`.
 - `L` follows the C locale, where `0x80`–`0xFF` follow the ASCII rules, whatever locale the environment has.
 
-The flags are the letters of the `re` flags, except `b`, which is `recheck`'s own.
+The flags are the letters of the `re` flags.
 
 | Flag | `re` flag                | Inline | Notes                                                              |
 | ---- | ------------------------ | ------ | ------------------------------------------------------------------ |
 | `a`  | `re.ASCII` (`re.A`)      | `(?a)` | An error with `u` or `L`.                                          |
-| `b`  |                          |        | A `bytes` pattern, as `type: "bytes"` makes.                       |
 | `i`  | `re.IGNORECASE` (`re.I`) | `(?i)` |                                                                    |
 | `L`  | `re.LOCALE` (`re.L`)     | `(?L)` | Only in a `bytes` pattern.                                         |
 | `m`  | `re.MULTILINE` (`re.M`)  | `(?m)` |                                                                    |

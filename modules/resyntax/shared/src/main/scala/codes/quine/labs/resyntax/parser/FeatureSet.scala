@@ -428,7 +428,7 @@ object FeatureSet:
 
     // Python's bytes pattern
     val isByte = dialect match
-      case Dialect.Python(tpe) => flagSet.bytes || tpe == Dialect.Python.Type.Bytes
+      case Dialect.Python(tpe) => tpe == Dialect.Python.Type.Bytes
       case _                   => false
     // Ruby's `n` is NOENCODING, which `FlagSet` keeps as `explicitCapture`.
     val isRubyByte = dialect match

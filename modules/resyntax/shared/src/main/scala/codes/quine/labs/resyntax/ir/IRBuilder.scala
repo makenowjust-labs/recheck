@@ -115,7 +115,7 @@ object IRBuilder:
       case Dialect.Java        => UnitMode.CodePoint
       case Dialect.DotNet      => UnitMode.Utf16
       case Dialect.Python(tpe) =>
-        if flagSet.bytes || tpe == Dialect.Python.Type.Bytes then UnitMode.Byte else UnitMode.CodePoint
+        if tpe == Dialect.Python.Type.Bytes then UnitMode.Byte else UnitMode.CodePoint
       // Ruby's `n` is the encoding option (NOENCODING), which `FlagSet` keeps as `explicitCapture`.
       case Dialect.Ruby(encoding) =>
         if flagSet.explicitCapture || encoding == Dialect.Ruby.Encoding.Ascii8Bit then UnitMode.Byte

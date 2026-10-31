@@ -84,7 +84,7 @@ final case class BuildingContext(flagSet: FlagSet, dialect: Dialect, featureSet:
         case Dialect.Java | _: Dialect.Perl => true
         case Dialect.JavaScript             => f.unicode || f.unicodeSets
         case Dialect.PCRE                   => f.unicode || featureSet.utf
-        case _: Dialect.Python              => !f.bytes
+        case Dialect.Python(tpe)            => tpe == Dialect.Python.Type.Str
         // Ruby's `n` is the encoding option (NOENCODING), not explicit capture.
         case _: Dialect.Ruby => !f.explicitCapture
       ,

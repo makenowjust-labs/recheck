@@ -21,7 +21,6 @@ class FlagSetSuite extends munit.FunSuite:
   check("U", Java, PCRE)(_.ungreedy)
   check("X", PCRE)(_.extra)
   check("a", Perl(), Python(), Ruby())(_.ascii)
-  check("b", Python())(_.bytes)
   check("c", Java, Perl())(_.continue)
   check("d", Java, JavaScript, Perl(), Ruby())(_.hasIndices)
   check("e", Perl())(_.evaluate)
@@ -54,7 +53,6 @@ class FlagSetSuite extends munit.FunSuite:
   error(" ", DotNet, Java, JavaScript, Perl(), Python(), Ruby())("Unknown flag ' ' at 0")
   // `new RegExp('a', 'uv')` is a `SyntaxError`.
   error("uv", JavaScript)("Incompatible flags 'u' and 'v'")
-  error("bu", Python())("Incompatible flags 'b' and 'u'")
   // `re.compile('a', re.A | re.U)` and `re.compile(b'a', re.A | re.L)` raise `ValueError`.
   error("au", Python())("Incompatible flags 'a' and 'u'")
   error("La", Python())("Incompatible flags 'a' and 'L'")

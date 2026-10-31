@@ -37,8 +37,6 @@ final case class FlagSet(
     asciiPosixDigit: Boolean = false,
     // `aW` (PCRE)
     asciiWord: Boolean = false,
-    // `b` (Python)
-    bytes: Boolean = false,
     // `c` (Java, Perl)
     continue: Boolean = false,
     // `d` (Java, JavaScript, Perl, Ruby)
@@ -118,9 +116,6 @@ object FlagSet:
           check(dialect.isPerl || dialect.isPython || dialect.isRuby)
           flagSet = rubyCharset(flagSet).copy(ascii = true)
           if counts(c) >= 2 && dialect.isPerl then flagSet = flagSet.copy(asciiRestrict = true)
-        case 'b' =>
-          check(dialect.isPython)
-          flagSet = flagSet.copy(bytes = true)
         case 'c' =>
           check(dialect.isJava || dialect.isPerl)
           flagSet = flagSet.copy(continue = true)
@@ -188,7 +183,6 @@ object FlagSet:
       case Dialect.JavaScript =>
         if flagSet.unicode && flagSet.unicodeSets then incompatible('u', 'v')
       case _: Dialect.Python =>
-        if flagSet.bytes && flagSet.unicode then incompatible('b', 'u')
         if flagSet.ascii && flagSet.unicode then incompatible('a', 'u')
         if flagSet.ascii && flagSet.localeUpper then incompatible('a', 'L')
       case _: Dialect.Perl =>

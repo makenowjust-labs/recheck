@@ -11,8 +11,8 @@ package codes.quine.labs.resyntax.ir
   * @param lineTerminators
   *   the line terminators that `.` and `\N` exclude without `dotAll` (Java's `d`, PCRE's newline options)
   * @param unicode
-  *   characters are code points, not UTF-16 code units or bytes (JavaScript `u`/`v`, PCRE `u`/`(*UTF)`, Python without
-  *   `b`, Ruby without `n`, and always in Java and Perl)
+  *   characters are code points, not UTF-16 code units or bytes (JavaScript `u`/`v`, PCRE `u`/`(*UTF)`, Python `str`,
+  *   Ruby without `n`, and always in Java and Perl)
   * @param unicodeSets
   *   JavaScript `v`
   * @param unicodeCase
