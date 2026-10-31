@@ -252,9 +252,7 @@ object PatternExtensions:
       val set = loop(pattern.node)
       val unicode = pattern.flagSet.unicode
       if pattern.flagSet.ignoreCase then
-        set.map: s =>
-          val shown = s.chars(unicode).map(c => EcmaScriptChars.showChar(EcmaScriptChars.canonicalize(c, unicode)))
-          UStringUtil.fromString(shown.mkString)
+        set.map(s => UStringUtil.fromCodePoints(s.chars(unicode).map(EcmaScriptChars.canonicalize(_, unicode))))
       else set
 
     /** Returns a maximum capture index or `0`. */

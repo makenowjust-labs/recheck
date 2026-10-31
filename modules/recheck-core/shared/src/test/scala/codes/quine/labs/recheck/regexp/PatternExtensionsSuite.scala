@@ -533,6 +533,16 @@ class PatternExtensionsSuite extends munit.FunSuite:
     assertEquals(Pattern(Dot(), flagSet).parts, Set.empty[UString])
     assertEquals(Pattern(Character('x'), flagSet).parts, Set.empty[UString])
 
+    val ignoreCase = FlagSet(false, true, false, false, false, false)
+    assertEquals(
+      Pattern(Sequence(Seq(Character('a'), Character('\n'), Character('\\'), Character('b'))), ignoreCase).parts,
+      Set(UStringUtil.fromString("A\n\\B"))
+    )
+    assertEquals(
+      Pattern(Sequence(Seq(Character('a'), Character(0x1f600))), ignoreCase).parts,
+      Set(UStringUtil.fromString("A😀"))
+    )
+
   test("PatternExtensions.PatternOps#capturesSize"):
     val flagSet = FlagSet(false, false, false, false, false, false)
     assertEquals(Pattern(Disjunction(Seq(Capture(1, Dot()), Capture(2, Dot()))), flagSet).capturesSize, 2)
