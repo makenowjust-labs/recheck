@@ -193,7 +193,7 @@ const DemoResult: React.FC<Props> = ({ recorded = false, result, time, log, buil
             <CopyButton text={permalink} />
           </p>
           {result.status === 'vulnerable' ? (
-            <div className="alert alert--info margin-top--sm" role="note">
+            <div className="alert alert--info margin-top--sm margin-bottom--md" role="note">
               <p>
                 This permalink records the result and the parameters, so you can cite it in a vulnerability report.
                 Once the vulnerability is fixed and disclosed, please let us know in <a href={REPORTS_URL}>Reports</a>{' '}
