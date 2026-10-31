@@ -10,6 +10,7 @@ import codes.quine.labs.recheck.automaton.EpsNFABuilder
 import codes.quine.labs.recheck.common.CancellationToken
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.ReDoSException
 import codes.quine.labs.recheck.common.UnsupportedException
@@ -20,8 +21,8 @@ import codes.quine.labs.recheck.fuzz.FuzzProgram
 import codes.quine.labs.recheck.recall.RecallValidator
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.regexp.PatternExtensions.*
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.DialectOptions
+import codes.quine.labs.resyntax.ast.Encoding
 import codes.quine.labs.resyntax.ast.PerlSource
 
 /** ReDoS is a ReDoS checker frontend. */
@@ -29,22 +30,16 @@ object ReDoS:
 
   /** Tests the given RegExp pattern causes ReDoS.
     *
-    * It returns the last diagnostics of [[checkAll]], and computes no more than it.
-    *
-    * @param dialect
-    *   the dialect of the pattern, which is not a public parameter yet
-    * @param options
-    *   the dialect's options (see [[DialectOptions]])
+    * The pattern and the flags are of `params.dialect`. It returns the last diagnostics of [[checkAll]], and computes
+    * no more than it.
     */
   def check(
       source: String,
       flags: String,
       params: Parameters = Parameters(),
-      token: Option[CancellationToken] = None,
-      dialect: Dialect = Dialect.JavaScript,
-      options: DialectOptions = DialectOptions.Default
+      token: Option[CancellationToken] = None
   ): Diagnostics =
-    iterator(source, flags, params, token, dialect, options).reduce((_, d) => d)
+    iterator(source, flags, params, token).reduce((_, d) => d)
 
   /** Tests the given RegExp pattern causes ReDoS, and returns all the diagnostics until the accepted one.
     *
@@ -55,11 +50,21 @@ object ReDoS:
       source: String,
       flags: String,
       params: Parameters = Parameters(),
-      token: Option[CancellationToken] = None,
-      dialect: Dialect = Dialect.JavaScript,
-      options: DialectOptions = DialectOptions.Default
+      token: Option[CancellationToken] = None
   ): List[Diagnostics] =
-    iterator(source, flags, params, token, dialect, options).toList
+    iterator(source, flags, params, token).toList
+
+  /** Returns the dialect's options of the parameters.
+    *
+    * It throws [[InvalidRegExpException]] if the dialect does not have the encoding.
+    */
+  private[recheck] def dialectOptions(params: Parameters): DialectOptions =
+    val encoding = params.encoding.map: name =>
+      Encoding
+        .of(params.dialect, name)
+        .getOrElse:
+          throw new InvalidRegExpException(s"Unknown encoding for ${params.dialect}: $name")
+    DialectOptions(params.perlSource, encoding, params.perlUtf8)
 
   /** Iterates the diagnostics of [[checkAll]].
     *
@@ -71,15 +76,14 @@ object ReDoS:
       flags: String,
       params: Parameters,
       token: Option[CancellationToken],
-      dialect: Dialect,
-      options: DialectOptions,
       exec: Context ?=> Option[RecallValidator.Exec] = RecallValidator.defaultExec
   ): Iterator[Diagnostics] =
     given ctx: Context = Context(params.timeout, token, params.logger)
 
     def ds: Iterator[Diagnostics] =
       ctx.log("parse: start")
-      val pattern = ctx.interrupt(ParsedPattern.parse(source, flags, dialect, options).toTry.get)
+      val options = dialectOptions(params)
+      val pattern = ctx.interrupt(ParsedPattern.parse(source, flags, params.dialect, options).toTry.get)
       ctx.log(s"parse: finish\n  pattern: $pattern")
       val candidates = params.checker match
         case Checker.Automaton => checkAutomaton(source, flags, pattern, params)

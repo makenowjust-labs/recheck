@@ -6,8 +6,6 @@ import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
-import codes.quine.labs.resyntax.ast.DialectOptions
-import codes.quine.labs.resyntax.ast.Encoding
 
 /** End-to-end checks of dialects other than JavaScript.
   *
@@ -18,8 +16,8 @@ class ReDoSDialectSuite extends munit.FunSuite:
 
   val params: Parameters = Parameters(randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
 
-  def check(source: String, dialect: Dialect, flags: String = "", encoding: Option[Encoding] = None): Diagnostics =
-    ReDoS.check(source, flags, params, None, dialect, DialectOptions(encoding = encoding))
+  def check(source: String, dialect: Dialect, flags: String = "", encoding: Option[String] = None): Diagnostics =
+    ReDoS.check(source, flags, params.copy(dialect = dialect, encoding = encoding))
 
   def assertVulnerable(d: Diagnostics, complexity: AttackComplexity.Vulnerable, checker: Checker.Used)(using
       loc: munit.Location
@@ -75,4 +73,15 @@ class ReDoSDialectSuite extends munit.FunSuite:
         Diagnostics.ErrorKind.InvalidRegExp("Look-behind requires fixed-width pattern at 0"),
         None
       )
+    )
+
+  test("ReDoS.check: encodings"):
+    assertVulnerable(
+      check("^(a|a)*$", Python, encoding = Some("bytes")),
+      AttackComplexity.Exponential(false),
+      Checker.Automaton
+    )
+    assertEquals(
+      check("^a$", Python, encoding = Some("UTF-8")),
+      Diagnostics.Unknown("^a$", "", Diagnostics.ErrorKind.InvalidRegExp("Unknown encoding for Python: UTF-8"), None)
     )

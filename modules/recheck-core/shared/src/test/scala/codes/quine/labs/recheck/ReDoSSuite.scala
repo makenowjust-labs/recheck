@@ -18,8 +18,6 @@ import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.recheck.recall.RecallValidator
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.util.UStringUtil
-import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.DialectOptions
 
 class ReDoSSuite extends munit.FunSuite:
 
@@ -87,7 +85,7 @@ class ReDoSSuite extends munit.FunSuite:
       val exec: RecallValidator.Exec = (_, _, _) =>
         runs += 1
         output
-      ReDoS.iterator("^(?:a|a)*$", "", params, None, Dialect.JavaScript, DialectOptions.Default, Some(exec)).toList
+      ReDoS.iterator("^(?:a|a)*$", "", params, None, Some(exec)).toList
     def recall(result: RecallResult): Option[RecallValidation] = Some(RecallValidation("node v0", 1.second, result))
 
     // A failed recall validation keeps the diagnostics, and the checking continues.
@@ -127,8 +125,6 @@ class ReDoSSuite extends munit.FunSuite:
           "",
           Parameters(recallTimeout = 1.second),
           None,
-          Dialect.JavaScript,
-          DialectOptions.Default,
           None
         )
         .toList,
