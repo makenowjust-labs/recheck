@@ -426,8 +426,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if ok then
         if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        steps = Math.addExact(steps, c.map(c => if c >= 0x10000 then 2 else 1).getOrElse(0))
-        frame.pos += c.size
+        val width = c.map(c => if c >= 0x10000 then 2 else 1).getOrElse(0)
+        steps = Math.addExact(steps, width)
+        frame.pos += width
         true
       else
         if options.needsFailedPoints then
@@ -464,8 +465,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if ok then
         if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        steps = Math.addExact(steps, c.map(c => if c >= 0x10000 then 2 else 1).getOrElse(0))
-        frame.pos -= c.size
+        val width = c.map(c => if c >= 0x10000 then 2 else 1).getOrElse(0)
+        steps = Math.addExact(steps, width)
+        frame.pos -= width
         true
       else
         if options.needsFailedPoints then

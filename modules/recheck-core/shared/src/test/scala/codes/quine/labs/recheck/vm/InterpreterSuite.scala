@@ -122,6 +122,10 @@ class InterpreterSuite extends munit.FunSuite:
     assertMatches("^\\w$", "i", "B", 0)
     assertNotMatches("^\\w$", "i", " ", 0)
 
+    assertMatches("^.$", "u", "😀", 0)
+    assertMatches("(?<=^.)a$", "u", "😀a", 2)
+    assertNotMatches("^.$", "", "😀", 0)
+
     assertMatches("^.$", "", "a", 0)
     assertNotMatches("^.$", "", "\n", 0)
 
