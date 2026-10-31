@@ -188,3 +188,23 @@ object FullCaseFolding:
       .view
       .mapValues(cs => CharSet.of(cs.map(_._1)*))
       .toMap
+
+/** FullCaseMapping is the full case mappings (UnicodeData.txt with the unconditional mappings of SpecialCasing.txt),
+  * which may map a code point to several code points, such as `U+00DF` to `SS`.
+  */
+object FullCaseMapping:
+
+  private lazy val upperOverrides: Map[Int, UString] = Codec.overrides(CaseData.FullUpper).toMap
+
+  private lazy val lowerOverrides: Map[Int, UString] = Codec.overrides(CaseData.FullLower).toMap
+
+  private lazy val titleOverrides: Map[Int, UString] = Codec.overrides(CaseData.FullTitle).toMap
+
+  /** Maps the code point to its uppercase. */
+  def upper(c: Int): UString = upperOverrides.getOrElse(c, UString(CaseMapping.SimpleUpper(c)))
+
+  /** Maps the code point to its lowercase. */
+  def lower(c: Int): UString = lowerOverrides.getOrElse(c, UString(CaseMapping.SimpleLower(c)))
+
+  /** Maps the code point to its titlecase (e.g. `U+01C6` to `U+01C5`, and `U+00DF` to `Ss`). */
+  def title(c: Int): UString = titleOverrides.getOrElse(c, upper(c))

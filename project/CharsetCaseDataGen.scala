@@ -66,6 +66,17 @@ object CharsetCaseDataGen extends UnicodeDataGen {
   private def fullFold(c: Int, options: Int): Seq[Int] =
     codePoints(UCharacter.foldCase(new String(Character.toChars(c)), options))
 
+  private def fullUpper(c: Int): Seq[Int] =
+    codePoints(UCharacter.toUpperCase(ULocale.ROOT, new String(Character.toChars(c))))
+
+  private def fullLower(c: Int): Seq[Int] =
+    codePoints(UCharacter.toLowerCase(ULocale.ROOT, new String(Character.toChars(c))))
+
+  private def fullTitle(c: Int): Seq[Int] = {
+    val options = UCharacter.TITLECASE_NO_LOWERCASE | UCharacter.TITLECASE_NO_BREAK_ADJUSTMENT
+    codePoints(UCharacter.toTitleCase(ULocale.ROOT, new String(Character.toChars(c)), null, options))
+  }
+
   /** ECMAScript `Canonicalize` without the `u` and `v` flags (ES2024 22.2.2.7.3). */
   private def ecmaScriptUpper(ch: Int): Int = {
     val u = UCharacter.toUpperCase(ULocale.ROOT, String.valueOf(ch.toChar))
@@ -95,6 +106,16 @@ object CharsetCaseDataGen extends UnicodeDataGen {
       case c if fullFold(c, turkic) != fullFold(c, default) => (c, fullFold(c, turkic))
     }
 
+    val upper = AllCodePoints.collect {
+      case c if fullUpper(c) != Seq(UCharacter.toUpperCase(c)) => (c, fullUpper(c))
+    }
+    val lower = AllCodePoints.collect {
+      case c if fullLower(c) != Seq(UCharacter.toLowerCase(c)) => (c, fullLower(c))
+    }
+    val title = AllCodePoints.collect {
+      case c if fullTitle(c) != fullUpper(c) => (c, fullTitle(c))
+    }
+
     val sb = new StringBuilder
     sb.append(s"package $pkg\n\n")
     sb.append("private[charset] object CaseData:\n\n")
@@ -110,6 +131,9 @@ object CharsetCaseDataGen extends UnicodeDataGen {
     sb.append(
       s"  val SimpleLower: String = ${CharsetEncoder.literal(runs(AllCodePoints)(UCharacter.toLowerCase(_: Int)))}\n\n"
     )
+    sb.append(s"  val FullUpper: String = ${CharsetEncoder.literal(overrides(upper))}\n\n")
+    sb.append(s"  val FullLower: String = ${CharsetEncoder.literal(overrides(lower))}\n\n")
+    sb.append(s"  val FullTitle: String = ${CharsetEncoder.literal(overrides(title))}\n\n")
     sb.append(s"  val EcmaScriptUpper: String = ${CharsetEncoder.literal(runs(0 to 0xffff)(ecmaScriptUpper))}\n")
     sb.result()
   }
