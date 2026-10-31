@@ -1,5 +1,6 @@
 // Generates `src/parameters.ts`, the rule options of the recheck parameters, from the schema of the parameters.
 // The parameters excluded for `eslint-plugin` (the logger and the dialect ones) are not options of the rule.
+// It also generates the `Parameters` type of `recheck` first, which the generated type extends.
 
 import { readFileSync, writeFileSync } from "node:fs";
 
@@ -21,6 +22,12 @@ const schemaUrl = new URL(
   import.meta.url,
 );
 const outputUrl = new URL("../src/parameters.ts", import.meta.url);
+const recheckGeneratorUrl = new URL(
+  "../../recheck/scripts/parameters.mts",
+  import.meta.url,
+);
+
+await import(recheckGeneratorUrl.href);
 
 const generate = (yaml: string): string => {
   const schema = parse(yaml) as Schema;
