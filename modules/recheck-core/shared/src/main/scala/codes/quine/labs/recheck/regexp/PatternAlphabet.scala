@@ -39,6 +39,7 @@ object PatternAlphabet:
   /** Builds the coarsest alphabet of all characters of the mode such that each set is a union of atoms.
     *
     * An atom in `lineTerminator` (resp. `word`) has the kind [[CharKind.LineTerminator]] (resp. [[CharKind.Word]]).
+    * With `crlf`, `\r` and `\n` are atoms of the kinds [[CharKind.CarriageReturn]] and [[CharKind.LineFeed]].
     *
     * An atom is narrowed to its characters in `preferred` if any, so that its first character, which stands for the
     * atom in generated strings, is a preferred one (e.g. a canonical character of JavaScript's ignore-case matching).
@@ -52,9 +53,11 @@ object PatternAlphabet:
       sets: Seq[CharSet] = Seq.empty,
       lineTerminator: Option[CharSet] = None,
       word: Option[CharSet] = None,
-      preferred: Option[CharSet] = None
+      preferred: Option[CharSet] = None,
+      crlf: Boolean = false
   ): PatternAlphabet =
-    val all = ((mode.universe +: lineTerminator.toSeq) ++ word ++ sets.distinct)
+    val crlfSets = if crlf then Seq(CharSet.single(0x0d), CharSet.single(0x0a)) else Seq.empty
+    val all = ((mode.universe +: lineTerminator.toSeq) ++ word ++ (sets ++ crlfSets).distinct)
       .map(_.restrict(mode))
       .filter(_.nonEmpty)
       .toIndexedSeq
@@ -71,7 +74,9 @@ object PatternAlphabet:
       .sortBy(_._2)(using Ordering.Implicits.seqOrdering)
       .map: (c, _) =>
         val kind =
-          if lineTerminator.exists(_.contains(c.head)) then CharKind.LineTerminator
+          if crlf && c.head == 0x0d then CharKind.CarriageReturn
+          else if crlf && c.head == 0x0a then CharKind.LineFeed
+          else if lineTerminator.exists(_.contains(c.head)) then CharKind.LineTerminator
           else if word.exists(_.contains(c.head)) then CharKind.Word
           else CharKind.Normal
         (c, kind)
@@ -88,3 +93,15 @@ object PatternAlphabet:
 
     /** A character kind for word character. */
     case Word
+
+    /** A character kind for `\r`, a line terminator that makes `\r\n` one line terminator. */
+    case CarriageReturn
+
+    /** A character kind for `\n`, a line terminator that makes `\r\n` one line terminator. */
+    case LineFeed
+
+    /** The kind of the begin and the end of the input, where there is no character. */
+    case Boundary
+
+    /** Checks whether the kind is of a line terminator. */
+    def isLineTerminator: Boolean = this == LineTerminator || this == CarriageReturn || this == LineFeed

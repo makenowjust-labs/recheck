@@ -113,23 +113,19 @@ private class EpsNFABuilder(
 
   /** Checks that the assertions of the pattern fit the character kinds of the ε-NFA.
     *
-    * The ε-NFA has one set of line terminators and one set of word characters, and the end of the input is a line
-    * terminator if there is a line assertion. Two simplifications are made, which only make more inputs accepted: `^`
-    * matching after a line terminator at the end, and `\r\n` being two line terminators for line assertions.
+    * The ε-NFA has one set of line terminators and one set of word characters.
     */
   private def checkAssertions(): Unit =
     val kinds = pattern.node.collect { case IRNodeData.Assert(kind) => kind }
+    if pattern.lineTerminators.size >= 2 then
+      throw new UnsupportedException("line assertions with different line terminators")
     val terminators = kinds.collect {
       case IRAssertKind.LineBegin(t, _) => t
       case IRAssertKind.LineEnd(t)      => t
     }.distinct
-    if terminators.size >= 2 then throw new UnsupportedException("line assertions with different line terminators")
     for t <- terminators do
       if t.crlf == IRLineTerminators.CRLF.Sequence && !(t.chars.contains(0x0a) && t.chars.contains(0x0d)) then
         throw new UnsupportedException("line assertion with the CRLF line terminator")
-      if kinds.exists(k => k == IRAssertKind.TextBegin || k == IRAssertKind.TextEnd) ||
-        kinds.exists(_.isInstanceOf[IRAssertKind.ChompTextEnd])
-      then throw new UnsupportedException("line assertions with text assertions")
     val words = pattern.wordSets
     if words.size >= 2 then throw new UnsupportedException("word boundary assertions with different word characters")
     for w <- words; t <- terminators if t.chars.exists(w.contains) do
@@ -276,14 +272,16 @@ private class EpsNFABuilder(
 
   /** Builds EpsNFA transitions for an assertion. */
   private def buildAssert(kind: IRAssertKind): (Int, Int) =
+    def atomic(t: IRLineTerminators): Boolean = t.crlf == IRLineTerminators.CRLF.Atomic
+    def boundary(kind: AssertKind): (Int, Int) = if needsInputTerminatorDistinction then assert(kind) else epsilon()
     kind match
-      case IRAssertKind.WordBoundary(_)                       => assert(AssertKind.WordBoundary)
-      case IRAssertKind.NotWordBoundary(_)                    => assert(AssertKind.WordBoundaryNot)
-      case IRAssertKind.TextBegin | _: IRAssertKind.LineBegin =>
-        if needsInputTerminatorDistinction then assert(AssertKind.LineBegin) else epsilon()
-      case IRAssertKind.TextEnd | _: IRAssertKind.LineEnd =>
-        if needsInputTerminatorDistinction then assert(AssertKind.LineEnd) else epsilon()
-      case IRAssertKind.ChompTextEnd(t) =>
+      case IRAssertKind.WordBoundary(_)     => assert(AssertKind.WordBoundary)
+      case IRAssertKind.NotWordBoundary(_)  => assert(AssertKind.WordBoundaryNot)
+      case IRAssertKind.LineBegin(t, atEnd) => assert(AssertKind.LineBegin(atEnd, atomic(t)))
+      case IRAssertKind.LineEnd(t)          => assert(AssertKind.LineEnd(atomic(t)))
+      case IRAssertKind.TextBegin           => boundary(AssertKind.TextBegin)
+      case IRAssertKind.TextEnd             => boundary(AssertKind.TextEnd)
+      case IRAssertKind.ChompTextEnd(t)     =>
         // At an end point, it is the end after an optional line terminator.
         val chars = CharSet.of(t.chars.toSeq*)
         val single = Option.when(chars.nonEmpty)(() => consume(refine(chars), None))
@@ -292,9 +290,13 @@ private class EpsNFABuilder(
             Seq(() => consume(refine(CharSet.single(0x0d)), None), () => consume(refine(CharSet.single(0x0a)), None))
           )
         val terminator = buildChoice(Seq(() => epsilon()) ++ single ++ crlf)
-        val end = if needsInputTerminatorDistinction then assert(AssertKind.LineEnd) else epsilon()
+        val end = boundary(AssertKind.TextEnd)
         emit(terminator._2 -> Eps(Vector(end._1)))
-        (terminator._1, end._2)
+        if atomic(t) then
+          val guard = assert(AssertKind.NotBetweenCRLF)
+          emit(guard._2 -> Eps(Vector(terminator._1)))
+          (guard._1, end._2)
+        else (terminator._1, end._2)
 
   private def assert(kind: AssertKind): (Int, Int) =
     val i = nextQ()

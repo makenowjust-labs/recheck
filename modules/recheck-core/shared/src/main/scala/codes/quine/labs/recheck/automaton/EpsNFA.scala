@@ -12,6 +12,7 @@ import codes.quine.labs.recheck.regexp.PatternAlphabet
 import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
 import codes.quine.labs.recheck.util.GraphvizUtil.escape
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 
 /** EpsNFA is an ordered ε-NFA on unicode code points. */
 final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q, accept: Q, tau: Map[Q, Transition[Q]]):
@@ -58,11 +59,11 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
   /** Converts this ε-NFA to ordered NFA with ε-elimination. */
   def toOrderedNFA(maxNFASize: Int)(using ctx: Context): OrderedNFA[CharSet, (CharKind, Seq[(Q, Set[CharKind])])] =
     ctx.interrupt:
-      val hasLineAssertion = tau.values
-        .collect:
-          case Assert(k, _) => k
-        .exists(k => k == AssertKind.LineBegin || k == AssertKind.LineEnd)
-      val inputTerminatorKind = if hasLineAssertion then CharKind.LineTerminator else CharKind.Normal
+      // The begin and the end of the input are distinguished only for the assertions looking at them.
+      val needsBoundary = tau.values.exists:
+        case Assert(k, _) => k.seesBoundary
+        case _            => false
+      val inputTerminatorKind = if needsBoundary then CharKind.Boundary else CharKind.Normal
 
       // Obtains a set of possible character kinds.
       val charKindSet = alphabet.pairs.iterator.map(_._2).toSet ++ Set(inputTerminatorKind)
@@ -173,30 +174,69 @@ object EpsNFA:
   /** AssertKind is assertion kind of this ε-NFA transition. */
   sealed abstract class AssertKind extends Serializable with Product:
 
+    /** Tests the assertion between the kinds of the previous and the next characters. */
+    def accepts(prev: CharKind, next: CharKind): Boolean
+
+    /** Whether the assertion distinguishes the begin and the end of the input from the characters. */
+    def seesBoundary: Boolean = true
+
     /** Returns a set of next possible character information from the previous character information. */
-    def toCharKindSet(prev: CharKind): Set[CharKind]
+    def toCharKindSet(prev: CharKind): Set[CharKind] = CharKind.values.iterator.filter(accepts(prev, _)).toSet
 
   /** AssertKind values and utilities. */
   object AssertKind:
 
-    /** LineBegin is `^` assertion. */
-    case object LineBegin extends AssertKind:
-      def toCharKindSet(prev: CharKind): Set[CharKind] =
-        if prev == CharKind.LineTerminator then Set(CharKind.Normal, CharKind.LineTerminator, CharKind.Word)
-        else Set.empty
+    /** Tests whether the position is between `\r` and `\n`. */
+    private def betweenCRLF(prev: CharKind, next: CharKind): Boolean =
+      prev == CharKind.CarriageReturn && next == CharKind.LineFeed
 
-    /** LineEnd is `$` assertion. */
-    case object LineEnd extends AssertKind:
-      def toCharKindSet(prev: CharKind): Set[CharKind] = Set(CharKind.LineTerminator)
+    /** LineBegin is `^` assertion with `m` flag.
+      *
+      * @param atEnd
+      *   where it matches at the end of the input
+      * @param atomicCRLF
+      *   whether `\r\n` is one line terminator, between which it does not match
+      */
+    final case class LineBegin(
+        atEnd: IRLineBeginAtEnd = IRLineBeginAtEnd.AfterTerminator,
+        atomicCRLF: Boolean = false
+    ) extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean =
+        val atBegin = prev == CharKind.Boundary
+        (atBegin || prev.isLineTerminator) && !(atomicCRLF && betweenCRLF(prev, next)) &&
+        (next != CharKind.Boundary || (atEnd match
+          case IRLineBeginAtEnd.AfterTerminator => true
+          case IRLineBeginAtEnd.InputBegin      => atBegin
+          case IRLineBeginAtEnd.Never           => false))
+
+    /** LineEnd is `$` assertion with `m` flag.
+      *
+      * @param atomicCRLF
+      *   whether `\r\n` is one line terminator, between which it does not match
+      */
+    final case class LineEnd(atomicCRLF: Boolean = false) extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean =
+        (next == CharKind.Boundary || next.isLineTerminator) && !(atomicCRLF && betweenCRLF(prev, next))
+
+    /** TextBegin is `\A` assertion. */
+    case object TextBegin extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean = prev == CharKind.Boundary
+
+    /** TextEnd is `\z` assertion. */
+    case object TextEnd extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean = next == CharKind.Boundary
+
+    /** NotBetweenCRLF is an assertion that the position is not between `\r` and `\n`. */
+    case object NotBetweenCRLF extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean = !betweenCRLF(prev, next)
+      override def seesBoundary: Boolean = false
 
     /** WordBoundary is `\b` assertion. */
     case object WordBoundary extends AssertKind:
-      def toCharKindSet(prev: CharKind): Set[CharKind] =
-        if prev == CharKind.Word then Set(CharKind.Normal, CharKind.LineTerminator)
-        else Set(CharKind.Word)
+      def accepts(prev: CharKind, next: CharKind): Boolean = (prev == CharKind.Word) != (next == CharKind.Word)
+      override def seesBoundary: Boolean = false
 
     /** WordBoundaryNot is `\B` assertion. */
     case object WordBoundaryNot extends AssertKind:
-      def toCharKindSet(prev: CharKind): Set[CharKind] =
-        if prev == CharKind.Word then Set(CharKind.Word)
-        else Set(CharKind.Normal, CharKind.LineTerminator)
+      def accepts(prev: CharKind, next: CharKind): Boolean = (prev == CharKind.Word) == (next == CharKind.Word)
+      override def seesBoundary: Boolean = false

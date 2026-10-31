@@ -216,7 +216,8 @@ object PatternExtensions:
         val word = Option.when(words.size == 1)(words.head)
         val extra = terminatorSets.filterNot(lineTerminator.contains) ++ (if words.size >= 2 then words else Seq.empty)
 
-        PatternAlphabet.build(pattern.ir.mode, loop(pattern.node) ++ extra, lineTerminator, word, preferredChars)
+        val crlf = terminators.size == 1 && terminators.head.crlf == IRLineTerminators.CRLF.Atomic
+        PatternAlphabet.build(pattern.ir.mode, loop(pattern.node) ++ extra, lineTerminator, word, preferredChars, crlf)
 
     /** Tests whether the pattern needs line terminator distinction or not. */
     def needsLineTerminatorDistinction(using ctx: Context): Boolean = ctx.interrupt:

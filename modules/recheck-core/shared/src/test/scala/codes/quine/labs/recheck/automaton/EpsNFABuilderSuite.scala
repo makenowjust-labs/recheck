@@ -247,17 +247,18 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     // `$` before a final line terminator at an end point is the end after an optional line terminator.
     assertEquals(build("^a$", "", Dialect.Python), build("^a(?:|\\n)\\Z", "", Dialect.Python))
     assertEquals(
-      build("^a$", "", Dialect.Java),
-      build("^a(?:|[\\n\\r\\u0085\\u2028\\u2029]|\\r\\n)\\z", "", Dialect.Java)
+      build("(*ANYCRLF)^a$", "", Dialect.PCRE),
+      build("(*ANYCRLF)^a(?:|[\\n\\r]|\\r\\n)\\z", "", Dialect.PCRE)
     )
+    // Java's `$` before a final line terminator is guarded against the position between `\r` and `\n`.
+    val java = build("^a$", "", Dialect.Java).get
+    assert(java.tau.values.exists { case Assert(k, _) => k == AssertKind.NotBetweenCRLF; case _ => false })
     assert(build("a\\Z|b", "", Dialect.Python).isSuccess)
     // Line assertions are supported with one set of line terminators.
     assert(build("^a$", "", Dialect.Ruby).isSuccess)
     assert(build("^a$", "m", Dialect.Java).isSuccess)
     interceptMessage[UnsupportedException]("end assertion in the middle")(build("a$\\n", "", Dialect.Python).get)
-    interceptMessage[UnsupportedException]("line assertions with text assertions")(
-      build("\\A^a", "", Dialect.Ruby).get
-    )
+    assert(build("\\A^a", "", Dialect.Ruby).isSuccess)
     interceptMessage[UnsupportedException]("line assertions with different line terminators")(
       build("^a(?d:^)", "m", Dialect.Java).get
     )
@@ -267,3 +268,15 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     interceptMessage[UnsupportedException]("word boundary assertions with different word characters")(
       build("\\b(?a:\\b)", "", Dialect.Python).get
     )
+
+  /** Tests whether the automaton of the source accepts the input, i.e. the source matches in the input. */
+  def searches(source: String, flags: String, dialect: Dialect, input: String): Boolean =
+    val nfa = build(source, flags, dialect).get.toOrderedNFA
+    val last = input.foldLeft(nfa.inits.toSet): (qs, c) =>
+      qs.flatMap(q => nfa.delta.collect { case ((p, a), ps) if p == q && a.contains(c) => ps }.flatten)
+    last.exists(nfa.acceptSet.contains)
+
+  test("EpsNFABuilder.build: line assertions at line terminators and the ends of the input"):
+    for c <- LineAssertionCases.cases; dialect <- c.dialects do
+      val message = s"/${c.source}/${c.flags} in $dialect on ${c.input}"
+      assertEquals(searches(c.source, c.flags, dialect, c.input), c.matches.contains(dialect), message)

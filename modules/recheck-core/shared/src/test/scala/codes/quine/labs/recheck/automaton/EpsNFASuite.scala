@@ -11,6 +11,7 @@ import codes.quine.labs.recheck.regexp.PatternAlphabet
 import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 
 class EpsNFASuite extends munit.FunSuite:
 
@@ -18,20 +19,34 @@ class EpsNFASuite extends munit.FunSuite:
   given ctx: Context = Context()
 
   test("EpsNFA.AssertKind#toCharKindSet"):
-    val Normal: CharKind = CharKind.Normal
-    val LineTerminator: CharKind = CharKind.LineTerminator
-    val Word: CharKind = CharKind.Word
-    assertEquals(AssertKind.LineBegin.toCharKindSet(Normal), Set.empty[CharKind])
-    assertEquals(AssertKind.LineBegin.toCharKindSet(LineTerminator), Set(Normal, LineTerminator, Word))
-    assertEquals(AssertKind.LineBegin.toCharKindSet(Word), Set.empty[CharKind])
-    assertEquals(AssertKind.LineEnd.toCharKindSet(Normal), Set(LineTerminator))
-    assertEquals(AssertKind.LineEnd.toCharKindSet(LineTerminator), Set(LineTerminator))
-    assertEquals(AssertKind.LineEnd.toCharKindSet(Word), Set(LineTerminator))
+    import CharKind.*
+    import IRLineBeginAtEnd.*
+    val all = CharKind.values.toSet
+    val terminators = Set(LineTerminator, CarriageReturn, LineFeed)
+    // JavaScript's `^` matches at the begin and after a line terminator.
+    assertEquals(AssertKind.LineBegin().toCharKindSet(Normal), Set.empty[CharKind])
+    assertEquals(AssertKind.LineBegin().toCharKindSet(Word), Set.empty[CharKind])
+    assertEquals(AssertKind.LineBegin().toCharKindSet(LineTerminator), all)
+    assertEquals(AssertKind.LineBegin().toCharKindSet(Boundary), all)
+    // Ruby's `^` does not match at the end after a line terminator.
+    assertEquals(AssertKind.LineBegin(InputBegin).toCharKindSet(LineTerminator), all - Boundary)
+    assertEquals(AssertKind.LineBegin(InputBegin).toCharKindSet(Boundary), all)
+    // Java's `^` does not match at the end at all, nor between `\r` and `\n`.
+    assertEquals(AssertKind.LineBegin(Never, true).toCharKindSet(Boundary), all - Boundary)
+    assertEquals(AssertKind.LineBegin(Never, true).toCharKindSet(CarriageReturn), all - Boundary - LineFeed)
+    assertEquals(AssertKind.LineBegin(Never, true).toCharKindSet(LineFeed), all - Boundary)
+    assertEquals(AssertKind.LineEnd().toCharKindSet(Normal), terminators + Boundary)
+    assertEquals(AssertKind.LineEnd().toCharKindSet(CarriageReturn), terminators + Boundary)
+    assertEquals(AssertKind.LineEnd(true).toCharKindSet(CarriageReturn), terminators + Boundary - LineFeed)
+    assertEquals(AssertKind.TextBegin.toCharKindSet(Boundary), all)
+    assertEquals(AssertKind.TextBegin.toCharKindSet(LineTerminator), Set.empty[CharKind])
+    assertEquals(AssertKind.TextEnd.toCharKindSet(Normal), Set(Boundary))
+    assertEquals(AssertKind.NotBetweenCRLF.toCharKindSet(CarriageReturn), all - LineFeed)
+    assertEquals(AssertKind.NotBetweenCRLF.toCharKindSet(Normal), all)
     assertEquals(AssertKind.WordBoundary.toCharKindSet(Normal), Set(Word))
-    assertEquals(AssertKind.WordBoundary.toCharKindSet(LineTerminator), Set(Word))
-    assertEquals(AssertKind.WordBoundary.toCharKindSet(Word), Set(Normal, LineTerminator))
-    assertEquals(AssertKind.WordBoundaryNot.toCharKindSet(Normal), Set(Normal, LineTerminator))
-    assertEquals(AssertKind.WordBoundaryNot.toCharKindSet(LineTerminator), Set(Normal, LineTerminator))
+    assertEquals(AssertKind.WordBoundary.toCharKindSet(Boundary), Set(Word))
+    assertEquals(AssertKind.WordBoundary.toCharKindSet(Word), all - Word)
+    assertEquals(AssertKind.WordBoundaryNot.toCharKindSet(LineTerminator), all - Word)
     assertEquals(AssertKind.WordBoundaryNot.toCharKindSet(Word), Set(Word))
 
   test("EpsNFA#toGraphviz"):
@@ -44,7 +59,7 @@ class EpsNFASuite extends munit.FunSuite:
         0 -> Eps(Seq(1)),
         1 -> Eps(Seq(2, 3)),
         2 -> Consume(Set((CharSet.single('a'), CharKind.Normal)), 4),
-        3 -> Assert(AssertKind.LineBegin, 4),
+        3 -> Assert(AssertKind.LineBegin(), 4),
         4 -> LoopEnter(0, 5),
         5 -> LoopExit(0, 6)
       )
@@ -62,7 +77,7 @@ class EpsNFASuite extends munit.FunSuite:
          |  "2" [shape=circle];
          |  "2" -> "4" [label="{([a],Normal)}"];
          |  "3" [shape=circle];
-         |  "3" -> "4" [label="LineBegin"];
+         |  "3" -> "4" [label="LineBegin(AfterTerminator,false)"];
          |  "4" [shape=circle];
          |  "4" -> "5" [label="Enter(0)"];
          |  "5" [shape=circle];
@@ -82,22 +97,23 @@ class EpsNFASuite extends munit.FunSuite:
         1 -> LoopEnter(0, 2),
         2 -> Eps(Seq(3, 4)),
         3 -> Consume(Set((CharSet.single('\n'), CharKind.LineTerminator)), 0),
-        4 -> Assert(AssertKind.LineEnd, 0),
+        4 -> Assert(AssertKind.LineEnd(), 0),
         5 -> LoopExit(0, 6)
       )
     )
-    val q36: Seq[(Int, Set[CharKind])] = Seq((3, Set(CharKind.LineTerminator, CharKind.Normal)), (6, Set.empty))
+    // The begin of the input is distinguished from a line terminator.
+    val q36: Seq[(Int, Set[CharKind])] =
+      Seq((3, Set(CharKind.LineTerminator, CharKind.Normal, CharKind.Boundary)), (6, Set.empty))
     assertEquals(
       nfa1.toOrderedNFA,
       OrderedNFA[CharSet, (CharKind, Seq[(Int, Set[CharKind])])](
         Set(CharSet.single('\n'), CharSet.single('\n').complement(UnitMode.Utf16)),
-        Set((CharKind.LineTerminator, q36)),
-        Vector((CharKind.LineTerminator, q36)),
-        Set((CharKind.LineTerminator, q36)),
+        Set((CharKind.Boundary, q36), (CharKind.LineTerminator, q36)),
+        Vector((CharKind.Boundary, q36)),
+        Set((CharKind.Boundary, q36), (CharKind.LineTerminator, q36)),
         Map(
-          ((CharKind.LineTerminator, q36), CharSet.single('\n')) -> Vector(
-            (CharKind.LineTerminator, q36)
-          )
+          ((CharKind.Boundary, q36), CharSet.single('\n')) -> Vector((CharKind.LineTerminator, q36)),
+          ((CharKind.LineTerminator, q36), CharSet.single('\n')) -> Vector((CharKind.LineTerminator, q36))
         )
       )
     )
@@ -108,7 +124,7 @@ class EpsNFASuite extends munit.FunSuite:
       0,
       10,
       Map(
-        0 -> Assert(AssertKind.LineEnd, 1),
+        0 -> Assert(AssertKind.LineEnd(), 1),
         1 -> Eps(Seq(2, 8)),
         2 -> LoopEnter(0, 3),
         3 -> Eps(Seq(4, 5)),
@@ -120,17 +136,10 @@ class EpsNFASuite extends munit.FunSuite:
         9 -> Assert(AssertKind.WordBoundary, 10)
       )
     )
-    val q4: Seq[(Int, Set[CharKind])] = Seq((4, Set(CharKind.LineTerminator)))
-    val q45: Seq[(Int, Set[CharKind])] = Seq(
-      (4, Set(CharKind.LineTerminator, CharKind.Word, CharKind.Normal)),
-      (5, Set(CharKind.LineTerminator, CharKind.Word, CharKind.Normal))
-    )
-    val q54510: Seq[(Int, Set[CharKind])] = Seq(
-      (5, Set(CharKind.Word)),
-      (4, Set(CharKind.LineTerminator, CharKind.Word, CharKind.Normal)),
-      (5, Set(CharKind.LineTerminator, CharKind.Word, CharKind.Normal)),
-      (10, Set.empty)
-    )
+    val all = Set(CharKind.LineTerminator, CharKind.Word, CharKind.Normal, CharKind.Boundary)
+    val q4: Seq[(Int, Set[CharKind])] = Seq((4, Set(CharKind.LineTerminator, CharKind.Boundary)))
+    val q45: Seq[(Int, Set[CharKind])] = Seq((4, all), (5, all))
+    val q54510: Seq[(Int, Set[CharKind])] = Seq((5, Set(CharKind.Word)), (4, all), (5, all), (10, Set.empty))
     assertEquals(
       nfa2.toOrderedNFA,
       OrderedNFA(
@@ -140,14 +149,14 @@ class EpsNFASuite extends munit.FunSuite:
           CharSet.single('a').union(CharSet.single('\n')).complement(UnitMode.Utf16)
         ),
         Set(
-          (CharKind.LineTerminator, q4),
+          (CharKind.Boundary, q4),
           (CharKind.LineTerminator, q45),
           (CharKind.Word, q54510)
         ),
-        Vector((CharKind.LineTerminator, q4)),
+        Vector((CharKind.Boundary, q4)),
         Set((CharKind.Word: CharKind, q54510)),
         Map(
-          ((CharKind.LineTerminator, q4), CharSet.single('\n')) -> Vector(
+          ((CharKind.Boundary, q4), CharSet.single('\n')) -> Vector(
             (CharKind.LineTerminator, q45)
           ),
           ((CharKind.LineTerminator, q45), CharSet.single('a')) -> Vector(
