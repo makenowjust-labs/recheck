@@ -271,7 +271,7 @@ class ParserBackslashSuite extends ParserSuiteBase:
   check("\\U000ABCDE", "", Python)(Backslash(Escape(UnicodeHex8, 0xabcde)))
   check("\\V", "", Java, PCRE, Perl)(Backslash(EscapeClass(NonVertical)))
   check("\\W", "", All*)(Backslash(EscapeClass(NonWord)))
-  check("\\X", "", Java, PCRE, Perl)(Backslash(EscapeClass(GraphemeCluster)))
+  check("\\X", "", Java, PCRE, Perl, Ruby)(Backslash(EscapeClass(GraphemeCluster)))
   check("\\Z", "", DotNet, Java, PCRE, Perl, Python, Ruby)(Backslash(Assert(UpperEnd)))
   check("\\010", "", DotNet, Java, JavaScript, PCRE, Perl, Python, Ruby)(Backslash(Escape(BareOctal, 8)))
   check("\\0", "", DotNet, JavaScript, PCRE, Perl, Python, Ruby)(Backslash(Escape(BareOctal, 0)))
@@ -315,10 +315,9 @@ class ParserBackslashSuite extends ParserSuiteBase:
       Literal('8')
     )
   check("()\\99999999999", "", Ruby):
-    Sequence(
-      Group(IndexedCapture, Sequence()),
-      Backslash(EscapeBackReference(BareBackReference, IndexedReference(Int.MaxValue)))
-    )
+    Sequence(Group(IndexedCapture, Sequence()) +: Backslash(Unknown('9')) +: Seq.fill(10)(Literal('9'))*)
+  check("()\\89", "", Ruby)(Sequence(Group(IndexedCapture, Sequence()), Backslash(Unknown('8')), Literal('9')))
+  check("\\9", "", Ruby)(Backslash(EscapeBackReference(BareBackReference, IndexedReference(9))))
   check("\\412", "", JavaScript)(Sequence(Backslash(Escape(BareOctal, 33)), Literal('2')))
   check("()\\1", "", All*):
     Sequence(Group(IndexedCapture, Sequence()), Backslash(EscapeBackReference(BareBackReference, IndexedReference(1))))

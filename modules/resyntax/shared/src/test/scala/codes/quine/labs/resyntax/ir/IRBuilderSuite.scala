@@ -1,89 +1,78 @@
 package codes.quine.labs.resyntax.ir
 
+import codes.quine.labs.resyntax.ast.AssertKind
 import codes.quine.labs.resyntax.ast.AssertNameStyle
+import codes.quine.labs.resyntax.ast.BackReferenceStyle
+import codes.quine.labs.resyntax.ast.BackslashKind
 import codes.quine.labs.resyntax.ast.BacktrackControlKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
+import codes.quine.labs.resyntax.ast.BoundaryModifier
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.ConditionalTest
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.NameStyle
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
+import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.ir.IRQuantifier.*
-import codes.quine.labs.resyntax.parser.Parser
 
-class IRBuilderSuite extends munit.FunSuite:
-  def check(s: String, flags: String, dialects: Dialect*)(expected: IRNodeData)(implicit loc: munit.Location): Unit =
-    for dialect <- dialects do
-      test(s"IRBuilder.build: /$s/$flags in $dialect"):
-        val flagSet = FlagSet.parse(flags, dialect)
-        val node = Parser.parse(s, flagSet, dialect)
-        val result = IRBuilder.build(node, flagSet, dialect)
-        assert(result.equalsWithoutLoc(IRNode(expected)))
-
-  val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl, Python, Ruby)
-
+class IRBuilderSuite extends IRSuiteBase:
   // Disjunction
   check("|", "", All*)(Disjunction(Empty, Empty))
 
   // Sequence
   check("", "", All*)(Empty)
   check("(?:)(?:)", "", All*)(Sequence(Empty, Empty))
+  check("ab", "", All*)(Sequence(char('a'), char('b')))
 
   // Repeat
   check("(?:)*", "", All*)(Repeat(Empty, Unbounded(0, Greedy)))
   check("(?:)*?", "", All*)(Repeat(Empty, Unbounded(0, Lazy)))
-  check("(?:)*+", "", Java, PCRE, Perl, Ruby)(Repeat(Empty, Unbounded(0, Possessive)))
+  check("(?:)*+", "", Java, PCRE, Perl, Python, Ruby)(Atomic(Repeat(Empty, Unbounded(0, Greedy))))
   check("(?:)+", "", All*)(Repeat(Empty, Unbounded(1, Greedy)))
   check("(?:)+?", "", All*)(Repeat(Empty, Unbounded(1, Lazy)))
-  check("(?:)++", "", Java, PCRE, Perl, Ruby)(Repeat(Empty, Unbounded(1, Possessive)))
+  check("(?:)++", "", Java, PCRE, Perl, Python, Ruby)(Atomic(Repeat(Empty, Unbounded(1, Greedy))))
   check("(?:)?", "", All*)(Repeat(Empty, Bounded(0, 1, Greedy)))
   check("(?:)??", "", All*)(Repeat(Empty, Bounded(0, 1, Lazy)))
-  check("(?:)?+", "", Java, PCRE, Perl, Ruby)(Repeat(Empty, Bounded(0, 1, Possessive)))
+  check("(?:)?+", "", Java, PCRE, Perl, Python, Ruby)(Atomic(Repeat(Empty, Bounded(0, 1, Greedy))))
   check("(?:){4}", "", All*)(Repeat(Empty, Exact(4)))
   check("(?:){4}?", "", DotNet, Java, JavaScript, PCRE, Perl, Python)(Repeat(Empty, Exact(4)))
   check("(?:){4}?", "", Ruby)(Repeat(Repeat(Empty, Exact(4)), Bounded(0, 1, Greedy)))
-  check("(?:){4}+", "", Java, PCRE, Perl)(Repeat(Empty, Exact(4)))
+  // `^(?:a|ab){1}+c` does not match `abc` in Java, PCRE, Perl and Python, so a possessive exact count is atomic.
+  check("(?:){4}+", "", Java, PCRE, Perl, Python)(Atomic(Repeat(Empty, Exact(4))))
   check("(?:){4}+", "", Ruby)(Repeat(Repeat(Empty, Exact(4)), Unbounded(1, Greedy)))
   check("(?:){2,3}", "", All*)(Repeat(Empty, Bounded(2, 3, Greedy)))
   check("(?:){2,2}", "", All*)(Repeat(Empty, Exact(2)))
   check("(?:){2,3}?", "", All*)(Repeat(Empty, Bounded(2, 3, Lazy)))
   check("(?:){2,2}?", "", All*)(Repeat(Empty, Exact(2)))
-  check("(?:){2,3}+", "", Java, PCRE, Perl, Ruby)(Repeat(Empty, Bounded(2, 3, Possessive)))
-  check("(?:){2,2}+", "", Java, PCRE, Perl, Ruby)(Repeat(Empty, Exact(2)))
-  check("(?:){,1}", "", Perl, Python, Ruby)(Repeat(Empty, Bounded(0, 1, Greedy)))
-  check("(?:){,0}", "", Perl, Python, Ruby)(Repeat(Empty, Exact(0)))
-  check("(?:){,1}?", "", Perl, Python, Ruby)(Repeat(Empty, Bounded(0, 1, Lazy)))
-  check("(?:){,0}?", "", Perl, Python, Ruby)(Repeat(Empty, Exact(0)))
-  check("(?:){,1}+", "", Perl, Ruby)(Repeat(Empty, Bounded(0, 1, Possessive)))
-  check("(?:){,0}+", "", Perl, Ruby)(Repeat(Empty, Exact(0)))
+  check("(?:){2,3}+", "", Java, PCRE, Perl, Python)(Atomic(Repeat(Empty, Bounded(2, 3, Greedy))))
+  // `^(?:a|ab){0,1}+c` matches `abc` in Ruby, so `+` after an interval is another repeat.
+  check("(?:){2,3}+", "", Ruby)(Repeat(Repeat(Empty, Bounded(2, 3, Greedy)), Unbounded(1, Greedy)))
+  check("(?:){2,2}+", "", Java, PCRE, Perl, Python)(Atomic(Repeat(Empty, Exact(2))))
+  check("(?:){,1}", "", PCRE, Perl, Python, Ruby)(Repeat(Empty, Bounded(0, 1, Greedy)))
+  check("(?:){,0}", "", PCRE, Perl, Python, Ruby)(Repeat(Empty, Exact(0)))
+  check("(?:){,1}?", "", PCRE, Perl, Python, Ruby)(Repeat(Empty, Bounded(0, 1, Lazy)))
+  check("(?:){,0}?", "", PCRE, Perl, Python, Ruby)(Repeat(Empty, Exact(0)))
+  check("(?:){,1}+", "", PCRE, Perl, Python)(Atomic(Repeat(Empty, Bounded(0, 1, Greedy))))
+  check("(?:){,1}+", "", Ruby)(Repeat(Repeat(Empty, Bounded(0, 1, Greedy)), Unbounded(1, Greedy)))
   check("(?:){2,}", "", All*)(Repeat(Empty, Unbounded(2, Greedy)))
   check("(?:){2,}?", "", All*)(Repeat(Empty, Unbounded(2, Lazy)))
-  check("(?:){2,}+", "", Java, PCRE, Perl, Ruby)(Repeat(Empty, Unbounded(2, Possessive)))
+  check("(?:){2,}+", "", Java, PCRE, Perl, Python)(Atomic(Repeat(Empty, Unbounded(2, Greedy))))
 
-  // Command
-  check("(?R)", "", PCRE, Perl)(Unsupported(NodeData.Command(CommandKind.RCall)))
-  check("(?1)", "", PCRE, Perl)(Unsupported(NodeData.Command(CommandKind.IndexedCall(1))))
-  check("(?-1)", "", PCRE, Perl)(Unsupported(NodeData.Command(CommandKind.RelativeCall(-1))))
-  check("(?&x)", "", PCRE, Perl)(Unsupported(NodeData.Command(CommandKind.NamedCall("x"))))
-  check("(?P>x)", "", PCRE, Perl)(Unsupported(NodeData.Command(CommandKind.PNamedCall("x"))))
-  check("(?#)", "", DotNet, PCRE, Perl, Python, Ruby)(Empty)
-  check("(?{})", "", Perl)(Unsupported(NodeData.Command(CommandKind.InlineCode(""))))
-  check("(??{})", "", Perl)(Unsupported(NodeData.Command(CommandKind.EmbedCode(""))))
-  check("(?C)", "", PCRE)(Unsupported(NodeData.Command(CommandKind.Callout)))
-  check("(?C{x})", "", PCRE)(Unsupported(NodeData.Command(CommandKind.CalloutString('{', '}', "x"))))
-  check("(?C1)", "", PCRE)(Unsupported(NodeData.Command(CommandKind.CalloutInt(1))))
-  check("(?|)", "", PCRE, Perl)(Unsupported(NodeData.Command(CommandKind.BranchReset(Seq(Node(NodeData.Sequence()))))))
-  check("(?(1)|)", "", DotNet, PCRE, Perl, Python, Ruby)(
-    Unsupported(NodeData.Command(CommandKind.Conditional(ConditionalTest.Indexed(1), NodeData.Sequence())))
-  )
-  check("(*ACCEPT)", "", PCRE, Perl)(
-    Unsupported(NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Accept), None)))
-  )
+  // PCRE's `U` swaps greedy and lazy: `^(?U)a+` matches `a` and `^(?U)a+?` matches `aaa` in `aaa`.
+  check("(?:)*", "U", PCRE)(Repeat(Empty, Unbounded(0, Lazy)))
+  check("(?:)*?", "U", PCRE)(Repeat(Empty, Unbounded(0, Greedy)))
+  check("(?:)*+", "U", PCRE)(Atomic(Repeat(Empty, Unbounded(0, Greedy))))
+  check("(?U)(?:)*(?-U)(?:)*", "", PCRE):
+    Sequence(Empty, Repeat(Empty, Unbounded(0, Lazy)), Empty, Repeat(Empty, Unbounded(0, Greedy)))
+  check("(?U:(?:)*)(?:)*", "", PCRE)(Sequence(Repeat(Empty, Unbounded(0, Lazy)), Repeat(Empty, Unbounded(0, Greedy))))
+  // `^(?U)(?^)a+` matches `a` in `aaa`, so `(?^)` keeps `U`.
+  check("(?U)(?^)(?:)*", "", PCRE)(Sequence(Empty, Empty, Repeat(Empty, Unbounded(0, Lazy))))
+  // Java's `U` is UNICODE_CHARACTER_CLASS: `^a+` matches `aaa` with it.
+  check("(?:)*", "U", Java)(Repeat(Empty, Unbounded(0, Greedy)))
 
   // Group
   check("()", "", All*)(Capture(1, None, Empty))
@@ -91,11 +80,19 @@ class IRBuilderSuite extends munit.FunSuite:
   check("(?<x>)", "", DotNet, Java, JavaScript, PCRE, Perl, Ruby)(Capture(1, Some("x"), Empty))
   check("(?'x')", "", DotNet, PCRE, Perl, Ruby)(Capture(1, Some("x"), Empty))
   check("(?P<x>)", "", PCRE, Perl, Python)(Capture(1, Some("x"), Empty))
-  check("(?<-x>)", "", DotNet)(
-    Unsupported(NodeData.Group(GroupKind.Balance(NameStyle.Angle, None, "x"), NodeData.Sequence()))
-  )
-  check("(?>)", "", DotNet, Java, PCRE, Perl, Ruby)(
-    Unsupported(NodeData.Group(GroupKind.Atomic(AssertNameStyle.Symbolic), NodeData.Sequence()))
+  check("(?=a)", "", All*)(LookAhead(false, char('a')))
+  check("(?!a)", "", All*)(LookAhead(true, char('a')))
+  check("(?<=a)", "", All*)(LookBehind(false, char('a')))
+  check("(?<!a)", "", All*)(LookBehind(true, char('a')))
+  check("(*pla:a)", "", PCRE, Perl)(LookAhead(false, char('a')))
+  check("(*negative_lookbehind:a)", "", PCRE, Perl)(LookBehind(true, char('a')))
+  check("(?>a)", "", DotNet, Java, PCRE, Perl, Python, Ruby)(Atomic(char('a')))
+  check("(*atomic:a)", "", PCRE, Perl)(Atomic(char('a')))
+  check("(?<x>)(?<-x>)", "", DotNet)(
+    Sequence(
+      Capture(1, Some("x"), Empty),
+      Unsupported(NodeData.Group(GroupKind.Balance(NameStyle.Angle, None, "x"), NodeData.Sequence()))
+    )
   )
   check("(?*)", "", PCRE)(
     Unsupported(NodeData.Group(GroupKind.NonAtomicPositiveLookAhead(AssertNameStyle.Symbolic), NodeData.Sequence()))
@@ -109,20 +106,130 @@ class IRBuilderSuite extends munit.FunSuite:
   check("(*atomic_script_run:)", "", PCRE, Perl)(
     Unsupported(NodeData.Group(GroupKind.AtomicScriptRun(AssertNameStyle.Alphabetic), NodeData.Sequence()))
   )
-  check("(?m:^)", "", DotNet, Java, PCRE, Perl, Python, Ruby)(Assert(IRAssertKind.LineBegin))
-  check("(?-m:^)", "m", DotNet, Java, PCRE, Perl, Python)(Assert(IRAssertKind.TextBegin))
-  check("(?-m:^)", "m", Ruby)(Assert(IRAssertKind.LineBegin))
-  check("(?^m:^)", "", PCRE, Perl)(Assert(IRAssertKind.LineBegin))
-  check("(?^:^)", "m", PCRE, Perl)(Assert(IRAssertKind.TextBegin))
   check("(?~)", "", Ruby)(Unsupported(NodeData.Group(GroupKind.Absence, NodeData.Sequence())))
+
+  // Command
+  check("(?R)", "", PCRE, Perl)(Unsupported(NodeData.Command(CommandKind.RCall)))
+  check("()(?1)", "", PCRE, Perl)(
+    Sequence(Capture(1, None, Empty), Unsupported(NodeData.Command(CommandKind.IndexedCall(1))))
+  )
+  check("()(?-1)", "", PCRE, Perl)(
+    Sequence(Capture(1, None, Empty), Unsupported(NodeData.Command(CommandKind.RelativeCall(-1))))
+  )
+  check("(?<x>)(?&x)", "", PCRE, Perl)(
+    Sequence(Capture(1, Some("x"), Empty), Unsupported(NodeData.Command(CommandKind.NamedCall("x"))))
+  )
+  check("(?P<x>)(?P>x)", "", PCRE, Perl)(
+    Sequence(Capture(1, Some("x"), Empty), Unsupported(NodeData.Command(CommandKind.PNamedCall("x"))))
+  )
+  check("()\\g<1>", "", PCRE, Ruby)(
+    Sequence(
+      Capture(1, None, Empty),
+      Unsupported(NodeData.Backslash(BackslashKind.EscapeCall(NameStyle.Angle, Reference.IndexedReference(1))))
+    )
+  )
+  check("(?#)", "", DotNet, PCRE, Perl, Python, Ruby)(Empty)
+  check("(?{})", "", Perl)(Unsupported(NodeData.Command(CommandKind.InlineCode(""))))
+  check("(??{})", "", Perl)(Unsupported(NodeData.Command(CommandKind.EmbedCode(""))))
+  check("(?C)", "", PCRE)(Unsupported(NodeData.Command(CommandKind.Callout)))
+  check("(?C{x})", "", PCRE)(Unsupported(NodeData.Command(CommandKind.CalloutString('{', '}', "x"))))
+  check("(?C1)", "", PCRE)(Unsupported(NodeData.Command(CommandKind.CalloutInt(1))))
+  check("(?|)", "", PCRE, Perl)(Empty)
+  check("(?|(a)|(b)(c))", "", PCRE, Perl)(
+    Disjunction(Capture(1, None, char('a')), Sequence(Capture(1, None, char('b')), Capture(2, None, char('c'))))
+  )
+  check("()(?(1)|)", "", DotNet, PCRE, Perl, Python, Ruby)(
+    Sequence(
+      Capture(1, None, Empty),
+      Unsupported(NodeData.Command(CommandKind.Conditional(ConditionalTest.Indexed(1), NodeData.Sequence())))
+    )
+  )
+  check("(*ACCEPT)", "", PCRE, Perl)(
+    Unsupported(NodeData.Command(CommandKind.BacktrackControl(Some(BacktrackControlKind.Accept), None)))
+  )
+  check("(?~|a|b)", "", Ruby)(
+    Unsupported(NodeData.Command(CommandKind.AbsenceExpression(NodeData.Literal('a'), NodeData.Literal('b'))))
+  )
+  check("(*CRLF)(*UTF)(*LIMIT_MATCH=1)", "", PCRE)(Sequence(Empty, Empty, Empty))
+  check("(*NOTEMPTY)", "", PCRE)(Unsupported(NodeData.Command(CommandKind.StartOption("NOTEMPTY", None))))
 
   // Caret
   check("^", "", DotNet, Java, JavaScript, PCRE, Perl, Python)(Assert(IRAssertKind.TextBegin))
-  check("^", "", Ruby)(Assert(IRAssertKind.LineBegin))
-  check("^", "m", All*)(Assert(IRAssertKind.LineBegin))
 
-  // Dollar
-  check("$", "", JavaScript)(Assert(IRAssertKind.TextEnd))
-  check("$", "", DotNet, Java, PCRE, Perl, Python)(Assert(IRAssertKind.ChompTextEnd))
-  check("$", "", Ruby)(Assert(IRAssertKind.LineEnd))
-  check("$", "m", All*)(Assert(IRAssertKind.LineEnd))
+  // Backslash assertions
+  check("\\A", "", DotNet, Java, PCRE, Perl, Python, Ruby)(Assert(IRAssertKind.TextBegin))
+  check("\\z", "", DotNet, Java, PCRE, Perl, Ruby)(Assert(IRAssertKind.TextEnd))
+  // `a\Z` does not match `a\n` in Python, where `\Z` is the end of the text.
+  check("\\Z", "", Python)(Assert(IRAssertKind.TextEnd))
+  checkWith("\\b", "", All*)(d => Assert(IRAssertKind.WordBoundary(flagsOf(d))))
+  checkWith("\\B", "", All*)(d => Assert(IRAssertKind.NotWordBoundary(flagsOf(d))))
+  checkWith("\\b", "iu", JavaScript)(d => Assert(IRAssertKind.WordBoundary(flagsOf(d, "iu"))))
+  check("\\b{wb}", "", Perl)(
+    Unsupported(NodeData.Backslash(BackslashKind.Assert(AssertKind.Boundary(Some(BoundaryModifier.WbModifier)))))
+  )
+  check("\\B{gcb}", "", Perl)(
+    Unsupported(
+      NodeData.Backslash(BackslashKind.Assert(AssertKind.NonBoundary(Some(BoundaryModifier.GcbModifier))))
+    )
+  )
+  check("\\b{g}", "", Java)(
+    Unsupported(NodeData.Backslash(BackslashKind.Assert(AssertKind.Boundary(Some(BoundaryModifier.GModifier)))))
+  )
+  check("\\G", "", DotNet, Java, PCRE, Perl, Ruby)(
+    Unsupported(NodeData.Backslash(BackslashKind.Assert(AssertKind.Sticky)))
+  )
+  check("\\K", "", PCRE, Perl, Ruby)(Unsupported(NodeData.Backslash(BackslashKind.Assert(AssertKind.Cut))))
+
+  // Back-reference
+  checkWith("(a)\\1", "", All*)(d => Sequence(Capture(1, None, char('a')), BackReference(Seq(1), flagsOf(d))))
+  checkWith("(a)(?i)\\1", "", DotNet, Java, PCRE, Perl, Ruby): d =>
+    Sequence(Capture(1, None, char('a')), Empty, BackReference(Seq(1), flagsOf(d, "i")))
+  check("(?<x>a)\\k<x+0>", "", Ruby)(
+    Sequence(
+      Capture(1, Some("x"), char('a')),
+      Unsupported(
+        NodeData.Backslash(
+          BackslashKind.EscapeBackReference(
+            BackReferenceStyle.KBackReference(NameStyle.Angle),
+            Reference.LeveledReference(Reference.NamedReference("x"), 0)
+          )
+        )
+      )
+    )
+  )
+
+  // Case command
+  check("\\Ua\\E", "", Perl)(Sequence(Empty, char('a'), Empty))
+  check("\\Qa\\E", "", Java, PCRE, Perl)(Sequence(Empty, char('a'), Empty))
+
+  // Java's CANON_EQ makes a character-level node unsupported.
+  check("a(?c)b", "", Java)(Sequence(char('a'), Empty, Unsupported(NodeData.Literal('b'))))
+
+  // Pattern
+  checkPattern("(a)", "", All*): pattern =>
+    assertEquals(pattern.captureCount, 1)
+    assertEquals(pattern.anchored, false)
+  checkPattern("", "y", JavaScript)(pattern => assertEquals(pattern.anchored, true))
+  checkPattern("", "A", PCRE)(pattern => assertEquals(pattern.anchored, true))
+  // `(?:(a)|b)\1c` matches `bc` only in JavaScript.
+  checkPattern("", "", JavaScript): pattern =>
+    assertEquals(pattern.backReference, IRBackReferenceSemantics(true, IRBackReferenceChoice.FirstSet))
+  checkPattern("", "", DotNet, Java, PCRE, Perl, Python): pattern =>
+    assertEquals(pattern.backReference, IRBackReferenceSemantics(false, IRBackReferenceChoice.FirstSet))
+  // `^(?<n>a)(?<n>ab)\k<n>b` does not match `aabab` in Ruby, which takes `ab` and does not backtrack to `a`.
+  checkPattern("", "", Ruby): pattern =>
+    assertEquals(pattern.backReference, IRBackReferenceSemantics(false, IRBackReferenceChoice.LastMatching))
+
+  test("IRBuilder.build: keeps the source location"):
+    val (pattern, _) = build("a(?:b)*+", "", Java)
+    pattern.node.data match
+      case Sequence(Seq(a, atomic)) =>
+        assertEquals(a.loc, codes.quine.labs.resyntax.ast.SourceLocation(0, 1))
+        assertEquals(atomic.loc, codes.quine.labs.resyntax.ast.SourceLocation(1, 8))
+        atomic.data match
+          case Atomic(repeat) => assertEquals(repeat.loc, atomic.loc)
+          case data           => fail(s"Unexpected: $data")
+      case data => fail(s"Unexpected: $data")
+
+  test("IRBuilder.build: leaves character-level nodes to the character resolution"):
+    intercept[NotImplementedError](IRBuilder.build(Node(NodeData.Literal('a')), FlagSet(), JavaScript))

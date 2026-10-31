@@ -153,6 +153,8 @@ final case class FeatureSet(
     // .NET, PCRE, Perl, Ruby
     fallsBackMultiDigitBackReferenceToOctal: Boolean,
     // Ruby
+    fallsBackMultiDigitBackReferenceToLiteral: Boolean,
+    // Ruby
     hasAbsenceOperator: Boolean,
     // PCRE, Perl
     hasAlphabeticGroup: Boolean,
@@ -204,7 +206,7 @@ final case class FeatureSet(
     hasBackslashGCall: Boolean,
     // Java, PCRE, Perl, Ruby
     hasBackslashGeneralNewline: Boolean,
-    // Java, PCRE, Perl
+    // Java, PCRE, Perl, Ruby
     hasBackslashGraphemeCluster: Boolean,
     // Java, PCRE, Perl
     hasBackslashHorizontalSpace: Boolean,
@@ -340,6 +342,8 @@ final case class FeatureSet(
     hasPGroup: Boolean,
     // Java, PCRE, Perl, Python, Ruby
     hasPossessiveBacktrackStrategy: Boolean,
+    // Java, PCRE, Perl, Python
+    hasPossessiveCurlyBacktrackStrategy: Boolean,
     // PCRE, Perl
     hasRecursionTest: Boolean,
     // PCRE, Perl
@@ -564,6 +568,8 @@ object FeatureSet:
       // .NET, PCRE, Perl, Ruby
       fallsBackMultiDigitBackReferenceToOctal = isDotNet || isPCRE || isPerl || isRuby,
       // Ruby
+      fallsBackMultiDigitBackReferenceToLiteral = isRuby,
+      // Ruby
       hasAbsenceOperator = isRuby,
       // PCRE, Perl
       hasAlphabeticGroup = isPCRE || isPerl,
@@ -615,8 +621,8 @@ object FeatureSet:
       hasBackslashGCall = isPCRE || isRuby,
       // Java, PCRE, Perl, Ruby
       hasBackslashGeneralNewline = isJava || isPCRE || isPerl || isRuby,
-      // Java, PCRE, Perl
-      hasBackslashGraphemeCluster = isJava || isPCRE || isPerl,
+      // Java, PCRE, Perl, Ruby
+      hasBackslashGraphemeCluster = isJava || isPCRE || isPerl || isRuby,
       // Java, PCRE, Perl
       hasBackslashHorizontalSpace = isJava || isPCRE || isPerl,
       // Ruby
@@ -752,6 +758,8 @@ object FeatureSet:
       hasPGroup = isPCRE || isPerl || isPython,
       // Java, PCRE, Perl, Python, Ruby
       hasPossessiveBacktrackStrategy = isJava || isPCRE || isPerl || isPython || isRuby,
+      // Java, PCRE, Perl, Python
+      hasPossessiveCurlyBacktrackStrategy = isJava || isPCRE || isPerl || isPython,
       // PCRE, Perl
       hasRecursionTest = isPCRE || isPerl,
       // PCRE, Perl
