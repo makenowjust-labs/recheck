@@ -157,6 +157,8 @@ There are other deliberate approximations.
   The others end the repetition with it: Python with an optional one, Perl, .NET and PCRE with the last mandatory one or an optional one, and Java's repetition of a group with branches with any one, even before the minimum count (e.g. `^(?:()|a){2}\1$` sets the group `1` at the end of `a` in Java and Perl, but at the start in Python and .NET).
   PCRE repeats copies of the node for a bounded repetition, where an empty iteration does not end it.
   Ruby is not reproduced: Onigmo also repeats copies for a bounded repetition depending on the size of its compiled code, and it checks the captures in an empty iteration.
+- `\R` is atomic, as `(?>\r\n|[\n\x0B\f\r\x85  ])`.
+  Perl backs off one character at a time from `\R` under a simple quantifier, which can split `\r\n` (e.g. `^\R?\n$` matches `"\r\n"` in Perl, but not in PCRE or Ruby), and `recheck` does not reproduce it.
 
 ### Searches, Conditionals and Backtracking Control Verbs
 
