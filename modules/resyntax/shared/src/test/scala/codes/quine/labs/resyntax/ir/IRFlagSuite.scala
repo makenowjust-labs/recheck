@@ -3,10 +3,10 @@ package codes.quine.labs.resyntax.ir
 import codes.quine.labs.resyntax.ast.CaseCommandKind.*
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ir.IRAssertKind.*
+import codes.quine.labs.resyntax.ir.IRLineTerminators as LT
 import codes.quine.labs.resyntax.ir.IRNodeData.Assert
 import codes.quine.labs.resyntax.ir.IRNodeData.Empty
 import codes.quine.labs.resyntax.ir.IRNodeData.Sequence
-import codes.quine.labs.resyntax.ir.IRLineTerminators as LT
 
 /** IRFlagSuite is tests of flag interpretation and scoping, where the comments show the engines' behavior. */
 class IRFlagSuite extends IRSuiteBase:
