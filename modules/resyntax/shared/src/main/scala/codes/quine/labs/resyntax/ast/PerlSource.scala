@@ -14,5 +14,4 @@ enum PerlSource(val name: String):
 
 object PerlSource:
 
-  /** Returns the source kind with the name. */
   def of(name: String): Option[PerlSource] = values.find(_.name == name)

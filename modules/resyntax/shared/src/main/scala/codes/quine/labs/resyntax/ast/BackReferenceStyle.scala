@@ -1,6 +1,5 @@
 package codes.quine.labs.resyntax.ast
 
-/** BackReferenceStyle is a style for back-reference escape. */
 sealed abstract class BackReferenceStyle extends Product with Serializable
 
 object BackReferenceStyle:

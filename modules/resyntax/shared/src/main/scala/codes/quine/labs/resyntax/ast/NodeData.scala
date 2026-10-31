@@ -1,6 +1,5 @@
 package codes.quine.labs.resyntax.ast
 
-/** Node is a AST (abstract syntax tree) node for regular expression pattern. */
 sealed abstract class NodeData extends Product with Serializable:
   def equalsWithoutLoc(that: NodeData): Boolean = (this, that) match
     case (NodeData.Disjunction(ls), NodeData.Disjunction(rs)) =>
@@ -105,7 +104,6 @@ object NodeData:
     */
   case object Dot extends NodeData
 
-  /** Backslash is a backslash pattern node. */
   final case class Backslash(kind: BackslashKind) extends NodeData
 
   /** Class is a class pattern node.
@@ -119,5 +117,4 @@ object NodeData:
   object Class:
     def apply(invert: Boolean, item: ClassItemData): Class = Class(invert, ClassItem(item))
 
-  /** Literal is a character literal node. */
   final case class Literal(value: Int) extends NodeData

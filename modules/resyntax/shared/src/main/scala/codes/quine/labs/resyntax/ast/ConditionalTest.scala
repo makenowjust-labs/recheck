@@ -55,7 +55,7 @@ object ConditionalTest:
   /** Version is a version comparison test (e.g. `(VERSION>=1.2)`). */
   final case class Version(lt: Boolean, major: Int, minor: Int) extends ConditionalTest
 
-  /** LookAhead is a look-around test (e.g. `(foo)`). */
+  /** LookAround is a look-around test (e.g. `(foo)`). */
   final case class LookAround(kind: Option[GroupKind.LookAround], node: Node) extends ConditionalTest
 
   object LookAround:

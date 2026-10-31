@@ -1,6 +1,5 @@
 package codes.quine.labs.resyntax.ast
 
-/** BoundaryModifier is a kind of boundary modifier. */
 sealed abstract class BoundaryModifier extends Product with Serializable
 
 object BoundaryModifier:

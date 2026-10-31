@@ -1,6 +1,5 @@
 package codes.quine.labs.resyntax.ast
 
-/** EscapeClassKind is a kind of backslash escape class. */
 sealed abstract class EscapeClassKind extends Product with Serializable
 
 object EscapeClassKind:
@@ -8,7 +7,7 @@ object EscapeClassKind:
   /** Digit is `\d` class. */
   case object Digit extends EscapeClassKind
 
-  /** Digit is `\d` class. */
+  /** NonDigit is `\D` class. */
   case object NonDigit extends EscapeClassKind
 
   /** Space is `\s` class. */
@@ -74,5 +73,5 @@ object EscapeClassKind:
   /** NonUnicodePropertyValue is `\P{XXX=YYY}` class. */
   final case class NonUnicodePropertyValue(name: String, value: String) extends EscapeClassKind
 
-  /** QuoteSet is `\q{}` */
+  /** QuoteSet is `\q{...}` class. */
   final case class QuoteSet(strings: Seq[Seq[QuoteLiteral]]) extends EscapeClassKind

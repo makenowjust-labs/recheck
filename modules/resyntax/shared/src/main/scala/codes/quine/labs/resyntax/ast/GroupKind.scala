@@ -42,7 +42,6 @@ object GroupKind:
   /** PNamedCapture is a kind of alternative named capture node (e.g. `(?P<foo>...)`). */
   final case class PNamedCapture(name: String) extends GroupKind
 
-  /** LookAround is a kind of look-around groups. */
   sealed abstract class LookAround extends GroupKind
 
   /** PositiveLookAhead is a kind of positive look-ahead group (e.g. `(?=...)`). */
@@ -63,7 +62,7 @@ object GroupKind:
   /** NonAtomicPositiveLookAhead is a kind of non-atomic positive look-ahead group (e.g. `(?*...)`). */
   final case class NonAtomicPositiveLookAhead(style: AssertNameStyle) extends GroupKind
 
-  /** NonAtomicPositiveLookAhead is a kind of non-atomic positive look-ahead group (e.g. `(?<*...)`). */
+  /** NonAtomicPositiveLookBehind is a kind of non-atomic positive look-behind group (e.g. `(?<*...)`). */
   final case class NonAtomicPositiveLookBehind(style: AssertNameStyle) extends GroupKind
 
   /** ScriptRun is a kind of script run group (e.g. `(*script_run:...)`). */

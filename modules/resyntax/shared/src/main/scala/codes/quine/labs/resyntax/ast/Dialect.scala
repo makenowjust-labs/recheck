@@ -8,10 +8,8 @@ enum Dialect:
   /** JavaScript specifies JavaScript (ECMA-262) dialect. */
   case JavaScript
 
-  /** Java specifies Java dialect. */
   case Java
 
-  /** DotNet specifies .NET dialect. */
   case DotNet
 
   /** PCRE specifies PCRE dialect, as PHP's `preg_*` functions use it.
@@ -44,7 +42,6 @@ enum Dialect:
     */
   case Perl(utf8: Boolean = true, source: PerlSource = PerlSource.Literal)
 
-  /** The name of the dialect's language. */
   def name: String = this match
     case JavaScript => "javascript"
     case Java       => "java"
@@ -54,39 +51,31 @@ enum Dialect:
     case _: Ruby    => "ruby"
     case _: Perl    => "perl"
 
-  /** Whether the dialect is [[JavaScript]]. */
   def isJavaScript: Boolean = this == JavaScript
 
-  /** Whether the dialect is [[Java]]. */
   def isJava: Boolean = this == Java
 
-  /** Whether the dialect is [[DotNet]]. */
   def isDotNet: Boolean = this == DotNet
 
-  /** Whether the dialect is [[PCRE]]. */
   def isPCRE: Boolean = this == PCRE
 
-  /** Whether the dialect is [[Python]]. */
   def isPython: Boolean = this match
     case _: Python => true
     case _         => false
 
-  /** Whether the dialect is [[Ruby]]. */
   def isRuby: Boolean = this match
     case _: Ruby => true
     case _       => false
 
-  /** Whether the dialect is [[Perl]]. */
   def isPerl: Boolean = this match
     case _: Perl => true
     case _       => false
 
 object Dialect:
 
-  /** The names of the dialects' languages. */
   val names: Seq[String] = Seq("javascript", "java", "dotnet", "pcre", "python", "ruby", "perl")
 
-  /** Returns the dialect of the language with the name, with the default settings. */
+  /** Returns the dialect with its default settings. */
   def of(name: String): Option[Dialect] = name match
     case "javascript" => Some(JavaScript)
     case "java"       => Some(Java)
@@ -110,7 +99,6 @@ object Dialect:
 
     object Type:
 
-      /** Returns the type with the name. */
       def of(name: String): Option[Type] = values.find(_.name == name)
 
   object Ruby:
@@ -126,5 +114,4 @@ object Dialect:
 
     object Encoding:
 
-      /** Returns the encoding with the name. */
       def of(name: String): Option[Encoding] = values.find(_.name == name)

@@ -1,6 +1,5 @@
 package codes.quine.labs.resyntax.ast
 
-/** AssertKind is a kind of backslash assertion. */
 sealed abstract class AssertKind extends Product with Serializable
 
 object AssertKind:

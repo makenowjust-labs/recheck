@@ -1,4 +1,5 @@
 package codes.quine.labs.resyntax.parser
+
 import codes.quine.labs.resyntax.ast.AssertNameStyle.*
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.CommandKind.*

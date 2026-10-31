@@ -69,7 +69,6 @@ object Parser:
       case ex: ParsingException if rewrites.nonEmpty =>
         throw new ParsingException(ex.message, ex.pos.map(pos => rewrites.foldLeft(pos)((p, r) => r.position(p))))
 
-  /** Rejects a character that the source encoding cannot have. */
   private def checkEncoding(source: String, encoding: SourceEncoding): Unit =
     if encoding == SourceEncoding.Latin1 then
       val pos = source.indexWhere(_ > 0xff)
@@ -272,8 +271,7 @@ private[parser] final class Parser(
         pushRepeat(stack, popRepeatable(stack), quantifier)
 
   private def parseRepeatCountOption(): Option[Int] =
-    val start = offset
-    parseSaturatedIntOption(featureSet.maxRepeatCount, "Number too big in {} quantifier", start)
+    parseSaturatedIntOption(featureSet.maxRepeatCount, "Number too big in {} quantifier", offset)
 
   private def skipBraceBlank(force: Boolean = false): Unit =
     if force || featureSet.allowsBlankInBrace then while !isEnd && (currentChar == ' ' || currentChar == '\t') do next()
@@ -970,11 +968,9 @@ private[parser] final class Parser(
 
   private def parseCode(end: Char, escapeDouble: Boolean = false): String =
     val start = offset
-    while !isEnd &&
-      !(currentChar == end && !(escapeDouble && offset + 1 < source.length && source.charAt(offset + 1) == end))
-    do
-      if currentChar == end && escapeDouble && offset + 1 < source.length && source.charAt(offset + 1) == end then
-        next()
+    def isDoubledEnd: Boolean = escapeDouble && source.startsWith(s"$end$end", offset)
+    while !isEnd && (currentChar != end || isDoubledEnd) do
+      if isDoubledEnd then next()
       next()
     assert(!isEnd, "Invalid group")
     val code = source.slice(start, offset)
@@ -1171,9 +1167,7 @@ private[parser] final class Parser(
       for name <- StartOptions do
         if source.startsWith(s"$name)", offset) then
           // PCRE2 accepts `(*TURKISH_CASING)` only in UTF mode (in the 8-bit library), by `u` or `(*UTF)`.
-          if name == "TURKISH_CASING" then
-            val options = "^(?:\\(\\*[A-Z0-9_=]+\\))*".r.findPrefixOf(source).getOrElse("")
-            assert(featureSet.readsAsUnicode || Seq("(*UTF)", "(*UTF8)").exists(options.contains), "Invalid group")
+          if name == "TURKISH_CASING" then assert(featureSet.readsAsUnicode, "Invalid group")
           reset(offset + name.length)
           pushCommand(stack, CommandKind.StartOption(name, None), start)
           boundary.break(true)
@@ -1470,11 +1464,11 @@ private[parser] final class Parser(
   private def parseBackslashLowerB(): BackslashKind =
     if context.inClass then
       assert(featureSet.hasBackslashBackspace, "Invalid backslash escape")
-      return parseBackslashBackslash()
+      return parseBackslashBackspace()
 
     parseBackslashBoundary()
 
-  private def parseBackslashBackslash(): BackslashKind =
+  private def parseBackslashBackspace(): BackslashKind =
     next()
     BackslashKind.Escape(EscapeStyle.Single('b'), 0x0008)
 
@@ -1698,7 +1692,9 @@ private[parser] final class Parser(
     expect('{', "Invalid backslash escape")
     val value = parseBracedCodePoint(8)
     BackslashKind.Escape(EscapeStyle.Octal, value)
+
   private def parseBackslashLowerP(): BackslashKind = parseBackslashProperty(invert = false)
+
   private def parseBackslashProperty(invert: Boolean): BackslashKind =
     if !featureSet.hasBackslashUnicodeProperty then return parseBackslashUnknown()
 
@@ -1789,8 +1785,8 @@ private[parser] final class Parser(
             fail("Invalid backslash escape", save)
       else
         assert(!"()[]{/-".contains(currentChar), "Invalid set operation")
-        val isDouble =
-          "&!#$%*+,.:;<=>?@^`~".contains(currentChar) && source.startsWith(s"$currentChar$currentChar", offset)
+        val isDouble = ClassSetReservedDoublePunctuators.contains(currentChar) &&
+          source.startsWith(s"$currentChar$currentChar", offset)
         assert(!isDouble, "Invalid set operation")
         val value = if featureSet.readsAsUnicode then currentCodePoint else currentChar.toInt
         nextCodePoint(value)
@@ -1870,6 +1866,7 @@ private[parser] final class Parser(
       case value +: rest =>
         pendingCodePoints = rest.toList
         BackslashKind.Escape(EscapeStyle.UnicodeBracket, value)
+
   private def parseBackslashLowerV(): BackslashKind =
     if !(featureSet.hasBackslashVerticalSpace || featureSet.hasBackslashVerticalTab) then return parseBackslashUnknown()
 
@@ -1906,6 +1903,7 @@ private[parser] final class Parser(
     assert(featureSet.allowsBrokenBackslashHex, "Invalid backslash escape")
     reset(save)
     parseBackslashUnknown()
+
   private def parseBackslashLowerZ(): BackslashKind =
     if !featureSet.hasBackslashEnd then return parseBackslashUnknown()
 
@@ -2021,6 +2019,7 @@ private[parser] final class Parser(
     }
 
   private def parseBackslashUpperP(): BackslashKind = parseBackslashProperty(invert = true)
+
   private def parseBackslashUpperQ(): BackslashKind =
     if !featureSet.hasBackslashQuoteCommand then return parseBackslashUnknown()
 
@@ -2050,6 +2049,7 @@ private[parser] final class Parser(
       )
 
     BackslashKind.Escape(EscapeStyle.UnicodeHex8, checkCodePoint(parseHexDigits(8), save))
+
   private def parseBackslashUpperV(): BackslashKind =
     if !featureSet.hasBackslashVerticalSpace then return parseBackslashUnknown()
 
@@ -2248,7 +2248,6 @@ private[parser] final class Parser(
 
     item
 
-  // Java skips whitespace and comments in a class in the comments mode.
   private def skipClassComment(): Unit =
     if context.skipsComment && featureSet.skipsCommentInClass then skipComment()
 
@@ -2487,7 +2486,6 @@ private[parser] final class Parser(
 
     fail("Unknown POSIX class", start)
 
-  /** Finds the end of a POSIX class (or a POSIX collating element if it is supported) beginning at the given offset. */
   private def findClassPosixEnd(start: Int): Option[Int] =
     if start + 1 >= source.length then return None
     val terminator = source.charAt(start + 1)
@@ -2865,7 +2863,7 @@ private[parser] final class Parser(
       featureSet.hasBackslashControlDigitInClass && context.inClass && (isDigit || currentChar == '_')
 
   private def isAlphabetic: Boolean =
-    !isEnd && ('a' <= currentChar && currentChar <= 'z' || 'A' <= currentChar && currentChar <= 'Z')
+    !isEnd && CodePointUtil.isAlphabetic(currentChar.toInt)
 
   private def isIDStart: Boolean =
     !isEnd && CodePointUtil.isIDStart(currentChar.toInt)
