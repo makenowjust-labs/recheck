@@ -11,6 +11,7 @@ import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.DialectOptions
 import codes.quine.labs.resyntax.ast.Encoding
 import codes.quine.labs.resyntax.ast.EscapeClassKind
+import codes.quine.labs.resyntax.ast.EscapeStyle
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.Node
@@ -118,19 +119,20 @@ object IRBuilder:
 
   /** Checks whether a Perl pattern uses Unicode rules under `/d` (perlre "Which character set modifier is in effect?").
     *
-    * A UTF-8 pattern does, and a code point above `U+00FF`, `\p{...}` and `\N{...}` make the pattern UTF-8. Without
-    * `utf8`, a non-ASCII literal is taken as a sign of a UTF-8 pattern (with `use utf8`).
+    * A UTF-8 pattern does, and a code point above `U+00FF`, `\p{...}` and `\N{...}` (including `\N{U+...}`) make the
+    * pattern UTF-8. Without `utf8`, a non-ASCII literal is taken as a sign of a UTF-8 pattern (with `use utf8`).
     */
   private def usesPerlUnicodeRules(node: Node, utf8: Option[Boolean]): Boolean =
     utf8.contains(true) || usesPerlUnicodeSyntax(node, literals = utf8.isEmpty)
 
   private def usesPerlUnicodeSyntax(node: Node, literals: Boolean): Boolean =
     def check(x: Any): Boolean = x match
-      case NodeData.Literal(value)           => literals && value >= 0x80
-      case ClassItemData.ClassLiteral(value) => literals && value >= 0x80
-      case QuoteLiteral.QuoteValue(value)    => literals && value >= 0x80
-      case BackslashKind.Escape(_, value)    => value > 0xff
-      case _: EscapeClassKind.CharName       => true
+      case NodeData.Literal(value)                       => literals && value >= 0x80
+      case ClassItemData.ClassLiteral(value)             => literals && value >= 0x80
+      case QuoteLiteral.QuoteValue(value)                => literals && value >= 0x80
+      case BackslashKind.Escape(EscapeStyle.NamedHex, _) => true
+      case BackslashKind.Escape(_, value)                => value > 0xff
+      case _: EscapeClassKind.CharName                   => true
       case _: EscapeClassKind.UnicodeProperty | _: EscapeClassKind.UnicodeBareProperty |
           _: EscapeClassKind.UnicodePropertyValue | _: EscapeClassKind.NonUnicodeProperty |
           _: EscapeClassKind.NonUnicodeBareProperty | _: EscapeClassKind.NonUnicodePropertyValue =>

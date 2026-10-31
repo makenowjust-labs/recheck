@@ -207,6 +207,9 @@ class IRCharSuite extends munit.FunSuite:
   chars("(?a)k", "i", Perl)(of("kK\u212a"))
   chars("(?aa)(?u)k", "i", Perl)(of("kK\u212a"))
   chars("(?aa)(?^i)k", "", Perl)(of("kK\u212a"))
+  // `\N{U+...}` makes Perl's pattern use Unicode rules, as `\N{...}` does.
+  checkSet("[\\w\\N{U+41}]", "", Perl)(set => set.contains(0xe9))
+  checkSet("[\\w\\x{41}]", "", Perl)(set => !set.contains(0xe9))
   chars("(*TURKISH_CASING)i", "iu", PCRE)(of("i\u0130"))
   // Ruby and Perl fold plain literals to several characters (e.g. `ß` and `ss`), longest first.
   // Unicode 18 adds a character folded to `ß`, so the sets come from the tables.
