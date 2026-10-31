@@ -24,7 +24,6 @@ object ParametersGen {
       values: Seq[String],
       scalaType: String,
       scalaValues: Map[String, String],
-      unit: Option[String],
       cli: Option[String],
       cliMetavar: Option[String],
       scalaDefaultValue: Option[String],
@@ -37,8 +36,7 @@ object ParametersGen {
     def capitalName: String = name.capitalize
     def defaultName: String = s"Parameters.Default$capitalName"
 
-    def scalaDefault: String = default match {
-      case _ if scalaDefaultValue.isDefined                   => scalaDefaultValue.get
+    def scalaDefault: String = scalaDefaultValue.getOrElse(default match {
       case null if isDuration                                 => "Duration.Inf"
       case null                                               => "None"
       case n: Number if isDuration && n.longValue % 1000 == 0 => s"Duration(${n.longValue / 1000}, SECONDS)"
@@ -47,7 +45,7 @@ object ParametersGen {
       case s: String                                          => s"Some(${literal(s)})"
       case b: java.lang.Boolean if isOption                   => s"Some($b)"
       case v                                                  => v.toString
-    }
+    })
 
     /** The first paragraph of the description on one line. */
     def summary: String = description.split("\n\n").head.replace('\n', ' ')
@@ -101,7 +99,6 @@ object ParametersGen {
         values = values,
         scalaType = string("x-scala-type").getOrElse(sys.error(s"$name has no x-scala-type")),
         scalaValues = scalaValues,
-        unit = string("x-unit"),
         cli = string("x-cli"),
         cliMetavar = string("x-cli-metavar"),
         scalaDefaultValue = string("x-scala-default"),
@@ -149,8 +146,7 @@ object ParametersGen {
 
   private def imports(names: Seq[String]): String = names.distinct.sorted.map(n => s"import $n").mkString("\n")
 
-  private def typeImportsOf(params: Seq[Param], exclude: String): Seq[String] =
-    params.flatMap(p => typeImports.get(p.scalaType)).filterNot(_.startsWith(exclude))
+  private def typeImportsOf(params: Seq[Param]): Seq[String] = params.flatMap(p => typeImports.get(p.scalaType))
 
   private def docLines(description: String, indent: String): String =
     description.linesIterator.map(l => if (l.isEmpty) s"$indent*" else s"$indent* $l").mkString("\n")
@@ -174,7 +170,7 @@ object ParametersGen {
         |
         |import scala.concurrent.duration.*
         |
-        |${imports(typeImportsOf(params, "codes.quine.labs.recheck.common."))}
+        |${imports(typeImportsOf(params).filterNot(_.startsWith("codes.quine.labs.recheck.common.")))}
         |
         |/** Parameters is an immutable representation of parameters.
         |  *
@@ -214,7 +210,7 @@ object ParametersGen {
       "io.circe.HCursor",
       "codes.quine.labs.recheck.common.Context",
       "codes.quine.labs.recheck.common.Parameters"
-    ) ++ typeImportsOf(params, "_")
+    ) ++ typeImportsOf(params)
     s"""|$header
         |${packages(Target.Codec)}
         |
@@ -277,7 +273,7 @@ object ParametersGen {
       "codes.quine.labs.recheck.common.Context",
       "codes.quine.labs.recheck.common.Parameters",
       "scala.concurrent.duration.Duration"
-    ) ++ typeImportsOf(params, "_")
+    ) ++ typeImportsOf(params)
     s"""|$header
         |${packages(Target.Cli)}
         |
