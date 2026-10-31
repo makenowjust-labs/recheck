@@ -69,7 +69,6 @@ Some constructs are recognized, but the checkers do not handle them.
 A pattern having one of them is reported as `unknown` with an `unsupported` error naming the construct (e.g. `a(?R)?` gives `unsupported syntax (RCall) at 1`).
 
 - Recursion and subroutine calls (e.g. `(?R)`, `(?1)`, `(?&name)`, `\g<name>`), and the conditionals depending on them (`(?(R)...)`, and `(?(DEFINE)...)` in a pattern with calls).
-- `(*ACCEPT)` in a look-behind.
 - Callouts (e.g. `(?C1)`) and embedded code (e.g. Perl's `(?{ ... })` and `(??{ ... })`).
 - `\N{name}` and `\C` in a mode other than bytes.
 - Word boundaries of a kind, such as `\b{wb}`.
@@ -149,11 +148,21 @@ There are other deliberate approximations.
 - `\X` is the extended grapheme cluster of the regular expression in UAX #29 (Table 1b) in an atomic group, as the engines match one cluster without backtracking into it.
   In a bytes mode, it reads each byte as the Latin-1 character.
   PCRE's `\X` follows the rules of PCRE2 10.49 instead, which differ from UAX #29: no rule GB9c of Unicode 15.1 (e.g. `क्ष` is two clusters there), no join of a regional indicator with a following mark or of a prepended character with an extended pictographic, and two regional indicators join only after an even number of regional indicators in the input (e.g. `\X` matches one of three regional indicators from the second).
-  Java's look-behind with `\X` matches nowhere if its `TreeInfo` lengths leave no start to try (e.g. `(?<=\X)`), and is unsupported otherwise.
+  Java's look-behind with `\X` matches nowhere if its `TreeInfo` lengths leave no start to try (e.g. `(?<=\X)`).
+- A look-behind matches as the engine does, which changes the captures, the chosen alternative and the steps.
+  JavaScript and .NET match it backward from the position.
+  The others match it forward from a start before the position, and the match must end at the position (or at `(*ACCEPT)`).
+  PCRE, Perl, Python and Ruby try the starts from the farthest, where PCRE and Ruby take each alternative in turn (e.g. `(?<=(a)|(aa))b` sets the group `1` on `aab`, but the group `2` in Perl).
+  Java tries the starts from the nearest by the lengths that its `TreeInfo` computes, in UTF-16 code units, or in code points when the pattern has a supplementary character after the look-behind.
 - For JavaScript's `v` flag, `recheck` follows the specification.
 - Look-arounds (including non-atomic ones), back-references, atomic groups, possessive quantifiers, conditionals and the backtracking control verbs other than `(*FAIL)` and `(*MARK)` are handled by the fuzz checker, not by the automaton checker.
 - A back-reference sees the captures as the engine keeps them over the iterations of a loop: JavaScript resets them on each iteration, and Perl unsets the captures of a failed alternative and of a fixed-length repetition matching nothing (e.g. `^(?:(a)?b){2}\1$` does not match `abba` in Perl).
-  Two behaviors are not reproduced: Java does not restore the captures in a repeated group without branches (e.g. `(?:(b)c)*`) when the repetition backtracks, even at a later starting position, and the engines differ on an iteration matching the empty string.
+  Java does not restore the captures in an atomic group, a look-around or a repeated group without branches (e.g. `(?:(b)c)*`) once it matches, even when it backtracks to a later starting position (e.g. `(?:(a)b)+x|b\1` matches `ba` in `aba`), and it matches each iteration of such a group, or of `\R` under a quantifier, in its first way.
+- An iteration matching the empty string is handled as the engine does.
+  JavaScript rejects an optional one, and so does Java's repetition of a single node or of a group without branches.
+  The others end the repetition with it: Python with an optional one, Perl, .NET and PCRE with the last mandatory one or an optional one, and Java's repetition of a group with branches with any one, even before the minimum count (e.g. `^(?:()|a){2}\1$` sets the group `1` at the end of `a` in Java and Perl, but at the start in Python and .NET).
+  PCRE repeats copies of the node for a bounded repetition, where an empty iteration does not end it.
+  Ruby is not reproduced: Onigmo also repeats copies for a bounded repetition depending on the size of its compiled code, and it checks the captures in an empty iteration.
 
 ### Searches, Conditionals and Backtracking Control Verbs
 
@@ -166,7 +175,8 @@ There are other deliberate approximations.
   Ruby allows it in a look-around, and reports a start after the end as the end.
 - A conditional tests whether a group is set, or a look-around assertion, which is atomic.
   `(?(DEFINE)...)` is skipped, `(?(R)...)` and the other recursion tests are false (out of recursion), and PCRE's `(?(VERSION>=10.0)...)` compares with PCRE2 10.49.
-  The captures in a look-around condition remain after it, except in .NET, which drops them (`recheck` unsets them, though they may have had earlier values).
+  The captures in a look-around condition remain after it, even if it is negative, except that .NET restores them for a negative one.
+  .NET does not capture the first unnamed group after a conditional with a look-around (e.g. `(?(?=(a))a)(b)` captures `b` as the group `1`, and the group `2` is never set), as its parser does.
   A name shared by groups holds if one of them is set, but Ruby tests only the first group.
 - PCRE's non-atomic look-arounds (`(*napla:...)`, `(?*...)`, `(*naplb:...)` and `(?<*...)`) let backtracking enter them again, as the engine does.
 - PCRE's `(*NOTEMPTY)` and `(*NOTEMPTY_ATSTART)` reject an empty match (anywhere, or at the start of the input), and the engine backtracks further.
@@ -174,7 +184,7 @@ There are other deliberate approximations.
 - The backtracking control verbs of PCRE and Perl follow the PCRE2 documentation: `(*FAIL)` never matches, `(*ACCEPT)` ends the match (or the assertion), and `(*COMMIT)`, `(*PRUNE)`, `(*SKIP)`, `(*SKIP:NAME)` and `(*THEN)` cut the backtracking when it reaches them.
   They can make a vulnerable pattern safe (e.g. `^(?:a|a)*(*COMMIT)$`), and the fuzz checker runs them.
   For Perl, `(*ACCEPT)` in an atomic group or a possessive repetition ends only the group, and `(*THEN)` goes beyond a look-around assertion to the enclosing alternation, as Perl does.
-  Perl ignores `(*THEN)` in alternatives that it compiles into a trie (e.g. `aa(*THEN)b|a`), which `recheck` does not reproduce.
+  Perl compiles consecutive alternatives starting with a literal into a trie, and `(*THEN)` in one of them goes to the alternative after the trie (e.g. `aa(*THEN)b|a` matches `a` at `1` in `aac`, and at `0` in PCRE2), which `recheck` reproduces.
 - PCRE2 and Perl skip the attempts that cannot match by their start-of-match optimizations (e.g. `(*COMMIT)abc` matches `xyzabc` in PCRE2, unless the pattern starts with `(*NO_START_OPT)`), and `recheck` does not model them, as it does not model the other optimizations.
 
 ## Recall Validation

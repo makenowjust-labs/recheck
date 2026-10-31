@@ -17,12 +17,13 @@ sealed abstract class IRNodeData extends Product with Serializable:
       l.equalsWithoutLoc(r)
     case (IRNodeData.LookAhead(ln, l), IRNodeData.LookAhead(rn, r)) =>
       ln == rn && l.equalsWithoutLoc(r)
-    case (IRNodeData.LookBehind(ln, l), IRNodeData.LookBehind(rn, r)) =>
-      ln == rn && l.equalsWithoutLoc(r)
+    case (IRNodeData.LookBehind(ln, l, lm), IRNodeData.LookBehind(rn, r, rm)) =>
+      ln == rn && lm == rm && l.equalsWithoutLoc(r)
     case (IRNodeData.Capture(li, ln, l), IRNodeData.Capture(ri, rn, r)) =>
       li == ri && ln == rn && l.equalsWithoutLoc(r)
-    case (IRNodeData.NonAtomicLookAhead(l), IRNodeData.NonAtomicLookAhead(r))     => l.equalsWithoutLoc(r)
-    case (IRNodeData.NonAtomicLookBehind(l), IRNodeData.NonAtomicLookBehind(r))   => l.equalsWithoutLoc(r)
+    case (IRNodeData.NonAtomicLookAhead(l), IRNodeData.NonAtomicLookAhead(r))           => l.equalsWithoutLoc(r)
+    case (IRNodeData.NonAtomicLookBehind(l, lm), IRNodeData.NonAtomicLookBehind(r, rm)) =>
+      lm == rm && l.equalsWithoutLoc(r)
     case (IRNodeData.Conditional(lc, ly, ln), IRNodeData.Conditional(rc, ry, rn)) =>
       lc.equalsWithoutLoc(rc) && ly.equalsWithoutLoc(ry) && ln.equalsWithoutLoc(rn)
     case (IRNodeData.Unsupported(l), IRNodeData.Unsupported(r)) => l.equalsWithoutLoc(r)
@@ -83,11 +84,14 @@ object IRNodeData:
   object LookAhead:
     def apply(negative: Boolean, data: IRNodeData): IRNodeData = LookAhead(negative, IRNode(data))
 
-  /** LookBehind is a look-behind assertion. */
-  final case class LookBehind(negative: Boolean, node: IRNode) extends IRNodeData
+  /** LookBehind is a look-behind assertion, whose body the engine matches as `matching`. */
+  final case class LookBehind(negative: Boolean, node: IRNode, matching: IRLookBehindMatch = IRLookBehindMatch.Backward)
+      extends IRNodeData
 
   object LookBehind:
     def apply(negative: Boolean, data: IRNodeData): IRNodeData = LookBehind(negative, IRNode(data))
+    def apply(negative: Boolean, data: IRNodeData, matching: IRLookBehindMatch): IRNodeData =
+      LookBehind(negative, IRNode(data), matching)
 
   /** Assert is a simple zero-width assertion. */
   final case class Assert(kind: IRAssertKind) extends IRNodeData
@@ -117,7 +121,8 @@ object IRNodeData:
   /** NonAtomicLookBehind is a positive look-behind assertion that backtracking can enter again (e.g. PCRE's
     * `(?<*...)`).
     */
-  final case class NonAtomicLookBehind(node: IRNode) extends IRNodeData
+  final case class NonAtomicLookBehind(node: IRNode, matching: IRLookBehindMatch = IRLookBehindMatch.Backward)
+      extends IRNodeData
 
   /** Conditional matches `yes` if the condition holds at the position, and `no` otherwise (e.g. `(?(1)a|b)`).
     *
@@ -145,9 +150,10 @@ object IRNodeData:
 /** IRCondition is a condition of [[IRNodeData.Conditional]]. */
 sealed abstract class IRCondition extends Product with Serializable:
   def equalsWithoutLoc(that: IRCondition): Boolean = (this, that) match
-    case (IRCondition.LookAhead(ln, l), IRCondition.LookAhead(rn, r))   => ln == rn && l.equalsWithoutLoc(r)
-    case (IRCondition.LookBehind(ln, l), IRCondition.LookBehind(rn, r)) => ln == rn && l.equalsWithoutLoc(r)
-    case (l, r)                                                         => l == r
+    case (IRCondition.LookAhead(ln, l), IRCondition.LookAhead(rn, r))           => ln == rn && l.equalsWithoutLoc(r)
+    case (IRCondition.LookBehind(ln, l, lm), IRCondition.LookBehind(rn, r, rm)) =>
+      ln == rn && lm == rm && l.equalsWithoutLoc(r)
+    case (l, r) => l == r
 
 object IRCondition:
 
@@ -161,10 +167,46 @@ object IRCondition:
     def apply(negative: Boolean, data: IRNodeData): IRCondition = LookAhead(negative, IRNode(data))
 
   /** LookBehind holds if the look-behind assertion succeeds, which is atomic. */
-  final case class LookBehind(negative: Boolean, node: IRNode) extends IRCondition
+  final case class LookBehind(negative: Boolean, node: IRNode, matching: IRLookBehindMatch = IRLookBehindMatch.Backward)
+      extends IRCondition
 
   object LookBehind:
     def apply(negative: Boolean, data: IRNodeData): IRCondition = LookBehind(negative, IRNode(data))
+    def apply(negative: Boolean, data: IRNodeData, matching: IRLookBehindMatch): IRCondition =
+      LookBehind(negative, IRNode(data), matching)
+
+/** IRLookBehindMatch is how the engine matches the body of a look-behind. */
+sealed abstract class IRLookBehindMatch extends Product with Serializable
+
+object IRLookBehindMatch:
+
+  /** Backward matches the body backward from the position (JavaScript and .NET). */
+  case object Backward extends IRLookBehindMatch
+
+  /** Forward matches the body forward from a start before the position, and the match must end at the position.
+    *
+    * It has the starts of the whole body, or of each alternative when the body is a disjunction that the engine splits
+    * (PCRE and Ruby), which are tried in turn.
+    */
+  final case class Forward(starts: Seq[IRLookBehindStarts]) extends IRLookBehindMatch
+
+/** IRLookBehindStarts is the starts of a look-behind matched forward, in the order that the engine tries them. */
+sealed abstract class IRLookBehindStarts extends Product with Serializable
+
+object IRLookBehindStarts:
+
+  /** Longest tries the starts from `max` characters before the position down to `min` ones, skipping the ones before
+    * the input (PCRE, Perl, Python and Ruby).
+    */
+  final case class Longest(min: Int, max: Int) extends IRLookBehindStarts
+
+  /** Java tries the starts of `java.util.regex.Pattern`'s look-behind with the lengths of its `TreeInfo`: from `min`
+    * UTF-16 code units before the position to `max` ones, where the lengths may overflow as `int`.
+    *
+    * With `codePoints`, they are code points (`BehindS`, when the pattern has a supplementary character from the
+    * look-behind on).
+    */
+  final case class Java(min: Int, max: Int, codePoints: Boolean) extends IRLookBehindStarts
 
 /** IRBacktrackControl is a backtracking control verb other than `(*FAIL)`.
   *

@@ -9,6 +9,7 @@ import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminators
+import codes.quine.labs.resyntax.ir.IRLookBehindStarts
 import codes.quine.labs.resyntax.ir.IRWordMarks
 
 /** Inst is an instruction. */
@@ -64,6 +65,13 @@ object Inst:
     def successors: Set[Label] = Set(lt, ge)
     override def toString: String = s"cmp $reg $n $lt $ge"
 
+  /** `cmp_canary`: Jumps to an `empty` block if current position is the one saved in the canary register, or to an
+    * `advanced` block.
+    */
+  final case class CmpCanary(reg: CanaryReg, empty: Label, advanced: Label) extends Terminator:
+    def successors: Set[Label] = Set(empty, advanced)
+    override def toString: String = s"cmp_canary $reg $empty $advanced"
+
   /** `fail`: Fails a matching, which backtracks. */
   case object Fail extends Terminator:
     def successors: Set[Label] = Set.empty
@@ -110,6 +118,15 @@ object Inst:
   final case class IfCap(indices: Seq[Int], yes: Label, no: Label) extends Terminator:
     def successors: Set[Label] = Set(yes, no)
     override def toString: String = s"if_cap ${indices.mkString(",")} $yes $no"
+
+  /** `step_back`: Saves the position to the `end` register, and jumps to a `next` block at each start of a look-behind
+    * matched forward, in the order of `starts`, as backtracking points.
+    *
+    * The register holds the end of the look-behind, so memoization tells the look-behinds at different positions apart.
+    */
+  final case class StepBack(end: CounterReg, starts: IRLookBehindStarts, next: Label) extends Terminator:
+    def successors: Set[Label] = Set(next)
+    override def toString: String = s"step_back $end $starts $next"
 
   /** Barrier is what the frame of a fallback is for the backtracking control verbs, which skip the frames to it. */
   sealed abstract class Barrier
@@ -193,6 +210,14 @@ object Inst:
     override def toString: String = restore match
       case Some((from, to)) => s"cap_keep $from $to"
       case None             => "cap_keep"
+
+  /** `cap_hold`: Holds the captures between `from` and `to` over backtracking, which takes their values now unless it
+    * goes back after this.
+    *
+    * Java does not restore the captures in an atomic group or a look-around, once it matches.
+    */
+  final case class CapHold(from: Int, to: Int) extends NonTerminator:
+    override def toString: String = s"cap_hold $from $to"
 
   /** `cap-reset`: Resets captures between `from` and `to`. */
   final case class CapReset(from: Int, to: Int) extends NonTerminator:
@@ -281,6 +306,10 @@ object Inst:
     /** `$` assertion matching also before a line terminator at the end (e.g. Python's `$`). */
     final case class ChompInputEnd(terminators: IRLineTerminators) extends AssertKind:
       override def toString: String = "chomp_input_end"
+
+    /** The end of a look-behind matched forward, which the register holds. */
+    final case class LookBehindEnd(end: CounterReg) extends AssertKind:
+      override def toString: String = s"look_behind_end $end"
 
     /** An assertion that the position is not between `\r` and `\n` (e.g. after PCRE's `.` with `(*CRLF)`). */
     case object NotBetweenCRLF extends AssertKind:

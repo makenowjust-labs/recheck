@@ -24,6 +24,9 @@ object Program:
     *   state includes then
     * @param hasVerb
     *   whether the program has `verb` instructions, which skip backtracking points, so memoization cannot be used
+    * @param hasLeave
+    *   whether the program has `leave` instructions, after which the matching depends on the start of the look-around,
+    *   so memoization cannot be used
     */
   final case class Meta(
       mode: UnitMode,
@@ -32,7 +35,8 @@ object Program:
       capturesSize: Int,
       countersSize: Int,
       canariesSize: Int,
-      predecessors: Vector[Set[Label]]
+      predecessors: Vector[Set[Label]],
+      hasLeave: Boolean = false
   ):
 
     /** Whether a surrogate pair of the input is read as one character. */
