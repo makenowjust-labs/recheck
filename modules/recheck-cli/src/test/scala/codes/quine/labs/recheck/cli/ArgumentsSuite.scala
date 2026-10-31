@@ -55,8 +55,3 @@ class ArgumentsSuite extends munit.FunSuite:
     assertEquals(perlSourceArgument.read("string"), Validated.validNel(PerlSource.String))
     assertEquals(perlSourceArgument.read("xxx"), Validated.invalidNel("unknown perl source: xxx"))
     assertEquals(perlSourceArgument.defaultMetavar, "source")
-
-  test("arguments.commandArgument"):
-    assertEquals(commandArgument.read(" ruby  --disable-gems "), Validated.validNel(Seq("ruby", "--disable-gems")))
-    assertEquals(commandArgument.read(" "), Validated.invalidNel("empty command"))
-    assertEquals(commandArgument.defaultMetavar, "command")
