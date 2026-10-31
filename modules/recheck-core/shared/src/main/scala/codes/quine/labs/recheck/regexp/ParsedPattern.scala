@@ -3,12 +3,12 @@ package codes.quine.labs.recheck.regexp
 import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.resyntax.ast.BackslashKind
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.DialectOptions
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetException
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ir.IRBuilder
 import codes.quine.labs.resyntax.ir.IRBuildingException
-import codes.quine.labs.resyntax.ir.IREncoding
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
 import codes.quine.labs.resyntax.ir.IRPattern
@@ -74,12 +74,12 @@ object ParsedPattern:
       source: String,
       flags: String,
       dialect: Dialect = Dialect.JavaScript,
-      encoding: Option[IREncoding] = None
+      options: DialectOptions = DialectOptions.Default
   ): Either[InvalidRegExpException, ParsedPattern] =
     try
       val flagSet = FlagSet.parse(flags, dialect)
-      val node = Parser.parse(source, flagSet, dialect)
-      val ir = IRBuilder.build(node, flagSet, dialect, encoding)
+      val node = Parser.parse(source, flagSet, dialect, options)
+      val ir = IRBuilder.build(node, flagSet, dialect, options)
       Right(ParsedPattern(source, flags, dialect, flagSet, ir))
     catch
       case ex: FlagSetException    => Left(new InvalidRegExpException(ex.getMessage))

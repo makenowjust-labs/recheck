@@ -3,6 +3,8 @@ package codes.quine.labs.resyntax.ir
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
+import codes.quine.labs.resyntax.ast.DialectOptions
+import codes.quine.labs.resyntax.ast.Encoding
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
@@ -17,9 +19,9 @@ import codes.quine.labs.resyntax.parser.Parser
 class IRCharSuite extends munit.FunSuite:
   val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl, Python, Ruby)
 
-  def build(s: String, flags: String, dialect: Dialect, encoding: Option[IREncoding] = None): IRPattern =
+  def build(s: String, flags: String, dialect: Dialect, options: DialectOptions = DialectOptions.Default): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)
-    IRBuilder.build(Parser.parse(s, flagSet, dialect), flagSet, dialect, encoding)
+    IRBuilder.build(Parser.parse(s, flagSet, dialect, options), flagSet, dialect, options)
 
   def of(s: String): CharSet = CharSet.of(UString.fromString(s).iterator.toSeq*)
 
@@ -75,20 +77,20 @@ class IRCharSuite extends munit.FunSuite:
       (PCRE, "", None, UnitMode.Byte),
       (PCRE, "u", None, UnitMode.CodePoint),
       (Python, "", None, UnitMode.CodePoint),
-      (Python, "", Some(IREncoding.PythonBytes), UnitMode.Byte),
+      (Python, "", Some(Encoding.PythonBytes), UnitMode.Byte),
       (Ruby, "", None, UnitMode.CodePoint),
       (Ruby, "n", None, UnitMode.Byte),
-      (Ruby, "", Some(IREncoding.RubyAscii8Bit), UnitMode.Byte),
+      (Ruby, "", Some(Encoding.RubyAscii8Bit), UnitMode.Byte),
       (Perl, "", None, UnitMode.CodePoint),
-      (Perl, "", Some(IREncoding.PerlBytes), UnitMode.Byte)
+      (Perl, "", Some(Encoding.PerlBytes), UnitMode.Byte)
     )
   do
     test(s"IRBuilder.build: the unit mode of $dialect with /$flags/ and $encoding"):
-      assertEquals(build("a", flags, dialect, encoding).mode, mode)
+      assertEquals(build("a", flags, dialect, DialectOptions(encoding = encoding)).mode, mode)
   test("IRBuilder.build: the unit mode of PCRE with (*UTF)"):
     assertEquals(build("(*UTF)a", "", PCRE).mode, UnitMode.CodePoint)
   test("IRBuilder.build: an encoding of another dialect"):
-    intercept[IllegalArgumentException](build("a", "", Ruby, Some(IREncoding.PythonBytes)))
+    intercept[IllegalArgumentException](build("a", "", Ruby, DialectOptions(encoding = Some(Encoding.PythonBytes))))
 
   // Literals
   chars("a", "", All*)(of("a"))

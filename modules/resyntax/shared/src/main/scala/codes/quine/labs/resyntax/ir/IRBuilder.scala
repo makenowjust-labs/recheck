@@ -7,6 +7,8 @@ import codes.quine.labs.resyntax.ast.CaseCommandKind
 import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.DialectOptions
+import codes.quine.labs.resyntax.ast.Encoding
 import codes.quine.labs.resyntax.ast.EscapeClassKind
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.GroupKind
@@ -28,23 +30,29 @@ object IRBuilder:
     * It throws [[IRBuildingException]] for an error that needs the whole pattern (e.g. a reference to a non-existent
     * group, or a look-behind that the dialect does not allow).
     *
-    * @param encoding
-    *   the kind of strings, for the dialects having the choice (see [[IREncoding]]); `None` is the dialect's default
+    * @param options
+    *   the dialect's options, where IR uses the encoding
     */
-  def build(node: Node, flagSet: FlagSet, dialect: Dialect, encoding: Option[IREncoding] = None): IRPattern =
-    build(node, flagSet, dialect, encoding, None)
+  def build(
+      node: Node,
+      flagSet: FlagSet,
+      dialect: Dialect,
+      options: DialectOptions = DialectOptions.Default
+  ): IRPattern =
+    build(node, flagSet, dialect, options, None)
 
   /** Returns an IR pattern built from the given AST, where `resolveCharacter` replaces the character resolution. */
   private[ir] def build(
       node: Node,
       flagSet: FlagSet,
       dialect: Dialect,
-      encoding: Option[IREncoding],
+      options: DialectOptions,
       resolveCharacter: Option[(Node, IRCharFlags) => IRNodeData]
   ): IRPattern =
-    val options = startOptions(node)
-    val featureSet = IRFeatureSet.from(flagSet, dialect, options)
-    val mode = IREncoding.unitMode(dialect, encoding, flagSet, featureSet.utf)
+    val starts = startOptions(node)
+    val featureSet = IRFeatureSet.from(flagSet, dialect, starts)
+    options.validate(dialect)
+    val mode = unitMode(dialect, options.encoding, flagSet, featureSet.utf)
     if dialect == Dialect.Python && mode == UnitMode.CodePoint && flagSet.localeUpper then
       throw new IRBuildingException("Cannot use LOCALE flag with a str pattern", SourceLocation.Invalid)
     val context = BuildingContext.from(flagSet, dialect, featureSet)
@@ -64,6 +72,27 @@ object IRBuilder:
       featureSet.anchored,
       mode
     )
+
+  /** Returns the unit mode of a pattern from the dialect, the encoding and the flags.
+    *
+    * @param utf
+    *   PCRE's `(*UTF)` start option
+    */
+  private def unitMode(dialect: Dialect, encoding: Option[Encoding], flagSet: FlagSet, utf: Boolean): UnitMode =
+    dialect match
+      case Dialect.JavaScript =>
+        if flagSet.unicode || flagSet.unicodeSets then UnitMode.CodePoint else UnitMode.Utf16
+      // Java matches code points, and reads a lone surrogate as a code point too.
+      case Dialect.Java   => UnitMode.CodePoint
+      case Dialect.DotNet => UnitMode.Utf16
+      case Dialect.Python =>
+        if flagSet.bytes || encoding.contains(Encoding.PythonBytes) then UnitMode.Byte else UnitMode.CodePoint
+      // Ruby's `n` is the encoding option (NOENCODING), which `FlagSet` keeps as `explicitCapture`.
+      case Dialect.Ruby =>
+        if flagSet.explicitCapture || encoding.contains(Encoding.RubyAscii8Bit) then UnitMode.Byte
+        else UnitMode.CodePoint
+      case Dialect.Perl => if encoding.contains(Encoding.PerlBytes) then UnitMode.Byte else UnitMode.CodePoint
+      case Dialect.PCRE => if flagSet.unicode || utf then UnitMode.CodePoint else UnitMode.Byte
 
   /** Returns the case equivalence of a back-reference with the flags in the dialect and the mode. */
   def caseEquivalence(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRCaseEquivalence =

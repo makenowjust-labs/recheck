@@ -24,7 +24,7 @@ import codes.quine.labs.recheck.recall.RecallValidator
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.regexp.PatternExtensions.*
 import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ir.IREncoding
+import codes.quine.labs.resyntax.ast.DialectOptions
 
 /** ReDoS is a ReDoS checker frontend. */
 object ReDoS:
@@ -33,8 +33,8 @@ object ReDoS:
     *
     * @param dialect
     *   the dialect of the pattern, which is not a public parameter yet
-    * @param encoding
-    *   the kind of strings of the dialect (see [[IREncoding]]), or `None` for the dialect's default
+    * @param options
+    *   the dialect's options (see [[DialectOptions]])
     */
   def check(
       source: String,
@@ -42,7 +42,7 @@ object ReDoS:
       params: Parameters = Parameters(),
       token: Option[CancellationToken] = None,
       dialect: Dialect = Dialect.JavaScript,
-      encoding: Option[IREncoding] = None
+      options: DialectOptions = DialectOptions.Default
   ): Diagnostics =
     import params._
 
@@ -51,7 +51,7 @@ object ReDoS:
     val result = for
       _ <- Try(()) // Ensures `Try` context.
       _ = ctx.log("parse: start")
-      pattern <- ctx.interrupt(ParsedPattern.parse(source, flags, dialect, encoding).toTry)
+      pattern <- ctx.interrupt(ParsedPattern.parse(source, flags, dialect, options).toTry)
       _ = ctx.log(s"parse: finish\n  pattern: $pattern")
       diagnostics <- checker match
         case Checker.Automaton => checkAutomaton(source, flags, pattern, params)

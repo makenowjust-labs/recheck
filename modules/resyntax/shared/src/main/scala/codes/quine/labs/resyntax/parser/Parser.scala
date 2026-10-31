@@ -17,6 +17,7 @@ import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.ConditionalTest
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.DialectOptions
 import codes.quine.labs.resyntax.ast.EscapeClassKind
 import codes.quine.labs.resyntax.ast.EscapeStyle
 import codes.quine.labs.resyntax.ast.FlagSet
@@ -45,7 +46,14 @@ object Parser:
       allowsDuplicatedGroupName = featureSet.allowsDuplicatedGroupName
     )
 
-  def parse(source: String, flagSet: FlagSet, dialect: Dialect): Node =
+  /** Parses the source in the dialect. */
+  def parse(
+      source: String,
+      flagSet: FlagSet,
+      dialect: Dialect,
+      options: DialectOptions = DialectOptions.Default
+  ): Node =
+    options.validate(dialect)
     val analysis = QuickAnalysis.from(source)
     val featureSet = FeatureSet.from(analysis, dialect, flagSet)
     val parser = new Parser(source, analysis, featureSet)
