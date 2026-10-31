@@ -108,11 +108,18 @@ object Interpreter:
   /** MatchState is a state of matching. */
   private[vm] final case class MatchState(blockID: Int, pos: Int, counters: Vector[Int], captures: Option[Vector[Int]])
 
-  /** Junction is a state for a junction block. */
-  private[vm] final case class Junction(state: MatchState, steps: Int, heatmap: Option[Map[Location, Int]])
+  /** Junction is a state for a junction block, with the time reaching it. */
+  private[vm] final case class Junction(state: MatchState, steps: Int, heatmap: Option[Map[Location, Int]], time: Long)
 
-  /** Diff is a difference of state on matching, with the captures of the last failed matching. */
-  private[vm] final case class Diff(steps: Int, heatmap: Option[Map[Location, Int]], failedCaptures: Vector[Int])
+  /** Diff is a difference of state on matching, with the captures of the last failed matching, and the captures held in
+    * it.
+    */
+  private[vm] final case class Diff(
+      steps: Int,
+      heatmap: Option[Map[Location, Int]],
+      failedCaptures: Vector[Int],
+      held: Map[Int, (Int, Int)]
+  )
 
 /** Interpreter is an interpreter of a program and an input. */
 private[vm] class Interpreter(program: Program, input: UString, options: Options)(using ctx: Context):
@@ -140,6 +147,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
     /** The verb acting when backtracking reaches this frame, or `null` for a usual frame. */
     var verb: VerbKind = uninitialized
+
+    /** The time this frame is made, which tells whether the captures were held after it. */
+    var time: Long = 0
 
     /** Gets a previous character. */
     def previousChar: Option[Int] = input.getBefore(pos, program.meta.unicode)
@@ -175,6 +185,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     override def clone(): Frame =
       val frame = new Frame(label, pos, captures, counters, canaries, rollback, fallback, junctions)
       frame.lastParen = lastParen
+      frame.time = tick()
       frame
 
     override def toString: String =
@@ -220,6 +231,17 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
   /** The captures of the last failed matching, which `cap_keep` takes. */
   private var failedCaptures: Vector[Int] = Vector.empty
+
+  /** A clock ordering the frames and the held captures. */
+  private var clock: Long = 0
+
+  /** The captures held by `cap_hold`, with the time holding them, by the index. */
+  private val held: mutable.Map[Int, (Int, Int, Long)] = mutable.Map.empty
+
+  /** Advances the clock. */
+  private def tick(): Long =
+    clock += 1
+    clock
 
   /** Whether it memoizes the failed states, which the verbs skipping backtracking points prevent.
     *
@@ -272,11 +294,12 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
             case Some(diff) =>
               memoized = true
               memoizedCaptures = Some(diff.failedCaptures)
+              for (index, (begin, end)) <- diff.held do held(index) = (begin, end, tick())
               steps = Math.addExact(steps, diff.steps)
               if options.needsHeatmap then
                 for (loc, n) <- diff.heatmap.get do heatmap = heatmap.updated(loc, heatmap(loc) + n)
             case None =>
-              val junction = Junction(state, steps, if options.needsHeatmap then Some(heatmap) else None)
+              val junction = Junction(state, steps, if options.needsHeatmap then Some(heatmap) else None, tick())
               frame.junctions = junction +: frame.junctions
 
         if options.needsLoopAnalysis then
@@ -425,13 +448,20 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                       val m = jxHeatmap(loc)
                       if n != m then builder.addOne(loc -> (n - m))
                     builder.result()
-                  memoTable(jx.state) = Diff(steps - jx.steps, diffHeatmap, captures)
+                  val diffHeld = held.collect { case (i, (b, e, t)) if t > jx.time => (i, (b, e)) }.toMap
+                  memoTable(jx.state) = Diff(steps - jx.steps, diffHeatmap, captures, diffHeld)
               frame = fallback
+              restoreHeld(frame)
             case None => return result(Status.Fail, None)
 
     // $COVERAGE-OFF$
     sys.error("unreachable")
     // $COVERAGE-ON$
+
+  /** Sets the captures held after the frame is made, which backtracking to it does not restore. */
+  private def restoreHeld(frame: Frame): Unit =
+    for (index, (begin, end, time)) <- held if time > frame.time do
+      frame.captures = frame.captures.updated(index * 2, begin).updated(index * 2 + 1, end)
 
   /** Drops the junctions reached in a transaction that ends, keeping the `size` ones before it.
     *
@@ -546,6 +576,10 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         true
       case Inst.CapReset(from, to) =>
         frame.capReset(from, to)
+        true
+      case Inst.CapHold(from, to) =>
+        val time = tick()
+        for index <- from to to do held(index) = (frame.captures(index * 2), frame.captures(index * 2 + 1), time)
         true
       case Inst.Verb(kind) =>
         val verbFrame = frame.clone()

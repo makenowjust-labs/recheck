@@ -87,6 +87,9 @@ private[ir] final class LookBehindChecker(
           case NodeData.Disjunction(nodes) => IRLookBehindMatch.Forward(nodes.map(fixed))
           case _                           => IRLookBehindMatch.Forward(Seq(fixed(body)))
 
+  /** Checks whether the group is deterministic for Java's `TreeInfo`, which makes a repetition of it `GroupCurly`. */
+  def javaDeterministic(group: Node): Boolean = java(List(group), JavaInfo.Initial).deterministic
+
   /** Returns the width of the node for PCRE, Perl and Python, or `None` if it is unknown (e.g. a conditional).
     *
     * With `conditionals`, PCRE's conditional is the union of its branches, which its look-behind tries.

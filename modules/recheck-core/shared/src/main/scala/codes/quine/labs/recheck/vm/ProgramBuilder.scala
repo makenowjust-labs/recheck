@@ -76,6 +76,12 @@ private[vm] class ProgramBuilder(
       case IRNodeData.Conditional(_: IRCondition.Captured, _, _) => true
       case _                                                     => false
 
+  /** Whether the captures in an atomic group or a look-around are held over backtracking once it matches, as in Java,
+    * which back-references only see.
+    */
+  private val holdsCaptures =
+    pattern.dialect == Dialect.Java && pattern.node.exists(_.isInstanceOf[IRNodeData.BackReference])
+
   /** Whether `(*THEN)` ends at a look-around assertion or a condition, as in PCRE but not in Perl. */
   private val assertionIsThenScope = pattern.dialect != Dialect.Perl
 
@@ -667,9 +673,14 @@ private[vm] class ProgramBuilder(
       atomicDepth += 1
       build(child)
       atomicDepth -= 1
+    emitHold(child)
     emitTerminator(Inst.Commit)
 
     enterBlock(cont)
+
+  /** Emits `cap_hold` of the captures in the node, if they are held over backtracking. */
+  def emitHold(node: IRNode): Unit =
+    if holdsCaptures then for (from, to) <- node.captureRange.range do emitInst(Inst.CapHold(from, to))
 
   /** Runs with the scope of `(*ACCEPT)`. */
   def withAcceptScope(scope: AcceptScope)(run: => Unit): Unit =
@@ -699,6 +710,7 @@ private[vm] class ProgramBuilder(
 
     enterBlock(main)
     buildAssertion(child, scope, body)
+    emitHold(child)
     emitTerminator(Inst.Rollback)
 
     enterBlock(cont)
@@ -713,6 +725,7 @@ private[vm] class ProgramBuilder(
 
     enterBlock(main)
     buildAssertion(child, scope, body)
+    emitHold(child)
     emitTerminator(Inst.Rollback)
 
     enterBlock(cont)

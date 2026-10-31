@@ -235,6 +235,37 @@ class InterpreterConstructSuite extends munit.FunSuite:
     check("(*NOTEMPTY_ATSTART)\\Ka|", "ba", PCRE)(Seq(g(1, 2)))
     check("(*NOTEMPTY_ATSTART)b\\K|a", "ba", PCRE)(Seq(g(1, 1)))
 
+  test("Interpreter.run: Java's captures"):
+    // Java does not restore the captures in an atomic group, a look-around or a repetition of a group without branches
+    // (`GroupCurly`) once it matches, even at a later starting position.
+    check("^(?:(.)b)*cb\\1$", "abcba", Java)(NoMatch)
+    check("^(?:(.)b)*cb\\1$", "abcba", PCRE, Perl, Python, Ruby, DotNet, JavaScript)(Seq(g(0, 5), g(0, 1)))
+    check("^(?:(.)b){0,3}cb\\1$", "abcba", Java)(NoMatch)
+    check("^(?:(.)b)*?cb\\1$", "abcba", Java)(Seq(g(0, 5), g(0, 1)))
+    check("^(?:x?(.)b)*cb\\1$", "abcba", Java)(Seq(g(0, 5), g(0, 1)))
+    check("(?:(a)b)+x|b\\1", "aba", Java)(Seq(g(1, 3), g(0, 1)))
+    check("(?:(a)b)+x|b\\1", "aba", PCRE, Perl, Python, Ruby, DotNet)(NoMatch)
+    check("(?>(a))x|.\\1", "aa", Java)(Seq(g(0, 2), g(0, 1)))
+    check("(?=(a))x|.\\1", "aa", Java)(Seq(g(0, 2), g(0, 1)))
+    check("(?!(a))|.\\1", "aa", Java)(Seq(g(0, 2), g(0, 1)))
+    check("(?<=(b))x|.\\1", "bab", Java)(Seq(g(1, 3), g(0, 1)))
+    check("(?<!(b))x|.\\1", "bab", Java)(Seq(g(1, 3), g(0, 1)))
+    check("(a)*+x|.\\1", "aa", Java)(Seq(g(0, 2), g(1, 2)))
+    check("(?:(a))?+x|.\\1", "aa", Java)(Seq(g(0, 2), g(0, 1)))
+    check("(?:(a)|b)*+x|.\\1", "aa", Java)(Seq(g(0, 2), g(1, 2)))
+    check("(a)*x|.\\1", "aa", Java)(NoMatch)
+    check("(?:(a)|b)*x|.\\1", "aa", Java)(NoMatch)
+    check("(?:(a))+y|x\\1", "xaay", Java)(Seq(g(1, 4), g(2, 3)))
+    check("x(?:(a)a)*z|.\\1", "xaay", Java)(Seq(g(0, 2), g(1, 2)))
+    check("^(?:(a)(b))*(?:\\1\\2)$", "abab", Java)(Seq(g(0, 4), g(2, 3), g(3, 4)))
+    // Java's `\R` under a quantifier, or in `GroupCurly`, matches each iteration in its first way.
+    check("^\\R\n$", "\r\n", Java)(Seq(g(0, 2)))
+    check("^\\R*\n$", "\r\n", Java)(NoMatch)
+    check("^\\R?\n$", "\r\n", Java)(NoMatch)
+    check("^(?:\\R)*\n$", "\r\n", Java)(NoMatch)
+    check("^(?:\\R)?\n$", "\r\n", Java)(Seq(g(0, 2)))
+    check("^(?:\\R|x)*\n$", "\r\n", Java)(Seq(g(0, 2)))
+
   test("Interpreter.run: look-behinds"):
     // .NET and JavaScript match a look-behind backward, and the others forward from the starts before the position.
     check("(?<=(a|aa))b", "aab", JavaScript, DotNet, Java)(Seq(g(2, 3), g(1, 2)))

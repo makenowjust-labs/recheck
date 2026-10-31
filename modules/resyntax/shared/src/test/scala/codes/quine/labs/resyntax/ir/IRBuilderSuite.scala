@@ -53,6 +53,33 @@ class IRBuilderSuite extends IRSuiteBase:
   check("(?:){2,3}?", "", All*)(Repeat(Empty, Bounded(2, 3, Lazy)))
   check("(?:){2,2}?", "", All*)(Repeat(Empty, Exact(2)))
   check("(?:){2,3}+", "", Java, PCRE, Perl, Python)(Atomic(Repeat(Empty, Bounded(2, 3, Greedy))))
+  // Java's `GroupCurly` matches each iteration in its first way, and keeps the captures in it.
+  // It is atomic in IR only where it matters: with `\R`, or with captures in a pattern with back-references.
+  checkPattern("(?:(a)b)*\\1", "", Java): pattern =>
+    val Sequence(Seq(repeat, _)) = pattern.node.data: @unchecked
+    assert(
+      repeat.equalsWithoutLoc(
+        IRNode(Repeat(Atomic(Sequence(Capture(1, None, char('a')), char('b'))), Unbounded(0, Greedy)))
+      )
+    )
+  checkPattern("((a)b){2}\\1", "", Java): pattern =>
+    val Sequence(Seq(repeat, _)) = pattern.node.data: @unchecked
+    assert(
+      repeat.equalsWithoutLoc(
+        IRNode(Repeat(Capture(1, None, Atomic(Sequence(Capture(2, None, char('a')), char('b')))), Exact(2)))
+      )
+    )
+  check("(?:(a)b)*", "", Java)(Repeat(Sequence(Capture(1, None, char('a')), char('b')), Unbounded(0, Greedy)))
+  check("(?:a|(b))*", "", Java)(Repeat(Disjunction(char('a'), Capture(1, None, char('b'))), Unbounded(0, Greedy)))
+  checkPattern("(?:(a)|b)*\\1", "", Java): pattern =>
+    val Sequence(Seq(IRNode(Repeat(body, _), _), _)) = pattern.node.data: @unchecked
+    assert(body.data.isInstanceOf[Disjunction], body)
+  checkPattern("(?:(a)b)?\\1", "", Java): pattern =>
+    val Sequence(Seq(IRNode(Repeat(body, _), _), _)) = pattern.node.data: @unchecked
+    assert(body.data.isInstanceOf[Sequence], body)
+  checkPattern("(?:(a)b)*\\1", "", PCRE, Perl, Python, Ruby, DotNet, JavaScript): pattern =>
+    val Sequence(Seq(IRNode(Repeat(body, _), _), _)) = pattern.node.data: @unchecked
+    assert(body.data.isInstanceOf[Sequence], body)
   // `^(?:a|ab){0,1}+c` matches `abc` in Ruby, so `+` after an interval is another repeat.
   check("(?:){2,3}+", "", Ruby)(Repeat(Repeat(Empty, Bounded(2, 3, Greedy)), Unbounded(1, Greedy)))
   check("(?:){2,2}+", "", Java, PCRE, Perl, Python)(Atomic(Repeat(Empty, Exact(2))))

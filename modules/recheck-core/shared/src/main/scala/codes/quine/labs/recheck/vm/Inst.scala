@@ -203,6 +203,14 @@ object Inst:
       case Some((from, to)) => s"cap_keep $from $to"
       case None             => "cap_keep"
 
+  /** `cap_hold`: Holds the captures between `from` and `to` over backtracking, which takes their values now unless it
+    * goes back after this.
+    *
+    * Java does not restore the captures in an atomic group or a look-around, once it matches.
+    */
+  final case class CapHold(from: Int, to: Int) extends NonTerminator:
+    override def toString: String = s"cap_hold $from $to"
+
   /** `cap-reset`: Resets captures between `from` and `to`. */
   final case class CapReset(from: Int, to: Int) extends NonTerminator:
     override def toString: String = s"cap_reset $from $to"

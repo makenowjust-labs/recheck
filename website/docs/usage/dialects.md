@@ -149,7 +149,8 @@ There are other deliberate approximations.
 - For JavaScript's `v` flag, `recheck` follows the specification.
 - Look-arounds (including non-atomic ones), back-references, atomic groups, possessive quantifiers, conditionals and the backtracking control verbs other than `(*FAIL)` and `(*MARK)` are handled by the fuzz checker, not by the automaton checker.
 - A back-reference sees the captures as the engine keeps them over the iterations of a loop: JavaScript resets them on each iteration, and Perl unsets the captures of a failed alternative and of a fixed-length repetition matching nothing (e.g. `^(?:(a)?b){2}\1$` does not match `abba` in Perl).
-  Two behaviors are not reproduced: Java does not restore the captures in a repeated group without branches (e.g. `(?:(b)c)*`) when the repetition backtracks, even at a later starting position, and the engines differ on an iteration matching the empty string.
+  Java does not restore the captures in an atomic group, a look-around or a repeated group without branches (e.g. `(?:(b)c)*`) once it matches, even when it backtracks to a later starting position (e.g. `(?:(a)b)+x|b\1` matches `ba` in `aba`), and it matches each iteration of such a group, or of `\R` under a quantifier, in its first way.
+  The engines differ on an iteration matching the empty string, which is not reproduced.
 
 ### Searches, Conditionals and Backtracking Control Verbs
 

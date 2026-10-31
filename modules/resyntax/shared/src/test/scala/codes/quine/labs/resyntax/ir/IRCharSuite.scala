@@ -282,6 +282,25 @@ class IRCharSuite extends munit.FunSuite:
     Atomic(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical)))
   )
   check("\\R", "", Java)(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical)))
+  // Java's `\R` under a quantifier matches each iteration in its first way.
+  check("\\R*", "", Java)(
+    Repeat(
+      Atomic(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical))),
+      IRQuantifier.Unbounded(0, BacktrackStrategy.Greedy)
+    )
+  )
+  check("(?:\\R)*", "", Java)(
+    Repeat(
+      Atomic(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical))),
+      IRQuantifier.Unbounded(0, BacktrackStrategy.Greedy)
+    )
+  )
+  check("(?:\\R)?", "", Java)(
+    Repeat(
+      Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical)),
+      IRQuantifier.Bounded(0, 1, BacktrackStrategy.Greedy)
+    )
+  )
   unsupported("\\N{LATIN SMALL LETTER A}", "", Perl, Python)
   error("\\N{U+41}", "", Java, Python)("Unknown character name at 0")
   error("\\p{RGI_Emoji}", "", Perl)("Unknown Unicode property name at 0")
