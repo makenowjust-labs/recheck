@@ -127,8 +127,6 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     name: Scala Test
-    env:
-      RECHECK_REQUIRE_RUNTIMES: 1
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5

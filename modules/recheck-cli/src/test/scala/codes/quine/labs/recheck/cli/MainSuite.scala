@@ -7,7 +7,6 @@ import java.io.InputStreamReader
 import java.io.SequenceInputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.nio.file.Paths
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
@@ -26,10 +25,6 @@ import codes.quine.labs.resyntax.ast.PerlSource
 
 class MainSuite extends munit.FunSuite:
   private class ExitException(val status: Int) extends SecurityException
-
-  /** Fails instead of skipping when `RECHECK_REQUIRE_RUNTIMES=1`, as on CI. */
-  override def assume(cond: Boolean, clue: => Any)(implicit loc: munit.Location): Unit =
-    if sys.env.get("RECHECK_REQUIRE_RUNTIMES").contains("1") then assert(cond, clue) else super.assume(cond, clue)
 
   def runMain(
       args: Seq[String],
@@ -188,12 +183,6 @@ class MainSuite extends munit.FunSuite:
     assert(clue(perl).contains("utf8::downgrade($input, 1);"))
 
   test("Main#run: --all with failed recall validation"):
-    assume(
-      sys.env.getOrElse("PATH", "").split(java.io.File.pathSeparatorChar).exists { dir =>
-        dir.nonEmpty && Files.isExecutable(Paths.get(dir, "ruby"))
-      },
-      "`ruby` is not in PATH"
-    )
     // Ruby's memoization makes the attacks fail, and the last diagnostics is safe.
     val (out, err, status) = runMain(Seq("--all", "--dialect=ruby", "--recall-timeout=1s", "/^(a|a)*$/"))
     assertEquals(err, "")

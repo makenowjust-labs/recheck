@@ -27,17 +27,13 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.ir.IRNodeData
 
-/** Runs recall validation on the runtimes in `PATH`, skipping the missing ones unless `RECHECK_REQUIRE_RUNTIMES=1`.
+/** Runs recall validation on the runtimes in `PATH`, which `mise install` provides.
   *
   * The comments note the behavior of the versions at the time of writing.
   */
 class RecallRuntimeSuite extends munit.FunSuite:
 
   override val munitTimeout: Duration = 60.seconds
-
-  /** Fails instead of skipping when `RECHECK_REQUIRE_RUNTIMES=1`, as on CI. */
-  override def assume(cond: Boolean, clue: => Any)(implicit loc: munit.Location): Unit =
-    if sys.env.get("RECHECK_REQUIRE_RUNTIMES").contains("1") then assert(cond, clue) else super.assume(cond, clue)
 
   /** A default context. */
   given ctx: Context = Context()
@@ -83,7 +79,7 @@ class RecallRuntimeSuite extends munit.FunSuite:
   /** Defines a test running only when the program is available. */
   def runtimeTest(name: String, program: String)(body: => Unit)(using munit.Location): Unit =
     test(name):
-      assume(available(program), s"`$program` is not in PATH")
+      assert(available(program), s"`$program` is not in PATH")
       body
 
   def assertFinish(r: RecallValidation)(using munit.Location): Unit =
@@ -115,7 +111,7 @@ class RecallRuntimeSuite extends munit.FunSuite:
     // `re.L` has no non-ASCII word byte in a UTF-8 locale, so it needs a Latin-1 locale to differ from the C locale.
     val probe = new ProcessBuilder("python3", "-I", "-c", "import re; print(re.match(rb'\\w', b'\\xe9', re.L))")
     probe.environment().put("LC_ALL", "en_US.ISO8859-1")
-    assume(new String(probe.start().getInputStream.readAllBytes()).trim != "None", "no en_US.ISO8859-1 locale")
+    assert(new String(probe.start().getInputStream.readAllBytes()).trim != "None", "no en_US.ISO8859-1 locale")
     val env = Map("RECHECK_PYTHON" -> "env LC_ALL=en_US.ISO8859-1 python3")
     val bytes = Dialect.Python(Dialect.Python.Type.Bytes)
     assertFinish(validate("^(\\w|\\w)*$", "L", bytes, attack("é", 31, "\u0000"), env = env))
@@ -225,8 +221,6 @@ class RecallRuntimeSuite extends munit.FunSuite:
     assertFinish(validate("^(?:é|é)*$", "u", Dialect.PCRE, attack("é", 3, "\u0000")))
 
   runtimeTest("PCRE: the r modifier", "php"):
-    val probe = new ProcessBuilder("php", "-r", "exit(@preg_match('/a/r', 'a') === false ? 1 : 0);").start()
-    assume(probe.waitFor() == 0, "PHP before 8.4 has no r modifier")
     // `r` (PCRE2_EXTRA_CASELESS_RESTRICT) keeps `k` from matching the Kelvin sign.
     val kelvin = attack("\u212a", 31, "\u0000")
     assertEquals(
