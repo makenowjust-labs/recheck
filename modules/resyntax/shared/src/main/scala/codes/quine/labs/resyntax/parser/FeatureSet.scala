@@ -204,7 +204,7 @@ final case class FeatureSet(
     hasBackslashGCall: Boolean,
     // Java, PCRE, Perl, Ruby
     hasBackslashGeneralNewline: Boolean,
-    // Java, PCRE, Perl
+    // Java, PCRE, Perl, Ruby
     hasBackslashGraphemeCluster: Boolean,
     // Java, PCRE, Perl
     hasBackslashHorizontalSpace: Boolean,
@@ -617,8 +617,8 @@ object FeatureSet:
       hasBackslashGCall = isPCRE || isRuby,
       // Java, PCRE, Perl, Ruby
       hasBackslashGeneralNewline = isJava || isPCRE || isPerl || isRuby,
-      // Java, PCRE, Perl
-      hasBackslashGraphemeCluster = isJava || isPCRE || isPerl,
+      // Java, PCRE, Perl, Ruby
+      hasBackslashGraphemeCluster = isJava || isPCRE || isPerl || isRuby,
       // Java, PCRE, Perl
       hasBackslashHorizontalSpace = isJava || isPCRE || isPerl,
       // Ruby

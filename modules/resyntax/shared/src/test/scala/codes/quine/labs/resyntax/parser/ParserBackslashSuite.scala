@@ -271,7 +271,7 @@ class ParserBackslashSuite extends ParserSuiteBase:
   check("\\U000ABCDE", "", Python)(Backslash(Escape(UnicodeHex8, 0xabcde)))
   check("\\V", "", Java, PCRE, Perl)(Backslash(EscapeClass(NonVertical)))
   check("\\W", "", All*)(Backslash(EscapeClass(NonWord)))
-  check("\\X", "", Java, PCRE, Perl)(Backslash(EscapeClass(GraphemeCluster)))
+  check("\\X", "", Java, PCRE, Perl, Ruby)(Backslash(EscapeClass(GraphemeCluster)))
   check("\\Z", "", DotNet, Java, PCRE, Perl, Python, Ruby)(Backslash(Assert(UpperEnd)))
   check("\\010", "", DotNet, Java, JavaScript, PCRE, Perl, Python, Ruby)(Backslash(Escape(BareOctal, 8)))
   check("\\0", "", DotNet, JavaScript, PCRE, Perl, Python, Ruby)(Backslash(Escape(BareOctal, 0)))
