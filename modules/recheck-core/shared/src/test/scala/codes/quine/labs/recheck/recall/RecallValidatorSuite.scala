@@ -9,6 +9,7 @@ import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.exec.Command
 import codes.quine.labs.recheck.exec.ExecResult
+import codes.quine.labs.recheck.exec.Executor
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.UString
@@ -46,12 +47,27 @@ class RecallValidatorSuite extends munit.FunSuite:
     )
     assertEquals(command.program, "python3")
 
-    RecallValidator.validate(parse("foo"), attack, 1.second, runtime = Some(Seq("/opt/python", "-X", "dev"))) {
-      (c, _, _) =>
+  test("RecallValidator.validate: environment variables"):
+    def run(env: Map[String, String], output: ExecResult = ExecResult.Timeout("")): (Command, RecallValidation) =
+      var command: Command = null
+      val result = RecallValidator.validate(parse("foo"), attack, 1.second, env = env) { (c, _, _) =>
         command = c
-        ExecResult.Timeout("")
-    }
-    assertEquals(command, Command("/opt/python", Seq("-X", "dev", "-I", "-")))
+        output
+      }
+      (command, result.get)
+
+    val (command, result) = run(Map("RECHECK_PYTHON" -> " \"/opt/my python/bin/python3\" -X dev "))
+    assertEquals(
+      command,
+      Command(Executor.shell, Seq("-c", "\"/opt/my python/bin/python3\" -X dev \"$@\"", "sh", "-I", "-"))
+    )
+    // Without the runtime line, the runtime is the command line of the variable.
+    assertEquals(result.runtime, "\"/opt/my python/bin/python3\" -X dev")
+    interceptMessage[UnexpectedException]("`\"/opt/my python/bin/python3\" -X dev -I -` exited with 2")(
+      run(Map("RECHECK_PYTHON" -> "\"/opt/my python/bin/python3\" -X dev"), ExecResult.Exit(2, "", ""))
+    )
+    // An empty value and the variables of the other dialects are ignored.
+    assertEquals(run(Map("RECHECK_PYTHON" -> " ", "RECHECK_RUBY" -> "ruby"))._1, Command("python3", Seq("-I", "-")))
 
   test("RecallValidator.validate: timeout"):
     def limit(timeout: Duration)(using Context): Option[FiniteDuration] =
@@ -69,15 +85,20 @@ class RecallValidatorSuite extends munit.FunSuite:
     assertEquals(limit(1.second)(using ctx50s), Some(1.second))
 
   test("RecallValidator.result"):
-    val command = Command("python3")
-    def result(output: ExecResult): RecallValidation = RecallValidator.result(command, 1.second, output)
+    def result(output: ExecResult): RecallValidation = RecallValidator.result("python3", "python3 -", 1.second, output)
     assertEquals(
       result(ExecResult.Exit(0, "recheck:runtime python 3.15.0\nrecheck:start\nrecheck:time 12\n", "")),
       RecallValidation("python 3.15.0", 1.second, RecallResult.Finish(12.millis))
     )
     assertEquals(
-      result(ExecResult.Exit(0, "recheck:runtime php 8.5\nrecheck:engine-error Backtrack limit exhausted\n", "")),
-      RecallValidation("php 8.5", 1.second, RecallResult.EngineError("Backtrack limit exhausted"))
+      result(ExecResult.Exit(0, "recheck:runtime php 8.5\nrecheck:engine-limit Backtrack limit exhausted\n", "")),
+      RecallValidation("php 8.5", 1.second, RecallResult.EngineLimit("Backtrack limit exhausted"))
+    )
+    assertEquals(
+      result(
+        ExecResult.Exit(0, "recheck:runtime node v26\nrecheck:engine-error Maximum call stack size exceeded\n", "")
+      ),
+      RecallValidation("node v26", 1.second, RecallResult.EngineError("Maximum call stack size exceeded"))
     )
     // Without the runtime line, the runtime is the program name.
     assertEquals(result(ExecResult.Timeout("")), RecallValidation("python3", 1.second, RecallResult.Timeout))
@@ -85,4 +106,4 @@ class RecallValidatorSuite extends munit.FunSuite:
       result(ExecResult.Exit(0, "foo\n", ""))
     )
     interceptMessage[UnexpectedException]("error")(result(ExecResult.Exit(1, "", "error\n")))
-    interceptMessage[UnexpectedException]("`python3` exited with 2")(result(ExecResult.Exit(2, "", "")))
+    interceptMessage[UnexpectedException]("`python3 -` exited with 2")(result(ExecResult.Exit(2, "", "")))

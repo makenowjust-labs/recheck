@@ -165,8 +165,12 @@ class CodecSuite extends munit.FunSuite:
       )
     )
     assertEquals(
-      encodeRecallResult(RecallResult.EngineError("Backtrack limit exhausted")),
-      Json.obj("kind" := "engine-error", "message" := "Backtrack limit exhausted")
+      encodeRecallResult(RecallResult.EngineLimit("Backtrack limit exhausted")),
+      Json.obj("kind" := "engine-limit", "message" := "Backtrack limit exhausted")
+    )
+    assertEquals(
+      encodeRecallResult(RecallResult.EngineError("StackOverflowError")),
+      Json.obj("kind" := "engine-error", "message" := "StackOverflowError")
     )
 
   test("codec.encodeErrorKind"):
@@ -174,6 +178,7 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(encodeErrorKind(ErrorKind.Cancel), Json.obj("kind" := "cancel"))
     assertEquals(encodeErrorKind(ErrorKind.Unsupported("foo")), Json.obj("kind" := "unsupported", "message" := "foo"))
     assertEquals(encodeErrorKind(ErrorKind.InvalidRegExp("foo")), Json.obj("kind" := "invalid", "message" := "foo"))
+    assertEquals(encodeErrorKind(ErrorKind.RecallFailureLimit), Json.obj("kind" := "recall-failure-limit"))
     assertEquals(encodeErrorKind(ErrorKind.Unexpected("foo")), Json.obj("kind" := "unexpected", "message" := "foo"))
 
   test("codec.encodeUString"):
@@ -235,7 +240,7 @@ class CodecSuite extends munit.FunSuite:
           "encoding" := "bytes",
           "perlSource" := "string",
           "perlUtf8" := true,
-          "recallCommand" := Json.arr("ruby".asJson, "--disable-gems".asJson)
+          "maxRecallFailures" := 123
         )
       ),
       Right(
@@ -269,7 +274,7 @@ class CodecSuite extends munit.FunSuite:
           encoding = Some("bytes"),
           perlSource = PerlSource.String,
           perlUtf8 = Some(true),
-          recallCommand = Some(Seq("ruby", "--disable-gems"))
+          maxRecallFailures = 123
         )
       )
     )

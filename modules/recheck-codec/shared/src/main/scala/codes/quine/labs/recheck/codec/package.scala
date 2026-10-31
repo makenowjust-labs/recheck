@@ -115,6 +115,7 @@ given encodeRecallResult: Encoder[RecallResult] with
   def apply(r: RecallResult): Json = r match
     case RecallResult.Finish(time)         => Json.obj("kind" := "finish", "time" := time.toMillis)
     case RecallResult.Timeout              => Json.obj("kind" := "timeout")
+    case RecallResult.EngineLimit(message) => Json.obj("kind" := "engine-limit", "message" := message)
     case RecallResult.EngineError(message) => Json.obj("kind" := "engine-error", "message" := message)
 
 /** An `Encoder` for `ErrorKind`. */
@@ -128,6 +129,8 @@ given encodeErrorKind: Encoder[ErrorKind] with
       Json.obj("kind" := "unsupported", "message" := message)
     case ErrorKind.InvalidRegExp(message) =>
       Json.obj("kind" := "invalid", "message" := message)
+    case ErrorKind.RecallFailureLimit =>
+      Json.obj("kind" := "recall-failure-limit")
     case ErrorKind.Unexpected(message) =>
       Json.obj("kind" := "unexpected", "message" := message)
 

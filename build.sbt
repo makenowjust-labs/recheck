@@ -166,7 +166,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |  pattern: AttackPattern,
       |  timeout: Duration = Duration(1, SECONDS)
       |)(using ctx: Context): Option[RecallValidation] =
-      |  time("validate")(RecallValidator.validate(parse(source, flags), pattern, timeout)(RecallValidator.defaultExec.get))
+      |  time("validate")(RecallValidator.validate(parse(source, flags), pattern, timeout, env = sys.env)(RecallValidator.defaultExec.get))
       |
       |""".stripMargin + ParametersGen.consoleCheck((ThisBuild / baseDirectory).value),
     // Settings for test:

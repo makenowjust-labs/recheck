@@ -73,14 +73,19 @@ class ReDoSSuite extends munit.FunSuite:
       Checker.Automaton
     )
     var runs = 0
-    def checkAll(output: ExecResult, checker: Checker = Checker.Automaton): List[Diagnostics] =
+    def checkAll(
+        output: ExecResult,
+        checker: Checker = Checker.Automaton,
+        maxRecallFailures: Int = 100
+    ): List[Diagnostics] =
       runs = 0
       val params = Parameters(
         checker = checker,
         recallTimeout = 1.second,
         maxGeneStringSize = 1000,
         maxAttackStringSize = 1000,
-        maxIteration = 2
+        maxIteration = 2,
+        maxRecallFailures = maxRecallFailures
       )
       val exec: RecallValidator.Exec = (_, _, _) =>
         runs += 1
@@ -103,6 +108,23 @@ class ReDoSSuite extends munit.FunSuite:
     assert(fuzz.init.nonEmpty)
     assert(fuzz.init.forall { case d: Diagnostics.Vulnerable => !d.isAccepted; case _ => false })
     assertEquals(runs, fuzz.size - 1)
+    // The attacks of the same complexity and hotspot as a failed one are skipped.
+    val keys = fuzz.init.collect { case d: Diagnostics.Vulnerable => ReDoS.RecallKey(d.complexity, d.hotspot) }
+    assertEquals(keys.distinct, keys)
+
+    // It stops at the limit of failures.
+    val limited = checkAll(finish, Checker.Fuzz, maxRecallFailures = 1)
+    assertEquals(limited.size, 2)
+    assertEquals(
+      limited.last,
+      Diagnostics.Unknown("^(?:a|a)*$", "", Diagnostics.ErrorKind.RecallFailureLimit, Some(Checker.Fuzz))
+    )
+    assertEquals(runs, 1)
+    // A non-positive limit stops at the first failure.
+    assertEquals(
+      checkAll(finish, maxRecallFailures = 0).last,
+      Diagnostics.Unknown("^(?:a|a)*$", "", Diagnostics.ErrorKind.RecallFailureLimit, Some(Checker.Automaton))
+    )
 
     // It stops at the first accepted diagnostics.
     assertEquals(
@@ -111,8 +133,16 @@ class ReDoSSuite extends munit.FunSuite:
     )
     assertEquals(runs, 1)
     assertEquals(
+      checkAll(ExecResult.Exit(0, "recheck:runtime node v0\nrecheck:engine-limit Backtrack limit exhausted\n", "")),
+      List(vulnerable.copy(recallValidation = recall(RecallResult.EngineLimit("Backtrack limit exhausted"))))
+    )
+    // An engine error on the stack depth or the memory is a failure.
+    assertEquals(
       checkAll(ExecResult.Exit(0, "recheck:runtime node v0\nrecheck:engine-error RangeError\n", "")),
-      List(vulnerable.copy(recallValidation = recall(RecallResult.EngineError("RangeError"))))
+      List(
+        vulnerable.copy(recallValidation = recall(RecallResult.EngineError("RangeError"))),
+        Diagnostics.Safe("^(?:a|a)*$", "", AttackComplexity.Linear, Checker.Automaton)
+      )
     )
     assertEquals(
       checkAll(ExecResult.Exit(1, "", "error")),
@@ -129,6 +159,21 @@ class ReDoSSuite extends munit.FunSuite:
         )
         .toList,
       List(vulnerable)
+    )
+
+  test("ReDoS.RecallKey"):
+    val hotspot = Hotspot(Seq(Spot(0, 1, Normal), Spot(4, 5, Heat), Spot(6, 7, Heat)))
+    assertEquals(
+      ReDoS.RecallKey(AttackComplexity.Exponential(true), hotspot),
+      ReDoS.RecallKey(None, Seq((4, 5), (6, 7)))
+    )
+    assertEquals(
+      ReDoS.RecallKey(AttackComplexity.Polynomial(2, false), hotspot),
+      ReDoS.RecallKey(AttackComplexity.Polynomial(2, true), Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))))
+    )
+    assertNotEquals(
+      ReDoS.RecallKey(AttackComplexity.Polynomial(2, false), hotspot),
+      ReDoS.RecallKey(AttackComplexity.Polynomial(3, false), hotspot)
     )
 
   test("ReDoS.checkAutomaton"):

@@ -1,6 +1,7 @@
 package codes.quine.labs.recheck
 
 import scala.collection.AbstractIterator
+import scala.collection.mutable
 import scala.concurrent.duration.Duration
 import scala.util.Random
 
@@ -16,6 +17,7 @@ import codes.quine.labs.recheck.common.ReDoSException
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.Diagnostics
+import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.fuzz.FuzzChecker
 import codes.quine.labs.recheck.fuzz.FuzzProgram
 import codes.quine.labs.recheck.recall.RecallValidator
@@ -45,6 +47,10 @@ object ReDoS:
     *
     * The list consists of the vulnerable diagnostics whose recall validation failed, followed by the accepted one: a
     * vulnerable diagnostics whose recall validation is not run or succeeded, or the safe or unknown one at the end.
+    *
+    * A vulnerable diagnostics with the same complexity and hotspot as a failed one is skipped. When the recall
+    * validation fails `maxRecallFailures` times, the last one is unknown with
+    * [[Diagnostics.ErrorKind.RecallFailureLimit]].
     */
   def checkAll(
       source: String,
@@ -70,13 +76,16 @@ object ReDoS:
     *
     * @param exec
     *   the executor for recall validation, or `None` if commands cannot run
+    * @param env
+    *   the environment variables giving the runtime command lines of recall validation
     */
   private[recheck] def iterator(
       source: String,
       flags: String,
       params: Parameters,
       token: Option[CancellationToken],
-      exec: Context ?=> Option[RecallValidator.Exec] = RecallValidator.defaultExec
+      exec: Context ?=> Option[RecallValidator.Exec] = RecallValidator.defaultExec,
+      env: Map[String, String] = sys.env
   ): Iterator[Diagnostics] =
     given ctx: Context = Context(params.timeout, token, params.logger)
 
@@ -85,16 +94,48 @@ object ReDoS:
       val options = dialectOptions(params)
       val pattern = ctx.interrupt(ParsedPattern.parse(source, flags, params.dialect, options).toTry.get)
       ctx.log(s"parse: finish\n  pattern: $pattern")
+      val failures = mutable.Set.empty[RecallKey]
+      val failed = (c: AttackComplexity.Vulnerable, h: Hotspot) => failures.contains(RecallKey(c, h))
       val candidates = params.checker match
         case Checker.Automaton => checkAutomaton(source, flags, pattern, params)
-        case Checker.Fuzz      => checkFuzz(source, flags, pattern, params)
-        case Checker.Auto      => checkAuto(source, flags, pattern, params)
-      val runtime = params.recallCommand.filter(_.nonEmpty)
-      candidates.map(recallValidation(pattern, options, params.recallTimeout, runtime, exec))
+        case Checker.Fuzz      => checkFuzz(source, flags, pattern, params, failed)
+        case Checker.Auto      => checkAuto(source, flags, pattern, params, failed)
+      val validate = recallValidation(pattern, options, params.recallTimeout, exec, env)
+      candidates.flatMap:
+        case d: Diagnostics.Vulnerable =>
+          val key = RecallKey(d.complexity, d.hotspot)
+          if failures.contains(key) then
+            ctx.log("recall: skip the same attack as a failed one")
+            Iterator.empty
+          else
+            val v = validate(d)
+            if v.isAccepted then Iterator(v)
+            else
+              failures.add(key)
+              if failures.size < params.maxRecallFailures then Iterator(v)
+              else
+                val limit =
+                  Diagnostics.Unknown(source, flags, Diagnostics.ErrorKind.RecallFailureLimit, Some(d.checker))
+                Iterator(v, limit)
+        case d => Iterator(d)
 
     val all = recovering(ds):
       case ex: ReDoSException => Iterator(Diagnostics.Unknown.from(source, flags, ex))
     takeUntilAccepted(all)
+
+  /** RecallKey identifies an attack on recall validation by the complexity and the hotspot.
+    *
+    * @param degree
+    *   the degree of the polynomial complexity, or `None` for the exponential one
+    */
+  private[recheck] final case class RecallKey(degree: Option[Int], spots: Seq[(Int, Int)])
+
+  private[recheck] object RecallKey:
+    def apply(complexity: AttackComplexity.Vulnerable, hotspot: Hotspot): RecallKey =
+      val degree = complexity match
+        case AttackComplexity.Polynomial(degree, _) => Some(degree)
+        case AttackComplexity.Exponential(_)        => None
+      RecallKey(degree, hotspot.spots.collect { case Hotspot.Spot(s, e, Hotspot.Heat) => (s, e) })
 
   /** Iterates the diagnostics of the automaton checker, ending with the safe one. */
   private[recheck] def checkAutomaton(
@@ -129,10 +170,18 @@ object ReDoS:
       case safe: Complexity.Safe => Diagnostics.Safe(source, flags, safe.toAttackComplexity, Checker.Automaton)
     ++ Iterator(Diagnostics.Safe(source, flags, AttackComplexity.Safe(false), Checker.Automaton))
 
-  /** Iterates the diagnostics of the fuzz checker, ending with the safe one. */
-  private[recheck] def checkFuzz(source: String, flags: String, pattern: ParsedPattern, params: Parameters)(using
-      ctx: Context
-  ): Iterator[Diagnostics] = tagging(Checker.Fuzz):
+  /** Iterates the diagnostics of the fuzz checker, ending with the safe one.
+    *
+    * @param failed
+    *   whether an attack of the complexity and the hotspot failed recall validation, which the fuzz checker avoids
+    */
+  private[recheck] def checkFuzz(
+      source: String,
+      flags: String,
+      pattern: ParsedPattern,
+      params: Parameters,
+      failed: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
+  )(using ctx: Context): Iterator[Diagnostics] = tagging(Checker.Fuzz):
     import params._
 
     val random = new Random(randomSeed)
@@ -158,7 +207,8 @@ object ReDoS:
       maxIteration,
       maxDegree,
       heatRatio,
-      accelerationMode
+      accelerationMode,
+      failed
     )
 
     results.map:
@@ -168,11 +218,15 @@ object ReDoS:
     ++ Iterator(Diagnostics.Safe(source, flags, AttackComplexity.Safe(true), Checker.Fuzz))
 
   /** Iterates the diagnostics of the automaton checker, or of the fuzz checker if the automaton checker gives up. */
-  private[recheck] def checkAuto(source: String, flags: String, pattern: ParsedPattern, params: Parameters)(using
-      ctx: Context
-  ): Iterator[Diagnostics] =
+  private[recheck] def checkAuto(
+      source: String,
+      flags: String,
+      pattern: ParsedPattern,
+      params: Parameters,
+      failed: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
+  )(using ctx: Context): Iterator[Diagnostics] =
     recovering(checkAutomaton(source, flags, pattern, params)):
-      case _: UnsupportedException => checkFuzz(source, flags, pattern, params)
+      case _: UnsupportedException => checkFuzz(source, flags, pattern, params, failed)
 
   /** Runs recall validation against a vulnerable diagnostics, and records the result in it.
     *
@@ -182,26 +236,20 @@ object ReDoS:
       pattern: ParsedPattern,
       options: DialectOptions,
       timeout: Duration,
-      runtime: Option[Seq[String]],
-      exec: Option[RecallValidator.Exec]
+      exec: Option[RecallValidator.Exec],
+      env: Map[String, String]
   )(
-      d: Diagnostics
-  )(using ctx: Context): Diagnostics = d match
-    case d: Diagnostics.Vulnerable =>
-      exec match
-        case Some(exec) =>
-          try
-            d.copy(recallValidation =
-              RecallValidator.validate(pattern, d.attack, timeout, options.perlSource == PerlSource.Literal, runtime)(
-                exec
-              )
-            )
-          catch
-            case ex: ReDoSException =>
-              ex.checker = Some(if d.checker == Checker.Fuzz then Checker.Fuzz else Checker.Automaton)
-              throw ex
-        case None => d
-    case d => d
+      d: Diagnostics.Vulnerable
+  )(using ctx: Context): Diagnostics.Vulnerable =
+    exec match
+      case Some(exec) =>
+        val perlLiteral = options.perlSource == PerlSource.Literal
+        try d.copy(recallValidation = RecallValidator.validate(pattern, d.attack, timeout, perlLiteral, env)(exec))
+        catch
+          case ex: ReDoSException =>
+            ex.checker = Some(if d.checker == Checker.Fuzz then Checker.Fuzz else Checker.Automaton)
+            throw ex
+      case None => d
 
   /** Iterates the diagnostics until the accepted one, without computing the next one. */
   private def takeUntilAccepted(ds: Iterator[Diagnostics]): Iterator[Diagnostics] = new AbstractIterator[Diagnostics]:

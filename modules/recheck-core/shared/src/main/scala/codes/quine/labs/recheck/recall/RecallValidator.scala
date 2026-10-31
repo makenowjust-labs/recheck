@@ -31,40 +31,50 @@ object RecallValidator:
     * It returns `None` without running when the timeout is not positive, or the dialect or the pattern is not
     * supported. It throws [[UnexpectedException]] when the runtime fails to run the program.
     *
-    * @param runtime
-    *   the program and the arguments to run the runtime instead of the dialect's default (see
-    *   [[RecallProgram.withRuntime]])
+    * @param env
+    *   the environment variables, whose [[RecallProgram.RuntimeVariables]] give the runtime command lines
     */
   def validate(
       pattern: ParsedPattern,
       attack: AttackPattern,
       timeout: Duration,
       perlLiteral: Boolean = true,
-      runtime: Option[Seq[String]] = None
+      env: Map[String, String] = Map.empty
   )(
       exec: Exec
   )(using ctx: Context): Option[RecallValidation] = ctx.interrupt:
     if timeout <= Duration.Zero then None
     else
-      RecallProgram.generate(pattern, attack, perlLiteral).map(p => runtime.fold(p)(p.withRuntime)) match
+      RecallProgram.generate(pattern, attack, perlLiteral) match
         case None =>
           ctx.log("recall: not supported")
           None
         case Some(program) =>
-          ctx.log(s"recall: command: ${program.command}\n${program.script}")
+          val runtime =
+            RecallProgram.RuntimeVariables.get(pattern.dialect).flatMap(env.get).map(_.trim).filter(_.nonEmpty)
+          val command = runtime.fold(program.command)(program.command.withShell(Executor.shell, _))
+          val name = runtime.getOrElse(program.command.program)
+          val commandLine = (name +: (program.command.args ++ program.command.source.map(_.name))).mkString(" ")
+          ctx.log(s"recall: command: $command\n${program.script}")
           val limit = timeout match
             case d: FiniteDuration if (ctx.deadline eq null) || d <= ctx.deadline.timeLeft => Some(d)
             case _ => Option(ctx.deadline).map(_.timeLeft)
-          val output = exec(program.command, program.script, limit)
-          Some(result(program.command, timeout, output))
+          val output = exec(command, program.script, limit)
+          Some(result(name, commandLine, timeout, output))
 
-  /** Converts the execution result to the recall validation. */
-  private[recall] def result(command: Command, timeout: Duration, output: ExecResult)(using
+  /** Converts the execution result to the recall validation.
+    *
+    * @param name
+    *   the runtime name if the output does not have it
+    * @param command
+    *   the command line to show in an error message
+    */
+  private[recall] def result(name: String, command: String, timeout: Duration, output: ExecResult)(using
       ctx: Context
   ): RecallValidation = ctx.interrupt:
     def line(out: String, name: String): Option[String] =
       out.linesIterator.collectFirst { case s if s.startsWith(s"$name ") => s.substring(name.length + 1) }
-    def runtime(out: String): String = line(out, RecallProgram.RuntimeLine).getOrElse(command.program)
+    def runtime(out: String): String = line(out, RecallProgram.RuntimeLine).getOrElse(name)
 
     output match
       case ExecResult.Timeout(out)    => RecallValidation(runtime(out), timeout, RecallResult.Timeout)
@@ -72,9 +82,10 @@ object RecallValidator:
         val result = line(out, RecallProgram.TimeLine).flatMap(_.toLongOption) match
           case Some(time) => RecallResult.Finish(FiniteDuration(time, TimeUnit.MILLISECONDS))
           case None       =>
-            line(out, RecallProgram.EngineErrorLine) match
-              case Some(message) => RecallResult.EngineError(message)
-              case None          => throw new UnexpectedException(s"invalid recall validation output: ${out.trim}")
+            line(out, RecallProgram.EngineLimitLine)
+              .map(RecallResult.EngineLimit(_))
+              .orElse(line(out, RecallProgram.EngineErrorLine).map(RecallResult.EngineError(_)))
+              .getOrElse(throw new UnexpectedException(s"invalid recall validation output: ${out.trim}"))
         RecallValidation(runtime(out), timeout, result)
       case ExecResult.Exit(code, _, err) =>
         throw new UnexpectedException(if err.trim.nonEmpty then err.trim else s"`$command` exited with $code")
