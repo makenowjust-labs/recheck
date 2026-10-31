@@ -553,8 +553,9 @@ private[ir] object IRProperties:
     val key = lowerAscii(name.filterNot(c => c == ' ' || c == '-' || c == '_' || c == '\t'))
     if key.startsWith("is") && key.length > 2 then key.drop(2) else key
 
+  // Perl has no properties of strings (e.g. `RGI_Emoji`).
   private lazy val perlBinaryIndex: Map[String, BinaryProperty] =
-    index(ucdBinary.map(p => (p.names, p)), perlKey)
+    index(ucdBinary.filterNot(_.isOfStrings).map(p => (p.names, p)), perlKey)
 
   private lazy val perlGeneralCategory = enumIndex(Properties.GeneralCategory, perlKey)
 

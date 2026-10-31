@@ -60,7 +60,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     if dialect != Dialect.Ruby || mode != UnitMode.CodePoint then return children
     def byteOf(node: Node): Option[Int] = node.data match
       case NodeData.Backslash(BackslashKind.Escape(style, value))
-          if RubyByteEscapes.contains(style) && value >= 0x80 && value <= 0xff =>
+          if isRubyByteStyle(style) && value >= 0x80 && value <= 0xff =>
         Some(value)
       case _ => None
     val out = mutable.ArrayBuffer.empty[Node]
@@ -252,7 +252,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     out.toSeq
 
   private def isRubyByte(lit: Lit): Boolean =
-    lit.escape.exists(RubyByteEscapes.contains) && 0x80 <= lit.value && lit.value <= 0xff
+    lit.escape.exists(isRubyByteStyle) && 0x80 <= lit.value && lit.value <= 0xff
 
   /** Returns the code values of a literal in the mode. */
   private def unitsOf(lit: Lit): Seq[Int] = mode match
@@ -318,6 +318,10 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         else not(CharSet.single(0x0a))
       case EscapeClassKind.CodeUnit =>
         if mode == UnitMode.Byte then set(mode.universe) else throw new NotModeledException
+      // Java and Python look up a Unicode name, which starts with a letter and has letters, digits, spaces and hyphens.
+      case EscapeClassKind.CharName(name)
+          if (dialect == Dialect.Java || dialect == Dialect.Python) && !isUnicodeNameLike(name) =>
+        throw new IRBuildingException("Unknown character name", loc)
       case EscapeClassKind.GeneralNewline | EscapeClassKind.GraphemeCluster | EscapeClassKind.CharName(_) =>
         throw new NotModeledException
       case EscapeClassKind.UnicodeProperty(name)                => property(name, None, false, flags, loc)
@@ -457,20 +461,22 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
             case kind => flags = flags.copy(caseCommands = kind :: flags.caseCommands)
           i += 1
         case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, value))
-            if dialect == Dialect.Ruby && mode == UnitMode.CodePoint && RubyByteEscapes.contains(style) &&
+            if dialect == Dialect.Ruby && mode == UnitMode.CodePoint && isRubyByteStyle(style) &&
               value >= 0x80 && value <= 0xff =>
           val bytes = items
             .drop(i)
             .takeWhile:
               case ClassItem.Value(ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, value)), _) =>
-                RubyByteEscapes.contains(style) && value >= 0x80 && value <= 0xff
+                isRubyByteStyle(style) && value >= 0x80 && value <= 0xff
               case _ => false
           val lits = bytes.map: b =>
             val ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, value)) = b.data: @unchecked
             Lit(value, false, Some(style), flags, b.loc)
           // Bytes of a character continued into a range endpoint (e.g. `[\xC3\xA0-\xC3\xA9]`) are not modeled.
-          if rangeByteAt(items, i - 1, begin = false) || rangeByteAt(items, i + bytes.length, begin = true) then
+          if rangeByteAt(items, i + bytes.length, begin = true) then
+            checkRubyBytePrefix(lits)
             throw new NotModeledException
+          if rangeByteAt(items, i - 1, begin = false) then throw new NotModeledException
           val decoded = mergeRubyBytesInClass(lits)
           result = result.union(ClassSet(closeChars(decoded.map(_.value), flags)))
           i += bytes.length
@@ -508,6 +514,14 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
   private def isCaseTarget(item: ClassItem): Boolean = item.data match
     case _: ClassItemData.ClassValue | _: ClassItemData.ClassRange => true
     case _                                                         => false
+
+  /** Checks the bytes before a range, whose last character may continue into the range's begin. */
+  private def checkRubyBytePrefix(lits: Seq[Lit]): Unit =
+    var i = 0
+    while i < lits.length do
+      val n = utf8Length(lits(i).value)
+      if n < 2 then throw new IRBuildingException("Invalid multibyte escape", lits(i).loc)
+      i += n
 
   /** Decodes all the byte escapes of a class item run; a sequence must be complete. */
   private def mergeRubyBytesInClass(lits: Seq[Lit]): Seq[Lit] =
@@ -549,7 +563,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
 
   private def isRubyByteValue(value: ClassItemData.ClassValue): Boolean = value match
     case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v)) =>
-      RubyByteEscapes.contains(style) && v >= 0x80 && v <= 0xff
+      isRubyByteStyle(style) && v >= 0x80 && v <= 0xff
     case _ => false
 
   private def posix(name: String, flags: IRCharFlags, loc: SourceLocation): CharSet =
@@ -598,9 +612,12 @@ private[ir] object IRCharResolver:
       plain: Boolean = false
   )
 
-  /** The escape styles giving a raw byte in Ruby. */
-  val RubyByteEscapes: Set[EscapeStyle] =
-    Set(EscapeStyle.Hex2, EscapeStyle.Hex1, EscapeStyle.BareOctal, EscapeStyle.Octal, EscapeStyle.Meta)
+  /** Checks whether the escape style gives a raw byte in Ruby (e.g. `\xFF`, `\377` and `\C-\M-a`). */
+  def isRubyByteStyle(style: EscapeStyle): Boolean = style match
+    case EscapeStyle.Hex2 | EscapeStyle.Hex1 | EscapeStyle.BareOctal | EscapeStyle.Octal | EscapeStyle.Meta |
+        EscapeStyle.ControlDash | EscapeStyle.Control(_) =>
+      true
+    case _ => false
 
   /** The largest number of multi-character foldings in a run; more of them leave the run to the one-to-one folding. */
   val MaxMultiFoldings: Int = 6
@@ -632,6 +649,10 @@ private[ir] object IRCharResolver:
     case Seq()     => IRNodeData.Empty
     case Seq(node) => node.data
     case nodes     => IRNodeData.Sequence(nodes)
+
+  def isUnicodeNameLike(name: String): Boolean =
+    name.nonEmpty && name.head.isLetter && name.head < 0x80 &&
+      name.forall(c => c < 0x80 && (c.isLetterOrDigit || c == ' ' || c == '-'))
 
   /** Checks whether a class item may contain strings, as ECMAScript's `MayContainStrings`. */
   def mayContainStrings(item: ClassItem): Boolean =

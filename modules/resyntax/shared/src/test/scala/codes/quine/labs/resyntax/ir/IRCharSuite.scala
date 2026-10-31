@@ -213,6 +213,10 @@ class IRCharSuite extends munit.FunSuite:
   check("\\R", "", Java)(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical)))
   unsupported("\\X", "", Java, PCRE, Perl, Ruby)
   unsupported("\\N{LATIN SMALL LETTER A}", "", Perl, Python)
+  error("\\N{U+41}", "", Java, Python)("Unknown character name at 0")
+  error("\\p{RGI_Emoji}", "", Perl)("Unknown Unicode property name at 0")
+  error("[\\xB1\\xB4-\\xB6]", "", Ruby)("Invalid multibyte escape at 1")
+  error("\\C-\\M-a", "", Ruby)("Invalid multibyte escape at 0")
   chars("\\N{U+263A}", "", Perl)(of("☺"))
 
   // Word boundaries
