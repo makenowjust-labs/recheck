@@ -168,13 +168,13 @@ sealed abstract class IRLookBehindMatch extends Product with Serializable
 
 object IRLookBehindMatch:
 
-  /** Backward matches the body backward from the position (JavaScript and .NET). */
+  /** Backward matches the body backward from the position (.NET, JavaScript and Ruby). */
   case object Backward extends IRLookBehindMatch
 
   /** Forward matches the body forward from a start before the position, and the match must end at the position.
     *
     * It has the starts of the whole body, or of each alternative when the body is a disjunction that the engine splits
-    * (PCRE and Ruby), which are tried in turn.
+    * (PCRE), which are tried in turn.
     */
   final case class Forward(starts: Seq[IRLookBehindStarts]) extends IRLookBehindMatch
 
@@ -184,7 +184,7 @@ sealed abstract class IRLookBehindStarts extends Product with Serializable
 object IRLookBehindStarts:
 
   /** Longest tries the starts from `max` characters before the position down to `min` ones, skipping the ones before
-    * the input (PCRE, Perl, Python and Ruby).
+    * the input (PCRE, Perl and Python).
     */
   final case class Longest(min: Int, max: Int) extends IRLookBehindStarts
 

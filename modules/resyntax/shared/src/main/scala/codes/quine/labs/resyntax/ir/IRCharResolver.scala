@@ -24,8 +24,8 @@ import codes.quine.labs.resyntax.ir.IRCharResolver.*
 /** IRCharResolver resolves character-level nodes (literals, `.`, escapes and classes) into character sets.
   *
   * @param perlUnicodeRules
-  *   whether a Perl pattern uses Unicode rules even under `/d` (it has a non-ASCII literal, a code point above
-  *   `U+00FF`, `\p{...}` or `\N{...}`)
+  *   whether a Perl pattern uses Unicode rules even under `/d` (a UTF-8 pattern, or one with a code point above
+  *   `U+00FF`, `\p{...}`, `\N{...}` or `\b{...}`)
   */
 private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUnicodeRules: Boolean):
 

@@ -134,18 +134,7 @@ object IRBuilder:
             case _                                            => IRBackReferenceFolding.Full(0)
         case _ => IRBackReferenceFolding.Simple
 
-  /** Returns the width of a literal, an escape or a class in a look-behind, where the dialects counting it differently
-    * from one care.
-    *
-    * Perl counts the folded length of a character under `i` (e.g. `(?<=ß{128})` is too long), and a class counts its
-    * longest character but not its ranges (e.g. `[ßa]` is two, and `[ß-ẞ]` is one). The folding is one for a Latin-1
-    * character under `l`, and for one with ASCII characters under `aa` and `l`, except `ẞ` and, under `aa`, `ß`.
-    *
-    * Ruby (Onigmo) matches a character folded to several characters under `i` as the folding (e.g. `ß` as `ss`), and a
-    * class having such a character and another has a variable width (e.g. `[ßa]`, but `[ß]` is two). The nodes are
-    * Ruby's escapes of the bytes of a character (e.g. `\xC3\x9F`), or one node otherwise.
-    */
-  /** Checks whether Perl folds the character to several characters (e.g. `ß` to `ss`) under the flags. */
+  /** Checks whether Perl takes the full case folding of the character under the flags (e.g. `ß` as `ss`). */
   private def perlFoldsMulti(value: Int, flags: IRCharFlags, perlUnicodeRules: Boolean): Boolean =
     val hasAscii = FullCaseFolding(value).iterator.exists(_ < 0x80)
     val one = flags.charset match
@@ -187,6 +176,17 @@ object IRBuilder:
           case None => i += 1
       subtract
 
+  /** Returns the width of a literal, an escape or a class in a look-behind, where the dialects counting it differently
+    * from one care.
+    *
+    * Perl counts the folded length of a character under `i` (e.g. `(?<=ß{128})` is too long), and a class counts its
+    * longest character but not its ranges (e.g. `[ßa]` is two, and `[ß-ẞ]` is one). The folding is one for a Latin-1
+    * character under `l`, and for one with ASCII characters under `aa` and `l`, except `ẞ` and, under `aa`, `ß`.
+    *
+    * Ruby (Onigmo) counts a character folded to several characters under `i` by the folding (e.g. `ß` as two), and a
+    * class having such a character and another has a variable width (e.g. `[ßa]`, but `[ß]` is two). The nodes are
+    * Ruby's escapes of the bytes of a character (e.g. `\xC3\x9F`), or one node otherwise.
+    */
   private def charWidth(
       table: CaptureTable,
       chars: IRCharResolver,
