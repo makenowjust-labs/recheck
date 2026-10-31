@@ -21,6 +21,8 @@ import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.util.UStringUtil
+import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.PerlSource
 
 class CodecSuite extends munit.FunSuite:
   test("codec.encodeDiagnostics"):
@@ -228,7 +230,11 @@ class CodecSuite extends munit.FunSuite:
           "accelerationMode" := "off",
           "maxRepeatCount" := 123,
           "maxNFASize" := 123,
-          "maxPatternSize" := 123
+          "maxPatternSize" := 123,
+          "dialect" := "perl",
+          "encoding" := "bytes",
+          "perlSource" := "string",
+          "perlUtf8" := true
         )
       ),
       Right(
@@ -257,10 +263,19 @@ class CodecSuite extends munit.FunSuite:
           accelerationMode = AccelerationMode.Off,
           maxRepeatCount = 123,
           maxNFASize = 123,
-          maxPatternSize = 123
+          maxPatternSize = 123,
+          dialect = Dialect.Perl,
+          encoding = Some("bytes"),
+          perlSource = PerlSource.String,
+          perlUtf8 = Some(true)
         )
       )
     )
+    assertEquals(
+      decodeParameters.decodeJson(Json.obj("encoding" := Json.Null, "perlUtf8" := Json.Null)),
+      Right(Parameters())
+    )
+    assert(decodeParameters.decodeJson(Json.obj("dialect" := "xxx")).isLeft)
 
   test("codec.decodeDuration"):
     assertEquals(decodeDuration.decodeJson(Json.Null), Right(Duration.Inf))
@@ -289,3 +304,17 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(decodeSeeder.decodeJson("static".asJson), Right(Seeder.Static))
     assertEquals(decodeSeeder.decodeJson("dynamic".asJson), Right(Seeder.Dynamic))
     assertEquals(decodeSeeder.decodeJson("xxx".asJson), Left(DecodingFailure("Unknown seeder: xxx", List.empty)))
+
+  test("codec.decodeDialect"):
+    assertEquals(decodeDialect.decodeJson("javascript".asJson), Right(Dialect.JavaScript))
+    assertEquals(decodeDialect.decodeJson("dotnet".asJson), Right(Dialect.DotNet))
+    assertEquals(decodeDialect.decodeJson("pcre".asJson), Right(Dialect.PCRE))
+    assertEquals(decodeDialect.decodeJson("xxx".asJson), Left(DecodingFailure("Unknown dialect: xxx", List.empty)))
+
+  test("codec.decodePerlSource"):
+    assertEquals(decodePerlSource.decodeJson("literal".asJson), Right(PerlSource.Literal))
+    assertEquals(decodePerlSource.decodeJson("string".asJson), Right(PerlSource.String))
+    assertEquals(
+      decodePerlSource.decodeJson("xxx".asJson),
+      Left(DecodingFailure("Unknown perl source: xxx", List.empty))
+    )

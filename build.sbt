@@ -34,6 +34,16 @@ ThisBuild / releaseVersion := {
   else version.value
 }
 
+val generateParameters = taskKey[Seq[File]]("Generate the Scala sources of the parameters from the schema")
+
+def parametersGenerator(target: ParametersGen.Target): Seq[Def.Setting[?]] = Seq(
+  Compile / sourceGenerators += generateParameters.taskValue,
+  generateParameters := Def.uncached {
+    Seq(ParametersGen.generate(target, (ThisBuild / baseDirectory).value, (Compile / sourceManaged).value))
+  },
+  coverageExcludedFiles := ".*[/\\\\]src_managed[/\\\\].*"
+)
+
 lazy val root = project
   .in(file("."))
   .settings(
@@ -77,6 +87,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.recheck.util.*
       |import codes.quine.labs.recheck.vm.*
       |import codes.quine.labs.resyntax.ast.Dialect
+      |import codes.quine.labs.resyntax.ast.PerlSource
       |import codes.quine.labs.resyntax.charset.*
       |
       |def logger: Context.Logger = (message: String) =>
@@ -142,70 +153,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |)(using ctx: Context): Option[RecallValidation] =
       |  time("validate")(RecallValidator.validate(parse(source, flags), pattern, timeout)(RecallValidator.defaultExec.get))
       |
-      |def check(
-      |    source: String,
-      |    flags: String,
-      |    accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode,
-      |    attackLimit: Int = Parameters.DefaultAttackLimit,
-      |    attackTimeout: Duration = Parameters.DefaultAttackTimeout,
-      |    checker: Checker = Parameters.DefaultChecker,
-      |    crossoverSize: Int = Parameters.DefaultCrossoverSize,
-      |    heatRatio: Double = Parameters.DefaultHeatRatio,
-      |    incubationLimit: Int = Parameters.DefaultIncubationLimit,
-      |    incubationTimeout: Duration = Parameters.DefaultIncubationTimeout,
-      |    logger: Option[Context.Logger] = Parameters.DefaultLogger,
-      |    maxAttackStringSize: Int = Parameters.DefaultMaxAttackStringSize,
-      |    maxDegree: Int = Parameters.DefaultMaxDegree,
-      |    maxGeneStringSize: Int = Parameters.DefaultMaxGeneStringSize,
-      |    maxGenerationSize: Int = Parameters.DefaultMaxGenerationSize,
-      |    maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
-      |    maxIteration: Int = Parameters.DefaultMaxIteration,
-      |    maxNFASize: Int = Parameters.DefaultMaxNFASize,
-      |    maxPatternSize: Int = Parameters.DefaultMaxPatternSize,
-      |    maxRecallStringSize: Int = Parameters.DefaultMaxRecallStringSize,
-      |    maxRepeatCount: Int = Parameters.DefaultMaxRepeatCount,
-      |    maxSimpleRepeatCount: Int = Parameters.DefaultMaxSimpleRepeatCount,
-      |    mutationSize: Int = Parameters.DefaultMutationSize,
-      |    randomSeed: Long = Parameters.DefaultRandomSeed,
-      |    recallLimit: Int = Parameters.DefaultRecallLimit,
-      |    recallTimeout: Duration = Parameters.DefaultRecallTimeout,
-      |    seeder: Seeder = Parameters.DefaultSeeder,
-      |    seedingLimit: Int = Parameters.DefaultSeedingLimit,
-      |    seedingTimeout: Duration = Parameters.DefaultSeedingTimeout,
-      |    timeout: Duration = Parameters.DefaultTimeout,
-      |): Diagnostics =
-      |  val params = Parameters(
-      |    accelerationMode,
-      |    attackLimit,
-      |    attackTimeout,
-      |    checker,
-      |    crossoverSize,
-      |    heatRatio,
-      |    incubationLimit,
-      |    incubationTimeout,
-      |    logger,
-      |    maxAttackStringSize,
-      |    maxDegree,
-      |    maxGeneStringSize,
-      |    maxGenerationSize,
-      |    maxInitialGenerationSize,
-      |    maxIteration,
-      |    maxNFASize,
-      |    maxPatternSize,
-      |    maxRecallStringSize,
-      |    maxRepeatCount,
-      |    maxSimpleRepeatCount,
-      |    mutationSize,
-      |    randomSeed,
-      |    recallLimit,
-      |    recallTimeout,
-      |    seeder,
-      |    seedingLimit,
-      |    seedingTimeout,
-      |    timeout,
-      |  )
-      |  time("check")(ReDoS.check(source, flags, params))
-      |""".stripMargin,
+      |""".stripMargin + ParametersGen.consoleCheck((ThisBuild / baseDirectory).value),
     // Settings for test:
     libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -224,6 +172,7 @@ lazy val common = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/recheck-common"))
   .settings(
     name := "recheck-common",
+    parametersGenerator(ParametersGen.Target.Parameters),
     console / initialCommands := """
       |import codes.quine.labs.recheck.common.*
       |""".stripMargin,
@@ -238,6 +187,7 @@ lazy val common = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
+  .dependsOn(resyntax)
 
 lazy val commonJVM = common.jvm
 lazy val commonJS = common.js
@@ -337,6 +287,7 @@ lazy val codec = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/recheck-codec"))
   .settings(
     name := "recheck-codec",
+    parametersGenerator(ParametersGen.Target.Codec),
     console / initialCommands := """
       |import io.circe.*
       |import io.circe.syntax.*
@@ -389,6 +340,7 @@ lazy val cli = project
   .enablePlugins(NativeImagePlugin)
   .settings(
     name := "recheck-cli",
+    parametersGenerator(ParametersGen.Target.Cli),
     NativeImage / name := "recheck",
     publish / skip := true,
     Compile / mainClass := Some("codes.quine.labs.recheck.cli.Main"),

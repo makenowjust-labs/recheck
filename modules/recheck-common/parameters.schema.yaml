@@ -1,0 +1,387 @@
+# The single source of recheck's parameters.
+#
+# It is a JSON Schema (draft 2020-12) written in YAML.
+# The sbt build generates the Scala `Parameters`, its JSON decoder and the CLI options from it,
+# and the npm builds generate the TypeScript types, the ESLint rule options, the website docs and the Playground form.
+#
+# Annotations:
+#
+# - `title`: the label in the Playground and in error messages.
+# - `description`: Markdown used in Scaladoc, TypeScript docs, the website and (the first paragraph) the CLI help.
+# - `x-scala-type`: the Scala type of the field.
+# - `x-scala-values`: the Scala value of each `enum` value.
+# - `x-typescript-type`: the TypeScript type when the JSON type does not tell it.
+# - `x-unit`: `milliseconds` for a duration, which is a number of milliseconds in JSON and a `Duration` in Scala.
+#   `null` means infinite.
+# - `x-cli`: the long option name of the CLI, and `x-cli-metavar` its metavar when it differs from the title.
+# - `x-exclude`: the targets not exposing the parameter (`cli`, `eslint-plugin`, `playground`).
+# - `x-since`: the first release having the parameter, so that the Playground hides it on older releases.
+#
+# String values are quoted because YAML 1.1 (SnakeYAML) reads `on` and `off` as booleans.
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://makenowjust-labs.github.io/recheck/parameters.schema.json"
+title: "Parameters"
+description: "Parameters is parameters for analysis."
+type: object
+additionalProperties: false
+properties:
+  accelerationMode:
+    title: "Acceleration Mode"
+    description: |-
+      The type of acceleration mode strategy on fuzzing.
+
+      There are three acceleration mode strategies.
+
+      - `auto` uses acceleration mode as default. However, if the regular expression has backreferences, it turns off the acceleration mode.
+      - `on` turns on the acceleration mode.
+      - `off` turns off the acceleration mode.
+    type: string
+    enum: ["auto", "on", "off"]
+    default: "auto"
+    x-scala-type: "AccelerationMode"
+    x-scala-values: { "auto": "AccelerationMode.Auto", "on": "AccelerationMode.On", "off": "AccelerationMode.Off" }
+    x-cli: "acceleration-mode"
+    x-cli-metavar: "mode"
+
+  attackLimit:
+    title: "Attack Limit"
+    description: "The upper limit on the number of characters read by VM on the attack."
+    type: integer
+    default: 1500000000
+    x-scala-type: "Int"
+    x-cli: "attack-limit"
+
+  attackTimeout:
+    title: "Attack Timeout"
+    description: "The upper limit of matching time on the attack."
+    type: [integer, "null"]
+    default: 1000
+    x-unit: "milliseconds"
+    x-scala-type: "Duration"
+    x-cli: "attack-timeout"
+
+  checker:
+    title: "Checker"
+    description: |-
+      The type of checker to be used.
+
+      There are three checker types.
+
+      - `auto` checker uses the criteria to decide which algorithm is better to use against a regular expression, the algorithm based on automata theory or the fuzzing algorithm.
+      - `fuzz` checker uses the fuzzing algorithm with static analysis.
+      - `automaton` checker uses the algorithm based on automata theory.
+    type: string
+    enum: ["auto", "fuzz", "automaton"]
+    default: "auto"
+    x-scala-type: "Checker"
+    x-scala-values: { "auto": "Checker.Auto", "fuzz": "Checker.Fuzz", "automaton": "Checker.Automaton" }
+    x-cli: "checker"
+
+  crossoverSize:
+    title: "Crossover Size"
+    description: "The number of crossover on each generation."
+    type: integer
+    default: 25
+    x-scala-type: "Int"
+    x-cli: "crossover-size"
+
+  dialect:
+    title: "Dialect"
+    description: |-
+      The regular expression dialect of the pattern.
+
+      The flags are the dialect's flag letters (e.g. `imsx`), and the attack string is checked on the dialect's semantics.
+
+      - `javascript` is ECMAScript's `RegExp`.
+      - `python` is Python's `re` module.
+      - `ruby` is Ruby's `Regexp`.
+      - `java` is Java's `java.util.regex.Pattern`.
+      - `dotnet` is .NET's `System.Text.RegularExpressions.Regex`.
+      - `perl` is Perl's regular expressions.
+      - `pcre` is PCRE2 as PHP's `preg_*` functions use it.
+    type: string
+    enum: ["javascript", "python", "ruby", "java", "dotnet", "perl", "pcre"]
+    default: "javascript"
+    x-scala-type: "Dialect"
+    x-scala-values:
+      "javascript": "Dialect.JavaScript"
+      "python": "Dialect.Python"
+      "ruby": "Dialect.Ruby"
+      "java": "Dialect.Java"
+      "dotnet": "Dialect.DotNet"
+      "perl": "Dialect.Perl"
+      "pcre": "Dialect.PCRE"
+    x-cli: "dialect"
+    x-exclude: ["eslint-plugin"]
+    x-since: "5.0.0"
+
+  encoding:
+    title: "Encoding"
+    description: |-
+      The kind of strings that the pattern and its input are, for the dialects having the choice.
+
+      The values depend on the dialect, and `null` is the dialect's default.
+
+      - `python`: `str` (default) or `bytes`.
+      - `ruby`: `UTF-8` (default) or `ASCII-8BIT` (as the `n` flag makes).
+      - `perl`: `characters` (default), which are character strings with `use utf8`, or `bytes`, which are byte strings whose non-ASCII literals are UTF-8 bytes.
+
+      The other dialects take only `null`.
+      JavaScript and .NET read UTF-16 code units (JavaScript reads code points with the `u` or `v` flag), Java reads code points, and PCRE reads UTF-8 with the `u` flag or `(*UTF)` and bytes otherwise.
+
+      An encoding that the dialect does not have makes the result `unknown` with an `invalid` error.
+    type: [string, "null"]
+    default: null
+    x-scala-type: "Option[String]"
+    x-cli: "encoding"
+    x-exclude: ["eslint-plugin", "playground"]
+    x-since: "5.0.0"
+
+  heatRatio:
+    title: "Heat Ratio"
+    description: "The ratio of the number of characters read to the maximum number to be considered as a hot spot."
+    type: number
+    default: 0.001
+    x-scala-type: "Double"
+    x-cli: "heat-ratio"
+
+  incubationLimit:
+    title: "Incubation Limit"
+    description: "The upper limit on the number of characters read by VM on incubation."
+    type: integer
+    default: 25000
+    x-scala-type: "Int"
+    x-cli: "incubation-limit"
+
+  incubationTimeout:
+    title: "Incubation Timeout"
+    description: "The upper limit of matching time on incubation."
+    type: [integer, "null"]
+    default: 250
+    x-unit: "milliseconds"
+    x-scala-type: "Duration"
+    x-cli: "incubation-timeout"
+
+  logger:
+    title: "Logger"
+    description: |-
+      The logger function to record execution traces.
+
+      To disable the logging, `null` in TypeScript or `None` in Scala should be passed.
+      The CLI enables it with `--enable-log`.
+    default: null
+    x-scala-type: "Option[Context.Logger]"
+    x-typescript-type: "(message: string) => void"
+    x-exclude: ["cli", "eslint-plugin", "playground"]
+
+  maxAttackStringSize:
+    title: "Max Attack String Size"
+    description: "The maximum length of the attack string on fuzzing."
+    type: integer
+    default: 300000
+    x-scala-type: "Int"
+    x-cli: "max-attack-string-size"
+
+  maxDegree:
+    title: "Max Degree"
+    description: "The maximum degree to be considered in fuzzing."
+    type: integer
+    default: 4
+    x-scala-type: "Int"
+    x-cli: "max-degree"
+
+  maxGeneStringSize:
+    title: "Max Gene String Size"
+    description: "The maximum length of the gene string on fuzzing."
+    type: integer
+    default: 2400
+    x-scala-type: "Int"
+    x-cli: "max-gene-string-size"
+
+  maxGenerationSize:
+    title: "Max Generation Size"
+    description: "The maximum size of each generation on fuzzing."
+    type: integer
+    default: 100
+    x-scala-type: "Int"
+    x-cli: "max-generation-size"
+
+  maxInitialGenerationSize:
+    title: "Max Initial Generation Size"
+    description: "The maximum size of the initial generation on fuzzing."
+    type: integer
+    default: 500
+    x-scala-type: "Int"
+    x-cli: "max-initial-generation-size"
+
+  maxIteration:
+    title: "Max Iteration"
+    description: "The maximum number of fuzzing iteration."
+    type: integer
+    default: 10
+    x-scala-type: "Int"
+    x-cli: "max-iteration"
+
+  maxNFASize:
+    title: "Max NFA Size"
+    description: "The maximum size of NFA to determine which algorithm is used."
+    type: integer
+    default: 35000
+    x-scala-type: "Int"
+    x-cli: "max-nfa-size"
+
+  maxPatternSize:
+    title: "Max Pattern Size"
+    description: "The maximum size of the regular expression pattern to determine which algorithm is used."
+    type: integer
+    default: 1500
+    x-scala-type: "Int"
+    x-cli: "max-pattern-size"
+
+  maxRecallStringSize:
+    title: "Max Recall String Size"
+    description: "The maximum length of the attack string on recall validation."
+    type: integer
+    default: 300000
+    x-scala-type: "Int"
+    x-cli: "max-recall-string-size"
+
+  maxRepeatCount:
+    title: "Max Repeat Count"
+    description: "The maximum number of sum of repetition quantifier’s repeat counts to determine which algorithm is used."
+    type: integer
+    default: 30
+    x-scala-type: "Int"
+    x-cli: "max-repeat-count"
+
+  maxSimpleRepeatCount:
+    title: "Max Simple Repeat Count"
+    description: "The maximum number of each repetition quantifier’s repeat count on `static` seeding."
+    type: integer
+    default: 30
+    x-scala-type: "Int"
+    x-cli: "max-simple-repeat-count"
+
+  mutationSize:
+    title: "Mutation Size"
+    description: "The number of mutation on each generation."
+    type: integer
+    default: 50
+    x-scala-type: "Int"
+    x-cli: "mutation-size"
+
+  perlSource:
+    title: "Perl Source"
+    description: |-
+      How a Perl pattern is given, which is used only for the `perl` dialect.
+
+      - `literal` is a regex literal written in Perl source (e.g. `qr/.../`). Perl applies `\U`, `\L`, `\u`, `\l`, `\F`, `\Q` and `\E` to its text before the regex engine reads it.
+      - `string` is a pattern from a runtime string (e.g. `qr/$p/`), which the regex engine reads unchanged.
+    type: string
+    enum: ["literal", "string"]
+    default: "literal"
+    x-scala-type: "PerlSource"
+    x-scala-values: { "literal": "PerlSource.Literal", "string": "PerlSource.String" }
+    x-cli: "perl-source"
+    x-cli-metavar: "source"
+    x-exclude: ["eslint-plugin"]
+    x-since: "5.0.0"
+
+  perlUtf8:
+    title: "Perl UTF-8"
+    description: |-
+      Whether a Perl pattern string is UTF-8, which is used only for the `perl` dialect.
+      A UTF-8 pattern makes the `/d` rules Unicode rules.
+
+      `null` decides it from the pattern.
+      A `literal` pattern is UTF-8 if its source has a non-ASCII character (as with `use utf8`).
+      A `string` pattern is UTF-8 if it has a code point of `\x{100}` or more, `\p` or `\N{...}`.
+    type: [boolean, "null"]
+    default: null
+    x-scala-type: "Option[Boolean]"
+    x-cli: "perl-utf8"
+    x-exclude: ["eslint-plugin", "playground"]
+    x-since: "5.0.0"
+
+  randomSeed:
+    title: "Random Seed"
+    description: "The PRNG seed number."
+    type: integer
+    default: 0
+    x-scala-type: "Long"
+    x-cli: "random-seed"
+
+  recallLimit:
+    title: "Recall Limit"
+    description: "The upper limit on the number of characters read by VM on the recall validation."
+    type: integer
+    default: 1500000000
+    x-scala-type: "Int"
+    x-cli: "recall-limit"
+
+  recallTimeout:
+    title: "Recall Timeout"
+    description: |-
+      The upper limit of matching time on the recall validation.
+
+      The recall validation runs the attack string on the real regex engine of the dialect, and records the result as `recallValidation` of the diagnostics.
+      The engine runs as a command found in `PATH` (`node`, `python3`, `ruby`, `java`, `dotnet`, `perl` or `php`).
+      If the attack does not take this time there, the diagnostics is not accepted and the checking goes on.
+
+      If this value is not positive, the recall validation is skipped.
+      It is skipped also where commands cannot run (e.g. in the browser).
+    type: [integer, "null"]
+    default: -1000
+    x-unit: "milliseconds"
+    x-scala-type: "Duration"
+    x-cli: "recall-timeout"
+
+  seeder:
+    title: "Seeder"
+    description: |-
+      The type of seeder to be used in fuzzing.
+
+      There are two seeders.
+
+      - `static` seeder uses the seeding algorithm based on the automata theory.
+      - `dynamic` seeder uses the seeding algorithm with dynamic analysis.
+    type: string
+    enum: ["static", "dynamic"]
+    default: "static"
+    x-scala-type: "Seeder"
+    x-scala-values: { "static": "Seeder.Static", "dynamic": "Seeder.Dynamic" }
+    x-cli: "seeder"
+
+  seedingLimit:
+    title: "Seeding Limit"
+    description: "The upper limit on the number of characters read by VM on `dynamic` seeding."
+    type: integer
+    default: 1000
+    x-scala-type: "Int"
+    x-cli: "seeding-limit"
+
+  seedingTimeout:
+    title: "Seeding Timeout"
+    description: "The upper limit of matching time on `dynamic` seeding."
+    type: [integer, "null"]
+    default: 100
+    x-unit: "milliseconds"
+    x-scala-type: "Duration"
+    x-cli: "seeding-timeout"
+
+  timeout:
+    title: "Timeout"
+    description: |-
+      The upper limit of checking time.
+
+      If the checking time exceeds this limit, the result will be reported as `timeout`. If the value is positive infinite in Scala or `null` in TypeScript, the result never becomes `timeout`.
+
+      The `timeout` time begins to be measured as soon as the check starts. Note that the `timeout` does not occur while the input is in the queue waiting to be checked.
+
+      In TypeScript, a number value is treated as in milliseconds.
+    type: [integer, "null"]
+    default: 10000
+    x-unit: "milliseconds"
+    x-scala-type: "Duration"
+    x-cli: "timeout"

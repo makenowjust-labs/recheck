@@ -8,8 +8,12 @@ import java.io.SequenceInputStream
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.Duration
+import scala.concurrent.duration.SECONDS
 
 import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.PerlSource
 
 class MainSuite extends munit.FunSuite:
   private class ExitException(val status: Int) extends SecurityException
@@ -17,6 +21,26 @@ class MainSuite extends munit.FunSuite:
   test("Main.command"):
     assert(clue(Main.command.parse(Seq.empty)).isLeft)
     assertEquals(Main.command.parse(Seq("/foo/")), Right(Main.CheckAction(InputPattern("foo", ""), Parameters())))
+    assertEquals(
+      Main.command.parse(
+        Seq("/foo/", "--dialect=perl", "--encoding=bytes", "--perl-source=string", "--perl-utf8=true")
+      ),
+      Right(
+        Main.CheckAction(
+          InputPattern("foo", ""),
+          Parameters(
+            dialect = Dialect.Perl,
+            encoding = Some("bytes"),
+            perlSource = PerlSource.String,
+            perlUtf8 = Some(true)
+          )
+        )
+      )
+    )
+    assertEquals(
+      Main.command.parse(Seq("/foo/", "--max-degree=2", "--timeout=1s")),
+      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(maxDegree = 2, timeout = Duration(1, SECONDS))))
+    )
     assertEquals(Main.command.parse(Seq("agent", "--thread-size=2")), Right(Main.BatchAction(2)))
     assertEquals(Main.command.parse(Seq("agent")), Right(Main.BatchAction(sys.runtime.availableProcessors())))
 

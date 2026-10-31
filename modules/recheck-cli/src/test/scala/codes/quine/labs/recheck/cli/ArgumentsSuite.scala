@@ -9,6 +9,8 @@ import codes.quine.labs.recheck.cli.arguments.given
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Seeder
+import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.PerlSource
 
 class ArgumentsSuite extends munit.FunSuite:
   test("arguments.durationArgument"):
@@ -35,3 +37,21 @@ class ArgumentsSuite extends munit.FunSuite:
     assertEquals(seederArgument.read("dynamic"), Validated.validNel(Seeder.Dynamic))
     assertEquals(seederArgument.read("xxx"), Validated.invalidNel("unknown seeder: xxx"))
     assertEquals(seederArgument.defaultMetavar, "seeder")
+
+  test("arguments.booleanArgument"):
+    assertEquals(booleanArgument.read("true"), Validated.validNel(true))
+    assertEquals(booleanArgument.read("false"), Validated.validNel(false))
+    assertEquals(booleanArgument.read("xxx"), Validated.invalidNel("invalid boolean: xxx"))
+    assertEquals(booleanArgument.defaultMetavar, "boolean")
+
+  test("arguments.dialectArgument"):
+    assertEquals(dialectArgument.read("python"), Validated.validNel(Dialect.Python))
+    assertEquals(dialectArgument.read("dotnet"), Validated.validNel(Dialect.DotNet))
+    assertEquals(dialectArgument.read("xxx"), Validated.invalidNel("unknown dialect: xxx"))
+    assertEquals(dialectArgument.defaultMetavar, "dialect")
+
+  test("arguments.perlSourceArgument"):
+    assertEquals(perlSourceArgument.read("literal"), Validated.validNel(PerlSource.Literal))
+    assertEquals(perlSourceArgument.read("string"), Validated.validNel(PerlSource.String))
+    assertEquals(perlSourceArgument.read("xxx"), Validated.invalidNel("unknown perl source: xxx"))
+    assertEquals(perlSourceArgument.defaultMetavar, "source")

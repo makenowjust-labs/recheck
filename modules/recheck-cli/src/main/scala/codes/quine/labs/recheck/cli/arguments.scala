@@ -6,12 +6,10 @@ import cats.data.Validated
 import cats.data.ValidatedNel
 import com.monovore.decline.Argument
 
-import codes.quine.labs.recheck.common.AccelerationMode
-import codes.quine.labs.recheck.common.Checker
-import codes.quine.labs.recheck.common.Seeder
-
 /** The object `arguments` provides decline's `Argument` instances for this application. */
 object arguments:
+
+  export ParameterArguments.given
 
   /** `Argument` instance for `Duration`. */
   given durationArgument: Argument[Duration] with
@@ -21,31 +19,11 @@ object arguments:
 
     def defaultMetavar: String = "duration"
 
-  /** `Argument` instance for `Checker`. */
-  given checkerArgument: Argument[Checker] with
-    def read(string: String): ValidatedNel[String, Checker] = string match
-      case "auto"      => Validated.validNel(Checker.Auto)
-      case "automaton" => Validated.validNel(Checker.Automaton)
-      case "fuzz"      => Validated.validNel(Checker.Fuzz)
-      case s           => Validated.invalidNel(s"unknown checker: $s")
+  /** `Argument` instance for `Boolean`. */
+  given booleanArgument: Argument[Boolean] with
+    def read(string: String): ValidatedNel[String, Boolean] = string match
+      case "true"  => Validated.validNel(true)
+      case "false" => Validated.validNel(false)
+      case s       => Validated.invalidNel(s"invalid boolean: $s")
 
-    def defaultMetavar: String = "checker"
-
-  /** `Argument` instance for `AccelerationMode`. */
-  given accelerationModeArgument: Argument[AccelerationMode] with
-    def read(string: String): ValidatedNel[String, AccelerationMode] = string match
-      case "auto" => Validated.validNel(AccelerationMode.Auto)
-      case "on"   => Validated.validNel(AccelerationMode.On)
-      case "off"  => Validated.validNel(AccelerationMode.Off)
-      case s      => Validated.invalidNel(s"unknown acceleration mode: $s")
-
-    def defaultMetavar: String = "mode"
-
-  /** `Argument` instance for `Seeder`. */
-  given seederArgument: Argument[Seeder] with
-    def read(string: String): ValidatedNel[String, Seeder] = string match
-      case "static"  => Validated.validNel(Seeder.Static)
-      case "dynamic" => Validated.validNel(Seeder.Dynamic)
-      case s         => Validated.invalidNel(s"unknown seeder: $s")
-
-    def defaultMetavar: String = "seeder"
+    def defaultMetavar: String = "boolean"
