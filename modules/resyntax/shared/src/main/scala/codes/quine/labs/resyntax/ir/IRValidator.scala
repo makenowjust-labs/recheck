@@ -1,0 +1,86 @@
+package codes.quine.labs.resyntax.ir
+
+import scala.collection.mutable
+
+import codes.quine.labs.resyntax.ast.AssertKind
+import codes.quine.labs.resyntax.ast.BackslashKind
+import codes.quine.labs.resyntax.ast.CommandKind
+import codes.quine.labs.resyntax.ast.ConditionalTest
+import codes.quine.labs.resyntax.ast.GroupKind
+import codes.quine.labs.resyntax.ast.Node
+import codes.quine.labs.resyntax.ast.NodeData
+
+/** IRValidator checks a whole pattern for the errors that the parser cannot find, including the ones in unsupported
+  * nodes, and resolves the back-references.
+  */
+private[ir] final class IRValidator(
+    table: CaptureTable,
+    resolver: ReferenceResolver,
+    checker: LookBehindChecker,
+    featureSet: IRFeatureSet
+):
+  private val backReferences = mutable.Map.empty[NodeKey, Seq[Int]]
+
+  /** Validates the pattern, and returns the resolved indices of each back-reference node. */
+  def validate(root: Node): Map[NodeKey, Seq[Int]] =
+    walk(root, inLookAround = false)
+    backReferences.toMap
+
+  private def walk(node: Node, inLookAround: Boolean): Unit =
+    node.data match
+      case NodeData.Group(kind, child) =>
+        kind match
+          case _: GroupKind.PositiveLookBehind | _: GroupKind.NonAtomicPositiveLookBehind =>
+            checker.check(node, child, negative = false)
+            walk(child, inLookAround = true)
+          case _: GroupKind.NegativeLookBehind =>
+            checker.check(node, child, negative = true)
+            walk(child, inLookAround = true)
+          case _: GroupKind.LookAround | _: GroupKind.NonAtomicPositiveLookAhead =>
+            walk(child, inLookAround = true)
+          case GroupKind.Balance(_, _, test) =>
+            resolver.calledName(test, node.loc)
+            walk(child, inLookAround)
+          case GroupKind.ScanSubstring(_, refs) =>
+            for ref <- refs do resolver.call(ref, table.siteOf(node), node.loc)
+            walk(child, inLookAround)
+          case _ => walk(child, inLookAround)
+      case NodeData.Command(kind) =>
+        kind match
+          case CommandKind.PBackReference(name) =>
+            backReferences(NodeKey(node)) = resolver.namedBackReference(name, table.siteOf(node), node.loc)
+          case CommandKind.IndexedCall(n)             => resolver.index(n, node.loc)
+          case CommandKind.RelativeCall(n)            => resolver.relative(n, table.siteOf(node), node.loc)
+          case CommandKind.NamedCall(name)            => resolver.calledName(name, node.loc)
+          case CommandKind.PNamedCall(name)           => resolver.calledName(name, node.loc)
+          case CommandKind.Conditional(test, yes, no) =>
+            walkTest(node, test)
+            walk(yes, inLookAround)
+            for no <- no do walk(no, inLookAround)
+          case _ => for child <- NodeKey.children(node) do walk(child, inLookAround)
+      case NodeData.Backslash(BackslashKind.EscapeBackReference(_, ref)) =>
+        backReferences(NodeKey(node)) = resolver.backReference(ref, table.siteOf(node), node.loc)
+      case NodeData.Backslash(BackslashKind.EscapeCall(_, ref)) =>
+        resolver.call(ref, table.siteOf(node), node.loc)
+      case NodeData.Backslash(BackslashKind.Assert(AssertKind.Cut)) =>
+        if inLookAround && featureSet.rejectsCutInLookAround then
+          throw new IRBuildingException("\\K is not allowed in a look-around", node.loc)
+      case _ => for child <- NodeKey.children(node) do walk(child, inLookAround)
+
+  private def walkTest(node: Node, test: ConditionalTest): Unit = test match
+    case ConditionalTest.Indexed(n) =>
+      if featureSet.checksIndexedCaptureTest then resolver.index(n, node.loc)
+    case ConditionalTest.Relative(n)         => resolver.relative(n, table.siteOf(node), node.loc)
+    case ConditionalTest.Named(_, name)      => resolver.groupName(name, table.siteOf(node), node.loc)
+    case ConditionalTest.Referenced(_, ref)  => resolver.backReference(ref, table.siteOf(node), node.loc)
+    case ConditionalTest.IndexedRecursion(n) =>
+      if featureSet.checksIndexedRecursionTest then resolver.index(n, node.loc)
+    case ConditionalTest.NamedRecursion(name)   => resolver.calledName(name, node.loc)
+    case ConditionalTest.LookAround(kind, body) =>
+      kind match
+        case Some(_: GroupKind.PositiveLookBehind) => checker.check(node, body, negative = false)
+        case Some(_: GroupKind.NegativeLookBehind) => checker.check(node, body, negative = true)
+        case _                                     => ()
+      walk(body, inLookAround = true)
+    case ConditionalTest.CalloutLookAround(_, test) => walkTest(node, test)
+    case _                                          => ()
