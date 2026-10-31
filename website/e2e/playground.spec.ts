@@ -131,3 +131,44 @@ test("reports a release that cannot be loaded", async ({ page }) => {
   );
   await expect(resultTitles(page)).toHaveCount(0);
 });
+
+test("shows the parameters of the selected dialect", async ({ page }) => {
+  await open(page);
+  const version = page.getByLabel("recheck version");
+  const bundled = (await version.locator("option").allTextContents()).at(-1)!;
+  await version.selectOption(bundled);
+  await page.getByText("Parameters", { exact: true }).click();
+
+  const select = (name: string) => page.locator(`select[name="${name}"]`);
+  const options = (name: string) =>
+    select(name).locator("option").allTextContents();
+  await expect(select("dialect")).toHaveValue("javascript");
+  await expect(select("encoding")).toHaveCount(0);
+  await expect(select("perlSource")).toHaveCount(0);
+
+  await select("dialect").selectOption("perl");
+  expect(await options("encoding")).toEqual(["characters", "bytes"]);
+  await expect(select("perlSource")).toHaveValue("literal");
+  expect(await options("perlUtf8")).toEqual(["null", "true", "false"]);
+
+  // An encoding of another dialect falls back to the default.
+  await select("dialect").selectOption("ruby");
+  await select("encoding").selectOption("ASCII-8BIT");
+  await select("dialect").selectOption("python");
+  expect(await options("encoding")).toEqual(["str", "bytes"]);
+  await expect(select("encoding")).toHaveValue("str");
+  await expect(select("perlUtf8")).toHaveCount(0);
+
+  await select("dialect").selectOption("perl");
+  await select("encoding").selectOption("bytes");
+  await input(page).fill("/^(?:é|é)*$/");
+  await check(page);
+  await expect(page.locator(".badge", { hasText: "vulnerable" })).toBeVisible();
+
+  // The permalink restores the parameters of the dialect.
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+  await expect(select("dialect")).toHaveValue("perl");
+  await expect(select("encoding")).toHaveValue("bytes");
+  await expect(select("perlUtf8")).toHaveValue("null");
+});

@@ -6,7 +6,7 @@ import { availableBuilds, findBuild, formatBuild, sameBuild } from './builds';
 import { loadChecker } from './checker';
 import DemoInput from './DemoInput';
 import DemoResult from './DemoResult';
-import { extract, parseParams } from './params';
+import { extract, formValues, parseParams } from './params';
 import { decode, encode, makeSnapshot, sameRequest, summarize } from './permalink';
 
 import type { Diagnostics } from 'recheck';
@@ -32,7 +32,7 @@ const Demo: React.FC = () => {
     if (snapshot !== null) {
       setRecorded(snapshot);
       const recordedBuild = findBuild(builds, formatBuild(snapshot.build)) ?? defaultBuild;
-      methods.reset({ input: snapshot.input, ...snapshot.params, version: formatBuild(recordedBuild) });
+      methods.reset({ input: snapshot.input, ...formValues(snapshot.params), version: formatBuild(recordedBuild) });
     }
   }, []);
 

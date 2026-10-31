@@ -1,4 +1,11 @@
-import { extract, params, paramsOf, parseParams } from "./params";
+import {
+  extract,
+  formValues,
+  params,
+  paramsOf,
+  parseParams,
+  selectValues,
+} from "./params";
 
 import type { Build } from "./builds";
 
@@ -14,7 +21,9 @@ describe("parseParams", () => {
     expect(parsed.recallTimeout).toBe(-1000);
     expect(parsed.dialect).toBe("javascript");
     expect(Object.keys(parsed).sort()).toEqual(
-      params.map(({ name }) => name).sort(),
+      paramsOf(dev)
+        .map(({ name }) => name)
+        .sort(),
     );
   });
 
@@ -36,6 +45,36 @@ describe("parseParams", () => {
     expect(parsed.maxDegree).toBe(2);
   });
 
+  test("parses the parameters of the dialect", () => {
+    expect(parseParams({}, dev)).not.toHaveProperty("encoding");
+    expect(parseParams({ perlUtf8: "true" }, dev)).not.toHaveProperty(
+      "perlUtf8",
+    );
+    const perl = parseParams(
+      { dialect: "perl", encoding: "bytes", perlUtf8: "true" },
+      dev,
+    );
+    expect(perl).toMatchObject({
+      dialect: "perl",
+      encoding: "bytes",
+      perlSource: "literal",
+      perlUtf8: true,
+    });
+    expect(
+      parseParams({ dialect: "perl", perlUtf8: "false" }, dev).perlUtf8,
+    ).toBe(false);
+    expect(parseParams({ dialect: "perl" }, dev).perlUtf8).toBeNull();
+    // An encoding of another dialect falls back to the default.
+    expect(
+      parseParams({ dialect: "ruby", encoding: "str" }, dev),
+    ).toMatchObject({
+      encoding: "UTF-8",
+    });
+    expect(parseParams({ dialect: "python" }, dev)).not.toHaveProperty(
+      "perlSource",
+    );
+  });
+
   test("ignores unknown values", () => {
     expect(parseParams({ input: "/a/", unknown: 1 }, dev)).not.toHaveProperty(
       "input",
@@ -53,7 +92,9 @@ describe("paramsOf", () => {
     ]);
     const names = params.map(({ name }) => name);
     expect(names).toContain("perlSource");
-    expect(names).not.toContain("encoding");
+    expect(names).toContain("encoding");
+    expect(names).toContain("perlUtf8");
+    expect(names).not.toContain("recallCommand");
     expect(params.find(({ name }) => name === "attackTimeout")?.type).toBe(
       "duration",
     );
@@ -68,8 +109,51 @@ describe("paramsOf", () => {
     expect(parseParams({ dialect: "python" }, old)).not.toHaveProperty(
       "dialect",
     );
-    expect(paramsOf({ type: "release", version: "5.0.0" })).toEqual(params);
-    expect(paramsOf(dev)).toEqual(params);
+    expect(paramsOf({ type: "release", version: "5.0.0" }, "perl")).toEqual(
+      params,
+    );
+    expect(paramsOf(dev, "perl")).toEqual(params);
+  });
+
+  test("hides the parameters of the other dialects", () => {
+    const names = (dialect?: string) =>
+      paramsOf(dev, dialect).map(({ name }) => name);
+    expect(names()).not.toContain("encoding");
+    expect(names()).not.toContain("perlSource");
+    expect(names("python")).toContain("encoding");
+    expect(names("python")).not.toContain("perlUtf8");
+    expect(names("perl")).toEqual(
+      expect.arrayContaining(["encoding", "perlSource", "perlUtf8"]),
+    );
+  });
+});
+
+describe("selectValues", () => {
+  test("gives the choices for the dialect", () => {
+    const param = (name: string) => params.find((p) => p.name === name)!;
+    expect(selectValues(param("encoding"), "ruby")).toEqual([
+      "UTF-8",
+      "ASCII-8BIT",
+    ]);
+    expect(selectValues(param("encoding"), "javascript")).toEqual([]);
+    expect(selectValues(param("perlUtf8"), "perl")).toEqual([
+      "null",
+      "true",
+      "false",
+    ]);
+    expect(selectValues(param("checker"), "perl")).toEqual([
+      "auto",
+      "fuzz",
+      "automaton",
+    ]);
+  });
+});
+
+describe("formValues", () => {
+  test("converts the parameters back to the form values", () => {
+    expect(
+      formValues(parseParams({ dialect: "perl", timeout: "3000" }, dev)),
+    ).toMatchObject({ dialect: "perl", timeout: 3000, perlUtf8: "null" });
   });
 });
 

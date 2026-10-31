@@ -41,7 +41,7 @@ import codes.quine.labs.resyntax.ast.Dialect
 ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Python))
 ```
 
-The Playground also has a selector of the dialect.
+The Playground also has a selector of the dialect, and it shows `encoding`, `perlSource` and `perlUtf8` for the dialects having them.
 
 :::note
 

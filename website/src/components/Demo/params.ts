@@ -5,7 +5,14 @@ import schema from "../../data/parameters.schema.json";
 
 import type { Build } from "./builds";
 
-export type ParamType = "duration" | "float" | "integer" | { select: string[] };
+export type ParamType =
+  | "duration"
+  | "float"
+  | "integer"
+  | "nullableBoolean"
+  | { select: string[] }
+  /** A select whose values depend on the dialect, the first value being the default. */
+  | { selectByDialect: Record<string, string[]> };
 
 export type Param = {
   title: string;
@@ -14,6 +21,8 @@ export type Param = {
   type: ParamType;
   /** The first release having the parameter, or `null` if every release has it. */
   since: string | null;
+  /** The dialects that the parameter applies to, or `null` if it applies to every dialect. */
+  dialects: string[] | null;
 };
 
 type Property = {
@@ -24,15 +33,31 @@ type Property = {
   "x-unit"?: string;
   "x-exclude"?: string[];
   "x-since"?: string;
+  "x-dialects"?: string[];
+  "x-encodings"?: Record<string, string[]>;
 };
 
 const paramType = (property: Property): ParamType | null => {
   if (property.enum !== undefined) return { select: property.enum };
+  if (property["x-encodings"] !== undefined) {
+    return { selectByDialect: property["x-encodings"] };
+  }
   if (property["x-unit"] === "milliseconds") return "duration";
   if (property.type === "integer") return "integer";
   if (property.type === "number") return "float";
+  const types = Array.isArray(property.type) ? property.type : [];
+  if (
+    types.length === 2 &&
+    types.includes("boolean") &&
+    types.includes("null")
+  ) {
+    return "nullableBoolean";
+  }
   return null;
 };
+
+/** The values of a nullable boolean in the form. */
+export const NULLABLE_BOOLEAN_VALUES = ["null", "true", "false"];
 
 /** The parameters of the form, read from the schema of the parameters. */
 const schemaParams: Param[] = Object.entries(
@@ -46,9 +71,10 @@ const schemaParams: Param[] = Object.entries(
     {
       name,
       title: property.title,
-      defaultValue: property.default as string | number,
+      defaultValue: (property.default ?? "null") as string | number,
       type,
       since: property["x-since"] ?? null,
+      dialects: property["x-dialects"] ?? null,
     },
   ];
 });
@@ -59,6 +85,7 @@ const loggerParam: Param = {
   defaultValue: "off",
   type: { select: ["on", "off"] },
   since: null,
+  dialects: null,
 };
 
 /** The parameters shown first, in this order; the others follow in the schema order. */
@@ -77,9 +104,36 @@ export const params: Param[] = [...schemaParams, loggerParam]
   )
   .map(({ param }) => param);
 
-/** The parameters of the form that the build has. */
-export const paramsOf = (build: Build): Param[] =>
-  params.filter(({ since }) => since === null || isAtLeast(build, since));
+/** The default dialect, which is the only one of the builds without the `dialect` parameter. */
+export const DEFAULT_DIALECT = "javascript";
+
+/** The parameters of the form that the build has and that apply to the dialect. */
+export const paramsOf = (
+  build: Build,
+  dialect: string = DEFAULT_DIALECT,
+): Param[] =>
+  params.filter(
+    ({ since, dialects }) =>
+      (since === null || isAtLeast(build, since)) &&
+      (dialects === null || dialects.includes(dialect)),
+  );
+
+/** The values of a select parameter for the dialect. */
+export const selectValues = (param: Param, dialect: string): string[] => {
+  const { type } = param;
+  if (type === "nullableBoolean") return NULLABLE_BOOLEAN_VALUES;
+  if (typeof type !== "object") return [];
+  return "select" in type ? type.select : (type.selectByDialect[dialect] ?? []);
+};
+
+/** The dialect of the form values, or the default one if the build does not have the `dialect` parameter. */
+export const dialectOf = (
+  values: Record<string, unknown>,
+  build: Build,
+): string =>
+  paramsOf(build).some(({ name }) => name === "dialect")
+    ? String(values["dialect"] ?? DEFAULT_DIALECT)
+    : DEFAULT_DIALECT;
 
 // `logger` is a Playground option rather than a `recheck` parameter.
 export type CheckParams = Parameters & { logger: "on" | "off" };
@@ -90,7 +144,9 @@ export const parseParams = (
   build: Build,
 ): CheckParams => {
   const parsed: Record<string, unknown> = {};
-  for (const { name, type, defaultValue } of paramsOf(build)) {
+  const dialect = dialectOf(values, build);
+  for (const param of paramsOf(build, dialect)) {
+    const { name, type, defaultValue } = param;
     const value = values[name] ?? defaultValue;
     switch (type) {
       case "duration":
@@ -100,12 +156,35 @@ export const parseParams = (
       case "float":
         parsed[name] = Number.parseFloat(String(value));
         break;
+      case "nullableBoolean":
+        parsed[name] =
+          value === "true" ? true : value === "false" ? false : null;
+        break;
       default:
-        parsed[name] = String(value);
+        if (typeof type === "object" && "selectByDialect" in type) {
+          // A value left by another dialect falls back to this dialect's default.
+          const choices = selectValues(param, dialect);
+          parsed[name] = choices.includes(String(value))
+            ? String(value)
+            : choices[0];
+        } else {
+          parsed[name] = String(value);
+        }
     }
   }
   return parsed as CheckParams;
 };
+
+/** Converts the parameters back to the form values, where every value is a string or a number. */
+export const formValues = (
+  params: Record<string, unknown>,
+): Record<string, string | number> =>
+  Object.fromEntries(
+    Object.entries(params).map(([name, value]) => [
+      name,
+      typeof value === "number" ? value : String(value),
+    ]),
+  );
 
 export const extract = (
   input: string,
