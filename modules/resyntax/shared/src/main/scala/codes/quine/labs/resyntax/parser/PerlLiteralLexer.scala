@@ -3,13 +3,6 @@ package codes.quine.labs.resyntax.parser
 import scala.collection.mutable
 import scala.util.boundary
 
-import codes.quine.labs.resyntax.ast.ClassItem
-import codes.quine.labs.resyntax.ast.ClassItemData
-import codes.quine.labs.resyntax.ast.CommandKind
-import codes.quine.labs.resyntax.ast.ConditionalTest
-import codes.quine.labs.resyntax.ast.Node
-import codes.quine.labs.resyntax.ast.NodeData
-import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.FullCaseMapping

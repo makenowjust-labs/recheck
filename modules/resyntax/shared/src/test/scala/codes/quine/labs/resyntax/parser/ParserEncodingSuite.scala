@@ -1,8 +1,9 @@
 package codes.quine.labs.resyntax.parser
 
-import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
 import codes.quine.labs.resyntax.ast.BackslashKind.*
+import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
 import codes.quine.labs.resyntax.ast.ClassItemData.*
+import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.DialectOptions
@@ -15,7 +16,6 @@ import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.Quantifier.*
 import codes.quine.labs.resyntax.ast.SourceLocation
-import codes.quine.labs.resyntax.ast.CommandKind
 
 /** Tests of the source encodings, where an engine reads a pattern by bytes. */
 class ParserEncodingSuite extends munit.FunSuite:
@@ -39,7 +39,7 @@ class ParserEncodingSuite extends munit.FunSuite:
   def bytes(s: String): Seq[NodeData] = s.getBytes("UTF-8").toSeq.map(b => Literal(b & 0xff))
 
   // Python's bytes pattern has no Unicode escape, and its characters are bytes of Latin-1.
-  val PythonBytes = Some(Encoding.PythonBytes)
+  val PythonBytes: Option[Encoding] = Some(Encoding.PythonBytes)
   for (flags, encoding) <- Seq(("b", None), ("", PythonBytes)) do
     error("\\u0041", flags, Python, encoding)("Invalid backslash escape at 1")
     error("[\\u0041]", flags, Python, encoding)("Invalid backslash escape at 2")
@@ -107,7 +107,7 @@ class ParserEncodingSuite extends munit.FunSuite:
     interceptMessage[ParsingException]("Code point too large at 5")(parse("\u00e9\u00e9\\x{100}", "", PCRE, None))
 
   // Perl's byte strings are UTF-8 bytes.
-  val PerlBytes = Some(Encoding.PerlBytes)
+  val PerlBytes: Option[Encoding] = Some(Encoding.PerlBytes)
   check("\u00e9+", "", Perl, PerlBytes)(Sequence(Literal(0xc3), Repeat(Literal(0xa9), Plus(Greedy))))
   check("\u00e9+", "", Perl)(Repeat(Literal(0xe9), Plus(Greedy)))
   check("[\u00e9-\u00e0]", "", Perl, PerlBytes)(
@@ -118,7 +118,7 @@ class ParserEncodingSuite extends munit.FunSuite:
   check("\\U\u00e9a", "", Perl, PerlBytes)(Sequence((bytes("\u00e9") :+ Literal('A'))*))
 
   // Ruby's ASCII-8BIT regexp reads the UTF-8 bytes of the source (as `Regexp.new(source.b, Regexp::NOENCODING)`).
-  val RubyBytes = Some(Encoding.RubyAscii8Bit)
+  val RubyBytes: Option[Encoding] = Some(Encoding.RubyAscii8Bit)
   for (flags, encoding) <- Seq(("n", None), ("", RubyBytes)) do
     check("\u00e9+", flags, Ruby, encoding)(Sequence(Literal(0xc3), Repeat(Literal(0xa9), Plus(Greedy))))
     check("[\u00e9-\u00e0]", flags, Ruby, encoding)(
