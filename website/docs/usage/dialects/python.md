@@ -4,7 +4,6 @@ title: Python
 ---
 
 Describes how `recheck` checks a regular expression of the `python` dialect.
-See [Dialects](../dialects.md) for what is common to all the dialects.
 
 ## Engine
 

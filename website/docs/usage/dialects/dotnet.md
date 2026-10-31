@@ -4,7 +4,6 @@ title: .NET
 ---
 
 Describes how `recheck` checks a regular expression of the `dotnet` dialect.
-See [Dialects](../dialects.md) for what is common to all the dialects.
 
 ## Engine
 
