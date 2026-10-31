@@ -44,6 +44,7 @@ await check("^(a|a)*$", "", {
 - The character set flags `a` (ASCII), `aa` and `u` (Unicode) change the meaning of `\w`, `\d`, `\s`, `\b`, POSIX classes and case-insensitive matching in the same way as in Perl.
 - Perl reads a byte of a string without `utf8` as the Latin-1 character, so `u` and a pattern switching to the Unicode rules give them to `0x80`–`0xFF` there too (e.g. `\w` matches `\xE9`).
 - `l` follows the C locale, where `0x80`–`0xFF` follow the ASCII rules even with `utf8`, whatever locale the environment has.
+  Under `i`, no character folds across `U+00FF` and `U+0100` there (e.g. `k` does not match the Kelvin sign `U+212A`, and `ß` matches neither `ẞ` nor `ss`).
 
 The flags are the modifiers of `m//`, `qr//` and `s///`, and `recheck` takes all of them.
 
