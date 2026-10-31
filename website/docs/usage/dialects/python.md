@@ -7,7 +7,7 @@ Describes how `recheck` checks a regular expression of the `python` dialect.
 
 ## Engine
 
-`recheck` follows Python 3.15's `re` module.
+`recheck` follows the syntax and the semantics of Python 3.15's `re` module.
 
 ## Settings
 
@@ -50,16 +50,9 @@ The `re` flags that `recheck` does not take:
 - `re.DEBUG`: no effect on matching (it prints the compiled pattern).
 - `re.NOFLAG`: no flags, which are the empty flags.
 
-## Syntax
+## Syntax Limitations
 
-The syntax includes atomic groups and possessive quantifiers (Python 3.11 or later).
-
-## Approximations
-
-- Python 3.15 takes exponential time on `^(a|a)*$` against `'a'.repeat(n) + '!'`: about 2 seconds for `n = 24`.
-- A look-behind matches forward from a start before the position, and the match must end at the position.
-  Python tries the starts from the farthest.
-- An iteration matching the empty string ends the repetition when it is an optional one (e.g. `^(?:()|a){2}\1$` sets the group `1` at the start of `a` in Python, but at the end in Java and Perl).
+`\N{...}` (e.g. `\N{EM DASH}`) is reported as `unsupported`, as in the other dialects having it.
 
 ## Recall Validation
 

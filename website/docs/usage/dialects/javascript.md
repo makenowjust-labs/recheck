@@ -7,7 +7,7 @@ Describes how `recheck` checks a regular expression of the `javascript` dialect,
 
 ## Engine
 
-`recheck` follows ECMAScript 2025 `RegExp`, as V8 implements it.
+`recheck` follows the syntax and the semantics of ECMAScript 2025 `RegExp`, as V8 implements it.
 
 ## Settings
 
@@ -31,10 +31,6 @@ The flags are the flags of `RegExp`.
 | `y`  | `sticky`          |            | The match starts at the start of the input (`lastIndex` is `0`).       |
 
 JavaScript has no other options.
-
-## Syntax
-
-The syntax includes the ES2025 features: the `v` flag, the modifiers `(?i:...)` and duplicate named groups.
 
 ## Approximations
 

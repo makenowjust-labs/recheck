@@ -57,7 +57,7 @@ The ESLint plugin (`eslint-plugin-redos`) checks JavaScript regular expressions 
 | [`perl`](dialects/perl.md)             | Perl 5.44 regular expressions                  | code points (`utf8`), or bytes (no `utf8`)         | `perl -`                                           |
 | [`pcre`](dialects/pcre.md)             | PCRE2 10.49 as PHP's `preg_*` functions use it | bytes, or code points (UTF-8) with `u` or `(*UTF)` | `php`                                              |
 
-Each dialect's page describes its engine, settings, flags and units, syntax, approximations and recall validation.
+Each dialect's page describes its engine, settings, flags and units, syntax limitations, approximations and recall validation.
 The rest of this page describes what is common to all the dialects.
 
 ## Units and Attack Strings
@@ -72,10 +72,10 @@ In a bytes mode, it is a bytes literal (`b'\xc3\xa9'` in Python, `"\xC3\xA9".b` 
 
 The character set flags change the meaning of `\w`, `\d`, `\s`, `\b`, POSIX classes and case-insensitive matching in the same way as in the engine.
 
-## Syntax
+## Syntax Limitations
 
 `recheck` reads the whole syntax of the latest version of each engine in the table above.
-It also reproduces the errors that the engine reports after reading the syntax, as far as possible: for example, the restriction on the look-behind length, a reference to a missing group, and an unknown Unicode property name.
+It also reproduces, as far as possible, the errors that the engine reports after reading the syntax.
 A pattern that the engine rejects is reported as `unknown` with an `invalid` error.
 
 Some constructs are recognized, but the checkers do not handle them.
@@ -91,7 +91,7 @@ The following are not supported in any dialect having them, and each dialect's p
 
 `recheck` models the matching of a naive backtracking engine.
 Most engines have optimizations that make some vulnerable patterns fast, and `recheck` does not model them.
-For example, Ruby's memoization (since Ruby 3.2), Perl's caches of the super-linear matching, Java's optimizations of loops, and PCRE2's auto-possessification and JIT.
+Examples are Ruby's memoization (since Ruby 3.2), Perl's caches of the super-linear matching, Java's optimizations of loops, and PCRE2's auto-possessification and JIT.
 
 The following is what we measured with `^(a|a)*$` against `'a'.repeat(n) + '!'`.
 
@@ -102,19 +102,10 @@ The following is what we measured with `^(a|a)*$` against `'a'.repeat(n) + '!'`.
 So `recheck` reports `^(a|a)*$` as vulnerable in every dialect, but the attack is not effective on some engines.
 [Recall Validation](recall-validation.md) runs the attack string on the real engine, and it tells whether the attack works there.
 
-There are other deliberate approximations.
-The following are common to the dialects, and each dialect's page describes how the dialect's engine behaves.
+The following approximations are common to the dialects, and each dialect's page describes its own ones.
 
-- Case-insensitive matching uses each dialect's mapping between single characters (e.g. JavaScript's `Canonicalize`, .NET's `ToLowerInvariant`, and the simple case folding of Ruby, Perl and PCRE).
 - The Unicode data (properties, case mappings) is of Unicode 18.0, while the engines use Unicode 16 or 17.
-- `\X` is the extended grapheme cluster of the regular expression in UAX #29 (Table 1b) in an atomic group, as the engines match one cluster without backtracking into it.
-  In a bytes mode, it reads each byte as the Latin-1 character.
-  PCRE's `\X` follows the rules of PCRE2 10.49 instead (see [PCRE](dialects/pcre.md#approximations)).
-- A look-behind matches as the engine does, which changes the captures, the chosen alternative and the steps.
 - Look-arounds (including non-atomic ones), back-references, atomic groups, possessive quantifiers, conditionals and the backtracking control verbs other than `(*FAIL)` and `(*MARK)` are handled by the fuzz checker, not by the automaton checker.
-- A back-reference sees the captures as the engine keeps them over the iterations of a loop.
-- An iteration matching the empty string is handled as the engine does.
-- `\R` is atomic, as `(?>\r\n|[\n\x0B\f\r\x85\u2028\u2029])`.
 
 ### Searches
 
@@ -123,14 +114,6 @@ The following are common to the dialects, and each dialect's page describes how 
 - `\G` matches at the start of the search, so it is the start of the input there, as JavaScript's `y` flag is.
   A search from a later position (e.g. the second match of a global search, Java's `find(int)`, Perl's `pos()` or Python's `search(s, pos)`) is not modeled.
   So a pattern can be slow only on such a search, where a look-behind, `\b`, `\B` or a multiline `^` sees the text before the starting position (e.g. `(?<=a)\G(?:b|b)*$` on `'a' + 'b'.repeat(n) + '!'` from the position `1`), and `recheck` misses it.
-- `\K` sets the start of the reported match, which matters only for PCRE's `(*NOTEMPTY)`.
-
-### Conditionals
-
-- A conditional tests whether a group is set, or a look-around assertion, which is atomic.
-- `(?(DEFINE)...)` is skipped, and `(?(R)...)` and the other recursion tests are false (out of recursion).
-- The captures in a look-around condition remain after it, even if it is negative, except in .NET (see [.NET](dialects/dotnet.md#approximations)).
-- A name shared by groups holds if one of them is set, except in Ruby (see [Ruby](dialects/ruby.md#approximations)).
 
 ## Recall Validation
 
