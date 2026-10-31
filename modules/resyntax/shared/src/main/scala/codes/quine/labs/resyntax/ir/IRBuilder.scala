@@ -4,14 +4,21 @@ import codes.quine.labs.resyntax.ast.AssertKind
 import codes.quine.labs.resyntax.ast.BackslashKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.ast.CaseCommandKind
+import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.EscapeClassKind
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.Quantifier
+import codes.quine.labs.resyntax.ast.QuoteLiteral
 import codes.quine.labs.resyntax.ast.Reference
+import codes.quine.labs.resyntax.ast.SourceLocation
+import codes.quine.labs.resyntax.charset.FullCaseFolding
+import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UnitMode
 
 /** IRBuilder is a builder from AST node to IR. */
 object IRBuilder:
@@ -20,35 +27,94 @@ object IRBuilder:
     *
     * It throws [[IRBuildingException]] for an error that needs the whole pattern (e.g. a reference to a non-existent
     * group, or a look-behind that the dialect does not allow).
+    *
+    * @param encoding
+    *   the kind of strings, for the dialects having the choice (see [[IREncoding]]); `None` is the dialect's default
     */
-  def build(node: Node, flagSet: FlagSet, dialect: Dialect): IRPattern =
-    build(node, flagSet, dialect, resolveCharacter)
+  def build(node: Node, flagSet: FlagSet, dialect: Dialect, encoding: Option[IREncoding] = None): IRPattern =
+    build(node, flagSet, dialect, encoding, None)
 
-  /** Resolves a character-level node with the flags at the node, which the character resolution step implements. */
-  def resolveCharacter(node: Node, flags: IRCharFlags): IRNodeData =
-    throw new NotImplementedError(s"Character resolution is not implemented: ${node.data} with $flags")
-
-  /** Returns an IR pattern built from the given AST, with the given resolution of character-level nodes. */
+  /** Returns an IR pattern built from the given AST, where `resolveCharacter` replaces the character resolution. */
   private[ir] def build(
       node: Node,
       flagSet: FlagSet,
       dialect: Dialect,
-      resolveCharacter: (Node, IRCharFlags) => IRNodeData
+      encoding: Option[IREncoding],
+      resolveCharacter: Option[(Node, IRCharFlags) => IRNodeData]
   ): IRPattern =
-    val featureSet = IRFeatureSet.from(flagSet, dialect, startOptions(node))
+    val options = startOptions(node)
+    val featureSet = IRFeatureSet.from(flagSet, dialect, options)
+    val mode = IREncoding.unitMode(dialect, encoding, flagSet, featureSet.utf)
+    if dialect == Dialect.Python && mode == UnitMode.CodePoint && flagSet.localeUpper then
+      throw new IRBuildingException("Cannot use LOCALE flag with a str pattern", SourceLocation.Invalid)
     val context = BuildingContext.from(flagSet, dialect, featureSet)
     val table = CaptureAnalyzer.analyze(node, context)
     val resolver = new ReferenceResolver(table, dialect, featureSet)
-    val checker = new LookBehindChecker(table, resolver, featureSet)
+    val perlUnicodeRules = dialect == Dialect.Perl && usesPerlUnicodeRules(node)
+    val checker =
+      new LookBehindChecker(table, resolver, featureSet, literalWidth(dialect, mode, flagSet, perlUnicodeRules))
     val backReferences = new IRValidator(table, resolver, checker, featureSet).validate(node)
-    val builder = new IRBuilder(context, table, backReferences, resolveCharacter)
+    val chars = new IRCharResolver(dialect, mode, perlUnicodeRules)
+    val builder = new IRBuilder(context, table, backReferences, chars, resolveCharacter)
     IRPattern(
       builder.build(node),
       table.count,
       table.names,
       IRBackReferenceSemantics(featureSet.unsetBackReferenceMatchesEmpty, featureSet.backReferenceChoice),
-      featureSet.anchored
+      featureSet.anchored,
+      mode
     )
+
+  /** Returns the case equivalence of a back-reference with the flags in the dialect and the mode. */
+  def caseEquivalence(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRCaseEquivalence =
+    IRCaseEquivalence.of(dialect, mode, flags, perlNative = false)
+
+  /** Returns the width of a literal in a look-behind, where the dialects counting it differently from one care.
+    *
+    * PCRE's byte mode counts the UTF-8 bytes of a non-ASCII literal (a surrogate of a pair is half of four bytes), and
+    * Perl counts the folded length under `i` (e.g. `(?<=ß{128})` is too long). The flag `i` is the pattern's one here.
+    */
+  private def literalWidth(
+      dialect: Dialect,
+      mode: UnitMode,
+      flagSet: FlagSet,
+      perlUnicodeRules: Boolean
+  ): Int => LookBehindChecker.Width =
+    import LookBehindChecker.Width
+    dialect match
+      case Dialect.PCRE if mode == UnitMode.Byte =>
+        value =>
+          if value < 0x80 then Width(1, 1)
+          else if 0xd800 <= value && value <= 0xdfff then Width(2, 2)
+          else
+            val n = UString(value).encode(UnitMode.Byte).length.toLong
+            Width(n, n)
+      case Dialect.Perl if flagSet.ignoreCase && perlUnicodeRules =>
+        value => Width(1, FullCaseFolding(value).length.max(1).toLong)
+      case _ => _ => Width(1, 1)
+
+  /** Checks whether a Perl pattern uses Unicode rules under `/d` (perlre "Which character set modifier is in effect?").
+    *
+    * A non-ASCII literal makes the pattern UTF-8 (with `use utf8`), and so do a code point above `U+00FF`, `\p{...}`
+    * and `\N{...}`.
+    */
+  private def usesPerlUnicodeRules(node: Node): Boolean =
+    def check(x: Any): Boolean = x match
+      case NodeData.Literal(value)           => value >= 0x80
+      case ClassItemData.ClassLiteral(value) => value >= 0x80
+      case QuoteLiteral.QuoteValue(value)    => value >= 0x80
+      case BackslashKind.Escape(_, value)    => value > 0xff
+      case _: EscapeClassKind.CharName       => true
+      case _: EscapeClassKind.UnicodeProperty | _: EscapeClassKind.UnicodeBareProperty |
+          _: EscapeClassKind.UnicodePropertyValue | _: EscapeClassKind.NonUnicodeProperty |
+          _: EscapeClassKind.NonUnicodeBareProperty | _: EscapeClassKind.NonUnicodePropertyValue =>
+        true
+      case xs: Iterable[?] => xs.exists(check)
+      case x: Option[?]    => x.exists(check)
+      case _: String       => false
+      case x: Product      => x.productIterator.exists(check)
+      case _               => false
+    check(node)
 
   /** Returns the names of PCRE's start options (e.g. `(*CRLF)`), which can appear only at the start. */
   private def startOptions(node: Node): Seq[String] =
@@ -70,7 +136,8 @@ private[ir] class IRBuilder(
     initial: BuildingContext,
     table: CaptureTable,
     backReferences: Map[NodeKey, Seq[Int]],
-    resolveCharacter: (Node, IRCharFlags) => IRNodeData
+    chars: IRCharResolver,
+    resolveCharacter: Option[(Node, IRCharFlags) => IRNodeData]
 ):
   private val dialect = initial.dialect
 
@@ -108,19 +175,51 @@ private[ir] class IRBuilder(
 
   /** Builds a character-level node: `.`, a class, a literal, and a backslash producing characters (e.g. `\d`). */
   def buildCharacter(node: Node): IRNodeData =
-    val flags = charFlags
-    pendingCaseCommand = None
+    val flags = nextCharFlags()
     // Java's CANON_EQ matches canonically equivalent sequences, which the checkers do not handle.
     if flags.canonicalEquivalence then IRNodeData.Unsupported(node.data)
-    else resolveCharacter(node, flags)
+    else resolveCharacter.fold(chars.resolve(node, flags))(_(node, flags))
+
+  /** Returns the flags of the next character, which consumes a pending `\l` or `\u`. */
+  def nextCharFlags(): IRCharFlags =
+    val flags = charFlags
+    pendingCaseCommand = None
+    flags
+
+  /** Builds consecutive literal characters together (e.g. for multi-character case folding). */
+  def buildLiterals(nodes: Seq[Node]): Seq[IRNode] =
+    val run = nodes.map(node => (node, nextCharFlags()))
+    // Java's CANON_EQ matches canonically equivalent sequences, which the checkers do not handle.
+    if run.exists(_._2.canonicalEquivalence) then
+      run.map((node, _) => IRNode(IRNodeData.Unsupported(node.data), node.loc))
+    else
+      resolveCharacter match
+        case Some(f) => run.map((node, flags) => IRNode(f(node, flags), node.loc))
+        case None    => chars.literals(run)
 
   def buildDisjunction(children: Seq[Node]): Either[IRNodeData, IRNode] =
     Left(IRNodeData.Disjunction(children.map(build)))
 
   def buildSequence(children: Seq[Node]): Either[IRNodeData, IRNode] =
     children match
-      case Seq()    => Left(IRNodeData.Empty)
-      case children => Left(IRNodeData.Sequence(children.map(build)))
+      case Seq()     => Left(IRNodeData.Empty)
+      case children0 =>
+        val children = chars.joinRubyByteRepeats(children0)
+        val nodes = Seq.newBuilder[IRNode]
+        var i = 0
+        while i < children.length do
+          if chars.isLiteral(children(i)) then
+            var j = i
+            while j < children.length && chars.isLiteral(children(j)) do j += 1
+            nodes ++= buildLiterals(children.slice(i, j))
+            i = j
+          else
+            nodes += build(children(i))
+            i += 1
+        // Literals resolved together may become one node (e.g. `ss` under Ruby's case folding).
+        nodes.result() match
+          case Seq(node) => Right(node)
+          case nodes     => Left(IRNodeData.Sequence(nodes))
 
   def buildRepeat(node: Node, child: Node, quantifier: Quantifier): IRNodeData =
     val ir = build(child)
@@ -229,8 +328,8 @@ private[ir] class IRBuilder(
     IRNodeData.BackReference(indices, charFlags)
 
   def buildAssert(node: Node, kind: AssertKind): IRNodeData = kind match
-    case AssertKind.Boundary(None)    => IRNodeData.Assert(IRAssertKind.WordBoundary(charFlags))
-    case AssertKind.NonBoundary(None) => IRNodeData.Assert(IRAssertKind.NotWordBoundary(charFlags))
+    case AssertKind.Boundary(None)    => IRNodeData.Assert(IRAssertKind.WordBoundary(chars.wordSet(charFlags)))
+    case AssertKind.NonBoundary(None) => IRNodeData.Assert(IRAssertKind.NotWordBoundary(chars.wordSet(charFlags)))
     case AssertKind.Begin             => IRNodeData.Assert(IRAssertKind.TextBegin)
     case AssertKind.LowerEnd          => IRNodeData.Assert(IRAssertKind.TextEnd)
     case AssertKind.UpperEnd          =>

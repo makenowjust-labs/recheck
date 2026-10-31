@@ -1,5 +1,7 @@
 package codes.quine.labs.resyntax.ir
 
+import codes.quine.labs.resyntax.charset.UnitMode
+
 /** IRPattern is a whole pattern in the internal representation.
   *
   * @param node
@@ -12,13 +14,16 @@ package codes.quine.labs.resyntax.ir
   *   how back-references behave in the dialect
   * @param anchored
   *   whether a match starts only at the starting position (JavaScript `y`, PCRE `A`)
+  * @param mode
+  *   the unit of the input, which the character sets of the nodes consist of
   */
 final case class IRPattern(
     node: IRNode,
     captureCount: Int,
     captureNames: Map[String, Seq[Int]],
     backReference: IRBackReferenceSemantics,
-    anchored: Boolean
+    anchored: Boolean,
+    mode: UnitMode
 )
 
 /** IRBackReferenceSemantics is how back-references behave, which differs among dialects.

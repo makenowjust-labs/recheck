@@ -160,7 +160,10 @@ class ParserBackslashSuite extends ParserSuiteBase:
   error("\\pL", "", DotNet)("Invalid backslash escape at 2")
   check("\\p{^L}", "", PCRE, Perl, Ruby)(Backslash(EscapeClass(NonUnicodeProperty("L"))))
   check("\\P{^L}", "", PCRE, Perl, Ruby)(Backslash(EscapeClass(UnicodeProperty("L"))))
-  error("\\p{^L}", "", DotNet)("Invalid identifier at 3")
+  // .NET reads a property name as it is, and IR rejects an unknown one.
+  check("\\p{^L}", "", DotNet)(Backslash(EscapeClass(UnicodeProperty("^L"))))
+  // .NET's block names have hyphens (e.g. `IsLatin-1Supplement`).
+  check("\\p{IsLatin-1Supplement}", "", DotNet)(Backslash(EscapeClass(UnicodeProperty("IsLatin-1Supplement"))))
   check("\\p{block=Basic Latin}", "", Java)(Backslash(EscapeClass(UnicodePropertyValue("block", "Basic Latin"))))
   check("\\p{ L& }", "", PCRE, Perl, Ruby)(Backslash(EscapeClass(UnicodeProperty("L&"))))
   check("\\p{Bc:EN}", "", PCRE, Perl)(Backslash(EscapeClass(UnicodePropertyValue("Bc", "EN"))))

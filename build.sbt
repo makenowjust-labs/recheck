@@ -293,6 +293,7 @@ lazy val parseJS = parse.js
 
 lazy val resyntax = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/resyntax"))
+  .dependsOn(resyntaxCharset)
   .settings(
     name := "resyntax",
     console / initialCommands := """

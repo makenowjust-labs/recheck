@@ -14,13 +14,15 @@ import codes.quine.labs.resyntax.ir.LookBehindChecker.*
 
 /** LookBehindChecker checks the dialect's restriction on a look-behind body.
   *
-  * A character-level node is one character long here, so a multi-character case folding (e.g. `ß` and `ss`) and a
-  * surrogate pair in UTF-16 dialects are not counted yet.
+  * @param literalWidth
+  *   the width of a literal in the engine's units, which differs from one for a non-ASCII literal in PCRE's byte mode
+  *   (its UTF-8 bytes) and for Perl's multi-character case folding (e.g. `ß` up to two)
   */
 private[ir] final class LookBehindChecker(
     table: CaptureTable,
     resolver: ReferenceResolver,
-    featureSet: IRFeatureSet
+    featureSet: IRFeatureSet,
+    literalWidth: Int => Width = _ => Width(1, 1)
 ):
 
   /** Checks the body of a look-behind, and throws an exception at the look-behind node if it is invalid. */
@@ -90,9 +92,10 @@ private[ir] final class LookBehindChecker(
         case CommandKind.NamedCall(name)  => callWidth(node, Reference.NamedReference(name), visiting)
         case CommandKind.PNamedCall(name) => callWidth(node, Reference.NamedReference(name), visiting)
         case _                            => None
-    case NodeData.Caret | NodeData.Dollar                          => Some(Width(0, 0))
-    case NodeData.Dot | NodeData.Class(_, _) | NodeData.Literal(_) => Some(Width(1, 1))
-    case NodeData.Backslash(kind)                                  =>
+    case NodeData.Caret | NodeData.Dollar    => Some(Width(0, 0))
+    case NodeData.Literal(value)             => Some(literalWidth(value))
+    case NodeData.Dot | NodeData.Class(_, _) => Some(Width(1, 1))
+    case NodeData.Backslash(kind)            =>
       kind match
         case BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline)      => Some(Width(1, 2))
         case BackslashKind.EscapeClass(EscapeClassKind.GraphemeCluster)     => Some(Width(1, Inf))
