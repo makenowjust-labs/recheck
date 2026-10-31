@@ -7,7 +7,6 @@
     "lib": ["ES2022", "DOM"],
     "module": "esnext",
     "moduleResolution": "bundler",
-    "resolveJsonModule": true,
     "noEmit": true,
     "paths": {
       "@site/*": ["./*"]

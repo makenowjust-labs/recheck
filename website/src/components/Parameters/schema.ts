@@ -2,7 +2,6 @@ import type { Property } from "recheck-parameters";
 
 import { schema, typescriptType } from "recheck-parameters";
 
-/** Section is what the parameters page shows for a parameter. */
 export type Section = {
   name: string;
   /** The anchor of the heading, which is the slug of the name as for a Markdown heading. */
@@ -20,7 +19,7 @@ export type Section = {
 /** TOCItem is an item of a page's table of contents, as Docusaurus takes it. */
 export type TOCItem = { value: string; id: string; level: number };
 
-export const scalaDefault = (property: Property): string => {
+const scalaDefault = (property: Property): string => {
   if (property["x-scala-default"] !== undefined) {
     return property["x-scala-default"];
   }
@@ -55,12 +54,10 @@ export const sectionOf = (name: string, property: Property): Section => ({
   description: property.description,
 });
 
-/** The sections of all the parameters, in the schema order. */
 export const sections: Section[] = Object.entries(schema.properties).map(
   ([name, property]) => sectionOf(name, property),
 );
 
-/** The table of contents of the sections, which are `h2` headings. */
 export const toc: TOCItem[] = sections.map(({ name, id }) => ({
   value: `<code>${name}</code>`,
   id,

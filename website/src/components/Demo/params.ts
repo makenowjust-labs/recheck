@@ -41,7 +41,6 @@ const paramType = (property: Property): ParamType | null => {
   return null;
 };
 
-/** The form name of a setting of the dialect, e.g. `dialectEncoding`. */
 const settingName = (key: string): string =>
   `dialect${key[0]!.toUpperCase()}${key.slice(1)}`;
 
@@ -85,10 +84,8 @@ const settingParams = (property: Property): Param[] => {
   });
 };
 
-/** The values of a boolean in the form. */
-export const BOOLEAN_VALUES = ["true", "false"];
+const BOOLEAN_VALUES = ["true", "false"];
 
-/** The parameters of the form, read from the schema of the parameters. */
 const schemaParams: Param[] = propertiesFor("playground").flatMap(
   ([name, property]) => {
     const type = paramType(property);
@@ -138,7 +135,6 @@ export const params: Param[] = [...schemaParams, loggerParam]
 /** The default dialect, which is the only one of the builds without the `dialect` parameter. */
 export const DEFAULT_DIALECT = "javascript";
 
-/** The parameters of the form that the build has and that apply to the dialect. */
 export const paramsOf = (
   build: Build,
   dialect: string = DEFAULT_DIALECT,
@@ -149,7 +145,6 @@ export const paramsOf = (
       (dialects === null || dialects.includes(dialect)),
   );
 
-/** The values of a select parameter for the dialect. */
 export const selectValues = (param: Param, dialect: string): string[] => {
   const { type } = param;
   if (type === "boolean") return BOOLEAN_VALUES;
@@ -190,7 +185,6 @@ export const parseParams = (
   return parsed as CheckParams;
 };
 
-/** Converts a form value to the parameter value. */
 const parseValue = (param: Param, value: unknown, dialect: string): unknown => {
   const { type } = param;
   switch (type) {
@@ -211,7 +205,6 @@ const parseValue = (param: Param, value: unknown, dialect: string): unknown => {
   }
 };
 
-/** Converts the parameters back to the form values, where every value is a string or a number. */
 export const formValues = (
   params: Record<string, unknown>,
 ): Record<string, string | number> =>

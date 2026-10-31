@@ -1,4 +1,3 @@
-// Reads the schema of the parameters and writes `lib/`: the schema as a module and the types generated from it.
 // `lib/parameters.d.ts` is self-contained because `recheck` publishes a copy of it.
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
