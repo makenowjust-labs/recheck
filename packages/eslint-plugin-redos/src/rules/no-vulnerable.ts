@@ -1,16 +1,16 @@
 import type { Rule } from "eslint";
 import type ESTree from "estree";
+import type { Parameters } from "../parameters";
 import type { CacheOptions } from "../utils/checker";
 
-import * as ReDoS from "recheck";
-
+import { parameterDefaults, parameterProperties } from "../parameters";
 import { createCachedCheck } from "../utils/checker";
 
 type Options = {
   ignoreErrors?: boolean;
   permittableComplexities?: ("polynomial" | "exponential")[];
   cache?: boolean | CacheOptions;
-} & Omit<ReDoS.Parameters, "logger">;
+} & Parameters;
 
 const rule: Rule.RuleModule = {
   meta: {
@@ -45,90 +45,7 @@ const rule: Rule.RuleModule = {
             },
             additionalProperties: false,
           },
-          accelerationMode: {
-            type: "string",
-            enum: ["auto", "on", "off"],
-          },
-          attackLimit: {
-            type: "number",
-          },
-          attackTimeout: {
-            type: ["number", "null"],
-          },
-          checker: {
-            type: "string",
-            enum: ["auto", "automaton", "fuzz"],
-          },
-          crossoverSize: {
-            type: "number",
-          },
-          heatRatio: {
-            type: "number",
-          },
-          incubationLimit: {
-            type: "number",
-          },
-          incubationTimeout: {
-            type: ["number", "null"],
-          },
-          maxAttackStringSize: {
-            type: "number",
-          },
-          maxDegree: {
-            type: "number",
-          },
-          maxGeneStringSize: {
-            type: "number",
-          },
-          maxGenerationSize: {
-            type: "number",
-          },
-          maxInitialGenerationSize: {
-            type: "number",
-          },
-          maxIteration: {
-            type: "number",
-          },
-          maxNFASize: {
-            type: "number",
-          },
-          maxPatternSize: {
-            type: "number",
-          },
-          maxRecallStringSize: {
-            type: "number",
-          },
-          maxRepeatCount: {
-            type: "number",
-          },
-          maxSimpleRepeatCount: {
-            type: "number",
-          },
-          mutationSize: {
-            type: "number",
-          },
-          randomSeed: {
-            type: "number",
-          },
-          recallLimit: {
-            type: "number",
-          },
-          recallTimeout: {
-            type: ["number", "null"],
-          },
-          seeder: {
-            type: "string",
-            enum: ["static", "dynamic"],
-          },
-          seedingLimit: {
-            type: "number",
-          },
-          seedingTimeout: {
-            type: ["number", "null"],
-          },
-          timeout: {
-            type: ["number", "null"],
-          },
+          ...parameterProperties,
         },
         additionalProperties: false,
       },
@@ -139,7 +56,7 @@ const rule: Rule.RuleModule = {
     const {
       ignoreErrors = true,
       permittableComplexities = [],
-      timeout = 10000,
+      timeout = parameterDefaults.timeout,
       cache = false,
       ...params
     } = options;

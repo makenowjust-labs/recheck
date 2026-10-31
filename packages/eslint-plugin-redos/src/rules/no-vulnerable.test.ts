@@ -131,3 +131,20 @@ tester.run("no-vulnerable", rule, {
     },
   ],
 });
+
+test("no-vulnerable: the options exclude the logger and the dialect parameters", () => {
+  const [options] = rule.meta!.schema as [
+    { properties: Record<string, unknown> },
+  ];
+  expect(options.properties).toHaveProperty("timeout");
+  expect(options.properties).toHaveProperty("maxDegree");
+  for (const name of [
+    "logger",
+    "dialect",
+    "encoding",
+    "perlSource",
+    "perlUtf8",
+  ]) {
+    expect(options.properties).not.toHaveProperty(name);
+  }
+});

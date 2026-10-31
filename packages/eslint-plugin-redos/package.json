@@ -26,12 +26,12 @@
     "lib"
   ],
   "scripts": {
-    "build": "node ./scripts/build.mts",
+    "build": "node ./scripts/parameters.mts && node ./scripts/build.mts",
     "clean": "rimraf lib",
     "format": "prettier -w '*.{json,md}' '{scripts,src}/**/*.{ts,mts}'",
     "lint": "prettier --check '*.{json,md}' '{scripts,src}/**/*.{ts,mts}'",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "typecheck": "tsc --noEmit -p ."
+    "test": "node ./scripts/parameters.mts && node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "typecheck": "node ./scripts/parameters.mts && tsc --noEmit -p ."
   },
   "dependencies": {
     "recheck": "workspace:*"
@@ -49,7 +49,8 @@
     "jest": "30.5.2",
     "prettier": "3.9.10",
     "rimraf": "6.1.3",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "yaml": "2.9.1"
   },
   "engines": {
     "node": ">=22"
