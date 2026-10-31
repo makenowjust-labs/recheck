@@ -73,8 +73,7 @@ object IRBuilder:
         featureSet,
         charWidth(table, chars, dialect, mode, perlUtf8Pattern),
         supplementary,
-        if dialect.isPerl && mode == UnitMode.CodePoint then perlMinSubtract(table, perlUtf8Pattern)
-        else _ => 0L,
+        if dialect.isPerl then perlMinSubtract(table, perlUnicodeRules) else _ => 0L,
         node => table.charFlagsOf(node).flatMap(chars.rubyClassWidths(node, _))
       )
     val backReferences = new IRValidator(table, resolver, checker, featureSet).validate(node)
@@ -151,7 +150,8 @@ object IRBuilder:
   /** Returns how much Perl lessens the minimum length of the nodes of a sequence, where literals may match one
     * character folded to several ones (e.g. `ss` matches `ß`).
     *
-    * Perl finds such literals from the left, the longest first, as `join_exact` does.
+    * Perl finds such literals from the left, the longest first, as `join_exact` does. It lessens the minimum also in a
+    * pattern that is not UTF-8, where the string decides the rules of `/d`, so it follows the rules at run time.
     */
   private def perlMinSubtract(table: CaptureTable, perlUnicodeRules: Boolean): Seq[Node] => Long =
     lazy val folds = FullCaseFolding.multiCodePointFoldings().keySet
