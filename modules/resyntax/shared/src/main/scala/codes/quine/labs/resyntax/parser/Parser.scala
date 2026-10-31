@@ -37,14 +37,16 @@ object Parser:
   private[parser] final case class ParsingContext(
       inClass: Boolean,
       skipsComment: Boolean,
-      allowsDuplicatedGroupName: Boolean
+      allowsDuplicatedGroupName: Boolean,
+      explicitCapture: Boolean
   )
 
   private[parser] object ParsingContext:
     def from(featureSet: FeatureSet): ParsingContext = ParsingContext(
       inClass = false,
       skipsComment = featureSet.skipsComment,
-      allowsDuplicatedGroupName = featureSet.allowsDuplicatedGroupName
+      allowsDuplicatedGroupName = featureSet.allowsDuplicatedGroupName,
+      explicitCapture = featureSet.explicitCapture
     )
 
   /** Parses the source in the dialect.
@@ -111,6 +113,9 @@ private[parser] final class Parser(
 
   private val groupNames: mutable.Map[String, Seq[List[(Int, Int, Boolean)]]] = mutable.Map.empty
 
+  /** The number of the capture groups opened so far, where a branch reset counts its alternative with the most. */
+  private var previousCaptureCount: Int = 0
+
   /** The offset of the first reference by a group number, which Ruby rejects in a pattern with named captures. */
   private var numberedReferenceOffset: Option[Int] = None
 
@@ -143,6 +148,8 @@ private[parser] final class Parser(
     val id = disjunctionCount
     disjunctionCount += 1
     val savedAlternativePath = alternativePath
+    val captureCountAtStart = previousCaptureCount
+    var maxCaptureCount = previousCaptureCount
     var index = 0
     alternativePath = (id, index, isBranchReset) :: savedAlternativePath
     builder.addOne(parseSequence())
@@ -151,8 +158,12 @@ private[parser] final class Parser(
       next()
       index += 1
       alternativePath = (id, index, isBranchReset) :: savedAlternativePath
+      if isBranchReset then
+        maxCaptureCount = maxCaptureCount.max(previousCaptureCount)
+        previousCaptureCount = captureCountAtStart
       builder.addOne(parseSequence())
     alternativePath = savedAlternativePath
+    if isBranchReset then previousCaptureCount = maxCaptureCount.max(previousCaptureCount)
 
     val nodes = builder.result()
     if nodes.size == 1 then return nodes.head
@@ -1250,6 +1261,11 @@ private[parser] final class Parser(
     false
 
   private def parseGroupBody(stack: mutable.Stack[Node], kind: GroupKind, start: Int): Unit =
+    kind match
+      case GroupKind.IndexedCapture if !context.explicitCapture => previousCaptureCount += 1
+      case _: GroupKind.NamedCapture | _: GroupKind.PNamedCapture | GroupKind.Balance(_, Some(_), _) =>
+        previousCaptureCount += 1
+      case _ => ()
     val node = protectContext(parseDisjunction())
     closeGroup()
     val end = offset
@@ -1306,6 +1322,8 @@ private[parser] final class Parser(
             case Some('W') => flagSet.copy(asciiWord = true)
             case _         => flagSet.copy(ascii = true)
           if subOption.isDefined then next()
+          else if featureSet.hasFlagAA && sliceSource(start, offset).contains('a') then
+            flagSet = flagSet.copy(asciiRestrict = true)
         case 'c' =>
           if !featureSet.hasFlagC then return result
           flagSet = flagSet.copy(continue = true)
@@ -1415,10 +1433,10 @@ private[parser] final class Parser(
       case 'r'                                                 => parseBackslashLowerR()
       case 's'                                                 => parseBackslashLowerS()
       case 't'                                                 => parseBackslashLowerT()
-      case 'u'                                                 => parseBackslashLowerU()
+      case 'u'                                                 => withoutRemovedComment(parseBackslashLowerU())
       case 'v'                                                 => parseBackslashLowerV()
       case 'w'                                                 => parseBackslashLowerW()
-      case 'x'                                                 => parseBackslashLowerX()
+      case 'x'                                                 => withoutRemovedComment(parseBackslashLowerX())
       case 'z'                                                 => parseBackslashLowerZ()
       case 'A'                                                 => parseBackslashUpperA()
       case 'B'                                                 => parseBackslashUpperB()
@@ -1792,6 +1810,18 @@ private[parser] final class Parser(
     next()
     BackslashKind.Escape(EscapeStyle.Single('t'), 0x09)
 
+  /** Parses an escape, which fails if it has a comment that Ruby removes, since Ruby reads `\x` and `\u` before.
+    *
+    * For example, `\x(?#x)41` and `\u{4(?#x)1}` are errors in Ruby, but `\x4(?#x)1` is `\x04` and `1`.
+    */
+  private def withoutRemovedComment(parse: => BackslashKind): BackslashKind =
+    val start = offset
+    val kind = parse
+    var end = offset
+    while removedCommentStarts.contains(end) do end = removedCommentStarts(end)
+    if removedCommentEnds.keysIterator.exists(s => start < s && s < end) then fail("Invalid backslash escape", start)
+    kind
+
   private def parseBackslashLowerU(): BackslashKind =
     if !featureSet.hasBackslashUnicodeHex then return parseBackslashUnknown()
 
@@ -2079,9 +2109,11 @@ private[parser] final class Parser(
         .count(CodePointUtil.isOctalDigit(_)) == 3
     then return parseBackslashOctal()
 
+    val groupCount =
+      if featureSet.readsBackReferenceDigitsByPreviousGroups then previousCaptureCount else analysis.captureSize
     val n =
       if featureSet.readsThreeOctalDigitsAsOctal then parseBoundedDigits(_ < 100)
-      else if featureSet.readsBackReferenceDigitsWhileGroupExists then parseBoundedDigits(_ <= analysis.captureSize)
+      else if featureSet.readsBackReferenceDigitsWhileGroupExists then parseBoundedDigits(_ <= groupCount)
       else parseSaturatedIntOption(Long.MaxValue, "Invalid backslash escape", save).get
 
     if featureSet.checksValidBackReference && !(0 < n && n <= analysis.captureSize) then
@@ -2091,12 +2123,12 @@ private[parser] final class Parser(
       return parseBackslashUnknown()
 
     val isOctalStart = CodePointUtil.isOctalDigit(source.charAt(save).toInt)
-    if featureSet.fallsBackMultiDigitBackReferenceToOctal && n >= 10 && n > analysis.captureSize && isOctalStart then
+    if featureSet.fallsBackMultiDigitBackReferenceToOctal && n >= 10 && n > groupCount && isOctalStart then
       reset(save)
       return parseBackslashOctal()
 
     // Ruby reads `\8` or `\9` followed by digits as a literal character when no such group exists.
-    if featureSet.fallsBackMultiDigitBackReferenceToLiteral && n >= 10 && n > analysis.captureSize then
+    if featureSet.fallsBackMultiDigitBackReferenceToLiteral && n >= 10 && n > groupCount then
       reset(save)
       return parseBackslashUnknown()
 
@@ -2539,6 +2571,8 @@ private[parser] final class Parser(
     if diff.removed.exists(_.verbose) then context = context.copy(skipsComment = false)
     if diff.added.dupNames then context = context.copy(allowsDuplicatedGroupName = true)
     if diff.removed.exists(_.dupNames) then context = context.copy(allowsDuplicatedGroupName = false)
+    if diff.added.explicitCapture then context = context.copy(explicitCapture = true)
+    if diff.removed.exists(_.explicitCapture) then context = context.copy(explicitCapture = false)
 
   private def applyFlagSetDiffWith(diff: FlagSetDiff)(body: => Unit): Unit =
     protectContext:
@@ -2549,6 +2583,7 @@ private[parser] final class Parser(
     context = context.copy(skipsComment = false)
     if flagSet.verbose then context = context.copy(skipsComment = true)
     if flagSet.dupNames then context = context.copy(allowsDuplicatedGroupName = true)
+    context = context.copy(explicitCapture = flagSet.explicitCapture)
 
   private def applyResetFlagWith(flagSet: FlagSet)(body: => Unit): Unit =
     protectContext:

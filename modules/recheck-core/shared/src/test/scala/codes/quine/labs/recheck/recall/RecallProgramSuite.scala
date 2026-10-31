@@ -166,18 +166,31 @@ class RecallProgramSuite extends munit.FunSuite:
     assertEquals(generate("/!,;~%&:=\"|^-"), None)
 
   test("RecallProgram.generate: Perl string patterns"):
-    def generate(source: String, flags: String, encoding: Option[Encoding] = None): RecallProgram =
-      val options = DialectOptions(perlSource = PerlSource.String, encoding = encoding)
+    def generate(
+        source: String,
+        flags: String,
+        encoding: Option[Encoding] = None,
+        utf8: Option[Boolean] = None
+    ): RecallProgram =
+      val options = DialectOptions(perlSource = PerlSource.String, encoding = encoding, perlUtf8 = utf8)
       val pattern = ParsedPattern.parse(source, flags, Dialect.Perl, options).toTry.get
       RecallProgram.generate(pattern, attack, perlLiteral = false).get
     // A string pattern is not interpolated again, so any pattern can run.
     assertEquals(
       line(generate("a$x@y/é", "gi"), "my $regex"),
-      "my $regex = do { my $pattern = \"a\\$x\\@y/\\xE9\"; qr/$pattern/i };"
+      "my $regex = do { my $pattern = \"a\\$x\\@y/\\xE9\"; utf8::upgrade($pattern); qr/$pattern/i };"
     )
     val bytes = generate("é", "", Some(Encoding.PerlBytes))
-    assertEquals(line(bytes, "my $regex"), "my $regex = do { my $pattern = \"\\xC3\\xA9\"; qr/$pattern/ };")
+    assertEquals(
+      line(bytes, "my $regex"),
+      "my $regex = do { my $pattern = \"\\xC3\\xA9\"; utf8::downgrade($pattern, 1); qr/$pattern/ };"
+    )
     assert(!bytes.script.contains("use utf8"))
+    // The UTF-8 flag of the string is `perlUtf8`, or what the pattern tells.
+    assert(line(generate("\\w", ""), "my $regex").contains("utf8::downgrade($pattern, 1);"))
+    assert(line(generate("\\w", "", utf8 = Some(true)), "my $regex").contains("utf8::upgrade($pattern);"))
+    assert(line(generate("\\p{L}", ""), "my $regex").contains("utf8::upgrade($pattern);"))
+    assert(line(generate("é", "", utf8 = Some(false)), "my $regex").contains("utf8::downgrade($pattern, 1);"))
 
   test("RecallProgram.isPerlSafe"):
     assert(RecallProgram.isPerlSafe("a$"))
@@ -232,6 +245,40 @@ class RecallProgramSuite extends munit.FunSuite:
     )
     // It falls back to a control character for the delimiter.
     assertEquals(line(generate("/#~!%@;,|=:", "", Dialect.PCRE), "$regex"), "$regex = \"\\x01/#~!%@;,|=:\\x01\";")
+
+  test("RecallProgram.script"):
+    def script(source: String, dialect: Dialect): RecallProgram.Script =
+      RecallProgram.script(ParsedPattern.parse(source, "", dialect).toTry.get, attack).get
+    val js = script("foo", Dialect.JavaScript)
+    assertEquals(js.name, "recall.cjs")
+    assertEquals(js.command, "node recall.cjs")
+    assertEquals(js.content, "// Run: node recall.cjs\n" + generate("foo", "", Dialect.JavaScript).script)
+    assertEquals(script("foo", Dialect.Python).command, "python3 -I recall.py")
+    assert(script("foo", Dialect.Python).content.startsWith("# Run: python3 -I recall.py\nimport "))
+    assertEquals(script("foo", Dialect.Ruby).command, "ruby recall.rb")
+    assertEquals(script("foo", Dialect.Perl).command, "perl recall.pl")
+    assert(script("foo", Dialect.Perl).content.startsWith("# Run: perl recall.pl\nuse utf8;\n"))
+    // PHP reads the comment after `<?php`.
+    val php = script("foo", Dialect.PCRE)
+    assertEquals(php.command, "php recall.php")
+    assert(clue(php.content).startsWith("<?php\n// Run: php recall.php\necho "))
+    // Java and .NET have the data in the program.
+    val java = script("foo", Dialect.Java)
+    assertEquals(java.command, "java --source 17 recall.java")
+    assert(java.content.startsWith("// Run: java --source 17 recall.java\nimport "))
+    assert(
+      clue(java.content).contains("String[] lines = \"-\\n0066006f006f\\n1:0078\\n2:0079\\n1:007a\\n\".split(\"\\n\");")
+    )
+    val dotnet = script("foo", Dialect.DotNet)
+    assertEquals(dotnet.command, "dotnet run recall.cs")
+    assert(dotnet.content.startsWith("// Run: dotnet run recall.cs\nusing "))
+    assert(clue(dotnet.content).contains("var lines = \"-\\n0066006f006f\\n1:0078\\n2:0079\\n1:007a\\n\".Split("))
+    assertEquals(RecallProgram.script(ParsedPattern.parse("a$x", "", Dialect.Perl).toTry.get, attack), None)
+
+  test("RecallProgram.javaString"):
+    assertEquals(RecallProgram.javaString("a\nb"), "\"a\\nb\"")
+    val long = "a" * 10001
+    assertEquals(RecallProgram.javaString(long), s"String.join(\"\", \"${"a" * 10000}\", \"a\")")
 
   test("RecallProgram.RuntimeVariables"):
     val dialects =

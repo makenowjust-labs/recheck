@@ -101,7 +101,8 @@ The attack string (`attack.pattern` of the diagnostics) is an expression in the 
 In a bytes mode, it is a bytes literal (`b'\xc3\xa9'` in Python, `"\xC3\xA9".b` in Ruby, `"\xC3\xA9"` in Perl and PHP).
 `attack.string` shows each byte as the character of the same code (as Latin-1), e.g. the UTF-8 bytes of `é` are `Ã©`.
 
-The character set flags change the meaning of `\w`, `\d`, `\s`, `\b`, POSIX classes and case-insensitive matching in the same way as in the engine: for example, `a` (ASCII) and `u` (Unicode) of Python, Ruby and Perl, `U` (`UNICODE_CHARACTER_CLASS`) and `u` (`UNICODE_CASE`) of Java, and PCRE's `(?aD)` and the like.
+The character set flags change the meaning of `\w`, `\d`, `\s`, `\b`, POSIX classes and case-insensitive matching in the same way as in the engine: for example, `a` (ASCII) and `u` (Unicode) of Python, Ruby and Perl, `aa` of Perl, `U` (`UNICODE_CHARACTER_CLASS`) and `u` (`UNICODE_CASE`) of Java, and PCRE's `(?aD)` and the like.
+Java's `\b` without `U` also takes a non-spacing mark after a letter or a digit as a word character (e.g. `\b` does not match between `a` and U+0301), as `java.util.regex` does.
 
 ### Perl
 
@@ -136,10 +137,11 @@ There are other deliberate approximations.
 - Case-insensitive matching uses each dialect's mapping between single characters (e.g. JavaScript's `Canonicalize`, .NET's `ToLowerInvariant`, and the simple case folding of Ruby, Perl and PCRE).
   Ruby and Perl also match a character against several characters (e.g. `ß` against `ss`), but `recheck` handles it only for a run of plain literals.
   It does not handle a character class, a group or a quantifier taking part in such a match (e.g. `[s]s`).
+  In a look-behind, Ruby matches such a character only as its folding (e.g. `(?<=ß)` matches `ss`, but not `ß`), and so does `recheck` for plain literals.
 - The Unicode data (properties, case mappings) is of Unicode 18.0, while the engines use Unicode 16 or 17.
 - `\X` is the extended grapheme cluster of the regular expression in UAX #29 (Table 1b) in an atomic group, as the engines match one cluster without backtracking into it.
   In a bytes mode, it reads each byte as the Latin-1 character.
-  PCRE2 10.49 does not implement the rule GB9c of Unicode 15.1 (e.g. `क्ष` is two clusters there), and does not join a regional indicator with a following mark.
+  PCRE's `\X` follows the rules of PCRE2 10.49 instead, which differ from UAX #29: no rule GB9c of Unicode 15.1 (e.g. `क्ष` is two clusters there), no join of a regional indicator with a following mark or of a prepended character with an extended pictographic, and two regional indicators join only after an even number of regional indicators in the input (e.g. `\X` matches one of three regional indicators from the second).
   Java's look-behind with `\X` matches nowhere if its `TreeInfo` lengths leave no start to try (e.g. `(?<=\X)`).
 - A look-behind matches as the engine does, which changes the captures, the chosen alternative and the steps.
   JavaScript and .NET match it backward from the position.
@@ -225,6 +227,7 @@ Notes on each dialect:
 - `perl` puts the pattern into the program as a `qr` literal with the `literal` [`perlSource`](parameters.mdx#perlsource).
   When the literal would interpolate a variable or run code (e.g. `$name`, `@{...}` or `(?{ ... })`), the recall validation is skipped and `recallValidation` is `null`.
   With the `string` source, the program builds the pattern from a string as `qr/$pattern/`.
+  It sets the UTF-8 flag of the string by `utf8::upgrade` or `utf8::downgrade`, as [`perlUtf8`](parameters.mdx#perlutf8) tells (or as `recheck` decides it from the pattern), since the flag decides the character set rules.
 - `pcre` runs with PHP's default settings of `pcre.backtrack_limit`, `pcre.recursion_limit` and `pcre.jit`, and the runtime name in the result shows them.
   With the default limits, an exponential match usually ends with the backtrack limit.
   `pcre.recursion_limit` is PCRE2's depth limit, so it is an engine error.
@@ -275,6 +278,12 @@ When the recall validation fails, `check` does not report the diagnostics, and i
 If no attack succeeds, the result is `safe`.
 `checkAll` returns the diagnostics whose recall validation failed too, followed by the reported one.
 This shows that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by the found attacks.
+The CLI shows them with the `--all` option, separated by a blank line, and its exit status follows the last one, as without the option (`0` for `safe`, and `1` otherwise).
+With the `--json` option, the CLI shows a diagnostics in JSON, or the array of them with `--all`.
+
+```bash
+recheck --all --dialect=ruby --recall-timeout=1s '/^(a|a)*$/'
+```
 
 The search avoids repeating a failed attack.
 
@@ -282,3 +291,33 @@ The search avoids repeating a failed attack.
 - The fuzz checker gives the strings whose attacks failed a lower priority in the next generation, so that it looks into other structures of the pattern.
 - When the recall validation fails [`maxRecallFailures`](parameters.mdx#maxrecallfailures) times (10 by default), the checking stops, and the last diagnostics is `unknown` with the `recall-failure-limit` error.
   So the list of `checkAll` has at most `maxRecallFailures + 1` diagnostics.
+
+### Recall Script
+
+The CLI's `generate-recall-script` subcommand writes the program that the recall validation runs as a standalone script, so that you can run the attack on the engine yourself.
+It takes a file of a `vulnerable` diagnostics in JSON (`-` reads the standard input), which is the output of the CLI with `--json`, or the result of the JavaScript library or the CLI's agent mode.
+The dialect of the pattern comes from the `dialect` field of the diagnostics.
+
+```bash
+recheck --json --dialect=python '/^(a|a)*$/' > diagnostics.json
+recheck generate-recall-script diagnostics.json > recall.py
+python3 -I recall.py
+```
+
+The first comment of the script shows the command to run it, which is the command of the recall validation with the script file.
+The script of `java` and `dotnet` has the pattern and the attack string in itself.
+
+| `dialect`    | Command                        |
+| ------------ | ------------------------------ |
+| `javascript` | `node recall.cjs`              |
+| `python`     | `python3 -I recall.py`         |
+| `ruby`       | `ruby recall.rb`               |
+| `java`       | `java --source 17 recall.java` |
+| `dotnet`     | `dotnet run recall.cs`         |
+| `perl`       | `perl recall.pl`               |
+| `pcre`       | `php recall.php`               |
+
+The script prints the lines that the recall validation reads: `recheck:runtime` with the runtime, `recheck:start` before the matching, and `recheck:time` with the matching time in milliseconds (or `recheck:engine-limit` or `recheck:engine-error` with the message).
+It has no timeout, so an effective attack does not end soon.
+
+When the diagnostics is not `vulnerable`, or the pattern cannot be put in the program (the case where the recall validation is skipped for `perl`), the subcommand fails with a message.

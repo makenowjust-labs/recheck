@@ -32,6 +32,28 @@ object IRAssertKind:
   /** NotWordBoundary is a non-word-boundary assertion with the word set. */
   final case class NotWordBoundary(word: CharSet) extends IRAssertKind
 
+  /** MarkWordBoundary is a word boundary assertion where a mark after a base is a word character too (Java's `\b`
+    * without `U`).
+    */
+  final case class MarkWordBoundary(word: CharSet, marks: IRWordMarks) extends IRAssertKind
+
+  /** NotMarkWordBoundary is a non-word-boundary assertion with the word set and the marks. */
+  final case class NotMarkWordBoundary(word: CharSet, marks: IRWordMarks) extends IRAssertKind
+
+  /** NotBetweenCRLF is an assertion that the position is not between `\r` and `\n`.
+    *
+    * PCRE's `.` with `(*CRLF)` has it after its character, which then is not `\r` before `\n`.
+    */
+  case object NotBetweenCRLF extends IRAssertKind
+
+/** IRWordMarks is the marks that a word boundary assertion takes as word characters after a base, as Java's
+  * `Pattern.Bound` does with a non-spacing mark (`hasBaseCharacter`).
+  *
+  * The text before a position has a base if it ends with a character of `bases` and then any characters of `extenders`.
+  * A character of `marks` after such a position is a word character, and so is a character of `extenders` before it.
+  */
+final case class IRWordMarks(marks: CharSet, extenders: CharSet, bases: CharSet)
+
 /** IRLineBeginAtEnd is where a line begin assertion matches at the end of the input. */
 sealed abstract class IRLineBeginAtEnd extends Product with Serializable
 

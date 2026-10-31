@@ -10,6 +10,7 @@ import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminators
 import codes.quine.labs.resyntax.ir.IRLookBehindStarts
+import codes.quine.labs.resyntax.ir.IRWordMarks
 
 /** Inst is an instruction. */
 sealed abstract class Inst:
@@ -274,6 +275,14 @@ object Inst:
     final case class WordBoundaryNot(word: CharSet) extends AssertKind:
       override def toString: String = "word_boundary_not"
 
+    /** `\b` assertion with the word characters and the marks after a base (Java's `\b` without `U`). */
+    final case class MarkWordBoundary(word: CharSet, marks: IRWordMarks) extends AssertKind:
+      override def toString: String = "mark_word_boundary"
+
+    /** `\B` assertion with the word characters and the marks after a base. */
+    final case class MarkWordBoundaryNot(word: CharSet, marks: IRWordMarks) extends AssertKind:
+      override def toString: String = "mark_word_boundary_not"
+
     /** `^` assertion with `m` flag.
       *
       * @param atEnd
@@ -301,6 +310,10 @@ object Inst:
     /** The end of a look-behind matched forward, which the register holds. */
     final case class LookBehindEnd(end: CounterReg) extends AssertKind:
       override def toString: String = s"look_behind_end $end"
+
+    /** An assertion that the position is not between `\r` and `\n` (e.g. after PCRE's `.` with `(*CRLF)`). */
+    case object NotBetweenCRLF extends AssertKind:
+      override def toString: String = "not_between_crlf"
 
   /** ReadKind is an operand of `read` instruction. */
   sealed abstract class ReadKind

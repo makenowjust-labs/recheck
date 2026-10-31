@@ -17,6 +17,7 @@ import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRCharClasses.AsciiWord
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch.Forward
 import codes.quine.labs.resyntax.ir.IRLookBehindStarts.Java as JavaStarts
@@ -357,8 +358,20 @@ class IRBuilderSuite extends IRSuiteBase:
   check("\\z", "", DotNet, Java, PCRE, Perl, Ruby)(Assert(IRAssertKind.TextEnd))
   // `a\Z` does not match `a\n` in Python, where `\Z` is the end of the text.
   check("\\Z", "", Python)(Assert(IRAssertKind.TextEnd))
-  check("\\b", "", JavaScript, Java, PCRE)(Assert(IRAssertKind.WordBoundary(AsciiWord)))
-  check("\\B", "", JavaScript, Java, PCRE)(Assert(IRAssertKind.NotWordBoundary(AsciiWord)))
+  check("\\b", "", JavaScript, PCRE)(Assert(IRAssertKind.WordBoundary(AsciiWord)))
+  check("\\B", "", JavaScript, PCRE)(Assert(IRAssertKind.NotWordBoundary(AsciiWord)))
+  // Java's `\b` without `U` takes a non-spacing mark after a letter or a digit as a word character.
+  locally:
+    val marks = new IRCharClasses(Java, UnitMode.CodePoint, false).javaWordMarks
+    check("\\b", "", Java)(Assert(IRAssertKind.MarkWordBoundary(AsciiWord, marks)))
+    check("\\B", "", Java)(Assert(IRAssertKind.NotMarkWordBoundary(AsciiWord, marks)))
+    test("IRBuilder.build: Java's word marks"):
+      assert(marks.marks.contains(0x0301) && marks.marks.contains(0x1d167) && !marks.extenders.contains(0x1d167))
+      assert(marks.bases.contains('a') && marks.bases.contains(0x0660) && !marks.bases.contains('_'))
+      assert(!marks.bases.contains(0x1d400) && !marks.bases.contains(0x2160))
+  checkWith("\\b", "U", Java)(_ =>
+    Assert(IRAssertKind.WordBoundary(new IRCharClasses(Java, UnitMode.CodePoint, false).word(flagsOf(Java, "U"))))
+  )
   // ECMAScript's WordCharacters with `u` and `i` includes U+017F and U+212A, which fold to `s` and `k`.
   check("\\b", "iu", JavaScript)(Assert(IRAssertKind.WordBoundary(AsciiWord.union(CharSet.of(0x17f, 0x212a)))))
   check("\\b{wb}", "", Perl)(

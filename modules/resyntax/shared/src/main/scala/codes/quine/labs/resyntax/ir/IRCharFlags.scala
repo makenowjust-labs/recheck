@@ -22,7 +22,7 @@ package codes.quine.labs.resyntax.ir
   * @param charset
   *   the character set modifier (Perl and Ruby `a`/`d`/`u`, Perl `l`, Python `a`/`u`/`L`, PCRE `a` and its sub-options)
   * @param caselessRestrict
-  *   PCRE `r` or `(*CASELESS_RESTRICT)`
+  *   PCRE `r` or `(*CASELESS_RESTRICT)`, and Perl `aa`
   * @param turkishCasing
   *   PCRE `(*TURKISH_CASING)`
   * @param bsrAnyCRLF

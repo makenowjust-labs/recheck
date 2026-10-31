@@ -297,6 +297,9 @@ private class EpsNFABuilder(
   /** The word sets that the character kinds tell, in the order of the bits. */
   private val wordSets = pattern.wordSets
 
+  /** The word marks that the character kinds tell, in the order of the bits. */
+  private val wordMarks = pattern.wordMarks
+
   /** The text end assertions before a final line terminator that are not at an end point. */
   private val chompTextEndsInMiddle = pattern.chompTextEndsInMiddle.toSet
 
@@ -312,6 +315,10 @@ private class EpsNFABuilder(
       case IRAssertKind.NotWordBoundary(w) =>
         val i = wordSets.indexOf(w)
         assert(if i == 0 then AssertKind.WordBoundaryNot else AssertKind.WordBoundaryNotOf(i))
+      case IRAssertKind.MarkWordBoundary(w, m) =>
+        assert(AssertKind.MarkWordBoundaryOf(wordSets.indexOf(w), wordMarks.indexOf(m)))
+      case IRAssertKind.NotMarkWordBoundary(w, m) =>
+        assert(AssertKind.MarkWordBoundaryNotOf(wordSets.indexOf(w), wordMarks.indexOf(m)))
       case IRAssertKind.LineBegin(t, atEnd) =>
         val i = kindLineTerminators.indexOf(t)
         if i == 0 && plain(t) && atEnd == IRLineBeginAtEnd.AfterTerminator then assert(AssertKind.LineBegin)
@@ -320,6 +327,7 @@ private class EpsNFABuilder(
         val i = kindLineTerminators.indexOf(t)
         if i == 0 && plain(t) then assert(AssertKind.LineEnd)
         else assert(AssertKind.LineEndOf(i, !plain(t) && !t.chars(0x0d), atomic(t)))
+      case IRAssertKind.NotBetweenCRLF                                          => assert(AssertKind.NotBetweenCRLF)
       case IRAssertKind.TextBegin                                               => boundary(AssertKind.InputBegin)
       case IRAssertKind.TextEnd                                                 => boundary(AssertKind.InputEnd)
       case IRAssertKind.ChompTextEnd(t) if chompTextEndsInMiddle.contains(node) =>
