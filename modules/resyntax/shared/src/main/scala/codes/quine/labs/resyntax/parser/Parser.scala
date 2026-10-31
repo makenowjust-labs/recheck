@@ -1467,11 +1467,11 @@ private[parser] final class Parser(
   private def parseBackslashLowerB(): BackslashKind =
     if context.inClass then
       assert(featureSet.hasBackslashBackspace, "Invalid backslash escape")
-      return parseBackslashBackslash()
+      return parseBackslashBackspace()
 
     parseBackslashBoundary()
 
-  private def parseBackslashBackslash(): BackslashKind =
+  private def parseBackslashBackspace(): BackslashKind =
     next()
     BackslashKind.Escape(EscapeStyle.Single('b'), 0x0008)
 
