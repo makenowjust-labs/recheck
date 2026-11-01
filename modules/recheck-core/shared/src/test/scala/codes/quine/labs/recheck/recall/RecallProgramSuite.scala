@@ -1,6 +1,7 @@
 package codes.quine.labs.recheck.recall
 
-import codes.quine.labs.recheck.SourcePattern
+import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.exec.DotNetExecutor
 import codes.quine.labs.recheck.exec.JavaExecutor
@@ -12,6 +13,7 @@ import codes.quine.labs.recheck.exec.RubyExecutor
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UnitMode
 
 class RecallProgramSuite extends munit.FunSuite:
 
@@ -23,8 +25,13 @@ class RecallProgramSuite extends munit.FunSuite:
   val nonASCII: AttackPattern =
     AttackPattern(Seq((UString.empty, UString.fromString("é"), 1)), UString(0), 2)
 
+  given Context = Context()
+
+  /** Returns the unit of the input that the pattern matches. */
+  def modeOf(source: String, flags: String, dialect: Dialect): UnitMode = ReDoS.parse(source, flags, dialect).mode
+
   def generate(source: String, flags: String, dialect: Dialect, attack: AttackPattern = attack): RecallProgram =
-    RecallProgram.generate(SourcePattern.parse(source, flags, dialect).toTry.get._1, attack).get
+    RecallProgram.generate(source, flags, dialect, modeOf(source, flags, dialect), attack).toOption.get
 
   /** Returns the line of the script starting with the prefix. */
   def line(program: RecallProgram, prefix: String): String =
@@ -131,7 +138,8 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.data"):
     def data(source: String, flags: String, attack: AttackPattern): String =
-      RecallProgram.data(flags, SourcePattern.parse(source, "", Dialect.Java).toTry.get._1, attack)
+      RecallProgram.data(flags, source, attack)
+
     val astral = AttackPattern(Seq((UString.empty, UString.fromString("😀"), 0)), UString.empty, 2)
     assertEquals(data("😀", "", astral), "-\nd83dde00\n2:d83dde00\n")
     assertEquals(data("", "", AttackPattern(Seq.empty, UString.empty, 0)), "-\n-\n")
@@ -167,18 +175,23 @@ class RecallProgramSuite extends munit.FunSuite:
     assertEquals(line(generate("a", "gi", Dialect.Perl()), "my $regex"), "my $regex = qr/a/i;")
 
   test("RecallProgram.generate: Perl unsafe patterns"):
-    def generate(source: String): Option[RecallProgram] =
-      RecallProgram.generate(SourcePattern.parse(source, "", Dialect.Perl()).toTry.get._1, attack)
-    assert(generate("a$|b$").isDefined)
-    assert(generate("(a$)\\$x\\@x").isDefined)
-    assertEquals(generate("a$x"), None)
-    assertEquals(generate("a@x"), None)
-    assertEquals(generate("/!,;~%&:=\"|^-"), None)
+    def generate(source: String): Either[String, RecallProgram] =
+      RecallProgram.generate(source, "", Dialect.Perl(), modeOf(source, "", Dialect.Perl()), attack)
+
+    val unsafe = "The pattern cannot be a Perl regex literal, which would interpolate a variable or run code"
+    assert(generate("a$|b$").isRight)
+    assert(generate("(a$)\\$x\\@x").isRight)
+    assertEquals(generate("a$x"), Left(unsafe))
+    assertEquals(generate("a@x"), Left(unsafe))
+    assertEquals(
+      generate("/!,;~%&:=\"|^-"),
+      Left("The pattern cannot be a Perl regex literal, since it contains every delimiter")
+    )
 
   test("RecallProgram.generate: Perl string patterns"):
     def generate(source: String, flags: String, utf8: Boolean = true): RecallProgram =
-      val pattern = SourcePattern.parse(source, flags, Dialect.Perl(utf8, PerlSource.String)).toTry.get._1
-      RecallProgram.generate(pattern, attack).get
+      this.generate(source, flags, Dialect.Perl(utf8, PerlSource.String))
+
     // A string pattern is not interpolated again, so any pattern can run.
     val chars = generate("a$x@y/é", "gi")
     assertEquals(
@@ -197,7 +210,8 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.generate: Perl literal patterns"):
     def generate(source: String, utf8: Boolean): RecallProgram =
-      RecallProgram.generate(SourcePattern.parse(source, "", Dialect.Perl(utf8)).toTry.get._1, attack).get
+      this.generate(source, "", Dialect.Perl(utf8))
+
     val chars = generate("é\\w", utf8 = true)
     assertEquals(line(chars, "my $regex"), "my $regex = qr/é\\w/;")
     assert(chars.script.startsWith("use utf8;\n"))
@@ -265,7 +279,8 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.script"):
     def script(source: String, dialect: Dialect): RecallProgram.Script =
-      RecallProgram.script(SourcePattern.parse(source, "", dialect).toTry.get._1, attack).get
+      RecallProgram.script(source, "", dialect, modeOf(source, "", dialect), attack).toOption.get
+
     val js = script("foo", Dialect.JavaScript)
     assertEquals(js.name, "recall.cjs")
     assertEquals(js.command, "node recall.cjs")
@@ -290,7 +305,7 @@ class RecallProgramSuite extends munit.FunSuite:
     assertEquals(dotnet.command, "dotnet run recall.cs")
     assert(dotnet.content.startsWith("// Run: dotnet run recall.cs\nusing "))
     assert(clue(dotnet.content).contains("var lines = \"-\\n0066006f006f\\n1:0078\\n2:0079\\n1:007a\\n\".Split("))
-    assertEquals(RecallProgram.script(SourcePattern.parse("a$x", "", Dialect.Perl()).toTry.get._1, attack), None)
+    assert(RecallProgram.script("a$x", "", Dialect.Perl(), UnitMode.CodePoint, attack).isLeft)
 
   test("RecallProgram.javaString"):
     assertEquals(RecallProgram.javaString("a\nb"), "\"a\\nb\"")

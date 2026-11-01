@@ -138,6 +138,7 @@ object RPC:
       */
     def stdio: IO = new IO:
       def read(): Iterator[String] = Iterator.continually(Console.in.readLine()).takeWhile(_ ne null)
+
       def write(line: String): Unit = synchronized:
         // It writes UTF-8 bytes directly to be independent of the platform's default charset (#1910).
         val bytes = line.getBytes(StandardCharsets.UTF_8)
@@ -222,14 +223,17 @@ object RPC:
   sealed trait Handler:
     type Params
     def decodeParams: Decoder[Params]
+
     private[cli] def handle(optID: Option[ID], paramsJson: Json, push: ResponsePush, send: ResponseSend): Result[Unit]
 
   /** RequestHandler represents an handler of JSON-RPC request. */
   sealed trait RequestHandler extends Handler:
     type Message
     def encodeMessage: Encoder[Message]
+
     type Result
     def encodeResult: Encoder[Result]
+
     def apply(id: ID, params: Params, push: Push[Message], send: Send[Result]): Unit
 
     private[cli] def handle(
@@ -266,10 +270,13 @@ object RPC:
       new RequestHandler:
         type Params = P
         def decodeParams: Decoder[P] = Decoder[P]
+
         type Message = M
         def encodeMessage: Encoder[M] = Encoder[M]
+
         type Result = R
         def encodeResult: Encoder[R] = Encoder[R]
+
         def apply(id: ID, params: P, push: Push[M], send: Send[R]): Unit = h(id, params, push, send)
 
   /** NotificationHandler represents an handler of JSON-RPC notification. */
@@ -297,4 +304,5 @@ object RPC:
     def apply[P: Decoder](h: P => Unit): NotificationHandler = new NotificationHandler:
       type Params = P
       def decodeParams: Decoder[P] = Decoder[P]
+
       def apply(params: P): Unit = h(params)

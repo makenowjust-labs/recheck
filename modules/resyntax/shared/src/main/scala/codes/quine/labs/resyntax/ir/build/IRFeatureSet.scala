@@ -105,7 +105,7 @@ object IRFeatureSet:
     val newline = startOptions.reverseIterator.collectFirst {
       case "CR"      => IRLineTerminators.CR
       case "LF"      => IRLineTerminators.LF
-      case "CRLF"    => IRLineTerminators.PCRECRLF
+      case "CRLF"    => IRLineTerminators.PCRE_CRLF
       case "ANYCRLF" => IRLineTerminators.PCREAnyCRLF
       case "ANY"     => IRLineTerminators.PCREAny
       case "NUL"     => IRLineTerminators.NUL

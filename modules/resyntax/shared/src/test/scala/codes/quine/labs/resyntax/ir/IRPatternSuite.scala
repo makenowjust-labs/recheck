@@ -3,7 +3,6 @@ package codes.quine.labs.resyntax.ir
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.charset.UString
-import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 import codes.quine.labs.resyntax.ir.build.IRBuilder
 import codes.quine.labs.resyntax.parser.Parser
 
@@ -24,6 +23,7 @@ class IRPatternSuite extends munit.FunSuite:
 
   test("IRNode#captureRange"):
     def range(source: String): Option[(Int, Int)] = parse(source).node.captureRange
+
     assertEquals(range("(.)(.)"), Some((1, 2)))
     assertEquals(range("(.)|(.)"), Some((1, 2)))
     assertEquals(range("(.)"), Some((1, 1)))
@@ -217,7 +217,7 @@ class IRPatternSuite extends munit.FunSuite:
     "." -> true
   )
 
-  check("IRPattern#isConstant")(_.isConstant)(
+  check("IRPattern#isBounded")(_.isBounded)(
     ".|." -> true,
     ".*|." -> false,
     ".|.*" -> false,
@@ -243,7 +243,7 @@ class IRPatternSuite extends munit.FunSuite:
     "(.)\\1" -> true
   )
 
-  check("IRPattern#isConstant", dialect = Dialect.Ruby())(_.isConstant)(
+  check("IRPattern#isBounded", dialect = Dialect.Ruby())(_.isBounded)(
     "(?>a)" -> true,
     "(?>a+)" -> false,
     "a++" -> false,
@@ -386,7 +386,7 @@ class IRPatternSuite extends munit.FunSuite:
     assertEquals(parse("^a$", "").assertionLineTerminators, Seq.empty)
     assertEquals(parse("(?m:^)a$", "", Dialect.Java).assertionLineTerminators, Seq(IRLineTerminators.Java))
 
-  check("IRPattern#parts")(_.parts(None))(
+  check("IRPattern#parts")(_.parts)(
     "xyz.0" -> Set(UString.fromUTF16Units("xyz")),
     "(?:xyz)" -> Set(UString.fromUTF16Units("xyz")),
     "xyz|." -> Set(UString.fromUTF16Units("xyz")),
@@ -407,17 +407,17 @@ class IRPatternSuite extends munit.FunSuite:
     "😀" -> Set(UString.fromUTF16Units("😀"))
   )
 
-  check("IRPattern#parts", "i")(p => p.parts(Some(PatternAlphabet.ecmaScriptCanonicalChars(p.mode))))(
+  check("IRPattern#parts", "i")(_.parts)(
     "xyz.0" -> Set(UString.fromUTF16Units("XYZ")),
     "a\\n\\\\b" -> Set(UString.fromUTF16Units("A\n\\B"))
   )
 
-  check("IRPattern#parts", "iu")(p => p.parts(Some(PatternAlphabet.ecmaScriptCanonicalChars(p.mode))))(
-    "a😀" -> Set(UString.fromUTF16Units("a😀")),
-    "XYZ" -> Set(UString.fromUTF16Units("xyz"))
+  check("IRPattern#parts", "iu")(_.parts)(
+    "a😀" -> Set(UString.fromUTF16Units("A😀")),
+    "XYZ" -> Set(UString.fromUTF16Units("XYZ"))
   )
 
-  check("IRPattern#parts", "i", Dialect.Python())(_.parts(None))("xyz" -> Set(UString.fromUTF16Units("XYZ")))
+  check("IRPattern#parts", "i", Dialect.Python())(_.parts)("xyz" -> Set(UString.fromUTF16Units("XYZ")))
 
   check("IRPattern#captureCount")(_.captureCount)(
     "(.)|(.)" -> 2,

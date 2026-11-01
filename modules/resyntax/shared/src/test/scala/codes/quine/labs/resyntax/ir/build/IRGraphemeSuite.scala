@@ -36,6 +36,7 @@ class IRGraphemeSuite extends munit.FunSuite:
         val more = if n < max then ends(node, input, p).filter(_ != p).flatMap(loop(_, n + 1)) else LazyList()
         val stop = if n >= min then LazyList(p) else LazyList()
         if greedy then more ++ stop else stop ++ more
+
       loop(pos, 0)
     case data => fail(s"Unexpected: $data")
 

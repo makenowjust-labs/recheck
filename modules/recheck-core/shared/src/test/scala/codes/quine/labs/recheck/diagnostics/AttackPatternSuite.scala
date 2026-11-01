@@ -81,6 +81,7 @@ class AttackPatternSuite extends munit.FunSuite:
   test("AttackPattern#toString: escapes"):
     import AttackPattern.*
     def show(style: Style, s: String): String = style.literal(UStringUtil.fromString(s))
+
     val special = "'\"\\$@#{\t\n"
     assertEquals(show(Python(), special), "'\\'\"\\\\$@#{\\t\\n'")
     assertEquals(show(Ruby(), special), "\"'\\\"\\\\$@\\#{\\t\\n\"")

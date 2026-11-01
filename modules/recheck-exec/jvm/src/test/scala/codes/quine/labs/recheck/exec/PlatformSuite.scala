@@ -66,6 +66,7 @@ class PlatformSuite extends munit.FunSuite:
     val file = SourceFile("recheck-test.js", "console.log(process.argv.length, require('fs').readFileSync(0, 'utf8'))")
     def run(input: String): ExecResult =
       Platform.run("node", Seq("--no-warnings"), None, Map.empty, Some(file), input, None, None)
+
     try
       assertEquals(run("foo"), ExecResult.Exit(0, "2 foo\n", ""))
       assertEquals(run("bar"), ExecResult.Exit(0, "2 bar\n", ""))

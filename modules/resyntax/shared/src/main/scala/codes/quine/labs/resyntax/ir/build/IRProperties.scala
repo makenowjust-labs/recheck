@@ -10,7 +10,7 @@ import codes.quine.labs.resyntax.charset.NameMatching
 import codes.quine.labs.resyntax.charset.Properties
 import codes.quine.labs.resyntax.charset.PropertyValue
 import codes.quine.labs.resyntax.charset.UnitMode
-import codes.quine.labs.resyntax.ir.build.IRCharClasses.ASCIIPOSIX
+import codes.quine.labs.resyntax.ir.build.IRCharClasses.ASCII_POSIX
 
 /** PropertyResult is a result of looking up a Unicode property in a dialect. */
 private[build] enum PropertyResult:
@@ -217,7 +217,9 @@ private[build] object IRProperties:
   /** `CharPredicates.forProperty`: general categories, POSIX names in ASCII and `java.lang.Character` methods. */
   private def javaForProperty(name: String, ci: Boolean): PropertyResult =
     def category(names: String*): PropertyResult = found(gc(names*))
+
     def cased(single: CharSet): PropertyResult = found(if ci then javaCased else single)
+
     name match
       case "Lu" | "Ll" | "Lt" => if ci then found(gc("Lu", "Ll", "Lt")) else category(name)
       case "Cn" | "Lm" | "Lo" | "Mn" | "Me" | "Mc" | "Nd" | "Nl" | "No" | "Zs" | "Zl" | "Zp" | "Cc" | "Cf" | "Co" |
@@ -228,18 +230,18 @@ private[build] object IRProperties:
       case "L1"                      => found(CharSet.range(0, 0xff))
       case "all"                     => found(unicodeUniverse.universe)
       case "ASCII"                   => found(CharSet.range(0, 0x7f))
-      case "Alnum"                   => found(ASCIIPOSIX("alnum"))
-      case "Alpha"                   => found(ASCIIPOSIX("alpha"))
-      case "Blank"                   => found(ASCIIPOSIX("blank"))
-      case "Cntrl"                   => found(ASCIIPOSIX("cntrl"))
-      case "Digit"                   => found(ASCIIPOSIX("digit"))
-      case "Graph"                   => found(ASCIIPOSIX("graph"))
+      case "Alnum"                   => found(ASCII_POSIX("alnum"))
+      case "Alpha"                   => found(ASCII_POSIX("alpha"))
+      case "Blank"                   => found(ASCII_POSIX("blank"))
+      case "Cntrl"                   => found(ASCII_POSIX("cntrl"))
+      case "Digit"                   => found(ASCII_POSIX("digit"))
+      case "Graph"                   => found(ASCII_POSIX("graph"))
       case "Lower"                   => found(if ci then ascii('A' -> 'Z', 'a' -> 'z') else ascii('a' -> 'z'))
-      case "Print"                   => found(ASCIIPOSIX("print"))
-      case "Punct"                   => found(ASCIIPOSIX("punct"))
-      case "Space"                   => found(ASCIIPOSIX("space"))
+      case "Print"                   => found(ASCII_POSIX("print"))
+      case "Punct"                   => found(ASCII_POSIX("punct"))
+      case "Space"                   => found(ASCII_POSIX("space"))
       case "Upper"                   => found(if ci then ascii('A' -> 'Z', 'a' -> 'z') else ascii('A' -> 'Z'))
-      case "XDigit"                  => found(ASCIIPOSIX("xdigit"))
+      case "XDigit"                  => found(ASCII_POSIX("xdigit"))
       case "javaLowerCase"           => cased(binary("Lowercase"))
       case "javaUpperCase"           => cased(binary("Uppercase"))
       case "javaTitleCase"           => cased(gc("Lt"))
@@ -589,6 +591,7 @@ private[build] object IRProperties:
   private def perlNumericValue(value: String): Option[CharSet] =
     val nv = Properties.NumericValue
     def gcd(a: Long, b: Long): Long = if b == 0 then a else gcd(b, a % b)
+
     value.trim match
       case v if lowerASCII(v) == "nan" => Some(nv.nan.set)
       case PerlFraction(sign, n, d)    =>
@@ -642,6 +645,7 @@ private[build] object IRProperties:
   private def perlSpecial(key: String): Option[(CharSet, CaseKind)] =
     val u = unicodeUniverse
     def o(set: CharSet, kind: CaseKind = CaseKind.Other) = Some((set, kind))
+
     val space = binary("White_Space")
     val horiz = space.diff(IRCharClasses.Vertical)
     val graph = space.union(gc("Cc", "Cn", "Cs")).complement(u)
@@ -649,7 +653,7 @@ private[build] object IRProperties:
     key match
       case "any" | "all" | "unicode"                            => o(u.universe)
       case "assigned"                                           => o(gc("Cn").complement(u))
-      case "ascii"                                              => o(ASCIIPOSIX("ascii"))
+      case "ascii"                                              => o(ASCII_POSIX("ascii"))
       case "l&" | "l_" | "lc" | "casedletter"                   => o(gc("LC"), CaseKind.Category)
       case "alnum" | "xposixalnum"                              => o(binary("Alphabetic").union(gc("Nd")))
       case "alpha" | "xposixalpha"                              => o(binary("Alphabetic"))
@@ -666,19 +670,19 @@ private[build] object IRProperties:
       case "word" | "xposixword"                                => o(IRCharClasses.perlWord)
       case "xdigit" | "xposixxdigit"                            => o(binary("Hex_Digit"))
       case "vertspace" | "v"                                    => o(IRCharClasses.Vertical)
-      case "posixalnum"                                         => o(ASCIIPOSIX("alnum"))
-      case "posixalpha"                                         => o(ASCIIPOSIX("alpha"))
-      case "posixblank"                                         => o(ASCIIPOSIX("blank"))
-      case "posixcntrl"                                         => o(ASCIIPOSIX("cntrl"))
-      case "posixdigit"                                         => o(ASCIIPOSIX("digit"))
-      case "posixgraph"                                         => o(ASCIIPOSIX("graph"))
-      case "posixlower"                                         => o(ASCIIPOSIX("lower"), CaseKind.Cased)
-      case "posixprint"                                         => o(ASCIIPOSIX("print"))
-      case "posixpunct"                                         => o(ASCIIPOSIX("punct"))
-      case "posixspace" | "perlspace"                           => o(ASCIIPOSIX("space"))
-      case "posixupper"                                         => o(ASCIIPOSIX("upper"), CaseKind.Cased)
-      case "posixword" | "perlword"                             => o(ASCIIPOSIX("word"))
-      case "posixxdigit"                                        => o(ASCIIPOSIX("xdigit"))
+      case "posixalnum"                                         => o(ASCII_POSIX("alnum"))
+      case "posixalpha"                                         => o(ASCII_POSIX("alpha"))
+      case "posixblank"                                         => o(ASCII_POSIX("blank"))
+      case "posixcntrl"                                         => o(ASCII_POSIX("cntrl"))
+      case "posixdigit"                                         => o(ASCII_POSIX("digit"))
+      case "posixgraph"                                         => o(ASCII_POSIX("graph"))
+      case "posixlower"                                         => o(ASCII_POSIX("lower"), CaseKind.Cased)
+      case "posixprint"                                         => o(ASCII_POSIX("print"))
+      case "posixpunct"                                         => o(ASCII_POSIX("punct"))
+      case "posixspace" | "perlspace"                           => o(ASCII_POSIX("space"))
+      case "posixupper"                                         => o(ASCII_POSIX("upper"), CaseKind.Cased)
+      case "posixword" | "perlword"                             => o(ASCII_POSIX("word"))
+      case "posixxdigit"                                        => o(ASCII_POSIX("xdigit"))
       case _                                                    => None
 
   def perl(name: String, value: Option[String]): PropertyResult =
@@ -816,6 +820,7 @@ private[build] object IRProperties:
     */
   private lazy val rubyContributory: Map[String, CharSet] =
     def other(derived: String, parts: CharSet): CharSet = binary(derived).diff(parts)
+
     Seq(
       Seq("Other_Alphabetic", "OAlpha") -> other("Alphabetic", gc("L", "Nl")),
       Seq("Other_Default_Ignorable_Code_Point", "ODI") ->
@@ -842,6 +847,7 @@ private[build] object IRProperties:
   private lazy val rubyValues: Map[String, CharSet] =
     def listed(name: String, property: EnumeratedProperty, default: String): Seq[(String, CharSet)] =
       property.values.filter(v => v.name != default && v.set.nonEmpty).map(v => s"$name=${rubyKey(v.name)}" -> v.set)
+
     val ages = Properties.Age.values.filter(_.shortName.matches("[0-9]+\\.[0-9]+"))
     (ages.map(v => s"age=${v.shortName}" -> Properties.presentIn(v)) ++
       listed("graphemeclusterbreak", Properties.GraphemeClusterBreak, "Other") ++

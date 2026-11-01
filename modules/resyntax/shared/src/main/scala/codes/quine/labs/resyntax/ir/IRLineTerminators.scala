@@ -26,8 +26,8 @@ object IRLineTerminators:
   /** CR is `\r` only, used by PCRE with `(*CR)`. */
   val CR: IRLineTerminators = IRLineTerminators(Set(0x0d), CRLF.Ignored)
 
-  /** PCRECRLF is `\r\n` only, used by PCRE with `(*CRLF)`. */
-  val PCRECRLF: IRLineTerminators = IRLineTerminators(Set.empty, CRLF.Sequence)
+  /** PCRE_CRLF is `\r\n` only, used by PCRE with `(*CRLF)`. */
+  val PCRE_CRLF: IRLineTerminators = IRLineTerminators(Set.empty, CRLF.Sequence)
 
   /** PCREAnyCRLF is `\r`, `\n` and `\r\n`, used by PCRE with `(*ANYCRLF)`. */
   val PCREAnyCRLF: IRLineTerminators = IRLineTerminators(Set(0x0a, 0x0d), CRLF.Sequence)

@@ -244,6 +244,7 @@ class IRLookBehindSuite extends IRSuiteBase:
           case IRNodeData.Conditional(IRCondition.LookBehind(_, _, m), _, _) => Some(m)
           case IRNodeData.Sequence(nodes) => nodes.iterator.flatMap(find).nextOption()
           case _                          => None
+
         val (pattern, _) = build(s, "", dialect)
         val expectedMatching =
           if expected.isEmpty then IRLookBehindMatch.Backward else IRLookBehindMatch.Forward(expected)

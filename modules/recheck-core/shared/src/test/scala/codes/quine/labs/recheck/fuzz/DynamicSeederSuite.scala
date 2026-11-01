@@ -3,10 +3,12 @@ package fuzz
 
 import scala.concurrent.duration.*
 import scala.language.implicitConversions
+import scala.util.Try
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.fuzz.DynamicSeeder.*
 import codes.quine.labs.recheck.util.UStringUtil
+import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
 
 class DynamicSeederSuite extends munit.FunSuite:
@@ -17,14 +19,14 @@ class DynamicSeederSuite extends munit.FunSuite:
   test("DynamicSeeder.seed"):
     def seed(source: String, flags: String): Set[String] =
       val result = for
-        (pattern, ir) <- SourcePattern.parse(source, flags).toTry
-        fuzz <- FuzzProgram.from(ir, pattern.dialect, pattern.preferredChars)
+        ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
+        fuzz <- FuzzProgram.from(ir)
       yield DynamicSeeder.seed(fuzz, timeout = Duration.Inf)
       result.get.map(_.toString)
 
     assertEquals(seed("^(a|b)$", ""), Set("''", "'a'", "'b'"))
     assertEquals(seed("^(a|b)$", "i"), Set("''", "'A'", "'B'"))
-    assertEquals(seed("^(A|B)$", "iu"), Set("''", "'a'", "'b'"))
+    assertEquals(seed("^(A|B)$", "iu"), Set("''", "'A'", "'B'"))
     assertEquals(seed("^[ab]$", ""), Set("''", "'a'"))
     assertEquals(seed("^[^ab]$", ""), Set("''", "'\\x00'"))
     assertEquals(seed("^(a)\\1$", ""), Set("''", "'a'", "'aa'"))

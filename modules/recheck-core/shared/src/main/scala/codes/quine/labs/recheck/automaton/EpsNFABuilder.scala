@@ -25,12 +25,12 @@ import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 /** RegExp IR to ε-NFA Compiler. */
 object EpsNFABuilder:
 
-  /** Compiles RegExp IR into ε-NFA, whose alphabet takes `preferred` (see [[PatternAlphabet.build]]). */
-  def build(pattern: IRPattern, preferred: Option[CharSet])(using ctx: Context): Try[EpsNFA[Int]] =
+  /** Compiles RegExp IR into ε-NFA. */
+  def build(pattern: IRPattern)(using ctx: Context): Try[EpsNFA[Int]] =
     ctx.interrupt:
       for
         _ <- Try(())
-        alphabet = PatternAlphabet.of(pattern, preferred)
+        alphabet = PatternAlphabet.of(pattern)
         builder = new EpsNFABuilder(pattern, alphabet)
         epsNFA <- Try(builder.build())
       yield
@@ -139,12 +139,14 @@ private class EpsNFABuilder(
         val shift = end - start
         counterQ += shift
         def moved(q: Int): Int = q + shift
+
         def retarget(t: Transition[Int], f: Int => Int): Transition[Int] = t match
           case Eps(qs)              => Eps(qs.map(f))
           case Assert(kind, q)      => Assert(kind, f(q))
           case Consume(set, q, loc) => Consume(set, f(q), loc)
           case LoopEnter(loop, q)   => LoopEnter(loop, f(q))
           case LoopExit(loop, q)    => LoopExit(loop, f(q))
+
         for q <- start until end; t <- tau.get(q) do
           val reset = notEmpty == IRNotEmpty.Anywhere && resetMatchStarts.contains(q)
           emit(moved(q) -> (if reset then t else retarget(t, moved)))
@@ -216,9 +218,9 @@ private class EpsNFABuilder(
         throw new UnsupportedException("look-ahead assertion")
       case IRNodeData.LookBehind(_, _, _) | IRNodeData.NonAtomicLookBehind(_, _) =>
         throw new UnsupportedException("look-behind assertion")
-      case IRNodeData.Atomic(_)           => throw new UnsupportedException("atomic group")
-      case IRNodeData.BackReference(_, _) => throw new UnsupportedException("back-reference")
-      case IRNodeData.Unsupported(_)      => throw new UnsupportedException(node.unsupportedMessage)
+      case IRNodeData.Atomic(_)              => throw new UnsupportedException("atomic group")
+      case IRNodeData.BackReference(_, _, _) => throw new UnsupportedException("back-reference")
+      case IRNodeData.Unsupported(_)         => throw new UnsupportedException(node.unsupportedMessage)
 
   /** Builds EpsNFA transitions for a repetition.
     *
@@ -233,6 +235,7 @@ private class EpsNFABuilder(
         buildSequence(Vector.fill(m)(() => buildNode(n)))
       case IRQuantifier.Bounded(min, max, strategy) =>
         def question(n: IRNode): IRNode = IRNode(IRNodeData.Repeat(n, IRQuantifier.Bounded(0, 1, strategy)))
+
         val maxN = Option.when(max > min):
           Vector
             .fill(max - min)(n)
@@ -300,8 +303,11 @@ private class EpsNFABuilder(
 
   private def buildAssert(node: IRNode, kind: IRAssertKind): (Int, Int) =
     def atomic(t: IRLineTerminators): Boolean = t.crlf == IRLineTerminators.CRLF.Atomic
+
     def plain(t: IRLineTerminators): Boolean = t.crlf == IRLineTerminators.CRLF.Ignored
+
     def boundary(kind: AssertKind): (Int, Int) = if needsInputTerminatorDistinction then assert(kind) else epsilon()
+
     kind match
       case IRAssertKind.WordBoundary(w) =>
         val i = wordSets.indexOf(w)

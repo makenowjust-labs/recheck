@@ -76,9 +76,11 @@ class ExecutorSuite extends munit.FunSuite:
       executor.exec("input", None, None, Map(executor.variable -> s"'$runtime'")) match
         case ExecResult.Exit(0, out, "") => out
         case result                      => fail(s"unexpected: $result")
+
     try
       // The first line has the variables, which the environment may have.
       def args(executor: Executor): String = exec(executor).linesIterator.drop(1).mkString("\n")
+
       assertEquals(args(NodeExecutor), "-\ninput")
       assertEquals(args(PythonExecutor), "-I\n-\ninput")
       assertEquals(args(RubyExecutor), "-\n# encoding: UTF-8\ninput")

@@ -38,6 +38,7 @@ class AgentCommandSuite extends munit.FunSuite:
           case Left(n)     =>
             sem.acquire(n)
             Iterator.empty
+
       def write(line: String): Unit =
         sem.release()
         out.addOne(line)

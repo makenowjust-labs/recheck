@@ -256,6 +256,7 @@ object CharsetPropertyDataGen extends UnicodeDataGen {
         else if (ns.head.isEmpty) Seq(v.toString, "")
         else ns :+ v.toString
       }
+
       val kept = values.indices.filter(v => used(v) || values(v).head.nonEmpty)
       val dense = kept.zipWithIndex.toMap
       enumerated(sb, name, propertyNames(prop), kept.map(names), rs.map { case (n, v) => (n, dense(v)) })

@@ -125,6 +125,7 @@ class IRCharSuite extends munit.FunSuite:
   )
   test("IRBuilder.build: Perl's byte strings"):
     def set(s: String): CharSet = setOf(build(s, "", Perl(utf8 = false)).node.data)
+
     assertEquals(set("[é]"), CharSet.of(0xa9, 0xc3))
     assertEquals(set("\\x{100}"), CharSet.empty)
     assertEquals(set("[a\\x{100}]"), of("a"))
@@ -132,7 +133,7 @@ class IRCharSuite extends munit.FunSuite:
     assertEquals(set("\\xe9"), CharSet.single(0xe9))
     // Its non-ASCII literals are bytes, which do not make the pattern use Unicode rules.
     val Sequence(nodes) = build("é\\w", "", Perl(utf8 = false)).node.data: @unchecked
-    assertEquals(nodes.last.data, Chars(IRCharClasses.ASCIIPOSIX("word")))
+    assertEquals(nodes.last.data, Chars(IRCharClasses.ASCII_POSIX("word")))
   // Perl reads the bytes of a byte string as Latin-1 characters, so a pattern switching `/d` to Unicode rules (e.g. by
   // `\x{100}`) has the rules of `0x80..0xFF` of the text strings (checked against Perl 5.44).
   for
@@ -154,6 +155,7 @@ class IRCharSuite extends munit.FunSuite:
       def lastSet(s: String, dialect: Dialect): CharSet = strip(build(s, "", dialect).node.data) match
         case Sequence(nodes) => setOf(nodes.last.data)
         case data            => setOf(data)
+
       val bytes = lastSet(s"(?:\\x{100})?$source", Perl(utf8 = false))
       assertEquals(bytes, lastSet(source, Perl()).restrict(UnitMode.Byte))
   test("IRBuilder.build: Perl's byte strings with Unicode rules"):
@@ -161,6 +163,7 @@ class IRCharSuite extends munit.FunSuite:
       strip(build(s, "", Perl(utf8 = false)).node.data) match
         case Sequence(nodes) => setOf(nodes.last.data)
         case data            => setOf(data)
+
     assert(!set("\\w").contains(0xe9))
     assert(set("(?u)\\w").contains(0xe9))
     for switch <- Seq("\\x{100}?", "\\o{400}?", "\\p{L}?", "\\N{U+41}?", "\\N{LATIN SMALL LETTER A}?") do
@@ -179,7 +182,7 @@ class IRCharSuite extends munit.FunSuite:
   chars("é", "", Python(Python.Type.Bytes))(CharSet.single(0xe9))
   // Ruby's ASCII-8BIT regexp has only the POSIX classes in ASCII as properties.
   chars("\\p{Alpha}", "n", Ruby())(CharSet.range('A', 'Z').union(CharSet.range('a', 'z')))
-  chars("\\p{Punct}", "n", Ruby())(IRCharClasses.ASCIIPOSIX("punct"))
+  chars("\\p{Punct}", "n", Ruby())(IRCharClasses.ASCII_POSIX("punct"))
   chars("\\P{Space}", "n", Ruby())(of(" \t\n\u000b\f\r").complement(UnitMode.Byte))
   error("\\p{L}", "n", Ruby())("Unknown Unicode property name at 0")
   error("\\p{Any}", "n", Ruby())("Unknown Unicode property name at 0")
@@ -380,6 +383,7 @@ class IRCharSuite extends munit.FunSuite:
       strip(build(s, "", dialect).node.data) match
         case IRNodeData.Sequence(nodes) => setOf(nodes.last.data)
         case data                       => setOf(data)
+
     assert(lastSet("a\\w", Perl()).contains(0xe9))
     assert(lastSet("a\\w", Perl(source = PerlSource.String)).contains(0xe9))
     assert(!lastSet("a\\w", Perl(utf8 = false)).contains(0xe9))

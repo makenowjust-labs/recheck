@@ -20,6 +20,12 @@ final case class IRPattern(
     captureNames: Map[String, Seq[Int]],
     /** How back-references behave in the dialect. */
     backReference: IRBackReferenceSemantics,
+    /** How backtracking treats the captures in the dialect. */
+    captures: IRCaptureSemantics,
+    /** How repetitions handle an iteration matching the empty string in the dialect. */
+    emptyIteration: IREmptyIterationSemantics,
+    /** Where the backtracking control verbs act in the dialect. */
+    backtrackControl: IRBacktrackControlSemantics,
     /** Whether a match starts only at the starting position (JavaScript `y`, PCRE `A`). */
     anchored: Boolean,
     /** The unit of the input, which the character sets of the nodes consist of. */
@@ -45,6 +51,7 @@ final case class IRPattern(
       case NonAtomicLookBehind(n, _)                => loop(n) + 1
       case Conditional(_, _, _)                     => node.children.map(loop).sum + 1
       case _                                        => 1
+
     loop(node)
 
   /** Returns the sum of the counts of the repetitions other than `*`, `+` and `?` (e.g. `{2,3}` counts `3`). */
@@ -59,10 +66,11 @@ final case class IRPattern(
           case IRQuantifier.Bounded(0, 1, _)    => count
           case IRQuantifier.Bounded(_, max, _)  => count + max
       case _ => node.children.map(loop).sum
+
     loop(node)
 
   /** Checks whether the pattern has no unbounded repetition, nor an unsupported node, which may be a recursion. */
-  def isConstant: Boolean =
+  def isBounded: Boolean =
     !node.exists:
       case Repeat(_, _: IRQuantifier.Unbounded) => true
       case _: Unsupported                       => true
@@ -91,6 +99,7 @@ final case class IRPattern(
         case Assert(k) if k.isBegin => !isBegin
         case Assert(k) if k.isEnd   => !isEnd
         case _                      => node.children.exists(loop(false, false, _))
+
     loop(true, true, node)
 
   /** Checks whether a begin assertion is placed at every begin point. */
@@ -117,6 +126,7 @@ final case class IRPattern(
       case Atomic(n)        => loop(n)
       case Assert(k)        => p(k)
       case _                => otherwise
+
     loop(node)
 
   /** Checks whether an assertion satisfying `p` is placed at every end point.
@@ -131,6 +141,7 @@ final case class IRPattern(
       case Atomic(n)        => loop(n)
       case Assert(k)        => p(k)
       case _                => otherwise
+
     loop(node)
 
   /** Returns the distinct line terminators of the line assertions and the text end assertions. */
@@ -154,6 +165,7 @@ final case class IRPattern(
         case Atomic(n)                            => loop(isEnd, n)
         case Assert(_: IRAssertKind.ChompTextEnd) => if isEnd then Seq.empty else Seq(node)
         case _                                    => node.children.flatMap(loop(false, _))
+
     loop(true, node)
 
   /** Checks whether the pattern has a line assertion (`^` or `$` with `m`), which tells line terminators. */
@@ -195,29 +207,29 @@ final case class IRPattern(
         true
       case _ => false
 
-  /** Returns the strings of two or more literal characters in a row in the pattern.
+  /** Returns the parts of the pattern, which are the strings of two or more literal characters in a row.
     *
     * A literal character is a set of one character or of the case variants of one character, and stands for its first
-    * character in `preferred` if any. A string is UTF-16 code units in the code point mode.
+    * character. A part is UTF-16 code units in the code point mode.
     */
-  def parts(preferred: Option[CharSet]): Set[UString] =
+  def parts: Set[UString] =
     def toUString(values: Seq[Int]): UString =
       if mode == UnitMode.CodePoint then UString.from(UString.from(values).encode(UnitMode.UTF16))
       else UString.from(values)
 
     def literal(node: IRNode): Option[Int] = node.data match
       case Chars(set) if IRPattern.isOneCharUpToCase(set) =>
-        Some(preferred.map(set.intersect).filter(_.nonEmpty).getOrElse(set).head)
+        Some(set.head)
       case _ => None
 
     @tailrec
-    def extract(ns: Seq[IRNode], set: Set[UString] = Set.empty): Set[UString] =
-      if ns.isEmpty then set
+    def extract(ns: Seq[IRNode], parts: Set[UString] = Set.empty): Set[UString] =
+      if ns.isEmpty then parts
       else
-        val (pre, suf) = ns.span(literal(_).isDefined)
-        val s = toUString(pre.flatMap(literal))
-        val newSet = set ++ (if s.length > 1 then Set(s) else Set.empty)
-        extract(suf.dropWhile(literal(_).isEmpty), newSet)
+        val (literals, rest) = ns.span(literal(_).isDefined)
+        val part = toUString(literals.flatMap(literal))
+        val newParts = parts ++ (if part.length > 1 then Set(part) else Set.empty)
+        extract(rest.dropWhile(literal(_).isEmpty), newParts)
 
     def loop(node: IRNode): Set[UString] = node.data match
       case Sequence(ns) => extract(ns) ++ ns.flatMap(loop).toSet
@@ -259,6 +271,60 @@ object IRNotEmpty:
   * it fails (the others). `choice` is how a reference with more than one index chooses the capture.
   */
 final case class IRBackReferenceSemantics(unsetMatchesEmpty: Boolean, choice: IRBackReferenceChoice)
+
+/** IRCaptureSemantics is how backtracking treats the captures, which differs among dialects. */
+final case class IRCaptureSemantics(
+    /** Whether each iteration of a repetition resets the captures in it (JavaScript). */
+    resetsEachIteration: Boolean,
+    /** Whether backtracking keeps the captures of the failed matching instead of restoring them, which back-references
+      * and capture tests see (Perl).
+      */
+    keptOnBacktracking: Boolean,
+    /** Whether the captures in an atomic group or a look-around keep their values over backtracking once it matches,
+      * which back-references see (Java).
+      */
+    heldAfterAtomicMatch: Boolean,
+    /** Whether a negative look-around condition restores the captures in it, as a negative look-around does (.NET). */
+    restoredByNegativeCondition: Boolean
+)
+
+/** IREmptyIterationSemantics is how repetitions handle an iteration matching the empty string, which differs among
+  * dialects.
+  */
+final case class IREmptyIterationSemantics(
+    /** The handling in an unbounded repetition (e.g. `*`). */
+    unbounded: IREmptyIteration,
+    /** The handling in a bounded repetition, including an exact one (e.g. `?` and `{2}`). */
+    bounded: IREmptyIteration
+)
+
+/** IREmptyIteration is how a repetition handles an iteration matching the empty string. */
+enum IREmptyIteration:
+
+  /** Ignore handles it as the others (PCRE's bounded repetition, which repeats copies of the node). */
+  case Ignore
+
+  /** Reject fails an optional one (JavaScript). */
+  case Reject
+
+  /** ExitOptional ends the repetition with an optional one (Python and Ruby). */
+  case ExitOptional
+
+  /** ExitFromMin ends the repetition with the last mandatory one or an optional one (.NET, PCRE and Perl). */
+  case ExitFromMin
+
+  /** ExitAll ends the repetition with any one, even before the minimum (Java's `Loop`). */
+  case ExitAll
+
+/** IRBacktrackControlSemantics is where the backtracking control verbs act, which differs among dialects. */
+final case class IRBacktrackControlSemantics(
+    /** Whether `(*THEN)` in a look-around or a condition takes the alternation outside it, instead of ending at it
+      * (Perl).
+      */
+    thenPassesAssertions: Boolean,
+    /** Whether `(*ACCEPT)` in an atomic group ends only the group, which the engine runs as a sub-match (Perl). */
+    acceptEndsAtomic: Boolean
+)
 
 /** IRBackReferenceChoice is how a back-reference with more than one index chooses the capture. */
 sealed abstract class IRBackReferenceChoice extends Product with Serializable

@@ -17,7 +17,7 @@ class IRReferenceSuite extends IRSuiteBase:
   def resolve(s: String, flags: String, dialects: Dialect*)(indices: Int*)(implicit loc: munit.Location): Unit =
     checkPattern(s, flags, dialects*): pattern =>
       def find(node: IRNode): Seq[Seq[Int]] = node.data match
-        case BackReference(indices, _)    => Seq(indices)
+        case BackReference(indices, _, _) => Seq(indices)
         case Sequence(nodes)              => nodes.flatMap(find)
         case Disjunction(nodes)           => nodes.flatMap(find)
         case Repeat(node, _)              => find(node)
@@ -29,6 +29,7 @@ class IRReferenceSuite extends IRSuiteBase:
         case NonAtomicLookBehind(node, _) => find(node)
         case Conditional(_, yes, no)      => find(yes) ++ find(no)
         case _                            => Seq.empty
+
       assertEquals(find(pattern.node).lastOption, Some(indices))
 
   // Indexed references

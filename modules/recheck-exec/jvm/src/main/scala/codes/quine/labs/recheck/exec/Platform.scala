@@ -44,6 +44,7 @@ private[exec] object Platform:
     val shown = (argv ++ file.map(_.name)).mkString(" ")
     val path = file.map(SourceFiles.path)
     def start(): ExecResult = exec(argv ++ path.map(_.toString), shown, env, input, timeout, marker)
+
     path.flatMap(SourceFiles.firstRunLock) match
       case Some(l) =>
         while !l.tryLock(PollMillis, TimeUnit.MILLISECONDS) do ctx.interrupt(())

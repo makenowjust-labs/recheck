@@ -19,7 +19,7 @@ import io.circe.syntax.*
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.cli.Main.BatchAction
 import codes.quine.labs.recheck.cli.Main.CheckAction
-import codes.quine.labs.recheck.cli.Main.RecallScriptAction
+import codes.quine.labs.recheck.cli.Main.GenerateRecallScriptAction
 import codes.quine.labs.recheck.cli.Main.command
 import codes.quine.labs.recheck.cli.arguments.given
 import codes.quine.labs.recheck.codec.given
@@ -45,11 +45,11 @@ object Main:
   final case class CheckAction(pattern: InputPattern, params: Parameters, all: Boolean = false, json: Boolean = false)
       extends Action
 
-  /** RecallScriptAction holds `recheck generate-recall-script` subcommand parameters.
+  /** GenerateRecallScriptAction holds `recheck generate-recall-script` subcommand parameters.
     *
     * `diagnostics` is the path of the diagnostics JSON, or `-` for the standard input.
     */
-  final case class RecallScriptAction(diagnostics: String) extends Action
+  final case class GenerateRecallScriptAction(diagnostics: String) extends Action
 
   /** A command-line definition of `recheck`. */
   def command: Command[Action] =
@@ -90,7 +90,7 @@ object Main:
         name = "generate-recall-script",
         help = "Generates the recall validation program of a vulnerable diagnostics in JSON as a standalone script."
       ):
-        Opts.argument[String](metavar = "diagnostics").map(RecallScriptAction.apply)
+        Opts.argument[String](metavar = "diagnostics").map(GenerateRecallScriptAction.apply)
 
       agent <+> recallScript <+> check
 
@@ -122,6 +122,7 @@ object Main:
     def named[A](option: String, value: Option[String], default: A)(of: String => Option[A]): ValidatedNel[String, A] =
       value.fold(Validated.validNel(default)): name =>
         Validated.fromOption(of(name), s"unknown value of --$option: $name").toValidatedNel
+
     misplaced match
       case Some(option) => Validated.invalidNel(s"--$option is not an option of ${dialect.name}")
       case None         =>
@@ -147,6 +148,7 @@ class Main:
 
   // $COVERAGE-OFF$
   def exit(exitCode: Int): Unit = sys.exit(exitCode)
+
   // $COVERAGE-ON$
 
   def run(args: Array[String]): Unit = command.parse(args.toSeq, sys.env) match
@@ -165,10 +167,10 @@ class Main:
         case _: Diagnostics.Safe                                => () // skip
         case _: Diagnostics.Vulnerable | _: Diagnostics.Unknown => exit(1)
 
-    case Right(action: RecallScriptAction) =>
+    case Right(action: GenerateRecallScriptAction) =>
       val script = for
         json <- read(action.diagnostics)
-        script <- RecallScriptCommand.generate(json)
+        script <- GenerateRecallScriptCommand.generate(json)
       yield script
       script match
         case Right(script) =>

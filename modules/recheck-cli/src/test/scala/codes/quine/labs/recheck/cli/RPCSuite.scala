@@ -88,6 +88,7 @@ class RPCSuite extends munit.FunSuite:
     val out = Seq.newBuilder[String]
     val io = new RPC.IO {
       def read(): Iterator[String] = in.iterator
+
       def write(line: String): Unit = out.addOne(line)
     }
 
@@ -154,6 +155,7 @@ class RPCSuite extends munit.FunSuite:
       f(_ => ???, r => result = r)
       result
     }
+
     assertEquals(
       cheat(handler.handle(Some(RPC.IntID(1)), true.asJson, _, _)),
       Right(RPC.ResultResponse(RPC.JsonRPCVersion, RPC.IntID(1), Json.obj()))

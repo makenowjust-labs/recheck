@@ -99,7 +99,7 @@ class MainSuite extends munit.FunSuite:
       Main.command.parse(Seq("--json", "/foo/")),
       Right(Main.CheckAction(InputPattern("foo", ""), Parameters(), json = true))
     )
-    assertEquals(Main.command.parse(Seq("generate-recall-script", "-")), Right(Main.RecallScriptAction("-")))
+    assertEquals(Main.command.parse(Seq("generate-recall-script", "-")), Right(Main.GenerateRecallScriptAction("-")))
     assert(clue(Main.command.parse(Seq("generate-recall-script"))).isLeft)
     assertEquals(Main.command.parse(Seq("agent", "--thread-size=2")), Right(Main.BatchAction(2)))
     assertEquals(Main.command.parse(Seq("agent")), Right(Main.BatchAction(sys.runtime.availableProcessors())))
@@ -174,6 +174,7 @@ class MainSuite extends munit.FunSuite:
       val (script, scriptErr, scriptStatus) = runMain(Seq("generate-recall-script", "-"), stdin)
       assertEquals((scriptErr, scriptStatus), ("", 0))
       script
+
     val python = roundTrip("--dialect=python", "--python-type=bytes", "/^(a|a)*$/")
     assert(clue(python).startsWith("# Run: python3 -I recall.py\n"))
     assert(clue(python).contains("string = b'a' * "))
@@ -223,6 +224,7 @@ class MainSuite extends munit.FunSuite:
     assert(clue(javaOut).startsWith("// Run: java --source 17 recall.java\n"))
 
     def error(json: String): (String, String, Int) = runMain(Seq("generate-recall-script", file(json)))
+
     assertEquals(error("{"), ("", "Invalid JSON: exhausted input\n", 1))
     assertEquals(
       error(diagnostics("foo", "").noSpaces),
@@ -233,8 +235,8 @@ class MainSuite extends munit.FunSuite:
       ("", "Invalid diagnostics: DecodingFailure at .attack: Missing required field\n", 1)
     )
     assertEquals(
-      error(js.mapObject(_.add("source", "(".asJson)).noSpaces)._2,
-      "Invalid pattern: Unclosed group at 1\n"
+      error(js.mapObject(_.add("flags", "z".asJson)).noSpaces)._2,
+      "Invalid flags: Unknown flag 'z' at 0\n"
     )
     assertEquals(
       error(js.mapObject(_.add("dialect", "cobol".asJson)).noSpaces),
@@ -251,12 +253,7 @@ class MainSuite extends munit.FunSuite:
     val perl = js.mapObject(_.add("source", "^(a|a)*$x".asJson).add("dialect", "perl".asJson))
     assertEquals(
       error(perl.noSpaces),
-      (
-        "",
-        "The pattern cannot be a Perl regex literal, which would interpolate a variable, run code, " +
-          "or be UTF-8 against `utf8`\n",
-        1
-      )
+      ("", "The pattern cannot be a Perl regex literal, which would interpolate a variable or run code\n", 1)
     )
     val perlString = perl.mapObject(_.add("dialect", Json.obj("name" := "perl", "source" := "string")))
     assert(clue(error(perlString.noSpaces)._1).contains("my $pattern = \"^(a|a)*\\$x\";"))

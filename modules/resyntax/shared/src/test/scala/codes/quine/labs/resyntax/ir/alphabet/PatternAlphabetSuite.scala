@@ -82,22 +82,6 @@ class PatternAlphabetSuite extends munit.FunSuite:
       IndexedSeq(CharSet.range(0xf0, 0xff), CharSet.range(0, 0xef))
     )
 
-  test("PatternAlphabet.build: preferred"):
-    val canonical = CharSet.range(0, 'a' - 1).union(CharSet.range('z' + 1, 0xffff))
-    val alphabet =
-      PatternAlphabet.build(UnitMode.UTF16, Seq(CharSet.of('a', 'A'), CharSet.single('b')), preferred = Some(canonical))
-    // An atom is narrowed to its preferred characters, unless it has none.
-    assertEquals(
-      alphabet.pairs.map(_._1),
-      IndexedSeq(
-        CharSet.single('A'),
-        CharSet.single('b'),
-        UnitMode.UTF16.universe.diff(CharSet.of('a', 'b', 'A')).intersect(canonical)
-      )
-    )
-    assertEquals(alphabet.refine(CharSet.of('a', 'A')), Set((CharSet.single('A'), CharKind.Normal)))
-    assertEquals(alphabet.refine(CharSet.single('b')), Set((CharSet.single('b'), CharKind.Normal)))
-
   locally:
     val alphabet =
       PatternAlphabet.build(UnitMode.UTF16, Seq(CharSet.single('A')), word = Some(CharSet.range('A', 'Z')))
@@ -118,13 +102,8 @@ class PatternAlphabetSuite extends munit.FunSuite:
     test("PatternAlphabet#any"):
       assertEquals(alphabet.any, alphabet.pairs.toSet)
 
-  /** Parses the pattern, and computes its alphabet, which takes JavaScript's canonical characters under `i`. */
   def alphabetOf(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): PatternAlphabet =
-    val pattern = parse(source, flags, dialect)
-    val preferred = Option.when(dialect.isJavaScript && FlagSet.parse(flags, dialect).ignoreCase)(
-      PatternAlphabet.ecmaScriptCanonicalChars(pattern.mode)
-    )
-    PatternAlphabet.of(pattern, preferred)
+    PatternAlphabet.of(parse(source, flags, dialect))
 
   def parse(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)
@@ -134,7 +113,6 @@ class PatternAlphabetSuite extends munit.FunSuite:
     val word = CharSet.fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))
     val lineTerminator = CharSet.of(0x0a, 0x0d, 0x2028, 0x2029)
     val utf16 = UnitMode.UTF16
-    val canonical16 = PatternAlphabet.ecmaScriptCanonicalChars(utf16)
     assertEquals(alphabetOf(""), PatternAlphabet.build(utf16))
     // A set like a negated class (e.g. `.` and `[^a]`) takes part in the order as its complement.
     assertEquals(alphabetOf("."), PatternAlphabet.build(utf16, Seq(lineTerminator)))
@@ -153,14 +131,14 @@ class PatternAlphabetSuite extends munit.FunSuite:
     )
     for source <- Seq("(.)", "(?<foo>.)", "(?:.)", ".*", ".+", ".?", ".{2}", "(?=.)", "(?<=.)", ".") do
       assertEquals(alphabetOf(source, "s"), PatternAlphabet.build(utf16), source)
-    assertEquals(alphabetOf("", "i"), PatternAlphabet.build(utf16, preferred = Some(canonical16)))
+    assertEquals(alphabetOf("", "i"), PatternAlphabet.build(utf16))
     assertEquals(
       alphabetOf("a|z", "i"),
-      PatternAlphabet.build(utf16, Seq(CharSet.of('A', 'a'), CharSet.of('Z', 'z')), preferred = Some(canonical16))
+      PatternAlphabet.build(utf16, Seq(CharSet.of('A', 'a'), CharSet.of('Z', 'z')))
     )
-    // An atom stands for its canonical character.
+    // An atom stands for its smallest character.
     assertEquals(alphabetOf("a", "i").pairs.map(_._1.head), Vector('A'.toInt, 0))
-    assertEquals(alphabetOf("A", "iu").pairs.map(_._1.head), Vector('a'.toInt, 0))
+    assertEquals(alphabetOf("A", "iu").pairs.map(_._1.head), Vector('A'.toInt, 0))
 
   test("PatternAlphabet.of: other dialects"):
     val alphabet = alphabetOf("^a$", "m", Dialect.Python())
@@ -173,14 +151,3 @@ class PatternAlphabetSuite extends munit.FunSuite:
 
   test("PatternAlphabet.wordSets"):
     assertEquals(PatternAlphabet.wordSets(parse("\\b(?a:\\b)", "", Dialect.Python())).size, 2)
-
-  test("PatternAlphabet.ecmaScriptCanonicalChars"):
-    val utf16 = PatternAlphabet.ecmaScriptCanonicalChars(UnitMode.UTF16)
-    val codePoint = PatternAlphabet.ecmaScriptCanonicalChars(UnitMode.CodePoint)
-    assert(utf16.contains('A') && !utf16.contains('a'))
-    assert(codePoint.contains('a') && !codePoint.contains('A'))
-    // U+FF21: FULLWIDTH LATIN CAPITAL LETTER A, U+FF41: FULLWIDTH LATIN SMALL LETTER A
-    assert(utf16.contains(0xff21) && !utf16.contains(0xff41))
-    assert(codePoint.contains(0xff41) && !codePoint.contains(0xff21))
-    // U+017F: LATIN SMALL LETTER LONG S
-    assert(utf16.contains(0x017f) && !codePoint.contains(0x017f))

@@ -115,6 +115,7 @@ class PropertiesSuite extends munit.FunSuite:
   test("Properties: General_Category groups"):
     val gc = Properties.GeneralCategory
     def union(names: String*): CharSet = CharSet.union(names.map(value(gc, _).set))
+
     assertEquals(value(gc, "L").set, union("Lu", "Ll", "Lt", "Lm", "Lo"))
     assertEquals(value(gc, "Letter").set, value(gc, "L").set)
     assertEquals(value(gc, "LC").set, union("Lu", "Ll", "Lt"))
@@ -212,6 +213,7 @@ class PropertiesSuite extends munit.FunSuite:
   test("Properties: other enumerated properties"):
     def check(p: EnumeratedProperty, v: String, c: Int)(implicit loc: munit.Location): Unit =
       assert(value(p, v).set.contains(c), s"${p.name}=$v U+${c.toHexString}")
+
     check(Properties.LineBreak, "AL", 'a')
     check(Properties.LineBreak, "Ideographic", 0x6f22)
     check(Properties.EastAsianWidth, "W", 0x3042)

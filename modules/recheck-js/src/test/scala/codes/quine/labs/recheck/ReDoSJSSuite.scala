@@ -29,6 +29,7 @@ class ReDoSJSSuite extends munit.FunSuite:
   test("ReDoSJS.check: dialect"):
     def dialect(params: js.Any): String =
       js.JSON.stringify(ReDoSJS.check("a", "", params).asInstanceOf[js.Dictionary[js.Any]]("dialect"))
+
     assertEquals(dialect(()), """{"name":"javascript"}""")
     assertEquals(dialect(js.Dynamic.literal(dialect = "python")), """{"name":"python","type":"str"}""")
     assertEquals(

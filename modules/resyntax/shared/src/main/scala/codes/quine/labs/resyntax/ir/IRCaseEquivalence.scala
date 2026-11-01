@@ -42,6 +42,7 @@ object IRCaseEquivalence:
     def closure(set: CharSet): CharSet =
       val cased = set.intersect(javaCased)
       set.union(javaKey.closure(cased))
+
     // `Pattern.CIRangeU` tests `c`, `toUpperCase(c)` and `toLowerCase(toUpperCase(c))`.
     override def closeRange(set: CharSet): CharSet =
       set.union(CaseMapping.SimpleUpper.preimage(set)).union(javaKey.preimage(set))

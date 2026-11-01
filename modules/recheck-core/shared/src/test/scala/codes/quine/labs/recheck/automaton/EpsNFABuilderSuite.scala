@@ -7,6 +7,8 @@ import scala.util.Try
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
+import codes.quine.labs.recheck.vm.AssertionCases
+import codes.quine.labs.recheck.vm.CaseFoldingCases
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
@@ -22,9 +24,9 @@ class EpsNFABuilderSuite extends munit.FunSuite:
 
   /** Builds an ε-NFA from the source, without the locations of transitions. */
   def build(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): Try[EpsNFA[Int]] =
-    val (pattern, ir) = SourcePattern.parse(source, flags, dialect).toTry.get
+    val ir = ReDoS.parse(source, flags, dialect)
     EpsNFABuilder
-      .build(ir, pattern.preferredChars)
+      .build(ir)
       .map: nfa =>
         nfa.copy(tau = nfa.tau.view.mapValues {
           case t: Consume[Int] => t.copy(loc = None)
@@ -99,10 +101,9 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       )
 
   test("EpsNFABuilder.build: Character, CharacterClass"):
-    val canonical = PatternAlphabet.ecmaScriptCanonicalChars(utf16)
     assertEquals(
       build("^a$", "i").get,
-      single(PatternAlphabet.build(utf16, Seq(CharSet.of('a', 'A')), preferred = Some(canonical)), CharSet.single('A'))
+      single(PatternAlphabet.build(utf16, Seq(CharSet.of('a', 'A'))), CharSet.of('a', 'A'))
     )
     assertEquals(
       build("^[a]$").get,
@@ -115,14 +116,13 @@ class EpsNFABuilderSuite extends munit.FunSuite:
 
   test("EpsNFABuilder.build: Dot"):
     val dot16 = any16.diff(lineTerminator)
-    val canonical = PatternAlphabet.ecmaScriptCanonicalChars(utf16)
     // `.` takes part in the order of atoms as its complement.
     assertEquals(build("^.$").get, single(PatternAlphabet.build(utf16, Seq(lineTerminator)), dot16))
     assertEquals(
       build("^.$", "i").get,
       single(
-        PatternAlphabet.build(utf16, Seq(lineTerminator), preferred = Some(canonical)),
-        dot16.intersect(canonical)
+        PatternAlphabet.build(utf16, Seq(lineTerminator)),
+        dot16
       )
     )
     assertEquals(build("^.$", "s").get, single(PatternAlphabet.build(utf16), any16))
@@ -262,6 +262,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     // Each line, text and word boundary assertion has its kind.
     def kinds(source: String, flags: String, dialect: Dialect): Set[AssertKind] =
       build(source, flags, dialect).get.tau.values.collect { case Assert(k, _) => k }.toSet
+
     import IRLineBeginAtEnd.*
     assertEquals(kinds("^a$", "m", Dialect.JavaScript), Set[AssertKind](AssertKind.LineBegin, AssertKind.LineEnd))
     assertEquals(
@@ -289,8 +290,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   def searches(source: String, flags: String, dialect: Dialect, input: String): Boolean =
     val nfa = build(source, flags, dialect).get.toOrderedNFA
     val units =
-      if SourcePattern.parse(source, flags, dialect).toTry.get._1.mode == UnitMode.CodePoint then
-        UString.fromString(input).iterator.toSeq
+      if ReDoS.parse(source, flags, dialect).mode == UnitMode.CodePoint then UString.fromString(input).iterator.toSeq
       else input.map(_.toInt)
     val last = units.foldLeft(nfa.inits.toSet): (qs, c) =>
       qs.flatMap(q => nfa.delta.collect { case ((p, a), ps) if p == q && a.contains(c) => ps }.flatten)

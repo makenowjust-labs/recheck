@@ -2,7 +2,6 @@ package codes.quine.labs.recheck.recall
 
 import scala.concurrent.duration.*
 
-import codes.quine.labs.recheck.SourcePattern
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
@@ -13,6 +12,7 @@ import codes.quine.labs.recheck.exec.Executor
 import codes.quine.labs.recheck.exec.PythonExecutor
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UnitMode
 
 class RecallValidatorSuite extends munit.FunSuite:
 
@@ -22,27 +22,30 @@ class RecallValidatorSuite extends munit.FunSuite:
   val attack: AttackPattern =
     AttackPattern(Seq((UString.fromString("x"), UString.fromString("y"), 0)), UString.fromString("z"), 2)
 
-  def parse(source: String, dialect: Dialect = Dialect.Python()): SourcePattern =
-    SourcePattern.parse(source, "", dialect).toTry.get._1
-
   test("RecallValidator.validate"):
     assertEquals(
-      RecallValidator.validate(parse("foo"), attack, Duration.MinusInf)((_, _, _, _) => fail("unreachable")),
+      RecallValidator.validate("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, Duration.MinusInf)(
+        (_, _, _, _) => fail("unreachable")
+      ),
       None
     )
     assertEquals(
-      RecallValidator.validate(parse("foo"), attack, Duration.Zero)((_, _, _, _) => fail("unreachable")),
+      RecallValidator.validate("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, Duration.Zero)((_, _, _, _) =>
+        fail("unreachable")
+      ),
       None
     )
     // A Perl pattern interpolating a variable is not run.
     assertEquals(
-      RecallValidator.validate(parse("a$x", Dialect.Perl()), attack, 1.second)((_, _, _, _) => fail("unreachable")),
+      RecallValidator.validate("a$x", "", Dialect.Perl(), UnitMode.CodePoint, attack, 1.second)((_, _, _, _) =>
+        fail("unreachable")
+      ),
       None
     )
 
     var executor: Executor = null
     assertEquals(
-      RecallValidator.validate(parse("foo"), attack, 1.second) { (e, _, _, _) =>
+      RecallValidator.validate("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, 1.second) { (e, _, _, _) =>
         executor = e
         ExecResult.Timeout("recheck:runtime python 3.15.0\nrecheck:start\n")
       },
@@ -53,7 +56,7 @@ class RecallValidatorSuite extends munit.FunSuite:
   test("RecallValidator.validate: environment variables"):
     def run(env: Map[String, String], output: ExecResult = ExecResult.Timeout("")): RecallValidation =
       RecallValidator
-        .validate(parse("foo"), attack, 1.second, env = env) { (_, _, _, e) =>
+        .validate("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, 1.second, env = env) { (_, _, _, e) =>
           assertEquals(e, env)
           output
         }
@@ -73,11 +76,12 @@ class RecallValidatorSuite extends munit.FunSuite:
   test("RecallValidator.validate: timeout"):
     def limit(timeout: Duration)(using Context): Option[FiniteDuration] =
       var limit: Option[FiniteDuration] = null
-      RecallValidator.validate(parse("foo"), attack, timeout) { (_, _, t, _) =>
+      RecallValidator.validate("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, timeout) { (_, _, t, _) =>
         limit = t
         ExecResult.Timeout("")
       }
       limit
+
     assertEquals(limit(Duration.Inf), None)
     assertEquals(limit(100.seconds), Some(100.seconds))
     val ctx50s = Context(timeout = 50.seconds)
@@ -87,6 +91,7 @@ class RecallValidatorSuite extends munit.FunSuite:
 
   test("RecallValidator.result"):
     def result(output: ExecResult): RecallValidation = RecallValidator.result("python3", "python3 -", 1.second, output)
+
     assertEquals(
       result(ExecResult.Exit(0, "recheck:runtime python 3.15.0\nrecheck:start\nrecheck:time 12\n", "")),
       RecallValidation("python 3.15.0", 1.second, RecallResult.Finish(12.millis))

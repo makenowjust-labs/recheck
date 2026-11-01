@@ -7,7 +7,6 @@ import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.data.Graph
 import codes.quine.labs.recheck.util.RepeatUtil
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
-import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
 import codes.quine.labs.resyntax.ir.IRNodeData.*
@@ -17,10 +16,9 @@ import codes.quine.labs.resyntax.ir.IRQuantifier
 /** StaticSeeder computes an initial generation for the pattern with static analysis. */
 object StaticSeeder:
 
-  /** Computes an initial generation of the pattern, whose strings take `preferred` (see [[PatternAlphabet.build]]). */
+  /** Computes an initial generation of the pattern. */
   def seed(
       pattern: IRPattern,
-      preferred: Option[CharSet],
       maxSimpleRepeatSize: Int = Parameters.DefaultMaxSimpleRepeatCount,
       maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
       limit: Int = Parameters.DefaultIncubationLimit,
@@ -29,10 +27,10 @@ object StaticSeeder:
       ctx: Context
   ): Set[FString] = ctx.interrupt:
     val epsNFA = EpsNFABuilder
-      .build(simplify(pattern, maxSimpleRepeatSize), preferred)
+      .build(simplify(pattern, maxSimpleRepeatSize))
       .recoverWith:
         case _: UnsupportedException =>
-          EpsNFABuilder.build(simplify(pattern, maxSimpleRepeatSize, dropsAssertions = true), preferred)
+          EpsNFABuilder.build(simplify(pattern, maxSimpleRepeatSize, dropsAssertions = true))
       .get
     val orderedNFA = epsNFA.toOrderedNFA.rename.mapAlphabet(_.head)
     val seeder = new StaticSeeder(
@@ -56,6 +54,7 @@ object StaticSeeder:
 
       def loop(node: IRNode, prevIsRepeat: Boolean, nextIsRepeat: Boolean, inside: Set[Int]): IRNode = ctx.interrupt:
         def copy(data: IRNodeData): IRNode = node.copy(data = data)
+
         node.data match
           case Disjunction(ns) => copy(Disjunction(ns.map(loop(_, prevIsRepeat, nextIsRepeat, inside))))
           case Sequence(ns)    =>
@@ -93,7 +92,7 @@ object StaticSeeder:
           case Conditional(_, yes, no) =>
             copy(Disjunction(Seq(yes, no).map(loop(_, prevIsRepeat, nextIsRepeat, inside))))
           case ResetMatchStart | BacktrackControl(_) => copy(Empty)
-          case BackReference(indices, _)             =>
+          case BackReference(indices, _, _)          =>
             val captures = indices.filterNot(inside.contains).flatMap(i => backRefs.get(i).map((i, _)))
             if captures.isEmpty then copy(Empty)
             else

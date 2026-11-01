@@ -81,6 +81,7 @@ object IRNodeData:
 
   object LookBehind:
     def apply(negative: Boolean, data: IRNodeData): IRNodeData = LookBehind(negative, IRNode(data))
+
     def apply(negative: Boolean, data: IRNodeData, matching: IRLookBehindMatch): IRNodeData =
       LookBehind(negative, IRNode(data), matching)
 
@@ -96,9 +97,13 @@ object IRNodeData:
     *
     * It has more than one index for a name shared by groups, and no index for a group that does not exist (Java). How a
     * reference chooses among the indices, and matches an unset capture, is [[IRBackReferenceSemantics]] of the pattern.
-    * The flags at the reference decide how case-insensitive comparison works.
+    * It compares the capture with the input by `equivalence` and `folding`, which the flags at the reference decide.
     */
-  final case class BackReference(indices: Seq[Int], flags: IRCharFlags) extends IRNodeData
+  final case class BackReference(
+      indices: Seq[Int],
+      equivalence: IRCaseEquivalence,
+      folding: IRBackReferenceFolding
+  ) extends IRNodeData
 
   /** NonAtomicLookAhead is a positive look-ahead assertion that backtracking can enter again (e.g. PCRE's
     * `(*napla:...)`).
@@ -158,6 +163,7 @@ object IRCondition:
 
   object LookBehind:
     def apply(negative: Boolean, data: IRNodeData): IRCondition = LookBehind(negative, IRNode(data))
+
     def apply(negative: Boolean, data: IRNodeData, matching: IRLookBehindMatch): IRCondition =
       LookBehind(negative, IRNode(data), matching)
 

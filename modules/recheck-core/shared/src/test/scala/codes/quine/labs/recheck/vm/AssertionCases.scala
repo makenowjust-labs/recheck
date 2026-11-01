@@ -1,4 +1,4 @@
-package codes.quine.labs.recheck
+package codes.quine.labs.recheck.vm
 
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*

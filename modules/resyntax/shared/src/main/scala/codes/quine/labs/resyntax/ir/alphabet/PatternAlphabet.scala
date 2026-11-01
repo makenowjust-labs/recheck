@@ -1,7 +1,6 @@
 package codes.quine.labs.resyntax.ir.alphabet
 
 import codes.quine.labs.resyntax.charset.Alphabet
-import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRAssertKind
@@ -48,10 +47,6 @@ object PatternAlphabet:
     * (`lineTerminator` first, then `moreLineTerminators`) have it, which sets of `wordMarks` have it, and, with `crlf`,
     * whether it is `\r` or `\n`, which are then atoms by themselves.
     *
-    * An atom is narrowed to its characters in `preferred` if any, so that its first character, which stands for the
-    * atom in generated strings, is a preferred one (e.g. a canonical character of JavaScript's ignore-case matching).
-    * Each set is still a union of the narrowed atoms intersecting it.
-    *
     * The atoms are ordered as splitting all characters, `lineTerminator`, `word` and `sets` in turn: an atom of an
     * earlier set comes first, and a split atom puts the part in the set first.
     */
@@ -60,7 +55,6 @@ object PatternAlphabet:
       sets: Seq[CharSet] = Seq.empty,
       lineTerminator: Option[CharSet] = None,
       word: Option[CharSet] = None,
-      preferred: Option[CharSet] = None,
       crlf: Boolean = false,
       moreLineTerminators: Seq[CharSet] = Seq.empty,
       moreWords: Seq[CharSet] = Seq.empty,
@@ -74,18 +68,17 @@ object PatternAlphabet:
       .map(_.restrict(mode))
       .filter(_.nonEmpty)
       .toIndexedSeq
-    def narrow(c: CharSet): CharSet =
-      preferred.map(c.intersect).filter(_.nonEmpty).getOrElse(c)
     def order(c: CharSet): Seq[Int] =
       val first = all.indexWhere(_.contains(c.head))
       first +: all.drop(first + 1).map(s => if s.contains(c.head) then 0 else 1)
+
     // The bits are of the sets as given, even if `lineTerminator` (resp. `word`) is `None`.
     def mask(first: Option[CharSet], more: Seq[CharSet], c: Int): Int =
       (first +: more.map(Some(_))).zipWithIndex.collect { case (Some(t), i) if t.contains(c) => 1 << i }.sum
+
     val pairs = Alphabet
       .refine(mode, all)
       .atoms
-      .map(narrow)
       .map(c => (c, order(c)))
       .sortBy(_._2)(using Ordering.Implicits.seqOrdering)
       .map: (c, _) =>
@@ -102,9 +95,9 @@ object PatternAlphabet:
   /** Computes the alphabet of the pattern.
     *
     * Its kinds tell the word sets of [[wordSets]], the line terminators of [[kindLineTerminators]] and the marks of
-    * [[wordMarks]] by their indices. See [[build]] for `preferred`.
+    * [[wordMarks]] by their indices.
     */
-  def of(pattern: IRPattern, preferred: Option[CharSet]): PatternAlphabet =
+  def of(pattern: IRPattern): PatternAlphabet =
     val mode = pattern.mode
     def loop(node: IRNode): Seq[CharSet] = node.data match
       case Chars(set) =>
@@ -128,18 +121,11 @@ object PatternAlphabet:
       loop(pattern.node) ++ extra,
       lineTerminator,
       words.headOption,
-      preferred,
       needsCRLFDistinction(pattern),
       kinds.drop(1),
       words.drop(1),
       wordMarks(pattern)
     )
-
-  /** Returns the characters that JavaScript's ignore-case matching canonicalizes to in the mode, which can stand for
-    * their case variants as `preferred`.
-    */
-  def ecmaScriptCanonicalChars(mode: UnitMode): CharSet =
-    CaseMapping.ecmaScriptCanonicalize(mode == UnitMode.CodePoint).image(mode.universe)
 
   /** Checks whether the set is described more simply by its complement, as a negated class or `.` is. */
   def prefersComplement(set: CharSet, mode: UnitMode): Boolean =
