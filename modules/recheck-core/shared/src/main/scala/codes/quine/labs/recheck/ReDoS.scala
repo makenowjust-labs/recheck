@@ -17,13 +17,13 @@ import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Diagnostics
+import codes.quine.labs.recheck.diagnostics.DiagnosticsIteratorUtil.recovering
+import codes.quine.labs.recheck.diagnostics.DiagnosticsIteratorUtil.tagging
+import codes.quine.labs.recheck.diagnostics.DiagnosticsIteratorUtil.takeUntilAccepted
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.fuzz.FuzzChecker
 import codes.quine.labs.recheck.fuzz.FuzzProgram
 import codes.quine.labs.recheck.recall.RecallValidator
-import codes.quine.labs.recheck.util.DiagnosticsIteratorUtil.recovering
-import codes.quine.labs.recheck.util.DiagnosticsIteratorUtil.tagging
-import codes.quine.labs.recheck.util.DiagnosticsIteratorUtil.takeUntilAccepted
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetException

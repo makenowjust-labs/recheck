@@ -1,10 +1,9 @@
-package codes.quine.labs.recheck.util
+package codes.quine.labs.recheck.diagnostics
 
 import scala.collection.AbstractIterator
 
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.ReDoSException
-import codes.quine.labs.recheck.diagnostics.Diagnostics
 
 /** DiagnosticsIteratorUtil provides operations on lazy iterators of diagnostics. */
 object DiagnosticsIteratorUtil:
