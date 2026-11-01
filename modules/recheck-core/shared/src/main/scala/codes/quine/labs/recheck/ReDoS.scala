@@ -139,7 +139,7 @@ object ReDoS:
         ctx.log("auto: exceed maxRepeatCount")
         throw UnsupportedException("The pattern contains too many repeat")
       // When the pattern has no infinite repetition, then it is safe.
-      else if ir.isConstant then
+      else if ir.isBounded then
         ctx.log("automaton: constant pattern")
         Iterator.empty
       else if checker == Checker.Auto && ir.size >= maxPatternSize then

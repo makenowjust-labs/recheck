@@ -217,7 +217,7 @@ class IRPatternSuite extends munit.FunSuite:
     "." -> true
   )
 
-  check("IRPattern#isConstant")(_.isConstant)(
+  check("IRPattern#isBounded")(_.isBounded)(
     ".|." -> true,
     ".*|." -> false,
     ".|.*" -> false,
@@ -243,7 +243,7 @@ class IRPatternSuite extends munit.FunSuite:
     "(.)\\1" -> true
   )
 
-  check("IRPattern#isConstant", dialect = Dialect.Ruby())(_.isConstant)(
+  check("IRPattern#isBounded", dialect = Dialect.Ruby())(_.isBounded)(
     "(?>a)" -> true,
     "(?>a+)" -> false,
     "a++" -> false,

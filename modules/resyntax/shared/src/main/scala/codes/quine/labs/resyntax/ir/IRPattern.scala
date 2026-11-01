@@ -62,7 +62,7 @@ final case class IRPattern(
     loop(node)
 
   /** Checks whether the pattern has no unbounded repetition, nor an unsupported node, which may be a recursion. */
-  def isConstant: Boolean =
+  def isBounded: Boolean =
     !node.exists:
       case Repeat(_, _: IRQuantifier.Unbounded) => true
       case _: Unsupported                       => true
