@@ -132,10 +132,10 @@ class IRFlagSuite extends IRSuiteBase:
 
   // Character set modifiers, where the last one wins in Perl, Python and Ruby: `(?a)\d(?u)\d` matches `1١`.
   checkFlags("a(?a)b(?u)c", "", Perl(), Ruby())(d =>
-    Seq(flagsOf(d), flagsOf(d).copy(charset = IRCharset.Ascii.All), flagsOf(d).copy(charset = IRCharset.Unicode))
+    Seq(flagsOf(d), flagsOf(d).copy(charset = IRCharset.ASCII.All), flagsOf(d).copy(charset = IRCharset.Unicode))
   )
   checkFlags("(?l)a(?d)b", "", Perl())(d => Seq(flagsOf(d).copy(charset = IRCharset.Locale), flagsOf(d)))
-  checkFlags("(?a)a", "", Python())(d => Seq(flagsOf(d).copy(charset = IRCharset.Ascii.All)))
+  checkFlags("(?a)a", "", Python())(d => Seq(flagsOf(d).copy(charset = IRCharset.ASCII.All)))
   checkFlags("(?L)a", "", Python(Python.Type.Bytes))(d => Seq(flagsOf(d, "").copy(charset = IRCharset.Locale)))
   error("a", "L", Python())("Cannot use LOCALE flag with a str pattern")
   error("a", "u", Python(Python.Type.Bytes))("Cannot use UNICODE flag with a bytes pattern")
@@ -145,19 +145,19 @@ class IRFlagSuite extends IRSuiteBase:
   error("(?L)x", "a", Python(Python.Type.Bytes))("ASCII and LOCALE flags are incompatible")
   error("(?a)x", "L", Python(Python.Type.Bytes))("ASCII and LOCALE flags are incompatible")
   // A scoped flag is not checked: `re.compile('(?a:x)', re.U)` is valid.
-  checkFlags("(?a:x)", "u", Python())(d => Seq(flagsOf(d, "u").copy(charset = IRCharset.Ascii.All)))
+  checkFlags("(?a:x)", "u", Python())(d => Seq(flagsOf(d, "u").copy(charset = IRCharset.ASCII.All)))
   // Ruby's character set options have no `Regexp` constant, and the last one wins: `/(?au)\w/` matches `é`.
   checkFlags("a", "au", Ruby())(d => Seq(flagsOf(d).copy(charset = IRCharset.Unicode)))
   checkFlags("(?au)a(?ud)b", "", Ruby())(d => Seq(flagsOf(d).copy(charset = IRCharset.Unicode), flagsOf(d)))
   // `(*UTF)(*UCP)(?a)(?^)\d` does not match `١`, so `(?^)` keeps `a` in PCRE, but not in Perl.
-  checkFlags("(?a)(?^)a", "", PCRE)(d => Seq(flagsOf(d).copy(charset = IRCharset.Ascii.All)))
+  checkFlags("(?a)(?^)a", "", PCRE)(d => Seq(flagsOf(d).copy(charset = IRCharset.ASCII.All)))
   checkFlags("(?a)(?^)a", "", Perl())(d => Seq(flagsOf(d)))
   checkFlags("(?aD)a(?aS)b", "", PCRE)(d =>
     Seq(
       flagsOf(d)
-        .copy(charset = IRCharset.Ascii(digit = true, space = false, word = false, posix = false, posixDigit = false)),
+        .copy(charset = IRCharset.ASCII(digit = true, space = false, word = false, posix = false, posixDigit = false)),
       flagsOf(d).copy(charset =
-        IRCharset.Ascii(digit = true, space = true, word = false, posix = false, posixDigit = false)
+        IRCharset.ASCII(digit = true, space = true, word = false, posix = false, posixDigit = false)
       )
     )
   )

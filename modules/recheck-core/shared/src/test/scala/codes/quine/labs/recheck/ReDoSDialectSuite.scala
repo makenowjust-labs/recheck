@@ -152,7 +152,7 @@ class ReDoSDialectSuite extends munit.FunSuite:
   test("ReDoS.check: the dialect of the diagnostics"):
     // The diagnostics have the dialect as given, before and after parsing the pattern.
     for
-      dialect <- Seq(Python(Python.Type.Bytes), Ruby(Ruby.Encoding.Ascii8Bit), Perl(), Perl(false, PerlSource.String))
+      dialect <- Seq(Python(Python.Type.Bytes), Ruby(Ruby.Encoding.ASCII8Bit), Perl(), Perl(false, PerlSource.String))
       source <- Seq("^a$", "^(a|a)*$", "(a")
     do
       val dialectOf = check(source, dialect) match

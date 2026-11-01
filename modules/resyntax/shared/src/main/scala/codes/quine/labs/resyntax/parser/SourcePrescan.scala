@@ -6,7 +6,7 @@ import scala.annotation.switch
   * capture, the number of its captures, and whether it starts with PCRE's start options including `(*UTF)` or
   * `(*UTF8)`.
   */
-final case class SourcePrescan(containsNamedCapture: Boolean, captureSize: Int, hasUtfStartOption: Boolean = false)
+final case class SourcePrescan(containsNamedCapture: Boolean, captureSize: Int, hasUTFStartOption: Boolean = false)
 
 object SourcePrescan:
 
@@ -32,7 +32,7 @@ object SourcePrescan:
         case '\\' => i += 2
         case _    => i += 1
     val startOptions = StartOptions.findPrefixOf(source).getOrElse("")
-    val hasUtfStartOption = startOptions.contains("(*UTF)") || startOptions.contains("(*UTF8)")
-    SourcePrescan(containsNamedCapture, captures, hasUtfStartOption)
+    val hasUTFStartOption = startOptions.contains("(*UTF)") || startOptions.contains("(*UTF8)")
+    SourcePrescan(containsNamedCapture, captures, hasUTFStartOption)
 
   private val StartOptions = """(?:\(\*[A-Z0-9_=]+\))*""".r

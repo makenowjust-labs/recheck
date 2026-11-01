@@ -22,7 +22,7 @@ enum Dialect:
   case Python(`type`: Python.Type = Python.Type.Str)
 
   /** Ruby specifies Ruby dialect, whose `encoding` is the encoding of the regexp. */
-  case Ruby(encoding: Ruby.Encoding = Ruby.Encoding.Utf8)
+  case Ruby(encoding: Ruby.Encoding = Ruby.Encoding.UTF8)
 
   /** Perl specifies Perl dialect, where `source` is how the pattern is given.
     *
@@ -95,11 +95,11 @@ object Dialect:
     /** Encoding is the encoding of a Ruby regexp. */
     enum Encoding(val name: String):
 
-      /** Utf8 is UTF-8, which matches code points. */
-      case Utf8 extends Encoding("UTF-8")
+      /** UTF8 is UTF-8, which matches code points. */
+      case UTF8 extends Encoding("UTF-8")
 
-      /** Ascii8Bit is ASCII-8BIT (as `n` makes), which matches bytes. */
-      case Ascii8Bit extends Encoding("ASCII-8BIT")
+      /** ASCII8Bit is ASCII-8BIT (as `n` makes), which matches bytes. */
+      case ASCII8Bit extends Encoding("ASCII-8BIT")
 
     object Encoding:
 

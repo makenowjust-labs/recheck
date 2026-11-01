@@ -49,11 +49,11 @@ object IRCharset:
   /** Locale is the locale rules (Perl `l`, Python `L`). */
   case object Locale extends IRCharset
 
-  /** Ascii restricts the classes to ASCII (`a`, and PCRE's `aD`, `aS`, `aW`, `aP` and `aT`). */
-  final case class Ascii(digit: Boolean, space: Boolean, word: Boolean, posix: Boolean, posixDigit: Boolean)
+  /** ASCII restricts the classes to ASCII (`a`, and PCRE's `aD`, `aS`, `aW`, `aP` and `aT`). */
+  final case class ASCII(digit: Boolean, space: Boolean, word: Boolean, posix: Boolean, posixDigit: Boolean)
       extends IRCharset
 
-  object Ascii:
+  object ASCII:
 
     /** All is the restriction of every class. */
-    val All: Ascii = Ascii(digit = true, space = true, word = true, posix = true, posixDigit = true)
+    val All: ASCII = ASCII(digit = true, space = true, word = true, posix = true, posixDigit = true)

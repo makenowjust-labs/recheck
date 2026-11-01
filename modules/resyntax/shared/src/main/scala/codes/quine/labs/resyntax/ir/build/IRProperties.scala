@@ -10,7 +10,7 @@ import codes.quine.labs.resyntax.charset.NameMatching
 import codes.quine.labs.resyntax.charset.Properties
 import codes.quine.labs.resyntax.charset.PropertyValue
 import codes.quine.labs.resyntax.charset.UnitMode
-import codes.quine.labs.resyntax.ir.build.IRCharClasses.AsciiPosix
+import codes.quine.labs.resyntax.ir.build.IRCharClasses.ASCIIPOSIX
 
 /** PropertyResult is a result of looking up a Unicode property in a dialect. */
 private[build] enum PropertyResult:
@@ -41,9 +41,9 @@ private[build] object IRProperties:
   import PropertyResult.*
 
   // Scala.js has no `java.util.Locale`, and the names are ASCII.
-  private def lowerAscii(s: String): String = s.map(c => if 'A' <= c && c <= 'Z' then (c + 0x20).toChar else c)
+  private def lowerASCII(s: String): String = s.map(c => if 'A' <= c && c <= 'Z' then (c + 0x20).toChar else c)
 
-  private def upperAscii(s: String): String = s.map(c => if 'a' <= c && c <= 'z' then (c - 0x20).toChar else c)
+  private def upperASCII(s: String): String = s.map(c => if 'a' <= c && c <= 'z' then (c - 0x20).toChar else c)
 
   private def gcValue(name: String): PropertyValue = Properties.GeneralCategory.value(name).get
 
@@ -56,7 +56,7 @@ private[build] object IRProperties:
   def ascii(ranges: (Char, Char)*): CharSet = CharSet.union(ranges.map((s, e) => CharSet.range(s, e)))
 
   /** ICU's binary properties that are not of the Unicode Character Database. */
-  private val IcuOnlyBinary: Set[String] =
+  private val ICUOnlyBinary: Set[String] =
     Set(
       "Case_Sensitive",
       "NFD_Inert",
@@ -73,7 +73,7 @@ private[build] object IRProperties:
 
   /** The binary properties of the Unicode Character Database (with `Any`, `ASCII` and `Assigned`). */
   private lazy val ucdBinary: IndexedSeq[BinaryProperty] =
-    Properties.binaryProperties.filterNot(p => IcuOnlyBinary.contains(p.name))
+    Properties.binaryProperties.filterNot(p => ICUOnlyBinary.contains(p.name))
 
   private def caseKindOfValue(value: PropertyValue): CaseKind =
     if Set("Lu", "Ll", "Lt").contains(value.shortName) then CaseKind.Category else CaseKind.Other
@@ -228,18 +228,18 @@ private[build] object IRProperties:
       case "L1"                      => found(CharSet.range(0, 0xff))
       case "all"                     => found(unicodeUniverse.universe)
       case "ASCII"                   => found(CharSet.range(0, 0x7f))
-      case "Alnum"                   => found(AsciiPosix("alnum"))
-      case "Alpha"                   => found(AsciiPosix("alpha"))
-      case "Blank"                   => found(AsciiPosix("blank"))
-      case "Cntrl"                   => found(AsciiPosix("cntrl"))
-      case "Digit"                   => found(AsciiPosix("digit"))
-      case "Graph"                   => found(AsciiPosix("graph"))
+      case "Alnum"                   => found(ASCIIPOSIX("alnum"))
+      case "Alpha"                   => found(ASCIIPOSIX("alpha"))
+      case "Blank"                   => found(ASCIIPOSIX("blank"))
+      case "Cntrl"                   => found(ASCIIPOSIX("cntrl"))
+      case "Digit"                   => found(ASCIIPOSIX("digit"))
+      case "Graph"                   => found(ASCIIPOSIX("graph"))
       case "Lower"                   => found(if ci then ascii('A' -> 'Z', 'a' -> 'z') else ascii('a' -> 'z'))
-      case "Print"                   => found(AsciiPosix("print"))
-      case "Punct"                   => found(AsciiPosix("punct"))
-      case "Space"                   => found(AsciiPosix("space"))
+      case "Print"                   => found(ASCIIPOSIX("print"))
+      case "Punct"                   => found(ASCIIPOSIX("punct"))
+      case "Space"                   => found(ASCIIPOSIX("space"))
       case "Upper"                   => found(if ci then ascii('A' -> 'Z', 'a' -> 'z') else ascii('A' -> 'Z'))
-      case "XDigit"                  => found(AsciiPosix("xdigit"))
+      case "XDigit"                  => found(ASCIIPOSIX("xdigit"))
       case "javaLowerCase"           => cased(binary("Lowercase"))
       case "javaUpperCase"           => cased(binary("Uppercase"))
       case "javaTitleCase"           => cased(gc("Lt"))
@@ -286,10 +286,10 @@ private[build] object IRProperties:
     case "UPPERCASE"                                         => found(if ci then javaCased else binary("Uppercase"))
     case "WHITESPACE" | "WHITE_SPACE"                        => found(javaWhiteSpace)
     case "WORD"                                              => found(javaWord)
-    case _                                                   => javaPosix(name, ci)
+    case _                                                   => javaPOSIX(name, ci)
 
   /** `CharPredicates.getPosixPredicate` of an upper-cased name, which `UNICODE_CHARACTER_CLASS` uses. */
-  private def javaPosix(name: String, ci: Boolean): PropertyResult = name match
+  private def javaPOSIX(name: String, ci: Boolean): PropertyResult = name match
     case "ALPHA"  => found(binary("Alphabetic"))
     case "LOWER"  => found(if ci then javaCased else binary("Lowercase"))
     case "UPPER"  => found(if ci then javaCased else binary("Uppercase"))
@@ -305,15 +305,15 @@ private[build] object IRProperties:
     case _        => Unknown
 
   private def javaScriptName(name: String): PropertyResult =
-    val key = upperAscii(name)
+    val key = upperASCII(name)
     fromOption(
       Properties.Script.values
-        .find(v => upperAscii(v.name) == key || upperAscii(v.shortName) == key)
+        .find(v => upperASCII(v.name) == key || upperASCII(v.shortName) == key)
         .map(foundValue)
     )
 
   private def blockKey(name: String): String =
-    upperAscii(name.filterNot(c => c == ' ' || c == '_' || c == '-'))
+    upperASCII(name.filterNot(c => c == ' ' || c == '_' || c == '-'))
 
   private lazy val javaBlocks: Map[String, PropertyValue] =
     index(Properties.Block.values.filter(_.shortName != "NB").map(v => (v.names, v)), blockKey)
@@ -324,7 +324,7 @@ private[build] object IRProperties:
     val ci = flags.ignoreCase
     value match
       case Some(value) =>
-        lowerAscii(name) match
+        lowerASCII(name) match
           case "sc" | "script"           => javaScriptName(value)
           case "blk" | "block"           => javaBlock(value)
           case "gc" | "general_category" => javaForProperty(value, ci)
@@ -332,11 +332,11 @@ private[build] object IRProperties:
       case None if name.startsWith("In") => javaBlock(name.drop(2))
       case None if name.startsWith("Is") =>
         val short = name.drop(2)
-        javaUnicodePredicate(upperAscii(short), ci)
+        javaUnicodePredicate(upperASCII(short), ci)
           .orElse(javaForProperty(short, ci))
           .orElse(javaScriptName(short))
       case None =>
-        (if flags.unicodeClass then javaPosix(upperAscii(name), ci) else Unknown)
+        (if flags.unicodeClass then javaPOSIX(upperASCII(name), ci) else Unknown)
           .orElse(javaForProperty(name, ci))
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -436,7 +436,7 @@ private[build] object IRProperties:
 
   /** PCRE2's loose name: lower-cased, without spaces, hyphens and underscores. */
   private def pcreKey(name: String): String =
-    lowerAscii(name.filterNot(c => c == ' ' || c == '-' || c == '_'))
+    lowerASCII(name.filterNot(c => c == ' ' || c == '-' || c == '_'))
 
   /** The binary properties of PCRE2 10.49 (`pcre2pattern`, "Binary (true/false) properties"). */
   private val PCREBinary: Seq[String] = Seq(
@@ -552,7 +552,7 @@ private[build] object IRProperties:
 
   /** Perl's loose name (perlunicode "Properties accessible through \p{} and \P{}"). */
   private def perlKey(name: String): String =
-    val key = lowerAscii(name.filterNot(c => c == ' ' || c == '-' || c == '_' || c == '\t'))
+    val key = lowerASCII(name.filterNot(c => c == ' ' || c == '-' || c == '_' || c == '\t'))
     if key.startsWith("is") && key.length > 2 then key.drop(2) else key
 
   // Perl has no properties of strings (e.g. `RGI_Emoji`).
@@ -590,7 +590,7 @@ private[build] object IRProperties:
     val nv = Properties.NumericValue
     def gcd(a: Long, b: Long): Long = if b == 0 then a else gcd(b, a % b)
     value.trim match
-      case v if lowerAscii(v) == "nan" => Some(nv.nan.set)
+      case v if lowerASCII(v) == "nan" => Some(nv.nan.set)
       case PerlFraction(sign, n, d)    =>
         for
           num <- n.toLongOption
@@ -649,7 +649,7 @@ private[build] object IRProperties:
     key match
       case "any" | "all" | "unicode"                            => o(u.universe)
       case "assigned"                                           => o(gc("Cn").complement(u))
-      case "ascii"                                              => o(AsciiPosix("ascii"))
+      case "ascii"                                              => o(ASCIIPOSIX("ascii"))
       case "l&" | "l_" | "lc" | "casedletter"                   => o(gc("LC"), CaseKind.Category)
       case "alnum" | "xposixalnum"                              => o(binary("Alphabetic").union(gc("Nd")))
       case "alpha" | "xposixalpha"                              => o(binary("Alphabetic"))
@@ -666,19 +666,19 @@ private[build] object IRProperties:
       case "word" | "xposixword"                                => o(IRCharClasses.perlWord)
       case "xdigit" | "xposixxdigit"                            => o(binary("Hex_Digit"))
       case "vertspace" | "v"                                    => o(IRCharClasses.Vertical)
-      case "posixalnum"                                         => o(AsciiPosix("alnum"))
-      case "posixalpha"                                         => o(AsciiPosix("alpha"))
-      case "posixblank"                                         => o(AsciiPosix("blank"))
-      case "posixcntrl"                                         => o(AsciiPosix("cntrl"))
-      case "posixdigit"                                         => o(AsciiPosix("digit"))
-      case "posixgraph"                                         => o(AsciiPosix("graph"))
-      case "posixlower"                                         => o(AsciiPosix("lower"), CaseKind.Cased)
-      case "posixprint"                                         => o(AsciiPosix("print"))
-      case "posixpunct"                                         => o(AsciiPosix("punct"))
-      case "posixspace" | "perlspace"                           => o(AsciiPosix("space"))
-      case "posixupper"                                         => o(AsciiPosix("upper"), CaseKind.Cased)
-      case "posixword" | "perlword"                             => o(AsciiPosix("word"))
-      case "posixxdigit"                                        => o(AsciiPosix("xdigit"))
+      case "posixalnum"                                         => o(ASCIIPOSIX("alnum"))
+      case "posixalpha"                                         => o(ASCIIPOSIX("alpha"))
+      case "posixblank"                                         => o(ASCIIPOSIX("blank"))
+      case "posixcntrl"                                         => o(ASCIIPOSIX("cntrl"))
+      case "posixdigit"                                         => o(ASCIIPOSIX("digit"))
+      case "posixgraph"                                         => o(ASCIIPOSIX("graph"))
+      case "posixlower"                                         => o(ASCIIPOSIX("lower"), CaseKind.Cased)
+      case "posixprint"                                         => o(ASCIIPOSIX("print"))
+      case "posixpunct"                                         => o(ASCIIPOSIX("punct"))
+      case "posixspace" | "perlspace"                           => o(ASCIIPOSIX("space"))
+      case "posixupper"                                         => o(ASCIIPOSIX("upper"), CaseKind.Cased)
+      case "posixword" | "perlword"                             => o(ASCIIPOSIX("word"))
+      case "posixxdigit"                                        => o(ASCIIPOSIX("xdigit"))
       case _                                                    => None
 
   def perl(name: String, value: Option[String]): PropertyResult =
@@ -708,7 +708,7 @@ private[build] object IRProperties:
                       case None        => Unknown
                   case None => Unknown
       case None =>
-        val raw = lowerAscii(name.filterNot(c => c == ' ' || c == '-' || c == '_' || c == '\t'))
+        val raw = lowerASCII(name.filterNot(c => c == ' ' || c == '-' || c == '_' || c == '\t'))
         val key = perlKey(name)
         perlSpecial(raw)
           .orElse(perlSpecial(key))
@@ -727,7 +727,7 @@ private[build] object IRProperties:
 
   /** Checks whether the value is a wildcard (e.g. `\p{gc=/^L/}`), which starts with a delimiter. */
   private def isPerlWildcard(value: String): Boolean =
-    value.trim.headOption.exists(c => c < 0x80 && isAsciiPunct(c) && !"+-_{}".contains(c))
+    value.trim.headOption.exists(c => c < 0x80 && isASCIIPunct(c) && !"+-_{}".contains(c))
 
   /** Checks whether the wildcard ends with the closing delimiter of its opening one. */
   private def isPerlWildcardTerminated(value: String): Boolean =
@@ -739,7 +739,7 @@ private[build] object IRProperties:
       case c   => c
     v.head != '\\' && v.length >= 2 && v.last == close
 
-  private def isAsciiPunct(c: Char): Boolean =
+  private def isASCIIPunct(c: Char): Boolean =
     ('!' <= c && c <= '/') || (':' <= c && c <= '@') || ('[' <= c && c <= '`') || ('{' <= c && c <= '~')
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -747,7 +747,7 @@ private[build] object IRProperties:
 
   /** Onigmo's property name: lower-cased, without spaces, hyphens and underscores. */
   private def rubyKey(name: String): String =
-    lowerAscii(name.filterNot(c => c == ' ' || c == '-' || c == '_'))
+    lowerASCII(name.filterNot(c => c == ' ' || c == '-' || c == '_'))
 
   /** The binary properties of Onigmo (Ruby 4.0's `enc/unicode/.../name2ctype.h`). */
   private val RubyBinary: Seq[String] = Seq(
@@ -851,7 +851,7 @@ private[build] object IRProperties:
     *
     * With `bracket`, it is a bracket (e.g. `[[:punct:]]`), whose `punct` adds the ASCII symbols unlike `\p{Punct}`.
     */
-  def rubyPosix(key: String, bracket: Boolean = true): Option[CharSet] =
+  def rubyPOSIX(key: String, bracket: Boolean = true): Option[CharSet] =
     val u = unicodeUniverse
     val space = binary("White_Space")
     val graph = space.union(gc("Cc", "Cs", "Cn")).complement(u)
@@ -878,7 +878,7 @@ private[build] object IRProperties:
       return fromOption(
         Option
           .when(value.isEmpty)(rubyKey(name))
-          .flatMap(rubyPosix(_))
+          .flatMap(rubyPOSIX(_))
           .map(s => found(s.intersect(CharSet.range(0, 0x7f))))
       )
     value match
@@ -889,8 +889,8 @@ private[build] object IRProperties:
           (key match
             case "any"         => Some(found(unicodeUniverse.universe))
             case "assigned"    => Some(found(gc("Cn").complement(unicodeUniverse)))
-            case "xposixpunct" => rubyPosix("punct").map(found(_))
-            case _             => rubyPosix(key, bracket = false).map(found(_))
+            case "xposixpunct" => rubyPOSIX("punct").map(found(_))
+            case _             => rubyPOSIX(key, bracket = false).map(found(_))
           )
             .orElse(rubyGeneralCategory.get(key).map(foundValue))
             .orElse(rubyScript.get(key).map(foundValue))

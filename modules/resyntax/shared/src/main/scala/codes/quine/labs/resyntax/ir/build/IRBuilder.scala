@@ -53,9 +53,9 @@ object IRBuilder:
       case Dialect.Perl(utf8, _) => utf8 || usesPerlUnicodeSyntax(node)
       case _                     => false
     // Perl decides the widths in a look-behind on compiling the pattern, by whether the pattern itself is UTF-8.
-    val perlUtf8Pattern = dialect match
+    val perlUTF8Pattern = dialect match
       case Dialect.Perl(true, PerlSource.String) => true
-      case Dialect.Perl(utf8, _)                 => usesPerlUnicodeSyntax(node) || utf8 && hasNonAsciiLiteral(node)
+      case Dialect.Perl(utf8, _)                 => usesPerlUnicodeSyntax(node) || utf8 && hasNonASCIILiteral(node)
       case _                                     => false
     val chars = new IRCharResolver(dialect, mode, perlUnicodeRules)
     val checker =
@@ -63,7 +63,7 @@ object IRBuilder:
         table,
         resolver,
         featureSet,
-        charWidth(table, chars, dialect, mode, perlUtf8Pattern),
+        charWidth(table, chars, dialect, mode, perlUTF8Pattern),
         node => table.charFlagsOf(node).flatMap(chars.rubyClassWidths(node, _))
       )
     val backReferences = new IRValidator(table, resolver, checker, featureSet).validate(node)
@@ -92,27 +92,27 @@ object IRBuilder:
   private def unitMode(dialect: Dialect, flagSet: FlagSet, utf: Boolean): UnitMode =
     dialect match
       case Dialect.JavaScript =>
-        if flagSet.unicode || flagSet.unicodeSets then UnitMode.CodePoint else UnitMode.Utf16
+        if flagSet.unicode || flagSet.unicodeSets then UnitMode.CodePoint else UnitMode.UTF16
       // Java matches code points, and reads a lone surrogate as a code point too.
       case Dialect.Java        => UnitMode.CodePoint
-      case Dialect.DotNet      => UnitMode.Utf16
+      case Dialect.DotNet      => UnitMode.UTF16
       case Dialect.Python(tpe) =>
         if tpe == Dialect.Python.Type.Bytes then UnitMode.Byte else UnitMode.CodePoint
       // Ruby's `n` is the encoding option (NOENCODING), which `FlagSet` keeps as `explicitCapture`.
       case Dialect.Ruby(encoding) =>
-        if flagSet.explicitCapture || encoding == Dialect.Ruby.Encoding.Ascii8Bit then UnitMode.Byte
+        if flagSet.explicitCapture || encoding == Dialect.Ruby.Encoding.ASCII8Bit then UnitMode.Byte
         else UnitMode.CodePoint
       case Dialect.Perl(utf8, _) => if utf8 then UnitMode.CodePoint else UnitMode.Byte
       case Dialect.PCRE          => if flagSet.unicode || utf then UnitMode.CodePoint else UnitMode.Byte
 
   /** Checks whether Perl takes the full case folding of the character under the flags (e.g. `ß` as `ss`). */
   private def perlFoldsMulti(value: Int, flags: IRCharFlags, perlUnicodeRules: Boolean): Boolean =
-    val hasAscii = FullCaseFolding(value).iterator.exists(_ < 0x80)
+    val hasASCII = FullCaseFolding(value).iterator.exists(_ < 0x80)
     val one = flags.charset match
       case IRCharset.Default  => !perlUnicodeRules
       case IRCharset.Unicode  => false
-      case IRCharset.Locale   => value < 0x100 || hasAscii && value != 0x1e9e
-      case _: IRCharset.Ascii => flags.caselessRestrict && hasAscii && value != 0xdf && value != 0x1e9e
+      case IRCharset.Locale   => value < 0x100 || hasASCII && value != 0x1e9e
+      case _: IRCharset.ASCII => flags.caselessRestrict && hasASCII && value != 0xdf && value != 0x1e9e
     flags.ignoreCase && !one
 
   /** Returns the width of a literal, an escape or a class in a look-behind, where the dialects counting it differently
@@ -131,7 +131,7 @@ object IRBuilder:
       chars: IRCharResolver,
       dialect: Dialect,
       mode: UnitMode,
-      perlUtf8Pattern: Boolean
+      perlUTF8Pattern: Boolean
   ): Seq[Node] => LookBehindChecker.Width =
     import LookBehindChecker.Width
     def single(n: Int): Width = Width(n, n)
@@ -140,7 +140,7 @@ object IRBuilder:
     dialect match
       case _: Dialect.Perl =>
         def fold(value: Int, flags: IRCharFlags): Int =
-          if perlFoldsMulti(value, flags, perlUtf8Pattern) then FullCaseFolding(value).length else 1
+          if perlFoldsMulti(value, flags, perlUTF8Pattern) then FullCaseFolding(value).length else 1
         def classWidth(data: ClassItemData, flags: IRCharFlags): Int = data match
           case ClassItemData.ClassUnion(items) => items.map(i => classWidth(i.data, flags)).maxOption.getOrElse(1)
           case value: ClassItemData.ClassValue => fold(value.value, flags)
@@ -167,7 +167,7 @@ object IRBuilder:
             .fold(single(1)): flags =>
               node.data match
                 case _ if nodes.size > 1 =>
-                  single(fold(IRCharResolver.decodeUtf8(nodes.collect {
+                  single(fold(IRCharResolver.decodeUTF8(nodes.collect {
                     case Node(NodeData.Backslash(BackslashKind.Escape(_, b)), _) => b
                   })))
                 case NodeData.Literal(value)                                 => single(fold(value))
@@ -210,7 +210,7 @@ object IRBuilder:
         true
 
   /** Checks whether a Perl pattern has a non-ASCII literal, which makes a regex literal UTF-8 with `use utf8`. */
-  private def hasNonAsciiLiteral(node: Node): Boolean =
+  private def hasNonASCIILiteral(node: Node): Boolean =
     deepExists(node):
       case NodeData.Literal(value)           => value >= 0x80
       case ClassItemData.ClassLiteral(value) => value >= 0x80

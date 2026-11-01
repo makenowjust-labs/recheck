@@ -31,7 +31,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
           case t               => t
         }.toMap)
 
-  val utf16: UnitMode = UnitMode.Utf16
+  val utf16: UnitMode = UnitMode.UTF16
   val any16: CharSet = utf16.universe
   val lineTerminator: CharSet = CharSet.of(0x0a, 0x0d, 0x2028, 0x2029)
   val word: CharSet = CharSet.fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))

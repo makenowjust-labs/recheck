@@ -100,18 +100,18 @@ final case class BuildingContext(flagSet: FlagSet, dialect: Dialect, featureSet:
     val f = flagSet
     dialect match
       case _: Dialect.Perl | _: Dialect.Ruby | _: Dialect.Python =>
-        if f.ascii then IRCharset.Ascii.All
+        if f.ascii then IRCharset.ASCII.All
         else if f.localeLower || f.localeUpper then IRCharset.Locale
         else if f.unicode then IRCharset.Unicode
         else IRCharset.Default
       case Dialect.PCRE
-          if f.ascii || f.asciiDigit || f.asciiSpace || f.asciiWord || f.asciiPosix || f.asciiPosixDigit =>
-        IRCharset.Ascii(
+          if f.ascii || f.asciiDigit || f.asciiSpace || f.asciiWord || f.asciiPOSIX || f.asciiPOSIXDigit =>
+        IRCharset.ASCII(
           digit = f.ascii || f.asciiDigit,
           space = f.ascii || f.asciiSpace,
           word = f.ascii || f.asciiWord,
-          posix = f.ascii || f.asciiPosix,
-          posixDigit = f.ascii || f.asciiPosixDigit
+          posix = f.ascii || f.asciiPOSIX,
+          posixDigit = f.ascii || f.asciiPOSIXDigit
         )
       case _ => IRCharset.Default
 

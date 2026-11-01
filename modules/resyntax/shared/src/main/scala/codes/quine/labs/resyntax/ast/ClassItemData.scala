@@ -38,7 +38,7 @@ object ClassItemData:
   object ClassNest:
     def apply(invert: Boolean, item: ClassItemData): ClassNest = ClassNest(invert, ClassItem(item))
 
-  final case class ClassPosix(invert: Boolean, name: String) extends ClassItemData
+  final case class ClassPOSIX(invert: Boolean, name: String) extends ClassItemData
 
   final case class ClassRange(begin: ClassItem.Value, end: ClassItem.Value) extends ClassItemData
 

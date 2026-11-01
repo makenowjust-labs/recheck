@@ -19,44 +19,44 @@ import codes.quine.labs.resyntax.ir.build.IRProperties.of
 private[build] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlNative: Boolean):
   import IRCharClasses.*
 
-  private def ruleOf(flags: IRCharFlags, asciiOf: IRCharset.Ascii => Boolean): Rule =
+  private def ruleOf(flags: IRCharFlags, asciiOf: IRCharset.ASCII => Boolean): Rule =
     val unicode = mode != UnitMode.Byte || flags.unicodeClass
     dialect match
-      case Dialect.JavaScript => Rule.Ascii
-      case Dialect.Java       => if flags.unicodeClass then Rule.Unicode else Rule.Ascii
+      case Dialect.JavaScript => Rule.ASCII
+      case Dialect.Java       => if flags.unicodeClass then Rule.Unicode else Rule.ASCII
       case Dialect.DotNet     => Rule.Unicode
       case _: Dialect.Python  =>
         flags.charset match
-          case _ if mode == UnitMode.Byte => Rule.Ascii
-          case _: IRCharset.Ascii         => Rule.Ascii
+          case _ if mode == UnitMode.Byte => Rule.ASCII
+          case _: IRCharset.ASCII         => Rule.ASCII
           case _                          => Rule.Unicode
       case _: Dialect.Ruby =>
         flags.charset match
-          case _ if mode == UnitMode.Byte => Rule.Ascii
+          case _ if mode == UnitMode.Byte => Rule.ASCII
           case IRCharset.Unicode          => Rule.Unicode
-          case _                          => Rule.Ascii
+          case _                          => Rule.ASCII
       // Perl reads the bytes of a byte string as Latin-1 characters.
       case _: Dialect.Perl =>
         flags.charset match
-          case _: IRCharset.Ascii => Rule.Ascii
+          case _: IRCharset.ASCII => Rule.ASCII
           case IRCharset.Unicode  => Rule.Unicode
           // `/l` takes the C locale, which has no non-ASCII character in a class, even in a UTF-8 pattern.
           case IRCharset.Locale => Rule.Native
           case _                => if perlNative then Rule.Native else Rule.Unicode
       case Dialect.PCRE =>
         val restricted = flags.charset match
-          case a: IRCharset.Ascii => asciiOf(a)
+          case a: IRCharset.ASCII => asciiOf(a)
           case _                  => false
-        if flags.unicodeClass && unicode && !restricted then Rule.Unicode else Rule.Ascii
+        if flags.unicodeClass && unicode && !restricted then Rule.Unicode else Rule.ASCII
 
   private def pick(rule: Rule, ascii: => CharSet, unicode: => CharSet): CharSet = rule match
-    case Rule.Ascii   => ascii
+    case Rule.ASCII   => ascii
     case Rule.Unicode => unicode
     case Rule.Native  => unicode.diff(Latin1)
 
   /** `\d`. */
   def digit(flags: IRCharFlags): CharSet =
-    pick(ruleOf(flags, _.digit), AsciiDigit, if dialect.isJavaScript then AsciiDigit else gc("Nd"))
+    pick(ruleOf(flags, _.digit), ASCIIDigit, if dialect.isJavaScript then ASCIIDigit else gc("Nd"))
 
   /** `\s`. */
   def space(flags: IRCharFlags): CharSet = dialect match
@@ -68,14 +68,14 @@ private[build] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlN
         case _: Dialect.Python => pythonSpace
         case Dialect.PCRE      => pcreHorizontal.union(Vertical)
         case _                 => binary("White_Space")
-      pick(ruleOf(flags, _.space), AsciiSpace, unicode)
+      pick(ruleOf(flags, _.space), ASCIISpace, unicode)
 
   /** `\w`. */
   def word(flags: IRCharFlags): CharSet = dialect match
     case Dialect.JavaScript =>
       // With `u` or `v` and `i`, ECMAScript's WordCharacters includes the characters folded to ASCII ones.
-      if mode == UnitMode.CodePoint && flags.ignoreCase then AsciiWord.union(CaseMapping.SimpleFold.preimage(AsciiWord))
-      else AsciiWord
+      if mode == UnitMode.CodePoint && flags.ignoreCase then ASCIIWord.union(CaseMapping.SimpleFold.preimage(ASCIIWord))
+      else ASCIIWord
     case Dialect.DotNet => dotNetWord
     case _              =>
       val unicode = dialect match
@@ -84,7 +84,7 @@ private[build] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlN
         case Dialect.PCRE      => pcreWord
         case _: Dialect.Ruby   => rubyWord
         case _                 => perlWord
-      pick(ruleOf(flags, _.word), AsciiWord, unicode)
+      pick(ruleOf(flags, _.word), ASCIIWord, unicode)
 
   /** The word characters of `\b` and `\B`. */
   def boundaryWord(flags: IRCharFlags): CharSet = dialect match
@@ -121,16 +121,16 @@ private[build] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlN
 
   /** `[[:name:]]`, or `None` for a name that the dialect does not know. */
   def posix(name: String, flags: IRCharFlags): Option[CharSet] =
-    val asciiSet = AsciiPosix.get(name)
+    val asciiSet = ASCIIPOSIX.get(name)
     dialect match
       case _: Dialect.Ruby =>
         val rule =
-          if mode == UnitMode.Byte then Rule.Ascii
+          if mode == UnitMode.Byte then Rule.ASCII
           else
             flags.charset match
-              case _: IRCharset.Ascii => Rule.Ascii
+              case _: IRCharset.ASCII => Rule.ASCII
               case _                  => Rule.Unicode
-        IRProperties.rubyPosix(name).map(u => pick(rule, asciiSet.get, u))
+        IRProperties.rubyPOSIX(name).map(u => pick(rule, asciiSet.get, u))
       case _: Dialect.Perl if name == "ascii" => asciiSet
       case _: Dialect.Perl                    =>
         IRProperties.perl("XPosix" + name, None) match
@@ -138,10 +138,10 @@ private[build] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlN
           case _                            => None
       case Dialect.PCRE =>
         val rule = ruleOf(flags, a => if name == "digit" || name == "xdigit" then a.posixDigit else a.posix)
-        asciiSet.map(a => pick(rule, a, pcrePosix(name).getOrElse(a)))
+        asciiSet.map(a => pick(rule, a, pcrePOSIX(name).getOrElse(a)))
       case _ => asciiSet
 
-  private def pcrePosix(name: String): Option[CharSet] =
+  private def pcrePOSIX(name: String): Option[CharSet] =
     // pcre2pattern: "[:graph:] matches all characters with the L, M, N, P, S, or Cf properties, except for U+061C,
     // U+180E and U+2066 - U+2069".
     val graph = gc("L", "M", "N", "P", "S", "Cf").diff(of("؜᠎⁦⁧⁨⁩"))
@@ -165,15 +165,15 @@ private[build] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlN
 object IRCharClasses:
 
   private enum Rule:
-    case Ascii, Unicode, Native
+    case ASCII, Unicode, Native
 
   val Latin1: CharSet = CharSet.range(0x80, 0xff)
 
-  val AsciiDigit: CharSet = ascii('0' -> '9')
+  val ASCIIDigit: CharSet = ascii('0' -> '9')
 
-  val AsciiWord: CharSet = ascii('0' -> '9', 'A' -> 'Z', '_' -> '_', 'a' -> 'z')
+  val ASCIIWord: CharSet = ascii('0' -> '9', 'A' -> 'Z', '_' -> '_', 'a' -> 'z')
 
-  val AsciiSpace: CharSet = of(" \t\n\u000b\f\r")
+  val ASCIISpace: CharSet = of(" \t\n\u000b\f\r")
 
   val Vertical: CharSet = CharSet.range(0x0a, 0x0d).union(of("\u0085  "))
 
@@ -196,7 +196,7 @@ object IRCharClasses:
   lazy val pcreWord: CharSet = gc("L", "N", "Mn", "Pc").union(of("_"))
 
   /** Onigmo's `\w` in Unicode: `[[:word:]]` and the `No` characters of Latin-1 (its Latin-1 ctype table marks them). */
-  lazy val rubyWord: CharSet = IRProperties.rubyPosix("word").get.union(of("\u00b2\u00b3\u00b9\u00bc\u00bd\u00be"))
+  lazy val rubyWord: CharSet = IRProperties.rubyPOSIX("word").get.union(of("\u00b2\u00b3\u00b9\u00bc\u00bd\u00be"))
 
   /** Perl's `\p{Word}`. */
   lazy val perlWord: CharSet = binary("Alphabetic").union(gc("M", "Nd", "Pc")).union(binary("Join_Control"))
@@ -205,19 +205,19 @@ object IRCharClasses:
   lazy val dotNetWord: CharSet = gc("L", "Mn", "Nd", "Pc")
 
   /** The POSIX classes in ASCII. */
-  val AsciiPosix: Map[String, CharSet] = Map(
+  val ASCIIPOSIX: Map[String, CharSet] = Map(
     "alnum" -> ascii('0' -> '9', 'A' -> 'Z', 'a' -> 'z'),
     "alpha" -> ascii('A' -> 'Z', 'a' -> 'z'),
     "ascii" -> CharSet.range(0, 0x7f),
     "blank" -> of(" \t"),
     "cntrl" -> CharSet.range(0, 0x1f).union(CharSet.single(0x7f)),
-    "digit" -> AsciiDigit,
+    "digit" -> ASCIIDigit,
     "graph" -> CharSet.range(0x21, 0x7e),
     "lower" -> ascii('a' -> 'z'),
     "print" -> CharSet.range(0x20, 0x7e),
     "punct" -> ascii('!' -> '/', ':' -> '@', '[' -> '`', '{' -> '~'),
-    "space" -> AsciiSpace,
+    "space" -> ASCIISpace,
     "upper" -> ascii('A' -> 'Z'),
-    "word" -> AsciiWord,
+    "word" -> ASCIIWord,
     "xdigit" -> ascii('0' -> '9', 'A' -> 'F', 'a' -> 'f')
   )

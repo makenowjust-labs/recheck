@@ -6,7 +6,7 @@ package codes.quine.labs.resyntax.charset
   */
 enum UnitMode(val limit: Int):
 
-  case Utf16 extends UnitMode(0x10000)
+  case UTF16 extends UnitMode(0x10000)
 
   case CodePoint extends UnitMode(0x110000)
 

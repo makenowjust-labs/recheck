@@ -42,11 +42,11 @@ class AutomatonCheckerSuite extends munit.FunSuite:
   test("AutomatonChecker.check: polynomial"):
     val a = CharSet.single('a')
     val at = CharSet.single('@')
-    val other1 = a.complement(UnitMode.Utf16)
+    val other1 = a.complement(UnitMode.UTF16)
     val other2 = CharSet
       .fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))
       .union(at)
-      .complement(UnitMode.Utf16)
+      .complement(UnitMode.UTF16)
     assertEquals(
       check("^.*a.*a$", "s"),
       Success(
@@ -87,8 +87,8 @@ class AutomatonCheckerSuite extends munit.FunSuite:
   test("AutomatonChecker.check: exponential"):
     val a = CharSet.single('a')
     val b = CharSet.single('b')
-    val other1 = CharSet.single('a').complement(UnitMode.Utf16)
-    val other2 = CharSet.union(Seq(a, b)).complement(UnitMode.Utf16)
+    val other1 = CharSet.single('a').complement(UnitMode.UTF16)
+    val other2 = CharSet.union(Seq(a, b)).complement(UnitMode.UTF16)
     assertEquals(
       check("^(a|a)*$", ""),
       Success(

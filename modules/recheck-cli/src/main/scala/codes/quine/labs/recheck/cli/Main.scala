@@ -98,25 +98,25 @@ object Main:
   def dialectSettings: Opts[Dialect => ValidatedNel[String, Dialect]] =
     val pythonType = Opts.option[String](long = "python-type", help = "The string type (python).").orNone
     val rubyEncoding = Opts.option[String](long = "ruby-encoding", help = "The encoding (ruby).").orNone
-    val perlUtf8 = Opts
+    val perlUTF8 = Opts
       .option[Boolean](long = "perl-utf8", help = "Whether the program has `use utf8` and decoded strings (perl).")
       .orNone
     val perlSource = Opts.option[PerlSource](long = "perl-source", help = "How the pattern is given (perl).").orNone
-    (pythonType, rubyEncoding, perlUtf8, perlSource).mapN: (pythonType, rubyEncoding, perlUtf8, perlSource) =>
-      withSettings(_, pythonType, rubyEncoding, perlUtf8, perlSource)
+    (pythonType, rubyEncoding, perlUTF8, perlSource).mapN: (pythonType, rubyEncoding, perlUTF8, perlSource) =>
+      withSettings(_, pythonType, rubyEncoding, perlUTF8, perlSource)
 
   /** Returns the dialect with the settings, or an error if the dialect does not have a given setting. */
   def withSettings(
       dialect: Dialect,
       pythonType: Option[String],
       rubyEncoding: Option[String],
-      perlUtf8: Option[Boolean],
+      perlUTF8: Option[Boolean],
       perlSource: Option[PerlSource]
   ): ValidatedNel[String, Dialect] =
     val misplaced = Seq(
       ("python-type", pythonType.isDefined, dialect.isPython),
       ("ruby-encoding", rubyEncoding.isDefined, dialect.isRuby),
-      ("perl-utf8", perlUtf8.isDefined, dialect.isPerl),
+      ("perl-utf8", perlUTF8.isDefined, dialect.isPerl),
       ("perl-source", perlSource.isDefined, dialect.isPerl)
     ).collectFirst { case (option, true, false) => option }
     def named[A](option: String, value: Option[String], default: A)(of: String => Option[A]): ValidatedNel[String, A] =
@@ -131,7 +131,7 @@ object Main:
           case ruby: Dialect.Ruby =>
             named("ruby-encoding", rubyEncoding, ruby.encoding)(Dialect.Ruby.Encoding.of).map(Dialect.Ruby(_))
           case perl: Dialect.Perl =>
-            Validated.validNel(Dialect.Perl(perlUtf8.getOrElse(perl.utf8), perlSource.getOrElse(perl.source)))
+            Validated.validNel(Dialect.Perl(perlUTF8.getOrElse(perl.utf8), perlSource.getOrElse(perl.source)))
           case _ => Validated.validNel(dialect)
 
   // $COVERAGE-OFF$

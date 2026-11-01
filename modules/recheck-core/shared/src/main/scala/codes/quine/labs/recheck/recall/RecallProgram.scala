@@ -6,8 +6,8 @@ import codes.quine.labs.recheck.exec.DotNetExecutor
 import codes.quine.labs.recheck.exec.Executor
 import codes.quine.labs.recheck.exec.JavaExecutor
 import codes.quine.labs.recheck.exec.NodeExecutor
+import codes.quine.labs.recheck.exec.PHPExecutor
 import codes.quine.labs.recheck.exec.PerlExecutor
-import codes.quine.labs.recheck.exec.PhpExecutor
 import codes.quine.labs.recheck.exec.PythonExecutor
 import codes.quine.labs.recheck.exec.RubyExecutor
 import codes.quine.labs.recheck.exec.SourceFile
@@ -313,7 +313,7 @@ object RecallProgram:
     */
   private[recall] def data(flags: String, pattern: SourcePattern, attack: AttackPattern): String =
     def units(cs: Iterator[Int]): String =
-      cs.flatMap(c => if c > 0xffff then UString(c).encode(UnitMode.Utf16).iterator else Iterator(c))
+      cs.flatMap(c => if c > 0xffff then UString(c).encode(UnitMode.UTF16).iterator else Iterator(c))
         .map(hex(_, 4))
         .mkString
     val source = units(pattern.source.iterator.map(_.toInt))
@@ -398,7 +398,7 @@ object RecallProgram:
     * and the JIT stack limit are on the depth of backtracking, which are engine errors.
     */
   private[recall] def php(pattern: SourcePattern, attack: AttackPattern): Option[RecallProgram] =
-    PhpDelimiters
+    PHPDelimiters
       .find(c => !pattern.source.contains(c))
       .map: delimiter =>
         val bytes = pattern.mode == UnitMode.Byte
@@ -432,10 +432,10 @@ object RecallProgram:
               |}
               |echo "$TimeLine ", $$time, "\\n";
               |""".stripMargin
-        RecallProgram(PhpExecutor, script)
+        RecallProgram(PHPExecutor, script)
 
   /** The delimiters of a PHP regex, preferring printable ones. */
-  private val PhpDelimiters: Seq[Char] = "/#~!%@;,|=:".toSeq ++ ((1 to 8) ++ (14 to 31)).map(_.toChar)
+  private val PHPDelimiters: Seq[Char] = "/#~!%@;,|=:".toSeq ++ ((1 to 8) ++ (14 to 31)).map(_.toChar)
 
   /** Returns an expression of the union of the flags, or the default for no flags. */
   private def union(flags: Seq[String], none: String): String = if flags.isEmpty then none else flags.mkString(" | ")

@@ -132,7 +132,7 @@ object CharsetCaseDataGen extends UnicodeDataGen {
     sb.append(s"  val FullUpper: String = ${CharsetEncoder.literal(overrides(upper))}\n\n")
     sb.append(s"  val FullLower: String = ${CharsetEncoder.literal(overrides(lower))}\n\n")
     sb.append(s"  val FullTitle: String = ${CharsetEncoder.literal(overrides(title))}\n\n")
-    sb.append(s"  val EcmaScriptUpper: String = ${CharsetEncoder.literal(runs(0 to 0xffff)(ecmaScriptUpper))}\n")
+    sb.append(s"  val ECMAScriptUpper: String = ${CharsetEncoder.literal(runs(0 to 0xffff)(ecmaScriptUpper))}\n")
     sb.result()
   }
 }

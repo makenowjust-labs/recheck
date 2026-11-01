@@ -17,7 +17,7 @@ object Program:
 
   /** Meta is a meta information of a program for matching and analysis. */
   final case class Meta(
-      /** The unit of characters, where the input is UTF-16 code units for `Utf16` and `CodePoint`, and bytes for
+      /** The unit of characters, where the input is UTF-16 code units for `UTF16` and `CodePoint`, and bytes for
         * `Byte`.
         */
       mode: UnitMode,

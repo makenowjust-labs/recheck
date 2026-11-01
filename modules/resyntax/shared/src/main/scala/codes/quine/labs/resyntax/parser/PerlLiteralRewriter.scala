@@ -28,12 +28,12 @@ private[parser] object PerlLiteralRewriter:
     if !source.contains('\\') then None else new PerlLiteralRewriter(source, extended, bytes).run()
 
   /** The non-ASCII characters that `quotemeta` quotes in a UTF-8 string (perlfunc `quotemeta`). */
-  private lazy val QuotedNonAscii: CharSet =
+  private lazy val QuotedNonASCII: CharSet =
     val names = Seq("Pattern_Syntax", "Pattern_White_Space", "White_Space", "Default_Ignorable_Code_Point")
     CharSet.union(names.map(Properties.binary(_).get.set) :+ Properties.GeneralCategory.value("Cc").get.set)
 
   private def isQuoted(c: Int): Boolean =
-    if c < 0x80 then !(Character.isLetterOrDigit(c) || c == '_') else QuotedNonAscii.contains(c)
+    if c < 0x80 then !(Character.isLetterOrDigit(c) || c == '_') else QuotedNonASCII.contains(c)
 
   private def isCommand(c: Char): Boolean = "lLuUEQF".indexOf(c.toInt) >= 0
 

@@ -5,8 +5,8 @@ import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.exec.DotNetExecutor
 import codes.quine.labs.recheck.exec.JavaExecutor
 import codes.quine.labs.recheck.exec.NodeExecutor
+import codes.quine.labs.recheck.exec.PHPExecutor
 import codes.quine.labs.recheck.exec.PerlExecutor
-import codes.quine.labs.recheck.exec.PhpExecutor
 import codes.quine.labs.recheck.exec.PythonExecutor
 import codes.quine.labs.recheck.exec.RubyExecutor
 import codes.quine.labs.resyntax.ast.Dialect
@@ -20,7 +20,7 @@ class RecallProgramSuite extends munit.FunSuite:
     AttackPattern(Seq((UString.fromString("x"), UString.fromString("y"), 0)), UString.fromString("z"), 2)
 
   /** `'é'.repeat(3) + '\0'` */
-  val nonAscii: AttackPattern =
+  val nonASCII: AttackPattern =
     AttackPattern(Seq((UString.empty, UString.fromString("é"), 1)), UString(0), 2)
 
   def generate(source: String, flags: String, dialect: Dialect, attack: AttackPattern = attack): RecallProgram =
@@ -73,9 +73,9 @@ class RecallProgramSuite extends munit.FunSuite:
          |sys.stdout.write('recheck:time ' + str((time.perf_counter_ns() - start) // 1000000) + '\n')
          |""".stripMargin
     )
-    assertEquals(line(generate("x", "", Dialect.Python(), nonAscii), "string"), "string = 'é' * 3 + '\\x00'")
+    assertEquals(line(generate("x", "", Dialect.Python(), nonASCII), "string"), "string = 'é' * 3 + '\\x00'")
     // A bytes pattern is the Latin-1 encoding of the source, and the input is bytes.
-    val bytes = generate("éa", "", Dialect.Python(Dialect.Python.Type.Bytes), nonAscii)
+    val bytes = generate("éa", "", Dialect.Python(Dialect.Python.Type.Bytes), nonASCII)
     assertEquals(line(bytes, "regex"), "regex = re.compile(b'\\xe9a', 0)")
     assertEquals(line(bytes, "string"), "string = b'\\xe9' * 3 + b'\\x00'")
 
@@ -100,7 +100,7 @@ class RecallProgramSuite extends munit.FunSuite:
          |puts "recheck:time #{Process.clock_gettime(Process::CLOCK_MONOTONIC, :millisecond) - start}"
          |""".stripMargin
     )
-    val utf8 = generate("é", "a", Dialect.Ruby(), nonAscii)
+    val utf8 = generate("é", "a", Dialect.Ruby(), nonASCII)
     assertEquals(line(utf8, "regex"), "regex = Regexp.new(\"(?a)\" + \"é\", 0)")
     assertEquals(line(utf8, "string"), "string = \"é\" * 3 + \"\\x00\"")
     // The last character set option wins, as the inline options do.
@@ -109,7 +109,7 @@ class RecallProgramSuite extends munit.FunSuite:
       "regex = Regexp.new(\"(?d)\" + \"a\", Regexp::IGNORECASE)"
     )
     // A pattern of bytes is the UTF-8 encoding of the source.
-    val bytes = generate("é", "n", Dialect.Ruby(), nonAscii)
+    val bytes = generate("é", "n", Dialect.Ruby(), nonASCII)
     assertEquals(line(bytes, "regex"), "regex = Regexp.new(\"\\xC3\\xA9\".b, Regexp::NOENCODING)")
     assertEquals(line(bytes, "string"), "string = \"\\xE9\".b * 3 + \"\\x00\".b")
 
@@ -160,7 +160,7 @@ class RecallProgramSuite extends munit.FunSuite:
          |""".stripMargin
     )
     assertEquals(
-      line(generate("a", "", Dialect.Perl(), nonAscii), "my $input"),
+      line(generate("a", "", Dialect.Perl(), nonASCII), "my $input"),
       "my $input = \"\\xE9\" x 3 . \"\\x00\";"
     )
     // Modifiers that `qr` does not take are dropped.
@@ -219,7 +219,7 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.generate: PCRE"):
     val program = generate("/#é$", "iu", Dialect.PCRE)
-    assertEquals(program.executor, PhpExecutor)
+    assertEquals(program.executor, PHPExecutor)
     assertEquals(
       program.script,
       """|<?php
@@ -250,12 +250,12 @@ class RecallProgramSuite extends munit.FunSuite:
          |""".stripMargin
     )
     assertEquals(
-      line(generate("é", "u", Dialect.PCRE, nonAscii), "$input"),
+      line(generate("é", "u", Dialect.PCRE, nonASCII), "$input"),
       "$input = str_repeat(\"é\", 3) . \"\\x00\";"
     )
     // Without `u`, the input is bytes.
     assertEquals(
-      line(generate("é", "", Dialect.PCRE, nonAscii), "$input"),
+      line(generate("é", "", Dialect.PCRE, nonASCII), "$input"),
       "$input = str_repeat(\"\\xE9\", 3) . \"\\x00\";"
     )
     // The modifiers pass through.

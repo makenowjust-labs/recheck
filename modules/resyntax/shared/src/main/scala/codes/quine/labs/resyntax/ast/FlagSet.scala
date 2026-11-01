@@ -26,11 +26,11 @@ final case class FlagSet(
     // `aD` (PCRE)
     asciiDigit: Boolean = false,
     // `aP` (PCRE)
-    asciiPosix: Boolean = false,
+    asciiPOSIX: Boolean = false,
     // `aS` (PCRE)
     asciiSpace: Boolean = false,
     // `aT` (PCRE)
-    asciiPosixDigit: Boolean = false,
+    asciiPOSIXDigit: Boolean = false,
     // `aW` (PCRE)
     asciiWord: Boolean = false,
     // `c` (Java, Perl)

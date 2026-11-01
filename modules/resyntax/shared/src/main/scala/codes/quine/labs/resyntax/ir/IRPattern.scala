@@ -202,7 +202,7 @@ final case class IRPattern(
     */
   def parts(preferred: Option[CharSet]): Set[UString] =
     def toUString(values: Seq[Int]): UString =
-      if mode == UnitMode.CodePoint then UString.from(UString.from(values).encode(UnitMode.Utf16))
+      if mode == UnitMode.CodePoint then UString.from(UString.from(values).encode(UnitMode.UTF16))
       else UString.from(values)
 
     def literal(node: IRNode): Option[Int] = node.data match
@@ -303,6 +303,6 @@ object IRBackReferenceFolding:
           flags.charset match
             case IRCharset.Default                            => Simple
             case IRCharset.Locale                             => Full(0x100)
-            case _: IRCharset.Ascii if flags.caselessRestrict => Full(0x80)
+            case _: IRCharset.ASCII if flags.caselessRestrict => Full(0x80)
             case _                                            => Full(0)
         case _ => Simple

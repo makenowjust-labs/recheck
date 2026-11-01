@@ -77,10 +77,10 @@ class IRCharSuite extends munit.FunSuite:
 
   // Unit modes
   for (dialect, flags, mode) <- Seq(
-      (JavaScript, "", UnitMode.Utf16),
+      (JavaScript, "", UnitMode.UTF16),
       (JavaScript, "u", UnitMode.CodePoint),
       (JavaScript, "v", UnitMode.CodePoint),
-      (DotNet, "", UnitMode.Utf16),
+      (DotNet, "", UnitMode.UTF16),
       (Java, "", UnitMode.CodePoint),
       (PCRE, "", UnitMode.Byte),
       (PCRE, "u", UnitMode.CodePoint),
@@ -88,7 +88,7 @@ class IRCharSuite extends munit.FunSuite:
       (Python(Python.Type.Bytes), "", UnitMode.Byte),
       (Ruby(), "", UnitMode.CodePoint),
       (Ruby(), "n", UnitMode.Byte),
-      (Ruby(Ruby.Encoding.Ascii8Bit), "", UnitMode.Byte),
+      (Ruby(Ruby.Encoding.ASCII8Bit), "", UnitMode.Byte),
       (Perl(), "", UnitMode.CodePoint),
       (Perl(utf8 = false), "", UnitMode.Byte)
     )
@@ -132,7 +132,7 @@ class IRCharSuite extends munit.FunSuite:
     assertEquals(set("\\xe9"), CharSet.single(0xe9))
     // Its non-ASCII literals are bytes, which do not make the pattern use Unicode rules.
     val Sequence(nodes) = build("é\\w", "", Perl(utf8 = false)).node.data: @unchecked
-    assertEquals(nodes.last.data, Chars(IRCharClasses.AsciiPosix("word")))
+    assertEquals(nodes.last.data, Chars(IRCharClasses.ASCIIPOSIX("word")))
   // Perl reads the bytes of a byte string as Latin-1 characters, so a pattern switching `/d` to Unicode rules (e.g. by
   // `\x{100}`) has the rules of `0x80..0xFF` of the text strings (checked against Perl 5.44).
   for
@@ -179,7 +179,7 @@ class IRCharSuite extends munit.FunSuite:
   chars("é", "", Python(Python.Type.Bytes))(CharSet.single(0xe9))
   // Ruby's ASCII-8BIT regexp has only the POSIX classes in ASCII as properties.
   chars("\\p{Alpha}", "n", Ruby())(CharSet.range('A', 'Z').union(CharSet.range('a', 'z')))
-  chars("\\p{Punct}", "n", Ruby())(IRCharClasses.AsciiPosix("punct"))
+  chars("\\p{Punct}", "n", Ruby())(IRCharClasses.ASCIIPOSIX("punct"))
   chars("\\P{Space}", "n", Ruby())(of(" \t\n\u000b\f\r").complement(UnitMode.Byte))
   error("\\p{L}", "n", Ruby())("Unknown Unicode property name at 0")
   error("\\p{Any}", "n", Ruby())("Unknown Unicode property name at 0")
@@ -345,13 +345,13 @@ class IRCharSuite extends munit.FunSuite:
   // Case-insensitive classes
   chars("[j-l]", "iu", Java)(of("jklJKL\u212a"))
   chars("[j-l]", "i", Python())(of("jklJKL\u212a"))
-  chars("[^k]", "i", JavaScript)(of("kK").complement(UnitMode.Utf16))
+  chars("[^k]", "i", JavaScript)(of("kK").complement(UnitMode.UTF16))
   chars("[^k]", "iu", JavaScript)(of("kK\u212a").complement(UnitMode.CodePoint))
 
   // Dot
-  chars(".", "", JavaScript)(of("\n\r  ").complement(UnitMode.Utf16))
-  chars(".", "s", JavaScript)(UnitMode.Utf16.universe)
-  chars(".", "", DotNet)(of("\n").complement(UnitMode.Utf16))
+  chars(".", "", JavaScript)(of("\n\r  ").complement(UnitMode.UTF16))
+  chars(".", "s", JavaScript)(UnitMode.UTF16.universe)
+  chars(".", "", DotNet)(of("\n").complement(UnitMode.UTF16))
   chars(".", "", Java)(of("\n\r\u0085  ").complement(UnitMode.CodePoint))
   chars(".", "d", Java)(of("\n").complement(UnitMode.CodePoint))
   chars(".", "", PCRE)(of("\n").complement(UnitMode.Byte))
@@ -370,8 +370,8 @@ class IRCharSuite extends munit.FunSuite:
   checkSet("\\s", "", Perl())(s => s.contains(0x2028) && s.contains(0x85) && s.contains(0xa0))
   checkSet("\\s", "", Perl(utf8 = false))(s => !s.contains(0x85) && !s.contains(0xa0))
   checkSet("\\s", "u", Perl())(s => s.contains(0x85) && s.contains(0xa0))
-  chars("\\w", "", JavaScript, Java, PCRE, Ruby())(IRCharClasses.AsciiWord)
-  chars("\\w", "iu", JavaScript)(IRCharClasses.AsciiWord.union(of("\u017f\u212a")))
+  chars("\\w", "", JavaScript, Java, PCRE, Ruby())(IRCharClasses.ASCIIWord)
+  chars("\\w", "iu", JavaScript)(IRCharClasses.ASCIIWord.union(of("\u017f\u212a")))
   checkSet("\\w", "", Perl())(s => s.contains(0x100) && s.contains(0xe9))
   checkSet("\\w", "", Perl(utf8 = false))(s => !s.contains(0xe9))
 
@@ -389,8 +389,8 @@ class IRCharSuite extends munit.FunSuite:
   checkSet("\\w", "U", Java)(s => s.contains(0xe9) && s.contains(0x200c))
   checkSet("(?u)\\w", "", Ruby())(s => s.contains(0xe9))
   checkSet("\\w", "", DotNet)(s => s.contains(0xe9) && !s.contains(0x0903) && s.last <= 0xffff)
-  chars("\\W", "", JavaScript)(IRCharClasses.AsciiWord.complement(UnitMode.Utf16))
-  chars("\\w", "", Python(Python.Type.Bytes))(IRCharClasses.AsciiWord)
+  chars("\\W", "", JavaScript)(IRCharClasses.ASCIIWord.complement(UnitMode.UTF16))
+  chars("\\w", "", Python(Python.Type.Bytes))(IRCharClasses.ASCIIWord)
   chars("\\h", "", Ruby())(of("0123456789abcdefABCDEF"))
   chars("\\h", "", Perl())(IRCharClasses.pcreHorizontal.diff(of("᠎")))
   chars("\\v", "", Java, Perl())(IRCharClasses.Vertical)
@@ -433,8 +433,8 @@ class IRCharSuite extends munit.FunSuite:
   chars("[[:alpha:]]", "a", Perl())(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
   check("[[:<:]]", "", PCRE)(
     Sequence(
-      Assert(IRAssertKind.WordBoundary(IRCharClasses.AsciiWord)),
-      LookAhead(false, Chars(IRCharClasses.AsciiWord))
+      Assert(IRAssertKind.WordBoundary(IRCharClasses.ASCIIWord)),
+      LookAhead(false, Chars(IRCharClasses.ASCIIWord))
     )
   )
   chars("[[:upper:]]", "i", PCRE)(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
@@ -442,10 +442,10 @@ class IRCharSuite extends munit.FunSuite:
   // Properties
   chars("\\p{Lu}", "u", JavaScript, PCRE)(gc("Lu"))
   chars("\\p{Lu}", "", Java, Perl(), Ruby())(gc("Lu"))
-  chars("\\p{Lu}", "", DotNet)(gc("Lu").restrict(UnitMode.Utf16))
+  chars("\\p{Lu}", "", DotNet)(gc("Lu").restrict(UnitMode.UTF16))
   chars("\\P{Lu}", "u", JavaScript)(gc("Lu").complement(UnitMode.CodePoint))
   chars("\\p{Lu}", "i", Java)(gc("LC"))
-  chars("\\p{Lu}", "i", DotNet)(gc("LC").restrict(UnitMode.Utf16))
+  chars("\\p{Lu}", "i", DotNet)(gc("LC").restrict(UnitMode.UTF16))
   chars("\\p{Lu}", "i", Perl())(gc("LC"))
   chars("\\p{Latin}", "u", PCRE)(Properties.ScriptExtensions.value("Latin").get.set)
   chars("\\p{sc=Latin}", "u", JavaScript)(Properties.Script.value("Latin").get.set)

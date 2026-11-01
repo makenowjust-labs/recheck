@@ -41,7 +41,7 @@ final case class FeatureSet(
     // Java, JavaScript (with `v`), Ruby
     allowsClassNest: Boolean,
     // PCRE, Perl, Ruby
-    allowsClassPosix: Boolean,
+    allowsClassPOSIX: Boolean,
     // JavaScript
     allowsDollarInGroupName: Boolean,
     // .NET, PCRE (with `J`), Perl, Ruby
@@ -137,9 +137,9 @@ final case class FeatureSet(
     // Perl, Python, Ruby
     checksCharsetInlineFlagRemoval: Boolean,
     // PCRE, Perl
-    checksClassPosixCollating: Boolean,
+    checksClassPOSIXCollating: Boolean,
     // PCRE
-    checksClassPosixOutsideClass: Boolean,
+    checksClassPOSIXOutsideClass: Boolean,
     // JavaScript (with `v`)
     checksClassSetSyntax: Boolean,
     // JavaScript (without `uv`)
@@ -267,7 +267,7 @@ final case class FeatureSet(
     // PCRE
     hasCallout: Boolean,
     // PCRE
-    hasClassPosixWordBoundary: Boolean,
+    hasClassPOSIXWordBoundary: Boolean,
     // .NET
     hasClassSubtraction: Boolean,
     // .NET, PCRE, Perl, Python, Ruby
@@ -381,7 +381,7 @@ final case class FeatureSet(
     // JavaScript (with `uv`)
     rejectsInvalidBackReference: Boolean,
     // Ruby (ASCII-8BIT)
-    rejectsNonAsciiUnicodeEscape: Boolean,
+    rejectsNonASCIIUnicodeEscape: Boolean,
     // Ruby
     rejectsNumberedReferenceWithNamedCapture: Boolean,
     // Ruby
@@ -407,7 +407,7 @@ final case class FeatureSet(
     // .NET: 2147483647, Java: 2147483647, JavaScript: unlimited, PCRE: 65535, Perl: 2147483646, Python: 4294967294, Ruby: 100000
     maxRepeatCount: Long,
     // PCRE: every name, Perl: 3 to 14 characters without upper case letters and blanks, Ruby: up to 20 characters without `:`
-    classPosixNameRule: ClassPosixNameRule,
+    classPOSIXNameRule: ClassPOSIXNameRule,
     // Python (`bytes`): Latin-1, PCRE (without `u`), Perl (without `utf8`), Ruby (ASCII-8BIT): UTF-8, the others: text
     sourceEncoding: SourceEncoding
 )
@@ -428,12 +428,12 @@ object FeatureSet:
       case _                   => false
     // Ruby's `n` is NOENCODING, which `FlagSet` keeps as `explicitCapture`.
     val isRubyByte = dialect match
-      case Dialect.Ruby(encoding) => flagSet.explicitCapture || encoding == Dialect.Ruby.Encoding.Ascii8Bit
+      case Dialect.Ruby(encoding) => flagSet.explicitCapture || encoding == Dialect.Ruby.Encoding.ASCII8Bit
       case _                      => false
     val isPerlByte = dialect match
       case Dialect.Perl(utf8, _) => !utf8
       case _                     => false
-    val isUnicode = flagSet.unicode || flagSet.unicodeSets || (isPCRE && prescan.hasUtfStartOption)
+    val isUnicode = flagSet.unicode || flagSet.unicodeSets || (isPCRE && prescan.hasUTFStartOption)
 
     FeatureSet(
       allowsAlphabeticUnknownBackslash = (isJavaScript && !isUnicode) || isPerl || isRuby,
@@ -457,7 +457,7 @@ object FeatureSet:
       allowsClassEmpty = isJavaScript,
       allowsClassIntersection = isJava || isJavaScript && flagSet.unicodeSets || isRuby,
       allowsClassNest = isJava || isJavaScript && flagSet.unicodeSets || isRuby,
-      allowsClassPosix = isPCRE || isPerl || isRuby,
+      allowsClassPOSIX = isPCRE || isPerl || isRuby,
       allowsDollarInGroupName = isJavaScript,
       allowsDuplicatedGroupName = isDotNet || (isPCRE && flagSet.dupNames) || isPerl || isRuby,
       allowsDuplicatedGroupNameInAlternatives = isJavaScript,
@@ -507,8 +507,8 @@ object FeatureSet:
       checksCharsetInlineFlagConflict = isPerl || isPython,
       checksCharsetInlineFlagCount = isPerl,
       checksCharsetInlineFlagRemoval = isPerl || isPython || isRuby,
-      checksClassPosixCollating = isPCRE || isPerl,
-      checksClassPosixOutsideClass = isPCRE,
+      checksClassPOSIXCollating = isPCRE || isPerl,
+      checksClassPOSIXOutsideClass = isPCRE,
       checksClassSetSyntax = isJavaScript && flagSet.unicodeSets,
       checksValidBackReference = isJavaScript && !isUnicode,
       combinesSurrogatePairEscape = isJava || (isJavaScript && isUnicode),
@@ -574,7 +574,7 @@ object FeatureSet:
       hasBranchReset = isPCRE || isPerl,
       hasCallCommand = isPCRE || isPerl,
       hasCallout = isPCRE,
-      hasClassPosixWordBoundary = isPCRE,
+      hasClassPOSIXWordBoundary = isPCRE,
       hasClassSubtraction = isDotNet,
       hasConditional = isDotNet || isPCRE || isPerl || isPython || isRuby,
       hasDefineTest = isPCRE || isPerl,
@@ -631,7 +631,7 @@ object FeatureSet:
       readsLeadingCurlyAsLiteral = isPerl,
       readsThreeOctalDigitsAsOctal = isPython,
       rejectsInvalidBackReference = isJavaScript && isUnicode,
-      rejectsNonAsciiUnicodeEscape = isRubyByte,
+      rejectsNonASCIIUnicodeEscape = isRubyByte,
       rejectsNumberedReferenceWithNamedCapture = isRuby,
       removesCommentGroup = isRuby,
       processBackslashInCommentGroup = isPython || isRuby,
@@ -652,12 +652,12 @@ object FeatureSet:
         case _: Dialect.Perl    => 2147483646L
         case _: Dialect.Python  => 4294967294L
         case _: Dialect.Ruby    => 100000L,
-      classPosixNameRule = dialect match
-        case _: Dialect.Perl => ClassPosixNameRule.Perl
-        case _: Dialect.Ruby => ClassPosixNameRule.Ruby
-        case _               => ClassPosixNameRule.Always,
+      classPOSIXNameRule = dialect match
+        case _: Dialect.Perl => ClassPOSIXNameRule.Perl
+        case _: Dialect.Ruby => ClassPOSIXNameRule.Ruby
+        case _               => ClassPOSIXNameRule.Always,
       sourceEncoding =
         if isByte then SourceEncoding.Latin1
-        else if (isPCRE && !isUnicode) || isPerlByte || isRubyByte then SourceEncoding.Utf8
+        else if (isPCRE && !isUnicode) || isPerlByte || isRubyByte then SourceEncoding.UTF8
         else SourceEncoding.Text
     )

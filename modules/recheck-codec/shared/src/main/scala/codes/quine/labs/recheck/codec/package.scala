@@ -197,10 +197,10 @@ given encodeUString: Encoder[UString] = _.asString.asJson
 /** Returns a `Decoder` for `UString` of the unit mode, which is the inverse of [[encodeUString]]. */
 def decodeUString(mode: UnitMode): Decoder[UString] = Decoder[String].emap: s =>
   mode match
-    case UnitMode.Utf16     => Right(UString.fromUtf16Units(s))
+    case UnitMode.UTF16     => Right(UString.fromUTF16Units(s))
     case UnitMode.CodePoint => Right(UString.fromString(s))
     case UnitMode.Byte      =>
-      if s.forall(_ <= 0xff) then Right(UString.fromUtf16Units(s)) else Left(s"Invalid byte string: $s")
+      if s.forall(_ <= 0xff) then Right(UString.fromUTF16Units(s)) else Left(s"Invalid byte string: $s")
 
 /** Returns a `Decoder` for `AttackPattern` of the unit mode in the style.
   *

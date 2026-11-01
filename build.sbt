@@ -359,7 +359,7 @@ lazy val cli = project
   .enablePlugins(NativeImagePlugin)
   .settings(
     name := "recheck-cli",
-    parametersGenerator(ParametersGen.Target.Cli),
+    parametersGenerator(ParametersGen.Target.CLI),
     NativeImage / name := "recheck",
     publish / skip := true,
     Compile / mainClass := Some("codes.quine.labs.recheck.cli.Main"),

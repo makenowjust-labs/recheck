@@ -245,7 +245,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
 
   /** Joins a surrogate pair of literals, which the parser reads by code units, into a code point. */
   private def mergeSurrogates(lits: IndexedSeq[Lit]): IndexedSeq[Lit] =
-    if !readsUnits || mode == UnitMode.Utf16 then lits
+    if !readsUnits || mode == UnitMode.UTF16 then lits
     else
       val out = mutable.ArrayBuffer.empty[Lit]
       var i = 0
@@ -276,7 +276,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
             .slice(i + 1, i + n)
             .forall(l => isRubyByteLit(l) && (l.value & 0xc0) == 0x80)
         then throw new IRBuildingException("Invalid multibyte escape", lit.loc)
-        val c = decodeUtf8(lits.slice(i, i + n).map(_.value))
+        val c = decodeUTF8(lits.slice(i, i + n).map(_.value))
         out += lit.copy(value = c, loc = SourceLocation(lit.loc.start, lits(i + n - 1).loc.end))
         i += n
       else
@@ -288,7 +288,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
 
   private def unitsOf(lit: Lit): Seq[Int] = mode match
     case UnitMode.CodePoint => Seq(lit.value)
-    case UnitMode.Utf16     => UString(lit.value).encode(UnitMode.Utf16).toSeq
+    case UnitMode.UTF16     => UString(lit.value).encode(UnitMode.UTF16).toSeq
     case UnitMode.Byte      =>
       // The parser reads a byte source by bytes, so only an escape can be above `0xFF`.
       if lit.value <= 0xff then Seq(lit.value)
@@ -475,7 +475,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
   private def klass(invert: Boolean, item: ClassItem, flags: IRCharFlags, loc: SourceLocation): IRNodeData =
     item.data match
       // PCRE's `[[:<:]]` and `[[:>:]]` are the start and the end of a word (`\b(?=\w)` and `\b(?<=\w)`).
-      case ClassItemData.ClassPosix(false, name @ ("<" | ">")) if dialect.isPCRE && !invert =>
+      case ClassItemData.ClassPOSIX(false, name @ ("<" | ">")) if dialect.isPCRE && !invert =>
         val word = classes.word(flags).restrict(mode)
         val boundary = IRNodeData.Assert(IRAssertKind.WordBoundary(wordSet(flags)))
         val look =
@@ -552,12 +552,12 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
     */
   private def perlMultiFolding(value: Int, flags: IRCharFlags): Option[UString] =
     multiFolding(value).filter: key =>
-      val hasAscii = key.iterator.exists(_ < 0x80)
+      val hasASCII = key.iterator.exists(_ < 0x80)
       flags.charset match
         case IRCharset.Default  => !perlNative(flags)
         case IRCharset.Unicode  => true
         case IRCharset.Locale   => key.iterator.forall(_ >= 0x100)
-        case _: IRCharset.Ascii => !(flags.caselessRestrict && hasAscii)
+        case _: IRCharset.ASCII => !(flags.caselessRestrict && hasASCII)
 
   /** Resolves a folding as a run of literals, which is how Ruby and Perl match it. */
   private def foldString(key: UString, flags: IRCharFlags, loc: SourceLocation): IRNodeData =
@@ -592,7 +592,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
         if invert && flags.unicodeSets && mayContainStrings(inner) then
           throw new IRBuildingException("Negated character class may contain strings", item.loc)
         if invert then negate(inner, flags) else classItem(inner, flags)
-      case ClassItemData.ClassPosix(invert, name) =>
+      case ClassItemData.ClassPOSIX(invert, name) =>
         val set = posix(name, flags, item.loc)
         if invert then ClassSet(set.complement(mode)) else ClassSet(set)
       case ClassItemData.ClassRange(begin, end)    => range(begin.data, end.data, flags, item.loc)
@@ -673,7 +673,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
       case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v)) => Lit(v, false, Some(style), flags, loc)
     val units = unitsOf(lit)
     // A class item is one unit in UTF-16 mode, so a code point beyond it cannot be a class member.
-    if mode == UnitMode.Utf16 && units.length != 1 then throw new NotModeledException
+    if mode == UnitMode.UTF16 && units.length != 1 then throw new NotModeledException
     units
 
   private def closeChars(values: Seq[Int], flags: IRCharFlags): CharSet =
@@ -712,7 +712,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
         case _: Dialect.Perl if name == "upper" || name == "lower" => classes.perlCased(flags).restrict(mode)
         // PCRE matches both cases with them in ASCII (not in UCP mode).
         case Dialect.PCRE if (name == "upper" || name == "lower") && restricted.last < 0x80 =>
-          restricted.union(IRCharClasses.AsciiPosix(if name == "upper" then "lower" else "upper"))
+          restricted.union(IRCharClasses.ASCIIPOSIX(if name == "upper" then "lower" else "upper"))
         case _: Dialect.Ruby => equivalence(flags).closure(restricted)
         case _               => restricted
 
@@ -782,7 +782,7 @@ private[build] object IRCharResolver:
     else if b < 0xf5 then 4
     else 0
 
-  def decodeUtf8(bytes: Seq[Int]): Int =
+  def decodeUTF8(bytes: Seq[Int]): Int =
     bytes.tail.foldLeft(bytes.head & (0xff >> (bytes.size + 1)))((c, b) => (c << 6) | (b & 0x3f))
 
   /** Removes the parts of a node that never match (an empty set, and what needs one), or returns `None` for all. */

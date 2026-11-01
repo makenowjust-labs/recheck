@@ -9,7 +9,7 @@ import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.QuoteLiteral.*
 
 class ParserClassSuite extends ParserSuiteBase:
-  def classPosixLiteral(name: String): NodeData =
+  def classPOSIXLiteral(name: String): NodeData =
     Sequence(Class(false, ClassUnion(s"[:$name:".map(c => ClassLiteral(c))*)), Literal(']'))
 
   // Class
@@ -42,10 +42,10 @@ class ParserClassSuite extends ParserSuiteBase:
       ClassUnion(ClassBackslashClass(Digit), ClassLiteral('-'), ClassRange(ClassLiteral('a'), ClassLiteral('c')))
     )
   check("[a-[:digit:]]", "", Perl()):
-    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassPosix(false, "digit")))
+    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassPOSIX(false, "digit")))
   error("[a-[:digit:]]", "", PCRE, Ruby())("Invalid class range at 1")
   check("[[:digit:]-z]", "", Perl()):
-    Class(false, ClassUnion(ClassPosix(false, "digit"), ClassLiteral('-'), ClassLiteral('z')))
+    Class(false, ClassUnion(ClassPOSIX(false, "digit"), ClassLiteral('-'), ClassLiteral('z')))
   error("[[:digit:]-z]", "", PCRE, Ruby())("Invalid class range at 1")
   check("[a-[b]]", "", Java, Ruby()):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassNest(false, ClassLiteral('b'))))
@@ -115,8 +115,8 @@ class ParserClassSuite extends ParserSuiteBase:
   )
   checkPerlString("[\\C]", "")(Class(false, ClassBackslashValue(Unknown('C'))))
   check("[]", "", JavaScript)(Class(false, ClassUnion()))
-  check("[[:alnum:]]", "", PCRE, Perl(), Ruby())(Class(false, ClassPosix(false, "alnum")))
-  check("[[:^alnum:]]", "", PCRE, Perl(), Ruby())(Class(false, ClassPosix(true, "alnum")))
+  check("[[:alnum:]]", "", PCRE, Perl(), Ruby())(Class(false, ClassPOSIX(false, "alnum")))
+  check("[[:^alnum:]]", "", PCRE, Perl(), Ruby())(Class(false, ClassPOSIX(true, "alnum")))
   error("[[:foo:]]", "", PCRE, Perl(), Ruby())("Unknown POSIX class at 1")
   error("[[:^foo:]]", "", PCRE, Perl(), Ruby())("Unknown POSIX class at 1")
   error("[[:FOO:]]", "", PCRE, Ruby())("Unknown POSIX class at 1")
@@ -165,14 +165,14 @@ class ParserClassSuite extends ParserSuiteBase:
     error(s"[[:$name:]]", "", PCRE, Perl(), Ruby())("Unknown POSIX class at 1")
   for name <- Seq("abcdefghijklmno", "a b", "a.b.c.d", "alphaxyzalphaxyzalphaxyz") do
     error(s"[[:$name:]]", "", PCRE, Ruby())("Unknown POSIX class at 1")
-    check(s"[[:$name:]]", "", Perl())(classPosixLiteral(name))
+    check(s"[[:$name:]]", "", Perl())(classPOSIXLiteral(name))
   for name <- Seq("al:pha", ":ab") do
     error(s"[[:$name:]]", "", PCRE, Perl())("Unknown POSIX class at 1")
-    check(s"[[:$name:]]", "", Ruby())(classPosixLiteral(name))
+    check(s"[[:$name:]]", "", Ruby())(classPOSIXLiteral(name))
   error("[[:abcdefghijklmnopqrst:]]", "", PCRE, Ruby())("Unknown POSIX class at 1")
-  check("[[:abcdefghijklmnopqrst:]]", "", Perl())(classPosixLiteral("abcdefghijklmnopqrst"))
+  check("[[:abcdefghijklmnopqrst:]]", "", Perl())(classPOSIXLiteral("abcdefghijklmnopqrst"))
   error("[[:abcdefghijklmnopqrstu:]]", "", PCRE)("Unknown POSIX class at 1")
-  check("[[:abcdefghijklmnopqrstu:]]", "", Perl(), Ruby())(classPosixLiteral("abcdefghijklmnopqrstu"))
+  check("[[:abcdefghijklmnopqrstu:]]", "", Perl(), Ruby())(classPOSIXLiteral("abcdefghijklmnopqrstu"))
   check("[[:]]", "", Ruby())(Class(false, ClassNest(false, ClassLiteral(':'))))
   check("[[:]]", "", PCRE, Perl()):
     Sequence(Class(false, ClassUnion(ClassLiteral('['), ClassLiteral(':'))), Literal(']'))
@@ -184,8 +184,8 @@ class ParserClassSuite extends ParserSuiteBase:
   error("[.a.]", "", PCRE)("Unsupported POSIX collating element at 0")
   check("[:a:]", "", DotNet, Java, JavaScript, Perl(), Python(), Ruby()):
     Class(false, ClassUnion(ClassLiteral(':'), ClassLiteral('a'), ClassLiteral(':')))
-  check("[[:<:]]", "", PCRE)(Class(false, ClassPosix(false, "<")))
-  check("[[:>:]]", "", PCRE)(Class(false, ClassPosix(false, ">")))
+  check("[[:<:]]", "", PCRE)(Class(false, ClassPOSIX(false, "<")))
+  check("[[:>:]]", "", PCRE)(Class(false, ClassPOSIX(false, ">")))
   error("[[:<:]a]", "", PCRE)("Unknown POSIX class at 1")
   check("[[a]]", "", Java, Ruby())(Class(false, ClassNest(false, ClassLiteral('a'))))
   check("[[a]]", "v", JavaScript)(Class(false, ClassNest(false, ClassLiteral('a'))))

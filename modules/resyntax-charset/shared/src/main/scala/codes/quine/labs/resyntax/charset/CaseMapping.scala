@@ -142,10 +142,10 @@ object CaseMapping:
     *
     * It maps a code unit to its full uppercase if that is a single code unit, except a non-ASCII code unit to ASCII.
     */
-  lazy val EcmaScriptUpper: CaseMapping = decode(CaseData.EcmaScriptUpper)
+  lazy val ECMAScriptUpper: CaseMapping = decode(CaseData.ECMAScriptUpper)
 
   /** ECMAScript `Canonicalize` (ES2024 22.2.2.7.3). */
-  def ecmaScriptCanonicalize(unicode: Boolean): CaseMapping = if unicode then SimpleFold else EcmaScriptUpper
+  def ecmaScriptCanonicalize(unicode: Boolean): CaseMapping = if unicode then SimpleFold else ECMAScriptUpper
 
 /** FullCaseFolding is full case folding (the `C` and `F` mappings of CaseFolding.txt), which may map a code point to
   * several code points, such as `U+00DF` to `ss`.

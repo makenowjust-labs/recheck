@@ -196,7 +196,7 @@ class CodecSuite extends munit.FunSuite:
   test("codec.decodeUString"):
     // Each mode decodes what `encodeUString` gives, including a lone surrogate.
     for (mode, s) <- Seq(
-        UnitMode.Utf16 -> UString(0x61, 0xd83d, 0xde00, 0xd800),
+        UnitMode.UTF16 -> UString(0x61, 0xd83d, 0xde00, 0xd800),
         UnitMode.CodePoint -> UString(0x61, 0x1f600, 0xd800),
         UnitMode.Byte -> UString(0x61, 0xc3, 0xa9, 0xff)
       )
@@ -358,7 +358,7 @@ class CodecSuite extends munit.FunSuite:
     )
     assertEquals(
       decodeDialect.decodeJson(Json.obj("name" := "ruby", "encoding" := "ASCII-8BIT")),
-      Right(Dialect.Ruby(Dialect.Ruby.Encoding.Ascii8Bit))
+      Right(Dialect.Ruby(Dialect.Ruby.Encoding.ASCII8Bit))
     )
     assertEquals(
       decodeDialect.decodeJson(Json.obj("name" := "perl", "source" := "string", "utf8" := false)),
@@ -400,7 +400,7 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(encodeDialect(Dialect.DotNet), Json.obj("name" := "dotnet"))
     assertEquals(encodeDialect(Dialect.Python()), Json.obj("name" := "python", "type" := "str"))
     assertEquals(
-      encodeDialect(Dialect.Ruby(Dialect.Ruby.Encoding.Ascii8Bit)),
+      encodeDialect(Dialect.Ruby(Dialect.Ruby.Encoding.ASCII8Bit)),
       Json.obj("name" := "ruby", "encoding" := "ASCII-8BIT")
     )
     assertEquals(

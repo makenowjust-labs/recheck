@@ -46,8 +46,8 @@ object IRCaseEquivalence:
     override def closeRange(set: CharSet): CharSet =
       set.union(CaseMapping.SimpleUpper.preimage(set)).union(javaKey.preimage(set))
 
-  /** JavaAscii is Java's `CASE_INSENSITIVE` without `UNICODE_CASE`, which folds ASCII letters only. */
-  case object JavaAscii extends IRCaseEquivalence:
+  /** JavaASCII is Java's `CASE_INSENSITIVE` without `UNICODE_CASE`, which folds ASCII letters only. */
+  case object JavaASCII extends IRCaseEquivalence:
     def closure(set: CharSet): CharSet = asciiFold.closure(set)
 
   /** PCRERestrict is PCRE's caseless restrict (`r`) and Perl's `aa`, which fold no ASCII and non-ASCII characters
@@ -55,9 +55,9 @@ object IRCaseEquivalence:
     */
   final case class PCRERestrict(mapping: CaseMapping, mode: UnitMode) extends IRCaseEquivalence:
     def closure(set: CharSet): CharSet =
-      val ascii = set.intersect(Ascii)
-      val other = set.diff(Ascii)
-      mapping.closure(ascii).intersect(Ascii).union(mapping.closure(other).diff(Ascii)).restrict(mode)
+      val ascii = set.intersect(ASCII)
+      val other = set.diff(ASCII)
+      mapping.closure(ascii).intersect(ASCII).union(mapping.closure(other).diff(ASCII)).restrict(mode)
 
   /** PerlNative is Perl's `/d` rules without a reason to use Unicode rules.
     *
@@ -78,7 +78,7 @@ object IRCaseEquivalence:
       val above = set.diff(Byte)
       asciiFold.closure(set.intersect(Byte)).union(CaseMapping.SimpleFold.closure(above).diff(Byte)).restrict(mode)
 
-  private val Ascii: CharSet = CharSet.range(0, 0x7f)
+  private val ASCII: CharSet = CharSet.range(0, 0x7f)
 
   private val Byte: CharSet = CharSet.range(0, 0xff)
 
@@ -123,14 +123,14 @@ object IRCaseEquivalence:
     */
   def of(dialect: Dialect, mode: UnitMode, flags: IRCharFlags, perlNative: Boolean): IRCaseEquivalence =
     val asciiOnly = flags.charset match
-      case IRCharset.Ascii(_, _, _, _, _) => dialect.isPython
+      case IRCharset.ASCII(_, _, _, _, _) => dialect.isPython
       case _                              => false
     if !flags.ignoreCase then Identity
     else
       dialect match
         case Dialect.JavaScript =>
           Keyed("ECMAScript", CaseMapping.ecmaScriptCanonicalize(mode == UnitMode.CodePoint), mode)
-        case Dialect.Java   => if flags.unicodeCase then JavaUnicode else JavaAscii
+        case Dialect.Java   => if flags.unicodeCase then JavaUnicode else JavaASCII
         case Dialect.DotNet => Keyed(".NET", dotNetKey, mode)
         case _: Dialect.Python if asciiOnly || mode == UnitMode.Byte => Keyed("ASCII", asciiFold, mode)
         case _: Dialect.Python                                       => Keyed("Python", pythonKey, mode)

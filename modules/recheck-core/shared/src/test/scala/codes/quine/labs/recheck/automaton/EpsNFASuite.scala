@@ -119,7 +119,7 @@ class EpsNFASuite extends munit.FunSuite:
 
   test("EpsNFA#toGraphviz"):
     val nfa = EpsNFA(
-      PatternAlphabet.build(UnitMode.Utf16, Seq(CharSet.single('a'))),
+      PatternAlphabet.build(UnitMode.UTF16, Seq(CharSet.single('a'))),
       immutable.SortedSet(0, 1, 2, 3, 4, 5, 6),
       0,
       6,
@@ -156,7 +156,7 @@ class EpsNFASuite extends munit.FunSuite:
 
   test("EpsNFA#toOrderedNFA"):
     val nfa1 = EpsNFA(
-      PatternAlphabet.build(UnitMode.Utf16, lineTerminator = Some(CharSet.single('\n'))),
+      PatternAlphabet.build(UnitMode.UTF16, lineTerminator = Some(CharSet.single('\n'))),
       Set(0, 1, 2, 3, 4, 5, 6),
       0,
       6,
@@ -173,7 +173,7 @@ class EpsNFASuite extends munit.FunSuite:
     assertEquals(
       nfa1.toOrderedNFA,
       OrderedNFA[CharSet, (CharKind, Seq[(Int, Set[CharKind])])](
-        Set(CharSet.single('\n'), CharSet.single('\n').complement(UnitMode.Utf16)),
+        Set(CharSet.single('\n'), CharSet.single('\n').complement(UnitMode.UTF16)),
         Set((CharKind.LineTerminator, q36)),
         Vector((CharKind.LineTerminator, q36)),
         Set((CharKind.LineTerminator, q36)),
@@ -186,7 +186,7 @@ class EpsNFASuite extends munit.FunSuite:
     )
     val nfa2 = EpsNFA(
       PatternAlphabet
-        .build(UnitMode.Utf16, lineTerminator = Some(CharSet.single('\n')), word = Some(CharSet.single('a'))),
+        .build(UnitMode.UTF16, lineTerminator = Some(CharSet.single('\n')), word = Some(CharSet.single('a'))),
       Set(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
       0,
       10,
@@ -220,7 +220,7 @@ class EpsNFASuite extends munit.FunSuite:
         Set(
           CharSet.single('\n'),
           CharSet.single('a'),
-          CharSet.single('a').union(CharSet.single('\n')).complement(UnitMode.Utf16)
+          CharSet.single('a').union(CharSet.single('\n')).complement(UnitMode.UTF16)
         ),
         Set(
           (CharKind.LineTerminator, q4),

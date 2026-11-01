@@ -4,12 +4,12 @@ class UStringSuite extends munit.FunSuite:
   test("UString.fromString"):
     assertEquals(UString.fromString("aあ😀"), UString(0x61, 0x3042, 0x1f600))
     assertEquals(UString.fromString("\ud83d"), UString(0xd83d))
-    assertEquals(UString.fromUtf16Units("😀"), UString(0xd83d, 0xde00))
+    assertEquals(UString.fromUTF16Units("😀"), UString(0xd83d, 0xde00))
 
   test("UString#encode"):
     val s = UString(0x61, 0xe9, 0x3042, 0x1f600)
     assertEquals(s.encode(UnitMode.CodePoint).toSeq, Seq(0x61, 0xe9, 0x3042, 0x1f600))
-    assertEquals(s.encode(UnitMode.Utf16).toSeq, Seq(0x61, 0xe9, 0x3042, 0xd83d, 0xde00))
+    assertEquals(s.encode(UnitMode.UTF16).toSeq, Seq(0x61, 0xe9, 0x3042, 0xd83d, 0xde00))
     assertEquals(
       s.encode(UnitMode.Byte).toSeq,
       Seq(0x61, 0xc3, 0xa9, 0xe3, 0x81, 0x82, 0xf0, 0x9f, 0x98, 0x80)
