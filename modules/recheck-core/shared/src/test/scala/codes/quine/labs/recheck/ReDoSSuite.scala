@@ -88,14 +88,14 @@ class ReDoSSuite extends munit.FunSuite:
       assertEquals(result(written), result(normal), written)
 
   test("ReDoS.checkAll"):
-    assertEquals(ReDoS.checkAll("^foo$", ""), List(ReDoS.check("^foo$", "")))
+    assertEquals(ReDoS.checkAll("^foo$", "").toList, List(ReDoS.check("^foo$", "")))
     assertEquals(
-      ReDoS.checkAll("^foo$", "", Parameters(timeout = Duration.MinusInf)),
+      ReDoS.checkAll("^foo$", "", Parameters(timeout = Duration.MinusInf)).toList,
       List(Diagnostics.Unknown("^foo$", "", Dialect.JavaScript, Diagnostics.ErrorKind.Timeout, None))
     )
     // Without recall validation, the first vulnerable diagnostics is the final one.
     assertEquals(
-      ReDoS.checkAll("^(?:a|a)*$", "", Parameters(recallTimeout = Duration.Zero)),
+      ReDoS.checkAll("^(?:a|a)*$", "", Parameters(recallTimeout = Duration.Zero)).toList,
       List(
         Diagnostics.Vulnerable(
           "^(?:a|a)*$",

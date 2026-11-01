@@ -158,7 +158,7 @@ class Main:
 
     case Right(action: CheckAction) =>
       val diagnostics =
-        if action.all then ReDoS.checkAll(action.pattern.source, action.pattern.flags, action.params)
+        if action.all then ReDoS.checkAll(action.pattern.source, action.pattern.flags, action.params).toList
         else List(ReDoS.check(action.pattern.source, action.pattern.flags, action.params))
       if !action.json then Console.out.println(diagnostics.mkString("\n\n"))
       else if action.all then Console.out.println(diagnostics.asJson.noSpaces)

@@ -66,7 +66,7 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio):
       push: RPC.Push[String],
       send: RPC.Send[List[Diagnostics]]
   ): Unit =
-    submit(id, check, push, send)(ReDoS.checkAll)(List(_))
+    submit(id, check, push, send)(ReDoS.checkAll(_, _, _, _).toList)(List(_))
 
   /** Runs a checking method on the thread pool, and sends its result.
     *

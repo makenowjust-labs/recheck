@@ -28,7 +28,7 @@ object ReDoSJS:
   /** Checks the given RegExp pattern, and returns all the diagnostics until the final one. */
   @JSExportTopLevel("checkAll", "recheck")
   def checkAll(source: String, flags: String, originalParams: js.UndefOr[js.Any]): js.Any =
-    run(originalParams)(ReDoS.checkAll(source, flags, _))
+    run(originalParams)(ReDoS.checkAll(source, flags, _).toList)
 
   private def run[A: Encoder](originalParams: js.UndefOr[js.Any])(check: Parameters => A): js.Any =
     decodeJs[Parameters](originalParams.getOrElse(js.Object())) match

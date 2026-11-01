@@ -49,12 +49,13 @@ object ReDoS:
       params: Parameters = Parameters(),
       token: Option[CancellationToken] = None
   ): Diagnostics =
-    iterator(source, flags, params, token).reduce((_, d) => d)
+    checkAll(source, flags, params, token).reduce((_, d) => d)
 
-  /** Tests the given RegExp pattern causes ReDoS, and returns all the diagnostics until the final one.
+  /** Tests the given RegExp pattern causes ReDoS, and iterates the diagnostics until the final one.
     *
-    * The list consists of the vulnerable diagnostics whose recall validation failed, followed by the final one: the
-    * first vulnerable diagnostics whose recall validation is not run or succeeded, or else the safe or unknown one.
+    * The diagnostics are the vulnerable ones whose recall validation failed, followed by the final one: the first
+    * vulnerable diagnostics whose recall validation is not run or succeeded, or else the safe or unknown one. The
+    * iterator computes no more than the next diagnostics.
     *
     * A vulnerable diagnostics with the same complexity and hotspot as a failed one is skipped. When the recall
     * validation fails `maxRecallFailures` times, the final one is unknown with
@@ -65,15 +66,6 @@ object ReDoS:
       flags: String,
       params: Parameters = Parameters(),
       token: Option[CancellationToken] = None
-  ): List[Diagnostics] =
-    iterator(source, flags, params, token).toList
-
-  /** Iterates the diagnostics of [[checkAll]]. */
-  private[recheck] def iterator(
-      source: String,
-      flags: String,
-      params: Parameters,
-      token: Option[CancellationToken]
   ): Iterator[Diagnostics] =
     given ctx: Context = Context(params.timeout, token, params.logger)
 
