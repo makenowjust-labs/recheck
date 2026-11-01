@@ -103,7 +103,7 @@ private[parser] final class Parser(
   /** A list of (disjunction ID, alternative index, whether it is a branch reset) of enclosing alternatives. */
   private var alternativePath: List[(Int, Int, Boolean)] = Nil
 
-  private val groupNames: mutable.Map[String, Seq[List[(Int, Int, Boolean)]]] = mutable.Map.empty
+  private val groupNames: mutable.Map[String, Vector[List[(Int, Int, Boolean)]]] = mutable.Map.empty
 
   /** The number of the capture groups opened so far, where a branch reset counts its alternative with the most. */
   private var previousCaptureCount: Int = 0
@@ -745,7 +745,7 @@ private[parser] final class Parser(
         fail("Invalid group")
 
   private def addGroupName(name: String, start: Int): Unit =
-    val paths = groupNames.getOrElse(name, Seq.empty)
+    val paths = groupNames.getOrElse(name, Vector.empty)
     if !context.allowsDuplicatedGroupName then
       for path <- paths do
         val exclusive = path.exists: (id, index, isBranchReset) =>
