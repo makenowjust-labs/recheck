@@ -19,6 +19,7 @@ import codes.quine.labs.recheck.recall.RecallValidator
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.parser.Parser
 
 class ReDoSSuite extends munit.FunSuite:
 
@@ -346,4 +347,44 @@ class ReDoSSuite extends munit.FunSuite:
         )
         .toList,
       List(Diagnostics.Safe("^.*$", "", Dialect.JavaScript, AttackComplexity.Safe(true), Checker.Fuzz))
+    )
+
+  val MaxNestingDepth: Int = Parser.MaxNestingDepth
+
+  /** Patterns nested at the limit by each construct, which go through the deepest recursions of the analyses. */
+  val deeplyNested: Seq[(String, Dialect, Int => String)] = Seq(
+    ("groups", Dialect.JavaScript, n => "(" * n + "a*" + ")" * n),
+    ("alternatives", Dialect.JavaScript, n => "(?:a|" * n + "a*" + ")" * n),
+    ("repeated groups", Dialect.JavaScript, n => "(?:" * n + "a" + ")*" * n),
+    ("look-aheads", Dialect.JavaScript, n => "(?=" * n + "a" + ")" * n + "a*"),
+    ("look-behinds", Dialect.Java, n => "(?<=" * n + "a" + ")" * n + "a*"),
+    ("conditionals", Dialect.PCRE, n => "(a)" + "(?(1)" * n + "a*" + ")" * n),
+    ("Perl groups", Dialect.Perl(), n => "(?:" * n + "a*" + ")" * n),
+    ("classes", Dialect.Java, n => "[" * n + "a" + "]" * n + "*"),
+    ("repeats", Dialect.Ruby(), n => "a" + "*" * (n + 1))
+  )
+
+  for
+    (name, dialect, pattern) <- deeplyNested
+    checker <- Seq(Checker.Automaton, Checker.Fuzz)
+  do
+    test(s"ReDoS.check: $name nested at the limit in $dialect with the $checker checker"):
+      val diagnostics = ReDoS.check(
+        pattern(MaxNestingDepth),
+        "",
+        Parameters(checker = checker, dialect = dialect, timeout = 5.seconds)
+      )
+      assert(!clue(diagnostics).toString.contains("Too deeply nested"))
+
+  test("ReDoS.check: a pattern nested beyond the limit"):
+    val source = "(?:" * (MaxNestingDepth + 1) + "a" + ")" * (MaxNestingDepth + 1)
+    assertEquals(
+      ReDoS.check(source, ""),
+      Diagnostics.Unknown(
+        source,
+        "",
+        Dialect.JavaScript,
+        Diagnostics.ErrorKind.Unsupported(s"Too deeply nested (limit $MaxNestingDepth) at ${MaxNestingDepth * 3}"),
+        None
+      )
     )
