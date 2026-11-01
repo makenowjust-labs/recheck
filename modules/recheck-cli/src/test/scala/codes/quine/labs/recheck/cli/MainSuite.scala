@@ -233,8 +233,8 @@ class MainSuite extends munit.FunSuite:
       ("", "Invalid diagnostics: DecodingFailure at .attack: Missing required field\n", 1)
     )
     assertEquals(
-      error(js.mapObject(_.add("source", "(".asJson)).noSpaces)._2,
-      "Invalid pattern: Unclosed group at 1\n"
+      error(js.mapObject(_.add("flags", "z".asJson)).noSpaces)._2,
+      "Invalid flags: Unknown flag 'z' at 0\n"
     )
     assertEquals(
       error(js.mapObject(_.add("dialect", "cobol".asJson)).noSpaces),

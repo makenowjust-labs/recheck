@@ -23,6 +23,7 @@ import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.parser.SourcePrescan
 
 object IRBuilder:
 
@@ -87,6 +88,13 @@ object IRBuilder:
       mode,
       notEmpty(starts)
     )
+
+  /** Returns the unit of the input of the pattern, which is [[IRPattern.mode]] of its IR, without parsing the source.
+    *
+    * It reads only PCRE's start options of the source.
+    */
+  def unitMode(source: String, flagSet: FlagSet, dialect: Dialect): UnitMode =
+    unitMode(dialect, flagSet, dialect.isPCRE && SourcePrescan.from(source).hasUTFStartOption)
 
   /** Returns the unit of the input, where `utf` is PCRE's `(*UTF)` start option. */
   private def unitMode(dialect: Dialect, flagSet: FlagSet, utf: Boolean): UnitMode =
