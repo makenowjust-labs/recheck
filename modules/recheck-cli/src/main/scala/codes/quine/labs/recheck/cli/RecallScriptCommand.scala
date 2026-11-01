@@ -1,11 +1,14 @@
 package codes.quine.labs.recheck.cli
 
+import scala.util.Try
+
 import io.circe.Decoder
 import io.circe.parser.parse
 
-import codes.quine.labs.recheck.SourcePattern
+import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.codec.decodeAttackPattern
 import codes.quine.labs.recheck.codec.given
+import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.recall.RecallProgram
 import codes.quine.labs.resyntax.ast.Dialect
@@ -25,15 +28,12 @@ object RecallScriptCommand:
       source <- invalid(c.get[String]("source"))
       flags <- invalid(c.get[String]("flags"))
       dialect <- invalid(c.get[Dialect]("dialect"))
-      parsed <- SourcePattern
-        .parse(source, flags, dialect)
-        .left
+      ir <- Try(ReDoS.parse(source, flags, dialect)(using Context())).toEither.left
         .map(ex => s"Invalid pattern: ${ex.getMessage}")
-      (pattern, _) = parsed
-      style = AttackPattern.Style.of(dialect, pattern.mode)
-      attack <- invalid(c.get("attack")(using decodeAttackPattern(pattern.mode, style)))
+      style = AttackPattern.Style.of(dialect, ir.mode)
+      attack <- invalid(c.get("attack")(using decodeAttackPattern(ir.mode, style)))
       script <- RecallProgram
-        .script(pattern, attack)
+        .script(source, flags, dialect, ir.mode, attack)
         .toRight(unsupported(dialect))
     yield script
 

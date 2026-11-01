@@ -1,6 +1,6 @@
 package codes.quine.labs.recheck.vm
 
-import codes.quine.labs.recheck.SourcePattern
+import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.recheck.vm.Interpreter.Options
@@ -26,7 +26,7 @@ class InterpreterConstructSuite extends munit.FunSuite:
   given Conversion[Seq[Option[(Int, Int)]], Spans] = Some(_)
 
   def run(source: String, dialect: Dialect, input: String, usesAcceleration: Boolean): Spans =
-    val (_, ir) = SourcePattern.parse(source, "", dialect).toTry.get
+    val ir = ReDoS.parse(source, "", dialect)
     val program = ProgramBuilder.build(ir, dialect).get
     val result =
       Interpreter.run(program, UStringUtil.fromString(input), 0, Options(usesAcceleration = usesAcceleration))

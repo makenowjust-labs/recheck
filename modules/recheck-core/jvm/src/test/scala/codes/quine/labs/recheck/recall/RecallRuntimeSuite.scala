@@ -10,7 +10,6 @@ import scala.concurrent.Future
 import scala.concurrent.duration.*
 
 import codes.quine.labs.recheck.ReDoS
-import codes.quine.labs.recheck.SourcePattern
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
@@ -25,6 +24,7 @@ import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRNodeData
 
 /** Runs recall validation on the runtimes in `PATH`, which `mise install` provides.
@@ -59,8 +59,10 @@ class RecallRuntimeSuite extends munit.FunSuite:
       timeout: Duration = 1.second,
       env: Map[String, String] = Map.empty
   ): RecallValidation =
-    val pattern = SourcePattern.parse(source, flags, dialect).toTry.get._1
-    RecallValidator.validate(pattern, attack, timeout, env = env)(RecallValidator.defaultExec.get).get
+    val mode = ReDoS.parse(source, flags, dialect).mode
+    RecallValidator
+      .validate(source, flags, dialect, mode, attack, timeout, env = env)(RecallValidator.defaultExec.get)
+      .get
 
   /** Returns the path of the program in `PATH`. */
   def which(program: String): Path =
@@ -170,10 +172,11 @@ class RecallRuntimeSuite extends munit.FunSuite:
     assertFinish(r)
     assert(clue(r.runtime).startsWith("perl 5."))
     // A string pattern may contain `$`, which a regex literal would interpolate.
-    val pattern = SourcePattern.parse("^(?:a|a)*$x", "", Dialect.Perl(source = PerlSource.String)).toTry.get._1
-    val string = RecallValidator.validate(pattern, attack("a", 31, ""), 1.second)(
-      RecallValidator.defaultExec.get
-    )
+    val perlString = Dialect.Perl(source = PerlSource.String)
+    val string =
+      RecallValidator.validate("^(?:a|a)*$x", "", perlString, UnitMode.CodePoint, attack("a", 31, ""), 1.second)(
+        RecallValidator.defaultExec.get
+      )
     assertFinish(string.get)
 
   runtimeTest("Perl: the C locale", "perl"):
@@ -186,13 +189,13 @@ class RecallRuntimeSuite extends munit.FunSuite:
   runtimeTest("Perl: the character set rules of utf8", "perl"):
     // The program matches `0x80..0xFF` as recheck's character sets have them.
     def check(source: String, dialect: Dialect.Perl): Unit =
-      val (pattern, ir) = SourcePattern.parse(source, "", dialect).toTry.get
+      val ir = ReDoS.parse(source, "", dialect)
       def last(data: IRNodeData): CharSet = data match
         case IRNodeData.Chars(set)      => set
         case IRNodeData.Sequence(nodes) => last(nodes.last.data)
         case data                       => fail(s"Unexpected: $data")
       val modeled = (0x80 to 0xff).filter(last(ir.node.data).contains)
-      val program = RecallProgram.generate(pattern, attack("a", 1, "")).get
+      val program = RecallProgram.generate(source, "", dialect, ir.mode, attack("a", 1, "")).get
       val lines = program.script.linesIterator.toSeq
       val pragma = lines.filter(_ == "use utf8;")
       val regex = lines.find(_.startsWith("my $regex = ")).get
@@ -253,9 +256,10 @@ class RecallRuntimeSuite extends munit.FunSuite:
     )
   do
     runtimeTest(s"RecallProgram.script: $dialect", program):
-      val pattern = SourcePattern.parse("^(?:a|é|😀)*$", "", dialect).toTry.get._1
+      val source = "^(?:a|é|😀)*$"
+      val mode = ReDoS.parse(source, "", dialect).mode
       val astral = AttackPattern(Seq((UString.fromString("é"), UString.fromString("😀a"), 0)), UString(0), 3)
-      val out = runScript(RecallProgram.script(pattern, astral).get)
+      val out = runScript(RecallProgram.script(source, "", dialect, mode, astral).get)
       val lines = out.linesIterator.map(_.takeWhile(_ != ' ')).toSeq
       assertEquals(lines.filter(_.startsWith("recheck:")), Seq("recheck:runtime", "recheck:start", "recheck:time"))
 
@@ -316,9 +320,9 @@ class RecallRuntimeSuite extends munit.FunSuite:
     assert(clue(ds.last).isInstanceOf[Diagnostics.Safe])
 
   test("RecallValidator.validate: the deadline of the context"):
-    val pattern = SourcePattern.parse("foo", "", Dialect.JavaScript).toTry.get._1
     intercept[TimeoutException]:
-      RecallValidator.validate(pattern, attack("a", 1, ""), 50.millis) { (_, _, _, _) =>
-        Thread.sleep(100)
-        ExecResult.Timeout("")
+      RecallValidator.validate("foo", "", Dialect.JavaScript, UnitMode.UTF16, attack("a", 1, ""), 50.millis) {
+        (_, _, _, _) =>
+          Thread.sleep(100)
+          ExecResult.Timeout("")
       }(using Context(timeout = 50.millis))

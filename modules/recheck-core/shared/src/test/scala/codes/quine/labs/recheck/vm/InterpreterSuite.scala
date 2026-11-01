@@ -3,8 +3,9 @@ package codes.quine.labs.recheck.vm
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.MILLISECONDS
 import scala.language.implicitConversions
+import scala.util.Try
 
-import codes.quine.labs.recheck.SourcePattern
+import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.recheck.vm.Inst.ReadKind
@@ -14,6 +15,7 @@ import codes.quine.labs.recheck.vm.Interpreter.FailedPoint
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
+import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
@@ -28,8 +30,8 @@ class InterpreterSuite extends munit.FunSuite:
 
   def matches(source: String, flags: String, input: String, pos: Int, opts: Options): Result =
     val t = for
-      (pattern, ir) <- SourcePattern.parse(source, flags).toTry
-      program <- ProgramBuilder.build(ir, pattern.dialect)
+      ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
+      program <- ProgramBuilder.build(ir, Dialect.JavaScript)
       result = Interpreter.run(program, UStringUtil.fromString(input), pos, opts)
     yield result
     t.get
@@ -299,8 +301,8 @@ class InterpreterSuite extends munit.FunSuite:
         timeout: Duration
     )(using ctx: Context): Result =
       val t = for
-        (pattern, ir) <- SourcePattern.parse(source, flags).toTry
-        program <- ProgramBuilder.build(ir, pattern.dialect)
+        ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
+        program <- ProgramBuilder.build(ir, Dialect.JavaScript)
         result = Interpreter.runWithTimeout(program, UStringUtil.fromString(input), pos, opts, timeout)
       yield result
       t.get

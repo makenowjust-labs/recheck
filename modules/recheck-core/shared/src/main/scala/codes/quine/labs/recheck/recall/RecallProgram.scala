@@ -1,6 +1,5 @@
 package codes.quine.labs.recheck.recall
 
-import codes.quine.labs.recheck.SourcePattern
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.exec.DotNetExecutor
 import codes.quine.labs.recheck.exec.Executor
@@ -41,16 +40,24 @@ object RecallProgram:
 
   val EngineErrorLine: String = "recheck:engine-error"
 
-  /** Generates the program of the dialect, or returns `None` if the dialect or the pattern is not supported. */
-  def generate(pattern: SourcePattern, attack: AttackPattern): Option[RecallProgram] =
-    pattern.dialect match
-      case Dialect.JavaScript        => Some(javascript(pattern, attack))
-      case _: Dialect.Python         => Some(python(pattern, attack))
-      case _: Dialect.Ruby           => Some(ruby(pattern, attack))
-      case Dialect.Java              => Some(java(pattern, attack))
-      case Dialect.DotNet            => Some(dotnet(pattern, attack))
-      case perlDialect: Dialect.Perl => perl(pattern, perlDialect, attack)
-      case Dialect.PCRE              => php(pattern, attack)
+  /** Generates the program of the pattern in the dialect, which matches strings of the mode, or returns `None` if the
+    * pattern cannot be put in the program.
+    */
+  def generate(
+      source: String,
+      flags: String,
+      dialect: Dialect,
+      mode: UnitMode,
+      attack: AttackPattern
+  ): Option[RecallProgram] =
+    dialect match
+      case Dialect.JavaScript        => Some(javascript(source, flags, attack))
+      case _: Dialect.Python         => Some(python(source, flags, mode, attack))
+      case _: Dialect.Ruby           => Some(ruby(source, flags, mode, attack))
+      case Dialect.Java              => Some(java(source, flags, attack))
+      case Dialect.DotNet            => Some(dotnet(source, flags, attack))
+      case perlDialect: Dialect.Perl => perl(source, flags, perlDialect, mode, attack)
+      case Dialect.PCRE              => php(source, flags, mode, attack)
 
   /** Script is a program of [[generate]] as a standalone file named `name`, which has the data of the program in
     * itself.
@@ -60,12 +67,18 @@ object RecallProgram:
   final case class Script(name: String, command: String, content: String)
 
   /** Generates the program of [[generate]] as a standalone file, or returns `None` as [[generate]] does. */
-  def script(pattern: SourcePattern, attack: AttackPattern): Option[Script] =
-    generate(pattern, attack).map: program =>
-      val name = scriptName(pattern.dialect)
+  def script(
+      source: String,
+      flags: String,
+      dialect: Dialect,
+      mode: UnitMode,
+      attack: AttackPattern
+  ): Option[Script] =
+    generate(source, flags, dialect, mode, attack).map: program =>
+      val name = scriptName(dialect)
       val command = program.executor.scriptCommandLine(name)
       val php = "<?php\n"
-      val content = pattern.dialect match
+      val content = dialect match
         case Dialect.Java       => s"// Run: $command\n" + javaProgram(javaString(program.script))
         case Dialect.DotNet     => s"// Run: $command\n" + dotnetProgram(quote(program.script))
         case Dialect.PCRE       => s"$php// Run: $command\n" + program.script.stripPrefix(php)
@@ -98,14 +111,14 @@ object RecallProgram:
   private def quote(data: String): String = "\"" + data.replace("\n", "\\n") + "\""
 
   /** Returns the JavaScript program for `node`. */
-  private[recall] def javascript(pattern: SourcePattern, attack: AttackPattern): RecallProgram =
-    val source = UStringUtil.show(UStringUtil.fromString(pattern.source))
-    val flags = UStringUtil.show(UStringUtil.fromString(pattern.flags))
+  private[recall] def javascript(source: String, flags: String, attack: AttackPattern): RecallProgram =
+    val sourceString = UStringUtil.show(UStringUtil.fromString(source))
+    val flagsString = UStringUtil.show(UStringUtil.fromString(flags))
     // `process.stdout` may write to a pipe asynchronously, so it uses `writeSync`.
     val script =
       s"""|const { writeSync } = require('node:fs');
           |writeSync(1, '$RuntimeLine node ' + process.version + '\\n');
-          |const re = new RegExp($source, $flags);
+          |const re = new RegExp($sourceString, $flagsString);
           |const input = ${attack.toString(AttackPattern.JavaScript)};
           |writeSync(1, '$StartLine\\n');
           |const start = performance.now();
@@ -121,21 +134,21 @@ object RecallProgram:
     RecallProgram(NodeExecutor, script)
 
   /** Returns the Python program for `python3`, using `re.search` in the C locale. */
-  private[recall] def python(pattern: SourcePattern, attack: AttackPattern): RecallProgram =
-    val bytes = pattern.mode == UnitMode.Byte
+  private[recall] def python(source: String, flags: String, mode: UnitMode, attack: AttackPattern): RecallProgram =
+    val bytes = mode == UnitMode.Byte
     val style = AttackPattern.Python(bytes)
     // A bytes pattern is the Latin-1 encoding of the source.
-    val source =
-      if bytes then style.literal(UString.from(pattern.source.iterator.flatMap(c => utf8OrLatin1(c.toInt))))
-      else style.literal(UStringUtil.fromString(pattern.source))
-    val flags = pattern.flags.distinct.collect:
+    val pattern =
+      if bytes then style.literal(UString.from(source.iterator.flatMap(c => utf8OrLatin1(c.toInt))))
+      else style.literal(UStringUtil.fromString(source))
+    val options = flags.distinct.collect:
       case c @ ('i' | 'm' | 's' | 'x' | 'a' | 'u' | 'L') => s"re.${c.toUpper}"
     val input = attack.toString(style)
     val script =
       s"""|import locale, platform, re, sys, time
           |locale.setlocale(locale.LC_ALL, 'C')
           |sys.stdout.write('$RuntimeLine python ' + platform.python_version() + '\\n')
-          |regex = re.compile($source, ${union(flags, "0")})
+          |regex = re.compile($pattern, ${union(options, "0")})
           |string = $input
           |sys.stdout.write('$StartLine\\n')
           |sys.stdout.flush()
@@ -150,19 +163,19 @@ object RecallProgram:
     RecallProgram(PythonExecutor, script)
 
   /** Returns the Ruby program for `ruby`, using `Regexp#match?` without `Regexp.timeout`. */
-  private[recall] def ruby(pattern: SourcePattern, attack: AttackPattern): RecallProgram =
-    val bytes = pattern.mode == UnitMode.Byte
+  private[recall] def ruby(source: String, flags: String, mode: UnitMode, attack: AttackPattern): RecallProgram =
+    val bytes = mode == UnitMode.Byte
     val style = AttackPattern.Ruby(bytes)
-    val source = style.literal(sourceString(pattern.source, bytes))
+    val pattern = style.literal(sourceString(source, bytes))
     // The character set options `a`, `d` and `u` have no `Regexp` option, but have the inline options, the last of
     // which wins.
-    val prefix = pattern.flags.findLast(c => "adu".contains(c)).fold("")(c => s"(?$c)")
-    val options = pattern.flags.distinct.collect:
+    val prefix = flags.findLast(c => "adu".contains(c)).fold("")(c => s"(?$c)")
+    val options = flags.distinct.collect:
       case 'i' => "Regexp::IGNORECASE"
       case 'm' => "Regexp::MULTILINE"
       case 'x' => "Regexp::EXTENDED"
       case 'n' => "Regexp::NOENCODING"
-    val regex = if prefix.isEmpty then source else s"${style.literal(UStringUtil.fromString(prefix))} + $source"
+    val regex = if prefix.isEmpty then pattern else s"${style.literal(UStringUtil.fromString(prefix))} + $pattern"
     val input = attack.toString(style)
     val script =
       s"""|$$stdout.sync = true
@@ -183,9 +196,9 @@ object RecallProgram:
     RecallProgram(RubyExecutor, script)
 
   /** Returns the data for the Java program for `java` as a single-file source program, using `Matcher#find`. */
-  private[recall] def java(pattern: SourcePattern, attack: AttackPattern): RecallProgram =
-    val flags = pattern.flags.distinct.filter(c => "cdimsuxU".contains(c))
-    RecallProgram(JavaExecutor(JavaSource), data(flags, pattern, attack))
+  private[recall] def java(source: String, flags: String, attack: AttackPattern): RecallProgram =
+    val options = flags.distinct.filter(c => "cdimsuxU".contains(c))
+    RecallProgram(JavaExecutor(JavaSource), data(options, source, attack))
 
   /** The Java program, which reads the data of [[data]] from the standard input. */
   private[recall] val JavaSource: SourceFile =
@@ -244,9 +257,9 @@ object RecallProgram:
   /** Returns the data for the C# program for `dotnet run` (.NET 10 or later), using `Regex.Match` in the invariant
     * culture.
     */
-  private[recall] def dotnet(pattern: SourcePattern, attack: AttackPattern): RecallProgram =
-    val flags = pattern.flags.distinct.filter(c => "imnsx".contains(c))
-    RecallProgram(DotNetExecutor(DotNetSource), data(flags, pattern, attack))
+  private[recall] def dotnet(source: String, flags: String, attack: AttackPattern): RecallProgram =
+    val options = flags.distinct.filter(c => "imnsx".contains(c))
+    RecallProgram(DotNetExecutor(DotNetSource), data(options, source, attack))
 
   /** The C# program, which reads the data of [[data]] from the standard input. */
   private[recall] val DotNetSource: SourceFile =
@@ -311,15 +324,15 @@ object RecallProgram:
     * the part separated by `:`. The flags and the pattern are `-` if they are empty. The pattern and the parts are the
     * hexadecimal digits of the UTF-16 code units, four for each.
     */
-  private[recall] def data(flags: String, pattern: SourcePattern, attack: AttackPattern): String =
+  private[recall] def data(flags: String, source: String, attack: AttackPattern): String =
     def units(cs: Iterator[Int]): String =
       cs.flatMap(c => if c > 0xffff then UString(c).encode(UnitMode.UTF16).iterator else Iterator(c))
         .map(hex(_, 4))
         .mkString
-    val source = units(pattern.source.iterator.map(_.toInt))
+    val pattern = units(source.iterator.map(_.toInt))
     val lines = Seq.newBuilder[String]
     lines.addOne(if flags.isEmpty then "-" else flags)
-    lines.addOne(if source.isEmpty then "-" else source)
+    lines.addOne(if pattern.isEmpty then "-" else pattern)
     for (s, t, m) <- attack.pumps do
       if s.nonEmpty then lines.addOne(s"1:${units(s.iterator)}")
       lines.addOne(s"${math.max(0, attack.n + m)}:${units(t.iterator)}")
@@ -333,24 +346,26 @@ object RecallProgram:
     * `qr` at runtime.
     */
   private[recall] def perl(
-      pattern: SourcePattern,
+      source: String,
+      flags: String,
       dialect: Dialect.Perl,
+      mode: UnitMode,
       attack: AttackPattern
   ): Option[RecallProgram] =
     // `qr` takes only these modifiers, and the others do not change a match.
-    val flags = pattern.flags.filter(c => "msixpodualn".contains(c))
-    val bytes = pattern.mode == UnitMode.Byte
+    val modifiers = flags.filter(c => "msixpodualn".contains(c))
+    val bytes = mode == UnitMode.Byte
     // Character strings are UTF-8 and byte strings are not, which decides Perl's `/d` rules.
     def flag(name: String): String = if bytes then s"utf8::downgrade($$$name, 1)" else s"utf8::upgrade($$$name)"
     val regex =
       if dialect.source == PerlSource.Literal then
         for
-          _ <- Option.when(isPerlSafe(pattern.source))(())
-          delimiter <- PerlDelimiters.find(c => !pattern.source.contains(c))
-        yield s"qr$delimiter${pattern.source}$delimiter$flags"
+          _ <- Option.when(isPerlSafe(source))(())
+          delimiter <- PerlDelimiters.find(c => !source.contains(c))
+        yield s"qr$delimiter$source$delimiter$modifiers"
       else
-        val source = AttackPattern.Perl.literal(sourceString(pattern.source, bytes))
-        Some(s"do { my $$pattern = $source; ${flag("pattern")}; qr/$$pattern/$flags }")
+        val pattern = AttackPattern.Perl.literal(sourceString(source, bytes))
+        Some(s"do { my $$pattern = $pattern; ${flag("pattern")}; qr/$$pattern/$modifiers }")
     regex.map: regex =>
       val input = attack.toString(AttackPattern.Perl)
       val pragma = if bytes then "" else "use utf8;\n"
@@ -397,13 +412,12 @@ object RecallProgram:
     * PHP's backtrack limit makes a slow match fail, which is an engine limit. The recursion limit (PCRE2's depth limit)
     * and the JIT stack limit are on the depth of backtracking, which are engine errors.
     */
-  private[recall] def php(pattern: SourcePattern, attack: AttackPattern): Option[RecallProgram] =
+  private[recall] def php(source: String, flags: String, mode: UnitMode, attack: AttackPattern): Option[RecallProgram] =
     PHPDelimiters
-      .find(c => !pattern.source.contains(c))
+      .find(c => !source.contains(c))
       .map: delimiter =>
-        val bytes = pattern.mode == UnitMode.Byte
-        val regex =
-          AttackPattern.PHP().literal(UStringUtil.fromString(s"$delimiter${pattern.source}$delimiter${pattern.flags}"))
+        val bytes = mode == UnitMode.Byte
+        val regex = AttackPattern.PHP().literal(UStringUtil.fromString(s"$delimiter$source$delimiter$flags"))
         val input = attack.toString(AttackPattern.PHP(bytes))
         val script =
           s"""|<?php

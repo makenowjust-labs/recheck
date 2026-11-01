@@ -24,7 +24,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
 
   /** Builds an ε-NFA from the source, without the locations of transitions. */
   def build(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): Try[EpsNFA[Int]] =
-    val (pattern, ir) = SourcePattern.parse(source, flags, dialect).toTry.get
+    val ir = ReDoS.parse(source, flags, dialect)
     EpsNFABuilder
       .build(ir)
       .map: nfa =>
@@ -289,8 +289,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   def searches(source: String, flags: String, dialect: Dialect, input: String): Boolean =
     val nfa = build(source, flags, dialect).get.toOrderedNFA
     val units =
-      if SourcePattern.parse(source, flags, dialect).toTry.get._1.mode == UnitMode.CodePoint then
-        UString.fromString(input).iterator.toSeq
+      if ReDoS.parse(source, flags, dialect).mode == UnitMode.CodePoint then UString.fromString(input).iterator.toSeq
       else input.map(_.toInt)
     val last = units.foldLeft(nfa.inits.toSet): (qs, c) =>
       qs.flatMap(q => nfa.delta.collect { case ((p, a), ps) if p == q && a.contains(c) => ps }.flatten)

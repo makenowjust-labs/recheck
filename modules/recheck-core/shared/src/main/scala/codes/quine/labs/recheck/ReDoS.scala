@@ -10,6 +10,7 @@ import codes.quine.labs.recheck.automaton.EpsNFABuilder
 import codes.quine.labs.recheck.common.CancellationToken
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.ReDoSException
 import codes.quine.labs.recheck.common.UnsupportedException
@@ -23,7 +24,17 @@ import codes.quine.labs.recheck.recall.RecallValidator
 import codes.quine.labs.recheck.util.DiagnosticsIteratorUtil.recovering
 import codes.quine.labs.recheck.util.DiagnosticsIteratorUtil.tagging
 import codes.quine.labs.recheck.util.DiagnosticsIteratorUtil.takeUntilAccepted
+import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.FlagSet
+import codes.quine.labs.resyntax.ast.FlagSetException
+import codes.quine.labs.resyntax.ast.Node
+import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRPattern
+import codes.quine.labs.resyntax.ir.build.IRBuilder
+import codes.quine.labs.resyntax.ir.build.IRBuildingException
+import codes.quine.labs.resyntax.parser.NestingLimitException
+import codes.quine.labs.resyntax.parser.Parser
+import codes.quine.labs.resyntax.parser.ParsingException
 
 /** ReDoS is a ReDoS checker frontend. */
 object ReDoS:
@@ -74,16 +85,15 @@ object ReDoS:
     given ctx: Context = Context(params.timeout, token, params.logger)
 
     def ds: Iterator[Diagnostics] =
-      ctx.log("parse: start")
-      val (pattern, ir) = ctx.interrupt(SourcePattern.parse(source, flags, params.dialect).toTry.get)
-      ctx.log(s"parse: finish\n  pattern: $pattern")
+      val ir = parse(source, flags, params.dialect)
+      val style = AttackPattern.Style.of(params.dialect, ir.mode)
       val failures = mutable.Set.empty[RecallKey]
       val failed = (c: AttackComplexity.Vulnerable, h: Hotspot) => failures.contains(RecallKey(c, h))
       val candidates = params.checker match
-        case Checker.Automaton => checkAutomaton(pattern, ir, params)
-        case Checker.Fuzz      => checkFuzz(pattern, ir, params, failed)
-        case Checker.Auto      => checkAuto(pattern, ir, params, failed)
-      val validate = recallValidation(pattern, params.recallTimeout, exec, env)
+        case Checker.Automaton => checkAutomaton(source, flags, ir, style, params)
+        case Checker.Fuzz      => checkFuzz(source, flags, ir, style, params, failed)
+        case Checker.Auto      => checkAuto(source, flags, ir, style, params, failed)
+      val validate = recallValidation(source, flags, params.dialect, ir.mode, params.recallTimeout, exec, env)
       candidates.flatMap:
         case d: Diagnostics.Vulnerable =>
           val key = RecallKey(d.complexity, d.hotspot)
@@ -112,6 +122,33 @@ object ReDoS:
       case ex: ReDoSException => Iterator(Diagnostics.Unknown.from(source, flags, params.dialect, ex))
     takeUntilAccepted(all)
 
+  /** Parses the pattern and the flags in the dialect, and builds its IR.
+    *
+    * It throws [[InvalidRegExpException]] on an invalid pattern, and [[UnsupportedException]] on a pattern nested
+    * deeper than [[Parser.MaxNestingDepth]].
+    */
+  private[recheck] def parse(source: String, flags: String, dialect: Dialect)(using ctx: Context): IRPattern =
+    ctx.log("parse: start")
+    val flagSet = ctx.interrupt(parseFlags(flags, dialect))
+    val node = ctx.interrupt(parseSource(source, flagSet, dialect))
+    val ir = ctx.interrupt(buildIR(node, flagSet, dialect))
+    ctx.log(s"parse: finish\n  pattern: /$source/$flags")
+    ir
+
+  private def parseFlags(flags: String, dialect: Dialect): FlagSet =
+    try FlagSet.parse(flags, dialect)
+    catch case ex: FlagSetException => throw new InvalidRegExpException(ex.getMessage)
+
+  private def parseSource(source: String, flagSet: FlagSet, dialect: Dialect): Node =
+    try Parser.parse(source, flagSet, dialect)
+    catch
+      case ex: ParsingException      => throw new InvalidRegExpException(ex.getMessage)
+      case ex: NestingLimitException => throw new UnsupportedException(ex.getMessage)
+
+  private def buildIR(node: Node, flagSet: FlagSet, dialect: Dialect): IRPattern =
+    try IRBuilder.build(node, flagSet, dialect)
+    catch case ex: IRBuildingException => throw new InvalidRegExpException(ex.getMessage)
+
   /** RecallKey identifies an attack on recall validation by the degree of the polynomial complexity (or `None` for the
     * exponential one) and the hotspot.
     */
@@ -126,12 +163,13 @@ object ReDoS:
 
   /** Iterates the diagnostics of the automaton checker, ending with the safe one. */
   private[recheck] def checkAutomaton(
-      pattern: SourcePattern,
+      source: String,
+      flags: String,
       ir: IRPattern,
+      style: AttackPattern.Style,
       params: Parameters
   )(using ctx: Context): Iterator[Diagnostics] = tagging(Checker.Automaton):
     import params.*
-    import pattern.{source, flags}
     val maxNFASize = if checker == Checker.Auto then params.maxNFASize else Int.MaxValue
 
     val complexities =
@@ -152,7 +190,7 @@ object ReDoS:
 
     complexities.map:
       case vul: Complexity.Vulnerable[Int] =>
-        val attack = vul.buildAttackPattern(recallLimit, maxRecallStringSize).copy(style = attackStyle(pattern))
+        val attack = vul.buildAttackPattern(recallLimit, maxRecallStringSize).copy(style = style)
         Diagnostics.Vulnerable(
           source,
           flags,
@@ -172,16 +210,17 @@ object ReDoS:
     * checker avoids.
     */
   private[recheck] def checkFuzz(
-      pattern: SourcePattern,
+      source: String,
+      flags: String,
       ir: IRPattern,
+      style: AttackPattern.Style,
       params: Parameters,
       failed: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
   )(using ctx: Context): Iterator[Diagnostics] = tagging(Checker.Fuzz):
     import params._
-    import pattern.{source, flags}
 
     val random = new Random(randomSeed)
-    val fuzz = FuzzProgram.from(ir, pattern.dialect).get
+    val fuzz = FuzzProgram.from(ir, dialect).get
     val results = FuzzChecker.check(
       ir,
       fuzz,
@@ -210,30 +249,31 @@ object ReDoS:
     results.map:
       case (complexity, attack, hotspot) =>
         val recallAttack =
-          attack.adjust(complexity, recallLimit, maxRecallStringSize).copy(style = attackStyle(pattern))
+          attack.adjust(complexity, recallLimit, maxRecallStringSize).copy(style = style)
         Diagnostics.Vulnerable(source, flags, params.dialect, complexity, recallAttack, hotspot, Checker.Fuzz)
     ++ Iterator(Diagnostics.Safe(source, flags, params.dialect, AttackComplexity.Safe(true), Checker.Fuzz))
 
   /** Iterates the diagnostics of the automaton checker, or of the fuzz checker if the automaton checker gives up. */
   private[recheck] def checkAuto(
-      pattern: SourcePattern,
+      source: String,
+      flags: String,
       ir: IRPattern,
+      style: AttackPattern.Style,
       params: Parameters,
       failed: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
   )(using ctx: Context): Iterator[Diagnostics] =
-    recovering(checkAutomaton(pattern, ir, params)):
-      case _: UnsupportedException => checkFuzz(pattern, ir, params, failed)
-
-  /** Returns the style of the attack strings of the pattern, which is the host language of its dialect. */
-  private[recheck] def attackStyle(pattern: SourcePattern): AttackPattern.Style =
-    AttackPattern.Style.of(pattern.dialect, pattern.mode)
+    recovering(checkAutomaton(source, flags, ir, style, params)):
+      case _: UnsupportedException => checkFuzz(source, flags, ir, style, params, failed)
 
   /** Runs recall validation against a vulnerable diagnostics, and records the result in it.
     *
     * It runs on the runtime of the dialect when this platform can run it.
     */
   private[recheck] def recallValidation(
-      pattern: SourcePattern,
+      source: String,
+      flags: String,
+      dialect: Dialect,
+      mode: UnitMode,
       timeout: Duration,
       exec: Option[RecallValidator.Exec],
       env: Map[String, String]
@@ -242,7 +282,10 @@ object ReDoS:
   )(using ctx: Context): Diagnostics.Vulnerable =
     exec match
       case Some(exec) =>
-        try d.copy(recallValidation = RecallValidator.validate(pattern, d.attack, timeout, env)(exec))
+        try
+          d.copy(recallValidation =
+            RecallValidator.validate(source, flags, dialect, mode, d.attack, timeout, env)(exec)
+          )
         catch
           case ex: ReDoSException =>
             ex.checker = Some(if d.checker == Checker.Fuzz then Checker.Fuzz else Checker.Automaton)

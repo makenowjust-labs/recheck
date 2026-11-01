@@ -4,7 +4,6 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
 
-import codes.quine.labs.recheck.SourcePattern
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
@@ -12,6 +11,8 @@ import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.recheck.exec.Executor
+import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.charset.UnitMode
 
 /** RecallValidator is the implementation of recall validation. */
 object RecallValidator:
@@ -25,7 +26,8 @@ object RecallValidator:
       executor.exec(script, timeout, Some(RecallProgram.StartLine), env)
     )
 
-  /** Runs the recall validation of the attack string on the runtime of the pattern's dialect.
+  /** Runs the recall validation of the attack string on the runtime of the dialect, where the pattern matches strings
+    * of the mode.
     *
     * It returns `None` without running when the timeout is not positive, or the dialect or the pattern is not
     * supported. It throws [[UnexpectedException]] when the runtime fails to run the program.
@@ -33,7 +35,10 @@ object RecallValidator:
     * The environment variables `env` may replace the command of the runtime (e.g. `RECHECK_NODE`).
     */
   def validate(
-      pattern: SourcePattern,
+      source: String,
+      flags: String,
+      dialect: Dialect,
+      mode: UnitMode,
       attack: AttackPattern,
       timeout: Duration,
       env: Map[String, String] = Map.empty
@@ -42,7 +47,7 @@ object RecallValidator:
   )(using ctx: Context): Option[RecallValidation] = ctx.interrupt:
     if timeout <= Duration.Zero then None
     else
-      RecallProgram.generate(pattern, attack) match
+      RecallProgram.generate(source, flags, dialect, mode, attack) match
         case None =>
           ctx.log("recall: not supported")
           None

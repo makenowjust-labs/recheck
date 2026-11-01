@@ -9,6 +9,7 @@ import codes.quine.labs.recheck.automaton.Complexity.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.Hotspot.*
+import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 
@@ -20,7 +21,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
   /** Runs a checker against the RegExp. */
   def check(source: String, flags: String): Try[Complexity[CharSet]] =
     for
-      (pattern, ir) <- SourcePattern.parse(source, flags).toTry
+      ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
       epsNFA <- EpsNFABuilder.build(ir)
       nfa = epsNFA.toOrderedNFA.rename
       result <- Try(AutomatonChecker.check(nfa).nextOption().getOrElse(Complexity.Constant))

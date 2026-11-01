@@ -26,16 +26,16 @@ class ReDoSSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
   def checkAutomaton(source: String, flags: String, params: Parameters): Iterator[Diagnostics] =
-    val (pattern, ir) = SourcePattern.parse(source, flags, params.dialect).toTry.get
-    ReDoS.checkAutomaton(pattern, ir, params)
+    val ir = ReDoS.parse(source, flags, params.dialect)
+    ReDoS.checkAutomaton(source, flags, ir, AttackPattern.Style.of(params.dialect, ir.mode), params)
 
   def checkFuzz(source: String, flags: String, params: Parameters)(using ctx: Context): Iterator[Diagnostics] =
-    val (pattern, ir) = SourcePattern.parse(source, flags, params.dialect).toTry.get
-    ReDoS.checkFuzz(pattern, ir, params)
+    val ir = ReDoS.parse(source, flags, params.dialect)(using Context())
+    ReDoS.checkFuzz(source, flags, ir, AttackPattern.Style.of(params.dialect, ir.mode), params)
 
   def checkAuto(source: String, flags: String, params: Parameters): Iterator[Diagnostics] =
-    val (pattern, ir) = SourcePattern.parse(source, flags, params.dialect).toTry.get
-    ReDoS.checkAuto(pattern, ir, params)
+    val ir = ReDoS.parse(source, flags, params.dialect)
+    ReDoS.checkAuto(source, flags, ir, AttackPattern.Style.of(params.dialect, ir.mode), params)
 
   test("ReDoS.check"):
     assertEquals(
