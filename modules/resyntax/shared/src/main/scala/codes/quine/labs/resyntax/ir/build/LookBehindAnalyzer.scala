@@ -12,10 +12,12 @@ import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ast.Reference
-import codes.quine.labs.resyntax.ir.build.LookBehindChecker.*
+import codes.quine.labs.resyntax.ir.build.LookBehindAnalyzer.*
 
-/** LookBehindChecker checks the dialect's restriction on a look-behind body. */
-private[build] final class LookBehindChecker(
+/** LookBehindAnalyzer computes the widths of a look-behind body, which decide whether the dialect accepts it and how
+  * the engine matches it.
+  */
+private[build] final class LookBehindAnalyzer(
     table: CaptureTable,
     resolver: ReferenceResolver,
     featureSet: IRFeatureSet,
@@ -30,7 +32,8 @@ private[build] final class LookBehindChecker(
     rubyClassWidths: Node => Option[Seq[Int]]
 ):
 
-  def check(lookBehind: Node, body: Node, negative: Boolean): Unit =
+  /** Throws [[IRBuildingException]] if the dialect does not accept the look-behind. */
+  def requireAccepted(lookBehind: Node, body: Node, negative: Boolean): Unit =
     featureSet.lookBehindRule match
       case IRLookBehindRule.Unrestricted => ()
       case IRLookBehindRule.Java         =>
@@ -372,7 +375,7 @@ private[build] final class LookBehindChecker(
   private def fail(message: String, node: Node): Nothing =
     throw new IRBuildingException(message, node.loc)
 
-private[build] object LookBehindChecker:
+private[build] object LookBehindAnalyzer:
 
   val Inf: Long = Long.MaxValue
 
