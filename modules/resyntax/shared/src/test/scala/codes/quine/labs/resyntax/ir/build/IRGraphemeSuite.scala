@@ -13,7 +13,7 @@ class IRGraphemeSuite extends munit.FunSuite:
 
   def build(s: String, flags: String, dialect: Dialect): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)
-    IRBuilder.build(Parser.parse(s, flagSet, dialect), flagSet, dialect)
+    IRBuilder.build(Parser.parse(s, flagSet, dialect), flagSet, dialect, Parser.determineUnitMode(s, flagSet, dialect))
 
   /** Returns the end positions of the matches of a node from a position, in the backtracking order. */
   def ends(node: IRNode, input: IndexedSeq[Int], pos: Int): LazyList[Int] = node.data match

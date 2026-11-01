@@ -23,25 +23,26 @@ import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.UnitMode
-import codes.quine.labs.resyntax.parser.Parser
 
 object IRBuilder:
 
   /** Throws [[IRBuildingException]] for an error that needs the whole pattern (e.g. a reference to a non-existent
     * group, or a look-behind that the dialect does not allow).
+    *
+    * The unit mode is the one that `Parser.determineUnitMode` determines for the source of the node.
     */
-  def build(node: Node, flagSet: FlagSet, dialect: Dialect): IRPattern =
-    build(node, flagSet, dialect, None)
+  def build(node: Node, flagSet: FlagSet, dialect: Dialect, mode: UnitMode): IRPattern =
+    build(node, flagSet, dialect, mode, None)
 
   private[build] def build(
       node: Node,
       flagSet: FlagSet,
       dialect: Dialect,
+      mode: UnitMode,
       resolveCharacter: Option[(Node, IRCharFlags) => IRNodeData]
   ): IRPattern =
     val starts = startOptions(node)
     val featureSet = IRFeatureSet.from(flagSet, dialect, starts)
-    val mode = Parser.determineUnitMode(flagSet, dialect, featureSet.utf)
     if dialect.isPython && mode == UnitMode.CodePoint && flagSet.localeUpper then
       throw new IRBuildingException("Cannot use LOCALE flag with a str pattern", SourceLocation.Invalid)
     if dialect.isPython && mode == UnitMode.Byte && flagSet.unicode then

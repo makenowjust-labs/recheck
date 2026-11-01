@@ -87,10 +87,6 @@ object Parser:
     * It reads only PCRE's start options of the source.
     */
   def determineUnitMode(source: String, flagSet: FlagSet, dialect: Dialect): UnitMode =
-    determineUnitMode(flagSet, dialect, dialect.isPCRE && SourcePrescan.from(source).hasUTFStartOption)
-
-  /** Determines the unit of the input, where `hasUTFStartOption` is whether PCRE's `(*UTF)` starts the pattern. */
-  private[resyntax] def determineUnitMode(flagSet: FlagSet, dialect: Dialect, hasUTFStartOption: Boolean): UnitMode =
     dialect match
       case Dialect.JavaScript =>
         if flagSet.unicode || flagSet.unicodeSets then UnitMode.CodePoint else UnitMode.UTF16
@@ -104,7 +100,8 @@ object Parser:
         if flagSet.explicitCapture || encoding == Dialect.Ruby.Encoding.ASCII8Bit then UnitMode.Byte
         else UnitMode.CodePoint
       case Dialect.Perl(utf8, _) => if utf8 then UnitMode.CodePoint else UnitMode.Byte
-      case Dialect.PCRE          => if flagSet.unicode || hasUTFStartOption then UnitMode.CodePoint else UnitMode.Byte
+      case Dialect.PCRE          =>
+        if flagSet.unicode || SourcePrescan.from(source).hasUTFStartOption then UnitMode.CodePoint else UnitMode.Byte
 
   private def validateEncoding(source: String, encoding: SourceEncoding): Unit =
     if encoding == SourceEncoding.Latin1 then
