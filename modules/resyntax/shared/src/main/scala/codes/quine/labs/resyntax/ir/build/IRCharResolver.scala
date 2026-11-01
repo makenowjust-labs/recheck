@@ -712,7 +712,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
         case _: Dialect.Perl if name == "upper" || name == "lower" => classes.perlCased(flags).restrict(mode)
         // PCRE matches both cases with them in ASCII (not in UCP mode).
         case Dialect.PCRE if (name == "upper" || name == "lower") && restricted.last < 0x80 =>
-          restricted.union(IRCharClasses.ASCIIPOSIX(if name == "upper" then "lower" else "upper"))
+          restricted.union(IRCharClasses.ASCII_POSIX(if name == "upper" then "lower" else "upper"))
         case _: Dialect.Ruby => equivalence(flags).closure(restricted)
         case _               => restricted
 

@@ -132,7 +132,7 @@ class IRCharSuite extends munit.FunSuite:
     assertEquals(set("\\xe9"), CharSet.single(0xe9))
     // Its non-ASCII literals are bytes, which do not make the pattern use Unicode rules.
     val Sequence(nodes) = build("é\\w", "", Perl(utf8 = false)).node.data: @unchecked
-    assertEquals(nodes.last.data, Chars(IRCharClasses.ASCIIPOSIX("word")))
+    assertEquals(nodes.last.data, Chars(IRCharClasses.ASCII_POSIX("word")))
   // Perl reads the bytes of a byte string as Latin-1 characters, so a pattern switching `/d` to Unicode rules (e.g. by
   // `\x{100}`) has the rules of `0x80..0xFF` of the text strings (checked against Perl 5.44).
   for
@@ -179,7 +179,7 @@ class IRCharSuite extends munit.FunSuite:
   chars("é", "", Python(Python.Type.Bytes))(CharSet.single(0xe9))
   // Ruby's ASCII-8BIT regexp has only the POSIX classes in ASCII as properties.
   chars("\\p{Alpha}", "n", Ruby())(CharSet.range('A', 'Z').union(CharSet.range('a', 'z')))
-  chars("\\p{Punct}", "n", Ruby())(IRCharClasses.ASCIIPOSIX("punct"))
+  chars("\\p{Punct}", "n", Ruby())(IRCharClasses.ASCII_POSIX("punct"))
   chars("\\P{Space}", "n", Ruby())(of(" \t\n\u000b\f\r").complement(UnitMode.Byte))
   error("\\p{L}", "n", Ruby())("Unknown Unicode property name at 0")
   error("\\p{Any}", "n", Ruby())("Unknown Unicode property name at 0")

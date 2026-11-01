@@ -46,7 +46,7 @@ class IRFlagSuite extends IRSuiteBase:
   check("(*CR)$", "", PCRE)(Sequence(Empty, Assert(ChompTextEnd(LT.CR))))
   check("(*LF)$", "", PCRE)(Sequence(Empty, Assert(ChompTextEnd(LT.LF))))
   // `(*CRLF)a$` matches `a\r\n`, but neither `a\n` nor `a\r`.
-  check("(*CRLF)$", "", PCRE)(Sequence(Empty, Assert(ChompTextEnd(LT.PCRECRLF))))
+  check("(*CRLF)$", "", PCRE)(Sequence(Empty, Assert(ChompTextEnd(LT.PCRE_CRLF))))
   // `(*ANYCRLF)(?m)\r^` matches between `\r` and `\n`, so `\r\n` is not atomic.
   check("(*ANYCRLF)^", "m", PCRE)(Sequence(Empty, Assert(LineBegin(LT.PCREAnyCRLF, InputBegin))))
   check("(*ANY)$", "m", PCRE)(Sequence(Empty, Assert(LineEnd(LT.PCREAny))))

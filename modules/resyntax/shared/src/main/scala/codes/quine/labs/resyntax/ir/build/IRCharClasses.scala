@@ -121,7 +121,7 @@ private[build] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlN
 
   /** `[[:name:]]`, or `None` for a name that the dialect does not know. */
   def posix(name: String, flags: IRCharFlags): Option[CharSet] =
-    val asciiSet = ASCIIPOSIX.get(name)
+    val asciiSet = ASCII_POSIX.get(name)
     dialect match
       case _: Dialect.Ruby =>
         val rule =
@@ -205,7 +205,7 @@ object IRCharClasses:
   lazy val dotNetWord: CharSet = gc("L", "Mn", "Nd", "Pc")
 
   /** The POSIX classes in ASCII. */
-  val ASCIIPOSIX: Map[String, CharSet] = Map(
+  val ASCII_POSIX: Map[String, CharSet] = Map(
     "alnum" -> ascii('0' -> '9', 'A' -> 'Z', 'a' -> 'z'),
     "alpha" -> ascii('A' -> 'Z', 'a' -> 'z'),
     "ascii" -> CharSet.range(0, 0x7f),
