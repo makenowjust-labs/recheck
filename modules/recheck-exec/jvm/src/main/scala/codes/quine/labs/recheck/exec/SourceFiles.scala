@@ -16,7 +16,7 @@ import java.util.concurrent.locks.ReentrantLock
 
 import codes.quine.labs.recheck.common.UnexpectedException
 
-/** SourceFiles keeps the source files of commands in a directory of this user.
+/** SourceFiles keeps the source files of programs in a directory of this user.
   *
   * The files stay after the process exits, so that a runtime caching the build of a file (e.g. `dotnet run`) reuses it.
   */
@@ -51,9 +51,9 @@ private[exec] object SourceFiles:
     catch case _: IOException | _: UnsupportedOperationException | _: SecurityException => None
 
   /** Writes the source file unless it exists with the same content, and returns its path. */
-  def path(source: Command.Source): Path = path(directory, source)
+  def path(source: SourceFile): Path = path(directory, source)
 
-  private[exec] def path(dir: Path, source: Command.Source): Path =
+  private[exec] def path(dir: Path, source: SourceFile): Path =
     val bytes = source.content.getBytes(StandardCharsets.UTF_8)
     val hash = MessageDigest.getInstance("SHA-256").digest(bytes).take(8).map(b => f"${b & 0xff}%02x").mkString
     val dot = source.name.lastIndexOf('.')

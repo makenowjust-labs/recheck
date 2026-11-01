@@ -9,7 +9,6 @@ import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
-import codes.quine.labs.recheck.exec.Command
 import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.recheck.exec.Executor
 import codes.quine.labs.recheck.regexp.ParsedPattern
@@ -17,13 +16,13 @@ import codes.quine.labs.recheck.regexp.ParsedPattern
 /** RecallValidator is the implementation of recall validation. */
 object RecallValidator:
 
-  /** Exec runs a command with a script on its standard input, counting the timeout from the start line. */
-  type Exec = (Command, String, Option[FiniteDuration]) => ExecResult
+  /** Exec runs a script on an executor in the environment variables, counting the timeout from the start line. */
+  type Exec = (Executor, String, Option[FiniteDuration], Map[String, String]) => ExecResult
 
-  /** The executor of this platform, or `None` if this platform cannot run commands. */
+  /** Runs the script on the executor, or `None` if this platform cannot run programs. */
   def defaultExec(using Context): Option[Exec] =
-    Option.when(Executor.isAvailable)((command, script, timeout) =>
-      Executor.exec(command, script, timeout, Some(RecallProgram.StartLine))
+    Option.when(Executor.isAvailable)((executor, script, timeout, env) =>
+      executor.exec(script, timeout, Some(RecallProgram.StartLine), env)
     )
 
   /** Runs the recall validation of the attack string on the runtime of the pattern's dialect.
@@ -31,8 +30,7 @@ object RecallValidator:
     * It returns `None` without running when the timeout is not positive, or the dialect or the pattern is not
     * supported. It throws [[UnexpectedException]] when the runtime fails to run the program.
     *
-    * @param env
-    *   the environment variables, whose [[RecallProgram.runtimeVariable]] gives the runtime command lines
+    * The environment variables `env` may replace the command of the runtime (e.g. `RECHECK_NODE`).
     */
   def validate(
       pattern: ParsedPattern,
@@ -49,24 +47,18 @@ object RecallValidator:
           ctx.log("recall: not supported")
           None
         case Some(program) =>
-          val runtime =
-            env.get(RecallProgram.runtimeVariable(pattern.dialect)).map(_.trim).filter(_.nonEmpty)
-          val command = runtime.fold(program.command)(program.command.withShell(Executor.shell, _))
-          val name = runtime.getOrElse(program.command.program)
-          val commandLine = (name +: (program.command.args ++ program.command.source.map(_.name))).mkString(" ")
-          ctx.log(s"recall: command: $command\n${program.script}")
+          val executor = program.executor
+          val commandLine = executor.commandLine(env)
+          ctx.log(s"recall: command: $commandLine\n${program.script}")
           val limit = timeout match
             case d: FiniteDuration if (ctx.deadline eq null) || d <= ctx.deadline.timeLeft => Some(d)
             case _ => Option(ctx.deadline).map(_.timeLeft)
-          val output = exec(command, program.script, limit)
-          Some(result(name, commandLine, timeout, output))
+          val output = exec(executor, program.script, limit, env)
+          Some(result(executor.runtime(env), commandLine, timeout, output))
 
   /** Converts the execution result to the recall validation.
     *
-    * @param name
-    *   the runtime name if the output does not have it
-    * @param command
-    *   the command line to show in an error message
+    * The runtime name is `name` if the output does not have it, and an error message shows the command line `command`.
     */
   private[recall] def result(name: String, command: String, timeout: Duration, output: ExecResult)(using
       ctx: Context

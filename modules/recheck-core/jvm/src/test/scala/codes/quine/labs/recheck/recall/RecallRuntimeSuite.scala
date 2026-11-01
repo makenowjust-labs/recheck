@@ -318,7 +318,7 @@ class RecallRuntimeSuite extends munit.FunSuite:
   test("RecallValidator.validate: the deadline of the context"):
     val pattern = ParsedPattern.parse("foo", "", Dialect.JavaScript).toTry.get
     intercept[TimeoutException]:
-      RecallValidator.validate(pattern, attack("a", 1, ""), 50.millis) { (_, _, _) =>
+      RecallValidator.validate(pattern, attack("a", 1, ""), 50.millis) { (_, _, _, _) =>
         Thread.sleep(100)
         ExecResult.Timeout("")
       }(using Context(timeout = 50.millis))

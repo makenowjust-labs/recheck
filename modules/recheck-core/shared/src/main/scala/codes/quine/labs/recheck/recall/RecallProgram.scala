@@ -1,7 +1,15 @@
 package codes.quine.labs.recheck.recall
 
 import codes.quine.labs.recheck.diagnostics.AttackPattern
-import codes.quine.labs.recheck.exec.Command
+import codes.quine.labs.recheck.exec.DotNetExecutor
+import codes.quine.labs.recheck.exec.Executor
+import codes.quine.labs.recheck.exec.JavaExecutor
+import codes.quine.labs.recheck.exec.NodeExecutor
+import codes.quine.labs.recheck.exec.PerlExecutor
+import codes.quine.labs.recheck.exec.PhpExecutor
+import codes.quine.labs.recheck.exec.PythonExecutor
+import codes.quine.labs.recheck.exec.RubyExecutor
+import codes.quine.labs.recheck.exec.SourceFile
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.ast.Dialect
@@ -11,15 +19,15 @@ import codes.quine.labs.resyntax.charset.UnitMode
 
 /** RecallProgram is a script for the runtime of a dialect, which matches the pattern against the attack string once.
   *
-  * The script is the program on the standard input, or the data of the program in the source file of the command. The
-  * program prints these lines to the standard output:
+  * The script is the input of the executor: the program, or the data of the program file of the executor. The program
+  * prints these lines to the standard output:
   *   - [[RecallProgram.RuntimeLine]] with the runtime name and version,
   *   - [[RecallProgram.StartLine]] just before the matching, from which the timeout counts,
   *   - [[RecallProgram.TimeLine]] with the matching time in milliseconds, [[RecallProgram.EngineLimitLine]] with the
   *     message if the engine stops on its limit of the matching steps, or [[RecallProgram.EngineErrorLine]] with the
   *     message if the engine gives up with an error on the stack depth or the memory.
   */
-final case class RecallProgram(command: Command, script: String)
+final case class RecallProgram(executor: Executor, script: String)
 
 object RecallProgram:
 
@@ -33,16 +41,6 @@ object RecallProgram:
 
   val EngineErrorLine: String = "recheck:engine-error"
 
-  /** Returns the environment variable of the runtime command line of the dialect. */
-  def runtimeVariable(dialect: Dialect): String = dialect match
-    case Dialect.JavaScript => "RECHECK_NODE"
-    case _: Dialect.Python  => "RECHECK_PYTHON"
-    case _: Dialect.Ruby    => "RECHECK_RUBY"
-    case Dialect.Java       => "RECHECK_JAVA"
-    case Dialect.DotNet     => "RECHECK_DOTNET"
-    case _: Dialect.Perl    => "RECHECK_PERL"
-    case Dialect.PCRE       => "RECHECK_PHP"
-
   /** Generates the program of the dialect, or returns `None` if the dialect or the pattern is not supported. */
   def generate(pattern: ParsedPattern, attack: AttackPattern): Option[RecallProgram] =
     pattern.dialect match
@@ -54,14 +52,10 @@ object RecallProgram:
       case perlDialect: Dialect.Perl => perl(pattern, perlDialect, attack)
       case Dialect.PCRE              => php(pattern, attack)
 
-  /** Script is a program of [[generate]] as a standalone file, which has the data of the program in itself.
+  /** Script is a program of [[generate]] as a standalone file named `name`, which has the data of the program in
+    * itself.
     *
-    * @param name
-    *   the file name that the command line takes
-    * @param command
-    *   the command line running the file
-    * @param content
-    *   the program, starting with a comment of the command line
+    * The content starts with a comment of the command line `command` running the file.
     */
   final case class Script(name: String, command: String, content: String)
 
@@ -69,8 +63,7 @@ object RecallProgram:
   def script(pattern: ParsedPattern, attack: AttackPattern): Option[Script] =
     generate(pattern, attack).map: program =>
       val name = scriptName(pattern.dialect)
-      // The file takes the place of the standard input `-`.
-      val command = (program.command.program +: program.command.args.filterNot(_ == "-") :+ name).mkString(" ")
+      val command = program.executor.scriptCommandLine(name)
       val php = "<?php\n"
       val content = pattern.dialect match
         case Dialect.Java       => s"// Run: $command\n" + javaProgram(javaString(program.script))
@@ -125,7 +118,7 @@ object RecallProgram:
           |}
           |writeSync(1, '$TimeLine ' + Math.floor(performance.now() - start) + '\\n');
           |""".stripMargin
-    RecallProgram(Command("node", Seq("-")), script)
+    RecallProgram(NodeExecutor, script)
 
   /** Returns the Python program for `python3`, using `re.search` in the C locale. */
   private[recall] def python(pattern: ParsedPattern, attack: AttackPattern): RecallProgram =
@@ -154,7 +147,7 @@ object RecallProgram:
           |    sys.exit(0)
           |sys.stdout.write('$TimeLine ' + str((time.perf_counter_ns() - start) // 1000000) + '\\n')
           |""".stripMargin
-    RecallProgram(Command("python3", Seq("-I", "-")), script)
+    RecallProgram(PythonExecutor, script)
 
   /** Returns the Ruby program for `ruby`, using `Regexp#match?` without `Regexp.timeout`. */
   private[recall] def ruby(pattern: ParsedPattern, attack: AttackPattern): RecallProgram =
@@ -171,10 +164,8 @@ object RecallProgram:
       case 'n' => "Regexp::NOENCODING"
     val regex = if prefix.isEmpty then source else s"${style.literal(UStringUtil.fromString(prefix))} + $source"
     val input = attack.toString(style)
-    // `ruby -` reads the program in the encoding of the locale.
     val script =
-      s"""|# encoding: UTF-8
-          |$$stdout.sync = true
+      s"""|$$stdout.sync = true
           |Regexp.timeout = nil if Regexp.respond_to?(:timeout=)
           |puts "$RuntimeLine ruby #{RUBY_VERSION}"
           |regex = Regexp.new($regex, ${union(options, "0")})
@@ -189,16 +180,16 @@ object RecallProgram:
           |end
           |puts "$TimeLine #{Process.clock_gettime(Process::CLOCK_MONOTONIC, :millisecond) - start}"
           |""".stripMargin
-    RecallProgram(Command("ruby", Seq("-")), script)
+    RecallProgram(RubyExecutor, script)
 
   /** Returns the data for the Java program for `java` as a single-file source program, using `Matcher#find`. */
   private[recall] def java(pattern: ParsedPattern, attack: AttackPattern): RecallProgram =
     val flags = pattern.flags.distinct.filter(c => "cdimsuxU".contains(c))
-    RecallProgram(Command("java", Seq("--source", "17"), source = Some(JavaSource)), data(flags, pattern, attack))
+    RecallProgram(JavaExecutor(JavaSource), data(flags, pattern, attack))
 
   /** The Java program, which reads the data of [[data]] from the standard input. */
-  private[recall] val JavaSource: Command.Source =
-    Command.Source("RecheckRecall.java", javaProgram("new String(System.in.readAllBytes(), StandardCharsets.US_ASCII)"))
+  private[recall] val JavaSource: SourceFile =
+    SourceFile("RecheckRecall.java", javaProgram("new String(System.in.readAllBytes(), StandardCharsets.US_ASCII)"))
 
   /** Returns the Java program reading the data of [[data]] from the expression. */
   private def javaProgram(data: String): String =
@@ -255,12 +246,11 @@ object RecallProgram:
     */
   private[recall] def dotnet(pattern: ParsedPattern, attack: AttackPattern): RecallProgram =
     val flags = pattern.flags.distinct.filter(c => "imnsx".contains(c))
-    val env = Map("DOTNET_NOLOGO" -> "1", "DOTNET_CLI_TELEMETRY_OPTOUT" -> "1")
-    RecallProgram(Command("dotnet", Seq("run"), env, Some(DotNetSource)), data(flags, pattern, attack))
+    RecallProgram(DotNetExecutor(DotNetSource), data(flags, pattern, attack))
 
   /** The C# program, which reads the data of [[data]] from the standard input. */
-  private[recall] val DotNetSource: Command.Source =
-    Command.Source("RecheckRecall.cs", dotnetProgram("Console.In.ReadToEnd()"))
+  private[recall] val DotNetSource: SourceFile =
+    SourceFile("RecheckRecall.cs", dotnetProgram("Console.In.ReadToEnd()"))
 
   /** Returns the C# program reading the data of [[data]] from the expression. */
   private def dotnetProgram(data: String): String =
@@ -378,7 +368,7 @@ object RecallProgram:
             |my $$matched = $$input =~ $$regex;
             |printf "$TimeLine %d\\n", (Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC()) - $$start) * 1000;
             |""".stripMargin
-      RecallProgram(Command("perl", Seq("-")), script)
+      RecallProgram(PerlExecutor, script)
 
   /** The delimiters of a Perl regex literal, which do not pair and keep interpolation. */
   private val PerlDelimiters: Seq[Char] = "/!,;~%&:=\"|^-".toSeq
@@ -442,7 +432,7 @@ object RecallProgram:
               |}
               |echo "$TimeLine ", $$time, "\\n";
               |""".stripMargin
-        RecallProgram(Command("php"), script)
+        RecallProgram(PhpExecutor, script)
 
   /** The delimiters of a PHP regex, preferring printable ones. */
   private val PhpDelimiters: Seq[Char] = "/#~!%@;,|=:".toSeq ++ ((1 to 8) ++ (14 to 31)).map(_.toChar)

@@ -40,16 +40,14 @@ object Main:
 
   /** CheckAction holds `recheck check` subcommand parameters.
     *
-    * @param all
-    *   whether it shows all the diagnostics of `ReDoS.checkAll`
+    * With `all`, it shows all the diagnostics of `ReDoS.checkAll`.
     */
   final case class CheckAction(pattern: InputPattern, params: Parameters, all: Boolean = false, json: Boolean = false)
       extends Action
 
   /** RecallScriptAction holds `recheck generate-recall-script` subcommand parameters.
     *
-    * @param diagnostics
-    *   the path of the diagnostics JSON, or `-` for the standard input
+    * `diagnostics` is the path of the diagnostics JSON, or `-` for the standard input.
     */
   final case class RecallScriptAction(diagnostics: String) extends Action
 
