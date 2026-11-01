@@ -1,11 +1,7 @@
 package codes.quine.labs.resyntax.ir
 
-/** IRLineTerminators is a set of line terminators that line assertions and `.` see.
-  *
-  * @param chars
-  *   single characters that are line terminators
-  * @param crlf
-  *   how the two-character sequence `\r\n` is treated
+/** IRLineTerminators is a set of line terminators that line assertions and `.` see: the single characters `chars`, and
+  * the two-character sequence `\r\n` as `crlf` tells.
   */
 final case class IRLineTerminators(chars: Set[Int], crlf: IRLineTerminators.CRLF)
 

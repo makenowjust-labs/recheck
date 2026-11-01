@@ -15,7 +15,7 @@ class CaseMappingSuite extends munit.FunSuite:
     "SimpleFoldTurkic" -> SimpleFoldTurkic,
     "SimpleUpper" -> SimpleUpper,
     "SimpleLower" -> SimpleLower,
-    "EcmaScriptUpper" -> EcmaScriptUpper
+    "ECMAScriptUpper" -> ECMAScriptUpper
   )
 
   test("CaseMapping.SimpleFold"):
@@ -66,29 +66,29 @@ class CaseMappingSuite extends munit.FunSuite:
     assertEquals(SimpleLower(0x01c5), 0x01c6)
     assertEquals(SimpleLower('a'), 'a'.toInt)
 
-  test("CaseMapping.EcmaScriptUpper"):
-    assertEquals(EcmaScriptUpper('a'), 'A'.toInt)
-    assertEquals(EcmaScriptUpper('A'), 'A'.toInt)
+  test("CaseMapping.ECMAScriptUpper"):
+    assertEquals(ECMAScriptUpper('a'), 'A'.toInt)
+    assertEquals(ECMAScriptUpper('A'), 'A'.toInt)
     // A non-ASCII character is never canonicalized to an ASCII character.
-    assertEquals(EcmaScriptUpper(LongS), LongS)
-    assertEquals(EcmaScriptUpper(DotlessI), DotlessI)
-    assertEquals(EcmaScriptUpper(Kelvin), Kelvin)
+    assertEquals(ECMAScriptUpper(LongS), LongS)
+    assertEquals(ECMAScriptUpper(DotlessI), DotlessI)
+    assertEquals(ECMAScriptUpper(Kelvin), Kelvin)
     // A character whose uppercase is not one code unit is unchanged.
-    assertEquals(EcmaScriptUpper(SharpS), SharpS)
-    assertEquals(EcmaScriptUpper(0x0390), 0x0390)
-    assertEquals(EcmaScriptUpper(0xfb00), 0xfb00)
-    assertEquals(EcmaScriptUpper(0x00b5), 0x039c)
-    assertEquals(EcmaScriptUpper(0x03c2), 0x03a3)
-    assertEquals(EcmaScriptUpper(0x01c5), 0x01c4)
-    assertEquals(EcmaScriptUpper(0xd801), 0xd801)
-    assertEquals(EcmaScriptUpper(0x10428), 0x10428)
-    assertEquals(EcmaScriptUpper.equivalents('k'), CharSet.of('K', 'k'))
-    assertEquals(EcmaScriptUpper.equivalents('s'), CharSet.of('S', 's'))
-    assertEquals(EcmaScriptUpper.equivalents(0x03bc), CharSet.of(0x00b5, 0x039c, 0x03bc))
-    assertEquals(EcmaScriptUpper.equivalents(SharpS), CharSet.of(SharpS))
-    assertEquals(EcmaScriptUpper.equivalents(CapitalSharpS), CharSet.of(CapitalSharpS))
-    assertEquals(EcmaScriptUpper.equivalents(0x01c4), CharSet.of(0x01c4, 0x01c5, 0x01c6))
-    assertEquals(ecmaScriptCanonicalize(false), EcmaScriptUpper)
+    assertEquals(ECMAScriptUpper(SharpS), SharpS)
+    assertEquals(ECMAScriptUpper(0x0390), 0x0390)
+    assertEquals(ECMAScriptUpper(0xfb00), 0xfb00)
+    assertEquals(ECMAScriptUpper(0x00b5), 0x039c)
+    assertEquals(ECMAScriptUpper(0x03c2), 0x03a3)
+    assertEquals(ECMAScriptUpper(0x01c5), 0x01c4)
+    assertEquals(ECMAScriptUpper(0xd801), 0xd801)
+    assertEquals(ECMAScriptUpper(0x10428), 0x10428)
+    assertEquals(ECMAScriptUpper.equivalents('k'), CharSet.of('K', 'k'))
+    assertEquals(ECMAScriptUpper.equivalents('s'), CharSet.of('S', 's'))
+    assertEquals(ECMAScriptUpper.equivalents(0x03bc), CharSet.of(0x00b5, 0x039c, 0x03bc))
+    assertEquals(ECMAScriptUpper.equivalents(SharpS), CharSet.of(SharpS))
+    assertEquals(ECMAScriptUpper.equivalents(CapitalSharpS), CharSet.of(CapitalSharpS))
+    assertEquals(ECMAScriptUpper.equivalents(0x01c4), CharSet.of(0x01c4, 0x01c5, 0x01c6))
+    assertEquals(ecmaScriptCanonicalize(false), ECMAScriptUpper)
     assertEquals(ecmaScriptCanonicalize(true), SimpleFold)
 
   test("CaseMapping#image / preimage / closure on sets"):
@@ -101,7 +101,7 @@ class CaseMappingSuite extends munit.FunSuite:
     assertEquals(SimpleFold.preimage(CharSet.single('k')), CharSet.of('K', 'k', Kelvin))
     assertEquals(SimpleFold.preimage(CharSet.single('K')), CharSet.empty)
     assertEquals(
-      EcmaScriptUpper.closure(CharSet.range('a', 'z')),
+      ECMAScriptUpper.closure(CharSet.range('a', 'z')),
       CharSet.range('A', 'Z').union(CharSet.range('a', 'z'))
     )
     assertEquals(SimpleFold.closure(CharSet.empty), CharSet.empty)

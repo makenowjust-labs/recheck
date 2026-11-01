@@ -14,7 +14,7 @@ class ExecutorSuite extends munit.FunSuite:
   val dotnet: DotNetExecutor = DotNetExecutor(SourceFile("RecheckTest.cs", "// test"))
 
   val executors: Seq[Executor] =
-    Seq(NodeExecutor, PythonExecutor, RubyExecutor, java, dotnet, PerlExecutor, PhpExecutor)
+    Seq(NodeExecutor, PythonExecutor, RubyExecutor, java, dotnet, PerlExecutor, PHPExecutor)
 
   test("Executor#variable"):
     assertEquals(
@@ -85,7 +85,7 @@ class ExecutorSuite extends munit.FunSuite:
       assertEquals(args(java), "--source\n17\nclass RecheckTest {}\ninput")
       assertEquals(exec(dotnet), "11\nrun\n// test\ninput\n")
       assertEquals(args(PerlExecutor), "-\ninput")
-      assertEquals(args(PhpExecutor), "input")
+      assertEquals(args(PHPExecutor), "input")
     finally
       Files.deleteIfExists(SourceFiles.path(java.program))
       Files.deleteIfExists(SourceFiles.path(dotnet.program))

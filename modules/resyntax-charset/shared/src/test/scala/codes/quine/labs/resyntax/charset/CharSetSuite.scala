@@ -63,14 +63,14 @@ class CharSetSuite extends munit.FunSuite:
   test("CharSet#complement"):
     val s = set((0x41, 0x5b))
     assertEquals(s.complement(UnitMode.Byte), set((0, 0x41), (0x5b, 0x100)))
-    assertEquals(s.complement(UnitMode.Utf16), set((0, 0x41), (0x5b, 0x10000)))
+    assertEquals(s.complement(UnitMode.UTF16), set((0, 0x41), (0x5b, 0x10000)))
     assertEquals(s.complement(UnitMode.CodePoint), set((0, 0x41), (0x5b, 0x110000)))
     assertEquals(set((0x80, 0x20000)).complement(UnitMode.Byte), set((0, 0x80)))
-    assertEquals(CharSet.empty.complement(UnitMode.Utf16), UnitMode.Utf16.universe)
+    assertEquals(CharSet.empty.complement(UnitMode.UTF16), UnitMode.UTF16.universe)
     assertEquals(UnitMode.CodePoint.universe.complement(UnitMode.CodePoint), CharSet.empty)
 
   test("CharSet#restrict"):
-    assertEquals(set((0x41, 0x20000)).restrict(UnitMode.Utf16), set((0x41, 0x10000)))
+    assertEquals(set((0x41, 0x20000)).restrict(UnitMode.UTF16), set((0x41, 0x10000)))
     assertEquals(set((0x41, 0x42)).restrict(UnitMode.Byte), set((0x41, 0x42)))
 
   test("CharSet#partition"):
@@ -107,10 +107,10 @@ class CharSetSuite extends munit.FunSuite:
     assertEquals(CharSet.union(Seq(set((1, 2)), set((5, 6)), set((2, 3)))), set((1, 3), (5, 6)))
 
   test("UnitMode"):
-    assertEquals(UnitMode.Utf16.max, 0xffff)
+    assertEquals(UnitMode.UTF16.max, 0xffff)
     assertEquals(UnitMode.CodePoint.max, 0x10ffff)
     assertEquals(UnitMode.Byte.max, 0xff)
     assert(UnitMode.Byte.contains(0xff))
     assert(!UnitMode.Byte.contains(0x100))
     assert(!UnitMode.CodePoint.contains(-1))
-    assertEquals(UnitMode.Utf16.universe, set((0, 0x10000)))
+    assertEquals(UnitMode.UTF16.universe, set((0, 0x10000)))

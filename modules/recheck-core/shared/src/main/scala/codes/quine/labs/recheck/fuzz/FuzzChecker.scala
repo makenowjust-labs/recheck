@@ -13,8 +13,6 @@ import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.fuzz.FuzzChecker.*
-import codes.quine.labs.recheck.regexp.ParsedPattern
-import codes.quine.labs.recheck.regexp.PatternAlphabet
 import codes.quine.labs.recheck.util.RepeatUtil
 import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.recheck.vm.Interpreter
@@ -23,19 +21,23 @@ import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
 import codes.quine.labs.recheck.vm.Program
+import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.ir.IRPattern
+import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
 /** ReDoS vulnerable RegExp checker based on fuzzing. */
 object FuzzChecker:
 
   /** Checks whether RegExp is ReDoS vulnerable or not.
     *
-    * @param failed
-    *   whether an attack of the complexity and the hotspot is known to fail recall validation, which may change while
-    *   iterating the results. Strings whose attacks failed rank below the others in the next generation.
+    * The strings take `preferred` (see [[PatternAlphabet.build]]). `failed` tells whether an attack of the complexity
+    * and the hotspot is known to fail recall validation, which may change while iterating the results. Strings whose
+    * attacks failed rank below the others in the next generation.
     */
   def check(
-      pattern: ParsedPattern,
+      pattern: IRPattern,
+      preferred: Option[CharSet],
       fuzz: FuzzProgram,
       random: Random = new Random(Parameters.DefaultRandomSeed),
       seeder: Seeder = Parameters.DefaultSeeder,
@@ -61,6 +63,7 @@ object FuzzChecker:
     ctx.interrupt:
       new FuzzChecker(
         pattern,
+        preferred,
         fuzz,
         random,
         seeder,
@@ -101,7 +104,8 @@ object FuzzChecker:
 
 /** FuzzChecker is a ReDoS vulnerable RegExp checker based on fuzzing. */
 private[fuzz] final class FuzzChecker(
-    val pattern: ParsedPattern,
+    val pattern: IRPattern,
+    val preferred: Option[CharSet],
     val fuzz: FuzzProgram,
     val random: Random,
     val seeder: Seeder,
@@ -170,7 +174,14 @@ private[fuzz] final class FuzzChecker(
     val seed: Set[FString] = seeder match
       case Seeder.Static =>
         val staticSeed =
-          StaticSeeder.seed(pattern, maxSimpleRepeatCount, maxInitialGenerationSize, incubationLimit, maxGeneStringSize)
+          StaticSeeder.seed(
+            pattern,
+            preferred,
+            maxSimpleRepeatCount,
+            maxInitialGenerationSize,
+            incubationLimit,
+            maxGeneStringSize
+          )
         if staticSeed.size < maxInitialGenerationSize then
           val dynamicSeed = DynamicSeeder.seed(
             fuzz,

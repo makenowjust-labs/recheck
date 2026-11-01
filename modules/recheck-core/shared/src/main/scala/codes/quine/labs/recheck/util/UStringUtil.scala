@@ -1,6 +1,5 @@
 package codes.quine.labs.recheck.util
 
-import codes.quine.labs.recheck.regexp.EcmaScriptChars
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
@@ -11,11 +10,11 @@ import codes.quine.labs.resyntax.charset.UnitMode
 object UStringUtil:
 
   /** Creates a string of the code units of the JavaScript string. */
-  def fromString(s: String): UString = UString.fromUtf16Units(s)
+  def fromString(s: String): UString = UString.fromUTF16Units(s)
 
   /** Creates a string of the code units encoding the code points. */
   def fromCodePoints(cs: IterableOnce[Int]): UString =
-    UString.from(IArray.genericWrapArray(UString.from(cs).encode(UnitMode.Utf16)))
+    UString.from(IArray.genericWrapArray(UString.from(cs).encode(UnitMode.UTF16)))
 
   /** Shows the string as a JavaScript string literal.
     *
@@ -26,7 +25,7 @@ object UStringUtil:
       .map:
         case 0x27                                       => "\\'"
         case c if c < 0x20 && !(0x09 <= c && c <= 0x0d) => f"\\x$c%02X"
-        case c                                          => EcmaScriptChars.showChar(c)
+        case c                                          => ECMAScriptNotation.showChar(c)
       .mkString("'", "", "'")
 
   /** Returns the number of the code units of the character, which is two only for a surrogate pair. */

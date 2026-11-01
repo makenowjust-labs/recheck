@@ -26,12 +26,12 @@ final class UString private (private val values: Array[Int]) extends Ordered[USt
 
   /** Encodes the code points of this string as code units of the mode.
     *
-    * `Utf16` gives UTF-16 code units, `CodePoint` gives the code points as they are, and `Byte` gives the UTF-8 bytes
+    * `UTF16` gives UTF-16 code units, `CodePoint` gives the code points as they are, and `Byte` gives the UTF-8 bytes
     * (surrogate code points are encoded like other code points).
     */
   def encode(mode: UnitMode): IArray[Int] = mode match
     case UnitMode.CodePoint => codeValues
-    case UnitMode.Utf16     =>
+    case UnitMode.UTF16     =>
       val out = Array.newBuilder[Int]
       for c <- values do
         if c < 0x10000 then out.addOne(c)
@@ -59,7 +59,7 @@ final class UString private (private val values: Array[Int]) extends Ordered[USt
 
   def asString: String =
     val sb = new java.lang.StringBuilder
-    for c <- encode(UnitMode.Utf16) do sb.append(c.toChar)
+    for c <- encode(UnitMode.UTF16) do sb.append(c.toChar)
     sb.toString
 
   /** Strings are ordered lexicographically by code values. */
@@ -97,4 +97,4 @@ object UString:
     new UString(out.result())
 
   /** Surrogate pairs are not combined. */
-  def fromUtf16Units(s: String): UString = new UString(s.map(_.toInt).toArray)
+  def fromUTF16Units(s: String): UString = new UString(s.map(_.toInt).toArray)

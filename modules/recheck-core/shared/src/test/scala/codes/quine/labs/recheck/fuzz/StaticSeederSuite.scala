@@ -1,6 +1,7 @@
 package codes.quine.labs.recheck.fuzz
+
+import codes.quine.labs.recheck.SourcePattern
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.regexp.ParsedPattern
 
 class StaticSeederSuite extends munit.FunSuite:
 
@@ -10,8 +11,8 @@ class StaticSeederSuite extends munit.FunSuite:
   test("StaticSeeder.seed"):
     def seed(source: String, flags: String): Set[String] =
       val result =
-        for pattern <- ParsedPattern.parse(source, flags).toTry
-        yield StaticSeeder.seed(pattern, limit = 25000, maxSimpleRepeatSize = 10)
+        for (pattern, ir) <- SourcePattern.parse(source, flags).toTry
+        yield StaticSeeder.seed(ir, pattern.preferredChars, limit = 25000, maxSimpleRepeatSize = 10)
       result.get.map(_.toString)
 
     assertEquals(seed("^a+a+$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))

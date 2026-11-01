@@ -65,13 +65,13 @@ object Parser:
     * [[SourceEncoding]]) is read by its bytes, and the locations of a byte point to its character.
     */
   def parse(source: String, flagSet: FlagSet, dialect: Dialect): Node =
-    val encoding = FeatureSet.from(QuickAnalysis.from(source), dialect, flagSet).sourceEncoding
+    val encoding = FeatureSet.from(SourcePrescan.from(source), dialect, flagSet).sourceEncoding
     checkEncoding(source, encoding)
-    val bytes = if encoding == SourceEncoding.Utf8 then Rewritten.utf8(source) else None
+    val bytes = if encoding == SourceEncoding.UTF8 then Rewritten.utf8(source) else None
     val text = bytes.fold(source)(_.text)
     val rewritten = dialect match
       case Dialect.Perl(_, PerlSource.Literal) =>
-        PerlLiteralLexer.rewrite(text, flagSet.verbose, bytes = encoding == SourceEncoding.Utf8)
+        PerlLiteralRewriter.rewrite(text, flagSet.verbose, bytes = encoding == SourceEncoding.UTF8)
       case _ => None
     val rewrites = rewritten.toSeq ++ bytes.toSeq
     try rewrites.foldLeft(parseText(rewritten.fold(text)(_.text), flagSet, dialect))((n, r) => r.relocate(n))
@@ -87,14 +87,14 @@ object Parser:
       if pos >= 0 then throw new ParsingException("Non-Latin-1 character in bytes pattern", Some(pos))
 
   private def parseText(source: String, flagSet: FlagSet, dialect: Dialect): Node =
-    val analysis = QuickAnalysis.from(source)
-    val featureSet = FeatureSet.from(analysis, dialect, flagSet)
-    val parser = new Parser(source, analysis, featureSet)
+    val prescan = SourcePrescan.from(source)
+    val featureSet = FeatureSet.from(prescan, dialect, flagSet)
+    val parser = new Parser(source, prescan, featureSet)
     parser.parse()
 
 private[parser] final class Parser(
     private val source: String,
-    private val analysis: QuickAnalysis,
+    private val prescan: SourcePrescan,
     private val featureSet: FeatureSet
 ):
   private var offset: Int = 0
@@ -1328,9 +1328,9 @@ private[parser] final class Parser(
             if featureSet.hasFlagASubOption then source.lift(offset + 1).filter("DPSTW".contains(_)) else None
           flagSet = subOption match
             case Some('D') => flagSet.copy(asciiDigit = true)
-            case Some('P') => flagSet.copy(asciiPosix = true)
+            case Some('P') => flagSet.copy(asciiPOSIX = true)
             case Some('S') => flagSet.copy(asciiSpace = true)
-            case Some('T') => flagSet.copy(asciiPosixDigit = true)
+            case Some('T') => flagSet.copy(asciiPOSIXDigit = true)
             case Some('W') => flagSet.copy(asciiWord = true)
             case _         => charset(flagSet).copy(ascii = true)
           if subOption.isDefined then next()
@@ -2135,13 +2135,13 @@ private[parser] final class Parser(
     then return parseBackslashOctal()
 
     val groupCount =
-      if featureSet.readsBackReferenceDigitsByPreviousGroups then previousCaptureCount else analysis.captureSize
+      if featureSet.readsBackReferenceDigitsByPreviousGroups then previousCaptureCount else prescan.captureSize
     val n =
       if featureSet.readsThreeOctalDigitsAsOctal then parseBoundedDigits(_ < 100)
       else if featureSet.readsBackReferenceDigitsWhileGroupExists then parseBoundedDigits(_ <= groupCount)
       else parseSaturatedIntOption(Long.MaxValue, "Invalid backslash escape", save).get
 
-    if featureSet.checksValidBackReference && !(0 < n && n <= analysis.captureSize) then
+    if featureSet.checksValidBackReference && !(0 < n && n <= prescan.captureSize) then
       reset(save)
       if isOctalDigit then return parseBackslashOctal()
 
@@ -2157,7 +2157,7 @@ private[parser] final class Parser(
       reset(save)
       return parseBackslashUnknown()
 
-    if featureSet.rejectsInvalidBackReference && n > analysis.captureSize then fail("Invalid back-reference", save)
+    if featureSet.rejectsInvalidBackReference && n > prescan.captureSize then fail("Invalid back-reference", save)
 
     markNumberedReference(save)
     BackslashKind.EscapeBackReference(BackReferenceStyle.BareBackReference, Reference.IndexedReference(n))
@@ -2199,17 +2199,17 @@ private[parser] final class Parser(
 
     val start = offset
 
-    if featureSet.hasClassPosixWordBoundary && (startWith("[[:<:]]") || startWith("[[:>:]]")) then
+    if featureSet.hasClassPOSIXWordBoundary && (startWith("[[:<:]]") || startWith("[[:>:]]")) then
       val name = source.slice(start + 3, start + 4)
       val end = offset
-      val item = ClassItem(ClassItemData.ClassPosix(false, name), SourceLocation(start + 1, end - 1))
+      val item = ClassItem(ClassItemData.ClassPOSIX(false, name), SourceLocation(start + 1, end - 1))
       stack.push(Node(NodeData.Class(false, item), SourceLocation(start, end)))
       return
 
     next()
 
-    if featureSet.checksClassPosixOutsideClass then
-      findClassPosixEnd(start).foreach: _ =>
+    if featureSet.checksClassPOSIXOutsideClass then
+      findClassPOSIXEnd(start).foreach: _ =>
         if currentChar == ':' then fail("POSIX class outside class", start)
         fail("Unsupported POSIX collating element", start)
 
@@ -2423,8 +2423,8 @@ private[parser] final class Parser(
   private def parseClassItemNonRange(): ClassItem =
     val start = offset
 
-    if featureSet.allowsClassPosix && currentChar == '[' then
-      parseClassPosixOption() match
+    if featureSet.allowsClassPOSIX && currentChar == '[' then
+      parseClassPOSIXOption() match
         case Some(item) => return item
         case None       => ()
 
@@ -2469,7 +2469,7 @@ private[parser] final class Parser(
 
     parseClassItemLiteral()
 
-  private val ClassPosixNames: Set[String] = Set(
+  private val ClassPOSIXNames: Set[String] = Set(
     "alnum",
     "alpha",
     "ascii",
@@ -2491,10 +2491,10 @@ private[parser] final class Parser(
     * It returns `None` if the source does not look like a POSIX class, and it returns the `[` literal if the source
     * looks like a POSIX class but the dialect reads it as literals.
     */
-  private def parseClassPosixOption(): Option[ClassItem] =
+  private def parseClassPOSIXOption(): Option[ClassItem] =
     val start = offset
     val bodyStart = offset + 2
-    val bodyEnd = findClassPosixEnd(start) match
+    val bodyEnd = findClassPOSIXEnd(start) match
       case Some(end) => end
       case None      => return None
 
@@ -2504,18 +2504,18 @@ private[parser] final class Parser(
     val invert = body.startsWith("^")
     val name = if invert then body.drop(1) else body
 
-    if ClassPosixNames.contains(name) then
+    if ClassPOSIXNames.contains(name) then
       reset(bodyEnd + 2)
-      return Some(ClassItem(ClassItemData.ClassPosix(invert, name), SourceLocation(start, offset)))
+      return Some(ClassItem(ClassItemData.ClassPOSIX(invert, name), SourceLocation(start, offset)))
 
-    if !featureSet.classPosixNameRule.looksLikeName(name, ClassPosixNames) then return Some(parseClassItemLiteral())
+    if !featureSet.classPOSIXNameRule.looksLikeName(name, ClassPOSIXNames) then return Some(parseClassItemLiteral())
 
     fail("Unknown POSIX class", start)
 
-  private def findClassPosixEnd(start: Int): Option[Int] =
+  private def findClassPOSIXEnd(start: Int): Option[Int] =
     if start + 1 >= source.length then return None
     val terminator = source.charAt(start + 1)
-    if !(terminator == ':' || featureSet.checksClassPosixCollating && (terminator == '.' || terminator == '=')) then
+    if !(terminator == ':' || featureSet.checksClassPOSIXCollating && (terminator == '.' || terminator == '=')) then
       return None
 
     var i = start + 2
@@ -2812,7 +2812,7 @@ private[parser] final class Parser(
       else 0x10ffff
     if value > max then fail("Code point too large", pos)
     // Ruby's `\u` escapes are Unicode, which an ASCII-8BIT regexp cannot have except ASCII.
-    if featureSet.rejectsNonAsciiUnicodeEscape && value >= 0x80 then fail("Incompatible character encoding", pos)
+    if featureSet.rejectsNonASCIIUnicodeEscape && value >= 0x80 then fail("Incompatible character encoding", pos)
     if !featureSet.allowsSurrogateEscape && 0xd800 <= value && value <= 0xdfff then fail("Invalid Unicode escape", pos)
     value.min(Int.MaxValue).toInt
 

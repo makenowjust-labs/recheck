@@ -110,7 +110,7 @@ class ParserEncodingSuite extends munit.FunSuite:
   check("\\U\u00e9a", "", PerlBytes)(Sequence((bytes("\u00e9") :+ Literal('A'))*))
 
   // Ruby's ASCII-8BIT regexp reads the UTF-8 bytes of the source (as `Regexp.new(source.b, Regexp::NOENCODING)`).
-  val RubyBytes: Dialect = Ruby(Ruby.Encoding.Ascii8Bit)
+  val RubyBytes: Dialect = Ruby(Ruby.Encoding.ASCII8Bit)
   for (flags, dialect) <- Seq(("n", Ruby()), ("", RubyBytes)) do
     check("\u00e9+", flags, dialect)(Sequence(Literal(0xc3), Repeat(Literal(0xa9), Plus(Greedy))))
     check("[\u00e9-\u00e0]", flags, dialect)(

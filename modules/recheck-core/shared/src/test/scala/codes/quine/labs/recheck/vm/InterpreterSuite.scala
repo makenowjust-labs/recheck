@@ -4,9 +4,8 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.duration.MILLISECONDS
 import scala.language.implicitConversions
 
+import codes.quine.labs.recheck.SourcePattern
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.regexp.Location
-import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.recheck.vm.Inst.ReadKind
 import codes.quine.labs.recheck.vm.Interpreter.CoverageItem
@@ -15,6 +14,7 @@ import codes.quine.labs.recheck.vm.Interpreter.FailedPoint
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
+import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
@@ -28,8 +28,8 @@ class InterpreterSuite extends munit.FunSuite:
 
   def matches(source: String, flags: String, input: String, pos: Int, opts: Options): Result =
     val t = for
-      pattern <- ParsedPattern.parse(source, flags).toTry
-      program <- ProgramBuilder.build(pattern)
+      (pattern, ir) <- SourcePattern.parse(source, flags).toTry
+      program <- ProgramBuilder.build(ir, pattern.dialect)
       result = Interpreter.run(program, UStringUtil.fromString(input), pos, opts)
     yield result
     t.get
@@ -99,10 +99,10 @@ class InterpreterSuite extends munit.FunSuite:
           CoverageItem(CoverageLocation(21, Vector.empty), false)
         ),
         Map(
-          Location(5, 6) -> 4,
-          Location(8, 10) -> 1,
-          Location(14, 16) -> 1,
-          Location(17, 18) -> 4
+          SourceLocation(5, 6) -> 4,
+          SourceLocation(8, 10) -> 1,
+          SourceLocation(14, 16) -> 1,
+          SourceLocation(17, 18) -> 4
         )
       )
     )
@@ -299,8 +299,8 @@ class InterpreterSuite extends munit.FunSuite:
         timeout: Duration
     )(using ctx: Context): Result =
       val t = for
-        pattern <- ParsedPattern.parse(source, flags).toTry
-        program <- ProgramBuilder.build(pattern)
+        (pattern, ir) <- SourcePattern.parse(source, flags).toTry
+        program <- ProgramBuilder.build(ir, pattern.dialect)
         result = Interpreter.runWithTimeout(program, UStringUtil.fromString(input), pos, opts, timeout)
       yield result
       t.get

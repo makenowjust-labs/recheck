@@ -16,7 +16,6 @@ import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.recheck.recall.RecallValidator
-import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.parser.Parser
@@ -26,7 +25,17 @@ class ReDoSSuite extends munit.FunSuite:
   /** A default context. */
   given ctx: Context = Context()
 
-  def parse(source: String, flags: String = ""): ParsedPattern = ParsedPattern.parse(source, flags).toTry.get
+  def checkAutomaton(source: String, flags: String, params: Parameters): Iterator[Diagnostics] =
+    val (pattern, ir) = SourcePattern.parse(source, flags, params.dialect).toTry.get
+    ReDoS.checkAutomaton(pattern, ir, params)
+
+  def checkFuzz(source: String, flags: String, params: Parameters)(using ctx: Context): Iterator[Diagnostics] =
+    val (pattern, ir) = SourcePattern.parse(source, flags, params.dialect).toTry.get
+    ReDoS.checkFuzz(pattern, ir, params)
+
+  def checkAuto(source: String, flags: String, params: Parameters): Iterator[Diagnostics] =
+    val (pattern, ir) = SourcePattern.parse(source, flags, params.dialect).toTry.get
+    ReDoS.checkAuto(pattern, ir, params)
 
   test("ReDoS.check"):
     assertEquals(
@@ -223,10 +232,9 @@ class ReDoSSuite extends munit.FunSuite:
 
   test("ReDoS.attackStyle"):
     def attack(dialect: Dialect, flags: String, checker: Checker = Checker.Automaton): String =
-      val pattern = ParsedPattern.parse("^(?:a|a)*$", flags, dialect).toTry.get
       val params = Parameters(checker = checker, dialect = dialect, randomSeed = 0)
-      val ds = if checker == Checker.Automaton then ReDoS.checkAutomaton("^(?:a|a)*$", flags, pattern, params)
-      else ReDoS.checkFuzz("^(?:a|a)*$", flags, pattern, params)
+      val ds = if checker == Checker.Automaton then checkAutomaton("^(?:a|a)*$", flags, params)
+      else checkFuzz("^(?:a|a)*$", flags, params)
       ds.next().asInstanceOf[Diagnostics.Vulnerable].attack.toString
     assertEquals(attack(Dialect.JavaScript, ""), "'a'.repeat(31) + '\\x00'")
     assertEquals(attack(Dialect.Python(), ""), "'a' * 31 + '\\x00'")
@@ -240,7 +248,7 @@ class ReDoSSuite extends munit.FunSuite:
 
   test("ReDoS.checkAutomaton"):
     assertEquals(
-      ReDoS.checkAutomaton("^(?:a|a)*$", "", parse("^(?:a|a)*$"), Parameters(checker = Checker.Automaton)).next(),
+      checkAutomaton("^(?:a|a)*$", "", Parameters(checker = Checker.Automaton)).next(),
       (
         Diagnostics.Vulnerable(
           "^(?:a|a)*$",
@@ -258,47 +266,42 @@ class ReDoSSuite extends munit.FunSuite:
       )
     )
     assertEquals(
-      ReDoS.checkAutomaton("^(?:.|.)*$", "s", parse("^(?:.|.)*$", "s"), Parameters(checker = Checker.Automaton)).next(),
+      checkAutomaton("^(?:.|.)*$", "s", Parameters(checker = Checker.Automaton)).next(),
       Diagnostics.Safe("^(?:.|.)*$", "s", Dialect.JavaScript, AttackComplexity.Linear, Checker.Automaton)
     )
     assertEquals(
-      ReDoS.checkAutomaton("^.$", "", parse("^.$"), Parameters(checker = Checker.Automaton)).toList,
+      checkAutomaton("^.$", "", Parameters(checker = Checker.Automaton)).toList,
       List(Diagnostics.Safe("^.$", "", Dialect.JavaScript, AttackComplexity.Safe(false), Checker.Automaton))
     )
 
   test("ReDoS.checkFuzz"):
-    val result = ReDoS
-      .checkFuzz(
-        "^(?:a|a)*$",
-        "",
-        parse("^(?:a|a)*$"),
-        Parameters(checker = Checker.Fuzz, randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
-      )
+    val result = checkFuzz(
+      "^(?:a|a)*$",
+      "",
+      Parameters(checker = Checker.Fuzz, randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
+    )
       .next()
     assert(clue(result).isInstanceOf[Diagnostics.Vulnerable])
     assertEquals(result.asInstanceOf[Diagnostics.Vulnerable].checker, Checker.Fuzz)
     assertEquals(
-      ReDoS
-        .checkFuzz(
-          ".",
-          "",
-          parse("."),
-          Parameters(checker = Checker.Fuzz, randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
-        )
-        .toList,
+      checkFuzz(
+        ".",
+        "",
+        Parameters(checker = Checker.Fuzz, randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
+      ).toList,
       List(Diagnostics.Safe(".", "", Dialect.JavaScript, AttackComplexity.Safe(true), Checker.Fuzz))
     )
     interceptMessage[TimeoutException](
-      "timeout at modules/recheck-core/shared/src/main/scala/codes/quine/labs/recheck/fuzz/FuzzProgram.scala:28"
+      "timeout at modules/recheck-core/shared/src/main/scala/codes/quine/labs/recheck/fuzz/FuzzProgram.scala:32"
     ) {
       val ctx = Context(timeout = Duration.MinusInf)
-      val result = ReDoS.checkFuzz(".", "", parse("."), Parameters(timeout = Duration.MinusInf))(using ctx)
+      val result = checkFuzz(".", "", Parameters(timeout = Duration.MinusInf))(using ctx)
       result.toList
     }
 
   test("ReDoS.checkAuto"):
     assertEquals(
-      ReDoS.checkAuto("^(?:a|a)*$", "", parse("^(?:a|a)*$"), Parameters(randomSeed = 0)).next(),
+      checkAuto("^(?:a|a)*$", "", Parameters(randomSeed = 0)).next(),
       (
         Diagnostics.Vulnerable(
           "^(?:a|a)*$",
@@ -316,36 +319,27 @@ class ReDoSSuite extends munit.FunSuite:
       )
     )
     assertEquals(
-      ReDoS
-        .checkAuto(
-          "^(?:a|a){3}$",
-          "",
-          parse("^(?:a|a){3}$"),
-          Parameters(randomSeed = 0, maxRepeatCount = 3, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
-        )
-        .toList,
+      checkAuto(
+        "^(?:a|a){3}$",
+        "",
+        Parameters(randomSeed = 0, maxRepeatCount = 3, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
+      ).toList,
       List(Diagnostics.Safe("^(?:a|a){3}$", "", Dialect.JavaScript, AttackComplexity.Safe(true), Checker.Fuzz))
     )
     assertEquals(
-      ReDoS
-        .checkAuto(
-          "^(?:a|a){3,}",
-          "",
-          parse("^(?:a|a){3,}"),
-          Parameters(randomSeed = 0, maxNFASize = 3, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
-        )
-        .toList,
+      checkAuto(
+        "^(?:a|a){3,}",
+        "",
+        Parameters(randomSeed = 0, maxNFASize = 3, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
+      ).toList,
       List(Diagnostics.Safe("^(?:a|a){3,}", "", Dialect.JavaScript, AttackComplexity.Safe(true), Checker.Fuzz))
     )
     assertEquals(
-      ReDoS
-        .checkAuto(
-          "^.*$",
-          "",
-          parse("^.*$"),
-          Parameters(randomSeed = 0, maxPatternSize = 1, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
-        )
-        .toList,
+      checkAuto(
+        "^.*$",
+        "",
+        Parameters(randomSeed = 0, maxPatternSize = 1, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
+      ).toList,
       List(Diagnostics.Safe("^.*$", "", Dialect.JavaScript, AttackComplexity.Safe(true), Checker.Fuzz))
     )
 

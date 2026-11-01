@@ -10,6 +10,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.*
 
 import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.SourcePattern
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
@@ -20,7 +21,6 @@ import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.exec.ExecResult
-import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.CharSet
@@ -59,7 +59,7 @@ class RecallRuntimeSuite extends munit.FunSuite:
       timeout: Duration = 1.second,
       env: Map[String, String] = Map.empty
   ): RecallValidation =
-    val pattern = ParsedPattern.parse(source, flags, dialect).toTry.get
+    val pattern = SourcePattern.parse(source, flags, dialect).toTry.get._1
     RecallValidator.validate(pattern, attack, timeout, env = env)(RecallValidator.defaultExec.get).get
 
   /** Returns the path of the program in `PATH`. */
@@ -170,7 +170,7 @@ class RecallRuntimeSuite extends munit.FunSuite:
     assertFinish(r)
     assert(clue(r.runtime).startsWith("perl 5."))
     // A string pattern may contain `$`, which a regex literal would interpolate.
-    val pattern = ParsedPattern.parse("^(?:a|a)*$x", "", Dialect.Perl(source = PerlSource.String)).toTry.get
+    val pattern = SourcePattern.parse("^(?:a|a)*$x", "", Dialect.Perl(source = PerlSource.String)).toTry.get._1
     val string = RecallValidator.validate(pattern, attack("a", 31, ""), 1.second)(
       RecallValidator.defaultExec.get
     )
@@ -186,12 +186,12 @@ class RecallRuntimeSuite extends munit.FunSuite:
   runtimeTest("Perl: the character set rules of utf8", "perl"):
     // The program matches `0x80..0xFF` as recheck's character sets have them.
     def check(source: String, dialect: Dialect.Perl): Unit =
-      val pattern = ParsedPattern.parse(source, "", dialect).toTry.get
+      val (pattern, ir) = SourcePattern.parse(source, "", dialect).toTry.get
       def last(data: IRNodeData): CharSet = data match
         case IRNodeData.Chars(set)      => set
         case IRNodeData.Sequence(nodes) => last(nodes.last.data)
         case data                       => fail(s"Unexpected: $data")
-      val modeled = (0x80 to 0xff).filter(last(pattern.node.data).contains)
+      val modeled = (0x80 to 0xff).filter(last(ir.node.data).contains)
       val program = RecallProgram.generate(pattern, attack("a", 1, "")).get
       val lines = program.script.linesIterator.toSeq
       val pragma = lines.filter(_ == "use utf8;")
@@ -253,7 +253,7 @@ class RecallRuntimeSuite extends munit.FunSuite:
     )
   do
     runtimeTest(s"RecallProgram.script: $dialect", program):
-      val pattern = ParsedPattern.parse("^(?:a|é|😀)*$", "", dialect).toTry.get
+      val pattern = SourcePattern.parse("^(?:a|é|😀)*$", "", dialect).toTry.get._1
       val astral = AttackPattern(Seq((UString.fromString("é"), UString.fromString("😀a"), 0)), UString(0), 3)
       val out = runScript(RecallProgram.script(pattern, astral).get)
       val lines = out.linesIterator.map(_.takeWhile(_ != ' ')).toSeq
@@ -316,7 +316,7 @@ class RecallRuntimeSuite extends munit.FunSuite:
     assert(clue(ds.last).isInstanceOf[Diagnostics.Safe])
 
   test("RecallValidator.validate: the deadline of the context"):
-    val pattern = ParsedPattern.parse("foo", "", Dialect.JavaScript).toTry.get
+    val pattern = SourcePattern.parse("foo", "", Dialect.JavaScript).toTry.get._1
     intercept[TimeoutException]:
       RecallValidator.validate(pattern, attack("a", 1, ""), 50.millis) { (_, _, _, _) =>
         Thread.sleep(100)

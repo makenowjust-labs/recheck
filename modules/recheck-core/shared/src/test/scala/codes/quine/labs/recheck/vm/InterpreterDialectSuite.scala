@@ -2,9 +2,9 @@ package codes.quine.labs.recheck.vm
 
 import codes.quine.labs.recheck.AssertionCases
 import codes.quine.labs.recheck.CaseFoldingCases
+import codes.quine.labs.recheck.SourcePattern
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
-import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Status
@@ -19,7 +19,8 @@ class InterpreterDialectSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
   def run(source: String, flags: String, dialect: Dialect, input: UString, usesAcceleration: Boolean): Status =
-    val program = ProgramBuilder.build(ParsedPattern.parse(source, flags, dialect).toTry.get).get
+    val (_, ir) = SourcePattern.parse(source, flags, dialect).toTry.get
+    val program = ProgramBuilder.build(ir, dialect).get
     Interpreter.run(program, input, 0, Options(usesAcceleration = usesAcceleration)).status
 
   def accepts(
@@ -248,5 +249,5 @@ class InterpreterDialectSuite extends munit.FunSuite:
     accepts("(*UTF)^.$", PCRE, "é")
 
   test("ProgramBuilder.build: unsupported"):
-    val pattern = ParsedPattern.parse("a(?R)?", "", PCRE).toTry.get
-    interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(ProgramBuilder.build(pattern).get)
+    val (_, ir) = SourcePattern.parse("a(?R)?", "", PCRE).toTry.get
+    interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(ProgramBuilder.build(ir, PCRE).get)

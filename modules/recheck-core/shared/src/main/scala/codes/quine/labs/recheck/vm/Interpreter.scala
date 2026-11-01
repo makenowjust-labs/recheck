@@ -7,7 +7,6 @@ import scala.concurrent.duration.Duration
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.TimeoutException
-import codes.quine.labs.recheck.regexp.Location
 import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.recheck.vm.Inst.AssertKind
 import codes.quine.labs.recheck.vm.Inst.Barrier
@@ -22,6 +21,7 @@ import codes.quine.labs.recheck.vm.Interpreter.MatchState
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
+import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
@@ -76,7 +76,7 @@ object Interpreter:
       loops: Seq[(Int, Int)],
       failedPoints: Set[FailedPoint],
       coverage: Set[CoverageItem],
-      heatmap: Map[Location, Int]
+      heatmap: Map[SourceLocation, Int]
   )
 
   /** Status is a matching status. */
@@ -118,14 +118,19 @@ object Interpreter:
   )
 
   /** Junction is a state for a junction block, with the time reaching it. */
-  private[vm] final case class Junction(state: MatchState, steps: Int, heatmap: Option[Map[Location, Int]], time: Long)
+  private[vm] final case class Junction(
+      state: MatchState,
+      steps: Int,
+      heatmap: Option[Map[SourceLocation, Int]],
+      time: Long
+  )
 
   /** Diff is a difference of state on matching, with the captures of the last failed matching, and the captures held in
     * it.
     */
   private[vm] final case class Diff(
       steps: Int,
-      heatmap: Option[Map[Location, Int]],
+      heatmap: Option[Map[SourceLocation, Int]],
       failedCaptures: Vector[Int],
       held: Map[Int, (Int, Int)]
   )
@@ -237,7 +242,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   private val failedPoints: mutable.Set[FailedPoint] = mutable.Set.empty
 
   /** A heatmap on matching. */
-  private var heatmap: Map[Location, Int] = Map.empty[Location, Int].withDefaultValue(0)
+  private var heatmap: Map[SourceLocation, Int] = Map.empty[SourceLocation, Int].withDefaultValue(0)
 
   /** The captures of the last failed matching, which `cap_keep` takes. */
   private var failedCaptures: Vector[Int] = Vector.empty
@@ -455,7 +460,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                 for jx <- frame.junctions.take(d) do
                   val diffHeatmap = Option.when(options.needsHeatmap):
                     val jxHeatmap = jx.heatmap.get
-                    val builder = Map.newBuilder[Location, Int]
+                    val builder = Map.newBuilder[SourceLocation, Int]
                     for (loc, n) <- heatmap do
                       val m = jxHeatmap(loc)
                       if n != m then builder.addOne(loc -> (n - m))
@@ -754,7 +759,13 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     (j, Option.when(k == target.length)(j))
 
   /** Runs a `read` (or `read_back`) instruction of a back-reference. */
-  private def instReadRef(frame: Frame, inst: Inst, ref: ReadKind.Ref, loc: Option[Location], back: Boolean): Boolean =
+  private def instReadRef(
+      frame: Frame,
+      inst: Inst,
+      ref: ReadKind.Ref,
+      loc: Option[SourceLocation],
+      back: Boolean
+  ): Boolean =
     val candidates = refCandidates(frame, ref)
     var width: Option[Int] = None
     val it = candidates.iterator

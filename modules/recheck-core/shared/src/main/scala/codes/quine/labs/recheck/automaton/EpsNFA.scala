@@ -6,14 +6,14 @@ import scala.collection.mutable
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
-import codes.quine.labs.recheck.regexp.EcmaScriptChars
-import codes.quine.labs.recheck.regexp.Location
-import codes.quine.labs.recheck.regexp.PatternAlphabet
-import codes.quine.labs.recheck.regexp.PatternAlphabet.CRFollow
-import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
+import codes.quine.labs.recheck.util.ECMAScriptNotation
 import codes.quine.labs.recheck.util.GraphvizUtil.escape
+import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
+import codes.quine.labs.resyntax.ir.alphabet.CRFollow
+import codes.quine.labs.resyntax.ir.alphabet.CharKind
+import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
 /** EpsNFA is an ordered ε-NFA on unicode code points. */
 final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q, accept: Q, tau: Map[Q, Transition[Q]]):
@@ -39,7 +39,7 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
         case Some(Consume(chs, q1, _)) =>
           sb.append(s"  ${escape(q0)} [shape=circle];\n")
           sb.append(
-            s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(chs.map((c, k) => s"(${EcmaScriptChars.showClass(c)},$k)").mkString("{", ", ", "}"))}];\n"
+            s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(chs.map((c, k) => s"(${ECMAScriptNotation.showClass(c)},$k)").mkString("{", ", ", "}"))}];\n"
           )
         case Some(LoopEnter(loop, q1)) =>
           sb.append(s"  ${escape(q0)} [shape=circle];\n")
@@ -117,7 +117,7 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
       val newAcceptSet = Set.newBuilder[(CharKind, Seq[P])]
       val newDelta = Map.newBuilder[((CharKind, Seq[P]), CharSet), Seq[(CharKind, Seq[P])]]
       val newSourcemap = mutable.Map
-        .empty[((CharKind, Seq[P]), CharSet, (CharKind, Seq[P])), Seq[Location]]
+        .empty[((CharKind, Seq[P]), CharSet, (CharKind, Seq[P])), Seq[SourceLocation]]
         .withDefaultValue(Vector.empty)
       var deltaSize = 0
 
@@ -177,7 +177,8 @@ object EpsNFA:
   final case class Assert[Q](kind: AssertKind, to: Q) extends Transition[Q]
 
   /** Consume is an ε-NFA transition with consuming a character. */
-  final case class Consume[Q](set: Set[(CharSet, CharKind)], to: Q, loc: Option[Location] = None) extends Transition[Q]
+  final case class Consume[Q](set: Set[(CharSet, CharKind)], to: Q, loc: Option[SourceLocation] = None)
+      extends Transition[Q]
 
   /** LoopEnter is an ε-NFA transition with consuming no character and marking a entering of the loop. */
   final case class LoopEnter[Q](loop: Int, to: Q) extends Transition[Q]
@@ -190,16 +191,11 @@ object EpsNFA:
     * A guess makes a character have more than one kind, and the next (or the previous) kind checks it, so that only the
     * right one survives.
     *
-    * @param last
-    *   whether a line terminator, `\r` or `\n` is the last character (for [[AssertKind.ChompEnd]])
-    * @param afterCR
-    *   whether `\r` precedes `\n` (for [[AssertKind.LineBeginOf]] after `\r\n`)
-    * @param follow
-    *   what follows `\r` (for [[AssertKind.LineEndOf]] before `\r\n` and [[AssertKind.ChompEnd]] before the final
-    *   `\r\n`)
-    * @param marks
-    *   the number of the word marks, for each of which an extender guesses whether the text up to it has a base (for
-    *   [[AssertKind.MarkWordBoundaryOf]])
+    * With `last`, a line terminator, `\r` or `\n` guesses whether it is the last character (for
+    * [[AssertKind.ChompEnd]]). With `afterCR`, `\n` guesses whether `\r` precedes it (for [[AssertKind.LineBeginOf]]
+    * after `\r\n`). With `follow`, `\r` guesses what follows it (for [[AssertKind.LineEndOf]] before `\r\n` and
+    * [[AssertKind.ChompEnd]] before the final `\r\n`). `marks` is the number of the word marks, for each of which an
+    * extender guesses whether the text up to it has a base (for [[AssertKind.MarkWordBoundaryOf]]).
     */
   final case class Guesses(last: Boolean, afterCR: Boolean, follow: Boolean, marks: Int = 0):
 
@@ -336,14 +332,11 @@ object EpsNFA:
     case object InputEnd extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean = next.boundary
 
-    /** LineBeginOf is `^` assertion with the `set`-th line terminator set.
+    /** LineBeginOf is `^` assertion with the `set`-th line terminator set, which `atEnd` tells where it matches at the
+      * end of the input.
       *
-      * @param atEnd
-      *   where it matches at the end of the input
-      * @param afterCRLF
-      *   whether it matches after `\r\n` too, where `\n` is not a line terminator by itself (PCRE's `(*CRLF)`)
-      * @param atomic
-      *   whether it does not match between `\r` and `\n` (Java)
+      * With `afterCRLF`, it matches after `\r\n` too, where `\n` is not a line terminator by itself (PCRE's `(*CRLF)`).
+      * With `atomic`, it does not match between `\r` and `\n` (Java).
       */
     final case class LineBeginOf(set: Int, atEnd: IRLineBeginAtEnd, afterCRLF: Boolean, atomic: Boolean)
         extends AssertKind:
@@ -357,10 +350,8 @@ object EpsNFA:
 
     /** LineEndOf is `$` assertion with the `set`-th line terminator set.
       *
-      * @param beforeCRLF
-      *   whether it matches before `\r\n` too, where `\r` is not a line terminator by itself (PCRE's `(*CRLF)`)
-      * @param atomic
-      *   whether it does not match between `\r` and `\n` (Java)
+      * With `beforeCRLF`, it matches before `\r\n` too, where `\r` is not a line terminator by itself (PCRE's
+      * `(*CRLF)`). With `atomic`, it does not match between `\r` and `\n` (Java).
       */
     final case class LineEndOf(set: Int, beforeCRLF: Boolean, atomic: Boolean) extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean =
@@ -371,10 +362,8 @@ object EpsNFA:
     /** ChompEnd is `\Z` assertion with the `set`-th line terminator set, which matches at the end or before a line
       * terminator at the end.
       *
-      * @param crlf
-      *   whether it matches before `\r\n` at the end too
-      * @param atomic
-      *   whether it does not match between `\r` and `\n` (Java)
+      * With `crlf`, it matches before `\r\n` at the end too. With `atomic`, it does not match between `\r` and `\n`
+      * (Java).
       */
     final case class ChompEnd(set: Int, crlf: Boolean, atomic: Boolean) extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean =

@@ -31,11 +31,7 @@ object Diagnostics:
           |Complexity: $complexity
           |Checker   : $checker""".stripMargin
 
-  /** Vulnerable is an analysis result against a vulnerable RegExp.
-    *
-    * @param recallValidation
-    *   the run of the attack string on the real regex engine, or `None` if it is not run
-    */
+  /** Vulnerable is an analysis result against a vulnerable RegExp. */
   final case class Vulnerable(
       source: String,
       flags: String,
@@ -44,6 +40,7 @@ object Diagnostics:
       attack: AttackPattern,
       hotspot: Hotspot,
       checker: Checker,
+      /** The run of the attack string on the real regex engine, or `None` if it is not run. */
       recallValidation: Option[RecallValidation] = None
   ) extends Diagnostics:
 

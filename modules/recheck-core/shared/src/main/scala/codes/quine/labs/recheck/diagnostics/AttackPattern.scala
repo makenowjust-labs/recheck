@@ -125,7 +125,7 @@ object AttackPattern:
     private def char(c: Int): String = c match
       case '\\' | '\''               => s"\\${c.toChar}"
       case Named(e)                  => e
-      case c if isAsciiPrintable(c)  => c.toChar.toString
+      case c if isASCIIPrintable(c)  => c.toChar.toString
       case c if !bytes && isShown(c) => codePoint(c)
       case c if c <= 0xff            => f"\\x$c%02x"
       case c if c <= 0xffff          => f"\\u$c%04x"
@@ -146,7 +146,7 @@ object AttackPattern:
     private def char(c: Int): String = c match
       case '\\' | '"'               => s"\\${c.toChar}"
       case Named(e)                 => e
-      case c if isAsciiPrintable(c) => c.toChar.toString
+      case c if isASCIIPrintable(c) => c.toChar.toString
       case c if bytes || c < 0x80   => f"\\x$c%02X"
       case c if isSurrogate(c)      => UString(c).encode(UnitMode.Byte).map(b => f"\\x$b%02X").mkString
       case c if isShown(c)          => codePoint(c)
@@ -163,7 +163,7 @@ object AttackPattern:
     private def char(c: Int): String = c match
       case '\\' | '"'               => s"\\${c.toChar}"
       case Named(e)                 => e
-      case c if isAsciiPrintable(c) => c.toChar.toString
+      case c if isASCIIPrintable(c) => c.toChar.toString
       case c if isShown(c)          => codePoint(c)
       case c                        => utf16(c)
 
@@ -180,7 +180,7 @@ object AttackPattern:
       case '\\'                     => "\\\\"
       case '"'                      => "\\\""
       case Named(e)                 => e
-      case c if isAsciiPrintable(c) => c.toChar.toString
+      case c if isASCIIPrintable(c) => c.toChar.toString
       case c if isShown(c)          => codePoint(c)
       case c                        => utf16(c)
 
@@ -196,7 +196,7 @@ object AttackPattern:
     private def char(c: Int): String = c match
       case '\\' | '"' | '$' | '@'   => s"\\${c.toChar}"
       case Named(e)                 => e
-      case c if isAsciiPrintable(c) => c.toChar.toString
+      case c if isASCIIPrintable(c) => c.toChar.toString
       case c if c <= 0xff           => f"\\x$c%02X"
       case c                        => f"\\x{$c%X}"
 
@@ -208,7 +208,7 @@ object AttackPattern:
   final case class PHP(bytes: Boolean = false) extends Style:
     def literal(s: UString): String =
       val cs = s.chars(true).toSeq
-      if cs.forall(isAsciiPrintable) then
+      if cs.forall(isASCIIPrintable) then
         cs.map(c => if c == '\\' || c == '\'' then s"\\${c.toChar}" else c.toChar.toString).mkString("'", "", "'")
       else cs.map(char).mkString("\"", "", "\"")
     def repeat(s: UString, n: Int): String = s"str_repeat(${literal(s)}, $n)"
@@ -217,7 +217,7 @@ object AttackPattern:
     private def char(c: Int): String = c match
       case '\\' | '"' | '$'         => s"\\${c.toChar}"
       case Named(e)                 => e
-      case c if isAsciiPrintable(c) => c.toChar.toString
+      case c if isASCIIPrintable(c) => c.toChar.toString
       case c if bytes || c < 0x80   => f"\\x$c%02X"
       case c if isShown(c)          => codePoint(c)
       case c                        => f"\\u{$c%X}"
@@ -234,7 +234,7 @@ object AttackPattern:
   private lazy val Shown: CharSet =
     CharSet.union(Seq("L", "N", "P", "S").map(Properties.GeneralCategory.value(_).get.set))
 
-  private def isAsciiPrintable(c: Int): Boolean = 0x20 <= c && c <= 0x7e
+  private def isASCIIPrintable(c: Int): Boolean = 0x20 <= c && c <= 0x7e
 
   private def isShown(c: Int): Boolean = Shown.contains(c)
 
@@ -243,4 +243,4 @@ object AttackPattern:
   private def codePoint(c: Int): String = String.valueOf(Character.toChars(c))
 
   /** Returns the `\uXXXX` escapes of the UTF-16 code units of the code point. */
-  private def utf16(c: Int): String = UString(c).encode(UnitMode.Utf16).map(u => f"\\u$u%04X").mkString
+  private def utf16(c: Int): String = UString(c).encode(UnitMode.UTF16).map(u => f"\\u$u%04X").mkString

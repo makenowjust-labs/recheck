@@ -28,7 +28,7 @@ class DialectSuite extends munit.FunSuite:
     assertEquals(Python.Type.values.toSeq.map(_.name), Seq("str", "bytes"))
     assertEquals(Ruby.Encoding.values.toSeq.map(_.name), Seq("UTF-8", "ASCII-8BIT"))
     assertEquals(Python.Type.of("bytes"), Some(Python.Type.Bytes))
-    assertEquals(Ruby.Encoding.of("ASCII-8BIT"), Some(Ruby.Encoding.Ascii8Bit))
+    assertEquals(Ruby.Encoding.of("ASCII-8BIT"), Some(Ruby.Encoding.ASCII8Bit))
     assertEquals(Ruby.Encoding.of("str"), None)
     assertEquals(Python(), Python(Python.Type.Str))
     assertEquals(Perl(), Perl(utf8 = true, source = PerlSource.Literal))

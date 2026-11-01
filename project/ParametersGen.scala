@@ -112,7 +112,7 @@ object ParametersGen {
   object Target {
     case object Parameters extends Target("Parameters.scala", Seq("codes.quine.labs.recheck.common"))
     case object Codec extends Target("ParametersCodec.scala", Seq("codes.quine.labs.recheck", "codec"))
-    case object Cli extends Target("ParametersOpts.scala", Seq("codes.quine.labs.recheck.cli"))
+    case object CLI extends Target("ParametersOpts.scala", Seq("codes.quine.labs.recheck.cli"))
     case object SchemaTest extends Target("ParametersSchema.scala", Seq("codes.quine.labs.recheck.common"))
   }
 
@@ -121,7 +121,7 @@ object ParametersGen {
     val source = target match {
       case Target.Parameters => parameters(params)
       case Target.Codec      => codec(params)
-      case Target.Cli        => cli(params)
+      case Target.CLI        => cli(params)
       case Target.SchemaTest => schemaTest(params)
     }
     val file = target.pkg.flatMap(_.split('.')).foldLeft(dir)(_ / _) / target.fileName
@@ -274,7 +274,7 @@ object ParametersGen {
       "scala.concurrent.duration.Duration"
     ) ++ typeImportsOf(params)
     s"""|$header
-        |${packages(Target.Cli)}
+        |${packages(Target.CLI)}
         |
         |${imports(names)}
         |

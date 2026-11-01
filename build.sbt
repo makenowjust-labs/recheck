@@ -98,12 +98,13 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.recheck.diagnostics.*
       |import codes.quine.labs.recheck.fuzz.*
       |import codes.quine.labs.recheck.recall.*
-      |import codes.quine.labs.recheck.regexp.*
       |import codes.quine.labs.recheck.util.*
       |import codes.quine.labs.recheck.vm.*
       |import codes.quine.labs.resyntax.ast.Dialect
       |import codes.quine.labs.resyntax.ast.PerlSource
       |import codes.quine.labs.resyntax.charset.*
+      |import codes.quine.labs.resyntax.ir.*
+      |import codes.quine.labs.resyntax.ir.alphabet.*
       |
       |def logger: Context.Logger = (message: String) =>
       |  val date = java.time.LocalDateTime.now()
@@ -117,12 +118,12 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |  finally
       |    println(s"$name: ${(System.nanoTime() - start) / 1e9} s")
       |
-      |def parse(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): ParsedPattern =
-      |  time("parse")(ParsedPattern.parse(source, flags, dialect).toTry.get)
+      |def parse(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): (SourcePattern, IRPattern) =
+      |  time("parse")(SourcePattern.parse(source, flags, dialect).toTry.get)
       |
       |def compile(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): Program =
-      |  val pattern = parse(source, flags, dialect)
-      |  time("compile")(ProgramBuilder.build(pattern).get)
+      |  val (_, ir) = parse(source, flags, dialect)
+      |  time("compile")(ProgramBuilder.build(ir, dialect).get)
       |
       |def run(
       |    source: String,
@@ -137,8 +138,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |    needsHeatmap: Boolean = false,
       |    dialect: Dialect = Dialect.JavaScript
       |)(using ctx: Context): Interpreter.Result =
-      |  val pattern = parse(source, flags, dialect)
-      |  val program = time("compile")(ProgramBuilder.build(pattern).get)
+      |  val program = compile(source, flags, dialect)
       |  val uinput = UStringUtil.fromString(input)
       |  val opts = Interpreter.Options(
       |    limit = limit,
@@ -157,8 +157,8 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |    maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
       |    limit: Int = Parameters.DefaultIncubationLimit
       |)(using ctx: Context): Set[FString] =
-      |  val pattern = parse(source, flags)
-      |  time("seed")(StaticSeeder.seed(pattern, maxSimpleRepeatSize, maxInitialGenerationSize, limit))
+      |  val (pattern, ir) = parse(source, flags)
+      |  time("seed")(StaticSeeder.seed(ir, pattern.preferredChars, maxSimpleRepeatSize, maxInitialGenerationSize, limit))
       |
       |def validate(
       |  source: String,
@@ -166,7 +166,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |  pattern: AttackPattern,
       |  timeout: Duration = Duration(1, SECONDS)
       |)(using ctx: Context): Option[RecallValidation] =
-      |  time("validate")(RecallValidator.validate(parse(source, flags), pattern, timeout, env = sys.env)(RecallValidator.defaultExec.get))
+      |  time("validate")(RecallValidator.validate(parse(source, flags)._1, pattern, timeout, env = sys.env)(RecallValidator.defaultExec.get))
       |
       |""".stripMargin + ParametersGen.consoleCheck((ThisBuild / baseDirectory).value),
     // Settings for test:
@@ -238,6 +238,7 @@ lazy val resyntax = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.resyntax.*
       |import codes.quine.labs.resyntax.ast.*
       |import codes.quine.labs.resyntax.ir.*
+      |import codes.quine.labs.resyntax.ir.build.*
       |import codes.quine.labs.resyntax.parser.*
       |""".stripMargin,
     // Settings for test:
@@ -262,6 +263,8 @@ lazy val resyntaxCharset = crossProject(JVMPlatform, JSPlatform)
     name := "resyntax-charset",
     console / initialCommands := """
       |import codes.quine.labs.resyntax.charset.*
+      |import codes.quine.labs.resyntax.ir.*
+      |import codes.quine.labs.resyntax.ir.alphabet.*
       |""".stripMargin,
     coverageExcludedFiles := ".*[/\\\\]src_managed[/\\\\].*",
     // Generators:
@@ -356,7 +359,7 @@ lazy val cli = project
   .enablePlugins(NativeImagePlugin)
   .settings(
     name := "recheck-cli",
-    parametersGenerator(ParametersGen.Target.Cli),
+    parametersGenerator(ParametersGen.Target.CLI),
     NativeImage / name := "recheck",
     publish / skip := true,
     Compile / mainClass := Some("codes.quine.labs.recheck.cli.Main"),

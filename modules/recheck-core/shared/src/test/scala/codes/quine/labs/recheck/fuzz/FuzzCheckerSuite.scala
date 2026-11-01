@@ -10,7 +10,6 @@ import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.fuzz.FuzzChecker.Trace
-import codes.quine.labs.recheck.regexp.ParsedPattern
 
 class FuzzCheckerSuite extends munit.FunSuite:
 
@@ -29,11 +28,12 @@ class FuzzCheckerSuite extends munit.FunSuite:
       attackTimeout: Duration = Parameters.DefaultAttackTimeout
   ): Boolean =
     val result = for
-      pattern <- ParsedPattern.parse(source, flags).toTry
-      fuzz <- FuzzProgram.from(pattern)
+      (pattern, ir) <- SourcePattern.parse(source, flags).toTry
+      fuzz <- FuzzProgram.from(ir, pattern.dialect, pattern.preferredChars)
     yield FuzzChecker
       .check(
-        pattern,
+        ir,
+        pattern.preferredChars,
         fuzz,
         random = random0,
         maxGeneStringSize = if quick then 400 else 4000,
@@ -78,11 +78,12 @@ class FuzzCheckerSuite extends munit.FunSuite:
     // The checker can find an attack string on seeding phase.
     assert:
       val result = for
-        pattern <- ParsedPattern.parse("^(a?){50}a{50}$", "").toTry
-        fuzz <- FuzzProgram.from(pattern)
+        (pattern, ir) <- SourcePattern.parse("^(a?){50}a{50}$", "").toTry
+        fuzz <- FuzzProgram.from(ir, pattern.dialect, pattern.preferredChars)
       yield FuzzChecker
         .check(
-          pattern,
+          ir,
+          pattern.preferredChars,
           fuzz,
           random0,
           seedingLimit = 10000,
@@ -95,11 +96,12 @@ class FuzzCheckerSuite extends munit.FunSuite:
     // The checker cannot find too small attack string
     assert:
       val result = for
-        pattern <- ParsedPattern.parse("^(a|a)*$", "").toTry
-        fuzz <- FuzzProgram.from(pattern)
+        (pattern, ir) <- SourcePattern.parse("^(a|a)*$", "").toTry
+        fuzz <- FuzzProgram.from(ir, pattern.dialect, pattern.preferredChars)
       yield FuzzChecker
         .check(
-          pattern,
+          ir,
+          pattern.preferredChars,
           fuzz,
           random0,
           incubationLimit = 100,
@@ -112,11 +114,12 @@ class FuzzCheckerSuite extends munit.FunSuite:
 
   test("FuzzChecker#Population#toGeneration: failed strings rank last"):
     import Parameters.*
-    val pattern = ParsedPattern.parse("^(a|a)*$", "").toTry.get
+    val (pattern, ir) = SourcePattern.parse("^(a|a)*$", "").toTry.get
     val failed = (c: AttackComplexity.Vulnerable, _: Hotspot) => c == AttackComplexity.Exponential(true)
     val checker = new FuzzChecker(
-      pattern,
-      FuzzProgram.from(pattern).get,
+      ir,
+      pattern.preferredChars,
+      FuzzProgram.from(ir, pattern.dialect, pattern.preferredChars).get,
       random0,
       DefaultSeeder,
       DefaultMaxSimpleRepeatCount,

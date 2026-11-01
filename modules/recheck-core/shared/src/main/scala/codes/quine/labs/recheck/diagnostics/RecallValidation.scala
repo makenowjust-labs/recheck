@@ -6,12 +6,8 @@ import scala.concurrent.duration.FiniteDuration
 
 /** RecallValidation is a run of an attack string on the real regex engine of the dialect.
   *
-  * @param runtime
-  *   the runtime name and version, e.g. `python 3.15.0`
-  * @param timeout
-  *   the timeout of the matching
-  * @param result
-  *   the result of the matching
+  * `runtime` is the runtime name and version (e.g. `python 3.15.0`), and `result` is the result of the matching within
+  * `timeout`.
   */
 final case class RecallValidation(runtime: String, timeout: Duration, result: RecallResult):
 

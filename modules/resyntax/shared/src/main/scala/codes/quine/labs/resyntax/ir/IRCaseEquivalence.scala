@@ -46,8 +46,8 @@ object IRCaseEquivalence:
     override def closeRange(set: CharSet): CharSet =
       set.union(CaseMapping.SimpleUpper.preimage(set)).union(javaKey.preimage(set))
 
-  /** JavaAscii is Java's `CASE_INSENSITIVE` without `UNICODE_CASE`, which folds ASCII letters only. */
-  case object JavaAscii extends IRCaseEquivalence:
+  /** JavaASCII is Java's `CASE_INSENSITIVE` without `UNICODE_CASE`, which folds ASCII letters only. */
+  case object JavaASCII extends IRCaseEquivalence:
     def closure(set: CharSet): CharSet = asciiFold.closure(set)
 
   /** PCRERestrict is PCRE's caseless restrict (`r`) and Perl's `aa`, which fold no ASCII and non-ASCII characters
@@ -55,9 +55,9 @@ object IRCaseEquivalence:
     */
   final case class PCRERestrict(mapping: CaseMapping, mode: UnitMode) extends IRCaseEquivalence:
     def closure(set: CharSet): CharSet =
-      val ascii = set.intersect(Ascii)
-      val other = set.diff(Ascii)
-      mapping.closure(ascii).intersect(Ascii).union(mapping.closure(other).diff(Ascii)).restrict(mode)
+      val ascii = set.intersect(ASCII)
+      val other = set.diff(ASCII)
+      mapping.closure(ascii).intersect(ASCII).union(mapping.closure(other).diff(ASCII)).restrict(mode)
 
   /** PerlNative is Perl's `/d` rules without a reason to use Unicode rules.
     *
@@ -66,7 +66,7 @@ object IRCaseEquivalence:
     */
   final case class PerlNative(mode: UnitMode) extends IRCaseEquivalence:
     def closure(set: CharSet): CharSet =
-      set.union(CaseMapping.SimpleFold.closure(set).diff(IRCharClasses.Latin1)).restrict(mode)
+      set.union(CaseMapping.SimpleFold.closure(set).diff(Latin1)).restrict(mode)
 
   /** PerlLocale is Perl's `/l` rules in the C locale.
     *
@@ -78,9 +78,11 @@ object IRCaseEquivalence:
       val above = set.diff(Byte)
       asciiFold.closure(set.intersect(Byte)).union(CaseMapping.SimpleFold.closure(above).diff(Byte)).restrict(mode)
 
-  private val Ascii: CharSet = CharSet.range(0, 0x7f)
+  private val ASCII: CharSet = CharSet.range(0, 0x7f)
 
   private val Byte: CharSet = CharSet.range(0, 0xff)
+
+  private val Latin1: CharSet = CharSet.range(0x80, 0xff)
 
   lazy val asciiFold: CaseMapping = CaseMapping.fromEntries(('A'.toInt to 'Z').map(c => (c, c + 0x20)))
 
@@ -108,19 +110,27 @@ object IRCaseEquivalence:
   /** .NET's key `ToLowerInvariant(c)`, where `U+0130` is not lower-cased to `i`. */
   lazy val dotNetKey: CaseMapping = CaseMapping.SimpleLower.updated(Seq(0x130 -> 0x130))
 
-  /** @param perlNative
-    *   Perl's `/d` rules without a reason to use Unicode rules (see [[PerlNative]])
+  /** Returns the equivalence that a back-reference with the flags compares by.
+    *
+    * Perl's `/d` rules there are the rules of a native string, since the builder gives a reference `/u` instead when
+    * Unicode rules apply.
+    */
+  def ofBackReference(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRCaseEquivalence =
+    of(dialect, mode, flags, perlNative = dialect.isPerl && flags.charset == IRCharset.Default)
+
+  /** Returns the equivalence of the dialect under the flags, where `perlNative` means Perl's `/d` rules without a
+    * reason to use Unicode rules (see [[PerlNative]]).
     */
   def of(dialect: Dialect, mode: UnitMode, flags: IRCharFlags, perlNative: Boolean): IRCaseEquivalence =
     val asciiOnly = flags.charset match
-      case IRCharset.Ascii(_, _, _, _, _) => dialect.isPython
+      case IRCharset.ASCII(_, _, _, _, _) => dialect.isPython
       case _                              => false
     if !flags.ignoreCase then Identity
     else
       dialect match
         case Dialect.JavaScript =>
           Keyed("ECMAScript", CaseMapping.ecmaScriptCanonicalize(mode == UnitMode.CodePoint), mode)
-        case Dialect.Java   => if flags.unicodeCase then JavaUnicode else JavaAscii
+        case Dialect.Java   => if flags.unicodeCase then JavaUnicode else JavaASCII
         case Dialect.DotNet => Keyed(".NET", dotNetKey, mode)
         case _: Dialect.Python if asciiOnly || mode == UnitMode.Byte => Keyed("ASCII", asciiFold, mode)
         case _: Dialect.Python                                       => Keyed("Python", pythonKey, mode)

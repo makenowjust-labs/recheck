@@ -96,9 +96,7 @@ object IRNodeData:
     *
     * It has more than one index for a name shared by groups, and no index for a group that does not exist (Java). How a
     * reference chooses among the indices, and matches an unset capture, is [[IRBackReferenceSemantics]] of the pattern.
-    *
-    * @param flags
-    *   the flags at the reference, which decide how case-insensitive comparison works
+    * The flags at the reference decide how case-insensitive comparison works.
     */
   final case class BackReference(indices: Seq[Int], flags: IRCharFlags) extends IRNodeData
 

@@ -7,7 +7,7 @@ import codes.quine.labs.recheck.automaton.Complexity.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.data.Graph
 import codes.quine.labs.recheck.diagnostics.Hotspot
-import codes.quine.labs.recheck.regexp.Location
+import codes.quine.labs.resyntax.ast.SourceLocation
 
 /** ReDoS vulnerable RegExp checker based on automata theory. */
 object AutomatonChecker:
@@ -74,7 +74,7 @@ private final class AutomatonChecker[A, Q](
   private type B = (A, Set[Q])
 
   /** A type of a pair of pumps of witness and hotspots. */
-  private type Pump = (R, Seq[B], R, Seq[Location])
+  private type Pump = (R, Seq[B], R, Seq[SourceLocation])
 
   /** Tests whether the SCC is an atom, which is a singleton and does not have a self-loop. */
   private def isAtom(sc: Seq[R]): Boolean =
@@ -230,28 +230,28 @@ private final class AutomatonChecker[A, Q](
       pumps.foldLeft((Vector.empty[(Seq[A], Seq[A])], nfaWLA.initSet.toSet, Vector.empty[Hotspot.Spot])):
         case ((pumpPaths, last, spots), (q1, path, q2, pos)) =>
           val (prefix, _) = graph.path(last, q1).get
-          val newSpots = spots ++ pos.map { case Location(s, e) => Hotspot.Spot(s, e, Hotspot.Heat) } ++
-            this.spots(prefix, q1).map { case Location(s, e) => Hotspot.Spot(s, e, Hotspot.Normal) }
+          val newSpots = spots ++ pos.map { case SourceLocation(s, e) => Hotspot.Spot(s, e, Hotspot.Heat) } ++
+            this.spots(prefix, q1).map { case SourceLocation(s, e) => Hotspot.Spot(s, e, Hotspot.Normal) }
           (pumpPaths :+ (prefix.map(_._2._1), path.map(_._1)), Set(q2), newSpots)
     val suffix = nfaWLA.lookAheadDFA.toGraph.path(Set(nfaWLA.lookAheadDFA.init), qs.head._2).get._1.map(_._2).reverse
     (Witness(pumpPaths, suffix), Hotspot(spots))
 
   /** Gets hotspots positions from a path. */
-  private def spots(path: Seq[(R, B)], last: R): Seq[Location] =
+  private def spots(path: Seq[(R, B)], last: R): Seq[SourceLocation] =
     path
-      .foldRight((last, Vector.empty[Location])):
+      .foldRight((last, Vector.empty[SourceLocation])):
         case ((q1, a), (q2, spots)) =>
           (q1, spots ++ nfaWLA.sourcemap.getOrElse((q1, a, q2), Vector.empty))
       ._2
 
   /** Gets hotspots positions from a G2 path. */
-  private def spotsG2(path: Seq[((R, R), B)], last: (R, R)): Seq[Location] =
+  private def spotsG2(path: Seq[((R, R), B)], last: (R, R)): Seq[SourceLocation] =
     val spots1 = spots(path.map { case ((q1, _), a) => (q1, a) }, last._1)
     val spots2 = spots(path.map { case ((_, q2), a) => (q2, a) }, last._2)
     spots1 ++ spots2
 
   /** Gets hotspots positions from a G3 path. */
-  private def spotsG3(path: Seq[((R, R, R), B)], last: (R, R, R)): Seq[Location] =
+  private def spotsG3(path: Seq[((R, R, R), B)], last: (R, R, R)): Seq[SourceLocation] =
     val spots1 = spots(path.map { case ((q1, _, _), a) => (q1, a) }, last._1)
     val spots2 = spots(path.map { case ((_, q2, _), a) => (q2, a) }, last._2)
     val spots3 = spots(path.map { case ((_, _, q3), a) => (q3, a) }, last._3)

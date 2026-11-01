@@ -6,9 +6,6 @@ import scala.util.Try
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
-import codes.quine.labs.recheck.regexp.Location
-import codes.quine.labs.recheck.regexp.ParsedPattern
-import codes.quine.labs.recheck.regexp.PatternExtensions.*
 import codes.quine.labs.recheck.vm.Inst.AssertKind
 import codes.quine.labs.recheck.vm.Inst.Barrier
 import codes.quine.labs.recheck.vm.Inst.ReadKind
@@ -16,27 +13,31 @@ import codes.quine.labs.recheck.vm.Inst.VerbKind
 import codes.quine.labs.recheck.vm.Program.Meta
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRAssertKind
+import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
 import codes.quine.labs.resyntax.ir.IRBacktrackControl
-import codes.quine.labs.resyntax.ir.IRBuilder
+import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRCondition
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch
 import codes.quine.labs.resyntax.ir.IRLookBehindStarts
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
 import codes.quine.labs.resyntax.ir.IRNotEmpty
+import codes.quine.labs.resyntax.ir.IRPattern
 import codes.quine.labs.resyntax.ir.IRQuantifier
+import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
 /** ProgramBuilder is a builder of a program from a RegExp pattern. */
 object ProgramBuilder:
 
-  /** Builds a corresponding program from the RegExp pattern. */
-  def build(pattern: ParsedPattern)(using ctx: Context): Try[Program] =
+  /** Builds a corresponding program from the RegExp pattern, which runs as the engine of the dialect. */
+  def build(pattern: IRPattern, dialect: Dialect)(using ctx: Context): Try[Program] =
     for
       _ <- Try(())
-      capturesSize = pattern.capturesSize
-      builder = new ProgramBuilder(pattern, capturesSize)
+      capturesSize = pattern.captureCount
+      builder = new ProgramBuilder(pattern, dialect, capturesSize)
       program <- Try(builder.build())
     yield program
 
@@ -71,19 +72,20 @@ private[vm] enum AcceptScope:
   case Atomic
 
 private[vm] class ProgramBuilder(
-    private val pattern: ParsedPattern,
+    private val pattern: IRPattern,
+    private val dialect: Dialect,
     private val capturesSize: Int
 )(using ctx: Context):
   import ctx._
 
-  private val mode = pattern.ir.mode
+  private val mode = pattern.mode
 
   /** Whether captures in a repetition are reset on each iteration, which only JavaScript does. */
-  private val resetsCaptures = pattern.dialect.isJavaScript
+  private val resetsCaptures = dialect.isJavaScript
 
   /** Whether captures follow Perl's backtracking, which back-references and capture tests only see. */
   private val perlCaptures =
-    pattern.dialect.isPerl && pattern.node.exists:
+    dialect.isPerl && pattern.node.exists:
       case _: IRNodeData.BackReference                           => true
       case IRNodeData.Conditional(_: IRCondition.Captured, _, _) => true
       case _                                                     => false
@@ -92,10 +94,10 @@ private[vm] class ProgramBuilder(
     * which back-references only see.
     */
   private val holdsCaptures =
-    pattern.dialect.isJava && pattern.node.exists(_.isInstanceOf[IRNodeData.BackReference])
+    dialect.isJava && pattern.node.exists(_.isInstanceOf[IRNodeData.BackReference])
 
   /** Whether `(*THEN)` ends at a look-around assertion or a condition, as in PCRE but not in Perl. */
-  private val assertionIsThenScope = !pattern.dialect.isPerl
+  private val assertionIsThenScope = !dialect.isPerl
 
   /** Whether the pattern has the verbs skipping backtracking points, which need the barriers. */
   private val hasCut = pattern.node.exists:
@@ -316,7 +318,7 @@ private[vm] class ProgramBuilder(
 
   /** Emits the end of a successful match, which rejects an empty match with `(*NOTEMPTY)`. */
   def emitOk(): Unit =
-    pattern.ir.notEmpty match
+    pattern.notEmpty match
       case IRNotEmpty.Never    => ()
       case IRNotEmpty.Anywhere => emitInst(Inst.CheckNotEmpty(false))
       case IRNotEmpty.AtStart  => emitInst(Inst.CheckNotEmpty(true))
@@ -345,9 +347,9 @@ private[vm] class ProgramBuilder(
       // `\K` sets the start of the whole match, which is the capture `0`.
       case IRNodeData.ResetMatchStart        => emitInst(Inst.CapBegin(0))
       case IRNodeData.BacktrackControl(verb) => buildBacktrackControl(verb)
-      case IRNodeData.Chars(set)             => emitRead(readKind(set), Location.from(node.loc))
+      case IRNodeData.Chars(set)             => emitRead(readKind(set), node.loc.toOption)
       case IRNodeData.Strings(set)           =>
-        val loc = Location.from(node.loc)
+        val loc = node.loc.toOption
         // The strings are tried from the longest, and then the characters.
         val strings = set.strings.toSeq
           .sortBy(-_.length)
@@ -357,15 +359,15 @@ private[vm] class ProgramBuilder(
         val chars = Option.when(set.chars.nonEmpty)(() => emitRead(charsKind(set.chars), loc))
         buildAlternatives(strings ++ chars)
       case IRNodeData.BackReference(indices, flags) =>
-        val equivalence = IRBuilder.caseEquivalence(pattern.dialect, mode, flags)
-        val folding = IRBuilder.backReferenceFolding(pattern.dialect, mode, flags)
-        emitRead(ReadKind.Ref(indices, pattern.ir.backReference, equivalence, folding), Location.from(node.loc))
-      case IRNodeData.Unsupported(_) => throw new UnsupportedException(pattern.unsupportedMessage(node))
+        val equivalence = IRCaseEquivalence.ofBackReference(dialect, mode, flags)
+        val folding = IRBackReferenceFolding.of(dialect, mode, flags)
+        emitRead(ReadKind.Ref(indices, pattern.backReference, equivalence, folding), node.loc.toOption)
+      case IRNodeData.Unsupported(_) => throw new UnsupportedException(node.unsupportedMessage)
 
   /** Returns the read kind of a set of a character node. */
   def readKind(set: CharSet): ReadKind =
     if set == mode.universe then ReadKind.Any
-    else if prefersComplement(set, mode) then ReadKind.ClassNot(set.complement(mode))
+    else if PatternAlphabet.prefersComplement(set, mode) then ReadKind.ClassNot(set.complement(mode))
     else charsKind(set)
 
   def charsKind(set: CharSet): ReadKind =
@@ -443,7 +445,7 @@ private[vm] class ProgramBuilder(
 
     for ((child, (l, r)), i) <- children.zip(labels).zipWithIndex do
       val last = i == children.size - 1
-      val captures = child.captureRange.range
+      val captures = child.captureRange
       if last && captures.isEmpty then
         run(i)
         emitTerminator(Inst.Jmp(cont))
@@ -566,7 +568,7 @@ private[vm] class ProgramBuilder(
       emitTerminator(Inst.Jmp(exit))
       enterBlock(exit)
 
-  def emptyIteration(quantifier: IRQuantifier): EmptyIteration = pattern.dialect match
+  def emptyIteration(quantifier: IRQuantifier): EmptyIteration = dialect match
     case Dialect.JavaScript => EmptyIteration.Reject
     case _: Dialect.Python  => EmptyIteration.ExitOptional
     case Dialect.Java       => EmptyIteration.ExitAll
@@ -661,7 +663,7 @@ private[vm] class ProgramBuilder(
 
   /** Emits a `cap-reset` if captures are reset on each iteration, then execute a `run`. */
   def wrapReset(child: IRNode)(run: => Unit): Unit =
-    if resetsCaptures then for (min, max) <- child.captureRange.range do emitInst(Inst.CapReset(min, max))
+    if resetsCaptures then for (min, max) <- child.captureRange do emitInst(Inst.CapReset(min, max))
     run
 
   /** A builder for an atomic group, which commits the first match of the child.
@@ -675,7 +677,7 @@ private[vm] class ProgramBuilder(
     emitTerminator(Inst.Tx(main, Some(cont), None))
 
     enterBlock(main)
-    if pattern.dialect.isPerl then withAcceptScope(AcceptScope.Atomic)(build(child))
+    if dialect.isPerl then withAcceptScope(AcceptScope.Atomic)(build(child))
     else
       atomicDepth += 1
       build(child)
@@ -687,7 +689,7 @@ private[vm] class ProgramBuilder(
 
   /** Emits `cap_hold` of the captures in the node, if they are held over backtracking. */
   def emitHold(node: IRNode): Unit =
-    if holdsCaptures then for (from, to) <- node.captureRange.range do emitInst(Inst.CapHold(from, to))
+    if holdsCaptures then for (from, to) <- node.captureRange do emitInst(Inst.CapHold(from, to))
 
   def withAcceptScope(scope: AcceptScope)(run: => Unit): Unit =
     val saved = (acceptScope, openCaptures, atomicDepth)
@@ -767,7 +769,7 @@ private[vm] class ProgramBuilder(
     def buildTest(negative: Boolean, child: IRNode, body: IRNode => Unit): Unit =
       val main = allocateLabel("main")
       val scope = assertionThenScope(child)
-      val restores = negative && pattern.dialect.isDotNet
+      val restores = negative && dialect.isDotNet
       val (rollback, fallback) = if negative && !restores then (noLabel, yesLabel) else (yesLabel, noLabel)
       emitTerminator(Inst.Tx(main, Some(rollback), Some(fallback), Option.when(hasCut)(Barrier.Assertion(scope))))
       enterBlock(main)
@@ -874,5 +876,5 @@ private[vm] class ProgramBuilder(
     emitInst(Inst.Assert(kind))
 
   /** Adds a `read` (or `read_back`) instruction. */
-  def emitRead(kind: ReadKind, loc: Option[Location]): Unit =
+  def emitRead(kind: ReadKind, loc: Option[SourceLocation]): Unit =
     emitInst(if back then Inst.ReadBack(kind, loc) else Inst.Read(kind, loc))

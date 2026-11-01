@@ -7,7 +7,6 @@ import scala.concurrent.duration.Duration
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.regexp.PatternAlphabet
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.recheck.vm.Inst.ReadKind
@@ -19,6 +18,7 @@ import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Status
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
 /** DynamicSeeder computes an initial generation for the pattern with dynamic analysis. */
 object DynamicSeeder:

@@ -15,23 +15,21 @@ final case class Program(blocks: Vector[(Label, Block)], meta: Meta):
 
 object Program:
 
-  /** Meta is a meta information of a program for matching and analysis.
-    *
-    * @param mode
-    *   the unit of characters, where the input is UTF-16 code units for `Utf16` and `CodePoint`, and bytes for `Byte`
-    * @param hasRef
-    *   whether the program reads the captures (back-references, capture tests and `check_not_empty`), which a matching
-    *   state includes then
-    * @param hasVerb
-    *   whether the program has `verb` instructions, which skip backtracking points, so memoization cannot be used
-    * @param hasLeave
-    *   whether the program has `leave` instructions, after which the matching depends on the start of the look-around,
-    *   so memoization cannot be used
-    */
+  /** Meta is a meta information of a program for matching and analysis. */
   final case class Meta(
+      /** The unit of characters, where the input is UTF-16 code units for `UTF16` and `CodePoint`, and bytes for
+        * `Byte`.
+        */
       mode: UnitMode,
+      /** Whether the program reads the captures (back-references, capture tests and `check_not_empty`), which a
+        * matching state includes then.
+        */
       hasRef: Boolean,
+      /** Whether the program has `verb` instructions, which skip backtracking points, so memoization cannot be used. */
       hasVerb: Boolean,
+      /** Whether the program has `leave` instructions, after which the matching depends on the start of the
+        * look-around, so memoization cannot be used.
+        */
       hasLeave: Boolean,
       capturesSize: Int,
       countersSize: Int,

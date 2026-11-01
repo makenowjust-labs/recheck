@@ -65,7 +65,7 @@ class MainSuite extends munit.FunSuite:
     assertEquals(
       Main.command.parse(Seq("/foo/", "--dialect=ruby", "--ruby-encoding=ASCII-8BIT")),
       Right(
-        Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Ruby(Dialect.Ruby.Encoding.Ascii8Bit)))
+        Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Ruby(Dialect.Ruby.Encoding.ASCII8Bit)))
       )
     )
     assertEquals(

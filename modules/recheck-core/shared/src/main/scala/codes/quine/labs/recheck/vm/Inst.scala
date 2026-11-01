@@ -2,8 +2,8 @@ package codes.quine.labs.recheck.vm
 
 import scala.compiletime.uninitialized
 
-import codes.quine.labs.recheck.regexp.EcmaScriptChars
-import codes.quine.labs.recheck.regexp.Location
+import codes.quine.labs.recheck.util.ECMAScriptNotation
+import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
@@ -179,19 +179,19 @@ object Inst:
     override def toString: String = s"assert $kind"
 
   /** `read`: Tests current position with advancing. */
-  final case class Read(kind: ReadKind, loc: Option[Location]) extends NonTerminator:
+  final case class Read(kind: ReadKind, loc: Option[SourceLocation]) extends NonTerminator:
     override def toString: String =
       val loc = this.loc match
-        case Some(Location(start, end)) => s" ; $start-$end"
-        case None                       => ""
+        case Some(SourceLocation(start, end)) => s" ; $start-$end"
+        case None                             => ""
       s"read $kind$loc"
 
   /** `read_back`: Tests current position with receding. */
-  final case class ReadBack(kind: ReadKind, loc: Option[Location]) extends NonTerminator:
+  final case class ReadBack(kind: ReadKind, loc: Option[SourceLocation]) extends NonTerminator:
     override def toString: String =
       val loc = this.loc match
-        case Some(Location(start, end)) => s" ; $start-$end"
-        case None                       => ""
+        case Some(SourceLocation(start, end)) => s" ; $start-$end"
+        case None                             => ""
       s"read_back $kind$loc"
 
   /** `cap_begin`: Captures current position as a beginning of a capture `index`. */
@@ -281,11 +281,7 @@ object Inst:
     final case class MarkWordBoundaryNot(word: CharSet, marks: IRWordMarks) extends AssertKind:
       override def toString: String = "mark_word_boundary_not"
 
-    /** `^` assertion with `m` flag.
-      *
-      * @param atEnd
-      *   where it matches at the end of the input
-      */
+    /** `^` assertion with `m` flag, which `atEnd` tells where it matches at the end of the input. */
     final case class LineBegin(terminators: IRLineTerminators, atEnd: IRLineBeginAtEnd) extends AssertKind:
       override def toString: String = "line_begin"
 
@@ -324,29 +320,24 @@ object Inst:
 
     /** An usual character matching. */
     final case class Char(c: Int) extends ReadKind:
-      override def toString: String = s"char '${EcmaScriptChars.showChar(c)}'"
+      override def toString: String = s"char '${ECMAScriptNotation.showChar(c)}'"
 
     /** A character class matching. */
     final case class Class(s: CharSet) extends ReadKind:
-      override def toString: String = s"class ${EcmaScriptChars.showClass(s)}"
+      override def toString: String = s"class ${ECMAScriptNotation.showClass(s)}"
 
     /** An inverted character class matching. */
     final case class ClassNot(s: CharSet) extends ReadKind:
-      override def toString: String = s"class_not ${EcmaScriptChars.showClass(s)}"
+      override def toString: String = s"class_not ${ECMAScriptNotation.showClass(s)}"
 
-    /** A capture reference matching.
-      *
-      * @param indices
-      *   the capture indices, which are more than one for a name shared by groups
-      * @param equivalence
-      *   the comparison of characters, which is not the identity for a case-insensitive reference
-      * @param folding
-      *   how a case-insensitive reference compares the capture with the input
-      */
+    /** A capture reference matching. */
     final case class Ref(
+        /** The capture indices, which are more than one for a name shared by groups. */
         indices: Seq[Int],
         semantics: IRBackReferenceSemantics,
+        /** The comparison of characters, which is not the identity for a case-insensitive reference. */
         equivalence: IRCaseEquivalence,
+        /** How a case-insensitive reference compares the capture with the input. */
         folding: IRBackReferenceFolding = IRBackReferenceFolding.Simple
     ) extends ReadKind:
       override def toString: String =
