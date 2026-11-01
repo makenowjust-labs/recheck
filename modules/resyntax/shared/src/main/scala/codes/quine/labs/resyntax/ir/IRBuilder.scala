@@ -337,7 +337,7 @@ private[ir] class IRBuilder(
     children match
       case Seq()     => Left(IRNodeData.Empty)
       case children0 =>
-        val children = chars.joinRubyByteRepeats(children0)
+        val children = chars.joinRubyByteRepeats(children0).toIndexedSeq
         val nodes = Seq.newBuilder[IRNode]
         var i = 0
         while i < children.length do

@@ -155,7 +155,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
           lits += Lit(value, false, Some(style), flags, node.loc)
         case data => throw new IllegalArgumentException(s"Not a literal: $data")
     val merged =
-      if dialect.isRuby && mode == UnitMode.CodePoint then mergeRubyBytes(lits.toSeq) else lits.toSeq
+      if dialect.isRuby && mode == UnitMode.CodePoint then mergeRubyBytes(lits.toIndexedSeq) else lits.toIndexedSeq
     val units = mergeSurrogates(merged).flatMap: lit =>
       unitsOf(lit) match
         case Seq() => Seq(lit.copy(value = NoUnit))
@@ -195,7 +195,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
     * the folding of a character (e.g. `ss`) also match the character; both are alternations, longest first. Folds
     * across literal boundaries, classes, groups or quantifiers are not reproduced.
     */
-  private def foldRun(units: Seq[Lit]): Seq[IRNode] =
+  private def foldRun(units: IndexedSeq[Lit]): Seq[IRNode] =
     val flags = units.head.flags
     val eq = equivalence(flags)
     val native = perlNative(flags)
@@ -244,7 +244,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       out.result()
 
   /** Joins a surrogate pair of literals, which the parser reads by code units, into a code point. */
-  private def mergeSurrogates(lits: Seq[Lit]): Seq[Lit] =
+  private def mergeSurrogates(lits: IndexedSeq[Lit]): IndexedSeq[Lit] =
     if !readsUnits || mode == UnitMode.Utf16 then lits
     else
       val out = mutable.ArrayBuffer.empty[Lit]
@@ -259,13 +259,13 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         else
           out += lit
           i += 1
-      out.toSeq
+      out.toIndexedSeq
 
   /** Decodes Ruby's byte escapes (e.g. `\xC3\xA9`) of a UTF-8 regexp into code points.
     *
     * Onigmo reads them as the bytes of a multibyte character, and rejects an invalid sequence.
     */
-  private def mergeRubyBytes(lits: Seq[Lit]): Seq[Lit] =
+  private def mergeRubyBytes(lits: IndexedSeq[Lit]): IndexedSeq[Lit] =
     val out = mutable.ArrayBuffer.empty[Lit]
     var i = 0
     while i < lits.length do
@@ -282,7 +282,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       else
         out += lit
         i += 1
-    out.toSeq
+    out.toIndexedSeq
 
   private def isRubyByteLit(lit: Lit): Boolean = lit.escape.exists(isRubyByte(_, lit.value))
 
@@ -561,7 +561,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
 
   /** Resolves a folding as a run of literals, which is how Ruby and Perl match it. */
   private def foldString(key: UString, flags: IRCharFlags, loc: SourceLocation): IRNodeData =
-    sequenceOf(foldRun(key.iterator.map(c => Lit(c, true, None, flags, loc)).toSeq))
+    sequenceOf(foldRun(key.iterator.map(c => Lit(c, true, None, flags, loc)).toIndexedSeq))
 
   private def negate(item: ClassItem, flags: IRCharFlags): ClassSet = item.data match
     // .NET's `[^a-z-[aeiou]]` negates the base before the subtraction.
@@ -585,7 +585,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
 
   private def classItem(item: ClassItem, flags: IRCharFlags): ClassSet =
     item.data match
-      case ClassItemData.ClassUnion(items)              => classUnion(items, flags)
+      case ClassItemData.ClassUnion(items)              => classUnion(items.toIndexedSeq, flags)
       case ClassItemData.ClassIntersection(left, right) => classItem(left, flags).intersect(classItem(right, flags))
       case ClassItemData.ClassDiff(left, right)         => classItem(left, flags).diff(classItem(right, flags))
       case ClassItemData.ClassNest(invert, inner)       =>
@@ -605,7 +605,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
       case value: ClassItemData.ClassValue => ClassSet(closeChars(valueUnits(value, flags, item.loc), flags))
 
   /** Evaluates a union, with Ruby's byte escapes (e.g. `[\xC3\xA9]`). */
-  private def classUnion(items: Seq[ClassItem], flags: IRCharFlags): ClassSet =
+  private def classUnion(items: IndexedSeq[ClassItem], flags: IRCharFlags): ClassSet =
     var result = ClassSet.empty
     var i = 0
     while i < items.length do
@@ -626,7 +626,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
             checkRubyBytePrefix(lits)
             throw new NotModeledException
           if rangeByteAt(items, i - 1, begin = false) then throw new NotModeledException
-          val decoded = mergeRubyBytesInClass(lits)
+          val decoded = mergeRubyBytes(lits)
           result = result.union(ClassSet(closeChars(decoded.map(_.value), flags)))
           i += bytes.length
         case ClassItemData.ClassRange(begin, end)
@@ -659,19 +659,12 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         case _                              => false)
 
   /** Checks the bytes before a range, whose last character may continue into the range's begin. */
-  private def checkRubyBytePrefix(lits: Seq[Lit]): Unit =
+  private def checkRubyBytePrefix(lits: IndexedSeq[Lit]): Unit =
     var i = 0
     while i < lits.length do
       val n = utf8Length(lits(i).value)
       if n < 2 then throw new IRBuildingException("Invalid multibyte escape", lits(i).loc)
       i += n
-
-  /** Decodes all the byte escapes of a class item run; a sequence must be complete. */
-  private def mergeRubyBytesInClass(lits: Seq[Lit]): Seq[Lit] =
-    val n = utf8Length(lits.head.value)
-    if n < 2 || n > lits.length then throw new IRBuildingException("Invalid multibyte escape", lits.head.loc)
-    val decoded = mergeRubyBytes(lits.take(n))
-    if lits.length > n then decoded ++ mergeRubyBytesInClass(lits.drop(n)) else decoded
 
   private def valueUnits(value: ClassItemData.ClassValue, flags: IRCharFlags, loc: SourceLocation): Seq[Int] =
     val lit = value match

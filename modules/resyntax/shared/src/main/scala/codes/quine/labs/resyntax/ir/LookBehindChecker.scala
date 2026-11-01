@@ -241,7 +241,7 @@ private[ir] final class LookBehindChecker(
       else if widths.distinct.size == 1 then widths.head
       else RubyWidth.Variable
     case NodeData.Sequence(nodes) =>
-      rubyChars(nodes).foldLeft[RubyWidth](RubyWidth.Fixed(0)) {
+      rubyChars(nodes.toIndexedSeq).foldLeft[RubyWidth](RubyWidth.Fixed(0)) {
         case (RubyWidth.Fixed(l), RubyWidth.Fixed(r))          => RubyWidth.Fixed(l + r)
         case (RubyWidth.Variable, _) | (_, RubyWidth.Variable) => RubyWidth.Variable
         case _                                                 => RubyWidth.Unknown
@@ -276,7 +276,7 @@ private[ir] final class LookBehindChecker(
     if w.min == w.max then RubyWidth.Fixed(w.min) else RubyWidth.Variable
 
   /** Returns the widths of the nodes, where the escapes of the bytes of a character are together (e.g. `\xC3\xA9`). */
-  private def rubyChars(nodes: Seq[Node]): Seq[RubyWidth] =
+  private def rubyChars(nodes: IndexedSeq[Node]): Seq[RubyWidth] =
     def byte(node: Node): Option[Int] = node.data match
       case NodeData.Backslash(BackslashKind.Escape(style, value)) if IRCharResolver.isRubyByte(style, value) =>
         Some(value)
