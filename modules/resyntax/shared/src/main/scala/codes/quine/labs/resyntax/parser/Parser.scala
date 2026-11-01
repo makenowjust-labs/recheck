@@ -31,6 +31,7 @@ import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ast.QuoteLiteral
 import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.ast.SourceLocation
+import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.parser.Parser.ParsingContext
 
 object Parser:
@@ -80,6 +81,30 @@ object Parser:
         throw new ParsingException(ex.message, ex.pos.map(pos => rewrites.foldLeft(pos)((p, r) => r.position(p))))
       case ex: NestingLimitException if rewrites.nonEmpty =>
         throw new NestingLimitException(ex.limit, rewrites.foldLeft(ex.pos)((p, r) => r.position(p)))
+
+  /** Determines the unit of the input of the pattern, which is `IRPattern.mode` of its IR, without parsing the source.
+    *
+    * It reads only PCRE's start options of the source.
+    */
+  def determineUnitMode(source: String, flagSet: FlagSet, dialect: Dialect): UnitMode =
+    determineUnitMode(flagSet, dialect, dialect.isPCRE && SourcePrescan.from(source).hasUTFStartOption)
+
+  /** Determines the unit of the input, where `hasUTFStartOption` is whether PCRE's `(*UTF)` starts the pattern. */
+  private[resyntax] def determineUnitMode(flagSet: FlagSet, dialect: Dialect, hasUTFStartOption: Boolean): UnitMode =
+    dialect match
+      case Dialect.JavaScript =>
+        if flagSet.unicode || flagSet.unicodeSets then UnitMode.CodePoint else UnitMode.UTF16
+      // Java matches code points, and reads a lone surrogate as a code point too.
+      case Dialect.Java        => UnitMode.CodePoint
+      case Dialect.DotNet      => UnitMode.UTF16
+      case Dialect.Python(tpe) =>
+        if tpe == Dialect.Python.Type.Bytes then UnitMode.Byte else UnitMode.CodePoint
+      // Ruby's `n` is the encoding option (NOENCODING), which `FlagSet` keeps as `explicitCapture`.
+      case Dialect.Ruby(encoding) =>
+        if flagSet.explicitCapture || encoding == Dialect.Ruby.Encoding.ASCII8Bit then UnitMode.Byte
+        else UnitMode.CodePoint
+      case Dialect.Perl(utf8, _) => if utf8 then UnitMode.CodePoint else UnitMode.Byte
+      case Dialect.PCRE          => if flagSet.unicode || hasUTFStartOption then UnitMode.CodePoint else UnitMode.Byte
 
   private def checkEncoding(source: String, encoding: SourceEncoding): Unit =
     if encoding == SourceEncoding.Latin1 then

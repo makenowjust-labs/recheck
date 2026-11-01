@@ -24,6 +24,7 @@ import codes.quine.labs.resyntax.ir.IRLookBehindStarts.Longest
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.ir.IRQuantifier.*
 import codes.quine.labs.resyntax.ir.build.IRCharClasses.ASCIIWord
+import codes.quine.labs.resyntax.parser.Parser
 
 class IRBuilderSuite extends IRSuiteBase:
   // Disjunction
@@ -353,7 +354,7 @@ class IRBuilderSuite extends IRSuiteBase:
   def referenceOf(d: Dialect, flags: String = "", unicode: Boolean = true): IRNodeData =
     val charFlags = flagsOf(d, flags)
     val referenceFlags = if d.isPerl && unicode then charFlags.copy(charset = IRCharset.Unicode) else charFlags
-    val mode = IRBuilder.unitMode("", FlagSet.parse(flags, d), d)
+    val mode = Parser.determineUnitMode("", FlagSet.parse(flags, d), d)
     BackReference(
       Seq(1),
       IRCaseEquivalence.ofBackReference(d, mode, referenceFlags),
@@ -430,7 +431,7 @@ class IRBuilderSuite extends IRSuiteBase:
     val pattern = IRBuilder.build(Node(NodeData.Literal('a')), FlagSet(), JavaScript)
     assertEquals(pattern.node.data, Chars(CharSet.single('a')))
 
-  test("IRBuilder.unitMode: the mode of the IR"):
+  test("Parser.determineUnitMode: the mode of the IR"):
     val cases = Seq(
       ("a", "", JavaScript, UnitMode.UTF16),
       ("a", "u", JavaScript, UnitMode.CodePoint),
@@ -451,7 +452,7 @@ class IRBuilderSuite extends IRSuiteBase:
     )
     for (source, flags, dialect, mode) <- cases do
       val flagSet = FlagSet.parse(flags, dialect)
-      assertEquals(IRBuilder.unitMode(source, flagSet, dialect), mode, (source, flags, dialect))
+      assertEquals(Parser.determineUnitMode(source, flagSet, dialect), mode, (source, flags, dialect))
       assertEquals(build(source, flags, dialect)._1.mode, mode, (source, flags, dialect))
 
   test("IRBuilder.build: the semantics of the dialect"):

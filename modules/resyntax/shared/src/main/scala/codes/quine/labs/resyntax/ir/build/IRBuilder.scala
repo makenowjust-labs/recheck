@@ -23,7 +23,7 @@ import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.UnitMode
-import codes.quine.labs.resyntax.parser.SourcePrescan
+import codes.quine.labs.resyntax.parser.Parser
 
 object IRBuilder:
 
@@ -41,7 +41,7 @@ object IRBuilder:
   ): IRPattern =
     val starts = startOptions(node)
     val featureSet = IRFeatureSet.from(flagSet, dialect, starts)
-    val mode = unitMode(dialect, flagSet, featureSet.utf)
+    val mode = Parser.determineUnitMode(flagSet, dialect, featureSet.utf)
     if dialect.isPython && mode == UnitMode.CodePoint && flagSet.localeUpper then
       throw new IRBuildingException("Cannot use LOCALE flag with a str pattern", SourceLocation.Invalid)
     if dialect.isPython && mode == UnitMode.Byte && flagSet.unicode then
@@ -114,30 +114,6 @@ object IRBuilder:
 
   private def backtrackControlSemantics(dialect: Dialect): IRBacktrackControlSemantics =
     IRBacktrackControlSemantics(thenPassesAssertions = dialect.isPerl, acceptEndsAtomic = dialect.isPerl)
-
-  /** Returns the unit of the input of the pattern, which is [[IRPattern.mode]] of its IR, without parsing the source.
-    *
-    * It reads only PCRE's start options of the source.
-    */
-  def unitMode(source: String, flagSet: FlagSet, dialect: Dialect): UnitMode =
-    unitMode(dialect, flagSet, dialect.isPCRE && SourcePrescan.from(source).hasUTFStartOption)
-
-  /** Returns the unit of the input, where `utf` is PCRE's `(*UTF)` start option. */
-  private def unitMode(dialect: Dialect, flagSet: FlagSet, utf: Boolean): UnitMode =
-    dialect match
-      case Dialect.JavaScript =>
-        if flagSet.unicode || flagSet.unicodeSets then UnitMode.CodePoint else UnitMode.UTF16
-      // Java matches code points, and reads a lone surrogate as a code point too.
-      case Dialect.Java        => UnitMode.CodePoint
-      case Dialect.DotNet      => UnitMode.UTF16
-      case Dialect.Python(tpe) =>
-        if tpe == Dialect.Python.Type.Bytes then UnitMode.Byte else UnitMode.CodePoint
-      // Ruby's `n` is the encoding option (NOENCODING), which `FlagSet` keeps as `explicitCapture`.
-      case Dialect.Ruby(encoding) =>
-        if flagSet.explicitCapture || encoding == Dialect.Ruby.Encoding.ASCII8Bit then UnitMode.Byte
-        else UnitMode.CodePoint
-      case Dialect.Perl(utf8, _) => if utf8 then UnitMode.CodePoint else UnitMode.Byte
-      case Dialect.PCRE          => if flagSet.unicode || utf then UnitMode.CodePoint else UnitMode.Byte
 
   /** Checks whether Perl takes the full case folding of the character under the flags (e.g. `ß` as `ss`). */
   private def perlFoldsMulti(value: Int, flags: IRCharFlags, perlUnicodeRules: Boolean): Boolean =
