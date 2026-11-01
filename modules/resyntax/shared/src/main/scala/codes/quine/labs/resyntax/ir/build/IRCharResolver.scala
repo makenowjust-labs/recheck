@@ -40,7 +40,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
       (flags.charset == IRCharset.Default && !perlUnicodeRules || flags.charset == IRCharset.Locale)
 
   def equivalence(flags: IRCharFlags): IRCaseEquivalence =
-    IRCaseEquivalence.of(dialect, mode, flags, perlNative(flags))
+    determineCaseEquivalence(dialect, mode, flags, perlNative(flags))
 
   /** Resolves a back-reference to the captures of the indices at the flags, which decide how it compares the capture
     * with the input.
@@ -54,8 +54,8 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
       else flags
     IRNodeData.BackReference(
       indices,
-      IRCaseEquivalence.ofBackReference(dialect, mode, referenceFlags),
-      IRBackReferenceFolding.of(dialect, mode, referenceFlags)
+      determineBackReferenceCaseEquivalence(dialect, mode, referenceFlags),
+      determineBackReferenceFolding(dialect, mode, referenceFlags)
     )
 
   /** Returns the word characters of `\b` and `\B` at the flags. */
@@ -638,7 +638,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
             Lit(value, false, Some(style), flags, b.loc)
           // Bytes of a character continued into a range endpoint (e.g. `[\xC3\xA0-\xC3\xA9]`) are not modeled.
           if rangeByteAt(items, i + bytes.length, begin = true) then
-            checkRubyBytePrefix(lits)
+            validateRubyBytePrefix(lits)
             throw new NotModeledException
           if rangeByteAt(items, i - 1, begin = false) then throw new NotModeledException
           val decoded = mergeRubyBytes(lits)
@@ -673,8 +673,8 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
         case ClassItemData.ClassRange(b, e) => isRubyByteValue(if begin then b.data else e.data)
         case _                              => false)
 
-  /** Checks the bytes before a range, whose last character may continue into the range's begin. */
-  private def checkRubyBytePrefix(lits: IndexedSeq[Lit]): Unit =
+  /** Validates the bytes before a range, whose last character may continue into the range's begin. */
+  private def validateRubyBytePrefix(lits: IndexedSeq[Lit]): Unit =
     var i = 0
     while i < lits.length do
       val n = utf8Length(lits(i).value)
@@ -847,3 +847,74 @@ private[build] object IRCharResolver:
         IRProperties.isJavaScriptStringProperty(name)
       case ClassItemData.ClassBackslashClass(EscapeClassKind.QuoteSet(strings)) => strings.exists(_.length != 1)
       case _                                                                    => false
+
+  /** Python's key `upper(lower(c))`.
+    *
+    * `re` compares lower cases, and also the lower cases sharing the upper case (`re._casefix`); the upper case there
+    * is the full mapping, so the pairs whose upper case is two or more characters are added.
+    */
+  lazy val pythonKey: CaseMapping =
+    val domain = CaseMapping.SimpleUpper.domain.union(CaseMapping.SimpleLower.domain)
+    val simple = domain.iterator.map(c => (c, CaseMapping.SimpleUpper(CaseMapping.SimpleLower(c))))
+    val full = Seq(0x1fd3 -> 0x390, 0x1fe3 -> 0x3b0, 0xfb06 -> 0xfb05)
+    CaseMapping.fromEntries(simple ++ full)
+
+  /** .NET's key `ToLowerInvariant(c)`, where `U+0130` is not lower-cased to `i`. */
+  lazy val dotNetKey: CaseMapping = CaseMapping.SimpleLower.updated(Seq(0x130 -> 0x130))
+
+  /** Determines the equivalence that a back-reference with the flags compares by.
+    *
+    * Perl's `/d` rules there are the rules of a native string, since the builder gives a reference `/u` instead when
+    * Unicode rules apply.
+    */
+  def determineBackReferenceCaseEquivalence(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRCaseEquivalence =
+    determineCaseEquivalence(dialect, mode, flags, perlNative = dialect.isPerl && flags.charset == IRCharset.Default)
+
+  /** Determines the equivalence of the dialect under the flags, where `perlNative` means Perl's `/d` rules without a
+    * reason to use Unicode rules (see [[IRCaseEquivalence.PerlNative]]).
+    */
+  def determineCaseEquivalence(
+      dialect: Dialect,
+      mode: UnitMode,
+      flags: IRCharFlags,
+      perlNative: Boolean
+  ): IRCaseEquivalence =
+    import IRCaseEquivalence.*
+    val asciiOnly = flags.charset match
+      case IRCharset.ASCII(_, _, _, _, _) => dialect.isPython
+      case _                              => false
+    if !flags.ignoreCase then Identity
+    else
+      dialect match
+        case Dialect.JavaScript =>
+          Keyed("ECMAScript", CaseMapping.ecmaScriptCanonicalize(mode == UnitMode.CodePoint), mode)
+        case Dialect.Java   => if flags.unicodeCase then JavaUnicode else JavaASCII
+        case Dialect.DotNet => Keyed(".NET", dotNetKey, mode)
+        case _: Dialect.Python if asciiOnly || mode == UnitMode.Byte => Keyed("ASCII", asciiFold, mode)
+        case _: Dialect.Python                                       => Keyed("Python", pythonKey, mode)
+        case _: Dialect.Ruby if mode == UnitMode.Byte                => Keyed("ASCII", asciiFold, mode)
+        case _: Dialect.Ruby => Keyed("simple folding", CaseMapping.SimpleFold, mode)
+        case _: Dialect.Perl if flags.charset == IRCharset.Locale => PerlLocale(mode)
+        case _: Dialect.Perl if perlNative                        => PerlNative(mode)
+        case _: Dialect.Perl if flags.caselessRestrict            => PCRERestrict(CaseMapping.SimpleFold, mode)
+        case _: Dialect.Perl => Keyed("simple folding", CaseMapping.SimpleFold, mode)
+        // PCRE folds non-ASCII characters only in UTF or UCP mode; PHP's `u` sets both.
+        case Dialect.PCRE if mode == UnitMode.Byte && !flags.unicodeClass => Keyed("ASCII", asciiFold, mode)
+        case Dialect.PCRE                                                 =>
+          val mapping = if flags.turkishCasing then CaseMapping.SimpleFoldTurkic else CaseMapping.SimpleFold
+          if flags.caselessRestrict then PCRERestrict(mapping, mode) else Keyed("simple folding", mapping, mode)
+
+  /** Determines how a back-reference with the flags compares the capture with the input in the dialect. */
+  def determineBackReferenceFolding(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRBackReferenceFolding =
+    import IRBackReferenceFolding.*
+    if !flags.ignoreCase then Simple
+    else
+      dialect match
+        case _: Dialect.Ruby if mode == UnitMode.CodePoint => Full(0)
+        case _: Dialect.Perl                               =>
+          flags.charset match
+            case IRCharset.Default                            => Simple
+            case IRCharset.Locale                             => Full(0x100)
+            case _: IRCharset.ASCII if flags.caselessRestrict => Full(0x80)
+            case _                                            => Full(0)
+        case _ => Simple

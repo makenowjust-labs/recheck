@@ -1,6 +1,5 @@
 package codes.quine.labs.resyntax.ir
 
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
@@ -96,53 +95,3 @@ object IRCaseEquivalence:
   lazy val javaKey: CaseMapping =
     val domain = CaseMapping.SimpleUpper.domain.union(CaseMapping.SimpleLower.domain)
     CaseMapping.fromEntries(domain.iterator.map(c => (c, CaseMapping.SimpleLower(CaseMapping.SimpleUpper(c)))))
-
-  /** Python's key `upper(lower(c))`.
-    *
-    * `re` compares lower cases, and also the lower cases sharing the upper case (`re._casefix`); the upper case there
-    * is the full mapping, so the pairs whose upper case is two or more characters are added.
-    */
-  lazy val pythonKey: CaseMapping =
-    val domain = CaseMapping.SimpleUpper.domain.union(CaseMapping.SimpleLower.domain)
-    val simple = domain.iterator.map(c => (c, CaseMapping.SimpleUpper(CaseMapping.SimpleLower(c))))
-    val full = Seq(0x1fd3 -> 0x390, 0x1fe3 -> 0x3b0, 0xfb06 -> 0xfb05)
-    CaseMapping.fromEntries(simple ++ full)
-
-  /** .NET's key `ToLowerInvariant(c)`, where `U+0130` is not lower-cased to `i`. */
-  lazy val dotNetKey: CaseMapping = CaseMapping.SimpleLower.updated(Seq(0x130 -> 0x130))
-
-  /** Returns the equivalence that a back-reference with the flags compares by.
-    *
-    * Perl's `/d` rules there are the rules of a native string, since the builder gives a reference `/u` instead when
-    * Unicode rules apply.
-    */
-  def ofBackReference(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRCaseEquivalence =
-    of(dialect, mode, flags, perlNative = dialect.isPerl && flags.charset == IRCharset.Default)
-
-  /** Returns the equivalence of the dialect under the flags, where `perlNative` means Perl's `/d` rules without a
-    * reason to use Unicode rules (see [[PerlNative]]).
-    */
-  def of(dialect: Dialect, mode: UnitMode, flags: IRCharFlags, perlNative: Boolean): IRCaseEquivalence =
-    val asciiOnly = flags.charset match
-      case IRCharset.ASCII(_, _, _, _, _) => dialect.isPython
-      case _                              => false
-    if !flags.ignoreCase then Identity
-    else
-      dialect match
-        case Dialect.JavaScript =>
-          Keyed("ECMAScript", CaseMapping.ecmaScriptCanonicalize(mode == UnitMode.CodePoint), mode)
-        case Dialect.Java   => if flags.unicodeCase then JavaUnicode else JavaASCII
-        case Dialect.DotNet => Keyed(".NET", dotNetKey, mode)
-        case _: Dialect.Python if asciiOnly || mode == UnitMode.Byte => Keyed("ASCII", asciiFold, mode)
-        case _: Dialect.Python                                       => Keyed("Python", pythonKey, mode)
-        case _: Dialect.Ruby if mode == UnitMode.Byte                => Keyed("ASCII", asciiFold, mode)
-        case _: Dialect.Ruby => Keyed("simple folding", CaseMapping.SimpleFold, mode)
-        case _: Dialect.Perl if flags.charset == IRCharset.Locale => PerlLocale(mode)
-        case _: Dialect.Perl if perlNative                        => PerlNative(mode)
-        case _: Dialect.Perl if flags.caselessRestrict            => PCRERestrict(CaseMapping.SimpleFold, mode)
-        case _: Dialect.Perl => Keyed("simple folding", CaseMapping.SimpleFold, mode)
-        // PCRE folds non-ASCII characters only in UTF or UCP mode; PHP's `u` sets both.
-        case Dialect.PCRE if mode == UnitMode.Byte && !flags.unicodeClass => Keyed("ASCII", asciiFold, mode)
-        case Dialect.PCRE                                                 =>
-          val mapping = if flags.turkishCasing then CaseMapping.SimpleFoldTurkic else CaseMapping.SimpleFold
-          if flags.caselessRestrict then PCRERestrict(mapping, mode) else Keyed("simple folding", mapping, mode)

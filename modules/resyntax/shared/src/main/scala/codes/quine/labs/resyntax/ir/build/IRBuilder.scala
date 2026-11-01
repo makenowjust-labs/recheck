@@ -23,7 +23,7 @@ import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.UnitMode
-import codes.quine.labs.resyntax.parser.SourcePrescan
+import codes.quine.labs.resyntax.parser.Parser
 
 object IRBuilder:
 
@@ -41,12 +41,12 @@ object IRBuilder:
   ): IRPattern =
     val starts = startOptions(node)
     val featureSet = IRFeatureSet.from(flagSet, dialect, starts)
-    val mode = unitMode(dialect, flagSet, featureSet.utf)
+    val mode = Parser.determineUnitMode(flagSet, dialect, featureSet.utf)
     if dialect.isPython && mode == UnitMode.CodePoint && flagSet.localeUpper then
       throw new IRBuildingException("Cannot use LOCALE flag with a str pattern", SourceLocation.Invalid)
     if dialect.isPython && mode == UnitMode.Byte && flagSet.unicode then
       throw new IRBuildingException("Cannot use UNICODE flag with a bytes pattern", SourceLocation.Invalid)
-    if dialect.isPython then checkPythonGlobalFlags(node, flagSet)
+    if dialect.isPython then validatePythonGlobalFlags(node, flagSet)
     val context = BuildingContext(flagSet, dialect, featureSet)
     val table = CaptureAnalyzer.analyze(node, context)
     val resolver = new ReferenceResolver(table, dialect, featureSet)
@@ -114,30 +114,6 @@ object IRBuilder:
 
   private def backtrackControlSemantics(dialect: Dialect): IRBacktrackControlSemantics =
     IRBacktrackControlSemantics(thenPassesAssertions = dialect.isPerl, acceptEndsAtomic = dialect.isPerl)
-
-  /** Returns the unit of the input of the pattern, which is [[IRPattern.mode]] of its IR, without parsing the source.
-    *
-    * It reads only PCRE's start options of the source.
-    */
-  def unitMode(source: String, flagSet: FlagSet, dialect: Dialect): UnitMode =
-    unitMode(dialect, flagSet, dialect.isPCRE && SourcePrescan.from(source).hasUTFStartOption)
-
-  /** Returns the unit of the input, where `utf` is PCRE's `(*UTF)` start option. */
-  private def unitMode(dialect: Dialect, flagSet: FlagSet, utf: Boolean): UnitMode =
-    dialect match
-      case Dialect.JavaScript =>
-        if flagSet.unicode || flagSet.unicodeSets then UnitMode.CodePoint else UnitMode.UTF16
-      // Java matches code points, and reads a lone surrogate as a code point too.
-      case Dialect.Java        => UnitMode.CodePoint
-      case Dialect.DotNet      => UnitMode.UTF16
-      case Dialect.Python(tpe) =>
-        if tpe == Dialect.Python.Type.Bytes then UnitMode.Byte else UnitMode.CodePoint
-      // Ruby's `n` is the encoding option (NOENCODING), which `FlagSet` keeps as `explicitCapture`.
-      case Dialect.Ruby(encoding) =>
-        if flagSet.explicitCapture || encoding == Dialect.Ruby.Encoding.ASCII8Bit then UnitMode.Byte
-        else UnitMode.CodePoint
-      case Dialect.Perl(utf8, _) => if utf8 then UnitMode.CodePoint else UnitMode.Byte
-      case Dialect.PCRE          => if flagSet.unicode || utf then UnitMode.CodePoint else UnitMode.Byte
 
   /** Checks whether Perl takes the full case folding of the character under the flags (e.g. `ß` as `ss`). */
   private def perlFoldsMulti(value: Int, flags: IRCharFlags, perlUnicodeRules: Boolean): Boolean =
@@ -218,8 +194,8 @@ object IRBuilder:
                 case _ => single(1)
       case _ => nodes => single(nodes.size)
 
-  /** Checks Python's flags with the global inline flags, which `re` checks together. */
-  private def checkPythonGlobalFlags(node: Node, flagSet: FlagSet): Unit =
+  /** Validates Python's flags with the global inline flags, which `re` validates together. */
+  private def validatePythonGlobalFlags(node: Node, flagSet: FlagSet): Unit =
     def inline(node: Node): Seq[FlagSet] = node.data match
       case NodeData.Command(CommandKind.InlineFlag(diff)) => Seq(diff.added)
       case _                                              => NodeKey.children(node).flatMap(inline)

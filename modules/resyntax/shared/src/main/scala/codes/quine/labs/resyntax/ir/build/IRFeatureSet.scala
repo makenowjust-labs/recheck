@@ -31,7 +31,7 @@ final case class IRFeatureSet(
     // Ruby
     ignoresUnnamedCaptureWithNamedCapture: Boolean,
     // PCRE
-    checksSameNameAndIndex: Boolean,
+    rejectsMismatchedNameAndIndex: Boolean,
     // JavaScript
     unsetBackReferenceMatchesEmpty: Boolean,
     // Ruby: LastMatching, the others: FirstSet
@@ -43,9 +43,9 @@ final case class IRFeatureSet(
     // Java, Python, Ruby
     requiresNameDefinedBefore: Boolean,
     // .NET, PCRE, Python, Ruby
-    checksIndexedCaptureTest: Boolean,
+    validatesIndexedCaptureTest: Boolean,
     // PCRE
-    checksIndexedRecursionTest: Boolean,
+    validatesIndexedRecursionTest: Boolean,
     // PCRE, Perl
     rejectsCutInLookAround: Boolean,
     // Ruby
@@ -135,14 +135,14 @@ object IRFeatureSet:
       hasExclusiveCharsetFlag = isPerl || isPython || isRuby,
       numbersNamedCaptureLast = isDotNet,
       ignoresUnnamedCaptureWithNamedCapture = isRuby,
-      checksSameNameAndIndex = isPCRE,
+      rejectsMismatchedNameAndIndex = isPCRE,
       unsetBackReferenceMatchesEmpty = isJavaScript,
       backReferenceChoice = if isRuby then IRBackReferenceChoice.LastMatching else IRBackReferenceChoice.FirstSet,
       allowsBackReferenceToMissingGroup = isJava,
       requiresClosedGroupReference = isPython,
       requiresNameDefinedBefore = isJava || isPython || isRuby,
-      checksIndexedCaptureTest = isDotNet || isPCRE || isPython || isRuby,
-      checksIndexedRecursionTest = isPCRE,
+      validatesIndexedCaptureTest = isDotNet || isPCRE || isPython || isRuby,
+      validatesIndexedRecursionTest = isPCRE,
       rejectsCutInLookAround = isPCRE || isPerl,
       rejectsCallToSharedName = isRuby,
       countsRelativeReferenceInSourceOrder = isPerl,

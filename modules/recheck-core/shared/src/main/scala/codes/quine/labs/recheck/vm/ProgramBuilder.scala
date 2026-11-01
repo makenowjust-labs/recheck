@@ -197,9 +197,9 @@ private[vm] class ProgramBuilder(
 
     // Updates a meta information.
     inst match
-      case Inst.Read(_: ReadKind.Ref, _) | _: Inst.CheckNotEmpty => hasRef = true
-      case _: Inst.Verb                                          => hasVerb = true
-      case _                                                     => // Nothing to do
+      case Inst.Read(_: ReadKind.Ref, _) | _: Inst.RejectEmpty => hasRef = true
+      case _: Inst.Verb                                        => hasVerb = true
+      case _                                                   => // Nothing to do
 
     instsBuffer.append(inst)
 
@@ -300,8 +300,8 @@ private[vm] class ProgramBuilder(
   def emitOk(): Unit =
     pattern.notEmpty match
       case IRNotEmpty.Never    => ()
-      case IRNotEmpty.Anywhere => emitInst(Inst.CheckNotEmpty(false))
-      case IRNotEmpty.AtStart  => emitInst(Inst.CheckNotEmpty(true))
+      case IRNotEmpty.Anywhere => emitInst(Inst.RejectEmpty(false))
+      case IRNotEmpty.AtStart  => emitInst(Inst.RejectEmpty(true))
     emitInst(Inst.CapEnd(0))
     emitTerminator(Inst.Ok)
 
@@ -628,7 +628,7 @@ private[vm] class ProgramBuilder(
       val reg = allocateCanary()
       emitInst(Inst.SetCanary(reg))
       run
-      if empty == IREmptyIteration.Reject then emitInst(Inst.CheckCanary(reg))
+      if empty == IREmptyIteration.Reject then emitInst(Inst.RejectEmptyIteration(reg))
       else
         val next = allocateLabel("next")
         emitTerminator(Inst.CmpCanary(reg, exit, next))

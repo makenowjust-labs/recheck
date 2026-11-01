@@ -36,7 +36,7 @@ class InstSuite extends munit.FunSuite:
     assertEquals(Inst.Tx(Label("x", 0), Some(Label("y", 1)), None).toString, "tx #x@0 #y@1 FAIL")
     assertEquals(Inst.Tx(Label("x", 0), None, Some(Label("y", 1))).toString, "tx #x@0 FAIL #y@1")
     assertEquals(Inst.SetCanary(CanaryReg(0)).toString, "set_canary %%0")
-    assertEquals(Inst.CheckCanary(CanaryReg(0)).toString, "check_canary %%0")
+    assertEquals(Inst.RejectEmptyIteration(CanaryReg(0)).toString, "reject_empty_iteration %%0")
     assertEquals(Inst.Reset(CounterReg(0)).toString, "reset %0")
     assertEquals(Inst.Inc(CounterReg(0)).toString, "inc %0")
     assertEquals(Inst.Assert(AssertKind.InputBegin).toString, "assert input_begin")
@@ -76,8 +76,8 @@ class InstSuite extends munit.FunSuite:
     assertEquals(Inst.Verb(Inst.VerbKind.Then(None)).toString, "verb then")
     assertEquals(Inst.Verb(Inst.VerbKind.Then(Some(1))).toString, "verb then 1")
     assertEquals(Inst.Verb(Inst.VerbKind.Mark("x")).toString, "verb mark x")
-    assertEquals(Inst.CheckNotEmpty(false).toString, "check_not_empty")
-    assertEquals(Inst.CheckNotEmpty(true).toString, "check_not_empty at_start")
+    assertEquals(Inst.RejectEmpty(false).toString, "reject_empty")
+    assertEquals(Inst.RejectEmpty(true).toString, "reject_empty at_start")
     assertEquals(Inst.TxDrop.toString, "tx_drop")
 
   test("Inst.Terminator#successors"):

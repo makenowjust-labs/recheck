@@ -548,7 +548,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       case Inst.SetCanary(reg) =>
         frame.canaries = frame.canaries.updated(reg.index, frame.pos)
         true
-      case Inst.CheckCanary(reg) =>
+      case Inst.RejectEmptyIteration(reg) =>
         frame.canaries(reg.index) != frame.pos
       case Inst.Reset(reg) =>
         frame.counters = frame.counters.updated(reg.index, 0)
@@ -607,7 +607,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         verbFrame.verb = kind
         frame.fallback = Some(verbFrame)
         true
-      case Inst.CheckNotEmpty(atStart) =>
+      case Inst.RejectEmpty(atStart) =>
         frame.captures(0) != frame.pos || atStart && frame.pos != 0
       case Inst.TxDrop =>
         frame.rollback = frame.rollback.get match

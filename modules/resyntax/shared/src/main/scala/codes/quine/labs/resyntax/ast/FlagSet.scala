@@ -80,7 +80,7 @@ object FlagSet:
     var flagSet = FlagSet()
     val counts = mutable.Map.empty[Char, Int].withDefaultValue(0)
     for (c, offset) <- flags.toCharArray.zipWithIndex do
-      def check(accepted: Boolean): Unit =
+      def validateFlag(accepted: Boolean): Unit =
         if !accepted then throw new FlagSetException(s"Unknown flag '$c'", Some(offset))
 
       counts(c) += 1
@@ -88,88 +88,88 @@ object FlagSet:
 
       (c: @switch) match
         case 'A' =>
-          check(dialect.isPCRE)
+          validateFlag(dialect.isPCRE)
           flagSet = flagSet.copy(anchored = true)
         case 'D' =>
-          check(dialect.isPCRE)
+          validateFlag(dialect.isPCRE)
           flagSet = flagSet.copy(dollarEndOnly = true)
         case 'J' =>
-          check(dialect.isPCRE)
+          validateFlag(dialect.isPCRE)
           flagSet = flagSet.copy(dupNames = true)
         case 'L' =>
-          check(dialect.isPython)
+          validateFlag(dialect.isPython)
           flagSet = flagSet.copy(localeUpper = true)
         case 'S' =>
-          check(dialect.isPCRE)
+          validateFlag(dialect.isPCRE)
           flagSet = flagSet.copy(analyze = true)
         case 'U' =>
-          check(dialect.isJava || dialect.isPCRE)
+          validateFlag(dialect.isJava || dialect.isPCRE)
           flagSet = flagSet.copy(ungreedy = true)
         case 'X' =>
-          check(dialect.isPCRE)
+          validateFlag(dialect.isPCRE)
           flagSet = flagSet.copy(extra = true)
         case 'a' =>
-          check(dialect.isPerl || dialect.isPython || dialect.isRuby)
+          validateFlag(dialect.isPerl || dialect.isPython || dialect.isRuby)
           flagSet = rubyCharset(flagSet).copy(ascii = true)
           if counts(c) >= 2 && dialect.isPerl then flagSet = flagSet.copy(asciiRestrict = true)
         case 'c' =>
-          check(dialect.isJava || dialect.isPerl)
+          validateFlag(dialect.isJava || dialect.isPerl)
           flagSet = flagSet.copy(continue = true)
         case 'd' =>
-          check(dialect.isJava || dialect.isJavaScript || dialect.isPerl || dialect.isRuby)
+          validateFlag(dialect.isJava || dialect.isJavaScript || dialect.isPerl || dialect.isRuby)
           flagSet = rubyCharset(flagSet).copy(hasIndices = true)
         case 'e' =>
-          check(dialect.isPerl)
+          validateFlag(dialect.isPerl)
           flagSet = flagSet.copy(evaluate = true)
         case 'g' =>
-          check(dialect.isJavaScript || dialect.isPerl)
+          validateFlag(dialect.isJavaScript || dialect.isPerl)
           flagSet = flagSet.copy(global = true)
         case 'i' =>
           flagSet = flagSet.copy(ignoreCase = true)
         case 'l' =>
-          check(dialect.isPerl)
+          validateFlag(dialect.isPerl)
           flagSet = flagSet.copy(localeLower = true)
         case 'm' =>
           flagSet = flagSet.copy(multiline = true)
         case 'n' =>
-          check(dialect.isDotNet || dialect.isPCRE || dialect.isPerl || dialect.isRuby)
+          validateFlag(dialect.isDotNet || dialect.isPCRE || dialect.isPerl || dialect.isRuby)
           flagSet = flagSet.copy(explicitCapture = true)
         case 'o' =>
-          check(dialect.isPerl || dialect.isRuby)
+          validateFlag(dialect.isPerl || dialect.isRuby)
           flagSet = flagSet.copy(once = true)
         case 'p' =>
-          check(dialect.isPerl)
+          validateFlag(dialect.isPerl)
           flagSet = flagSet.copy(preserve = true)
         case 'r' =>
-          check(dialect.isPCRE || dialect.isPerl)
+          validateFlag(dialect.isPCRE || dialect.isPerl)
           flagSet = flagSet.copy(nonDestructive = true)
         case 's' =>
-          check(
+          validateFlag(
             dialect.isDotNet || dialect.isJava || dialect.isJavaScript || dialect.isPCRE || dialect.isPerl || dialect.isPython
           )
           flagSet = flagSet.copy(dotAll = true)
         case 'u' =>
-          check(
+          validateFlag(
             dialect.isJava || dialect.isJavaScript || dialect.isPCRE || dialect.isPerl || dialect.isPython || dialect.isRuby
           )
           flagSet = rubyCharset(flagSet).copy(unicode = true)
         case 'v' =>
-          check(dialect.isJavaScript)
+          validateFlag(dialect.isJavaScript)
           flagSet = flagSet.copy(unicodeSets = true)
         case 'x' =>
-          check(
+          validateFlag(
             dialect.isDotNet || dialect.isJava || dialect.isPCRE || dialect.isPerl || dialect.isPython || dialect.isRuby
           )
           flagSet = flagSet.copy(verbose = true)
           if counts(c) >= 2 && dialect.isPerl then flagSet = flagSet.copy(verboseMore = true)
         case 'y' =>
-          check(dialect.isJavaScript)
+          validateFlag(dialect.isJavaScript)
           flagSet = flagSet.copy(sticky = true)
         // PHP skips these characters in the modifiers.
         case ' ' | '\n' | '\r' =>
-          check(dialect.isPCRE)
+          validateFlag(dialect.isPCRE)
         case _ =>
-          check(false)
+          validateFlag(false)
       if dialect.isPerl && PerlCharsets.contains(c) && counts(c) > (if c == 'a' then 2 else 1) then
         throw new FlagSetException(s"Duplicated flag '$c'", Some(offset))
 

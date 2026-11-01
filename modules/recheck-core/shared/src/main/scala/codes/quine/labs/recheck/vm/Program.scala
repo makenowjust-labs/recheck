@@ -21,8 +21,8 @@ object Program:
         * `Byte`.
         */
       mode: UnitMode,
-      /** Whether the program reads the captures (back-references, capture tests and `check_not_empty`), which a
-        * matching state includes then.
+      /** Whether the program reads the captures (back-references, capture tests and `reject_empty`), which a matching
+        * state includes then.
         */
       hasRef: Boolean,
       /** Whether the program has `verb` instructions, which skip backtracking points, so memoization cannot be used. */

@@ -10,7 +10,7 @@ import codes.quine.labs.recheck.recall.RecallProgram
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetException
-import codes.quine.labs.resyntax.ir.build.IRBuilder
+import codes.quine.labs.resyntax.parser.Parser
 
 /** `recheck generate-recall-script` command implementation.
   *
@@ -29,7 +29,7 @@ object GenerateRecallScriptCommand:
       flags <- invalid(c.get[String]("flags"))
       dialect <- invalid(c.get[Dialect]("dialect"))
       flagSet <- parseFlags(flags, dialect)
-      mode = IRBuilder.unitMode(source, flagSet, dialect)
+      mode = Parser.determineUnitMode(source, flagSet, dialect)
       style = AttackPattern.Style.of(dialect, mode)
       attack <- invalid(c.get("attack")(using decodeAttackPattern(mode, style)))
       script <- RecallProgram.script(source, flags, dialect, mode, attack)

@@ -234,7 +234,7 @@ private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext)
 
   private def addName(node: Node, name: String, index: Int): Unit =
     val indices = nameIndices.getOrElse(name, Vector.empty)
-    if featureSet.checksSameNameAndIndex then
+    if featureSet.rejectsMismatchedNameAndIndex then
       if indices.exists(_ != index) && !context.dupNames then
         throw new IRBuildingException("Duplicated group name", node.loc)
       if indexNames.get(index).exists(_ != name) then
