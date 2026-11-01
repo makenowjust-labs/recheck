@@ -93,13 +93,13 @@ private final class AutomatonChecker[A, Q](
     interrupt:
       scc.iterator
         .filterNot(isAtom)
-        .flatMap(checkExponentialComponent)
+        .flatMap(findEDA)
         .map: pump =>
           val (w, hotspot) = witness(Vector(pump))
           Exponential(w, hotspot)
 
   /** Finds an EDA structure in the SCC. */
-  private def checkExponentialComponent(sc: IndexedSeq[R]): Option[Pump] =
+  private def findEDA(sc: IndexedSeq[R]): Option[Pump] =
     interrupt:
       val edges = interrupt(sccPairEdges((sc, sc)))
 
@@ -139,7 +139,7 @@ private final class AutomatonChecker[A, Q](
     log("automaton: find IDA")
     interrupt:
       scc
-        .map(checkPolynomialComponent)
+        .map(findIDAChain)
         .sortBy(-_._1)
         .map:
           case (0, _)          => Constant
@@ -148,19 +148,19 @@ private final class AutomatonChecker[A, Q](
             val (w, hotspot) = witness(pumps)
             Polynomial(degree, w, hotspot)
 
-  /** An internal cache of [[checkPolynomialComponent]] method's result. */
-  private val checkPolynomialComponentCache = mutable.Map.empty[Seq[R], (Int, Seq[Pump])]
+  /** An internal cache of [[findIDAChain]] method's result. */
+  private val idaChainCache = mutable.Map.empty[Seq[R], (Int, Seq[Pump])]
 
   /** Finds an IDA structure chain from the SCC. */
-  private def checkPolynomialComponent(sc: IndexedSeq[R]): (Int, Seq[Pump]) =
-    checkPolynomialComponentCache.getOrElseUpdate(
+  private def findIDAChain(sc: IndexedSeq[R]): (Int, Seq[Pump]) =
+    idaChainCache.getOrElseUpdate(
       sc,
       interrupt:
         // Computes the maximum IDA structure chain from neighbors.
         val (maxDegree, maxPumps) = interrupt:
           sccGraph
             .neighbors(sc)
-            .map { case ((), sc) => checkPolynomialComponent(sc) }
+            .map { case ((), sc) => findIDAChain(sc) }
             .maxByOption(_._1)
             .getOrElse((0, Vector.empty))
         if maxDegree == 0 then (if isAtom(sc) then 0 else 1, Vector.empty)
@@ -170,19 +170,19 @@ private final class AutomatonChecker[A, Q](
           val result = interrupt:
             sccReachableMap(sc).iterator
               .filter: target =>
-                sc != target && !isAtom(target) && checkPolynomialComponent(target)._1 == maxDegree &&
+                sc != target && !isAtom(target) && findIDAChain(target)._1 == maxDegree &&
                   // If the intersection of lookahead states of `sc` and `target` is empty,
                   // then there is no IDA structure between them.
                   (sccLookaheadMap(sc) & sccLookaheadMap(target)).nonEmpty
-              .flatMap(target => checkPolynomialComponentBetween(sc, target).map((target, _)))
-              .map { case (target, pump) => (maxDegree + 1, pump +: checkPolynomialComponent(target)._2) }
+              .flatMap(target => findIDABetween(sc, target).map((target, _)))
+              .map { case (target, pump) => (maxDegree + 1, pump +: findIDAChain(target)._2) }
               .nextOption()
               .getOrElse((maxDegree, maxPumps))
           result
     )
 
   /** Finds an IDA structure between source and target SCCs. */
-  private def checkPolynomialComponentBetween(source: IndexedSeq[R], target: IndexedSeq[R]): Option[Pump] =
+  private def findIDABetween(source: IndexedSeq[R], target: IndexedSeq[R]): Option[Pump] =
     val sourceEdges = interrupt(sccPairEdges((source, source)))
     val between = interrupt(sccReachableMap(source) & sccReverseReachableMap(target))
     val betweenEdges = interrupt(for sc1 <- between; sc2 <- between yield sccPairEdges((sc1, sc2)))

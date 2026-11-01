@@ -17,7 +17,7 @@ private[build] final class ReferenceResolver(table: CaptureTable, dialect: Diale
   def indexedBackReference(n: Int, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
     if featureSet.requiresClosedGroupReference then
       if n > site.opened then fail("Reference to non-existent group", loc)
-      checkClosed(Seq(n), site, loc)
+      validateClosedGroups(Seq(n), site, loc)
     else if table.defined.contains(n) then Seq(n)
     else if featureSet.allowsBackReferenceToMissingGroup then Seq.empty
     else fail("Reference to non-existent group", loc)
@@ -34,7 +34,7 @@ private[build] final class ReferenceResolver(table: CaptureTable, dialect: Diale
       val indices = groupName(name, site, loc)
       // Ruby takes only the groups of the name opened before the reference (e.g. `\k<n>` of `(?<n>a)|\k<n>|(?<n>b)`).
       val before = if featureSet.requiresNameDefinedBefore then indices.filter(_ <= site.opened) else indices
-      if featureSet.requiresClosedGroupReference then checkClosed(before, site, loc) else before
+      if featureSet.requiresClosedGroupReference then validateClosedGroups(before, site, loc) else before
 
   /** Resolves a name for a back-reference or a conditional test. */
   def groupName(name: String, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
@@ -74,7 +74,7 @@ private[build] final class ReferenceResolver(table: CaptureTable, dialect: Diale
     val resolved = indices
     if featureSet.requiresClosedGroupReference && site.lookBehindFrom.isDefined then
       if resolved.exists(_ > site.opened) then fail("Reference to an open group", loc)
-      checkClosed(resolved, site, loc)
+      validateClosedGroups(resolved, site, loc)
     else resolved
 
   /** Resolves a call by `\g<...>`, where Ruby rejects a name shared by groups. */
@@ -84,7 +84,7 @@ private[build] final class ReferenceResolver(table: CaptureTable, dialect: Diale
     indices
 
   // Python rejects a reference to a group that is not closed, or that is in the same look-behind.
-  private def checkClosed(indices: Seq[Int], site: ReferenceSite, loc: SourceLocation): Seq[Int] =
+  private def validateClosedGroups(indices: Seq[Int], site: ReferenceSite, loc: SourceLocation): Seq[Int] =
     if indices.exists(site.open.contains) then fail("Reference to an open group", loc)
     if indices.exists(n => site.lookBehindFrom.exists(n >= _)) then
       fail("Reference to a group defined in the same look-behind", loc)

@@ -73,7 +73,7 @@ private[build] final class SemanticAnalyzer(
   private def walkTest(node: Node, test: ConditionalTest): Unit = test match
     case ConditionalTest.Indexed(n) =>
       backReferences(NodeKey(node)) =
-        if featureSet.checksIndexedCaptureTest then
+        if featureSet.validatesIndexedCaptureTest then
           resolver.test(resolver.index(n, node.loc), table.siteOf(node), node.loc)
         // Perl accepts a test of a missing group, which never holds.
         else Seq(n).filter(table.defined.contains)
@@ -85,7 +85,7 @@ private[build] final class SemanticAnalyzer(
     case ConditionalTest.Referenced(_, ref) =>
       backReferences(NodeKey(node)) = resolver.backReference(ref, table.siteOf(node), node.loc)
     case ConditionalTest.IndexedRecursion(n) =>
-      if featureSet.checksIndexedRecursionTest then resolver.index(n, node.loc)
+      if featureSet.validatesIndexedRecursionTest then resolver.index(n, node.loc)
     case ConditionalTest.NamedRecursion(name)   => resolver.calledName(name, node.loc)
     case ConditionalTest.LookAround(kind, body) =>
       kind match

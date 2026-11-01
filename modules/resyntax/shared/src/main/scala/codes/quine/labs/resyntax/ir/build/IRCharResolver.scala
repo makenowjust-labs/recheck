@@ -638,7 +638,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
             Lit(value, false, Some(style), flags, b.loc)
           // Bytes of a character continued into a range endpoint (e.g. `[\xC3\xA0-\xC3\xA9]`) are not modeled.
           if rangeByteAt(items, i + bytes.length, begin = true) then
-            checkRubyBytePrefix(lits)
+            validateRubyBytePrefix(lits)
             throw new NotModeledException
           if rangeByteAt(items, i - 1, begin = false) then throw new NotModeledException
           val decoded = mergeRubyBytes(lits)
@@ -673,8 +673,8 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
         case ClassItemData.ClassRange(b, e) => isRubyByteValue(if begin then b.data else e.data)
         case _                              => false)
 
-  /** Checks the bytes before a range, whose last character may continue into the range's begin. */
-  private def checkRubyBytePrefix(lits: IndexedSeq[Lit]): Unit =
+  /** Validates the bytes before a range, whose last character may continue into the range's begin. */
+  private def validateRubyBytePrefix(lits: IndexedSeq[Lit]): Unit =
     var i = 0
     while i < lits.length do
       val n = utf8Length(lits(i).value)

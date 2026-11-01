@@ -46,7 +46,7 @@ object IRBuilder:
       throw new IRBuildingException("Cannot use LOCALE flag with a str pattern", SourceLocation.Invalid)
     if dialect.isPython && mode == UnitMode.Byte && flagSet.unicode then
       throw new IRBuildingException("Cannot use UNICODE flag with a bytes pattern", SourceLocation.Invalid)
-    if dialect.isPython then checkPythonGlobalFlags(node, flagSet)
+    if dialect.isPython then validatePythonGlobalFlags(node, flagSet)
     val context = BuildingContext(flagSet, dialect, featureSet)
     val table = CaptureAnalyzer.analyze(node, context)
     val resolver = new ReferenceResolver(table, dialect, featureSet)
@@ -194,8 +194,8 @@ object IRBuilder:
                 case _ => single(1)
       case _ => nodes => single(nodes.size)
 
-  /** Checks Python's flags with the global inline flags, which `re` checks together. */
-  private def checkPythonGlobalFlags(node: Node, flagSet: FlagSet): Unit =
+  /** Validates Python's flags with the global inline flags, which `re` validates together. */
+  private def validatePythonGlobalFlags(node: Node, flagSet: FlagSet): Unit =
     def inline(node: Node): Seq[FlagSet] = node.data match
       case NodeData.Command(CommandKind.InlineFlag(diff)) => Seq(diff.added)
       case _                                              => NodeKey.children(node).flatMap(inline)

@@ -175,11 +175,9 @@ object Inst:
   final case class SetCanary(reg: CanaryReg) extends NonTerminator:
     override def toString: String = s"set_canary $reg"
 
-  /** `check_canary`: Checks current position is advanced from saved in the canary register. If it is not, a matching is
-    * failed.
-    */
-  final case class CheckCanary(reg: CanaryReg) extends NonTerminator:
-    override def toString: String = s"check_canary $reg"
+  /** `reject_empty_iteration`: Fails if the current position is not advanced from the one in the canary register. */
+  final case class RejectEmptyIteration(reg: CanaryReg) extends NonTerminator:
+    override def toString: String = s"reject_empty_iteration $reg"
 
   /** `reset`: Sets a `reg` value to `0`. */
   final case class Reset(reg: CounterReg) extends NonTerminator:
@@ -240,11 +238,11 @@ object Inst:
   final case class Verb(kind: VerbKind) extends NonTerminator:
     override def toString: String = s"verb $kind"
 
-  /** `check_not_empty`: Fails if the match from the start of the capture `0` is empty, only at the start of the input
-    * with `atStart`.
+  /** `reject_empty`: Fails if the match from the start of the capture `0` is empty, only at the start of the input with
+    * `atStart`.
     */
-  final case class CheckNotEmpty(atStart: Boolean) extends NonTerminator:
-    override def toString: String = if atStart then "check_not_empty at_start" else "check_not_empty"
+  final case class RejectEmpty(atStart: Boolean) extends NonTerminator:
+    override def toString: String = if atStart then "reject_empty at_start" else "reject_empty"
 
   /** `tx_drop`: Drops the innermost transaction, which `(*ACCEPT)` leaves to end an outer one. */
   case object TxDrop extends NonTerminator:

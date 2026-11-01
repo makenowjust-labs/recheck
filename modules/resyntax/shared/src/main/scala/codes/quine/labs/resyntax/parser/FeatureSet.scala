@@ -131,19 +131,19 @@ final case class FeatureSet(
     // .NET, Java, Perl, Ruby
     allowsZeroWidthAssertRepeat: Boolean,
     // Perl, Python
-    checksCharsetInlineFlagConflict: Boolean,
+    rejectsConflictingCharsetInlineFlag: Boolean,
     // Perl
-    checksCharsetInlineFlagCount: Boolean,
+    limitsCharsetInlineFlagCount: Boolean,
     // Perl, Python, Ruby
-    checksCharsetInlineFlagRemoval: Boolean,
+    rejectsCharsetInlineFlagRemoval: Boolean,
     // PCRE, Perl
-    checksClassPOSIXCollating: Boolean,
+    rejectsClassPOSIXCollating: Boolean,
     // PCRE
-    checksClassPOSIXOutsideClass: Boolean,
+    rejectsClassPOSIXOutsideClass: Boolean,
     // JavaScript (with `v`)
-    checksClassSetSyntax: Boolean,
+    validatesClassSetSyntax: Boolean,
     // JavaScript (without `uv`)
-    checksValidBackReference: Boolean,
+    fallsBackInvalidBackReferenceToEscape: Boolean,
     // Java, JavaScript (with `uv`)
     combinesSurrogatePairEscape: Boolean,
     // JavaScript (without `uv`)
@@ -504,13 +504,13 @@ object FeatureSet:
       allowsNonNameKBackReference = isRuby,
       allowsNonNameCaptureTest = isRuby,
       allowsZeroWidthAssertRepeat = isDotNet || isJava || isPerl || isRuby,
-      checksCharsetInlineFlagConflict = isPerl || isPython,
-      checksCharsetInlineFlagCount = isPerl,
-      checksCharsetInlineFlagRemoval = isPerl || isPython || isRuby,
-      checksClassPOSIXCollating = isPCRE || isPerl,
-      checksClassPOSIXOutsideClass = isPCRE,
-      checksClassSetSyntax = isJavaScript && flagSet.unicodeSets,
-      checksValidBackReference = isJavaScript && !isUnicode,
+      rejectsConflictingCharsetInlineFlag = isPerl || isPython,
+      limitsCharsetInlineFlagCount = isPerl,
+      rejectsCharsetInlineFlagRemoval = isPerl || isPython || isRuby,
+      rejectsClassPOSIXCollating = isPCRE || isPerl,
+      rejectsClassPOSIXOutsideClass = isPCRE,
+      validatesClassSetSyntax = isJavaScript && flagSet.unicodeSets,
+      fallsBackInvalidBackReferenceToEscape = isJavaScript && !isUnicode,
       combinesSurrogatePairEscape = isJava || (isJavaScript && isUnicode),
       consumesBrokenClassRange = isJavaScript && !isUnicode,
       explicitCapture = (isDotNet || isPCRE || isPerl) && flagSet.explicitCapture,
