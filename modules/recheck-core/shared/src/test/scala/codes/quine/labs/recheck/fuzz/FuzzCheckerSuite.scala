@@ -29,11 +29,10 @@ class FuzzCheckerSuite extends munit.FunSuite:
   ): Boolean =
     val result = for
       (pattern, ir) <- SourcePattern.parse(source, flags).toTry
-      fuzz <- FuzzProgram.from(ir, pattern.dialect, pattern.preferredChars)
+      fuzz <- FuzzProgram.from(ir, pattern.dialect)
     yield FuzzChecker
       .check(
         ir,
-        pattern.preferredChars,
         fuzz,
         random = random0,
         maxGeneStringSize = if quick then 400 else 4000,
@@ -79,11 +78,10 @@ class FuzzCheckerSuite extends munit.FunSuite:
     assert:
       val result = for
         (pattern, ir) <- SourcePattern.parse("^(a?){50}a{50}$", "").toTry
-        fuzz <- FuzzProgram.from(ir, pattern.dialect, pattern.preferredChars)
+        fuzz <- FuzzProgram.from(ir, pattern.dialect)
       yield FuzzChecker
         .check(
           ir,
-          pattern.preferredChars,
           fuzz,
           random0,
           seedingLimit = 10000,
@@ -97,11 +95,10 @@ class FuzzCheckerSuite extends munit.FunSuite:
     assert:
       val result = for
         (pattern, ir) <- SourcePattern.parse("^(a|a)*$", "").toTry
-        fuzz <- FuzzProgram.from(ir, pattern.dialect, pattern.preferredChars)
+        fuzz <- FuzzProgram.from(ir, pattern.dialect)
       yield FuzzChecker
         .check(
           ir,
-          pattern.preferredChars,
           fuzz,
           random0,
           incubationLimit = 100,
@@ -118,8 +115,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
     val failed = (c: AttackComplexity.Vulnerable, _: Hotspot) => c == AttackComplexity.Exponential(true)
     val checker = new FuzzChecker(
       ir,
-      pattern.preferredChars,
-      FuzzProgram.from(ir, pattern.dialect, pattern.preferredChars).get,
+      FuzzProgram.from(ir, pattern.dialect).get,
       random0,
       DefaultSeeder,
       DefaultMaxSimpleRepeatCount,

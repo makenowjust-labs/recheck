@@ -25,12 +25,12 @@ import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 /** RegExp IR to ε-NFA Compiler. */
 object EpsNFABuilder:
 
-  /** Compiles RegExp IR into ε-NFA, whose alphabet takes `preferred` (see [[PatternAlphabet.build]]). */
-  def build(pattern: IRPattern, preferred: Option[CharSet])(using ctx: Context): Try[EpsNFA[Int]] =
+  /** Compiles RegExp IR into ε-NFA. */
+  def build(pattern: IRPattern)(using ctx: Context): Try[EpsNFA[Int]] =
     ctx.interrupt:
       for
         _ <- Try(())
-        alphabet = PatternAlphabet.of(pattern, preferred)
+        alphabet = PatternAlphabet.of(pattern)
         builder = new EpsNFABuilder(pattern, alphabet)
         epsNFA <- Try(builder.build())
       yield

@@ -18,13 +18,13 @@ class DynamicSeederSuite extends munit.FunSuite:
     def seed(source: String, flags: String): Set[String] =
       val result = for
         (pattern, ir) <- SourcePattern.parse(source, flags).toTry
-        fuzz <- FuzzProgram.from(ir, pattern.dialect, pattern.preferredChars)
+        fuzz <- FuzzProgram.from(ir, pattern.dialect)
       yield DynamicSeeder.seed(fuzz, timeout = Duration.Inf)
       result.get.map(_.toString)
 
     assertEquals(seed("^(a|b)$", ""), Set("''", "'a'", "'b'"))
     assertEquals(seed("^(a|b)$", "i"), Set("''", "'A'", "'B'"))
-    assertEquals(seed("^(A|B)$", "iu"), Set("''", "'a'", "'b'"))
+    assertEquals(seed("^(A|B)$", "iu"), Set("''", "'A'", "'B'"))
     assertEquals(seed("^[ab]$", ""), Set("''", "'a'"))
     assertEquals(seed("^[^ab]$", ""), Set("''", "'\\x00'"))
     assertEquals(seed("^(a)\\1$", ""), Set("''", "'a'", "'aa'"))

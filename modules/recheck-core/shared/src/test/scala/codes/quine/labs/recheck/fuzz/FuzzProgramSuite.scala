@@ -13,7 +13,7 @@ class FuzzProgramSuite extends munit.FunSuite:
     def from(source: String, flags: String): FuzzProgram =
       (for
         (pattern, ir) <- SourcePattern.parse(source, flags).toTry
-        fuzz <- FuzzProgram.from(ir, pattern.dialect, pattern.preferredChars)
+        fuzz <- FuzzProgram.from(ir, pattern.dialect)
       yield fuzz).get
 
     val fuzz1 = from("foo", "")

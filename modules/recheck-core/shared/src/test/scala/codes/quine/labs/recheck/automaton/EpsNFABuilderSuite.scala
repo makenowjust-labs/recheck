@@ -26,7 +26,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   def build(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): Try[EpsNFA[Int]] =
     val (pattern, ir) = SourcePattern.parse(source, flags, dialect).toTry.get
     EpsNFABuilder
-      .build(ir, pattern.preferredChars)
+      .build(ir)
       .map: nfa =>
         nfa.copy(tau = nfa.tau.view.mapValues {
           case t: Consume[Int] => t.copy(loc = None)
@@ -101,10 +101,9 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       )
 
   test("EpsNFABuilder.build: Character, CharacterClass"):
-    val canonical = PatternAlphabet.ecmaScriptCanonicalChars(utf16)
     assertEquals(
       build("^a$", "i").get,
-      single(PatternAlphabet.build(utf16, Seq(CharSet.of('a', 'A')), preferred = Some(canonical)), CharSet.single('A'))
+      single(PatternAlphabet.build(utf16, Seq(CharSet.of('a', 'A'))), CharSet.of('a', 'A'))
     )
     assertEquals(
       build("^[a]$").get,
@@ -117,14 +116,13 @@ class EpsNFABuilderSuite extends munit.FunSuite:
 
   test("EpsNFABuilder.build: Dot"):
     val dot16 = any16.diff(lineTerminator)
-    val canonical = PatternAlphabet.ecmaScriptCanonicalChars(utf16)
     // `.` takes part in the order of atoms as its complement.
     assertEquals(build("^.$").get, single(PatternAlphabet.build(utf16, Seq(lineTerminator)), dot16))
     assertEquals(
       build("^.$", "i").get,
       single(
-        PatternAlphabet.build(utf16, Seq(lineTerminator), preferred = Some(canonical)),
-        dot16.intersect(canonical)
+        PatternAlphabet.build(utf16, Seq(lineTerminator)),
+        dot16
       )
     )
     assertEquals(build("^.$", "s").get, single(PatternAlphabet.build(utf16), any16))

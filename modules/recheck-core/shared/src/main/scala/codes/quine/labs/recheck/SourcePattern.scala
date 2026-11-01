@@ -6,10 +6,8 @@ import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetException
-import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRPattern
-import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 import codes.quine.labs.resyntax.ir.build.IRBuilder
 import codes.quine.labs.resyntax.ir.build.IRBuildingException
 import codes.quine.labs.resyntax.parser.NestingLimitException
@@ -22,14 +20,6 @@ import codes.quine.labs.resyntax.parser.ParsingException
   * decides (e.g. bytes for a Python bytes pattern), and the programs need to write strings.
   */
 final case class SourcePattern(source: String, flags: String, dialect: Dialect, mode: UnitMode):
-
-  /** The characters that stand for their case variants in generated strings, which are the ones that JavaScript's
-    * ignore-case matching canonicalizes to.
-    */
-  lazy val preferredChars: Option[CharSet] =
-    Option.when(dialect.isJavaScript && FlagSet.parse(flags, dialect).ignoreCase):
-      PatternAlphabet.ecmaScriptCanonicalChars(mode)
-
   override def toString: String = s"/$source/$flags"
 
 object SourcePattern:

@@ -21,7 +21,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
   def check(source: String, flags: String): Try[Complexity[CharSet]] =
     for
       (pattern, ir) <- SourcePattern.parse(source, flags).toTry
-      epsNFA <- EpsNFABuilder.build(ir, pattern.preferredChars)
+      epsNFA <- EpsNFABuilder.build(ir)
       nfa = epsNFA.toOrderedNFA.rename
       result <- Try(AutomatonChecker.check(nfa).nextOption().getOrElse(Complexity.Constant))
     yield result
