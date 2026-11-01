@@ -281,11 +281,7 @@ object Inst:
     final case class MarkWordBoundaryNot(word: CharSet, marks: IRWordMarks) extends AssertKind:
       override def toString: String = "mark_word_boundary_not"
 
-    /** `^` assertion with `m` flag.
-      *
-      * @param atEnd
-      *   where it matches at the end of the input
-      */
+    /** `^` assertion with `m` flag, which `atEnd` tells where it matches at the end of the input. */
     final case class LineBegin(terminators: IRLineTerminators, atEnd: IRLineBeginAtEnd) extends AssertKind:
       override def toString: String = "line_begin"
 
@@ -334,19 +330,14 @@ object Inst:
     final case class ClassNot(s: CharSet) extends ReadKind:
       override def toString: String = s"class_not ${EcmaScriptNotation.showClass(s)}"
 
-    /** A capture reference matching.
-      *
-      * @param indices
-      *   the capture indices, which are more than one for a name shared by groups
-      * @param equivalence
-      *   the comparison of characters, which is not the identity for a case-insensitive reference
-      * @param folding
-      *   how a case-insensitive reference compares the capture with the input
-      */
+    /** A capture reference matching. */
     final case class Ref(
+        /** The capture indices, which are more than one for a name shared by groups. */
         indices: Seq[Int],
         semantics: IRBackReferenceSemantics,
+        /** The comparison of characters, which is not the identity for a case-insensitive reference. */
         equivalence: IRCaseEquivalence,
+        /** How a case-insensitive reference compares the capture with the input. */
         folding: IRBackReferenceFolding = IRBackReferenceFolding.Simple
     ) extends ReadKind:
       override def toString: String =

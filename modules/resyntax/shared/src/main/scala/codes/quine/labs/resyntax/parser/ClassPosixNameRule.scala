@@ -4,16 +4,9 @@ package codes.quine.labs.resyntax.parser
   *
   * Such a name is an error, and otherwise the `[` is read as a literal.
   *
-  * @param minLength
-  *   the minimum length of a name in code points
-  * @param maxLength
-  *   the maximum length of a name in code points
-  * @param rejectedChars
-  *   characters that make a name not look like a POSIX class name
-  * @param maxPunctuationCount
-  *   the maximum number of ASCII punctuation characters in a name
-  * @param acceptsKnownPrefix
-  *   whether a name starting with a known name always looks like a POSIX class name
+  * A name looks like a POSIX class name if its length in code points is from `minLength` to `maxLength`, it has none of
+  * `rejectedChars`, and it has at most `maxPunctuationCount` ASCII punctuation characters. With `acceptsKnownPrefix`, a
+  * name starting with a known name always looks like one.
   */
 final case class ClassPosixNameRule(
     minLength: Int,

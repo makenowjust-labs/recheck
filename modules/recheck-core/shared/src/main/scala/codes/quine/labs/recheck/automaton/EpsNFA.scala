@@ -191,16 +191,11 @@ object EpsNFA:
     * A guess makes a character have more than one kind, and the next (or the previous) kind checks it, so that only the
     * right one survives.
     *
-    * @param last
-    *   whether a line terminator, `\r` or `\n` is the last character (for [[AssertKind.ChompEnd]])
-    * @param afterCR
-    *   whether `\r` precedes `\n` (for [[AssertKind.LineBeginOf]] after `\r\n`)
-    * @param follow
-    *   what follows `\r` (for [[AssertKind.LineEndOf]] before `\r\n` and [[AssertKind.ChompEnd]] before the final
-    *   `\r\n`)
-    * @param marks
-    *   the number of the word marks, for each of which an extender guesses whether the text up to it has a base (for
-    *   [[AssertKind.MarkWordBoundaryOf]])
+    * With `last`, a line terminator, `\r` or `\n` guesses whether it is the last character (for
+    * [[AssertKind.ChompEnd]]). With `afterCR`, `\n` guesses whether `\r` precedes it (for [[AssertKind.LineBeginOf]]
+    * after `\r\n`). With `follow`, `\r` guesses what follows it (for [[AssertKind.LineEndOf]] before `\r\n` and
+    * [[AssertKind.ChompEnd]] before the final `\r\n`). `marks` is the number of the word marks, for each of which an
+    * extender guesses whether the text up to it has a base (for [[AssertKind.MarkWordBoundaryOf]]).
     */
   final case class Guesses(last: Boolean, afterCR: Boolean, follow: Boolean, marks: Int = 0):
 
@@ -337,14 +332,11 @@ object EpsNFA:
     case object InputEnd extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean = next.boundary
 
-    /** LineBeginOf is `^` assertion with the `set`-th line terminator set.
+    /** LineBeginOf is `^` assertion with the `set`-th line terminator set, which `atEnd` tells where it matches at the
+      * end of the input.
       *
-      * @param atEnd
-      *   where it matches at the end of the input
-      * @param afterCRLF
-      *   whether it matches after `\r\n` too, where `\n` is not a line terminator by itself (PCRE's `(*CRLF)`)
-      * @param atomic
-      *   whether it does not match between `\r` and `\n` (Java)
+      * With `afterCRLF`, it matches after `\r\n` too, where `\n` is not a line terminator by itself (PCRE's `(*CRLF)`).
+      * With `atomic`, it does not match between `\r` and `\n` (Java).
       */
     final case class LineBeginOf(set: Int, atEnd: IRLineBeginAtEnd, afterCRLF: Boolean, atomic: Boolean)
         extends AssertKind:
@@ -358,10 +350,8 @@ object EpsNFA:
 
     /** LineEndOf is `$` assertion with the `set`-th line terminator set.
       *
-      * @param beforeCRLF
-      *   whether it matches before `\r\n` too, where `\r` is not a line terminator by itself (PCRE's `(*CRLF)`)
-      * @param atomic
-      *   whether it does not match between `\r` and `\n` (Java)
+      * With `beforeCRLF`, it matches before `\r\n` too, where `\r` is not a line terminator by itself (PCRE's
+      * `(*CRLF)`). With `atomic`, it does not match between `\r` and `\n` (Java).
       */
     final case class LineEndOf(set: Int, beforeCRLF: Boolean, atomic: Boolean) extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean =
@@ -372,10 +362,8 @@ object EpsNFA:
     /** ChompEnd is `\Z` assertion with the `set`-th line terminator set, which matches at the end or before a line
       * terminator at the end.
       *
-      * @param crlf
-      *   whether it matches before `\r\n` at the end too
-      * @param atomic
-      *   whether it does not match between `\r` and `\n` (Java)
+      * With `crlf`, it matches before `\r\n` at the end too. With `atomic`, it does not match between `\r` and `\n`
+      * (Java).
       */
     final case class ChompEnd(set: Int, crlf: Boolean, atomic: Boolean) extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean =

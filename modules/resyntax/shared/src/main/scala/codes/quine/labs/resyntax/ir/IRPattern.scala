@@ -10,30 +10,21 @@ import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 
-/** IRPattern is a whole pattern in the internal representation.
-  *
-  * @param node
-  *   the root node
-  * @param captureCount
-  *   the largest capture index, or `0` without captures
-  * @param captureNames
-  *   the capture indices of each name, in the order of the groups
-  * @param backReference
-  *   how back-references behave in the dialect
-  * @param anchored
-  *   whether a match starts only at the starting position (JavaScript `y`, PCRE `A`)
-  * @param mode
-  *   the unit of the input, which the character sets of the nodes consist of
-  * @param notEmpty
-  *   where an empty match is rejected (PCRE's `(*NOTEMPTY)` and `(*NOTEMPTY_ATSTART)`)
-  */
+/** IRPattern is a whole pattern in the internal representation. */
 final case class IRPattern(
+    /** The root node. */
     node: IRNode,
+    /** The largest capture index, or `0` without captures. */
     captureCount: Int,
+    /** The capture indices of each name, in the order of the groups. */
     captureNames: Map[String, Seq[Int]],
+    /** How back-references behave in the dialect. */
     backReference: IRBackReferenceSemantics,
+    /** Whether a match starts only at the starting position (JavaScript `y`, PCRE `A`). */
     anchored: Boolean,
+    /** The unit of the input, which the character sets of the nodes consist of. */
     mode: UnitMode,
+    /** Where an empty match is rejected (PCRE's `(*NOTEMPTY)` and `(*NOTEMPTY_ATSTART)`). */
     notEmpty: IRNotEmpty = IRNotEmpty.Never
 ):
 
@@ -264,10 +255,8 @@ object IRNotEmpty:
 
 /** IRBackReferenceSemantics is how back-references behave, which differs among dialects.
   *
-  * @param unsetMatchesEmpty
-  *   whether a reference to a capture that is not set matches the empty string (JavaScript), or fails (the others)
-  * @param choice
-  *   how a reference with more than one index chooses the capture
+  * With `unsetMatchesEmpty`, a reference to a capture that is not set matches the empty string (JavaScript); otherwise,
+  * it fails (the others). `choice` is how a reference with more than one index chooses the capture.
   */
 final case class IRBackReferenceSemantics(unsetMatchesEmpty: Boolean, choice: IRBackReferenceChoice)
 
@@ -295,9 +284,8 @@ object IRBackReferenceFolding:
   /** Full compares the full case foldings of the capture and the input, which must end at the end of a character of
     * both (Perl and Ruby, e.g. `(ß)\1` matches `"ßss"`, but `(s)\1` does not match `"sß"`).
     *
-    * @param below
-    *   the smallest code value of a folding to several characters, which a character with another folding keeps instead
-    *   (`0x80` under `aa`, and `0x100` under `l`)
+    * A folding of a character to several characters counts only if all its code values are `below` or more; otherwise,
+    * the character keeps its other folding (`below` is `0x80` under `aa`, and `0x100` under `l`).
     */
   final case class Full(below: Int) extends IRBackReferenceFolding:
 

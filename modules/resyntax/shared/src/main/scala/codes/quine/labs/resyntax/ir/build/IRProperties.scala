@@ -849,8 +849,7 @@ private[build] object IRProperties:
 
   /** Onigmo's POSIX bracket classes in Unicode (Ruby's `tool/enc-unicode.rb`).
     *
-    * @param bracket
-    *   whether it is a bracket (e.g. `[[:punct:]]`), whose `punct` adds the ASCII symbols unlike `\p{Punct}`
+    * With `bracket`, it is a bracket (e.g. `[[:punct:]]`), whose `punct` adds the ASCII symbols unlike `\p{Punct}`.
     */
   def rubyPosix(key: String, bracket: Boolean = true): Option[CharSet] =
     val u = unicodeUniverse

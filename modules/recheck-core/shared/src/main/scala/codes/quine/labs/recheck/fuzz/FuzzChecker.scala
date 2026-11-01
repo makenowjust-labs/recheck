@@ -31,9 +31,9 @@ object FuzzChecker:
 
   /** Checks whether RegExp is ReDoS vulnerable or not.
     *
-    * @param failed
-    *   whether an attack of the complexity and the hotspot is known to fail recall validation, which may change while
-    *   iterating the results. Strings whose attacks failed rank below the others in the next generation.
+    * The strings take `preferred` (see [[PatternAlphabet.build]]). `failed` tells whether an attack of the complexity
+    * and the hotspot is known to fail recall validation, which may change while iterating the results. Strings whose
+    * attacks failed rank below the others in the next generation.
     */
   def check(
       pattern: IRPattern,

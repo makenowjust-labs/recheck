@@ -5,39 +5,29 @@ import scala.util.hashing.MurmurHash3
 /** CharKind is a minimum character information for assertion check.
   *
   * The last three are guesses on the context, which the automaton checks with the next (resp. previous) kind.
-  *
-  * @param words
-  *   the bits of the word sets having the character
-  * @param terminators
-  *   the bits of the line terminator sets having the character
-  * @param marks
-  *   the bits of the sets of the word marks having the character, three for each (the marks, the extenders and the
-  *   bases)
-  * @param cr
-  *   whether it is `\r`, which is distinguished for `\r\n`
-  * @param lf
-  *   whether it is `\n`, which is distinguished for `\r\n`
-  * @param boundary
-  *   whether it is the begin or the end of the input instead of a character
-  * @param last
-  *   whether the character is the last of the input
-  * @param afterCR
-  *   whether `\r` precedes the `\n`
-  * @param follow
-  *   what follows the `\r`
-  * @param based
-  *   the bits of the word marks whose base the text up to the character has
   */
 final case class CharKind(
+    /** The bits of the word sets having the character. */
     words: Int = 0,
+    /** The bits of the line terminator sets having the character. */
     terminators: Int = 0,
+    /** The bits of the sets of the word marks having the character, three for each (the marks, the extenders and the
+      * bases).
+      */
     marks: Int = 0,
+    /** Whether it is `\r`, which is distinguished for `\r\n`. */
     cr: Boolean = false,
+    /** Whether it is `\n`, which is distinguished for `\r\n`. */
     lf: Boolean = false,
+    /** Whether it is the begin or the end of the input instead of a character. */
     boundary: Boolean = false,
+    /** Whether the character is the last of the input. */
     last: Option[Boolean] = None,
+    /** Whether `\r` precedes the `\n`. */
     afterCR: Option[Boolean] = None,
+    /** What follows the `\r`. */
     follow: Option[CRFollow] = None,
+    /** The bits of the word marks whose base the text up to the character has. */
     based: Int = 0
 ):
 

@@ -18,27 +18,16 @@ enum Dialect:
     */
   case PCRE
 
-  /** Python specifies Python dialect.
-    *
-    * @param type
-    *   the string type of the pattern and its input
-    */
+  /** Python specifies Python dialect, whose `type` is the string type of the pattern and its input. */
   case Python(`type`: Python.Type = Python.Type.Str)
 
-  /** Ruby specifies Ruby dialect.
-    *
-    * @param encoding
-    *   the encoding of the regexp
-    */
+  /** Ruby specifies Ruby dialect, whose `encoding` is the encoding of the regexp. */
   case Ruby(encoding: Ruby.Encoding = Ruby.Encoding.Utf8)
 
-  /** Perl specifies Perl dialect.
+  /** Perl specifies Perl dialect, where `source` is how the pattern is given.
     *
-    * @param utf8
-    *   whether the program has `use utf8` and its strings are text with the UTF-8 flag (e.g. decoded input), which
-    *   match code points with Unicode rules; otherwise, they are byte strings, whose non-ASCII literals are UTF-8 bytes
-    * @param source
-    *   how the pattern is given
+    * With `utf8`, the program has `use utf8` and its strings are text with the UTF-8 flag (e.g. decoded input), which
+    * match code points with Unicode rules. Otherwise, they are byte strings, whose non-ASCII literals are UTF-8 bytes.
     */
   case Perl(utf8: Boolean = true, source: PerlSource = PerlSource.Literal)
 

@@ -112,10 +112,8 @@ object ReDoS:
       case ex: ReDoSException => Iterator(Diagnostics.Unknown.from(source, flags, params.dialect, ex))
     takeUntilAccepted(all)
 
-  /** RecallKey identifies an attack on recall validation by the complexity and the hotspot.
-    *
-    * @param degree
-    *   the degree of the polynomial complexity, or `None` for the exponential one
+  /** RecallKey identifies an attack on recall validation by the degree of the polynomial complexity (or `None` for the
+    * exponential one) and the hotspot.
     */
   private[recheck] final case class RecallKey(degree: Option[Int], spots: Seq[(Int, Int)])
 
@@ -170,8 +168,8 @@ object ReDoS:
 
   /** Iterates the diagnostics of the fuzz checker, ending with the safe one.
     *
-    * @param failed
-    *   whether an attack of the complexity and the hotspot failed recall validation, which the fuzz checker avoids
+    * `failed` tells whether an attack of the complexity and the hotspot failed recall validation, which the fuzz
+    * checker avoids.
     */
   private[recheck] def checkFuzz(
       pattern: SourcePattern,

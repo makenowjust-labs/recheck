@@ -88,9 +88,7 @@ object IRBuilder:
       notEmpty(starts)
     )
 
-  /** @param utf
-    *   PCRE's `(*UTF)` start option
-    */
+  /** Returns the unit of the input, where `utf` is PCRE's `(*UTF)` start option. */
   private def unitMode(dialect: Dialect, flagSet: FlagSet, utf: Boolean): UnitMode =
     dialect match
       case Dialect.JavaScript =>

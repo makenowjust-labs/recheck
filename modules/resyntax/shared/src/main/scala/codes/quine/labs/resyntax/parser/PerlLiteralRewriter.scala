@@ -21,10 +21,8 @@ private[parser] object PerlLiteralRewriter:
 
   /** Rewrites the regex literal, or returns `None` if it has no command.
     *
-    * @param extended
-    *   whether the literal has the `x` flag, where the lexer skips `#` comments
-    * @param bytes
-    *   whether the literal is a byte string, whose non-ASCII bytes the case commands do not change
+    * With `extended` (the `x` flag), the lexer skips `#` comments. With `bytes`, the literal is a byte string, whose
+    * non-ASCII bytes the case commands do not change.
     */
   def rewrite(source: String, extended: Boolean, bytes: Boolean = false): Option[Rewritten] =
     if !source.contains('\\') then None else new PerlLiteralRewriter(source, extended, bytes).run()

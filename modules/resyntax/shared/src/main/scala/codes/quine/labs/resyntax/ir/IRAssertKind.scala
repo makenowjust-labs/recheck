@@ -17,9 +17,7 @@ sealed abstract class IRAssertKind extends Product with Serializable:
 
 object IRAssertKind:
 
-  /** @param atEnd
-    *   where it matches at the end of the input
-    */
+  /** LineBegin is a line begin assertion, which `atEnd` tells where it matches at the end of the input. */
   final case class LineBegin(terminators: IRLineTerminators, atEnd: IRLineBeginAtEnd) extends IRAssertKind
 
   final case class LineEnd(terminators: IRLineTerminators) extends IRAssertKind

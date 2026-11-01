@@ -11,48 +11,34 @@ import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 
-/** ReferenceSite is the state of capture groups at a node referring to a group.
-  *
-  * @param opened
-  *   the index of the last group opened before the node
-  * @param open
-  *   the indices of the groups enclosing the node
-  * @param namesBefore
-  *   the names of the groups opened before the node
-  * @param lookBehindFrom
-  *   the first index of the groups in the outermost look-behind enclosing the node
-  * @param openedInOrder
-  *   the indices of the groups opened before the node in the source order, which a branch reset does not rewind
-  */
+/** ReferenceSite is the state of capture groups at a node referring to a group. */
 private[build] final case class ReferenceSite(
+    /** The index of the last group opened before the node. */
     opened: Int,
+    /** The indices of the groups enclosing the node. */
     open: Set[Int],
+    /** The names of the groups opened before the node. */
     namesBefore: Set[String],
+    /** The first index of the groups in the outermost look-behind enclosing the node. */
     lookBehindFrom: Option[Int],
+    /** The indices of the groups opened before the node in the source order, which a branch reset does not rewind. */
     openedInOrder: Vector[Int]
 )
 
-/** CaptureTable is the capture numbering of a pattern.
-  *
-  * @param count
-  *   the largest index
-  * @param defined
-  *   the defined indices, which can be sparse in .NET
-  * @param names
-  *   the indices of each name
-  * @param inBranchReset
-  *   the indices of the groups in a branch reset
-  * @param charFlags
-  *   the flags at each character-level node of a Perl or Ruby pattern, whose look-behind width depends on them
-  */
+/** CaptureTable is the capture numbering of a pattern. */
 private[build] final class CaptureTable(
     indices: Map[NodeKey, Int],
     sites: Map[NodeKey, ReferenceSite],
+    /** The largest index. */
     val count: Int,
+    /** The defined indices, which can be sparse in .NET. */
     val defined: Set[Int],
+    /** The indices of each name. */
     val names: Map[String, Seq[Int]],
     val groups: Map[Int, Seq[Node]],
+    /** The indices of the groups in a branch reset. */
     val inBranchReset: Set[Int],
+    /** The flags at each character-level node of a Perl or Ruby pattern, whose look-behind width depends on them. */
     charFlags: Map[NodeKey, IRCharFlags]
 ):
 

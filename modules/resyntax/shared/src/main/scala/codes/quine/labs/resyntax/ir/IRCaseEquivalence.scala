@@ -118,8 +118,8 @@ object IRCaseEquivalence:
   def ofBackReference(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRCaseEquivalence =
     of(dialect, mode, flags, perlNative = dialect.isPerl && flags.charset == IRCharset.Default)
 
-  /** @param perlNative
-    *   Perl's `/d` rules without a reason to use Unicode rules (see [[PerlNative]])
+  /** Returns the equivalence of the dialect under the flags, where `perlNative` means Perl's `/d` rules without a
+    * reason to use Unicode rules (see [[PerlNative]]).
     */
   def of(dialect: Dialect, mode: UnitMode, flags: IRCharFlags, perlNative: Boolean): IRCaseEquivalence =
     val asciiOnly = flags.charset match

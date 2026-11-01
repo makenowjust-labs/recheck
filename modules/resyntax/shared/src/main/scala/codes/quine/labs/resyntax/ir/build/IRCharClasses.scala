@@ -13,10 +13,8 @@ import codes.quine.labs.resyntax.ir.build.IRProperties.of
 
 /** IRCharClasses gives the code points of escape classes (e.g. `\w`) and POSIX classes in a dialect.
   *
-  * The sets are of code points; the caller restricts them to the unit mode.
-  *
-  * @param perlNative
-  *   Perl's `/d` rules without a reason to use Unicode rules, where `U+0080..U+00FF` follow ASCII rules
+  * The sets are of code points; the caller restricts them to the unit mode. `perlNative` is Perl's `/d` rules without a
+  * reason to use Unicode rules, where `U+0080..U+00FF` follow ASCII rules.
   */
 private[build] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlNative: Boolean):
   import IRCharClasses.*
