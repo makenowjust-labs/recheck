@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.parser
 
 import scala.annotation.switch
+import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.boundary
 
@@ -33,6 +34,15 @@ import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.parser.Parser.ParsingContext
 
 object Parser:
+
+  /** The maximum nesting depth of a pattern.
+    *
+    * A group, a look-around condition, a class, an operand of a class set operation, and a repeat of a repeat nest one
+    * deeper, and a deeper pattern throws [[NestingLimitException]], so that the recursive analyses on the pattern do
+    * not overflow the stack.
+    */
+  val MaxNestingDepth: Int = 150
+
   private[parser] final case class ParsingContext(
       inClass: Boolean,
       skipsComment: Boolean,
@@ -68,6 +78,8 @@ object Parser:
     catch
       case ex: ParsingException if rewrites.nonEmpty =>
         throw new ParsingException(ex.message, ex.pos.map(pos => rewrites.foldLeft(pos)((p, r) => r.position(p))))
+      case ex: NestingLimitException if rewrites.nonEmpty =>
+        throw new NestingLimitException(ex.limit, rewrites.foldLeft(ex.pos)((p, r) => r.position(p)))
 
   private def checkEncoding(source: String, encoding: SourceEncoding): Unit =
     if encoding == SourceEncoding.Latin1 then
@@ -122,6 +134,9 @@ private[parser] final class Parser(
 
   /** The end of the last removed comment that is already in the result. */
   private var removedCommentEmittedEnd: Int = 0
+
+  /** The nesting depth limited by [[Parser.MaxNestingDepth]]. */
+  private var depth: Int = 0
 
   reset(0)
 
@@ -307,6 +322,7 @@ private[parser] final class Parser(
         ()
 
   private def pushRepeat(stack: mutable.Stack[Node], node: Node, quantifier: Quantifier): Unit =
+    checkRepeatNesting(node)
     val end = offset
     stack.push(Node(NodeData.Repeat(node, quantifier), node.loc.copy(end = end)))
 
@@ -435,7 +451,7 @@ private[parser] final class Parser(
     assert(featureSet.hasBranchReset, "Invalid group")
     next()
     protectContext:
-      val node = parseDisjunction(isBranchReset = true)
+      val node = nest(start)(parseDisjunction(isBranchReset = true))
       closeGroup()
       val nodes = node.data match
         case NodeData.Disjunction(nodes) => nodes
@@ -498,10 +514,10 @@ private[parser] final class Parser(
       return
 
     protectContext:
-      val absent = protectContext(parseSequence())
+      val absent = nest(start)(protectContext(parseSequence()))
       if !isEnd && currentChar == '|' then
         next()
-        val exp = protectContext(parseDisjunction())
+        val exp = nest(start)(protectContext(parseDisjunction()))
         pushCommand(stack, CommandKind.AbsenceExpression(absent, exp), start)
       else pushCommand(stack, CommandKind.AbsenceStopper(absent), start)
 
@@ -515,7 +531,9 @@ private[parser] final class Parser(
   private def parseConditionalGroup(stack: mutable.Stack[Node], start: Int): Unit =
     assert(featureSet.hasConditional, "Invalid group")
     next()
+    nest(start)(parseConditionalGroupTest(stack, start))
 
+  private def parseConditionalGroupTest(stack: mutable.Stack[Node], start: Int): Unit =
     boundary:
       val indexStart = offset
       for n <- parseIntOption() do
@@ -617,9 +635,10 @@ private[parser] final class Parser(
           if parseLookAroundTest(stack, start, symbolic, alphabetic, abbrev, la) then boundary.break()
 
       if featureSet.hasBareLookAroundTest then
+        val testStart = offset - 1
         // .NET reads `(?(?:x)...)` and `(?(?>x)...)` as `(?(x)...)` because the condition is a look-ahead.
         if !startWith("?:") then startWith("?>")
-        parseLookAroundConditional(stack, None, start)
+        parseLookAroundConditional(stack, None, start, testStart)
         boundary.break()
 
       fail("Invalid condition")
@@ -659,16 +678,17 @@ private[parser] final class Parser(
       la: AssertNameStyle => GroupKind.LookAround,
       callout: Option[CommandKind] = None
   ): Boolean =
+    val testStart = offset - 1
     if startWith(symbolic) then
-      parseLookAroundConditional(stack, Some(la(AssertNameStyle.Symbolic)), start, callout)
+      parseLookAroundConditional(stack, Some(la(AssertNameStyle.Symbolic)), start, testStart, callout)
       return true
 
     if featureSet.hasAlphabeticGroup && startWith(alphabetic) then
-      parseLookAroundConditional(stack, Some(la(AssertNameStyle.Alphabetic)), start, callout)
+      parseLookAroundConditional(stack, Some(la(AssertNameStyle.Alphabetic)), start, testStart, callout)
       return true
 
     if featureSet.hasAlphabeticGroup && startWith(abbrev) then
-      parseLookAroundConditional(stack, Some(la(AssertNameStyle.Abbrev)), start, callout)
+      parseLookAroundConditional(stack, Some(la(AssertNameStyle.Abbrev)), start, testStart, callout)
       return true
 
     false
@@ -677,9 +697,10 @@ private[parser] final class Parser(
       stack: mutable.Stack[Node],
       kind: Option[GroupKind.LookAround],
       start: Int,
+      testStart: Int,
       callout: Option[CommandKind] = None
   ): Unit =
-    val node = protectContext(parseDisjunction())
+    val node = nest(testStart)(protectContext(parseDisjunction()))
     closeCondition()
     val test = ConditionalTest.LookAround(kind, node)
     parseConditionalGroupBody(stack, callout.fold(test)(ConditionalTest.CalloutLookAround(_, test)), start)
@@ -1068,13 +1089,13 @@ private[parser] final class Parser(
         case _                                                                             => false
       assert(atStart, "Inline flag not at the start", start)
     pushCommand(stack, CommandKind.InlineFlag(diff), start)
-    if featureSet.hasIncomprehensiveInlineFlag then parseOpaqueDisjunction(stack, diff)
+    if featureSet.hasIncomprehensiveInlineFlag then parseOpaqueDisjunction(stack, diff, start)
     else applyFlagSetDiff(diff)
 
-  private def parseOpaqueDisjunction(stack: mutable.Stack[Node], diff: FlagSetDiff): Unit =
+  private def parseOpaqueDisjunction(stack: mutable.Stack[Node], diff: FlagSetDiff, start: Int): Unit =
     boundary:
       applyFlagSetDiffWith(diff):
-        val node = parseDisjunction()
+        val node = nest(start)(parseDisjunction())
         node.data match
           case s: NodeData.Sequence =>
             if s.nodes.isEmpty then boundary.break()
@@ -1253,7 +1274,7 @@ private[parser] final class Parser(
       case _: GroupKind.NamedCapture | _: GroupKind.PNamedCapture | GroupKind.Balance(_, Some(_), _) =>
         previousCaptureCount += 1
       case _ => ()
-    val node = protectContext(parseDisjunction())
+    val node = nest(start)(protectContext(parseDisjunction()))
     closeGroup()
     val end = offset
     stack.push(Node(NodeData.Group(kind, node), SourceLocation(start, end)))
@@ -2195,7 +2216,7 @@ private[parser] final class Parser(
     val invert = currentChar == '^'
     if invert then next()
 
-    val item = parseClassItem(!featureSet.allowsClassEmpty)
+    val item = nest(start)(parseClassItem(!featureSet.allowsClassEmpty))
     expect(']', "Unclosed ']'")
     checkNegatedClassSet(invert, item, start)
 
@@ -2208,6 +2229,7 @@ private[parser] final class Parser(
     var item = parseClassItemUnion(first)
     val operands = Seq.newBuilder[ClassItem]
     val operators = mutable.Set.empty[String]
+    val savedDepth = depth
 
     var continue = true
     while continue do
@@ -2215,6 +2237,7 @@ private[parser] final class Parser(
 
       if featureSet.allowsClassIntersection && startWith("&&") then
         continue = true
+        enter(offset - 2)
         if featureSet.checksClassSetSyntax then assert(isEnd || currentChar != '&', "Invalid class set character")
         val right = parseClassItemUnion(false)
         val end = offset
@@ -2226,6 +2249,7 @@ private[parser] final class Parser(
 
       if featureSet.allowsClassDiff && startWith("--") then
         continue = true
+        enter(offset - 2)
         val right = parseClassItemUnion(false)
         val end = offset
         operands.addOne(item).addOne(right)
@@ -2236,11 +2260,13 @@ private[parser] final class Parser(
         val nestStart = offset - 1
         val invert = currentChar == '^'
         if invert then next()
-        val inner = parseClassItem(true)
+        val inner = nest(nestStart)(parseClassItem(true))
         expect(']', "Unclosed ']'")
-        val nest = ClassItem(ClassItemData.ClassNest(invert, inner), SourceLocation(nestStart, offset))
+        val nested = ClassItem(ClassItemData.ClassNest(invert, inner), SourceLocation(nestStart, offset))
         assert(isEnd || currentChar == ']', "Class subtraction must be last")
-        item = ClassItem(ClassItemData.ClassDiff(item, nest), SourceLocation(start, offset))
+        item = ClassItem(ClassItemData.ClassDiff(item, nested), SourceLocation(start, offset))
+
+    depth = savedDepth
 
     if featureSet.checksClassSetSyntax && operators.nonEmpty then
       assert(operators.size == 1, "Invalid class set operation", start)
@@ -2406,7 +2432,7 @@ private[parser] final class Parser(
       next()
       val invert = currentChar == '^'
       if invert then next()
-      val item = parseClassItem(!featureSet.allowsClassEmpty)
+      val item = nest(start)(parseClassItem(!featureSet.allowsClassEmpty))
       expect(']', "Unclosed ']'")
       checkNegatedClassSet(invert, item, start)
       val end = offset
@@ -2561,6 +2587,28 @@ private[parser] final class Parser(
     nextCodePoint(value)
     val end = offset
     stack.push(Node(NodeData.Literal(value), SourceLocation(start, end)))
+
+  /** Parses the body one level deeper. */
+  private def nest[A](start: Int)(body: => A): A =
+    enter(start)
+    val value = body
+    depth -= 1
+    value
+
+  private def enter(start: Int): Unit =
+    if depth >= Parser.MaxNestingDepth then throw new NestingLimitException(Parser.MaxNestingDepth, start)
+    depth += 1
+
+  /** Checks the depth of a repeat of the node, where a repeat of a repeat is one deeper. */
+  private def checkRepeatNesting(node: Node): Unit =
+    @tailrec def loop(current: Node, repeatDepth: Int): Unit =
+      current.data match
+        case NodeData.Repeat(inner, _) =>
+          if repeatDepth >= Parser.MaxNestingDepth then
+            throw new NestingLimitException(Parser.MaxNestingDepth, node.loc.end)
+          loop(inner, repeatDepth + 1)
+        case _ => ()
+    loop(node, depth)
 
   private def protectContext[A](body: => A): A =
     val savedContext = context
