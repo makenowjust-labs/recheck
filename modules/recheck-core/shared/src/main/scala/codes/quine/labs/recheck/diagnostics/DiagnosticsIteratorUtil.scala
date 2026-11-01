@@ -8,23 +8,8 @@ import codes.quine.labs.recheck.common.ReDoSException
 /** DiagnosticsIteratorUtil provides operations on lazy iterators of diagnostics. */
 object DiagnosticsIteratorUtil:
 
-  /** Iterates the diagnostics until the accepted one, without computing the next one. */
-  private[recheck] def takeUntilAccepted(ds: Iterator[Diagnostics]): Iterator[Diagnostics] =
-    new AbstractIterator[Diagnostics]:
-      private var accepted = false
-
-      def hasNext: Boolean = !accepted && ds.hasNext
-
-      def next(): Diagnostics =
-        if !hasNext then throw new NoSuchElementException
-        val d = ds.next()
-        accepted = d match
-          case v: Diagnostics.Vulnerable => v.isAccepted
-          case _                         => true
-        d
-
   /** Sets the checker to an exception thrown on building or iterating the diagnostics. */
-  private[recheck] def tagging(checker: Checker.Used)(ds: => Iterator[Diagnostics]): Iterator[Diagnostics] =
+  private[recheck] def tagging[D <: Diagnostics](checker: Checker.Used)(ds: => Iterator[D]): Iterator[D] =
     recovering(ds):
       case ex: ReDoSException if ex.checker.isEmpty =>
         ex.checker = Some(checker)
@@ -34,24 +19,24 @@ object DiagnosticsIteratorUtil:
     *
     * It computes the next element on `hasNext` so that an exception is thrown there.
     */
-  private[recheck] def recovering(ds: => Iterator[Diagnostics])(
-      recover: PartialFunction[Throwable, Iterator[Diagnostics]]
-  ): Iterator[Diagnostics] = new AbstractIterator[Diagnostics]:
-    private var current: Iterator[Diagnostics] = null
+  private[recheck] def recovering[D <: Diagnostics](ds: => Iterator[D])(
+      recover: PartialFunction[Throwable, Iterator[D]]
+  ): Iterator[D] = new AbstractIterator[D]:
+    private var current: Iterator[D] = null
     private var recovered = false
-    private var buffer: Option[Diagnostics] = None
+    private var buffer: Option[D] = None
 
     def hasNext: Boolean =
       if buffer.isEmpty then buffer = fetch()
       buffer.isDefined
 
-    def next(): Diagnostics =
+    def next(): D =
       if !hasNext then throw new NoSuchElementException
       val d = buffer.get
       buffer = None
       d
 
-    private[recheck] def fetch(): Option[Diagnostics] =
+    private[recheck] def fetch(): Option[D] =
       try
         if current eq null then current = ds
         Option.when(current.hasNext)(current.next())

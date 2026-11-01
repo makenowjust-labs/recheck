@@ -43,10 +43,6 @@ object Diagnostics:
       /** The run of the attack string on the real regex engine, or `None` if it is not run. */
       recallValidation: Option[RecallValidation] = None
   ) extends Diagnostics:
-
-    /** Whether this result is accepted, i.e. recall validation is not run or succeeded. */
-    def isAccepted: Boolean = recallValidation.forall(_.succeeded)
-
     override def toString: String =
       val recall = recallValidation.map(r => s"\nRecall       : $r").getOrElse("")
       s"""|Input        : /$source/$flags

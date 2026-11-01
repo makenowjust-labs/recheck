@@ -1,5 +1,6 @@
 package codes.quine.labs.recheck
 
+import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.language.implicitConversions
 
@@ -14,8 +15,6 @@ import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.Hotspot.*
 import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
-import codes.quine.labs.recheck.exec.ExecResult
-import codes.quine.labs.recheck.recall.RecallValidator
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.parser.Parser
@@ -25,17 +24,21 @@ class ReDoSSuite extends munit.FunSuite:
   /** A default context. */
   given ctx: Context = Context()
 
+  /** The vulnerable diagnostics of a checker followed by its safe diagnostics. */
+  def concat(result: (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe)): Iterator[Diagnostics] =
+    result._1 ++ Iterator(result._2())
+
   def checkAutomaton(source: String, flags: String, params: Parameters): Iterator[Diagnostics] =
     val ir = ReDoS.parse(source, flags, params.dialect)
-    ReDoS.checkAutomaton(source, flags, ir, AttackPattern.Style.of(params.dialect, ir.mode), params)
+    concat(ReDoS.checkAutomaton(source, flags, ir, AttackPattern.Style.of(params.dialect, ir.mode), params))
 
   def checkFuzz(source: String, flags: String, params: Parameters)(using ctx: Context): Iterator[Diagnostics] =
     val ir = ReDoS.parse(source, flags, params.dialect)(using Context())
-    ReDoS.checkFuzz(source, flags, ir, AttackPattern.Style.of(params.dialect, ir.mode), params)
+    concat(ReDoS.checkFuzz(source, flags, ir, AttackPattern.Style.of(params.dialect, ir.mode), params))
 
   def checkAuto(source: String, flags: String, params: Parameters): Iterator[Diagnostics] =
     val ir = ReDoS.parse(source, flags, params.dialect)
-    ReDoS.checkAuto(source, flags, ir, AttackPattern.Style.of(params.dialect, ir.mode), params)
+    concat(ReDoS.checkAuto(source, flags, ir, AttackPattern.Style.of(params.dialect, ir.mode), params))
 
   test("ReDoS.check"):
     assertEquals(
@@ -90,132 +93,130 @@ class ReDoSSuite extends munit.FunSuite:
       ReDoS.checkAll("^foo$", "", Parameters(timeout = Duration.MinusInf)),
       List(Diagnostics.Unknown("^foo$", "", Dialect.JavaScript, Diagnostics.ErrorKind.Timeout, None))
     )
-
-    val vulnerable = Diagnostics.Vulnerable(
-      "^(?:a|a)*$",
-      "",
-      Dialect.JavaScript,
-      AttackComplexity.Exponential(false),
-      AttackPattern(
-        Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
-        UStringUtil.fromString("\u0000"),
-        31
-      ),
-      Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))),
-      Checker.Automaton
-    )
-    var runs = 0
-    def checkAll(
-        output: ExecResult,
-        checker: Checker = Checker.Automaton,
-        maxRecallFailures: Int = 100
-    ): List[Diagnostics] =
-      runs = 0
-      val params = Parameters(
-        checker = checker,
-        recallTimeout = 1.second,
-        maxGeneStringSize = 1000,
-        maxAttackStringSize = 1000,
-        maxIteration = 2,
-        maxRecallFailures = maxRecallFailures
+    // Without recall validation, the first vulnerable diagnostics is the final one.
+    assertEquals(
+      ReDoS.checkAll("^(?:a|a)*$", "", Parameters(recallTimeout = Duration.Zero)),
+      List(
+        Diagnostics.Vulnerable(
+          "^(?:a|a)*$",
+          "",
+          Dialect.JavaScript,
+          AttackComplexity.Exponential(false),
+          AttackPattern(
+            Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
+            UStringUtil.fromString("\u0000"),
+            31
+          ),
+          Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))),
+          Checker.Automaton
+        )
       )
-      val exec: RecallValidator.Exec = (_, _, _, _) =>
-        runs += 1
-        output
-      ReDoS.iterator("^(?:a|a)*$", "", params, None, Some(exec)).toList
+    )
+
+  test("ReDoS.validateCandidates"):
+    def vulnerable(degree: Int): Diagnostics.Vulnerable =
+      Diagnostics.Vulnerable(
+        "^a*a*$",
+        "",
+        Dialect.JavaScript,
+        AttackComplexity.Polynomial(degree, false),
+        AttackPattern(
+          Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
+          UStringUtil.fromString(""),
+          10
+        ),
+        Hotspot(Seq(Spot(1, 2, Heat))),
+        Checker.Automaton
+      )
+
+    val safe = Diagnostics.Safe("^a*a*$", "", Dialect.JavaScript, AttackComplexity.Linear, Checker.Automaton)
 
     def recall(result: RecallResult): Option[RecallValidation] = Some(RecallValidation("node v0", 1.second, result))
 
-    // A failed recall validation keeps the diagnostics, and the checking continues.
-    val finish = ExecResult.Exit(0, "recheck:runtime node v0\nrecheck:time 1\n", "")
+    val finish = recall(RecallResult.Finish(1.millis))
+    val timeout = recall(RecallResult.Timeout)
+    var pulled = 0
+    var validated = 0
+
+    // The candidates are of the degrees, and validation gives the results in order.
+    def validateCandidates(
+        degrees: Seq[Int],
+        results: Seq[Option[RecallValidation]],
+        maxRecallFailures: Int = 100
+    ): List[Diagnostics] =
+      pulled = 0
+      validated = 0
+      val candidates = degrees.iterator.map: degree =>
+        pulled += 1
+        vulnerable(degree)
+      val validate = (d: Diagnostics.Vulnerable) =>
+        validated += 1
+        d.copy(recallValidation = results(validated - 1))
+      ReDoS
+        .validateCandidates(candidates, () => safe, validate, mutable.Set.empty, maxRecallFailures)
+        .toList
+
+    // The failed ones are kept, and the safe one is the final one when the candidates run out.
     assertEquals(
-      checkAll(finish),
-      List(
-        vulnerable.copy(recallValidation = recall(RecallResult.Finish(1.millis))),
-        Diagnostics.Safe("^(?:a|a)*$", "", Dialect.JavaScript, AttackComplexity.Linear, Checker.Automaton)
-      )
+      validateCandidates(Seq(3, 2), Seq(finish, finish)),
+      List(vulnerable(3).copy(recallValidation = finish), vulnerable(2).copy(recallValidation = finish), safe)
     )
-    assertEquals(runs, 1)
-    val fuzz = checkAll(finish, Checker.Fuzz)
+    assertEquals(validateCandidates(Seq.empty, Seq.empty), List(safe))
+    // The first one not refuted by recall validation is the final one, and no more candidates are computed.
+    assertEquals(
+      validateCandidates(Seq(3, 2, 2), Seq(finish, timeout)),
+      List(vulnerable(3).copy(recallValidation = finish), vulnerable(2).copy(recallValidation = timeout))
+    )
+    assertEquals(pulled, 2)
+    assertEquals(validateCandidates(Seq(3, 2), Seq(None)), List(vulnerable(3)))
+    assertEquals(pulled, 1)
+    // The attacks of the same complexity and hotspot as a failed one are skipped.
+    assertEquals(
+      validateCandidates(Seq(3, 3, 2), Seq(finish, timeout)),
+      List(vulnerable(3).copy(recallValidation = finish), vulnerable(2).copy(recallValidation = timeout))
+    )
+    assertEquals(validated, 2)
+    // It stops at the limit of failures.
+    val limit = Diagnostics.Unknown(
+      "^a*a*$",
+      "",
+      Dialect.JavaScript,
+      Diagnostics.ErrorKind.RecallFailureLimit,
+      Some(Checker.Automaton)
+    )
+    assertEquals(
+      validateCandidates(Seq(4, 3, 2), Seq(finish, finish), maxRecallFailures = 2),
+      List(vulnerable(4).copy(recallValidation = finish), vulnerable(3).copy(recallValidation = finish), limit)
+    )
+    assertEquals(pulled, 2)
+    // A non-positive limit stops at the first failure.
+    assertEquals(
+      validateCandidates(Seq(3, 2), Seq(finish), maxRecallFailures = 0),
+      List(vulnerable(3).copy(recallValidation = finish), limit)
+    )
+
+    // The fuzz checker avoids the failed attacks.
+    val params =
+      Parameters(checker = Checker.Fuzz, maxGeneStringSize = 1000, maxAttackStringSize = 1000, maxIteration = 2)
+    val ir = ReDoS.parse("^(?:a|a)*$", "", params.dialect)
+    val failures = mutable.Set.empty[ReDoS.RecallKey]
+    val (candidates, fuzzSafe) = ReDoS.checkFuzz(
+      "^(?:a|a)*$",
+      "",
+      ir,
+      AttackPattern.Style.of(params.dialect, ir.mode),
+      params,
+      (c, h) => failures.contains(ReDoS.RecallKey(c, h))
+    )
+    val fuzz = ReDoS.validateCandidates(candidates, fuzzSafe, _.copy(recallValidation = finish), failures, 100).toList
     assertEquals(
       fuzz.last,
       Diagnostics.Safe("^(?:a|a)*$", "", Dialect.JavaScript, AttackComplexity.Safe(true), Checker.Fuzz)
     )
     assert(fuzz.init.nonEmpty)
-    assert(fuzz.init.forall { case d: Diagnostics.Vulnerable => !d.isAccepted; case _ => false })
-    assertEquals(runs, fuzz.size - 1)
-    // The attacks of the same complexity and hotspot as a failed one are skipped.
     val keys = fuzz.init.collect { case d: Diagnostics.Vulnerable => ReDoS.RecallKey(d.complexity, d.hotspot) }
+    assertEquals(keys.size, fuzz.size - 1)
     assertEquals(keys.distinct, keys)
-
-    // It stops at the limit of failures.
-    val limited = checkAll(finish, Checker.Fuzz, maxRecallFailures = 1)
-    assertEquals(limited.size, 2)
-    assertEquals(
-      limited.last,
-      Diagnostics.Unknown(
-        "^(?:a|a)*$",
-        "",
-        Dialect.JavaScript,
-        Diagnostics.ErrorKind.RecallFailureLimit,
-        Some(Checker.Fuzz)
-      )
-    )
-    assertEquals(runs, 1)
-    // A non-positive limit stops at the first failure.
-    assertEquals(
-      checkAll(finish, maxRecallFailures = 0).last,
-      Diagnostics.Unknown(
-        "^(?:a|a)*$",
-        "",
-        Dialect.JavaScript,
-        Diagnostics.ErrorKind.RecallFailureLimit,
-        Some(Checker.Automaton)
-      )
-    )
-
-    // It stops at the first accepted diagnostics.
-    assertEquals(
-      checkAll(ExecResult.Timeout("recheck:runtime node v0\nrecheck:start\n")),
-      List(vulnerable.copy(recallValidation = recall(RecallResult.Timeout)))
-    )
-    assertEquals(runs, 1)
-    assertEquals(
-      checkAll(ExecResult.Exit(0, "recheck:runtime node v0\nrecheck:engine-limit Backtrack limit exhausted\n", "")),
-      List(vulnerable.copy(recallValidation = recall(RecallResult.EngineLimit("Backtrack limit exhausted"))))
-    )
-    // An engine error on the stack depth or the memory is a failure.
-    assertEquals(
-      checkAll(ExecResult.Exit(0, "recheck:runtime node v0\nrecheck:engine-error RangeError\n", "")),
-      List(
-        vulnerable.copy(recallValidation = recall(RecallResult.EngineError("RangeError"))),
-        Diagnostics.Safe("^(?:a|a)*$", "", Dialect.JavaScript, AttackComplexity.Linear, Checker.Automaton)
-      )
-    )
-    assertEquals(
-      checkAll(ExecResult.Exit(1, "", "error")),
-      List(
-        Diagnostics.Unknown(
-          "^(?:a|a)*$",
-          "",
-          Dialect.JavaScript,
-          Diagnostics.ErrorKind.Unexpected("error"),
-          Some(Checker.Automaton)
-        )
-      )
-    )
-    assertEquals(
-      ReDoS
-        .iterator(
-          "^(?:a|a)*$",
-          "",
-          Parameters(recallTimeout = 1.second),
-          None,
-          None
-        )
-        .toList,
-      List(vulnerable)
-    )
 
   test("ReDoS.RecallKey"):
     val hotspot = Hotspot(Seq(Spot(0, 1, Normal), Spot(4, 5, Heat), Spot(6, 7, Heat)))
@@ -267,6 +268,11 @@ class ReDoSSuite extends munit.FunSuite:
           Checker.Automaton
         )
       )
+    )
+    // The safe diagnostics after the vulnerable ones has the complexity that the automaton checker finds.
+    assertEquals(
+      checkAutomaton("^(?:a|a)*$", "", Parameters(checker = Checker.Automaton)).toList.last,
+      Diagnostics.Safe("^(?:a|a)*$", "", Dialect.JavaScript, AttackComplexity.Linear, Checker.Automaton)
     )
     assertEquals(
       checkAutomaton("^(?:.|.)*$", "s", Parameters(checker = Checker.Automaton)).next(),

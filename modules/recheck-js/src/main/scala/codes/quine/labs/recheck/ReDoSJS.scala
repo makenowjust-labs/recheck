@@ -25,7 +25,7 @@ object ReDoSJS:
   def check(source: String, flags: String, originalParams: js.UndefOr[js.Any]): js.Any =
     run(originalParams)(ReDoS.check(source, flags, _))
 
-  /** Checks the given RegExp pattern, and returns all the diagnostics until the accepted one. */
+  /** Checks the given RegExp pattern, and returns all the diagnostics until the final one. */
   @JSExportTopLevel("checkAll", "recheck")
   def checkAll(source: String, flags: String, originalParams: js.UndefOr[js.Any]): js.Any =
     run(originalParams)(ReDoS.checkAll(source, flags, _))
