@@ -58,7 +58,7 @@ object StaticSeeder:
         node.data match
           case Disjunction(ns) => copy(Disjunction(ns.map(loop(_, prevIsRepeat, nextIsRepeat, inside))))
           case Sequence(ns)    =>
-            val children = ns.lift
+            val children = ns.toIndexedSeq.lift
             copy:
               Sequence:
                 ns.zipWithIndex.map:

@@ -326,7 +326,9 @@ private[vm] class ProgramBuilder(
   /** Builds a program from a node. */
   def build(node: IRNode): Unit = interrupt:
     node.data match
-      case IRNodeData.Disjunction(children)         => buildDisjunction(children, i => build(children(i)))
+      case IRNodeData.Disjunction(children) =>
+        val alternatives = children.toIndexedSeq
+        buildDisjunction(alternatives, i => build(alternatives(i)))
       case IRNodeData.Sequence(children)            => buildSequence(children)
       case IRNodeData.Empty                         => ()
       case IRNodeData.Capture(index, _, child)      => buildCapture(index, child)
@@ -386,7 +388,7 @@ private[vm] class ProgramBuilder(
     * When `(*THEN)` in it takes the next alternative, the fallback of each alternative is a barrier, and so is a
     * failing fallback before them, which `(*THEN)` in the last alternative takes.
     */
-  def buildDisjunction(children: Seq[IRNode], run: Int => Unit): Unit =
+  def buildDisjunction(children: IndexedSeq[IRNode], run: Int => Unit): Unit =
     val scope = Option.when(children.exists(hasThen))(newThenScope())
     for id <- scope do
       val next = allocateLabel("next")
@@ -435,7 +437,7 @@ private[vm] class ProgramBuilder(
     Option.when(assertionIsThenScope && hasThen(child))(newThenScope())
 
   /** A builder for a disjunction node of Perl, which unsets the captures of an alternative when it fails. */
-  def buildPerlDisjunction(children: Seq[IRNode], barrier: Option[Barrier], run: Int => Unit): Unit =
+  def buildPerlDisjunction(children: IndexedSeq[IRNode], barrier: Option[Barrier], run: Int => Unit): Unit =
     val labels = children.map(_ => (allocateLabel("left"), allocateLabel("right")))
     val cont = allocateLabel("cont")
 
@@ -854,7 +856,8 @@ private[vm] class ProgramBuilder(
     (starts, child.data) match
       case (Seq(s), _)                                                     => attempt(child, s)
       case (_, IRNodeData.Disjunction(nodes)) if nodes.size == starts.size =>
-        buildDisjunction(nodes, i => attempt(nodes(i), starts(i)))
+        val (alternatives, alternativeStarts) = (nodes.toIndexedSeq, starts.toIndexedSeq)
+        buildDisjunction(alternatives, i => attempt(alternatives(i), alternativeStarts(i)))
       // $COVERAGE-OFF$
       case _ => throw new IllegalStateException("look-behind starts do not match the alternatives")
       // $COVERAGE-ON$

@@ -180,10 +180,12 @@ object PatternExtensions:
     def chompTextEndsInMiddle: Seq[IRNode] =
       def loop(isEnd: Boolean, node: IRNode): Seq[IRNode] =
         node.data match
-          case Disjunction(ns)  => ns.flatMap(loop(isEnd, _))
-          case Sequence(ns)     => ns.zipWithIndex.flatMap((n, i) => loop(isEnd && i == ns.size - 1, n))
-          case Capture(_, _, n) => loop(isEnd, n)
-          case Atomic(n)        => loop(isEnd, n)
+          case Disjunction(ns) => ns.flatMap(loop(isEnd, _))
+          case Sequence(ns)    =>
+            val last = ns.size - 1
+            ns.zipWithIndex.flatMap((n, i) => loop(isEnd && i == last, n))
+          case Capture(_, _, n)                     => loop(isEnd, n)
+          case Atomic(n)                            => loop(isEnd, n)
           case Assert(_: IRAssertKind.ChompTextEnd) => if isEnd then Seq.empty else Seq(node)
           case _                                    => node.children.flatMap(loop(false, _))
       loop(true, pattern.node)
