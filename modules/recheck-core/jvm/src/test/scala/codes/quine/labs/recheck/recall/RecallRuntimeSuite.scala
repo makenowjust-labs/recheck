@@ -10,7 +10,6 @@ import scala.concurrent.Future
 import scala.concurrent.duration.*
 
 import codes.quine.labs.recheck.ReDoS
-import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.TimeoutException
@@ -268,7 +267,7 @@ class RecallRuntimeSuite extends munit.FunSuite:
 
   runtimeTest("ReDoS.checkAll: Ruby", "ruby"):
     // The failed recall validation is kept, and the checking continues to the safe result.
-    val ds = ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby()))
+    val ds = ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby())).toList
     assert(clue(ds).size >= 2)
     ds.init.foreach:
       case d: Diagnostics.Vulnerable => assertFinish(d.recallValidation.get)
@@ -277,12 +276,12 @@ class RecallRuntimeSuite extends munit.FunSuite:
     assertEquals(ReDoS.check("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby())), ds.last)
 
   runtimeTest("ReDoS.checkAll: Python", "python3"):
-    ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.Python())) match
+    ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.Python())).toList match
       case List(d: Diagnostics.Vulnerable) => assertEquals(d.recallValidation.map(_.result), Some(RecallResult.Timeout))
       case ds                              => fail(s"unexpected: $ds")
 
   runtimeTest("ReDoS.checkAll: PCRE", "php"):
-    ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.PCRE)) match
+    ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.PCRE)).toList match
       case List(d: Diagnostics.Vulnerable) =>
         assertEquals(d.recallValidation.map(_.result), Some(RecallResult.EngineLimit("Backtrack limit exhausted")))
       case ds => fail(s"unexpected: $ds")
@@ -310,17 +309,6 @@ class RecallRuntimeSuite extends munit.FunSuite:
     assertEquals(r, RecallValidation("fake --source 17", 1.second, RecallResult.EngineError("StackOverflowError")))
     interceptMessage[UnexpectedException]("`sh -c 'exit 3' --source 17 RecheckRecall.java` exited with 3"):
       validate("a", "", Dialect.Java, attack("a", 3, ""), env = Map("RECHECK_JAVA" -> "sh -c 'exit 3'"))
-
-  test("ReDoS.iterator: environment variables"):
-    val node = script("node", "echo recheck:runtime fake; echo recheck:start; echo recheck:time 0")
-    val ds = ReDoS
-      .iterator("^(a|a)*$", "", params.copy(checker = Checker.Automaton), None, env = Map("RECHECK_NODE" -> s"'$node'"))
-      .toList
-    assertEquals(
-      ds.collect { case d: Diagnostics.Vulnerable => d.recallValidation },
-      List(Some(RecallValidation("fake", 1.second, RecallResult.Finish(0.millis))))
-    )
-    assert(clue(ds.last).isInstanceOf[Diagnostics.Safe])
 
   test("RecallValidator.validate: the deadline of the context"):
     intercept[TimeoutException]:

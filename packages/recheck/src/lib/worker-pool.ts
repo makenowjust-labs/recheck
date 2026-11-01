@@ -75,7 +75,7 @@ export class WorkerPool {
     return this.request("check", source, flags, params);
   }
 
-  /** Checks a given regular expression using this pool, and returns all the diagnostics until the accepted one. */
+  /** Checks a given regular expression using this pool, and returns all the diagnostics until the final one. */
   public checkAll(
     source: string,
     flags: string,

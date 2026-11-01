@@ -193,7 +193,7 @@ export async function check(
   return await run(agent, "check", source, flags, params);
 }
 
-/** Checks a given regular expression on the `agent`, and returns all the diagnostics until the accepted one. */
+/** Checks a given regular expression on the `agent`, and returns all the diagnostics until the final one. */
 export async function checkAll(
   agent: Agent,
   source: string,
