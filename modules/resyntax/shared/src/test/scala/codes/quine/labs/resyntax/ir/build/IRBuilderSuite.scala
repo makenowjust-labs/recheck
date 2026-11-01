@@ -357,8 +357,8 @@ class IRBuilderSuite extends IRSuiteBase:
     val mode = Parser.determineUnitMode("", FlagSet.parse(flags, d), d)
     BackReference(
       Seq(1),
-      IRCaseEquivalence.ofBackReference(d, mode, referenceFlags),
-      IRBackReferenceFolding.of(d, mode, referenceFlags)
+      IRCharResolver.determineBackReferenceCaseEquivalence(d, mode, referenceFlags),
+      IRCharResolver.determineBackReferenceFolding(d, mode, referenceFlags)
     )
 
   checkWith("(a)\\1", "", All*)(d => Sequence(Capture(1, None, char('a')), referenceOf(d)))

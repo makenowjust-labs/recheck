@@ -2,7 +2,6 @@ package codes.quine.labs.resyntax.ir
 
 import scala.annotation.tailrec
 
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
@@ -358,17 +357,3 @@ object IRBackReferenceFolding:
     /** Returns the folding of a character to several characters, if any. */
     def fold(c: Int): Option[UString] =
       Some(FullCaseFolding(c)).filter(key => key.length >= 2 && key.iterator.forall(_ >= below))
-
-  /** Returns how a back-reference with the flags compares the capture with the input in the dialect. */
-  def of(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRBackReferenceFolding =
-    if !flags.ignoreCase then Simple
-    else
-      dialect match
-        case _: Dialect.Ruby if mode == UnitMode.CodePoint => Full(0)
-        case _: Dialect.Perl                               =>
-          flags.charset match
-            case IRCharset.Default                            => Simple
-            case IRCharset.Locale                             => Full(0x100)
-            case _: IRCharset.ASCII if flags.caselessRestrict => Full(0x80)
-            case _                                            => Full(0)
-        case _ => Simple
