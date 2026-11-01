@@ -1,8 +1,8 @@
 package codes.quine.labs.recheck.recall
 
+import codes.quine.labs.recheck.SourcePattern
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.exec.Command
-import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
@@ -18,7 +18,7 @@ class RecallProgramSuite extends munit.FunSuite:
     AttackPattern(Seq((UString.empty, UString.fromString("é"), 1)), UString(0), 2)
 
   def generate(source: String, flags: String, dialect: Dialect, attack: AttackPattern = attack): RecallProgram =
-    RecallProgram.generate(ParsedPattern.parse(source, flags, dialect).toTry.get, attack).get
+    RecallProgram.generate(SourcePattern.parse(source, flags, dialect).toTry.get._1, attack).get
 
   /** Returns the line of the script starting with the prefix. */
   def line(program: RecallProgram, prefix: String): String =
@@ -134,7 +134,7 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.data"):
     def data(source: String, flags: String, attack: AttackPattern): String =
-      RecallProgram.data(flags, ParsedPattern.parse(source, "", Dialect.Java).toTry.get, attack)
+      RecallProgram.data(flags, SourcePattern.parse(source, "", Dialect.Java).toTry.get._1, attack)
     val astral = AttackPattern(Seq((UString.empty, UString.fromString("😀"), 0)), UString.empty, 2)
     assertEquals(data("😀", "", astral), "-\nd83dde00\n2:d83dde00\n")
     assertEquals(data("", "", AttackPattern(Seq.empty, UString.empty, 0)), "-\n-\n")
@@ -171,7 +171,7 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.generate: Perl unsafe patterns"):
     def generate(source: String): Option[RecallProgram] =
-      RecallProgram.generate(ParsedPattern.parse(source, "", Dialect.Perl()).toTry.get, attack)
+      RecallProgram.generate(SourcePattern.parse(source, "", Dialect.Perl()).toTry.get._1, attack)
     assert(generate("a$|b$").isDefined)
     assert(generate("(a$)\\$x\\@x").isDefined)
     assertEquals(generate("a$x"), None)
@@ -180,7 +180,7 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.generate: Perl string patterns"):
     def generate(source: String, flags: String, utf8: Boolean = true): RecallProgram =
-      val pattern = ParsedPattern.parse(source, flags, Dialect.Perl(utf8, PerlSource.String)).toTry.get
+      val pattern = SourcePattern.parse(source, flags, Dialect.Perl(utf8, PerlSource.String)).toTry.get._1
       RecallProgram.generate(pattern, attack).get
     // A string pattern is not interpolated again, so any pattern can run.
     val chars = generate("a$x@y/é", "gi")
@@ -200,7 +200,7 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.generate: Perl literal patterns"):
     def generate(source: String, utf8: Boolean): RecallProgram =
-      RecallProgram.generate(ParsedPattern.parse(source, "", Dialect.Perl(utf8)).toTry.get, attack).get
+      RecallProgram.generate(SourcePattern.parse(source, "", Dialect.Perl(utf8)).toTry.get._1, attack).get
     val chars = generate("é\\w", utf8 = true)
     assertEquals(line(chars, "my $regex"), "my $regex = qr/é\\w/;")
     assert(chars.script.startsWith("use utf8;\n"))
@@ -268,7 +268,7 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.script"):
     def script(source: String, dialect: Dialect): RecallProgram.Script =
-      RecallProgram.script(ParsedPattern.parse(source, "", dialect).toTry.get, attack).get
+      RecallProgram.script(SourcePattern.parse(source, "", dialect).toTry.get._1, attack).get
     val js = script("foo", Dialect.JavaScript)
     assertEquals(js.name, "recall.cjs")
     assertEquals(js.command, "node recall.cjs")
@@ -293,7 +293,7 @@ class RecallProgramSuite extends munit.FunSuite:
     assertEquals(dotnet.command, "dotnet run recall.cs")
     assert(dotnet.content.startsWith("// Run: dotnet run recall.cs\nusing "))
     assert(clue(dotnet.content).contains("var lines = \"-\\n0066006f006f\\n1:0078\\n2:0079\\n1:007a\\n\".Split("))
-    assertEquals(RecallProgram.script(ParsedPattern.parse("a$x", "", Dialect.Perl()).toTry.get, attack), None)
+    assertEquals(RecallProgram.script(SourcePattern.parse("a$x", "", Dialect.Perl()).toTry.get._1, attack), None)
 
   test("RecallProgram.javaString"):
     assertEquals(RecallProgram.javaString("a\nb"), "\"a\\nb\"")

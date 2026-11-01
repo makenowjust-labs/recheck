@@ -21,8 +21,7 @@ import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.fuzz.FuzzChecker
 import codes.quine.labs.recheck.fuzz.FuzzProgram
 import codes.quine.labs.recheck.recall.RecallValidator
-import codes.quine.labs.recheck.regexp.ParsedPattern
-import codes.quine.labs.recheck.regexp.PatternExtensions.*
+import codes.quine.labs.resyntax.ir.IRPattern
 
 /** ReDoS is a ReDoS checker frontend. */
 object ReDoS:
@@ -76,14 +75,14 @@ object ReDoS:
 
     def ds: Iterator[Diagnostics] =
       ctx.log("parse: start")
-      val pattern = ctx.interrupt(ParsedPattern.parse(source, flags, params.dialect).toTry.get)
+      val (pattern, ir) = ctx.interrupt(SourcePattern.parse(source, flags, params.dialect).toTry.get)
       ctx.log(s"parse: finish\n  pattern: $pattern")
       val failures = mutable.Set.empty[RecallKey]
       val failed = (c: AttackComplexity.Vulnerable, h: Hotspot) => failures.contains(RecallKey(c, h))
       val candidates = params.checker match
-        case Checker.Automaton => checkAutomaton(source, flags, pattern, params)
-        case Checker.Fuzz      => checkFuzz(source, flags, pattern, params, failed)
-        case Checker.Auto      => checkAuto(source, flags, pattern, params, failed)
+        case Checker.Automaton => checkAutomaton(pattern, ir, params)
+        case Checker.Fuzz      => checkFuzz(pattern, ir, params, failed)
+        case Checker.Auto      => checkAuto(pattern, ir, params, failed)
       val validate = recallValidation(pattern, params.recallTimeout, exec, env)
       candidates.flatMap:
         case d: Diagnostics.Vulnerable =>
@@ -129,27 +128,27 @@ object ReDoS:
 
   /** Iterates the diagnostics of the automaton checker, ending with the safe one. */
   private[recheck] def checkAutomaton(
-      source: String,
-      flags: String,
-      pattern: ParsedPattern,
+      pattern: SourcePattern,
+      ir: IRPattern,
       params: Parameters
   )(using ctx: Context): Iterator[Diagnostics] = tagging(Checker.Automaton):
     import params.*
+    import pattern.{source, flags}
     val maxNFASize = if checker == Checker.Auto then params.maxNFASize else Int.MaxValue
 
     val complexities =
-      if checker == Checker.Auto && pattern.repeatCount >= maxRepeatCount then
+      if checker == Checker.Auto && ir.repeatCount >= maxRepeatCount then
         ctx.log("auto: exceed maxRepeatCount")
         throw UnsupportedException("The pattern contains too many repeat")
       // When the pattern has no infinite repetition, then it is safe.
-      else if pattern.isConstant then
+      else if ir.isConstant then
         ctx.log("automaton: constant pattern")
         Iterator.empty
-      else if checker == Checker.Auto && pattern.size >= maxPatternSize then
+      else if checker == Checker.Auto && ir.size >= maxPatternSize then
         ctx.log("auto: exceed maxPatternSize")
         throw UnsupportedException("The pattern is too large")
       else
-        val epsNFA = EpsNFABuilder.build(pattern).get
+        val epsNFA = EpsNFABuilder.build(ir, pattern.preferredChars).get
         val orderedNFA = epsNFA.toOrderedNFA(maxNFASize).rename.mapAlphabet(_.head)
         AutomatonChecker.check(orderedNFA, maxNFASize)
 
@@ -175,18 +174,19 @@ object ReDoS:
     *   whether an attack of the complexity and the hotspot failed recall validation, which the fuzz checker avoids
     */
   private[recheck] def checkFuzz(
-      source: String,
-      flags: String,
-      pattern: ParsedPattern,
+      pattern: SourcePattern,
+      ir: IRPattern,
       params: Parameters,
       failed: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
   )(using ctx: Context): Iterator[Diagnostics] = tagging(Checker.Fuzz):
     import params._
+    import pattern.{source, flags}
 
     val random = new Random(randomSeed)
-    val fuzz = FuzzProgram.from(pattern).get
+    val fuzz = FuzzProgram.from(ir, pattern.dialect, pattern.preferredChars).get
     val results = FuzzChecker.check(
-      pattern,
+      ir,
+      pattern.preferredChars,
       fuzz,
       random,
       seeder,
@@ -219,25 +219,24 @@ object ReDoS:
 
   /** Iterates the diagnostics of the automaton checker, or of the fuzz checker if the automaton checker gives up. */
   private[recheck] def checkAuto(
-      source: String,
-      flags: String,
-      pattern: ParsedPattern,
+      pattern: SourcePattern,
+      ir: IRPattern,
       params: Parameters,
       failed: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
   )(using ctx: Context): Iterator[Diagnostics] =
-    recovering(checkAutomaton(source, flags, pattern, params)):
-      case _: UnsupportedException => checkFuzz(source, flags, pattern, params, failed)
+    recovering(checkAutomaton(pattern, ir, params)):
+      case _: UnsupportedException => checkFuzz(pattern, ir, params, failed)
 
   /** Returns the style of the attack strings of the pattern, which is the host language of its dialect. */
-  private[recheck] def attackStyle(pattern: ParsedPattern): AttackPattern.Style =
-    AttackPattern.Style.of(pattern.dialect, pattern.ir.mode)
+  private[recheck] def attackStyle(pattern: SourcePattern): AttackPattern.Style =
+    AttackPattern.Style.of(pattern.dialect, pattern.mode)
 
   /** Runs recall validation against a vulnerable diagnostics, and records the result in it.
     *
     * It runs on the runtime of the dialect when this platform can run it.
     */
   private[recheck] def recallValidation(
-      pattern: ParsedPattern,
+      pattern: SourcePattern,
       timeout: Duration,
       exec: Option[RecallValidator.Exec],
       env: Map[String, String]

@@ -6,14 +6,14 @@ import scala.collection.mutable
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
-import codes.quine.labs.recheck.regexp.EcmaScriptChars
-import codes.quine.labs.recheck.regexp.Location
-import codes.quine.labs.recheck.regexp.PatternAlphabet
-import codes.quine.labs.recheck.regexp.PatternAlphabet.CRFollow
-import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
+import codes.quine.labs.recheck.util.EcmaScriptChars
 import codes.quine.labs.recheck.util.GraphvizUtil.escape
+import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
+import codes.quine.labs.resyntax.ir.alphabet.CRFollow
+import codes.quine.labs.resyntax.ir.alphabet.CharKind
+import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
 /** EpsNFA is an ordered ε-NFA on unicode code points. */
 final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q, accept: Q, tau: Map[Q, Transition[Q]]):
@@ -117,7 +117,7 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
       val newAcceptSet = Set.newBuilder[(CharKind, Seq[P])]
       val newDelta = Map.newBuilder[((CharKind, Seq[P]), CharSet), Seq[(CharKind, Seq[P])]]
       val newSourcemap = mutable.Map
-        .empty[((CharKind, Seq[P]), CharSet, (CharKind, Seq[P])), Seq[Location]]
+        .empty[((CharKind, Seq[P]), CharSet, (CharKind, Seq[P])), Seq[SourceLocation]]
         .withDefaultValue(Vector.empty)
       var deltaSize = 0
 
@@ -177,7 +177,8 @@ object EpsNFA:
   final case class Assert[Q](kind: AssertKind, to: Q) extends Transition[Q]
 
   /** Consume is an ε-NFA transition with consuming a character. */
-  final case class Consume[Q](set: Set[(CharSet, CharKind)], to: Q, loc: Option[Location] = None) extends Transition[Q]
+  final case class Consume[Q](set: Set[(CharSet, CharKind)], to: Q, loc: Option[SourceLocation] = None)
+      extends Transition[Q]
 
   /** LoopEnter is an ε-NFA transition with consuming no character and marking a entering of the loop. */
   final case class LoopEnter[Q](loop: Int, to: Q) extends Transition[Q]

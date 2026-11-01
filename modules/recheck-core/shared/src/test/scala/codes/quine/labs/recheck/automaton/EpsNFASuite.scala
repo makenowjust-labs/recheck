@@ -7,12 +7,12 @@ import scala.language.implicitConversions
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
-import codes.quine.labs.recheck.regexp.PatternAlphabet
-import codes.quine.labs.recheck.regexp.PatternAlphabet.CRFollow
-import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
+import codes.quine.labs.resyntax.ir.alphabet.CRFollow
+import codes.quine.labs.resyntax.ir.alphabet.CharKind
+import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
 class EpsNFASuite extends munit.FunSuite:
 

@@ -2,8 +2,8 @@ package codes.quine.labs.recheck.vm
 
 import scala.compiletime.uninitialized
 
-import codes.quine.labs.recheck.regexp.EcmaScriptChars
-import codes.quine.labs.recheck.regexp.Location
+import codes.quine.labs.recheck.util.EcmaScriptChars
+import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
@@ -179,19 +179,19 @@ object Inst:
     override def toString: String = s"assert $kind"
 
   /** `read`: Tests current position with advancing. */
-  final case class Read(kind: ReadKind, loc: Option[Location]) extends NonTerminator:
+  final case class Read(kind: ReadKind, loc: Option[SourceLocation]) extends NonTerminator:
     override def toString: String =
       val loc = this.loc match
-        case Some(Location(start, end)) => s" ; $start-$end"
-        case None                       => ""
+        case Some(SourceLocation(start, end)) => s" ; $start-$end"
+        case None                             => ""
       s"read $kind$loc"
 
   /** `read_back`: Tests current position with receding. */
-  final case class ReadBack(kind: ReadKind, loc: Option[Location]) extends NonTerminator:
+  final case class ReadBack(kind: ReadKind, loc: Option[SourceLocation]) extends NonTerminator:
     override def toString: String =
       val loc = this.loc match
-        case Some(Location(start, end)) => s" ; $start-$end"
-        case None                       => ""
+        case Some(SourceLocation(start, end)) => s" ; $start-$end"
+        case None                             => ""
       s"read_back $kind$loc"
 
   /** `cap_begin`: Captures current position as a beginning of a capture `index`. */

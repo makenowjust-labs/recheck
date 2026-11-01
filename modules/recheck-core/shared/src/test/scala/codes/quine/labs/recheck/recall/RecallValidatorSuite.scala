@@ -2,6 +2,7 @@ package codes.quine.labs.recheck.recall
 
 import scala.concurrent.duration.*
 
+import codes.quine.labs.recheck.SourcePattern
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
@@ -10,7 +11,6 @@ import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.exec.Command
 import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.recheck.exec.Executor
-import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.UString
 
@@ -22,8 +22,8 @@ class RecallValidatorSuite extends munit.FunSuite:
   val attack: AttackPattern =
     AttackPattern(Seq((UString.fromString("x"), UString.fromString("y"), 0)), UString.fromString("z"), 2)
 
-  def parse(source: String, dialect: Dialect = Dialect.Python()): ParsedPattern =
-    ParsedPattern.parse(source, "", dialect).toTry.get
+  def parse(source: String, dialect: Dialect = Dialect.Python()): SourcePattern =
+    SourcePattern.parse(source, "", dialect).toTry.get._1
 
   test("RecallValidator.validate"):
     assertEquals(

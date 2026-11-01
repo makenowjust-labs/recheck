@@ -7,12 +7,8 @@ import scala.util.Try
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
-import codes.quine.labs.recheck.regexp.Location
-import codes.quine.labs.recheck.regexp.ParsedPattern
-import codes.quine.labs.recheck.regexp.PatternAlphabet
-import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
-import codes.quine.labs.recheck.regexp.PatternExtensions.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
+import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRAssertKind
 import codes.quine.labs.resyntax.ir.IRBacktrackControl
@@ -21,17 +17,20 @@ import codes.quine.labs.resyntax.ir.IRLineTerminators
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
 import codes.quine.labs.resyntax.ir.IRNotEmpty
+import codes.quine.labs.resyntax.ir.IRPattern
 import codes.quine.labs.resyntax.ir.IRQuantifier
+import codes.quine.labs.resyntax.ir.alphabet.CharKind
+import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
 /** RegExp IR to ε-NFA Compiler. */
 object EpsNFABuilder:
 
-  /** Compiles RegExp IR into ε-NFA. */
-  def build(pattern: ParsedPattern)(using ctx: Context): Try[EpsNFA[Int]] =
+  /** Compiles RegExp IR into ε-NFA, whose alphabet takes `preferred` (see [[PatternAlphabet.build]]). */
+  def build(pattern: IRPattern, preferred: Option[CharSet])(using ctx: Context): Try[EpsNFA[Int]] =
     ctx.interrupt:
       for
         _ <- Try(())
-        alphabet = pattern.alphabet
+        alphabet = PatternAlphabet.of(pattern, preferred)
         builder = new EpsNFABuilder(pattern, alphabet)
         epsNFA <- Try(builder.build())
       yield
@@ -42,11 +41,11 @@ object EpsNFABuilder:
         epsNFA
 
 private class EpsNFABuilder(
-    private val pattern: ParsedPattern,
+    private val pattern: IRPattern,
     private val alphabet: PatternAlphabet
 )(using ctx: Context):
 
-  /** A cached result of `ParsedPattern#needsInputTerminatorDistinction`. */
+  /** A cached result of `IRPattern#needsInputTerminatorDistinction`. */
   private val needsInputTerminatorDistinction = pattern.needsInputTerminatorDistinction
 
   /** A next state counter. */
@@ -133,7 +132,7 @@ private class EpsNFABuilder(
     * match. For `(*NOTEMPTY_ATSTART)`, the search after the start begins in the second copy.
     */
   private def rejectEmpty(start: Int, i0: Int, a0: Int): (Int, Int, Int) =
-    pattern.ir.notEmpty match
+    pattern.notEmpty match
       case IRNotEmpty.Never => (i0, i0, a0)
       case notEmpty         =>
         val end = counterQ
@@ -159,7 +158,7 @@ private class EpsNFABuilder(
     refineCache.getOrElseUpdate(set, alphabet.refine(set))
 
   /** Builds a transition consuming one of the pairs. */
-  private def consume(chs: Set[(CharSet, CharKind)], loc: Option[Location]): (Int, Int) =
+  private def consume(chs: Set[(CharSet, CharKind)], loc: Option[SourceLocation]): (Int, Int) =
     val i = nextQ()
     val a = nextQ()
     emit(i -> Consume(chs, a, loc))
@@ -194,9 +193,9 @@ private class EpsNFABuilder(
       case IRNodeData.Capture(_, _, n) => buildNode(n)
       case IRNodeData.Repeat(n, q)     => buildRepeat(n, q)
       case IRNodeData.Assert(kind)     => buildAssert(node, kind)
-      case IRNodeData.Chars(set)       => consume(refine(set), Location.from(node.loc))
+      case IRNodeData.Chars(set)       => consume(refine(set), node.loc.toOption)
       case IRNodeData.Strings(set)     =>
-        val loc = Location.from(node.loc)
+        val loc = node.loc.toOption
         // The strings are tried from the longest, and then the characters.
         val strings = set.strings.toSeq
           .sortBy(-_.length)
@@ -219,7 +218,7 @@ private class EpsNFABuilder(
         throw new UnsupportedException("look-behind assertion")
       case IRNodeData.Atomic(_)           => throw new UnsupportedException("atomic group")
       case IRNodeData.BackReference(_, _) => throw new UnsupportedException("back-reference")
-      case IRNodeData.Unsupported(_)      => throw new UnsupportedException(pattern.unsupportedMessage(node))
+      case IRNodeData.Unsupported(_)      => throw new UnsupportedException(node.unsupportedMessage)
 
   /** Builds EpsNFA transitions for a repetition.
     *
@@ -288,13 +287,13 @@ private class EpsNFABuilder(
     (i, a)
 
   /** The line terminator sets that the character kinds tell, in the order of the bits. */
-  private val kindLineTerminators = pattern.kindLineTerminators
+  private val kindLineTerminators = PatternAlphabet.kindLineTerminators(pattern)
 
   /** The word sets that the character kinds tell, in the order of the bits. */
-  private val wordSets = pattern.wordSets
+  private val wordSets = PatternAlphabet.wordSets(pattern)
 
   /** The word marks that the character kinds tell, in the order of the bits. */
-  private val wordMarks = pattern.wordMarks
+  private val wordMarks = PatternAlphabet.wordMarks(pattern)
 
   /** The text end assertions before a final line terminator that are not at an end point. */
   private val chompTextEndsInMiddle = pattern.chompTextEndsInMiddle.toSet

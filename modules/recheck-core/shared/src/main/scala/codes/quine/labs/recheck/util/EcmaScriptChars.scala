@@ -1,14 +1,10 @@
-package codes.quine.labs.recheck.regexp
+package codes.quine.labs.recheck.util
 
-import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.Properties
 
-/** EcmaScriptChars provides the character notation of ECMAScript, and its case canonicalization. */
+/** EcmaScriptChars provides the character notation of ECMAScript. */
 object EcmaScriptChars:
-
-  /** Canonicalizes each character of the set for ignore-case matching (ECMAScript `Canonicalize`). */
-  def canonicalize(set: CharSet, unicode: Boolean): CharSet = CaseMapping.ecmaScriptCanonicalize(unicode).image(set)
 
   def isPrintable(c: Int): Boolean = !Other.contains(c)
 

@@ -7,15 +7,13 @@ import scala.util.Try
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
-import codes.quine.labs.recheck.regexp.EcmaScriptChars
-import codes.quine.labs.recheck.regexp.ParsedPattern
-import codes.quine.labs.recheck.regexp.PatternAlphabet
-import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
+import codes.quine.labs.resyntax.ir.alphabet.CharKind
+import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
 class EpsNFABuilderSuite extends munit.FunSuite:
 
@@ -24,8 +22,9 @@ class EpsNFABuilderSuite extends munit.FunSuite:
 
   /** Builds an ε-NFA from the source, without the locations of transitions. */
   def build(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): Try[EpsNFA[Int]] =
+    val (pattern, ir) = SourcePattern.parse(source, flags, dialect).toTry.get
     EpsNFABuilder
-      .build(ParsedPattern.parse(source, flags, dialect).toTry.get)
+      .build(ir, pattern.preferredChars)
       .map: nfa =>
         nfa.copy(tau = nfa.tau.view.mapValues {
           case t: Consume[Int] => t.copy(loc = None)
@@ -100,7 +99,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       )
 
   test("EpsNFABuilder.build: Character, CharacterClass"):
-    val canonical = EcmaScriptChars.canonicalize(any16, false)
+    val canonical = PatternAlphabet.ecmaScriptCanonicalChars(utf16)
     assertEquals(
       build("^a$", "i").get,
       single(PatternAlphabet.build(utf16, Seq(CharSet.of('a', 'A')), preferred = Some(canonical)), CharSet.single('A'))
@@ -116,7 +115,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
 
   test("EpsNFABuilder.build: Dot"):
     val dot16 = any16.diff(lineTerminator)
-    val canonical = EcmaScriptChars.canonicalize(any16, false)
+    val canonical = PatternAlphabet.ecmaScriptCanonicalChars(utf16)
     // `.` takes part in the order of atoms as its complement.
     assertEquals(build("^.$").get, single(PatternAlphabet.build(utf16, Seq(lineTerminator)), dot16))
     assertEquals(
@@ -290,7 +289,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   def searches(source: String, flags: String, dialect: Dialect, input: String): Boolean =
     val nfa = build(source, flags, dialect).get.toOrderedNFA
     val units =
-      if ParsedPattern.parse(source, flags, dialect).toTry.get.ir.mode == UnitMode.CodePoint then
+      if SourcePattern.parse(source, flags, dialect).toTry.get._1.mode == UnitMode.CodePoint then
         UString.fromString(input).iterator.toSeq
       else input.map(_.toInt)
     val last = units.foldLeft(nfa.inits.toSet): (qs, c) =>

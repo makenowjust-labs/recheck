@@ -1,6 +1,5 @@
 package codes.quine.labs.recheck.util
 
-import codes.quine.labs.recheck.regexp.EcmaScriptChars
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 

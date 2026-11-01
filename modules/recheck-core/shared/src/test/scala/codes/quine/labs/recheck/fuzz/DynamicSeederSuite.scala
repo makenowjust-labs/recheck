@@ -6,7 +6,6 @@ import scala.language.implicitConversions
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.fuzz.DynamicSeeder.*
-import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.charset.CharSet
 
@@ -18,8 +17,8 @@ class DynamicSeederSuite extends munit.FunSuite:
   test("DynamicSeeder.seed"):
     def seed(source: String, flags: String): Set[String] =
       val result = for
-        pattern <- ParsedPattern.parse(source, flags).toTry
-        fuzz <- FuzzProgram.from(pattern)
+        (pattern, ir) <- SourcePattern.parse(source, flags).toTry
+        fuzz <- FuzzProgram.from(ir, pattern.dialect, pattern.preferredChars)
       yield DynamicSeeder.seed(fuzz, timeout = Duration.Inf)
       result.get.map(_.toString)
 

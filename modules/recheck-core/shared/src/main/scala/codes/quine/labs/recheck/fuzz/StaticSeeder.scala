@@ -5,21 +5,22 @@ import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.data.Graph
-import codes.quine.labs.recheck.regexp.ParsedPattern
-import codes.quine.labs.recheck.regexp.PatternExtensions.*
 import codes.quine.labs.recheck.util.RepeatUtil
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
+import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
 import codes.quine.labs.resyntax.ir.IRNodeData.*
+import codes.quine.labs.resyntax.ir.IRPattern
 import codes.quine.labs.resyntax.ir.IRQuantifier
 
 /** StaticSeeder computes an initial generation for the pattern with static analysis. */
 object StaticSeeder:
 
-  /** Computes an initial generation of the pattern. */
+  /** Computes an initial generation of the pattern, whose strings take `preferred` (see [[PatternAlphabet.build]]). */
   def seed(
-      pattern: ParsedPattern,
+      pattern: IRPattern,
+      preferred: Option[CharSet],
       maxSimpleRepeatSize: Int = Parameters.DefaultMaxSimpleRepeatCount,
       maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
       limit: Int = Parameters.DefaultIncubationLimit,
@@ -28,10 +29,10 @@ object StaticSeeder:
       ctx: Context
   ): Set[FString] = ctx.interrupt:
     val epsNFA = EpsNFABuilder
-      .build(simplify(pattern, maxSimpleRepeatSize))
+      .build(simplify(pattern, maxSimpleRepeatSize), preferred)
       .recoverWith:
         case _: UnsupportedException =>
-          EpsNFABuilder.build(simplify(pattern, maxSimpleRepeatSize, dropsAssertions = true))
+          EpsNFABuilder.build(simplify(pattern, maxSimpleRepeatSize, dropsAssertions = true), preferred)
       .get
     val orderedNFA = epsNFA.toOrderedNFA.rename.mapAlphabet(_.head)
     val seeder = new StaticSeeder(
@@ -44,9 +45,9 @@ object StaticSeeder:
     seeder.seed(maxInitialGenerationSize, limit, maxSize)
 
   /** Returns a simplified pattern, which the ε-NFA can handle. */
-  private[fuzz] def simplify(pattern: ParsedPattern, maxSimpleRepeatSize: Int, dropsAssertions: Boolean = false)(using
+  private[fuzz] def simplify(pattern: IRPattern, maxSimpleRepeatSize: Int, dropsAssertions: Boolean = false)(using
       ctx: Context
-  ): ParsedPattern =
+  ): IRPattern =
     ctx.interrupt:
       val backRefs = extractBackRefs(pattern.node)
       val empty = IRNode(Empty)
@@ -102,7 +103,7 @@ object StaticSeeder:
           case Unsupported(_)               => copy(Empty)
           case _                            => node
 
-      pattern.copy(ir = pattern.ir.copy(node = loop(pattern.node, true, true, Set.empty)))
+      pattern.copy(node = loop(pattern.node, true, true, Set.empty))
 
   /** Extracts back-references inside the given node. */
   private[fuzz] def extractBackRefs(node: IRNode): Map[Int, IRNode] = node.data match

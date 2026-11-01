@@ -1,8 +1,8 @@
 package codes.quine.labs.recheck.fuzz
 
+import codes.quine.labs.recheck.SourcePattern
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.regexp.ParsedPattern
 
 class FuzzProgramSuite extends munit.FunSuite:
 
@@ -12,8 +12,8 @@ class FuzzProgramSuite extends munit.FunSuite:
   test("FuzzProgram#usesAcceleration"):
     def from(source: String, flags: String): FuzzProgram =
       (for
-        pattern <- ParsedPattern.parse(source, flags).toTry
-        fuzz <- FuzzProgram.from(pattern)
+        (pattern, ir) <- SourcePattern.parse(source, flags).toTry
+        fuzz <- FuzzProgram.from(ir, pattern.dialect, pattern.preferredChars)
       yield fuzz).get
 
     val fuzz1 = from("foo", "")

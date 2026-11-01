@@ -2,9 +2,9 @@ package codes.quine.labs.recheck.vm
 
 import scala.language.implicitConversions
 
-import codes.quine.labs.recheck.regexp.Location
 import codes.quine.labs.recheck.vm.Inst.AssertKind
 import codes.quine.labs.recheck.vm.Inst.ReadKind
+import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
@@ -41,9 +41,9 @@ class InstSuite extends munit.FunSuite:
     assertEquals(Inst.Inc(CounterReg(0)).toString, "inc %0")
     assertEquals(Inst.Assert(AssertKind.InputBegin).toString, "assert input_begin")
     assertEquals(Inst.Read(ReadKind.Char('a'), None).toString, "read char 'a'")
-    assertEquals(Inst.Read(ReadKind.Char('a'), Some(Location(0, 1))).toString, "read char 'a' ; 0-1")
+    assertEquals(Inst.Read(ReadKind.Char('a'), Some(SourceLocation(0, 1))).toString, "read char 'a' ; 0-1")
     assertEquals(Inst.ReadBack(ReadKind.Char('a'), None).toString, "read_back char 'a'")
-    assertEquals(Inst.ReadBack(ReadKind.Char('a'), Some(Location(0, 1))).toString, "read_back char 'a' ; 0-1")
+    assertEquals(Inst.ReadBack(ReadKind.Char('a'), Some(SourceLocation(0, 1))).toString, "read_back char 'a' ; 0-1")
     assertEquals(Inst.CapBegin(0).toString, "cap_begin 0")
     assertEquals(Inst.CapEnd(0).toString, "cap_end 0")
     assertEquals(Inst.CapReset(0, 1).toString, "cap_reset 0 1")

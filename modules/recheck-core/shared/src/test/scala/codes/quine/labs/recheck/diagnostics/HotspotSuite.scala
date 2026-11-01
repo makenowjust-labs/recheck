@@ -2,7 +2,7 @@ package codes.quine.labs.recheck.diagnostics
 
 import scala.io.AnsiColor.*
 
-import codes.quine.labs.recheck.regexp.Location
+import codes.quine.labs.resyntax.ast.SourceLocation
 
 class HotspotSuite extends munit.FunSuite {
   test("Hotspot#highlight") {
@@ -31,7 +31,8 @@ class HotspotSuite extends munit.FunSuite {
   }
 
   test("Hotspot.build") {
-    val hotspot = Hotspot.build(Map(Location(0, 1) -> 4, Location(2, 3) -> 2, Location(4, 5) -> 1), 0.5)
+    val hotspot =
+      Hotspot.build(Map(SourceLocation(0, 1) -> 4, SourceLocation(2, 3) -> 2, SourceLocation(4, 5) -> 1), 0.5)
     assertEquals(
       hotspot,
       Hotspot(

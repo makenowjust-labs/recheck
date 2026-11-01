@@ -1,8 +1,12 @@
-package codes.quine.labs.recheck.regexp
+package codes.quine.labs.resyntax.ir.alphabet
 
-import codes.quine.labs.recheck.regexp.PatternAlphabet.CharKind
+import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.ir.IRPattern
+import codes.quine.labs.resyntax.ir.build.IRBuilder
+import codes.quine.labs.resyntax.parser.Parser
 
 class PatternAlphabetSuite extends munit.FunSuite:
   val Word: CharSet = CharSet.fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))
@@ -113,3 +117,70 @@ class PatternAlphabetSuite extends munit.FunSuite:
 
     test("PatternAlphabet#any"):
       assertEquals(alphabet.any, alphabet.pairs.toSet)
+
+  /** Parses the pattern, and computes its alphabet, which takes JavaScript's canonical characters under `i`. */
+  def alphabetOf(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): PatternAlphabet =
+    val pattern = parse(source, flags, dialect)
+    val preferred = Option.when(dialect.isJavaScript && FlagSet.parse(flags, dialect).ignoreCase)(
+      PatternAlphabet.ecmaScriptCanonicalChars(pattern.mode)
+    )
+    PatternAlphabet.of(pattern, preferred)
+
+  def parse(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): IRPattern =
+    val flagSet = FlagSet.parse(flags, dialect)
+    IRBuilder.build(Parser.parse(source, flagSet, dialect), flagSet, dialect)
+
+  test("PatternAlphabet.of"):
+    val word = CharSet.fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))
+    val lineTerminator = CharSet.of(0x0a, 0x0d, 0x2028, 0x2029)
+    val utf16 = UnitMode.Utf16
+    val canonical16 = PatternAlphabet.ecmaScriptCanonicalChars(utf16)
+    assertEquals(alphabetOf(""), PatternAlphabet.build(utf16))
+    // A set like a negated class (e.g. `.` and `[^a]`) takes part in the order as its complement.
+    assertEquals(alphabetOf("."), PatternAlphabet.build(utf16, Seq(lineTerminator)))
+    assertEquals(alphabetOf(".", "u"), PatternAlphabet.build(UnitMode.CodePoint, Seq(lineTerminator)))
+    assertEquals(alphabetOf("[a-z]"), PatternAlphabet.build(utf16, Seq(CharSet.range('a', 'z'))))
+    assertEquals(
+      alphabetOf("A|Z"),
+      PatternAlphabet.build(utf16, Seq(CharSet.single('A'), CharSet.single('Z')))
+    )
+    assertEquals(alphabetOf("[^a]"), PatternAlphabet.build(utf16, Seq(CharSet.single('a'))))
+    assertEquals(alphabetOf("\\b"), PatternAlphabet.build(utf16, word = Some(word)))
+    assertEquals(alphabetOf("^", "m"), PatternAlphabet.build(utf16, lineTerminator = Some(lineTerminator)))
+    assertEquals(
+      alphabetOf("^\\b", "m"),
+      PatternAlphabet.build(utf16, lineTerminator = Some(lineTerminator), word = Some(word))
+    )
+    for source <- Seq("(.)", "(?<foo>.)", "(?:.)", ".*", ".+", ".?", ".{2}", "(?=.)", "(?<=.)", ".") do
+      assertEquals(alphabetOf(source, "s"), PatternAlphabet.build(utf16), source)
+    assertEquals(alphabetOf("", "i"), PatternAlphabet.build(utf16, preferred = Some(canonical16)))
+    assertEquals(
+      alphabetOf("a|z", "i"),
+      PatternAlphabet.build(utf16, Seq(CharSet.of('A', 'a'), CharSet.of('Z', 'z')), preferred = Some(canonical16))
+    )
+    // An atom stands for its canonical character.
+    assertEquals(alphabetOf("a", "i").pairs.map(_._1.head), Vector('A'.toInt, 0))
+    assertEquals(alphabetOf("A", "iu").pairs.map(_._1.head), Vector('a'.toInt, 0))
+
+  test("PatternAlphabet.of: other dialects"):
+    val alphabet = alphabetOf("^a$", "m", Dialect.Python())
+    assertEquals(alphabet.refine(CharSet.single(0x0a)).map(_._2), Set(CharKind.LineTerminator))
+    assertEquals(alphabetOf("a", "i", Dialect.PCRE).pairs.map(_._1.head), Vector('A'.toInt, 0))
+    // Bytes are in the alphabet in byte mode.
+    assertEquals(alphabetOf("\\xff", "", Dialect.PCRE).any.map(_._1).flatMap(_.iterator).max, 0xff)
+    // The line terminators of `$` before a final line terminator are distinguished.
+    assert(alphabetOf("a$", "", Dialect.Python()).pairs.exists(_._1 == CharSet.single(0x0a)))
+
+  test("PatternAlphabet.wordSets"):
+    assertEquals(PatternAlphabet.wordSets(parse("\\b(?a:\\b)", "", Dialect.Python())).size, 2)
+
+  test("PatternAlphabet.ecmaScriptCanonicalChars"):
+    val utf16 = PatternAlphabet.ecmaScriptCanonicalChars(UnitMode.Utf16)
+    val codePoint = PatternAlphabet.ecmaScriptCanonicalChars(UnitMode.CodePoint)
+    assert(utf16.contains('A') && !utf16.contains('a'))
+    assert(codePoint.contains('a') && !codePoint.contains('A'))
+    // U+FF21: FULLWIDTH LATIN CAPITAL LETTER A, U+FF41: FULLWIDTH LATIN SMALL LETTER A
+    assert(utf16.contains(0xff21) && !utf16.contains(0xff41))
+    assert(codePoint.contains(0xff41) && !codePoint.contains(0xff21))
+    // U+017F: LATIN SMALL LETTER LONG S
+    assert(utf16.contains(0x017f) && !codePoint.contains(0x017f))

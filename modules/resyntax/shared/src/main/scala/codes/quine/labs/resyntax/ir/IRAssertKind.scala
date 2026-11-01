@@ -3,7 +3,17 @@ package codes.quine.labs.resyntax.ir
 import codes.quine.labs.resyntax.charset.CharSet
 
 /** IRAssertKind is a kind of zero-width assertion. */
-sealed abstract class IRAssertKind extends Product with Serializable
+sealed abstract class IRAssertKind extends Product with Serializable:
+
+  /** Checks whether it asserts the begin of a line or the text (`^` or `\A`). */
+  def isBegin: Boolean = this match
+    case IRAssertKind.TextBegin | _: IRAssertKind.LineBegin => true
+    case _                                                  => false
+
+  /** Checks whether it asserts the end of a line or the text (`$`, `\z` or `\Z`). */
+  def isEnd: Boolean = this match
+    case IRAssertKind.TextEnd | _: IRAssertKind.LineEnd | _: IRAssertKind.ChompTextEnd => true
+    case _                                                                             => false
 
 object IRAssertKind:
 

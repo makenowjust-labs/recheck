@@ -4,6 +4,7 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
 
+import codes.quine.labs.recheck.SourcePattern
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
@@ -12,7 +13,6 @@ import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.exec.Command
 import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.recheck.exec.Executor
-import codes.quine.labs.recheck.regexp.ParsedPattern
 
 /** RecallValidator is the implementation of recall validation. */
 object RecallValidator:
@@ -35,7 +35,7 @@ object RecallValidator:
     *   the environment variables, whose [[RecallProgram.runtimeVariable]] gives the runtime command lines
     */
   def validate(
-      pattern: ParsedPattern,
+      pattern: SourcePattern,
       attack: AttackPattern,
       timeout: Duration,
       env: Map[String, String] = Map.empty
