@@ -107,7 +107,12 @@ class PatternAlphabetSuite extends munit.FunSuite:
 
   def parse(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)
-    IRBuilder.build(Parser.parse(source, flagSet, dialect), flagSet, dialect)
+    IRBuilder.build(
+      Parser.parse(source, flagSet, dialect),
+      flagSet,
+      dialect,
+      Parser.determineUnitMode(source, flagSet, dialect)
+    )
 
   test("PatternAlphabet.of"):
     val word = CharSet.fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))

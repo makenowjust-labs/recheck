@@ -23,7 +23,7 @@ class IRCharSuite extends munit.FunSuite:
 
   def build(s: String, flags: String, dialect: Dialect): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)
-    IRBuilder.build(Parser.parse(s, flagSet, dialect), flagSet, dialect)
+    IRBuilder.build(Parser.parse(s, flagSet, dialect), flagSet, dialect, Parser.determineUnitMode(s, flagSet, dialect))
 
   def of(s: String): CharSet = CharSet.of(UString.fromString(s).iterator.toSeq*)
 

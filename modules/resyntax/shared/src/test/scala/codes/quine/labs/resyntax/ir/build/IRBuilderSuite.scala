@@ -428,7 +428,7 @@ class IRBuilderSuite extends IRSuiteBase:
       case data => fail(s"Unexpected: $data")
 
   test("IRBuilder.build: resolves character-level nodes into character sets"):
-    val pattern = IRBuilder.build(Node(NodeData.Literal('a')), FlagSet(), JavaScript)
+    val pattern = IRBuilder.build(Node(NodeData.Literal('a')), FlagSet(), JavaScript, UnitMode.UTF16)
     assertEquals(pattern.node.data, Chars(CharSet.single('a')))
 
   test("Parser.determineUnitMode: the mode of the IR"):
@@ -453,7 +453,10 @@ class IRBuilderSuite extends IRSuiteBase:
     for (source, flags, dialect, mode) <- cases do
       val flagSet = FlagSet.parse(flags, dialect)
       assertEquals(Parser.determineUnitMode(source, flagSet, dialect), mode, (source, flags, dialect))
-      assertEquals(build(source, flags, dialect)._1.mode, mode, (source, flags, dialect))
+      // The builder reads PCRE's `(*UTF)` from the node for the Unicode semantics of the characters.
+      if dialect.isPCRE then
+        val (_, charFlags) = build(source, flags, dialect)
+        assertEquals(charFlags.head.unicode, mode == UnitMode.CodePoint, (source, flags, dialect))
 
   test("IRBuilder.build: the semantics of the dialect"):
     def patternOf(dialect: Dialect): IRPattern = build("a", "", dialect)._1

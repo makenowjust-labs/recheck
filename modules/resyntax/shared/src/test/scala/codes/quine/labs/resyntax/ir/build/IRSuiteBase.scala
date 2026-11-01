@@ -22,6 +22,7 @@ abstract class IRSuiteBase extends munit.FunSuite:
       node,
       flagSet,
       dialect,
+      Parser.determineUnitMode(s, flagSet, dialect),
       Some((node: Node, flags: IRCharFlags) =>
         charFlags.addOne(flags)
         IRNodeData.Unsupported(node.data)

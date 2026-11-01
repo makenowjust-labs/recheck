@@ -131,7 +131,8 @@ object ReDoS:
     ctx.log("parse: start")
     val flagSet = ctx.interrupt(parseFlags(flags, dialect))
     val node = ctx.interrupt(parseSource(source, flagSet, dialect))
-    val ir = ctx.interrupt(buildIR(node, flagSet, dialect))
+    val mode = ctx.interrupt(Parser.determineUnitMode(source, flagSet, dialect))
+    val ir = ctx.interrupt(buildIR(node, flagSet, dialect, mode))
     ctx.log(s"parse: finish\n  pattern: /$source/$flags")
     ir
 
@@ -145,8 +146,8 @@ object ReDoS:
       case ex: ParsingException      => throw new InvalidRegExpException(ex.getMessage)
       case ex: NestingLimitException => throw new UnsupportedException(ex.getMessage)
 
-  private def buildIR(node: Node, flagSet: FlagSet, dialect: Dialect): IRPattern =
-    try IRBuilder.build(node, flagSet, dialect)
+  private def buildIR(node: Node, flagSet: FlagSet, dialect: Dialect, mode: UnitMode): IRPattern =
+    try IRBuilder.build(node, flagSet, dialect, mode)
     catch case ex: IRBuildingException => throw new InvalidRegExpException(ex.getMessage)
 
   /** RecallKey identifies an attack on recall validation by the degree of the polynomial complexity (or `None` for the

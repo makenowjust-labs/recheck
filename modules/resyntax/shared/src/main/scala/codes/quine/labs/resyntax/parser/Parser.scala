@@ -87,10 +87,6 @@ object Parser:
     * It reads only PCRE's start options of the source.
     */
   def determineUnitMode(source: String, flagSet: FlagSet, dialect: Dialect): UnitMode =
-    determineUnitMode(flagSet, dialect, dialect.isPCRE && SourcePrescan.from(source).hasUTFStartOption)
-
-  /** Determines the unit of the input, where `hasUTFStartOption` is whether PCRE's `(*UTF)` starts the pattern. */
-  private[resyntax] def determineUnitMode(flagSet: FlagSet, dialect: Dialect, hasUTFStartOption: Boolean): UnitMode =
     dialect match
       case Dialect.JavaScript =>
         if flagSet.unicode || flagSet.unicodeSets then UnitMode.CodePoint else UnitMode.UTF16
@@ -104,7 +100,8 @@ object Parser:
         if flagSet.explicitCapture || encoding == Dialect.Ruby.Encoding.ASCII8Bit then UnitMode.Byte
         else UnitMode.CodePoint
       case Dialect.Perl(utf8, _) => if utf8 then UnitMode.CodePoint else UnitMode.Byte
-      case Dialect.PCRE          => if flagSet.unicode || hasUTFStartOption then UnitMode.CodePoint else UnitMode.Byte
+      case Dialect.PCRE          =>
+        if flagSet.unicode || SourcePrescan.from(source).hasUTFStartOption then UnitMode.CodePoint else UnitMode.Byte
 
   private def validateEncoding(source: String, encoding: SourceEncoding): Unit =
     if encoding == SourceEncoding.Latin1 then
@@ -320,10 +317,10 @@ private[parser] final class Parser(
     while stack.headOption.exists(isComment) do stack.pop()
     assert(stack.nonEmpty, "Nothing to repeat")
     val node = stack.pop()
-    assertRepeatable(node)
+    validateRepeatable(node)
     node
 
-  private def assertRepeatable(node: Node): Unit =
+  private def validateRepeatable(node: Node): Unit =
     node.data match
       case NodeData.Group(_: GroupKind.PositiveLookAhead | _: GroupKind.NegativeLookAhead, _) =>
         assert(featureSet.allowsLookAheadRepeat, "Nothing to repeat")
@@ -2201,7 +2198,7 @@ private[parser] final class Parser(
 
   private def parseBackslashEscape(): BackslashKind =
     val value = currentChar
-    if value == '&' then assertSymbolUnknownBackslash()
+    if value == '&' then validateSymbolUnknownBackslash()
     next()
     BackslashKind.Escape(EscapeStyle.Single(value), value.toInt)
 
@@ -2211,12 +2208,12 @@ private[parser] final class Parser(
 
     if isAlphabetic then assert(featureSet.allowsAlphabeticUnknownBackslash, "Invalid backslash escape")
     else if CodePointUtil.isWord(value) then assert(featureSet.allowsWordUnknownBackslash, "Invalid backslash escape")
-    else assertSymbolUnknownBackslash()
+    else validateSymbolUnknownBackslash()
 
     nextCodePoint(value)
     BackslashKind.Unknown(value)
 
-  private def assertSymbolUnknownBackslash(): Unit =
+  private def validateSymbolUnknownBackslash(): Unit =
     if featureSet.allowsSymbolUnknownBackslash then return
     if context.inClass && currentChar == '-' then return
     if featureSet.hasBackslashClassSetReservedPunctuator && context.inClass && "&-!#%,:;<=>@`~".contains(currentChar)

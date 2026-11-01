@@ -33,7 +33,7 @@ private[build] final class LookBehindAnalyzer(
 ):
 
   /** Throws [[IRBuildingException]] if the dialect does not accept the look-behind. */
-  def requireAccepted(lookBehind: Node, body: Node, negative: Boolean): Unit =
+  def validateLookBehind(lookBehind: Node, body: Node, negative: Boolean): Unit =
     featureSet.lookBehindRule match
       case IRLookBehindRule.Unrestricted => ()
       case IRLookBehindRule.Java         =>

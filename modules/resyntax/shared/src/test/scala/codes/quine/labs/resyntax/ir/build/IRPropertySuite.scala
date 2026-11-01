@@ -15,7 +15,7 @@ class IRPropertySuite extends munit.FunSuite:
 
   def build(s: String, flags: String, dialect: Dialect): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)
-    IRBuilder.build(Parser.parse(s, flagSet, dialect), flagSet, dialect)
+    IRBuilder.build(Parser.parse(s, flagSet, dialect), flagSet, dialect, Parser.determineUnitMode(s, flagSet, dialect))
 
   def value(p: EnumeratedProperty, name: String): CharSet = p.value(name).get.set
 
