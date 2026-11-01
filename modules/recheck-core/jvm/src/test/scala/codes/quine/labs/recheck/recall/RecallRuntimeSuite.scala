@@ -164,6 +164,7 @@ class RecallRuntimeSuite extends munit.FunSuite:
     val env = Map("RECHECK_DOTNET" -> "env LC_ALL=tr_TR.UTF-8 dotnet")
     def validateTurkish(c: String): RecallValidation =
       validate("^[ia]*[ib]*[ic]*$", "i", Dialect.DotNet, attack(c, 2000, "!"), env = env)
+
     assertFinish(validateTurkish("İ"))
     assertEquals(validateTurkish("I").result, RecallResult.Timeout)
 
@@ -194,6 +195,7 @@ class RecallRuntimeSuite extends munit.FunSuite:
         case IRNodeData.Chars(set)      => set
         case IRNodeData.Sequence(nodes) => last(nodes.last.data)
         case data                       => fail(s"Unexpected: $data")
+
       val modeled = (0x80 to 0xff).filter(last(ir.node.data).contains)
       val program = RecallProgram.generate(source, "", dialect, ir.mode, attack("a", 1, "")).toOption.get
       val lines = program.script.linesIterator.toSeq
@@ -205,6 +207,7 @@ class RecallRuntimeSuite extends munit.FunSuite:
       val process = new ProcessBuilder("perl", "-e", (pragma ++ Seq(regex, loop)).mkString("\n")).start()
       val out = new String(process.getInputStream.readAllBytes(), StandardCharsets.UTF_8)
       assertEquals(out.linesIterator.map(_.toInt).toSeq, modeled, s"$source in $dialect")
+
     for
       source <- Seq("\\w", "\\d", "\\s", "[[:alpha:]]", "(?i)\\xC9", "(?a)\\w", "(?u)\\w", "\\x{100}?\\w", "\\p{L}?\\w")
       utf8 <- Seq(true, false)

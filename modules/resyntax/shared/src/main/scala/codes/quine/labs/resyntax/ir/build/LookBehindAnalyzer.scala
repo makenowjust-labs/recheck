@@ -61,6 +61,7 @@ private[build] final class LookBehindAnalyzer(
       width(node, Set.empty, conditionals = true) match
         case Some(w) => IRLookBehindStarts.Longest(w.min.min(Int.MaxValue).toInt, w.max.min(Int.MaxValue).toInt)
         case None    => IRLookBehindStarts.Longest(0, 0)
+
     featureSet.lookBehindRule match
       case IRLookBehindRule.Unrestricted => IRLookBehindMatch.Backward
       case IRLookBehindRule.Java         => IRLookBehindMatch.Forward(Seq(longest(body)))
@@ -283,6 +284,7 @@ private[build] final class LookBehindAnalyzer(
       case NodeData.Backslash(BackslashKind.Escape(style, value)) if IRCharResolver.isRubyByte(style, value) =>
         Some(value)
       case _ => None
+
     val out = Seq.newBuilder[RubyWidth]
     var i = 0
     while i < nodes.length do

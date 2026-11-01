@@ -45,6 +45,7 @@ final case class IRPattern(
       case NonAtomicLookBehind(n, _)                => loop(n) + 1
       case Conditional(_, _, _)                     => node.children.map(loop).sum + 1
       case _                                        => 1
+
     loop(node)
 
   /** Returns the sum of the counts of the repetitions other than `*`, `+` and `?` (e.g. `{2,3}` counts `3`). */
@@ -59,6 +60,7 @@ final case class IRPattern(
           case IRQuantifier.Bounded(0, 1, _)    => count
           case IRQuantifier.Bounded(_, max, _)  => count + max
       case _ => node.children.map(loop).sum
+
     loop(node)
 
   /** Checks whether the pattern has no unbounded repetition, nor an unsupported node, which may be a recursion. */
@@ -91,6 +93,7 @@ final case class IRPattern(
         case Assert(k) if k.isBegin => !isBegin
         case Assert(k) if k.isEnd   => !isEnd
         case _                      => node.children.exists(loop(false, false, _))
+
     loop(true, true, node)
 
   /** Checks whether a begin assertion is placed at every begin point. */
@@ -117,6 +120,7 @@ final case class IRPattern(
       case Atomic(n)        => loop(n)
       case Assert(k)        => p(k)
       case _                => otherwise
+
     loop(node)
 
   /** Checks whether an assertion satisfying `p` is placed at every end point.
@@ -131,6 +135,7 @@ final case class IRPattern(
       case Atomic(n)        => loop(n)
       case Assert(k)        => p(k)
       case _                => otherwise
+
     loop(node)
 
   /** Returns the distinct line terminators of the line assertions and the text end assertions. */
@@ -154,6 +159,7 @@ final case class IRPattern(
         case Atomic(n)                            => loop(isEnd, n)
         case Assert(_: IRAssertKind.ChompTextEnd) => if isEnd then Seq.empty else Seq(node)
         case _                                    => node.children.flatMap(loop(false, _))
+
     loop(true, node)
 
   /** Checks whether the pattern has a line assertion (`^` or `$` with `m`), which tells line terminators. */

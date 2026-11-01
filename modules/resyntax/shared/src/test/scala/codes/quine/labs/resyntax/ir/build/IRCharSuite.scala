@@ -125,6 +125,7 @@ class IRCharSuite extends munit.FunSuite:
   )
   test("IRBuilder.build: Perl's byte strings"):
     def set(s: String): CharSet = setOf(build(s, "", Perl(utf8 = false)).node.data)
+
     assertEquals(set("[é]"), CharSet.of(0xa9, 0xc3))
     assertEquals(set("\\x{100}"), CharSet.empty)
     assertEquals(set("[a\\x{100}]"), of("a"))
@@ -154,6 +155,7 @@ class IRCharSuite extends munit.FunSuite:
       def lastSet(s: String, dialect: Dialect): CharSet = strip(build(s, "", dialect).node.data) match
         case Sequence(nodes) => setOf(nodes.last.data)
         case data            => setOf(data)
+
       val bytes = lastSet(s"(?:\\x{100})?$source", Perl(utf8 = false))
       assertEquals(bytes, lastSet(source, Perl()).restrict(UnitMode.Byte))
   test("IRBuilder.build: Perl's byte strings with Unicode rules"):
@@ -161,6 +163,7 @@ class IRCharSuite extends munit.FunSuite:
       strip(build(s, "", Perl(utf8 = false)).node.data) match
         case Sequence(nodes) => setOf(nodes.last.data)
         case data            => setOf(data)
+
     assert(!set("\\w").contains(0xe9))
     assert(set("(?u)\\w").contains(0xe9))
     for switch <- Seq("\\x{100}?", "\\o{400}?", "\\p{L}?", "\\N{U+41}?", "\\N{LATIN SMALL LETTER A}?") do
@@ -380,6 +383,7 @@ class IRCharSuite extends munit.FunSuite:
       strip(build(s, "", dialect).node.data) match
         case IRNodeData.Sequence(nodes) => setOf(nodes.last.data)
         case data                       => setOf(data)
+
     assert(lastSet("a\\w", Perl()).contains(0xe9))
     assert(lastSet("a\\w", Perl(source = PerlSource.String)).contains(0xe9))
     assert(!lastSet("a\\w", Perl(utf8 = false)).contains(0xe9))

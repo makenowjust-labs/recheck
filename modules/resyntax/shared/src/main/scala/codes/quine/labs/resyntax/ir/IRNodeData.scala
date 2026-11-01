@@ -81,6 +81,7 @@ object IRNodeData:
 
   object LookBehind:
     def apply(negative: Boolean, data: IRNodeData): IRNodeData = LookBehind(negative, IRNode(data))
+
     def apply(negative: Boolean, data: IRNodeData, matching: IRLookBehindMatch): IRNodeData =
       LookBehind(negative, IRNode(data), matching)
 
@@ -158,6 +159,7 @@ object IRCondition:
 
   object LookBehind:
     def apply(negative: Boolean, data: IRNodeData): IRCondition = LookBehind(negative, IRNode(data))
+
     def apply(negative: Boolean, data: IRNodeData, matching: IRLookBehindMatch): IRCondition =
       LookBehind(negative, IRNode(data), matching)
 

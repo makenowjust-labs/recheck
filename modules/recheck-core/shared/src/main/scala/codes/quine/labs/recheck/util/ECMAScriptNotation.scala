@@ -28,6 +28,7 @@ object ECMAScriptNotation:
       if c.isValidChar && "[^-]".contains(c.toChar) then s"\\${c.toChar}"
       else if 1 <= c && c < 32 then s"\\c${(c + 0x40).toChar}"
       else showChar(c)
+
     set.intervals
       .map:
         case (x, y) if x + 1 == y => showInClass(x)

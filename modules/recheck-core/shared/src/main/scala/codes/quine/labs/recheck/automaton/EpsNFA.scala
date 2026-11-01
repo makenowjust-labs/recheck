@@ -97,6 +97,7 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
               case None =>
                 if ks.contains(inputTerminatorKind) then Vector(((q, Set.empty), None))
                 else Vector.empty
+
       // A character tells the following ones only whether it is an extender after a base among its marks, so the other
       // marks are dropped from the kinds of the states.
       def asPrevious(k: CharKind): CharKind =
@@ -283,21 +284,25 @@ object EpsNFA:
     /** WordBoundary is `\b` assertion of the first word set. */
     case object WordBoundary extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean = prev.word != next.word
+
       override def seesBoundary: Boolean = false
 
     /** WordBoundaryNot is `\B` assertion of the first word set. */
     case object WordBoundaryNot extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean = prev.word == next.word
+
       override def seesBoundary: Boolean = false
 
     /** WordBoundaryOf is `\b` assertion of the `set`-th word set. */
     final case class WordBoundaryOf(set: Int) extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean = prev.isWordOf(set) != next.isWordOf(set)
+
       override def seesBoundary: Boolean = false
 
     /** WordBoundaryNotOf is `\B` assertion of the `set`-th word set. */
     final case class WordBoundaryNotOf(set: Int) extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean = prev.isWordOf(set) == next.isWordOf(set)
+
       override def seesBoundary: Boolean = false
 
     /** Tests whether the character of the kind before a position is a word character of the `word`-th word set, or an
@@ -316,12 +321,14 @@ object EpsNFA:
     final case class MarkWordBoundaryOf(word: Int, marks: Int) extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean =
         isMarkWordBefore(prev, word, marks) != isMarkWordAfter(prev, next, word, marks)
+
       override def seesBoundary: Boolean = false
 
     /** MarkWordBoundaryNotOf is `\B` assertion of the `word`-th word set and the `marks`-th word marks. */
     final case class MarkWordBoundaryNotOf(word: Int, marks: Int) extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean =
         isMarkWordBefore(prev, word, marks) == isMarkWordAfter(prev, next, word, marks)
+
       override def seesBoundary: Boolean = false
 
     /** InputBegin is `\A` assertion. */
@@ -374,4 +381,5 @@ object EpsNFA:
     /** NotBetweenCRLF is an assertion that the position is not between `\r` and `\n`. */
     case object NotBetweenCRLF extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean = !betweenCRLF(prev, next)
+
       override def seesBoundary: Boolean = false

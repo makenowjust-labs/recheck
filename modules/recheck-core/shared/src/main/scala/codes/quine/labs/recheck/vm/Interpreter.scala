@@ -738,6 +738,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   ): (Int, Option[Int]) =
     val unicode = program.meta.unicode
     def folded(c: Int): Seq[Int] = full.fold(c).map(_.iterator.toSeq).getOrElse(Seq(c))
+
     val target =
       val units = s.chars(unicode).flatMap(folded).toSeq
       if back then units.reverse else units

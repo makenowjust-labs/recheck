@@ -68,6 +68,7 @@ class InterpreterDialectSuite extends munit.FunSuite:
     def perlOnly(source: String, input: String)(using munit.Location): Unit =
       refutes(source, Perl(), input)
       for dialect <- Seq(Java, Python(), PCRE, Ruby(), DotNet) do accepts(source, dialect, input)
+
     // A repetition matching nothing keeps the capture of an earlier iteration, whatever node Perl compiles it into.
     accepts("^(?:(a)?b){2}\\1$", Perl(), "abba")
     accepts("^(?:(ab)*c)*\\1$", Perl(), "abccab")

@@ -30,10 +30,15 @@ object ParametersGen {
       variants: Seq[Variant]
   ) {
     def isDuration: Boolean = scalaType == "Duration"
+
     def isLogger: Boolean = scalaType == "Option[Context.Logger]"
+
     def isEnum: Boolean = values.nonEmpty
+
     def isOption: Boolean = scalaType.startsWith("Option[")
+
     def capitalName: String = name.capitalize
+
     def defaultName: String = s"Parameters.Default$capitalName"
 
     def scalaDefault: String = scalaDefaultValue.getOrElse(default match {
@@ -73,6 +78,7 @@ object ParametersGen {
     val properties = root.get("properties").asInstanceOf[java.util.Map[String, java.util.Map[String, Any]]]
     properties.asScala.toSeq.map { case (name, p) =>
       def string(key: String): Option[String] = Option(p.get(key)).map(_.toString)
+
       val values = Option(p.get("enum")).map(_.asInstanceOf[java.util.List[String]].asScala.toSeq).getOrElse(Seq.empty)
       val scalaValues = Option(p.get("x-scala-values"))
         .map(_.asInstanceOf[java.util.Map[String, String]].asScala.toMap)
@@ -298,11 +304,13 @@ object ParametersGen {
   /** Generates `ParametersSchema.scala` for the tests, the dialects of the schema. */
   def schemaTest(params: Seq[Param]): String = {
     def seq(ss: Seq[String]): String = ss.map(literal).mkString("Seq(", ", ", ")")
+
     def value(v: Any): String = v match {
       case null      => "null"
       case s: String => literal(s)
       case v         => v.toString
     }
+
     val dialect = params.find(_.name == "dialect").getOrElse(sys.error("no dialect parameter"))
     val variants = dialect.variants.map { v =>
       val settings = v.settings.map { case (key, values, default) =>

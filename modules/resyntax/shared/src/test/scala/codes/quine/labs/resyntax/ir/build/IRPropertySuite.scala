@@ -113,6 +113,7 @@ class IRPropertySuite extends munit.FunSuite:
   // Perl's Numeric_Value
   val nv = Properties.NumericValue
   def nvSet(n: Long, d: Long): CharSet = nv.values.find(v => v.numerator == n && v.denominator == d).get.set
+
   chars("\\p{nv=3}", "", Perl())(nvSet(3, 1))
   chars("\\p{Numeric_Value=+3}", "", Perl())(nvSet(3, 1))
   chars("\\p{nv=3.0}", "", Perl())(nvSet(3, 1))

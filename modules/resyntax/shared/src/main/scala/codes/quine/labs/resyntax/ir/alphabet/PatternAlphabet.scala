@@ -71,9 +71,11 @@ object PatternAlphabet:
     def order(c: CharSet): Seq[Int] =
       val first = all.indexWhere(_.contains(c.head))
       first +: all.drop(first + 1).map(s => if s.contains(c.head) then 0 else 1)
+
     // The bits are of the sets as given, even if `lineTerminator` (resp. `word`) is `None`.
     def mask(first: Option[CharSet], more: Seq[CharSet], c: Int): Int =
       (first +: more.map(Some(_))).zipWithIndex.collect { case (Some(t), i) if t.contains(c) => 1 << i }.sum
+
     val pairs = Alphabet
       .refine(mode, all)
       .atoms

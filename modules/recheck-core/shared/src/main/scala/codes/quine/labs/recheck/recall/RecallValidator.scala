@@ -70,6 +70,7 @@ object RecallValidator:
   ): RecallValidation = ctx.interrupt:
     def line(out: String, name: String): Option[String] =
       out.linesIterator.collectFirst { case s if s.startsWith(s"$name ") => s.substring(name.length + 1) }
+
     def runtime(out: String): String = line(out, RecallProgram.RuntimeLine).getOrElse(name)
 
     output match

@@ -139,6 +139,7 @@ class RecallProgramSuite extends munit.FunSuite:
   test("RecallProgram.data"):
     def data(source: String, flags: String, attack: AttackPattern): String =
       RecallProgram.data(flags, source, attack)
+
     val astral = AttackPattern(Seq((UString.empty, UString.fromString("😀"), 0)), UString.empty, 2)
     assertEquals(data("😀", "", astral), "-\nd83dde00\n2:d83dde00\n")
     assertEquals(data("", "", AttackPattern(Seq.empty, UString.empty, 0)), "-\n-\n")
@@ -176,6 +177,7 @@ class RecallProgramSuite extends munit.FunSuite:
   test("RecallProgram.generate: Perl unsafe patterns"):
     def generate(source: String): Either[String, RecallProgram] =
       RecallProgram.generate(source, "", Dialect.Perl(), modeOf(source, "", Dialect.Perl()), attack)
+
     val unsafe = "The pattern cannot be a Perl regex literal, which would interpolate a variable or run code"
     assert(generate("a$|b$").isRight)
     assert(generate("(a$)\\$x\\@x").isRight)
@@ -189,6 +191,7 @@ class RecallProgramSuite extends munit.FunSuite:
   test("RecallProgram.generate: Perl string patterns"):
     def generate(source: String, flags: String, utf8: Boolean = true): RecallProgram =
       this.generate(source, flags, Dialect.Perl(utf8, PerlSource.String))
+
     // A string pattern is not interpolated again, so any pattern can run.
     val chars = generate("a$x@y/é", "gi")
     assertEquals(
@@ -208,6 +211,7 @@ class RecallProgramSuite extends munit.FunSuite:
   test("RecallProgram.generate: Perl literal patterns"):
     def generate(source: String, utf8: Boolean): RecallProgram =
       this.generate(source, "", Dialect.Perl(utf8))
+
     val chars = generate("é\\w", utf8 = true)
     assertEquals(line(chars, "my $regex"), "my $regex = qr/é\\w/;")
     assert(chars.script.startsWith("use utf8;\n"))
@@ -276,6 +280,7 @@ class RecallProgramSuite extends munit.FunSuite:
   test("RecallProgram.script"):
     def script(source: String, dialect: Dialect): RecallProgram.Script =
       RecallProgram.script(source, "", dialect, modeOf(source, "", dialect), attack).toOption.get
+
     val js = script("foo", Dialect.JavaScript)
     assertEquals(js.name, "recall.cjs")
     assertEquals(js.command, "node recall.cjs")

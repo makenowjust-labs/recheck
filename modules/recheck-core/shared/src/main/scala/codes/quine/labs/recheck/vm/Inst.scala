@@ -37,26 +37,31 @@ object Inst:
   /** `ok`: Terminates a matching with a succeeded. */
   case object Ok extends Terminator:
     def successors: Set[Label] = Set.empty
+
     override def toString: String = "ok"
 
   /** `jmp`: Jumps to a `next` block. */
   final case class Jmp(next: Label) extends Terminator:
     def successors: Set[Label] = Set(next)
+
     override def toString: String = s"jmp $next"
 
   /** `try`: Jumps to a `next` block at first. When it is failed, it jumps to a `fallback` block. */
   final case class Try(next: Label, fallback: Label) extends Terminator:
     def successors: Set[Label] = Set(next, fallback)
+
     override def toString: String = s"try $next $fallback"
 
   /** `try-la`: Compound instruction of `try` and `read`. */
   final case class TryLA(read: Read, next: Label, fallback: Label) extends Terminator:
     def successors: Set[Label] = Set(next, fallback)
+
     override def toString: String = s"try-la (${read.kind}) $next $fallback"
 
   /** `try-lb`: Compound instruction of `try` and `read-back`. */
   final case class TryLB(read: ReadBack, next: Label, fallback: Label) extends Terminator:
     def successors: Set[Label] = Set(next, fallback)
+
     override def toString: String = s"try-lb (${read.kind}) $next $fallback"
 
   /** `cmp`: Compares a `reg` value with its operands, and jumps to a block depending on the comparison result. If `reg
@@ -64,6 +69,7 @@ object Inst:
     */
   final case class Cmp(reg: CounterReg, n: Int, lt: Label, ge: Label) extends Terminator:
     def successors: Set[Label] = Set(lt, ge)
+
     override def toString: String = s"cmp $reg $n $lt $ge"
 
   /** `cmp_canary`: Jumps to an `empty` block if current position is the one saved in the canary register, or to an
@@ -71,16 +77,19 @@ object Inst:
     */
   final case class CmpCanary(reg: CanaryReg, empty: Label, advanced: Label) extends Terminator:
     def successors: Set[Label] = Set(empty, advanced)
+
     override def toString: String = s"cmp_canary $reg $empty $advanced"
 
   /** `fail`: Fails a matching, which backtracks. */
   case object Fail extends Terminator:
     def successors: Set[Label] = Set.empty
+
     override def toString: String = "fail"
 
   /** `rollback`: Terminates a matching with a rollback. */
   case object Rollback extends Terminator:
     def successors: Set[Label] = Set.empty
+
     override def toString: String = "rollback"
 
   /** `commit`: Terminates a transaction with keeping the current position, and drops the backtracking points in it.
@@ -89,6 +98,7 @@ object Inst:
     */
   case object Commit extends Terminator:
     def successors: Set[Label] = Set.empty
+
     override def toString: String = "commit"
 
   /** `tx`: Marks as a transaction point, then jumps a `next` block. When it is terminated with a rollback, it jumps to
@@ -100,12 +110,14 @@ object Inst:
   final case class Tx(next: Label, rollback: Option[Label], fallback: Option[Label], barrier: Option[Barrier] = None)
       extends Terminator:
     def successors: Set[Label] = Set(Some(next), rollback, fallback).flatten
+
     override def toString: String =
       s"tx $next ${rollback.getOrElse("FAIL")} ${fallback.getOrElse("FAIL")}${barrier.fold("")(b => s" ; $b")}"
 
   /** `try_barrier`: `try` whose fallback frame is the `barrier` for the backtracking control verbs. */
   final case class TryBarrier(next: Label, fallback: Label, barrier: Barrier) extends Terminator:
     def successors: Set[Label] = Set(next, fallback)
+
     override def toString: String = s"try_barrier $next $fallback ; $barrier"
 
   /** `leave`: Terminates a transaction as `rollback` does, but it keeps the backtracking points in it, so backtracking
@@ -113,11 +125,13 @@ object Inst:
     */
   case object Leave extends Terminator:
     def successors: Set[Label] = Set.empty
+
     override def toString: String = "leave"
 
   /** `if_cap`: Jumps to a `yes` block if one of the captures of the indices is set, or to a `no` block. */
   final case class IfCap(indices: Seq[Int], yes: Label, no: Label) extends Terminator:
     def successors: Set[Label] = Set(yes, no)
+
     override def toString: String = s"if_cap ${indices.mkString(",")} $yes $no"
 
   /** `step_back`: Saves the position to the `end` register, and jumps to a `next` block at each start of a look-behind
@@ -127,6 +141,7 @@ object Inst:
     */
   final case class StepBack(end: CounterReg, starts: IRLookBehindStarts, next: Label) extends Terminator:
     def successors: Set[Label] = Set(next)
+
     override def toString: String = s"step_back $end $starts $next"
 
   /** Barrier is what the frame of a fallback is for the backtracking control verbs, which skip the frames to it. */

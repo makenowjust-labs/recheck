@@ -107,19 +107,25 @@ object AttackPattern:
   /** JavaScript is a JavaScript style specifier, e.g. `'a'.repeat(31) + '\x00'`. */
   case object JavaScript extends Style:
     def literal(s: UString): String = UStringUtil.show(s)
+
     def repeat(s: UString, n: Int): String = s"${literal(s)}.repeat(${n})"
+
     def join: String = " + "
 
   /** Superscript is a superscript style specifier for logs, e.g. `'a'³¹ '\x00'`. */
   case object Superscript extends Style:
     def literal(s: UString): String = UStringUtil.show(s)
+
     def repeat(s: UString, n: Int): String = s"${literal(s)}${NumberFormat.superscript(n)}"
+
     def join: String = " "
 
   /** Python is a Python style specifier, e.g. `'a' * 31 + '\x00'`, or `b'a' * 31 + b'\x00'` for bytes. */
   final case class Python(bytes: Boolean = false) extends Style:
     def literal(s: UString): String = s.chars(true).map(char).mkString(if bytes then "b'" else "'", "", "'")
+
     def repeat(s: UString, n: Int): String = s"${literal(s)} * $n"
+
     def join: String = " + "
 
     private def char(c: Int): String = c match
@@ -140,7 +146,9 @@ object AttackPattern:
           // `#` starts an interpolation before these characters.
           if cs(i) == '#' && i + 1 < cs.size && "{$@".indexOf(cs(i + 1)) >= 0 then "\\#" else char(cs(i))
         .mkString("\"", "", if bytes then "\".b" else "\"")
+
     def repeat(s: UString, n: Int): String = s"${literal(s)} * $n"
+
     def join: String = " + "
 
     private def char(c: Int): String = c match
@@ -156,7 +164,9 @@ object AttackPattern:
   /** Java is a Java style specifier, e.g. `"a".repeat(31) + "\u0000"`. */
   case object Java extends Style:
     def literal(s: UString): String = s.chars(true).map(char).mkString("\"", "", "\"")
+
     def repeat(s: UString, n: Int): String = s"${literal(s)}.repeat($n)"
+
     def join: String = " + "
 
     // Java translates `\uXXXX` before reading a literal, so a line terminator, `"` and `\` need the other escapes.
@@ -173,7 +183,9 @@ object AttackPattern:
     */
   case object CSharp extends Style:
     def literal(s: UString): String = s.chars(true).map(char).mkString("\"", "", "\"")
+
     def repeat(s: UString, n: Int): String = s"string.Concat(Enumerable.Repeat(${literal(s)}, $n))"
+
     def join: String = " + "
 
     private def char(c: Int): String = c match
@@ -190,7 +202,9 @@ object AttackPattern:
     */
   case object Perl extends Style:
     def literal(s: UString): String = s.chars(true).map(char).mkString("\"", "", "\"")
+
     def repeat(s: UString, n: Int): String = s"${literal(s)} x $n"
+
     def join: String = " . "
 
     private def char(c: Int): String = c match
@@ -211,7 +225,9 @@ object AttackPattern:
       if cs.forall(isASCIIPrintable) then
         cs.map(c => if c == '\\' || c == '\'' then s"\\${c.toChar}" else c.toChar.toString).mkString("'", "", "'")
       else cs.map(char).mkString("\"", "", "\"")
+
     def repeat(s: UString, n: Int): String = s"str_repeat(${literal(s)}, $n)"
+
     def join: String = " . "
 
     private def char(c: Int): String = c match

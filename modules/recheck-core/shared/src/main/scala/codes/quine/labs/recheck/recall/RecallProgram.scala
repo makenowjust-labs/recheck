@@ -329,6 +329,7 @@ object RecallProgram:
       cs.flatMap(c => if c > 0xffff then UString(c).encode(UnitMode.UTF16).iterator else Iterator(c))
         .map(hex(_, 4))
         .mkString
+
     val pattern = units(source.iterator.map(_.toInt))
     val lines = Seq.newBuilder[String]
     lines.addOne(if flags.isEmpty then "-" else flags)
@@ -357,6 +358,7 @@ object RecallProgram:
     val bytes = mode == UnitMode.Byte
     // Character strings are UTF-8 and byte strings are not, which decides Perl's `/d` rules.
     def flag(name: String): String = if bytes then s"utf8::downgrade($$$name, 1)" else s"utf8::upgrade($$$name)"
+
     val regex =
       if dialect.source == PerlSource.Literal then
         for

@@ -106,6 +106,7 @@ final class CharSet private (private val bounds: Array[Int]):
 
   override def toString: String =
     def hex(value: Int): String = "0x" + Integer.toHexString(value).toUpperCase
+
     intervals
       .map((start, end) => if start + 1 == end then hex(start) else s"${hex(start)}-${hex(end - 1)}")
       .mkString("CharSet(", ", ", ")")

@@ -143,17 +143,20 @@ object IRBuilder:
   ): Seq[Node] => LookBehindAnalyzer.Width =
     import LookBehindAnalyzer.Width
     def single(n: Int): Width = Width(n, n)
+
     // Perl reads the bytes of a byte string as Latin-1 characters.
     if mode != UnitMode.CodePoint && !dialect.isPerl then return nodes => single(nodes.size)
     dialect match
       case _: Dialect.Perl =>
         def fold(value: Int, flags: IRCharFlags): Int =
           if perlFoldsMulti(value, flags, perlUTF8Pattern) then FullCaseFolding(value).length else 1
+
         def classWidth(data: ClassItemData, flags: IRCharFlags): Int = data match
           case ClassItemData.ClassUnion(items) => items.map(i => classWidth(i.data, flags)).maxOption.getOrElse(1)
           case value: ClassItemData.ClassValue => fold(value.value, flags)
           case ClassItemData.ClassRange(b, e) if b.data.value == e.data.value => fold(b.data.value, flags)
           case _                                                              => 1
+
         nodes =>
           val node = nodes.head
           val width = table
@@ -167,6 +170,7 @@ object IRBuilder:
           Width(1, width.toLong)
       case _: Dialect.Ruby =>
         def fold(value: Int): Int = FullCaseFolding(value).length.max(1)
+
         nodes =>
           val node = nodes.head
           table
@@ -193,8 +197,10 @@ object IRBuilder:
     def inline(node: Node): Seq[FlagSet] = node.data match
       case NodeData.Command(CommandKind.InlineFlag(diff)) => Seq(diff.added)
       case _                                              => NodeKey.children(node).flatMap(inline)
+
     val flagSets = flagSet +: inline(node)
     def has(p: FlagSet => Boolean): Boolean = flagSets.exists(p)
+
     if has(_.ascii) && has(_.unicode) then
       throw new IRBuildingException("ASCII and UNICODE flags are incompatible", SourceLocation.Invalid)
     if has(_.ascii) && has(_.localeUpper) then
@@ -243,6 +249,7 @@ object IRBuilder:
       case NodeData.Sequence(nodes)         => nodes
       case NodeData.Disjunction(first +: _) => leading(first)
       case _                                => Seq(node)
+
     leading(node).iterator
       .map(_.data)
       .takeWhile:
@@ -399,6 +406,7 @@ private[build] class IRBuilder(
 
   def buildConditional(node: Node, test: ConditionalTest, yes: Node, no: Option[Node]): Either[IRNodeData, IRNode] =
     def branch(node: Option[Node]): IRNode = node.fold(IRNode(IRNodeData.Empty))(n => scoped(build(n)))
+
     def captured(indices: Seq[Int]): Either[Boolean, IRCondition] =
       // .NET's group `0` is the whole match, which is not set yet.
       val set = indices.filter(_ != 0)
@@ -406,14 +414,17 @@ private[build] class IRBuilder(
       // Ruby tests only the first group of a name shared by groups.
       else if dialect.isRuby then Right(IRCondition.Captured(set.take(1)))
       else Right(IRCondition.Captured(set))
+
     def resolved: Seq[Int] =
       backReferences.getOrElse(NodeKey(node), throw new IllegalStateException(s"No resolved test: $node"))
+
     // A recursion test is false out of a recursion, so it is constant without calls.
     // PCRE reads `(R)` and `(R1)` as capture tests when a group has the name.
     def recursion(name: Option[String]): Option[Either[Boolean, IRCondition]] =
       name.filter(dialect.isPCRE && table.names.contains(_)) match
         case Some(name) => Some(captured(table.names(name)))
         case None       => Option.when(!hasCall)(Left(false))
+
     val condition: Option[Either[Boolean, IRCondition]] = test match
       case ConditionalTest.Indexed(_) | ConditionalTest.Relative(_) | ConditionalTest.Named(_, _) =>
         Some(captured(resolved))
@@ -444,6 +455,7 @@ private[build] class IRBuilder(
         val cs = nodes.collect { case Node(NodeData.Literal(c), _) => String(Character.toChars(c)) }
         Option.when(cs.size == nodes.size)(cs.mkString)
       case _ => None
+
     kind match
       case None =>
         dotNetName.flatMap(table.names.get) match

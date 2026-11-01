@@ -16,6 +16,7 @@ object TryUtil:
         f(x) match
           case Success(y)  => loop(acc :+ y, xs)
           case Failure(xs) => Failure(xs)
+
     loop(Vector.empty, xs)
 
   /** Like `traverse`, but discards results. */

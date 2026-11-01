@@ -122,6 +122,7 @@ object Main:
     def named[A](option: String, value: Option[String], default: A)(of: String => Option[A]): ValidatedNel[String, A] =
       value.fold(Validated.validNel(default)): name =>
         Validated.fromOption(of(name), s"unknown value of --$option: $name").toValidatedNel
+
     misplaced match
       case Some(option) => Validated.invalidNel(s"--$option is not an option of ${dialect.name}")
       case None         =>
@@ -147,6 +148,7 @@ class Main:
 
   // $COVERAGE-OFF$
   def exit(exitCode: Int): Unit = sys.exit(exitCode)
+
   // $COVERAGE-ON$
 
   def run(args: Array[String]): Unit = command.parse(args.toSeq, sys.env) match

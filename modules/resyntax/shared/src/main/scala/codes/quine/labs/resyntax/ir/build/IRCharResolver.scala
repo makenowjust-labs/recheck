@@ -77,6 +77,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
     def byteOf(node: Node): Option[Int] = node.data match
       case NodeData.Backslash(BackslashKind.Escape(style, value)) if isRubyByte(style, value) => Some(value)
       case _                                                                                  => None
+
     val out = mutable.ArrayBuffer.empty[Node]
     for child <- children do
       child.data match
@@ -207,6 +208,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
     for (u, i) <- units.zipWithIndex; c <- FullCaseFolding(u.value).iterator do folded += ((c, i))
     def char(i: Int, loc: SourceLocation): IRNode =
       IRNode(IRNodeData.Chars(eq.closure(CharSet.single(folded(i)._1))), loc)
+
     val occurrences = for
       i <- folded.indices
       (key, set) <- multiFoldings
@@ -240,6 +242,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
                   IRNode(IRNodeData.Chars(set), loc) +: alternatives(i + len)
               if multi.isEmpty then single
               else Seq(IRNode(IRNodeData.Disjunction((single +: multi).map(seq => IRNode(sequenceOf(seq), loc))), loc))
+
           out ++= alternatives(from)
       out.result()
 
@@ -334,6 +337,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
   private lazy val graphemeCluster: IRNodeData =
     import Grammar.*
     def incb(name: String): CharSet = Properties.IndicConjunctBreak.value(name).get.set.restrict(mode)
+
     val extPict = Properties.binary("Extended_Pictographic").get.set.restrict(mode)
     val control = gcb("Control", "CR", "LF")
     val ri = seq(c(gcb("RI")), c(gcb("RI")))
@@ -393,7 +397,9 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
 
   private def escapeClassSet(kind: EscapeClassKind, flags: IRCharFlags, loc: SourceLocation): ClassSet =
     def set(s: CharSet): ClassSet = ClassSet(s.restrict(mode))
+
     def not(s: CharSet): ClassSet = ClassSet(s.restrict(mode).complement(mode))
+
     kind match
       case EscapeClassKind.Digit         => set(classes.digit(flags))
       case EscapeClassKind.NonDigit      => not(classes.digit(flags))
@@ -454,6 +460,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
             case (_: Dialect.Perl | Dialect.PCRE, CaseKind.Category) => IRProperties.gc("LC").restrict(mode)
             case (_: Dialect.Perl, CaseKind.Cased)                   => IRProperties.binary("Cased").restrict(mode)
             case _                                                   => s
+
           dialect match
             case Dialect.JavaScript if flags.unicodeSets =>
               val closed = ClassSet(eq.closure(restricted.chars), restricted.strings.map(CaseMapping.SimpleFold(_)))
@@ -721,10 +728,15 @@ private[build] object IRCharResolver:
   private object Grammar:
     import BacktrackStrategy.Greedy
     def c(set: CharSet): IRNode = IRNode(IRNodeData.Chars(set))
+
     def star(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, IRQuantifier.Unbounded(0, Greedy)))
+
     def plus(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, IRQuantifier.Unbounded(1, Greedy)))
+
     def opt(node: IRNode): IRNode = IRNode(IRNodeData.Repeat(node, IRQuantifier.Bounded(0, 1, Greedy)))
+
     def seq(nodes: IRNode*): IRNode = IRNode(IRNodeData.Sequence(nodes))
+
     def alt(nodes: IRNode*): IRNode = IRNode(IRNodeData.Disjunction(nodes))
 
   /** NotModeledException is thrown for a construct that IR cannot represent, which becomes `Unsupported`. */

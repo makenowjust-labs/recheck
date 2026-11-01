@@ -217,7 +217,9 @@ private[build] object IRProperties:
   /** `CharPredicates.forProperty`: general categories, POSIX names in ASCII and `java.lang.Character` methods. */
   private def javaForProperty(name: String, ci: Boolean): PropertyResult =
     def category(names: String*): PropertyResult = found(gc(names*))
+
     def cased(single: CharSet): PropertyResult = found(if ci then javaCased else single)
+
     name match
       case "Lu" | "Ll" | "Lt" => if ci then found(gc("Lu", "Ll", "Lt")) else category(name)
       case "Cn" | "Lm" | "Lo" | "Mn" | "Me" | "Mc" | "Nd" | "Nl" | "No" | "Zs" | "Zl" | "Zp" | "Cc" | "Cf" | "Co" |
@@ -589,6 +591,7 @@ private[build] object IRProperties:
   private def perlNumericValue(value: String): Option[CharSet] =
     val nv = Properties.NumericValue
     def gcd(a: Long, b: Long): Long = if b == 0 then a else gcd(b, a % b)
+
     value.trim match
       case v if lowerASCII(v) == "nan" => Some(nv.nan.set)
       case PerlFraction(sign, n, d)    =>
@@ -642,6 +645,7 @@ private[build] object IRProperties:
   private def perlSpecial(key: String): Option[(CharSet, CaseKind)] =
     val u = unicodeUniverse
     def o(set: CharSet, kind: CaseKind = CaseKind.Other) = Some((set, kind))
+
     val space = binary("White_Space")
     val horiz = space.diff(IRCharClasses.Vertical)
     val graph = space.union(gc("Cc", "Cn", "Cs")).complement(u)
@@ -816,6 +820,7 @@ private[build] object IRProperties:
     */
   private lazy val rubyContributory: Map[String, CharSet] =
     def other(derived: String, parts: CharSet): CharSet = binary(derived).diff(parts)
+
     Seq(
       Seq("Other_Alphabetic", "OAlpha") -> other("Alphabetic", gc("L", "Nl")),
       Seq("Other_Default_Ignorable_Code_Point", "ODI") ->
@@ -842,6 +847,7 @@ private[build] object IRProperties:
   private lazy val rubyValues: Map[String, CharSet] =
     def listed(name: String, property: EnumeratedProperty, default: String): Seq[(String, CharSet)] =
       property.values.filter(v => v.name != default && v.set.nonEmpty).map(v => s"$name=${rubyKey(v.name)}" -> v.set)
+
     val ages = Properties.Age.values.filter(_.shortName.matches("[0-9]+\\.[0-9]+"))
     (ages.map(v => s"age=${v.shortName}" -> Properties.presentIn(v)) ++
       listed("graphemeclusterbreak", Properties.GraphemeClusterBreak, "Other") ++

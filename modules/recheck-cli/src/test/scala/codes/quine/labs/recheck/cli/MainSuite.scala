@@ -174,6 +174,7 @@ class MainSuite extends munit.FunSuite:
       val (script, scriptErr, scriptStatus) = runMain(Seq("generate-recall-script", "-"), stdin)
       assertEquals((scriptErr, scriptStatus), ("", 0))
       script
+
     val python = roundTrip("--dialect=python", "--python-type=bytes", "/^(a|a)*$/")
     assert(clue(python).startsWith("# Run: python3 -I recall.py\n"))
     assert(clue(python).contains("string = b'a' * "))
@@ -223,6 +224,7 @@ class MainSuite extends munit.FunSuite:
     assert(clue(javaOut).startsWith("// Run: java --source 17 recall.java\n"))
 
     def error(json: String): (String, String, Int) = runMain(Seq("generate-recall-script", file(json)))
+
     assertEquals(error("{"), ("", "Invalid JSON: exhausted input\n", 1))
     assertEquals(
       error(diagnostics("foo", "").noSpaces),

@@ -990,6 +990,7 @@ private[parser] final class Parser(
   private def parseCode(end: Char, escapeDouble: Boolean = false): String =
     val start = offset
     def isDoubledEnd: Boolean = escapeDouble && source.startsWith(s"$end$end", offset)
+
     while !isEnd && (currentChar != end || isDoubledEnd) do
       if isDoubledEnd then next()
       next()
@@ -1296,10 +1297,12 @@ private[parser] final class Parser(
     val start = offset
     var flagSet = initial
     def result: (FlagSet, String) = (flagSet, sliceSource(start, offset))
+
     // Ruby's last character set flag wins (e.g. `(?au)` is `(?u)`).
     def charset(flagSet: FlagSet): FlagSet =
       if featureSet.overridesCharsetInlineFlag then flagSet.copy(ascii = false, hasIndices = false, unicode = false)
       else flagSet
+
     while !isEnd do
       val flagStart = offset
       val c = if featureSet.ignoresInlineFlagCase then currentChar.toLower else currentChar
@@ -1873,6 +1876,7 @@ private[parser] final class Parser(
   // Ruby separates the code points by ASCII spaces (`ISSPACE`, e.g. `\n`), and reads at most six digits for each.
   private def parseUnicodeList(): BackslashKind =
     def skipSpaces(): Unit = while !isEnd && " \t\n\u000b\f\r".contains(currentChar) do next()
+
     skipSpaces()
     val values = Seq.newBuilder[Int]
     while !isEnd && isHexDigit do
@@ -2608,6 +2612,7 @@ private[parser] final class Parser(
             throw new NestingLimitException(Parser.MaxNestingDepth, node.loc.end)
           loop(inner, repeatDepth + 1)
         case _ => ()
+
     loop(node, depth)
 
   private def protectContext[A](body: => A): A =

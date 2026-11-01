@@ -540,6 +540,7 @@ private[vm] class ProgramBuilder(
   /** A builder for `x{n,m}` node. */
   def buildRepeat(quantifier: IRQuantifier, child: IRNode): Unit =
     def isLazy(strategy: BacktrackStrategy): Boolean = strategy == BacktrackStrategy.Lazy
+
     val empty = if child.canMatchEmpty then emptyIteration(quantifier) else EmptyIteration.Ignore
     // An empty mandatory iteration ending the repetition jumps to `exit`.
     val exit = allocateLabel("exit")
@@ -554,6 +555,7 @@ private[vm] class ProgramBuilder(
           buildRepeatN(n - 1, child)
           wrapCanary(child, EmptyIteration.ExitFromMin, exit)(wrapReset(child)(buildIteration(child)))
         case _ => buildRepeatN(n, child)
+
     quantifier match
       case IRQuantifier.Exact(n) if empty == EmptyIteration.ExitAll => mandatory(n)
       case IRQuantifier.Exact(n)                                    => buildRepeatN(n, child)
@@ -855,6 +857,7 @@ private[vm] class ProgramBuilder(
       enterBlock(start)
       build(node)
       emitAssert(AssertKind.LookBehindEnd(end))
+
     (starts, child.data) match
       case (Seq(s), _)                                                     => attempt(child, s)
       case (_, IRNodeData.Disjunction(nodes)) if nodes.size == starts.size =>

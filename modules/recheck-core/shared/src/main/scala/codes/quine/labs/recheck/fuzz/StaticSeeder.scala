@@ -54,6 +54,7 @@ object StaticSeeder:
 
       def loop(node: IRNode, prevIsRepeat: Boolean, nextIsRepeat: Boolean, inside: Set[Int]): IRNode = ctx.interrupt:
         def copy(data: IRNodeData): IRNode = node.copy(data = data)
+
         node.data match
           case Disjunction(ns) => copy(Disjunction(ns.map(loop(_, prevIsRepeat, nextIsRepeat, inside))))
           case Sequence(ns)    =>

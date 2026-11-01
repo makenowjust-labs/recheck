@@ -192,9 +192,11 @@ private final class PerlLiteralRewriter(source: String, extended: Boolean, bytes
     var i = open + 1
     var digits = false
     def skipBlank(): Unit = while i < n && (src(i) == ' ' || src(i) == '\t') do i += 1
+
     def skipDigits(): Unit = while i < n && src(i).isDigit do
       digits = true
       i += 1
+
     skipBlank()
     skipDigits()
     skipBlank()

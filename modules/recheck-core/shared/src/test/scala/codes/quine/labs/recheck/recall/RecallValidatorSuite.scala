@@ -81,6 +81,7 @@ class RecallValidatorSuite extends munit.FunSuite:
         ExecResult.Timeout("")
       }
       limit
+
     assertEquals(limit(Duration.Inf), None)
     assertEquals(limit(100.seconds), Some(100.seconds))
     val ctx50s = Context(timeout = 50.seconds)
@@ -90,6 +91,7 @@ class RecallValidatorSuite extends munit.FunSuite:
 
   test("RecallValidator.result"):
     def result(output: ExecResult): RecallValidation = RecallValidator.result("python3", "python3 -", 1.second, output)
+
     assertEquals(
       result(ExecResult.Exit(0, "recheck:runtime python 3.15.0\nrecheck:start\nrecheck:time 12\n", "")),
       RecallValidation("python 3.15.0", 1.second, RecallResult.Finish(12.millis))

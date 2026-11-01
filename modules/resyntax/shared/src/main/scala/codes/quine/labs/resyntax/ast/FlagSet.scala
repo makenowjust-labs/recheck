@@ -82,6 +82,7 @@ object FlagSet:
     for (c, offset) <- flags.toCharArray.zipWithIndex do
       def check(accepted: Boolean): Unit =
         if !accepted then throw new FlagSetException(s"Unknown flag '$c'", Some(offset))
+
       counts(c) += 1
       if counts(c) >= 2 && !allowsDuplicatedFlag then throw new FlagSetException(s"Duplicated flag '$c'", Some(offset))
 
@@ -174,6 +175,7 @@ object FlagSet:
 
     def incompatible(c1: Char, c2: Char): Nothing =
       throw new FlagSetException(s"Incompatible flags '$c1' and '$c2'", None)
+
     dialect match
       case Dialect.JavaScript =>
         if flagSet.unicode && flagSet.unicodeSets then incompatible('u', 'v')

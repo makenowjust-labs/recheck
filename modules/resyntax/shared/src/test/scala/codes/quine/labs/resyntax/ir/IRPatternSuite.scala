@@ -23,6 +23,7 @@ class IRPatternSuite extends munit.FunSuite:
 
   test("IRNode#captureRange"):
     def range(source: String): Option[(Int, Int)] = parse(source).node.captureRange
+
     assertEquals(range("(.)(.)"), Some((1, 2)))
     assertEquals(range("(.)|(.)"), Some((1, 2)))
     assertEquals(range("(.)"), Some((1, 1)))

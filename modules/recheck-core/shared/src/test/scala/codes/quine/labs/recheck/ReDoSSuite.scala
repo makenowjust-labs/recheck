@@ -78,6 +78,7 @@ class ReDoSSuite extends munit.FunSuite:
       ReDoS.check(source, "") match
         case d: Diagnostics.Vulnerable => Some((d.complexity, d.attack))
         case _                         => None
+
     for (written, normal) <- Seq("^(?:a|a){1,}$" -> "^(?:a|a)+$", "^(?:a|a){0,1}(?:b|b)*$" -> "^(?:a|a)?(?:b|b)*$")
     do
       assert(result(normal).isDefined, normal)
@@ -122,6 +123,7 @@ class ReDoSSuite extends munit.FunSuite:
         runs += 1
         output
       ReDoS.iterator("^(?:a|a)*$", "", params, None, Some(exec)).toList
+
     def recall(result: RecallResult): Option[RecallValidation] = Some(RecallValidation("node v0", 1.second, result))
 
     // A failed recall validation keeps the diagnostics, and the checking continues.
@@ -236,6 +238,7 @@ class ReDoSSuite extends munit.FunSuite:
       val ds = if checker == Checker.Automaton then checkAutomaton("^(?:a|a)*$", flags, params)
       else checkFuzz("^(?:a|a)*$", flags, params)
       ds.next().asInstanceOf[Diagnostics.Vulnerable].attack.toString
+
     assertEquals(attack(Dialect.JavaScript, ""), "'a'.repeat(31) + '\\x00'")
     assertEquals(attack(Dialect.Python(), ""), "'a' * 31 + '\\x00'")
     assertEquals(attack(Dialect.Python(Dialect.Python.Type.Bytes), ""), "b'a' * 31 + b'\\x00'")

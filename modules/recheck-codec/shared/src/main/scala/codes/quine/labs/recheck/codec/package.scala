@@ -79,11 +79,13 @@ given encodeDialect: Encoder[Dialect] with
 given decodeDialect: Decoder[Dialect] with
   def apply(c: HCursor): Decoder.Result[Dialect] =
     def fail(message: String): Decoder.Result[Dialect] = Left(DecodingFailure(message, c.history))
+
     def setting[A](dialect: Dialect, key: String, default: A)(of: String => Option[A]): Decoder.Result[A] =
       c.get[Option[String]](key)
         .flatMap:
           case None       => Right(default)
           case Some(name) => of(name).toRight(DecodingFailure(s"Unknown $key of ${dialect.name}: $name", c.history))
+
     c.value.asString match
       case Some(name) => Dialect.of(name).fold(fail(s"Unknown dialect: $name"))(Right(_))
       case None       =>

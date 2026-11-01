@@ -262,6 +262,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     // Each line, text and word boundary assertion has its kind.
     def kinds(source: String, flags: String, dialect: Dialect): Set[AssertKind] =
       build(source, flags, dialect).get.tau.values.collect { case Assert(k, _) => k }.toSet
+
     import IRLineBeginAtEnd.*
     assertEquals(kinds("^a$", "m", Dialect.JavaScript), Set[AssertKind](AssertKind.LineBegin, AssertKind.LineEnd))
     assertEquals(

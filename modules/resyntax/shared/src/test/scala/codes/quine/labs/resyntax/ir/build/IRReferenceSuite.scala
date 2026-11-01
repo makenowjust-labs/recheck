@@ -29,6 +29,7 @@ class IRReferenceSuite extends IRSuiteBase:
         case NonAtomicLookBehind(node, _) => find(node)
         case Conditional(_, yes, no)      => find(yes) ++ find(no)
         case _                            => Seq.empty
+
       assertEquals(find(pattern.node).lastOption, Some(indices))
 
   // Indexed references
