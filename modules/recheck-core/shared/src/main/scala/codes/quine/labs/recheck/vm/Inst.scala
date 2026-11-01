@@ -2,7 +2,7 @@ package codes.quine.labs.recheck.vm
 
 import scala.compiletime.uninitialized
 
-import codes.quine.labs.recheck.util.EcmaScriptChars
+import codes.quine.labs.recheck.util.EcmaScriptNotation
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
@@ -324,15 +324,15 @@ object Inst:
 
     /** An usual character matching. */
     final case class Char(c: Int) extends ReadKind:
-      override def toString: String = s"char '${EcmaScriptChars.showChar(c)}'"
+      override def toString: String = s"char '${EcmaScriptNotation.showChar(c)}'"
 
     /** A character class matching. */
     final case class Class(s: CharSet) extends ReadKind:
-      override def toString: String = s"class ${EcmaScriptChars.showClass(s)}"
+      override def toString: String = s"class ${EcmaScriptNotation.showClass(s)}"
 
     /** An inverted character class matching. */
     final case class ClassNot(s: CharSet) extends ReadKind:
-      override def toString: String = s"class_not ${EcmaScriptChars.showClass(s)}"
+      override def toString: String = s"class_not ${EcmaScriptNotation.showClass(s)}"
 
     /** A capture reference matching.
       *

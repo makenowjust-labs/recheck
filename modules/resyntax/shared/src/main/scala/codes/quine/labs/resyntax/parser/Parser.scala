@@ -65,13 +65,13 @@ object Parser:
     * [[SourceEncoding]]) is read by its bytes, and the locations of a byte point to its character.
     */
   def parse(source: String, flagSet: FlagSet, dialect: Dialect): Node =
-    val encoding = FeatureSet.from(QuickAnalysis.from(source), dialect, flagSet).sourceEncoding
+    val encoding = FeatureSet.from(SourcePrescan.from(source), dialect, flagSet).sourceEncoding
     checkEncoding(source, encoding)
     val bytes = if encoding == SourceEncoding.Utf8 then Rewritten.utf8(source) else None
     val text = bytes.fold(source)(_.text)
     val rewritten = dialect match
       case Dialect.Perl(_, PerlSource.Literal) =>
-        PerlLiteralLexer.rewrite(text, flagSet.verbose, bytes = encoding == SourceEncoding.Utf8)
+        PerlLiteralRewriter.rewrite(text, flagSet.verbose, bytes = encoding == SourceEncoding.Utf8)
       case _ => None
     val rewrites = rewritten.toSeq ++ bytes.toSeq
     try rewrites.foldLeft(parseText(rewritten.fold(text)(_.text), flagSet, dialect))((n, r) => r.relocate(n))
@@ -87,14 +87,14 @@ object Parser:
       if pos >= 0 then throw new ParsingException("Non-Latin-1 character in bytes pattern", Some(pos))
 
   private def parseText(source: String, flagSet: FlagSet, dialect: Dialect): Node =
-    val analysis = QuickAnalysis.from(source)
-    val featureSet = FeatureSet.from(analysis, dialect, flagSet)
-    val parser = new Parser(source, analysis, featureSet)
+    val prescan = SourcePrescan.from(source)
+    val featureSet = FeatureSet.from(prescan, dialect, flagSet)
+    val parser = new Parser(source, prescan, featureSet)
     parser.parse()
 
 private[parser] final class Parser(
     private val source: String,
-    private val analysis: QuickAnalysis,
+    private val prescan: SourcePrescan,
     private val featureSet: FeatureSet
 ):
   private var offset: Int = 0
@@ -2135,13 +2135,13 @@ private[parser] final class Parser(
     then return parseBackslashOctal()
 
     val groupCount =
-      if featureSet.readsBackReferenceDigitsByPreviousGroups then previousCaptureCount else analysis.captureSize
+      if featureSet.readsBackReferenceDigitsByPreviousGroups then previousCaptureCount else prescan.captureSize
     val n =
       if featureSet.readsThreeOctalDigitsAsOctal then parseBoundedDigits(_ < 100)
       else if featureSet.readsBackReferenceDigitsWhileGroupExists then parseBoundedDigits(_ <= groupCount)
       else parseSaturatedIntOption(Long.MaxValue, "Invalid backslash escape", save).get
 
-    if featureSet.checksValidBackReference && !(0 < n && n <= analysis.captureSize) then
+    if featureSet.checksValidBackReference && !(0 < n && n <= prescan.captureSize) then
       reset(save)
       if isOctalDigit then return parseBackslashOctal()
 
@@ -2157,7 +2157,7 @@ private[parser] final class Parser(
       reset(save)
       return parseBackslashUnknown()
 
-    if featureSet.rejectsInvalidBackReference && n > analysis.captureSize then fail("Invalid back-reference", save)
+    if featureSet.rejectsInvalidBackReference && n > prescan.captureSize then fail("Invalid back-reference", save)
 
     markNumberedReference(save)
     BackslashKind.EscapeBackReference(BackReferenceStyle.BareBackReference, Reference.IndexedReference(n))

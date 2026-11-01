@@ -9,14 +9,15 @@ import codes.quine.labs.resyntax.charset.FullCaseMapping
 import codes.quine.labs.resyntax.charset.Properties
 import codes.quine.labs.resyntax.charset.UString
 
-/** PerlLiteralLexer rewrites the text of a Perl regex literal as Perl's lexer does before the regex compiler reads it.
+/** PerlLiteralRewriter rewrites the text of a Perl regex literal as Perl's lexer does before the regex compiler reads
+  * it.
   *
   * The lexer applies the case modification and quoting commands (`\U`, `\L`, `\u`, `\l`, `\F`, `\Q` and `\E`) to the
   * text: each command wraps the text up to its `\E` (or the end) in a call of `uc`, `lc`, `ucfirst`, `lcfirst`, `fc` or
   * `quotemeta`, regardless of the regex syntax (e.g. `[A-\LZ]` is `[A-z]`, and `\U\d` is `\D`). It follows
   * `S_scan_const` and `yyl_interpcasemod` of perl 5.44's `toke.c`.
   */
-private[parser] object PerlLiteralLexer:
+private[parser] object PerlLiteralRewriter:
 
   /** Rewrites the regex literal, or returns `None` if it has no command.
     *
@@ -26,7 +27,7 @@ private[parser] object PerlLiteralLexer:
     *   whether the literal is a byte string, whose non-ASCII bytes the case commands do not change
     */
   def rewrite(source: String, extended: Boolean, bytes: Boolean = false): Option[Rewritten] =
-    if !source.contains('\\') then None else new PerlLiteralLexer(source, extended, bytes).run()
+    if !source.contains('\\') then None else new PerlLiteralRewriter(source, extended, bytes).run()
 
   /** The non-ASCII characters that `quotemeta` quotes in a UTF-8 string (perlfunc `quotemeta`). */
   private lazy val QuotedNonAscii: CharSet =
@@ -40,8 +41,8 @@ private[parser] object PerlLiteralLexer:
 
   private def isLUF(c: Char): Boolean = c == 'L' || c == 'U' || c == 'F'
 
-private final class PerlLiteralLexer(source: String, extended: Boolean, bytes: Boolean):
-  import PerlLiteralLexer.*
+private final class PerlLiteralRewriter(source: String, extended: Boolean, bytes: Boolean):
+  import PerlLiteralRewriter.*
 
   /** The source, where the lexer swaps `\L\u` and `\U\l` in place. */
   private val src: Array[Char] = source.toCharArray

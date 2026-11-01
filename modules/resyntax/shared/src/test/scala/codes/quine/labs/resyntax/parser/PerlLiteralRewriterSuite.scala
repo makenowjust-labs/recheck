@@ -3,18 +3,18 @@ package codes.quine.labs.resyntax.parser
 import codes.quine.labs.resyntax.ast.SourceLocation
 
 /** The expected texts are what perl 5.44 shows for `qr/.../` written in the source. */
-class PerlLiteralLexerSuite extends munit.FunSuite:
+class PerlLiteralRewriterSuite extends munit.FunSuite:
   def rewrite(s: String, extended: Boolean = false)(expected: String)(implicit loc: munit.Location): Unit =
-    test(s"PerlLiteralLexer.rewrite: /$s/${if extended then "x" else ""}"):
-      assertEquals(PerlLiteralLexer.rewrite(s, extended).map(_.text), Some(expected))
+    test(s"PerlLiteralRewriter.rewrite: /$s/${if extended then "x" else ""}"):
+      assertEquals(PerlLiteralRewriter.rewrite(s, extended).map(_.text), Some(expected))
 
   def error(s: String)(message: String)(implicit loc: munit.Location): Unit =
-    test(s"PerlLiteralLexer.rewrite: /$s/ with error \"$message\""):
-      interceptMessage[ParsingException](message)(PerlLiteralLexer.rewrite(s, extended = false))
+    test(s"PerlLiteralRewriter.rewrite: /$s/ with error \"$message\""):
+      interceptMessage[ParsingException](message)(PerlLiteralRewriter.rewrite(s, extended = false))
 
-  test("PerlLiteralLexer.rewrite: no command"):
-    assertEquals(PerlLiteralLexer.rewrite("a\\d[\\\\U]", extended = false), None)
-    assertEquals(PerlLiteralLexer.rewrite("a(?#\\U)", extended = false), None)
+  test("PerlLiteralRewriter.rewrite: no command"):
+    assertEquals(PerlLiteralRewriter.rewrite("a\\d[\\\\U]", extended = false), None)
+    assertEquals(PerlLiteralRewriter.rewrite("a(?#\\U)", extended = false), None)
 
   // A command changes the text up to `\E` or the end, across classes and escapes.
   rewrite("[A\\L-z]")("[A-z]")
@@ -119,8 +119,8 @@ class PerlLiteralLexerSuite extends munit.FunSuite:
   rewrite("\\U[]#\\Ea]b", extended = true)("[]#\\EA]B")
   rewrite("\\U[[:alpha:]#\\Ea]b", extended = true)("[[:ALPHA:]#\\EA]B")
 
-  test("PerlLiteralLexer.Rewritten: positions and locations"):
-    val r = PerlLiteralLexer.rewrite("\\Ua[\\Lb]", extended = false).get
+  test("PerlLiteralRewriter.Rewritten: positions and locations"):
+    val r = PerlLiteralRewriter.rewrite("\\Ua[\\Lb]", extended = false).get
     assertEquals(r.text, "A[b]")
     assertEquals((0 to 4).map(r.position), Seq(2, 3, 6, 7, 8))
     assertEquals(r.location(SourceLocation(0, 4)), SourceLocation(0, 8))
@@ -130,8 +130,8 @@ class PerlLiteralLexerSuite extends munit.FunSuite:
     assertEquals(r.location(SourceLocation(1, 1)), SourceLocation(3, 3))
     assertEquals(r.location(SourceLocation.Invalid), SourceLocation.Invalid)
 
-  test("PerlLiteralLexer.Rewritten: a character mapped to several"):
-    val r = PerlLiteralLexer.rewrite("a\\Uß\\Q.", extended = false).get
+  test("PerlLiteralRewriter.Rewritten: a character mapped to several"):
+    val r = PerlLiteralRewriter.rewrite("a\\Uß\\Q.", extended = false).get
     assertEquals(r.text, "aSS\\.")
     assertEquals((0 to 5).map(r.position), Seq(0, 3, 3, 6, 6, 7))
     assertEquals(r.location(SourceLocation(1, 2)), SourceLocation(3, 4))

@@ -414,7 +414,7 @@ final case class FeatureSet(
 
 object FeatureSet:
 
-  def from(analysis: QuickAnalysis, dialect: Dialect, flagSet: FlagSet): FeatureSet =
+  def from(prescan: SourcePrescan, dialect: Dialect, flagSet: FlagSet): FeatureSet =
     val isDotNet = dialect.isDotNet
     val isJava = dialect.isJava
     val isJavaScript = dialect.isJavaScript
@@ -433,7 +433,7 @@ object FeatureSet:
     val isPerlByte = dialect match
       case Dialect.Perl(utf8, _) => !utf8
       case _                     => false
-    val isUnicode = flagSet.unicode || flagSet.unicodeSets || (isPCRE && analysis.hasUtfStartOption)
+    val isUnicode = flagSet.unicode || flagSet.unicodeSets || (isPCRE && prescan.hasUtfStartOption)
 
     FeatureSet(
       allowsAlphabeticUnknownBackslash = (isJavaScript && !isUnicode) || isPerl || isRuby,
@@ -547,7 +547,7 @@ object FeatureSet:
       hasBackslashMetaControl = isRuby,
       hasBackslashHexDigit = isRuby,
       hasBackslashKBackReference =
-        isDotNet || isJava || (isJavaScript && analysis.containsNamedCapture) || isPCRE || isPerl || isRuby,
+        isDotNet || isJava || (isJavaScript && prescan.containsNamedCapture) || isPCRE || isPerl || isRuby,
       hasBackslashKBackReferenceQuote = isDotNet || isPCRE || isPerl || isRuby,
       hasBackslashKBackReferenceCurly = isPCRE || isPerl,
       hasBackslashNonNewline = isPCRE || isPerl,

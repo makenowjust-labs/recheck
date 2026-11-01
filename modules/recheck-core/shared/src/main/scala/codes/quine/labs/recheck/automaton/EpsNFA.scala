@@ -6,7 +6,7 @@ import scala.collection.mutable
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
-import codes.quine.labs.recheck.util.EcmaScriptChars
+import codes.quine.labs.recheck.util.EcmaScriptNotation
 import codes.quine.labs.recheck.util.GraphvizUtil.escape
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
@@ -39,7 +39,7 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
         case Some(Consume(chs, q1, _)) =>
           sb.append(s"  ${escape(q0)} [shape=circle];\n")
           sb.append(
-            s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(chs.map((c, k) => s"(${EcmaScriptChars.showClass(c)},$k)").mkString("{", ", ", "}"))}];\n"
+            s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(chs.map((c, k) => s"(${EcmaScriptNotation.showClass(c)},$k)").mkString("{", ", ", "}"))}];\n"
           )
         case Some(LoopEnter(loop, q1)) =>
           sb.append(s"  ${escape(q0)} [shape=circle];\n")

@@ -3,8 +3,8 @@ package codes.quine.labs.recheck.util
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.Properties
 
-/** EcmaScriptChars provides the character notation of ECMAScript. */
-object EcmaScriptChars:
+/** EcmaScriptNotation provides the character notation of ECMAScript. */
+object EcmaScriptNotation:
 
   def isPrintable(c: Int): Boolean = !Other.contains(c)
 

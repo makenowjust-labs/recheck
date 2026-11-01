@@ -25,7 +25,7 @@ object UStringUtil:
       .map:
         case 0x27                                       => "\\'"
         case c if c < 0x20 && !(0x09 <= c && c <= 0x0d) => f"\\x$c%02X"
-        case c                                          => EcmaScriptChars.showChar(c)
+        case c                                          => EcmaScriptNotation.showChar(c)
       .mkString("'", "", "'")
 
   /** Returns the number of the code units of the character, which is two only for a surrogate pair. */
