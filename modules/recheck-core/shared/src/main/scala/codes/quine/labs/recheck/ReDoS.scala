@@ -1,6 +1,5 @@
 package codes.quine.labs.recheck
 
-import scala.collection.AbstractIterator
 import scala.collection.mutable
 import scala.concurrent.duration.Duration
 import scala.util.Random
@@ -21,6 +20,9 @@ import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.fuzz.FuzzChecker
 import codes.quine.labs.recheck.fuzz.FuzzProgram
 import codes.quine.labs.recheck.recall.RecallValidator
+import codes.quine.labs.recheck.util.DiagnosticsIteratorUtil.recovering
+import codes.quine.labs.recheck.util.DiagnosticsIteratorUtil.tagging
+import codes.quine.labs.recheck.util.DiagnosticsIteratorUtil.takeUntilAccepted
 import codes.quine.labs.resyntax.ir.IRPattern
 
 /** ReDoS is a ReDoS checker frontend. */
@@ -251,55 +253,3 @@ object ReDoS:
             ex.checker = Some(if d.checker == Checker.Fuzz then Checker.Fuzz else Checker.Automaton)
             throw ex
       case None => d
-
-  /** Iterates the diagnostics until the accepted one, without computing the next one. */
-  private def takeUntilAccepted(ds: Iterator[Diagnostics]): Iterator[Diagnostics] = new AbstractIterator[Diagnostics]:
-    private var accepted = false
-
-    def hasNext: Boolean = !accepted && ds.hasNext
-
-    def next(): Diagnostics =
-      if !hasNext then throw new NoSuchElementException
-      val d = ds.next()
-      accepted = d match
-        case v: Diagnostics.Vulnerable => v.isAccepted
-        case _                         => true
-      d
-
-  /** Sets the checker to an exception thrown on building or iterating the diagnostics. */
-  private def tagging(checker: Checker.Used)(ds: => Iterator[Diagnostics]): Iterator[Diagnostics] =
-    recovering(ds):
-      case ex: ReDoSException if ex.checker.isEmpty =>
-        ex.checker = Some(checker)
-        throw ex
-
-  /** Iterates the diagnostics, and continues with the recovery when an exception is thrown on the iteration.
-    *
-    * It computes the next element on `hasNext` so that an exception is thrown there.
-    */
-  private def recovering(ds: => Iterator[Diagnostics])(
-      recover: PartialFunction[Throwable, Iterator[Diagnostics]]
-  ): Iterator[Diagnostics] = new AbstractIterator[Diagnostics]:
-    private var current: Iterator[Diagnostics] = null
-    private var recovered = false
-    private var buffer: Option[Diagnostics] = None
-
-    def hasNext: Boolean =
-      if buffer.isEmpty then buffer = fetch()
-      buffer.isDefined
-
-    def next(): Diagnostics =
-      if !hasNext then throw new NoSuchElementException
-      val d = buffer.get
-      buffer = None
-      d
-
-    private def fetch(): Option[Diagnostics] =
-      try
-        if current eq null then current = ds
-        Option.when(current.hasNext)(current.next())
-      catch
-        case ex if !recovered && recover.isDefinedAt(ex) =>
-          recovered = true
-          current = recover(ex)
-          Option.when(current.hasNext)(current.next())
