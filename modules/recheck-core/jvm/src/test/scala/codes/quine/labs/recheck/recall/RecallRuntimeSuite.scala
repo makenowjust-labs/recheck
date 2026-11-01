@@ -195,7 +195,7 @@ class RecallRuntimeSuite extends munit.FunSuite:
         case IRNodeData.Sequence(nodes) => last(nodes.last.data)
         case data                       => fail(s"Unexpected: $data")
       val modeled = (0x80 to 0xff).filter(last(ir.node.data).contains)
-      val program = RecallProgram.generate(source, "", dialect, ir.mode, attack("a", 1, "")).get
+      val program = RecallProgram.generate(source, "", dialect, ir.mode, attack("a", 1, "")).toOption.get
       val lines = program.script.linesIterator.toSeq
       val pragma = lines.filter(_ == "use utf8;")
       val regex = lines.find(_.startsWith("my $regex = ")).get
@@ -259,7 +259,7 @@ class RecallRuntimeSuite extends munit.FunSuite:
       val source = "^(?:a|é|😀)*$"
       val mode = ReDoS.parse(source, "", dialect).mode
       val astral = AttackPattern(Seq((UString.fromString("é"), UString.fromString("😀a"), 0)), UString(0), 3)
-      val out = runScript(RecallProgram.script(source, "", dialect, mode, astral).get)
+      val out = runScript(RecallProgram.script(source, "", dialect, mode, astral).toOption.get)
       val lines = out.linesIterator.map(_.takeWhile(_ != ' ')).toSeq
       assertEquals(lines.filter(_.startsWith("recheck:")), Seq("recheck:runtime", "recheck:start", "recheck:time"))
 

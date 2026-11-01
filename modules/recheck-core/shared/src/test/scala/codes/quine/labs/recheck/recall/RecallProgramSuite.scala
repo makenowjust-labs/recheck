@@ -31,7 +31,7 @@ class RecallProgramSuite extends munit.FunSuite:
   def modeOf(source: String, flags: String, dialect: Dialect): UnitMode = ReDoS.parse(source, flags, dialect).mode
 
   def generate(source: String, flags: String, dialect: Dialect, attack: AttackPattern = attack): RecallProgram =
-    RecallProgram.generate(source, flags, dialect, modeOf(source, flags, dialect), attack).get
+    RecallProgram.generate(source, flags, dialect, modeOf(source, flags, dialect), attack).toOption.get
 
   /** Returns the line of the script starting with the prefix. */
   def line(program: RecallProgram, prefix: String): String =
@@ -174,13 +174,17 @@ class RecallProgramSuite extends munit.FunSuite:
     assertEquals(line(generate("a", "gi", Dialect.Perl()), "my $regex"), "my $regex = qr/a/i;")
 
   test("RecallProgram.generate: Perl unsafe patterns"):
-    def generate(source: String): Option[RecallProgram] =
+    def generate(source: String): Either[String, RecallProgram] =
       RecallProgram.generate(source, "", Dialect.Perl(), modeOf(source, "", Dialect.Perl()), attack)
-    assert(generate("a$|b$").isDefined)
-    assert(generate("(a$)\\$x\\@x").isDefined)
-    assertEquals(generate("a$x"), None)
-    assertEquals(generate("a@x"), None)
-    assertEquals(generate("/!,;~%&:=\"|^-"), None)
+    val unsafe = "The pattern cannot be a Perl regex literal, which would interpolate a variable or run code"
+    assert(generate("a$|b$").isRight)
+    assert(generate("(a$)\\$x\\@x").isRight)
+    assertEquals(generate("a$x"), Left(unsafe))
+    assertEquals(generate("a@x"), Left(unsafe))
+    assertEquals(
+      generate("/!,;~%&:=\"|^-"),
+      Left("The pattern cannot be a Perl regex literal, since it contains every delimiter")
+    )
 
   test("RecallProgram.generate: Perl string patterns"):
     def generate(source: String, flags: String, utf8: Boolean = true): RecallProgram =
@@ -271,7 +275,7 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.script"):
     def script(source: String, dialect: Dialect): RecallProgram.Script =
-      RecallProgram.script(source, "", dialect, modeOf(source, "", dialect), attack).get
+      RecallProgram.script(source, "", dialect, modeOf(source, "", dialect), attack).toOption.get
     val js = script("foo", Dialect.JavaScript)
     assertEquals(js.name, "recall.cjs")
     assertEquals(js.command, "node recall.cjs")
@@ -296,7 +300,7 @@ class RecallProgramSuite extends munit.FunSuite:
     assertEquals(dotnet.command, "dotnet run recall.cs")
     assert(dotnet.content.startsWith("// Run: dotnet run recall.cs\nusing "))
     assert(clue(dotnet.content).contains("var lines = \"-\\n0066006f006f\\n1:0078\\n2:0079\\n1:007a\\n\".Split("))
-    assertEquals(RecallProgram.script("a$x", "", Dialect.Perl(), UnitMode.CodePoint, attack), None)
+    assert(RecallProgram.script("a$x", "", Dialect.Perl(), UnitMode.CodePoint, attack).isLeft)
 
   test("RecallProgram.javaString"):
     assertEquals(RecallProgram.javaString("a\nb"), "\"a\\nb\"")

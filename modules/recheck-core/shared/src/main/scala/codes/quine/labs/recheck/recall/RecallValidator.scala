@@ -48,10 +48,10 @@ object RecallValidator:
     if timeout <= Duration.Zero then None
     else
       RecallProgram.generate(source, flags, dialect, mode, attack) match
-        case None =>
+        case Left(_) =>
           ctx.log("recall: not supported")
           None
-        case Some(program) =>
+        case Right(program) =>
           val executor = program.executor
           val commandLine = executor.commandLine(env)
           ctx.log(s"recall: command: $commandLine\n${program.script}")

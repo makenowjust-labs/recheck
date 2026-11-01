@@ -14,12 +14,10 @@ import codes.quine.labs.recheck.recall.RecallProgram
 import codes.quine.labs.resyntax.ast.Dialect
 
 /** `recheck generate-recall-script` command implementation. */
-object RecallScriptCommand:
+object GenerateRecallScriptCommand:
 
   /** Generates the recall program of a vulnerable diagnostics in JSON as a standalone script, or returns the error. */
   def generate(json: String): Either[String, RecallProgram.Script] =
-    def invalid[A](result: Decoder.Result[A]): Either[String, A] =
-      result.left.map(f => s"Invalid diagnostics: ${f.getMessage}")
     for
       root <- parse(json).left.map(f => s"Invalid JSON: ${f.message}")
       c = root.hcursor
@@ -32,14 +30,8 @@ object RecallScriptCommand:
         .map(ex => s"Invalid pattern: ${ex.getMessage}")
       style = AttackPattern.Style.of(dialect, ir.mode)
       attack <- invalid(c.get("attack")(using decodeAttackPattern(ir.mode, style)))
-      script <- RecallProgram
-        .script(source, flags, dialect, ir.mode, attack)
-        .toRight(unsupported(dialect))
+      script <- RecallProgram.script(source, flags, dialect, ir.mode, attack)
     yield script
 
-  private def unsupported(dialect: Dialect): String = dialect match
-    case _: Dialect.Perl =>
-      "The pattern cannot be a Perl regex literal, which would interpolate a variable, run code, " +
-        "or be UTF-8 against `utf8`"
-    case Dialect.PCRE => "The pattern cannot be a PHP regex, since it contains every delimiter"
-    case dialect      => s"The pattern cannot be put in a program of ${dialect.name}"
+  private def invalid[A](result: Decoder.Result[A]): Either[String, A] =
+    result.left.map(f => s"Invalid diagnostics: ${f.getMessage}")

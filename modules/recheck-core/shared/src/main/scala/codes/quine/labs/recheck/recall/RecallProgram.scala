@@ -40,8 +40,8 @@ object RecallProgram:
 
   val EngineErrorLine: String = "recheck:engine-error"
 
-  /** Generates the program of the pattern in the dialect, which matches strings of the mode, or returns `None` if the
-    * pattern cannot be put in the program.
+  /** Generates the program of the pattern in the dialect, which matches strings of the mode, or returns why the pattern
+    * cannot be put in the program.
     */
   def generate(
       source: String,
@@ -49,13 +49,13 @@ object RecallProgram:
       dialect: Dialect,
       mode: UnitMode,
       attack: AttackPattern
-  ): Option[RecallProgram] =
+  ): Either[String, RecallProgram] =
     dialect match
-      case Dialect.JavaScript        => Some(javascript(source, flags, attack))
-      case _: Dialect.Python         => Some(python(source, flags, mode, attack))
-      case _: Dialect.Ruby           => Some(ruby(source, flags, mode, attack))
-      case Dialect.Java              => Some(java(source, flags, attack))
-      case Dialect.DotNet            => Some(dotnet(source, flags, attack))
+      case Dialect.JavaScript        => Right(javascript(source, flags, attack))
+      case _: Dialect.Python         => Right(python(source, flags, mode, attack))
+      case _: Dialect.Ruby           => Right(ruby(source, flags, mode, attack))
+      case Dialect.Java              => Right(java(source, flags, attack))
+      case Dialect.DotNet            => Right(dotnet(source, flags, attack))
       case perlDialect: Dialect.Perl => perl(source, flags, perlDialect, mode, attack)
       case Dialect.PCRE              => php(source, flags, mode, attack)
 
@@ -66,14 +66,14 @@ object RecallProgram:
     */
   final case class Script(name: String, command: String, content: String)
 
-  /** Generates the program of [[generate]] as a standalone file, or returns `None` as [[generate]] does. */
+  /** Generates the program of [[generate]] as a standalone file, or returns why as [[generate]] does. */
   def script(
       source: String,
       flags: String,
       dialect: Dialect,
       mode: UnitMode,
       attack: AttackPattern
-  ): Option[Script] =
+  ): Either[String, Script] =
     generate(source, flags, dialect, mode, attack).map: program =>
       val name = scriptName(dialect)
       val command = program.executor.scriptCommandLine(name)
@@ -339,7 +339,7 @@ object RecallProgram:
     if attack.suffix.nonEmpty then lines.addOne(s"1:${units(attack.suffix.iterator)}")
     lines.result().mkString("", "\n", "\n")
 
-  /** Returns the Perl program for `perl` in the C locale, or `None` if the pattern cannot be put in the program as the
+  /** Returns the Perl program for `perl` in the C locale, or why the pattern cannot be put in the program as the
     * dialect tells.
     *
     * A regex literal (the default of recheck's Perl dialect) is put in the program, and a string is interpolated into
@@ -351,7 +351,7 @@ object RecallProgram:
       dialect: Dialect.Perl,
       mode: UnitMode,
       attack: AttackPattern
-  ): Option[RecallProgram] =
+  ): Either[String, RecallProgram] =
     // `qr` takes only these modifiers, and the others do not change a match.
     val modifiers = flags.filter(c => "msixpodualn".contains(c))
     val bytes = mode == UnitMode.Byte
@@ -360,12 +360,18 @@ object RecallProgram:
     val regex =
       if dialect.source == PerlSource.Literal then
         for
-          _ <- Option.when(isPerlSafe(source))(())
-          delimiter <- PerlDelimiters.find(c => !source.contains(c))
+          _ <- Either.cond(
+            isPerlSafe(source),
+            (),
+            "The pattern cannot be a Perl regex literal, which would interpolate a variable or run code"
+          )
+          delimiter <- PerlDelimiters
+            .find(c => !source.contains(c))
+            .toRight("The pattern cannot be a Perl regex literal, since it contains every delimiter")
         yield s"qr$delimiter$source$delimiter$modifiers"
       else
         val pattern = AttackPattern.Perl.literal(sourceString(source, bytes))
-        Some(s"do { my $$pattern = $pattern; ${flag("pattern")}; qr/$$pattern/$modifiers }")
+        Right(s"do { my $$pattern = $pattern; ${flag("pattern")}; qr/$$pattern/$modifiers }")
     regex.map: regex =>
       val input = attack.toString(AttackPattern.Perl)
       val pragma = if bytes then "" else "use utf8;\n"
@@ -407,14 +413,21 @@ object RecallProgram:
       i += 1
     safe
 
-  /** Returns the PHP program for `php` with the default settings of `pcre.*`, using `preg_match`.
+  /** Returns the PHP program for `php` with the default settings of `pcre.*`, using `preg_match`, or why the pattern
+    * cannot be put in the program.
     *
     * PHP's backtrack limit makes a slow match fail, which is an engine limit. The recursion limit (PCRE2's depth limit)
     * and the JIT stack limit are on the depth of backtracking, which are engine errors.
     */
-  private[recall] def php(source: String, flags: String, mode: UnitMode, attack: AttackPattern): Option[RecallProgram] =
+  private[recall] def php(
+      source: String,
+      flags: String,
+      mode: UnitMode,
+      attack: AttackPattern
+  ): Either[String, RecallProgram] =
     PHPDelimiters
       .find(c => !source.contains(c))
+      .toRight("The pattern cannot be a PHP regex, since it contains every delimiter")
       .map: delimiter =>
         val bytes = mode == UnitMode.Byte
         val regex = AttackPattern.PHP().literal(UStringUtil.fromString(s"$delimiter$source$delimiter$flags"))
