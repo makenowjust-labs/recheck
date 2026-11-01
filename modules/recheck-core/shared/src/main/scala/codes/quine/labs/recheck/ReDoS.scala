@@ -60,10 +60,8 @@ object ReDoS:
 
   /** Iterates the diagnostics of [[checkAll]].
     *
-    * @param exec
-    *   the executor for recall validation, or `None` if commands cannot run
-    * @param env
-    *   the environment variables giving the runtime command lines of recall validation
+    * Recall validation runs on `exec`, or does not run if it is `None`. The environment variables `env` may replace the
+    * commands of the runtimes.
     */
   private[recheck] def iterator(
       source: String,

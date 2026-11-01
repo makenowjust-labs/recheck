@@ -118,7 +118,7 @@ class ReDoSSuite extends munit.FunSuite:
         maxIteration = 2,
         maxRecallFailures = maxRecallFailures
       )
-      val exec: RecallValidator.Exec = (_, _, _) =>
+      val exec: RecallValidator.Exec = (_, _, _, _) =>
         runs += 1
         output
       ReDoS.iterator("^(?:a|a)*$", "", params, None, Some(exec)).toList

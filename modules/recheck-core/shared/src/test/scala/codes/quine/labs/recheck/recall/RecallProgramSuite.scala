@@ -2,7 +2,13 @@ package codes.quine.labs.recheck.recall
 
 import codes.quine.labs.recheck.SourcePattern
 import codes.quine.labs.recheck.diagnostics.AttackPattern
-import codes.quine.labs.recheck.exec.Command
+import codes.quine.labs.recheck.exec.DotNetExecutor
+import codes.quine.labs.recheck.exec.JavaExecutor
+import codes.quine.labs.recheck.exec.NodeExecutor
+import codes.quine.labs.recheck.exec.PerlExecutor
+import codes.quine.labs.recheck.exec.PhpExecutor
+import codes.quine.labs.recheck.exec.PythonExecutor
+import codes.quine.labs.recheck.exec.RubyExecutor
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
@@ -26,7 +32,7 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.generate: JavaScript"):
     val program = generate("foo", "i", Dialect.JavaScript)
-    assertEquals(program.command, Command("node", Seq("-")))
+    assertEquals(program.executor, NodeExecutor)
     assertEquals(
       program.script,
       """|const { writeSync } = require('node:fs');
@@ -48,7 +54,7 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.generate: Python"):
     val program = generate("f'o\\.", "im", Dialect.Python())
-    assertEquals(program.command, Command("python3", Seq("-I", "-")))
+    assertEquals(program.executor, PythonExecutor)
     assertEquals(
       program.script,
       """|import locale, platform, re, sys, time
@@ -75,11 +81,10 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.generate: Ruby"):
     val program = generate("a#{b}\"", "ix", Dialect.Ruby())
-    assertEquals(program.command, Command("ruby", Seq("-")))
+    assertEquals(program.executor, RubyExecutor)
     assertEquals(
       program.script,
-      """|# encoding: UTF-8
-         |$stdout.sync = true
+      """|$stdout.sync = true
          |Regexp.timeout = nil if Regexp.respond_to?(:timeout=)
          |puts "recheck:runtime ruby #{RUBY_VERSION}"
          |regex = Regexp.new("a\#{b}\"", Regexp::IGNORECASE | Regexp::EXTENDED)
@@ -110,7 +115,7 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.generate: Java"):
     val program = generate("f\"oo\\d\r", "iU", Dialect.Java)
-    assertEquals(program.command, Command("java", Seq("--source", "17"), source = Some(RecallProgram.JavaSource)))
+    assertEquals(program.executor, JavaExecutor(RecallProgram.JavaSource))
     assertEquals(program.script, "iU\n00660022006f006f005c0064000d\n1:0078\n2:0079\n1:007a\n")
     assert(RecallProgram.JavaSource.content.contains("catch (StackOverflowError | OutOfMemoryError e)"))
     assertEquals(generate("", "cdimsuxU", Dialect.Java).script.linesIterator.next(), "cdimsuxU")
@@ -118,15 +123,7 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.generate: .NET"):
     val program = generate("foo", "in", Dialect.DotNet)
-    assertEquals(
-      program.command,
-      Command(
-        "dotnet",
-        Seq("run"),
-        Map("DOTNET_NOLOGO" -> "1", "DOTNET_CLI_TELEMETRY_OPTOUT" -> "1"),
-        Some(RecallProgram.DotNetSource)
-      )
-    )
+    assertEquals(program.executor, DotNetExecutor(RecallProgram.DotNetSource))
     assertEquals(program.script, "in\n0066006f006f\n1:0078\n2:0079\n1:007a\n")
     assert(
       RecallProgram.DotNetSource.content.contains("\nCultureInfo.CurrentCulture = CultureInfo.InvariantCulture;\n")
@@ -144,7 +141,7 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.generate: Perl"):
     val program = generate("f/o$", "ix", Dialect.Perl())
-    assertEquals(program.command, Command("perl", Seq("-")))
+    assertEquals(program.executor, PerlExecutor)
     assertEquals(
       program.script,
       """|use utf8;
@@ -222,7 +219,7 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.generate: PCRE"):
     val program = generate("/#é$", "iu", Dialect.PCRE)
-    assertEquals(program.command, Command("php"))
+    assertEquals(program.executor, PhpExecutor)
     assertEquals(
       program.script,
       """|<?php
@@ -300,7 +297,7 @@ class RecallProgramSuite extends munit.FunSuite:
     val long = "a" * 10001
     assertEquals(RecallProgram.javaString(long), s"String.join(\"\", \"${"a" * 10000}\", \"a\")")
 
-  test("RecallProgram.runtimeVariable"):
+  test("RecallProgram.generate: the variables of the runtimes"):
     val dialects = Seq(
       Dialect.JavaScript,
       Dialect.Python(Dialect.Python.Type.Bytes),
@@ -311,7 +308,7 @@ class RecallProgramSuite extends munit.FunSuite:
       Dialect.PCRE
     )
     assertEquals(
-      dialects.map(RecallProgram.runtimeVariable),
+      dialects.map(d => generate("a", "", d).executor.variable),
       Seq("NODE", "PYTHON", "RUBY", "JAVA", "DOTNET", "PERL", "PHP").map("RECHECK_" + _)
     )
 

@@ -13,10 +13,9 @@ import scala.jdk.CollectionConverters.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnexpectedException
 
-/** Executor runs a command with a script on its standard input. */
-object Executor:
+/** Platform runs the commands of the executors. */
+private[exec] object Platform:
 
-  /** Whether this platform can run commands. */
   val isAvailable: Boolean = true
 
   /** The shell to run a command line, which Windows has only with a POSIX environment (e.g. Git for Windows). */
@@ -25,43 +24,52 @@ object Executor:
   /** The interval to check the interruption of the context while waiting. */
   private val PollMillis = 50L
 
-  /** Runs the command, writing the script to its standard input.
+  /** Runs the command with the arguments, writing the input to its standard input.
     *
-    * With a marker, the timeout counts from the time when the process prints the marker as a line, so that the startup
-    * of the runtime is not counted. Waiting for the marker is limited only by the context.
-    *
-    * Until a run of a source file exits normally or times out in this process, its runs do not run concurrently.
+    * The replacement is a command line of the shell running instead of the command. The path of the file follows the
+    * arguments, and until a run of the file exits normally or times out in this process, its runs do not run
+    * concurrently.
     */
-  def exec(command: Command, script: String, timeout: Option[FiniteDuration], marker: Option[String] = None)(using
-      ctx: Context
-  ): ExecResult =
-    val file = command.source.map(SourceFiles.path)
-    val lock = file.flatMap(SourceFiles.firstRunLock)
-    lock match
-      case Some(l) =>
-        while !l.tryLock(PollMillis, TimeUnit.MILLISECONDS) do ctx.interrupt(())
-        try
-          val result = run(command, file, script, timeout, marker)
-          result match
-            case ExecResult.Exit(0, _, _) | ExecResult.Timeout(_) => file.foreach(SourceFiles.markWarm)
-            case _                                                => ()
-          result
-        finally l.unlock()
-      case None => run(command, file, script, timeout, marker)
-
-  private def run(
-      command: Command,
-      file: Option[java.nio.file.Path],
-      script: String,
+  def run(
+      command: String,
+      args: Seq[String],
+      replacement: Option[String],
+      env: Map[String, String],
+      file: Option[SourceFile],
+      input: String,
       timeout: Option[FiniteDuration],
       marker: Option[String]
   )(using ctx: Context): ExecResult =
-    val builder = new ProcessBuilder((command.program +: (command.args ++ file.map(_.toString))).asJava)
-    builder.environment().putAll(command.env.asJava)
+    val argv = replacement.fold(command +: args)(line => Seq(shell, "-c", s"$line \"$$@\"", "sh") ++ args)
+    val shown = (argv ++ file.map(_.name)).mkString(" ")
+    val path = file.map(SourceFiles.path)
+    def start(): ExecResult = exec(argv ++ path.map(_.toString), shown, env, input, timeout, marker)
+    path.flatMap(SourceFiles.firstRunLock) match
+      case Some(l) =>
+        while !l.tryLock(PollMillis, TimeUnit.MILLISECONDS) do ctx.interrupt(())
+        try
+          val result = start()
+          result match
+            case ExecResult.Exit(0, _, _) | ExecResult.Timeout(_) => path.foreach(SourceFiles.markWarm)
+            case _                                                => ()
+          result
+        finally l.unlock()
+      case None => start()
+
+  private def exec(
+      argv: Seq[String],
+      shown: String,
+      env: Map[String, String],
+      input: String,
+      timeout: Option[FiniteDuration],
+      marker: Option[String]
+  )(using ctx: Context): ExecResult =
+    val builder = new ProcessBuilder(argv.asJava)
+    builder.environment().putAll(env.asJava)
     val process =
       try builder.start()
-      catch case ex: IOException => throw new UnexpectedException(s"cannot run `${command}`: ${ex.getMessage}")
-    ctx.log(s"exec: process (pid: ${process.pid()}, command: ${command})")
+      catch case ex: IOException => throw new UnexpectedException(s"cannot run `${shown}`: ${ex.getMessage}")
+    ctx.log(s"exec: process (pid: ${process.pid()}, command: ${shown})")
 
     val started = new CountDownLatch(if marker.isDefined then 1 else 0)
     val out = new StringBuffer
@@ -78,9 +86,9 @@ object Executor:
 
     try
       try
-        process.getOutputStream.write(script.getBytes(StandardCharsets.UTF_8))
+        process.getOutputStream.write(input.getBytes(StandardCharsets.UTF_8))
         process.getOutputStream.close()
-      catch case _: IOException => () // The process exited before reading all the script.
+      catch case _: IOException => () // The process exited before reading all the input.
 
       while !started.await(PollMillis, TimeUnit.MILLISECONDS) && process.isAlive do ctx.interrupt(())
 
