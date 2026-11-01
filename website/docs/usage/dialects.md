@@ -86,6 +86,7 @@ The following are not supported in any dialect having them, and each dialect's p
 - Callouts (e.g. `(?C1)`) and embedded code (e.g. Perl's `(?{ ... })` and `(??{ ... })`).
 - `\N{name}` and `\C` in a mode other than bytes.
 - Word boundaries of a kind, such as `\b{wb}`.
+- Nesting deeper than 150 levels, where each group, look-around condition of a conditional, class, operand of a class set operation, and repeat of a repeat is one level (e.g. `(?:` repeated 151 times gives `Too deeply nested (limit 150) at 450`).
 
 ## Approximations
 

@@ -1,6 +1,8 @@
 package codes.quine.labs.recheck.regexp
 
 import codes.quine.labs.recheck.common.InvalidRegExpException
+import codes.quine.labs.recheck.common.ReDoSException
+import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.resyntax.ast.BackslashKind
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
@@ -11,6 +13,7 @@ import codes.quine.labs.resyntax.ir.IRBuildingException
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
 import codes.quine.labs.resyntax.ir.IRPattern
+import codes.quine.labs.resyntax.parser.NestingLimitException
 import codes.quine.labs.resyntax.parser.Parser
 import codes.quine.labs.resyntax.parser.ParsingException
 
@@ -43,18 +46,22 @@ final case class ParsedPattern(source: String, flags: String, dialect: Dialect, 
 
 object ParsedPattern:
 
-  /** Parses the source and the flags in the dialect, and builds the IR. */
+  /** Parses the source and the flags in the dialect, and builds the IR.
+    *
+    * It fails with [[UnsupportedException]] on a pattern nested deeper than [[Parser.MaxNestingDepth]].
+    */
   def parse(
       source: String,
       flags: String,
       dialect: Dialect = Dialect.JavaScript
-  ): Either[InvalidRegExpException, ParsedPattern] =
+  ): Either[ReDoSException, ParsedPattern] =
     try
       val flagSet = FlagSet.parse(flags, dialect)
       val node = Parser.parse(source, flagSet, dialect)
       val ir = IRBuilder.build(node, flagSet, dialect)
       Right(ParsedPattern(source, flags, dialect, flagSet, ir))
     catch
-      case ex: FlagSetException    => Left(new InvalidRegExpException(ex.getMessage))
-      case ex: ParsingException    => Left(new InvalidRegExpException(ex.getMessage))
-      case ex: IRBuildingException => Left(new InvalidRegExpException(ex.getMessage))
+      case ex: FlagSetException      => Left(new InvalidRegExpException(ex.getMessage))
+      case ex: ParsingException      => Left(new InvalidRegExpException(ex.getMessage))
+      case ex: IRBuildingException   => Left(new InvalidRegExpException(ex.getMessage))
+      case ex: NestingLimitException => Left(new UnsupportedException(ex.getMessage))
