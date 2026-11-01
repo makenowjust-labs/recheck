@@ -1,7 +1,5 @@
 package codes.quine.labs.recheck.vm
 
-import codes.quine.labs.recheck.AssertionCases
-import codes.quine.labs.recheck.CaseFoldingCases
 import codes.quine.labs.recheck.SourcePattern
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
