@@ -220,7 +220,7 @@ object ReDoS:
     import params._
 
     val random = new Random(randomSeed)
-    val fuzz = FuzzProgram.from(ir, dialect).get
+    val fuzz = FuzzProgram.from(ir).get
     val results = FuzzChecker.check(
       ir,
       fuzz,

@@ -16,7 +16,7 @@ class FuzzProgramSuite extends munit.FunSuite:
     def from(source: String, flags: String): FuzzProgram =
       (for
         ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
-        fuzz <- FuzzProgram.from(ir, Dialect.JavaScript)
+        fuzz <- FuzzProgram.from(ir)
       yield fuzz).get
 
     val fuzz1 = from("foo", "")

@@ -27,7 +27,7 @@ class InterpreterConstructSuite extends munit.FunSuite:
 
   def run(source: String, dialect: Dialect, input: String, usesAcceleration: Boolean): Spans =
     val ir = ReDoS.parse(source, "", dialect)
-    val program = ProgramBuilder.build(ir, dialect).get
+    val program = ProgramBuilder.build(ir).get
     val result =
       Interpreter.run(program, UStringUtil.fromString(input), 0, Options(usesAcceleration = usesAcceleration))
     result.captures.map: captures =>

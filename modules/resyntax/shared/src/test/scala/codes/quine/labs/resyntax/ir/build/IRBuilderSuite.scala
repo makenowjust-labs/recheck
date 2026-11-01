@@ -349,16 +349,26 @@ class IRBuilderSuite extends IRSuiteBase:
   check("\\K", "", PCRE, Perl(), Ruby())(ResetMatchStart)
 
   // Back-reference
-  // Perl's `/d` at a back-reference is `/u` under Unicode rules.
-  def referenceFlagsOf(d: Dialect, flags: String = ""): IRCharFlags =
-    if d.isPerl then flagsOf(d, flags).copy(charset = IRCharset.Unicode) else flagsOf(d, flags)
+  /** Returns a back-reference to the capture `1` at the flags, where Perl's `/d` is `/u` under Unicode rules. */
+  def referenceOf(d: Dialect, flags: String = "", unicode: Boolean = true): IRNodeData =
+    val charFlags = flagsOf(d, flags)
+    val referenceFlags = if d.isPerl && unicode then charFlags.copy(charset = IRCharset.Unicode) else charFlags
+    val mode = IRBuilder.unitMode("", FlagSet.parse(flags, d), d)
+    BackReference(
+      Seq(1),
+      IRCaseEquivalence.ofBackReference(d, mode, referenceFlags),
+      IRBackReferenceFolding.of(d, mode, referenceFlags)
+    )
 
-  checkWith("(a)\\1", "", All*)(d => Sequence(Capture(1, None, char('a')), BackReference(Seq(1), referenceFlagsOf(d))))
+  checkWith("(a)\\1", "", All*)(d => Sequence(Capture(1, None, char('a')), referenceOf(d)))
   checkWith("(a)(?i)\\1", "", DotNet, Java, PCRE, Perl(), Ruby()): d =>
-    Sequence(Capture(1, None, char('a')), Empty, BackReference(Seq(1), referenceFlagsOf(d, "i")))
+    Sequence(Capture(1, None, char('a')), Empty, referenceOf(d, "i"))
   checkWith("(a)\\1", "", Perl(utf8 = false))(d =>
-    Sequence(Capture(1, None, char('a')), BackReference(Seq(1), flagsOf(d)))
+    Sequence(Capture(1, None, char('a')), referenceOf(d, unicode = false))
   )
+  checkPattern("(a)(?i)\\1", "", Perl(), Ruby()): pattern =>
+    val Sequence(Seq(_, _, IRNode(BackReference(_, _, folding), _))) = pattern.node.data: @unchecked
+    assertEquals(folding, IRBackReferenceFolding.Full(0))
   check("(?<x>a)\\k<x+0>", "", Ruby())(
     Sequence(
       Capture(1, Some("x"), char('a')),
@@ -443,3 +453,18 @@ class IRBuilderSuite extends IRSuiteBase:
       val flagSet = FlagSet.parse(flags, dialect)
       assertEquals(IRBuilder.unitMode(source, flagSet, dialect), mode, (source, flags, dialect))
       assertEquals(build(source, flags, dialect)._1.mode, mode, (source, flags, dialect))
+
+  test("IRBuilder.build: the semantics of the dialect"):
+    def patternOf(dialect: Dialect): IRPattern = build("a", "", dialect)._1
+
+    assert(patternOf(JavaScript).captures.resetsEachIteration)
+    assert(patternOf(Perl()).captures.keptOnBacktracking)
+    assert(patternOf(Java).captures.heldAfterAtomicMatch)
+    assert(patternOf(DotNet).captures.restoredByNegativeCondition)
+    assertEquals(
+      patternOf(PCRE).emptyIteration,
+      IREmptyIterationSemantics(IREmptyIteration.ExitFromMin, IREmptyIteration.Ignore)
+    )
+    assertEquals(patternOf(Python()).emptyIteration.bounded, IREmptyIteration.ExitOptional)
+    assertEquals(patternOf(Perl()).backtrackControl, IRBacktrackControlSemantics(true, true))
+    assertEquals(patternOf(PCRE).backtrackControl, IRBacktrackControlSemantics(false, false))

@@ -20,7 +20,7 @@ class DynamicSeederSuite extends munit.FunSuite:
     def seed(source: String, flags: String): Set[String] =
       val result = for
         ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
-        fuzz <- FuzzProgram.from(ir, Dialect.JavaScript)
+        fuzz <- FuzzProgram.from(ir)
       yield DynamicSeeder.seed(fuzz, timeout = Duration.Inf)
       result.get.map(_.toString)
 

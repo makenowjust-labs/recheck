@@ -20,6 +20,12 @@ final case class IRPattern(
     captureNames: Map[String, Seq[Int]],
     /** How back-references behave in the dialect. */
     backReference: IRBackReferenceSemantics,
+    /** How backtracking treats the captures in the dialect. */
+    captures: IRCaptureSemantics,
+    /** How repetitions handle an iteration matching the empty string in the dialect. */
+    emptyIteration: IREmptyIterationSemantics,
+    /** Where the backtracking control verbs act in the dialect. */
+    backtrackControl: IRBacktrackControlSemantics,
     /** Whether a match starts only at the starting position (JavaScript `y`, PCRE `A`). */
     anchored: Boolean,
     /** The unit of the input, which the character sets of the nodes consist of. */
@@ -265,6 +271,60 @@ object IRNotEmpty:
   * it fails (the others). `choice` is how a reference with more than one index chooses the capture.
   */
 final case class IRBackReferenceSemantics(unsetMatchesEmpty: Boolean, choice: IRBackReferenceChoice)
+
+/** IRCaptureSemantics is how backtracking treats the captures, which differs among dialects. */
+final case class IRCaptureSemantics(
+    /** Whether each iteration of a repetition resets the captures in it (JavaScript). */
+    resetsEachIteration: Boolean,
+    /** Whether backtracking keeps the captures of the failed matching instead of restoring them, which back-references
+      * and capture tests see (Perl).
+      */
+    keptOnBacktracking: Boolean,
+    /** Whether the captures in an atomic group or a look-around keep their values over backtracking once it matches,
+      * which back-references see (Java).
+      */
+    heldAfterAtomicMatch: Boolean,
+    /** Whether a negative look-around condition restores the captures in it, as a negative look-around does (.NET). */
+    restoredByNegativeCondition: Boolean
+)
+
+/** IREmptyIterationSemantics is how repetitions handle an iteration matching the empty string, which differs among
+  * dialects.
+  */
+final case class IREmptyIterationSemantics(
+    /** The handling in an unbounded repetition (e.g. `*`). */
+    unbounded: IREmptyIteration,
+    /** The handling in a bounded repetition, including an exact one (e.g. `?` and `{2}`). */
+    bounded: IREmptyIteration
+)
+
+/** IREmptyIteration is how a repetition handles an iteration matching the empty string. */
+enum IREmptyIteration:
+
+  /** Ignore handles it as the others (PCRE's bounded repetition, which repeats copies of the node). */
+  case Ignore
+
+  /** Reject fails an optional one (JavaScript). */
+  case Reject
+
+  /** ExitOptional ends the repetition with an optional one (Python and Ruby). */
+  case ExitOptional
+
+  /** ExitFromMin ends the repetition with the last mandatory one or an optional one (.NET, PCRE and Perl). */
+  case ExitFromMin
+
+  /** ExitAll ends the repetition with any one, even before the minimum (Java's `Loop`). */
+  case ExitAll
+
+/** IRBacktrackControlSemantics is where the backtracking control verbs act, which differs among dialects. */
+final case class IRBacktrackControlSemantics(
+    /** Whether `(*THEN)` in a look-around or a condition takes the alternation outside it, instead of ending at it
+      * (Perl).
+      */
+    thenPassesAssertions: Boolean,
+    /** Whether `(*ACCEPT)` in an atomic group ends only the group, which the engine runs as a sub-match (Perl). */
+    acceptEndsAtomic: Boolean
+)
 
 /** IRBackReferenceChoice is how a back-reference with more than one index chooses the capture. */
 sealed abstract class IRBackReferenceChoice extends Product with Serializable

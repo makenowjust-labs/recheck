@@ -18,7 +18,7 @@ class InterpreterDialectSuite extends munit.FunSuite:
 
   def run(source: String, flags: String, dialect: Dialect, input: UString, usesAcceleration: Boolean): Status =
     val ir = ReDoS.parse(source, flags, dialect)
-    val program = ProgramBuilder.build(ir, dialect).get
+    val program = ProgramBuilder.build(ir).get
     Interpreter.run(program, input, 0, Options(usesAcceleration = usesAcceleration)).status
 
   def accepts(
@@ -249,4 +249,4 @@ class InterpreterDialectSuite extends munit.FunSuite:
 
   test("ProgramBuilder.build: unsupported"):
     val ir = ReDoS.parse("a(?R)?", "", PCRE)
-    interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(ProgramBuilder.build(ir, PCRE).get)
+    interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(ProgramBuilder.build(ir).get)

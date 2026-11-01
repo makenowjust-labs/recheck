@@ -42,13 +42,21 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
   def equivalence(flags: IRCharFlags): IRCaseEquivalence =
     IRCaseEquivalence.of(dialect, mode, flags, perlNative(flags))
 
-  /** Returns the flags of a back-reference, where Perl's `/d` rules are `/u` with a reason to use Unicode rules, and
-    * otherwise the rules of a native string.
+  /** Resolves a back-reference to the captures of the indices at the flags, which decide how it compares the capture
+    * with the input.
+    *
+    * Perl's `/d` rules there are `/u` with a reason to use Unicode rules, and otherwise the rules of a native string.
     */
-  def referenceFlags(flags: IRCharFlags): IRCharFlags =
-    if dialect.isPerl && flags.charset == IRCharset.Default && perlUnicodeRules then
-      flags.copy(charset = IRCharset.Unicode)
-    else flags
+  def backReference(indices: Seq[Int], flags: IRCharFlags): IRNodeData =
+    val referenceFlags =
+      if dialect.isPerl && flags.charset == IRCharset.Default && perlUnicodeRules then
+        flags.copy(charset = IRCharset.Unicode)
+      else flags
+    IRNodeData.BackReference(
+      indices,
+      IRCaseEquivalence.ofBackReference(dialect, mode, referenceFlags),
+      IRBackReferenceFolding.of(dialect, mode, referenceFlags)
+    )
 
   /** Returns the word characters of `\b` and `\B` at the flags. */
   def wordSet(flags: IRCharFlags): CharSet = classes.boundaryWord(flags).restrict(mode)

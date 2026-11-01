@@ -6,7 +6,6 @@ import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.vm.Program
 import codes.quine.labs.recheck.vm.ProgramBuilder
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.ir.IRPattern
 import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
@@ -22,12 +21,12 @@ final case class FuzzProgram(program: Program, alphabet: PatternAlphabet, parts:
 
 object FuzzProgram:
 
-  /** Builds a program from the pattern, which runs as the engine of the dialect. */
-  def from(pattern: IRPattern, dialect: Dialect)(using ctx: Context): Try[FuzzProgram] =
+  /** Builds a program from the pattern, which runs as the engine of its dialect. */
+  def from(pattern: IRPattern)(using ctx: Context): Try[FuzzProgram] =
     Try:
       ctx.interrupt:
         for
-          program <- ProgramBuilder.build(pattern, dialect)
+          program <- ProgramBuilder.build(pattern)
           alphabet = PatternAlphabet.of(pattern)
         yield FuzzProgram(program, alphabet, pattern.parts)
     .flatten

@@ -92,7 +92,7 @@ object StaticSeeder:
           case Conditional(_, yes, no) =>
             copy(Disjunction(Seq(yes, no).map(loop(_, prevIsRepeat, nextIsRepeat, inside))))
           case ResetMatchStart | BacktrackControl(_) => copy(Empty)
-          case BackReference(indices, _)             =>
+          case BackReference(indices, _, _)          =>
             val captures = indices.filterNot(inside.contains).flatMap(i => backRefs.get(i).map((i, _)))
             if captures.isEmpty then copy(Empty)
             else

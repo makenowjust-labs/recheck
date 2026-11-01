@@ -12,14 +12,12 @@ import codes.quine.labs.recheck.vm.Inst.ReadKind
 import codes.quine.labs.recheck.vm.Inst.VerbKind
 import codes.quine.labs.recheck.vm.Program.Meta
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRAssertKind
-import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
 import codes.quine.labs.resyntax.ir.IRBacktrackControl
-import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRCondition
+import codes.quine.labs.resyntax.ir.IREmptyIteration
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch
 import codes.quine.labs.resyntax.ir.IRLookBehindStarts
 import codes.quine.labs.resyntax.ir.IRNode
@@ -32,32 +30,14 @@ import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 /** ProgramBuilder is a builder of a program from a RegExp pattern. */
 object ProgramBuilder:
 
-  /** Builds a corresponding program from the RegExp pattern, which runs as the engine of the dialect. */
-  def build(pattern: IRPattern, dialect: Dialect)(using ctx: Context): Try[Program] =
+  /** Builds a corresponding program from the RegExp pattern, which runs as the engine of its dialect. */
+  def build(pattern: IRPattern)(using ctx: Context): Try[Program] =
     for
       _ <- Try(())
       capturesSize = pattern.captureCount
-      builder = new ProgramBuilder(pattern, dialect, capturesSize)
+      builder = new ProgramBuilder(pattern, capturesSize)
       program <- Try(builder.build())
     yield program
-
-/** EmptyIteration is how a repetition handles an iteration matching the empty string, which differs among dialects. */
-private[vm] enum EmptyIteration:
-
-  /** Ignore handles it as the others (PCRE's bounded repetition, which repeats copies of the node). */
-  case Ignore
-
-  /** Reject fails an optional one (JavaScript). */
-  case Reject
-
-  /** ExitOptional ends the repetition with an optional one (Python). */
-  case ExitOptional
-
-  /** ExitFromMin ends the repetition with the last mandatory one or an optional one (Perl, .NET, PCRE). */
-  case ExitFromMin
-
-  /** ExitAll ends the repetition with any one, even before the minimum (Java's `Loop`). */
-  case ExitAll
 
 /** AcceptScope is what `(*ACCEPT)` ends successfully. */
 private[vm] enum AcceptScope:
@@ -68,36 +48,36 @@ private[vm] enum AcceptScope:
   /** A look-around assertion or a condition, which succeeds (or fails for a negative one). */
   case LookAround
 
-  /** Perl's atomic group, which Perl runs as a sub-match. */
+  /** An atomic group, which the engine runs as a sub-match. */
   case Atomic
 
 private[vm] class ProgramBuilder(
     private val pattern: IRPattern,
-    private val dialect: Dialect,
     private val capturesSize: Int
 )(using ctx: Context):
   import ctx._
 
   private val mode = pattern.mode
 
-  /** Whether captures in a repetition are reset on each iteration, which only JavaScript does. */
-  private val resetsCaptures = dialect.isJavaScript
+  /** Whether captures in a repetition are reset on each iteration. */
+  private val resetsCaptures = pattern.captures.resetsEachIteration
 
-  /** Whether captures follow Perl's backtracking, which back-references and capture tests only see. */
-  private val perlCaptures =
-    dialect.isPerl && pattern.node.exists:
+  /** Whether backtracking keeps the captures of the failed matching, which back-references and capture tests only see.
+    */
+  private val keepsCaptures =
+    pattern.captures.keptOnBacktracking && pattern.node.exists:
       case _: IRNodeData.BackReference                           => true
       case IRNodeData.Conditional(_: IRCondition.Captured, _, _) => true
       case _                                                     => false
 
-  /** Whether the captures in an atomic group or a look-around are held over backtracking once it matches, as in Java,
-    * which back-references only see.
+  /** Whether the captures in an atomic group or a look-around are held over backtracking once it matches, which
+    * back-references only see.
     */
   private val holdsCaptures =
-    dialect.isJava && pattern.node.exists(_.isInstanceOf[IRNodeData.BackReference])
+    pattern.captures.heldAfterAtomicMatch && pattern.node.exists(_.isInstanceOf[IRNodeData.BackReference])
 
-  /** Whether `(*THEN)` ends at a look-around assertion or a condition, as in PCRE but not in Perl. */
-  private val assertionIsThenScope = !dialect.isPerl
+  /** Whether `(*THEN)` ends at a look-around assertion or a condition. */
+  private val assertionIsThenScope = !pattern.backtrackControl.thenPassesAssertions
 
   /** Whether the pattern has the verbs skipping backtracking points, which need the barriers. */
   private val hasCut = pattern.node.exists:
@@ -358,9 +338,7 @@ private[vm] class ProgramBuilder(
               for c <- if back then s.iterator.toSeq.reverse else s.iterator.toSeq do emitRead(ReadKind.Char(c), loc)
         val chars = Option.when(set.chars.nonEmpty)(() => emitRead(charsKind(set.chars), loc))
         buildAlternatives(strings ++ chars)
-      case IRNodeData.BackReference(indices, flags) =>
-        val equivalence = IRCaseEquivalence.ofBackReference(dialect, mode, flags)
-        val folding = IRBackReferenceFolding.of(dialect, mode, flags)
+      case IRNodeData.BackReference(indices, equivalence, folding) =>
         emitRead(ReadKind.Ref(indices, pattern.backReference, equivalence, folding), node.loc.toOption)
       case IRNodeData.Unsupported(_) => throw new UnsupportedException(node.unsupportedMessage)
 
@@ -398,7 +376,7 @@ private[vm] class ProgramBuilder(
       enterBlock(next)
     val barrier = scope.map(Barrier.Then(_))
     withThenScope(scope.orElse(thenScope)):
-      if perlCaptures then buildPerlDisjunction(children, barrier, run)
+      if keepsCaptures then buildKeepingDisjunction(children, barrier, run)
       else buildAlternatives(children.indices.map(i => () => run(i)), barrier)
 
   def newThenScope(): Int =
@@ -438,8 +416,10 @@ private[vm] class ProgramBuilder(
   def assertionThenScope(child: IRNode): Option[Int] =
     Option.when(assertionIsThenScope && hasThen(child))(newThenScope())
 
-  /** A builder for a disjunction node of Perl, which unsets the captures of an alternative when it fails. */
-  def buildPerlDisjunction(children: IndexedSeq[IRNode], barrier: Option[Barrier], run: Int => Unit): Unit =
+  /** A builder for a disjunction node keeping the captures on backtracking, which unsets the captures of an alternative
+    * when it fails.
+    */
+  def buildKeepingDisjunction(children: IndexedSeq[IRNode], barrier: Option[Barrier], run: Int => Unit): Unit =
     val labels = children.map(_ => (allocateLabel("left"), allocateLabel("right")))
     val cont = allocateLabel("cont")
 
@@ -460,8 +440,8 @@ private[vm] class ProgramBuilder(
 
     enterBlock(cont)
 
-  /** Allocates a block for a fallback in Perl, which keeps the captures of the failed matching, and unsets `reset`,
-    * then continues to `next` or fails.
+  /** Allocates a block for a fallback keeping the captures on backtracking, which keeps the captures of the failed
+    * matching, and unsets `reset`, then continues to `next` or fails.
     */
   def allocateKeep(reset: Option[(Int, Int)], next: Option[Label]): Label =
     val label = allocateLabel("keep")
@@ -508,14 +488,14 @@ private[vm] class ProgramBuilder(
   def buildStar(
       isLazy: Boolean,
       child: IRNode,
-      empty: EmptyIteration
+      empty: IREmptyIteration
   ): Unit =
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
     val cont = allocateLabel("cont")
 
     enterLoopBlock(isLazy, loop, cont)
-    wrapCanary(child, empty, cont)(wrapReset(child)(buildIteration(child, isLazy && perlCaptures)))
+    wrapCanary(child, empty, cont)(wrapReset(child)(buildIteration(child, isLazy && keepsCaptures)))
     emitTerminator(Inst.Jmp(begin))
 
     enterBlock(cont)
@@ -524,7 +504,7 @@ private[vm] class ProgramBuilder(
   def buildQuestion(
       isLazy: Boolean,
       child: IRNode,
-      empty: EmptyIteration
+      empty: IREmptyIteration
   ): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
@@ -532,7 +512,7 @@ private[vm] class ProgramBuilder(
     emitTerminator(if isLazy then Inst.Try(cont, main) else Inst.Try(main, cont))
 
     enterBlock(main)
-    wrapCanary(child, empty, cont)(wrapReset(child)(buildIteration(child, isLazy && perlCaptures)))
+    wrapCanary(child, empty, cont)(wrapReset(child)(buildIteration(child, isLazy && keepsCaptures)))
     emitTerminator(Inst.Jmp(cont))
 
     enterBlock(cont)
@@ -541,25 +521,25 @@ private[vm] class ProgramBuilder(
   def buildRepeat(quantifier: IRQuantifier, child: IRNode): Unit =
     def isLazy(strategy: BacktrackStrategy): Boolean = strategy == BacktrackStrategy.Lazy
 
-    val empty = if child.canMatchEmpty then emptyIteration(quantifier) else EmptyIteration.Ignore
+    val empty = if child.canMatchEmpty then emptyIteration(quantifier) else IREmptyIteration.Ignore
     // An empty mandatory iteration ending the repetition jumps to `exit`.
     val exit = allocateLabel("exit")
     var exits = false
     def mandatory(n: Int): Unit =
       empty match
-        case EmptyIteration.ExitAll =>
+        case IREmptyIteration.ExitAll =>
           exits = true
           buildRepeatN(n, child, Some(exit))
-        case EmptyIteration.ExitFromMin if n > 0 =>
+        case IREmptyIteration.ExitFromMin if n > 0 =>
           exits = true
           buildRepeatN(n - 1, child)
-          wrapCanary(child, EmptyIteration.ExitFromMin, exit)(wrapReset(child)(buildIteration(child)))
+          wrapCanary(child, IREmptyIteration.ExitFromMin, exit)(wrapReset(child)(buildIteration(child)))
         case _ => buildRepeatN(n, child)
 
     quantifier match
-      case IRQuantifier.Exact(n) if empty == EmptyIteration.ExitAll => mandatory(n)
-      case IRQuantifier.Exact(n)                                    => buildRepeatN(n, child)
-      case IRQuantifier.Unbounded(n, strategy)                      =>
+      case IRQuantifier.Exact(n) if empty == IREmptyIteration.ExitAll => mandatory(n)
+      case IRQuantifier.Exact(n)                                      => buildRepeatN(n, child)
+      case IRQuantifier.Unbounded(n, strategy)                        =>
         mandatory(n)
         buildStar(isLazy(strategy), child, empty)
       case IRQuantifier.Bounded(n, m, strategy) =>
@@ -570,24 +550,16 @@ private[vm] class ProgramBuilder(
       emitTerminator(Inst.Jmp(exit))
       enterBlock(exit)
 
-  def emptyIteration(quantifier: IRQuantifier): EmptyIteration = dialect match
-    case Dialect.JavaScript => EmptyIteration.Reject
-    case _: Dialect.Python  => EmptyIteration.ExitOptional
-    case Dialect.Java       => EmptyIteration.ExitAll
-    // PCRE repeats copies of the node for a bounded repetition.
-    case Dialect.PCRE =>
-      quantifier match
-        case _: IRQuantifier.Unbounded => EmptyIteration.ExitFromMin
-        case _                         => EmptyIteration.Ignore
-    case _: Dialect.Ruby => EmptyIteration.ExitOptional
-    case _               => EmptyIteration.ExitFromMin
+  def emptyIteration(quantifier: IRQuantifier): IREmptyIteration = quantifier match
+    case _: IRQuantifier.Unbounded => pattern.emptyIteration.unbounded
+    case _                         => pattern.emptyIteration.bounded
 
   /** A builder for `x{n}` node, where an empty iteration jumps to `exit` if it is given. */
   def buildRepeatN(n: Int, child: IRNode, exit: Option[Label] = None): Unit =
     if n == 1 then
       exit match
         case Some(exit) =>
-          wrapCanary(child, EmptyIteration.ExitAll, exit)(wrapReset(child)(buildIteration(child)))
+          wrapCanary(child, IREmptyIteration.ExitAll, exit)(wrapReset(child)(buildIteration(child)))
         case None => buildIteration(child)
     else if n > 1 then
       val loop = allocateEntrance("loop")
@@ -599,7 +571,7 @@ private[vm] class ProgramBuilder(
         case Some(exit) =>
           val leave = allocateLabel("leave")
           trailingBlocks.append((leave, Seq(Inst.Reset(reg)), Inst.Jmp(exit)))
-          wrapCanary(child, EmptyIteration.ExitAll, leave)(wrapReset(child)(buildIteration(child)))
+          wrapCanary(child, IREmptyIteration.ExitAll, leave)(wrapReset(child)(buildIteration(child)))
         case None => wrapReset(child)(buildIteration(child))
       closeLoopBlock(reg, n, loop, cont)
 
@@ -608,7 +580,7 @@ private[vm] class ProgramBuilder(
       isLazy: Boolean,
       n: Int,
       child: IRNode,
-      empty: EmptyIteration
+      empty: IREmptyIteration
   ): Unit =
     val begin = allocateEntrance("begin")
     val loop = allocateLabel("loop")
@@ -617,14 +589,15 @@ private[vm] class ProgramBuilder(
     val reg = allocateCounter()
 
     enterLoopBlock(isLazy, loop, cont)
-    wrapCanary(child, empty, cont)(wrapReset(child)(buildIteration(child, isLazy && perlCaptures)))
+    wrapCanary(child, empty, cont)(wrapReset(child)(buildIteration(child, isLazy && keepsCaptures)))
     closeLoopBlock(reg, n, begin, cont)
 
-  /** Builds an iteration of a repetition, which Perl wraps to restore the captures when the iteration fails.
+  /** Builds an iteration of a repetition, which is wrapped to restore the captures when the iteration fails if
+    * backtracking keeps them.
     *
     * A greedy optional iteration needs no wrapping, since its fallback restores them.
     */
-  def buildIteration(child: IRNode, wraps: Boolean = perlCaptures): Unit =
+  def buildIteration(child: IRNode, wraps: Boolean = keepsCaptures): Unit =
     if wraps then
       val next = allocateLabel("next")
       val restore = allocateLabel("restore")
@@ -650,12 +623,12 @@ private[vm] class ProgramBuilder(
     freeCounter(reg)
 
   /** Inserts a canary around an iteration if needed, where an empty iteration fails, or jumps to `exit`. */
-  def wrapCanary(child: IRNode, empty: EmptyIteration, exit: Label)(run: => Unit): Unit =
-    if child.canMatchEmpty && empty != EmptyIteration.Ignore then
+  def wrapCanary(child: IRNode, empty: IREmptyIteration, exit: Label)(run: => Unit): Unit =
+    if child.canMatchEmpty && empty != IREmptyIteration.Ignore then
       val reg = allocateCanary()
       emitInst(Inst.SetCanary(reg))
       run
-      if empty == EmptyIteration.Reject then emitInst(Inst.CheckCanary(reg))
+      if empty == IREmptyIteration.Reject then emitInst(Inst.CheckCanary(reg))
       else
         val next = allocateLabel("next")
         emitTerminator(Inst.CmpCanary(reg, exit, next))
@@ -670,7 +643,7 @@ private[vm] class ProgramBuilder(
 
   /** A builder for an atomic group, which commits the first match of the child.
     *
-    * Perl runs an atomic group as a sub-match, which `(*ACCEPT)` in it ends.
+    * When `(*ACCEPT)` ends only an atomic group, the engine runs it as a sub-match.
     */
   def buildAtomic(child: IRNode): Unit =
     val main = allocateLabel("main")
@@ -679,7 +652,7 @@ private[vm] class ProgramBuilder(
     emitTerminator(Inst.Tx(main, Some(cont), None))
 
     enterBlock(main)
-    if dialect.isPerl then withAcceptScope(AcceptScope.Atomic)(build(child))
+    if pattern.backtrackControl.acceptEndsAtomic then withAcceptScope(AcceptScope.Atomic)(build(child))
     else
       atomicDepth += 1
       build(child)
@@ -759,9 +732,9 @@ private[vm] class ProgramBuilder(
 
   /** A builder for a conditional.
     *
-    * A look-around condition is atomic, and it keeps the captures in it even if it is negative, except in .NET, which
-    * restores them as a negative look-around does. Its fallback is the barrier, so `(*COMMIT)`, `(*PRUNE)` and
-    * `(*SKIP)` in it make it false (or true for a negative one).
+    * A look-around condition is atomic, and it keeps the captures in it even if it is negative, unless they are
+    * restored as in a negative look-around. Its fallback is the barrier, so `(*COMMIT)`, `(*PRUNE)` and `(*SKIP)` in it
+    * make it false (or true for a negative one).
     */
   def buildConditional(condition: IRCondition, yes: IRNode, no: IRNode): Unit =
     val yesLabel = allocateLabel("yes")
@@ -771,7 +744,7 @@ private[vm] class ProgramBuilder(
     def buildTest(negative: Boolean, child: IRNode, body: IRNode => Unit): Unit =
       val main = allocateLabel("main")
       val scope = assertionThenScope(child)
-      val restores = negative && dialect.isDotNet
+      val restores = negative && pattern.captures.restoredByNegativeCondition
       val (rollback, fallback) = if negative && !restores then (noLabel, yesLabel) else (yesLabel, noLabel)
       emitTerminator(Inst.Tx(main, Some(rollback), Some(fallback), Option.when(hasCut)(Barrier.Assertion(scope))))
       enterBlock(main)

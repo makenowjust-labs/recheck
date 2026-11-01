@@ -31,7 +31,7 @@ class InterpreterSuite extends munit.FunSuite:
   def matches(source: String, flags: String, input: String, pos: Int, opts: Options): Result =
     val t = for
       ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
-      program <- ProgramBuilder.build(ir, Dialect.JavaScript)
+      program <- ProgramBuilder.build(ir)
       result = Interpreter.run(program, UStringUtil.fromString(input), pos, opts)
     yield result
     t.get
@@ -302,7 +302,7 @@ class InterpreterSuite extends munit.FunSuite:
     )(using ctx: Context): Result =
       val t = for
         ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
-        program <- ProgramBuilder.build(ir, Dialect.JavaScript)
+        program <- ProgramBuilder.build(ir)
         result = Interpreter.runWithTimeout(program, UStringUtil.fromString(input), pos, opts, timeout)
       yield result
       t.get

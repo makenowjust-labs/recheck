@@ -218,9 +218,9 @@ private class EpsNFABuilder(
         throw new UnsupportedException("look-ahead assertion")
       case IRNodeData.LookBehind(_, _, _) | IRNodeData.NonAtomicLookBehind(_, _) =>
         throw new UnsupportedException("look-behind assertion")
-      case IRNodeData.Atomic(_)           => throw new UnsupportedException("atomic group")
-      case IRNodeData.BackReference(_, _) => throw new UnsupportedException("back-reference")
-      case IRNodeData.Unsupported(_)      => throw new UnsupportedException(node.unsupportedMessage)
+      case IRNodeData.Atomic(_)              => throw new UnsupportedException("atomic group")
+      case IRNodeData.BackReference(_, _, _) => throw new UnsupportedException("back-reference")
+      case IRNodeData.Unsupported(_)         => throw new UnsupportedException(node.unsupportedMessage)
 
   /** Builds EpsNFA transitions for a repetition.
     *

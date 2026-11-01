@@ -84,10 +84,36 @@ object IRBuilder:
       table.count,
       table.names,
       IRBackReferenceSemantics(featureSet.unsetBackReferenceMatchesEmpty, featureSet.backReferenceChoice),
+      captureSemantics(dialect),
+      emptyIterationSemantics(dialect),
+      backtrackControlSemantics(dialect),
       featureSet.anchored,
       mode,
       notEmpty(starts)
     )
+
+  private def captureSemantics(dialect: Dialect): IRCaptureSemantics =
+    IRCaptureSemantics(
+      resetsEachIteration = dialect.isJavaScript,
+      keptOnBacktracking = dialect.isPerl,
+      heldAfterAtomicMatch = dialect.isJava,
+      restoredByNegativeCondition = dialect.isDotNet
+    )
+
+  private def emptyIterationSemantics(dialect: Dialect): IREmptyIterationSemantics =
+    def all(handling: IREmptyIteration): IREmptyIterationSemantics = IREmptyIterationSemantics(handling, handling)
+
+    dialect match
+      case Dialect.JavaScript => all(IREmptyIteration.Reject)
+      case _: Dialect.Python  => all(IREmptyIteration.ExitOptional)
+      case Dialect.Java       => all(IREmptyIteration.ExitAll)
+      // PCRE repeats copies of the node for a bounded repetition.
+      case Dialect.PCRE    => IREmptyIterationSemantics(IREmptyIteration.ExitFromMin, IREmptyIteration.Ignore)
+      case _: Dialect.Ruby => all(IREmptyIteration.ExitOptional)
+      case Dialect.DotNet | _: Dialect.Perl => all(IREmptyIteration.ExitFromMin)
+
+  private def backtrackControlSemantics(dialect: Dialect): IRBacktrackControlSemantics =
+    IRBacktrackControlSemantics(thenPassesAssertions = dialect.isPerl, acceptEndsAtomic = dialect.isPerl)
 
   /** Returns the unit of the input of the pattern, which is [[IRPattern.mode]] of its IR, without parsing the source.
     *
@@ -532,7 +558,7 @@ private[build] class IRBuilder(
       NodeKey(node),
       throw new IllegalStateException(s"No resolved back-reference: $node")
     )
-    IRNodeData.BackReference(indices, chars.referenceFlags(charFlags))
+    chars.backReference(indices, charFlags)
 
   def buildAssert(node: Node, kind: AssertKind): IRNodeData = kind match
     case AssertKind.Boundary(None) =>
