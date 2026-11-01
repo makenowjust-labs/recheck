@@ -34,10 +34,10 @@ private[build] final class SemanticAnalyzer(
       case NodeData.Group(kind, child) =>
         kind match
           case _: GroupKind.PositiveLookBehind | _: GroupKind.NonAtomicPositiveLookBehind =>
-            lookBehindAnalyzer.requireAccepted(node, child, negative = false)
+            lookBehindAnalyzer.validateLookBehind(node, child, negative = false)
             walk(child, inLookAround = true)
           case _: GroupKind.NegativeLookBehind =>
-            lookBehindAnalyzer.requireAccepted(node, child, negative = true)
+            lookBehindAnalyzer.validateLookBehind(node, child, negative = true)
             walk(child, inLookAround = true)
           case _: GroupKind.LookAround | _: GroupKind.NonAtomicPositiveLookAhead =>
             walk(child, inLookAround = true)
@@ -89,8 +89,9 @@ private[build] final class SemanticAnalyzer(
     case ConditionalTest.NamedRecursion(name)   => resolver.calledName(name, node.loc)
     case ConditionalTest.LookAround(kind, body) =>
       kind match
-        case Some(_: GroupKind.PositiveLookBehind) => lookBehindAnalyzer.requireAccepted(node, body, negative = false)
-        case Some(_: GroupKind.NegativeLookBehind) => lookBehindAnalyzer.requireAccepted(node, body, negative = true)
+        case Some(_: GroupKind.PositiveLookBehind) =>
+          lookBehindAnalyzer.validateLookBehind(node, body, negative = false)
+        case Some(_: GroupKind.NegativeLookBehind) => lookBehindAnalyzer.validateLookBehind(node, body, negative = true)
         case _                                     => ()
       walk(body, inLookAround = true)
     case ConditionalTest.CalloutLookAround(_, test) => walkTest(node, test)

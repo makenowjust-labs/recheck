@@ -317,10 +317,10 @@ private[parser] final class Parser(
     while stack.headOption.exists(isComment) do stack.pop()
     assert(stack.nonEmpty, "Nothing to repeat")
     val node = stack.pop()
-    assertRepeatable(node)
+    validateRepeatable(node)
     node
 
-  private def assertRepeatable(node: Node): Unit =
+  private def validateRepeatable(node: Node): Unit =
     node.data match
       case NodeData.Group(_: GroupKind.PositiveLookAhead | _: GroupKind.NegativeLookAhead, _) =>
         assert(featureSet.allowsLookAheadRepeat, "Nothing to repeat")
@@ -2198,7 +2198,7 @@ private[parser] final class Parser(
 
   private def parseBackslashEscape(): BackslashKind =
     val value = currentChar
-    if value == '&' then assertSymbolUnknownBackslash()
+    if value == '&' then validateSymbolUnknownBackslash()
     next()
     BackslashKind.Escape(EscapeStyle.Single(value), value.toInt)
 
@@ -2208,12 +2208,12 @@ private[parser] final class Parser(
 
     if isAlphabetic then assert(featureSet.allowsAlphabeticUnknownBackslash, "Invalid backslash escape")
     else if CodePointUtil.isWord(value) then assert(featureSet.allowsWordUnknownBackslash, "Invalid backslash escape")
-    else assertSymbolUnknownBackslash()
+    else validateSymbolUnknownBackslash()
 
     nextCodePoint(value)
     BackslashKind.Unknown(value)
 
-  private def assertSymbolUnknownBackslash(): Unit =
+  private def validateSymbolUnknownBackslash(): Unit =
     if featureSet.allowsSymbolUnknownBackslash then return
     if context.inClass && currentChar == '-' then return
     if featureSet.hasBackslashClassSetReservedPunctuator && context.inClass && "&-!#%,:;<=>@`~".contains(currentChar)
