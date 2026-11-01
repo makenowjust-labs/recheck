@@ -7,9 +7,9 @@ import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
-import codes.quine.labs.recheck.exec.Command
 import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.recheck.exec.Executor
+import codes.quine.labs.recheck.exec.PythonExecutor
 import codes.quine.labs.recheck.regexp.ParsedPattern
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.UString
@@ -27,52 +27,53 @@ class RecallValidatorSuite extends munit.FunSuite:
 
   test("RecallValidator.validate"):
     assertEquals(
-      RecallValidator.validate(parse("foo"), attack, Duration.MinusInf)((_, _, _) => fail("unreachable")),
+      RecallValidator.validate(parse("foo"), attack, Duration.MinusInf)((_, _, _, _) => fail("unreachable")),
       None
     )
-    assertEquals(RecallValidator.validate(parse("foo"), attack, Duration.Zero)((_, _, _) => fail("unreachable")), None)
+    assertEquals(
+      RecallValidator.validate(parse("foo"), attack, Duration.Zero)((_, _, _, _) => fail("unreachable")),
+      None
+    )
     // A Perl pattern interpolating a variable is not run.
     assertEquals(
-      RecallValidator.validate(parse("a$x", Dialect.Perl()), attack, 1.second)((_, _, _) => fail("unreachable")),
+      RecallValidator.validate(parse("a$x", Dialect.Perl()), attack, 1.second)((_, _, _, _) => fail("unreachable")),
       None
     )
 
-    var command: Command = null
+    var executor: Executor = null
     assertEquals(
-      RecallValidator.validate(parse("foo"), attack, 1.second) { (c, _, _) =>
-        command = c
+      RecallValidator.validate(parse("foo"), attack, 1.second) { (e, _, _, _) =>
+        executor = e
         ExecResult.Timeout("recheck:runtime python 3.15.0\nrecheck:start\n")
       },
       Some(RecallValidation("python 3.15.0", 1.second, RecallResult.Timeout))
     )
-    assertEquals(command.program, "python3")
+    assertEquals(executor, PythonExecutor)
 
   test("RecallValidator.validate: environment variables"):
-    def run(env: Map[String, String], output: ExecResult = ExecResult.Timeout("")): (Command, RecallValidation) =
-      var command: Command = null
-      val result = RecallValidator.validate(parse("foo"), attack, 1.second, env = env) { (c, _, _) =>
-        command = c
-        output
-      }
-      (command, result.get)
+    def run(env: Map[String, String], output: ExecResult = ExecResult.Timeout("")): RecallValidation =
+      RecallValidator
+        .validate(parse("foo"), attack, 1.second, env = env) { (_, _, _, e) =>
+          assertEquals(e, env)
+          output
+        }
+        .get
 
-    val (command, result) = run(Map("RECHECK_PYTHON" -> " \"/opt/my python/bin/python3\" -X dev "))
-    assertEquals(
-      command,
-      Command(Executor.shell, Seq("-c", "\"/opt/my python/bin/python3\" -X dev \"$@\"", "sh", "-I", "-"))
-    )
     // Without the runtime line, the runtime is the command line of the variable.
-    assertEquals(result.runtime, "\"/opt/my python/bin/python3\" -X dev")
+    assertEquals(
+      run(Map("RECHECK_PYTHON" -> " \"/opt/my python/bin/python3\" -X dev ")).runtime,
+      "\"/opt/my python/bin/python3\" -X dev"
+    )
     interceptMessage[UnexpectedException]("`\"/opt/my python/bin/python3\" -X dev -I -` exited with 2")(
       run(Map("RECHECK_PYTHON" -> "\"/opt/my python/bin/python3\" -X dev"), ExecResult.Exit(2, "", ""))
     )
     // An empty value and the variables of the other dialects are ignored.
-    assertEquals(run(Map("RECHECK_PYTHON" -> " ", "RECHECK_RUBY" -> "ruby"))._1, Command("python3", Seq("-I", "-")))
+    assertEquals(run(Map("RECHECK_PYTHON" -> " ", "RECHECK_RUBY" -> "ruby")).runtime, "python3")
 
   test("RecallValidator.validate: timeout"):
     def limit(timeout: Duration)(using Context): Option[FiniteDuration] =
       var limit: Option[FiniteDuration] = null
-      RecallValidator.validate(parse("foo"), attack, timeout) { (_, _, t) =>
+      RecallValidator.validate(parse("foo"), attack, timeout) { (_, _, t, _) =>
         limit = t
         ExecResult.Timeout("")
       }
