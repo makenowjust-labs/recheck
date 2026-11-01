@@ -62,7 +62,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
       val marks = classes.javaWordMarks
       IRWordMarks(marks.marks.restrict(mode), marks.extenders.restrict(mode), marks.bases.restrict(mode))
 
-  /** Checks whether the node is a literal character, which [[literals]] resolves with its neighbors. */
+  /** Checks whether the node is a literal character, which [[literals]] resolves with the others of its part. */
   def isLiteral(node: Node): Boolean = node.data match
     case NodeData.Literal(_)                                 => true
     case NodeData.Backslash(_: BackslashKind.BackslashValue) => true
@@ -113,17 +113,17 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
   // ---------------------------------------------------------------------------------------------------------------
   // Literals
 
-  /** Resolves consecutive literal characters together.
+  /** Resolves a part, which is literal characters in a row, together.
     *
     * They are resolved together for a surrogate pair read by code units and Ruby's UTF-8 bytes by escapes (e.g.
     * `\xC3\xA9`). Case-insensitivity is the dialect's one-to-one case equivalence, and Ruby's and Perl's simple
-    * multi-character folding of literals (e.g. `ß` and `ss`, see [[foldRun]]).
+    * multi-character folding of literals (e.g. `ß` and `ss`, see [[foldPart]]).
     */
-  def literals(run: Seq[(Node, IRCharFlags)]): Seq[IRNode] =
-    try resolveLiterals(run)
+  def literals(part: Seq[(Node, IRCharFlags)]): Seq[IRNode] =
+    try resolveLiterals(part)
     catch
       case _: NotModeledException =>
-        run.map((node, _) => IRNode(IRNodeData.Unsupported(node.data), node.loc))
+        part.map((node, _) => IRNode(IRNodeData.Unsupported(node.data), node.loc))
 
   /** Returns the widths of the alternatives that Ruby makes of a class matching the foldings of its characters (e.g.
     * `[ßx]` is `[ßẞx]|ss|ss`), or `None` for another node, which decide whether Ruby accepts a look-behind.
@@ -143,9 +143,9 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
       set.map(s => rubyFoldings(s.restrict(mode))).filter(_.nonEmpty).map(keys => 1 +: keys.map(_.length))
     catch case _: NotModeledException => None
 
-  private def resolveLiterals(run: Seq[(Node, IRCharFlags)]): Seq[IRNode] =
+  private def resolveLiterals(part: Seq[(Node, IRCharFlags)]): Seq[IRNode] =
     val lits = mutable.ArrayBuffer.empty[Lit]
-    for (node, flags) <- run do
+    for (node, flags) <- part do
       node.data match
         case NodeData.Literal(value) =>
           lits += Lit(value, true, None, flags, node.loc)
@@ -166,7 +166,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
       if foldsMultiChar(units(i)) then
         var j = i
         while j < units.length && foldsMultiChar(units(j)) && units(j).flags == units(i).flags do j += 1
-        out ++= foldRun(units.slice(i, j))
+        out ++= foldPart(units.slice(i, j))
         i = j
       else
         out += closed(units(i))
@@ -189,13 +189,13 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
       case _: Dialect.Ruby => mode == UnitMode.CodePoint && (u.escape.isEmpty || u.value >= 0x80)
       case _               => false)
 
-  /** Resolves a run of literals with the multi-character case folding of Ruby and Perl.
+  /** Resolves a part with the multi-character case folding of Ruby and Perl.
     *
-    * A literal folded to several characters (e.g. `ß` to `ss`) also matches them, and consecutive literals folded to
-    * the folding of a character (e.g. `ss`) also match the character; both are alternations, longest first. Folds
-    * across literal boundaries, classes, groups or quantifiers are not reproduced.
+    * A literal folded to several characters (e.g. `ß` to `ss`) also matches them, and literals in a row folded to the
+    * folding of a character (e.g. `ss`) also match the character; both are alternations, longest first. Folds across
+    * literal boundaries, classes, groups or quantifiers are not reproduced.
     */
-  private def foldRun(units: IndexedSeq[Lit]): Seq[IRNode] =
+  private def foldPart(units: IndexedSeq[Lit]): Seq[IRNode] =
     val flags = units.head.flags
     val eq = equivalence(flags)
     val native = perlNative(flags)
@@ -559,9 +559,9 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
         case IRCharset.Locale   => key.iterator.forall(_ >= 0x100)
         case _: IRCharset.ASCII => !(flags.caselessRestrict && hasASCII)
 
-  /** Resolves a folding as a run of literals, which is how Ruby and Perl match it. */
+  /** Resolves a folding as a part, which is how Ruby and Perl match it. */
   private def foldString(key: UString, flags: IRCharFlags, loc: SourceLocation): IRNodeData =
-    sequenceOf(foldRun(key.iterator.map(c => Lit(c, true, None, flags, loc)).toIndexedSeq))
+    sequenceOf(foldPart(key.iterator.map(c => Lit(c, true, None, flags, loc)).toIndexedSeq))
 
   private def negate(item: ClassItem, flags: IRCharFlags): ClassSet = item.data match
     // .NET's `[^a-z-[aeiou]]` negates the base before the subtraction.
@@ -751,7 +751,8 @@ private[build] object IRCharResolver:
   /** The value of a literal that has no unit in the mode, which never matches. */
   val NoUnit: Int = -1
 
-  /** The largest number of multi-character foldings in a run; more of them leave the run to the one-to-one folding. */
+  /** The largest number of multi-character foldings in a part; more of them leave the part to the one-to-one folding.
+    */
   val MaxMultiFoldings: Int = 6
 
   /** The strings of two or more code points that some characters fold to (e.g. `ss` from `ß`). */

@@ -195,10 +195,10 @@ final case class IRPattern(
         true
       case _ => false
 
-  /** Returns the strings of two or more literal characters in a row in the pattern.
+  /** Returns the parts of the pattern, which are the strings of two or more literal characters in a row.
     *
     * A literal character is a set of one character or of the case variants of one character, and stands for its first
-    * character in `preferred` if any. A string is UTF-16 code units in the code point mode.
+    * character in `preferred` if any. A part is UTF-16 code units in the code point mode.
     */
   def parts(preferred: Option[CharSet]): Set[UString] =
     def toUString(values: Seq[Int]): UString =
@@ -211,13 +211,13 @@ final case class IRPattern(
       case _ => None
 
     @tailrec
-    def extract(ns: Seq[IRNode], set: Set[UString] = Set.empty): Set[UString] =
-      if ns.isEmpty then set
+    def extract(ns: Seq[IRNode], parts: Set[UString] = Set.empty): Set[UString] =
+      if ns.isEmpty then parts
       else
-        val (pre, suf) = ns.span(literal(_).isDefined)
-        val s = toUString(pre.flatMap(literal))
-        val newSet = set ++ (if s.length > 1 then Set(s) else Set.empty)
-        extract(suf.dropWhile(literal(_).isEmpty), newSet)
+        val (literals, rest) = ns.span(literal(_).isDefined)
+        val part = toUString(literals.flatMap(literal))
+        val newParts = parts ++ (if part.length > 1 then Set(part) else Set.empty)
+        extract(rest.dropWhile(literal(_).isEmpty), newParts)
 
     def loop(node: IRNode): Set[UString] = node.data match
       case Sequence(ns) => extract(ns) ++ ns.flatMap(loop).toSet

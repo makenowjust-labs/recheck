@@ -300,15 +300,15 @@ private[build] class IRBuilder(
     if flags.canonicalEquivalence then IRNodeData.Unsupported(node.data)
     else resolveCharacter.fold(chars.resolve(node, flags))(_(node, flags))
 
-  /** Builds consecutive literal characters together (e.g. for multi-character case folding). */
-  def buildLiterals(nodes: Seq[Node]): Seq[IRNode] =
-    val run = nodes.map(node => (node, charFlags))
-    if run.exists(_._2.canonicalEquivalence) then
-      run.map((node, _) => IRNode(IRNodeData.Unsupported(node.data), node.loc))
+  /** Builds a part, which is literal characters in a row, together (e.g. for multi-character case folding). */
+  def buildPart(nodes: Seq[Node]): Seq[IRNode] =
+    val part = nodes.map(node => (node, charFlags))
+    if part.exists(_._2.canonicalEquivalence) then
+      part.map((node, _) => IRNode(IRNodeData.Unsupported(node.data), node.loc))
     else
       resolveCharacter match
-        case Some(f) => run.map((node, flags) => IRNode(f(node, flags), node.loc))
-        case None    => chars.literals(run)
+        case Some(f) => part.map((node, flags) => IRNode(f(node, flags), node.loc))
+        case None    => chars.literals(part)
 
   def buildDisjunction(children: Seq[Node]): IRNodeData =
     // The flags at an alternative are the ones after the previous alternatives, as `(?i)` reaches the next ones.
@@ -325,12 +325,12 @@ private[build] class IRBuilder(
           if chars.isLiteral(children(i)) then
             var j = i
             while j < children.length && chars.isLiteral(children(j)) do j += 1
-            nodes ++= buildLiterals(children.slice(i, j))
+            nodes ++= buildPart(children.slice(i, j))
             i = j
           else
             nodes += build(children(i))
             i += 1
-        // Literals resolved together may become one node (e.g. `ss` under Ruby's case folding).
+        // A part resolved together may become one node (e.g. `ss` under Ruby's case folding).
         nodes.result() match
           case Seq(node) => Right(node)
           case nodes     => Left(IRNodeData.Sequence(nodes))
