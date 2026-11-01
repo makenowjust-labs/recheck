@@ -43,11 +43,7 @@ object AgentCommand:
   object PingParams:
     given decode: Decoder[PingParams] = deriveDecoder
 
-  /** A running execution token to cancel.
-    *
-    * @param sendCancel
-    *   sends the result of the cancelled execution
-    */
+  /** A running execution token to cancel, with the function sending the result of the cancelled execution. */
   private[cli] final case class Token(cancellation: CancellationTokenSource, sendCancel: () => Unit)
 
 /** `recheck agent` command implementation. */
@@ -74,8 +70,7 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio):
 
   /** Runs a checking method on the thread pool, and sends its result.
     *
-    * @param cancelled
-    *   converts the diagnostics of the cancellation to the method's result
+    * On a cancellation, `cancelled` converts the diagnostics of the cancellation to the method's result.
     */
   private def submit[A](id: RPC.ID, check: CheckParams, push: RPC.Push[String], send: RPC.Send[A])(
       run: (String, String, Parameters, Option[CancellationToken]) => A

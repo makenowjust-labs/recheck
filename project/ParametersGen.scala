@@ -56,8 +56,7 @@ object ParametersGen {
 
   /** Variant is an object of `oneOf` with the `name` constant, e.g. a dialect with its settings.
     *
-    * @param settings
-    *   the properties other than `name`, with their `enum` values (empty for a non-enum) and default
+    * The settings are the properties other than `name`, with their `enum` values (empty for a non-enum) and default.
     */
   final case class Variant(name: String, settings: Seq[(String, Seq[String], Any)])
 
@@ -154,11 +153,11 @@ object ParametersGen {
   /** Generates `Parameters.scala`. */
   def parameters(params: Seq[Param]): String = {
     val docs = params.map { p =>
-      s"""|  * @param ${p.name}
+      // The descriptions start with "The ...", which follows "`name` is".
+      val description = s"`${p.name}` is ${p.description.head.toLower}${p.description.tail}"
+      s"""|${docLines(description, "  ")}
           |  *
-          |${docLines(p.description, "  ")}
-          |  *
-          |  * (default: `${p.scalaDefault}`)""".stripMargin
+          |  * The default is `${p.scalaDefault}`.""".stripMargin
     }
     val fields = params.map(p => s"    ${p.name}: ${p.scalaType} = ${p.defaultName}")
     val defaults = params.map { p =>
