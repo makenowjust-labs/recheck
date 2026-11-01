@@ -8,11 +8,11 @@ import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetException
 import codes.quine.labs.resyntax.ast.NodeData
-import codes.quine.labs.resyntax.ir.IRBuilder
-import codes.quine.labs.resyntax.ir.IRBuildingException
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
 import codes.quine.labs.resyntax.ir.IRPattern
+import codes.quine.labs.resyntax.ir.build.IRBuilder
+import codes.quine.labs.resyntax.ir.build.IRBuildingException
 import codes.quine.labs.resyntax.parser.NestingLimitException
 import codes.quine.labs.resyntax.parser.Parser
 import codes.quine.labs.resyntax.parser.ParsingException

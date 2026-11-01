@@ -1,14 +1,15 @@
 package codes.quine.labs.resyntax.ir
+package build
 
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.Properties
 import codes.quine.labs.resyntax.charset.UnitMode
-import codes.quine.labs.resyntax.ir.IRProperties.ascii
-import codes.quine.labs.resyntax.ir.IRProperties.binary
-import codes.quine.labs.resyntax.ir.IRProperties.gc
-import codes.quine.labs.resyntax.ir.IRProperties.of
+import codes.quine.labs.resyntax.ir.build.IRProperties.ascii
+import codes.quine.labs.resyntax.ir.build.IRProperties.binary
+import codes.quine.labs.resyntax.ir.build.IRProperties.gc
+import codes.quine.labs.resyntax.ir.build.IRProperties.of
 
 /** IRCharClasses gives the code points of escape classes (e.g. `\w`) and POSIX classes in a dialect.
   *
@@ -17,7 +18,7 @@ import codes.quine.labs.resyntax.ir.IRProperties.of
   * @param perlNative
   *   Perl's `/d` rules without a reason to use Unicode rules, where `U+0080..U+00FF` follow ASCII rules
   */
-private[ir] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlNative: Boolean):
+private[build] final class IRCharClasses(dialect: Dialect, mode: UnitMode, perlNative: Boolean):
   import IRCharClasses.*
 
   private def ruleOf(flags: IRCharFlags, asciiOf: IRCharset.Ascii => Boolean): Rule =

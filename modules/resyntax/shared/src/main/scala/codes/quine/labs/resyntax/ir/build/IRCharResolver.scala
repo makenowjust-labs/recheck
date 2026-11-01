@@ -1,4 +1,5 @@
 package codes.quine.labs.resyntax.ir
+package build
 
 import scala.collection.mutable
 
@@ -20,7 +21,7 @@ import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.Properties
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
-import codes.quine.labs.resyntax.ir.IRCharResolver.*
+import codes.quine.labs.resyntax.ir.build.IRCharResolver.*
 
 /** IRCharResolver resolves character-level nodes (literals, `.`, escapes and classes) into character sets.
   *
@@ -28,7 +29,7 @@ import codes.quine.labs.resyntax.ir.IRCharResolver.*
   *   whether a Perl pattern uses Unicode rules even under `/d` (a UTF-8 pattern, or one with a code point above
   *   `U+00FF`, `\p{...}`, `\N{...}` or `\b{...}`)
   */
-private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUnicodeRules: Boolean):
+private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUnicodeRules: Boolean):
 
   private val classes = new IRCharClasses(dialect, mode, !perlUnicodeRules)
 
@@ -716,7 +717,7 @@ private[ir] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perlUni
         case _: Dialect.Ruby => equivalence(flags).closure(restricted)
         case _               => restricted
 
-private[ir] object IRCharResolver:
+private[build] object IRCharResolver:
 
   private object Grammar:
     import BacktrackStrategy.Greedy

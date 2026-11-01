@@ -1,4 +1,5 @@
 package codes.quine.labs.resyntax.ir
+package build
 
 import codes.quine.labs.resyntax.ast.AssertKind
 import codes.quine.labs.resyntax.ast.AssertNameStyle
@@ -18,11 +19,11 @@ import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
-import codes.quine.labs.resyntax.ir.IRCharClasses.AsciiWord
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch.Forward
 import codes.quine.labs.resyntax.ir.IRLookBehindStarts.Longest
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.ir.IRQuantifier.*
+import codes.quine.labs.resyntax.ir.build.IRCharClasses.AsciiWord
 
 class IRBuilderSuite extends IRSuiteBase:
   // Disjunction

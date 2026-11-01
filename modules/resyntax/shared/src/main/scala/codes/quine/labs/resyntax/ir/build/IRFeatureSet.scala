@@ -1,4 +1,5 @@
 package codes.quine.labs.resyntax.ir
+package build
 
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet

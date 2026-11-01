@@ -1,4 +1,5 @@
 package codes.quine.labs.resyntax.ir
+package build
 
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.BinaryProperty
@@ -9,10 +10,10 @@ import codes.quine.labs.resyntax.charset.NameMatching
 import codes.quine.labs.resyntax.charset.Properties
 import codes.quine.labs.resyntax.charset.PropertyValue
 import codes.quine.labs.resyntax.charset.UnitMode
-import codes.quine.labs.resyntax.ir.IRCharClasses.AsciiPosix
+import codes.quine.labs.resyntax.ir.build.IRCharClasses.AsciiPosix
 
 /** PropertyResult is a result of looking up a Unicode property in a dialect. */
-private[ir] enum PropertyResult:
+private[build] enum PropertyResult:
 
   /** Found is a property with its strings and characters, and how case-insensitivity treats it. */
   case Found(set: ClassSet, caseKind: CaseKind)
@@ -24,7 +25,7 @@ private[ir] enum PropertyResult:
   case NotModeled
 
 /** CaseKind is a kind of property that some dialects change under case-insensitivity. */
-private[ir] enum CaseKind:
+private[build] enum CaseKind:
 
   /** Other is a property that only case folding changes. */
   case Other
@@ -36,7 +37,7 @@ private[ir] enum CaseKind:
   case Cased
 
 /** IRProperties resolves Unicode property names (`\p{...}`) by each dialect's rules. */
-private[ir] object IRProperties:
+private[build] object IRProperties:
   import PropertyResult.*
 
   // Scala.js has no `java.util.Locale`, and the names are ASCII.

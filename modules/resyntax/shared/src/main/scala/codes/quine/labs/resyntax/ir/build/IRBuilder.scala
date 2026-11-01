@@ -1,4 +1,5 @@
 package codes.quine.labs.resyntax.ir
+package build
 
 import codes.quine.labs.resyntax.ast.AssertKind
 import codes.quine.labs.resyntax.ast.BackslashKind
@@ -31,7 +32,7 @@ object IRBuilder:
   def build(node: Node, flagSet: FlagSet, dialect: Dialect): IRPattern =
     build(node, flagSet, dialect, None)
 
-  private[ir] def build(
+  private[build] def build(
       node: Node,
       flagSet: FlagSet,
       dialect: Dialect,
@@ -105,24 +106,6 @@ object IRBuilder:
         else UnitMode.CodePoint
       case Dialect.Perl(utf8, _) => if utf8 then UnitMode.CodePoint else UnitMode.Byte
       case Dialect.PCRE          => if flagSet.unicode || utf then UnitMode.CodePoint else UnitMode.Byte
-
-  /** Perl's `/d` rules at a back-reference are the rules of a native string (see [[IRCharResolver.referenceFlags]]).
-    */
-  def caseEquivalence(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRCaseEquivalence =
-    IRCaseEquivalence.of(dialect, mode, flags, perlNative = dialect.isPerl && flags.charset == IRCharset.Default)
-
-  def backReferenceFolding(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRBackReferenceFolding =
-    if !flags.ignoreCase then IRBackReferenceFolding.Simple
-    else
-      dialect match
-        case _: Dialect.Ruby if mode == UnitMode.CodePoint => IRBackReferenceFolding.Full(0)
-        case _: Dialect.Perl                               =>
-          flags.charset match
-            case IRCharset.Default                            => IRBackReferenceFolding.Simple
-            case IRCharset.Locale                             => IRBackReferenceFolding.Full(0x100)
-            case _: IRCharset.Ascii if flags.caselessRestrict => IRBackReferenceFolding.Full(0x80)
-            case _                                            => IRBackReferenceFolding.Full(0)
-        case _ => IRBackReferenceFolding.Simple
 
   /** Checks whether Perl takes the full case folding of the character under the flags (e.g. `ß` as `ss`). */
   private def perlFoldsMulti(value: Int, flags: IRCharFlags, perlUnicodeRules: Boolean): Boolean =
@@ -281,7 +264,7 @@ object IRBuilder:
   /** The version of PCRE2 that the PCRE dialect follows, which `(?(VERSION>=10.0)...)` compares with. */
   val PCREVersion: (Int, Int) = (10, 49)
 
-private[ir] class IRBuilder(
+private[build] class IRBuilder(
     initial: BuildingContext,
     table: CaptureTable,
     backReferences: Map[NodeKey, Seq[Int]],

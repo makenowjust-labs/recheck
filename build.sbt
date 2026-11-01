@@ -238,6 +238,7 @@ lazy val resyntax = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.resyntax.*
       |import codes.quine.labs.resyntax.ast.*
       |import codes.quine.labs.resyntax.ir.*
+      |import codes.quine.labs.resyntax.ir.build.*
       |import codes.quine.labs.resyntax.parser.*
       |""".stripMargin,
     // Settings for test:

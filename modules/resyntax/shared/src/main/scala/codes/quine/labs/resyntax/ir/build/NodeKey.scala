@@ -1,4 +1,5 @@
 package codes.quine.labs.resyntax.ir
+package build
 
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.ConditionalTest
@@ -6,14 +7,14 @@ import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 
 /** NodeKey is a map key of an AST node by identity, because equal nodes can appear at different places. */
-private[ir] final class NodeKey(val node: Node):
+private[build] final class NodeKey(val node: Node):
   override def equals(that: Any): Boolean = that match
     case that: NodeKey => node eq that.node
     case _             => false
 
   override def hashCode(): Int = System.identityHashCode(node)
 
-private[ir] object NodeKey:
+private[build] object NodeKey:
 
   /** Returns the child nodes of the node, including the ones in commands. */
   def children(node: Node): Seq[Node] = node.data match

@@ -1,11 +1,12 @@
 package codes.quine.labs.resyntax.ir
+package build
 
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.ast.SourceLocation
 
 /** ReferenceResolver resolves group references to capture indices, and rejects the ones the dialect rejects. */
-private[ir] final class ReferenceResolver(table: CaptureTable, dialect: Dialect, featureSet: IRFeatureSet):
+private[build] final class ReferenceResolver(table: CaptureTable, dialect: Dialect, featureSet: IRFeatureSet):
 
   def backReference(ref: Reference, site: ReferenceSite, loc: SourceLocation): Seq[Int] = ref match
     case Reference.IndexedReference(n)      => indexedBackReference(n, site, loc)

@@ -1,4 +1,5 @@
 package codes.quine.labs.resyntax.ir
+package build
 
 import scala.collection.mutable
 
@@ -13,7 +14,7 @@ import codes.quine.labs.resyntax.ast.NodeData
 /** IRValidator checks a whole pattern for the errors that the parser cannot find, including the ones in unsupported
   * nodes, and resolves the back-references and the capture tests of conditionals.
   */
-private[ir] final class IRValidator(
+private[build] final class IRValidator(
     table: CaptureTable,
     resolver: ReferenceResolver,
     checker: LookBehindChecker,

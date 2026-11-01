@@ -1,4 +1,5 @@
 package codes.quine.labs.resyntax.ir
+package build
 
 import scala.collection.mutable
 
@@ -23,7 +24,7 @@ import codes.quine.labs.resyntax.ast.NodeData
   * @param openedInOrder
   *   the indices of the groups opened before the node in the source order, which a branch reset does not rewind
   */
-private[ir] final case class ReferenceSite(
+private[build] final case class ReferenceSite(
     opened: Int,
     open: Set[Int],
     namesBefore: Set[String],
@@ -44,7 +45,7 @@ private[ir] final case class ReferenceSite(
   * @param charFlags
   *   the flags at each character-level node of a Perl or Ruby pattern, whose look-behind width depends on them
   */
-private[ir] final class CaptureTable(
+private[build] final class CaptureTable(
     indices: Map[NodeKey, Int],
     sites: Map[NodeKey, ReferenceSite],
     val count: Int,
@@ -63,7 +64,7 @@ private[ir] final class CaptureTable(
     sites.getOrElse(NodeKey(node), throw new IllegalArgumentException(s"No reference site: $node"))
 
 /** CaptureAnalyzer numbers the capture groups of a whole pattern, including the groups in unsupported nodes. */
-private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
+private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
   private val featureSet = initial.featureSet
 
   private var context: BuildingContext = initial
@@ -284,7 +285,7 @@ private[ir] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
       context = savedContext
       open = savedOpen
 
-private[ir] object CaptureAnalyzer:
+private[build] object CaptureAnalyzer:
   def analyze(root: Node, context: BuildingContext): CaptureTable =
     new CaptureAnalyzer(root, context).analyze()
 

@@ -1,4 +1,5 @@
 package codes.quine.labs.resyntax.ir
+package build
 
 import codes.quine.labs.resyntax.ast.AssertKind
 import codes.quine.labs.resyntax.ast.BackslashKind
@@ -11,7 +12,7 @@ import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ast.Reference
-import codes.quine.labs.resyntax.ir.LookBehindChecker.*
+import codes.quine.labs.resyntax.ir.build.LookBehindChecker.*
 
 /** LookBehindChecker checks the dialect's restriction on a look-behind body.
   *
@@ -23,7 +24,7 @@ import codes.quine.labs.resyntax.ir.LookBehindChecker.*
   *   the widths of the alternatives that Ruby makes of a class matching the foldings of its characters (e.g. `[ßx]` is
   *   `[ßẞx]|ss|ss`), which are top-level alternatives as the body
   */
-private[ir] final class LookBehindChecker(
+private[build] final class LookBehindChecker(
     table: CaptureTable,
     resolver: ReferenceResolver,
     featureSet: IRFeatureSet,
@@ -373,7 +374,7 @@ private[ir] final class LookBehindChecker(
   private def fail(message: String, node: Node): Nothing =
     throw new IRBuildingException(message, node.loc)
 
-private[ir] object LookBehindChecker:
+private[build] object LookBehindChecker:
 
   val Inf: Long = Long.MaxValue
 

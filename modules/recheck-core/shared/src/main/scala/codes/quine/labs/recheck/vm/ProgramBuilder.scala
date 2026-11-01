@@ -19,7 +19,8 @@ import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRAssertKind
 import codes.quine.labs.resyntax.ir.IRBacktrackControl
-import codes.quine.labs.resyntax.ir.IRBuilder
+import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
+import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRCondition
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch
 import codes.quine.labs.resyntax.ir.IRLookBehindStarts
@@ -357,8 +358,8 @@ private[vm] class ProgramBuilder(
         val chars = Option.when(set.chars.nonEmpty)(() => emitRead(charsKind(set.chars), loc))
         buildAlternatives(strings ++ chars)
       case IRNodeData.BackReference(indices, flags) =>
-        val equivalence = IRBuilder.caseEquivalence(pattern.dialect, mode, flags)
-        val folding = IRBuilder.backReferenceFolding(pattern.dialect, mode, flags)
+        val equivalence = IRCaseEquivalence.ofBackReference(pattern.dialect, mode, flags)
+        val folding = IRBackReferenceFolding.of(pattern.dialect, mode, flags)
         emitRead(ReadKind.Ref(indices, pattern.ir.backReference, equivalence, folding), Location.from(node.loc))
       case IRNodeData.Unsupported(_) => throw new UnsupportedException(pattern.unsupportedMessage(node))
 

@@ -1,4 +1,5 @@
 package codes.quine.labs.resyntax.ir
+package build
 
 import scala.deriving.Mirror
 

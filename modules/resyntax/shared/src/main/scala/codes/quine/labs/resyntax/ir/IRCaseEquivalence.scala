@@ -66,7 +66,7 @@ object IRCaseEquivalence:
     */
   final case class PerlNative(mode: UnitMode) extends IRCaseEquivalence:
     def closure(set: CharSet): CharSet =
-      set.union(CaseMapping.SimpleFold.closure(set).diff(IRCharClasses.Latin1)).restrict(mode)
+      set.union(CaseMapping.SimpleFold.closure(set).diff(Latin1)).restrict(mode)
 
   /** PerlLocale is Perl's `/l` rules in the C locale.
     *
@@ -81,6 +81,8 @@ object IRCaseEquivalence:
   private val Ascii: CharSet = CharSet.range(0, 0x7f)
 
   private val Byte: CharSet = CharSet.range(0, 0xff)
+
+  private val Latin1: CharSet = CharSet.range(0x80, 0xff)
 
   lazy val asciiFold: CaseMapping = CaseMapping.fromEntries(('A'.toInt to 'Z').map(c => (c, c + 0x20)))
 
@@ -107,6 +109,14 @@ object IRCaseEquivalence:
 
   /** .NET's key `ToLowerInvariant(c)`, where `U+0130` is not lower-cased to `i`. */
   lazy val dotNetKey: CaseMapping = CaseMapping.SimpleLower.updated(Seq(0x130 -> 0x130))
+
+  /** Returns the equivalence that a back-reference with the flags compares by.
+    *
+    * Perl's `/d` rules there are the rules of a native string, since the builder gives a reference `/u` instead when
+    * Unicode rules apply.
+    */
+  def ofBackReference(dialect: Dialect, mode: UnitMode, flags: IRCharFlags): IRCaseEquivalence =
+    of(dialect, mode, flags, perlNative = dialect.isPerl && flags.charset == IRCharset.Default)
 
   /** @param perlNative
     *   Perl's `/d` rules without a reason to use Unicode rules (see [[PerlNative]])
