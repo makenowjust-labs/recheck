@@ -246,7 +246,7 @@ class ReDoSSuite extends munit.FunSuite:
     assertEquals(attack(Dialect.JavaScript, ""), "'a'.repeat(31) + '\\x00'")
     assertEquals(attack(Dialect.Python(), ""), "'a' * 31 + '\\x00'")
     assertEquals(attack(Dialect.Python(Dialect.Python.Type.Bytes), ""), "b'a' * 31 + b'\\x00'")
-    assertEquals(attack(Dialect.Ruby(), "n"), "\"a\".b + \"a\".b * 31 + \"\\x00\".b")
+    assertEquals(attack(Dialect.Ruby(), "n"), "\"a\".b + \"a\".b * 31 + \"\\x00\\n\\n\".b")
     assertEquals(attack(Dialect.Java, ""), "\"a\".repeat(31) + \"\\u0000\"")
     assertEquals(attack(Dialect.DotNet, ""), "string.Concat(Enumerable.Repeat(\"a\", 31)) + \"\\u0000\"")
     assertEquals(attack(Dialect.Perl(), ""), "\"a\" x 31 . \"\\x00\"")

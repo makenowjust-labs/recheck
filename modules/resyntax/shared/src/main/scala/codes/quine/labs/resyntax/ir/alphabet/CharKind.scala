@@ -1,7 +1,5 @@
 package codes.quine.labs.resyntax.ir.alphabet
 
-import scala.util.hashing.MurmurHash3
-
 /** CharKind is what the zero-width assertions inspect of a character. */
 final case class CharKind(
     /** The bits of the word sets having the character. */
@@ -42,29 +40,6 @@ final case class CharKind(
 
   /** Checks whether it is a base of the `i`-th word marks. */
   def isBaseOf(i: Int): Boolean = (bases & (1 << i)) != 0
-
-  // The named kinds hash by their names, as the enum values did, which keeps the orders of the automaton's states.
-  override def hashCode: Int = this match
-    case CharKind.Normal | CharKind.LineTerminator | CharKind.Word | CharKind.Boundary => toString.hashCode
-    case _                                                                             => MurmurHash3.productHash(this)
-
-  override def toString: String = this match
-    case CharKind.Normal         => "Normal"
-    case CharKind.LineTerminator => "LineTerminator"
-    case CharKind.Word           => "Word"
-    case CharKind.Boundary       => "Boundary"
-    case _                       =>
-      val flags = Seq(
-        Option.when(words != 0)(s"words=$words"),
-        Option.when(terminators != 0)(s"terminators=$terminators"),
-        Option.when(marks != 0)(s"marks=$marks"),
-        Option.when(extenders != 0)(s"extenders=$extenders"),
-        Option.when(bases != 0)(s"bases=$bases"),
-        Option.when(cr)("cr"),
-        Option.when(lf)("lf"),
-        Option.when(boundary)("boundary")
-      ).flatten
-      flags.mkString("CharKind(", ",", ")")
 
 object CharKind:
 
