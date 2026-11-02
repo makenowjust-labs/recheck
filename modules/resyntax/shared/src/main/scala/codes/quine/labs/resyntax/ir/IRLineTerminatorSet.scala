@@ -2,12 +2,12 @@ package codes.quine.labs.resyntax.ir
 
 import codes.quine.labs.resyntax.charset.UChar
 
-/** IRLineTerminators is a set of line terminators that line assertions and `.` see: the single characters `chars`, and
-  * the two-character sequence `\r\n` as `crlf` tells.
+/** IRLineTerminatorSet is a set of line terminators that line assertions and `.` see: the single characters `chars`,
+  * and the two-character sequence `\r\n` as `crlf` tells.
   */
-final case class IRLineTerminators(chars: Set[UChar], crlf: IRLineTerminators.CRLF)
+final case class IRLineTerminatorSet(chars: Set[UChar], crlf: IRLineTerminatorSet.CRLF)
 
-object IRLineTerminators:
+object IRLineTerminatorSet:
 
   sealed abstract class CRLF extends Product with Serializable
 
@@ -23,26 +23,26 @@ object IRLineTerminators:
     case object Atomic extends CRLF
 
   /** LF is `\n` only, used by .NET, Perl, Python, Ruby, Java with `d`, and PCRE by default. */
-  val LF: IRLineTerminators = IRLineTerminators(Set(0x0a), CRLF.Ignored)
+  val LF: IRLineTerminatorSet = IRLineTerminatorSet(Set(0x0a), CRLF.Ignored)
 
   /** CR is `\r` only, used by PCRE with `(*CR)`. */
-  val CR: IRLineTerminators = IRLineTerminators(Set(0x0d), CRLF.Ignored)
+  val CR: IRLineTerminatorSet = IRLineTerminatorSet(Set(0x0d), CRLF.Ignored)
 
   /** PCRE_CRLF is `\r\n` only, used by PCRE with `(*CRLF)`. */
-  val PCRE_CRLF: IRLineTerminators = IRLineTerminators(Set.empty, CRLF.Sequence)
+  val PCRE_CRLF: IRLineTerminatorSet = IRLineTerminatorSet(Set.empty, CRLF.Sequence)
 
   /** PCREAnyCRLF is `\r`, `\n` and `\r\n`, used by PCRE with `(*ANYCRLF)`. */
-  val PCREAnyCRLF: IRLineTerminators = IRLineTerminators(Set(0x0a, 0x0d), CRLF.Sequence)
+  val PCREAnyCRLF: IRLineTerminatorSet = IRLineTerminatorSet(Set(0x0a, 0x0d), CRLF.Sequence)
 
   /** PCREAny is all Unicode newlines, used by PCRE with `(*ANY)`. */
-  val PCREAny: IRLineTerminators =
-    IRLineTerminators(Set(0x0a, 0x0b, 0x0c, 0x0d, 0x85, 0x2028, 0x2029), CRLF.Sequence)
+  val PCREAny: IRLineTerminatorSet =
+    IRLineTerminatorSet(Set(0x0a, 0x0b, 0x0c, 0x0d, 0x85, 0x2028, 0x2029), CRLF.Sequence)
 
   /** NUL is the NUL character only, used by PCRE with `(*NUL)`. */
-  val NUL: IRLineTerminators = IRLineTerminators(Set(0x00), CRLF.Ignored)
+  val NUL: IRLineTerminatorSet = IRLineTerminatorSet(Set(0x00), CRLF.Ignored)
 
   /** JavaScript is the ECMA-262 LineTerminator. */
-  val JavaScript: IRLineTerminators = IRLineTerminators(Set(0x0a, 0x0d, 0x2028, 0x2029), CRLF.Ignored)
+  val JavaScript: IRLineTerminatorSet = IRLineTerminatorSet(Set(0x0a, 0x0d, 0x2028, 0x2029), CRLF.Ignored)
 
   /** Java is the line terminators of `java.util.regex` without `d` (UNIX_LINES). */
-  val Java: IRLineTerminators = IRLineTerminators(Set(0x0a, 0x0d, 0x85, 0x2028, 0x2029), CRLF.Atomic)
+  val Java: IRLineTerminatorSet = IRLineTerminatorSet(Set(0x0a, 0x0d, 0x85, 0x2028, 0x2029), CRLF.Atomic)

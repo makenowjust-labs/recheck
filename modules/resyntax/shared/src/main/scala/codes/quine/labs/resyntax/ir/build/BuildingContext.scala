@@ -63,14 +63,14 @@ final case class BuildingContext(flagSet: FlagSet, dialect: Dialect, featureSet:
   def dupNames: Boolean = flagSet.dupNames
 
   /** The line terminators of `^`, `$` and `.`, where Java's `d` (UNIX_LINES) limits them to `\n`. */
-  def lineTerminators: IRLineTerminators =
-    if featureSet.hasUnixLinesFlag && flagSet.hasIndices then IRLineTerminators.LF else featureSet.lineTerminators
+  def lineTerminators: IRLineTerminatorSet =
+    if featureSet.hasUnixLinesFlag && flagSet.hasIndices then IRLineTerminatorSet.LF else featureSet.lineTerminators
 
-  def charFlags: IRCharFlags =
+  def charFlags: IRCharFlagSet =
     val f = flagSet
     val isJava = dialect.isJava
     val isPCRE = dialect.isPCRE
-    IRCharFlags(
+    IRCharFlagSet(
       ignoreCase = f.ignoreCase,
       dotAll = if dialect.isRuby then f.multiline else f.dotAll,
       lineTerminators = lineTerminators,

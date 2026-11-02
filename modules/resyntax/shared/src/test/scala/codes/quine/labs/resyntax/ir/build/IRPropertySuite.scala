@@ -73,7 +73,7 @@ class IRPropertySuite extends munit.FunSuite:
   chars("\\p{i-n-c-b=l-i-n-k-e-r}", "", Ruby())(value(PropertyTable.IndicConjunctBreak, "Linker"))
   // Ruby's input has no surrogate.
   chars("\\p{^InCB=Linker}", "", Ruby())(
-    value(PropertyTable.IndicConjunctBreak, "Linker").complement(UnitMode.CodePoint).diff(IRSurrogates.All)
+    value(PropertyTable.IndicConjunctBreak, "Linker").complement(UnitMode.CodePoint).diff(IRSurrogateKind.All)
   )
   chars("\\P{^InCB=Consonant}", "", Ruby())(value(PropertyTable.IndicConjunctBreak, "Consonant"))
   chars("\\p{Grapheme_Cluster_Break=Extend}", "", Ruby())(value(PropertyTable.GraphemeClusterBreak, "Extend"))
@@ -81,7 +81,7 @@ class IRPropertySuite extends munit.FunSuite:
     value(PropertyTable.GraphemeClusterBreak, "Regional_Indicator")
   )
   chars("\\p{age = 6. 0}", "", Ruby())(
-    PropertyTable.presentIn(PropertyTable.Age.value("6.0").get).diff(IRSurrogates.All)
+    PropertyTable.presentIn(PropertyTable.Age.value("6.0").get).diff(IRSurrogateKind.All)
   )
   // Only the long names of the values listed in the data files, and no other property with a value.
   for name <- Seq(

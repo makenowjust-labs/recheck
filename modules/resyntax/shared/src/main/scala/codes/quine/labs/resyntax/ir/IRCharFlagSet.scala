@@ -1,16 +1,16 @@
 package codes.quine.labs.resyntax.ir
 
-/** IRCharFlags is a set of flags that a character-level node depends on, interpreted per dialect.
+/** IRCharFlagSet is a set of flags that a character-level node depends on, interpreted per dialect.
   *
   * It is computed at each position of a pattern, so it reflects inline flags and their scopes.
   */
-final case class IRCharFlags(
+final case class IRCharFlagSet(
     /** `i`. */
     ignoreCase: Boolean,
     /** `.` matches line terminators too (`s`, or `m` in Ruby). */
     dotAll: Boolean,
     /** The line terminators that `.` and `\N` exclude without `dotAll` (Java's `d`, PCRE's newline options). */
-    lineTerminators: IRLineTerminators,
+    lineTerminators: IRLineTerminatorSet,
     /** JavaScript `v`. */
     unicodeSets: Boolean,
     /** Case-insensitive matching beyond ASCII (Java `u`/`U`; always true in the other dialects). */

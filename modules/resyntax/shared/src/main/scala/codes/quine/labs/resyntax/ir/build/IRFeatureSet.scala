@@ -17,7 +17,7 @@ final case class IRFeatureSet(
     // .NET, JavaScript, Python: AfterTerminator, Java: Never, the others: InputBegin
     lineBeginAtEnd: IRLineBeginAtEnd,
     // JavaScript: LineTerminator, Java: six characters with atomic `\r\n`, PCRE: `(*CR)` and so on, the others: `\n`
-    lineTerminators: IRLineTerminators,
+    lineTerminators: IRLineTerminatorSet,
     // Java
     hasUnixLinesFlag: Boolean,
     // PCRE
@@ -101,12 +101,12 @@ object IRFeatureSet:
 
     // PCRE uses the last newline option.
     val newline = startOptions.reverseIterator.collectFirst {
-      case "CR"      => IRLineTerminators.CR
-      case "LF"      => IRLineTerminators.LF
-      case "CRLF"    => IRLineTerminators.PCRE_CRLF
-      case "ANYCRLF" => IRLineTerminators.PCREAnyCRLF
-      case "ANY"     => IRLineTerminators.PCREAny
-      case "NUL"     => IRLineTerminators.NUL
+      case "CR"      => IRLineTerminatorSet.CR
+      case "LF"      => IRLineTerminatorSet.LF
+      case "CRLF"    => IRLineTerminatorSet.PCRE_CRLF
+      case "ANYCRLF" => IRLineTerminatorSet.PCREAnyCRLF
+      case "ANY"     => IRLineTerminatorSet.PCREAny
+      case "NUL"     => IRLineTerminatorSet.NUL
     }
     val bsr = startOptions.reverseIterator.collectFirst {
       case "BSR_ANYCRLF" => true
@@ -123,10 +123,10 @@ object IRFeatureSet:
         else if isJava then IRLineBeginAtEnd.Never
         else IRLineBeginAtEnd.InputBegin,
       lineTerminators =
-        if isJavaScript then IRLineTerminators.JavaScript
-        else if isJava then IRLineTerminators.Java
-        else if isPCRE then newline.getOrElse(IRLineTerminators.LF)
-        else IRLineTerminators.LF,
+        if isJavaScript then IRLineTerminatorSet.JavaScript
+        else if isJava then IRLineTerminatorSet.Java
+        else if isPCRE then newline.getOrElse(IRLineTerminatorSet.LF)
+        else IRLineTerminatorSet.LF,
       hasUnixLinesFlag = isJava,
       hasUngreedyFlag = isPCRE,
       hasExplicitCaptureFlag = isDotNet || isPCRE || isPerl,

@@ -10,9 +10,9 @@ import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
-import codes.quine.labs.resyntax.ir.IRLineTerminators
+import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRLookBehindStarts
-import codes.quine.labs.resyntax.ir.IRWordMarks
+import codes.quine.labs.resyntax.ir.IRWordMarkSet
 
 /** Inst is an instruction. */
 sealed abstract class Inst:
@@ -284,19 +284,19 @@ object Inst:
       override def toString: String = "word_boundary_not"
 
     /** `\b` assertion with the word characters and the marks after a base (Java's `\b` without `U`). */
-    final case class MarkWordBoundary(word: CharSet, marks: IRWordMarks) extends AssertKind:
+    final case class MarkWordBoundary(word: CharSet, marks: IRWordMarkSet) extends AssertKind:
       override def toString: String = "mark_word_boundary"
 
     /** `\B` assertion with the word characters and the marks after a base. */
-    final case class MarkWordBoundaryNot(word: CharSet, marks: IRWordMarks) extends AssertKind:
+    final case class MarkWordBoundaryNot(word: CharSet, marks: IRWordMarkSet) extends AssertKind:
       override def toString: String = "mark_word_boundary_not"
 
     /** `^` assertion with `m` flag, which `atEnd` tells where it matches at the end of the input. */
-    final case class LineBegin(terminators: IRLineTerminators, atEnd: IRLineBeginAtEnd) extends AssertKind:
+    final case class LineBegin(terminators: IRLineTerminatorSet, atEnd: IRLineBeginAtEnd) extends AssertKind:
       override def toString: String = "line_begin"
 
     /** `$` assertion with `m` flag. */
-    final case class LineEnd(terminators: IRLineTerminators) extends AssertKind:
+    final case class LineEnd(terminators: IRLineTerminatorSet) extends AssertKind:
       override def toString: String = "line_end"
 
     /** `^` assertion. */
@@ -308,7 +308,7 @@ object Inst:
       override def toString: String = "input_end"
 
     /** `$` assertion matching also before a line terminator at the end (e.g. Python's `$`). */
-    final case class ChompInputEnd(terminators: IRLineTerminators) extends AssertKind:
+    final case class ChompInputEnd(terminators: IRLineTerminatorSet) extends AssertKind:
       override def toString: String = "chomp_input_end"
 
     /** The end of a look-behind matched forward, which the register holds. */

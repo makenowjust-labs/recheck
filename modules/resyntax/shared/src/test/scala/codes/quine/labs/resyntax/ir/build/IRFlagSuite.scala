@@ -7,7 +7,7 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRAssertKind.*
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd.*
-import codes.quine.labs.resyntax.ir.IRLineTerminators as LT
+import codes.quine.labs.resyntax.ir.IRLineTerminatorSet as LT
 import codes.quine.labs.resyntax.ir.IRNodeData.Assert
 import codes.quine.labs.resyntax.ir.IRNodeData.Chars
 import codes.quine.labs.resyntax.ir.IRNodeData.Empty
@@ -103,7 +103,7 @@ class IRFlagSuite extends munit.FunSuite with IRHelper:
   )
 
   // Unicode modes.
-  test("IRCharFlags: the defaults"):
+  test("IRCharFlagSet: the defaults"):
     assertEquals(flagsOf(JavaScript, "v").unicodeSets, true)
     assertEquals(flagsOf(Java).unicodeCase, false)
     assertEquals(flagsOf(Java, "u").unicodeCase, true)

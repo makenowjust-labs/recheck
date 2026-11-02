@@ -18,16 +18,16 @@ sealed abstract class IRAssertKind extends Product with Serializable:
 object IRAssertKind:
 
   /** LineBegin is a line begin assertion, which `atEnd` tells where it matches at the end of the input. */
-  final case class LineBegin(terminators: IRLineTerminators, atEnd: IRLineBeginAtEnd) extends IRAssertKind
+  final case class LineBegin(terminators: IRLineTerminatorSet, atEnd: IRLineBeginAtEnd) extends IRAssertKind
 
-  final case class LineEnd(terminators: IRLineTerminators) extends IRAssertKind
+  final case class LineEnd(terminators: IRLineTerminatorSet) extends IRAssertKind
 
   case object TextBegin extends IRAssertKind
 
   case object TextEnd extends IRAssertKind
 
   /** ChompTextEnd is a text end assertion that also matches before a line terminator at the end. */
-  final case class ChompTextEnd(terminators: IRLineTerminators) extends IRAssertKind
+  final case class ChompTextEnd(terminators: IRLineTerminatorSet) extends IRAssertKind
 
   /** WordBoundary is a word boundary assertion between a code value in the word set and one not in it. */
   final case class WordBoundary(word: CharSet) extends IRAssertKind
@@ -37,9 +37,9 @@ object IRAssertKind:
   /** MarkWordBoundary is a word boundary assertion where a mark after a base is a word character too (Java's `\b`
     * without `U`).
     */
-  final case class MarkWordBoundary(word: CharSet, marks: IRWordMarks) extends IRAssertKind
+  final case class MarkWordBoundary(word: CharSet, marks: IRWordMarkSet) extends IRAssertKind
 
-  final case class NotMarkWordBoundary(word: CharSet, marks: IRWordMarks) extends IRAssertKind
+  final case class NotMarkWordBoundary(word: CharSet, marks: IRWordMarkSet) extends IRAssertKind
 
   /** NotBetweenCRLF is an assertion that the position is not between `\r` and `\n`.
     *
@@ -47,13 +47,13 @@ object IRAssertKind:
     */
   case object NotBetweenCRLF extends IRAssertKind
 
-/** IRWordMarks is the marks that a word boundary assertion takes as word characters after a base, as Java's
+/** IRWordMarkSet is the set of marks that a word boundary assertion takes as word characters after a base, as Java's
   * `Pattern.Bound` does with a non-spacing mark (`hasBaseCharacter`).
   *
   * The text before a position has a base if it ends with a character of `bases` and then any characters of `extenders`.
   * A character of `marks` after such a position is a word character, and so is a character of `extenders` before it.
   */
-final case class IRWordMarks(marks: CharSet, extenders: CharSet, bases: CharSet)
+final case class IRWordMarkSet(marks: CharSet, extenders: CharSet, bases: CharSet)
 
 /** IRLineBeginAtEnd is where a line begin assertion matches at the end of the input. */
 sealed abstract class IRLineBeginAtEnd extends Product with Serializable

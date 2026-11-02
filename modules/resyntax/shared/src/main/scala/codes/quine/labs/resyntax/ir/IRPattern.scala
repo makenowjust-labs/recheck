@@ -29,7 +29,7 @@ final case class IRPattern(
     /** The unit of the input, which the character sets of the nodes consist of. */
     mode: UnitMode,
     /** What the surrogate code points of the input are in the dialect. */
-    surrogates: IRSurrogates,
+    surrogates: IRSurrogateKind,
     /** Where an empty match is rejected (PCRE's `(*NOTEMPTY)` and `(*NOTEMPTY_ATSTART)`). */
     notEmpty: IRNotEmpty
 ):
@@ -148,7 +148,7 @@ final case class IRPattern(
     loop(node)
 
   /** Returns the distinct line terminators of the line assertions and the text end assertions. */
-  def assertionLineTerminators: Seq[IRLineTerminators] =
+  def assertionLineTerminators: Seq[IRLineTerminatorSet] =
     node
       .collect:
         case Assert(IRAssertKind.LineBegin(t, _)) => t
@@ -305,9 +305,10 @@ enum IREmptyIteration:
   /** ExitAll ends the repetition with any one, even before the minimum (Java's `Loop`). */
   case ExitAll
 
-/** IRSurrogates is what the surrogate code points of the input are, which differs among dialects in `CodePoint` mode.
+/** IRSurrogateKind is the kind of the surrogate code points of the input, which differs among dialects in `CodePoint`
+  * mode.
   */
-enum IRSurrogates:
+enum IRSurrogateKind:
 
   /** Separate makes each surrogate a character, even before another (Python's `str` and Perl, and the other modes). */
   case Separate
@@ -322,9 +323,9 @@ enum IRSurrogates:
 
   /** Returns the characters of the input in the mode. */
   def universe(mode: UnitMode): CharSet =
-    if this == Absent then mode.universe.diff(IRSurrogates.All) else mode.universe
+    if this == Absent then mode.universe.diff(IRSurrogateKind.All) else mode.universe
 
-object IRSurrogates:
+object IRSurrogateKind:
 
   val High: CharSet = CharSet.range(0xd800, 0xdbff)
 

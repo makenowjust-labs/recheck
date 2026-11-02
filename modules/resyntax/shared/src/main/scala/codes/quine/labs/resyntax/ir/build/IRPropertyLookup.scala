@@ -9,7 +9,7 @@ import codes.quine.labs.resyntax.charset.EnumeratedProperty
 import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.PropertyValue
 import codes.quine.labs.resyntax.charset.UnitMode
-import codes.quine.labs.resyntax.ir.build.IRCharClasses.ASCII_POSIX
+import codes.quine.labs.resyntax.ir.build.IRClassLookup.ASCII_POSIX
 
 /** PropertyResult is a result of looking up a Unicode property in a dialect. */
 private[build] enum PropertyResult:
@@ -35,8 +35,10 @@ private[build] enum CaseKind:
   /** Cased is a property of upper, lower or title case (e.g. `Lowercase`), which some dialects take as cased. */
   case Cased
 
-/** IRProperties resolves Unicode property names (`\p{...}`) by each dialect's rules. */
-private[build] object IRProperties:
+/** IRPropertyLookup is a table that `IRCharResolver` looks up by the name of a Unicode property (`\p{...}`), giving its
+  * code points by each dialect's rules.
+  */
+private[build] object IRPropertyLookup:
   import PropertyResult.*
 
   // Scala.js has no `java.util.Locale`, and the names are ASCII.
@@ -321,7 +323,7 @@ private[build] object IRProperties:
 
   private def javaBlock(name: String): PropertyResult = fromOption(javaBlocks.get(blockKey(name)).map(foundValue))
 
-  def java(name: String, value: Option[String], flags: IRCharFlags): PropertyResult =
+  def java(name: String, value: Option[String], flags: IRCharFlagSet): PropertyResult =
     val ci = flags.ignoreCase
     value match
       case Some(value) =>
@@ -520,8 +522,8 @@ private[build] object IRProperties:
     case "any"         => Some(unicodeUniverse.universe)
     case "l&" | "lc"   => Some(gc("LC"))
     case "xan"         => Some(gc("L", "N"))
-    case "xps" | "xsp" => Some(IRCharClasses.pcreHorizontal.union(IRCharClasses.Vertical))
-    case "xwd"         => Some(IRCharClasses.pcreWord)
+    case "xps" | "xsp" => Some(IRClassLookup.pcreHorizontal.union(IRClassLookup.Vertical))
+    case "xwd"         => Some(IRClassLookup.pcreWord)
     // `$`, `@`, `` ` `` and the characters other than surrogates from U+00A0.
     case "xuc" => Some(of("$@`").union(CharSet.range(0xa0, 0xd7ff)).union(CharSet.range(0xe000, 0x10ffff)))
     case _     => None
@@ -645,7 +647,7 @@ private[build] object IRProperties:
     def o(set: CharSet, kind: CaseKind = CaseKind.Other) = Some((set, kind))
 
     val space = binary("White_Space")
-    val horiz = space.diff(IRCharClasses.Vertical)
+    val horiz = space.diff(IRClassLookup.Vertical)
     val graph = space.union(gc("Cc", "Cn", "Cs")).complement(u)
     val punct = gc("P").union(of("$+<=>^`|~"))
     key match
@@ -665,9 +667,9 @@ private[build] object IRProperties:
       case "space" | "xposixspace" | "spaceperl" | "xperlspace" => o(space)
       case "upper" | "xposixupper"                              => o(binary("Uppercase"), CaseKind.Cased)
       case "title" | "titlecase"                                => o(gc("Lt"), CaseKind.Cased)
-      case "word" | "xposixword"                                => o(IRCharClasses.perlWord)
+      case "word" | "xposixword"                                => o(IRClassLookup.perlWord)
       case "xdigit" | "xposixxdigit"                            => o(binary("Hex_Digit"))
-      case "vertspace" | "v"                                    => o(IRCharClasses.Vertical)
+      case "vertspace" | "v"                                    => o(IRClassLookup.Vertical)
       case "posixalnum"                                         => o(ASCII_POSIX("alnum"))
       case "posixalpha"                                         => o(ASCII_POSIX("alpha"))
       case "posixblank"                                         => o(ASCII_POSIX("blank"))
@@ -908,7 +910,7 @@ private[build] object IRProperties:
       dialect: Dialect,
       name: String,
       value: Option[String],
-      flags: IRCharFlags,
+      flags: IRCharFlagSet,
       mode: UnitMode
   ): PropertyResult =
     dialect match

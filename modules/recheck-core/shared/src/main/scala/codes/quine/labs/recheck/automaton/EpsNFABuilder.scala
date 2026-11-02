@@ -12,7 +12,7 @@ import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRAssertKind
 import codes.quine.labs.resyntax.ir.IRBacktrackControl
-import codes.quine.labs.resyntax.ir.IRLineTerminators
+import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
 import codes.quine.labs.resyntax.ir.IRNotEmpty
@@ -301,9 +301,9 @@ private class EpsNFABuilder(
   private val chompTextEndsInMiddle = pattern.chompTextEndsInMiddle.toSet
 
   private def buildAssert(node: IRNode, kind: IRAssertKind): (Int, Int) =
-    def atomic(t: IRLineTerminators): Boolean = t.crlf == IRLineTerminators.CRLF.Atomic
+    def atomic(t: IRLineTerminatorSet): Boolean = t.crlf == IRLineTerminatorSet.CRLF.Atomic
 
-    def plain(t: IRLineTerminators): Boolean = t.crlf == IRLineTerminators.CRLF.Ignored
+    def plain(t: IRLineTerminatorSet): Boolean = t.crlf == IRLineTerminatorSet.CRLF.Ignored
 
     def boundary(kind: AssertKind): (Int, Int) = if needsInputTerminatorDistinction then assert(kind) else epsilon()
 

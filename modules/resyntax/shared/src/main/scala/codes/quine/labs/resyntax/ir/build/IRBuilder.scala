@@ -96,19 +96,19 @@ object IRBuilder:
       case _: Dialect.Ruby => all(IREmptyIteration.ExitOptional)
       case Dialect.DotNet | _: Dialect.Perl => all(IREmptyIteration.ExitFromMin)
 
-  private def surrogateSemantics(dialect: Dialect, mode: UnitMode): IRSurrogates =
-    if mode != UnitMode.CodePoint then IRSurrogates.Separate
+  private def surrogateSemantics(dialect: Dialect, mode: UnitMode): IRSurrogateKind =
+    if mode != UnitMode.CodePoint then IRSurrogateKind.Separate
     else
       dialect match
-        case Dialect.JavaScript | Dialect.Java => IRSurrogates.Paired
-        case _: Dialect.Ruby | Dialect.PCRE    => IRSurrogates.Absent
-        case _                                 => IRSurrogates.Separate
+        case Dialect.JavaScript | Dialect.Java => IRSurrogateKind.Paired
+        case _: Dialect.Ruby | Dialect.PCRE    => IRSurrogateKind.Absent
+        case _                                 => IRSurrogateKind.Separate
 
   private def backtrackControlSemantics(dialect: Dialect): IRBacktrackControlSemantics =
     IRBacktrackControlSemantics(thenPassesAssertions = dialect.isPerl, acceptEndsAtomic = dialect.isPerl)
 
   /** Checks whether Perl takes the full case folding of the character under the flags (e.g. `ß` as `ss`). */
-  private def perlFoldsMulti(value: Int, flags: IRCharFlags, perlUnicodeRules: Boolean): Boolean =
+  private def perlFoldsMulti(value: Int, flags: IRCharFlagSet, perlUnicodeRules: Boolean): Boolean =
     val hasASCII = FullCaseFolding(value).iterator.exists(_ < 0x80)
     val one = flags.charset match
       case IRCharset.Default  => !perlUnicodeRules
@@ -142,10 +142,10 @@ object IRBuilder:
     if mode != UnitMode.CodePoint && !dialect.isPerl then return nodes => single(nodes.size)
     dialect match
       case _: Dialect.Perl =>
-        def fold(value: Int, flags: IRCharFlags): Int =
+        def fold(value: Int, flags: IRCharFlagSet): Int =
           if perlFoldsMulti(value, flags, perlUTF8Pattern) then FullCaseFolding(value).length else 1
 
-        def classWidth(data: ClassItemData, flags: IRCharFlags): Int = data match
+        def classWidth(data: ClassItemData, flags: IRCharFlagSet): Int = data match
           case ClassItemData.ClassUnion(items) => items.map(i => classWidth(i.data, flags)).maxOption.getOrElse(1)
           case value: ClassItemData.ClassValue => fold(value.value, flags)
           case ClassItemData.ClassRange(b, e) if b.data.value == e.data.value => fold(b.data.value, flags)
@@ -300,7 +300,7 @@ private[build] class IRBuilder(
       case Left(data) => IRNode(data, node.loc)
       case Right(ir)  => ir
 
-  def charFlags: IRCharFlags = context.charFlags
+  def charFlags: IRCharFlagSet = context.charFlags
 
   def buildCharacter(node: Node): IRNodeData =
     val flags = charFlags
