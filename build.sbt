@@ -44,21 +44,6 @@ def parametersGenerator(target: ParametersGen.Target): Seq[Def.Setting[?]] = Seq
   coverageExcludedFiles := ".*[/\\\\]src_managed[/\\\\].*"
 )
 
-val generateParametersSchema = taskKey[Seq[File]]("Generate the Scala test source of the schema's dialect annotations")
-
-def parametersSchemaGenerator: Seq[Def.Setting[?]] = Seq(
-  Test / sourceGenerators += generateParametersSchema.taskValue,
-  generateParametersSchema := Def.uncached {
-    Seq(
-      ParametersGen.generate(
-        ParametersGen.Target.SchemaTest,
-        (ThisBuild / baseDirectory).value,
-        (Test / sourceManaged).value
-      )
-    )
-  }
-)
-
 lazy val root = project
   .in(file("."))
   .settings(
@@ -188,7 +173,6 @@ lazy val common = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "recheck-common",
     parametersGenerator(ParametersGen.Target.Parameters),
-    parametersSchemaGenerator,
     console / initialCommands := """
       |import codes.quine.labs.recheck.common.*
       |""".stripMargin,

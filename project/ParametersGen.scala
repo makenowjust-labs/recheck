@@ -26,8 +26,7 @@ object ParametersGen {
       scalaValues: Map[String, String],
       cli: Option[String],
       cliMetavar: Option[String],
-      scalaDefaultValue: Option[String],
-      variants: Seq[Variant]
+      scalaDefaultValue: Option[String]
   ) {
     def isDuration: Boolean = scalaType == "Duration"
 
@@ -59,12 +58,6 @@ object ParametersGen {
     def label: String = title.toLowerCase
   }
 
-  /** Variant is an object of `oneOf` with the `name` constant, e.g. a dialect with its settings.
-    *
-    * The settings are the properties other than `name`, with their `enum` values (empty for a non-enum) and default.
-    */
-  final case class Variant(name: String, settings: Seq[(String, Seq[String], Any)])
-
   private val typeImports: Map[String, String] = Map(
     "AccelerationMode" -> "codes.quine.labs.recheck.common.AccelerationMode",
     "Checker" -> "codes.quine.labs.recheck.common.Checker",
@@ -84,18 +77,6 @@ object ParametersGen {
         .map(_.asInstanceOf[java.util.Map[String, String]].asScala.toMap)
         .getOrElse(Map.empty[String, String])
       require(values.forall(scalaValues.contains), s"x-scala-values of $name must map every enum value")
-      val variants = Option(p.get("oneOf")).toSeq
-        .flatMap(_.asInstanceOf[java.util.List[java.util.Map[String, Any]]].asScala)
-        .flatMap(v => Option(v.get("properties")))
-        .map { ps =>
-          val properties = ps.asInstanceOf[java.util.Map[String, java.util.Map[String, Any]]].asScala.toSeq
-          val variantName = properties.collectFirst { case ("name", n) => n.get("const").toString }
-          val settings = properties.filter(_._1 != "name").map { case (key, setting) =>
-            val values = Option(setting.get("enum")).map(_.asInstanceOf[java.util.List[String]].asScala.toSeq)
-            (key, values.getOrElse(Seq.empty), setting.get("default"))
-          }
-          Variant(variantName.getOrElse(sys.error(s"$name has a variant without name")), settings)
-        }
       Param(
         name = name,
         title = string("title").getOrElse(sys.error(s"$name has no title")),
@@ -106,8 +87,7 @@ object ParametersGen {
         scalaValues = scalaValues,
         cli = string("x-cli"),
         cliMetavar = string("x-cli-metavar"),
-        scalaDefaultValue = string("x-scala-default"),
-        variants = variants
+        scalaDefaultValue = string("x-scala-default")
       )
     }
   }
@@ -119,7 +99,6 @@ object ParametersGen {
     case object Parameters extends Target("Parameters.scala", Seq("codes.quine.labs.recheck.common"))
     case object Codec extends Target("ParametersCodec.scala", Seq("codes.quine.labs.recheck", "codec"))
     case object CLI extends Target("ParametersOpts.scala", Seq("codes.quine.labs.recheck.cli"))
-    case object SchemaTest extends Target("ParametersSchema.scala", Seq("codes.quine.labs.recheck.common"))
   }
 
   def generate(target: Target, root: File, dir: File): File = {
@@ -128,7 +107,6 @@ object ParametersGen {
       case Target.Parameters => parameters(params)
       case Target.Codec      => codec(params)
       case Target.CLI        => cli(params)
-      case Target.SchemaTest => schemaTest(params)
     }
     val file = target.pkg.flatMap(_.split('.')).foldLeft(dir)(_ / _) / target.fileName
     if (!file.exists() || IO.read(file, StandardCharsets.UTF_8) != source)
@@ -298,36 +276,6 @@ object ParametersGen {
         |object ParameterArguments:
         |
         |${arguments.mkString("\n\n")}
-        |""".stripMargin
-  }
-
-  /** Generates `ParametersSchema.scala` for the tests, the dialects of the schema. */
-  def schemaTest(params: Seq[Param]): String = {
-    def seq(ss: Seq[String]): String = ss.map(literal).mkString("Seq(", ", ", ")")
-
-    def value(v: Any): String = v match {
-      case null      => "null"
-      case s: String => literal(s)
-      case v         => v.toString
-    }
-
-    val dialect = params.find(_.name == "dialect").getOrElse(sys.error("no dialect parameter"))
-    val variants = dialect.variants.map { v =>
-      val settings = v.settings.map { case (key, values, default) =>
-        s"(${literal(key)}, ${seq(values)}, ${value(default)})"
-      }
-      s"    ${literal(v.name)} -> Seq(${settings.mkString(", ")})"
-    }
-    s"""|$header
-        |${packages(Target.SchemaTest)}
-        |
-        |/** ParametersSchema is the dialects of the schema, to test them against `Dialect`. */
-        |object ParametersSchema:
-        |
-        |  /** The settings of each dialect: the key, the `enum` values (empty for a non-enum) and the default. */
-        |  val dialects: Seq[(String, Seq[(String, Seq[String], Any)])] = Seq(
-        |${variants.mkString(",\n")}
-        |  )
         |""".stripMargin
   }
 

@@ -1,8 +1,7 @@
 # The single source of recheck's parameters.
 #
-# It is a JSON Schema (draft 2020-12) written in YAML.
-# The sbt build generates the Scala `Parameters`, its JSON decoder and the CLI options from it,
-# and the npm builds generate the TypeScript types, the ESLint rule options, the website docs and the Playground form.
+# It is a JSON Schema written in YAML.
+# The builds generate the Scala, JavaScript and TypeScript code of the parameters from it.
 #
 # Annotations:
 #
@@ -17,8 +16,6 @@
 # - `x-exclude`: the targets not exposing the parameter (`cli`, `eslint-plugin`, `playground`).
 # - `x-since`: the first release having the parameter, so that the Playground hides it on older releases.
 # - `x-scala-default`: the Scala value of the default when `x-scala-values` does not give it.
-#
-# String values are quoted because YAML 1.1 (SnakeYAML) reads `on` and `off` as booleans.
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "https://makenowjust-labs.github.io/recheck/parameters.schema.json"
