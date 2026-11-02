@@ -6,15 +6,15 @@ import codes.quine.labs.resyntax.ast.SourceLocation
 class PerlLiteralRewriterSuite extends munit.FunSuite:
   def rewrite(s: String, extended: Boolean = false)(expected: String)(implicit loc: munit.Location): Unit =
     test(s"PerlLiteralRewriter.rewrite: /$s/${if extended then "x" else ""}"):
-      assertEquals(PerlLiteralRewriter.rewrite(s, extended).map(_.text), Some(expected))
+      assertEquals(PerlLiteralRewriter.rewrite(s, extended, bytes = false).map(_.text), Some(expected))
 
   def error(s: String)(message: String)(implicit loc: munit.Location): Unit =
     test(s"PerlLiteralRewriter.rewrite: /$s/ with error \"$message\""):
-      interceptMessage[ParsingException](message)(PerlLiteralRewriter.rewrite(s, extended = false))
+      interceptMessage[ParsingException](message)(PerlLiteralRewriter.rewrite(s, extended = false, bytes = false))
 
   test("PerlLiteralRewriter.rewrite: no command"):
-    assertEquals(PerlLiteralRewriter.rewrite("a\\d[\\\\U]", extended = false), None)
-    assertEquals(PerlLiteralRewriter.rewrite("a(?#\\U)", extended = false), None)
+    assertEquals(PerlLiteralRewriter.rewrite("a\\d[\\\\U]", extended = false, bytes = false), None)
+    assertEquals(PerlLiteralRewriter.rewrite("a(?#\\U)", extended = false, bytes = false), None)
 
   // A command changes the text up to `\E` or the end, across classes and escapes.
   rewrite("[A\\L-z]")("[A-z]")
@@ -120,7 +120,7 @@ class PerlLiteralRewriterSuite extends munit.FunSuite:
   rewrite("\\U[[:alpha:]#\\Ea]b", extended = true)("[[:ALPHA:]#\\EA]B")
 
   test("PerlLiteralRewriter.Rewritten: positions and locations"):
-    val r = PerlLiteralRewriter.rewrite("\\Ua[\\Lb]", extended = false).get
+    val r = PerlLiteralRewriter.rewrite("\\Ua[\\Lb]", extended = false, bytes = false).get
     assertEquals(r.text, "A[b]")
     assertEquals((0 to 4).map(r.position), Seq(2, 3, 6, 7, 8))
     assertEquals(r.location(SourceLocation(0, 4)), SourceLocation(0, 8))
@@ -131,7 +131,7 @@ class PerlLiteralRewriterSuite extends munit.FunSuite:
     assertEquals(r.location(SourceLocation.Invalid), SourceLocation.Invalid)
 
   test("PerlLiteralRewriter.Rewritten: a character mapped to several"):
-    val r = PerlLiteralRewriter.rewrite("a\\Uß\\Q.", extended = false).get
+    val r = PerlLiteralRewriter.rewrite("a\\Uß\\Q.", extended = false, bytes = false).get
     assertEquals(r.text, "aSS\\.")
     assertEquals((0 to 5).map(r.position), Seq(0, 3, 3, 6, 6, 7))
     assertEquals(r.location(SourceLocation(1, 2)), SourceLocation(3, 4))

@@ -16,8 +16,6 @@ final case class IRPattern(
     node: IRNode,
     /** The largest capture index, or `0` without captures. */
     captureCount: Int,
-    /** The capture indices of each name, in the order of the groups. */
-    captureNames: Map[String, Seq[Int]],
     /** How back-references behave in the dialect. */
     backReference: IRBackReferenceSemantics,
     /** How backtracking treats the captures in the dialect. */

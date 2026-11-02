@@ -90,7 +90,7 @@ object IRLookBehindRule:
   case object Ruby extends IRLookBehindRule
 
 object IRFeatureSet:
-  def from(flagSet: FlagSet, dialect: Dialect, startOptions: Seq[String] = Seq.empty): IRFeatureSet =
+  def from(flagSet: FlagSet, dialect: Dialect, startOptions: Seq[String]): IRFeatureSet =
     val isDotNet = dialect.isDotNet
     val isJava = dialect.isJava
     val isJavaScript = dialect.isJavaScript

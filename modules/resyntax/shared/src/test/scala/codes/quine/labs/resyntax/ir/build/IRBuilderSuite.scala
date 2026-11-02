@@ -417,7 +417,7 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
     assertEquals(pattern.backReference, IRBackReferenceSemantics(false, IRBackReferenceChoice.LastMatching))
 
   test("IRBuilder.build: keeps the source location"):
-    val (pattern, _) = build("a(?:b)*+", "", Java)
+    val pattern = build("a(?:b)*+", "", Java)
     pattern.node.data match
       case Sequence(Seq(a, atomic)) =>
         assertEquals(a.loc, codes.quine.labs.resyntax.ast.SourceLocation(0, 1))
@@ -455,7 +455,7 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
       assertEquals(Parser.determineUnitMode(source, flagSet, dialect), mode, (source, flags, dialect))
 
   test("IRBuilder.build: the semantics of the dialect"):
-    def patternOf(dialect: Dialect): IRPattern = build("a", "", dialect)._1
+    def patternOf(dialect: Dialect): IRPattern = build("a", "", dialect)
 
     assert(patternOf(JavaScript).captures.resetsEachIteration)
     assert(patternOf(Perl()).captures.keptOnBacktracking)

@@ -32,15 +32,6 @@ object IRBuilder:
     * The unit mode is the one that `Parser.determineUnitMode` determines for the source of the node.
     */
   def build(node: Node, flagSet: FlagSet, dialect: Dialect, mode: UnitMode): IRPattern =
-    build(node, flagSet, dialect, mode, None)
-
-  private[build] def build(
-      node: Node,
-      flagSet: FlagSet,
-      dialect: Dialect,
-      mode: UnitMode,
-      resolveCharacter: Option[(Node, IRCharFlags) => IRNodeData]
-  ): IRPattern =
     val starts = startOptions(node)
     val featureSet = IRFeatureSet.from(flagSet, dialect, starts)
     if dialect.isPython && mode == UnitMode.CodePoint && flagSet.localeUpper then
@@ -70,21 +61,11 @@ object IRBuilder:
         node => table.charFlagsOf(node).flatMap(chars.rubyClassWidths(node, _))
       )
     val backReferences = new SemanticAnalyzer(table, resolver, lookBehindAnalyzer, featureSet).analyze(node)
-    val builder =
-      new IRBuilder(
-        context,
-        table,
-        backReferences,
-        chars,
-        lookBehindAnalyzer,
-        resolveCharacter,
-        hasCall(node)
-      )
+    val builder = new IRBuilder(context, table, backReferences, chars, lookBehindAnalyzer, hasCall(node))
     val root = builder.build(node)
     IRPattern(
       root,
       table.count,
-      table.names,
       IRBackReferenceSemantics(featureSet.unsetBackReferenceMatchesEmpty, featureSet.backReferenceChoice),
       captureSemantics(dialect),
       emptyIterationSemantics(dialect),
@@ -296,7 +277,6 @@ private[build] class IRBuilder(
     backReferences: Map[NodeKey, Seq[Int]],
     chars: IRCharResolver,
     lookBehindAnalyzer: LookBehindAnalyzer,
-    resolveCharacter: Option[(Node, IRCharFlags) => IRNodeData],
     hasCall: Boolean
 ):
   private val dialect = initial.dialect
@@ -326,17 +306,14 @@ private[build] class IRBuilder(
     val flags = charFlags
     // Java's CANON_EQ matches canonically equivalent sequences, which the checkers do not handle.
     if flags.canonicalEquivalence then IRNodeData.Unsupported(node.data)
-    else resolveCharacter.fold(chars.resolve(node, flags))(_(node, flags))
+    else chars.resolve(node, flags)
 
   /** Builds a part, which is literal characters in a row, together (e.g. for multi-character case folding). */
   def buildPart(nodes: Seq[Node]): Seq[IRNode] =
     val part = nodes.map(node => (node, charFlags))
     if part.exists(_._2.canonicalEquivalence) then
       part.map((node, _) => IRNode(IRNodeData.Unsupported(node.data), node.loc))
-    else
-      resolveCharacter match
-        case Some(f) => part.map((node, flags) => IRNode(f(node, flags), node.loc))
-        case None    => chars.literals(part)
+    else chars.literals(part)
 
   def buildDisjunction(children: Seq[Node]): IRNodeData =
     // The flags at an alternative are the ones after the previous alternatives, as `(?i)` reaches the next ones.
