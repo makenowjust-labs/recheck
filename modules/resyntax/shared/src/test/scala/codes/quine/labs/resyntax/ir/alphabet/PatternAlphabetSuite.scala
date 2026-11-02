@@ -84,11 +84,31 @@ class PatternAlphabetSuite extends munit.FunSuite:
     )
 
   test("PatternAlphabet.build: surrogates"):
+    import IRSurrogates.{High, Low}
     val scalars = UnitMode.CodePoint.universe.diff(IRSurrogates.All)
     // Absent surrogates are not characters.
     assertEquals(
       PatternAlphabet.build(UnitMode.CodePoint, Seq(CharSet.single('a')), surrogates = IRSurrogates.Absent).pairs,
       IndexedSeq((CharSet.single('a'), CharKind.Normal), (scalars.diff(CharSet.single('a')), CharKind.Normal))
+    )
+    // Paired surrogates split an atom of surrogates alone, and the kinds tell the high ones and the low ones.
+    val paired = IndexedSeq((High, CharKind(high = true)), (Low, CharKind(low = true)), (scalars, CharKind.Normal))
+    assertEquals(
+      PatternAlphabet.build(UnitMode.CodePoint, Seq(High, Low), surrogates = IRSurrogates.Paired).pairs,
+      paired
+    )
+    assertEquals(
+      PatternAlphabet.build(UnitMode.CodePoint, Seq(IRSurrogates.All), surrogates = IRSurrogates.Paired).pairs,
+      paired
+    )
+    // The kinds tell nothing without both of them, and of separate surrogates.
+    assertEquals(
+      PatternAlphabet.build(UnitMode.CodePoint, Seq(High), surrogates = IRSurrogates.Paired).pairs,
+      IndexedSeq((High, CharKind.Normal), (UnitMode.CodePoint.universe.diff(High), CharKind.Normal))
+    )
+    assertEquals(
+      PatternAlphabet.build(UnitMode.CodePoint, Seq(High, Low)).pairs,
+      IndexedSeq((High, CharKind.Normal), (Low, CharKind.Normal), (scalars, CharKind.Normal))
     )
 
   locally:
@@ -162,6 +182,12 @@ class PatternAlphabetSuite extends munit.FunSuite:
     assertEquals(alphabetOf("\\xff", "", Dialect.PCRE).any.map(_._1).flatMap(_.iterator).max, 0xff)
     // The line terminators of `$` before a final line terminator are distinguished.
     assert(alphabetOf("a$", "", Dialect.Python()).pairs.exists(_._1 == CharSet.single(0x0a)))
+    // The kinds tell the high surrogates and the low ones where a high one followed by a low one is one character.
+    val surrogates = "[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]"
+    for (flags, dialect) <- Seq(("u", Dialect.JavaScript), ("", Dialect.Java)) do
+      assertEquals(alphabetOf(surrogates, flags, dialect).pairs.count((_, k) => k.high || k.low), 2)
+    for (flags, dialect) <- Seq(("", Dialect.JavaScript), ("", Dialect.Python())) do
+      assertEquals(alphabetOf(surrogates, flags, dialect).pairs.count((_, k) => k.high || k.low), 0)
     // Ruby's input has no surrogate.
     assert(!alphabetOf("[^a]", "", Dialect.Ruby()).any.exists(_._1.intersects(IRSurrogates.All)))
 

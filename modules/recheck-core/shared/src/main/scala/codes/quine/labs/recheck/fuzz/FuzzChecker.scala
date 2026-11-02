@@ -375,7 +375,7 @@ private[fuzz] final class FuzzChecker(
     * and it runs as is.
     */
   def tryAttackExecute(str: FString, degree: Option[Int]): Option[(AttackPattern, Hotspot)] = interrupt:
-    val input = str.toUString
+    val input = fuzz.joinSurrogates(str.toUString)
     if input.length <= maxAttackStringSize && degree.forall(growsAsExpected(str, _)) then
       val usesAcceleration = fuzz.usesAcceleration(accelerationMode)
       val opts = Options(attackLimit, usesAcceleration = usesAcceleration, needsHeatmap = true)
@@ -396,7 +396,7 @@ private[fuzz] final class FuzzChecker(
 
     val opts = Options(attackLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode))
     val results = Seq(n1, n2).map: n =>
-      Interpreter.runWithTimeout(program, str.copy(n = n).toUString, 0, opts, attackTimeout)
+      Interpreter.runWithTimeout(program, fuzz.joinSurrogates(str.copy(n = n).toUString), 0, opts, attackTimeout)
     // A string that cannot be measured is at least as heavy as assumed.
     if results.exists(r => r.status == Status.Limit || r.status == Status.Timeout) then return true
 
@@ -418,7 +418,7 @@ private[fuzz] final class FuzzChecker(
     def execute(str: FString): Iterator[AttackResult] =
       if str.countRepeat >= maxDegree then return Iterator.empty
 
-      val input = str.toUString
+      val input = fuzz.joinSurrogates(str.toUString)
       if inputs.contains(input) || input.length >= maxGeneStringSize then return Iterator.empty
 
       val opts =

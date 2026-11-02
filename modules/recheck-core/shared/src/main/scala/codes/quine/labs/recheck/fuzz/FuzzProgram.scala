@@ -8,16 +8,28 @@ import codes.quine.labs.recheck.vm.Program
 import codes.quine.labs.recheck.vm.ProgramBuilder
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.ir.IRPattern
+import codes.quine.labs.resyntax.ir.IRSurrogates
 import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
 /** FuzzProgram is a program wrapper for fuzzing. */
-final case class FuzzProgram(program: Program, alphabet: PatternAlphabet, parts: Set[UString]):
+final case class FuzzProgram(
+    program: Program,
+    alphabet: PatternAlphabet,
+    parts: Set[UString],
+    surrogates: IRSurrogates
+):
 
   /** Whether or not it uses acceleration of VM execution, which the verbs skipping backtracking points prevent. */
   def usesAcceleration(mode: AccelerationMode): Boolean = mode match
     case AccelerationMode.Auto => !program.meta.hasRef && !program.meta.hasVerb
     case AccelerationMode.On   => !program.meta.hasVerb
     case AccelerationMode.Off  => false
+
+  /** Joins a high surrogate followed by a low surrogate in the string into one character with `Paired` surrogates, as
+    * the engine reads the string.
+    */
+  def joinSurrogates(s: UString): UString =
+    if surrogates == IRSurrogates.Paired then UString.fromString(s.asString) else s
 
 object FuzzProgram:
 
@@ -28,5 +40,5 @@ object FuzzProgram:
         for
           program <- ProgramBuilder.build(pattern)
           alphabet = PatternAlphabet.of(pattern)
-        yield FuzzProgram(program, alphabet, pattern.parts)
+        yield FuzzProgram(program, alphabet, pattern.parts, pattern.surrogates)
     .flatten

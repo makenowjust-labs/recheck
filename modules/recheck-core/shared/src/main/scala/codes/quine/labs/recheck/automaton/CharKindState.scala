@@ -30,8 +30,11 @@ final case class CharKindState(
     * Their facts behind follow from this state, and they tell `\n` after `\r` only with `afterCRLF`.
     *
     * They guess whether the character is the last of the input with `last`, and what follows `\r` with `follow`.
+    *
+    * There is none for a low surrogate after a high surrogate, which the input has as one character instead.
     */
   def advance(next: CharKind, afterCRLF: Boolean, last: Boolean, follow: Boolean): Seq[CharKindState] =
+    if kind.high && next.low then return Seq.empty
     val state = CharKindState(next, afterCRLF && next.lf && kind.cr, next.bases | (next.extenders & based))
     val lasts =
       if last && (next.isLineTerminator || next.cr || next.lf) then Seq(Some(false), Some(true)) else Seq(None)

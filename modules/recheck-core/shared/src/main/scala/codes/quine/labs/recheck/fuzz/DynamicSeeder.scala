@@ -71,7 +71,7 @@ object DynamicSeeder:
               for failedPoint <- result.failedPoints do
                 if !covered.contains(CoverageItem(failedPoint.target, true)) then
                   for
-                    patched <- Patch.build(failedPoint, fuzz.alphabet).apply(input);
+                    patched <- Patch.build(failedPoint, fuzz.alphabet).apply(input).map(fuzz.joinSurrogates);
                     if !added.contains(patched)
                   do
                     queue.enqueue((patched, Some(failedPoint.target)))

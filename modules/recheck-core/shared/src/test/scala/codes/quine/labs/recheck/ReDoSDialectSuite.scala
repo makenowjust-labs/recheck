@@ -17,8 +17,8 @@ class ReDoSDialectSuite extends munit.FunSuite:
 
   val params: Parameters = Parameters(randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
 
-  def check(source: String, dialect: Dialect, flags: String = ""): Diagnostics =
-    ReDoS.check(source, flags, params.copy(dialect = dialect))
+  def check(source: String, dialect: Dialect, flags: String = "", checker: Checker = Checker.Auto): Diagnostics =
+    ReDoS.check(source, flags, params.copy(dialect = dialect, checker = checker))
 
   def assertVulnerable(d: Diagnostics, complexity: AttackComplexity.Vulnerable, checker: Checker.Used)(using
       loc: munit.Location
@@ -52,6 +52,18 @@ class ReDoSDialectSuite extends munit.FunSuite:
     assertVulnerable(check("(*CRLF)^(?:a|.)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
 
   test("ReDoS.check: surrogates"):
+    // Node 26 and Java 25 read a high surrogate followed by a low surrogate as one character, so the alternatives do not
+    // overlap, unlike Python 3.15 and Node without `u`, which double their time for each pair.
+    val pairs = "^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF]|[\\uDC00-\\uDFFF])*$"
+    for checker <- Seq[Checker.Used](Checker.Automaton, Checker.Fuzz) do
+      assertSafe(check(pairs, JavaScript, "u", checker), checker)
+      assertSafe(check(pairs, Java, "", checker), checker)
+    assertVulnerable(check(pairs, JavaScript), AttackComplexity.Exponential(false), Checker.Automaton)
+    assertVulnerable(check(pairs, Python()), AttackComplexity.Exponential(false), Checker.Automaton)
+    // A high surrogate, any surrogate and a low surrogate in a row have a pair in any case.
+    val triple = "^(?:\\uD800[\\uD800-\\uDFFF]\\uDFFF|\\uD800[\\uD800-\\uDFFF]\\uDFFF)*$"
+    assertSafe(check(triple, JavaScript, "u"), Checker.Automaton)
+    assertVulnerable(check(triple, Python()), AttackComplexity.Exponential(false), Checker.Automaton)
     // An attack takes a character other than a surrogate from a set having one, which Ruby's and PCRE's input cannot
     // have.
     for (source, dialect, flags) <- Seq(

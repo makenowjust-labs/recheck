@@ -16,6 +16,10 @@ final case class CharKind(
     cr: Boolean = false,
     /** Whether it is `\n`, which is distinguished for `\r\n`. */
     lf: Boolean = false,
+    /** Whether it is a high surrogate, which a low surrogate never follows as another character. */
+    high: Boolean = false,
+    /** Whether it is a low surrogate, which never follows a high surrogate as another character. */
+    low: Boolean = false,
     /** Whether it is the begin or the end of the input instead of a character. */
     boundary: Boolean = false
 ):
