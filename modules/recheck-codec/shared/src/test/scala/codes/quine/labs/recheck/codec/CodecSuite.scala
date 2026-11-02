@@ -15,6 +15,7 @@ import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.Seeder
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
+import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labs.recheck.diagnostics.Hotspot
@@ -63,7 +64,7 @@ class CodecSuite extends munit.FunSuite:
         "status" := "vulnerable",
         "checker" := Checker.Automaton.asInstanceOf[Checker],
         "complexity" := AttackComplexity.Exponential(false).asInstanceOf[AttackComplexity],
-        "attack" -> encodeAttackPattern(AttackPattern.JavaScript)(
+        "attack" -> encodeAttackPattern(AttackPatternStyle.JavaScript)(
           AttackPattern(
             Seq((UString.fromUTF16Units(""), UString.fromUTF16Units("a"), 0)),
             UString.fromUTF16Units("\u0000"),
@@ -148,7 +149,7 @@ class CodecSuite extends munit.FunSuite:
       0
     )
     assertEquals(
-      encodeAttackPattern(AttackPattern.JavaScript)(attack),
+      encodeAttackPattern(AttackPatternStyle.JavaScript)(attack),
       Json.obj(
         "pumps" := Json.arr(Json.obj("prefix" := "a", "pump" := "b", "bias" := 2)),
         "suffix" := "c",
@@ -158,7 +159,7 @@ class CodecSuite extends munit.FunSuite:
       )
     )
     assertEquals(
-      encodeAttackPattern(AttackPattern.Python())(attack).hcursor.get[String]("pattern"),
+      encodeAttackPattern(AttackPatternStyle.Python())(attack).hcursor.get[String]("pattern"),
       Right("'a' + 'b' * 2 + 'c'")
     )
 
@@ -230,7 +231,7 @@ class CodecSuite extends munit.FunSuite:
       17
     )
     val decoder = decodeAttackPattern(UnitMode.CodePoint)
-    assertEquals(decoder.decodeJson(encodeAttackPattern(AttackPattern.Python())(attack)), Right(attack))
+    assertEquals(decoder.decodeJson(encodeAttackPattern(AttackPatternStyle.Python())(attack)), Right(attack))
     assertEquals(
       decoder.decodeJson(Json.obj("pumps" := Json.arr(), "suffix" := "a")).left.map(_.pathToRootString),
       Left(Some(".base"))

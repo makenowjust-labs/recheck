@@ -2,6 +2,7 @@ package codes.quine.labs.recheck
 package fuzz
 
 import codes.quine.labs.recheck.diagnostics.AttackPattern
+import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.fuzz.FString.*
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
@@ -109,9 +110,9 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]):
     AttackPattern(pumps.result(), suffix, n)
 
   /** Returns the string representation of this string in the style. */
-  def toString(style: AttackPattern.Style): String = toAttackPattern.toString(style)
+  def toString(style: AttackPatternStyle): String = toAttackPattern.toString(style)
 
-  override def toString: String = toString(AttackPattern.JavaScript)
+  override def toString: String = toString(AttackPatternStyle.JavaScript)
 
 /** FString types and utilities. */
 object FString:

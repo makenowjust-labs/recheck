@@ -10,6 +10,7 @@ import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.TimeoutException
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
+import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.Hotspot.*
@@ -241,7 +242,7 @@ class ReDoSSuite extends munit.FunSuite:
       val ds = if checker == Checker.Automaton then checkAutomaton("^(?:a|a)*$", flags, params)
       else checkFuzz("^(?:a|a)*$", flags, params)
       val d = ds.next().asInstanceOf[Diagnostics.Vulnerable]
-      d.attack.toString(AttackPattern.Style.of(d.dialect, d.unitMode))
+      d.attack.toString(AttackPatternStyle.of(d.dialect, d.unitMode))
 
     assertEquals(attack(Dialect.JavaScript, ""), "'a'.repeat(31) + '\\x00'")
     assertEquals(attack(Dialect.Python(), ""), "'a' * 31 + '\\x00'")

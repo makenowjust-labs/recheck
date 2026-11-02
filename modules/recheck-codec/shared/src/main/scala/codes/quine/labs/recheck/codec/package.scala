@@ -15,6 +15,7 @@ import io.circe.syntax.*
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
+import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labs.recheck.diagnostics.Hotspot
@@ -59,7 +60,7 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "status" := "vulnerable",
         "checker" := checker,
         "complexity" := complexity.asInstanceOf[AttackComplexity],
-        "attack" -> encodeAttackPattern(AttackPattern.Style.of(dialect, unitMode))(attack),
+        "attack" -> encodeAttackPattern(AttackPatternStyle.of(dialect, unitMode))(attack),
         "hotspot" := hotspot,
         "recallValidation" := recallValidation
       )
@@ -162,7 +163,7 @@ given encodeAttackComplexity: Encoder[AttackComplexity] with
       Json.obj("type" := "exponential", "summary" := c.toString, "isFuzz" := c.isFuzz)
 
 /** Returns an `Encoder` for `AttackPattern` whose `pattern` is in the style. */
-def encodeAttackPattern(style: AttackPattern.Style): Encoder[AttackPattern] = (p: AttackPattern) =>
+def encodeAttackPattern(style: AttackPatternStyle): Encoder[AttackPattern] = (p: AttackPattern) =>
   val pumps = p.pumps.map:
     case (p, s, n) => Json.obj("prefix" := p, "pump" := s, "bias" := n)
   Json.obj(

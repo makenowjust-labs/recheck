@@ -52,7 +52,7 @@ object Diagnostics:
           |Dialect      : ${show(dialect)}
           |Status       : vulnerable
           |Complexity   : $complexity
-          |Attack string: ${attack.toString(AttackPattern.Style.of(dialect, unitMode))}
+          |Attack string: ${attack.toString(AttackPatternStyle.of(dialect, unitMode))}
           |Hotspot      : /${hotspot.highlight(source)}/$flags
           |Checker      : $checker""".stripMargin + recall
 

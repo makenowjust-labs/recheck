@@ -4,6 +4,7 @@ package fuzz
 import scala.language.implicitConversions
 
 import codes.quine.labs.recheck.diagnostics.AttackPattern
+import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.fuzz.FString.*
 import codes.quine.labs.resyntax.charset.UString
 
@@ -115,30 +116,30 @@ class FStringSuite extends munit.FunSuite:
     }
 
   test("FString#toString"):
-    assertEquals(FString(2, IndexedSeq.empty).toString(AttackPattern.JavaScript), "''")
-    assertEquals(FString(2, IndexedSeq.empty).toString(AttackPattern.Superscript), "''")
+    assertEquals(FString(2, IndexedSeq.empty).toString(AttackPatternStyle.JavaScript), "''")
+    assertEquals(FString(2, IndexedSeq.empty).toString(AttackPatternStyle.Superscript), "''")
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d')))
-        .toString(AttackPattern.JavaScript),
+        .toString(AttackPatternStyle.JavaScript),
       "'a' + 'bc'.repeat(3) + 'd'"
     )
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d')))
-        .toString(AttackPattern.Superscript),
+        .toString(AttackPatternStyle.Superscript),
       "'a' 'bc'³ 'd'"
     )
     assertEquals(
       FString(
         2,
         IndexedSeq(Repeat(1, 1), Wrap('a'), Repeat(1, 1), Wrap('b'), Repeat(0, 1), Wrap('c'))
-      ).toString(AttackPattern.JavaScript),
+      ).toString(AttackPatternStyle.JavaScript),
       "'a'.repeat(3) + 'b'.repeat(3) + 'c'.repeat(2)"
     )
     assertEquals(
       FString(
         2,
         IndexedSeq(Repeat(1, 1), Wrap('a'), Repeat(1, 1), Wrap('b'), Repeat(0, 1), Wrap('c'))
-      ).toString(AttackPattern.Superscript),
+      ).toString(AttackPatternStyle.Superscript),
       "'a'³ 'b'³ 'c'²"
     )
     intercept[IllegalArgumentException] {
