@@ -44,7 +44,8 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     val a = CharSet.single('a')
     val at = CharSet.single('@')
     val other1 = a.complement(UnitMode.UTF16)
-    val word = CharSet.fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))
+    val word =
+      CharSet.union(Seq(CharSet.range('0', '9'), CharSet.range('A', 'Z'), CharSet.single('_'), CharSet.range('a', 'z')))
     val other2 = word.union(at).complement(UnitMode.UTF16)
     assertEquals(
       check("^.*a.*a$", "s"),

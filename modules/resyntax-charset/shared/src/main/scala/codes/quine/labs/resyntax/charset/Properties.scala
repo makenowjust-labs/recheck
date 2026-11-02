@@ -1,13 +1,10 @@
 package codes.quine.labs.resyntax.charset
 
-/** Properties provides the Unicode character properties of [[unicodeVersion]].
+/** Properties provides the Unicode character properties.
   *
   * The data are generated from ICU4J at build time and decoded at first use.
   */
 object Properties:
-
-  /** The Unicode version of the data, such as `"18.0.0"`. */
-  def unicodeVersion: String = UnicodeData.Version
 
   /** The binary properties known to ICU4J, in ICU's `UProperty` order. */
   lazy val icuBinaryProperties: IndexedSeq[BinaryProperty] =
@@ -118,7 +115,7 @@ object Properties:
               case Array(n, d) => (n.toLong, d.toLong)
               case _           => throw new IllegalStateException(s"invalid numeric value: $value")
         new NumericValue(n, d, table.setOf(_ == i))
-    NumericProperty(names, short, values, c => values(table.valueAt(c)))
+    NumericProperty(names, short, values)
 
   lazy val enumeratedProperties: IndexedSeq[EnumeratedProperty] =
     IndexedSeq(
@@ -156,22 +153,16 @@ object Properties:
 
   private lazy val index = NameIndex(all.map(p => (p.names, p)))
 
-  def lookup(name: String, matching: NameMatching = NameMatching.Exact): Option[Property] =
-    index.get(name, matching)
+  def lookup(name: String): Option[Property] = index.get(name, NameMatching.Exact)
 
-  def binary(name: String, matching: NameMatching = NameMatching.Exact): Option[BinaryProperty] =
-    lookup(name, matching).collect { case p: BinaryProperty => p }
-
-  def enumerated(name: String, matching: NameMatching = NameMatching.Exact): Option[EnumeratedProperty] =
-    lookup(name, matching).collect { case p: EnumeratedProperty => p }
+  def binary(name: String): Option[BinaryProperty] = lookup(name).collect { case p: BinaryProperty => p }
 
   private lazy val binaryValueIndex =
     val Array(yes, no) = UnicodeData.BinaryValueNames.split(";")
     NameIndex(Seq((Codec.names(yes)._1, true), (Codec.names(no)._1, false)))
 
-  /** Looks up a value of binary properties: `Yes` (`Y`, `True`, `T`) or `No` (`N`, `False`, `F`). */
-  def binaryValue(name: String, matching: NameMatching = NameMatching.Exact): Option[Boolean] =
-    binaryValueIndex.get(name, matching)
+  /** Looks up a value of binary properties by loose matching: `Yes` (`Y`, `True`, `T`) or `No` (`N`, `False`, `F`). */
+  def binaryValue(name: String): Option[Boolean] = binaryValueIndex.get(name, NameMatching.Loose)
 
   /** Returns the code points assigned in the version of the [[Age]] value or earlier.
     *
@@ -198,7 +189,7 @@ object Properties:
     lazy val values: IndexedSeq[PropertyValue] = fields.zipWithIndex.map:
       case ((valueNames, valueShort), i) =>
         PropertyValue(names.head, valueNames, valueShort, table.setOf(combos(_).contains(i)))
-    EnumeratedProperty(names, short, values, c => combos(table.valueAt(c)).toSeq.sorted.map(values))
+    EnumeratedProperty(names, short, values)
 
   private def fromRaw(raw: RawEnumerated): EnumeratedProperty =
     val (names, short) = Codec.names(raw.names)
@@ -221,4 +212,4 @@ object Properties:
             val (valueNames, valueShort) = Codec.names(field)
             val memberSet = members.split(" ").map(_.toInt).toSet
             PropertyValue(names.head, valueNames, valueShort, table.setOf(memberSet.contains))
-    EnumeratedProperty(names, short, baseValues ++ groupValues, c => Seq(baseValues(table.valueAt(c))))
+    EnumeratedProperty(names, short, baseValues ++ groupValues)

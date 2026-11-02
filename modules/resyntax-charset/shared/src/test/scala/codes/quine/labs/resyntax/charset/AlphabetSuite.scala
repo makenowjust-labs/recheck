@@ -3,7 +3,10 @@ package codes.quine.labs.resyntax.charset
 import scala.collection.immutable.BitSet
 
 class AlphabetSuite extends munit.FunSuite:
-  def set(intervals: (Int, Int)*): CharSet = CharSet.fromIntervals(intervals)
+  def set(intervals: (Int, Int)*): CharSet =
+    val builder = CharSet.newBuilder
+    for (start, end) <- intervals do builder.addRange(start, end)
+    builder.result()
 
   test("Alphabet.refine: no sets"):
     val a = Alphabet.refine(UnitMode.Byte, Seq.empty)
@@ -28,7 +31,7 @@ class AlphabetSuite extends munit.FunSuite:
     assertEquals(a.atomsOf(lower), BitSet(2, 3))
     assertEquals(a.atomsOf(hex), BitSet(1, 2))
     assertEquals(a.atomsOf(hex.diff(lower)), BitSet(1))
-    assertEquals(a.setOf(a.atomsOf(lower)), lower)
+    assertEquals(CharSet.union(a.atomsOf(lower).iterator.map(a.atoms)), lower)
     assertEquals(a.atomOf(0x62), 2)
     assertEquals(a.atomOf(0x7a), 3)
     assertEquals(a.atomOf(0xff), 0)
@@ -38,10 +41,10 @@ class AlphabetSuite extends munit.FunSuite:
     for mode <- UnitMode.values do
       val a = Alphabet.refine(mode, sets)
       assertEquals(CharSet.union(a.atoms), mode.universe)
-      for i <- a.atoms.indices; j <- a.atoms.indices if i < j do assert(!a.atoms(i).intersects(a.atoms(j)))
-      for s <- sets do assertEquals(a.setOf(a.atomsOf(s)), s.restrict(mode))
+      for i <- a.atoms.indices; j <- a.atoms.indices if i < j do assert(a.atoms(i).intersect(a.atoms(j)).isEmpty)
+      for s <- sets do assertEquals(CharSet.union(a.atomsOf(s).iterator.map(a.atoms)), s.restrict(mode))
       for (atom, i) <- a.atoms.zipWithIndex; c <- Seq(atom.head, atom.last) do assertEquals(a.atomOf(c), i)
-      for atom <- a.atoms; s <- sets do assert(atom.subsetOf(s) || !atom.intersects(s))
+      for atom <- a.atoms; s <- sets do assert(atom.subsetOf(s) || atom.intersect(s).isEmpty)
 
   test("Alphabet.refine: coarsest"):
     val a = Alphabet.refine(UnitMode.Byte, Seq(set((0x41, 0x42), (0x61, 0x62)), set((0x41, 0x42), (0x61, 0x62))))

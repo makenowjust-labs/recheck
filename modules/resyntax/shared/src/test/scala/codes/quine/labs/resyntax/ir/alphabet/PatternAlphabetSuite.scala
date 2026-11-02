@@ -10,7 +10,8 @@ import codes.quine.labs.resyntax.ir.build.IRBuilder
 import codes.quine.labs.resyntax.parser.Parser
 
 class PatternAlphabetSuite extends munit.FunSuite:
-  val Word: CharSet = CharSet.fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))
+  val Word: CharSet =
+    CharSet.union(Seq(CharSet.range('0', '9'), CharSet.range('A', 'Z'), CharSet.single('_'), CharSet.range('a', 'z')))
 
   test("PatternAlphabet.build"):
     assertEquals(
@@ -144,7 +145,8 @@ class PatternAlphabetSuite extends munit.FunSuite:
     )
 
   test("PatternAlphabet.of"):
-    val word = CharSet.fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))
+    val word =
+      CharSet.union(Seq(CharSet.range('0', '9'), CharSet.range('A', 'Z'), CharSet.single('_'), CharSet.range('a', 'z')))
     val lineTerminator = CharSet.of(0x0a, 0x0d, 0x2028, 0x2029)
     val utf16 = UnitMode.UTF16
     assertEquals(alphabetOf(""), PatternAlphabet.build(utf16))
@@ -189,7 +191,7 @@ class PatternAlphabetSuite extends munit.FunSuite:
     for (flags, dialect) <- Seq(("", Dialect.JavaScript), ("", Dialect.Python())) do
       assertEquals(alphabetOf(surrogates, flags, dialect).pairs.count((_, k) => k.high || k.low), 0)
     // Ruby's input has no surrogate.
-    assert(!alphabetOf("[^a]", "", Dialect.Ruby()).any.exists(_._1.intersects(IRSurrogates.All)))
+    assert(!alphabetOf("[^a]", "", Dialect.Ruby()).any.exists(_._1.intersect(IRSurrogates.All).nonEmpty))
 
   test("PatternAlphabet.wordSets"):
     assertEquals(PatternAlphabet.wordSets(parse("\\b(?a:\\b)", "", Dialect.Python())).size, 2)

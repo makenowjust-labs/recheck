@@ -6,7 +6,6 @@ import codes.quine.labs.resyntax.charset.BinaryProperty
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
 import codes.quine.labs.resyntax.charset.EnumeratedProperty
-import codes.quine.labs.resyntax.charset.NameMatching
 import codes.quine.labs.resyntax.charset.Properties
 import codes.quine.labs.resyntax.charset.PropertyValue
 import codes.quine.labs.resyntax.charset.UnitMode
@@ -705,7 +704,7 @@ private[build] object IRProperties:
               case _                     =>
                 perlBinaryIndex.get(propertyKey) match
                   case Some(p) =>
-                    Properties.binaryValue(value, NameMatching.Loose) match
+                    Properties.binaryValue(value) match
                       case Some(true)  => foundBinary(p)
                       case Some(false) => found(p.set.complement(unicodeUniverse))
                       case None        => Unknown

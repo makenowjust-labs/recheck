@@ -14,7 +14,8 @@ import codes.quine.labs.resyntax.ir.IRLineTerminators
 import codes.quine.labs.resyntax.ir.IRLookBehindStarts
 
 class InstSuite extends munit.FunSuite:
-  val Word: CharSet = CharSet.fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))
+  val Word: CharSet =
+    CharSet.union(Seq(CharSet.range('0', '9'), CharSet.range('A', 'Z'), CharSet.single('_'), CharSet.range('a', 'z')))
 
   test("Inst#toString"):
     assertEquals(Inst.Ok.toString, "ok")

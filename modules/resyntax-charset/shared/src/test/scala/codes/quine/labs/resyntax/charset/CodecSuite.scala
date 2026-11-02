@@ -12,7 +12,7 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(Seq(0, 1, 2, 3, 4).map(Codec.unzigzag), Seq(0, -1, 1, -2, 2))
 
   test("Codec.intervals"):
-    assertEquals(Codec.intervals("!#!$"), CharSet.fromIntervals(Seq((1, 3), (4, 7))))
+    assertEquals(Codec.intervals("!#!$"), CharSet.range(1, 2).union(CharSet.range(4, 6)))
 
   test("Codec.strings"):
     assertEquals(Codec.strings(" #%'"), Seq(UString(2, 3)))

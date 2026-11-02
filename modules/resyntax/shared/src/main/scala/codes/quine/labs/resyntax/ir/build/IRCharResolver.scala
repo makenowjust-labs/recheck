@@ -781,7 +781,7 @@ private[build] object IRCharResolver:
   val MaxMultiFoldings: Int = 6
 
   /** The strings of two or more code points that some characters fold to (e.g. `ss` from `ß`). */
-  lazy val multiFoldings: Seq[(UString, CharSet)] = FullCaseFolding.multiCodePointFoldings().toSeq.sortBy(_._1)
+  lazy val multiFoldings: Seq[(UString, CharSet)] = FullCaseFolding.multiCodePointFoldings.toSeq.sortBy(_._1)
 
   /** [[multiFoldings]] in the order of Onigmo's tables: by the length, and then by the folding. */
   lazy val rubyMultiFoldings: Seq[(UString, CharSet)] = multiFoldings.sortBy((key, _) => (key.length, key))

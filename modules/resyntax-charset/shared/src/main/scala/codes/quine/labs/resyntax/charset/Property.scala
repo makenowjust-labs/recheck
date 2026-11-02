@@ -42,18 +42,13 @@ final class PropertyValue private[charset] (
 final class EnumeratedProperty private[charset] (
     val names: IndexedSeq[String],
     val shortName: String,
-    val values: IndexedSeq[PropertyValue],
-    valuesOf: Int => Seq[PropertyValue]
+    val values: IndexedSeq[PropertyValue]
 ) extends Property:
 
   private val index = NameIndex(values.map(v => (v.names, v)))
 
   /** It also finds a group of values such as `General_Category=L`. */
-  def value(name: String, matching: NameMatching = NameMatching.Exact): Option[PropertyValue] =
-    index.get(name, matching)
-
-  /** A code point has one value except in a multi-valued property such as Script_Extensions, and no group value. */
-  def valuesAt(c: Int): Seq[PropertyValue] = valuesOf(c)
+  def value(name: String): Option[PropertyValue] = index.get(name, NameMatching.Exact)
 
   override def toString: String = s"EnumeratedProperty($name)"
 
@@ -75,12 +70,9 @@ final class NumericValue private[charset] (val numerator: Long, val denominator:
 final class NumericProperty private[charset] (
     val names: IndexedSeq[String],
     val shortName: String,
-    val values: IndexedSeq[NumericValue],
-    valueOf: Int => NumericValue
+    val values: IndexedSeq[NumericValue]
 ) extends Property:
 
   def nan: NumericValue = values.find(_.isNaN).get
-
-  def valueAt(c: Int): NumericValue = valueOf(c)
 
   override def toString: String = s"NumericProperty($name)"

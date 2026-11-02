@@ -12,12 +12,7 @@ final class ClassSet private (val chars: CharSet, val strings: SortedSet[UString
 
   def isEmpty: Boolean = chars.isEmpty && strings.isEmpty
 
-  def nonEmpty: Boolean = !isEmpty
-
   def hasStrings: Boolean = strings.nonEmpty
-
-  def contains(s: UString): Boolean =
-    if s.length == 1 then chars.contains(s(0)) else strings.contains(s)
 
   infix def union(that: ClassSet): ClassSet =
     new ClassSet(chars.union(that.chars), strings.union(that.strings))
@@ -27,11 +22,6 @@ final class ClassSet private (val chars: CharSet, val strings: SortedSet[UString
 
   infix def diff(that: ClassSet): ClassSet =
     new ClassSet(chars.diff(that.chars), strings.diff(that.strings))
-
-  /** Returns the complement of the class, which has no string. */
-  def complement(mode: UnitMode): ClassSet =
-    require(!hasStrings, "a class containing strings cannot be complemented")
-    new ClassSet(chars.complement(mode), strings)
 
   override def equals(that: Any): Boolean = that match
     case that: ClassSet => chars == that.chars && strings == that.strings
@@ -50,5 +40,3 @@ object ClassSet:
   def apply(chars: CharSet, strings: IterableOnce[UString] = Nil): ClassSet =
     val (singles, others) = strings.iterator.toSeq.partition(_.length == 1)
     new ClassSet(chars.union(CharSet.of(singles.map(_(0))*)), SortedSet.from(others))
-
-  def fromStrings(strings: IterableOnce[UString]): ClassSet = ClassSet(CharSet.empty, strings)
