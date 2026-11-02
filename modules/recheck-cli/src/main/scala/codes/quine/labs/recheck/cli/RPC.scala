@@ -222,6 +222,7 @@ object RPC:
   /** Handler represents an handler of JSON-RPC. */
   sealed trait Handler:
     type Params
+
     def decodeParams: Decoder[Params]
 
     private[cli] def handle(optID: Option[ID], paramsJson: Json, push: ResponsePush, send: ResponseSend): Result[Unit]
@@ -229,9 +230,11 @@ object RPC:
   /** RequestHandler represents an handler of JSON-RPC request. */
   sealed trait RequestHandler extends Handler:
     type Message
+
     def encodeMessage: Encoder[Message]
 
     type Result
+
     def encodeResult: Encoder[Result]
 
     def apply(id: ID, params: Params, push: Push[Message], send: Send[Result]): Unit
@@ -269,12 +272,15 @@ object RPC:
     def apply[P: Decoder, M: Encoder, R: Encoder](h: (ID, P, Push[M], Send[R]) => Unit): RequestHandler =
       new RequestHandler:
         type Params = P
+
         def decodeParams: Decoder[P] = Decoder[P]
 
         type Message = M
+
         def encodeMessage: Encoder[M] = Encoder[M]
 
         type Result = R
+
         def encodeResult: Encoder[R] = Encoder[R]
 
         def apply(id: ID, params: P, push: Push[M], send: Send[R]): Unit = h(id, params, push, send)
@@ -303,6 +309,7 @@ object RPC:
   object NotificationHandler:
     def apply[P: Decoder](h: P => Unit): NotificationHandler = new NotificationHandler:
       type Params = P
+
       def decodeParams: Decoder[P] = Decoder[P]
 
       def apply(params: P): Unit = h(params)

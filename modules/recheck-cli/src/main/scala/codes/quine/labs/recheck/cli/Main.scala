@@ -86,13 +86,13 @@ object Main:
 
         threadSize.map(BatchAction.apply)
 
-      val recallScript: Opts[Action] = Opts.subcommand(
+      val generateRecallScript: Opts[Action] = Opts.subcommand(
         name = "generate-recall-script",
         help = "Generates the recall validation program of a vulnerable diagnostics in JSON as a standalone script."
       ):
         Opts.argument[String](metavar = "diagnostics").map(GenerateRecallScriptAction.apply)
 
-      agent <+> recallScript <+> check
+      agent <+> generateRecallScript <+> check
 
   /** The options of the dialect's settings, which set them on the dialect of `--dialect`. */
   def dialectSettings: Opts[Dialect => ValidatedNel[String, Dialect]] =
@@ -148,7 +148,6 @@ class Main:
 
   // $COVERAGE-OFF$
   def exit(exitCode: Int): Unit = sys.exit(exitCode)
-
   // $COVERAGE-ON$
 
   def run(args: Array[String]): Unit = command.parse(args.toSeq, sys.env) match

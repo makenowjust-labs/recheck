@@ -12,10 +12,7 @@ import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetException
 import codes.quine.labs.resyntax.parser.Parser
 
-/** `recheck generate-recall-script` command implementation.
-  *
-  * The pattern of the diagnostics is not parsed, but only its flags and what decides the unit of the attack string.
-  */
+/** `recheck generate-recall-script` command implementation. */
 object GenerateRecallScriptCommand:
 
   /** Generates the recall program of a vulnerable diagnostics in JSON as a standalone script, or returns the error. */
