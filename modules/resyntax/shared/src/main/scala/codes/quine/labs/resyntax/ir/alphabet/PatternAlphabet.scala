@@ -2,6 +2,7 @@ package codes.quine.labs.resyntax.ir.alphabet
 
 import codes.quine.labs.resyntax.charset.Alphabet
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRAssertKind
 import codes.quine.labs.resyntax.ir.IRLineTerminators
@@ -73,7 +74,7 @@ object PatternAlphabet:
       first +: all.drop(first + 1).map(s => if s.contains(c.head) then 0 else 1)
 
     // The bits are of the sets as given, even if `lineTerminator` (resp. `word`) is `None`.
-    def mask(sets: Seq[Option[CharSet]], c: Int): Int =
+    def mask(sets: Seq[Option[CharSet]], c: UChar): Int =
       sets.zipWithIndex.collect { case (Some(t), i) if t.contains(c) => 1 << i }.sum
 
     val pairs = Alphabet

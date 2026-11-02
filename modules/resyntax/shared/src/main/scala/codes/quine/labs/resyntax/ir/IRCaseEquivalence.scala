@@ -2,6 +2,7 @@ package codes.quine.labs.resyntax.ir
 
 import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UnitMode
 
 /** IRCaseEquivalence is a dialect's relation of case-insensitive matching of single code values.
@@ -19,7 +20,7 @@ sealed abstract class IRCaseEquivalence:
     */
   def closeRange(set: CharSet): CharSet = closure(set)
 
-  def equiv(a: Int, b: Int): Boolean = closure(CharSet.single(a)).contains(b)
+  def equiv(a: UChar, b: UChar): Boolean = closure(CharSet.single(a)).contains(b)
 
 object IRCaseEquivalence:
 

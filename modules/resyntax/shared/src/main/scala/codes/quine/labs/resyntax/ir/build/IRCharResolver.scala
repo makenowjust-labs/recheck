@@ -19,6 +19,7 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.Properties
+import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.build.IRCharResolver.*
@@ -297,7 +298,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
 
   private def isRubyByteLit(lit: Lit): Boolean = lit.escape.exists(isRubyByte(_, lit.value))
 
-  private def unitsOf(lit: Lit): Seq[Int] = mode match
+  private def unitsOf(lit: Lit): Seq[UChar] = mode match
     case UnitMode.CodePoint => Seq(lit.value)
     case UnitMode.UTF16     => UString(lit.value).encode(UnitMode.UTF16).toSeq
     case UnitMode.Byte      =>
@@ -681,7 +682,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
       if n < 2 then throw new IRBuildingException("Invalid multibyte escape", lits(i).loc)
       i += n
 
-  private def valueUnits(value: ClassItemData.ClassValue, flags: IRCharFlags, loc: SourceLocation): Seq[Int] =
+  private def valueUnits(value: ClassItemData.ClassValue, flags: IRCharFlags, loc: SourceLocation): Seq[UChar] =
     val lit = value match
       case ClassItemData.ClassLiteral(v)                                     => Lit(v, true, None, flags, loc)
       case ClassItemData.ClassBackslashValue(BackslashKind.Unknown(v))       => Lit(v, true, None, flags, loc)
@@ -691,7 +692,7 @@ private[build] final class IRCharResolver(dialect: Dialect, mode: UnitMode, perl
     if mode == UnitMode.UTF16 && units.length != 1 then throw new NotModeledException
     units
 
-  private def closeChars(values: Seq[Int], flags: IRCharFlags): CharSet =
+  private def closeChars(values: Seq[UChar], flags: IRCharFlags): CharSet =
     equivalence(flags).closure(CharSet.of(values*))
 
   private def range(
