@@ -111,6 +111,7 @@ class ReDoSSuite extends munit.FunSuite:
             31
           ),
           Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))),
+          None,
           Checker.Automaton
         )
       )
@@ -130,6 +131,7 @@ class ReDoSSuite extends munit.FunSuite:
           10
         ),
         Hotspot(Seq(Spot(1, 2, Heat))),
+        None,
         Checker.Automaton
       )
 
@@ -270,6 +272,7 @@ class ReDoSSuite extends munit.FunSuite:
             31
           ),
           Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))),
+          None,
           Checker.Automaton
         )
       )
@@ -329,6 +332,7 @@ class ReDoSSuite extends munit.FunSuite:
             31
           ),
           Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))),
+          None,
           Checker.Automaton
         )
       )

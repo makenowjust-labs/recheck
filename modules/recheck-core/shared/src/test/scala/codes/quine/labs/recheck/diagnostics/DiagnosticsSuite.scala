@@ -40,6 +40,7 @@ class DiagnosticsSuite extends munit.FunSuite:
             2
           ),
           Hotspot.empty,
+          None,
           Checker.Automaton
         )
         .toString,
@@ -65,8 +66,8 @@ class DiagnosticsSuite extends munit.FunSuite:
             2
           ),
           Hotspot.empty,
-          Checker.Automaton,
-          Some(RecallValidation("ruby 4.0.7", Duration(1, SECONDS), RecallResult.Finish(Duration(3, MILLISECONDS))))
+          Some(RecallValidation("ruby 4.0.7", Duration(1, SECONDS), RecallResult.Finish(Duration(3, MILLISECONDS)))),
+          Checker.Automaton
         )
         .toString,
       s"""|Input        : /a*a*$$/
@@ -75,8 +76,8 @@ class DiagnosticsSuite extends munit.FunSuite:
           |Complexity   : 2nd degree polynomial
           |Attack string: "a" * 2 + "!"
           |Hotspot      : /a*a*$$/
-          |Checker      : automaton
-          |Recall       : failed (finished in 3 ms on ruby 4.0.7, timeout: 1000 ms)""".stripMargin
+          |Recall       : failed (finished in 3 ms on ruby 4.0.7, timeout: 1000 ms)
+          |Checker      : automaton""".stripMargin
     )
     assertEquals(
       Diagnostics.Unknown("", "", Dialect.JavaScript, Diagnostics.ErrorKind.Timeout, Some(Checker.Automaton)).toString,

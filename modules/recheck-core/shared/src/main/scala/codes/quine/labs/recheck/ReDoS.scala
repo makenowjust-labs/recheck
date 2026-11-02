@@ -203,6 +203,7 @@ object ReDoS:
             vul.toAttackComplexity,
             attack,
             vul.hotspot,
+            None,
             Checker.Automaton
           )
       .withChecker(Checker.Automaton)
@@ -269,6 +270,7 @@ object ReDoS:
             complexity,
             recallAttack,
             hotspot,
+            None,
             Checker.Fuzz
           )
 

@@ -75,8 +75,8 @@ export type SafeDiagnostics = {
   flags: string;
   dialect: Dialect;
   status: "safe";
-  checker: "automaton" | "fuzz";
   complexity: SafeComplexity;
+  checker: "automaton" | "fuzz";
 };
 
 /**
@@ -91,14 +91,14 @@ export type VulnerableDiagnostics = {
    */
   unitMode: "utf16" | "code-point" | "byte";
   status: "vulnerable";
-  checker: "automaton" | "fuzz";
-  attack: AttackPattern;
   complexity: VulnerableComplexity;
+  attack: AttackPattern;
   hotspot: Hotspot[];
   /**
    * The recall validation of the attack string, or `null` if it is not run.
    */
   recallValidation: RecallValidation | null;
+  checker: "automaton" | "fuzz";
 };
 
 /**
@@ -144,8 +144,8 @@ export type UnknownDiagnostics = {
   flags: string;
   dialect: Dialect;
   status: "unknown";
-  checker?: "automaton" | "fuzz";
   error: Error;
+  checker?: "automaton" | "fuzz";
 };
 
 /**

@@ -38,8 +38,8 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "flags" := flags,
         "dialect" := dialect,
         "status" := "safe",
-        "checker" := checker,
-        "complexity" := complexity.asInstanceOf[AttackComplexity]
+        "complexity" := complexity.asInstanceOf[AttackComplexity],
+        "checker" := checker
       )
     case Diagnostics.Vulnerable(
           source,
@@ -49,8 +49,8 @@ given encodeDiagnostics: Encoder[Diagnostics] with
           complexity,
           attack,
           hotspot,
-          checker,
-          recallValidation
+          recallValidation,
+          checker
         ) =>
       Json.obj(
         "source" := source,
@@ -58,11 +58,11 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "dialect" := dialect,
         "unitMode" := unitMode,
         "status" := "vulnerable",
-        "checker" := checker,
         "complexity" := complexity.asInstanceOf[AttackComplexity],
         "attack" -> encodeAttackPattern(AttackPatternStyle.of(dialect, unitMode))(attack),
         "hotspot" := hotspot,
-        "recallValidation" := recallValidation
+        "recallValidation" := recallValidation,
+        "checker" := checker
       )
     case Diagnostics.Unknown(source, flags, dialect, error, checker) =>
       Json.obj(
@@ -70,8 +70,8 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "flags" := flags,
         "dialect" := dialect,
         "status" := "unknown",
-        "checker" := checker,
-        "error" := error
+        "error" := error,
+        "checker" := checker
       )
 
 /** An `Encoder` for `Dialect`, an object of the name and every setting. */
