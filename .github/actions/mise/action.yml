@@ -1,4 +1,4 @@
-name: Set up
+name: mise
 description: Installs the tools of mise.toml, and the Node.js packages with the cached pnpm store.
 
 inputs:

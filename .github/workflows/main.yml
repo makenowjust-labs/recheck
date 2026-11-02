@@ -24,24 +24,12 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/mise
         with:
           tools: java sbt
-      - name: Cache SBT
-        uses: actions/cache@v6
+      - uses: ./.github/actions/sbt-cache
         with:
-          path: |
-            ~/.ivy2/cache
-            ~/.cache/coursier
-            ~/.sbt
-          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
-      - name: Cache Build Files
-        uses: actions/cache@v6
-        with:
-          path: |
-            **/target
-          key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
-          restore-keys: ${{ runner.os }}-build-
+          build: true
       - name: Build
         run: sbt "compile; js/fullLinkJS; cli/assembly"
       - id: save-settings
@@ -69,23 +57,12 @@ jobs:
     name: Scala Lint
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/mise
         with:
           tools: java sbt
-      - name: Cache SBT
-        uses: actions/cache@v6
+      - uses: ./.github/actions/sbt-cache
         with:
-          path: |
-            ~/.ivy2/cache
-            ~/.cache/coursier
-            ~/.sbt
-          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
-      - name: Cache Build Files
-        uses: actions/cache@v6
-        with:
-          path: |
-            **/target
-          key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
+          build: true
       - name: Lint
         run: sbt "scalafmtCheckAll; scalafmtSbtCheck; scalafixAll --check"
 
@@ -95,7 +72,7 @@ jobs:
     name: Node Lint
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/mise
         with:
           tools: node pnpm
           pnpm-install: true
@@ -112,17 +89,10 @@ jobs:
     name: Scala Test
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/mise
       - name: Generate the locales of the tests
         run: sudo locale-gen en_US en_US.UTF-8 tr_TR.UTF-8
-      - name: Cache SBT
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.ivy2/cache
-            ~/.cache/coursier
-            ~/.sbt
-          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
+      - uses: ./.github/actions/sbt-cache
       - name: Test
         run: sbt "coverage; test; coverageAggregate"
       - uses: codecov/codecov-action@v7
@@ -141,7 +111,7 @@ jobs:
       MISE_NODE_VERSION: ${{ matrix.node }}
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/mise
         with:
           cache-key: "{{default}}-node${{ matrix.node }}"
           pnpm-install: true
@@ -172,7 +142,7 @@ jobs:
     name: Node E2E Test (${{ matrix.backend }})
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/mise
         with:
           tools: java node pnpm
           pnpm-install: true
@@ -201,7 +171,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-tags: true
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/mise
         with:
           tools: node pnpm
           pnpm-install: true
@@ -251,27 +221,14 @@ jobs:
           path: ${{ steps.binary.outputs.path }}
           key: native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('modules/**/src/main/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
       - if: steps.restore-binary.outputs.cache-hit != 'true'
-        uses: ./.github/actions/setup
+        uses: ./.github/actions/mise
         with:
           tools: java sbt
           cache-key: "{{default}}-${{ needs.build.outputs.graalvm }}"
       - if: steps.restore-binary.outputs.cache-hit != 'true'
-        name: Cache SBT
-        uses: actions/cache@v6
+        uses: ./.github/actions/sbt-cache
         with:
-          path: |
-            ~/.ivy2/cache
-            ~/.cache/coursier
-            ~/.sbt
-          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
-      - if: steps.restore-binary.outputs.cache-hit != 'true'
-        name: Cache Build Files
-        uses: actions/cache@v6
-        with:
-          path: |
-            **/target
-          key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
-          restore-keys: ${{ runner.os }}-build-
+          build: true
       - if: steps.restore-binary.outputs.cache-hit != 'true' && runner.os == 'Windows'
         name: Set up MSVC environment
         uses: TheMrMilchmann/setup-msvc-dev@v4
@@ -315,7 +272,7 @@ jobs:
           ext=$([[ "$RUNNER_OS" == Windows ]] && echo .exe || echo)
           echo "artifact=recheck-$platform-$arch$ext" >> "$GITHUB_OUTPUT"
           echo "bin=recheck$ext" >> "$GITHUB_OUTPUT"
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/mise
         with:
           tools: node pnpm
           pnpm-install: true
@@ -348,23 +305,12 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/mise
         with:
           tools: java sbt
-      - name: Cache SBT
-        uses: actions/cache@v6
+      - uses: ./.github/actions/sbt-cache
         with:
-          path: |
-            ~/.ivy2/cache
-            ~/.cache/coursier
-            ~/.sbt
-          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
-      - name: Cache Build Files
-        uses: actions/cache@v6
-        with:
-          path: |
-            **/target
-          key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
+          build: true
       - id: check-published
         name: Check whether the version is already published
         run: |
@@ -393,24 +339,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/mise
         with:
           tools: java sbt node pnpm
           pnpm-install: true
-      - name: Cache SBT
-        uses: actions/cache@v6
+      - uses: ./.github/actions/sbt-cache
         with:
-          path: |
-            ~/.ivy2/cache
-            ~/.cache/coursier
-            ~/.sbt
-          key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
-      - name: Cache Build Files
-        uses: actions/cache@v6
-        with:
-          path: |
-            **/target
-          key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
+          build: true
       - uses: actions/download-artifact@v8
         with:
           name: recheck.js
@@ -512,7 +447,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-tags: true
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/mise
         with:
           tools: node pnpm
           pnpm-install: true

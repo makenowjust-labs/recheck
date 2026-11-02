@@ -1,0 +1,27 @@
+name: sbt cache
+description: Caches the dependencies of sbt, and the build files.
+
+inputs:
+  build:
+    description: Whether to cache the build files.
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Cache SBT
+      uses: actions/cache@v6
+      with:
+        path: |
+          ~/.ivy2/cache
+          ~/.cache/coursier
+          ~/.sbt
+        key: ${{ runner.os }}-sbt-${{ hashFiles('**/*.sbt') }}
+    - if: inputs.build == 'true'
+      name: Cache Build Files
+      uses: actions/cache@v6
+      with:
+        path: |
+          **/target
+        key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
+        restore-keys: ${{ runner.os }}-build-
