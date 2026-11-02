@@ -40,10 +40,10 @@ sealed abstract class Executor:
 
   /** Runs the input on the runtime in the environment variables.
     *
-    * With a marker, the timeout counts from the time when the process prints the marker as a line, so that the startup
-    * of the runtime is not counted. Waiting for the marker is limited only by the context.
+    * The timeout counts from the time when the process prints the marker as a line, so that the startup of the runtime
+    * is not counted. Waiting for the marker is limited only by the context.
     */
-  def exec(input: String, timeout: Option[FiniteDuration], marker: Option[String], env: Map[String, String])(using
+  def exec(input: String, timeout: Option[FiniteDuration], marker: String, env: Map[String, String])(using
       Context
   ): ExecResult =
     Platform.run(command, args, replacement(env), variables, file, input, timeout, marker)

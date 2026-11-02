@@ -18,7 +18,7 @@ private[exec] object Platform:
       file: Option[SourceFile],
       input: String,
       timeout: Option[FiniteDuration],
-      marker: Option[String]
+      marker: String
   )(using Context): ExecResult =
     // $COVERAGE-OFF$
     throw new UnexpectedException("recall validation is not supported.")

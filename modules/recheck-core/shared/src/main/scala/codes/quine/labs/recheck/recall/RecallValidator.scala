@@ -45,7 +45,7 @@ object RecallValidator:
           val env = sys.env
           val commandLine = executor.commandLine(env)
           ctx.log(s"recall: command: $commandLine\n${program.script}")
-          val output = executor.exec(program.script, limit(timeout), Some(RecallProgram.StartLine), env)
+          val output = executor.exec(program.script, limit(timeout), RecallProgram.StartLine, env)
           Some(result(executor.runtime(env), commandLine, timeout, output))
 
   /** Returns the time limit of a matching for the timeout, which is bounded by the deadline of the context. */

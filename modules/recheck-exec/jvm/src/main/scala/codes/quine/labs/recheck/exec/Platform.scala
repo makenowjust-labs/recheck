@@ -38,7 +38,7 @@ private[exec] object Platform:
       file: Option[SourceFile],
       input: String,
       timeout: Option[FiniteDuration],
-      marker: Option[String]
+      marker: String
   )(using ctx: Context): ExecResult =
     val argv = replacement.fold(command +: args)(line => Seq(shell, "-c", s"$line \"$$@\"", "sh") ++ args)
     val shown = (argv ++ file.map(_.name)).mkString(" ")
@@ -63,7 +63,7 @@ private[exec] object Platform:
       env: Map[String, String],
       input: String,
       timeout: Option[FiniteDuration],
-      marker: Option[String]
+      marker: String
   )(using ctx: Context): ExecResult =
     val builder = new ProcessBuilder(argv.asJava)
     builder.environment().putAll(env.asJava)
@@ -72,7 +72,7 @@ private[exec] object Platform:
       catch case ex: IOException => throw new UnexpectedException(s"cannot run `${shown}`: ${ex.getMessage}")
     ctx.log(s"exec: process (pid: ${process.pid()}, command: ${shown})")
 
-    val started = new CountDownLatch(if marker.isDefined then 1 else 0)
+    val started = new CountDownLatch(1)
     val out = new StringBuffer
     val outReader = daemon:
       val reader = new BufferedReader(new InputStreamReader(process.getInputStream, StandardCharsets.UTF_8))
@@ -80,7 +80,7 @@ private[exec] object Platform:
         .lines()
         .forEach: line =>
           out.append(line).append('\n')
-          if marker.contains(line) then started.countDown()
+          if line == marker then started.countDown()
     val err = new StringBuffer
     val errReader = daemon:
       err.append(new String(process.getErrorStream.readAllBytes(), StandardCharsets.UTF_8))

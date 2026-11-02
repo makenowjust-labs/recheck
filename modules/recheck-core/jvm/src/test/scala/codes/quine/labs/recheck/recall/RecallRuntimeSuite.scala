@@ -66,7 +66,7 @@ class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     val mode = ReDoS.parse(source, flags, dialect).mode
     val program = RecallProgram.generate(source, flags, dialect, mode, attack).toOption.get
     val executor = program.executor
-    val output = executor.exec(program.script, Some(1.second), Some(RecallProgram.StartLine), env)
+    val output = executor.exec(program.script, Some(1.second), RecallProgram.StartLine, env)
     RecallValidator.result(executor.runtime(env), executor.commandLine(env), 1.second, output)
 
   /** Returns the path of the program in `PATH`. */

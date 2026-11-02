@@ -57,7 +57,7 @@ class ExecutorSuite extends munit.FunSuite:
     )
 
   test("Executor#exec"):
-    assertEquals(NodeExecutor.exec("console.log('foo');", None, None, Map.empty), ExecResult.Exit(0, "foo\n", ""))
+    assertEquals(NodeExecutor.exec("console.log('foo');", None, "start", Map.empty), ExecResult.Exit(0, "foo\n", ""))
 
   test("Executor#exec: the variable"):
     // A fake runtime prints the variables of .NET, the arguments with the content of a file, and the input.
@@ -73,7 +73,7 @@ class ExecutorSuite extends munit.FunSuite:
     )
     runtime.toFile.setExecutable(true)
     def exec(executor: Executor): String =
-      executor.exec("input", None, None, Map(executor.variable -> s"'$runtime'")) match
+      executor.exec("input", None, "start", Map(executor.variable -> s"'$runtime'")) match
         case ExecResult.Exit(0, out, "") => out
         case result                      => fail(s"unexpected: $result")
 

@@ -15,8 +15,8 @@ class PlatformSuite extends munit.FunSuite:
   /** A default context. */
   given ctx: Context = Context()
 
-  def node(script: String, timeout: Option[FiniteDuration], marker: Option[String] = None)(using Context): ExecResult =
-    Platform.run("node", Seq("-"), None, Map.empty, None, script, timeout, marker)
+  def node(script: String, timeout: Option[FiniteDuration])(using Context): ExecResult =
+    Platform.run("node", Seq("-"), None, Map.empty, None, script, timeout, "start")
 
   test("Platform.run"):
     assertEquals(node("console.log('foo');", None), ExecResult.Exit(0, "foo\n", ""))
@@ -26,33 +26,34 @@ class PlatformSuite extends munit.FunSuite:
       ExecResult.Exit(0, "é\n", "")
     )
     assertEquals(
-      Platform.run("node", Seq("-e", "console.log(process.env.FOO)"), None, Map("FOO" -> "foo"), None, "", None, None),
+      Platform
+        .run("node", Seq("-e", "console.log(process.env.FOO)"), None, Map("FOO" -> "foo"), None, "", None, "start"),
       ExecResult.Exit(0, "foo\n", "")
     )
 
   test("Platform.run: timeout"):
     assertEquals(
-      node("console.log('foo'); setTimeout(() => {}, 5000);", Some(100.millis)),
-      ExecResult.Timeout("foo\n")
+      node("console.log('start'); console.log('foo'); setTimeout(() => {}, 5000);", Some(100.millis)),
+      ExecResult.Timeout("start\nfoo\n")
     )
 
   test("Platform.run: marker"):
     // The startup before the marker does not count toward the timeout.
     val script = "setTimeout(() => { console.log('start'); console.log('end'); }, 500);"
-    assertEquals(node(script, Some(200.millis), Some("start")), ExecResult.Exit(0, "start\nend\n", ""))
+    assertEquals(node(script, Some(200.millis)), ExecResult.Exit(0, "start\nend\n", ""))
     assertEquals(
-      node("console.log('start'); setTimeout(() => {}, 5000);", Some(200.millis), Some("start")),
+      node("console.log('start'); setTimeout(() => {}, 5000);", Some(200.millis)),
       ExecResult.Timeout("start\n")
     )
     // A process exiting without the marker is just finished.
     assertEquals(
-      node("console.log('foo');", Some(200.millis), Some("start")),
+      node("console.log('foo');", Some(200.millis)),
       ExecResult.Exit(0, "foo\n", "")
     )
 
   test("Platform.run: interruption"):
     intercept[TimeoutException]:
-      node("setTimeout(() => {}, 5000);", None, Some("start"))(using Context(timeout = 200.millis))
+      node("setTimeout(() => {}, 5000);", None)(using Context(timeout = 200.millis))
     val source = new CancellationTokenSource
     source.cancel()
     intercept[CancelException]:
@@ -60,12 +61,12 @@ class PlatformSuite extends munit.FunSuite:
 
   test("Platform.run: missing command"):
     intercept[UnexpectedException]:
-      Platform.run("recheck-missing-command", Seq.empty, None, Map.empty, None, "", None, None)
+      Platform.run("recheck-missing-command", Seq.empty, None, Map.empty, None, "", None, "start")
 
   test("Platform.run: file"):
     val file = SourceFile("recheck-test.js", "console.log(process.argv.length, require('fs').readFileSync(0, 'utf8'))")
     def run(input: String): ExecResult =
-      Platform.run("node", Seq("--no-warnings"), None, Map.empty, Some(file), input, None, None)
+      Platform.run("node", Seq("--no-warnings"), None, Map.empty, Some(file), input, None, "start")
 
     try
       assertEquals(run("foo"), ExecResult.Exit(0, "2 foo\n", ""))
@@ -80,7 +81,7 @@ class PlatformSuite extends munit.FunSuite:
       node.toFile.setExecutable(true)
       val replacement = Some(s"'$node' --flag")
       assertEquals(
-        Platform.run("node", Seq("-", "a b"), replacement, Map.empty, None, "", None, None),
+        Platform.run("node", Seq("-", "a b"), replacement, Map.empty, None, "", None, "start"),
         ExecResult.Exit(0, "3 --flag - a b\n", "")
       )
     finally
