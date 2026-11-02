@@ -144,6 +144,14 @@ class PatternAlphabetSuite extends munit.FunSuite:
       Parser.determineUnitMode(source, flagSet, dialect)
     )
 
+  test("PatternAlphabet.build: too many sets"):
+    val sets = Seq.tabulate(Integer.SIZE)(i => CharSet.single('a' + i))
+    PatternAlphabet.build(UnitMode.UTF16, moreWords = sets.tail)
+    interceptMessage[IllegalArgumentException]("requirement failed: Too many sets for the bits of CharKind: 33"):
+      PatternAlphabet.build(UnitMode.UTF16, moreWords = sets)
+    interceptMessage[IllegalArgumentException]("requirement failed: Too many sets for the bits of CharKind: 33"):
+      PatternAlphabet.build(UnitMode.UTF16, moreLineTerminators = sets)
+
   test("PatternAlphabet.of"):
     val word =
       CharSet.union(Seq(CharSet.range('0', '9'), CharSet.range('A', 'Z'), CharSet.single('_'), CharSet.range('a', 'z')))

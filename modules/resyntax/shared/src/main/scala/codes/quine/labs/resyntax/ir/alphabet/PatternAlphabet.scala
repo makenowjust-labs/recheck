@@ -82,6 +82,11 @@ object PatternAlphabet:
       val first = all.indexWhere(_.contains(c.head))
       first +: all.drop(first + 1).map(s => if s.contains(c.head) then 0 else 1)
 
+    // The flags of a dialect give only a few distinct sets, so these hold for every pattern.
+    validateBitCount(1 + moreWords.size)
+    validateBitCount(1 + moreLineTerminators.size)
+    validateBitCount(wordMarks.size)
+
     // The bits are of the sets as given, even if `lineTerminator` (resp. `word`) is `None`.
     def mask(sets: Seq[Option[CharSet]], c: UChar): Int =
       sets.zipWithIndex.collect { case (Some(t), i) if t.contains(c) => 1 << i }.sum
@@ -154,6 +159,10 @@ object PatternAlphabet:
   /** Checks whether the set is described more simply by its complement, as a negated class or `.` is. */
   def prefersComplement(set: CharSet, universe: CharSet): Boolean =
     set.complement(universe).intervalCount < set.intervalCount
+
+  /** Validates that the sets fit in the bits of an `Int` of [[CharKind]]. */
+  private def validateBitCount(count: Int): Unit =
+    require(count <= Integer.SIZE, s"Too many sets for the bits of CharKind: $count")
 
   /** Returns the distinct word sets of the word boundary assertions, in the order of the bits of [[CharKind.words]]. */
   def wordSets(pattern: IRPattern): Seq[CharSet] =
