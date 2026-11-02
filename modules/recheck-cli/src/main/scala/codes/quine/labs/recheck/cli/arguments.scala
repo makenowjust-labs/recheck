@@ -35,12 +35,3 @@ object arguments:
       PerlSource.of(string).fold(Validated.invalidNel(s"unknown perl source: $string"))(Validated.validNel)
 
     def defaultMetavar: String = "source"
-
-  /** `Argument` instance for `Boolean`. */
-  given booleanArgument: Argument[Boolean] with
-    def read(string: String): ValidatedNel[String, Boolean] = string match
-      case "true"  => Validated.validNel(true)
-      case "false" => Validated.validNel(false)
-      case s       => Validated.invalidNel(s"invalid boolean: $s")
-
-    def defaultMetavar: String = "boolean"

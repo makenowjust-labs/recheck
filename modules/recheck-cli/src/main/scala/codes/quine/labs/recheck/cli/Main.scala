@@ -99,7 +99,8 @@ object Main:
     val pythonType = Opts.option[String](long = "python-type", help = "The string type (python).").orNone
     val rubyEncoding = Opts.option[String](long = "ruby-encoding", help = "The encoding (ruby).").orNone
     val perlUTF8 = Opts
-      .option[Boolean](long = "perl-utf8", help = "Whether the program has `use utf8` and decoded strings (perl).")
+      .flag(long = "no-perl-utf8", help = "The program has no `use utf8`, and its strings are bytes (perl).")
+      .map(_ => false)
       .orNone
     val perlSource = Opts.option[PerlSource](long = "perl-source", help = "How the pattern is given (perl).").orNone
     (pythonType, rubyEncoding, perlUTF8, perlSource).mapN: (pythonType, rubyEncoding, perlUTF8, perlSource) =>
@@ -116,7 +117,7 @@ object Main:
     val misplaced = Seq(
       ("python-type", pythonType.isDefined, dialect.isPython),
       ("ruby-encoding", rubyEncoding.isDefined, dialect.isRuby),
-      ("perl-utf8", perlUTF8.isDefined, dialect.isPerl),
+      ("no-perl-utf8", perlUTF8.isDefined, dialect.isPerl),
       ("perl-source", perlSource.isDefined, dialect.isPerl)
     ).collectFirst { case (option, true, false) => option }
     def named[A](option: String, value: Option[String], default: A)(of: String => Option[A]): ValidatedNel[String, A] =

@@ -50,7 +50,7 @@ class MainSuite extends munit.FunSuite:
     assertEquals(Main.command.parse(Seq("/foo/")), Right(Main.CheckAction(InputPattern("foo", ""), Parameters())))
     assertEquals(
       Main.command.parse(
-        Seq("/foo/", "--dialect=perl", "--perl-utf8=false", "--perl-source=string")
+        Seq("/foo/", "--dialect=perl", "--no-perl-utf8", "--perl-source=string")
       ),
       Right(
         Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Perl(false, PerlSource.String)))
@@ -76,7 +76,7 @@ class MainSuite extends munit.FunSuite:
         Seq("--python-type=str") -> "--python-type is not an option of javascript",
         Seq("--dialect=perl", "--ruby-encoding=UTF-8") -> "--ruby-encoding is not an option of perl",
         Seq("--dialect=python", "--perl-source=string") -> "--perl-source is not an option of python",
-        Seq("--dialect=ruby", "--perl-utf8=true") -> "--perl-utf8 is not an option of ruby",
+        Seq("--dialect=ruby", "--no-perl-utf8") -> "--no-perl-utf8 is not an option of ruby",
         Seq("--dialect=ruby", "--ruby-encoding=str") -> "unknown value of --ruby-encoding: str",
         Seq("--dialect=python", "--python-type=bytez") -> "unknown value of --python-type: bytez"
       )
@@ -200,7 +200,7 @@ class MainSuite extends munit.FunSuite:
     assert(clue(python).contains("string = b'a' * "))
     val (java, _, _) = generate(diagnostics("--dialect=java", "/^(a|a)*$/").noSpaces)
     assert(clue(java).startsWith("// Run: java --source 17 recall.java\n"))
-    val perlArgs = Seq("--dialect=perl", "--perl-source=string", "--perl-utf8=false", "/^(a|a)*$x/")
+    val perlArgs = Seq("--dialect=perl", "--perl-source=string", "--no-perl-utf8", "/^(a|a)*$x/")
     val (perl, _, _) = generate(diagnostics(perlArgs*).noSpaces)
     assert(clue(perl).startsWith("# Run: perl recall.pl\n"))
     assert(clue(perl).contains("my $pattern = \"^(a|a)*\\$x\"; utf8::downgrade($pattern, 1);"))

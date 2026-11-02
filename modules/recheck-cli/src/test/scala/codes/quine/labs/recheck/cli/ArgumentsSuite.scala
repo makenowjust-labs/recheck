@@ -38,12 +38,6 @@ class ArgumentsSuite extends munit.FunSuite:
     assertEquals(seederArgument.read("xxx"), Validated.invalidNel("unknown seeder: xxx"))
     assertEquals(seederArgument.defaultMetavar, "seeder")
 
-  test("arguments.booleanArgument"):
-    assertEquals(booleanArgument.read("true"), Validated.validNel(true))
-    assertEquals(booleanArgument.read("false"), Validated.validNel(false))
-    assertEquals(booleanArgument.read("xxx"), Validated.invalidNel("invalid boolean: xxx"))
-    assertEquals(booleanArgument.defaultMetavar, "boolean")
-
   test("arguments.dialectArgument"):
     assertEquals(dialectArgument.read("python"), Validated.validNel(Dialect.Python()))
     assertEquals(dialectArgument.read("dotnet"), Validated.validNel(Dialect.DotNet))

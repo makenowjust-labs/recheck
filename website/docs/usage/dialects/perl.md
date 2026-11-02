@@ -15,14 +15,14 @@ Describes how `recheck` checks a regular expression of the `perl` dialect.
   `true` (default) is a program with `use utf8` whose strings are decoded text.
   `false` is a program without `use utf8` whose strings are bytes without the flag.
   A program reading text that is not decoded (e.g. Latin-1 bytes) is `utf8: false`.
-  The CLI takes it by `--perl-utf8`.
+  The CLI takes `false` by `--no-perl-utf8`.
 - `source` tells how the pattern is given.
   `literal` (default) is a regular expression literal written in Perl source (e.g. `qr/.../`), where Perl applies `\U`, `\L`, `\u`, `\l`, `\F`, `\Q` and `\E` to the text before the regex engine reads it.
   `string` is a pattern from a string at runtime (e.g. `qr/$p/`), which the regex engine reads unchanged.
   The CLI takes it by `--perl-source`.
 
 ```bash
-recheck --dialect=perl --perl-utf8=false --perl-source=string '/^(a|a)*$/'
+recheck --dialect=perl --no-perl-utf8 --perl-source=string '/^(a|a)*$/'
 ```
 
 ```tsx
