@@ -10,14 +10,19 @@ import codes.quine.labs.recheck.data.MultiSet
 import codes.quine.labs.recheck.util.GraphvizUtil.escape
 import codes.quine.labs.resyntax.ast.SourceLocation
 
-/** OrderedNFA is a NFA, but its transitions has a priority in the order. */
+/** OrderedNFA is a NFA, but its transitions has a priority in the order.
+  *
+  * When the input cannot be any string, `inputStates` are the states accepting exactly the strings that the input can
+  * be, which the initial states do not reach (see [[restrictInputs]]).
+  */
 final case class OrderedNFA[A, Q](
     alphabet: Set[A],
     stateSet: Set[Q],
     inits: Seq[Q],
     acceptSet: Set[Q],
     delta: Map[(Q, A), Seq[Q]],
-    sourcemap: Map[(Q, A, Q), Seq[SourceLocation]] = Map.empty[(Q, A, Q), Seq[SourceLocation]]
+    sourcemap: Map[(Q, A, Q), Seq[SourceLocation]] = Map.empty[(Q, A, Q), Seq[SourceLocation]],
+    inputStates: Set[Q] = Set.empty[Q]
 ):
 
   /** Renames its states as integers. */
@@ -29,7 +34,8 @@ final case class OrderedNFA[A, Q](
       inits.map(f),
       acceptSet.map(f),
       delta.map { case (q1, a) -> qs => (f(q1), a) -> qs.map(f) },
-      sourcemap.map { case ((q1, a, q2), pos) => (f(q1), a, f(q2)) -> pos }
+      sourcemap.map { case ((q1, a, q2), pos) => (f(q1), a, f(q2)) -> pos },
+      inputStates.map(f)
     )
 
   /** Converts this NFA's alphabet by the function. */
@@ -40,7 +46,27 @@ final case class OrderedNFA[A, Q](
       inits,
       acceptSet,
       delta.map { case ((q1, a), q2) => ((q1, f(a)), q2) },
-      sourcemap.map { case ((q1, a, q2), pos) => ((q1, f(a), q2), pos) }
+      sourcemap.map { case ((q1, a, q2), pos) => ((q1, f(a), q2), pos) },
+      inputStates
+    )
+
+  /** Restricts the input to the strings in which no character of `seconds` follows one of `firsts` (e.g. a low
+    * surrogate never follows a high surrogate), adding the new states `free` and `after` as [[inputStates]].
+    *
+    * They accept such strings, after a character not in `firsts` (or at the begin) and after one in `firsts`
+    * respectively. The transitions of the other states must not let a character of `seconds` follow one of `firsts`
+    * already.
+    */
+  def restrictInputs(firsts: Set[A], seconds: Set[A], free: Q, after: Q): OrderedNFA[A, Q] =
+    def next(a: A): Q = if firsts.contains(a) then after else free
+
+    val freeDelta = alphabet.iterator.map(a => (free, a) -> Seq(next(a)))
+    val afterDelta = alphabet.iterator.filterNot(seconds.contains).map(a => (after, a) -> Seq(next(a)))
+    copy(
+      stateSet = stateSet ++ Set(free, after),
+      acceptSet = acceptSet ++ Set(free, after),
+      delta = delta ++ freeDelta ++ afterDelta,
+      inputStates = inputStates ++ Set(free, after)
     )
 
   /** Exports this transition function as a graph. */
@@ -65,18 +91,24 @@ final case class OrderedNFA[A, Q](
   /** Converts this into [[NFAwLA]]. */
   def toNFAwLA(using ctx: Context): NFAwLA[A, Q] = toNFAwLA(Int.MaxValue)
 
-  /** Converts this into [[NFAwLA]]. */
+  /** Converts this into [[NFAwLA]].
+    *
+    * With [[inputStates]], a look-ahead that none of them has is of no input, which the result does not have.
+    */
   def toNFAwLA(maxNFASize: Int)(using ctx: Context): NFAwLA[A, Q] =
     ctx.interrupt:
       val reverseDFA = reverse.toDFA
+      def isInput(p: Set[Q]): Boolean = inputStates.isEmpty || p.exists(inputStates.contains)
+
       val reverseDelta = ctx.interrupt:
         reverseDFA.delta
+          .filter { case (_, p1) => isInput(p1) }
           .groupMap(_._1._2) { case (p2, _) -> p1 => ctx.interrupt((p1, p2)) }
           .withDefaultValue(Vector.empty)
 
       val newAlphabet = Set.newBuilder[(A, Set[Q])]
       val newStateSet = Set.newBuilder[(Q, Set[Q])]
-      val newInits = ctx.interrupt(MultiSet.from(for q <- inits; p <- reverseDFA.stateSet yield (q, p)))
+      val newInits = ctx.interrupt(MultiSet.from(for q <- inits; p <- reverseDFA.stateSet if isInput(p) yield (q, p)))
       val newAcceptSet = ctx.interrupt(for q <- acceptSet yield (q, reverseDFA.init))
       val newSourcemap =
         mutable.Map.empty[((Q, Set[Q]), (A, Set[Q]), (Q, Set[Q])), Seq[SourceLocation]].withDefaultValue(Vector.empty)
@@ -84,7 +116,7 @@ final case class OrderedNFA[A, Q](
       val newDelta =
         mutable.Map.empty[((Q, Set[Q]), (A, Set[Q])), MultiSet[(Q, Set[Q])]].withDefaultValue(MultiSet.empty)
       var deltaSize = 0
-      for ((q1, a) -> qs) <- delta do
+      for ((q1, a) -> qs) <- delta if !inputStates.contains(q1) do
         ctx.interrupt:
           for (p1, p2) <- reverseDelta(a) do
             // There is a transition `q1 --(a)-> qs` in ordered NFA, and

@@ -60,6 +60,10 @@ class ReDoSDialectSuite extends munit.FunSuite:
       assertSafe(check(pairs, Java, "", checker), checker)
     assertVulnerable(check(pairs, JavaScript), AttackComplexity.Exponential(false), Checker.Automaton)
     assertVulnerable(check(pairs, Python()), AttackComplexity.Exponential(false), Checker.Automaton)
+    // A failing suffix is never a high surrogate followed by a low surrogate, which is one character that `[^…]` matches.
+    val lead = "^(?:\\uD800|\\uD800)*(?:[^\\uDC00-\\uDFFF]|$)"
+    assertSafe(check(lead, JavaScript, "u"), Checker.Automaton)
+    assertSafe(check(lead, Java), Checker.Automaton)
     // A high surrogate, any surrogate and a low surrogate in a row have a pair in any case.
     val triple = "^(?:\\uD800[\\uD800-\\uDFFF]\\uDFFF|\\uD800[\\uD800-\\uDFFF]\\uDFFF)*$"
     assertSafe(check(triple, JavaScript, "u"), Checker.Automaton)
