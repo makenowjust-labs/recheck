@@ -28,9 +28,9 @@ import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
 import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
-import codes.quine.labs.resyntax.ir.IRLineTerminators
+import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRLookBehindStarts
-import codes.quine.labs.resyntax.ir.IRWordMarks
+import codes.quine.labs.resyntax.ir.IRWordMarkSet
 
 /** Interpreter executes a program on a input. */
 object Interpreter:
@@ -651,38 +651,38 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     case IRLookBehindStarts.Longest(min, max) => math.max(0, pos - max) to pos - min
 
   /** Tests whether the text before the position ends with a base and then any extenders of the marks. */
-  private def hasBase(pos: Int, marks: IRWordMarks): Boolean =
+  private def hasBase(pos: Int, marks: IRWordMarkSet): Boolean =
     var p = pos
     while input.getBefore(p).exists(marks.extenders.contains) do p -= 1
     input.getBefore(p).exists(marks.bases.contains)
 
   /** Tests whether the character before the position is a word character, or an extender of the marks after a base. */
-  private def isMarkWordBefore(frame: Frame, word: CharSet, marks: IRWordMarks): Boolean =
+  private def isMarkWordBefore(frame: Frame, word: CharSet, marks: IRWordMarkSet): Boolean =
     frame.previousChar.exists(c => word.contains(c) || marks.extenders.contains(c) && hasBase(frame.pos, marks))
 
   /** Tests whether the character at the position is a word character, or a mark after a base. */
-  private def isMarkWordAt(frame: Frame, word: CharSet, marks: IRWordMarks): Boolean =
+  private def isMarkWordAt(frame: Frame, word: CharSet, marks: IRWordMarkSet): Boolean =
     frame.currentChar.exists(c => word.contains(c) || marks.marks.contains(c) && hasBase(frame.pos, marks))
 
   /** Tests whether the position is after a line terminator. */
-  private def afterTerminator(pos: Int, terminators: IRLineTerminators): Boolean =
+  private def afterTerminator(pos: Int, terminators: IRLineTerminatorSet): Boolean =
     val c = input.getBefore(pos)
     val single = c.exists(terminators.chars.contains)
     val crlf =
-      terminators.crlf != IRLineTerminators.CRLF.Ignored && c.contains(0x0a) && pos >= 2 && input(pos - 2) == 0x0d
+      terminators.crlf != IRLineTerminatorSet.CRLF.Ignored && c.contains(0x0a) && pos >= 2 && input(pos - 2) == 0x0d
     (single || crlf) && !betweenCRLF(pos, terminators)
 
   /** Returns the end position of a line terminator at the position, if any. */
-  private def beforeTerminator(pos: Int, terminators: IRLineTerminators): Option[Int] =
+  private def beforeTerminator(pos: Int, terminators: IRLineTerminatorSet): Option[Int] =
     if betweenCRLF(pos, terminators) then None
-    else if terminators.crlf != IRLineTerminators.CRLF.Ignored && pos + 1 < input.length &&
+    else if terminators.crlf != IRLineTerminatorSet.CRLF.Ignored && pos + 1 < input.length &&
       input(pos) == 0x0d && input(pos + 1) == 0x0a
     then Some(pos + 2)
     else Option.when(input.getAt(pos).exists(terminators.chars.contains))(pos + 1)
 
   /** Tests whether the position is between `\r` and `\n`, where no line assertion matches with `CRLF.Atomic`. */
-  private def betweenCRLF(pos: Int, terminators: IRLineTerminators): Boolean =
-    terminators.crlf == IRLineTerminators.CRLF.Atomic && 0 < pos && pos < input.length &&
+  private def betweenCRLF(pos: Int, terminators: IRLineTerminatorSet): Boolean =
+    terminators.crlf == IRLineTerminatorSet.CRLF.Atomic && 0 < pos && pos < input.length &&
       input(pos - 1) == 0x0d && input(pos) == 0x0a
 
   /** Returns the captures that a back-reference compares in turn, where `None` matches the empty string. */

@@ -1,7 +1,7 @@
 package codes.quine.labs.recheck.util
 
 import codes.quine.labs.resyntax.charset.CharSet
-import codes.quine.labs.resyntax.charset.Properties
+import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UChar
 
 /** ECMAScriptNotation provides the character notation of ECMAScript. */
@@ -37,4 +37,4 @@ object ECMAScriptNotation:
       .mkString("[", "", "]")
 
   /** The characters of General_Category `Other`. */
-  private lazy val Other: CharSet = Properties.GeneralCategory.value("C").get.set
+  private lazy val Other: CharSet = PropertyTable.GeneralCategory.value("C").get.set

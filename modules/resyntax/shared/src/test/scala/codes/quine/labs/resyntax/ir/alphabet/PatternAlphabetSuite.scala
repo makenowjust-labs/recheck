@@ -5,7 +5,7 @@ import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRPattern
-import codes.quine.labs.resyntax.ir.IRSurrogates
+import codes.quine.labs.resyntax.ir.IRSurrogateKind
 import codes.quine.labs.resyntax.ir.build.IRBuilder
 import codes.quine.labs.resyntax.parser.Parser
 
@@ -85,26 +85,26 @@ class PatternAlphabetSuite extends munit.FunSuite:
     )
 
   test("PatternAlphabet.build: surrogates"):
-    import IRSurrogates.{High, Low}
-    val scalars = UnitMode.CodePoint.universe.diff(IRSurrogates.All)
+    import IRSurrogateKind.{High, Low}
+    val scalars = UnitMode.CodePoint.universe.diff(IRSurrogateKind.All)
     // Absent surrogates are not characters.
     assertEquals(
-      PatternAlphabet.build(UnitMode.CodePoint, Seq(CharSet.single('a')), surrogates = IRSurrogates.Absent).pairs,
+      PatternAlphabet.build(UnitMode.CodePoint, Seq(CharSet.single('a')), surrogates = IRSurrogateKind.Absent).pairs,
       IndexedSeq((CharSet.single('a'), CharKind.Normal), (scalars.diff(CharSet.single('a')), CharKind.Normal))
     )
     // Paired surrogates split an atom of surrogates alone, and the kinds tell the high ones and the low ones.
     val paired = IndexedSeq((High, CharKind(high = true)), (Low, CharKind(low = true)), (scalars, CharKind.Normal))
     assertEquals(
-      PatternAlphabet.build(UnitMode.CodePoint, Seq(High, Low), surrogates = IRSurrogates.Paired).pairs,
+      PatternAlphabet.build(UnitMode.CodePoint, Seq(High, Low), surrogates = IRSurrogateKind.Paired).pairs,
       paired
     )
     assertEquals(
-      PatternAlphabet.build(UnitMode.CodePoint, Seq(IRSurrogates.All), surrogates = IRSurrogates.Paired).pairs,
+      PatternAlphabet.build(UnitMode.CodePoint, Seq(IRSurrogateKind.All), surrogates = IRSurrogateKind.Paired).pairs,
       paired
     )
     // The kinds tell nothing without both of them, and of separate surrogates.
     assertEquals(
-      PatternAlphabet.build(UnitMode.CodePoint, Seq(High), surrogates = IRSurrogates.Paired).pairs,
+      PatternAlphabet.build(UnitMode.CodePoint, Seq(High), surrogates = IRSurrogateKind.Paired).pairs,
       IndexedSeq((High, CharKind.Normal), (UnitMode.CodePoint.universe.diff(High), CharKind.Normal))
     )
     assertEquals(
@@ -199,7 +199,7 @@ class PatternAlphabetSuite extends munit.FunSuite:
     for (flags, dialect) <- Seq(("", Dialect.JavaScript), ("", Dialect.Python())) do
       assertEquals(alphabetOf(surrogates, flags, dialect).pairs.count((_, k) => k.high || k.low), 0)
     // Ruby's input has no surrogate.
-    assert(!alphabetOf("[^a]", "", Dialect.Ruby()).any.exists(_._1.intersect(IRSurrogates.All).nonEmpty))
+    assert(!alphabetOf("[^a]", "", Dialect.Ruby()).any.exists(_._1.intersect(IRSurrogateKind.All).nonEmpty))
 
   test("PatternAlphabet.wordSets"):
     assertEquals(PatternAlphabet.wordSets(parse("\\b(?a:\\b)", "", Dialect.Python())).size, 2)

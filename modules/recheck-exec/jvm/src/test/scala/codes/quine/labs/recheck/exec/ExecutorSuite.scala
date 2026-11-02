@@ -89,7 +89,7 @@ class ExecutorSuite extends munit.FunSuite:
       assertEquals(args(PerlExecutor), "-\ninput")
       assertEquals(args(PHPExecutor), "input")
     finally
-      Files.deleteIfExists(SourceFiles.path(java.program))
-      Files.deleteIfExists(SourceFiles.path(dotnet.program))
+      Files.deleteIfExists(SourceDirectory.path(java.program))
+      Files.deleteIfExists(SourceDirectory.path(dotnet.program))
       Files.deleteIfExists(runtime)
       Files.deleteIfExists(dir)

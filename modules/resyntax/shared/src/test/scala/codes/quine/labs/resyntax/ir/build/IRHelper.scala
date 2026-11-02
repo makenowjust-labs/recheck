@@ -20,7 +20,7 @@ trait IRHelper:
   def char(c: Char): IRNodeData = IRNodeData.Chars(CharSet.single(c))
 
   /** Returns the flags at the start of a pattern without start options. */
-  def flagsOf(dialect: Dialect, flags: String = ""): IRCharFlags =
+  def flagsOf(dialect: Dialect, flags: String = ""): IRCharFlagSet =
     val flagSet = FlagSet.parse(flags, dialect)
     BuildingContext(flagSet, dialect, IRFeatureSet.from(flagSet, dialect, Seq.empty)).charFlags
 

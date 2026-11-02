@@ -10,7 +10,7 @@ import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
-import codes.quine.labs.resyntax.charset.Properties
+import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch.Forward
@@ -22,7 +22,7 @@ class IRCharSuite extends munit.FunSuite:
   val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())
 
   /** The characters of the input without surrogates (Ruby and PCRE with `u`). */
-  val Scalars: CharSet = UnitMode.CodePoint.universe.diff(IRSurrogates.All)
+  val Scalars: CharSet = UnitMode.CodePoint.universe.diff(IRSurrogateKind.All)
 
   def build(s: String, flags: String, dialect: Dialect): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)
@@ -30,7 +30,7 @@ class IRCharSuite extends munit.FunSuite:
 
   def of(s: String): CharSet = CharSet.of(UString.fromString(s).iterator.toSeq*)
 
-  def gc(name: String): CharSet = Properties.GeneralCategory.value(name).get.set
+  def gc(name: String): CharSet = PropertyTable.GeneralCategory.value(name).get.set
 
   /** Drops the empty nodes of inline flags, start options and case commands (e.g. `(?i)`). */
   def strip(data: IRNodeData): IRNodeData = data match
@@ -136,7 +136,7 @@ class IRCharSuite extends munit.FunSuite:
     assertEquals(set("\\xe9"), CharSet.single(0xe9))
     // Its non-ASCII literals are bytes, which do not make the pattern use Unicode rules.
     val Sequence(nodes) = build("é\\w", "", Perl(utf8 = false)).node.data: @unchecked
-    assertEquals(nodes.last.data, Chars(IRCharClasses.ASCII_POSIX("word")))
+    assertEquals(nodes.last.data, Chars(IRClassLookup.ASCII_POSIX("word")))
   // Perl reads the bytes of a byte string as Latin-1 characters, so a pattern switching `/d` to Unicode rules (e.g. by
   // `\x{100}`) has the rules of `0x80..0xFF` of the text strings (checked against Perl 5.44).
   for
@@ -185,7 +185,7 @@ class IRCharSuite extends munit.FunSuite:
   chars("é", "", Python(Python.Type.Bytes))(CharSet.single(0xe9))
   // Ruby's ASCII-8BIT regexp has only the POSIX classes in ASCII as properties.
   chars("\\p{Alpha}", "n", Ruby())(CharSet.range('A', 'Z').union(CharSet.range('a', 'z')))
-  chars("\\p{Punct}", "n", Ruby())(IRCharClasses.ASCII_POSIX("punct"))
+  chars("\\p{Punct}", "n", Ruby())(IRClassLookup.ASCII_POSIX("punct"))
   chars("\\P{Space}", "n", Ruby())(of(" \t\n\u000b\f\r").complement(UnitMode.Byte))
   error("\\p{L}", "n", Ruby())("Unknown Unicode property name at 0")
   error("\\p{Any}", "n", Ruby())("Unknown Unicode property name at 0")
@@ -394,8 +394,8 @@ class IRCharSuite extends munit.FunSuite:
   checkSet("\\s", "", Perl())(s => s.contains(0x2028) && s.contains(0x85) && s.contains(0xa0))
   checkSet("\\s", "", Perl(utf8 = false))(s => !s.contains(0x85) && !s.contains(0xa0))
   checkSet("\\s", "u", Perl())(s => s.contains(0x85) && s.contains(0xa0))
-  chars("\\w", "", JavaScript, Java, PCRE, Ruby())(IRCharClasses.ASCIIWord)
-  chars("\\w", "iu", JavaScript)(IRCharClasses.ASCIIWord.union(of("\u017f\u212a")))
+  chars("\\w", "", JavaScript, Java, PCRE, Ruby())(IRClassLookup.ASCIIWord)
+  chars("\\w", "iu", JavaScript)(IRClassLookup.ASCIIWord.union(of("\u017f\u212a")))
   checkSet("\\w", "", Perl())(s => s.contains(0x100) && s.contains(0xe9))
   checkSet("\\w", "", Perl(utf8 = false))(s => !s.contains(0xe9))
 
@@ -414,25 +414,25 @@ class IRCharSuite extends munit.FunSuite:
   checkSet("\\w", "U", Java)(s => s.contains(0xe9) && s.contains(0x200c))
   checkSet("(?u)\\w", "", Ruby())(s => s.contains(0xe9))
   checkSet("\\w", "", DotNet)(s => s.contains(0xe9) && !s.contains(0x0903) && s.last <= 0xffff)
-  chars("\\W", "", JavaScript)(IRCharClasses.ASCIIWord.complement(UnitMode.UTF16))
-  chars("\\w", "", Python(Python.Type.Bytes))(IRCharClasses.ASCIIWord)
+  chars("\\W", "", JavaScript)(IRClassLookup.ASCIIWord.complement(UnitMode.UTF16))
+  chars("\\w", "", Python(Python.Type.Bytes))(IRClassLookup.ASCIIWord)
   chars("\\h", "", Ruby())(of("0123456789abcdefABCDEF"))
-  chars("\\h", "", Perl())(IRCharClasses.pcreHorizontal.diff(of("᠎")))
-  chars("\\v", "", Java, Perl())(IRCharClasses.Vertical)
+  chars("\\h", "", Perl())(IRClassLookup.pcreHorizontal.diff(of("᠎")))
+  chars("\\v", "", Java, Perl())(IRClassLookup.Vertical)
   chars("\\N", "", Perl())(of("\n").complement(UnitMode.CodePoint))
   check("\\R", "", Perl(), Ruby())(
-    Atomic(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical)))
+    Atomic(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical)))
   )
-  check("\\R", "", Java)(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical)))
+  check("\\R", "", Java)(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical)))
   check("\\R*", "", Java)(
     Repeat(
-      Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical)),
+      Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical)),
       IRQuantifier.Unbounded(0, BacktrackStrategy.Greedy)
     )
   )
   check("(?:\\R)?", "", Java)(
     Repeat(
-      Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRCharClasses.Vertical)),
+      Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical)),
       IRQuantifier.Bounded(0, 1, BacktrackStrategy.Greedy)
     )
   )
@@ -453,13 +453,13 @@ class IRCharSuite extends munit.FunSuite:
 
   // POSIX classes
   chars("[[:alpha:]]", "", PCRE)(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
-  checkSet("[[:alpha:]]", "", Ruby())(_ == Properties.binary("Alphabetic").get.set)
+  checkSet("[[:alpha:]]", "", Ruby())(_ == PropertyTable.binary("Alphabetic").get.set)
   checkSet("[[:alpha:]]", "u", PCRE)(_ == gc("L"))
   chars("[[:alpha:]]", "a", Perl())(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
   check("[[:<:]]", "", PCRE)(
     Sequence(
-      Assert(IRAssertKind.WordBoundary(IRCharClasses.ASCIIWord)),
-      LookAhead(false, Chars(IRCharClasses.ASCIIWord))
+      Assert(IRAssertKind.WordBoundary(IRClassLookup.ASCIIWord)),
+      LookAhead(false, Chars(IRClassLookup.ASCIIWord))
     )
   )
   chars("[[:upper:]]", "i", PCRE)(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
@@ -472,15 +472,17 @@ class IRCharSuite extends munit.FunSuite:
   chars("\\p{Lu}", "i", Java)(gc("LC"))
   chars("\\p{Lu}", "i", DotNet)(gc("LC").restrict(UnitMode.UTF16))
   chars("\\p{Lu}", "i", Perl())(gc("LC"))
-  chars("\\p{Latin}", "u", PCRE)(Properties.ScriptExtensions.value("Latin").get.set)
-  chars("\\p{sc=Latin}", "u", JavaScript)(Properties.Script.value("Latin").get.set)
-  chars("\\p{IsLatin}", "", Java)(Properties.Script.value("Latin").get.set)
-  chars("\\p{InGreek}", "", Java, Perl())(Properties.Block.value("Greek_And_Coptic").get.set)
+  chars("\\p{Latin}", "u", PCRE)(PropertyTable.ScriptExtensions.value("Latin").get.set)
+  chars("\\p{sc=Latin}", "u", JavaScript)(PropertyTable.Script.value("Latin").get.set)
+  chars("\\p{IsLatin}", "", Java)(PropertyTable.Script.value("Latin").get.set)
+  chars("\\p{InGreek}", "", Java, Perl())(PropertyTable.Block.value("Greek_And_Coptic").get.set)
   chars("\\p{IsGreek}", "", DotNet)(CharSet.range(0x370, 0x3ff))
   chars("\\p{Lower}", "", Java)(of("abcdefghijklmnopqrstuvwxyz"))
-  chars("\\p{Lower}", "U", Java)(Properties.binary("Lowercase").get.set)
-  chars("\\p{Age=6.0}", "", Ruby())(Properties.presentIn(Properties.Age.value("6.0").get).diff(IRSurrogates.All))
-  chars("\\p{Xwd}", "u", PCRE)(IRCharClasses.pcreWord)
+  chars("\\p{Lower}", "U", Java)(PropertyTable.binary("Lowercase").get.set)
+  chars("\\p{Age=6.0}", "", Ruby())(
+    PropertyTable.presentIn(PropertyTable.Age.value("6.0").get).diff(IRSurrogateKind.All)
+  )
+  chars("\\p{Xwd}", "u", PCRE)(IRClassLookup.pcreWord)
   chars("\\p{Lu}", "", PCRE)(gc("Lu").restrict(UnitMode.Byte))
   error("\\p{Foo}", "u", JavaScript, PCRE)("Unknown Unicode property name at 0")
   error("\\p{Foo}", "", Java, DotNet, Perl(), Ruby())("Unknown Unicode property name at 0")
@@ -500,7 +502,7 @@ class IRCharSuite extends munit.FunSuite:
   error("\\p{Nv=.5}", "", Perl())("Unknown Unicode property name at 0")
   chars("\\p{gc=-Lu}", "", Perl())(gc("Lu"))
   check("\\p{RGI_Emoji_Flag_Sequence}", "v", JavaScript)(
-    Strings(Properties.binary("RGI_Emoji_Flag_Sequence").get.classSet)
+    Strings(PropertyTable.binary("RGI_Emoji_Flag_Sequence").get.classSet)
   )
   error("\\p{RGI_Emoji}", "u", JavaScript)("Unknown Unicode property name at 0")
   error("\\P{RGI_Emoji}", "v", JavaScript)("Invalid property name at 0")

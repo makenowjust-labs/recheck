@@ -6,7 +6,7 @@ import scala.util.boundary
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.FullCaseMapping
-import codes.quine.labs.resyntax.charset.Properties
+import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UString
 
 /** PerlLiteralRewriter rewrites the text of a Perl regex literal as Perl's lexer does before the regex compiler reads
@@ -30,7 +30,7 @@ private[parser] object PerlLiteralRewriter:
   /** The non-ASCII characters that `quotemeta` quotes in a UTF-8 string (perlfunc `quotemeta`). */
   private lazy val QuotedNonASCII: CharSet =
     val names = Seq("Pattern_Syntax", "Pattern_White_Space", "White_Space", "Default_Ignorable_Code_Point")
-    CharSet.union(names.map(Properties.binary(_).get.set) :+ Properties.GeneralCategory.value("Cc").get.set)
+    CharSet.union(names.map(PropertyTable.binary(_).get.set) :+ PropertyTable.GeneralCategory.value("Cc").get.set)
 
   private def isQuoted(c: Int): Boolean =
     if c < 0x80 then !(Character.isLetterOrDigit(c) || c == '_') else QuotedNonASCII.contains(c)

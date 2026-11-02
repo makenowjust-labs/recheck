@@ -8,7 +8,7 @@ import codes.quine.labs.recheck.vm.Program
 import codes.quine.labs.recheck.vm.ProgramBuilder
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.ir.IRPattern
-import codes.quine.labs.resyntax.ir.IRSurrogates
+import codes.quine.labs.resyntax.ir.IRSurrogateKind
 import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
 /** FuzzProgram is a program wrapper for fuzzing. */
@@ -16,7 +16,7 @@ final case class FuzzProgram(
     program: Program,
     alphabet: PatternAlphabet,
     parts: Set[UString],
-    surrogates: IRSurrogates
+    surrogates: IRSurrogateKind
 ):
 
   /** Whether or not it uses acceleration of VM execution. */
@@ -30,7 +30,7 @@ final case class FuzzProgram(
     * the engine reads the string.
     */
   def joinSurrogates(s: UString): UString =
-    if surrogates == IRSurrogates.Paired then UString.fromString(s.asString) else s
+    if surrogates == IRSurrogateKind.Paired then UString.fromString(s.asString) else s
 
 object FuzzProgram:
 

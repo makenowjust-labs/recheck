@@ -39,12 +39,12 @@ private[build] final class CaptureTable(
     /** The indices of the groups in a branch reset. */
     val inBranchReset: Set[Int],
     /** The flags at each character-level node of a Perl or Ruby pattern, whose look-behind width depends on them. */
-    charFlags: Map[NodeKey, IRCharFlags]
+    charFlags: Map[NodeKey, IRCharFlagSet]
 ):
 
   def indexOf(node: Node): Option[Int] = indices.get(NodeKey(node))
 
-  def charFlagsOf(node: Node): Option[IRCharFlags] = charFlags.get(NodeKey(node))
+  def charFlagsOf(node: Node): Option[IRCharFlagSet] = charFlags.get(NodeKey(node))
 
   def siteOf(node: Node): ReferenceSite =
     sites.getOrElse(NodeKey(node), throw new IllegalArgumentException(s"No reference site: $node"))
@@ -87,7 +87,7 @@ private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext)
   /** The number of .NET's ignored unnamed groups, which still take the indices before the named groups. */
   private var ignoredGroups: Int = 0
 
-  private val charFlags = mutable.Map.empty[NodeKey, IRCharFlags]
+  private val charFlags = mutable.Map.empty[NodeKey, IRCharFlagSet]
 
   private val recordsCharFlags = initial.dialect.isPerl || initial.dialect.isRuby
 

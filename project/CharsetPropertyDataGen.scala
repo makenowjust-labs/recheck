@@ -13,7 +13,7 @@ object CharsetPropertyDataGen extends UnicodeDataGen {
 
   val GeneralCategoryGroups: Seq[String] = Seq("C", "L", "LC", "M", "N", "P", "S", "Z")
 
-  /** The names of the derived binary properties defined in `Properties`. */
+  /** The names of the derived binary properties defined in `PropertyTable`. */
   val DerivedBinaryNames: Seq[String] = Seq("Any", "ASCII", "Assigned")
 
   val MaxCodePoint: Int = 0x10ffff
@@ -92,7 +92,7 @@ object CharsetPropertyDataGen extends UnicodeDataGen {
 
   private def field(names: Seq[String]): String = names.mkString(",")
 
-  /** The enumerated properties of ICU's integer properties, by their names in `UnicodeData` and `Properties`.
+  /** The enumerated properties of ICU's integer properties, by their names in `UnicodeData` and `PropertyTable`.
     *
     * The values of each property are the named ones and the ones that some code point has.
     */

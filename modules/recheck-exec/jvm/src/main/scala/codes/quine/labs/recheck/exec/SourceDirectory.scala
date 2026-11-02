@@ -16,11 +16,11 @@ import java.util.concurrent.locks.ReentrantLock
 
 import codes.quine.labs.recheck.common.UnexpectedException
 
-/** SourceFiles keeps the source files of programs in a directory of this user.
+/** SourceDirectory keeps the source files of programs in a directory of this user.
   *
   * The files stay after the process exits.
   */
-private[exec] object SourceFiles:
+private[exec] object SourceDirectory:
 
   /** The directory `recheck-<user>` in the temporary directory, or a new temporary directory if it is not safe. */
   lazy val directory: Path =

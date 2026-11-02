@@ -4,7 +4,7 @@ package diagnostics
 import codes.quine.labs.recheck.util.ECMAScriptNotation
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
-import codes.quine.labs.resyntax.charset.Properties
+import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
@@ -187,7 +187,7 @@ object AttackPatternStyle:
 
   /** The non-ASCII characters written as they are: letters, numbers, punctuation and symbols. */
   private lazy val Shown: CharSet =
-    CharSet.union(Seq("L", "N", "P", "S").map(Properties.GeneralCategory.value(_).get.set))
+    CharSet.union(Seq("L", "N", "P", "S").map(PropertyTable.GeneralCategory.value(_).get.set))
 
   private def isASCIIPrintable(c: UChar): Boolean = 0x20 <= c && c <= 0x7e
 

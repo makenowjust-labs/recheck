@@ -1,10 +1,10 @@
 package codes.quine.labs.resyntax.charset
 
-/** Properties provides the Unicode character properties.
+/** PropertyTable provides the Unicode character properties.
   *
   * The data are generated from ICU4J at build time and decoded at first use.
   */
-object Properties:
+object PropertyTable:
 
   /** The binary properties known to ICU4J, in ICU's `UProperty` order. */
   lazy val icuBinaryProperties: IndexedSeq[BinaryProperty] =

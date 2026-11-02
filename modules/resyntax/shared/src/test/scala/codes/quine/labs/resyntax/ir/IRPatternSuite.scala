@@ -362,22 +362,22 @@ class IRPatternSuite extends munit.FunSuite:
   )
 
   test("IRPattern#surrogates"):
-    assertEquals(parse("a").surrogates, IRSurrogates.Separate)
-    assertEquals(parse("a", "u").surrogates, IRSurrogates.Paired)
-    assertEquals(parse("a", "v").surrogates, IRSurrogates.Paired)
-    assertEquals(parse("a", "", Dialect.Java).surrogates, IRSurrogates.Paired)
-    assertEquals(parse("a", "", Dialect.Python()).surrogates, IRSurrogates.Separate)
-    assertEquals(parse("a", "", Dialect.Perl(utf8 = true)).surrogates, IRSurrogates.Separate)
-    assertEquals(parse("a", "", Dialect.Ruby()).surrogates, IRSurrogates.Absent)
-    assertEquals(parse("a", "u", Dialect.PCRE).surrogates, IRSurrogates.Absent)
-    assertEquals(parse("a", "", Dialect.PCRE).surrogates, IRSurrogates.Separate)
-    assertEquals(parse("a", "", Dialect.Ruby()).universe, UnitMode.CodePoint.universe.diff(IRSurrogates.All))
+    assertEquals(parse("a").surrogates, IRSurrogateKind.Separate)
+    assertEquals(parse("a", "u").surrogates, IRSurrogateKind.Paired)
+    assertEquals(parse("a", "v").surrogates, IRSurrogateKind.Paired)
+    assertEquals(parse("a", "", Dialect.Java).surrogates, IRSurrogateKind.Paired)
+    assertEquals(parse("a", "", Dialect.Python()).surrogates, IRSurrogateKind.Separate)
+    assertEquals(parse("a", "", Dialect.Perl(utf8 = true)).surrogates, IRSurrogateKind.Separate)
+    assertEquals(parse("a", "", Dialect.Ruby()).surrogates, IRSurrogateKind.Absent)
+    assertEquals(parse("a", "u", Dialect.PCRE).surrogates, IRSurrogateKind.Absent)
+    assertEquals(parse("a", "", Dialect.PCRE).surrogates, IRSurrogateKind.Separate)
+    assertEquals(parse("a", "", Dialect.Ruby()).universe, UnitMode.CodePoint.universe.diff(IRSurrogateKind.All))
     assertEquals(parse("a", "u").universe, UnitMode.CodePoint.universe)
 
   test("IRPattern#assertionLineTerminators"):
-    assertEquals(parse("^a$|\\b", "m").assertionLineTerminators, Seq(IRLineTerminators.JavaScript))
+    assertEquals(parse("^a$|\\b", "m").assertionLineTerminators, Seq(IRLineTerminatorSet.JavaScript))
     assertEquals(parse("^a$", "").assertionLineTerminators, Seq.empty)
-    assertEquals(parse("(?m:^)a$", "", Dialect.Java).assertionLineTerminators, Seq(IRLineTerminators.Java))
+    assertEquals(parse("(?m:^)a$", "", Dialect.Java).assertionLineTerminators, Seq(IRLineTerminatorSet.Java))
 
   check("IRPattern#parts")(_.parts)(
     "xyz.0" -> Set(UString.fromUTF16Units("xyz")),

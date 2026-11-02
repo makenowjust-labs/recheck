@@ -6,10 +6,10 @@ import codes.quine.labs.resyntax.charset.BinaryProperty
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
 import codes.quine.labs.resyntax.charset.EnumeratedProperty
-import codes.quine.labs.resyntax.charset.Properties
+import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.PropertyValue
 import codes.quine.labs.resyntax.charset.UnitMode
-import codes.quine.labs.resyntax.ir.build.IRCharClasses.ASCII_POSIX
+import codes.quine.labs.resyntax.ir.build.IRClassLookup.ASCII_POSIX
 
 /** PropertyResult is a result of looking up a Unicode property in a dialect. */
 private[build] enum PropertyResult:
@@ -35,8 +35,10 @@ private[build] enum CaseKind:
   /** Cased is a property of upper, lower or title case (e.g. `Lowercase`), which some dialects take as cased. */
   case Cased
 
-/** IRProperties resolves Unicode property names (`\p{...}`) by each dialect's rules. */
-private[build] object IRProperties:
+/** IRPropertyLookup is a table that `IRCharResolver` looks up by the name of a Unicode property (`\p{...}`), giving its
+  * code points by each dialect's rules.
+  */
+private[build] object IRPropertyLookup:
   import PropertyResult.*
 
   // Scala.js has no `java.util.Locale`, and the names are ASCII.
@@ -44,11 +46,11 @@ private[build] object IRProperties:
 
   private def upperASCII(s: String): String = s.map(c => if 'a' <= c && c <= 'z' then (c - 0x20).toChar else c)
 
-  private def gcValue(name: String): PropertyValue = Properties.GeneralCategory.value(name).get
+  private def gcValue(name: String): PropertyValue = PropertyTable.GeneralCategory.value(name).get
 
   def gc(names: String*): CharSet = CharSet.union(names.map(gcValue(_).set))
 
-  def binary(name: String): CharSet = Properties.binary(name).get.set
+  def binary(name: String): CharSet = PropertyTable.binary(name).get.set
 
   def of(chars: String): CharSet = CharSet.of(chars.map(_.toInt)*)
 
@@ -72,7 +74,7 @@ private[build] object IRProperties:
 
   /** The binary properties of the Unicode Character Database (with `Any`, `ASCII` and `Assigned`). */
   private lazy val ucdBinary: IndexedSeq[BinaryProperty] =
-    Properties.binaryProperties.filterNot(p => ICUOnlyBinary.contains(p.name))
+    PropertyTable.binaryProperties.filterNot(p => ICUOnlyBinary.contains(p.name))
 
   private def caseKindOfValue(value: PropertyValue): CaseKind =
     if Set("Lu", "Ll", "Lt").contains(value.shortName) then CaseKind.Category else CaseKind.Other
@@ -174,21 +176,21 @@ private[build] object IRProperties:
   def javaScript(name: String, value: Option[String], unicodeSets: Boolean): PropertyResult = value match
     case None =>
       fromOption(
-        Properties.GeneralCategory
+        PropertyTable.GeneralCategory
           .value(name)
           .map(foundValue)
-          .orElse(JavaScriptBinary.get(name).map(n => foundBinary(Properties.binary(n).get)))
+          .orElse(JavaScriptBinary.get(name).map(n => foundBinary(PropertyTable.binary(n).get)))
           .orElse(
             Option.when(unicodeSets && JavaScriptStringProperties.contains(name))(
-              foundBinary(Properties.binary(name).get)
+              foundBinary(PropertyTable.binary(name).get)
             )
           )
       )
     case Some(value) =>
       val property = name match
-        case "General_Category" | "gc"   => Some(Properties.GeneralCategory)
-        case "Script" | "sc"             => Some(Properties.Script)
-        case "Script_Extensions" | "scx" => Some(Properties.ScriptExtensions)
+        case "General_Category" | "gc"   => Some(PropertyTable.GeneralCategory)
+        case "Script" | "sc"             => Some(PropertyTable.Script)
+        case "Script_Extensions" | "scx" => Some(PropertyTable.ScriptExtensions)
         case _                           => None
       fromOption(property.flatMap(_.value(value)).map(foundValue))
 
@@ -308,7 +310,7 @@ private[build] object IRProperties:
   private def javaScriptName(name: String): PropertyResult =
     val key = upperASCII(name)
     fromOption(
-      Properties.Script.values
+      PropertyTable.Script.values
         .find(v => upperASCII(v.name) == key || upperASCII(v.shortName) == key)
         .map(foundValue)
     )
@@ -317,11 +319,11 @@ private[build] object IRProperties:
     upperASCII(name.filterNot(c => c == ' ' || c == '_' || c == '-'))
 
   private lazy val javaBlocks: Map[String, PropertyValue] =
-    index(Properties.Block.values.filter(_.shortName != "NB").map(v => (v.names, v)), blockKey)
+    index(PropertyTable.Block.values.filter(_.shortName != "NB").map(v => (v.names, v)), blockKey)
 
   private def javaBlock(name: String): PropertyResult = fromOption(javaBlocks.get(blockKey(name)).map(foundValue))
 
-  def java(name: String, value: Option[String], flags: IRCharFlags): PropertyResult =
+  def java(name: String, value: Option[String], flags: IRCharFlagSet): PropertyResult =
     val ci = flags.ignoreCase
     value match
       case Some(value) =>
@@ -500,28 +502,28 @@ private[build] object IRProperties:
   )
 
   private lazy val pcreBinaryIndex: Map[String, BinaryProperty] =
-    index(PCREBinary.map(n => Properties.binary(n).get).map(p => (p.names, p)), pcreKey)
+    index(PCREBinary.map(n => PropertyTable.binary(n).get).map(p => (p.names, p)), pcreKey)
 
   private def enumIndex(property: EnumeratedProperty, key: String => String): Map[String, PropertyValue] =
     index(property.values.map(v => (v.names, v)), key)
 
   /** PCRE2 accepts only the short names of General_Category values. */
   private lazy val pcreGeneralCategory =
-    Properties.GeneralCategory.values.map(v => pcreKey(v.shortName) -> v).toMap
+    PropertyTable.GeneralCategory.values.map(v => pcreKey(v.shortName) -> v).toMap
 
-  private lazy val pcreScript = enumIndex(Properties.Script, pcreKey)
+  private lazy val pcreScript = enumIndex(PropertyTable.Script, pcreKey)
 
-  private lazy val pcreScriptExtensions = enumIndex(Properties.ScriptExtensions, pcreKey)
+  private lazy val pcreScriptExtensions = enumIndex(PropertyTable.ScriptExtensions, pcreKey)
 
-  private lazy val pcreBidiClass = enumIndex(Properties.BidiClass, pcreKey)
+  private lazy val pcreBidiClass = enumIndex(PropertyTable.BidiClass, pcreKey)
 
   /** `Xan`, `Xps`, `Xsp`, `Xwd` and `Xuc` of PCRE. */
   private def pcreSpecial(key: String): Option[CharSet] = key match
     case "any"         => Some(unicodeUniverse.universe)
     case "l&" | "lc"   => Some(gc("LC"))
     case "xan"         => Some(gc("L", "N"))
-    case "xps" | "xsp" => Some(IRCharClasses.pcreHorizontal.union(IRCharClasses.Vertical))
-    case "xwd"         => Some(IRCharClasses.pcreWord)
+    case "xps" | "xsp" => Some(IRClassLookup.pcreHorizontal.union(IRClassLookup.Vertical))
+    case "xwd"         => Some(IRClassLookup.pcreWord)
     // `$`, `@`, `` ` `` and the characters other than surrogates from U+00A0.
     case "xuc" => Some(of("$@`").union(CharSet.range(0xa0, 0xd7ff)).union(CharSet.range(0xe000, 0x10ffff)))
     case _     => None
@@ -560,19 +562,19 @@ private[build] object IRProperties:
   private lazy val perlBinaryIndex: Map[String, BinaryProperty] =
     index(ucdBinary.filterNot(_.isOfStrings).map(p => (p.names, p)), perlKey)
 
-  private lazy val perlGeneralCategory = enumIndex(Properties.GeneralCategory, perlKey)
+  private lazy val perlGeneralCategory = enumIndex(PropertyTable.GeneralCategory, perlKey)
 
-  private lazy val perlScriptExtensions = enumIndex(Properties.ScriptExtensions, perlKey)
+  private lazy val perlScriptExtensions = enumIndex(PropertyTable.ScriptExtensions, perlKey)
 
-  private lazy val perlBlock = enumIndex(Properties.Block, perlKey)
+  private lazy val perlBlock = enumIndex(PropertyTable.Block, perlKey)
 
-  private lazy val perlAge = enumIndex(Properties.Age, perlKey)
+  private lazy val perlAge = enumIndex(PropertyTable.Age, perlKey)
 
   /** The enumerated properties that Perl looks up by their names, except those with special values. */
   private lazy val perlEnumerated: Map[String, Map[String, PropertyValue]] =
-    val special = Set(Properties.GeneralCategory, Properties.Age)
+    val special = Set(PropertyTable.GeneralCategory, PropertyTable.Age)
     index(
-      Properties.enumeratedProperties.filterNot(special.contains).map(p => (p.names, enumIndex(p, perlKey))),
+      PropertyTable.enumeratedProperties.filterNot(special.contains).map(p => (p.names, enumIndex(p, perlKey))),
       perlKey
     )
 
@@ -588,7 +590,7 @@ private[build] object IRProperties:
     * digits (e.g. `0.3333` is `1/3`, and `0.333` is unknown).
     */
   private def perlNumericValue(value: String): Option[CharSet] =
-    val nv = Properties.NumericValue
+    val nv = PropertyTable.NumericValue
     def gcd(a: Long, b: Long): Long = if b == 0 then a else gcd(b, a % b)
 
     value.trim match
@@ -645,7 +647,7 @@ private[build] object IRProperties:
     def o(set: CharSet, kind: CaseKind = CaseKind.Other) = Some((set, kind))
 
     val space = binary("White_Space")
-    val horiz = space.diff(IRCharClasses.Vertical)
+    val horiz = space.diff(IRClassLookup.Vertical)
     val graph = space.union(gc("Cc", "Cn", "Cs")).complement(u)
     val punct = gc("P").union(of("$+<=>^`|~"))
     key match
@@ -665,9 +667,9 @@ private[build] object IRProperties:
       case "space" | "xposixspace" | "spaceperl" | "xperlspace" => o(space)
       case "upper" | "xposixupper"                              => o(binary("Uppercase"), CaseKind.Cased)
       case "title" | "titlecase"                                => o(gc("Lt"), CaseKind.Cased)
-      case "word" | "xposixword"                                => o(IRCharClasses.perlWord)
+      case "word" | "xposixword"                                => o(IRClassLookup.perlWord)
       case "xdigit" | "xposixxdigit"                            => o(binary("Hex_Digit"))
-      case "vertspace" | "v"                                    => o(IRCharClasses.Vertical)
+      case "vertspace" | "v"                                    => o(IRClassLookup.Vertical)
       case "posixalnum"                                         => o(ASCII_POSIX("alnum"))
       case "posixalpha"                                         => o(ASCII_POSIX("alpha"))
       case "posixblank"                                         => o(ASCII_POSIX("blank"))
@@ -698,13 +700,13 @@ private[build] object IRProperties:
           case Some(values) => fromOption(values.get(valueKey).map(foundValue))
           case None         =>
             propertyKey match
-              case "age"                 => fromOption(perlAge.get(valueKey).map(foundValue))
-              case "in" | "presentin"    => fromOption(perlAge.get(valueKey).map(v => found(Properties.presentIn(v))))
+              case "age"              => fromOption(perlAge.get(valueKey).map(foundValue))
+              case "in" | "presentin" => fromOption(perlAge.get(valueKey).map(v => found(PropertyTable.presentIn(v))))
               case "nv" | "numericvalue" => fromOption(perlNumericValue(value).map(found(_)))
               case _                     =>
                 perlBinaryIndex.get(propertyKey) match
                   case Some(p) =>
-                    Properties.binaryValue(value) match
+                    PropertyTable.binaryValue(value) match
                       case Some(true)  => foundBinary(p)
                       case Some(false) => found(p.set.complement(unicodeUniverse))
                       case None        => Unknown
@@ -811,7 +813,7 @@ private[build] object IRProperties:
   )
 
   private lazy val rubyBinaryIndex: Map[String, BinaryProperty] =
-    index(RubyBinary.map(n => Properties.binary(n).get).map(p => (p.names, p)), rubyKey)
+    index(RubyBinary.map(n => PropertyTable.binary(n).get).map(p => (p.names, p)), rubyKey)
 
   /** The contributory properties of PropList.txt (e.g. `Other_Alphabetic`). */
   private lazy val rubyContributory: Map[String, CharSet] =
@@ -831,13 +833,14 @@ private[build] object IRProperties:
       Seq("Other_Uppercase", "OUpper") -> other("Uppercase", gc("Lu"))
     ).flatMap((names, set) => names.map(rubyKey(_) -> set)).toMap
 
-  private lazy val rubyGeneralCategory = enumIndex(Properties.GeneralCategory, rubyKey)
+  private lazy val rubyGeneralCategory = enumIndex(PropertyTable.GeneralCategory, rubyKey)
 
   /** Onigmo has the scripts of Scripts.txt, which have some characters. */
-  private lazy val rubyScript = index(Properties.Script.values.filter(_.set.nonEmpty).map(v => (v.names, v)), rubyKey)
+  private lazy val rubyScript =
+    index(PropertyTable.Script.values.filter(_.set.nonEmpty).map(v => (v.names, v)), rubyKey)
 
   /** Onigmo accepts only the long names of blocks (e.g. `In_Greek_and_Coptic`, not `InGreek`). */
-  private lazy val rubyBlock = Properties.Block.values.map(v => rubyKey(v.name) -> v).toMap
+  private lazy val rubyBlock = PropertyTable.Block.values.map(v => rubyKey(v.name) -> v).toMap
 
   /** Onigmo's names with a value: `Age` by the version (e.g. `age=6.0`), and `Grapheme_Cluster_Break` and `InCB` by the
     * long names of the values listed in the data files (e.g. `graphemeclusterbreak=regionalindicator`).
@@ -846,10 +849,10 @@ private[build] object IRProperties:
     def listed(name: String, property: EnumeratedProperty, default: String): Seq[(String, CharSet)] =
       property.values.filter(v => v.name != default && v.set.nonEmpty).map(v => s"$name=${rubyKey(v.name)}" -> v.set)
 
-    val ages = Properties.Age.values.filter(_.shortName.matches("[0-9]+\\.[0-9]+"))
-    (ages.map(v => s"age=${v.shortName}" -> Properties.presentIn(v)) ++
-      listed("graphemeclusterbreak", Properties.GraphemeClusterBreak, "Other") ++
-      listed("incb", Properties.IndicConjunctBreak, "None")).toMap
+    val ages = PropertyTable.Age.values.filter(_.shortName.matches("[0-9]+\\.[0-9]+"))
+    (ages.map(v => s"age=${v.shortName}" -> PropertyTable.presentIn(v)) ++
+      listed("graphemeclusterbreak", PropertyTable.GraphemeClusterBreak, "Other") ++
+      listed("incb", PropertyTable.IndicConjunctBreak, "None")).toMap
 
   /** Onigmo's POSIX bracket classes in Unicode (Ruby's `tool/enc-unicode.rb`).
     *
@@ -907,7 +910,7 @@ private[build] object IRProperties:
       dialect: Dialect,
       name: String,
       value: Option[String],
-      flags: IRCharFlags,
+      flags: IRCharFlagSet,
       mode: UnitMode
   ): PropertyResult =
     dialect match
