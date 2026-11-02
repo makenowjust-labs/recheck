@@ -55,7 +55,7 @@ export type Schema = {
   properties: Record<string, Property>;
 };
 
-/** The schema of the parameters, read from `modules/recheck-common/parameters.schema.yaml` at build time. */
+/** The schema of the parameters, read from `schema/parameters.schema.yaml` at build time. */
 export declare const schema: Schema;
 
 /** The default value of each parameter, which is `null` if the schema has none. */

@@ -219,7 +219,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ${{ steps.binary.outputs.path }}
-          key: native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('modules/**/src/main/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
+          key: native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('modules/**/src/main/**', 'schema/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
       - if: steps.restore-binary.outputs.cache-hit != 'true'
         uses: ./.github/actions/mise
         with:

@@ -9,13 +9,13 @@ import { typescriptType } from "../typescript.js";
 import type { Property, Schema } from "../index.js";
 
 const schemaUrl = new URL(
-  "../../../modules/recheck-common/parameters.schema.yaml",
+  "../../../schema/parameters.schema.yaml",
   import.meta.url,
 );
 const libUrl = new URL("../lib/", import.meta.url);
 
 const header =
-  "// This file is generated from `modules/recheck-common/parameters.schema.yaml` by `recheck-parameters`.";
+  "// This file is generated from `schema/parameters.schema.yaml` by `recheck-parameters`.";
 
 const comment = (lines: string[], indent: string): string =>
   [

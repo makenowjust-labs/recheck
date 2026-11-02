@@ -14,7 +14,7 @@ import sbt.io.syntax._
 object ParametersGen {
 
   /** The schema path relative to the repository root. */
-  val SchemaPath: String = "modules/recheck-common/parameters.schema.yaml"
+  val SchemaPath: String = "schema/parameters.schema.yaml"
 
   final case class Param(
       name: String,

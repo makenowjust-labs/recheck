@@ -23,5 +23,5 @@ runs:
       with:
         path: |
           **/target
-        key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
+        key: ${{ runner.os }}-build-${{ hashFiles('modules/**/src/**', 'schema/**', 'build.sbt', 'project/*.sbt', 'project/*.scala', 'project/build.properties') }}
         restore-keys: ${{ runner.os }}-build-
