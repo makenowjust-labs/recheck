@@ -8,8 +8,6 @@ import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.exec.ExecResult
-import codes.quine.labs.recheck.exec.Executor
-import codes.quine.labs.recheck.exec.PythonExecutor
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
@@ -24,70 +22,20 @@ class RecallValidatorSuite extends munit.FunSuite:
 
   test("RecallValidator.validate"):
     assertEquals(
-      RecallValidator.validate("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, Duration.MinusInf)(
-        (_, _, _, _) => fail("unreachable")
-      ),
+      RecallValidator.validate("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, Duration.MinusInf),
       None
     )
-    assertEquals(
-      RecallValidator.validate("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, Duration.Zero)((_, _, _, _) =>
-        fail("unreachable")
-      ),
-      None
-    )
+    assertEquals(RecallValidator.validate("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, Duration.Zero), None)
     // A Perl pattern interpolating a variable is not run.
-    assertEquals(
-      RecallValidator.validate("a$x", "", Dialect.Perl(), UnitMode.CodePoint, attack, 1.second)((_, _, _, _) =>
-        fail("unreachable")
-      ),
-      None
-    )
+    assertEquals(RecallValidator.validate("a$x", "", Dialect.Perl(), UnitMode.CodePoint, attack, 1.second), None)
 
-    var executor: Executor = null
-    assertEquals(
-      RecallValidator.validate("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, 1.second) { (e, _, _, _) =>
-        executor = e
-        ExecResult.Timeout("recheck:runtime python 3.15.0\nrecheck:start\n")
-      },
-      Some(RecallValidation("python 3.15.0", 1.second, RecallResult.Timeout))
-    )
-    assertEquals(executor, PythonExecutor)
-
-  test("RecallValidator.validate: environment variables"):
-    def run(env: Map[String, String], output: ExecResult = ExecResult.Timeout("")): RecallValidation =
-      RecallValidator
-        .validate("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, 1.second, env = env) { (_, _, _, e) =>
-          assertEquals(e, env)
-          output
-        }
-        .get
-
-    // Without the runtime line, the runtime is the command line of the variable.
-    assertEquals(
-      run(Map("RECHECK_PYTHON" -> " \"/opt/my python/bin/python3\" -X dev ")).runtime,
-      "\"/opt/my python/bin/python3\" -X dev"
-    )
-    interceptMessage[UnexpectedException]("`\"/opt/my python/bin/python3\" -X dev -I -` exited with 2")(
-      run(Map("RECHECK_PYTHON" -> "\"/opt/my python/bin/python3\" -X dev"), ExecResult.Exit(2, "", ""))
-    )
-    // An empty value and the variables of the other dialects are ignored.
-    assertEquals(run(Map("RECHECK_PYTHON" -> " ", "RECHECK_RUBY" -> "ruby")).runtime, "python3")
-
-  test("RecallValidator.validate: timeout"):
-    def limit(timeout: Duration)(using Context): Option[FiniteDuration] =
-      var limit: Option[FiniteDuration] = null
-      RecallValidator.validate("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, timeout) { (_, _, t, _) =>
-        limit = t
-        ExecResult.Timeout("")
-      }
-      limit
-
-    assertEquals(limit(Duration.Inf), None)
-    assertEquals(limit(100.seconds), Some(100.seconds))
+  test("RecallValidator.limit"):
+    assertEquals(RecallValidator.limit(Duration.Inf), None)
+    assertEquals(RecallValidator.limit(100.seconds), Some(100.seconds))
     val ctx50s = Context(timeout = 50.seconds)
-    assert(limit(100.seconds)(using ctx50s).exists(_ <= 50.seconds))
-    assert(limit(Duration.Inf)(using ctx50s).exists(_ <= 50.seconds))
-    assertEquals(limit(1.second)(using ctx50s), Some(1.second))
+    assert(RecallValidator.limit(100.seconds)(using ctx50s).exists(_ <= 50.seconds))
+    assert(RecallValidator.limit(Duration.Inf)(using ctx50s).exists(_ <= 50.seconds))
+    assertEquals(RecallValidator.limit(1.second)(using ctx50s), Some(1.second))
 
   test("RecallValidator.result"):
     def result(output: ExecResult): RecallValidation = RecallValidator.result("python3", "python3 -", 1.second, output)

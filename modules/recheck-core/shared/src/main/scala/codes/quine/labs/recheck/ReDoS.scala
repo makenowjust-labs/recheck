@@ -296,10 +296,7 @@ object ReDoS:
         fuzz
     (diagnostics, () => safe())
 
-  /** Runs recall validation against a vulnerable diagnostics, and records the result in it.
-    *
-    * It runs on the runtime of the dialect when this platform can run it.
-    */
+  /** Runs recall validation against a vulnerable diagnostics, and records the result in it. */
   private[recheck] def recallValidation(
       source: String,
       flags: String,
@@ -309,14 +306,8 @@ object ReDoS:
   )(
       d: Diagnostics.Vulnerable
   )(using ctx: Context): Diagnostics.Vulnerable =
-    RecallValidator.defaultExec match
-      case Some(exec) =>
-        try
-          d.copy(recallValidation =
-            RecallValidator.validate(source, flags, dialect, mode, d.attack, timeout, sys.env)(exec)
-          )
-        catch
-          case ex: ReDoSException =>
-            ex.checker = Some(if d.checker == Checker.Fuzz then Checker.Fuzz else Checker.Automaton)
-            throw ex
-      case None => d
+    try d.copy(recallValidation = RecallValidator.validate(source, flags, dialect, mode, d.attack, timeout))
+    catch
+      case ex: ReDoSException =>
+        ex.checker = Some(if d.checker == Checker.Fuzz then Checker.Fuzz else Checker.Automaton)
+        throw ex

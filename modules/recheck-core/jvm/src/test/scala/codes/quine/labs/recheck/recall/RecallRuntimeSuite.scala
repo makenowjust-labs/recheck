@@ -19,7 +19,6 @@ import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
-import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.CharSet
@@ -50,13 +49,25 @@ class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
       flags: String,
       dialect: Dialect,
       attack: AttackPattern,
-      timeout: Duration = 1.second,
-      env: Map[String, String] = Map.empty
+      timeout: Duration = 1.second
   ): RecallValidation =
     val mode = ReDoS.parse(source, flags, dialect).mode
-    RecallValidator
-      .validate(source, flags, dialect, mode, attack, timeout, env = env)(RecallValidator.defaultExec.get)
-      .get
+    RecallValidator.validate(source, flags, dialect, mode, attack, timeout).get
+
+  /** Runs the recall program as [[RecallValidator.validate]] does, where the environment variables replace the commands
+    * of the runtimes.
+    */
+  def validateIn(env: Map[String, String])(
+      source: String,
+      flags: String,
+      dialect: Dialect,
+      attack: AttackPattern
+  ): RecallValidation =
+    val mode = ReDoS.parse(source, flags, dialect).mode
+    val program = RecallProgram.generate(source, flags, dialect, mode, attack).toOption.get
+    val executor = program.executor
+    val output = executor.exec(program.script, Some(1.second), Some(RecallProgram.StartLine), env)
+    RecallValidator.result(executor.runtime(env), executor.commandLine(env), 1.second, output)
 
   /** Returns the path of the program in `PATH`. */
   def which(program: String): Path =
@@ -100,8 +111,8 @@ class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     assert(new String(probe.start().getInputStream.readAllBytes()).trim != "None", "no en_US.ISO8859-1 locale")
     val env = Map("RECHECK_PYTHON" -> "env LC_ALL=en_US.ISO8859-1 python3")
     val bytes = Dialect.Python(Dialect.Python.Type.Bytes)
-    assertFinish(validate("^(\\w|\\w)*$", "L", bytes, attack("é", 31, "\u0000"), env = env))
-    val unicode = validate("^(\\w|\\w)*$", "", Dialect.Python(), attack("é", 31, "\u0000"), env = env)
+    assertFinish(validateIn(env)("^(\\w|\\w)*$", "L", bytes, attack("é", 31, "\u0000")))
+    val unicode = validateIn(env)("^(\\w|\\w)*$", "", Dialect.Python(), attack("é", 31, "\u0000"))
     assertEquals(unicode.result, RecallResult.Timeout)
 
   runtimeTest("Ruby", "ruby"):
@@ -114,7 +125,7 @@ class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
   runtimeTest("Ruby: the program in UTF-8", "ruby"):
     // The C locale would read a non-ASCII character of the program as an invalid US-ASCII byte.
     val env = Map("RECHECK_RUBY" -> "env LC_ALL=C ruby")
-    assertFinish(validate("^(?:é|é)*$", "", Dialect.Ruby(), attack("é", 3, "\u0000"), env = env))
+    assertFinish(validateIn(env)("^(?:é|é)*$", "", Dialect.Ruby(), attack("é", 3, "\u0000")))
 
   runtimeTest("Ruby: the character set options", "ruby"):
     // `u` is `(?u)`, not `/u` (FIXEDENCODING), so `\w` matches `é`, and a backreference turns off the memoization.
@@ -147,7 +158,7 @@ class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     // The Turkish culture matches `i` with `İ` and `I` with `ı` under `IgnoreCase`.
     val env = Map("RECHECK_DOTNET" -> "env LC_ALL=tr_TR.UTF-8 dotnet")
     def validateTurkish(c: String): RecallValidation =
-      validate("^[ia]*[ib]*[ic]*$", "i", Dialect.DotNet, attack(c, 2000, "!"), env = env)
+      validateIn(env)("^[ia]*[ib]*[ic]*$", "i", Dialect.DotNet, attack(c, 2000, "!"))
 
     assertFinish(validateTurkish("İ"))
     assertEquals(validateTurkish("I").result, RecallResult.Timeout)
@@ -159,16 +170,14 @@ class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     // A string pattern may contain `$`, which a regex literal would interpolate.
     val perlString = Dialect.Perl(source = PerlSource.String)
     val string =
-      RecallValidator.validate("^(?:a|a)*$x", "", perlString, UnitMode.CodePoint, attack("a", 31, ""), 1.second)(
-        RecallValidator.defaultExec.get
-      )
+      RecallValidator.validate("^(?:a|a)*$x", "", perlString, UnitMode.CodePoint, attack("a", 31, ""), 1.second)
     assertFinish(string.get)
 
   runtimeTest("Perl: the C locale", "perl"):
     // Perl takes the locale of the environment, whose `\w` under `l` matches `é` in a UTF-8 locale.
     val env = Map("RECHECK_PERL" -> "env LC_ALL=en_US.UTF-8 perl")
-    assertFinish(validate("^\\w*\\w*\\w*$", "l", Dialect.Perl(), attack("é", 3000, "\u0000"), env = env))
-    val unicode = validate("^\\w*\\w*\\w*$", "u", Dialect.Perl(), attack("é", 3000, "\u0000"), env = env)
+    assertFinish(validateIn(env)("^\\w*\\w*\\w*$", "l", Dialect.Perl(), attack("é", 3000, "\u0000")))
+    val unicode = validateIn(env)("^\\w*\\w*\\w*$", "u", Dialect.Perl(), attack("é", 3000, "\u0000"))
     assertEquals(unicode.result, RecallResult.Timeout)
 
   runtimeTest("Perl: the character set rules of utf8", "perl"):
@@ -294,7 +303,7 @@ class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     // The wrapper's runtime line comes first, and it shows the arguments.
     val ruby = script("my ruby", s"echo recheck:runtime wrapped \"$$@\"; exec '${which("ruby")}' \"$$@\"")
     val env = Map("RECHECK_RUBY" -> s"'$ruby' --disable-gems")
-    val r = validate("^(a|a)*$", "", Dialect.Ruby(), attack("a", 3, "\u0000"), env = env)
+    val r = validateIn(env)("^(a|a)*$", "", Dialect.Ruby(), attack("a", 3, "\u0000"))
     assertEquals(r.runtime, "wrapped --disable-gems -")
     assertFinish(r)
 
@@ -309,15 +318,13 @@ class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
          |echo recheck:start
          |echo recheck:engine-error StackOverflowError""".stripMargin
     )
-    val r = validate("a", "", Dialect.Java, attack("a", 3, ""), env = Map("RECHECK_JAVA" -> s"\"$java\""))
+    val r = validateIn(Map("RECHECK_JAVA" -> s"\"$java\""))("a", "", Dialect.Java, attack("a", 3, ""))
     assertEquals(r, RecallValidation("fake --source 17", 1.second, RecallResult.EngineError("StackOverflowError")))
     interceptMessage[UnexpectedException]("`sh -c 'exit 3' --source 17 RecheckRecall.java` exited with 3"):
-      validate("a", "", Dialect.Java, attack("a", 3, ""), env = Map("RECHECK_JAVA" -> "sh -c 'exit 3'"))
+      validateIn(Map("RECHECK_JAVA" -> "sh -c 'exit 3'"))("a", "", Dialect.Java, attack("a", 3, ""))
 
-  test("RecallValidator.validate: the deadline of the context"):
+  runtimeTest("RecallValidator.validate: the deadline of the context", "node"):
+    given Context = Context(timeout = 50.millis)
+    val exponential = attack("a", 31, "\u0000")
     intercept[TimeoutException]:
-      RecallValidator.validate("foo", "", Dialect.JavaScript, UnitMode.UTF16, attack("a", 1, ""), 50.millis) {
-        (_, _, _, _) =>
-          Thread.sleep(100)
-          ExecResult.Timeout("")
-      }(using Context(timeout = 50.millis))
+      RecallValidator.validate("^(a|a)*$", "", Dialect.JavaScript, UnitMode.UTF16, exponential, 10.seconds)
