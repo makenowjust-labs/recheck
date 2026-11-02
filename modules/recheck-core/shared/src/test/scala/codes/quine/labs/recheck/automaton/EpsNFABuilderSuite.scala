@@ -88,7 +88,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     )
 
   test("EpsNFABuilder.build: WordBoundary"):
-    for (source, kind) <- Seq("^\\b$" -> AssertKind.WordBoundary, "^\\B$" -> AssertKind.WordBoundaryNot) do
+    for (source, kind) <- Seq("^\\b$" -> AssertKind.WordBoundary(0), "^\\B$" -> AssertKind.NotWordBoundary(0)) do
       assertEquals(
         build(source).get,
         EpsNFA(
@@ -264,26 +264,32 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       build(source, flags, dialect).get.tau.values.collect { case Assert(k, _) => k }.toSet
 
     import IRLineBeginAtEnd.*
-    assertEquals(kinds("^a$", "m", Dialect.JavaScript), Set[AssertKind](AssertKind.LineBegin, AssertKind.LineEnd))
+    assertEquals(
+      kinds("^a$", "m", Dialect.JavaScript),
+      Set[AssertKind](AssertKind.LineBegin(0, AfterTerminator, false, false), AssertKind.LineEnd(0, false, false))
+    )
     assertEquals(
       kinds("^a$", "", Dialect.Ruby()),
-      Set[AssertKind](AssertKind.LineBeginOf(0, InputBegin, false, false), AssertKind.LineEnd)
+      Set[AssertKind](AssertKind.LineBegin(0, InputBegin, false, false), AssertKind.LineEnd(0, false, false))
     )
     assertEquals(
       kinds("^a(?d:^)", "m", Dialect.Java),
-      Set[AssertKind](AssertKind.LineBeginOf(0, Never, false, true), AssertKind.LineBeginOf(1, Never, false, false))
+      Set[AssertKind](AssertKind.LineBegin(0, Never, false, true), AssertKind.LineBegin(1, Never, false, false))
     )
     assertEquals(
       kinds("(*CRLF)(?m)^a$", "", Dialect.PCRE),
-      Set[AssertKind](AssertKind.LineBeginOf(0, InputBegin, true, false), AssertKind.LineEndOf(0, true, false))
+      Set[AssertKind](AssertKind.LineBegin(0, InputBegin, true, false), AssertKind.LineEnd(0, true, false))
     )
-    assertEquals(kinds("\\Aa(?m:$)|b", "", Dialect.Ruby()), Set[AssertKind](AssertKind.InputBegin, AssertKind.LineEnd))
-    assertEquals(kinds("a\\z|b", "", Dialect.Ruby()), Set[AssertKind](AssertKind.InputEnd))
-    assertEquals(kinds("a$\\n", "", Dialect.Python()), Set[AssertKind](AssertKind.ChompEnd(0, false, false)))
-    assertEquals(kinds("a$\\n", "", Dialect.Java), Set[AssertKind](AssertKind.ChompEnd(0, true, true)))
+    assertEquals(
+      kinds("\\Aa(?m:$)|b", "", Dialect.Ruby()),
+      Set[AssertKind](AssertKind.TextBegin, AssertKind.LineEnd(0, false, false))
+    )
+    assertEquals(kinds("a\\z|b", "", Dialect.Ruby()), Set[AssertKind](AssertKind.TextEnd))
+    assertEquals(kinds("a$\\n", "", Dialect.Python()), Set[AssertKind](AssertKind.ChompTextEnd(0, false, false)))
+    assertEquals(kinds("a$\\n", "", Dialect.Java), Set[AssertKind](AssertKind.ChompTextEnd(0, true, true)))
     assertEquals(
       kinds("\\b(?a:\\B)", "", Dialect.Python()),
-      Set[AssertKind](AssertKind.WordBoundary, AssertKind.WordBoundaryNotOf(1))
+      Set[AssertKind](AssertKind.WordBoundary(0), AssertKind.NotWordBoundary(1))
     )
 
   /** Tests whether the automaton of the source accepts the input, i.e. the source matches in the input. */

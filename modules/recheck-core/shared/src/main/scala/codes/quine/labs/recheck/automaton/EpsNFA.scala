@@ -193,10 +193,10 @@ object EpsNFA:
     * right one survives.
     *
     * With `last`, a line terminator, `\r` or `\n` guesses whether it is the last character (for
-    * [[AssertKind.ChompEnd]]). With `afterCR`, `\n` guesses whether `\r` precedes it (for [[AssertKind.LineBeginOf]]
-    * after `\r\n`). With `follow`, `\r` guesses what follows it (for [[AssertKind.LineEndOf]] before `\r\n` and
-    * [[AssertKind.ChompEnd]] before the final `\r\n`). `marks` is the number of the word marks, for each of which an
-    * extender guesses whether the text up to it has a base (for [[AssertKind.MarkWordBoundaryOf]]).
+    * [[AssertKind.ChompTextEnd]]). With `afterCR`, `\n` guesses whether `\r` precedes it (for [[AssertKind.LineBegin]]
+    * after `\r\n`). With `follow`, `\r` guesses what follows it (for [[AssertKind.LineEnd]] before `\r\n` and
+    * [[AssertKind.ChompTextEnd]] before the final `\r\n`). `marks` is the number of the word marks, for each of which
+    * an extender guesses whether the text up to it has a base (for [[AssertKind.MarkWordBoundary]]).
     */
   final case class Guesses(last: Boolean, afterCR: Boolean, follow: Boolean, marks: Int = 0):
 
@@ -235,18 +235,18 @@ object EpsNFA:
 
     /** Returns the guesses that the assertions need. */
     def of(kinds: Set[AssertKind]): Guesses =
-      val last = kinds.exists(_.isInstanceOf[AssertKind.ChompEnd])
+      val last = kinds.exists(_.isInstanceOf[AssertKind.ChompTextEnd])
       val afterCR = kinds.exists:
-        case AssertKind.LineBeginOf(_, _, afterCRLF, _) => afterCRLF
-        case _                                          => false
+        case AssertKind.LineBegin(_, _, afterCRLF, _) => afterCRLF
+        case _                                        => false
       val follow = kinds.exists:
-        case AssertKind.LineEndOf(_, beforeCRLF, _) => beforeCRLF
-        case AssertKind.ChompEnd(_, crlf, _)        => crlf
-        case _                                      => false
+        case AssertKind.LineEnd(_, beforeCRLF, _) => beforeCRLF
+        case AssertKind.ChompTextEnd(_, crlf, _)  => crlf
+        case _                                    => false
       val marks = kinds
         .collect:
-          case AssertKind.MarkWordBoundaryOf(_, m)    => m + 1
-          case AssertKind.MarkWordBoundaryNotOf(_, m) => m + 1
+          case AssertKind.MarkWordBoundary(_, m)    => m + 1
+          case AssertKind.NotMarkWordBoundary(_, m) => m + 1
         .maxOption
         .getOrElse(0)
       Guesses(last, afterCR, follow, marks)
@@ -268,39 +268,66 @@ object EpsNFA:
     /** Returns a set of next possible basic character kinds from the previous character kind. */
     def toCharKindSet(prev: CharKind): Set[CharKind] = CharKind.basic.filter(accepts(prev, _)).toSet
 
-  /** AssertKind values and utilities. */
+  /** AssertKind values, one for each kind of the IR assertions. */
   object AssertKind:
 
     private def betweenCRLF(prev: CharKind, next: CharKind): Boolean = prev.cr && next.lf
 
-    /** LineBegin is `^` assertion, which matches after a line terminator of the first set or at the begin. */
-    case object LineBegin extends AssertKind:
-      def accepts(prev: CharKind, next: CharKind): Boolean = prev.boundary || prev.isLineTerminatorOf(0)
+    /** LineBegin is `^` assertion with the `set`-th line terminator set, which `atEnd` tells where it matches at the
+      * end of the input.
+      *
+      * With `afterCRLF`, it matches after `\r\n` too, where `\n` is not a line terminator by itself (PCRE's `(*CRLF)`).
+      * With `atomic`, it does not match between `\r` and `\n` (Java).
+      */
+    final case class LineBegin(set: Int, atEnd: IRLineBeginAtEnd, afterCRLF: Boolean, atomic: Boolean)
+        extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean =
+        val afterTerminator = prev.isLineTerminatorOf(set) || (afterCRLF && prev.lf && prev.afterCR.contains(true))
+        (prev.boundary || afterTerminator) && !(atomic && betweenCRLF(prev, next)) &&
+        (!next.boundary || (atEnd match
+          case IRLineBeginAtEnd.AfterTerminator => true
+          case IRLineBeginAtEnd.InputBegin      => prev.boundary
+          case IRLineBeginAtEnd.Never           => false))
 
-    /** LineEnd is `$` assertion, which matches before a line terminator of the first set or at the end. */
-    case object LineEnd extends AssertKind:
-      def accepts(prev: CharKind, next: CharKind): Boolean = next.boundary || next.isLineTerminatorOf(0)
+    /** LineEnd is `$` assertion with the `set`-th line terminator set.
+      *
+      * With `beforeCRLF`, it matches before `\r\n` too, where `\r` is not a line terminator by itself (PCRE's
+      * `(*CRLF)`). With `atomic`, it does not match between `\r` and `\n` (Java).
+      */
+    final case class LineEnd(set: Int, beforeCRLF: Boolean, atomic: Boolean) extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean =
+        val beforeTerminator =
+          next.isLineTerminatorOf(set) || (beforeCRLF && next.cr && !next.follow.contains(CRFollow.Other))
+        (next.boundary || beforeTerminator) && !(atomic && betweenCRLF(prev, next))
 
-    /** WordBoundary is `\b` assertion of the first word set. */
-    case object WordBoundary extends AssertKind:
-      def accepts(prev: CharKind, next: CharKind): Boolean = prev.word != next.word
+    /** TextBegin is `\A` assertion. */
+    case object TextBegin extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean = prev.boundary
 
-      override def seesBoundary: Boolean = false
+    /** TextEnd is `\z` assertion. */
+    case object TextEnd extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean = next.boundary
 
-    /** WordBoundaryNot is `\B` assertion of the first word set. */
-    case object WordBoundaryNot extends AssertKind:
-      def accepts(prev: CharKind, next: CharKind): Boolean = prev.word == next.word
+    /** ChompTextEnd is `\Z` assertion with the `set`-th line terminator set, which matches at the end or before a line
+      * terminator at the end.
+      *
+      * With `crlf`, it matches before `\r\n` at the end too. With `atomic`, it does not match between `\r` and `\n`
+      * (Java).
+      */
+    final case class ChompTextEnd(set: Int, crlf: Boolean, atomic: Boolean) extends AssertKind:
+      def accepts(prev: CharKind, next: CharKind): Boolean =
+        val beforeFinal = (next.isLineTerminatorOf(set) && next.last.contains(true)) ||
+          (crlf && next.cr && next.follow.contains(CRFollow.FinalLF))
+        (next.boundary || beforeFinal) && !(atomic && betweenCRLF(prev, next))
 
-      override def seesBoundary: Boolean = false
-
-    /** WordBoundaryOf is `\b` assertion of the `set`-th word set. */
-    final case class WordBoundaryOf(set: Int) extends AssertKind:
+    /** WordBoundary is `\b` assertion of the `set`-th word set. */
+    final case class WordBoundary(set: Int) extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean = prev.isWordOf(set) != next.isWordOf(set)
 
       override def seesBoundary: Boolean = false
 
-    /** WordBoundaryNotOf is `\B` assertion of the `set`-th word set. */
-    final case class WordBoundaryNotOf(set: Int) extends AssertKind:
+    /** NotWordBoundary is `\B` assertion of the `set`-th word set. */
+    final case class NotWordBoundary(set: Int) extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean = prev.isWordOf(set) == next.isWordOf(set)
 
       override def seesBoundary: Boolean = false
@@ -317,66 +344,19 @@ object EpsNFA:
     private def isMarkWordAfter(prev: CharKind, next: CharKind, word: Int, marks: Int): Boolean =
       next.isWordOf(word) || next.isMarkOf(marks) && prev.isBasedOf(marks)
 
-    /** MarkWordBoundaryOf is `\b` assertion of the `word`-th word set and the `marks`-th word marks. */
-    final case class MarkWordBoundaryOf(word: Int, marks: Int) extends AssertKind:
+    /** MarkWordBoundary is `\b` assertion of the `word`-th word set and the `marks`-th word marks. */
+    final case class MarkWordBoundary(word: Int, marks: Int) extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean =
         isMarkWordBefore(prev, word, marks) != isMarkWordAfter(prev, next, word, marks)
 
       override def seesBoundary: Boolean = false
 
-    /** MarkWordBoundaryNotOf is `\B` assertion of the `word`-th word set and the `marks`-th word marks. */
-    final case class MarkWordBoundaryNotOf(word: Int, marks: Int) extends AssertKind:
+    /** NotMarkWordBoundary is `\B` assertion of the `word`-th word set and the `marks`-th word marks. */
+    final case class NotMarkWordBoundary(word: Int, marks: Int) extends AssertKind:
       def accepts(prev: CharKind, next: CharKind): Boolean =
         isMarkWordBefore(prev, word, marks) == isMarkWordAfter(prev, next, word, marks)
 
       override def seesBoundary: Boolean = false
-
-    /** InputBegin is `\A` assertion. */
-    case object InputBegin extends AssertKind:
-      def accepts(prev: CharKind, next: CharKind): Boolean = prev.boundary
-
-    /** InputEnd is `\z` assertion. */
-    case object InputEnd extends AssertKind:
-      def accepts(prev: CharKind, next: CharKind): Boolean = next.boundary
-
-    /** LineBeginOf is `^` assertion with the `set`-th line terminator set, which `atEnd` tells where it matches at the
-      * end of the input.
-      *
-      * With `afterCRLF`, it matches after `\r\n` too, where `\n` is not a line terminator by itself (PCRE's `(*CRLF)`).
-      * With `atomic`, it does not match between `\r` and `\n` (Java).
-      */
-    final case class LineBeginOf(set: Int, atEnd: IRLineBeginAtEnd, afterCRLF: Boolean, atomic: Boolean)
-        extends AssertKind:
-      def accepts(prev: CharKind, next: CharKind): Boolean =
-        val afterTerminator = prev.isLineTerminatorOf(set) || (afterCRLF && prev.lf && prev.afterCR.contains(true))
-        (prev.boundary || afterTerminator) && !(atomic && betweenCRLF(prev, next)) &&
-        (!next.boundary || (atEnd match
-          case IRLineBeginAtEnd.AfterTerminator => true
-          case IRLineBeginAtEnd.InputBegin      => prev.boundary
-          case IRLineBeginAtEnd.Never           => false))
-
-    /** LineEndOf is `$` assertion with the `set`-th line terminator set.
-      *
-      * With `beforeCRLF`, it matches before `\r\n` too, where `\r` is not a line terminator by itself (PCRE's
-      * `(*CRLF)`). With `atomic`, it does not match between `\r` and `\n` (Java).
-      */
-    final case class LineEndOf(set: Int, beforeCRLF: Boolean, atomic: Boolean) extends AssertKind:
-      def accepts(prev: CharKind, next: CharKind): Boolean =
-        val beforeTerminator =
-          next.isLineTerminatorOf(set) || (beforeCRLF && next.cr && !next.follow.contains(CRFollow.Other))
-        (next.boundary || beforeTerminator) && !(atomic && betweenCRLF(prev, next))
-
-    /** ChompEnd is `\Z` assertion with the `set`-th line terminator set, which matches at the end or before a line
-      * terminator at the end.
-      *
-      * With `crlf`, it matches before `\r\n` at the end too. With `atomic`, it does not match between `\r` and `\n`
-      * (Java).
-      */
-    final case class ChompEnd(set: Int, crlf: Boolean, atomic: Boolean) extends AssertKind:
-      def accepts(prev: CharKind, next: CharKind): Boolean =
-        val beforeFinal = (next.isLineTerminatorOf(set) && next.last.contains(true)) ||
-          (crlf && next.cr && next.follow.contains(CRFollow.FinalLF))
-        (next.boundary || beforeFinal) && !(atomic && betweenCRLF(prev, next))
 
     /** NotBetweenCRLF is an assertion that the position is not between `\r` and `\n`. */
     case object NotBetweenCRLF extends AssertKind:
