@@ -54,6 +54,3 @@ object CharKind:
 
   /** The kind of the begin and the end of the input, where there is no character. */
   val Boundary: CharKind = CharKind(boundary = true)
-
-  /** The basic kinds, which the original assertions tell about. */
-  val basic: Seq[CharKind] = Seq(Normal, LineTerminator, Word)

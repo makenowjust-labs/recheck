@@ -27,23 +27,6 @@ class EpsNFASuite extends munit.FunSuite:
 
   val notWordBoundary: AssertKind = AssertKind.NotWordBoundary(0)
 
-  test("EpsNFA.AssertKind#toCharKindSet"):
-    val Normal: CharKind = CharKind.Normal
-    val LineTerminator: CharKind = CharKind.LineTerminator
-    val Word: CharKind = CharKind.Word
-    assertEquals(lineBegin.toCharKindSet(Normal), Set.empty[CharKind])
-    assertEquals(lineBegin.toCharKindSet(LineTerminator), Set(Normal, LineTerminator, Word))
-    assertEquals(lineBegin.toCharKindSet(Word), Set.empty[CharKind])
-    assertEquals(lineEnd.toCharKindSet(Normal), Set(LineTerminator))
-    assertEquals(lineEnd.toCharKindSet(LineTerminator), Set(LineTerminator))
-    assertEquals(lineEnd.toCharKindSet(Word), Set(LineTerminator))
-    assertEquals(wordBoundary.toCharKindSet(Normal), Set(Word))
-    assertEquals(wordBoundary.toCharKindSet(LineTerminator), Set(Word))
-    assertEquals(wordBoundary.toCharKindSet(Word), Set(Normal, LineTerminator))
-    assertEquals(notWordBoundary.toCharKindSet(Normal), Set(Normal, LineTerminator))
-    assertEquals(notWordBoundary.toCharKindSet(LineTerminator), Set(Normal, LineTerminator))
-    assertEquals(notWordBoundary.toCharKindSet(Word), Set(Word))
-
   test("EpsNFA.AssertKind#accepts"):
     import IRLineBeginAtEnd.*
     val normal = CharKindState(CharKind.Normal)
@@ -92,7 +75,7 @@ class EpsNFASuite extends munit.FunSuite:
     assert(!markBoundary.accepts(boundary, mark) && AssertKind.NotMarkWordBoundary(0, 0).accepts(boundary, mark))
 
   test("EpsNFA.AssertKind#treatsBoundaryAsLineTerminator"):
-    val kinds = CharKind.basic
+    val kinds = Seq(CharKind.Normal, CharKind.LineTerminator, CharKind.Word)
     assert(lineBegin.treatsBoundaryAsLineTerminator(kinds))
     assert(lineEnd.treatsBoundaryAsLineTerminator(kinds))
     assert(wordBoundary.treatsBoundaryAsLineTerminator(kinds))

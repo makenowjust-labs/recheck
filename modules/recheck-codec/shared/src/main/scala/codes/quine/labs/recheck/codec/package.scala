@@ -190,7 +190,7 @@ given encodeRecallValidation: Encoder[RecallValidation] with
       "runtime" := r.runtime,
       "timeout" := timeout,
       "result" := r.result,
-      "succeeded" := r.succeeded
+      "succeeded" := r.isSucceeded
     )
 
 /** An `Encoder` for `RecallResult`. */

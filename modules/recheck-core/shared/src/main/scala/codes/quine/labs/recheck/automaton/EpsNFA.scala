@@ -213,11 +213,7 @@ object EpsNFA:
       (kinds.map(CharKindState(_)) ++ Seq(b, t)).forall: s =>
         accepts(b, s) == accepts(t, s) && accepts(s, b) == accepts(s, t)
 
-    /** Returns a set of next possible basic character kinds from the previous character kind. */
-    def toCharKindSet(prev: CharKind): Set[CharKind] =
-      CharKind.basic.filter(k => accepts(CharKindState(prev), CharKindState(k))).toSet
-
-  /** AssertKind values, one for each kind of the IR assertions. */
+  /** AssertKind values. */
   object AssertKind:
 
     private def betweenCRLF(prev: CharKindState, next: CharKindState): Boolean = prev.kind.cr && next.kind.lf

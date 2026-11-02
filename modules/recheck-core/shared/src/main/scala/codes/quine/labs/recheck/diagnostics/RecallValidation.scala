@@ -12,13 +12,13 @@ import scala.concurrent.duration.FiniteDuration
 final case class RecallValidation(runtime: String, timeout: Duration, result: RecallResult):
 
   /** Whether the attack is effective on the engine. */
-  def succeeded: Boolean = result.succeeded
+  def isSucceeded: Boolean = result.isSucceeded
 
   override def toString: String =
     val limit = timeout match
       case d: FiniteDuration => s"${d.toMillis} ms"
       case _                 => "none"
-    s"${if succeeded then "succeeded" else "failed"} ($result on $runtime, timeout: $limit)"
+    s"${if isSucceeded then "succeeded" else "failed"} ($result on $runtime, timeout: $limit)"
 
 /** RecallResult is the result of matching an attack string on the real regex engine. */
 enum RecallResult:
@@ -44,7 +44,7 @@ enum RecallResult:
   case EngineError(message: String)
 
   /** Whether the attack is effective on the engine. */
-  def succeeded: Boolean = this match
+  def isSucceeded: Boolean = this match
     case Finish(_)      => false
     case Timeout        => true
     case EngineLimit(_) => true

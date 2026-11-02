@@ -103,7 +103,7 @@ object ReDoS:
       if !untried.hasNext then Iterator(safe())
       else
         val d = validate(untried.next())
-        if d.recallValidation.forall(_.succeeded) then Iterator(d)
+        if d.recallValidation.forall(_.isSucceeded) then Iterator(d)
         else
           failures.add(RecallKey(d.complexity, d.hotspot))
           if failures.size < maxRecallFailures then Iterator(d) ++ validateNext()
