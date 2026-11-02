@@ -210,7 +210,6 @@ private class EpsNFABuilder(
         emit(i -> Eps(Vector(a)))
         resetMatchStarts.add(i)
         (i, a)
-      // A mark has no effect on matching, and `(*SKIP:NAME)` is unsupported.
       case IRNodeData.BacktrackControl(_: IRBacktrackControl.Mark) => epsilon()
       case IRNodeData.BacktrackControl(_)  => throw new UnsupportedException("backtracking control verb")
       case IRNodeData.Conditional(_, _, _) => throw new UnsupportedException("conditional")

@@ -3,7 +3,7 @@ package codes.quine.labs.recheck.diagnostics
 import java.nio.file.Path
 import scala.concurrent.duration.*
 
-import codes.quine.labs.recheck.util.RuntimeHelper
+import codes.quine.labs.recheck.RuntimeHelper
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.resyntax.charset.UString

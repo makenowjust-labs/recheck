@@ -17,8 +17,7 @@ import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Diagnostics
-import codes.quine.labs.recheck.diagnostics.DiagnosticsIteratorUtil.recovering
-import codes.quine.labs.recheck.diagnostics.DiagnosticsIteratorUtil.tagging
+import codes.quine.labs.recheck.diagnostics.DiagnosticsIteratorUtil.*
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.fuzz.FuzzChecker
 import codes.quine.labs.recheck.fuzz.FuzzProgram
@@ -81,7 +80,7 @@ object ReDoS:
       val validate = recallValidation(source, flags, params.dialect, ir.mode, params.recallTimeout)
       validateCandidates(candidates, safe, validate, failures, params.maxRecallFailures)
 
-    recovering(diagnose):
+    diagnose.recoverWith:
       case ex: ReDoSException => Iterator(Diagnostics.Unknown.from(source, flags, params.dialect, ex))
 
   /** Runs `validate` on the candidates in order, and iterates the diagnostics of [[checkAll]] until the final one.
@@ -194,8 +193,8 @@ object ReDoS:
     // The safe complexities follow the vulnerable ones.
     lazy val (vulnerable, rest) = complexities.span(_.isInstanceOf[Complexity.Vulnerable[?]])
 
-    val diagnostics = tagging(Checker.Automaton):
-      vulnerable.collect:
+    val diagnostics = vulnerable
+      .collect:
         case vul: Complexity.Vulnerable[Int] =>
           val attack = vul.buildAttackPattern(recallLimit, maxRecallStringSize).copy(style = style)
           Diagnostics.Vulnerable(
@@ -207,6 +206,7 @@ object ReDoS:
             vul.hotspot,
             Checker.Automaton
           )
+      .withChecker(Checker.Automaton)
 
     def safe(): Diagnostics.Safe =
       val complexity = rest.nextOption() match
@@ -232,7 +232,7 @@ object ReDoS:
   )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
     import params._
 
-    val diagnostics = tagging(Checker.Fuzz):
+    def diagnose: Iterator[Diagnostics.Vulnerable] =
       val random = new Random(randomSeed)
       val fuzz = FuzzProgram.from(ir).get
       val results = FuzzChecker.check(
@@ -266,6 +266,7 @@ object ReDoS:
             attack.adjust(complexity, recallLimit, maxRecallStringSize).copy(style = style)
           Diagnostics.Vulnerable(source, flags, params.dialect, complexity, recallAttack, hotspot, Checker.Fuzz)
 
+    val diagnostics = diagnose.withChecker(Checker.Fuzz)
     (diagnostics, () => Diagnostics.Safe(source, flags, params.dialect, AttackComplexity.Safe(true), Checker.Fuzz))
 
   /** Runs the automaton checker, or the fuzz checker if the automaton checker gives up, and returns the vulnerable
@@ -281,7 +282,7 @@ object ReDoS:
   )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
     val (automaton, automatonSafe) = checkAutomaton(source, flags, ir, style, params)
     var safe = automatonSafe
-    val diagnostics = recovering(automaton):
+    val diagnostics = automaton.recoverWith:
       case _: UnsupportedException =>
         val (fuzz, fuzzSafe) = checkFuzz(source, flags, ir, style, params, failed)
         safe = fuzzSafe

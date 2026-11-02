@@ -1,4 +1,4 @@
-package codes.quine.labs.recheck.util
+package codes.quine.labs.recheck
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files

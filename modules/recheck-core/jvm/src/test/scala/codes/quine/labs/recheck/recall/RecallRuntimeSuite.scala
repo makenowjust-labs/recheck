@@ -10,6 +10,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.*
 
 import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.RuntimeHelper
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.TimeoutException
@@ -19,7 +20,6 @@ import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.exec.ExecResult
-import codes.quine.labs.recheck.util.RuntimeHelper
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.CharSet
