@@ -19,6 +19,7 @@ import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.exec.ExecResult
+import codes.quine.labs.recheck.util.RuntimeSuite
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.CharSet
@@ -26,11 +27,11 @@ import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRNodeData
 
-/** Runs recall validation on the runtimes in `PATH`, which `mise install` provides.
+/** Tests recall validation on the runtime of each dialect.
   *
   * The comments note the behavior of the versions at the time of writing.
   */
-class RecallRuntimeSuite extends munit.FunSuite:
+class RecallRuntimeSuite extends RuntimeSuite:
 
   override val munitTimeout: Duration = 60.seconds
 
@@ -39,12 +40,6 @@ class RecallRuntimeSuite extends munit.FunSuite:
 
   val params: Parameters =
     Parameters(recallTimeout = 1.second, randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
-
-  /** Checks whether the program is in `PATH`. */
-  def available(program: String): Boolean =
-    sys.env.getOrElse("PATH", "").split(java.io.File.pathSeparatorChar).exists { dir =>
-      dir.nonEmpty && Files.isExecutable(Paths.get(dir, program))
-    }
 
   /** `s.repeat(n) + t` */
   def attack(s: String, n: Int, t: String): AttackPattern =
@@ -69,19 +64,9 @@ class RecallRuntimeSuite extends munit.FunSuite:
 
   /** Creates a shell script in a new directory with a space in its name. */
   def script(name: String, body: String): Path =
-    val dir = Files.createTempDirectory("recheck runtime ")
-    val file = dir.resolve(name)
-    Files.writeString(file, s"#!/bin/sh\n$body\n")
+    val file = createFile("recheck runtime ", name, s"#!/bin/sh\n$body\n")
     file.toFile.setExecutable(true)
-    file.toFile.deleteOnExit()
-    dir.toFile.deleteOnExit()
     file
-
-  /** Defines a test running only when the program is available. */
-  def runtimeTest(name: String, program: String)(body: => Unit)(using munit.Location): Unit =
-    test(name):
-      assert(available(program), s"`$program` is not in PATH")
-      body
 
   def assertFinish(r: RecallValidation)(using munit.Location): Unit =
     assert(clue(r).result.isInstanceOf[RecallResult.Finish])
@@ -236,16 +221,8 @@ class RecallRuntimeSuite extends munit.FunSuite:
 
   /** Runs the standalone program in a new directory, and returns the output. */
   def runScript(script: RecallProgram.Script): String =
-    val dir = Files.createTempDirectory("recheck script ")
-    val file = dir.resolve(script.name)
-    Files.writeString(file, script.content)
-    file.toFile.deleteOnExit()
-    dir.toFile.deleteOnExit()
-    val process = new ProcessBuilder(script.command.split(' ')*).directory(dir.toFile).redirectErrorStream(true).start()
-    process.getOutputStream.close()
-    val out = new String(process.getInputStream.readAllBytes(), StandardCharsets.UTF_8)
-    assertEquals(process.waitFor(), 0, out)
-    out
+    val file = createFile("recheck script ", script.name, script.content)
+    run(script.command.split(' ').toSeq, dir = Some(file.getParent))
 
   for (dialect, program) <- Seq(
       Dialect.JavaScript -> "node",

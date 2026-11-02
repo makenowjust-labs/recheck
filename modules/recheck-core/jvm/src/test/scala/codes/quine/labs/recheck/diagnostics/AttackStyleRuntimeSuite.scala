@@ -1,18 +1,16 @@
 package codes.quine.labs.recheck.diagnostics
 
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.Paths
 import scala.concurrent.duration.*
 
+import codes.quine.labs.recheck.util.RuntimeSuite
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
-/** Evaluates the attack strings written in each style on the runtimes in `PATH`, which `mise install` provides. */
-class AttackStyleRuntimeSuite extends munit.FunSuite:
+/** Evaluates the attack strings written in each style on the runtimes. */
+class AttackStyleRuntimeSuite extends RuntimeSuite:
 
   override val munitTimeout: Duration = 120.seconds
 
@@ -49,43 +47,9 @@ class AttackStyleRuntimeSuite extends munit.FunSuite:
 
   def hex(values: Seq[Int]): String = values.map(Integer.toHexString).mkString(" ")
 
-  /** Checks whether the program is in `PATH`. */
-  def available(program: String): Boolean =
-    sys.env.getOrElse("PATH", "").split(java.io.File.pathSeparatorChar).exists { dir =>
-      dir.nonEmpty && Files.isExecutable(Paths.get(dir, program))
-    }
-
   /** Runs the command with the input, and returns the lines of the output marked by `case:`. */
-  def run(command: Seq[String], input: String = "", dir: Option[Path] = None): Seq[String] =
-    val builder = new ProcessBuilder(command*)
-    dir.foreach(d => builder.directory(d.toFile))
-    builder.environment().put("DOTNET_NOLOGO", "1")
-    builder.environment().put("DOTNET_CLI_TELEMETRY_OPTOUT", "1")
-    val error = Files.createTempFile("recheck-style", ".err")
-    error.toFile.deleteOnExit()
-    builder.redirectError(error.toFile)
-    val process = builder.start()
-    process.getOutputStream.write(input.getBytes(StandardCharsets.UTF_8))
-    process.getOutputStream.close()
-    val output = new String(process.getInputStream.readAllBytes(), StandardCharsets.UTF_8)
-    val code = process.waitFor()
-    if code != 0 then fail(s"${command.mkString(" ")} exited with $code\n$output\n${Files.readString(error)}\n$input")
-    output.linesIterator.collect { case s"case:$line" => line }.toSeq
-
-  /** Creates a new directory having the file. */
-  def file(name: String, content: String): Path =
-    val dir = Files.createTempDirectory("recheck-style")
-    val path = dir.resolve(name)
-    Files.writeString(path, content)
-    path.toFile.deleteOnExit()
-    dir.toFile.deleteOnExit()
-    path
-
-  /** Defines a test running only when the program is available. */
-  def runtimeTest(name: String, program: String)(body: => Unit)(using munit.Location): Unit =
-    test(name):
-      assert(available(program), s"`$program` is not in PATH")
-      body
+  def cases(command: Seq[String], input: String = "", dir: Option[Path] = None): Seq[String] =
+    run(command, input, dir).linesIterator.collect { case s"case:$line" => line }.toSeq
 
   def check(attacks: Seq[AttackPattern], style: AttackPattern.Style, actual: Seq[String])(
       expected: AttackPattern => String
@@ -100,14 +64,14 @@ class AttackStyleRuntimeSuite extends munit.FunSuite:
           |  console.log('case:' + Array.from({ length: s.length }, (_, i) => s.charCodeAt(i).toString(16)).join(' '));
           |}
           |""".stripMargin
-    check(texts, style, run(Seq("node", "-"), script))(a => hex(units(a)))
+    check(texts, style, cases(Seq("node", "-"), script))(a => hex(units(a)))
 
   def python(attacks: Seq[AttackPattern], style: AttackPattern.Style): Seq[String] =
     val script =
       s"""|for s in [${attacks.map(_.toString(style)).mkString(", ")}]:
           |    print('case:' + ' '.join('%x' % (c if isinstance(c, int) else ord(c)) for c in s))
           |""".stripMargin
-    run(Seq("python3", "-I", "-"), script)
+    cases(Seq("python3", "-I", "-"), script)
 
   runtimeTest("Python: str", "python3"):
     val style = AttackPattern.Python()
@@ -123,7 +87,7 @@ class AttackStyleRuntimeSuite extends munit.FunSuite:
           |  puts "case:#{s.encoding} " + s.bytes.map { |b| b.to_s(16) }.join(' ')
           |end
           |""".stripMargin
-    run(Seq("ruby", "-"), script)
+    cases(Seq("ruby", "-"), script)
 
   runtimeTest("Ruby: UTF-8", "ruby"):
     val style = AttackPattern.Ruby()
@@ -147,8 +111,8 @@ class AttackStyleRuntimeSuite extends munit.FunSuite:
           |  }
           |}
           |""".stripMargin
-    val path = file("Main.java", program)
-    check(texts, style, run(Seq("java", path.toString)))(a => hex(units(a)))
+    val path = createFile("recheck-style", "Main.java", program)
+    check(texts, style, cases(Seq("java", path.toString)))(a => hex(units(a)))
 
   runtimeTest("C#", "dotnet"):
     val style = AttackPattern.CSharp
@@ -159,8 +123,8 @@ class AttackStyleRuntimeSuite extends munit.FunSuite:
           |string[] cases = { ${texts.map(_.toString(style)).mkString(", ")} };
           |foreach (var s in cases) Console.WriteLine("case:" + string.Join(" ", s.Select(c => ((int)c).ToString("x"))));
           |""".stripMargin
-    val path = file("Main.cs", program)
-    check(texts, style, run(Seq("dotnet", "run", path.getFileName.toString), dir = Some(path.getParent)))(a =>
+    val path = createFile("recheck-style", "Main.cs", program)
+    check(texts, style, cases(Seq("dotnet", "run", path.getFileName.toString), dir = Some(path.getParent)))(a =>
       hex(units(a))
     )
 
@@ -170,7 +134,7 @@ class AttackStyleRuntimeSuite extends munit.FunSuite:
           |  print 'case:' . join(' ', map { sprintf '%x', ord } split //, $$s) . "\\n";
           |}
           |""".stripMargin
-    run(Seq("perl", "-"), script)
+    cases(Seq("perl", "-"), script)
 
   runtimeTest("Perl: characters", "perl"):
     check(texts, AttackPattern.Perl, perl(texts))(a => hex(codePoints(a)))
@@ -185,7 +149,7 @@ class AttackStyleRuntimeSuite extends munit.FunSuite:
           |  echo 'case:', implode(' ', array_map('dechex', array_values(unpack('C*', $$s) ?: []))), "\\n";
           |}
           |""".stripMargin
-    run(Seq("php"), script)
+    cases(Seq("php"), script)
 
   runtimeTest("PHP: UTF-8", "php"):
     val style = AttackPattern.PHP()
