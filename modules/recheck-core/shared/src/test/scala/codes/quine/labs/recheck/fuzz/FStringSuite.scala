@@ -39,10 +39,6 @@ class FStringSuite extends munit.FunSuite:
     assert(FString(2, IndexedSeq.empty).isEmpty)
     assert(!FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c'))).isEmpty)
 
-  test("FString#nonEmpty"):
-    assert(!FString(2, IndexedSeq.empty).nonEmpty)
-    assert(FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c'))).nonEmpty)
-
   test("FString#size"):
     assertEquals(FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c'))).size, 3)
 
@@ -117,16 +113,10 @@ class FStringSuite extends munit.FunSuite:
 
   test("FString#toString"):
     assertEquals(FString(2, IndexedSeq.empty).toString(AttackPatternStyle.JavaScript), "''")
-    assertEquals(FString(2, IndexedSeq.empty).toString(AttackPatternStyle.Superscript), "''")
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d')))
         .toString(AttackPatternStyle.JavaScript),
       "'a' + 'bc'.repeat(3) + 'd'"
-    )
-    assertEquals(
-      FString(2, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d')))
-        .toString(AttackPatternStyle.Superscript),
-      "'a' 'bc'³ 'd'"
     )
     assertEquals(
       FString(
@@ -134,13 +124,6 @@ class FStringSuite extends munit.FunSuite:
         IndexedSeq(Repeat(1, 1), Wrap('a'), Repeat(1, 1), Wrap('b'), Repeat(0, 1), Wrap('c'))
       ).toString(AttackPatternStyle.JavaScript),
       "'a'.repeat(3) + 'b'.repeat(3) + 'c'.repeat(2)"
-    )
-    assertEquals(
-      FString(
-        2,
-        IndexedSeq(Repeat(1, 1), Wrap('a'), Repeat(1, 1), Wrap('b'), Repeat(0, 1), Wrap('c'))
-      ).toString(AttackPatternStyle.Superscript),
-      "'a'³ 'b'³ 'c'²"
     )
     intercept[IllegalArgumentException] {
       FString(1, IndexedSeq(Repeat(1, 2), Wrap('a'), Repeat(0, 1))).toString

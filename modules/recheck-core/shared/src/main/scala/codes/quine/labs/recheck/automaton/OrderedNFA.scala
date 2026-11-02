@@ -88,9 +88,6 @@ final case class OrderedNFA[A, Q](
           reverseDelta((q2, a)) = reverseDelta((q2, a)) | Set(q1)
       NFA(alphabet, stateSet, acceptSet, inits.toSet, reverseDelta.toMap)
 
-  /** Converts this into [[NFAwLA]]. */
-  def toNFAwLA(using ctx: Context): NFAwLA[A, Q] = toNFAwLA(Int.MaxValue)
-
   /** Converts this into [[NFAwLA]].
     *
     * With [[inputStates]], a look-ahead that none of them has is of no input, which the result does not have.

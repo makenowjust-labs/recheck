@@ -12,14 +12,6 @@ import codes.quine.labs.resyntax.charset.UString
   */
 final case class Witness[A](pumps: Seq[(Seq[A], Seq[A])], suffix: Seq[A]):
 
-  /** Transforms each values of this witness by the function. */
-  def map[B](f: A => B): Witness[B] =
-    Witness(pumps.map { case (pre, pump) => (pre.map(f), pump.map(f)) }, suffix.map(f))
-
-  /** Builds an attack string with `n` times repetition. */
-  def buildAttack(n: Int): Seq[A] =
-    pumps.flatMap { case (pre, pump) => pre ++ Vector.fill(n)(pump).flatten } ++ suffix
-
   /** Builds an attack pattern string with `n` times repetition. */
   def buildAttackPattern(n: Int)(using ev: A =:= UChar): AttackPattern =
     val pumps = this.pumps.map:
@@ -32,10 +24,3 @@ final case class Witness[A](pumps: Seq[(Seq[A], Seq[A])], suffix: Seq[A]):
 
   /** A sum of a fixed part size. */
   def fixedSize: Int = pumps.map(_._1.size).sum + suffix.size
-
-  /** Constructs a witness strings.
-    *
-    * This result's `n`-th element means `n` times repeated sequence.
-    */
-  def toLazyList: LazyList[Seq[A]] =
-    LazyList.from(0).map(buildAttack)

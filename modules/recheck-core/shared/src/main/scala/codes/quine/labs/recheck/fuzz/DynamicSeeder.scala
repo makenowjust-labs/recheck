@@ -56,7 +56,7 @@ object DynamicSeeder:
           val (input, target) = queue.dequeue()
 
           if target.forall(loc => !covered.contains(CoverageItem(loc, true))) then
-            val result = Interpreter.runWithTimeout(fuzz.program, input, 0, opts, timeout)
+            val result = Interpreter.runWithTimeout(fuzz.program, input, opts, timeout)
             if result.status == Status.Limit || result.status == Status.Timeout then
               set.add(FString(input))
               set.add(FString.build(input, result.loops))
