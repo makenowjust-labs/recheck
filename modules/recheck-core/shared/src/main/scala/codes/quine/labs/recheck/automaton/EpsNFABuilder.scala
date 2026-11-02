@@ -12,7 +12,6 @@ import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRAssertKind
 import codes.quine.labs.resyntax.ir.IRBacktrackControl
-import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminators
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
@@ -308,29 +307,14 @@ private class EpsNFABuilder(
     def boundary(kind: AssertKind): (Int, Int) = if needsInputTerminatorDistinction then assert(kind) else epsilon()
 
     kind match
-      case IRAssertKind.WordBoundary(w) =>
-        val i = wordSets.indexOf(w)
-        assert(if i == 0 then AssertKind.WordBoundary else AssertKind.WordBoundaryOf(i))
-      case IRAssertKind.NotWordBoundary(w) =>
-        val i = wordSets.indexOf(w)
-        assert(if i == 0 then AssertKind.WordBoundaryNot else AssertKind.WordBoundaryNotOf(i))
-      case IRAssertKind.MarkWordBoundary(w, m) =>
-        assert(AssertKind.MarkWordBoundaryOf(wordSets.indexOf(w), wordMarks.indexOf(m)))
-      case IRAssertKind.NotMarkWordBoundary(w, m) =>
-        assert(AssertKind.MarkWordBoundaryNotOf(wordSets.indexOf(w), wordMarks.indexOf(m)))
       case IRAssertKind.LineBegin(t, atEnd) =>
-        val i = kindLineTerminators.indexOf(t)
-        if i == 0 && plain(t) && atEnd == IRLineBeginAtEnd.AfterTerminator then assert(AssertKind.LineBegin)
-        else assert(AssertKind.LineBeginOf(i, atEnd, !plain(t) && !t.chars(0x0a), atomic(t)))
+        assert(AssertKind.LineBegin(kindLineTerminators.indexOf(t), atEnd, !plain(t) && !t.chars(0x0a), atomic(t)))
       case IRAssertKind.LineEnd(t) =>
-        val i = kindLineTerminators.indexOf(t)
-        if i == 0 && plain(t) then assert(AssertKind.LineEnd)
-        else assert(AssertKind.LineEndOf(i, !plain(t) && !t.chars(0x0d), atomic(t)))
-      case IRAssertKind.NotBetweenCRLF                                          => assert(AssertKind.NotBetweenCRLF)
-      case IRAssertKind.TextBegin                                               => boundary(AssertKind.InputBegin)
-      case IRAssertKind.TextEnd                                                 => boundary(AssertKind.InputEnd)
+        assert(AssertKind.LineEnd(kindLineTerminators.indexOf(t), !plain(t) && !t.chars(0x0d), atomic(t)))
+      case IRAssertKind.TextBegin                                               => boundary(AssertKind.TextBegin)
+      case IRAssertKind.TextEnd                                                 => boundary(AssertKind.TextEnd)
       case IRAssertKind.ChompTextEnd(t) if chompTextEndsInMiddle.contains(node) =>
-        assert(AssertKind.ChompEnd(kindLineTerminators.indexOf(t), !plain(t), atomic(t)))
+        assert(AssertKind.ChompTextEnd(kindLineTerminators.indexOf(t), !plain(t), atomic(t)))
       case IRAssertKind.ChompTextEnd(t) =>
         // At an end point, it is the end after an optional line terminator.
         val chars = CharSet.of(t.chars.toSeq*)
@@ -340,13 +324,20 @@ private class EpsNFABuilder(
             Seq(() => consume(refine(CharSet.single(0x0d)), None), () => consume(refine(CharSet.single(0x0a)), None))
           )
         val terminator = buildChoice(Seq(() => epsilon()) ++ single ++ crlf)
-        val end = boundary(AssertKind.InputEnd)
+        val end = boundary(AssertKind.TextEnd)
         emit(terminator._2 -> Eps(Vector(end._1)))
         if atomic(t) then
           val guard = assert(AssertKind.NotBetweenCRLF)
           emit(guard._2 -> Eps(Vector(terminator._1)))
           (guard._1, end._2)
         else (terminator._1, end._2)
+      case IRAssertKind.WordBoundary(w)        => assert(AssertKind.WordBoundary(wordSets.indexOf(w)))
+      case IRAssertKind.NotWordBoundary(w)     => assert(AssertKind.NotWordBoundary(wordSets.indexOf(w)))
+      case IRAssertKind.MarkWordBoundary(w, m) =>
+        assert(AssertKind.MarkWordBoundary(wordSets.indexOf(w), wordMarks.indexOf(m)))
+      case IRAssertKind.NotMarkWordBoundary(w, m) =>
+        assert(AssertKind.NotMarkWordBoundary(wordSets.indexOf(w), wordMarks.indexOf(m)))
+      case IRAssertKind.NotBetweenCRLF => assert(AssertKind.NotBetweenCRLF)
 
   private def assert(kind: AssertKind): (Int, Int) =
     val i = nextQ()
