@@ -108,14 +108,21 @@ object Interpreter:
   /** FailedPoint is a failed point on matching. */
   final case class FailedPoint(target: CoverageLocation, pos: Int, kind: ReadKind, capture: Option[UString])
 
-  /** MatchState is a state of matching, where `canaries` tells which canary registers hold the position. */
-  private[vm] final case class MatchState(
-      blockID: Int,
-      pos: Int,
-      counters: Vector[Int],
-      captures: Option[Vector[Int]],
-      canaries: Vector[Boolean]
-  )
+  /** MatchState is a state of matching, which the memoization table looks up on each junction block.
+    *
+    * It lays out as integers the block ID, the position, the counters, the captures with the largest closed index if
+    * the program reads the captures, and whether each canary register holds the position, which make hashing and
+    * comparing it cheap.
+    */
+  private[vm] final class MatchState(private val values: Array[Int]):
+
+    override val hashCode: Int = java.util.Arrays.hashCode(values)
+
+    override def equals(that: Any): Boolean = that match
+      case that: MatchState => java.util.Arrays.equals(values, that.values)
+      case _                => false
+
+    override def toString: String = values.mkString("MatchState(", ", ", ")")
 
   /** Junction is a state for a junction block, with the time reaching it. */
   private[vm] final case class Junction(
@@ -194,8 +201,22 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
     /** Converts this frame into a corresponding state. */
     def toState: MatchState =
-      val captureState = Option.when(program.meta.hasRef)(captures :+ lastParen)
-      Interpreter.MatchState(label.index, pos, counters, captureState, canaries.map(_ == pos))
+      val capturesSize = if program.meta.hasRef then captures.size + 1 else 0
+      val values = new Array[Int](2 + counters.size + capturesSize + canaries.size)
+      var size = 0
+
+      def add(n: Int): Unit =
+        values(size) = n
+        size += 1
+
+      add(label.index)
+      add(pos)
+      counters.foreach(add)
+      if program.meta.hasRef then
+        captures.foreach(add)
+        add(lastParen)
+      for canary <- canaries do add(if canary == pos then 1 else 0)
+      MatchState(values)
 
     override def clone(): Frame =
       val frame = new Frame(label, pos, captures, counters, canaries, rollback, fallback, junctions)
