@@ -105,7 +105,6 @@ class MainSuite extends munit.FunSuite:
     assertEquals(Main.command.parse(Seq("agent")), Right(Main.BatchAction(sys.runtime.availableProcessors())))
 
   test("Main#run"):
-
     assertEquals(
       runMain(Seq.empty),
       (
@@ -160,29 +159,6 @@ class MainSuite extends munit.FunSuite:
     assertEquals(allStatus, 0)
     assertEquals(parse(all), Right(Json.arr(encodeDiagnostics(ReDoS.check("foo", "", params)))))
 
-    // The output is the input of `generate-recall-script`.
-    val stdin = new ByteArrayInputStream(out.getBytes(StandardCharsets.UTF_8))
-    val (script, scriptErr, scriptStatus) = runMain(Seq("generate-recall-script", "-"), stdin)
-    assertEquals((scriptErr, scriptStatus), ("", 0))
-    assert(clue(script).startsWith("// Run: node recall.cjs\n"))
-
-    // The diagnostics have the dialect with its settings, which `generate-recall-script` reads.
-    def roundTrip(args: String*): String =
-      val (out, err, status) = runMain(Seq("--json", "--checker=automaton") ++ args)
-      assertEquals((err, status), ("", 1))
-      val stdin = new ByteArrayInputStream(out.getBytes(StandardCharsets.UTF_8))
-      val (script, scriptErr, scriptStatus) = runMain(Seq("generate-recall-script", "-"), stdin)
-      assertEquals((scriptErr, scriptStatus), ("", 0))
-      script
-
-    val python = roundTrip("--dialect=python", "--python-type=bytes", "/^(a|a)*$/")
-    assert(clue(python).startsWith("# Run: python3 -I recall.py\n"))
-    assert(clue(python).contains("string = b'a' * "))
-    val perl = roundTrip("--dialect=perl", "--perl-source=string", "--perl-utf8=false", "/^(a|a)*$x/")
-    assert(clue(perl).startsWith("# Run: perl recall.pl\n"))
-    assert(clue(perl).contains("my $pattern = \"^(a|a)*\\$x\"; utf8::downgrade($pattern, 1);"))
-    assert(clue(perl).contains("utf8::downgrade($input, 1);"))
-
   test("Main#run: --all with failed recall validation"):
     // Ruby's memoization makes the attacks fail, and the last diagnostics is safe.
     val (out, err, status) = runMain(Seq("--all", "--dialect=ruby", "--recall-timeout=1s", "/^(a|a)*$/"))
@@ -194,8 +170,11 @@ class MainSuite extends munit.FunSuite:
     assert(clue(blocks.last).contains("Status    : safe"))
 
   test("Main#run: generate-recall-script"):
-    def diagnostics(source: String, flags: String, params: Parameters = Parameters()): Json =
-      encodeDiagnostics(ReDoS.check(source, flags, params))
+    // The input is the output of `--json`.
+    def diagnostics(args: String*): Json =
+      val (out, err, _) = runMain(Seq("--json", "--checker=automaton") ++ args)
+      assertEquals(err, "")
+      parse(out).fold(throw _, identity)
 
     def file(json: String): String =
       val path = Files.createTempFile("recheck diagnostics ", ".json")
@@ -203,59 +182,56 @@ class MainSuite extends munit.FunSuite:
       path.toFile.deleteOnExit()
       path.toString
 
-    val js = diagnostics("^(a|a)*$", "")
-    val (out, err, status) = runMain(Seq("generate-recall-script", file(js.noSpaces)))
+    def generate(json: String): (String, String, Int) = runMain(Seq("generate-recall-script", file(json)))
+
+    val js = diagnostics("/^(a|a)*$/")
+    val (out, err, status) = generate(js.noSpaces)
     assertEquals((err, status), ("", 0))
     assert(clue(out).startsWith("// Run: node recall.cjs\nconst "))
     assert(clue(out).contains("const input = 'a'.repeat("))
     // `-` reads the standard input as UTF-8.
-    val stdin = new ByteArrayInputStream(diagnostics("^(é|é)*$", "u").noSpaces.getBytes(StandardCharsets.UTF_8))
+    val stdin = new ByteArrayInputStream(diagnostics("/^(é|é)*$/u").noSpaces.getBytes(StandardCharsets.UTF_8))
     val (utf8, _, _) = runMain(Seq("generate-recall-script", "-"), stdin)
     assert(clue(utf8).contains("const re = new RegExp('^(é|é)*$', 'u');"))
 
-    // The dialect comes from the `dialect` field.
-    val python = diagnostics("^(a|a)*$", "", Parameters(dialect = Dialect.Python()))
-    val bytes = python.deepMerge(Json.obj("dialect" := Json.obj("name" := "python", "type" := "bytes")))
-    val (pythonOut, _, _) = runMain(Seq("generate-recall-script", file(bytes.noSpaces)))
-    assert(clue(pythonOut).startsWith("# Run: python3 -I recall.py\n"))
-    assert(clue(pythonOut).contains("string = b'a' * "))
-    val java = diagnostics("^(a|a)*$", "", Parameters(dialect = Dialect.Java)).deepMerge(Json.obj("dialect" := "java"))
-    val (javaOut, _, _) = runMain(Seq("generate-recall-script", file(java.noSpaces)))
-    assert(clue(javaOut).startsWith("// Run: java --source 17 recall.java\n"))
+    // The dialect with its settings comes from the `dialect` field.
+    val (python, _, _) = generate(diagnostics("--dialect=python", "--python-type=bytes", "/^(a|a)*$/").noSpaces)
+    assert(clue(python).startsWith("# Run: python3 -I recall.py\n"))
+    assert(clue(python).contains("string = b'a' * "))
+    val (java, _, _) = generate(diagnostics("--dialect=java", "/^(a|a)*$/").noSpaces)
+    assert(clue(java).startsWith("// Run: java --source 17 recall.java\n"))
+    val perlArgs = Seq("--dialect=perl", "--perl-source=string", "--perl-utf8=false", "/^(a|a)*$x/")
+    val (perl, _, _) = generate(diagnostics(perlArgs*).noSpaces)
+    assert(clue(perl).startsWith("# Run: perl recall.pl\n"))
+    assert(clue(perl).contains("my $pattern = \"^(a|a)*\\$x\"; utf8::downgrade($pattern, 1);"))
+    assert(clue(perl).contains("utf8::downgrade($input, 1);"))
 
-    def error(json: String): (String, String, Int) = runMain(Seq("generate-recall-script", file(json)))
-
-    assertEquals(error("{"), ("", "Invalid JSON: exhausted input\n", 1))
+    assertEquals(generate("{"), ("", "Invalid JSON: exhausted input\n", 1))
+    assertEquals(generate(diagnostics("/foo/").noSpaces), ("", "The diagnostics is not vulnerable: safe\n", 1))
     assertEquals(
-      error(diagnostics("foo", "").noSpaces),
-      ("", "The diagnostics is not vulnerable: safe\n", 1)
-    )
-    assertEquals(
-      error(js.mapObject(_.remove("attack")).noSpaces),
+      generate(js.mapObject(_.remove("attack")).noSpaces),
       ("", "Invalid diagnostics: DecodingFailure at .attack: Missing required field\n", 1)
     )
     assertEquals(
-      error(js.mapObject(_.add("flags", "z".asJson)).noSpaces)._2,
+      generate(js.mapObject(_.add("flags", "z".asJson)).noSpaces)._2,
       "Invalid flags: Unknown flag 'z' at 0\n"
     )
     assertEquals(
-      error(js.mapObject(_.add("dialect", "cobol".asJson)).noSpaces),
+      generate(js.mapObject(_.add("dialect", "cobol".asJson)).noSpaces),
       ("", "Invalid diagnostics: DecodingFailure at .dialect: Unknown dialect: cobol\n", 1)
     )
     assertEquals(
-      error(js.mapObject(_.add("dialect", Json.obj("name" := "ruby", "encoding" := "bytes"))).noSpaces),
+      generate(js.mapObject(_.add("dialect", Json.obj("name" := "ruby", "encoding" := "bytes"))).noSpaces),
       ("", "Invalid diagnostics: DecodingFailure at .dialect: Unknown encoding of ruby: bytes\n", 1)
     )
     assertEquals(
-      error(js.mapObject(_.remove("dialect")).noSpaces),
+      generate(js.mapObject(_.remove("dialect")).noSpaces),
       ("", "Invalid diagnostics: DecodingFailure at .dialect: Missing required field\n", 1)
     )
-    val perl = js.mapObject(_.add("source", "^(a|a)*$x".asJson).add("dialect", "perl".asJson))
+    val perlLiteral = js.mapObject(_.add("source", "^(a|a)*$x".asJson).add("dialect", "perl".asJson))
     assertEquals(
-      error(perl.noSpaces),
+      generate(perlLiteral.noSpaces),
       ("", "The pattern cannot be a Perl regex literal, which would interpolate a variable or run code\n", 1)
     )
-    val perlString = perl.mapObject(_.add("dialect", Json.obj("name" := "perl", "source" := "string")))
-    assert(clue(error(perlString.noSpaces)._1).contains("my $pattern = \"^(a|a)*\\$x\";"))
     val missing = runMain(Seq("generate-recall-script", "no such file.json"))
     assertEquals(missing, ("", "No such file: no such file.json\n", 1))

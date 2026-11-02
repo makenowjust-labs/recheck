@@ -86,11 +86,10 @@ class RPCSuite extends munit.FunSuite:
       s"""{"jsonrpc": "${RPC.JsonRPCVersion}", "method": "bar", "params": {}}"""
     )
     val out = Seq.newBuilder[String]
-    val io = new RPC.IO {
+    val io = new RPC.IO:
       def read(): Iterator[String] = in.iterator
 
       def write(line: String): Unit = out.addOne(line)
-    }
 
     var fooPush: RPC.Push[String] = null
     var fooSend: RPC.Send[Unit] = null
