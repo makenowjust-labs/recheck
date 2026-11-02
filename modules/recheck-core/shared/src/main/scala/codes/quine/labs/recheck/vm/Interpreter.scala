@@ -486,7 +486,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                       val m = jxHeatmap(loc)
                       if n != m then builder.addOne(loc -> (n - m))
                     builder.result()
-                  val diffHeld = held.collect { case (i, (b, e, t)) if t > jx.time => (i, (b, e)) }.toMap
+                  val diffHeld =
+                    if held.isEmpty then Map.empty
+                    else held.iterator.collect { case (i, (b, e, t)) if t > jx.time => (i, (b, e)) }.toMap
                   memoTable(jx.state) = Diff(steps - jx.steps, diffHeatmap, captures, diffHeld)
               frame = fallback
               restoreHeld(frame)
@@ -498,7 +500,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
   /** Sets the captures held after the frame is made, which backtracking to it does not restore. */
   private def restoreHeld(frame: Frame): Unit =
-    for (index, (begin, end, time)) <- held if time > frame.time do
+    for (index, (begin, end, time)) <- held.iterator if time > frame.time do
       frame.captures = frame.captures.updated(index * 2, begin).updated(index * 2 + 1, end)
 
   /** Drops the junctions reached in a transaction that ends, keeping the `size` ones before it.
