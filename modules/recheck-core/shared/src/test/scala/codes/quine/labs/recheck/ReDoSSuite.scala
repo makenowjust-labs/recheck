@@ -17,6 +17,7 @@ import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.parser.Parser
 
 class ReDoSSuite extends munit.FunSuite:
@@ -30,15 +31,15 @@ class ReDoSSuite extends munit.FunSuite:
 
   def checkAutomaton(source: String, flags: String, params: Parameters): Iterator[Diagnostics] =
     val ir = ReDoS.parse(source, flags, params.dialect)
-    concat(ReDoS.checkAutomaton(source, flags, ir, AttackPattern.Style.of(params.dialect, ir.mode), params))
+    concat(ReDoS.checkAutomaton(source, flags, ir, params))
 
   def checkFuzz(source: String, flags: String, params: Parameters)(using ctx: Context): Iterator[Diagnostics] =
     val ir = ReDoS.parse(source, flags, params.dialect)(using Context())
-    concat(ReDoS.checkFuzz(source, flags, ir, AttackPattern.Style.of(params.dialect, ir.mode), params))
+    concat(ReDoS.checkFuzz(source, flags, ir, params))
 
   def checkAuto(source: String, flags: String, params: Parameters): Iterator[Diagnostics] =
     val ir = ReDoS.parse(source, flags, params.dialect)
-    concat(ReDoS.checkAuto(source, flags, ir, AttackPattern.Style.of(params.dialect, ir.mode), params))
+    concat(ReDoS.checkAuto(source, flags, ir, params))
 
   test("ReDoS.check"):
     assertEquals(
@@ -101,6 +102,7 @@ class ReDoSSuite extends munit.FunSuite:
           "^(?:a|a)*$",
           "",
           Dialect.JavaScript,
+          UnitMode.UTF16,
           AttackComplexity.Exponential(false),
           AttackPattern(
             Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
@@ -119,6 +121,7 @@ class ReDoSSuite extends munit.FunSuite:
         "^a*a*$",
         "",
         Dialect.JavaScript,
+        UnitMode.UTF16,
         AttackComplexity.Polynomial(degree, false),
         AttackPattern(
           Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
@@ -204,7 +207,6 @@ class ReDoSSuite extends munit.FunSuite:
       "^(?:a|a)*$",
       "",
       ir,
-      AttackPattern.Style.of(params.dialect, ir.mode),
       params,
       (c, h) => failures.contains(ReDoS.RecallKey(c, h))
     )
@@ -238,7 +240,8 @@ class ReDoSSuite extends munit.FunSuite:
       val params = Parameters(checker = checker, dialect = dialect, randomSeed = 0)
       val ds = if checker == Checker.Automaton then checkAutomaton("^(?:a|a)*$", flags, params)
       else checkFuzz("^(?:a|a)*$", flags, params)
-      ds.next().asInstanceOf[Diagnostics.Vulnerable].attack.toString
+      val d = ds.next().asInstanceOf[Diagnostics.Vulnerable]
+      d.attack.toString(AttackPattern.Style.of(d.dialect, d.unitMode))
 
     assertEquals(attack(Dialect.JavaScript, ""), "'a'.repeat(31) + '\\x00'")
     assertEquals(attack(Dialect.Python(), ""), "'a' * 31 + '\\x00'")
@@ -258,6 +261,7 @@ class ReDoSSuite extends munit.FunSuite:
           "^(?:a|a)*$",
           "",
           Dialect.JavaScript,
+          UnitMode.UTF16,
           AttackComplexity.Exponential(false),
           AttackPattern(
             Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
@@ -316,6 +320,7 @@ class ReDoSSuite extends munit.FunSuite:
           "^(?:a|a)*$",
           "",
           Dialect.JavaScript,
+          UnitMode.UTF16,
           AttackComplexity.Exponential(false),
           AttackPattern(
             Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),

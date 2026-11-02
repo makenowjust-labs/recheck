@@ -40,7 +40,17 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "checker" := checker,
         "complexity" := complexity.asInstanceOf[AttackComplexity]
       )
-    case Diagnostics.Vulnerable(source, flags, dialect, complexity, attack, hotspot, checker, recallValidation) =>
+    case Diagnostics.Vulnerable(
+          source,
+          flags,
+          dialect,
+          unitMode,
+          complexity,
+          attack,
+          hotspot,
+          checker,
+          recallValidation
+        ) =>
       Json.obj(
         "source" := source,
         "flags" := flags,
@@ -48,7 +58,7 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "status" := "vulnerable",
         "checker" := checker,
         "complexity" := complexity.asInstanceOf[AttackComplexity],
-        "attack" := attack,
+        "attack" -> encodeAttackPattern(AttackPattern.Style.of(dialect, unitMode))(attack),
         "hotspot" := hotspot,
         "recallValidation" := recallValidation
       )
@@ -136,18 +146,17 @@ given encodeAttackComplexity: Encoder[AttackComplexity] with
     case c: AttackComplexity.Exponential =>
       Json.obj("type" := "exponential", "summary" := c.toString, "isFuzz" := c.isFuzz)
 
-/** An `Encoder` for `AttackPattern`. */
-given encodeAttackPattern: Encoder[AttackPattern] with
-  def apply(p: AttackPattern): Json =
-    val pumps = p.pumps.map:
-      case (p, s, n) => Json.obj("prefix" := p, "pump" := s, "bias" := n)
-    Json.obj(
-      "pumps" := Json.arr(pumps*),
-      "suffix" := p.suffix,
-      "base" := p.n,
-      "string" := p.asUString,
-      "pattern" := p.toString
-    )
+/** Returns an `Encoder` for `AttackPattern` whose `pattern` is in the style. */
+def encodeAttackPattern(style: AttackPattern.Style): Encoder[AttackPattern] = (p: AttackPattern) =>
+  val pumps = p.pumps.map:
+    case (p, s, n) => Json.obj("prefix" := p, "pump" := s, "bias" := n)
+  Json.obj(
+    "pumps" := Json.arr(pumps*),
+    "suffix" := p.suffix,
+    "base" := p.n,
+    "string" := p.asUString,
+    "pattern" := p.toString(style)
+  )
 
 /** An `Encoder` for `Hotspot`. */
 given encodeHotspot: Encoder[Hotspot] with
@@ -204,11 +213,11 @@ def decodeUString(mode: UnitMode): Decoder[UString] = Decoder[String].emap: s =>
     case UnitMode.Byte      =>
       if s.forall(_ <= 0xff) then Right(UString.fromUTF16Units(s)) else Left(s"Invalid byte string: $s")
 
-/** Returns a `Decoder` for `AttackPattern` of the unit mode in the style.
+/** Returns a `Decoder` for `AttackPattern` of the unit mode.
   *
   * It reads the fields of [[encodeAttackPattern]] except `string` and `pattern`, which are derived from the others.
   */
-def decodeAttackPattern(mode: UnitMode, style: AttackPattern.Style): Decoder[AttackPattern] =
+def decodeAttackPattern(mode: UnitMode): Decoder[AttackPattern] =
   given Decoder[UString] = decodeUString(mode)
   given Decoder[(UString, UString, Int)] = (c: HCursor) =>
     for
@@ -221,7 +230,7 @@ def decodeAttackPattern(mode: UnitMode, style: AttackPattern.Style): Decoder[Att
       pumps <- c.get[Seq[(UString, UString, Int)]]("pumps")
       suffix <- c.get[UString]("suffix")
       n <- c.get[Int]("base")
-    yield AttackPattern(pumps, suffix, n, style)
+    yield AttackPattern(pumps, suffix, n)
 
 /** A `Decoder` for `Duration`. */
 given decodeDuration: Decoder[Duration] = (c: HCursor) =>

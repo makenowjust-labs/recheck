@@ -9,6 +9,7 @@ import codes.quine.labs.recheck.common.TimeoutException
 import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.charset.UnitMode
 
 /** Diagnostics ia an analysis result. */
 sealed abstract class Diagnostics extends Product with Serializable
@@ -36,6 +37,8 @@ object Diagnostics:
       source: String,
       flags: String,
       dialect: Dialect,
+      /** The unit of the attack string. */
+      unitMode: UnitMode,
       complexity: AttackComplexity.Vulnerable,
       attack: AttackPattern,
       hotspot: Hotspot,
@@ -49,7 +52,7 @@ object Diagnostics:
           |Dialect      : ${show(dialect)}
           |Status       : vulnerable
           |Complexity   : $complexity
-          |Attack string: $attack
+          |Attack string: ${attack.toString(AttackPattern.Style.of(dialect, unitMode))}
           |Hotspot      : /${hotspot.highlight(source)}/$flags
           |Checker      : $checker""".stripMargin + recall
 

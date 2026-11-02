@@ -45,6 +45,7 @@ class CodecSuite extends munit.FunSuite:
           "(a|a)*$",
           "",
           Dialect.JavaScript,
+          UnitMode.UTF16,
           AttackComplexity.Exponential(false),
           AttackPattern(
             Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
@@ -62,10 +63,12 @@ class CodecSuite extends munit.FunSuite:
         "status" := "vulnerable",
         "checker" := Checker.Automaton.asInstanceOf[Checker],
         "complexity" := AttackComplexity.Exponential(false).asInstanceOf[AttackComplexity],
-        "attack" := AttackPattern(
-          Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
-          UStringUtil.fromString("\u0000"),
-          17
+        "attack" -> encodeAttackPattern(AttackPattern.JavaScript)(
+          AttackPattern(
+            Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
+            UStringUtil.fromString("\u0000"),
+            17
+          )
         ),
         "hotspot" := Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat), Hotspot.Spot(3, 4, Hotspot.Heat))),
         "recallValidation" := Json.Null
@@ -78,6 +81,7 @@ class CodecSuite extends munit.FunSuite:
           "(a|a)*$",
           "",
           Dialect.JavaScript,
+          UnitMode.UTF16,
           AttackComplexity.Exponential(false),
           AttackPattern(Seq.empty, UStringUtil.fromString(""), 0),
           Hotspot(Seq.empty),
@@ -129,14 +133,13 @@ class CodecSuite extends munit.FunSuite:
     )
 
   test("codec.encodeAttackPattern"):
+    val attack = AttackPattern(
+      Seq((UStringUtil.fromString("a"), UStringUtil.fromString("b"), 2)),
+      UStringUtil.fromString("c"),
+      0
+    )
     assertEquals(
-      encodeAttackPattern(
-        AttackPattern(
-          Seq((UStringUtil.fromString("a"), UStringUtil.fromString("b"), 2)),
-          UStringUtil.fromString("c"),
-          0
-        )
-      ),
+      encodeAttackPattern(AttackPattern.JavaScript)(attack),
       Json.obj(
         "pumps" := Json.arr(Json.obj("prefix" := "a", "pump" := "b", "bias" := 2)),
         "suffix" := "c",
@@ -144,6 +147,10 @@ class CodecSuite extends munit.FunSuite:
         "string" := "abbc",
         "pattern" := "'a' + 'b'.repeat(2) + 'c'"
       )
+    )
+    assertEquals(
+      encodeAttackPattern(AttackPattern.Python())(attack).hcursor.get[String]("pattern"),
+      Right("'a' + 'b' * 2 + 'c'")
     )
 
   test("codec.encodeHotspot"):
@@ -211,11 +218,10 @@ class CodecSuite extends munit.FunSuite:
     val attack = AttackPattern(
       Seq((UString.fromString("x"), UString(0x1f600), -1), (UString.empty, UString.fromString("y"), 2)),
       UString(0),
-      17,
-      AttackPattern.Python()
+      17
     )
-    val decoder = decodeAttackPattern(UnitMode.CodePoint, AttackPattern.Python())
-    assertEquals(decoder.decodeJson(encodeAttackPattern(attack)), Right(attack))
+    val decoder = decodeAttackPattern(UnitMode.CodePoint)
+    assertEquals(decoder.decodeJson(encodeAttackPattern(AttackPattern.Python())(attack)), Right(attack))
     assertEquals(
       decoder.decodeJson(Json.obj("pumps" := Json.arr(), "suffix" := "a")).left.map(_.pathToRootString),
       Left(Some(".base"))

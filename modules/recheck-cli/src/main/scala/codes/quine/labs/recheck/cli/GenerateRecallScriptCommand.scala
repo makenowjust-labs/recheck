@@ -5,7 +5,6 @@ import io.circe.parser.parse
 
 import codes.quine.labs.recheck.codec.decodeAttackPattern
 import codes.quine.labs.recheck.codec.given
-import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.recall.RecallProgram
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
@@ -27,8 +26,7 @@ object GenerateRecallScriptCommand:
       dialect <- invalid(c.get[Dialect]("dialect"))
       flagSet <- parseFlags(flags, dialect)
       mode = Parser.determineUnitMode(source, flagSet, dialect)
-      style = AttackPattern.Style.of(dialect, mode)
-      attack <- invalid(c.get("attack")(using decodeAttackPattern(mode, style)))
+      attack <- invalid(c.get("attack")(using decodeAttackPattern(mode)))
       script <- RecallProgram.script(source, flags, dialect, mode, attack)
     yield script
 

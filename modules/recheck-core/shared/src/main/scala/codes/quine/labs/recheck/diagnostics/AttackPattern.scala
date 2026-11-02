@@ -21,16 +21,10 @@ import codes.quine.labs.resyntax.charset.UnitMode
   *     and the 3rd element is a bias of the number of repeating.
   *   - `suffix` is a suffix string.
   *   - `n` is the base number of repeating. The total repeating number is a sum of bias and base.
-  *   - `style` is the notation of `toString`, which is the host language of the pattern's dialect.
   *
   * For example, when the pattern is `AttackPattern(Seq(w, u, n), (v, s, m), t, l)`, it means `w u^(n+l) v s^(m+l) t`.
   */
-final case class AttackPattern(
-    pumps: Seq[(UString, UString, Int)],
-    suffix: UString,
-    n: Int,
-    style: AttackPattern.Style = AttackPattern.JavaScript
-):
+final case class AttackPattern(pumps: Seq[(UString, UString, Int)], suffix: UString, n: Int):
 
   /** Returns a size number of sum of fixed parts. */
   def fixedSize: Int = pumps.map(_._1.length).sum + suffix.length
@@ -70,7 +64,7 @@ final case class AttackPattern(
     val result = parts.result()
     if result.isEmpty then style.literal(UString.empty) else result.mkString(style.join)
 
-  override def toString: String = toString(style)
+  override def toString: String = toString(AttackPattern.JavaScript)
 
 object AttackPattern:
 
