@@ -7,7 +7,6 @@ import scala.concurrent.duration.Duration
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.TimeoutException
-import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.recheck.vm.Inst.AssertKind
 import codes.quine.labs.recheck.vm.Inst.Barrier
 import codes.quine.labs.recheck.vm.Inst.ReadKind
@@ -636,7 +635,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       var p = pos
       var k = 0
       while k < max && p > 0 do
-        p -= input.getBefore(p, program.meta.unicode).fold(1)(charWidth)
+        p -= input.getBefore(p, program.meta.unicode).fold(1)(UString.charWidth)
         k += 1
         if k >= min then builder.addOne(p)
       builder.result().reverse
@@ -646,7 +645,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     var p = pos
     var c = input.getBefore(p, program.meta.unicode)
     while c.exists(marks.extenders.contains) do
-      p -= charWidth(c.get)
+      p -= UString.charWidth(c.get)
       c = input.getBefore(p, program.meta.unicode)
     c.exists(marks.bases.contains)
 
@@ -676,7 +675,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       input
         .getAt(pos, program.meta.unicode)
         .filter(terminators.chars.contains)
-        .map(c => pos + charWidth(c))
+        .map(c => pos + UString.charWidth(c))
 
   /** Tests whether the position is between `\r` and `\n`, where no line assertion matches with `CRLF.Atomic`. */
   private def betweenCRLF(pos: Int, terminators: IRLineTerminators): Boolean =
@@ -722,8 +721,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         val c2 = if back then input.getBefore(pos - j, unicode) else input.getAt(pos + j, unicode)
         (c1, c2) match
           case (Some(c1), Some(c2)) if c1 == c2 || equivalence.equiv(c1, c2) =>
-            i += charWidth(c1)
-            j += charWidth(c2)
+            i += UString.charWidth(c1)
+            j += UString.charWidth(c2)
           case _ => continues = false
       (i, Option.when(i == s.length)(j))
 
@@ -755,7 +754,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
             units.indices.forall(n => target(k + n) == units(n) || equivalence.equiv(target(k + n), units(n)))
           then
             k += units.length
-            j += charWidth(c)
+            j += UString.charWidth(c)
           else continues = false
         case None => continues = false
     (j, Option.when(k == target.length)(j))
@@ -801,7 +800,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if ok then
         if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        val width = c.map(charWidth).getOrElse(0)
+        val width = c.map(UString.charWidth).getOrElse(0)
         steps = Math.addExact(steps, width)
         frame.pos += width
         true
@@ -820,7 +819,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if ok then
         if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        val width = c.map(charWidth).getOrElse(0)
+        val width = c.map(UString.charWidth).getOrElse(0)
         steps = Math.addExact(steps, width)
         frame.pos -= width
         true

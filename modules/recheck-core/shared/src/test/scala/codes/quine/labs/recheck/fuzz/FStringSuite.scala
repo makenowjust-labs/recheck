@@ -5,7 +5,7 @@ import scala.language.implicitConversions
 
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.fuzz.FString.*
-import codes.quine.labs.recheck.util.UStringUtil
+import codes.quine.labs.resyntax.charset.UString
 
 class FStringSuite extends munit.FunSuite:
   test("FString.cross"):
@@ -95,7 +95,7 @@ class FStringSuite extends munit.FunSuite:
   test("FString#toUString"):
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toUString,
-      UStringUtil.fromString("abcbcbcd")
+      UString.fromUTF16Units("abcbcbcd")
     )
     intercept[IllegalArgumentException] {
       FString(1, IndexedSeq(Repeat(0, 2), Wrap('a'), Repeat(0, 1))).toUString
@@ -104,11 +104,11 @@ class FStringSuite extends munit.FunSuite:
   test("FString#toAttackPattern"):
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toAttackPattern,
-      AttackPattern(Seq((UStringUtil.fromString("a"), UStringUtil.fromString("bc"), 1)), UStringUtil.fromString("d"), 2)
+      AttackPattern(Seq((UString.fromUTF16Units("a"), UString.fromUTF16Units("bc"), 1)), UString.fromUTF16Units("d"), 2)
     )
     assertEquals(
       FString(0, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toAttackPattern,
-      AttackPattern(Seq.empty, UStringUtil.fromString("abcd"), 0)
+      AttackPattern(Seq.empty, UString.fromUTF16Units("abcd"), 0)
     )
     intercept[IllegalArgumentException] {
       FString(1, IndexedSeq(Repeat(1, 2), Wrap('a'), Repeat(1, 1))).toAttackPattern

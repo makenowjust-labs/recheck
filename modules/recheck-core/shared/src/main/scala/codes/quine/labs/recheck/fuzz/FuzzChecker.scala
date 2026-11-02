@@ -14,7 +14,6 @@ import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.fuzz.FuzzChecker.*
 import codes.quine.labs.recheck.util.RepeatUtil
-import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.recheck.vm.Interpreter
 import codes.quine.labs.recheck.vm.Interpreter.CoverageItem
 import codes.quine.labs.recheck.vm.Interpreter.Options

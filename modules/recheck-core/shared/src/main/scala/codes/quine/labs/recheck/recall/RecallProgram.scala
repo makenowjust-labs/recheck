@@ -10,7 +10,6 @@ import codes.quine.labs.recheck.exec.PerlExecutor
 import codes.quine.labs.recheck.exec.PythonExecutor
 import codes.quine.labs.recheck.exec.RubyExecutor
 import codes.quine.labs.recheck.exec.SourceFile
-import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UChar
@@ -113,8 +112,8 @@ object RecallProgram:
 
   /** Returns the JavaScript program for `node`. */
   private[recall] def javascript(source: String, flags: String, attack: AttackPattern): RecallProgram =
-    val sourceString = UStringUtil.show(UStringUtil.fromString(source))
-    val flagsString = UStringUtil.show(UStringUtil.fromString(flags))
+    val sourceString = AttackPattern.JavaScript.literal(UString.fromUTF16Units(source))
+    val flagsString = AttackPattern.JavaScript.literal(UString.fromUTF16Units(flags))
     // `process.stdout` may write to a pipe asynchronously, so it uses `writeSync`.
     val script =
       s"""|const { writeSync } = require('node:fs');
@@ -141,7 +140,7 @@ object RecallProgram:
     // A bytes pattern is the Latin-1 encoding of the source.
     val pattern =
       if bytes then style.literal(UString.from(source.iterator.flatMap(c => utf8OrLatin1(c.toInt))))
-      else style.literal(UStringUtil.fromString(source))
+      else style.literal(UString.fromUTF16Units(source))
     val options = flags.distinct.collect:
       case c @ ('i' | 'm' | 's' | 'x' | 'a' | 'u' | 'L') => s"re.${c.toUpper}"
     val input = attack.toString(style)
@@ -176,7 +175,7 @@ object RecallProgram:
       case 'm' => "Regexp::MULTILINE"
       case 'x' => "Regexp::EXTENDED"
       case 'n' => "Regexp::NOENCODING"
-    val regex = if prefix.isEmpty then pattern else s"${style.literal(UStringUtil.fromString(prefix))} + $pattern"
+    val regex = if prefix.isEmpty then pattern else s"${style.literal(UString.fromUTF16Units(prefix))} + $pattern"
     val input = attack.toString(style)
     val script =
       s"""|$$stdout.sync = true
@@ -433,7 +432,7 @@ object RecallProgram:
       .toRight("The pattern cannot be a PHP regex, since it contains every delimiter")
       .map: delimiter =>
         val bytes = mode == UnitMode.Byte
-        val regex = AttackPattern.PHP().literal(UStringUtil.fromString(s"$delimiter$source$delimiter$flags"))
+        val regex = AttackPattern.PHP().literal(UString.fromUTF16Units(s"$delimiter$source$delimiter$flags"))
         val input = attack.toString(AttackPattern.PHP(bytes))
         val script =
           s"""|<?php
@@ -472,7 +471,7 @@ object RecallProgram:
 
   /** Returns the source as a string of the code points, or of the UTF-8 bytes for a pattern of bytes. */
   private def sourceString(source: String, bytes: Boolean): UString =
-    if bytes then UString.from(UString.fromString(source).encode(UnitMode.Byte)) else UStringUtil.fromString(source)
+    if bytes then UString.from(UString.fromString(source).encode(UnitMode.Byte)) else UString.fromUTF16Units(source)
 
   /** Returns the byte of a Latin-1 character, or the UTF-8 bytes of another character. */
   private def utf8OrLatin1(c: UChar): Iterator[UChar] =

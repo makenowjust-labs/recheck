@@ -15,8 +15,8 @@ import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.Hotspot.*
 import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
-import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.parser.Parser
 
@@ -105,8 +105,8 @@ class ReDoSSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Exponential(false),
           AttackPattern(
-            Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
-            UStringUtil.fromString("\u0000"),
+            Seq((UString.fromUTF16Units(""), UString.fromUTF16Units("a"), 0)),
+            UString.fromUTF16Units("\u0000"),
             31
           ),
           Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))),
@@ -124,8 +124,8 @@ class ReDoSSuite extends munit.FunSuite:
         UnitMode.UTF16,
         AttackComplexity.Polynomial(degree, false),
         AttackPattern(
-          Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
-          UStringUtil.fromString(""),
+          Seq((UString.fromUTF16Units(""), UString.fromUTF16Units("a"), 0)),
+          UString.fromUTF16Units(""),
           10
         ),
         Hotspot(Seq(Spot(1, 2, Heat))),
@@ -264,8 +264,8 @@ class ReDoSSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Exponential(false),
           AttackPattern(
-            Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
-            UStringUtil.fromString("\u0000"),
+            Seq((UString.fromUTF16Units(""), UString.fromUTF16Units("a"), 0)),
+            UString.fromUTF16Units("\u0000"),
             31
           ),
           Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))),
@@ -323,8 +323,8 @@ class ReDoSSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Exponential(false),
           AttackPattern(
-            Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
-            UStringUtil.fromString("\u0000"),
+            Seq((UString.fromUTF16Units(""), UString.fromUTF16Units("a"), 0)),
+            UString.fromUTF16Units("\u0000"),
             31
           ),
           Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))),

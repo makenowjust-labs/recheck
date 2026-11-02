@@ -2,10 +2,10 @@ package codes.quine.labs.recheck.vm
 
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
+import codes.quine.labs.resyntax.charset.UString
 
 /** Spans of the constructs that only some dialects have, checked on the engines (Ruby 4.0, Java 25, .NET 10, Perl 5.44
   * and PHP 8.5 with PCRE2 10.49 without JIT).
@@ -29,7 +29,7 @@ class InterpreterConstructSuite extends munit.FunSuite:
     val ir = ReDoS.parse(source, "", dialect)
     val program = ProgramBuilder.build(ir).get
     val result =
-      Interpreter.run(program, UStringUtil.fromString(input), 0, Options(usesAcceleration = usesAcceleration))
+      Interpreter.run(program, UString.fromUTF16Units(input), 0, Options(usesAcceleration = usesAcceleration))
     result.captures.map: captures =>
       captures
         .grouped(2)

@@ -1,10 +1,9 @@
 package codes.quine.labs.recheck
 package diagnostics
 
+import codes.quine.labs.recheck.util.ECMAScriptNotation
 import codes.quine.labs.recheck.util.NumberFormat
 import codes.quine.labs.recheck.util.RepeatUtil
-import codes.quine.labs.recheck.util.UStringUtil
-import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.Properties
@@ -99,7 +98,14 @@ object AttackPattern:
 
   /** JavaScript is a JavaScript style specifier, e.g. `'a'.repeat(31) + '\x00'`. */
   case object JavaScript extends Style:
-    def literal(s: UString): String = UStringUtil.show(s)
+    /** A control character uses `\xHH`, because `\cX` is not an escape in a string literal. */
+    def literal(s: UString): String =
+      s.chars(true)
+        .map:
+          case 0x27                                       => "\\'"
+          case c if c < 0x20 && !(0x09 <= c && c <= 0x0d) => f"\\x$c%02X"
+          case c                                          => ECMAScriptNotation.showChar(c)
+        .mkString("'", "", "'")
 
     def repeat(s: UString, n: Int): String = s"${literal(s)}.repeat(${n})"
 
@@ -107,7 +113,7 @@ object AttackPattern:
 
   /** Superscript is a superscript style specifier for logs, e.g. `'a'³¹ '\x00'`. */
   case object Superscript extends Style:
-    def literal(s: UString): String = UStringUtil.show(s)
+    def literal(s: UString): String = JavaScript.literal(s)
 
     def repeat(s: UString, n: Int): String = s"${literal(s)}${NumberFormat.superscript(n)}"
 

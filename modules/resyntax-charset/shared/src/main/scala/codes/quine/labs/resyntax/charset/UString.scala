@@ -24,6 +24,52 @@ final class UString private (private val values: Array[UChar]) extends Ordered[U
 
   def map(f: UChar => UChar): UString = new UString(values.map(f))
 
+  def insert(n: Int, that: UString): UString = slice(0, n) ++ that ++ slice(n, length)
+
+  /** Returns the character at the position of this string of UTF-16 code units.
+    *
+    * With `combinesSurrogatePairs`, a surrogate pair is read as one code point.
+    */
+  def getAt(n: Int, combinesSurrogatePairs: Boolean): Option[UChar] =
+    Option.when(0 <= n && n < length):
+      val c = values(n)
+      if combinesSurrogatePairs && UString.isHighSurrogate(c) && n + 1 < length && UString.isLowSurrogate(values(n + 1))
+      then Character.toCodePoint(c.toChar, values(n + 1).toChar)
+      else c
+
+  /** Returns the character before the position of this string of UTF-16 code units.
+    *
+    * With `combinesSurrogatePairs`, a surrogate pair is read as one code point.
+    */
+  def getBefore(n: Int, combinesSurrogatePairs: Boolean): Option[UChar] =
+    Option.when(0 < n && n <= length):
+      val c = values(n - 1)
+      if combinesSurrogatePairs && UString.isLowSurrogate(c) && n - 2 >= 0 && UString.isHighSurrogate(values(n - 2))
+      then Character.toCodePoint(values(n - 2).toChar, c.toChar)
+      else c
+
+  /** Returns the characters of this string of UTF-16 code units.
+    *
+    * With `combinesSurrogatePairs`, a surrogate pair is read as one code point.
+    */
+  def chars(combinesSurrogatePairs: Boolean): Iterator[UChar] =
+    if combinesSurrogatePairs then
+      Iterator.unfold(0): i =>
+        getAt(i, combinesSurrogatePairs).map(c => (c, i + UString.charWidth(c)))
+    else iterator
+
+  /** Inserts the UTF-16 code units of the code point into this string of UTF-16 code units. */
+  def insertAt(n: Int, c: UChar): UString = insert(n, UString.fromCodePointsAsUTF16(Iterator(c)))
+
+  /** Replaces the character at the position of this string of UTF-16 code units with the UTF-16 code units of the code
+    * point.
+    *
+    * With `combinesSurrogatePairs`, a surrogate pair is replaced as one code point.
+    */
+  def replaceAt(n: Int, c: UChar, combinesSurrogatePairs: Boolean): UString =
+    val skip = getAt(n, combinesSurrogatePairs).map(UString.charWidth).getOrElse(0)
+    slice(0, n) ++ UString.fromCodePointsAsUTF16(Iterator(c)) ++ slice(n + skip, length)
+
   /** Encodes the code points of this string as code units of the mode.
     *
     * `UTF16` gives UTF-16 code units, `CodePoint` gives the code points as they are, and `Byte` gives the UTF-8 bytes
@@ -98,3 +144,13 @@ object UString:
 
   /** Surrogate pairs are not combined. */
   def fromUTF16Units(s: String): UString = new UString(s.map(_.toInt).toArray)
+
+  /** Creates a string of the UTF-16 code units encoding the code points. */
+  def fromCodePointsAsUTF16(cs: IterableOnce[UChar]): UString = new UString(from(cs).encode(UnitMode.UTF16).toArray)
+
+  /** Returns the number of the UTF-16 code units of the code point, which is two only for a supplementary one. */
+  def charWidth(c: UChar): Int = if c >= 0x10000 then 2 else 1
+
+  private def isHighSurrogate(c: UChar): Boolean = 0xd800 <= c && c <= 0xdbff
+
+  private def isLowSurrogate(c: UChar): Boolean = 0xdc00 <= c && c <= 0xdfff

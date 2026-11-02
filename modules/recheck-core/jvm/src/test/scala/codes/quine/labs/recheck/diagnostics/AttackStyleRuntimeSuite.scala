@@ -4,8 +4,6 @@ import java.nio.file.Path
 import scala.concurrent.duration.*
 
 import codes.quine.labs.recheck.RuntimeHelper
-import codes.quine.labs.recheck.util.UStringUtil
-import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
@@ -15,8 +13,8 @@ class AttackStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
   override val munitTimeout: Duration = 120.seconds
 
   def attack(pumps: Seq[(String, String, Int)], suffix: String, n: Int): AttackPattern =
-    val ps = pumps.map((s, t, m) => (UStringUtil.fromString(s), UStringUtil.fromString(t), m))
-    AttackPattern(ps, UStringUtil.fromString(suffix), n)
+    val ps = pumps.map((s, t, m) => (UString.fromUTF16Units(s), UString.fromUTF16Units(t), m))
+    AttackPattern(ps, UString.fromUTF16Units(suffix), n)
 
   /** Attack strings of UTF-16 code units, where no surrogate pair spans two parts. */
   val texts: Seq[AttackPattern] = Seq(
