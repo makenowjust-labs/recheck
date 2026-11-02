@@ -73,8 +73,8 @@ object PatternAlphabet:
       first +: all.drop(first + 1).map(s => if s.contains(c.head) then 0 else 1)
 
     // The bits are of the sets as given, even if `lineTerminator` (resp. `word`) is `None`.
-    def mask(first: Option[CharSet], more: Seq[CharSet], c: Int): Int =
-      (first +: more.map(Some(_))).zipWithIndex.collect { case (Some(t), i) if t.contains(c) => 1 << i }.sum
+    def mask(sets: Seq[Option[CharSet]], c: Int): Int =
+      sets.zipWithIndex.collect { case (Some(t), i) if t.contains(c) => 1 << i }.sum
 
     val pairs = Alphabet
       .refine(mode, all)
@@ -83,9 +83,11 @@ object PatternAlphabet:
       .sortBy(_._2)(using Ordering.Implicits.seqOrdering)
       .map: (c, _) =>
         val kind = CharKind(
-          words = mask(word, moreWords, c.head),
-          terminators = mask(lineTerminator, moreLineTerminators, c.head),
-          marks = markSets.zipWithIndex.collect { case (s, i) if s.contains(c.head) => 1 << i }.sum,
+          words = mask(word +: moreWords.map(Some(_)), c.head),
+          terminators = mask(lineTerminator +: moreLineTerminators.map(Some(_)), c.head),
+          marks = mask(wordMarks.map(m => Some(m.marks)), c.head),
+          extenders = mask(wordMarks.map(m => Some(m.extenders)), c.head),
+          bases = mask(wordMarks.map(m => Some(m.bases)), c.head),
           cr = crlf && c.head == 0x0d,
           lf = crlf && c.head == 0x0a
         )
