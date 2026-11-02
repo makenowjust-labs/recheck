@@ -111,10 +111,10 @@ class FuzzCheckerSuite extends munit.FunSuite:
         .nextOption()
       result.get.isEmpty
 
-  test("FuzzChecker#Population#toGeneration: failed strings rank last"):
+  test("FuzzChecker#Population#toGeneration: strings with an avoided attack rank last"):
     import Parameters.*
     val ir = ReDoS.parse("^(a|a)*$", "", Dialect.JavaScript)
-    val failed = (c: AttackComplexity.Vulnerable, _: Hotspot) => c == AttackComplexity.Exponential(true)
+    val avoidsAttack = (c: AttackComplexity.Vulnerable, _: Hotspot) => c == AttackComplexity.Exponential(true)
     val checker = new FuzzChecker(
       ir,
       FuzzProgram.from(ir).get,
@@ -137,7 +137,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
       DefaultMaxDegree,
       DefaultHeatRatio,
       DefaultAccelerationMode,
-      failed
+      avoidsAttack
     )
     val strs = Seq(1, 2, 3).map(n => FString(n, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a'))))
     val traces = strs.zip(Seq(3.0, 2.0, 1.0)).map((s, rate) => Trace(s, rate, 0, Set.empty))
@@ -145,6 +145,6 @@ class FuzzCheckerSuite extends munit.FunSuite:
     checker.attacks(strs(0)) = List((AttackComplexity.Exponential(true), Hotspot.empty))
     checker.attacks(strs(1)) = List((AttackComplexity.Polynomial(2, true), Hotspot.empty))
     assertEquals(pop.toGeneration.traces.map(_.str), IndexedSeq(strs(1), strs(2)))
-    // A failed string remains when the generation has room.
+    // A string with an avoided attack remains when the generation has room.
     val all = new checker.Population(0, mutable.Set.from(traces.take(1)), mutable.Set.empty)
     assertEquals(all.toGeneration.traces.map(_.str), IndexedSeq(strs(0)))

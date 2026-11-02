@@ -71,11 +71,11 @@ object ReDoS:
     def diagnose: Iterator[Diagnostics] =
       val ir = parse(source, flags, params.dialect)
       val failures = mutable.Set.empty[RecallKey]
-      val failed = (c: AttackComplexity.Vulnerable, h: Hotspot) => failures.contains(RecallKey(c, h))
+      val avoidsAttack = (c: AttackComplexity.Vulnerable, h: Hotspot) => failures.contains(RecallKey(c, h))
       val (candidates, safe) = params.checker match
         case Checker.Automaton => checkAutomaton(source, flags, ir, params)
-        case Checker.Fuzz      => checkFuzz(source, flags, ir, params, failed)
-        case Checker.Auto      => checkAuto(source, flags, ir, params, failed)
+        case Checker.Fuzz      => checkFuzz(source, flags, ir, params, avoidsAttack)
+        case Checker.Auto      => checkAuto(source, flags, ir, params, avoidsAttack)
       val validate = recallValidation(source, flags, params.dialect, ir.mode, params.recallTimeout)
       validateCandidates(candidates, safe, validate, failures, params.maxRecallFailures)
 
@@ -218,15 +218,15 @@ object ReDoS:
   /** Runs the fuzz checker, and returns the vulnerable diagnostics it finds and a function giving the safe diagnostics
     * once they run out.
     *
-    * `failed` tells whether an attack of the complexity and the hotspot failed recall validation, which the fuzz
-    * checker avoids.
+    * `avoidsAttack` tells whether the fuzz checker avoids an attack of the complexity and the hotspot, which failed
+    * recall validation.
     */
   private[recheck] def checkFuzz(
       source: String,
       flags: String,
       ir: IRPattern,
       params: Parameters,
-      failed: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
+      avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
   )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
     import params._
 
@@ -255,7 +255,7 @@ object ReDoS:
         maxDegree,
         heatRatio,
         accelerationMode,
-        failed
+        avoidsAttack
       )
 
       results.map:
@@ -283,13 +283,13 @@ object ReDoS:
       flags: String,
       ir: IRPattern,
       params: Parameters,
-      failed: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
+      avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
   )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
     val (automaton, automatonSafe) = checkAutomaton(source, flags, ir, params)
     var safe = automatonSafe
     val diagnostics = automaton.recoverWith:
       case _: UnsupportedException =>
-        val (fuzz, fuzzSafe) = checkFuzz(source, flags, ir, params, failed)
+        val (fuzz, fuzzSafe) = checkFuzz(source, flags, ir, params, avoidsAttack)
         safe = fuzzSafe
         fuzz
     (diagnostics, () => safe())
