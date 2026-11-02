@@ -108,14 +108,21 @@ object Interpreter:
   /** FailedPoint is a failed point on matching. */
   final case class FailedPoint(target: CoverageLocation, pos: Int, kind: ReadKind, capture: Option[UString])
 
-  /** MatchState is a state of matching, where `canaries` tells which canary registers hold the position. */
-  private[vm] final case class MatchState(
-      blockID: Int,
-      pos: Int,
-      counters: Vector[Int],
-      captures: Option[Vector[Int]],
-      canaries: Vector[Boolean]
-  )
+  /** MatchState is a state of matching, which the memoization table looks up on each junction block.
+    *
+    * It lays out as integers the block ID, the position, the counters, the captures with the largest closed index if
+    * the program reads the captures, and whether each canary register holds the position, which make hashing and
+    * comparing it cheap.
+    */
+  private[vm] final class MatchState(private val values: Array[Int]):
+
+    override val hashCode: Int = java.util.Arrays.hashCode(values)
+
+    override def equals(that: Any): Boolean = that match
+      case that: MatchState => java.util.Arrays.equals(values, that.values)
+      case _                => false
+
+    override def toString: String = values.mkString("MatchState(", ", ", ")")
 
   /** Junction is a state for a junction block, with the time reaching it. */
   private[vm] final case class Junction(
@@ -194,8 +201,22 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
     /** Converts this frame into a corresponding state. */
     def toState: MatchState =
-      val captureState = Option.when(program.meta.hasRef)(captures :+ lastParen)
-      Interpreter.MatchState(label.index, pos, counters, captureState, canaries.map(_ == pos))
+      val capturesSize = if program.meta.hasRef then captures.size + 1 else 0
+      val values = new Array[Int](2 + counters.size + capturesSize + canaries.size)
+      var size = 0
+
+      def add(n: Int): Unit =
+        values(size) = n
+        size += 1
+
+      add(label.index)
+      add(pos)
+      counters.foreach(add)
+      if program.meta.hasRef then
+        captures.foreach(add)
+        add(lastParen)
+      for canary <- canaries do add(if canary == pos then 1 else 0)
+      MatchState(values)
 
     override def clone(): Frame =
       val frame = new Frame(label, pos, captures, counters, canaries, rollback, fallback, junctions)
@@ -465,7 +486,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                       val m = jxHeatmap(loc)
                       if n != m then builder.addOne(loc -> (n - m))
                     builder.result()
-                  val diffHeld = held.collect { case (i, (b, e, t)) if t > jx.time => (i, (b, e)) }.toMap
+                  val diffHeld =
+                    if held.isEmpty then Map.empty
+                    else held.iterator.collect { case (i, (b, e, t)) if t > jx.time => (i, (b, e)) }.toMap
                   memoTable(jx.state) = Diff(steps - jx.steps, diffHeatmap, captures, diffHeld)
               frame = fallback
               restoreHeld(frame)
@@ -477,7 +500,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
   /** Sets the captures held after the frame is made, which backtracking to it does not restore. */
   private def restoreHeld(frame: Frame): Unit =
-    for (index, (begin, end, time)) <- held if time > frame.time do
+    for (index, (begin, end, time)) <- held.iterator if time > frame.time do
       frame.captures = frame.captures.updated(index * 2, begin).updated(index * 2 + 1, end)
 
   /** Drops the junctions reached in a transaction that ends, keeping the `size` ones before it.
