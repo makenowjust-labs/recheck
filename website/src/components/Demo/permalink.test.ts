@@ -52,6 +52,7 @@ describe("makeSnapshot", () => {
       source: "^(a|a)*$",
       flags: "",
       dialect: { name: "javascript" },
+      unitMode: "utf16",
       status: "vulnerable",
       checker: "automaton",
       complexity: {

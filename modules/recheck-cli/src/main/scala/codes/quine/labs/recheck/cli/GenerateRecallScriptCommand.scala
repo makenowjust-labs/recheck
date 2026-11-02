@@ -5,12 +5,9 @@ import io.circe.parser.parse
 
 import codes.quine.labs.recheck.codec.decodeAttackPattern
 import codes.quine.labs.recheck.codec.given
-import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.recall.RecallProgram
 import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.FlagSet
-import codes.quine.labs.resyntax.ast.FlagSetException
-import codes.quine.labs.resyntax.parser.Parser
+import codes.quine.labs.resyntax.charset.UnitMode
 
 /** `recheck generate-recall-script` command implementation. */
 object GenerateRecallScriptCommand:
@@ -25,16 +22,10 @@ object GenerateRecallScriptCommand:
       source <- invalid(c.get[String]("source"))
       flags <- invalid(c.get[String]("flags"))
       dialect <- invalid(c.get[Dialect]("dialect"))
-      flagSet <- parseFlags(flags, dialect)
-      mode = Parser.determineUnitMode(source, flagSet, dialect)
-      style = AttackPattern.Style.of(dialect, mode)
-      attack <- invalid(c.get("attack")(using decodeAttackPattern(mode, style)))
+      mode <- invalid(c.get[UnitMode]("unitMode"))
+      attack <- invalid(c.get("attack")(using decodeAttackPattern(mode)))
       script <- RecallProgram.script(source, flags, dialect, mode, attack)
     yield script
 
   private def invalid[A](result: Decoder.Result[A]): Either[String, A] =
     result.left.map(f => s"Invalid diagnostics: ${f.getMessage}")
-
-  private def parseFlags(flags: String, dialect: Dialect): Either[String, FlagSet] =
-    try Right(FlagSet.parse(flags, dialect))
-    catch case ex: FlagSetException => Left(s"Invalid flags: ${ex.getMessage}")

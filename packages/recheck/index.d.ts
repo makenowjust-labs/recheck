@@ -86,6 +86,10 @@ export type VulnerableDiagnostics = {
   source: string;
   flags: string;
   dialect: Dialect;
+  /**
+   * The unit of the attack string: UTF-16 code units (`utf16`), code points (`code-point`), or bytes (`byte`).
+   */
+  unitMode: "utf16" | "code-point" | "byte";
   status: "vulnerable";
   checker: "automaton" | "fuzz";
   attack: AttackPattern;
@@ -233,7 +237,7 @@ export type Unexpected = {
 /**
  * AttackPattern is an attack pattern string.
  *
- * The strings are UTF-16 code units, or bytes as the characters of the same codes if the pattern matches bytes.
+ * The strings are UTF-16 code units, or bytes as the characters of the same codes if `unitMode` is `byte`.
  */
 export type AttackPattern = {
   pumps: {

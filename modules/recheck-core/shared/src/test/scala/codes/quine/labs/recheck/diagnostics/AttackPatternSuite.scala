@@ -59,7 +59,6 @@ class AttackPatternSuite extends munit.FunSuite:
 
     // The default style is `JavaScript`.
     assertEquals(attack1.toString, "'ab' + 'cd'.repeat(3) + 'ef'")
-    assertEquals(attack1.copy(style = AttackPattern.Python()).toString, "'ab' + 'cd' * 3 + 'ef'")
     assertEquals(AttackPattern(Seq.empty, UString.empty, 0).toString, "''")
 
   test("AttackPattern#toString: languages"):

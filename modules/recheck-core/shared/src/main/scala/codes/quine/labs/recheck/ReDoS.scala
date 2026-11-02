@@ -15,7 +15,6 @@ import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.ReDoSException
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
-import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.DiagnosticsIteratorUtil.*
 import codes.quine.labs.recheck.diagnostics.Hotspot
@@ -71,13 +70,12 @@ object ReDoS:
 
     def diagnose: Iterator[Diagnostics] =
       val ir = parse(source, flags, params.dialect)
-      val style = AttackPattern.Style.of(params.dialect, ir.mode)
       val failures = mutable.Set.empty[RecallKey]
       val failed = (c: AttackComplexity.Vulnerable, h: Hotspot) => failures.contains(RecallKey(c, h))
       val (candidates, safe) = params.checker match
-        case Checker.Automaton => checkAutomaton(source, flags, ir, style, params)
-        case Checker.Fuzz      => checkFuzz(source, flags, ir, style, params, failed)
-        case Checker.Auto      => checkAuto(source, flags, ir, style, params, failed)
+        case Checker.Automaton => checkAutomaton(source, flags, ir, params)
+        case Checker.Fuzz      => checkFuzz(source, flags, ir, params, failed)
+        case Checker.Auto      => checkAuto(source, flags, ir, params, failed)
       val validate = recallValidation(source, flags, params.dialect, ir.mode, params.recallTimeout)
       validateCandidates(candidates, safe, validate, failures, params.maxRecallFailures)
 
@@ -169,7 +167,6 @@ object ReDoS:
       source: String,
       flags: String,
       ir: IRPattern,
-      style: AttackPattern.Style,
       params: Parameters
   )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
     import params.*
@@ -197,11 +194,12 @@ object ReDoS:
     val diagnostics = vulnerable
       .collect:
         case vul: Complexity.Vulnerable[UChar] =>
-          val attack = vul.buildAttackPattern(recallLimit, maxRecallStringSize).copy(style = style)
+          val attack = vul.buildAttackPattern(recallLimit, maxRecallStringSize)
           Diagnostics.Vulnerable(
             source,
             flags,
             params.dialect,
+            ir.mode,
             vul.toAttackComplexity,
             attack,
             vul.hotspot,
@@ -227,7 +225,6 @@ object ReDoS:
       source: String,
       flags: String,
       ir: IRPattern,
-      style: AttackPattern.Style,
       params: Parameters,
       failed: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
   )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
@@ -263,9 +260,17 @@ object ReDoS:
 
       results.map:
         case (complexity, attack, hotspot) =>
-          val recallAttack =
-            attack.adjust(complexity, recallLimit, maxRecallStringSize).copy(style = style)
-          Diagnostics.Vulnerable(source, flags, params.dialect, complexity, recallAttack, hotspot, Checker.Fuzz)
+          val recallAttack = attack.adjust(complexity, recallLimit, maxRecallStringSize)
+          Diagnostics.Vulnerable(
+            source,
+            flags,
+            params.dialect,
+            ir.mode,
+            complexity,
+            recallAttack,
+            hotspot,
+            Checker.Fuzz
+          )
 
     val diagnostics = diagnose.withChecker(Checker.Fuzz)
     (diagnostics, () => Diagnostics.Safe(source, flags, params.dialect, AttackComplexity.Safe(true), Checker.Fuzz))
@@ -277,15 +282,14 @@ object ReDoS:
       source: String,
       flags: String,
       ir: IRPattern,
-      style: AttackPattern.Style,
       params: Parameters,
       failed: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
   )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
-    val (automaton, automatonSafe) = checkAutomaton(source, flags, ir, style, params)
+    val (automaton, automatonSafe) = checkAutomaton(source, flags, ir, params)
     var safe = automatonSafe
     val diagnostics = automaton.recoverWith:
       case _: UnsupportedException =>
-        val (fuzz, fuzzSafe) = checkFuzz(source, flags, ir, style, params, failed)
+        val (fuzz, fuzzSafe) = checkFuzz(source, flags, ir, params, failed)
         safe = fuzzSafe
         fuzz
     (diagnostics, () => safe())

@@ -14,6 +14,7 @@ import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
+import codes.quine.labs.resyntax.charset.UnitMode
 
 class DiagnosticsSuite extends munit.FunSuite:
   test("Diagnostics#toString"):
@@ -31,6 +32,7 @@ class DiagnosticsSuite extends munit.FunSuite:
           "abbc",
           "",
           Dialect.JavaScript,
+          UnitMode.UTF16,
           AttackComplexity.Exponential(false),
           AttackPattern(
             Seq((UStringUtil.fromString("a"), UStringUtil.fromString("b"), 0)),
@@ -55,6 +57,7 @@ class DiagnosticsSuite extends munit.FunSuite:
           "a*a*$",
           "",
           Dialect.Ruby(),
+          UnitMode.CodePoint,
           AttackComplexity.Polynomial(2, false),
           AttackPattern(
             Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
@@ -70,7 +73,7 @@ class DiagnosticsSuite extends munit.FunSuite:
           |Dialect      : ruby (encoding: UTF-8)
           |Status       : vulnerable
           |Complexity   : 2nd degree polynomial
-          |Attack string: 'a'.repeat(2) + '!'
+          |Attack string: "a" * 2 + "!"
           |Hotspot      : /a*a*$$/
           |Checker      : automaton
           |Recall       : failed (finished in 3 ms on ruby 4.0.7, timeout: 1000 ms)""".stripMargin
