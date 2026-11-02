@@ -21,6 +21,9 @@ import codes.quine.labs.resyntax.parser.Parser
 class IRCharSuite extends munit.FunSuite:
   val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())
 
+  /** The characters of the input without surrogates (Ruby and PCRE with `u`). */
+  val Scalars: CharSet = UnitMode.CodePoint.universe.diff(IRSurrogates.All)
+
   def build(s: String, flags: String, dialect: Dialect): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)
     IRBuilder.build(Parser.parse(s, flagSet, dialect), flagSet, dialect, Parser.determineUnitMode(s, flagSet, dialect))
@@ -191,6 +194,9 @@ class IRCharSuite extends munit.FunSuite:
   chars("\\xC3\\xA9", "", Ruby())(of("é"))
   chars("[\\xC3\\xA9]", "", Ruby())(of("é"))
   error("\\xC3", "", Ruby())("Invalid multibyte escape at 0")
+  // Ruby 4.0 rejects the UTF-8 bytes of a surrogate.
+  error("\\xED\\xA0\\x80", "", Ruby())("Invalid multibyte escape at 0")
+  error("[\\xED\\xA0\\x80]", "", Ruby())("Invalid multibyte escape at 1")
   error("[\\xFF]", "", Ruby())("Invalid multibyte escape at 1")
   error("[\\x00-\\xFF]", "", Ruby())("Invalid multibyte escape at 1")
   error("[a\\xA1-\\uFFFF]", "", Ruby())("Invalid multibyte escape at 2")
@@ -358,8 +364,23 @@ class IRCharSuite extends munit.FunSuite:
   chars(".", "", Java)(of("\n\r\u0085  ").complement(UnitMode.CodePoint))
   chars(".", "d", Java)(of("\n").complement(UnitMode.CodePoint))
   chars(".", "", PCRE)(of("\n").complement(UnitMode.Byte))
-  chars(".", "", Python(), Perl(), Ruby())(of("\n").complement(UnitMode.CodePoint))
-  chars(".", "m", Ruby())(UnitMode.CodePoint.universe)
+  chars(".", "", Python(), Perl())(of("\n").complement(UnitMode.CodePoint))
+  // The input of Ruby and PCRE with `u` has no surrogate.
+  chars(".", "", Ruby())(of("\n").complement(Scalars))
+  chars(".", "m", Ruby())(Scalars)
+  chars(".", "su", PCRE)(Scalars)
+  chars("[^a]", "u", PCRE)(of("a").complement(Scalars))
+  chars("[^a]", "", Ruby())(of("a").complement(Scalars))
+  chars("[\\u{D7FF}-\\u{E000}]", "", Ruby())(of("\uD7FF\uE000"))
+  chars("[\\x{D7FF}-\\x{E000}]", "u", PCRE)(of("\uD7FF\uE000"))
+  chars("\\p{Cs}", "", Ruby())(CharSet.empty)
+  chars("\\p{Cs}", "u", PCRE)(CharSet.empty)
+
+  test("IRBuilder.build: a literal surrogate in Ruby"):
+    assertEquals(setOf(build("\uD800", "", Ruby()).node.data), CharSet.empty)
+
+  chars("[^a]", "", Python(), Perl())(of("a").complement(UnitMode.CodePoint))
+  chars("[^a]", "u", JavaScript)(of("a").complement(UnitMode.CodePoint))
   check("(*CRLF).", "", PCRE)(Sequence(Chars(UnitMode.Byte.universe), Assert(IRAssertKind.NotBetweenCRLF)))
 
   // Escape classes
@@ -458,7 +479,7 @@ class IRCharSuite extends munit.FunSuite:
   chars("\\p{IsGreek}", "", DotNet)(CharSet.range(0x370, 0x3ff))
   chars("\\p{Lower}", "", Java)(of("abcdefghijklmnopqrstuvwxyz"))
   chars("\\p{Lower}", "U", Java)(Properties.binary("Lowercase").get.set)
-  chars("\\p{Age=6.0}", "", Ruby())(Properties.presentIn(Properties.Age.value("6.0").get))
+  chars("\\p{Age=6.0}", "", Ruby())(Properties.presentIn(Properties.Age.value("6.0").get).diff(IRSurrogates.All))
   chars("\\p{Xwd}", "u", PCRE)(IRCharClasses.pcreWord)
   chars("\\p{Lu}", "", PCRE)(gc("Lu").restrict(UnitMode.Byte))
   error("\\p{Foo}", "u", JavaScript, PCRE)("Unknown Unicode property name at 0")

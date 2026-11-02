@@ -51,6 +51,20 @@ class ReDoSDialectSuite extends munit.FunSuite:
     // PCRE2's `.` with `(*CRLF)` fails only at `\r` before `\n` (0.38 s at n = 22 on `'a'.repeat(n) + '\r\nx'`).
     assertVulnerable(check("(*CRLF)^(?:a|.)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
 
+  test("ReDoS.check: surrogates"):
+    // Ruby's and PCRE's input has no surrogate.
+    for (source, dialect, flags) <- Seq(
+        ("\\A(?:[^\\u0000-\\u{D7FF}]|[^\\u0000-\\u{D7FF}])*\\z", Ruby(), ""),
+        ("^(?:[^\\x00-\\x{D7FF}]|[^\\x00-\\x{D7FF}])*$", PCRE, "u")
+      )
+    do
+      check(source, dialect, flags) match
+        case v: Diagnostics.Vulnerable =>
+          assert(!v.attack.asUString.iterator.exists(c => 0xd800 <= c && c <= 0xdfff), v)
+        case d => fail(s"not vulnerable: $d")
+    assertSafe(check("\\A(?:\\p{Cs}|\\p{Cs})*\\z", Ruby()), Checker.Automaton)
+    assertSafe(check("^(?:\\p{Cs}|\\p{Cs})*$", PCRE, "u"), Checker.Automaton)
+
   test("ReDoS.check: classes folded to several characters"):
     // Ruby 4.0 (with a back-reference stopping the memoization) is exponential on `'ß'.repeat(n) + '!'` against
     // `\A()[ßx]*\1\z` (3.6 s at n = 16), where `[ßx]` matches `ß` as the class and as the foldings of `ß` and `ẞ`.

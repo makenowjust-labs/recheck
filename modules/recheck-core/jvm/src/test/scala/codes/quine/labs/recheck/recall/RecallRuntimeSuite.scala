@@ -263,6 +263,15 @@ class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
         assertEquals(d.recallValidation.map(_.result), Some(RecallResult.EngineLimit("Backtrack limit exhausted")))
       case ds => fail(s"unexpected: $ds")
 
+  runtimeTest("Surrogates: PCRE", "php"):
+    // A subject with a surrogate is invalid UTF-8, which the attack does not take.
+    val source = "^(?:[^\\x00-\\x{D7FF}]|[^\\x00-\\x{D7FF}])*$"
+    ReDoS.check(source, "u", params.copy(dialect = Dialect.PCRE)) match
+      case d: Diagnostics.Vulnerable =>
+        assert(!d.attack.asUString.iterator.exists(c => 0xd800 <= c && c <= 0xdfff), d.attack)
+        assertEquals(d.recallValidation.map(_.result), Some(RecallResult.EngineLimit("Backtrack limit exhausted")))
+      case d => fail(s"not vulnerable: $d")
+
   runtimeTest("RECHECK_RUBY", "ruby"):
     // The wrapper's runtime line comes first, and it shows the arguments.
     val ruby = script("my ruby", s"echo recheck:runtime wrapped \"$$@\"; exec '${which("ruby")}' \"$$@\"")

@@ -71,13 +71,16 @@ class IRPropertySuite extends munit.FunSuite:
   chars("\\p{InCB=Linker}", "", Ruby())(value(Properties.IndicConjunctBreak, "Linker"))
   chars("\\p{In CB = Linker}", "", Ruby())(value(Properties.IndicConjunctBreak, "Linker"))
   chars("\\p{i-n-c-b=l-i-n-k-e-r}", "", Ruby())(value(Properties.IndicConjunctBreak, "Linker"))
-  chars("\\p{^InCB=Linker}", "", Ruby())(value(Properties.IndicConjunctBreak, "Linker").complement(UnitMode.CodePoint))
+  // Ruby's input has no surrogate.
+  chars("\\p{^InCB=Linker}", "", Ruby())(
+    value(Properties.IndicConjunctBreak, "Linker").complement(UnitMode.CodePoint).diff(IRSurrogates.All)
+  )
   chars("\\P{^InCB=Consonant}", "", Ruby())(value(Properties.IndicConjunctBreak, "Consonant"))
   chars("\\p{Grapheme_Cluster_Break=Extend}", "", Ruby())(value(Properties.GraphemeClusterBreak, "Extend"))
   chars("\\p{GraphemeClusterBreak=RegionalIndicator}", "", Ruby())(
     value(Properties.GraphemeClusterBreak, "Regional_Indicator")
   )
-  chars("\\p{age = 6. 0}", "", Ruby())(Properties.presentIn(Properties.Age.value("6.0").get))
+  chars("\\p{age = 6. 0}", "", Ruby())(Properties.presentIn(Properties.Age.value("6.0").get).diff(IRSurrogates.All))
   // Only the long names of the values listed in the data files, and no other property with a value.
   for name <- Seq(
       "Indic_Conjunct_Break=Linker",

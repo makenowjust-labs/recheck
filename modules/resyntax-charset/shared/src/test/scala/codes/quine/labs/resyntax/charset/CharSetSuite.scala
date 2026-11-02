@@ -68,6 +68,7 @@ class CharSetSuite extends munit.FunSuite:
     assertEquals(set((0x80, 0x20000)).complement(UnitMode.Byte), set((0, 0x80)))
     assertEquals(CharSet.empty.complement(UnitMode.UTF16), UnitMode.UTF16.universe)
     assertEquals(UnitMode.CodePoint.universe.complement(UnitMode.CodePoint), CharSet.empty)
+    assertEquals(s.complement(set((0x30, 0x50))), set((0x30, 0x41)))
 
   test("CharSet#restrict"):
     assertEquals(set((0x41, 0x20000)).restrict(UnitMode.UTF16), set((0x41, 0x10000)))

@@ -5,6 +5,7 @@ import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRPattern
+import codes.quine.labs.resyntax.ir.IRSurrogates
 import codes.quine.labs.resyntax.ir.build.IRBuilder
 import codes.quine.labs.resyntax.parser.Parser
 
@@ -82,6 +83,14 @@ class PatternAlphabetSuite extends munit.FunSuite:
       IndexedSeq(CharSet.range(0xf0, 0xff), CharSet.range(0, 0xef))
     )
 
+  test("PatternAlphabet.build: surrogates"):
+    val scalars = UnitMode.CodePoint.universe.diff(IRSurrogates.All)
+    // Absent surrogates are not characters.
+    assertEquals(
+      PatternAlphabet.build(UnitMode.CodePoint, Seq(CharSet.single('a')), surrogates = IRSurrogates.Absent).pairs,
+      IndexedSeq((CharSet.single('a'), CharKind.Normal), (scalars.diff(CharSet.single('a')), CharKind.Normal))
+    )
+
   locally:
     val alphabet =
       PatternAlphabet.build(UnitMode.UTF16, Seq(CharSet.single('A')), word = Some(CharSet.range('A', 'Z')))
@@ -153,6 +162,8 @@ class PatternAlphabetSuite extends munit.FunSuite:
     assertEquals(alphabetOf("\\xff", "", Dialect.PCRE).any.map(_._1).flatMap(_.iterator).max, 0xff)
     // The line terminators of `$` before a final line terminator are distinguished.
     assert(alphabetOf("a$", "", Dialect.Python()).pairs.exists(_._1 == CharSet.single(0x0a)))
+    // Ruby's input has no surrogate.
+    assert(!alphabetOf("[^a]", "", Dialect.Ruby()).any.exists(_._1.intersects(IRSurrogates.All)))
 
   test("PatternAlphabet.wordSets"):
     assertEquals(PatternAlphabet.wordSets(parse("\\b(?a:\\b)", "", Dialect.Python())).size, 2)

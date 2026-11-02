@@ -59,7 +59,8 @@ object IRBuilder:
       case Dialect.Perl(true, PerlSource.String) => true
       case Dialect.Perl(utf8, _)                 => usesPerlUnicodeSyntax(node) || utf8 && hasNonASCIILiteral(node)
       case _                                     => false
-    val chars = new IRCharResolver(dialect, mode, perlUnicodeRules)
+    val surrogates = surrogateSemantics(dialect, mode)
+    val chars = new IRCharResolver(dialect, mode, surrogates.universe(mode), perlUnicodeRules)
     val lookBehindAnalyzer =
       new LookBehindAnalyzer(
         table,
@@ -90,6 +91,7 @@ object IRBuilder:
       backtrackControlSemantics(dialect),
       featureSet.anchored,
       mode,
+      surrogates,
       notEmpty(starts)
     )
 
@@ -112,6 +114,14 @@ object IRBuilder:
       case Dialect.PCRE    => IREmptyIterationSemantics(IREmptyIteration.ExitFromMin, IREmptyIteration.Ignore)
       case _: Dialect.Ruby => all(IREmptyIteration.ExitOptional)
       case Dialect.DotNet | _: Dialect.Perl => all(IREmptyIteration.ExitFromMin)
+
+  private def surrogateSemantics(dialect: Dialect, mode: UnitMode): IRSurrogates =
+    if mode != UnitMode.CodePoint then IRSurrogates.Separate
+    else
+      dialect match
+        case Dialect.JavaScript | Dialect.Java => IRSurrogates.Paired
+        case _: Dialect.Ruby | Dialect.PCRE    => IRSurrogates.Absent
+        case _                                 => IRSurrogates.Separate
 
   private def backtrackControlSemantics(dialect: Dialect): IRBacktrackControlSemantics =
     IRBacktrackControlSemantics(thenPassesAssertions = dialect.isPerl, acceptEndsAtomic = dialect.isPerl)

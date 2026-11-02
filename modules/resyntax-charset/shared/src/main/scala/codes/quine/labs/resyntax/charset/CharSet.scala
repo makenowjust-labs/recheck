@@ -65,7 +65,9 @@ final class CharSet private (private val bounds: Array[UChar]):
     if isEmpty || that.isEmpty then this
     else combine(bounds, that.bounds, DiffTable)
 
-  def complement(mode: UnitMode): CharSet = mode.universe.diff(this)
+  def complement(mode: UnitMode): CharSet = complement(mode.universe)
+
+  def complement(universe: CharSet): CharSet = universe.diff(this)
 
   def restrict(mode: UnitMode): CharSet =
     if isEmpty || bounds(bounds.length - 1) <= mode.limit then this

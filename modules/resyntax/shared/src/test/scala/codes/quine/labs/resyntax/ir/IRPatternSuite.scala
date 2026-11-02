@@ -3,6 +3,7 @@ package codes.quine.labs.resyntax.ir
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.build.IRBuilder
 import codes.quine.labs.resyntax.parser.Parser
 
@@ -385,6 +386,19 @@ class IRPatternSuite extends munit.FunSuite:
     "a\\Z" -> false,
     "a" -> true
   )
+
+  test("IRPattern#surrogates"):
+    assertEquals(parse("a").surrogates, IRSurrogates.Separate)
+    assertEquals(parse("a", "u").surrogates, IRSurrogates.Paired)
+    assertEquals(parse("a", "v").surrogates, IRSurrogates.Paired)
+    assertEquals(parse("a", "", Dialect.Java).surrogates, IRSurrogates.Paired)
+    assertEquals(parse("a", "", Dialect.Python()).surrogates, IRSurrogates.Separate)
+    assertEquals(parse("a", "", Dialect.Perl(utf8 = true)).surrogates, IRSurrogates.Separate)
+    assertEquals(parse("a", "", Dialect.Ruby()).surrogates, IRSurrogates.Absent)
+    assertEquals(parse("a", "u", Dialect.PCRE).surrogates, IRSurrogates.Absent)
+    assertEquals(parse("a", "", Dialect.PCRE).surrogates, IRSurrogates.Separate)
+    assertEquals(parse("a", "", Dialect.Ruby()).universe, UnitMode.CodePoint.universe.diff(IRSurrogates.All))
+    assertEquals(parse("a", "u").universe, UnitMode.CodePoint.universe)
 
   test("IRPattern#assertionLineTerminators"):
     assertEquals(parse("^a$|\\b", "m").assertionLineTerminators, Seq(IRLineTerminators.JavaScript))

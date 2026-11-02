@@ -30,9 +30,14 @@ final case class IRPattern(
     anchored: Boolean,
     /** The unit of the input, which the character sets of the nodes consist of. */
     mode: UnitMode,
+    /** What the surrogate code points of the input are in the dialect. */
+    surrogates: IRSurrogates,
     /** Where an empty match is rejected (PCRE's `(*NOTEMPTY)` and `(*NOTEMPTY_ATSTART)`). */
     notEmpty: IRNotEmpty = IRNotEmpty.Never
 ):
+
+  /** The characters of the input, which the character sets of the nodes are subsets of. */
+  lazy val universe: CharSet = surrogates.universe(mode)
 
   /** Returns the size of the pattern, which counts a repetition as its copies (e.g. `a{2,3}` is `4`). */
   def size: Int =
@@ -311,6 +316,33 @@ enum IREmptyIteration:
 
   /** ExitAll ends the repetition with any one, even before the minimum (Java's `Loop`). */
   case ExitAll
+
+/** IRSurrogates is what the surrogate code points of the input are, which differs among dialects in `CodePoint` mode.
+  */
+enum IRSurrogates:
+
+  /** Separate makes each surrogate a character, even before another (Python's `str` and Perl, and the other modes). */
+  case Separate
+
+  /** Paired makes a lone surrogate a character, but a high surrogate followed by a low surrogate is one supplementary
+    * character (JavaScript's `u` and `v`, and Java).
+    */
+  case Paired
+
+  /** Absent keeps the surrogates out of the input, which is valid UTF-8 (Ruby and PCRE). */
+  case Absent
+
+  /** Returns the characters of the input in the mode. */
+  def universe(mode: UnitMode): CharSet =
+    if this == Absent then mode.universe.diff(IRSurrogates.All) else mode.universe
+
+object IRSurrogates:
+
+  val High: CharSet = CharSet.range(0xd800, 0xdbff)
+
+  val Low: CharSet = CharSet.range(0xdc00, 0xdfff)
+
+  val All: CharSet = CharSet.range(0xd800, 0xdfff)
 
 /** IRBacktrackControlSemantics is where the backtracking control verbs act, which differs among dialects. */
 final case class IRBacktrackControlSemantics(
