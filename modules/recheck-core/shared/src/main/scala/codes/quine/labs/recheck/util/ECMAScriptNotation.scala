@@ -2,14 +2,15 @@ package codes.quine.labs.recheck.util
 
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.Properties
+import codes.quine.labs.resyntax.charset.UChar
 
 /** ECMAScriptNotation provides the character notation of ECMAScript. */
 object ECMAScriptNotation:
 
-  def isPrintable(c: Int): Boolean = !Other.contains(c)
+  def isPrintable(c: UChar): Boolean = !Other.contains(c)
 
   /** Shows the character as a pattern. */
-  def showChar(c: Int): String = c match
+  def showChar(c: UChar): String = c match
     case 0x09                  => "\\t"
     case 0x0a                  => "\\n"
     case 0x0b                  => "\\v"
@@ -24,7 +25,7 @@ object ECMAScriptNotation:
 
   /** Shows the set as a character class. */
   def showClass(set: CharSet): String =
-    def showInClass(c: Int): String =
+    def showInClass(c: UChar): String =
       if c.isValidChar && "[^-]".contains(c.toChar) then s"\\${c.toChar}"
       else if 1 <= c && c < 32 then s"\\c${(c + 0x40).toChar}"
       else showChar(c)

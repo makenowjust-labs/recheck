@@ -26,6 +26,7 @@ import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetException
 import codes.quine.labs.resyntax.ast.Node
+import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRPattern
 import codes.quine.labs.resyntax.ir.build.IRBuilder
@@ -174,7 +175,7 @@ object ReDoS:
     import params.*
     val maxNFASize = if checker == Checker.Auto then params.maxNFASize else Int.MaxValue
 
-    def complexities: Iterator[Complexity[Int]] =
+    def complexities: Iterator[Complexity[UChar]] =
       if checker == Checker.Auto && ir.repeatCount >= maxRepeatCount then
         ctx.log("auto: exceed maxRepeatCount")
         throw UnsupportedException("The pattern contains too many repeat")
@@ -195,7 +196,7 @@ object ReDoS:
 
     val diagnostics = vulnerable
       .collect:
-        case vul: Complexity.Vulnerable[Int] =>
+        case vul: Complexity.Vulnerable[UChar] =>
           val attack = vul.buildAttackPattern(recallLimit, maxRecallStringSize).copy(style = style)
           Diagnostics.Vulnerable(
             source,

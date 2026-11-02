@@ -5,6 +5,7 @@ import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.fuzz.FString.*
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.recheck.util.UStringUtil.*
+import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
 
 /** FString is a string with a repetition structure for fuzzing. */
@@ -60,7 +61,7 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]):
 
   /** Builds a UString instance from this. */
   def toUString: UString =
-    val str = IndexedSeq.newBuilder[Int]
+    val str = IndexedSeq.newBuilder[UChar]
     var pos = 0
     while pos < seq.size do
       seq(pos) match
@@ -83,7 +84,7 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]):
   def toAttackPattern: AttackPattern =
     val pumps = Seq.newBuilder[(UString, UString, Int)]
 
-    val str = IndexedSeq.newBuilder[Int]
+    val str = IndexedSeq.newBuilder[UChar]
     var pos = 0
 
     while pos < seq.size do
@@ -121,7 +122,7 @@ object FString:
   sealed abstract class FChar extends Serializable with Product
 
   /** Wrap is a wrapper of a unicode character in FString. */
-  final case class Wrap(u: Int) extends FChar
+  final case class Wrap(u: UChar) extends FChar
 
   /** Repeat is a repetition specifier in FString. */
   final case class Repeat(m: Int, size: Int) extends FChar
