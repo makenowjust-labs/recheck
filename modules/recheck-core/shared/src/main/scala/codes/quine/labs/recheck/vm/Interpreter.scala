@@ -166,10 +166,10 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     var time: Long = 0
 
     /** Gets a previous character. */
-    def previousChar: Option[UChar] = input.getBefore(pos, program.meta.unicode)
+    def previousChar: Option[UChar] = input.getBefore(pos)
 
     /** Gets a current character. */
-    def currentChar: Option[UChar] = input.getAt(pos, program.meta.unicode)
+    def currentChar: Option[UChar] = input.getAt(pos)
 
     /** Captures a beginning position of the index. */
     def capBegin(index: Int): Unit =
@@ -629,25 +629,13 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
   /** Returns the starts of a look-behind at the position in the order that the engine tries them. */
   private def lookBehindStarts(pos: Int, starts: IRLookBehindStarts): Seq[Int] = starts match
-    case IRLookBehindStarts.Longest(min, max) =>
-      val builder = Seq.newBuilder[Int]
-      if min == 0 then builder.addOne(pos)
-      var p = pos
-      var k = 0
-      while k < max && p > 0 do
-        p -= input.getBefore(p, program.meta.unicode).fold(1)(UString.charWidth)
-        k += 1
-        if k >= min then builder.addOne(p)
-      builder.result().reverse
+    case IRLookBehindStarts.Longest(min, max) => math.max(0, pos - max) to pos - min
 
   /** Tests whether the text before the position ends with a base and then any extenders of the marks. */
   private def hasBase(pos: Int, marks: IRWordMarks): Boolean =
     var p = pos
-    var c = input.getBefore(p, program.meta.unicode)
-    while c.exists(marks.extenders.contains) do
-      p -= UString.charWidth(c.get)
-      c = input.getBefore(p, program.meta.unicode)
-    c.exists(marks.bases.contains)
+    while input.getBefore(p).exists(marks.extenders.contains) do p -= 1
+    input.getBefore(p).exists(marks.bases.contains)
 
   /** Tests whether the character before the position is a word character, or an extender of the marks after a base. */
   private def isMarkWordBefore(frame: Frame, word: CharSet, marks: IRWordMarks): Boolean =
@@ -659,7 +647,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
   /** Tests whether the position is after a line terminator. */
   private def afterTerminator(pos: Int, terminators: IRLineTerminators): Boolean =
-    val c = input.getBefore(pos, program.meta.unicode)
+    val c = input.getBefore(pos)
     val single = c.exists(terminators.chars.contains)
     val crlf =
       terminators.crlf != IRLineTerminators.CRLF.Ignored && c.contains(0x0a) && pos >= 2 && input(pos - 2) == 0x0d
@@ -671,11 +659,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     else if terminators.crlf != IRLineTerminators.CRLF.Ignored && pos + 1 < input.length &&
       input(pos) == 0x0d && input(pos + 1) == 0x0a
     then Some(pos + 2)
-    else
-      input
-        .getAt(pos, program.meta.unicode)
-        .filter(terminators.chars.contains)
-        .map(c => pos + UString.charWidth(c))
+    else Option.when(input.getAt(pos).exists(terminators.chars.contains))(pos + 1)
 
   /** Tests whether the position is between `\r` and `\n`, where no line assertion matches with `CRLF.Atomic`. */
   private def betweenCRLF(pos: Int, terminators: IRLineTerminators): Boolean =
@@ -704,27 +688,15 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       case IRBackReferenceFolding.Simple     => compareChars(s, pos, back, equivalence)
 
   private def compareChars(s: UString, pos: Int, back: Boolean, equivalence: IRCaseEquivalence): (Int, Option[Int]) =
-    if equivalence == IRCaseEquivalence.Identity then
-      var count = 0
-      if back then
-        while count < s.length && pos - count - 1 >= 0 && s(s.length - count - 1) == input(pos - count - 1) do
-          count += 1
-      else while count < s.length && pos + count < input.length && s(count) == input(pos + count) do count += 1
-      (count, Option.when(count == s.length)(s.length))
-    else
-      val unicode = program.meta.unicode
-      var i = 0
-      var j = 0
-      var continues = true
-      while continues && i < s.length do
-        val c1 = if back then s.getBefore(s.length - i, unicode) else s.getAt(i, unicode)
-        val c2 = if back then input.getBefore(pos - j, unicode) else input.getAt(pos + j, unicode)
-        (c1, c2) match
-          case (Some(c1), Some(c2)) if c1 == c2 || equivalence.equiv(c1, c2) =>
-            i += UString.charWidth(c1)
-            j += UString.charWidth(c2)
-          case _ => continues = false
-      (i, Option.when(i == s.length)(j))
+    val identity = equivalence == IRCaseEquivalence.Identity
+    def equiv(c1: UChar, c2: UChar): Boolean = c1 == c2 || !identity && equivalence.equiv(c1, c2)
+
+    var count = 0
+    if back then
+      while count < s.length && pos - count - 1 >= 0 && equiv(s(s.length - count - 1), input(pos - count - 1)) do
+        count += 1
+    else while count < s.length && pos + count < input.length && equiv(s(count), input(pos + count)) do count += 1
+    (count, Option.when(count == s.length)(s.length))
 
   /** Compares the full case foldings of the capture and the input, where the input's characters must fold to the
     * capture's folding exactly, and returns the compared width of the input and the matched width if matched.
@@ -736,17 +708,16 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       equivalence: IRCaseEquivalence,
       full: IRBackReferenceFolding.Full
   ): (Int, Option[Int]) =
-    val unicode = program.meta.unicode
     def folded(c: UChar): Seq[UChar] = full.fold(c).map(_.iterator.toSeq).getOrElse(Seq(c))
 
     val target =
-      val units = s.chars(unicode).flatMap(folded).toSeq
+      val units = s.iterator.flatMap(folded).toSeq
       if back then units.reverse else units
     var k = 0
     var j = 0
     var continues = true
     while continues && k < target.length do
-      val c = if back then input.getBefore(pos - j, unicode) else input.getAt(pos + j, unicode)
+      val c = if back then input.getBefore(pos - j) else input.getAt(pos + j)
       c match
         case Some(c) =>
           val units = if back then folded(c).reverse else folded(c)
@@ -754,7 +725,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
             units.indices.forall(n => target(k + n) == units(n) || equivalence.equiv(target(k + n), units(n)))
           then
             k += units.length
-            j += UString.charWidth(c)
+            j += 1
           else continues = false
         case None => continues = false
     (j, Option.when(k == target.length)(j))
@@ -800,9 +771,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if ok then
         if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        val width = c.map(UString.charWidth).getOrElse(0)
-        steps = Math.addExact(steps, width)
-        frame.pos += width
+        steps = Math.addExact(steps, 1)
+        frame.pos += 1
         true
       else
         if options.needsFailedPoints then
@@ -819,9 +789,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if ok then
         if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        val width = c.map(UString.charWidth).getOrElse(0)
-        steps = Math.addExact(steps, width)
-        frame.pos -= width
+        steps = Math.addExact(steps, 1)
+        frame.pos -= 1
         true
       else
         if options.needsFailedPoints then

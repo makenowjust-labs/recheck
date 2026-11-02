@@ -36,12 +36,12 @@ class DynamicSeederSuite extends munit.FunSuite:
 
   test("DynamicSeeder.Patch.InsertChar#apply"):
     assertEquals(
-      Patch.InsertChar(1, Set(CharSet.single('x'))).apply(UString.fromUTF16Units("012"), false),
+      Patch.InsertChar(1, Set(CharSet.single('x'))).apply(UString.fromUTF16Units("012")),
       Seq(UString.fromUTF16Units("0x12"), UString.fromUTF16Units("0x2"))
     )
 
   test("DynamicSeeder.Patch.InsertString#apply"):
     assertEquals(
-      Patch.InsertString(1, UString.fromUTF16Units("xyz")).apply(UString.fromUTF16Units("012"), false),
+      Patch.InsertString(1, UString.fromUTF16Units("xyz")).apply(UString.fromUTF16Units("012")),
       Seq(UString.fromUTF16Units("0xyz12"))
     )

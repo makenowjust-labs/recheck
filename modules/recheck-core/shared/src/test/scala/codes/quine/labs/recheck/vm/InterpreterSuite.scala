@@ -32,7 +32,7 @@ class InterpreterSuite extends munit.FunSuite:
     val t = for
       ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
       program <- ProgramBuilder.build(ir)
-      result = Interpreter.run(program, UString.fromUTF16Units(input), pos, opts)
+      result = Interpreter.run(program, inputOf(input, program.meta.mode), pos, opts)
     yield result
     t.get
 
@@ -127,7 +127,7 @@ class InterpreterSuite extends munit.FunSuite:
     assertNotMatches("^\\w$", "i", " ", 0)
 
     assertMatches("^.$", "u", "😀", 0)
-    assertMatches("(?<=^.)a$", "u", "😀a", 2)
+    assertMatches("(?<=^.)a$", "u", "😀a", 1)
     assertNotMatches("^.$", "", "😀", 0)
 
     assertMatches("^.$", "", "a", 0)
@@ -303,7 +303,7 @@ class InterpreterSuite extends munit.FunSuite:
       val t = for
         ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
         program <- ProgramBuilder.build(ir)
-        result = Interpreter.runWithTimeout(program, UString.fromUTF16Units(input), pos, opts, timeout)
+        result = Interpreter.runWithTimeout(program, inputOf(input, program.meta.mode), pos, opts, timeout)
       yield result
       t.get
 

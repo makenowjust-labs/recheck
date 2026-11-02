@@ -77,7 +77,7 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]):
           val repeat = n + m
           for _ <- 1 to repeat do str.addAll(part)
           pos += size
-    UString.fromCodePointsAsUTF16(str.result())
+    UString.from(str.result())
 
   /** Builds an attack pattern string from this. */
   def toAttackPattern: AttackPattern =
@@ -95,18 +95,18 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]):
           pos += 1
           val repeat = n + m
           if repeat > 1 then
-            val s = UString.fromCodePointsAsUTF16(str.result())
+            val s = UString.from(str.result())
             str.clear()
             val pump = seq
               .slice(pos, pos + size)
               .map:
                 case Wrap(u)      => u
                 case Repeat(_, _) => throw new IllegalArgumentException
-            val t = UString.fromCodePointsAsUTF16(pump)
+            val t = UString.from(pump)
             pumps.addOne((s, t, m))
             pos += size
 
-    val suffix = UString.fromCodePointsAsUTF16(str.result())
+    val suffix = UString.from(str.result())
     AttackPattern(pumps.result(), suffix, n)
 
   /** Returns the string representation of this string in the style. */
@@ -120,17 +120,17 @@ object FString:
   /** FChar is a character of FString. */
   sealed abstract class FChar extends Serializable with Product
 
-  /** Wrap is a wrapper of a unicode character in FString. */
+  /** Wrap is a wrapper of a character in FString. */
   final case class Wrap(u: UChar) extends FChar
 
   /** Repeat is a repetition specifier in FString. */
   final case class Repeat(m: Int, size: Int) extends FChar
 
   /** Builds a FString from a string. */
-  def apply(input: UString, unicode: Boolean): FString = FString(1, input.chars(unicode).map(Wrap(_)).toIndexedSeq)
+  def apply(input: UString): FString = FString(1, input.iterator.map(Wrap(_)).toIndexedSeq)
 
   /** Builds a FString from a string with a loop analysis information. */
-  def build(input: UString, loops: Seq[(Int, Int)], unicode: Boolean): FString =
+  def build(input: UString, loops: Seq[(Int, Int)]): FString =
     val repeats = loops.iterator.collect { case (start, end) if start != end => (start, end - start) }.toMap
 
     val str = IndexedSeq.newBuilder[FChar]
@@ -145,9 +145,9 @@ object FString:
           while pos < input.length && part == input.slice(pos, pos + size) do
             m += 1
             pos += size
-          str.addOne(Repeat(m, size)).addAll(part.chars(unicode).map(Wrap(_)))
+          str.addOne(Repeat(m, size)).addAll(part.iterator.map(Wrap(_)))
         case None =>
-          str.addOne(Wrap(input.getAt(pos, unicode).get))
+          str.addOne(Wrap(input(pos)))
           pos += 1
 
     FString(1, str.result())
