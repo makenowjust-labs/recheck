@@ -13,10 +13,7 @@ import codes.quine.labs.resyntax.ast.SourceLocation
 object AutomatonChecker:
 
   /** Checks a match time complexity of the NFA. */
-  def check[A, Q](
-      nfa: OrderedNFA[A, Q],
-      maxNFASize: Int = Int.MaxValue
-  )(using ctx: Context): Iterator[Complexity[A]] =
+  def check[A, Q](nfa: OrderedNFA[A, Q], maxNFASize: Int)(using ctx: Context): Iterator[Complexity[A]] =
     ctx.interrupt(new AutomatonChecker(nfa, maxNFASize).check())
 
 /** AutomatonChecker is a ReDoS vulnerable RegExp checker based on automata theory. */

@@ -348,7 +348,7 @@ object Inst:
         /** The comparison of characters, which is not the identity for a case-insensitive reference. */
         equivalence: IRCaseEquivalence,
         /** How a case-insensitive reference compares the capture with the input. */
-        folding: IRBackReferenceFolding = IRBackReferenceFolding.Simple
+        folding: IRBackReferenceFolding
     ) extends ReadKind:
       override def toString: String =
         val i = if equivalence == IRCaseEquivalence.Identity then "" else " ignore_case"

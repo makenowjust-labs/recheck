@@ -31,7 +31,7 @@ final case class IRPattern(
     /** What the surrogate code points of the input are in the dialect. */
     surrogates: IRSurrogates,
     /** Where an empty match is rejected (PCRE's `(*NOTEMPTY)` and `(*NOTEMPTY_ATSTART)`). */
-    notEmpty: IRNotEmpty = IRNotEmpty.Never
+    notEmpty: IRNotEmpty
 ):
 
   /** The characters of the input, which the character sets of the nodes are subsets of. */

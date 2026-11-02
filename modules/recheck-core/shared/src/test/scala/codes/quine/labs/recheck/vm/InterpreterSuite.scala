@@ -18,6 +18,7 @@ import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
+import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 
@@ -26,7 +27,12 @@ class InterpreterSuite extends munit.FunSuite:
 
   /** A JavaScript back-reference to the index. */
   def ref(index: Int): ReadKind.Ref =
-    ReadKind.Ref(Seq(index), IRBackReferenceSemantics(true, IRBackReferenceChoice.FirstSet), IRCaseEquivalence.Identity)
+    ReadKind.Ref(
+      Seq(index),
+      IRBackReferenceSemantics(true, IRBackReferenceChoice.FirstSet),
+      IRCaseEquivalence.Identity,
+      IRBackReferenceFolding.Simple
+    )
 
   def matches(source: String, flags: String, input: String, opts: Options): Result =
     val t = for

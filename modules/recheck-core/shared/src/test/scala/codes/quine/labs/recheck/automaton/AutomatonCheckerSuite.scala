@@ -24,7 +24,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
       epsNFA <- EpsNFABuilder.build(ir)
       nfa = epsNFA.toOrderedNFA.rename
-      result <- Try(AutomatonChecker.check(nfa).nextOption().getOrElse(Complexity.Constant))
+      result <- Try(AutomatonChecker.check(nfa, Int.MaxValue).nextOption().getOrElse(Complexity.Constant))
     yield result
 
   test("AutomatonChecker.check: constant"):
