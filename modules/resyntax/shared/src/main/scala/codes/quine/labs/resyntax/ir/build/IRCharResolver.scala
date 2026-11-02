@@ -68,11 +68,9 @@ private[build] final class IRCharResolver(
   /** Returns the word characters of `\b` and `\B` at the flags. */
   def wordSet(flags: IRCharFlags): CharSet = classes.boundaryWord(flags).intersect(universe)
 
-  /** Returns the marks that `\b` and `\B` take as word characters after a base at the flags, if any.
-    *
-    * Java's `\b` with `U` has the non-spacing marks in its word set already.
-    */
+  /** Returns the marks that `\b` and `\B` take as word characters after a base at the flags, if any. */
   def wordMarks(flags: IRCharFlags): Option[IRWordMarks] =
+    // Java's `\b` with `U` has the non-spacing marks in its word set already.
     Option.when(dialect.isJava && !flags.unicodeClass):
       val marks = classes.javaWordMarks
       IRWordMarks(marks.marks.intersect(universe), marks.extenders.intersect(universe), marks.bases.intersect(universe))
@@ -83,11 +81,9 @@ private[build] final class IRCharResolver(
     case NodeData.Backslash(_: BackslashKind.BackslashValue) => true
     case _                                                   => false
 
-  /** Moves Ruby's byte escapes before a repeated byte escape into the repeat (e.g. `\xC3\xA9+` repeats `é`).
-    *
-    * The parser puts a quantifier on the last escape, but Onigmo reads the bytes of a character as one.
-    */
+  /** Moves Ruby's byte escapes before a repeated byte escape into the repeat (e.g. `\xC3\xA9+` repeats `é`). */
   def joinRubyByteRepeats(children: Seq[Node]): Seq[Node] =
+    // The parser puts a quantifier on the last escape, but Onigmo reads the bytes of a character as one.
     if !dialect.isRuby || mode != UnitMode.CodePoint then return children
     def byteOf(node: Node): Option[Int] = node.data match
       case NodeData.Backslash(BackslashKind.Escape(style, value)) if isRubyByte(style, value) => Some(value)
@@ -131,9 +127,9 @@ private[build] final class IRCharResolver(
 
   /** Resolves a part, which is literal characters in a row, together.
     *
-    * They are resolved together for a surrogate pair read by code units and Ruby's UTF-8 bytes by escapes (e.g.
-    * `\xC3\xA9`). Case-insensitivity is the dialect's one-to-one case equivalence, and Ruby's and Perl's simple
-    * multi-character folding of literals (e.g. `ß` and `ss`, see [[foldPart]]).
+    * A surrogate pair read by code units and Ruby's UTF-8 bytes by escapes (e.g. `\xC3\xA9`) are one character there.
+    * Case-insensitivity is the dialect's one-to-one case equivalence, and Ruby's and Perl's simple multi-character
+    * folding of literals (e.g. `ß` and `ss`, see [[foldPart]]).
     */
   def literals(part: Seq[(Node, IRCharFlags)]): Seq[IRNode] =
     try resolveLiterals(part)
@@ -348,7 +344,7 @@ private[build] final class IRCharResolver(
 
   /** `\X`: an extended grapheme cluster by the regular expression of UAX #29 (Table 1b), in an atomic group.
     *
-    * The engines take the longest cluster and do not backtrack into it. In byte mode, the bytes are Latin-1 characters.
+    * In byte mode, the bytes are Latin-1 characters.
     */
   private lazy val graphemeCluster: IRNodeData =
     import Grammar.*
@@ -364,6 +360,7 @@ private[build] final class IRCharResolver(
     val core = alt(hangul, ri, xpicto, conjunct, c(control.complement(universe)))
     val postcore = star(c(gcb("Extend", "ZWJ", "SpacingMark")))
     val cluster = alt(seq(c(gcb("CR")), c(gcb("LF"))), c(control), seq(star(c(gcb("Prepend"))), core, postcore))
+    // The engines take the longest cluster and do not backtrack into it.
     IRNodeData.Atomic(IRCharResolver.prune(cluster).getOrElse(IRNode(IRNodeData.Chars(CharSet.empty))))
 
   /** PCRE's `\X`: an extended grapheme cluster by PCRE2's own rules (`pcre2_extuni.c` of 10.49), in an atomic group.
@@ -856,14 +853,12 @@ private[build] object IRCharResolver:
       case ClassItemData.ClassBackslashClass(EscapeClassKind.QuoteSet(strings)) => strings.exists(_.length != 1)
       case _                                                                    => false
 
-  /** Python's key `upper(lower(c))`.
-    *
-    * `re` compares lower cases, and also the lower cases sharing the upper case (`re._casefix`); the upper case there
-    * is the full mapping, so the pairs whose upper case is two or more characters are added.
-    */
+  /** Python's key `upper(lower(c))`. */
   lazy val pythonKey: CaseMapping =
     val domain = CaseMapping.SimpleUpper.domain.union(CaseMapping.SimpleLower.domain)
     val simple = domain.iterator.map(c => (c, CaseMapping.SimpleUpper(CaseMapping.SimpleLower(c))))
+    // `re` compares lower cases, and also the lower cases sharing the upper case (`re._casefix`).
+    // The upper case there is the full mapping, so the pairs whose upper case is two or more characters are added.
     val full = Seq(0x1fd3 -> 0x390, 0x1fe3 -> 0x3b0, 0xfb06 -> 0xfb05)
     CaseMapping.fromEntries(simple ++ full)
 

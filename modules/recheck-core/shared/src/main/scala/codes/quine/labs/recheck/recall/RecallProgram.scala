@@ -97,15 +97,13 @@ object RecallProgram:
     case _: Dialect.Perl    => "recall.pl"
     case Dialect.PCRE       => "recall.php"
 
-  /** Returns a Java expression of the data.
-    *
-    * A string constant of Java has at most 65535 bytes, so a long data is a join of literals.
-    */
+  /** Returns a Java expression of the data, which is a join of literals for a long data. */
   private[recall] def javaString(data: String): String =
     val literals = data.grouped(JavaLiteralSize).map(quote).toSeq
     if literals.sizeIs <= 1 then literals.headOption.getOrElse(quote(""))
     else literals.mkString("String.join(\"\", ", ", ", ")")
 
+  // A string constant of Java has at most 65535 bytes.
   private val JavaLiteralSize: Int = 10000
 
   /** Returns a Java or C# literal of the data, whose only characters to escape are the line breaks. */
@@ -321,9 +319,14 @@ object RecallProgram:
 
   /** Returns the data of a pattern and an attack string for the programs reading it from the standard input.
     *
-    * The lines are the flags, the pattern and the parts of the attack string, where each part is the repeat count and
-    * the part separated by `:`. The flags and the pattern are `-` if they are empty. The pattern and the parts are the
-    * hexadecimal digits of the UTF-16 code units, four for each.
+    * For example, the data of `/^a*$/i` and `'a'.repeat(31) + '!'` is the following.
+    *
+    * {{{
+    * i
+    * 005e0061002a0024
+    * 31:0061
+    * 1:0021
+    * }}}
     */
   private[recall] def data(flags: String, source: String, attack: AttackPattern): String =
     def units(s: UString): String = s.encode(UnitMode.UTF16).map(hex(_, 4)).mkString
@@ -394,11 +397,7 @@ object RecallProgram:
   /** The delimiters of a Perl regex literal, which do not pair and keep interpolation. */
   private val PerlDelimiters: Seq[Char] = "/!,;~%&:=\"|^-".toSeq
 
-  /** Checks whether the Perl regex literal neither interpolates variables nor runs code.
-    *
-    * `$` interpolates a variable unless it is followed by `)`, `|` or the end, and `@` interpolates an array when it is
-    * followed by a name or a block.
-    */
+  /** Checks whether the Perl regex literal neither interpolates variables nor runs code. */
   private[recall] def isPerlSafe(source: String): Boolean =
     val code = Seq("(?{", "(??{", "(*{").exists(source.contains)
     var i = 0
@@ -407,17 +406,19 @@ object RecallProgram:
       val next = if i + 1 < source.length then Some(source.charAt(i + 1)) else None
       source.charAt(i) match
         case '\\' => i += 1
-        case '$'  => safe = next.forall(c => c == ')' || c == '|')
-        case '@'  => safe = !next.exists(c => c.isLetterOrDigit || "_{$:^".contains(c))
-        case _    => ()
+        // `$` interpolates a variable unless it is followed by `)`, `|` or the end.
+        case '$' => safe = next.forall(c => c == ')' || c == '|')
+        // `@` interpolates an array when it is followed by a name or a block.
+        case '@' => safe = !next.exists(c => c.isLetterOrDigit || "_{$:^".contains(c))
+        case _   => ()
       i += 1
     safe
 
   /** Returns the PHP program for `php` with the default settings of `pcre.*`, using `preg_match`, or why the pattern
     * cannot be put in the program.
     *
-    * PHP's backtrack limit makes a slow match fail, which is an engine limit. The recursion limit (PCRE2's depth limit)
-    * and the JIT stack limit are on the depth of backtracking, which are engine errors.
+    * The backtrack limit gives an engine limit, and the recursion limit (PCRE2's depth limit) and the JIT stack limit
+    * give engine errors.
     */
   private[recall] def php(
       source: String,

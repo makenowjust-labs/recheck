@@ -37,24 +37,23 @@ object Diagnostics:
       source: String,
       flags: String,
       dialect: Dialect,
-      /** The unit of the attack string. */
       unitMode: UnitMode,
       complexity: AttackComplexity.Vulnerable,
       attack: AttackPattern,
       hotspot: Hotspot,
-      checker: Checker,
-      /** The run of the attack string on the real regex engine, or `None` if it is not run. */
-      recallValidation: Option[RecallValidation] = None
+      recallValidation: Option[RecallValidation],
+      checker: Checker
   ) extends Diagnostics:
     override def toString: String =
-      val recall = recallValidation.map(r => s"\nRecall       : $r").getOrElse("")
-      s"""|Input        : /$source/$flags
-          |Dialect      : ${show(dialect)}
-          |Status       : vulnerable
-          |Complexity   : $complexity
-          |Attack string: ${attack.toString(AttackPatternStyle.of(dialect, unitMode))}
-          |Hotspot      : /${hotspot.highlight(source)}/$flags
-          |Checker      : $checker""".stripMargin + recall
+      val lines = Seq(
+        s"Input        : /$source/$flags",
+        s"Dialect      : ${show(dialect)}",
+        "Status       : vulnerable",
+        s"Complexity   : $complexity",
+        s"Attack string: ${attack.toString(AttackPatternStyle.of(dialect, unitMode))}",
+        s"Hotspot      : /${hotspot.highlight(source)}/$flags"
+      ) ++ recallValidation.map(r => s"Recall       : $r") :+ s"Checker      : $checker"
+      lines.mkString("\n")
 
   /** Unknown is an analysis result against a RegExp in which vulnerability is unknown for some reason. */
   final case class Unknown(

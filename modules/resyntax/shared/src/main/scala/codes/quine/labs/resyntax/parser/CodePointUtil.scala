@@ -34,7 +34,7 @@ object CodePointUtil:
   def isAlphabetic(codePoint: Int): Boolean =
     codePoint >= 'a' && codePoint <= 'z' || codePoint >= 'A' && codePoint <= 'Z'
 
-  // It follows .NET's `RegexCharClass.IsBoundaryWordChar`.
+  /** Checks whether the code point is a word character of .NET's `RegexCharClass.IsBoundaryWordChar`. */
   def isWord(codePoint: Int): Boolean =
     codePoint == '_' || codePoint == 0x200c || codePoint == 0x200d || (Character.getType(codePoint) match
       case Character.UPPERCASE_LETTER | Character.LOWERCASE_LETTER | Character.TITLECASE_LETTER |
@@ -43,11 +43,15 @@ object CodePointUtil:
         true
       case _ => false)
 
-  // It approximates Perl's `isIDFIRST_uni` (`XID_Start` restricted to `\w`) by letters and letter numbers.
+  /** Checks whether the code point is a letter or a letter number, which approximates Perl's `isIDFIRST_uni`
+    * (`XID_Start` restricted to `\w`).
+    */
   def isWordIDStart(codePoint: Int): Boolean =
     Character.isLetter(codePoint) || Character.getType(codePoint) == Character.LETTER_NUMBER
 
-  // It approximates Perl's `isIDCONT_uni` (`XID_Continue` restricted to `\w`) in the same way.
+  /** Checks whether the code point is a character of [[isWordIDStart]], a mark, a decimal digit, a connector
+    * punctuation, ZWNJ or ZWJ, which approximates Perl's `isIDCONT_uni` (`XID_Continue` restricted to `\w`).
+    */
   def isWordIDContinue(codePoint: Int): Boolean =
     isWordIDStart(codePoint) || codePoint == 0x200c || codePoint == 0x200d || (Character.getType(codePoint) match
       case Character.NON_SPACING_MARK | Character.COMBINING_SPACING_MARK | Character.DECIMAL_DIGIT_NUMBER |

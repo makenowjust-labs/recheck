@@ -137,8 +137,6 @@ object Inst:
 
   /** `step_back`: Saves the position to the `end` register, and jumps to a `next` block at each start of a look-behind
     * matched forward, in the order of `starts`, as backtracking points.
-    *
-    * The register holds the end of the look-behind, so memoization tells the look-behinds at different positions apart.
     */
   final case class StepBack(end: CounterReg, starts: IRLookBehindStarts, next: Label) extends Terminator:
     def successors: Set[Label] = Set(next)
@@ -225,8 +223,6 @@ object Inst:
 
   /** `cap_hold`: Holds the captures between `from` and `to` over backtracking, which takes their values now unless it
     * goes back after this.
-    *
-    * Java does not restore the captures in an atomic group or a look-around, once it matches.
     */
   final case class CapHold(from: Int, to: Int) extends NonTerminator:
     override def toString: String = s"cap_hold $from $to"

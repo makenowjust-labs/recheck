@@ -32,7 +32,7 @@ class InterpreterSuite extends munit.FunSuite:
     val t = for
       ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
       program <- ProgramBuilder.build(ir)
-      result = Interpreter.run(program, inputOf(input, program.meta.mode), pos, opts)
+      result = Interpreter.run(program, inputOf(input, ir.mode), pos, opts)
     yield result
     t.get
 
@@ -303,7 +303,7 @@ class InterpreterSuite extends munit.FunSuite:
       val t = for
         ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
         program <- ProgramBuilder.build(ir)
-        result = Interpreter.runWithTimeout(program, inputOf(input, program.meta.mode), pos, opts, timeout)
+        result = Interpreter.runWithTimeout(program, inputOf(input, ir.mode), pos, opts, timeout)
       yield result
       t.get
 

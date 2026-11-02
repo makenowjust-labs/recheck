@@ -15,8 +15,9 @@ enum NameMatching:
 
 object NameMatching:
 
-  /** It must agree with `CharsetPropertyDataGen.loose`, which checks the generated names have no collision. */
+  /** Returns the key of the name for `Loose`. */
   def loose(name: String): String =
+    // It must agree with `CharsetPropertyDataGen.loose`, which checks the generated names have no collision.
     val sb = new StringBuilder
     for c <- name do
       c match

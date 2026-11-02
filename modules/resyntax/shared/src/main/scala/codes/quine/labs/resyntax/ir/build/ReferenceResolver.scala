@@ -83,7 +83,7 @@ private[build] final class ReferenceResolver(table: CaptureTable, dialect: Diale
     if featureSet.rejectsCallToSharedName && indices.size > 1 then fail("Call to a name shared by groups", loc)
     indices
 
-  // Python rejects a reference to a group that is not closed, or that is in the same look-behind.
+  /** Rejects a reference to a group that is not closed, or that is in the same look-behind, as Python does. */
   private def validateClosedGroups(indices: Seq[Int], site: ReferenceSite, loc: SourceLocation): Seq[Int] =
     if indices.exists(site.open.contains) then fail("Reference to an open group", loc)
     if indices.exists(n => site.lookBehindFrom.exists(n >= _)) then

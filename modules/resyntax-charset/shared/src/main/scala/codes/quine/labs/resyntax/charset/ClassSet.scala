@@ -28,7 +28,7 @@ final class ClassSet private (val chars: CharSet, val strings: SortedSet[UString
   infix def diff(that: ClassSet): ClassSet =
     new ClassSet(chars.diff(that.chars), strings.diff(that.strings))
 
-  /** ECMAScript rejects negating a class containing strings. */
+  /** Returns the complement of the class, which has no string. */
   def complement(mode: UnitMode): ClassSet =
     require(!hasStrings, "a class containing strings cannot be complemented")
     new ClassSet(chars.complement(mode), strings)

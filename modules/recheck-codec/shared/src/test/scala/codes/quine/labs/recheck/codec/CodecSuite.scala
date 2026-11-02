@@ -35,8 +35,8 @@ class CodecSuite extends munit.FunSuite:
         "flags" := "",
         "dialect" := Json.obj("name" := "javascript"),
         "status" := "safe",
-        "checker" := Checker.Fuzz.asInstanceOf[Checker],
-        "complexity" := AttackComplexity.Linear.asInstanceOf[AttackComplexity]
+        "complexity" := AttackComplexity.Linear.asInstanceOf[AttackComplexity],
+        "checker" := Checker.Fuzz.asInstanceOf[Checker]
       )
     )
     assertEquals(
@@ -53,6 +53,7 @@ class CodecSuite extends munit.FunSuite:
             17
           ),
           Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat), Hotspot.Spot(3, 4, Hotspot.Heat))),
+          None,
           Checker.Automaton
         )
       ),
@@ -62,7 +63,6 @@ class CodecSuite extends munit.FunSuite:
         "dialect" := Json.obj("name" := "javascript"),
         "unitMode" := "utf16",
         "status" := "vulnerable",
-        "checker" := Checker.Automaton.asInstanceOf[Checker],
         "complexity" := AttackComplexity.Exponential(false).asInstanceOf[AttackComplexity],
         "attack" -> encodeAttackPattern(AttackPatternStyle.JavaScript)(
           AttackPattern(
@@ -72,7 +72,8 @@ class CodecSuite extends munit.FunSuite:
           )
         ),
         "hotspot" := Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat), Hotspot.Spot(3, 4, Hotspot.Heat))),
-        "recallValidation" := Json.Null
+        "recallValidation" := Json.Null,
+        "checker" := Checker.Automaton.asInstanceOf[Checker]
       )
     )
     val recall = RecallValidation("python 3.15.0", Duration(1000, MILLISECONDS), RecallResult.Timeout)
@@ -86,8 +87,8 @@ class CodecSuite extends munit.FunSuite:
           AttackComplexity.Exponential(false),
           AttackPattern(Seq.empty, UString.fromUTF16Units(""), 0),
           Hotspot(Seq.empty),
-          Checker.Automaton,
-          Some(recall)
+          Some(recall),
+          Checker.Automaton
         )
       ).hcursor.downField("recallValidation").focus,
       Some(encodeRecallValidation(recall))
@@ -101,8 +102,8 @@ class CodecSuite extends munit.FunSuite:
         "flags" := "#",
         "dialect" := Json.obj("name" := "javascript"),
         "status" := "unknown",
-        "checker" := None,
-        "error" := ErrorKind.InvalidRegExp("unknown flag").asInstanceOf[ErrorKind]
+        "error" := ErrorKind.InvalidRegExp("unknown flag").asInstanceOf[ErrorKind],
+        "checker" := None
       )
     )
 

@@ -17,7 +17,7 @@ final class Context private (
     private[recheck] val logger: Context.Logger
 ):
 
-  /** */
+  /** Whether this context has a logger. */
   private[recheck] val hasLogger: Boolean = logger ne null
 
   /** Checks whether this context is interrupted or not. */

@@ -124,16 +124,15 @@ private class EpsNFABuilder(
   /** Makes the pattern's states between `start` and the current counter reject an empty match, as PCRE's `(*NOTEMPTY)`
     * and `(*NOTEMPTY_ATSTART)` do, and returns the initial states of the search at the start and after it, and the
     * final state.
-    *
-    * The states are doubled into a copy before consuming a character and one after it (a product with a 2-state DFA),
-    * and only the latter accepts. It keeps the order of the transitions, so the engine backtracks from an empty match
-    * as the ε-NFA does from a dead state. `\K` returns to the first copy for `(*NOTEMPTY)`, which sees the reported
-    * match. For `(*NOTEMPTY_ATSTART)`, the search after the start begins in the second copy.
     */
   private def rejectEmpty(start: Int, i0: Int, a0: Int): (Int, Int, Int) =
     pattern.notEmpty match
       case IRNotEmpty.Never => (i0, i0, a0)
       case notEmpty         =>
+        // The states are doubled into a copy before consuming a character and one after it (a product with a 2-state
+        // DFA), and only the latter accepts.
+        // It keeps the order of the transitions, so the engine backtracks from an empty match as the ε-NFA does from a
+        // dead state.
         val end = counterQ
         val shift = end - start
         counterQ += shift
@@ -147,12 +146,14 @@ private class EpsNFABuilder(
           case LoopExit(loop, q)    => LoopExit(loop, f(q))
 
         for q <- start until end; t <- tau.get(q) do
+          // `\K` returns to the first copy for `(*NOTEMPTY)`, which sees the reported match.
           val reset = notEmpty == IRNotEmpty.Anywhere && resetMatchStarts.contains(q)
           emit(moved(q) -> (if reset then t else retarget(t, moved)))
           t match
             case c: Consume[Int] => emit(q -> retarget(c, moved))
             case _               => ()
         emit(a0 -> Eps(Vector.empty))
+        // For `(*NOTEMPTY_ATSTART)`, the search after the start begins in the second copy.
         (i0, if notEmpty == IRNotEmpty.AtStart then moved(i0) else i0, moved(a0))
 
   private def refine(set: CharSet): Set[(CharSet, CharKind)] =

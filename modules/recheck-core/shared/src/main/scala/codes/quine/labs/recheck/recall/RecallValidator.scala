@@ -17,22 +17,14 @@ import codes.quine.labs.resyntax.charset.UnitMode
 /** RecallValidator is the implementation of recall validation. */
 object RecallValidator:
 
-  /** Exec runs a script on an executor in the environment variables, counting the timeout from the start line. */
-  type Exec = (Executor, String, Option[FiniteDuration], Map[String, String]) => ExecResult
-
-  /** Runs the script on the executor, or `None` if this platform cannot run programs. */
-  def defaultExec(using Context): Option[Exec] =
-    Option.when(Executor.isAvailable)((executor, script, timeout, env) =>
-      executor.exec(script, timeout, Some(RecallProgram.StartLine), env)
-    )
-
   /** Runs the recall validation of the attack string on the runtime of the dialect, where the pattern matches strings
     * of the mode.
     *
-    * It returns `None` without running when the timeout is not positive, or the dialect or the pattern is not
-    * supported. It throws [[UnexpectedException]] when the runtime fails to run the program.
+    * It returns `None` without running when the timeout is not positive, this platform cannot run programs, or the
+    * dialect or the pattern is not supported. It throws [[UnexpectedException]] when the runtime fails to run the
+    * program.
     *
-    * The environment variables `env` may replace the command of the runtime (e.g. `RECHECK_NODE`).
+    * The environment variables of this process may replace the command of the runtime (e.g. `RECHECK_NODE`).
     */
   def validate(
       source: String,
@@ -40,12 +32,9 @@ object RecallValidator:
       dialect: Dialect,
       mode: UnitMode,
       attack: AttackPattern,
-      timeout: Duration,
-      env: Map[String, String] = Map.empty
-  )(
-      exec: Exec
+      timeout: Duration
   )(using ctx: Context): Option[RecallValidation] = ctx.interrupt:
-    if timeout <= Duration.Zero then None
+    if timeout <= Duration.Zero || !Executor.isAvailable then None
     else
       RecallProgram.generate(source, flags, dialect, mode, attack) match
         case Left(_) =>
@@ -53,13 +42,16 @@ object RecallValidator:
           None
         case Right(program) =>
           val executor = program.executor
+          val env = sys.env
           val commandLine = executor.commandLine(env)
           ctx.log(s"recall: command: $commandLine\n${program.script}")
-          val limit = timeout match
-            case d: FiniteDuration if (ctx.deadline eq null) || d <= ctx.deadline.timeLeft => Some(d)
-            case _ => Option(ctx.deadline).map(_.timeLeft)
-          val output = exec(executor, program.script, limit, env)
+          val output = executor.exec(program.script, limit(timeout), Some(RecallProgram.StartLine), env)
           Some(result(executor.runtime(env), commandLine, timeout, output))
+
+  /** Returns the time limit of a matching for the timeout, which is bounded by the deadline of the context. */
+  private[recall] def limit(timeout: Duration)(using ctx: Context): Option[FiniteDuration] = timeout match
+    case d: FiniteDuration if (ctx.deadline eq null) || d <= ctx.deadline.timeLeft => Some(d)
+    case _ => Option(ctx.deadline).map(_.timeLeft)
 
   /** Converts the execution result to the recall validation.
     *

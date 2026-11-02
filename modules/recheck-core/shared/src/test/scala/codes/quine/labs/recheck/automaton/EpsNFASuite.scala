@@ -18,7 +18,7 @@ class EpsNFASuite extends munit.FunSuite:
   /** A default context. */
   given ctx: Context = Context()
 
-  /** JavaScript's `^` and `$` with the `m` flag, and `\b` and `\B`. */
+  // JavaScript's `^` and `$` with the `m` flag, and `\b` and `\B`.
   val lineBegin: AssertKind = AssertKind.LineBegin(0, IRLineBeginAtEnd.AfterTerminator, false, false)
 
   val lineEnd: AssertKind = AssertKind.LineEnd(0, false, false)

@@ -140,6 +140,8 @@ class RecallProgramSuite extends munit.FunSuite:
     def data(source: String, flags: String, attack: AttackPattern): String =
       RecallProgram.data(flags, source, attack)
 
+    val repeat = AttackPattern(Seq((UString.empty, UString.fromString("a"), 0)), UString.fromString("!"), 31)
+    assertEquals(data("^a*$", "i", repeat), "i\n005e0061002a0024\n31:0061\n1:0021\n")
     val astral = AttackPattern(Seq((UString.empty, UString.fromString("😀"), 0)), UString.empty, 2)
     assertEquals(data("😀", "", astral), "-\nd83dde00\n2:d83dde00\n")
     assertEquals(data("", "", AttackPattern(Seq.empty, UString.empty, 0)), "-\n-\n")

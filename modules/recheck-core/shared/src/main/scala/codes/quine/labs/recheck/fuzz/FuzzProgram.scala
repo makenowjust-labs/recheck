@@ -19,8 +19,9 @@ final case class FuzzProgram(
     surrogates: IRSurrogates
 ):
 
-  /** Whether or not it uses acceleration of VM execution, which the verbs skipping backtracking points prevent. */
+  /** Whether or not it uses acceleration of VM execution. */
   def usesAcceleration(mode: AccelerationMode): Boolean = mode match
+    // The verbs skipping backtracking points prevent acceleration.
     case AccelerationMode.Auto => !program.meta.hasRef && !program.meta.hasVerb
     case AccelerationMode.On   => !program.meta.hasVerb
     case AccelerationMode.Off  => false

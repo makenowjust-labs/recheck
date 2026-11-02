@@ -202,16 +202,6 @@ final case class IRPattern(
       case IRAssertKind.TextEnd | _: IRAssertKind.ChompTextEnd => true
       case _                                                   => false
 
-  /** Checks whether the pattern has a word boundary assertion, which tells word characters. */
-  def needsWordDistinction: Boolean =
-    node.exists:
-      case Assert(
-            _: IRAssertKind.WordBoundary | _: IRAssertKind.NotWordBoundary | _: IRAssertKind.MarkWordBoundary |
-            _: IRAssertKind.NotMarkWordBoundary
-          ) =>
-        true
-      case _ => false
-
   /** Returns the parts of the pattern, which are the strings of two or more literal characters in a row.
     *
     * A literal character is a set of one character or of the case variants of one character, and stands for its first

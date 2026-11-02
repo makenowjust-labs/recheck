@@ -1,19 +1,20 @@
 import scala.collection.mutable
 
-/** CharsetEncoder encodes integer sequences into string literals for `resyntax-charset`.
-  *
-  * The decoder is `codes.quine.labs.resyntax.charset.Codec`; both must agree on the symbols and the digit counts.
+/** CharsetEncoder encodes integer sequences into string literals for `resyntax-charset`, which
+  * `codes.quine.labs.resyntax.charset.Codec` decodes.
   */
 object CharsetEncoder {
 
-  /** Symbols of the encoding: printable ASCII except `"` and `\`, so a literal needs no escape and costs one byte. */
+  // The symbols and the digit counts must agree with `Codec`.
+
+  /** Symbols of the encoding: printable ASCII except `"` and `\`. */
   val Symbols: IndexedSeq[Char] = (0x20 to 0x7e).map(_.toChar).filter(c => c != '"' && c != '\\')
 
   val TerminalCount: Int = 47
 
   val ContinuationCount: Int = Symbols.size - TerminalCount
 
-  /** The maximum length of a single string literal; a JVM string constant must be under 65535 bytes in UTF-8. */
+  /** The maximum length of a single string literal. */
   val MaxLiteralLength: Int = 60000
 
   /** Encodes non-negative integers as little-endian variable-length digits. */
@@ -66,6 +67,7 @@ object CharsetEncoder {
   /** Quotes a string as a Scala expression, splitting it into several literals if it is too long. */
   def literal(s: String): String = {
     require(!s.exists(c => c == '"' || c == '\\' || c < 0x20 || c > 0x7e), s"unquotable string: $s")
+    // A JVM string constant must be under 65535 bytes in UTF-8.
     if (s.length <= MaxLiteralLength) "\"" + s + "\""
     else s.grouped(MaxLiteralLength).map("\"" + _ + "\"").mkString("Seq(", ", ", ").mkString")
   }

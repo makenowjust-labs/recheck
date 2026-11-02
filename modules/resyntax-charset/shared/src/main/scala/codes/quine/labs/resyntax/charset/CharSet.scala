@@ -45,12 +45,10 @@ final class CharSet private (private val bounds: Array[UChar]):
     if isEmpty then throw new NoSuchElementException("CharSet.empty.last")
     bounds(bounds.length - 1) - 1
 
-  /** Returns the smallest member that is not a surrogate, or the smallest one if all are surrogates.
-    *
-    * A surrogate is not a character of some inputs, and may join its neighbor in others.
-    */
+  /** Returns the smallest member that is not a surrogate, or the smallest one if all are surrogates. */
   def representative: UChar =
     if isEmpty then throw new NoSuchElementException("CharSet.empty.representative")
+    // A surrogate is not a character of some inputs, and may join its neighbor in others.
     var i = 0
     while i < bounds.length do
       if bounds(i) < 0xd800 || 0xdfff < bounds(i) then return bounds(i)

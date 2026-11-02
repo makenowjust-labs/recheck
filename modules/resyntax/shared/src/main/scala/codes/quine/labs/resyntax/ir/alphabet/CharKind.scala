@@ -24,9 +24,6 @@ final case class CharKind(
     boundary: Boolean = false
 ):
 
-  /** Checks whether it is a character of the first word set. */
-  def word: Boolean = isWordOf(0)
-
   /** Checks whether it is a character of the `i`-th word set. */
   def isWordOf(i: Int): Boolean = (words & (1 << i)) != 0
 
@@ -41,9 +38,6 @@ final case class CharKind(
 
   /** Checks whether it is an extender of the `i`-th word marks. */
   def isExtenderOf(i: Int): Boolean = (extenders & (1 << i)) != 0
-
-  /** Checks whether it is a base of the `i`-th word marks. */
-  def isBaseOf(i: Int): Boolean = (bases & (1 << i)) != 0
 
 object CharKind:
 

@@ -108,12 +108,7 @@ object Interpreter:
   /** FailedPoint is a failed point on matching. */
   final case class FailedPoint(target: CoverageLocation, pos: Int, kind: ReadKind, capture: Option[UString])
 
-  /** MatchState is a state of matching, which the memoization table looks up on each junction block.
-    *
-    * It lays out as integers the block ID, the position, the counters, the captures with the largest closed index if
-    * the program reads the captures, and whether each canary register holds the position, which make hashing and
-    * comparing it cheap.
-    */
+  /** MatchState is a state of matching, which the memoization table looks up on each junction block. */
   private[vm] final class MatchState(private val values: Array[Int]):
 
     override val hashCode: Int = java.util.Arrays.hashCode(values)
@@ -201,6 +196,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
     /** Converts this frame into a corresponding state. */
     def toState: MatchState =
+      // It lays out as integers the block ID, the position, the counters, the captures with the largest closed index if
+      // the program reads the captures, and whether each canary register holds the position, which make hashing and
+      // comparing it cheap.
       val capturesSize = if program.meta.hasRef then captures.size + 1 else 0
       val values = new Array[Int](2 + counters.size + capturesSize + canaries.size)
       var size = 0
@@ -278,11 +276,11 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     clock += 1
     clock
 
-  /** Whether it memoizes the failed states, which the verbs skipping backtracking points prevent.
-    *
-    * So do non-atomic look-arounds, since the matching after one depends on its start, which a state does not have.
-    */
-  private val memoizes: Boolean = options.usesAcceleration && !program.meta.hasVerb && !program.meta.hasLeave
+  /** Whether it memoizes the failed states. */
+  private val memoizes: Boolean =
+    // The verbs skipping backtracking points prevent it.
+    // So do non-atomic look-arounds, since the matching after one depends on its start, which a state does not have.
+    options.usesAcceleration && !program.meta.hasVerb && !program.meta.hasLeave
 
   /** Constructs a result of matching. */
   private[vm] def result(status: Status, captures: Option[Seq[Int]]): Result =
@@ -503,11 +501,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     for (index, (begin, end, time)) <- held.iterator if time > frame.time do
       frame.captures = frame.captures.updated(index * 2, begin).updated(index * 2 + 1, end)
 
-  /** Drops the junctions reached in a transaction that ends, keeping the `size` ones before it.
-    *
-    * The transaction drops the backtracking points in it, so a failure after it does not tell that they fail.
-    */
+  /** Drops the junctions reached in a transaction that ends, keeping the `size` ones before it. */
   private def dropJunctions(frame: Frame, size: Int): Unit =
+    // The transaction drops the backtracking points in it, so a failure after it does not tell that they fail.
     if frame.junctions.size > size then frame.junctions = frame.junctions.takeRight(size)
 
   /** Returns the frame that backtracking resumes from the fallback, where the frames of the verbs act. */

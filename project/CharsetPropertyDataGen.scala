@@ -47,8 +47,9 @@ object CharsetPropertyDataGen extends UnicodeDataGen {
   private def valueNames(prop: Int, value: Int): Seq[String] =
     nameField(UCharacter.getPropertyValueName(prop, value, _))
 
-  /** The loose matching key of UAX44-LM3; it must agree with `NameMatching.Loose`. */
+  /** The loose matching key of UAX44-LM3. */
   def loose(name: String): String = {
+    // It must agree with `NameMatching.Loose`.
     val key = name
       .filterNot(c => " \t\n\r\f\u000b_-".contains(c))
       .map(c => if ('A' <= c && c <= 'Z') (c + 0x20).toChar else c)

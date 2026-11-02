@@ -48,16 +48,16 @@ class AgentCommandSuite extends munit.FunSuite:
       out.result().sorted, // Result ordering depends on scheduling.
       Seq(
         """{"jsonrpc":"2.0+push","id":0,"result":{}}""",
-        """{"jsonrpc":"2.0+push","id":1,"result":{"source":"a","flags":"","dialect":{"name":"javascript"},"status":"safe","checker":"automaton","complexity":{"type":"safe","summary":"safe","isFuzz":false}}}""",
-        """{"jsonrpc":"2.0+push","id":2,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"status":"unknown","checker":null,"error":{"kind":"cancel"}}}""",
-        """{"jsonrpc":"2.0+push","id":3,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"status":"unknown","checker":null,"error":{"kind":"cancel"}}}""",
-        """{"jsonrpc":"2.0+push","id":3,"result":{"source":"a","flags":"","dialect":{"name":"javascript"},"status":"safe","checker":"automaton","complexity":{"type":"safe","summary":"safe","isFuzz":false}}}""",
+        """{"jsonrpc":"2.0+push","id":1,"result":{"source":"a","flags":"","dialect":{"name":"javascript"},"status":"safe","complexity":{"type":"safe","summary":"safe","isFuzz":false},"checker":"automaton"}}""",
+        """{"jsonrpc":"2.0+push","id":2,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"status":"unknown","error":{"kind":"cancel"},"checker":null}}""",
+        """{"jsonrpc":"2.0+push","id":3,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"status":"unknown","error":{"kind":"cancel"},"checker":null}}""",
+        """{"jsonrpc":"2.0+push","id":3,"result":{"source":"a","flags":"","dialect":{"name":"javascript"},"status":"safe","complexity":{"type":"safe","summary":"safe","isFuzz":false},"checker":"automaton"}}""",
         """{"jsonrpc":"2.0+push","id":4,"message":"automaton: constant pattern"}""",
         """{"jsonrpc":"2.0+push","id":4,"message":"parse: finish\n  pattern: /a/"}""",
         """{"jsonrpc":"2.0+push","id":4,"message":"parse: start"}""",
-        """{"jsonrpc":"2.0+push","id":4,"result":{"source":"a","flags":"","dialect":{"name":"javascript"},"status":"safe","checker":"automaton","complexity":{"type":"safe","summary":"safe","isFuzz":false}}}""",
-        """{"jsonrpc":"2.0+push","id":5,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"status":"unknown","checker":null,"error":{"kind":"cancel"}}}""",
-        """{"jsonrpc":"2.0+push","id":6,"result":[{"source":"a","flags":"","dialect":{"name":"javascript"},"status":"safe","checker":"automaton","complexity":{"type":"safe","summary":"safe","isFuzz":false}}]}""",
-        """{"jsonrpc":"2.0+push","id":7,"result":[{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"status":"unknown","checker":null,"error":{"kind":"cancel"}}]}"""
+        """{"jsonrpc":"2.0+push","id":4,"result":{"source":"a","flags":"","dialect":{"name":"javascript"},"status":"safe","complexity":{"type":"safe","summary":"safe","isFuzz":false},"checker":"automaton"}}""",
+        """{"jsonrpc":"2.0+push","id":5,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"status":"unknown","error":{"kind":"cancel"},"checker":null}}""",
+        """{"jsonrpc":"2.0+push","id":6,"result":[{"source":"a","flags":"","dialect":{"name":"javascript"},"status":"safe","complexity":{"type":"safe","summary":"safe","isFuzz":false},"checker":"automaton"}]}""",
+        """{"jsonrpc":"2.0+push","id":7,"result":[{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"status":"unknown","error":{"kind":"cancel"},"checker":null}]}"""
       )
     )
