@@ -1,7 +1,5 @@
-# The single source of recheck's parameters.
-#
-# It is a JSON Schema written in YAML.
-# The builds generate the Scala, JavaScript and TypeScript code of the parameters from it.
+# This file is the JSON Schema of recheck's parameters, but it is written in YAML for readability.
+# This file is used to generate the Scala, JavaScript and TypeScript code of the parameters.
 #
 # Annotations:
 #

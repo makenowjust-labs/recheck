@@ -1,9 +1,12 @@
 // @ts-check
 
 import { execSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { join } from "node:path";
 
 import { themes } from "prism-react-renderer";
+import { schema } from "recheck-parameters";
 import katex from "rehype-katex";
 import math from "remark-math";
 
@@ -12,6 +15,15 @@ const { github: lightCodeTheme, dracula: darkCodeTheme } = themes;
 const katexCss = createRequire(
   createRequire(import.meta.url).resolve("rehype-katex"),
 ).resolve("katex/dist/katex.min.css");
+
+/** Publishes the schema of the parameters at its `$id`. */
+const parametersSchema = () => ({
+  name: "parameters-schema",
+  async postBuild({ outDir }) {
+    const name = new URL(schema.$id).pathname.split("/").pop();
+    writeFileSync(join(outDir, name), JSON.stringify(schema, null, 2) + "\n");
+  },
+});
 
 /** Release tags the Playground offers as selectable versions. */
 const releaseTags = () => {
@@ -69,7 +81,7 @@ const config = {
     ],
   ],
 
-  plugins: ["@docusaurus/plugin-ideal-image"],
+  plugins: ["@docusaurus/plugin-ideal-image", parametersSchema],
 
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
