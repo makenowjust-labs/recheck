@@ -13,6 +13,7 @@ import codes.quine.labs.recheck.exec.SourceFile
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
+import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
@@ -325,7 +326,7 @@ object RecallProgram:
     * hexadecimal digits of the UTF-16 code units, four for each.
     */
   private[recall] def data(flags: String, source: String, attack: AttackPattern): String =
-    def units(cs: Iterator[Int]): String =
+    def units(cs: Iterator[UChar]): String =
       cs.flatMap(c => if c > 0xffff then UString(c).encode(UnitMode.UTF16).iterator else Iterator(c))
         .map(hex(_, 4))
         .mkString
@@ -474,7 +475,7 @@ object RecallProgram:
     if bytes then UString.from(UString.fromString(source).encode(UnitMode.Byte)) else UStringUtil.fromString(source)
 
   /** Returns the byte of a Latin-1 character, or the UTF-8 bytes of another character. */
-  private def utf8OrLatin1(c: Int): Iterator[Int] =
+  private def utf8OrLatin1(c: UChar): Iterator[UChar] =
     if c <= 0xff then Iterator(c) else UString(c).encode(UnitMode.Byte).iterator
 
   private def hex(c: Int, width: Int): String =

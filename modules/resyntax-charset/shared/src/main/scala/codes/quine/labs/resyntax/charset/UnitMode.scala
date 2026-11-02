@@ -12,8 +12,8 @@ enum UnitMode(val limit: Int):
 
   case Byte extends UnitMode(0x100)
 
-  def max: Int = limit - 1
+  def max: UChar = limit - 1
 
-  def contains(value: Int): Boolean = 0 <= value && value < limit
+  def contains(value: UChar): Boolean = 0 <= value && value < limit
 
   lazy val universe: CharSet = CharSet.range(0, max)

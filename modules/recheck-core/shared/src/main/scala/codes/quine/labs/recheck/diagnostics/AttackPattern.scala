@@ -8,6 +8,7 @@ import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.Properties
+import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
@@ -128,7 +129,7 @@ object AttackPattern:
 
     def join: String = " + "
 
-    private def char(c: Int): String = c match
+    private def char(c: UChar): String = c match
       case '\\' | '\''               => s"\\${c.toChar}"
       case Named(e)                  => e
       case c if isASCIIPrintable(c)  => c.toChar.toString
@@ -151,7 +152,7 @@ object AttackPattern:
 
     def join: String = " + "
 
-    private def char(c: Int): String = c match
+    private def char(c: UChar): String = c match
       case '\\' | '"'               => s"\\${c.toChar}"
       case Named(e)                 => e
       case c if isASCIIPrintable(c) => c.toChar.toString
@@ -170,7 +171,7 @@ object AttackPattern:
     def join: String = " + "
 
     // Java translates `\uXXXX` before reading a literal, so a line terminator, `"` and `\` need the other escapes.
-    private def char(c: Int): String = c match
+    private def char(c: UChar): String = c match
       case '\\' | '"'               => s"\\${c.toChar}"
       case Named(e)                 => e
       case c if isASCIIPrintable(c) => c.toChar.toString
@@ -188,7 +189,7 @@ object AttackPattern:
 
     def join: String = " + "
 
-    private def char(c: Int): String = c match
+    private def char(c: UChar): String = c match
       case '\\'                     => "\\\\"
       case '"'                      => "\\\""
       case Named(e)                 => e
@@ -207,7 +208,7 @@ object AttackPattern:
 
     def join: String = " . "
 
-    private def char(c: Int): String = c match
+    private def char(c: UChar): String = c match
       case '\\' | '"' | '$' | '@'   => s"\\${c.toChar}"
       case Named(e)                 => e
       case c if isASCIIPrintable(c) => c.toChar.toString
@@ -230,7 +231,7 @@ object AttackPattern:
 
     def join: String = " . "
 
-    private def char(c: Int): String = c match
+    private def char(c: UChar): String = c match
       case '\\' | '"' | '$'         => s"\\${c.toChar}"
       case Named(e)                 => e
       case c if isASCIIPrintable(c) => c.toChar.toString
@@ -240,7 +241,7 @@ object AttackPattern:
 
   /** The escapes common to the languages except JavaScript. */
   private object Named:
-    def unapply(c: Int): Option[String] = c match
+    def unapply(c: UChar): Option[String] = c match
       case '\t' => Some("\\t")
       case '\n' => Some("\\n")
       case '\r' => Some("\\r")
@@ -250,13 +251,13 @@ object AttackPattern:
   private lazy val Shown: CharSet =
     CharSet.union(Seq("L", "N", "P", "S").map(Properties.GeneralCategory.value(_).get.set))
 
-  private def isASCIIPrintable(c: Int): Boolean = 0x20 <= c && c <= 0x7e
+  private def isASCIIPrintable(c: UChar): Boolean = 0x20 <= c && c <= 0x7e
 
-  private def isShown(c: Int): Boolean = Shown.contains(c)
+  private def isShown(c: UChar): Boolean = Shown.contains(c)
 
-  private def isSurrogate(c: Int): Boolean = 0xd800 <= c && c <= 0xdfff
+  private def isSurrogate(c: UChar): Boolean = 0xd800 <= c && c <= 0xdfff
 
-  private def codePoint(c: Int): String = String.valueOf(Character.toChars(c))
+  private def codePoint(c: UChar): String = String.valueOf(Character.toChars(c))
 
   /** Returns the `\uXXXX` escapes of the UTF-16 code units of the code point. */
-  private def utf16(c: Int): String = UString(c).encode(UnitMode.UTF16).map(u => f"\\u$u%04X").mkString
+  private def utf16(c: UChar): String = UString(c).encode(UnitMode.UTF16).map(u => f"\\u$u%04X").mkString

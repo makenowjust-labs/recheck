@@ -5,6 +5,7 @@ import scala.annotation.tailrec
 import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
+import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRNodeData.*
@@ -212,11 +213,11 @@ final case class IRPattern(
     * character. A part is UTF-16 code units in the code point mode.
     */
   def parts: Set[UString] =
-    def toUString(values: Seq[Int]): UString =
+    def toUString(values: Seq[UChar]): UString =
       if mode == UnitMode.CodePoint then UString.from(UString.from(values).encode(UnitMode.UTF16))
       else UString.from(values)
 
-    def literal(node: IRNode): Option[Int] = node.data match
+    def literal(node: IRNode): Option[UChar] = node.data match
       case Chars(set) if IRPattern.isOneCharUpToCase(set) =>
         Some(set.head)
       case _ => None
@@ -355,5 +356,5 @@ object IRBackReferenceFolding:
   final case class Full(below: Int) extends IRBackReferenceFolding:
 
     /** Returns the folding of a character to several characters, if any. */
-    def fold(c: Int): Option[UString] =
+    def fold(c: UChar): Option[UString] =
       Some(FullCaseFolding(c)).filter(key => key.length >= 2 && key.iterator.forall(_ >= below))

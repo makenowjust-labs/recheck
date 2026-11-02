@@ -23,6 +23,7 @@ import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
 import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
@@ -166,10 +167,10 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     var time: Long = 0
 
     /** Gets a previous character. */
-    def previousChar: Option[Int] = input.getBefore(pos, program.meta.unicode)
+    def previousChar: Option[UChar] = input.getBefore(pos, program.meta.unicode)
 
     /** Gets a current character. */
-    def currentChar: Option[Int] = input.getAt(pos, program.meta.unicode)
+    def currentChar: Option[UChar] = input.getAt(pos, program.meta.unicode)
 
     /** Captures a beginning position of the index. */
     def capBegin(index: Int): Unit =
@@ -737,7 +738,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       full: IRBackReferenceFolding.Full
   ): (Int, Option[Int]) =
     val unicode = program.meta.unicode
-    def folded(c: Int): Seq[Int] = full.fold(c).map(_.iterator.toSeq).getOrElse(Seq(c))
+    def folded(c: UChar): Seq[UChar] = full.fold(c).map(_.iterator.toSeq).getOrElse(Seq(c))
 
     val target =
       val units = s.chars(unicode).flatMap(folded).toSeq
@@ -830,7 +831,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         false
 
   /** Checks to match `read` instruction. */
-  private def read(c: Option[Int], kind: ReadKind): Boolean =
+  private def read(c: Option[UChar], kind: ReadKind): Boolean =
     c match
       case Some(c) =>
         kind match

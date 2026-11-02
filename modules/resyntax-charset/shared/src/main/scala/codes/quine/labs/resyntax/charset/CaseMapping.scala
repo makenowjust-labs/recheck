@@ -16,7 +16,7 @@ final class CaseMapping private (
 
   private def lastOf(i: Int): Int = starts(i) + (counts(i) - 1) * strides(i)
 
-  def apply(c: Int): Int =
+  def apply(c: UChar): UChar =
     val i = CharSet.countLessOrEqual(starts, c) - 1
     if i < 0 then c
     else
@@ -26,7 +26,7 @@ final class CaseMapping private (
   def apply(s: UString): UString = s.map(apply)
 
   /** Iterates the code values changed by this mapping with their images, in ascending order. */
-  def entries: Iterator[(Int, Int)] =
+  def entries: Iterator[(UChar, UChar)] =
     Iterator
       .range(0, starts.length)
       .flatMap(i => Iterator.range(0, counts(i)).map(k => starts(i) + k * strides(i)).map(c => (c, c + deltas(i))))
@@ -65,9 +65,9 @@ final class CaseMapping private (
 
   def closure(set: CharSet): CharSet = preimage(image(set))
 
-  def equivalents(c: Int): CharSet = closure(CharSet.single(c))
+  def equivalents(c: UChar): CharSet = closure(CharSet.single(c))
 
-  def updated(overrides: IterableOnce[(Int, Int)]): CaseMapping =
+  def updated(overrides: IterableOnce[(UChar, UChar)]): CaseMapping =
     val map = mutable.SortedMap.from(entries)
     for (c, to) <- overrides.iterator do if c == to then map.remove(c) else map(c) = to
     CaseMapping.fromEntries(map)
@@ -78,7 +78,7 @@ final class CaseMapping private (
 object CaseMapping:
 
   /** Builds a mapping from pairs `(c, f(c))`; unlisted code values are mapped to themselves. */
-  def fromEntries(entries: IterableOnce[(Int, Int)]): CaseMapping =
+  def fromEntries(entries: IterableOnce[(UChar, UChar)]): CaseMapping =
     val starts = mutable.ArrayBuilder.make[Int]
     val counts = mutable.ArrayBuffer.empty[Int]
     val strides = mutable.ArrayBuffer.empty[Int]

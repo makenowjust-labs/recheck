@@ -5,6 +5,7 @@ import scala.compiletime.uninitialized
 import codes.quine.labs.recheck.util.ECMAScriptNotation
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
@@ -332,7 +333,7 @@ object Inst:
       override def toString: String = "any"
 
     /** An usual character matching. */
-    final case class Char(c: Int) extends ReadKind:
+    final case class Char(c: UChar) extends ReadKind:
       override def toString: String = s"char '${ECMAScriptNotation.showChar(c)}'"
 
     /** A character class matching. */
