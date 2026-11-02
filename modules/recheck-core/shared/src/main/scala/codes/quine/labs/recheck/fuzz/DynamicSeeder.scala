@@ -47,7 +47,7 @@ object DynamicSeeder:
     interrupt:
       queue.enqueue((UString.empty, None))
       for (ch, _) <- fuzz.alphabet.pairs do
-        val s = UString(ch.head)
+        val s = UString(ch.representative)
         queue.enqueue((s, None))
         added.add(s)
 
@@ -71,7 +71,7 @@ object DynamicSeeder:
               for failedPoint <- result.failedPoints do
                 if !covered.contains(CoverageItem(failedPoint.target, true)) then
                   for
-                    patched <- Patch.build(failedPoint, fuzz.alphabet).apply(input);
+                    patched <- Patch.build(failedPoint, fuzz.alphabet).apply(input).map(fuzz.joinSurrogates);
                     if !added.contains(patched)
                   do
                     queue.enqueue((patched, Some(failedPoint.target)))
@@ -89,7 +89,7 @@ object DynamicSeeder:
     final case class InsertChar(pos: Int, chs: Set[CharSet]) extends Patch:
       def apply(s: UString): Seq[UString] =
         chs.toSeq.flatMap: cs =>
-          val c = UString(cs.head)
+          val c = UString(cs.representative)
           Seq(s.insert(pos, c), s.slice(0, pos) ++ c ++ s.slice(pos + 1, s.length))
 
     /** InsertString is a patch to insert a string at the `pos`. */

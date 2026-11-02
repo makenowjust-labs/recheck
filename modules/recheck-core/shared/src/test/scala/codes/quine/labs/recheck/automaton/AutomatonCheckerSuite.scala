@@ -44,10 +44,8 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     val a = CharSet.single('a')
     val at = CharSet.single('@')
     val other1 = a.complement(UnitMode.UTF16)
-    val other2 = CharSet
-      .fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))
-      .union(at)
-      .complement(UnitMode.UTF16)
+    val word = CharSet.fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))
+    val other2 = word.union(at).complement(UnitMode.UTF16)
     assertEquals(
       check("^.*a.*a$", "s"),
       Success(
@@ -59,7 +57,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Polynomial(
           2,
-          Witness(Seq((Seq.empty, Seq(a, a))), Seq(a, a, a)),
+          Witness(Seq((Seq(a), Seq(a, a))), Seq(a, a)),
           Hotspot(Seq(Spot(2, 4, Heat), Spot(6, 7, Heat), Spot(8, 10, Heat)))
         )
       )
@@ -79,7 +77,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Polynomial(
           2,
-          Witness(Seq((Seq(at), Seq(a, a, other2))), Seq.empty),
+          Witness(Seq((Seq(word.diff(a)), Seq(a, a, other2, a))), Seq.empty),
           Hotspot(Seq(Spot(2, 3, Heat), Spot(6, 8, Heat), Spot(10, 14, Heat)))
         )
       )
@@ -113,7 +111,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       check("^(aa|b|aab)*$", ""),
       Success(
         Exponential(
-          Witness(Seq((Seq(a, a), Seq(b, a, a, b, a, a))), Seq(other2)),
+          Witness(Seq((Seq(a), Seq(a, a, a, b, a))), Seq(other2)),
           Hotspot(Seq(Spot(2, 4, Heat), Spot(5, 6, Heat), Spot(7, 10, Heat)))
         )
       )

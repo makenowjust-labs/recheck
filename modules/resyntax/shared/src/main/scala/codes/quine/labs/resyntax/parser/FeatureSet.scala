@@ -94,7 +94,7 @@ final case class FeatureSet(
     allowsOctalAbove0377: Boolean,
     // Perl
     allowsReversedBoundedRepeat: Boolean,
-    // .NET, Java, JavaScript, PCRE, Perl, Python
+    // .NET, Java, JavaScript, Perl, Python
     allowsSurrogateEscape: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
     allowsSymbolUnknownBackslash: Boolean,
@@ -485,7 +485,7 @@ object FeatureSet:
       allowsNonOctalDigitBackslash = (isJavaScript && !isUnicode) || isPCRE || isPerl || isRuby,
       allowsOctalAbove0377 = isDotNet || (isPCRE && isUnicode) || isPerl,
       allowsReversedBoundedRepeat = isPerl,
-      allowsSurrogateEscape = isDotNet || isJava || isJavaScript || isPCRE || isPerl || isPython,
+      allowsSurrogateEscape = isDotNet || isJava || isJavaScript || isPerl || isPython,
       allowsSymbolUnknownBackslash =
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
       allowsUnpairedQuoteEnd = isPCRE,

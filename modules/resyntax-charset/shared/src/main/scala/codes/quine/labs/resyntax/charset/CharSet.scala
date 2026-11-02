@@ -45,6 +45,19 @@ final class CharSet private (private val bounds: Array[UChar]):
     if isEmpty then throw new NoSuchElementException("CharSet.empty.last")
     bounds(bounds.length - 1) - 1
 
+  /** Returns the smallest member that is not a surrogate, or the smallest one if all are surrogates.
+    *
+    * A surrogate is not a character of some inputs, and may join its neighbor in others.
+    */
+  def representative: UChar =
+    if isEmpty then throw new NoSuchElementException("CharSet.empty.representative")
+    var i = 0
+    while i < bounds.length do
+      if bounds(i) < 0xd800 || 0xdfff < bounds(i) then return bounds(i)
+      if bounds(i + 1) > 0xe000 then return 0xe000
+      i += 2
+    bounds(0)
+
   def contains(value: UChar): Boolean = (countLessOrEqual(bounds, value) & 1) == 1
 
   /** Checks whether this set contains a code value in `[first, last]`. */
@@ -65,7 +78,9 @@ final class CharSet private (private val bounds: Array[UChar]):
     if isEmpty || that.isEmpty then this
     else combine(bounds, that.bounds, DiffTable)
 
-  def complement(mode: UnitMode): CharSet = mode.universe.diff(this)
+  def complement(mode: UnitMode): CharSet = complement(mode.universe)
+
+  def complement(universe: CharSet): CharSet = universe.diff(this)
 
   def restrict(mode: UnitMode): CharSet =
     if isEmpty || bounds(bounds.length - 1) <= mode.limit then this

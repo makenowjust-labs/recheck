@@ -231,6 +231,10 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   error("\\x{4G}", "", Java, PCRE)("Invalid backslash escape at 4")
   error("\\x{100}", "", PCRE)("Code point too large at 3")
   check("\\x{10FFFF}", "u", PCRE)(Backslash(Escape(HexBracket, 0x10ffff)))
+  // PCRE2 10.49 disallows a surrogate in UTF mode.
+  error("\\x{D800}", "u", PCRE)("Invalid Unicode escape at 3")
+  error("\\o{154000}", "u", PCRE)("Invalid Unicode escape at 3")
+  error("\\N{U+DFFF}", "u", PCRE)("Invalid Unicode escape at 5")
   error("\\x{110000}", "", Java)("Code point too large at 3")
   check("\\x{110000}", "", Perl())(Backslash(Escape(HexBracket, 0x110000)))
   check("\\o{8}", "", Perl())(Backslash(Escape(Octal, 0x00)))

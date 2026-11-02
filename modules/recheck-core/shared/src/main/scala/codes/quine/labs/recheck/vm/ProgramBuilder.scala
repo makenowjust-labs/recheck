@@ -59,6 +59,8 @@ private[vm] class ProgramBuilder(
 
   private val mode = pattern.mode
 
+  private val universe = pattern.universe
+
   /** Whether captures in a repetition are reset on each iteration. */
   private val resetsCaptures = pattern.captures.resetsEachIteration
 
@@ -344,8 +346,8 @@ private[vm] class ProgramBuilder(
 
   /** Returns the read kind of a set of a character node. */
   def readKind(set: CharSet): ReadKind =
-    if set == mode.universe then ReadKind.Any
-    else if PatternAlphabet.prefersComplement(set, mode) then ReadKind.ClassNot(set.complement(mode))
+    if set == universe then ReadKind.Any
+    else if PatternAlphabet.prefersComplement(set, universe) then ReadKind.ClassNot(set.complement(universe))
     else charsKind(set)
 
   def charsKind(set: CharSet): ReadKind =

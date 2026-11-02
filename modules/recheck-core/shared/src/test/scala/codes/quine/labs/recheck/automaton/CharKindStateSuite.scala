@@ -26,6 +26,13 @@ class CharKindStateSuite extends munit.FunSuite:
     assertEquals(begin.advance(extender, false, false, false), Seq(CharKindState(extender)))
     assertEquals(based.advance(CharKind.Word, false, false, false), Seq(CharKindState(CharKind.Word)))
 
+  test("CharKindState#advance: surrogates"):
+    val (high, low) = (CharKind(high = true), CharKind(low = true))
+    assertEquals(CharKindState(high).advance(low, false, false, false), Seq.empty)
+    assertEquals(CharKindState(low).advance(high, false, false, false), Seq(CharKindState(high)))
+    assertEquals(CharKindState(high).advance(high, false, false, false), Seq(CharKindState(high)))
+    assertEquals(CharKindState(CharKind.Normal).advance(low, false, false, false), Seq(CharKindState(low)))
+
   test("CharKindState#advance: the guesses ahead"):
     val begin = CharKindState(CharKind.Boundary)
     assertEquals(begin.advance(CharKind.Normal, true, true, true), Seq(CharKindState(CharKind.Normal)))

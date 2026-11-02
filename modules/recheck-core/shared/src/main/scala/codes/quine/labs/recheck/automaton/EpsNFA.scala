@@ -52,6 +52,17 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
 
     sb.result()
 
+  /** Restricts the input of the NFA renamed from [[toOrderedNFA]] to the strings where no low surrogate follows a high
+    * surrogate, if the kinds tell them (see [[CharKind.high]]).
+    */
+  def restrictInputs(nfa: OrderedNFA[CharSet, Int]): OrderedNFA[CharSet, Int] =
+    val highs = alphabet.pairs.collect { case (c, k) if k.high => c }.toSet
+    val lows = alphabet.pairs.collect { case (c, k) if k.low => c }.toSet
+    if highs.isEmpty || lows.isEmpty then nfa
+    else
+      val free = nfa.stateSet.maxOption.getOrElse(-1) + 1
+      nfa.restrictInputs(highs, lows, free, free + 1)
+
   /** Converts this ε-NFA to ordered NFA with ε-elimination. */
   def toOrderedNFA(using ctx: Context): OrderedNFA[CharSet, (CharKindState, Seq[(Q, Set[CharKindState])])] =
     toOrderedNFA(Int.MaxValue)

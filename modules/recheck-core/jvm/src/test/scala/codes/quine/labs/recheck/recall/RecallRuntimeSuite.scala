@@ -263,6 +263,33 @@ class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
         assertEquals(d.recallValidation.map(_.result), Some(RecallResult.EngineLimit("Backtrack limit exhausted")))
       case ds => fail(s"unexpected: $ds")
 
+  /** `"\uD800\uDC00".repeat(n) + "!"` of a high surrogate and a low surrogate. */
+  def surrogatePairs(n: Int): AttackPattern =
+    AttackPattern(Seq((UString.empty, UString(0xd800, 0xdc00), 0)), UString('!'), n)
+
+  val surrogates: String = "^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF]|[\\uDC00-\\uDFFF])*$"
+
+  runtimeTest("Surrogates: JavaScript", "node"):
+    // A high surrogate followed by a low surrogate is one character with `u`, which the alternatives cannot match.
+    assertFinish(validate(surrogates, "u", Dialect.JavaScript, surrogatePairs(31)))
+    assertEquals(validate(surrogates, "", Dialect.JavaScript, surrogatePairs(31)).result, RecallResult.Timeout)
+    assertEquals(ReDoS.check(surrogates, "u", params).getClass, classOf[Diagnostics.Safe])
+
+  runtimeTest("Surrogates: Python", "python3"):
+    assertEquals(validate(surrogates, "", Dialect.Python(), surrogatePairs(31)).result, RecallResult.Timeout)
+    ReDoS.check(surrogates, "", params.copy(dialect = Dialect.Python())) match
+      case d: Diagnostics.Vulnerable => assertEquals(d.recallValidation.map(_.result), Some(RecallResult.Timeout))
+      case d                         => fail(s"not vulnerable: $d")
+
+  runtimeTest("Surrogates: PCRE", "php"):
+    // A subject with a surrogate is invalid UTF-8, which the attack does not take.
+    val source = "^(?:[^\\x00-\\x{D7FF}]|[^\\x00-\\x{D7FF}])*$"
+    ReDoS.check(source, "u", params.copy(dialect = Dialect.PCRE)) match
+      case d: Diagnostics.Vulnerable =>
+        assert(!d.attack.asUString.iterator.exists(c => 0xd800 <= c && c <= 0xdfff), d.attack)
+        assertEquals(d.recallValidation.map(_.result), Some(RecallResult.EngineLimit("Backtrack limit exhausted")))
+      case d => fail(s"not vulnerable: $d")
+
   runtimeTest("RECHECK_RUBY", "ruby"):
     // The wrapper's runtime line comes first, and it shows the arguments.
     val ruby = script("my ruby", s"echo recheck:runtime wrapped \"$$@\"; exec '${which("ruby")}' \"$$@\"")

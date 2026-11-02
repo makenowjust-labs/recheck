@@ -109,7 +109,7 @@ class EpsNFASuite extends munit.FunSuite:
          |  "1" -> "2" [label=0];
          |  "1" -> "3" [label=1];
          |  "2" [shape=circle];
-         |  "2" -> "4" [label="{([a],CharKind(0,0,0,0,0,false,false,false))}"];
+         |  "2" -> "4" [label="{([a],CharKind(0,0,0,0,0,false,false,false,false,false))}"];
          |  "3" [shape=circle];
          |  "3" -> "4" [label="LineBegin(0,AfterTerminator,false,false)"];
          |  "4" [shape=circle];

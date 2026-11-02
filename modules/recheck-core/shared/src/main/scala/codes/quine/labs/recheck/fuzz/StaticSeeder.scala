@@ -33,7 +33,7 @@ object StaticSeeder:
         case _: UnsupportedException =>
           EpsNFABuilder.build(simplify(pattern, maxSimpleRepeatSize, dropsAssertions = true))
       .get
-    val orderedNFA = epsNFA.toOrderedNFA.rename.mapAlphabet(_.head)
+    val orderedNFA = epsNFA.toOrderedNFA.rename.mapAlphabet(_.representative)
     val seeder = new StaticSeeder(
       orderedNFA.alphabet,
       orderedNFA.stateSet,
