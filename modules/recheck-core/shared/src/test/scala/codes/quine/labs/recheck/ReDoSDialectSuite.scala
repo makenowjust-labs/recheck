@@ -52,8 +52,11 @@ class ReDoSDialectSuite extends munit.FunSuite:
     assertVulnerable(check("(*CRLF)^(?:a|.)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
 
   test("ReDoS.check: surrogates"):
-    // Ruby's and PCRE's input has no surrogate.
+    // An attack takes a character other than a surrogate from a set having one, which Ruby's and PCRE's input cannot
+    // have.
     for (source, dialect, flags) <- Seq(
+        ("^(?:[\\uD800-\\uFFFF]|[\\uD800-\\uFFFF])*$", JavaScript, "u"),
+        ("^(?:[\\uD800-\\uFFFF]|[\\uD800-\\uFFFF])*$", Java, ""),
         ("\\A(?:[^\\u0000-\\u{D7FF}]|[^\\u0000-\\u{D7FF}])*\\z", Ruby(), ""),
         ("^(?:[^\\x00-\\x{D7FF}]|[^\\x00-\\x{D7FF}])*$", PCRE, "u")
       )

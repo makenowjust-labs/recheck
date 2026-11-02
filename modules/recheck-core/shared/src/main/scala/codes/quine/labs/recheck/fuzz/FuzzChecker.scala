@@ -260,7 +260,7 @@ private[fuzz] final class FuzzChecker(
     val fc = random.between(0, 2) match
       case 0 =>
         val idx = random.between(0, alphabet.pairs.size)
-        val c = alphabet.pairs(idx)._1.head
+        val c = alphabet.pairs(idx)._1.representative
         FString.Wrap(c)
       case 1 =>
         if t.isEmpty then return Iterator.empty
@@ -302,7 +302,7 @@ private[fuzz] final class FuzzChecker(
     val fc = t(pos) match
       case FString.Wrap(_) =>
         val k = random.nextInt(alphabet.pairs.size)
-        val c = alphabet.pairs(k)._1.head
+        val c = alphabet.pairs(k)._1.representative
         FString.Wrap(c)
       case FString.Repeat(m0, size0) =>
         val m = random.between(0, 2) match

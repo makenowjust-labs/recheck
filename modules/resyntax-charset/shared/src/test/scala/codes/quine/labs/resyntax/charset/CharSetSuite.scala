@@ -31,6 +31,14 @@ class CharSetSuite extends munit.FunSuite:
     assertEquals(set((1, 3), (5, 10)).last, 9)
     intercept[NoSuchElementException](CharSet.empty.head)
 
+  test("CharSet#representative"):
+    assertEquals(set((1, 3), (5, 10)).representative, 1)
+    assertEquals(set((0xd800, 0xdc00), (0xe100, 0xe200)).representative, 0xe100)
+    assertEquals(set((0xd800, 0x10000)).representative, 0xe000)
+    assertEquals(set((0xdc00, 0xe000), (0x10000, 0x10001)).representative, 0x10000)
+    assertEquals(set((0xdc00, 0xe000)).representative, 0xdc00)
+    intercept[NoSuchElementException](CharSet.empty.representative)
+
   test("CharSet#contains"):
     val s = set((1, 3), (5, 7))
     assertEquals((0 to 8).filter(s.contains), IndexedSeq(1, 2, 5, 6))
