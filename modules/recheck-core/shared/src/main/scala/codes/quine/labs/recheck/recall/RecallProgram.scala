@@ -321,9 +321,14 @@ object RecallProgram:
 
   /** Returns the data of a pattern and an attack string for the programs reading it from the standard input.
     *
-    * The lines are the flags, the pattern and the parts of the attack string, where each part is the repeat count and
-    * the part separated by `:`. The flags and the pattern are `-` if they are empty. The pattern and the parts are the
-    * hexadecimal digits of the UTF-16 code units, four for each.
+    * For example, the data of `/^a*$/i` and `'a'.repeat(31) + '!'` is the following.
+    *
+    * {{{
+    * i
+    * 005e0061002a0024
+    * 31:0061
+    * 1:0021
+    * }}}
     */
   private[recall] def data(flags: String, source: String, attack: AttackPattern): String =
     def units(s: UString): String = s.encode(UnitMode.UTF16).map(hex(_, 4)).mkString
