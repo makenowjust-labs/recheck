@@ -18,7 +18,7 @@ final class Alphabet private (
   def size: Int = atoms.size
 
   /** Returns `-1` for a code value outside the mode. */
-  def atomOf(value: Int): Int =
+  def atomOf(value: UChar): Int =
     if !mode.contains(value) then -1
     else segmentAtoms(CharSet.countLessOrEqual(segmentStarts, value) - 1)
 

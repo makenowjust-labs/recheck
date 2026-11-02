@@ -4,7 +4,7 @@ package codes.quine.labs.resyntax.charset
   *
   * The values are usually code points; a string over the bytes alphabet holds the bytes as values in `0..0xFF`.
   */
-final class UString private (private val values: Array[Int]) extends Ordered[UString]:
+final class UString private (private val values: Array[UChar]) extends Ordered[UString]:
 
   def length: Int = values.length
 
@@ -12,27 +12,27 @@ final class UString private (private val values: Array[Int]) extends Ordered[USt
 
   def nonEmpty: Boolean = values.length != 0
 
-  def apply(i: Int): Int = values(i)
+  def apply(i: Int): UChar = values(i)
 
-  def codeValues: IArray[Int] = IArray.unsafeFromArray(values)
+  def codeValues: IArray[UChar] = IArray.unsafeFromArray(values)
 
-  def iterator: Iterator[Int] = values.iterator
+  def iterator: Iterator[UChar] = values.iterator
 
   def ++(that: UString): UString = new UString(values ++ that.values)
 
   def slice(from: Int, until: Int): UString = new UString(values.slice(from, until))
 
-  def map(f: Int => Int): UString = new UString(values.map(f))
+  def map(f: UChar => UChar): UString = new UString(values.map(f))
 
   /** Encodes the code points of this string as code units of the mode.
     *
     * `UTF16` gives UTF-16 code units, `CodePoint` gives the code points as they are, and `Byte` gives the UTF-8 bytes
     * (surrogate code points are encoded like other code points).
     */
-  def encode(mode: UnitMode): IArray[Int] = mode match
+  def encode(mode: UnitMode): IArray[UChar] = mode match
     case UnitMode.CodePoint => codeValues
     case UnitMode.UTF16     =>
-      val out = Array.newBuilder[Int]
+      val out = Array.newBuilder[UChar]
       for c <- values do
         if c < 0x10000 then out.addOne(c)
         else
@@ -40,7 +40,7 @@ final class UString private (private val values: Array[Int]) extends Ordered[USt
           out.addOne(0xdc00 | (c & 0x3ff))
       IArray.unsafeFromArray(out.result())
     case UnitMode.Byte =>
-      val out = Array.newBuilder[Int]
+      val out = Array.newBuilder[UChar]
       for c <- values do
         if c < 0x80 then out.addOne(c)
         else if c < 0x800 then
@@ -82,13 +82,13 @@ object UString:
 
   val empty: UString = new UString(Array.empty)
 
-  def apply(values: Int*): UString = new UString(values.toArray)
+  def apply(values: UChar*): UString = new UString(values.toArray)
 
-  def from(values: IterableOnce[Int]): UString = new UString(values.iterator.toArray)
+  def from(values: IterableOnce[UChar]): UString = new UString(values.iterator.toArray)
 
   /** A lone surrogate becomes a code point of itself. */
   def fromString(s: String): UString =
-    val out = Array.newBuilder[Int]
+    val out = Array.newBuilder[UChar]
     var i = 0
     while i < s.length do
       val c = s.codePointAt(i)

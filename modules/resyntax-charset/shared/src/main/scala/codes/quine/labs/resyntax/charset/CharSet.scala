@@ -9,7 +9,7 @@ import codes.quine.labs.resyntax.charset.CharSet.*
   * It is represented by strictly increasing interval boundaries `b(0) < b(1) < ...` of even length. The set contains
   * the half-open intervals `[b(0), b(1))`, `[b(2), b(3))`, and so on.
   */
-final class CharSet private (private val bounds: Array[Int]):
+final class CharSet private (private val bounds: Array[UChar]):
 
   def isEmpty: Boolean = bounds.length == 0
 
@@ -17,17 +17,17 @@ final class CharSet private (private val bounds: Array[Int]):
 
   def intervalCount: Int = bounds.length / 2
 
-  def intervalStart(i: Int): Int = bounds(2 * i)
+  def intervalStart(i: Int): UChar = bounds(2 * i)
 
-  def intervalEnd(i: Int): Int = bounds(2 * i + 1)
+  def intervalEnd(i: Int): UChar = bounds(2 * i + 1)
 
   /** Iterates the maximal intervals of this set as half-open pairs `(start, end)` in ascending order. */
-  def intervals: Iterator[(Int, Int)] =
+  def intervals: Iterator[(UChar, UChar)] =
     Iterator.range(0, intervalCount).map(i => (intervalStart(i), intervalEnd(i)))
 
-  def boundaries: IArray[Int] = IArray.unsafeFromArray(bounds)
+  def boundaries: IArray[UChar] = IArray.unsafeFromArray(bounds)
 
-  def iterator: Iterator[Int] = intervals.flatMap((start, end) => Iterator.range(start, end))
+  def iterator: Iterator[UChar] = intervals.flatMap((start, end) => Iterator.range(start, end))
 
   def size: Int =
     var n = 0
@@ -37,18 +37,18 @@ final class CharSet private (private val bounds: Array[Int]):
       i += 2
     n
 
-  def head: Int =
+  def head: UChar =
     if isEmpty then throw new NoSuchElementException("CharSet.empty.head")
     bounds(0)
 
-  def last: Int =
+  def last: UChar =
     if isEmpty then throw new NoSuchElementException("CharSet.empty.last")
     bounds(bounds.length - 1) - 1
 
-  def contains(value: Int): Boolean = (countLessOrEqual(bounds, value) & 1) == 1
+  def contains(value: UChar): Boolean = (countLessOrEqual(bounds, value) & 1) == 1
 
   /** Checks whether this set contains a code value in `[first, last]`. */
-  def intersectsRange(first: Int, last: Int): Boolean =
+  def intersectsRange(first: UChar, last: UChar): Boolean =
     val i = countLessOrEqual(bounds, first)
     (i & 1) == 1 || i < bounds.length && bounds(i) <= last
 
@@ -89,7 +89,7 @@ final class CharSet private (private val bounds: Array[Int]):
   /** Calls the function with every non-empty intersection `[start, end)` of an interval of this set and
     * `[from, until)`.
     */
-  private[charset] def foreachIntervalWithin(from: Int, until: Int)(f: (Int, Int) => Unit): Unit =
+  private[charset] def foreachIntervalWithin(from: UChar, until: UChar)(f: (UChar, UChar) => Unit): Unit =
     var i = countLessOrEqual(bounds, from)
     if (i & 1) == 1 then i -= 1
     while i < bounds.length && bounds(i) < until do
@@ -105,7 +105,7 @@ final class CharSet private (private val bounds: Array[Int]):
   override def hashCode(): Int = java.util.Arrays.hashCode(bounds)
 
   override def toString: String =
-    def hex(value: Int): String = "0x" + Integer.toHexString(value).toUpperCase
+    def hex(value: UChar): String = "0x" + Integer.toHexString(value).toUpperCase
 
     intervals
       .map((start, end) => if start + 1 == end then hex(start) else s"${hex(start)}-${hex(end - 1)}")
@@ -120,12 +120,12 @@ object CharSet:
     private val ranges = mutable.ArrayBuilder.make[Long]
 
     /** Adds the half-open interval `[start, end)`; an empty interval is ignored. */
-    def addRange(start: Int, end: Int): this.type =
+    def addRange(start: UChar, end: UChar): this.type =
       require(start >= 0, s"negative code value: $start")
       if start < end then ranges.addOne((start.toLong << 32) | end.toLong)
       this
 
-    def addOne(value: Int): this.type = addRange(value, value + 1)
+    def addOne(value: UChar): this.type = addRange(value, value + 1)
 
     def addAll(set: CharSet): this.type =
       var i = 0
@@ -154,33 +154,33 @@ object CharSet:
 
   def newBuilder: Builder = new Builder
 
-  def single(value: Int): CharSet =
+  def single(value: UChar): CharSet =
     require(value >= 0, s"negative code value: $value")
     new CharSet(Array(value, value + 1))
 
   /** Creates a set containing the code values in `[first, last]`; it is empty if `first > last`. */
-  def range(first: Int, last: Int): CharSet =
+  def range(first: UChar, last: UChar): CharSet =
     require(first >= 0, s"negative code value: $first")
     if first > last then empty else new CharSet(Array(first, last + 1))
 
-  def of(values: Int*): CharSet =
+  def of(values: UChar*): CharSet =
     val builder = newBuilder
     values.foreach(builder.addOne)
     builder.result()
 
   /** Creates a set from half-open intervals `(start, end)` in any order; they may overlap. */
-  def fromIntervals(intervals: IterableOnce[(Int, Int)]): CharSet =
+  def fromIntervals(intervals: IterableOnce[(UChar, UChar)]): CharSet =
     val builder = newBuilder
     intervals.iterator.foreach((start, end) => builder.addRange(start, end))
     builder.result()
 
-  def fromBoundaries(boundaries: IArray[Int]): CharSet =
+  def fromBoundaries(boundaries: IArray[UChar]): CharSet =
     require(boundaries.length % 2 == 0, "odd number of boundaries")
     require(boundaries.isEmpty || boundaries(0) >= 0, "negative code value")
     require((1 until boundaries.length).forall(i => boundaries(i - 1) < boundaries(i)), "unsorted boundaries")
     new CharSet(IArray.genericWrapArray(boundaries).toArray)
 
-  private[charset] def unsafeFromBoundaries(boundaries: Array[Int]): CharSet = new CharSet(boundaries)
+  private[charset] def unsafeFromBoundaries(boundaries: Array[UChar]): CharSet = new CharSet(boundaries)
 
   def union(sets: IterableOnce[CharSet]): CharSet =
     val builder = newBuilder
