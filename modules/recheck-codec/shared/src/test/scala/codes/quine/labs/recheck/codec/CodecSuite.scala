@@ -60,6 +60,7 @@ class CodecSuite extends munit.FunSuite:
         "source" := "(a|a)*$",
         "flags" := "",
         "dialect" := Json.obj("name" := "javascript"),
+        "unitMode" := "utf16",
         "status" := "vulnerable",
         "checker" := Checker.Automaton.asInstanceOf[Checker],
         "complexity" := AttackComplexity.Exponential(false).asInstanceOf[AttackComplexity],
@@ -104,6 +105,11 @@ class CodecSuite extends munit.FunSuite:
         "error" := ErrorKind.InvalidRegExp("unknown flag").asInstanceOf[ErrorKind]
       )
     )
+
+  test("codec.encodeUnitMode"):
+    assertEquals(encodeUnitMode(UnitMode.UTF16), "utf16".asJson)
+    assertEquals(encodeUnitMode(UnitMode.CodePoint), "code-point".asJson)
+    assertEquals(encodeUnitMode(UnitMode.Byte), "byte".asJson)
 
   test("codec.encodeChecker"):
     assertEquals(encodeChecker(Checker.Auto), "auto".asJson)

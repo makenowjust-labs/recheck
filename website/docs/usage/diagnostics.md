@@ -45,6 +45,7 @@ It may invoke a matching time explosion against too little string (`length < 100
 ## Attack String
 
 A `vulnerable` diagnostics has the `attack` field. It contains the attack string found by the checking.
+It also has the `unitMode` field, which is the unit of the attack string: `utf16` (UTF-16 code units), `code-point` (code points), or `byte` (bytes).
 
 The attack string is a string that causes the explosion of the matching time, also known as a ReDoS vulnerability.
 
@@ -53,7 +54,7 @@ Each `pump` consists of `prefix`, `repeating` substrings, and the individual rep
 
 The `attack` field also has these fields.
 
-- `string` is the actual string. Its characters are UTF-16 code units, or bytes as the characters of the same codes (as Latin-1) when the pattern matches bytes.
+- `string` is the actual string. Its characters are UTF-16 code units, or bytes as the characters of the same codes (as Latin-1) when `unitMode` is `byte`.
 - `pattern` is an expression that evaluates to the actual string in the host language of the [dialect](dialects.md).
   The attack string of `/^(a|a)*$/` looks like the following.
 

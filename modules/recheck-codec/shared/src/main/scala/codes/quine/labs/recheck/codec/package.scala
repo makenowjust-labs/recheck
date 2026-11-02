@@ -55,6 +55,7 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "source" := source,
         "flags" := flags,
         "dialect" := dialect,
+        "unitMode" := unitMode,
         "status" := "vulnerable",
         "checker" := checker,
         "complexity" := complexity.asInstanceOf[AttackComplexity],
@@ -124,6 +125,13 @@ given decodeDialect: Decoder[Dialect] with
                           source <- setting(perl, "source", perl.source)(PerlSource.of)
                         yield Dialect.Perl(utf8.getOrElse(perl.utf8), source)
                       case dialect => Right(dialect)
+
+/** An `Encoder` for `UnitMode`. */
+given encodeUnitMode: Encoder[UnitMode] with
+  def apply(m: UnitMode): Json = m match
+    case UnitMode.UTF16     => "utf16".asJson
+    case UnitMode.CodePoint => "code-point".asJson
+    case UnitMode.Byte      => "byte".asJson
 
 /** An `Encoder` for `Checker`. */
 given encodeChecker: Encoder[Checker] with
