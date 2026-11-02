@@ -42,16 +42,16 @@ private[exec] object Platform:
   )(using ctx: Context): ExecResult =
     val argv = replacement.fold(command +: args)(line => Seq(shell, "-c", s"$line \"$$@\"", "sh") ++ args)
     val shown = (argv ++ file.map(_.name)).mkString(" ")
-    val path = file.map(SourceFiles.path)
+    val path = file.map(SourceDirectory.path)
     def start(): ExecResult = exec(argv ++ path.map(_.toString), shown, env, input, timeout, marker)
 
-    path.flatMap(SourceFiles.firstRunLock) match
+    path.flatMap(SourceDirectory.firstRunLock) match
       case Some(l) =>
         while !l.tryLock(PollMillis, TimeUnit.MILLISECONDS) do ctx.interrupt(())
         try
           val result = start()
           result match
-            case ExecResult.Exit(0, _, _) | ExecResult.Timeout(_) => path.foreach(SourceFiles.markWarm)
+            case ExecResult.Exit(0, _, _) | ExecResult.Timeout(_) => path.foreach(SourceDirectory.markWarm)
             case _                                                => ()
           result
         finally l.unlock()

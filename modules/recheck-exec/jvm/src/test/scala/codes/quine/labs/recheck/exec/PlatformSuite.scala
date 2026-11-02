@@ -71,7 +71,7 @@ class PlatformSuite extends munit.FunSuite:
     try
       assertEquals(run("foo"), ExecResult.Exit(0, "2 foo\n", ""))
       assertEquals(run("bar"), ExecResult.Exit(0, "2 bar\n", ""))
-    finally Files.deleteIfExists(SourceFiles.path(file))
+    finally Files.deleteIfExists(SourceDirectory.path(file))
 
   test("Platform.run: shell"):
     val dir = Files.createTempDirectory("recheck exec ")
@@ -88,39 +88,39 @@ class PlatformSuite extends munit.FunSuite:
       Files.deleteIfExists(node)
       Files.deleteIfExists(dir)
 
-  test("SourceFiles.path"):
+  test("SourceDirectory.path"):
     val dir = Files.createTempDirectory("recheck-exec-")
     try
       val source = SourceFile("Foo.java", "class Foo {}")
-      val file = SourceFiles.path(dir, source)
+      val file = SourceDirectory.path(dir, source)
       assertEquals(file.getParent, dir)
       assert(clue(file.getFileName.toString).matches("Foo-[0-9a-f]{16}\\.java"))
       assertEquals(Files.readString(file), "class Foo {}")
       val modified = Files.getLastModifiedTime(file)
-      assertEquals(SourceFiles.path(dir, source), file)
+      assertEquals(SourceDirectory.path(dir, source), file)
       assertEquals(Files.getLastModifiedTime(file), modified)
       // A changed file is written again.
       Files.writeString(file, "broken")
-      assertEquals(SourceFiles.path(dir, source), file)
+      assertEquals(SourceDirectory.path(dir, source), file)
       assertEquals(Files.readString(file), "class Foo {}")
-      assertNotEquals(SourceFiles.path(dir, source.copy(content = "class Foo { }")), file)
+      assertNotEquals(SourceDirectory.path(dir, source.copy(content = "class Foo { }")), file)
       assertEquals(Files.list(dir).count(), 2L)
     finally
       Files.list(dir).forEach(Files.delete)
       Files.delete(dir)
 
-  test("SourceFiles.sharedDirectory"):
+  test("SourceDirectory.sharedDirectory"):
     val parent = Files.createTempDirectory("recheck-exec-")
     try
       val created = parent.resolve("new")
-      assertEquals(SourceFiles.sharedDirectory(created), Some(created))
+      assertEquals(SourceDirectory.sharedDirectory(created), Some(created))
       assertEquals(Files.getPosixFilePermissions(created), PosixFilePermissions.fromString("rwx------"))
       assertEquals(Files.list(created).count(), 0L)
-      assertEquals(SourceFiles.sharedDirectory(created), Some(created))
+      assertEquals(SourceDirectory.sharedDirectory(created), Some(created))
       // A directory others can write is not used.
       val open = Files.createDirectory(parent.resolve("open"))
       Files.setPosixFilePermissions(open, PosixFilePermissions.fromString("rwxrwxrwx"))
-      assertEquals(SourceFiles.sharedDirectory(open), None)
+      assertEquals(SourceDirectory.sharedDirectory(open), None)
       val link = Files.createSymbolicLink(parent.resolve("link"), created)
-      assertEquals(SourceFiles.sharedDirectory(link), None)
+      assertEquals(SourceDirectory.sharedDirectory(link), None)
     finally Files.walk(parent).sorted(java.util.Comparator.reverseOrder()).forEach(Files.delete)
