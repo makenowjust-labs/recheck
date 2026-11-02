@@ -24,8 +24,6 @@ import codes.quine.labs.resyntax.charset.UnitMode
   *   - `style` is the notation of `toString`, which is the host language of the pattern's dialect.
   *
   * For example, when the pattern is `AttackPattern(Seq(w, u, n), (v, s, m), t, l)`, it means `w u^(n+l) v s^(m+l) t`.
-  *
-  * The strings are UTF-16 code units, or bytes if the pattern matches bytes.
   */
 final case class AttackPattern(
     pumps: Seq[(UString, UString, Int)],
