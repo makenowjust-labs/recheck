@@ -176,7 +176,7 @@ class CodecSuite extends munit.FunSuite:
         "runtime" := "node v26.11.1",
         "timeout" := 1000,
         "result" := Json.obj("kind" := "timeout"),
-        "succeeded" := true
+        "isSucceeded" := true
       )
     )
     assertEquals(
@@ -187,7 +187,7 @@ class CodecSuite extends munit.FunSuite:
         "runtime" := "ruby 4.0.7",
         "timeout" := Json.Null,
         "result" := Json.obj("kind" := "finish", "time" := 3),
-        "succeeded" := false
+        "isSucceeded" := false
       )
     )
     assertEquals(

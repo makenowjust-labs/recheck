@@ -118,7 +118,7 @@ export type RecallValidation = {
    * Whether the attack is effective on the engine (`timeout` or `engine-limit`).
    * `check` reports the vulnerable diagnostics only if it is `true`.
    */
-  succeeded: boolean;
+  isSucceeded: boolean;
 };
 
 /**

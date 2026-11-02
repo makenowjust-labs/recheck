@@ -194,7 +194,7 @@ test("checkAll: java", async () => {
       runtime: "fake",
       timeout: 1000,
       result: { kind: "finish", time: 0 },
-      succeeded: false,
+      isSucceeded: false,
     },
   });
 });

@@ -86,7 +86,7 @@ It is `null` if the recall validation is not run: [`recallTimeout`](parameters.m
   - `engine-limit` means the engine stopped on its limit of the matching steps (PHP's backtrack limit), which also shows that the attack is effective. It has `message`.
   - `engine-error` means the engine gave up with an error on the stack depth or the memory (e.g. Java's `StackOverflowError` or JavaScript's `RangeError`). It has `message`.
     Such an error may happen on a long string even if the matching takes linear time (e.g. V8 raises it for `/^(?:a|b)*$/` on 10,000,000 characters), so the attack is not considered effective.
-- `succeeded` is whether the attack is effective on the engine (`timeout` or `engine-limit`).
+- `isSucceeded` is whether the attack is effective on the engine (`timeout` or `engine-limit`).
 
 When the recall validation fails, the check does not report the diagnostics, and it goes on to look for another attack string.
 If no attack succeeds, the result is `safe`.
