@@ -6,7 +6,7 @@ import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.EnumeratedProperty
-import codes.quine.labs.resyntax.charset.Properties
+import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.parser.Parser
@@ -30,32 +30,32 @@ class IRPropertySuite extends munit.FunSuite:
         interceptMessage[IRBuildingException](message)(build(s, flags, dialect))
 
   // Perl's enumerated properties
-  chars("\\p{Line_Break=Alphabetic}", "", Perl())(value(Properties.LineBreak, "AL"))
-  chars("\\p{lb: al}", "", Perl())(value(Properties.LineBreak, "AL"))
-  chars("\\p{IsLb=AL}", "", Perl())(value(Properties.LineBreak, "AL"))
-  chars("\\P{Lb=AL}", "", Perl())(value(Properties.LineBreak, "AL").complement(UnitMode.CodePoint))
-  chars("\\p{Ea=W}", "", Perl())(value(Properties.EastAsianWidth, "W"))
-  chars("\\p{East_Asian_Width=Ambiguous}", "", Perl())(value(Properties.EastAsianWidth, "A"))
-  chars("\\p{Nt=De}", "", Perl())(value(Properties.NumericType, "Decimal"))
-  chars("\\p{Wb=LE}", "", Perl())(value(Properties.WordBreak, "ALetter"))
-  chars("\\p{Sb=UP}", "", Perl())(value(Properties.SentenceBreak, "Upper"))
-  chars("\\p{Hst=LV}", "", Perl())(value(Properties.HangulSyllableType, "LV"))
-  chars("\\p{Jt=D}", "", Perl())(value(Properties.JoiningType, "Dual_Joining"))
-  chars("\\p{Jg=Beh}", "", Perl())(value(Properties.JoiningGroup, "Beh"))
-  chars("\\p{Ccc=230}", "", Perl())(value(Properties.CanonicalCombiningClass, "Above"))
-  chars("\\p{Ccc=A}", "", Perl())(value(Properties.CanonicalCombiningClass, "Above"))
-  chars("\\p{Ccc=CCC10}", "", Perl())(value(Properties.CanonicalCombiningClass, "10"))
-  chars("\\p{Dt=can}", "", Perl())(value(Properties.DecompositionType, "Canonical"))
-  chars("\\p{GCB=CN}", "", Perl())(value(Properties.GraphemeClusterBreak, "Control"))
-  chars("\\p{InSC=Vowel}", "", Perl())(value(Properties.IndicSyllabicCategory, "Vowel"))
-  chars("\\p{InPC=Top}", "", Perl())(value(Properties.IndicPositionalCategory, "Top"))
-  chars("\\p{InCB=Linker}", "", Perl())(value(Properties.IndicConjunctBreak, "Linker"))
-  chars("\\p{Vo=U}", "", Perl())(value(Properties.VerticalOrientation, "Upright"))
-  chars("\\p{NFC_QC=M}", "", Perl())(value(Properties.NFCQuickCheck, "Maybe"))
-  chars("\\p{NFKD_QC=N}", "", Perl())(value(Properties.NFKDQuickCheck, "No"))
-  chars("\\p{Bpt=o}", "", Perl())(value(Properties.BidiPairedBracketType, "Open"))
-  chars("\\p{Identifier_Status=Allowed}", "", Perl())(value(Properties.IdentifierStatus, "Allowed"))
-  chars("\\p{Identifier_Type=Not_XID}", "", Perl())(value(Properties.IdentifierType, "Not_XID"))
+  chars("\\p{Line_Break=Alphabetic}", "", Perl())(value(PropertyTable.LineBreak, "AL"))
+  chars("\\p{lb: al}", "", Perl())(value(PropertyTable.LineBreak, "AL"))
+  chars("\\p{IsLb=AL}", "", Perl())(value(PropertyTable.LineBreak, "AL"))
+  chars("\\P{Lb=AL}", "", Perl())(value(PropertyTable.LineBreak, "AL").complement(UnitMode.CodePoint))
+  chars("\\p{Ea=W}", "", Perl())(value(PropertyTable.EastAsianWidth, "W"))
+  chars("\\p{East_Asian_Width=Ambiguous}", "", Perl())(value(PropertyTable.EastAsianWidth, "A"))
+  chars("\\p{Nt=De}", "", Perl())(value(PropertyTable.NumericType, "Decimal"))
+  chars("\\p{Wb=LE}", "", Perl())(value(PropertyTable.WordBreak, "ALetter"))
+  chars("\\p{Sb=UP}", "", Perl())(value(PropertyTable.SentenceBreak, "Upper"))
+  chars("\\p{Hst=LV}", "", Perl())(value(PropertyTable.HangulSyllableType, "LV"))
+  chars("\\p{Jt=D}", "", Perl())(value(PropertyTable.JoiningType, "Dual_Joining"))
+  chars("\\p{Jg=Beh}", "", Perl())(value(PropertyTable.JoiningGroup, "Beh"))
+  chars("\\p{Ccc=230}", "", Perl())(value(PropertyTable.CanonicalCombiningClass, "Above"))
+  chars("\\p{Ccc=A}", "", Perl())(value(PropertyTable.CanonicalCombiningClass, "Above"))
+  chars("\\p{Ccc=CCC10}", "", Perl())(value(PropertyTable.CanonicalCombiningClass, "10"))
+  chars("\\p{Dt=can}", "", Perl())(value(PropertyTable.DecompositionType, "Canonical"))
+  chars("\\p{GCB=CN}", "", Perl())(value(PropertyTable.GraphemeClusterBreak, "Control"))
+  chars("\\p{InSC=Vowel}", "", Perl())(value(PropertyTable.IndicSyllabicCategory, "Vowel"))
+  chars("\\p{InPC=Top}", "", Perl())(value(PropertyTable.IndicPositionalCategory, "Top"))
+  chars("\\p{InCB=Linker}", "", Perl())(value(PropertyTable.IndicConjunctBreak, "Linker"))
+  chars("\\p{Vo=U}", "", Perl())(value(PropertyTable.VerticalOrientation, "Upright"))
+  chars("\\p{NFC_QC=M}", "", Perl())(value(PropertyTable.NFCQuickCheck, "Maybe"))
+  chars("\\p{NFKD_QC=N}", "", Perl())(value(PropertyTable.NFKDQuickCheck, "No"))
+  chars("\\p{Bpt=o}", "", Perl())(value(PropertyTable.BidiPairedBracketType, "Open"))
+  chars("\\p{Identifier_Status=Allowed}", "", Perl())(value(PropertyTable.IdentifierStatus, "Allowed"))
+  chars("\\p{Identifier_Type=Not_XID}", "", Perl())(value(PropertyTable.IdentifierType, "Not_XID"))
   error("\\p{Ccc=2}", "", Perl())("Unknown Unicode property name at 0")
   error("\\p{NFD_QC=M}", "", Perl())("Unknown Unicode property name at 0")
   error("\\p{Lb}", "", Perl())("Unknown Unicode property name at 0")
@@ -68,19 +68,21 @@ class IRPropertySuite extends munit.FunSuite:
   error("\\p{Lb=AL}", "", Java, Ruby())("Unknown Unicode property name at 0")
 
   // Ruby looks up the whole name without spaces, hyphens, underscores and cases, `=` and the value included.
-  chars("\\p{InCB=Linker}", "", Ruby())(value(Properties.IndicConjunctBreak, "Linker"))
-  chars("\\p{In CB = Linker}", "", Ruby())(value(Properties.IndicConjunctBreak, "Linker"))
-  chars("\\p{i-n-c-b=l-i-n-k-e-r}", "", Ruby())(value(Properties.IndicConjunctBreak, "Linker"))
+  chars("\\p{InCB=Linker}", "", Ruby())(value(PropertyTable.IndicConjunctBreak, "Linker"))
+  chars("\\p{In CB = Linker}", "", Ruby())(value(PropertyTable.IndicConjunctBreak, "Linker"))
+  chars("\\p{i-n-c-b=l-i-n-k-e-r}", "", Ruby())(value(PropertyTable.IndicConjunctBreak, "Linker"))
   // Ruby's input has no surrogate.
   chars("\\p{^InCB=Linker}", "", Ruby())(
-    value(Properties.IndicConjunctBreak, "Linker").complement(UnitMode.CodePoint).diff(IRSurrogates.All)
+    value(PropertyTable.IndicConjunctBreak, "Linker").complement(UnitMode.CodePoint).diff(IRSurrogates.All)
   )
-  chars("\\P{^InCB=Consonant}", "", Ruby())(value(Properties.IndicConjunctBreak, "Consonant"))
-  chars("\\p{Grapheme_Cluster_Break=Extend}", "", Ruby())(value(Properties.GraphemeClusterBreak, "Extend"))
+  chars("\\P{^InCB=Consonant}", "", Ruby())(value(PropertyTable.IndicConjunctBreak, "Consonant"))
+  chars("\\p{Grapheme_Cluster_Break=Extend}", "", Ruby())(value(PropertyTable.GraphemeClusterBreak, "Extend"))
   chars("\\p{GraphemeClusterBreak=RegionalIndicator}", "", Ruby())(
-    value(Properties.GraphemeClusterBreak, "Regional_Indicator")
+    value(PropertyTable.GraphemeClusterBreak, "Regional_Indicator")
   )
-  chars("\\p{age = 6. 0}", "", Ruby())(Properties.presentIn(Properties.Age.value("6.0").get).diff(IRSurrogates.All))
+  chars("\\p{age = 6. 0}", "", Ruby())(
+    PropertyTable.presentIn(PropertyTable.Age.value("6.0").get).diff(IRSurrogates.All)
+  )
   // Only the long names of the values listed in the data files, and no other property with a value.
   for name <- Seq(
       "Indic_Conjunct_Break=Linker",
@@ -103,18 +105,18 @@ class IRPropertySuite extends munit.FunSuite:
     )
   do error(s"\\p{$name}", "", Ruby())("Unknown Unicode property name at 0")
   // Ruby has the properties of PropList.txt, but not the scripts without characters.
-  chars("\\p{Hyphen}", "", Ruby())(Properties.binary("Hyphen").get.set)
+  chars("\\p{Hyphen}", "", Ruby())(PropertyTable.binary("Hyphen").get.set)
   chars("\\p{OIDS}", "", Ruby())(CharSet.of(0x1885, 0x1886, 0x2118, 0x212e, 0x309b, 0x309c))
   chars("\\p{Other_Uppercase}", "", Ruby())(
-    Properties.binary("Uppercase").get.set.diff(value(Properties.GeneralCategory, "Lu"))
+    PropertyTable.binary("Uppercase").get.set.diff(value(PropertyTable.GeneralCategory, "Lu"))
   )
   chars("\\p{XPosixPunct}", "", Ruby())(
-    value(Properties.GeneralCategory, "P").union(CharSet.of("$+<=>^`|~".map(_.toInt)*))
+    value(PropertyTable.GeneralCategory, "P").union(CharSet.of("$+<=>^`|~".map(_.toInt)*))
   )
   error("\\p{Hrkt}", "", Ruby())("Unknown Unicode property name at 0")
 
   // Perl's Numeric_Value
-  val nv = Properties.NumericValue
+  val nv = PropertyTable.NumericValue
   def nvSet(n: Long, d: Long): CharSet = nv.values.find(v => v.numerator == n && v.denominator == d).get.set
 
   chars("\\p{nv=3}", "", Perl())(nvSet(3, 1))

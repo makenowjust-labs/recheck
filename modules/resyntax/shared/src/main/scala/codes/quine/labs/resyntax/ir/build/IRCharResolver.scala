@@ -18,7 +18,7 @@ import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
-import codes.quine.labs.resyntax.charset.Properties
+import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
@@ -348,9 +348,9 @@ private[build] final class IRCharResolver(
     */
   private lazy val graphemeCluster: IRNodeData =
     import Grammar.*
-    def incb(name: String): CharSet = Properties.IndicConjunctBreak.value(name).get.set.intersect(universe)
+    def incb(name: String): CharSet = PropertyTable.IndicConjunctBreak.value(name).get.set.intersect(universe)
 
-    val extPict = Properties.binary("Extended_Pictographic").get.set.intersect(universe)
+    val extPict = PropertyTable.binary("Extended_Pictographic").get.set.intersect(universe)
     val control = gcb("Control", "CR", "LF")
     val ri = seq(c(gcb("RI")), c(gcb("RI")))
     val xpicto = seq(c(extPict), star(seq(star(c(gcb("Extend"))), c(gcb("ZWJ")), c(extPict))))
@@ -371,7 +371,7 @@ private[build] final class IRCharResolver(
     */
   private lazy val pcreGraphemeCluster: IRNodeData =
     import Grammar.*
-    val extPict = Properties.binary("Extended_Pictographic").get.set.intersect(universe).intersect(gcb("Other"))
+    val extPict = PropertyTable.binary("Extended_Pictographic").get.set.intersect(universe).intersect(gcb("Other"))
     val ri = c(gcb("RI"))
     val other = c(gcb("Other").diff(extPict))
     val extend = gcb("Extend", "ZWJ", "SpacingMark")
@@ -401,7 +401,7 @@ private[build] final class IRCharResolver(
     IRNodeData.Atomic(IRCharResolver.prune(cluster).getOrElse(IRNode(IRNodeData.Chars(CharSet.empty))))
 
   private def gcb(names: String*): CharSet =
-    CharSet.union(names.map(Properties.GraphemeClusterBreak.value(_).get.set)).intersect(universe)
+    CharSet.union(names.map(PropertyTable.GraphemeClusterBreak.value(_).get.set)).intersect(universe)
 
   private def hangul: IRNode =
     import Grammar.*

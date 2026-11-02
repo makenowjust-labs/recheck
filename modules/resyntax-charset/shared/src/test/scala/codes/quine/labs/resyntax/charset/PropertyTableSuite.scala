@@ -1,48 +1,48 @@
 package codes.quine.labs.resyntax.charset
 
-class PropertiesSuite extends munit.FunSuite:
-  def binary(name: String): BinaryProperty = Properties.binary(name).get
+class PropertyTableSuite extends munit.FunSuite:
+  def binary(name: String): BinaryProperty = PropertyTable.binary(name).get
 
   def value(property: EnumeratedProperty, name: String): PropertyValue = property.value(name).get
 
-  test("Properties.lookup: names and aliases"):
+  test("PropertyTable.lookup: names and aliases"):
     val ws = binary("White_Space")
     assertEquals(ws.name, "White_Space")
     assertEquals(ws.shortName, "WSpace")
     assert(ws.names.contains("space"))
-    assertEquals(Properties.lookup("WSpace"), Some(ws))
-    assertEquals(Properties.lookup("space"), Some(ws))
-    assertEquals(Properties.lookup("gc"), Some(Properties.GeneralCategory))
-    assertEquals(Properties.lookup("General_Category"), Some(Properties.GeneralCategory))
-    assertEquals(Properties.lookup("scx"), Some(Properties.ScriptExtensions))
-    assertEquals(Properties.lookup("blk"), Some(Properties.Block))
-    assertEquals(Properties.lookup("bc"), Some(Properties.BidiClass))
-    assertEquals(Properties.lookup("age"), Some(Properties.Age))
-    assertEquals(Properties.lookup("Dash").map(_.shortName), Some("Dash"))
-    assertEquals(Properties.lookup("unknown"), None)
-    assertEquals(Properties.binary("gc"), None)
+    assertEquals(PropertyTable.lookup("WSpace"), Some(ws))
+    assertEquals(PropertyTable.lookup("space"), Some(ws))
+    assertEquals(PropertyTable.lookup("gc"), Some(PropertyTable.GeneralCategory))
+    assertEquals(PropertyTable.lookup("General_Category"), Some(PropertyTable.GeneralCategory))
+    assertEquals(PropertyTable.lookup("scx"), Some(PropertyTable.ScriptExtensions))
+    assertEquals(PropertyTable.lookup("blk"), Some(PropertyTable.Block))
+    assertEquals(PropertyTable.lookup("bc"), Some(PropertyTable.BidiClass))
+    assertEquals(PropertyTable.lookup("age"), Some(PropertyTable.Age))
+    assertEquals(PropertyTable.lookup("Dash").map(_.shortName), Some("Dash"))
+    assertEquals(PropertyTable.lookup("unknown"), None)
+    assertEquals(PropertyTable.binary("gc"), None)
 
-  test("Properties.lookup: exact matching is case-sensitive"):
-    assertEquals(Properties.lookup("alpha"), None)
-    assertEquals(Properties.lookup("White Space"), None)
+  test("PropertyTable.lookup: exact matching is case-sensitive"):
+    assertEquals(PropertyTable.lookup("alpha"), None)
+    assertEquals(PropertyTable.lookup("White Space"), None)
 
   test("NameMatching.loose (UAX44-LM3)"):
     assertEquals(NameMatching.loose("Is_Line-Break Foo"), "linebreakfoo")
     assertEquals(NameMatching.loose("ISO_Comment"), "ocomment")
 
-  test("Properties.lookup: every alias finds its own property and value"):
-    for p <- Properties.all; name <- p.names do assert(Properties.lookup(name).exists(_ eq p), name)
-    for p <- Properties.enumeratedProperties; v <- p.values; name <- v.names do
+  test("PropertyTable.lookup: every alias finds its own property and value"):
+    for p <- PropertyTable.all; name <- p.names do assert(PropertyTable.lookup(name).exists(_ eq p), name)
+    for p <- PropertyTable.enumeratedProperties; v <- p.values; name <- v.names do
       assert(p.value(name).exists(_ eq v), s"${p.name}=$name")
 
-  test("Properties.binaryValue"):
-    assertEquals(Properties.binaryValue("Y"), Some(true))
-    assertEquals(Properties.binaryValue("True"), Some(true))
-    assertEquals(Properties.binaryValue("F"), Some(false))
-    assertEquals(Properties.binaryValue("is_No"), Some(false))
-    assertEquals(Properties.binaryValue("maybe"), None)
+  test("PropertyTable.binaryValue"):
+    assertEquals(PropertyTable.binaryValue("Y"), Some(true))
+    assertEquals(PropertyTable.binaryValue("True"), Some(true))
+    assertEquals(PropertyTable.binaryValue("F"), Some(false))
+    assertEquals(PropertyTable.binaryValue("is_No"), Some(false))
+    assertEquals(PropertyTable.binaryValue("maybe"), None)
 
-  test("Properties: binary properties"):
+  test("PropertyTable: binary properties"):
     assert(binary("Alphabetic").set.contains('a'))
     assert(!binary("Alpha").set.contains('1'))
     assertEquals(
@@ -53,16 +53,16 @@ class PropertiesSuite extends munit.FunSuite:
     assert(binary("Emoji").set.contains(0x1f600))
     assert(binary("Ideographic").set.contains(0x6f22))
     assert(!binary("Lowercase").isOfStrings)
-    assert(Properties.icuBinaryProperties.size >= 70)
+    assert(PropertyTable.icuBinaryProperties.size >= 70)
 
-  test("Properties: derived binary properties"):
+  test("PropertyTable: derived binary properties"):
     assertEquals(binary("Any").set, UnitMode.CodePoint.universe)
     assertEquals(binary("ASCII").set, CharSet.range(0, 0x7f))
     assert(binary("Assigned").set.contains('a'))
     assert(!binary("Assigned").set.contains(0x0378))
     assert(binary("Assigned").set.contains(0xe000))
 
-  test("Properties: properties of strings"):
+  test("PropertyTable: properties of strings"):
     val rgi = binary("RGI_Emoji")
     assert(rgi.isOfStrings)
     assert(rgi.set.contains(0x1f600))
@@ -88,8 +88,8 @@ class PropertiesSuite extends munit.FunSuite:
     )
     assertEquals(rgi.classSet.strings, parts.map(binary(_).classSet.strings).reduce(_ ++ _))
 
-  test("Properties: General_Category"):
-    val gc = Properties.GeneralCategory
+  test("PropertyTable: General_Category"):
+    val gc = PropertyTable.GeneralCategory
     assertEquals(value(gc, "Lu").name, "Uppercase_Letter")
     assert(value(gc, "Lu").set.contains('A'))
     assert(value(gc, "Uppercase_Letter").set.contains(0x0391))
@@ -100,8 +100,8 @@ class PropertiesSuite extends munit.FunSuite:
     assert(value(gc, "Cn").set.contains(0x0378))
     assertEquals(gc.value("L&"), None)
 
-  test("Properties: General_Category groups"):
-    val gc = Properties.GeneralCategory
+  test("PropertyTable: General_Category groups"):
+    val gc = PropertyTable.GeneralCategory
     def union(names: String*): CharSet = CharSet.union(names.map(value(gc, _).set))
 
     assertEquals(value(gc, "L").set, union("Lu", "Ll", "Lt", "Lm", "Lo"))
@@ -119,9 +119,9 @@ class PropertiesSuite extends munit.FunSuite:
     assertEquals(CharSet.union(bases.map(_.set)), UnitMode.CodePoint.universe)
     assertEquals(bases.map(_.set.size).sum, 0x110000)
 
-  test("Properties: Script and Script_Extensions"):
-    val sc = Properties.Script
-    val scx = Properties.ScriptExtensions
+  test("PropertyTable: Script and Script_Extensions"):
+    val sc = PropertyTable.Script
+    val scx = PropertyTable.ScriptExtensions
     assertEquals(value(sc, "Hira").name, "Hiragana")
     assert(value(sc, "Hiragana").set.contains(0x3042))
     assert(!value(sc, "Hiragana").set.contains(0x30fc))
@@ -136,8 +136,8 @@ class PropertiesSuite extends munit.FunSuite:
     assertEquals(scx.values.map(_.names), sc.values.map(_.names))
     assert(value(sc, "Latin").set.subsetOf(value(scx, "Latin").set))
 
-  test("Properties: Block"):
-    val blk = Properties.Block
+  test("PropertyTable: Block"):
+    val blk = PropertyTable.Block
     assertEquals(value(blk, "Greek").name, "Greek_And_Coptic")
     assertEquals(value(blk, "Greek_And_Coptic").set, CharSet.range(0x0370, 0x03ff))
     assertEquals(value(blk, "ASCII").set, CharSet.range(0, 0x7f))
@@ -145,8 +145,8 @@ class PropertiesSuite extends munit.FunSuite:
     assertEquals(value(blk, "Hiragana").set, CharSet.range(0x3040, 0x309f))
     assert(value(blk, "No_Block").set.contains(0x2fe0))
 
-  test("Properties: Bidi_Class"):
-    val bc = Properties.BidiClass
+  test("PropertyTable: Bidi_Class"):
+    val bc = PropertyTable.BidiClass
     assertEquals(value(bc, "EN").name, "European_Number")
     assert(CharSet.range('0', '9').subsetOf(value(bc, "EN").set))
     assert(value(bc, "EN").set.contains(0x00b2))
@@ -154,8 +154,8 @@ class PropertiesSuite extends munit.FunSuite:
     assert(value(bc, "R").set.contains(0x05d0))
     assert(value(bc, "AL").set.contains(0x0627))
 
-  test("Properties: Age"):
-    val age = Properties.Age
+  test("PropertyTable: Age"):
+    val age = PropertyTable.Age
     assertEquals(age.values.head.names, IndexedSeq("Unassigned", "NA"))
     assertEquals(value(age, "1.1"), value(age, "V1_1"))
     assertEquals(value(age, "V1_1").shortName, "1.1")
@@ -164,16 +164,16 @@ class PropertiesSuite extends munit.FunSuite:
     assert(value(age, "2.1").set.contains(0x20ac))
     assert(value(age, "6.1").set.contains(0x1f600))
     assert(value(age, "NA").set.contains(0x0378))
-    assert(Properties.presentIn(value(age, "2.1")).contains('A'))
-    assert(Properties.presentIn(value(age, "2.1")).contains(0x20ac))
-    assert(!Properties.presentIn(value(age, "2.1")).contains(0x1f600))
-    assertEquals(Properties.presentIn(value(age, "NA")), CharSet.empty)
-    assertEquals(Properties.presentIn(age.values.last), value(age, "NA").set.complement(UnitMode.CodePoint))
+    assert(PropertyTable.presentIn(value(age, "2.1")).contains('A'))
+    assert(PropertyTable.presentIn(value(age, "2.1")).contains(0x20ac))
+    assert(!PropertyTable.presentIn(value(age, "2.1")).contains(0x1f600))
+    assertEquals(PropertyTable.presentIn(value(age, "NA")), CharSet.empty)
+    assertEquals(PropertyTable.presentIn(age.values.last), value(age, "NA").set.complement(UnitMode.CodePoint))
     assertEquals(age.values.map(_.set.size).sum, 0x110000)
 
-  test("Properties: Grapheme_Cluster_Break and Indic_Conjunct_Break"):
-    val gcb = Properties.GraphemeClusterBreak
-    assertEquals(Properties.lookup("GCB"), Some(gcb))
+  test("PropertyTable: Grapheme_Cluster_Break and Indic_Conjunct_Break"):
+    val gcb = PropertyTable.GraphemeClusterBreak
+    assertEquals(PropertyTable.lookup("GCB"), Some(gcb))
     assertEquals(value(gcb, "CR").set, CharSet.single(0x0d))
     assertEquals(value(gcb, "LF").set, CharSet.single(0x0a))
     assert(value(gcb, "Control").set.contains(0x00))
@@ -185,43 +185,43 @@ class PropertiesSuite extends munit.FunSuite:
     assert(value(gcb, "L").set.contains(0x1100))
     assert(value(gcb, "LV").set.contains(0xac00))
     assert(value(gcb, "LVT").set.contains(0xac01))
-    val incb = Properties.IndicConjunctBreak
+    val incb = PropertyTable.IndicConjunctBreak
     assert(value(incb, "Consonant").set.contains(0x0915))
     assert(value(incb, "Linker").set.contains(0x094d))
     assert(value(incb, "Extend").set.contains(0x200d))
 
-  test("Properties: other enumerated properties"):
+  test("PropertyTable: other enumerated properties"):
     def check(p: EnumeratedProperty, v: String, c: Int)(implicit loc: munit.Location): Unit =
       assert(value(p, v).set.contains(c), s"${p.name}=$v U+${c.toHexString}")
 
-    check(Properties.LineBreak, "AL", 'a')
-    check(Properties.LineBreak, "Ideographic", 0x6f22)
-    check(Properties.EastAsianWidth, "W", 0x3042)
-    check(Properties.EastAsianWidth, "Na", 'a')
-    check(Properties.NumericType, "De", '0')
-    check(Properties.NumericType, "Nu", 0x00bd)
-    check(Properties.WordBreak, "ALetter", 'a')
-    check(Properties.SentenceBreak, "Upper", 'A')
-    check(Properties.HangulSyllableType, "LV", 0xac00)
-    check(Properties.JoiningType, "D", 0x0628)
-    check(Properties.JoiningGroup, "Beh", 0x0628)
-    check(Properties.DecompositionType, "Canonical", 0x00e9)
-    check(Properties.NFCQuickCheck, "M", 0x0301)
-    check(Properties.NFDQuickCheck, "N", 0x00e9)
-    check(Properties.NFKCQuickCheck, "N", 0x00a0)
-    check(Properties.NFKDQuickCheck, "N", 0x00a0)
-    check(Properties.BidiPairedBracketType, "Open", '(')
-    check(Properties.IndicPositionalCategory, "Left", 0x093f)
-    check(Properties.IndicSyllabicCategory, "Virama", 0x094d)
-    check(Properties.VerticalOrientation, "U", 0x3042)
-    check(Properties.IdentifierStatus, "Allowed", 'a')
-    check(Properties.IdentifierType, "Recommended", 'a')
-    assertEquals(Properties.lookup("lb"), Some(Properties.LineBreak))
-    assertEquals(Properties.lookup("Identifier_Type"), Some(Properties.IdentifierType))
-    assert(Properties.IdentifierType.values.count(_.set.contains(0x018d)) >= 2)
+    check(PropertyTable.LineBreak, "AL", 'a')
+    check(PropertyTable.LineBreak, "Ideographic", 0x6f22)
+    check(PropertyTable.EastAsianWidth, "W", 0x3042)
+    check(PropertyTable.EastAsianWidth, "Na", 'a')
+    check(PropertyTable.NumericType, "De", '0')
+    check(PropertyTable.NumericType, "Nu", 0x00bd)
+    check(PropertyTable.WordBreak, "ALetter", 'a')
+    check(PropertyTable.SentenceBreak, "Upper", 'A')
+    check(PropertyTable.HangulSyllableType, "LV", 0xac00)
+    check(PropertyTable.JoiningType, "D", 0x0628)
+    check(PropertyTable.JoiningGroup, "Beh", 0x0628)
+    check(PropertyTable.DecompositionType, "Canonical", 0x00e9)
+    check(PropertyTable.NFCQuickCheck, "M", 0x0301)
+    check(PropertyTable.NFDQuickCheck, "N", 0x00e9)
+    check(PropertyTable.NFKCQuickCheck, "N", 0x00a0)
+    check(PropertyTable.NFKDQuickCheck, "N", 0x00a0)
+    check(PropertyTable.BidiPairedBracketType, "Open", '(')
+    check(PropertyTable.IndicPositionalCategory, "Left", 0x093f)
+    check(PropertyTable.IndicSyllabicCategory, "Virama", 0x094d)
+    check(PropertyTable.VerticalOrientation, "U", 0x3042)
+    check(PropertyTable.IdentifierStatus, "Allowed", 'a')
+    check(PropertyTable.IdentifierType, "Recommended", 'a')
+    assertEquals(PropertyTable.lookup("lb"), Some(PropertyTable.LineBreak))
+    assertEquals(PropertyTable.lookup("Identifier_Type"), Some(PropertyTable.IdentifierType))
+    assert(PropertyTable.IdentifierType.values.count(_.set.contains(0x018d)) >= 2)
 
-  test("Properties: Canonical_Combining_Class values are named by their numbers too"):
-    val ccc = Properties.CanonicalCombiningClass
+  test("PropertyTable: Canonical_Combining_Class values are named by their numbers too"):
+    val ccc = PropertyTable.CanonicalCombiningClass
     assertEquals(value(ccc, "230"), value(ccc, "Above"))
     assertEquals(value(ccc, "A"), value(ccc, "Above"))
     assertEquals(value(ccc, "10"), value(ccc, "CCC10"))
@@ -229,9 +229,9 @@ class PropertiesSuite extends munit.FunSuite:
     assert(value(ccc, "230").set.contains(0x0301))
     assertEquals(ccc.value("2"), None)
 
-  test("Properties: Numeric_Value"):
-    val nv = Properties.NumericValue
-    assertEquals(Properties.lookup("nv"), Some(nv))
+  test("PropertyTable: Numeric_Value"):
+    val nv = PropertyTable.NumericValue
+    assertEquals(PropertyTable.lookup("nv"), Some(nv))
     assert(nv.nan.isNaN)
     assert(nv.nan.set.contains('a'))
     def valueAt(c: Int): NumericValue = nv.values.find(_.set.contains(c)).get

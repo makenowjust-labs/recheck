@@ -4,7 +4,7 @@ package build
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
-import codes.quine.labs.resyntax.charset.Properties
+import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.build.IRProperties.ascii
 import codes.quine.labs.resyntax.ir.build.IRProperties.binary
@@ -184,7 +184,7 @@ object IRCharClasses:
 
   /** Python's `str.isspace`: `Zs`, or the bidirectional class `WS`, `B` or `S`. */
   lazy val pythonSpace: CharSet =
-    val bc = Properties.BidiClass
+    val bc = PropertyTable.BidiClass
     gc("Zs").union(CharSet.union(Seq("WS", "B", "S").map(bc.value(_).get.set)))
 
   /** Python's `str.isalnum` or `_`, approximated by letters and numbers. */

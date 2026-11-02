@@ -10,7 +10,7 @@ import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
-import codes.quine.labs.resyntax.charset.Properties
+import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch.Forward
@@ -30,7 +30,7 @@ class IRCharSuite extends munit.FunSuite:
 
   def of(s: String): CharSet = CharSet.of(UString.fromString(s).iterator.toSeq*)
 
-  def gc(name: String): CharSet = Properties.GeneralCategory.value(name).get.set
+  def gc(name: String): CharSet = PropertyTable.GeneralCategory.value(name).get.set
 
   /** Drops the empty nodes of inline flags, start options and case commands (e.g. `(?i)`). */
   def strip(data: IRNodeData): IRNodeData = data match
@@ -453,7 +453,7 @@ class IRCharSuite extends munit.FunSuite:
 
   // POSIX classes
   chars("[[:alpha:]]", "", PCRE)(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
-  checkSet("[[:alpha:]]", "", Ruby())(_ == Properties.binary("Alphabetic").get.set)
+  checkSet("[[:alpha:]]", "", Ruby())(_ == PropertyTable.binary("Alphabetic").get.set)
   checkSet("[[:alpha:]]", "u", PCRE)(_ == gc("L"))
   chars("[[:alpha:]]", "a", Perl())(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
   check("[[:<:]]", "", PCRE)(
@@ -472,14 +472,14 @@ class IRCharSuite extends munit.FunSuite:
   chars("\\p{Lu}", "i", Java)(gc("LC"))
   chars("\\p{Lu}", "i", DotNet)(gc("LC").restrict(UnitMode.UTF16))
   chars("\\p{Lu}", "i", Perl())(gc("LC"))
-  chars("\\p{Latin}", "u", PCRE)(Properties.ScriptExtensions.value("Latin").get.set)
-  chars("\\p{sc=Latin}", "u", JavaScript)(Properties.Script.value("Latin").get.set)
-  chars("\\p{IsLatin}", "", Java)(Properties.Script.value("Latin").get.set)
-  chars("\\p{InGreek}", "", Java, Perl())(Properties.Block.value("Greek_And_Coptic").get.set)
+  chars("\\p{Latin}", "u", PCRE)(PropertyTable.ScriptExtensions.value("Latin").get.set)
+  chars("\\p{sc=Latin}", "u", JavaScript)(PropertyTable.Script.value("Latin").get.set)
+  chars("\\p{IsLatin}", "", Java)(PropertyTable.Script.value("Latin").get.set)
+  chars("\\p{InGreek}", "", Java, Perl())(PropertyTable.Block.value("Greek_And_Coptic").get.set)
   chars("\\p{IsGreek}", "", DotNet)(CharSet.range(0x370, 0x3ff))
   chars("\\p{Lower}", "", Java)(of("abcdefghijklmnopqrstuvwxyz"))
-  chars("\\p{Lower}", "U", Java)(Properties.binary("Lowercase").get.set)
-  chars("\\p{Age=6.0}", "", Ruby())(Properties.presentIn(Properties.Age.value("6.0").get).diff(IRSurrogates.All))
+  chars("\\p{Lower}", "U", Java)(PropertyTable.binary("Lowercase").get.set)
+  chars("\\p{Age=6.0}", "", Ruby())(PropertyTable.presentIn(PropertyTable.Age.value("6.0").get).diff(IRSurrogates.All))
   chars("\\p{Xwd}", "u", PCRE)(IRCharClasses.pcreWord)
   chars("\\p{Lu}", "", PCRE)(gc("Lu").restrict(UnitMode.Byte))
   error("\\p{Foo}", "u", JavaScript, PCRE)("Unknown Unicode property name at 0")
@@ -500,7 +500,7 @@ class IRCharSuite extends munit.FunSuite:
   error("\\p{Nv=.5}", "", Perl())("Unknown Unicode property name at 0")
   chars("\\p{gc=-Lu}", "", Perl())(gc("Lu"))
   check("\\p{RGI_Emoji_Flag_Sequence}", "v", JavaScript)(
-    Strings(Properties.binary("RGI_Emoji_Flag_Sequence").get.classSet)
+    Strings(PropertyTable.binary("RGI_Emoji_Flag_Sequence").get.classSet)
   )
   error("\\p{RGI_Emoji}", "u", JavaScript)("Unknown Unicode property name at 0")
   error("\\P{RGI_Emoji}", "v", JavaScript)("Invalid property name at 0")
