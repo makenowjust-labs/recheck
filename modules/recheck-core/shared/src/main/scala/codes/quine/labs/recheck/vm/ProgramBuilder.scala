@@ -365,12 +365,10 @@ private[vm] class ProgramBuilder(
     case IRAssertKind.ChompTextEnd(t)                  => AssertKind.ChompInputEnd(t)
     case IRAssertKind.NotBetweenCRLF                   => AssertKind.NotBetweenCRLF
 
-  /** A builder for a disjunction node, where `run` builds the alternative of the index.
-    *
-    * When `(*THEN)` in it takes the next alternative, the fallback of each alternative is a barrier, and so is a
-    * failing fallback before them, which `(*THEN)` in the last alternative takes.
-    */
+  /** A builder for a disjunction node, where `run` builds the alternative of the index. */
   def buildDisjunction(children: IndexedSeq[IRNode], run: Int => Unit): Unit =
+    // When `(*THEN)` in it takes the next alternative, the fallback of each alternative is a barrier, and so is a
+    // failing fallback before them, which `(*THEN)` in the last alternative takes.
     val scope = Option.when(children.exists(hasThen))(newThenScope())
     for id <- scope do
       val next = allocateLabel("next")
@@ -643,10 +641,7 @@ private[vm] class ProgramBuilder(
     if resetsCaptures then for (min, max) <- child.captureRange do emitInst(Inst.CapReset(min, max))
     run
 
-  /** A builder for an atomic group, which commits the first match of the child.
-    *
-    * When `(*ACCEPT)` ends only an atomic group, the engine runs it as a sub-match.
-    */
+  /** A builder for an atomic group, which commits the first match of the child. */
   def buildAtomic(child: IRNode): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
@@ -654,6 +649,7 @@ private[vm] class ProgramBuilder(
     emitTerminator(Inst.Tx(main, Some(cont), None))
 
     enterBlock(main)
+    // When `(*ACCEPT)` ends only an atomic group, the engine runs it as a sub-match.
     if pattern.backtrackControl.acceptEndsAtomic then withAcceptScope(AcceptScope.Atomic)(build(child))
     else
       atomicDepth += 1
@@ -666,6 +662,7 @@ private[vm] class ProgramBuilder(
 
   /** Emits `cap_hold` of the captures in the node, if they are held over backtracking. */
   def emitHold(node: IRNode): Unit =
+    // Java does not restore the captures in an atomic group or a look-around, once it matches.
     if holdsCaptures then for (from, to) <- node.captureRange do emitInst(Inst.CapHold(from, to))
 
   def withAcceptScope(scope: AcceptScope)(run: => Unit): Unit =
@@ -682,15 +679,13 @@ private[vm] class ProgramBuilder(
   def buildAssertion(child: IRNode, scope: Option[Int], body: IRNode => Unit): Unit =
     withThenScope(scope.orElse(thenScope))(withAcceptScope(AcceptScope.LookAround)(body(child)))
 
-  /** A builder for positive look-around assertion.
-    *
-    * With `(*THEN)` in it, a failing fallback is the barrier, which makes the assertion fail.
-    */
+  /** A builder for positive look-around assertion. */
   def buildPositiveLookAround(child: IRNode, body: IRNode => Unit = build): Unit =
     val main = allocateLabel("main")
     val cont = allocateLabel("cont")
     val scope = assertionThenScope(child)
 
+    // With `(*THEN)` in it, a failing fallback is the barrier, which makes the assertion fail.
     emitTerminator(Inst.Tx(main, Some(cont), scope.map(_ => failLabel()), scope.map(Barrier.Then(_))))
 
     enterBlock(main)
@@ -732,17 +727,16 @@ private[vm] class ProgramBuilder(
 
     enterBlock(cont)
 
-  /** A builder for a conditional.
-    *
-    * A look-around condition is atomic, and it keeps the captures in it even if it is negative, unless they are
-    * restored as in a negative look-around. Its fallback is the barrier, so `(*COMMIT)`, `(*PRUNE)` and `(*SKIP)` in it
-    * make it false (or true for a negative one).
-    */
+  /** A builder for a conditional. */
   def buildConditional(condition: IRCondition, yes: IRNode, no: IRNode): Unit =
     val yesLabel = allocateLabel("yes")
     val noLabel = allocateLabel("no")
     val cont = allocateLabel("cont")
 
+    // A look-around condition is atomic, and it keeps the captures in it even if it is negative, unless they are
+    // restored as in a negative look-around.
+    // Its fallback is the barrier, so `(*COMMIT)`, `(*PRUNE)` and `(*SKIP)` in it make it false (or true for a negative
+    // one).
     def buildTest(negative: Boolean, child: IRNode, body: IRNode => Unit): Unit =
       val main = allocateLabel("main")
       val scope = assertionThenScope(child)
@@ -786,12 +780,13 @@ private[vm] class ProgramBuilder(
 
   /** A builder for `(*ACCEPT)`, which closes the open captures and ends its scope successfully.
     *
-    * In a look-behind, which PCRE and Perl match forward, it ends the look-behind before reaching the position.
+    * In a look-behind, it ends the look-behind before reaching the position.
     */
   def buildAccept(): Unit =
     for index <- openCaptures do emitInst(Inst.CapEnd(index))
     acceptScope match
-      case AcceptScope.Top        => emitOk()
+      case AcceptScope.Top => emitOk()
+      // PCRE and Perl match a look-behind forward.
       case AcceptScope.LookAround =>
         for _ <- 0 until atomicDepth do emitInst(Inst.TxDrop)
         emitTerminator(Inst.Rollback)
@@ -828,6 +823,8 @@ private[vm] class ProgramBuilder(
   def buildForwardBody(child: IRNode, starts: Seq[IRLookBehindStarts], end: CounterReg): Unit =
     def attempt(node: IRNode, starts: IRLookBehindStarts): Unit =
       val start = allocateLabel("start")
+      // The register holds the end of the look-behind, so memoization tells the look-behinds at different positions
+      // apart.
       emitTerminator(Inst.StepBack(end, starts, start))
       enterBlock(start)
       build(node)

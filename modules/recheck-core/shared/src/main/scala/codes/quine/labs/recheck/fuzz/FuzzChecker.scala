@@ -369,13 +369,13 @@ private[fuzz] final class FuzzChecker(
 
   /** Executes the string to construct attack string.
     *
-    * `degree` is the assumed polynomial degree, or `None` for exponential. A timeout of a long polynomial attack string
-    * alone proves nothing, because a linear but slow pattern also runs over `attackTimeout`, so the growth is measured
-    * first on strings small enough to finish. An exponential attack string is short, so a timeout on it is a blow-up
-    * and it runs as is.
+    * `degree` is the assumed polynomial degree, or `None` for exponential.
     */
   def tryAttackExecute(str: FString, degree: Option[Int]): Option[(AttackPattern, Hotspot)] = interrupt:
     val input = fuzz.joinSurrogates(str.toUString)
+    // A timeout of a long polynomial attack string alone proves nothing, because a linear but slow pattern also runs
+    // over `attackTimeout`, so the growth is measured first on strings small enough to finish.
+    // An exponential attack string is short, so a timeout on it is a blow-up and it runs as is.
     if input.length <= maxAttackStringSize && degree.forall(growsAsExpected(str, _)) then
       val usesAcceleration = fuzz.usesAcceleration(accelerationMode)
       val opts = Options(attackLimit, usesAcceleration = usesAcceleration, needsHeatmap = true)

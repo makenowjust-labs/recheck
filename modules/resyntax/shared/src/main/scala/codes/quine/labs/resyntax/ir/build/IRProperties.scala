@@ -577,12 +577,12 @@ private[build] object IRProperties:
       perlKey
     )
 
-  /** Perl's number of `\p{Numeric_Value=...}`: a reduced fraction, a decimal number, or `NaN`. */
+  /** A reduced fraction of Perl's `\p{Numeric_Value=...}`. */
   private val PerlFraction = """([-+]?)(\d+)/(\d+)""".r
 
   private val PerlDecimal = """[-+]?_?\d+(?:_\d+)*(?:\.(?:\d+(?:_\d+)*)?)?(?:[eE][-+]?\d+)?""".r
 
-  /** Looks up Perl's `Numeric_Value`.
+  /** Looks up Perl's `Numeric_Value`, whose number is a reduced fraction, a decimal number, or `NaN`.
     *
     * A fraction must be reduced to a denominator other than 1 (`2/4` is `1/2`, and `3/1` is unknown). A decimal number
     * is an integer value if it is integral, and otherwise matches a non-integer value with the same 4 significant
@@ -619,11 +619,10 @@ private[build] object IRProperties:
 
   /** Returns the sign, the 4 significant digits rounded half to even (or up) and the exponent of a non-zero number, as
     * Perl compares numeric values by `%.3e`.
-    *
-    * The digits come from the shortest representation of the double, which is exact for the ties of the Unicode data
-    * (e.g. `1/64`).
     */
   private def roundSignificant(d: Double, halfEven: Boolean): (Boolean, Long, Int) =
+    // The digits come from the shortest representation of the double, which is exact for the ties of the Unicode data
+    // (e.g. `1/64`).
     val s = math.abs(d).toString
     val (mantissa, exp) = s.indexWhere(c => c == 'e' || c == 'E') match
       case -1 => (s, 0)
@@ -815,10 +814,10 @@ private[build] object IRProperties:
   private lazy val rubyBinaryIndex: Map[String, BinaryProperty] =
     index(RubyBinary.map(n => Properties.binary(n).get).map(p => (p.names, p)), rubyKey)
 
-  /** The contributory properties of PropList.txt (e.g. `Other_Alphabetic`), which the data of resyntax-charset lacks:
-    * the derived property without the other parts of its definition.
-    */
+  /** The contributory properties of PropList.txt (e.g. `Other_Alphabetic`). */
   private lazy val rubyContributory: Map[String, CharSet] =
+    // The data of resyntax-charset lacks them, so each is the derived property without the other parts of its
+    // definition.
     def other(derived: String, parts: CharSet): CharSet = binary(derived).diff(parts)
 
     Seq(

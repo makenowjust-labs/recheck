@@ -108,7 +108,7 @@ final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q,
 
       type Step = (Set[(CharSet, CharKindState)], Q, Option[SourceLocation])
 
-      /** Skips ε-transitions from the state and collects not ε-transition or terminal state. */
+      // Skips ε-transitions from the state and collects not ε-transition or terminal state.
       def buildClosure(s0: CharKindState, ss: Set[CharKindState], q: Q, loops: Set[Int]): Seq[(P, Option[Step])] =
         ctx.interrupt:
           if ss.isEmpty then Vector.empty

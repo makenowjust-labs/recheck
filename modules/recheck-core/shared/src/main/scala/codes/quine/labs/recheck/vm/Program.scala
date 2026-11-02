@@ -19,14 +19,12 @@ object Program:
   final case class Meta(
       /** The unit of the input, which is a UTF-16 code unit, a code point or a byte. */
       mode: UnitMode,
-      /** Whether the program reads the captures (back-references, capture tests and `reject_empty`), which a matching
-        * state includes then.
-        */
+      /** Whether the program reads the captures (back-references, capture tests and `reject_empty`). */
       hasRef: Boolean,
-      /** Whether the program has `verb` instructions, which skip backtracking points, so memoization cannot be used. */
+      /** Whether the program has `verb` instructions, which skip backtracking points. */
       hasVerb: Boolean,
       /** Whether the program has `leave` instructions, after which the matching depends on the start of the
-        * look-around, so memoization cannot be used.
+        * look-around.
         */
       hasLeave: Boolean,
       capturesSize: Int,

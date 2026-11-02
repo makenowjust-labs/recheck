@@ -41,11 +41,11 @@ object AttackPatternStyle:
 
   /** JavaScript is a JavaScript style specifier, e.g. `'a'.repeat(31) + '\x00'`. */
   case object JavaScript extends AttackPatternStyle:
-    /** A control character uses `\xHH`, because `\cX` is not an escape in a string literal. */
     def literal(s: UString): String =
       utf16Chars(s)
         .map:
-          case 0x27                                       => "\\'"
+          case 0x27 => "\\'"
+          // A control character uses `\xHH`, because `\cX` is not an escape in a string literal.
           case c if c < 0x20 && !(0x09 <= c && c <= 0x0d) => f"\\x$c%02X"
           case c                                          => ECMAScriptNotation.showChar(c)
         .mkString("'", "", "'")
@@ -140,7 +140,7 @@ object AttackPatternStyle:
 
   /** Perl is a Perl style specifier, e.g. `"a" x 31 . "\x00"`.
     *
-    * Its literals are ASCII, so that they do not depend on `use utf8`.
+    * Its literals are ASCII.
     */
   case object Perl extends AttackPatternStyle:
     def literal(s: UString): String = s.iterator.map(char).mkString("\"", "", "\"")
@@ -149,6 +149,7 @@ object AttackPatternStyle:
 
     def join: String = " . "
 
+    // ASCII literals do not depend on `use utf8`.
     private def char(c: UChar): String = c match
       case '\\' | '"' | '$' | '@'   => s"\\${c.toChar}"
       case Named(e)                 => e

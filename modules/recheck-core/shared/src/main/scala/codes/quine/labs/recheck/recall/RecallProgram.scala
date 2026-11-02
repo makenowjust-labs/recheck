@@ -97,15 +97,13 @@ object RecallProgram:
     case _: Dialect.Perl    => "recall.pl"
     case Dialect.PCRE       => "recall.php"
 
-  /** Returns a Java expression of the data.
-    *
-    * A string constant of Java has at most 65535 bytes, so a long data is a join of literals.
-    */
+  /** Returns a Java expression of the data, which is a join of literals for a long data. */
   private[recall] def javaString(data: String): String =
     val literals = data.grouped(JavaLiteralSize).map(quote).toSeq
     if literals.sizeIs <= 1 then literals.headOption.getOrElse(quote(""))
     else literals.mkString("String.join(\"\", ", ", ", ")")
 
+  // A string constant of Java has at most 65535 bytes.
   private val JavaLiteralSize: Int = 10000
 
   /** Returns a Java or C# literal of the data, whose only characters to escape are the line breaks. */
@@ -399,11 +397,7 @@ object RecallProgram:
   /** The delimiters of a Perl regex literal, which do not pair and keep interpolation. */
   private val PerlDelimiters: Seq[Char] = "/!,;~%&:=\"|^-".toSeq
 
-  /** Checks whether the Perl regex literal neither interpolates variables nor runs code.
-    *
-    * `$` interpolates a variable unless it is followed by `)`, `|` or the end, and `@` interpolates an array when it is
-    * followed by a name or a block.
-    */
+  /** Checks whether the Perl regex literal neither interpolates variables nor runs code. */
   private[recall] def isPerlSafe(source: String): Boolean =
     val code = Seq("(?{", "(??{", "(*{").exists(source.contains)
     var i = 0
@@ -412,17 +406,19 @@ object RecallProgram:
       val next = if i + 1 < source.length then Some(source.charAt(i + 1)) else None
       source.charAt(i) match
         case '\\' => i += 1
-        case '$'  => safe = next.forall(c => c == ')' || c == '|')
-        case '@'  => safe = !next.exists(c => c.isLetterOrDigit || "_{$:^".contains(c))
-        case _    => ()
+        // `$` interpolates a variable unless it is followed by `)`, `|` or the end.
+        case '$' => safe = next.forall(c => c == ')' || c == '|')
+        // `@` interpolates an array when it is followed by a name or a block.
+        case '@' => safe = !next.exists(c => c.isLetterOrDigit || "_{$:^".contains(c))
+        case _   => ()
       i += 1
     safe
 
   /** Returns the PHP program for `php` with the default settings of `pcre.*`, using `preg_match`, or why the pattern
     * cannot be put in the program.
     *
-    * PHP's backtrack limit makes a slow match fail, which is an engine limit. The recursion limit (PCRE2's depth limit)
-    * and the JIT stack limit are on the depth of backtracking, which are engine errors.
+    * The backtrack limit gives an engine limit, and the recursion limit (PCRE2's depth limit) and the JIT stack limit
+    * give engine errors.
     */
   private[recall] def php(
       source: String,

@@ -145,7 +145,7 @@ private[parser] final class Parser(
   /** The offset of the first reference by a group number, which Ruby rejects in a pattern with named captures. */
   private var numberedReferenceOffset: Option[Int] = None
 
-  // Ruby's `\u{X Y}` is read as the first code point, and the rest are kept here until the caller takes them.
+  /** The code points of Ruby's `\u{X Y}` after the first one, which is read first, until the caller takes them. */
   private var pendingCodePoints: List[Int] = Nil
 
   /** The `(?#...)` ranges that Ruby removes from the source before parsing, as maps from start to end and back. */
@@ -1852,7 +1852,7 @@ private[parser] final class Parser(
     next()
     BackslashKind.Escape(EscapeStyle.Single('t'), 0x09)
 
-  /** Parses an escape, which fails if it has a comment that Ruby removes, since Ruby reads `\x` and `\u` before.
+  /** Parses an escape, which fails if it has a comment that Ruby removes.
     *
     * For example, `\x(?#x)41` and `\u{4(?#x)1}` are errors in Ruby, but `\x4(?#x)1` is `\x04` and `1`.
     */
@@ -1861,6 +1861,7 @@ private[parser] final class Parser(
     val kind = parse
     var end = offset
     while removedCommentStarts.contains(end) do end = removedCommentStarts(end)
+    // Ruby reads `\x` and `\u` before removing comments.
     if removedCommentEnds.keysIterator.exists(s => start < s && s < end) then fail("Invalid backslash escape", start)
     kind
 
@@ -1895,7 +1896,9 @@ private[parser] final class Parser(
 
     BackslashKind.Escape(EscapeStyle.UnicodeHex4, value)
 
-  // Ruby separates the code points by ASCII spaces (`ISSPACE`, e.g. `\n`), and reads at most six digits for each.
+  /** Parses the code points of Ruby's `\u{...}`, which are separated by ASCII spaces (`ISSPACE`, e.g. `\n`), with at
+    * most six digits for each.
+    */
   private def parseUnicodeList(): BackslashKind =
     def skipSpaces(): Unit = while !isEnd && " \t\n\u000b\f\r".contains(currentChar) do next()
 

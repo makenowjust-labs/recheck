@@ -18,12 +18,13 @@ import codes.quine.labs.recheck.common.UnexpectedException
 
 /** SourceFiles keeps the source files of programs in a directory of this user.
   *
-  * The files stay after the process exits, so that a runtime caching the build of a file (e.g. `dotnet run`) reuses it.
+  * The files stay after the process exits.
   */
 private[exec] object SourceFiles:
 
   /** The directory `recheck-<user>` in the temporary directory, or a new temporary directory if it is not safe. */
   lazy val directory: Path =
+    // A runtime caching the build of a file (e.g. `dotnet run`) reuses it in the next process.
     val user = System.getProperty("user.name", "").replaceAll("[^A-Za-z0-9._-]", "_")
     sharedDirectory(Paths.get(System.getProperty("java.io.tmpdir"), s"recheck-$user")).getOrElse:
       val dir = Files.createTempDirectory("recheck-")
@@ -70,11 +71,9 @@ private[exec] object SourceFiles:
       file
     catch case ex: IOException => throw new UnexpectedException(s"cannot write `$file`: ${ex.getMessage}")
 
-  /** Returns the lock to hold on the first run of the file, or `None` if it has run in this process.
-    *
-    * Runtimes building the file on the first run (e.g. `dotnet run`) fail when they run it concurrently.
-    */
+  /** Returns the lock to hold on the first run of the file, or `None` if it has run in this process. */
   def firstRunLock(file: Path): Option[ReentrantLock] =
+    // Runtimes building the file on the first run (e.g. `dotnet run`) fail when they run it concurrently.
     Option.unless(warm.contains(file))(locks.computeIfAbsent(file, _ => new ReentrantLock))
 
   /** Marks the file as run once. */

@@ -7,8 +7,7 @@ import codes.quine.labs.resyntax.ast.Dialect.*
   * input.
   *
   * The results are of the engines (Node 26, Python 3.15, Ruby 4.0, Java 25, .NET 10, Perl 5.44 and PHP 8.5 with PCRE2
-  * 10.49), where a pattern is searched in the input. Perl's `$` before `\n` is checked as `(?:$)\n`, since `$\` in a
-  * literal is a variable.
+  * 10.49), where a pattern is searched in the input.
   */
 object AssertionCases:
 
@@ -47,6 +46,7 @@ object AssertionCases:
     Case("(?md)\\r^\\n", "", "\r\n", Seq(Java), Set.empty),
     Case("(?md)^", "", "", Seq(Java), Set.empty),
     // `$` (without `m`) and `\Z` in the middle, where Ruby's `$` is a line end (Perl's is checked as `\Z`).
+    // Perl's `$` before `\n` is checked as `(?:$)\n`, since `$\` in a literal is a variable.
     Case("a$\\n", "", "a\n", noJS, noJS.toSet),
     Case("a$\\n", "", "a\n\n", noJS, Set(Ruby())),
     Case("a$\\nb", "", "a\nb", noJS, Set(Ruby())),

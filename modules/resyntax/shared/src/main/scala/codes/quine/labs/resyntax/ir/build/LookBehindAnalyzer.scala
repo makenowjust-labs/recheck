@@ -174,7 +174,9 @@ private[build] final class LookBehindAnalyzer(
     if widths.exists(_.isEmpty) then None
     else Some(widths.flatten.reduceOption(union).getOrElse(Width(0, 0)))
 
-  // PCRE and Python use the width of the referred groups, and Perl takes a back-reference as unbounded.
+  /** Returns the width of a back-reference, which is the width of the referred groups in PCRE and Python, and unbounded
+    * in Perl.
+    */
   private def backReferenceWidth(node: Node, ref: Reference, visiting: Set[Int]): Option[Width] =
     if featureSet.lookBehindRule == IRLookBehindRule.Perl then return Some(Width(0, Inf))
     ref match
@@ -188,7 +190,7 @@ private[build] final class LookBehindAnalyzer(
         then Some(Width(0, Inf))
         else groupWidth(indices, visiting)
 
-  // PCRE and Perl use the width of the called groups, where a recursion is unbounded.
+  /** Returns the width of a call, which is the width of the called groups, or unbounded for a recursion. */
   private def callWidth(node: Node, ref: Reference, visiting: Set[Int]): Option[Width] =
     val site = table.siteOf(node)
     val indices = resolver.call(ref, site, node.loc)

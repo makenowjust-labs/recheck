@@ -31,9 +31,10 @@ final case class CharKindState(
     *
     * They guess whether the character is the last of the input with `last`, and what follows `\r` with `follow`.
     *
-    * There is none for a low surrogate after a high surrogate, which the input has as one character instead.
+    * There is none for a low surrogate after a high surrogate.
     */
   def advance(next: CharKind, afterCRLF: Boolean, last: Boolean, follow: Boolean): Seq[CharKindState] =
+    // The input has a high surrogate followed by a low surrogate as one character instead.
     if kind.high && next.low then return Seq.empty
     val state = CharKindState(next, afterCRLF && next.lf && kind.cr, next.bases | (next.extenders & based))
     val lasts =
@@ -50,8 +51,9 @@ final case class CharKindState(
       case CRFollow.LF      => next.kind.lf && !next.last.contains(true)
       case CRFollow.FinalLF => next.kind.lf && next.last.contains(true)
 
-  /** Forgets the marks of the character except an extender after a base, the only one that later assertions inspect. */
+  /** Forgets the marks of the character except an extender after a base. */
   def forgetMarks: CharKindState =
+    // Later assertions inspect only an extender after a base.
     copy(kind = kind.copy(marks = 0, extenders = kind.extenders & based, bases = 0))
 
 /** CRFollow is what follows `\r`. */

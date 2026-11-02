@@ -4,10 +4,10 @@ import scala.collection.mutable
 
 /** CaseMapping is a simple (one-to-one) mapping of code values, such as a simple case folding.
   *
-  * Two code values are case-equivalent under a mapping iff they are mapped to the same value. The mapping is stored as
-  * runs: the `i`-th run maps `starts(i) + k * strides(i)` to itself plus `deltas(i)` for `k` in `[0, counts(i))`.
+  * Two code values are case-equivalent under a mapping iff they are mapped to the same value.
   */
 final class CaseMapping private (
+    // The `i`-th run maps `starts(i) + k * strides(i)` to itself plus `deltas(i)` for `k` in `[0, counts(i))`.
     starts: Array[Int],
     counts: Array[Int],
     strides: Array[Int],

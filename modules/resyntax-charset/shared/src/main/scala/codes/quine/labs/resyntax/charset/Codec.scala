@@ -2,12 +2,10 @@ package codes.quine.labs.resyntax.charset
 
 import scala.collection.mutable
 
-/** Codec decodes the string literals of the generated Unicode data.
-  *
-  * It must agree with `project/CharsetEncoder.scala`.
-  */
+/** Codec decodes the string literals of the generated Unicode data. */
 private[charset] object Codec:
 
+  // The symbols and the digit counts must agree with `project/CharsetEncoder.scala`.
   private val TerminalCount = 47
 
   private val ContinuationCount = 46
