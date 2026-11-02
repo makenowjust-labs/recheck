@@ -118,7 +118,7 @@ class IRFlagSuite extends munit.FunSuite with IRHelper:
   checkChars("(*UTF)(*UCP)\\d", "", PCRE)(d => charsIn("\\d", "u", d))
   // `(*UTF)(*TURKISH_CASING)(?i)i` matches `İ` but not `I`.
   checkChars("(*UTF)(*TURKISH_CASING)(?i)i", "", PCRE)(_ => Seq(Chars(CharSet.of('i', 0x0130))))
-  // `(*UTF)(*CASELESS_RESTRICT)(?i)k` does not match the Kelvin sign, as `(?r)` does.
+  // Neither `(*UTF)(*CASELESS_RESTRICT)(?i)k` nor `(*UTF)(?i)(?r)k` matches the Kelvin sign.
   val kelvin: IRNodeData = Chars(CharSet.of('K', 'k', 0x212a))
   checkChars("(*UTF)(*CASELESS_RESTRICT)(?i)k(?r)k", "", PCRE)(_ => Seq(caseless('k'), caseless('k')))
   checkChars("(*UTF)(?i)k(?r)k", "", PCRE)(_ => Seq(kelvin, caseless('k')))
