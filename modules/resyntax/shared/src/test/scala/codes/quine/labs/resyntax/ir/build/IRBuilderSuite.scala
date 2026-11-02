@@ -453,10 +453,6 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
     for (source, flags, dialect, mode) <- cases do
       val flagSet = FlagSet.parse(flags, dialect)
       assertEquals(Parser.determineUnitMode(source, flagSet, dialect), mode, (source, flags, dialect))
-      // The builder reads PCRE's `(*UTF)` from the node for the Unicode semantics of the characters.
-      if dialect.isPCRE then
-        val (_, charFlags) = build(source, flags, dialect)
-        assertEquals(charFlags.head.unicode, mode == UnitMode.CodePoint, (source, flags, dialect))
 
   test("IRBuilder.build: the semantics of the dialect"):
     def patternOf(dialect: Dialect): IRPattern = build("a", "", dialect)._1

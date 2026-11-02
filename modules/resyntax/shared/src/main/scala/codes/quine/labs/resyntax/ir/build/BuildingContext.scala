@@ -74,15 +74,6 @@ final case class BuildingContext(flagSet: FlagSet, dialect: Dialect, featureSet:
       ignoreCase = f.ignoreCase,
       dotAll = if dialect.isRuby then f.multiline else f.dotAll,
       lineTerminators = lineTerminators,
-      unicode = dialect match
-        case Dialect.DotNet                 => false
-        case Dialect.Java | _: Dialect.Perl => true
-        case Dialect.JavaScript             => f.unicode || f.unicodeSets
-        case Dialect.PCRE                   => f.unicode || featureSet.utf
-        case Dialect.Python(tpe)            => tpe == Dialect.Python.Type.Str
-        // Ruby's `n` is the encoding option (NOENCODING), not explicit capture.
-        case _: Dialect.Ruby => !f.explicitCapture
-      ,
       unicodeSets = dialect.isJavaScript && f.unicodeSets,
       unicodeCase = !isJava || f.unicode || f.ungreedy,
       // PHP's `u` sets PCRE2_UCP as well as PCRE2_UTF.

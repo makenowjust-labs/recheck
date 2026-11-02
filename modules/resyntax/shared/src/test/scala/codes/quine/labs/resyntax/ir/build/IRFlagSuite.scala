@@ -95,31 +95,19 @@ class IRFlagSuite extends munit.FunSuite with IRHelper:
   // Unicode modes.
   checkFlags("a", "", DotNet)(d => Seq(flagsOf(d)))
   test("IRCharFlags: the defaults"):
-    assertEquals(flagsOf(DotNet).unicode, false)
-    assertEquals(flagsOf(JavaScript).unicode, false)
-    assertEquals(flagsOf(JavaScript, "u").unicode, true)
     assertEquals(flagsOf(JavaScript, "v").unicodeSets, true)
-    assertEquals(flagsOf(JavaScript, "v").unicode, true)
-    assertEquals(flagsOf(Java).unicode, true)
     assertEquals(flagsOf(Java).unicodeCase, false)
     assertEquals(flagsOf(Java, "u").unicodeCase, true)
     assertEquals(flagsOf(Java, "U").unicodeCase, true)
     assertEquals(flagsOf(Java, "U").unicodeClass, true)
-    assertEquals(flagsOf(PCRE).unicode, false)
     assertEquals(flagsOf(PCRE).unicodeClass, false)
     // PHP's `u` sets UCP as well as UTF: `\w` with `u` matches `é`.
-    assertEquals(flagsOf(PCRE, "u").unicode, true)
     assertEquals(flagsOf(PCRE, "u").unicodeClass, true)
-    assertEquals(flagsOf(Perl()).unicode, true)
-    assertEquals(flagsOf(Python()).unicode, true)
-    assertEquals(flagsOf(Python(Python.Type.Bytes), "").unicode, false)
-    assertEquals(flagsOf(Ruby()).unicode, true)
-    assertEquals(flagsOf(Ruby(), "n").unicode, false)
     for d <- All do
       assertEquals(flagsOf(d).charset, IRCharset.Default)
       assertEquals(flagsOf(d).ignoreCase, false)
-  checkFlags("(*UTF)(*UCP)a", "", PCRE)(d => Seq(flagsOf(d).copy(unicode = true, unicodeClass = true)))
-  checkFlags("(*UTF)(*TURKISH_CASING)a", "", PCRE)(d => Seq(flagsOf(d).copy(unicode = true, turkishCasing = true)))
+  checkFlags("(*UTF)(*UCP)a", "", PCRE)(d => Seq(flagsOf(d).copy(unicodeClass = true)))
+  checkFlags("(*UTF)(*TURKISH_CASING)a", "", PCRE)(d => Seq(flagsOf(d).copy(turkishCasing = true)))
   checkFlags("(*CASELESS_RESTRICT)a(?r)b", "", PCRE)(d =>
     Seq(flagsOf(d).copy(caselessRestrict = true), flagsOf(d).copy(caselessRestrict = true))
   )

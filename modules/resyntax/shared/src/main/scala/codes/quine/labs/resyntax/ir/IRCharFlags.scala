@@ -11,10 +11,6 @@ final case class IRCharFlags(
     dotAll: Boolean,
     /** The line terminators that `.` and `\N` exclude without `dotAll` (Java's `d`, PCRE's newline options). */
     lineTerminators: IRLineTerminators,
-    /** Characters are code points, not UTF-16 code units or bytes (JavaScript `u`/`v`, PCRE `u`/`(*UTF)`, Python `str`,
-      * Ruby without `n`, and always in Java and Perl).
-      */
-    unicode: Boolean,
     /** JavaScript `v`. */
     unicodeSets: Boolean,
     /** Case-insensitive matching beyond ASCII (Java `u`/`U`; always true in the other dialects). */

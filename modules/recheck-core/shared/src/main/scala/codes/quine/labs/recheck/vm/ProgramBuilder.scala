@@ -57,8 +57,6 @@ private[vm] class ProgramBuilder(
 )(using ctx: Context):
   import ctx._
 
-  private val mode = pattern.mode
-
   private val universe = pattern.universe
 
   /** Whether captures in a repetition are reset on each iteration. */
@@ -265,7 +263,7 @@ private[vm] class ProgramBuilder(
 
     val blocks = labelsBuffer.iterator.map(label => (label, label.block)).toVector
     val predecessors = predecessorsBuffer.iterator.map(_.toSet).toVector
-    val meta = Meta(mode, hasRef, hasVerb, hasLeave, capturesSize, counters.size, canaries.size, predecessors)
+    val meta = Meta(hasRef, hasVerb, hasLeave, capturesSize, counters.size, canaries.size, predecessors)
 
     Program(blocks, meta)
 

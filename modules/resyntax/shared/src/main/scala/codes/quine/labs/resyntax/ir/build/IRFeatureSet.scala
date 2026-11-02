@@ -56,8 +56,6 @@ final case class IRFeatureSet(
     lookBehindRule: IRLookBehindRule,
     // JavaScript (with `y`), PCRE (with `A`)
     anchored: Boolean,
-    // PCRE (with `(*UTF)`)
-    utf: Boolean,
     // PCRE (with `(*UCP)`)
     ucp: Boolean,
     // PCRE (with `(*CASELESS_RESTRICT)`)
@@ -154,7 +152,6 @@ object IRFeatureSet:
         case _: Dialect.Python                   => IRLookBehindRule.Python
         case _: Dialect.Ruby                     => IRLookBehindRule.Ruby,
       anchored = isJavaScript && flagSet.sticky || isPCRE && flagSet.anchored,
-      utf = isPCRE && startOptions.exists(o => o == "UTF" || o == "UTF8"),
       ucp = isPCRE && startOptions.contains("UCP"),
       caselessRestrict = isPCRE && startOptions.contains("CASELESS_RESTRICT"),
       turkishCasing = isPCRE && startOptions.contains("TURKISH_CASING"),

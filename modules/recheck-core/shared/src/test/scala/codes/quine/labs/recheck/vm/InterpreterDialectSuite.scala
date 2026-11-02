@@ -19,7 +19,7 @@ class InterpreterDialectSuite extends munit.FunSuite:
     val ir = ReDoS.parse(source, flags, dialect)
     val program = ProgramBuilder.build(ir).get
     val u = input match
-      case s: String  => inputOf(s, program.meta.mode)
+      case s: String  => inputOf(s, ir.mode)
       case u: UString => u
     Interpreter.run(program, u, 0, Options(usesAcceleration = usesAcceleration)).status
 

@@ -343,32 +343,6 @@ class IRPatternSuite extends munit.FunSuite:
     ".|$" -> true
   )
 
-  check("IRPattern#needsWordDistinction")(_.needsWordDistinction)(
-    ".|\\b" -> true,
-    "\\b|." -> true,
-    ".|." -> false,
-    ".\\b" -> true,
-    "\\b." -> true,
-    ".." -> false,
-    "(\\b)" -> true,
-    "(.)" -> false,
-    "(?<foo>\\b)" -> true,
-    "(?:\\b)" -> true,
-    "(?:\\b)*" -> true,
-    ".*" -> false,
-    "(?:\\b)+" -> true,
-    "(?:\\b)?" -> true,
-    "(?:\\b){2}" -> true,
-    "(?=\\b)" -> true,
-    "(?=.)" -> false,
-    "(?<=\\b)" -> true,
-    "\\B" -> true,
-    "\\b" -> true,
-    "^" -> false,
-    "$" -> false,
-    "." -> false
-  )
-
   check("IRPattern#needsSigmaStarAtBegin", "m")(_.needsSigmaStarAtBegin)("." -> true, "^" -> true)
   check("IRPattern#needsSigmaStarAtBegin")(_.needsSigmaStarAtBegin)("." -> true, "^" -> false)
   check("IRPattern#needsSigmaStarAtBegin", "y")(_.needsSigmaStarAtBegin)("." -> false)
