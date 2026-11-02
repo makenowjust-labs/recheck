@@ -151,11 +151,9 @@ object CharsetPropertyDataGen extends UnicodeDataGen {
 
   def source(pkg: String): String = {
     val sb = new StringBuilder
-    val version = UCharacter.getUnicodeVersion
 
     sb.append(s"package $pkg\n\n")
     sb.append("private[charset] object UnicodeData:\n\n")
-    sb.append(s"  val Version: String = \"${version.getMajor}.${version.getMinor}.${version.getMilli}\"\n\n")
 
     val binaryValues = Seq(1, 0).map(v => field(valueNames(UProperty.ALPHABETIC, v))).mkString(";")
     sb.append(s"  val BinaryValueNames: String = ${CharsetEncoder.literal(binaryValues)}\n\n")

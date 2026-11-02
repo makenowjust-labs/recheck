@@ -24,7 +24,7 @@ private[parser] object PerlLiteralRewriter:
     * With `extended` (the `x` flag), the lexer skips `#` comments. With `bytes`, the literal is a byte string, whose
     * non-ASCII bytes the case commands do not change.
     */
-  def rewrite(source: String, extended: Boolean, bytes: Boolean = false): Option[Rewritten] =
+  def rewrite(source: String, extended: Boolean, bytes: Boolean): Option[Rewritten] =
     if !source.contains('\\') then None else new PerlLiteralRewriter(source, extended, bytes).run()
 
   /** The non-ASCII characters that `quotemeta` quotes in a UTF-8 string (perlfunc `quotemeta`). */

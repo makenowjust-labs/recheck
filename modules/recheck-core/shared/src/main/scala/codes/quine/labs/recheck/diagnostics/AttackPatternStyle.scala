@@ -2,7 +2,6 @@ package codes.quine.labs.recheck
 package diagnostics
 
 import codes.quine.labs.recheck.util.ECMAScriptNotation
-import codes.quine.labs.recheck.util.NumberFormat
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.Properties
@@ -12,8 +11,8 @@ import codes.quine.labs.resyntax.charset.UnitMode
 
 /** AttackPatternStyle is a notation of [[AttackPattern]] and similar classes.
   *
-  * Except [[AttackPatternStyle.Superscript]], it writes an expression of the language that evaluates to the string. The
-  * JavaScript, Java and C# styles write the UTF-16 encoding of the string, which a string of these languages holds.
+  * It writes an expression of the language that evaluates to the string. The JavaScript, Java and C# styles write the
+  * UTF-16 encoding of the string, which a string of these languages holds.
   */
 sealed abstract class AttackPatternStyle extends Product with Serializable:
 
@@ -54,16 +53,8 @@ object AttackPatternStyle:
 
     def join: String = " + "
 
-  /** Superscript is a superscript style specifier for logs, e.g. `'a'³¹ '\x00'`. */
-  case object Superscript extends AttackPatternStyle:
-    def literal(s: UString): String = JavaScript.literal(s)
-
-    def repeat(s: UString, n: Int): String = s"${literal(s)}${NumberFormat.superscript(n)}"
-
-    def join: String = " "
-
   /** Python is a Python style specifier, e.g. `'a' * 31 + '\x00'`, or `b'a' * 31 + b'\x00'` for bytes. */
-  final case class Python(bytes: Boolean = false) extends AttackPatternStyle:
+  final case class Python(bytes: Boolean) extends AttackPatternStyle:
     def literal(s: UString): String = s.iterator.map(char).mkString(if bytes then "b'" else "'", "", "'")
 
     def repeat(s: UString, n: Int): String = s"${literal(s)} * $n"
@@ -80,7 +71,7 @@ object AttackPatternStyle:
       case c                         => f"\\U$c%08x"
 
   /** Ruby is a Ruby style specifier, e.g. `"a" * 31 + "\x00"`, or `"a".b * 31 + "\x00".b` for bytes. */
-  final case class Ruby(bytes: Boolean = false) extends AttackPatternStyle:
+  final case class Ruby(bytes: Boolean) extends AttackPatternStyle:
     def literal(s: UString): String =
       val cs = s.iterator.toIndexedSeq
       cs.indices
@@ -162,7 +153,7 @@ object AttackPatternStyle:
     * A literal of printable ASCII characters is single-quoted, and the others are double-quoted. Unless the style is
     * for bytes, a character is written as its UTF-8 bytes.
     */
-  final case class PHP(bytes: Boolean = false) extends AttackPatternStyle:
+  final case class PHP(bytes: Boolean) extends AttackPatternStyle:
     def literal(s: UString): String =
       val cs = s.iterator.toSeq
       if cs.forall(isASCIIPrintable) then

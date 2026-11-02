@@ -1,13 +1,10 @@
 package codes.quine.labs.resyntax.ir
 package build
 
-import scala.collection.mutable
-
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.FlagSet
-import codes.quine.labs.resyntax.ast.Node
-import codes.quine.labs.resyntax.ast.NodeData
+import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.parser.Parser
 
 trait IRHelper:
@@ -15,35 +12,22 @@ trait IRHelper:
 
   val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())
 
-  /** Builds IR, where a character-level node stays as `Unsupported` of itself, and returns the flags of each one. */
-  def build(s: String, flags: String, dialect: Dialect): (IRPattern, Seq[IRCharFlags]) =
+  def build(s: String, flags: String, dialect: Dialect): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)
-    val node = Parser.parse(s, flagSet, dialect)
-    val charFlags = mutable.ArrayBuffer.empty[IRCharFlags]
-    val pattern = IRBuilder.build(
-      node,
-      flagSet,
-      dialect,
-      Parser.determineUnitMode(s, flagSet, dialect),
-      Some((node: Node, flags: IRCharFlags) =>
-        charFlags.addOne(flags)
-        IRNodeData.Unsupported(node.data)
-      )
-    )
-    (pattern, charFlags.toSeq)
+    IRBuilder.build(Parser.parse(s, flagSet, dialect), flagSet, dialect, Parser.determineUnitMode(s, flagSet, dialect))
 
-  /** Returns the placeholder of a literal character in the expected IR. */
-  def char(c: Char): IRNodeData = IRNodeData.Unsupported(NodeData.Literal(c))
+  /** Returns a case-sensitive literal character in the expected IR. */
+  def char(c: Char): IRNodeData = IRNodeData.Chars(CharSet.single(c))
 
   /** Returns the flags at the start of a pattern without start options. */
   def flagsOf(dialect: Dialect, flags: String = ""): IRCharFlags =
     val flagSet = FlagSet.parse(flags, dialect)
-    BuildingContext(flagSet, dialect, IRFeatureSet.from(flagSet, dialect)).charFlags
+    BuildingContext(flagSet, dialect, IRFeatureSet.from(flagSet, dialect, Seq.empty)).charFlags
 
   def check(s: String, flags: String, dialects: Dialect*)(expected: IRNodeData)(implicit loc: munit.Location): Unit =
     for dialect <- dialects do
       test(s"IRBuilder.build: /$s/$flags in $dialect"):
-        val (pattern, _) = build(s, flags, dialect)
+        val pattern = build(s, flags, dialect)
         assert(pattern.node.equalsWithoutLoc(IRNode(expected)), pattern.node)
 
   /** Checks the IR whose expected value depends on the dialect (e.g. the flags in a node). */
@@ -52,7 +36,7 @@ trait IRHelper:
   ): Unit =
     for dialect <- dialects do
       test(s"IRBuilder.build: /$s/$flags in $dialect"):
-        val (pattern, _) = build(s, flags, dialect)
+        val pattern = build(s, flags, dialect)
         assert(pattern.node.equalsWithoutLoc(IRNode(expected(dialect))), pattern.node)
 
   def checkPattern(s: String, flags: String, dialects: Dialect*)(body: IRPattern => Unit)(implicit
@@ -60,17 +44,20 @@ trait IRHelper:
   ): Unit =
     for dialect <- dialects do
       test(s"IRBuilder.build: /$s/$flags in $dialect (pattern)"):
-        val (pattern, _) = build(s, flags, dialect)
+        val pattern = build(s, flags, dialect)
         body(pattern)
 
-  /** Checks the flags that each character-level node gets, in the source order. */
-  def checkFlags(s: String, flags: String, dialects: Dialect*)(expected: Dialect => Seq[IRCharFlags])(implicit
+  /** Returns the character-level nodes in the IR, in the source order. */
+  def charsIn(s: String, flags: String, dialect: Dialect): Seq[IRNodeData] =
+    build(s, flags, dialect).node.collect { case data @ (IRNodeData.Chars(_) | IRNodeData.Strings(_)) => data }
+
+  /** Checks the character-level nodes in the IR, which tell the flags each one gets. */
+  def checkChars(s: String, flags: String, dialects: Dialect*)(expected: Dialect => Seq[IRNodeData])(implicit
       loc: munit.Location
   ): Unit =
     for dialect <- dialects do
-      test(s"IRBuilder.build: /$s/$flags in $dialect (flags)"):
-        val (_, charFlags) = build(s, flags, dialect)
-        assertEquals(charFlags, expected(dialect))
+      test(s"IRBuilder.build: /$s/$flags in $dialect (chars)"):
+        assertEquals(charsIn(s, flags, dialect), expected(dialect))
 
   def error(s: String, flags: String, dialects: Dialect*)(message: String)(implicit loc: munit.Location): Unit =
     for dialect <- dialects do

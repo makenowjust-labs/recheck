@@ -44,15 +44,12 @@ class AttackPatternSuite extends munit.FunSuite:
       1
     )
     assertEquals(attack1.toString(AttackPatternStyle.JavaScript), "'ab' + 'cd'.repeat(3) + 'ef'")
-    assertEquals(attack1.toString(AttackPatternStyle.Superscript), "'ab' 'cd'³ 'ef'")
     val attack2 =
       AttackPattern(Seq((UString.fromUTF16Units(""), UString.fromUTF16Units("cd"), 2)), UString.fromUTF16Units("ef"), 1)
     assertEquals(attack2.toString(AttackPatternStyle.JavaScript), "'cd'.repeat(3) + 'ef'")
-    assertEquals(attack2.toString(AttackPatternStyle.Superscript), "'cd'³ 'ef'")
     val attack3 =
       AttackPattern(Seq((UString.fromUTF16Units("ab"), UString.fromUTF16Units("cd"), 2)), UString.fromUTF16Units(""), 1)
     assertEquals(attack3.toString(AttackPatternStyle.JavaScript), "'ab' + 'cd'.repeat(3)")
-    assertEquals(attack3.toString(AttackPatternStyle.Superscript), "'ab' 'cd'³")
 
     // The default style is `JavaScript`.
     assertEquals(attack1.toString, "'ab' + 'cd'.repeat(3) + 'ef'")

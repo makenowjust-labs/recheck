@@ -16,9 +16,6 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]):
   /** Tests whether this string is empty or not. */
   def isEmpty: Boolean = seq.isEmpty
 
-  /** Negates [[isEmpty]]. */
-  def nonEmpty: Boolean = seq.nonEmpty
-
   /** A size of this string's characters. */
   def size: Int = seq.size
 

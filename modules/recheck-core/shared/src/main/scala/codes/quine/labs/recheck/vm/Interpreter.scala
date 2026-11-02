@@ -39,23 +39,23 @@ object Interpreter:
     *
     * Note that we assume an input string is normalized here.
     */
-  def run(program: Program, input: UString, pos: Int, options: Options)(using ctx: Context): Result =
+  def run(program: Program, input: UString, options: Options)(using ctx: Context): Result =
     val interpreter = Interpreter(program, input, options)
-    interpreter.run(pos)
+    interpreter.run()
 
   /** Runs a program on a given input and a timeout. */
-  def runWithTimeout(program: Program, input: UString, pos: Int, options: Options, timeout: Duration)(using
+  def runWithTimeout(program: Program, input: UString, options: Options, timeout: Duration)(using
       ctx: Context
   ): Result =
     timeout match
       case d if d < Duration.Zero => Result(Status.Timeout, None, 0, Seq.empty, Set.empty, Set.empty, Map.empty)
-      case _: Duration.Infinite   => run(program, input, pos, options)
+      case _: Duration.Infinite   => run(program, input, options)
       case d                      =>
-        if (ctx.deadline ne null) && ctx.deadline.timeLeft < d then run(program, input, pos, options)
+        if (ctx.deadline ne null) && ctx.deadline.timeLeft < d then run(program, input, options)
         else
           val newCtx = Context(d, Option(ctx.token))
           val interpreter = new Interpreter(program, input, options)(using newCtx)
-          try interpreter.run(pos)
+          try interpreter.run()
           catch case _: TimeoutException => interpreter.result(Status.Timeout, None)
 
   /** Options is an options for running an interpreter. */
@@ -290,11 +290,11 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       .toSeq
     Result(status, captures, steps, loops, failedPoints.toSet, coverage.toSet, heatmap)
 
-  /** Runs matching from a position. */
-  def run(pos: Int): Result =
+  /** Runs matching from the start of the input. */
+  def run(): Result =
     val frame = Frame(
       program.blocks.head._1,
-      pos,
+      0,
       Vector.fill((program.meta.capturesSize + 1) * 2)(-1),
       Vector.fill(program.meta.countersSize)(0),
       Vector.fill(program.meta.canariesSize)(0),

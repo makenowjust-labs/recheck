@@ -21,7 +21,7 @@ class InterpreterDialectSuite extends munit.FunSuite:
     val u = input match
       case s: String  => inputOf(s, ir.mode)
       case u: UString => u
-    Interpreter.run(program, u, 0, Options(usesAcceleration = usesAcceleration)).status
+    Interpreter.run(program, u, Options(usesAcceleration = usesAcceleration)).status
 
   def accepts(
       source: String,

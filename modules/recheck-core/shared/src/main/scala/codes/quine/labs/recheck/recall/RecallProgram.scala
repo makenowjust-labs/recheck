@@ -431,7 +431,8 @@ object RecallProgram:
       .toRight("The pattern cannot be a PHP regex, since it contains every delimiter")
       .map: delimiter =>
         val bytes = mode == UnitMode.Byte
-        val regex = AttackPatternStyle.PHP().literal(UString.fromString(s"$delimiter$source$delimiter$flags"))
+        val regex =
+          AttackPatternStyle.PHP(bytes = false).literal(UString.fromString(s"$delimiter$source$delimiter$flags"))
         val input = attack.toString(AttackPatternStyle.PHP(bytes))
         val script =
           s"""|<?php

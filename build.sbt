@@ -114,7 +114,6 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |    source: String,
       |    flags: String,
       |    input: String,
-      |    pos: Int = 0,
       |    limit: Int = Int.MaxValue,
       |    usesAcceleration: Boolean = true,
       |    needsLoopAnalysis: Boolean = false,
@@ -133,7 +132,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |    needsCoverage = needsCoverage,
       |    needsHeatmap = needsHeatmap
       |  )
-      |  time("run")(Interpreter.run(program, uinput, pos, opts))
+      |  time("run")(Interpreter.run(program, uinput, opts))
       |
       |def seed(
       |    source: String,

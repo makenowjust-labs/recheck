@@ -55,7 +55,7 @@ object FuzzChecker:
       maxDegree: Int = Parameters.DefaultMaxDegree,
       heatRatio: Double = Parameters.DefaultHeatRatio,
       accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode,
-      avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
+      avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
   )(using ctx: Context): Iterator[(AttackComplexity.Vulnerable, AttackPattern, Hotspot)] =
     ctx.interrupt:
       new FuzzChecker(
@@ -121,7 +121,7 @@ private[fuzz] final class FuzzChecker(
     val maxDegree: Int,
     val heatRatio: Double,
     val accelerationMode: AccelerationMode,
-    val avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
+    val avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
 )(using val ctx: Context):
 
   import ctx._
@@ -379,7 +379,7 @@ private[fuzz] final class FuzzChecker(
     if input.length <= maxAttackStringSize && degree.forall(growsAsExpected(str, _)) then
       val usesAcceleration = fuzz.usesAcceleration(accelerationMode)
       val opts = Options(attackLimit, usesAcceleration = usesAcceleration, needsHeatmap = true)
-      val result = Interpreter.runWithTimeout(program, input, 0, opts, attackTimeout)
+      val result = Interpreter.runWithTimeout(program, input, opts, attackTimeout)
       if result.status == Status.Limit || result.status == Status.Timeout then
         log:
           s"""|fuzz: attack succeeded (status: ${result.status})
@@ -396,7 +396,7 @@ private[fuzz] final class FuzzChecker(
 
     val opts = Options(attackLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode))
     val results = Seq(n1, n2).map: n =>
-      Interpreter.runWithTimeout(program, fuzz.joinSurrogates(str.copy(n = n).toUString), 0, opts, attackTimeout)
+      Interpreter.runWithTimeout(program, fuzz.joinSurrogates(str.copy(n = n).toUString), opts, attackTimeout)
     // A string that cannot be measured is at least as heavy as assumed.
     if results.exists(r => r.status == Status.Limit || r.status == Status.Timeout) then return true
 
@@ -423,7 +423,7 @@ private[fuzz] final class FuzzChecker(
 
       val opts =
         Options(incubationLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode), needsCoverage = true)
-      val result = Interpreter.runWithTimeout(program, input, 0, opts, incubationTimeout)
+      val result = Interpreter.runWithTimeout(program, input, opts, incubationTimeout)
       add(str, input, result)
       if result.status == Status.Limit || result.status == Status.Timeout then
         log:

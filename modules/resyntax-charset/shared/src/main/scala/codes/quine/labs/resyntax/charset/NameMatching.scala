@@ -1,7 +1,7 @@
 package codes.quine.labs.resyntax.charset
 
 /** NameMatching is a rule to match property and value names against their aliases. */
-enum NameMatching:
+private[charset] enum NameMatching:
 
   case Exact
 
@@ -13,7 +13,7 @@ enum NameMatching:
     case Exact => name
     case Loose => NameMatching.loose(name)
 
-object NameMatching:
+private[charset] object NameMatching:
 
   /** Returns the key of the name for `Loose`. */
   def loose(name: String): String =

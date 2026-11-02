@@ -36,11 +36,11 @@ class ReDoSSuite extends munit.FunSuite:
 
   def checkFuzz(source: String, flags: String, params: Parameters)(using ctx: Context): Iterator[Diagnostics] =
     val ir = ReDoS.parse(source, flags, params.dialect)(using Context())
-    concat(ReDoS.checkFuzz(source, flags, ir, params))
+    concat(ReDoS.checkFuzz(source, flags, ir, params, (_, _) => false))
 
   def checkAuto(source: String, flags: String, params: Parameters): Iterator[Diagnostics] =
     val ir = ReDoS.parse(source, flags, params.dialect)
-    concat(ReDoS.checkAuto(source, flags, ir, params))
+    concat(ReDoS.checkAuto(source, flags, ir, params, (_, _) => false))
 
   test("ReDoS.check"):
     assertEquals(

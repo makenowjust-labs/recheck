@@ -160,7 +160,7 @@ class CodecSuite extends munit.FunSuite:
       )
     )
     assertEquals(
-      encodeAttackPattern(AttackPatternStyle.Python())(attack).hcursor.get[String]("pattern"),
+      encodeAttackPattern(AttackPatternStyle.Python(bytes = false))(attack).hcursor.get[String]("pattern"),
       Right("'a' + 'b' * 2 + 'c'")
     )
 
@@ -232,7 +232,10 @@ class CodecSuite extends munit.FunSuite:
       17
     )
     val decoder = decodeAttackPattern(UnitMode.CodePoint)
-    assertEquals(decoder.decodeJson(encodeAttackPattern(AttackPatternStyle.Python())(attack)), Right(attack))
+    assertEquals(
+      decoder.decodeJson(encodeAttackPattern(AttackPatternStyle.Python(bytes = false))(attack)),
+      Right(attack)
+    )
     assertEquals(
       decoder.decodeJson(Json.obj("pumps" := Json.arr(), "suffix" := "a")).left.map(_.pathToRootString),
       Left(Some(".base"))

@@ -34,22 +34,22 @@ class CaseMappingSuite extends munit.FunSuite:
     assertEquals(SimpleFold(0x10400), 0x10428)
     assertEquals(SimpleFold(0x1e921), 0x1e943)
     assertEquals(SimpleFold(0x10ffff), 0x10ffff)
-    assertEquals(SimpleFold.equivalents('k'), CharSet.of('K', 'k', Kelvin))
-    assertEquals(SimpleFold.equivalents('S'), CharSet.of('S', 's', LongS))
-    assertEquals(SimpleFold.equivalents(0x03c3), CharSet.of(0x03a3, 0x03c2, 0x03c3))
-    assert(CharSet.of(SharpS, CapitalSharpS).subsetOf(SimpleFold.equivalents(SharpS)))
-    assert(!SimpleFold.equivalents(SharpS).contains('s'))
-    assertEquals(SimpleFold.equivalents('i'), CharSet.of('I', 'i'))
-    assertEquals(SimpleFold.equivalents(DottedI), CharSet.of(DottedI))
+    assertEquals(SimpleFold.closure(CharSet.single('k')), CharSet.of('K', 'k', Kelvin))
+    assertEquals(SimpleFold.closure(CharSet.single('S')), CharSet.of('S', 's', LongS))
+    assertEquals(SimpleFold.closure(CharSet.single(0x03c3)), CharSet.of(0x03a3, 0x03c2, 0x03c3))
+    assert(CharSet.of(SharpS, CapitalSharpS).subsetOf(SimpleFold.closure(CharSet.single(SharpS))))
+    assert(!SimpleFold.closure(CharSet.single(SharpS)).contains('s'))
+    assertEquals(SimpleFold.closure(CharSet.single('i')), CharSet.of('I', 'i'))
+    assertEquals(SimpleFold.closure(CharSet.single(DottedI)), CharSet.of(DottedI))
     assertEquals(SimpleFold(UString('A', 0x03a3)), UString('a', 0x03c3))
 
   test("CaseMapping.SimpleFoldTurkic"):
     assertEquals(SimpleFoldTurkic('I'), DotlessI)
     assertEquals(SimpleFoldTurkic(DottedI), 'i'.toInt)
     assertEquals(SimpleFoldTurkic('A'), 'a'.toInt)
-    assertEquals(SimpleFoldTurkic.equivalents('i'), CharSet.of('i', DottedI))
-    assertEquals(SimpleFoldTurkic.equivalents('I'), CharSet.of('I', DotlessI))
-    assertEquals(SimpleFoldTurkic.equivalents('k'), CharSet.of('K', 'k', Kelvin))
+    assertEquals(SimpleFoldTurkic.closure(CharSet.single('i')), CharSet.of('i', DottedI))
+    assertEquals(SimpleFoldTurkic.closure(CharSet.single('I')), CharSet.of('I', DotlessI))
+    assertEquals(SimpleFoldTurkic.closure(CharSet.single('k')), CharSet.of('K', 'k', Kelvin))
 
   test("CaseMapping.SimpleUpper / SimpleLower"):
     assertEquals(SimpleUpper('a'), 'A'.toInt)
@@ -82,12 +82,12 @@ class CaseMappingSuite extends munit.FunSuite:
     assertEquals(ECMAScriptUpper(0x01c5), 0x01c4)
     assertEquals(ECMAScriptUpper(0xd801), 0xd801)
     assertEquals(ECMAScriptUpper(0x10428), 0x10428)
-    assertEquals(ECMAScriptUpper.equivalents('k'), CharSet.of('K', 'k'))
-    assertEquals(ECMAScriptUpper.equivalents('s'), CharSet.of('S', 's'))
-    assertEquals(ECMAScriptUpper.equivalents(0x03bc), CharSet.of(0x00b5, 0x039c, 0x03bc))
-    assertEquals(ECMAScriptUpper.equivalents(SharpS), CharSet.of(SharpS))
-    assertEquals(ECMAScriptUpper.equivalents(CapitalSharpS), CharSet.of(CapitalSharpS))
-    assertEquals(ECMAScriptUpper.equivalents(0x01c4), CharSet.of(0x01c4, 0x01c5, 0x01c6))
+    assertEquals(ECMAScriptUpper.closure(CharSet.single('k')), CharSet.of('K', 'k'))
+    assertEquals(ECMAScriptUpper.closure(CharSet.single('s')), CharSet.of('S', 's'))
+    assertEquals(ECMAScriptUpper.closure(CharSet.single(0x03bc)), CharSet.of(0x00b5, 0x039c, 0x03bc))
+    assertEquals(ECMAScriptUpper.closure(CharSet.single(SharpS)), CharSet.of(SharpS))
+    assertEquals(ECMAScriptUpper.closure(CharSet.single(CapitalSharpS)), CharSet.of(CapitalSharpS))
+    assertEquals(ECMAScriptUpper.closure(CharSet.single(0x01c4)), CharSet.of(0x01c4, 0x01c5, 0x01c6))
     assertEquals(ecmaScriptCanonicalize(false), ECMAScriptUpper)
     assertEquals(ecmaScriptCanonicalize(true), SimpleFold)
 
@@ -108,8 +108,9 @@ class CaseMappingSuite extends munit.FunSuite:
 
   for (name, f) <- mappings do
     test(s"CaseMapping.$name: image and preimage agree with apply"):
-      val set =
-        CharSet.fromIntervals(Seq((0x40, 0x5b), (0xc0, 0x250), (0x370, 0x400), (0x1e00, 0x1f40), (0x2100, 0x2200)))
+      val set = CharSet.union(
+        Seq((0x40, 0x5a), (0xc0, 0x24f), (0x370, 0x3ff), (0x1e00, 0x1f3f), (0x2100, 0x21ff)).map(CharSet.range)
+      )
       assertEquals(f.image(set), CharSet.of(set.iterator.map(f(_)).toSeq*))
       val range = 0 until 0x10000
       val pre = f.preimage(set)
@@ -129,7 +130,6 @@ class CaseMappingSuite extends munit.FunSuite:
     assertEquals(f.domain, CharSet.of(0x41, 0x43, 0x45, 0x46))
     val g = f.updated(Seq((0x43, 0x43), (0x42, 0x30)))
     assertEquals(g.entries.toSeq, Seq((0x41, 0x61), (0x42, 0x30), (0x45, 0x65), (0x46, 0x66)))
-    assertEquals(CaseMapping.identity.closure(CharSet.single(1)), CharSet.single(1))
     assertEquals(CaseMapping.fromEntries(SimpleFold.entries).entries.toSeq, SimpleFold.entries.toSeq)
 
   test("FullCaseFolding"):
@@ -141,22 +141,14 @@ class CaseMappingSuite extends munit.FunSuite:
     assertEquals(FullCaseFolding(0xfb03), UString('f', 'f', 'i'))
     assertEquals(FullCaseFolding(0x0390), UString(0x03b9, 0x0308, 0x0301))
     assertEquals(FullCaseFolding(0x1f88), UString(0x1f00, 0x03b9))
-    assertEquals(FullCaseFolding.turkic(DottedI), UString('i'))
-    assertEquals(FullCaseFolding.turkic('I'), UString(DotlessI))
-    assertEquals(FullCaseFolding.turkic(SharpS), UString('s', 's'))
-    assertEquals(FullCaseFolding(UString('S', SharpS)), UString('s', 's', 's'))
-    assertEquals(FullCaseFolding(UString('I'), turkic = true), UString(DotlessI))
 
   test("FullCaseFolding.multiCodePointFoldings"):
-    val m = FullCaseFolding.multiCodePointFoldings()
+    val m = FullCaseFolding.multiCodePointFoldings
     assert(CharSet.of(SharpS, CapitalSharpS).subsetOf(m(UString('s', 's'))))
     assertEquals(m(UString('i', 0x0307)), CharSet.of(DottedI))
     assertEquals(m(UString('f', 'f', 'i')), CharSet.of(0xfb03))
     assert(m.keys.forall(_.length >= 2))
     assert(m.size > 50, m.size)
-    val t = FullCaseFolding.multiCodePointFoldings(turkic = true)
-    assert(!t.contains(UString('i', 0x0307)))
-    assertEquals(t(UString('s', 's')), m(UString('s', 's')))
 
   test("FullCaseMapping.upper / lower / title"):
     assertEquals(FullCaseMapping.upper('a'), UString('A'))

@@ -72,7 +72,7 @@ class AttackStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     cases(Seq("python3", "-I", "-"), script)
 
   runtimeTest("Python: str", "python3"):
-    val style = AttackPatternStyle.Python()
+    val style = AttackPatternStyle.Python(bytes = false)
     check(texts, style, python(texts, style))(a => hex(units(a)))
 
   runtimeTest("Python: bytes", "python3"):
@@ -88,7 +88,7 @@ class AttackStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     cases(Seq("ruby", "-"), script)
 
   runtimeTest("Ruby: UTF-8", "ruby"):
-    val style = AttackPatternStyle.Ruby()
+    val style = AttackPatternStyle.Ruby(bytes = false)
     check(texts, style, ruby(texts, style))(a => s"UTF-8 ${hex(utf8(a))}")
 
   runtimeTest("Ruby: ASCII-8BIT", "ruby"):
@@ -150,7 +150,7 @@ class AttackStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     cases(Seq("php"), script)
 
   runtimeTest("PHP: UTF-8", "php"):
-    val style = AttackPatternStyle.PHP()
+    val style = AttackPatternStyle.PHP(bytes = false)
     check(texts, style, php(texts, style))(a => hex(utf8(a)))
 
   runtimeTest("PHP: bytes", "php"):

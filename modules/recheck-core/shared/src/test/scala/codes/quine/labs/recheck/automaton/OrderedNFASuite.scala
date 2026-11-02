@@ -23,7 +23,7 @@ class OrderedNFASuite extends munit.FunSuite:
         (1, 'b') -> Seq(1)
       )
     )
-    val nfaWLA = nfa.toNFAwLA
+    val nfaWLA = nfa.toNFAwLA(Int.MaxValue)
     assertEquals(
       nfaWLA,
       NFAwLA(
@@ -65,8 +65,8 @@ class OrderedNFASuite extends munit.FunSuite:
       )
     )
     // A look-ahead of no input, such as that of `hl` (`{0}`), is not in the NFAwLA.
-    assert(nfa.toNFAwLA.stateSet.contains((0, Set(0))))
-    val nfaWLA = restricted.toNFAwLA
+    assert(nfa.toNFAwLA(Int.MaxValue).stateSet.contains((0, Set(0))))
+    val nfaWLA = restricted.toNFAwLA(Int.MaxValue)
     assert(clue(nfaWLA.stateSet).forall((q, p) => q == 0 && p.exists(Set(1, 2).contains)))
     assertEquals(nfaWLA.stateSet.size, 2)
 

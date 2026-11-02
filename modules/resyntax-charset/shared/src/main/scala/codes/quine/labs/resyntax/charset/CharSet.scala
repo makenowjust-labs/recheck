@@ -84,20 +84,7 @@ final class CharSet private (private val bounds: Array[UChar]):
     if isEmpty || bounds(bounds.length - 1) <= mode.limit then this
     else intersect(mode.universe)
 
-  infix def partition(that: CharSet): Partition =
-    Partition(intersect(that), diff(that), that.diff(this))
-
   def subsetOf(that: CharSet): Boolean = diff(that).isEmpty
-
-  def intersects(that: CharSet): Boolean = intersect(that).nonEmpty
-
-  /** Code values shifted below zero are dropped. */
-  def shift(offset: Int): CharSet =
-    if offset == 0 || isEmpty then this
-    else
-      val builder = newBuilder
-      for (start, end) <- intervals do builder.addRange(math.max(start + offset, 0), math.max(end + offset, 0))
-      builder.result()
 
   /** Calls the function with every non-empty intersection `[start, end)` of an interval of this set and
     * `[from, until)`.
@@ -125,8 +112,6 @@ final class CharSet private (private val bounds: Array[UChar]):
       .mkString("CharSet(", ", ", ")")
 
 object CharSet:
-
-  final case class Partition(both: CharSet, onlyThis: CharSet, onlyThat: CharSet)
 
   /** Builder accumulates intervals in any order to build a set. */
   final class Builder private[CharSet] ():
@@ -180,18 +165,6 @@ object CharSet:
     val builder = newBuilder
     values.foreach(builder.addOne)
     builder.result()
-
-  /** Creates a set from half-open intervals `(start, end)` in any order; they may overlap. */
-  def fromIntervals(intervals: IterableOnce[(UChar, UChar)]): CharSet =
-    val builder = newBuilder
-    intervals.iterator.foreach((start, end) => builder.addRange(start, end))
-    builder.result()
-
-  def fromBoundaries(boundaries: IArray[UChar]): CharSet =
-    require(boundaries.length % 2 == 0, "odd number of boundaries")
-    require(boundaries.isEmpty || boundaries(0) >= 0, "negative code value")
-    require((1 until boundaries.length).forall(i => boundaries(i - 1) < boundaries(i)), "unsorted boundaries")
-    new CharSet(IArray.genericWrapArray(boundaries).toArray)
 
   private[charset] def unsafeFromBoundaries(boundaries: Array[UChar]): CharSet = new CharSet(boundaries)
 

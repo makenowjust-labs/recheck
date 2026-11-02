@@ -1,11 +1,15 @@
 package codes.quine.labs.resyntax.ir
 package build
 
+import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
+import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRAssertKind.*
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd.*
 import codes.quine.labs.resyntax.ir.IRLineTerminators as LT
 import codes.quine.labs.resyntax.ir.IRNodeData.Assert
+import codes.quine.labs.resyntax.ir.IRNodeData.Chars
 import codes.quine.labs.resyntax.ir.IRNodeData.Empty
 import codes.quine.labs.resyntax.ir.IRNodeData.Sequence
 
@@ -78,22 +82,27 @@ class IRFlagSuite extends munit.FunSuite with IRHelper:
   check("(?m)^", "", Python())(Sequence(Empty, Assert(LineBegin(LT.LF, AfterTerminator))))
 
   // The flags of character-level nodes.
-  checkFlags("a(?i)b(?-i)c", "", DotNet, Java, PCRE, Perl())(d => Seq(flagsOf(d), flagsOf(d, "i"), flagsOf(d)))
-  checkFlags("a(?i:b)c", "", All*)(d => Seq(flagsOf(d), flagsOf(d, "i"), flagsOf(d)))
-  checkFlags("(?:a(?i)b|c)d", "", DotNet, Java, PCRE, Perl())(d =>
-    Seq(flagsOf(d), flagsOf(d, "i"), flagsOf(d, "i"), flagsOf(d))
+  def caseless(c: Char): IRNodeData = Chars(CharSet.of(c, c.toUpper))
+
+  def any(s: String, flags: String, dialect: Dialect): IRNodeData = Chars(build(s, flags, dialect).universe)
+
+  checkChars("a(?i)b(?-i)c", "", DotNet, Java, PCRE, Perl())(_ => Seq(char('a'), caseless('b'), char('c')))
+  checkChars("a(?i:b)c", "", All*)(_ => Seq(char('a'), caseless('b'), char('c')))
+  checkChars("(?:a(?i)b|c)d", "", DotNet, Java, PCRE, Perl())(_ =>
+    Seq(char('a'), caseless('b'), caseless('c'), char('d'))
   )
-  checkFlags("(?i)a|b", "", Python())(d => Seq(flagsOf(d, "i"), flagsOf(d, "i")))
+  checkChars("(?i)a|b", "", Python())(_ => Seq(caseless('a'), caseless('b')))
   // Ruby's `m` is dot-all: `(?m:.)` matches `\n`.
-  checkFlags(".(?m:.)", "", Ruby())(d => Seq(flagsOf(d), flagsOf(d).copy(dotAll = true)))
-  checkFlags(".", "m", Ruby())(d => Seq(flagsOf(d).copy(dotAll = true)))
-  checkFlags(".", "s", DotNet, Java, JavaScript, PCRE, Perl(), Python())(d => Seq(flagsOf(d).copy(dotAll = true)))
-  checkFlags(".", "m", DotNet, Java, JavaScript, PCRE, Perl(), Python())(d => Seq(flagsOf(d)))
-  checkFlags(".(?d).", "", Java)(d => Seq(flagsOf(d), flagsOf(d).copy(lineTerminators = LT.LF)))
-  checkFlags("(*ANY).", "", PCRE)(d => Seq(flagsOf(d).copy(lineTerminators = LT.PCREAny)))
+  checkChars(".(?m:.)", "", Ruby())(d => charsIn(".", "", d) :+ any(".", "", d))
+  checkChars(".", "m", Ruby())(d => Seq(any(".", "", d)))
+  checkChars(".", "s", DotNet, Java, JavaScript, PCRE, Perl(), Python())(d => Seq(any(".", "", d)))
+  checkChars(".", "m", DotNet, Java, JavaScript, PCRE, Perl(), Python())(d => charsIn(".", "", d))
+  checkChars(".(?d).", "", Java)(d => charsIn(".", "", d) ++ charsIn(".", "d", d))
+  checkChars("(*ANY).", "", PCRE)(_ =>
+    Seq(Chars(UnitMode.Byte.universe.diff(CharSet.of(0x0a, 0x0b, 0x0c, 0x0d, 0x85))))
+  )
 
   // Unicode modes.
-  checkFlags("a", "", DotNet)(d => Seq(flagsOf(d)))
   test("IRCharFlags: the defaults"):
     assertEquals(flagsOf(JavaScript, "v").unicodeSets, true)
     assertEquals(flagsOf(Java).unicodeCase, false)
@@ -106,25 +115,26 @@ class IRFlagSuite extends munit.FunSuite with IRHelper:
     for d <- All do
       assertEquals(flagsOf(d).charset, IRCharset.Default)
       assertEquals(flagsOf(d).ignoreCase, false)
-  checkFlags("(*UTF)(*UCP)a", "", PCRE)(d => Seq(flagsOf(d).copy(unicodeClass = true)))
-  checkFlags("(*UTF)(*TURKISH_CASING)a", "", PCRE)(d => Seq(flagsOf(d).copy(turkishCasing = true)))
-  checkFlags("(*CASELESS_RESTRICT)a(?r)b", "", PCRE)(d =>
-    Seq(flagsOf(d).copy(caselessRestrict = true), flagsOf(d).copy(caselessRestrict = true))
-  )
-  checkFlags("a(?r)b", "", PCRE)(d => Seq(flagsOf(d), flagsOf(d).copy(caselessRestrict = true)))
+  checkChars("(*UTF)(*UCP)\\d", "", PCRE)(d => charsIn("\\d", "u", d))
+  // `(*UTF)(*TURKISH_CASING)(?i)i` matches `İ` but not `I`.
+  checkChars("(*UTF)(*TURKISH_CASING)(?i)i", "", PCRE)(_ => Seq(Chars(CharSet.of('i', 0x0130))))
+  // Neither `(*UTF)(*CASELESS_RESTRICT)(?i)k` nor `(*UTF)(?i)(?r)k` matches the Kelvin sign.
+  val kelvin: IRNodeData = Chars(CharSet.of('K', 'k', 0x212a))
+  checkChars("(*UTF)(*CASELESS_RESTRICT)(?i)k(?r)k", "", PCRE)(_ => Seq(caseless('k'), caseless('k')))
+  checkChars("(*UTF)(?i)k(?r)k", "", PCRE)(_ => Seq(kelvin, caseless('k')))
   // PHP's `r` is `(?r)`: `/k/iur` does not match the Kelvin sign, but `/(?-r)k/iur` does.
-  checkFlags("a(?-r)b", "r", PCRE)(d => Seq(flagsOf(d).copy(caselessRestrict = true), flagsOf(d)))
+  checkChars("k(?-r)k", "iur", PCRE)(_ => Seq(caseless('k'), kelvin))
   // `(*UTF)(?r)(?^i)k` matches the Kelvin sign, so `(?^)` resets `r`.
-  checkFlags("(?r)(?^i)a", "", PCRE)(d => Seq(flagsOf(d, "i")))
-  checkFlags("(*BSR_UNICODE)(*BSR_ANYCRLF)a", "", PCRE)(d => Seq(flagsOf(d).copy(bsrAnyCRLF = true)))
+  checkChars("(*UTF)(?r)(?^i)k", "", PCRE)(_ => Seq(kelvin))
+  checkChars("(*BSR_UNICODE)(*BSR_ANYCRLF)\\R", "", PCRE)(d => charsIn("(*BSR_ANYCRLF)\\R", "", d))
 
   // Character set modifiers, where the last one wins in Perl, Python and Ruby: `(?a)\d(?u)\d` matches `1١`.
-  checkFlags("a(?a)b(?u)c", "", Perl(), Ruby())(d =>
-    Seq(flagsOf(d), flagsOf(d).copy(charset = IRCharset.ASCII.All), flagsOf(d).copy(charset = IRCharset.Unicode))
+  checkChars("\\d(?a)\\d(?u)\\d", "", Perl(), Ruby())(d =>
+    charsIn("\\d", "", d) ++ charsIn("\\d", "a", d) ++ charsIn("\\d", "u", d)
   )
-  checkFlags("(?l)a(?d)b", "", Perl())(d => Seq(flagsOf(d).copy(charset = IRCharset.Locale), flagsOf(d)))
-  checkFlags("(?a)a", "", Python())(d => Seq(flagsOf(d).copy(charset = IRCharset.ASCII.All)))
-  checkFlags("(?L)a", "", Python(Python.Type.Bytes))(d => Seq(flagsOf(d, "").copy(charset = IRCharset.Locale)))
+  checkChars("(?l)\\w(?d)\\w", "", Perl())(d => charsIn("\\w", "l", d) ++ charsIn("\\w", "", d))
+  checkChars("(?a)\\w", "", Python())(d => charsIn("\\w", "a", d))
+  checkChars("(?L)\\w", "", Python(Python.Type.Bytes))(d => charsIn("\\w", "L", d))
   error("a", "L", Python())("Cannot use LOCALE flag with a str pattern")
   error("a", "u", Python(Python.Type.Bytes))("Cannot use UNICODE flag with a bytes pattern")
   // `re` checks the flags with the global inline flags: `re.compile('(?a)x', re.U)` raises `ValueError`.
@@ -132,27 +142,18 @@ class IRFlagSuite extends munit.FunSuite with IRHelper:
   error("(?u)(?a)x", "", Python())("ASCII and UNICODE flags are incompatible")
   error("(?L)x", "a", Python(Python.Type.Bytes))("ASCII and LOCALE flags are incompatible")
   error("(?a)x", "L", Python(Python.Type.Bytes))("ASCII and LOCALE flags are incompatible")
-  // A scoped flag is not checked: `re.compile('(?a:x)', re.U)` is valid.
-  checkFlags("(?a:x)", "u", Python())(d => Seq(flagsOf(d, "u").copy(charset = IRCharset.ASCII.All)))
+  // A scoped flag is not checked: `re.compile('(?a:\w)', re.U)` is valid.
+  checkChars("(?a:\\w)", "u", Python())(d => charsIn("\\w", "a", d))
   // Ruby's character set options have no `Regexp` constant, and the last one wins: `/(?au)\w/` matches `é`.
-  checkFlags("a", "au", Ruby())(d => Seq(flagsOf(d).copy(charset = IRCharset.Unicode)))
-  checkFlags("(?au)a(?ud)b", "", Ruby())(d => Seq(flagsOf(d).copy(charset = IRCharset.Unicode), flagsOf(d)))
+  checkChars("\\d", "au", Ruby())(d => charsIn("\\d", "u", d))
+  checkChars("(?au)\\d(?ud)\\d", "", Ruby())(d => charsIn("\\d", "u", d) ++ charsIn("\\d", "", d))
   // `(*UTF)(*UCP)(?a)(?^)\d` does not match `١`, so `(?^)` keeps `a` in PCRE, but not in Perl.
-  checkFlags("(?a)(?^)a", "", PCRE)(d => Seq(flagsOf(d).copy(charset = IRCharset.ASCII.All)))
-  checkFlags("(?a)(?^)a", "", Perl())(d => Seq(flagsOf(d)))
-  checkFlags("(?aD)a(?aS)b", "", PCRE)(d =>
-    Seq(
-      flagsOf(d)
-        .copy(charset = IRCharset.ASCII(digit = true, space = false, word = false, posix = false, posixDigit = false)),
-      flagsOf(d).copy(charset =
-        IRCharset.ASCII(digit = true, space = true, word = false, posix = false, posixDigit = false)
-      )
-    )
+  checkChars("(?a)(?^)\\d", "u", PCRE)(_ => Seq(Chars(CharSet.range('0', '9'))))
+  checkChars("(?a)(?^)\\d", "", Perl())(d => charsIn("\\d", "", d))
+  checkChars("(?aD)\\s(?aS)\\s", "u", PCRE)(d =>
+    charsIn("\\s", "u", d) :+ Chars(CharSet.of(0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x20))
   )
 
-  // Java's CANON_EQ makes a character-level node unsupported, so it does not reach the resolution.
-  checkFlags("a(?c)b", "", Java)(d => Seq(flagsOf(d)))
-
   // Perl's case commands are applied to a regex literal before parsing, so they leave no flags.
-  checkFlags("\\Ua\\Eb", "", Perl())(d => Seq(flagsOf(d), flagsOf(d)))
-  checkFlags("\\Qa\\Eb", "", Perl())(d => Seq(flagsOf(d), flagsOf(d)))
+  checkChars("\\Ua\\Eb", "", Perl())(_ => Seq(char('A'), char('b')))
+  checkChars("\\Qa\\Eb", "", Perl())(_ => Seq(char('a'), char('b')))

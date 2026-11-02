@@ -6,7 +6,7 @@ class DialectSuite extends munit.FunSuite:
   val All: Seq[Dialect] = Seq(JavaScript, Java, DotNet, PCRE, Python(), Ruby(), Perl())
 
   test("Dialect#name and Dialect.of"):
-    assertEquals(All.map(_.name), Dialect.names)
+    assertEquals(All.map(_.name), Seq("javascript", "java", "dotnet", "pcre", "python", "ruby", "perl"))
     for dialect <- All do assertEquals(Dialect.of(dialect.name), Some(dialect))
     assertEquals(Dialect.of("perl5"), None)
 

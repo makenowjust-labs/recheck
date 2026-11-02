@@ -7,6 +7,7 @@ import codes.quine.labs.recheck.vm.Inst.ReadKind
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
+import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
@@ -14,7 +15,8 @@ import codes.quine.labs.resyntax.ir.IRLineTerminators
 import codes.quine.labs.resyntax.ir.IRLookBehindStarts
 
 class InstSuite extends munit.FunSuite:
-  val Word: CharSet = CharSet.fromIntervals(Seq(('0', '9' + 1), ('A', 'Z' + 1), ('_', '_' + 1), ('a', 'z' + 1)))
+  val Word: CharSet =
+    CharSet.union(Seq(CharSet.range('0', '9'), CharSet.range('A', 'Z'), CharSet.single('_'), CharSet.range('a', 'z')))
 
   test("Inst#toString"):
     assertEquals(Inst.Ok.toString, "ok")
@@ -124,5 +126,11 @@ class InstSuite extends munit.FunSuite:
     assertEquals(ReadKind.Class(Word).toString, "class [0-9A-Z_a-z]")
     assertEquals(ReadKind.ClassNot(Word).toString, "class_not [0-9A-Z_a-z]")
     val semantics = IRBackReferenceSemantics(true, IRBackReferenceChoice.FirstSet)
-    assertEquals(ReadKind.Ref(Seq(0), semantics, IRCaseEquivalence.Identity).toString, "ref 0")
-    assertEquals(ReadKind.Ref(Seq(1, 2), semantics, IRCaseEquivalence.JavaASCII).toString, "ref 1,2 ignore_case")
+    assertEquals(
+      ReadKind.Ref(Seq(0), semantics, IRCaseEquivalence.Identity, IRBackReferenceFolding.Simple).toString,
+      "ref 0"
+    )
+    assertEquals(
+      ReadKind.Ref(Seq(1, 2), semantics, IRCaseEquivalence.JavaASCII, IRBackReferenceFolding.Simple).toString,
+      "ref 1,2 ignore_case"
+    )

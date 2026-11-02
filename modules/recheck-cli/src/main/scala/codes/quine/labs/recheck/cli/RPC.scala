@@ -114,7 +114,6 @@ object RPC:
     final val InvalidRequestCode = -32600
     final val MethodNotFoundCode = -32601
     final val InvalidParamsCode = -32602
-    final val InternalErrorCode = -32603
     // $COVERAGE-ON$
 
     given encode: Encoder[Error] = deriveEncoder

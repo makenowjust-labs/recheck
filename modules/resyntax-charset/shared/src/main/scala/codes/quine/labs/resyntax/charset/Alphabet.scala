@@ -36,8 +36,6 @@ final class Alphabet private (
         i += 1
     builder.result()
 
-  def setOf(indices: IterableOnce[Int]): CharSet = CharSet.union(indices.iterator.map(atoms))
-
   override def toString: String = atoms.mkString(s"Alphabet($mode, ", ", ", ")")
 
 object Alphabet:

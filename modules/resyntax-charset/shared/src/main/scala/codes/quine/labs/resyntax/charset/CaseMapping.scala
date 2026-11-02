@@ -65,8 +65,6 @@ final class CaseMapping private (
 
   def closure(set: CharSet): CharSet = preimage(image(set))
 
-  def equivalents(c: UChar): CharSet = closure(CharSet.single(c))
-
   def updated(overrides: IterableOnce[(UChar, UChar)]): CaseMapping =
     val map = mutable.SortedMap.from(entries)
     for (c, to) <- overrides.iterator do if c == to then map.remove(c) else map(c) = to
@@ -74,7 +72,7 @@ final class CaseMapping private (
 
   override def toString: String = s"CaseMapping(${starts.length} runs)"
 
-/** CaseMapping utilities and the mappings of [[Properties.unicodeVersion]]. */
+/** CaseMapping utilities and the Unicode case mappings. */
 object CaseMapping:
 
   /** Builds a mapping from pairs `(c, f(c))`; unlisted code values are mapped to themselves. */
@@ -123,8 +121,6 @@ object CaseMapping:
       next = start + (count - 1) * stride + 1
     new CaseMapping(starts.result(), counts.result(), strides.result(), deltas.result())
 
-  val identity: CaseMapping = new CaseMapping(Array.empty, Array.empty, Array.empty, Array.empty)
-
   /** Simple case folding: the `C` and `S` mappings of CaseFolding.txt. */
   lazy val SimpleFold: CaseMapping = decode(CaseData.SimpleFold)
 
@@ -154,23 +150,13 @@ object FullCaseFolding:
 
   private lazy val fullOverrides: Map[Int, UString] = Codec.overrides(CaseData.FullFold).toMap
 
-  private lazy val turkicOverrides: Map[Int, UString] =
-    fullOverrides ++ Codec.overrides(CaseData.FullFoldTurkic)
-
   def apply(c: Int): UString = fullOverrides.getOrElse(c, UString(CaseMapping.SimpleFold(c)))
-
-  /** Folds with the `T` mappings of CaseFolding.txt. */
-  def turkic(c: Int): UString = turkicOverrides.getOrElse(c, UString(CaseMapping.SimpleFold(c)))
-
-  def apply(s: UString, turkic: Boolean = false): UString =
-    UString.from(s.iterator.flatMap(c => (if turkic then this.turkic(c) else apply(c)).iterator))
 
   /** Maps each folded string of two or more code points to the code points folded to it, such as `ss` to `U+00DF` and
     * `U+1E9E`.
     */
-  def multiCodePointFoldings(turkic: Boolean = false): Map[UString, CharSet] =
-    val overrides = if turkic then turkicOverrides else fullOverrides
-    overrides.toSeq
+  def multiCodePointFoldings: Map[UString, CharSet] =
+    fullOverrides.toSeq
       .filter(_._2.length >= 2)
       .groupBy(_._2)
       .view

@@ -13,7 +13,8 @@ class IRCaptureSuite extends munit.FunSuite with IRHelper:
   )(implicit loc: munit.Location): Unit =
     checkPattern(s, flags, dialects*): pattern =>
       assertEquals(pattern.captureCount, count)
-      assertEquals(pattern.captureNames, names)
+      val named = pattern.node.collect { case Capture(index, Some(name), _) => (name, index) }
+      assertEquals(named.groupMap(_._1)(_._2).view.mapValues(_.distinct).toMap, names)
 
   // Simple numbering in the source order.
   check("(a)(?:(b)(c))", "", All*)(
@@ -82,8 +83,10 @@ class IRCaptureSuite extends munit.FunSuite with IRHelper:
   check("(?(?=a)a)(?<n>b)", "", DotNet)(
     Sequence(Conditional(IRCondition.LookAhead(false, char('a')), char('a'), Empty), Capture(1, Some("n"), char('b')))
   )
-  // A balancing group with a name captures (e.g. `(?<y-x>...)`).
-  captures("(?<x>a)(?<y-x>b)", "", DotNet)(2, Map("x" -> Seq(1), "y" -> Seq(2)))
+  // A balancing group with a name captures (e.g. `(?<y-x>...)`), which is unsupported but takes an index.
+  captures("(?<x>a)(?<y-x>b)", "", DotNet)(2, Map("x" -> Seq(1)))
+  checkPattern("(?<x>a)(?<y-x>b)\\k<y>", "", DotNet): pattern =>
+    assertEquals(pattern.node.collect { case BackReference(indices, _, _) => indices }, Seq(Seq(2)))
 
   // Explicit capture: `(a)(?<x>b)(c)` with `n` gives only `x` in .NET, PCRE (PHP's `n`) and Perl.
   check("(a)(?<x>b)(c)", "n", DotNet, PCRE, Perl())(Sequence(char('a'), Capture(1, Some("x"), char('b')), char('c')))

@@ -252,7 +252,7 @@ class IRCharSuite extends munit.FunSuite:
   // Perl's `aa` matches no ASCII and non-ASCII characters together, even by a multi-character folding.
   chars("(?aa)k", "i", Perl())(of("kK"))
   chars("(?aa)s", "i", Perl())(of("sS"))
-  chars("(?aa)ß", "i", Perl())(CaseMapping.SimpleFold.equivalents(0xdf))
+  chars("(?aa)ß", "i", Perl())(CaseMapping.SimpleFold.closure(CharSet.single(0xdf)))
   check("(?aa)ss", "i", Perl())(Sequence(Chars(of("sS")), Chars(of("sS"))))
   chars("(?a)k", "i", Perl())(of("kK\u212a"))
   chars("(?aa)(?u)k", "i", Perl())(of("kK\u212a"))
@@ -273,10 +273,10 @@ class IRCharSuite extends munit.FunSuite:
   chars("(*TURKISH_CASING)i", "iu", PCRE)(of("i\u0130"))
   // Ruby and Perl fold literals to several characters (e.g. `ß` and `ss`), longest first.
   // Unicode 18 adds a character folded to `ß`, so the sets come from the tables.
-  val sharpSs: CharSet = CaseMapping.SimpleFold.equivalents(0xdf)
+  val sharpSs: CharSet = CaseMapping.SimpleFold.closure(CharSet.single(0xdf))
   val sharpS: IRNodeData = Disjunction(
     Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))),
-    Chars(FullCaseFolding.multiCodePointFoldings()(UString.fromString("ss")))
+    Chars(FullCaseFolding.multiCodePointFoldings(UString.fromString("ss")))
   )
   check("ß", "i", Ruby(), Perl())(sharpS)
   check("ss", "i", Ruby())(sharpS)
@@ -329,7 +329,7 @@ class IRCharSuite extends munit.FunSuite:
   check("[s]s", "i", Ruby(), Perl())(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))
   // A class matches the foldings of its characters folded to several characters.
   // Ruby tries the class first and then a folding for each character.
-  val ssCount: Int = FullCaseFolding.multiCodePointFoldings()(UString.fromString("ss")).intersect(sharpSs).size
+  val ssCount: Int = FullCaseFolding.multiCodePointFoldings(UString.fromString("ss")).intersect(sharpSs).size
   check("[ß]", "i", Perl())(sharpS)
   check("[ß]", "i", Ruby())(Disjunction(Chars(sharpSs) +: Seq.fill(ssCount)(sharpS)*))
   check("[ßx]", "i", Ruby())(Disjunction(Chars(sharpSs.union(of("xX"))) +: Seq.fill(ssCount)(sharpS)*))

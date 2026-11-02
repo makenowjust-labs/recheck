@@ -227,7 +227,7 @@ object ReDoS:
       flags: String,
       ir: IRPattern,
       params: Parameters,
-      avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
+      avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
   )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
     import params._
 
@@ -285,7 +285,7 @@ object ReDoS:
       flags: String,
       ir: IRPattern,
       params: Parameters,
-      avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
+      avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
   )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
     val (automaton, automatonSafe) = checkAutomaton(source, flags, ir, params)
     var safe = automatonSafe

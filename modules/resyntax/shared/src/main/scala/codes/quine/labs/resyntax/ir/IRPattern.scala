@@ -16,8 +16,6 @@ final case class IRPattern(
     node: IRNode,
     /** The largest capture index, or `0` without captures. */
     captureCount: Int,
-    /** The capture indices of each name, in the order of the groups. */
-    captureNames: Map[String, Seq[Int]],
     /** How back-references behave in the dialect. */
     backReference: IRBackReferenceSemantics,
     /** How backtracking treats the captures in the dialect. */
@@ -33,7 +31,7 @@ final case class IRPattern(
     /** What the surrogate code points of the input are in the dialect. */
     surrogates: IRSurrogates,
     /** Where an empty match is rejected (PCRE's `(*NOTEMPTY)` and `(*NOTEMPTY_ATSTART)`). */
-    notEmpty: IRNotEmpty = IRNotEmpty.Never
+    notEmpty: IRNotEmpty
 ):
 
   /** The characters of the input, which the character sets of the nodes are subsets of. */

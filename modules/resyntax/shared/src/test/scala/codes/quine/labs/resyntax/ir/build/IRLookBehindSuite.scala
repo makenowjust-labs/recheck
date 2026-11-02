@@ -245,7 +245,7 @@ class IRLookBehindSuite extends munit.FunSuite with IRHelper:
           case IRNodeData.Sequence(nodes) => nodes.iterator.flatMap(find).nextOption()
           case _                          => None
 
-        val (pattern, _) = build(s, "", dialect)
+        val pattern = build(s, "", dialect)
         val expectedMatching =
           if expected.isEmpty then IRLookBehindMatch.Backward else IRLookBehindMatch.Forward(expected)
         assertEquals(find(pattern.node), Some(expectedMatching))

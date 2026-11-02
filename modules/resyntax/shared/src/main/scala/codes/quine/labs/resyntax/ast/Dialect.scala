@@ -62,8 +62,6 @@ enum Dialect:
 
 object Dialect:
 
-  val names: Seq[String] = Seq("javascript", "java", "dotnet", "pcre", "python", "ruby", "perl")
-
   /** Returns the dialect with its default settings. */
   def of(name: String): Option[Dialect] = name match
     case "javascript" => Some(JavaScript)

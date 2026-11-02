@@ -1,9 +1,12 @@
 package codes.quine.labs.resyntax.charset
 
 class CharSetSuite extends munit.FunSuite:
-  def set(intervals: (Int, Int)*): CharSet = CharSet.fromIntervals(intervals)
+  def set(intervals: (Int, Int)*): CharSet =
+    val builder = CharSet.newBuilder
+    for (start, end) <- intervals do builder.addRange(start, end)
+    builder.result()
 
-  test("CharSet.fromIntervals"):
+  test("CharSet.Builder"):
     assertEquals(set((1, 3), (5, 7)).intervals.toSeq, Seq((1, 3), (5, 7)))
     assertEquals(set((5, 7), (1, 3)).intervals.toSeq, Seq((1, 3), (5, 7)))
     assertEquals(set((1, 3), (3, 7)).intervals.toSeq, Seq((1, 7)))
@@ -16,12 +19,6 @@ class CharSetSuite extends munit.FunSuite:
     assertEquals(CharSet.range(2, 1), CharSet.empty)
     assertEquals(CharSet.of(3, 1, 2, 7), set((1, 4), (7, 8)))
     intercept[IllegalArgumentException](CharSet.single(-1))
-
-  test("CharSet.fromBoundaries"):
-    assertEquals(CharSet.fromBoundaries(IArray(1, 3, 5, 7)), set((1, 3), (5, 7)))
-    intercept[IllegalArgumentException](CharSet.fromBoundaries(IArray(1, 3, 5)))
-    intercept[IllegalArgumentException](CharSet.fromBoundaries(IArray(3, 1)))
-    intercept[IllegalArgumentException](CharSet.fromBoundaries(IArray(1, 3, 3, 4)))
 
   test("CharSet#isEmpty / nonEmpty / size / head / last"):
     assert(CharSet.empty.isEmpty)
@@ -82,20 +79,9 @@ class CharSetSuite extends munit.FunSuite:
     assertEquals(set((0x41, 0x20000)).restrict(UnitMode.UTF16), set((0x41, 0x10000)))
     assertEquals(set((0x41, 0x42)).restrict(UnitMode.Byte), set((0x41, 0x42)))
 
-  test("CharSet#partition"):
-    val p = set((1, 5)).partition(set((3, 8)))
-    assertEquals(p, CharSet.Partition(set((3, 5)), set((1, 3)), set((5, 8))))
-
-  test("CharSet#subsetOf / intersects"):
+  test("CharSet#subsetOf"):
     assert(set((2, 3)).subsetOf(set((1, 5))))
     assert(!set((2, 6)).subsetOf(set((1, 5))))
-    assert(set((2, 6)).intersects(set((5, 7))))
-    assert(!set((2, 5)).intersects(set((5, 7))))
-
-  test("CharSet#shift"):
-    assertEquals(set((1, 3), (5, 7)).shift(10), set((11, 13), (15, 17)))
-    assertEquals(set((1, 3), (5, 7)).shift(-2), set((0, 1), (3, 5)))
-    assertEquals(set((1, 3)).shift(-5), CharSet.empty)
 
   test("CharSet#iterator / boundaries"):
     assertEquals(set((1, 3), (5, 6)).iterator.toSeq, Seq(1, 2, 5))

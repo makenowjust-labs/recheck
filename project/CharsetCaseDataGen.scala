@@ -100,9 +100,6 @@ object CharsetCaseDataGen extends UnicodeDataGen {
     val full = AllCodePoints.collect {
       case c if fullFold(c, default) != Seq(UCharacter.foldCase(c, default)) => (c, fullFold(c, default))
     }
-    val fullTurkic = AllCodePoints.collect {
-      case c if fullFold(c, turkic) != fullFold(c, default) => (c, fullFold(c, turkic))
-    }
 
     val upper = AllCodePoints.collect {
       case c if fullUpper(c) != Seq(UCharacter.toUpperCase(c)) => (c, fullUpper(c))
@@ -122,7 +119,6 @@ object CharsetCaseDataGen extends UnicodeDataGen {
     )
     sb.append(s"  val SimpleFoldTurkic: String = ${CharsetEncoder.literal(overrides(simpleTurkic))}\n\n")
     sb.append(s"  val FullFold: String = ${CharsetEncoder.literal(overrides(full))}\n\n")
-    sb.append(s"  val FullFoldTurkic: String = ${CharsetEncoder.literal(overrides(fullTurkic))}\n\n")
     sb.append(
       s"  val SimpleUpper: String = ${CharsetEncoder.literal(runs(AllCodePoints)(UCharacter.toUpperCase(_: Int)))}\n\n"
     )

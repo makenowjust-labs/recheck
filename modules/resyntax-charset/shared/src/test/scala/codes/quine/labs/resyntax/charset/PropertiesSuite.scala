@@ -1,14 +1,9 @@
 package codes.quine.labs.resyntax.charset
 
 class PropertiesSuite extends munit.FunSuite:
-  import NameMatching.*
-
   def binary(name: String): BinaryProperty = Properties.binary(name).get
 
   def value(property: EnumeratedProperty, name: String): PropertyValue = property.value(name).get
-
-  test("Properties.unicodeVersion"):
-    assert(Properties.unicodeVersion.matches("""\d+\.\d+\.\d+"""), Properties.unicodeVersion)
 
   test("Properties.lookup: names and aliases"):
     val ws = binary("White_Space")
@@ -26,39 +21,34 @@ class PropertiesSuite extends munit.FunSuite:
     assertEquals(Properties.lookup("Dash").map(_.shortName), Some("Dash"))
     assertEquals(Properties.lookup("unknown"), None)
     assertEquals(Properties.binary("gc"), None)
-    assertEquals(Properties.enumerated("Alpha"), None)
 
   test("Properties.lookup: exact matching is case-sensitive"):
     assertEquals(Properties.lookup("alpha"), None)
     assertEquals(Properties.lookup("White Space"), None)
 
-  test("Properties.lookup: loose matching (UAX44-LM3)"):
-    val ws = binary("White_Space")
-    for name <- Seq("whitespace", "White-Space", "WHITE SPACE", "isWhite_Space", "Is_White_Space", "wspace") do
-      assertEquals(Properties.lookup(name, Loose), Some(ws), name)
-    assertEquals(Properties.lookup("generalcategory", Loose), Some(Properties.GeneralCategory))
-    assertEquals(Properties.GeneralCategory.value("isLu", Loose).map(_.name), Some("Uppercase_Letter"))
-    assertEquals(Properties.Script.value("is greek", Loose).map(_.name), Some("Greek"))
+  test("NameMatching.loose (UAX44-LM3)"):
     assertEquals(NameMatching.loose("Is_Line-Break Foo"), "linebreakfoo")
     assertEquals(NameMatching.loose("ISO_Comment"), "ocomment")
 
   test("Properties.lookup: every alias finds its own property and value"):
-    for matching <- NameMatching.values; p <- Properties.all; name <- p.names do
-      assert(Properties.lookup(name, matching).exists(_ eq p), s"$matching $name")
-    for matching <- NameMatching.values; p <- Properties.enumeratedProperties; v <- p.values; name <- v.names do
-      assert(p.value(name, matching).exists(_ eq v), s"$matching ${p.name}=$name")
+    for p <- Properties.all; name <- p.names do assert(Properties.lookup(name).exists(_ eq p), name)
+    for p <- Properties.enumeratedProperties; v <- p.values; name <- v.names do
+      assert(p.value(name).exists(_ eq v), s"${p.name}=$name")
 
   test("Properties.binaryValue"):
     assertEquals(Properties.binaryValue("Y"), Some(true))
     assertEquals(Properties.binaryValue("True"), Some(true))
     assertEquals(Properties.binaryValue("F"), Some(false))
-    assertEquals(Properties.binaryValue("no", Loose), Some(false))
-    assertEquals(Properties.binaryValue("no"), None)
+    assertEquals(Properties.binaryValue("is_No"), Some(false))
+    assertEquals(Properties.binaryValue("maybe"), None)
 
   test("Properties: binary properties"):
     assert(binary("Alphabetic").set.contains('a'))
     assert(!binary("Alpha").set.contains('1'))
-    assertEquals(binary("ASCII_Hex_Digit").set, CharSet.fromIntervals(Seq((0x30, 0x3a), (0x41, 0x47), (0x61, 0x67))))
+    assertEquals(
+      binary("ASCII_Hex_Digit").set,
+      CharSet.union(Seq(CharSet.range(0x30, 0x39), CharSet.range(0x41, 0x46), CharSet.range(0x61, 0x66)))
+    )
     assert(binary("White_Space").set.contains(0x3000))
     assert(binary("Emoji").set.contains(0x1f600))
     assert(binary("Ideographic").set.contains(0x6f22))
@@ -76,16 +66,16 @@ class PropertiesSuite extends munit.FunSuite:
     val rgi = binary("RGI_Emoji")
     assert(rgi.isOfStrings)
     assert(rgi.set.contains(0x1f600))
-    assert(rgi.classSet.contains(UString(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467)))
-    assert(rgi.classSet.contains(UString(0x23, 0xfe0f, 0x20e3)))
-    assert(rgi.classSet.contains(UString(0x1f1ef, 0x1f1f5)))
-    assert(!rgi.classSet.contains(UString(0x61, 0x62)))
-    assert(binary("Basic_Emoji").classSet.contains(UString(0xa9, 0xfe0f)))
+    assert(rgi.classSet.strings.contains(UString(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467)))
+    assert(rgi.classSet.strings.contains(UString(0x23, 0xfe0f, 0x20e3)))
+    assert(rgi.classSet.strings.contains(UString(0x1f1ef, 0x1f1f5)))
+    assert(!rgi.classSet.strings.contains(UString(0x61, 0x62)))
+    assert(binary("Basic_Emoji").classSet.strings.contains(UString(0xa9, 0xfe0f)))
     assert(binary("Basic_Emoji").set.contains(0x231a))
     assertEquals(binary("Emoji_Keycap_Sequence").classSet.strings.size, 12)
     assert(binary("Emoji_Keycap_Sequence").set.isEmpty)
-    assert(binary("RGI_Emoji_Flag_Sequence").classSet.contains(UString(0x1f1fa, 0x1f1f8)))
-    assert(binary("RGI_Emoji_Modifier_Sequence").classSet.contains(UString(0x1f44b, 0x1f3fb)))
+    assert(binary("RGI_Emoji_Flag_Sequence").classSet.strings.contains(UString(0x1f1fa, 0x1f1f8)))
+    assert(binary("RGI_Emoji_Modifier_Sequence").classSet.strings.contains(UString(0x1f44b, 0x1f3fb)))
     assert(binary("RGI_Emoji_Tag_Sequence").classSet.strings.forall(_(0) == 0x1f3f4))
     assert(binary("RGI_Emoji_ZWJ_Sequence").classSet.strings.forall(_.iterator.contains(0x200d)))
     val parts = Seq(
@@ -108,8 +98,6 @@ class PropertiesSuite extends munit.FunSuite:
     assertEquals(value(gc, "punct"), value(gc, "P"))
     assertEquals(value(gc, "Combining_Mark"), value(gc, "M"))
     assert(value(gc, "Cn").set.contains(0x0378))
-    assertEquals(gc.valuesAt('A'), Seq(value(gc, "Lu")))
-    assertEquals(gc.valuesAt(0x0378), Seq(value(gc, "Cn")))
     assertEquals(gc.value("L&"), None)
 
   test("Properties: General_Category groups"):
@@ -144,10 +132,7 @@ class PropertiesSuite extends munit.FunSuite:
     assertEquals(value(sc, "Qaai"), value(sc, "Inherited"))
     assert(value(sc, "Greek").set.contains(0x03b1))
     assert(value(sc, "Latin").set.contains('a'))
-    assertEquals(sc.valuesAt(0x3042).map(_.name), Seq("Hiragana"))
-    assertEquals(scx.valuesAt(0x30fc).map(_.name).toSet, Set("Hiragana", "Katakana"))
-    assert(Set("Arabic", "Thaana").subsetOf(scx.valuesAt(0x0660).map(_.name).toSet))
-    assertEquals(scx.valuesAt('a').map(_.name), Seq("Latin"))
+    assert(value(scx, "Arabic").set.contains(0x0660) && value(scx, "Thaana").set.contains(0x0660))
     assertEquals(scx.values.map(_.names), sc.values.map(_.names))
     assert(value(sc, "Latin").set.subsetOf(value(scx, "Latin").set))
 
@@ -159,7 +144,6 @@ class PropertiesSuite extends munit.FunSuite:
     assertEquals(value(blk, "Basic_Latin"), value(blk, "ASCII"))
     assertEquals(value(blk, "Hiragana").set, CharSet.range(0x3040, 0x309f))
     assert(value(blk, "No_Block").set.contains(0x2fe0))
-    assertEquals(blk.valuesAt(0x3042).map(_.name), Seq("Hiragana"))
 
   test("Properties: Bidi_Class"):
     val bc = Properties.BidiClass
@@ -169,7 +153,6 @@ class PropertiesSuite extends munit.FunSuite:
     assert(value(bc, "L").set.contains('a'))
     assert(value(bc, "R").set.contains(0x05d0))
     assert(value(bc, "AL").set.contains(0x0627))
-    assertEquals(bc.valuesAt('a').map(_.shortName), Seq("L"))
 
   test("Properties: Age"):
     val age = Properties.Age
@@ -181,7 +164,6 @@ class PropertiesSuite extends munit.FunSuite:
     assert(value(age, "2.1").set.contains(0x20ac))
     assert(value(age, "6.1").set.contains(0x1f600))
     assert(value(age, "NA").set.contains(0x0378))
-    assertEquals(age.valuesAt(0x1f600).map(_.shortName), Seq("6.1"))
     assert(Properties.presentIn(value(age, "2.1")).contains('A'))
     assert(Properties.presentIn(value(age, "2.1")).contains(0x20ac))
     assert(!Properties.presentIn(value(age, "2.1")).contains(0x1f600))
@@ -203,12 +185,10 @@ class PropertiesSuite extends munit.FunSuite:
     assert(value(gcb, "L").set.contains(0x1100))
     assert(value(gcb, "LV").set.contains(0xac00))
     assert(value(gcb, "LVT").set.contains(0xac01))
-    assertEquals(gcb.valuesAt('a').map(_.shortName), Seq("XX"))
     val incb = Properties.IndicConjunctBreak
     assert(value(incb, "Consonant").set.contains(0x0915))
     assert(value(incb, "Linker").set.contains(0x094d))
     assert(value(incb, "Extend").set.contains(0x200d))
-    assertEquals(incb.valuesAt('a').map(_.name), Seq("None"))
 
   test("Properties: other enumerated properties"):
     def check(p: EnumeratedProperty, v: String, c: Int)(implicit loc: munit.Location): Unit =
@@ -238,7 +218,7 @@ class PropertiesSuite extends munit.FunSuite:
     check(Properties.IdentifierType, "Recommended", 'a')
     assertEquals(Properties.lookup("lb"), Some(Properties.LineBreak))
     assertEquals(Properties.lookup("Identifier_Type"), Some(Properties.IdentifierType))
-    assert(Properties.IdentifierType.valuesAt(0x018d).size >= 2, Properties.IdentifierType.valuesAt(0x018d))
+    assert(Properties.IdentifierType.values.count(_.set.contains(0x018d)) >= 2)
 
   test("Properties: Canonical_Combining_Class values are named by their numbers too"):
     val ccc = Properties.CanonicalCombiningClass
@@ -254,10 +234,11 @@ class PropertiesSuite extends munit.FunSuite:
     assertEquals(Properties.lookup("nv"), Some(nv))
     assert(nv.nan.isNaN)
     assert(nv.nan.set.contains('a'))
-    assertEquals(nv.valueAt('3').toDouble, 3.0)
-    assertEquals(nv.valueAt(0x00bd).numerator, 1L)
-    assertEquals(nv.valueAt(0x00bd).denominator, 2L)
-    assertEquals(nv.valueAt(0x0f33).toDouble, -0.5)
+    def valueAt(c: Int): NumericValue = nv.values.find(_.set.contains(c)).get
+    assertEquals(valueAt('3').toDouble, 3.0)
+    assertEquals(valueAt(0x00bd).numerator, 1L)
+    assertEquals(valueAt(0x00bd).denominator, 2L)
+    assertEquals(valueAt(0x0f33).toDouble, -0.5)
     assert(nv.values.exists(v => v.denominator == 320))
     assert(nv.values.exists(_.toDouble == 1e16))
     assertEquals(nv.values.map(_.set.size).sum, 0x110000)
