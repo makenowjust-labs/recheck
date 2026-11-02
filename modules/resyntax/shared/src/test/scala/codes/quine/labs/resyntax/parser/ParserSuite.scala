@@ -11,7 +11,7 @@ import codes.quine.labs.resyntax.ast.GroupKind.*
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.Quantifier.*
 
-class ParserSuite extends ParserSuiteBase:
+class ParserSuite extends munit.FunSuite with ParserHelper:
   // Top
   error(")", "", All*)("Unmatched ')' at 0")
 

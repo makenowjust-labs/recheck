@@ -3,14 +3,14 @@ package codes.quine.labs.recheck.diagnostics
 import java.nio.file.Path
 import scala.concurrent.duration.*
 
-import codes.quine.labs.recheck.util.RuntimeSuite
+import codes.quine.labs.recheck.util.RuntimeHelper
 import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
 /** Evaluates the attack strings written in each style on the runtimes. */
-class AttackStyleRuntimeSuite extends RuntimeSuite:
+class AttackStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
 
   override val munitTimeout: Duration = 120.seconds
 

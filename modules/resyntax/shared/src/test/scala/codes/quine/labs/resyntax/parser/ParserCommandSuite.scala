@@ -18,7 +18,7 @@ import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.Quantifier.*
 import codes.quine.labs.resyntax.ast.Reference.*
 
-class ParserCommandSuite extends ParserSuiteBase:
+class ParserCommandSuite extends munit.FunSuite with ParserHelper:
   check("(?(1)a)", "", DotNet, PCRE, Perl(), Python(), Ruby())(Command(Conditional(Indexed(1), Literal('a'))))
   check("(?(1)a|b)", "", DotNet, PCRE, Perl(), Python(), Ruby())(
     Command(Conditional(Indexed(1), Literal('a'), Literal('b')))

@@ -10,7 +10,7 @@ import codes.quine.labs.resyntax.ast.GroupKind.*
 import codes.quine.labs.resyntax.ast.NameStyle.*
 import codes.quine.labs.resyntax.ast.NodeData.*
 
-class ParserGroupSuite extends ParserSuiteBase:
+class ParserGroupSuite extends munit.FunSuite with ParserHelper:
   // Group
   check("(?:a)", "", All*)(Group(NonCapture, Literal('a')))
   check("(?|a)", "", PCRE, Perl())(Command(BranchReset(Literal('a'))))

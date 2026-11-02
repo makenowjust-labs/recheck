@@ -19,7 +19,7 @@ import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.Quantifier.*
 import codes.quine.labs.resyntax.ast.Reference.*
 
-class ParserBackslashSuite extends ParserSuiteBase:
+class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   // Backslash
   check("\\a", "", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Backslash(Escape(Single('a'), 0x07)))
   check("\\b", "", All*)(Backslash(Assert(Boundary(None))))

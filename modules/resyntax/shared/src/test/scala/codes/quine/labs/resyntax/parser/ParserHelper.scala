@@ -7,7 +7,9 @@ import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.PerlSource
 
-abstract class ParserSuiteBase extends munit.FunSuite:
+trait ParserHelper:
+  self: munit.FunSuite =>
+
   def check(s: String, flags: String, dialects: Dialect*)(expected: NodeData)(implicit loc: munit.Location): Unit =
     for dialect <- dialects do
       test(s"Parser.parse: /$s/$flags in $dialect"):

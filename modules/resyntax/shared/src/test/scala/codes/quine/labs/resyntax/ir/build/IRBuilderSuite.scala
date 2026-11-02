@@ -26,7 +26,7 @@ import codes.quine.labs.resyntax.ir.IRQuantifier.*
 import codes.quine.labs.resyntax.ir.build.IRCharClasses.ASCIIWord
 import codes.quine.labs.resyntax.parser.Parser
 
-class IRBuilderSuite extends IRSuiteBase:
+class IRBuilderSuite extends munit.FunSuite with IRHelper:
   // Disjunction
   check("|", "", All*)(Disjunction(Empty, Empty))
 

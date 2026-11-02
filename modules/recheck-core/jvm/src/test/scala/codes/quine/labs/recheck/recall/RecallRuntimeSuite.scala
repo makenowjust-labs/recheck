@@ -19,7 +19,7 @@ import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.exec.ExecResult
-import codes.quine.labs.recheck.util.RuntimeSuite
+import codes.quine.labs.recheck.util.RuntimeHelper
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.CharSet
@@ -31,7 +31,7 @@ import codes.quine.labs.resyntax.ir.IRNodeData
   *
   * The comments note the behavior of the versions at the time of writing.
   */
-class RecallRuntimeSuite extends RuntimeSuite:
+class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
 
   override val munitTimeout: Duration = 60.seconds
 

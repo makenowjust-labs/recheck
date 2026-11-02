@@ -8,7 +8,7 @@ import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.QuoteLiteral.*
 
-class ParserClassSuite extends ParserSuiteBase:
+class ParserClassSuite extends munit.FunSuite with ParserHelper:
   def classPOSIXLiteral(name: String): NodeData =
     Sequence(Class(false, ClassUnion(s"[:$name:".map(c => ClassLiteral(c))*)), Literal(']'))
 

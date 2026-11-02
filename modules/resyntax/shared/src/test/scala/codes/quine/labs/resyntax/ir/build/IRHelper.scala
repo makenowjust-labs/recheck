@@ -10,7 +10,9 @@ import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.parser.Parser
 
-abstract class IRSuiteBase extends munit.FunSuite:
+trait IRHelper:
+  self: munit.FunSuite =>
+
   val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())
 
   /** Builds IR, where a character-level node stays as `Unsupported` of itself, and returns the flags of each one. */

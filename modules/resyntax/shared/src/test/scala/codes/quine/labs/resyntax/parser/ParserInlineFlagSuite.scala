@@ -7,7 +7,7 @@ import codes.quine.labs.resyntax.ast.FlagSetDiff
 import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.NodeData.*
 
-class ParserInlineFlagSuite extends ParserSuiteBase:
+class ParserInlineFlagSuite extends munit.FunSuite with ParserHelper:
   check("(?i)", "", DotNet, Java, PCRE, Perl(), Python(), Ruby()):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None)))
   check("(?m)", "", DotNet, Java, PCRE, Perl(), Python(), Ruby()):

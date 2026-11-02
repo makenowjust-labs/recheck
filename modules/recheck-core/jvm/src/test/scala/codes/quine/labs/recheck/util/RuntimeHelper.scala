@@ -5,8 +5,9 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
-/** RuntimeSuite provides the helpers of the tests running the runtimes in `PATH`. */
-trait RuntimeSuite extends munit.FunSuite:
+/** RuntimeHelper provides the helpers of the tests running the runtimes in `PATH`. */
+trait RuntimeHelper:
+  self: munit.FunSuite =>
 
   /** Checks whether the program is in `PATH`. */
   def available(program: String): Boolean =
