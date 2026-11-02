@@ -7,9 +7,9 @@ import scala.util.Try
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.fuzz.DynamicSeeder.*
-import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UString
 
 class DynamicSeederSuite extends munit.FunSuite:
 
@@ -36,12 +36,12 @@ class DynamicSeederSuite extends munit.FunSuite:
 
   test("DynamicSeeder.Patch.InsertChar#apply"):
     assertEquals(
-      Patch.InsertChar(1, Set(CharSet.single('x'))).apply(UStringUtil.fromString("012"), false),
-      Seq(UStringUtil.fromString("0x12"), UStringUtil.fromString("0x2"))
+      Patch.InsertChar(1, Set(CharSet.single('x'))).apply(UString.fromUTF16Units("012"), false),
+      Seq(UString.fromUTF16Units("0x12"), UString.fromUTF16Units("0x2"))
     )
 
   test("DynamicSeeder.Patch.InsertString#apply"):
     assertEquals(
-      Patch.InsertString(1, UStringUtil.fromString("xyz")).apply(UStringUtil.fromString("012"), false),
-      Seq(UStringUtil.fromString("0xyz12"))
+      Patch.InsertString(1, UString.fromUTF16Units("xyz")).apply(UString.fromUTF16Units("012"), false),
+      Seq(UString.fromUTF16Units("0xyz12"))
     )

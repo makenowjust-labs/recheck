@@ -7,8 +7,6 @@ import scala.concurrent.duration.Duration
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.util.UStringUtil
-import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.recheck.vm.Inst.ReadKind
 import codes.quine.labs.recheck.vm.Interpreter
 import codes.quine.labs.recheck.vm.Interpreter.CoverageItem
@@ -51,7 +49,7 @@ object DynamicSeeder:
     interrupt:
       queue.enqueue((UString.empty, None))
       for (ch, _) <- fuzz.alphabet.pairs do
-        val s = UStringUtil.fromCodePoints(Iterator(ch.head))
+        val s = UString.fromCodePointsAsUTF16(Iterator(ch.head))
         queue.enqueue((s, None))
         added.add(s)
 

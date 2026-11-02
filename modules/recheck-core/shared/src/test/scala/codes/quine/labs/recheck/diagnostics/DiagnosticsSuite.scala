@@ -11,9 +11,9 @@ import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.TimeoutException
 import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.common.UnsupportedException
-import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
+import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
 class DiagnosticsSuite extends munit.FunSuite:
@@ -35,8 +35,8 @@ class DiagnosticsSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Exponential(false),
           AttackPattern(
-            Seq((UStringUtil.fromString("a"), UStringUtil.fromString("b"), 0)),
-            UStringUtil.fromString("c"),
+            Seq((UString.fromUTF16Units("a"), UString.fromUTF16Units("b"), 0)),
+            UString.fromUTF16Units("c"),
             2
           ),
           Hotspot.empty,
@@ -60,8 +60,8 @@ class DiagnosticsSuite extends munit.FunSuite:
           UnitMode.CodePoint,
           AttackComplexity.Polynomial(2, false),
           AttackPattern(
-            Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
-            UStringUtil.fromString("!"),
+            Seq((UString.fromUTF16Units(""), UString.fromUTF16Units("a"), 0)),
+            UString.fromUTF16Units("!"),
             2
           ),
           Hotspot.empty,

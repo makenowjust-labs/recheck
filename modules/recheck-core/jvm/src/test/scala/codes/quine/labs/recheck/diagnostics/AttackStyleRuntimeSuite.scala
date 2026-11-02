@@ -4,8 +4,6 @@ import java.nio.file.Path
 import scala.concurrent.duration.*
 
 import codes.quine.labs.recheck.RuntimeHelper
-import codes.quine.labs.recheck.util.UStringUtil
-import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
@@ -15,8 +13,8 @@ class AttackStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
   override val munitTimeout: Duration = 120.seconds
 
   def attack(pumps: Seq[(String, String, Int)], suffix: String, n: Int): AttackPattern =
-    val ps = pumps.map((s, t, m) => (UStringUtil.fromString(s), UStringUtil.fromString(t), m))
-    AttackPattern(ps, UStringUtil.fromString(suffix), n)
+    val ps = pumps.map((s, t, m) => (UString.fromUTF16Units(s), UString.fromUTF16Units(t), m))
+    AttackPattern(ps, UString.fromUTF16Units(suffix), n)
 
   /** Attack strings of UTF-16 code units, where no surrogate pair spans two parts. */
   val texts: Seq[AttackPattern] = Seq(
@@ -51,14 +49,14 @@ class AttackStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
   def cases(command: Seq[String], input: String = "", dir: Option[Path] = None): Seq[String] =
     run(command, input, dir).linesIterator.collect { case s"case:$line" => line }.toSeq
 
-  def check(attacks: Seq[AttackPattern], style: AttackPattern.Style, actual: Seq[String])(
+  def check(attacks: Seq[AttackPattern], style: AttackPatternStyle, actual: Seq[String])(
       expected: AttackPattern => String
   )(using munit.Location): Unit =
     assertEquals(actual.size, attacks.size)
     for (a, line) <- attacks.zip(actual) do assertEquals(line, expected(a), clue(a.toString(style)))
 
   runtimeTest("JavaScript", "node"):
-    val style = AttackPattern.JavaScript
+    val style = AttackPatternStyle.JavaScript
     val script =
       s"""|for (const s of [${texts.map(_.toString(style)).mkString(", ")}]) {
           |  console.log('case:' + Array.from({ length: s.length }, (_, i) => s.charCodeAt(i).toString(16)).join(' '));
@@ -66,7 +64,7 @@ class AttackStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
           |""".stripMargin
     check(texts, style, cases(Seq("node", "-"), script))(a => hex(units(a)))
 
-  def python(attacks: Seq[AttackPattern], style: AttackPattern.Style): Seq[String] =
+  def python(attacks: Seq[AttackPattern], style: AttackPatternStyle): Seq[String] =
     val script =
       s"""|for s in [${attacks.map(_.toString(style)).mkString(", ")}]:
           |    print('case:' + ' '.join('%x' % (c if isinstance(c, int) else ord(c)) for c in s))
@@ -74,14 +72,14 @@ class AttackStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     cases(Seq("python3", "-I", "-"), script)
 
   runtimeTest("Python: str", "python3"):
-    val style = AttackPattern.Python()
+    val style = AttackPatternStyle.Python()
     check(texts, style, python(texts, style))(a => hex(codePoints(a)))
 
   runtimeTest("Python: bytes", "python3"):
-    val style = AttackPattern.Python(bytes = true)
+    val style = AttackPatternStyle.Python(bytes = true)
     check(bytes, style, python(bytes, style))(a => hex(units(a)))
 
-  def ruby(attacks: Seq[AttackPattern], style: AttackPattern.Style): Seq[String] =
+  def ruby(attacks: Seq[AttackPattern], style: AttackPatternStyle): Seq[String] =
     val script =
       s"""|[${attacks.map(_.toString(style)).mkString(", ")}].each do |s|
           |  puts "case:#{s.encoding} " + s.bytes.map { |b| b.to_s(16) }.join(' ')
@@ -90,15 +88,15 @@ class AttackStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     cases(Seq("ruby", "-"), script)
 
   runtimeTest("Ruby: UTF-8", "ruby"):
-    val style = AttackPattern.Ruby()
+    val style = AttackPatternStyle.Ruby()
     check(texts, style, ruby(texts, style))(a => s"UTF-8 ${hex(utf8(a))}")
 
   runtimeTest("Ruby: ASCII-8BIT", "ruby"):
-    val style = AttackPattern.Ruby(bytes = true)
+    val style = AttackPatternStyle.Ruby(bytes = true)
     check(bytes, style, ruby(bytes, style))(a => s"ASCII-8BIT ${hex(units(a))}")
 
   runtimeTest("Java", "java"):
-    val style = AttackPattern.Java
+    val style = AttackPatternStyle.Java
     val program =
       s"""|class Main {
           |  public static void main(String[] args) {
@@ -115,7 +113,7 @@ class AttackStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     check(texts, style, cases(Seq("java", path.toString)))(a => hex(units(a)))
 
   runtimeTest("C#", "dotnet"):
-    val style = AttackPattern.CSharp
+    val style = AttackPatternStyle.CSharp
     val program =
       s"""|using System;
           |using System.Linq;
@@ -130,19 +128,19 @@ class AttackStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
 
   def perl(attacks: Seq[AttackPattern]): Seq[String] =
     val script =
-      s"""|for my $$s (${attacks.map(_.toString(AttackPattern.Perl)).mkString(", ")}) {
+      s"""|for my $$s (${attacks.map(_.toString(AttackPatternStyle.Perl)).mkString(", ")}) {
           |  print 'case:' . join(' ', map { sprintf '%x', ord } split //, $$s) . "\\n";
           |}
           |""".stripMargin
     cases(Seq("perl", "-"), script)
 
   runtimeTest("Perl: characters", "perl"):
-    check(texts, AttackPattern.Perl, perl(texts))(a => hex(codePoints(a)))
+    check(texts, AttackPatternStyle.Perl, perl(texts))(a => hex(codePoints(a)))
 
   runtimeTest("Perl: bytes", "perl"):
-    check(bytes, AttackPattern.Perl, perl(bytes))(a => hex(units(a)))
+    check(bytes, AttackPatternStyle.Perl, perl(bytes))(a => hex(units(a)))
 
-  def php(attacks: Seq[AttackPattern], style: AttackPattern.Style): Seq[String] =
+  def php(attacks: Seq[AttackPattern], style: AttackPatternStyle): Seq[String] =
     val script =
       s"""|<?php
           |foreach ([${attacks.map(_.toString(style)).mkString(", ")}] as $$s) {
@@ -152,9 +150,9 @@ class AttackStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     cases(Seq("php"), script)
 
   runtimeTest("PHP: UTF-8", "php"):
-    val style = AttackPattern.PHP()
+    val style = AttackPatternStyle.PHP()
     check(texts, style, php(texts, style))(a => hex(utf8(a)))
 
   runtimeTest("PHP: bytes", "php"):
-    val style = AttackPattern.PHP(bytes = true)
+    val style = AttackPatternStyle.PHP(bytes = true)
     check(bytes, style, php(bytes, style))(a => hex(units(a)))

@@ -15,12 +15,12 @@ import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.Seeder
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
+import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
-import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
@@ -48,8 +48,8 @@ class CodecSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Exponential(false),
           AttackPattern(
-            Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
-            UStringUtil.fromString("\u0000"),
+            Seq((UString.fromUTF16Units(""), UString.fromUTF16Units("a"), 0)),
+            UString.fromUTF16Units("\u0000"),
             17
           ),
           Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat), Hotspot.Spot(3, 4, Hotspot.Heat))),
@@ -64,10 +64,10 @@ class CodecSuite extends munit.FunSuite:
         "status" := "vulnerable",
         "checker" := Checker.Automaton.asInstanceOf[Checker],
         "complexity" := AttackComplexity.Exponential(false).asInstanceOf[AttackComplexity],
-        "attack" -> encodeAttackPattern(AttackPattern.JavaScript)(
+        "attack" -> encodeAttackPattern(AttackPatternStyle.JavaScript)(
           AttackPattern(
-            Seq((UStringUtil.fromString(""), UStringUtil.fromString("a"), 0)),
-            UStringUtil.fromString("\u0000"),
+            Seq((UString.fromUTF16Units(""), UString.fromUTF16Units("a"), 0)),
+            UString.fromUTF16Units("\u0000"),
             17
           )
         ),
@@ -84,7 +84,7 @@ class CodecSuite extends munit.FunSuite:
           Dialect.JavaScript,
           UnitMode.UTF16,
           AttackComplexity.Exponential(false),
-          AttackPattern(Seq.empty, UStringUtil.fromString(""), 0),
+          AttackPattern(Seq.empty, UString.fromUTF16Units(""), 0),
           Hotspot(Seq.empty),
           Checker.Automaton,
           Some(recall)
@@ -144,12 +144,12 @@ class CodecSuite extends munit.FunSuite:
 
   test("codec.encodeAttackPattern"):
     val attack = AttackPattern(
-      Seq((UStringUtil.fromString("a"), UStringUtil.fromString("b"), 2)),
-      UStringUtil.fromString("c"),
+      Seq((UString.fromUTF16Units("a"), UString.fromUTF16Units("b"), 2)),
+      UString.fromUTF16Units("c"),
       0
     )
     assertEquals(
-      encodeAttackPattern(AttackPattern.JavaScript)(attack),
+      encodeAttackPattern(AttackPatternStyle.JavaScript)(attack),
       Json.obj(
         "pumps" := Json.arr(Json.obj("prefix" := "a", "pump" := "b", "bias" := 2)),
         "suffix" := "c",
@@ -159,7 +159,7 @@ class CodecSuite extends munit.FunSuite:
       )
     )
     assertEquals(
-      encodeAttackPattern(AttackPattern.Python())(attack).hcursor.get[String]("pattern"),
+      encodeAttackPattern(AttackPatternStyle.Python())(attack).hcursor.get[String]("pattern"),
       Right("'a' + 'b' * 2 + 'c'")
     )
 
@@ -208,7 +208,7 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(encodeErrorKind(ErrorKind.Unexpected("foo")), Json.obj("kind" := "unexpected", "message" := "foo"))
 
   test("codec.encodeUString"):
-    assertEquals(encodeUString(UStringUtil.fromString("foo")), Json.fromString("foo"))
+    assertEquals(encodeUString(UString.fromUTF16Units("foo")), Json.fromString("foo"))
 
   test("codec.decodeUString"):
     // Each mode decodes what `encodeUString` gives, including a lone surrogate.
@@ -231,7 +231,7 @@ class CodecSuite extends munit.FunSuite:
       17
     )
     val decoder = decodeAttackPattern(UnitMode.CodePoint)
-    assertEquals(decoder.decodeJson(encodeAttackPattern(AttackPattern.Python())(attack)), Right(attack))
+    assertEquals(decoder.decodeJson(encodeAttackPattern(AttackPatternStyle.Python())(attack)), Right(attack))
     assertEquals(
       decoder.decodeJson(Json.obj("pumps" := Json.arr(), "suffix" := "a")).left.map(_.pathToRootString),
       Left(Some(".base"))

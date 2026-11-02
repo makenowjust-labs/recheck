@@ -3,7 +3,6 @@ package codes.quine.labs.recheck.vm
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
-import codes.quine.labs.recheck.util.UStringUtil
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Status
 import codes.quine.labs.resyntax.ast.Dialect
@@ -29,7 +28,7 @@ class InterpreterDialectSuite extends munit.FunSuite:
       matches: Boolean = true
   )(using loc: munit.Location): Unit =
     val u = input match
-      case s: String  => UStringUtil.fromString(s)
+      case s: String  => UString.fromUTF16Units(s)
       case u: UString => u
     val expected = if matches then Status.Ok else Status.Fail
     for usesAcceleration <- Seq(false, true) do

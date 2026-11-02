@@ -2,9 +2,8 @@ package codes.quine.labs.recheck
 package fuzz
 
 import codes.quine.labs.recheck.diagnostics.AttackPattern
+import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.fuzz.FString.*
-import codes.quine.labs.recheck.util.UStringUtil
-import codes.quine.labs.recheck.util.UStringUtil.*
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
 
@@ -78,7 +77,7 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]):
           val repeat = n + m
           for _ <- 1 to repeat do str.addAll(part)
           pos += size
-    UStringUtil.fromCodePoints(str.result())
+    UString.fromCodePointsAsUTF16(str.result())
 
   /** Builds an attack pattern string from this. */
   def toAttackPattern: AttackPattern =
@@ -96,24 +95,24 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]):
           pos += 1
           val repeat = n + m
           if repeat > 1 then
-            val s = UStringUtil.fromCodePoints(str.result())
+            val s = UString.fromCodePointsAsUTF16(str.result())
             str.clear()
             val pump = seq
               .slice(pos, pos + size)
               .map:
                 case Wrap(u)      => u
                 case Repeat(_, _) => throw new IllegalArgumentException
-            val t = UStringUtil.fromCodePoints(pump)
+            val t = UString.fromCodePointsAsUTF16(pump)
             pumps.addOne((s, t, m))
             pos += size
 
-    val suffix = UStringUtil.fromCodePoints(str.result())
+    val suffix = UString.fromCodePointsAsUTF16(str.result())
     AttackPattern(pumps.result(), suffix, n)
 
   /** Returns the string representation of this string in the style. */
-  def toString(style: AttackPattern.Style): String = toAttackPattern.toString(style)
+  def toString(style: AttackPatternStyle): String = toAttackPattern.toString(style)
 
-  override def toString: String = toString(AttackPattern.JavaScript)
+  override def toString: String = toString(AttackPatternStyle.JavaScript)
 
 /** FString types and utilities. */
 object FString:
