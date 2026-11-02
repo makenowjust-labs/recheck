@@ -1,0 +1,38 @@
+name: Set up
+description: Installs the tools of mise.toml, and the Node.js packages with the cached pnpm store.
+
+inputs:
+  tools:
+    description: The tools to install, separated by spaces, or all the tools if empty.
+    default: ""
+  cache-key:
+    description: The cache key of the tools, or the default one of mise-action if empty.
+    default: ""
+  pnpm-install:
+    description: Whether to install the Node.js packages.
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: jdx/mise-action@v5
+      with:
+        version: 2026.10.25
+        install_args: ${{ inputs.tools }}
+        cache_key: ${{ inputs.cache-key }}
+    - if: inputs.pnpm-install == 'true'
+      id: pnpm-store
+      name: Locate pnpm store
+      shell: bash
+      run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+    - if: inputs.pnpm-install == 'true'
+      name: Cache pnpm
+      uses: actions/cache@v6
+      with:
+        path: ${{ steps.pnpm-store.outputs.path }}
+        key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: ${{ runner.os }}-pnpm-
+    - if: inputs.pnpm-install == 'true'
+      name: Install
+      shell: bash
+      run: pnpm install --frozen-lockfile
