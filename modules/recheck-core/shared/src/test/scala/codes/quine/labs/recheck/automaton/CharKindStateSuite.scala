@@ -50,6 +50,3 @@ class CharKindStateSuite extends munit.FunSuite:
     assertEquals(CharKindState(base, based = 1).forgetMarks, CharKindState(CharKind.Normal, based = 1))
     assertEquals(CharKindState(extender, based = 1).forgetMarks, CharKindState(CharKind(extenders = 1), based = 1))
     assertEquals(CharKindState(extender).forgetMarks, CharKindState(CharKind.Normal))
-
-  test("CharKindState#hashCode"):
-    assertEquals(CharKindState(CharKind.Word).hashCode, CharKind.Word.hashCode)

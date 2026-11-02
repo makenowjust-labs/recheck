@@ -1,8 +1,6 @@
 package codes.quine.labs.recheck
 package automaton
 
-import scala.util.hashing.MurmurHash3
-
 import codes.quine.labs.resyntax.ir.alphabet.CharKind
 
 /** CharKindState is the state of the text around a position that the zero-width assertions inspect.
@@ -52,11 +50,6 @@ final case class CharKindState(
   /** Forgets the marks of the character except an extender after a base, the only one that later assertions inspect. */
   def forgetMarks: CharKindState =
     copy(kind = kind.copy(marks = 0, extenders = kind.extenders & based, bases = 0))
-
-  // A state with only the kind hashes as the kind, which keeps the orders of the automaton's states.
-  override def hashCode: Int =
-    if !afterCR && based == 0 && last.isEmpty && follow.isEmpty then kind.hashCode
-    else MurmurHash3.caseClassHash(this)
 
 /** CRFollow is what follows `\r`. */
 enum CRFollow:
