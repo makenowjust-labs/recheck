@@ -31,8 +31,6 @@ object DynamicSeeder:
   )(using ctx: Context): Set[FString] = ctx.interrupt:
     import ctx._
 
-    val unicode = fuzz.program.meta.unicode
-
     val set = mutable.Set.empty[FString]
     val added = mutable.Set.empty[UString]
     val queue = mutable.Queue.empty[(UString, Option[CoverageLocation])]
@@ -49,7 +47,7 @@ object DynamicSeeder:
     interrupt:
       queue.enqueue((UString.empty, None))
       for (ch, _) <- fuzz.alphabet.pairs do
-        val s = UString.fromCodePointsAsUTF16(Iterator(ch.head))
+        val s = UString(ch.head)
         queue.enqueue((s, None))
         added.add(s)
 
@@ -60,20 +58,20 @@ object DynamicSeeder:
           if target.forall(loc => !covered.contains(CoverageItem(loc, true))) then
             val result = Interpreter.runWithTimeout(fuzz.program, input, 0, opts, timeout)
             if result.status == Status.Limit || result.status == Status.Timeout then
-              set.add(FString(input, unicode))
-              set.add(FString.build(input, result.loops, unicode))
+              set.add(FString(input))
+              set.add(FString.build(input, result.loops))
               return set.toSet
 
             // If the input string can reach a new pc,
             // it should be added to a seed set.
             if !result.coverage.subsetOf(covered) then
               covered.addAll(result.coverage)
-              set.add(FString(input, unicode))
-              set.add(FString.build(input, result.loops, unicode))
+              set.add(FString(input))
+              set.add(FString.build(input, result.loops))
               for failedPoint <- result.failedPoints do
                 if !covered.contains(CoverageItem(failedPoint.target, true)) then
                   for
-                    patched <- Patch.build(failedPoint, fuzz.alphabet).apply(input, unicode);
+                    patched <- Patch.build(failedPoint, fuzz.alphabet).apply(input);
                     if !added.contains(patched)
                   do
                     queue.enqueue((patched, Some(failedPoint.target)))
@@ -83,18 +81,20 @@ object DynamicSeeder:
 
   /** Patch is a patch to reach a new pc. */
   private[fuzz] sealed abstract class Patch extends Serializable with Product:
-    def apply(s: UString, unicode: Boolean): Seq[UString]
+    def apply(s: UString): Seq[UString]
 
   private[fuzz] object Patch:
 
     /** InsertChar is a patch to insert (or replace) each characters at the `pos`. */
     final case class InsertChar(pos: Int, chs: Set[CharSet]) extends Patch:
-      def apply(s: UString, unicode: Boolean): Seq[UString] =
-        chs.toSeq.map(_.head).flatMap(c => Seq(s.insertAt(pos, c), s.replaceAt(pos, c, unicode)))
+      def apply(s: UString): Seq[UString] =
+        chs.toSeq.flatMap: cs =>
+          val c = UString(cs.head)
+          Seq(s.insert(pos, c), s.slice(0, pos) ++ c ++ s.slice(pos + 1, s.length))
 
     /** InsertString is a patch to insert a string at the `pos`. */
     final case class InsertString(pos: Int, s: UString) extends Patch:
-      def apply(t: UString, unicode: Boolean): Seq[UString] =
+      def apply(t: UString): Seq[UString] =
         Seq(t.insert(pos, s))
 
     /** Builds a patch from a failed point. */

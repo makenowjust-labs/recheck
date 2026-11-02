@@ -17,9 +17,7 @@ object Program:
 
   /** Meta is a meta information of a program for matching and analysis. */
   final case class Meta(
-      /** The unit of characters, where the input is UTF-16 code units for `UTF16` and `CodePoint`, and bytes for
-        * `Byte`.
-        */
+      /** The unit of the input, which is a UTF-16 code unit, a code point or a byte. */
       mode: UnitMode,
       /** Whether the program reads the captures (back-references, capture tests and `reject_empty`), which a matching
         * state includes then.
@@ -35,7 +33,4 @@ object Program:
       countersSize: Int,
       canariesSize: Int,
       predecessors: Vector[Set[Label]]
-  ):
-
-    /** Whether a surrogate pair of the input is read as one character. */
-    def unicode: Boolean = mode == UnitMode.CodePoint
+  )

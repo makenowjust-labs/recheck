@@ -15,10 +15,13 @@ import codes.quine.labs.resyntax.charset.UString
 class InterpreterDialectSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
-  def run(source: String, flags: String, dialect: Dialect, input: UString, usesAcceleration: Boolean): Status =
+  def run(source: String, flags: String, dialect: Dialect, input: String | UString, usesAcceleration: Boolean): Status =
     val ir = ReDoS.parse(source, flags, dialect)
     val program = ProgramBuilder.build(ir).get
-    Interpreter.run(program, input, 0, Options(usesAcceleration = usesAcceleration)).status
+    val u = input match
+      case s: String  => inputOf(s, program.meta.mode)
+      case u: UString => u
+    Interpreter.run(program, u, 0, Options(usesAcceleration = usesAcceleration)).status
 
   def accepts(
       source: String,
@@ -27,12 +30,9 @@ class InterpreterDialectSuite extends munit.FunSuite:
       flags: String = "",
       matches: Boolean = true
   )(using loc: munit.Location): Unit =
-    val u = input match
-      case s: String  => UString.fromUTF16Units(s)
-      case u: UString => u
     val expected = if matches then Status.Ok else Status.Fail
     for usesAcceleration <- Seq(false, true) do
-      assertEquals(run(source, flags, dialect, u, usesAcceleration), expected, s"/$source/ in $dialect on $input")
+      assertEquals(run(source, flags, dialect, input, usesAcceleration), expected, s"/$source/ in $dialect on $input")
 
   def refutes(source: String, dialect: Dialect, input: String | UString, flags: String = "")(using
       loc: munit.Location

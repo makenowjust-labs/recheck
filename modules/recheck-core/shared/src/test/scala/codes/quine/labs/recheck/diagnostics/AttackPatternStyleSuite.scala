@@ -18,7 +18,7 @@ class AttackPatternStyleSuite extends munit.FunSuite:
     assertEquals(attack.toString(Perl), "\"x\" . \"a\" x 31 . \"\\x00\"")
     assertEquals(attack.toString(PHP()), "'x' . str_repeat('a', 31) . \"\\x00\"")
 
-    val pump = AttackPattern(Seq((UString.empty, UString.fromUTF16Units("😀"), 0)), UString.empty, 2)
+    val pump = AttackPattern(Seq((UString.empty, UString.fromString("😀"), 0)), UString.empty, 2)
     assertEquals(pump.toString(CSharp), "string.Concat(Enumerable.Repeat(\"😀\", 2))")
     assertEquals(pump.toString(Python()), "'😀' * 2")
 
@@ -34,7 +34,7 @@ class AttackPatternStyleSuite extends munit.FunSuite:
     assertEquals(show("\u0000\u0001\u0008\t\u000b\u001b\u007f"), "'\\x00\\x01\\x08\\t\\v\\x1B\\x7F'")
 
   test("AttackPatternStyle#literal: escapes"):
-    def show(style: AttackPatternStyle, s: String): String = style.literal(UString.fromUTF16Units(s))
+    def show(style: AttackPatternStyle, s: String): String = style.literal(UString.fromString(s))
 
     val special = "'\"\\$@#{\t\n"
     assertEquals(show(Python(), special), "'\\'\"\\\\$@#{\\t\\n'")

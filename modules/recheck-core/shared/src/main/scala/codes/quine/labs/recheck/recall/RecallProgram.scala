@@ -113,8 +113,8 @@ object RecallProgram:
 
   /** Returns the JavaScript program for `node`. */
   private[recall] def javascript(source: String, flags: String, attack: AttackPattern): RecallProgram =
-    val sourceString = AttackPatternStyle.JavaScript.literal(UString.fromUTF16Units(source))
-    val flagsString = AttackPatternStyle.JavaScript.literal(UString.fromUTF16Units(flags))
+    val sourceString = AttackPatternStyle.JavaScript.literal(UString.fromString(source))
+    val flagsString = AttackPatternStyle.JavaScript.literal(UString.fromString(flags))
     // `process.stdout` may write to a pipe asynchronously, so it uses `writeSync`.
     val script =
       s"""|const { writeSync } = require('node:fs');
@@ -141,7 +141,7 @@ object RecallProgram:
     // A bytes pattern is the Latin-1 encoding of the source.
     val pattern =
       if bytes then style.literal(UString.from(source.iterator.flatMap(c => utf8OrLatin1(c.toInt))))
-      else style.literal(UString.fromUTF16Units(source))
+      else style.literal(UString.fromString(source))
     val options = flags.distinct.collect:
       case c @ ('i' | 'm' | 's' | 'x' | 'a' | 'u' | 'L') => s"re.${c.toUpper}"
     val input = attack.toString(style)
@@ -176,7 +176,7 @@ object RecallProgram:
       case 'm' => "Regexp::MULTILINE"
       case 'x' => "Regexp::EXTENDED"
       case 'n' => "Regexp::NOENCODING"
-    val regex = if prefix.isEmpty then pattern else s"${style.literal(UString.fromUTF16Units(prefix))} + $pattern"
+    val regex = if prefix.isEmpty then pattern else s"${style.literal(UString.fromString(prefix))} + $pattern"
     val input = attack.toString(style)
     val script =
       s"""|$$stdout.sync = true
@@ -326,19 +326,16 @@ object RecallProgram:
     * hexadecimal digits of the UTF-16 code units, four for each.
     */
   private[recall] def data(flags: String, source: String, attack: AttackPattern): String =
-    def units(cs: Iterator[UChar]): String =
-      cs.flatMap(c => if c > 0xffff then UString(c).encode(UnitMode.UTF16).iterator else Iterator(c))
-        .map(hex(_, 4))
-        .mkString
+    def units(s: UString): String = s.encode(UnitMode.UTF16).map(hex(_, 4)).mkString
 
-    val pattern = units(source.iterator.map(_.toInt))
+    val pattern = units(UString.fromUTF16Units(source))
     val lines = Seq.newBuilder[String]
     lines.addOne(if flags.isEmpty then "-" else flags)
     lines.addOne(if pattern.isEmpty then "-" else pattern)
     for (s, t, m) <- attack.pumps do
-      if s.nonEmpty then lines.addOne(s"1:${units(s.iterator)}")
-      lines.addOne(s"${math.max(0, attack.n + m)}:${units(t.iterator)}")
-    if attack.suffix.nonEmpty then lines.addOne(s"1:${units(attack.suffix.iterator)}")
+      if s.nonEmpty then lines.addOne(s"1:${units(s)}")
+      lines.addOne(s"${math.max(0, attack.n + m)}:${units(t)}")
+    if attack.suffix.nonEmpty then lines.addOne(s"1:${units(attack.suffix)}")
     lines.result().mkString("", "\n", "\n")
 
   /** Returns the Perl program for `perl` in the C locale, or why the pattern cannot be put in the program as the
@@ -433,7 +430,7 @@ object RecallProgram:
       .toRight("The pattern cannot be a PHP regex, since it contains every delimiter")
       .map: delimiter =>
         val bytes = mode == UnitMode.Byte
-        val regex = AttackPatternStyle.PHP().literal(UString.fromUTF16Units(s"$delimiter$source$delimiter$flags"))
+        val regex = AttackPatternStyle.PHP().literal(UString.fromString(s"$delimiter$source$delimiter$flags"))
         val input = attack.toString(AttackPatternStyle.PHP(bytes))
         val script =
           s"""|<?php
@@ -472,7 +469,8 @@ object RecallProgram:
 
   /** Returns the source as a string of the code points, or of the UTF-8 bytes for a pattern of bytes. */
   private def sourceString(source: String, bytes: Boolean): UString =
-    if bytes then UString.from(UString.fromString(source).encode(UnitMode.Byte)) else UString.fromUTF16Units(source)
+    val s = UString.fromString(source)
+    if bytes then UString.from(s.encode(UnitMode.Byte)) else s
 
   /** Returns the byte of a Latin-1 character, or the UTF-8 bytes of another character. */
   private def utf8OrLatin1(c: UChar): Iterator[UChar] =

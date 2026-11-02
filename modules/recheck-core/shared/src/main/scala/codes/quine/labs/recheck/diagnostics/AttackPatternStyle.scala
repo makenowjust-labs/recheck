@@ -13,7 +13,7 @@ import codes.quine.labs.resyntax.charset.UnitMode
 /** AttackPatternStyle is a notation of [[AttackPattern]] and similar classes.
   *
   * Except [[AttackPatternStyle.Superscript]], it writes an expression of the language that evaluates to the string. The
-  * strings are UTF-16 code units, or bytes in a style for bytes.
+  * JavaScript, Java and C# styles write the UTF-16 encoding of the string, which a string of these languages holds.
   */
 sealed abstract class AttackPatternStyle extends Product with Serializable:
 
@@ -43,7 +43,7 @@ object AttackPatternStyle:
   case object JavaScript extends AttackPatternStyle:
     /** A control character uses `\xHH`, because `\cX` is not an escape in a string literal. */
     def literal(s: UString): String =
-      s.chars(true)
+      utf16Chars(s)
         .map:
           case 0x27                                       => "\\'"
           case c if c < 0x20 && !(0x09 <= c && c <= 0x0d) => f"\\x$c%02X"
@@ -64,7 +64,7 @@ object AttackPatternStyle:
 
   /** Python is a Python style specifier, e.g. `'a' * 31 + '\x00'`, or `b'a' * 31 + b'\x00'` for bytes. */
   final case class Python(bytes: Boolean = false) extends AttackPatternStyle:
-    def literal(s: UString): String = s.chars(true).map(char).mkString(if bytes then "b'" else "'", "", "'")
+    def literal(s: UString): String = s.iterator.map(char).mkString(if bytes then "b'" else "'", "", "'")
 
     def repeat(s: UString, n: Int): String = s"${literal(s)} * $n"
 
@@ -82,7 +82,7 @@ object AttackPatternStyle:
   /** Ruby is a Ruby style specifier, e.g. `"a" * 31 + "\x00"`, or `"a".b * 31 + "\x00".b` for bytes. */
   final case class Ruby(bytes: Boolean = false) extends AttackPatternStyle:
     def literal(s: UString): String =
-      val cs = s.chars(true).toIndexedSeq
+      val cs = s.iterator.toIndexedSeq
       cs.indices
         .map: i =>
           // `#` starts an interpolation before these characters.
@@ -105,7 +105,7 @@ object AttackPatternStyle:
 
   /** Java is a Java style specifier, e.g. `"a".repeat(31) + "\u0000"`. */
   case object Java extends AttackPatternStyle:
-    def literal(s: UString): String = s.chars(true).map(char).mkString("\"", "", "\"")
+    def literal(s: UString): String = utf16Chars(s).map(char).mkString("\"", "", "\"")
 
     def repeat(s: UString, n: Int): String = s"${literal(s)}.repeat($n)"
 
@@ -124,7 +124,7 @@ object AttackPatternStyle:
     * `Enumerable.Repeat` needs `System.Linq`.
     */
   case object CSharp extends AttackPatternStyle:
-    def literal(s: UString): String = s.chars(true).map(char).mkString("\"", "", "\"")
+    def literal(s: UString): String = utf16Chars(s).map(char).mkString("\"", "", "\"")
 
     def repeat(s: UString, n: Int): String = s"string.Concat(Enumerable.Repeat(${literal(s)}, $n))"
 
@@ -143,7 +143,7 @@ object AttackPatternStyle:
     * Its literals are ASCII, so that they do not depend on `use utf8`.
     */
   case object Perl extends AttackPatternStyle:
-    def literal(s: UString): String = s.chars(true).map(char).mkString("\"", "", "\"")
+    def literal(s: UString): String = s.iterator.map(char).mkString("\"", "", "\"")
 
     def repeat(s: UString, n: Int): String = s"${literal(s)} x $n"
 
@@ -163,7 +163,7 @@ object AttackPatternStyle:
     */
   final case class PHP(bytes: Boolean = false) extends AttackPatternStyle:
     def literal(s: UString): String =
-      val cs = s.chars(true).toSeq
+      val cs = s.iterator.toSeq
       if cs.forall(isASCIIPrintable) then
         cs.map(c => if c == '\\' || c == '\'' then s"\\${c.toChar}" else c.toChar.toString).mkString("'", "", "'")
       else cs.map(char).mkString("\"", "", "\"")
@@ -179,6 +179,11 @@ object AttackPatternStyle:
       case c if bytes || c < 0x80   => f"\\x$c%02X"
       case c if isShown(c)          => codePoint(c)
       case c                        => f"\\u{$c%X}"
+
+  /** Returns the characters of the UTF-16 encoding of the string, where a surrogate pair is one character as a language
+    * with UTF-16 strings reads it.
+    */
+  private def utf16Chars(s: UString): Iterator[UChar] = UString.fromString(s.asString).iterator
 
   /** The escapes common to the languages except JavaScript. */
   private object Named:

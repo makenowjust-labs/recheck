@@ -210,13 +210,9 @@ final case class IRPattern(
   /** Returns the parts of the pattern, which are the strings of two or more literal characters in a row.
     *
     * A literal character is a set of one character or of the case variants of one character, and stands for its first
-    * character. A part is UTF-16 code units in the code point mode.
+    * character.
     */
   def parts: Set[UString] =
-    def toUString(values: Seq[UChar]): UString =
-      if mode == UnitMode.CodePoint then UString.from(UString.from(values).encode(UnitMode.UTF16))
-      else UString.from(values)
-
     def literal(node: IRNode): Option[UChar] = node.data match
       case Chars(set) if IRPattern.isOneCharUpToCase(set) =>
         Some(set.head)
@@ -227,7 +223,7 @@ final case class IRPattern(
       if ns.isEmpty then parts
       else
         val (literals, rest) = ns.span(literal(_).isDefined)
-        val part = toUString(literals.flatMap(literal))
+        val part = UString.from(literals.flatMap(literal))
         val newParts = parts ++ (if part.length > 1 then Set(part) else Set.empty)
         extract(rest.dropWhile(literal(_).isEmpty), newParts)
 

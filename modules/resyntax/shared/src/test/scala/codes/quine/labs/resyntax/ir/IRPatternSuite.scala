@@ -418,8 +418,9 @@ class IRPatternSuite extends munit.FunSuite:
   )
 
   check("IRPattern#parts", "iu")(_.parts)(
-    "a😀" -> Set(UString.fromUTF16Units("A😀")),
-    "XYZ" -> Set(UString.fromUTF16Units("XYZ"))
+    "a😀" -> Set(UString.fromString("A😀")),
+    "XYZ" -> Set(UString.fromUTF16Units("XYZ")),
+    "😀" -> Set.empty[UString]
   )
 
   check("IRPattern#parts", "i", Dialect.Python())(_.parts)("xyz" -> Set(UString.fromUTF16Units("XYZ")))

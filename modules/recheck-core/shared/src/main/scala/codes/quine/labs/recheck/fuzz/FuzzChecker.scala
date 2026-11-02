@@ -141,9 +141,6 @@ private[fuzz] final class FuzzChecker(
   /** An alias to `fuzz.alphabet`. */
   def alphabet: PatternAlphabet = fuzz.alphabet
 
-  /** An alias to `fuzz.program.meta.unicode` */
-  def unicode: Boolean = fuzz.program.meta.unicode
-
   /** A sequence of `fuzz.parts` */
   val parts: Seq[UString] = fuzz.parts.toSeq
 
@@ -284,7 +281,7 @@ private[fuzz] final class FuzzChecker(
     val t = gen.traces(i).str
 
     val idx = random.between(0, parts.size)
-    val part = parts(idx).chars(unicode).map(FString.Wrap(_)).toIndexedSeq
+    val part = parts(idx).iterator.map(FString.Wrap(_)).toIndexedSeq
     val fcs = random.between(0, 2) match
       case 0 => part
       case 1 =>
