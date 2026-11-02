@@ -117,7 +117,7 @@ The search avoids repeating a failed attack.
 
 The CLI's `generate-recall-script` subcommand writes the program that the recall validation runs as a standalone script, so that you can run the attack on the engine yourself.
 It takes a file of a `vulnerable` diagnostics in JSON (`-` reads the standard input), which is the output of the CLI with `--json`, or the result of the JavaScript library or the CLI's agent mode.
-The dialect of the pattern comes from the `dialect` field of the diagnostics.
+The dialect of the pattern comes from the `dialect` field of the diagnostics, and the unit of the attack string from the `unitMode` field.
 
 ```bash
 recheck --json --dialect=python '/^(a|a)*$/' > diagnostics.json

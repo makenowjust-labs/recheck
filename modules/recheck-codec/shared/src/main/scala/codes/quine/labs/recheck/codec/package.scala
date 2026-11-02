@@ -133,6 +133,13 @@ given encodeUnitMode: Encoder[UnitMode] with
     case UnitMode.CodePoint => "code-point".asJson
     case UnitMode.Byte      => "byte".asJson
 
+/** A `Decoder` for `UnitMode`, which is the inverse of [[encodeUnitMode]]. */
+given decodeUnitMode: Decoder[UnitMode] = Decoder[String].emap:
+  case "utf16"      => Right(UnitMode.UTF16)
+  case "code-point" => Right(UnitMode.CodePoint)
+  case "byte"       => Right(UnitMode.Byte)
+  case name         => Left(s"Unknown unit mode: $name")
+
 /** An `Encoder` for `Checker`. */
 given encodeChecker: Encoder[Checker] with
   def apply(c: Checker): Json = c match

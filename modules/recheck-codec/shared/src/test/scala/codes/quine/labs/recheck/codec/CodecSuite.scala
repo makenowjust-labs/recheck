@@ -111,6 +111,10 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(encodeUnitMode(UnitMode.CodePoint), "code-point".asJson)
     assertEquals(encodeUnitMode(UnitMode.Byte), "byte".asJson)
 
+  test("codec.decodeUnitMode"):
+    for mode <- UnitMode.values do assertEquals(decodeUnitMode.decodeJson(encodeUnitMode(mode)), Right(mode))
+    assertEquals(decodeUnitMode.decodeJson("ucs2".asJson).left.map(_.message), Left("Unknown unit mode: ucs2"))
+
   test("codec.encodeChecker"):
     assertEquals(encodeChecker(Checker.Auto), "auto".asJson)
     assertEquals(encodeChecker(Checker.Fuzz), "fuzz".asJson)
