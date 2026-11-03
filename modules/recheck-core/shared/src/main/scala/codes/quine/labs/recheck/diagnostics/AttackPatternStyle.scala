@@ -9,11 +9,7 @@ import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
-/** AttackPatternStyle is a notation of [[AttackPattern]] and similar classes.
-  *
-  * Except [[AttackPatternStyle.Superscript]], it writes an expression of the language that evaluates to the string. The
-  * JavaScript, Java and C# styles write the UTF-16 encoding of the string, which a string of these languages holds.
-  */
+/** AttackPatternStyle is a notation of [[AttackPattern]] and similar classes. */
 sealed abstract class AttackPatternStyle extends Product with Serializable:
 
   def literal(s: UString): String
@@ -38,7 +34,10 @@ object AttackPatternStyle:
       case _: Dialect.Perl    => Perl
       case Dialect.PCRE       => PHP(bytes)
 
-  /** JavaScript is a JavaScript style specifier, e.g. `'a'.repeat(31) + '\x00'`. */
+  /** JavaScript is a JavaScript style specifier, e.g. `'a'.repeat(31) + '\x00'`.
+    *
+    * It writes the UTF-16 encoding of the string, which a JavaScript string holds.
+    */
   case object JavaScript extends AttackPatternStyle:
     def literal(s: UString): String = utf16Chars(s).map(char).mkString("'", "", "'")
 
@@ -57,7 +56,10 @@ object AttackPatternStyle:
       case c if c <= 0xffff         => f"\\u$c%04X"
       case c                        => f"\\u{$c%X}"
 
-  /** Superscript is a superscript style specifier for logs, e.g. `'a'³¹ '\x00'`. */
+  /** Superscript is a superscript style specifier for logs, e.g. `'a'³¹ '\x00'`.
+    *
+    * Unlike the other styles, it is not an expression of a language.
+    */
   case object Superscript extends AttackPatternStyle:
     def literal(s: UString): String = JavaScript.literal(s)
 
@@ -106,7 +108,10 @@ object AttackPatternStyle:
       case c if c <= 0xffff         => f"\\u$c%04X"
       case c                        => f"\\u{$c%X}"
 
-  /** Java is a Java style specifier, e.g. `"a".repeat(31) + "\u0000"`. */
+  /** Java is a Java style specifier, e.g. `"a".repeat(31) + "\u0000"`.
+    *
+    * It writes the UTF-16 encoding of the string, which a Java string holds.
+    */
   case object Java extends AttackPatternStyle:
     def literal(s: UString): String = utf16Chars(s).map(char).mkString("\"", "", "\"")
 
@@ -124,7 +129,7 @@ object AttackPatternStyle:
 
   /** CSharp is a C# style specifier for .NET, e.g. `string.Concat(Enumerable.Repeat("a", 31)) + "\u0000"`.
     *
-    * `Enumerable.Repeat` needs `System.Linq`.
+    * It writes the UTF-16 encoding of the string, which a C# string holds. `Enumerable.Repeat` needs `System.Linq`.
     */
   case object CSharp extends AttackPatternStyle:
     def literal(s: UString): String = utf16Chars(s).map(char).mkString("\"", "", "\"")
