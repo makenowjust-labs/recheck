@@ -43,13 +43,10 @@ object ParametersGen:
 
     def scalaDefault: String = scalaDefaultValue.getOrElse:
       default match
-        case null if isDuration                                 => "Duration.Inf"
         case null                                               => "None"
         case n: Number if isDuration && n.longValue % 1000 == 0 => s"Duration(${n.longValue / 1000}, SECONDS)"
         case n: Number if isDuration                            => s"Duration(${n.longValue}, MILLISECONDS)"
         case s: String if isEnum                                => scalaValues(s)
-        case s: String                                          => s"Some(${literal(s)})"
-        case b: java.lang.Boolean if isOption                   => s"Some($b)"
         case v                                                  => v.toString
 
     /** The first paragraph of the description on one line. */
@@ -160,11 +157,8 @@ object ParametersGen:
         |)
         |
         |object Parameters:
-        |  // $$COVERAGE-OFF$$
         |
         |${defaults.mkString("\n\n")}
-        |
-        |  // $$COVERAGE-ON$$
         |""".stripMargin
 
   /** Generates `ParametersCodec.scala`, the decoders of `Parameters` and its enums. */
@@ -278,7 +272,6 @@ object ParametersGen:
     val params = read(root / SchemaPath)
     // `dialect` follows `flags`, so that it is given without its name.
     val (dialect, others) = params.partition(_.name == "dialect")
-    // `logger` defaults to the console's logger.
     val args = (dialect ++ others).map: p =>
       val default = if p.isLogger then "Some(logger)" else p.defaultName
       s"    ${p.name}: ${p.scalaType} = $default"
