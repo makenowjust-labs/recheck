@@ -1,7 +1,5 @@
 package codes.quine.labs.recheck.fuzz
 
-import scala.util.Try
-
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.vm.Program
@@ -36,11 +34,6 @@ final case class FuzzProgram(
 object FuzzProgram:
 
   /** Builds a program from the pattern, which runs as the engine of its dialect. */
-  def from(pattern: IRPattern)(using ctx: Context): Try[FuzzProgram] =
-    Try:
-      ctx.interrupt:
-        for
-          program <- ProgramBuilder.build(pattern)
-          alphabet = PatternAlphabet.of(pattern)
-        yield FuzzProgram(program, alphabet, pattern.parts, pattern.surrogates)
-    .flatten
+  def from(pattern: IRPattern)(using ctx: Context): FuzzProgram =
+    ctx.interrupt:
+      FuzzProgram(ProgramBuilder.build(pattern), PatternAlphabet.of(pattern), pattern.parts, pattern.surrogates)

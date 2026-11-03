@@ -22,7 +22,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
   def check(source: String, flags: String): Try[Complexity[CharSet]] =
     for
       ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
-      epsNFA <- EpsNFABuilder.build(ir)
+      epsNFA = EpsNFABuilder.build(ir)
       nfa = epsNFA.toOrderedNFA.rename
       result <- Try(AutomatonChecker.check(nfa, Int.MaxValue).nextOption().getOrElse(Complexity.Constant))
     yield result

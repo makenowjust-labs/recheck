@@ -184,7 +184,7 @@ object ReDoS:
         ctx.log("auto: exceed maxPatternSize")
         throw UnsupportedException("The pattern is too large")
       else
-        val epsNFA = EpsNFABuilder.build(ir).get
+        val epsNFA = EpsNFABuilder.build(ir)
         val orderedNFA = epsNFA.restrictInputs(epsNFA.toOrderedNFA(maxNFASize).rename).mapAlphabet(_.representative)
         AutomatonChecker.check(orderedNFA, maxNFASize)
 
@@ -233,7 +233,7 @@ object ReDoS:
 
     def diagnose: Iterator[Diagnostics.Vulnerable] =
       val random = new Random(randomSeed)
-      val fuzz = FuzzProgram.from(ir).get
+      val fuzz = FuzzProgram.from(ir)
       val results = FuzzChecker.check(
         ir,
         fuzz,

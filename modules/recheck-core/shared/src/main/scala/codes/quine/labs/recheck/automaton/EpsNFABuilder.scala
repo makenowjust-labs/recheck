@@ -2,7 +2,6 @@ package codes.quine.labs.recheck
 package automaton
 
 import scala.collection.mutable
-import scala.util.Try
 
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
@@ -25,19 +24,14 @@ import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 object EpsNFABuilder:
 
   /** Compiles RegExp IR into ε-NFA. */
-  def build(pattern: IRPattern)(using ctx: Context): Try[EpsNFA[Int]] =
+  def build(pattern: IRPattern)(using ctx: Context): EpsNFA[Int] =
     ctx.interrupt:
-      for
-        _ <- Try(())
-        alphabet = PatternAlphabet.of(pattern)
-        builder = new EpsNFABuilder(pattern, alphabet)
-        epsNFA <- Try(builder.build())
-      yield
-        ctx.log:
-          s"""|automaton: EpsNFA construction
-              |     state size: ${epsNFA.stateSet.size}
-              |  alphabet size: ${epsNFA.alphabet.pairs.size}""".stripMargin
-        epsNFA
+      val epsNFA = new EpsNFABuilder(pattern, PatternAlphabet.of(pattern)).build()
+      ctx.log:
+        s"""|automaton: EpsNFA construction
+            |     state size: ${epsNFA.stateSet.size}
+            |  alphabet size: ${epsNFA.alphabet.pairs.size}""".stripMargin
+      epsNFA
 
 private class EpsNFABuilder(
     private val pattern: IRPattern,

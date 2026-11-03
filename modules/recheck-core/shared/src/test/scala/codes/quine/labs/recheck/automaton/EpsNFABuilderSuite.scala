@@ -2,7 +2,6 @@ package codes.quine.labs.recheck
 package automaton
 
 import scala.language.implicitConversions
-import scala.util.Try
 
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
@@ -23,15 +22,12 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
   /** Builds an ε-NFA from the source, without the locations of transitions. */
-  def build(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): Try[EpsNFA[Int]] =
-    val ir = ReDoS.parse(source, flags, dialect)
-    EpsNFABuilder
-      .build(ir)
-      .map: nfa =>
-        nfa.copy(tau = nfa.tau.view.mapValues {
-          case t: Consume[Int] => t.copy(loc = None)
-          case t               => t
-        }.toMap)
+  def build(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): EpsNFA[Int] =
+    val nfa = EpsNFABuilder.build(ReDoS.parse(source, flags, dialect))
+    nfa.copy(tau = nfa.tau.view.mapValues {
+      case t: Consume[Int] => t.copy(loc = None)
+      case t               => t
+    }.toMap)
 
   val utf16: UnitMode = UnitMode.UTF16
   val any16: CharSet = utf16.universe
@@ -51,7 +47,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
 
   test("EpsNFABuilder.build: submatch"):
     assertEquals(
-      build("$").get,
+      build("$"),
       EpsNFA(
         PatternAlphabet.build(utf16),
         Set(0, 1, 2, 3, 4),
@@ -66,7 +62,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       )
     )
     assertEquals(
-      build("^").get,
+      build("^"),
       EpsNFA(
         PatternAlphabet.build(utf16),
         Set(0, 1, 2, 3, 4),
@@ -82,16 +78,16 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     )
 
   test("EpsNFABuilder.build: LineBegin, LineEnd, Sequence"):
-    assertEquals(build("^$").get, EpsNFA(PatternAlphabet.build(utf16), Set(0, 1), 0, 1, Map(0 -> Eps(Seq(1)))))
+    assertEquals(build("^$"), EpsNFA(PatternAlphabet.build(utf16), Set(0, 1), 0, 1, Map(0 -> Eps(Seq(1)))))
     assertEquals(
-      build("^(?:)$").get,
+      build("^(?:)$"),
       EpsNFA(PatternAlphabet.build(utf16), Set(0, 1, 2), 0, 2, Map(0 -> Eps(Seq(1)), 1 -> Eps(Seq(2))))
     )
 
   test("EpsNFABuilder.build: WordBoundary"):
     for (source, kind) <- Seq("^\\b$" -> AssertKind.WordBoundary(0), "^\\B$" -> AssertKind.NotWordBoundary(0)) do
       assertEquals(
-        build(source).get,
+        build(source),
         EpsNFA(
           PatternAlphabet.build(utf16, word = Some(word)),
           Set(0, 1, 2, 3),
@@ -103,38 +99,38 @@ class EpsNFABuilderSuite extends munit.FunSuite:
 
   test("EpsNFABuilder.build: Character, CharacterClass"):
     assertEquals(
-      build("^a$", "i").get,
+      build("^a$", "i"),
       single(PatternAlphabet.build(utf16, Seq(CharSet.of('a', 'A'))), CharSet.of('a', 'A'))
     )
     assertEquals(
-      build("^[a]$").get,
+      build("^[a]$"),
       single(PatternAlphabet.build(utf16, Seq(CharSet.single('a'))), CharSet.single('a'))
     )
     assertEquals(
-      build("^[^a]$").get,
+      build("^[^a]$"),
       single(PatternAlphabet.build(utf16, Seq(CharSet.single('a'))), any16.diff(CharSet.single('a')))
     )
 
   test("EpsNFABuilder.build: Dot"):
     val dot16 = any16.diff(lineTerminator)
     // `.` takes part in the order of atoms as its complement.
-    assertEquals(build("^.$").get, single(PatternAlphabet.build(utf16, Seq(lineTerminator)), dot16))
+    assertEquals(build("^.$"), single(PatternAlphabet.build(utf16, Seq(lineTerminator)), dot16))
     assertEquals(
-      build("^.$", "i").get,
+      build("^.$", "i"),
       single(
         PatternAlphabet.build(utf16, Seq(lineTerminator)),
         dot16
       )
     )
-    assertEquals(build("^.$", "s").get, single(PatternAlphabet.build(utf16), any16))
+    assertEquals(build("^.$", "s"), single(PatternAlphabet.build(utf16), any16))
     assertEquals(
-      build("^.$", "su").get,
+      build("^.$", "su"),
       single(PatternAlphabet.build(UnitMode.CodePoint), UnitMode.CodePoint.universe)
     )
 
   test("EpsNFABuilder.build: Disjunction"):
     assertEquals(
-      build("^(?:.|.)$", "s").get,
+      build("^(?:.|.)$", "s"),
       EpsNFA(
         PatternAlphabet.build(utf16),
         Set(0, 1, 2, 3, 4, 5, 6, 7),
@@ -155,7 +151,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   test("EpsNFABuilder.build: Star, Plus, Question"):
     for (source, t) <- Seq("^.*$" -> Seq(4, 5), "^.*?$" -> Seq(5, 4)) do
       assertEquals(
-        build(source, "s").get,
+        build(source, "s"),
         EpsNFA(
           PatternAlphabet.build(utf16),
           Set(0, 1, 2, 3, 4, 5, 6, 7),
@@ -174,7 +170,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       )
     for (source, t) <- Seq("^.+$" -> Seq(3, 4), "^.+?$" -> Seq(4, 3)) do
       assertEquals(
-        build(source, "s").get,
+        build(source, "s"),
         EpsNFA(
           PatternAlphabet.build(utf16),
           Set(0, 1, 2, 3, 4, 5, 6),
@@ -192,7 +188,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       )
     for (source, t) <- Seq("^.?$" -> Seq(1, 2), "^.??$" -> Seq(2, 1)) do
       assertEquals(
-        build(source, "s").get,
+        build(source, "s"),
         EpsNFA(
           PatternAlphabet.build(utf16),
           Set(0, 1, 2, 3, 4),
@@ -228,27 +224,27 @@ class EpsNFABuilderSuite extends munit.FunSuite:
 
   test("EpsNFABuilder.build: Capture, NamedCapture, Group"):
     val nfaA = single(PatternAlphabet.build(utf16, Seq(CharSet.single('a'))), CharSet.single('a'))
-    for source <- Seq("^a$", "^(a)$", "^(?<foo>a)$", "^(?:a)$") do assertEquals(build(source).get, nfaA, source)
+    for source <- Seq("^a$", "^(a)$", "^(?<foo>a)$", "^(?:a)$") do assertEquals(build(source), nfaA, source)
 
   test("EpsNFABuilder.build: Strings"):
     // Strings are tried from the longest, and then the characters.
     assertEquals(build("^[\\q{ab|c}d]$", "v"), build("^(?:ab|[cd])$", "u"))
 
   test("EpsNFABuilder.build: unsupported"):
-    interceptMessage[UnsupportedException]("look-ahead assertion")(build("(?=.)").get)
-    interceptMessage[UnsupportedException]("look-behind assertion")(build("(?<=.)").get)
-    interceptMessage[UnsupportedException]("back-reference")(build("(.)\\1").get)
-    interceptMessage[UnsupportedException]("back-reference")(build("(?<foo>.)\\k<foo>").get)
-    interceptMessage[UnsupportedException]("atomic group")(build("(?>a)", "", Dialect.Java).get)
-    interceptMessage[UnsupportedException]("atomic group")(build("a++", "", Dialect.Java).get)
+    interceptMessage[UnsupportedException]("look-ahead assertion")(build("(?=.)"))
+    interceptMessage[UnsupportedException]("look-behind assertion")(build("(?<=.)"))
+    interceptMessage[UnsupportedException]("back-reference")(build("(.)\\1"))
+    interceptMessage[UnsupportedException]("back-reference")(build("(?<foo>.)\\k<foo>"))
+    interceptMessage[UnsupportedException]("atomic group")(build("(?>a)", "", Dialect.Java))
+    interceptMessage[UnsupportedException]("atomic group")(build("a++", "", Dialect.Java))
     interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(
-      build("a(?R)?", "", Dialect.PCRE).get
+      build("a(?R)?", "", Dialect.PCRE)
     )
-    interceptMessage[UnsupportedException]("conditional")(build("(a)?(?(1)b|c)", "", Dialect.PCRE).get)
-    interceptMessage[UnsupportedException]("look-ahead assertion")(build("(?*a)", "", Dialect.PCRE).get)
-    interceptMessage[UnsupportedException]("look-behind assertion")(build("(?<*a)", "", Dialect.PCRE).get)
+    interceptMessage[UnsupportedException]("conditional")(build("(a)?(?(1)b|c)", "", Dialect.PCRE))
+    interceptMessage[UnsupportedException]("look-ahead assertion")(build("(?*a)", "", Dialect.PCRE))
+    interceptMessage[UnsupportedException]("look-behind assertion")(build("(?<*a)", "", Dialect.PCRE))
     for verb <- Seq("ACCEPT", "COMMIT", "PRUNE", "SKIP", "SKIP:x", "THEN") do
-      interceptMessage[UnsupportedException]("backtracking control verb")(build(s"a(*$verb)b", "", Dialect.PCRE).get)
+      interceptMessage[UnsupportedException]("backtracking control verb")(build(s"a(*$verb)b", "", Dialect.PCRE))
 
   test("EpsNFABuilder.build: assertions of other dialects"):
     // `$` before a final line terminator at an end point is the end after an optional line terminator.
@@ -258,11 +254,11 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       build("(*ANYCRLF)^a(?:|[\\n\\r]|\\r\\n)\\z", "", Dialect.PCRE)
     )
     // Java's `$` before a final line terminator is guarded against the position between `\r` and `\n`.
-    val java = build("^a$", "", Dialect.Java).get
+    val java = build("^a$", "", Dialect.Java)
     assert(java.tau.values.exists { case Assert(k, _) => k == AssertKind.NotBetweenCRLF; case _ => false })
     // Each line, text and word boundary assertion has its kind.
     def kinds(source: String, flags: String, dialect: Dialect): Set[AssertKind] =
-      build(source, flags, dialect).get.tau.values.collect { case Assert(k, _) => k }.toSet
+      build(source, flags, dialect).tau.values.collect { case Assert(k, _) => k }.toSet
 
     import IRLineBeginAtEnd.*
     assertEquals(
@@ -295,7 +291,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
 
   /** Tests whether the automaton of the source accepts the input, i.e. the source matches in the input. */
   def searches(source: String, flags: String, dialect: Dialect, input: String | UString): Boolean =
-    val nfa = build(source, flags, dialect).get.toOrderedNFA
+    val nfa = build(source, flags, dialect).toOrderedNFA
     val units = input match
       case s: String  => ReDoS.parse(source, flags, dialect).mode.decode(s).iterator.toSeq
       case u: UString => u.iterator.toSeq

@@ -40,7 +40,7 @@ class InterpreterSuite extends munit.FunSuite:
   def matches(source: String, flags: String, input: String, opts: Options): Result =
     val t = for
       ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
-      program <- ProgramBuilder.build(ir)
+      program = ProgramBuilder.build(ir)
       result = Interpreter.run(program, ir.mode.decode(input), opts)
     yield result
     t.get
@@ -78,7 +78,7 @@ class InterpreterSuite extends munit.FunSuite:
       usesAcceleration: Boolean
   ): Status =
     val ir = ReDoS.parse(source, flags, dialect)
-    val program = ProgramBuilder.build(ir).get
+    val program = ProgramBuilder.build(ir)
     val u = input match
       case s: String  => ir.mode.decode(s)
       case u: UString => u
@@ -116,7 +116,7 @@ class InterpreterSuite extends munit.FunSuite:
 
   def runSpans(source: String, dialect: Dialect, input: String, usesAcceleration: Boolean): Spans =
     val ir = ReDoS.parse(source, "", dialect)
-    val program = ProgramBuilder.build(ir).get
+    val program = ProgramBuilder.build(ir)
     val result =
       Interpreter.run(program, ir.mode.decode(input), Options(usesAcceleration = usesAcceleration))
     // The spans drop the unset groups at the end, which Perl does not report.
@@ -373,7 +373,7 @@ class InterpreterSuite extends munit.FunSuite:
     )(using ctx: Context): Result =
       val t = for
         ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
-        program <- ProgramBuilder.build(ir)
+        program = ProgramBuilder.build(ir)
         result = Interpreter.runWithTimeout(program, ir.mode.decode(input), opts, timeout)
       yield result
       t.get
@@ -614,7 +614,7 @@ class InterpreterSuite extends munit.FunSuite:
 
   test("ProgramBuilder.build: unsupported"):
     val ir = ReDoS.parse("a(?R)?", "", PCRE)
-    interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(ProgramBuilder.build(ir).get)
+    interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(ProgramBuilder.build(ir))
 
   // The expected spans are checked on Ruby 4.0, Java 25, .NET 10, Perl 5.44 and PHP 8.5 with PCRE2 10.49 without JIT.
 

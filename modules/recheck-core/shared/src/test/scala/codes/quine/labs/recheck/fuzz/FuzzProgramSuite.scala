@@ -1,7 +1,5 @@
 package codes.quine.labs.recheck.fuzz
 
-import scala.util.Try
-
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Context
@@ -14,10 +12,7 @@ class FuzzProgramSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
   def from(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): FuzzProgram =
-    (for
-      ir <- Try(ReDoS.parse(source, flags, dialect))
-      fuzz <- FuzzProgram.from(ir)
-    yield fuzz).get
+    FuzzProgram.from(ReDoS.parse(source, flags, dialect))
 
   test("FuzzProgram#usesAcceleration"):
     val fuzz1 = from("foo", "")

@@ -32,7 +32,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
 
   def matches(source: String, flags: String, dialect: Dialect, input: UString): Boolean =
     val ir = ReDoS.parse(source, flags, dialect)
-    val program = ProgramBuilder.build(ir).get
+    val program = ProgramBuilder.build(ir)
     Interpreter.run(program, input, Interpreter.Options()).status == Interpreter.Status.Ok
 
   def marks(chars: UString, set: CharSet): String =

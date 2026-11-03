@@ -31,7 +31,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
   ): Boolean =
     val result = for
       ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
-      fuzz <- FuzzProgram.from(ir)
+      fuzz = FuzzProgram.from(ir)
     yield FuzzChecker
       .check(
         ir,
@@ -81,7 +81,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
     assert:
       val result = for
         ir <- Try(ReDoS.parse("^(a?){50}a{50}$", "", Dialect.JavaScript))
-        fuzz <- FuzzProgram.from(ir)
+        fuzz = FuzzProgram.from(ir)
       yield FuzzChecker
         .check(
           ir,
@@ -99,7 +99,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
     assert:
       val result = for
         ir <- Try(ReDoS.parse("^(a|a)*$", "", Dialect.JavaScript))
-        fuzz <- FuzzProgram.from(ir)
+        fuzz = FuzzProgram.from(ir)
       yield FuzzChecker
         .check(
           ir,
@@ -120,7 +120,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
     val avoidsAttack = (c: AttackComplexity.Vulnerable, _: Hotspot) => c == AttackComplexity.Exponential(true)
     val checker = new FuzzChecker(
       ir,
-      FuzzProgram.from(ir).get,
+      FuzzProgram.from(ir),
       random0,
       DefaultSeeder,
       DefaultMaxSimpleRepeatCount,

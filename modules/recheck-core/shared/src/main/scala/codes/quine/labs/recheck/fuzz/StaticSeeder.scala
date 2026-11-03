@@ -3,7 +3,6 @@ package codes.quine.labs.recheck.fuzz
 import codes.quine.labs.recheck.automaton.EpsNFABuilder
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.data.Graph
 import codes.quine.labs.recheck.util.RepeatUtil
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
@@ -27,12 +26,7 @@ object StaticSeeder:
   )(using
       ctx: Context
   ): Set[FString] = ctx.interrupt:
-    val epsNFA = EpsNFABuilder
-      .build(simplify(pattern, maxSimpleRepeatSize))
-      .recoverWith:
-        case _: UnsupportedException =>
-          EpsNFABuilder.build(simplify(pattern, maxSimpleRepeatSize, dropsAssertions = true))
-      .get
+    val epsNFA = EpsNFABuilder.build(simplify(pattern, maxSimpleRepeatSize))
     val orderedNFA = epsNFA.toOrderedNFA.rename.mapAlphabet(_.representative)
     val seeder = new StaticSeeder(
       orderedNFA.alphabet,
@@ -44,9 +38,7 @@ object StaticSeeder:
     seeder.seed(maxInitialGenerationSize, limit, maxSize)
 
   /** Returns a simplified pattern, which the ε-NFA can handle. */
-  private[fuzz] def simplify(pattern: IRPattern, maxSimpleRepeatSize: Int, dropsAssertions: Boolean = false)(using
-      ctx: Context
-  ): IRPattern =
+  private[fuzz] def simplify(pattern: IRPattern, maxSimpleRepeatSize: Int)(using ctx: Context): IRPattern =
     ctx.interrupt:
       val backRefs = extractBackRefs(pattern.node)
       val empty = IRNode(Empty)
@@ -99,9 +91,8 @@ object StaticSeeder:
             else
               val cs = captures.map((i, n) => loop(n, prevIsRepeat, nextIsRepeat, inside + i))
               copy(Disjunction(cs :+ empty))
-          case Assert(_) if dropsAssertions => copy(Empty)
-          case Unsupported(_)               => copy(Empty)
-          case _                            => node
+          case Unsupported(_) => copy(Empty)
+          case _              => node
 
       pattern.copy(node = loop(pattern.node, true, true, Set.empty))
 
