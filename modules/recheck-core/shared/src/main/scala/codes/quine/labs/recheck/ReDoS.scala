@@ -229,7 +229,7 @@ object ReDoS:
       params: Parameters,
       avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
   )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
-    import params._
+    import params.*
 
     def diagnose: Iterator[Diagnostics.Vulnerable] =
       val random = new Random(randomSeed)

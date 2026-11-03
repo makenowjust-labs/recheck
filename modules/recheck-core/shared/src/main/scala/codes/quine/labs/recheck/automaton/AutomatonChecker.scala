@@ -23,7 +23,7 @@ private final class AutomatonChecker[A, Q](
 )(using private val ctx: Context):
 
   // Introduces `ctx` methods into the scope.
-  import ctx._
+  import ctx.*
 
   /** An NFA with look-ahead constructed from [[nfa]]. */
   private val nfaWLA = nfa.toNFAwLA(maxNFASize)

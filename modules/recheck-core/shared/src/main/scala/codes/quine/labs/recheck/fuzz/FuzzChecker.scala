@@ -124,7 +124,7 @@ private[fuzz] final class FuzzChecker(
     val avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
 )(using val ctx: Context):
 
-  import ctx._
+  import ctx.*
 
   /** A set that holds strings once executed. */
   val inputs: mutable.Set[UString] = mutable.Set.empty

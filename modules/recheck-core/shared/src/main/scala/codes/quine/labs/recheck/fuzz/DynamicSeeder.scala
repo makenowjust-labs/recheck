@@ -29,7 +29,7 @@ object DynamicSeeder:
       maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
       accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode
   )(using ctx: Context): Set[FString] = ctx.interrupt:
-    import ctx._
+    import ctx.*
 
     val set = mutable.Set.empty[FString]
     val added = mutable.Set.empty[UString]
