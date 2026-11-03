@@ -3,6 +3,7 @@ package codes.quine.labs.resyntax.ir
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UTF16
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.build.IRBuilder
 import codes.quine.labs.resyntax.parser.Parser
@@ -371,7 +372,7 @@ class IRPatternSuite extends munit.FunSuite:
     assertEquals(parse("a", "", Dialect.Ruby()).surrogates, IRSurrogateKind.Absent)
     assertEquals(parse("a", "u", Dialect.PCRE).surrogates, IRSurrogateKind.Absent)
     assertEquals(parse("a", "", Dialect.PCRE).surrogates, IRSurrogateKind.Separate)
-    assertEquals(parse("a", "", Dialect.Ruby()).universe, UnitMode.CodePoint.universe.diff(IRSurrogateKind.All))
+    assertEquals(parse("a", "", Dialect.Ruby()).universe, UnitMode.CodePoint.universe.diff(UTF16.Surrogates))
     assertEquals(parse("a", "u").universe, UnitMode.CodePoint.universe)
 
   test("IRPattern#assertionLineTerminators"):

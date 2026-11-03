@@ -69,12 +69,3 @@ object CodePointUtil:
 
   def isIDContinue(codePoint: Int): Boolean =
     isIDStart(codePoint) || isDigit(codePoint)
-
-  def isHighSurrogate(codePoint: Int): Boolean =
-    0xd800 <= codePoint && codePoint <= 0xdbff
-
-  def isLowSurrogate(codePoint: Int): Boolean =
-    0xdc00 <= codePoint && codePoint <= 0xdfff
-
-  def decodeSurrogatePair(codePoint1: Int, codePoint2: Int): Int =
-    0x10000 + (codePoint1 - 0xd800) * 0x400 + (codePoint2 - 0xdc00)

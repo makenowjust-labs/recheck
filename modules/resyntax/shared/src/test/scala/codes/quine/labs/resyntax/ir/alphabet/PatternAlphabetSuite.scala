@@ -3,6 +3,7 @@ package codes.quine.labs.resyntax.ir.alphabet
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UTF16
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRPattern
 import codes.quine.labs.resyntax.ir.IRSurrogateKind
@@ -85,8 +86,8 @@ class PatternAlphabetSuite extends munit.FunSuite:
     )
 
   test("PatternAlphabet.build: surrogates"):
-    import IRSurrogateKind.{High, Low}
-    val scalars = UnitMode.CodePoint.universe.diff(IRSurrogateKind.All)
+    import UTF16.{HighSurrogates as High, LowSurrogates as Low}
+    val scalars = UnitMode.CodePoint.universe.diff(UTF16.Surrogates)
     // Absent surrogates are not characters.
     assertEquals(
       PatternAlphabet.build(UnitMode.CodePoint, Seq(CharSet.single('a')), surrogates = IRSurrogateKind.Absent).pairs,
@@ -99,7 +100,7 @@ class PatternAlphabetSuite extends munit.FunSuite:
       paired
     )
     assertEquals(
-      PatternAlphabet.build(UnitMode.CodePoint, Seq(IRSurrogateKind.All), surrogates = IRSurrogateKind.Paired).pairs,
+      PatternAlphabet.build(UnitMode.CodePoint, Seq(UTF16.Surrogates), surrogates = IRSurrogateKind.Paired).pairs,
       paired
     )
     // The kinds tell nothing without both of them, and of separate surrogates.
@@ -199,7 +200,7 @@ class PatternAlphabetSuite extends munit.FunSuite:
     for (flags, dialect) <- Seq(("", Dialect.JavaScript), ("", Dialect.Python())) do
       assertEquals(alphabetOf(surrogates, flags, dialect).pairs.count((_, k) => k.high || k.low), 0)
     // Ruby's input has no surrogate.
-    assert(!alphabetOf("[^a]", "", Dialect.Ruby()).any.exists(_._1.intersect(IRSurrogateKind.All).nonEmpty))
+    assert(!alphabetOf("[^a]", "", Dialect.Ruby()).any.exists(_._1.intersect(UTF16.Surrogates).nonEmpty))
 
   test("PatternAlphabet.wordSets"):
     assertEquals(PatternAlphabet.wordSets(parse("\\b(?a:\\b)", "", Dialect.Python())).size, 2)

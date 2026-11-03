@@ -21,6 +21,8 @@ import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UTF16
+import codes.quine.labs.resyntax.charset.UTF8
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.build.IRCharResolver.*
 
@@ -96,11 +98,11 @@ private[build] final class IRCharResolver(
     val out = mutable.ArrayBuffer.empty[Node]
     for child <- children do
       child.data match
-        case NodeData.Repeat(inner, quantifier) if byteOf(inner).exists(b => (b & 0xc0) == 0x80) =>
+        case NodeData.Repeat(inner, quantifier) if byteOf(inner).exists(UTF8.isContinuation) =>
           var k = out.length
-          while k > 0 && byteOf(out(k - 1)).exists(b => (b & 0xc0) == 0x80) do k -= 1
+          while k > 0 && byteOf(out(k - 1)).exists(UTF8.isContinuation) do k -= 1
           val lead = if k > 0 then byteOf(out(k - 1)) else None
-          if lead.exists(b => utf8Length(b) == out.length - k + 2) then
+          if lead.exists(b => UTF8.sequenceLength(b) == out.length - k + 2) then
             val bytes = out.slice(k - 1, out.length).toSeq :+ inner
             out.remove(k - 1, bytes.length - 1)
             val loc = SourceLocation(bytes.head.loc.start, inner.loc.end)
@@ -269,9 +271,10 @@ private[build] final class IRCharResolver(
       var i = 0
       while i < lits.length do
         val lit = lits(i)
-        if i + 1 < lits.length && lit.source && lits(i + 1).source && isHigh(lit.value) && isLow(lits(i + 1).value)
+        if i + 1 < lits.length && lit.source && lits(i + 1).source && UTF16.isHighSurrogate(lit.value) &&
+          UTF16.isLowSurrogate(lits(i + 1).value)
         then
-          val c = 0x10000 + ((lit.value - 0xd800) << 10) + (lits(i + 1).value - 0xdc00)
+          val c = UTF16.decodeSurrogatePair(lit.value, lits(i + 1).value)
           out += lit.copy(value = c, loc = SourceLocation(lit.loc.start, lits(i + 1).loc.end))
           i += 2
         else
@@ -289,13 +292,13 @@ private[build] final class IRCharResolver(
     while i < lits.length do
       val lit = lits(i)
       if isRubyByteLit(lit) then
-        val n = utf8Length(lit.value)
+        val n = UTF8.sequenceLength(lit.value)
         if n < 2 || i + n > lits.length || !lits
             .slice(i + 1, i + n)
-            .forall(l => isRubyByteLit(l) && (l.value & 0xc0) == 0x80)
+            .forall(l => isRubyByteLit(l) && UTF8.isContinuation(l.value))
         then throw new IRBuildingException("Invalid multibyte escape", lit.loc)
-        val c = decodeUTF8(lits.slice(i, i + n).map(_.value))
-        if IRSurrogateKind.All.contains(c) then throw new IRBuildingException("Invalid multibyte escape", lit.loc)
+        val c = UTF8.decode(lits.slice(i, i + n).map(_.value))
+        if UTF16.isSurrogate(c) then throw new IRBuildingException("Invalid multibyte escape", lit.loc)
         out += lit.copy(value = c, loc = SourceLocation(lit.loc.start, lits(i + n - 1).loc.end))
         i += n
       else
@@ -307,7 +310,7 @@ private[build] final class IRCharResolver(
 
   private def unitsOf(lit: Lit): Seq[UChar] = mode match
     case UnitMode.CodePoint => Seq(lit.value)
-    case UnitMode.UTF16     => UnitMode.UTF16.fromCodePoints(UString(lit.value)).iterator.toSeq
+    case UnitMode.UTF16     => UTF16.encode(lit.value)
     case UnitMode.Byte      =>
       // The parser reads a byte source by bytes, so only an escape can be above `0xFF`.
       if lit.value <= 0xff then Seq(lit.value)
@@ -658,8 +661,9 @@ private[build] final class IRCharResolver(
               (isRubyByteValue(begin.data) || isRubyByteValue(end.data)) =>
           // Onigmo rejects a byte escape endpoint unless it is in a multibyte character with its neighbors.
           val beginOk =
-            !isRubyByteValue(begin.data) || utf8Length(begin.data.value) == 0 && isRubyByteItem(items, i - 1)
-          val endOk = !isRubyByteValue(end.data) || utf8Length(end.data.value) >= 2 && isRubyByteItem(items, i + 1)
+            !isRubyByteValue(begin.data) || UTF8.sequenceLength(begin.data.value) == 0 && isRubyByteItem(items, i - 1)
+          val endOk =
+            !isRubyByteValue(end.data) || UTF8.sequenceLength(end.data.value) >= 2 && isRubyByteItem(items, i + 1)
           if !(beginOk && endOk) then throw new IRBuildingException("Invalid multibyte escape", item.loc)
           throw new NotModeledException
         case _ =>
@@ -686,7 +690,7 @@ private[build] final class IRCharResolver(
   private def validateRubyBytePrefix(lits: IndexedSeq[Lit]): Unit =
     var i = 0
     while i < lits.length do
-      val n = utf8Length(lits(i).value)
+      val n = UTF8.sequenceLength(lits(i).value)
       if n < 2 then throw new IRBuildingException("Invalid multibyte escape", lits(i).loc)
       i += n
 
@@ -798,22 +802,6 @@ private[build] object IRCharResolver:
         _: EscapeClassKind.UnicodePropertyValue =>
       true
     case _ => false
-
-  def isHigh(c: Int): Boolean = 0xd800 <= c && c <= 0xdbff
-
-  def isLow(c: Int): Boolean = 0xdc00 <= c && c <= 0xdfff
-
-  /** Returns the length of a UTF-8 sequence by its first byte, or `0` for a continuation byte or an invalid byte. */
-  def utf8Length(b: Int): Int =
-    if b < 0x80 then 1
-    else if b < 0xc2 then 0
-    else if b < 0xe0 then 2
-    else if b < 0xf0 then 3
-    else if b < 0xf5 then 4
-    else 0
-
-  def decodeUTF8(bytes: Seq[Int]): Int =
-    bytes.tail.foldLeft(bytes.head & (0xff >> (bytes.size + 1)))((c, b) => (c << 6) | (b & 0x3f))
 
   /** Removes the parts of a node that never match (an empty set, and what needs one), or returns `None` for all. */
   def prune(node: IRNode): Option[IRNode] = node.data match

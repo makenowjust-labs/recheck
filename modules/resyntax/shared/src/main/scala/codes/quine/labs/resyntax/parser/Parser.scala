@@ -31,6 +31,7 @@ import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ast.QuoteLiteral
 import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.ast.SourceLocation
+import codes.quine.labs.resyntax.charset.UTF16
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.parser.Parser.ParsingContext
 
@@ -892,9 +893,9 @@ private[parser] final class Parser(
 
     def skipEscape(i: Int): Int =
       source.charAt(i) match
-        case 'c' | 'C' | 'M'                             => skipControlEscape(i)
-        case c if CodePointUtil.isHighSurrogate(c.toInt) => i + 2
-        case _                                           => i + 1
+        case 'c' | 'C' | 'M'               => skipControlEscape(i)
+        case c if UTF16.isHighSurrogate(c) => i + 2
+        case _                             => i + 1
 
     // It follows `read_escaped_byte` because `\cX`, `\C-X` and `\M-X` consume `X` even if it is `(` or `[`.
     def skipControlEscape(start: Int): Int =
@@ -941,7 +942,7 @@ private[parser] final class Parser(
                 j += 1
                 if d == ')' then closed = true
                 else if d == '\\' && j < source.length then
-                  j += (if CodePointUtil.isHighSurrogate(source.charAt(j).toInt) then 2 else 1)
+                  j += (if UTF16.isHighSurrogate(source.charAt(j)) then 2 else 1)
               // An unterminated `(?#` is left as is, so it is a syntax error.
               if closed then
                 ranges.addOne((i - 1, j))
@@ -1884,14 +1885,13 @@ private[parser] final class Parser(
 
     val value = validateCodePoint(parseHexDigits(4), save)
 
-    val isHighSurrogate = CodePointUtil.isHighSurrogate(value)
-    if featureSet.combinesSurrogatePairEscape && isHighSurrogate && source.startsWith("\\u", offset) then
+    if featureSet.combinesSurrogatePairEscape && UTF16.isHighSurrogate(value) && source.startsWith("\\u", offset) then
       val low = source.slice(offset + 2, offset + 6)
       if low.length == 4 && low.forall(CodePointUtil.isHexDigit(_)) then
         val lowValue = Integer.parseInt(low, 16)
-        if CodePointUtil.isLowSurrogate(lowValue) then
+        if UTF16.isLowSurrogate(lowValue) then
           reset(offset + 6)
-          val pairValue = CodePointUtil.decodeSurrogatePair(value, lowValue)
+          val pairValue = UTF16.decodeSurrogatePair(value, lowValue)
           return BackslashKind.Escape(EscapeStyle.UnicodeHex4Pair, pairValue)
 
     BackslashKind.Escape(EscapeStyle.UnicodeHex4, value)
@@ -2732,11 +2732,11 @@ private[parser] final class Parser(
       return value.toInt
 
     val high = parseHex4()
-    if CodePointUtil.isHighSurrogate(high) && source.startsWith("\\u", offset) then
+    if UTF16.isHighSurrogate(high) && source.startsWith("\\u", offset) then
       val save = offset
       reset(offset + 2)
       val low = parseHex4()
-      if CodePointUtil.isLowSurrogate(low) then return CodePointUtil.decodeSurrogatePair(high, low)
+      if UTF16.isLowSurrogate(low) then return UTF16.decodeSurrogatePair(high, low)
       reset(save)
     high
 
@@ -2843,7 +2843,8 @@ private[parser] final class Parser(
     if value > max then fail("Code point too large", pos)
     // Ruby's `\u` escapes are Unicode, which an ASCII-8BIT regexp cannot have except ASCII.
     if featureSet.rejectsNonASCIIUnicodeEscape && value >= 0x80 then fail("Incompatible character encoding", pos)
-    if !featureSet.allowsSurrogateEscape && 0xd800 <= value && value <= 0xdfff then fail("Invalid Unicode escape", pos)
+    if !featureSet.allowsSurrogateEscape && value.isValidInt && UTF16.isSurrogate(value.toInt) then
+      fail("Invalid Unicode escape", pos)
     value.min(Int.MaxValue).toInt
 
   private def skipComment(): Boolean =
@@ -2894,9 +2895,9 @@ private[parser] final class Parser(
 
   private def currentCodePoint: Int =
     val codePoint1 = currentChar.toInt
-    if CodePointUtil.isHighSurrogate(codePoint1) && offset + 1 < source.length then
+    if UTF16.isHighSurrogate(codePoint1) && offset + 1 < source.length then
       val codePoint2 = source.charAt(offset + 1).toInt
-      if CodePointUtil.isLowSurrogate(codePoint2) then CodePointUtil.decodeSurrogatePair(codePoint1, codePoint2)
+      if UTF16.isLowSurrogate(codePoint2) then UTF16.decodeSurrogatePair(codePoint1, codePoint2)
       else codePoint1
     else codePoint1
 

@@ -15,6 +15,7 @@ import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UTF8
 import codes.quine.labs.resyntax.charset.UnitMode
 
 /** RecallProgram is a script for the runtime of a dialect, which matches the pattern against the attack string once.
@@ -477,7 +478,7 @@ object RecallProgram:
 
   /** Returns the byte of a Latin-1 character, or the UTF-8 bytes of another character. */
   private def utf8OrLatin1(c: UChar): Iterator[UChar] =
-    if c <= 0xff then Iterator(c) else UnitMode.Byte.fromCodePoints(UString(c)).iterator
+    if c <= 0xff then Iterator(c) else UTF8.encode(c).iterator
 
   private def hex(c: Int, width: Int): String =
     val s = Integer.toHexString(c)

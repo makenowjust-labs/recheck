@@ -3,6 +3,7 @@ package codes.quine.labs.resyntax.ir.alphabet
 import codes.quine.labs.resyntax.charset.Alphabet
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UChar
+import codes.quine.labs.resyntax.charset.UTF16
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRAssertKind
 import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
@@ -98,11 +99,11 @@ object PatternAlphabet:
       .map(c => (c, order(c)))
       .sortBy(_._2)(using Ordering.Implicits.seqOrdering)
       .flatMap: (c, _) =>
-        if surrogates == IRSurrogateKind.Paired && c.subsetOf(IRSurrogateKind.All) then
-          Seq(c.intersect(IRSurrogateKind.High), c.intersect(IRSurrogateKind.Low)).filter(_.nonEmpty)
+        if surrogates == IRSurrogateKind.Paired && c.subsetOf(UTF16.Surrogates) then
+          Seq(c.intersect(UTF16.HighSurrogates), c.intersect(UTF16.LowSurrogates)).filter(_.nonEmpty)
         else Seq(c)
     val tellsSurrogates = surrogates == IRSurrogateKind.Paired &&
-      atoms.exists(_.subsetOf(IRSurrogateKind.High)) && atoms.exists(_.subsetOf(IRSurrogateKind.Low))
+      atoms.exists(_.subsetOf(UTF16.HighSurrogates)) && atoms.exists(_.subsetOf(UTF16.LowSurrogates))
 
     val pairs = atoms
       .map: c =>
@@ -114,8 +115,8 @@ object PatternAlphabet:
           bases = mask(wordMarks.map(m => Some(m.bases)), c.head),
           cr = crlf && c.head == 0x0d,
           lf = crlf && c.head == 0x0a,
-          high = tellsSurrogates && c.subsetOf(IRSurrogateKind.High),
-          low = tellsSurrogates && c.subsetOf(IRSurrogateKind.Low)
+          high = tellsSurrogates && c.subsetOf(UTF16.HighSurrogates),
+          low = tellsSurrogates && c.subsetOf(UTF16.LowSurrogates)
         )
         (c, kind)
     PatternAlphabet(pairs)

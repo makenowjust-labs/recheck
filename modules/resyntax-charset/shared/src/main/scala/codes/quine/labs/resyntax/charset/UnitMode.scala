@@ -58,28 +58,5 @@ enum UnitMode(val limit: Int):
     */
   def fromCodePoints(s: UString): UString = this match
     case UnitMode.CodePoint => s
-    case UnitMode.UTF16     =>
-      val out = Array.newBuilder[UChar]
-      for c <- s.iterator do
-        if c < 0x10000 then out.addOne(c)
-        else
-          out.addOne(0xd800 | ((c - 0x10000) >> 10))
-          out.addOne(0xdc00 | (c & 0x3ff))
-      UString.from(out.result())
-    case UnitMode.Byte =>
-      val out = Array.newBuilder[UChar]
-      for c <- s.iterator do
-        if c < 0x80 then out.addOne(c)
-        else if c < 0x800 then
-          out.addOne(0xc0 | (c >> 6))
-          out.addOne(0x80 | (c & 0x3f))
-        else if c < 0x10000 then
-          out.addOne(0xe0 | (c >> 12))
-          out.addOne(0x80 | ((c >> 6) & 0x3f))
-          out.addOne(0x80 | (c & 0x3f))
-        else
-          out.addOne(0xf0 | (c >> 18))
-          out.addOne(0x80 | ((c >> 12) & 0x3f))
-          out.addOne(0x80 | ((c >> 6) & 0x3f))
-          out.addOne(0x80 | (c & 0x3f))
-      UString.from(out.result())
+    case UnitMode.UTF16     => UString.from(s.iterator.flatMap(codes.quine.labs.resyntax.charset.UTF16.encode))
+    case UnitMode.Byte      => UString.from(s.iterator.flatMap(UTF8.encode))
