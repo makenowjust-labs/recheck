@@ -21,7 +21,7 @@ class FuzzCheckerSuite extends munit.FunSuite:
   /** A fixed seed random instance for deterministic test. */
   def random0: Random = new Random(0)
 
-  /** Tests the pattern is vulnerable or not. */
+  /** Tests whether the pattern is vulnerable. */
   def check(
       source: String,
       flags: String,

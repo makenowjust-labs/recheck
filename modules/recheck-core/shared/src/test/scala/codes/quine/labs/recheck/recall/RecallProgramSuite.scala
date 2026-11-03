@@ -17,7 +17,7 @@ import codes.quine.labs.resyntax.charset.UnitMode
 
 class RecallProgramSuite extends munit.FunSuite:
 
-  /** `'x' + 'y'.repeat(2) + 'z'` */
+  /** The attack string `'x' + 'y'.repeat(2) + 'z'`. */
   val attack: AttackPattern =
     AttackPattern(
       Seq((UnitMode.CodePoint.decode("x"), UnitMode.CodePoint.decode("y"), 0)),
@@ -25,7 +25,7 @@ class RecallProgramSuite extends munit.FunSuite:
       2
     )
 
-  /** `'é'.repeat(3) + '\0'` */
+  /** The attack string `'é'.repeat(3) + '\0'`. */
   val nonASCII: AttackPattern =
     AttackPattern(Seq((UString.empty, UnitMode.CodePoint.decode("é"), 1)), UString(0), 2)
 

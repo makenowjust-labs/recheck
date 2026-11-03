@@ -25,7 +25,7 @@ import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 class InterpreterSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
-  /** A JavaScript back-reference to the index. */
+  /** Returns a JavaScript back-reference to the index. */
   def ref(index: Int): ReadKind.Ref =
     ReadKind.Ref(
       Seq(index),

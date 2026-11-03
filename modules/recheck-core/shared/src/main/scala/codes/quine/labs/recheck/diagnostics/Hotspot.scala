@@ -44,7 +44,7 @@ object Hotspot:
   /** An empty hotspot. */
   def empty: Hotspot = new Hotspot(Seq.empty)
 
-  /** Spot is a hotspot. A range corresponding to the RegExp position is exclusive. */
+  /** Spot is a range of the RegExp source with its temperature, whose end is exclusive. */
   final case class Spot(start: Int, end: Int, temperature: Temperature)
 
   /** Temperature is a temperature of a hotspot. */

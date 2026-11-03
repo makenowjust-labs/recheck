@@ -47,7 +47,7 @@ object CharsetPropertyDataGen extends UnicodeDataGen {
   private def valueNames(prop: Int, value: Int): Seq[String] =
     nameField(UCharacter.getPropertyValueName(prop, value, _))
 
-  /** The loose matching key of UAX44-LM3. */
+  /** Returns the loose matching key of the name by UAX44-LM3. */
   def loose(name: String): String = {
     // It must agree with `NameMatching.Loose`.
     val key = name
@@ -56,7 +56,7 @@ object CharsetPropertyDataGen extends UnicodeDataGen {
     if (key.startsWith("is")) key.drop(2) else key
   }
 
-  /** Fails if two different entries share a loose matching key. */
+  /** Checks that no two different entries share a loose matching key. */
   private def checkLoose(namespace: String, entries: Seq[Seq[String]]): Unit = {
     val seen = mutable.Map.empty[String, Int]
     for ((names, i) <- entries.zipWithIndex; name <- names if name.nonEmpty) {

@@ -36,7 +36,7 @@ class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
   val params: Parameters =
     Parameters(recallTimeout = 1.second, randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
 
-  /** `s.repeat(n) + t` */
+  /** Returns the attack string `s.repeat(n) + t`. */
   def attack(s: String, n: Int, t: String): AttackPattern =
     AttackPattern(Seq((UString.empty, UnitMode.CodePoint.decode(s), 0)), UnitMode.CodePoint.decode(t), n)
 
@@ -271,7 +271,9 @@ class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
         assertEquals(d.recallValidation.map(_.result), Some(RecallResult.EngineLimit("Backtrack limit exhausted")))
       case ds => fail(s"unexpected: $ds")
 
-  /** `"\uD800\uDC00".repeat(n) + "!"` of a high surrogate and a low surrogate. */
+  /** Returns the attack string `"\uD800\uDC00".repeat(n) + "!"`, which repeats a high surrogate followed by a low
+    * surrogate.
+    */
   def surrogatePairs(n: Int): AttackPattern =
     AttackPattern(Seq((UString.empty, UString(0xd800, 0xdc00), 0)), UString('!'), n)
 

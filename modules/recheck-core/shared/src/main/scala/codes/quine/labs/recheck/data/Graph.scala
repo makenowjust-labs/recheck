@@ -112,7 +112,7 @@ final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]):
 
     None
 
-  /** Computes a new graph collects vertices and edges can be reachable from the init vertices. */
+  /** Computes a new graph of the vertices and the edges reachable from the init vertices. */
   def reachable(init: Set[V])(using ctx: Context): Graph[V, L] = ctx.interrupt:
     val queue = mutable.Queue.empty[V]
     val reachable = mutable.Set.empty[V]

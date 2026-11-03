@@ -39,7 +39,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   val word: CharSet =
     CharSet.union(Seq(CharSet.range('0', '9'), CharSet.range('A', 'Z'), CharSet.single('_'), CharSet.range('a', 'z')))
 
-  /** An ε-NFA of `^x$` consuming the set. */
+  /** Returns an ε-NFA of `^x$`, where `x` consumes the set. */
   def single(alphabet: PatternAlphabet, set: CharSet): EpsNFA[Int] =
     EpsNFA(
       alphabet,

@@ -11,7 +11,7 @@ import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.UnitMode
 
-/** Diagnostics ia an analysis result. */
+/** Diagnostics is an analysis result. */
 sealed abstract class Diagnostics extends Product with Serializable
 
 /** Diagnostics types. */
@@ -106,18 +106,18 @@ object Diagnostics:
     case object Cancel extends ErrorKind:
       override def toString: String = "cancel"
 
-    /** Unsupported is the RegExp pattern is not supported yet. */
+    /** Unsupported is an error that the RegExp pattern is not supported yet. */
     final case class Unsupported(message: String) extends ErrorKind:
       override def toString: String = s"unsupported ($message)"
 
-    /** InvalidRegExp is the RegExp pattern is invalid on parsing or semantics. */
+    /** InvalidRegExp is an error that the RegExp pattern is invalid on parsing or semantics. */
     final case class InvalidRegExp(message: String) extends ErrorKind:
       override def toString: String = s"invalid RegExp ($message)"
 
-    /** RecallFailureLimit is that the recall validation fails as many times as `maxRecallFailures`. */
+    /** RecallFailureLimit is an error that the recall validation fails as many times as `maxRecallFailures`. */
     case object RecallFailureLimit extends ErrorKind:
       override def toString: String = "recall failure limit"
 
-    /** Unexpected is a unexpected error. */
+    /** Unexpected is an unexpected error. */
     final case class Unexpected(message: String) extends ErrorKind:
       override def toString: String = s"unexpected ($message)"

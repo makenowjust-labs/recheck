@@ -37,7 +37,7 @@ import codes.quine.labs.resyntax.parser.ParsingException
 /** ReDoS is a ReDoS checker frontend. */
 object ReDoS:
 
-  /** Tests the given RegExp pattern causes ReDoS.
+  /** Tests whether the given RegExp pattern causes ReDoS.
     *
     * The pattern and the flags are of `params.dialect`. It returns the final diagnostics of [[checkAll]], and computes
     * no more than it.
@@ -50,7 +50,7 @@ object ReDoS:
   ): Diagnostics =
     checkAll(source, flags, params, token).reduce((_, d) => d)
 
-  /** Tests the given RegExp pattern causes ReDoS, and iterates the diagnostics until the final one.
+  /** Tests whether the given RegExp pattern causes ReDoS, and iterates the diagnostics until the final one.
     *
     * The diagnostics are the vulnerable ones whose recall validation failed, followed by the final one: the first
     * vulnerable diagnostics whose recall validation is not run or succeeded, or else the safe or unknown one. The

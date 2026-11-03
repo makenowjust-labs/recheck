@@ -25,7 +25,7 @@ class ReDoSSuite extends munit.FunSuite:
   /** A default context. */
   given ctx: Context = Context()
 
-  /** The vulnerable diagnostics of a checker followed by its safe diagnostics. */
+  /** Returns the vulnerable diagnostics of a checker followed by its safe diagnostics. */
   def concat(result: (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe)): Iterator[Diagnostics] =
     result._1 ++ Iterator(result._2())
 

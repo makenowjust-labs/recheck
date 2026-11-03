@@ -136,13 +136,13 @@ private[vm] class ProgramBuilder(
   /** A buffer of current processing block's instructions. */
   private val instsBuffer: mutable.Buffer[Inst.NonTerminator] = mutable.Buffer.empty
 
-  /** A program has a back reference information. */
+  /** Whether the program reads the captures. */
   private var hasRef: Boolean = false
 
-  /** A program has `verb` instructions. */
+  /** Whether the program has `verb` instructions. */
   private var hasVerb: Boolean = false
 
-  /** A program has `leave` instructions. */
+  /** Whether the program has `leave` instructions. */
   private var hasLeave: Boolean = false
 
   /** Whether a matching direction is backward or not. */
@@ -157,7 +157,7 @@ private[vm] class ProgramBuilder(
       counters.append(reg)
       reg
 
-  /** Marks the counter register is free. */
+  /** Marks the counter register as free. */
   def freeCounter(reg: CounterReg): Unit =
     countersPool.push(reg)
 
@@ -170,11 +170,11 @@ private[vm] class ProgramBuilder(
       canaries.append(reg)
       reg
 
-  /** Marks the canary register is free. */
+  /** Marks the canary register as free. */
   def freeCanary(reg: CanaryReg): Unit =
     canariesPool.push(reg)
 
-  /** Allocates a new label with an unique ID. */
+  /** Allocates a new label with a unique ID. */
   def allocateLabel(name: String): Label =
     val index = predecessorsBuffer.size
     predecessorsBuffer.append(mutable.Set.empty)
@@ -634,7 +634,7 @@ private[vm] class ProgramBuilder(
       freeCanary(reg)
     else run
 
-  /** Emits a `cap-reset` if captures are reset on each iteration, then execute a `run`. */
+  /** Emits a `cap-reset` if captures are reset on each iteration, and then runs `run`. */
   def wrapReset(child: IRNode)(run: => Unit): Unit =
     if resetsCaptures then for (min, max) <- child.captureRange do emitInst(Inst.CapReset(min, max))
     run
@@ -794,7 +794,7 @@ private[vm] class ProgramBuilder(
     // The rest of the sequence is not reachable.
     enterBlock(allocateLabel("accepted"))
 
-  /** Sets a matching direction fot look-ahead assertion. */
+  /** Sets the matching direction for a look-ahead assertion. */
   def wrapLookAhead(run: => Unit): Unit =
     val oldBack = back
     back = false
@@ -837,7 +837,7 @@ private[vm] class ProgramBuilder(
       case _ => throw new IllegalStateException("look-behind starts do not match the alternatives")
       // $COVERAGE-ON$
 
-  /** Sets a matching direction fot look-behind assertion. */
+  /** Sets the matching direction for a look-behind assertion. */
   def wrapLookBehind(run: => Unit): Unit =
     val oldBack = back
     back = true
