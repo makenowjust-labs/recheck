@@ -108,7 +108,12 @@ object Interpreter:
   /** FailedPoint is a failed point on matching. */
   final case class FailedPoint(target: CoverageLocation, pos: Int, kind: ReadKind, capture: Option[UString])
 
-  /** MatchState is a state of matching, which the memoization table looks up on each junction block. */
+  /** MatchState is a state of matching, which the memoization table looks up on each junction block.
+    *
+    * `values` lays out the state as integers in this order: the block ID, the position, the counters, the captures
+    * followed by the largest index of the closed captures (only when the program reads the captures), and one flag for
+    * each canary register, which is `1` if it holds the position and `0` otherwise.
+    */
   private[vm] final class MatchState(private val values: Array[Int]):
 
     override val hashCode: Int = java.util.Arrays.hashCode(values)
@@ -196,9 +201,6 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
     /** Converts this frame into a corresponding state. */
     def toState: MatchState =
-      // It lays out as integers the block ID, the position, the counters, the captures with the largest closed index if
-      // the program reads the captures, and whether each canary register holds the position, which make hashing and
-      // comparing it cheap.
       val capturesSize = if program.meta.hasRef then captures.size + 1 else 0
       val values = new Array[Int](2 + counters.size + capturesSize + canaries.size)
       var size = 0
