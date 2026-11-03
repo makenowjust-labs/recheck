@@ -12,11 +12,11 @@ import io.circe.generic.semiauto.*
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.cli.AgentCommand.*
 import codes.quine.labs.recheck.codec.given
-import codes.quine.labs.recheck.common.CancellationToken
 import codes.quine.labs.recheck.common.CancellationTokenSource
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.diagnostics.Diagnostics
+import codes.quine.labs.resyntax.ast.Dialect
 
 /** `recheck agent` method types. */
 object AgentCommand:
@@ -25,7 +25,7 @@ object AgentCommand:
   given decodeLogger: Decoder[Context.Logger] =
     Decoder.decodeUnit.map(_ => null.asInstanceOf[Context.Logger])
 
-  /** `"check"` and `"checkAll"` method parameter. */
+  /** `"check"` method parameter. */
   final case class CheckParams(source: String, flags: String, params: Parameters)
 
   object CheckParams:
@@ -43,8 +43,14 @@ object AgentCommand:
   object PingParams:
     given decode: Decoder[PingParams] = deriveDecoder
 
-  /** A running execution token to cancel, with the function sending the result of the cancelled execution. */
-  private[cli] final case class Token(cancellation: CancellationTokenSource, sendCancel: () => Unit)
+  /** A running execution token to cancel. */
+  private[cli] final case class Token(
+      source: String,
+      flags: String,
+      dialect: Dialect,
+      send: RPC.Send[Diagnostics],
+      cancellation: CancellationTokenSource
+  )
 
 /** `recheck agent` command implementation. */
 class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio):
@@ -57,40 +63,18 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio):
 
   /** `"check"` method implementation. */
   def handleCheck(id: RPC.ID, check: CheckParams, push: RPC.Push[String], send: RPC.Send[Diagnostics]): Unit =
-    submit(id, check, push, send)(ReDoS.check)(identity)
-
-  /** `"checkAll"` method implementation. */
-  def handleCheckAll(
-      id: RPC.ID,
-      check: CheckParams,
-      push: RPC.Push[String],
-      send: RPC.Send[List[Diagnostics]]
-  ): Unit =
-    submit(id, check, push, send)(ReDoS.checkAll(_, _, _, _).toList)(List(_))
-
-  /** Runs a checking method on the thread pool, and sends its result.
-    *
-    * On a cancellation, `cancelled` converts the diagnostics of the cancellation to the method's result.
-    */
-  private def submit[A](id: RPC.ID, check: CheckParams, push: RPC.Push[String], send: RPC.Send[A])(
-      run: (String, String, Parameters, Option[CancellationToken]) => A
-  )(cancelled: Diagnostics => A): Unit =
     val token = synchronized:
       val source = new CancellationTokenSource
       tokens.remove(id).foreach(doCancel)
-      val sendCancel = () =>
-        val unknown =
-          Diagnostics.Unknown(check.source, check.flags, check.params.dialect, Diagnostics.ErrorKind.Cancel, None)
-        send(Right(cancelled(unknown)))
-      tokens.update(id, Token(source, sendCancel))
+      tokens.update(id, Token(check.source, check.flags, check.params.dialect, send, source))
       source.token
     executor.execute: () =>
       val params =
         if check.params.logger.isDefined then check.params.copy(logger = Some(message => push(message)))
         else check.params
-      val result = run(check.source, check.flags, params, Some(token))
+      val diagnostics = ReDoS.check(check.source, check.flags, params, Some(token))
       synchronized:
-        send(Right(result))
+        send(Right(diagnostics))
         tokens.remove(id)
         // When there is no running execution, it enforces GC.
         if tokens.isEmpty then gc()
@@ -104,7 +88,9 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio):
   /** Cancels the given token execution. */
   def doCancel(token: Token): Unit =
     token.cancellation.cancel()
-    token.sendCancel()
+    val cancelled =
+      Diagnostics.Unknown(token.source, token.flags, token.dialect, None, Diagnostics.ErrorKind.Cancel, Seq.empty, None)
+    token.send(Right(cancelled))
 
   /** `"ping"` method implementation. */
   @nowarn
@@ -119,7 +105,6 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio):
     try
       RPC.run(io)(
         "check" -> RPC.RequestHandler(handleCheck),
-        "checkAll" -> RPC.RequestHandler(handleCheckAll),
         "cancel" -> RPC.NotificationHandler(handleCancel),
         "ping" -> RPC.RequestHandler(handlePing)
       )

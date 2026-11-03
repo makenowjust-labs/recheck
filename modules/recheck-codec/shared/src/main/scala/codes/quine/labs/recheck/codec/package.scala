@@ -21,6 +21,7 @@ import codes.quine.labs.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
+import codes.quine.labs.recheck.diagnostics.RefutedRecall
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
@@ -32,13 +33,15 @@ package object codec
 /** An `Encoder` for `Diagnostics`. */
 given encodeDiagnostics: Encoder[Diagnostics] with
   def apply(d: Diagnostics): Json = d match
-    case Diagnostics.Safe(source, flags, dialect, complexity, checker) =>
+    case Diagnostics.Safe(source, flags, dialect, unitMode, complexity, refutedRecalls, checker) =>
       Json.obj(
         "source" := source,
         "flags" := flags,
         "dialect" := dialect,
+        "unitMode" := unitMode,
         "status" := "safe",
         "complexity" := complexity.asInstanceOf[AttackComplexity],
+        "refutedRecalls" := refutedRecalls.map(encodeRefutedRecall(dialect, unitMode)(_)),
         "checker" := checker
       )
     case Diagnostics.Vulnerable(
@@ -50,6 +53,7 @@ given encodeDiagnostics: Encoder[Diagnostics] with
           attack,
           hotspot,
           recallValidation,
+          refutedRecalls,
           checker
         ) =>
       Json.obj(
@@ -62,15 +66,18 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "attack" -> encodeAttackPattern(dialect, unitMode)(attack),
         "hotspot" := hotspot,
         "recallValidation" := recallValidation,
+        "refutedRecalls" := refutedRecalls.map(encodeRefutedRecall(dialect, unitMode)(_)),
         "checker" := (checker: Checker)
       )
-    case Diagnostics.Unknown(source, flags, dialect, error, checker) =>
+    case Diagnostics.Unknown(source, flags, dialect, unitMode, error, refutedRecalls, checker) =>
       Json.obj(
         "source" := source,
         "flags" := flags,
         "dialect" := dialect,
+        "unitMode" := unitMode,
         "status" := "unknown",
         "error" := error,
+        "refutedRecalls" := refutedRecalls.map(encodeRefutedRecall(dialect, unitMode.get)(_)),
         "checker" := checker
       )
 
@@ -175,6 +182,17 @@ def encodeAttackPattern(dialect: Dialect, mode: UnitMode): Encoder[AttackPattern
       "base" := p.n,
       "string" := p.asUString,
       "pattern" := p.toString(style)
+    )
+
+/** Returns an `Encoder` for `RefutedRecall` of the unit mode, whose `attack` is in the style of the dialect. */
+def encodeRefutedRecall(dialect: Dialect, mode: UnitMode): Encoder[RefutedRecall] =
+  given Encoder[AttackPattern] = encodeAttackPattern(dialect, mode)
+  (r: RefutedRecall) =>
+    Json.obj(
+      "complexity" := r.complexity.asInstanceOf[AttackComplexity],
+      "attack" := r.attack,
+      "hotspot" := r.hotspot,
+      "recallValidation" := r.recallValidation
     )
 
 /** An `Encoder` for `Hotspot`. */

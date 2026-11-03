@@ -38,7 +38,6 @@ Finished the installation, you are going to play with the `recheck`.
 `recheck` exposes two methods: `check` and `checkSync`.
 `check` is an asynchronous version of the entry point of this library.
 `checkSync` is similar to `check`, but it is the synchronous version.
-`checkAll` and `checkAllSync` are their variants returning a list of `Diagnostics` (see [Check All](#check-all) below).
 As stated below, `check` invokes the external CLI command as backend if possible, so it is faster and more useful than the `checkSync`,
 thus we recommend using the `check`.
 
@@ -56,18 +55,6 @@ export function checkSync(
   flags: string,
   params?: Parameters,
 ): Diagnostics;
-
-export function checkAll(
-  source: string,
-  flags: string,
-  params?: Parameters & HasAbortSignal,
-): Promise<Diagnostics[]>;
-
-export function checkAllSync(
-  source: string,
-  flags: string,
-  params?: Parameters,
-): Diagnostics[];
 ```
 
 The first argument `source` is a source string of `RegExp` (corresponding to [`RegExp.prototype.source`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/source) in JavaScript).
@@ -112,30 +99,6 @@ Though it has many fields, the most important one is `status`. This field takes 
 See [this page](diagnostics.md) for detailed information on `Diagnostics` value.
 
 :::
-
-### Check All
-
-`check` reports one `Diagnostics`.
-When the [recall validation](diagnostics.md#recall-validation) is enabled, an attack string that does not work on the real regex engine is not reported, and the check goes on to look for another one.
-`checkAll` returns these refuted `vulnerable` diagnostics as well, followed by the `Diagnostics` that `check` returns.
-So its last element is always the result of `check`, and the list is longer than one only when the recall validation refutes an attack.
-An attack with the same complexity and hotspot as a refuted one is skipped, and the check stops with `unknown` after [`maxRefutedRecalls`](parameters.mdx#maxrefutedrecalls) refuted attacks (see [Refuted Attacks](recall-validation.md#refuted-attacks)).
-
-```tsx
-import { checkAll } from "recheck";
-
-// Ruby's regex engine runs `/^(a|a)*$/` fast thanks to its memoization.
-const diagnostics = await checkAll("^(a|a)*$", "", {
-  dialect: "ruby",
-  recallTimeout: 1000,
-});
-for (const d of diagnostics) {
-  console.log(d.status, d.status === "vulnerable" ? d.recallValidation : "");
-}
-```
-
-`checkAll` takes the same parameters and `signal` as `check`.
-A cancelled `checkAll` returns a list of one `unknown` diagnostics.
 
 ### Cancel
 

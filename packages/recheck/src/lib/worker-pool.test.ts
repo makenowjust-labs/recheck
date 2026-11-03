@@ -57,10 +57,14 @@ test("check: with abort (3)", async () => {
     signal,
     dialect: { name: "perl", source: "string" },
   });
-  expect(diagnostics.dialect).toEqual({
-    name: "perl",
-    utf8: true,
-    source: "string",
+  expect(diagnostics).toEqual({
+    source: "^(a|a)*$",
+    flags: "",
+    dialect: { name: "perl", utf8: true, source: "string" },
+    unitMode: null,
+    status: "unknown",
+    error: { kind: "cancel" },
+    refutedRecalls: [],
   });
 });
 
@@ -84,21 +88,4 @@ test("kill", async () => {
   const promise = pool.check("^(a|a)*$", "");
   pool.kill();
   expect((await promise).status).toBe("unknown");
-});
-
-test("checkAll", async () => {
-  const pool = start();
-
-  const diagnostics = await pool.checkAll("^(a|a)*$", "");
-  expect(diagnostics.map((d) => d.status)).toEqual(["vulnerable"]);
-});
-
-test("checkAll: with abort", async () => {
-  const pool = start();
-
-  const controller = new AbortController();
-  const signal = controller.signal;
-  const promise = pool.checkAll("^(a|a)*$", "", { signal });
-  setTimeout(() => controller.abort(), 10);
-  expect((await promise).map((d) => d.status)).toEqual(["unknown"]);
 });

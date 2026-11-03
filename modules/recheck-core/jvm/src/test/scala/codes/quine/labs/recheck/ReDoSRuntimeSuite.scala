@@ -14,26 +14,26 @@ class ReDoSRuntimeSuite extends munit.FunSuite with RuntimeHelper:
   val params: Parameters =
     Parameters(recallTimeout = 1.second, randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
 
-  runtimeTest("ReDoS.checkAll: Ruby", "ruby"):
-    // The refuted recall is kept, and the checking continues to the safe result.
-    val ds = ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby())).toList
-    assert(clue(ds).size >= 2)
-    ds.init.foreach:
+  runtimeTest("ReDoS.check: Ruby", "ruby"):
+    // The refuted recalls are recorded, and the checking continues to the safe result.
+    ReDoS.check("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby())) match
+      case d: Diagnostics.Safe =>
+        assert(clue(d.refutedRecalls).nonEmpty)
+        d.refutedRecalls.foreach: r =>
+          assert(clue(r.recallValidation).result.isInstanceOf[RecallResult.Finish])
+          assert(!r.recallValidation.isConfirmed)
+      case d => fail(s"not safe: $d")
+
+  runtimeTest("ReDoS.check: Python", "python3"):
+    ReDoS.check("^(a|a)*$", "", params.copy(dialect = Dialect.Python())) match
       case d: Diagnostics.Vulnerable =>
-        val r = d.recallValidation.get
-        assert(clue(r).result.isInstanceOf[RecallResult.Finish])
-        assert(!r.isConfirmed)
+        assertEquals(d.recallValidation.map(_.result), Some(RecallResult.Timeout))
+        assertEquals(d.refutedRecalls, Seq.empty)
       case d => fail(s"not vulnerable: $d")
-    assert(clue(ds.last).isInstanceOf[Diagnostics.Safe])
-    assertEquals(ReDoS.check("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby())), ds.last)
 
-  runtimeTest("ReDoS.checkAll: Python", "python3"):
-    ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.Python())).toList match
-      case List(d: Diagnostics.Vulnerable) => assertEquals(d.recallValidation.map(_.result), Some(RecallResult.Timeout))
-      case ds                              => fail(s"unexpected: $ds")
-
-  runtimeTest("ReDoS.checkAll: PCRE", "php"):
-    ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.PCRE)).toList match
-      case List(d: Diagnostics.Vulnerable) =>
+  runtimeTest("ReDoS.check: PCRE", "php"):
+    ReDoS.check("^(a|a)*$", "", params.copy(dialect = Dialect.PCRE)) match
+      case d: Diagnostics.Vulnerable =>
         assertEquals(d.recallValidation.map(_.result), Some(RecallResult.EngineLimit("Backtrack limit exhausted")))
-      case ds => fail(s"unexpected: $ds")
+        assertEquals(d.refutedRecalls, Seq.empty)
+      case d => fail(s"not vulnerable: $d")

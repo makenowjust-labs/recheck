@@ -21,7 +21,7 @@ import { check } from "recheck";
 await check("^(a|a)*$", "", { dialect: "ruby", recallTimeout: 1000 });
 ```
 
-The result is recorded as `recallValidation` of the diagnostics (see [Diagnostics](diagnostics.md#recall-validation)).
+The result is recorded as `recallValidation` of the diagnostics, or in `refutedRecalls` when the attack is refuted (see [Diagnostics](diagnostics.md#recall-validation)).
 
 ## Programs
 
@@ -97,21 +97,32 @@ On Windows, the variables need `sh` in `PATH` (e.g. from Git for Windows), and `
 
 When the recall validation refutes an attack, `check` does not report the diagnostics, and it goes on to look for another attack string.
 If no attack is confirmed, the result is `safe`.
-`checkAll` returns the diagnostics of the refuted attacks too, followed by the reported one.
-This shows that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by the found attacks.
-The CLI shows them with the `--all` option, separated by a `---` line as soon as each one is computed, and its exit status follows the last one, as without the option (`0` for `safe`, and `1` otherwise).
-With the `--json` option, the CLI shows a diagnostics in JSON, or the array of them with `--all`.
+The result lists the refuted attacks in its `refutedRecalls` field (see [Diagnostics](diagnostics.md#recall-validation)).
+They show that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by these attacks.
+The CLI shows them in the `Refuted recalls` section after the result.
 
 ```bash
-recheck --all --dialect=ruby --recall-timeout=1s '/^(a|a)*$/'
+recheck --dialect=ruby --recall-timeout=1s '/^(a|a)*$/'
+```
+
+```
+Input     : /^(a|a)*$/
+Dialect   : ruby (encoding: UTF-8)
+Status    : safe
+Complexity: linear
+Checker   : automaton
+
+Refuted recalls:
+- Complexity   : exponential
+  Attack string: "a" + "a" * 31 + "\x00"
+  Recall       : refuted (finished in 0 ms on ruby 4.0.7, timeout: 1000 ms)
 ```
 
 The search avoids repeating a refuted attack.
 
-- An attack with the same complexity (the type and the degree) and the same hotspot (the heat spots) as a refuted one is skipped without running the recall validation, and it is not in the list of `checkAll`.
+- An attack with the same complexity (the type and the degree) and the same hotspot (the heat spots) as a refuted one is skipped without running the recall validation, and it is not in `refutedRecalls`.
 - The fuzz checker gives the strings whose attacks were refuted a lower priority in the next generation, so that it looks into other structures of the pattern.
-- When the recall validation refutes [`maxRefutedRecalls`](parameters.mdx#maxrefutedrecalls) attacks (10 by default), the checking stops, and the last diagnostics is `unknown` with the `recall-refutation-limit` error.
-  So the list of `checkAll` has at most `maxRefutedRecalls + 1` diagnostics.
+- When the recall validation refutes [`maxRefutedRecalls`](parameters.mdx#maxrefutedrecalls) attacks (10 by default), the checking stops, and the result is `unknown` with the `recall-refutation-limit` error.
 
 ## Recall Script
 

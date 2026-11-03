@@ -5,29 +5,16 @@ import type { Diagnostics, HasAbortSignal, Parameters } from "..";
 
 let pool: WorkerPool | null = null;
 
-const getPool = (): WorkerPool => {
-  if (pool === null) {
-    pool = new WorkerPool(1);
-  }
-  return pool;
-};
-
 export async function check(
   source: string,
   flags: string,
   params: Parameters & HasAbortSignal = {},
 ): Promise<Diagnostics> {
-  return getPool().check(source, flags, params);
-}
+  if (pool === null) {
+    pool = new WorkerPool(1);
+  }
 
-export async function checkAll(
-  source: string,
-  flags: string,
-  params: Parameters & HasAbortSignal = {},
-): Promise<Diagnostics[]> {
-  return getPool().checkAll(source, flags, params);
+  return pool.check(source, flags, params);
 }
 
 export const checkSync = pure.check;
-
-export const checkAllSync = pure.checkAll;

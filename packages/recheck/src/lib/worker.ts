@@ -17,8 +17,7 @@ port.onMessage((message) => {
       port.postMessage(JSON.stringify({ id: request.id, message }));
     };
   }
-  const check = request.method === "checkAll" ? pure.checkAll : pure.check;
-  const result = check(request.source, request.flags, {
+  const result = pure.check(request.source, request.flags, {
     ...request.params,
     logger,
   });

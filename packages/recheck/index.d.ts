@@ -17,27 +17,6 @@ export function checkSync(
   params?: Parameters,
 ): Diagnostics;
 
-/**
- * Checks whether the given RegExp pattern is ReDoS vulnerable or safe, and returns all the diagnostics found until the reported one.
- *
- * The list consists of the vulnerable diagnostics whose attacks the recall validation refuted, followed by the diagnostics that `check` returns.
- * It is longer than one only when the recall validation runs (see the `recallTimeout` parameter).
- */
-export function checkAll(
-  source: string,
-  flags: string,
-  params?: Parameters & HasAbortSignal,
-): Promise<Diagnostics[]>;
-
-/**
- * Synchronous version of `checkAll`. Take care that it will block the Node.js process.
- */
-export function checkAllSync(
-  source: string,
-  flags: string,
-  params?: Parameters,
-): Diagnostics[];
-
 export type {
   Dialect,
   DialectParameter,
@@ -74,8 +53,10 @@ export type SafeDiagnostics = {
   source: string;
   flags: string;
   dialect: Dialect;
+  unitMode: UnitMode;
   status: "safe";
   complexity: SafeComplexity;
+  refutedRecalls: RefutedRecall[];
   checker: "automaton" | "fuzz";
 };
 
@@ -86,10 +67,7 @@ export type VulnerableDiagnostics = {
   source: string;
   flags: string;
   dialect: Dialect;
-  /**
-   * The unit of the attack string: UTF-16 code units (`utf16`), code points (`code-point`), or bytes (`byte`).
-   */
-  unitMode: "utf16" | "code-point" | "byte";
+  unitMode: UnitMode;
   status: "vulnerable";
   complexity: VulnerableComplexity;
   attack: AttackPattern;
@@ -98,7 +76,23 @@ export type VulnerableDiagnostics = {
    * The recall validation of the attack string, or `null` if it is not run.
    */
   recallValidation: RecallValidation | null;
+  refutedRecalls: RefutedRecall[];
   checker: "automaton" | "fuzz";
+};
+
+/**
+ * UnitMode is the unit of the attack strings: UTF-16 code units (`utf16`), code points (`code-point`), or bytes (`byte`).
+ */
+export type UnitMode = "utf16" | "code-point" | "byte";
+
+/**
+ * RefutedRecall is an attack that the recall validation refuted before the result.
+ */
+export type RefutedRecall = {
+  complexity: VulnerableComplexity;
+  attack: AttackPattern;
+  hotspot: Hotspot[];
+  recallValidation: RecallValidation;
 };
 
 /**
@@ -117,7 +111,6 @@ export type RecallValidation = {
   /**
    * Whether the engine confirms the attack, i.e. the attack is effective there (`timeout` or `engine-limit`).
    * Otherwise, the engine refutes the attack.
-   * `check` reports the vulnerable diagnostics only if it is `true`.
    */
   isConfirmed: boolean;
 };
@@ -144,8 +137,13 @@ export type UnknownDiagnostics = {
   source: string;
   flags: string;
   dialect: Dialect;
+  /**
+   * The unit mode of the pattern, or `null` if the error happened on parsing the pattern.
+   */
+  unitMode: UnitMode | null;
   status: "unknown";
   error: Error;
+  refutedRecalls: RefutedRecall[];
   checker?: "automaton" | "fuzz";
 };
 

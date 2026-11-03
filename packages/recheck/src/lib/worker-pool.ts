@@ -43,7 +43,6 @@ const dialectOf = (dialect: DialectParameter = defaults.dialect): Dialect => {
 /** Ref is an object contains a check information to resolve or to cancel. */
 type Ref = {
   id: number;
-  method: "check" | "checkAll";
   source: string;
   flags: string;
   params: Parameters;
@@ -83,25 +82,6 @@ export class WorkerPool {
     flags: string,
     params: Parameters & HasAbortSignal = {},
   ): Promise<Diagnostics> {
-    return this.request("check", source, flags, params);
-  }
-
-  /** Checks a given regular expression using this pool, and returns all the diagnostics until the final one. */
-  public checkAll(
-    source: string,
-    flags: string,
-    params: Parameters & HasAbortSignal = {},
-  ): Promise<Diagnostics[]> {
-    return this.request("checkAll", source, flags, params);
-  }
-
-  /** Queues a checking method request. */
-  private request<M extends "check" | "checkAll">(
-    method: M,
-    source: string,
-    flags: string,
-    params: Parameters & HasAbortSignal,
-  ): Promise<M extends "checkAll" ? Diagnostics[] : Diagnostics> {
     const id = this.nextID++;
 
     const newParams = { ...params };
@@ -122,7 +102,6 @@ export class WorkerPool {
       // Creates and registers a reference.
       const ref = {
         id,
-        method,
         source,
         flags,
         params: newParams,
@@ -188,7 +167,6 @@ export class WorkerPool {
       worker.postMessage(
         JSON.stringify({
           id: ref.id,
-          method: ref.method,
           source: ref.source,
           flags: ref.flags,
           params: ref.params,
@@ -249,10 +227,12 @@ export class WorkerPool {
       source: ref.source,
       flags: ref.flags,
       dialect: dialectOf(ref.params.dialect),
+      unitMode: null,
       status: "unknown",
       error: { kind: "cancel" },
+      refutedRecalls: [],
     };
-    ref.resolve(ref.method === "checkAll" ? [cancelled] : cancelled);
+    ref.resolve(cancelled);
 
     this.unregisterRef(ref);
     if (ref.worker) {

@@ -1,6 +1,6 @@
 import { createSyncFn } from "synckit";
 
-import { check as checkAgent, checkAll as checkAllAgent } from "./lib/agent";
+import { check as checkAgent } from "./lib/agent";
 import * as env from "./lib/env";
 import { nodeRequire } from "./require";
 import * as java from "./lib/java";
@@ -122,30 +122,11 @@ export async function check(
   }
 }
 
-/** `checkAll` implementation. */
-export async function checkAll(
-  source: string,
-  flags: string,
-  params: Parameters & HasAbortSignal = {},
-): Promise<Diagnostics[]> {
-  validateArguments(source, flags);
-  const b = await selectBackend();
-  switch (b.type) {
-    case "agent":
-      return checkAllAgent(b.agent, source, flags, params);
-    case "pool":
-      return b.pool.checkAll(source, flags, params);
-    case "pure":
-      return pure.checkAll(source, flags, params);
-  }
-}
-
 type SyncFn = (
-  method: "check" | "checkAll",
   source: string,
   flags: string,
   params: Parameters,
-) => Diagnostics | Diagnostics[];
+) => Diagnostics;
 
 /** The function calling the synckit worker, which is created on the first use. */
 let synckitFn: SyncFn | null = null;
@@ -162,10 +143,7 @@ const selectSyncFn = (): SyncFn => {
       }
       return synckitFn;
     case "pure":
-      return (method, source, flags, params) =>
-        method === "checkAll"
-          ? pure.checkAll(source, flags, params)
-          : pure.check(source, flags, params);
+      return pure.check;
   }
   throw new Error(`invalid sync backend: ${name}`);
 };
@@ -176,14 +154,5 @@ export const checkSync = (
   params: Parameters = {},
 ): Diagnostics => {
   validateArguments(source, flags);
-  return selectSyncFn()("check", source, flags, params) as Diagnostics;
-};
-
-export const checkAllSync = (
-  source: string,
-  flags: string,
-  params: Parameters = {},
-): Diagnostics[] => {
-  validateArguments(source, flags);
-  return selectSyncFn()("checkAll", source, flags, params) as Diagnostics[];
+  return selectSyncFn()(source, flags, params);
 };

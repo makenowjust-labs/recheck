@@ -11,12 +11,3 @@ export function check(
 ): Diagnostics {
   return bundle.check(source, flags, params);
 }
-
-/** The well-typed shortcut to Scala.js (pure JavaScript) implementation of `checkAll`. */
-export function checkAll(
-  source: string,
-  flags: string,
-  params: Parameters = {},
-): Diagnostics[] {
-  return bundle.checkAll(source, flags, params);
-}

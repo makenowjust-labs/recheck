@@ -356,7 +356,7 @@ properties:
       The upper limit of matching time on the recall validation.
 
       The recall validation runs the attack string on the real engine of the dialect (see [Recall Validation](/docs/usage/recall-validation)).
-      An attack string that the engine matches within this time is not reported, and the checking goes on.
+      An attack string that the engine matches within this time is refuted: it is recorded in `refutedRecalls` of the diagnostics, and the checking goes on.
       The recall validation is skipped if this value is not positive, or where commands cannot run (e.g. in the browser).
     type: [integer, "null"]
     default: -1000

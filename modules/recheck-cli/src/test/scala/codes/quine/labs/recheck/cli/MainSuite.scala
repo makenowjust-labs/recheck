@@ -49,7 +49,7 @@ class MainSuite extends munit.FunSuite:
     assert(clue(Main.command.parse(Seq.empty)).isLeft)
     assertEquals(
       Main.command.parse(Seq("/foo/")),
-      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(), all = false, json = false))
+      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(), json = false))
     )
     assertEquals(
       Main.command.parse(
@@ -59,7 +59,6 @@ class MainSuite extends munit.FunSuite:
         Main.CheckAction(
           InputPattern("foo", ""),
           Parameters(dialect = Dialect.Perl(false, PerlSource.String)),
-          all = false,
           json = false
         )
       )
@@ -70,7 +69,6 @@ class MainSuite extends munit.FunSuite:
         Main.CheckAction(
           InputPattern("foo", ""),
           Parameters(dialect = Dialect.Python(Dialect.Python.Type.Bytes)),
-          all = false,
           json = false
         )
       )
@@ -81,7 +79,6 @@ class MainSuite extends munit.FunSuite:
         Main.CheckAction(
           InputPattern("foo", ""),
           Parameters(dialect = Dialect.Ruby(Dialect.Ruby.Encoding.ASCII8Bit)),
-          all = false,
           json = false
         )
       )
@@ -89,7 +86,7 @@ class MainSuite extends munit.FunSuite:
     assertEquals(
       Main.command.parse(Seq("/foo/", "--dialect=python")),
       Right(
-        Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Python()), all = false, json = false)
+        Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Python()), json = false)
       )
     )
     for (args, message) <- Seq(
@@ -105,7 +102,7 @@ class MainSuite extends munit.FunSuite:
       assert(clue(result).left.exists(_.errors == List(message)))
     assertEquals(
       Main.command.parse(Seq("/foo/", "--max-refuted-recalls=3")),
-      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(maxRefutedRecalls = 3), all = false, json = false))
+      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(maxRefutedRecalls = 3), json = false))
     )
     assertEquals(
       Main.command.parse(Seq("/foo/", "--max-degree=2", "--timeout=1s")),
@@ -113,18 +110,13 @@ class MainSuite extends munit.FunSuite:
         Main.CheckAction(
           InputPattern("foo", ""),
           Parameters(maxDegree = 2, timeout = Duration(1, SECONDS)),
-          all = false,
           json = false
         )
       )
     )
     assertEquals(
-      Main.command.parse(Seq("--all", "/foo/")),
-      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(), all = true, json = false))
-    )
-    assertEquals(
       Main.command.parse(Seq("--json", "/foo/")),
-      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(), all = false, json = true))
+      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(), json = true))
     )
     assertEquals(Main.command.parse(Seq("generate-recall-script", "-")), Right(Main.GenerateRecallScriptAction("-")))
     assert(clue(Main.command.parse(Seq("generate-recall-script"))).isLeft)
@@ -172,19 +164,11 @@ class MainSuite extends munit.FunSuite:
     assert(clue(out).contains(""""status":"vulnerable""""))
     assert(clue(out).contains(""""summary":"2nd degree polynomial""""))
 
-  test("Main#run: --all"):
-    // Without recall validation, it shows the same as `check`.
-    assertEquals(runMain(Seq("--all", "/(a|a)*$/")), runMain(Seq("/(a|a)*$/")))
-    assertEquals(runMain(Seq("--all", "/foo/"))._3, 0)
-
   test("Main#run: --json"):
     val params = Parameters(checker = Checker.Automaton)
     val (out, err, status) = runMain(Seq("--json", "--checker=automaton", "/(a|a)*$/"))
     assertEquals((err, status), ("", 1))
     assertEquals(parse(out), Right(encodeDiagnostics(ReDoS.check("(a|a)*$", "", params))))
-    val (all, _, allStatus) = runMain(Seq("--all", "--json", "--checker=automaton", "/foo/"))
-    assertEquals(allStatus, 0)
-    assertEquals(parse(all), Right(Json.arr(encodeDiagnostics(ReDoS.check("foo", "", params)))))
 
   test("Main#run: generate-recall-script"):
     // The input is the output of `--json`.

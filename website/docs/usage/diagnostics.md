@@ -14,6 +14,9 @@ Every `Diagnostics` has the following fields.
 - `source` is the given regular expression’s source string.
 - `flags` is the given regular expression’s flags string.
 - `dialect` is the given [`dialect`](parameters.mdx#dialect) parameter, as an object of the name and every setting of the dialect.
+- `unitMode` is the unit of the attack strings (see [Attack String](#attack-string)).
+  It is `null` in an `unknown` diagnostics whose error happened on parsing the pattern.
+- `refutedRecalls` is the list of the attack strings that the recall validation refuted before the result (see [Recall Validation](#recall-validation)).
 - `checker` is a checker type to be used (one of `fuzz` and `automaton`).
 
 ## Status
@@ -45,7 +48,7 @@ It may invoke a matching time explosion against too little string (`length < 100
 ## Attack String
 
 A `vulnerable` diagnostics has the `attack` field. It contains the attack string found by the checking.
-It also has the `unitMode` field, which is the unit of the attack string: `utf16` (UTF-16 code units), `code-point` (code points), or `byte` (bytes).
+Its unit is the `unitMode` field: `utf16` (UTF-16 code units), `code-point` (code points), or `byte` (bytes).
 
 The attack string is a string that causes the explosion of the matching time, also known as a ReDoS vulnerability.
 
@@ -92,7 +95,9 @@ It is `null` if the recall validation is not run: [`recallTimeout`](parameters.m
 When the recall validation refutes an attack, the check does not report the diagnostics, and it goes on to look for another attack string.
 If no attack is confirmed, the result is `safe`.
 
-`checkAll` (`ReDoS.checkAll` in Scala) returns the diagnostics of the refuted attacks too, followed by the reported one.
+Every diagnostics lists the refuted attacks in the `refutedRecalls` field, in the order of the checking.
+Each element has the `complexity`, `attack`, `hotspot` and `recallValidation` fields of the refuted attack, which are the same as those of a `vulnerable` diagnostics.
+They show that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by these attacks (see [Refuted Attacks](recall-validation.md#refuted-attacks)).
 
 ## Hotspot
 

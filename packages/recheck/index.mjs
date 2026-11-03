@@ -1,1 +1,1 @@
-export { check, checkAll, checkAllSync, checkSync } from "./lib/main.mjs";
+export { check, checkSync } from "./lib/main.mjs";

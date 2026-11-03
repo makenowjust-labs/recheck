@@ -22,11 +22,6 @@ class AgentCommandSuite extends munit.FunSuite:
       Left(2), // Wait the above `check` execution.
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":4,$simpleLog}"""),
       Left(4), // Wait the above `check` execution.
-      Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":6,${simple.replace("\"check\"", "\"checkAll\"")}}"""),
-      Left(1),
-      Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":7,${complex.replace("\"check\"", "\"checkAll\"")}}"""),
-      Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","method":"cancel","params":{"id":7}}"""),
-      Left(1),
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":5,$complex}""")
     )
     val out = Seq.newBuilder[String]
@@ -48,16 +43,14 @@ class AgentCommandSuite extends munit.FunSuite:
       out.result().sorted, // Result ordering depends on scheduling.
       Seq(
         """{"jsonrpc":"2.0+push","id":0,"result":{}}""",
-        """{"jsonrpc":"2.0+push","id":1,"result":{"source":"a","flags":"","dialect":{"name":"javascript"},"status":"safe","complexity":{"type":"safe","summary":"safe","isFuzz":false},"checker":"automaton"}}""",
-        """{"jsonrpc":"2.0+push","id":2,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"status":"unknown","error":{"kind":"cancel"},"checker":null}}""",
-        """{"jsonrpc":"2.0+push","id":3,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"status":"unknown","error":{"kind":"cancel"},"checker":null}}""",
-        """{"jsonrpc":"2.0+push","id":3,"result":{"source":"a","flags":"","dialect":{"name":"javascript"},"status":"safe","complexity":{"type":"safe","summary":"safe","isFuzz":false},"checker":"automaton"}}""",
+        """{"jsonrpc":"2.0+push","id":1,"result":{"source":"a","flags":"","dialect":{"name":"javascript"},"unitMode":"utf16","status":"safe","complexity":{"type":"safe","summary":"safe","isFuzz":false},"refutedRecalls":[],"checker":"automaton"}}""",
+        """{"jsonrpc":"2.0+push","id":2,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"unitMode":null,"status":"unknown","error":{"kind":"cancel"},"refutedRecalls":[],"checker":null}}""",
+        """{"jsonrpc":"2.0+push","id":3,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"unitMode":null,"status":"unknown","error":{"kind":"cancel"},"refutedRecalls":[],"checker":null}}""",
+        """{"jsonrpc":"2.0+push","id":3,"result":{"source":"a","flags":"","dialect":{"name":"javascript"},"unitMode":"utf16","status":"safe","complexity":{"type":"safe","summary":"safe","isFuzz":false},"refutedRecalls":[],"checker":"automaton"}}""",
         """{"jsonrpc":"2.0+push","id":4,"message":"automaton: constant pattern"}""",
         """{"jsonrpc":"2.0+push","id":4,"message":"parse: finish\n  pattern: /a/"}""",
         """{"jsonrpc":"2.0+push","id":4,"message":"parse: start"}""",
-        """{"jsonrpc":"2.0+push","id":4,"result":{"source":"a","flags":"","dialect":{"name":"javascript"},"status":"safe","complexity":{"type":"safe","summary":"safe","isFuzz":false},"checker":"automaton"}}""",
-        """{"jsonrpc":"2.0+push","id":5,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"status":"unknown","error":{"kind":"cancel"},"checker":null}}""",
-        """{"jsonrpc":"2.0+push","id":6,"result":[{"source":"a","flags":"","dialect":{"name":"javascript"},"status":"safe","complexity":{"type":"safe","summary":"safe","isFuzz":false},"checker":"automaton"}]}""",
-        """{"jsonrpc":"2.0+push","id":7,"result":[{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"status":"unknown","error":{"kind":"cancel"},"checker":null}]}"""
+        """{"jsonrpc":"2.0+push","id":4,"result":{"source":"a","flags":"","dialect":{"name":"javascript"},"unitMode":"utf16","status":"safe","complexity":{"type":"safe","summary":"safe","isFuzz":false},"refutedRecalls":[],"checker":"automaton"}}""",
+        """{"jsonrpc":"2.0+push","id":5,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"unitMode":null,"status":"unknown","error":{"kind":"cancel"},"refutedRecalls":[],"checker":null}}"""
       )
     )
