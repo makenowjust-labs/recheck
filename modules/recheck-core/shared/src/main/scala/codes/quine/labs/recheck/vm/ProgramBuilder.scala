@@ -49,6 +49,7 @@ private[vm] class ProgramBuilder(
     private val pattern: IRPattern,
     private val capturesSize: Int
 )(using ctx: Context):
+
   import ctx.*
 
   private val universe = pattern.universe

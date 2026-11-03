@@ -9,6 +9,7 @@ import codes.quine.labs.recheck.fuzz.FString.*
 import codes.quine.labs.resyntax.charset.UnitMode
 
 class FStringSuite extends munit.FunSuite:
+
   test("FString.cross"):
     val fs1 = FString(2, IndexedSeq(Wrap('a'), Wrap('b'), Wrap('c')))
     val fs2 = FString(4, IndexedSeq(Wrap('d'), Repeat(0, 1), Wrap('e')))

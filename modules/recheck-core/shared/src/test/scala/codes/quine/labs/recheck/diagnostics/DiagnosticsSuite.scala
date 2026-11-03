@@ -16,6 +16,7 @@ import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UnitMode
 
 class DiagnosticsSuite extends munit.FunSuite:
+
   test("Diagnostics#toString"):
     assertEquals(
       Diagnostics.Safe("", "", Dialect.JavaScript, AttackComplexity.Constant, Checker.Automaton).toString,

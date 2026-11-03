@@ -1,6 +1,7 @@
 package codes.quine.labs.recheck.data
 
 class MultiSetSuite extends munit.FunSuite:
+
   test("MultiSet.empty"):
     assertEquals(MultiSet.empty.map, Map.empty)
 

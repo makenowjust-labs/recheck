@@ -81,12 +81,14 @@ object DynamicSeeder:
 
   /** Patch is a patch to reach a new pc. */
   private[fuzz] sealed abstract class Patch extends Serializable with Product:
+
     def apply(s: UString): Seq[UString]
 
   private[fuzz] object Patch:
 
     /** InsertChar is a patch to insert (or replace) each character at the `pos`. */
     final case class InsertChar(pos: Int, chs: Set[CharSet]) extends Patch:
+
       def apply(s: UString): Seq[UString] =
         chs.toSeq.flatMap: cs =>
           val c = UString(cs.representative)
@@ -94,6 +96,7 @@ object DynamicSeeder:
 
     /** InsertString is a patch to insert a string at the `pos`. */
     final case class InsertString(pos: Int, s: UString) extends Patch:
+
       def apply(t: UString): Seq[UString] =
         Seq(t.insert(pos, s))
 

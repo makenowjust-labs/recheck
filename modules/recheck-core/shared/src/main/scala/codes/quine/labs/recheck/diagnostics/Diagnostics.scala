@@ -25,6 +25,7 @@ object Diagnostics:
       complexity: AttackComplexity.Safe,
       checker: Checker
   ) extends Diagnostics:
+
     override def toString: String =
       s"""|Input     : /$source/$flags
           |Dialect   : ${show(dialect)}
@@ -44,6 +45,7 @@ object Diagnostics:
       recallValidation: Option[RecallValidation],
       checker: Checker.Used
   ) extends Diagnostics:
+
     override def toString: String =
       val lines = Seq(
         s"Input        : /$source/$flags",
@@ -63,6 +65,7 @@ object Diagnostics:
       error: ErrorKind,
       checker: Option[Checker]
   ) extends Diagnostics:
+
     override def toString: String =
       s"""|Input  : /$source/$flags
           |Dialect: ${show(dialect)}
@@ -100,24 +103,30 @@ object Diagnostics:
 
     /** Timeout is a timeout on RegExp analyzing. */
     case object Timeout extends ErrorKind:
+
       override def toString: String = "timeout"
 
     /** Cancel is a cancel on RegExp analyzing. */
     case object Cancel extends ErrorKind:
+
       override def toString: String = "cancel"
 
     /** Unsupported is an error that the RegExp pattern is not supported yet. */
     final case class Unsupported(message: String) extends ErrorKind:
+
       override def toString: String = s"unsupported ($message)"
 
     /** InvalidRegExp is an error that the RegExp pattern is invalid on parsing or semantics. */
     final case class InvalidRegExp(message: String) extends ErrorKind:
+
       override def toString: String = s"invalid RegExp ($message)"
 
     /** RecallFailureLimit is an error that the recall validation fails as many times as `maxRecallFailures`. */
     case object RecallFailureLimit extends ErrorKind:
+
       override def toString: String = "recall failure limit"
 
     /** Unexpected is an unexpected error. */
     final case class Unexpected(message: String) extends ErrorKind:
+
       override def toString: String = s"unexpected ($message)"

@@ -154,6 +154,7 @@ object ReDoS:
   private[recheck] final case class RecallKey(degree: Option[Int], spots: Seq[(Int, Int)])
 
   private[recheck] object RecallKey:
+
     def apply(complexity: AttackComplexity.Vulnerable, hotspot: Hotspot): RecallKey =
       val degree = complexity match
         case AttackComplexity.Polynomial(degree, _) => Some(degree)

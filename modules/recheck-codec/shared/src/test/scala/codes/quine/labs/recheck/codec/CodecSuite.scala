@@ -26,6 +26,7 @@ import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
 class CodecSuite extends munit.FunSuite:
+
   test("codec.encodeDiagnostics"):
     assertEquals(
       encodeDiagnostics(Diagnostics.Safe("a", "", Dialect.JavaScript, AttackComplexity.Linear, Checker.Fuzz)),

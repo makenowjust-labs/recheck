@@ -52,8 +52,10 @@ object Hotspot:
 
   /** Heat is a high temperature. */
   case object Heat extends Temperature:
+
     override def toString: String = "heat"
 
   /** Normal is a normal temperature. */
   case object Normal extends Temperature:
+
     override def toString: String = "normal"

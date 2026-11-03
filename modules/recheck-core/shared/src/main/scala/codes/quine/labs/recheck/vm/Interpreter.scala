@@ -86,17 +86,21 @@ object Interpreter:
 
     /** Ok is the status of a succeeded matching. */
     case object Ok extends Status:
+
       override def toString: String = "ok"
 
     /** Fail is the status of a failed matching. */
     case object Fail extends Status:
+
       override def toString: String = "fail"
 
     /** Limit is the status of a matching that exceeds the limit of steps. */
     case object Limit extends Status:
+
       override def toString: String = "limit"
 
     case object Timeout extends Status:
+
       override def toString: String = "timeout"
 
   /** CoverageLocation is a location in coverage. */

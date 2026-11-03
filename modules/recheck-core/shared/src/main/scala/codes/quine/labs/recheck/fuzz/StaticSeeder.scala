@@ -108,6 +108,7 @@ private[fuzz] class StaticSeeder[A, Q](
     val acceptSet: Set[Q],
     val graph: Graph[Q, A]
 )(using ctx: Context):
+
   import ctx.*
 
   /** A reversed graph of [[graph]]. */

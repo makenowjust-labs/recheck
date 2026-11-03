@@ -4,6 +4,7 @@ import codes.quine.labs.recheck.vm.Program.Meta
 
 /** Program is a compiled RegExp pattern. */
 final case class Program(blocks: Vector[(Label, Block)], meta: Meta):
+
   override def toString: String =
     val sb = new StringBuilder
     for (label, block) <- blocks do

@@ -5,6 +5,7 @@ import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
 class AttackPatternSuite extends munit.FunSuite:
+
   test("AttackPattern#fixedSize"):
     val attack = AttackPattern(
       Seq((UnitMode.UTF16.decode("ab"), UnitMode.UTF16.decode("cd"), 2)),

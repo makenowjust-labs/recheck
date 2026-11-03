@@ -28,6 +28,7 @@ import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 
 class InterpreterSuite extends munit.FunSuite:
+
   given ctx: Context = Context()
 
   /** Returns a JavaScript back-reference to the index. */

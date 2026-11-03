@@ -2,6 +2,7 @@ package codes.quine.labs.recheck.common
 
 /** Checker is an enum values to specify a checker to be used. */
 enum Checker:
+
   /** An automaton theory based checker. */
   case Automaton
 

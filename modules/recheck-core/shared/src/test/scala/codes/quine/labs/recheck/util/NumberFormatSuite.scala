@@ -1,6 +1,7 @@
 package codes.quine.labs.recheck.util
 
 class NumberFormatSuite extends munit.FunSuite:
+
   test("NumberFormat.superscript"):
     assertEquals(NumberFormat.superscript(1234567890), "¹²³⁴⁵⁶⁷⁸⁹⁰")
     assertEquals(NumberFormat.superscript(-1234567890), "⁻¹²³⁴⁵⁶⁷⁸⁹⁰")
