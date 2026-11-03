@@ -128,8 +128,8 @@ object ReDoS:
   private[recheck] def parse(source: String, flags: String, dialect: Dialect)(using ctx: Context): IRPattern =
     ctx.log("parse: start")
     val flagSet = ctx.interrupt(parseFlags(flags, dialect))
-    val node = ctx.interrupt(parseSource(source, flagSet, dialect))
     val mode = ctx.interrupt(Parser.determineUnitMode(source, flagSet, dialect))
+    val node = ctx.interrupt(parseSource(source, flagSet, dialect, mode))
     val ir = ctx.interrupt(buildIR(node, flagSet, dialect, mode))
     ctx.log(s"parse: finish\n  pattern: /$source/$flags")
     ir
@@ -138,8 +138,8 @@ object ReDoS:
     try FlagSet.parse(flags, dialect)
     catch case ex: FlagSetException => throw new InvalidRegExpException(ex.getMessage)
 
-  private def parseSource(source: String, flagSet: FlagSet, dialect: Dialect): Node =
-    try Parser.parse(source, flagSet, dialect)
+  private def parseSource(source: String, flagSet: FlagSet, dialect: Dialect, mode: UnitMode): Node =
+    try Parser.parse(source, flagSet, dialect, mode)
     catch
       case ex: ParsingException      => throw new InvalidRegExpException(ex.getMessage)
       case ex: NestingLimitException => throw new UnsupportedException(ex.getMessage)
