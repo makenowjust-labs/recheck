@@ -872,22 +872,22 @@ private[build] object IRCharResolver:
     else
       dialect match
         case Dialect.JavaScript =>
-          Keyed("ECMAScript", CaseMapping.ecmaScriptCanonicalize(mode), mode)
+          Keyed(CaseMapping.ecmaScriptCanonicalize(mode), mode)
         case Dialect.Java   => if flags.unicodeCase then JavaUnicode else JavaASCII
-        case Dialect.DotNet => Keyed(".NET", dotNetKey, mode)
-        case _: Dialect.Python if asciiOnly || mode == UnitMode.Byte => Keyed("ASCII", asciiFold, mode)
-        case _: Dialect.Python                                       => Keyed("Python", pythonKey, mode)
-        case _: Dialect.Ruby if mode == UnitMode.Byte                => Keyed("ASCII", asciiFold, mode)
-        case _: Dialect.Ruby => Keyed("simple folding", CaseMapping.SimpleFold, mode)
-        case _: Dialect.Perl if flags.charset == IRCharset.Locale => PerlLocale(mode)
-        case _: Dialect.Perl if perlNative                        => PerlNative(mode)
-        case _: Dialect.Perl if flags.caselessRestrict            => PCRERestrict(CaseMapping.SimpleFold, mode)
-        case _: Dialect.Perl => Keyed("simple folding", CaseMapping.SimpleFold, mode)
+        case Dialect.DotNet => Keyed(dotNetKey, mode)
+        case _: Dialect.Python if asciiOnly || mode == UnitMode.Byte => Keyed(asciiFold, mode)
+        case _: Dialect.Python                                       => Keyed(pythonKey, mode)
+        case _: Dialect.Ruby if mode == UnitMode.Byte                => Keyed(asciiFold, mode)
+        case _: Dialect.Ruby                                         => Keyed(CaseMapping.SimpleFold, mode)
+        case _: Dialect.Perl if flags.charset == IRCharset.Locale    => PerlLocale(mode)
+        case _: Dialect.Perl if perlNative                           => PerlNative(mode)
+        case _: Dialect.Perl if flags.caselessRestrict               => PCRERestrict(CaseMapping.SimpleFold, mode)
+        case _: Dialect.Perl                                         => Keyed(CaseMapping.SimpleFold, mode)
         // PCRE folds non-ASCII characters only in UTF or UCP mode; PHP's `u` sets both.
-        case Dialect.PCRE if mode == UnitMode.Byte && !flags.unicodeClass => Keyed("ASCII", asciiFold, mode)
+        case Dialect.PCRE if mode == UnitMode.Byte && !flags.unicodeClass => Keyed(asciiFold, mode)
         case Dialect.PCRE                                                 =>
           val mapping = if flags.turkishCasing then CaseMapping.SimpleFoldTurkic else CaseMapping.SimpleFold
-          if flags.caselessRestrict then PCRERestrict(mapping, mode) else Keyed("simple folding", mapping, mode)
+          if flags.caselessRestrict then PCRERestrict(mapping, mode) else Keyed(mapping, mode)
 
   /** Determines how a back-reference with the flags compares the capture with the input in the dialect. */
   def determineBackReferenceFolding(dialect: Dialect, mode: UnitMode, flags: IRCharFlagSet): IRBackReferenceFolding =
