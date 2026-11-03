@@ -23,6 +23,9 @@ class FuzzProgramSuite extends munit.FunSuite:
     assertEquals(fuzz2.usesAcceleration(AccelerationMode.On), true)
     assertEquals(fuzz1.usesAcceleration(AccelerationMode.Off), false)
     assertEquals(fuzz2.usesAcceleration(AccelerationMode.Off), false)
+    // The verbs and the non-atomic look-arounds do not allow memoization.
+    for source <- Seq("a(*PRUNE)b", "(*napla:a)a"); mode <- AccelerationMode.values do
+      assertEquals(from(source, "", Dialect.PCRE).usesAcceleration(mode), false, s"$source in $mode")
 
   test("FuzzProgram#joinSurrogates"):
     val s = UString(0xd83d, 0xde00, 0xde00, 0xd83d)

@@ -18,11 +18,10 @@ final case class FuzzProgram(
     surrogates: IRSurrogateKind
 ):
 
-  /** Whether or not it uses acceleration of VM execution. */
+  /** Whether the VM memoizes the failed states in the mode, which it does only where the program allows it. */
   def usesAcceleration(mode: AccelerationMode): Boolean = mode match
-    // The verbs skipping backtracking points prevent acceleration.
-    case AccelerationMode.Auto => !program.meta.hasRef && !program.meta.hasVerb
-    case AccelerationMode.On   => !program.meta.hasVerb
+    case AccelerationMode.Auto => program.meta.allowsMemoization && !program.meta.hasRef
+    case AccelerationMode.On   => program.meta.allowsMemoization
     case AccelerationMode.Off  => false
 
   /** Joins a high surrogate followed by a low surrogate in the string of code points into one code point with `Paired`

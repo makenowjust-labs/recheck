@@ -502,7 +502,7 @@ class ReDoSSuite extends munit.FunSuite:
       List(Diagnostics.Safe(".", "", Dialect.JavaScript, AttackComplexity.Safe(true), Checker.Fuzz))
     )
     interceptMessage[TimeoutException](
-      "timeout at modules/recheck-core/shared/src/main/scala/codes/quine/labs/recheck/fuzz/FuzzProgram.scala:38"
+      "timeout at modules/recheck-core/shared/src/main/scala/codes/quine/labs/recheck/fuzz/FuzzProgram.scala:37"
     ) {
       val ctx = Context(timeout = Duration.MinusInf)
       val result = checkFuzz(".", "", Parameters(timeout = Duration.MinusInf))(using ctx)

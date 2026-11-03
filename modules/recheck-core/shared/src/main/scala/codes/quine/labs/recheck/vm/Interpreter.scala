@@ -286,10 +286,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     clock
 
   /** Whether it memoizes the failed states. */
-  private val memoizes: Boolean =
-    // The verbs skipping backtracking points prevent it.
-    // So do non-atomic look-arounds, since the matching after one depends on its start, which a state does not have.
-    options.usesAcceleration && !program.meta.hasVerb && !program.meta.hasLeave
+  private val memoizes: Boolean = options.usesAcceleration
+
+  require(!memoizes || program.meta.allowsMemoization, "The program does not allow memoization")
 
   /** Constructs a result of matching. */
   private[vm] def result(status: Status, captures: Option[Seq[Int]]): Result =

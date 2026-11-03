@@ -70,6 +70,10 @@ class InterpreterSuite extends munit.FunSuite:
     val opts = Options(usesAcceleration = true)
     assertEquals(matches(source, flags, input, opts).status, Status.Limit)
 
+  /** Returns the options using acceleration if it is asked for and the program allows it. */
+  def options(program: Program, usesAcceleration: Boolean): Options =
+    Options(usesAcceleration = usesAcceleration && program.meta.allowsMemoization)
+
   def runStatus(
       source: String,
       flags: String,
@@ -82,7 +86,7 @@ class InterpreterSuite extends munit.FunSuite:
     val u = input match
       case s: String  => ir.mode.decode(s)
       case u: UString => u
-    Interpreter.run(program, u, Options(usesAcceleration = usesAcceleration)).status
+    Interpreter.run(program, u, options(program, usesAcceleration)).status
 
   def accepts(
       source: String,
@@ -118,7 +122,7 @@ class InterpreterSuite extends munit.FunSuite:
     val ir = ReDoS.parse(source, "", dialect)
     val program = ProgramBuilder.build(ir)
     val result =
-      Interpreter.run(program, ir.mode.decode(input), Options(usesAcceleration = usesAcceleration))
+      Interpreter.run(program, ir.mode.decode(input), options(program, usesAcceleration))
     // The spans drop the unset groups at the end, which Perl does not report.
     result.captures.map: captures =>
       captures
@@ -611,6 +615,11 @@ class InterpreterSuite extends munit.FunSuite:
     refutes("^.$", PCRE, UString(0xc3, 0xa9))
     accepts("^..$", PCRE, UString(0xc3, 0xa9))
     accepts("(*UTF)^.$", PCRE, "é")
+
+  test("Interpreter.run: acceleration on a program not allowing memoization"):
+    val program = ProgramBuilder.build(ReDoS.parse("a(*PRUNE)b", "", PCRE))
+    interceptMessage[IllegalArgumentException]("requirement failed: The program does not allow memoization"):
+      Interpreter.run(program, UString.empty, Options(usesAcceleration = true))
 
   test("ProgramBuilder.build: unsupported"):
     val ir = ReDoS.parse("a(?R)?", "", PCRE)
