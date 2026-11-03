@@ -7,8 +7,7 @@ import codes.quine.labs.recheck.util.NumberFormat
   */
 sealed abstract class AttackComplexity extends Product with Serializable:
 
-  /** When it is `true`, this complexity maybe wrong. Otherwise, this comes from a precise analysis.
-    */
+  /** Whether this complexity comes from fuzzing, which may be wrong, instead of a precise analysis. */
   def isFuzz: Boolean
 
 /** AttackComplexity types. */
@@ -27,22 +26,22 @@ object AttackComplexity:
   /** UnknownSafe is a complexity for a safe RegExp but the true complexity is unknown. */
   final private case class UnknownSafe(override val isFuzz: Boolean) extends Safe(isFuzz)
 
-  /** RegExp can check a match in a constant time. */
+  /** Constant is the complexity of a RegExp that checks a match in constant time. */
   case object Constant extends Safe(false):
     override def toString: String = s"constant"
 
-  /** RegExp can check a match in a linear time. */
+  /** Linear is the complexity of a RegExp that checks a match in linear time. */
   case object Linear extends Safe(false):
     override def toString: String = s"linear"
 
   /** Vulnerable is a common class for unsafe complexity. */
   sealed abstract class Vulnerable extends AttackComplexity
 
-  /** RegExp can check a match in a polynomial time. */
+  /** Polynomial is the complexity of a RegExp that checks a match in polynomial time of the degree. */
   final case class Polynomial(degree: Int, isFuzz: Boolean) extends Vulnerable:
     override def toString: String =
       s"${NumberFormat.ordinalize(degree)} degree polynomial${if isFuzz then " (fuzz)" else ""}"
 
-  /** RegExp can check a match in an exponential time. */
+  /** Exponential is the complexity of a RegExp that checks a match in exponential time. */
   final case class Exponential(isFuzz: Boolean) extends Vulnerable:
     override def toString: String = s"exponential${if isFuzz then " (fuzz)" else ""}"

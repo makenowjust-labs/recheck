@@ -204,7 +204,7 @@ object CharSet:
         inR = r
     new CharSet(java.util.Arrays.copyOf(out, n))
 
-  /** The array must be sorted. */
+  /** Returns the number of the elements of the sorted array that are less than or equal to the value. */
   private[charset] def countLessOrEqual(array: Array[Int], value: Int): Int =
     var lo = 0
     var hi = array.length

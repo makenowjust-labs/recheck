@@ -13,7 +13,6 @@ import codes.quine.labs.resyntax.ir.IRNodeData.Chars
 import codes.quine.labs.resyntax.ir.IRNodeData.Empty
 import codes.quine.labs.resyntax.ir.IRNodeData.Sequence
 
-/** IRFlagSuite is tests of flag interpretation and scoping, where the comments show the engines' behavior. */
 class IRFlagSuite extends munit.FunSuite with IRHelper:
   // `\n^` with `m` matches `a\n` in .NET, JavaScript and Python, but not in Java, Perl, PCRE and Ruby.
   // `^` with `m` matches the empty string except in Java.

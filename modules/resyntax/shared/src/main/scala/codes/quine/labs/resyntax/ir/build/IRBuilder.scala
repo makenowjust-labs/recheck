@@ -26,7 +26,9 @@ import codes.quine.labs.resyntax.charset.UnitMode
 
 object IRBuilder:
 
-  /** Throws [[IRBuildingException]] for an error that needs the whole pattern (e.g. a reference to a non-existent
+  /** Builds the IR of the pattern of the node with the flags in the dialect.
+    *
+    * It throws [[IRBuildingException]] for an error that needs the whole pattern (e.g. a reference to a non-existent
     * group, or a look-behind that the dialect does not allow).
     *
     * The unit mode is the one that `Parser.determineUnitMode` determines for the source of the node.

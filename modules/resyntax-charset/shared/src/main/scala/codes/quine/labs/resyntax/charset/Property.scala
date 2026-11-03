@@ -2,15 +2,15 @@ package codes.quine.labs.resyntax.charset
 
 sealed abstract class Property:
 
-  /** The long name first, then the short name and the other aliases. */
+  /** The names of the property: the long name first, then the short name and the other aliases. */
   def names: IndexedSeq[String]
 
-  /** The long name if it has no short name. */
+  /** The short name of the property, or the long name if it has no short name. */
   def shortName: String
 
   def name: String = names.head
 
-/** BinaryProperty may be a property of strings such as `RGI_Emoji`. */
+/** BinaryProperty is a binary property, which may be a property of strings such as `RGI_Emoji`. */
 final class BinaryProperty private[charset] (
     val names: IndexedSeq[String],
     val shortName: String,
@@ -25,7 +25,7 @@ final class BinaryProperty private[charset] (
 
   override def toString: String = s"BinaryProperty($name)"
 
-/** PropertyValue may be a group of values such as `General_Category=L`. */
+/** PropertyValue is a value of an enumerated property, which may be a group of values such as `General_Category=L`. */
 final class PropertyValue private[charset] (
     val propertyName: String,
     val names: IndexedSeq[String],
@@ -47,7 +47,7 @@ final class EnumeratedProperty private[charset] (
 
   private val index = NameIndex(values.map(v => (v.names, v)))
 
-  /** It also finds a group of values such as `General_Category=L`. */
+  /** Returns the value of the name, which may be a group of values such as `General_Category=L`. */
   def value(name: String): Option[PropertyValue] = index.get(name, NameMatching.Exact)
 
   override def toString: String = s"EnumeratedProperty($name)"

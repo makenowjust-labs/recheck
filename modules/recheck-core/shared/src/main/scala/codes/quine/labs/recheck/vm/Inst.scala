@@ -27,14 +27,13 @@ sealed abstract class Inst:
 
 object Inst:
 
-  /** Branch is a base class for terminal instructions. Such a type instruction is placed in a last of a basic block.
-    */
+  /** Terminator is a base class for terminal instructions, which end a basic block. */
   sealed abstract class Terminator extends Inst:
 
     /** A successor block's labels. */
     def successors: Set[Label]
 
-  /** `ok`: Terminates a matching with a succeeded. */
+  /** `ok`: Terminates a matching with a success. */
   case object Ok extends Terminator:
     def successors: Set[Label] = Set.empty
 
@@ -327,7 +326,7 @@ object Inst:
     case object Any extends ReadKind:
       override def toString: String = "any"
 
-    /** An usual character matching. */
+    /** A usual character matching. */
     final case class Char(c: UChar) extends ReadKind:
       override def toString: String = s"char 0x${Integer.toHexString(c).toUpperCase}"
 

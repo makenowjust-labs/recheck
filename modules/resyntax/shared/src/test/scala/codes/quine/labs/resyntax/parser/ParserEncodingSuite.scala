@@ -15,7 +15,6 @@ import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.Quantifier.*
 import codes.quine.labs.resyntax.ast.SourceLocation
 
-/** Tests of the source encodings, where an engine reads a pattern by bytes. */
 class ParserEncodingSuite extends munit.FunSuite:
 
   def parse(s: String, flags: String, dialect: Dialect): Node =

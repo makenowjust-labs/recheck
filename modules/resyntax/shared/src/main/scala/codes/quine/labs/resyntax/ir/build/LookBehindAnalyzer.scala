@@ -32,7 +32,7 @@ private[build] final class LookBehindAnalyzer(
     rubyClassWidths: Node => Option[Seq[Int]]
 ):
 
-  /** Throws [[IRBuildingException]] if the dialect does not accept the look-behind. */
+  /** Validates that the dialect accepts the look-behind, or throws [[IRBuildingException]]. */
   def validateLookBehind(lookBehind: Node, body: Node, negative: Boolean): Unit =
     featureSet.lookBehindRule match
       case IRLookBehindRule.Unrestricted => ()
@@ -383,7 +383,7 @@ private[build] object LookBehindAnalyzer:
 
   val Inf: Long = Long.MaxValue
 
-  /** Lengths beyond this are unbounded, which are far beyond the dialects' limits. */
+  /** Cap is the length beyond which a length is unbounded, which is far beyond the dialects' limits. */
   private val Cap: Long = 1L << 40
 
   /** JavaMaxReps is `Pattern.MAX_REPS`. */

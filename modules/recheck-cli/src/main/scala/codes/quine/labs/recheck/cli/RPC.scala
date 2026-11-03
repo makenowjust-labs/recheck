@@ -41,14 +41,14 @@ object RPC:
       def apply(c: HCursor): Decoder.Result[ID] =
         List[Decoder[ID]](NullID.decode.widen, StringID.decode.widen, IntID.decode.widen).reduceLeft(_ or _).apply(c)
 
-  /** StringID is an ID consists a string value. */
+  /** StringID is an ID of a string value. */
   final case class StringID(value: String) extends ID
 
   object StringID:
     given encode: Encoder[StringID] = _.value.asJson
     given decode: Decoder[StringID] = _.as[String].map(StringID(_))
 
-  /** IntID is an ID consists an integer value. */
+  /** IntID is an ID of an integer value. */
   final case class IntID(value: Int) extends ID
 
   object IntID:
@@ -200,7 +200,7 @@ object RPC:
         else Result.ok((optID, method, paramsJson))
       case Left(err) => Result.raise(ErrorResponse.ParseError(err.getMessage))
 
-  /** Finds an handler for the request. */
+  /** Finds a handler for the request. */
   private[cli] def find(handlerMap: Map[String, Handler], optID: Option[ID], method: String): Result[Handler] =
     handlerMap.get(method) match
       case Some(handler) => Result.ok(handler)
@@ -218,7 +218,7 @@ object RPC:
   /** A function type to send a response in handler. */
   private[cli] type ResponseSend = Either[ErrorResponse, ResultResponse] => Unit
 
-  /** Handler represents an handler of JSON-RPC. */
+  /** Handler is a handler of JSON-RPC. */
   sealed trait Handler:
     type Params
 
@@ -226,7 +226,7 @@ object RPC:
 
     private[cli] def handle(optID: Option[ID], paramsJson: Json, push: ResponsePush, send: ResponseSend): Result[Unit]
 
-  /** RequestHandler represents an handler of JSON-RPC request. */
+  /** RequestHandler is a handler of JSON-RPC requests. */
   sealed trait RequestHandler extends Handler:
     type Message
 
@@ -284,7 +284,7 @@ object RPC:
 
         def apply(id: ID, params: P, push: Push[M], send: Send[R]): Unit = h(id, params, push, send)
 
-  /** NotificationHandler represents an handler of JSON-RPC notification. */
+  /** NotificationHandler is a handler of JSON-RPC notifications. */
   sealed trait NotificationHandler extends Handler:
     def apply(params: Params): Unit
 

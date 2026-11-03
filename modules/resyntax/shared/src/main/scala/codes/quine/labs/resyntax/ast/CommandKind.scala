@@ -61,7 +61,7 @@ object CommandKind:
   /** PNamedCall is an alternative form of a call command to named group (e.g. `(?P>foo)`). */
   final case class PNamedCall(name: String) extends CommandKind
 
-  /** Comment is a inline comment (e.g. `(?#...)`). */
+  /** Comment is an inline comment (e.g. `(?#...)`). */
   final case class Comment(text: String) extends CommandKind
 
   /** InlineCode is an inline code command (e.g. `(?{ code })`). */
@@ -73,7 +73,7 @@ object CommandKind:
   /** Callout is a callout command without arguments (e.g. `(?C)`). */
   case object Callout extends CommandKind
 
-  /** CalloutInt is an callout command with integer value (e.g. `(?C1)`). */
+  /** CalloutInt is a callout command with an integer value (e.g. `(?C1)`). */
   final case class CalloutInt(value: Int) extends CommandKind
 
   /** CalloutString is a callout command with string value (e.g. `(?C{foo})`). */

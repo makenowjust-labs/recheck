@@ -34,15 +34,15 @@ object Complexity:
     /** A hotspot for this. */
     def hotspot: Hotspot
 
-  /** RegExp can check a match in a constant time. */
+  /** Constant is the complexity of a RegExp that checks a match in constant time. */
   case object Constant extends Safe:
     def toAttackComplexity: AttackComplexity.Safe = AttackComplexity.Constant
 
-  /** RegExp can check a match in a linear time. */
+  /** Linear is the complexity of a RegExp that checks a match in linear time. */
   case object Linear extends Safe:
     def toAttackComplexity: AttackComplexity.Safe = AttackComplexity.Linear
 
-  /** RegExp can check a match in a `n`th polynomial time. */
+  /** Polynomial is the complexity of a RegExp that checks a match in polynomial time of the degree. */
   final case class Polynomial[A](degree: Int, witness: Witness[A], hotspot: Hotspot = Hotspot.empty)
       extends Vulnerable[A]:
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Polynomial(degree, false)
@@ -51,7 +51,7 @@ object Complexity:
       val bestRepeatCount = RepeatUtil.polynomial(degree, attackLimit, witness.fixedSize, witness.repeatSize, maxSize)
       witness.buildAttackPattern(bestRepeatCount)
 
-  /** RegExp can check a match in an exponential time. */
+  /** Exponential is the complexity of a RegExp that checks a match in exponential time. */
   final case class Exponential[A](witness: Witness[A], hotspot: Hotspot = Hotspot.empty) extends Vulnerable[A]:
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Exponential(false)
 

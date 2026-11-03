@@ -9,9 +9,6 @@ import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.charset.UString
 
-/** The expected results are checked on the engines (Node 26, Python 3.15, Ruby 4.0, Java 25, .NET 10, Perl 5.44 and PHP
-  * 8.5 with PCRE2).
-  */
 class InterpreterDialectSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
@@ -38,6 +35,9 @@ class InterpreterDialectSuite extends munit.FunSuite:
       loc: munit.Location
   ): Unit =
     accepts(source, dialect, input, flags, false)
+
+  // The expected results are checked on Node 26, Python 3.15, Ruby 4.0, Java 25, .NET 10, Perl 5.44 and PHP 8.5 with
+  // PCRE2.
 
   test("Interpreter.run: atomic groups and possessive repeats"):
     for dialect <- Seq(Java, Python(), PCRE) do

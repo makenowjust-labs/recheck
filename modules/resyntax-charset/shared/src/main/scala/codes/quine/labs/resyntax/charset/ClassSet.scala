@@ -36,7 +36,9 @@ object ClassSet:
 
   val empty: ClassSet = new ClassSet(CharSet.empty, SortedSet.empty)
 
-  /** Strings of exactly one code value are folded into [[chars]]. */
+  /** Creates a class set of the characters and the strings, where a string of exactly one code value is folded into
+    * [[chars]].
+    */
   def apply(chars: CharSet, strings: IterableOnce[UString] = Nil): ClassSet =
     val (singles, others) = strings.iterator.toSeq.partition(_.length == 1)
     new ClassSet(chars.union(CharSet.of(singles.map(_(0))*)), SortedSet.from(others))

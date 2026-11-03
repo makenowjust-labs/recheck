@@ -1,6 +1,6 @@
 package codes.quine.labs.resyntax.ast
 
-/** QuoteLiteral is literal in `\q` escape. */
+/** QuoteLiteral is a literal in a `\q` escape. */
 sealed abstract class QuoteLiteral extends Product with Serializable
 
 object QuoteLiteral:

@@ -58,7 +58,7 @@ object IRNodeData:
     def apply(nodes: IRNodeData*): IRNodeData =
       Disjunction(nodes.map(IRNode(_)))
 
-  /** Its strategy is greedy or lazy; a possessive repetition is a repetition in [[Atomic]]. */
+  /** Repeat is a greedy or lazy repetition; a possessive repetition is a repetition in [[Atomic]]. */
   final case class Repeat(node: IRNode, quantifier: IRQuantifier) extends IRNodeData
 
   object Repeat:

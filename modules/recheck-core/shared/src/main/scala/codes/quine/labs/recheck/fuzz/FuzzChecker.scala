@@ -344,14 +344,14 @@ private[fuzz] final class FuzzChecker(
     val s = t.delete(pos, size)
     next.execute(s)
 
-  /** Construct an attack string. */
+  /** Constructs an attack string. */
   def tryAttack(str: FString): Iterator[AttackResult] = interrupt:
     val exponential = tryAttackExponential(str).iterator
     val polynomials = (maxDegree to 2 by -1).iterator.flatMap(tryAttackPolynomial(str, _))
 
     (exponential ++ polynomials)
 
-  /** Construct an attack string on assuming the pattern is exponential. */
+  /** Constructs an attack string on assuming the pattern is exponential. */
   def tryAttackExponential(str: FString): Option[AttackResult] = interrupt:
     log("fuzz: attack (exponential)")
     val n = RepeatUtil.exponential(attackLimit, str.fixedSize, str.repeatSize, maxAttackStringSize)
@@ -359,7 +359,7 @@ private[fuzz] final class FuzzChecker(
     tryAttackExecute(attack, None).map:
       case (pattern, hotspot) => (AttackComplexity.Exponential(true), pattern, hotspot)
 
-  /** Construct an attack string on assuming the pattern is polynomial. */
+  /** Constructs an attack string on assuming the pattern is polynomial. */
   def tryAttackPolynomial(str: FString, degree: Int): Option[AttackResult] = interrupt:
     log(s"fuzz: attack (polynomial: $degree)")
     val n = RepeatUtil.polynomial(degree, attackLimit, str.fixedSize, str.repeatSize, maxAttackStringSize)

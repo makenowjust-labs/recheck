@@ -12,7 +12,7 @@ trait UnicodeDataGen {
   /** A generated source code. */
   def source(pkg: String): String
 
-  /** Run this generator. */
+  /** Runs this generator. */
   def gen(pkg: String, dir: File): Unit =
     IO.write(file(dir), source(pkg))
 }

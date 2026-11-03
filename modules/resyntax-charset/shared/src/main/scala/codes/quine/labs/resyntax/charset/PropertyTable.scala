@@ -35,7 +35,7 @@ object PropertyTable:
 
   lazy val binaryProperties: IndexedSeq[BinaryProperty] = icuBinaryProperties ++ IndexedSeq(Any, ASCII, Assigned)
 
-  /** It has the group values such as `L` and `LC`. */
+  /** The `General_Category` property, which has the group values such as `L` and `LC`. */
   lazy val GeneralCategory: EnumeratedProperty = fromRaw(UnicodeData.GeneralCategory)
 
   lazy val Script: EnumeratedProperty = fromRaw(UnicodeData.Script)
@@ -47,12 +47,12 @@ object PropertyTable:
 
   lazy val BidiClass: EnumeratedProperty = fromRaw(UnicodeData.BidiClass)
 
-  /** Its values are `Unassigned` (`NA`) and the versions such as `V1_1` (`1.1`) in order. */
+  /** The `Age` property, whose values are `Unassigned` (`NA`) and the versions such as `V1_1` (`1.1`) in order. */
   lazy val Age: EnumeratedProperty = fromRaw(UnicodeData.Age)
 
   lazy val BidiPairedBracketType: EnumeratedProperty = fromRaw(UnicodeData.BidiPairedBracketType)
 
-  /** Its values are also named by their numbers (e.g. `230`). */
+  /** The `Canonical_Combining_Class` property, whose values are also named by their numbers (e.g. `230`). */
   lazy val CanonicalCombiningClass: EnumeratedProperty = fromRaw(UnicodeData.CanonicalCombiningClass)
 
   lazy val DecompositionType: EnumeratedProperty = fromRaw(UnicodeData.DecompositionType)
@@ -63,10 +63,10 @@ object PropertyTable:
 
   lazy val HangulSyllableType: EnumeratedProperty = fromRaw(UnicodeData.HangulSyllableType)
 
-  /** It is defined by UTS #39. */
+  /** The `Identifier_Status` property of UTS #39. */
   lazy val IdentifierStatus: EnumeratedProperty = fromRaw(UnicodeData.IdentifierStatus)
 
-  /** A code point may have several values of it (UTS #39). */
+  /** The `Identifier_Type` property of UTS #39, of which a code point may have several values. */
   lazy val IdentifierType: EnumeratedProperty = fromCombined(UnicodeData.IdentifierType, IndexedSeq.empty)
 
   lazy val IndicConjunctBreak: EnumeratedProperty = fromRaw(UnicodeData.IndicConjunctBreak)
@@ -97,7 +97,7 @@ object PropertyTable:
 
   lazy val WordBreak: EnumeratedProperty = fromRaw(UnicodeData.WordBreak)
 
-  /** Its values are NaN first, and then the numbers in ascending order. */
+  /** The `Numeric_Value` property, whose values are NaN first, and then the numbers in ascending order. */
   lazy val NumericValue: NumericProperty =
     val raw = UnicodeData.NumericValue
     val (names, short) = Codec.names(raw.names)

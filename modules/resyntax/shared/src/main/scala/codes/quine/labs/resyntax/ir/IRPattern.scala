@@ -361,7 +361,7 @@ sealed abstract class IRBackReferenceFolding extends Product with Serializable
 
 object IRBackReferenceFolding:
 
-  /** Simple compares them character by character with the case equivalence. */
+  /** Simple compares the capture and the input character by character with the case equivalence. */
   case object Simple extends IRBackReferenceFolding
 
   /** Full compares the full case foldings of the capture and the input, which must end at the end of a character of

@@ -273,6 +273,6 @@ private[build] object CaptureAnalyzer:
   def analyze(root: Node, context: BuildingContext): CaptureTable =
     new CaptureAnalyzer(root, context).analyze()
 
-  /** Whether the dialect is .NET, whose numeric names (e.g. `(?<2>...)`) are indices. */
+  /** Checks whether the name is a number in .NET, where such a name (e.g. `(?<2>...)`) is an index. */
   def isNumericName(dialect: Dialect, name: String): Boolean =
     dialect.isDotNet && name.nonEmpty && name.forall(_.isDigit)

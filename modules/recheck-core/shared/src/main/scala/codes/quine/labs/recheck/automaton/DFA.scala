@@ -17,7 +17,7 @@ final case class DFA[A, Q](
     delta: Map[(Q, A), Q]
 ):
 
-  /** Exports this transition function as a grapg. */
+  /** Exports this transition function as a graph. */
   def toGraph: Graph[Q, A] = Graph.from(delta.iterator.map { case (q1, a) -> q2 => (q1, a, q2) }.toIndexedSeq)
 
   /** Converts to Graphviz format text. */

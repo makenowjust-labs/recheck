@@ -6,11 +6,6 @@ import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 
-/** Spans of the constructs that only some dialects have, checked on the engines (Ruby 4.0, Java 25, .NET 10, Perl 5.44
-  * and PHP 8.5 with PCRE2 10.49 without JIT).
-  *
-  * An expected span list drops the unset groups at the end, which Perl does not report.
-  */
 class InterpreterConstructSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
@@ -29,6 +24,7 @@ class InterpreterConstructSuite extends munit.FunSuite:
     val program = ProgramBuilder.build(ir).get
     val result =
       Interpreter.run(program, ir.mode.decode(input), Options(usesAcceleration = usesAcceleration))
+    // The spans drop the unset groups at the end, which Perl does not report.
     result.captures.map: captures =>
       captures
         .grouped(2)
@@ -43,6 +39,8 @@ class InterpreterConstructSuite extends munit.FunSuite:
   def check(source: String, input: String, dialects: Dialect*)(expected: Spans)(using loc: munit.Location): Unit =
     for dialect <- dialects; usesAcceleration <- Seq(false, true) do
       assertEquals(run(source, dialect, input, usesAcceleration), expected, s"/$source/ in $dialect on $input")
+
+  // The expected spans are checked on Ruby 4.0, Java 25, .NET 10, Perl 5.44 and PHP 8.5 with PCRE2 10.49 without JIT.
 
   test("Interpreter.run: \\K"):
     check("a\\Kb", "ab", PCRE, Perl(), Ruby())(Seq(g(1, 2)))

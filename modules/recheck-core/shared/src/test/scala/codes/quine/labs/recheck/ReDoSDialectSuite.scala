@@ -8,11 +8,6 @@ import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.PerlSource
 
-/** End-to-end checks of dialects other than JavaScript.
-  *
-  * recheck models naive backtracking, so an engine optimization may make a vulnerable pattern fast (e.g. Ruby's
-  * memoization).
-  */
 class ReDoSDialectSuite extends munit.FunSuite:
 
   val params: Parameters = Parameters(randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
@@ -28,6 +23,9 @@ class ReDoSDialectSuite extends munit.FunSuite:
         assertEquals(v.complexity, complexity)
         assertEquals(v.checker, checker)
       case d => fail(s"not vulnerable: $d")
+
+  // recheck models naive backtracking, so an engine optimization may make a vulnerable pattern fast (e.g. Ruby's
+  // memoization).
 
   test("ReDoS.check: exponential patterns"):
     // Python 3.15 doubles its time for each `a` of `'a'.repeat(N) + '!'` (0.36 s at N = 22).

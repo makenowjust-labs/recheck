@@ -32,7 +32,7 @@ import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRLookBehindStarts
 import codes.quine.labs.resyntax.ir.IRWordMarkSet
 
-/** Interpreter executes a program on a input. */
+/** Interpreter executes a program on an input. */
 object Interpreter:
 
   /** Runs a program on a given input.
@@ -58,7 +58,7 @@ object Interpreter:
           try interpreter.run()
           catch case _: TimeoutException => interpreter.result(Status.Timeout, None)
 
-  /** Options is an options for running an interpreter. */
+  /** Options is the options for running an interpreter. */
   final case class Options(
       limit: Int = Int.MaxValue,
       usesAcceleration: Boolean = false,
@@ -84,15 +84,15 @@ object Interpreter:
 
   object Status:
 
-    /** Matching is succeeded. */
+    /** Ok is the status of a succeeded matching. */
     case object Ok extends Status:
       override def toString: String = "ok"
 
-    /** Matching is failed. */
+    /** Fail is the status of a failed matching. */
     case object Fail extends Status:
       override def toString: String = "fail"
 
-    /** A limit is exceeded on matching. */
+    /** Limit is the status of a matching that exceeds the limit of steps. */
     case object Limit extends Status:
       override def toString: String = "limit"
 
@@ -108,7 +108,12 @@ object Interpreter:
   /** FailedPoint is a failed point on matching. */
   final case class FailedPoint(target: CoverageLocation, pos: Int, kind: ReadKind, capture: Option[UString])
 
-  /** MatchState is a state of matching, which the memoization table looks up on each junction block. */
+  /** MatchState is a state of matching, which the memoization table looks up on each junction block.
+    *
+    * `values` lays out the state as integers in this order: the block ID, the position, the counters, the captures
+    * followed by the largest index of the closed captures (only when the program reads the captures), and one flag for
+    * each canary register, which is `1` if it holds the position and `0` otherwise.
+    */
   private[vm] final class MatchState(private val values: Array[Int]):
 
     override val hashCode: Int = java.util.Arrays.hashCode(values)
@@ -155,7 +160,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     /** The largest index of the closed captures, which Perl uses to unset the captures on backtracking. */
     var lastParen: Int = 0
 
-    /** What this frame is to the backtracking control verbs as a fallback, or `null`. */
+    /** The barrier that this frame is as a fallback for the backtracking control verbs, or `null`. */
     var barrier: Barrier = uninitialized
 
     /** The label retrying the search, for a [[Barrier.Search]] frame. */
@@ -196,9 +201,6 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
     /** Converts this frame into a corresponding state. */
     def toState: MatchState =
-      // It lays out as integers the block ID, the position, the counters, the captures with the largest closed index if
-      // the program reads the captures, and whether each canary register holds the position, which make hashing and
-      // comparing it cheap.
       val capturesSize = if program.meta.hasRef then captures.size + 1 else 0
       val values = new Array[Int](2 + counters.size + capturesSize + canaries.size)
       var size = 0
@@ -257,7 +259,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   /** A coverage set. */
   private val coverage: mutable.Set[CoverageItem] = mutable.Set.empty
 
-  /** A failed points list */
+  /** A failed points set. */
   private val failedPoints: mutable.Set[FailedPoint] = mutable.Set.empty
 
   /** A heatmap on matching. */

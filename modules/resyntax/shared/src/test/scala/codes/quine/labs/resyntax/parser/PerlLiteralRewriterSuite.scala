@@ -2,7 +2,6 @@ package codes.quine.labs.resyntax.parser
 
 import codes.quine.labs.resyntax.ast.SourceLocation
 
-/** The expected texts are what perl 5.44 shows for `qr/.../` written in the source. */
 class PerlLiteralRewriterSuite extends munit.FunSuite:
   def rewrite(s: String, extended: Boolean = false)(expected: String)(implicit loc: munit.Location): Unit =
     test(s"PerlLiteralRewriter.rewrite: /$s/${if extended then "x" else ""}"):
@@ -11,6 +10,8 @@ class PerlLiteralRewriterSuite extends munit.FunSuite:
   def error(s: String)(message: String)(implicit loc: munit.Location): Unit =
     test(s"PerlLiteralRewriter.rewrite: /$s/ with error \"$message\""):
       interceptMessage[ParsingException](message)(PerlLiteralRewriter.rewrite(s, extended = false, bytes = false))
+
+  // The expected texts are what perl 5.44 shows for `qr/.../` written in the source.
 
   test("PerlLiteralRewriter.rewrite: no command"):
     assertEquals(PerlLiteralRewriter.rewrite("a\\d[\\\\U]", extended = false, bytes = false), None)
