@@ -7,7 +7,6 @@ import cats.data.ValidatedNel
 import com.monovore.decline.Argument
 
 import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.PerlSource
 
 /** The object `arguments` provides decline's `Argument` instances for this application. */
 object arguments:
@@ -28,10 +27,3 @@ object arguments:
       Dialect.of(string).fold(Validated.invalidNel(s"unknown dialect: $string"))(Validated.validNel)
 
     def defaultMetavar: String = "dialect"
-
-  /** `Argument` instance for `PerlSource`. */
-  given perlSourceArgument: Argument[PerlSource] with
-    def read(string: String): ValidatedNel[String, PerlSource] =
-      PerlSource.of(string).fold(Validated.invalidNel(s"unknown perl source: $string"))(Validated.validNel)
-
-    def defaultMetavar: String = "source"

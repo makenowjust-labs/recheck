@@ -14,6 +14,13 @@
 # - `x-exclude`: the targets not exposing the parameter (`cli`, `eslint-plugin`, `playground`).
 # - `x-since`: the first release having the parameter, so that the Playground hides it on older releases.
 # - `x-scala-default`: the Scala value of the default when `x-scala-values` does not give it.
+#
+# Annotations of the variants of `dialect` with settings, and of their settings:
+#
+# - `x-scala-type`: the Scala type of the variant (e.g. `Dialect.Python`), or of the setting, which is `Boolean` or an enum
+#   whose companion has `of(name)` (e.g. `Dialect.Python.Type`).
+# - `x-cli-help`: the help of the CLI option of the setting, which is `--<dialect>-<setting>`.
+#   A boolean setting whose default is `true` is `--no-<dialect>-<setting>`, and the help tells the `false` case.
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "https://makenowjust-labs.github.io/recheck/parameters.schema.json"
@@ -117,22 +124,45 @@ properties:
       - type: object
         properties:
           name: { const: "python" }
-          type: { title: "Python Type", enum: ["str", "bytes"], default: "str" }
+          type:
+            title: "Python Type"
+            enum: ["str", "bytes"]
+            default: "str"
+            x-scala-type: "Dialect.Python.Type"
+            x-cli-help: "The string type."
         required: ["name"]
         additionalProperties: false
+        x-scala-type: "Dialect.Python"
       - type: object
         properties:
           name: { const: "ruby" }
-          encoding: { title: "Ruby Encoding", enum: ["UTF-8", "ASCII-8BIT"], default: "UTF-8" }
+          encoding:
+            title: "Ruby Encoding"
+            enum: ["UTF-8", "ASCII-8BIT"]
+            default: "UTF-8"
+            x-scala-type: "Dialect.Ruby.Encoding"
+            x-cli-help: "The encoding."
         required: ["name"]
         additionalProperties: false
+        x-scala-type: "Dialect.Ruby"
       - type: object
         properties:
           name: { const: "perl" }
-          utf8: { title: "Perl UTF-8", type: boolean, default: true }
-          source: { title: "Perl Source", enum: ["literal", "string"], default: "literal" }
+          utf8:
+            title: "Perl UTF-8"
+            type: boolean
+            default: true
+            x-scala-type: "Boolean"
+            x-cli-help: "The program has no `use utf8`, and its strings are bytes."
+          source:
+            title: "Perl Source"
+            enum: ["literal", "string"]
+            default: "literal"
+            x-scala-type: "PerlSource"
+            x-cli-help: "How the pattern is given."
         required: ["name"]
         additionalProperties: false
+        x-scala-type: "Dialect.Perl"
     default: "javascript"
     x-scala-type: "Dialect"
     x-typescript-type: "DialectParameter"
