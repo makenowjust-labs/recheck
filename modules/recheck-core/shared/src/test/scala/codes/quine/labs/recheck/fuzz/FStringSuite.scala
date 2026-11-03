@@ -6,7 +6,7 @@ import scala.language.implicitConversions
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.fuzz.FString.*
-import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UnitMode
 
 class FStringSuite extends munit.FunSuite:
   test("FString.cross"):
@@ -92,7 +92,7 @@ class FStringSuite extends munit.FunSuite:
   test("FString#toUString"):
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toUString,
-      UString.fromUTF16Units("abcbcbcd")
+      UnitMode.UTF16.decode("abcbcbcd")
     )
     intercept[IllegalArgumentException] {
       FString(1, IndexedSeq(Repeat(0, 2), Wrap('a'), Repeat(0, 1))).toUString
@@ -101,28 +101,28 @@ class FStringSuite extends munit.FunSuite:
   test("FString#toAttackPattern"):
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toAttackPattern,
-      AttackPattern(Seq((UString.fromUTF16Units("a"), UString.fromUTF16Units("bc"), 1)), UString.fromUTF16Units("d"), 2)
+      AttackPattern(Seq((UnitMode.UTF16.decode("a"), UnitMode.UTF16.decode("bc"), 1)), UnitMode.UTF16.decode("d"), 2)
     )
     assertEquals(
       FString(0, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toAttackPattern,
-      AttackPattern(Seq.empty, UString.fromUTF16Units("abcd"), 0)
+      AttackPattern(Seq.empty, UnitMode.UTF16.decode("abcd"), 0)
     )
     intercept[IllegalArgumentException] {
       FString(1, IndexedSeq(Repeat(1, 2), Wrap('a'), Repeat(1, 1))).toAttackPattern
     }
 
   test("FString#toString"):
-    assertEquals(FString(2, IndexedSeq.empty).toString(AttackPatternStyle.JavaScript), "''")
+    assertEquals(FString(2, IndexedSeq.empty).toString(AttackPatternStyle.JavaScript(unicode = false)), "''")
     assertEquals(
       FString(2, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d')))
-        .toString(AttackPatternStyle.JavaScript),
+        .toString(AttackPatternStyle.JavaScript(unicode = false)),
       "'a' + 'bc'.repeat(3) + 'd'"
     )
     assertEquals(
       FString(
         2,
         IndexedSeq(Repeat(1, 1), Wrap('a'), Repeat(1, 1), Wrap('b'), Repeat(0, 1), Wrap('c'))
-      ).toString(AttackPatternStyle.JavaScript),
+      ).toString(AttackPatternStyle.JavaScript(unicode = false)),
       "'a'.repeat(3) + 'b'.repeat(3) + 'c'.repeat(2)"
     )
     intercept[IllegalArgumentException] {

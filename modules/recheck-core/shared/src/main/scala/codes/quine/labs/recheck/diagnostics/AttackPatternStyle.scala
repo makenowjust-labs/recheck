@@ -26,7 +26,7 @@ object AttackPatternStyle:
   def of(dialect: Dialect, mode: UnitMode): AttackPatternStyle =
     val bytes = mode == UnitMode.Byte
     dialect match
-      case Dialect.JavaScript => JavaScript
+      case Dialect.JavaScript => JavaScript(unicode = mode == UnitMode.CodePoint)
       case _: Dialect.Python  => Python(bytes)
       case _: Dialect.Ruby    => Ruby(bytes)
       case Dialect.Java       => Java
@@ -36,10 +36,13 @@ object AttackPatternStyle:
 
   /** JavaScript is a JavaScript style specifier, e.g. `'a'.repeat(31) + '\x00'`.
     *
-    * It writes the UTF-16 encoding of the string, which a JavaScript string holds.
+    * Its units are code points for a `unicode` pattern (the `u` or `v` flag), and UTF-16 code units for the others. It
+    * writes the UTF-16 encoding of the string, which a JavaScript string holds.
     */
-  case object JavaScript extends AttackPatternStyle:
-    def literal(s: UString): String = utf16Chars(s).map(char).mkString("'", "", "'")
+  final case class JavaScript(unicode: Boolean) extends AttackPatternStyle:
+    def literal(s: UString): String =
+      val mode = if unicode then UnitMode.CodePoint else UnitMode.UTF16
+      UnitMode.CodePoint.decode(mode.encode(s)).iterator.map(char).mkString("'", "", "'")
 
     def repeat(s: UString, n: Int): String = s"${literal(s)}.repeat(${n})"
 
@@ -58,16 +61,20 @@ object AttackPatternStyle:
 
   /** Superscript is a superscript style specifier for logs, e.g. `'a'³¹ '\x00'`.
     *
-    * Unlike the other styles, it is not an expression of a language.
+    * Unlike the other styles, it is not an expression of a language. Its units are code points, written as
+    * [[JavaScript]] for a `unicode` pattern writes them.
     */
   case object Superscript extends AttackPatternStyle:
-    def literal(s: UString): String = JavaScript.literal(s)
+    def literal(s: UString): String = JavaScript(unicode = true).literal(s)
 
     def repeat(s: UString, n: Int): String = s"${literal(s)}${NumberFormat.superscript(n)}"
 
     def join: String = " "
 
-  /** Python is a Python style specifier, e.g. `'a' * 31 + '\x00'`, or `b'a' * 31 + b'\x00'` for bytes. */
+  /** Python is a Python style specifier, e.g. `'a' * 31 + '\x00'`, or `b'a' * 31 + b'\x00'` for bytes.
+    *
+    * Its units are code points, or bytes for bytes.
+    */
   final case class Python(bytes: Boolean) extends AttackPatternStyle:
     def literal(s: UString): String = s.iterator.map(char).mkString(if bytes then "b'" else "'", "", "'")
 
@@ -84,7 +91,10 @@ object AttackPatternStyle:
       case c if c <= 0xffff          => f"\\u$c%04x"
       case c                         => f"\\U$c%08x"
 
-  /** Ruby is a Ruby style specifier, e.g. `"a" * 31 + "\x00"`, or `"a".b * 31 + "\x00".b` for bytes. */
+  /** Ruby is a Ruby style specifier, e.g. `"a" * 31 + "\x00"`, or `"a".b * 31 + "\x00".b` for bytes.
+    *
+    * Its units are code points, or bytes for bytes.
+    */
   final case class Ruby(bytes: Boolean) extends AttackPatternStyle:
     def literal(s: UString): String =
       val cs = s.iterator.toIndexedSeq
@@ -103,17 +113,18 @@ object AttackPatternStyle:
       case Named(e)                 => e
       case c if isASCIIPrintable(c) => c.toChar.toString
       case c if bytes || c < 0x80   => f"\\x$c%02X"
-      case c if isSurrogate(c)      => UString(c).encode(UnitMode.Byte).map(b => f"\\x$b%02X").mkString
+      case c if isSurrogate(c)      => UnitMode.Byte.fromCodePoints(UString(c)).iterator.map(b => f"\\x$b%02X").mkString
       case c if isShown(c)          => codePoint(c)
       case c if c <= 0xffff         => f"\\u$c%04X"
       case c                        => f"\\u{$c%X}"
 
   /** Java is a Java style specifier, e.g. `"a".repeat(31) + "\u0000"`.
     *
-    * It writes the UTF-16 encoding of the string, which a Java string holds.
+    * Its units are code points, and it writes their UTF-16 encoding, which a Java string holds.
     */
   case object Java extends AttackPatternStyle:
-    def literal(s: UString): String = utf16Chars(s).map(char).mkString("\"", "", "\"")
+    def literal(s: UString): String =
+      UnitMode.CodePoint.decode(UnitMode.CodePoint.encode(s)).iterator.map(char).mkString("\"", "", "\"")
 
     def repeat(s: UString, n: Int): String = s"${literal(s)}.repeat($n)"
 
@@ -129,10 +140,11 @@ object AttackPatternStyle:
 
   /** CSharp is a C# style specifier for .NET, e.g. `string.Concat(Enumerable.Repeat("a", 31)) + "\u0000"`.
     *
-    * It writes the UTF-16 encoding of the string, which a C# string holds. `Enumerable.Repeat` needs `System.Linq`.
+    * Its units are UTF-16 code units, which a C# string holds. `Enumerable.Repeat` needs `System.Linq`.
     */
   case object CSharp extends AttackPatternStyle:
-    def literal(s: UString): String = utf16Chars(s).map(char).mkString("\"", "", "\"")
+    def literal(s: UString): String =
+      UnitMode.CodePoint.decode(UnitMode.UTF16.encode(s)).iterator.map(char).mkString("\"", "", "\"")
 
     def repeat(s: UString, n: Int): String = s"string.Concat(Enumerable.Repeat(${literal(s)}, $n))"
 
@@ -148,7 +160,7 @@ object AttackPatternStyle:
 
   /** Perl is a Perl style specifier, e.g. `"a" x 31 . "\x00"`.
     *
-    * Its literals are ASCII.
+    * Its units are code points or bytes, and its literals are ASCII.
     */
   case object Perl extends AttackPatternStyle:
     def literal(s: UString): String = s.iterator.map(char).mkString("\"", "", "\"")
@@ -167,8 +179,8 @@ object AttackPatternStyle:
 
   /** PHP is a PHP style specifier for PCRE, e.g. `str_repeat('a', 31) . "\x00"`.
     *
-    * A literal of printable ASCII characters is single-quoted, and the others are double-quoted. Unless the style is
-    * for bytes, a character is written as its UTF-8 bytes.
+    * Its units are code points, or bytes for bytes. A literal of printable ASCII characters is single-quoted, and the
+    * others are double-quoted. Unless the style is for bytes, a character is written as its UTF-8 bytes.
     */
   final case class PHP(bytes: Boolean) extends AttackPatternStyle:
     def literal(s: UString): String =
@@ -189,11 +201,6 @@ object AttackPatternStyle:
       case c if isShown(c)          => codePoint(c)
       case c                        => f"\\u{$c%X}"
 
-  /** Returns the characters of the UTF-16 encoding of the string, where a surrogate pair is one character as a language
-    * with UTF-16 strings reads it.
-    */
-  private def utf16Chars(s: UString): Iterator[UChar] = UString.fromString(s.asString).iterator
-
   /** The escapes common to the languages. */
   private object Named:
     def unapply(c: UChar): Option[String] = c match
@@ -202,9 +209,9 @@ object AttackPatternStyle:
       case '\r' => Some("\\r")
       case _    => None
 
-  /** The non-ASCII characters written as they are: letters, numbers, punctuation and symbols. */
+  /** The non-ASCII characters written as they are: letters, numbers, punctuation, symbols and space separators. */
   private lazy val Shown: CharSet =
-    CharSet.union(Seq("L", "N", "P", "S").map(PropertyTable.GeneralCategory.value(_).get.set))
+    CharSet.union(Seq("L", "N", "P", "S", "Zs").map(PropertyTable.GeneralCategory.value(_).get.set))
 
   private def isASCIIPrintable(c: UChar): Boolean = 0x20 <= c && c <= 0x7e
 
@@ -215,4 +222,5 @@ object AttackPatternStyle:
   private def codePoint(c: UChar): String = String.valueOf(Character.toChars(c))
 
   /** Returns the `\uXXXX` escapes of the UTF-16 code units of the code point. */
-  private def utf16(c: UChar): String = UString(c).encode(UnitMode.UTF16).map(u => f"\\u$u%04X").mkString
+  private def utf16(c: UChar): String =
+    UnitMode.UTF16.fromCodePoints(UString(c)).iterator.map(u => f"\\u$u%04X").mkString

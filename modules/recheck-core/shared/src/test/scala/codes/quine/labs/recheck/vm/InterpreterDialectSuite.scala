@@ -19,7 +19,7 @@ class InterpreterDialectSuite extends munit.FunSuite:
     val ir = ReDoS.parse(source, flags, dialect)
     val program = ProgramBuilder.build(ir).get
     val u = input match
-      case s: String  => inputOf(s, ir.mode)
+      case s: String  => ir.mode.decode(s)
       case u: UString => u
     Interpreter.run(program, u, Options(usesAcceleration = usesAcceleration)).status
 
@@ -146,7 +146,8 @@ class InterpreterDialectSuite extends munit.FunSuite:
 
   test("Interpreter.run: classes folded to several characters"):
     for c <- CaseFoldingCases.cases; dialect <- c.dialects do
-      accepts(c.source, dialect, c.input, "i", c.matches.contains(dialect))
+      val input = c.inputOf(ReDoS.parse(c.source, "i", dialect).mode)
+      accepts(c.source, dialect, input, "i", c.matches.contains(dialect))
     // Ruby tries the class before the foldings, and Perl tries the foldings first, the longest first.
     accepts("\\A(?>[ßs])s\\z", Ruby(), "ss", "i")
     refutes("\\A(?>[ßs])s\\z", Perl(), "ss", "i")

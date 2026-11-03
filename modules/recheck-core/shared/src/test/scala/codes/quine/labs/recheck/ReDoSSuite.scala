@@ -17,7 +17,6 @@ import codes.quine.labs.recheck.diagnostics.Hotspot.*
 import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.parser.Parser
 
@@ -106,8 +105,8 @@ class ReDoSSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Exponential(false),
           AttackPattern(
-            Seq((UString.fromUTF16Units(""), UString.fromUTF16Units("a"), 0)),
-            UString.fromUTF16Units("\u0000"),
+            Seq((UnitMode.UTF16.decode(""), UnitMode.UTF16.decode("a"), 0)),
+            UnitMode.UTF16.decode("\u0000"),
             31
           ),
           Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))),
@@ -126,8 +125,8 @@ class ReDoSSuite extends munit.FunSuite:
         UnitMode.UTF16,
         AttackComplexity.Polynomial(degree, false),
         AttackPattern(
-          Seq((UString.fromUTF16Units(""), UString.fromUTF16Units("a"), 0)),
-          UString.fromUTF16Units(""),
+          Seq((UnitMode.UTF16.decode(""), UnitMode.UTF16.decode("a"), 0)),
+          UnitMode.UTF16.decode(""),
           10
         ),
         Hotspot(Seq(Spot(1, 2, Heat))),
@@ -267,8 +266,8 @@ class ReDoSSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Exponential(false),
           AttackPattern(
-            Seq((UString.fromUTF16Units(""), UString.fromUTF16Units("a"), 0)),
-            UString.fromUTF16Units("\u0000"),
+            Seq((UnitMode.UTF16.decode(""), UnitMode.UTF16.decode("a"), 0)),
+            UnitMode.UTF16.decode("\u0000"),
             31
           ),
           Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))),
@@ -309,7 +308,7 @@ class ReDoSSuite extends munit.FunSuite:
       List(Diagnostics.Safe(".", "", Dialect.JavaScript, AttackComplexity.Safe(true), Checker.Fuzz))
     )
     interceptMessage[TimeoutException](
-      "timeout at modules/recheck-core/shared/src/main/scala/codes/quine/labs/recheck/fuzz/FuzzProgram.scala:40"
+      "timeout at modules/recheck-core/shared/src/main/scala/codes/quine/labs/recheck/fuzz/FuzzProgram.scala:41"
     ) {
       val ctx = Context(timeout = Duration.MinusInf)
       val result = checkFuzz(".", "", Parameters(timeout = Duration.MinusInf))(using ctx)
@@ -327,8 +326,8 @@ class ReDoSSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Exponential(false),
           AttackPattern(
-            Seq((UString.fromUTF16Units(""), UString.fromUTF16Units("a"), 0)),
-            UString.fromUTF16Units("\u0000"),
+            Seq((UnitMode.UTF16.decode(""), UnitMode.UTF16.decode("a"), 0)),
+            UnitMode.UTF16.decode("\u0000"),
             31
           ),
           Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))),

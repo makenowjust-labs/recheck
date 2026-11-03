@@ -1,27 +1,6 @@
 package codes.quine.labs.resyntax.charset
 
-import codes.quine.labs.resyntax.charset.UString.fromUTF16Units
-
 class UStringSuite extends munit.FunSuite:
-  test("UString.fromString"):
-    assertEquals(UString.fromString("aあ😀"), UString(0x61, 0x3042, 0x1f600))
-    assertEquals(UString.fromString("\ud83d"), UString(0xd83d))
-
-  test("UString.fromUTF16Units"):
-    assertEquals(fromUTF16Units(""), UString.empty)
-    assertEquals(fromUTF16Units("x🍣"), UString('x', 0xd83c, 0xdf63))
-    assertEquals(fromUTF16Units("\udf63"), UString(0xdf63))
-
-  test("UString#encode"):
-    val s = UString(0x61, 0xe9, 0x3042, 0x1f600)
-    assertEquals(s.encode(UnitMode.CodePoint).toSeq, Seq(0x61, 0xe9, 0x3042, 0x1f600))
-    assertEquals(s.encode(UnitMode.UTF16).toSeq, Seq(0x61, 0xe9, 0x3042, 0xd83d, 0xde00))
-    assertEquals(
-      s.encode(UnitMode.Byte).toSeq,
-      Seq(0x61, 0xc3, 0xa9, 0xe3, 0x81, 0x82, 0xf0, 0x9f, 0x98, 0x80)
-    )
-    assertEquals(s.asString, "aéあ😀")
-
   test("UString basic operations"):
     val s = UString(1, 2, 3)
     assertEquals(s.length, 3)
@@ -56,8 +35,8 @@ class UStringSuite extends munit.FunSuite:
     assertEquals(s.getBefore(4), None)
 
   test("UString#insert"):
-    val s = fromUTF16Units("012")
-    assertEquals(s.insert(0, fromUTF16Units("xyz")), fromUTF16Units("xyz012"))
-    assertEquals(s.insert(1, fromUTF16Units("xyz")), fromUTF16Units("0xyz12"))
-    assertEquals(s.insert(2, fromUTF16Units("xyz")), fromUTF16Units("01xyz2"))
-    assertEquals(s.insert(3, fromUTF16Units("xyz")), fromUTF16Units("012xyz"))
+    val s = UnitMode.UTF16.decode("012")
+    assertEquals(s.insert(0, UnitMode.UTF16.decode("xyz")), UnitMode.UTF16.decode("xyz012"))
+    assertEquals(s.insert(1, UnitMode.UTF16.decode("xyz")), UnitMode.UTF16.decode("0xyz12"))
+    assertEquals(s.insert(2, UnitMode.UTF16.decode("xyz")), UnitMode.UTF16.decode("01xyz2"))
+    assertEquals(s.insert(3, UnitMode.UTF16.decode("xyz")), UnitMode.UTF16.decode("012xyz"))

@@ -15,7 +15,6 @@ import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.Seeder
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
-import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labs.recheck.diagnostics.Hotspot
@@ -48,8 +47,8 @@ class CodecSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Exponential(false),
           AttackPattern(
-            Seq((UString.fromUTF16Units(""), UString.fromUTF16Units("a"), 0)),
-            UString.fromUTF16Units("\u0000"),
+            Seq((UnitMode.UTF16.decode(""), UnitMode.UTF16.decode("a"), 0)),
+            UnitMode.UTF16.decode("\u0000"),
             17
           ),
           Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat), Hotspot.Spot(3, 4, Hotspot.Heat))),
@@ -64,10 +63,10 @@ class CodecSuite extends munit.FunSuite:
         "unitMode" := "utf16",
         "status" := "vulnerable",
         "complexity" := AttackComplexity.Exponential(false).asInstanceOf[AttackComplexity],
-        "attack" -> encodeAttackPattern(AttackPatternStyle.JavaScript)(
+        "attack" -> encodeAttackPattern(Dialect.JavaScript, UnitMode.UTF16)(
           AttackPattern(
-            Seq((UString.fromUTF16Units(""), UString.fromUTF16Units("a"), 0)),
-            UString.fromUTF16Units("\u0000"),
+            Seq((UnitMode.UTF16.decode(""), UnitMode.UTF16.decode("a"), 0)),
+            UnitMode.UTF16.decode("\u0000"),
             17
           )
         ),
@@ -85,7 +84,7 @@ class CodecSuite extends munit.FunSuite:
           Dialect.JavaScript,
           UnitMode.UTF16,
           AttackComplexity.Exponential(false),
-          AttackPattern(Seq.empty, UString.fromUTF16Units(""), 0),
+          AttackPattern(Seq.empty, UnitMode.UTF16.decode(""), 0),
           Hotspot(Seq.empty),
           Some(recall),
           Checker.Automaton
@@ -145,12 +144,12 @@ class CodecSuite extends munit.FunSuite:
 
   test("codec.encodeAttackPattern"):
     val attack = AttackPattern(
-      Seq((UString.fromUTF16Units("a"), UString.fromUTF16Units("b"), 2)),
-      UString.fromUTF16Units("c"),
+      Seq((UnitMode.UTF16.decode("a"), UnitMode.UTF16.decode("b"), 2)),
+      UnitMode.UTF16.decode("c"),
       0
     )
     assertEquals(
-      encodeAttackPattern(AttackPatternStyle.JavaScript)(attack),
+      encodeAttackPattern(Dialect.JavaScript, UnitMode.UTF16)(attack),
       Json.obj(
         "pumps" := Json.arr(Json.obj("prefix" := "a", "pump" := "b", "bias" := 2)),
         "suffix" := "c",
@@ -160,8 +159,19 @@ class CodecSuite extends munit.FunSuite:
       )
     )
     assertEquals(
-      encodeAttackPattern(AttackPatternStyle.Python(bytes = false))(attack).hcursor.get[String]("pattern"),
+      encodeAttackPattern(Dialect.Python(), UnitMode.CodePoint)(attack).hcursor.get[String]("pattern"),
       Right("'a' + 'b' * 2 + 'c'")
+    )
+    // The units of the mode are written in the string of UTF-16.
+    val astral = AttackPattern(Seq.empty, UString(0x1f600), 0)
+    assertEquals(
+      encodeAttackPattern(Dialect.JavaScript, UnitMode.CodePoint)(astral).hcursor.get[String]("string"),
+      Right("😀")
+    )
+    val utf16 = AttackPattern(Seq.empty, UString(0xd83d, 0xde00), 0)
+    assertEquals(
+      encodeAttackPattern(Dialect.JavaScript, UnitMode.UTF16)(utf16).hcursor.get[String]("string"),
+      Right("😀")
     )
 
   test("codec.encodeHotspot"):
@@ -209,7 +219,9 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(encodeErrorKind(ErrorKind.Unexpected("foo")), Json.obj("kind" := "unexpected", "message" := "foo"))
 
   test("codec.encodeUString"):
-    assertEquals(encodeUString(UString.fromUTF16Units("foo")), Json.fromString("foo"))
+    assertEquals(encodeUString(UnitMode.UTF16)(UString(0x61, 0xd83d, 0xde00)), Json.fromString("a😀"))
+    assertEquals(encodeUString(UnitMode.CodePoint)(UString(0x61, 0x1f600)), Json.fromString("a😀"))
+    assertEquals(encodeUString(UnitMode.Byte)(UString(0x61, 0xc3, 0xa9)), Json.fromString("a\u00c3\u00a9"))
 
   test("codec.decodeUString"):
     // Each mode decodes what `encodeUString` gives, including a lone surrogate.
@@ -218,7 +230,7 @@ class CodecSuite extends munit.FunSuite:
         UnitMode.CodePoint -> UString(0x61, 0x1f600, 0xd800),
         UnitMode.Byte -> UString(0x61, 0xc3, 0xa9, 0xff)
       )
-    do assertEquals(decodeUString(mode).decodeJson(encodeUString(s)), Right(s))
+    do assertEquals(decodeUString(mode).decodeJson(encodeUString(mode)(s)), Right(s))
     assert(clue(decodeUString(UnitMode.Byte).decodeJson("é".asJson)).isRight)
     assertEquals(
       decodeUString(UnitMode.Byte).decodeJson("\u0100".asJson).left.map(_.message),
@@ -227,13 +239,13 @@ class CodecSuite extends munit.FunSuite:
 
   test("codec.decodeAttackPattern"):
     val attack = AttackPattern(
-      Seq((UString.fromString("x"), UString(0x1f600), -1), (UString.empty, UString.fromString("y"), 2)),
+      Seq((UnitMode.CodePoint.decode("x"), UString(0x1f600), -1), (UString.empty, UnitMode.CodePoint.decode("y"), 2)),
       UString(0),
       17
     )
     val decoder = decodeAttackPattern(UnitMode.CodePoint)
     assertEquals(
-      decoder.decodeJson(encodeAttackPattern(AttackPatternStyle.Python(bytes = false))(attack)),
+      decoder.decodeJson(encodeAttackPattern(Dialect.Python(), UnitMode.CodePoint)(attack)),
       Right(attack)
     )
     assertEquals(

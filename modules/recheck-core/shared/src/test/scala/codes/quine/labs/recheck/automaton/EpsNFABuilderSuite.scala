@@ -294,11 +294,11 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     )
 
   /** Tests whether the automaton of the source accepts the input, i.e. the source matches in the input. */
-  def searches(source: String, flags: String, dialect: Dialect, input: String): Boolean =
+  def searches(source: String, flags: String, dialect: Dialect, input: String | UString): Boolean =
     val nfa = build(source, flags, dialect).get.toOrderedNFA
-    val units =
-      if ReDoS.parse(source, flags, dialect).mode == UnitMode.CodePoint then UString.fromString(input).iterator.toSeq
-      else input.map(_.toInt)
+    val units = input match
+      case s: String  => ReDoS.parse(source, flags, dialect).mode.decode(s).iterator.toSeq
+      case u: UString => u.iterator.toSeq
     val last = units.foldLeft(nfa.inits.toSet): (qs, c) =>
       qs.flatMap(q => nfa.delta.collect { case ((p, a), ps) if p == q && a.contains(c) => ps }.flatten)
     last.exists(nfa.acceptSet.contains)
@@ -331,4 +331,5 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   test("EpsNFABuilder.build: classes folded to several characters"):
     for c <- CaseFoldingCases.cases; dialect <- c.dialects do
       val message = s"/${c.source}/i in $dialect on ${c.input}"
-      assertEquals(searches(c.source, "i", dialect, c.input), c.matches.contains(dialect), message)
+      val input = c.inputOf(ReDoS.parse(c.source, "i", dialect).mode)
+      assertEquals(searches(c.source, "i", dialect, input), c.matches.contains(dialect), message)

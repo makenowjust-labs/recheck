@@ -7,6 +7,7 @@ import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.vm.Program
 import codes.quine.labs.recheck.vm.ProgramBuilder
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRPattern
 import codes.quine.labs.resyntax.ir.IRSurrogateKind
 import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
@@ -26,11 +27,11 @@ final case class FuzzProgram(
     case AccelerationMode.On   => !program.meta.hasVerb
     case AccelerationMode.Off  => false
 
-  /** Joins a high surrogate followed by a low surrogate in the string into one character with `Paired` surrogates, as
-    * the engine reads the string.
+  /** Joins a high surrogate followed by a low surrogate in the string of code points into one code point with `Paired`
+    * surrogates, as the engine reads the string.
     */
   def joinSurrogates(s: UString): UString =
-    if surrogates == IRSurrogateKind.Paired then UString.fromString(s.asString) else s
+    if surrogates == IRSurrogateKind.Paired then UnitMode.CodePoint.decode(UnitMode.CodePoint.encode(s)) else s
 
 object FuzzProgram:
 

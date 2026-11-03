@@ -109,7 +109,7 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]):
   /** Returns the string representation of this string in the style. */
   def toString(style: AttackPatternStyle): String = toAttackPattern.toString(style)
 
-  override def toString: String = toString(AttackPatternStyle.JavaScript)
+  override def toString: String = toString(AttackPatternStyle.JavaScript(unicode = true))
 
 /** FString types and utilities. */
 object FString:

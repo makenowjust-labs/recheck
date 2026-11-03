@@ -28,7 +28,7 @@ class InterpreterConstructSuite extends munit.FunSuite:
     val ir = ReDoS.parse(source, "", dialect)
     val program = ProgramBuilder.build(ir).get
     val result =
-      Interpreter.run(program, inputOf(input, ir.mode), Options(usesAcceleration = usesAcceleration))
+      Interpreter.run(program, ir.mode.decode(input), Options(usesAcceleration = usesAcceleration))
     result.captures.map: captures =>
       captures
         .grouped(2)

@@ -59,7 +59,7 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "unitMode" := unitMode,
         "status" := "vulnerable",
         "complexity" := complexity.asInstanceOf[AttackComplexity],
-        "attack" -> encodeAttackPattern(AttackPatternStyle.of(dialect, unitMode))(attack),
+        "attack" -> encodeAttackPattern(dialect, unitMode)(attack),
         "hotspot" := hotspot,
         "recallValidation" := recallValidation,
         "checker" := checker
@@ -162,17 +162,20 @@ given encodeAttackComplexity: Encoder[AttackComplexity] with
     case c: AttackComplexity.Exponential =>
       Json.obj("type" := "exponential", "summary" := c.toString, "isFuzz" := c.isFuzz)
 
-/** Returns an `Encoder` for `AttackPattern` whose `pattern` is in the style. */
-def encodeAttackPattern(style: AttackPatternStyle): Encoder[AttackPattern] = (p: AttackPattern) =>
-  val pumps = p.pumps.map:
-    case (p, s, n) => Json.obj("prefix" := p, "pump" := s, "bias" := n)
-  Json.obj(
-    "pumps" := Json.arr(pumps*),
-    "suffix" := p.suffix,
-    "base" := p.n,
-    "string" := p.asUString,
-    "pattern" := p.toString(style)
-  )
+/** Returns an `Encoder` for `AttackPattern` of the unit mode, whose `pattern` is in the style of the dialect. */
+def encodeAttackPattern(dialect: Dialect, mode: UnitMode): Encoder[AttackPattern] =
+  given Encoder[UString] = encodeUString(mode)
+  val style = AttackPatternStyle.of(dialect, mode)
+  (p: AttackPattern) =>
+    val pumps = p.pumps.map:
+      case (p, s, n) => Json.obj("prefix" := p, "pump" := s, "bias" := n)
+    Json.obj(
+      "pumps" := Json.arr(pumps*),
+      "suffix" := p.suffix,
+      "base" := p.n,
+      "string" := p.asUString,
+      "pattern" := p.toString(style)
+    )
 
 /** An `Encoder` for `Hotspot`. */
 given encodeHotspot: Encoder[Hotspot] with
@@ -218,16 +221,12 @@ given encodeErrorKind: Encoder[ErrorKind] with
     case ErrorKind.Unexpected(message) =>
       Json.obj("kind" := "unexpected", "message" := message)
 
-/** An `Encoder` for `UString`. */
-given encodeUString: Encoder[UString] = _.asString.asJson
+/** Returns an `Encoder` for `UString` of the unit mode. */
+def encodeUString(mode: UnitMode): Encoder[UString] = mode.encode(_).asJson
 
 /** Returns a `Decoder` for `UString` of the unit mode, which is the inverse of [[encodeUString]]. */
 def decodeUString(mode: UnitMode): Decoder[UString] = Decoder[String].emap: s =>
-  mode match
-    case UnitMode.UTF16     => Right(UString.fromUTF16Units(s))
-    case UnitMode.CodePoint => Right(UString.fromString(s))
-    case UnitMode.Byte      =>
-      if s.forall(_ <= 0xff) then Right(UString.fromUTF16Units(s)) else Left(s"Invalid byte string: $s")
+  Either.cond(mode != UnitMode.Byte || s.forall(_ <= 0xff), mode.decode(s), s"Invalid byte string: $s")
 
 /** Returns a `Decoder` for `AttackPattern` of the unit mode.
   *

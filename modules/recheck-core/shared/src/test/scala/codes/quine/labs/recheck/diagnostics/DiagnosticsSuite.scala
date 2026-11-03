@@ -13,7 +13,6 @@ import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
-import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
 class DiagnosticsSuite extends munit.FunSuite:
@@ -35,8 +34,8 @@ class DiagnosticsSuite extends munit.FunSuite:
           UnitMode.UTF16,
           AttackComplexity.Exponential(false),
           AttackPattern(
-            Seq((UString.fromUTF16Units("a"), UString.fromUTF16Units("b"), 0)),
-            UString.fromUTF16Units("c"),
+            Seq((UnitMode.UTF16.decode("a"), UnitMode.UTF16.decode("b"), 0)),
+            UnitMode.UTF16.decode("c"),
             2
           ),
           Hotspot.empty,
@@ -61,8 +60,8 @@ class DiagnosticsSuite extends munit.FunSuite:
           UnitMode.CodePoint,
           AttackComplexity.Polynomial(2, false),
           AttackPattern(
-            Seq((UString.fromUTF16Units(""), UString.fromUTF16Units("a"), 0)),
-            UString.fromUTF16Units("!"),
+            Seq((UnitMode.UTF16.decode(""), UnitMode.UTF16.decode("a"), 0)),
+            UnitMode.UTF16.decode("!"),
             2
           ),
           Hotspot.empty,

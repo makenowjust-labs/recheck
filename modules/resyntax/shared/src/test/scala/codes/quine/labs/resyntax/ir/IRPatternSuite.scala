@@ -380,38 +380,38 @@ class IRPatternSuite extends munit.FunSuite:
     assertEquals(parse("(?m:^)a$", "", Dialect.Java).assertionLineTerminators, Seq(IRLineTerminatorSet.Java))
 
   check("IRPattern#parts")(_.parts)(
-    "xyz.0" -> Set(UString.fromUTF16Units("xyz")),
-    "(?:xyz)" -> Set(UString.fromUTF16Units("xyz")),
-    "xyz|." -> Set(UString.fromUTF16Units("xyz")),
-    "(xyz)" -> Set(UString.fromUTF16Units("xyz")),
-    "(?<x>xyz)" -> Set(UString.fromUTF16Units("xyz")),
-    "(?:xyz)*" -> Set(UString.fromUTF16Units("xyz")),
-    "(?:xyz)+" -> Set(UString.fromUTF16Units("xyz")),
-    "(?:xyz)?" -> Set(UString.fromUTF16Units("xyz")),
-    "(?:xyz){2}" -> Set(UString.fromUTF16Units("xyz")),
-    "(?=xyz)" -> Set(UString.fromUTF16Units("xyz")),
-    "(?<=xyz)" -> Set(UString.fromUTF16Units("xyz")),
+    "xyz.0" -> Set(UnitMode.UTF16.decode("xyz")),
+    "(?:xyz)" -> Set(UnitMode.UTF16.decode("xyz")),
+    "xyz|." -> Set(UnitMode.UTF16.decode("xyz")),
+    "(xyz)" -> Set(UnitMode.UTF16.decode("xyz")),
+    "(?<x>xyz)" -> Set(UnitMode.UTF16.decode("xyz")),
+    "(?:xyz)*" -> Set(UnitMode.UTF16.decode("xyz")),
+    "(?:xyz)+" -> Set(UnitMode.UTF16.decode("xyz")),
+    "(?:xyz)?" -> Set(UnitMode.UTF16.decode("xyz")),
+    "(?:xyz){2}" -> Set(UnitMode.UTF16.decode("xyz")),
+    "(?=xyz)" -> Set(UnitMode.UTF16.decode("xyz")),
+    "(?<=xyz)" -> Set(UnitMode.UTF16.decode("xyz")),
     "." -> Set.empty[UString],
     "x" -> Set.empty[UString],
     // A set of one character is a literal however it is written.
-    "x[y]z\\d" -> Set(UString.fromUTF16Units("xyz")),
+    "x[y]z\\d" -> Set(UnitMode.UTF16.decode("xyz")),
     "x[yz]" -> Set.empty[UString],
-    "\\x41\\n" -> Set(UString.fromUTF16Units("A\n")),
-    "😀" -> Set(UString.fromUTF16Units("😀"))
+    "\\x41\\n" -> Set(UnitMode.UTF16.decode("A\n")),
+    "😀" -> Set(UnitMode.UTF16.decode("😀"))
   )
 
   check("IRPattern#parts", "i")(_.parts)(
-    "xyz.0" -> Set(UString.fromUTF16Units("XYZ")),
-    "a\\n\\\\b" -> Set(UString.fromUTF16Units("A\n\\B"))
+    "xyz.0" -> Set(UnitMode.UTF16.decode("XYZ")),
+    "a\\n\\\\b" -> Set(UnitMode.UTF16.decode("A\n\\B"))
   )
 
   check("IRPattern#parts", "iu")(_.parts)(
-    "a😀" -> Set(UString.fromString("A😀")),
-    "XYZ" -> Set(UString.fromUTF16Units("XYZ")),
+    "a😀" -> Set(UnitMode.CodePoint.decode("A😀")),
+    "XYZ" -> Set(UnitMode.UTF16.decode("XYZ")),
     "😀" -> Set.empty[UString]
   )
 
-  check("IRPattern#parts", "i", Dialect.Python())(_.parts)("xyz" -> Set(UString.fromUTF16Units("XYZ")))
+  check("IRPattern#parts", "i", Dialect.Python())(_.parts)("xyz" -> Set(UnitMode.UTF16.decode("XYZ")))
 
   check("IRPattern#captureCount")(_.captureCount)(
     "(.)|(.)" -> 2,
