@@ -84,6 +84,57 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     val model = options.map((flags, _) => marks(candidates, chars("\\w", flags, Dialect.Ruby())))
     assertEquals(cases(Seq("ruby", "-"), script), model)
 
+  // Checked with .NET 10.0.14.
+  runtimeTest(".NET: the named blocks", "dotnet"):
+    val names =
+      """|AlphabeticPresentationForms Arabic ArabicPresentationForms-A ArabicPresentationForms-B Armenian Arrows
+         |BasicLatin Bengali BlockElements Bopomofo BopomofoExtended BoxDrawing BraillePatterns Buhid CJKCompatibility
+         |CJKCompatibilityForms CJKCompatibilityIdeographs CJKRadicalsSupplement CJKSymbolsandPunctuation
+         |CJKUnifiedIdeographs CJKUnifiedIdeographsExtensionA Cherokee CombiningDiacriticalMarks
+         |CombiningDiacriticalMarksforSymbols CombiningHalfMarks CombiningMarksforSymbols ControlPictures CurrencySymbols
+         |Cyrillic CyrillicSupplement Devanagari Dingbats EnclosedAlphanumerics EnclosedCJKLettersandMonths Ethiopic
+         |GeneralPunctuation GeometricShapes Georgian Greek GreekExtended GreekandCoptic Gujarati Gurmukhi
+         |HalfwidthandFullwidthForms HangulCompatibilityJamo HangulJamo HangulSyllables Hanunoo Hebrew
+         |HighPrivateUseSurrogates HighSurrogates Hiragana IPAExtensions IdeographicDescriptionCharacters Kanbun
+         |KangxiRadicals Kannada Katakana KatakanaPhoneticExtensions Khmer KhmerSymbols Lao Latin-1Supplement
+         |LatinExtended-A LatinExtended-B LatinExtendedAdditional LetterlikeSymbols Limbu LowSurrogates Malayalam
+         |MathematicalOperators MiscellaneousMathematicalSymbols-A MiscellaneousMathematicalSymbols-B
+         |MiscellaneousSymbols MiscellaneousSymbolsandArrows MiscellaneousTechnical Mongolian Myanmar NumberForms Ogham
+         |OpticalCharacterRecognition Oriya PhoneticExtensions PrivateUse PrivateUseArea Runic Sinhala
+         |SmallFormVariants SpacingModifierLetters Specials SuperscriptsandSubscripts SupplementalArrows-A
+         |SupplementalArrows-B SupplementalMathematicalOperators Syriac Tagalog Tagbanwa TaiLe Tamil Telugu Thaana Thai
+         |Tibetan UnifiedCanadianAboriginalSyllabics VariationSelectors YiRadicals YiSyllables YijingHexagramSymbols
+         |""".stripMargin.split("\\s+").toSeq
+    val program =
+      s"""|using System;
+          |using System.Collections.Generic;
+          |using System.Text.RegularExpressions;
+          |
+          |foreach (var name in "${names.mkString(" ")}".Split(' '))
+          |{
+          |    var regex = new Regex(@"\\A\\p{Is" + name + @"}\\z");
+          |    var ranges = new List<string>();
+          |    var start = -1;
+          |    for (var c = 0; c <= 0x10000; c++)
+          |    {
+          |        var matched = c < 0x10000 && regex.IsMatch(((char)c).ToString());
+          |        if (matched && start < 0) start = c;
+          |        if (!matched && start >= 0)
+          |        {
+          |            ranges.Add(start.ToString("x") + "-" + (c - 1).ToString("x"));
+          |            start = -1;
+          |        }
+          |    }
+          |    Console.WriteLine("case:" + name + " " + string.Join(",", ranges));
+          |}
+          |""".stripMargin
+    val model = names.map: name =>
+      val set = chars(s"\\p{Is$name}", "", Dialect.DotNet)
+      val ranges = set.intervals.map((start, end) => s"${Integer.toHexString(start)}-${Integer.toHexString(end - 1)}")
+      s"$name ${ranges.mkString(",")}"
+    val path = createFile("recheck-engine", "Main.cs", program)
+    assertEquals(cases(Seq("dotnet", "run", path.getFileName.toString), dir = Some(path.getParent)), model)
+
   // Checked with Perl 5.44.0.
   runtimeTest("Perl: the character set rules of utf8", "perl"):
     // The program matches `0x80..0xFF` as recheck's character sets have them.
