@@ -52,18 +52,16 @@ private[exec] object SourceDirectory:
     catch case _: IOException | _: UnsupportedOperationException | _: SecurityException => None
 
   /** Writes the source file unless it exists with the same content, and returns its path. */
-  def path(source: SourceFile): Path = path(directory, source)
-
-  private[exec] def path(dir: Path, source: SourceFile): Path =
+  def path(source: SourceFile): Path =
     val bytes = source.content.getBytes(StandardCharsets.UTF_8)
     val hash = MessageDigest.getInstance("SHA-256").digest(bytes).take(8).map(b => f"${b & 0xff}%02x").mkString
     val dot = source.name.lastIndexOf('.')
     val name = if dot < 0 then s"${source.name}-$hash" else s"${source.name.take(dot)}-$hash${source.name.drop(dot)}"
-    val file = dir.resolve(name)
+    val file = directory.resolve(name)
     try
       if !Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) || !Files.readAllBytes(file).sameElements(bytes) then
         // A temporary file and a move keep a concurrent writer from reading a partial file.
-        val tmp = Files.createTempFile(dir, s"$name-", ".tmp")
+        val tmp = Files.createTempFile(directory, s"$name-", ".tmp")
         try
           Files.write(tmp, bytes)
           Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)

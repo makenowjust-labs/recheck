@@ -57,7 +57,9 @@ class ExecutorSuite extends munit.FunSuite:
     )
 
   test("Executor#exec"):
-    assertEquals(NodeExecutor.exec("console.log('foo');", None, "start", Map.empty), ExecResult.Exit(0, "foo\n", ""))
+    // The command runs from `PATH` without the variable.
+    object ShellExecutor extends Executor.Stdin("sh", "RECHECK_SH", stdin = Seq.empty)
+    assertEquals(ShellExecutor.exec("echo foo", None, "start", Map.empty), ExecResult.Exit(0, "foo\n", ""))
 
   test("Executor#exec: the variable"):
     // A fake runtime prints the variables of .NET, the arguments with the content of a file, and the input.
