@@ -31,7 +31,7 @@ final class CaseMapping private (
       .range(0, starts.length)
       .flatMap(i => Iterator.range(0, counts(i)).map(k => starts(i) + k * strides(i)).map(c => (c, c + deltas(i))))
 
-  /** The set of the code values changed by this mapping. */
+  /** domain is the set of the code values that this mapping changes. */
   lazy val domain: CharSet =
     val builder = CharSet.newBuilder
     for i <- starts.indices do
@@ -127,20 +127,23 @@ object CaseMapping:
       next = start + (count - 1) * stride + 1
     new CaseMapping(starts.result(), counts.result(), strides.result(), deltas.result())
 
-  /** Simple case folding: the `C` and `S` mappings of CaseFolding.txt. */
+  /** SimpleFold is the simple case folding, which is the `C` and `S` mappings of CaseFolding.txt. */
   lazy val SimpleFold: CaseMapping = decode(CaseData.SimpleFold)
 
-  /** Simple case folding for Turkic languages: the `C`, `S` and `T` mappings of CaseFolding.txt. */
+  /** SimpleFoldTurkic is the simple case folding for Turkic languages, which is the `C`, `S` and `T` mappings of
+    * CaseFolding.txt.
+    */
   lazy val SimpleFoldTurkic: CaseMapping =
     SimpleFold.updated(CharsetDecoder.decodeOverrides(CaseData.SimpleFoldTurkic).map((c, s) => (c, s(0))))
 
-  /** Simple uppercase mapping (`Simple_Uppercase_Mapping`). */
+  /** SimpleUpper maps a code point to its uppercase if it is one code point (`Simple_Uppercase_Mapping`). */
   lazy val SimpleUpper: CaseMapping = decode(CaseData.SimpleUpper)
 
-  /** Simple lowercase mapping (`Simple_Lowercase_Mapping`). */
+  /** SimpleLower maps a code point to its lowercase if it is one code point (`Simple_Lowercase_Mapping`). */
   lazy val SimpleLower: CaseMapping = decode(CaseData.SimpleLower)
 
-  /** ECMAScript `Canonicalize` without the `u` and `v` flags, on UTF-16 code units (ES2024 22.2.2.7.3).
+  /** ECMAScriptUpper is ECMAScript `Canonicalize` without the `u` and `v` flags, on UTF-16 code units (ES2024
+    * 22.2.2.7.3).
     *
     * It maps a code unit to its full uppercase if that is a single code unit, except a non-ASCII code unit to ASCII.
     */

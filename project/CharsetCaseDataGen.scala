@@ -8,7 +8,9 @@ import com.ibm.icu.util.ULocale
 /** CharsetCaseDataGen is a generator for `CaseData.scala` of `resyntax-charset`. */
 object CharsetCaseDataGen extends UnicodeDataGen:
 
-  /** A run maps `start + k * stride` to `start + k * stride + delta` for `k` in `[0, count)`. */
+  /** Run is a part of a mapping, which maps `start + k * stride` to `start + k * stride + delta` for `k` in
+    * `[0, count)`.
+    */
   private final case class Run(start: Int, var count: Int, var stride: Int, delta: Int):
 
     def last: Int = start + (count - 1) * stride
@@ -69,7 +71,9 @@ object CharsetCaseDataGen extends UnicodeDataGen:
     val options = UCharacter.TITLECASE_NO_LOWERCASE | UCharacter.TITLECASE_NO_BREAK_ADJUSTMENT
     toCodePoints(UCharacter.toTitleCase(ULocale.ROOT, new String(Character.toChars(c)), null, options))
 
-  /** ECMAScript `Canonicalize` without the `u` and `v` flags (ES2024 22.2.2.7.3). */
+  /** Returns the UTF-16 code unit that ECMAScript `Canonicalize` maps the code unit to without the `u` and `v` flags
+    * (ES2024 22.2.2.7.3).
+    */
   private def ecmaScriptUpper(ch: Int): Int =
     val u = UCharacter.toUpperCase(ULocale.ROOT, String.valueOf(ch.toChar))
     if u.length != 1 then ch
