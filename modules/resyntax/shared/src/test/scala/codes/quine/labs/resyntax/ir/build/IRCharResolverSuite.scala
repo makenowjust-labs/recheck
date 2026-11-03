@@ -200,7 +200,18 @@ class IRCharResolverSuite extends munit.FunSuite:
   error("[\\xFF]", "", Ruby())("Invalid multibyte escape at 1")
   error("[\\x00-\\xFF]", "", Ruby())("Invalid multibyte escape at 1")
   error("[a\\xA1-\\uFFFF]", "", Ruby())("Invalid multibyte escape at 2")
-  unsupported("[\\xC3\\xA0-\\xC3\\xA9]", "", Ruby())
+  // Onigmo reads the bytes of a character as one also at a range endpoint (checked against Ruby 4.0).
+  chars("[\\xC3\\xA0-\\xC3\\xA9]", "", Ruby())(CharSet.range(0xe0, 0xe9))
+  chars("[a-\\xC3\\xA9]", "", Ruby())(CharSet.range('a', 0xe9))
+  chars("[\\xC3\\xA0-\\u00E9]", "", Ruby())(CharSet.range(0xe0, 0xe9))
+  chars("[x\\xC3\\xA1\\xC3\\xA0-\\xC3\\xA9\\xC3\\xAF]", "", Ruby())(CharSet.range(0xe0, 0xe9).union(of("x\u00ef")))
+  chars("[\\xC3\\xA0-\\xC3\\xA9-\\xC3\\xAF]", "", Ruby())(CharSet.range(0xe0, 0xe9).union(of("-\u00ef")))
+  chars("[\\xC3\\xA0-\\xC3\\xA9]", "i", Ruby())(
+    CharSet.range(0xc0, 0xc9).union(CharSet.range(0xe0, 0xe9)).union(CharSet.single(0x212b))
+  )
+  error("[\\xC3\\xA0-\\xA9]", "", Ruby())("Invalid multibyte escape at 10")
+  error("[\\xC3\\xA0-\\xC3]", "", Ruby())("Invalid multibyte escape at 10")
+  error("[\\xC3\\xA9-\\xC3\\xA0]", "", Ruby())("Range out of order in character class at 1")
   chars("[\\xC3\\xBD\\xC3\\xBF]", "", Ruby())(of("\u00fd\u00ff"))
   // Onigmo repeats the whole character of byte escapes.
   check("\\xC3\\xA9+", "", Ruby())(Repeat(Chars(of("\u00e9")), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy)))

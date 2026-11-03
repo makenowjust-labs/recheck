@@ -590,7 +590,7 @@ private[build] final class IRCharResolver(
 
   private def classItem(item: ClassItem, flags: IRCharFlagSet): ClassSet =
     item.data match
-      case ClassItemData.ClassUnion(items)              => classUnion(items.toIndexedSeq, flags)
+      case ClassItemData.ClassUnion(items)              => classUnion(items, flags)
       case ClassItemData.ClassIntersection(left, right) => classItem(left, flags).intersect(classItem(right, flags))
       case ClassItemData.ClassDiff(left, right)         => classItem(left, flags).diff(classItem(right, flags))
       case ClassItemData.ClassNest(invert, inner)       =>
@@ -609,81 +609,73 @@ private[build] final class IRCharResolver(
         throw new IRBuildingException("Invalid multibyte escape", item.loc)
       case value: ClassItemData.ClassValue => ClassSet(closeChars(valueUnits(value, flags, item.loc), flags))
 
-  /** Evaluates a union, with Ruby's byte escapes (e.g. `[\xC3\xA9]`). */
-  private def classUnion(items: IndexedSeq[ClassItem], flags: IRCharFlagSet): ClassSet =
+  /** Evaluates a union, where Ruby's byte escapes make characters (e.g. `[\xC3\xA9]` is `[é]`). */
+  private def classUnion(items: Seq[ClassItem], flags: IRCharFlagSet): ClassSet =
+    if !dialect.isRuby || mode != UnitMode.CodePoint then
+      return items.foldLeft(ClassSet.empty)((set, item) => set.union(classItem(item, flags)))
+    // Onigmo reads the bytes of a character as one also at a range endpoint (e.g. `[\xC3\xA0-\xC3\xA9]` is `[à-é]`).
+    // The parser reads a range between bytes there (`\xA0-\xC3`), so the range is split at its hyphen and made again.
+    val tokens = items.flatMap: item =>
+      item.data match
+        case ClassItemData.ClassRange(begin, end) if isRubyByteValue(begin.data) || isRubyByteValue(end.data) =>
+          Seq(
+            RubyClassToken.Value(classLit(begin.data, flags, begin.loc)),
+            RubyClassToken.Hyphen,
+            RubyClassToken.Value(classLit(end.data, flags, end.loc))
+          )
+        case value: ClassItemData.ClassValue if isRubyByteValue(value) =>
+          Seq(RubyClassToken.Value(classLit(value, flags, item.loc)))
+        case _ => Seq(RubyClassToken.Other(item))
+    val decoded = decodeRubyClassBytes(tokens)
     var result = ClassSet.empty
     var i = 0
-    while i < items.length do
-      val item = items(i)
-      item.data match
-        case value: ClassItemData.ClassValue
-            if dialect.isRuby && mode == UnitMode.CodePoint && isRubyByteValue(value) =>
-          val bytes = items
-            .drop(i)
-            .takeWhile:
-              case ClassItem.Value(value, _) => isRubyByteValue(value)
-              case _                         => false
-          val lits = bytes.map: b =>
-            val ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, value)) = b.data: @unchecked
-            Lit(value, Some(style), flags, b.loc)
-          // Bytes of a character continued into a range endpoint (e.g. `[\xC3\xA0-\xC3\xA9]`) are not modeled.
-          if rangeByteAt(items, i + bytes.length, begin = true) then
-            validateRubyBytePrefix(lits)
-            throw new NotModeledException
-          if rangeByteAt(items, i - 1, begin = false) then throw new NotModeledException
-          val decoded = mergeRubyBytes(lits)
-          result = result.union(ClassSet(closeChars(decoded.map(_.value), flags)))
-          i += bytes.length
-        case ClassItemData.ClassRange(begin, end)
-            if dialect.isRuby && mode == UnitMode.CodePoint &&
-              (isRubyByteValue(begin.data) || isRubyByteValue(end.data)) =>
-          // Onigmo rejects a byte escape endpoint unless it is in a multibyte character with its neighbors.
-          val beginOk =
-            !isRubyByteValue(begin.data) || UTF8Encoding.sequenceLength(begin.data.value) == 0 && isRubyByteItem(
-              items,
-              i - 1
+    while i < decoded.length do
+      decoded(i) match
+        case RubyClassToken.Value(begin) if decoded.lift(i + 1).contains(RubyClassToken.Hyphen) =>
+          val RubyClassToken.Value(end) = decoded(i + 2): @unchecked
+          if begin.value > end.value then
+            throw new IRBuildingException(
+              "Range out of order in character class",
+              SourceLocation(begin.loc.start, end.loc.end)
             )
-          val endOk =
-            !isRubyByteValue(end.data) || UTF8Encoding.sequenceLength(end.data.value) >= 2 && isRubyByteItem(
-              items,
-              i + 1
-            )
-          if !(beginOk && endOk) then throw new IRBuildingException("Invalid multibyte escape", item.loc)
-          throw new NotModeledException
-        case _ =>
+          result = result.union(ClassSet(equivalence(flags).closeRange(CharSet.range(begin.value, end.value))))
+          i += 3
+        // A hyphen after a range is a character, as in `[a-c-e]`.
+        case RubyClassToken.Hyphen =>
+          result = result.union(ClassSet(closeChars(Seq('-'), flags)))
+          i += 1
+        case RubyClassToken.Value(lit) =>
+          result = result.union(ClassSet(closeChars(Seq(lit.value), flags)))
+          i += 1
+        case RubyClassToken.Other(item) =>
           result = result.union(classItem(item, flags))
           i += 1
     result
 
-  private def isRubyByteItem(items: Seq[ClassItem], i: Int): Boolean =
-    items
-      .lift(i)
-      .exists:
-        case ClassItem.Value(value, _) => isRubyByteValue(value)
-        case _                         => false
+  /** Decodes the byte escapes in a row of Ruby's class into code points. */
+  private def decodeRubyClassBytes(tokens: Seq[RubyClassToken]): IndexedSeq[RubyClassToken] =
+    val out = mutable.ArrayBuffer.empty[RubyClassToken]
+    val lits = mutable.ArrayBuffer.empty[Lit]
+    def flush(): Unit =
+      out ++= mergeRubyBytes(lits.toIndexedSeq).map(RubyClassToken.Value(_))
+      lits.clear()
 
-  /** Checks whether the item is a range whose begin (or end) is a Ruby byte escape. */
-  private def rangeByteAt(items: Seq[ClassItem], i: Int, begin: Boolean): Boolean =
-    items
-      .lift(i)
-      .exists(_.data match
-        case ClassItemData.ClassRange(b, e) => isRubyByteValue(if begin then b.data else e.data)
-        case _                              => false)
+    for token <- tokens do
+      token match
+        case RubyClassToken.Value(lit) => lits += lit
+        case _                         =>
+          flush()
+          out += token
+    flush()
+    out.toIndexedSeq
 
-  /** Validates the bytes before a range, whose last character may continue into the range's begin. */
-  private def validateRubyBytePrefix(lits: IndexedSeq[Lit]): Unit =
-    var i = 0
-    while i < lits.length do
-      val n = UTF8Encoding.sequenceLength(lits(i).value)
-      if n < 2 then throw new IRBuildingException("Invalid multibyte escape", lits(i).loc)
-      i += n
+  private def classLit(value: ClassItemData.ClassValue, flags: IRCharFlagSet, loc: SourceLocation): Lit = value match
+    case ClassItemData.ClassLiteral(v)                                     => Lit(v, None, flags, loc)
+    case ClassItemData.ClassBackslashValue(BackslashKind.Unknown(v))       => Lit(v, None, flags, loc)
+    case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v)) => Lit(v, Some(style), flags, loc)
 
   private def valueUnits(value: ClassItemData.ClassValue, flags: IRCharFlagSet, loc: SourceLocation): Seq[UChar] =
-    val lit = value match
-      case ClassItemData.ClassLiteral(v)                                     => Lit(v, None, flags, loc)
-      case ClassItemData.ClassBackslashValue(BackslashKind.Unknown(v))       => Lit(v, None, flags, loc)
-      case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v)) => Lit(v, Some(style), flags, loc)
-    val units = unitsOf(lit)
+    val units = unitsOf(classLit(value, flags, loc))
     // A class item is one unit in UTF-16 mode, so a code point beyond it cannot be a class member.
     if mode == UnitMode.UTF16 && units.length != 1 then throw new NotModeledException
     units
@@ -746,6 +738,12 @@ private[build] object IRCharResolver:
 
   /** NotModeledException is thrown for a construct that IR cannot represent, which becomes `Unsupported`. */
   final class NotModeledException extends Exception("not modeled")
+
+  /** RubyClassToken is an item of Ruby's class, where a range with a byte escape endpoint is split at its hyphen. */
+  private enum RubyClassToken:
+    case Value(lit: Lit)
+    case Hyphen
+    case Other(item: ClassItem)
 
   /** Lit is a literal character before being resolved. */
   final case class Lit(
