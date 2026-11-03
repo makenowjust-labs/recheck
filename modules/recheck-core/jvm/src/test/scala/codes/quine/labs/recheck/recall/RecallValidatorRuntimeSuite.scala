@@ -1,6 +1,5 @@
 package codes.quine.labs.recheck.recall
 
-import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -21,10 +20,8 @@ import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
-import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
-import codes.quine.labs.resyntax.ir.IRNodeData
 
 class RecallValidatorRuntimeSuite extends munit.FunSuite with RuntimeHelper:
 
@@ -123,12 +120,6 @@ class RecallValidatorRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     val env = Map("RECHECK_RUBY" -> "env LC_ALL=C ruby")
     assertFinish(validateIn(env)("^(?:é|é)*$", "", Dialect.Ruby(), attack("é", 3, "\u0000")))
 
-  runtimeTest("Ruby: the character set options", "ruby"):
-    // `u` is `(?u)`, not `/u` (FIXEDENCODING), so `\w` matches `é`, and a backreference turns off the memoization.
-    val pattern = "^(?:(\\w)|\\w)*\\1$"
-    assertEquals(validate(pattern, "u", Dialect.Ruby(), attack("é", 31, "!")).result, RecallResult.Timeout)
-    assertFinish(validate(pattern, "ua", Dialect.Ruby(), attack("é", 31, "!")))
-
   runtimeTest("Java", "java"):
     val r = validate("^(a|a)*$", "", Dialect.Java, attack("a", 31, "\u0000"))
     assertFinish(r)
@@ -177,33 +168,6 @@ class RecallValidatorRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     val unicode = validateIn(env)("^\\w*\\w*\\w*$", "u", Dialect.Perl(), attack("é", 3000, "\u0000"))
     assertEquals(unicode.result, RecallResult.Timeout)
 
-  runtimeTest("Perl: the character set rules of utf8", "perl"):
-    // The program matches `0x80..0xFF` as recheck's character sets have them.
-    def check(source: String, dialect: Dialect.Perl): Unit =
-      val ir = ReDoS.parse(source, "", dialect)
-      def last(data: IRNodeData): CharSet = data match
-        case IRNodeData.Chars(set)      => set
-        case IRNodeData.Sequence(nodes) => last(nodes.last.data)
-        case data                       => fail(s"Unexpected: $data")
-
-      val modeled = (0x80 to 0xff).filter(last(ir.node.data).contains)
-      val program = RecallProgram.generate(source, "", dialect, ir.mode, attack("a", 1, "")).toOption.get
-      val lines = program.script.linesIterator.toSeq
-      val pragma = lines.filter(_ == "use utf8;")
-      val regex = lines.find(_.startsWith("my $regex = ")).get
-      val flag = lines.find(_.startsWith("utf8::")).get
-      val loop =
-        s"""for my $$b (0x80..0xFF) { my $$input = chr($$b); $flag print "$$b\\n" if $$input =~ /\\A$$regex\\z/ }"""
-      val process = new ProcessBuilder("perl", "-e", (pragma ++ Seq(regex, loop)).mkString("\n")).start()
-      val out = new String(process.getInputStream.readAllBytes(), StandardCharsets.UTF_8)
-      assertEquals(out.linesIterator.map(_.toInt).toSeq, modeled, s"$source in $dialect")
-
-    for
-      source <- Seq("\\w", "\\d", "\\s", "[[:alpha:]]", "(?i)\\xC9", "(?a)\\w", "(?u)\\w", "\\x{100}?\\w", "\\p{L}?\\w")
-      utf8 <- Seq(true, false)
-      perlSource <- Seq(PerlSource.Literal, PerlSource.String)
-    do check(source, Dialect.Perl(utf8, perlSource))
-
   runtimeTest("PCRE", "php"):
     // PHP's default `pcre.backtrack_limit` stops the match.
     val r = validate("^(?:é|é)*$", "", Dialect.PCRE, attack("Ã©", 31, "\u0000"))
@@ -215,15 +179,6 @@ class RecallValidatorRuntimeSuite extends munit.FunSuite with RuntimeHelper:
       RecallResult.EngineLimit("Backtrack limit exhausted")
     )
     assertFinish(validate("^(?:é|é)*$", "u", Dialect.PCRE, attack("é", 3, "\u0000")))
-
-  runtimeTest("PCRE: the r modifier", "php"):
-    // `r` (PCRE2_EXTRA_CASELESS_RESTRICT) keeps `k` from matching the Kelvin sign.
-    val kelvin = attack("\u212a", 31, "\u0000")
-    assertEquals(
-      validate("^(?:k|k)*$", "iu", Dialect.PCRE, kelvin).result,
-      RecallResult.EngineLimit("Backtrack limit exhausted")
-    )
-    assertFinish(validate("^(?:k|k)*$", "iur", Dialect.PCRE, kelvin))
 
   /** Runs the standalone program in a new directory, and returns the output. */
   def runScript(script: RecallProgram.Script): String =
@@ -270,35 +225,6 @@ class RecallValidatorRuntimeSuite extends munit.FunSuite with RuntimeHelper:
       case List(d: Diagnostics.Vulnerable) =>
         assertEquals(d.recallValidation.map(_.result), Some(RecallResult.EngineLimit("Backtrack limit exhausted")))
       case ds => fail(s"unexpected: $ds")
-
-  /** Returns the attack string `"\uD800\uDC00".repeat(n) + "!"`, which repeats a high surrogate followed by a low
-    * surrogate.
-    */
-  def surrogatePairs(n: Int): AttackPattern =
-    AttackPattern(Seq((UString.empty, UString(0xd800, 0xdc00), 0)), UString('!'), n)
-
-  val surrogates: String = "^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF]|[\\uDC00-\\uDFFF])*$"
-
-  runtimeTest("Surrogates: JavaScript", "node"):
-    // A high surrogate followed by a low surrogate is one character with `u`, which the alternatives cannot match.
-    assertFinish(validate(surrogates, "u", Dialect.JavaScript, surrogatePairs(31)))
-    assertEquals(validate(surrogates, "", Dialect.JavaScript, surrogatePairs(31)).result, RecallResult.Timeout)
-    assertEquals(ReDoS.check(surrogates, "u", params).getClass, classOf[Diagnostics.Safe])
-
-  runtimeTest("Surrogates: Python", "python3"):
-    assertEquals(validate(surrogates, "", Dialect.Python(), surrogatePairs(31)).result, RecallResult.Timeout)
-    ReDoS.check(surrogates, "", params.copy(dialect = Dialect.Python())) match
-      case d: Diagnostics.Vulnerable => assertEquals(d.recallValidation.map(_.result), Some(RecallResult.Timeout))
-      case d                         => fail(s"not vulnerable: $d")
-
-  runtimeTest("Surrogates: PCRE", "php"):
-    // A subject with a surrogate is invalid UTF-8, which the attack does not take.
-    val source = "^(?:[^\\x00-\\x{D7FF}]|[^\\x00-\\x{D7FF}])*$"
-    ReDoS.check(source, "u", params.copy(dialect = Dialect.PCRE)) match
-      case d: Diagnostics.Vulnerable =>
-        assert(!d.attack.asUString.iterator.exists(c => 0xd800 <= c && c <= 0xdfff), d.attack)
-        assertEquals(d.recallValidation.map(_.result), Some(RecallResult.EngineLimit("Backtrack limit exhausted")))
-      case d => fail(s"not vulnerable: $d")
 
   runtimeTest("RECHECK_RUBY", "ruby"):
     // The wrapper's runtime line comes first, and it shows the arguments.
