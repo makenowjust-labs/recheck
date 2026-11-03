@@ -47,8 +47,8 @@ const generateDialectDts = (dialect: Property): string[] => {
   return [
     comment(
       [
-        "Dialect is the dialect of a diagnostics as the parameter gives it, with every setting of the dialect.",
-        "An omitted setting is the default.",
+        "Dialect is the dialect of a diagnostics, with every setting of the dialect.",
+        "A setting that the `dialect` parameter omits is the default.",
       ],
       "",
     ),
@@ -81,7 +81,7 @@ const generateParametersDts = (schema: Schema): string => {
       `(default: \`${defaultOf(property)}\`)`,
     ];
     if (property["x-since"] !== undefined) {
-      lines.push("", `@since ${property["x-since"]}`);
+      lines.push("", `Since ${property["x-since"]}.`);
     }
     return `${comment(lines, "  ")}\n  ${name}?: ${generateTypescriptType(property)};`;
   });

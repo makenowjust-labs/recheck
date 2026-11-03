@@ -64,7 +64,7 @@ export declare const schema: Schema;
 /** The default value of each parameter, which is `null` if the schema has none. */
 export declare const defaults: DefaultTable;
 
-/** The entries are in the schema order. */
+/** Returns the names and the properties of the parameters that the target exposes, in the schema order. */
 export declare const propertiesFor: <T extends Target>(
   target: T,
 ) => [keyof ParametersFor<T> & string, Property][];
