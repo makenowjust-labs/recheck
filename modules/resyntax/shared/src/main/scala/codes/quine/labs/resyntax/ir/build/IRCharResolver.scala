@@ -790,7 +790,10 @@ private[build] object IRCharResolver:
   /** The value of a literal that has no unit in the mode, which never matches. */
   val NoUnit: Int = -1
 
-  /** The largest number of multi-character foldings in a part; more of them leave the part to the one-to-one folding.
+  /** MaxMultiFoldings is the largest number of multi-character foldings in a part that are resolved as alternatives.
+    *
+    * A part with more of them is folded one to one, which misses some matches, since the alternatives grow
+    * exponentially.
     */
   val MaxMultiFoldings: Int = 6
 
