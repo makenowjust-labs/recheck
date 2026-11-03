@@ -47,17 +47,17 @@ The ESLint plugin (`eslint-plugin-redos`) checks JavaScript regular expressions 
 
 ## Supported Dialects
 
-| `dialect`                              | Engine that `recheck` follows                  | Matching unit                                      | Recall validation command                          |
-| -------------------------------------- | ---------------------------------------------- | -------------------------------------------------- | -------------------------------------------------- |
-| [`javascript`](dialects/javascript.md) | ECMAScript 2025 `RegExp` (V8)                  | UTF-16 code units, or code points with `u` or `v`  | `node -`                                           |
-| [`python`](dialects/python.md)         | Python 3.15 `re`                               | code points (`str`), or bytes (`bytes`)            | `python3 -I -`                                     |
-| [`ruby`](dialects/ruby.md)             | Ruby 4.0 `Regexp` (Onigmo)                     | code points (`UTF-8`), or bytes (`ASCII-8BIT`)     | `ruby -`                                           |
-| [`java`](dialects/java.md)             | Java 25 `java.util.regex.Pattern`              | code points                                        | `java --source 17 <dir>/RecheckRecall-<hash>.java` |
-| [`dotnet`](dialects/dotnet.md)         | .NET 10 `System.Text.RegularExpressions.Regex` | UTF-16 code units                                  | `dotnet run <dir>/RecheckRecall-<hash>.cs`         |
-| [`perl`](dialects/perl.md)             | Perl 5.44 regular expressions                  | code points (`utf8`), or bytes (no `utf8`)         | `perl -`                                           |
-| [`pcre`](dialects/pcre.md)             | PCRE2 10.49 as PHP's `preg_*` functions use it | bytes, or code points (UTF-8) with `u` or `(*UTF)` | `php`                                              |
+| `dialect`                              | Engine that `recheck` follows                  | Matching unit                                      | Runtime-attack verification command                       |
+| -------------------------------------- | ---------------------------------------------- | -------------------------------------------------- | --------------------------------------------------------- |
+| [`javascript`](dialects/javascript.md) | ECMAScript 2025 `RegExp` (V8)                  | UTF-16 code units, or code points with `u` or `v`  | `node -`                                                  |
+| [`python`](dialects/python.md)         | Python 3.15 `re`                               | code points (`str`), or bytes (`bytes`)            | `python3 -I -`                                            |
+| [`ruby`](dialects/ruby.md)             | Ruby 4.0 `Regexp` (Onigmo)                     | code points (`UTF-8`), or bytes (`ASCII-8BIT`)     | `ruby -`                                                  |
+| [`java`](dialects/java.md)             | Java 25 `java.util.regex.Pattern`              | code points                                        | `java --source 17 <dir>/RecheckRuntimeAttack-<hash>.java` |
+| [`dotnet`](dialects/dotnet.md)         | .NET 10 `System.Text.RegularExpressions.Regex` | UTF-16 code units                                  | `dotnet run <dir>/RecheckRuntimeAttack-<hash>.cs`         |
+| [`perl`](dialects/perl.md)             | Perl 5.44 regular expressions                  | code points (`utf8`), or bytes (no `utf8`)         | `perl -`                                                  |
+| [`pcre`](dialects/pcre.md)             | PCRE2 10.49 as PHP's `preg_*` functions use it | bytes, or code points (UTF-8) with `u` or `(*UTF)` | `php`                                                     |
 
-Each dialect's page describes its engine, settings, flags and units, syntax limitations, approximations and recall validation.
+Each dialect's page describes its engine, settings, flags and units, syntax limitations, approximations and runtime-attack verification.
 The rest of this page describes what is common to all the dialects.
 
 ## Units and Attack Strings
@@ -102,7 +102,7 @@ The following is what we measured with `^(a|a)*$` against `'a'.repeat(n) + '!'`.
 - PHP 8.5 (PCRE2 10.49 with the default `pcre.backtrack_limit`) gives up with the backtrack limit error for `n = 20`.
 
 So `recheck` reports `^(a|a)*$` as vulnerable in every dialect, but the attack is not effective on some engines.
-[Recall Validation](recall-validation.md) runs the attack string on the real engine, and it tells whether the attack works there.
+[Runtime-Attack Verification](runtime-attack-verification.md) runs the attack string on the real engine, and it tells whether the attack works there.
 
 The following approximations are common to the dialects, and each dialect's page describes its own ones.
 
@@ -117,7 +117,7 @@ The following approximations are common to the dialects, and each dialect's page
   A search from a later position (e.g. the second match of a global search, Java's `find(int)`, Perl's `pos()` or Python's `search(s, pos)`) is not modeled.
   So a pattern can be slow only on such a search, where a look-behind, `\b`, `\B` or a multiline `^` sees the text before the starting position (e.g. `(?<=a)\G(?:b|b)*$` on `'a' + 'b'.repeat(n) + '!'` from the position `1`), and `recheck` misses it.
 
-## Recall Validation
+## Runtime-Attack Verification
 
-The [recall validation](recall-validation.md) runs the attack string on the real engine of the dialect, and it tells whether the attack works there.
-Each dialect's page has the command of the recall validation and the notes on its program.
+The [runtime-attack verification](runtime-attack-verification.md) runs the attack string on the real engine of the dialect, and it tells whether the attack works there.
+Each dialect's page has the command of the runtime-attack verification and the notes on its program.

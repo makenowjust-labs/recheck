@@ -3,19 +3,21 @@ import { sectionOf, sections, toc } from "./schema";
 
 describe("sections", () => {
   test("follow the schema with stable anchors", () => {
-    const recallTimeout = sections.find(({ name }) => name === "recallTimeout");
-    expect(recallTimeout).toMatchObject({
-      id: "recalltimeout",
+    const runtimeAttackTimeout = sections.find(
+      ({ name }) => name === "runtimeAttackTimeout",
+    );
+    expect(runtimeAttackTimeout).toMatchObject({
+      id: "runtimeattacktimeout",
       typescriptType: "number | null",
       scalaType: "Duration",
       unit: "milliseconds",
       typescriptDefault: "-1000",
       scalaDefault: "Duration(-1, SECONDS)",
-      cli: "recall-timeout",
+      cli: "runtime-attack-timeout",
     });
     expect(toc).toContainEqual({
-      value: "<code>recallTimeout</code>",
-      id: "recalltimeout",
+      value: "<code>runtimeAttackTimeout</code>",
+      id: "runtimeattacktimeout",
       level: 2,
     });
     expect(toc.map(({ id }) => id)).toEqual(sections.map(({ id }) => id));

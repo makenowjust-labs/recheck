@@ -42,7 +42,7 @@ The canonical equivalence (`(?c)`) is not supported, and it is reported as `unsu
 
 ## Approximations
 
-- Java has optimizations of loops that `recheck` does not model, so an attack that `recheck` reports may not work on Java, and the recall validation checks whether it does.
+- Java has optimizations of loops that `recheck` does not model, so an attack that `recheck` reports may not work on Java, and the runtime-attack verification checks whether it does.
 - Java compiles a repetition into a node that depends on its body (`Curly`, `GroupCurly` or `Loop`), and the nodes differ in captures, `\R` and empty iterations.
   `recheck` does not reproduce the differences, and it repeats any node as `Loop` does.
   For example, `^(?:(.)b)*cb\1$` does not match `"abcba"` in Java, since `GroupCurly` does not restore the capture on backtracking, and `^\R*\n$` does not match `"\r\n"`, since `Curly` does not backtrack into `\R`.
@@ -50,16 +50,16 @@ The canonical equivalence (`(?c)`) is not supported, and it is reported as `unsu
   `recheck` does not reproduce them, and it tries the starts from the longest by the lengths of the body, as for PCRE.
   For example, `(?<=\X)a` never matches in Java, and `(?<=(a|aa))b` captures `"a"` of `"aab"` in Java, but `"aa"` in `recheck`.
 
-## Recall Validation
+## Runtime-Attack Verification
 
-- Command: `java --source 17 <dir>/RecheckRecall-<hash>.java`.
+- Command: `java --source 17 <dir>/RecheckRuntimeAttack-<hash>.java`.
 - Matching: `Matcher#find`.
 - Engine limits: none.
 - Engine errors: `StackOverflowError`, `OutOfMemoryError`.
 - Environment variable: `RECHECK_JAVA`.
-- Recall script: `java --source 17 recall.java`.
+- Runtime-attack script: `java --source 17 runtime-attack.java`.
 
 `java` runs a fixed program as a single-file source program, which needs a JDK (17 or later).
 The program reads the pattern and the attack string from the standard input.
-`recheck` writes the program file once into its directory in the temporary directory (see [Program Files](../recall-validation.md#program-files)), so a command in a container needs the directory mounted at the same path.
-The recall script has the pattern and the attack string in itself.
+`recheck` writes the program file once into its directory in the temporary directory (see [Program Files](../runtime-attack-verification.md#program-files)), so a command in a container needs the directory mounted at the same path.
+The runtime-attack script has the pattern and the attack string in itself.

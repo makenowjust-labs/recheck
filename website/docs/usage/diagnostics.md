@@ -16,7 +16,7 @@ Every `Diagnostics` has the following fields.
 - `dialect` is the given [`dialect`](parameters.mdx#dialect) parameter, as an object of the name and every setting of the dialect.
 - `unitMode` is the unit of the attack strings (see [Attack String](#attack-string)).
   It is `null` in an `unknown` diagnostics whose error happened on parsing the pattern.
-- `refutedRecalls` is the list of the attack strings that the recall validation refuted before the result (see [Recall Validation](#recall-validation)).
+- `refutedAttacks` is the list of the attack strings that the runtime-attack verification refuted before the result (see [Runtime-Attack Verification](#runtime-attack-verification)).
 - `checker` is a checker type to be used (one of `fuzz` and `automaton`).
 
 ## Status
@@ -26,7 +26,7 @@ Every `Diagnostics` has the following fields.
 - `safe` means the given regular expression seems safe at least in this checking.
 - `vulnerable` means vulnerability in the given regular expression is found.
 - `unknown` means something wrong happened in checking (timeout, cancel, or error). It has the `error` field to describe the reason for this result.
-  Its `kind` is one of `timeout`, `cancel`, `unsupported`, `invalid`, `recall-refutation-limit` (see [Recall Validation](#recall-validation)) and `unexpected`.
+  Its `kind` is one of `timeout`, `cancel`, `unsupported`, `invalid`, `runtime-attacks-refuted` (see [Runtime-Attack Verification](#runtime-attack-verification)) and `unexpected`.
 
 ## Complexity
 
@@ -72,14 +72,14 @@ The `attack` field also has these fields.
   | `pcre`       | PHP        | `str_repeat('a', 31) . "\x00"`                                                 |
 
 Note that the attack string is computed in theory, so it may not cause the explosion on the real engine because of the engine's optimizations.
-The recall validation checks it on the real engine.
+The runtime-attack verification checks it on the real engine.
 
-## Recall Validation
+## Runtime-Attack Verification
 
-A `vulnerable` diagnostics has the `recallValidation` field.
+A `vulnerable` diagnostics has the `runtimeAttack` field.
 
-The recall validation runs the attack string on the real regex engine of the dialect (see [Recall Validation](recall-validation.md)), and this field records the run.
-It is `null` if the recall validation is not run: [`recallTimeout`](parameters.mdx#recalltimeout) is not positive (the default), or commands cannot run (e.g. in the browser).
+The runtime-attack verification runs the attack string on the real regex engine of the dialect (see [Runtime-Attack Verification](runtime-attack-verification.md)), and this field records the run.
+It is `null` if the runtime attack is not run: [`runtimeAttackTimeout`](parameters.mdx#runtimeattacktimeout) is not positive (the default), or commands cannot run (e.g. in the browser).
 
 - `runtime` is the runtime name and version (e.g. `node v26.11.1`).
 - `timeout` is the timeout of the matching in milliseconds (`null` if it is infinite).
@@ -90,14 +90,14 @@ It is `null` if the recall validation is not run: [`recallTimeout`](parameters.m
   - `engine-error` means the engine gave up with an error on the stack depth or the memory (e.g. Java's `StackOverflowError` or JavaScript's `RangeError`). It has `message`.
     Such an error may happen on a long string even if the matching takes linear time (e.g. V8 raises it for `/^(?:a|b)*$/` on 10,000,000 characters), so the attack is not considered effective.
 - `isConfirmed` is whether the engine confirms the attack, that is, the attack is effective on the engine (`timeout` or `engine-limit`).
-  Otherwise, the recall validation refutes the attack.
+  Otherwise, the runtime-attack verification refutes the attack.
 
-When the recall validation refutes an attack, the check does not report the diagnostics, and it goes on to look for another attack string.
+When the runtime-attack verification refutes an attack, the check does not report the diagnostics, and it goes on to look for another attack string.
 If no attack is confirmed, the result is `safe`.
 
-Every diagnostics lists the refuted attacks in the `refutedRecalls` field, in the order of the checking.
-Each element has the `complexity`, `attack`, `hotspot` and `recallValidation` fields of the refuted attack, which are the same as those of a `vulnerable` diagnostics.
-They show that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by these attacks (see [Refuted Attacks](recall-validation.md#refuted-attacks)).
+Every diagnostics lists the refuted attacks in the `refutedAttacks` field, in the order of the checking.
+Each element has the `complexity`, `attack`, `hotspot` and `runtimeAttack` fields of the refuted attack, which are the same as those of a `vulnerable` diagnostics.
+They show that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by these attacks (see [Refuted Attacks](runtime-attack-verification.md#refuted-attacks)).
 
 ## Hotspot
 

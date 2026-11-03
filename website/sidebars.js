@@ -33,7 +33,7 @@ const sidebars = {
             "usage/dialects/pcre",
           ],
         },
-        "usage/recall-validation",
+        "usage/runtime-attack-verification",
         "usage/parameters",
         "usage/diagnostics",
       ],

@@ -17,11 +17,11 @@ import codes.quine.labs.resyntax.charset.UnitMode
 
 class DiagnosticsSuite extends munit.FunSuite:
 
-  val refutedRecall: RefutedRecall = RefutedRecall(
+  val refutedAttack: RefutedAttack = RefutedAttack(
     AttackComplexity.Polynomial(2, false),
     AttackPattern(Seq((UnitMode.UTF16.decode(""), UnitMode.UTF16.decode("a"), 0)), UnitMode.UTF16.decode("!"), 2),
     Hotspot.empty,
-    RecallValidation("ruby 4.0.7", Duration(1, SECONDS), RecallResult.Finish(Duration(3, MILLISECONDS)))
+    RuntimeAttack("ruby 4.0.7", Duration(1, SECONDS), RuntimeAttackResult.Finish(Duration(3, MILLISECONDS)))
   )
 
   test("Diagnostics#toString"):
@@ -54,13 +54,13 @@ class DiagnosticsSuite extends munit.FunSuite:
           Checker.Automaton
         )
         .toString,
-      s"""|Input        : /abbc/
-          |Dialect      : javascript
-          |Status       : vulnerable
-          |Complexity   : exponential
-          |Attack string: 'a' + 'b'.repeat(2) + 'c'
-          |Hotspot      : /abbc/
-          |Checker      : automaton""".stripMargin
+      s"""|Input         : /abbc/
+          |Dialect       : javascript
+          |Status        : vulnerable
+          |Complexity    : exponential
+          |Attack string : 'a' + 'b'.repeat(2) + 'c'
+          |Hotspot       : /abbc/
+          |Checker       : automaton""".stripMargin
     )
     assertEquals(
       Diagnostics
@@ -76,27 +76,27 @@ class DiagnosticsSuite extends munit.FunSuite:
             2
           ),
           Hotspot.empty,
-          Some(RecallValidation("ruby 4.0.7", Duration(1, SECONDS), RecallResult.Timeout)),
-          Seq(refutedRecall, refutedRecall),
+          Some(RuntimeAttack("ruby 4.0.7", Duration(1, SECONDS), RuntimeAttackResult.Timeout)),
+          Seq(refutedAttack, refutedAttack),
           Checker.Automaton
         )
         .toString,
-      s"""|Input        : /a*a*$$/
-          |Dialect      : ruby (encoding: UTF-8)
-          |Status       : vulnerable
-          |Complexity   : 2nd degree polynomial
-          |Attack string: "a" * 2 + "!"
-          |Hotspot      : /a*a*$$/
-          |Recall       : confirmed (timed out on ruby 4.0.7, timeout: 1000 ms)
-          |Checker      : automaton
+      s"""|Input         : /a*a*$$/
+          |Dialect       : ruby (encoding: UTF-8)
+          |Status        : vulnerable
+          |Complexity    : 2nd degree polynomial
+          |Attack string : "a" * 2 + "!"
+          |Hotspot       : /a*a*$$/
+          |Runtime attack: confirmed (timed out on ruby 4.0.7, timeout: 1000 ms)
+          |Checker       : automaton
           |
-          |Refuted recalls:
-          |- Complexity   : 2nd degree polynomial
-          |  Attack string: "a" * 2 + "!"
-          |  Recall       : refuted (finished in 3 ms on ruby 4.0.7, timeout: 1000 ms)
-          |- Complexity   : 2nd degree polynomial
-          |  Attack string: "a" * 2 + "!"
-          |  Recall       : refuted (finished in 3 ms on ruby 4.0.7, timeout: 1000 ms)""".stripMargin
+          |Refuted attacks:
+          |- Complexity    : 2nd degree polynomial
+          |  Attack string : "a" * 2 + "!"
+          |  Runtime attack: refuted (finished in 3 ms on ruby 4.0.7, timeout: 1000 ms)
+          |- Complexity    : 2nd degree polynomial
+          |  Attack string : "a" * 2 + "!"
+          |  Runtime attack: refuted (finished in 3 ms on ruby 4.0.7, timeout: 1000 ms)""".stripMargin
     )
     assertEquals(
       Diagnostics
@@ -106,7 +106,7 @@ class DiagnosticsSuite extends munit.FunSuite:
           Dialect.Ruby(),
           UnitMode.CodePoint,
           AttackComplexity.Linear,
-          Seq(refutedRecall),
+          Seq(refutedAttack),
           Checker.Fuzz
         )
         .toString,
@@ -116,10 +116,10 @@ class DiagnosticsSuite extends munit.FunSuite:
           |Complexity: linear
           |Checker   : fuzz
           |
-          |Refuted recalls:
-          |- Complexity   : 2nd degree polynomial
-          |  Attack string: "a" * 2 + "!"
-          |  Recall       : refuted (finished in 3 ms on ruby 4.0.7, timeout: 1000 ms)""".stripMargin
+          |Refuted attacks:
+          |- Complexity    : 2nd degree polynomial
+          |  Attack string : "a" * 2 + "!"
+          |  Runtime attack: refuted (finished in 3 ms on ruby 4.0.7, timeout: 1000 ms)""".stripMargin
     )
     assertEquals(
       Diagnostics
@@ -164,90 +164,90 @@ class DiagnosticsSuite extends munit.FunSuite:
           "",
           Dialect.Ruby(),
           Some(UnitMode.CodePoint),
-          Diagnostics.ErrorKind.RecallRefutationLimit,
-          Seq(refutedRecall),
+          Diagnostics.ErrorKind.RuntimeAttacksRefuted,
+          Seq(refutedAttack),
           Some(Checker.Fuzz)
         )
         .toString,
       s"""|Input  : /a*a*$$/
           |Dialect: ruby (encoding: UTF-8)
           |Status : unknown
-          |Error  : recall refutation limit
+          |Error  : runtime attacks refuted
           |Checker: fuzz
           |
-          |Refuted recalls:
-          |- Complexity   : 2nd degree polynomial
-          |  Attack string: "a" * 2 + "!"
-          |  Recall       : refuted (finished in 3 ms on ruby 4.0.7, timeout: 1000 ms)""".stripMargin
+          |Refuted attacks:
+          |- Complexity    : 2nd degree polynomial
+          |  Attack string : "a" * 2 + "!"
+          |  Runtime attack: refuted (finished in 3 ms on ruby 4.0.7, timeout: 1000 ms)""".stripMargin
     )
 
-  test("Diagnostics.Unknown: refuted recalls require the unit mode"):
+  test("Diagnostics.Unknown: refuted attacks require the unit mode"):
     intercept[IllegalArgumentException]:
-      Diagnostics.Unknown("", "", Dialect.JavaScript, None, Diagnostics.ErrorKind.Timeout, Seq(refutedRecall), None)
+      Diagnostics.Unknown("", "", Dialect.JavaScript, None, Diagnostics.ErrorKind.Timeout, Seq(refutedAttack), None)
 
   test("Diagnostics.Unknown.from"):
     assertEquals(
       Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedRecall), new TimeoutException("foo")),
+        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedAttack), new TimeoutException("foo")),
       Diagnostics.Unknown(
         "",
         "",
         Dialect.JavaScript,
         Some(UnitMode.UTF16),
         Diagnostics.ErrorKind.Timeout,
-        Seq(refutedRecall),
+        Seq(refutedAttack),
         None
       )
     )
     assertEquals(
       Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedRecall), new CancelException("foo")),
+        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedAttack), new CancelException("foo")),
       Diagnostics.Unknown(
         "",
         "",
         Dialect.JavaScript,
         Some(UnitMode.UTF16),
         Diagnostics.ErrorKind.Cancel,
-        Seq(refutedRecall),
+        Seq(refutedAttack),
         None
       )
     )
     assertEquals(
       Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedRecall), new InvalidRegExpException("foo")),
+        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedAttack), new InvalidRegExpException("foo")),
       Diagnostics.Unknown(
         "",
         "",
         Dialect.JavaScript,
         Some(UnitMode.UTF16),
         Diagnostics.ErrorKind.InvalidRegExp("foo"),
-        Seq(refutedRecall),
+        Seq(refutedAttack),
         None
       )
     )
     assertEquals(
       Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedRecall), new UnsupportedException("foo")),
+        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedAttack), new UnsupportedException("foo")),
       Diagnostics.Unknown(
         "",
         "",
         Dialect.JavaScript,
         Some(UnitMode.UTF16),
         Diagnostics.ErrorKind.Unsupported("foo"),
-        Seq(refutedRecall),
+        Seq(refutedAttack),
         None
       )
     )
     assertEquals(
       Diagnostics.Unknown
-        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedRecall), new UnexpectedException("foo")),
+        .from("", "", Dialect.JavaScript, Some(UnitMode.UTF16), Seq(refutedAttack), new UnexpectedException("foo")),
       Diagnostics.Unknown(
         "",
         "",
         Dialect.JavaScript,
         Some(UnitMode.UTF16),
         Diagnostics.ErrorKind.Unexpected("foo"),
-        Seq(refutedRecall),
+        Seq(refutedAttack),
         None
       )
     )
@@ -257,4 +257,4 @@ class DiagnosticsSuite extends munit.FunSuite:
     assertEquals(Diagnostics.ErrorKind.Cancel.toString, "cancel")
     assertEquals(Diagnostics.ErrorKind.Unsupported("foo").toString, "unsupported (foo)")
     assertEquals(Diagnostics.ErrorKind.InvalidRegExp("foo").toString, "invalid RegExp (foo)")
-    assertEquals(Diagnostics.ErrorKind.RecallRefutationLimit.toString, "recall refutation limit")
+    assertEquals(Diagnostics.ErrorKind.RuntimeAttacksRefuted.toString, "runtime attacks refuted")

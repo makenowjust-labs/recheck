@@ -76,7 +76,7 @@ The following constructs are not supported.
 
 ## Approximations
 
-- Perl has caches of the super-linear matching that `recheck` does not model, so an attack that `recheck` reports may not work on Perl, and the recall validation checks whether it does.
+- Perl has caches of the super-linear matching that `recheck` does not model, so an attack that `recheck` reports may not work on Perl, and the runtime-attack verification checks whether it does.
 - Under `i`, Perl matches a character against its folding to several characters (e.g. `ß` against `ss`).
   Whether several nodes together match such a character depends on how Perl joins the nodes into a string on compiling, and `recheck` does not reproduce it.
   A non-capturing group and a class of one character or of a character and its case variants join (e.g. `(?:s)s`, `s[s]` and `[sS]s` match `ß`).
@@ -92,19 +92,19 @@ The following constructs are not supported.
 - Perl compiles a repetition of a fixed-length node with no captures inside (e.g. `(a)?`) into a counting node, which unsets the capture of the node when the repetition matches nothing (e.g. `^(?:(a)?b){2}\1$` does not match `"abba"`).
   `recheck` does not reproduce it, and such a repetition keeps the capture of an earlier iteration as the other repetitions do.
 
-## Recall Validation
+## Runtime-Attack Verification
 
 - Command: `perl -`, which reads the program from the standard input.
 - Matching: `=~`.
 - Engine limits: none.
 - Engine errors: none.
 - Environment variable: `RECHECK_PERL`.
-- Recall script: `perl recall.pl`.
+- Runtime-attack script: `perl runtime-attack.pl`.
 
 The program sets the C locale by `POSIX::setlocale` before compiling the pattern, so the result does not depend on the locale of the environment (e.g. `LC_ALL` or `LANG`).
 
 With the `literal` source, the program has the pattern as a `qr` literal.
-When the literal would interpolate a variable or run code (e.g. `$name`, `@{...}` or `(?{ ... })`), the recall validation is skipped and `recallValidation` is `null`, and `generate-recall-script` fails.
+When the literal would interpolate a variable or run code (e.g. `$name`, `@{...}` or `(?{ ... })`), the runtime-attack verification is skipped and `runtimeAttack` is `null`, and `generate-runtime-attack-script` fails.
 With the `string` source, the program builds the pattern from a string as `qr/$pattern/`.
 
 With `utf8`, the program has `use utf8`, and it sets the UTF-8 flag of the input string (and of a `string` pattern) by `utf8::upgrade`; without `utf8`, it has no `use utf8` and clears the flag by `utf8::downgrade`.

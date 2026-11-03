@@ -84,7 +84,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.recheck.data.*
       |import codes.quine.labs.recheck.diagnostics.*
       |import codes.quine.labs.recheck.fuzz.*
-      |import codes.quine.labs.recheck.recall.*
+      |import codes.quine.labs.recheck.verification.*
       |import codes.quine.labs.recheck.util.*
       |import codes.quine.labs.recheck.vm.*
       |import codes.quine.labs.resyntax.ast.Dialect
@@ -153,15 +153,15 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |  val ir = parse(source, flags, dialect)
       |  time("seed")(StaticSeeder.seed(ir, maxSimpleRepeatSize, maxInitialGenerationSize, limit))
       |
-      |def validate(
+      |def verify(
       |    source: String,
       |    flags: String,
       |    attack: AttackPattern,
       |    timeout: Duration = Duration(1, SECONDS),
       |    dialect: Dialect = Dialect.JavaScript
-      |)(using ctx: Context): Option[RecallValidation] =
+      |)(using ctx: Context): Option[RuntimeAttack] =
       |  val ir = parse(source, flags, dialect)
-      |  time("validate")(RecallValidator.validate(source, flags, dialect, ir.mode, attack, timeout))
+      |  time("verify")(RuntimeAttackVerifier.verify(source, flags, dialect, ir.mode, attack, timeout, sys.env))
       |
       |""".stripMargin + ParametersGen.consoleCheck((ThisBuild / baseDirectory).value),
     // Settings for test:

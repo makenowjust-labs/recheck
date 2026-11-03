@@ -48,19 +48,19 @@ The following constructs are not supported, and they are reported as `unsupporte
 
 ## Approximations
 
-- .NET has optimizations that `recheck` does not model, so an attack that `recheck` reports may not work on .NET, and the recall validation checks whether it does.
+- .NET has optimizations that `recheck` does not model, so an attack that `recheck` reports may not work on .NET, and the runtime-attack verification checks whether it does.
 
-## Recall Validation
+## Runtime-Attack Verification
 
-- Command: `dotnet run <dir>/RecheckRecall-<hash>.cs`.
+- Command: `dotnet run <dir>/RecheckRuntimeAttack-<hash>.cs`.
 - Matching: `Regex.Match`.
 - Engine limits: none.
 - Engine errors: `OutOfMemoryException`, `InsufficientExecutionStackException`.
 - Environment variable: `RECHECK_DOTNET`.
-- Recall script: `dotnet run recall.cs`.
+- Runtime-attack script: `dotnet run runtime-attack.cs`.
 
 `dotnet` needs the .NET 10 SDK for `dotnet run` of a file.
 It runs a fixed program reading the pattern and the attack string from the standard input, so `dotnet` builds and caches the program only once.
-`recheck` writes the program file once into its directory in the temporary directory (see [Program Files](../recall-validation.md#program-files)), so a command in a container needs the directory mounted at the same path.
+`recheck` writes the program file once into its directory in the temporary directory (see [Program Files](../runtime-attack-verification.md#program-files)), so a command in a container needs the directory mounted at the same path.
 The program sets the invariant culture (`CultureInfo.CurrentCulture`) before compiling the pattern, so the result does not depend on the locale of the environment (e.g. `LC_ALL` or `LANG`).
-The recall script has the pattern and the attack string in itself.
+The runtime-attack script has the pattern and the attack string in itself.

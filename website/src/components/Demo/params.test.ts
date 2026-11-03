@@ -18,7 +18,7 @@ describe("parseParams", () => {
     expect(parsed.logger).toBe("off");
     expect(parsed.timeout).toBe(10000);
     expect(parsed.heatRatio).toBe(0.001);
-    expect(parsed.recallTimeout).toBe(-1000);
+    expect(parsed.runtimeAttackTimeout).toBe(-1000);
     expect(parsed.dialect).toEqual({ name: "javascript" });
     expect(Object.keys(parsed).sort()).toEqual(
       paramsOf(dev)

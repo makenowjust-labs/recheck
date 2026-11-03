@@ -55,17 +55,17 @@ The following constructs are not supported.
 
 ## Approximations
 
-- PCRE2 has auto-possessification and JIT that `recheck` does not model, so an attack that `recheck` reports may not work on PCRE2, and the recall validation checks whether it does.
+- PCRE2 has auto-possessification and JIT that `recheck` does not model, so an attack that `recheck` reports may not work on PCRE2, and the runtime-attack verification checks whether it does.
 - PCRE2 skips the attempts that cannot match by its start-of-match optimizations (e.g. `(*COMMIT)abc` matches `xyzabc` in PCRE2, unless the pattern starts with `(*NO_START_OPT)`), and `recheck` does not model them.
 
-## Recall Validation
+## Runtime-Attack Verification
 
 - Command: `php`, which reads the program from the standard input.
 - Matching: `preg_match`.
 - Engine limits: the backtrack limit.
 - Engine errors: the recursion limit and the JIT stack limit.
 - Environment variable: `RECHECK_PHP`.
-- Recall script: `php recall.php`.
+- Runtime-attack script: `php runtime-attack.php`.
 
 The program runs with PHP's default settings of `pcre.backtrack_limit`, `pcre.recursion_limit` and `pcre.jit`, and the runtime name in the result shows them.
 With the default limits, an exponential match usually ends with the backtrack limit.

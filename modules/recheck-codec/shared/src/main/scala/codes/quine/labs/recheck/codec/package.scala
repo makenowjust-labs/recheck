@@ -19,9 +19,9 @@ import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labs.recheck.diagnostics.Hotspot
-import codes.quine.labs.recheck.diagnostics.RecallResult
-import codes.quine.labs.recheck.diagnostics.RecallValidation
-import codes.quine.labs.recheck.diagnostics.RefutedRecall
+import codes.quine.labs.recheck.diagnostics.RefutedAttack
+import codes.quine.labs.recheck.diagnostics.RuntimeAttack
+import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
@@ -33,7 +33,7 @@ package object codec
 /** An `Encoder` for `Diagnostics`. */
 given encodeDiagnostics: Encoder[Diagnostics] with
   def apply(d: Diagnostics): Json = d match
-    case Diagnostics.Safe(source, flags, dialect, unitMode, complexity, refutedRecalls, checker) =>
+    case Diagnostics.Safe(source, flags, dialect, unitMode, complexity, refutedAttacks, checker) =>
       Json.obj(
         "source" := source,
         "flags" := flags,
@@ -41,7 +41,7 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "unitMode" := unitMode,
         "status" := "safe",
         "complexity" := complexity.asInstanceOf[AttackComplexity],
-        "refutedRecalls" := refutedRecalls.map(encodeRefutedRecall(dialect, unitMode)(_)),
+        "refutedAttacks" := refutedAttacks.map(encodeRefutedAttack(dialect, unitMode)(_)),
         "checker" := checker
       )
     case Diagnostics.Vulnerable(
@@ -52,8 +52,8 @@ given encodeDiagnostics: Encoder[Diagnostics] with
           complexity,
           attack,
           hotspot,
-          recallValidation,
-          refutedRecalls,
+          runtimeAttack,
+          refutedAttacks,
           checker
         ) =>
       Json.obj(
@@ -65,11 +65,11 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "complexity" := complexity.asInstanceOf[AttackComplexity],
         "attack" -> encodeAttackPattern(dialect, unitMode)(attack),
         "hotspot" := hotspot,
-        "recallValidation" := recallValidation,
-        "refutedRecalls" := refutedRecalls.map(encodeRefutedRecall(dialect, unitMode)(_)),
+        "runtimeAttack" := runtimeAttack,
+        "refutedAttacks" := refutedAttacks.map(encodeRefutedAttack(dialect, unitMode)(_)),
         "checker" := (checker: Checker)
       )
-    case Diagnostics.Unknown(source, flags, dialect, unitMode, error, refutedRecalls, checker) =>
+    case Diagnostics.Unknown(source, flags, dialect, unitMode, error, refutedAttacks, checker) =>
       Json.obj(
         "source" := source,
         "flags" := flags,
@@ -77,7 +77,7 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "unitMode" := unitMode,
         "status" := "unknown",
         "error" := error,
-        "refutedRecalls" := refutedRecalls.map(encodeRefutedRecall(dialect, unitMode.get)(_)),
+        "refutedAttacks" := refutedAttacks.map(encodeRefutedAttack(dialect, unitMode.get)(_)),
         "checker" := checker
       )
 
@@ -184,15 +184,15 @@ def encodeAttackPattern(dialect: Dialect, mode: UnitMode): Encoder[AttackPattern
       "pattern" := p.toString(style)
     )
 
-/** Returns an `Encoder` for `RefutedRecall` of the unit mode, whose `attack` is in the style of the dialect. */
-def encodeRefutedRecall(dialect: Dialect, mode: UnitMode): Encoder[RefutedRecall] =
+/** Returns an `Encoder` for `RefutedAttack` of the unit mode, whose `attack` is in the style of the dialect. */
+def encodeRefutedAttack(dialect: Dialect, mode: UnitMode): Encoder[RefutedAttack] =
   given Encoder[AttackPattern] = encodeAttackPattern(dialect, mode)
-  (r: RefutedRecall) =>
+  (r: RefutedAttack) =>
     Json.obj(
       "complexity" := r.complexity.asInstanceOf[AttackComplexity],
       "attack" := r.attack,
       "hotspot" := r.hotspot,
-      "recallValidation" := r.recallValidation
+      "runtimeAttack" := r.runtimeAttack
     )
 
 /** An `Encoder` for `Hotspot`. */
@@ -202,9 +202,9 @@ given encodeHotspot: Encoder[Hotspot] with
       case Hotspot.Spot(s, e, t) => Json.obj("start" := s, "end" := e, "temperature" := t.toString)
     Json.arr(spots*)
 
-/** An `Encoder` for `RecallValidation`. */
-given encodeRecallValidation: Encoder[RecallValidation] with
-  def apply(r: RecallValidation): Json =
+/** An `Encoder` for `RuntimeAttack`. */
+given encodeRuntimeAttack: Encoder[RuntimeAttack] with
+  def apply(r: RuntimeAttack): Json =
     val timeout = r.timeout match
       case d: FiniteDuration => d.toMillis.asJson
       case _                 => Json.Null
@@ -215,13 +215,13 @@ given encodeRecallValidation: Encoder[RecallValidation] with
       "isConfirmed" := r.isConfirmed
     )
 
-/** An `Encoder` for `RecallResult`. */
-given encodeRecallResult: Encoder[RecallResult] with
-  def apply(r: RecallResult): Json = r match
-    case RecallResult.Finish(time)         => Json.obj("kind" := "finish", "time" := time.toMillis)
-    case RecallResult.Timeout              => Json.obj("kind" := "timeout")
-    case RecallResult.EngineLimit(message) => Json.obj("kind" := "engine-limit", "message" := message)
-    case RecallResult.EngineError(message) => Json.obj("kind" := "engine-error", "message" := message)
+/** An `Encoder` for `RuntimeAttackResult`. */
+given encodeRuntimeAttackResult: Encoder[RuntimeAttackResult] with
+  def apply(r: RuntimeAttackResult): Json = r match
+    case RuntimeAttackResult.Finish(time)         => Json.obj("kind" := "finish", "time" := time.toMillis)
+    case RuntimeAttackResult.Timeout              => Json.obj("kind" := "timeout")
+    case RuntimeAttackResult.EngineLimit(message) => Json.obj("kind" := "engine-limit", "message" := message)
+    case RuntimeAttackResult.EngineError(message) => Json.obj("kind" := "engine-error", "message" := message)
 
 /** An `Encoder` for `ErrorKind`. */
 given encodeErrorKind: Encoder[ErrorKind] with
@@ -234,8 +234,8 @@ given encodeErrorKind: Encoder[ErrorKind] with
       Json.obj("kind" := "unsupported", "message" := message)
     case ErrorKind.InvalidRegExp(message) =>
       Json.obj("kind" := "invalid", "message" := message)
-    case ErrorKind.RecallRefutationLimit =>
-      Json.obj("kind" := "recall-refutation-limit")
+    case ErrorKind.RuntimeAttacksRefuted =>
+      Json.obj("kind" := "runtime-attacks-refuted")
     case ErrorKind.Unexpected(message) =>
       Json.obj("kind" := "unexpected", "message" := message)
 

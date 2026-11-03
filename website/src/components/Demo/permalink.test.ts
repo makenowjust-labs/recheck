@@ -68,8 +68,8 @@ describe("makeSnapshot", () => {
         pattern: "'a'.repeat(1000) + '\\x00'",
       },
       hotspot: [{ start: 2, end: 5, temperature: "heat" }],
-      recallValidation: null,
-      refutedRecalls: [],
+      runtimeAttack: null,
+      refutedAttacks: [],
     };
     expect(snapshot("/^(a|a)*$/", diagnostics)).toEqual(vulnerable);
   });
@@ -83,7 +83,7 @@ describe("makeSnapshot", () => {
       status: "safe",
       checker: "automaton",
       complexity: { type: "safe", summary: "safe", isFuzz: false },
-      refutedRecalls: [],
+      refutedAttacks: [],
     };
     expect(snapshot("/a/", diagnostics)).toEqual(safe);
   });
@@ -103,7 +103,7 @@ describe("makeSnapshot", () => {
       unitMode: null,
       status: "unknown",
       error: { kind: "timeout" },
-      refutedRecalls: [],
+      refutedAttacks: [],
     };
     expect(snapshot("/a/", unknown).result).toEqual({
       status: "unknown",

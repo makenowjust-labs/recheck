@@ -1,4 +1,4 @@
-package codes.quine.labs.recheck.recall
+package codes.quine.labs.recheck.verification
 
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
@@ -16,19 +16,21 @@ import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
-/** RecallProgram is a script for the runtime of a dialect, which matches the pattern against the attack string once.
+/** RuntimeAttackProgram is a script for the runtime of a dialect, which matches the pattern against the attack string
+  * once.
   *
   * The script is the input of the executor: the program, or the data of the program file of the executor. The program
   * prints these lines to the standard output:
-  *   - [[RecallProgram.RuntimeLine]] with the runtime name and version,
-  *   - [[RecallProgram.StartLine]] just before the matching, from which the timeout counts,
-  *   - [[RecallProgram.TimeLine]] with the matching time in milliseconds, [[RecallProgram.EngineLimitLine]] with the
-  *     message if the engine stops on its limit of the matching steps, or [[RecallProgram.EngineErrorLine]] with the
-  *     message if the engine gives up with an error on the stack depth or the memory.
+  *   - [[RuntimeAttackProgram.RuntimeLine]] with the runtime name and version,
+  *   - [[RuntimeAttackProgram.StartLine]] just before the matching, from which the timeout counts,
+  *   - [[RuntimeAttackProgram.TimeLine]] with the matching time in milliseconds,
+  *     [[RuntimeAttackProgram.EngineLimitLine]] with the message if the engine stops on its limit of the matching
+  *     steps, or [[RuntimeAttackProgram.EngineErrorLine]] with the message if the engine gives up with an error on the
+  *     stack depth or the memory.
   */
-final case class RecallProgram(executor: Executor, script: String)
+final case class RuntimeAttackProgram(executor: Executor, script: String)
 
-object RecallProgram:
+object RuntimeAttackProgram:
 
   val RuntimeLine: String = "recheck:runtime"
 
@@ -49,7 +51,7 @@ object RecallProgram:
       dialect: Dialect,
       mode: UnitMode,
       attack: AttackPattern
-  ): Either[String, RecallProgram] =
+  ): Either[String, RuntimeAttackProgram] =
     val pattern = encodeSource(source, dialect, mode)
     dialect match
       case Dialect.JavaScript        => Right(javascript(pattern, flags, mode, attack))
@@ -97,13 +99,13 @@ object RecallProgram:
 
   /** Returns the file name of the standalone program of the dialect. */
   private def scriptName(dialect: Dialect): String = dialect match
-    case Dialect.JavaScript => "recall.cjs"
-    case _: Dialect.Python  => "recall.py"
-    case _: Dialect.Ruby    => "recall.rb"
-    case Dialect.Java       => "recall.java"
-    case Dialect.DotNet     => "recall.cs"
-    case _: Dialect.Perl    => "recall.pl"
-    case Dialect.PCRE       => "recall.php"
+    case Dialect.JavaScript => "runtime-attack.cjs"
+    case _: Dialect.Python  => "runtime-attack.py"
+    case _: Dialect.Ruby    => "runtime-attack.rb"
+    case Dialect.Java       => "runtime-attack.java"
+    case Dialect.DotNet     => "runtime-attack.cs"
+    case _: Dialect.Perl    => "runtime-attack.pl"
+    case Dialect.PCRE       => "runtime-attack.php"
 
   /** Returns a Java expression of the data, which is a join of literals for a long data. */
   private def javaString(data: String): String =
@@ -118,7 +120,7 @@ object RecallProgram:
   private def quote(data: String): String = "\"" + data.replace("\n", "\\n") + "\""
 
   /** Returns the JavaScript program for `node`. */
-  private def javascript(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RecallProgram =
+  private def javascript(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RuntimeAttackProgram =
     val style = AttackPatternStyle.JavaScript(unicode = mode == UnitMode.CodePoint)
     val sourceString = style.literal(pattern)
     val flagsString = style.literal(mode.decode(flags))
@@ -139,10 +141,10 @@ object RecallProgram:
           |}
           |writeSync(1, '$TimeLine ' + Math.floor(performance.now() - start) + '\\n');
           |""".stripMargin
-    RecallProgram(NodeExecutor, script)
+    RuntimeAttackProgram(NodeExecutor, script)
 
   /** Returns the Python program for `python3`, using `re.search` in the C locale. */
-  private def python(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RecallProgram =
+  private def python(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RuntimeAttackProgram =
     val style = AttackPatternStyle.Python(bytes = mode == UnitMode.Byte)
     val options = flags.distinct.collect:
       case c @ ('i' | 'm' | 's' | 'x' | 'a' | 'u' | 'L') => s"re.${c.toUpper}"
@@ -163,10 +165,10 @@ object RecallProgram:
           |    sys.exit(0)
           |sys.stdout.write('$TimeLine ' + str((time.perf_counter_ns() - start) // 1000000) + '\\n')
           |""".stripMargin
-    RecallProgram(PythonExecutor, script)
+    RuntimeAttackProgram(PythonExecutor, script)
 
   /** Returns the Ruby program for `ruby`, using `Regexp#match?` without `Regexp.timeout`. */
-  private def ruby(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RecallProgram =
+  private def ruby(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RuntimeAttackProgram =
     val style = AttackPatternStyle.Ruby(bytes = mode == UnitMode.Byte)
     // The character set options `a`, `d` and `u` have no `Regexp` option, but have the inline options, the last of
     // which wins.
@@ -196,23 +198,26 @@ object RecallProgram:
           |end
           |puts "$TimeLine #{Process.clock_gettime(Process::CLOCK_MONOTONIC, :millisecond) - start}"
           |""".stripMargin
-    RecallProgram(RubyExecutor, script)
+    RuntimeAttackProgram(RubyExecutor, script)
 
   /** Returns the data for the Java program for `java` as a single-file source program, using `Matcher#find`. */
-  private def java(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RecallProgram =
+  private def java(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RuntimeAttackProgram =
     val options = flags.distinct.filter(c => "cdimsuxU".contains(c))
-    RecallProgram(JavaExecutor(JavaSource), encodeData(options, pattern, mode, attack))
+    RuntimeAttackProgram(JavaExecutor(JavaSource), encodeData(options, pattern, mode, attack))
 
   /** The Java program, which reads the data of [[encodeData]] from the standard input. */
   private val JavaSource: SourceFile =
-    SourceFile("RecheckRecall.java", javaProgram("new String(System.in.readAllBytes(), StandardCharsets.US_ASCII)"))
+    SourceFile(
+      "RecheckRuntimeAttack.java",
+      javaProgram("new String(System.in.readAllBytes(), StandardCharsets.US_ASCII)")
+    )
 
   /** Returns the Java program reading the data of [[encodeData]] from the expression. */
   private def javaProgram(data: String): String =
     s"""|import java.nio.charset.StandardCharsets;
         |import java.util.regex.Pattern;
         |
-        |class RecheckRecall {
+        |class RecheckRuntimeAttack {
         |  static String decode(String hex) {
         |    StringBuilder s = new StringBuilder(hex.length() / 4);
         |    for (int i = 0; i < hex.length(); i += 4) s.append((char) Integer.parseInt(hex.substring(i, i + 4), 16));
@@ -260,13 +265,13 @@ object RecallProgram:
   /** Returns the data for the C# program for `dotnet run` (.NET 10 or later), using `Regex.Match` in the invariant
     * culture.
     */
-  private def dotnet(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RecallProgram =
+  private def dotnet(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RuntimeAttackProgram =
     val options = flags.distinct.filter(c => "imnsx".contains(c))
-    RecallProgram(DotNetExecutor(DotNetSource), encodeData(options, pattern, mode, attack))
+    RuntimeAttackProgram(DotNetExecutor(DotNetSource), encodeData(options, pattern, mode, attack))
 
   /** The C# program, which reads the data of [[encodeData]] from the standard input. */
   private val DotNetSource: SourceFile =
-    SourceFile("RecheckRecall.cs", dotnetProgram("Console.In.ReadToEnd()"))
+    SourceFile("RecheckRuntimeAttack.cs", dotnetProgram("Console.In.ReadToEnd()"))
 
   /** Returns the C# program reading the data of [[encodeData]] from the expression. */
   private def dotnetProgram(data: String): String =
@@ -358,7 +363,7 @@ object RecallProgram:
       dialect: Dialect.Perl,
       mode: UnitMode,
       attack: AttackPattern
-  ): Either[String, RecallProgram] =
+  ): Either[String, RuntimeAttackProgram] =
     // `qr` takes only these modifiers, and the others do not change a match.
     val modifiers = flags.filter(c => "msixpodualn".contains(c))
     val bytes = mode == UnitMode.Byte
@@ -397,7 +402,7 @@ object RecallProgram:
             |my $$matched = $$input =~ $$regex;
             |printf "$TimeLine %d\\n", (Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC()) - $$start) * 1000;
             |""".stripMargin
-      RecallProgram(PerlExecutor, script)
+      RuntimeAttackProgram(PerlExecutor, script)
 
   /** The delimiters of a Perl regex literal, which do not pair and keep interpolation. */
   private val PerlDelimiters: Seq[Char] = "/!,;~%&:=\"|^-".toSeq
@@ -431,7 +436,7 @@ object RecallProgram:
       flags: String,
       mode: UnitMode,
       attack: AttackPattern
-  ): Either[String, RecallProgram] =
+  ): Either[String, RuntimeAttackProgram] =
     PHPDelimiters
       .find(c => !source.contains(c))
       .toRight("The pattern cannot be a PHP regex, since it contains every delimiter")
@@ -466,7 +471,7 @@ object RecallProgram:
               |}
               |echo "$TimeLine ", $$time, "\\n";
               |""".stripMargin
-        RecallProgram(PHPExecutor, script)
+        RuntimeAttackProgram(PHPExecutor, script)
 
   /** The delimiters of a PHP regex, preferring printable ones. */
   private val PHPDelimiters: Seq[Char] = "/#~!%@;,|=:".toSeq ++ ((1 to 8) ++ (14 to 31)).map(_.toChar)

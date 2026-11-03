@@ -64,7 +64,7 @@ The following constructs are not supported, and they are reported as `unsupporte
 
 ## Approximations
 
-- Ruby has memoization (since Ruby 3.2) that `recheck` does not model, so an attack that `recheck` reports may not work on Ruby, and the recall validation checks whether it does.
+- Ruby has memoization (since Ruby 3.2) that `recheck` does not model, so an attack that `recheck` reports may not work on Ruby, and the runtime-attack verification checks whether it does.
 - Under `i`, `recheck` does not reproduce Onigmo's bugs in matching a character folded to several characters (e.g. `ß` and `ss`).
   For example, `(?<=ß)` and `(ß)\1` do not match `"ß"` and `"ßss"` in Ruby, but they do in `recheck`.
   Also, `[s]s` and `ßs` match `"ß"` and `"sß"` in Ruby, but not in `recheck`.
@@ -74,13 +74,13 @@ The following constructs are not supported, and they are reported as `unsupporte
   `recheck` takes such a pattern in `UTF-8` (e.g. it reports `(?<=a[[:lower:]])y` with `i` as invalid).
 - An iteration matching the empty string is not handled as Ruby does: Onigmo repeats copies of the node for a bounded repetition depending on the size of its compiled code, and it checks the captures in an empty iteration.
 
-## Recall Validation
+## Runtime-Attack Verification
 
 - Command: `ruby -`, which reads the program from the standard input.
 - Matching: `Regexp#match?` (no `Regexp.timeout`).
 - Engine limits: none.
 - Engine errors: `RegexpError`, `NoMemoryError`, `SystemStackError`.
 - Environment variable: `RECHECK_RUBY`.
-- Recall script: `ruby recall.rb`.
+- Runtime-attack script: `ruby runtime-attack.rb`.
 
 `ruby -` reads a program in the encoding of the locale, so the program starts with the magic comment `# encoding: UTF-8`.

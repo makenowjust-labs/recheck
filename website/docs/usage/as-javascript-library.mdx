@@ -192,7 +192,7 @@ There are four options to the `RECHECK_BACKEND` value.
 The `java` and `native` backends are the external CLI command backend. They have some better features than the `worker` and `pure` backend.
 
 - Supports the `signal` parameter to cancel checking. `worker` also supports this feature.
-- Supports recall validation. `worker` backend does not support this feature for now.
+- Supports runtime-attack verification. `worker` backend does not support this feature for now.
 - Checks in true asynchronous. Although we can use the `pure` as a backend of the asynchronous API, it blocks the process, unfortunately. However, `worker` does not.
 - Works with multiple threads. On the external CLI command backend, it can check multiple regular expressions at once.
 

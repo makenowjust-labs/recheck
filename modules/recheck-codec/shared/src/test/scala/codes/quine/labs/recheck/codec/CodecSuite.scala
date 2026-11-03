@@ -18,9 +18,9 @@ import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labs.recheck.diagnostics.Hotspot
-import codes.quine.labs.recheck.diagnostics.RecallResult
-import codes.quine.labs.recheck.diagnostics.RecallValidation
-import codes.quine.labs.recheck.diagnostics.RefutedRecall
+import codes.quine.labs.recheck.diagnostics.RefutedAttack
+import codes.quine.labs.recheck.diagnostics.RuntimeAttack
+import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
@@ -28,11 +28,11 @@ import codes.quine.labs.resyntax.charset.UnitMode
 
 class CodecSuite extends munit.FunSuite:
 
-  val refutedRecall: RefutedRecall = RefutedRecall(
+  val refutedAttack: RefutedAttack = RefutedAttack(
     AttackComplexity.Polynomial(2, false),
     AttackPattern(Seq((UnitMode.UTF16.decode(""), UnitMode.UTF16.decode("a"), 0)), UnitMode.UTF16.decode("!"), 2),
     Hotspot(Seq(Hotspot.Spot(0, 2, Hotspot.Heat))),
-    RecallValidation("python 3.15.0", Duration(1000, MILLISECONDS), RecallResult.Finish(Duration(3, MILLISECONDS)))
+    RuntimeAttack("python 3.15.0", Duration(1000, MILLISECONDS), RuntimeAttackResult.Finish(Duration(3, MILLISECONDS)))
   )
 
   test("codec.encodeDiagnostics"):
@@ -47,7 +47,7 @@ class CodecSuite extends munit.FunSuite:
         "unitMode" := "utf16",
         "status" := "safe",
         "complexity" := AttackComplexity.Linear.asInstanceOf[AttackComplexity],
-        "refutedRecalls" := Json.arr(),
+        "refutedAttacks" := Json.arr(),
         "checker" := Checker.Fuzz.asInstanceOf[Checker]
       )
     )
@@ -59,11 +59,11 @@ class CodecSuite extends munit.FunSuite:
           Dialect.Python(),
           UnitMode.CodePoint,
           AttackComplexity.Safe(true),
-          Seq(refutedRecall),
+          Seq(refutedAttack),
           Checker.Fuzz
         )
-      ).hcursor.downField("refutedRecalls").focus,
-      Some(Json.arr(encodeRefutedRecall(Dialect.Python(), UnitMode.CodePoint)(refutedRecall)))
+      ).hcursor.downField("refutedAttacks").focus,
+      Some(Json.arr(encodeRefutedAttack(Dialect.Python(), UnitMode.CodePoint)(refutedAttack)))
     )
     assertEquals(
       encodeDiagnostics(
@@ -99,12 +99,12 @@ class CodecSuite extends munit.FunSuite:
           )
         ),
         "hotspot" := Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat), Hotspot.Spot(3, 4, Hotspot.Heat))),
-        "recallValidation" := Json.Null,
-        "refutedRecalls" := Json.arr(),
+        "runtimeAttack" := Json.Null,
+        "refutedAttacks" := Json.arr(),
         "checker" := Checker.Automaton.asInstanceOf[Checker]
       )
     )
-    val recall = RecallValidation("python 3.15.0", Duration(1000, MILLISECONDS), RecallResult.Timeout)
+    val runtimeAttack = RuntimeAttack("python 3.15.0", Duration(1000, MILLISECONDS), RuntimeAttackResult.Timeout)
     assertEquals(
       encodeDiagnostics(
         Diagnostics.Vulnerable(
@@ -115,12 +115,12 @@ class CodecSuite extends munit.FunSuite:
           AttackComplexity.Exponential(false),
           AttackPattern(Seq.empty, UnitMode.UTF16.decode(""), 0),
           Hotspot(Seq.empty),
-          Some(recall),
+          Some(runtimeAttack),
           Seq.empty,
           Checker.Automaton
         )
-      ).hcursor.downField("recallValidation").focus,
-      Some(encodeRecallValidation(recall))
+      ).hcursor.downField("runtimeAttack").focus,
+      Some(encodeRuntimeAttack(runtimeAttack))
     )
     assertEquals(
       encodeDiagnostics(
@@ -133,7 +133,7 @@ class CodecSuite extends munit.FunSuite:
         "unitMode" := Json.Null,
         "status" := "unknown",
         "error" := ErrorKind.InvalidRegExp("unknown flag").asInstanceOf[ErrorKind],
-        "refutedRecalls" := Json.arr(),
+        "refutedAttacks" := Json.arr(),
         "checker" := None
       )
     )
@@ -144,8 +144,8 @@ class CodecSuite extends munit.FunSuite:
           "",
           Dialect.JavaScript,
           Some(UnitMode.UTF16),
-          ErrorKind.RecallRefutationLimit,
-          Seq(refutedRecall),
+          ErrorKind.RuntimeAttacksRefuted,
+          Seq(refutedAttack),
           Some(Checker.Fuzz)
         )
       ),
@@ -155,15 +155,15 @@ class CodecSuite extends munit.FunSuite:
         "dialect" := Json.obj("name" := "javascript"),
         "unitMode" := "utf16",
         "status" := "unknown",
-        "error" := Json.obj("kind" := "recall-refutation-limit"),
-        "refutedRecalls" := Json.arr(encodeRefutedRecall(Dialect.JavaScript, UnitMode.UTF16)(refutedRecall)),
+        "error" := Json.obj("kind" := "runtime-attacks-refuted"),
+        "refutedAttacks" := Json.arr(encodeRefutedAttack(Dialect.JavaScript, UnitMode.UTF16)(refutedAttack)),
         "checker" := "fuzz"
       )
     )
 
-  test("codec.encodeRefutedRecall"):
+  test("codec.encodeRefutedAttack"):
     assertEquals(
-      encodeRefutedRecall(Dialect.Python(), UnitMode.CodePoint)(refutedRecall),
+      encodeRefutedAttack(Dialect.Python(), UnitMode.CodePoint)(refutedAttack),
       Json.obj(
         "complexity" := Json.obj(
           "type" := "polynomial",
@@ -179,7 +179,7 @@ class CodecSuite extends munit.FunSuite:
           "pattern" := "'a' * 2 + '!'"
         ),
         "hotspot" := Json.arr(Json.obj("start" := 0, "end" := 2, "temperature" := "heat")),
-        "recallValidation" := Json.obj(
+        "runtimeAttack" := Json.obj(
           "runtime" := "python 3.15.0",
           "timeout" := 1000,
           "result" := Json.obj("kind" := "finish", "time" := 3),
@@ -262,9 +262,9 @@ class CodecSuite extends munit.FunSuite:
       Json.arr(Json.obj("start" := 1, "end" := 2, "temperature" := "heat"))
     )
 
-  test("codec.encodeRecallValidation"):
+  test("codec.encodeRuntimeAttack"):
     assertEquals(
-      encodeRecallValidation(RecallValidation("node v26.11.1", Duration(1000, MILLISECONDS), RecallResult.Timeout)),
+      encodeRuntimeAttack(RuntimeAttack("node v26.11.1", Duration(1000, MILLISECONDS), RuntimeAttackResult.Timeout)),
       Json.obj(
         "runtime" := "node v26.11.1",
         "timeout" := 1000,
@@ -273,8 +273,8 @@ class CodecSuite extends munit.FunSuite:
       )
     )
     assertEquals(
-      encodeRecallValidation(
-        RecallValidation("ruby 4.0.7", Duration.Inf, RecallResult.Finish(Duration(3, MILLISECONDS)))
+      encodeRuntimeAttack(
+        RuntimeAttack("ruby 4.0.7", Duration.Inf, RuntimeAttackResult.Finish(Duration(3, MILLISECONDS)))
       ),
       Json.obj(
         "runtime" := "ruby 4.0.7",
@@ -284,11 +284,11 @@ class CodecSuite extends munit.FunSuite:
       )
     )
     assertEquals(
-      encodeRecallResult(RecallResult.EngineLimit("Backtrack limit exhausted")),
+      encodeRuntimeAttackResult(RuntimeAttackResult.EngineLimit("Backtrack limit exhausted")),
       Json.obj("kind" := "engine-limit", "message" := "Backtrack limit exhausted")
     )
     assertEquals(
-      encodeRecallResult(RecallResult.EngineError("StackOverflowError")),
+      encodeRuntimeAttackResult(RuntimeAttackResult.EngineError("StackOverflowError")),
       Json.obj("kind" := "engine-error", "message" := "StackOverflowError")
     )
 
@@ -297,7 +297,7 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(encodeErrorKind(ErrorKind.Cancel), Json.obj("kind" := "cancel"))
     assertEquals(encodeErrorKind(ErrorKind.Unsupported("foo")), Json.obj("kind" := "unsupported", "message" := "foo"))
     assertEquals(encodeErrorKind(ErrorKind.InvalidRegExp("foo")), Json.obj("kind" := "invalid", "message" := "foo"))
-    assertEquals(encodeErrorKind(ErrorKind.RecallRefutationLimit), Json.obj("kind" := "recall-refutation-limit"))
+    assertEquals(encodeErrorKind(ErrorKind.RuntimeAttacksRefuted), Json.obj("kind" := "runtime-attacks-refuted"))
     assertEquals(encodeErrorKind(ErrorKind.Unexpected("foo")), Json.obj("kind" := "unexpected", "message" := "foo"))
 
   test("codec.encodeUString"):
@@ -346,7 +346,7 @@ class CodecSuite extends munit.FunSuite:
         Json.obj(
           "attackTimeout" := Json.Null,
           "incubationTimeout" := Json.Null,
-          "recallTimeout" := Json.Null,
+          "runtimeAttackTimeout" := Json.Null,
           "seedingTimeout" := Json.Null
         )
       ),
@@ -354,7 +354,7 @@ class CodecSuite extends munit.FunSuite:
         Parameters(
           attackTimeout = Duration.Inf,
           incubationTimeout = Duration.Inf,
-          recallTimeout = Duration.Inf,
+          runtimeAttackTimeout = Duration.Inf,
           seedingTimeout = Duration.Inf
         )
       )
@@ -388,7 +388,7 @@ class CodecSuite extends munit.FunSuite:
           "maxNFASize" := 123,
           "maxPatternSize" := 123,
           "dialect" := Json.obj("name" := "perl", "utf8" := false, "source" := "string"),
-          "maxRefutedRecalls" := 123
+          "maxRefutedAttacks" := 123
         )
       ),
       Right(
@@ -419,7 +419,7 @@ class CodecSuite extends munit.FunSuite:
           maxNFASize = 123,
           maxPatternSize = 123,
           dialect = Dialect.Perl(utf8 = false, source = PerlSource.String),
-          maxRefutedRecalls = 123
+          maxRefutedAttacks = 123
         )
       )
     )

@@ -101,8 +101,8 @@ class MainSuite extends munit.FunSuite:
       val result = Main.command.parse("/foo/" +: args)
       assert(clue(result).left.exists(_.errors == List(message)))
     assertEquals(
-      Main.command.parse(Seq("/foo/", "--max-refuted-recalls=3")),
-      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(maxRefutedRecalls = 3), json = false))
+      Main.command.parse(Seq("/foo/", "--max-refuted-attacks=3")),
+      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(maxRefutedAttacks = 3), json = false))
     )
     assertEquals(
       Main.command.parse(Seq("/foo/", "--max-degree=2", "--timeout=1s")),
@@ -118,8 +118,11 @@ class MainSuite extends munit.FunSuite:
       Main.command.parse(Seq("--json", "/foo/")),
       Right(Main.CheckAction(InputPattern("foo", ""), Parameters(), json = true))
     )
-    assertEquals(Main.command.parse(Seq("generate-recall-script", "-")), Right(Main.GenerateRecallScriptAction("-")))
-    assert(clue(Main.command.parse(Seq("generate-recall-script"))).isLeft)
+    assertEquals(
+      Main.command.parse(Seq("generate-runtime-attack-script", "-")),
+      Right(Main.GenerateRuntimeAttackScriptAction("-"))
+    )
+    assert(clue(Main.command.parse(Seq("generate-runtime-attack-script"))).isLeft)
     assertEquals(Main.command.parse(Seq("agent", "--thread-size=2")), Right(Main.BatchAction(2)))
     assertEquals(Main.command.parse(Seq("agent")), Right(Main.BatchAction(sys.runtime.availableProcessors())))
 
@@ -128,7 +131,7 @@ class MainSuite extends munit.FunSuite:
       runMain(Seq.empty),
       (
         "",
-        "Missing expected command (agent or generate-recall-script), or positional argument!\n\n" + Main.command.showHelp + "\n",
+        "Missing expected command (agent or generate-runtime-attack-script), or positional argument!\n\n" + Main.command.showHelp + "\n",
         2
       )
     )
@@ -170,7 +173,7 @@ class MainSuite extends munit.FunSuite:
     assertEquals((err, status), ("", 1))
     assertEquals(parse(out), Right(encodeDiagnostics(ReDoS.check("(a|a)*$", "", params))))
 
-  test("Main#run: generate-recall-script"):
+  test("Main#run: generate-runtime-attack-script"):
     // The input is the output of `--json`.
     def diagnostics(args: String*): Json =
       val (out, err, _) = runMain(Seq("--json", "--checker=automaton") ++ args)
@@ -183,27 +186,27 @@ class MainSuite extends munit.FunSuite:
       path.toFile.deleteOnExit()
       path.toString
 
-    def generate(json: String): (String, String, Int) = runMain(Seq("generate-recall-script", file(json)))
+    def generate(json: String): (String, String, Int) = runMain(Seq("generate-runtime-attack-script", file(json)))
 
     val js = diagnostics("/^(a|a)*$/")
     val (out, err, status) = generate(js.noSpaces)
     assertEquals((err, status), ("", 0))
-    assert(clue(out).startsWith("// Run: node recall.cjs\nconst "))
+    assert(clue(out).startsWith("// Run: node runtime-attack.cjs\nconst "))
     assert(clue(out).contains("const input = 'a'.repeat("))
     // `-` reads the standard input as UTF-8.
     val stdin = new ByteArrayInputStream(diagnostics("/^(é|é)*$/u").noSpaces.getBytes(StandardCharsets.UTF_8))
-    val (utf8, _, _) = runMain(Seq("generate-recall-script", "-"), stdin)
+    val (utf8, _, _) = runMain(Seq("generate-runtime-attack-script", "-"), stdin)
     assert(clue(utf8).contains("const re = new RegExp('^(é|é)*$', 'u');"))
 
     // The dialect with its settings comes from the `dialect` field.
     val (python, _, _) = generate(diagnostics("--dialect=python", "--python-type=bytes", "/^(a|a)*$/").noSpaces)
-    assert(clue(python).startsWith("# Run: python3 -I recall.py\n"))
+    assert(clue(python).startsWith("# Run: python3 -I runtime-attack.py\n"))
     assert(clue(python).contains("string = b'a' * "))
     val (java, _, _) = generate(diagnostics("--dialect=java", "/^(a|a)*$/").noSpaces)
-    assert(clue(java).startsWith("// Run: java --source 17 recall.java\n"))
+    assert(clue(java).startsWith("// Run: java --source 17 runtime-attack.java\n"))
     val perlArgs = Seq("--dialect=perl", "--perl-source=string", "--no-perl-utf8", "/^(a|a)*$x/")
     val (perl, _, _) = generate(diagnostics(perlArgs*).noSpaces)
-    assert(clue(perl).startsWith("# Run: perl recall.pl\n"))
+    assert(clue(perl).startsWith("# Run: perl runtime-attack.pl\n"))
     assert(clue(perl).contains("my $pattern = \"^(a|a)*\\$x\"; utf8::downgrade($pattern, 1);"))
     assert(clue(perl).contains("utf8::downgrade($input, 1);"))
 
@@ -234,5 +237,5 @@ class MainSuite extends munit.FunSuite:
       generate(perlLiteral.noSpaces),
       ("", "The pattern cannot be a Perl regex literal, which would interpolate a variable or run code\n", 1)
     )
-    val missing = runMain(Seq("generate-recall-script", "no such file.json"))
+    val missing = runMain(Seq("generate-runtime-attack-script", "no such file.json"))
     assertEquals(missing, ("", "No such file: no such file.json\n", 1))
