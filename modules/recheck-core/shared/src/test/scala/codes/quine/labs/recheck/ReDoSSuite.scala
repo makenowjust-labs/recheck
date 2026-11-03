@@ -14,9 +14,9 @@ import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.diagnostics.Hotspot.*
-import codes.quine.labs.recheck.diagnostics.RecallResult
-import codes.quine.labs.recheck.diagnostics.RecallValidation
-import codes.quine.labs.recheck.diagnostics.RefutedRecall
+import codes.quine.labs.recheck.diagnostics.RefutedAttack
+import codes.quine.labs.recheck.diagnostics.RuntimeAttack
+import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.PerlSource
@@ -329,7 +329,7 @@ class ReDoSSuite extends munit.FunSuite:
       Checker.Automaton
     )
 
-  test("ReDoS.validateCandidates"):
+  test("ReDoS.verifyCandidates"):
     def vulnerable(degree: Int): Diagnostics.Vulnerable =
       Diagnostics.Vulnerable(
         "^a*a*$",
@@ -358,85 +358,86 @@ class ReDoSSuite extends munit.FunSuite:
       Checker.Automaton
     )
 
-    def recall(result: RecallResult): Option[RecallValidation] = Some(RecallValidation("node v0", 1.second, result))
+    def runtimeAttack(result: RuntimeAttackResult): Option[RuntimeAttack] =
+      Some(RuntimeAttack("node v0", 1.second, result))
 
-    val finish = recall(RecallResult.Finish(1.millis))
-    val timeout = recall(RecallResult.Timeout)
+    val finish = runtimeAttack(RuntimeAttackResult.Finish(1.millis))
+    val timeout = runtimeAttack(RuntimeAttackResult.Timeout)
     var pulled = 0
-    var validated = 0
+    var verified = 0
 
-    def refuted(degree: Int): RefutedRecall =
+    def refuted(degree: Int): RefutedAttack =
       val d = vulnerable(degree)
-      RefutedRecall(d.complexity, d.attack, d.hotspot, finish.get)
+      RefutedAttack(d.complexity, d.attack, d.hotspot, finish.get)
 
-    // The candidates are of the degrees, and validation gives the results in order.
-    def validateCandidates(
+    // The candidates are of the degrees, and verification gives the results in order.
+    def verifyCandidates(
         degrees: Seq[Int],
-        results: Seq[Option[RecallValidation]],
-        maxRefutedRecalls: Int = 100
+        results: Seq[Option[RuntimeAttack]],
+        maxRefutedAttacks: Int = 100
     ): Diagnostics =
       pulled = 0
-      validated = 0
+      verified = 0
       val candidates = degrees.iterator.map: degree =>
         pulled += 1
         vulnerable(degree)
-      val validate = (d: Diagnostics.Vulnerable) =>
-        validated += 1
-        d.copy(recallValidation = results(validated - 1))
-      ReDoS.validateCandidates(candidates, () => safe, validate, mutable.ArrayBuffer.empty, maxRefutedRecalls)
+      val verify = (d: Diagnostics.Vulnerable) =>
+        verified += 1
+        d.copy(runtimeAttack = results(verified - 1))
+      ReDoS.verifyCandidates(candidates, () => safe, verify, mutable.ArrayBuffer.empty, maxRefutedAttacks)
 
     // The refuted ones are recorded, and the safe one is the final one when the candidates run out.
     assertEquals(
-      validateCandidates(Seq(3, 2), Seq(finish, finish)),
-      safe.copy(refutedRecalls = Seq(refuted(3), refuted(2)))
+      verifyCandidates(Seq(3, 2), Seq(finish, finish)),
+      safe.copy(refutedAttacks = Seq(refuted(3), refuted(2)))
     )
-    assertEquals(validateCandidates(Seq.empty, Seq.empty), safe)
-    // The first one not refuted by recall validation is the final one, and no more candidates are computed.
+    assertEquals(verifyCandidates(Seq.empty, Seq.empty), safe)
+    // The first one not refuted by runtime-attack verification is the final one, and no more candidates are computed.
     assertEquals(
-      validateCandidates(Seq(3, 2, 2), Seq(finish, timeout)),
-      vulnerable(2).copy(recallValidation = timeout, refutedRecalls = Seq(refuted(3)))
+      verifyCandidates(Seq(3, 2, 2), Seq(finish, timeout)),
+      vulnerable(2).copy(runtimeAttack = timeout, refutedAttacks = Seq(refuted(3)))
     )
     assertEquals(pulled, 2)
-    assertEquals(validateCandidates(Seq(3, 2), Seq(None)), vulnerable(3))
+    assertEquals(verifyCandidates(Seq(3, 2), Seq(None)), vulnerable(3))
     assertEquals(pulled, 1)
     // The attacks of the same complexity and hotspot as a refuted one are skipped.
     assertEquals(
-      validateCandidates(Seq(3, 3, 2), Seq(finish, timeout)),
-      vulnerable(2).copy(recallValidation = timeout, refutedRecalls = Seq(refuted(3)))
+      verifyCandidates(Seq(3, 3, 2), Seq(finish, timeout)),
+      vulnerable(2).copy(runtimeAttack = timeout, refutedAttacks = Seq(refuted(3)))
     )
-    assertEquals(validated, 2)
+    assertEquals(verified, 2)
 
-    // It stops at the limit of refuted recalls.
-    def limit(refutedRecalls: RefutedRecall*): Diagnostics.Unknown =
+    // It stops at the limit of refuted attacks.
+    def limit(refutedAttacks: RefutedAttack*): Diagnostics.Unknown =
       Diagnostics.Unknown(
         "^a*a*$",
         "",
         Dialect.JavaScript,
         Some(UnitMode.UTF16),
-        Diagnostics.ErrorKind.RecallRefutationLimit,
-        refutedRecalls,
+        Diagnostics.ErrorKind.RuntimeAttacksRefuted,
+        refutedAttacks,
         Some(Checker.Automaton)
       )
 
     assertEquals(
-      validateCandidates(Seq(4, 3, 2), Seq(finish, finish), maxRefutedRecalls = 2),
+      verifyCandidates(Seq(4, 3, 2), Seq(finish, finish), maxRefutedAttacks = 2),
       limit(refuted(4), refuted(3))
     )
     assertEquals(pulled, 2)
-    // A non-positive limit stops at the first refuted recall.
-    assertEquals(validateCandidates(Seq(3, 2), Seq(finish), maxRefutedRecalls = 0), limit(refuted(3)))
+    // A non-positive limit stops at the first refuted attack.
+    assertEquals(verifyCandidates(Seq(3, 2), Seq(finish), maxRefutedAttacks = 0), limit(refuted(3)))
 
     // The fuzz checker avoids the refuted attacks.
     val params =
       Parameters(checker = Checker.Fuzz, maxGeneStringSize = 1000, maxAttackStringSize = 1000, maxIteration = 2)
     val ir = ReDoS.parse("^(?:a|a)*$", "", params.dialect)
-    val refutedRecalls = mutable.ArrayBuffer.empty[RefutedRecall]
+    val refutedAttacks = mutable.ArrayBuffer.empty[RefutedAttack]
     val (candidates, fuzzSafe) =
-      ReDoS.checkFuzz("^(?:a|a)*$", "", ir, params, ReDoS.isRefuted(refutedRecalls, _, _))
-    ReDoS.validateCandidates(candidates, fuzzSafe, _.copy(recallValidation = finish), refutedRecalls, 100) match
+      ReDoS.checkFuzz("^(?:a|a)*$", "", ir, params, ReDoS.isRefuted(refutedAttacks, _, _))
+    ReDoS.verifyCandidates(candidates, fuzzSafe, _.copy(runtimeAttack = finish), refutedAttacks, 100) match
       case d: Diagnostics.Safe =>
         assertEquals(
-          d.copy(refutedRecalls = Seq.empty),
+          d.copy(refutedAttacks = Seq.empty),
           Diagnostics.Safe(
             "^(?:a|a)*$",
             "",
@@ -447,24 +448,24 @@ class ReDoSSuite extends munit.FunSuite:
             Checker.Fuzz
           )
         )
-        assert(d.refutedRecalls.nonEmpty)
-        val keys = d.refutedRecalls.map(r => ReDoS.RecallKey(r.complexity, r.hotspot))
+        assert(d.refutedAttacks.nonEmpty)
+        val keys = d.refutedAttacks.map(r => ReDoS.AttackKey(r.complexity, r.hotspot))
         assertEquals(keys.distinct, keys)
       case d => fail(s"not safe: $d")
 
-  test("ReDoS.RecallKey"):
+  test("ReDoS.AttackKey"):
     val hotspot = Hotspot(Seq(Spot(0, 1, Normal), Spot(4, 5, Heat), Spot(6, 7, Heat)))
     assertEquals(
-      ReDoS.RecallKey(AttackComplexity.Exponential(true), hotspot),
-      ReDoS.RecallKey(None, Seq((4, 5), (6, 7)))
+      ReDoS.AttackKey(AttackComplexity.Exponential(true), hotspot),
+      ReDoS.AttackKey(None, Seq((4, 5), (6, 7)))
     )
     assertEquals(
-      ReDoS.RecallKey(AttackComplexity.Polynomial(2, false), hotspot),
-      ReDoS.RecallKey(AttackComplexity.Polynomial(2, true), Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))))
+      ReDoS.AttackKey(AttackComplexity.Polynomial(2, false), hotspot),
+      ReDoS.AttackKey(AttackComplexity.Polynomial(2, true), Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))))
     )
     assertNotEquals(
-      ReDoS.RecallKey(AttackComplexity.Polynomial(2, false), hotspot),
-      ReDoS.RecallKey(AttackComplexity.Polynomial(3, false), hotspot)
+      ReDoS.AttackKey(AttackComplexity.Polynomial(2, false), hotspot),
+      ReDoS.AttackKey(AttackComplexity.Polynomial(3, false), hotspot)
     )
 
   test("ReDoS.attackStyle"):

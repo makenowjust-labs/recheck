@@ -44,15 +44,15 @@ class ExecutorSuite extends munit.FunSuite:
 
   test("Executor#scriptCommandLine"):
     assertEquals(
-      executors.map(_.scriptCommandLine("recall")),
+      executors.map(_.scriptCommandLine("script")),
       Seq(
-        "node recall",
-        "python3 -I recall",
-        "ruby recall",
-        "java --source 17 recall",
-        "dotnet run recall",
-        "perl recall",
-        "php recall"
+        "node script",
+        "python3 -I script",
+        "ruby script",
+        "java --source 17 script",
+        "dotnet run script",
+        "perl script",
+        "php script"
       )
     )
 

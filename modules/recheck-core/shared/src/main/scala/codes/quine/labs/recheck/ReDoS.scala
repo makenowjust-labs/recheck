@@ -19,10 +19,10 @@ import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.DiagnosticsIteratorUtil.*
 import codes.quine.labs.recheck.diagnostics.Hotspot
-import codes.quine.labs.recheck.diagnostics.RefutedRecall
+import codes.quine.labs.recheck.diagnostics.RefutedAttack
 import codes.quine.labs.recheck.fuzz.FuzzChecker
 import codes.quine.labs.recheck.fuzz.FuzzProgram
-import codes.quine.labs.recheck.recall.RecallValidator
+import codes.quine.labs.recheck.verification.RuntimeAttackVerifier
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetException
@@ -42,11 +42,11 @@ object ReDoS:
 
   /** Tests whether the given RegExp pattern causes ReDoS.
     *
-    * The pattern and the flags are of `params.dialect`. The result is the first vulnerable diagnostics whose recall
-    * validation is not run or confirms the attack, or else the safe or unknown one, with the attacks refuted before it.
+    * The pattern and the flags are of `params.dialect`. The result is the first vulnerable diagnostics whose runtime
+    * attack is not run or confirms the attack, or else the safe or unknown one, with the attacks refuted before it.
     *
-    * An attack with the same complexity and hotspot as a refuted one is skipped. When recall validation refutes
-    * `maxRefutedRecalls` attacks, the result is unknown with [[Diagnostics.ErrorKind.RecallRefutationLimit]].
+    * An attack with the same complexity and hotspot as a refuted one is skipped. When runtime-attack verification
+    * refutes `maxRefutedAttacks` attacks, the result is unknown with [[Diagnostics.ErrorKind.RuntimeAttacksRefuted]].
     */
   def check(
       source: String,
@@ -57,70 +57,70 @@ object ReDoS:
     given ctx: Context = Context(params.timeout, token, params.logger)
 
     def diagnose(ir: IRPattern): Diagnostics =
-      val refutedRecalls = mutable.ArrayBuffer.empty[RefutedRecall]
-      val avoidsAttack = (c: AttackComplexity.Vulnerable, h: Hotspot) => isRefuted(refutedRecalls, c, h)
+      val refutedAttacks = mutable.ArrayBuffer.empty[RefutedAttack]
+      val avoidsAttack = (c: AttackComplexity.Vulnerable, h: Hotspot) => isRefuted(refutedAttacks, c, h)
       try
         val (candidates, safe) = params.checker match
           case Checker.Automaton => checkAutomaton(source, flags, ir, params)
           case Checker.Fuzz      => checkFuzz(source, flags, ir, params, avoidsAttack)
           case Checker.Auto      => checkAuto(source, flags, ir, params, avoidsAttack)
-        val validate = recallValidation(source, flags, params.dialect, ir.mode, params.recallTimeout)
-        validateCandidates(candidates, safe, validate, refutedRecalls, params.maxRefutedRecalls)
+        val verify = runRuntimeAttack(source, flags, params.dialect, ir.mode, params.runtimeAttackTimeout)
+        verifyCandidates(candidates, safe, verify, refutedAttacks, params.maxRefutedAttacks)
       catch
         case ex: ReDoSException =>
-          Diagnostics.Unknown.from(source, flags, params.dialect, Some(ir.mode), refutedRecalls.toSeq, ex)
+          Diagnostics.Unknown.from(source, flags, params.dialect, Some(ir.mode), refutedAttacks.toSeq, ex)
 
     try diagnose(parse(source, flags, params.dialect))
     catch case ex: ReDoSException => Diagnostics.Unknown.from(source, flags, params.dialect, None, Seq.empty, ex)
 
-  /** Runs `validate` on the candidates in order, and returns the final diagnostics of [[check]].
+  /** Runs `verify` on the candidates in order, and returns the final diagnostics of [[check]].
     *
-    * `safe` gives the final diagnostics after the candidates run out. `refutedRecalls` collects the attacks that recall
-    * validation refutes.
+    * `safe` gives the final diagnostics after the candidates run out. `refutedAttacks` collects the attacks that
+    * runtime attacks refute.
     */
-  private[recheck] def validateCandidates(
+  private[recheck] def verifyCandidates(
       candidates: Iterator[Diagnostics.Vulnerable],
       safe: () => Diagnostics.Safe,
-      validate: Diagnostics.Vulnerable => Diagnostics.Vulnerable,
-      refutedRecalls: mutable.Buffer[RefutedRecall],
-      maxRefutedRecalls: Int
+      verify: Diagnostics.Vulnerable => Diagnostics.Vulnerable,
+      refutedAttacks: mutable.Buffer[RefutedAttack],
+      maxRefutedAttacks: Int
   )(using ctx: Context): Diagnostics =
     val untried = candidates.filter: d =>
-      val skipped = isRefuted(refutedRecalls, d.complexity, d.hotspot)
-      if skipped then ctx.log("recall: skip the same attack as a refuted one")
+      val skipped = isRefuted(refutedAttacks, d.complexity, d.hotspot)
+      if skipped then ctx.log("runtime attack: skip the same attack as a refuted one")
       !skipped
 
     @tailrec
-    def validateNext(): Diagnostics =
-      if !untried.hasNext then safe().copy(refutedRecalls = refutedRecalls.toSeq)
+    def verifyNext(): Diagnostics =
+      if !untried.hasNext then safe().copy(refutedAttacks = refutedAttacks.toSeq)
       else
-        val d = validate(untried.next())
-        d.recallValidation match
+        val d = verify(untried.next())
+        d.runtimeAttack match
           case Some(r) if !r.isConfirmed =>
-            refutedRecalls += RefutedRecall(d.complexity, d.attack, d.hotspot, r)
-            if refutedRecalls.size < maxRefutedRecalls then validateNext()
+            refutedAttacks += RefutedAttack(d.complexity, d.attack, d.hotspot, r)
+            if refutedAttacks.size < maxRefutedAttacks then verifyNext()
             else
               Diagnostics.Unknown(
                 d.source,
                 d.flags,
                 d.dialect,
                 Some(d.unitMode),
-                Diagnostics.ErrorKind.RecallRefutationLimit,
-                refutedRecalls.toSeq,
+                Diagnostics.ErrorKind.RuntimeAttacksRefuted,
+                refutedAttacks.toSeq,
                 Some(d.checker)
               )
-          case _ => d.copy(refutedRecalls = refutedRecalls.toSeq)
+          case _ => d.copy(refutedAttacks = refutedAttacks.toSeq)
 
-    validateNext()
+    verifyNext()
 
   /** Whether an attack of the complexity and the hotspot is the same as a refuted one. */
   private[recheck] def isRefuted(
-      refutedRecalls: collection.Seq[RefutedRecall],
+      refutedAttacks: collection.Seq[RefutedAttack],
       complexity: AttackComplexity.Vulnerable,
       hotspot: Hotspot
   ): Boolean =
-    val key = RecallKey(complexity, hotspot)
-    refutedRecalls.exists(r => RecallKey(r.complexity, r.hotspot) == key)
+    val key = AttackKey(complexity, hotspot)
+    refutedAttacks.exists(r => AttackKey(r.complexity, r.hotspot) == key)
 
   /** Parses the pattern and the flags in the dialect, and builds its IR.
     *
@@ -152,18 +152,18 @@ object ReDoS:
       case ex: IRBuildingException        => throw new InvalidRegExpException(ex.getMessage)
       case ex: MultiFoldingLimitException => throw new UnsupportedException(ex.getMessage)
 
-  /** RecallKey identifies an attack on recall validation by the degree of the polynomial complexity (or `None` for the
-    * exponential one) and the hotspot.
+  /** AttackKey identifies an attack by the degree of the polynomial complexity (or `None` for the exponential one) and
+    * the hotspot.
     */
-  private[recheck] final case class RecallKey(degree: Option[Int], spots: Seq[(Int, Int)])
+  private[recheck] final case class AttackKey(degree: Option[Int], spots: Seq[(Int, Int)])
 
-  private[recheck] object RecallKey:
+  private[recheck] object AttackKey:
 
-    def apply(complexity: AttackComplexity.Vulnerable, hotspot: Hotspot): RecallKey =
+    def apply(complexity: AttackComplexity.Vulnerable, hotspot: Hotspot): AttackKey =
       val degree = complexity match
         case AttackComplexity.Polynomial(degree, _) => Some(degree)
         case AttackComplexity.Exponential(_)        => None
-      RecallKey(degree, hotspot.spots.collect { case Hotspot.Spot(s, e, Hotspot.Heat) => (s, e) })
+      AttackKey(degree, hotspot.spots.collect { case Hotspot.Spot(s, e, Hotspot.Heat) => (s, e) })
 
   /** Runs the automaton checker, and returns the vulnerable diagnostics it finds and a function giving the safe
     * diagnostics once they run out.
@@ -199,7 +199,7 @@ object ReDoS:
     val diagnostics = vulnerable
       .collect:
         case vul: Complexity.Vulnerable[UChar] =>
-          val attack = vul.buildAttackPattern(recallLimit, maxRecallStringSize)
+          val attack = vul.buildAttackPattern(runtimeAttackLimit, maxRuntimeAttackStringSize)
           Diagnostics.Vulnerable(
             source,
             flags,
@@ -225,8 +225,8 @@ object ReDoS:
   /** Runs the fuzz checker, and returns the vulnerable diagnostics it finds and a function giving the safe diagnostics
     * once they run out.
     *
-    * `avoidsAttack` tells whether the fuzz checker avoids an attack of the complexity and the hotspot, which recall
-    * validation refuted.
+    * `avoidsAttack` tells whether the fuzz checker avoids an attack of the complexity and the hotspot, which a runtime
+    * attack refuted.
     */
   private[recheck] def checkFuzz(
       source: String,
@@ -267,14 +267,14 @@ object ReDoS:
 
       results.map:
         case (complexity, attack, hotspot) =>
-          val recallAttack = attack.adjust(complexity, recallLimit, maxRecallStringSize)
+          val adjusted = attack.adjust(complexity, runtimeAttackLimit, maxRuntimeAttackStringSize)
           Diagnostics.Vulnerable(
             source,
             flags,
             params.dialect,
             ir.mode,
             complexity,
-            recallAttack,
+            adjusted,
             hotspot,
             None,
             Seq.empty,
@@ -305,8 +305,8 @@ object ReDoS:
         fuzz
     (diagnostics, () => safe())
 
-  /** Runs recall validation against a vulnerable diagnostics, and records the result in it. */
-  private[recheck] def recallValidation(
+  /** Runs the attack of a vulnerable diagnostics on the runtime of the dialect, and records the result in it. */
+  private[recheck] def runRuntimeAttack(
       source: String,
       flags: String,
       dialect: Dialect,
@@ -315,7 +315,7 @@ object ReDoS:
   )(
       d: Diagnostics.Vulnerable
   )(using ctx: Context): Diagnostics.Vulnerable =
-    try d.copy(recallValidation = RecallValidator.validate(source, flags, dialect, mode, d.attack, timeout, sys.env))
+    try d.copy(runtimeAttack = RuntimeAttackVerifier.verify(source, flags, dialect, mode, d.attack, timeout, sys.env))
     catch
       case ex: ReDoSException =>
         ex.checker = Some(d.checker)

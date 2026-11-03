@@ -284,25 +284,25 @@ properties:
     x-cli: "max-pattern-size"
     x-since: "1.1.1"
 
-  maxRecallStringSize:
-    title: "Max Recall String Size"
-    description: "The maximum length of the attack string on recall validation."
+  maxRuntimeAttackStringSize:
+    title: "Max Runtime Attack String Size"
+    description: "The maximum length of the attack string on runtime-attack verification."
     type: integer
     default: 300000
     x-scala-type: "Int"
-    x-cli: "max-recall-string-size"
+    x-cli: "max-runtime-attack-string-size"
     x-since: "4.2.0"
 
-  maxRefutedRecalls:
-    title: "Max Refuted Recalls"
+  maxRefutedAttacks:
+    title: "Max Refuted Attacks"
     description: |-
-      The maximum number of attacks that recall validation refutes.
+      The maximum number of attacks that runtime-attack verification refutes.
 
-      When it is reached, the checking stops, and the result is `unknown` with the `recall-refutation-limit` error.
+      When it is reached, the checking stops, and the result is `unknown` with the `runtime-attacks-refuted` error.
     type: integer
     default: 10
     x-scala-type: "Int"
-    x-cli: "max-refuted-recalls"
+    x-cli: "max-refuted-attacks"
     x-since: "5.0.0"
 
   maxRepeatCount:
@@ -341,28 +341,28 @@ properties:
     x-cli: "random-seed"
     x-since: "4.0.0"
 
-  recallLimit:
-    title: "Recall Limit"
-    description: "The upper limit on the number of characters read by the VM on the recall validation."
+  runtimeAttackLimit:
+    title: "Runtime Attack Limit"
+    description: "The upper limit on the number of characters read by the VM on the runtime-attack verification."
     type: integer
     default: 1500000000
     x-scala-type: "Int"
-    x-cli: "recall-limit"
+    x-cli: "runtime-attack-limit"
     x-since: "4.2.0"
 
-  recallTimeout:
-    title: "Recall Timeout"
+  runtimeAttackTimeout:
+    title: "Runtime Attack Timeout"
     description: |-
-      The upper limit of matching time on the recall validation.
+      The upper limit of matching time on the runtime-attack verification.
 
-      The recall validation runs the attack string on the real engine of the dialect (see [Recall Validation](/docs/usage/recall-validation)).
-      An attack string that the engine matches within this time is refuted: it is recorded in `refutedRecalls` of the diagnostics, and the checking goes on.
-      The recall validation is skipped if this value is not positive, or where commands cannot run (e.g. in the browser).
+      The runtime-attack verification runs the attack string on the real engine of the dialect (see [Runtime-Attack Verification](/docs/usage/runtime-attack-verification)).
+      An attack string that the engine matches within this time is refuted: it is recorded in `refutedAttacks` of the diagnostics, and the checking goes on.
+      The runtime-attack verification is skipped if this value is not positive, or where commands cannot run (e.g. in the browser).
     type: [integer, "null"]
     default: -1000
     x-unit: "milliseconds"
     x-scala-type: "Duration"
-    x-cli: "recall-timeout"
+    x-cli: "runtime-attack-timeout"
     x-since: "4.2.0"
 
   seeder:

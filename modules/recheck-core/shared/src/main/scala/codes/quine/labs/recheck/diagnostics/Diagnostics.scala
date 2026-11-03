@@ -24,7 +24,7 @@ object Diagnostics:
       dialect: Dialect,
       unitMode: UnitMode,
       complexity: AttackComplexity.Safe,
-      refutedRecalls: Seq[RefutedRecall],
+      refutedAttacks: Seq[RefutedAttack],
       checker: Checker
   ) extends Diagnostics:
 
@@ -33,7 +33,7 @@ object Diagnostics:
           |Dialect   : ${show(dialect)}
           |Status    : safe
           |Complexity: $complexity
-          |Checker   : $checker""".stripMargin + showRefutedRecalls(dialect, unitMode, refutedRecalls)
+          |Checker   : $checker""".stripMargin + showRefutedAttacks(dialect, unitMode, refutedAttacks)
 
   /** Vulnerable is an analysis result against a vulnerable RegExp. */
   final case class Vulnerable(
@@ -44,21 +44,21 @@ object Diagnostics:
       complexity: AttackComplexity.Vulnerable,
       attack: AttackPattern,
       hotspot: Hotspot,
-      recallValidation: Option[RecallValidation],
-      refutedRecalls: Seq[RefutedRecall],
+      runtimeAttack: Option[RuntimeAttack],
+      refutedAttacks: Seq[RefutedAttack],
       checker: Checker.Used
   ) extends Diagnostics:
 
     override def toString: String =
       val lines = Seq(
-        s"Input        : /$source/$flags",
-        s"Dialect      : ${show(dialect)}",
-        "Status       : vulnerable",
-        s"Complexity   : $complexity",
-        s"Attack string: ${attack.toString(AttackPatternStyle.of(dialect, unitMode))}",
-        s"Hotspot      : /${hotspot.highlight(source)}/$flags"
-      ) ++ recallValidation.map(r => s"Recall       : $r") :+ s"Checker      : $checker"
-      lines.mkString("\n") + showRefutedRecalls(dialect, unitMode, refutedRecalls)
+        s"Input         : /$source/$flags",
+        s"Dialect       : ${show(dialect)}",
+        "Status        : vulnerable",
+        s"Complexity    : $complexity",
+        s"Attack string : ${attack.toString(AttackPatternStyle.of(dialect, unitMode))}",
+        s"Hotspot       : /${hotspot.highlight(source)}/$flags"
+      ) ++ runtimeAttack.map(r => s"Runtime attack: $r") :+ s"Checker       : $checker"
+      lines.mkString("\n") + showRefutedAttacks(dialect, unitMode, refutedAttacks)
 
   /** Unknown is an analysis result against a RegExp in which vulnerability is unknown for some reason. */
   final case class Unknown(
@@ -68,11 +68,11 @@ object Diagnostics:
       /** The unit mode of the pattern, or `None` when the error happened on parsing the pattern. */
       unitMode: Option[UnitMode],
       error: ErrorKind,
-      refutedRecalls: Seq[RefutedRecall],
+      refutedAttacks: Seq[RefutedAttack],
       checker: Option[Checker]
   ) extends Diagnostics:
 
-    require(refutedRecalls.isEmpty || unitMode.isDefined, "refuted recalls without the unit mode")
+    require(refutedAttacks.isEmpty || unitMode.isDefined, "refuted attacks without the unit mode")
 
     override def toString: String =
       s"""|Input  : /$source/$flags
@@ -80,7 +80,7 @@ object Diagnostics:
           |Status : unknown
           |Error  : $error
           |Checker: ${checker.map(_.toString).getOrElse("(none)")}""".stripMargin +
-        unitMode.fold("")(showRefutedRecalls(dialect, _, refutedRecalls))
+        unitMode.fold("")(showRefutedAttacks(dialect, _, refutedAttacks))
 
   /** Unknown utilities. */
   object Unknown:
@@ -91,7 +91,7 @@ object Diagnostics:
         flags: String,
         dialect: Dialect,
         unitMode: Option[UnitMode],
-        refutedRecalls: Seq[RefutedRecall],
+        refutedAttacks: Seq[RefutedAttack],
         ex: ReDoSException
     ): Diagnostics =
       val kind = ex match
@@ -100,26 +100,26 @@ object Diagnostics:
         case ex: UnsupportedException   => ErrorKind.Unsupported(ex.getMessage)
         case ex: InvalidRegExpException => ErrorKind.InvalidRegExp(ex.getMessage)
         case ex: UnexpectedException    => ErrorKind.Unexpected(ex.getMessage)
-      Unknown(source, flags, dialect, unitMode, kind, refutedRecalls, ex.checker)
+      Unknown(source, flags, dialect, unitMode, kind, refutedAttacks, ex.checker)
 
-  /** Returns the section listing the refuted recalls after a blank line, or an empty string if there is none.
+  /** Returns the section listing the refuted attacks after a blank line, or an empty string if there is none.
     *
     * {{{
-    * Refuted recalls:
-    * - Complexity   : exponential
-    *   Attack string: 'a'.repeat(31) + '\x00'
-    *   Recall       : refuted (finished in 3 ms on node v26.11.1, timeout: 1000 ms)
+    * Refuted attacks:
+    * - Complexity    : exponential
+    *   Attack string : 'a'.repeat(31) + '\x00'
+    *   Runtime attack: refuted (finished in 3 ms on node v26.11.1, timeout: 1000 ms)
     * }}}
     */
-  private def showRefutedRecalls(dialect: Dialect, unitMode: UnitMode, refutedRecalls: Seq[RefutedRecall]): String =
-    if refutedRecalls.isEmpty then ""
+  private def showRefutedAttacks(dialect: Dialect, unitMode: UnitMode, refutedAttacks: Seq[RefutedAttack]): String =
+    if refutedAttacks.isEmpty then ""
     else
       val style = AttackPatternStyle.of(dialect, unitMode)
-      val items = refutedRecalls.map: r =>
-        s"""|- Complexity   : ${r.complexity}
-            |  Attack string: ${r.attack.toString(style)}
-            |  Recall       : ${r.recallValidation}""".stripMargin
-      items.mkString("\n\nRefuted recalls:\n", "\n", "")
+      val items = refutedAttacks.map: r =>
+        s"""|- Complexity    : ${r.complexity}
+            |  Attack string : ${r.attack.toString(style)}
+            |  Runtime attack: ${r.runtimeAttack}""".stripMargin
+      items.mkString("\n\nRefuted attacks:\n", "\n", "")
 
   /** Returns the dialect with its settings on one line (e.g. `python (type: str)`). */
   private def show(dialect: Dialect): String =
@@ -156,10 +156,10 @@ object Diagnostics:
 
       override def toString: String = s"invalid RegExp ($message)"
 
-    /** RecallRefutationLimit is an error that recall validation refutes as many attacks as `maxRefutedRecalls`. */
-    case object RecallRefutationLimit extends ErrorKind:
+    /** RuntimeAttacksRefuted is an error that the runtime refutes as many attacks as `maxRefutedAttacks`. */
+    case object RuntimeAttacksRefuted extends ErrorKind:
 
-      override def toString: String = "recall refutation limit"
+      override def toString: String = "runtime attacks refuted"
 
     /** Unexpected is an unexpected error. */
     final case class Unexpected(message: String) extends ErrorKind:

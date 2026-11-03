@@ -1,4 +1,4 @@
-package codes.quine.labs.recheck.recall
+package codes.quine.labs.recheck.verification
 
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.Context
@@ -16,7 +16,7 @@ import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
-class RecallProgramSuite extends munit.FunSuite:
+class RuntimeAttackProgramSuite extends munit.FunSuite:
 
   /** The attack string `'x' + 'y'.repeat(2) + 'z'`. */
   val attack: AttackPattern =
@@ -35,20 +35,20 @@ class RecallProgramSuite extends munit.FunSuite:
   /** Returns the unit of the input that the pattern matches. */
   def modeOf(source: String, flags: String, dialect: Dialect): UnitMode = ReDoS.parse(source, flags, dialect).mode
 
-  def generate(source: String, flags: String, dialect: Dialect, attack: AttackPattern = attack): RecallProgram =
-    RecallProgram.generate(source, flags, dialect, modeOf(source, flags, dialect), attack).toOption.get
+  def generate(source: String, flags: String, dialect: Dialect, attack: AttackPattern = attack): RuntimeAttackProgram =
+    RuntimeAttackProgram.generate(source, flags, dialect, modeOf(source, flags, dialect), attack).toOption.get
 
   /** Returns the program file of the executor of a Java or .NET program. */
-  def programFile(program: RecallProgram): SourceFile = program.executor match
+  def programFile(program: RuntimeAttackProgram): SourceFile = program.executor match
     case JavaExecutor(file)   => file
     case DotNetExecutor(file) => file
     case executor             => fail(s"no program file: $executor")
 
   /** Returns the line of the script starting with the prefix. */
-  def line(program: RecallProgram, prefix: String): String =
+  def line(program: RuntimeAttackProgram, prefix: String): String =
     program.script.linesIterator.find(_.startsWith(prefix)).getOrElse(fail(s"no line: $prefix\n${program.script}"))
 
-  test("RecallProgram.generate: JavaScript"):
+  test("RuntimeAttackProgram.generate: JavaScript"):
     val program = generate("foo", "i", Dialect.JavaScript)
     assertEquals(program.executor, NodeExecutor)
     assertEquals(
@@ -70,7 +70,7 @@ class RecallProgramSuite extends munit.FunSuite:
          |""".stripMargin
     )
 
-  test("RecallProgram.generate: Python"):
+  test("RuntimeAttackProgram.generate: Python"):
     val program = generate("f'o\\.", "im", Dialect.Python())
     assertEquals(program.executor, PythonExecutor)
     assertEquals(
@@ -97,7 +97,7 @@ class RecallProgramSuite extends munit.FunSuite:
     assertEquals(line(bytes, "regex"), "regex = re.compile(b'\\xe9a', 0)")
     assertEquals(line(bytes, "string"), "string = b'\\xe9' * 3 + b'\\x00'")
 
-  test("RecallProgram.generate: Ruby"):
+  test("RuntimeAttackProgram.generate: Ruby"):
     val program = generate("a#{b}\"", "ix", Dialect.Ruby())
     assertEquals(program.executor, RubyExecutor)
     assertEquals(
@@ -131,23 +131,23 @@ class RecallProgramSuite extends munit.FunSuite:
     assertEquals(line(bytes, "regex"), "regex = Regexp.new(\"\\xC3\\xA9\".b, Regexp::NOENCODING)")
     assertEquals(line(bytes, "string"), "string = \"\\xE9\".b * 3 + \"\\x00\".b")
 
-  test("RecallProgram.generate: Java"):
+  test("RuntimeAttackProgram.generate: Java"):
     val program = generate("f\"oo\\d\r", "iU", Dialect.Java)
     assertEquals(program.executor, JavaExecutor(programFile(program)))
-    assertEquals(programFile(program).name, "RecheckRecall.java")
+    assertEquals(programFile(program).name, "RecheckRuntimeAttack.java")
     assertEquals(program.script, "iU\n00660022006f006f005c0064000d\n1:0078\n2:0079\n1:007a\n")
     assert(programFile(program).content.contains("catch (StackOverflowError | OutOfMemoryError e)"))
     assertEquals(generate("", "cdimsuxU", Dialect.Java).script.linesIterator.next(), "cdimsuxU")
     assert(programFile(program).content.contains("case 'c' -> Pattern.CANON_EQ;"))
 
-  test("RecallProgram.generate: .NET"):
+  test("RuntimeAttackProgram.generate: .NET"):
     val program = generate("foo", "in", Dialect.DotNet)
     assertEquals(program.executor, DotNetExecutor(programFile(program)))
-    assertEquals(programFile(program).name, "RecheckRecall.cs")
+    assertEquals(programFile(program).name, "RecheckRuntimeAttack.cs")
     assertEquals(program.script, "in\n0066006f006f\n1:0078\n2:0079\n1:007a\n")
     assert(programFile(program).content.contains("\nCultureInfo.CurrentCulture = CultureInfo.InvariantCulture;\n"))
 
-  test("RecallProgram.generate: the data of Java and .NET"):
+  test("RuntimeAttackProgram.generate: the data of Java and .NET"):
     val repeat =
       AttackPattern(Seq((UString.empty, UnitMode.CodePoint.decode("a"), 0)), UnitMode.CodePoint.decode("!"), 31)
     assertEquals(generate("^a*$", "i", Dialect.Java, repeat).script, "i\n005e0061002a0024\n31:0061\n1:0021\n")
@@ -161,7 +161,7 @@ class RecallProgramSuite extends munit.FunSuite:
     val negative = AttackPattern(Seq((UString.empty, UnitMode.CodePoint.decode("a"), -3)), UString.empty, 2)
     assertEquals(generate("a", "i", Dialect.Java, negative).script, "i\n0061\n0:0061\n")
 
-  test("RecallProgram.generate: Perl"):
+  test("RuntimeAttackProgram.generate: Perl"):
     val program = generate("f/o$", "ix", Dialect.Perl())
     assertEquals(program.executor, PerlExecutor)
     assertEquals(
@@ -188,9 +188,9 @@ class RecallProgramSuite extends munit.FunSuite:
     // Modifiers that `qr` does not take are dropped.
     assertEquals(line(generate("a", "gi", Dialect.Perl()), "my $regex"), "my $regex = qr/a/i;")
 
-  test("RecallProgram.generate: Perl unsafe patterns"):
-    def generate(source: String): Either[String, RecallProgram] =
-      RecallProgram.generate(source, "", Dialect.Perl(), modeOf(source, "", Dialect.Perl()), attack)
+  test("RuntimeAttackProgram.generate: Perl unsafe patterns"):
+    def generate(source: String): Either[String, RuntimeAttackProgram] =
+      RuntimeAttackProgram.generate(source, "", Dialect.Perl(), modeOf(source, "", Dialect.Perl()), attack)
 
     val unsafe = "The pattern cannot be a Perl regex literal, which would interpolate a variable or run code"
     assert(generate("a$|b$").isRight)
@@ -202,8 +202,8 @@ class RecallProgramSuite extends munit.FunSuite:
       Left("The pattern cannot be a Perl regex literal, since it contains every delimiter")
     )
 
-  test("RecallProgram.generate: Perl string patterns"):
-    def generate(source: String, flags: String, utf8: Boolean = true): RecallProgram =
+  test("RuntimeAttackProgram.generate: Perl string patterns"):
+    def generate(source: String, flags: String, utf8: Boolean = true): RuntimeAttackProgram =
       this.generate(source, flags, Dialect.Perl(utf8, PerlSource.String))
 
     // A string pattern is not interpolated again, so any pattern can run.
@@ -222,8 +222,8 @@ class RecallProgramSuite extends munit.FunSuite:
     assert(!bytes.script.contains("use utf8"))
     assertEquals(line(bytes, "utf8::"), "utf8::downgrade($input, 1);")
 
-  test("RecallProgram.generate: Perl literal patterns"):
-    def generate(source: String, utf8: Boolean): RecallProgram =
+  test("RuntimeAttackProgram.generate: Perl literal patterns"):
+    def generate(source: String, utf8: Boolean): RuntimeAttackProgram =
       this.generate(source, "", Dialect.Perl(utf8))
 
     val chars = generate("é\\w", utf8 = true)
@@ -235,9 +235,9 @@ class RecallProgramSuite extends munit.FunSuite:
     assert(!bytes.script.contains("use utf8"))
     assertEquals(line(bytes, "utf8::"), "utf8::downgrade($input, 1);")
 
-  test("RecallProgram.generate: Perl code in patterns"):
+  test("RuntimeAttackProgram.generate: Perl code in patterns"):
     def isGenerated(source: String): Boolean =
-      RecallProgram.generate(source, "", Dialect.Perl(), UnitMode.CodePoint, attack).isRight
+      RuntimeAttackProgram.generate(source, "", Dialect.Perl(), UnitMode.CodePoint, attack).isRight
 
     assert(isGenerated("a$"))
     assert(isGenerated("\\$x"))
@@ -248,7 +248,7 @@ class RecallProgramSuite extends munit.FunSuite:
     assert(!isGenerated("(??{ 1 })"))
     assert(!isGenerated("(*{ 1 })"))
 
-  test("RecallProgram.generate: PCRE"):
+  test("RuntimeAttackProgram.generate: PCRE"):
     val program = generate("/#é$", "iu", Dialect.PCRE)
     assertEquals(program.executor, PHPExecutor)
     assertEquals(
@@ -294,41 +294,41 @@ class RecallProgramSuite extends munit.FunSuite:
     // It falls back to a control character for the delimiter.
     assertEquals(line(generate("/#~!%@;,|=:", "", Dialect.PCRE), "$regex"), "$regex = \"\\x01/#~!%@;,|=:\\x01\";")
 
-  test("RecallProgram.generateScript"):
-    def script(source: String, dialect: Dialect): RecallProgram.Script =
-      RecallProgram.generateScript(source, "", dialect, modeOf(source, "", dialect), attack).toOption.get
+  test("RuntimeAttackProgram.generateScript"):
+    def script(source: String, dialect: Dialect): RuntimeAttackProgram.Script =
+      RuntimeAttackProgram.generateScript(source, "", dialect, modeOf(source, "", dialect), attack).toOption.get
 
     val js = script("foo", Dialect.JavaScript)
-    assertEquals(js.name, "recall.cjs")
-    assertEquals(js.command, "node recall.cjs")
-    assertEquals(js.content, "// Run: node recall.cjs\n" + generate("foo", "", Dialect.JavaScript).script)
-    assertEquals(script("foo", Dialect.Python()).command, "python3 -I recall.py")
-    assert(script("foo", Dialect.Python()).content.startsWith("# Run: python3 -I recall.py\nimport "))
-    assertEquals(script("foo", Dialect.Ruby()).command, "ruby recall.rb")
-    assertEquals(script("foo", Dialect.Perl()).command, "perl recall.pl")
-    assert(script("foo", Dialect.Perl()).content.startsWith("# Run: perl recall.pl\nuse utf8;\n"))
+    assertEquals(js.name, "runtime-attack.cjs")
+    assertEquals(js.command, "node runtime-attack.cjs")
+    assertEquals(js.content, "// Run: node runtime-attack.cjs\n" + generate("foo", "", Dialect.JavaScript).script)
+    assertEquals(script("foo", Dialect.Python()).command, "python3 -I runtime-attack.py")
+    assert(script("foo", Dialect.Python()).content.startsWith("# Run: python3 -I runtime-attack.py\nimport "))
+    assertEquals(script("foo", Dialect.Ruby()).command, "ruby runtime-attack.rb")
+    assertEquals(script("foo", Dialect.Perl()).command, "perl runtime-attack.pl")
+    assert(script("foo", Dialect.Perl()).content.startsWith("# Run: perl runtime-attack.pl\nuse utf8;\n"))
     // PHP reads the comment after `<?php`.
     val php = script("foo", Dialect.PCRE)
-    assertEquals(php.command, "php recall.php")
-    assert(clue(php.content).startsWith("<?php\n// Run: php recall.php\necho "))
+    assertEquals(php.command, "php runtime-attack.php")
+    assert(clue(php.content).startsWith("<?php\n// Run: php runtime-attack.php\necho "))
     // Java and .NET have the data in the program.
     val java = script("foo", Dialect.Java)
-    assertEquals(java.command, "java --source 17 recall.java")
-    assert(java.content.startsWith("// Run: java --source 17 recall.java\nimport "))
+    assertEquals(java.command, "java --source 17 runtime-attack.java")
+    assert(java.content.startsWith("// Run: java --source 17 runtime-attack.java\nimport "))
     assert(
       clue(java.content).contains("String[] lines = \"-\\n0066006f006f\\n1:0078\\n2:0079\\n1:007a\\n\".split(\"\\n\");")
     )
     val dotnet = script("foo", Dialect.DotNet)
-    assertEquals(dotnet.command, "dotnet run recall.cs")
-    assert(dotnet.content.startsWith("// Run: dotnet run recall.cs\nusing "))
+    assertEquals(dotnet.command, "dotnet run runtime-attack.cs")
+    assert(dotnet.content.startsWith("// Run: dotnet run runtime-attack.cs\nusing "))
     assert(clue(dotnet.content).contains("var lines = \"-\\n0066006f006f\\n1:0078\\n2:0079\\n1:007a\\n\".Split("))
-    assert(RecallProgram.generateScript("a$x", "", Dialect.Perl(), UnitMode.CodePoint, attack).isLeft)
+    assert(RuntimeAttackProgram.generateScript("a$x", "", Dialect.Perl(), UnitMode.CodePoint, attack).isLeft)
     // Java splits long data into literals, since a string constant has at most 65535 bytes.
     val long = script("a" * 2500, Dialect.Java).content
     assert(clue(long).contains("String[] lines = String.join(\"\", \"-\\n00610061"))
     assert(long.contains("006100\", \"61\\n1:0078\\n2:0079\\n1:007a\\n\").split("))
 
-  test("RecallProgram.generate: the variables of the runtimes"):
+  test("RuntimeAttackProgram.generate: the variables of the runtimes"):
     val dialects = Seq(
       Dialect.JavaScript,
       Dialect.Python(Dialect.Python.Type.Bytes),
@@ -343,7 +343,7 @@ class RecallProgramSuite extends munit.FunSuite:
       Seq("NODE", "PYTHON", "RUBY", "JAVA", "DOTNET", "PERL", "PHP").map("RECHECK_" + _)
     )
 
-  test("RecallProgram.generate: empty attack string"):
+  test("RuntimeAttackProgram.generate: empty attack string"):
     val empty = AttackPattern(Seq.empty, UString.empty, 0)
     assertEquals(line(generate("a", "", Dialect.Python(), empty), "string"), "string = ''")
     assertEquals(line(generate("a", "", Dialect.PCRE, empty), "$input"), "$input = '';")

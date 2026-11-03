@@ -12,7 +12,7 @@ import codes.quine.labs.recheck.exec.PerlExecutor
 import codes.quine.labs.recheck.exec.PythonExecutor
 import codes.quine.labs.recheck.exec.RubyExecutor
 import codes.quine.labs.recheck.exec.SourceFile
-import codes.quine.labs.recheck.recall.RecallProgram
+import codes.quine.labs.recheck.verification.RuntimeAttackProgram
 import codes.quine.labs.recheck.vm.Interpreter
 import codes.quine.labs.recheck.vm.ProgramBuilder
 import codes.quine.labs.resyntax.ast.Dialect
@@ -144,7 +144,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
       val modeled = (0x80 to 0xff).filter(chars(source, "", dialect).contains)
       val mode = ReDoS.parse(source, "", dialect).mode
       val attack = AttackPattern(Seq((UString.empty, UString('a'), 0)), UString.empty, 1)
-      val program = RecallProgram.generate(source, "", dialect, mode, attack).toOption.get
+      val program = RuntimeAttackProgram.generate(source, "", dialect, mode, attack).toOption.get
       val lines = program.script.linesIterator.toSeq
       val pragma = lines.filter(_ == "use utf8;")
       val regex = lines.find(_.startsWith("my $regex = ")).get

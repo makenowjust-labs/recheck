@@ -4,12 +4,12 @@ package diagnostics
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
 
-/** RecallValidation is a run of an attack string on the real regex engine of the dialect.
+/** RuntimeAttack is a run of an attack string on the real regex engine of the dialect.
   *
   * `runtime` is the runtime name and version (e.g. `python 3.15.0`), and `result` is the result of the matching within
   * `timeout`.
   */
-final case class RecallValidation(runtime: String, timeout: Duration, result: RecallResult):
+final case class RuntimeAttack(runtime: String, timeout: Duration, result: RuntimeAttackResult):
 
   /** Whether the engine confirms the attack, that is, the attack is effective on it. */
   def isConfirmed: Boolean = result.isConfirmed
@@ -20,8 +20,8 @@ final case class RecallValidation(runtime: String, timeout: Duration, result: Re
       case _                 => "none"
     s"${if isConfirmed then "confirmed" else "refuted"} ($result on $runtime, timeout: $limit)"
 
-/** RecallResult is the result of matching an attack string on the real regex engine. */
-enum RecallResult:
+/** RuntimeAttackResult is the result of matching an attack string on the real regex engine. */
+enum RuntimeAttackResult:
 
   /** Finish is a matching finished in time, so the attack is not effective. */
   case Finish(time: FiniteDuration)

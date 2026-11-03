@@ -17,7 +17,7 @@ import io.circe.syntax.*
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.cli.Main.BatchAction
 import codes.quine.labs.recheck.cli.Main.CheckAction
-import codes.quine.labs.recheck.cli.Main.GenerateRecallScriptAction
+import codes.quine.labs.recheck.cli.Main.GenerateRuntimeAttackScriptAction
 import codes.quine.labs.recheck.cli.Main.command
 import codes.quine.labs.recheck.codec.given
 import codes.quine.labs.recheck.common.Context
@@ -36,11 +36,11 @@ object Main:
   /** CheckAction holds `recheck check` subcommand parameters. */
   final case class CheckAction(pattern: InputPattern, params: Parameters, json: Boolean) extends Action
 
-  /** GenerateRecallScriptAction holds `recheck generate-recall-script` subcommand parameters.
+  /** GenerateRuntimeAttackScriptAction holds `recheck generate-runtime-attack-script` subcommand parameters.
     *
     * `diagnostics` is the path of the diagnostics JSON, or `-` for the standard input.
     */
-  final case class GenerateRecallScriptAction(diagnostics: String) extends Action
+  final case class GenerateRuntimeAttackScriptAction(diagnostics: String) extends Action
 
   /** A command-line definition of `recheck`. */
   def command: Command[Action] =
@@ -68,13 +68,13 @@ object Main:
 
         threadSize.map(BatchAction.apply)
 
-      val generateRecallScript: Opts[Action] = Opts.subcommand(
-        name = "generate-recall-script",
-        help = "Generates the recall validation program of a vulnerable diagnostics in JSON as a standalone script."
+      val generateRuntimeAttackScript: Opts[Action] = Opts.subcommand(
+        name = "generate-runtime-attack-script",
+        help = "Generates the runtime-attack program of a vulnerable diagnostics in JSON as a standalone script."
       ):
-        Opts.argument[String](metavar = "diagnostics").map(GenerateRecallScriptAction.apply)
+        Opts.argument[String](metavar = "diagnostics").map(GenerateRuntimeAttackScriptAction.apply)
 
-      agent <+> generateRecallScript <+> check
+      agent <+> generateRuntimeAttackScript <+> check
 
   // $COVERAGE-OFF$
   /** An entrypoint of `recheck` command. */
@@ -103,10 +103,10 @@ class Main:
         case _: Diagnostics.Safe                                => () // skip
         case _: Diagnostics.Vulnerable | _: Diagnostics.Unknown => exit(1)
 
-    case Right(action: GenerateRecallScriptAction) =>
+    case Right(action: GenerateRuntimeAttackScriptAction) =>
       val script = for
         json <- read(action.diagnostics)
-        script <- GenerateRecallScriptCommand.generate(json)
+        script <- GenerateRuntimeAttackScriptCommand.generate(json)
       yield script
       script match
         case Right(script) =>

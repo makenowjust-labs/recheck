@@ -5,15 +5,15 @@ import io.circe.parser.parse
 
 import codes.quine.labs.recheck.codec.decodeAttackPattern
 import codes.quine.labs.recheck.codec.given
-import codes.quine.labs.recheck.recall.RecallProgram
+import codes.quine.labs.recheck.verification.RuntimeAttackProgram
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.UnitMode
 
-/** `recheck generate-recall-script` command implementation. */
-object GenerateRecallScriptCommand:
+/** `recheck generate-runtime-attack-script` command implementation. */
+object GenerateRuntimeAttackScriptCommand:
 
-  /** Generates the recall program of a vulnerable diagnostics in JSON as a standalone script, or returns the error. */
-  def generate(json: String): Either[String, RecallProgram.Script] =
+  /** Generates the standalone runtime-attack script of a vulnerable diagnostics in JSON, or returns the error. */
+  def generate(json: String): Either[String, RuntimeAttackProgram.Script] =
     for
       root <- parse(json).left.map(f => s"Invalid JSON: ${f.message}")
       c = root.hcursor
@@ -24,7 +24,7 @@ object GenerateRecallScriptCommand:
       dialect <- invalid(c.get[Dialect]("dialect"))
       mode <- invalid(c.get[UnitMode]("unitMode"))
       attack <- invalid(c.get("attack")(using decodeAttackPattern(mode)))
-      script <- RecallProgram.generateScript(source, flags, dialect, mode, attack)
+      script <- RuntimeAttackProgram.generateScript(source, flags, dialect, mode, attack)
     yield script
 
   private def invalid[A](result: Decoder.Result[A]): Either[String, A] =

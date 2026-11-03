@@ -1,4 +1,4 @@
-package codes.quine.labs.recheck.recall
+package codes.quine.labs.recheck.verification
 
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
@@ -7,18 +7,18 @@ import scala.concurrent.duration.FiniteDuration
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
-import codes.quine.labs.recheck.diagnostics.RecallResult
-import codes.quine.labs.recheck.diagnostics.RecallValidation
+import codes.quine.labs.recheck.diagnostics.RuntimeAttack
+import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.recheck.exec.Executor
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.UnitMode
 
-/** RecallValidator is the implementation of recall validation. */
-object RecallValidator:
+/** RuntimeAttackVerifier is the implementation of runtime-attack verification. */
+object RuntimeAttackVerifier:
 
-  /** Runs the recall validation of the attack string on the runtime of the dialect, where the pattern matches strings
-    * of the mode.
+  /** Runs the attack string on the runtime of the dialect, where the pattern matches strings of the mode, and returns
+    * the runtime attack.
     *
     * It returns `None` without running when the timeout is not positive, this platform cannot run programs, or the
     * dialect or the pattern is not supported. It throws [[UnexpectedException]] when the runtime fails to run the
@@ -26,7 +26,7 @@ object RecallValidator:
     *
     * The environment variables `env` may replace the command of the runtime (e.g. `RECHECK_NODE`).
     */
-  def validate(
+  def verify(
       source: String,
       flags: String,
       dialect: Dialect,
@@ -34,47 +34,47 @@ object RecallValidator:
       attack: AttackPattern,
       timeout: Duration,
       env: Map[String, String]
-  )(using ctx: Context): Option[RecallValidation] = ctx.interrupt:
+  )(using ctx: Context): Option[RuntimeAttack] = ctx.interrupt:
     if timeout <= Duration.Zero || !Executor.isAvailable then None
     else
-      RecallProgram.generate(source, flags, dialect, mode, attack) match
+      RuntimeAttackProgram.generate(source, flags, dialect, mode, attack) match
         case Left(reason) =>
-          ctx.log(s"recall: not supported\n  reason: $reason")
+          ctx.log(s"runtime attack: not supported\n  reason: $reason")
           None
         case Right(program) =>
           val executor = program.executor
           val commandLine = executor.commandLine(env)
-          ctx.log(s"recall: command: $commandLine\n${program.script}")
-          val output = executor.exec(program.script, boundTimeout(timeout), RecallProgram.StartLine, env)
+          ctx.log(s"runtime attack: command: $commandLine\n${program.script}")
+          val output = executor.exec(program.script, boundTimeout(timeout), RuntimeAttackProgram.StartLine, env)
           Some(parseOutput(executor.runtime(env), commandLine, timeout, output))
 
   /** Returns the time limit of a matching for the timeout, which is bounded by the deadline of the context. */
-  private[recall] def boundTimeout(timeout: Duration)(using ctx: Context): Option[FiniteDuration] = timeout match
+  private[verification] def boundTimeout(timeout: Duration)(using ctx: Context): Option[FiniteDuration] = timeout match
     case d: FiniteDuration if (ctx.deadline eq null) || d <= ctx.deadline.timeLeft => Some(d)
     case _ => Option(ctx.deadline).map(_.timeLeft)
 
-  /** Converts the execution result to the recall validation.
+  /** Converts the execution result to the runtime attack.
     *
     * The runtime name is `name` if the output does not have it, and an error message shows the command line `command`.
     */
-  private[recall] def parseOutput(name: String, command: String, timeout: Duration, output: ExecResult)(using
+  private[verification] def parseOutput(name: String, command: String, timeout: Duration, output: ExecResult)(using
       ctx: Context
-  ): RecallValidation = ctx.interrupt:
+  ): RuntimeAttack = ctx.interrupt:
     def line(out: String, name: String): Option[String] =
       out.linesIterator.collectFirst { case s if s.startsWith(s"$name ") => s.substring(name.length + 1) }
 
-    def runtime(out: String): String = line(out, RecallProgram.RuntimeLine).getOrElse(name)
+    def runtime(out: String): String = line(out, RuntimeAttackProgram.RuntimeLine).getOrElse(name)
 
     output match
-      case ExecResult.Timeout(out)    => RecallValidation(runtime(out), timeout, RecallResult.Timeout)
+      case ExecResult.Timeout(out)    => RuntimeAttack(runtime(out), timeout, RuntimeAttackResult.Timeout)
       case ExecResult.Exit(0, out, _) =>
-        val result = line(out, RecallProgram.TimeLine).flatMap(_.toLongOption) match
-          case Some(time) => RecallResult.Finish(FiniteDuration(time, TimeUnit.MILLISECONDS))
+        val result = line(out, RuntimeAttackProgram.TimeLine).flatMap(_.toLongOption) match
+          case Some(time) => RuntimeAttackResult.Finish(FiniteDuration(time, TimeUnit.MILLISECONDS))
           case None       =>
-            line(out, RecallProgram.EngineLimitLine)
-              .map(RecallResult.EngineLimit(_))
-              .orElse(line(out, RecallProgram.EngineErrorLine).map(RecallResult.EngineError(_)))
-              .getOrElse(throw new UnexpectedException(s"invalid recall validation output: ${out.trim}"))
-        RecallValidation(runtime(out), timeout, result)
+            line(out, RuntimeAttackProgram.EngineLimitLine)
+              .map(RuntimeAttackResult.EngineLimit(_))
+              .orElse(line(out, RuntimeAttackProgram.EngineErrorLine).map(RuntimeAttackResult.EngineError(_)))
+              .getOrElse(throw new UnexpectedException(s"invalid runtime attack output: ${out.trim}"))
+        RuntimeAttack(runtime(out), timeout, result)
       case ExecResult.Exit(code, _, err) =>
         throw new UnexpectedException(if err.trim.nonEmpty then err.trim else s"`$command` exited with $code")
