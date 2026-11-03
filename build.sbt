@@ -239,9 +239,6 @@ lazy val resyntax = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
     testFrameworks += new TestFramework("munit.Framework")
   )
-  .jvmSettings(
-    fork := true
-  )
   .jsSettings(
     coverageEnabled := false,
     libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
