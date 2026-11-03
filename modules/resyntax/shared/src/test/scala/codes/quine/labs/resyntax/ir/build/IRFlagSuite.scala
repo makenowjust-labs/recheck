@@ -23,7 +23,7 @@ class IRFlagSuite extends munit.FunSuite with IRHelper:
   check("^", "", Ruby())(Assert(LineBegin(LT.LF, InputBegin)))
   check("^", "m", Ruby())(Assert(LineBegin(LT.LF, InputBegin)))
 
-  // `a$` matches `a\n` except in JavaScript; Java also before `\r\n`, `\r`, `\u0085` and ` ` at the end.
+  // `a$` matches `a\n` except in JavaScript; Java also before `\r\n`, `\r`, U+0085 and U+2028 at the end.
   check("$", "", JavaScript)(Assert(TextEnd))
   check("$", "", DotNet, PCRE, Perl(), Python())(Assert(ChompTextEnd(LT.LF)))
   check("$", "", Java)(Assert(ChompTextEnd(LT.Java)))

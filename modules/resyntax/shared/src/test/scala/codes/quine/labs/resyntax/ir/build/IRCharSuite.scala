@@ -357,10 +357,10 @@ class IRCharSuite extends munit.FunSuite:
   chars("[^k]", "iu", JavaScript)(of("kK\u212a").complement(UnitMode.CodePoint))
 
   // Dot
-  chars(".", "", JavaScript)(of("\n\r  ").complement(UnitMode.UTF16))
+  chars(".", "", JavaScript)(of("\n\r\u2028\u2029").complement(UnitMode.UTF16))
   chars(".", "s", JavaScript)(UnitMode.UTF16.universe)
   chars(".", "", DotNet)(of("\n").complement(UnitMode.UTF16))
-  chars(".", "", Java)(of("\n\r\u0085  ").complement(UnitMode.CodePoint))
+  chars(".", "", Java)(of("\n\r\u0085\u2028\u2029").complement(UnitMode.CodePoint))
   chars(".", "d", Java)(of("\n").complement(UnitMode.CodePoint))
   chars(".", "", PCRE)(of("\n").complement(UnitMode.Byte))
   chars(".", "", Python(), Perl())(of("\n").complement(UnitMode.CodePoint))
