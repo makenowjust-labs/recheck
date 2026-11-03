@@ -10,7 +10,6 @@ import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 
-/** IRReferenceSuite is tests of group references, where each error is an error of the engines too. */
 class IRReferenceSuite extends munit.FunSuite with IRHelper:
 
   /** Checks the indices of the last back-reference in the pattern. */

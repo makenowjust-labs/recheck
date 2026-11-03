@@ -26,10 +26,6 @@ import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRNodeData
 
-/** Tests recall validation on the runtime of each dialect.
-  *
-  * The comments note the behavior of the versions at the time of writing.
-  */
 class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
 
   override val munitTimeout: Duration = 60.seconds

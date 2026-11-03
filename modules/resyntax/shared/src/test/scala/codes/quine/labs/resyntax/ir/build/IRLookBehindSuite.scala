@@ -5,7 +5,6 @@ import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.PerlSource
 
-/** IRLookBehindSuite is tests of look-behind restrictions, where each case is checked with the engines. */
 class IRLookBehindSuite extends munit.FunSuite with IRHelper:
   def valid(s: String, dialects: Dialect*)(implicit loc: munit.Location): Unit =
     for dialect <- dialects do

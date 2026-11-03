@@ -5,7 +5,6 @@ import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 
-/** IRCaptureSuite is tests of capture numbering, where the comments show the engines' group spans. */
 class IRCaptureSuite extends munit.FunSuite with IRHelper:
   def captures(s: String, flags: String, dialects: Dialect*)(
       count: Int,
