@@ -216,7 +216,7 @@ private[build] final class IRCharResolver(
     val native = perlNative(flags)
     // Perl's `aa` forbids a non-ASCII character to match a folding with ASCII characters (e.g. `ß` and `ss`), and `l`
     // one with characters below `U+0100`.
-    val below =
+    val minFoldedValue =
       if flags.caselessRestrict then 0x80 else if dialect.isPerl && flags.charset == IRCharset.Locale then 0x100 else 0
     val folded = mutable.ArrayBuffer.empty[(Int, Int)]
     for (u, i) <- units.zipWithIndex; c <- FullCaseFolding(u.value).iterator do folded += ((c, i))
@@ -226,7 +226,7 @@ private[build] final class IRCharResolver(
     val occurrences = for
       i <- folded.indices
       (key, set) <- multiFoldings
-      if key.iterator.forall(_ >= below)
+      if key.iterator.forall(_ >= minFoldedValue)
       if i + key.length <= folded.length && (0 until key.length).forall(k => folded(i + k)._1 == key(k))
       // A key must start and end at literal boundaries.
       if (i == 0 || folded(i - 1)._2 != folded(i)._2) &&

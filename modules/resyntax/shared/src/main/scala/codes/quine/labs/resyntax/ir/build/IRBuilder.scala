@@ -111,10 +111,10 @@ object IRBuilder:
     IRBacktrackControlSemantics(thenPassesAssertions = dialect.isPerl, acceptEndsAtomic = dialect.isPerl)
 
   /** Checks whether Perl takes the full case folding of the character under the flags (e.g. `ß` as `ss`). */
-  private def perlFoldsMulti(value: Int, flags: IRCharFlagSet, perlUnicodeRules: Boolean): Boolean =
+  private def perlFoldsMulti(value: Int, flags: IRCharFlagSet, perlUTF8Pattern: Boolean): Boolean =
     val hasASCII = FullCaseFolding(value).iterator.exists(_ < 0x80)
     val one = flags.charset match
-      case IRCharset.Default  => !perlUnicodeRules
+      case IRCharset.Default  => !perlUTF8Pattern
       case IRCharset.Unicode  => false
       case IRCharset.Locale   => value < 0x100 || hasASCII && value != 0x1e9e
       case _: IRCharset.ASCII => flags.caselessRestrict && hasASCII && value != 0xdf && value != 0x1e9e
