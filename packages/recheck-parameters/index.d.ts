@@ -1,12 +1,15 @@
 import type { Parameters } from "./lib/parameters.js";
-import type { Defaults, Excluded } from "./lib/types.js";
+import type { DefaultTable, ExclusionTable } from "./lib/types.js";
 
-export type { Defaults, Parameters };
+export type { DefaultTable, Parameters };
 
 /** Target is a consumer of the parameters that may leave some of them out by `x-exclude`. */
-export type Target = keyof Excluded;
+export type Target = keyof ExclusionTable;
 
-export type ParametersFor<T extends Target> = Omit<Parameters, Excluded[T]>;
+export type ParametersFor<T extends Target> = Omit<
+  Parameters,
+  ExclusionTable[T]
+>;
 
 /** Variant is an alternative of `oneOf` of a parameter: an enum of names, or an object of a name and its settings. */
 export type Variant = {
@@ -59,11 +62,11 @@ export type Schema = {
 export declare const schema: Schema;
 
 /** The default value of each parameter, which is `null` if the schema has none. */
-export declare const defaults: Defaults;
+export declare const defaults: DefaultTable;
 
 /** The entries are in the schema order. */
 export declare const propertiesFor: <T extends Target>(
   target: T,
 ) => [keyof ParametersFor<T> & string, Property][];
 
-export { typescriptType } from "./typescript.js";
+export { generateTypescriptType } from "./typescript.js";
