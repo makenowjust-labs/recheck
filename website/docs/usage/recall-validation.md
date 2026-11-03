@@ -43,11 +43,11 @@ The program sets the locale that `recheck` assumes before compiling the pattern,
 Each dialect's page has the notes on its program (e.g. the requirements of `java` and `dotnet`, and when the recall validation of `perl` is skipped).
 
 An engine limit is a limit on the number of the matching steps.
-When the engine stops on it, the attack is considered effective, so the recall validation succeeds as with a timeout.
+When the engine stops on it, the attack is considered effective, so the recall validation confirms the attack as with a timeout.
 The result records it as `engine-limit`.
 
 An engine error is an error on the stack depth or the memory.
-The engines may raise it on a long string even if the matching takes linear time (e.g. V8 raises `RangeError` for `/^(?:a|b)*$/` on 10,000,000 characters), so it does not show that the attack is effective, and the recall validation fails.
+The engines may raise it on a long string even if the matching takes linear time (e.g. V8 raises `RangeError` for `/^(?:a|b)*$/` on 10,000,000 characters), so it does not show that the attack is effective, and the recall validation refutes the attack.
 The result records it as `engine-error` with the message (see [Diagnostics](diagnostics.md#recall-validation)).
 
 When the command cannot run (e.g. the runtime is not installed), the result is `unknown` with an `unexpected` error.
@@ -93,11 +93,11 @@ The JavaScript library and the ESLint plugin pass their environment to the `rech
 The command of `java` and `dotnet` must be able to read the program file in the temporary directory, so a container needs the directory mounted at the same path.
 On Windows, the variables need `sh` in `PATH` (e.g. from Git for Windows), and `recheck` has not been tested there.
 
-## Failed Recall Validation
+## Refuted Attacks
 
-When the recall validation fails, `check` does not report the diagnostics, and it goes on to look for another attack string.
-If no attack succeeds, the result is `safe`.
-`checkAll` returns the diagnostics whose recall validation failed too, followed by the reported one.
+When the recall validation refutes an attack, `check` does not report the diagnostics, and it goes on to look for another attack string.
+If no attack is confirmed, the result is `safe`.
+`checkAll` returns the diagnostics of the refuted attacks too, followed by the reported one.
 This shows that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by the found attacks.
 The CLI shows them with the `--all` option, separated by a `---` line as soon as each one is computed, and its exit status follows the last one, as without the option (`0` for `safe`, and `1` otherwise).
 With the `--json` option, the CLI shows a diagnostics in JSON, or the array of them with `--all`.
@@ -106,12 +106,12 @@ With the `--json` option, the CLI shows a diagnostics in JSON, or the array of t
 recheck --all --dialect=ruby --recall-timeout=1s '/^(a|a)*$/'
 ```
 
-The search avoids repeating a failed attack.
+The search avoids repeating a refuted attack.
 
-- An attack with the same complexity (the type and the degree) and the same hotspot (the heat spots) as a failed one is skipped without running the recall validation, and it is not in the list of `checkAll`.
-- The fuzz checker gives the strings whose attacks failed a lower priority in the next generation, so that it looks into other structures of the pattern.
-- When the recall validation fails [`maxRecallFailures`](parameters.mdx#maxrecallfailures) times (10 by default), the checking stops, and the last diagnostics is `unknown` with the `recall-failure-limit` error.
-  So the list of `checkAll` has at most `maxRecallFailures + 1` diagnostics.
+- An attack with the same complexity (the type and the degree) and the same hotspot (the heat spots) as a refuted one is skipped without running the recall validation, and it is not in the list of `checkAll`.
+- The fuzz checker gives the strings whose attacks were refuted a lower priority in the next generation, so that it looks into other structures of the pattern.
+- When the recall validation refutes [`maxRefutedRecalls`](parameters.mdx#maxrefutedrecalls) attacks (10 by default), the checking stops, and the last diagnostics is `unknown` with the `recall-refutation-limit` error.
+  So the list of `checkAll` has at most `maxRefutedRecalls + 1` diagnostics.
 
 ## Recall Script
 

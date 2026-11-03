@@ -64,7 +64,7 @@ object Main:
       val all = Opts
         .flag(
           long = "all",
-          help = "Show all the diagnostics, including the vulnerable ones whose recall validation failed."
+          help = "Show all the diagnostics, including the vulnerable ones whose attacks recall validation refuted."
         )
         .orFalse
       val json = Opts

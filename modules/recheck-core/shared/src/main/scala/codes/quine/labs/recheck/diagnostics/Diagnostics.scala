@@ -121,10 +121,10 @@ object Diagnostics:
 
       override def toString: String = s"invalid RegExp ($message)"
 
-    /** RecallFailureLimit is an error that the recall validation fails as many times as `maxRecallFailures`. */
-    case object RecallFailureLimit extends ErrorKind:
+    /** RecallRefutationLimit is an error that recall validation refutes as many attacks as `maxRefutedRecalls`. */
+    case object RecallRefutationLimit extends ErrorKind:
 
-      override def toString: String = "recall failure limit"
+      override def toString: String = "recall refutation limit"
 
     /** Unexpected is an unexpected error. */
     final case class Unexpected(message: String) extends ErrorKind:

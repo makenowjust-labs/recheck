@@ -188,7 +188,7 @@ class CodecSuite extends munit.FunSuite:
         "runtime" := "node v26.11.1",
         "timeout" := 1000,
         "result" := Json.obj("kind" := "timeout"),
-        "isSucceeded" := true
+        "isConfirmed" := true
       )
     )
     assertEquals(
@@ -199,7 +199,7 @@ class CodecSuite extends munit.FunSuite:
         "runtime" := "ruby 4.0.7",
         "timeout" := Json.Null,
         "result" := Json.obj("kind" := "finish", "time" := 3),
-        "isSucceeded" := false
+        "isConfirmed" := false
       )
     )
     assertEquals(
@@ -216,7 +216,7 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(encodeErrorKind(ErrorKind.Cancel), Json.obj("kind" := "cancel"))
     assertEquals(encodeErrorKind(ErrorKind.Unsupported("foo")), Json.obj("kind" := "unsupported", "message" := "foo"))
     assertEquals(encodeErrorKind(ErrorKind.InvalidRegExp("foo")), Json.obj("kind" := "invalid", "message" := "foo"))
-    assertEquals(encodeErrorKind(ErrorKind.RecallFailureLimit), Json.obj("kind" := "recall-failure-limit"))
+    assertEquals(encodeErrorKind(ErrorKind.RecallRefutationLimit), Json.obj("kind" := "recall-refutation-limit"))
     assertEquals(encodeErrorKind(ErrorKind.Unexpected("foo")), Json.obj("kind" := "unexpected", "message" := "foo"))
 
   test("codec.encodeUString"):
@@ -307,7 +307,7 @@ class CodecSuite extends munit.FunSuite:
           "maxNFASize" := 123,
           "maxPatternSize" := 123,
           "dialect" := Json.obj("name" := "perl", "utf8" := false, "source" := "string"),
-          "maxRecallFailures" := 123
+          "maxRefutedRecalls" := 123
         )
       ),
       Right(
@@ -338,7 +338,7 @@ class CodecSuite extends munit.FunSuite:
           maxNFASize = 123,
           maxPatternSize = 123,
           dialect = Dialect.Perl(utf8 = false, source = PerlSource.String),
-          maxRecallFailures = 123
+          maxRefutedRecalls = 123
         )
       )
     )

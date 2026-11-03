@@ -341,7 +341,7 @@ class ReDoSSuite extends munit.FunSuite:
     def validateCandidates(
         degrees: Seq[Int],
         results: Seq[Option[RecallValidation]],
-        maxRecallFailures: Int = 100
+        maxRefutedRecalls: Int = 100
     ): List[Diagnostics] =
       pulled = 0
       validated = 0
@@ -352,10 +352,10 @@ class ReDoSSuite extends munit.FunSuite:
         validated += 1
         d.copy(recallValidation = results(validated - 1))
       ReDoS
-        .validateCandidates(candidates, () => safe, validate, mutable.Set.empty, maxRecallFailures)
+        .validateCandidates(candidates, () => safe, validate, mutable.Set.empty, maxRefutedRecalls)
         .toList
 
-    // The failed ones are kept, and the safe one is the final one when the candidates run out.
+    // The refuted ones are kept, and the safe one is the final one when the candidates run out.
     assertEquals(
       validateCandidates(Seq(3, 2), Seq(finish, finish)),
       List(vulnerable(3).copy(recallValidation = finish), vulnerable(2).copy(recallValidation = finish), safe)
@@ -369,44 +369,44 @@ class ReDoSSuite extends munit.FunSuite:
     assertEquals(pulled, 2)
     assertEquals(validateCandidates(Seq(3, 2), Seq(None)), List(vulnerable(3)))
     assertEquals(pulled, 1)
-    // The attacks of the same complexity and hotspot as a failed one are skipped.
+    // The attacks of the same complexity and hotspot as a refuted one are skipped.
     assertEquals(
       validateCandidates(Seq(3, 3, 2), Seq(finish, timeout)),
       List(vulnerable(3).copy(recallValidation = finish), vulnerable(2).copy(recallValidation = timeout))
     )
     assertEquals(validated, 2)
-    // It stops at the limit of failures.
+    // It stops at the limit of refuted recalls.
     val limit = Diagnostics.Unknown(
       "^a*a*$",
       "",
       Dialect.JavaScript,
-      Diagnostics.ErrorKind.RecallFailureLimit,
+      Diagnostics.ErrorKind.RecallRefutationLimit,
       Some(Checker.Automaton)
     )
     assertEquals(
-      validateCandidates(Seq(4, 3, 2), Seq(finish, finish), maxRecallFailures = 2),
+      validateCandidates(Seq(4, 3, 2), Seq(finish, finish), maxRefutedRecalls = 2),
       List(vulnerable(4).copy(recallValidation = finish), vulnerable(3).copy(recallValidation = finish), limit)
     )
     assertEquals(pulled, 2)
-    // A non-positive limit stops at the first failure.
+    // A non-positive limit stops at the first refuted recall.
     assertEquals(
-      validateCandidates(Seq(3, 2), Seq(finish), maxRecallFailures = 0),
+      validateCandidates(Seq(3, 2), Seq(finish), maxRefutedRecalls = 0),
       List(vulnerable(3).copy(recallValidation = finish), limit)
     )
 
-    // The fuzz checker avoids the failed attacks.
+    // The fuzz checker avoids the refuted attacks.
     val params =
       Parameters(checker = Checker.Fuzz, maxGeneStringSize = 1000, maxAttackStringSize = 1000, maxIteration = 2)
     val ir = ReDoS.parse("^(?:a|a)*$", "", params.dialect)
-    val failures = mutable.Set.empty[ReDoS.RecallKey]
+    val refuted = mutable.Set.empty[ReDoS.RecallKey]
     val (candidates, fuzzSafe) = ReDoS.checkFuzz(
       "^(?:a|a)*$",
       "",
       ir,
       params,
-      (c, h) => failures.contains(ReDoS.RecallKey(c, h))
+      (c, h) => refuted.contains(ReDoS.RecallKey(c, h))
     )
-    val fuzz = ReDoS.validateCandidates(candidates, fuzzSafe, _.copy(recallValidation = finish), failures, 100).toList
+    val fuzz = ReDoS.validateCandidates(candidates, fuzzSafe, _.copy(recallValidation = finish), refuted, 100).toList
     assertEquals(
       fuzz.last,
       Diagnostics.Safe("^(?:a|a)*$", "", Dialect.JavaScript, AttackComplexity.Safe(true), Checker.Fuzz)

@@ -23,7 +23,7 @@ Known that already, `Diagnostics` has three statuses.
 - `safe` means the given regular expression seems safe at least in this checking.
 - `vulnerable` means vulnerability in the given regular expression is found.
 - `unknown` means something wrong happened in checking (timeout, cancel, or error). It has the `error` field to describe the reason for this result.
-  Its `kind` is one of `timeout`, `cancel`, `unsupported`, `invalid`, `recall-failure-limit` (see [Recall Validation](#recall-validation)) and `unexpected`.
+  Its `kind` is one of `timeout`, `cancel`, `unsupported`, `invalid`, `recall-refutation-limit` (see [Recall Validation](#recall-validation)) and `unexpected`.
 
 ## Complexity
 
@@ -86,12 +86,13 @@ It is `null` if the recall validation is not run: [`recallTimeout`](parameters.m
   - `engine-limit` means the engine stopped on its limit of the matching steps (PHP's backtrack limit), which also shows that the attack is effective. It has `message`.
   - `engine-error` means the engine gave up with an error on the stack depth or the memory (e.g. Java's `StackOverflowError` or JavaScript's `RangeError`). It has `message`.
     Such an error may happen on a long string even if the matching takes linear time (e.g. V8 raises it for `/^(?:a|b)*$/` on 10,000,000 characters), so the attack is not considered effective.
-- `isSucceeded` is whether the attack is effective on the engine (`timeout` or `engine-limit`).
+- `isConfirmed` is whether the engine confirms the attack, that is, the attack is effective on the engine (`timeout` or `engine-limit`).
+  Otherwise, the recall validation refutes the attack.
 
-When the recall validation fails, the check does not report the diagnostics, and it goes on to look for another attack string.
-If no attack succeeds, the result is `safe`.
+When the recall validation refutes an attack, the check does not report the diagnostics, and it goes on to look for another attack string.
+If no attack is confirmed, the result is `safe`.
 
-`checkAll` (`ReDoS.checkAll` in Scala) returns the recall-failed diagnostics too, followed by the reported one.
+`checkAll` (`ReDoS.checkAll` in Scala) returns the diagnostics of the refuted attacks too, followed by the reported one.
 
 ## Hotspot
 

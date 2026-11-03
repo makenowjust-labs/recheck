@@ -284,18 +284,6 @@ properties:
     x-cli: "max-pattern-size"
     x-since: "1.1.1"
 
-  maxRecallFailures:
-    title: "Max Recall Failures"
-    description: |-
-      The maximum number of failed recall validations.
-
-      When it is reached, the checking stops, and the result is `unknown` with the `recall-failure-limit` error.
-    type: integer
-    default: 10
-    x-scala-type: "Int"
-    x-cli: "max-recall-failures"
-    x-since: "5.0.0"
-
   maxRecallStringSize:
     title: "Max Recall String Size"
     description: "The maximum length of the attack string on recall validation."
@@ -304,6 +292,18 @@ properties:
     x-scala-type: "Int"
     x-cli: "max-recall-string-size"
     x-since: "4.2.0"
+
+  maxRefutedRecalls:
+    title: "Max Refuted Recalls"
+    description: |-
+      The maximum number of attacks that recall validation refutes.
+
+      When it is reached, the checking stops, and the result is `unknown` with the `recall-refutation-limit` error.
+    type: integer
+    default: 10
+    x-scala-type: "Int"
+    x-cli: "max-refuted-recalls"
+    x-since: "5.0.0"
 
   maxRepeatCount:
     title: "Max Repeat Count"

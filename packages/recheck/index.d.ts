@@ -20,7 +20,7 @@ export function checkSync(
 /**
  * Checks whether the given RegExp pattern is ReDoS vulnerable or safe, and returns all the diagnostics found until the reported one.
  *
- * The list consists of the vulnerable diagnostics whose recall validation failed, followed by the diagnostics that `check` returns.
+ * The list consists of the vulnerable diagnostics whose attacks the recall validation refuted, followed by the diagnostics that `check` returns.
  * It is longer than one only when the recall validation runs (see the `recallTimeout` parameter).
  */
 export function checkAll(
@@ -115,10 +115,11 @@ export type RecallValidation = {
   timeout: number | null;
   result: RecallResult;
   /**
-   * Whether the attack is effective on the engine (`timeout` or `engine-limit`).
+   * Whether the engine confirms the attack, i.e. the attack is effective there (`timeout` or `engine-limit`).
+   * Otherwise, the engine refutes the attack.
    * `check` reports the vulnerable diagnostics only if it is `true`.
    */
-  isSucceeded: boolean;
+  isConfirmed: boolean;
 };
 
 /**
@@ -196,7 +197,7 @@ export type Hotspot = {
  * Error is a possible error on analyzing.
  */
 export type Error =
-  Timeout | Cancel | Unsupported | Invalid | RecallFailureLimit | Unexpected;
+  Timeout | Cancel | Unsupported | Invalid | RecallRefutationLimit | Unexpected;
 
 /**
  * Timeout is a timeout error.
@@ -222,9 +223,9 @@ export type Invalid = {
   message: string;
 };
 /**
- * RecallFailureLimit is an error reported when the recall validation fails `maxRecallFailures` times.
+ * RecallRefutationLimit is an error reported when the recall validation refutes `maxRefutedRecalls` attacks.
  */
-export type RecallFailureLimit = { kind: "recall-failure-limit" };
+export type RecallRefutationLimit = { kind: "recall-refutation-limit" };
 
 /**
  * Unexpected is an error reported when unexpected error occurs.

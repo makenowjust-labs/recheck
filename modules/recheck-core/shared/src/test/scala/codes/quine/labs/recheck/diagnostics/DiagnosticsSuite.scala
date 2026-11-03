@@ -76,7 +76,7 @@ class DiagnosticsSuite extends munit.FunSuite:
           |Complexity   : 2nd degree polynomial
           |Attack string: "a" * 2 + "!"
           |Hotspot      : /a*a*$$/
-          |Recall       : failed (finished in 3 ms on ruby 4.0.7, timeout: 1000 ms)
+          |Recall       : refuted (finished in 3 ms on ruby 4.0.7, timeout: 1000 ms)
           |Checker      : automaton""".stripMargin
     )
     assertEquals(

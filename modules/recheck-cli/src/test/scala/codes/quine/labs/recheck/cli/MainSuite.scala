@@ -104,8 +104,8 @@ class MainSuite extends munit.FunSuite:
       val result = Main.command.parse("/foo/" +: args)
       assert(clue(result).left.exists(_.errors == List(message)))
     assertEquals(
-      Main.command.parse(Seq("/foo/", "--max-recall-failures=3")),
-      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(maxRecallFailures = 3), all = false, json = false))
+      Main.command.parse(Seq("/foo/", "--max-refuted-recalls=3")),
+      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(maxRefutedRecalls = 3), all = false, json = false))
     )
     assertEquals(
       Main.command.parse(Seq("/foo/", "--max-degree=2", "--timeout=1s")),

@@ -53,7 +53,7 @@ class RecallValidatorRuntimeSuite extends munit.FunSuite with RuntimeHelper:
 
   def assertFinish(r: RecallValidation)(using munit.Location): Unit =
     assert(clue(r).result.isInstanceOf[RecallResult.Finish])
-    assert(!r.isSucceeded)
+    assert(!r.isConfirmed)
 
   runtimeTest("JavaScript", "node"):
     val r = validate("^(a|a)*$", "", Dialect.JavaScript, attack("a", 31, "\u0000"))
@@ -63,7 +63,7 @@ class RecallValidatorRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     // V8 overflows its backtracking stack even on a linear matching.
     val overflow = validate("^(?:a|b)*$", "", Dialect.JavaScript, attack("a", 10_000_000, "!"), 10.seconds)
     assertEquals(overflow.result, RecallResult.EngineError("Maximum call stack size exceeded"))
-    assert(!overflow.isSucceeded)
+    assert(!overflow.isConfirmed)
 
   runtimeTest("Python", "python3"):
     // Python 3.15 doubles its time for each `a`.
@@ -105,7 +105,7 @@ class RecallValidatorRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     // `java.util.regex` recurses on each iteration of a group, which is not an effective attack.
     val overflow = validate("^(?:a|b)*$", "", Dialect.Java, attack("a", 100000, "!"))
     assertEquals(overflow.result, RecallResult.EngineError("StackOverflowError"))
-    assert(!overflow.isSucceeded)
+    assert(!overflow.isConfirmed)
     // The data of the program keeps a character out of the BMP.
     val astral =
       AttackPattern(Seq((UString.empty, UnitMode.CodePoint.decode("😀"), 0)), UnitMode.CodePoint.decode("!"), 3)
@@ -148,7 +148,7 @@ class RecallValidatorRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     // PHP's default `pcre.backtrack_limit` stops the match.
     val r = validate("^(?:é|é)*$", "", Dialect.PCRE, attack("Ã©", 31, "\u0000"))
     assertEquals(r.result, RecallResult.EngineLimit("Backtrack limit exhausted"))
-    assert(r.isSucceeded)
+    assert(r.isConfirmed)
     assert(clue(r.runtime).startsWith("php "))
     assertEquals(
       validate("^(?:é|é)*$", "u", Dialect.PCRE, attack("é", 31, "\u0000")).result,

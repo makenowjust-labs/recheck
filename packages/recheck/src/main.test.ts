@@ -174,7 +174,7 @@ test("checkSync: invalid", () => {
   );
 });
 
-// A runtime command line whose recall validation always finishes, so that every attack fails.
+// A runtime command line whose recall validation always finishes, so that every attack is refuted.
 const finishing =
   "sh -c 'echo recheck:runtime fake; echo recheck:start; echo recheck:time 0' sh";
 
@@ -201,7 +201,7 @@ test("checkAll: java", async () => {
       runtime: "fake",
       timeout: 1000,
       result: { kind: "finish", time: 0 },
-      isSucceeded: false,
+      isConfirmed: false,
     },
   });
 });

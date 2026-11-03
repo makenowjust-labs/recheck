@@ -15,14 +15,14 @@ class ReDoSRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     Parameters(recallTimeout = 1.second, randomSeed = 0, maxGeneStringSize = 1000, maxAttackStringSize = 1000)
 
   runtimeTest("ReDoS.checkAll: Ruby", "ruby"):
-    // The failed recall validation is kept, and the checking continues to the safe result.
+    // The refuted recall is kept, and the checking continues to the safe result.
     val ds = ReDoS.checkAll("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby())).toList
     assert(clue(ds).size >= 2)
     ds.init.foreach:
       case d: Diagnostics.Vulnerable =>
         val r = d.recallValidation.get
         assert(clue(r).result.isInstanceOf[RecallResult.Finish])
-        assert(!r.isSucceeded)
+        assert(!r.isConfirmed)
       case d => fail(s"not vulnerable: $d")
     assert(clue(ds.last).isInstanceOf[Diagnostics.Safe])
     assertEquals(ReDoS.check("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby())), ds.last)

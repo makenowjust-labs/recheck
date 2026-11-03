@@ -194,7 +194,7 @@ given encodeRecallValidation: Encoder[RecallValidation] with
       "runtime" := r.runtime,
       "timeout" := timeout,
       "result" := r.result,
-      "isSucceeded" := r.isSucceeded
+      "isConfirmed" := r.isConfirmed
     )
 
 /** An `Encoder` for `RecallResult`. */
@@ -216,8 +216,8 @@ given encodeErrorKind: Encoder[ErrorKind] with
       Json.obj("kind" := "unsupported", "message" := message)
     case ErrorKind.InvalidRegExp(message) =>
       Json.obj("kind" := "invalid", "message" := message)
-    case ErrorKind.RecallFailureLimit =>
-      Json.obj("kind" := "recall-failure-limit")
+    case ErrorKind.RecallRefutationLimit =>
+      Json.obj("kind" := "recall-refutation-limit")
     case ErrorKind.Unexpected(message) =>
       Json.obj("kind" := "unexpected", "message" := message)
 
