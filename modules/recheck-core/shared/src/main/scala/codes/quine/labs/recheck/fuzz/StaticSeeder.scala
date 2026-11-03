@@ -3,7 +3,6 @@ package codes.quine.labs.recheck.fuzz
 import codes.quine.labs.recheck.automaton.EpsNFABuilder
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.data.Graph
 import codes.quine.labs.recheck.util.RepeatUtil
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
@@ -27,12 +26,7 @@ object StaticSeeder:
   )(using
       ctx: Context
   ): Set[FString] = ctx.interrupt:
-    val epsNFA = EpsNFABuilder
-      .build(simplify(pattern, maxSimpleRepeatSize))
-      .recoverWith:
-        case _: UnsupportedException =>
-          EpsNFABuilder.build(simplify(pattern, maxSimpleRepeatSize, dropsAssertions = true))
-      .get
+    val epsNFA = EpsNFABuilder.build(simplify(pattern, maxSimpleRepeatSize))
     val orderedNFA = epsNFA.toOrderedNFA.rename.mapAlphabet(_.representative)
     val seeder = new StaticSeeder(
       orderedNFA.alphabet,
@@ -44,9 +38,7 @@ object StaticSeeder:
     seeder.seed(maxInitialGenerationSize, limit, maxSize)
 
   /** Returns a simplified pattern, which the ε-NFA can handle. */
-  private[fuzz] def simplify(pattern: IRPattern, maxSimpleRepeatSize: Int, dropsAssertions: Boolean = false)(using
-      ctx: Context
-  ): IRPattern =
+  private[fuzz] def simplify(pattern: IRPattern, maxSimpleRepeatSize: Int)(using ctx: Context): IRPattern =
     ctx.interrupt:
       val backRefs = extractBackRefs(pattern.node)
       val empty = IRNode(Empty)
@@ -99,9 +91,8 @@ object StaticSeeder:
             else
               val cs = captures.map((i, n) => loop(n, prevIsRepeat, nextIsRepeat, inside + i))
               copy(Disjunction(cs :+ empty))
-          case Assert(_) if dropsAssertions => copy(Empty)
-          case Unsupported(_)               => copy(Empty)
-          case _                            => node
+          case Unsupported(_) => copy(Empty)
+          case _              => node
 
       pattern.copy(node = loop(pattern.node, true, true, Set.empty))
 
@@ -117,7 +108,8 @@ private[fuzz] class StaticSeeder[A, Q](
     val acceptSet: Set[Q],
     val graph: Graph[Q, A]
 )(using ctx: Context):
-  import ctx._
+
+  import ctx.*
 
   /** A reversed graph of [[graph]]. */
   val reverseGraph = graph.reverse
@@ -199,7 +191,7 @@ private[fuzz] class StaticSeeder[A, Q](
       case None    =>
         interrupt(reverseGraph.path(stateSet.diff(acceptSet), q).map(_._1.map(_._2).reverse))
 
-  /** Constructs a FString from an EDA/IDA triple. */
+  /** Constructs an FString from an EDA/IDA triple. */
   def construct(t: (Seq[A], Seq[A], Seq[A]), f: (Int, Int) => Int)(using ev: A =:= UChar): FString =
     val w1 = t._1.map(u => FString.Wrap(ev(u))).toIndexedSeq
     val w2 = t._2.map(u => FString.Wrap(ev(u))).toIndexedSeq

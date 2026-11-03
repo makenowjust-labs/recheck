@@ -154,6 +154,7 @@ object ReDoS:
   private[recheck] final case class RecallKey(degree: Option[Int], spots: Seq[(Int, Int)])
 
   private[recheck] object RecallKey:
+
     def apply(complexity: AttackComplexity.Vulnerable, hotspot: Hotspot): RecallKey =
       val degree = complexity match
         case AttackComplexity.Polynomial(degree, _) => Some(degree)
@@ -184,7 +185,7 @@ object ReDoS:
         ctx.log("auto: exceed maxPatternSize")
         throw UnsupportedException("The pattern is too large")
       else
-        val epsNFA = EpsNFABuilder.build(ir).get
+        val epsNFA = EpsNFABuilder.build(ir)
         val orderedNFA = epsNFA.restrictInputs(epsNFA.toOrderedNFA(maxNFASize).rename).mapAlphabet(_.representative)
         AutomatonChecker.check(orderedNFA, maxNFASize)
 
@@ -229,11 +230,11 @@ object ReDoS:
       params: Parameters,
       avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
   )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
-    import params._
+    import params.*
 
     def diagnose: Iterator[Diagnostics.Vulnerable] =
       val random = new Random(randomSeed)
-      val fuzz = FuzzProgram.from(ir).get
+      val fuzz = FuzzProgram.from(ir)
       val results = FuzzChecker.check(
         ir,
         fuzz,
@@ -306,8 +307,8 @@ object ReDoS:
   )(
       d: Diagnostics.Vulnerable
   )(using ctx: Context): Diagnostics.Vulnerable =
-    try d.copy(recallValidation = RecallValidator.validate(source, flags, dialect, mode, d.attack, timeout))
+    try d.copy(recallValidation = RecallValidator.validate(source, flags, dialect, mode, d.attack, timeout, sys.env))
     catch
       case ex: ReDoSException =>
-        ex.checker = Some(if d.checker == Checker.Fuzz then Checker.Fuzz else Checker.Automaton)
+        ex.checker = Some(d.checker)
         throw ex

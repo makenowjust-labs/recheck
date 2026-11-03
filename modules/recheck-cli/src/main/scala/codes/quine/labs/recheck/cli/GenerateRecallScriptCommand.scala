@@ -24,7 +24,7 @@ object GenerateRecallScriptCommand:
       dialect <- invalid(c.get[Dialect]("dialect"))
       mode <- invalid(c.get[UnitMode]("unitMode"))
       attack <- invalid(c.get("attack")(using decodeAttackPattern(mode)))
-      script <- RecallProgram.script(source, flags, dialect, mode, attack)
+      script <- RecallProgram.generateScript(source, flags, dialect, mode, attack)
     yield script
 
   private def invalid[A](result: Decoder.Result[A]): Either[String, A] =

@@ -1,9 +1,16 @@
 package codes.quine.labs.recheck.diagnostics
 
-import java.nio.file.Path
 import scala.concurrent.duration.*
 
 import codes.quine.labs.recheck.RuntimeHelper
+import codes.quine.labs.recheck.exec.DotNetExecutor
+import codes.quine.labs.recheck.exec.JavaExecutor
+import codes.quine.labs.recheck.exec.NodeExecutor
+import codes.quine.labs.recheck.exec.PHPExecutor
+import codes.quine.labs.recheck.exec.PerlExecutor
+import codes.quine.labs.recheck.exec.PythonExecutor
+import codes.quine.labs.recheck.exec.RubyExecutor
+import codes.quine.labs.recheck.exec.SourceFile
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
@@ -19,8 +26,8 @@ class AttackPatternStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
   val texts: Seq[AttackPattern] = Seq(
     attack(Seq(("", "a", 0)), "\u0000", 31),
     attack(Seq(("'\"\\`", "#{x}#$y#@z$@{$a}", 0)), "\t\n\r\u000b\u000c", 2),
-    attack(Seq(("", "\u0001\u0008\u001b\u007f\u0085 \u2028\u2029​﻿", 0)), "1", 3),
-    attack(Seq(("éあ", "́", 0)), "😀Ω", 2),
+    attack(Seq(("", "\u0001\u0008\u001b\u007f\u0085\u00a0\u2028\u2029\u200b\ufeff", 0)), "1", 3),
+    attack(Seq(("éあ", "\u0301", 0)), "😀Ω", 2),
     attack(Seq(("a\u00a0b", "\u3000", 0)), "\u2000\u202f\u205f\u1680", 2),
     attack(Seq(("", "😀", 0)), "", 2),
     attack(Seq(("x", "\ud800", 0)), "-\udfff\udbff", 3),
@@ -51,10 +58,6 @@ class AttackPatternStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
 
   def hex(values: Seq[Int]): String = values.map(Integer.toHexString).mkString(" ")
 
-  /** Runs the command with the input, and returns the lines of the output marked by `case:`. */
-  def cases(command: Seq[String], input: String = "", dir: Option[Path] = None): Seq[String] =
-    run(command, input, dir).linesIterator.collect { case s"case:$line" => line }.toSeq
-
   def check(attacks: Seq[AttackPattern], style: AttackPatternStyle, actual: Seq[String])(
       expected: AttackPattern => String
   )(using munit.Location): Unit =
@@ -67,7 +70,7 @@ class AttackPatternStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
           |  console.log('case:' + Array.from({ length: s.length }, (_, i) => s.charCodeAt(i).toString(16)).join(' '));
           |}
           |""".stripMargin
-    cases(Seq("node", "-"), script)
+    cases(NodeExecutor, script)
 
   runtimeTest("JavaScript: unicode", "node"):
     val style = AttackPatternStyle.JavaScript(unicode = true)
@@ -82,7 +85,7 @@ class AttackPatternStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
       s"""|for s in [${attacks.map(_.toString(style)).mkString(", ")}]:
           |    print('case:' + ' '.join('%x' % (c if isinstance(c, int) else ord(c)) for c in s))
           |""".stripMargin
-    cases(Seq("python3", "-I", "-"), script)
+    cases(PythonExecutor, script)
 
   runtimeTest("Python: str", "python3"):
     val style = AttackPatternStyle.Python(bytes = false)
@@ -98,7 +101,7 @@ class AttackPatternStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
           |  puts "case:#{s.encoding} " + s.bytes.map { |b| b.to_s(16) }.join(' ')
           |end
           |""".stripMargin
-    cases(Seq("ruby", "-"), script)
+    cases(RubyExecutor, script)
 
   runtimeTest("Ruby: UTF-8", "ruby"):
     val style = AttackPatternStyle.Ruby(bytes = false)
@@ -122,8 +125,7 @@ class AttackPatternStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
           |  }
           |}
           |""".stripMargin
-    val path = createFile("recheck-style", "Main.java", program)
-    check(texts, style, cases(Seq("java", path.toString)))(a => hex(utf16(a)))
+    check(texts, style, cases(JavaExecutor(SourceFile("Main.java", program))))(a => hex(utf16(a)))
 
   runtimeTest("C#", "dotnet"):
     val style = AttackPatternStyle.CSharp
@@ -134,10 +136,7 @@ class AttackPatternStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
           |string[] cases = { ${utf16Texts.map(_.toString(style)).mkString(", ")} };
           |foreach (var s in cases) Console.WriteLine("case:" + string.Join(" ", s.Select(c => ((int)c).ToString("x"))));
           |""".stripMargin
-    val path = createFile("recheck-style", "Main.cs", program)
-    check(utf16Texts, style, cases(Seq("dotnet", "run", path.getFileName.toString), dir = Some(path.getParent)))(a =>
-      hex(units(a))
-    )
+    check(utf16Texts, style, cases(DotNetExecutor(SourceFile("Main.cs", program))))(a => hex(units(a)))
 
   def perl(attacks: Seq[AttackPattern]): Seq[String] =
     val script =
@@ -145,7 +144,7 @@ class AttackPatternStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
           |  print 'case:' . join(' ', map { sprintf '%x', ord } split //, $$s) . "\\n";
           |}
           |""".stripMargin
-    cases(Seq("perl", "-"), script)
+    cases(PerlExecutor, script)
 
   runtimeTest("Perl: characters", "perl"):
     check(texts, AttackPatternStyle.Perl, perl(texts))(a => hex(units(a)))
@@ -160,7 +159,7 @@ class AttackPatternStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
           |  echo 'case:', implode(' ', array_map('dechex', array_values(unpack('C*', $$s) ?: []))), "\\n";
           |}
           |""".stripMargin
-    cases(Seq("php"), script)
+    cases(PHPExecutor, script)
 
   runtimeTest("PHP: UTF-8", "php"):
     val style = AttackPatternStyle.PHP(bytes = false)

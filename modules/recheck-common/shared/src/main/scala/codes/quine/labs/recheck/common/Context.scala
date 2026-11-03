@@ -44,6 +44,7 @@ object Context:
 
   /** Logger is a logger function. */
   abstract class Logger extends (String => Unit):
+
     def apply(message: String): Unit
 
   /** Creates a new context with the given timeout and the given cancellation token. */

@@ -5,6 +5,8 @@ import scala.concurrent.duration.MILLISECONDS
 import scala.language.implicitConversions
 import scala.util.Try
 
+import codes.quine.labs.recheck.AssertionCases
+import codes.quine.labs.recheck.CaseFoldingCases
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
@@ -26,6 +28,7 @@ import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 
 class InterpreterSuite extends munit.FunSuite:
+
   given ctx: Context = Context()
 
   /** Returns a JavaScript back-reference to the index. */
@@ -40,7 +43,7 @@ class InterpreterSuite extends munit.FunSuite:
   def matches(source: String, flags: String, input: String, opts: Options): Result =
     val t = for
       ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
-      program <- ProgramBuilder.build(ir)
+      program = ProgramBuilder.build(ir)
       result = Interpreter.run(program, ir.mode.decode(input), opts)
     yield result
     t.get
@@ -70,6 +73,10 @@ class InterpreterSuite extends munit.FunSuite:
     val opts = Options(usesAcceleration = true)
     assertEquals(matches(source, flags, input, opts).status, Status.Limit)
 
+  /** Returns the options using acceleration if it is asked for and the program allows it. */
+  def options(program: Program, usesAcceleration: Boolean): Options =
+    Options(usesAcceleration = usesAcceleration && program.meta.allowsMemoization)
+
   def runStatus(
       source: String,
       flags: String,
@@ -78,11 +85,11 @@ class InterpreterSuite extends munit.FunSuite:
       usesAcceleration: Boolean
   ): Status =
     val ir = ReDoS.parse(source, flags, dialect)
-    val program = ProgramBuilder.build(ir).get
+    val program = ProgramBuilder.build(ir)
     val u = input match
       case s: String  => ir.mode.decode(s)
       case u: UString => u
-    Interpreter.run(program, u, Options(usesAcceleration = usesAcceleration)).status
+    Interpreter.run(program, u, options(program, usesAcceleration)).status
 
   def accepts(
       source: String,
@@ -116,9 +123,9 @@ class InterpreterSuite extends munit.FunSuite:
 
   def runSpans(source: String, dialect: Dialect, input: String, usesAcceleration: Boolean): Spans =
     val ir = ReDoS.parse(source, "", dialect)
-    val program = ProgramBuilder.build(ir).get
+    val program = ProgramBuilder.build(ir)
     val result =
-      Interpreter.run(program, ir.mode.decode(input), Options(usesAcceleration = usesAcceleration))
+      Interpreter.run(program, ir.mode.decode(input), options(program, usesAcceleration))
     // The spans drop the unset groups at the end, which Perl does not report.
     result.captures.map: captures =>
       captures
@@ -373,7 +380,7 @@ class InterpreterSuite extends munit.FunSuite:
     )(using ctx: Context): Result =
       val t = for
         ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
-        program <- ProgramBuilder.build(ir)
+        program = ProgramBuilder.build(ir)
         result = Interpreter.runWithTimeout(program, ir.mode.decode(input), opts, timeout)
       yield result
       t.get
@@ -612,9 +619,14 @@ class InterpreterSuite extends munit.FunSuite:
     accepts("^..$", PCRE, UString(0xc3, 0xa9))
     accepts("(*UTF)^.$", PCRE, "é")
 
+  test("Interpreter.run: acceleration on a program not allowing memoization"):
+    val program = ProgramBuilder.build(ReDoS.parse("a(*PRUNE)b", "", PCRE))
+    interceptMessage[IllegalArgumentException]("requirement failed: The program does not allow memoization"):
+      Interpreter.run(program, UString.empty, Options(usesAcceleration = true))
+
   test("ProgramBuilder.build: unsupported"):
     val ir = ReDoS.parse("a(?R)?", "", PCRE)
-    interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(ProgramBuilder.build(ir).get)
+    interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(ProgramBuilder.build(ir))
 
   // The expected spans are checked on Ruby 4.0, Java 25, .NET 10, Perl 5.44 and PHP 8.5 with PCRE2 10.49 without JIT.
 

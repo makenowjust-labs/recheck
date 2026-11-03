@@ -23,9 +23,9 @@ private final class AutomatonChecker[A, Q](
 )(using private val ctx: Context):
 
   // Introduces `ctx` methods into the scope.
-  import ctx._
+  import ctx.*
 
-  /** A NFA with look-ahead constructed from [[nfa]]. */
+  /** An NFA with look-ahead constructed from [[nfa]]. */
   private val nfaWLA = nfa.toNFAwLA(maxNFASize)
 
   /** A [[nfaWLA]] transition graph. */
@@ -61,7 +61,7 @@ private final class AutomatonChecker[A, Q](
       .toMap
       .withDefaultValue(Map.empty.withDefaultValue(Vector.empty))
 
-  /** A map from a SCC to the lookahead DFA states in this. */
+  /** A map from an SCC to the lookahead DFA states in this. */
   private val sccLookaheadMap = scc.map { sc => sc -> sc.map(_._2).toSet }.toMap
 
   /** A type of [[nfaWLA]] state. */
@@ -120,7 +120,7 @@ private final class AutomatonChecker[A, Q](
             g2.scc.view
               .flatMap: sc =>
                 val eda = interrupt(for
-                  // If there is a SCC of g2 contains `(q1, q1)` and `(q2, q3)` (s.t. `q2 != q3`),
+                  // If there is an SCC of g2 that contains `(q1, q1)` and `(q2, q3)` (s.t. `q2 != q3`),
                   // then the SCC contains an EDA structure.
                   p1 <- sc.find { case (q1, q2) => q1 == q2 }
                   p2 <- sc.find { case (q1, q2) => q1 != q2 }
@@ -206,7 +206,7 @@ private final class AutomatonChecker[A, Q](
       g3back.scc.iterator
         .flatMap: sc =>
           val ida = interrupt:
-            // If there is a SCC of `g3back` contains `(q1, q1, q2)` and `(q1, q2, q2)`,
+            // If there is an SCC of `g3back` that contains `(q1, q1, q2)` and `(q1, q2, q2)`,
             // then an IDA structure exists between `source` and `target`.
             sc
               .collect:

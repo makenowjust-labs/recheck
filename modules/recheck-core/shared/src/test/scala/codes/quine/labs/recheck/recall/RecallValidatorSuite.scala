@@ -25,42 +25,49 @@ class RecallValidatorSuite extends munit.FunSuite:
 
   test("RecallValidator.validate"):
     assertEquals(
-      RecallValidator.validate("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, Duration.MinusInf),
+      RecallValidator.validate("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, Duration.MinusInf, Map.empty),
       None
     )
-    assertEquals(RecallValidator.validate("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, Duration.Zero), None)
+    assertEquals(
+      RecallValidator.validate("foo", "", Dialect.Python(), UnitMode.CodePoint, attack, Duration.Zero, Map.empty),
+      None
+    )
     // A Perl pattern interpolating a variable is not run.
-    assertEquals(RecallValidator.validate("a$x", "", Dialect.Perl(), UnitMode.CodePoint, attack, 1.second), None)
+    assertEquals(
+      RecallValidator.validate("a$x", "", Dialect.Perl(), UnitMode.CodePoint, attack, 1.second, Map.empty),
+      None
+    )
 
-  test("RecallValidator.limit"):
-    assertEquals(RecallValidator.limit(Duration.Inf), None)
-    assertEquals(RecallValidator.limit(100.seconds), Some(100.seconds))
+  test("RecallValidator.boundTimeout"):
+    assertEquals(RecallValidator.boundTimeout(Duration.Inf), None)
+    assertEquals(RecallValidator.boundTimeout(100.seconds), Some(100.seconds))
     val ctx50s = Context(timeout = 50.seconds)
-    assert(RecallValidator.limit(100.seconds)(using ctx50s).exists(_ <= 50.seconds))
-    assert(RecallValidator.limit(Duration.Inf)(using ctx50s).exists(_ <= 50.seconds))
-    assertEquals(RecallValidator.limit(1.second)(using ctx50s), Some(1.second))
+    assert(RecallValidator.boundTimeout(100.seconds)(using ctx50s).exists(_ <= 50.seconds))
+    assert(RecallValidator.boundTimeout(Duration.Inf)(using ctx50s).exists(_ <= 50.seconds))
+    assertEquals(RecallValidator.boundTimeout(1.second)(using ctx50s), Some(1.second))
 
-  test("RecallValidator.result"):
-    def result(output: ExecResult): RecallValidation = RecallValidator.result("python3", "python3 -", 1.second, output)
+  test("RecallValidator.parseOutput"):
+    def parse(output: ExecResult): RecallValidation =
+      RecallValidator.parseOutput("python3", "python3 -", 1.second, output)
 
     assertEquals(
-      result(ExecResult.Exit(0, "recheck:runtime python 3.15.0\nrecheck:start\nrecheck:time 12\n", "")),
+      parse(ExecResult.Exit(0, "recheck:runtime python 3.15.0\nrecheck:start\nrecheck:time 12\n", "")),
       RecallValidation("python 3.15.0", 1.second, RecallResult.Finish(12.millis))
     )
     assertEquals(
-      result(ExecResult.Exit(0, "recheck:runtime php 8.5\nrecheck:engine-limit Backtrack limit exhausted\n", "")),
+      parse(ExecResult.Exit(0, "recheck:runtime php 8.5\nrecheck:engine-limit Backtrack limit exhausted\n", "")),
       RecallValidation("php 8.5", 1.second, RecallResult.EngineLimit("Backtrack limit exhausted"))
     )
     assertEquals(
-      result(
+      parse(
         ExecResult.Exit(0, "recheck:runtime node v26\nrecheck:engine-error Maximum call stack size exceeded\n", "")
       ),
       RecallValidation("node v26", 1.second, RecallResult.EngineError("Maximum call stack size exceeded"))
     )
     // Without the runtime line, the runtime is the program name.
-    assertEquals(result(ExecResult.Timeout("")), RecallValidation("python3", 1.second, RecallResult.Timeout))
+    assertEquals(parse(ExecResult.Timeout("")), RecallValidation("python3", 1.second, RecallResult.Timeout))
     interceptMessage[UnexpectedException]("invalid recall validation output: foo")(
-      result(ExecResult.Exit(0, "foo\n", ""))
+      parse(ExecResult.Exit(0, "foo\n", ""))
     )
-    interceptMessage[UnexpectedException]("error")(result(ExecResult.Exit(1, "", "error\n")))
-    interceptMessage[UnexpectedException]("`python3 -` exited with 2")(result(ExecResult.Exit(2, "", "")))
+    interceptMessage[UnexpectedException]("error")(parse(ExecResult.Exit(1, "", "error\n")))
+    interceptMessage[UnexpectedException]("`python3 -` exited with 2")(parse(ExecResult.Exit(2, "", "")))

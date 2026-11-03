@@ -36,15 +36,18 @@ object Complexity:
 
   /** Constant is the complexity of a RegExp that checks a match in constant time. */
   case object Constant extends Safe:
+
     def toAttackComplexity: AttackComplexity.Safe = AttackComplexity.Constant
 
   /** Linear is the complexity of a RegExp that checks a match in linear time. */
   case object Linear extends Safe:
+
     def toAttackComplexity: AttackComplexity.Safe = AttackComplexity.Linear
 
   /** Polynomial is the complexity of a RegExp that checks a match in polynomial time of the degree. */
   final case class Polynomial[A](degree: Int, witness: Witness[A], hotspot: Hotspot = Hotspot.empty)
       extends Vulnerable[A]:
+
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Polynomial(degree, false)
 
     def buildAttackPattern(attackLimit: Int, maxSize: Int)(using ev: A =:= UChar): AttackPattern =
@@ -53,6 +56,7 @@ object Complexity:
 
   /** Exponential is the complexity of a RegExp that checks a match in exponential time. */
   final case class Exponential[A](witness: Witness[A], hotspot: Hotspot = Hotspot.empty) extends Vulnerable[A]:
+
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Exponential(false)
 
     def buildAttackPattern(attackLimit: Int, maxSize: Int)(using ev: A =:= UChar): AttackPattern =

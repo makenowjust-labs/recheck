@@ -86,17 +86,21 @@ object Interpreter:
 
     /** Ok is the status of a succeeded matching. */
     case object Ok extends Status:
+
       override def toString: String = "ok"
 
     /** Fail is the status of a failed matching. */
     case object Fail extends Status:
+
       override def toString: String = "fail"
 
     /** Limit is the status of a matching that exceeds the limit of steps. */
     case object Limit extends Status:
+
       override def toString: String = "limit"
 
     case object Timeout extends Status:
+
       override def toString: String = "timeout"
 
   /** CoverageLocation is a location in coverage. */
@@ -286,10 +290,9 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     clock
 
   /** Whether it memoizes the failed states. */
-  private val memoizes: Boolean =
-    // The verbs skipping backtracking points prevent it.
-    // So do non-atomic look-arounds, since the matching after one depends on its start, which a state does not have.
-    options.usesAcceleration && !program.meta.hasVerb && !program.meta.hasLeave
+  private val memoizes: Boolean = options.usesAcceleration
+
+  require(!memoizes || program.meta.allowsMemoization, "The program does not allow memoization")
 
   /** Constructs a result of matching. */
   private[vm] def result(status: Status, captures: Option[Seq[Int]]): Result =

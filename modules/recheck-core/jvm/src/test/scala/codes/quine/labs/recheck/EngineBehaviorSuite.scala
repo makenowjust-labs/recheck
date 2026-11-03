@@ -1,11 +1,17 @@
 package codes.quine.labs.recheck
 
-import java.nio.file.Path
 import scala.concurrent.duration.*
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
+import codes.quine.labs.recheck.exec.DotNetExecutor
+import codes.quine.labs.recheck.exec.NodeExecutor
+import codes.quine.labs.recheck.exec.PHPExecutor
+import codes.quine.labs.recheck.exec.PerlExecutor
+import codes.quine.labs.recheck.exec.PythonExecutor
+import codes.quine.labs.recheck.exec.RubyExecutor
+import codes.quine.labs.recheck.exec.SourceFile
 import codes.quine.labs.recheck.recall.RecallProgram
 import codes.quine.labs.recheck.vm.Interpreter
 import codes.quine.labs.recheck.vm.ProgramBuilder
@@ -32,14 +38,11 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
 
   def matches(source: String, flags: String, dialect: Dialect, input: UString): Boolean =
     val ir = ReDoS.parse(source, flags, dialect)
-    val program = ProgramBuilder.build(ir).get
+    val program = ProgramBuilder.build(ir)
     Interpreter.run(program, input, Interpreter.Options()).status == Interpreter.Status.Ok
 
   def marks(chars: UString, set: CharSet): String =
     chars.iterator.map(c => if set.contains(c) then "1" else "0").mkString(" ")
-
-  def cases(command: Seq[String], input: String = "", dir: Option[Path] = None): Seq[String] =
-    run(command, input, dir).linesIterator.collect { case s"case:$line" => line }.toSeq
 
   val surrogates: String = "^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF]|[\\uDC00-\\uDFFF])*$"
 
@@ -54,7 +57,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
       val mode = ReDoS.parse(surrogates, flags, Dialect.JavaScript).mode
       val model = surrogateInputs.map: s =>
         matches(surrogates, flags, Dialect.JavaScript, mode.decode(UnitMode.UTF16.encode(s))).toString
-      assertEquals(cases(Seq("node", "-"), script), model, flags)
+      assertEquals(cases(NodeExecutor, script), model, flags)
 
   // Checked with Python 3.15.0.
   runtimeTest("Python: surrogates", "python3"):
@@ -66,7 +69,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
           |    print('case:' + str(regex.search(s) is not None).lower())
           |""".stripMargin
     val model = surrogateInputs.map(s => matches(surrogates, "", Dialect.Python(), s).toString)
-    assertEquals(cases(Seq("python3", "-I", "-"), script), model)
+    assertEquals(cases(PythonExecutor, script), model)
 
   // Checked with Ruby 4.0.7.
   runtimeTest("Ruby: the character set options", "ruby"):
@@ -82,7 +85,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
           |end
           |""".stripMargin
     val model = options.map((flags, _) => marks(candidates, chars("\\w", flags, Dialect.Ruby())))
-    assertEquals(cases(Seq("ruby", "-"), script), model)
+    assertEquals(cases(RubyExecutor, script), model)
 
   // Checked with .NET 10.0.14.
   runtimeTest(".NET: the named blocks", "dotnet"):
@@ -132,8 +135,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
       val set = chars(s"\\p{Is$name}", "", Dialect.DotNet)
       val ranges = set.intervals.map((start, end) => s"${Integer.toHexString(start)}-${Integer.toHexString(end - 1)}")
       s"$name ${ranges.mkString(",")}"
-    val path = createFile("recheck-engine", "Main.cs", program)
-    assertEquals(cases(Seq("dotnet", "run", path.getFileName.toString), dir = Some(path.getParent)), model)
+    assertEquals(cases(DotNetExecutor(SourceFile("Main.cs", program))), model)
 
   // Checked with Perl 5.44.0.
   runtimeTest("Perl: the character set rules of utf8", "perl"):
@@ -149,7 +151,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
       val flag = lines.find(_.startsWith("utf8::")).get
       val loop =
         s"""for my $$b (0x80..0xFF) { my $$input = chr($$b); $flag print "$$b\\n" if $$input =~ /\\A$$regex\\z/ }"""
-      val out = run(Seq("perl", "-e", (pragma ++ Seq(regex, loop)).mkString("\n")))
+      val out = run(PerlExecutor, (pragma ++ Seq(regex, loop)).mkString("", "\n", "\n"))
       assertEquals(out.linesIterator.map(_.toInt).toSeq, modeled, s"$source in $dialect")
 
     for
@@ -177,7 +179,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     val subjects = UString(0x4b, 0x6b, 0x212a, 0x53, 0x73, 0x17f)
     val model = patterns.map((source, flags) => marks(subjects, chars(source, flags, Dialect.PCRE)))
     val regexes = patterns.map((source, flags) => s"/\\A$source\\z/$flags")
-    assertEquals(cases(Seq("php"), php(regexes, subjects)), model)
+    assertEquals(cases(PHPExecutor, php(regexes, subjects)), model)
 
   // Checked with PHP 8.5.12 and PCRE2 10.49.
   runtimeTest("PCRE: surrogates", "php"):
@@ -188,4 +190,4 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     val set = chars(source, "u", Dialect.PCRE)
     val model = subjects.iterator.map: c =>
       if !universe.contains(c) then "false" else if set.contains(c) then "1" else "0"
-    assertEquals(cases(Seq("php"), php(Seq(s"/\\A$source\\z/u"), subjects)), Seq(model.mkString(" ")))
+    assertEquals(cases(PHPExecutor, php(Seq(s"/\\A$source\\z/u"), subjects)), Seq(model.mkString(" ")))

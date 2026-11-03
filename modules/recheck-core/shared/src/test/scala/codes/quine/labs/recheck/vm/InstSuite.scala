@@ -15,6 +15,7 @@ import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRLookBehindStarts
 
 class InstSuite extends munit.FunSuite:
+
   val Word: CharSet =
     CharSet.union(Seq(CharSet.range('0', '9'), CharSet.range('A', 'Z'), CharSet.single('_'), CharSet.range('a', 'z')))
 

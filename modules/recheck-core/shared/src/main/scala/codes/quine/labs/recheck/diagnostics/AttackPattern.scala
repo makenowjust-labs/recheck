@@ -4,17 +4,12 @@ package diagnostics
 import codes.quine.labs.recheck.util.RepeatUtil
 import codes.quine.labs.resyntax.charset.UString
 
-/** AttackPattern is an attack pattern string to ReDoS.
+/** AttackPattern is an attack string to ReDoS, which repeats its pumps and ends with `suffix`.
   *
-  * It is a string with repetition structure and the number of repeating. It can consider as the general representation
-  * of both [[automaton.Witness]] and [[fuzz.FString]].
+  * It is the general representation of both [[automaton.Witness]] and [[fuzz.FString]]. Each pump is a prefix, a string
+  * repeated `n` plus the bias times, and the bias.
   *
-  *   - `pump` is a sequence of pumps. The 1st element of the item is a prefix string, the 2nd element is pump string,
-  *     and the 3rd element is a bias of the number of repeating.
-  *   - `suffix` is a suffix string.
-  *   - `n` is the base number of repeating. The total repeating number is a sum of bias and base.
-  *
-  * For example, when the pattern is `AttackPattern(Seq(w, u, n), (v, s, m), t, l)`, it means `w u^(n+l) v s^(m+l) t`.
+  * For example, `AttackPattern(Seq((w, u, 0), (v, s, 1)), t, 3)` is the string `w u^3 v s^4 t`.
   */
 final case class AttackPattern(pumps: Seq[(UString, UString, Int)], suffix: UString, n: Int):
 

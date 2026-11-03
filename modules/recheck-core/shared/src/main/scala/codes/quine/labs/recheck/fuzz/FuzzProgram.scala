@@ -1,7 +1,5 @@
 package codes.quine.labs.recheck.fuzz
 
-import scala.util.Try
-
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.vm.Program
@@ -20,11 +18,10 @@ final case class FuzzProgram(
     surrogates: IRSurrogateKind
 ):
 
-  /** Whether or not it uses acceleration of VM execution. */
+  /** Whether the VM memoizes the failed states in the mode, which it does only where the program allows it. */
   def usesAcceleration(mode: AccelerationMode): Boolean = mode match
-    // The verbs skipping backtracking points prevent acceleration.
-    case AccelerationMode.Auto => !program.meta.hasRef && !program.meta.hasVerb
-    case AccelerationMode.On   => !program.meta.hasVerb
+    case AccelerationMode.Auto => program.meta.allowsMemoization && !program.meta.hasRef
+    case AccelerationMode.On   => program.meta.allowsMemoization
     case AccelerationMode.Off  => false
 
   /** Joins a high surrogate followed by a low surrogate in the string of code points into one code point with `Paired`
@@ -36,11 +33,6 @@ final case class FuzzProgram(
 object FuzzProgram:
 
   /** Builds a program from the pattern, which runs as the engine of its dialect. */
-  def from(pattern: IRPattern)(using ctx: Context): Try[FuzzProgram] =
-    Try:
-      ctx.interrupt:
-        for
-          program <- ProgramBuilder.build(pattern)
-          alphabet = PatternAlphabet.of(pattern)
-        yield FuzzProgram(program, alphabet, pattern.parts, pattern.surrogates)
-    .flatten
+  def from(pattern: IRPattern)(using ctx: Context): FuzzProgram =
+    ctx.interrupt:
+      FuzzProgram(ProgramBuilder.build(pattern), PatternAlphabet.of(pattern), pattern.parts, pattern.surrogates)

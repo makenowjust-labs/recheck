@@ -16,6 +16,7 @@ import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UnitMode
 
 class DiagnosticsSuite extends munit.FunSuite:
+
   test("Diagnostics#toString"):
     assertEquals(
       Diagnostics.Safe("", "", Dialect.JavaScript, AttackComplexity.Constant, Checker.Automaton).toString,
@@ -101,24 +102,6 @@ class DiagnosticsSuite extends munit.FunSuite:
           |Status : unknown
           |Error  : timeout
           |Checker: (none)""".stripMargin
-    )
-
-  test("RecallValidation#toString"):
-    assertEquals(
-      RecallValidation("python 3.15.0", Duration.Inf, RecallResult.Timeout).toString,
-      "succeeded (timed out on python 3.15.0, timeout: none)"
-    )
-    assertEquals(
-      RecallValidation(
-        "php 8.5.12",
-        Duration(1, SECONDS),
-        RecallResult.EngineLimit("Backtrack limit exhausted")
-      ).toString,
-      "succeeded (engine limit: Backtrack limit exhausted on php 8.5.12, timeout: 1000 ms)"
-    )
-    assertEquals(
-      RecallValidation("java 25", Duration(1, SECONDS), RecallResult.EngineError("StackOverflowError")).toString,
-      "failed (engine error: StackOverflowError on java 25, timeout: 1000 ms)"
     )
 
   test("Diagnostics.Unknown.from"):

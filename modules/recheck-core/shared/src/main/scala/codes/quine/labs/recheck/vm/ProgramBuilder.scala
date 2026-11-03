@@ -2,7 +2,6 @@ package codes.quine.labs.recheck.vm
 
 import scala.collection.mutable
 import scala.compiletime.uninitialized
-import scala.util.Try
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
@@ -31,13 +30,8 @@ import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 object ProgramBuilder:
 
   /** Builds a corresponding program from the RegExp pattern, which runs as the engine of its dialect. */
-  def build(pattern: IRPattern)(using ctx: Context): Try[Program] =
-    for
-      _ <- Try(())
-      capturesSize = pattern.captureCount
-      builder = new ProgramBuilder(pattern, capturesSize)
-      program <- Try(builder.build())
-    yield program
+  def build(pattern: IRPattern)(using ctx: Context): Program =
+    new ProgramBuilder(pattern, pattern.captureCount).build()
 
 /** AcceptScope is what `(*ACCEPT)` ends successfully. */
 private[vm] enum AcceptScope:
@@ -55,7 +49,8 @@ private[vm] class ProgramBuilder(
     private val pattern: IRPattern,
     private val capturesSize: Int
 )(using ctx: Context):
-  import ctx._
+
+  import ctx.*
 
   private val universe = pattern.universe
 

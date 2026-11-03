@@ -3,6 +3,7 @@ package codes.quine.labs.recheck.common
 import scala.concurrent.duration.*
 
 class ContextSuite extends munit.FunSuite:
+
   test("Context.apply"):
     assertEquals(Context().isInterrupted(), false)
     assertEquals(Context(timeout = 1.second).isInterrupted(), false)
@@ -32,7 +33,7 @@ class ContextSuite extends munit.FunSuite:
     source.cancel()
     called = false
     interceptMessage[CancelException](
-      "cancel at modules/recheck-common/shared/src/test/scala/codes/quine/labs/recheck/common/ContextSuite.scala:37"
+      "cancel at modules/recheck-common/shared/src/test/scala/codes/quine/labs/recheck/common/ContextSuite.scala:38"
     ):
       ctx.interrupt:
         called = true
@@ -42,7 +43,7 @@ class ContextSuite extends munit.FunSuite:
     // Case: timeout
     called = false
     interceptMessage[TimeoutException](
-      "timeout at modules/recheck-common/shared/src/test/scala/codes/quine/labs/recheck/common/ContextSuite.scala:47"
+      "timeout at modules/recheck-common/shared/src/test/scala/codes/quine/labs/recheck/common/ContextSuite.scala:48"
     ):
       Context(timeout = Duration.MinusInf).interrupt:
         called = true

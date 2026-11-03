@@ -186,16 +186,6 @@ class MainSuite extends munit.FunSuite:
     assertEquals(allStatus, 0)
     assertEquals(parse(all), Right(Json.arr(encodeDiagnostics(ReDoS.check("foo", "", params)))))
 
-  test("Main#run: --all with failed recall validation"):
-    // Ruby's memoization makes the attacks fail, and the last diagnostics is safe.
-    val (out, err, status) = runMain(Seq("--all", "--dialect=ruby", "--recall-timeout=1s", "/^(a|a)*$/"))
-    assertEquals(err, "")
-    assertEquals(status, 0)
-    val blocks = out.stripSuffix("\n").split("\n\n").toSeq
-    assert(clue(blocks).sizeIs >= 2)
-    blocks.init.foreach(b => assert(clue(b).contains("Status       : vulnerable")))
-    assert(clue(blocks.last).contains("Status    : safe"))
-
   test("Main#run: generate-recall-script"):
     // The input is the output of `--json`.
     def diagnostics(args: String*): Json =

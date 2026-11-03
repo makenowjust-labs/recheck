@@ -123,10 +123,10 @@ object FString:
   /** Repeat is a repetition specifier in FString. */
   final case class Repeat(m: Int, size: Int) extends FChar
 
-  /** Builds a FString from a string. */
+  /** Builds an FString from a string. */
   def apply(input: UString): FString = FString(1, input.iterator.map(Wrap(_)).toIndexedSeq)
 
-  /** Builds a FString from a string with a loop analysis information. */
+  /** Builds an FString from a string with a loop analysis information. */
   def build(input: UString, loops: Seq[(Int, Int)]): FString =
     val repeats = loops.iterator.collect { case (start, end) if start != end => (start, end - start) }.toMap
 
@@ -156,7 +156,7 @@ object FString:
     val seq2 = fs2.seq.slice(0, n2) ++ fs1.seq.slice(n1, fs1.seq.size)
     (fix(FString(n, seq1)), fix(FString(n, seq2)))
 
-  /** Fixes a FString sequence. */
+  /** Fixes an FString sequence. */
   private[fuzz] def fix(fs: FString): FString =
     val seq = IndexedSeq.newBuilder[FChar]
     var repeat = 0

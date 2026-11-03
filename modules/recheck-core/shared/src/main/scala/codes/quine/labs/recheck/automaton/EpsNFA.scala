@@ -13,7 +13,7 @@ import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.alphabet.CharKind
 import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
-/** EpsNFA is an ordered ε-NFA on unicode code points. */
+/** EpsNFA is an ordered ε-NFA on the units of the pattern's unit mode. */
 final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q, accept: Q, tau: Map[Q, Transition[Q]]):
 
   /** Converts to Graphviz format text. */
@@ -199,10 +199,10 @@ object EpsNFA:
   final case class Consume[Q](set: Set[(CharSet, CharKind)], to: Q, loc: Option[SourceLocation] = None)
       extends Transition[Q]
 
-  /** LoopEnter is an ε-NFA transition with consuming no character and marking a entering of the loop. */
+  /** LoopEnter is an ε-NFA transition with consuming no character and marking the entry to the loop. */
   final case class LoopEnter[Q](loop: Int, to: Q) extends Transition[Q]
 
-  /** LoopExit is an ε-NFA transition with consuming no character and marking a exiting of the loop. */
+  /** LoopExit is an ε-NFA transition with consuming no character and marking the exit from the loop. */
   final case class LoopExit[Q](loop: Int, to: Q) extends Transition[Q]
 
   /** AssertKind is assertion kind of this ε-NFA transition. */
@@ -236,6 +236,7 @@ object EpsNFA:
       */
     final case class LineBegin(set: Int, atEnd: IRLineBeginAtEnd, afterCRLF: Boolean, atomic: Boolean)
         extends AssertKind:
+
       def accepts(prev: CharKindState, next: CharKindState): Boolean =
         val afterTerminator = prev.kind.isLineTerminatorOf(set) || (afterCRLF && prev.afterCR)
         (prev.kind.boundary || afterTerminator) && !(atomic && betweenCRLF(prev, next)) &&
@@ -250,6 +251,7 @@ object EpsNFA:
       * `(*CRLF)`). With `atomic`, it does not match between `\r` and `\n` (Java).
       */
     final case class LineEnd(set: Int, beforeCRLF: Boolean, atomic: Boolean) extends AssertKind:
+
       def accepts(prev: CharKindState, next: CharKindState): Boolean =
         val beforeTerminator =
           next.kind.isLineTerminatorOf(set) || (beforeCRLF && next.kind.cr && !next.follow.contains(CRFollow.Other))
@@ -257,10 +259,12 @@ object EpsNFA:
 
     /** TextBegin is `\A` assertion. */
     case object TextBegin extends AssertKind:
+
       def accepts(prev: CharKindState, next: CharKindState): Boolean = prev.kind.boundary
 
     /** TextEnd is `\z` assertion. */
     case object TextEnd extends AssertKind:
+
       def accepts(prev: CharKindState, next: CharKindState): Boolean = next.kind.boundary
 
     /** ChompTextEnd is `\Z` assertion with the `set`-th line terminator set, which matches at the end or before a line
@@ -270,6 +274,7 @@ object EpsNFA:
       * (Java).
       */
     final case class ChompTextEnd(set: Int, crlf: Boolean, atomic: Boolean) extends AssertKind:
+
       def accepts(prev: CharKindState, next: CharKindState): Boolean =
         val beforeFinal = (next.kind.isLineTerminatorOf(set) && next.last.contains(true)) ||
           (crlf && next.kind.cr && next.follow.contains(CRFollow.FinalLF))
@@ -277,6 +282,7 @@ object EpsNFA:
 
     /** WordBoundary is `\b` assertion of the `set`-th word set. */
     final case class WordBoundary(set: Int) extends AssertKind:
+
       def accepts(prev: CharKindState, next: CharKindState): Boolean =
         prev.kind.isWordOf(set) != next.kind.isWordOf(set)
 
@@ -284,6 +290,7 @@ object EpsNFA:
 
     /** NotWordBoundary is `\B` assertion of the `set`-th word set. */
     final case class NotWordBoundary(set: Int) extends AssertKind:
+
       def accepts(prev: CharKindState, next: CharKindState): Boolean =
         prev.kind.isWordOf(set) == next.kind.isWordOf(set)
 
@@ -303,6 +310,7 @@ object EpsNFA:
 
     /** MarkWordBoundary is `\b` assertion of the `word`-th word set and the `marks`-th word marks. */
     final case class MarkWordBoundary(word: Int, marks: Int) extends AssertKind:
+
       def accepts(prev: CharKindState, next: CharKindState): Boolean =
         isMarkWordBefore(prev, word, marks) != isMarkWordAfter(prev, next, word, marks)
 
@@ -310,6 +318,7 @@ object EpsNFA:
 
     /** NotMarkWordBoundary is `\B` assertion of the `word`-th word set and the `marks`-th word marks. */
     final case class NotMarkWordBoundary(word: Int, marks: Int) extends AssertKind:
+
       def accepts(prev: CharKindState, next: CharKindState): Boolean =
         isMarkWordBefore(prev, word, marks) == isMarkWordAfter(prev, next, word, marks)
 
@@ -317,6 +326,7 @@ object EpsNFA:
 
     /** NotBetweenCRLF is an assertion that the position is not between `\r` and `\n`. */
     case object NotBetweenCRLF extends AssertKind:
+
       def accepts(prev: CharKindState, next: CharKindState): Boolean = !betweenCRLF(prev, next)
 
       override def seesBoundary: Boolean = false

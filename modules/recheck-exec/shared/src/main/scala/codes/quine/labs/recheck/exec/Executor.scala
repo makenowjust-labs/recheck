@@ -63,6 +63,7 @@ object Executor:
       val options: Seq[String] = Seq.empty,
       stdin: Seq[String] = Seq("-")
   ) extends Executor:
+
     protected val args: Seq[String] = options ++ stdin
 
   /** File is an executor running a program file, whose input is the data of the program on the standard input.
@@ -76,5 +77,6 @@ object Executor:
       program: SourceFile,
       override protected val variables: Map[String, String] = Map.empty
   ) extends Executor:
+
     protected val args: Seq[String] = options
     override protected val file: Option[SourceFile] = Some(program)

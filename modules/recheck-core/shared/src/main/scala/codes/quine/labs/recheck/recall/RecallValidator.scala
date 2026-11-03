@@ -24,7 +24,7 @@ object RecallValidator:
     * dialect or the pattern is not supported. It throws [[UnexpectedException]] when the runtime fails to run the
     * program.
     *
-    * The environment variables of this process may replace the command of the runtime (e.g. `RECHECK_NODE`).
+    * The environment variables `env` may replace the command of the runtime (e.g. `RECHECK_NODE`).
     */
   def validate(
       source: String,
@@ -32,24 +32,24 @@ object RecallValidator:
       dialect: Dialect,
       mode: UnitMode,
       attack: AttackPattern,
-      timeout: Duration
+      timeout: Duration,
+      env: Map[String, String]
   )(using ctx: Context): Option[RecallValidation] = ctx.interrupt:
     if timeout <= Duration.Zero || !Executor.isAvailable then None
     else
       RecallProgram.generate(source, flags, dialect, mode, attack) match
-        case Left(_) =>
-          ctx.log("recall: not supported")
+        case Left(reason) =>
+          ctx.log(s"recall: not supported\n  reason: $reason")
           None
         case Right(program) =>
           val executor = program.executor
-          val env = sys.env
           val commandLine = executor.commandLine(env)
           ctx.log(s"recall: command: $commandLine\n${program.script}")
-          val output = executor.exec(program.script, limit(timeout), RecallProgram.StartLine, env)
-          Some(result(executor.runtime(env), commandLine, timeout, output))
+          val output = executor.exec(program.script, boundTimeout(timeout), RecallProgram.StartLine, env)
+          Some(parseOutput(executor.runtime(env), commandLine, timeout, output))
 
   /** Returns the time limit of a matching for the timeout, which is bounded by the deadline of the context. */
-  private[recall] def limit(timeout: Duration)(using ctx: Context): Option[FiniteDuration] = timeout match
+  private[recall] def boundTimeout(timeout: Duration)(using ctx: Context): Option[FiniteDuration] = timeout match
     case d: FiniteDuration if (ctx.deadline eq null) || d <= ctx.deadline.timeLeft => Some(d)
     case _ => Option(ctx.deadline).map(_.timeLeft)
 
@@ -57,7 +57,7 @@ object RecallValidator:
     *
     * The runtime name is `name` if the output does not have it, and an error message shows the command line `command`.
     */
-  private[recall] def result(name: String, command: String, timeout: Duration, output: ExecResult)(using
+  private[recall] def parseOutput(name: String, command: String, timeout: Duration, output: ExecResult)(using
       ctx: Context
   ): RecallValidation = ctx.interrupt:
     def line(out: String, name: String): Option[String] =

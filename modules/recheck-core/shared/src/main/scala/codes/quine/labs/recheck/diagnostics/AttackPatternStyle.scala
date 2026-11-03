@@ -42,6 +42,7 @@ object AttackPatternStyle:
     * writes the UTF-16 encoding of the string, which a JavaScript string holds.
     */
   final case class JavaScript(unicode: Boolean) extends AttackPatternStyle:
+
     def literal(s: UString): String =
       val mode = if unicode then UnitMode.CodePoint else UnitMode.UTF16
       UnitMode.CodePoint.decode(mode.encode(s)).iterator.map(char).mkString("'", "", "'")
@@ -67,6 +68,7 @@ object AttackPatternStyle:
     * [[JavaScript]] for a `unicode` pattern writes them.
     */
   case object Superscript extends AttackPatternStyle:
+
     def literal(s: UString): String = JavaScript(unicode = true).literal(s)
 
     def repeat(s: UString, n: Int): String = s"${literal(s)}${NumberFormat.superscript(n)}"
@@ -78,6 +80,7 @@ object AttackPatternStyle:
     * Its units are code points, or bytes for bytes.
     */
   final case class Python(bytes: Boolean) extends AttackPatternStyle:
+
     def literal(s: UString): String = s.iterator.map(char).mkString(if bytes then "b'" else "'", "", "'")
 
     def repeat(s: UString, n: Int): String = s"${literal(s)} * $n"
@@ -98,6 +101,7 @@ object AttackPatternStyle:
     * Its units are code points, or bytes for bytes.
     */
   final case class Ruby(bytes: Boolean) extends AttackPatternStyle:
+
     def literal(s: UString): String =
       val cs = s.iterator.toIndexedSeq
       cs.indices
@@ -125,6 +129,7 @@ object AttackPatternStyle:
     * Its units are code points, and it writes their UTF-16 encoding, which a Java string holds.
     */
   case object Java extends AttackPatternStyle:
+
     def literal(s: UString): String =
       UnitMode.CodePoint.decode(UnitMode.CodePoint.encode(s)).iterator.map(char).mkString("\"", "", "\"")
 
@@ -145,6 +150,7 @@ object AttackPatternStyle:
     * Its units are UTF-16 code units, which a C# string holds. `Enumerable.Repeat` needs `System.Linq`.
     */
   case object CSharp extends AttackPatternStyle:
+
     def literal(s: UString): String =
       UnitMode.CodePoint.decode(UnitMode.UTF16.encode(s)).iterator.map(char).mkString("\"", "", "\"")
 
@@ -165,6 +171,7 @@ object AttackPatternStyle:
     * Its units are code points or bytes, and its literals are ASCII.
     */
   case object Perl extends AttackPatternStyle:
+
     def literal(s: UString): String = s.iterator.map(char).mkString("\"", "", "\"")
 
     def repeat(s: UString, n: Int): String = s"${literal(s)} x $n"
@@ -185,6 +192,7 @@ object AttackPatternStyle:
     * others are double-quoted. Unless the style is for bytes, a character is written as its UTF-8 bytes.
     */
   final case class PHP(bytes: Boolean) extends AttackPatternStyle:
+
     def literal(s: UString): String =
       val cs = s.iterator.toSeq
       if cs.forall(isASCIIPrintable) then
@@ -205,6 +213,7 @@ object AttackPatternStyle:
 
   /** The escapes common to the languages. */
   private object Named:
+
     def unapply(c: UChar): Option[String] = c match
       case '\t' => Some("\\t")
       case '\n' => Some("\\n")

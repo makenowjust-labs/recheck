@@ -1,7 +1,5 @@
 package codes.quine.labs.recheck.fuzz
 
-import scala.util.Try
-
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Context
@@ -14,10 +12,7 @@ class FuzzProgramSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
   def from(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): FuzzProgram =
-    (for
-      ir <- Try(ReDoS.parse(source, flags, dialect))
-      fuzz <- FuzzProgram.from(ir)
-    yield fuzz).get
+    FuzzProgram.from(ReDoS.parse(source, flags, dialect))
 
   test("FuzzProgram#usesAcceleration"):
     val fuzz1 = from("foo", "")
@@ -28,6 +23,9 @@ class FuzzProgramSuite extends munit.FunSuite:
     assertEquals(fuzz2.usesAcceleration(AccelerationMode.On), true)
     assertEquals(fuzz1.usesAcceleration(AccelerationMode.Off), false)
     assertEquals(fuzz2.usesAcceleration(AccelerationMode.Off), false)
+    // The verbs and the non-atomic look-arounds do not allow memoization.
+    for source <- Seq("a(*PRUNE)b", "(*napla:a)a"); mode <- AccelerationMode.values do
+      assertEquals(from(source, "", Dialect.PCRE).usesAcceleration(mode), false, s"$source in $mode")
 
   test("FuzzProgram#joinSurrogates"):
     val s = UString(0xd83d, 0xde00, 0xde00, 0xd83d)

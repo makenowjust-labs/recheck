@@ -7,6 +7,7 @@ import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
 class AttackPatternStyleSuite extends munit.FunSuite:
+
   test("AttackPatternStyle: languages"):
     val attack = AttackPattern(Seq((UnitMode.UTF16.decode("x"), UnitMode.UTF16.decode("a"), 0)), UString(0), 31)
     assertEquals(attack.toString(Python(bytes = false)), "'x' + 'a' * 31 + '\\x00'")

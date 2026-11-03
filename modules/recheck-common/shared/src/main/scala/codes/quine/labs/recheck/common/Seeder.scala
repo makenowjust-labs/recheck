@@ -2,6 +2,7 @@ package codes.quine.labs.recheck.common
 
 /** Seeder is an enum values to specify a seeder to be used. */
 enum Seeder:
+
   /** A seeder by using static analysis. */
   case Static
 
