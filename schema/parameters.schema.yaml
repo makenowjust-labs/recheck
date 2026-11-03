@@ -48,7 +48,11 @@ properties:
 
   attackLimit:
     title: "Attack Limit"
-    description: "The upper limit on the number of characters read by the VM on the attack."
+    description: |-
+      The upper limit of the VM's steps when the fuzz checker runs an attack string.
+
+      A step is a character that the VM reads, including each character that a back-reference compares.
+      The fuzz checker also sizes the attack string to reach this number of steps.
     type: integer
     default: 1500000000
     x-scala-type: "Int"
@@ -182,7 +186,10 @@ properties:
 
   incubationLimit:
     title: "Incubation Limit"
-    description: "The upper limit on the number of characters read by the VM on incubation."
+    description: |-
+      The upper limit of the VM's steps when the fuzz checker runs a gene string on incubation.
+
+      `static` seeding also sizes its seed strings to reach this number of steps.
     type: integer
     default: 25000
     x-scala-type: "Int"
@@ -284,21 +291,12 @@ properties:
     x-cli: "max-pattern-size"
     x-since: "1.1.1"
 
-  maxRuntimeAttackStringSize:
-    title: "Max Runtime Attack String Size"
-    description: "The maximum length of the attack string on runtime-attack verification."
-    type: integer
-    default: 300000
-    x-scala-type: "Int"
-    x-cli: "max-runtime-attack-string-size"
-    x-since: "4.2.0"
-
   maxRefutedAttacks:
     title: "Max Refuted Attacks"
     description: |-
-      The maximum number of attacks that runtime-attack verification refutes.
+      The maximum number of attacks that the runtime attacks refute.
 
-      When it is reached, the checking stops, and the result is `unknown` with the `runtime-attacks-refuted` error.
+      When the runtime attacks refute this many attacks, the checking stops, and the result is `unknown` with the `runtime-attacks-refuted` error.
     type: integer
     default: 10
     x-scala-type: "Int"
@@ -313,6 +311,15 @@ properties:
     x-scala-type: "Int"
     x-cli: "max-repeat-count"
     x-since: "1.0.0"
+
+  maxRuntimeAttackStringSize:
+    title: "Max Runtime Attack String Size"
+    description: "The maximum length of the attack string in the diagnostics, which the runtime attack runs."
+    type: integer
+    default: 300000
+    x-scala-type: "Int"
+    x-cli: "max-runtime-attack-string-size"
+    x-since: "5.0.0"
 
   maxSimpleRepeatCount:
     title: "Max Simple Repeat Count"
@@ -343,27 +350,32 @@ properties:
 
   runtimeAttackLimit:
     title: "Runtime Attack Limit"
-    description: "The upper limit on the number of characters read by the VM on the runtime-attack verification."
+    description: |-
+      The number of steps that the attack string in the diagnostics is sized for.
+
+      It is not a limit of the VM.
+      The repeat count of the attack string, which the runtime attack runs, is chosen so that a backtracking matcher reads about this many characters, counted as the VM counts its steps (see `attackLimit`).
     type: integer
     default: 1500000000
     x-scala-type: "Int"
     x-cli: "runtime-attack-limit"
-    x-since: "4.2.0"
+    x-since: "5.0.0"
 
   runtimeAttackTimeout:
     title: "Runtime Attack Timeout"
     description: |-
-      The upper limit of matching time on the runtime-attack verification.
+      The upper limit of matching time on the runtime attack.
 
-      The runtime-attack verification runs the attack string on the real engine of the dialect (see [Runtime-Attack Verification](/docs/usage/runtime-attack-verification)).
+      The runtime attack runs the attack string on the real engine of the dialect (see [Runtime-Attack Verification](/docs/usage/runtime-attack-verification)).
       An attack string that the engine matches within this time is refuted: it is recorded in `refutedAttacks` of the diagnostics, and the checking goes on.
-      The runtime-attack verification is skipped if this value is not positive, or where commands cannot run (e.g. in the browser).
+      The time is also bounded by the time left of `timeout`.
+      The runtime attack is skipped if this value is not positive, or where commands cannot run (e.g. in the browser).
     type: [integer, "null"]
     default: -1000
     x-unit: "milliseconds"
     x-scala-type: "Duration"
     x-cli: "runtime-attack-timeout"
-    x-since: "4.2.0"
+    x-since: "5.0.0"
 
   seeder:
     title: "Seeder"
@@ -382,7 +394,7 @@ properties:
 
   seedingLimit:
     title: "Seeding Limit"
-    description: "The upper limit on the number of characters read by the VM on `dynamic` seeding."
+    description: "The upper limit of the VM's steps on `dynamic` seeding."
     type: integer
     default: 1000
     x-scala-type: "Int"
