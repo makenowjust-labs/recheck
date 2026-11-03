@@ -88,8 +88,9 @@ class CaseMappingSuite extends munit.FunSuite:
     assertEquals(ECMAScriptUpper.closure(CharSet.single(SharpS)), CharSet.of(SharpS))
     assertEquals(ECMAScriptUpper.closure(CharSet.single(CapitalSharpS)), CharSet.of(CapitalSharpS))
     assertEquals(ECMAScriptUpper.closure(CharSet.single(0x01c4)), CharSet.of(0x01c4, 0x01c5, 0x01c6))
-    assertEquals(ecmaScriptCanonicalize(false), ECMAScriptUpper)
-    assertEquals(ecmaScriptCanonicalize(true), SimpleFold)
+    assertEquals(ecmaScriptCanonicalize(UnitMode.UTF16), ECMAScriptUpper)
+    assertEquals(ecmaScriptCanonicalize(UnitMode.CodePoint), SimpleFold)
+    intercept[IllegalArgumentException](ecmaScriptCanonicalize(UnitMode.Byte))
 
   test("CaseMapping#image / preimage / closure on sets"):
     assertEquals(SimpleFold.image(CharSet.range('A', 'Z')), CharSet.range('a', 'z'))

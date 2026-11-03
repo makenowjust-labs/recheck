@@ -146,8 +146,16 @@ object CaseMapping:
     */
   lazy val ECMAScriptUpper: CaseMapping = decode(CaseData.ECMAScriptUpper)
 
-  /** Returns the mapping of ECMAScript `Canonicalize` (ES2024 22.2.2.7.3) with or without the `u` and `v` flags. */
-  def ecmaScriptCanonicalize(unicode: Boolean): CaseMapping = if unicode then SimpleFold else ECMAScriptUpper
+  /** Returns the mapping of ECMAScript `Canonicalize` (ES2024 22.2.2.7.3) on the units of the mode.
+    *
+    * `CodePoint` is the mode with the `u` or `v` flag, and `UTF16` is the one without them.
+    *
+    * It throws `IllegalArgumentException` for `Byte`, which ECMAScript does not have.
+    */
+  def ecmaScriptCanonicalize(mode: UnitMode): CaseMapping = mode match
+    case UnitMode.CodePoint => SimpleFold
+    case UnitMode.UTF16     => ECMAScriptUpper
+    case UnitMode.Byte      => throw new IllegalArgumentException("ECMAScript has no byte mode")
 
 /** FullCaseFolding is full case folding (the `C` and `F` mappings of CaseFolding.txt), which may map a code point to
   * several code points, such as `U+00DF` to `ss`.

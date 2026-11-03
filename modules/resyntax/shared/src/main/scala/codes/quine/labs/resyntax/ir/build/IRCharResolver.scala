@@ -888,7 +888,7 @@ private[build] object IRCharResolver:
     else
       dialect match
         case Dialect.JavaScript =>
-          Keyed("ECMAScript", CaseMapping.ecmaScriptCanonicalize(mode == UnitMode.CodePoint), mode)
+          Keyed("ECMAScript", CaseMapping.ecmaScriptCanonicalize(mode), mode)
         case Dialect.Java   => if flags.unicodeCase then JavaUnicode else JavaASCII
         case Dialect.DotNet => Keyed(".NET", dotNetKey, mode)
         case _: Dialect.Python if asciiOnly || mode == UnitMode.Byte => Keyed("ASCII", asciiFold, mode)
