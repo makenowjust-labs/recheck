@@ -56,7 +56,7 @@ export type SafeDiagnostics = {
   unitMode: UnitMode;
   status: "safe";
   complexity: SafeComplexity;
-  refutedRecalls: RefutedRecall[];
+  refutedAttacks: RefutedAttack[];
   checker: "automaton" | "fuzz";
 };
 
@@ -73,10 +73,10 @@ export type VulnerableDiagnostics = {
   attack: AttackPattern;
   hotspot: Hotspot[];
   /**
-   * The recall validation of the attack string, or `null` if it is not run.
+   * The run of the attack string on the real regex engine, or `null` if it is not run.
    */
-  recallValidation: RecallValidation | null;
-  refutedRecalls: RefutedRecall[];
+  runtimeAttack: RuntimeAttack | null;
+  refutedAttacks: RefutedAttack[];
   checker: "automaton" | "fuzz";
 };
 
@@ -86,19 +86,19 @@ export type VulnerableDiagnostics = {
 export type UnitMode = "utf16" | "code-point" | "byte";
 
 /**
- * RefutedRecall is an attack that the recall validation refuted before the result.
+ * RefutedAttack is an attack that the runtime-attack verification refuted before the result.
  */
-export type RefutedRecall = {
+export type RefutedAttack = {
   complexity: VulnerableComplexity;
   attack: AttackPattern;
   hotspot: Hotspot[];
-  recallValidation: RecallValidation;
+  runtimeAttack: RuntimeAttack;
 };
 
 /**
- * RecallValidation is a run of the attack string on the real regex engine of the dialect.
+ * RuntimeAttack is a run of the attack string on the real regex engine of the dialect.
  */
-export type RecallValidation = {
+export type RuntimeAttack = {
   /**
    * The runtime name and version, e.g. `"node v26.11.1"`.
    */
@@ -107,7 +107,7 @@ export type RecallValidation = {
    * The timeout of the matching in milliseconds, or `null` if it is infinite.
    */
   timeout: number | null;
-  result: RecallResult;
+  result: RuntimeAttackResult;
   /**
    * Whether the engine confirms the attack, i.e. the attack is effective there (`timeout` or `engine-limit`).
    * Otherwise, the engine refutes the attack.
@@ -116,7 +116,7 @@ export type RecallValidation = {
 };
 
 /**
- * RecallResult is the result of matching the attack string on the real regex engine.
+ * RuntimeAttackResult is the result of matching the attack string on the real regex engine.
  *
  * - `finish`: The matching finished in `time` milliseconds, so the attack is not effective.
  * - `timeout`: The matching did not finish in time.
@@ -124,7 +124,7 @@ export type RecallValidation = {
  * - `engine-error`: The engine gave up with an error on the stack depth or the memory, e.g. Java's `StackOverflowError`.
  *   It may happen on a long string even if the matching takes linear time, so the attack is not considered effective.
  */
-export type RecallResult =
+export type RuntimeAttackResult =
   | { kind: "finish"; time: number }
   | { kind: "timeout" }
   | { kind: "engine-limit"; message: string }
@@ -143,7 +143,7 @@ export type UnknownDiagnostics = {
   unitMode: UnitMode | null;
   status: "unknown";
   error: Error;
-  refutedRecalls: RefutedRecall[];
+  refutedAttacks: RefutedAttack[];
   checker?: "automaton" | "fuzz";
 };
 
@@ -195,7 +195,7 @@ export type Hotspot = {
  * Error is a possible error on analyzing.
  */
 export type Error =
-  Timeout | Cancel | Unsupported | Invalid | RecallRefutationLimit | Unexpected;
+  Timeout | Cancel | Unsupported | Invalid | RuntimeAttacksRefuted | Unexpected;
 
 /**
  * Timeout is a timeout error.
@@ -221,9 +221,9 @@ export type Invalid = {
   message: string;
 };
 /**
- * RecallRefutationLimit is an error reported when the recall validation refutes `maxRefutedRecalls` attacks.
+ * RuntimeAttacksRefuted is an error reported when the runtime-attack verification refutes `maxRefutedAttacks` attacks.
  */
-export type RecallRefutationLimit = { kind: "recall-refutation-limit" };
+export type RuntimeAttacksRefuted = { kind: "runtime-attacks-refuted" };
 
 /**
  * Unexpected is an error reported when unexpected error occurs.

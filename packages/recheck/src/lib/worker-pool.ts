@@ -230,7 +230,7 @@ export class WorkerPool {
       unitMode: null,
       status: "unknown",
       error: { kind: "cancel" },
-      refutedRecalls: [],
+      refutedAttacks: [],
     };
     ref.resolve(cancelled);
 

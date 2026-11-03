@@ -169,11 +169,11 @@ test("checkSync: invalid", () => {
   );
 });
 
-// A runtime command line whose recall validation always finishes, so that every attack is refuted.
+// A runtime command line whose runtime attack always finishes, so that every attack is refuted.
 const finishing =
   "sh -c 'echo recheck:runtime fake; echo recheck:start; echo recheck:time 0' sh";
 
-test("check: java with refuted recalls", async () => {
+test("check: java with refuted attacks", async () => {
   backend.mockReturnValueOnce("java");
   // Jest's `process.env` does not reach child processes, so `env` sets the variable.
   javaEnsure.mockImplementationOnce(() =>
@@ -188,16 +188,16 @@ test("check: java with refuted recalls", async () => {
 
   const diagnostics = await main.check("^(a|a)*$", "", {
     checker: "automaton",
-    recallTimeout: 1000,
+    runtimeAttackTimeout: 1000,
   });
   expect(diagnostics).toMatchObject({
     status: "safe",
     unitMode: "utf16",
-    refutedRecalls: [
+    refutedAttacks: [
       {
         complexity: { type: "exponential" },
         attack: { pattern: "'a'.repeat(31) + '\\x00'" },
-        recallValidation: {
+        runtimeAttack: {
           runtime: "fake",
           timeout: 1000,
           result: { kind: "finish", time: 0 },
