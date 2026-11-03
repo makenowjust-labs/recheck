@@ -8,7 +8,7 @@ private[charset] enum NameMatching:
   /** Matches names by UAX #44 LM3: ignore ASCII case, whitespace, `_`, `-` and a leading "is". */
   case Loose
 
-  /** Two names match iff their keys are equal. */
+  /** Returns the key of the name, where two names match iff their keys are equal. */
   def key(name: String): String = this match
     case Exact => name
     case Loose => NameMatching.loose(name)

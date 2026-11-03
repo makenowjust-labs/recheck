@@ -17,7 +17,7 @@ final class Alphabet private (
 
   def size: Int = atoms.size
 
-  /** Returns `-1` for a code value outside the mode. */
+  /** Returns the index of the atom containing the code value, or `-1` for a code value outside the mode. */
   def atomOf(value: UChar): Int =
     if !mode.contains(value) then -1
     else segmentAtoms(CharSet.countLessOrEqual(segmentStarts, value) - 1)
@@ -40,7 +40,10 @@ final class Alphabet private (
 
 object Alphabet:
 
-  /** The sets are restricted to the mode, and the atoms are ordered by their smallest code values. */
+  /** Builds the coarsest alphabet of the mode such that each set is a union of atoms.
+    *
+    * The sets are restricted to the mode, and the atoms are ordered by their smallest code values.
+    */
   def refine(mode: UnitMode, sets: Iterable[CharSet]): Alphabet =
     val restricted = sets.iterator.map(_.restrict(mode)).filter(_.nonEmpty).toVector
 

@@ -32,7 +32,7 @@ final class UString private (private val values: Array[UChar]) extends Ordered[U
   /** Returns the unit before the position, if any. */
   def getBefore(n: Int): Option[UChar] = Option.when(0 < n && n <= length)(values(n - 1))
 
-  /** Strings are ordered lexicographically by code values. */
+  /** Compares the strings lexicographically by code values. */
   def compare(that: UString): Int =
     val n = math.min(length, that.length)
     var i = 0

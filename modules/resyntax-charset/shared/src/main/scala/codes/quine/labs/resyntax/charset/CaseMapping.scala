@@ -140,7 +140,7 @@ object CaseMapping:
     */
   lazy val ECMAScriptUpper: CaseMapping = decode(CaseData.ECMAScriptUpper)
 
-  /** ECMAScript `Canonicalize` (ES2024 22.2.2.7.3). */
+  /** Returns the mapping of ECMAScript `Canonicalize` (ES2024 22.2.2.7.3) with or without the `u` and `v` flags. */
   def ecmaScriptCanonicalize(unicode: Boolean): CaseMapping = if unicode then SimpleFold else ECMAScriptUpper
 
 /** FullCaseFolding is full case folding (the `C` and `F` mappings of CaseFolding.txt), which may map a code point to
@@ -178,5 +178,7 @@ object FullCaseMapping:
 
   def lower(c: Int): UString = lowerOverrides.getOrElse(c, UString(CaseMapping.SimpleLower(c)))
 
-  /** Maps `U+01C6` to `U+01C5`, and `U+00DF` to `Ss`, for example. */
+  /** Returns the full titlecase mapping of the code point, which maps `U+01C6` to `U+01C5` and `U+00DF` to `Ss`, for
+    * example.
+    */
   def title(c: Int): UString = titleOverrides.getOrElse(c, upper(c))
