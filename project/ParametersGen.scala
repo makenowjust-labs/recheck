@@ -1,17 +1,17 @@
 import java.io.File
 import java.nio.charset.StandardCharsets
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 import org.yaml.snakeyaml.LoaderOptions
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.SafeConstructor
 
 import sbt.io.IO
-import sbt.io.syntax._
+import sbt.io.syntax.*
 
 /** ParametersGen generates the Scala code of recheck's parameters from `parameters.schema.yaml`. */
-object ParametersGen {
+object ParametersGen:
 
   /** The schema path relative to the repository root. */
   val SchemaPath: String = "schema/parameters.schema.yaml"
@@ -27,7 +27,8 @@ object ParametersGen {
       cli: Option[String],
       cliMetavar: Option[String],
       scalaDefaultValue: Option[String]
-  ) {
+  ):
+
     def isDuration: Boolean = scalaType == "Duration"
 
     def isLogger: Boolean = scalaType == "Option[Context.Logger]"
@@ -40,23 +41,22 @@ object ParametersGen {
 
     def defaultName: String = s"Parameters.Default$capitalName"
 
-    def scalaDefault: String = scalaDefaultValue.getOrElse(default match {
-      case null if isDuration                                 => "Duration.Inf"
-      case null                                               => "None"
-      case n: Number if isDuration && n.longValue % 1000 == 0 => s"Duration(${n.longValue / 1000}, SECONDS)"
-      case n: Number if isDuration                            => s"Duration(${n.longValue}, MILLISECONDS)"
-      case s: String if isEnum                                => scalaValues(s)
-      case s: String                                          => s"Some(${literal(s)})"
-      case b: java.lang.Boolean if isOption                   => s"Some($b)"
-      case v                                                  => v.toString
-    })
+    def scalaDefault: String = scalaDefaultValue.getOrElse:
+      default match
+        case null if isDuration                                 => "Duration.Inf"
+        case null                                               => "None"
+        case n: Number if isDuration && n.longValue % 1000 == 0 => s"Duration(${n.longValue / 1000}, SECONDS)"
+        case n: Number if isDuration                            => s"Duration(${n.longValue}, MILLISECONDS)"
+        case s: String if isEnum                                => scalaValues(s)
+        case s: String                                          => s"Some(${literal(s)})"
+        case b: java.lang.Boolean if isOption                   => s"Some($b)"
+        case v                                                  => v.toString
 
     /** The first paragraph of the description on one line. */
     def summary: String = description.split("\n\n").head.replace('\n', ' ')
 
     /** The error message's name of the value. */
     def label: String = title.toLowerCase
-  }
 
   private val typeImports: Map[String, String] = Map(
     "AccelerationMode" -> "codes.quine.labs.recheck.common.AccelerationMode",
@@ -65,65 +65,63 @@ object ParametersGen {
     "Dialect" -> "codes.quine.labs.resyntax.ast.Dialect"
   )
 
-  def read(schema: File): Seq[Param] = {
+  def read(schema: File): Seq[Param] =
     val yaml = new Yaml(new SafeConstructor(new LoaderOptions))
     val root = yaml.load[java.util.Map[String, Any]](IO.read(schema, StandardCharsets.UTF_8))
     val properties = root.get("properties").asInstanceOf[java.util.Map[String, java.util.Map[String, Any]]]
-    properties.asScala.toSeq.map { case (name, p) =>
-      def string(key: String): Option[String] = Option(p.get(key)).map(_.toString)
+    properties.asScala.toSeq.map:
+      case (name, p) =>
+        def string(key: String): Option[String] = Option(p.get(key)).map(_.toString)
 
-      val values = Option(p.get("enum")).map(_.asInstanceOf[java.util.List[String]].asScala.toSeq).getOrElse(Seq.empty)
-      val scalaValues = Option(p.get("x-scala-values"))
-        .map(_.asInstanceOf[java.util.Map[String, String]].asScala.toMap)
-        .getOrElse(Map.empty[String, String])
-      require(values.forall(scalaValues.contains), s"x-scala-values of $name must map every enum value")
-      Param(
-        name = name,
-        title = string("title").getOrElse(sys.error(s"$name has no title")),
-        description = string("description").getOrElse(sys.error(s"$name has no description")),
-        default = p.get("default"),
-        values = values,
-        scalaType = string("x-scala-type").getOrElse(sys.error(s"$name has no x-scala-type")),
-        scalaValues = scalaValues,
-        cli = string("x-cli"),
-        cliMetavar = string("x-cli-metavar"),
-        scalaDefaultValue = string("x-scala-default")
-      )
-    }
-  }
+        val values =
+          Option(p.get("enum")).map(_.asInstanceOf[java.util.List[String]].asScala.toSeq).getOrElse(Seq.empty)
+        val scalaValues = Option(p.get("x-scala-values"))
+          .map(_.asInstanceOf[java.util.Map[String, String]].asScala.toMap)
+          .getOrElse(Map.empty[String, String])
+        require(values.forall(scalaValues.contains), s"x-scala-values of $name must map every enum value")
+        Param(
+          name = name,
+          title = string("title").getOrElse(sys.error(s"$name has no title")),
+          description = string("description").getOrElse(sys.error(s"$name has no description")),
+          default = p.get("default"),
+          values = values,
+          scalaType = string("x-scala-type").getOrElse(sys.error(s"$name has no x-scala-type")),
+          scalaValues = scalaValues,
+          cli = string("x-cli"),
+          cliMetavar = string("x-cli-metavar"),
+          scalaDefaultValue = string("x-scala-default")
+        )
 
   /** Target is a generated Scala source. */
   sealed abstract class Target(val fileName: String, val pkg: Seq[String])
 
-  object Target {
+  object Target:
+
     case object Parameters extends Target("Parameters.scala", Seq("codes.quine.labs.recheck.common"))
     case object Codec extends Target("ParametersCodec.scala", Seq("codes.quine.labs.recheck", "codec"))
     case object CLI extends Target("ParametersOpts.scala", Seq("codes.quine.labs.recheck.cli"))
-  }
 
-  def generate(target: Target, root: File, dir: File): File = {
+  def generate(target: Target, root: File, dir: File): File =
     val params = read(root / SchemaPath)
-    val source = target match {
+    val source = target match
       case Target.Parameters => parameters(params)
       case Target.Codec      => codec(params)
       case Target.CLI        => cli(params)
-    }
     val file = target.pkg.flatMap(_.split('.')).foldLeft(dir)(_ / _) / target.fileName
-    if (!file.exists() || IO.read(file, StandardCharsets.UTF_8) != source)
+    if !file.exists() || IO.read(file, StandardCharsets.UTF_8) != source then
       IO.write(file, source, StandardCharsets.UTF_8)
     file
-  }
 
   private val header: String =
     s"// This file is generated from `$SchemaPath` by `project/ParametersGen.scala`. Do not edit it."
 
   def literal(s: String): String =
-    "\"" + s.flatMap {
+    "\"" + s.flatMap:
       case '"'  => "\\\""
       case '\\' => "\\\\"
       case '\n' => "\\n"
       case c    => c.toString
-    } + "\""
+    + "\""
 
   private def packages(target: Target): String = target.pkg.map(p => s"package $p").mkString("\n")
 
@@ -132,22 +130,20 @@ object ParametersGen {
   private def typeImportsOf(params: Seq[Param]): Seq[String] = params.flatMap(p => typeImports.get(p.scalaType))
 
   private def docLines(description: String, indent: String): String =
-    description.linesIterator.map(l => if (l.isEmpty) s"$indent*" else s"$indent* $l").mkString("\n")
+    description.linesIterator.map(l => if l.isEmpty then s"$indent*" else s"$indent* $l").mkString("\n")
 
   /** Generates `Parameters.scala`. */
-  def parameters(params: Seq[Param]): String = {
-    val docs = params.map { p =>
+  def parameters(params: Seq[Param]): String =
+    val docs = params.map: p =>
       // The descriptions start with "The ...", which follows "`name` is".
       val description = s"`${p.name}` is ${p.description.head.toLower}${p.description.tail}"
       s"""|${docLines(description, "  ")}
           |  *
           |  * The default is `${p.scalaDefault}`.""".stripMargin
-    }
     val fields = params.map(p => s"    ${p.name}: ${p.scalaType} = ${p.defaultName}")
-    val defaults = params.map { p =>
+    val defaults = params.map: p =>
       s"""|  /** The default value of [[Parameters.${p.name}]]. */
           |  val Default${p.capitalName}: ${p.scalaType} = ${p.scalaDefault}""".stripMargin
-    }
     s"""|$header
         |${packages(Target.Parameters)}
         |
@@ -170,22 +166,21 @@ object ParametersGen {
         |
         |  // $$COVERAGE-ON$$
         |""".stripMargin
-  }
 
   /** Generates `ParametersCodec.scala`, the decoders of `Parameters` and its enums. */
-  def codec(params: Seq[Param]): String = {
-    val fields = params.map { p =>
+  def codec(params: Seq[Param]): String =
+    val fields = params.map: p =>
       s"      ${p.name} <- getOrElse[${p.scalaType}](${literal(p.name)})(${p.defaultName})"
-    }
     val args = params.map(p => s"      ${p.name} = ${p.name}")
-    val enums = params.filter(_.isEnum).map { p =>
-      val cases = p.values.map(v => s"    case ${literal(v)} => Right(${p.scalaValues(v)})")
-      s"""|/** A `Decoder` for `${p.scalaType}`. */
+    val enums = params
+      .filter(_.isEnum)
+      .map: p =>
+        val cases = p.values.map(v => s"    case ${literal(v)} => Right(${p.scalaValues(v)})")
+        s"""|/** A `Decoder` for `${p.scalaType}`. */
           |given decode${p.scalaType}: Decoder[${p.scalaType}] =
           |  Decoder[String].emap:
           |${cases.mkString("\n")}
           |    case s => Left(s"Unknown ${p.label}: $$s")""".stripMargin
-    }
     val names = Seq(
       "scala.concurrent.duration.Duration",
       "io.circe.Decoder",
@@ -219,33 +214,33 @@ object ParametersGen {
         |
         |${enums.mkString("\n\n")}
         |""".stripMargin
-  }
 
   /** Generates `ParametersOpts.scala`, the CLI options of `Parameters`. */
-  def cli(params: Seq[Param]): String = {
-    val options = params.filter(p => p.cli.isDefined || p.isLogger).map { p =>
-      val update = s"map(v => (p: Parameters) => p.copy(${p.name} = v))"
-      if (p.isLogger) s"      logger.$update"
-      else {
-        val tpe = if (p.isOption) p.scalaType.stripPrefix("Option[").stripSuffix("]") else p.scalaType
-        val withDefault = if (p.isOption && p.default == null) "orNone" else s"withDefault(${p.defaultName})"
-        s"""|      Opts
+  def cli(params: Seq[Param]): String =
+    val options = params
+      .filter(p => p.cli.isDefined || p.isLogger)
+      .map: p =>
+        val update = s"map(v => (p: Parameters) => p.copy(${p.name} = v))"
+        if p.isLogger then s"      logger.$update"
+        else
+          val tpe = if p.isOption then p.scalaType.stripPrefix("Option[").stripSuffix("]") else p.scalaType
+          val withDefault = if p.isOption && p.default == null then "orNone" else s"withDefault(${p.defaultName})"
+          s"""|      Opts
             |        .option[$tpe](long = ${literal(p.cli.get)}, help = ${literal(p.summary)})
             |        .$withDefault
             |        .$update""".stripMargin
-      }
-    }
-    val arguments = params.filter(_.isEnum).map { p =>
-      val cases = p.values.map(v => s"      case ${literal(v)} => Validated.validNel(${p.scalaValues(v)})")
-      val metavar = p.cliMetavar.getOrElse(p.label.replace(' ', '-'))
-      s"""|  /** `Argument` instance for `${p.scalaType}`. */
+    val arguments = params
+      .filter(_.isEnum)
+      .map: p =>
+        val cases = p.values.map(v => s"      case ${literal(v)} => Validated.validNel(${p.scalaValues(v)})")
+        val metavar = p.cliMetavar.getOrElse(p.label.replace(' ', '-'))
+        s"""|  /** `Argument` instance for `${p.scalaType}`. */
           |  given ${p.scalaType.head.toLower}${p.scalaType.tail}Argument: Argument[${p.scalaType}] with
           |    def read(string: String): ValidatedNel[String, ${p.scalaType}] = string match
           |${cases.mkString("\n")}
           |      case s => Validated.invalidNel(s"unknown ${p.label}: $$s")
           |
           |    def defaultMetavar: String = ${literal(metavar)}""".stripMargin
-    }
     val names = Seq(
       "cats.data.Validated",
       "cats.data.ValidatedNel",
@@ -277,10 +272,9 @@ object ParametersGen {
         |
         |${arguments.mkString("\n\n")}
         |""".stripMargin
-  }
 
   /** Returns the `check` helper of the console, which takes every parameter as a named argument. */
-  def consoleCheck(root: File): String = {
+  def consoleCheck(root: File): String =
     val params = read(root / SchemaPath)
     val args = params.map(p => s"    ${p.name}: ${p.scalaType} = ${p.defaultName}")
     s"""|
@@ -292,5 +286,3 @@ object ParametersGen {
         |  val params = Parameters(${params.map(p => s"${p.name} = ${p.name}").mkString(", ")})
         |  time("check")(ReDoS.check(source, flags, params))
         |""".stripMargin
-  }
-}

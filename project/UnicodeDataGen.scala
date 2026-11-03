@@ -1,10 +1,10 @@
 import java.io.File
 
 import sbt.io.IO
-import sbt.io.syntax._
+import sbt.io.syntax.*
 
 /** UnicodeDataGen is a common interface for Unicode data generator. */
-trait UnicodeDataGen {
+trait UnicodeDataGen:
 
   /** A file to generate. */
   def file(dir: File): File
@@ -15,4 +15,3 @@ trait UnicodeDataGen {
   /** Runs this generator. */
   def gen(pkg: String, dir: File): Unit =
     IO.write(file(dir), source(pkg))
-}
