@@ -55,11 +55,11 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
     case Rule.Unicode => unicode
     case Rule.Native  => unicode.diff(Latin1)
 
-  /** `\d`. */
+  /** Returns the characters of `\d` under the flags. */
   def digit(flags: IRCharFlagSet): CharSet =
     pick(ruleOf(flags, _.digit), ASCIIDigit, if dialect.isJavaScript then ASCIIDigit else gc("Nd"))
 
-  /** `\s`. */
+  /** Returns the characters of `\s` under the flags. */
   def space(flags: IRCharFlagSet): CharSet = dialect match
     case Dialect.JavaScript => javaScriptSpace
     case Dialect.DotNet     => gc("Z").union(of("\f\n\r\t\u000b\u0085"))
@@ -71,7 +71,7 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
         case _                 => binary("White_Space")
       pick(ruleOf(flags, _.space), ASCIISpace, unicode)
 
-  /** `\w`. */
+  /** Returns the characters of `\w` under the flags. */
   def word(flags: IRCharFlagSet): CharSet = dialect match
     case Dialect.JavaScript =>
       // With `u` or `v` and `i`, ECMAScript's WordCharacters includes the characters folded to ASCII ones.
@@ -87,7 +87,7 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
         case _                 => perlWord
       pick(ruleOf(flags, _.word), ASCIIWord, unicode)
 
-  /** The word characters of `\b` and `\B`. */
+  /** Returns the word characters of `\b` and `\B` under the flags. */
   def boundaryWord(flags: IRCharFlagSet): CharSet = dialect match
     // .NET's `RegexCharClass.IsBoundaryWordChar` adds ZWNJ and ZWJ.
     case Dialect.DotNet => dotNetWord.union(of("‌‍"))
@@ -103,7 +103,9 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
     val bmp = CharSet.range(0, 0xffff)
     IRWordMarkSet(gc("Mn"), gc("Mn").intersect(bmp), gc("L", "Nd").intersect(bmp))
 
-  /** Perl's `[[:upper:]]` and `[[:lower:]]` under case-insensitivity: the cased characters. */
+  /** Returns the characters of Perl's `[[:upper:]]` and `[[:lower:]]` under case-insensitivity, which are the cased
+    * characters.
+    */
   def perlCased(flags: IRCharFlagSet): CharSet =
     pick(ruleOf(flags, _.posix), ascii('A' -> 'Z', 'a' -> 'z'), binary("Cased"))
 
@@ -118,7 +120,7 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
   /** `\h` as a hexadecimal digit (Ruby). */
   def hexDigit: CharSet = ascii('0' -> '9', 'A' -> 'F', 'a' -> 'f')
 
-  /** `[[:name:]]`, or `None` for a name that the dialect does not know. */
+  /** Returns the characters of `[[:name:]]` under the flags, or `None` for a name that the dialect does not know. */
   def posix(name: String, flags: IRCharFlagSet): Option[CharSet] =
     val asciiSet = ASCII_POSIX.get(name)
     dialect match

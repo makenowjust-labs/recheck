@@ -803,7 +803,7 @@ private[build] object IRCharResolver:
 
   def isLow(c: Int): Boolean = 0xdc00 <= c && c <= 0xdfff
 
-  /** The length of a UTF-8 sequence by its first byte, or `0` for a continuation byte or an invalid byte. */
+  /** Returns the length of a UTF-8 sequence by its first byte, or `0` for a continuation byte or an invalid byte. */
   def utf8Length(b: Int): Int =
     if b < 0x80 then 1
     else if b < 0xc2 then 0

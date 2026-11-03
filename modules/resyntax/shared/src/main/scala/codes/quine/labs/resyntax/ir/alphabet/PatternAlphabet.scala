@@ -37,7 +37,7 @@ final case class PatternAlphabet(pairs: IndexedSeq[(CharSet, CharKind)]):
   /** Splits the complement of the set into the pairs. */
   def refineInvert(c: CharSet): Set[(CharSet, CharKind)] = any.diff(refine(c))
 
-  /** The pairs for a 'any' pattern. */
+  /** The pairs for a pattern matching any character. */
   def any: Set[(CharSet, CharKind)] = pairs.toSet
 
 /** PatternAlphabet utilities. */

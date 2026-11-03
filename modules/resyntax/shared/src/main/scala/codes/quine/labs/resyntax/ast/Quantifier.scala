@@ -27,7 +27,7 @@ object Quantifier:
   /** Question is a question quantifier (e.g. `?`). */
   final case class Question(strategy: BacktrackStrategy) extends Quantifier
 
-  /** Exact is a exact number bounded quantifier (e.g. `{2}`). */
+  /** Exact is an exact number bounded quantifier (e.g. `{2}`). */
   final case class Exact(n: Int, strategy: BacktrackStrategy) extends Quantifier
 
   /** Bounded is a bounded quantifier (e.g. `{2,3}`). */
@@ -36,5 +36,5 @@ object Quantifier:
   /** MaxBounded is an alternative bounded quantifier (e.g. `{,3}`). */
   final case class MaxBounded(max: Int, strategy: BacktrackStrategy) extends Quantifier
 
-  /** Unbounded is a unbounded quantifier (e.g. `{2,}`). */
+  /** Unbounded is an unbounded quantifier (e.g. `{2,}`). */
   final case class Unbounded(min: Int, strategy: BacktrackStrategy) extends Quantifier

@@ -3,7 +3,10 @@ package codes.quine.labs.resyntax.ast
 import scala.annotation.switch
 import scala.collection.mutable
 
-/** Each field corresponds to one flag letter, so its name may not match the flag's meaning in some dialects. */
+/** FlagSet is a set of the flags of a pattern, whose fields correspond to the flag letters.
+  *
+  * A field's name may not match the flag's meaning in some dialects.
+  */
 final case class FlagSet(
     // `A` (PCRE)
     anchored: Boolean = false,

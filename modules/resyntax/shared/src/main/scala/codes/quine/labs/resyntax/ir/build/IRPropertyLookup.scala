@@ -215,7 +215,9 @@ private[build] object IRPropertyLookup:
   private def javaIdentifierIgnorable: CharSet =
     CharSet.range(0, 8).union(CharSet.range(0x0e, 0x1b)).union(CharSet.range(0x7f, 0x9f)).union(gc("Cf"))
 
-  /** `CharPredicates.forProperty`: general categories, POSIX names in ASCII and `java.lang.Character` methods. */
+  /** Looks up a property as `CharPredicates.forProperty` does: general categories, POSIX names in ASCII and
+    * `java.lang.Character` methods.
+    */
   private def javaForProperty(name: String, ci: Boolean): PropertyResult =
     def category(names: String*): PropertyResult = found(gc(names*))
 
@@ -267,7 +269,7 @@ private[build] object IRPropertyLookup:
       case "javaMirrored"   => found(binary("Bidi_Mirrored"))
       case _                => Unknown
 
-  /** `CharPredicates.getUnicodePredicate` of an upper-cased name. */
+  /** Looks up an upper-cased name as `CharPredicates.getUnicodePredicate` does. */
   private def javaUnicodePredicate(name: String, ci: Boolean): PropertyResult = name match
     case "ALPHABETIC"                                        => found(binary("Alphabetic"))
     case "ASSIGNED"                                          => found(gc("Cn").complement(unicodeUniverse))
@@ -291,7 +293,7 @@ private[build] object IRPropertyLookup:
     case "WORD"                                              => found(javaWord)
     case _                                                   => javaPOSIX(name, ci)
 
-  /** `CharPredicates.getPosixPredicate` of an upper-cased name, which `UNICODE_CHARACTER_CLASS` uses. */
+  /** Looks up an upper-cased name as `CharPredicates.getPosixPredicate` does, which `UNICODE_CHARACTER_CLASS` uses. */
   private def javaPOSIX(name: String, ci: Boolean): PropertyResult = name match
     case "ALPHA"  => found(binary("Alphabetic"))
     case "LOWER"  => found(if ci then javaCased else binary("Lowercase"))
@@ -437,7 +439,7 @@ private[build] object IRPropertyLookup:
   // ---------------------------------------------------------------------------------------------------------------
   // PCRE
 
-  /** PCRE2's loose name: lower-cased, without spaces, hyphens and underscores. */
+  /** Returns PCRE2's loose key of the name: lower-cased, without spaces, hyphens and underscores. */
   private def pcreKey(name: String): String =
     lowerASCII(name.filterNot(c => c == ' ' || c == '-' || c == '_'))
 
@@ -507,7 +509,7 @@ private[build] object IRPropertyLookup:
   private def enumIndex(property: EnumeratedProperty, key: String => String): Map[String, PropertyValue] =
     index(property.values.map(v => (v.names, v)), key)
 
-  /** PCRE2 accepts only the short names of General_Category values. */
+  /** The `General_Category` values of PCRE2, which accepts only their short names. */
   private lazy val pcreGeneralCategory =
     PropertyTable.GeneralCategory.values.map(v => pcreKey(v.shortName) -> v).toMap
 
@@ -517,7 +519,7 @@ private[build] object IRPropertyLookup:
 
   private lazy val pcreBidiClass = enumIndex(PropertyTable.BidiClass, pcreKey)
 
-  /** `Xan`, `Xps`, `Xsp`, `Xwd` and `Xuc` of PCRE. */
+  /** Returns PCRE's special property of the key (`Any`, `L&`, `Xan`, `Xps`, `Xsp`, `Xwd` and `Xuc`), if any. */
   private def pcreSpecial(key: String): Option[CharSet] = key match
     case "any"         => Some(unicodeUniverse.universe)
     case "l&" | "lc"   => Some(gc("LC"))
@@ -553,7 +555,7 @@ private[build] object IRPropertyLookup:
   // ---------------------------------------------------------------------------------------------------------------
   // Perl
 
-  /** Perl's loose name (perlunicode "Properties accessible through \p{} and \P{}"). */
+  /** Returns Perl's loose key of the name (perlunicode "Properties accessible through \p{} and \P{}"). */
   private def perlKey(name: String): String =
     val key = lowerASCII(name.filterNot(c => c == ' ' || c == '-' || c == '_' || c == '\t'))
     if key.startsWith("is") && key.length > 2 then key.drop(2) else key
@@ -749,7 +751,7 @@ private[build] object IRPropertyLookup:
   // ---------------------------------------------------------------------------------------------------------------
   // Ruby
 
-  /** Onigmo's property name: lower-cased, without spaces, hyphens and underscores. */
+  /** Returns Onigmo's key of the property name: lower-cased, without spaces, hyphens and underscores. */
   private def rubyKey(name: String): String =
     lowerASCII(name.filterNot(c => c == ' ' || c == '-' || c == '_'))
 
@@ -835,11 +837,11 @@ private[build] object IRPropertyLookup:
 
   private lazy val rubyGeneralCategory = enumIndex(PropertyTable.GeneralCategory, rubyKey)
 
-  /** Onigmo has the scripts of Scripts.txt, which have some characters. */
+  /** The scripts of Onigmo, which has only the scripts of Scripts.txt that have some characters. */
   private lazy val rubyScript =
     index(PropertyTable.Script.values.filter(_.set.nonEmpty).map(v => (v.names, v)), rubyKey)
 
-  /** Onigmo accepts only the long names of blocks (e.g. `In_Greek_and_Coptic`, not `InGreek`). */
+  /** The blocks of Onigmo, which accepts only their long names (e.g. `In_Greek_and_Coptic`, not `InGreek`). */
   private lazy val rubyBlock = PropertyTable.Block.values.map(v => rubyKey(v.name) -> v).toMap
 
   /** Onigmo's names with a value: `Age` by the version (e.g. `age=6.0`), and `Grapheme_Cluster_Break` and `InCB` by the
@@ -854,7 +856,7 @@ private[build] object IRPropertyLookup:
       listed("graphemeclusterbreak", PropertyTable.GraphemeClusterBreak, "Other") ++
       listed("incb", PropertyTable.IndicConjunctBreak, "None")).toMap
 
-  /** Onigmo's POSIX bracket classes in Unicode (Ruby's `tool/enc-unicode.rb`).
+  /** Returns Onigmo's POSIX bracket class of the key in Unicode (Ruby's `tool/enc-unicode.rb`), if any.
     *
     * With `bracket`, it is a bracket (e.g. `[[:punct:]]`), whose `punct` adds the ASCII symbols unlike `\p{Punct}`.
     */
