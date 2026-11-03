@@ -7,7 +7,7 @@ package codes.quine.labs.resyntax.charset
 object PropertyTable:
 
   /** The binary properties known to ICU4J, in ICU's `UProperty` order. */
-  lazy val icuBinaryProperties: IndexedSeq[BinaryProperty] =
+  private lazy val icuBinaryProperties: IndexedSeq[BinaryProperty] =
     val raws = UnicodeData.Binary
     lazy val properties: IndexedSeq[BinaryProperty] = raws.toIndexedSeq.map: raw =>
       val (names, short) = Codec.names(raw.names)

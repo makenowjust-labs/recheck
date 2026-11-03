@@ -53,7 +53,7 @@ class PropertyTableSuite extends munit.FunSuite:
     assert(binary("Emoji").set.contains(0x1f600))
     assert(binary("Ideographic").set.contains(0x6f22))
     assert(!binary("Lowercase").isOfStrings)
-    assert(PropertyTable.icuBinaryProperties.size >= 70)
+    assert(PropertyTable.binaryProperties.size >= 73)
 
   test("PropertyTable: derived binary properties"):
     assertEquals(binary("Any").set, UnitMode.CodePoint.universe)
