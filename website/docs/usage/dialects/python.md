@@ -53,13 +53,13 @@ The `re` flags that `recheck` does not take:
 
 `\N{...}` (e.g. `\N{EM DASH}`) is reported as `unsupported`, as in the other dialects having it.
 
-## Recall Validation
+## Runtime-Attack Verification
 
 - Command: `python3 -I -`, which reads the program from the standard input.
 - Matching: `re.search`.
 - Engine limits: none.
 - Engine errors: `RecursionError`, `MemoryError`.
 - Environment variable: `RECHECK_PYTHON`.
-- Recall script: `python3 -I recall.py`.
+- Runtime-attack script: `python3 -I runtime-attack.py`.
 
 The program sets the C locale by `locale.setlocale` before compiling the pattern, so the result does not depend on the locale of the environment (e.g. `LC_ALL` or `LANG`).

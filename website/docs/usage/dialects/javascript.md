@@ -37,11 +37,11 @@ JavaScript has no other options.
 - With the `y` flag, the match starts only at the start of the input, as with `lastIndex` of `0`.
   A match from a later `lastIndex` is not modeled, so `recheck` misses a pattern that is slow only there, where a look-behind, `\b`, `\B` or a multiline `^` sees the text before the starting position (e.g. `/(?<=a)(?:b|b)*$/y` with `lastIndex` of `1` on `'a' + 'b'.repeat(n) + '!'`).
 
-## Recall Validation
+## Runtime-Attack Verification
 
 - Command: `node -`, which reads the program from the standard input.
 - Matching: `RegExp.prototype.exec`.
 - Engine limits: none.
 - Engine errors: `RangeError` (e.g. V8 raises it for `/^(?:a|b)*$/` on 10,000,000 characters).
 - Environment variable: `RECHECK_NODE`.
-- Recall script: `node recall.cjs`.
+- Runtime-attack script: `node runtime-attack.cjs`.
