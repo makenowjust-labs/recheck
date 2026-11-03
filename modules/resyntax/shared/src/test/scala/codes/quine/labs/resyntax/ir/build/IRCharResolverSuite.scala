@@ -139,8 +139,7 @@ class IRCharResolverSuite extends munit.FunSuite:
     // Its non-ASCII literals are bytes, which do not make the pattern use Unicode rules.
     val Sequence(nodes) = build("é\\w", "", Perl(utf8 = false)).node.data: @unchecked
     assertEquals(nodes.last.data, Chars(IRClassLookup.ASCII_POSIX("word")))
-  // Perl reads the bytes of a byte string as Latin-1 characters, so a pattern switching `/d` to Unicode rules (e.g. by
-  // `\x{100}`) has the rules of `0x80..0xFF` of the text strings (checked against Perl 5.44).
+  // Perl reads the bytes of a byte string as Latin-1 characters, so a pattern switching `/d` to Unicode rules (e.g. by `\x{100}`) has the rules of `0x80..0xFF` of the text strings (checked against Perl 5.44).
   for
     body <- Seq(
       "\\w",
@@ -606,8 +605,7 @@ class IRCharResolverSuite extends munit.FunSuite:
 
   def cp(s: String): Seq[Int] = UnitMode.CodePoint.decode(s).iterator.toSeq
 
-  // The first cluster's length in the engines (Java 25, PCRE2 10.49, Perl 5.44, Ruby 4.0), where they agree except
-  // PCRE2 on the conjuncts (see `PCREProbes`).
+  // The first cluster's length in the engines (Java 25, PCRE2 10.49, Perl 5.44, Ruby 4.0), where they agree except PCRE2 on the conjuncts (see `PCREProbes`).
   val Probes: Seq[(String, String, Int)] = Seq(
     ("CRLF", "\r\ń", 2),
     ("LF and a mark", "\ń", 1),

@@ -187,8 +187,7 @@ final case class IRPattern(
     // When line assertion appears in middle part of the pattern, then the pattern needs input terminator distinction.
     if existsLineAssertionInMiddle then return true
 
-    // When line begin (resp. end) assertion appears at every begin (resp. end) point with consistency,
-    // then the pattern needs input terminator distinction.
+    // When line begin (resp. end) assertion appears at every begin (resp. end) point with consistency, then the pattern needs input terminator distinction.
     (!everyBeginPointIsLineBegin && !everyBeginPointIsNotLineBegin) || (!everyEndPointIsLineEnd && !everyEndPointIsNotLineEnd)
 
   /** Checks whether a match may start after the begin of the input, as if the pattern began with `.*?`. */

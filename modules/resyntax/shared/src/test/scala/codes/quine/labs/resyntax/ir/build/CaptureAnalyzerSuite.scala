@@ -66,10 +66,7 @@ class CaptureAnalyzerSuite extends munit.FunSuite with IRHelper:
   check("(?<x>a)(?<1>b)(c)", "", DotNet)(
     Sequence(Capture(2, Some("x"), char('a')), Capture(1, None, char('b')), Capture(1, None, char('c')))
   )
-  // .NET's parser does not capture the first unnamed group after a conditional with a look-around (even after the
-  // conditional), which still takes an index before the named groups: `(?(?=(a))a)(b)` on `ab` gives 1 = `b` and 2
-  // unset, `(?(?=(?<x>a)(b))a)` gives 1 unset and 2 = `a`, and `(?(?=((a)))a)a(b)` on `aab` gives 1 = `a`, 2 = `b` and 3
-  // unset.
+  // .NET's parser does not capture the first unnamed group after a conditional with a look-around (even after the conditional), which still takes an index before the named groups: `(?(?=(a))a)(b)` on `ab` gives 1 = `b` and 2 unset, `(?(?=(?<x>a)(b))a)` gives 1 unset and 2 = `a`, and `(?(?=((a)))a)a(b)` on `aab` gives 1 = `a`, 2 = `b` and 3 unset.
   check("(?(?=(a))a)(b)", "", DotNet)(
     Sequence(Conditional(IRCondition.LookAhead(false, char('a')), char('a'), Empty), Capture(1, None, char('b')))
   )

@@ -701,8 +701,7 @@ private[build] object IRPropertyLookup:
     * Perl compares numeric values by `%.3e`.
     */
   private def roundSignificant(d: Double, halfEven: Boolean): (Boolean, Long, Int) =
-    // The digits come from the shortest representation of the double, which is exact for the ties of the Unicode data
-    // (e.g. `1/64`).
+    // The digits come from the shortest representation of the double, which is exact for the ties of the Unicode data (e.g. `1/64`).
     val s = math.abs(d).toString
     val (mantissa, exp) = s.indexWhere(c => c == 'e' || c == 'E') match
       case -1 => (s, 0)
@@ -803,8 +802,7 @@ private[build] object IRPropertyLookup:
           .orElse(if raw.startsWith("in") then perlBlock.get(raw.drop(2)).map(foundValue) else None)
           .orElse(perlBlock.get(key).filter(_ => raw.startsWith("in")).map(foundValue))
           .getOrElse:
-            // A name starting with `In` or `Is` (after a package name) may be a user-defined property, which Perl
-            // looks up at run time.
+            // A name starting with `In` or `Is` (after a package name) may be a user-defined property, which Perl looks up at run time.
             val local = name.split("::").last
             if local.startsWith("In") || local.startsWith("Is") then NotModeled else Unknown
 
@@ -896,8 +894,7 @@ private[build] object IRPropertyLookup:
 
   /** The contributory properties of PropList.txt (e.g. `Other_Alphabetic`). */
   private lazy val rubyContributory: Map[String, CharSet] =
-    // The data of resyntax-charset lacks them, so each is the derived property without the other parts of its
-    // definition.
+    // The data of resyntax-charset lacks them, so each is the derived property without the other parts of its definition.
     def other(derived: String, parts: CharSet): CharSet = binary(derived).diff(parts)
 
     Seq(

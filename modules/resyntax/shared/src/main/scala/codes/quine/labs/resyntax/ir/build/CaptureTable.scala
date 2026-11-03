@@ -183,8 +183,7 @@ private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext)
       markSite(node)
       test match
         case ConditionalTest.LookAround(Some(kind), node) if initial.dialect.isDotNet =>
-          // .NET's parser ignores the next unnamed group to skip the parentheses of a conditional expression, and the
-          // look-around does not reset it, so it goes on to the next unnamed group, even after the conditional.
+          // .NET's parser ignores the next unnamed group to skip the parentheses of a conditional expression, and the look-around does not reset it, so it goes on to the next unnamed group, even after the conditional.
           ignoresNextGroup = true
           walkTest(Some(kind), node)
         case ConditionalTest.LookAround(kind, node)                                       => walkTest(kind, node)

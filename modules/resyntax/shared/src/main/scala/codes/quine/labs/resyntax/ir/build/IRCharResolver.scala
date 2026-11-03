@@ -214,8 +214,7 @@ private[build] final class IRCharResolver(
     val flags = units.head.flags
     val eq = equivalence(flags)
     val native = perlNative(flags)
-    // Perl's `aa` forbids a non-ASCII character to match a folding with ASCII characters (e.g. `ß` and `ss`), and `l`
-    // one with characters below `U+0100`.
+    // Perl's `aa` forbids a non-ASCII character to match a folding with ASCII characters (e.g. `ß` and `ss`), and `l` one with characters below `U+0100`.
     val minFoldedValue =
       if flags.caselessRestrict then 0x80 else if dialect.isPerl && flags.charset == IRCharset.Locale then 0x100 else 0
     val folded = mutable.ArrayBuffer.empty[(Int, Int)]

@@ -143,8 +143,7 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
       case _ => asciiSet
 
   private def pcrePOSIX(name: String): Option[CharSet] =
-    // pcre2pattern: "[:graph:] matches all characters with the L, M, N, P, S, or Cf properties, except for U+061C,
-    // U+180E and U+2066 - U+2069".
+    // pcre2pattern: "[:graph:] matches all characters with the L, M, N, P, S, or Cf properties, except for U+061C, U+180E and U+2066 - U+2069".
     val graph = gc("L", "M", "N", "P", "S", "Cf").diff(of("؜᠎⁦⁧⁨⁩"))
     name match
       case "alnum" => Some(gc("L", "N"))
