@@ -86,10 +86,13 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.recheck.util.*
       |import codes.quine.labs.recheck.vm.*
       |import codes.quine.labs.resyntax.ast.Dialect
+      |import codes.quine.labs.resyntax.ast.FlagSet
       |import codes.quine.labs.resyntax.ast.PerlSource
       |import codes.quine.labs.resyntax.charset.*
       |import codes.quine.labs.resyntax.ir.*
       |import codes.quine.labs.resyntax.ir.alphabet.*
+      |import codes.quine.labs.resyntax.ir.build.IRBuilder
+      |import codes.quine.labs.resyntax.parser.Parser
       |
       |def logger: Context.Logger = (message: String) =>
       |  val date = java.time.LocalDateTime.now()
@@ -103,12 +106,15 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |  finally
       |    println(s"$name: ${(System.nanoTime() - start) / 1e9} s")
       |
-      |def parse(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): (SourcePattern, IRPattern) =
-      |  time("parse")(SourcePattern.parse(source, flags, dialect).toTry.get)
+      |def parse(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): IRPattern =
+      |  time("parse"):
+      |    val flagSet = FlagSet.parse(flags, dialect)
+      |    val node = Parser.parse(source, flagSet, dialect)
+      |    IRBuilder.build(node, flagSet, dialect, Parser.determineUnitMode(source, flagSet, dialect))
       |
       |def compile(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): Program =
-      |  val (_, ir) = parse(source, flags, dialect)
-      |  time("compile")(ProgramBuilder.build(ir, dialect).get)
+      |  val ir = parse(source, flags, dialect)
+      |  time("compile")(ProgramBuilder.build(ir).get)
       |
       |def run(
       |    source: String,
@@ -122,8 +128,8 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |    needsHeatmap: Boolean = false,
       |    dialect: Dialect = Dialect.JavaScript
       |)(using ctx: Context): Interpreter.Result =
-      |  val program = compile(source, flags, dialect)
-      |  val uinput = UnitMode.UTF16.decode(input)
+      |  val ir = parse(source, flags, dialect)
+      |  val program = time("compile")(ProgramBuilder.build(ir).get)
       |  val opts = Interpreter.Options(
       |    limit = limit,
       |    usesAcceleration = usesAcceleration,
@@ -132,25 +138,28 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |    needsCoverage = needsCoverage,
       |    needsHeatmap = needsHeatmap
       |  )
-      |  time("run")(Interpreter.run(program, uinput, opts))
+      |  time("run")(Interpreter.run(program, ir.mode.decode(input), opts))
       |
       |def seed(
       |    source: String,
       |    flags: String,
       |    maxSimpleRepeatSize: Int = Parameters.DefaultMaxSimpleRepeatCount,
       |    maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
-      |    limit: Int = Parameters.DefaultIncubationLimit
+      |    limit: Int = Parameters.DefaultIncubationLimit,
+      |    dialect: Dialect = Dialect.JavaScript
       |)(using ctx: Context): Set[FString] =
-      |  val (pattern, ir) = parse(source, flags)
-      |  time("seed")(StaticSeeder.seed(ir, pattern.preferredChars, maxSimpleRepeatSize, maxInitialGenerationSize, limit))
+      |  val ir = parse(source, flags, dialect)
+      |  time("seed")(StaticSeeder.seed(ir, maxSimpleRepeatSize, maxInitialGenerationSize, limit))
       |
       |def validate(
-      |  source: String,
-      |  flags: String,
-      |  pattern: AttackPattern,
-      |  timeout: Duration = Duration(1, SECONDS)
+      |    source: String,
+      |    flags: String,
+      |    attack: AttackPattern,
+      |    timeout: Duration = Duration(1, SECONDS),
+      |    dialect: Dialect = Dialect.JavaScript
       |)(using ctx: Context): Option[RecallValidation] =
-      |  time("validate")(RecallValidator.validate(parse(source, flags)._1, pattern, timeout, env = sys.env)(RecallValidator.defaultExec.get))
+      |  val ir = parse(source, flags, dialect)
+      |  time("validate")(RecallValidator.validate(source, flags, dialect, ir.mode, attack, timeout))
       |
       |""".stripMargin + ParametersGen.consoleCheck((ThisBuild / baseDirectory).value),
     // Settings for test:
@@ -196,7 +205,7 @@ lazy val exec = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "recheck-exec",
     console / initialCommands := """
-      |import codes.quine.labs.recheck.exec._
+      |import codes.quine.labs.recheck.exec.*
       |""".stripMargin,
     // Settings for test:
     libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
@@ -246,8 +255,6 @@ lazy val resyntaxCharset = crossProject(JVMPlatform, JSPlatform)
     name := "resyntax-charset",
     console / initialCommands := """
       |import codes.quine.labs.resyntax.charset.*
-      |import codes.quine.labs.resyntax.ir.*
-      |import codes.quine.labs.resyntax.ir.alphabet.*
       |""".stripMargin,
     coverageExcludedFiles := ".*[/\\\\]src_managed[/\\\\].*",
     // Generators:
