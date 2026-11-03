@@ -3,12 +3,13 @@ package codes.quine.labs.resyntax.ast
 import codes.quine.labs.resyntax.ast.Dialect.*
 
 class FlagSetSuite extends munit.FunSuite:
-  def check(s: String, dialects: Dialect*)(cond: FlagSet => Boolean)(implicit loc: munit.Location): Unit =
+
+  def check(s: String, dialects: Dialect*)(cond: FlagSet => Boolean)(using loc: munit.Location): Unit =
     for dialect <- dialects do
       test(s"FlagSet.parse: parse \"$s\" in $dialect"):
         assert(cond(FlagSet.parse(s, dialect)))
 
-  def error(s: String, dialects: Dialect*)(message: String)(implicit loc: munit.Location): Unit =
+  def error(s: String, dialects: Dialect*)(message: String)(using loc: munit.Location): Unit =
     for dialect <- dialects do
       test(s"FlagSet.parse: parse \"$s\" in $dialect with message \"$message\""):
         interceptMessage[FlagSetException](message)(FlagSet.parse(s, dialect))

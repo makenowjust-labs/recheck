@@ -39,6 +39,7 @@ private[build] enum CaseKind:
   * code points by each dialect's rules.
   */
 private[build] object IRPropertyLookup:
+
   import PropertyResult.*
 
   // Scala.js has no `java.util.Locale`, and the names are ASCII.

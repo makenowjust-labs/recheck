@@ -14,6 +14,7 @@ import codes.quine.labs.resyntax.ir.IRNodeData.Empty
 import codes.quine.labs.resyntax.ir.IRNodeData.Sequence
 
 class BuildingContextSuite extends munit.FunSuite with IRHelper:
+
   // `\n^` with `m` matches `a\n` in .NET, JavaScript and Python, but not in Java, Perl, PCRE and Ruby.
   // `^` with `m` matches the empty string except in Java.
   check("^", "m", DotNet, Python())(Assert(LineBegin(LT.LF, AfterTerminator)))

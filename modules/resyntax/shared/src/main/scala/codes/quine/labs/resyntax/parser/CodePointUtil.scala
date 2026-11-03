@@ -3,6 +3,7 @@ package codes.quine.labs.resyntax.parser
 import scala.annotation.switch
 
 object CodePointUtil:
+
   def isSpace(codePoint: Int): Boolean =
     (codePoint: @switch) match
       case 0x0009 => true

@@ -11,6 +11,7 @@ import codes.quine.labs.resyntax.ir.build.IRBuilder
 import codes.quine.labs.resyntax.parser.Parser
 
 class PatternAlphabetSuite extends munit.FunSuite:
+
   val Word: CharSet =
     CharSet.union(Seq(CharSet.range('0', '9'), CharSet.range('A', 'Z'), CharSet.single('_'), CharSet.range('a', 'z')))
 

@@ -13,7 +13,7 @@ import codes.quine.labs.resyntax.ir.IRNodeData.*
 class ReferenceResolverSuite extends munit.FunSuite with IRHelper:
 
   /** Checks the indices of the last back-reference in the pattern. */
-  def resolve(s: String, flags: String, dialects: Dialect*)(indices: Int*)(implicit loc: munit.Location): Unit =
+  def resolve(s: String, flags: String, dialects: Dialect*)(indices: Int*)(using loc: munit.Location): Unit =
     checkPattern(s, flags, dialects*): pattern =>
       def find(node: IRNode): Seq[Seq[Int]] = node.data match
         case BackReference(indices, _, _) => Seq(indices)

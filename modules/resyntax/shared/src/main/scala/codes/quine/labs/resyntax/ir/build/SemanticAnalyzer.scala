@@ -20,6 +20,7 @@ private[build] final class SemanticAnalyzer(
     lookBehindAnalyzer: LookBehindAnalyzer,
     featureSet: IRFeatureSet
 ):
+
   private val backReferences = mutable.Map.empty[NodeKey, Seq[Int]]
 
   /** Analyzes the pattern, and returns the resolved indices of each back-reference node and each conditional node

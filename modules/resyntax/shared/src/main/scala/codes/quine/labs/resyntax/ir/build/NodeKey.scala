@@ -8,6 +8,7 @@ import codes.quine.labs.resyntax.ast.NodeData
 
 /** NodeKey is a map key of an AST node by identity, because equal nodes can appear at different places. */
 private[build] final class NodeKey(val node: Node):
+
   override def equals(that: Any): Boolean = that match
     case that: NodeKey => node eq that.node
     case _             => false

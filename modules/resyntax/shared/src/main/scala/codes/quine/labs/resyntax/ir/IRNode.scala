@@ -75,4 +75,5 @@ final case class IRNode(data: IRNodeData, loc: SourceLocation):
     s"unsupported syntax ($name)$at"
 
 object IRNode:
+
   def apply(data: IRNodeData): IRNode = IRNode(data, SourceLocation.Invalid)

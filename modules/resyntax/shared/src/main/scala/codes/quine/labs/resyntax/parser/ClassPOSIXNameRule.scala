@@ -15,6 +15,7 @@ final case class ClassPOSIXNameRule(
     maxPunctuationCount: Int,
     acceptsKnownPrefix: Boolean
 ):
+
   def looksLikeName(name: String, knownNames: Set[String]): Boolean =
     if acceptsKnownPrefix && knownNames.exists(name.startsWith) then return true
     val length = name.codePointCount(0, name.length)

@@ -53,6 +53,7 @@ object Parser:
   )
 
   private[parser] object ParsingContext:
+
     def from(featureSet: FeatureSet): ParsingContext = ParsingContext(
       inClass = false,
       skipsComment = featureSet.skipsComment,
@@ -120,6 +121,7 @@ private[parser] final class Parser(
     private val prescan: SourcePrescan,
     private val featureSet: FeatureSet
 ):
+
   private var offset: Int = 0
 
   private var currentChar: Char =

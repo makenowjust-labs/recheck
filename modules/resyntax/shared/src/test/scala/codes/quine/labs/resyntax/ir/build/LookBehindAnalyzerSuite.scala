@@ -6,7 +6,8 @@ import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.PerlSource
 
 class LookBehindAnalyzerSuite extends munit.FunSuite with IRHelper:
-  def valid(s: String, dialects: Dialect*)(implicit loc: munit.Location): Unit =
+
+  def valid(s: String, dialects: Dialect*)(using loc: munit.Location): Unit =
     for dialect <- dialects do
       test(s"IRBuilder.build: /$s/ in $dialect is valid"):
         build(s, "", dialect)
@@ -241,7 +242,7 @@ class LookBehindAnalyzerSuite extends munit.FunSuite with IRHelper:
   error("(a)(?<=\\1)", "", Java)("Look-behind group does not have an obvious maximum length at 3")
 
   /** Checks how the engine matches the first look-behind of the pattern. */
-  def matching(s: String, dialects: Dialect*)(expected: IRLookBehindStarts*)(implicit loc: munit.Location): Unit =
+  def matching(s: String, dialects: Dialect*)(expected: IRLookBehindStarts*)(using loc: munit.Location): Unit =
     for dialect <- dialects do
       test(s"IRBuilder.build: the look-behind of /$s/ in $dialect"):
         def find(node: IRNode): Option[IRLookBehindMatch] = node.data match

@@ -30,6 +30,7 @@ import codes.quine.labs.resyntax.ir.build.IRHelper.given
 import codes.quine.labs.resyntax.parser.Parser
 
 class IRBuilderSuite extends munit.FunSuite with IRHelper:
+
   // Disjunction
   check("|", "", All*)(Disjunction(Empty, Empty))
 

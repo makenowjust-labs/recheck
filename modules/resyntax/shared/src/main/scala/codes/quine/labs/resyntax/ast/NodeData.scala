@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.ast
 
 sealed abstract class NodeData extends Product with Serializable:
+
   def equalsWithoutLoc(that: NodeData): Boolean = (this, that) match
     case (NodeData.Disjunction(ls), NodeData.Disjunction(rs)) =>
       ls.length == rs.length && ls.zip(rs).forall { case (l, r) => l.equalsWithoutLoc(r) }
@@ -27,7 +28,8 @@ object NodeData:
   final case class Disjunction(nodes: Seq[Node]) extends NodeData
 
   object Disjunction:
-    def apply(dataSeq: NodeData*)(implicit dummy: DummyImplicit): Disjunction = Disjunction(dataSeq.map(Node(_)))
+
+    def apply(dataSeq: NodeData*)(using DummyImplicit): Disjunction = Disjunction(dataSeq.map(Node(_)))
 
   /** Sequence is a sequence pattern node.
     *
@@ -38,7 +40,8 @@ object NodeData:
   final case class Sequence(nodes: Seq[Node]) extends NodeData
 
   object Sequence:
-    def apply(dataSeq: NodeData*)(implicit dummy: DummyImplicit): Sequence = Sequence(dataSeq.map(Node(_)))
+
+    def apply(dataSeq: NodeData*)(using DummyImplicit): Sequence = Sequence(dataSeq.map(Node(_)))
 
   /** Repeat is a repetition pattern node.
     *
@@ -49,6 +52,7 @@ object NodeData:
   final case class Repeat(node: Node, quantifier: Quantifier) extends NodeData
 
   object Repeat:
+
     def apply(data: NodeData, quantifier: Quantifier): Repeat = Repeat(Node(data), quantifier)
 
   /** Group is a group pattern node.
@@ -68,6 +72,7 @@ object NodeData:
   final case class Group(kind: GroupKind, node: Node) extends NodeData
 
   object Group:
+
     def apply(kind: GroupKind, data: NodeData): Group = Group(kind, Node(data))
 
   /** Command is a command pattern node.
@@ -115,6 +120,7 @@ object NodeData:
   final case class Class(invert: Boolean, item: ClassItem) extends NodeData
 
   object Class:
+
     def apply(invert: Boolean, item: ClassItemData): Class = Class(invert, ClassItem(item))
 
   final case class Literal(value: Int) extends NodeData

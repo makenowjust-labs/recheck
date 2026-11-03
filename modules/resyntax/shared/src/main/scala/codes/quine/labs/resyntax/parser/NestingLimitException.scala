@@ -5,4 +5,5 @@ package codes.quine.labs.resyntax.parser
   * Unlike [[ParsingException]], the pattern may be valid on the engine.
   */
 final class NestingLimitException(val limit: Int, val pos: Int) extends Exception:
+
   override def getMessage: String = s"Too deeply nested (limit $limit) at $pos"

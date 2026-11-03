@@ -3,6 +3,7 @@ package codes.quine.labs.resyntax.ast
 import codes.quine.labs.resyntax.ast.Dialect.*
 
 class DialectSuite extends munit.FunSuite:
+
   val All: Seq[Dialect] = Seq(JavaScript, Java, DotNet, PCRE, Python(), Ruby(), Perl())
 
   test("Dialect#name and Dialect.of"):

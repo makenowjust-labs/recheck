@@ -9,10 +9,11 @@ import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.ir.build.IRHelper.given
 
 class CaptureAnalyzerSuite extends munit.FunSuite with IRHelper:
+
   def captures(s: String, flags: String, dialects: Dialect*)(
       count: Int,
       names: Map[String, Seq[Int]] = Map.empty
-  )(implicit loc: munit.Location): Unit =
+  )(using loc: munit.Location): Unit =
     checkPattern(s, flags, dialects*): pattern =>
       assertEquals(pattern.captureCount, count)
       val named = pattern.node.collect { case Capture(index, Some(name), _) => (name, index) }

@@ -14,6 +14,7 @@ package codes.quine.labs.resyntax.ast
   * }}}
   */
 sealed abstract class Quantifier extends Product with Serializable:
+
   def strategy: BacktrackStrategy
 
 object Quantifier:

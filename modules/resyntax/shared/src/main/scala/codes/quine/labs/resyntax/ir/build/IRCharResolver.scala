@@ -724,6 +724,7 @@ private[build] final class IRCharResolver(
 private[build] object IRCharResolver:
 
   private object Grammar:
+
     import BacktrackStrategy.Greedy
     def c(set: CharSet): IRNode = IRNode(IRNodeData.Chars(set))
 
@@ -742,6 +743,7 @@ private[build] object IRCharResolver:
 
   /** RubyClassToken is an item of Ruby's class, where a range with a byte escape endpoint is split at its hyphen. */
   private enum RubyClassToken:
+
     case Value(lit: Lit)
     case Hyphen
     case Other(item: ClassItem)

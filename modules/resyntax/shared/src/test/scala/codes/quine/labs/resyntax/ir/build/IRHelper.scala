@@ -26,14 +26,14 @@ trait IRHelper:
     val flagSet = FlagSet.parse(flags, dialect)
     BuildingContext(flagSet, dialect, IRFeatureSet.from(flagSet, dialect, Seq.empty)).charFlags
 
-  def check(s: String, flags: String, dialects: Dialect*)(expected: IRNodeData)(implicit loc: munit.Location): Unit =
+  def check(s: String, flags: String, dialects: Dialect*)(expected: IRNodeData)(using loc: munit.Location): Unit =
     for dialect <- dialects do
       test(s"IRBuilder.build: /$s/$flags in $dialect"):
         val pattern = build(s, flags, dialect)
         assert(pattern.node.equalsWithoutLoc(IRNode(expected)), pattern.node)
 
   /** Checks the IR whose expected value depends on the dialect (e.g. the flags in a node). */
-  def checkWith(s: String, flags: String, dialects: Dialect*)(expected: Dialect => IRNodeData)(implicit
+  def checkWith(s: String, flags: String, dialects: Dialect*)(expected: Dialect => IRNodeData)(using
       loc: munit.Location
   ): Unit =
     for dialect <- dialects do
@@ -41,7 +41,7 @@ trait IRHelper:
         val pattern = build(s, flags, dialect)
         assert(pattern.node.equalsWithoutLoc(IRNode(expected(dialect))), pattern.node)
 
-  def checkPattern(s: String, flags: String, dialects: Dialect*)(body: IRPattern => Unit)(implicit
+  def checkPattern(s: String, flags: String, dialects: Dialect*)(body: IRPattern => Unit)(using
       loc: munit.Location
   ): Unit =
     for dialect <- dialects do
@@ -54,14 +54,14 @@ trait IRHelper:
     build(s, flags, dialect).node.collect { case data @ (IRNodeData.Chars(_) | IRNodeData.Strings(_)) => data }
 
   /** Checks the character-level nodes in the IR, which tell the flags each one gets. */
-  def checkChars(s: String, flags: String, dialects: Dialect*)(expected: Dialect => Seq[IRNodeData])(implicit
+  def checkChars(s: String, flags: String, dialects: Dialect*)(expected: Dialect => Seq[IRNodeData])(using
       loc: munit.Location
   ): Unit =
     for dialect <- dialects do
       test(s"IRBuilder.build: /$s/$flags in $dialect (chars)"):
         assertEquals(charsIn(s, flags, dialect), expected(dialect))
 
-  def error(s: String, flags: String, dialects: Dialect*)(message: String)(implicit loc: munit.Location): Unit =
+  def error(s: String, flags: String, dialects: Dialect*)(message: String)(using loc: munit.Location): Unit =
     for dialect <- dialects do
       test(s"IRBuilder.build: /$s/$flags in $dialect with error \"$message\""):
         interceptMessage[IRBuildingException](message):

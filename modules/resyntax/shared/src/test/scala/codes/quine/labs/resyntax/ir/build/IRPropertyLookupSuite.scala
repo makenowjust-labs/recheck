@@ -14,7 +14,7 @@ class IRPropertyLookupSuite extends munit.FunSuite with IRHelper:
 
   def value(p: EnumeratedProperty, name: String): CharSet = p.value(name).get.set
 
-  def chars(s: String, flags: String, dialects: Dialect*)(expected: CharSet)(implicit loc: munit.Location): Unit =
+  def chars(s: String, flags: String, dialects: Dialect*)(expected: CharSet)(using loc: munit.Location): Unit =
     for dialect <- dialects do
       test(s"IRBuilder.build: /$s/$flags in $dialect"):
         assertEquals(build(s, flags, dialect).node.data, Chars(expected))

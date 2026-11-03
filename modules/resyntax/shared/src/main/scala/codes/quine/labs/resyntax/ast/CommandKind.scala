@@ -24,6 +24,7 @@ package codes.quine.labs.resyntax.ast
   * }}}
   */
 sealed abstract class CommandKind extends Product with Serializable:
+
   def equalsWithoutLoc(that: CommandKind): Boolean = (this, that) match
     case (CommandKind.BranchReset(ls), CommandKind.BranchReset(rs)) =>
       ls.length == rs.length && ls.zip(rs).forall { case (l, r) => l.equalsWithoutLoc(r) }
@@ -83,12 +84,14 @@ object CommandKind:
   final case class BranchReset(nodes: Seq[Node]) extends CommandKind
 
   object BranchReset:
-    def apply(dataSeq: NodeData*)(implicit dummy: DummyImplicit): BranchReset = BranchReset(dataSeq.map(Node(_)))
+
+    def apply(dataSeq: NodeData*)(using DummyImplicit): BranchReset = BranchReset(dataSeq.map(Node(_)))
 
   /** Conditional is a conditional group (e.g. `(?(x)...|...)`). */
   final case class Conditional(test: ConditionalTest, yes: Node, no: Option[Node]) extends CommandKind
 
   object Conditional:
+
     def apply(test: ConditionalTest, yes: NodeData): Conditional =
       Conditional(test, Node(yes), None)
 
@@ -102,12 +105,14 @@ object CommandKind:
   final case class AbsenceExpression(absent: Node, exp: Node) extends CommandKind
 
   object AbsenceExpression:
+
     def apply(absent: NodeData, exp: NodeData): AbsenceExpression = AbsenceExpression(Node(absent), Node(exp))
 
   /** AbsenceStopper is an absence stopper (e.g. `(?~|foo)`). */
   final case class AbsenceStopper(absent: Node) extends CommandKind
 
   object AbsenceStopper:
+
     def apply(absent: NodeData): AbsenceStopper = AbsenceStopper(Node(absent))
 
   /** AbsenceRangeClear is a range clear of absence stoppers (e.g. `(?~|)`). */

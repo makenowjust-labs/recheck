@@ -191,10 +191,10 @@ object PatternAlphabet:
     */
   def kindLineTerminators(pattern: IRPattern): Seq[IRLineTerminatorSet] =
     val chomps = pattern.chompTextEndsInMiddle.collect { case IRNode(Assert(IRAssertKind.ChompTextEnd(t)), _) => t }
-    (pattern.node.collect {
+    val lines = pattern.node.collect:
       case Assert(IRAssertKind.LineBegin(t, _)) => t
       case Assert(IRAssertKind.LineEnd(t))      => t
-    } ++ chomps).distinct
+    (lines ++ chomps).distinct
 
   /** Checks whether the kinds tell `\r` and `\n`, for an assertion seeing `\r\n` as one line terminator. */
   def needsCRLFDistinction(pattern: IRPattern): Boolean =

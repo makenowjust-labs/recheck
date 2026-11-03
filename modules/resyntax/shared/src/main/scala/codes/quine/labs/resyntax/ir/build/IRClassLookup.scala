@@ -18,6 +18,7 @@ import codes.quine.labs.resyntax.ir.build.IRPropertyLookup.of
   * reason to use Unicode rules, where `U+0080..U+00FF` follow ASCII rules.
   */
 private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlNative: Boolean):
+
   import IRClassLookup.*
 
   private def ruleOf(flags: IRCharFlagSet, asciiOf: IRCharset.ASCII => Boolean): Rule =
@@ -165,6 +166,7 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
 object IRClassLookup:
 
   private enum Rule:
+
     case ASCII, Unicode, Native
 
   val Latin1: CharSet = CharSet.range(0x80, 0xff)

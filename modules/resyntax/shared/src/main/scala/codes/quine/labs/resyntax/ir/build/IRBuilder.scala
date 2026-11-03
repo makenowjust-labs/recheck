@@ -176,9 +176,9 @@ object IRBuilder:
             .fold(single(1)): flags =>
               node.data match
                 case _ if nodes.size > 1 =>
-                  single(fold(UTF8Encoding.decode(nodes.collect {
+                  val bytes = nodes.collect:
                     case Node(NodeData.Backslash(BackslashKind.Escape(_, b)), _) => b
-                  })))
+                  single(fold(UTF8Encoding.decode(bytes)))
                 case NodeData.Literal(value)                                 => single(fold(value))
                 case NodeData.Backslash(value: BackslashKind.BackslashValue) => single(fold(value.value))
                 case NodeData.Class(false, _)                                =>
@@ -228,16 +228,14 @@ object IRBuilder:
       case QuoteLiteral.QuoteValue(value)    => value >= 0x80
 
   private def deepExists(x: Any)(p: PartialFunction[Any, Boolean]): Boolean =
-    p.applyOrElse(
-      x,
-      {
+    if p.isDefinedAt(x) then p(x)
+    else
+      x match
         case xs: Iterable[?] => xs.exists(deepExists(_)(p))
         case x: Option[?]    => x.exists(deepExists(_)(p))
         case _: String       => false
         case x: Product      => x.productIterator.exists(deepExists(_)(p))
         case _               => false
-      }
-    )
 
   /** Returns the names of PCRE's start options (e.g. `(*CRLF)`), which can appear only at the start. */
   private def startOptions(node: Node): Seq[String] =
@@ -282,6 +280,7 @@ private[build] class IRBuilder(
     lookBehindAnalyzer: LookBehindAnalyzer,
     hasCall: Boolean
 ):
+
   private val dialect = initial.dialect
 
   private val featureSet = initial.featureSet

@@ -27,12 +27,14 @@ object IRNodeData:
   final case class Sequence(nodes: Seq[IRNode]) extends IRNodeData
 
   object Sequence:
+
     def apply(nodes: IRNodeData*): IRNodeData =
       Sequence(nodes.map(IRNode(_)))
 
   final case class Disjunction(nodes: Seq[IRNode]) extends IRNodeData
 
   object Disjunction:
+
     def apply(nodes: IRNodeData*): IRNodeData =
       Disjunction(nodes.map(IRNode(_)))
 
@@ -42,11 +44,13 @@ object IRNodeData:
   final case class Atomic(node: IRNode) extends IRNodeData
 
   object Atomic:
+
     def apply(data: IRNodeData): IRNodeData = Atomic(IRNode(data))
 
   final case class LookAhead(negative: Boolean, node: IRNode) extends IRNodeData
 
   object LookAhead:
+
     def apply(negative: Boolean, data: IRNodeData): IRNodeData = LookAhead(negative, IRNode(data))
 
   /** LookBehind is a look-behind assertion, whose body the engine matches as `matching`. */
@@ -54,6 +58,7 @@ object IRNodeData:
       extends IRNodeData
 
   object LookBehind:
+
     def apply(negative: Boolean, data: IRNodeData): IRNodeData = LookBehind(negative, IRNode(data))
 
   final case class Assert(kind: IRAssertKind) extends IRNodeData

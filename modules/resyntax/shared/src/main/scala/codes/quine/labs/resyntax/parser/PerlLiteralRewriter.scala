@@ -41,6 +41,7 @@ private[parser] object PerlLiteralRewriter:
   private def isLUF(c: Char): Boolean = c == 'L' || c == 'U' || c == 'F'
 
 private final class PerlLiteralRewriter(source: String, extended: Boolean, bytes: Boolean):
+
   import PerlLiteralRewriter.*
 
   /** The source, where the lexer swaps `\L\u` and `\U\l` in place. */
@@ -54,6 +55,7 @@ private final class PerlLiteralRewriter(source: String, extended: Boolean, bytes
 
   /** Frame is an open command (or the whole text) and its text so far. */
   private final class Frame(val command: Char):
+
     val text: java.lang.StringBuilder = new java.lang.StringBuilder
     val starts: mutable.ArrayBuilder.ofInt = new mutable.ArrayBuilder.ofInt
     val ends: mutable.ArrayBuilder.ofInt = new mutable.ArrayBuilder.ofInt

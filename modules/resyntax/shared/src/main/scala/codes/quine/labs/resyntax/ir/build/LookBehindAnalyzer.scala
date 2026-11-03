@@ -270,11 +270,10 @@ private[build] final class LookBehindAnalyzer(
       else if widths.distinct.size == 1 then widths.head
       else RubyWidth.Variable
     case NodeData.Sequence(nodes) =>
-      rubyChars(nodes.toIndexedSeq).foldLeft[RubyWidth](RubyWidth.Fixed(0)) {
+      rubyChars(nodes.toIndexedSeq).foldLeft[RubyWidth](RubyWidth.Fixed(0)):
         case (RubyWidth.Fixed(l), RubyWidth.Fixed(r))          => RubyWidth.Fixed(l + r)
         case (RubyWidth.Variable, _) | (_, RubyWidth.Variable) => RubyWidth.Variable
         case _                                                 => RubyWidth.Unknown
-      }
     case NodeData.Repeat(node, quantifier) =>
       bounds(quantifier) match
         case (min, max) if min == max =>
@@ -421,6 +420,7 @@ private[build] object LookBehindAnalyzer:
   sealed abstract class RubyWidth extends Product with Serializable
 
   object RubyWidth:
+
     final case class Fixed(n: Long) extends RubyWidth
     case object Variable extends RubyWidth
     case object Unknown extends RubyWidth
@@ -429,6 +429,7 @@ private[build] object LookBehindAnalyzer:
   final case class JavaInfo(maxLength: Int, maxValid: Boolean, deterministic: Boolean)
 
   object JavaInfo:
+
     val Initial: JavaInfo = JavaInfo(0, maxValid = true, deterministic = true)
 
   /** Returns the length as `Int`, where a length above `Int.MaxValue` is `Int.MaxValue`. */

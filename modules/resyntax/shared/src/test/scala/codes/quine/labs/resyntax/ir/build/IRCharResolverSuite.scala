@@ -20,6 +20,7 @@ import codes.quine.labs.resyntax.ir.build.IRHelper.equalsWithoutLoc
 import codes.quine.labs.resyntax.parser.Parser
 
 class IRCharResolverSuite extends munit.FunSuite:
+
   val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())
 
   /** The characters of the input without surrogates (Ruby and PCRE with `u`). */
@@ -46,17 +47,17 @@ class IRCharResolverSuite extends munit.FunSuite:
     case Chars(set) => set
     case data       => fail(s"Not a character set: $data")
 
-  def check(s: String, flags: String, dialects: Dialect*)(expected: IRNodeData)(implicit loc: munit.Location): Unit =
+  def check(s: String, flags: String, dialects: Dialect*)(expected: IRNodeData)(using loc: munit.Location): Unit =
     for dialect <- dialects do
       test(s"IRBuilder.build: /$s/$flags in $dialect"):
         val node = IRNode(strip(build(s, flags, dialect).node.data))
         assert(node.equalsWithoutLoc(IRNode(expected)), node)
 
-  def chars(s: String, flags: String, dialects: Dialect*)(expected: CharSet)(implicit loc: munit.Location): Unit =
+  def chars(s: String, flags: String, dialects: Dialect*)(expected: CharSet)(using loc: munit.Location): Unit =
     check(s, flags, dialects*)(Chars(expected))
 
   /** Checks the IR of a Perl pattern from a runtime string, which Perl's lexer does not rewrite. */
-  def checkPerlString(s: String, flags: String)(expected: IRNodeData)(implicit loc: munit.Location): Unit =
+  def checkPerlString(s: String, flags: String)(expected: IRNodeData)(using loc: munit.Location): Unit =
     test(s"IRBuilder.build: /$s/$flags in Perl from a string"):
       val node = IRNode(strip(build(s, flags, Perl(source = PerlSource.String)).node.data))
       assert(node.equalsWithoutLoc(IRNode(expected)), node)
@@ -64,18 +65,18 @@ class IRCharResolverSuite extends munit.FunSuite:
   /** Checks a set by a predicate, for a large set. */
   def checkSet(s: String, flags: String, dialects: Dialect*)(
       p: CharSet => Boolean
-  )(implicit loc: munit.Location): Unit =
+  )(using loc: munit.Location): Unit =
     for dialect <- dialects do
       test(s"IRBuilder.build: /$s/$flags in $dialect (set)"):
         val set = setOf(build(s, flags, dialect).node.data)
         assert(p(set), set)
 
-  def error(s: String, flags: String, dialects: Dialect*)(message: String)(implicit loc: munit.Location): Unit =
+  def error(s: String, flags: String, dialects: Dialect*)(message: String)(using loc: munit.Location): Unit =
     for dialect <- dialects do
       test(s"IRBuilder.build: /$s/$flags in $dialect with error \"$message\""):
         interceptMessage[IRBuildingException](message)(build(s, flags, dialect))
 
-  def unsupported(s: String, flags: String, dialects: Dialect*)(implicit loc: munit.Location): Unit =
+  def unsupported(s: String, flags: String, dialects: Dialect*)(using loc: munit.Location): Unit =
     for dialect <- dialects do
       test(s"IRBuilder.build: /$s/$flags in $dialect is unsupported"):
         assert(strip(build(s, flags, dialect).node.data).isInstanceOf[Unsupported])

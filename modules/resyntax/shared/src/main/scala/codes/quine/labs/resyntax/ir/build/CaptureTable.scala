@@ -51,6 +51,7 @@ private[build] final class CaptureTable(
 
 /** CaptureAnalyzer numbers the capture groups of a whole pattern, including the groups in unsupported nodes. */
 private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
+
   private val featureSet = initial.featureSet
 
   private var context: BuildingContext = initial
@@ -269,6 +270,7 @@ private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext)
       open = savedOpen
 
 private[build] object CaptureAnalyzer:
+
   def analyze(root: Node, context: BuildingContext): CaptureTable =
     new CaptureAnalyzer(root, context).analyze()
 
