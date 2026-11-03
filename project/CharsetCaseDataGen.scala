@@ -18,7 +18,7 @@ object CharsetCaseDataGen extends UnicodeDataGen:
     * Each run is the gap from the previous run, the count, the stride (only if the count is more than one) and the
     * zigzag delta.
     */
-  private def runs(range: Range)(f: Int => Int): String =
+  private def encodeRuns(range: Range)(f: Int => Int): String =
     val rs = mutable.ArrayBuffer.empty[Run]
     for c <- range do
       val delta = f(c) - c
@@ -42,7 +42,7 @@ object CharsetCaseDataGen extends UnicodeDataGen:
     CharsetEncoder.encode(values)
 
   /** Encodes overriding mappings as the gap from the previous code point, the length and the code points. */
-  private def overrides(entries: Seq[(Int, Seq[Int])]): String =
+  private def encodeOverrides(entries: Seq[(Int, Seq[Int])]): String =
     val values = mutable.ArrayBuffer.empty[Int]
     var prev = 0
     for (c, to) <- entries do
@@ -54,20 +54,20 @@ object CharsetCaseDataGen extends UnicodeDataGen:
 
   private val AllCodePoints: Range = 0 to 0x10ffff
 
-  private def codePoints(s: String): Seq[Int] = s.codePoints().toArray.toSeq
+  private def toCodePoints(s: String): Seq[Int] = s.codePoints().toArray.toSeq
 
   private def fullFold(c: Int, options: Int): Seq[Int] =
-    codePoints(UCharacter.foldCase(new String(Character.toChars(c)), options))
+    toCodePoints(UCharacter.foldCase(new String(Character.toChars(c)), options))
 
   private def fullUpper(c: Int): Seq[Int] =
-    codePoints(UCharacter.toUpperCase(ULocale.ROOT, new String(Character.toChars(c))))
+    toCodePoints(UCharacter.toUpperCase(ULocale.ROOT, new String(Character.toChars(c))))
 
   private def fullLower(c: Int): Seq[Int] =
-    codePoints(UCharacter.toLowerCase(ULocale.ROOT, new String(Character.toChars(c))))
+    toCodePoints(UCharacter.toLowerCase(ULocale.ROOT, new String(Character.toChars(c))))
 
   private def fullTitle(c: Int): Seq[Int] =
     val options = UCharacter.TITLECASE_NO_LOWERCASE | UCharacter.TITLECASE_NO_BREAK_ADJUSTMENT
-    codePoints(UCharacter.toTitleCase(ULocale.ROOT, new String(Character.toChars(c)), null, options))
+    toCodePoints(UCharacter.toTitleCase(ULocale.ROOT, new String(Character.toChars(c)), null, options))
 
   /** ECMAScript `Canonicalize` without the `u` and `v` flags (ES2024 22.2.2.7.3). */
   private def ecmaScriptUpper(ch: Int): Int =
@@ -100,18 +100,20 @@ object CharsetCaseDataGen extends UnicodeDataGen:
     sb.append(s"package $pkg\n\n")
     sb.append("private[charset] object CaseData:\n\n")
     sb.append(
-      s"  val SimpleFold: String = ${CharsetEncoder.literal(runs(AllCodePoints)(UCharacter.foldCase(_, default)))}\n\n"
+      s"  val SimpleFold: String = ${CharsetEncoder.quoteLiteral(encodeRuns(AllCodePoints)(UCharacter.foldCase(_, default)))}\n\n"
     )
-    sb.append(s"  val SimpleFoldTurkic: String = ${CharsetEncoder.literal(overrides(simpleTurkic))}\n\n")
-    sb.append(s"  val FullFold: String = ${CharsetEncoder.literal(overrides(full))}\n\n")
+    sb.append(s"  val SimpleFoldTurkic: String = ${CharsetEncoder.quoteLiteral(encodeOverrides(simpleTurkic))}\n\n")
+    sb.append(s"  val FullFold: String = ${CharsetEncoder.quoteLiteral(encodeOverrides(full))}\n\n")
     sb.append(
-      s"  val SimpleUpper: String = ${CharsetEncoder.literal(runs(AllCodePoints)(UCharacter.toUpperCase(_: Int)))}\n\n"
+      s"  val SimpleUpper: String = ${CharsetEncoder.quoteLiteral(encodeRuns(AllCodePoints)(UCharacter.toUpperCase(_: Int)))}\n\n"
     )
     sb.append(
-      s"  val SimpleLower: String = ${CharsetEncoder.literal(runs(AllCodePoints)(UCharacter.toLowerCase(_: Int)))}\n\n"
+      s"  val SimpleLower: String = ${CharsetEncoder.quoteLiteral(encodeRuns(AllCodePoints)(UCharacter.toLowerCase(_: Int)))}\n\n"
     )
-    sb.append(s"  val FullUpper: String = ${CharsetEncoder.literal(overrides(upper))}\n\n")
-    sb.append(s"  val FullLower: String = ${CharsetEncoder.literal(overrides(lower))}\n\n")
-    sb.append(s"  val FullTitle: String = ${CharsetEncoder.literal(overrides(title))}\n\n")
-    sb.append(s"  val ECMAScriptUpper: String = ${CharsetEncoder.literal(runs(0 to 0xffff)(ecmaScriptUpper))}\n")
+    sb.append(s"  val FullUpper: String = ${CharsetEncoder.quoteLiteral(encodeOverrides(upper))}\n\n")
+    sb.append(s"  val FullLower: String = ${CharsetEncoder.quoteLiteral(encodeOverrides(lower))}\n\n")
+    sb.append(s"  val FullTitle: String = ${CharsetEncoder.quoteLiteral(encodeOverrides(title))}\n\n")
+    sb.append(
+      s"  val ECMAScriptUpper: String = ${CharsetEncoder.quoteLiteral(encodeRuns(0 to 0xffff)(ecmaScriptUpper))}\n"
+    )
     sb.result()

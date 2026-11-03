@@ -31,7 +31,7 @@ private[charset] object RunTable:
 
   /** Decodes runs encoded as pairs of a length and a value. */
   def decode(s: String): RunTable =
-    val pairs = Codec.decode(s)
+    val pairs = CharsetDecoder.decode(s)
     val n = pairs.length / 2
     val starts = new Array[Int](n)
     val values = new Array[Int](n)

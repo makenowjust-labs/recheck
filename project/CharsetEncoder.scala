@@ -1,11 +1,11 @@
 import scala.collection.mutable
 
 /** CharsetEncoder encodes integer sequences into string literals for `resyntax-charset`, which
-  * `codes.quine.labs.resyntax.charset.Codec` decodes.
+  * `codes.quine.labs.resyntax.charset.CharsetDecoder` decodes.
   */
 object CharsetEncoder:
 
-  // The symbols and the digit counts must agree with `Codec`.
+  // The symbols and the digit counts must agree with `CharsetDecoder`.
 
   /** Symbols of the encoding: printable ASCII except `"` and `\`. */
   val Symbols: IndexedSeq[Char] = (0x20 to 0x7e).map(_.toChar).filter(c => c != '"' && c != '\\')
@@ -32,7 +32,7 @@ object CharsetEncoder:
   def zigzag(v: Int): Int = (v << 1) ^ (v >> 31)
 
   /** Encodes half-open intervals as deltas of their boundaries. */
-  def intervals(intervals: Seq[(Int, Int)]): String =
+  def encodeIntervals(intervals: Seq[(Int, Int)]): String =
     val deltas = mutable.ArrayBuffer.empty[Int]
     var prev = 0
     for (start, end) <- intervals do
@@ -46,7 +46,7 @@ object CharsetEncoder:
     * Each string is the length of the common prefix with the previous string, the length of the rest, and the rest as
     * zigzag deltas from the code points at the same positions of the previous string.
     */
-  def strings(strings: Seq[Seq[Int]]): String =
+  def encodeStrings(strings: Seq[Seq[Int]]): String =
     val values = mutable.ArrayBuffer.empty[Int]
     var prev = Seq.empty[Int]
     for s <- strings do
@@ -62,7 +62,7 @@ object CharsetEncoder:
     encode(values)
 
   /** Quotes a string as a Scala expression, splitting it into several literals if it is too long. */
-  def literal(s: String): String =
+  def quoteLiteral(s: String): String =
     require(!s.exists(c => c == '"' || c == '\\' || c < 0x20 || c > 0x7e), s"unquotable string: $s")
     // A JVM string constant must be under 65535 bytes in UTF-8.
     if s.length <= MaxLiteralLength then "\"" + s + "\""

@@ -107,7 +107,7 @@ object CaseMapping:
 
   /** Decodes runs encoded as gaps, counts, strides and zigzag deltas. */
   private def decode(s: String): CaseMapping =
-    val values = Codec.decode(s)
+    val values = CharsetDecoder.decode(s)
     val starts = mutable.ArrayBuilder.make[Int]
     val counts = mutable.ArrayBuilder.make[Int]
     val strides = mutable.ArrayBuilder.make[Int]
@@ -122,7 +122,7 @@ object CaseMapping:
       starts.addOne(start)
       counts.addOne(count)
       strides.addOne(stride)
-      deltas.addOne(Codec.unzigzag(values(i)))
+      deltas.addOne(CharsetDecoder.unzigzag(values(i)))
       i += 1
       next = start + (count - 1) * stride + 1
     new CaseMapping(starts.result(), counts.result(), strides.result(), deltas.result())
@@ -132,7 +132,7 @@ object CaseMapping:
 
   /** Simple case folding for Turkic languages: the `C`, `S` and `T` mappings of CaseFolding.txt. */
   lazy val SimpleFoldTurkic: CaseMapping =
-    SimpleFold.updated(Codec.overrides(CaseData.SimpleFoldTurkic).map((c, s) => (c, s(0))))
+    SimpleFold.updated(CharsetDecoder.decodeOverrides(CaseData.SimpleFoldTurkic).map((c, s) => (c, s(0))))
 
   /** Simple uppercase mapping (`Simple_Uppercase_Mapping`). */
   lazy val SimpleUpper: CaseMapping = decode(CaseData.SimpleUpper)
@@ -162,7 +162,7 @@ object CaseMapping:
   */
 object FullCaseFolding:
 
-  private lazy val fullOverrides: Map[Int, UString] = Codec.overrides(CaseData.FullFold).toMap
+  private lazy val fullOverrides: Map[Int, UString] = CharsetDecoder.decodeOverrides(CaseData.FullFold).toMap
 
   def apply(c: Int): UString = fullOverrides.getOrElse(c, UString(CaseMapping.SimpleFold(c)))
 
@@ -182,11 +182,11 @@ object FullCaseFolding:
   */
 object FullCaseMapping:
 
-  private lazy val upperOverrides: Map[Int, UString] = Codec.overrides(CaseData.FullUpper).toMap
+  private lazy val upperOverrides: Map[Int, UString] = CharsetDecoder.decodeOverrides(CaseData.FullUpper).toMap
 
-  private lazy val lowerOverrides: Map[Int, UString] = Codec.overrides(CaseData.FullLower).toMap
+  private lazy val lowerOverrides: Map[Int, UString] = CharsetDecoder.decodeOverrides(CaseData.FullLower).toMap
 
-  private lazy val titleOverrides: Map[Int, UString] = Codec.overrides(CaseData.FullTitle).toMap
+  private lazy val titleOverrides: Map[Int, UString] = CharsetDecoder.decodeOverrides(CaseData.FullTitle).toMap
 
   def upper(c: Int): UString = upperOverrides.getOrElse(c, UString(CaseMapping.SimpleUpper(c)))
 
