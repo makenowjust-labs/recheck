@@ -18,6 +18,7 @@ export type Variant = {
   properties?: Record<string, Setting>;
   required?: string[];
   additionalProperties?: boolean;
+  "x-scala-type"?: string;
 };
 
 /** Setting is a property of a variant object: `name` with `const`, or a setting with `enum` or `type`. */
@@ -27,6 +28,8 @@ export type Setting = {
   type?: string | string[];
   enum?: string[];
   default?: unknown;
+  "x-scala-type"?: string;
+  "x-cli-help"?: string;
 };
 
 export type Property = {
