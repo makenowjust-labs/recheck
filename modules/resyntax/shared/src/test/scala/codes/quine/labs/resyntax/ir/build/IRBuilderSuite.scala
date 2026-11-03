@@ -431,29 +431,6 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
     val pattern = IRBuilder.build(Node(NodeData.Literal('a')), FlagSet(), JavaScript, UnitMode.UTF16)
     assertEquals(pattern.node.data, Chars(CharSet.single('a')))
 
-  test("Parser.determineUnitMode: the mode of the IR"):
-    val cases = Seq(
-      ("a", "", JavaScript, UnitMode.UTF16),
-      ("a", "u", JavaScript, UnitMode.CodePoint),
-      ("a", "v", JavaScript, UnitMode.CodePoint),
-      ("a", "", Java, UnitMode.CodePoint),
-      ("a", "", DotNet, UnitMode.UTF16),
-      ("a", "", Python(), UnitMode.CodePoint),
-      ("a", "", Python(Python.Type.Bytes), UnitMode.Byte),
-      ("a", "", Ruby(), UnitMode.CodePoint),
-      ("a", "n", Ruby(), UnitMode.Byte),
-      ("a", "", Ruby(Ruby.Encoding.ASCII8Bit), UnitMode.Byte),
-      ("a", "", Perl(), UnitMode.CodePoint),
-      ("a", "", Perl(utf8 = false), UnitMode.Byte),
-      ("a", "", PCRE, UnitMode.Byte),
-      ("a", "u", PCRE, UnitMode.CodePoint),
-      ("(*UTF)a", "", PCRE, UnitMode.CodePoint),
-      ("(*NOTEMPTY)(*UTF8)a|b", "", PCRE, UnitMode.CodePoint)
-    )
-    for (source, flags, dialect, mode) <- cases do
-      val flagSet = FlagSet.parse(flags, dialect)
-      assertEquals(Parser.determineUnitMode(source, flagSet, dialect), mode, (source, flags, dialect))
-
   test("IRBuilder.build: the semantics of the dialect"):
     def patternOf(dialect: Dialect): IRPattern = build("a", "", dialect)
 

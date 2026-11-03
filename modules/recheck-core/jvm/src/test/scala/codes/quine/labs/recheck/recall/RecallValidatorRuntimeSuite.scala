@@ -26,7 +26,7 @@ import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRNodeData
 
-class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
+class RecallValidatorRuntimeSuite extends munit.FunSuite with RuntimeHelper:
 
   override val munitTimeout: Duration = 60.seconds
 

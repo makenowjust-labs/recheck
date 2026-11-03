@@ -7,7 +7,7 @@ import codes.quine.labs.recheck.RuntimeHelper
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
-class AttackStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
+class AttackPatternStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
 
   override val munitTimeout: Duration = 120.seconds
 
@@ -19,7 +19,7 @@ class AttackStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
   val texts: Seq[AttackPattern] = Seq(
     attack(Seq(("", "a", 0)), "\u0000", 31),
     attack(Seq(("'\"\\`", "#{x}#$y#@z$@{$a}", 0)), "\t\n\r\u000b\u000c", 2),
-    attack(Seq(("", "\u0001\u0008\u001b\u007f\u0085   ​﻿", 0)), "1", 3),
+    attack(Seq(("", "\u0001\u0008\u001b\u007f\u0085 \u2028\u2029​﻿", 0)), "1", 3),
     attack(Seq(("éあ", "́", 0)), "😀Ω", 2),
     attack(Seq(("a\u00a0b", "\u3000", 0)), "\u2000\u202f\u205f\u1680", 2),
     attack(Seq(("", "😀", 0)), "", 2),

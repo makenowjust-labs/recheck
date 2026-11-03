@@ -13,7 +13,7 @@ import codes.quine.labs.resyntax.ir.IRNodeData.Chars
 import codes.quine.labs.resyntax.ir.IRNodeData.Empty
 import codes.quine.labs.resyntax.ir.IRNodeData.Sequence
 
-class IRFlagSuite extends munit.FunSuite with IRHelper:
+class BuildingContextSuite extends munit.FunSuite with IRHelper:
   // `\n^` with `m` matches `a\n` in .NET, JavaScript and Python, but not in Java, Perl, PCRE and Ruby.
   // `^` with `m` matches the empty string except in Java.
   check("^", "m", DotNet, Python())(Assert(LineBegin(LT.LF, AfterTerminator)))
@@ -23,7 +23,7 @@ class IRFlagSuite extends munit.FunSuite with IRHelper:
   check("^", "", Ruby())(Assert(LineBegin(LT.LF, InputBegin)))
   check("^", "m", Ruby())(Assert(LineBegin(LT.LF, InputBegin)))
 
-  // `a$` matches `a\n` except in JavaScript; Java also before `\r\n`, `\r`, `\u0085` and ` ` at the end.
+  // `a$` matches `a\n` except in JavaScript; Java also before `\r\n`, `\r`, U+0085 and U+2028 at the end.
   check("$", "", JavaScript)(Assert(TextEnd))
   check("$", "", DotNet, PCRE, Perl(), Python())(Assert(ChompTextEnd(LT.LF)))
   check("$", "", Java)(Assert(ChompTextEnd(LT.Java)))

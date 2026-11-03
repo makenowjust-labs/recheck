@@ -176,14 +176,14 @@ object IRClassLookup:
 
   val ASCIISpace: CharSet = of(" \t\n\u000b\f\r")
 
-  val Vertical: CharSet = CharSet.range(0x0a, 0x0d).union(of("\u0085  "))
+  val Vertical: CharSet = CharSet.range(0x0a, 0x0d).union(of("\u0085\u2028\u2029"))
 
   /** `\h` of Java and PCRE. */
   lazy val pcreHorizontal: CharSet =
     of("\t   ᠎  　").union(CharSet.range(0x2000, 0x200a))
 
   /** ECMAScript's WhiteSpace and LineTerminator. */
-  lazy val javaScriptSpace: CharSet = gc("Zs").union(of("\t\n\u000b\f\r  ﻿"))
+  lazy val javaScriptSpace: CharSet = gc("Zs").union(of("\t\n\u000b\f\r\u2028\u2029﻿"))
 
   /** Python's `str.isspace`: `Zs`, or the bidirectional class `WS`, `B` or `S`. */
   lazy val pythonSpace: CharSet =

@@ -7,9 +7,11 @@ import codes.quine.labs.resyntax.ast.CommandKind.Comment
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.EscapeClassKind.*
 import codes.quine.labs.resyntax.ast.EscapeStyle.*
+import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.GroupKind.*
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.Quantifier.*
+import codes.quine.labs.resyntax.charset.UnitMode
 
 class ParserSuite extends munit.FunSuite with ParserHelper:
   // Top
@@ -157,3 +159,26 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
 
   // Dot
   check(".", "", All*)(Dot)
+
+  test("Parser.determineUnitMode: the mode of the IR"):
+    val cases = Seq(
+      ("a", "", JavaScript, UnitMode.UTF16),
+      ("a", "u", JavaScript, UnitMode.CodePoint),
+      ("a", "v", JavaScript, UnitMode.CodePoint),
+      ("a", "", Java, UnitMode.CodePoint),
+      ("a", "", DotNet, UnitMode.UTF16),
+      ("a", "", Python(), UnitMode.CodePoint),
+      ("a", "", Python(Python.Type.Bytes), UnitMode.Byte),
+      ("a", "", Ruby(), UnitMode.CodePoint),
+      ("a", "n", Ruby(), UnitMode.Byte),
+      ("a", "", Ruby(Ruby.Encoding.ASCII8Bit), UnitMode.Byte),
+      ("a", "", Perl(), UnitMode.CodePoint),
+      ("a", "", Perl(utf8 = false), UnitMode.Byte),
+      ("a", "", PCRE, UnitMode.Byte),
+      ("a", "u", PCRE, UnitMode.CodePoint),
+      ("(*UTF)a", "", PCRE, UnitMode.CodePoint),
+      ("(*NOTEMPTY)(*UTF8)a|b", "", PCRE, UnitMode.CodePoint)
+    )
+    for (source, flags, dialect, mode) <- cases do
+      val flagSet = FlagSet.parse(flags, dialect)
+      assertEquals(Parser.determineUnitMode(source, flagSet, dialect), mode, (source, flags, dialect))
