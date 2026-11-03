@@ -3,8 +3,12 @@ package codes.quine.labs.resyntax.charset
 /** UTF8Encoding is the UTF-8 encoding form, which writes a code point in one to four bytes. */
 object UTF8Encoding:
 
-  /** Returns the UTF-8 bytes of the code point, where a surrogate code point is encoded like the others. */
+  /** Returns the UTF-8 bytes of the code point, where a surrogate code point is encoded like the others.
+    *
+    * It throws `IllegalArgumentException` for a value outside `[0, 0x10FFFF]`.
+    */
   def encode(c: Int): Seq[Int] =
+    if c < 0 || c > 0x10ffff then throw new IllegalArgumentException(f"Invalid code point: $c%X")
     if c < 0x80 then Seq(c)
     else if c < 0x800 then Seq(0xc0 | (c >> 6), 0x80 | (c & 0x3f))
     else if c < 0x10000 then Seq(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f))

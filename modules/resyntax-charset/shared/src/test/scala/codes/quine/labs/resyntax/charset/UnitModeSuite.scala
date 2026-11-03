@@ -16,6 +16,7 @@ class UnitModeSuite extends munit.FunSuite:
     assertEquals(UnitMode.Byte.encode(UString(0x61, 0xc3, 0xa9)), "a\u00c3\u00a9")
     intercept[IllegalArgumentException](UnitMode.UTF16.encode(UString(0x1f600)))
     intercept[IllegalArgumentException](UnitMode.Byte.encode(UString(0x100)))
+    intercept[IllegalArgumentException](UnitMode.CodePoint.encode(UString(0x110000)))
     for (mode, s) <- Seq(
         UnitMode.UTF16 -> UString(0x61, 0xd83d, 0xde00, 0xdc00),
         UnitMode.CodePoint -> UString(0x61, 0x1f600, 0xdc00, 0xd800),
@@ -33,3 +34,4 @@ class UnitModeSuite extends munit.FunSuite:
       UnitMode.Byte.fromCodePoints(s),
       UString(0x61, 0xc3, 0xa9, 0xe3, 0x81, 0x82, 0xf0, 0x9f, 0x98, 0x80)
     )
+    for mode <- UnitMode.values do intercept[IllegalArgumentException](mode.fromCodePoints(UString(0x110000)))

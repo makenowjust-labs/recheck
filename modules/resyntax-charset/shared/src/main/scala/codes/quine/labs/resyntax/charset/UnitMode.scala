@@ -55,8 +55,12 @@ enum UnitMode(val limit: Int):
     *
     * `UTF16` gives UTF-16 code units, `CodePoint` gives the code points as they are, and `Byte` gives the UTF-8 bytes,
     * where a surrogate code point is encoded like the others.
+    *
+    * It throws `IllegalArgumentException` for a value outside `[0, 0x10FFFF]`.
     */
   def fromCodePoints(s: UString): UString = this match
-    case UnitMode.CodePoint => s
-    case UnitMode.UTF16     => UString.from(s.iterator.flatMap(UTF16Encoding.encode))
-    case UnitMode.Byte      => UString.from(s.iterator.flatMap(UTF8Encoding.encode))
+    case UnitMode.CodePoint =>
+      for c <- s.iterator if !contains(c) do throw new IllegalArgumentException(f"Invalid code point: $c%X")
+      s
+    case UnitMode.UTF16 => UString.from(s.iterator.flatMap(UTF16Encoding.encode))
+    case UnitMode.Byte  => UString.from(s.iterator.flatMap(UTF8Encoding.encode))

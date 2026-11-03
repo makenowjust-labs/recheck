@@ -18,8 +18,12 @@ object UTF16Encoding:
 
   def isSurrogate(c: Int): Boolean = 0xd800 <= c && c <= 0xdfff
 
-  /** Returns the UTF-16 code units of the code point, where a surrogate code point is a code unit of itself. */
+  /** Returns the UTF-16 code units of the code point, where a surrogate code point is a code unit of itself.
+    *
+    * It throws `IllegalArgumentException` for a value outside `[0, 0x10FFFF]`.
+    */
   def encode(c: Int): Seq[Int] =
+    if c < 0 || c > 0x10ffff then throw new IllegalArgumentException(f"Invalid code point: $c%X")
     if c < 0x10000 then Seq(c) else Seq(0xd800 | ((c - 0x10000) >> 10), 0xdc00 | (c & 0x3ff))
 
   /** Returns the code point of the surrogate pair of the high surrogate and the low surrogate. */
