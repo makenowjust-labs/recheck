@@ -96,12 +96,12 @@ export class WorkerPool {
   }
 
   /** Queues a checking method request. */
-  private request(
-    method: "check" | "checkAll",
+  private request<M extends "check" | "checkAll">(
+    method: M,
     source: string,
     flags: string,
     params: Parameters & HasAbortSignal,
-  ): Promise<any> {
+  ): Promise<M extends "checkAll" ? Diagnostics[] : Diagnostics> {
     const id = this.nextID++;
 
     const newParams = { ...params };

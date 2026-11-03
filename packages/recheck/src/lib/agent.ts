@@ -204,13 +204,13 @@ export async function checkAll(
 }
 
 /** Sends a checking method request to the `agent`, and cancels it on the abort of the `signal`. */
-async function run(
+async function run<M extends "check" | "checkAll">(
   agent: Agent,
-  method: "check" | "checkAll",
+  method: M,
   source: string,
   flags: string,
   params: Parameters & HasAbortSignal,
-): Promise<any> {
+): Promise<M extends "checkAll" ? Diagnostics[] : Diagnostics> {
   const newParams = { ...params };
 
   // Drops `signal` parameter from `newParams`.
