@@ -327,7 +327,8 @@ private[build] final class IRCharResolver(
       if dialect.isPCRE then pcreGraphemeCluster else graphemeCluster
     case _ => output(escapeClassSet(kind, flags, loc), flags)
 
-  /** `\X`: an extended grapheme cluster by the regular expression of UAX #29 (Table 1b), in an atomic group.
+  /** graphemeCluster is the IR of `\X`, which matches an extended grapheme cluster by the regular expression of UAX #29
+    * (Table 1b) in an atomic group.
     *
     * In byte mode, the bytes are Latin-1 characters.
     */
@@ -348,7 +349,8 @@ private[build] final class IRCharResolver(
     // The engines take the longest cluster and do not backtrack into it.
     IRNodeData.Atomic(IRCharResolver.prune(cluster).getOrElse(IRNode(IRNodeData.Chars(CharSet.empty))))
 
-  /** PCRE's `\X`: an extended grapheme cluster by PCRE2's own rules (`pcre2_extuni.c` of 10.49), in an atomic group.
+  /** pcreGraphemeCluster is the IR of PCRE's `\X`, which matches an extended grapheme cluster by PCRE2's own rules
+    * (`pcre2_extuni.c` of 10.49) in an atomic group.
     *
     * They differ from UAX #29: no GB9c, no extending character after a regional indicator or before an extended
     * pictographic after a prepend, and a pair of regional indicators at the start needs an even number of regional
@@ -775,7 +777,7 @@ private[build] object IRCharResolver:
   /** The strings of two or more code points that some characters fold to (e.g. `ss` from `ß`). */
   lazy val multiFoldings: Seq[(UString, CharSet)] = FullCaseFolding.multiCodePointFoldings.toSeq.sortBy(_._1)
 
-  /** [[multiFoldings]] in the order of Onigmo's tables: by the length, and then by the folding. */
+  /** rubyMultiFoldings is [[multiFoldings]] in the order of Onigmo's tables: by the length, and then by the folding. */
   lazy val rubyMultiFoldings: Seq[(UString, CharSet)] = multiFoldings.sortBy((key, _) => (key.length, key))
 
   def multiFolding(c: Int): Option[UString] = Some(FullCaseFolding(c)).filter(_.length >= 2)
@@ -829,7 +831,7 @@ private[build] object IRCharResolver:
       case ClassItemData.ClassBackslashClass(EscapeClassKind.QuoteSet(strings)) => strings.exists(_.length != 1)
       case _                                                                    => false
 
-  /** Python's key `upper(lower(c))`. */
+  /** pythonKey is the key that Python's `re` compares characters by case-insensitively, `upper(lower(c))`. */
   lazy val pythonKey: CaseMapping =
     val domain = CaseMapping.SimpleUpper.domain.union(CaseMapping.SimpleLower.domain)
     val simple = domain.iterator.map(c => (c, CaseMapping.SimpleUpper(CaseMapping.SimpleLower(c))))
@@ -838,7 +840,9 @@ private[build] object IRCharResolver:
     val full = Seq(0x1fd3 -> 0x390, 0x1fe3 -> 0x3b0, 0xfb06 -> 0xfb05)
     CaseMapping.fromEntries(simple ++ full)
 
-  /** .NET's key `ToLowerInvariant(c)`, where `U+0130` is not lower-cased to `i`. */
+  /** dotNetKey is the key that .NET compares characters by case-insensitively, `ToLowerInvariant(c)`, where `U+0130` is
+    * not lower-cased to `i`.
+    */
   lazy val dotNetKey: CaseMapping = CaseMapping.SimpleLower.updated(Seq(0x130 -> 0x130))
 
   /** Determines the equivalence that a back-reference with the flags compares by.
