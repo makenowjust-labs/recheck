@@ -112,11 +112,13 @@ object Interpreter:
     *
     * For example, a state of a program reading the captures has `values` like the following.
     * {{{
-    * 4, 2,         // the block ID and the position
-    * 1,            // the counters
-    * 0, -1, 0, 1,  // the begin and the end of each capture, or -1 (only when the program reads the captures)
-    * 1,            // the largest index of the closed captures (likewise)
-    * 1, 0          // 1 if the canary register holds the position, or 0
+    * MatchState(
+    *   4, 2,        // the block ID and the position
+    *   1,           // the counters
+    *   0, -1, 0, 1, // the begin and the end of each capture, or -1 (only when the program reads the captures)
+    *   1,           // the largest index of the closed captures (likewise)
+    *   1, 0         // 1 if the canary register holds the position, or 0
+    * )
     * }}}
     */
   private[vm] final class MatchState(private val values: Array[Int]):
