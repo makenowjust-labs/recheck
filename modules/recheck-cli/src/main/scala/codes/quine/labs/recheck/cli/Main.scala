@@ -109,14 +109,20 @@ class Main:
 
     case Right(action: CheckAction) =>
       val diagnostics =
-        if action.all then ReDoS.checkAll(action.pattern.source, action.pattern.flags, action.params).toList
-        else List(ReDoS.check(action.pattern.source, action.pattern.flags, action.params))
-      if !action.json then Console.out.println(diagnostics.mkString("\n\n"))
-      else if action.all then Console.out.println(diagnostics.asJson.noSpaces)
-      else Console.out.println(diagnostics.head.asJson.noSpaces)
-      diagnostics.last match
-        case _: Diagnostics.Safe                                => () // skip
-        case _: Diagnostics.Vulnerable | _: Diagnostics.Unknown => exit(1)
+        if action.all then ReDoS.checkAll(action.pattern.source, action.pattern.flags, action.params)
+        else Iterator(ReDoS.check(action.pattern.source, action.pattern.flags, action.params))
+      val (open, separator, close) = if action.json && action.all then ("[", ",", "]") else ("", "\n---\n", "")
+      var last: Option[Diagnostics] = None
+      Console.out.print(open)
+      for d <- diagnostics do
+        if last.isDefined then Console.out.print(separator)
+        Console.out.print(if action.json then d.asJson.noSpaces else d.toString)
+        Console.out.flush()
+        last = Some(d)
+      Console.out.println(close)
+      last match
+        case Some(_: Diagnostics.Safe) => () // skip
+        case _                         => exit(1)
 
     case Right(action: GenerateRecallScriptAction) =>
       val script = for

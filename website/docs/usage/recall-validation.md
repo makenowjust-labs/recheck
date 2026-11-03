@@ -99,7 +99,7 @@ When the recall validation fails, `check` does not report the diagnostics, and i
 If no attack succeeds, the result is `safe`.
 `checkAll` returns the diagnostics whose recall validation failed too, followed by the reported one.
 This shows that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by the found attacks.
-The CLI shows them with the `--all` option, separated by a blank line, and its exit status follows the last one, as without the option (`0` for `safe`, and `1` otherwise).
+The CLI shows them with the `--all` option, separated by a `---` line as soon as each one is computed, and its exit status follows the last one, as without the option (`0` for `safe`, and `1` otherwise).
 With the `--json` option, the CLI shows a diagnostics in JSON, or the array of them with `--all`.
 
 ```bash
