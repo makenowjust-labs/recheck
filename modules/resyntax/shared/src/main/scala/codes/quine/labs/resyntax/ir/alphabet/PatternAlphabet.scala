@@ -13,11 +13,11 @@ import codes.quine.labs.resyntax.ir.IRPattern
 import codes.quine.labs.resyntax.ir.IRSurrogateKind
 import codes.quine.labs.resyntax.ir.IRWordMarkSet
 
-/** PatternAlphabet is a set of pairs of a disjoint character set (an atom) and a character kind. */
-final case class PatternAlphabet(pairs: IndexedSeq[(CharSet, CharKind)]):
+/** PatternAlphabet is a set of pairs of a disjoint character set (an atom) of the mode and a character kind. */
+final case class PatternAlphabet(mode: UnitMode, pairs: IndexedSeq[(CharSet, CharKind)]):
 
   /** An alphabet whose atoms are the pairs' sets and the rest. */
-  private lazy val alphabet: Alphabet = Alphabet.refine(UnitMode.CodePoint, pairs.map(_._1))
+  private lazy val alphabet: Alphabet = Alphabet.refine(mode, pairs.map(_._1))
 
   /** A map from an atom index of [[alphabet]] to the index of its pair, or `-1` for the rest. */
   private lazy val pairIndices: Array[Int] =
@@ -56,8 +56,9 @@ object PatternAlphabet:
     * an atom of high surrogates and one of low surrogates if both exist, since a high surrogate followed by a low one
     * is one character.
     *
-    * The atoms are ordered as splitting all characters, `lineTerminator`, `word` and `sets` in turn: an atom of an
-    * earlier set comes first, and a split atom puts the part in the set first.
+    * The atoms are ordered by whether `lineTerminator`, `moreLineTerminators`, `word`, `moreWords`, `wordMarks` and
+    * `sets` have them, in turn, where one having it comes first (e.g. with `lineTerminator` `[\n]`, `word` `\w` and
+    * `sets` `[a]`, the atoms are `[\n]`, `[a]`, `[0-9A-Z_b-z]` and the rest).
     */
   def build(
       mode: UnitMode,
@@ -119,7 +120,7 @@ object PatternAlphabet:
           low = tellsSurrogates && c.subsetOf(UTF16Encoding.LowSurrogates)
         )
         (c, kind)
-    PatternAlphabet(pairs)
+    PatternAlphabet(mode, pairs)
 
   /** Computes the alphabet of the pattern.
     *

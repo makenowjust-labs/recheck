@@ -959,7 +959,7 @@ private[build] object IRPropertyLookup:
       case _        => None
 
   /** Looks up Ruby's property; an ASCII-8BIT regexp (`bytes`) has only the POSIX classes in ASCII. */
-  def ruby(name: String, value: Option[String], bytes: Boolean = false): PropertyResult =
+  def ruby(name: String, value: Option[String], bytes: Boolean): PropertyResult =
     if bytes then
       return fromOption(
         Option
