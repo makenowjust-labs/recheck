@@ -36,7 +36,7 @@ private[recheck] object DiagnosticsIteratorUtil:
         buffer = None
         d
 
-      private[recheck] def fetch(): Option[D] =
+      private def fetch(): Option[D] =
         try
           if current eq null then current = ds
           Option.when(current.hasNext)(current.next())
