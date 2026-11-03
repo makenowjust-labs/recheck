@@ -18,7 +18,7 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "https://makenowjust-labs.github.io/recheck/parameters.schema.json"
 title: "Parameters"
-description: "Parameters is parameters for analysis."
+description: "Parameters is the set of the parameters of the analysis."
 type: object
 additionalProperties: false
 properties:
@@ -41,7 +41,7 @@ properties:
 
   attackLimit:
     title: "Attack Limit"
-    description: "The upper limit on the number of characters read by VM on the attack."
+    description: "The upper limit on the number of characters read by the VM on the attack."
     type: integer
     default: 1500000000
     x-scala-type: "Int"
@@ -76,7 +76,7 @@ properties:
 
   crossoverSize:
     title: "Crossover Size"
-    description: "The number of crossover on each generation."
+    description: "The number of crossovers on each generation."
     type: integer
     default: 25
     x-scala-type: "Int"
@@ -152,7 +152,7 @@ properties:
 
   incubationLimit:
     title: "Incubation Limit"
-    description: "The upper limit on the number of characters read by VM on incubation."
+    description: "The upper limit on the number of characters read by the VM on incubation."
     type: integer
     default: 25000
     x-scala-type: "Int"
@@ -229,7 +229,7 @@ properties:
 
   maxIteration:
     title: "Max Iteration"
-    description: "The maximum number of fuzzing iteration."
+    description: "The maximum number of fuzzing iterations."
     type: integer
     default: 10
     x-scala-type: "Int"
@@ -238,7 +238,7 @@ properties:
 
   maxNFASize:
     title: "Max NFA Size"
-    description: "The maximum size of NFA to determine which algorithm is used."
+    description: "The maximum size of the NFA to determine which algorithm is used."
     type: integer
     default: 35000
     x-scala-type: "Int"
@@ -277,7 +277,7 @@ properties:
 
   maxRepeatCount:
     title: "Max Repeat Count"
-    description: "The maximum number of sum of repetition quantifier’s repeat counts to determine which algorithm is used."
+    description: "The maximum sum of the repeat counts of the repetition quantifiers to determine which algorithm is used."
     type: integer
     default: 30
     x-scala-type: "Int"
@@ -286,7 +286,7 @@ properties:
 
   maxSimpleRepeatCount:
     title: "Max Simple Repeat Count"
-    description: "The maximum number of each repetition quantifier’s repeat count on `static` seeding."
+    description: "The maximum repeat count of each repetition quantifier on `static` seeding."
     type: integer
     default: 30
     x-scala-type: "Int"
@@ -295,7 +295,7 @@ properties:
 
   mutationSize:
     title: "Mutation Size"
-    description: "The number of mutation on each generation."
+    description: "The number of mutations on each generation."
     type: integer
     default: 50
     x-scala-type: "Int"
@@ -313,7 +313,7 @@ properties:
 
   recallLimit:
     title: "Recall Limit"
-    description: "The upper limit on the number of characters read by VM on the recall validation."
+    description: "The upper limit on the number of characters read by the VM on the recall validation."
     type: integer
     default: 1500000000
     x-scala-type: "Int"
@@ -352,7 +352,7 @@ properties:
 
   seedingLimit:
     title: "Seeding Limit"
-    description: "The upper limit on the number of characters read by VM on `dynamic` seeding."
+    description: "The upper limit on the number of characters read by the VM on `dynamic` seeding."
     type: integer
     default: 1000
     x-scala-type: "Int"
