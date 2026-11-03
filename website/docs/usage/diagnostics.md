@@ -21,7 +21,7 @@ Every `Diagnostics` has the following fields.
 
 ## Status
 
-Known that already, `Diagnostics` has three statuses.
+`Diagnostics` has three statuses.
 
 - `safe` means the given regular expression seems safe at least in this checking.
 - `vulnerable` means vulnerability in the given regular expression is found.
@@ -30,7 +30,7 @@ Known that already, `Diagnostics` has three statuses.
 
 ## Complexity
 
-`safe` and `vulnerable` has the `complexity` field.
+`safe` and `vulnerable` have the `complexity` field.
 This field contains the matching time complexity estimated in this checking.
 There are five `complexity` varieties.
 

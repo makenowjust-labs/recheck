@@ -156,7 +156,7 @@ There are four options to the `RECHECK_BACKEND` value.
 
 - `RECHECK_BACKEND=native`
 
-  Uses the Graal `native-image` build contained by `recheck-${os}-${arch}` package. When the platform is not supported, it will be failed.
+  Uses the Graal `native-image` build contained by `recheck-${os}-${arch}` package. When the platform is not supported, it fails.
   The following table shows supported platforms.
 
   | package name        | OS      | CPU    |
@@ -171,7 +171,7 @@ There are four options to the `RECHECK_BACKEND` value.
 
 - `RECHECK_BACKEND=java`
 
-  Uses the JAR build contained by the `recheck-jar` package with the `java` command. When the system does not have the `java` command, it will be failed.
+  Uses the JAR build contained by the `recheck-jar` package with the `java` command. When the system does not have the `java` command, it fails.
 
   This backend is a bit slow for starting up, but the checking time is expected to be faster than other backends if the process lives a long time.
 
