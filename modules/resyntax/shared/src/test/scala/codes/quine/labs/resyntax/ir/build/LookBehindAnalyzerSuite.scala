@@ -72,6 +72,9 @@ class LookBehindAnalyzerSuite extends munit.FunSuite with IRHelper:
   error("(?<=(?R))", "", Perl())("Look-behind longer than 255 at 0")
   error("(?<x>(?<=(?1)))", "", Perl())("Look-behind longer than 255 at 5")
   error("(?<=(?(1)a{300}))(a)", "", Perl())("Look-behind longer than 255 at 0")
+  // Perl takes `(?{...})` as empty and the pattern of `(??{...})` as unbounded (checked against Perl 5.44).
+  valid("(?<=a(?{1}))b", Perl())
+  error("(?<=a(??{\"x\"}))b", "", Perl())("Look-behind longer than 255 at 0")
 
   // PCRE requires each top-level branch to be bounded, and at most 255 long if its length varies.
   valid("(?<=a|bc)", PCRE)
@@ -110,6 +113,10 @@ class LookBehindAnalyzerSuite extends munit.FunSuite with IRHelper:
   valid("(?<=(?:){0,256})", PCRE)
   valid("(?<=(?<!.){2})", PCRE)
   error("(?<=(?:)*)", "", PCRE)("Look-behind is not limited at 0")
+  test("IRBuilder.build: a look-behind referring to a chain of groups in PCRE"):
+    val groups = "(a)" + (1 until 30).map(n => s"(\\g{$n}\\g{$n})").mkString
+    interceptMessage[IRBuildingException](s"Look-behind is too long at ${groups.length}"):
+      build(s"$groups(?<=\\g{30})", "", PCRE)
   error("(?<=(?<!.)*)", "", PCRE)("Look-behind is not limited at 0")
   error("(?<=(?<x>$)+)", "", PCRE)("Look-behind is not limited at 0")
   valid("(?<=(?:)*)", Perl(), Python(), Java)
