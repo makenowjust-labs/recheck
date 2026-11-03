@@ -42,7 +42,7 @@ object Diagnostics:
       attack: AttackPattern,
       hotspot: Hotspot,
       recallValidation: Option[RecallValidation],
-      checker: Checker
+      checker: Checker.Used
   ) extends Diagnostics:
     override def toString: String =
       val lines = Seq(

@@ -309,5 +309,5 @@ object ReDoS:
     try d.copy(recallValidation = RecallValidator.validate(source, flags, dialect, mode, d.attack, timeout))
     catch
       case ex: ReDoSException =>
-        ex.checker = Some(if d.checker == Checker.Fuzz then Checker.Fuzz else Checker.Automaton)
+        ex.checker = Some(d.checker)
         throw ex

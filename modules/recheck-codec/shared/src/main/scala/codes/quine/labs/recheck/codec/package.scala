@@ -62,7 +62,7 @@ given encodeDiagnostics: Encoder[Diagnostics] with
         "attack" -> encodeAttackPattern(dialect, unitMode)(attack),
         "hotspot" := hotspot,
         "recallValidation" := recallValidation,
-        "checker" := checker
+        "checker" := (checker: Checker)
       )
     case Diagnostics.Unknown(source, flags, dialect, error, checker) =>
       Json.obj(
