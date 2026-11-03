@@ -28,12 +28,16 @@ object StaticSeeder:
   ): Set[FString] = ctx.interrupt:
     val epsNFA = EpsNFABuilder.build(simplify(pattern, maxSimpleRepeatSize))
     val orderedNFA = epsNFA.toOrderedNFA.rename.mapAlphabet(_.representative)
+    val highs = epsNFA.alphabet.pairs.collect { case (c, k) if k.high => c.representative }.toSet
+    val lows = epsNFA.alphabet.pairs.collect { case (c, k) if k.low => c.representative }.toSet
     val seeder = new StaticSeeder(
       orderedNFA.alphabet,
       orderedNFA.stateSet,
       orderedNFA.inits.toSet,
       orderedNFA.acceptSet,
-      orderedNFA.toGraph
+      orderedNFA.toGraph,
+      highs,
+      lows
     )
     seeder.seed(maxInitialGenerationSize, limit, maxSize)
 
@@ -106,7 +110,11 @@ private[fuzz] class StaticSeeder[A, Q](
     val stateSet: Set[Q],
     val initSet: Set[Q],
     val acceptSet: Set[Q],
-    val graph: Graph[Q, A]
+    val graph: Graph[Q, A],
+    /** The high surrogates that the kinds of the alphabet tell apart. */
+    val highs: Set[A],
+    /** The low surrogates that the kinds of the alphabet tell apart. */
+    val lows: Set[A]
 )(using ctx: Context):
 
   import ctx.*
@@ -184,9 +192,14 @@ private[fuzz] class StaticSeeder[A, Q](
     if a == b && q1s.contains(q3) && q2s.contains(q0) then Some(Seq(a))
     else path(q1s, q2s).map(w => a +: w :+ b)
 
-  /** Finds a dead path from `q`. */
+  /** Finds a dead path from `q`.
+    *
+    * It does not start with a low surrogate after a high surrogate, which the engine reads together as one character.
+    */
   def deadPath(q: Q): Option[Seq[A]] =
-    interrupt(alphabet.diff(graph.neighbors(q).map(_._1).toSet)).headOption match
+    val afterHigh = reverseGraph.neighbors.getOrElse(q, Vector.empty).exists((a, _) => highs.contains(a))
+    val chars = if afterHigh then alphabet.diff(lows) else alphabet
+    interrupt(chars.diff(graph.neighbors(q).map(_._1).toSet)).headOption match
       case Some(c) => Some(Seq(c))
       case None    =>
         interrupt(reverseGraph.path(stateSet.diff(acceptSet), q).map(_._1.map(_._2).reverse))
