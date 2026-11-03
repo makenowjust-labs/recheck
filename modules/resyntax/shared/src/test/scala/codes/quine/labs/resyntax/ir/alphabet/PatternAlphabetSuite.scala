@@ -140,12 +140,8 @@ class PatternAlphabetSuite extends munit.FunSuite:
 
   def parse(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)
-    IRBuilder.build(
-      Parser.parse(source, flagSet, dialect),
-      flagSet,
-      dialect,
-      Parser.determineUnitMode(source, flagSet, dialect)
-    )
+    val mode = Parser.determineUnitMode(source, flagSet, dialect)
+    IRBuilder.build(Parser.parse(source, flagSet, dialect, mode), flagSet, dialect, mode)
 
   test("PatternAlphabet.build: too many sets"):
     val sets = Seq.tabulate(Integer.SIZE)(i => CharSet.single('a' + i))

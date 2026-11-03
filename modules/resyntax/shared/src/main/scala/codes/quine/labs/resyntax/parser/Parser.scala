@@ -60,14 +60,14 @@ object Parser:
       explicitCapture = featureSet.explicitCapture
     )
 
-  /** Parses the source in the dialect.
+  /** Parses the source in the dialect, whose unit mode is `mode` (see [[determineUnitMode]]).
     *
     * A Perl regex literal (the default of [[Dialect.Perl.source]]) is rewritten as Perl's lexer does first, and the
     * locations of the result point into the given source. A source that the engine reads as bytes (see
     * [[SourceEncoding]]) is read by its bytes, and the locations of a byte point to its character.
     */
-  def parse(source: String, flagSet: FlagSet, dialect: Dialect): Node =
-    val encoding = FeatureSet.from(SourcePrescan.from(source), dialect, flagSet).sourceEncoding
+  def parse(source: String, flagSet: FlagSet, dialect: Dialect, mode: UnitMode): Node =
+    val encoding = FeatureSet.from(SourcePrescan.from(source), dialect, flagSet, mode).sourceEncoding
     validateEncoding(source, encoding)
     val bytes = if encoding == SourceEncoding.UTF8 then Rewritten.utf8(source) else None
     val text = bytes.fold(source)(_.text)
@@ -76,7 +76,7 @@ object Parser:
         PerlLiteralRewriter.rewrite(text, flagSet.verbose, bytes = encoding == SourceEncoding.UTF8)
       case _ => None
     val rewrites = rewritten.toSeq ++ bytes.toSeq
-    try rewrites.foldLeft(parseText(rewritten.fold(text)(_.text), flagSet, dialect))((n, r) => r.relocate(n))
+    try rewrites.foldLeft(parseText(rewritten.fold(text)(_.text), flagSet, dialect, mode))((n, r) => r.relocate(n))
     catch
       case ex: ParsingException if rewrites.nonEmpty =>
         throw new ParsingException(ex.message, ex.pos.map(pos => rewrites.foldLeft(pos)((p, r) => r.position(p))))
@@ -109,9 +109,9 @@ object Parser:
       val pos = source.indexWhere(_ > 0xff)
       if pos >= 0 then throw new ParsingException("Non-Latin-1 character in bytes pattern", Some(pos))
 
-  private def parseText(source: String, flagSet: FlagSet, dialect: Dialect): Node =
+  private def parseText(source: String, flagSet: FlagSet, dialect: Dialect, mode: UnitMode): Node =
     val prescan = SourcePrescan.from(source)
-    val featureSet = FeatureSet.from(prescan, dialect, flagSet)
+    val featureSet = FeatureSet.from(prescan, dialect, flagSet, mode)
     val parser = new Parser(source, prescan, featureSet)
     parser.parse()
 

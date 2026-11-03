@@ -14,7 +14,7 @@ trait ParserHelper:
     for dialect <- dialects do
       test(s"Parser.parse: /$s/$flags in $dialect"):
         val flagSet = FlagSet.parse(flags, dialect)
-        val result = Parser.parse(s, flagSet, dialect)
+        val result = Parser.parse(s, flagSet, dialect, Parser.determineUnitMode(s, flagSet, dialect))
         assert(result.equalsWithoutLoc(Node(expected)))
 
   def error(s: String, flags: String, dialects: Dialect*)(message: String)(implicit loc: munit.Location): Unit =
@@ -22,19 +22,23 @@ trait ParserHelper:
       test(s"Parser.parse: /$s/$flags in $dialect with error \"$message\""):
         val flagSet = FlagSet.parse(flags, dialect)
         interceptMessage[ParsingException](message):
-          Parser.parse(s, flagSet, dialect)
+          Parser.parse(s, flagSet, dialect, Parser.determineUnitMode(s, flagSet, dialect))
 
   /** Checks a Perl pattern from a runtime string, which Perl's lexer does not rewrite. */
   def checkPerlString(s: String, flags: String)(expected: NodeData)(implicit loc: munit.Location): Unit =
     test(s"Parser.parse: /$s/$flags in Perl from a string"):
-      val result = Parser.parse(s, FlagSet.parse(flags, PerlString), PerlString)
+      val result = parsePerlString(s, flags)
       assert(result.equalsWithoutLoc(Node(expected)), result)
 
   def errorPerlString(s: String, flags: String)(message: String)(implicit loc: munit.Location): Unit =
     test(s"Parser.parse: /$s/$flags in Perl from a string with error \"$message\""):
       interceptMessage[ParsingException](message):
-        Parser.parse(s, FlagSet.parse(flags, PerlString), PerlString)
+        parsePerlString(s, flags)
 
   val PerlString: Dialect = Perl(source = PerlSource.String)
+
+  def parsePerlString(s: String, flags: String): Node =
+    val flagSet = FlagSet.parse(flags, PerlString)
+    Parser.parse(s, flagSet, PerlString, Parser.determineUnitMode(s, flagSet, PerlString))
 
   val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())

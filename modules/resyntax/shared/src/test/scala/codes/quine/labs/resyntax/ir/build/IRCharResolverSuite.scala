@@ -26,7 +26,8 @@ class IRCharResolverSuite extends munit.FunSuite:
 
   def build(s: String, flags: String, dialect: Dialect): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)
-    IRBuilder.build(Parser.parse(s, flagSet, dialect), flagSet, dialect, Parser.determineUnitMode(s, flagSet, dialect))
+    val mode = Parser.determineUnitMode(s, flagSet, dialect)
+    IRBuilder.build(Parser.parse(s, flagSet, dialect, mode), flagSet, dialect, mode)
 
   def of(s: String): CharSet = CharSet.of(UnitMode.CodePoint.decode(s).iterator.toSeq*)
 

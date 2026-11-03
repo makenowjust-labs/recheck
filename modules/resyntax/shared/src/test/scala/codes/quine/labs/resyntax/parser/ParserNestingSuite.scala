@@ -8,7 +8,8 @@ class ParserNestingSuite extends munit.FunSuite:
   val Max: Int = Parser.MaxNestingDepth
 
   def parse(s: String, flags: String, dialect: Dialect): Unit =
-    Parser.parse(s, FlagSet.parse(flags, dialect), dialect)
+    val flagSet = FlagSet.parse(flags, dialect)
+    Parser.parse(s, flagSet, dialect, Parser.determineUnitMode(s, flagSet, dialect))
 
   /** Checks that a pattern of the depth `Max` is parsed, and that of `Max + 1` fails at the position. */
   def nesting(name: String, flags: String, dialects: Dialect*)(pattern: Int => String, pos: Int)(implicit

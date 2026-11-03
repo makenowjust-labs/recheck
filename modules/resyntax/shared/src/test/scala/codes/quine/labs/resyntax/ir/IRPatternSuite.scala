@@ -12,12 +12,8 @@ class IRPatternSuite extends munit.FunSuite:
 
   def parse(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)
-    IRBuilder.build(
-      Parser.parse(source, flagSet, dialect),
-      flagSet,
-      dialect,
-      Parser.determineUnitMode(source, flagSet, dialect)
-    )
+    val mode = Parser.determineUnitMode(source, flagSet, dialect)
+    IRBuilder.build(Parser.parse(source, flagSet, dialect, mode), flagSet, dialect, mode)
 
   /** Checks a property of patterns, given as pairs of a source and the expected value. */
   def check[A](name: String, flags: String = "", dialect: Dialect = Dialect.JavaScript)(f: IRPattern => A)(
