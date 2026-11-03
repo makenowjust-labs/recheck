@@ -17,7 +17,7 @@ sealed abstract class Diagnostics extends Product with Serializable
 /** Diagnostics types. */
 object Diagnostics:
 
-  /** Safe is a analysis result against a safe RegExp. */
+  /** Safe is an analysis result against a safe RegExp. */
   final case class Safe(
       source: String,
       flags: String,
@@ -83,7 +83,7 @@ object Diagnostics:
         case ex: UnexpectedException    => ErrorKind.Unexpected(ex.getMessage)
       Unknown(source, flags, dialect, kind, ex.checker)
 
-  /** Returns the dialect with its settings on one line (e.g. `python (encoding: str)`). */
+  /** Returns the dialect with its settings on one line (e.g. `python (type: str)`). */
   private def show(dialect: Dialect): String =
     val settings = dialect match
       case Dialect.Python(tpe)        => Seq(s"type: ${tpe.name}")

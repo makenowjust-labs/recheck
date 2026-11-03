@@ -154,8 +154,7 @@ private[fuzz] final class FuzzChecker(
     val (initResults, initPop) = init()
     var pop = initPop
     initResults ++ (1 to maxIteration).iterator.flatMap: i =>
-      // Because `Population` is mutable and `Iterator` is lazy, this `pop,toGeneration` is called after done of the
-      // previous iteration.
+      // `Population` is mutable and `Iterator` is lazy, so `pop.toGeneration` runs after the previous iteration.
       val (iterResults, iterPop) = iterate(i, pop.toGeneration)
       pop = iterPop
       iterResults

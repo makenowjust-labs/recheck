@@ -9,7 +9,7 @@ import codes.quine.labs.recheck.data.MultiSet
 import codes.quine.labs.recheck.util.GraphvizUtil.escape
 import codes.quine.labs.resyntax.ast.SourceLocation
 
-/** NFAwLA is a NFA with a look-ahead DFA.
+/** NFAwLA is an NFA with a look-ahead DFA.
   *
   * This NFA uses a multi-set instead of a set for duplicated transitions. A look-ahead DFA is a DFA which is
   * constructed from the reversed original NFA. A state of this NFA is a pair of the original NFA state and the

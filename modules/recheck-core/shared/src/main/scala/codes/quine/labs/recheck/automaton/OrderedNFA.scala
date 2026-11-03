@@ -10,7 +10,7 @@ import codes.quine.labs.recheck.data.MultiSet
 import codes.quine.labs.recheck.util.GraphvizUtil.escape
 import codes.quine.labs.resyntax.ast.SourceLocation
 
-/** OrderedNFA is a NFA, but its transitions has a priority in the order.
+/** OrderedNFA is an NFA, but its transitions have a priority in the order.
   *
   * When the input cannot be any string, `inputStates` are the states accepting exactly the strings that the input can
   * be, which the initial states do not reach (see [[restrictInputs]]).

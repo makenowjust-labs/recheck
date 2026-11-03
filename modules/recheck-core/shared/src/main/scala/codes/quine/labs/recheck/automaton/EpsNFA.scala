@@ -13,7 +13,7 @@ import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.alphabet.CharKind
 import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
-/** EpsNFA is an ordered ε-NFA on unicode code points. */
+/** EpsNFA is an ordered ε-NFA on the units of the pattern's unit mode. */
 final case class EpsNFA[Q](alphabet: PatternAlphabet, stateSet: Set[Q], init: Q, accept: Q, tau: Map[Q, Transition[Q]]):
 
   /** Converts to Graphviz format text. */
@@ -199,10 +199,10 @@ object EpsNFA:
   final case class Consume[Q](set: Set[(CharSet, CharKind)], to: Q, loc: Option[SourceLocation] = None)
       extends Transition[Q]
 
-  /** LoopEnter is an ε-NFA transition with consuming no character and marking a entering of the loop. */
+  /** LoopEnter is an ε-NFA transition with consuming no character and marking the entry to the loop. */
   final case class LoopEnter[Q](loop: Int, to: Q) extends Transition[Q]
 
-  /** LoopExit is an ε-NFA transition with consuming no character and marking a exiting of the loop. */
+  /** LoopExit is an ε-NFA transition with consuming no character and marking the exit from the loop. */
   final case class LoopExit[Q](loop: Int, to: Q) extends Transition[Q]
 
   /** AssertKind is assertion kind of this ε-NFA transition. */

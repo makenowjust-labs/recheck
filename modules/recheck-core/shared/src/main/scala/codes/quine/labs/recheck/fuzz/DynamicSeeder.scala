@@ -85,7 +85,7 @@ object DynamicSeeder:
 
   private[fuzz] object Patch:
 
-    /** InsertChar is a patch to insert (or replace) each characters at the `pos`. */
+    /** InsertChar is a patch to insert (or replace) each character at the `pos`. */
     final case class InsertChar(pos: Int, chs: Set[CharSet]) extends Patch:
       def apply(s: UString): Seq[UString] =
         chs.toSeq.flatMap: cs =>
