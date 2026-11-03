@@ -1,3 +1,5 @@
+import { defaults, schema } from "recheck-parameters";
+
 import createWorker from "./worker";
 
 import type {
@@ -9,24 +11,33 @@ import type {
   Parameters,
 } from "../..";
 
+/** The default settings of each dialect, read from the variants of `dialect` in the schema. */
+const defaultSettings: Record<
+  string,
+  Record<string, unknown>
+> = Object.fromEntries(
+  (schema.properties["dialect"]!.oneOf ?? []).flatMap(({ properties }) => {
+    const { name, ...settings } = properties ?? {};
+    if (name?.const === undefined) return [];
+    const values = Object.entries(settings).map(([key, setting]) => [
+      key,
+      setting.default,
+    ]);
+    return [[name.const, Object.fromEntries(values)]];
+  }),
+);
+
 /** Returns the dialect of the parameter as the diagnostics have it, where an omitted setting is the default. */
-const dialectOf = (dialect: DialectParameter = "javascript"): Dialect => {
+const dialectOf = (dialect: DialectParameter = defaults.dialect): Dialect => {
   const given: DialectSettings =
     typeof dialect === "string" ? { name: dialect } : dialect;
-  switch (given.name) {
-    case "python":
-      return { name: "python", type: given.type ?? "str" };
-    case "ruby":
-      return { name: "ruby", encoding: given.encoding ?? "UTF-8" };
-    case "perl":
-      return {
-        name: "perl",
-        utf8: given.utf8 ?? true,
-        source: given.source ?? "literal",
-      };
-    default:
-      return { name: given.name };
-  }
+  const settings = Object.entries(given).filter(
+    ([, value]) => value !== undefined,
+  );
+  return {
+    ...defaultSettings[given.name],
+    ...Object.fromEntries(settings),
+  } as Dialect;
 };
 
 /** Ref is an object contains a check information to resolve or to cancel. */
