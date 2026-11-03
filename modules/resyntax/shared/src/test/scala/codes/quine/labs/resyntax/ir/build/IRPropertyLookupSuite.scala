@@ -11,7 +11,7 @@ import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.parser.Parser
 
-class IRPropertySuite extends munit.FunSuite:
+class IRPropertyLookupSuite extends munit.FunSuite:
 
   def build(s: String, flags: String, dialect: Dialect): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)

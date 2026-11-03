@@ -10,7 +10,7 @@ import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 
-class IRReferenceSuite extends munit.FunSuite with IRHelper:
+class ReferenceResolverSuite extends munit.FunSuite with IRHelper:
 
   /** Checks the indices of the last back-reference in the pattern. */
   def resolve(s: String, flags: String, dialects: Dialect*)(indices: Int*)(implicit loc: munit.Location): Unit =
