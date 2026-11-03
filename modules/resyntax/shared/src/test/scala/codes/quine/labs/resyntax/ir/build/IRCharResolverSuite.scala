@@ -295,6 +295,14 @@ class IRCharResolverSuite extends munit.FunSuite:
   )
   check("ß", "i", Ruby(), Perl())(sharpS)
   check("ss", "i", Ruby())(sharpS)
+  for dialect <- Seq(Ruby(), Perl()) do
+    test(s"IRBuilder.build: too many multi-character case foldings in $dialect"):
+      val Max = IRCharResolver.MaxMultiFoldings
+      build("s" * (Max + 1), "i", dialect)
+      interceptMessage[MultiFoldingLimitException](
+        s"Too many multi-character case foldings in a literal (limit $Max) at 5"
+      ):
+        build("x(?i)" + "s" * (Max + 2), "", dialect)
   check("ass", "i", Ruby())(Sequence(Chars(of("aA")), sharpS))
   // Perl's `/d` rules fold no Latin-1 character in a native string, unless the pattern is in Unicode rules.
   check("ss", "iu", Perl())(sharpS)

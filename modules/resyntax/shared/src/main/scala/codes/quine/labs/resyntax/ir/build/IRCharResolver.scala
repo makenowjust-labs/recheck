@@ -237,7 +237,9 @@ private[build] final class IRCharResolver(
       chars = (if native then set.diff(IRClassLookup.Latin1) else set).intersect(universe)
       if chars.nonEmpty
     yield (i, key.length, chars)
-    if occurrences.isEmpty || occurrences.size > MaxMultiFoldings then units.map(closed)
+    if occurrences.size > MaxMultiFoldings then
+      throw new MultiFoldingLimitException(MaxMultiFoldings, units.head.loc.start)
+    if occurrences.isEmpty then units.map(closed)
     else
       val cuts = (0 to folded.length).filter(p => !occurrences.exists((s, len, _) => s < p && p < s + len))
       val out = Seq.newBuilder[IRNode]
@@ -770,8 +772,7 @@ private[build] object IRCharResolver:
 
   /** MaxMultiFoldings is the largest number of multi-character foldings in a part that are resolved as alternatives.
     *
-    * A part with more of them is folded one to one, which misses some matches, since the alternatives grow
-    * exponentially.
+    * A part with more of them throws [[MultiFoldingLimitException]], since the alternatives grow exponentially.
     */
   val MaxMultiFoldings: Int = 6
 

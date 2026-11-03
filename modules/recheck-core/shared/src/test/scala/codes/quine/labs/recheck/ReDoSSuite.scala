@@ -594,3 +594,16 @@ class ReDoSSuite extends munit.FunSuite:
         None
       )
     )
+
+  test("ReDoS.check: a literal with too many multi-character case foldings"):
+    val source = "s" * 8
+    assertEquals(
+      ReDoS.check(source, "i", Parameters(dialect = Dialect.Ruby())),
+      Diagnostics.Unknown(
+        source,
+        "i",
+        Dialect.Ruby(),
+        Diagnostics.ErrorKind.Unsupported("Too many multi-character case foldings in a literal (limit 6) at 0"),
+        None
+      )
+    )

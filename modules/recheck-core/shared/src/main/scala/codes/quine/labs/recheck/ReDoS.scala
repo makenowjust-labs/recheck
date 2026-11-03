@@ -30,6 +30,7 @@ import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRPattern
 import codes.quine.labs.resyntax.ir.build.IRBuilder
 import codes.quine.labs.resyntax.ir.build.IRBuildingException
+import codes.quine.labs.resyntax.ir.build.MultiFoldingLimitException
 import codes.quine.labs.resyntax.parser.NestingLimitException
 import codes.quine.labs.resyntax.parser.Parser
 import codes.quine.labs.resyntax.parser.ParsingException
@@ -123,7 +124,7 @@ object ReDoS:
   /** Parses the pattern and the flags in the dialect, and builds its IR.
     *
     * It throws [[InvalidRegExpException]] on an invalid pattern, and [[UnsupportedException]] on a pattern nested
-    * deeper than [[Parser.MaxNestingDepth]].
+    * deeper than [[Parser.MaxNestingDepth]] or with too many multi-character case foldings in a literal.
     */
   private[recheck] def parse(source: String, flags: String, dialect: Dialect)(using ctx: Context): IRPattern =
     ctx.log("parse: start")
@@ -146,7 +147,9 @@ object ReDoS:
 
   private def buildIR(node: Node, flagSet: FlagSet, dialect: Dialect, mode: UnitMode): IRPattern =
     try IRBuilder.build(node, flagSet, dialect, mode)
-    catch case ex: IRBuildingException => throw new InvalidRegExpException(ex.getMessage)
+    catch
+      case ex: IRBuildingException        => throw new InvalidRegExpException(ex.getMessage)
+      case ex: MultiFoldingLimitException => throw new UnsupportedException(ex.getMessage)
 
   /** RecallKey identifies an attack on recall validation by the degree of the polynomial complexity (or `None` for the
     * exponential one) and the hotspot.
