@@ -26,8 +26,8 @@ class AttackPatternStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
   val texts: Seq[AttackPattern] = Seq(
     attack(Seq(("", "a", 0)), "\u0000", 31),
     attack(Seq(("'\"\\`", "#{x}#$y#@z$@{$a}", 0)), "\t\n\r\u000b\u000c", 2),
-    attack(Seq(("", "\u0001\u0008\u001b\u007f\u0085 \u2028\u2029​﻿", 0)), "1", 3),
-    attack(Seq(("éあ", "́", 0)), "😀Ω", 2),
+    attack(Seq(("", "\u0001\u0008\u001b\u007f\u0085\u00a0\u2028\u2029\u200b\ufeff", 0)), "1", 3),
+    attack(Seq(("éあ", "\u0301", 0)), "😀Ω", 2),
     attack(Seq(("a\u00a0b", "\u3000", 0)), "\u2000\u202f\u205f\u1680", 2),
     attack(Seq(("", "😀", 0)), "", 2),
     attack(Seq(("x", "\ud800", 0)), "-\udfff\udbff", 3),
