@@ -276,7 +276,9 @@ object ParametersGen:
   /** Returns the `check` helper of the console, which takes every parameter as a named argument. */
   def consoleCheck(root: File): String =
     val params = read(root / SchemaPath)
-    val args = params.map(p => s"    ${p.name}: ${p.scalaType} = ${p.defaultName}")
+    // `dialect` follows `flags`, so that it is given without its name.
+    val (dialect, others) = params.partition(_.name == "dialect")
+    val args = (dialect ++ others).map(p => s"    ${p.name}: ${p.scalaType} = ${p.defaultName}")
     s"""|
         |def check(
         |    source: String,
