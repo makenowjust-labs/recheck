@@ -14,7 +14,6 @@ import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch.Forward
-import codes.quine.labs.resyntax.ir.IRLookBehindStarts.Longest
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.ir.build.IRHelper.equalsWithoutLoc
 import codes.quine.labs.resyntax.parser.Parser
@@ -295,6 +294,7 @@ class IRCharResolverSuite extends munit.FunSuite:
   )
   check("ß", "i", Ruby(), Perl())(sharpS)
   check("ss", "i", Ruby())(sharpS)
+  check("ass", "i", Ruby())(Sequence(Chars(of("aA")), sharpS))
   for dialect <- Seq(Ruby(), Perl()) do
     test(s"IRBuilder.build: too many multi-character case foldings in $dialect"):
       val Max = IRCharResolver.MaxMultiFoldings
@@ -303,13 +303,12 @@ class IRCharResolverSuite extends munit.FunSuite:
         s"Too many multi-character case foldings in a literal (limit $Max) at 5"
       ):
         build("x(?i)" + "s" * (Max + 2), "", dialect)
-  check("ass", "i", Ruby())(Sequence(Chars(of("aA")), sharpS))
   // Perl's `/d` rules fold no Latin-1 character in a native string, unless the pattern is in Unicode rules.
   check("ss", "iu", Perl())(sharpS)
   check("ff", "i", Ruby())(Disjunction(Sequence(Chars(of("fF")), Chars(of("fF"))), Chars(of("\ufb00"))))
   check("(?<=ß)", "i", Ruby())(LookBehind(false, sharpS))
   check("(?<=ss)", "i", Ruby())(LookBehind(false, sharpS))
-  check("(?<=ß)", "i", Perl())(LookBehind(false, IRNode(sharpS), Forward(Seq(Longest(1, 2)))))
+  check("(?<=ß)", "i", Perl())(LookBehind(false, IRNode(sharpS), Forward(Seq(IRLookBehindStartRange(1, 2)))))
   // Escapes fold as the literals, but Ruby keeps an escape of an ASCII character apart.
   check("\\xDF", "i", Perl())(sharpS)
   check("\\x{DF}", "i", Perl())(sharpS)
@@ -327,9 +326,9 @@ class IRCharResolverSuite extends munit.FunSuite:
   check("\\x73s", "i", Ruby())(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))
   check("\\u0073s", "i", Ruby())(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))
   check("(?<=\\u00DF)", "i", Ruby())(LookBehind(false, sharpS))
-  check("(?<=\\N{U+DF})", "i", Perl())(LookBehind(false, IRNode(sharpS), Forward(Seq(Longest(1, 2)))))
+  check("(?<=\\N{U+DF})", "i", Perl())(LookBehind(false, IRNode(sharpS), Forward(Seq(IRLookBehindStartRange(1, 2)))))
   // Perl counts `\xDF` of a pattern that is not UTF-8 as one character in a look-behind, so it does not match `ss` there.
-  check("(?<=\\xDF)", "i", Perl())(LookBehind(false, IRNode(sharpS), Forward(Seq(Longest(1, 1)))))
+  check("(?<=\\xDF)", "i", Perl())(LookBehind(false, IRNode(sharpS), Forward(Seq(IRLookBehindStartRange(1, 1)))))
   // `İ` folds to `i` and U+0307 by default (the Turkic folding to `i` is apart).
   val dottedI: IRNodeData = Disjunction(Sequence(Chars(of("iI")), Chars(of("\u0307"))), Chars(of("\u0130")))
   check("İ", "i", Ruby(), Perl())(dottedI)
@@ -339,7 +338,7 @@ class IRCharResolverSuite extends munit.FunSuite:
   check("i\\x{307}", "i", Perl())(dottedI)
   check("[İ]", "i", Perl())(dottedI)
   check("[İ]", "i", Ruby())(Disjunction(Chars(of("\u0130")), dottedI))
-  check("(?<=İ)", "i", Perl())(LookBehind(false, IRNode(dottedI), Forward(Seq(Longest(1, 2)))))
+  check("(?<=İ)", "i", Perl())(LookBehind(false, IRNode(dottedI), Forward(Seq(IRLookBehindStartRange(1, 2)))))
   // Perl's `aa` and `l` forbid it, because the folding has an ASCII character.
   chars("İ", "iaa", Perl())(of("\u0130"))
   chars("[İx]", "il", Perl())(of("\u0130xX"))
@@ -714,7 +713,7 @@ class IRCharResolverSuite extends munit.FunSuite:
     val IRNodeData.Sequence(nodes) = build("(?<=\\X)a", "", Java).node.data: @unchecked
     nodes.head.data match
       case IRNodeData.LookBehind(false, _, matching) =>
-        assertEquals(matching, IRLookBehindMatch.Forward(Seq(IRLookBehindStarts.Longest(1, Int.MaxValue))))
+        assertEquals(matching, IRLookBehindMatch.Forward(Seq(IRLookBehindStartRange(1, Int.MaxValue))))
       case data => fail(s"unexpected: $data")
 
   test("IRBuilder.build: \\X in a look-behind is an error in the others"):

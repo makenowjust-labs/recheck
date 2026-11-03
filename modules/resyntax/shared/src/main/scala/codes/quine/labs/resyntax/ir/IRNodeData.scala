@@ -134,17 +134,12 @@ object IRLookBehindMatch:
     * It has the starts of the whole body, or of each alternative when the body is a disjunction that the engine splits
     * (PCRE), which are tried in turn.
     */
-  final case class Forward(starts: Seq[IRLookBehindStarts]) extends IRLookBehindMatch
+  final case class Forward(starts: Seq[IRLookBehindStartRange]) extends IRLookBehindMatch
 
-/** IRLookBehindStarts is the starts of a look-behind matched forward, in the order that the engine tries them. */
-sealed abstract class IRLookBehindStarts extends Product with Serializable
-
-object IRLookBehindStarts:
-
-  /** Longest tries the starts from `max` characters before the position down to `min` ones, skipping the ones before
-    * the input (Java, PCRE, Perl and Python).
-    */
-  final case class Longest(min: Int, max: Int) extends IRLookBehindStarts
+/** IRLookBehindStartRange is the starts of a look-behind matched forward, which the engine tries from `max` characters
+  * before the position down to `min` ones, skipping the ones before the input (Java, PCRE, Perl and Python).
+  */
+final case class IRLookBehindStartRange(min: Int, max: Int)
 
 /** IRBacktrackControl is a backtracking control verb other than `(*FAIL)`.
   *

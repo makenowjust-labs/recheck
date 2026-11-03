@@ -12,7 +12,7 @@ import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
-import codes.quine.labs.resyntax.ir.IRLookBehindStarts
+import codes.quine.labs.resyntax.ir.IRLookBehindStartRange
 
 class InstSuite extends munit.FunSuite:
 
@@ -54,8 +54,8 @@ class InstSuite extends munit.FunSuite:
     assertEquals(Inst.CapHold(1, 2).toString, "cap_hold 1 2")
     assertEquals(Inst.CmpCanary(CanaryReg(0), Label("x", 0), Label("y", 1)).toString, "cmp_canary %%0 #x@0 #y@1")
     assertEquals(
-      Inst.StepBack(CounterReg(0), IRLookBehindStarts.Longest(1, 2), Label("x", 0)).toString,
-      "step_back %0 Longest(1,2) #x@0"
+      Inst.StepBack(CounterReg(0), IRLookBehindStartRange(1, 2), Label("x", 0)).toString,
+      "step_back %0 IRLookBehindStartRange(1,2) #x@0"
     )
     assertEquals(Inst.Assert(AssertKind.LookBehindEnd(CounterReg(0))).toString, "assert look_behind_end %0")
     assertEquals(

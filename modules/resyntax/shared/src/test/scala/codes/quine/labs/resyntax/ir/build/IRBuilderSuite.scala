@@ -22,7 +22,6 @@ import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch.Forward
-import codes.quine.labs.resyntax.ir.IRLookBehindStarts.Longest
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.ir.IRQuantifier.*
 import codes.quine.labs.resyntax.ir.build.IRClassLookup.ASCIIWord
@@ -97,13 +96,15 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   check("(?=a)", "", All*)(LookAhead(false, char('a')))
   check("(?!a)", "", All*)(LookAhead(true, char('a')))
   check("(?<=a)", "", DotNet, JavaScript, Ruby())(LookBehind(false, char('a')))
-  check("(?<=a)", "", PCRE, Perl(), Python())(LookBehind(false, char('a'), Forward(Seq(Longest(1, 1)))))
-  check("(?<=a)", "", Java)(LookBehind(false, char('a'), Forward(Seq(Longest(1, 1)))))
+  check("(?<=a)", "", PCRE, Perl(), Python())(LookBehind(false, char('a'), Forward(Seq(IRLookBehindStartRange(1, 1)))))
+  check("(?<=a)", "", Java)(LookBehind(false, char('a'), Forward(Seq(IRLookBehindStartRange(1, 1)))))
   check("(?<!a)", "", DotNet, JavaScript, Ruby())(LookBehind(true, char('a')))
-  check("(?<!a)", "", PCRE, Perl(), Python())(LookBehind(true, char('a'), Forward(Seq(Longest(1, 1)))))
-  check("(?<!a)", "", Java)(LookBehind(true, char('a'), Forward(Seq(Longest(1, 1)))))
+  check("(?<!a)", "", PCRE, Perl(), Python())(LookBehind(true, char('a'), Forward(Seq(IRLookBehindStartRange(1, 1)))))
+  check("(?<!a)", "", Java)(LookBehind(true, char('a'), Forward(Seq(IRLookBehindStartRange(1, 1)))))
   check("(*pla:a)", "", PCRE, Perl())(LookAhead(false, char('a')))
-  check("(*negative_lookbehind:a)", "", PCRE, Perl())(LookBehind(true, char('a'), Forward(Seq(Longest(1, 1)))))
+  check("(*negative_lookbehind:a)", "", PCRE, Perl())(
+    LookBehind(true, char('a'), Forward(Seq(IRLookBehindStartRange(1, 1))))
+  )
   check("(?>a)", "", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Atomic(char('a')))
   check("(*atomic:a)", "", PCRE, Perl())(Atomic(char('a')))
   check("(?<x>)(?<-x>)", "", DotNet)(
@@ -114,9 +115,9 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   )
   check("(?*a)", "", PCRE)(NonAtomicLookAhead(IRNode(char('a'))))
   check("(*napla:a)", "", PCRE)(NonAtomicLookAhead(IRNode(char('a'))))
-  check("(?<*a)", "", PCRE)(NonAtomicLookBehind(IRNode(char('a')), Forward(Seq(Longest(1, 1)))))
+  check("(?<*a)", "", PCRE)(NonAtomicLookBehind(IRNode(char('a')), Forward(Seq(IRLookBehindStartRange(1, 1)))))
   check("(*non_atomic_positive_lookbehind:a)", "", PCRE)(
-    NonAtomicLookBehind(IRNode(char('a')), Forward(Seq(Longest(1, 1))))
+    NonAtomicLookBehind(IRNode(char('a')), Forward(Seq(IRLookBehindStartRange(1, 1))))
   )
   check("(*script_run:)", "", PCRE, Perl())(
     Unsupported(NodeData.Group(GroupKind.ScriptRun(AssertNameStyle.Alphabetic), NodeData.Sequence()))
@@ -226,10 +227,18 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
     Conditional(IRCondition.LookBehind(false, char('x')), char('a'), char('b'))
   )
   check("(?(?<=x)a|b)", "", PCRE, Perl())(
-    Conditional(IRCondition.LookBehind(false, char('x'), Forward(Seq(Longest(1, 1)))), char('a'), char('b'))
+    Conditional(
+      IRCondition.LookBehind(false, char('x'), Forward(Seq(IRLookBehindStartRange(1, 1)))),
+      char('a'),
+      char('b')
+    )
   )
   check("(?(*nlb:x)a|b)", "", PCRE, Perl())(
-    Conditional(IRCondition.LookBehind(true, char('x'), Forward(Seq(Longest(1, 1)))), char('a'), char('b'))
+    Conditional(
+      IRCondition.LookBehind(true, char('x'), Forward(Seq(IRLookBehindStartRange(1, 1)))),
+      char('a'),
+      char('b')
+    )
   )
   check("(?(?C1)(?=x)a|b)", "", PCRE)(
     Unsupported(
