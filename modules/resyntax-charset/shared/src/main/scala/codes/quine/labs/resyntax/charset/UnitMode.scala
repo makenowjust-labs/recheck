@@ -58,5 +58,5 @@ enum UnitMode(val limit: Int):
     */
   def fromCodePoints(s: UString): UString = this match
     case UnitMode.CodePoint => s
-    case UnitMode.UTF16     => UString.from(s.iterator.flatMap(codes.quine.labs.resyntax.charset.UTF16.encode))
-    case UnitMode.Byte      => UString.from(s.iterator.flatMap(UTF8.encode))
+    case UnitMode.UTF16     => UString.from(s.iterator.flatMap(UTF16Encoding.encode))
+    case UnitMode.Byte      => UString.from(s.iterator.flatMap(UTF8Encoding.encode))

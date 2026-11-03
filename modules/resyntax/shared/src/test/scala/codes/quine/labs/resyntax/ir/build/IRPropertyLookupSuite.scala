@@ -7,7 +7,7 @@ import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.EnumeratedProperty
 import codes.quine.labs.resyntax.charset.PropertyTable
-import codes.quine.labs.resyntax.charset.UTF16
+import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.parser.Parser
@@ -74,7 +74,7 @@ class IRPropertyLookupSuite extends munit.FunSuite:
   chars("\\p{i-n-c-b=l-i-n-k-e-r}", "", Ruby())(value(PropertyTable.IndicConjunctBreak, "Linker"))
   // Ruby's input has no surrogate.
   chars("\\p{^InCB=Linker}", "", Ruby())(
-    value(PropertyTable.IndicConjunctBreak, "Linker").complement(UnitMode.CodePoint).diff(UTF16.Surrogates)
+    value(PropertyTable.IndicConjunctBreak, "Linker").complement(UnitMode.CodePoint).diff(UTF16Encoding.Surrogates)
   )
   chars("\\P{^InCB=Consonant}", "", Ruby())(value(PropertyTable.IndicConjunctBreak, "Consonant"))
   chars("\\p{Grapheme_Cluster_Break=Extend}", "", Ruby())(value(PropertyTable.GraphemeClusterBreak, "Extend"))
@@ -82,7 +82,7 @@ class IRPropertyLookupSuite extends munit.FunSuite:
     value(PropertyTable.GraphemeClusterBreak, "Regional_Indicator")
   )
   chars("\\p{age = 6. 0}", "", Ruby())(
-    PropertyTable.presentIn(PropertyTable.Age.value("6.0").get).diff(UTF16.Surrogates)
+    PropertyTable.presentIn(PropertyTable.Age.value("6.0").get).diff(UTF16Encoding.Surrogates)
   )
   // Only the long names of the values listed in the data files, and no other property with a value.
   for name <- Seq(

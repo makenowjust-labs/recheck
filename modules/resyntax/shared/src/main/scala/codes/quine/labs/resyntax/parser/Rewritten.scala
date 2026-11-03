@@ -7,7 +7,7 @@ import codes.quine.labs.resyntax.ast.ConditionalTest
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.SourceLocation
-import codes.quine.labs.resyntax.charset.UTF8
+import codes.quine.labs.resyntax.charset.UTF8Encoding
 
 /** Rewritten is a rewritten text, where each code unit keeps the range of the source that it comes from. */
 private[parser] final class Rewritten(val text: String, starts: Array[Int], ends: Array[Int], sourceLength: Int):
@@ -85,7 +85,7 @@ private[parser] object Rewritten:
       while i < source.length do
         val c = source.codePointAt(i)
         val end = i + Character.charCount(c)
-        for b <- UTF8.encode(c) do
+        for b <- UTF8Encoding.encode(c) do
           text.append(b.toChar)
           starts.addOne(i)
           ends.addOne(end)

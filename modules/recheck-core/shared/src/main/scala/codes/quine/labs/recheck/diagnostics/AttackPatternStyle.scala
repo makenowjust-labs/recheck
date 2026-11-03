@@ -7,8 +7,8 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
-import codes.quine.labs.resyntax.charset.UTF16
-import codes.quine.labs.resyntax.charset.UTF8
+import codes.quine.labs.resyntax.charset.UTF16Encoding
+import codes.quine.labs.resyntax.charset.UTF8Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
 
 /** AttackPatternStyle is a notation of [[AttackPattern]] and similar classes. */
@@ -111,14 +111,14 @@ object AttackPatternStyle:
     def join: String = " + "
 
     private def char(c: UChar): String = c match
-      case '\\' | '"'                => s"\\${c.toChar}"
-      case Named(e)                  => e
-      case c if isASCIIPrintable(c)  => c.toChar.toString
-      case c if bytes || c < 0x80    => f"\\x$c%02X"
-      case c if UTF16.isSurrogate(c) => UTF8.encode(c).map(b => f"\\x$b%02X").mkString
-      case c if isShown(c)           => codePoint(c)
-      case c if c <= 0xffff          => f"\\u$c%04X"
-      case c                         => f"\\u{$c%X}"
+      case '\\' | '"'                        => s"\\${c.toChar}"
+      case Named(e)                          => e
+      case c if isASCIIPrintable(c)          => c.toChar.toString
+      case c if bytes || c < 0x80            => f"\\x$c%02X"
+      case c if UTF16Encoding.isSurrogate(c) => UTF8Encoding.encode(c).map(b => f"\\x$b%02X").mkString
+      case c if isShown(c)                   => codePoint(c)
+      case c if c <= 0xffff                  => f"\\u$c%04X"
+      case c                                 => f"\\u{$c%X}"
 
   /** Java is a Java style specifier, e.g. `"a".repeat(31) + "\u0000"`.
     *
@@ -223,4 +223,4 @@ object AttackPatternStyle:
 
   /** Returns the `\uXXXX` escapes of the UTF-16 code units of the code point. */
   private def utf16(c: UChar): String =
-    UTF16.encode(c).map(u => f"\\u$u%04X").mkString
+    UTF16Encoding.encode(c).map(u => f"\\u$u%04X").mkString

@@ -1,7 +1,7 @@
 package codes.quine.labs.resyntax.charset
 
-/** UTF16 is the UTF-16 encoding form, which writes a code point in one code unit or in a surrogate pair. */
-object UTF16:
+/** UTF16Encoding is the UTF-16 encoding form, which writes a code point in one code unit or in a surrogate pair. */
+object UTF16Encoding:
 
   /** HighSurrogates is the set of the high surrogates, which begin a surrogate pair. */
   val HighSurrogates: CharSet = CharSet.range(0xd800, 0xdbff)

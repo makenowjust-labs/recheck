@@ -1,7 +1,7 @@
 package codes.quine.labs.resyntax.charset
 
-/** UTF8 is the UTF-8 encoding form, which writes a code point in one to four bytes. */
-object UTF8:
+/** UTF8Encoding is the UTF-8 encoding form, which writes a code point in one to four bytes. */
+object UTF8Encoding:
 
   /** Returns the UTF-8 bytes of the code point, where a surrogate code point is encoded like the others. */
   def encode(c: Int): Seq[Int] =
