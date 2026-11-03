@@ -64,7 +64,7 @@ object Main:
               Console.out.println(s"[$date] $message")
             }
           case false => None
-      val params = (ParametersOpts(logger), dialectSettings).tupled.mapValidated: (params, settings) =>
+      val params = (ParametersOption(logger), dialectSettings).tupled.mapValidated: (params, settings) =>
         settings(params.dialect).map(dialect => params.copy(dialect = dialect))
 
       val pattern = Opts.argument[InputPattern](metavar = "pattern")

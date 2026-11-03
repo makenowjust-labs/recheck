@@ -96,7 +96,7 @@ object ParametersGen:
 
     case object Parameters extends Target("Parameters.scala", Seq("codes.quine.labs.recheck.common"))
     case object Codec extends Target("ParametersCodec.scala", Seq("codes.quine.labs.recheck", "codec"))
-    case object CLI extends Target("ParametersOpts.scala", Seq("codes.quine.labs.recheck.cli"))
+    case object CLI extends Target("ParametersOption.scala", Seq("codes.quine.labs.recheck.cli"))
 
   def generate(target: Target, root: File, dir: File): File =
     val params = read(root / SchemaPath)
@@ -209,7 +209,7 @@ object ParametersGen:
         |${enums.mkString("\n\n")}
         |""".stripMargin
 
-  /** Generates `ParametersOpts.scala`, the CLI options of `Parameters`. */
+  /** Generates `ParametersOption.scala`, the CLI options of `Parameters`. */
   def cli(params: Seq[Param]): String =
     val options = params
       .filter(p => p.cli.isDefined || p.isLogger)
@@ -251,8 +251,8 @@ object ParametersGen:
         |
         |${imports(names)}
         |
-        |/** ParametersOpts provides the CLI options of `Parameters`. */
-        |object ParametersOpts:
+        |/** ParametersOption provides the CLI options of `Parameters`. */
+        |object ParametersOption:
         |
         |  /** Returns the options of `Parameters` with the given option of the logger. */
         |  def apply(logger: Opts[Option[Context.Logger]]): Opts[Parameters] =
@@ -261,8 +261,8 @@ object ParametersGen:
         |    )
         |    updates.foldLeft(Opts(Parameters()))((params, update) => (params, update).mapN((p, f) => f(p)))
         |
-        |/** ParameterArguments provides decline's `Argument` instances of the enums of `Parameters`. */
-        |object ParameterArguments:
+        |/** ParametersArgument provides decline's `Argument` instances of the enums of `Parameters`. */
+        |object ParametersArgument:
         |
         |${arguments.mkString("\n\n")}
         |""".stripMargin

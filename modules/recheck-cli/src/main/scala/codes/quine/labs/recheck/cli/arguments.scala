@@ -12,7 +12,7 @@ import codes.quine.labs.resyntax.ast.PerlSource
 /** The object `arguments` provides decline's `Argument` instances for this application. */
 object arguments:
 
-  export ParameterArguments.given
+  export ParametersArgument.given
 
   /** `Argument` instance for `Duration`. */
   given durationArgument: Argument[Duration] with
