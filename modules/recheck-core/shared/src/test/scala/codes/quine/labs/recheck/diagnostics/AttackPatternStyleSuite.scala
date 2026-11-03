@@ -33,6 +33,11 @@ class AttackPatternStyleSuite extends munit.FunSuite:
     assertEquals(show("🍣"), "'🍣'")
     assertEquals(show("\u0000\u0001\u0008\t\u000b\u001b\u007f"), "'\\x00\\x01\\x08\\t\\v\\x1B\\x7F'")
 
+  test("AttackPatternStyle.Superscript"):
+    val attack = AttackPattern(Seq((UString.fromString("a"), UString.fromString("bc"), 1)), UString.fromString("d"), 2)
+    assertEquals(attack.toString(Superscript), "'a' 'bc'³ 'd'")
+    assertEquals(AttackPattern(Seq.empty, UString.empty, 2).toString(Superscript), "''")
+
   test("AttackPatternStyle#literal: escapes"):
     def show(style: AttackPatternStyle, s: String): String = style.literal(UString.fromString(s))
 

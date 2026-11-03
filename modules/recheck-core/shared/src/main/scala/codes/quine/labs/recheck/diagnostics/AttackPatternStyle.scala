@@ -1,6 +1,7 @@
 package codes.quine.labs.recheck
 package diagnostics
 
+import codes.quine.labs.recheck.util.NumberFormat
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.PropertyTable
@@ -10,8 +11,8 @@ import codes.quine.labs.resyntax.charset.UnitMode
 
 /** AttackPatternStyle is a notation of [[AttackPattern]] and similar classes.
   *
-  * It writes an expression of the language that evaluates to the string. The JavaScript, Java and C# styles write the
-  * UTF-16 encoding of the string, which a string of these languages holds.
+  * Except [[AttackPatternStyle.Superscript]], it writes an expression of the language that evaluates to the string. The
+  * JavaScript, Java and C# styles write the UTF-16 encoding of the string, which a string of these languages holds.
   */
 sealed abstract class AttackPatternStyle extends Product with Serializable:
 
@@ -55,6 +56,14 @@ object AttackPatternStyle:
       case c if c <= 0xff           => f"\\x$c%02X"
       case c if c <= 0xffff         => f"\\u$c%04X"
       case c                        => f"\\u{$c%X}"
+
+  /** Superscript is a superscript style specifier for logs, e.g. `'a'³¹ '\x00'`. */
+  case object Superscript extends AttackPatternStyle:
+    def literal(s: UString): String = JavaScript.literal(s)
+
+    def repeat(s: UString, n: Int): String = s"${literal(s)}${NumberFormat.superscript(n)}"
+
+    def join: String = " "
 
   /** Python is a Python style specifier, e.g. `'a' * 31 + '\x00'`, or `b'a' * 31 + b'\x00'` for bytes. */
   final case class Python(bytes: Boolean) extends AttackPatternStyle:
