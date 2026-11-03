@@ -307,7 +307,7 @@ private[build] final class IRCharResolver(
 
   private def unitsOf(lit: Lit): Seq[UChar] = mode match
     case UnitMode.CodePoint => Seq(lit.value)
-    case UnitMode.UTF16     => UString(lit.value).encode(UnitMode.UTF16).toSeq
+    case UnitMode.UTF16     => UnitMode.UTF16.fromCodePoints(UString(lit.value)).iterator.toSeq
     case UnitMode.Byte      =>
       // The parser reads a byte source by bytes, so only an escape can be above `0xFF`.
       if lit.value <= 0xff then Seq(lit.value)

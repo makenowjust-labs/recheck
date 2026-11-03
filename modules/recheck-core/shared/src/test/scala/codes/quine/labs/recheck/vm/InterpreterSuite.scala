@@ -16,7 +16,7 @@ import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.SourceLocation
-import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
 import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
@@ -38,7 +38,7 @@ class InterpreterSuite extends munit.FunSuite:
     val t = for
       ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
       program <- ProgramBuilder.build(ir)
-      result = Interpreter.run(program, inputOf(input, ir.mode), opts)
+      result = Interpreter.run(program, ir.mode.decode(input), opts)
     yield result
     t.get
 
@@ -86,11 +86,11 @@ class InterpreterSuite extends munit.FunSuite:
         Set(
           FailedPoint(CoverageLocation(6, Vector.empty), 4, ReadKind.Char('a'), None),
           FailedPoint(CoverageLocation(9, Vector.empty), 4, ReadKind.Char('a'), None),
-          FailedPoint(CoverageLocation(12, Vector.empty), 3, ref(1), Some(UString.fromUTF16Units("aaa"))),
-          FailedPoint(CoverageLocation(12, Vector.empty), 4, ref(1), Some(UString.fromUTF16Units("aaaa"))),
+          FailedPoint(CoverageLocation(12, Vector.empty), 3, ref(1), Some(UnitMode.UTF16.decode("aaa"))),
+          FailedPoint(CoverageLocation(12, Vector.empty), 4, ref(1), Some(UnitMode.UTF16.decode("aaaa"))),
           FailedPoint(CoverageLocation(18, Vector.empty), 0, ReadKind.Char('a'), None),
-          FailedPoint(CoverageLocation(21, Vector.empty), 0, ref(2), Some(UString.fromUTF16Units("aaaa"))),
-          FailedPoint(CoverageLocation(21, Vector.empty), 1, ref(2), Some(UString.fromUTF16Units("aaa")))
+          FailedPoint(CoverageLocation(21, Vector.empty), 0, ref(2), Some(UnitMode.UTF16.decode("aaaa"))),
+          FailedPoint(CoverageLocation(21, Vector.empty), 1, ref(2), Some(UnitMode.UTF16.decode("aaa")))
         ),
         Set(
           CoverageItem(CoverageLocation(1, Vector.empty), true),
@@ -306,7 +306,7 @@ class InterpreterSuite extends munit.FunSuite:
       val t = for
         ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
         program <- ProgramBuilder.build(ir)
-        result = Interpreter.runWithTimeout(program, inputOf(input, ir.mode), opts, timeout)
+        result = Interpreter.runWithTimeout(program, ir.mode.decode(input), opts, timeout)
       yield result
       t.get
 

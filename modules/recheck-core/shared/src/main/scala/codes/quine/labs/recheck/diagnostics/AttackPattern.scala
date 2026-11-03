@@ -56,4 +56,4 @@ final case class AttackPattern(pumps: Seq[(UString, UString, Int)], suffix: UStr
     val result = parts.result()
     if result.isEmpty then style.literal(UString.empty) else result.mkString(style.join)
 
-  override def toString: String = toString(AttackPatternStyle.JavaScript)
+  override def toString: String = toString(AttackPatternStyle.JavaScript(unicode = true))

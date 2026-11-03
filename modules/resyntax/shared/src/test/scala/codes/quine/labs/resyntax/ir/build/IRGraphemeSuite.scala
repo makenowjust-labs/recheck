@@ -5,7 +5,6 @@ import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.FlagSet
-import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.parser.Parser
 
@@ -44,7 +43,7 @@ class IRGraphemeSuite extends munit.FunSuite:
   def cluster(input: Seq[Int], dialect: Dialect = Perl(), flags: String = "", pos: Int = 0): Option[Int] =
     ends(build("\\X", flags, dialect).node, input.toIndexedSeq, pos).headOption.map(_ - pos)
 
-  def cp(s: String): Seq[Int] = UString.fromString(s).iterator.toSeq
+  def cp(s: String): Seq[Int] = UnitMode.CodePoint.decode(s).iterator.toSeq
 
   // The first cluster's length in the engines (Java 25, PCRE2 10.49, Perl 5.44, Ruby 4.0), where they agree except
   // PCRE2 on the conjuncts (see `PCREProbes`).

@@ -19,11 +19,15 @@ class RecallProgramSuite extends munit.FunSuite:
 
   /** `'x' + 'y'.repeat(2) + 'z'` */
   val attack: AttackPattern =
-    AttackPattern(Seq((UString.fromString("x"), UString.fromString("y"), 0)), UString.fromString("z"), 2)
+    AttackPattern(
+      Seq((UnitMode.CodePoint.decode("x"), UnitMode.CodePoint.decode("y"), 0)),
+      UnitMode.CodePoint.decode("z"),
+      2
+    )
 
   /** `'é'.repeat(3) + '\0'` */
   val nonASCII: AttackPattern =
-    AttackPattern(Seq((UString.empty, UString.fromString("é"), 1)), UString(0), 2)
+    AttackPattern(Seq((UString.empty, UnitMode.CodePoint.decode("é"), 1)), UString(0), 2)
 
   given Context = Context()
 
@@ -138,15 +142,18 @@ class RecallProgramSuite extends munit.FunSuite:
 
   test("RecallProgram.data"):
     def data(source: String, flags: String, attack: AttackPattern): String =
-      RecallProgram.data(flags, source, attack)
+      RecallProgram.data(flags, source, UnitMode.CodePoint, attack)
 
-    val repeat = AttackPattern(Seq((UString.empty, UString.fromString("a"), 0)), UString.fromString("!"), 31)
+    val repeat =
+      AttackPattern(Seq((UString.empty, UnitMode.CodePoint.decode("a"), 0)), UnitMode.CodePoint.decode("!"), 31)
     assertEquals(data("^a*$", "i", repeat), "i\n005e0061002a0024\n31:0061\n1:0021\n")
-    val astral = AttackPattern(Seq((UString.empty, UString.fromString("😀"), 0)), UString.empty, 2)
+    val astral = AttackPattern(Seq((UString.empty, UnitMode.CodePoint.decode("😀"), 0)), UString.empty, 2)
     assertEquals(data("😀", "", astral), "-\nd83dde00\n2:d83dde00\n")
+    val utf16 = AttackPattern(Seq((UString.empty, UString(0xd83d, 0xde00), 0)), UString.empty, 2)
+    assertEquals(RecallProgram.data("", "😀", UnitMode.UTF16, utf16), "-\nd83dde00\n2:d83dde00\n")
     assertEquals(data("", "", AttackPattern(Seq.empty, UString.empty, 0)), "-\n-\n")
     // A negative repeat count is zero.
-    val negative = AttackPattern(Seq((UString.empty, UString.fromString("a"), -3)), UString.empty, 2)
+    val negative = AttackPattern(Seq((UString.empty, UnitMode.CodePoint.decode("a"), -3)), UString.empty, 2)
     assertEquals(data("a", "i", negative), "i\n0061\n0:0061\n")
 
   test("RecallProgram.generate: Perl"):

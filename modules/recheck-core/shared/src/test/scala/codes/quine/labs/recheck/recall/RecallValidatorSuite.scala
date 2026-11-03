@@ -9,7 +9,6 @@ import codes.quine.labs.recheck.diagnostics.RecallResult
 import codes.quine.labs.recheck.diagnostics.RecallValidation
 import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
 class RecallValidatorSuite extends munit.FunSuite:
@@ -18,7 +17,11 @@ class RecallValidatorSuite extends munit.FunSuite:
   given ctx: Context = Context()
 
   val attack: AttackPattern =
-    AttackPattern(Seq((UString.fromString("x"), UString.fromString("y"), 0)), UString.fromString("z"), 2)
+    AttackPattern(
+      Seq((UnitMode.CodePoint.decode("x"), UnitMode.CodePoint.decode("y"), 0)),
+      UnitMode.CodePoint.decode("z"),
+      2
+    )
 
   test("RecallValidator.validate"):
     assertEquals(

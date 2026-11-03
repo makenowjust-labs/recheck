@@ -2,6 +2,8 @@ package codes.quine.labs.recheck.vm
 
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
+import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UnitMode
 
 /** CaseFoldingCases is a table of case-insensitive classes, literals and escapes having a character folded to several
   * characters (e.g. `ß` to `ss`), which only Ruby and Perl match against the folding.
@@ -12,7 +14,10 @@ import codes.quine.labs.resyntax.ast.Dialect.*
 object CaseFoldingCases:
 
   /** A case of a search of the source in the input, which matches in the dialects of `matches` among `dialects`. */
-  final case class Case(source: String, input: String, dialects: Seq[Dialect], matches: Set[Dialect])
+  final case class Case(source: String, input: String, dialects: Seq[Dialect], matches: Set[Dialect]):
+
+    /** Returns the units of the input in the mode, which are the UTF-8 bytes in `Byte` mode as the engines read it. */
+    def inputOf(mode: UnitMode): UString = mode.fromCodePoints(UnitMode.CodePoint.decode(input))
 
   private val all = Seq(JavaScript, Python(), Ruby(), Java, DotNet, Perl(), PCRE)
   private val folds: Set[Dialect] = Set(Ruby(), Perl())

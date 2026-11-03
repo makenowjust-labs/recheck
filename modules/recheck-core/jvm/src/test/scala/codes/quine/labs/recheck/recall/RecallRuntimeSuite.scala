@@ -42,7 +42,7 @@ class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
 
   /** `s.repeat(n) + t` */
   def attack(s: String, n: Int, t: String): AttackPattern =
-    AttackPattern(Seq((UString.empty, UString.fromString(s), 0)), UString.fromString(t), n)
+    AttackPattern(Seq((UString.empty, UnitMode.CodePoint.decode(s), 0)), UnitMode.CodePoint.decode(t), n)
 
   def validate(
       source: String,
@@ -142,7 +142,8 @@ class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     assertEquals(overflow.result, RecallResult.EngineError("StackOverflowError"))
     assert(!overflow.isSucceeded)
     // The data of the program keeps a character out of the BMP.
-    val astral = AttackPattern(Seq((UString.empty, UString.fromString("😀"), 0)), UString.fromString("!"), 3)
+    val astral =
+      AttackPattern(Seq((UString.empty, UnitMode.CodePoint.decode("😀"), 0)), UnitMode.CodePoint.decode("!"), 3)
     assertFinish(validate("^(?:😀)*!$", "", Dialect.Java, astral))
 
   runtimeTest(".NET", "dotnet"):
@@ -246,7 +247,9 @@ class RecallRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     runtimeTest(s"RecallProgram.script: $dialect", program):
       val source = "^(?:a|é|😀)*$"
       val mode = ReDoS.parse(source, "", dialect).mode
-      val astral = AttackPattern(Seq((UString.fromString("é"), UString.fromString("😀a"), 0)), UString(0), 3)
+      def units(s: String): UString = mode.fromCodePoints(UnitMode.CodePoint.decode(s))
+
+      val astral = AttackPattern(Seq((units("é"), units("😀a"), 0)), UString(0), 3)
       val out = runScript(RecallProgram.script(source, "", dialect, mode, astral).toOption.get)
       val lines = out.linesIterator.map(_.takeWhile(_ != ' ')).toSeq
       assertEquals(lines.filter(_.startsWith("recheck:")), Seq("recheck:runtime", "recheck:start", "recheck:time"))

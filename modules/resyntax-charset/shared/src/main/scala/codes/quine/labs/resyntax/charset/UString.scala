@@ -4,7 +4,7 @@ package codes.quine.labs.resyntax.charset
   * [[ClassSet]].
   *
   * The units are code points in `CodePoint` mode, where a lone surrogate is a code point of itself. They are UTF-16
-  * code units in `UTF16` mode, and bytes in `Byte` mode.
+  * code units in `UTF16` mode, and bytes in `Byte` mode. [[UnitMode]] converts it from and to a Scala string.
   */
 final class UString private (private val values: Array[UChar]) extends Ordered[UString]:
 
@@ -32,48 +32,6 @@ final class UString private (private val values: Array[UChar]) extends Ordered[U
   /** Returns the unit before the position, if any. */
   def getBefore(n: Int): Option[UChar] = Option.when(0 < n && n <= length)(values(n - 1))
 
-  /** Encodes this string of code points as units of the mode.
-    *
-    * `UTF16` gives UTF-16 code units, `CodePoint` gives the code points as they are, and `Byte` gives the UTF-8 bytes
-    * (surrogate code points are encoded like other code points).
-    */
-  def encode(mode: UnitMode): IArray[UChar] = mode match
-    case UnitMode.CodePoint => IArray.unsafeFromArray(values)
-    case UnitMode.UTF16     =>
-      val out = Array.newBuilder[UChar]
-      for c <- values do
-        if c < 0x10000 then out.addOne(c)
-        else
-          out.addOne(0xd800 | ((c - 0x10000) >> 10))
-          out.addOne(0xdc00 | (c & 0x3ff))
-      IArray.unsafeFromArray(out.result())
-    case UnitMode.Byte =>
-      val out = Array.newBuilder[UChar]
-      for c <- values do
-        if c < 0x80 then out.addOne(c)
-        else if c < 0x800 then
-          out.addOne(0xc0 | (c >> 6))
-          out.addOne(0x80 | (c & 0x3f))
-        else if c < 0x10000 then
-          out.addOne(0xe0 | (c >> 12))
-          out.addOne(0x80 | ((c >> 6) & 0x3f))
-          out.addOne(0x80 | (c & 0x3f))
-        else
-          out.addOne(0xf0 | (c >> 18))
-          out.addOne(0x80 | ((c >> 12) & 0x3f))
-          out.addOne(0x80 | ((c >> 6) & 0x3f))
-          out.addOne(0x80 | (c & 0x3f))
-      IArray.unsafeFromArray(out.result())
-
-  /** Returns this string as a Scala string, encoding it in UTF-16.
-    *
-    * UTF-16 code units and bytes are kept as they are.
-    */
-  def asString: String =
-    val sb = new java.lang.StringBuilder
-    for c <- encode(UnitMode.UTF16) do sb.append(c.toChar)
-    sb.toString
-
   /** Strings are ordered lexicographically by code values. */
   def compare(that: UString): Int =
     val n = math.min(length, that.length)
@@ -97,16 +55,3 @@ object UString:
   def apply(values: UChar*): UString = new UString(values.toArray)
 
   def from(values: IterableOnce[UChar]): UString = new UString(values.iterator.toArray)
-
-  /** Decodes the code points of the Scala string, where a lone surrogate becomes a code point of itself. */
-  def fromString(s: String): UString =
-    val out = Array.newBuilder[UChar]
-    var i = 0
-    while i < s.length do
-      val c = s.codePointAt(i)
-      out.addOne(c)
-      i += Character.charCount(c)
-    new UString(out.result())
-
-  /** Returns the UTF-16 code units of the Scala string. */
-  def fromUTF16Units(s: String): UString = new UString(s.map(_.toInt).toArray)
