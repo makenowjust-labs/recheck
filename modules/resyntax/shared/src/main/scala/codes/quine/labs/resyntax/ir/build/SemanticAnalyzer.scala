@@ -45,17 +45,17 @@ private[build] final class SemanticAnalyzer(
             resolver.calledName(test, node.loc)
             walk(child, inLookAround)
           case GroupKind.ScanSubstring(_, refs) =>
-            for ref <- refs do resolver.call(ref, table.siteOf(node), node.loc)
+            for ref <- refs do resolver.resolveCall(ref, table.siteOf(node), node.loc)
             walk(child, inLookAround)
           case _ => walk(child, inLookAround)
       case NodeData.Command(kind) =>
         kind match
           case CommandKind.PBackReference(name) =>
             backReferences(NodeKey(node)) = resolver.namedBackReference(name, table.siteOf(node), node.loc)
-          case CommandKind.IndexedCall(n)             => resolver.index(n, node.loc)
-          case CommandKind.RelativeCall(n)            => resolver.relative(n, table.siteOf(node), node.loc)
-          case CommandKind.NamedCall(name)            => resolver.calledName(name, node.loc)
-          case CommandKind.PNamedCall(name)           => resolver.calledName(name, node.loc)
+          case CommandKind.IndexedCall(n)   => resolver.resolveIndex(n, node.loc)
+          case CommandKind.RelativeCall(n)  => resolver.resolveRelativeReference(n, table.siteOf(node), node.loc)
+          case CommandKind.NamedCall(name)  => resolver.calledName(name, node.loc)
+          case CommandKind.PNamedCall(name) => resolver.calledName(name, node.loc)
           case CommandKind.Conditional(test, yes, no) =>
             walkTest(node, test)
             walk(yes, inLookAround)
@@ -74,18 +74,18 @@ private[build] final class SemanticAnalyzer(
     case ConditionalTest.Indexed(n) =>
       backReferences(NodeKey(node)) =
         if featureSet.validatesIndexedCaptureTest then
-          resolver.test(resolver.index(n, node.loc), table.siteOf(node), node.loc)
+          resolver.resolveTest(resolver.resolveIndex(n, node.loc), table.siteOf(node), node.loc)
         // Perl accepts a test of a missing group, which never holds.
         else Seq(n).filter(table.defined.contains)
     case ConditionalTest.Relative(n) =>
-      backReferences(NodeKey(node)) = resolver.relative(n, table.siteOf(node), node.loc)
+      backReferences(NodeKey(node)) = resolver.resolveRelativeReference(n, table.siteOf(node), node.loc)
     case ConditionalTest.Named(_, name) =>
       backReferences(NodeKey(node)) =
-        resolver.test(resolver.groupName(name, table.siteOf(node), node.loc), table.siteOf(node), node.loc)
+        resolver.resolveTest(resolver.groupName(name, table.siteOf(node), node.loc), table.siteOf(node), node.loc)
     case ConditionalTest.Referenced(_, ref) =>
       backReferences(NodeKey(node)) = resolver.backReference(ref, table.siteOf(node), node.loc)
     case ConditionalTest.IndexedRecursion(n) =>
-      if featureSet.validatesIndexedRecursionTest then resolver.index(n, node.loc)
+      if featureSet.validatesIndexedRecursionTest then resolver.resolveIndex(n, node.loc)
     case ConditionalTest.NamedRecursion(name)   => resolver.calledName(name, node.loc)
     case ConditionalTest.LookAround(kind, body) =>
       kind match
