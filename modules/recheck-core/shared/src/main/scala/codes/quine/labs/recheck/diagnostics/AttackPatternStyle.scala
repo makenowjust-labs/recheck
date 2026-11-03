@@ -209,9 +209,9 @@ object AttackPatternStyle:
       case '\r' => Some("\\r")
       case _    => None
 
-  /** The non-ASCII characters written as they are: letters, numbers, punctuation and symbols. */
+  /** The non-ASCII characters written as they are: letters, numbers, punctuation, symbols and space separators. */
   private lazy val Shown: CharSet =
-    CharSet.union(Seq("L", "N", "P", "S").map(PropertyTable.GeneralCategory.value(_).get.set))
+    CharSet.union(Seq("L", "N", "P", "S", "Zs").map(PropertyTable.GeneralCategory.value(_).get.set))
 
   private def isASCIIPrintable(c: UChar): Boolean = 0x20 <= c && c <= 0x7e
 

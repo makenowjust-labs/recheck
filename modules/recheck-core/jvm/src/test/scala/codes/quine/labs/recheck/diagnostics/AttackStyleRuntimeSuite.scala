@@ -22,6 +22,7 @@ class AttackStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
     attack(Seq(("'\"\\`", "#{x}#$y#@z$@{$a}", 0)), "\t\n\r\u000b\u000c", 2),
     attack(Seq(("", "\u0001\u0008\u001b\u007f\u0085   ​﻿", 0)), "1", 3),
     attack(Seq(("éあ", "́", 0)), "😀Ω", 2),
+    attack(Seq(("a\u00a0b", "\u3000", 0)), "\u2000\u202f\u205f\u1680", 2),
     attack(Seq(("", "😀", 0)), "", 2),
     attack(Seq(("x", "\ud800", 0)), "-\udfff\udbff", 3),
     attack(Seq(("p", "ab", 1), ("q", "c", 0)), "0", 2),
