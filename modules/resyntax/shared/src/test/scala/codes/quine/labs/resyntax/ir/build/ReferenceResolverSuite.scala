@@ -130,7 +130,7 @@ class ReferenceResolverSuite extends munit.FunSuite with IRHelper:
   check("\\g<x>(?<x>a)", "", Ruby())(
     Sequence(
       Unsupported(NodeData.Backslash(BackslashKind.EscapeCall(NameStyle.Angle, Reference.NamedReference("x")))),
-      Capture(1, Some("x"), char('a'))
+      Capture(1, Some("x"), IRNode(char('a')))
     )
   )
 

@@ -1,9 +1,12 @@
 package codes.quine.labs.resyntax.ir
 package build
 
+import scala.language.implicitConversions
+
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ir.IRNodeData.*
+import codes.quine.labs.resyntax.ir.build.IRHelper.given
 
 class CaptureAnalyzerSuite extends munit.FunSuite with IRHelper:
   def captures(s: String, flags: String, dialects: Dialect*)(

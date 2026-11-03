@@ -1,6 +1,8 @@
 package codes.quine.labs.resyntax.ir
 package build
 
+import scala.language.implicitConversions
+
 import codes.quine.labs.resyntax.ast.AssertKind
 import codes.quine.labs.resyntax.ast.AssertNameStyle
 import codes.quine.labs.resyntax.ast.BackReferenceStyle
@@ -24,6 +26,7 @@ import codes.quine.labs.resyntax.ir.IRLookBehindStarts.Longest
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.ir.IRQuantifier.*
 import codes.quine.labs.resyntax.ir.build.IRClassLookup.ASCIIWord
+import codes.quine.labs.resyntax.ir.build.IRHelper.given
 import codes.quine.labs.resyntax.parser.Parser
 
 class IRBuilderSuite extends munit.FunSuite with IRHelper:

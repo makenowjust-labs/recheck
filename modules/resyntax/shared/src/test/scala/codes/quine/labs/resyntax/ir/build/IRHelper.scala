@@ -5,6 +5,7 @@ import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.ir.build.IRHelper.equalsWithoutLoc
 import codes.quine.labs.resyntax.parser.Parser
 
 trait IRHelper:
@@ -65,3 +66,42 @@ trait IRHelper:
       test(s"IRBuilder.build: /$s/$flags in $dialect with error \"$message\""):
         interceptMessage[IRBuildingException](message):
           build(s, flags, dialect)
+
+object IRHelper:
+
+  /** Makes a node without a location of the data, as the expected IR has. */
+  given Conversion[IRNodeData, IRNode] = IRNode(_)
+
+  extension (node: IRNode)
+    /** Checks whether the nodes are equal except for their locations. */
+    def equalsWithoutLoc(that: IRNode): Boolean = node.data.equalsWithoutLoc(that.data)
+
+  extension (data: IRNodeData)
+    /** Checks whether the data are equal except for the locations of their nodes. */
+    def equalsWithoutLoc(that: IRNodeData): Boolean = (data, that) match
+      case (IRNodeData.Disjunction(ls), IRNodeData.Disjunction(rs)) =>
+        ls.length == rs.length && ls.zip(rs).forall((l, r) => l.equalsWithoutLoc(r))
+      case (IRNodeData.Sequence(ls), IRNodeData.Sequence(rs)) =>
+        ls.length == rs.length && ls.zip(rs).forall((l, r) => l.equalsWithoutLoc(r))
+      case (IRNodeData.Repeat(l, lq), IRNodeData.Repeat(r, rq))                 => lq == rq && l.equalsWithoutLoc(r)
+      case (IRNodeData.Atomic(l), IRNodeData.Atomic(r))                         => l.equalsWithoutLoc(r)
+      case (IRNodeData.LookAhead(ln, l), IRNodeData.LookAhead(rn, r))           => ln == rn && l.equalsWithoutLoc(r)
+      case (IRNodeData.LookBehind(ln, l, lm), IRNodeData.LookBehind(rn, r, rm)) =>
+        ln == rn && lm == rm && l.equalsWithoutLoc(r)
+      case (IRNodeData.Capture(li, ln, l), IRNodeData.Capture(ri, rn, r)) =>
+        li == ri && ln == rn && l.equalsWithoutLoc(r)
+      case (IRNodeData.NonAtomicLookAhead(l), IRNodeData.NonAtomicLookAhead(r))           => l.equalsWithoutLoc(r)
+      case (IRNodeData.NonAtomicLookBehind(l, lm), IRNodeData.NonAtomicLookBehind(r, rm)) =>
+        lm == rm && l.equalsWithoutLoc(r)
+      case (IRNodeData.Conditional(lc, ly, ln), IRNodeData.Conditional(rc, ry, rn)) =>
+        lc.equalsWithoutLoc(rc) && ly.equalsWithoutLoc(ry) && ln.equalsWithoutLoc(rn)
+      case (IRNodeData.Unsupported(l), IRNodeData.Unsupported(r)) => l.equalsWithoutLoc(r)
+      case (l, r)                                                 => l == r
+
+  extension (condition: IRCondition)
+    /** Checks whether the conditions are equal except for the locations of their nodes. */
+    def equalsWithoutLoc(that: IRCondition): Boolean = (condition, that) match
+      case (IRCondition.LookAhead(ln, l), IRCondition.LookAhead(rn, r))           => ln == rn && l.equalsWithoutLoc(r)
+      case (IRCondition.LookBehind(ln, l, lm), IRCondition.LookBehind(rn, r, rm)) =>
+        ln == rn && lm == rm && l.equalsWithoutLoc(r)
+      case (l, r) => l == r

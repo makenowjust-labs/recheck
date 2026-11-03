@@ -16,6 +16,7 @@ import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch.Forward
 import codes.quine.labs.resyntax.ir.IRLookBehindStarts.Longest
 import codes.quine.labs.resyntax.ir.IRNodeData.*
+import codes.quine.labs.resyntax.ir.build.IRHelper.equalsWithoutLoc
 import codes.quine.labs.resyntax.parser.Parser
 
 class IRCharResolverSuite extends munit.FunSuite:
@@ -120,10 +121,10 @@ class IRCharResolverSuite extends munit.FunSuite:
   check("é+", "", PCRE)(
     Sequence(
       Chars(CharSet.single(0xc3)),
-      Repeat(Chars(CharSet.single(0xa9)), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy))
+      Repeat(IRNode(Chars(CharSet.single(0xa9))), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy))
     )
   )
-  check("(*UTF)é+", "", PCRE)(Repeat(Chars(of("é")), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy)))
+  check("(*UTF)é+", "", PCRE)(Repeat(IRNode(Chars(of("é"))), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy)))
   chars("[𝌆-𝌈a-z]", "", PCRE)(
     CharSet.of(0xf0, 0x9d, 0x8c, 0x88).union(CharSet.range(0x86, 0xf0)).union(CharSet.range('a', 'z'))
   )
@@ -215,7 +216,9 @@ class IRCharResolverSuite extends munit.FunSuite:
   error("[\\xC3\\xA9-\\xC3\\xA0]", "", Ruby())("Range out of order in character class at 1")
   chars("[\\xC3\\xBD\\xC3\\xBF]", "", Ruby())(of("\u00fd\u00ff"))
   // Onigmo repeats the whole character of byte escapes.
-  check("\\xC3\\xA9+", "", Ruby())(Repeat(Chars(of("\u00e9")), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy)))
+  check("\\xC3\\xA9+", "", Ruby())(
+    Repeat(IRNode(Chars(of("\u00e9"))), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy))
+  )
   chars("\\xC3", "n", Ruby())(CharSet.single(0xc3))
   // Perl's lexer applies the case commands to the text of a regex literal, even across a class and its ranges.
   chars("\\Ua", "", Perl())(of("A"))
@@ -298,7 +301,7 @@ class IRCharResolverSuite extends munit.FunSuite:
   check("ff", "i", Ruby())(Disjunction(Sequence(Chars(of("fF")), Chars(of("fF"))), Chars(of("\ufb00"))))
   check("(?<=ß)", "i", Ruby())(LookBehind(false, sharpS))
   check("(?<=ss)", "i", Ruby())(LookBehind(false, sharpS))
-  check("(?<=ß)", "i", Perl())(LookBehind(false, sharpS, Forward(Seq(Longest(1, 2)))))
+  check("(?<=ß)", "i", Perl())(LookBehind(false, IRNode(sharpS), Forward(Seq(Longest(1, 2)))))
   // Escapes fold as the literals, but Ruby keeps an escape of an ASCII character apart.
   check("\\xDF", "i", Perl())(sharpS)
   check("\\x{DF}", "i", Perl())(sharpS)
@@ -316,9 +319,9 @@ class IRCharResolverSuite extends munit.FunSuite:
   check("\\x73s", "i", Ruby())(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))
   check("\\u0073s", "i", Ruby())(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))
   check("(?<=\\u00DF)", "i", Ruby())(LookBehind(false, sharpS))
-  check("(?<=\\N{U+DF})", "i", Perl())(LookBehind(false, sharpS, Forward(Seq(Longest(1, 2)))))
+  check("(?<=\\N{U+DF})", "i", Perl())(LookBehind(false, IRNode(sharpS), Forward(Seq(Longest(1, 2)))))
   // Perl counts `\xDF` of a pattern that is not UTF-8 as one character in a look-behind, so it does not match `ss` there.
-  check("(?<=\\xDF)", "i", Perl())(LookBehind(false, sharpS, Forward(Seq(Longest(1, 1)))))
+  check("(?<=\\xDF)", "i", Perl())(LookBehind(false, IRNode(sharpS), Forward(Seq(Longest(1, 1)))))
   // `İ` folds to `i` and U+0307 by default (the Turkic folding to `i` is apart).
   val dottedI: IRNodeData = Disjunction(Sequence(Chars(of("iI")), Chars(of("\u0307"))), Chars(of("\u0130")))
   check("İ", "i", Ruby(), Perl())(dottedI)
@@ -328,7 +331,7 @@ class IRCharResolverSuite extends munit.FunSuite:
   check("i\\x{307}", "i", Perl())(dottedI)
   check("[İ]", "i", Perl())(dottedI)
   check("[İ]", "i", Ruby())(Disjunction(Chars(of("\u0130")), dottedI))
-  check("(?<=İ)", "i", Perl())(LookBehind(false, dottedI, Forward(Seq(Longest(1, 2)))))
+  check("(?<=İ)", "i", Perl())(LookBehind(false, IRNode(dottedI), Forward(Seq(Longest(1, 2)))))
   // Perl's `aa` and `l` forbid it, because the folding has an ASCII character.
   chars("İ", "iaa", Perl())(of("\u0130"))
   chars("[İx]", "il", Perl())(of("\u0130xX"))
@@ -438,13 +441,13 @@ class IRCharResolverSuite extends munit.FunSuite:
   check("\\R", "", Java)(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical)))
   check("\\R*", "", Java)(
     Repeat(
-      Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical)),
+      IRNode(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical))),
       IRQuantifier.Unbounded(0, BacktrackStrategy.Greedy)
     )
   )
   check("(?:\\R)?", "", Java)(
     Repeat(
-      Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical)),
+      IRNode(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical))),
       IRQuantifier.Bounded(0, 1, BacktrackStrategy.Greedy)
     )
   )

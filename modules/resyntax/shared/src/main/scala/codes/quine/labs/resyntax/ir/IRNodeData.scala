@@ -4,29 +4,7 @@ import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
 
-sealed abstract class IRNodeData extends Product with Serializable:
-  def equalsWithoutLoc(that: IRNodeData): Boolean = (this, that) match
-    case (IRNodeData.Disjunction(ls), IRNodeData.Disjunction(rs)) =>
-      ls.length == rs.length && ls.zip(rs).forall { case (l, r) => l.equalsWithoutLoc(r) }
-    case (IRNodeData.Sequence(ls), IRNodeData.Sequence(rs)) =>
-      ls.length == rs.length && ls.zip(rs).forall { case (l, r) => l.equalsWithoutLoc(r) }
-    case (IRNodeData.Repeat(l, lq), IRNodeData.Repeat(r, rq)) =>
-      lq == rq && l.equalsWithoutLoc(r)
-    case (IRNodeData.Atomic(l), IRNodeData.Atomic(r)) =>
-      l.equalsWithoutLoc(r)
-    case (IRNodeData.LookAhead(ln, l), IRNodeData.LookAhead(rn, r)) =>
-      ln == rn && l.equalsWithoutLoc(r)
-    case (IRNodeData.LookBehind(ln, l, lm), IRNodeData.LookBehind(rn, r, rm)) =>
-      ln == rn && lm == rm && l.equalsWithoutLoc(r)
-    case (IRNodeData.Capture(li, ln, l), IRNodeData.Capture(ri, rn, r)) =>
-      li == ri && ln == rn && l.equalsWithoutLoc(r)
-    case (IRNodeData.NonAtomicLookAhead(l), IRNodeData.NonAtomicLookAhead(r))           => l.equalsWithoutLoc(r)
-    case (IRNodeData.NonAtomicLookBehind(l, lm), IRNodeData.NonAtomicLookBehind(r, rm)) =>
-      lm == rm && l.equalsWithoutLoc(r)
-    case (IRNodeData.Conditional(lc, ly, ln), IRNodeData.Conditional(rc, ry, rn)) =>
-      lc.equalsWithoutLoc(rc) && ly.equalsWithoutLoc(ry) && ln.equalsWithoutLoc(rn)
-    case (IRNodeData.Unsupported(l), IRNodeData.Unsupported(r)) => l.equalsWithoutLoc(r)
-    case (l, r)                                                 => l == r
+sealed abstract class IRNodeData extends Product with Serializable
 
 object IRNodeData:
 
@@ -61,10 +39,6 @@ object IRNodeData:
   /** Repeat is a greedy or lazy repetition; a possessive repetition is a repetition in [[Atomic]]. */
   final case class Repeat(node: IRNode, quantifier: IRQuantifier) extends IRNodeData
 
-  object Repeat:
-    def apply(node: IRNodeData, quantifier: IRQuantifier): IRNodeData =
-      Repeat(IRNode(node), quantifier)
-
   final case class Atomic(node: IRNode) extends IRNodeData
 
   object Atomic:
@@ -82,16 +56,9 @@ object IRNodeData:
   object LookBehind:
     def apply(negative: Boolean, data: IRNodeData): IRNodeData = LookBehind(negative, IRNode(data))
 
-    def apply(negative: Boolean, data: IRNodeData, matching: IRLookBehindMatch): IRNodeData =
-      LookBehind(negative, IRNode(data), matching)
-
   final case class Assert(kind: IRAssertKind) extends IRNodeData
 
   final case class Capture(index: Int, name: Option[String], node: IRNode) extends IRNodeData
-
-  object Capture:
-    def apply(index: Int, name: Option[String], data: IRNodeData): IRNodeData =
-      Capture(index, name, IRNode(data))
 
   /** BackReference is a back-reference to the captures of the indices.
     *
@@ -123,10 +90,6 @@ object IRNodeData:
     */
   final case class Conditional(condition: IRCondition, yes: IRNode, no: IRNode) extends IRNodeData
 
-  object Conditional:
-    def apply(condition: IRCondition, yes: IRNodeData, no: IRNodeData): IRNodeData =
-      Conditional(condition, IRNode(yes), IRNode(no))
-
   /** ResetMatchStart sets the start of the reported match to the position (`\K`). */
   case object ResetMatchStart extends IRNodeData
 
@@ -139,12 +102,7 @@ object IRNodeData:
   final case class Unsupported(data: NodeData) extends IRNodeData
 
 /** IRCondition is a condition of [[IRNodeData.Conditional]]. */
-sealed abstract class IRCondition extends Product with Serializable:
-  def equalsWithoutLoc(that: IRCondition): Boolean = (this, that) match
-    case (IRCondition.LookAhead(ln, l), IRCondition.LookAhead(rn, r))           => ln == rn && l.equalsWithoutLoc(r)
-    case (IRCondition.LookBehind(ln, l, lm), IRCondition.LookBehind(rn, r, rm)) =>
-      ln == rn && lm == rm && l.equalsWithoutLoc(r)
-    case (l, r) => l == r
+sealed abstract class IRCondition extends Product with Serializable
 
 object IRCondition:
 
@@ -154,18 +112,9 @@ object IRCondition:
   /** LookAhead holds if the look-ahead assertion succeeds, which is atomic. */
   final case class LookAhead(negative: Boolean, node: IRNode) extends IRCondition
 
-  object LookAhead:
-    def apply(negative: Boolean, data: IRNodeData): IRCondition = LookAhead(negative, IRNode(data))
-
   /** LookBehind holds if the look-behind assertion succeeds, which is atomic. */
   final case class LookBehind(negative: Boolean, node: IRNode, matching: IRLookBehindMatch = IRLookBehindMatch.Backward)
       extends IRCondition
-
-  object LookBehind:
-    def apply(negative: Boolean, data: IRNodeData): IRCondition = LookBehind(negative, IRNode(data))
-
-    def apply(negative: Boolean, data: IRNodeData, matching: IRLookBehindMatch): IRCondition =
-      LookBehind(negative, IRNode(data), matching)
 
 /** IRLookBehindMatch is how the engine matches the body of a look-behind. */
 sealed abstract class IRLookBehindMatch extends Product with Serializable
