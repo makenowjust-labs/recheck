@@ -62,14 +62,14 @@ object PatternAlphabet:
     */
   def build(
       mode: UnitMode,
-      sets: Seq[CharSet] = Seq.empty,
-      lineTerminator: Option[CharSet] = None,
-      word: Option[CharSet] = None,
-      crlf: Boolean = false,
-      moreLineTerminators: Seq[CharSet] = Seq.empty,
-      moreWords: Seq[CharSet] = Seq.empty,
-      wordMarks: Seq[IRWordMarkSet] = Seq.empty,
-      surrogates: IRSurrogateKind = IRSurrogateKind.Separate
+      sets: Seq[CharSet],
+      lineTerminator: Option[CharSet],
+      word: Option[CharSet],
+      crlf: Boolean,
+      moreLineTerminators: Seq[CharSet],
+      moreWords: Seq[CharSet],
+      wordMarks: Seq[IRWordMarkSet],
+      surrogates: IRSurrogateKind
   ): PatternAlphabet =
     val crlfSets = if crlf then Seq(CharSet.single(0x0d), CharSet.single(0x0a)) else Seq.empty
     val terminators = lineTerminator.toSeq ++ moreLineTerminators

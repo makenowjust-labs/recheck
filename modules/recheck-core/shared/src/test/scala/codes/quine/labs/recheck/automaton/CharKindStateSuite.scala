@@ -11,6 +11,8 @@ class CharKindStateSuite extends munit.FunSuite:
 
   val base: CharKind = CharKind(bases = 1)
 
+  val word: CharKind = CharKind(words = 1)
+
   val extender: CharKind = CharKind(marks = 1, extenders = 1)
 
   test("CharKindState#advance: the facts behind"):
@@ -24,7 +26,7 @@ class CharKindStateSuite extends munit.FunSuite:
     assertEquals(based, CharKindState(base, based = 1))
     assertEquals(based.advance(extender, false, false, false), Seq(CharKindState(extender, based = 1)))
     assertEquals(begin.advance(extender, false, false, false), Seq(CharKindState(extender)))
-    assertEquals(based.advance(CharKind.Word, false, false, false), Seq(CharKindState(CharKind.Word)))
+    assertEquals(based.advance(word, false, false, false), Seq(CharKindState(word)))
 
   test("CharKindState#advance: surrogates"):
     val (high, low) = (CharKind(high = true), CharKind(low = true))

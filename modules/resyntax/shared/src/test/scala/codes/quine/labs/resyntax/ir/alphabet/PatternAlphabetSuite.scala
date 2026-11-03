@@ -17,41 +17,42 @@ class PatternAlphabetSuite extends munit.FunSuite:
 
   test("PatternAlphabet.build"):
     assertEquals(
-      PatternAlphabet.build(UnitMode.CodePoint).pairs,
+      buildAlphabet(UnitMode.CodePoint).pairs,
       IndexedSeq((UnitMode.CodePoint.universe, CharKind.Normal))
     )
-    assertEquals(PatternAlphabet.build(UnitMode.UTF16).pairs, IndexedSeq((UnitMode.UTF16.universe, CharKind.Normal)))
-    assertEquals(PatternAlphabet.build(UnitMode.Byte).pairs, IndexedSeq((UnitMode.Byte.universe, CharKind.Normal)))
+    assertEquals(buildAlphabet(UnitMode.UTF16).pairs, IndexedSeq((UnitMode.UTF16.universe, CharKind.Normal)))
+    assertEquals(buildAlphabet(UnitMode.Byte).pairs, IndexedSeq((UnitMode.Byte.universe, CharKind.Normal)))
 
     assertEquals(
-      PatternAlphabet.build(UnitMode.UTF16, Seq(CharSet.single('A'))).pairs,
+      buildAlphabet(UnitMode.UTF16, Seq(CharSet.single('A'))).pairs,
       IndexedSeq(
         (CharSet.single('A'), CharKind.Normal),
         (CharSet.range(0, 'A' - 1).union(CharSet.range('B', 0xffff)), CharKind.Normal)
       )
     )
     assertEquals(
-      PatternAlphabet.build(UnitMode.UTF16, Seq(CharSet.single('a'), CharSet.single('A')), word = Some(Word)).pairs,
+      buildAlphabet(UnitMode.UTF16, Seq(CharSet.single('a'), CharSet.single('A')), word = Some(Word)).pairs,
       IndexedSeq(
-        (CharSet.single('a'), CharKind.Word),
-        (CharSet.single('A'), CharKind.Word),
-        (Word.diff(CharSet.of('a', 'A')), CharKind.Word),
+        (CharSet.single('a'), CharKind(words = 1)),
+        (CharSet.single('A'), CharKind(words = 1)),
+        (Word.diff(CharSet.of('a', 'A')), CharKind(words = 1)),
         (UnitMode.UTF16.universe.diff(Word), CharKind.Normal)
       )
     )
     assertEquals(
-      PatternAlphabet
-        .build(UnitMode.UTF16, Seq(CharSet.single('\n')), lineTerminator = Some(CharSet.single('\n')))
-        .pairs,
+      buildAlphabet(UnitMode.UTF16, Seq(CharSet.single('\n')), lineTerminator = Some(CharSet.single('\n'))).pairs,
       IndexedSeq(
         (CharSet.single('\n'), CharKind.LineTerminator),
         (UnitMode.UTF16.universe.diff(CharSet.single('\n')), CharKind.Normal)
       )
     )
     assertEquals(
-      PatternAlphabet
-        .build(UnitMode.UTF16, Seq(CharSet.single('a')), lineTerminator = Some(CharSet.single('\n')), word = Some(Word))
-        .pairs
+      buildAlphabet(
+        UnitMode.UTF16,
+        Seq(CharSet.single('a')),
+        lineTerminator = Some(CharSet.single('\n')),
+        word = Some(Word)
+      ).pairs
         .map(_._1),
       IndexedSeq(
         CharSet.single('\n'),
@@ -62,9 +63,7 @@ class PatternAlphabetSuite extends munit.FunSuite:
     )
     // `\r` and `\n` have their own kinds with `crlf`, where `\r\n` is one line terminator.
     assertEquals(
-      PatternAlphabet
-        .build(UnitMode.UTF16, lineTerminator = Some(CharSet.of(0x0a, 0x0d, 0x85)), crlf = true)
-        .pairs,
+      buildAlphabet(UnitMode.UTF16, lineTerminator = Some(CharSet.of(0x0a, 0x0d, 0x85)), crlf = true).pairs,
       IndexedSeq(
         (CharSet.single('\r'), CharKind(terminators = 1, cr = true)),
         (CharSet.single('\n'), CharKind(terminators = 1, lf = true)),
@@ -74,15 +73,13 @@ class PatternAlphabetSuite extends munit.FunSuite:
     )
     // The kinds tell the memberships of each line terminator set and each word set.
     assertEquals(
-      PatternAlphabet
-        .build(
-          UnitMode.UTF16,
-          lineTerminator = Some(CharSet.single('\n')),
-          word = Some(CharSet.single('a')),
-          moreLineTerminators = Seq(CharSet.of('\n', '\r')),
-          moreWords = Seq(CharSet.of('a', 0xe9))
-        )
-        .pairs
+      buildAlphabet(
+        UnitMode.UTF16,
+        lineTerminator = Some(CharSet.single('\n')),
+        word = Some(CharSet.single('a')),
+        moreLineTerminators = Seq(CharSet.of('\n', '\r')),
+        moreWords = Seq(CharSet.of('a', 0xe9))
+      ).pairs
         .map(_._2),
       IndexedSeq(
         CharKind(terminators = 3),
@@ -94,7 +91,7 @@ class PatternAlphabetSuite extends munit.FunSuite:
     )
     // A set outside the mode is restricted.
     assertEquals(
-      PatternAlphabet.build(UnitMode.Byte, Seq(CharSet.range(0xf0, 0x10ffff))).pairs.map(_._1),
+      buildAlphabet(UnitMode.Byte, Seq(CharSet.range(0xf0, 0x10ffff))).pairs.map(_._1),
       IndexedSeq(CharSet.range(0xf0, 0xff), CharSet.range(0, 0xef))
     )
 
@@ -103,41 +100,39 @@ class PatternAlphabetSuite extends munit.FunSuite:
     val scalars = UnitMode.CodePoint.universe.diff(UTF16Encoding.Surrogates)
     // Absent surrogates are not characters.
     assertEquals(
-      PatternAlphabet.build(UnitMode.CodePoint, Seq(CharSet.single('a')), surrogates = IRSurrogateKind.Absent).pairs,
+      buildAlphabet(UnitMode.CodePoint, Seq(CharSet.single('a')), surrogates = IRSurrogateKind.Absent).pairs,
       IndexedSeq((CharSet.single('a'), CharKind.Normal), (scalars.diff(CharSet.single('a')), CharKind.Normal))
     )
     // Paired surrogates split an atom of surrogates alone, and the kinds tell the high ones and the low ones.
     val paired = IndexedSeq((High, CharKind(high = true)), (Low, CharKind(low = true)), (scalars, CharKind.Normal))
     assertEquals(
-      PatternAlphabet.build(UnitMode.CodePoint, Seq(High, Low), surrogates = IRSurrogateKind.Paired).pairs,
+      buildAlphabet(UnitMode.CodePoint, Seq(High, Low), surrogates = IRSurrogateKind.Paired).pairs,
       paired
     )
     assertEquals(
-      PatternAlphabet
-        .build(UnitMode.CodePoint, Seq(UTF16Encoding.Surrogates), surrogates = IRSurrogateKind.Paired)
-        .pairs,
+      buildAlphabet(UnitMode.CodePoint, Seq(UTF16Encoding.Surrogates), surrogates = IRSurrogateKind.Paired).pairs,
       paired
     )
     // The kinds tell nothing without both of them, and of separate surrogates.
     assertEquals(
-      PatternAlphabet.build(UnitMode.CodePoint, Seq(High), surrogates = IRSurrogateKind.Paired).pairs,
+      buildAlphabet(UnitMode.CodePoint, Seq(High), surrogates = IRSurrogateKind.Paired).pairs,
       IndexedSeq((High, CharKind.Normal), (UnitMode.CodePoint.universe.diff(High), CharKind.Normal))
     )
     assertEquals(
-      PatternAlphabet.build(UnitMode.CodePoint, Seq(High, Low)).pairs,
+      buildAlphabet(UnitMode.CodePoint, Seq(High, Low)).pairs,
       IndexedSeq((High, CharKind.Normal), (Low, CharKind.Normal), (scalars, CharKind.Normal))
     )
 
   locally:
     val alphabet =
-      PatternAlphabet.build(UnitMode.UTF16, Seq(CharSet.single('A')), word = Some(CharSet.range('A', 'Z')))
+      buildAlphabet(UnitMode.UTF16, Seq(CharSet.single('A')), word = Some(CharSet.range('A', 'Z')))
 
     test("PatternAlphabet#refine"):
       assertEquals(
         alphabet.refine(CharSet.range('A', 'Z')),
-        Set((CharSet.single('A'), CharKind.Word), (CharSet.range('B', 'Z'), CharKind.Word))
+        Set((CharSet.single('A'), CharKind(words = 1)), (CharSet.range('B', 'Z'), CharKind(words = 1)))
       )
-      assertEquals(alphabet.refine(CharSet.range('A', 'B')), Set((CharSet.single('A'), CharKind.Word)))
+      assertEquals(alphabet.refine(CharSet.range('A', 'B')), Set((CharSet.single('A'), CharKind(words = 1))))
 
     test("PatternAlphabet#refineInvert"):
       assertEquals(
@@ -147,6 +142,18 @@ class PatternAlphabetSuite extends munit.FunSuite:
 
     test("PatternAlphabet#any"):
       assertEquals(alphabet.any, alphabet.pairs.toSet)
+
+  def buildAlphabet(
+      mode: UnitMode,
+      sets: Seq[CharSet] = Seq.empty,
+      lineTerminator: Option[CharSet] = None,
+      word: Option[CharSet] = None,
+      crlf: Boolean = false,
+      moreLineTerminators: Seq[CharSet] = Seq.empty,
+      moreWords: Seq[CharSet] = Seq.empty,
+      surrogates: IRSurrogateKind = IRSurrogateKind.Separate
+  ): PatternAlphabet =
+    PatternAlphabet.build(mode, sets, lineTerminator, word, crlf, moreLineTerminators, moreWords, Seq.empty, surrogates)
 
   def alphabetOf(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): PatternAlphabet =
     PatternAlphabet.of(parse(source, flags, dialect))
@@ -158,39 +165,39 @@ class PatternAlphabetSuite extends munit.FunSuite:
 
   test("PatternAlphabet.build: too many sets"):
     val sets = Seq.tabulate(Integer.SIZE)(i => CharSet.single('a' + i))
-    PatternAlphabet.build(UnitMode.UTF16, moreWords = sets.tail)
+    buildAlphabet(UnitMode.UTF16, moreWords = sets.tail)
     interceptMessage[IllegalArgumentException]("requirement failed: Too many sets for the bits of CharKind: 33"):
-      PatternAlphabet.build(UnitMode.UTF16, moreWords = sets)
+      buildAlphabet(UnitMode.UTF16, moreWords = sets)
     interceptMessage[IllegalArgumentException]("requirement failed: Too many sets for the bits of CharKind: 33"):
-      PatternAlphabet.build(UnitMode.UTF16, moreLineTerminators = sets)
+      buildAlphabet(UnitMode.UTF16, moreLineTerminators = sets)
 
   test("PatternAlphabet.of"):
     val word =
       CharSet.union(Seq(CharSet.range('0', '9'), CharSet.range('A', 'Z'), CharSet.single('_'), CharSet.range('a', 'z')))
     val lineTerminator = CharSet.of(0x0a, 0x0d, 0x2028, 0x2029)
     val utf16 = UnitMode.UTF16
-    assertEquals(alphabetOf(""), PatternAlphabet.build(utf16))
+    assertEquals(alphabetOf(""), buildAlphabet(utf16))
     // A set like a negated class (e.g. `.` and `[^a]`) takes part in the order as its complement.
-    assertEquals(alphabetOf("."), PatternAlphabet.build(utf16, Seq(lineTerminator)))
-    assertEquals(alphabetOf(".", "u"), PatternAlphabet.build(UnitMode.CodePoint, Seq(lineTerminator)))
-    assertEquals(alphabetOf("[a-z]"), PatternAlphabet.build(utf16, Seq(CharSet.range('a', 'z'))))
+    assertEquals(alphabetOf("."), buildAlphabet(utf16, Seq(lineTerminator)))
+    assertEquals(alphabetOf(".", "u"), buildAlphabet(UnitMode.CodePoint, Seq(lineTerminator)))
+    assertEquals(alphabetOf("[a-z]"), buildAlphabet(utf16, Seq(CharSet.range('a', 'z'))))
     assertEquals(
       alphabetOf("A|Z"),
-      PatternAlphabet.build(utf16, Seq(CharSet.single('A'), CharSet.single('Z')))
+      buildAlphabet(utf16, Seq(CharSet.single('A'), CharSet.single('Z')))
     )
-    assertEquals(alphabetOf("[^a]"), PatternAlphabet.build(utf16, Seq(CharSet.single('a'))))
-    assertEquals(alphabetOf("\\b"), PatternAlphabet.build(utf16, word = Some(word)))
-    assertEquals(alphabetOf("^", "m"), PatternAlphabet.build(utf16, lineTerminator = Some(lineTerminator)))
+    assertEquals(alphabetOf("[^a]"), buildAlphabet(utf16, Seq(CharSet.single('a'))))
+    assertEquals(alphabetOf("\\b"), buildAlphabet(utf16, word = Some(word)))
+    assertEquals(alphabetOf("^", "m"), buildAlphabet(utf16, lineTerminator = Some(lineTerminator)))
     assertEquals(
       alphabetOf("^\\b", "m"),
-      PatternAlphabet.build(utf16, lineTerminator = Some(lineTerminator), word = Some(word))
+      buildAlphabet(utf16, lineTerminator = Some(lineTerminator), word = Some(word))
     )
     for source <- Seq("(.)", "(?<foo>.)", "(?:.)", ".*", ".+", ".?", ".{2}", "(?=.)", "(?<=.)", ".") do
-      assertEquals(alphabetOf(source, "s"), PatternAlphabet.build(utf16), source)
-    assertEquals(alphabetOf("", "i"), PatternAlphabet.build(utf16))
+      assertEquals(alphabetOf(source, "s"), buildAlphabet(utf16), source)
+    assertEquals(alphabetOf("", "i"), buildAlphabet(utf16))
     assertEquals(
       alphabetOf("a|z", "i"),
-      PatternAlphabet.build(utf16, Seq(CharSet.of('A', 'a'), CharSet.of('Z', 'z')))
+      buildAlphabet(utf16, Seq(CharSet.of('A', 'a'), CharSet.of('Z', 'z')))
     )
     // An atom stands for its smallest character.
     assertEquals(alphabetOf("a", "i").pairs.map(_._1.head), Vector('A'.toInt, 0))
