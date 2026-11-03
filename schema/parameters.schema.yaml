@@ -14,11 +14,18 @@
 # - `x-exclude`: the targets not exposing the parameter (`cli`, `eslint-plugin`, `playground`).
 # - `x-since`: the first release having the parameter, so that the Playground hides it on older releases.
 # - `x-scala-default`: the Scala value of the default when `x-scala-values` does not give it.
+#
+# Annotations of the variants of `dialect` with settings, and of their settings:
+#
+# - `x-scala-type`: the Scala type of the variant (e.g. `Dialect.Python`), or of the setting, which is `Boolean` or an enum
+#   whose companion has `of(name)` (e.g. `Dialect.Python.Type`).
+# - `x-cli-help`: the help of the CLI option of the setting, which is `--<dialect>-<setting>`.
+#   A boolean setting whose default is `true` is `--no-<dialect>-<setting>`, and the help tells the `false` case.
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "https://makenowjust-labs.github.io/recheck/parameters.schema.json"
 title: "Parameters"
-description: "Parameters is parameters for analysis."
+description: "Parameters is the set of the parameters of the analysis."
 type: object
 additionalProperties: false
 properties:
@@ -41,7 +48,7 @@ properties:
 
   attackLimit:
     title: "Attack Limit"
-    description: "The upper limit on the number of characters read by VM on the attack."
+    description: "The upper limit on the number of characters read by the VM on the attack."
     type: integer
     default: 1500000000
     x-scala-type: "Int"
@@ -76,7 +83,7 @@ properties:
 
   crossoverSize:
     title: "Crossover Size"
-    description: "The number of crossover on each generation."
+    description: "The number of crossovers on each generation."
     type: integer
     default: 25
     x-scala-type: "Int"
@@ -117,22 +124,45 @@ properties:
       - type: object
         properties:
           name: { const: "python" }
-          type: { title: "Python Type", enum: ["str", "bytes"], default: "str" }
+          type:
+            title: "Python Type"
+            enum: ["str", "bytes"]
+            default: "str"
+            x-scala-type: "Dialect.Python.Type"
+            x-cli-help: "The string type."
         required: ["name"]
         additionalProperties: false
+        x-scala-type: "Dialect.Python"
       - type: object
         properties:
           name: { const: "ruby" }
-          encoding: { title: "Ruby Encoding", enum: ["UTF-8", "ASCII-8BIT"], default: "UTF-8" }
+          encoding:
+            title: "Ruby Encoding"
+            enum: ["UTF-8", "ASCII-8BIT"]
+            default: "UTF-8"
+            x-scala-type: "Dialect.Ruby.Encoding"
+            x-cli-help: "The encoding."
         required: ["name"]
         additionalProperties: false
+        x-scala-type: "Dialect.Ruby"
       - type: object
         properties:
           name: { const: "perl" }
-          utf8: { title: "Perl UTF-8", type: boolean, default: true }
-          source: { title: "Perl Source", enum: ["literal", "string"], default: "literal" }
+          utf8:
+            title: "Perl UTF-8"
+            type: boolean
+            default: true
+            x-scala-type: "Boolean"
+            x-cli-help: "The program has no `use utf8`, and its strings are bytes."
+          source:
+            title: "Perl Source"
+            enum: ["literal", "string"]
+            default: "literal"
+            x-scala-type: "PerlSource"
+            x-cli-help: "How the pattern is given."
         required: ["name"]
         additionalProperties: false
+        x-scala-type: "Dialect.Perl"
     default: "javascript"
     x-scala-type: "Dialect"
     x-typescript-type: "DialectParameter"
@@ -152,7 +182,7 @@ properties:
 
   incubationLimit:
     title: "Incubation Limit"
-    description: "The upper limit on the number of characters read by VM on incubation."
+    description: "The upper limit on the number of characters read by the VM on incubation."
     type: integer
     default: 25000
     x-scala-type: "Int"
@@ -229,7 +259,7 @@ properties:
 
   maxIteration:
     title: "Max Iteration"
-    description: "The maximum number of fuzzing iteration."
+    description: "The maximum number of fuzzing iterations."
     type: integer
     default: 10
     x-scala-type: "Int"
@@ -238,7 +268,7 @@ properties:
 
   maxNFASize:
     title: "Max NFA Size"
-    description: "The maximum size of NFA to determine which algorithm is used."
+    description: "The maximum size of the NFA to determine which algorithm is used."
     type: integer
     default: 35000
     x-scala-type: "Int"
@@ -277,7 +307,7 @@ properties:
 
   maxRepeatCount:
     title: "Max Repeat Count"
-    description: "The maximum number of sum of repetition quantifier’s repeat counts to determine which algorithm is used."
+    description: "The maximum sum of the repeat counts of the repetition quantifiers to determine which algorithm is used."
     type: integer
     default: 30
     x-scala-type: "Int"
@@ -286,7 +316,7 @@ properties:
 
   maxSimpleRepeatCount:
     title: "Max Simple Repeat Count"
-    description: "The maximum number of each repetition quantifier’s repeat count on `static` seeding."
+    description: "The maximum repeat count of each repetition quantifier on `static` seeding."
     type: integer
     default: 30
     x-scala-type: "Int"
@@ -295,7 +325,7 @@ properties:
 
   mutationSize:
     title: "Mutation Size"
-    description: "The number of mutation on each generation."
+    description: "The number of mutations on each generation."
     type: integer
     default: 50
     x-scala-type: "Int"
@@ -313,7 +343,7 @@ properties:
 
   recallLimit:
     title: "Recall Limit"
-    description: "The upper limit on the number of characters read by VM on the recall validation."
+    description: "The upper limit on the number of characters read by the VM on the recall validation."
     type: integer
     default: 1500000000
     x-scala-type: "Int"
@@ -352,7 +382,7 @@ properties:
 
   seedingLimit:
     title: "Seeding Limit"
-    description: "The upper limit on the number of characters read by VM on `dynamic` seeding."
+    description: "The upper limit on the number of characters read by the VM on `dynamic` seeding."
     type: integer
     default: 1000
     x-scala-type: "Int"

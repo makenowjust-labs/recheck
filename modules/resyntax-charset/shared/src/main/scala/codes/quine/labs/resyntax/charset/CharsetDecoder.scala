@@ -2,8 +2,10 @@ package codes.quine.labs.resyntax.charset
 
 import scala.collection.mutable
 
-/** Codec decodes the string literals of the generated Unicode data. */
-private[charset] object Codec:
+/** CharsetDecoder decodes the string literals of the generated Unicode data, which `project/CharsetEncoder.scala`
+  * encodes.
+  */
+private[charset] object CharsetDecoder:
 
   // The symbols and the digit counts must agree with `project/CharsetEncoder.scala`.
   private val TerminalCount = 47
@@ -38,7 +40,7 @@ private[charset] object Codec:
   def unzigzag(v: Int): Int = (v >>> 1) ^ -(v & 1)
 
   /** Decodes intervals encoded as deltas of their boundaries. */
-  def intervals(s: String): CharSet =
+  def decodeIntervals(s: String): CharSet =
     val bounds = decode(s)
     var i = 1
     while i < bounds.length do
@@ -47,7 +49,7 @@ private[charset] object Codec:
     CharSet.unsafeFromBoundaries(bounds)
 
   /** Decodes front-coded strings. */
-  def strings(s: String): Seq[UString] =
+  def decodeStrings(s: String): Seq[UString] =
     val values = decode(s)
     val out = Seq.newBuilder[UString]
     var prev = Array.empty[Int]
@@ -66,7 +68,7 @@ private[charset] object Codec:
     out.result()
 
   /** Decodes mappings from code points to strings, encoded as gaps, lengths and code points. */
-  def overrides(s: String): Seq[(Int, UString)] =
+  def decodeOverrides(s: String): Seq[(Int, UString)] =
     val values = decode(s)
     val out = Seq.newBuilder[(Int, UString)]
     var c = 0
@@ -79,7 +81,7 @@ private[charset] object Codec:
     out.result()
 
   /** Decodes a name field `long,short,extra...` into the distinct names and the short name. */
-  def names(field: String): (IndexedSeq[String], String) =
+  def decodeNames(field: String): (IndexedSeq[String], String) =
     val parts = field.split(",", -1).toIndexedSeq
     val short = if parts.length > 1 && parts(1).nonEmpty then parts(1) else parts(0)
     (parts.filter(_.nonEmpty).distinct, short)

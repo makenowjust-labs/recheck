@@ -10,7 +10,6 @@ import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Seeder
 import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.PerlSource
 
 class ArgumentsSuite extends munit.FunSuite:
   test("arguments.durationArgument"):
@@ -43,9 +42,3 @@ class ArgumentsSuite extends munit.FunSuite:
     assertEquals(dialectArgument.read("dotnet"), Validated.validNel(Dialect.DotNet))
     assertEquals(dialectArgument.read("xxx"), Validated.invalidNel("unknown dialect: xxx"))
     assertEquals(dialectArgument.defaultMetavar, "dialect")
-
-  test("arguments.perlSourceArgument"):
-    assertEquals(perlSourceArgument.read("literal"), Validated.validNel(PerlSource.Literal))
-    assertEquals(perlSourceArgument.read("string"), Validated.validNel(PerlSource.String))
-    assertEquals(perlSourceArgument.read("xxx"), Validated.invalidNel("unknown perl source: xxx"))
-    assertEquals(perlSourceArgument.defaultMetavar, "source")

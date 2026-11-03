@@ -26,7 +26,8 @@ object ParametersGen:
       scalaValues: Map[String, String],
       cli: Option[String],
       cliMetavar: Option[String],
-      scalaDefaultValue: Option[String]
+      scalaDefaultValue: Option[String],
+      variants: Seq[Variant]
   ):
 
     def isDuration: Boolean = scalaType == "Duration"
@@ -43,13 +44,10 @@ object ParametersGen:
 
     def scalaDefault: String = scalaDefaultValue.getOrElse:
       default match
-        case null if isDuration                                 => "Duration.Inf"
         case null                                               => "None"
         case n: Number if isDuration && n.longValue % 1000 == 0 => s"Duration(${n.longValue / 1000}, SECONDS)"
         case n: Number if isDuration                            => s"Duration(${n.longValue}, MILLISECONDS)"
         case s: String if isEnum                                => scalaValues(s)
-        case s: String                                          => s"Some(${literal(s)})"
-        case b: java.lang.Boolean if isOption                   => s"Some($b)"
         case v                                                  => v.toString
 
     /** The first paragraph of the description on one line. */
@@ -58,12 +56,91 @@ object ParametersGen:
     /** The error message's name of the value. */
     def label: String = title.toLowerCase
 
+  /** Variant is an object of `oneOf` of a parameter, which has `name` as `const` and some settings. */
+  final case class Variant(name: String, scalaType: String, settings: Seq[Setting])
+
+  /** Setting is a setting of a variant, which the CLI takes by an option. */
+  final case class Setting(key: String, default: Any, scalaType: String, cliHelp: String):
+
+    def isBoolean: Boolean = scalaType == "Boolean"
+
+    /** The long option name, which is `no-…` for a boolean setting whose default is `true`. */
+    def cliOption(variant: Variant): String =
+      val name = s"${variant.name}-${key.flatMap(c => if c.isUpper then s"-${c.toLower}" else c.toString)}"
+      if isBoolean && default == true then s"no-$name" else name
+
+    /** The name of the local value of the option. */
+    def valueName(variant: Variant): String = s"${variant.name}${key.capitalize}"
+
   private val typeImports: Map[String, String] = Map(
     "AccelerationMode" -> "codes.quine.labs.recheck.common.AccelerationMode",
     "Checker" -> "codes.quine.labs.recheck.common.Checker",
     "Seeder" -> "codes.quine.labs.recheck.common.Seeder",
-    "Dialect" -> "codes.quine.labs.resyntax.ast.Dialect"
+    "Dialect" -> "codes.quine.labs.resyntax.ast.Dialect",
+    "PerlSource" -> "codes.quine.labs.resyntax.ast.PerlSource"
   )
+
+  private val scalaKeywords: Set[String] = Set(
+    "abstract",
+    "case",
+    "catch",
+    "class",
+    "def",
+    "do",
+    "else",
+    "enum",
+    "export",
+    "extends",
+    "false",
+    "final",
+    "finally",
+    "for",
+    "given",
+    "if",
+    "implicit",
+    "import",
+    "lazy",
+    "match",
+    "new",
+    "null",
+    "object",
+    "override",
+    "package",
+    "private",
+    "protected",
+    "return",
+    "sealed",
+    "super",
+    "then",
+    "this",
+    "throw",
+    "trait",
+    "true",
+    "try",
+    "type",
+    "val",
+    "var",
+    "while",
+    "with",
+    "yield"
+  )
+
+  /** Returns the identifier, which is quoted by backticks if it is a keyword. */
+  private def identifier(name: String): String = if scalaKeywords(name) then s"`$name`" else name
+
+  private def readVariant(v: java.util.Map[String, Any]): Option[Variant] =
+    Option(v.get("x-scala-type")).map: scalaType =>
+      val properties = v.get("properties").asInstanceOf[java.util.Map[String, java.util.Map[String, Any]]].asScala
+      val name = properties("name").get("const").toString
+      val settings = properties.toSeq
+        .filter(_._1 != "name")
+        .map:
+          case (key, setting) =>
+            def string(field: String): String =
+              Option(setting.get(field)).map(_.toString).getOrElse(sys.error(s"$key of $name has no $field"))
+
+            Setting(key, setting.get("default"), string("x-scala-type"), string("x-cli-help"))
+      Variant(name, scalaType.toString, settings)
 
   def read(schema: File): Seq[Param] =
     val yaml = new Yaml(new SafeConstructor(new LoaderOptions))
@@ -89,7 +166,10 @@ object ParametersGen:
           scalaValues = scalaValues,
           cli = string("x-cli"),
           cliMetavar = string("x-cli-metavar"),
-          scalaDefaultValue = string("x-scala-default")
+          scalaDefaultValue = string("x-scala-default"),
+          variants = Option(p.get("oneOf")).toSeq
+            .flatMap(_.asInstanceOf[java.util.List[java.util.Map[String, Any]]].asScala)
+            .flatMap(readVariant)
         )
 
   /** Target is a generated Scala source. */
@@ -99,7 +179,7 @@ object ParametersGen:
 
     case object Parameters extends Target("Parameters.scala", Seq("codes.quine.labs.recheck.common"))
     case object Codec extends Target("ParametersCodec.scala", Seq("codes.quine.labs.recheck", "codec"))
-    case object CLI extends Target("ParametersOpts.scala", Seq("codes.quine.labs.recheck.cli"))
+    case object CLI extends Target("ParametersOption.scala", Seq("codes.quine.labs.recheck.cli"))
 
   def generate(target: Target, root: File, dir: File): File =
     val params = read(root / SchemaPath)
@@ -128,6 +208,14 @@ object ParametersGen:
   private def imports(names: Seq[String]): String = names.distinct.sorted.map(n => s"import $n").mkString("\n")
 
   private def typeImportsOf(params: Seq[Param]): Seq[String] = params.flatMap(p => typeImports.get(p.scalaType))
+
+  private def settingImportsOf(params: Seq[Param]): Seq[String] =
+    for
+      p <- params
+      variant <- p.variants
+      scalaType <- variant.scalaType +: variant.settings.map(_.scalaType)
+      name <- typeImports.get(scalaType.takeWhile(_ != '.'))
+    yield name
 
   private def docLines(description: String, indent: String): String =
     description.linesIterator.map(l => if l.isEmpty then s"$indent*" else s"$indent* $l").mkString("\n")
@@ -160,11 +248,8 @@ object ParametersGen:
         |)
         |
         |object Parameters:
-        |  // $$COVERAGE-OFF$$
         |
         |${defaults.mkString("\n\n")}
-        |
-        |  // $$COVERAGE-ON$$
         |""".stripMargin
 
   /** Generates `ParametersCodec.scala`, the decoders of `Parameters` and its enums. */
@@ -215,7 +300,7 @@ object ParametersGen:
         |${enums.mkString("\n\n")}
         |""".stripMargin
 
-  /** Generates `ParametersOpts.scala`, the CLI options of `Parameters`. */
+  /** Generates `ParametersOption.scala`, the CLI options of `Parameters`. */
   def cli(params: Seq[Param]): String =
     val options = params
       .filter(p => p.cli.isDefined || p.isLogger)
@@ -229,6 +314,13 @@ object ParametersGen:
             |        .option[$tpe](long = ${literal(p.cli.get)}, help = ${literal(p.summary)})
             |        .$withDefault
             |        .$update""".stripMargin
+    val variantParams = params.filter(_.variants.nonEmpty)
+    val result = variantParams match
+      case Seq()  => "    params"
+      case Seq(p) =>
+        s"""|    (params, ${p.name}Settings).tupled.mapValidated: (params, settings) =>
+            |      settings(params.${p.name}).map(v => params.copy(${p.name} = v))""".stripMargin
+      case _ => sys.error("only one parameter may have variants")
     val arguments = params
       .filter(_.isEnum)
       .map: p =>
@@ -251,34 +343,94 @@ object ParametersGen:
       "codes.quine.labs.recheck.common.Context",
       "codes.quine.labs.recheck.common.Parameters",
       "scala.concurrent.duration.Duration"
-    ) ++ typeImportsOf(params)
+    ) ++ typeImportsOf(params) ++ settingImportsOf(params)
     s"""|$header
         |${packages(Target.CLI)}
         |
         |${imports(names)}
         |
-        |/** ParametersOpts provides the CLI options of `Parameters`. */
-        |object ParametersOpts:
+        |/** ParametersOption provides the CLI options of `Parameters`. */
+        |object ParametersOption:
         |
         |  /** Returns the options of `Parameters` with the given option of the logger. */
         |  def apply(logger: Opts[Option[Context.Logger]]): Opts[Parameters] =
         |    val updates = List[Opts[Parameters => Parameters]](
         |${options.mkString(",\n")}
         |    )
-        |    updates.foldLeft(Opts(Parameters()))((params, update) => (params, update).mapN((p, f) => f(p)))
+        |    val params = updates.foldLeft(Opts(Parameters()))((params, update) => (params, update).mapN((p, f) => f(p)))
+        |$result
         |
-        |/** ParameterArguments provides decline's `Argument` instances of the enums of `Parameters`. */
-        |object ParameterArguments:
+        |${variantParams.map(variantSettings).mkString("\n\n")}
+        |
+        |  /** Returns the value of the option, or the default if the option is not given. */
+        |  private def readSetting[A](option: String, value: Option[String], default: A)(
+        |      of: String => Option[A]
+        |  ): ValidatedNel[String, A] =
+        |    value.fold(Validated.validNel(default)): name =>
+        |      Validated.fromOption(of(name), s"unknown value of --$$option: $$name").toValidatedNel
+        |
+        |/** ParametersArgument provides decline's `Argument` instances of the enums of `Parameters`. */
+        |object ParametersArgument:
         |
         |${arguments.mkString("\n\n")}
         |""".stripMargin
+
+  /** Returns the options of the settings of the variants of the parameter, which set them on the variant that the
+    * parameter's option gives.
+    *
+    * An option of another variant is an error.
+    */
+  private def variantSettings(p: Param): String =
+    val pairs = for variant <- p.variants; setting <- variant.settings yield (variant, setting)
+    require(pairs.nonEmpty, s"${p.name} has no settings")
+    val optionValues = pairs.map: (variant, setting) =>
+      val option = literal(setting.cliOption(variant))
+      val help = literal(s"${setting.cliHelp.stripSuffix(".")} (${variant.name}).")
+      val opts =
+        if setting.isBoolean then s"Opts.flag(long = $option, help = $help).map(_ => ${setting.default != true})"
+        else s"Opts.option[String](long = $option, help = $help, metavar = ${literal(setting.key)})"
+      s"    val ${setting.valueName(variant)} = $opts.orNone"
+    val valueNames = pairs.map((variant, setting) => setting.valueName(variant))
+    val combined =
+      if valueNames.size == 1 then s"${valueNames.head}.map: ${valueNames.head} =>"
+      else s"(${valueNames.mkString(", ")}).mapN: (${valueNames.mkString(", ")}) =>"
+    val misplaced = pairs.map: (variant, setting) =>
+      s"          (${literal(setting.cliOption(variant))}, ${setting.valueName(variant)}.isDefined, ${literal(variant.name)})"
+    val cases = p.variants.map: variant =>
+      val bound = identifier(variant.name)
+      val values = variant.settings.map: setting =>
+        val name = setting.valueName(variant)
+        val default = s"$bound.${identifier(setting.key)}"
+        if setting.isBoolean then s"Validated.validNel[String, Boolean]($name.getOrElse($default))"
+        else s"readSetting(${literal(setting.cliOption(variant))}, $name, $default)(${setting.scalaType}.of)"
+      val keys = variant.settings.map(setting => identifier(setting.key))
+      val copy = s"$bound.copy(${keys.map(k => s"$k = $k").mkString(", ")})"
+      val update =
+        if values.size == 1 then s"${values.head}.map(${keys.head} => $copy)"
+        else s"(${values.mkString(", ")}).mapN((${keys.mkString(", ")}) => $copy)"
+      s"""|              case $bound: ${variant.scalaType} =>
+          |                $update""".stripMargin
+    s"""|  /** Returns the options of the settings of `${p.name}`, which set them on the value of `--${p.cli.get}`. */
+        |  private def ${p.name}Settings: Opts[${p.scalaType} => ValidatedNel[String, ${p.scalaType}]] =
+        |${optionValues.mkString("\n")}
+        |    $combined
+        |      (${p.name}: ${p.scalaType}) =>
+        |        val misplaced = Seq(
+        |${misplaced.mkString(",\n")}
+        |        ).collectFirst:
+        |          case (option, true, name) if name != ${p.name}.name => option
+        |        misplaced match
+        |          case Some(option) => Validated.invalidNel(s"--$$option is not an option of $${${p.name}.name}")
+        |          case None         =>
+        |            ${p.name} match
+        |${cases.mkString("\n")}
+        |              case _ => Validated.validNel(${p.name})""".stripMargin
 
   /** Returns the `check` helper of the console, which takes every parameter as a named argument. */
   def consoleCheck(root: File): String =
     val params = read(root / SchemaPath)
     // `dialect` follows `flags`, so that it is given without its name.
     val (dialect, others) = params.partition(_.name == "dialect")
-    // `logger` defaults to the console's logger.
     val args = (dialect ++ others).map: p =>
       val default = if p.isLogger then "Some(logger)" else p.defaultName
       s"    ${p.name}: ${p.scalaType} = $default"

@@ -57,7 +57,7 @@
   ],
   "scripts": {
     "build": "node ./scripts/parameters.mts && node ./scripts/build.mts",
-    "clean": "rimraf lib",
+    "clean": "rimraf lib parameters.d.ts",
     "format": "prettier -w '*.{js,json,md,mjs}' '{scripts,src}/**/*.{js,ts,mts}' index.d.ts index.d.mts",
     "lint": "prettier --check '*.{js,json,md,mjs}' '{scripts,src}/**/*.{js,ts,mts}' index.d.ts index.d.mts",
     "prepare": "node ./scripts/parameters.mts",

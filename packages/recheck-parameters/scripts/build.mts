@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 import { parse } from "yaml";
 
-import { typescriptType } from "../typescript.js";
+import { generateTypescriptType } from "../typescript.js";
 
 import type { Property, Schema } from "../index.js";
 
@@ -30,7 +30,7 @@ const defaultOf = (property: Property): string =>
   JSON.stringify(property.default ?? null);
 
 // The variants of `dialect` give the diagnostics' `Dialect` with every setting, and the parameter with optional ones.
-const dialectDts = (dialect: Property): string[] => {
+const generateDialectDts = (dialect: Property): string[] => {
   const variants = (dialect.oneOf ?? []).filter(
     (variant) => variant.type === "object",
   );
@@ -39,7 +39,7 @@ const dialectDts = (dialect: Property): string[] => {
       .map((variant) => {
         const fields = Object.entries(variant.properties ?? {}).map(
           ([key, setting]) =>
-            `${key}${required || key === "name" ? "" : "?"}: ${typescriptType(setting)}`,
+            `${key}${required || key === "name" ? "" : "?"}: ${generateTypescriptType(setting)}`,
         );
         return `\n  | { ${fields.join("; ")} }`;
       })
@@ -47,8 +47,8 @@ const dialectDts = (dialect: Property): string[] => {
   return [
     comment(
       [
-        "Dialect is the dialect of a diagnostics as the parameter gives it, with every setting of the dialect.",
-        "An omitted setting is the default.",
+        "Dialect is the dialect of a diagnostics, with every setting of the dialect.",
+        "A setting that the `dialect` parameter omits is the default.",
       ],
       "",
     ),
@@ -73,7 +73,7 @@ const dialectDts = (dialect: Property): string[] => {
   ];
 };
 
-const parametersDts = (schema: Schema): string => {
+const generateParametersDts = (schema: Schema): string => {
   const fields = Object.entries(schema.properties).map(([name, property]) => {
     const lines = [
       ...property.description.split("\n"),
@@ -81,14 +81,14 @@ const parametersDts = (schema: Schema): string => {
       `(default: \`${defaultOf(property)}\`)`,
     ];
     if (property["x-since"] !== undefined) {
-      lines.push("", `@since ${property["x-since"]}`);
+      lines.push("", `Since ${property["x-since"]}.`);
     }
-    return `${comment(lines, "  ")}\n  ${name}?: ${typescriptType(property)};`;
+    return `${comment(lines, "  ")}\n  ${name}?: ${generateTypescriptType(property)};`;
   });
   return [
     header,
     "",
-    ...dialectDts(schema.properties["dialect"]!),
+    ...generateDialectDts(schema.properties["dialect"]!),
     comment([schema.description], ""),
     "export type Parameters = {",
     fields.join("\n\n"),
@@ -97,7 +97,7 @@ const parametersDts = (schema: Schema): string => {
   ].join("\n");
 };
 
-const typesDts = (schema: Schema): string => {
+const generateTypesDts = (schema: Schema): string => {
   const entries = Object.entries(schema.properties);
   const targets = [
     ...new Set(entries.flatMap(([, property]) => property["x-exclude"] ?? [])),
@@ -115,12 +115,12 @@ const typesDts = (schema: Schema): string => {
     header,
     "",
     "/** The names of the parameters that each target leaves out. */",
-    "export type Excluded = {",
+    "export type ExclusionTable = {",
     ...excluded,
     "};",
     "",
     "/** The default value of each parameter. */",
-    "export type Defaults = {",
+    "export type DefaultTable = {",
     ...defaults,
     "};",
     "",
@@ -134,5 +134,8 @@ writeFileSync(
   new URL("schema.js", libUrl),
   `${header}\n\nexport default ${JSON.stringify(schema, null, 2)};\n`,
 );
-writeFileSync(new URL("parameters.d.ts", libUrl), parametersDts(schema));
-writeFileSync(new URL("types.d.ts", libUrl), typesDts(schema));
+writeFileSync(
+  new URL("parameters.d.ts", libUrl),
+  generateParametersDts(schema),
+);
+writeFileSync(new URL("types.d.ts", libUrl), generateTypesDts(schema));

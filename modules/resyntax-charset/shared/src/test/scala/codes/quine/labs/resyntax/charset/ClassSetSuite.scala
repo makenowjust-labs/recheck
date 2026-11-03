@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.charset
 
 class ClassSetSuite extends munit.FunSuite:
+
   val ab: UString = UString(0x61, 0x62)
   val cd: UString = UString(0x63, 0x64)
   val e: UString = UString.empty

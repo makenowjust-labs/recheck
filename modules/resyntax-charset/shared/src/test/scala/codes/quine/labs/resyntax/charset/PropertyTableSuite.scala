@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.charset
 
 class PropertyTableSuite extends munit.FunSuite:
+
   def binary(name: String): BinaryProperty = PropertyTable.binary(name).get
 
   def value(property: EnumeratedProperty, name: String): PropertyValue = property.value(name).get
@@ -26,10 +27,6 @@ class PropertyTableSuite extends munit.FunSuite:
     assertEquals(PropertyTable.lookup("alpha"), None)
     assertEquals(PropertyTable.lookup("White Space"), None)
 
-  test("NameMatching.loose (UAX44-LM3)"):
-    assertEquals(NameMatching.loose("Is_Line-Break Foo"), "linebreakfoo")
-    assertEquals(NameMatching.loose("ISO_Comment"), "ocomment")
-
   test("PropertyTable.lookup: every alias finds its own property and value"):
     for p <- PropertyTable.all; name <- p.names do assert(PropertyTable.lookup(name).exists(_ eq p), name)
     for p <- PropertyTable.enumeratedProperties; v <- p.values; name <- v.names do
@@ -53,7 +50,7 @@ class PropertyTableSuite extends munit.FunSuite:
     assert(binary("Emoji").set.contains(0x1f600))
     assert(binary("Ideographic").set.contains(0x6f22))
     assert(!binary("Lowercase").isOfStrings)
-    assert(PropertyTable.icuBinaryProperties.size >= 70)
+    assert(PropertyTable.binaryProperties.size >= 73)
 
   test("PropertyTable: derived binary properties"):
     assertEquals(binary("Any").set, UnitMode.CodePoint.universe)
@@ -191,31 +188,31 @@ class PropertyTableSuite extends munit.FunSuite:
     assert(value(incb, "Extend").set.contains(0x200d))
 
   test("PropertyTable: other enumerated properties"):
-    def check(p: EnumeratedProperty, v: String, c: Int)(implicit loc: munit.Location): Unit =
+    def assertValueContains(p: EnumeratedProperty, v: String, c: Int)(using loc: munit.Location): Unit =
       assert(value(p, v).set.contains(c), s"${p.name}=$v U+${c.toHexString}")
 
-    check(PropertyTable.LineBreak, "AL", 'a')
-    check(PropertyTable.LineBreak, "Ideographic", 0x6f22)
-    check(PropertyTable.EastAsianWidth, "W", 0x3042)
-    check(PropertyTable.EastAsianWidth, "Na", 'a')
-    check(PropertyTable.NumericType, "De", '0')
-    check(PropertyTable.NumericType, "Nu", 0x00bd)
-    check(PropertyTable.WordBreak, "ALetter", 'a')
-    check(PropertyTable.SentenceBreak, "Upper", 'A')
-    check(PropertyTable.HangulSyllableType, "LV", 0xac00)
-    check(PropertyTable.JoiningType, "D", 0x0628)
-    check(PropertyTable.JoiningGroup, "Beh", 0x0628)
-    check(PropertyTable.DecompositionType, "Canonical", 0x00e9)
-    check(PropertyTable.NFCQuickCheck, "M", 0x0301)
-    check(PropertyTable.NFDQuickCheck, "N", 0x00e9)
-    check(PropertyTable.NFKCQuickCheck, "N", 0x00a0)
-    check(PropertyTable.NFKDQuickCheck, "N", 0x00a0)
-    check(PropertyTable.BidiPairedBracketType, "Open", '(')
-    check(PropertyTable.IndicPositionalCategory, "Left", 0x093f)
-    check(PropertyTable.IndicSyllabicCategory, "Virama", 0x094d)
-    check(PropertyTable.VerticalOrientation, "U", 0x3042)
-    check(PropertyTable.IdentifierStatus, "Allowed", 'a')
-    check(PropertyTable.IdentifierType, "Recommended", 'a')
+    assertValueContains(PropertyTable.LineBreak, "AL", 'a')
+    assertValueContains(PropertyTable.LineBreak, "Ideographic", 0x6f22)
+    assertValueContains(PropertyTable.EastAsianWidth, "W", 0x3042)
+    assertValueContains(PropertyTable.EastAsianWidth, "Na", 'a')
+    assertValueContains(PropertyTable.NumericType, "De", '0')
+    assertValueContains(PropertyTable.NumericType, "Nu", 0x00bd)
+    assertValueContains(PropertyTable.WordBreak, "ALetter", 'a')
+    assertValueContains(PropertyTable.SentenceBreak, "Upper", 'A')
+    assertValueContains(PropertyTable.HangulSyllableType, "LV", 0xac00)
+    assertValueContains(PropertyTable.JoiningType, "D", 0x0628)
+    assertValueContains(PropertyTable.JoiningGroup, "Beh", 0x0628)
+    assertValueContains(PropertyTable.DecompositionType, "Canonical", 0x00e9)
+    assertValueContains(PropertyTable.NFCQuickCheck, "M", 0x0301)
+    assertValueContains(PropertyTable.NFDQuickCheck, "N", 0x00e9)
+    assertValueContains(PropertyTable.NFKCQuickCheck, "N", 0x00a0)
+    assertValueContains(PropertyTable.NFKDQuickCheck, "N", 0x00a0)
+    assertValueContains(PropertyTable.BidiPairedBracketType, "Open", '(')
+    assertValueContains(PropertyTable.IndicPositionalCategory, "Left", 0x093f)
+    assertValueContains(PropertyTable.IndicSyllabicCategory, "Virama", 0x094d)
+    assertValueContains(PropertyTable.VerticalOrientation, "U", 0x3042)
+    assertValueContains(PropertyTable.IdentifierStatus, "Allowed", 'a')
+    assertValueContains(PropertyTable.IdentifierType, "Recommended", 'a')
     assertEquals(PropertyTable.lookup("lb"), Some(PropertyTable.LineBreak))
     assertEquals(PropertyTable.lookup("Identifier_Type"), Some(PropertyTable.IdentifierType))
     assert(PropertyTable.IdentifierType.values.count(_.set.contains(0x018d)) >= 2)
@@ -235,6 +232,7 @@ class PropertyTableSuite extends munit.FunSuite:
     assert(nv.nan.isNaN)
     assert(nv.nan.set.contains('a'))
     def valueAt(c: Int): NumericValue = nv.values.find(_.set.contains(c)).get
+
     assertEquals(valueAt('3').toDouble, 3.0)
     assertEquals(valueAt(0x00bd).numerator, 1L)
     assertEquals(valueAt(0x00bd).denominator, 2L)

@@ -36,7 +36,6 @@ const nativeEnsure = jest.mocked(native.ensure);
 beforeEach(() => {
   main.__mock__.agent = undefined;
   main.__mock__.pool = null;
-  main.__mock__.syncFn = null;
 });
 
 afterEach(() => {
@@ -142,14 +141,22 @@ test("check: invalid", async () => {
   );
 });
 
-test("checkSync: synckit", () => {
-  syncBackend.mockReturnValueOnce("synckit");
+// The synckit function is created once per module, so this is the only test using it.
+test("checkSync and checkAllSync: synckit", () => {
+  syncBackend.mockReturnValueOnce("synckit").mockReturnValueOnce("synckit");
+  const syncFn = jest.fn((method: unknown, ..._: unknown[]) =>
+    method === "checkAll"
+      ? [{ status: "vulnerable" }]
+      : { status: "vulnerable" },
+  );
   const createSyncFn = jest.mocked(synckit.createSyncFn);
-  createSyncFn.mockReturnValueOnce((() => ({ status: "vulnerable" })) as any);
+  createSyncFn.mockReturnValueOnce(syncFn as any);
 
-  const diagnostics = main.checkSync("^(a|a)+$", "");
-  expect(diagnostics.status).toBe("vulnerable");
-  expect(createSyncFn).toHaveBeenCalled();
+  expect(main.checkSync("^(a|a)+$", "").status).toBe("vulnerable");
+  const diagnostics = main.checkAllSync("^(a|a)+$", "");
+  expect(diagnostics.map((d) => d.status)).toEqual(["vulnerable"]);
+  expect(createSyncFn).toHaveBeenCalledTimes(1);
+  expect(syncFn).toHaveBeenCalledWith("checkAll", "^(a|a)+$", "", {});
 });
 
 test("checkSync: pure", () => {
@@ -219,17 +226,6 @@ test("checkAll: invalid", async () => {
   await expect(main.checkAll("^(a|a)+$", "")).rejects.toThrow(
     "invalid backend: invalid",
   );
-});
-
-test("checkAllSync: synckit", () => {
-  syncBackend.mockReturnValueOnce("synckit");
-  const syncFn = jest.fn((..._: unknown[]) => [{ status: "vulnerable" }]);
-  const createSyncFn = jest.mocked(synckit.createSyncFn);
-  createSyncFn.mockReturnValueOnce(syncFn as any);
-
-  const diagnostics = main.checkAllSync("^(a|a)+$", "");
-  expect(diagnostics.map((d) => d.status)).toEqual(["vulnerable"]);
-  expect(syncFn).toHaveBeenCalledWith("checkAll", "^(a|a)+$", "", {});
 });
 
 test("checkAllSync: pure", () => {

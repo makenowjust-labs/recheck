@@ -8,8 +8,6 @@ import java.nio.file.NoSuchFileException
 import java.nio.file.Paths
 import java.time.LocalDateTime
 
-import cats.data.Validated
-import cats.data.ValidatedNel
 import cats.syntax.apply.*
 import cats.syntax.semigroupk.*
 import com.monovore.decline.Command
@@ -21,13 +19,10 @@ import codes.quine.labs.recheck.cli.Main.BatchAction
 import codes.quine.labs.recheck.cli.Main.CheckAction
 import codes.quine.labs.recheck.cli.Main.GenerateRecallScriptAction
 import codes.quine.labs.recheck.cli.Main.command
-import codes.quine.labs.recheck.cli.arguments.given
 import codes.quine.labs.recheck.codec.given
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.diagnostics.Diagnostics
-import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.PerlSource
 
 /** Main provides the entrypoint of `recheck` command. */
 object Main:
@@ -42,8 +37,7 @@ object Main:
     *
     * With `all`, it shows all the diagnostics of `ReDoS.checkAll`.
     */
-  final case class CheckAction(pattern: InputPattern, params: Parameters, all: Boolean = false, json: Boolean = false)
-      extends Action
+  final case class CheckAction(pattern: InputPattern, params: Parameters, all: Boolean, json: Boolean) extends Action
 
   /** GenerateRecallScriptAction holds `recheck generate-recall-script` subcommand parameters.
     *
@@ -64,8 +58,7 @@ object Main:
               Console.out.println(s"[$date] $message")
             }
           case false => None
-      val params = (ParametersOpts(logger), dialectSettings).tupled.mapValidated: (params, settings) =>
-        settings(params.dialect).map(dialect => params.copy(dialect = dialect))
+      val params = ParametersOption(logger)
 
       val pattern = Opts.argument[InputPattern](metavar = "pattern")
       val all = Opts
@@ -93,48 +86,6 @@ object Main:
         Opts.argument[String](metavar = "diagnostics").map(GenerateRecallScriptAction.apply)
 
       agent <+> generateRecallScript <+> check
-
-  /** The options of the dialect's settings, which set them on the dialect of `--dialect`. */
-  def dialectSettings: Opts[Dialect => ValidatedNel[String, Dialect]] =
-    val pythonType = Opts.option[String](long = "python-type", help = "The string type (python).").orNone
-    val rubyEncoding = Opts.option[String](long = "ruby-encoding", help = "The encoding (ruby).").orNone
-    val perlUTF8 = Opts
-      .flag(long = "no-perl-utf8", help = "The program has no `use utf8`, and its strings are bytes (perl).")
-      .map(_ => false)
-      .orNone
-    val perlSource = Opts.option[PerlSource](long = "perl-source", help = "How the pattern is given (perl).").orNone
-    (pythonType, rubyEncoding, perlUTF8, perlSource).mapN: (pythonType, rubyEncoding, perlUTF8, perlSource) =>
-      withSettings(_, pythonType, rubyEncoding, perlUTF8, perlSource)
-
-  /** Returns the dialect with the settings, or an error if the dialect does not have a given setting. */
-  def withSettings(
-      dialect: Dialect,
-      pythonType: Option[String],
-      rubyEncoding: Option[String],
-      perlUTF8: Option[Boolean],
-      perlSource: Option[PerlSource]
-  ): ValidatedNel[String, Dialect] =
-    val misplaced = Seq(
-      ("python-type", pythonType.isDefined, dialect.isPython),
-      ("ruby-encoding", rubyEncoding.isDefined, dialect.isRuby),
-      ("no-perl-utf8", perlUTF8.isDefined, dialect.isPerl),
-      ("perl-source", perlSource.isDefined, dialect.isPerl)
-    ).collectFirst { case (option, true, false) => option }
-    def named[A](option: String, value: Option[String], default: A)(of: String => Option[A]): ValidatedNel[String, A] =
-      value.fold(Validated.validNel(default)): name =>
-        Validated.fromOption(of(name), s"unknown value of --$option: $name").toValidatedNel
-
-    misplaced match
-      case Some(option) => Validated.invalidNel(s"--$option is not an option of ${dialect.name}")
-      case None         =>
-        dialect match
-          case python: Dialect.Python =>
-            named("python-type", pythonType, python.`type`)(Dialect.Python.Type.of).map(Dialect.Python(_))
-          case ruby: Dialect.Ruby =>
-            named("ruby-encoding", rubyEncoding, ruby.encoding)(Dialect.Ruby.Encoding.of).map(Dialect.Ruby(_))
-          case perl: Dialect.Perl =>
-            Validated.validNel(Dialect.Perl(perlUTF8.getOrElse(perl.utf8), perlSource.getOrElse(perl.source)))
-          case _ => Validated.validNel(dialect)
 
   // $COVERAGE-OFF$
   /** An entrypoint of `recheck` command. */

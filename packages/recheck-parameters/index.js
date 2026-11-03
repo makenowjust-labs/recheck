@@ -1,7 +1,7 @@
 import schema from "./lib/schema.js";
 
 export { schema };
-export { typescriptType } from "./typescript.js";
+export { generateTypescriptType } from "./typescript.js";
 
 export const defaults = Object.fromEntries(
   Object.entries(schema.properties).map(([name, property]) => [

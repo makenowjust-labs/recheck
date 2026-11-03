@@ -7,17 +7,18 @@ package codes.quine.labs.resyntax.charset
 object PropertyTable:
 
   /** The binary properties known to ICU4J, in ICU's `UProperty` order. */
-  lazy val icuBinaryProperties: IndexedSeq[BinaryProperty] =
+  private lazy val icuBinaryProperties: IndexedSeq[BinaryProperty] =
     val raws = UnicodeData.Binary
     lazy val properties: IndexedSeq[BinaryProperty] = raws.toIndexedSeq.map: raw =>
-      val (names, short) = Codec.names(raw.names)
+      val (names, short) = CharsetDecoder.decodeNames(raw.names)
       BinaryProperty(
         names,
         short,
-        if raw.unionOf.isEmpty then ClassSet(Codec.intervals(raw.set), Codec.strings(raw.strings))
+        if raw.unionOf.isEmpty then
+          ClassSet(CharsetDecoder.decodeIntervals(raw.set), CharsetDecoder.decodeStrings(raw.strings))
         else
           val parts = raw.unionOf.split(" ").toSeq.map(i => properties(i.toInt).classSet)
-          ClassSet(Codec.intervals(raw.set), parts.flatMap(_.strings))
+          ClassSet(CharsetDecoder.decodeIntervals(raw.set), parts.flatMap(_.strings))
       )
     properties
 
@@ -100,7 +101,7 @@ object PropertyTable:
   /** The `Numeric_Value` property, whose values are NaN first, and then the numbers in ascending order. */
   lazy val NumericValue: NumericProperty =
     val raw = UnicodeData.NumericValue
-    val (names, short) = Codec.names(raw.names)
+    val (names, short) = CharsetDecoder.decodeNames(raw.names)
     lazy val table = RunTable.decode(raw.runs)
     val values = raw.values
       .split(";")
@@ -155,11 +156,12 @@ object PropertyTable:
 
   def lookup(name: String): Option[Property] = index.get(name, NameMatching.Exact)
 
-  def binary(name: String): Option[BinaryProperty] = lookup(name).collect { case p: BinaryProperty => p }
+  def binary(name: String): Option[BinaryProperty] = lookup(name).collect:
+    case p: BinaryProperty => p
 
   private lazy val binaryValueIndex =
     val Array(yes, no) = UnicodeData.BinaryValueNames.split(";")
-    NameIndex(Seq((Codec.names(yes)._1, true), (Codec.names(no)._1, false)))
+    NameIndex(Seq((CharsetDecoder.decodeNames(yes)._1, true), (CharsetDecoder.decodeNames(no)._1, false)))
 
   /** Looks up a value of binary properties by loose matching: `Yes` (`Y`, `True`, `T`) or `No` (`N`, `False`, `F`). */
   def binaryValue(name: String): Option[Boolean] = binaryValueIndex.get(name, NameMatching.Loose)
@@ -175,31 +177,32 @@ object PropertyTable:
 
   /** Builds a multi-valued property; `defaults` name the values when the raw data has no value names. */
   private def fromCombined(raw: RawCombined, defaults: IndexedSeq[(IndexedSeq[String], String)]): EnumeratedProperty =
-    val (names, short) = Codec.names(raw.names)
+    val (names, short) = CharsetDecoder.decodeNames(raw.names)
     lazy val table = RunTable.decode(raw.runs)
     lazy val combos: IndexedSeq[Set[Int]] =
-      val values = Codec.decode(raw.combos)
+      val values = CharsetDecoder.decode(raw.combos)
       val out = IndexedSeq.newBuilder[Set[Int]]
       var i = 0
       while i < values.length do
         out += values.slice(i + 1, i + 1 + values(i)).toSet
         i += 1 + values(i)
       out.result()
-    val fields = if raw.values.isEmpty then defaults else raw.values.split(";").toIndexedSeq.map(Codec.names)
+    val fields =
+      if raw.values.isEmpty then defaults else raw.values.split(";").toIndexedSeq.map(CharsetDecoder.decodeNames)
     lazy val values: IndexedSeq[PropertyValue] = fields.zipWithIndex.map:
       case ((valueNames, valueShort), i) =>
         PropertyValue(names.head, valueNames, valueShort, table.setOf(combos(_).contains(i)))
     EnumeratedProperty(names, short, values)
 
   private def fromRaw(raw: RawEnumerated): EnumeratedProperty =
-    val (names, short) = Codec.names(raw.names)
+    val (names, short) = CharsetDecoder.decodeNames(raw.names)
     lazy val table = RunTable.decode(raw.runs)
     val baseValues = raw.values
       .split(";")
       .toIndexedSeq
       .zipWithIndex
       .map: (field, i) =>
-        val (valueNames, valueShort) = Codec.names(field)
+        val (valueNames, valueShort) = CharsetDecoder.decodeNames(field)
         PropertyValue(names.head, valueNames, valueShort, table.setOf(_ == i))
     val groupValues =
       if raw.groups.isEmpty then IndexedSeq.empty
@@ -209,7 +212,7 @@ object PropertyTable:
           .toIndexedSeq
           .map: group =>
             val Array(field, members) = group.split(":")
-            val (valueNames, valueShort) = Codec.names(field)
+            val (valueNames, valueShort) = CharsetDecoder.decodeNames(field)
             val memberSet = members.split(" ").map(_.toInt).toSet
             PropertyValue(names.head, valueNames, valueShort, table.setOf(memberSet.contains))
     EnumeratedProperty(names, short, baseValues ++ groupValues)

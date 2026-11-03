@@ -17,17 +17,23 @@ final class Alphabet private (
 
   def size: Int = atoms.size
 
-  /** Returns the index of the atom containing the code value, or `-1` for a code value outside the mode. */
+  /** Returns the index of the atom containing the code value.
+    *
+    * It throws `IllegalArgumentException` for a code value outside the mode.
+    */
   def atomOf(value: UChar): Int =
-    if !mode.contains(value) then -1
-    else segmentAtoms(CharSet.countLessOrEqual(segmentStarts, value) - 1)
+    require(mode.contains(value), f"Invalid unit in $mode mode: $value%X")
+    segmentAtoms(CharSet.countLessOrEqual(segmentStarts, value) - 1)
 
   /** Returns the indices of the atoms intersecting the set.
     *
     * For a set that is a union of atoms, such as a Boolean combination of the refined sets, the returned atoms
     * partition the set exactly.
+    *
+    * It throws `IllegalArgumentException` for a set having a code value outside the mode.
     */
   def atomsOf(set: CharSet): BitSet =
+    require(set.isEmpty || mode.contains(set.last), f"Invalid unit in $mode mode: ${set.last}%X")
     val builder = BitSet.newBuilder
     set.foreachIntervalWithin(0, mode.limit): (start, end) =>
       var i = CharSet.countLessOrEqual(segmentStarts, start) - 1
@@ -57,6 +63,11 @@ object Alphabet:
 
     val segmentAtoms = new Array[Int](n)
     var nextAtom = 1
+
+    def newAtom(): Int =
+      nextAtom += 1
+      nextAtom - 1
+
     for set <- restricted do
       // Splitting atoms by a set or by its complement gives the same partition, so walk the smaller side.
       val spans = mutable.ArrayBuilder.make[Int]
@@ -75,25 +86,19 @@ object Alphabet:
       while k < segmentSpans.length do
         var i = segmentSpans(k)
         while i < segmentSpans(k + 1) do
-          segmentAtoms(i) = remap.getOrElseUpdate(
-            segmentAtoms(i), {
-              val atom = nextAtom
-              nextAtom += 1
-              atom
-            }
-          )
+          segmentAtoms(i) = remap.getOrElseUpdate(segmentAtoms(i), newAtom())
           i += 1
         k += 2
 
     val renumber = mutable.HashMap.empty[Int, Int]
     val builders = mutable.ArrayBuffer.empty[CharSet.Builder]
+
+    def newBuilder(): Int =
+      builders += CharSet.newBuilder
+      builders.size - 1
+
     for i <- 0 until n do
-      val atom = renumber.getOrElseUpdate(
-        segmentAtoms(i), {
-          builders += CharSet.newBuilder
-          builders.size - 1
-        }
-      )
+      val atom = renumber.getOrElseUpdate(segmentAtoms(i), newBuilder())
       segmentAtoms(i) = atom
       builders(atom).addRange(sortedPoints(i), sortedPoints(i + 1))
 

@@ -29,18 +29,20 @@ ThisBuild / semanticdbEnabled := true
 ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 
 val releaseVersion = taskKey[String]("A release version")
-ThisBuild / releaseVersion := {
-  if (version.value.endsWith("-SNAPSHOT")) previousStableVersion.value.getOrElse("0.0.0")
+ThisBuild / releaseVersion := (
+  if version.value.endsWith("-SNAPSHOT") then previousStableVersion.value.getOrElse("0.0.0")
   else version.value
-}
+)
 
 val generateParameters = taskKey[Seq[File]]("Generate the Scala sources of the parameters from the schema")
 
+val generateUnicodeData = taskKey[Seq[File]]("Generate the Scala sources of the Unicode data")
+
 def parametersGenerator(target: ParametersGen.Target): Seq[Def.Setting[?]] = Seq(
   Compile / sourceGenerators += generateParameters.taskValue,
-  generateParameters := Def.uncached {
+  generateParameters := Def.uncached(
     Seq(ParametersGen.generate(target, (ThisBuild / baseDirectory).value, (Compile / sourceManaged).value))
-  },
+  ),
   coverageExcludedFiles := ".*[/\\\\]src_managed[/\\\\].*"
 )
 
@@ -258,27 +260,10 @@ lazy val resyntaxCharset = crossProject(JVMPlatform, JSPlatform)
       |""".stripMargin,
     coverageExcludedFiles := ".*[/\\\\]src_managed[/\\\\].*",
     // Generators:
-    {
-      val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
-      Seq(
-        Compile / sourceGenerators += generateUnicodeData.taskValue,
-        generateUnicodeData := Def.uncached {
-          val gens = Map[String, UnicodeDataGen](
-            "CharsetCaseDataGen.scala" -> CharsetCaseDataGen,
-            "CharsetPropertyDataGen.scala" -> CharsetPropertyDataGen
-          )
-          val pkg = "codes.quine.labs.resyntax.charset"
-          val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labs" / "resyntax" / "charset"
-          val projectDir = (ThisBuild / baseDirectory).value / "project"
-          for ((fileName, gen) <- gens) {
-            val output = gen.file(dir)
-            val inputs = Seq(projectDir / fileName, projectDir / "CharsetEncoder.scala")
-            if (!output.exists() || inputs.exists(_.lastModified() > output.lastModified())) gen.gen(pkg, dir)
-          }
-          gens.values.map(_.file(dir)).toSeq
-        }
-      )
-    },
+    Compile / sourceGenerators += generateUnicodeData.taskValue,
+    generateUnicodeData := Def.uncached(
+      UnicodeDataGen.generate((ThisBuild / baseDirectory).value / "project", (Compile / sourceManaged).value)
+    ),
     // Settings for test:
     libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -337,8 +322,8 @@ lazy val js = project
     testFrameworks += new TestFramework("munit.Framework"),
     // ScalaJS config:
     coverageEnabled := false,
-    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
-    Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) },
+    scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.ESModule)),
+    Test / scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.CommonJSModule)),
     // Output `recheck.js` to a path independent of the Scala version.
     Compile / fullLinkJS / scalaJSLinkerOutputDirectory := (ThisBuild / baseDirectory).value / "target" / "recheck-js-opt"
   )
@@ -364,11 +349,11 @@ lazy val cli = project
     // `scala.runtime.LazyVals` uses `sun.misc.Unsafe`, and JDK 24+ warns on its first use (JEP 471).
     nativeImageOptions += "-Dsun.misc.unsafe.memory.access=allow",
     // The minimum macOS version of the binary is the build machine's version by default.
-    nativeImageOptions ++= {
-      if (scala.util.Properties.isMac)
+    nativeImageOptions ++= (
+      if scala.util.Properties.isMac then
         Seq("-H:+UnlockExperimentalVMOptions", "-H:NativeLinkerOption=-mmacosx-version-min=15.0")
       else Seq.empty
-    },
+    ),
     console / initialCommands := """
       |import io.circe.*
       |import io.circe.parser.*

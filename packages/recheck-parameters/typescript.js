@@ -10,17 +10,17 @@ const objectType = (property) => {
   const required = property.required ?? [];
   const fields = Object.entries(property.properties ?? {}).map(
     ([key, value]) =>
-      `${key}${required.includes(key) ? "" : "?"}: ${typescriptType(value)}`,
+      `${key}${required.includes(key) ? "" : "?"}: ${generateTypescriptType(value)}`,
   );
   return `{ ${fields.join("; ")} }`;
 };
 
-export const typescriptType = (property) => {
+export const generateTypescriptType = (property) => {
   if (property["x-typescript-type"] !== undefined) {
     return property["x-typescript-type"];
   }
   if (property.oneOf !== undefined) {
-    return property.oneOf.map(typescriptType).join(" | ");
+    return property.oneOf.map(generateTypescriptType).join(" | ");
   }
   if (property.const !== undefined) return JSON.stringify(property.const);
   if (property.type === "object") return objectType(property);

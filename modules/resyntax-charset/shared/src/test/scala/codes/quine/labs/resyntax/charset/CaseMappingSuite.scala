@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.charset
 
 class CaseMappingSuite extends munit.FunSuite:
+
   import CaseMapping.*
 
   val Kelvin = 0x212a
@@ -88,8 +89,9 @@ class CaseMappingSuite extends munit.FunSuite:
     assertEquals(ECMAScriptUpper.closure(CharSet.single(SharpS)), CharSet.of(SharpS))
     assertEquals(ECMAScriptUpper.closure(CharSet.single(CapitalSharpS)), CharSet.of(CapitalSharpS))
     assertEquals(ECMAScriptUpper.closure(CharSet.single(0x01c4)), CharSet.of(0x01c4, 0x01c5, 0x01c6))
-    assertEquals(ecmaScriptCanonicalize(false), ECMAScriptUpper)
-    assertEquals(ecmaScriptCanonicalize(true), SimpleFold)
+    assertEquals(ecmaScriptCanonicalize(UnitMode.UTF16), ECMAScriptUpper)
+    assertEquals(ecmaScriptCanonicalize(UnitMode.CodePoint), SimpleFold)
+    intercept[IllegalArgumentException](ecmaScriptCanonicalize(UnitMode.Byte))
 
   test("CaseMapping#image / preimage / closure on sets"):
     assertEquals(SimpleFold.image(CharSet.range('A', 'Z')), CharSet.range('a', 'z'))
@@ -131,6 +133,11 @@ class CaseMappingSuite extends munit.FunSuite:
     val g = f.updated(Seq((0x43, 0x43), (0x42, 0x30)))
     assertEquals(g.entries.toSeq, Seq((0x41, 0x61), (0x42, 0x30), (0x45, 0x65), (0x46, 0x66)))
     assertEquals(CaseMapping.fromEntries(SimpleFold.entries).entries.toSeq, SimpleFold.entries.toSeq)
+    assertEquals(
+      CaseMapping.fromEntries(Seq((0x43, 0x63), (0x41, 0x61))).entries.toSeq,
+      Seq((0x41, 0x61), (0x43, 0x63))
+    )
+    intercept[IllegalArgumentException](CaseMapping.fromEntries(Seq((0x41, 0x61), (0x41, 0x41))))
 
   test("FullCaseFolding"):
     assertEquals(FullCaseFolding('A'), UString('a'))

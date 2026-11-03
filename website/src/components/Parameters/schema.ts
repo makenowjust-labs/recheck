@@ -1,6 +1,6 @@
 import type { Property } from "recheck-parameters";
 
-import { schema, typescriptType } from "recheck-parameters";
+import { generateTypescriptType, schema } from "recheck-parameters";
 
 export type Section = {
   name: string;
@@ -44,7 +44,7 @@ const scalaDefault = (property: Property): string => {
 export const sectionOf = (name: string, property: Property): Section => ({
   name,
   id: name.toLowerCase(),
-  typescriptType: typescriptType(property),
+  typescriptType: generateTypescriptType(property),
   scalaType: property["x-scala-type"],
   unit: property["x-unit"] ?? null,
   typescriptDefault: JSON.stringify(property.default ?? null),

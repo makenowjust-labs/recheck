@@ -15,14 +15,12 @@ import type { Agent } from "./lib/agent";
 type Mock = {
   agent: Agent | null | undefined;
   pool: WorkerPool | null;
-  syncFn: SyncFn | null;
 };
 
-/** Exposes this to mock `agent`, `pool` and `syncFn`. */
+/** Exposes this to mock `agent` and `pool`. */
 export const __mock__: Mock = {
   agent: undefined,
   pool: null,
-  syncFn: null,
 };
 
 type Backend =
@@ -30,7 +28,7 @@ type Backend =
   | { type: "pool"; pool: WorkerPool }
   | { type: "pure" };
 
-const validate = (source: unknown, flags: unknown): void => {
+const validateArguments = (source: unknown, flags: unknown): void => {
   /* c8 ignore start */
   if (typeof source !== "string") {
     throw new TypeError(
@@ -45,7 +43,7 @@ const validate = (source: unknown, flags: unknown): void => {
   /* c8 ignore stop */
 };
 
-const poolBackend = (): Backend => {
+const ensurePoolBackend = (): Backend => {
   if (__mock__.pool === null) {
     __mock__.pool = new WorkerPool(1);
   }
@@ -53,7 +51,7 @@ const poolBackend = (): Backend => {
 };
 
 /** Returns the backend of `RECHECK_BACKEND`, starting the agent on the first call. */
-async function backend(): Promise<Backend> {
+async function selectBackend(): Promise<Backend> {
   const name = env.RECHECK_BACKEND();
   switch (name) {
     case "auto":
@@ -88,7 +86,7 @@ async function backend(): Promise<Backend> {
       }
       break;
     case "worker":
-      return poolBackend();
+      return ensurePoolBackend();
     case "pure":
       return { type: "pure" };
     default:
@@ -100,7 +98,7 @@ async function backend(): Promise<Backend> {
     if (name !== "auto") {
       throw new Error("there is no available implementation");
     }
-    return poolBackend();
+    return ensurePoolBackend();
   }
 
   return { type: "agent", agent };
@@ -112,8 +110,8 @@ export async function check(
   flags: string,
   params: Parameters & HasAbortSignal = {},
 ): Promise<Diagnostics> {
-  validate(source, flags);
-  const b = await backend();
+  validateArguments(source, flags);
+  const b = await selectBackend();
   switch (b.type) {
     case "agent":
       return checkAgent(b.agent, source, flags, params);
@@ -130,8 +128,8 @@ export async function checkAll(
   flags: string,
   params: Parameters & HasAbortSignal = {},
 ): Promise<Diagnostics[]> {
-  validate(source, flags);
-  const b = await backend();
+  validateArguments(source, flags);
+  const b = await selectBackend();
   switch (b.type) {
     case "agent":
       return checkAllAgent(b.agent, source, flags, params);
@@ -147,18 +145,22 @@ type SyncFn = (
   source: string,
   flags: string,
   params: Parameters,
-) => any;
+) => Diagnostics | Diagnostics[];
 
-const syncFn = (): SyncFn => {
+/** The function calling the synckit worker, which is created on the first use. */
+let synckitFn: SyncFn | null = null;
+
+/** Returns the function of `RECHECK_SYNC_BACKEND`. */
+const selectSyncFn = (): SyncFn => {
   const name = env.RECHECK_SYNC_BACKEND();
   switch (name) {
     case "synckit":
-      if (__mock__.syncFn === null) {
-        __mock__.syncFn = createSyncFn<SyncFn>(
+      if (synckitFn === null) {
+        synckitFn = createSyncFn<SyncFn>(
           nodeRequire.resolve("./synckit-worker"),
         );
       }
-      return __mock__.syncFn;
+      return synckitFn;
     case "pure":
       return (method, source, flags, params) =>
         method === "checkAll"
@@ -173,8 +175,8 @@ export const checkSync = (
   flags: string,
   params: Parameters = {},
 ): Diagnostics => {
-  validate(source, flags);
-  return syncFn()("check", source, flags, params);
+  validateArguments(source, flags);
+  return selectSyncFn()("check", source, flags, params) as Diagnostics;
 };
 
 export const checkAllSync = (
@@ -182,6 +184,6 @@ export const checkAllSync = (
   flags: string,
   params: Parameters = {},
 ): Diagnostics[] => {
-  validate(source, flags);
-  return syncFn()("checkAll", source, flags, params);
+  validateArguments(source, flags);
+  return selectSyncFn()("checkAll", source, flags, params) as Diagnostics[];
 };

@@ -2,18 +2,15 @@ package codes.quine.labs.resyntax.charset
 
 import scala.collection.immutable.BitSet
 
-class AlphabetSuite extends munit.FunSuite:
-  def set(intervals: (Int, Int)*): CharSet =
-    val builder = CharSet.newBuilder
-    for (start, end) <- intervals do builder.addRange(start, end)
-    builder.result()
+class AlphabetSuite extends munit.FunSuite with CharSetHelper:
 
   test("Alphabet.refine: no sets"):
     val a = Alphabet.refine(UnitMode.Byte, Seq.empty)
     assertEquals(a.atoms, IndexedSeq(UnitMode.Byte.universe))
     assertEquals(a.atomOf(0x41), 0)
-    assertEquals(a.atomOf(0x100), -1)
-    assertEquals(a.atomOf(-1), -1)
+    intercept[IllegalArgumentException](a.atomOf(0x100))
+    intercept[IllegalArgumentException](a.atomOf(-1))
+    intercept[IllegalArgumentException](a.atomsOf(set((0x41, 0x101))))
 
   test("Alphabet.refine: overlapping sets"):
     val lower = set((0x61, 0x7b))
@@ -42,7 +39,7 @@ class AlphabetSuite extends munit.FunSuite:
       val a = Alphabet.refine(mode, sets)
       assertEquals(CharSet.union(a.atoms), mode.universe)
       for i <- a.atoms.indices; j <- a.atoms.indices if i < j do assert(a.atoms(i).intersect(a.atoms(j)).isEmpty)
-      for s <- sets do assertEquals(CharSet.union(a.atomsOf(s).iterator.map(a.atoms)), s.restrict(mode))
+      for s <- sets.map(_.restrict(mode)) do assertEquals(CharSet.union(a.atomsOf(s).iterator.map(a.atoms)), s)
       for (atom, i) <- a.atoms.zipWithIndex; c <- Seq(atom.head, atom.last) do assertEquals(a.atomOf(c), i)
       for atom <- a.atoms; s <- sets do assert(atom.subsetOf(s) || atom.intersect(s).isEmpty)
 
