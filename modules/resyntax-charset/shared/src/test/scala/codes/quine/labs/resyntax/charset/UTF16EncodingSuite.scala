@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.charset
 
 class UTF16EncodingSuite extends munit.FunSuite:
+
   test("UTF16Encoding.isHighSurrogate"):
     assert(UTF16Encoding.isHighSurrogate(0xd800))
     assert(UTF16Encoding.isHighSurrogate(0xdbff))

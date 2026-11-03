@@ -156,7 +156,8 @@ object PropertyTable:
 
   def lookup(name: String): Option[Property] = index.get(name, NameMatching.Exact)
 
-  def binary(name: String): Option[BinaryProperty] = lookup(name).collect { case p: BinaryProperty => p }
+  def binary(name: String): Option[BinaryProperty] = lookup(name).collect:
+    case p: BinaryProperty => p
 
   private lazy val binaryValueIndex =
     val Array(yes, no) = UnicodeData.BinaryValueNames.split(";")

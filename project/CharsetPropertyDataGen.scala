@@ -73,8 +73,7 @@ object CharsetPropertyDataGen extends UnicodeDataGen:
     result.toSeq
 
   private def encodeRuns(rs: Seq[(Int, Int)]): String =
-    CharsetEncoder.encode(rs.flatMap:
-      case (length, value) => Seq(length, value))
+    CharsetEncoder.encode(rs.flatMap((length, value) => Seq(length, value)))
 
   private def collectIntervals(set: com.ibm.icu.text.UnicodeSet): Seq[(Int, Int)] =
     (0 until set.getRangeCount).map(i => (set.getRangeStart(i), set.getRangeEnd(i) + 1))
@@ -158,8 +157,11 @@ object CharsetPropertyDataGen extends UnicodeDataGen:
       .toVector
     val binarySets = binaryProps.map(CharacterProperties.getBinaryPropertySet)
     val binaryNames = binaryProps.map(propertyNames)
-    val stringsOf = binarySets.map(
-      _.strings().asScala.toSeq
+    val stringsOf = binarySets.map: set =>
+      set
+        .strings()
+        .asScala
+        .toSeq
         .map(_.codePoints().toArray.toSeq)
         .sortWith: (a, b) =>
           val c = a
@@ -168,7 +170,6 @@ object CharsetPropertyDataGen extends UnicodeDataGen:
               case (x, y) => x != y
           c.fold(a.size < b.size):
             case (x, y) => x < y
-    )
     val rgiEmoji = binaryProps.indexOf(UProperty.RGI_EMOJI)
     val rgiEmojiParts = Seq(
       UProperty.BASIC_EMOJI,

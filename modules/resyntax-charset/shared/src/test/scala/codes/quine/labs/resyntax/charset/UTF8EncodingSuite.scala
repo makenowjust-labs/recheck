@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.charset
 
 class UTF8EncodingSuite extends munit.FunSuite:
+
   test("UTF8Encoding.encode"):
     assertEquals(UTF8Encoding.encode(0x61), Seq(0x61))
     assertEquals(UTF8Encoding.encode(0xe9), Seq(0xc3, 0xa9))

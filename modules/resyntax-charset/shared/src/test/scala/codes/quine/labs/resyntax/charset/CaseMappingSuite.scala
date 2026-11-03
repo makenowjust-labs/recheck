@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.charset
 
 class CaseMappingSuite extends munit.FunSuite:
+
   import CaseMapping.*
 
   val Kelvin = 0x212a

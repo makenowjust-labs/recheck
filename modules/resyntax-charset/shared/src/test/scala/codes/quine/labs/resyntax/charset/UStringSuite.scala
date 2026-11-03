@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.charset
 
 class UStringSuite extends munit.FunSuite:
+
   test("UString basic operations"):
     val s = UString(1, 2, 3)
     assertEquals(s.length, 3)

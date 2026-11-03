@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.charset
 
 class CharsetDecoderSuite extends munit.FunSuite:
+
   test("CharsetDecoder.decode"):
     assertEquals(CharsetDecoder.decode("").toSeq, Seq.empty)
     assertEquals(CharsetDecoder.decode(" !#").toSeq, Seq(0, 1, 2))

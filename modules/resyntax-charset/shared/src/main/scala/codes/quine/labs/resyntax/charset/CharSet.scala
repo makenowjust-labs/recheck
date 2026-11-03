@@ -115,6 +115,7 @@ object CharSet:
 
   /** Builder accumulates intervals in any order to build a set. */
   final class Builder private[CharSet] ():
+
     private val ranges = mutable.ArrayBuilder.make[Long]
 
     /** Adds the half-open interval `[start, end)`; an empty interval is ignored. */

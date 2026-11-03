@@ -63,6 +63,11 @@ object Alphabet:
 
     val segmentAtoms = new Array[Int](n)
     var nextAtom = 1
+
+    def newAtom(): Int =
+      nextAtom += 1
+      nextAtom - 1
+
     for set <- restricted do
       // Splitting atoms by a set or by its complement gives the same partition, so walk the smaller side.
       val spans = mutable.ArrayBuilder.make[Int]
@@ -81,25 +86,19 @@ object Alphabet:
       while k < segmentSpans.length do
         var i = segmentSpans(k)
         while i < segmentSpans(k + 1) do
-          segmentAtoms(i) = remap.getOrElseUpdate(
-            segmentAtoms(i), {
-              val atom = nextAtom
-              nextAtom += 1
-              atom
-            }
-          )
+          segmentAtoms(i) = remap.getOrElseUpdate(segmentAtoms(i), newAtom())
           i += 1
         k += 2
 
     val renumber = mutable.HashMap.empty[Int, Int]
     val builders = mutable.ArrayBuffer.empty[CharSet.Builder]
+
+    def newBuilder(): Int =
+      builders += CharSet.newBuilder
+      builders.size - 1
+
     for i <- 0 until n do
-      val atom = renumber.getOrElseUpdate(
-        segmentAtoms(i), {
-          builders += CharSet.newBuilder
-          builders.size - 1
-        }
-      )
+      val atom = renumber.getOrElseUpdate(segmentAtoms(i), newBuilder())
       segmentAtoms(i) = atom
       builders(atom).addRange(sortedPoints(i), sortedPoints(i + 1))
 

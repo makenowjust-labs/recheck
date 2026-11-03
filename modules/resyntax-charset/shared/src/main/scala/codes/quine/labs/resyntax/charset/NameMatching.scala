@@ -29,6 +29,7 @@ private[charset] object NameMatching:
 
 /** NameIndex looks up entries by any of their names under a matching. */
 private[charset] final class NameIndex[A](entries: Seq[(Seq[String], A)]):
+
   private lazy val exact: Map[String, A] = build(NameMatching.Exact)
   private lazy val loose: Map[String, A] = build(NameMatching.Loose)
 
