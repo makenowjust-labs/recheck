@@ -88,11 +88,12 @@ See [this page](parameters.mdx) for detailed information on `Parameters` value.
 :::
 
 The result value of the `check` is called `Diagnostics`.
+It is the evidence for judging the ReDoS risk of the regular expression, not a final verdict.
 Though it has many fields, the most important one is `status`. This field takes one of the three values.
 
-- `'safe'` means the given regular expression seems safe at least in this checking.
-- `'vulnerable'` means vulnerability in the given regular expression is found.
-- `'unknown'` means something wrong happened in checking (timeout, cancel, or error).
+- `'safe'` means that the checking found no attack string within its limits.
+- `'vulnerable'` means that the checking found an attack string.
+- `'unknown'` means that the checking could not finish (timeout, cancel, or error).
 
 :::info
 

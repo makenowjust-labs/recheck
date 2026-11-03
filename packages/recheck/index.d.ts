@@ -35,19 +35,18 @@ export type HasAbortSignal = {
 };
 
 /**
- * Diagnostics is an analyzing result.
+ * Diagnostics is what `check` reports about a RegExp: the evidence for judging its ReDoS risk, not a final verdict.
  * It takes one of the following three statuses:
  *
- * - `safe`: The given RegExp is safe.
- * - `vulnerable`: The given RegExp is potentially vulnerable.
- * - `unknown`: An error is occurred on analyzing.
- *   As a result, it is unknown whether the RegExp is safe or vulnerable.
+ * - `safe`: The checking found no attack string within its limits.
+ * - `vulnerable`: The checking found an attack string.
+ * - `unknown`: The checking could not finish because of an error, so it gives no evidence either way.
  */
 export type Diagnostics =
   SafeDiagnostics | VulnerableDiagnostics | UnknownDiagnostics;
 
 /**
- * SafeDiagnostics is a diagnostics against a safe RegExp.
+ * SafeDiagnostics is a diagnostics in which the checking found no attack string.
  */
 export type SafeDiagnostics = {
   source: string;
@@ -61,7 +60,7 @@ export type SafeDiagnostics = {
 };
 
 /**
- * VulnerableDiagnostics is a diagnostics against a vulnerable RegExp.
+ * VulnerableDiagnostics is a diagnostics with the attack string that the checking found.
  */
 export type VulnerableDiagnostics = {
   source: string;
@@ -131,7 +130,7 @@ export type RuntimeAttackResult =
   | { kind: "engine-error"; message: string };
 
 /**
- * UnknownDiagnostics is a diagnostics when an error is occurred on analyzing.
+ * UnknownDiagnostics is a diagnostics of a checking that could not finish because of an error.
  */
 export type UnknownDiagnostics = {
   source: string;

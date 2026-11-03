@@ -47,11 +47,12 @@ See [this page](parameters.mdx) for detailed information on `Parameters` value.
 :::
 
 The result of `ReDoS.check` is called `Diagnostics`.
+It is the evidence for judging the ReDoS risk of the regular expression, not a final verdict.
 `Diagnostics` is a `sealed class`, and it has three child classes.
 
-- `Diagnostics.Safe` means the given regular expression seems safe at least in this checking.
-- `Diagnostics.Vulnerable` means vulnerability in the given regular expression is found.
-- `Diagnostics.Unknown` means something wrong happened in checking (timeout, cancel, or error).
+- `Diagnostics.Safe` means that the checking found no attack string within its limits.
+- `Diagnostics.Vulnerable` means that the checking found an attack string.
+- `Diagnostics.Unknown` means that the checking could not finish (timeout, cancel, or error).
 
 :::info
 

@@ -11,13 +11,13 @@ import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.UnitMode
 
-/** Diagnostics is an analysis result. */
+/** Diagnostics is what `ReDoS.check` reports: the evidence for judging the ReDoS risk of a RegExp, not a verdict. */
 sealed abstract class Diagnostics extends Product with Serializable
 
 /** Diagnostics types. */
 object Diagnostics:
 
-  /** Safe is an analysis result against a safe RegExp. */
+  /** Safe is a diagnostics in which the checking found no attack string. */
   final case class Safe(
       source: String,
       flags: String,
@@ -35,7 +35,7 @@ object Diagnostics:
           |Complexity: $complexity
           |Checker   : $checker""".stripMargin + showRefutedAttacks(dialect, unitMode, refutedAttacks)
 
-  /** Vulnerable is an analysis result against a vulnerable RegExp. */
+  /** Vulnerable is a diagnostics with the attack string that the checking found. */
   final case class Vulnerable(
       source: String,
       flags: String,
@@ -60,7 +60,7 @@ object Diagnostics:
       ) ++ runtimeAttack.map(r => s"Runtime attack: $r") :+ s"Checker       : $checker"
       lines.mkString("\n") + showRefutedAttacks(dialect, unitMode, refutedAttacks)
 
-  /** Unknown is an analysis result against a RegExp in which vulnerability is unknown for some reason. */
+  /** Unknown is a diagnostics of a checking that could not finish because of an error. */
   final case class Unknown(
       source: String,
       flags: String,

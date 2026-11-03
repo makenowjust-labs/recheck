@@ -3,9 +3,14 @@ id: diagnostics
 title: Diagnostics
 ---
 
-`Diagnostics` is a result type of checking. In Scala, it is a `sealed class`.
-But in TypeScript, it is a serialized object.
-However, they have the same information. We will describe this.
+`Diagnostics` is what `check` reports about a regular expression.
+It is not a final verdict on whether the regular expression is a threat.
+It is the evidence for judging the ReDoS risk: whether an attack string was found, the estimated complexity, the attack string itself, and how they were found.
+Whether a finding matters depends on where the regular expression is used, e.g. how long an input can reach it and which engine runs it.
+So the decision is left to you, or to the tool using `recheck` (e.g. the [ESLint plugin](as-eslint-plugin.mdx) decides it by its options).
+
+In Scala, `Diagnostics` is a `sealed class`, and in TypeScript, it is a serialized object.
+They have the same information, which this page describes.
 
 ## Common Fields
 
@@ -23,9 +28,11 @@ Every `Diagnostics` has the following fields.
 
 `Diagnostics` has three statuses.
 
-- `safe` means the given regular expression seems safe at least in this checking.
-- `vulnerable` means vulnerability in the given regular expression is found.
-- `unknown` means something wrong happened in checking (timeout, cancel, or error). It has the `error` field to describe the reason for this result.
+- `safe` means that the checking found no attack string within its limits.
+  The fuzz checker may miss an attack string, so a `safe` diagnostics from it (`complexity.isFuzz` is `true`) is weaker evidence than one from the automaton checker.
+- `vulnerable` means that the checking found an attack string, which is the evidence of the vulnerability (see [Attack String](#attack-string)).
+  When the runtime-attack verification is enabled, the attack string is also confirmed on the real engine (see [Runtime-Attack Verification](#runtime-attack-verification)).
+- `unknown` means that the checking could not finish (timeout, cancel, or error), so it gives no evidence either way. It has the `error` field to describe the reason for this result.
   Its `kind` is one of `timeout`, `cancel`, `unsupported`, `invalid`, `runtime-attacks-refuted` (see [Runtime-Attack Verification](#runtime-attack-verification)) and `unexpected`.
 
 ## Complexity
@@ -34,9 +41,14 @@ Every `Diagnostics` has the following fields.
 This field contains the matching time complexity estimated in this checking.
 There are five `complexity` varieties.
 
-- `safe`, `constant`, and `linear` are safe matching time complexity.
-- `polynomial` is a vulnerable matching time complexity. It has an additional field called `degree` which represents the maximum degree of the matching time complexity polynomial.
+- `safe`, `constant`, and `linear` are safe matching time complexities.
+  `safe` means that the checking found no attack string, but it did not estimate the complexity.
+- `polynomial` is a vulnerable matching time complexity. It has an additional field called `degree`, which is the degree of the polynomial.
+  The degree shows how fast the matching time grows: e.g. with degree 2, an input 10 times longer takes about 100 times longer.
 - `exponential` is a vulnerable matching time complexity.
+
+Every complexity has the `isFuzz` field.
+It is `true` when the fuzz checker estimated the complexity by running the matching, which may be wrong, and `false` when the automaton checker analysed it.
 
 :::caution
 
