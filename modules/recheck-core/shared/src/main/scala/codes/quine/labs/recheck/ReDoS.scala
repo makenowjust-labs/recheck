@@ -306,7 +306,7 @@ object ReDoS:
   )(
       d: Diagnostics.Vulnerable
   )(using ctx: Context): Diagnostics.Vulnerable =
-    try d.copy(recallValidation = RecallValidator.validate(source, flags, dialect, mode, d.attack, timeout))
+    try d.copy(recallValidation = RecallValidator.validate(source, flags, dialect, mode, d.attack, timeout, sys.env))
     catch
       case ex: ReDoSException =>
         ex.checker = Some(d.checker)
