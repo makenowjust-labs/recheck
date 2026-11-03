@@ -3,21 +3,14 @@ package build
 
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
-import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.EnumeratedProperty
 import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRNodeData.*
-import codes.quine.labs.resyntax.parser.Parser
 
-class IRPropertyLookupSuite extends munit.FunSuite:
-
-  def build(s: String, flags: String, dialect: Dialect): IRPattern =
-    val flagSet = FlagSet.parse(flags, dialect)
-    val mode = Parser.determineUnitMode(s, flagSet, dialect)
-    IRBuilder.build(Parser.parse(s, flagSet, dialect, mode), flagSet, dialect, mode)
+class IRPropertyLookupSuite extends munit.FunSuite with IRHelper:
 
   def value(p: EnumeratedProperty, name: String): CharSet = p.value(name).get.set
 
@@ -25,11 +18,6 @@ class IRPropertyLookupSuite extends munit.FunSuite:
     for dialect <- dialects do
       test(s"IRBuilder.build: /$s/$flags in $dialect"):
         assertEquals(build(s, flags, dialect).node.data, Chars(expected))
-
-  def error(s: String, flags: String, dialects: Dialect*)(message: String)(implicit loc: munit.Location): Unit =
-    for dialect <- dialects do
-      test(s"IRBuilder.build: /$s/$flags in $dialect with error \"$message\""):
-        interceptMessage[IRBuildingException](message)(build(s, flags, dialect))
 
   // Perl's enumerated properties
   chars("\\p{Line_Break=Alphabetic}", "", Perl())(value(PropertyTable.LineBreak, "AL"))
