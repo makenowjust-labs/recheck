@@ -131,6 +131,11 @@ class CaseMappingSuite extends munit.FunSuite:
     val g = f.updated(Seq((0x43, 0x43), (0x42, 0x30)))
     assertEquals(g.entries.toSeq, Seq((0x41, 0x61), (0x42, 0x30), (0x45, 0x65), (0x46, 0x66)))
     assertEquals(CaseMapping.fromEntries(SimpleFold.entries).entries.toSeq, SimpleFold.entries.toSeq)
+    assertEquals(
+      CaseMapping.fromEntries(Seq((0x43, 0x63), (0x41, 0x61))).entries.toSeq,
+      Seq((0x41, 0x61), (0x43, 0x63))
+    )
+    intercept[IllegalArgumentException](CaseMapping.fromEntries(Seq((0x41, 0x61), (0x41, 0x41))))
 
   test("FullCaseFolding"):
     assertEquals(FullCaseFolding('A'), UString('a'))

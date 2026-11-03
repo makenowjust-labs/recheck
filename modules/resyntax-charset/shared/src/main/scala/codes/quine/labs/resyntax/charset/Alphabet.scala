@@ -17,17 +17,23 @@ final class Alphabet private (
 
   def size: Int = atoms.size
 
-  /** Returns the index of the atom containing the code value, or `-1` for a code value outside the mode. */
+  /** Returns the index of the atom containing the code value.
+    *
+    * It throws `IllegalArgumentException` for a code value outside the mode.
+    */
   def atomOf(value: UChar): Int =
-    if !mode.contains(value) then -1
-    else segmentAtoms(CharSet.countLessOrEqual(segmentStarts, value) - 1)
+    require(mode.contains(value), f"Invalid unit in $mode mode: $value%X")
+    segmentAtoms(CharSet.countLessOrEqual(segmentStarts, value) - 1)
 
   /** Returns the indices of the atoms intersecting the set.
     *
     * For a set that is a union of atoms, such as a Boolean combination of the refined sets, the returned atoms
     * partition the set exactly.
+    *
+    * It throws `IllegalArgumentException` for a set having a code value outside the mode.
     */
   def atomsOf(set: CharSet): BitSet =
+    require(set.isEmpty || mode.contains(set.last), f"Invalid unit in $mode mode: ${set.last}%X")
     val builder = BitSet.newBuilder
     set.foreachIntervalWithin(0, mode.limit): (start, end) =>
       var i = CharSet.countLessOrEqual(segmentStarts, start) - 1

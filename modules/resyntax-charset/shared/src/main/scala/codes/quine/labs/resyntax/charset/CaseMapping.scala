@@ -75,15 +75,21 @@ final class CaseMapping private (
 /** CaseMapping utilities and the Unicode case mappings. */
 object CaseMapping:
 
-  /** Builds a mapping from pairs `(c, f(c))`; unlisted code values are mapped to themselves. */
+  /** Builds a mapping from pairs `(c, f(c))`; unlisted code values are mapped to themselves.
+    *
+    * It throws `IllegalArgumentException` if two pairs have the same code value.
+    */
   def fromEntries(entries: IterableOnce[(UChar, UChar)]): CaseMapping =
+    val sorted = entries.iterator.toArray.sortBy(_._1)
+    for i <- 1 until sorted.length if sorted(i - 1)._1 == sorted(i)._1 do
+      throw new IllegalArgumentException(f"Duplicate code value: ${sorted(i)._1}%X")
     val starts = mutable.ArrayBuilder.make[Int]
     val counts = mutable.ArrayBuffer.empty[Int]
     val strides = mutable.ArrayBuffer.empty[Int]
     val deltas = mutable.ArrayBuilder.make[Int]
     var lastStart = -1
     var lastDelta = 0
-    for (c, to) <- entries.iterator.filter(_ != _).toSeq.sortBy(_._1) do
+    for (c, to) <- sorted.iterator.filter(_ != _) do
       val delta = to - c
       val n = counts.size
       if n > 0 && delta == lastDelta && counts(n - 1) == 1 && c > lastStart then
