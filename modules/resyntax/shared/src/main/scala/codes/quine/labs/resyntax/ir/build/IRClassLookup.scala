@@ -190,8 +190,10 @@ object IRClassLookup:
     val bc = PropertyTable.BidiClass
     gc("Zs").union(CharSet.union(Seq("WS", "B", "S").map(bc.value(_).get.set)))
 
-  /** Python's `str.isalnum` or `_`, approximated by letters and numbers. */
-  lazy val pythonWord: CharSet = gc("L", "N").union(of("_"))
+  /** Python's `str.isalnum` or `_`, where `str.isalnum` is a letter or a character with a numeric type. */
+  lazy val pythonWord: CharSet =
+    val numeric = Seq("Decimal", "Digit", "Numeric").map(PropertyTable.NumericType.value(_).get.set)
+    gc("L").union(CharSet.union(numeric)).union(of("_"))
 
   /** PCRE2's `\w` in UCP mode (with `Mn` and `Pc` since 10.43). */
   lazy val pcreWord: CharSet = gc("L", "N", "Mn", "Pc").union(of("_"))

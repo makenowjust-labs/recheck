@@ -421,7 +421,7 @@ class IRCharResolverSuite extends munit.FunSuite:
     assert(!lastSet("a\\w", Perl(utf8 = false)).contains(0xe9))
     assert(!lastSet("\u00e9\\w", Perl(utf8 = false)).contains(0xe9))
     assert(lastSet("\\x{100}\\w", Perl(utf8 = false)).contains(0xe9))
-  checkSet("\\w", "", Python())(s => s.contains(0xe9) && s.contains(0xb2))
+  checkSet("\\w", "", Python())(s => s.contains(0xe9) && s.contains(0xb2) && s.contains(0x2155) && !s.contains(0x300))
   checkSet("\\w", "U", Java)(s => s.contains(0xe9) && s.contains(0x200c))
   checkSet("(?u)\\w", "", Ruby())(s => s.contains(0xe9))
   checkSet("\\w", "", DotNet)(s => s.contains(0xe9) && !s.contains(0x0903) && s.last <= 0xffff)
