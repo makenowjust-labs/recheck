@@ -22,6 +22,7 @@ import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
+import codes.quine.labs.resyntax.charset.UTF8
 import codes.quine.labs.resyntax.charset.UnitMode
 
 object IRBuilder:
@@ -175,7 +176,7 @@ object IRBuilder:
             .fold(single(1)): flags =>
               node.data match
                 case _ if nodes.size > 1 =>
-                  single(fold(IRCharResolver.decodeUTF8(nodes.collect {
+                  single(fold(UTF8.decode(nodes.collect {
                     case Node(NodeData.Backslash(BackslashKind.Escape(_, b)), _) => b
                   })))
                 case NodeData.Literal(value)                                 => single(fold(value))

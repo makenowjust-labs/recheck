@@ -347,46 +347,123 @@ private[build] object IRPropertyLookup:
   // ---------------------------------------------------------------------------------------------------------------
   // .NET
 
-  /** .NET's `RegexCharClass` table of `\p{IsXxx}` (dumped from .NET 10 by reflection), without the `Is` prefix. */
-  private val DotNetBlockTable: String =
-    "AlphabeticPresentationForms FB00-FB4F,Arabic 0600-06FF,ArabicPresentationForms-A FB50-FDFF,ArabicPre" +
-      "sentationForms-B FE70-FEFF,Armenian 0530-058F,Arrows 2190-21FF,BasicLatin 0000-007F,Bengali 0980-09F" +
-      "F,BlockElements 2580-259F,Bopomofo 3100-312F,BopomofoExtended 31A0-31BF,BoxDrawing 2500-257F,Braille" +
-      "Patterns 2800-28FF,Buhid 1740-175F,CJKCompatibility 3300-33FF,CJKCompatibilityForms FE30-FE4F,CJKCom" +
-      "patibilityIdeographs F900-FAFF,CJKRadicalsSupplement 2E80-2EFF,CJKSymbolsandPunctuation 3000-303F,CJ" +
-      "KUnifiedIdeographs 4E00-9FFF,CJKUnifiedIdeographsExtensionA 3400-4DBF,Cherokee 13A0-13FF,CombiningDi" +
-      "acriticalMarks 0300-036F,CombiningDiacriticalMarksforSymbols 20D0-20FF,CombiningHalfMarks FE20-FE2F," +
-      "CombiningMarksforSymbols 20D0-20FF,ControlPictures 2400-243F,CurrencySymbols 20A0-20CF,Cyrillic 0400" +
-      "-04FF,CyrillicSupplement 0500-052F,Devanagari 0900-097F,Dingbats 2700-27BF,EnclosedAlphanumerics 246" +
-      "0-24FF,EnclosedCJKLettersandMonths 3200-32FF,Ethiopic 1200-137F,GeneralPunctuation 2000-206F,Geometr" +
-      "icShapes 25A0-25FF,Georgian 10A0-10FF,Greek 0370-03FF,GreekExtended 1F00-1FFF,GreekandCoptic 0370-03" +
-      "FF,Gujarati 0A80-0AFF,Gurmukhi 0A00-0A7F,HalfwidthandFullwidthForms FF00-FFEF,HangulCompatibilityJam" +
-      "o 3130-318F,HangulJamo 1100-11FF,HangulSyllables AC00-D7AF,Hanunoo 1720-173F,Hebrew 0590-05FF,HighPr" +
-      "ivateUseSurrogates DB80-DBFF,HighSurrogates D800-DB7F,Hiragana 3040-309F,IPAExtensions 0250-02AF,Ide" +
-      "ographicDescriptionCharacters 2FF0-2FFF,Kanbun 3190-319F,KangxiRadicals 2F00-2FDF,Kannada 0C80-0CFF," +
-      "Katakana 30A0-30FF,KatakanaPhoneticExtensions 31F0-31FF,Khmer 1780-17FF,KhmerSymbols 19E0-19FF,Lao 0" +
-      "E80-0EFF,Latin-1Supplement 0080-00FF,LatinExtended-A 0100-017F,LatinExtended-B 0180-024F,LatinExtend" +
-      "edAdditional 1E00-1EFF,LetterlikeSymbols 2100-214F,Limbu 1900-194F,LowSurrogates DC00-DFFF,Malayalam" +
-      " 0D00-0D7F,MathematicalOperators 2200-22FF,MiscellaneousMathematicalSymbols-A 27C0-27EF,Miscellaneou" +
-      "sMathematicalSymbols-B 2980-29FF,MiscellaneousSymbols 2600-26FF,MiscellaneousSymbolsandArrows 2B00-2" +
-      "BFF,MiscellaneousTechnical 2300-23FF,Mongolian 1800-18AF,Myanmar 1000-109F,NumberForms 2150-218F,Ogh" +
-      "am 1680-169F,OpticalCharacterRecognition 2440-245F,Oriya 0B00-0B7F,PhoneticExtensions 1D00-1D7F,Priv" +
-      "ateUse E000-F8FF,PrivateUseArea E000-F8FF,Runic 16A0-16FF,Sinhala 0D80-0DFF,SmallFormVariants FE50-F" +
-      "E6F,SpacingModifierLetters 02B0-02FF,Specials FFF0-FFFF,SuperscriptsandSubscripts 2070-209F,Suppleme" +
-      "ntalArrows-A 27F0-27FF,SupplementalArrows-B 2900-297F,SupplementalMathematicalOperators 2A00-2AFF,Sy" +
-      "riac 0700-074F,Tagalog 1700-171F,Tagbanwa 1760-177F,TaiLe 1950-197F,Tamil 0B80-0BFF,Telugu 0C00-0C7F" +
-      ",Thaana 0780-07BF,Thai 0E00-0E7F,Tibetan 0F00-0FFF,UnifiedCanadianAboriginalSyllabics 1400-167F,Vari" +
-      "ationSelectors FE00-FE0F,YiRadicals A490-A4CF,YiSyllables A000-A48F,YijingHexagramSymbols 4DC0-4DFF"
-
-  private lazy val dotNetBlocks: Map[String, CharSet] =
-    DotNetBlockTable
-      .split(",")
-      .iterator
-      .map: entry =>
-        val Array(name, range) = entry.split(" ")
-        val Array(start, end) = range.split("-").map(Integer.parseInt(_, 16))
-        name -> CharSet.range(start, end)
-      .toMap
+  /** The named blocks of .NET's `\p{IsXxx}`, without the `Is` prefix.
+    *
+    * It is .NET's own table in `RegexCharClass`, which keeps the Unicode 4.0 blocks of the BMP with .NET's names and
+    * aliases (e.g. `GreekandCoptic` and `Greek`), so it does not follow the current Unicode data. The documentation
+    * lists them:
+    * https://learn.microsoft.com/en-us/dotnet/standard/base-types/character-classes-in-regular-expressions#supported-named-blocks
+    */
+  private lazy val dotNetBlocks: Map[String, CharSet] = Map(
+    "AlphabeticPresentationForms" -> CharSet.range(0xfb00, 0xfb4f),
+    "Arabic" -> CharSet.range(0x0600, 0x06ff),
+    "ArabicPresentationForms-A" -> CharSet.range(0xfb50, 0xfdff),
+    "ArabicPresentationForms-B" -> CharSet.range(0xfe70, 0xfeff),
+    "Armenian" -> CharSet.range(0x0530, 0x058f),
+    "Arrows" -> CharSet.range(0x2190, 0x21ff),
+    "BasicLatin" -> CharSet.range(0x0000, 0x007f),
+    "Bengali" -> CharSet.range(0x0980, 0x09ff),
+    "BlockElements" -> CharSet.range(0x2580, 0x259f),
+    "Bopomofo" -> CharSet.range(0x3100, 0x312f),
+    "BopomofoExtended" -> CharSet.range(0x31a0, 0x31bf),
+    "BoxDrawing" -> CharSet.range(0x2500, 0x257f),
+    "BraillePatterns" -> CharSet.range(0x2800, 0x28ff),
+    "Buhid" -> CharSet.range(0x1740, 0x175f),
+    "CJKCompatibility" -> CharSet.range(0x3300, 0x33ff),
+    "CJKCompatibilityForms" -> CharSet.range(0xfe30, 0xfe4f),
+    "CJKCompatibilityIdeographs" -> CharSet.range(0xf900, 0xfaff),
+    "CJKRadicalsSupplement" -> CharSet.range(0x2e80, 0x2eff),
+    "CJKSymbolsandPunctuation" -> CharSet.range(0x3000, 0x303f),
+    "CJKUnifiedIdeographs" -> CharSet.range(0x4e00, 0x9fff),
+    "CJKUnifiedIdeographsExtensionA" -> CharSet.range(0x3400, 0x4dbf),
+    "Cherokee" -> CharSet.range(0x13a0, 0x13ff),
+    "CombiningDiacriticalMarks" -> CharSet.range(0x0300, 0x036f),
+    "CombiningDiacriticalMarksforSymbols" -> CharSet.range(0x20d0, 0x20ff),
+    "CombiningHalfMarks" -> CharSet.range(0xfe20, 0xfe2f),
+    "CombiningMarksforSymbols" -> CharSet.range(0x20d0, 0x20ff),
+    "ControlPictures" -> CharSet.range(0x2400, 0x243f),
+    "CurrencySymbols" -> CharSet.range(0x20a0, 0x20cf),
+    "Cyrillic" -> CharSet.range(0x0400, 0x04ff),
+    "CyrillicSupplement" -> CharSet.range(0x0500, 0x052f),
+    "Devanagari" -> CharSet.range(0x0900, 0x097f),
+    "Dingbats" -> CharSet.range(0x2700, 0x27bf),
+    "EnclosedAlphanumerics" -> CharSet.range(0x2460, 0x24ff),
+    "EnclosedCJKLettersandMonths" -> CharSet.range(0x3200, 0x32ff),
+    "Ethiopic" -> CharSet.range(0x1200, 0x137f),
+    "GeneralPunctuation" -> CharSet.range(0x2000, 0x206f),
+    "GeometricShapes" -> CharSet.range(0x25a0, 0x25ff),
+    "Georgian" -> CharSet.range(0x10a0, 0x10ff),
+    "Greek" -> CharSet.range(0x0370, 0x03ff),
+    "GreekExtended" -> CharSet.range(0x1f00, 0x1fff),
+    "GreekandCoptic" -> CharSet.range(0x0370, 0x03ff),
+    "Gujarati" -> CharSet.range(0x0a80, 0x0aff),
+    "Gurmukhi" -> CharSet.range(0x0a00, 0x0a7f),
+    "HalfwidthandFullwidthForms" -> CharSet.range(0xff00, 0xffef),
+    "HangulCompatibilityJamo" -> CharSet.range(0x3130, 0x318f),
+    "HangulJamo" -> CharSet.range(0x1100, 0x11ff),
+    "HangulSyllables" -> CharSet.range(0xac00, 0xd7af),
+    "Hanunoo" -> CharSet.range(0x1720, 0x173f),
+    "Hebrew" -> CharSet.range(0x0590, 0x05ff),
+    "HighPrivateUseSurrogates" -> CharSet.range(0xdb80, 0xdbff),
+    "HighSurrogates" -> CharSet.range(0xd800, 0xdb7f),
+    "Hiragana" -> CharSet.range(0x3040, 0x309f),
+    "IPAExtensions" -> CharSet.range(0x0250, 0x02af),
+    "IdeographicDescriptionCharacters" -> CharSet.range(0x2ff0, 0x2fff),
+    "Kanbun" -> CharSet.range(0x3190, 0x319f),
+    "KangxiRadicals" -> CharSet.range(0x2f00, 0x2fdf),
+    "Kannada" -> CharSet.range(0x0c80, 0x0cff),
+    "Katakana" -> CharSet.range(0x30a0, 0x30ff),
+    "KatakanaPhoneticExtensions" -> CharSet.range(0x31f0, 0x31ff),
+    "Khmer" -> CharSet.range(0x1780, 0x17ff),
+    "KhmerSymbols" -> CharSet.range(0x19e0, 0x19ff),
+    "Lao" -> CharSet.range(0x0e80, 0x0eff),
+    "Latin-1Supplement" -> CharSet.range(0x0080, 0x00ff),
+    "LatinExtended-A" -> CharSet.range(0x0100, 0x017f),
+    "LatinExtended-B" -> CharSet.range(0x0180, 0x024f),
+    "LatinExtendedAdditional" -> CharSet.range(0x1e00, 0x1eff),
+    "LetterlikeSymbols" -> CharSet.range(0x2100, 0x214f),
+    "Limbu" -> CharSet.range(0x1900, 0x194f),
+    "LowSurrogates" -> CharSet.range(0xdc00, 0xdfff),
+    "Malayalam" -> CharSet.range(0x0d00, 0x0d7f),
+    "MathematicalOperators" -> CharSet.range(0x2200, 0x22ff),
+    "MiscellaneousMathematicalSymbols-A" -> CharSet.range(0x27c0, 0x27ef),
+    "MiscellaneousMathematicalSymbols-B" -> CharSet.range(0x2980, 0x29ff),
+    "MiscellaneousSymbols" -> CharSet.range(0x2600, 0x26ff),
+    "MiscellaneousSymbolsandArrows" -> CharSet.range(0x2b00, 0x2bff),
+    "MiscellaneousTechnical" -> CharSet.range(0x2300, 0x23ff),
+    "Mongolian" -> CharSet.range(0x1800, 0x18af),
+    "Myanmar" -> CharSet.range(0x1000, 0x109f),
+    "NumberForms" -> CharSet.range(0x2150, 0x218f),
+    "Ogham" -> CharSet.range(0x1680, 0x169f),
+    "OpticalCharacterRecognition" -> CharSet.range(0x2440, 0x245f),
+    "Oriya" -> CharSet.range(0x0b00, 0x0b7f),
+    "PhoneticExtensions" -> CharSet.range(0x1d00, 0x1d7f),
+    "PrivateUse" -> CharSet.range(0xe000, 0xf8ff),
+    "PrivateUseArea" -> CharSet.range(0xe000, 0xf8ff),
+    "Runic" -> CharSet.range(0x16a0, 0x16ff),
+    "Sinhala" -> CharSet.range(0x0d80, 0x0dff),
+    "SmallFormVariants" -> CharSet.range(0xfe50, 0xfe6f),
+    "SpacingModifierLetters" -> CharSet.range(0x02b0, 0x02ff),
+    "Specials" -> CharSet.range(0xfff0, 0xffff),
+    "SuperscriptsandSubscripts" -> CharSet.range(0x2070, 0x209f),
+    "SupplementalArrows-A" -> CharSet.range(0x27f0, 0x27ff),
+    "SupplementalArrows-B" -> CharSet.range(0x2900, 0x297f),
+    "SupplementalMathematicalOperators" -> CharSet.range(0x2a00, 0x2aff),
+    "Syriac" -> CharSet.range(0x0700, 0x074f),
+    "Tagalog" -> CharSet.range(0x1700, 0x171f),
+    "Tagbanwa" -> CharSet.range(0x1760, 0x177f),
+    "TaiLe" -> CharSet.range(0x1950, 0x197f),
+    "Tamil" -> CharSet.range(0x0b80, 0x0bff),
+    "Telugu" -> CharSet.range(0x0c00, 0x0c7f),
+    "Thaana" -> CharSet.range(0x0780, 0x07bf),
+    "Thai" -> CharSet.range(0x0e00, 0x0e7f),
+    "Tibetan" -> CharSet.range(0x0f00, 0x0fff),
+    "UnifiedCanadianAboriginalSyllabics" -> CharSet.range(0x1400, 0x167f),
+    "VariationSelectors" -> CharSet.range(0xfe00, 0xfe0f),
+    "YiRadicals" -> CharSet.range(0xa490, 0xa4cf),
+    "YiSyllables" -> CharSet.range(0xa000, 0xa48f),
+    "YijingHexagramSymbols" -> CharSet.range(0x4dc0, 0x4dff)
+  )
 
   private val DotNetCategories: Set[String] = Set(
     "Cc",

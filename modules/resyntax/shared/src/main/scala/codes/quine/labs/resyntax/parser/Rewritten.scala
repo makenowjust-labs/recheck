@@ -7,6 +7,7 @@ import codes.quine.labs.resyntax.ast.ConditionalTest
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.SourceLocation
+import codes.quine.labs.resyntax.charset.UTF8
 
 /** Rewritten is a rewritten text, where each code unit keeps the range of the source that it comes from. */
 private[parser] final class Rewritten(val text: String, starts: Array[Int], ends: Array[Int], sourceLength: Int):
@@ -84,15 +85,9 @@ private[parser] object Rewritten:
       while i < source.length do
         val c = source.codePointAt(i)
         val end = i + Character.charCount(c)
-        for b <- utf8Bytes(c) do
+        for b <- UTF8.encode(c) do
           text.append(b.toChar)
           starts.addOne(i)
           ends.addOne(end)
         i = end
       Some(new Rewritten(text.toString, starts.result(), ends.result(), source.length))
-
-  private def utf8Bytes(c: Int): Seq[Int] =
-    if c < 0x80 then Seq(c)
-    else if c < 0x800 then Seq(0xc0 | (c >> 6), 0x80 | (c & 0x3f))
-    else if c < 0x10000 then Seq(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f))
-    else Seq(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 0x3f), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f))

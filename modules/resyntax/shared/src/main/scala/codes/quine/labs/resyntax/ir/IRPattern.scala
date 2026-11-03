@@ -7,6 +7,7 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UTF16
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 
@@ -323,15 +324,7 @@ enum IRSurrogateKind:
 
   /** Returns the characters of the input in the mode. */
   def universe(mode: UnitMode): CharSet =
-    if this == Absent then mode.universe.diff(IRSurrogateKind.All) else mode.universe
-
-object IRSurrogateKind:
-
-  val High: CharSet = CharSet.range(0xd800, 0xdbff)
-
-  val Low: CharSet = CharSet.range(0xdc00, 0xdfff)
-
-  val All: CharSet = CharSet.range(0xd800, 0xdfff)
+    if this == Absent then mode.universe.diff(UTF16.Surrogates) else mode.universe
 
 /** IRBacktrackControlSemantics is where the backtracking control verbs act, which differs among dialects. */
 final case class IRBacktrackControlSemantics(

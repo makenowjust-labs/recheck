@@ -12,6 +12,7 @@ import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ast.Reference
+import codes.quine.labs.resyntax.charset.UTF8
 import codes.quine.labs.resyntax.ir.build.LookBehindAnalyzer.*
 
 /** LookBehindAnalyzer computes the widths of a look-behind body, which decide whether the dialect accepts it and how
@@ -290,8 +291,8 @@ private[build] final class LookBehindAnalyzer(
     val out = Seq.newBuilder[RubyWidth]
     var i = 0
     while i < nodes.length do
-      val n = byte(nodes(i)).map(IRCharResolver.utf8Length).filter(_ >= 2).getOrElse(1)
-      if n >= 2 && i + n <= nodes.length && nodes.slice(i + 1, i + n).forall(byte(_).exists(b => (b & 0xc0) == 0x80))
+      val n = byte(nodes(i)).map(UTF8.sequenceLength).filter(_ >= 2).getOrElse(1)
+      if n >= 2 && i + n <= nodes.length && nodes.slice(i + 1, i + n).forall(byte(_).exists(UTF8.isContinuation))
       then
         out += rubyCharWidth(nodes.slice(i, i + n))
         i += n

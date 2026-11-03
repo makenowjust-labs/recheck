@@ -51,7 +51,7 @@ final class CharSet private (private val bounds: Array[UChar]):
     // A surrogate is not a character of some inputs, and may join its neighbor in others.
     var i = 0
     while i < bounds.length do
-      if bounds(i) < 0xd800 || 0xdfff < bounds(i) then return bounds(i)
+      if !UTF16.isSurrogate(bounds(i)) then return bounds(i)
       if bounds(i + 1) > 0xe000 then return 0xe000
       i += 2
     bounds(0)

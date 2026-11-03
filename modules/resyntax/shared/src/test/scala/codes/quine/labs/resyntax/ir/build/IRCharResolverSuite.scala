@@ -11,6 +11,7 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.PropertyTable
+import codes.quine.labs.resyntax.charset.UTF16
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch.Forward
 import codes.quine.labs.resyntax.ir.IRLookBehindStarts.Longest
@@ -21,7 +22,7 @@ class IRCharResolverSuite extends munit.FunSuite:
   val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())
 
   /** The characters of the input without surrogates (Ruby and PCRE with `u`). */
-  val Scalars: CharSet = UnitMode.CodePoint.universe.diff(IRSurrogateKind.All)
+  val Scalars: CharSet = UnitMode.CodePoint.universe.diff(UTF16.Surrogates)
 
   def build(s: String, flags: String, dialect: Dialect): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)
@@ -479,7 +480,7 @@ class IRCharResolverSuite extends munit.FunSuite:
   chars("\\p{Lower}", "", Java)(of("abcdefghijklmnopqrstuvwxyz"))
   chars("\\p{Lower}", "U", Java)(PropertyTable.binary("Lowercase").get.set)
   chars("\\p{Age=6.0}", "", Ruby())(
-    PropertyTable.presentIn(PropertyTable.Age.value("6.0").get).diff(IRSurrogateKind.All)
+    PropertyTable.presentIn(PropertyTable.Age.value("6.0").get).diff(UTF16.Surrogates)
   )
   chars("\\p{Xwd}", "u", PCRE)(IRClassLookup.pcreWord)
   chars("\\p{Lu}", "", PCRE)(gc("Lu").restrict(UnitMode.Byte))

@@ -8,6 +8,7 @@ import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.FullCaseMapping
 import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UTF16
 
 /** PerlLiteralRewriter rewrites the text of a Perl regex literal as Perl's lexer does before the regex compiler reads
   * it.
@@ -66,11 +67,7 @@ private final class PerlLiteralRewriter(source: String, extended: Boolean, bytes
       ends.addOne(end)
 
     def addCodePoints(cs: UString, start: Int, end: Int): Unit =
-      for c <- cs.iterator do
-        if Character.isBmpCodePoint(c) then add(c.toChar, start, end)
-        else
-          add(Character.highSurrogate(c), start, end)
-          add(Character.lowSurrogate(c), start, end)
+      for c <- cs.iterator; u <- UTF16.encode(c) do add(u.toChar, start, end)
 
   private val root: Frame = new Frame('\u0000')
 
@@ -212,7 +209,7 @@ private final class PerlLiteralRewriter(source: String, extended: Boolean, bytes
     pos += 1
 
   private def copyCodePoint(frame: Frame): Unit =
-    if pos + 1 < n && src(pos).isHighSurrogate && src(pos + 1).isLowSurrogate then
+    if pos + 1 < n && UTF16.isHighSurrogate(src(pos)) && UTF16.isLowSurrogate(src(pos + 1)) then
       frame.add(src(pos), pos, pos + 2)
       frame.add(src(pos + 1), pos, pos + 2)
       pos += 2
