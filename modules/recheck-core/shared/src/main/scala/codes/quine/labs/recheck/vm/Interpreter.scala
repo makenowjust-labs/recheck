@@ -110,9 +110,14 @@ object Interpreter:
 
   /** MatchState is a state of matching, which the memoization table looks up on each junction block.
     *
-    * `values` lays out the state as integers in this order: the block ID, the position, the counters, the captures
-    * followed by the largest index of the closed captures (only when the program reads the captures), and one flag for
-    * each canary register, which is `1` if it holds the position and `0` otherwise.
+    * For example, a state of a program reading the captures has `values` like the following.
+    * {{{
+    * 4, 2,         // the block ID and the position
+    * 1,            // the counters
+    * 0, -1, 0, 1,  // the begin and the end of each capture, or -1 (only when the program reads the captures)
+    * 1,            // the largest index of the closed captures (likewise)
+    * 1, 0          // 1 if the canary register holds the position, or 0
+    * }}}
     */
   private[vm] final class MatchState(private val values: Array[Int]):
 
