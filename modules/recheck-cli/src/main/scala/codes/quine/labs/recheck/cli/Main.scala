@@ -37,8 +37,7 @@ object Main:
     *
     * With `all`, it shows all the diagnostics of `ReDoS.checkAll`.
     */
-  final case class CheckAction(pattern: InputPattern, params: Parameters, all: Boolean = false, json: Boolean = false)
-      extends Action
+  final case class CheckAction(pattern: InputPattern, params: Parameters, all: Boolean, json: Boolean) extends Action
 
   /** GenerateRecallScriptAction holds `recheck generate-recall-script` subcommand parameters.
     *

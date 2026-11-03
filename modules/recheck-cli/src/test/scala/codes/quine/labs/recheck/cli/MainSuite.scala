@@ -47,30 +47,50 @@ class MainSuite extends munit.FunSuite:
 
   test("Main.command"):
     assert(clue(Main.command.parse(Seq.empty)).isLeft)
-    assertEquals(Main.command.parse(Seq("/foo/")), Right(Main.CheckAction(InputPattern("foo", ""), Parameters())))
+    assertEquals(
+      Main.command.parse(Seq("/foo/")),
+      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(), all = false, json = false))
+    )
     assertEquals(
       Main.command.parse(
         Seq("/foo/", "--dialect=perl", "--no-perl-utf8", "--perl-source=string")
       ),
       Right(
-        Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Perl(false, PerlSource.String)))
+        Main.CheckAction(
+          InputPattern("foo", ""),
+          Parameters(dialect = Dialect.Perl(false, PerlSource.String)),
+          all = false,
+          json = false
+        )
       )
     )
     assertEquals(
       Main.command.parse(Seq("/foo/", "--dialect=python", "--python-type=bytes")),
       Right(
-        Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Python(Dialect.Python.Type.Bytes)))
+        Main.CheckAction(
+          InputPattern("foo", ""),
+          Parameters(dialect = Dialect.Python(Dialect.Python.Type.Bytes)),
+          all = false,
+          json = false
+        )
       )
     )
     assertEquals(
       Main.command.parse(Seq("/foo/", "--dialect=ruby", "--ruby-encoding=ASCII-8BIT")),
       Right(
-        Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Ruby(Dialect.Ruby.Encoding.ASCII8Bit)))
+        Main.CheckAction(
+          InputPattern("foo", ""),
+          Parameters(dialect = Dialect.Ruby(Dialect.Ruby.Encoding.ASCII8Bit)),
+          all = false,
+          json = false
+        )
       )
     )
     assertEquals(
       Main.command.parse(Seq("/foo/", "--dialect=python")),
-      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Python())))
+      Right(
+        Main.CheckAction(InputPattern("foo", ""), Parameters(dialect = Dialect.Python()), all = false, json = false)
+      )
     )
     for (args, message) <- Seq(
         Seq("--python-type=str") -> "--python-type is not an option of javascript",
@@ -85,19 +105,26 @@ class MainSuite extends munit.FunSuite:
       assert(clue(result).left.exists(_.errors == List(message)))
     assertEquals(
       Main.command.parse(Seq("/foo/", "--max-recall-failures=3")),
-      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(maxRecallFailures = 3)))
+      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(maxRecallFailures = 3), all = false, json = false))
     )
     assertEquals(
       Main.command.parse(Seq("/foo/", "--max-degree=2", "--timeout=1s")),
-      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(maxDegree = 2, timeout = Duration(1, SECONDS))))
+      Right(
+        Main.CheckAction(
+          InputPattern("foo", ""),
+          Parameters(maxDegree = 2, timeout = Duration(1, SECONDS)),
+          all = false,
+          json = false
+        )
+      )
     )
     assertEquals(
       Main.command.parse(Seq("--all", "/foo/")),
-      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(), all = true))
+      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(), all = true, json = false))
     )
     assertEquals(
       Main.command.parse(Seq("--json", "/foo/")),
-      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(), json = true))
+      Right(Main.CheckAction(InputPattern("foo", ""), Parameters(), all = false, json = true))
     )
     assertEquals(Main.command.parse(Seq("generate-recall-script", "-")), Right(Main.GenerateRecallScriptAction("-")))
     assert(clue(Main.command.parse(Seq("generate-recall-script"))).isLeft)
