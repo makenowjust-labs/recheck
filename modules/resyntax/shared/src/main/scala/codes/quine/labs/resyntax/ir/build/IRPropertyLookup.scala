@@ -264,7 +264,7 @@ private[build] object IRPropertyLookup:
       case "javaIdentifierIgnorable" => found(javaIdentifierIgnorable)
       case "javaSpaceChar"           => category("Z")
       case "javaWhitespace"          =>
-        found(gc("Z").diff(of("   ")).union(CharSet.range(0x09, 0x0d)).union(CharSet.range(0x1c, 0x1f)))
+        found(gc("Z").diff(of("\u00A0\u2007\u202F")).union(CharSet.range(0x09, 0x0d)).union(CharSet.range(0x1c, 0x1f)))
       case "javaISOControl" => found(CharSet.range(0, 0x1f).union(CharSet.range(0x7f, 0x9f)))
       case "javaMirrored"   => found(binary("Bidi_Mirrored"))
       case _                => Unknown

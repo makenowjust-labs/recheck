@@ -431,7 +431,7 @@ class IRCharResolverSuite extends munit.FunSuite:
   chars("\\W", "", JavaScript)(IRClassLookup.ASCIIWord.complement(UnitMode.UTF16))
   chars("\\w", "", Python(Python.Type.Bytes))(IRClassLookup.ASCIIWord)
   chars("\\h", "", Ruby())(of("0123456789abcdefABCDEF"))
-  chars("\\h", "", Perl())(IRClassLookup.pcreHorizontal.diff(of("᠎")))
+  chars("\\h", "", Perl())(IRClassLookup.pcreHorizontal.diff(of("\u180E")))
   chars("\\v", "", Java, Perl())(IRClassLookup.Vertical)
   chars("\\N", "", Perl())(of("\n").complement(UnitMode.CodePoint))
   check("\\R", "", Perl(), Ruby())(
@@ -607,12 +607,12 @@ class IRCharResolverSuite extends munit.FunSuite:
 
   // The first cluster's length in the engines (Java 25, PCRE2 10.49, Perl 5.44, Ruby 4.0), where they agree except PCRE2 on the conjuncts (see `PCREProbes`).
   val Probes: Seq[(String, String, Int)] = Seq(
-    ("CRLF", "\r\ń", 2),
-    ("LF and a mark", "\ń", 1),
+    ("CRLF", "\r\n\u0301", 2),
+    ("LF and a mark", "\n\u0301", 1),
     ("CR alone", "\rx", 1),
-    ("a control and a mark", "\u0001́", 1),
-    ("marks", "é̂x", 3),
-    ("a mark and ZWJ", "ä‍x", 3),
+    ("a control and a mark", "\u0001\u0301", 1),
+    ("marks", "e\u0301\u0302x", 3),
+    ("a mark and ZWJ", "a\u0308\u200Dx", 3),
     ("L V T", "각x", 3),
     ("LV T", "각x", 2),
     ("LVT T", "각ᆨx", 2),
@@ -623,36 +623,36 @@ class IRCharResolverSuite extends munit.FunSuite:
     ("LVT V", "각ᅡx", 1),
     ("L T", "ᄀᆨ", 1),
     ("LV LV", "가가", 1),
-    ("an emoji ZWJ sequence", "👨‍👩‍👧x", 5),
+    ("an emoji ZWJ sequence", "👨\u200D👩\u200D👧x", 5),
     ("an emoji modifier", "👍🏽x", 2),
-    ("ExtPict Extend ZWJ ExtPict", "😀́‍😀x", 4),
-    ("ZWJ ExtPict without a base", "a‍😀", 2),
+    ("ExtPict Extend ZWJ ExtPict", "😀\u0301\u200D😀x", 4),
+    ("ZWJ ExtPict without a base", "a\u200D😀", 2),
     ("four regional indicators", "🇯🇵🇺🇸", 2),
     ("three regional indicators", "🇯🇵🇺", 2),
-    ("prepend and a digit", "؀١x", 2),
-    ("prepend and LF", "؀\n", 1),
-    ("two prepends", "؀؀ax", 3),
-    ("prepend and a mark", "؀́", 2),
-    ("a spacing mark", "किx", 2),
+    ("prepend and a digit", "\u0600١x", 2),
+    ("prepend and LF", "\u0600\n", 1),
+    ("two prepends", "\u0600\u0600ax", 3),
+    ("prepend and a mark", "\u0600\u0301", 2),
+    ("a spacing mark", "क\u093Fx", 2),
     ("Thai SARA AM", "กำx", 2),
-    ("a spacing mark alone", "िx", 1),
-    ("a conjunct", "क्षx", 3),
-    ("a conjunct with ZWJ", "क्‍षx", 4),
-    ("a conjunct with a nukta", "क़्षx", 4),
-    ("a conjunct with two viramas", "क््षx", 4),
+    ("a spacing mark alone", "\u093Fx", 1),
+    ("a conjunct", "क\u094Dषx", 3),
+    ("a conjunct with ZWJ", "क\u094D\u200Dषx", 4),
+    ("a conjunct with a nukta", "क\u093C\u094Dषx", 4),
+    ("a conjunct with two viramas", "क\u094D\u094Dषx", 4),
     ("consonants", "कषx", 1),
-    ("a virama", "क्x", 2),
-    ("a Bengali conjunct", "ক্ষx", 3),
-    ("soft hyphen", "­́", 1),
-    ("ZWSP", "​́", 1),
+    ("a virama", "क\u094Dx", 2),
+    ("a Bengali conjunct", "ক\u09CDষx", 3),
+    ("soft hyphen", "\u00AD\u0301", 1),
+    ("ZWSP", "\u200B\u0301", 1),
     ("dot reph", "ൎകx", 2),
-    ("VS16", "❤️x", 2),
-    ("keycap", "1️⃣x", 3),
-    ("a tag sequence", "🏴󠁧󠁢󠁥󠁮󠁧󠁿x", 7),
+    ("VS16", "❤\uFE0Fx", 2),
+    ("keycap", "1\uFE0F\u20E3x", 3),
+    ("a tag sequence", "🏴\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7Fx", 7),
     ("LF LF", "\n\n", 1),
     ("CR CR", "\r\r", 1),
-    ("marks alone", "́́x", 2),
-    ("ZWJ alone", "‍‍x", 2)
+    ("marks alone", "\u0301\u0301x", 2),
+    ("ZWJ alone", "\u200D\u200Dx", 2)
   )
 
   for (name, input, expected) <- Probes do
@@ -667,20 +667,20 @@ class IRCharResolverSuite extends munit.FunSuite:
 
   // PCRE2 10.49 has its own rules (`pcre2_extuni.c`), checked with PHP 8.5.
   val PCREProbes: Seq[(String, String, Int, Int)] = Seq(
-    ("a conjunct", "क्षx", 0, 2),
-    ("a conjunct with ZWJ", "क्‍षx", 0, 3),
-    ("a conjunct with a nukta", "क़्षx", 0, 3),
-    ("a conjunct with two viramas", "क््षx", 0, 3),
-    ("a Bengali conjunct", "ক্ষx", 0, 2),
-    ("a regional indicator and a mark", "🇯́", 0, 1),
-    ("a regional indicator and ZWJ", "🇯‍", 0, 1),
-    ("a regional indicator and a spacing mark", "🇯ः", 0, 1),
-    ("prepend and an extended pictographic", "؀😀", 0, 1),
-    ("prepend and regional indicators", "؀🇯🇵🇺", 0, 3),
+    ("a conjunct", "क\u094Dषx", 0, 2),
+    ("a conjunct with ZWJ", "क\u094D\u200Dषx", 0, 3),
+    ("a conjunct with a nukta", "क\u093C\u094Dषx", 0, 3),
+    ("a conjunct with two viramas", "क\u094D\u094Dषx", 0, 3),
+    ("a Bengali conjunct", "ক\u09CDষx", 0, 2),
+    ("a regional indicator and a mark", "🇯\u0301", 0, 1),
+    ("a regional indicator and ZWJ", "🇯\u200D", 0, 1),
+    ("a regional indicator and a spacing mark", "🇯\u0903", 0, 1),
+    ("prepend and an extended pictographic", "\u0600😀", 0, 1),
+    ("prepend and regional indicators", "\u0600🇯🇵🇺", 0, 3),
     ("a regional indicator after one", "🇯🇵🇺", 1, 1),
     ("a regional indicator after two", "🇯🇵🇺🇸", 2, 2),
     ("a regional indicator after three", "🇯🇵🇺🇸🇯", 3, 1),
-    ("a regional indicator after a mark", "á🇯🇵", 2, 2)
+    ("a regional indicator after a mark", "a\u0301🇯🇵", 2, 2)
   )
 
   for (name, input, expected) <- Probes if !PCREProbes.exists(_._1 == name) do

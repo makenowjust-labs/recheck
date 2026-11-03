@@ -90,7 +90,7 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
   /** Returns the word characters of `\b` and `\B` under the flags. */
   def boundaryWord(flags: IRCharFlagSet): CharSet = dialect match
     // .NET's `RegexCharClass.IsBoundaryWordChar` adds ZWNJ and ZWJ.
-    case Dialect.DotNet => dotNetWord.union(of("‌‍"))
+    case Dialect.DotNet => dotNetWord.union(of("\u200C\u200D"))
     // Onigmo's `(?d)` uses Unicode for `\b` and `\B`, unlike `\w`.
     case _: Dialect.Ruby
         if mode == UnitMode.CodePoint && (flags.charset == IRCharset.Default || flags.charset == IRCharset.Locale) =>
@@ -111,7 +111,7 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
 
   /** Returns the characters of `\h` as a horizontal space (Java, PCRE and Perl). */
   def horizontal: CharSet = dialect match
-    case _: Dialect.Perl => pcreHorizontal.diff(of("᠎"))
+    case _: Dialect.Perl => pcreHorizontal.diff(of("\u180E"))
     case _               => pcreHorizontal
 
   /** Returns the characters of `\v` as a vertical space (Java, PCRE and Perl). */
@@ -144,7 +144,7 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
 
   private def pcrePOSIX(name: String): Option[CharSet] =
     // pcre2pattern: "[:graph:] matches all characters with the L, M, N, P, S, or Cf properties, except for U+061C, U+180E and U+2066 - U+2069".
-    val graph = gc("L", "M", "N", "P", "S", "Cf").diff(of("؜᠎⁦⁧⁨⁩"))
+    val graph = gc("L", "M", "N", "P", "S", "Cf").diff(of("\u061C\u180E\u2066\u2067\u2068\u2069"))
     name match
       case "alnum" => Some(gc("L", "N"))
       case "alpha" => Some(gc("L"))
@@ -179,10 +179,10 @@ object IRClassLookup:
 
   /** pcreHorizontal is the characters of `\h` in Java and PCRE. */
   lazy val pcreHorizontal: CharSet =
-    of("\t   ᠎  　").union(CharSet.range(0x2000, 0x200a))
+    of("\t \u00A0\u1680\u180E\u202F\u205F\u3000").union(CharSet.range(0x2000, 0x200a))
 
   /** javaScriptSpace is the characters of JavaScript's `\s`, which are ECMAScript's WhiteSpace and LineTerminator. */
-  lazy val javaScriptSpace: CharSet = gc("Zs").union(of("\t\n\u000b\f\r\u2028\u2029﻿"))
+  lazy val javaScriptSpace: CharSet = gc("Zs").union(of("\t\n\u000b\f\r\u2028\u2029\uFEFF"))
 
   /** pythonSpace is the characters of Python's `\s`, which are `str.isspace`: `Zs`, or the bidirectional class `WS`,
     * `B` or `S`.
