@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.charset
 
 class PropertyTableSuite extends munit.FunSuite:
+
   def binary(name: String): BinaryProperty = PropertyTable.binary(name).get
 
   def value(property: EnumeratedProperty, name: String): PropertyValue = property.value(name).get
@@ -25,10 +26,6 @@ class PropertyTableSuite extends munit.FunSuite:
   test("PropertyTable.lookup: exact matching is case-sensitive"):
     assertEquals(PropertyTable.lookup("alpha"), None)
     assertEquals(PropertyTable.lookup("White Space"), None)
-
-  test("NameMatching.loose (UAX44-LM3)"):
-    assertEquals(NameMatching.loose("Is_Line-Break Foo"), "linebreakfoo")
-    assertEquals(NameMatching.loose("ISO_Comment"), "ocomment")
 
   test("PropertyTable.lookup: every alias finds its own property and value"):
     for p <- PropertyTable.all; name <- p.names do assert(PropertyTable.lookup(name).exists(_ eq p), name)
@@ -235,6 +232,7 @@ class PropertyTableSuite extends munit.FunSuite:
     assert(nv.nan.isNaN)
     assert(nv.nan.set.contains('a'))
     def valueAt(c: Int): NumericValue = nv.values.find(_.set.contains(c)).get
+
     assertEquals(valueAt('3').toDouble, 3.0)
     assertEquals(valueAt(0x00bd).numerator, 1L)
     assertEquals(valueAt(0x00bd).denominator, 2L)

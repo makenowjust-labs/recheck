@@ -1,6 +1,16 @@
 package codes.quine.labs.resyntax.charset
 
 class UnitModeSuite extends munit.FunSuite:
+
+  test("UnitMode#max / contains / universe"):
+    assertEquals(UnitMode.UTF16.max, 0xffff)
+    assertEquals(UnitMode.CodePoint.max, 0x10ffff)
+    assertEquals(UnitMode.Byte.max, 0xff)
+    assert(UnitMode.Byte.contains(0xff))
+    assert(!UnitMode.Byte.contains(0x100))
+    assert(!UnitMode.CodePoint.contains(-1))
+    assertEquals(UnitMode.UTF16.universe, CharSet.range(0, 0xffff))
+
   test("UnitMode#decode"):
     assertEquals(UnitMode.UTF16.decode(""), UString.empty)
     assertEquals(UnitMode.UTF16.decode("x🍣"), UString('x', 0xd83c, 0xdf63))

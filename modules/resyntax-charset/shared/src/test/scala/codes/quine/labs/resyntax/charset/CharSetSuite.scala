@@ -1,10 +1,6 @@
 package codes.quine.labs.resyntax.charset
 
-class CharSetSuite extends munit.FunSuite:
-  def set(intervals: (Int, Int)*): CharSet =
-    val builder = CharSet.newBuilder
-    for (start, end) <- intervals do builder.addRange(start, end)
-    builder.result()
+class CharSetSuite extends munit.FunSuite with CharSetHelper:
 
   test("CharSet.Builder"):
     assertEquals(set((1, 3), (5, 7)).intervals.toSeq, Seq((1, 3), (5, 7)))
@@ -100,12 +96,3 @@ class CharSetSuite extends munit.FunSuite:
 
   test("CharSet.union"):
     assertEquals(CharSet.union(Seq(set((1, 2)), set((5, 6)), set((2, 3)))), set((1, 3), (5, 6)))
-
-  test("UnitMode"):
-    assertEquals(UnitMode.UTF16.max, 0xffff)
-    assertEquals(UnitMode.CodePoint.max, 0x10ffff)
-    assertEquals(UnitMode.Byte.max, 0xff)
-    assert(UnitMode.Byte.contains(0xff))
-    assert(!UnitMode.Byte.contains(0x100))
-    assert(!UnitMode.CodePoint.contains(-1))
-    assertEquals(UnitMode.UTF16.universe, set((0, 0x10000)))

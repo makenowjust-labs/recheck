@@ -2,11 +2,7 @@ package codes.quine.labs.resyntax.charset
 
 import scala.collection.immutable.BitSet
 
-class AlphabetSuite extends munit.FunSuite:
-  def set(intervals: (Int, Int)*): CharSet =
-    val builder = CharSet.newBuilder
-    for (start, end) <- intervals do builder.addRange(start, end)
-    builder.result()
+class AlphabetSuite extends munit.FunSuite with CharSetHelper:
 
   test("Alphabet.refine: no sets"):
     val a = Alphabet.refine(UnitMode.Byte, Seq.empty)
