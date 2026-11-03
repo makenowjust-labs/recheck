@@ -278,7 +278,11 @@ object ParametersGen:
     val params = read(root / SchemaPath)
     // `dialect` follows `flags`, so that it is given without its name.
     val (dialect, others) = params.partition(_.name == "dialect")
-    val args = (dialect ++ others).map(p => s"    ${p.name}: ${p.scalaType} = ${p.defaultName}")
+    // `logger` defaults to the console's logger.
+    val args = (dialect ++ others).map: p =>
+      val default = if p.isLogger then "Some(logger)" else p.defaultName
+      s"    ${p.name}: ${p.scalaType} = $default"
+
     s"""|
         |def check(
         |    source: String,
