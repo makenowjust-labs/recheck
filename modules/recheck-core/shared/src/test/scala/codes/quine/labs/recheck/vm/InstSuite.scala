@@ -24,11 +24,11 @@ class InstSuite extends munit.FunSuite:
     assertEquals(Inst.Try(Label("x", 0), Label("y", 1)).toString, "try #x@0 #y@1")
     assertEquals(
       Inst.TryLA(Inst.Read(ReadKind.Char('a'), None), Label("x", 0), Label("y", 1)).toString,
-      "try-la (char 'a') #x@0 #y@1"
+      "try-la (char 0x61) #x@0 #y@1"
     )
     assertEquals(
       Inst.TryLB(Inst.ReadBack(ReadKind.Char('a'), None), Label("x", 0), Label("y", 1)).toString,
-      "try-lb (char 'a') #x@0 #y@1"
+      "try-lb (char 0x61) #x@0 #y@1"
     )
     assertEquals(Inst.Cmp(CounterReg(0), 1, Label("x", 2), Label("y", 3)).toString, "cmp %0 1 #x@2 #y@3")
     assertEquals(Inst.Rollback.toString, "rollback")
@@ -42,10 +42,10 @@ class InstSuite extends munit.FunSuite:
     assertEquals(Inst.Reset(CounterReg(0)).toString, "reset %0")
     assertEquals(Inst.Inc(CounterReg(0)).toString, "inc %0")
     assertEquals(Inst.Assert(AssertKind.InputBegin).toString, "assert input_begin")
-    assertEquals(Inst.Read(ReadKind.Char('a'), None).toString, "read char 'a'")
-    assertEquals(Inst.Read(ReadKind.Char('a'), Some(SourceLocation(0, 1))).toString, "read char 'a' ; 0-1")
-    assertEquals(Inst.ReadBack(ReadKind.Char('a'), None).toString, "read_back char 'a'")
-    assertEquals(Inst.ReadBack(ReadKind.Char('a'), Some(SourceLocation(0, 1))).toString, "read_back char 'a' ; 0-1")
+    assertEquals(Inst.Read(ReadKind.Char('a'), None).toString, "read char 0x61")
+    assertEquals(Inst.Read(ReadKind.Char('a'), Some(SourceLocation(0, 1))).toString, "read char 0x61 ; 0-1")
+    assertEquals(Inst.ReadBack(ReadKind.Char('a'), None).toString, "read_back char 0x61")
+    assertEquals(Inst.ReadBack(ReadKind.Char('a'), Some(SourceLocation(0, 1))).toString, "read_back char 0x61 ; 0-1")
     assertEquals(Inst.CapBegin(0).toString, "cap_begin 0")
     assertEquals(Inst.CapEnd(0).toString, "cap_end 0")
     assertEquals(Inst.CapReset(0, 1).toString, "cap_reset 0 1")
@@ -122,9 +122,9 @@ class InstSuite extends munit.FunSuite:
 
   test("Inst.ReadKind#toString"):
     assertEquals(ReadKind.Any.toString, "any")
-    assertEquals(ReadKind.Char('a').toString, "char 'a'")
-    assertEquals(ReadKind.Class(Word).toString, "class [0-9A-Z_a-z]")
-    assertEquals(ReadKind.ClassNot(Word).toString, "class_not [0-9A-Z_a-z]")
+    assertEquals(ReadKind.Char('a').toString, "char 0x61")
+    assertEquals(ReadKind.Class(Word).toString, "class CharSet(0x30-0x39, 0x41-0x5A, 0x5F, 0x61-0x7A)")
+    assertEquals(ReadKind.ClassNot(Word).toString, "class_not CharSet(0x30-0x39, 0x41-0x5A, 0x5F, 0x61-0x7A)")
     val semantics = IRBackReferenceSemantics(true, IRBackReferenceChoice.FirstSet)
     assertEquals(
       ReadKind.Ref(Seq(0), semantics, IRCaseEquivalence.Identity, IRBackReferenceFolding.Simple).toString,

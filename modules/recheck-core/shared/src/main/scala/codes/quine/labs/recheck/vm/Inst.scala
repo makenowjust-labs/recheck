@@ -2,7 +2,6 @@ package codes.quine.labs.recheck.vm
 
 import scala.compiletime.uninitialized
 
-import codes.quine.labs.recheck.util.ECMAScriptNotation
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UChar
@@ -330,15 +329,15 @@ object Inst:
 
     /** An usual character matching. */
     final case class Char(c: UChar) extends ReadKind:
-      override def toString: String = s"char '${ECMAScriptNotation.showChar(c)}'"
+      override def toString: String = s"char 0x${Integer.toHexString(c).toUpperCase}"
 
     /** A character class matching. */
     final case class Class(s: CharSet) extends ReadKind:
-      override def toString: String = s"class ${ECMAScriptNotation.showClass(s)}"
+      override def toString: String = s"class $s"
 
     /** An inverted character class matching. */
     final case class ClassNot(s: CharSet) extends ReadKind:
-      override def toString: String = s"class_not ${ECMAScriptNotation.showClass(s)}"
+      override def toString: String = s"class_not $s"
 
     /** A capture reference matching. */
     final case class Ref(

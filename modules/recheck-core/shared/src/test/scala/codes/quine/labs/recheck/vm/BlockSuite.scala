@@ -8,6 +8,6 @@ class BlockSuite extends munit.FunSuite:
   test("Block#toString"):
     assertEquals(
       Block(Seq(Inst.Read(ReadKind.Char('a'), None)), Inst.Ok).toString,
-      """|read char 'a'
+      """|read char 0x61
          |ok""".stripMargin
     )

@@ -1,7 +1,6 @@
 package codes.quine.labs.recheck
 package diagnostics
 
-import codes.quine.labs.recheck.util.ECMAScriptNotation
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.PropertyTable
@@ -40,18 +39,22 @@ object AttackPatternStyle:
 
   /** JavaScript is a JavaScript style specifier, e.g. `'a'.repeat(31) + '\x00'`. */
   case object JavaScript extends AttackPatternStyle:
-    def literal(s: UString): String =
-      utf16Chars(s)
-        .map:
-          case 0x27 => "\\'"
-          // A control character uses `\xHH`, because `\cX` is not an escape in a string literal.
-          case c if c < 0x20 && !(0x09 <= c && c <= 0x0d) => f"\\x$c%02X"
-          case c                                          => ECMAScriptNotation.showChar(c)
-        .mkString("'", "", "'")
+    def literal(s: UString): String = utf16Chars(s).map(char).mkString("'", "", "'")
 
     def repeat(s: UString, n: Int): String = s"${literal(s)}.repeat(${n})"
 
     def join: String = " + "
+
+    private def char(c: UChar): String = c match
+      case '\\' | '\''              => s"\\${c.toChar}"
+      case Named(e)                 => e
+      case 0x0b                     => "\\v"
+      case 0x0c                     => "\\f"
+      case c if isASCIIPrintable(c) => c.toChar.toString
+      case c if isShown(c)          => codePoint(c)
+      case c if c <= 0xff           => f"\\x$c%02X"
+      case c if c <= 0xffff         => f"\\u$c%04X"
+      case c                        => f"\\u{$c%X}"
 
   /** Python is a Python style specifier, e.g. `'a' * 31 + '\x00'`, or `b'a' * 31 + b'\x00'` for bytes. */
   final case class Python(bytes: Boolean) extends AttackPatternStyle:
@@ -177,7 +180,7 @@ object AttackPatternStyle:
     */
   private def utf16Chars(s: UString): Iterator[UChar] = UString.fromString(s.asString).iterator
 
-  /** The escapes common to the languages except JavaScript. */
+  /** The escapes common to the languages. */
   private object Named:
     def unapply(c: UChar): Option[String] = c match
       case '\t' => Some("\\t")

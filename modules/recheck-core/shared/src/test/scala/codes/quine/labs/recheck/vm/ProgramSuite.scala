@@ -12,7 +12,7 @@ class ProgramSuite extends munit.FunSuite:
     assertEquals(
       program.toString,
       """|#x@0:
-         |    read char 'a'
+         |    read char 0x61
          |    ok
          |
          |""".stripMargin
