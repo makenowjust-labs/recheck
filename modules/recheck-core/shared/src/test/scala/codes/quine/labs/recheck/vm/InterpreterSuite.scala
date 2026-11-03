@@ -5,6 +5,8 @@ import scala.concurrent.duration.MILLISECONDS
 import scala.language.implicitConversions
 import scala.util.Try
 
+import codes.quine.labs.recheck.AssertionCases
+import codes.quine.labs.recheck.CaseFoldingCases
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
