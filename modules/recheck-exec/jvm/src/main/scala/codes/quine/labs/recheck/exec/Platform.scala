@@ -102,8 +102,9 @@ private[exec] object Platform:
         finished = process.waitFor(math.max(wait, 1L), TimeUnit.MILLISECONDS)
 
       if finished then
-        outReader.join()
-        errReader.join()
+        // A descendant may still hold the pipes after the process exits.
+        await(outReader)
+        await(errReader)
         val code = process.exitValue()
         ctx.log(s"exec: finish\n  exit code: ${code}\n  out: ${out.toString.trim}\n  err: ${err.toString.trim}")
         ExecResult.Exit(code, out.toString, err.toString)
@@ -119,6 +120,13 @@ private[exec] object Platform:
     process.descendants().forEach(p => { p.destroyForcibly(); () })
     process.destroyForcibly()
     ()
+
+  /** Waits for the thread to end, checking the interruption of the context. */
+  private def await(thread: Thread)(using ctx: Context): Unit =
+    thread.join(PollMillis)
+    while thread.isAlive do
+      ctx.interrupt(())
+      thread.join(PollMillis)
 
   /** Starts a daemon thread running the body, which ends quietly when the stream is closed. */
   private def daemon(body: => Unit): Thread =
