@@ -41,9 +41,6 @@ private[build] final class IRCharResolver(
 
   private val classes = new IRClassLookup(dialect, mode, !perlUnicodeRules)
 
-  /** Whether the parser reads the source by UTF-16 code units, so a literal astral character is a surrogate pair. */
-  private val readsUnits = mode != UnitMode.CodePoint
-
   private def perlNative(flags: IRCharFlagSet): Boolean =
     dialect.isPerl &&
       (flags.charset == IRCharset.Default && !perlUnicodeRules || flags.charset == IRCharset.Locale)
@@ -133,9 +130,9 @@ private[build] final class IRCharResolver(
 
   /** Resolves a part, which is literal characters in a row, together.
     *
-    * A surrogate pair read by code units and Ruby's UTF-8 bytes by escapes (e.g. `\xC3\xA9`) are one character there.
-    * Case-insensitivity is the dialect's one-to-one case equivalence, and Ruby's and Perl's simple multi-character
-    * folding of literals (e.g. `ß` and `ss`, see [[foldPart]]).
+    * Ruby's UTF-8 bytes by escapes (e.g. `\xC3\xA9`) are one character there. Case-insensitivity is the dialect's
+    * one-to-one case equivalence, and Ruby's and Perl's simple multi-character folding of literals (e.g. `ß` and `ss`,
+    * see [[foldPart]]).
     */
   def literals(part: Seq[(Node, IRCharFlagSet)]): Seq[IRNode] =
     try resolveLiterals(part)
@@ -166,15 +163,15 @@ private[build] final class IRCharResolver(
     for (node, flags) <- part do
       node.data match
         case NodeData.Literal(value) =>
-          lits += Lit(value, true, None, flags, node.loc)
+          lits += Lit(value, None, flags, node.loc)
         case NodeData.Backslash(BackslashKind.Unknown(value)) =>
-          lits += Lit(value, true, None, flags, node.loc)
+          lits += Lit(value, None, flags, node.loc)
         case NodeData.Backslash(BackslashKind.Escape(style, value)) =>
-          lits += Lit(value, false, Some(style), flags, node.loc)
+          lits += Lit(value, Some(style), flags, node.loc)
         case data => throw new IllegalArgumentException(s"Not a literal: $data")
     val merged =
       if dialect.isRuby && mode == UnitMode.CodePoint then mergeRubyBytes(lits.toIndexedSeq) else lits.toIndexedSeq
-    val units = mergeSurrogates(merged).flatMap: lit =>
+    val units = merged.flatMap: lit =>
       unitsOf(lit) match
         case Seq() => Seq(lit.copy(value = NoUnit))
         case us    => us.map(u => lit.copy(value = u))
@@ -217,9 +214,8 @@ private[build] final class IRCharResolver(
     val flags = units.head.flags
     val eq = equivalence(flags)
     val native = perlNative(flags)
-    // Perl's `aa` forbids a non-ASCII character to match a folding with ASCII characters (e.g. `ß` and `ss`), and `l`
-    // one with characters below `U+0100`.
-    val below =
+    // Perl's `aa` forbids a non-ASCII character to match a folding with ASCII characters (e.g. `ß` and `ss`), and `l` one with characters below `U+0100`.
+    val minFoldedValue =
       if flags.caselessRestrict then 0x80 else if dialect.isPerl && flags.charset == IRCharset.Locale then 0x100 else 0
     val folded = mutable.ArrayBuffer.empty[(Int, Int)]
     for (u, i) <- units.zipWithIndex; c <- FullCaseFolding(u.value).iterator do folded += ((c, i))
@@ -229,7 +225,7 @@ private[build] final class IRCharResolver(
     val occurrences = for
       i <- folded.indices
       (key, set) <- multiFoldings
-      if key.iterator.forall(_ >= below)
+      if key.iterator.forall(_ >= minFoldedValue)
       if i + key.length <= folded.length && (0 until key.length).forall(k => folded(i + k)._1 == key(k))
       // A key must start and end at literal boundaries.
       if (i == 0 || folded(i - 1)._2 != folded(i)._2) &&
@@ -262,25 +258,6 @@ private[build] final class IRCharResolver(
 
           out ++= alternatives(from)
       out.result()
-
-  /** Joins a surrogate pair of literals, which the parser reads by code units, into a code point. */
-  private def mergeSurrogates(lits: IndexedSeq[Lit]): IndexedSeq[Lit] =
-    if !readsUnits || mode == UnitMode.UTF16 then lits
-    else
-      val out = mutable.ArrayBuffer.empty[Lit]
-      var i = 0
-      while i < lits.length do
-        val lit = lits(i)
-        if i + 1 < lits.length && lit.source && lits(i + 1).source && UTF16Encoding.isHighSurrogate(lit.value) &&
-          UTF16Encoding.isLowSurrogate(lits(i + 1).value)
-        then
-          val c = UTF16Encoding.decodeSurrogatePair(lit.value, lits(i + 1).value)
-          out += lit.copy(value = c, loc = SourceLocation(lit.loc.start, lits(i + 1).loc.end))
-          i += 2
-        else
-          out += lit
-          i += 1
-      out.toIndexedSeq
 
   /** Decodes Ruby's byte escapes (e.g. `\xC3\xA9`) of a UTF-8 regexp into code points.
     *
@@ -349,7 +326,8 @@ private[build] final class IRCharResolver(
       if dialect.isPCRE then pcreGraphemeCluster else graphemeCluster
     case _ => output(escapeClassSet(kind, flags, loc), flags)
 
-  /** `\X`: an extended grapheme cluster by the regular expression of UAX #29 (Table 1b), in an atomic group.
+  /** graphemeCluster is the IR of `\X`, which matches an extended grapheme cluster by the regular expression of UAX #29
+    * (Table 1b) in an atomic group.
     *
     * In byte mode, the bytes are Latin-1 characters.
     */
@@ -370,7 +348,8 @@ private[build] final class IRCharResolver(
     // The engines take the longest cluster and do not backtrack into it.
     IRNodeData.Atomic(IRCharResolver.prune(cluster).getOrElse(IRNode(IRNodeData.Chars(CharSet.empty))))
 
-  /** PCRE's `\X`: an extended grapheme cluster by PCRE2's own rules (`pcre2_extuni.c` of 10.49), in an atomic group.
+  /** pcreGraphemeCluster is the IR of PCRE's `\X`, which matches an extended grapheme cluster by PCRE2's own rules
+    * (`pcre2_extuni.c` of 10.49) in an atomic group.
     *
     * They differ from UAX #29: no GB9c, no extending character after a regional indicator or before an extended
     * pictographic after a prepend, and a pair of regional indicators at the start needs an even number of regional
@@ -588,7 +567,7 @@ private[build] final class IRCharResolver(
 
   /** Resolves a folding as a part, which is how Ruby and Perl match it. */
   private def foldString(key: UString, flags: IRCharFlagSet, loc: SourceLocation): IRNodeData =
-    sequenceOf(foldPart(key.iterator.map(c => Lit(c, true, None, flags, loc)).toIndexedSeq))
+    sequenceOf(foldPart(key.iterator.map(c => Lit(c, None, flags, loc)).toIndexedSeq))
 
   private def negate(item: ClassItem, flags: IRCharFlagSet): ClassSet = item.data match
     // .NET's `[^a-z-[aeiou]]` negates the base before the subtraction.
@@ -612,7 +591,7 @@ private[build] final class IRCharResolver(
 
   private def classItem(item: ClassItem, flags: IRCharFlagSet): ClassSet =
     item.data match
-      case ClassItemData.ClassUnion(items)              => classUnion(items.toIndexedSeq, flags)
+      case ClassItemData.ClassUnion(items)              => classUnion(items, flags)
       case ClassItemData.ClassIntersection(left, right) => classItem(left, flags).intersect(classItem(right, flags))
       case ClassItemData.ClassDiff(left, right)         => classItem(left, flags).diff(classItem(right, flags))
       case ClassItemData.ClassNest(invert, inner)       =>
@@ -631,81 +610,73 @@ private[build] final class IRCharResolver(
         throw new IRBuildingException("Invalid multibyte escape", item.loc)
       case value: ClassItemData.ClassValue => ClassSet(closeChars(valueUnits(value, flags, item.loc), flags))
 
-  /** Evaluates a union, with Ruby's byte escapes (e.g. `[\xC3\xA9]`). */
-  private def classUnion(items: IndexedSeq[ClassItem], flags: IRCharFlagSet): ClassSet =
+  /** Evaluates a union, where Ruby's byte escapes make characters (e.g. `[\xC3\xA9]` is `[é]`). */
+  private def classUnion(items: Seq[ClassItem], flags: IRCharFlagSet): ClassSet =
+    if !dialect.isRuby || mode != UnitMode.CodePoint then
+      return items.foldLeft(ClassSet.empty)((set, item) => set.union(classItem(item, flags)))
+    // Onigmo reads the bytes of a character as one also at a range endpoint (e.g. `[\xC3\xA0-\xC3\xA9]` is `[à-é]`).
+    // The parser reads a range between bytes there (`\xA0-\xC3`), so the range is split at its hyphen and made again.
+    val tokens = items.flatMap: item =>
+      item.data match
+        case ClassItemData.ClassRange(begin, end) if isRubyByteValue(begin.data) || isRubyByteValue(end.data) =>
+          Seq(
+            RubyClassToken.Value(classLit(begin.data, flags, begin.loc)),
+            RubyClassToken.Hyphen,
+            RubyClassToken.Value(classLit(end.data, flags, end.loc))
+          )
+        case value: ClassItemData.ClassValue if isRubyByteValue(value) =>
+          Seq(RubyClassToken.Value(classLit(value, flags, item.loc)))
+        case _ => Seq(RubyClassToken.Other(item))
+    val decoded = decodeRubyClassBytes(tokens)
     var result = ClassSet.empty
     var i = 0
-    while i < items.length do
-      val item = items(i)
-      item.data match
-        case value: ClassItemData.ClassValue
-            if dialect.isRuby && mode == UnitMode.CodePoint && isRubyByteValue(value) =>
-          val bytes = items
-            .drop(i)
-            .takeWhile:
-              case ClassItem.Value(value, _) => isRubyByteValue(value)
-              case _                         => false
-          val lits = bytes.map: b =>
-            val ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, value)) = b.data: @unchecked
-            Lit(value, false, Some(style), flags, b.loc)
-          // Bytes of a character continued into a range endpoint (e.g. `[\xC3\xA0-\xC3\xA9]`) are not modeled.
-          if rangeByteAt(items, i + bytes.length, begin = true) then
-            validateRubyBytePrefix(lits)
-            throw new NotModeledException
-          if rangeByteAt(items, i - 1, begin = false) then throw new NotModeledException
-          val decoded = mergeRubyBytes(lits)
-          result = result.union(ClassSet(closeChars(decoded.map(_.value), flags)))
-          i += bytes.length
-        case ClassItemData.ClassRange(begin, end)
-            if dialect.isRuby && mode == UnitMode.CodePoint &&
-              (isRubyByteValue(begin.data) || isRubyByteValue(end.data)) =>
-          // Onigmo rejects a byte escape endpoint unless it is in a multibyte character with its neighbors.
-          val beginOk =
-            !isRubyByteValue(begin.data) || UTF8Encoding.sequenceLength(begin.data.value) == 0 && isRubyByteItem(
-              items,
-              i - 1
+    while i < decoded.length do
+      decoded(i) match
+        case RubyClassToken.Value(begin) if decoded.lift(i + 1).contains(RubyClassToken.Hyphen) =>
+          val RubyClassToken.Value(end) = decoded(i + 2): @unchecked
+          if begin.value > end.value then
+            throw new IRBuildingException(
+              "Range out of order in character class",
+              SourceLocation(begin.loc.start, end.loc.end)
             )
-          val endOk =
-            !isRubyByteValue(end.data) || UTF8Encoding.sequenceLength(end.data.value) >= 2 && isRubyByteItem(
-              items,
-              i + 1
-            )
-          if !(beginOk && endOk) then throw new IRBuildingException("Invalid multibyte escape", item.loc)
-          throw new NotModeledException
-        case _ =>
+          result = result.union(ClassSet(equivalence(flags).closeRange(CharSet.range(begin.value, end.value))))
+          i += 3
+        // A hyphen after a range is a character, as in `[a-c-e]`.
+        case RubyClassToken.Hyphen =>
+          result = result.union(ClassSet(closeChars(Seq('-'), flags)))
+          i += 1
+        case RubyClassToken.Value(lit) =>
+          result = result.union(ClassSet(closeChars(Seq(lit.value), flags)))
+          i += 1
+        case RubyClassToken.Other(item) =>
           result = result.union(classItem(item, flags))
           i += 1
     result
 
-  private def isRubyByteItem(items: Seq[ClassItem], i: Int): Boolean =
-    items
-      .lift(i)
-      .exists:
-        case ClassItem.Value(value, _) => isRubyByteValue(value)
-        case _                         => false
+  /** Decodes the byte escapes in a row of Ruby's class into code points. */
+  private def decodeRubyClassBytes(tokens: Seq[RubyClassToken]): IndexedSeq[RubyClassToken] =
+    val out = mutable.ArrayBuffer.empty[RubyClassToken]
+    val lits = mutable.ArrayBuffer.empty[Lit]
+    def flush(): Unit =
+      out ++= mergeRubyBytes(lits.toIndexedSeq).map(RubyClassToken.Value(_))
+      lits.clear()
 
-  /** Checks whether the item is a range whose begin (or end) is a Ruby byte escape. */
-  private def rangeByteAt(items: Seq[ClassItem], i: Int, begin: Boolean): Boolean =
-    items
-      .lift(i)
-      .exists(_.data match
-        case ClassItemData.ClassRange(b, e) => isRubyByteValue(if begin then b.data else e.data)
-        case _                              => false)
+    for token <- tokens do
+      token match
+        case RubyClassToken.Value(lit) => lits += lit
+        case _                         =>
+          flush()
+          out += token
+    flush()
+    out.toIndexedSeq
 
-  /** Validates the bytes before a range, whose last character may continue into the range's begin. */
-  private def validateRubyBytePrefix(lits: IndexedSeq[Lit]): Unit =
-    var i = 0
-    while i < lits.length do
-      val n = UTF8Encoding.sequenceLength(lits(i).value)
-      if n < 2 then throw new IRBuildingException("Invalid multibyte escape", lits(i).loc)
-      i += n
+  private def classLit(value: ClassItemData.ClassValue, flags: IRCharFlagSet, loc: SourceLocation): Lit = value match
+    case ClassItemData.ClassLiteral(v)                                     => Lit(v, None, flags, loc)
+    case ClassItemData.ClassBackslashValue(BackslashKind.Unknown(v))       => Lit(v, None, flags, loc)
+    case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v)) => Lit(v, Some(style), flags, loc)
 
   private def valueUnits(value: ClassItemData.ClassValue, flags: IRCharFlagSet, loc: SourceLocation): Seq[UChar] =
-    val lit = value match
-      case ClassItemData.ClassLiteral(v)                                     => Lit(v, true, None, flags, loc)
-      case ClassItemData.ClassBackslashValue(BackslashKind.Unknown(v))       => Lit(v, true, None, flags, loc)
-      case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v)) => Lit(v, false, Some(style), flags, loc)
-    val units = unitsOf(lit)
+    val units = unitsOf(classLit(value, flags, loc))
     // A class item is one unit in UTF-16 mode, so a code point beyond it cannot be a class member.
     if mode == UnitMode.UTF16 && units.length != 1 then throw new NotModeledException
     units
@@ -753,6 +724,7 @@ private[build] final class IRCharResolver(
 private[build] object IRCharResolver:
 
   private object Grammar:
+
     import BacktrackStrategy.Greedy
     def c(set: CharSet): IRNode = IRNode(IRNodeData.Chars(set))
 
@@ -769,10 +741,16 @@ private[build] object IRCharResolver:
   /** NotModeledException is thrown for a construct that IR cannot represent, which becomes `Unsupported`. */
   final class NotModeledException extends Exception("not modeled")
 
+  /** RubyClassToken is an item of Ruby's class, where a range with a byte escape endpoint is split at its hyphen. */
+  private enum RubyClassToken:
+
+    case Value(lit: Lit)
+    case Hyphen
+    case Other(item: ClassItem)
+
   /** Lit is a literal character before being resolved. */
   final case class Lit(
       value: Int,
-      source: Boolean,
       escape: Option[EscapeStyle],
       flags: IRCharFlagSet,
       loc: SourceLocation
@@ -790,14 +768,17 @@ private[build] object IRCharResolver:
   /** The value of a literal that has no unit in the mode, which never matches. */
   val NoUnit: Int = -1
 
-  /** The largest number of multi-character foldings in a part; more of them leave the part to the one-to-one folding.
+  /** MaxMultiFoldings is the largest number of multi-character foldings in a part that are resolved as alternatives.
+    *
+    * A part with more of them is folded one to one, which misses some matches, since the alternatives grow
+    * exponentially.
     */
   val MaxMultiFoldings: Int = 6
 
   /** The strings of two or more code points that some characters fold to (e.g. `ss` from `ß`). */
   lazy val multiFoldings: Seq[(UString, CharSet)] = FullCaseFolding.multiCodePointFoldings.toSeq.sortBy(_._1)
 
-  /** [[multiFoldings]] in the order of Onigmo's tables: by the length, and then by the folding. */
+  /** rubyMultiFoldings is [[multiFoldings]] in the order of Onigmo's tables: by the length, and then by the folding. */
   lazy val rubyMultiFoldings: Seq[(UString, CharSet)] = multiFoldings.sortBy((key, _) => (key.length, key))
 
   def multiFolding(c: Int): Option[UString] = Some(FullCaseFolding(c)).filter(_.length >= 2)
@@ -851,7 +832,7 @@ private[build] object IRCharResolver:
       case ClassItemData.ClassBackslashClass(EscapeClassKind.QuoteSet(strings)) => strings.exists(_.length != 1)
       case _                                                                    => false
 
-  /** Python's key `upper(lower(c))`. */
+  /** pythonKey is the key that Python's `re` compares characters by case-insensitively, `upper(lower(c))`. */
   lazy val pythonKey: CaseMapping =
     val domain = CaseMapping.SimpleUpper.domain.union(CaseMapping.SimpleLower.domain)
     val simple = domain.iterator.map(c => (c, CaseMapping.SimpleUpper(CaseMapping.SimpleLower(c))))
@@ -860,7 +841,9 @@ private[build] object IRCharResolver:
     val full = Seq(0x1fd3 -> 0x390, 0x1fe3 -> 0x3b0, 0xfb06 -> 0xfb05)
     CaseMapping.fromEntries(simple ++ full)
 
-  /** .NET's key `ToLowerInvariant(c)`, where `U+0130` is not lower-cased to `i`. */
+  /** dotNetKey is the key that .NET compares characters by case-insensitively, `ToLowerInvariant(c)`, where `U+0130` is
+    * not lower-cased to `i`.
+    */
   lazy val dotNetKey: CaseMapping = CaseMapping.SimpleLower.updated(Seq(0x130 -> 0x130))
 
   /** Determines the equivalence that a back-reference with the flags compares by.

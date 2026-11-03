@@ -11,6 +11,7 @@ import codes.quine.labs.resyntax.ir.build.IRBuilder
 import codes.quine.labs.resyntax.parser.Parser
 
 class PatternAlphabetSuite extends munit.FunSuite:
+
   val Word: CharSet =
     CharSet.union(Seq(CharSet.range('0', '9'), CharSet.range('A', 'Z'), CharSet.single('_'), CharSet.range('a', 'z')))
 
@@ -45,6 +46,18 @@ class PatternAlphabetSuite extends munit.FunSuite:
       IndexedSeq(
         (CharSet.single('\n'), CharKind.LineTerminator),
         (UnitMode.UTF16.universe.diff(CharSet.single('\n')), CharKind.Normal)
+      )
+    )
+    assertEquals(
+      PatternAlphabet
+        .build(UnitMode.UTF16, Seq(CharSet.single('a')), lineTerminator = Some(CharSet.single('\n')), word = Some(Word))
+        .pairs
+        .map(_._1),
+      IndexedSeq(
+        CharSet.single('\n'),
+        CharSet.single('a'),
+        Word.diff(CharSet.single('a')),
+        UnitMode.UTF16.universe.diff(Word.union(CharSet.single('\n')))
       )
     )
     // `\r` and `\n` have their own kinds with `crlf`, where `\r\n` is one line terminator.
@@ -140,12 +153,8 @@ class PatternAlphabetSuite extends munit.FunSuite:
 
   def parse(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)
-    IRBuilder.build(
-      Parser.parse(source, flagSet, dialect),
-      flagSet,
-      dialect,
-      Parser.determineUnitMode(source, flagSet, dialect)
-    )
+    val mode = Parser.determineUnitMode(source, flagSet, dialect)
+    IRBuilder.build(Parser.parse(source, flagSet, dialect, mode), flagSet, dialect, mode)
 
   test("PatternAlphabet.build: too many sets"):
     val sets = Seq.tabulate(Integer.SIZE)(i => CharSet.single('a' + i))

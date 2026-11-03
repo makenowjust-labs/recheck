@@ -11,7 +11,7 @@ private[build] final class ReferenceResolver(table: CaptureTable, dialect: Diale
   def backReference(ref: Reference, site: ReferenceSite, loc: SourceLocation): Seq[Int] = ref match
     case Reference.IndexedReference(n)      => indexedBackReference(n, site, loc)
     case Reference.NamedReference(name)     => namedBackReference(name, site, loc)
-    case Reference.RelativeReference(n)     => relative(n, site, loc)
+    case Reference.RelativeReference(n)     => resolveRelativeReference(n, site, loc)
     case Reference.LeveledReference(ref, _) => backReference(ref, site, loc)
 
   def indexedBackReference(n: Int, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
@@ -45,15 +45,15 @@ private[build] final class ReferenceResolver(table: CaptureTable, dialect: Diale
   /** Resolves a name for a call, which can refer to a group defined later. */
   def calledName(name: String, loc: SourceLocation): Seq[Int] =
     if CaptureAnalyzer.isNumericName(dialect, name) then
-      index(name.toIntOption.getOrElse(fail("Reference to non-existent group", loc)), loc)
+      resolveIndex(name.toIntOption.getOrElse(fail("Reference to non-existent group", loc)), loc)
     else table.names.getOrElse(name, fail("Reference to non-existent named group", loc))
 
   /** Resolves an index for a call or a test, where `0` is the whole pattern. */
-  def index(n: Int, loc: SourceLocation): Seq[Int] =
+  def resolveIndex(n: Int, loc: SourceLocation): Seq[Int] =
     if n == 0 || table.defined.contains(n) then Seq(n) else fail("Reference to non-existent group", loc)
 
   /** Resolves a relative reference (e.g. `\g{-1}`), where `-1` is the last group opened before the reference. */
-  def relative(n: Int, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
+  def resolveRelativeReference(n: Int, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
     // Perl counts the groups in the source order even in a branch reset (e.g. `(?|(a)|\g{-1}b)` is valid).
     if featureSet.countsRelativeReferenceInSourceOrder && n < 0 then
       return site.openedInOrder.lift(site.openedInOrder.size + n) match
@@ -63,14 +63,14 @@ private[build] final class ReferenceResolver(table: CaptureTable, dialect: Diale
     if index >= 1 && table.defined.contains(index) then Seq(index) else fail("Reference to non-existent group", loc)
 
   /** Resolves a base reference of a call or a scan substring. */
-  def call(ref: Reference, site: ReferenceSite, loc: SourceLocation): Seq[Int] = ref match
-    case Reference.IndexedReference(n)      => index(n, loc)
+  def resolveCall(ref: Reference, site: ReferenceSite, loc: SourceLocation): Seq[Int] = ref match
+    case Reference.IndexedReference(n)      => resolveIndex(n, loc)
     case Reference.NamedReference(name)     => calledName(name, loc)
-    case Reference.RelativeReference(n)     => relative(n, site, loc)
-    case Reference.LeveledReference(ref, _) => call(ref, site, loc)
+    case Reference.RelativeReference(n)     => resolveRelativeReference(n, site, loc)
+    case Reference.LeveledReference(ref, _) => resolveCall(ref, site, loc)
 
   /** Resolves a conditional test, which Python checks like a back-reference only in a look-behind. */
-  def test(indices: => Seq[Int], site: ReferenceSite, loc: SourceLocation): Seq[Int] =
+  def resolveTest(indices: => Seq[Int], site: ReferenceSite, loc: SourceLocation): Seq[Int] =
     val resolved = indices
     if featureSet.requiresClosedGroupReference && site.lookBehindFrom.isDefined then
       if resolved.exists(_ > site.opened) then fail("Reference to an open group", loc)
@@ -79,7 +79,7 @@ private[build] final class ReferenceResolver(table: CaptureTable, dialect: Diale
 
   /** Resolves a call by `\g<...>`, where Ruby rejects a name shared by groups. */
   def escapeCall(ref: Reference, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
-    val indices = call(ref, site, loc)
+    val indices = resolveCall(ref, site, loc)
     if featureSet.rejectsCallToSharedName && indices.size > 1 then fail("Call to a name shared by groups", loc)
     indices
 

@@ -19,6 +19,7 @@ package codes.quine.labs.resyntax.ast
   * }}}
   */
 sealed abstract class ConditionalTest extends Product with Serializable:
+
   def equalsWithoutLoc(that: ConditionalTest): Boolean = (this, that) match
     case (ConditionalTest.LookAround(kl, l), ConditionalTest.LookAround(kr, r)) =>
       kl == kr && l.equalsWithoutLoc(r)
@@ -59,6 +60,7 @@ object ConditionalTest:
   final case class LookAround(kind: Option[GroupKind.LookAround], node: Node) extends ConditionalTest
 
   object LookAround:
+
     def apply(kind: GroupKind.LookAround, data: NodeData): LookAround = LookAround(Some(kind), Node(data))
 
     def apply(data: NodeData): LookAround = LookAround(None, Node(data))

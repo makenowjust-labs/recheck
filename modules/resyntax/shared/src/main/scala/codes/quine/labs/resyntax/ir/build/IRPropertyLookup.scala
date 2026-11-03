@@ -39,6 +39,7 @@ private[build] enum CaseKind:
   * code points by each dialect's rules.
   */
 private[build] object IRPropertyLookup:
+
   import PropertyResult.*
 
   // Scala.js has no `java.util.Locale`, and the names are ASCII.
@@ -264,7 +265,7 @@ private[build] object IRPropertyLookup:
       case "javaIdentifierIgnorable" => found(javaIdentifierIgnorable)
       case "javaSpaceChar"           => category("Z")
       case "javaWhitespace"          =>
-        found(gc("Z").diff(of("   ")).union(CharSet.range(0x09, 0x0d)).union(CharSet.range(0x1c, 0x1f)))
+        found(gc("Z").diff(of("\u00A0\u2007\u202F")).union(CharSet.range(0x09, 0x0d)).union(CharSet.range(0x1c, 0x1f)))
       case "javaISOControl" => found(CharSet.range(0, 0x1f).union(CharSet.range(0x7f, 0x9f)))
       case "javaMirrored"   => found(binary("Bidi_Mirrored"))
       case _                => Unknown
@@ -701,8 +702,7 @@ private[build] object IRPropertyLookup:
     * Perl compares numeric values by `%.3e`.
     */
   private def roundSignificant(d: Double, halfEven: Boolean): (Boolean, Long, Int) =
-    // The digits come from the shortest representation of the double, which is exact for the ties of the Unicode data
-    // (e.g. `1/64`).
+    // The digits come from the shortest representation of the double, which is exact for the ties of the Unicode data (e.g. `1/64`).
     val s = math.abs(d).toString
     val (mantissa, exp) = s.indexWhere(c => c == 'e' || c == 'E') match
       case -1 => (s, 0)
@@ -803,8 +803,7 @@ private[build] object IRPropertyLookup:
           .orElse(if raw.startsWith("in") then perlBlock.get(raw.drop(2)).map(foundValue) else None)
           .orElse(perlBlock.get(key).filter(_ => raw.startsWith("in")).map(foundValue))
           .getOrElse:
-            // A name starting with `In` or `Is` (after a package name) may be a user-defined property, which Perl
-            // looks up at run time.
+            // A name starting with `In` or `Is` (after a package name) may be a user-defined property, which Perl looks up at run time.
             val local = name.split("::").last
             if local.startsWith("In") || local.startsWith("Is") then NotModeled else Unknown
 
@@ -896,8 +895,7 @@ private[build] object IRPropertyLookup:
 
   /** The contributory properties of PropList.txt (e.g. `Other_Alphabetic`). */
   private lazy val rubyContributory: Map[String, CharSet] =
-    // The data of resyntax-charset lacks them, so each is the derived property without the other parts of its
-    // definition.
+    // The data of resyntax-charset lacks them, so each is the derived property without the other parts of its definition.
     def other(derived: String, parts: CharSet): CharSet = binary(derived).diff(parts)
 
     Seq(
@@ -959,7 +957,7 @@ private[build] object IRPropertyLookup:
       case _        => None
 
   /** Looks up Ruby's property; an ASCII-8BIT regexp (`bytes`) has only the POSIX classes in ASCII. */
-  def ruby(name: String, value: Option[String], bytes: Boolean = false): PropertyResult =
+  def ruby(name: String, value: Option[String], bytes: Boolean): PropertyResult =
     if bytes then
       return fromOption(
         Option

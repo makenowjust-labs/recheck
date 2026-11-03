@@ -5,6 +5,7 @@ sealed abstract class BackslashKind extends Product with Serializable
 object BackslashKind:
 
   sealed abstract class BackslashValue extends BackslashKind:
+
     def value: Int
 
   final case class Unknown(value: Int) extends BackslashValue

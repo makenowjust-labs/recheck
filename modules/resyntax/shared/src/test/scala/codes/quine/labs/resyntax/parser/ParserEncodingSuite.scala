@@ -18,14 +18,15 @@ import codes.quine.labs.resyntax.ast.SourceLocation
 class ParserEncodingSuite extends munit.FunSuite:
 
   def parse(s: String, flags: String, dialect: Dialect): Node =
-    Parser.parse(s, FlagSet.parse(flags, dialect), dialect)
+    val flagSet = FlagSet.parse(flags, dialect)
+    Parser.parse(s, flagSet, dialect, Parser.determineUnitMode(s, flagSet, dialect))
 
-  def check(s: String, flags: String, dialect: Dialect)(expected: NodeData)(implicit loc: munit.Location): Unit =
+  def check(s: String, flags: String, dialect: Dialect)(expected: NodeData)(using loc: munit.Location): Unit =
     test(s"Parser.parse: /$s/$flags in $dialect"):
       val result = parse(s, flags, dialect)
       assert(result.equalsWithoutLoc(Node(expected)), result)
 
-  def error(s: String, flags: String, dialect: Dialect)(message: String)(implicit loc: munit.Location): Unit =
+  def error(s: String, flags: String, dialect: Dialect)(message: String)(using loc: munit.Location): Unit =
     test(s"Parser.parse: /$s/$flags in $dialect with error \"$message\""):
       interceptMessage[ParsingException](message)(parse(s, flags, dialect))
 

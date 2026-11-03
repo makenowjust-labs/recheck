@@ -16,9 +16,11 @@ import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch.Forward
 import codes.quine.labs.resyntax.ir.IRLookBehindStarts.Longest
 import codes.quine.labs.resyntax.ir.IRNodeData.*
+import codes.quine.labs.resyntax.ir.build.IRHelper.equalsWithoutLoc
 import codes.quine.labs.resyntax.parser.Parser
 
 class IRCharResolverSuite extends munit.FunSuite:
+
   val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())
 
   /** The characters of the input without surrogates (Ruby and PCRE with `u`). */
@@ -26,7 +28,8 @@ class IRCharResolverSuite extends munit.FunSuite:
 
   def build(s: String, flags: String, dialect: Dialect): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)
-    IRBuilder.build(Parser.parse(s, flagSet, dialect), flagSet, dialect, Parser.determineUnitMode(s, flagSet, dialect))
+    val mode = Parser.determineUnitMode(s, flagSet, dialect)
+    IRBuilder.build(Parser.parse(s, flagSet, dialect, mode), flagSet, dialect, mode)
 
   def of(s: String): CharSet = CharSet.of(UnitMode.CodePoint.decode(s).iterator.toSeq*)
 
@@ -44,17 +47,17 @@ class IRCharResolverSuite extends munit.FunSuite:
     case Chars(set) => set
     case data       => fail(s"Not a character set: $data")
 
-  def check(s: String, flags: String, dialects: Dialect*)(expected: IRNodeData)(implicit loc: munit.Location): Unit =
+  def check(s: String, flags: String, dialects: Dialect*)(expected: IRNodeData)(using loc: munit.Location): Unit =
     for dialect <- dialects do
       test(s"IRBuilder.build: /$s/$flags in $dialect"):
         val node = IRNode(strip(build(s, flags, dialect).node.data))
         assert(node.equalsWithoutLoc(IRNode(expected)), node)
 
-  def chars(s: String, flags: String, dialects: Dialect*)(expected: CharSet)(implicit loc: munit.Location): Unit =
+  def chars(s: String, flags: String, dialects: Dialect*)(expected: CharSet)(using loc: munit.Location): Unit =
     check(s, flags, dialects*)(Chars(expected))
 
   /** Checks the IR of a Perl pattern from a runtime string, which Perl's lexer does not rewrite. */
-  def checkPerlString(s: String, flags: String)(expected: IRNodeData)(implicit loc: munit.Location): Unit =
+  def checkPerlString(s: String, flags: String)(expected: IRNodeData)(using loc: munit.Location): Unit =
     test(s"IRBuilder.build: /$s/$flags in Perl from a string"):
       val node = IRNode(strip(build(s, flags, Perl(source = PerlSource.String)).node.data))
       assert(node.equalsWithoutLoc(IRNode(expected)), node)
@@ -62,18 +65,18 @@ class IRCharResolverSuite extends munit.FunSuite:
   /** Checks a set by a predicate, for a large set. */
   def checkSet(s: String, flags: String, dialects: Dialect*)(
       p: CharSet => Boolean
-  )(implicit loc: munit.Location): Unit =
+  )(using loc: munit.Location): Unit =
     for dialect <- dialects do
       test(s"IRBuilder.build: /$s/$flags in $dialect (set)"):
         val set = setOf(build(s, flags, dialect).node.data)
         assert(p(set), set)
 
-  def error(s: String, flags: String, dialects: Dialect*)(message: String)(implicit loc: munit.Location): Unit =
+  def error(s: String, flags: String, dialects: Dialect*)(message: String)(using loc: munit.Location): Unit =
     for dialect <- dialects do
       test(s"IRBuilder.build: /$s/$flags in $dialect with error \"$message\""):
         interceptMessage[IRBuildingException](message)(build(s, flags, dialect))
 
-  def unsupported(s: String, flags: String, dialects: Dialect*)(implicit loc: munit.Location): Unit =
+  def unsupported(s: String, flags: String, dialects: Dialect*)(using loc: munit.Location): Unit =
     for dialect <- dialects do
       test(s"IRBuilder.build: /$s/$flags in $dialect is unsupported"):
         assert(strip(build(s, flags, dialect).node.data).isInstanceOf[Unsupported])
@@ -119,10 +122,10 @@ class IRCharResolverSuite extends munit.FunSuite:
   check("é+", "", PCRE)(
     Sequence(
       Chars(CharSet.single(0xc3)),
-      Repeat(Chars(CharSet.single(0xa9)), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy))
+      Repeat(IRNode(Chars(CharSet.single(0xa9))), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy))
     )
   )
-  check("(*UTF)é+", "", PCRE)(Repeat(Chars(of("é")), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy)))
+  check("(*UTF)é+", "", PCRE)(Repeat(IRNode(Chars(of("é"))), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy)))
   chars("[𝌆-𝌈a-z]", "", PCRE)(
     CharSet.of(0xf0, 0x9d, 0x8c, 0x88).union(CharSet.range(0x86, 0xf0)).union(CharSet.range('a', 'z'))
   )
@@ -137,8 +140,7 @@ class IRCharResolverSuite extends munit.FunSuite:
     // Its non-ASCII literals are bytes, which do not make the pattern use Unicode rules.
     val Sequence(nodes) = build("é\\w", "", Perl(utf8 = false)).node.data: @unchecked
     assertEquals(nodes.last.data, Chars(IRClassLookup.ASCII_POSIX("word")))
-  // Perl reads the bytes of a byte string as Latin-1 characters, so a pattern switching `/d` to Unicode rules (e.g. by
-  // `\x{100}`) has the rules of `0x80..0xFF` of the text strings (checked against Perl 5.44).
+  // Perl reads the bytes of a byte string as Latin-1 characters, so a pattern switching `/d` to Unicode rules (e.g. by `\x{100}`) has the rules of `0x80..0xFF` of the text strings (checked against Perl 5.44).
   for
     body <- Seq(
       "\\w",
@@ -200,10 +202,23 @@ class IRCharResolverSuite extends munit.FunSuite:
   error("[\\xFF]", "", Ruby())("Invalid multibyte escape at 1")
   error("[\\x00-\\xFF]", "", Ruby())("Invalid multibyte escape at 1")
   error("[a\\xA1-\\uFFFF]", "", Ruby())("Invalid multibyte escape at 2")
-  unsupported("[\\xC3\\xA0-\\xC3\\xA9]", "", Ruby())
+  // Onigmo reads the bytes of a character as one also at a range endpoint (checked against Ruby 4.0).
+  chars("[\\xC3\\xA0-\\xC3\\xA9]", "", Ruby())(CharSet.range(0xe0, 0xe9))
+  chars("[a-\\xC3\\xA9]", "", Ruby())(CharSet.range('a', 0xe9))
+  chars("[\\xC3\\xA0-\\u00E9]", "", Ruby())(CharSet.range(0xe0, 0xe9))
+  chars("[x\\xC3\\xA1\\xC3\\xA0-\\xC3\\xA9\\xC3\\xAF]", "", Ruby())(CharSet.range(0xe0, 0xe9).union(of("x\u00ef")))
+  chars("[\\xC3\\xA0-\\xC3\\xA9-\\xC3\\xAF]", "", Ruby())(CharSet.range(0xe0, 0xe9).union(of("-\u00ef")))
+  chars("[\\xC3\\xA0-\\xC3\\xA9]", "i", Ruby())(
+    CharSet.range(0xc0, 0xc9).union(CharSet.range(0xe0, 0xe9)).union(CharSet.single(0x212b))
+  )
+  error("[\\xC3\\xA0-\\xA9]", "", Ruby())("Invalid multibyte escape at 10")
+  error("[\\xC3\\xA0-\\xC3]", "", Ruby())("Invalid multibyte escape at 10")
+  error("[\\xC3\\xA9-\\xC3\\xA0]", "", Ruby())("Range out of order in character class at 1")
   chars("[\\xC3\\xBD\\xC3\\xBF]", "", Ruby())(of("\u00fd\u00ff"))
   // Onigmo repeats the whole character of byte escapes.
-  check("\\xC3\\xA9+", "", Ruby())(Repeat(Chars(of("\u00e9")), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy)))
+  check("\\xC3\\xA9+", "", Ruby())(
+    Repeat(IRNode(Chars(of("\u00e9"))), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy))
+  )
   chars("\\xC3", "n", Ruby())(CharSet.single(0xc3))
   // Perl's lexer applies the case commands to the text of a regex literal, even across a class and its ranges.
   chars("\\Ua", "", Perl())(of("A"))
@@ -286,7 +301,7 @@ class IRCharResolverSuite extends munit.FunSuite:
   check("ff", "i", Ruby())(Disjunction(Sequence(Chars(of("fF")), Chars(of("fF"))), Chars(of("\ufb00"))))
   check("(?<=ß)", "i", Ruby())(LookBehind(false, sharpS))
   check("(?<=ss)", "i", Ruby())(LookBehind(false, sharpS))
-  check("(?<=ß)", "i", Perl())(LookBehind(false, sharpS, Forward(Seq(Longest(1, 2)))))
+  check("(?<=ß)", "i", Perl())(LookBehind(false, IRNode(sharpS), Forward(Seq(Longest(1, 2)))))
   // Escapes fold as the literals, but Ruby keeps an escape of an ASCII character apart.
   check("\\xDF", "i", Perl())(sharpS)
   check("\\x{DF}", "i", Perl())(sharpS)
@@ -304,9 +319,9 @@ class IRCharResolverSuite extends munit.FunSuite:
   check("\\x73s", "i", Ruby())(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))
   check("\\u0073s", "i", Ruby())(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))
   check("(?<=\\u00DF)", "i", Ruby())(LookBehind(false, sharpS))
-  check("(?<=\\N{U+DF})", "i", Perl())(LookBehind(false, sharpS, Forward(Seq(Longest(1, 2)))))
+  check("(?<=\\N{U+DF})", "i", Perl())(LookBehind(false, IRNode(sharpS), Forward(Seq(Longest(1, 2)))))
   // Perl counts `\xDF` of a pattern that is not UTF-8 as one character in a look-behind, so it does not match `ss` there.
-  check("(?<=\\xDF)", "i", Perl())(LookBehind(false, sharpS, Forward(Seq(Longest(1, 1)))))
+  check("(?<=\\xDF)", "i", Perl())(LookBehind(false, IRNode(sharpS), Forward(Seq(Longest(1, 1)))))
   // `İ` folds to `i` and U+0307 by default (the Turkic folding to `i` is apart).
   val dottedI: IRNodeData = Disjunction(Sequence(Chars(of("iI")), Chars(of("\u0307"))), Chars(of("\u0130")))
   check("İ", "i", Ruby(), Perl())(dottedI)
@@ -316,7 +331,7 @@ class IRCharResolverSuite extends munit.FunSuite:
   check("i\\x{307}", "i", Perl())(dottedI)
   check("[İ]", "i", Perl())(dottedI)
   check("[İ]", "i", Ruby())(Disjunction(Chars(of("\u0130")), dottedI))
-  check("(?<=İ)", "i", Perl())(LookBehind(false, dottedI, Forward(Seq(Longest(1, 2)))))
+  check("(?<=İ)", "i", Perl())(LookBehind(false, IRNode(dottedI), Forward(Seq(Longest(1, 2)))))
   // Perl's `aa` and `l` forbid it, because the folding has an ASCII character.
   chars("İ", "iaa", Perl())(of("\u0130"))
   chars("[İx]", "il", Perl())(of("\u0130xX"))
@@ -410,14 +425,14 @@ class IRCharResolverSuite extends munit.FunSuite:
     assert(!lastSet("a\\w", Perl(utf8 = false)).contains(0xe9))
     assert(!lastSet("\u00e9\\w", Perl(utf8 = false)).contains(0xe9))
     assert(lastSet("\\x{100}\\w", Perl(utf8 = false)).contains(0xe9))
-  checkSet("\\w", "", Python())(s => s.contains(0xe9) && s.contains(0xb2))
+  checkSet("\\w", "", Python())(s => s.contains(0xe9) && s.contains(0xb2) && s.contains(0x2155) && !s.contains(0x300))
   checkSet("\\w", "U", Java)(s => s.contains(0xe9) && s.contains(0x200c))
   checkSet("(?u)\\w", "", Ruby())(s => s.contains(0xe9))
   checkSet("\\w", "", DotNet)(s => s.contains(0xe9) && !s.contains(0x0903) && s.last <= 0xffff)
   chars("\\W", "", JavaScript)(IRClassLookup.ASCIIWord.complement(UnitMode.UTF16))
   chars("\\w", "", Python(Python.Type.Bytes))(IRClassLookup.ASCIIWord)
   chars("\\h", "", Ruby())(of("0123456789abcdefABCDEF"))
-  chars("\\h", "", Perl())(IRClassLookup.pcreHorizontal.diff(of("᠎")))
+  chars("\\h", "", Perl())(IRClassLookup.pcreHorizontal.diff(of("\u180E")))
   chars("\\v", "", Java, Perl())(IRClassLookup.Vertical)
   chars("\\N", "", Perl())(of("\n").complement(UnitMode.CodePoint))
   check("\\R", "", Perl(), Ruby())(
@@ -426,13 +441,13 @@ class IRCharResolverSuite extends munit.FunSuite:
   check("\\R", "", Java)(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical)))
   check("\\R*", "", Java)(
     Repeat(
-      Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical)),
+      IRNode(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical))),
       IRQuantifier.Unbounded(0, BacktrackStrategy.Greedy)
     )
   )
   check("(?:\\R)?", "", Java)(
     Repeat(
-      Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical)),
+      IRNode(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical))),
       IRQuantifier.Bounded(0, 1, BacktrackStrategy.Greedy)
     )
   )
@@ -591,15 +606,14 @@ class IRCharResolverSuite extends munit.FunSuite:
 
   def cp(s: String): Seq[Int] = UnitMode.CodePoint.decode(s).iterator.toSeq
 
-  // The first cluster's length in the engines (Java 25, PCRE2 10.49, Perl 5.44, Ruby 4.0), where they agree except
-  // PCRE2 on the conjuncts (see `PCREProbes`).
+  // The first cluster's length in the engines (Java 25, PCRE2 10.49, Perl 5.44, Ruby 4.0), where they agree except PCRE2 on the conjuncts (see `PCREProbes`).
   val Probes: Seq[(String, String, Int)] = Seq(
-    ("CRLF", "\r\ń", 2),
-    ("LF and a mark", "\ń", 1),
+    ("CRLF", "\r\n\u0301", 2),
+    ("LF and a mark", "\n\u0301", 1),
     ("CR alone", "\rx", 1),
-    ("a control and a mark", "\u0001́", 1),
-    ("marks", "é̂x", 3),
-    ("a mark and ZWJ", "ä‍x", 3),
+    ("a control and a mark", "\u0001\u0301", 1),
+    ("marks", "e\u0301\u0302x", 3),
+    ("a mark and ZWJ", "a\u0308\u200Dx", 3),
     ("L V T", "각x", 3),
     ("LV T", "각x", 2),
     ("LVT T", "각ᆨx", 2),
@@ -610,36 +624,36 @@ class IRCharResolverSuite extends munit.FunSuite:
     ("LVT V", "각ᅡx", 1),
     ("L T", "ᄀᆨ", 1),
     ("LV LV", "가가", 1),
-    ("an emoji ZWJ sequence", "👨‍👩‍👧x", 5),
+    ("an emoji ZWJ sequence", "👨\u200D👩\u200D👧x", 5),
     ("an emoji modifier", "👍🏽x", 2),
-    ("ExtPict Extend ZWJ ExtPict", "😀́‍😀x", 4),
-    ("ZWJ ExtPict without a base", "a‍😀", 2),
+    ("ExtPict Extend ZWJ ExtPict", "😀\u0301\u200D😀x", 4),
+    ("ZWJ ExtPict without a base", "a\u200D😀", 2),
     ("four regional indicators", "🇯🇵🇺🇸", 2),
     ("three regional indicators", "🇯🇵🇺", 2),
-    ("prepend and a digit", "؀١x", 2),
-    ("prepend and LF", "؀\n", 1),
-    ("two prepends", "؀؀ax", 3),
-    ("prepend and a mark", "؀́", 2),
-    ("a spacing mark", "किx", 2),
+    ("prepend and a digit", "\u0600١x", 2),
+    ("prepend and LF", "\u0600\n", 1),
+    ("two prepends", "\u0600\u0600ax", 3),
+    ("prepend and a mark", "\u0600\u0301", 2),
+    ("a spacing mark", "क\u093Fx", 2),
     ("Thai SARA AM", "กำx", 2),
-    ("a spacing mark alone", "िx", 1),
-    ("a conjunct", "क्षx", 3),
-    ("a conjunct with ZWJ", "क्‍षx", 4),
-    ("a conjunct with a nukta", "क़्षx", 4),
-    ("a conjunct with two viramas", "क््षx", 4),
+    ("a spacing mark alone", "\u093Fx", 1),
+    ("a conjunct", "क\u094Dषx", 3),
+    ("a conjunct with ZWJ", "क\u094D\u200Dषx", 4),
+    ("a conjunct with a nukta", "क\u093C\u094Dषx", 4),
+    ("a conjunct with two viramas", "क\u094D\u094Dषx", 4),
     ("consonants", "कषx", 1),
-    ("a virama", "क्x", 2),
-    ("a Bengali conjunct", "ক্ষx", 3),
-    ("soft hyphen", "­́", 1),
-    ("ZWSP", "​́", 1),
+    ("a virama", "क\u094Dx", 2),
+    ("a Bengali conjunct", "ক\u09CDষx", 3),
+    ("soft hyphen", "\u00AD\u0301", 1),
+    ("ZWSP", "\u200B\u0301", 1),
     ("dot reph", "ൎകx", 2),
-    ("VS16", "❤️x", 2),
-    ("keycap", "1️⃣x", 3),
-    ("a tag sequence", "🏴󠁧󠁢󠁥󠁮󠁧󠁿x", 7),
+    ("VS16", "❤\uFE0Fx", 2),
+    ("keycap", "1\uFE0F\u20E3x", 3),
+    ("a tag sequence", "🏴\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7Fx", 7),
     ("LF LF", "\n\n", 1),
     ("CR CR", "\r\r", 1),
-    ("marks alone", "́́x", 2),
-    ("ZWJ alone", "‍‍x", 2)
+    ("marks alone", "\u0301\u0301x", 2),
+    ("ZWJ alone", "\u200D\u200Dx", 2)
   )
 
   for (name, input, expected) <- Probes do
@@ -654,20 +668,20 @@ class IRCharResolverSuite extends munit.FunSuite:
 
   // PCRE2 10.49 has its own rules (`pcre2_extuni.c`), checked with PHP 8.5.
   val PCREProbes: Seq[(String, String, Int, Int)] = Seq(
-    ("a conjunct", "क्षx", 0, 2),
-    ("a conjunct with ZWJ", "क्‍षx", 0, 3),
-    ("a conjunct with a nukta", "क़्षx", 0, 3),
-    ("a conjunct with two viramas", "क््षx", 0, 3),
-    ("a Bengali conjunct", "ক্ষx", 0, 2),
-    ("a regional indicator and a mark", "🇯́", 0, 1),
-    ("a regional indicator and ZWJ", "🇯‍", 0, 1),
-    ("a regional indicator and a spacing mark", "🇯ः", 0, 1),
-    ("prepend and an extended pictographic", "؀😀", 0, 1),
-    ("prepend and regional indicators", "؀🇯🇵🇺", 0, 3),
+    ("a conjunct", "क\u094Dषx", 0, 2),
+    ("a conjunct with ZWJ", "क\u094D\u200Dषx", 0, 3),
+    ("a conjunct with a nukta", "क\u093C\u094Dषx", 0, 3),
+    ("a conjunct with two viramas", "क\u094D\u094Dषx", 0, 3),
+    ("a Bengali conjunct", "ক\u09CDষx", 0, 2),
+    ("a regional indicator and a mark", "🇯\u0301", 0, 1),
+    ("a regional indicator and ZWJ", "🇯\u200D", 0, 1),
+    ("a regional indicator and a spacing mark", "🇯\u0903", 0, 1),
+    ("prepend and an extended pictographic", "\u0600😀", 0, 1),
+    ("prepend and regional indicators", "\u0600🇯🇵🇺", 0, 3),
     ("a regional indicator after one", "🇯🇵🇺", 1, 1),
     ("a regional indicator after two", "🇯🇵🇺🇸", 2, 2),
     ("a regional indicator after three", "🇯🇵🇺🇸🇯", 3, 1),
-    ("a regional indicator after a mark", "á🇯🇵", 2, 2)
+    ("a regional indicator after a mark", "a\u0301🇯🇵", 2, 2)
   )
 
   for (name, input, expected) <- Probes if !PCREProbes.exists(_._1 == name) do

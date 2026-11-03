@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.ast
 
 sealed abstract class ClassItem extends Product with Serializable:
+
   def data: ClassItemData
 
   def loc: SourceLocation
@@ -13,6 +14,7 @@ object ClassItem:
   final case class Value(data: ClassItemData.ClassValue, loc: SourceLocation) extends ClassItem
 
   object Value:
+
     def apply(data: ClassItemData.ClassValue): Value = Value(data, SourceLocation.Invalid)
 
   final case class NonValue(data: ClassItemData, loc: SourceLocation) extends ClassItem

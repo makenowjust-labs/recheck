@@ -6,8 +6,6 @@ import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 
 final case class IRNode(data: IRNodeData, loc: SourceLocation):
-  def equalsWithoutLoc(that: IRNode): Boolean =
-    data.equalsWithoutLoc(that.data)
 
   def children: Seq[IRNode] = data match
     case Disjunction(ns)                 => ns
@@ -77,4 +75,5 @@ final case class IRNode(data: IRNodeData, loc: SourceLocation):
     s"unsupported syntax ($name)$at"
 
 object IRNode:
+
   def apply(data: IRNodeData): IRNode = IRNode(data, SourceLocation.Invalid)

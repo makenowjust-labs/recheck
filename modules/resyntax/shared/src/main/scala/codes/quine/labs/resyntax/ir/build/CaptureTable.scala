@@ -51,6 +51,7 @@ private[build] final class CaptureTable(
 
 /** CaptureAnalyzer numbers the capture groups of a whole pattern, including the groups in unsupported nodes. */
 private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext):
+
   private val featureSet = initial.featureSet
 
   private var context: BuildingContext = initial
@@ -183,8 +184,7 @@ private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext)
       markSite(node)
       test match
         case ConditionalTest.LookAround(Some(kind), node) if initial.dialect.isDotNet =>
-          // .NET's parser ignores the next unnamed group to skip the parentheses of a conditional expression, and the
-          // look-around does not reset it, so it goes on to the next unnamed group, even after the conditional.
+          // .NET's parser ignores the next unnamed group to skip the parentheses of a conditional expression, and the look-around does not reset it, so it goes on to the next unnamed group, even after the conditional.
           ignoresNextGroup = true
           walkTest(Some(kind), node)
         case ConditionalTest.LookAround(kind, node)                                       => walkTest(kind, node)
@@ -270,6 +270,7 @@ private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext)
       open = savedOpen
 
 private[build] object CaptureAnalyzer:
+
   def analyze(root: Node, context: BuildingContext): CaptureTable =
     new CaptureAnalyzer(root, context).analyze()
 

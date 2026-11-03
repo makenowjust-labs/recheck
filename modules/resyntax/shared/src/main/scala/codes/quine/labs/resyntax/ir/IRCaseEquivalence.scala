@@ -26,10 +26,12 @@ object IRCaseEquivalence:
 
   /** Identity matches a code value only with itself. */
   case object Identity extends IRCaseEquivalence:
+
     def closure(set: CharSet): CharSet = set
 
   /** Keyed matches code values mapped to the same key. */
   final case class Keyed(name: String, mapping: CaseMapping, mode: UnitMode) extends IRCaseEquivalence:
+
     def closure(set: CharSet): CharSet = mapping.closure(set).restrict(mode)
 
   /** JavaUnicode is Java's `CASE_INSENSITIVE` with `UNICODE_CASE`.
@@ -38,6 +40,7 @@ object IRCaseEquivalence:
     * matches a range iff it, its `toUpperCase` or its `toLowerCase` is in the range (`Pattern.CIRangeU`).
     */
   case object JavaUnicode extends IRCaseEquivalence:
+
     // `Pattern.single` matches a character exactly if `toUpperCase(c) == toLowerCase(toUpperCase(c))` (e.g. `ß`).
     def closure(set: CharSet): CharSet =
       val cased = set.intersect(javaCased)
@@ -49,12 +52,14 @@ object IRCaseEquivalence:
 
   /** JavaASCII is Java's `CASE_INSENSITIVE` without `UNICODE_CASE`, which folds ASCII letters only. */
   case object JavaASCII extends IRCaseEquivalence:
+
     def closure(set: CharSet): CharSet = asciiFold.closure(set)
 
   /** PCRERestrict is PCRE's caseless restrict (`r`) and Perl's `aa`, which fold no ASCII and non-ASCII characters
     * together.
     */
   final case class PCRERestrict(mapping: CaseMapping, mode: UnitMode) extends IRCaseEquivalence:
+
     def closure(set: CharSet): CharSet =
       val ascii = set.intersect(ASCII)
       val other = set.diff(ASCII)
@@ -66,6 +71,7 @@ object IRCaseEquivalence:
     * string UTF-8, which uses Unicode rules.
     */
   final case class PerlNative(mode: UnitMode) extends IRCaseEquivalence:
+
     def closure(set: CharSet): CharSet =
       set.union(CaseMapping.SimpleFold.closure(set).diff(Latin1)).restrict(mode)
 
@@ -75,6 +81,7 @@ object IRCaseEquivalence:
     * `k` and `K`, or `ß` and `ẞ`).
     */
   final case class PerlLocale(mode: UnitMode) extends IRCaseEquivalence:
+
     def closure(set: CharSet): CharSet =
       val above = set.diff(Byte)
       asciiFold.closure(set.intersect(Byte)).union(CaseMapping.SimpleFold.closure(above).diff(Byte)).restrict(mode)

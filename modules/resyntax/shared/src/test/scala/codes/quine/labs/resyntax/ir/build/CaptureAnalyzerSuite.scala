@@ -1,15 +1,19 @@
 package codes.quine.labs.resyntax.ir
 package build
 
+import scala.language.implicitConversions
+
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ir.IRNodeData.*
+import codes.quine.labs.resyntax.ir.build.IRHelper.given
 
 class CaptureAnalyzerSuite extends munit.FunSuite with IRHelper:
+
   def captures(s: String, flags: String, dialects: Dialect*)(
       count: Int,
       names: Map[String, Seq[Int]] = Map.empty
-  )(implicit loc: munit.Location): Unit =
+  )(using loc: munit.Location): Unit =
     checkPattern(s, flags, dialects*): pattern =>
       assertEquals(pattern.captureCount, count)
       val named = pattern.node.collect { case Capture(index, Some(name), _) => (name, index) }
@@ -63,10 +67,7 @@ class CaptureAnalyzerSuite extends munit.FunSuite with IRHelper:
   check("(?<x>a)(?<1>b)(c)", "", DotNet)(
     Sequence(Capture(2, Some("x"), char('a')), Capture(1, None, char('b')), Capture(1, None, char('c')))
   )
-  // .NET's parser does not capture the first unnamed group after a conditional with a look-around (even after the
-  // conditional), which still takes an index before the named groups: `(?(?=(a))a)(b)` on `ab` gives 1 = `b` and 2
-  // unset, `(?(?=(?<x>a)(b))a)` gives 1 unset and 2 = `a`, and `(?(?=((a)))a)a(b)` on `aab` gives 1 = `a`, 2 = `b` and 3
-  // unset.
+  // .NET's parser does not capture the first unnamed group after a conditional with a look-around (even after the conditional), which still takes an index before the named groups: `(?(?=(a))a)(b)` on `ab` gives 1 = `b` and 2 unset, `(?(?=(?<x>a)(b))a)` gives 1 unset and 2 = `a`, and `(?(?=((a)))a)a(b)` on `aab` gives 1 = `a`, 2 = `b` and 3 unset.
   check("(?(?=(a))a)(b)", "", DotNet)(
     Sequence(Conditional(IRCondition.LookAhead(false, char('a')), char('a'), Empty), Capture(1, None, char('b')))
   )

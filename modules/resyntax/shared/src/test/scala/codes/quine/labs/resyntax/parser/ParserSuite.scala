@@ -14,6 +14,7 @@ import codes.quine.labs.resyntax.ast.Quantifier.*
 import codes.quine.labs.resyntax.charset.UnitMode
 
 class ParserSuite extends munit.FunSuite with ParserHelper:
+
   // Top
   error(")", "", All*)("Unmatched ')' at 0")
 

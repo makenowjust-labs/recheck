@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.ast
 
 sealed abstract class ClassItemData extends Product with Serializable:
+
   def equalsWithoutLoc(that: ClassItemData): Boolean =
     (this, that) match
       case (ClassItemData.ClassUnion(ls), ClassItemData.ClassUnion(rs)) =>
@@ -20,22 +21,26 @@ object ClassItemData:
   final case class ClassUnion(items: Seq[ClassItem]) extends ClassItemData
 
   object ClassUnion:
-    def apply(items: ClassItemData*)(implicit dummy: DummyImplicit): ClassUnion = ClassUnion(items.map(ClassItem(_)))
+
+    def apply(items: ClassItemData*)(using DummyImplicit): ClassUnion = ClassUnion(items.map(ClassItem(_)))
 
   final case class ClassIntersection(left: ClassItem, right: ClassItem) extends ClassItemData
 
   object ClassIntersection:
+
     def apply(left: ClassItemData, right: ClassItemData): ClassIntersection =
       ClassIntersection(ClassItem(left), ClassItem(right))
 
   final case class ClassDiff(left: ClassItem, right: ClassItem) extends ClassItemData
 
   object ClassDiff:
+
     def apply(left: ClassItemData, right: ClassItemData): ClassDiff = ClassDiff(ClassItem(left), ClassItem(right))
 
   final case class ClassNest(invert: Boolean, item: ClassItem) extends ClassItemData
 
   object ClassNest:
+
     def apply(invert: Boolean, item: ClassItemData): ClassNest = ClassNest(invert, ClassItem(item))
 
   final case class ClassPOSIX(invert: Boolean, name: String) extends ClassItemData
@@ -43,6 +48,7 @@ object ClassItemData:
   final case class ClassRange(begin: ClassItem.Value, end: ClassItem.Value) extends ClassItemData
 
   object ClassRange:
+
     def apply(left: ClassItemData.ClassValue, right: ClassItemData.ClassValue): ClassRange =
       ClassRange(ClassItem.Value(left), ClassItem.Value(right))
 
@@ -52,9 +58,11 @@ object ClassItemData:
   final case class ClassBackslashClass(klass: EscapeClassKind) extends ClassItemData
 
   sealed abstract class ClassValue extends ClassItemData:
+
     def value: Int
 
   final case class ClassBackslashValue(kind: BackslashKind.BackslashValue) extends ClassValue:
+
     def value: Int = kind.value
 
   final case class ClassLiteral(value: Int) extends ClassValue

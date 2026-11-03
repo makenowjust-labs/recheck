@@ -2,6 +2,7 @@ package codes.quine.labs.resyntax.parser
 
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
+import codes.quine.labs.resyntax.charset.UnitMode
 
 final case class FeatureSet(
     // JavaScript (without `uv`), Perl, Ruby
@@ -388,7 +389,7 @@ final case class FeatureSet(
     removesCommentGroup: Boolean,
     // Python, Ruby
     processBackslashInCommentGroup: Boolean,
-    // Java, JavaScript (with `uv`), Perl, PCRE (with `u`), Python (`str`), Ruby
+    // Java, JavaScript (with `uv`), PCRE (with `u`), Perl (with `utf8`), Python (`str`), Ruby (UTF-8 without `n`)
     readsAsUnicode: Boolean,
     // Python
     requiresInlineFlagAtStart: Boolean,
@@ -414,7 +415,7 @@ final case class FeatureSet(
 
 object FeatureSet:
 
-  def from(prescan: SourcePrescan, dialect: Dialect, flagSet: FlagSet): FeatureSet =
+  def from(prescan: SourcePrescan, dialect: Dialect, flagSet: FlagSet, mode: UnitMode): FeatureSet =
     val isDotNet = dialect.isDotNet
     val isJava = dialect.isJava
     val isJavaScript = dialect.isJavaScript
@@ -423,17 +424,8 @@ object FeatureSet:
     val isPython = dialect.isPython
     val isRuby = dialect.isRuby
 
-    val isByte = dialect match
-      case Dialect.Python(tpe) => tpe == Dialect.Python.Type.Bytes
-      case _                   => false
-    // Ruby's `n` is NOENCODING, which `FlagSet` keeps as `explicitCapture`.
-    val isRubyByte = dialect match
-      case Dialect.Ruby(encoding) => flagSet.explicitCapture || encoding == Dialect.Ruby.Encoding.ASCII8Bit
-      case _                      => false
-    val isPerlByte = dialect match
-      case Dialect.Perl(utf8, _) => !utf8
-      case _                     => false
-    val isUnicode = flagSet.unicode || flagSet.unicodeSets || (isPCRE && prescan.hasUTFStartOption)
+    val isByte = mode == UnitMode.Byte
+    val isUnicode = flagSet.unicode || flagSet.unicodeSets || (isPCRE && mode == UnitMode.CodePoint)
 
     FeatureSet(
       allowsAlphabeticUnknownBackslash = (isJavaScript && !isUnicode) || isPerl || isRuby,
@@ -631,12 +623,11 @@ object FeatureSet:
       readsLeadingCurlyAsLiteral = isPerl,
       readsThreeOctalDigitsAsOctal = isPython,
       rejectsInvalidBackReference = isJavaScript && isUnicode,
-      rejectsNonASCIIUnicodeEscape = isRubyByte,
+      rejectsNonASCIIUnicodeEscape = isRuby && isByte,
       rejectsNumberedReferenceWithNamedCapture = isRuby,
       removesCommentGroup = isRuby,
       processBackslashInCommentGroup = isPython || isRuby,
-      readsAsUnicode =
-        isJava || (isJavaScript && isUnicode) || (isPCRE && isUnicode) || isPerl || (isPython && !isByte) || isRuby,
+      readsAsUnicode = mode == UnitMode.CodePoint,
       requiresInlineFlagAtStart = isPython,
       skipsComment = flagSet.verbose,
       skipsCommentBeforeBacktrackStrategy = isDotNet || isJava || isPCRE || isPerl,
@@ -657,7 +648,7 @@ object FeatureSet:
         case _: Dialect.Ruby => ClassPOSIXNameRule.Ruby
         case _               => ClassPOSIXNameRule.Always,
       sourceEncoding =
-        if isByte then SourceEncoding.Latin1
-        else if (isPCRE && !isUnicode) || isPerlByte || isRubyByte then SourceEncoding.UTF8
-        else SourceEncoding.Text
+        if !isByte then SourceEncoding.Text
+        else if isPython then SourceEncoding.Latin1
+        else SourceEncoding.UTF8
     )

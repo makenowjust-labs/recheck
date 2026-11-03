@@ -18,6 +18,7 @@ import codes.quine.labs.resyntax.ir.build.IRPropertyLookup.of
   * reason to use Unicode rules, where `U+0080..U+00FF` follow ASCII rules.
   */
 private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlNative: Boolean):
+
   import IRClassLookup.*
 
   private def ruleOf(flags: IRCharFlagSet, asciiOf: IRCharset.ASCII => Boolean): Rule =
@@ -90,7 +91,7 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
   /** Returns the word characters of `\b` and `\B` under the flags. */
   def boundaryWord(flags: IRCharFlagSet): CharSet = dialect match
     // .NET's `RegexCharClass.IsBoundaryWordChar` adds ZWNJ and ZWJ.
-    case Dialect.DotNet => dotNetWord.union(of("‌‍"))
+    case Dialect.DotNet => dotNetWord.union(of("\u200C\u200D"))
     // Onigmo's `(?d)` uses Unicode for `\b` and `\B`, unlike `\w`.
     case _: Dialect.Ruby
         if mode == UnitMode.CodePoint && (flags.charset == IRCharset.Default || flags.charset == IRCharset.Locale) =>
@@ -109,15 +110,15 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
   def perlCased(flags: IRCharFlagSet): CharSet =
     pick(ruleOf(flags, _.posix), ascii('A' -> 'Z', 'a' -> 'z'), binary("Cased"))
 
-  /** `\h` as a horizontal space (Java, PCRE and Perl). */
+  /** Returns the characters of `\h` as a horizontal space (Java, PCRE and Perl). */
   def horizontal: CharSet = dialect match
-    case _: Dialect.Perl => pcreHorizontal.diff(of("᠎"))
+    case _: Dialect.Perl => pcreHorizontal.diff(of("\u180E"))
     case _               => pcreHorizontal
 
-  /** `\v` as a vertical space (Java, PCRE and Perl). */
+  /** Returns the characters of `\v` as a vertical space (Java, PCRE and Perl). */
   def vertical: CharSet = Vertical
 
-  /** `\h` as a hexadecimal digit (Ruby). */
+  /** Returns the characters of `\h` as a hexadecimal digit (Ruby). */
   def hexDigit: CharSet = ascii('0' -> '9', 'A' -> 'F', 'a' -> 'f')
 
   /** Returns the characters of `[[:name:]]` under the flags, or `None` for a name that the dialect does not know. */
@@ -143,9 +144,8 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
       case _ => asciiSet
 
   private def pcrePOSIX(name: String): Option[CharSet] =
-    // pcre2pattern: "[:graph:] matches all characters with the L, M, N, P, S, or Cf properties, except for U+061C,
-    // U+180E and U+2066 - U+2069".
-    val graph = gc("L", "M", "N", "P", "S", "Cf").diff(of("؜᠎⁦⁧⁨⁩"))
+    // pcre2pattern: "[:graph:] matches all characters with the L, M, N, P, S, or Cf properties, except for U+061C, U+180E and U+2066 - U+2069".
+    val graph = gc("L", "M", "N", "P", "S", "Cf").diff(of("\u061C\u180E\u2066\u2067\u2068\u2069"))
     name match
       case "alnum" => Some(gc("L", "N"))
       case "alpha" => Some(gc("L"))
@@ -166,6 +166,7 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
 object IRClassLookup:
 
   private enum Rule:
+
     case ASCII, Unicode, Native
 
   val Latin1: CharSet = CharSet.range(0x80, 0xff)
@@ -178,34 +179,42 @@ object IRClassLookup:
 
   val Vertical: CharSet = CharSet.range(0x0a, 0x0d).union(of("\u0085\u2028\u2029"))
 
-  /** `\h` of Java and PCRE. */
+  /** pcreHorizontal is the characters of `\h` in Java and PCRE. */
   lazy val pcreHorizontal: CharSet =
-    of("\t   ᠎  　").union(CharSet.range(0x2000, 0x200a))
+    of("\t \u00A0\u1680\u180E\u202F\u205F\u3000").union(CharSet.range(0x2000, 0x200a))
 
-  /** ECMAScript's WhiteSpace and LineTerminator. */
-  lazy val javaScriptSpace: CharSet = gc("Zs").union(of("\t\n\u000b\f\r\u2028\u2029﻿"))
+  /** javaScriptSpace is the characters of JavaScript's `\s`, which are ECMAScript's WhiteSpace and LineTerminator. */
+  lazy val javaScriptSpace: CharSet = gc("Zs").union(of("\t\n\u000b\f\r\u2028\u2029\uFEFF"))
 
-  /** Python's `str.isspace`: `Zs`, or the bidirectional class `WS`, `B` or `S`. */
+  /** pythonSpace is the characters of Python's `\s`, which are `str.isspace`: `Zs`, or the bidirectional class `WS`,
+    * `B` or `S`.
+    */
   lazy val pythonSpace: CharSet =
     val bc = PropertyTable.BidiClass
     gc("Zs").union(CharSet.union(Seq("WS", "B", "S").map(bc.value(_).get.set)))
 
-  /** Python's `str.isalnum` or `_`, approximated by letters and numbers. */
-  lazy val pythonWord: CharSet = gc("L", "N").union(of("_"))
+  /** pythonWord is the characters of Python's `\w`, which are `str.isalnum` (a letter or a character with a numeric
+    * type) or `_`.
+    */
+  lazy val pythonWord: CharSet =
+    val numeric = Seq("Decimal", "Digit", "Numeric").map(PropertyTable.NumericType.value(_).get.set)
+    gc("L").union(CharSet.union(numeric)).union(of("_"))
 
-  /** PCRE2's `\w` in UCP mode (with `Mn` and `Pc` since 10.43). */
+  /** pcreWord is the characters of PCRE2's `\w` in UCP mode (with `Mn` and `Pc` since 10.43). */
   lazy val pcreWord: CharSet = gc("L", "N", "Mn", "Pc").union(of("_"))
 
-  /** Onigmo's `\w` in Unicode: `[[:word:]]` and the `No` characters of Latin-1 (its Latin-1 ctype table marks them). */
+  /** rubyWord is the characters of Onigmo's `\w` in Unicode: `[[:word:]]` and the `No` characters of Latin-1 (its
+    * Latin-1 ctype table marks them).
+    */
   lazy val rubyWord: CharSet = IRPropertyLookup.rubyPOSIX("word").get.union(of("\u00b2\u00b3\u00b9\u00bc\u00bd\u00be"))
 
-  /** Perl's `\p{Word}`. */
+  /** perlWord is the characters of Perl's `\w` under Unicode rules, which is `\p{Word}`. */
   lazy val perlWord: CharSet = binary("Alphabetic").union(gc("M", "Nd", "Pc")).union(binary("Join_Control"))
 
-  /** .NET's `\w`: `[\p{L}\p{Mn}\p{Nd}\p{Pc}]`. */
+  /** dotNetWord is the characters of .NET's `\w`, which is `[\p{L}\p{Mn}\p{Nd}\p{Pc}]`. */
   lazy val dotNetWord: CharSet = gc("L", "Mn", "Nd", "Pc")
 
-  /** The POSIX classes in ASCII. */
+  /** ASCII_POSIX is the characters of each POSIX class in ASCII, by its name (e.g. `alpha`). */
   val ASCII_POSIX: Map[String, CharSet] = Map(
     "alnum" -> ascii('0' -> '9', 'A' -> 'Z', 'a' -> 'z'),
     "alpha" -> ascii('A' -> 'Z', 'a' -> 'z'),

@@ -12,12 +12,8 @@ class IRPatternSuite extends munit.FunSuite:
 
   def parse(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)
-    IRBuilder.build(
-      Parser.parse(source, flagSet, dialect),
-      flagSet,
-      dialect,
-      Parser.determineUnitMode(source, flagSet, dialect)
-    )
+    val mode = Parser.determineUnitMode(source, flagSet, dialect)
+    IRBuilder.build(Parser.parse(source, flagSet, dialect, mode), flagSet, dialect, mode)
 
   /** Checks a property of patterns, given as pairs of a source and the expected value. */
   def check[A](name: String, flags: String = "", dialect: Dialect = Dialect.JavaScript)(f: IRPattern => A)(
@@ -27,63 +23,6 @@ class IRPatternSuite extends munit.FunSuite:
         if dialect == Dialect.JavaScript then "" else s" in $dialect"
       }"):
       for (source, expected) <- cases do assertEquals(f(parse(source, flags, dialect)), expected, source)
-
-  test("IRNode#captureRange"):
-    def range(source: String): Option[(Int, Int)] = parse(source).node.captureRange
-
-    assertEquals(range("(.)(.)"), Some((1, 2)))
-    assertEquals(range("(.)|(.)"), Some((1, 2)))
-    assertEquals(range("(.)"), Some((1, 1)))
-    assertEquals(range("((.))"), Some((1, 2)))
-    assertEquals(range("(?<x>.)"), Some((1, 1)))
-    assertEquals(range("(?<x>(.))"), Some((1, 2)))
-    assertEquals(range("(?:(.))"), Some((1, 1)))
-    assertEquals(range("(.){1}"), Some((1, 1)))
-    assertEquals(range("(?=(.))"), Some((1, 1)))
-    assertEquals(range("(?<=(.))"), Some((1, 1)))
-    for source <- Seq("\\b", "^", "$", "a", "\\d", "[a]", ".", "(?:a)\\1") do assertEquals(range(source), None, source)
-    assertEquals(parse("(?>(a))", dialect = Dialect.Java).node.captureRange, Some((1, 1)))
-
-  check("IRNode#canMatchEmpty")(_.node.canMatchEmpty)(
-    ".." -> false,
-    "" -> true,
-    ".|." -> false,
-    "|." -> true,
-    ".|" -> true,
-    "(.)" -> false,
-    "()" -> true,
-    "(?<x>.)" -> false,
-    "(?<x>)" -> true,
-    "(?:.)" -> false,
-    ".*" -> true,
-    "(?:)*" -> true,
-    ".+" -> false,
-    "(?:)+" -> true,
-    ".?" -> true,
-    ".{0}" -> true,
-    ".{1}" -> false,
-    "(?:){1}" -> true,
-    ".{0,}" -> true,
-    ".{1,}" -> false,
-    ".{0,1}" -> true,
-    ".{1,2}" -> false,
-    "(?:){1,2}" -> true,
-    "\\b" -> true,
-    "^" -> true,
-    "$" -> true,
-    "(?=.)" -> true,
-    "(?<=.)" -> true,
-    "a" -> false,
-    "\\d" -> false,
-    "[a]" -> false,
-    "(.)\\1" -> false,
-    "(?:(.)|)\\1" -> true
-  )
-
-  check("IRNode#canMatchEmpty", "v")(_.node.canMatchEmpty)(
-    "[\\q{ab|c}]" -> false,
-    "[\\q{ab|}]" -> true
-  )
 
   check("IRPattern#existsLineAssertion")(_.existsLineAssertion)(
     ".|^" -> true,

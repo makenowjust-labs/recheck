@@ -187,8 +187,7 @@ final case class IRPattern(
     // When line assertion appears in middle part of the pattern, then the pattern needs input terminator distinction.
     if existsLineAssertionInMiddle then return true
 
-    // When line begin (resp. end) assertion appears at every begin (resp. end) point with consistency,
-    // then the pattern needs input terminator distinction.
+    // When line begin (resp. end) assertion appears at every begin (resp. end) point with consistency, then the pattern needs input terminator distinction.
     (!everyBeginPointIsLineBegin && !everyBeginPointIsNotLineBegin) || (!everyEndPointIsLineEnd && !everyEndPointIsNotLineEnd)
 
   /** Checks whether a match may start after the begin of the input, as if the pattern began with `.*?`. */
@@ -360,11 +359,11 @@ object IRBackReferenceFolding:
   /** Full compares the full case foldings of the capture and the input, which must end at the end of a character of
     * both (Perl and Ruby, e.g. `(ß)\1` matches `"ßss"`, but `(s)\1` does not match `"sß"`).
     *
-    * A folding of a character to several characters counts only if all its code values are `below` or more; otherwise,
-    * the character keeps its other folding (`below` is `0x80` under `aa`, and `0x100` under `l`).
+    * A folding of a character to several characters counts only if all its code values are `minFoldedValue` or more;
+    * otherwise, the character keeps its other folding (`minFoldedValue` is `0x80` under `aa`, and `0x100` under `l`).
     */
-  final case class Full(below: Int) extends IRBackReferenceFolding:
+  final case class Full(minFoldedValue: Int) extends IRBackReferenceFolding:
 
     /** Returns the folding of a character to several characters, if any. */
     def fold(c: UChar): Option[UString] =
-      Some(FullCaseFolding(c)).filter(key => key.length >= 2 && key.iterator.forall(_ >= below))
+      Some(FullCaseFolding(c)).filter(key => key.length >= 2 && key.iterator.forall(_ >= minFoldedValue))

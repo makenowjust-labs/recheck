@@ -111,10 +111,10 @@ object IRBuilder:
     IRBacktrackControlSemantics(thenPassesAssertions = dialect.isPerl, acceptEndsAtomic = dialect.isPerl)
 
   /** Checks whether Perl takes the full case folding of the character under the flags (e.g. `ß` as `ss`). */
-  private def perlFoldsMulti(value: Int, flags: IRCharFlagSet, perlUnicodeRules: Boolean): Boolean =
+  private def perlFoldsMulti(value: Int, flags: IRCharFlagSet, perlUTF8Pattern: Boolean): Boolean =
     val hasASCII = FullCaseFolding(value).iterator.exists(_ < 0x80)
     val one = flags.charset match
-      case IRCharset.Default  => !perlUnicodeRules
+      case IRCharset.Default  => !perlUTF8Pattern
       case IRCharset.Unicode  => false
       case IRCharset.Locale   => value < 0x100 || hasASCII && value != 0x1e9e
       case _: IRCharset.ASCII => flags.caselessRestrict && hasASCII && value != 0xdf && value != 0x1e9e
@@ -176,9 +176,9 @@ object IRBuilder:
             .fold(single(1)): flags =>
               node.data match
                 case _ if nodes.size > 1 =>
-                  single(fold(UTF8Encoding.decode(nodes.collect {
+                  val bytes = nodes.collect:
                     case Node(NodeData.Backslash(BackslashKind.Escape(_, b)), _) => b
-                  })))
+                  single(fold(UTF8Encoding.decode(bytes)))
                 case NodeData.Literal(value)                                 => single(fold(value))
                 case NodeData.Backslash(value: BackslashKind.BackslashValue) => single(fold(value.value))
                 case NodeData.Class(false, _)                                =>
@@ -228,16 +228,14 @@ object IRBuilder:
       case QuoteLiteral.QuoteValue(value)    => value >= 0x80
 
   private def deepExists(x: Any)(p: PartialFunction[Any, Boolean]): Boolean =
-    p.applyOrElse(
-      x,
-      {
+    if p.isDefinedAt(x) then p(x)
+    else
+      x match
         case xs: Iterable[?] => xs.exists(deepExists(_)(p))
         case x: Option[?]    => x.exists(deepExists(_)(p))
         case _: String       => false
         case x: Product      => x.productIterator.exists(deepExists(_)(p))
         case _               => false
-      }
-    )
 
   /** Returns the names of PCRE's start options (e.g. `(*CRLF)`), which can appear only at the start. */
   private def startOptions(node: Node): Seq[String] =
@@ -282,6 +280,7 @@ private[build] class IRBuilder(
     lookBehindAnalyzer: LookBehindAnalyzer,
     hasCall: Boolean
 ):
+
   private val dialect = initial.dialect
 
   private val featureSet = initial.featureSet
@@ -457,9 +456,9 @@ private[build] class IRBuilder(
       case Some(_: GroupKind.PositiveLookAhead)  => IRCondition.LookAhead(false, scoped(build(body)))
       case Some(_: GroupKind.NegativeLookAhead)  => IRCondition.LookAhead(true, scoped(build(body)))
       case Some(_: GroupKind.PositiveLookBehind) =>
-        IRCondition.LookBehind(false, scoped(build(body)), lookBehindAnalyzer.matching(body))
+        IRCondition.LookBehind(false, scoped(build(body)), lookBehindAnalyzer.determineLookBehindMatch(body))
       case Some(_: GroupKind.NegativeLookBehind) =>
-        IRCondition.LookBehind(true, scoped(build(body)), lookBehindAnalyzer.matching(body))
+        IRCondition.LookBehind(true, scoped(build(body)), lookBehindAnalyzer.determineLookBehindMatch(body))
 
   def buildBacktrackControl(kind: Option[BacktrackControlKind], name: Option[String]): IRNodeData =
     // An empty name is the same as no name.
@@ -475,7 +474,7 @@ private[build] class IRBuilder(
         IRNodeData.BacktrackControl(IRBacktrackControl.Mark(name.getOrElse("")))
 
   def buildLookBehind(negative: Boolean, child: Node): IRNodeData =
-    IRNodeData.LookBehind(negative, scoped(build(child)), lookBehindAnalyzer.matching(child))
+    IRNodeData.LookBehind(negative, scoped(build(child)), lookBehindAnalyzer.determineLookBehindMatch(child))
 
   def buildGroup(node: Node, kind: GroupKind, child: Node): Either[IRNodeData, IRNode] = kind match
     case GroupKind.IndexedCapture =>
@@ -501,7 +500,7 @@ private[build] class IRBuilder(
     case GroupKind.Balance(_, _, _)               => Left(IRNodeData.Unsupported(node.data))
     case GroupKind.NonAtomicPositiveLookAhead(_)  => Left(IRNodeData.NonAtomicLookAhead(scoped(build(child))))
     case GroupKind.NonAtomicPositiveLookBehind(_) =>
-      Left(IRNodeData.NonAtomicLookBehind(scoped(build(child)), lookBehindAnalyzer.matching(child)))
+      Left(IRNodeData.NonAtomicLookBehind(scoped(build(child)), lookBehindAnalyzer.determineLookBehindMatch(child)))
     case GroupKind.ScriptRun(_)        => Left(IRNodeData.Unsupported(node.data))
     case GroupKind.AtomicScriptRun(_)  => Left(IRNodeData.Unsupported(node.data))
     case GroupKind.ScanSubstring(_, _) => Left(IRNodeData.Unsupported(node.data))

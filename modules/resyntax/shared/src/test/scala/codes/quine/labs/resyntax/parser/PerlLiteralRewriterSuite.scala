@@ -3,11 +3,12 @@ package codes.quine.labs.resyntax.parser
 import codes.quine.labs.resyntax.ast.SourceLocation
 
 class PerlLiteralRewriterSuite extends munit.FunSuite:
-  def rewrite(s: String, extended: Boolean = false)(expected: String)(implicit loc: munit.Location): Unit =
+
+  def rewrite(s: String, extended: Boolean = false)(expected: String)(using loc: munit.Location): Unit =
     test(s"PerlLiteralRewriter.rewrite: /$s/${if extended then "x" else ""}"):
       assertEquals(PerlLiteralRewriter.rewrite(s, extended, bytes = false).map(_.text), Some(expected))
 
-  def error(s: String)(message: String)(implicit loc: munit.Location): Unit =
+  def error(s: String)(message: String)(using loc: munit.Location): Unit =
     test(s"PerlLiteralRewriter.rewrite: /$s/ with error \"$message\""):
       interceptMessage[ParsingException](message)(PerlLiteralRewriter.rewrite(s, extended = false, bytes = false))
 

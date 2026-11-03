@@ -90,6 +90,7 @@ object IRLookBehindRule:
   case object Ruby extends IRLookBehindRule
 
 object IRFeatureSet:
+
   def from(flagSet: FlagSet, dialect: Dialect, startOptions: Seq[String]): IRFeatureSet =
     val isDotNet = dialect.isDotNet
     val isJava = dialect.isJava
@@ -100,18 +101,16 @@ object IRFeatureSet:
     val isRuby = dialect.isRuby
 
     // PCRE uses the last newline option.
-    val newline = startOptions.reverseIterator.collectFirst {
+    val newline = startOptions.reverseIterator.collectFirst:
       case "CR"      => IRLineTerminatorSet.CR
       case "LF"      => IRLineTerminatorSet.LF
       case "CRLF"    => IRLineTerminatorSet.PCRE_CRLF
       case "ANYCRLF" => IRLineTerminatorSet.PCREAnyCRLF
       case "ANY"     => IRLineTerminatorSet.PCREAny
       case "NUL"     => IRLineTerminatorSet.NUL
-    }
-    val bsr = startOptions.reverseIterator.collectFirst {
+    val bsr = startOptions.reverseIterator.collectFirst:
       case "BSR_ANYCRLF" => true
       case "BSR_UNICODE" => false
-    }
 
     IRFeatureSet(
       caretIsLineBegin = isRuby,

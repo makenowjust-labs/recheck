@@ -41,14 +41,14 @@ final case class CharKind(
 
 object CharKind:
 
-  /** A character kind for normal character. */
+  /** Normal is the kind of a character in no set. */
   val Normal: CharKind = CharKind()
 
-  /** A character kind for line terminator character (of the first set). */
+  /** LineTerminator is the kind of a character of the first line terminator set only. */
   val LineTerminator: CharKind = CharKind(terminators = 1)
 
-  /** A character kind for word character. */
+  /** Word is the kind of a character of the first word set only. */
   val Word: CharKind = CharKind(words = 1)
 
-  /** The kind of the begin and the end of the input, where there is no character. */
+  /** Boundary is the kind of the begin and the end of the input, where there is no character. */
   val Boundary: CharKind = CharKind(boundary = true)

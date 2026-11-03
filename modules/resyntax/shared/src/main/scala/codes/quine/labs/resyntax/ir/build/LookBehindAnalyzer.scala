@@ -1,6 +1,8 @@
 package codes.quine.labs.resyntax.ir
 package build
 
+import scala.collection.mutable
+
 import codes.quine.labs.resyntax.ast.AssertKind
 import codes.quine.labs.resyntax.ast.BackslashKind
 import codes.quine.labs.resyntax.ast.BacktrackControlKind
@@ -33,12 +35,18 @@ private[build] final class LookBehindAnalyzer(
     rubyClassWidths: Node => Option[Seq[Int]]
 ):
 
+  /** The widths of the groups of each index that do not depend on the visited groups. */
+  private val groupWidths = mutable.HashMap.empty[Int, Seq[Option[Width]]]
+
+  /** The number of the references to a visited group so far, which make a width depend on the visited groups. */
+  private var recursions = 0
+
   /** Validates that the dialect accepts the look-behind, or throws [[IRBuildingException]]. */
   def validateLookBehind(lookBehind: Node, body: Node, negative: Boolean): Unit =
     featureSet.lookBehindRule match
       case IRLookBehindRule.Unrestricted => ()
       case IRLookBehindRule.Java         =>
-        if !java(List(body), JavaInfo.Initial).maxValid then
+        if !studyJava(List(body), JavaInfo.Initial).maxValid then
           fail("Look-behind group does not have an obvious maximum length", lookBehind)
       case IRLookBehindRule.PCRE =>
         val branches = body.data match
@@ -54,14 +62,17 @@ private[build] final class LookBehindAnalyzer(
         for w <- width(body, Set.empty) do
           if w.min != w.max || w.max == Inf then fail("Look-behind requires fixed-width pattern", lookBehind)
       case IRLookBehindRule.Ruby =>
-        if !ruby(body, negative) then fail("Invalid pattern in look-behind", lookBehind)
+        if !isValidRubyLookBehind(body, negative) then fail("Invalid pattern in look-behind", lookBehind)
 
-  /** Returns how the engine matches the body of a valid look-behind. */
-  def matching(body: Node): IRLookBehindMatch =
-    def longest(node: Node): IRLookBehindStarts =
-      width(node, Set.empty, conditionals = true) match
-        case Some(w) => IRLookBehindStarts.Longest(w.min.min(Int.MaxValue).toInt, w.max.min(Int.MaxValue).toInt)
-        case None    => IRLookBehindStarts.Longest(0, 0)
+  /** Determines how the engine matches the body of a valid look-behind.
+    *
+    * A length above `Int.MaxValue`, which no input reaches, is `Int.MaxValue`.
+    */
+  def determineLookBehindMatch(body: Node): IRLookBehindMatch =
+    def longest(node: Node): IRLookBehindStarts.Longest =
+      val w = width(node, Set.empty, conditionals = true).getOrElse:
+        throw new IllegalStateException("The width of a valid look-behind is unknown")
+      IRLookBehindStarts.Longest(toLength(w.min), toLength(w.max))
 
     featureSet.lookBehindRule match
       case IRLookBehindRule.Unrestricted => IRLookBehindMatch.Backward
@@ -73,11 +84,9 @@ private[build] final class LookBehindAnalyzer(
           case _                           => IRLookBehindMatch.Forward(Seq(longest(body)))
       // Perl tries the starts from the minimum length to `(*ACCEPT)` too.
       case IRLookBehindRule.Perl =>
-        val starts = longest(body) match
-          case IRLookBehindStarts.Longest(min, max) =>
-            IRLookBehindStarts.Longest(perlAcceptMin(body).fold(min)(n => min.min(n.toInt)), max)
-          case starts => starts
-        IRLookBehindMatch.Forward(Seq(starts))
+        val starts = longest(body)
+        val min = perlAcceptMin(body).fold(starts.min)(n => starts.min.min(toLength(n)))
+        IRLookBehindMatch.Forward(Seq(starts.copy(min = min)))
       case IRLookBehindRule.Python => IRLookBehindMatch.Forward(Seq(longest(body)))
       // Each top-level alternative of Ruby's look-behind has a fixed width, so matching it backward is the same.
       case IRLookBehindRule.Ruby => IRLookBehindMatch.Backward
@@ -117,8 +126,10 @@ private[build] final class LookBehindAnalyzer(
       kind match
         case _: CommandKind.Comment | _: CommandKind.InlineFlag | _: CommandKind.ResetFlag |
             _: CommandKind.StartOption | CommandKind.Callout | _: CommandKind.CalloutInt |
-            _: CommandKind.CalloutString | _: CommandKind.BacktrackControl =>
+            _: CommandKind.CalloutString | _: CommandKind.BacktrackControl | _: CommandKind.InlineCode =>
           Some(Width(0, 0))
+        // Perl takes the pattern of `(??{...})` as unbounded (e.g. `(?<=(??{"a"}))` is too long in Perl 5.44).
+        case _: CommandKind.EmbedCode         => Some(Width(0, Inf))
         case CommandKind.BranchReset(nodes)   => widthOfAlternatives(nodes, visiting, conditionals)
         case CommandKind.PBackReference(name) =>
           backReferenceWidth(node, Reference.NamedReference(name), visiting)
@@ -185,8 +196,7 @@ private[build] final class LookBehindAnalyzer(
       case ref                           =>
         val site = table.siteOf(node)
         val indices = resolver.backReference(ref, site, node.loc)
-        // A reference to a group enclosing it, to more than one group, or to a group in a branch reset is unbounded in
-        // PCRE (e.g. `(a(?<=\1))` and `(?|(a))(?<!\1)`).
+        // A reference to a group enclosing it, to more than one group, or to a group in a branch reset is unbounded in PCRE (e.g. `(a(?<=\1))` and `(?|(a))(?<!\1)`).
         if indices.isEmpty || indices.size > 1 || indices.exists(i => site.open.contains(i) || table.inBranchReset(i))
         then Some(Width(0, Inf))
         else groupWidth(indices, visiting)
@@ -194,20 +204,33 @@ private[build] final class LookBehindAnalyzer(
   /** Returns the width of a call, which is the width of the called groups, or unbounded for a recursion. */
   private def callWidth(node: Node, ref: Reference, visiting: Set[Int]): Option[Width] =
     val site = table.siteOf(node)
-    val indices = resolver.call(ref, site, node.loc)
+    val indices = resolver.resolveCall(ref, site, node.loc)
     if indices.exists(site.open.contains) then Some(Width(0, Inf)) else groupWidth(indices, visiting)
 
   private def groupWidth(indices: Seq[Int], visiting: Set[Int]): Option[Width] =
-    if indices.exists(visiting.contains) then return Some(Width(0, Inf))
-    val widths = for index <- indices; group <- groupsOf(index) yield group.data match
-      case NodeData.Group(_, child) => width(child, visiting + index)
-      case _                        => None
+    if indices.exists(visiting.contains) then
+      recursions += 1
+      return Some(Width(0, Inf))
+    val widths = indices.flatMap(groupWidthsOf(_, visiting))
     if widths.isEmpty || widths.exists(_.isEmpty) then None else Some(widths.flatten.reduce(union))
 
-  private def groupsOf(index: Int): Seq[Node] = table.groups.getOrElse(index, Seq.empty)
+  /** Returns the widths of the groups of the index, which are memoized unless they depend on the visited groups. */
+  private def groupWidthsOf(index: Int, visiting: Set[Int]): Seq[Option[Width]] =
+    groupWidths.get(index) match
+      case Some(widths) => widths
+      case None         =>
+        val before = recursions
+        val widths = table.groups
+          .getOrElse(index, Seq.empty)
+          .map: group =>
+            group.data match
+              case NodeData.Group(_, child) => width(child, visiting + index)
+              case _                        => None
+        if recursions == before then groupWidths(index) = widths
+        widths
 
   /** Checks Onigmo's restriction: each top-level alternative has a fixed length, and some nodes are forbidden. */
-  private def ruby(body: Node, negative: Boolean): Boolean =
+  private def isValidRubyLookBehind(body: Node, negative: Boolean): Boolean =
     if NodeKey.exists(body)(rubyForbidden(_, negative)) then return false
     val node = rubyUnwrap(body)
     node.data match
@@ -247,11 +270,10 @@ private[build] final class LookBehindAnalyzer(
       else if widths.distinct.size == 1 then widths.head
       else RubyWidth.Variable
     case NodeData.Sequence(nodes) =>
-      rubyChars(nodes.toIndexedSeq).foldLeft[RubyWidth](RubyWidth.Fixed(0)) {
+      rubyChars(nodes.toIndexedSeq).foldLeft[RubyWidth](RubyWidth.Fixed(0)):
         case (RubyWidth.Fixed(l), RubyWidth.Fixed(r))          => RubyWidth.Fixed(l + r)
         case (RubyWidth.Variable, _) | (_, RubyWidth.Variable) => RubyWidth.Variable
         case _                                                 => RubyWidth.Unknown
-      }
     case NodeData.Repeat(node, quantifier) =>
       bounds(quantifier) match
         case (min, max) if min == max =>
@@ -306,48 +328,48 @@ private[build] final class LookBehindAnalyzer(
   /** Studies a node chain as `java.util.regex.Pattern`'s `TreeInfo` for the maximum length, where an alternation
     * studies its continuation from scratch, and the length overflows as `int`.
     */
-  private def java(chain: List[Node], info: JavaInfo): JavaInfo = chain match
+  private def studyJava(chain: List[Node], info: JavaInfo): JavaInfo = chain match
     case Nil          => info
     case node :: rest =>
       node.data match
-        case NodeData.Sequence(nodes)                                 => java(nodes.toList ++ rest, info)
-        case NodeData.Disjunction(nodes)                              => javaBranch(nodes.map(Some(_)), rest, info)
-        case NodeData.Group(kind, child) if isJavaGroup(kind)         => java(child :: rest, info)
-        case NodeData.Group(GroupKind.Atomic(_), child)               => java(rest, java(List(child), info))
-        case NodeData.Group(_, _)                                     => java(rest, info)
-        case NodeData.Repeat(child, quantifier)                       => javaRepeat(child, quantifier, rest, info)
-        case NodeData.Backslash(_: BackslashKind.EscapeBackReference) => java(rest, info.copy(maxValid = false))
+        case NodeData.Sequence(nodes)                                 => studyJava(nodes.toList ++ rest, info)
+        case NodeData.Disjunction(nodes)                              => studyJavaBranch(nodes.map(Some(_)), rest, info)
+        case NodeData.Group(kind, child) if isJavaGroup(kind)         => studyJava(child :: rest, info)
+        case NodeData.Group(GroupKind.Atomic(_), child)               => studyJava(rest, studyJava(List(child), info))
+        case NodeData.Group(_, _)                                     => studyJava(rest, info)
+        case NodeData.Repeat(child, quantifier)                       => studyJavaRepeat(child, quantifier, rest, info)
+        case NodeData.Backslash(_: BackslashKind.EscapeBackReference) => studyJava(rest, info.copy(maxValid = false))
         case NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.GeneralNewline)) =>
-          java(rest, info.copy(maxLength = info.maxLength + 2))
+          studyJava(rest, info.copy(maxLength = info.maxLength + 2))
         case NodeData.Backslash(BackslashKind.EscapeClass(EscapeClassKind.GraphemeCluster)) =>
-          java(rest, info.copy(deterministic = false))
-        case _ if isJavaCharProperty(node) => java(rest, info.copy(maxLength = info.maxLength + 1))
-        case _                             => java(rest, info)
+          studyJava(rest, info.copy(deterministic = false))
+        case _ if isJavaCharProperty(node) => studyJava(rest, info.copy(maxLength = info.maxLength + 1))
+        case _                             => studyJava(rest, info)
 
-  private def javaBranch(nodes: Seq[Option[Node]], rest: List[Node], info: JavaInfo): JavaInfo =
-    val alternatives = nodes.map(_.fold(JavaInfo.Initial)(node => java(List(node), JavaInfo.Initial)))
+  private def studyJavaBranch(nodes: Seq[Option[Node]], rest: List[Node], info: JavaInfo): JavaInfo =
+    val alternatives = nodes.map(_.fold(JavaInfo.Initial)(node => studyJava(List(node), JavaInfo.Initial)))
     val maxLength = info.maxLength + alternatives.map(_.maxLength).max
     val maxValid = info.maxValid && alternatives.forall(_.maxValid)
-    val after = java(rest, JavaInfo.Initial)
+    val after = studyJava(rest, JavaInfo.Initial)
     JavaInfo(after.maxLength + maxLength, after.maxValid && maxValid, deterministic = false)
 
-  private def javaRepeat(child: Node, quantifier: Quantifier, rest: List[Node], info: JavaInfo): JavaInfo =
+  private def studyJavaRepeat(child: Node, quantifier: Quantifier, rest: List[Node], info: JavaInfo): JavaInfo =
     val isGroup = child.data match
       case NodeData.Group(kind, _) => isJavaGroup(kind)
       case _                       => false
     val possessive = quantifier.strategy == BacktrackStrategy.Possessive
     quantifier match
-      case Quantifier.Question(_) if isGroup && !possessive => javaBranch(Seq(Some(child), None), rest, info)
+      case Quantifier.Question(_) if isGroup && !possessive => studyJavaBranch(Seq(Some(child), None), rest, info)
       case Quantifier.Question(_)                           =>
-        java(rest, java(List(child), info).copy(deterministic = false))
+        studyJava(rest, studyJava(List(child), info).copy(deterministic = false))
       case Quantifier.Star(BacktrackStrategy.Greedy) | Quantifier.Plus(BacktrackStrategy.Greedy)
           if isJavaCharProperty(child) =>
         val maxLength = if info.maxValid then info.maxLength + JavaMaxReps else info.maxLength
-        java(rest, JavaInfo(maxLength, info.maxValid, deterministic = false))
+        studyJava(rest, JavaInfo(maxLength, info.maxValid, deterministic = false))
       case _ =>
         val (min, max) = bounds(quantifier)
         val cmax = if max == Inf then JavaMaxReps else max.toInt
-        val atom = java(List(child), JavaInfo.Initial)
+        val atom = studyJava(List(child), JavaInfo.Initial)
         // A group with a non-deterministic body becomes a `Loop` node, which has no maximum length.
         if isGroup && !possessive && !atom.deterministic then JavaInfo(info.maxLength, maxValid = false, false)
         else
@@ -357,7 +379,7 @@ private[build] final class LookBehindAnalyzer(
               val temp = atom.maxLength * cmax + info.maxLength
               JavaInfo(temp, temp >= info.maxLength, deterministic)
             else JavaInfo(atom.maxLength, maxValid = false, deterministic)
-          java(rest, after)
+          studyJava(rest, after)
 
   private def isJavaGroup(kind: GroupKind): Boolean = kind match
     case GroupKind.IndexedCapture | GroupKind.NonCapture | _: GroupKind.NamedCapture | _: GroupKind.InlineFlag => true
@@ -398,6 +420,7 @@ private[build] object LookBehindAnalyzer:
   sealed abstract class RubyWidth extends Product with Serializable
 
   object RubyWidth:
+
     final case class Fixed(n: Long) extends RubyWidth
     case object Variable extends RubyWidth
     case object Unknown extends RubyWidth
@@ -406,7 +429,11 @@ private[build] object LookBehindAnalyzer:
   final case class JavaInfo(maxLength: Int, maxValid: Boolean, deterministic: Boolean)
 
   object JavaInfo:
+
     val Initial: JavaInfo = JavaInfo(0, maxValid = true, deterministic = true)
+
+  /** Returns the length as `Int`, where a length above `Int.MaxValue` is `Int.MaxValue`. */
+  private def toLength(n: Long): Int = n.min(Int.MaxValue).toInt
 
   private def union(l: Width, r: Width): Width = Width(l.min.min(r.min), l.max.max(r.max))
 
