@@ -29,9 +29,9 @@ object FuzzChecker:
 
   /** Checks whether RegExp is ReDoS vulnerable or not.
     *
-    * `avoidsAttack` tells whether to avoid an attack of the complexity and the hotspot, which is known to fail recall
-    * validation, and may change while iterating the results. Strings with an avoided attack rank below the others in
-    * the next generation.
+    * `avoidsAttack` tells whether to avoid an attack of the complexity and the hotspot, which recall validation
+    * refuted, and may change while iterating the results. Strings with an avoided attack rank below the others in the
+    * next generation.
     */
   def check(
       pattern: IRPattern,

@@ -6,11 +6,20 @@ import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.DiagnosticsIteratorUtil.*
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.charset.UnitMode
 
 class DiagnosticsIteratorUtilSuite extends munit.FunSuite:
 
   def safe(source: String): Diagnostics =
-    Diagnostics.Safe(source, "", Dialect.JavaScript, AttackComplexity.Constant, Checker.Automaton)
+    Diagnostics.Safe(
+      source,
+      "",
+      Dialect.JavaScript,
+      UnitMode.UTF16,
+      AttackComplexity.Constant,
+      Seq.empty,
+      Checker.Automaton
+    )
 
   /** Returns no iterator, but throws the exception. */
   def raise(ex: Exception): Iterator[Diagnostics] = throw ex

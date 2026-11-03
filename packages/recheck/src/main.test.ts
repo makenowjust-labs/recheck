@@ -142,21 +142,16 @@ test("check: invalid", async () => {
 });
 
 // The synckit function is created once per module, so this is the only test using it.
-test("checkSync and checkAllSync: synckit", () => {
-  syncBackend.mockReturnValueOnce("synckit").mockReturnValueOnce("synckit");
-  const syncFn = jest.fn((method: unknown, ..._: unknown[]) =>
-    method === "checkAll"
-      ? [{ status: "vulnerable" }]
-      : { status: "vulnerable" },
-  );
+test("checkSync: synckit", () => {
+  syncBackend.mockReturnValueOnce("synckit");
+  const syncFn = jest.fn((..._: unknown[]) => ({ status: "vulnerable" }));
   const createSyncFn = jest.mocked(synckit.createSyncFn);
   createSyncFn.mockReturnValueOnce(syncFn as any);
 
-  expect(main.checkSync("^(a|a)+$", "").status).toBe("vulnerable");
-  const diagnostics = main.checkAllSync("^(a|a)+$", "");
-  expect(diagnostics.map((d) => d.status)).toEqual(["vulnerable"]);
+  const diagnostics = main.checkSync("^(a|a)+$", "");
+  expect(diagnostics.status).toBe("vulnerable");
   expect(createSyncFn).toHaveBeenCalledTimes(1);
-  expect(syncFn).toHaveBeenCalledWith("checkAll", "^(a|a)+$", "", {});
+  expect(syncFn).toHaveBeenCalledWith("^(a|a)+$", "", {});
 });
 
 test("checkSync: pure", () => {
@@ -174,11 +169,11 @@ test("checkSync: invalid", () => {
   );
 });
 
-// A runtime command line whose recall validation always finishes, so that every attack fails.
+// A runtime command line whose recall validation always finishes, so that every attack is refuted.
 const finishing =
   "sh -c 'echo recheck:runtime fake; echo recheck:start; echo recheck:time 0' sh";
 
-test("checkAll: java", async () => {
+test("check: java with refuted recalls", async () => {
   backend.mockReturnValueOnce("java");
   // Jest's `process.env` does not reach child processes, so `env` sets the variable.
   javaEnsure.mockImplementationOnce(() =>
@@ -191,46 +186,24 @@ test("checkAll: java", async () => {
     ]),
   );
 
-  const diagnostics = await main.checkAll("^(a|a)*$", "", {
+  const diagnostics = await main.check("^(a|a)*$", "", {
     checker: "automaton",
     recallTimeout: 1000,
   });
-  expect(diagnostics.map((d) => d.status)).toEqual(["vulnerable", "safe"]);
-  expect(diagnostics[0]).toMatchObject({
-    recallValidation: {
-      runtime: "fake",
-      timeout: 1000,
-      result: { kind: "finish", time: 0 },
-      isSucceeded: false,
-    },
+  expect(diagnostics).toMatchObject({
+    status: "safe",
+    unitMode: "utf16",
+    refutedRecalls: [
+      {
+        complexity: { type: "exponential" },
+        attack: { pattern: "'a'.repeat(31) + '\\x00'" },
+        recallValidation: {
+          runtime: "fake",
+          timeout: 1000,
+          result: { kind: "finish", time: 0 },
+          isConfirmed: false,
+        },
+      },
+    ],
   });
-});
-
-test("checkAll: worker", async () => {
-  backend.mockReturnValueOnce("worker");
-
-  const diagnostics = await main.checkAll("^(a|a)+$", "");
-  expect(diagnostics.map((d) => d.status)).toEqual(["vulnerable"]);
-});
-
-test("checkAll: pure", async () => {
-  backend.mockReturnValueOnce("pure");
-
-  const diagnostics = await main.checkAll("^(a|a)+$", "");
-  expect(diagnostics.map((d) => d.status)).toEqual(["vulnerable"]);
-});
-
-test("checkAll: invalid", async () => {
-  backend.mockReturnValueOnce("invalid" as any);
-
-  await expect(main.checkAll("^(a|a)+$", "")).rejects.toThrow(
-    "invalid backend: invalid",
-  );
-});
-
-test("checkAllSync: pure", () => {
-  syncBackend.mockReturnValueOnce("pure");
-
-  const diagnostics = main.checkAllSync("^(a|a)+$", "");
-  expect(diagnostics.map((d) => d.status)).toEqual(["vulnerable"]);
 });

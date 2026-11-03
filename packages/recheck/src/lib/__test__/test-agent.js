@@ -1,6 +1,5 @@
 let count = 0;
 let checks = {};
-let methods = {};
 
 process.stdin.on("data", (data) => {
   const lines = data.toString("utf-8").split("\n").filter(Boolean);
@@ -36,7 +35,6 @@ process.stdin.on("data", (data) => {
 
       // A fake `checker` implementation.
       case "check":
-      case "checkAll":
         console.log(
           JSON.stringify({
             jsonrpc: "2.0+push",
@@ -44,9 +42,6 @@ process.stdin.on("data", (data) => {
             message: "message",
           }),
         );
-        const wrap = (result) =>
-          json.method === "checkAll" ? [result] : result;
-        methods[json.id] = json.method;
         checks[json.id] = setTimeout(() => {
           switch (json.params.source) {
             case "test-large":
@@ -55,7 +50,7 @@ process.stdin.on("data", (data) => {
                 JSON.stringify({
                   jsonrpc: "2.0+push",
                   id: json.id,
-                  result: wrap({ status: "vulnerable", attack: { string } }),
+                  result: { status: "vulnerable", attack: { string } },
                 }),
               );
               break;
@@ -64,7 +59,7 @@ process.stdin.on("data", (data) => {
                 JSON.stringify({
                   jsonrpc: "2.0+push",
                   id: json.id,
-                  result: wrap({ status: "safe" }),
+                  result: { status: "safe" },
                 }),
               );
               break;
@@ -77,10 +72,7 @@ process.stdin.on("data", (data) => {
           JSON.stringify({
             jsonrpc: "2.0+push",
             id: json.params.id,
-            result:
-              methods[json.params.id] === "checkAll"
-                ? [{ status: "unknown" }]
-                : { status: "unknown" },
+            result: { status: "unknown" },
           }),
         );
         clearTimeout(checks[json.params.id]);

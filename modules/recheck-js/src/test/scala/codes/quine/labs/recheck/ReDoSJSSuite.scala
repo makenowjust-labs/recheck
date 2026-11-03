@@ -39,10 +39,3 @@ class ReDoSJSSuite extends munit.FunSuite:
     interceptMessage[DecodingFailure]("DecodingFailure at .dialect: Unknown encoding of ruby: str") {
       ReDoSJS.check("a", "", js.Dynamic.literal(dialect = js.Dynamic.literal(name = "ruby", encoding = "str")))
     }
-
-  test("ReDoSJS.checkAll"):
-    val ds = ReDoSJS.checkAll("^foo$", "", ()).asInstanceOf[js.Array[js.Dictionary[String]]]
-    assertEquals(ds.toSeq.map(_("status")), Seq("safe"))
-    interceptMessage[DecodingFailure]("DecodingFailure at .checker: Unknown checker: invalid") {
-      ReDoSJS.checkAll("^foo$", "", js.Dynamic.literal(checker = "invalid"))
-    }

@@ -33,11 +33,8 @@ object Main:
   /** BatchAction holds `recheck batch` subcommand parameters. */
   final case class BatchAction(threadSize: Int) extends Action
 
-  /** CheckAction holds `recheck check` subcommand parameters.
-    *
-    * With `all`, it shows all the diagnostics of `ReDoS.checkAll`.
-    */
-  final case class CheckAction(pattern: InputPattern, params: Parameters, all: Boolean, json: Boolean) extends Action
+  /** CheckAction holds `recheck check` subcommand parameters. */
+  final case class CheckAction(pattern: InputPattern, params: Parameters, json: Boolean) extends Action
 
   /** GenerateRecallScriptAction holds `recheck generate-recall-script` subcommand parameters.
     *
@@ -61,16 +58,8 @@ object Main:
       val params = ParametersOption(logger)
 
       val pattern = Opts.argument[InputPattern](metavar = "pattern")
-      val all = Opts
-        .flag(
-          long = "all",
-          help = "Show all the diagnostics, including the vulnerable ones whose recall validation failed."
-        )
-        .orFalse
-      val json = Opts
-        .flag(long = "json", help = "Show the diagnostics in JSON, an array of them with `--all`.")
-        .orFalse
-      val check: Opts[Action] = (pattern, params, all, json).mapN(CheckAction(_, _, _, _))
+      val json = Opts.flag(long = "json", help = "Show the diagnostics in JSON.").orFalse
+      val check: Opts[Action] = (pattern, params, json).mapN(CheckAction(_, _, _))
 
       val agent: Opts[Action] = Opts.subcommand(name = "agent", help = "Starts the batch mode."):
         val threadSize = Opts
@@ -108,21 +97,11 @@ class Main:
       exit(2)
 
     case Right(action: CheckAction) =>
-      val diagnostics =
-        if action.all then ReDoS.checkAll(action.pattern.source, action.pattern.flags, action.params)
-        else Iterator(ReDoS.check(action.pattern.source, action.pattern.flags, action.params))
-      val (open, separator, close) = if action.json && action.all then ("[", ",", "]") else ("", "\n---\n", "")
-      var last: Option[Diagnostics] = None
-      Console.out.print(open)
-      for d <- diagnostics do
-        if last.isDefined then Console.out.print(separator)
-        Console.out.print(if action.json then d.asJson.noSpaces else d.toString)
-        Console.out.flush()
-        last = Some(d)
-      Console.out.println(close)
-      last match
-        case Some(_: Diagnostics.Safe) => () // skip
-        case _                         => exit(1)
+      val diagnostics = ReDoS.check(action.pattern.source, action.pattern.flags, action.params)
+      Console.out.println(if action.json then diagnostics.asJson.noSpaces else diagnostics.toString)
+      diagnostics match
+        case _: Diagnostics.Safe                                => () // skip
+        case _: Diagnostics.Vulnerable | _: Diagnostics.Unknown => exit(1)
 
     case Right(action: GenerateRecallScriptAction) =>
       val script = for

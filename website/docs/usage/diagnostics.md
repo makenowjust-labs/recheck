@@ -14,20 +14,23 @@ Every `Diagnostics` has the following fields.
 - `source` is the given regular expression’s source string.
 - `flags` is the given regular expression’s flags string.
 - `dialect` is the given [`dialect`](parameters.mdx#dialect) parameter, as an object of the name and every setting of the dialect.
+- `unitMode` is the unit of the attack strings (see [Attack String](#attack-string)).
+  It is `null` in an `unknown` diagnostics whose error happened on parsing the pattern.
+- `refutedRecalls` is the list of the attack strings that the recall validation refuted before the result (see [Recall Validation](#recall-validation)).
 - `checker` is a checker type to be used (one of `fuzz` and `automaton`).
 
 ## Status
 
-Known that already, `Diagnostics` has three statuses.
+`Diagnostics` has three statuses.
 
 - `safe` means the given regular expression seems safe at least in this checking.
 - `vulnerable` means vulnerability in the given regular expression is found.
 - `unknown` means something wrong happened in checking (timeout, cancel, or error). It has the `error` field to describe the reason for this result.
-  Its `kind` is one of `timeout`, `cancel`, `unsupported`, `invalid`, `recall-failure-limit` (see [Recall Validation](#recall-validation)) and `unexpected`.
+  Its `kind` is one of `timeout`, `cancel`, `unsupported`, `invalid`, `recall-refutation-limit` (see [Recall Validation](#recall-validation)) and `unexpected`.
 
 ## Complexity
 
-`safe` and `vulnerable` has the `complexity` field.
+`safe` and `vulnerable` have the `complexity` field.
 This field contains the matching time complexity estimated in this checking.
 There are five `complexity` varieties.
 
@@ -45,7 +48,7 @@ It may invoke a matching time explosion against too little string (`length < 100
 ## Attack String
 
 A `vulnerable` diagnostics has the `attack` field. It contains the attack string found by the checking.
-It also has the `unitMode` field, which is the unit of the attack string: `utf16` (UTF-16 code units), `code-point` (code points), or `byte` (bytes).
+Its unit is the `unitMode` field: `utf16` (UTF-16 code units), `code-point` (code points), or `byte` (bytes).
 
 The attack string is a string that causes the explosion of the matching time, also known as a ReDoS vulnerability.
 
@@ -86,12 +89,15 @@ It is `null` if the recall validation is not run: [`recallTimeout`](parameters.m
   - `engine-limit` means the engine stopped on its limit of the matching steps (PHP's backtrack limit), which also shows that the attack is effective. It has `message`.
   - `engine-error` means the engine gave up with an error on the stack depth or the memory (e.g. Java's `StackOverflowError` or JavaScript's `RangeError`). It has `message`.
     Such an error may happen on a long string even if the matching takes linear time (e.g. V8 raises it for `/^(?:a|b)*$/` on 10,000,000 characters), so the attack is not considered effective.
-- `isSucceeded` is whether the attack is effective on the engine (`timeout` or `engine-limit`).
+- `isConfirmed` is whether the engine confirms the attack, that is, the attack is effective on the engine (`timeout` or `engine-limit`).
+  Otherwise, the recall validation refutes the attack.
 
-When the recall validation fails, the check does not report the diagnostics, and it goes on to look for another attack string.
-If no attack succeeds, the result is `safe`.
+When the recall validation refutes an attack, the check does not report the diagnostics, and it goes on to look for another attack string.
+If no attack is confirmed, the result is `safe`.
 
-`checkAll` (`ReDoS.checkAll` in Scala) returns the recall-failed diagnostics too, followed by the reported one.
+Every diagnostics lists the refuted attacks in the `refutedRecalls` field, in the order of the checking.
+Each element has the `complexity`, `attack`, `hotspot` and `recallValidation` fields of the refuted attack, which are the same as those of a `vulnerable` diagnostics.
+They show that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by these attacks (see [Refuted Attacks](recall-validation.md#refuted-attacks)).
 
 ## Hotspot
 

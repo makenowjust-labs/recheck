@@ -69,6 +69,7 @@ describe("makeSnapshot", () => {
       },
       hotspot: [{ start: 2, end: 5, temperature: "heat" }],
       recallValidation: null,
+      refutedRecalls: [],
     };
     expect(snapshot("/^(a|a)*$/", diagnostics)).toEqual(vulnerable);
   });
@@ -78,9 +79,11 @@ describe("makeSnapshot", () => {
       source: "a",
       flags: "",
       dialect: { name: "javascript" },
+      unitMode: "utf16",
       status: "safe",
       checker: "automaton",
       complexity: { type: "safe", summary: "safe", isFuzz: false },
+      refutedRecalls: [],
     };
     expect(snapshot("/a/", diagnostics)).toEqual(safe);
   });
@@ -97,8 +100,10 @@ describe("makeSnapshot", () => {
       source: "a",
       flags: "",
       dialect: { name: "javascript" },
+      unitMode: null,
       status: "unknown",
       error: { kind: "timeout" },
+      refutedRecalls: [],
     };
     expect(snapshot("/a/", unknown).result).toEqual({
       status: "unknown",
