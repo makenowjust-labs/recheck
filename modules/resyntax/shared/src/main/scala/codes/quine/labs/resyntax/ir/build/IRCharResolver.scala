@@ -41,9 +41,6 @@ private[build] final class IRCharResolver(
 
   private val classes = new IRClassLookup(dialect, mode, !perlUnicodeRules)
 
-  /** Whether the parser reads the source by UTF-16 code units, so a literal astral character is a surrogate pair. */
-  private val readsUnits = mode != UnitMode.CodePoint
-
   private def perlNative(flags: IRCharFlagSet): Boolean =
     dialect.isPerl &&
       (flags.charset == IRCharset.Default && !perlUnicodeRules || flags.charset == IRCharset.Locale)
@@ -133,9 +130,9 @@ private[build] final class IRCharResolver(
 
   /** Resolves a part, which is literal characters in a row, together.
     *
-    * A surrogate pair read by code units and Ruby's UTF-8 bytes by escapes (e.g. `\xC3\xA9`) are one character there.
-    * Case-insensitivity is the dialect's one-to-one case equivalence, and Ruby's and Perl's simple multi-character
-    * folding of literals (e.g. `ß` and `ss`, see [[foldPart]]).
+    * Ruby's UTF-8 bytes by escapes (e.g. `\xC3\xA9`) are one character there. Case-insensitivity is the dialect's
+    * one-to-one case equivalence, and Ruby's and Perl's simple multi-character folding of literals (e.g. `ß` and `ss`,
+    * see [[foldPart]]).
     */
   def literals(part: Seq[(Node, IRCharFlagSet)]): Seq[IRNode] =
     try resolveLiterals(part)
@@ -166,15 +163,15 @@ private[build] final class IRCharResolver(
     for (node, flags) <- part do
       node.data match
         case NodeData.Literal(value) =>
-          lits += Lit(value, true, None, flags, node.loc)
+          lits += Lit(value, None, flags, node.loc)
         case NodeData.Backslash(BackslashKind.Unknown(value)) =>
-          lits += Lit(value, true, None, flags, node.loc)
+          lits += Lit(value, None, flags, node.loc)
         case NodeData.Backslash(BackslashKind.Escape(style, value)) =>
-          lits += Lit(value, false, Some(style), flags, node.loc)
+          lits += Lit(value, Some(style), flags, node.loc)
         case data => throw new IllegalArgumentException(s"Not a literal: $data")
     val merged =
       if dialect.isRuby && mode == UnitMode.CodePoint then mergeRubyBytes(lits.toIndexedSeq) else lits.toIndexedSeq
-    val units = mergeSurrogates(merged).flatMap: lit =>
+    val units = merged.flatMap: lit =>
       unitsOf(lit) match
         case Seq() => Seq(lit.copy(value = NoUnit))
         case us    => us.map(u => lit.copy(value = u))
@@ -262,25 +259,6 @@ private[build] final class IRCharResolver(
 
           out ++= alternatives(from)
       out.result()
-
-  /** Joins a surrogate pair of literals, which the parser reads by code units, into a code point. */
-  private def mergeSurrogates(lits: IndexedSeq[Lit]): IndexedSeq[Lit] =
-    if !readsUnits || mode == UnitMode.UTF16 then lits
-    else
-      val out = mutable.ArrayBuffer.empty[Lit]
-      var i = 0
-      while i < lits.length do
-        val lit = lits(i)
-        if i + 1 < lits.length && lit.source && lits(i + 1).source && UTF16Encoding.isHighSurrogate(lit.value) &&
-          UTF16Encoding.isLowSurrogate(lits(i + 1).value)
-        then
-          val c = UTF16Encoding.decodeSurrogatePair(lit.value, lits(i + 1).value)
-          out += lit.copy(value = c, loc = SourceLocation(lit.loc.start, lits(i + 1).loc.end))
-          i += 2
-        else
-          out += lit
-          i += 1
-      out.toIndexedSeq
 
   /** Decodes Ruby's byte escapes (e.g. `\xC3\xA9`) of a UTF-8 regexp into code points.
     *
@@ -588,7 +566,7 @@ private[build] final class IRCharResolver(
 
   /** Resolves a folding as a part, which is how Ruby and Perl match it. */
   private def foldString(key: UString, flags: IRCharFlagSet, loc: SourceLocation): IRNodeData =
-    sequenceOf(foldPart(key.iterator.map(c => Lit(c, true, None, flags, loc)).toIndexedSeq))
+    sequenceOf(foldPart(key.iterator.map(c => Lit(c, None, flags, loc)).toIndexedSeq))
 
   private def negate(item: ClassItem, flags: IRCharFlagSet): ClassSet = item.data match
     // .NET's `[^a-z-[aeiou]]` negates the base before the subtraction.
@@ -647,7 +625,7 @@ private[build] final class IRCharResolver(
               case _                         => false
           val lits = bytes.map: b =>
             val ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, value)) = b.data: @unchecked
-            Lit(value, false, Some(style), flags, b.loc)
+            Lit(value, Some(style), flags, b.loc)
           // Bytes of a character continued into a range endpoint (e.g. `[\xC3\xA0-\xC3\xA9]`) are not modeled.
           if rangeByteAt(items, i + bytes.length, begin = true) then
             validateRubyBytePrefix(lits)
@@ -702,9 +680,9 @@ private[build] final class IRCharResolver(
 
   private def valueUnits(value: ClassItemData.ClassValue, flags: IRCharFlagSet, loc: SourceLocation): Seq[UChar] =
     val lit = value match
-      case ClassItemData.ClassLiteral(v)                                     => Lit(v, true, None, flags, loc)
-      case ClassItemData.ClassBackslashValue(BackslashKind.Unknown(v))       => Lit(v, true, None, flags, loc)
-      case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v)) => Lit(v, false, Some(style), flags, loc)
+      case ClassItemData.ClassLiteral(v)                                     => Lit(v, None, flags, loc)
+      case ClassItemData.ClassBackslashValue(BackslashKind.Unknown(v))       => Lit(v, None, flags, loc)
+      case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v)) => Lit(v, Some(style), flags, loc)
     val units = unitsOf(lit)
     // A class item is one unit in UTF-16 mode, so a code point beyond it cannot be a class member.
     if mode == UnitMode.UTF16 && units.length != 1 then throw new NotModeledException
@@ -772,7 +750,6 @@ private[build] object IRCharResolver:
   /** Lit is a literal character before being resolved. */
   final case class Lit(
       value: Int,
-      source: Boolean,
       escape: Option[EscapeStyle],
       flags: IRCharFlagSet,
       loc: SourceLocation
