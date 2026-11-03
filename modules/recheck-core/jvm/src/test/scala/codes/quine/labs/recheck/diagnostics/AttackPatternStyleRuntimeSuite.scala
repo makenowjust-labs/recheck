@@ -7,7 +7,7 @@ import codes.quine.labs.recheck.RuntimeHelper
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
-class AttackStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
+class AttackPatternStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
 
   override val munitTimeout: Duration = 120.seconds
 
