@@ -21,5 +21,5 @@ private[exec] object Platform:
       marker: String
   )(using Context): ExecResult =
     // $COVERAGE-OFF$
-    throw new UnexpectedException("recall validation is not supported.")
+    throw new UnexpectedException("Running a command is not supported on Scala.js.")
     // $COVERAGE-ON$
