@@ -47,7 +47,7 @@ const generateDialectDts = (dialect: Property): string[] => {
   return [
     comment(
       [
-        "Dialect is the dialect of a diagnostics, with every setting of the dialect.",
+        "Dialect is the dialect in the diagnostics, with every setting of the dialect.",
         "A setting that the `dialect` parameter omits is the default.",
       ],
       "",

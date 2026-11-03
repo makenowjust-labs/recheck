@@ -46,7 +46,7 @@ export type Diagnostics =
   SafeDiagnostics | VulnerableDiagnostics | UnknownDiagnostics;
 
 /**
- * SafeDiagnostics is a diagnostics in which the checking found no attack string.
+ * SafeDiagnostics is the type of the diagnostics in which the checking found no attack string.
  */
 export type SafeDiagnostics = {
   source: string;
@@ -60,7 +60,7 @@ export type SafeDiagnostics = {
 };
 
 /**
- * VulnerableDiagnostics is a diagnostics with the attack string that the checking found.
+ * VulnerableDiagnostics is the type of the diagnostics with the attack string that the checking found.
  */
 export type VulnerableDiagnostics = {
   source: string;
@@ -130,7 +130,7 @@ export type RuntimeAttackResult =
   | { kind: "engine-error"; message: string };
 
 /**
- * UnknownDiagnostics is a diagnostics of a checking that could not finish because of an error.
+ * UnknownDiagnostics is the type of the diagnostics of a checking that could not finish because of an error.
  */
 export type UnknownDiagnostics = {
   source: string;

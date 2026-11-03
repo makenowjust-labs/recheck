@@ -12,13 +12,13 @@ import codes.quine.labs.resyntax.charset.UnitMode
 /** `recheck generate-runtime-attack-script` command implementation. */
 object GenerateRuntimeAttackScriptCommand:
 
-  /** Generates the standalone runtime-attack script of a vulnerable diagnostics in JSON, or returns the error. */
+  /** Generates the standalone runtime-attack script of vulnerable diagnostics in JSON, or returns the error. */
   def generate(json: String): Either[String, RuntimeAttackProgram.Script] =
     for
       root <- parse(json).left.map(f => s"Invalid JSON: ${f.message}")
       c = root.hcursor
       status <- invalid(c.get[String]("status"))
-      _ <- Either.cond(status == "vulnerable", (), s"The diagnostics is not vulnerable: $status")
+      _ <- Either.cond(status == "vulnerable", (), s"The diagnostics are not vulnerable: $status")
       source <- invalid(c.get[String]("source"))
       flags <- invalid(c.get[String]("flags"))
       dialect <- invalid(c.get[Dialect]("dialect"))

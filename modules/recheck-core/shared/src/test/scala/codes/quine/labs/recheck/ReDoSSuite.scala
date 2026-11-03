@@ -508,7 +508,7 @@ class ReDoSSuite extends munit.FunSuite:
         )
       )
     )
-    // The safe diagnostics after the vulnerable ones has the complexity that the automaton checker finds.
+    // The safe diagnostics after the vulnerable diagnostics have the complexity that the automaton checker finds.
     assertEquals(
       checkAutomaton("^(?:a|a)*$", "", Parameters(checker = Checker.Automaton)).toList.last,
       Diagnostics.Safe(

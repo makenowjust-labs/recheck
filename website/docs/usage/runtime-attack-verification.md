@@ -127,7 +127,7 @@ The search avoids repeating a refuted attack.
 ## Runtime-Attack Script
 
 The CLI's `generate-runtime-attack-script` subcommand writes the program that the runtime-attack verification runs as a standalone script, so that you can run the attack on the engine yourself.
-It takes a file of a `vulnerable` diagnostics in JSON (`-` reads the standard input), which is the output of the CLI with `--json`, or the result of the JavaScript library or the CLI's agent mode.
+It takes a file of `vulnerable` diagnostics in JSON (`-` reads the standard input), which is the output of the CLI with `--json`, or the result of the JavaScript library or the CLI's agent mode.
 The dialect of the pattern comes from the `dialect` field of the diagnostics, and the unit of the attack string from the `unitMode` field.
 
 ```bash
@@ -153,4 +153,4 @@ The script of `java` and `dotnet` has the pattern and the attack string in itsel
 The script prints the lines that the runtime-attack verification reads: `recheck:runtime` with the runtime, `recheck:start` before the matching, and `recheck:time` with the matching time in milliseconds (or `recheck:engine-limit` or `recheck:engine-error` with the message).
 It has no timeout, so an effective attack does not end soon.
 
-When the diagnostics is not `vulnerable`, or the pattern cannot be put in the program (the case where the runtime-attack verification is skipped for [`perl`](dialects/perl.md#runtime-attack-verification)), the subcommand fails with a message.
+When the diagnostics are not `vulnerable`, or the pattern cannot be put in the program (the case where the runtime-attack verification is skipped for [`perl`](dialects/perl.md#runtime-attack-verification)), the subcommand fails with a message.

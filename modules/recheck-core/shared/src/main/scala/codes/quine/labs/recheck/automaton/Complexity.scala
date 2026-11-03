@@ -16,7 +16,7 @@ object Complexity:
   /** Safe is a common class for safe complexity. */
   sealed abstract class Safe extends Complexity[Nothing]:
 
-    /** Converts this into a diagnostics complexity. */
+    /** Converts this into the complexity of the diagnostics. */
     def toAttackComplexity: AttackComplexity.Safe
 
   /** Vulnerable is a common class for vulnerable complexity. */
@@ -28,7 +28,7 @@ object Complexity:
     /** Builds an attack string pattern of this. */
     def buildAttackPattern(attackLimit: Int, maxSize: Int)(using ev: A =:= UChar): AttackPattern
 
-    /** Converts this into a diagnostics complexity. */
+    /** Converts this into the complexity of the diagnostics. */
     def toAttackComplexity: AttackComplexity.Vulnerable
 
     /** A hotspot for this. */

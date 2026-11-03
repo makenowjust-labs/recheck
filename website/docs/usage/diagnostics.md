@@ -20,7 +20,7 @@ Every `Diagnostics` has the following fields.
 - `flags` is the given regular expression’s flags string.
 - `dialect` is the given [`dialect`](parameters.mdx#dialect) parameter, as an object of the name and every setting of the dialect.
 - `unitMode` is the unit of the attack strings (see [Attack String](#attack-string)).
-  It is `null` in an `unknown` diagnostics whose error happened on parsing the pattern.
+  It is `null` in `unknown` diagnostics when the error happened on parsing the pattern.
 - `refutedAttacks` is the list of the attack strings that the runtime-attack verification refuted before the result (see [Runtime-Attack Verification](#runtime-attack-verification)).
 - `checker` is a checker type to be used (one of `fuzz` and `automaton`).
 
@@ -29,7 +29,7 @@ Every `Diagnostics` has the following fields.
 `Diagnostics` has three statuses.
 
 - `safe` means that the checking found no attack string within its limits.
-  The fuzz checker may miss an attack string, so a `safe` diagnostics from it (`complexity.isFuzz` is `true`) is weaker evidence than one from the automaton checker.
+  The fuzz checker may miss an attack string, so `safe` diagnostics from it (`complexity.isFuzz` is `true`) are weaker evidence than those from the automaton checker.
 - `vulnerable` means that the checking found an attack string, which is the evidence of the vulnerability (see [Attack String](#attack-string)).
   When the runtime-attack verification is enabled, the attack string is also confirmed on the real engine (see [Runtime-Attack Verification](#runtime-attack-verification)).
 - `unknown` means that the checking could not finish (timeout, cancel, or error), so it gives no evidence either way. It has the `error` field to describe the reason for this result.
@@ -59,7 +59,7 @@ It may invoke a matching time explosion against too little string (`length < 100
 
 ## Attack String
 
-A `vulnerable` diagnostics has the `attack` field. It contains the attack string found by the checking.
+`vulnerable` diagnostics have the `attack` field. It contains the attack string found by the checking.
 Its unit is the `unitMode` field: `utf16` (UTF-16 code units), `code-point` (code points), or `byte` (bytes).
 
 The attack string is a string that causes the explosion of the matching time, also known as a ReDoS vulnerability.
@@ -88,7 +88,7 @@ The runtime-attack verification checks it on the real engine.
 
 ## Runtime-Attack Verification
 
-A `vulnerable` diagnostics has the `runtimeAttack` field.
+`vulnerable` diagnostics have the `runtimeAttack` field.
 
 The runtime-attack verification runs the attack string on the real regex engine of the dialect (see [Runtime-Attack Verification](runtime-attack-verification.md)), and this field records the run.
 It is `null` if the runtime attack is not run: [`runtimeAttackTimeout`](parameters.mdx#runtimeattacktimeout) is not positive (the default), or commands cannot run (e.g. in the browser).
@@ -107,8 +107,8 @@ It is `null` if the runtime attack is not run: [`runtimeAttackTimeout`](paramete
 When the runtime-attack verification refutes an attack, the check does not report the diagnostics, and it goes on to look for another attack string.
 If no attack is confirmed, the result is `safe`.
 
-Every diagnostics lists the refuted attacks in the `refutedAttacks` field, in the order of the checking.
-Each element has the `complexity`, `attack`, `hotspot` and `runtimeAttack` fields of the refuted attack, which are the same as those of a `vulnerable` diagnostics.
+The diagnostics of every status list the refuted attacks in the `refutedAttacks` field, in the order of the checking.
+Each element has the `complexity`, `attack`, `hotspot` and `runtimeAttack` fields of the refuted attack, which are the same as those of `vulnerable` diagnostics.
 They show that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by these attacks (see [Refuted Attacks](runtime-attack-verification.md#refuted-attacks)).
 
 ## Hotspot

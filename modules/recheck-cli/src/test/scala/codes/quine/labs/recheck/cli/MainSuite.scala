@@ -211,7 +211,7 @@ class MainSuite extends munit.FunSuite:
     assert(clue(perl).contains("utf8::downgrade($input, 1);"))
 
     assertEquals(generate("{"), ("", "Invalid JSON: exhausted input\n", 1))
-    assertEquals(generate(diagnostics("/foo/").noSpaces), ("", "The diagnostics is not vulnerable: safe\n", 1))
+    assertEquals(generate(diagnostics("/foo/").noSpaces), ("", "The diagnostics are not vulnerable: safe\n", 1))
     assertEquals(
       generate(js.mapObject(_.remove("attack")).noSpaces),
       ("", "Invalid diagnostics: DecodingFailure at .attack: Missing required field\n", 1)

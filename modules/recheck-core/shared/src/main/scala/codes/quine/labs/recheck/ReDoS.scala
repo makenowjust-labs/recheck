@@ -40,10 +40,11 @@ import codes.quine.labs.resyntax.parser.ParsingException
 /** ReDoS is a ReDoS checker frontend. */
 object ReDoS:
 
-  /** Tests whether the given RegExp pattern causes ReDoS.
+  /** Returns the diagnostics of the given RegExp pattern.
     *
     * The pattern and the flags are of `params.dialect`. The result is the first vulnerable diagnostics whose runtime
-    * attack is not run or confirms the attack, or else the safe or unknown one, with the attacks refuted before it.
+    * attack is not run or confirms the attack, or else the safe or unknown diagnostics, with the attacks refuted before
+    * them.
     *
     * An attack with the same complexity and hotspot as a refuted one is skipped. When runtime-attack verification
     * refutes `maxRefutedAttacks` attacks, the result is unknown with [[Diagnostics.ErrorKind.RuntimeAttacksRefuted]].
@@ -305,7 +306,7 @@ object ReDoS:
         fuzz
     (diagnostics, () => safe())
 
-  /** Runs the attack of a vulnerable diagnostics on the runtime of the dialect, and records the result in it. */
+  /** Runs the attack in the vulnerable diagnostics on the runtime of the dialect, and records the result in them. */
   private[recheck] def runRuntimeAttack(
       source: String,
       flags: String,

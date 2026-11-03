@@ -70,7 +70,7 @@ object Main:
 
       val generateRuntimeAttackScript: Opts[Action] = Opts.subcommand(
         name = "generate-runtime-attack-script",
-        help = "Generates the runtime-attack program of a vulnerable diagnostics in JSON as a standalone script."
+        help = "Generates the runtime-attack program of vulnerable diagnostics in JSON as a standalone script."
       ):
         Opts.argument[String](metavar = "diagnostics").map(GenerateRuntimeAttackScriptAction.apply)
 

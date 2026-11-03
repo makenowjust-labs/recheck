@@ -17,7 +17,7 @@ sealed abstract class Diagnostics extends Product with Serializable
 /** Diagnostics types. */
 object Diagnostics:
 
-  /** Safe is a diagnostics in which the checking found no attack string. */
+  /** Safe is the type of the diagnostics in which the checking found no attack string. */
   final case class Safe(
       source: String,
       flags: String,
@@ -35,7 +35,7 @@ object Diagnostics:
           |Complexity: $complexity
           |Checker   : $checker""".stripMargin + showRefutedAttacks(dialect, unitMode, refutedAttacks)
 
-  /** Vulnerable is a diagnostics with the attack string that the checking found. */
+  /** Vulnerable is the type of the diagnostics with the attack string that the checking found. */
   final case class Vulnerable(
       source: String,
       flags: String,
@@ -60,7 +60,7 @@ object Diagnostics:
       ) ++ runtimeAttack.map(r => s"Runtime attack: $r") :+ s"Checker       : $checker"
       lines.mkString("\n") + showRefutedAttacks(dialect, unitMode, refutedAttacks)
 
-  /** Unknown is a diagnostics of a checking that could not finish because of an error. */
+  /** Unknown is the type of the diagnostics of a checking that could not finish because of an error. */
   final case class Unknown(
       source: String,
       flags: String,
@@ -85,7 +85,7 @@ object Diagnostics:
   /** Unknown utilities. */
   object Unknown:
 
-    /** Creates a diagnostics from the exception. */
+    /** Creates the unknown diagnostics from the exception. */
     def from(
         source: String,
         flags: String,
@@ -130,7 +130,7 @@ object Diagnostics:
       case _                          => Seq.empty
     if settings.isEmpty then dialect.name else settings.mkString(s"${dialect.name} (", ", ", ")")
 
-  /** ErrorKind is a reason of an unknown diagnostics. */
+  /** ErrorKind is the reason for unknown diagnostics. */
   sealed abstract class ErrorKind extends Serializable with Product
 
   /** ErrorKind types. */

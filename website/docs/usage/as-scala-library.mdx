@@ -56,7 +56,7 @@ It is the evidence for judging the ReDoS risk of the regular expression, not a f
 
 :::info
 
-See [this page](diagnostics.md) for detailed information on `Diagnostics` value.
+See [this page](diagnostics.md) for detailed information on the `Diagnostics` value.
 
 :::
 
@@ -102,7 +102,7 @@ Please use this instead of the manual way.
 
 The above example does not work with `cats-effect` better actually, because `fiber` has `cancel` method and it does not work with this method.
 
-To fix this problem, we can use `IO.async`. The following is the complete example. However, by `cats-effect` restriction, it will lose a result diagnostics when a fiber is cancelled.
+To fix this problem, we can use `IO.async`. The following is the complete example. However, because of a restriction of `cats-effect`, it loses the diagnostics when a fiber is cancelled.
 
 ```scala
 import scala.concurrent.duration._
