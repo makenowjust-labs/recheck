@@ -29,7 +29,7 @@ import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
-import codes.quine.labs.resyntax.ir.IRLookBehindStarts
+import codes.quine.labs.resyntax.ir.IRLookBehindStartRange
 import codes.quine.labs.resyntax.ir.IRWordMarkSet
 
 /** Interpreter executes a program on an input. */
@@ -659,8 +659,8 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         true
 
   /** Returns the starts of a look-behind at the position in the order that the engine tries them. */
-  private def lookBehindStarts(pos: Int, starts: IRLookBehindStarts): Seq[Int] = starts match
-    case IRLookBehindStarts.Longest(min, max) => math.max(0, pos - max) to pos - min
+  private def lookBehindStarts(pos: Int, starts: IRLookBehindStartRange): Seq[Int] =
+    math.max(0, pos - starts.max) to pos - starts.min
 
   /** Tests whether the text before the position ends with a base and then any extenders of the marks. */
   private def hasBase(pos: Int, marks: IRWordMarkSet): Boolean =

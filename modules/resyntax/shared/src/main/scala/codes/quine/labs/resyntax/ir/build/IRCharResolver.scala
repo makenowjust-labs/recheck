@@ -237,7 +237,9 @@ private[build] final class IRCharResolver(
       chars = (if native then set.diff(IRClassLookup.Latin1) else set).intersect(universe)
       if chars.nonEmpty
     yield (i, key.length, chars)
-    if occurrences.isEmpty || occurrences.size > MaxMultiFoldings then units.map(closed)
+    if occurrences.size > MaxMultiFoldings then
+      throw new MultiFoldingLimitException(MaxMultiFoldings, units.head.loc.start)
+    if occurrences.isEmpty then units.map(closed)
     else
       val cuts = (0 to folded.length).filter(p => !occurrences.exists((s, len, _) => s < p && p < s + len))
       val out = Seq.newBuilder[IRNode]
@@ -770,8 +772,7 @@ private[build] object IRCharResolver:
 
   /** MaxMultiFoldings is the largest number of multi-character foldings in a part that are resolved as alternatives.
     *
-    * A part with more of them is folded one to one, which misses some matches, since the alternatives grow
-    * exponentially.
+    * A part with more of them throws [[MultiFoldingLimitException]], since the alternatives grow exponentially.
     */
   val MaxMultiFoldings: Int = 6
 
@@ -871,22 +872,22 @@ private[build] object IRCharResolver:
     else
       dialect match
         case Dialect.JavaScript =>
-          Keyed("ECMAScript", CaseMapping.ecmaScriptCanonicalize(mode), mode)
+          Keyed(CaseMapping.ecmaScriptCanonicalize(mode), mode)
         case Dialect.Java   => if flags.unicodeCase then JavaUnicode else JavaASCII
-        case Dialect.DotNet => Keyed(".NET", dotNetKey, mode)
-        case _: Dialect.Python if asciiOnly || mode == UnitMode.Byte => Keyed("ASCII", asciiFold, mode)
-        case _: Dialect.Python                                       => Keyed("Python", pythonKey, mode)
-        case _: Dialect.Ruby if mode == UnitMode.Byte                => Keyed("ASCII", asciiFold, mode)
-        case _: Dialect.Ruby => Keyed("simple folding", CaseMapping.SimpleFold, mode)
-        case _: Dialect.Perl if flags.charset == IRCharset.Locale => PerlLocale(mode)
-        case _: Dialect.Perl if perlNative                        => PerlNative(mode)
-        case _: Dialect.Perl if flags.caselessRestrict            => PCRERestrict(CaseMapping.SimpleFold, mode)
-        case _: Dialect.Perl => Keyed("simple folding", CaseMapping.SimpleFold, mode)
+        case Dialect.DotNet => Keyed(dotNetKey, mode)
+        case _: Dialect.Python if asciiOnly || mode == UnitMode.Byte => Keyed(asciiFold, mode)
+        case _: Dialect.Python                                       => Keyed(pythonKey, mode)
+        case _: Dialect.Ruby if mode == UnitMode.Byte                => Keyed(asciiFold, mode)
+        case _: Dialect.Ruby                                         => Keyed(CaseMapping.SimpleFold, mode)
+        case _: Dialect.Perl if flags.charset == IRCharset.Locale    => PerlLocale(mode)
+        case _: Dialect.Perl if perlNative                           => PerlNative(mode)
+        case _: Dialect.Perl if flags.caselessRestrict               => PCRERestrict(CaseMapping.SimpleFold, mode)
+        case _: Dialect.Perl                                         => Keyed(CaseMapping.SimpleFold, mode)
         // PCRE folds non-ASCII characters only in UTF or UCP mode; PHP's `u` sets both.
-        case Dialect.PCRE if mode == UnitMode.Byte && !flags.unicodeClass => Keyed("ASCII", asciiFold, mode)
+        case Dialect.PCRE if mode == UnitMode.Byte && !flags.unicodeClass => Keyed(asciiFold, mode)
         case Dialect.PCRE                                                 =>
           val mapping = if flags.turkishCasing then CaseMapping.SimpleFoldTurkic else CaseMapping.SimpleFold
-          if flags.caselessRestrict then PCRERestrict(mapping, mode) else Keyed("simple folding", mapping, mode)
+          if flags.caselessRestrict then PCRERestrict(mapping, mode) else Keyed(mapping, mode)
 
   /** Determines how a back-reference with the flags compares the capture with the input in the dialect. */
   def determineBackReferenceFolding(dialect: Dialect, mode: UnitMode, flags: IRCharFlagSet): IRBackReferenceFolding =

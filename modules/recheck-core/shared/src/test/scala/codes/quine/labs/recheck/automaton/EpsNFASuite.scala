@@ -10,6 +10,7 @@ import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
+import codes.quine.labs.resyntax.ir.IRSurrogateKind.Separate
 import codes.quine.labs.resyntax.ir.alphabet.CharKind
 import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
@@ -27,11 +28,18 @@ class EpsNFASuite extends munit.FunSuite:
 
   val notWordBoundary: AssertKind = AssertKind.NotWordBoundary(0)
 
+  def buildAlphabet(
+      sets: Seq[CharSet],
+      lineTerminator: Option[CharSet] = None,
+      word: Option[CharSet] = None
+  ): PatternAlphabet =
+    PatternAlphabet.build(UnitMode.UTF16, sets, lineTerminator, word, false, Seq.empty, Seq.empty, Seq.empty, Separate)
+
   test("EpsNFA.AssertKind#accepts"):
     import IRLineBeginAtEnd.*
     val normal = CharKindState(CharKind.Normal)
     val terminator = CharKindState(CharKind.LineTerminator)
-    val word = CharKindState(CharKind.Word)
+    val word = CharKindState(CharKind(words = 1))
     val boundary = CharKindState(CharKind.Boundary)
     val cr = CharKindState(CharKind(terminators = 1, cr = true))
     val lf = CharKindState(CharKind(terminators = 1, lf = true))
@@ -75,7 +83,7 @@ class EpsNFASuite extends munit.FunSuite:
     assert(!markBoundary.accepts(boundary, mark) && AssertKind.NotMarkWordBoundary(0, 0).accepts(boundary, mark))
 
   test("EpsNFA.AssertKind#treatsBoundaryAsLineTerminator"):
-    val kinds = Seq(CharKind.Normal, CharKind.LineTerminator, CharKind.Word)
+    val kinds = Seq(CharKind.Normal, CharKind.LineTerminator, CharKind(words = 1))
     assert(lineBegin.treatsBoundaryAsLineTerminator(kinds))
     assert(lineEnd.treatsBoundaryAsLineTerminator(kinds))
     assert(wordBoundary.treatsBoundaryAsLineTerminator(kinds))
@@ -85,7 +93,7 @@ class EpsNFASuite extends munit.FunSuite:
 
   test("EpsNFA#toGraphviz"):
     val nfa = EpsNFA(
-      PatternAlphabet.build(UnitMode.UTF16, Seq(CharSet.single('a'))),
+      buildAlphabet(Seq(CharSet.single('a'))),
       immutable.SortedSet(0, 1, 2, 3, 4, 5, 6),
       0,
       6,
@@ -123,9 +131,9 @@ class EpsNFASuite extends munit.FunSuite:
   test("EpsNFA#toOrderedNFA"):
     val normal = CharKindState(CharKind.Normal)
     val terminator = CharKindState(CharKind.LineTerminator)
-    val word = CharKindState(CharKind.Word)
+    val word = CharKindState(CharKind(words = 1))
     val nfa1 = EpsNFA(
-      PatternAlphabet.build(UnitMode.UTF16, lineTerminator = Some(CharSet.single('\n'))),
+      buildAlphabet(Seq.empty, Some(CharSet.single('\n'))),
       Set(0, 1, 2, 3, 4, 5, 6),
       0,
       6,
@@ -154,8 +162,7 @@ class EpsNFASuite extends munit.FunSuite:
       )
     )
     val nfa2 = EpsNFA(
-      PatternAlphabet
-        .build(UnitMode.UTF16, lineTerminator = Some(CharSet.single('\n')), word = Some(CharSet.single('a'))),
+      buildAlphabet(Seq.empty, Some(CharSet.single('\n')), Some(CharSet.single('a'))),
       Set(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
       0,
       10,
@@ -165,7 +172,7 @@ class EpsNFASuite extends munit.FunSuite:
         2 -> LoopEnter(0, 3),
         3 -> Eps(Seq(4, 5)),
         4 -> Consume(Set((CharSet.single('\n'), CharKind.LineTerminator)), 1),
-        5 -> Consume(Set((CharSet.single('a'), CharKind.Word)), 6),
+        5 -> Consume(Set((CharSet.single('a'), CharKind(words = 1))), 6),
         6 -> Eps(Seq(7, 1)),
         7 -> Assert(notWordBoundary, 1),
         8 -> LoopExit(0, 9),

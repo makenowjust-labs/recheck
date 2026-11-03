@@ -30,7 +30,7 @@ object IRCaseEquivalence:
     def closure(set: CharSet): CharSet = set
 
   /** Keyed matches code values mapped to the same key. */
-  final case class Keyed(name: String, mapping: CaseMapping, mode: UnitMode) extends IRCaseEquivalence:
+  final case class Keyed(mapping: CaseMapping, mode: UnitMode) extends IRCaseEquivalence:
 
     def closure(set: CharSet): CharSet = mapping.closure(set).restrict(mode)
 

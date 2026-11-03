@@ -87,7 +87,7 @@ The following are not supported in any dialect having them, and each dialect's p
 - `\N{name}` and `\C` in a mode other than bytes.
 - Word boundaries of a kind, such as `\b{wb}`.
 - Nesting deeper than 150 levels, where each group, look-around condition of a conditional, class, operand of a class set operation, and repeat of a repeat is one level (e.g. `(?:` repeated 151 times gives `Too deeply nested (limit 150) at 450`).
-- Under `i` in Ruby and Perl, a run of literals with more than six places matching a folding to several characters (e.g. `ß`, or `ss`, which matches `ß`) is folded one to one, so some matches are missed (e.g. `ssssssss` does not match `"ßßßß"`).
+- Under `i` in Ruby and Perl, more than six places in a run of literals that match a folding to several characters, such as `ß` or `ss`, which matches `ß` (e.g. `ssssssss` gives `Too many multi-character case foldings in a literal (limit 6) at 0`).
 
 ## Approximations
 

@@ -11,6 +11,7 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
+import codes.quine.labs.resyntax.ir.IRSurrogateKind.Separate
 import codes.quine.labs.resyntax.ir.alphabet.CharKind
 import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
@@ -33,6 +34,9 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   val word: CharSet =
     CharSet.union(Seq(CharSet.range('0', '9'), CharSet.range('A', 'Z'), CharSet.single('_'), CharSet.range('a', 'z')))
 
+  def buildAlphabet(mode: UnitMode, sets: Seq[CharSet] = Seq.empty, word: Option[CharSet] = None): PatternAlphabet =
+    PatternAlphabet.build(mode, sets, None, word, false, Seq.empty, Seq.empty, Seq.empty, Separate)
+
   /** Returns an ε-NFA of `^x$`, where `x` consumes the set. */
   def single(alphabet: PatternAlphabet, set: CharSet): EpsNFA[Int] =
     EpsNFA(
@@ -47,7 +51,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     assertEquals(
       build("$"),
       EpsNFA(
-        PatternAlphabet.build(utf16),
+        buildAlphabet(utf16),
         Set(0, 1, 2, 3, 4),
         1,
         0,
@@ -62,7 +66,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     assertEquals(
       build("^"),
       EpsNFA(
-        PatternAlphabet.build(utf16),
+        buildAlphabet(utf16),
         Set(0, 1, 2, 3, 4),
         0,
         4,
@@ -76,10 +80,10 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     )
 
   test("EpsNFABuilder.build: LineBegin, LineEnd, Sequence"):
-    assertEquals(build("^$"), EpsNFA(PatternAlphabet.build(utf16), Set(0, 1), 0, 1, Map(0 -> Eps(Seq(1)))))
+    assertEquals(build("^$"), EpsNFA(buildAlphabet(utf16), Set(0, 1), 0, 1, Map(0 -> Eps(Seq(1)))))
     assertEquals(
       build("^(?:)$"),
-      EpsNFA(PatternAlphabet.build(utf16), Set(0, 1, 2), 0, 2, Map(0 -> Eps(Seq(1)), 1 -> Eps(Seq(2))))
+      EpsNFA(buildAlphabet(utf16), Set(0, 1, 2), 0, 2, Map(0 -> Eps(Seq(1)), 1 -> Eps(Seq(2))))
     )
 
   test("EpsNFABuilder.build: WordBoundary"):
@@ -87,7 +91,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       assertEquals(
         build(source),
         EpsNFA(
-          PatternAlphabet.build(utf16, word = Some(word)),
+          buildAlphabet(utf16, word = Some(word)),
           Set(0, 1, 2, 3),
           0,
           3,
@@ -98,39 +102,39 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   test("EpsNFABuilder.build: Character, CharacterClass"):
     assertEquals(
       build("^a$", "i"),
-      single(PatternAlphabet.build(utf16, Seq(CharSet.of('a', 'A'))), CharSet.of('a', 'A'))
+      single(buildAlphabet(utf16, Seq(CharSet.of('a', 'A'))), CharSet.of('a', 'A'))
     )
     assertEquals(
       build("^[a]$"),
-      single(PatternAlphabet.build(utf16, Seq(CharSet.single('a'))), CharSet.single('a'))
+      single(buildAlphabet(utf16, Seq(CharSet.single('a'))), CharSet.single('a'))
     )
     assertEquals(
       build("^[^a]$"),
-      single(PatternAlphabet.build(utf16, Seq(CharSet.single('a'))), any16.diff(CharSet.single('a')))
+      single(buildAlphabet(utf16, Seq(CharSet.single('a'))), any16.diff(CharSet.single('a')))
     )
 
   test("EpsNFABuilder.build: Dot"):
     val dot16 = any16.diff(lineTerminator)
     // `.` takes part in the order of atoms as its complement.
-    assertEquals(build("^.$"), single(PatternAlphabet.build(utf16, Seq(lineTerminator)), dot16))
+    assertEquals(build("^.$"), single(buildAlphabet(utf16, Seq(lineTerminator)), dot16))
     assertEquals(
       build("^.$", "i"),
       single(
-        PatternAlphabet.build(utf16, Seq(lineTerminator)),
+        buildAlphabet(utf16, Seq(lineTerminator)),
         dot16
       )
     )
-    assertEquals(build("^.$", "s"), single(PatternAlphabet.build(utf16), any16))
+    assertEquals(build("^.$", "s"), single(buildAlphabet(utf16), any16))
     assertEquals(
       build("^.$", "su"),
-      single(PatternAlphabet.build(UnitMode.CodePoint), UnitMode.CodePoint.universe)
+      single(buildAlphabet(UnitMode.CodePoint), UnitMode.CodePoint.universe)
     )
 
   test("EpsNFABuilder.build: Disjunction"):
     assertEquals(
       build("^(?:.|.)$", "s"),
       EpsNFA(
-        PatternAlphabet.build(utf16),
+        buildAlphabet(utf16),
         Set(0, 1, 2, 3, 4, 5, 6, 7),
         0,
         7,
@@ -151,7 +155,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       assertEquals(
         build(source, "s"),
         EpsNFA(
-          PatternAlphabet.build(utf16),
+          buildAlphabet(utf16),
           Set(0, 1, 2, 3, 4, 5, 6, 7),
           0,
           7,
@@ -170,7 +174,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       assertEquals(
         build(source, "s"),
         EpsNFA(
-          PatternAlphabet.build(utf16),
+          buildAlphabet(utf16),
           Set(0, 1, 2, 3, 4, 5, 6),
           0,
           6,
@@ -188,7 +192,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
       assertEquals(
         build(source, "s"),
         EpsNFA(
-          PatternAlphabet.build(utf16),
+          buildAlphabet(utf16),
           Set(0, 1, 2, 3, 4),
           0,
           4,
@@ -221,7 +225,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     for (source, expected) <- cases do assertEquals(build(source, "s"), build(expected, "s"), source)
 
   test("EpsNFABuilder.build: Capture, NamedCapture, Group"):
-    val nfaA = single(PatternAlphabet.build(utf16, Seq(CharSet.single('a'))), CharSet.single('a'))
+    val nfaA = single(buildAlphabet(utf16, Seq(CharSet.single('a'))), CharSet.single('a'))
     for source <- Seq("^a$", "^(a)$", "^(?<foo>a)$", "^(?:a)$") do assertEquals(build(source), nfaA, source)
 
   test("EpsNFABuilder.build: Strings"):

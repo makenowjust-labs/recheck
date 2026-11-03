@@ -69,25 +69,25 @@ private[build] final class LookBehindAnalyzer(
     * A length above `Int.MaxValue`, which no input reaches, is `Int.MaxValue`.
     */
   def determineLookBehindMatch(body: Node): IRLookBehindMatch =
-    def longest(node: Node): IRLookBehindStarts.Longest =
+    def startRange(node: Node): IRLookBehindStartRange =
       val w = width(node, Set.empty, conditionals = true).getOrElse:
         throw new IllegalStateException("The width of a valid look-behind is unknown")
-      IRLookBehindStarts.Longest(toLength(w.min), toLength(w.max))
+      IRLookBehindStartRange(toLength(w.min), toLength(w.max))
 
     featureSet.lookBehindRule match
       case IRLookBehindRule.Unrestricted => IRLookBehindMatch.Backward
-      case IRLookBehindRule.Java         => IRLookBehindMatch.Forward(Seq(longest(body)))
+      case IRLookBehindRule.Java         => IRLookBehindMatch.Forward(Seq(startRange(body)))
       // PCRE matches each alternative of the body from its own lengths.
       case IRLookBehindRule.PCRE =>
         body.data match
-          case NodeData.Disjunction(nodes) => IRLookBehindMatch.Forward(nodes.map(longest))
-          case _                           => IRLookBehindMatch.Forward(Seq(longest(body)))
+          case NodeData.Disjunction(nodes) => IRLookBehindMatch.Forward(nodes.map(startRange))
+          case _                           => IRLookBehindMatch.Forward(Seq(startRange(body)))
       // Perl tries the starts from the minimum length to `(*ACCEPT)` too.
       case IRLookBehindRule.Perl =>
-        val starts = longest(body)
+        val starts = startRange(body)
         val min = perlAcceptMin(body).fold(starts.min)(n => starts.min.min(toLength(n)))
         IRLookBehindMatch.Forward(Seq(starts.copy(min = min)))
-      case IRLookBehindRule.Python => IRLookBehindMatch.Forward(Seq(longest(body)))
+      case IRLookBehindRule.Python => IRLookBehindMatch.Forward(Seq(startRange(body)))
       // Each top-level alternative of Ruby's look-behind has a fixed width, so matching it backward is the same.
       case IRLookBehindRule.Ruby => IRLookBehindMatch.Backward
 

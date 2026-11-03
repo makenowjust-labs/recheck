@@ -47,8 +47,5 @@ object CharKind:
   /** LineTerminator is the kind of a character of the first line terminator set only. */
   val LineTerminator: CharKind = CharKind(terminators = 1)
 
-  /** Word is the kind of a character of the first word set only. */
-  val Word: CharKind = CharKind(words = 1)
-
   /** Boundary is the kind of the begin and the end of the input, where there is no character. */
   val Boundary: CharKind = CharKind(boundary = true)

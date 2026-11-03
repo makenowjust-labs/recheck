@@ -10,7 +10,7 @@ import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
-import codes.quine.labs.resyntax.ir.IRLookBehindStarts
+import codes.quine.labs.resyntax.ir.IRLookBehindStartRange
 import codes.quine.labs.resyntax.ir.IRWordMarkSet
 
 /** Inst is an instruction. */
@@ -150,7 +150,7 @@ object Inst:
   /** `step_back`: Saves the position to the `end` register, and jumps to a `next` block at each start of a look-behind
     * matched forward, in the order of `starts`, as backtracking points.
     */
-  final case class StepBack(end: CounterReg, starts: IRLookBehindStarts, next: Label) extends Terminator:
+  final case class StepBack(end: CounterReg, starts: IRLookBehindStartRange, next: Label) extends Terminator:
 
     def successors: Set[Label] = Set(next)
 

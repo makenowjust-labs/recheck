@@ -18,7 +18,7 @@ import codes.quine.labs.resyntax.ir.IRBacktrackControl
 import codes.quine.labs.resyntax.ir.IRCondition
 import codes.quine.labs.resyntax.ir.IREmptyIteration
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch
-import codes.quine.labs.resyntax.ir.IRLookBehindStarts
+import codes.quine.labs.resyntax.ir.IRLookBehindStartRange
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData
 import codes.quine.labs.resyntax.ir.IRNotEmpty
@@ -813,8 +813,8 @@ private[vm] class ProgramBuilder(
     *
     * With the starts of each alternative, the body is a disjunction of them.
     */
-  def buildForwardBody(child: IRNode, starts: Seq[IRLookBehindStarts], end: CounterReg): Unit =
-    def attempt(node: IRNode, starts: IRLookBehindStarts): Unit =
+  def buildForwardBody(child: IRNode, starts: Seq[IRLookBehindStartRange], end: CounterReg): Unit =
+    def attempt(node: IRNode, starts: IRLookBehindStartRange): Unit =
       val start = allocateLabel("start")
       // The register holds the end of the look-behind, so memoization tells the look-behinds at different positions
       // apart.

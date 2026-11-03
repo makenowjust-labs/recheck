@@ -37,3 +37,14 @@ class StaticSeederSuite extends munit.FunSuite:
 
     assertEquals(seed("^a(?=a)$", ""), Set.empty[String])
     assertEquals(seed("^a(?<=a)$", ""), Set.empty[String])
+
+    // A dead suffix after a high surrogate is not a low surrogate, which the engine reads together with it.
+    assertEquals(
+      seed("^(?:\\uD800|\\uDC00)*(?:\\uD800|\\uDC00)*$", "u"),
+      Set(
+        "'\\uD800' + '\\uD800'.repeat(224) + '\\x00'",
+        "'\\uD800' + '\\uD800'.repeat(15) + '\\x00'",
+        "'\\uDC00' + '\\uDC00'.repeat(224) + '\\x00'",
+        "'\\uDC00' + '\\uDC00'.repeat(15) + '\\x00'"
+      )
+    )
