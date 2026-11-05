@@ -99,5 +99,6 @@ The following constructs are not supported, and they are reported as `unsupporte
 
 `java` runs a fixed program as a single-file source program, which needs a JDK (17 or later).
 The program reads the pattern and the attack string from the standard input.
-`recheck` writes the program file once into its directory in the temporary directory (see [Program Files](../runtime-attack-verification.mdx#program-files)), so a command in a container needs the directory mounted at the same path.
+`recheck` writes the program file once into the directory `recheck-<user>` in the temporary directory of the JVM (`java.io.tmpdir`), so a command in a container needs the directory mounted at the same path.
+If the directory is not owned only by the user (`rwx------`), or the file system has no POSIX permissions (e.g. on Windows), `recheck` uses a new temporary directory, which it deletes on exit.
 The runtime-attack script has the pattern and the attack string in itself.

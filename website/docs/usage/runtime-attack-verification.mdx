@@ -105,22 +105,9 @@ The result records it as `engine-error` with the message (see [Diagnostics](diag
 
 When the command cannot run (e.g. the runtime is not installed), the result is `unknown` with an `unexpected` error.
 
-## Programs
-
-For each attack string, `recheck` generates a small program in the dialect's language, and runs it with the dialect's command.
-The program is given on the standard input, except for `java` and `dotnet` (see [Program Files](#program-files)).
-The timeout counts from the start of the matching, so the startup of the runtime (e.g. compiling the program) is not counted.
-The program sets the locale that `recheck` assumes before compiling the pattern, so the result does not depend on the locale of the environment (e.g. `LC_ALL` or `LANG`).
-Each dialect's page (see [Dialects](dialects.mdx#supported-dialects)) lists its command, its matching function, its engine limits and errors, its environment variable and its runtime-attack script, with the notes on its program.
-
-### Program Files
-
-`recheck` writes the programs of `java` and `dotnet` once into the directory `recheck-<user>` in the temporary directory of the JVM (`java.io.tmpdir`), and it keeps them there.
-The directory must be owned only by the user (`rwx------`).
-If it is not, or the file system has no POSIX permissions (e.g. on Windows), `recheck` uses a new temporary directory, which it deletes on exit.
-
 ## Runtime Command
 
+Each dialect's page (see [Dialects](dialects.mdx#supported-dialects)) lists its command and its environment variable.
 By default, the command is found by its name in `PATH`.
 An environment variable of each dialect (e.g. `RECHECK_RUBY`) replaces the runtime program with a command line.
 
