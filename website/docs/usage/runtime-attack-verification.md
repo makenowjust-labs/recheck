@@ -3,11 +3,11 @@ id: runtime-attack-verification
 title: Runtime-Attack Verification
 ---
 
-Describes the runtime-attack verification, which runs the attack string on the real engine of the [dialect](dialects.md).
+Describes the runtime-attack verification, which runs the attack string on the real engine of the [dialect](dialects.mdx).
 
 ## Overview
 
-`recheck` models a naive backtracking engine, and some engines run a found attack fast by their optimizations (see [Approximations](dialects.md#approximations)).
+`recheck` models a naive backtracking engine, and some engines run a found attack fast by their optimizations (see [Approximations](dialects.mdx#approximations)).
 The runtime-attack verification runs the attack string on the real engine of the dialect (the runtime attack), and it tells whether the attack works there.
 It runs when [`runtimeAttackTimeout`](parameters.mdx#runtimeattacktimeout) is positive, and only where `recheck` can run commands: it does not run in the browser or with the Scala.js build (the `worker` and `pure` backends of the JavaScript library).
 

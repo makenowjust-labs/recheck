@@ -3,22 +3,33 @@ id: dialects
 title: Dialects
 ---
 
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
 Describes the regular expression dialects that `recheck` supports, and what is common to all of them.
-Each dialect has its own page on how it is checked.
+
+Each dialect has its own page on how it is checked:
+[JavaScript](dialects/javascript.md) / [Python](dialects/python.md) / [Ruby](dialects/ruby.md) / [Java](dialects/java.md) / [.NET](dialects/dotnet.md) / [Perl](dialects/perl.md) / [PCRE](dialects/pcre.md).
 
 ## Choosing a Dialect
 
 `recheck` checks a regular expression in the syntax and the semantics of one dialect.
-The [`dialect`](parameters.mdx#dialect) parameter chooses it, and its default is `javascript`.
-It is the name of the dialect, or an object of the name and the dialect's settings (e.g. `{ "name": "python", "type": "bytes" }`), where an omitted setting takes the default.
-The flags are the dialect's own flag letters (e.g. `imsx`), not a JavaScript flags string.
+
+The [`dialect`](parameters.mdx#dialect) parameter chooses it (the default is `javascript`).
+It is the name of the dialect, or an object of the name and the dialect's settings (e.g. `{ "name": "python", "type": "bytes" }`).
 
 The following shows how to check a pattern in the Python dialect.
 
-```bash
-recheck --dialect=python '/^(a|a)*$/'
-recheck --dialect=python --python-type=bytes '/^(a|a)*$/'
+<Tabs>
+<TabItem value="cli" label="CLI">
+
+```console
+$ recheck --dialect=python '/^(a|a)*$/'
+$ recheck --dialect=python --python-type=bytes '/^(a|a)*$/'
 ```
+
+</TabItem>
+<TabItem value="js" label="JavaScript">
 
 ```tsx
 import { check } from "recheck";
@@ -26,6 +37,9 @@ import { check } from "recheck";
 await check("^(a|a)*$", "", { dialect: "python" });
 await check("^(a|a)*$", "", { dialect: { name: "python", type: "bytes" } });
 ```
+
+</TabItem>
+<TabItem value="scala" label="Scala">
 
 ```scala
 import codes.quine.labs.recheck.ReDoS
@@ -36,8 +50,8 @@ ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Python()))
 ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Python(Dialect.Python.Type.Bytes)))
 ```
 
-The CLI takes the settings by `--python-type`, `--ruby-encoding`, `--no-perl-utf8` and `--perl-source`, and an option of another dialect is an error.
-The Playground also has a selector of the dialect, and it shows the settings of the selected dialect.
+</TabItem>
+</Tabs>
 
 :::note
 
@@ -47,18 +61,15 @@ The ESLint plugin (`eslint-plugin-redos`) checks JavaScript regular expressions 
 
 ## Supported Dialects
 
-| `dialect`                              | Engine that `recheck` follows                  | Matching unit                                      | Runtime-attack verification command                       |
-| -------------------------------------- | ---------------------------------------------- | -------------------------------------------------- | --------------------------------------------------------- |
-| [`javascript`](dialects/javascript.md) | ECMAScript 2025 `RegExp` (V8)                  | UTF-16 code units, or code points with `u` or `v`  | `node -`                                                  |
-| [`python`](dialects/python.md)         | Python 3.15 `re`                               | code points (`str`), or bytes (`bytes`)            | `python3 -I -`                                            |
-| [`ruby`](dialects/ruby.md)             | Ruby 4.0 `Regexp` (Onigmo)                     | code points (`UTF-8`), or bytes (`ASCII-8BIT`)     | `ruby -`                                                  |
-| [`java`](dialects/java.md)             | Java 25 `java.util.regex.Pattern`              | code points                                        | `java --source 17 <dir>/RecheckRuntimeAttack-<hash>.java` |
-| [`dotnet`](dialects/dotnet.md)         | .NET 10 `System.Text.RegularExpressions.Regex` | UTF-16 code units                                  | `dotnet run <dir>/RecheckRuntimeAttack-<hash>.cs`         |
-| [`perl`](dialects/perl.md)             | Perl 5.44 regular expressions                  | code points (`utf8`), or bytes (no `utf8`)         | `perl -`                                                  |
-| [`pcre`](dialects/pcre.md)             | PCRE2 10.49 as PHP's `preg_*` functions use it | bytes, or code points (UTF-8) with `u` or `(*UTF)` | `php`                                                     |
-
-Each dialect's page describes its engine, settings, flags and units, syntax limitations, approximations and runtime-attack verification.
-The rest of this page describes what is common to all the dialects.
+| `dialect`                              | Engine that `recheck` follows                  | Matching unit                                      |
+| -------------------------------------- | ---------------------------------------------- | -------------------------------------------------- |
+| [`javascript`](dialects/javascript.md) | ECMAScript 2025 `RegExp` (V8)                  | UTF-16 code units, or code points with `u` or `v`  |
+| [`python`](dialects/python.md)         | Python 3.15 `re`                               | code points (`str`), or bytes (`bytes`)            |
+| [`ruby`](dialects/ruby.md)             | Ruby 4.0 `Regexp` (Onigmo)                     | code points (`UTF-8`), or bytes (`ASCII-8BIT`)     |
+| [`java`](dialects/java.md)             | Java 25 `java.util.regex.Pattern`              | code points                                        |
+| [`dotnet`](dialects/dotnet.md)         | .NET 10 `System.Text.RegularExpressions.Regex` | UTF-16 code units                                  |
+| [`perl`](dialects/perl.md)             | Perl 5.44 regular expressions                  | code points (`utf8`), or bytes (no `utf8`)         |
+| [`pcre`](dialects/pcre.md)             | PCRE2 10.49 as PHP's `preg_*` functions use it | bytes, or code points (UTF-8) with `u` or `(*UTF)` |
 
 ## Units and Attack Strings
 
