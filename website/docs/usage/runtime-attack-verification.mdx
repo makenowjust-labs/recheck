@@ -118,8 +118,6 @@ For example, the following uses Ruby installed in `/opt/ruby-4.0` with `--disabl
 $ RECHECK_RUBY='/opt/ruby-4.0/bin/ruby --disable-gems' recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
 ```
 
-The command line is written as in a shell, so a path with spaces needs quotes (e.g. `RECHECK_RUBY='"/Applications/My Ruby/bin/ruby"'`).
-It can also run the runtime in a container (e.g. `RECHECK_RUBY='docker run -i --rm ruby:4.0 ruby'`).
 The environment variables work with the JavaScript library and the ESLint plugin too, since they pass their environment to `recheck`.
 
 :::info
