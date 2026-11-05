@@ -303,7 +303,7 @@ class CodecSuite extends munit.FunSuite:
   test("codec.encodeUString"):
     assertEquals(encodeUString(UnitMode.UTF16)(UString(0x61, 0xd83d, 0xde00)), Json.fromString("a😀"))
     assertEquals(encodeUString(UnitMode.CodePoint)(UString(0x61, 0x1f600)), Json.fromString("a😀"))
-    assertEquals(encodeUString(UnitMode.Byte)(UString(0x61, 0xc3, 0xa9)), Json.fromString("a\u00c3\u00a9"))
+    assertEquals(encodeUString(UnitMode.Byte)(UString(0x61, 0x7f)), Json.fromString("a\u007f"))
 
     // A string that does not read back as the units is an array of them.
     assertEquals(
@@ -311,6 +311,7 @@ class CodecSuite extends munit.FunSuite:
       Json.arr(Json.fromInt(0x61), Json.fromInt(0xd800))
     )
     assertEquals(encodeUString(UnitMode.CodePoint)(UString(0xdc00)), Json.arr(Json.fromInt(0xdc00)))
+    assertEquals(encodeUString(UnitMode.Byte)(UString(0x61, 0x80)), Json.arr(Json.fromInt(0x61), Json.fromInt(0x80)))
     assertEquals(
       encodeUString(UnitMode.CodePoint)(UString(0xd800, 0xdc00)),
       Json.arr(Json.fromInt(0xd800), Json.fromInt(0xdc00))

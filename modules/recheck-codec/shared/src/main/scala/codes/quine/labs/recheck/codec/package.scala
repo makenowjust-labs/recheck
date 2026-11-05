@@ -241,7 +241,8 @@ given encodeErrorKind: Encoder[ErrorKind] with
       Json.obj("kind" := "unexpected", "message" := message)
 
 /** Returns an `Encoder` for `UString` of the unit mode, which gives the string of the mode, or the array of the units
-  * when they have a surrogate code point in `CodePoint` mode or a lone surrogate in `UTF16` mode.
+  * when they have a surrogate code point in `CodePoint` mode, a lone surrogate in `UTF16` mode, or a byte above `0x7F`
+  * in `Byte` mode.
   */
 def encodeUString(mode: UnitMode): Encoder[UString] = (s: UString) =>
   val isArray = mode match
@@ -249,7 +250,8 @@ def encodeUString(mode: UnitMode): Encoder[UString] = (s: UString) =>
     case UnitMode.CodePoint => s.iterator.exists(UTF16Encoding.isSurrogate)
     // UTF-8 cannot write a lone surrogate.
     case UnitMode.UTF16 => hasLoneSurrogate(s)
-    case UnitMode.Byte  => false
+    // A character above `0x7F` does not read as the same byte in every language.
+    case UnitMode.Byte => s.iterator.exists(_ > 0x7f)
   if isArray then s.iterator.toSeq.asJson else mode.encode(s).asJson
 
 /** Returns a `Decoder` for `UString` of the unit mode, which reads a string or an array of units. */
