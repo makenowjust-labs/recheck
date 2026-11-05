@@ -457,6 +457,8 @@ class IRCharResolverSuite extends munit.FunSuite:
   chars("\\C", "", PCRE)(UnitMode.Byte.universe)
   unsupported("(*UTF)\\C", "", PCRE)
   chars("\\N", "", Perl())(of("\n").complement(UnitMode.CodePoint))
+  // PCRE's `\N` is `.` without `s`.
+  chars("\\N", "s", PCRE)(of("\n").complement(UnitMode.Byte))
   check("\\R", "", Perl(), Ruby())(
     Atomic(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical)))
   )
@@ -485,6 +487,9 @@ class IRCharResolverSuite extends munit.FunSuite:
   test("IRBuilder.build: the word set of \\b in Ruby is Unicode under (?d)"):
     val Assert(IRAssertKind.WordBoundary(word)) = build("\\b", "", Ruby()).node.data: @unchecked
     assert(word.contains(0xe9))
+  test("IRBuilder.build: the word set of \\b in Ruby is ASCII in byte mode"):
+    val Assert(IRAssertKind.WordBoundary(word)) = build("\\b", "n", Ruby()).node.data: @unchecked
+    assertEquals(word, IRClassLookup.ASCIIWord)
   test("IRBuilder.build: the word set of \\b in .NET has ZWJ and ZWNJ"):
     val Assert(IRAssertKind.WordBoundary(word)) = build("\\b", "", DotNet).node.data: @unchecked
     assert(word.contains(0x200c) && word.contains(0x200d))

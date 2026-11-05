@@ -338,16 +338,14 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   check("\\B", "", JavaScript, PCRE)(Assert(IRAssertKind.NotWordBoundary(ASCIIWord)))
   // Java's `\b` without `U` takes a non-spacing mark after a letter or a digit as a word character.
   locally:
-    val marks = new IRClassLookup(Java, UnitMode.UTF16CodePoint, false).javaWordMarks
+    val marks = IRClassLookup.javaWordMarks
     check("\\b", "", Java)(Assert(IRAssertKind.MarkWordBoundary(ASCIIWord, marks)))
     check("\\B", "", Java)(Assert(IRAssertKind.NotMarkWordBoundary(ASCIIWord, marks)))
     test("IRBuilder.build: Java's word marks"):
       assert(marks.marks.contains(0x0301) && marks.marks.contains(0x1d167) && !marks.extenders.contains(0x1d167))
       assert(marks.bases.contains('a') && marks.bases.contains(0x0660) && !marks.bases.contains('_'))
       assert(!marks.bases.contains(0x1d400) && !marks.bases.contains(0x2160))
-  checkWith("\\b", "U", Java)(_ =>
-    Assert(IRAssertKind.WordBoundary(new IRClassLookup(Java, UnitMode.UTF16CodePoint, false).word(flagsOf(Java, "U"))))
-  )
+  checkWith("\\b", "U", Java)(_ => Assert(IRAssertKind.WordBoundary(IRClassLookup.Java.word(flagsOf(Java, "U")))))
   // ECMAScript's WordCharacters with `u` and `i` includes U+017F and U+212A, which fold to `s` and `k`.
   check("\\b", "iu", JavaScript)(Assert(IRAssertKind.WordBoundary(ASCIIWord.union(CharSet.of(0x17f, 0x212a)))))
   check("\\b{wb}", "", Perl())(
@@ -370,11 +368,13 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   def referenceOf(d: Dialect, flags: String = "", unicode: Boolean = true): IRNodeData =
     val charFlags = flagsOf(d, flags)
     val referenceFlags = if d.isPerl && unicode then charFlags.copy(charset = IRCharset.Unicode) else charFlags
-    val mode = Parser.determineUnitMode("", FlagSet.parse(flags, d), d)
+    val flagSet = FlagSet.parse(flags, d)
+    val mode = Parser.determineUnitMode("", flagSet, d)
+    val featureSet = IRFeatureSet.from(flagSet, d, Seq.empty)
     BackReference(
       Seq(1),
-      IRCharResolver.determineBackReferenceCaseEquivalence(d, mode, referenceFlags),
-      IRCharResolver.determineBackReferenceFolding(d, mode, referenceFlags)
+      IRCharResolver.determineBackReferenceCaseEquivalence(featureSet.caseEquivalenceKind, mode, referenceFlags),
+      IRCharResolver.determineBackReferenceFolding(featureSet.multiCharFoldingKind, mode, referenceFlags)
     )
 
   checkWith("(a)\\1", "", All*)(d => Sequence(Capture(1, None, char('a')), referenceOf(d)))

@@ -15,7 +15,6 @@ import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
-import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.ast.SourceLocation
@@ -36,29 +35,27 @@ object IRBuilder:
   def build(node: Node, flagSet: FlagSet, dialect: Dialect, mode: UnitMode): IRPattern =
     val starts = startOptions(node)
     val featureSet = IRFeatureSet.from(flagSet, dialect, starts)
-    if dialect.isPython && mode == UnitMode.CodePoint && flagSet.localeUpper then
-      throw new IRBuildingException("Cannot use LOCALE flag with a str pattern", SourceLocation.Invalid)
-    if dialect.isPython && mode == UnitMode.Byte && flagSet.unicode then
-      throw new IRBuildingException("Cannot use UNICODE flag with a bytes pattern", SourceLocation.Invalid)
-    if dialect.isPython then validatePythonGlobalFlags(node, flagSet)
-    val context = BuildingContext(flagSet, dialect, featureSet)
+    if featureSet.validatesCharsetFlags then
+      if mode == UnitMode.CodePoint && flagSet.localeUpper then
+        throw new IRBuildingException("Cannot use LOCALE flag with a str pattern", SourceLocation.Invalid)
+      if mode == UnitMode.Byte && flagSet.unicode then
+        throw new IRBuildingException("Cannot use UNICODE flag with a bytes pattern", SourceLocation.Invalid)
+      validatePythonGlobalFlags(node, flagSet)
+    val context = BuildingContext(flagSet, featureSet)
     val table = CaptureAnalyzer.analyze(node, context)
-    val resolver = new ReferenceResolver(table, dialect, featureSet)
-    val perlUnicodeRules = dialect match
-      case Dialect.Perl(utf8, _) => utf8 || usesPerlUnicodeSyntax(node)
-      case _                     => false
+    val resolver = new ReferenceResolver(table, featureSet)
+    val perlUnicodeRules =
+      featureSet.hasNativeString && (featureSet.matchesUTF8String || usesPerlUnicodeSyntax(node))
     // Perl decides the widths in a look-behind on compiling the pattern, by whether the pattern itself is UTF-8.
-    val perlUTF8Pattern = dialect match
-      case Dialect.Perl(true, PerlSource.String) => true
-      case Dialect.Perl(utf8, _)                 => usesPerlUnicodeSyntax(node) || utf8 && hasNonASCIILiteral(node)
-      case _                                     => false
-    val chars = new IRCharResolver(dialect, mode, perlUnicodeRules)
+    val perlUTF8Pattern = featureSet.hasNativeString && (featureSet.hasUTF8Source || usesPerlUnicodeSyntax(node) ||
+      featureSet.matchesUTF8String && hasNonASCIILiteral(node))
+    val chars = new IRCharResolver(featureSet, mode, perlUnicodeRules)
     val lookBehindAnalyzer =
       new LookBehindAnalyzer(
         table,
         resolver,
         featureSet,
-        charWidth(table, chars, dialect, mode, perlUTF8Pattern),
+        charWidth(table, chars, featureSet.lookBehindRule, mode, perlUTF8Pattern),
         node => table.charFlagsOf(node).flatMap(chars.rubyClassWidths(node, _))
       )
     val backReferences = new SemanticAnalyzer(table, resolver, lookBehindAnalyzer, featureSet).analyze(node)
@@ -68,36 +65,18 @@ object IRBuilder:
       root,
       table.count,
       IRBackReferenceSemantics(featureSet.unsetBackReferenceMatchesEmpty, featureSet.backReferenceChoice),
-      captureSemantics(dialect),
-      emptyIterationSemantics(dialect),
-      backtrackControlSemantics(dialect),
+      IRCaptureSemantics(
+        resetsEachIteration = featureSet.resetsCapturesEachIteration,
+        keptOnBacktracking = featureSet.keepsCapturesOnBacktracking,
+        heldAfterAtomicMatch = featureSet.holdsCapturesAfterAtomicMatch,
+        restoredByNegativeCondition = featureSet.restoresCapturesByNegativeCondition
+      ),
+      IREmptyIterationSemantics(featureSet.unboundedEmptyIteration, featureSet.boundedEmptyIteration),
+      IRBacktrackControlSemantics(featureSet.thenPassesAssertions, featureSet.acceptEndsAtomic),
       featureSet.anchored,
       mode,
       notEmpty(starts)
     )
-
-  private def captureSemantics(dialect: Dialect): IRCaptureSemantics =
-    IRCaptureSemantics(
-      resetsEachIteration = dialect.isJavaScript,
-      keptOnBacktracking = dialect.isPerl,
-      heldAfterAtomicMatch = dialect.isJava,
-      restoredByNegativeCondition = dialect.isDotNet
-    )
-
-  private def emptyIterationSemantics(dialect: Dialect): IREmptyIterationSemantics =
-    def all(handling: IREmptyIteration): IREmptyIterationSemantics = IREmptyIterationSemantics(handling, handling)
-
-    dialect match
-      case Dialect.JavaScript => all(IREmptyIteration.Reject)
-      case _: Dialect.Python  => all(IREmptyIteration.ExitOptional)
-      case Dialect.Java       => all(IREmptyIteration.ExitAll)
-      // PCRE repeats copies of the node for a bounded repetition.
-      case Dialect.PCRE    => IREmptyIterationSemantics(IREmptyIteration.ExitFromMin, IREmptyIteration.Ignore)
-      case _: Dialect.Ruby => all(IREmptyIteration.ExitOptional)
-      case Dialect.DotNet | _: Dialect.Perl => all(IREmptyIteration.ExitFromMin)
-
-  private def backtrackControlSemantics(dialect: Dialect): IRBacktrackControlSemantics =
-    IRBacktrackControlSemantics(thenPassesAssertions = dialect.isPerl, acceptEndsAtomic = dialect.isPerl)
 
   /** Checks whether Perl takes the full case folding of the character under the flags (e.g. `ß` as `ss`). */
   private def perlFoldsMulti(value: Int, flags: IRCharFlagSet, perlUTF8Pattern: Boolean): Boolean =
@@ -123,7 +102,7 @@ object IRBuilder:
   private def charWidth(
       table: CaptureTable,
       chars: IRCharResolver,
-      dialect: Dialect,
+      lookBehindRule: IRLookBehindRule,
       mode: UnitMode,
       perlUTF8Pattern: Boolean
   ): Seq[Node] => LookBehindAnalyzer.Width =
@@ -131,9 +110,9 @@ object IRBuilder:
     def single(n: Int): Width = Width(n, n)
 
     // Perl reads the bytes of a byte string as Latin-1 characters.
-    if !mode.isCodePoint && !dialect.isPerl then return nodes => single(nodes.size)
-    dialect match
-      case _: Dialect.Perl =>
+    if !mode.isCodePoint && lookBehindRule != IRLookBehindRule.Perl then return nodes => single(nodes.size)
+    lookBehindRule match
+      case IRLookBehindRule.Perl =>
         def fold(value: Int, flags: IRCharFlagSet): Int =
           if perlFoldsMulti(value, flags, perlUTF8Pattern) then FullCaseFolding(value).length else 1
 
@@ -154,7 +133,7 @@ object IRBuilder:
                 case NodeData.Class(false, item)                             => classWidth(item.data, flags)
                 case _                                                       => 1
           Width(1, width.toLong)
-      case _: Dialect.Ruby =>
+      case IRLookBehindRule.Ruby =>
         def fold(value: Int): Int = FullCaseFolding(value).length.max(1)
 
         nodes =>
@@ -268,8 +247,6 @@ private[build] class IRBuilder(
     lookBehindAnalyzer: LookBehindAnalyzer,
     hasCall: Boolean
 ):
-
-  private val dialect = initial.dialect
 
   private val featureSet = initial.featureSet
 
@@ -392,7 +369,7 @@ private[build] class IRBuilder(
       val set = indices.filter(_ != 0)
       if set.isEmpty then Left(false)
       // Ruby tests only the first group of a name shared by groups.
-      else if dialect.isRuby then Right(IRCondition.Captured(set.take(1)))
+      else if featureSet.testsFirstGroupOfName then Right(IRCondition.Captured(set.take(1)))
       else Right(IRCondition.Captured(set))
 
     def resolved: Seq[Int] = backReferences(NodeKey(node))
@@ -400,7 +377,7 @@ private[build] class IRBuilder(
     // A recursion test is false out of a recursion, so it is constant without calls.
     // PCRE reads `(R)` and `(R1)` as capture tests when a group has the name.
     def recursion(name: Option[String]): Option[Either[Boolean, IRCondition]] =
-      name.filter(dialect.isPCRE && table.names.contains(_)) match
+      name.filter(featureSet.readsRecursionTestAsCaptureTest && table.names.contains(_)) match
         case Some(name) => Some(captured(table.names(name)))
         case None       => Option.when(!hasCall)(Left(false))
 
@@ -495,7 +472,7 @@ private[build] class IRBuilder(
 
   def buildNamedCapture(node: Node, name: String, child: Node): IRNodeData =
     val index = table.indexOf(node).getOrElse(throw new IllegalStateException(s"No capture index: $node"))
-    val captureName = if CaptureAnalyzer.isNumericName(dialect, name) then None else Some(name)
+    val captureName = if CaptureAnalyzer.isNumericName(featureSet, name) then None else Some(name)
     IRNodeData.Capture(index, captureName, scoped(build(child)))
 
   def buildBackslash(node: Node, kind: BackslashKind): IRNodeData = kind match

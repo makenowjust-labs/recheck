@@ -6,7 +6,6 @@ import scala.collection.mutable
 import codes.quine.labs.resyntax.ast.BackslashKind
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.ConditionalTest
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
@@ -90,7 +89,9 @@ private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext)
 
   private val charFlags = mutable.Map.empty[NodeKey, IRCharFlagSet]
 
-  private val recordsCharFlags = initial.dialect.isPerl || initial.dialect.isRuby
+  private val recordsCharFlags = featureSet.lookBehindRule match
+    case IRLookBehindRule.Perl | IRLookBehindRule.Ruby => true
+    case _                                             => false
 
   private var branchResetDepth: Int = 0
 
@@ -183,7 +184,7 @@ private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext)
     case CommandKind.Conditional(test, yes, no) =>
       markSite(node)
       test match
-        case ConditionalTest.LookAround(Some(kind), node) if initial.dialect.isDotNet =>
+        case ConditionalTest.LookAround(Some(kind), node) if featureSet.ignoresGroupAfterLookAroundCondition =>
           // .NET's parser ignores the next unnamed group to skip the parentheses of a conditional expression, and the look-around does not reset it, so it goes on to the next unnamed group, even after the conditional.
           ignoresNextGroup = true
           walkTest(Some(kind), node)
@@ -208,7 +209,7 @@ private[build] final class CaptureAnalyzer(root: Node, initial: BuildingContext)
 
   private def namedCapture(node: Node, name: String, child: Node): Unit =
     if featureSet.numbersNamedCaptureLast then
-      if CaptureAnalyzer.isNumericName(initial.dialect, name) then
+      if CaptureAnalyzer.isNumericName(featureSet, name) then
         val index = name.toIntOption.getOrElse(throw new IRBuildingException("Group number is too large", node.loc))
         usedIndices.add(index)
         capture(node, index, child)
@@ -275,5 +276,5 @@ private[build] object CaptureAnalyzer:
     new CaptureAnalyzer(root, context).analyze()
 
   /** Checks whether the name is a number in .NET, where such a name (e.g. `(?<2>...)`) is an index. */
-  def isNumericName(dialect: Dialect, name: String): Boolean =
-    dialect.isDotNet && name.nonEmpty && name.forall(_.isDigit)
+  def isNumericName(featureSet: IRFeatureSet, name: String): Boolean =
+    featureSet.readsNumericNameAsIndex && name.nonEmpty && name.forall(_.isDigit)
