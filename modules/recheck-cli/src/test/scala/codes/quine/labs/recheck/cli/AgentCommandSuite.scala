@@ -8,6 +8,7 @@ class AgentCommandSuite extends munit.FunSuite:
     val complex =
       """"method":"check","params":{"source":"(a|b|aba)*$","flags":"","params":{"checker":"fuzz","usesAcceleration":false,"dialect":"perl"}}"""
     val simpleLog = """"method":"check","params":{"source":"a","flags":"","params":{"logger":[]}}"""
+    val repair = """"method":"repair","params":{"source":"^(a+)+$","flags":"","params":{},"keep":"match-range"}"""
     val in = Seq(
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":0,"method":"ping","params":{}}"""),
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":1,$simple}"""),
@@ -22,7 +23,9 @@ class AgentCommandSuite extends munit.FunSuite:
       Left(2), // Wait the above `check` execution.
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":4,$simpleLog}"""),
       Left(4), // Wait the above `check` execution.
-      Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":5,$complex}""")
+      Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":5,$repair}"""),
+      Left(1), // Wait the above `repair` execution.
+      Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":6,$complex}""")
     )
     val out = Seq.newBuilder[String]
     val sem = new Semaphore(0)
@@ -51,6 +54,7 @@ class AgentCommandSuite extends munit.FunSuite:
         """{"jsonrpc":"2.0+push","id":4,"message":"parse: finish\n  pattern: /a/"}""",
         """{"jsonrpc":"2.0+push","id":4,"message":"parse: start"}""",
         """{"jsonrpc":"2.0+push","id":4,"result":{"source":"a","flags":"","dialect":{"name":"javascript"},"unitMode":"utf16","status":"safe","complexity":{"type":"safe","summary":"safe","isFuzz":false},"upperBound":null,"refutedAttacks":[],"checker":"automaton"}}""",
-        """{"jsonrpc":"2.0+push","id":5,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"unitMode":null,"status":"unknown","error":{"kind":"cancel"},"upperBound":null,"refutedAttacks":[],"checker":null}}"""
+        """{"jsonrpc":"2.0+push","id":5,"result":{"source":"^(a+)+$","flags":"","dialect":{"name":"javascript"},"unitMode":"utf16","status":"repaired","repaired":"^(a+)$","complexity":{"type":"linear","summary":"linear","isFuzz":false},"kept":[0],"comparison":{"kind":"equivalent"}}}""",
+        """{"jsonrpc":"2.0+push","id":6,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"unitMode":null,"status":"unknown","error":{"kind":"cancel"},"upperBound":null,"refutedAttacks":[],"checker":null}}"""
       )
     )

@@ -8,6 +8,7 @@ import java.nio.file.NoSuchFileException
 import java.nio.file.Paths
 import java.time.LocalDateTime
 
+import cats.data.Validated
 import cats.syntax.apply.*
 import cats.syntax.semigroupk.*
 import com.monovore.decline.Command
@@ -18,11 +19,14 @@ import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.cli.Main.BatchAction
 import codes.quine.labs.recheck.cli.Main.CheckAction
 import codes.quine.labs.recheck.cli.Main.GenerateRuntimeAttackScriptAction
+import codes.quine.labs.recheck.cli.Main.RepairAction
 import codes.quine.labs.recheck.cli.Main.command
 import codes.quine.labs.recheck.codec.given
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.diagnostics.Diagnostics
+import codes.quine.labs.recheck.repair.Keep
+import codes.quine.labs.recheck.repair.Rx
 
 /** Main provides the entrypoint of `recheck` command. */
 object Main:
@@ -35,6 +39,9 @@ object Main:
 
   /** CheckAction holds `recheck check` subcommand parameters. */
   final case class CheckAction(pattern: InputPattern, params: Parameters, json: Boolean) extends Action
+
+  /** RepairAction holds `recheck repair` subcommand parameters. */
+  final case class RepairAction(pattern: InputPattern, params: Parameters, keep: Keep, json: Boolean) extends Action
 
   /** GenerateRuntimeAttackScriptAction holds `recheck generate-runtime-attack-script` subcommand parameters.
     *
@@ -74,7 +81,29 @@ object Main:
       ):
         Opts.argument[String](metavar = "diagnostics").map(GenerateRuntimeAttackScriptAction.apply)
 
-      agent <+> generateRuntimeAttackScript <+> check
+      val repair: Opts[Action] =
+        Opts.subcommand(name = "repair", help = "Repairs the given RegExp pattern to a better one."):
+          val keep = Opts
+            .option[String](
+              long = "keep",
+              help =
+                "What the repair keeps of the matches: all (default), named, match-range, match, or capture numbers " +
+                  "and names separated by commas."
+            )
+            .mapValidated:
+              case "all"         => Validated.validNel(Keep.All)
+              case "named"       => Validated.validNel(Keep.Named)
+              case "match-range" => Validated.validNel(Keep.MatchRange)
+              case "match"       => Validated.validNel(Keep.Match)
+              case refs          =>
+                Validated.validNel(
+                  Keep.Captures(refs.split(",").toSeq.map(r => r.trim.toIntOption.getOrElse[Int | String](r.trim)))
+                )
+            .withDefault(Keep.All)
+          val json = Opts.flag(long = "json", help = "Show the result in JSON.").orFalse
+          (pattern, params, keep, json).mapN(RepairAction(_, _, _, _))
+
+      agent <+> generateRuntimeAttackScript <+> repair <+> check
 
   // $COVERAGE-OFF$
   /** An entrypoint of `recheck` command. */
@@ -102,6 +131,13 @@ class Main:
       diagnostics match
         case _: Diagnostics.Safe                                => () // skip
         case _: Diagnostics.Vulnerable | _: Diagnostics.Unknown => exit(1)
+
+    case Right(action: RepairAction) =>
+      val rx = ReDoS.repair(action.pattern.source, action.pattern.flags, action.params, action.keep)
+      Console.out.println(if action.json then rx.asJson.noSpaces else rx.toString)
+      rx match
+        case _: Rx.Safe | _: Rx.Repaired => () // skip
+        case _: Rx.Unknown               => exit(1)
 
     case Right(action: GenerateRuntimeAttackScriptAction) =>
       val script = for

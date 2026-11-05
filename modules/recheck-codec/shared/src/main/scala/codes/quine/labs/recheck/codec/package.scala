@@ -23,6 +23,8 @@ import codes.quine.labs.recheck.diagnostics.RefutedAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.recheck.diagnostics.UpperBound
+import codes.quine.labs.recheck.repair.Keep
+import codes.quine.labs.recheck.repair.Rx
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
@@ -236,6 +238,57 @@ given encodeRuntimeAttackResult: Encoder[RuntimeAttackResult] with
     case RuntimeAttackResult.Timeout              => Json.obj("kind" := "timeout")
     case RuntimeAttackResult.EngineLimit(message) => Json.obj("kind" := "engine-limit", "message" := message)
     case RuntimeAttackResult.EngineError(message) => Json.obj("kind" := "engine-error", "message" := message)
+
+/** An `Encoder` for `Rx`. */
+given encodeRx: Encoder[Rx] with
+  def apply(rx: Rx): Json = rx match
+    case Rx.Safe(source, flags, dialect) =>
+      Json.obj("source" := source, "flags" := flags, "dialect" := dialect, "status" := "safe")
+    case Rx.Repaired(source, flags, dialect, unitMode, repaired, complexity, kept, comparison) =>
+      Json.obj(
+        "source" := source,
+        "flags" := flags,
+        "dialect" := dialect,
+        "unitMode" := unitMode,
+        "status" := "repaired",
+        "repaired" := repaired,
+        "complexity" := complexity,
+        "kept" := kept,
+        "comparison" -> encodeComparison(unitMode)(comparison)
+      )
+    case Rx.Unknown(source, flags, dialect, error) =>
+      Json.obj("source" := source, "flags" := flags, "dialect" := dialect, "status" := "unknown", "error" := error)
+
+/** Returns an `Encoder` for `Rx.Comparison` of the unit mode, where a match is the pairs of the begin and the end of
+  * the kept captures, or `null` for an unset one, or `null` for no match.
+  */
+def encodeComparison(mode: UnitMode): Encoder[Rx.Comparison] =
+  given Encoder[UString] = encodeUString(mode)
+  given Encoder[(Int, Int)] = (span: (Int, Int)) => Seq(span._1, span._2).asJson
+  (c: Rx.Comparison) =>
+    c match
+      case Rx.Comparison.Equivalent                                              => Json.obj("kind" := "equivalent")
+      case Rx.Comparison.Different(Rx.Counterexample(input, original, repaired)) =>
+        Json.obj("kind" := "different", "input" := input, "original" := original, "repaired" := repaired)
+      case Rx.Comparison.Unknown => Json.obj("kind" := "unknown")
+
+/** A `Decoder` for `Keep`, which reads `"all"`, `"named"`, `"match-range"`, `"match"`, or an array of capture numbers
+  * and names.
+  */
+given decodeKeep: Decoder[Keep] = (c: HCursor) =>
+  c.value.asString match
+    case Some("all")         => Right(Keep.All)
+    case Some("named")       => Right(Keep.Named)
+    case Some("match-range") => Right(Keep.MatchRange)
+    case Some("match")       => Right(Keep.Match)
+    case Some(s)             => Left(DecodingFailure(s"Unknown keep: $s", c.history))
+    case _                   =>
+      c.value.asArray match
+        case Some(refs) =>
+          val decoded = refs.map(j => j.asNumber.flatMap(_.toInt).orElse(j.asString))
+          if decoded.forall(_.isDefined) then Right(Keep.Captures(decoded.flatten))
+          else Left(DecodingFailure("Keep must be capture numbers and names", c.history))
+        case None => Left(DecodingFailure("Keep must be a string or an array", c.history))
 
 /** An `Encoder` for `ErrorKind`. */
 given encodeErrorKind: Encoder[ErrorKind] with

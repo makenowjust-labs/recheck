@@ -22,6 +22,8 @@ import codes.quine.labs.recheck.diagnostics.RefutedAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.recheck.diagnostics.UpperBound
+import codes.quine.labs.recheck.repair.Keep
+import codes.quine.labs.recheck.repair.Rx
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
@@ -324,6 +326,72 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(
       encodeRuntimeAttackResult(RuntimeAttackResult.EngineError("StackOverflowError")),
       Json.obj("kind" := "engine-error", "message" := "StackOverflowError")
+    )
+
+  test("codec.encodeRx"):
+    val js = Dialect.JavaScript
+    assertEquals(
+      encodeRx(Rx.Safe("a", "", js)),
+      Json.obj("source" := "a", "flags" := "", "dialect" := js, "status" := "safe")
+    )
+    assertEquals(
+      encodeRx(Rx.Unknown("(", "", js, Some(ErrorKind.InvalidRegExp("foo")))),
+      Json.obj(
+        "source" := "(",
+        "flags" := "",
+        "dialect" := js,
+        "status" := "unknown",
+        "error" := Json.obj("kind" := "invalid", "message" := "foo")
+      )
+    )
+    assertEquals(encodeRx(Rx.Unknown("a", "", js, None)).hcursor.downField("error").focus, Some(Json.Null))
+    def repaired(comparison: Rx.Comparison): Json =
+      encodeRx(Rx.Repaired("^(a+)+$", "", js, UnitMode.UTF16, "^(a+)$", AttackComplexity.Linear, Seq(0, 1), comparison))
+    assertEquals(
+      repaired(Rx.Comparison.Equivalent),
+      Json.obj(
+        "source" := "^(a+)+$",
+        "flags" := "",
+        "dialect" := js,
+        "unitMode" := "utf16",
+        "status" := "repaired",
+        "repaired" := "^(a+)$",
+        "complexity" := (AttackComplexity.Linear: AttackComplexity),
+        "kept" := Seq(0, 1),
+        "comparison" := Json.obj("kind" := "equivalent")
+      )
+    )
+    val counterexample = Rx.Counterexample(UString(0x61, 0x62), Some(Seq(Some((0, 2)), None)), None)
+    assertEquals(
+      repaired(Rx.Comparison.Different(counterexample)).hcursor.downField("comparison").focus,
+      Some(
+        Json.obj(
+          "kind" := "different",
+          "input" := "ab",
+          "original" := Json.arr(Json.arr(0.asJson, 2.asJson), Json.Null),
+          "repaired" := Json.Null
+        )
+      )
+    )
+    assertEquals(
+      repaired(Rx.Comparison.Unknown).hcursor.downField("comparison").focus,
+      Some(Json.obj("kind" := "unknown"))
+    )
+
+  test("codec.decodeKeep"):
+    assertEquals(decodeKeep.decodeJson("all".asJson), Right(Keep.All))
+    assertEquals(decodeKeep.decodeJson("named".asJson), Right(Keep.Named))
+    assertEquals(decodeKeep.decodeJson("match-range".asJson), Right(Keep.MatchRange))
+    assertEquals(decodeKeep.decodeJson("match".asJson), Right(Keep.Match))
+    assertEquals(decodeKeep.decodeJson(Json.arr(1.asJson, "year".asJson)), Right(Keep.Captures(Seq(1, "year"))))
+    assertEquals(decodeKeep.decodeJson("foo".asJson), Left(DecodingFailure("Unknown keep: foo", List.empty)))
+    assertEquals(
+      decodeKeep.decodeJson(Json.arr(true.asJson)),
+      Left(DecodingFailure("Keep must be capture numbers and names", List.empty))
+    )
+    assertEquals(
+      decodeKeep.decodeJson(1.asJson),
+      Left(DecodingFailure("Keep must be a string or an array", List.empty))
     )
 
   test("codec.encodeErrorKind"):

@@ -18,8 +18,10 @@ import io.circe.syntax.*
 
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.codec.encodeDiagnostics
+import codes.quine.labs.recheck.codec.encodeRx
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.repair.Keep
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.dialect.PerlSource
 
@@ -123,6 +125,23 @@ class MainSuite extends munit.FunSuite:
       Right(Main.GenerateRuntimeAttackScriptAction("-"))
     )
     assert(clue(Main.command.parse(Seq("generate-runtime-attack-script"))).isLeft)
+    assertEquals(
+      Main.command.parse(Seq("repair", "/a/")),
+      Right(Main.RepairAction(InputPattern("a", ""), Parameters(), Keep.All, false))
+    )
+    assertEquals(
+      Main.command.parse(Seq("repair", "--keep=match", "--json", "/a/")),
+      Right(Main.RepairAction(InputPattern("a", ""), Parameters(), Keep.Match, true))
+    )
+    for (value, keep) <- Seq("all" -> Keep.All, "named" -> Keep.Named, "match-range" -> Keep.MatchRange) do
+      assertEquals(
+        Main.command.parse(Seq("repair", s"--keep=$value", "/a/")),
+        Right(Main.RepairAction(InputPattern("a", ""), Parameters(), keep, false))
+      )
+    assertEquals(
+      Main.command.parse(Seq("repair", "--keep=1, year", "/a/")),
+      Right(Main.RepairAction(InputPattern("a", ""), Parameters(), Keep.Captures(Seq(1, "year")), false))
+    )
     assertEquals(Main.command.parse(Seq("agent", "--thread-size=2")), Right(Main.BatchAction(2)))
     assertEquals(Main.command.parse(Seq("agent")), Right(Main.BatchAction(sys.runtime.availableProcessors())))
 
@@ -131,7 +150,7 @@ class MainSuite extends munit.FunSuite:
       runMain(Seq.empty),
       (
         "",
-        "Missing expected command (agent or generate-runtime-attack-script), or positional argument!\n\n" + Main.command.showHelp + "\n",
+        "Missing expected command (agent or generate-runtime-attack-script or repair), or positional argument!\n\n" + Main.command.showHelp + "\n",
         2
       )
     )
@@ -172,6 +191,14 @@ class MainSuite extends munit.FunSuite:
     val (out, err, status) = runMain(Seq("--json", "--checker=automaton", "/(a|a)*$/"))
     assertEquals((err, status), ("", 1))
     assertEquals(parse(out), Right(encodeDiagnostics(ReDoS.check("(a|a)*$", "", params))))
+
+  test("Main#run: repair"):
+    val (out, err, status) = runMain(Seq("repair", "/^(a+)+$/"))
+    assertEquals((err, status), ("", 0))
+    assertEquals(out, ReDoS.repair("^(a+)+$", "").toString + "\n")
+    val (json, _, _) = runMain(Seq("repair", "--json", "--keep=match", "/^(a+)+$/"))
+    assertEquals(parse(json), Right(encodeRx(ReDoS.repair("^(a+)+$", "", keep = Keep.Match))))
+    assertEquals(runMain(Seq("repair", "/^(a|aa)+$/"))._3, 1)
 
   test("Main#run: generate-runtime-attack-script"):
     // The input is the output of `--json`.
