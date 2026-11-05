@@ -23,7 +23,7 @@ The following shows how to check a pattern in the Python dialect.
 <Tabs>
 <TabItem value="cli" label="CLI">
 
-```console
+```sh-session
 $ recheck --dialect=python '/^(a|a)*$/'
 $ recheck --dialect=python --python-type=bytes '/^(a|a)*$/'
 ```
@@ -120,7 +120,7 @@ The following is what we measured with `^(a|a)*$` against `'a'.repeat(n) + '!'`.
 - PHP 8.5 (PCRE2 10.49 with the default `pcre.backtrack_limit`) gives up with the backtrack limit error for `n = 20`.
 
 So `recheck` reports `^(a|a)*$` as vulnerable in every dialect, but the attack is not effective on some engines.
-[Runtime-Attack Verification](runtime-attack-verification.md) runs the attack string on the real engine, and it tells whether the attack works there.
+[Runtime-Attack Verification](runtime-attack-verification.mdx) runs the attack string on the real engine, and it tells whether the attack works there.
 
 The following approximations are common to the dialects.
 

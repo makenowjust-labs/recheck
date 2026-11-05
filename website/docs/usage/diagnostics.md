@@ -96,7 +96,7 @@ The runtime-attack verification checks it on the real engine.
 
 `vulnerable` diagnostics have the `runtimeAttack` field.
 
-The runtime-attack verification runs the attack string on the real regex engine of the dialect (see [Runtime-Attack Verification](runtime-attack-verification.md)), and this field records the run.
+The runtime-attack verification runs the attack string on the real regex engine of the dialect (see [Runtime-Attack Verification](runtime-attack-verification.mdx)), and this field records the run.
 It is `null` if the runtime attack is not run: [`runtimeAttackTimeout`](parameters.mdx#runtimeattacktimeout) is not positive (the default), or commands cannot run (e.g. in the browser).
 
 - `runtime` is the runtime name and version (e.g. `node v26.11.1`).
@@ -115,7 +115,7 @@ If no attack is confirmed, the result is `safe`.
 
 The diagnostics of every status list the refuted attacks in the `refutedAttacks` field, in the order of the checking.
 Each element has the `complexity`, `attack`, `hotspot` and `runtimeAttack` fields of the refuted attack, which are the same as those of `vulnerable` diagnostics.
-They show that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by these attacks (see [Refuted Attacks](runtime-attack-verification.md#refuted-attacks)).
+They show that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by these attacks (see [Refuted Attacks](runtime-attack-verification.mdx#refuted-attacks)).
 
 ## Hotspot
 

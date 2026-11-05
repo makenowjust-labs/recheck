@@ -3,6 +3,9 @@ id: runtime-attack-verification
 title: Runtime-Attack Verification
 ---
 
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
 Describes the runtime-attack verification, which runs the attack string on the real engine of the [dialect](dialects.mdx).
 
 ## Overview
@@ -11,15 +14,24 @@ Describes the runtime-attack verification, which runs the attack string on the r
 The runtime-attack verification runs the attack string on the real engine of the dialect (the runtime attack), and it tells whether the attack works there.
 It runs when [`runtimeAttackTimeout`](parameters.mdx#runtimeattacktimeout) is positive, and only where `recheck` can run commands: it does not run in the browser or with the Scala.js build (the `worker` and `pure` backends of the JavaScript library).
 
-```bash
-recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
+<Tabs>
+<TabItem value="cli" label="CLI">
+
+```sh-session
+$ recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
 ```
+
+</TabItem>
+<TabItem value="js" label="JavaScript">
 
 ```tsx
 import { check } from "recheck";
 
 await check("^(a|a)*$", "", { dialect: "ruby", runtimeAttackTimeout: 1000 });
 ```
+
+</TabItem>
+</Tabs>
 
 The result is recorded as `runtimeAttack` of the diagnostics, or in `refutedAttacks` when the attack is refuted (see [Diagnostics](diagnostics.md#runtime-attack-verification)).
 
@@ -56,16 +68,13 @@ The value is a command line run by `/bin/sh -c`, and `recheck` appends the diale
 So the shell splits the value on spaces, and a path with spaces needs quotes.
 An empty value is ignored.
 
-```bash
-# Runs `/opt/ruby-4.0/bin/ruby --disable-gems -`.
-RECHECK_RUBY='/opt/ruby-4.0/bin/ruby --disable-gems' recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
+For example, the following runs `/opt/ruby-4.0/bin/ruby --disable-gems -`.
 
-# A path with spaces.
-RECHECK_RUBY='"/Applications/My Ruby/bin/ruby" --disable-gems' recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
-
-# Runs Ruby in a container, which reads the program from the standard input.
-RECHECK_RUBY='docker run -i --rm ruby:4.0 ruby' recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
+```sh-session
+$ RECHECK_RUBY='/opt/ruby-4.0/bin/ruby --disable-gems' recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
 ```
+
+A path with spaces is quoted (e.g. `RECHECK_RUBY='"/Applications/My Ruby/bin/ruby" --disable-gems'`), and a container runs the runtime that reads the program from the standard input (e.g. `RECHECK_RUBY='docker run -i --rm ruby:4.0 ruby'`).
 
 The JavaScript library and the ESLint plugin pass their environment to the `recheck` process, so the variables work there too.
 On Windows, the variables need `sh` in `PATH` (e.g. from Git for Windows), and `recheck` has not been tested there.
@@ -78,11 +87,8 @@ The result lists the refuted attacks in its `refutedAttacks` field (see [Diagnos
 They show that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by these attacks.
 The CLI shows them in the `Refuted attacks` section after the result.
 
-```bash
-recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
-```
-
-```
+```sh-session
+$ recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
 Input     : /^(a|a)*$/
 Dialect   : ruby (encoding: UTF-8)
 Status    : safe
@@ -107,10 +113,10 @@ The CLI's `generate-runtime-attack-script` subcommand writes the program that th
 It takes a file of `vulnerable` diagnostics in JSON (`-` reads the standard input), which is the output of the CLI with `--json`, or the result of the JavaScript library or the CLI's agent mode.
 The dialect of the pattern comes from the `dialect` field of the diagnostics, and the unit of the attack string from the `unitMode` field.
 
-```bash
-recheck --json --dialect=python '/^(a|a)*$/' > diagnostics.json
-recheck generate-runtime-attack-script diagnostics.json > runtime-attack.py
-python3 -I runtime-attack.py
+```sh-session
+$ recheck --json --dialect=python '/^(a|a)*$/' > diagnostics.json
+$ recheck generate-runtime-attack-script diagnostics.json > runtime-attack.py
+$ python3 -I runtime-attack.py
 ```
 
 The first comment of the script shows the command to run it, which is the command of the runtime attack with the script file.
