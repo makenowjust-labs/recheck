@@ -3,6 +3,7 @@ package repair
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.repair.Repair.Comparison
 import codes.quine.labs.recheck.repair.Repair.Result
@@ -40,7 +41,7 @@ class RepairSuite extends munit.FunSuite:
 
   test("Repair.search: nested repetitions"):
     assertEquals(search("^(a+)+$"), repaired("^(a+)$"))
-    assertEquals(search("^(?:a+)+$", Dialect.Java), repaired("^(?:a+)$", Dialect.Java))
+    assertEquals(search("^(?:a+)+$", Dialect.Java), repaired("^(?:a)+$", Dialect.Java))
 
   test("Repair.search: alternatives"):
     assertEquals(search("^(?:a|a)*$"), repaired("^(?:a)*$"))
@@ -53,32 +54,48 @@ class RepairSuite extends munit.FunSuite:
     assertEquals(search("^\\s*,?\\s*$"), repaired("^\\s*(?:,\\s*)?$"))
 
   test("Repair.search: words with separators"):
-    assertEquals(search("^(?:\\w+\\s?)*$"), repaired("^(?:\\w+(?:\\s\\w+)*\\s?)?$"))
+    assertEquals(search("^(?:\\w+\\s?)*$"), repaired("^(?:\\w\\s?)*$"))
     assertEquals(search("^(\\w+\\s?)*$", Dialect.Java), repaired("^(\\w++\\s?)*$", Dialect.Java))
 
   test("Repair.search: optional parts between repetitions"):
     assertEquals(search("^\\d+\\.?\\d+$"), repaired("^\\d+(?:\\.\\d+|\\d)$"))
     assertEquals(search("^(\\d+\\.?\\d+)$"), repaired("^(\\d+(?:\\.\\d+|\\d))$"))
-    assertEquals(search("^[a-z0-9]+[a-z0-9._-]*@"), repaired("^[a-z0-9]+(?:[\\-\\._][a-z0-9._-]*)?@"))
+    assertEquals(search("^[a-z0-9]+[a-z0-9._-]*@"), repaired("^[a-z0-9][a-z0-9._-]*@"))
 
   test("Repair.search: searches"):
     assertEquals(search("\\s*$"), repaired("(?<!\\s)\\s*$"))
     assertEquals(search("(\\d+)+x"), repaired("(?<!\\d)(\\d+)x"))
 
   test("Repair.search: captures not kept"):
-    val source = "^([a-z]+\\s?)+(x)$"
     // The repair removes the first capture, so the second one is the first after it.
     assertEquals(
-      search(source, captures = Some(Seq(0, 2))),
-      repaired("^[a-z]+(?:\\s[a-z]+)*\\s?(x)$", captures = Some(Seq(0, 1)))
+      search("^(\\s*x\\s*)*(a+)+$", captures = Some(Seq(0, 2))),
+      repaired("^(?:\\s*x(?:\\s*x)*\\s*)?(a+)$", captures = Some(Seq(0, 1)))
     )
-    assertEquals(search(source, captures = Some(Seq(0, 1))), Result.NotFound)
+    // The first capture is not kept, so its repetition may read only the minimum.
+    assertEquals(
+      search("^([a-z]+\\s?)+(x)$", captures = Some(Seq(0, 2))),
+      repaired("^([a-z]\\s?)+(x)$", captures = Some(Seq(0, 2)))
+    )
 
   test("Repair.search: a repair that differs"):
     assertEquals(
-      search("^(\\s*)*$"),
-      repaired("^(\\s*)$", comparison = Comparison.Different(UString.from("".map(_.toInt))))
+      search("^(\\w+\\s?)+\\d$", Dialect.Java),
+      repaired("^(\\w+\\s?)\\d$", Dialect.Java, Comparison.Different(UString(0x30, 0x0d, 0x30, 0x30)))
     )
 
+  test("Repair.search: empty iterations"):
+    assertEquals(search("^(\\s*)*$"), repaired("^(\\s*)?$"))
+
+  test("Repair.search: possessive emulation"):
+    assertEquals(search("^([a-z]+\\s?)+$"), repaired("^([a-z]+(?![a-z])\\s?)+$"))
+
   test("Repair.search: not found"):
-    assertEquals(search("^(a|aa)+$"), Result.NotFound)
+    assertEquals(search("^[^*]*(?:\\*(?!/)[^*]*)*@[^*]*(?:\\*(?!/)[^*]*)*$"), Result.NotFound)
+
+  test("Repair.search: unsupported"):
+    interceptMessage[UnsupportedException]("the automaton checker cannot check the pattern"):
+      search("^(a|a)*(?R)?$", Dialect.PCRE)
+    // Unrolling the repetition nests the groups deeper than the parser supports, so another edit repairs it.
+    val deep = "^" + "(?:" * 149 + "(?:\\w+\\s?)*" + ")" * 149 + "$"
+    assert(clue(search(deep)).isInstanceOf[Result.Repaired])

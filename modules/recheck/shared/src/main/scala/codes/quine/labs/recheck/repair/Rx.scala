@@ -90,9 +90,13 @@ object Rx:
         val escaped = mode
           .encode(s)
           .flatMap:
-            case '"'  => "\\\""
-            case '\\' => "\\\\"
-            case c    => c.toString
+            case '"'                       => "\\\""
+            case '\\'                      => "\\\\"
+            case '\n'                      => "\\n"
+            case '\r'                      => "\\r"
+            case '\t'                      => "\\t"
+            case c if c < ' ' || c == 0x7f => f"\\x${c.toInt}%02X"
+            case c                         => c.toString
         "\"" + escaped + "\""
 
       def showMatch(m: Option[Seq[Option[(Int, Int)]]]): String = m.fold("no match"): spans =>

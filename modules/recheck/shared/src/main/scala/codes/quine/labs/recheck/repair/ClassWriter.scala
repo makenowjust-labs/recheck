@@ -23,7 +23,8 @@ private[repair] object ClassWriter:
   private def isWord(c: UChar): Boolean =
     ('0' <= c && c <= '9') || ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') || c == '_'
 
-  private def writeRanges(set: CharSet, features: FeatureSet, mode: UnitMode): String =
+  /** Writes the set as the contents of a character class. */
+  def writeRanges(set: CharSet, features: FeatureSet, mode: UnitMode): String =
     set.intervals
       .map: (start, end) =>
         val last = end - 1

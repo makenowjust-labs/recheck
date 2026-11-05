@@ -17,20 +17,30 @@ import codes.quine.labs.resyntax.parser.FeatureSet
 
 /** Candidate is an edit of a pattern, which may remove the captures of `removedCaptures` (their groups no longer
   * capture).
+  *
+  * An `isFallback` one comes after the others that make the pattern as good.
   */
-private[repair] final case class Candidate(edit: Edit, removedCaptures: Seq[Int] = Seq.empty)
+private[repair] final case class Candidate(
+    edit: Edit,
+    removedCaptures: Seq[Int] = Seq.empty,
+    isFallback: Boolean = false
+)
 
 /** CandidateFinder lists the edits of a pattern around the atoms of a hotspot, which may remove the ambiguity there.
   *
   * They are:
-  *   - a possessive quantifier or an atomic group of a repetition, if the dialect has it,
-  *   - the outer one of nested repetitions removed (e.g. `(a+)+` to `(a+)`),
+  *   - a possessive quantifier or an atomic group of a repetition, if the dialect has it, or else, as a fallback, a
+  *     negative look-ahead of the atom after a repetition of it, which reads the most as a possessive one does (e.g.
+  *     `[a-z]+` to `[a-z]+(?![a-z])`),
+  *   - a repetition read at most once or exactly its minimum (e.g. `(a+)+` to `(a+)`, and `(\s*)*` to `(\s*)?`),
   *   - the characters of the earlier alternatives removed from a later one, or a later alternative removed if an
   *     earlier one is written the same or covers it (e.g. `(?:\w|\d)` to `(?:\w)`),
   *   - for adjacent repetitions (possibly with an optional part between them), the characters of the first removed from
   *     the start of the next, or the minimum of one of them if the other reads its characters (e.g. `a*[ab]*` to
   *     `[ab]*`, `\s*,?\s*` to `\s*(?:,\s*)?`, and `\d+\.?\d+` to `\d+(?:\.\d+|\d)`),
-  *   - a repetition of words with an optional separator unrolled (e.g. `(?:\w+\s?)*` to `(?:\w+(?:\s\w+)*\s?)?`), and
+  *   - the characters of the next atom removed from a repetition of an atom (e.g. `\s*\n\s*` to `[^\S\n]*\n\s*`),
+  *   - a repetition of words with an optional separator unrolled (e.g. `(?:\w+\s?)*` to `(?:\w+(?:\s\w+)*\s?)?`), or
+  *     `(?:L M T)*` unrolled to `(?:L M (?:L M)* T)?` if `L` reads the characters of `T` (e.g. `(?:\s*X\s*)*`), and
   *   - for a search, a look-behind before the repetition at the start, so a match does not start in the middle of its
   *     characters (e.g. `\s*$` to `(?<!\s)\s*$`).
   *
@@ -111,6 +121,16 @@ private[repair] final class CandidateFinder(
   private def writeMinimum(loop: AtomLoop): String =
     if loop.min == 1 then text(loop.atom) else s"${text(loop.atom)}{${loop.min}}"
 
+  /** Writes the set of the atom without the characters of `removed`, as the complement of the escape's complement if
+    * the atom is a class escape (e.g. `[^\S\n]` for `\s` without `\n`).
+    */
+  private def writeWithout(atom: Node, set: CharSet, removed: CharSet): String =
+    val rest = set.diff(removed)
+    val escapes = Map("\\s" -> "\\S", "\\w" -> "\\W", "\\d" -> "\\D", "\\S" -> "\\s", "\\W" -> "\\w", "\\D" -> "\\d")
+    escapes.get(text(atom)) match
+      case Some(complement) => s"[^$complement${ClassWriter.writeRanges(set.intersect(removed), features, ir.mode)}]"
+      case None             => ClassWriter(rest, features, ir.mode)
+
   /** Strips the groups around the node that do not capture, or capture one not kept, with the indices of the latter.
     */
   private def strip(n: Node): (Node, Seq[Int]) = n.data match
@@ -139,7 +159,7 @@ private[repair] final class CandidateFinder(
     for (n, parent) <- hot if n.loc != SourceLocation.Invalid do
       n.data match
         case NodeData.Repeat(child, q, _) if min(q).nonEmpty =>
-          candidates ++= makePossessive(n, q).map(Candidate(_))
+          candidates ++= makePossessive(n, q)
           candidates ++= reduceRepetition(n, child, q).map(Candidate(_))
           candidates ++= unrollRepetition(n, child, q, parent)
         case NodeData.Disjunction(alternatives) => candidates ++= trimAlternatives(alternatives).map(Candidate(_))
@@ -148,26 +168,28 @@ private[repair] final class CandidateFinder(
     candidates ++= addLookBehind(overlaps).map(Candidate(_))
     candidates.result().distinct
 
-  private def makePossessive(n: Node, q: Quantifier): Option[Edit] =
+  private def makePossessive(n: Node, q: Quantifier): Option[Candidate] =
     if q.strategy != BacktrackStrategy.Greedy then None
     else
       val hasPossessive = q match
         case Quantifier.Star(_) | Quantifier.Plus(_) => features.hasPossessiveBacktrackStrategy
         case _                                       => features.hasPossessiveCurlyBacktrackStrategy
-      if hasPossessive then Some(Edit(n.loc.end, n.loc.end, "+"))
-      else Option.when(features.hasAtomicGroup)(Edit(n.loc.start, n.loc.end, s"(?>${text(n)})"))
+      if hasPossessive then Some(Candidate(Edit(n.loc.end, n.loc.end, "+")))
+      else if features.hasAtomicGroup then Some(Candidate(Edit(n.loc.start, n.loc.end, s"(?>${text(n)})")))
+      // A repetition of an atom followed by a negative look-ahead of it reads the most, as a possessive one does.
+      else
+        loopOf(n).map: loop =>
+          Candidate(Edit(n.loc.end, n.loc.end, s"(?!${text(loop.atom)})"), isFallback = true)
 
-  private def reduceRepetition(n: Node, child: Node, q: Quantifier): Option[Edit] =
-    def inner(n: Node): Node = n.data match
-      case NodeData.Group(GroupKind.NonCapture | GroupKind.IndexedCapture, child)        => inner(child)
-      case NodeData.Group(_: GroupKind.NamedCapture | _: GroupKind.PNamedCapture, child) => inner(child)
-      case _                                                                             => n
-
-    inner(child).data match
-      case NodeData.Repeat(_, q2, _) =>
-        for m1 <- min(q); m2 <- min(q2)
-        yield Edit(child.loc.end, n.loc.end, if m1 == 0 && m2 > 0 then "?" else "")
-      case _ => None
+  /** The repetition read at most once, or exactly its minimum (e.g. `(a+)+` to `(a+)`, and `(.*,)+` to `(.*,)`). */
+  private def reduceRepetition(n: Node, child: Node, q: Quantifier): Seq[Edit] =
+    val lazily = if q.strategy == BacktrackStrategy.Lazy then "?" else ""
+    val quantifiers = min(q).toSeq.flatMap:
+      case 0 => Seq(s"?$lazily", "")
+      case 1 => Seq("")
+      case m => Seq(s"{$m}")
+    if q.strategy == BacktrackStrategy.Possessive then Seq.empty
+    else quantifiers.map(Edit(child.loc.end, n.loc.end, _))
 
   private def unrollRepetition(n: Node, child: Node, q: Quantifier, parent: Option[Node]): Option[Candidate] =
     val (body, removedCaptures) = strip(child)
@@ -189,6 +211,23 @@ private[repair] final class CandidateFinder(
                     case 1               => s"(?:$unrolled)"
                   .map(text => Candidate(Edit(n.loc.start, n.loc.end, text), removedCaptures))
           case _ => None
+      // `(?:L M T)*` is `(?:L M (?:L M)* T)?` if `L` reads the characters of `T`, which then never meet.
+      case NodeData.Sequence(elements)
+          if elements.size >= 3 && q.strategy == BacktrackStrategy.Greedy && !hasCapture(body) =>
+        for
+          first <- loopOf(elements.head)
+          last <- loopOf(elements.last)
+          if first.min == 0 && last.min == 0 && last.set.diff(first.set).isEmpty
+          m <- min(q)
+          if m <= 1
+        yield
+          val middle = source.substring(elements(1).loc.start, elements(elements.size - 2).loc.end)
+          val item = s"${text(elements.head)}$middle"
+          val unrolled = s"$item(?:$item)*${text(elements.last)}"
+          Candidate(
+            Edit(n.loc.start, n.loc.end, if m == 0 then s"(?:$unrolled)?" else s"(?:$unrolled)"),
+            removedCaptures
+          )
       case _ => None
 
   private def trimAlternatives(alternatives: Seq[Node]): Seq[Edit] =
@@ -227,7 +266,9 @@ private[repair] final class CandidateFinder(
           if loop.set.diff(nextLoop.set).isEmpty && loop.min == 0 then edits += Edit(first.loc.start, first.loc.end, "")
           if rest.isEmpty && nextLoop.min > 0 then edits += Edit(next.loc.start, next.loc.end, writeMinimum(nextLoop))
           if nextLoop.min == 0 then
-            val text = if rest.isEmpty then "" else s"(?:${ClassWriter(rest, features, ir.mode)}${this.text(next)})?"
+            val text =
+              if rest.isEmpty then ""
+              else s"(?:${writeWithout(nextLoop.atom, nextLoop.set, loop.set)}${this.text(next)})?"
             edits += Edit(next.loc.start, next.loc.end, text)
           edits.result()
       yield edit
@@ -246,7 +287,14 @@ private[repair] final class CandidateFinder(
           if nextLoop.min == 0 then s"(?:${this.text(inner)}${this.text(next)})?"
           else s"(?:${this.text(inner)}${this.text(next)}|${writeMinimum(nextLoop)})"
         Edit(middle.loc.start, next.loc.end, text)
-      pairs ++ optional
+      // The characters of the next atom are removed from this one, so it reads up to the first of them.
+      val atom = for
+        loop <- loopOf(first).toSeq
+        next <- elements.lift(i + 1).toSeq
+        nextSet <- setOf(next).toSeq
+        if loop.set.intersect(nextSet).nonEmpty && loop.set.diff(nextSet).nonEmpty
+      yield Edit(loop.atom.loc.start, loop.atom.loc.end, writeWithout(loop.atom, loop.set, nextSet))
+      pairs ++ optional ++ atom
 
   /** A look-behind before the repetition at the start of a search, which is hot. */
   private def addLookBehind(hot: SourceLocation => Boolean): Option[Edit] =

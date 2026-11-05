@@ -183,7 +183,7 @@ test("repair: java", async () => {
   const rx = await main.repair("^(a+)+$", "", { keep: "match-range" });
   expect(rx).toMatchObject({
     status: "repaired",
-    repaired: "^(a+)$",
+    repaired: "^(a)+$",
     kept: [0],
   });
 });
@@ -212,7 +212,7 @@ test("repairSync: pure", () => {
   const rx = main.repairSync("^(a+)+$", "", { keep: "match" });
   expect(rx).toMatchObject({
     status: "repaired",
-    repaired: "^(a+)$",
+    repaired: "^(a)+$",
     kept: [],
   });
 });
