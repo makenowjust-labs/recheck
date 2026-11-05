@@ -478,7 +478,7 @@ class IRCharResolverSuite extends munit.FunSuite:
   error("\\p{RGI_Emoji}", "", Perl())("Unknown Unicode property name at 0")
   error("[\\xB1\\xB4-\\xB6]", "", Ruby())("Invalid multibyte escape at 1")
   error("\\C-\\M-a", "", Ruby())("Invalid multibyte escape at 0")
-  error("\\xA9+", "", Ruby())("Invalid multibyte escape at 0")
+  error("a\\xA9+", "", Ruby())("Invalid multibyte escape at 1")
   chars("\\N{U+263A}", "", Perl())(of("☺"))
 
   // Word boundaries

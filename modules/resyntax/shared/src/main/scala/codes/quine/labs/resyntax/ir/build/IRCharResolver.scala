@@ -142,7 +142,8 @@ private[build] final class IRCharResolver(
           lits += Lit(value, None, flags, node.loc)
         case NodeData.Backslash(BackslashKind.Escape(style, value)) =>
           lits += Lit(value, Some(style), flags, node.loc)
-        // $COVERAGE-OFF$ A part has only the nodes that `isLiteral` accepts.
+        // A part has only the nodes that `isLiteral` accepts.
+        // $COVERAGE-OFF$
         case data => throw new IllegalArgumentException(s"Not a literal: $data")
       // $COVERAGE-ON$
     val merged =
@@ -287,7 +288,8 @@ private[build] final class IRCharResolver(
       if lit.value <= 0xff then Seq(lit.value)
       // Perl makes the pattern UTF-8 for it, and it never matches a byte string.
       else if dialect.isPerl then Seq.empty
-      // $COVERAGE-OFF$ The parsers of the other dialects reject a code point above `0xFF` in byte mode.
+      // The parsers of the other dialects reject a code point above `0xFF` in byte mode.
+      // $COVERAGE-OFF$
       else throw new IllegalArgumentException(s"Character value is too large in byte mode: ${lit.value}")
     // $COVERAGE-ON$
 

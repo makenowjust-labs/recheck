@@ -141,7 +141,10 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
       case Dialect.PCRE =>
         val rule = ruleOf(flags, a => if name == "digit" || name == "xdigit" then a.posixDigit else a.posix)
         asciiSet.map(a => pick(rule, a, pcrePOSIX(name).getOrElse(a)))
-      case _ => asciiSet
+      // The parsers of the other dialects have no POSIX class.
+      // $COVERAGE-OFF$
+      case _ => throw new IllegalArgumentException(s"No POSIX class in $dialect")
+      // $COVERAGE-ON$
 
   private def pcrePOSIX(name: String): Option[CharSet] =
     // pcre2pattern: "[:graph:] matches all characters with the L, M, N, P, S, or Cf properties, except for U+061C, U+180E and U+2066 - U+2069".

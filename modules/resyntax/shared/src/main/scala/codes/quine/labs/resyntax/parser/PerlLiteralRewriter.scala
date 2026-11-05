@@ -147,7 +147,8 @@ private final class PerlLiteralRewriter(source: String, extended: Boolean, bytes
         case 'F'                     => out.addCodePoints(FullCaseFolding(c), start, end)
         case 'u' => out.addCodePoints(if i == 0 then FullCaseMapping.title(c) else UString(c), start, end)
         case 'l' => out.addCodePoints(if i == 0 then FullCaseMapping.lower(c) else UString(c), start, end)
-        // $COVERAGE-OFF$ A frame has one of the commands above.
+        // A frame has one of the commands above.
+        // $COVERAGE-OFF$
         case _ => throw new IllegalStateException(s"Unknown command: ${frame.command}")
       // $COVERAGE-ON$
       i += len

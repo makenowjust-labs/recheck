@@ -143,6 +143,8 @@ class ParserEncodingSuite extends munit.FunSuite:
     val Command(CommandKind.BranchReset(Seq(first, second))) = parse("(?|\u00e9|a)", "", PCRE).data: @unchecked
     assertEquals(first.loc, SourceLocation(3, 4))
     assertEquals(second.loc, SourceLocation(5, 6))
+    val Sequence(Seq(_, _, comment)) = parse("\u00e9(?#a)", "", PCRE).data: @unchecked
+    assertEquals(comment, Node(Command(CommandKind.Comment("a")), SourceLocation(1, 6)))
 
   test("Parser.parse: the locations of bytes in absence operators and class operations point to their characters"):
     val Command(CommandKind.AbsenceExpression(absent, exp)) = parse("(?~|\u00e9|a)", "", RubyBytes).data: @unchecked

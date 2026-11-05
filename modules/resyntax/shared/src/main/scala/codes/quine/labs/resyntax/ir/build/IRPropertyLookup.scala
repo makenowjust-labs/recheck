@@ -997,6 +997,7 @@ private[build] object IRPropertyLookup:
       case Dialect.PCRE       => pcre(name, value)
       case _: Dialect.Perl    => perl(name, value)
       case _: Dialect.Ruby    => ruby(name, value, mode == UnitMode.Byte)
-      // $COVERAGE-OFF$ Python's parser rejects `\p`.
+      // Python's parser rejects `\p`.
+      // $COVERAGE-OFF$
       case _: Dialect.Python => throw new IllegalArgumentException("Python has no Unicode property")
       // $COVERAGE-ON$
