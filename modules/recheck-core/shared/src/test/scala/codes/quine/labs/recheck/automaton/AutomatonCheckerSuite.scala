@@ -50,7 +50,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     assertEquals(
       check("^.*a.*a$", "s"),
       Success(
-        Polynomial(2, Witness(Seq((Seq.empty, Seq(a))), Seq(other1)), Hotspot(Seq(Spot(1, 2, Heat), Spot(3, 5, Heat))))
+        Polynomial(2, Witness(Seq((Seq.empty, Seq(a))), Seq(other1)), Hotspot(Seq(Spot(1, 2, Hot), Spot(3, 5, Hot))))
       )
     )
     assertEquals(
@@ -59,7 +59,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
         Polynomial(
           2,
           Witness(Seq((Seq(a), Seq(a, a))), Seq(a, a)),
-          Hotspot(Seq(Spot(2, 4, Heat), Spot(6, 7, Heat), Spot(8, 10, Heat)))
+          Hotspot(Seq(Spot(2, 4, Hot), Spot(6, 7, Hot), Spot(8, 10, Hot)))
         )
       )
     )
@@ -69,7 +69,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
         Polynomial(
           3,
           Witness(Seq((Seq.empty, Seq(a)), (Seq.empty, Seq(a))), Seq(other1)),
-          Hotspot(Seq(Spot(1, 2, Heat), Spot(3, 5, Heat), Spot(6, 8, Heat)))
+          Hotspot(Seq(Spot(1, 2, Hot), Spot(3, 5, Hot), Spot(6, 8, Hot)))
         )
       )
     )
@@ -79,7 +79,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
         Polynomial(
           2,
           Witness(Seq((Seq(word.diff(a)), Seq(a, a, other2, a))), Seq.empty),
-          Hotspot(Seq(Spot(2, 3, Heat), Spot(6, 8, Heat), Spot(10, 14, Heat)))
+          Hotspot(Seq(Spot(2, 3, Hot), Spot(6, 8, Hot), Spot(10, 14, Hot)))
         )
       )
     )
@@ -92,19 +92,19 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     assertEquals(
       check("^(a|a)*$", ""),
       Success(
-        Exponential(Witness(Seq((Seq.empty, Seq(a))), Seq(other1)), Hotspot(Seq(Spot(2, 3, Heat), Spot(4, 5, Heat))))
+        Exponential(Witness(Seq((Seq.empty, Seq(a))), Seq(other1)), Hotspot(Seq(Spot(2, 3, Hot), Spot(4, 5, Hot))))
       )
     )
     assertEquals(
       check("^((a)*)*$", ""),
-      Success(Exponential(Witness(Seq((Seq(a), Seq(a))), Seq(other1)), Hotspot(Seq(Spot(3, 4, Heat)))))
+      Success(Exponential(Witness(Seq((Seq(a), Seq(a))), Seq(other1)), Hotspot(Seq(Spot(3, 4, Hot)))))
     )
     assertEquals(
       check("^(a|b|ab)*$", ""),
       Success(
         Exponential(
           Witness(Seq((Seq(a), Seq(b, a, b, a))), Seq(other2)),
-          Hotspot(Seq(Spot(2, 3, Heat), Spot(4, 5, Heat), Spot(6, 8, Heat)))
+          Hotspot(Seq(Spot(2, 3, Hot), Spot(4, 5, Hot), Spot(6, 8, Hot)))
         )
       )
     )
@@ -113,7 +113,7 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       Success(
         Exponential(
           Witness(Seq((Seq(a), Seq(a, a, a, b, a))), Seq(other2)),
-          Hotspot(Seq(Spot(2, 4, Heat), Spot(5, 6, Heat), Spot(7, 10, Heat)))
+          Hotspot(Seq(Spot(2, 4, Hot), Spot(5, 6, Hot), Spot(7, 10, Hot)))
         )
       )
     )

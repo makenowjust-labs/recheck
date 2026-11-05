@@ -164,7 +164,7 @@ object ReDoS:
       val degree = complexity match
         case AttackComplexity.Polynomial(degree, _) => Some(degree)
         case AttackComplexity.Exponential(_)        => None
-      AttackKey(degree, hotspot.spots.collect { case Hotspot.Spot(s, e, Hotspot.Heat) => (s, e) })
+      AttackKey(degree, hotspot.spots.collect { case Hotspot.Spot(s, e, Hotspot.Hot) => (s, e) })
 
   /** Runs the automaton checker, and returns the vulnerable diagnostics it finds and a function giving the safe
     * diagnostics once they run out.

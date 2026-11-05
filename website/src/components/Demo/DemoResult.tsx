@@ -5,6 +5,7 @@ import Hotspot from '../Hotspot';
 
 import { formatBuild } from './builds';
 import styles from './Demo.module.css';
+import { hotspotOf } from './permalink';
 
 import type { Build } from './builds';
 import type { DiagnosticsSnapshot } from './permalink';
@@ -152,7 +153,7 @@ const DemoResult: React.FC<Props> = ({ recorded = false, result, time, log, buil
             </pre>
           </Row>,
           <Row title="Hotspot" key="hotspot">
-            <Hotspot source={result.source} hotspot={result.hotspot} />
+            <Hotspot source={result.source} hotspot={hotspotOf(result)} />
           </Row>,
           <Row title="Checker" key="checker">
             <Badge kind="secondary">{result.checker}</Badge>

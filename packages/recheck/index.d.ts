@@ -194,7 +194,7 @@ export type ExponentialComplexity = {
 export type Hotspot = {
   start: number;
   end: number;
-  temperature: "heat" | "normal";
+  temperature: "hot" | "warm";
 };
 
 /**

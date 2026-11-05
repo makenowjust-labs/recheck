@@ -358,7 +358,7 @@ class ReDoSSuite extends munit.FunSuite:
           UnitMode.UTF16.decode(""),
           10
         ),
-        Hotspot(Seq(Spot(1, 2, Heat))),
+        Hotspot(Seq(Spot(1, 2, Hot))),
         None,
         Seq.empty,
         Checker.Automaton
@@ -470,14 +470,14 @@ class ReDoSSuite extends munit.FunSuite:
       case d => fail(s"not safe: $d")
 
   test("ReDoS.AttackKey"):
-    val hotspot = Hotspot(Seq(Spot(0, 1, Normal), Spot(4, 5, Heat), Spot(6, 7, Heat)))
+    val hotspot = Hotspot(Seq(Spot(0, 1, Warm), Spot(4, 5, Hot), Spot(6, 7, Hot)))
     assertEquals(
       ReDoS.AttackKey(AttackComplexity.Exponential(true), hotspot),
       ReDoS.AttackKey(None, Seq((4, 5), (6, 7)))
     )
     assertEquals(
       ReDoS.AttackKey(AttackComplexity.Polynomial(2, false), hotspot),
-      ReDoS.AttackKey(AttackComplexity.Polynomial(2, true), Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))))
+      ReDoS.AttackKey(AttackComplexity.Polynomial(2, true), Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot))))
     )
     assertNotEquals(
       ReDoS.AttackKey(AttackComplexity.Polynomial(2, false), hotspot),
@@ -517,7 +517,7 @@ class ReDoSSuite extends munit.FunSuite:
             UnitMode.UTF16.decode("\u0000"),
             31
           ),
-          Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))),
+          Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot))),
           None,
           Seq.empty,
           Checker.Automaton
@@ -614,7 +614,7 @@ class ReDoSSuite extends munit.FunSuite:
             UnitMode.UTF16.decode("\u0000"),
             31
           ),
-          Hotspot(Seq(Spot(4, 5, Heat), Spot(6, 7, Heat))),
+          Hotspot(Seq(Spot(4, 5, Hot), Spot(6, 7, Hot))),
           None,
           Seq.empty,
           Checker.Automaton

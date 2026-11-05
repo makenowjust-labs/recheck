@@ -67,7 +67,7 @@ describe("makeSnapshot", () => {
         string: "a".repeat(1000) + "\x00",
         pattern: "'a'.repeat(1000) + '\\x00'",
       },
-      hotspot: [{ start: 2, end: 5, temperature: "heat" }],
+      hotspot: [{ start: 2, end: 5, temperature: "hot" }],
       runtimeAttack: null,
       refutedAttacks: [],
     };

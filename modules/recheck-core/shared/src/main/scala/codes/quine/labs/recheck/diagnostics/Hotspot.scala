@@ -12,7 +12,7 @@ final case class Hotspot(spots: Seq[Spot]):
   def highlight(source: String): String =
     val (str, i) = spots.foldLeft(("", 0)):
       case ((acc, i), Spot(s, e, t)) =>
-        val color = if t == Heat then RED_B else GREEN_B
+        val color = if t == Hot then RED_B else GREEN_B
         (acc + source.substring(i, s) + color + source.substring(s, e) + RESET, e)
     str + source.substring(i)
 
@@ -22,8 +22,8 @@ object Hotspot:
   /** Builds a collection of hotspots from a spots sequence with squashing continuous spots. */
   def apply(spots: Seq[Spot]): Hotspot =
     val sortedSpots = spots
-      // A heat spot is higher priority than a normal spot.
-      .sortBy(spot => (spot.start, spot.end, if spot.temperature == Heat then 0 else 1))
+      // A hot spot takes priority over a warm spot.
+      .sortBy(spot => (spot.start, spot.end, if spot.temperature == Hot then 0 else 1))
       .distinctBy(spot => (spot.start, spot.end))
       .foldLeft(Vector.empty[Spot]):
         case (ss :+ Spot(s1, e1, t1), Spot(s2, e2, t2)) if e1 == s2 && t1 == t2 =>
@@ -38,7 +38,7 @@ object Hotspot:
         Hotspot:
           heatmap.toSeq.map:
             case (SourceLocation(start, end), count) =>
-              Hotspot.Spot(start, end, if count >= max * heatRate then Hotspot.Heat else Hotspot.Normal)
+              Hotspot.Spot(start, end, if count >= max * heatRate then Hotspot.Hot else Hotspot.Warm)
       case None => empty
 
   /** An empty hotspot. */
@@ -50,12 +50,12 @@ object Hotspot:
   /** Temperature is a temperature of a hotspot. */
   sealed abstract class Temperature extends Product with Serializable
 
-  /** Heat is a high temperature. */
-  case object Heat extends Temperature:
+  /** Hot is the temperature of a part that the matching repeats many times, which causes the explosion. */
+  case object Hot extends Temperature:
 
-    override def toString: String = "heat"
+    override def toString: String = "hot"
 
-  /** Normal is a normal temperature. */
-  case object Normal extends Temperature:
+  /** Warm is the temperature of a part that the matching runs on the way to a hot part. */
+  case object Warm extends Temperature:
 
-    override def toString: String = "normal"
+    override def toString: String = "warm"

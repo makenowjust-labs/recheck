@@ -3,7 +3,7 @@ import {
   decompressFromEncodedURIComponent,
 } from "lz-string";
 
-import type { Diagnostics } from "recheck";
+import type { Diagnostics, Hotspot } from "recheck";
 import type { Build } from "./builds";
 import type { CheckParams } from "./params";
 
@@ -23,6 +23,7 @@ export type DiagnosticsSnapshot =
       checker: Checker;
       complexity: { type: "polynomial" | "exponential"; summary: string };
       attackPattern: string;
+      // The permalinks keep the temperatures of 4.x (`heat` and `normal`), which are now `hot` and `warm`.
       hotspot: { start: number; end: number; temperature: "heat" | "normal" }[];
     }
   | {
@@ -74,7 +75,7 @@ const makeSnapshotDiagnostics = (
         hotspot: result.hotspot.map(({ start, end, temperature }) => ({
           start,
           end,
-          temperature,
+          temperature: temperature === "hot" ? "heat" : "normal",
         })),
       };
     case "unknown":
@@ -144,3 +145,13 @@ export const decode = (hash: string): Snapshot | null => {
     return null;
   }
 };
+
+/** Returns the hotspot of the snapshot with the temperatures of `Diagnostics`. */
+export const hotspotOf = (
+  result: Extract<DiagnosticsSnapshot, { status: "vulnerable" }>,
+): Hotspot[] =>
+  result.hotspot.map(({ start, end, temperature }) => ({
+    start,
+    end,
+    temperature: temperature === "heat" ? "hot" : "warm",
+  }));

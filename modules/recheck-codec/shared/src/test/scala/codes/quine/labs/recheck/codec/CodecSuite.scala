@@ -31,7 +31,7 @@ class CodecSuite extends munit.FunSuite:
   val refutedAttack: RefutedAttack = RefutedAttack(
     AttackComplexity.Polynomial(2, false),
     AttackPattern(Seq((UnitMode.UTF16.decode(""), UnitMode.UTF16.decode("a"), 0)), UnitMode.UTF16.decode("!"), 2),
-    Hotspot(Seq(Hotspot.Spot(0, 2, Hotspot.Heat))),
+    Hotspot(Seq(Hotspot.Spot(0, 2, Hotspot.Hot))),
     RuntimeAttack("python 3.15.0", Duration(1000, MILLISECONDS), RuntimeAttackResult.Finish(Duration(3, MILLISECONDS)))
   )
 
@@ -78,7 +78,7 @@ class CodecSuite extends munit.FunSuite:
             UnitMode.UTF16.decode("\u0000"),
             17
           ),
-          Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat), Hotspot.Spot(3, 4, Hotspot.Heat))),
+          Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Hot), Hotspot.Spot(3, 4, Hotspot.Hot))),
           None,
           Seq.empty,
           Checker.Automaton
@@ -98,7 +98,7 @@ class CodecSuite extends munit.FunSuite:
             17
           )
         ),
-        "hotspot" := Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat), Hotspot.Spot(3, 4, Hotspot.Heat))),
+        "hotspot" := Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Hot), Hotspot.Spot(3, 4, Hotspot.Hot))),
         "runtimeAttack" := Json.Null,
         "refutedAttacks" := Json.arr(),
         "checker" := Checker.Automaton.asInstanceOf[Checker]
@@ -178,7 +178,7 @@ class CodecSuite extends munit.FunSuite:
           "string" := "aa!",
           "pattern" := "'a' * 2 + '!'"
         ),
-        "hotspot" := Json.arr(Json.obj("start" := 0, "end" := 2, "temperature" := "heat")),
+        "hotspot" := Json.arr(Json.obj("start" := 0, "end" := 2, "temperature" := "hot")),
         "runtimeAttack" := Json.obj(
           "runtime" := "python 3.15.0",
           "timeout" := 1000,
@@ -260,8 +260,8 @@ class CodecSuite extends munit.FunSuite:
 
   test("codec.encodeHotspot"):
     assertEquals(
-      encodeHotspot(Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Heat)))),
-      Json.arr(Json.obj("start" := 1, "end" := 2, "temperature" := "heat"))
+      encodeHotspot(Hotspot(Seq(Hotspot.Spot(1, 2, Hotspot.Hot)))),
+      Json.arr(Json.obj("start" := 1, "end" := 2, "temperature" := "hot"))
     )
 
   test("codec.encodeRuntimeAttack"):
