@@ -70,6 +70,7 @@ Each `pump` consists of `prefix`, `repeating` substrings, and the individual rep
 The `attack` field also has these fields.
 
 - `string` is the actual string. Its characters are UTF-16 code units, or bytes as the characters of the same codes (as Latin-1) when `unitMode` is `byte`.
+  `string`, `suffix`, and `prefix` and `pump` of `pumps` are the arrays of the units of `unitMode` instead when a string cannot hold them: a lone surrogate, or a high surrogate followed by a low surrogate as two code points (e.g. in the `python` dialect).
 - `pattern` is an expression that evaluates to the actual string in the host language of the [dialect](dialects.mdx).
   The attack string of `/^(a|a)*$/` looks like the following.
 

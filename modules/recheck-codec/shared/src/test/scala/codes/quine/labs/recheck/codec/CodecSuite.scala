@@ -305,6 +305,17 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(encodeUString(UnitMode.CodePoint)(UString(0x61, 0x1f600)), Json.fromString("a😀"))
     assertEquals(encodeUString(UnitMode.Byte)(UString(0x61, 0xc3, 0xa9)), Json.fromString("a\u00c3\u00a9"))
 
+    // A string that does not read back as the units is an array of them.
+    assertEquals(
+      encodeUString(UnitMode.UTF16)(UString(0x61, 0xd800)),
+      Json.arr(Json.fromInt(0x61), Json.fromInt(0xd800))
+    )
+    assertEquals(encodeUString(UnitMode.CodePoint)(UString(0xdc00)), Json.arr(Json.fromInt(0xdc00)))
+    assertEquals(
+      encodeUString(UnitMode.CodePoint)(UString(0xd800, 0xdc00)),
+      Json.arr(Json.fromInt(0xd800), Json.fromInt(0xdc00))
+    )
+
   test("codec.decodeUString"):
     // Each mode decodes what `encodeUString` gives, including a lone surrogate.
     for (mode, s) <- Seq(
@@ -317,6 +328,15 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(
       decodeUString(UnitMode.Byte).decodeJson("\u0100".asJson).left.map(_.message),
       Left("Invalid byte string: \u0100")
+    )
+
+    assertEquals(
+      decodeUString(UnitMode.CodePoint).decodeJson(Json.arr(Json.fromInt(0xd800), Json.fromInt(0xdc00))),
+      Right(UString(0xd800, 0xdc00))
+    )
+    assertEquals(
+      decodeUString(UnitMode.Byte).decodeJson(Json.arr(Json.fromInt(0x100))).left.map(_.message),
+      Left("Invalid unit in Byte mode: 100")
     )
 
   test("codec.decodeAttackPattern"):

@@ -239,12 +239,33 @@ given encodeErrorKind: Encoder[ErrorKind] with
     case ErrorKind.Unexpected(message) =>
       Json.obj("kind" := "unexpected", "message" := message)
 
-/** Returns an `Encoder` for `UString` of the unit mode. */
-def encodeUString(mode: UnitMode): Encoder[UString] = mode.encode(_).asJson
+/** Returns an `Encoder` for `UString` of the unit mode, which gives the string of the mode, or the array of the units
+  * when the string does not read back as them.
+  */
+def encodeUString(mode: UnitMode): Encoder[UString] = (s: UString) =>
+  val str = mode.encode(s)
+  // A lone surrogate cannot be written in UTF-8, and a surrogate pair of code points reads back as one code point.
+  if !hasLoneSurrogate(str) && mode.decode(str) == s then str.asJson else s.iterator.toSeq.asJson
 
-/** Returns a `Decoder` for `UString` of the unit mode, which is the inverse of [[encodeUString]]. */
-def decodeUString(mode: UnitMode): Decoder[UString] = Decoder[String].emap: s =>
-  Either.cond(mode != UnitMode.Byte || s.forall(_ <= 0xff), mode.decode(s), s"Invalid byte string: $s")
+/** Returns a `Decoder` for `UString` of the unit mode, which reads a string or an array of units. */
+def decodeUString(mode: UnitMode): Decoder[UString] =
+  val fromString = Decoder[String].emap: s =>
+    Either.cond(mode != UnitMode.Byte || s.forall(_ <= 0xff), mode.decode(s), s"Invalid byte string: $s")
+  val fromUnits = Decoder[Seq[Int]].emap: us =>
+    us.find(!mode.contains(_)) match
+      case Some(u) => Left(f"Invalid unit in $mode mode: $u%X")
+      case None    => Right(UString.from(us))
+  (c: HCursor) => if c.value.isArray then fromUnits(c) else fromString(c)
+
+/** Tests whether the string has a surrogate that is not a part of a surrogate pair. */
+private def hasLoneSurrogate(s: String): Boolean =
+  var i = 0
+  while i < s.length do
+    val c = s.charAt(i)
+    if Character.isHighSurrogate(c) && i + 1 < s.length && Character.isLowSurrogate(s.charAt(i + 1)) then i += 2
+    else if Character.isSurrogate(c) then return true
+    else i += 1
+  false
 
 /** Returns a `Decoder` for `AttackPattern` of the unit mode.
   *
