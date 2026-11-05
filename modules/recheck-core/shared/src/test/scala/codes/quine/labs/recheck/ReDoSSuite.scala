@@ -19,6 +19,9 @@ import codes.quine.labs.recheck.diagnostics.RefutedAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.recheck.diagnostics.UpperBound
+import codes.quine.labs.recheck.repair.Keep
+import codes.quine.labs.recheck.repair.Rx
+import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.dialect.Dialect.*
@@ -76,6 +79,78 @@ class ReDoSSuite extends munit.FunSuite:
     d match
       case s: Diagnostics.Safe => assertEquals((s.checker, s.complexity), (Checker.Fuzz, AttackComplexity.Safe(false)))
       case d                   => fail(s"not safe: $d")
+
+  test("ReDoS.repair"):
+    assertEquals(ReDoS.repair("^a+$", ""), Rx.Safe("^a+$", "", Dialect.JavaScript))
+    assertEquals(
+      ReDoS.repair("^(a+)+$", ""),
+      Rx.Repaired(
+        "^(a+)+$",
+        "",
+        Dialect.JavaScript,
+        UnitMode.UTF16,
+        "^(a+)$",
+        AttackComplexity.Linear,
+        Seq(0, 1),
+        Rx.Comparison.Equivalent
+      )
+    )
+    assertEquals(
+      ReDoS.repair("^(\\s*)*$", ""),
+      Rx.Repaired(
+        "^(\\s*)*$",
+        "",
+        Dialect.JavaScript,
+        UnitMode.UTF16,
+        "^(\\s*)$",
+        AttackComplexity.Linear,
+        Seq(0, 1),
+        Rx.Comparison.Different(
+          Rx.Counterexample(UString.empty, Some(Seq(Some((0, 0)), None)), Some(Seq(Some((0, 0)), Some((0, 0)))))
+        )
+      )
+    )
+    assertEquals(ReDoS.repair("^(a|aa)+$", ""), Rx.Unknown("^(a|aa)+$", "", Dialect.JavaScript, None))
+    assertEquals(
+      ReDoS.repair("(", ""),
+      Rx.Unknown("(", "", Dialect.JavaScript, Some(Diagnostics.ErrorKind.InvalidRegExp("Unclosed group at 1")))
+    )
+    assertEquals(
+      ReDoS.repair("^(a+)+$", "", keep = Keep.Captures(Seq("y"))),
+      Rx.Unknown("^(a+)+$", "", Dialect.JavaScript, Some(Diagnostics.ErrorKind.InvalidKeep("no capture of y")))
+    )
+    // The repair removes the first capture, so the second one is the first in the repaired RegExp.
+    assertEquals(
+      ReDoS.repair("^([a-z]+\\s?)+(\\s*)*$", "", keep = Keep.Captures(Seq(2))),
+      Rx.Repaired(
+        "^([a-z]+\\s?)+(\\s*)*$",
+        "",
+        Dialect.JavaScript,
+        UnitMode.UTF16,
+        "^[a-z]+(?:\\s[a-z]+)*\\s?(\\s*)$",
+        AttackComplexity.Linear,
+        Seq(0, 2),
+        Rx.Comparison.Different(
+          Rx.Counterexample(
+            UString.from("a".map(_.toInt)),
+            Some(Seq(Some((0, 1)), None)),
+            Some(Seq(Some((0, 1)), Some((1, 1))))
+          )
+        )
+      )
+    )
+
+  test("ReDoS.repair: keep"):
+    val source = "^((?<x>a)+)+$"
+    def kept(keep: Keep): Seq[Int] = ReDoS.repair(source, "", keep = keep) match
+      case r: Rx.Repaired => r.kept
+      case rx             => fail(s"not repaired: $rx")
+
+    assertEquals(kept(Keep.All), Seq(0, 1, 2))
+    assertEquals(kept(Keep.Named), Seq(0, 2))
+    assertEquals(kept(Keep.MatchRange), Seq(0))
+    assertEquals(kept(Keep.Match), Seq.empty)
+    assertEquals(kept(Keep.Captures(Seq(1, "x"))), Seq(0, 1, 2))
 
   test("ReDoS.check"):
     assertEquals(

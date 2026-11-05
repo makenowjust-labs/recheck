@@ -3,6 +3,7 @@ package diagnostics
 
 import codes.quine.labs.recheck.common.CancelException
 import codes.quine.labs.recheck.common.Checker
+import codes.quine.labs.recheck.common.InvalidKeepException
 import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.ReDoSException
 import codes.quine.labs.recheck.common.TimeoutException
@@ -105,13 +106,7 @@ object Diagnostics:
         refutedAttacks: Seq[RefutedAttack],
         ex: ReDoSException
     ): Diagnostics =
-      val kind = ex match
-        case _: TimeoutException        => ErrorKind.Timeout
-        case _: CancelException         => ErrorKind.Cancel
-        case ex: UnsupportedException   => ErrorKind.Unsupported(ex.getMessage)
-        case ex: InvalidRegExpException => ErrorKind.InvalidRegExp(ex.getMessage)
-        case ex: UnexpectedException    => ErrorKind.Unexpected(ex.getMessage)
-      Unknown(source, flags, dialect, unitMode, kind, refutedAttacks, ex.checker)
+      Unknown(source, flags, dialect, unitMode, ErrorKind.from(ex), refutedAttacks, ex.checker)
 
   /** Returns the section of the upper bound after a blank line, or an empty string if there is none.
     *
@@ -160,6 +155,15 @@ object Diagnostics:
   /** ErrorKind types. */
   object ErrorKind:
 
+    /** Returns the kind of the exception. */
+    def from(ex: ReDoSException): ErrorKind = ex match
+      case _: TimeoutException        => Timeout
+      case _: CancelException         => Cancel
+      case ex: UnsupportedException   => Unsupported(ex.getMessage)
+      case ex: InvalidRegExpException => InvalidRegExp(ex.getMessage)
+      case ex: InvalidKeepException   => InvalidKeep(ex.getMessage)
+      case ex: UnexpectedException    => Unexpected(ex.getMessage)
+
     /** Timeout is a timeout on RegExp analyzing. */
     case object Timeout extends ErrorKind:
 
@@ -179,6 +183,11 @@ object Diagnostics:
     final case class InvalidRegExp(message: String) extends ErrorKind:
 
       override def toString: String = s"invalid RegExp ($message)"
+
+    /** InvalidKeep is an error that what a repair keeps refers to no capture of the RegExp. */
+    final case class InvalidKeep(message: String) extends ErrorKind:
+
+      override def toString: String = s"invalid keep ($message)"
 
     /** RuntimeAttacksRefuted is an error that the runtime refutes as many attacks as `maxRefutedAttacks`. */
     case object RuntimeAttacksRefuted extends ErrorKind:

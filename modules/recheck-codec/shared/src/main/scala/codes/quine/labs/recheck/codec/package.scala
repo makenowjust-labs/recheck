@@ -248,6 +248,8 @@ given encodeErrorKind: Encoder[ErrorKind] with
       Json.obj("kind" := "unsupported", "message" := message)
     case ErrorKind.InvalidRegExp(message) =>
       Json.obj("kind" := "invalid", "message" := message)
+    case ErrorKind.InvalidKeep(message) =>
+      Json.obj("kind" := "invalid-keep", "message" := message)
     case ErrorKind.RuntimeAttacksRefuted =>
       Json.obj("kind" := "runtime-attacks-refuted")
     case ErrorKind.Unexpected(message) =>

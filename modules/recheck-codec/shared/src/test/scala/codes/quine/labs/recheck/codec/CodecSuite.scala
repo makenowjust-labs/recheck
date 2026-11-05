@@ -331,6 +331,10 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(encodeErrorKind(ErrorKind.Cancel), Json.obj("kind" := "cancel"))
     assertEquals(encodeErrorKind(ErrorKind.Unsupported("foo")), Json.obj("kind" := "unsupported", "message" := "foo"))
     assertEquals(encodeErrorKind(ErrorKind.InvalidRegExp("foo")), Json.obj("kind" := "invalid", "message" := "foo"))
+    assertEquals(
+      encodeErrorKind(ErrorKind.InvalidKeep("foo")),
+      Json.obj("kind" := "invalid-keep", "message" := "foo")
+    )
     assertEquals(encodeErrorKind(ErrorKind.RuntimeAttacksRefuted), Json.obj("kind" := "runtime-attacks-refuted"))
     assertEquals(encodeErrorKind(ErrorKind.Unexpected("foo")), Json.obj("kind" := "unexpected", "message" := "foo"))
 

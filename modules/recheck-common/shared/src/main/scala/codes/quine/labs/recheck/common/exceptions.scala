@@ -16,5 +16,8 @@ final class UnsupportedException(message: String) extends ReDoSException(message
 /** InvalidRegExpException is an exception thrown when regexp is invalid. */
 final class InvalidRegExpException(message: String) extends ReDoSException(message)
 
+/** InvalidKeepException is an exception thrown when what a repair keeps refers to no capture. */
+final class InvalidKeepException(message: String) extends ReDoSException(message)
+
 /** UnexpectedException is an exception thrown when unexpected error occurs. */
 final class UnexpectedException(message: String) extends ReDoSException(message)
