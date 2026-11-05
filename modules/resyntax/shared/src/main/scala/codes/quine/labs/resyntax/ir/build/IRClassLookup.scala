@@ -76,7 +76,7 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
   def word(flags: IRCharFlagSet): CharSet = dialect match
     case Dialect.JavaScript =>
       // With `u` or `v` and `i`, ECMAScript's WordCharacters includes the characters folded to ASCII ones.
-      if mode == UnitMode.CodePoint && flags.ignoreCase then ASCIIWord.union(CaseMapping.SimpleFold.preimage(ASCIIWord))
+      if mode.isCodePoint && flags.ignoreCase then ASCIIWord.union(CaseMapping.SimpleFold.preimage(ASCIIWord))
       else ASCIIWord
     case Dialect.DotNet => dotNetWord
     case _              =>
@@ -94,7 +94,7 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
     case Dialect.DotNet => dotNetWord.union(of("\u200C\u200D"))
     // Onigmo's `(?d)` uses Unicode for `\b` and `\B`, unlike `\w`.
     case _: Dialect.Ruby
-        if mode == UnitMode.CodePoint && (flags.charset == IRCharset.Default || flags.charset == IRCharset.Locale) =>
+        if mode.isCodePoint && (flags.charset == IRCharset.Default || flags.charset == IRCharset.Locale) =>
       rubyWord
     case _ => word(flags)
 

@@ -190,7 +190,9 @@ class CodecSuite extends munit.FunSuite:
 
   test("codec.encodeUnitMode"):
     assertEquals(encodeUnitMode(UnitMode.UTF16), "utf16".asJson)
+    assertEquals(encodeUnitMode(UnitMode.UTF16CodePoint), "utf16-code-point".asJson)
     assertEquals(encodeUnitMode(UnitMode.CodePoint), "code-point".asJson)
+    assertEquals(encodeUnitMode(UnitMode.ScalarValue), "scalar-value".asJson)
     assertEquals(encodeUnitMode(UnitMode.Byte), "byte".asJson)
 
   test("codec.decodeUnitMode"):
@@ -247,7 +249,7 @@ class CodecSuite extends munit.FunSuite:
     // The units of the mode are written in the string of UTF-16.
     val astral = AttackPattern(Seq.empty, UString(0x1f600), 0)
     assertEquals(
-      encodeAttackPattern(Dialect.JavaScript, UnitMode.CodePoint)(astral).hcursor.get[String]("string"),
+      encodeAttackPattern(Dialect.JavaScript, UnitMode.UTF16CodePoint)(astral).hcursor.get[String]("string"),
       Right("😀")
     )
     val utf16 = AttackPattern(Seq.empty, UString(0xd83d, 0xde00), 0)
@@ -310,7 +312,9 @@ class CodecSuite extends munit.FunSuite:
       encodeUString(UnitMode.UTF16)(UString(0x61, 0xd800)),
       Json.arr(Json.fromInt(0x61), Json.fromInt(0xd800))
     )
-    assertEquals(encodeUString(UnitMode.CodePoint)(UString(0xdc00)), Json.arr(Json.fromInt(0xdc00)))
+    for mode <- Seq(UnitMode.UTF16CodePoint, UnitMode.CodePoint) do
+      assertEquals(encodeUString(mode)(UString(0xdc00)), Json.arr(Json.fromInt(0xdc00)))
+    assertEquals(encodeUString(UnitMode.ScalarValue)(UString(0x61, 0x1f600)), Json.fromString("a😀"))
     assertEquals(encodeUString(UnitMode.Byte)(UString(0x61, 0x80)), Json.arr(Json.fromInt(0x61), Json.fromInt(0x80)))
     assertEquals(
       encodeUString(UnitMode.CodePoint)(UString(0xd800, 0xdc00)),
@@ -321,7 +325,9 @@ class CodecSuite extends munit.FunSuite:
     // Each mode decodes what `encodeUString` gives, including a lone surrogate.
     for (mode, s) <- Seq(
         UnitMode.UTF16 -> UString(0x61, 0xd83d, 0xde00, 0xd800),
+        UnitMode.UTF16CodePoint -> UString(0x61, 0x1f600, 0xd800),
         UnitMode.CodePoint -> UString(0x61, 0x1f600, 0xd800),
+        UnitMode.ScalarValue -> UString(0x61, 0x1f600),
         UnitMode.Byte -> UString(0x61, 0xc3, 0xa9, 0xff)
       )
     do assertEquals(decodeUString(mode).decodeJson(encodeUString(mode)(s)), Right(s))
@@ -339,6 +345,14 @@ class CodecSuite extends munit.FunSuite:
       decodeUString(UnitMode.Byte).decodeJson(Json.arr(Json.fromInt(0x100))).left.map(_.message),
       Left("Invalid unit in Byte mode: 100")
     )
+    assertEquals(
+      decodeUString(UnitMode.ScalarValue).decodeJson("\ud800".asJson).left.map(_.message),
+      Left("Invalid unit in ScalarValue mode: D800")
+    )
+    assertEquals(
+      decodeUString(UnitMode.ScalarValue).decodeJson(Json.arr(Json.fromInt(0xd800))).left.map(_.message),
+      Left("Invalid unit in ScalarValue mode: D800")
+    )
 
   test("codec.decodeAttackPattern"):
     val attack = AttackPattern(
@@ -354,6 +368,15 @@ class CodecSuite extends munit.FunSuite:
     assertEquals(
       decoder.decodeJson(Json.obj("pumps" := Json.arr(), "suffix" := "a")).left.map(_.pathToRootString),
       Left(Some(".base"))
+    )
+
+    // A high surrogate followed by a low surrogate, which some repeat count gives, is not a string of `UTF16CodePoint`.
+    val paired = AttackPattern(Seq((UString(0xd800), UString(0xdc00), 0)), UString.empty, 1)
+    val json = encodeAttackPattern(Dialect.JavaScript, UnitMode.CodePoint)(paired)
+    assertEquals(decodeAttackPattern(UnitMode.CodePoint).decodeJson(json), Right(paired))
+    assertEquals(
+      decodeAttackPattern(UnitMode.UTF16CodePoint).decodeJson(json).left.map(_.message),
+      Left("Invalid attack pattern in UTF16CodePoint mode: a high surrogate followed by a low surrogate")
     )
 
   test("codec.decodeParameters"):

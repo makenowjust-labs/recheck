@@ -91,19 +91,19 @@ object Parser:
   def determineUnitMode(source: String, flagSet: FlagSet, dialect: Dialect): UnitMode =
     dialect match
       case Dialect.JavaScript =>
-        if flagSet.unicode || flagSet.unicodeSets then UnitMode.CodePoint else UnitMode.UTF16
-      // Java matches code points, and reads a lone surrogate as a code point too.
-      case Dialect.Java        => UnitMode.CodePoint
+        if flagSet.unicode || flagSet.unicodeSets then UnitMode.UTF16CodePoint else UnitMode.UTF16
+      case Dialect.Java        => UnitMode.UTF16CodePoint
       case Dialect.DotNet      => UnitMode.UTF16
       case Dialect.Python(tpe) =>
         if tpe == Dialect.Python.Type.Bytes then UnitMode.Byte else UnitMode.CodePoint
       // Ruby's `n` is the encoding option (NOENCODING), which `FlagSet` keeps as `explicitCapture`.
       case Dialect.Ruby(encoding) =>
         if flagSet.explicitCapture || encoding == Dialect.Ruby.Encoding.ASCII8Bit then UnitMode.Byte
-        else UnitMode.CodePoint
+        else UnitMode.ScalarValue
       case Dialect.Perl(utf8, _) => if utf8 then UnitMode.CodePoint else UnitMode.Byte
       case Dialect.PCRE          =>
-        if flagSet.unicode || SourcePrescan.from(source).hasUTFStartOption then UnitMode.CodePoint else UnitMode.Byte
+        if flagSet.unicode || SourcePrescan.from(source).hasUTFStartOption then UnitMode.ScalarValue
+        else UnitMode.Byte
 
   private def validateEncoding(source: String, encoding: SourceEncoding): Unit =
     if encoding == SourceEncoding.Latin1 then

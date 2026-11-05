@@ -95,7 +95,7 @@ Though it has many fields, the most important one is `status`. This field takes 
 - `'vulnerable'` means that the checking found an attack string.
 - `'unknown'` means that the checking could not finish (timeout, cancel, or error).
 
-The strings of an attack (`string`, `suffix`, and `prefix` and `pump` of each pump, in `attack` and in `refutedAttacks`) are arrays of the units of `unitMode` instead when a string cannot carry them exactly: a surrogate code point in `code-point`, a lone surrogate in `utf16`, or a byte above `0x7F` in `byte`.
+The strings of an attack (`string`, `suffix`, and `prefix` and `pump` of each pump, in `attack` and in `refutedAttacks`) are arrays of the units of `unitMode` instead when a string cannot carry them exactly: a surrogate code point in `utf16-code-point`, `code-point` or `scalar-value`, a lone surrogate in `utf16`, or a byte above `0x7F` in `byte`.
 
 :::info
 

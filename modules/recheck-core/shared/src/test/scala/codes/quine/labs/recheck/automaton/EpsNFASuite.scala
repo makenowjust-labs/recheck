@@ -10,7 +10,6 @@ import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
-import codes.quine.labs.resyntax.ir.IRSurrogateKind.Separate
 import codes.quine.labs.resyntax.ir.alphabet.CharKind
 import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
@@ -33,7 +32,7 @@ class EpsNFASuite extends munit.FunSuite:
       lineTerminator: Option[CharSet] = None,
       word: Option[CharSet] = None
   ): PatternAlphabet =
-    PatternAlphabet.build(UnitMode.UTF16, sets, lineTerminator, word, false, Seq.empty, Seq.empty, Seq.empty, Separate)
+    PatternAlphabet.build(UnitMode.UTF16, sets, lineTerminator, word, false, Seq.empty, Seq.empty, Seq.empty)
 
   test("EpsNFA.AssertKind#accepts"):
     import IRLineBeginAtEnd.*

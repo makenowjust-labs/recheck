@@ -60,7 +60,13 @@ It may invoke a matching time explosion against too little string (`length < 100
 ## Attack String
 
 `vulnerable` diagnostics have the `attack` field. It contains the attack string found by the checking.
-Its unit is the `unitMode` field: `utf16` (UTF-16 code units), `code-point` (code points), or `byte` (bytes).
+Its unit is the `unitMode` field, which takes one of these values.
+
+- `utf16`: UTF-16 code units (JavaScript without `u` or `v`, and .NET).
+- `utf16-code-point`: code points read from UTF-16, where a lone surrogate is a code point, but a high surrogate followed by a low surrogate is one code point (JavaScript with `u` or `v`, and Java).
+- `code-point`: code points, where the surrogates are ordinary code points in any order (Python's `str`, and Perl with `utf8`).
+- `scalar-value`: Unicode scalar values, which are the code points other than the surrogates (Ruby with `UTF-8`, and PCRE with `u` or `(*UTF)`).
+- `byte`: bytes.
 
 The attack string is a string that causes the explosion of the matching time, also known as a ReDoS vulnerability.
 

@@ -43,6 +43,19 @@ class AlphabetSuite extends munit.FunSuite with CharSetHelper:
       for (atom, i) <- a.atoms.zipWithIndex; c <- Seq(atom.head, atom.last) do assertEquals(a.atomOf(c), i)
       for atom <- a.atoms; s <- sets do assert(atom.subsetOf(s) || atom.intersect(s).isEmpty)
 
+  test("Alphabet.refine: no surrogates in ScalarValue"):
+    val a = Alphabet.refine(UnitMode.ScalarValue, Seq(set((0x41, 0x42)), set((0xd000, 0xe001))))
+    assertEquals(
+      a.atoms,
+      IndexedSeq(
+        set((0, 0x41), (0x42, 0xd000), (0xe001, 0x110000)),
+        set((0x41, 0x42)),
+        set((0xd000, 0xd800), (0xe000, 0xe001))
+      )
+    )
+    intercept[IllegalArgumentException](a.atomOf(0xd800))
+    intercept[IllegalArgumentException](a.atomsOf(set((0xdc00, 0xdc01))))
+
   test("Alphabet.refine: coarsest"):
     val a = Alphabet.refine(UnitMode.Byte, Seq(set((0x41, 0x42), (0x61, 0x62)), set((0x41, 0x42), (0x61, 0x62))))
     assertEquals(a.size, 2)

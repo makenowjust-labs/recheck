@@ -85,12 +85,13 @@ class AttackPatternStyleSuite extends munit.FunSuite:
 
   test("AttackPatternStyle.of"):
     assertEquals(of(Dialect.JavaScript, UnitMode.UTF16), JavaScript(unicode = false))
-    assertEquals(of(Dialect.JavaScript, UnitMode.CodePoint), JavaScript(unicode = true))
+    assertEquals(of(Dialect.JavaScript, UnitMode.UTF16CodePoint), JavaScript(unicode = true))
     assertEquals(of(Dialect.Python(), UnitMode.CodePoint), Python(bytes = false))
     assertEquals(of(Dialect.Python(), UnitMode.Byte), Python(bytes = true))
+    assertEquals(of(Dialect.Ruby(), UnitMode.ScalarValue), Ruby(bytes = false))
     assertEquals(of(Dialect.Ruby(), UnitMode.Byte), Ruby(bytes = true))
-    assertEquals(of(Dialect.Java, UnitMode.CodePoint), Java)
+    assertEquals(of(Dialect.Java, UnitMode.UTF16CodePoint), Java)
     assertEquals(of(Dialect.DotNet, UnitMode.UTF16), CSharp)
     assertEquals(of(Dialect.Perl(), UnitMode.Byte), Perl)
-    assertEquals(of(Dialect.PCRE, UnitMode.CodePoint), PHP(bytes = false))
+    assertEquals(of(Dialect.PCRE, UnitMode.ScalarValue), PHP(bytes = false))
     assertEquals(of(Dialect.PCRE, UnitMode.Byte), PHP(bytes = true))

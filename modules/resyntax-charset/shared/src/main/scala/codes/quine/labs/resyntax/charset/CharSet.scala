@@ -81,7 +81,7 @@ final class CharSet private (private val bounds: Array[UChar]):
   def complement(universe: CharSet): CharSet = universe.diff(this)
 
   def restrict(mode: UnitMode): CharSet =
-    if isEmpty || bounds(bounds.length - 1) <= mode.limit then this
+    if isEmpty || mode != UnitMode.ScalarValue && bounds(bounds.length - 1) <= mode.limit then this
     else intersect(mode.universe)
 
   def subsetOf(that: CharSet): Boolean = diff(that).isEmpty

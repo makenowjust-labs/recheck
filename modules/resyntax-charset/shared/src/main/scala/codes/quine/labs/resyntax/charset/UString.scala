@@ -3,8 +3,8 @@ package codes.quine.labs.resyntax.charset
 /** UString is an immutable sequence of the units of a [[UnitMode]], used for attack strings and the strings of a
   * [[ClassSet]].
   *
-  * The units are code points in `CodePoint` mode, where a lone surrogate is a code point of itself. They are UTF-16
-  * code units in `UTF16` mode, and bytes in `Byte` mode. [[UnitMode]] converts it from and to a Scala string.
+  * The units are code points in the code point modes (`UTF16CodePoint`, `CodePoint` and `ScalarValue`), UTF-16 code
+  * units in `UTF16` mode, and bytes in `Byte` mode. [[UnitMode]] converts it from and to a Scala string.
   */
 final class UString private (private val values: Array[UChar]) extends Ordered[UString]:
 

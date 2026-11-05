@@ -200,7 +200,7 @@ object ReDoS:
     val diagnostics = vulnerable
       .collect:
         case vul: Complexity.Vulnerable[UChar] =>
-          val attack = vul.buildAttackPattern(runtimeAttackLimit, maxRuntimeAttackStringSize)
+          val attack = vul.buildAttackPattern(runtimeAttackLimit, maxRuntimeAttackStringSize, ir.mode)
           Diagnostics.Vulnerable(
             source,
             flags,
@@ -268,7 +268,7 @@ object ReDoS:
 
       results.map:
         case (complexity, attack, hotspot) =>
-          val adjusted = attack.adjust(complexity, runtimeAttackLimit, maxRuntimeAttackStringSize)
+          val adjusted = attack.adjust(complexity, runtimeAttackLimit, maxRuntimeAttackStringSize, ir.mode)
           Diagnostics.Vulnerable(
             source,
             flags,

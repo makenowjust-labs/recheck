@@ -6,6 +6,7 @@ import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.util.RepeatUtil
 import codes.quine.labs.resyntax.charset.UChar
+import codes.quine.labs.resyntax.charset.UnitMode
 
 /** Complexity is a result of [[AutomatonChecker.check]] method. */
 sealed abstract class Complexity[+A] extends Serializable with Product
@@ -25,8 +26,11 @@ object Complexity:
     /** A witness for this complexity. */
     def witness: Witness[A]
 
-    /** Builds an attack string pattern of this. */
-    def buildAttackPattern(attackLimit: Int, maxSize: Int)(using ev: A =:= UChar): AttackPattern
+    /** Builds an attack string pattern of this, whose units are of the mode.
+      *
+      * It throws [[common.UnexpectedException]] as [[diagnostics.AttackPattern.build]] does.
+      */
+    def buildAttackPattern(attackLimit: Int, maxSize: Int, mode: UnitMode)(using ev: A =:= UChar): AttackPattern
 
     /** Converts this into the complexity of the diagnostics. */
     def toAttackComplexity: AttackComplexity.Vulnerable
@@ -50,15 +54,15 @@ object Complexity:
 
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Polynomial(degree, false)
 
-    def buildAttackPattern(attackLimit: Int, maxSize: Int)(using ev: A =:= UChar): AttackPattern =
+    def buildAttackPattern(attackLimit: Int, maxSize: Int, mode: UnitMode)(using ev: A =:= UChar): AttackPattern =
       val bestRepeatCount = RepeatUtil.polynomial(degree, attackLimit, witness.fixedSize, witness.repeatSize, maxSize)
-      witness.buildAttackPattern(bestRepeatCount)
+      witness.buildAttackPattern(bestRepeatCount, mode)
 
   /** Exponential is the complexity of a RegExp that checks a match in exponential time. */
   final case class Exponential[A](witness: Witness[A], hotspot: Hotspot = Hotspot.empty) extends Vulnerable[A]:
 
     def toAttackComplexity: AttackComplexity.Vulnerable = AttackComplexity.Exponential(false)
 
-    def buildAttackPattern(attackLimit: Int, maxSize: Int)(using ev: A =:= UChar): AttackPattern =
+    def buildAttackPattern(attackLimit: Int, maxSize: Int, mode: UnitMode)(using ev: A =:= UChar): AttackPattern =
       val bestRepeatCount = RepeatUtil.exponential(attackLimit, witness.fixedSize, witness.repeatSize, maxSize)
-      witness.buildAttackPattern(bestRepeatCount)
+      witness.buildAttackPattern(bestRepeatCount, mode)

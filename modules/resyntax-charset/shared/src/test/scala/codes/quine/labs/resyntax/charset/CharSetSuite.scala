@@ -74,6 +74,8 @@ class CharSetSuite extends munit.FunSuite with CharSetHelper:
   test("CharSet#restrict"):
     assertEquals(set((0x41, 0x20000)).restrict(UnitMode.UTF16), set((0x41, 0x10000)))
     assertEquals(set((0x41, 0x42)).restrict(UnitMode.Byte), set((0x41, 0x42)))
+    assertEquals(set((0xd000, 0xe001)).restrict(UnitMode.ScalarValue), set((0xd000, 0xd800), (0xe000, 0xe001)))
+    assertEquals(set((0xd000, 0xe001)).restrict(UnitMode.CodePoint), set((0xd000, 0xe001)))
 
   test("CharSet#subsetOf"):
     assert(set((2, 3)).subsetOf(set((1, 5))))

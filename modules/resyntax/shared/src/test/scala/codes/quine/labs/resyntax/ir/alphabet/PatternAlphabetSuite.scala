@@ -6,7 +6,6 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRPattern
-import codes.quine.labs.resyntax.ir.IRSurrogateKind
 import codes.quine.labs.resyntax.ir.build.IRBuilder
 import codes.quine.labs.resyntax.parser.Parser
 
@@ -97,25 +96,19 @@ class PatternAlphabetSuite extends munit.FunSuite:
 
   test("PatternAlphabet.build: surrogates"):
     import UTF16Encoding.{HighSurrogates as High, LowSurrogates as Low}
-    val scalars = UnitMode.CodePoint.universe.diff(UTF16Encoding.Surrogates)
-    // Absent surrogates are not characters.
+    val scalars = UnitMode.ScalarValue.universe
+    // Surrogates are not characters in `ScalarValue`.
     assertEquals(
-      buildAlphabet(UnitMode.CodePoint, Seq(CharSet.single('a')), surrogates = IRSurrogateKind.Absent).pairs,
+      buildAlphabet(UnitMode.ScalarValue, Seq(CharSet.single('a'), High)).pairs,
       IndexedSeq((CharSet.single('a'), CharKind.Normal), (scalars.diff(CharSet.single('a')), CharKind.Normal))
     )
-    // Paired surrogates split an atom of surrogates alone, and the kinds tell the high ones and the low ones.
+    // `UTF16CodePoint` splits an atom of surrogates alone, and the kinds tell the high ones and the low ones.
     val paired = IndexedSeq((High, CharKind(high = true)), (Low, CharKind(low = true)), (scalars, CharKind.Normal))
+    assertEquals(buildAlphabet(UnitMode.UTF16CodePoint, Seq(High, Low)).pairs, paired)
+    assertEquals(buildAlphabet(UnitMode.UTF16CodePoint, Seq(UTF16Encoding.Surrogates)).pairs, paired)
+    // The kinds tell nothing without both of them, and in `CodePoint`.
     assertEquals(
-      buildAlphabet(UnitMode.CodePoint, Seq(High, Low), surrogates = IRSurrogateKind.Paired).pairs,
-      paired
-    )
-    assertEquals(
-      buildAlphabet(UnitMode.CodePoint, Seq(UTF16Encoding.Surrogates), surrogates = IRSurrogateKind.Paired).pairs,
-      paired
-    )
-    // The kinds tell nothing without both of them, and of separate surrogates.
-    assertEquals(
-      buildAlphabet(UnitMode.CodePoint, Seq(High), surrogates = IRSurrogateKind.Paired).pairs,
+      buildAlphabet(UnitMode.UTF16CodePoint, Seq(High)).pairs,
       IndexedSeq((High, CharKind.Normal), (UnitMode.CodePoint.universe.diff(High), CharKind.Normal))
     )
     assertEquals(
@@ -150,10 +143,9 @@ class PatternAlphabetSuite extends munit.FunSuite:
       word: Option[CharSet] = None,
       crlf: Boolean = false,
       moreLineTerminators: Seq[CharSet] = Seq.empty,
-      moreWords: Seq[CharSet] = Seq.empty,
-      surrogates: IRSurrogateKind = IRSurrogateKind.Separate
+      moreWords: Seq[CharSet] = Seq.empty
   ): PatternAlphabet =
-    PatternAlphabet.build(mode, sets, lineTerminator, word, crlf, moreLineTerminators, moreWords, Seq.empty, surrogates)
+    PatternAlphabet.build(mode, sets, lineTerminator, word, crlf, moreLineTerminators, moreWords, Seq.empty)
 
   def alphabetOf(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): PatternAlphabet =
     PatternAlphabet.of(parse(source, flags, dialect))
@@ -179,7 +171,7 @@ class PatternAlphabetSuite extends munit.FunSuite:
     assertEquals(alphabetOf(""), buildAlphabet(utf16))
     // A set like a negated class (e.g. `.` and `[^a]`) takes part in the order as its complement.
     assertEquals(alphabetOf("."), buildAlphabet(utf16, Seq(lineTerminator)))
-    assertEquals(alphabetOf(".", "u"), buildAlphabet(UnitMode.CodePoint, Seq(lineTerminator)))
+    assertEquals(alphabetOf(".", "u"), buildAlphabet(UnitMode.UTF16CodePoint, Seq(lineTerminator)))
     assertEquals(alphabetOf("[a-z]"), buildAlphabet(utf16, Seq(CharSet.range('a', 'z'))))
     assertEquals(
       alphabetOf("A|Z"),

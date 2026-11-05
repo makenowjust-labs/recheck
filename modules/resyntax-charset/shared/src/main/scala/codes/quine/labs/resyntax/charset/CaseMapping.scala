@@ -151,14 +151,14 @@ object CaseMapping:
 
   /** Returns the mapping of ECMAScript `Canonicalize` (ES2024 22.2.2.7.3) on the units of the mode.
     *
-    * `CodePoint` is the mode with the `u` or `v` flag, and `UTF16` is the one without them.
+    * `UTF16CodePoint` is the mode with the `u` or `v` flag, and `UTF16` is the one without them.
     *
-    * It throws `IllegalArgumentException` for `Byte`, which ECMAScript does not have.
+    * It throws `IllegalArgumentException` for the other modes, which ECMAScript does not have.
     */
   def ecmaScriptCanonicalize(mode: UnitMode): CaseMapping = mode match
-    case UnitMode.CodePoint => SimpleFold
-    case UnitMode.UTF16     => ECMAScriptUpper
-    case UnitMode.Byte      => throw new IllegalArgumentException("ECMAScript has no byte mode")
+    case UnitMode.UTF16CodePoint => SimpleFold
+    case UnitMode.UTF16          => ECMAScriptUpper
+    case _                       => throw new IllegalArgumentException(s"ECMAScript has no $mode mode")
 
 /** FullCaseFolding is full case folding (the `C` and `F` mappings of CaseFolding.txt), which may map a code point to
   * several code points, such as `U+00DF` to `ss`.
