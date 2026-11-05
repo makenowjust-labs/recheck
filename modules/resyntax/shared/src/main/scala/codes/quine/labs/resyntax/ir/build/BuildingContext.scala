@@ -3,7 +3,6 @@ package build
 
 import scala.deriving.Mirror
 
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetDiff
 
@@ -12,7 +11,7 @@ import codes.quine.labs.resyntax.ast.FlagSetDiff
   * The flag set is letter-keyed, so the meaning of a letter is decided here (e.g. `U` is ungreedy in PCRE, but Unicode
   * character classes in Java).
   */
-final case class BuildingContext(flagSet: FlagSet, dialect: Dialect, featureSet: IRFeatureSet):
+final case class BuildingContext(flagSet: FlagSet, featureSet: IRFeatureSet):
 
   def update(diff: FlagSetDiff): BuildingContext =
     val base =
@@ -40,11 +39,11 @@ final case class BuildingContext(flagSet: FlagSet, dialect: Dialect, featureSet:
       verbose = reset.verbose,
       verboseMore = reset.verboseMore
     )
-    val result = dialect match
+    val result =
       // PCRE also resets `r`, but keeps `a`, `J` and `U`.
-      case Dialect.PCRE => common.copy(nonDestructive = reset.nonDestructive)
+      if featureSet.resetFlagKeepsCharset then common.copy(nonDestructive = reset.nonDestructive)
       // Perl also resets the character set to `d`.
-      case _ =>
+      else
         common.copy(
           ascii = reset.ascii,
           asciiRestrict = reset.asciiRestrict,
@@ -68,43 +67,44 @@ final case class BuildingContext(flagSet: FlagSet, dialect: Dialect, featureSet:
 
   def charFlags: IRCharFlagSet =
     val f = flagSet
-    val isJava = dialect.isJava
-    val isPCRE = dialect.isPCRE
+    // PHP's `u` sets PCRE2_UCP as well as PCRE2_UTF.
+    val unicodeClass =
+      featureSet.hasUnicodeClassFlag && f.ungreedy || featureSet.unicodeFlagSetsUCP && f.unicode || featureSet.ucp
     IRCharFlagSet(
       ignoreCase = f.ignoreCase,
-      dotAll = if dialect.isRuby then f.multiline else f.dotAll,
+      dotAll = if featureSet.multilineIsDotAll then f.multiline else f.dotAll,
       lineTerminators = lineTerminators,
-      unicodeSets = dialect.isJavaScript && f.unicodeSets,
-      unicodeCase = !isJava || f.unicode || f.ungreedy,
-      // PHP's `u` sets PCRE2_UCP as well as PCRE2_UTF.
-      unicodeClass = isJava && f.ungreedy || isPCRE && (f.unicode || featureSet.ucp),
+      unicodeSets = featureSet.hasUnicodeSetsFlag && f.unicodeSets,
+      // Java's `U` implies `u`.
+      unicodeCase = !featureSet.hasUnicodeCaseFlag || f.unicode || unicodeClass,
+      unicodeClass = unicodeClass,
       charset = charset,
       // Perl's `aa` forbids ASCII and non-ASCII characters to match case-insensitively, as PCRE's `r` does.
-      caselessRestrict = isPCRE && (f.nonDestructive || featureSet.caselessRestrict) ||
-        dialect.isPerl && f.asciiRestrict,
+      caselessRestrict = featureSet.hasCaselessRestrictFlag && f.nonDestructive || featureSet.caselessRestrict ||
+        featureSet.hasASCIIRestrictFlag && f.asciiRestrict,
       turkishCasing = featureSet.turkishCasing,
       bsrAnyCRLF = featureSet.bsrAnyCRLF,
-      canonicalEquivalence = isJava && f.continue
+      canonicalEquivalence = featureSet.hasCanonicalEquivalenceFlag && f.continue
     )
 
   private def charset: IRCharset =
     val f = flagSet
-    dialect match
-      case _: Dialect.Perl | _: Dialect.Ruby | _: Dialect.Python =>
-        if f.ascii then IRCharset.ASCII.All
-        else if f.localeLower || f.localeUpper then IRCharset.Locale
-        else if f.unicode then IRCharset.Unicode
-        else IRCharset.Default
-      case Dialect.PCRE
-          if f.ascii || f.asciiDigit || f.asciiSpace || f.asciiWord || f.asciiPOSIX || f.asciiPOSIXDigit =>
-        IRCharset.ASCII(
-          digit = f.ascii || f.asciiDigit,
-          space = f.ascii || f.asciiSpace,
-          word = f.ascii || f.asciiWord,
-          posix = f.ascii || f.asciiPOSIX,
-          posixDigit = f.ascii || f.asciiPOSIXDigit
-        )
-      case _ => IRCharset.Default
+    if featureSet.hasExclusiveCharsetFlag then
+      if f.ascii then IRCharset.ASCII.All
+      else if f.localeLower || f.localeUpper then IRCharset.Locale
+      else if f.unicode then IRCharset.Unicode
+      else IRCharset.Default
+    else if featureSet.hasASCIIOptionFlag &&
+      (f.ascii || f.asciiDigit || f.asciiSpace || f.asciiWord || f.asciiPOSIX || f.asciiPOSIXDigit)
+    then
+      IRCharset.ASCII(
+        digit = f.ascii || f.asciiDigit,
+        space = f.ascii || f.asciiSpace,
+        word = f.ascii || f.asciiWord,
+        posix = f.ascii || f.asciiPOSIX,
+        posixDigit = f.ascii || f.asciiPOSIXDigit
+      )
+    else IRCharset.Default
 
 object BuildingContext:
 

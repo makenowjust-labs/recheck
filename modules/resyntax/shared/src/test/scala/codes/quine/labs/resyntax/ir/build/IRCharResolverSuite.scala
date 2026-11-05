@@ -485,6 +485,9 @@ class IRCharResolverSuite extends munit.FunSuite:
   test("IRBuilder.build: the word set of \\b in Ruby is Unicode under (?d)"):
     val Assert(IRAssertKind.WordBoundary(word)) = build("\\b", "", Ruby()).node.data: @unchecked
     assert(word.contains(0xe9))
+  test("IRBuilder.build: the word set of \\b in Ruby is ASCII in byte mode"):
+    val Assert(IRAssertKind.WordBoundary(word)) = build("\\b", "n", Ruby()).node.data: @unchecked
+    assertEquals(word, IRClassLookup.ASCIIWord)
   test("IRBuilder.build: the word set of \\b in .NET has ZWJ and ZWNJ"):
     val Assert(IRAssertKind.WordBoundary(word)) = build("\\b", "", DotNet).node.data: @unchecked
     assert(word.contains(0x200c) && word.contains(0x200d))

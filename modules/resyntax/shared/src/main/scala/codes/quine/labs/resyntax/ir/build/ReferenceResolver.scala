@@ -1,12 +1,11 @@
 package codes.quine.labs.resyntax.ir
 package build
 
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.ast.SourceLocation
 
 /** ReferenceResolver resolves group references to capture indices, and rejects the ones the dialect rejects. */
-private[build] final class ReferenceResolver(table: CaptureTable, dialect: Dialect, featureSet: IRFeatureSet):
+private[build] final class ReferenceResolver(table: CaptureTable, featureSet: IRFeatureSet):
 
   def backReference(ref: Reference, site: ReferenceSite, loc: SourceLocation): Seq[Int] = ref match
     case Reference.IndexedReference(n)      => indexedBackReference(n, site, loc)
@@ -24,7 +23,7 @@ private[build] final class ReferenceResolver(table: CaptureTable, dialect: Diale
 
   /** Resolves a back-reference by a name (e.g. `\k<x>`), where .NET reads a numeric name as an index. */
   def namedBackReference(name: String, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
-    if CaptureAnalyzer.isNumericName(dialect, name) then
+    if CaptureAnalyzer.isNumericName(featureSet, name) then
       name.toIntOption match
         // .NET accepts `\k<0>`, which never matches because the whole match is not set yet (e.g. `a\k<0>` on `aa`).
         case Some(0)                              => Seq.empty
@@ -44,7 +43,7 @@ private[build] final class ReferenceResolver(table: CaptureTable, dialect: Diale
 
   /** Resolves a name for a call, which can refer to a group defined later. */
   def calledName(name: String, loc: SourceLocation): Seq[Int] =
-    if CaptureAnalyzer.isNumericName(dialect, name) then
+    if CaptureAnalyzer.isNumericName(featureSet, name) then
       resolveIndex(name.toIntOption.getOrElse(fail("Reference to non-existent group", loc)), loc)
     else table.names.getOrElse(name, fail("Reference to non-existent named group", loc))
 

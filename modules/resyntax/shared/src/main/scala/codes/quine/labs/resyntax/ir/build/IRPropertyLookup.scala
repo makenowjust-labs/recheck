@@ -1,7 +1,6 @@
 package codes.quine.labs.resyntax.ir
 package build
 
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.BinaryProperty
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
@@ -982,22 +981,3 @@ private[build] object IRPropertyLookup:
             .orElse(rubyContributory.get(key).map(found(_)))
             .orElse(if key.startsWith("in") then rubyBlock.get(key.drop(2)).map(foundValue) else None)
         )
-
-  def resolve(
-      dialect: Dialect,
-      name: String,
-      value: Option[String],
-      flags: IRCharFlagSet,
-      mode: UnitMode
-  ): PropertyResult =
-    dialect match
-      case Dialect.JavaScript => javaScript(name, value, flags.unicodeSets)
-      case Dialect.Java       => java(name, value, flags)
-      case Dialect.DotNet     => if value.isEmpty then dotNet(name) else Unknown
-      case Dialect.PCRE       => pcre(name, value)
-      case _: Dialect.Perl    => perl(name, value)
-      case _: Dialect.Ruby    => ruby(name, value, mode == UnitMode.Byte)
-      // Python's parser rejects `\p`.
-      // $COVERAGE-OFF$
-      case _: Dialect.Python => throw new IllegalArgumentException("Python has no Unicode property")
-      // $COVERAGE-ON$
