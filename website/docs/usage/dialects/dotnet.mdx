@@ -93,7 +93,5 @@ The following constructs are not supported, and they are reported as `unsupporte
 - Environment variable: `RECHECK_DOTNET`.
 - Runtime-attack script: `dotnet run runtime-attack.cs`.
 
-`dotnet` needs the .NET 10 SDK for `dotnet run` of a file.
-It runs a fixed program reading the pattern and the attack string from the standard input, so `dotnet` builds and caches the program only once.
-The program sets the invariant culture (`CultureInfo.CurrentCulture`) before compiling the pattern, so the result does not depend on the locale of the environment (e.g. `LC_ALL` or `LANG`).
-The runtime-attack script has the pattern and the attack string in itself.
+`dotnet` runs the program as a file-based app, which needs a .NET 10 SDK or later.
+The program reads the pattern and the attack string from the standard input, and the runtime-attack script has them in itself.

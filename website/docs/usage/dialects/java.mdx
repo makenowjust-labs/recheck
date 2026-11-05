@@ -97,6 +97,5 @@ The following constructs are not supported, and they are reported as `unsupporte
 - Environment variable: `RECHECK_JAVA`.
 - Runtime-attack script: `java --source 17 runtime-attack.java`.
 
-`java` runs a fixed program as a single-file source program, which needs a JDK (17 or later).
-The program reads the pattern and the attack string from the standard input.
-The runtime-attack script has the pattern and the attack string in itself.
+`java` runs the program as a single-file source-code program, which needs a JDK 17 or later.
+The program reads the pattern and the attack string from the standard input, and the runtime-attack script has them in itself.
