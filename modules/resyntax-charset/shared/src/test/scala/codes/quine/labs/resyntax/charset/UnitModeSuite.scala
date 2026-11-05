@@ -37,11 +37,11 @@ class UnitModeSuite extends munit.FunSuite:
     assertEquals(UnitMode.CodePoint.decode(UnitMode.CodePoint.encode(UString(0xd83d, 0xde00))), UString(0x1f600))
 
   test("UnitMode#fromCodePoints"):
-    val s = UString(0x61, 0xe9, 0x3042, 0x1f600)
-    assertEquals(UnitMode.CodePoint.fromCodePoints(s), s)
+    val s = IArray(0x61, 0xe9, 0x3042, 0x1f600)
+    assertEquals(UnitMode.CodePoint.fromCodePoints(s), UString(0x61, 0xe9, 0x3042, 0x1f600))
     assertEquals(UnitMode.UTF16.fromCodePoints(s), UString(0x61, 0xe9, 0x3042, 0xd83d, 0xde00))
     assertEquals(
       UnitMode.Byte.fromCodePoints(s),
       UString(0x61, 0xc3, 0xa9, 0xe3, 0x81, 0x82, 0xf0, 0x9f, 0x98, 0x80)
     )
-    for mode <- UnitMode.values do intercept[IllegalArgumentException](mode.fromCodePoints(UString(0x110000)))
+    for mode <- UnitMode.values do intercept[IllegalArgumentException](mode.fromCodePoints(IArray(0x110000)))

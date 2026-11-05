@@ -68,7 +68,7 @@ object RuntimeAttackProgram:
     */
   private def encodeSource(source: String, dialect: Dialect, mode: UnitMode): UString = dialect match
     case _: Dialect.Python if mode == UnitMode.Byte => UnitMode.Byte.decode(source)
-    case _                                          => mode.fromCodePoints(UnitMode.CodePoint.decode(source))
+    case _ => mode.fromCodePoints(IArray.from(UnitMode.CodePoint.decode(source).iterator))
 
   /** Script is a program of [[generate]] as a standalone file named `name`, which has the data of the program in
     * itself.

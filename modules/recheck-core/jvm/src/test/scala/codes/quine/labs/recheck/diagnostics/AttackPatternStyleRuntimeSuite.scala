@@ -39,7 +39,7 @@ class AttackPatternStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
 
   /** Attack strings of UTF-16 code units, which encode [[texts]]. */
   val utf16Texts: Seq[AttackPattern] = texts.map: a =>
-    def encode(s: UString): UString = UnitMode.UTF16.fromCodePoints(s)
+    def encode(s: UString): UString = UnitMode.UTF16.fromCodePoints(IArray.from(s.iterator))
 
     AttackPattern(a.pumps.map((s, t, m) => (encode(s), encode(t), m)), encode(a.suffix), a.n)
 
@@ -52,9 +52,10 @@ class AttackPatternStyleRuntimeSuite extends munit.FunSuite with RuntimeHelper:
 
   def units(a: AttackPattern): Seq[Int] = a.asUString.iterator.toSeq
 
-  def utf16(a: AttackPattern): Seq[Int] = UnitMode.UTF16.fromCodePoints(a.asUString).iterator.toSeq
+  def utf16(a: AttackPattern): Seq[Int] =
+    UnitMode.UTF16.fromCodePoints(IArray.from(a.asUString.iterator)).iterator.toSeq
 
-  def utf8(a: AttackPattern): Seq[Int] = UnitMode.Byte.fromCodePoints(a.asUString).iterator.toSeq
+  def utf8(a: AttackPattern): Seq[Int] = UnitMode.Byte.fromCodePoints(IArray.from(a.asUString.iterator)).iterator.toSeq
 
   def hex(values: Seq[Int]): String = values.map(Integer.toHexString).mkString(" ")
 

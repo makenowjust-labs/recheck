@@ -175,7 +175,7 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
     runtimeTest(s"RuntimeAttackProgram.generateScript: $dialect", program):
       val source = "^(?:a|é|😀)*$"
       val mode = ReDoS.parse(source, "", dialect).mode
-      def units(s: String): UString = mode.fromCodePoints(UnitMode.CodePoint.decode(s))
+      def units(s: String): UString = mode.fromCodePoints(IArray.from(UnitMode.CodePoint.decode(s).iterator))
 
       val astral = AttackPattern(Seq((units("é"), units("😀a"), 0)), UString(0), 3)
       val script = RuntimeAttackProgram.generateScript(source, "", dialect, mode, astral).toOption.get

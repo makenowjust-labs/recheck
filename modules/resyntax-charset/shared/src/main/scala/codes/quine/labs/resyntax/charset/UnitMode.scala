@@ -43,7 +43,10 @@ enum UnitMode(val limit: Int):
     * `CodePoint`, a high surrogate followed by a low surrogate becomes one code point.
     */
   def encode(s: UString): String = this match
-    case UnitMode.CodePoint             => UnitMode.UTF16.encode(UnitMode.UTF16.fromCodePoints(s))
+    case UnitMode.CodePoint =>
+      val sb = new java.lang.StringBuilder(s.length)
+      for c <- s.iterator; u <- UTF16Encoding.encode(c) do sb.append(u.toChar)
+      sb.toString
     case UnitMode.UTF16 | UnitMode.Byte =>
       val sb = new java.lang.StringBuilder(s.length)
       for c <- s.iterator do
@@ -51,16 +54,16 @@ enum UnitMode(val limit: Int):
         sb.append(c.toChar)
       sb.toString
 
-  /** Encodes the string of code points into the units of the mode.
+  /** Encodes the code points into the units of the mode.
     *
     * `UTF16` gives UTF-16 code units, `CodePoint` gives the code points as they are, and `Byte` gives the UTF-8 bytes,
     * where a surrogate code point is encoded like the others.
     *
     * It throws `IllegalArgumentException` for a value outside `[0, 0x10FFFF]`.
     */
-  def fromCodePoints(s: UString): UString = this match
+  def fromCodePoints(codePoints: IArray[Int]): UString = this match
     case UnitMode.CodePoint =>
-      for c <- s.iterator if !contains(c) do throw new IllegalArgumentException(f"Invalid code point: $c%X")
-      s
-    case UnitMode.UTF16 => UString.from(s.iterator.flatMap(UTF16Encoding.encode))
-    case UnitMode.Byte  => UString.from(s.iterator.flatMap(UTF8Encoding.encode))
+      for c <- codePoints if !contains(c) do throw new IllegalArgumentException(f"Invalid code point: $c%X")
+      UString.from(codePoints.iterator)
+    case UnitMode.UTF16 => UString.from(codePoints.iterator.flatMap(UTF16Encoding.encode))
+    case UnitMode.Byte  => UString.from(codePoints.iterator.flatMap(UTF8Encoding.encode))
