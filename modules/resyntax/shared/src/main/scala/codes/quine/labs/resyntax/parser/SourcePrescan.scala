@@ -3,10 +3,11 @@ package codes.quine.labs.resyntax.parser
 import scala.annotation.switch
 
 /** SourcePrescan is what the parser needs to know about the whole source before parsing it: whether it has a named
-  * capture, the number of its captures, and whether it starts with PCRE's start options including `(*UTF)` or
-  * `(*UTF8)`.
+  * capture, the number of its captures, and the names of PCRE's start options at its start (e.g. `UTF` for `(*UTF)`).
   */
-final case class SourcePrescan(containsNamedCapture: Boolean, captureSize: Int, hasUTFStartOption: Boolean)
+final case class SourcePrescan(containsNamedCapture: Boolean, captureSize: Int, startOptions: Seq[String]):
+
+  def hasUTFStartOption: Boolean = startOptions.exists(name => name == "UTF" || name == "UTF8")
 
 object SourcePrescan:
 
@@ -32,7 +33,8 @@ object SourcePrescan:
         case '\\' => i += 2
         case _    => i += 1
     val startOptions = StartOptions.findPrefixOf(source).getOrElse("")
-    val hasUTFStartOption = startOptions.contains("(*UTF)") || startOptions.contains("(*UTF8)")
-    SourcePrescan(containsNamedCapture, captures, hasUTFStartOption)
+    SourcePrescan(containsNamedCapture, captures, StartOption.findAllMatchIn(startOptions).map(_.group(1)).toSeq)
 
   private val StartOptions = """(?:\(\*[A-Z0-9_=]+\))*""".r
+
+  private val StartOption = """\(\*([A-Z0-9_=]+)\)""".r
