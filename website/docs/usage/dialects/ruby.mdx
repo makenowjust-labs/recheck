@@ -55,7 +55,7 @@ ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Ruby(Dialect.Ruby.Encod
 
 A pattern in `UTF-8` (the default `encoding`) matches code points, and a pattern in `ASCII-8BIT` (or with the `n` flag) matches bytes.
 
-The flags are the letters of the options of a regexp literal (e.g. `/.../i`) and of the inline options.
+`recheck` supports the following options of a regexp literal (e.g. `/.../i`) and inline options, written as their letters.
 
 | Flag | `Regexp` option      | Inline | Notes                                                                                                      |
 | ---- | -------------------- | ------ | ---------------------------------------------------------------------------------------------------------- |

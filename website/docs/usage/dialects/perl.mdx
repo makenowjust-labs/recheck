@@ -62,7 +62,7 @@ ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Perl(utf8 = false, sour
 
 A pattern matches code points with `utf8: true` (the default), and bytes with `utf8: false`.
 
-The flags are the modifiers of `m//`, `qr//` and `s///`, and `recheck` takes all of them.
+`recheck` supports all the modifiers of `m//`, `qr//` and `s///`.
 
 | Flag      | Modifier    | Inline          | Notes                                                                                      |
 | --------- | ----------- | --------------- | ------------------------------------------------------------------------------------------ |
