@@ -89,12 +89,7 @@ It does not run in the browser or with the Scala.js build (the `worker` and `pur
 
 A refuted attack shows that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by the attack.
 When no attack is confirmed, the result is `safe`, with the refuted attacks in `refutedAttacks`.
-
-The search avoids repeating a refuted attack.
-
-- An attack with the same complexity (the type and the degree) and the same hotspot (the heat spots) as a refuted one is skipped without the runtime attack, and it is not in `refutedAttacks`.
-- The fuzz checker gives the strings whose attacks were refuted a lower priority in the next generation, so that it looks into other structures of the pattern.
-- When the runtime-attack verification refutes [`maxRefutedAttacks`](parameters.mdx#maxrefutedattacks) attacks (10 by default), the checking stops, and the result is `unknown` with the `runtime-attacks-refuted` error.
+However, when [`maxRefutedAttacks`](parameters.mdx#maxrefutedattacks) attacks (10 by default) are refuted, the checking stops there, and the result is `unknown` with the `runtime-attacks-refuted` error.
 
 ## Engine Limits and Errors
 
