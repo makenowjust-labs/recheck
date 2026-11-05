@@ -113,9 +113,15 @@ importers:
 
   packages/recheck-parameters:
     devDependencies:
+      '@types/jest':
+        specifier: 30.0.0
+        version: 30.0.0
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
+      jest:
+        specifier: 30.5.2
+        version: 30.5.2(@types/node@26.6.5)(esbuild-register@3.6.0(esbuild@0.28.2)(supports-color@8.1.1))(supports-color@8.1.1)
       prettier:
         specifier: 3.9.10
         version: 3.9.10

@@ -18,10 +18,13 @@
     "format": "prettier -w '*.{js,json,ts}' 'scripts/**/*.mts'",
     "lint": "prettier --check '*.{js,json,ts}' 'scripts/**/*.mts'",
     "prepare": "node ./scripts/build.mts",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "typecheck": "tsc --noEmit -p ."
   },
   "devDependencies": {
+    "@types/jest": "30.0.0",
     "@types/node": "26.6.5",
+    "jest": "30.5.2",
     "prettier": "3.9.10",
     "rimraf": "6.1.3",
     "typescript": "7.0.2",

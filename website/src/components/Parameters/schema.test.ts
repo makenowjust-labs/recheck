@@ -51,18 +51,11 @@ describe("sections", () => {
       cli: null,
       since: null,
     });
-    expect(
-      sectionOf("command", {
-        title: "Command",
-        description: "",
-        type: ["array", "null"],
-        items: { type: "string" },
-        default: null,
-        "x-scala-type": "Option[Seq[String]]",
-      }),
-    ).toMatchObject({
-      typescriptType: "string[] | null",
+    expect(sections.find(({ name }) => name === "logger")).toMatchObject({
+      typescriptType: "(message: string) => void",
+      typescriptDefault: "null",
       scalaDefault: "None",
+      cli: null,
     });
   });
 });

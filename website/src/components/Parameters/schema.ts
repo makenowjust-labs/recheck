@@ -35,9 +35,6 @@ const scalaDefault = (property: Property): string => {
     return property["x-scala-values"][String(value)]!;
   }
   if (value === null) return "None";
-  if (property["x-scala-type"].startsWith("Option[")) {
-    return `Some(${JSON.stringify(value)})`;
-  }
   return String(value);
 };
 
