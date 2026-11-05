@@ -95,12 +95,11 @@ The following constructs are not supported.
 
 ## Runtime-Attack Verification
 
-- Command: `php`, which reads the program from the standard input.
+- Command: `php`.
 - Matching: `preg_match`.
 - Engine limits: the backtrack limit.
 - Engine errors: the recursion limit and the JIT stack limit.
 - Environment variable: `RECHECK_PHP`.
-- Runtime-attack script: `php runtime-attack.php`.
 
 The program runs with PHP's default settings of `pcre.backtrack_limit`, `pcre.recursion_limit` and `pcre.jit`, and the runtime name in the result shows them.
 With the default limits, an exponential match usually ends with the backtrack limit.

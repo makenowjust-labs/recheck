@@ -72,9 +72,8 @@ JavaScript has no other options.
 
 ## Runtime-Attack Verification
 
-- Command: `node -`, which reads the program from the standard input.
+- Command: `node -`.
 - Matching: `RegExp.prototype.exec`.
 - Engine limits: none.
 - Engine errors: `RangeError` (e.g. V8 raises it for `/^(?:a|b)*$/` on 10,000,000 characters).
 - Environment variable: `RECHECK_NODE`.
-- Runtime-attack script: `node runtime-attack.cjs`.

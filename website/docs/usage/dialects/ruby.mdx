@@ -104,11 +104,10 @@ The following constructs are not supported, and they are reported as `unsupporte
 
 ## Runtime-Attack Verification
 
-- Command: `ruby -`, which reads the program from the standard input.
+- Command: `ruby -`.
 - Matching: `Regexp#match?` (no `Regexp.timeout`).
 - Engine limits: none.
 - Engine errors: `RegexpError`, `NoMemoryError`, `SystemStackError`.
 - Environment variable: `RECHECK_RUBY`.
-- Runtime-attack script: `ruby runtime-attack.rb`.
 
 `ruby -` reads a program in the encoding of the locale, so the program starts with the magic comment `# encoding: UTF-8`.

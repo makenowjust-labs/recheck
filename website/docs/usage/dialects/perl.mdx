@@ -123,12 +123,11 @@ The following constructs are not supported.
 
 ## Runtime-Attack Verification
 
-- Command: `perl -`, which reads the program from the standard input.
+- Command: `perl -`.
 - Matching: `=~`.
 - Engine limits: none.
 - Engine errors: none.
 - Environment variable: `RECHECK_PERL`.
-- Runtime-attack script: `perl runtime-attack.pl`.
 
 The program sets the C locale by `POSIX::setlocale` before compiling the pattern, so the result does not depend on the locale of the environment (e.g. `LC_ALL` or `LANG`).
 
