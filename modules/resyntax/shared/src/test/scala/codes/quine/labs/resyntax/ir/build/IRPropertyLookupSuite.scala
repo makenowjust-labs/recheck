@@ -1,13 +1,14 @@
 package codes.quine.labs.resyntax.ir
 package build
 
-import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.CompatibilityPropertyTable
 import codes.quine.labs.resyntax.charset.EnumeratedProperty
 import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.Dialect.*
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 
 class IRPropertyLookupSuite extends munit.FunSuite with IRHelper:
@@ -287,7 +288,7 @@ class IRPropertyLookupSuite extends munit.FunSuite with IRHelper:
       "Lower" -> binary("Lowercase"),
       "Space" -> perlSpace,
       "Title" -> gc("Lt"),
-      "Word" -> IRClassLookup.perlWord,
+      "Word" -> CompatibilityPropertyTable.Word,
       "XDigit" -> binary("Hex_Digit"),
       "VertSpace" -> IRClassLookup.Vertical,
       "PosixAlnum" -> ascii(Digits + Letters),

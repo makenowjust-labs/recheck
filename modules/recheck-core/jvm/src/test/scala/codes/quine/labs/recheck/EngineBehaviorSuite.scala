@@ -17,11 +17,11 @@ import codes.quine.labs.recheck.exec.SourceFile
 import codes.quine.labs.recheck.verification.RuntimeAttackProgram
 import codes.quine.labs.recheck.vm.Interpreter
 import codes.quine.labs.recheck.vm.ProgramBuilder
-import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.PerlSource
 import codes.quine.labs.resyntax.ir.IRNodeData
 
 class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:

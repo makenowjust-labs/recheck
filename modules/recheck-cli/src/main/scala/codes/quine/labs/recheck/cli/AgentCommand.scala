@@ -16,7 +16,7 @@ import codes.quine.labs.recheck.common.CancellationTokenSource
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.diagnostics.Diagnostics
-import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.dialect.Dialect
 
 /** `recheck agent` method types. */
 object AgentCommand:

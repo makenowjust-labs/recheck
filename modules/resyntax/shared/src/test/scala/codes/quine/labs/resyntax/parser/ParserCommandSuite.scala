@@ -7,7 +7,6 @@ import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.CommandKind.*
 import codes.quine.labs.resyntax.ast.ConditionalTest.*
-import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.EscapeStyle
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetDiff
@@ -17,6 +16,7 @@ import codes.quine.labs.resyntax.ast.NameStyle.*
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.Quantifier.*
 import codes.quine.labs.resyntax.ast.Reference.*
+import codes.quine.labs.resyntax.dialect.Dialect.*
 
 class ParserCommandSuite extends munit.FunSuite with ParserHelper:
 

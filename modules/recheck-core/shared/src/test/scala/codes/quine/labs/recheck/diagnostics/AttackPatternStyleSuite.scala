@@ -2,9 +2,9 @@ package codes.quine.labs.recheck
 package diagnostics
 
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle.*
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
 
 class AttackPatternStyleSuite extends munit.FunSuite:
 

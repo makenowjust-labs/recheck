@@ -48,8 +48,8 @@ await check("^(a|a)*$", "", {
 ```scala
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.PerlSource
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.PerlSource
 
 ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Perl()))
 ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Perl(utf8 = false, source = PerlSource.String)))

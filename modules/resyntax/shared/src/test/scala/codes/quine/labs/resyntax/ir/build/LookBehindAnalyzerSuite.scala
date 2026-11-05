@@ -1,9 +1,9 @@
 package codes.quine.labs.resyntax.ir
 package build
 
-import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.Dialect.*
-import codes.quine.labs.resyntax.ast.PerlSource
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.Dialect.*
+import codes.quine.labs.resyntax.dialect.PerlSource
 
 class LookBehindAnalyzerSuite extends munit.FunSuite with IRHelper:
 

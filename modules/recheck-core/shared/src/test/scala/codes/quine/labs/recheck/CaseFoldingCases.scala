@@ -1,9 +1,9 @@
 package codes.quine.labs.recheck
 
-import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.Dialect.*
 
 /** CaseFoldingCases is a table of case-insensitive classes, literals and escapes around special case foldings.
   *

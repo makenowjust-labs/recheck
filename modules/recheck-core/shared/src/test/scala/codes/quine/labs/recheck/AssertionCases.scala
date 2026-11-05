@@ -1,7 +1,7 @@
 package codes.quine.labs.recheck
 
-import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.Dialect.*
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.Dialect.*
 
 /** AssertionCases is a table of line, text and word boundary assertions, around line terminators and the ends of the
   * input, where a pattern is searched in the input.

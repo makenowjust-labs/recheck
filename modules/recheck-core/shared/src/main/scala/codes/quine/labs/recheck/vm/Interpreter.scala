@@ -24,11 +24,11 @@ import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.dialect.LineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
 import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
-import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRLookBehindStartRange
 import codes.quine.labs.resyntax.ir.IRWordMarkSet
 
@@ -677,24 +677,24 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     frame.currentChar.exists(c => word.contains(c) || marks.marks.contains(c) && hasBase(frame.pos, marks))
 
   /** Tests whether the position is after a line terminator. */
-  private def afterTerminator(pos: Int, terminators: IRLineTerminatorSet): Boolean =
+  private def afterTerminator(pos: Int, terminators: LineTerminatorSet): Boolean =
     val c = input.getBefore(pos)
     val single = c.exists(terminators.chars.contains)
     val crlf =
-      terminators.crlf != IRLineTerminatorSet.CRLF.Ignored && c.contains(0x0a) && pos >= 2 && input(pos - 2) == 0x0d
+      terminators.crlf != LineTerminatorSet.CRLF.Ignored && c.contains(0x0a) && pos >= 2 && input(pos - 2) == 0x0d
     (single || crlf) && !betweenCRLF(pos, terminators)
 
   /** Returns the end position of a line terminator at the position, if any. */
-  private def beforeTerminator(pos: Int, terminators: IRLineTerminatorSet): Option[Int] =
+  private def beforeTerminator(pos: Int, terminators: LineTerminatorSet): Option[Int] =
     if betweenCRLF(pos, terminators) then None
-    else if terminators.crlf != IRLineTerminatorSet.CRLF.Ignored && pos + 1 < input.length &&
+    else if terminators.crlf != LineTerminatorSet.CRLF.Ignored && pos + 1 < input.length &&
       input(pos) == 0x0d && input(pos + 1) == 0x0a
     then Some(pos + 2)
     else Option.when(input.getAt(pos).exists(terminators.chars.contains))(pos + 1)
 
   /** Tests whether the position is between `\r` and `\n`, where no line assertion matches with `CRLF.Atomic`. */
-  private def betweenCRLF(pos: Int, terminators: IRLineTerminatorSet): Boolean =
-    terminators.crlf == IRLineTerminatorSet.CRLF.Atomic && 0 < pos && pos < input.length &&
+  private def betweenCRLF(pos: Int, terminators: LineTerminatorSet): Boolean =
+    terminators.crlf == LineTerminatorSet.CRLF.Atomic && 0 < pos && pos < input.length &&
       input(pos - 1) == 0x0d && input(pos) == 0x0a
 
   /** Returns the captures that a back-reference compares in turn, where `None` matches the empty string. */

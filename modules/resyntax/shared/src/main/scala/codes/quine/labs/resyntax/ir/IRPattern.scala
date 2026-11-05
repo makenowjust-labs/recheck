@@ -8,6 +8,7 @@ import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.LineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 
 /** IRPattern is a whole pattern in the internal representation. */
@@ -142,7 +143,7 @@ final case class IRPattern(
     loop(node)
 
   /** Returns the distinct line terminators of the line assertions and the text end assertions. */
-  def assertionLineTerminators: Seq[IRLineTerminatorSet] =
+  def assertionLineTerminators: Seq[LineTerminatorSet] =
     node
       .collect:
         case Assert(IRAssertKind.LineBegin(t, _)) => t

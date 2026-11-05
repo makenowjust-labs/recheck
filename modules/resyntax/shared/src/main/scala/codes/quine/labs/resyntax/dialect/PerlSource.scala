@@ -1,4 +1,4 @@
-package codes.quine.labs.resyntax.ast
+package codes.quine.labs.resyntax.dialect
 
 /** PerlSource is how a Perl pattern reaches the regex engine. */
 enum PerlSource:

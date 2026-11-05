@@ -23,6 +23,7 @@ import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UTF8Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.LineTerminatorSet
 import codes.quine.labs.resyntax.ir.build.IRCharResolver.*
 
 /** IRCharResolver resolves character-level nodes (literals, `.`, escapes and classes) into character sets of the
@@ -39,7 +40,7 @@ private[build] final class IRCharResolver(
 
   private val universe = mode.universe
 
-  private val classes = featureSet.classLookup(mode, !perlUnicodeRules)
+  private val classes = IRClassLookup.from(featureSet.classLookupKind, mode, perlUnicodeRules)
 
   /** Whether Ruby's byte escapes (e.g. `\xC3\xA9`) are the bytes of a UTF-8 character. */
   private val readsByteEscapesAsUTF8 = featureSet.readsByteEscapesAsUTF8 && mode.isCodePoint
@@ -311,7 +312,7 @@ private[build] final class IRCharResolver(
       val terminators = flags.lineTerminators
       val set = complement(CharSet.of(terminators.chars.toSeq*))
       // PCRE's `(*CRLF)` makes `.` fail only at `\r` followed by `\n`.
-      if terminators.crlf == IRLineTerminatorSet.CRLF.Sequence && !terminators.chars.contains(0x0d) then
+      if terminators.crlf == LineTerminatorSet.CRLF.Sequence && !terminators.chars.contains(0x0d) then
         IRNodeData.Sequence(set, IRNodeData.Assert(IRAssertKind.NotBetweenCRLF))
       else set
 
@@ -448,7 +449,11 @@ private[build] final class IRCharResolver(
       flags: IRCharFlagSet,
       loc: SourceLocation
   ): ClassSet =
-    featureSet.propertyLookup(name, value, flags, mode) match
+    // Python's parser rejects `\p`.
+    // $COVERAGE-OFF$
+    val kind = featureSet.propertyLookupKind.getOrElse(throw new IllegalArgumentException("No Unicode property"))
+    // $COVERAGE-ON$
+    IRPropertyLookup.lookup(kind, name, value, flags, mode) match
       case PropertyResult.Unknown              => throw new IRBuildingException("Unknown Unicode property name", loc)
       case PropertyResult.NotModeled           => throw new NotModeledException
       case PropertyResult.Found(set, caseKind) =>

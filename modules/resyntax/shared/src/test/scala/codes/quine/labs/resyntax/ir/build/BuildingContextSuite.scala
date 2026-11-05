@@ -1,13 +1,13 @@
 package codes.quine.labs.resyntax.ir
 package build
 
-import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.Dialect.*
+import codes.quine.labs.resyntax.dialect.LineTerminatorSet as LT
 import codes.quine.labs.resyntax.ir.IRAssertKind.*
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd.*
-import codes.quine.labs.resyntax.ir.IRLineTerminatorSet as LT
 import codes.quine.labs.resyntax.ir.IRNodeData.Assert
 import codes.quine.labs.resyntax.ir.IRNodeData.Chars
 import codes.quine.labs.resyntax.ir.IRNodeData.Empty

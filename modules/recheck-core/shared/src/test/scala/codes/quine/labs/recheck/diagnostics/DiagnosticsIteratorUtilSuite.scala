@@ -5,8 +5,8 @@ import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.DiagnosticsIteratorUtil.*
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
 
 class DiagnosticsIteratorUtilSuite extends munit.FunSuite:
 

@@ -5,11 +5,11 @@ import scala.compiletime.uninitialized
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UChar
+import codes.quine.labs.resyntax.dialect.LineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
-import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRLookBehindStartRange
 import codes.quine.labs.resyntax.ir.IRWordMarkSet
 
@@ -332,12 +332,12 @@ object Inst:
       override def toString: String = "mark_word_boundary_not"
 
     /** `^` assertion with `m` flag, which `atEnd` tells where it matches at the end of the input. */
-    final case class LineBegin(terminators: IRLineTerminatorSet, atEnd: IRLineBeginAtEnd) extends AssertKind:
+    final case class LineBegin(terminators: LineTerminatorSet, atEnd: IRLineBeginAtEnd) extends AssertKind:
 
       override def toString: String = "line_begin"
 
     /** `$` assertion with `m` flag. */
-    final case class LineEnd(terminators: IRLineTerminatorSet) extends AssertKind:
+    final case class LineEnd(terminators: LineTerminatorSet) extends AssertKind:
 
       override def toString: String = "line_end"
 
@@ -352,7 +352,7 @@ object Inst:
       override def toString: String = "input_end"
 
     /** `$` assertion matching also before a line terminator at the end (e.g. Python's `$`). */
-    final case class ChompInputEnd(terminators: IRLineTerminatorSet) extends AssertKind:
+    final case class ChompInputEnd(terminators: LineTerminatorSet) extends AssertKind:
 
       override def toString: String = "chomp_input_end"
 

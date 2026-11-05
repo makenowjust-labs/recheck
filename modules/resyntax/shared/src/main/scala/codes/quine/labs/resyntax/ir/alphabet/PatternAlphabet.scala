@@ -5,8 +5,8 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.LineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRAssertKind
-import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.ir.IRPattern
@@ -135,7 +135,7 @@ object PatternAlphabet:
 
     val terminatorSets = pattern.assertionLineTerminators.flatMap: t =>
       val chars = CharSet.of(t.chars.toSeq*)
-      if t.crlf == IRLineTerminatorSet.CRLF.Ignored then Seq(chars)
+      if t.crlf == LineTerminatorSet.CRLF.Ignored then Seq(chars)
       else Seq(chars, CharSet.of(0x0d), CharSet.of(0x0a))
     val words = wordSets(pattern)
     val kinds = kindLineTerminators(pattern).map(t => CharSet.of(t.chars.toSeq*))
@@ -184,7 +184,7 @@ object PatternAlphabet:
   /** Returns the distinct line terminators that the kinds tell, which are of the line assertions and the text end
     * assertions in the middle, in the order of the bits of [[CharKind.terminators]].
     */
-  def kindLineTerminators(pattern: IRPattern): Seq[IRLineTerminatorSet] =
+  def kindLineTerminators(pattern: IRPattern): Seq[LineTerminatorSet] =
     val chomps = pattern.chompTextEndsInMiddle.collect { case IRNode(Assert(IRAssertKind.ChompTextEnd(t)), _) => t }
     val lines = pattern.node.collect:
       case Assert(IRAssertKind.LineBegin(t, _)) => t
@@ -193,11 +193,11 @@ object PatternAlphabet:
 
   /** Checks whether the kinds tell `\r` and `\n`, for an assertion seeing `\r\n` as one line terminator. */
   def needsCRLFDistinction(pattern: IRPattern): Boolean =
-    pattern.assertionLineTerminators.exists(_.crlf == IRLineTerminatorSet.CRLF.Atomic) ||
+    pattern.assertionLineTerminators.exists(_.crlf == LineTerminatorSet.CRLF.Atomic) ||
       pattern.node.exists(_ == Assert(IRAssertKind.NotBetweenCRLF)) ||
       kindLineTerminators(pattern).exists(t =>
-        t.crlf != IRLineTerminatorSet.CRLF.Ignored && !(t.chars(0x0a) && t.chars(0x0d))
+        t.crlf != LineTerminatorSet.CRLF.Ignored && !(t.chars(0x0a) && t.chars(0x0d))
       ) ||
       pattern.chompTextEndsInMiddle.exists: node =>
         val Assert(IRAssertKind.ChompTextEnd(t)) = node.data: @unchecked
-        t.crlf != IRLineTerminatorSet.CRLF.Ignored
+        t.crlf != LineTerminatorSet.CRLF.Ignored

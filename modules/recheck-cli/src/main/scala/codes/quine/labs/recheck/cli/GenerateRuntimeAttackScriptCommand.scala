@@ -6,8 +6,8 @@ import io.circe.parser.parse
 import codes.quine.labs.recheck.codec.decodeAttackPattern
 import codes.quine.labs.recheck.codec.given
 import codes.quine.labs.recheck.verification.RuntimeAttackProgram
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
 
 /** `recheck generate-runtime-attack-script` command implementation. */
 object GenerateRuntimeAttackScriptCommand:

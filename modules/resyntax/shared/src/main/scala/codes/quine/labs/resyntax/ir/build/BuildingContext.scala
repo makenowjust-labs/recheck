@@ -5,6 +5,7 @@ import scala.deriving.Mirror
 
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetDiff
+import codes.quine.labs.resyntax.dialect.LineTerminatorSet
 
 /** BuildingContext is the flags in effect at a position of a pattern, and their per-dialect interpretation.
   *
@@ -62,8 +63,8 @@ final case class BuildingContext(flagSet: FlagSet, featureSet: IRFeatureSet):
   def dupNames: Boolean = flagSet.dupNames
 
   /** The line terminators of `^`, `$` and `.`, where Java's `d` (UNIX_LINES) limits them to `\n`. */
-  def lineTerminators: IRLineTerminatorSet =
-    if featureSet.hasUnixLinesFlag && flagSet.hasIndices then IRLineTerminatorSet.LF else featureSet.lineTerminators
+  def lineTerminators: LineTerminatorSet =
+    if featureSet.hasUnixLinesFlag && flagSet.hasIndices then LineTerminatorSet.LF else featureSet.lineTerminators
 
   def charFlags: IRCharFlagSet =
     val f = flagSet

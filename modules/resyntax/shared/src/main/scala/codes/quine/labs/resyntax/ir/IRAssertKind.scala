@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.ir
 
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.dialect.LineTerminatorSet
 
 /** IRAssertKind is a kind of zero-width assertion. */
 sealed abstract class IRAssertKind extends Product with Serializable:
@@ -18,16 +19,16 @@ sealed abstract class IRAssertKind extends Product with Serializable:
 object IRAssertKind:
 
   /** LineBegin is a line begin assertion, which `atEnd` tells where it matches at the end of the input. */
-  final case class LineBegin(terminators: IRLineTerminatorSet, atEnd: IRLineBeginAtEnd) extends IRAssertKind
+  final case class LineBegin(terminators: LineTerminatorSet, atEnd: IRLineBeginAtEnd) extends IRAssertKind
 
-  final case class LineEnd(terminators: IRLineTerminatorSet) extends IRAssertKind
+  final case class LineEnd(terminators: LineTerminatorSet) extends IRAssertKind
 
   case object TextBegin extends IRAssertKind
 
   case object TextEnd extends IRAssertKind
 
   /** ChompTextEnd is a text end assertion that also matches before a line terminator at the end. */
-  final case class ChompTextEnd(terminators: IRLineTerminatorSet) extends IRAssertKind
+  final case class ChompTextEnd(terminators: LineTerminatorSet) extends IRAssertKind
 
   /** WordBoundary is a word boundary assertion between a code value in the word set and one not in it. */
   final case class WordBoundary(word: CharSet) extends IRAssertKind

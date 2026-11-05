@@ -1,10 +1,11 @@
 package codes.quine.labs.resyntax.ir
 
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.LineTerminatorSet
 import codes.quine.labs.resyntax.ir.build.IRBuilder
 import codes.quine.labs.resyntax.parser.Parser
 
@@ -320,9 +321,9 @@ class IRPatternSuite extends munit.FunSuite:
     assertEquals(parse("a", "", Dialect.PCRE).universe, UnitMode.Byte.universe)
 
   test("IRPattern#assertionLineTerminators"):
-    assertEquals(parse("^a$|\\b", "m").assertionLineTerminators, Seq(IRLineTerminatorSet.JavaScript))
+    assertEquals(parse("^a$|\\b", "m").assertionLineTerminators, Seq(LineTerminatorSet.JavaScript))
     assertEquals(parse("^a$", "").assertionLineTerminators, Seq.empty)
-    assertEquals(parse("(?m:^)a$", "", Dialect.Java).assertionLineTerminators, Seq(IRLineTerminatorSet.Java))
+    assertEquals(parse("(?m:^)a$", "", Dialect.Java).assertionLineTerminators, Seq(LineTerminatorSet.Java))
 
   check("IRPattern#parts")(_.parts)(
     "xyz.0" -> Set(UnitMode.UTF16.decode("xyz")),

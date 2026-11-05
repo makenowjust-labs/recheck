@@ -1,6 +1,6 @@
-package codes.quine.labs.resyntax.ast
+package codes.quine.labs.resyntax.dialect
 
-import codes.quine.labs.resyntax.ast.Dialect.*
+import codes.quine.labs.resyntax.dialect.Dialect.*
 
 class DialectSuite extends munit.FunSuite:
 

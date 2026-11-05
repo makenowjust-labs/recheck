@@ -76,8 +76,8 @@ object ParametersGen:
     "AccelerationMode" -> "codes.quine.labs.recheck.common.AccelerationMode",
     "Checker" -> "codes.quine.labs.recheck.common.Checker",
     "Seeder" -> "codes.quine.labs.recheck.common.Seeder",
-    "Dialect" -> "codes.quine.labs.resyntax.ast.Dialect",
-    "PerlSource" -> "codes.quine.labs.resyntax.ast.PerlSource"
+    "Dialect" -> "codes.quine.labs.resyntax.dialect.Dialect",
+    "PerlSource" -> "codes.quine.labs.resyntax.dialect.PerlSource"
   )
 
   private val scalaKeywords: Set[String] = Set(
