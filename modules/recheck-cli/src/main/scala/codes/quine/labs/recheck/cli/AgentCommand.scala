@@ -15,10 +15,14 @@ import io.circe.generic.semiauto.*
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.cli.AgentCommand.*
 import codes.quine.labs.recheck.codec.given
+import codes.quine.labs.recheck.context.CancellationToken
 import codes.quine.labs.recheck.context.CancellationTokenSource
 import codes.quine.labs.recheck.context.Context
 import codes.quine.labs.recheck.diagnostics.Diagnostics
+import codes.quine.labs.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labs.recheck.parameters.Parameters
+import codes.quine.labs.recheck.repair.Keep
+import codes.quine.labs.recheck.repair.Rx
 import codes.quine.labs.resyntax.dialect.Dialect
 
 /** `recheck agent` method types. */
@@ -37,6 +41,12 @@ object AgentCommand:
   object CheckParams:
     given decode: Decoder[CheckParams] = deriveDecoder
 
+  /** `"repair"` method parameter, where `keep` is `Keep.All` if it is omitted. */
+  final case class RepairParams(source: String, flags: String, params: Parameters, keep: Option[Keep])
+
+  object RepairParams:
+    given decode: Decoder[RepairParams] = deriveDecoder
+
   /** `"cancel"` method parameter. */
   final case class CancelParams(id: RPC.ID)
 
@@ -49,14 +59,8 @@ object AgentCommand:
   object PingParams:
     given decode: Decoder[PingParams] = deriveDecoder
 
-  /** A running execution token to cancel. */
-  private[cli] final case class Token(
-      source: String,
-      flags: String,
-      dialect: Dialect,
-      send: RPC.Send[Diagnostics],
-      cancellation: CancellationTokenSource
-  )
+  /** A running execution token to cancel, which sends the cancelled result by `sendCancelled`. */
+  private[cli] final case class Token(sendCancelled: () => Unit, cancellation: CancellationTokenSource)
 
 /** `recheck agent` command implementation. */
 class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio, gcDelay: FiniteDuration = GCDelay):
@@ -77,18 +81,35 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio, gcDelay: FiniteDu
 
   /** `"check"` method implementation. */
   def handleCheck(id: RPC.ID, check: CheckParams, push: RPC.Push[String], send: RPC.Send[Diagnostics]): Unit =
+    val cancelled =
+      Diagnostics.Unknown(check.source, check.flags, check.params.dialect, None, ErrorKind.Cancel, Seq.empty, None)
+    execute(id, check.params, push, send, cancelled)((params, token) =>
+      ReDoS.check(check.source, check.flags, params, Some(token))
+    )
+
+  /** `"repair"` method implementation. */
+  def handleRepair(id: RPC.ID, repair: RepairParams, push: RPC.Push[String], send: RPC.Send[Rx]): Unit =
+    val cancelled = Rx.Unknown(repair.source, repair.flags, repair.params.dialect, Some(ErrorKind.Cancel))
+    execute(id, repair.params, push, send, cancelled)((params, token) =>
+      ReDoS.repair(repair.source, repair.flags, params, repair.keep.getOrElse(Keep.All), Some(token))
+    )
+
+  /** Runs `run` on the executor, and sends its result, or `cancelled` on cancel. */
+  private def execute[A](id: RPC.ID, params: Parameters, push: RPC.Push[String], send: RPC.Send[A], cancelled: A)(
+      run: (Parameters, CancellationToken) => A
+  ): Unit =
     val token = synchronized:
       val source = new CancellationTokenSource
       tokens.remove(id).foreach(doCancel)
-      tokens.update(id, Token(check.source, check.flags, check.params.dialect, send, source))
+      tokens.update(id, Token(() => send(Right(cancelled)), source))
       source.token
     executor.execute: () =>
-      val params =
-        if check.params.logger.isDefined then check.params.copy(logger = Some(message => push(message)))
-        else check.params
-      val diagnostics = ReDoS.check(check.source, check.flags, params, Some(token))
+      val newParams =
+        if params.logger.isDefined then params.copy(logger = Some(message => push(message)))
+        else params
+      val result = run(newParams, token)
       synchronized:
-        send(Right(diagnostics))
+        send(Right(result))
         tokens.remove(id)
         if tokens.isEmpty then scheduleGC()
 
@@ -100,9 +121,7 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio, gcDelay: FiniteDu
   /** Cancels the given token execution. */
   def doCancel(token: Token): Unit =
     token.cancellation.cancel()
-    val cancelled =
-      Diagnostics.Unknown(token.source, token.flags, token.dialect, None, Diagnostics.ErrorKind.Cancel, Seq.empty, None)
-    token.send(Right(cancelled))
+    token.sendCancelled()
 
   /** `"ping"` method implementation. */
   @nowarn
@@ -126,6 +145,7 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio, gcDelay: FiniteDu
     try
       RPC.run(io)(
         "check" -> RPC.RequestHandler(handleCheck),
+        "repair" -> RPC.RequestHandler(handleRepair),
         "cancel" -> RPC.NotificationHandler(handleCancel),
         "ping" -> RPC.RequestHandler(handlePing)
       )
