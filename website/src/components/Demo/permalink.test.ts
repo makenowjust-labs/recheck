@@ -4,6 +4,7 @@ import { parseParams } from "./params";
 import {
   decode,
   encode,
+  hotspotOf,
   makeSnapshot,
   sameRequest,
   summarize,
@@ -37,7 +38,10 @@ const vulnerable: Snapshot = {
     checker: "automaton",
     complexity: { type: "exponential", summary: "exponential" },
     attackPattern: "'a'.repeat(1000) + '\\x00'",
-    hotspot: [{ start: 2, end: 5, temperature: "heat" }],
+    hotspot: [
+      { start: 2, end: 3, temperature: "heat" },
+      { start: 4, end: 5, temperature: "normal" },
+    ],
   },
 };
 
@@ -67,7 +71,10 @@ describe("makeSnapshot", () => {
         string: "a".repeat(1000) + "\x00",
         pattern: "'a'.repeat(1000) + '\\x00'",
       },
-      hotspot: [{ start: 2, end: 5, temperature: "hot" }],
+      hotspot: [
+        { start: 2, end: 3, temperature: "hot" },
+        { start: 4, end: 5, temperature: "warm" },
+      ],
       runtimeAttack: null,
       refutedAttacks: [],
     };
@@ -156,6 +163,16 @@ describe("sameRequest", () => {
     expect(
       sameRequest(safe, safe.input, parseParams({ checker: "fuzz" }, build)),
     ).toBe(false);
+  });
+});
+
+describe("hotspotOf", () => {
+  test("maps the temperatures of the permalinks to those of Diagnostics", () => {
+    const { result } = vulnerable;
+    expect(result.status === "vulnerable" && hotspotOf(result)).toEqual([
+      { start: 2, end: 3, temperature: "hot" },
+      { start: 4, end: 5, temperature: "warm" },
+    ]);
   });
 });
 

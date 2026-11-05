@@ -29,7 +29,7 @@ export type Param = {
   setting: string | null;
 };
 
-const paramType = (property: Property): ParamType | null => {
+const paramType = (property: Property): ParamType => {
   if (property.enum !== undefined) return { select: property.enum };
   // `dialect` is the name of the language or an object of the name and the settings.
   const names = property.oneOf?.find(({ type }) => type === "string")?.enum;
@@ -37,8 +37,7 @@ const paramType = (property: Property): ParamType | null => {
   if (property["x-unit"] === "milliseconds") return "duration";
   if (property.type === "integer") return "integer";
   if (property.type === "number") return "float";
-  if (property.type === "boolean") return "boolean";
-  return null;
+  throw new Error(`The Playground has no input for ${property.title}`);
 };
 
 const settingName = (key: string): string =>
@@ -87,24 +86,18 @@ const settingParams = (property: Property): Param[] => {
 const BOOLEAN_VALUES = ["true", "false"];
 
 const schemaParams: Param[] = propertiesFor("playground").flatMap(
-  ([name, property]) => {
-    const type = paramType(property);
-    if (type === null) {
-      return [];
-    }
-    return [
-      {
-        name,
-        title: property.title,
-        defaultValue: (property.default ?? "null") as string | number,
-        type,
-        since: property["x-since"] ?? null,
-        dialects: null,
-        setting: null,
-      },
-      ...(name === "dialect" ? settingParams(property) : []),
-    ];
-  },
+  ([name, property]) => [
+    {
+      name,
+      title: property.title,
+      defaultValue: (property.default ?? "null") as string | number,
+      type: paramType(property),
+      since: property["x-since"] ?? null,
+      dialects: null,
+      setting: null,
+    },
+    ...(name === "dialect" ? settingParams(property) : []),
+  ],
 );
 
 const loggerParam: Param = {
