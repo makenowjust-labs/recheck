@@ -61,3 +61,7 @@ class AlphabetSuite extends munit.FunSuite with CharSetHelper:
     assertEquals(a.size, 2)
     val b = Alphabet.refine(UnitMode.Byte, Seq(set((0, 0x80)), set((0x80, 0x100))))
     assertEquals(b.atoms, IndexedSeq(set((0, 0x80)), set((0x80, 0x100))))
+
+  test("Alphabet#toString"):
+    val a = Alphabet.refine(UnitMode.Byte, Seq(set((0x41, 0x42))))
+    assertEquals(a.toString, "Alphabet(Byte, CharSet(0x0-0x40, 0x42-0xFF), CharSet(0x41))")

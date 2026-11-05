@@ -13,6 +13,12 @@ class UStringSuite extends munit.FunSuite:
     assertEquals(UString.from(Iterator(1, 2)), UString(1, 2))
     assertEquals(s.toString, "UString(U+1 U+2 U+3)")
 
+  test("UString#equals / hashCode"):
+    assertEquals(UString(0x61, 0x62), UString.from(Iterator(0x61, 0x62)))
+    assertEquals(UString(0x61, 0x62).hashCode, UString.from(Iterator(0x61, 0x62)).hashCode)
+    assertNotEquals(UString(0x61, 0x62), UString(0x61))
+    assertNotEquals[Any, Any](UString(0x61, 0x62), "ab")
+
   test("UString#compare"):
     assert(UString(1, 2) < UString(1, 3))
     assert(UString(1, 2) < UString(1, 2, 0))

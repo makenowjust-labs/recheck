@@ -24,6 +24,17 @@ class ClassSetSuite extends munit.FunSuite:
     val c = ClassSet(CharSet.range(0x61, 0x7a), Seq(ab, cd)).diff(ClassSet(CharSet.empty, Seq(cd, UString(0x61))))
     assertEquals(c, ClassSet(CharSet.range(0x62, 0x7a), Seq(ab)))
 
+  test("ClassSet#equals / hashCode / toString"):
+    assertEquals(ClassSet(CharSet.single(0x61), Seq(ab)), ClassSet(CharSet.single(0x61), Seq(ab, ab)))
+    assertEquals(ClassSet(CharSet.single(0x61), Seq(ab)).hashCode, ClassSet(CharSet.single(0x61), Seq(ab)).hashCode)
+    assertNotEquals(ClassSet(CharSet.single(0x61), Seq(ab)), ClassSet(CharSet.single(0x61)))
+    assertNotEquals[Any, Any](ClassSet(CharSet.single(0x61)), CharSet.single(0x61))
+    assertEquals(ClassSet(CharSet.single(0x61)).toString, "ClassSet(CharSet(0x61))")
+    assertEquals(
+      ClassSet(CharSet.single(0x61), Seq(ab, e)).toString,
+      "ClassSet(CharSet(0x61), UString(), UString(U+61 U+62))"
+    )
+
   test("ClassSet#isEmpty"):
     assert(ClassSet.empty.isEmpty)
     assert(!ClassSet(CharSet.empty, Seq(e)).isEmpty)
