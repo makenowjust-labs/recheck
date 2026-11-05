@@ -14,12 +14,6 @@ sealed abstract class IRCaseEquivalence:
   /** Returns the code values that match a code value of the set case-insensitively (including the set itself). */
   def closure(set: CharSet): CharSet
 
-  /** Returns the code values that a range of a class matches case-insensitively.
-    *
-    * Java and Python test a code value against a range with its case mappings, which is weaker than [[closure]].
-    */
-  def closeRange(set: CharSet): CharSet = closure(set)
-
   def equiv(a: UChar, b: UChar): Boolean = closure(CharSet.single(a)).contains(b)
 
 object IRCaseEquivalence:
@@ -33,22 +27,6 @@ object IRCaseEquivalence:
   final case class Keyed(mapping: CaseMapping, mode: UnitMode) extends IRCaseEquivalence:
 
     def closure(set: CharSet): CharSet = mapping.closure(set).restrict(mode)
-
-  /** JavaUnicode is Java's `CASE_INSENSITIVE` with `UNICODE_CASE`.
-    *
-    * A character matches another iff `toLowerCase(toUpperCase(c))` is equal (`Pattern.SingleU`), and a code point
-    * matches a range iff it, its `toUpperCase` or its `toLowerCase` is in the range (`Pattern.CIRangeU`).
-    */
-  case object JavaUnicode extends IRCaseEquivalence:
-
-    // `Pattern.single` matches a character exactly if `toUpperCase(c) == toLowerCase(toUpperCase(c))` (e.g. `ß`).
-    def closure(set: CharSet): CharSet =
-      val cased = set.intersect(javaCased)
-      set.union(javaKey.closure(cased))
-
-    // `Pattern.CIRangeU` tests `c`, `toUpperCase(c)` and `toLowerCase(toUpperCase(c))`.
-    override def closeRange(set: CharSet): CharSet =
-      set.union(CaseMapping.SimpleUpper.preimage(set)).union(javaKey.preimage(set))
 
   /** JavaASCII is Java's `CASE_INSENSITIVE` without `UNICODE_CASE`, which folds ASCII letters only. */
   case object JavaASCII extends IRCaseEquivalence:
@@ -94,12 +72,7 @@ object IRCaseEquivalence:
 
   lazy val asciiFold: CaseMapping = CaseMapping.fromEntries(('A'.toInt to 'Z').map(c => (c, c + 0x20)))
 
-  /** The characters that Java's `Pattern.single` folds under `UNICODE_CASE`: `toUpperCase(c)` differs from the key. */
-  lazy val javaCased: CharSet =
-    val domain = CaseMapping.SimpleUpper.domain.union(javaKey.domain)
-    CharSet.of(domain.iterator.filter(c => CaseMapping.SimpleUpper(c) != javaKey(c)).toSeq*)
-
-  /** Java's key `toLowerCase(toUpperCase(c))` of the simple mappings. */
+  /** Java's key `toLowerCase(toUpperCase(c))` of the simple mappings, which `UNICODE_CASE` compares. */
   lazy val javaKey: CaseMapping =
     val domain = CaseMapping.SimpleUpper.domain.union(CaseMapping.SimpleLower.domain)
     CaseMapping.fromEntries(domain.iterator.map(c => (c, CaseMapping.SimpleLower(CaseMapping.SimpleUpper(c)))))

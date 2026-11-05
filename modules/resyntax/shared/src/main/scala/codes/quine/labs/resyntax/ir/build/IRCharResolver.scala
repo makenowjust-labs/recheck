@@ -642,7 +642,7 @@ private[build] final class IRCharResolver(
               "Range out of order in character class",
               SourceLocation(begin.loc.start, end.loc.end)
             )
-          result = result.union(ClassSet(equivalence(flags).closeRange(CharSet.range(begin.value, end.value))))
+          result = result.union(ClassSet(equivalence(flags).closure(CharSet.range(begin.value, end.value))))
           i += 3
         // A hyphen after a range is a character, as in `[a-c-e]`.
         case RubyClassToken.Hyphen =>
@@ -698,13 +698,12 @@ private[build] final class IRCharResolver(
     // Perl's range with an endpoint above `0xFF` is between code points, and a byte string has only its bytes.
     if b.isEmpty || e.isEmpty then
       if begin.value > end.value then throw new IRBuildingException("Range out of order in character class", loc)
-      return ClassSet(equivalence(flags).closeRange(CharSet.range(begin.value, end.value).intersect(universe)))
+      return ClassSet(equivalence(flags).closure(CharSet.range(begin.value, end.value).intersect(universe)))
     // A range alone in a class has no neighbors to make a multibyte character with its byte escape.
     if dialect.isRuby && mode.isCodePoint && Seq(begin, end).exists(isRubyByteValue) then
       throw new IRBuildingException("Invalid multibyte escape", loc)
     if b.last > e.head then throw new IRBuildingException("Range out of order in character class", loc)
-    val eq = equivalence(flags)
-    ClassSet(eq.closure(CharSet.of((b.init ++ e.tail)*)).union(eq.closeRange(CharSet.range(b.last, e.head))))
+    ClassSet(equivalence(flags).closure(CharSet.of((b.init ++ e.tail)*).union(CharSet.range(b.last, e.head))))
 
   private def isRubyByteValue(value: ClassItemData.ClassValue): Boolean = value match
     case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v)) => isRubyByte(style, v)
@@ -874,7 +873,7 @@ private[build] object IRCharResolver:
       dialect match
         case Dialect.JavaScript =>
           Keyed(CaseMapping.ecmaScriptCanonicalize(mode), mode)
-        case Dialect.Java   => if flags.unicodeCase then JavaUnicode else JavaASCII
+        case Dialect.Java   => if flags.unicodeCase then Keyed(javaKey, mode) else JavaASCII
         case Dialect.DotNet => Keyed(dotNetKey, mode)
         case _: Dialect.Python if asciiOnly || mode == UnitMode.Byte => Keyed(asciiFold, mode)
         case _: Dialect.Python                                       => Keyed(pythonKey, mode)

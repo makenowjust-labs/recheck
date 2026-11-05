@@ -5,8 +5,9 @@ import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 
-/** CaseFoldingCases is a table of case-insensitive classes, literals and escapes having a character folded to several
-  * characters (e.g. `ß` to `ss`), which only Ruby and Perl match against the folding.
+/** CaseFoldingCases is a table of case-insensitive classes, literals and escapes around special case foldings.
+  *
+  * Only Ruby and Perl match a character folded to several characters (e.g. `ß` to `ss`) against the folding.
   *
   * A pattern is searched in the input with `i`.
   */
@@ -64,5 +65,16 @@ object CaseFoldingCases:
     Case("^ﬀi$", "ﬃ", Seq(Ruby(), Perl()), Set(Perl())),
     Case("^fﬁ$", "ﬃ", Seq(Ruby(), Perl()), Set(Perl())),
     Case("^ᾶι$", "ᾷ", Seq(Ruby(), Perl()), Set(Perl())),
-    Case("^ffi$", "ﬃ", Seq(Ruby(), Perl()), Set(Ruby(), Perl()))
+    Case("^ffi$", "ﬃ", Seq(Ruby(), Perl()), Set(Ruby(), Perl())),
+    // Java 26 made `ß` and ranges match more characters under `UNICODE_CASE` (JDK-8360459).
+    Case("(?u)^ß$", "ẞ", Seq(Java), Set(Java)),
+    Case("(?u)^[ß]$", "ẞ", Seq(Java), Set(Java)),
+    Case("(?u)^[\\u212A-\\u212A]$", "K", Seq(Java), Set(Java)),
+    Case("(?u)^[ς-ς]$", "Σ", Seq(Java), Set(Java)),
+    Case("(?u)^[İ-İ]$", "ı", Seq(Java), Set(Java)),
+    Case("(?u)^[İ-İ]$", "i", Seq(Java), Set(Java)),
+    Case("(?u)^[\\u2120-\\u212B]$", "k", Seq(Java), Set(Java)),
+    Case("(?u)^[\\u2120-\\u212B]$", "å", Seq(Java), Set(Java)),
+    Case("(?u)^[Ā-ſ]$", "s", Seq(Java), Set(Java)),
+    Case("(?u)^[Ā-ſ]$", "k", Seq(Java), Set.empty)
   )

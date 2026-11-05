@@ -53,6 +53,9 @@ The following constructs are not supported, and they are reported as `unsupporte
 - Java tries the starts of a look-behind from the shortest by the lengths that its `TreeInfo` computes, where `\X` adds nothing to the maximum and the lengths can overflow as `int`.
   `recheck` does not reproduce them, and it tries the starts from the longest by the lengths of the body, as for PCRE.
   For example, `(?<=\X)a` never matches in Java, and `(?<=(a|aa))b` captures `"a"` of `"aab"` in Java, but `"aa"` in `recheck`.
+- Under `UNICODE_CASE`, Java tests a character against a range of a class by its `toUpperCase`, its `toLowerCase(toUpperCase(c))` and a table from CaseFolding.txt, which misses some characters that the members match as single characters.
+  `recheck` does not reproduce it, and a range matches the characters that its members match, by `toLowerCase(toUpperCase(c))`.
+  For example, `(?ui)[ı-ı]` does not match `İ` in Java, while `(?ui)[ı]` does, and `(?ui)[A-Z]` matches neither `İ` nor the Kelvin sign U+212A, while `(?ui)[K]` matches the Kelvin sign.
 
 ## Runtime-Attack Verification
 
