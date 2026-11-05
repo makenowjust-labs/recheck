@@ -20,7 +20,7 @@ The `javascript` dialect has no settings.
 <TabItem value="cli" label="CLI">
 
 ```console
-$ recheck '/^(a|a)*$/'
+$ recheck --dialect=javascript '/^(a|a)*$/'
 ```
 
 </TabItem>
@@ -29,7 +29,7 @@ $ recheck '/^(a|a)*$/'
 ```tsx
 import { check } from "recheck";
 
-await check("^(a|a)*$", "");
+await check("^(a|a)*$", "", { dialect: "javascript" });
 ```
 
 </TabItem>
@@ -40,7 +40,7 @@ import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.resyntax.ast.Dialect
 
-ReDoS.check("^(a|a)*$", "", Parameters())
+ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.JavaScript))
 ```
 
 </TabItem>
