@@ -27,7 +27,7 @@ import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.build.IRCharResolver.*
 
 /** IRCharResolver resolves character-level nodes (literals, `.`, escapes and classes) into character sets of the
-  * universe, which has the characters of the input.
+  * universe of the mode, which has the characters of the input.
   *
   * With `perlUnicodeRules`, a Perl pattern uses Unicode rules even under `/d` (a UTF-8 pattern, or one with a code
   * point above `U+00FF`, `\p{...}`, `\N{...}` or `\b{...}`).
@@ -35,9 +35,10 @@ import codes.quine.labs.resyntax.ir.build.IRCharResolver.*
 private[build] final class IRCharResolver(
     dialect: Dialect,
     mode: UnitMode,
-    universe: CharSet,
     perlUnicodeRules: Boolean
 ):
+
+  private val universe = mode.universe
 
   private val classes = new IRClassLookup(dialect, mode, !perlUnicodeRules)
 
@@ -87,7 +88,7 @@ private[build] final class IRCharResolver(
   /** Moves Ruby's byte escapes before a repeated byte escape into the repeat (e.g. `\xC3\xA9+` repeats `é`). */
   def joinRubyByteRepeats(children: Seq[Node]): Seq[Node] =
     // The parser puts a quantifier on the last escape, but Onigmo reads the bytes of a character as one.
-    if !dialect.isRuby || mode != UnitMode.CodePoint then return children
+    if !dialect.isRuby || !mode.isCodePoint then return children
     def byteOf(node: Node): Option[Int] = node.data match
       case NodeData.Backslash(BackslashKind.Escape(style, value)) if isRubyByte(style, value) => Some(value)
       case _                                                                                  => None
@@ -170,7 +171,7 @@ private[build] final class IRCharResolver(
           lits += Lit(value, Some(style), flags, node.loc)
         case data => throw new IllegalArgumentException(s"Not a literal: $data")
     val merged =
-      if dialect.isRuby && mode == UnitMode.CodePoint then mergeRubyBytes(lits.toIndexedSeq) else lits.toIndexedSeq
+      if dialect.isRuby && mode.isCodePoint then mergeRubyBytes(lits.toIndexedSeq) else lits.toIndexedSeq
     val units = merged.flatMap: lit =>
       unitsOf(lit) match
         case Seq() => Seq(lit.copy(value = NoUnit))
@@ -201,7 +202,7 @@ private[build] final class IRCharResolver(
   private def foldsMultiChar(u: Lit): Boolean =
     u.flags.ignoreCase && u.value != NoUnit && (dialect match
       case _: Dialect.Perl => true
-      case _: Dialect.Ruby => mode == UnitMode.CodePoint && (u.escape.isEmpty || u.value >= 0x80)
+      case _: Dialect.Ruby => mode.isCodePoint && (u.escape.isEmpty || u.value >= 0x80)
       case _               => false)
 
   /** Resolves a part with the multi-character case folding of Ruby and Perl.
@@ -288,9 +289,9 @@ private[build] final class IRCharResolver(
   private def isRubyByteLit(lit: Lit): Boolean = lit.escape.exists(isRubyByte(_, lit.value))
 
   private def unitsOf(lit: Lit): Seq[UChar] = mode match
-    case UnitMode.CodePoint => Seq(lit.value)
-    case UnitMode.UTF16     => UTF16Encoding.encode(lit.value)
-    case UnitMode.Byte      =>
+    case UnitMode.UTF16CodePoint | UnitMode.CodePoint | UnitMode.ScalarValue => Seq(lit.value)
+    case UnitMode.UTF16                                                      => UTF16Encoding.encode(lit.value)
+    case UnitMode.Byte                                                       =>
       // The parser reads a byte source by bytes, so only an escape can be above `0xFF`.
       if lit.value <= 0xff then Seq(lit.value)
       // Perl makes the pattern UTF-8 for it, and it never matches a byte string.
@@ -500,7 +501,7 @@ private[build] final class IRCharResolver(
 
   /** Whether Ruby matches a class under the flags with the foldings of its characters to several characters. */
   private def rubyFolds(flags: IRCharFlagSet): Boolean =
-    dialect.isRuby && mode == UnitMode.CodePoint && flags.ignoreCase
+    dialect.isRuby && mode.isCodePoint && flags.ignoreCase
 
   /** Adds the foldings of the characters of Ruby's class to several characters after the class, as Onigmo tries them
     * (e.g. `[ßx]` is `[ßẞx]|ss|ss`).
@@ -607,14 +608,14 @@ private[build] final class IRCharResolver(
       case ClassItemData.ClassCaseCommand(_)       => ClassSet.empty
       case ClassItemData.ClassBackslashClass(kind) => escapeClassSet(kind, flags, item.loc)
       case value: ClassItemData.ClassValue
-          if dialect.isRuby && mode == UnitMode.CodePoint &&
+          if dialect.isRuby && mode.isCodePoint &&
             isRubyByteValue(value) =>
         throw new IRBuildingException("Invalid multibyte escape", item.loc)
       case value: ClassItemData.ClassValue => ClassSet(closeChars(valueUnits(value, flags, item.loc), flags))
 
   /** Evaluates a union, where Ruby's byte escapes make characters (e.g. `[\xC3\xA9]` is `[é]`). */
   private def classUnion(items: Seq[ClassItem], flags: IRCharFlagSet): ClassSet =
-    if !dialect.isRuby || mode != UnitMode.CodePoint then
+    if !dialect.isRuby || !mode.isCodePoint then
       return items.foldLeft(ClassSet.empty)((set, item) => set.union(classItem(item, flags)))
     // Onigmo reads the bytes of a character as one also at a range endpoint (e.g. `[\xC3\xA0-\xC3\xA9]` is `[à-é]`).
     // The parser reads a range between bytes there (`\xA0-\xC3`), so the range is split at its hyphen and made again.
@@ -699,7 +700,7 @@ private[build] final class IRCharResolver(
       if begin.value > end.value then throw new IRBuildingException("Range out of order in character class", loc)
       return ClassSet(equivalence(flags).closeRange(CharSet.range(begin.value, end.value).intersect(universe)))
     // A range alone in a class has no neighbors to make a multibyte character with its byte escape.
-    if dialect.isRuby && mode == UnitMode.CodePoint && Seq(begin, end).exists(isRubyByteValue) then
+    if dialect.isRuby && mode.isCodePoint && Seq(begin, end).exists(isRubyByteValue) then
       throw new IRBuildingException("Invalid multibyte escape", loc)
     if b.last > e.head then throw new IRBuildingException("Range out of order in character class", loc)
     val eq = equivalence(flags)
@@ -895,8 +896,8 @@ private[build] object IRCharResolver:
     if !flags.ignoreCase then Simple
     else
       dialect match
-        case _: Dialect.Ruby if mode == UnitMode.CodePoint => Full(0)
-        case _: Dialect.Perl                               =>
+        case _: Dialect.Ruby if mode.isCodePoint => Full(0)
+        case _: Dialect.Perl                     =>
           flags.charset match
             case IRCharset.Default                            => Simple
             case IRCharset.Locale                             => Full(0x100)

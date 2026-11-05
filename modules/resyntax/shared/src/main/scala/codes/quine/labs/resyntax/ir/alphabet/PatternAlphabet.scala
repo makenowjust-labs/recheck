@@ -10,7 +10,6 @@ import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRNode
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.ir.IRPattern
-import codes.quine.labs.resyntax.ir.IRSurrogateKind
 import codes.quine.labs.resyntax.ir.IRWordMarkSet
 
 /** PatternAlphabet is a set of pairs of a disjoint character set (an atom) of the mode and a character kind. */
@@ -46,13 +45,13 @@ object PatternAlphabet:
 
   /** Builds the coarsest alphabet of the characters of the input such that each set is a union of atoms.
     *
-    * The characters are those of the mode, without the surrogates if they are `Absent`.
+    * The characters are those of the universe of the mode.
     *
     * The kind of an atom tells which word sets (`word` first, then `moreWords`) and which line terminator sets
     * (`lineTerminator` first, then `moreLineTerminators`) have it, which sets of `wordMarks` have it, and, with `crlf`,
     * whether it is `\r` or `\n`, which are then atoms by themselves.
     *
-    * With `Paired` surrogates, an atom of surrogates alone is split into the high and the low ones, and the kinds tell
+    * In `UTF16CodePoint` mode, an atom of surrogates alone is split into the high and the low ones, and the kinds tell
     * an atom of high surrogates and one of low surrogates if both exist, since a high surrogate followed by a low one
     * is one character.
     *
@@ -68,15 +67,13 @@ object PatternAlphabet:
       crlf: Boolean,
       moreLineTerminators: Seq[CharSet],
       moreWords: Seq[CharSet],
-      wordMarks: Seq[IRWordMarkSet],
-      surrogates: IRSurrogateKind
+      wordMarks: Seq[IRWordMarkSet]
   ): PatternAlphabet =
     val crlfSets = if crlf then Seq(CharSet.single(0x0d), CharSet.single(0x0a)) else Seq.empty
     val terminators = lineTerminator.toSeq ++ moreLineTerminators
     val words = word.toSeq ++ moreWords
     val markSets = wordMarks.flatMap(m => Seq(m.marks, m.extenders, m.bases))
-    val universe = surrogates.universe(mode)
-    val all = ((universe +: terminators) ++ words ++ markSets ++ (sets ++ crlfSets).distinct)
+    val all = ((mode.universe +: terminators) ++ words ++ markSets ++ (sets ++ crlfSets).distinct)
       .map(_.restrict(mode))
       .filter(_.nonEmpty)
       .toIndexedSeq
@@ -96,14 +93,13 @@ object PatternAlphabet:
     val atoms = Alphabet
       .refine(mode, all)
       .atoms
-      .filter(c => universe.contains(c.head))
       .map(c => (c, order(c)))
       .sortBy(_._2)(using Ordering.Implicits.seqOrdering)
       .flatMap: (c, _) =>
-        if surrogates == IRSurrogateKind.Paired && c.subsetOf(UTF16Encoding.Surrogates) then
+        if mode == UnitMode.UTF16CodePoint && c.subsetOf(UTF16Encoding.Surrogates) then
           Seq(c.intersect(UTF16Encoding.HighSurrogates), c.intersect(UTF16Encoding.LowSurrogates)).filter(_.nonEmpty)
         else Seq(c)
-    val tellsSurrogates = surrogates == IRSurrogateKind.Paired &&
+    val tellsSurrogates = mode == UnitMode.UTF16CodePoint &&
       atoms.exists(_.subsetOf(UTF16Encoding.HighSurrogates)) && atoms.exists(_.subsetOf(UTF16Encoding.LowSurrogates))
 
     val pairs = atoms
@@ -154,8 +150,7 @@ object PatternAlphabet:
       needsCRLFDistinction(pattern),
       kinds.drop(1),
       words.drop(1),
-      wordMarks(pattern),
-      pattern.surrogates
+      wordMarks(pattern)
     )
 
   /** Checks whether the set is described more simply by its complement, as a negated class or `.` is. */

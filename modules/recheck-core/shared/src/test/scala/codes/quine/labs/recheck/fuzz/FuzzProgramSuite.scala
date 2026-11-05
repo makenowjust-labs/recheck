@@ -4,7 +4,6 @@ import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.charset.UString
 
 class FuzzProgramSuite extends munit.FunSuite:
 
@@ -26,10 +25,3 @@ class FuzzProgramSuite extends munit.FunSuite:
     // The verbs and the non-atomic look-arounds do not allow memoization.
     for source <- Seq("a(*PRUNE)b", "(*napla:a)a"); mode <- AccelerationMode.values do
       assertEquals(from(source, "", Dialect.PCRE).usesAcceleration(mode), false, s"$source in $mode")
-
-  test("FuzzProgram#joinSurrogates"):
-    val s = UString(0xd83d, 0xde00, 0xde00, 0xd83d)
-    assertEquals(from("a", "u").joinSurrogates(s), UString(0x1f600, 0xde00, 0xd83d))
-    assertEquals(from("a", "", Dialect.Java).joinSurrogates(s), UString(0x1f600, 0xde00, 0xd83d))
-    assertEquals(from("a", "").joinSurrogates(s), s)
-    assertEquals(from("a", "", Dialect.Python()).joinSurrogates(s), s)

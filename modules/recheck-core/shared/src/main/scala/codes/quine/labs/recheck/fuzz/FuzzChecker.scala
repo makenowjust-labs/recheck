@@ -371,7 +371,7 @@ private[fuzz] final class FuzzChecker(
     * `degree` is the assumed polynomial degree, or `None` for exponential.
     */
   def tryAttackExecute(str: FString, degree: Option[Int]): Option[(AttackPattern, Hotspot)] = interrupt:
-    val input = fuzz.joinSurrogates(str.toUString)
+    val input = str.toUString
     // A timeout of a long polynomial attack string alone proves nothing, because a linear but slow pattern also runs
     // over `attackTimeout`, so the growth is measured first on strings small enough to finish.
     // An exponential attack string is short, so a timeout on it is a blow-up and it runs as is.
@@ -383,7 +383,7 @@ private[fuzz] final class FuzzChecker(
         log:
           s"""|fuzz: attack succeeded (status: ${result.status})
               |  string: ${str}""".stripMargin
-        return Some((str.toAttackPattern, Hotspot.build(result.heatmap, heatRatio)))
+        return Some((str.toAttackPattern(pattern.mode), Hotspot.build(result.heatmap, heatRatio)))
     None
 
   /** Checks that the steps grow with the repeat count as `degree` predicts, by measuring two smaller strings. */
@@ -395,7 +395,7 @@ private[fuzz] final class FuzzChecker(
 
     val opts = Options(attackLimit, usesAcceleration = fuzz.usesAcceleration(accelerationMode))
     val results = Seq(n1, n2).map: n =>
-      Interpreter.runWithTimeout(program, fuzz.joinSurrogates(str.copy(n = n).toUString), opts, attackTimeout)
+      Interpreter.runWithTimeout(program, str.copy(n = n).toUString, opts, attackTimeout)
     // A string that cannot be measured is at least as heavy as assumed.
     if results.exists(r => r.status == Status.Limit || r.status == Status.Timeout) then return true
 
@@ -413,11 +413,14 @@ private[fuzz] final class FuzzChecker(
       val visited: mutable.Set[CoverageItem]
   ):
 
-    /** Executes the string and adds its result. */
+    /** Executes the string and adds its result.
+      *
+      * It discards a string that some repeat count makes no string of the mode (see [[FString.admitsAnyRepeatCount]]).
+      */
     def execute(str: FString): Iterator[AttackResult] =
-      if str.countRepeat >= maxDegree then return Iterator.empty
+      if str.countRepeat >= maxDegree || !str.admitsAnyRepeatCount(pattern.mode) then return Iterator.empty
 
-      val input = fuzz.joinSurrogates(str.toUString)
+      val input = str.toUString
       if inputs.contains(input) || input.length >= maxGeneStringSize then return Iterator.empty
 
       val opts =

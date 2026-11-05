@@ -53,8 +53,7 @@ object IRBuilder:
       case Dialect.Perl(true, PerlSource.String) => true
       case Dialect.Perl(utf8, _)                 => usesPerlUnicodeSyntax(node) || utf8 && hasNonASCIILiteral(node)
       case _                                     => false
-    val surrogates = surrogateSemantics(dialect, mode)
-    val chars = new IRCharResolver(dialect, mode, surrogates.universe(mode), perlUnicodeRules)
+    val chars = new IRCharResolver(dialect, mode, perlUnicodeRules)
     val lookBehindAnalyzer =
       new LookBehindAnalyzer(
         table,
@@ -75,7 +74,6 @@ object IRBuilder:
       backtrackControlSemantics(dialect),
       featureSet.anchored,
       mode,
-      surrogates,
       notEmpty(starts)
     )
 
@@ -98,14 +96,6 @@ object IRBuilder:
       case Dialect.PCRE    => IREmptyIterationSemantics(IREmptyIteration.ExitFromMin, IREmptyIteration.Ignore)
       case _: Dialect.Ruby => all(IREmptyIteration.ExitOptional)
       case Dialect.DotNet | _: Dialect.Perl => all(IREmptyIteration.ExitFromMin)
-
-  private def surrogateSemantics(dialect: Dialect, mode: UnitMode): IRSurrogateKind =
-    if mode != UnitMode.CodePoint then IRSurrogateKind.Separate
-    else
-      dialect match
-        case Dialect.JavaScript | Dialect.Java => IRSurrogateKind.Paired
-        case _: Dialect.Ruby | Dialect.PCRE    => IRSurrogateKind.Absent
-        case _                                 => IRSurrogateKind.Separate
 
   private def backtrackControlSemantics(dialect: Dialect): IRBacktrackControlSemantics =
     IRBacktrackControlSemantics(thenPassesAssertions = dialect.isPerl, acceptEndsAtomic = dialect.isPerl)
@@ -142,7 +132,7 @@ object IRBuilder:
     def single(n: Int): Width = Width(n, n)
 
     // Perl reads the bytes of a byte string as Latin-1 characters.
-    if mode != UnitMode.CodePoint && !dialect.isPerl then return nodes => single(nodes.size)
+    if !mode.isCodePoint && !dialect.isPerl then return nodes => single(nodes.size)
     dialect match
       case _: Dialect.Perl =>
         def fold(value: Int, flags: IRCharFlagSet): Int =

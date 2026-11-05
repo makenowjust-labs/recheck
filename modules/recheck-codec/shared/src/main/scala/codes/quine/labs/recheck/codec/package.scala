@@ -138,16 +138,20 @@ given decodeDialect: Decoder[Dialect] with
 /** An `Encoder` for `UnitMode`. */
 given encodeUnitMode: Encoder[UnitMode] with
   def apply(m: UnitMode): Json = m match
-    case UnitMode.UTF16     => "utf16".asJson
-    case UnitMode.CodePoint => "code-point".asJson
-    case UnitMode.Byte      => "byte".asJson
+    case UnitMode.UTF16          => "utf16".asJson
+    case UnitMode.UTF16CodePoint => "utf16-code-point".asJson
+    case UnitMode.CodePoint      => "code-point".asJson
+    case UnitMode.ScalarValue    => "scalar-value".asJson
+    case UnitMode.Byte           => "byte".asJson
 
 /** A `Decoder` for `UnitMode`, which is the inverse of [[encodeUnitMode]]. */
 given decodeUnitMode: Decoder[UnitMode] = Decoder[String].emap:
-  case "utf16"      => Right(UnitMode.UTF16)
-  case "code-point" => Right(UnitMode.CodePoint)
-  case "byte"       => Right(UnitMode.Byte)
-  case name         => Left(s"Unknown unit mode: $name")
+  case "utf16"            => Right(UnitMode.UTF16)
+  case "utf16-code-point" => Right(UnitMode.UTF16CodePoint)
+  case "code-point"       => Right(UnitMode.CodePoint)
+  case "scalar-value"     => Right(UnitMode.ScalarValue)
+  case "byte"             => Right(UnitMode.Byte)
+  case name               => Left(s"Unknown unit mode: $name")
 
 /** An `Encoder` for `Checker`. */
 given encodeChecker: Encoder[Checker] with
@@ -241,13 +245,14 @@ given encodeErrorKind: Encoder[ErrorKind] with
       Json.obj("kind" := "unexpected", "message" := message)
 
 /** Returns an `Encoder` for `UString` of the unit mode, which gives the string of the mode, or the array of the units
-  * when they have a surrogate code point in `CodePoint` mode, a lone surrogate in `UTF16` mode, or a byte above `0x7F`
-  * in `Byte` mode.
+  * when they have a surrogate code point in the code point modes, a lone surrogate in `UTF16` mode, or a byte above
+  * `0x7F` in `Byte` mode.
   */
 def encodeUString(mode: UnitMode): Encoder[UString] = (s: UString) =>
   val isArray = mode match
     // In UTF-16, a surrogate code point is a lone surrogate, or reads back as a part of another code point.
-    case UnitMode.CodePoint => s.iterator.exists(UTF16Encoding.isSurrogate)
+    case UnitMode.UTF16CodePoint | UnitMode.CodePoint | UnitMode.ScalarValue =>
+      s.iterator.exists(UTF16Encoding.isSurrogate)
     // UTF-8 cannot write a lone surrogate.
     case UnitMode.UTF16 => hasLoneSurrogate(s)
     // A character above `0x7F` does not read as the same byte in every language.
@@ -257,7 +262,8 @@ def encodeUString(mode: UnitMode): Encoder[UString] = (s: UString) =>
 /** Returns a `Decoder` for `UString` of the unit mode, which reads a string or an array of units. */
 def decodeUString(mode: UnitMode): Decoder[UString] =
   val fromString = Decoder[String].emap: s =>
-    Either.cond(mode != UnitMode.Byte || s.forall(_ <= 0xff), mode.decode(s), s"Invalid byte string: $s")
+    try Right(mode.decode(s))
+    catch case ex: IllegalArgumentException => Left(ex.getMessage)
   val fromUnits = Decoder[Seq[Int]].emap: us =>
     us.find(!mode.contains(_)) match
       case Some(u) => Left(f"Invalid unit in $mode mode: $u%X")
@@ -275,7 +281,9 @@ private def hasLoneSurrogate(s: UString): Boolean =
 
 /** Returns a `Decoder` for `AttackPattern` of the unit mode.
   *
-  * It reads the fields of [[encodeAttackPattern]] except `string` and `pattern`, which are derived from the others.
+  * It reads the fields of [[encodeAttackPattern]] except `string` and `pattern`, which are derived from the others. It
+  * fails on an attack pattern that is not one of the mode for some repeat count (see
+  * `AttackPattern.admitsAnyRepeatCount`).
   */
 def decodeAttackPattern(mode: UnitMode): Decoder[AttackPattern] =
   given Decoder[UString] = decodeUString(mode)
@@ -290,7 +298,16 @@ def decodeAttackPattern(mode: UnitMode): Decoder[AttackPattern] =
       pumps <- c.get[Seq[(UString, UString, Int)]]("pumps")
       suffix <- c.get[UString]("suffix")
       n <- c.get[Int]("base")
-    yield AttackPattern(pumps, suffix, n)
+      attack = AttackPattern(pumps, suffix, n)
+      _ <- Either.cond(
+        attack.admitsAnyRepeatCount(mode),
+        (),
+        DecodingFailure(
+          s"Invalid attack pattern in $mode mode: a high surrogate followed by a low surrogate",
+          c.history
+        )
+      )
+    yield attack
 
 /** A `Decoder` for `Duration`. */
 given decodeDuration: Decoder[Duration] = (c: HCursor) =>

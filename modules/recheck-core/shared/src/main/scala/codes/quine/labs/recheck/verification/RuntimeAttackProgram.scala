@@ -68,7 +68,9 @@ object RuntimeAttackProgram:
     */
   private def encodeSource(source: String, dialect: Dialect, mode: UnitMode): UString = dialect match
     case _: Dialect.Python if mode == UnitMode.Byte => UnitMode.Byte.decode(source)
-    case _ => mode.fromCodePoints(IArray.from(UnitMode.CodePoint.decode(source).iterator))
+    // A source may have a lone surrogate even in `ScalarValue` mode, so the code points stay as they are.
+    case _ if mode.isCodePoint => UnitMode.UTF16CodePoint.decode(source)
+    case _                     => mode.fromCodePoints(IArray.from(UnitMode.UTF16CodePoint.decode(source).iterator))
 
   /** Script is a program of [[generate]] as a standalone file named `name`, which has the data of the program in
     * itself.
@@ -121,7 +123,7 @@ object RuntimeAttackProgram:
 
   /** Returns the JavaScript program for `node`. */
   private def javascript(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RuntimeAttackProgram =
-    val style = AttackPatternStyle.JavaScript(unicode = mode == UnitMode.CodePoint)
+    val style = AttackPatternStyle.JavaScript(unicode = mode == UnitMode.UTF16CodePoint)
     val sourceString = style.literal(pattern)
     val flagsString = style.literal(mode.decode(flags))
     // `process.stdout` may write to a pipe asynchronously, so it uses `writeSync`.

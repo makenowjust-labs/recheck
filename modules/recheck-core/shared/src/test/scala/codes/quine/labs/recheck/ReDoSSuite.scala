@@ -225,11 +225,27 @@ class ReDoSSuite extends munit.FunSuite:
     // Python and PCRE2 (without JIT) are exponential on the third, and Java is fast on it.
     assertEquals(
       check("^(?>a|a)*$", Java),
-      Diagnostics.Safe("^(?>a|a)*$", "", Java, UnitMode.CodePoint, AttackComplexity.Safe(true), Seq.empty, Checker.Fuzz)
+      Diagnostics.Safe(
+        "^(?>a|a)*$",
+        "",
+        Java,
+        UnitMode.UTF16CodePoint,
+        AttackComplexity.Safe(true),
+        Seq.empty,
+        Checker.Fuzz
+      )
     )
     assertEquals(
       check("^(?:a++)+$", Java),
-      Diagnostics.Safe("^(?:a++)+$", "", Java, UnitMode.CodePoint, AttackComplexity.Safe(true), Seq.empty, Checker.Fuzz)
+      Diagnostics.Safe(
+        "^(?:a++)+$",
+        "",
+        Java,
+        UnitMode.UTF16CodePoint,
+        AttackComplexity.Safe(true),
+        Seq.empty,
+        Checker.Fuzz
+      )
     )
     assertVulnerable(check("^(?:(?>a|a)|a)*$", Java), AttackComplexity.Exponential(true), Checker.Fuzz)
 
@@ -576,7 +592,7 @@ class ReDoSSuite extends munit.FunSuite:
       )
     )
     interceptMessage[TimeoutException](
-      "timeout at modules/recheck-core/shared/src/main/scala/codes/quine/labs/recheck/fuzz/FuzzProgram.scala:37"
+      "timeout at modules/recheck-core/shared/src/main/scala/codes/quine/labs/recheck/fuzz/FuzzProgram.scala:24"
     ) {
       val ctx = Context(timeout = Duration.MinusInf)
       val result = checkFuzz(".", "", Parameters(timeout = Duration.MinusInf))(using ctx)

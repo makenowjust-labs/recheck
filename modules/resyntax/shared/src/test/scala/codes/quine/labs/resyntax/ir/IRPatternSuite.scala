@@ -301,18 +301,13 @@ class IRPatternSuite extends munit.FunSuite:
     "a" -> true
   )
 
-  test("IRPattern#surrogates"):
-    assertEquals(parse("a").surrogates, IRSurrogateKind.Separate)
-    assertEquals(parse("a", "u").surrogates, IRSurrogateKind.Paired)
-    assertEquals(parse("a", "v").surrogates, IRSurrogateKind.Paired)
-    assertEquals(parse("a", "", Dialect.Java).surrogates, IRSurrogateKind.Paired)
-    assertEquals(parse("a", "", Dialect.Python()).surrogates, IRSurrogateKind.Separate)
-    assertEquals(parse("a", "", Dialect.Perl(utf8 = true)).surrogates, IRSurrogateKind.Separate)
-    assertEquals(parse("a", "", Dialect.Ruby()).surrogates, IRSurrogateKind.Absent)
-    assertEquals(parse("a", "u", Dialect.PCRE).surrogates, IRSurrogateKind.Absent)
-    assertEquals(parse("a", "", Dialect.PCRE).surrogates, IRSurrogateKind.Separate)
-    assertEquals(parse("a", "", Dialect.Ruby()).universe, UnitMode.CodePoint.universe.diff(UTF16Encoding.Surrogates))
+  test("IRPattern#universe"):
+    assertEquals(parse("a").universe, UnitMode.UTF16.universe)
     assertEquals(parse("a", "u").universe, UnitMode.CodePoint.universe)
+    assertEquals(parse("a", "", Dialect.Python()).universe, UnitMode.CodePoint.universe)
+    assertEquals(parse("a", "", Dialect.Ruby()).universe, UnitMode.CodePoint.universe.diff(UTF16Encoding.Surrogates))
+    assertEquals(parse("a", "u", Dialect.PCRE).universe, UnitMode.CodePoint.universe.diff(UTF16Encoding.Surrogates))
+    assertEquals(parse("a", "", Dialect.PCRE).universe, UnitMode.Byte.universe)
 
   test("IRPattern#assertionLineTerminators"):
     assertEquals(parse("^a$|\\b", "m").assertionLineTerminators, Seq(IRLineTerminatorSet.JavaScript))

@@ -425,7 +425,7 @@ object FeatureSet:
     val isRuby = dialect.isRuby
 
     val isByte = mode == UnitMode.Byte
-    val isUnicode = flagSet.unicode || flagSet.unicodeSets || (isPCRE && mode == UnitMode.CodePoint)
+    val isUnicode = flagSet.unicode || flagSet.unicodeSets || (isPCRE && mode.isCodePoint)
 
     FeatureSet(
       allowsAlphabeticUnknownBackslash = (isJavaScript && !isUnicode) || isPerl || isRuby,
@@ -627,7 +627,7 @@ object FeatureSet:
       rejectsNumberedReferenceWithNamedCapture = isRuby,
       removesCommentGroup = isRuby,
       processBackslashInCommentGroup = isPython || isRuby,
-      readsAsUnicode = mode == UnitMode.CodePoint,
+      readsAsUnicode = mode.isCodePoint,
       requiresInlineFlagAtStart = isPython,
       skipsComment = flagSet.verbose,
       skipsCommentBeforeBacktrackStrategy = isDotNet || isJava || isPCRE || isPerl,

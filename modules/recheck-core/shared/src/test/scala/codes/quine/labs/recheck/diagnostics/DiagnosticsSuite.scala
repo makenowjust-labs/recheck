@@ -68,7 +68,7 @@ class DiagnosticsSuite extends munit.FunSuite:
           "a*a*$",
           "",
           Dialect.Ruby(),
-          UnitMode.CodePoint,
+          UnitMode.ScalarValue,
           AttackComplexity.Polynomial(2, false),
           AttackPattern(
             Seq((UnitMode.UTF16.decode(""), UnitMode.UTF16.decode("a"), 0)),
@@ -104,7 +104,7 @@ class DiagnosticsSuite extends munit.FunSuite:
           "a*a*$",
           "",
           Dialect.Ruby(),
-          UnitMode.CodePoint,
+          UnitMode.ScalarValue,
           AttackComplexity.Linear,
           Seq(refutedAttack),
           Checker.Fuzz
@@ -163,7 +163,7 @@ class DiagnosticsSuite extends munit.FunSuite:
           "a*a*$",
           "",
           Dialect.Ruby(),
-          Some(UnitMode.CodePoint),
+          Some(UnitMode.ScalarValue),
           Diagnostics.ErrorKind.RuntimeAttacksRefuted,
           Seq(refutedAttack),
           Some(Checker.Fuzz)

@@ -164,21 +164,21 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
   test("Parser.determineUnitMode: the mode of the IR"):
     val cases = Seq(
       ("a", "", JavaScript, UnitMode.UTF16),
-      ("a", "u", JavaScript, UnitMode.CodePoint),
-      ("a", "v", JavaScript, UnitMode.CodePoint),
-      ("a", "", Java, UnitMode.CodePoint),
+      ("a", "u", JavaScript, UnitMode.UTF16CodePoint),
+      ("a", "v", JavaScript, UnitMode.UTF16CodePoint),
+      ("a", "", Java, UnitMode.UTF16CodePoint),
       ("a", "", DotNet, UnitMode.UTF16),
       ("a", "", Python(), UnitMode.CodePoint),
       ("a", "", Python(Python.Type.Bytes), UnitMode.Byte),
-      ("a", "", Ruby(), UnitMode.CodePoint),
+      ("a", "", Ruby(), UnitMode.ScalarValue),
       ("a", "n", Ruby(), UnitMode.Byte),
       ("a", "", Ruby(Ruby.Encoding.ASCII8Bit), UnitMode.Byte),
       ("a", "", Perl(), UnitMode.CodePoint),
       ("a", "", Perl(utf8 = false), UnitMode.Byte),
       ("a", "", PCRE, UnitMode.Byte),
-      ("a", "u", PCRE, UnitMode.CodePoint),
-      ("(*UTF)a", "", PCRE, UnitMode.CodePoint),
-      ("(*NOTEMPTY)(*UTF8)a|b", "", PCRE, UnitMode.CodePoint)
+      ("a", "u", PCRE, UnitMode.ScalarValue),
+      ("(*UTF)a", "", PCRE, UnitMode.ScalarValue),
+      ("(*NOTEMPTY)(*UTF8)a|b", "", PCRE, UnitMode.ScalarValue)
     )
     for (source, flags, dialect, mode) <- cases do
       val flagSet = FlagSet.parse(flags, dialect)

@@ -28,7 +28,7 @@ object AttackPatternStyle:
   def of(dialect: Dialect, mode: UnitMode): AttackPatternStyle =
     val bytes = mode == UnitMode.Byte
     dialect match
-      case Dialect.JavaScript => JavaScript(unicode = mode == UnitMode.CodePoint)
+      case Dialect.JavaScript => JavaScript(unicode = mode == UnitMode.UTF16CodePoint)
       case _: Dialect.Python  => Python(bytes)
       case _: Dialect.Ruby    => Ruby(bytes)
       case Dialect.Java       => Java
@@ -44,8 +44,8 @@ object AttackPatternStyle:
   final case class JavaScript(unicode: Boolean) extends AttackPatternStyle:
 
     def literal(s: UString): String =
-      val mode = if unicode then UnitMode.CodePoint else UnitMode.UTF16
-      UnitMode.CodePoint.decode(mode.encode(s)).iterator.map(char).mkString("'", "", "'")
+      val mode = if unicode then UnitMode.UTF16CodePoint else UnitMode.UTF16
+      UnitMode.UTF16CodePoint.decode(mode.encode(s)).iterator.map(char).mkString("'", "", "'")
 
     def repeat(s: UString, n: Int): String = s"${literal(s)}.repeat(${n})"
 
@@ -131,7 +131,7 @@ object AttackPatternStyle:
   case object Java extends AttackPatternStyle:
 
     def literal(s: UString): String =
-      UnitMode.CodePoint.decode(UnitMode.CodePoint.encode(s)).iterator.map(char).mkString("\"", "", "\"")
+      UnitMode.UTF16CodePoint.decode(UnitMode.UTF16CodePoint.encode(s)).iterator.map(char).mkString("\"", "", "\"")
 
     def repeat(s: UString, n: Int): String = s"${literal(s)}.repeat($n)"
 
@@ -152,7 +152,7 @@ object AttackPatternStyle:
   case object CSharp extends AttackPatternStyle:
 
     def literal(s: UString): String =
-      UnitMode.CodePoint.decode(UnitMode.UTF16.encode(s)).iterator.map(char).mkString("\"", "", "\"")
+      UnitMode.UTF16CodePoint.decode(UnitMode.UTF16.encode(s)).iterator.map(char).mkString("\"", "", "\"")
 
     def repeat(s: UString, n: Int): String = s"string.Concat(Enumerable.Repeat(${literal(s)}, $n))"
 

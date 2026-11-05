@@ -3,6 +3,7 @@ package fuzz
 
 import scala.language.implicitConversions
 
+import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.fuzz.FString.*
@@ -99,18 +100,46 @@ class FStringSuite extends munit.FunSuite:
       FString(1, IndexedSeq(Repeat(0, 2), Wrap('a'), Repeat(0, 1))).toUString
     }
 
+  test("FString#admitsAnyRepeatCount"):
+    val (high, low) = (Wrap(0xd800), Wrap(0xdc00))
+    val paired = Seq(
+      IndexedSeq(high, low),
+      IndexedSeq(Repeat(0, 2), high, low),
+      // From the part before a repetition to it, and from it to itself.
+      IndexedSeq(high, Repeat(0, 1), low),
+      IndexedSeq(Repeat(0, 2), low, high),
+      // From a repetition to the part after it.
+      IndexedSeq(Repeat(0, 1), high, low),
+      // From the part before a repetition to the part after it, when it repeats no times.
+      IndexedSeq(high, Repeat(5, 1), Wrap('a'), low),
+      IndexedSeq(high, Repeat(5, 1), Wrap('a'), Repeat(5, 1), low)
+    )
+    for seq <- paired; n <- Seq(1, 2) do
+      val str = FString(n, seq)
+      assert(!str.admitsAnyRepeatCount(UnitMode.UTF16CodePoint), str)
+      for mode <- Seq(UnitMode.UTF16, UnitMode.CodePoint) do assert(str.admitsAnyRepeatCount(mode), str)
+    // A low surrogate before a high surrogate, or one after another unit, is a lone surrogate.
+    for seq <- Seq(
+        IndexedSeq(low, high),
+        IndexedSeq(high, Wrap('a'), Repeat(0, 1), low),
+        IndexedSeq(Repeat(0, 2), high, Wrap('a'), low)
+      )
+    do assert(FString(1, seq).admitsAnyRepeatCount(UnitMode.UTF16CodePoint), seq)
+
   test("FString#toAttackPattern"):
     assertEquals(
-      FString(2, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toAttackPattern,
+      FString(2, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toAttackPattern(UnitMode.UTF16),
       AttackPattern(Seq((UnitMode.UTF16.decode("a"), UnitMode.UTF16.decode("bc"), 1)), UnitMode.UTF16.decode("d"), 2)
     )
     assertEquals(
-      FString(0, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toAttackPattern,
+      FString(0, IndexedSeq(Wrap('a'), Repeat(1, 2), Wrap('b'), Wrap('c'), Wrap('d'))).toAttackPattern(UnitMode.UTF16),
       AttackPattern(Seq.empty, UnitMode.UTF16.decode("abcd"), 0)
     )
     intercept[IllegalArgumentException] {
-      FString(1, IndexedSeq(Repeat(1, 2), Wrap('a'), Repeat(1, 1))).toAttackPattern
+      FString(1, IndexedSeq(Repeat(1, 2), Wrap('a'), Repeat(1, 1))).toAttackPattern(UnitMode.UTF16)
     }
+    intercept[UnexpectedException]:
+      FString(2, IndexedSeq(Wrap(0xd800), Repeat(0, 1), Wrap(0xdc00))).toAttackPattern(UnitMode.UTF16CodePoint)
 
   test("FString#toString"):
     assertEquals(FString(2, IndexedSeq.empty).toString(AttackPatternStyle.JavaScript(unicode = false)), "''")

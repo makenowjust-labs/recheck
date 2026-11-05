@@ -12,6 +12,8 @@ import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.recheck.fuzz.FuzzChecker.Trace
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.ir.IRPattern
 
 class FuzzCheckerSuite extends munit.FunSuite:
 
@@ -114,11 +116,14 @@ class FuzzCheckerSuite extends munit.FunSuite:
         .nextOption()
       result.get.isEmpty
 
-  test("FuzzChecker#Population#toGeneration: strings with an avoided attack rank last"):
+  /** Builds a checker of the pattern with the default parameters, except the given ones. */
+  def checkerOf(
+      ir: IRPattern,
+      maxGenerationSize: Int = Parameters.DefaultMaxGenerationSize,
+      avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean = (_, _) => false
+  ): FuzzChecker =
     import Parameters.*
-    val ir = ReDoS.parse("^(a|a)*$", "", Dialect.JavaScript)
-    val avoidsAttack = (c: AttackComplexity.Vulnerable, _: Hotspot) => c == AttackComplexity.Exponential(true)
-    val checker = new FuzzChecker(
+    new FuzzChecker(
       ir,
       FuzzProgram.from(ir),
       random0,
@@ -135,13 +140,37 @@ class FuzzCheckerSuite extends munit.FunSuite:
       DefaultMutationSize,
       DefaultMaxAttackStringSize,
       DefaultMaxInitialGenerationSize,
-      2,
+      maxGenerationSize,
       DefaultMaxIteration,
       DefaultMaxDegree,
       DefaultHeatRatio,
       DefaultAccelerationMode,
       avoidsAttack
     )
+
+  test("FuzzChecker#Population#execute: strings that some repeat count makes no string of the mode"):
+    val ir = ReDoS.parse("^[\\uD800-\\uDBFF]*[\\uDC00-\\uDFFF]*$", "u", Dialect.JavaScript)
+    val (high, low) = (FString.Wrap(0xd800), FString.Wrap(0xdc00))
+    // A high surrogate followed by a low surrogate is one code point in `UTF16CodePoint`, so the string is discarded.
+    for seq <- Seq(
+        IndexedSeq(high, low),
+        IndexedSeq(high, FString.Repeat(0, 1), low),
+        IndexedSeq(FString.Repeat(0, 2), low, high)
+      )
+    do
+      val checker = checkerOf(ir)
+      val pop = new checker.Population(0, mutable.Set.empty, mutable.Set.empty)
+      pop.execute(FString(1, seq))
+      assertEquals(checker.inputs.toSet, Set.empty, seq)
+    val checker = checkerOf(ir)
+    val pop = new checker.Population(0, mutable.Set.empty, mutable.Set.empty)
+    pop.execute(FString(1, IndexedSeq(low, high)))
+    assertEquals(checker.inputs.toSet, Set(UString(0xdc00, 0xd800)))
+
+  test("FuzzChecker#Population#toGeneration: strings with an avoided attack rank last"):
+    val ir = ReDoS.parse("^(a|a)*$", "", Dialect.JavaScript)
+    val avoidsAttack = (c: AttackComplexity.Vulnerable, _: Hotspot) => c == AttackComplexity.Exponential(true)
+    val checker = checkerOf(ir, 2, avoidsAttack)
     val strs = Seq(1, 2, 3).map(n => FString(n, IndexedSeq(FString.Repeat(0, 1), FString.Wrap('a'))))
     val traces = strs.zip(Seq(3.0, 2.0, 1.0)).map((s, rate) => Trace(s, rate, 0, Set.empty))
     val pop = new checker.Population(0, mutable.Set.from(traces), mutable.Set.empty)

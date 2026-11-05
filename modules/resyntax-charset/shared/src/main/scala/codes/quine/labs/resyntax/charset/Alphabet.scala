@@ -34,6 +34,10 @@ final class Alphabet private (
     */
   def atomsOf(set: CharSet): BitSet =
     require(set.isEmpty || mode.contains(set.last), f"Invalid unit in $mode mode: ${set.last}%X")
+    require(
+      mode != UnitMode.ScalarValue || !set.intersectsRange(0xd800, 0xdfff),
+      s"Invalid unit in $mode mode: a surrogate"
+    )
     val builder = BitSet.newBuilder
     set.foreachIntervalWithin(0, mode.limit): (start, end) =>
       var i = CharSet.countLessOrEqual(segmentStarts, start) - 1
@@ -51,11 +55,10 @@ object Alphabet:
     * The sets are restricted to the mode, and the atoms are ordered by their smallest code values.
     */
   def refine(mode: UnitMode, sets: Iterable[CharSet]): Alphabet =
-    val restricted = sets.iterator.map(_.restrict(mode)).filter(_.nonEmpty).toVector
+    // Refining by the universe separates the surrogates in `ScalarValue`, which are in no atom.
+    val restricted = mode.universe +: sets.iterator.map(_.restrict(mode)).filter(_.nonEmpty).toVector
 
     val points = mutable.ArrayBuilder.make[Int]
-    points.addOne(0)
-    points.addOne(mode.limit)
     for set <- restricted do points.addAll(set.boundaries)
     val sortedPoints = points.result().sorted.distinct
     val segmentStarts = sortedPoints.init
@@ -98,8 +101,10 @@ object Alphabet:
       builders.size - 1
 
     for i <- 0 until n do
-      val atom = renumber.getOrElseUpdate(segmentAtoms(i), newBuilder())
-      segmentAtoms(i) = atom
-      builders(atom).addRange(sortedPoints(i), sortedPoints(i + 1))
+      if mode.contains(sortedPoints(i)) then
+        val atom = renumber.getOrElseUpdate(segmentAtoms(i), newBuilder())
+        segmentAtoms(i) = atom
+        builders(atom).addRange(sortedPoints(i), sortedPoints(i + 1))
+      else segmentAtoms(i) = -1
 
     new Alphabet(mode, segmentStarts, segmentAtoms, builders.iterator.map(_.result()).toIndexedSeq)

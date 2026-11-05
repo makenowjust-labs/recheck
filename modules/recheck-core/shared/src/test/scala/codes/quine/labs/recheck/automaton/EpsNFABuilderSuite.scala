@@ -11,7 +11,6 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
-import codes.quine.labs.resyntax.ir.IRSurrogateKind.Separate
 import codes.quine.labs.resyntax.ir.alphabet.CharKind
 import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
@@ -35,7 +34,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     CharSet.union(Seq(CharSet.range('0', '9'), CharSet.range('A', 'Z'), CharSet.single('_'), CharSet.range('a', 'z')))
 
   def buildAlphabet(mode: UnitMode, sets: Seq[CharSet] = Seq.empty, word: Option[CharSet] = None): PatternAlphabet =
-    PatternAlphabet.build(mode, sets, None, word, false, Seq.empty, Seq.empty, Seq.empty, Separate)
+    PatternAlphabet.build(mode, sets, None, word, false, Seq.empty, Seq.empty, Seq.empty)
 
   /** Returns an ε-NFA of `^x$`, where `x` consumes the set. */
   def single(alphabet: PatternAlphabet, set: CharSet): EpsNFA[Int] =
@@ -127,7 +126,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     assertEquals(build("^.$", "s"), single(buildAlphabet(utf16), any16))
     assertEquals(
       build("^.$", "su"),
-      single(buildAlphabet(UnitMode.CodePoint), UnitMode.CodePoint.universe)
+      single(buildAlphabet(UnitMode.UTF16CodePoint), UnitMode.UTF16CodePoint.universe)
     )
 
   test("EpsNFABuilder.build: Disjunction"):

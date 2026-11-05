@@ -23,7 +23,7 @@ class IRCharResolverSuite extends munit.FunSuite:
   val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())
 
   /** The characters of the input without surrogates (Ruby and PCRE with `u`). */
-  val Scalars: CharSet = UnitMode.CodePoint.universe.diff(UTF16Encoding.Surrogates)
+  val Scalars: CharSet = UnitMode.ScalarValue.universe
 
   def build(s: String, flags: String, dialect: Dialect): IRPattern =
     val flagSet = FlagSet.parse(flags, dialect)
@@ -83,15 +83,15 @@ class IRCharResolverSuite extends munit.FunSuite:
   // Unit modes
   for (dialect, flags, mode) <- Seq(
       (JavaScript, "", UnitMode.UTF16),
-      (JavaScript, "u", UnitMode.CodePoint),
-      (JavaScript, "v", UnitMode.CodePoint),
+      (JavaScript, "u", UnitMode.UTF16CodePoint),
+      (JavaScript, "v", UnitMode.UTF16CodePoint),
       (DotNet, "", UnitMode.UTF16),
-      (Java, "", UnitMode.CodePoint),
+      (Java, "", UnitMode.UTF16CodePoint),
       (PCRE, "", UnitMode.Byte),
-      (PCRE, "u", UnitMode.CodePoint),
+      (PCRE, "u", UnitMode.ScalarValue),
       (Python(), "", UnitMode.CodePoint),
       (Python(Python.Type.Bytes), "", UnitMode.Byte),
-      (Ruby(), "", UnitMode.CodePoint),
+      (Ruby(), "", UnitMode.ScalarValue),
       (Ruby(), "n", UnitMode.Byte),
       (Ruby(Ruby.Encoding.ASCII8Bit), "", UnitMode.Byte),
       (Perl(), "", UnitMode.CodePoint),
@@ -101,7 +101,7 @@ class IRCharResolverSuite extends munit.FunSuite:
     test(s"IRBuilder.build: the unit mode of $dialect with /$flags/"):
       assertEquals(build("a", flags, dialect).mode, mode)
   test("IRBuilder.build: the unit mode of PCRE with (*UTF)"):
-    assertEquals(build("(*UTF)a", "", PCRE).mode, UnitMode.CodePoint)
+    assertEquals(build("(*UTF)a", "", PCRE).mode, UnitMode.ScalarValue)
 
   // Literals
   chars("a", "", All*)(of("a"))

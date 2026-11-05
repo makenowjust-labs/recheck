@@ -80,9 +80,16 @@ export type VulnerableDiagnostics = {
 };
 
 /**
- * UnitMode is the unit of the attack strings: UTF-16 code units (`utf16`), code points (`code-point`), or bytes (`byte`).
+ * UnitMode is the unit of the attack strings.
+ *
+ * - `utf16`: UTF-16 code units.
+ * - `utf16-code-point`: code points read from UTF-16, where a lone surrogate is a code point, but a high surrogate followed by a low surrogate is one code point.
+ * - `code-point`: code points, where the surrogates are ordinary code points in any order.
+ * - `scalar-value`: Unicode scalar values, which are the code points other than the surrogates.
+ * - `byte`: bytes.
  */
-export type UnitMode = "utf16" | "code-point" | "byte";
+export type UnitMode =
+  "utf16" | "utf16-code-point" | "code-point" | "scalar-value" | "byte";
 
 /**
  * RefutedAttack is an attack that the runtime-attack verification refuted before the result.
@@ -236,8 +243,8 @@ export type Unexpected = {
  * AttackPattern is an attack pattern string.
  *
  * The strings are UTF-16 code units, or bytes as the characters of the same codes if `unitMode` is `byte`.
- * A string is the array of the units of `unitMode` instead when they have a surrogate code point in `code-point`,
- * a lone surrogate in `utf16`, or a byte above `0x7F` in `byte`.
+ * A string is the array of the units of `unitMode` instead when they have a surrogate code point in
+ * `utf16-code-point`, `code-point` or `scalar-value`, a lone surrogate in `utf16`, or a byte above `0x7F` in `byte`.
  */
 export type AttackPattern = {
   pumps: {

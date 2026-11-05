@@ -6,6 +6,8 @@ import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.fuzz.FString.*
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UTF16Encoding
+import codes.quine.labs.resyntax.charset.UnitMode
 
 /** FString is a string with a repetition structure for fuzzing. */
 final case class FString(n: Int, seq: IndexedSeq[FChar]):
@@ -76,8 +78,64 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]):
           pos += size
     UString.from(str.result())
 
-  /** Builds an attack pattern string from this. */
-  def toAttackPattern: AttackPattern =
+  /** Checks whether the string is one of the mode for any repeat counts, as
+    * [[diagnostics.AttackPattern.admitsAnyRepeatCount]] does.
+    *
+    * Each repetition counts as repeated any times independently, including no times, whatever `n` is.
+    */
+  def admitsAnyRepeatCount(mode: UnitMode): Boolean =
+    if mode != UnitMode.UTF16CodePoint then return true
+    // Whether the unit before `pos` may be a high surrogate.
+    var afterHigh = false
+    var pos = 0
+    while pos < seq.size do
+      seq(pos) match
+        case Wrap(u) =>
+          if afterHigh && UTF16Encoding.isLowSurrogate(u) then return false
+          afterHigh = UTF16Encoding.isHighSurrogate(u)
+          pos += 1
+        case Repeat(_, size) =>
+          val start = pos + 1
+          val end = Math.min(start + size, seq.size)
+          if start < end then
+            val first = unitAt(start)
+            val last = unitAt(end - 1)
+            // The part follows the unit before it, or itself on a repetition.
+            if (afterHigh || UTF16Encoding.isHighSurrogate(last)) && UTF16Encoding.isLowSurrogate(first) then
+              return false
+            var i = start + 1
+            while i < end do
+              if UTF16Encoding.isHighSurrogate(unitAt(i - 1)) && UTF16Encoding.isLowSurrogate(unitAt(i)) then
+                return false
+              i += 1
+            afterHigh = afterHigh || UTF16Encoding.isHighSurrogate(last)
+          pos = end
+    true
+
+  /** Returns the unit of the `pos`-th character, which must not be a repeat specifier. */
+  private def unitAt(pos: Int): UChar = seq(pos) match
+    case Wrap(u)      => u
+    case Repeat(_, _) => throw new IllegalArgumentException
+
+  /** Builds an attack pattern string of the units of the mode from this.
+    *
+    * It throws [[common.UnexpectedException]] as [[diagnostics.AttackPattern.build]] does.
+    */
+  def toAttackPattern(mode: UnitMode): AttackPattern =
+    val (pumps, suffix) = splitPumps
+    AttackPattern.build(pumps, suffix, n, mode)
+
+  /** Returns the string representation of this string in the style. */
+  def toString(style: AttackPatternStyle): String =
+    val (pumps, suffix) = splitPumps
+    AttackPattern(pumps, suffix, n).toString(style)
+
+  override def toString: String = toString(AttackPatternStyle.JavaScript(unicode = true))
+
+  /** Splits this into the pumps and the suffix of an attack pattern, where a repetition is a pump if it repeats more
+    * than once.
+    */
+  private def splitPumps: (Seq[(UString, UString, Int)], UString) =
     val pumps = Seq.newBuilder[(UString, UString, Int)]
 
     val str = IndexedSeq.newBuilder[UChar]
@@ -103,13 +161,7 @@ final case class FString(n: Int, seq: IndexedSeq[FChar]):
             pumps.addOne((s, t, m))
             pos += size
 
-    val suffix = UString.from(str.result())
-    AttackPattern(pumps.result(), suffix, n)
-
-  /** Returns the string representation of this string in the style. */
-  def toString(style: AttackPatternStyle): String = toAttackPattern.toString(style)
-
-  override def toString: String = toString(AttackPatternStyle.JavaScript(unicode = true))
+    (pumps.result(), UString.from(str.result()))
 
 /** FString types and utilities. */
 object FString:

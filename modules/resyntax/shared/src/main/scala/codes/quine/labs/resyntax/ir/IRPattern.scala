@@ -7,7 +7,6 @@ import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UString
-import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 
@@ -29,14 +28,12 @@ final case class IRPattern(
     anchored: Boolean,
     /** The unit of the input, which the character sets of the nodes consist of. */
     mode: UnitMode,
-    /** What the surrogate code points of the input are in the dialect. */
-    surrogates: IRSurrogateKind,
     /** Where an empty match is rejected (PCRE's `(*NOTEMPTY)` and `(*NOTEMPTY_ATSTART)`). */
     notEmpty: IRNotEmpty
 ):
 
   /** The characters of the input, which the character sets of the nodes are subsets of. */
-  lazy val universe: CharSet = surrogates.universe(mode)
+  def universe: CharSet = mode.universe
 
   /** Returns the size of the pattern, which counts a repetition as its copies (e.g. `a{2,3}` is `4`). */
   def size: Int =
@@ -304,26 +301,6 @@ enum IREmptyIteration:
 
   /** ExitAll ends the repetition with any one, even before the minimum (Java's `Loop`). */
   case ExitAll
-
-/** IRSurrogateKind is the kind of the surrogate code points of the input, which differs among dialects in `CodePoint`
-  * mode.
-  */
-enum IRSurrogateKind:
-
-  /** Separate makes each surrogate a character, even before another (Python's `str` and Perl, and the other modes). */
-  case Separate
-
-  /** Paired makes a lone surrogate a character, but a high surrogate followed by a low surrogate is one supplementary
-    * character (JavaScript's `u` and `v`, and Java).
-    */
-  case Paired
-
-  /** Absent keeps the surrogates out of the input, which is valid UTF-8 (Ruby and PCRE). */
-  case Absent
-
-  /** Returns the characters of the input in the mode. */
-  def universe(mode: UnitMode): CharSet =
-    if this == Absent then mode.universe.diff(UTF16Encoding.Surrogates) else mode.universe
 
 /** IRBacktrackControlSemantics is where the backtracking control verbs act, which differs among dialects. */
 final case class IRBacktrackControlSemantics(
