@@ -71,17 +71,24 @@ The ESLint plugin (`eslint-plugin-redos`) checks JavaScript regular expressions 
 | [`perl`](dialects/perl.md)             | Perl 5.44 regular expressions                  | code points (`utf8`), or bytes (no `utf8`)         |
 | [`pcre`](dialects/pcre.md)             | PCRE2 10.49 as PHP's `preg_*` functions use it | bytes, or code points (UTF-8) with `u` or `(*UTF)` |
 
-## Units and Attack Strings
+## Units
 
-A pattern matches a string of UTF-16 code units, of code points, or of bytes, which depends on the dialect.
+A unit is what a pattern reads as one character: `.` matches exactly one unit.
+It is a UTF-16 code unit, a code point, or a byte, which depends on the dialect and its settings (see the table above).
+
+For example, `^.$` matches `😀` (U+1F600) in Python's `str` and in Java, where it is one code point.
+In JavaScript without `u` and in .NET, it does not match, since `😀` is two UTF-16 code units there, and `^..$` matches instead.
+Likewise, in Python's `bytes`, Ruby's `ASCII-8BIT`, Perl without `utf8` and PCRE without `u`, `é` is two bytes in UTF-8, so `^.$` does not match it, and `^..$` does.
+
 The dialects having the choice take a setting of the [`dialect`](parameters.mdx#dialect) in the dialect's own words: `type` of `python`, `encoding` of `ruby` and `utf8` of `perl`.
 The setting also changes how the pattern is read, as the engine does.
 
-The attack string (`attack.pattern` of the diagnostics) is an expression in the dialect's host language, e.g. `'a' * 31 + '\x00'` in Python (see [Diagnostics](diagnostics.md#attack-string) for each dialect).
-In a bytes mode, it is a bytes literal (`b'\xc3\xa9'` in Python, `"\xC3\xA9".b` in Ruby, `"\xC3\xA9"` in Perl and PHP).
-`attack.string` shows each byte as the character of the same code (as Latin-1), e.g. the UTF-8 bytes of `é` are `Ã©`.
-
 The character set flags change the meaning of `\w`, `\d`, `\s`, `\b`, POSIX classes and case-insensitive matching in the same way as in the engine.
+
+## Attack Strings
+
+The attack string (`attack.pattern` of the diagnostics) is an expression in the dialect's host language, e.g. `'a' * 31 + '\x00'` in Python (see [Diagnostics](diagnostics.md#attack-string) for each dialect).
+It is a string of the units of the pattern, so in a mode of bytes, it is a bytes literal (`b'\xc3\xa9'` in Python, `"\xC3\xA9".b` in Ruby, `"\xC3\xA9"` in Perl and PHP).
 
 ## Syntax Limitations
 
