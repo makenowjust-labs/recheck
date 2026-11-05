@@ -17,7 +17,7 @@ It runs when [`runtimeAttackTimeout`](parameters.mdx#runtimeattacktimeout) is po
 <Tabs>
 <TabItem value="cli" label="CLI">
 
-```sh-session
+```console
 $ recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
 ```
 
@@ -28,6 +28,19 @@ $ recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
 import { check } from "recheck";
 
 await check("^(a|a)*$", "", { dialect: "ruby", runtimeAttackTimeout: 1000 });
+```
+
+</TabItem>
+<TabItem value="scala" label="Scala">
+
+```scala
+import scala.concurrent.duration.*
+
+import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.resyntax.ast.Dialect
+
+ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Ruby(), runtimeAttackTimeout = 1.second))
 ```
 
 </TabItem>
@@ -70,7 +83,7 @@ An empty value is ignored.
 
 For example, the following runs `/opt/ruby-4.0/bin/ruby --disable-gems -`.
 
-```sh-session
+```console
 $ RECHECK_RUBY='/opt/ruby-4.0/bin/ruby --disable-gems' recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
 ```
 
@@ -87,7 +100,7 @@ The result lists the refuted attacks in its `refutedAttacks` field (see [Diagnos
 They show that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by these attacks.
 The CLI shows them in the `Refuted attacks` section after the result.
 
-```sh-session
+```console
 $ recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
 Input     : /^(a|a)*$/
 Dialect   : ruby (encoding: UTF-8)
@@ -113,7 +126,7 @@ The CLI's `generate-runtime-attack-script` subcommand writes the program that th
 It takes a file of `vulnerable` diagnostics in JSON (`-` reads the standard input), which is the output of the CLI with `--json`, or the result of the JavaScript library or the CLI's agent mode.
 The dialect of the pattern comes from the `dialect` field of the diagnostics, and the unit of the attack string from the `unitMode` field.
 
-```sh-session
+```console
 $ recheck --json --dialect=python '/^(a|a)*$/' > diagnostics.json
 $ recheck generate-runtime-attack-script diagnostics.json > runtime-attack.py
 $ python3 -I runtime-attack.py
