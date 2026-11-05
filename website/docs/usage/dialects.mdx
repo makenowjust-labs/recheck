@@ -94,11 +94,6 @@ re.match(".", "😀").group()           # => '😀' (one code point in a `str` p
 re.match(b".", "😀".encode()).group() # => b'\xf0' (one byte in a `bytes` pattern)
 ```
 
-## Attack Strings
-
-The attack string (`attack.pattern` of the diagnostics) is an expression in the dialect's host language, e.g. `'a' * 31 + '\x00'` in Python (see [Diagnostics](diagnostics.md#attack-string) for each dialect).
-It is a string of the units of the pattern, so in a mode of bytes, it is a bytes literal (`b'\xc3\xa9'` in Python, `"\xC3\xA9".b` in Ruby, `"\xC3\xA9"` in Perl and PHP).
-
 ## Syntax Limitations
 
 `recheck` reads the whole syntax of the latest version of each engine in the table above.
