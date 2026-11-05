@@ -11,8 +11,8 @@ import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.recheck.exec.ExecResult
 import codes.quine.labs.recheck.exec.Executor
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
 
 /** RuntimeAttackVerifier is the implementation of runtime-attack verification. */
 object RuntimeAttackVerifier:

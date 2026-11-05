@@ -1,11 +1,11 @@
 package codes.quine.labs.resyntax.parser
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.CommandKind.*
-import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetDiff
 import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.NodeData.*
+import codes.quine.labs.resyntax.dialect.Dialect.*
 
 class ParserInlineFlagSuite extends munit.FunSuite with ParserHelper:
 

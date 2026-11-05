@@ -4,6 +4,7 @@ package build
 import codes.quine.labs.resyntax.charset.BinaryProperty
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.ClassSet
+import codes.quine.labs.resyntax.charset.CompatibilityPropertyTable
 import codes.quine.labs.resyntax.charset.EnumeratedProperty
 import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.PropertyValue
@@ -171,6 +172,23 @@ private[build] object IRPropertyLookup:
     "RGI_Emoji"
   )
 
+  /** Looks up the property of the name, with the value of `\p{name=value}` if any, by the rules of the kind at the
+    * flags in the unit mode.
+    */
+  def lookup(
+      kind: IRPropertyLookupKind,
+      name: String,
+      value: Option[String],
+      flags: IRCharFlagSet,
+      mode: UnitMode
+  ): PropertyResult = kind match
+    case IRPropertyLookupKind.JavaScript => javaScript(name, value, flags.unicodeSets)
+    case IRPropertyLookupKind.Java       => java(name, value, flags)
+    case IRPropertyLookupKind.DotNet     => if value.isEmpty then dotNet(name) else Unknown
+    case IRPropertyLookupKind.PCRE       => pcre(name, value)
+    case IRPropertyLookupKind.Perl       => perl(name, value)
+    case IRPropertyLookupKind.Ruby       => ruby(name, value, mode == UnitMode.Byte)
+
   def isJavaScriptStringProperty(name: String): Boolean = JavaScriptStringProperties.contains(name)
 
   def javaScript(name: String, value: Option[String], unicodeSets: Boolean): PropertyResult = value match
@@ -198,16 +216,6 @@ private[build] object IRPropertyLookup:
   // Java
 
   private def javaCased: CharSet = binary("Lowercase").union(binary("Uppercase")).union(gc("Lt"))
-
-  private def javaWhiteSpace: CharSet = gc("Z").union(CharSet.range(0x09, 0x0d)).union(CharSet.single(0x85))
-
-  private def javaHexDigit: CharSet = gc("Nd").union(binary("Hex_Digit"))
-
-  /** `java.util.regex.CharPredicates.WORD`. */
-  def javaWord: CharSet =
-    binary("Alphabetic").union(gc("Mn", "Me", "Mc", "Nd", "Pc")).union(binary("Join_Control"))
-
-  private def javaGraph: CharSet = javaWhiteSpace.union(gc("Cc", "Cs", "Cn")).complement(unicodeUniverse)
 
   private val unicodeUniverse = UnitMode.CodePoint
 
@@ -280,7 +288,7 @@ private[build] object IRPropertyLookup:
     case "EMOJI_MODIFIER_BASE"                               => found(binary("Emoji_Modifier_Base"))
     case "EMOJI_COMPONENT"                                   => found(binary("Emoji_Component"))
     case "EXTENDED_PICTOGRAPHIC"                             => found(binary("Extended_Pictographic"))
-    case "HEXDIGIT" | "HEX_DIGIT"                            => found(javaHexDigit)
+    case "HEXDIGIT" | "HEX_DIGIT"                            => found(CompatibilityPropertyTable.XDigit)
     case "IDEOGRAPHIC"                                       => found(binary("Ideographic"))
     case "JOINCONTROL" | "JOIN_CONTROL"                      => found(binary("Join_Control"))
     case "LETTER"                                            => found(gc("L"))
@@ -289,24 +297,24 @@ private[build] object IRPropertyLookup:
     case "TITLECASE"                                         => found(if ci then javaCased else gc("Lt"))
     case "PUNCTUATION"                                       => found(gc("P"))
     case "UPPERCASE"                                         => found(if ci then javaCased else binary("Uppercase"))
-    case "WHITESPACE" | "WHITE_SPACE"                        => found(javaWhiteSpace)
-    case "WORD"                                              => found(javaWord)
+    case "WHITESPACE" | "WHITE_SPACE"                        => found(CompatibilityPropertyTable.Space)
+    case "WORD"                                              => found(CompatibilityPropertyTable.Word)
     case _                                                   => javaPOSIX(name, ci)
 
   /** Looks up an upper-cased name as `CharPredicates.getPosixPredicate` does, which `UNICODE_CHARACTER_CLASS` uses. */
   private def javaPOSIX(name: String, ci: Boolean): PropertyResult = name match
-    case "ALPHA"  => found(binary("Alphabetic"))
-    case "LOWER"  => found(if ci then javaCased else binary("Lowercase"))
-    case "UPPER"  => found(if ci then javaCased else binary("Uppercase"))
-    case "SPACE"  => found(javaWhiteSpace)
-    case "PUNCT"  => found(gc("P"))
-    case "XDIGIT" => found(javaHexDigit)
-    case "ALNUM"  => found(binary("Alphabetic").union(gc("Nd")))
-    case "CNTRL"  => found(gc("Cc"))
-    case "DIGIT"  => found(gc("Nd"))
-    case "BLANK"  => found(gc("Zs").union(of("\t")))
-    case "GRAPH"  => found(javaGraph)
-    case "PRINT"  => found(javaGraph.union(gc("Zs")).union(of("\t")).diff(gc("Cc")))
+    case "ALPHA"  => found(CompatibilityPropertyTable.Alpha)
+    case "LOWER"  => found(if ci then javaCased else CompatibilityPropertyTable.Lower)
+    case "UPPER"  => found(if ci then javaCased else CompatibilityPropertyTable.Upper)
+    case "SPACE"  => found(CompatibilityPropertyTable.Space)
+    case "PUNCT"  => found(CompatibilityPropertyTable.Punct)
+    case "XDIGIT" => found(CompatibilityPropertyTable.XDigit)
+    case "ALNUM"  => found(CompatibilityPropertyTable.Alnum)
+    case "CNTRL"  => found(CompatibilityPropertyTable.Cntrl)
+    case "DIGIT"  => found(CompatibilityPropertyTable.Digit)
+    case "BLANK"  => found(CompatibilityPropertyTable.Blank)
+    case "GRAPH"  => found(CompatibilityPropertyTable.Graph)
+    case "PRINT"  => found(CompatibilityPropertyTable.Print)
     case _        => Unknown
 
   private def javaScriptName(name: String): PropertyResult =
@@ -724,28 +732,25 @@ private[build] object IRPropertyLookup:
     val u = unicodeUniverse
     def o(set: CharSet, kind: CaseKind = CaseKind.Other) = Some((set, kind))
 
-    val space = binary("White_Space")
-    val horiz = space.diff(IRClassLookup.Vertical)
-    val graph = space.union(gc("Cc", "Cn", "Cs")).complement(u)
     val punct = gc("P").union(of("$+<=>^`|~"))
     key match
       case "any" | "all" | "unicode"                            => o(u.universe)
       case "assigned"                                           => o(gc("Cn").complement(u))
       case "ascii"                                              => o(ASCII_POSIX("ascii"))
       case "l&" | "l_" | "lc" | "casedletter"                   => o(gc("LC"), CaseKind.Category)
-      case "alnum" | "xposixalnum"                              => o(binary("Alphabetic").union(gc("Nd")))
-      case "alpha" | "xposixalpha"                              => o(binary("Alphabetic"))
-      case "blank" | "xposixblank" | "horizspace" | "h"         => o(horiz)
-      case "cntrl" | "xposixcntrl"                              => o(gc("Cc"))
-      case "digit" | "xposixdigit"                              => o(gc("Nd"))
-      case "graph" | "xposixgraph"                              => o(graph)
-      case "lower" | "xposixlower"                              => o(binary("Lowercase"), CaseKind.Cased)
-      case "print" | "xposixprint"                              => o(graph.union(horiz).diff(gc("Cc")))
+      case "alnum" | "xposixalnum"                              => o(CompatibilityPropertyTable.Alnum)
+      case "alpha" | "xposixalpha"                              => o(CompatibilityPropertyTable.Alpha)
+      case "blank" | "xposixblank" | "horizspace" | "h"         => o(CompatibilityPropertyTable.Blank)
+      case "cntrl" | "xposixcntrl"                              => o(CompatibilityPropertyTable.Cntrl)
+      case "digit" | "xposixdigit"                              => o(CompatibilityPropertyTable.Digit)
+      case "graph" | "xposixgraph"                              => o(CompatibilityPropertyTable.Graph)
+      case "lower" | "xposixlower"                              => o(CompatibilityPropertyTable.Lower, CaseKind.Cased)
+      case "print" | "xposixprint"                              => o(CompatibilityPropertyTable.Print)
       case "punct" | "xposixpunct"                              => o(punct)
-      case "space" | "xposixspace" | "spaceperl" | "xperlspace" => o(space)
-      case "upper" | "xposixupper"                              => o(binary("Uppercase"), CaseKind.Cased)
+      case "space" | "xposixspace" | "spaceperl" | "xperlspace" => o(CompatibilityPropertyTable.Space)
+      case "upper" | "xposixupper"                              => o(CompatibilityPropertyTable.Upper, CaseKind.Cased)
       case "title" | "titlecase"                                => o(gc("Lt"), CaseKind.Cased)
-      case "word" | "xposixword"                                => o(IRClassLookup.perlWord)
+      case "word" | "xposixword"                                => o(CompatibilityPropertyTable.Word)
       case "xdigit" | "xposixxdigit"                            => o(binary("Hex_Digit"))
       case "vertspace" | "v"                                    => o(IRClassLookup.Vertical)
       case "posixalnum"                                         => o(ASCII_POSIX("alnum"))
@@ -934,26 +939,11 @@ private[build] object IRPropertyLookup:
     *
     * With `bracket`, it is a bracket (e.g. `[[:punct:]]`), whose `punct` adds the ASCII symbols unlike `\p{Punct}`.
     */
-  def rubyPOSIX(key: String, bracket: Boolean = true): Option[CharSet] =
-    val u = unicodeUniverse
-    val space = binary("White_Space")
-    val graph = space.union(gc("Cc", "Cs", "Cn")).complement(u)
-    key match
-      case "alnum"  => Some(binary("Alphabetic").union(gc("Nd")))
-      case "alpha"  => Some(binary("Alphabetic"))
-      case "ascii"  => Some(CharSet.range(0, 0x7f))
-      case "blank"  => Some(gc("Zs").union(of("\t")))
-      case "cntrl"  => Some(gc("Cc"))
-      case "digit"  => Some(gc("Nd"))
-      case "graph"  => Some(graph)
-      case "lower"  => Some(binary("Lowercase"))
-      case "print"  => Some(graph.union(gc("Zs")))
-      case "punct"  => Some(if bracket then gc("P").union(of("$+<=>^`|~")) else gc("P"))
-      case "space"  => Some(space)
-      case "upper"  => Some(binary("Uppercase"))
-      case "xdigit" => Some(ascii('0' -> '9', 'A' -> 'F', 'a' -> 'f'))
-      case "word"   => Some(binary("Alphabetic").union(gc("M", "Nd", "Pc")).union(binary("Join_Control")))
-      case _        => None
+  def rubyPOSIX(key: String, bracket: Boolean = true): Option[CharSet] = key match
+    case "ascii"            => Some(CharSet.range(0, 0x7f))
+    case "punct" if bracket => Some(gc("P").union(of("$+<=>^`|~")))
+    case "xdigit"           => Some(ascii('0' -> '9', 'A' -> 'F', 'a' -> 'f'))
+    case _                  => CompatibilityPropertyTable.lookup(key)
 
   /** Looks up Ruby's property; an ASCII-8BIT regexp (`bytes`) has only the POSIX classes in ASCII. */
   def ruby(name: String, value: Option[String], bytes: Boolean): PropertyResult =

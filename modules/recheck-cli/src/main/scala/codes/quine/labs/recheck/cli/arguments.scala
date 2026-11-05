@@ -6,7 +6,7 @@ import cats.data.Validated
 import cats.data.ValidatedNel
 import com.monovore.decline.Argument
 
-import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.dialect.Dialect
 
 /** The object `arguments` provides decline's `Argument` instances for this application. */
 object arguments:

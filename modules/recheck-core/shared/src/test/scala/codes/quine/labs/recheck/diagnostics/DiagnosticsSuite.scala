@@ -11,9 +11,9 @@ import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.TimeoutException
 import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.common.UnsupportedException
-import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.PerlSource
 
 class DiagnosticsSuite extends munit.FunSuite:
 

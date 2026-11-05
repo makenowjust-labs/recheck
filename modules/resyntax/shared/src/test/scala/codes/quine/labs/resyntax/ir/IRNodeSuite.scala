@@ -1,6 +1,6 @@
 package codes.quine.labs.resyntax.ir
 
-import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.ir.build.IRHelper
 
 class IRNodeSuite extends munit.FunSuite with IRHelper:

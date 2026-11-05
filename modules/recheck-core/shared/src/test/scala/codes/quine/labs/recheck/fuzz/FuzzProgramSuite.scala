@@ -3,7 +3,7 @@ package codes.quine.labs.recheck.fuzz
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.dialect.Dialect
 
 class FuzzProgramSuite extends munit.FunSuite:
 

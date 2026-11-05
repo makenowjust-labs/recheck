@@ -1,10 +1,10 @@
 package codes.quine.labs.resyntax.ir
 package build
 
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
-import codes.quine.labs.resyntax.ast.PerlSource
-import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.LineTerminatorSet
+import codes.quine.labs.resyntax.dialect.PerlSource
 
 /** IRFeatureSet is a set of feature flags on building IR. */
 final case class IRFeatureSet(
@@ -19,7 +19,7 @@ final case class IRFeatureSet(
     // .NET, JavaScript, Python: AfterTerminator, Java: Never, the others: InputBegin
     lineBeginAtEnd: IRLineBeginAtEnd,
     // JavaScript: LineTerminator, Java: six characters with atomic `\r\n`, PCRE: `(*CR)` and so on, the others: `\n`
-    lineTerminators: IRLineTerminatorSet,
+    lineTerminators: LineTerminatorSet,
     // Java
     hasUnixLinesFlag: Boolean,
     // PCRE
@@ -114,10 +114,10 @@ final case class IRFeatureSet(
     multiCharFoldingKind: IRMultiCharFoldingKind,
     // Ruby
     readsByteEscapesAsUTF8: Boolean,
-    // `IRClassLookup`'s .NET: DotNet, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, Python: Python, Ruby: Ruby
-    classLookup: (UnitMode, Boolean) => IRClassLookup,
-    // `IRPropertyLookup`'s .NET: dotNet, Java: java, JavaScript: javaScript, PCRE: pcre, Perl: perl, Ruby: ruby, Python: none
-    propertyLookup: (String, Option[String], IRCharFlagSet, UnitMode) => PropertyResult,
+    // .NET: DotNet, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, Python: Python, Ruby: Ruby
+    classLookupKind: IRClassLookupKind,
+    // .NET: DotNet, Java: Java, JavaScript: JavaScript, PCRE: PCRE, Perl: Perl, Ruby: Ruby, Python: none
+    propertyLookupKind: Option[IRPropertyLookupKind],
     // .NET, PCRE: CasedLetter, JavaScript: Canonicalized, Perl: CasedLetterAndCased, Ruby: ClosedBeforeNegation, the others: Unchanged
     caselessPropertyKind: IRCaselessPropertyKind,
     // Ruby
@@ -217,6 +217,60 @@ enum IRMultiCharFoldingKind:
   /** Ruby folds literals other than escapes of ASCII characters, classes, properties and back-references in UTF-8. */
   case Ruby
 
+/** IRClassLookupKind is the family of a dialect's table of escape classes and POSIX classes.
+  *
+  * `IRClassLookup.from` selects the [[IRClassLookup]] of the family by the unit mode and Perl's Unicode rules.
+  */
+enum IRClassLookupKind:
+
+  /** JavaScript has classes of ASCII, whose `\w` with `u` or `v` and `i` has the characters folded to ASCII ones too.
+    */
+  case JavaScript
+
+  /** Java has classes of Unicode with `U`, and of ASCII without it. */
+  case Java
+
+  /** DotNet has classes of Unicode. */
+  case DotNet
+
+  /** PCRE has classes of Unicode in UCP mode, except the ones that `a` restricts. */
+  case PCRE
+
+  /** Perl has classes of Unicode or of the rules of the character set, where `/d` uses Unicode rules only with a reason
+    * (e.g. a UTF-8 pattern).
+    */
+  case Perl
+
+  /** Python has classes of Unicode in a `str` pattern without `a`. */
+  case Python
+
+  /** Ruby has escape classes of Unicode with `u`, and POSIX classes of Unicode without `a`, in a code point mode. */
+  case Ruby
+
+/** IRPropertyLookupKind is the family of a dialect's table of Unicode properties (`\p{...}`).
+  *
+  * `IRPropertyLookup.lookup` looks up a property in the table of the family at the flags in the unit mode.
+  */
+enum IRPropertyLookupKind:
+
+  /** JavaScript has ECMAScript's properties, and the properties of strings with `v`. */
+  case JavaScript
+
+  /** Java has `java.util.regex`'s properties, and its POSIX names of Unicode with `U`. */
+  case Java
+
+  /** DotNet has the general categories and .NET's named blocks, without values. */
+  case DotNet
+
+  /** PCRE has PCRE2's properties with its loose names. */
+  case PCRE
+
+  /** Perl has Perl's properties with its loose names. */
+  case Perl
+
+  /** Ruby has Onigmo's properties, and only the POSIX names in ASCII in byte mode. */
+  case Ruby
+
 /** IRCaselessPropertyKind is how a Unicode property (`\p{...}` or `\P{...}`) matches case-insensitively. */
 enum IRCaselessPropertyKind:
 
@@ -264,10 +318,10 @@ object IRFeatureSet:
         else if isJava then IRLineBeginAtEnd.Never
         else IRLineBeginAtEnd.InputBegin,
       lineTerminators =
-        if isJavaScript then IRLineTerminatorSet.JavaScript
-        else if isJava then IRLineTerminatorSet.Java
-        else if isPCRE then IRLineTerminatorSet.fromPCREStartOptions(startOptions).getOrElse(IRLineTerminatorSet.LF)
-        else IRLineTerminatorSet.LF,
+        if isJavaScript then LineTerminatorSet.JavaScript
+        else if isJava then LineTerminatorSet.Java
+        else if isPCRE then LineTerminatorSet.fromPCREStartOptions(startOptions).getOrElse(LineTerminatorSet.LF)
+        else LineTerminatorSet.LF,
       hasUnixLinesFlag = isJava,
       hasUngreedyFlag = isPCRE,
       hasExplicitCaptureFlag = isDotNet || isPCRE || isPerl,
@@ -343,27 +397,22 @@ object IRFeatureSet:
         else if isRuby then IRMultiCharFoldingKind.Ruby
         else IRMultiCharFoldingKind.OneToOne,
       readsByteEscapesAsUTF8 = isRuby,
-      classLookup = dialect match
-        case Dialect.DotNet     => (_, _) => IRClassLookup.DotNet
-        case Dialect.Java       => (_, _) => IRClassLookup.Java
-        case Dialect.JavaScript => (mode, _) => IRClassLookup.JavaScript(mode)
-        case Dialect.PCRE       => (_, _) => IRClassLookup.PCRE
-        case _: Dialect.Perl    => (_, native) => IRClassLookup.Perl(native)
-        case _: Dialect.Python  => (mode, _) => IRClassLookup.Python(mode)
-        case _: Dialect.Ruby    => (mode, _) => IRClassLookup.Ruby(mode),
-      propertyLookup = dialect match
-        case Dialect.DotNet =>
-          (name, value, _, _) => if value.isEmpty then IRPropertyLookup.dotNet(name) else PropertyResult.Unknown
-        case Dialect.Java       => (name, value, flags, _) => IRPropertyLookup.java(name, value, flags)
-        case Dialect.JavaScript =>
-          (name, value, flags, _) => IRPropertyLookup.javaScript(name, value, flags.unicodeSets)
-        case Dialect.PCRE    => (name, value, _, _) => IRPropertyLookup.pcre(name, value)
-        case _: Dialect.Perl => (name, value, _, _) => IRPropertyLookup.perl(name, value)
-        // Python's parser rejects `\p`.
-        // $COVERAGE-OFF$
-        case _: Dialect.Python => (_, _, _, _) => throw new IllegalArgumentException("Python has no Unicode property")
-        // $COVERAGE-ON$
-        case _: Dialect.Ruby => (name, value, _, mode) => IRPropertyLookup.ruby(name, value, mode == UnitMode.Byte),
+      classLookupKind = dialect match
+        case Dialect.DotNet     => IRClassLookupKind.DotNet
+        case Dialect.Java       => IRClassLookupKind.Java
+        case Dialect.JavaScript => IRClassLookupKind.JavaScript
+        case Dialect.PCRE       => IRClassLookupKind.PCRE
+        case _: Dialect.Perl    => IRClassLookupKind.Perl
+        case _: Dialect.Python  => IRClassLookupKind.Python
+        case _: Dialect.Ruby    => IRClassLookupKind.Ruby,
+      propertyLookupKind = dialect match
+        case Dialect.DotNet     => Some(IRPropertyLookupKind.DotNet)
+        case Dialect.Java       => Some(IRPropertyLookupKind.Java)
+        case Dialect.JavaScript => Some(IRPropertyLookupKind.JavaScript)
+        case Dialect.PCRE       => Some(IRPropertyLookupKind.PCRE)
+        case _: Dialect.Perl    => Some(IRPropertyLookupKind.Perl)
+        case _: Dialect.Python  => None
+        case _: Dialect.Ruby    => Some(IRPropertyLookupKind.Ruby),
       caselessPropertyKind =
         if isDotNet || isPCRE then IRCaselessPropertyKind.CasedLetter
         else if isJavaScript then IRCaselessPropertyKind.Canonicalized

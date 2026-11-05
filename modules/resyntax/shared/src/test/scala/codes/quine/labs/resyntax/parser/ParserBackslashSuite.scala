@@ -8,7 +8,6 @@ import codes.quine.labs.resyntax.ast.BoundaryModifier.*
 import codes.quine.labs.resyntax.ast.CaseCommandKind.*
 import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.CommandKind
-import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.EscapeClassKind.*
 import codes.quine.labs.resyntax.ast.EscapeStyle.*
 import codes.quine.labs.resyntax.ast.FlagSet
@@ -18,6 +17,7 @@ import codes.quine.labs.resyntax.ast.NameStyle.*
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.Quantifier.*
 import codes.quine.labs.resyntax.ast.Reference.*
+import codes.quine.labs.resyntax.dialect.Dialect.*
 
 class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
 

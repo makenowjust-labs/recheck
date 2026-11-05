@@ -4,7 +4,6 @@ import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.CaseCommandKind
 import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.CommandKind.InlineFlag
-import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.EscapeClassKind.*
 import codes.quine.labs.resyntax.ast.EscapeStyle.*
 import codes.quine.labs.resyntax.ast.FlagSet
@@ -12,6 +11,7 @@ import codes.quine.labs.resyntax.ast.FlagSetDiff
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.QuoteLiteral.*
+import codes.quine.labs.resyntax.dialect.Dialect.*
 
 class ParserClassSuite extends munit.FunSuite with ParserHelper:
 

@@ -6,10 +6,10 @@ import scala.language.implicitConversions
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.alphabet.CharKind
 import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet

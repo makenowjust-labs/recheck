@@ -3,8 +3,8 @@ package build
 
 import scala.language.implicitConversions
 
-import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.Dialect.*
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.Dialect.*
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.ir.build.IRHelper.given
 

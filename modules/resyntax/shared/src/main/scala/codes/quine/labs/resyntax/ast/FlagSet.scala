@@ -3,6 +3,8 @@ package codes.quine.labs.resyntax.ast
 import scala.annotation.switch
 import scala.collection.mutable
 
+import codes.quine.labs.resyntax.dialect.Dialect
+
 /** FlagSet is a set of the flags of a pattern, whose fields correspond to the flag letters.
   *
   * A field's name may not match the flag's meaning in some dialects.

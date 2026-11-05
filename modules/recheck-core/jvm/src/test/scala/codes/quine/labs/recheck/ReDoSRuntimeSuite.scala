@@ -6,8 +6,8 @@ import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
 
 class ReDoSRuntimeSuite extends munit.FunSuite with RuntimeHelper:
 

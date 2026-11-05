@@ -11,8 +11,6 @@ import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
 import codes.quine.labs.resyntax.ast.BoundaryModifier
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.ConditionalTest
-import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.NameStyle
@@ -21,6 +19,8 @@ import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.Dialect.*
 import codes.quine.labs.resyntax.ir.IRLookBehindMatch.Forward
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 import codes.quine.labs.resyntax.ir.IRQuantifier.*

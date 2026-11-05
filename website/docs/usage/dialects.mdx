@@ -44,7 +44,7 @@ await check("^(a|a)*$", "", { dialect: { name: "python", type: "bytes" } });
 ```scala
 import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.dialect.Dialect
 
 ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Python()))
 ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Python(Dialect.Python.Type.Bytes)))

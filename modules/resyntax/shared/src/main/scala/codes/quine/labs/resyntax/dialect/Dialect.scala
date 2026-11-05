@@ -1,4 +1,4 @@
-package codes.quine.labs.resyntax.ast
+package codes.quine.labs.resyntax.dialect
 
 /** Dialect is a regular expression dialect specifier, with the settings of the dialect that do not come from the
   * pattern or its flags.

@@ -2,7 +2,6 @@ package codes.quine.labs.recheck
 package diagnostics
 
 import codes.quine.labs.recheck.util.NumberFormat
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UChar
@@ -10,6 +9,7 @@ import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UTF8Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
 
 /** AttackPatternStyle is a notation of [[AttackPattern]] and similar classes. */
 sealed abstract class AttackPatternStyle extends Product with Serializable:

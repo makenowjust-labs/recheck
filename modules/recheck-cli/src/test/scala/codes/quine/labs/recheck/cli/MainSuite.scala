@@ -20,8 +20,8 @@ import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.codec.encodeDiagnostics
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.PerlSource
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.PerlSource
 
 class MainSuite extends munit.FunSuite:
   private class ExitException(val status: Int) extends SecurityException

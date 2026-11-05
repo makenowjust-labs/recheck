@@ -6,12 +6,12 @@ import codes.quine.labs.recheck.vm.Inst.AssertKind
 import codes.quine.labs.recheck.vm.Inst.ReadKind
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.dialect.LineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
 import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics
 import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
-import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRLookBehindStartRange
 import codes.quine.labs.resyntax.ir.IRWordMarkSet
 
@@ -114,13 +114,13 @@ class InstSuite extends munit.FunSuite:
     assertEquals(AssertKind.WordBoundary(Word).toString, "word_boundary")
     assertEquals(AssertKind.WordBoundaryNot(Word).toString, "word_boundary_not")
     assertEquals(
-      AssertKind.LineBegin(IRLineTerminatorSet.JavaScript, IRLineBeginAtEnd.AfterTerminator).toString,
+      AssertKind.LineBegin(LineTerminatorSet.JavaScript, IRLineBeginAtEnd.AfterTerminator).toString,
       "line_begin"
     )
-    assertEquals(AssertKind.LineEnd(IRLineTerminatorSet.JavaScript).toString, "line_end")
+    assertEquals(AssertKind.LineEnd(LineTerminatorSet.JavaScript).toString, "line_end")
     assertEquals(AssertKind.InputBegin.toString, "input_begin")
     assertEquals(AssertKind.InputEnd.toString, "input_end")
-    assertEquals(AssertKind.ChompInputEnd(IRLineTerminatorSet.LF).toString, "chomp_input_end")
+    assertEquals(AssertKind.ChompInputEnd(LineTerminatorSet.LF).toString, "chomp_input_end")
     val marks = IRWordMarkSet(CharSet.single(0x300), CharSet.single(0x300), Word)
     assertEquals(AssertKind.MarkWordBoundary(Word, marks).toString, "mark_word_boundary")
     assertEquals(AssertKind.MarkWordBoundaryNot(Word, marks).toString, "mark_word_boundary_not")

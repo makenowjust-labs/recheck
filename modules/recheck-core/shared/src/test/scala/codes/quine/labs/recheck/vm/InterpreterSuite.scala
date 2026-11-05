@@ -17,11 +17,11 @@ import codes.quine.labs.recheck.vm.Interpreter.FailedPoint
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
-import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.Dialect.*
 import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
 import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
 import codes.quine.labs.resyntax.ir.IRBackReferenceSemantics

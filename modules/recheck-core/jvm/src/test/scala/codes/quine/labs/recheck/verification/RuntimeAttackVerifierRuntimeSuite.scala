@@ -18,10 +18,10 @@ import codes.quine.labs.recheck.exec.DotNetExecutor
 import codes.quine.labs.recheck.exec.JavaExecutor
 import codes.quine.labs.recheck.exec.PythonExecutor
 import codes.quine.labs.recheck.exec.SourceFile
-import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.PerlSource
 
 class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelper:
 

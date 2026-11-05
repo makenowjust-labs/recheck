@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.ast
 
-import codes.quine.labs.resyntax.ast.Dialect.*
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.Dialect.*
 
 class FlagSetSuite extends munit.FunSuite:
 

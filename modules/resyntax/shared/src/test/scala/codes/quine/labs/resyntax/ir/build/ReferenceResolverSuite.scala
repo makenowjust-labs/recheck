@@ -3,11 +3,11 @@ package build
 
 import codes.quine.labs.resyntax.ast.BackslashKind
 import codes.quine.labs.resyntax.ast.CommandKind
-import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.NameStyle
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.Reference
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.Dialect.*
 import codes.quine.labs.resyntax.ir.IRNodeData.*
 
 class ReferenceResolverSuite extends munit.FunSuite with IRHelper:

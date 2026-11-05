@@ -1,11 +1,11 @@
 package codes.quine.labs.resyntax.parser
 
-import codes.quine.labs.resyntax.ast.Dialect
-import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
-import codes.quine.labs.resyntax.ast.PerlSource
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.Dialect.*
+import codes.quine.labs.resyntax.dialect.PerlSource
 
 trait ParserHelper:
   self: munit.FunSuite =>

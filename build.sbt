@@ -87,10 +87,10 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.recheck.verification.*
       |import codes.quine.labs.recheck.util.*
       |import codes.quine.labs.recheck.vm.*
-      |import codes.quine.labs.resyntax.ast.Dialect
       |import codes.quine.labs.resyntax.ast.FlagSet
-      |import codes.quine.labs.resyntax.ast.PerlSource
       |import codes.quine.labs.resyntax.charset.*
+      |import codes.quine.labs.resyntax.dialect.Dialect
+      |import codes.quine.labs.resyntax.dialect.PerlSource
       |import codes.quine.labs.resyntax.ir.*
       |import codes.quine.labs.resyntax.ir.alphabet.*
       |import codes.quine.labs.resyntax.ir.build.IRBuilder
@@ -231,6 +231,7 @@ lazy val resyntax = crossProject(JVMPlatform, JSPlatform)
     console / initialCommands := """
       |import codes.quine.labs.resyntax.*
       |import codes.quine.labs.resyntax.ast.*
+      |import codes.quine.labs.resyntax.dialect.*
       |import codes.quine.labs.resyntax.ir.*
       |import codes.quine.labs.resyntax.ir.build.*
       |import codes.quine.labs.resyntax.parser.*

@@ -17,7 +17,6 @@ import codes.quine.labs.resyntax.ast.ClassItem
 import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.ConditionalTest
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.EscapeClassKind
 import codes.quine.labs.resyntax.ast.EscapeStyle
 import codes.quine.labs.resyntax.ast.FlagSet
@@ -26,17 +25,19 @@ import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.NameStyle
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
-import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.ast.Quantifier
 import codes.quine.labs.resyntax.ast.QuoteLiteral
 import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.CompatibilityPropertyTable
 import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
-import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
-import codes.quine.labs.resyntax.ir.build.IRClassLookup
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.DotNetCharClass
+import codes.quine.labs.resyntax.dialect.LineTerminatorSet
+import codes.quine.labs.resyntax.dialect.PerlSource
 import codes.quine.labs.resyntax.parser.Parser.ParsingContext
 
 object Parser:
@@ -49,20 +50,17 @@ object Parser:
     */
   val MaxNestingDepth: Int = 150
 
-  /** DotNetBoundaryWord is the characters of .NET's `RegexCharClass.IsBoundaryWordChar`: `\\w`, ZWNJ and ZWJ. */
-  private lazy val DotNetBoundaryWord: CharSet = IRClassLookup.dotNetWord.union(CharSet.of(0x200c, 0x200d))
-
   /** PerlGroupNameStart is the characters that start a group name in Perl's UTF-8 pattern: `XID_Start` restricted to
     * `\\w`.
     */
   private lazy val PerlGroupNameStart: CharSet =
-    PropertyTable.binary("XID_Start").get.set.intersect(IRClassLookup.perlWord)
+    PropertyTable.binary("XID_Start").get.set.intersect(CompatibilityPropertyTable.Word)
 
   /** PerlGroupNameContinue is the characters of a group name in Perl's UTF-8 pattern: `XID_Continue` restricted to
     * `\\w`.
     */
   private lazy val PerlGroupNameContinue: CharSet =
-    PropertyTable.binary("XID_Continue").get.set.intersect(IRClassLookup.perlWord)
+    PropertyTable.binary("XID_Continue").get.set.intersect(CompatibilityPropertyTable.Word)
 
   private[parser] final case class ParsingContext(
       inClass: Boolean,
@@ -2887,7 +2885,7 @@ private[parser] final class Parser(
     * supplementary character is not one.
     */
   private def isDotNetWord(c: Int): Boolean =
-    (c < 0x10000 || featureSet.readsAsUnicode) && Parser.DotNetBoundaryWord.contains(c)
+    (c < 0x10000 || featureSet.readsAsUnicode) && DotNetCharClass.BoundaryWord.contains(c)
 
   private def parseIntOption(): Option[Int] =
     if !isDigit then return None
@@ -2976,8 +2974,8 @@ private[parser] final class Parser(
 
   /** Skips a `#` comment up to its line terminator, which Java keeps (e.g. U+2028 after it is a literal). */
   private def skipLineComment(): Unit =
-    val terminators = if context.unixLines then IRLineTerminatorSet.LF else featureSet.commentTerminators
-    val hasCRLF = terminators.crlf != IRLineTerminatorSet.CRLF.Ignored
+    val terminators = if context.unixLines then LineTerminatorSet.LF else featureSet.commentTerminators
+    val hasCRLF = terminators.crlf != LineTerminatorSet.CRLF.Ignored
     def isCRLF: Boolean = hasCRLF && source.startsWith("\r\n", offset)
     // Java's pattern buffer ends with NUL, so a NUL also ends a comment.
     def isTerminator: Boolean =

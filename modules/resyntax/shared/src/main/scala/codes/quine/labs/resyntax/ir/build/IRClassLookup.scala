@@ -3,8 +3,10 @@ package build
 
 import codes.quine.labs.resyntax.charset.CaseMapping
 import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.CompatibilityPropertyTable
 import codes.quine.labs.resyntax.charset.PropertyTable
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.DotNetCharClass
 import codes.quine.labs.resyntax.ir.build.IRPropertyLookup.ascii
 import codes.quine.labs.resyntax.ir.build.IRPropertyLookup.binary
 import codes.quine.labs.resyntax.ir.build.IRPropertyLookup.gc
@@ -49,6 +51,17 @@ private[build] sealed abstract class IRClassLookup:
 
 object IRClassLookup:
 
+  /** Returns the table of the kind in the unit mode, where `perlUnicodeRules` makes Perl's `/d` use Unicode rules. */
+  private[build] def from(kind: IRClassLookupKind, mode: UnitMode, perlUnicodeRules: Boolean): IRClassLookup =
+    kind match
+      case IRClassLookupKind.JavaScript => JavaScript(mode)
+      case IRClassLookupKind.Java       => Java
+      case IRClassLookupKind.DotNet     => DotNet
+      case IRClassLookupKind.PCRE       => PCRE
+      case IRClassLookupKind.Perl       => Perl(native = !perlUnicodeRules)
+      case IRClassLookupKind.Python     => Python(mode)
+      case IRClassLookupKind.Ruby       => Ruby(mode)
+
   private enum Rule:
 
     case ASCII, Unicode, Native
@@ -77,10 +90,9 @@ object IRClassLookup:
 
     def digit(flags: IRCharFlagSet): CharSet = pick(ruleOf(flags), ASCIIDigit, gc("Nd"))
 
-    def space(flags: IRCharFlagSet): CharSet =
-      pick(ruleOf(flags), ASCIISpace, gc("Z").union(CharSet.range(0x09, 0x0d)).union(CharSet.single(0x85)))
+    def space(flags: IRCharFlagSet): CharSet = pick(ruleOf(flags), ASCIISpace, CompatibilityPropertyTable.Space)
 
-    def word(flags: IRCharFlagSet): CharSet = pick(ruleOf(flags), ASCIIWord, IRPropertyLookup.javaWord)
+    def word(flags: IRCharFlagSet): CharSet = pick(ruleOf(flags), ASCIIWord, CompatibilityPropertyTable.Word)
 
   /** DotNet is the table of .NET, whose classes are of Unicode. */
   private[build] case object DotNet extends IRClassLookup:
@@ -89,10 +101,9 @@ object IRClassLookup:
 
     def space(flags: IRCharFlagSet): CharSet = gc("Z").union(of("\f\n\r\t\u000b\u0085"))
 
-    def word(flags: IRCharFlagSet): CharSet = dotNetWord
+    def word(flags: IRCharFlagSet): CharSet = DotNetCharClass.Word
 
-    // .NET's `RegexCharClass.IsBoundaryWordChar` adds ZWNJ and ZWJ.
-    override def boundaryWord(flags: IRCharFlagSet): CharSet = dotNetWord.union(of("\u200C\u200D"))
+    override def boundaryWord(flags: IRCharFlagSet): CharSet = DotNetCharClass.BoundaryWord
 
   /** PCRE is the table of PCRE, whose classes are of Unicode in UCP mode, except the ones that `a` restricts. */
   private[build] case object PCRE extends IRClassLookup:
@@ -158,7 +169,7 @@ object IRClassLookup:
 
     def space(flags: IRCharFlagSet): CharSet = pick(ruleOf(flags), ASCIISpace, binary("White_Space"))
 
-    def word(flags: IRCharFlagSet): CharSet = pick(ruleOf(flags), ASCIIWord, perlWord)
+    def word(flags: IRCharFlagSet): CharSet = pick(ruleOf(flags), ASCIIWord, CompatibilityPropertyTable.Word)
 
     override def horizontal: CharSet = pcreHorizontal.diff(of("\u180E"))
 
@@ -260,12 +271,6 @@ object IRClassLookup:
     * Latin-1 ctype table marks them).
     */
   lazy val rubyWord: CharSet = IRPropertyLookup.rubyPOSIX("word").get.union(of("\u00b2\u00b3\u00b9\u00bc\u00bd\u00be"))
-
-  /** perlWord is the characters of Perl's `\w` under Unicode rules, which is `\p{Word}`. */
-  lazy val perlWord: CharSet = binary("Alphabetic").union(gc("M", "Nd", "Pc")).union(binary("Join_Control"))
-
-  /** dotNetWord is the characters of .NET's `\w`, which is `[\p{L}\p{Mn}\p{Nd}\p{Pc}]`. */
-  lazy val dotNetWord: CharSet = gc("L", "Mn", "Nd", "Pc")
 
   /** ASCII_POSIX is the characters of each POSIX class in ASCII, by its name (e.g. `alpha`). */
   val ASCII_POSIX: Map[String, CharSet] = Map(

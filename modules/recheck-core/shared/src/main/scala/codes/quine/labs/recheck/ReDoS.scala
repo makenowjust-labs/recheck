@@ -23,12 +23,12 @@ import codes.quine.labs.recheck.diagnostics.RefutedAttack
 import codes.quine.labs.recheck.fuzz.FuzzChecker
 import codes.quine.labs.recheck.fuzz.FuzzProgram
 import codes.quine.labs.recheck.verification.RuntimeAttackVerifier
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetException
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.charset.UChar
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.ir.IRPattern
 import codes.quine.labs.resyntax.ir.build.IRBuilder
 import codes.quine.labs.resyntax.ir.build.IRBuildingException

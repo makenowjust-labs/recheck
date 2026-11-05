@@ -1,9 +1,9 @@
 package codes.quine.labs.resyntax.parser
 
-import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.charset.UnitMode
-import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.LineTerminatorSet
 
 final case class FeatureSet(
     // JavaScript (without `uv`), Perl, Ruby
@@ -427,7 +427,7 @@ final case class FeatureSet(
     // Python (`bytes`): Latin-1, PCRE (without `u`), Perl (without `utf8`), Ruby (ASCII-8BIT): UTF-8, the others: text
     sourceEncoding: SourceEncoding,
     // Java: `\n`, `\r`, U+0085, U+2028 and U+2029, PCRE: its newline start option (`\n` by default), the others: `\n`
-    commentTerminators: IRLineTerminatorSet
+    commentTerminators: LineTerminatorSet
 )
 
 object FeatureSet:
@@ -676,8 +676,7 @@ object FeatureSet:
         else if isPython then SourceEncoding.Latin1
         else SourceEncoding.UTF8,
       commentTerminators =
-        if isJava then IRLineTerminatorSet.Java
-        else if isPCRE then
-          IRLineTerminatorSet.fromPCREStartOptions(prescan.startOptions).getOrElse(IRLineTerminatorSet.LF)
-        else IRLineTerminatorSet.LF
+        if isJava then LineTerminatorSet.Java
+        else if isPCRE then LineTerminatorSet.fromPCREStartOptions(prescan.startOptions).getOrElse(LineTerminatorSet.LF)
+        else LineTerminatorSet.LF
     )
