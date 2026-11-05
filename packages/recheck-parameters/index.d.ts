@@ -36,7 +36,6 @@ export type Property = {
   title: string;
   description: string;
   type?: string | string[];
-  items?: { type: string };
   enum?: string[];
   oneOf?: Variant[];
   default?: unknown;

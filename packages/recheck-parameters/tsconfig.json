@@ -5,10 +5,10 @@
     "moduleResolution": "nodenext",
     "verbatimModuleSyntax": true,
     "erasableSyntaxOnly": true,
-    "types": ["node"],
+    "types": ["jest", "node"],
     "strict": true,
     "noEmit": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["scripts", "*.d.ts", "lib/*.d.ts"]
+  "include": ["scripts", "*.ts", "lib/*.d.ts"]
 }
