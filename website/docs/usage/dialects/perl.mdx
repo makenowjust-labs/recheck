@@ -60,16 +60,7 @@ ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Perl(utf8 = false, sour
 
 ## Flags and Units
 
-- `utf8: true` matches code points, and `/d` (the default) uses the Unicode rules.
-- `utf8: false` matches bytes, a non-ASCII literal is its UTF-8 bytes, and `/d` uses the ASCII rules on `0x80`–`0xFF` unless the pattern itself switches to the Unicode rules by a code point of `\x{100}` or more, `\p{...}`, `\N{...}` or `\b{...}`.
-- A pattern without `utf8` is read by the UTF-8 bytes of the pattern.
-  A quantifier after a non-ASCII literal repeats its last byte (e.g. `é+` is `\xC3\xA9+`), and a character class has the bytes (e.g. `[é-à]` is `[\xC3\xA9-\xC3\xA0]`, which is valid).
-  It can have a code point above `0xFF` by an escape (e.g. `\x{100}`), which never matches a byte.
-- Without `utf8`, the attack string is a bytes literal (e.g. `"\xC3\xA9"`).
-- The character set flags `a` (ASCII), `aa` and `u` (Unicode) change the meaning of `\w`, `\d`, `\s`, `\b`, POSIX classes and case-insensitive matching in the same way as in Perl.
-- Perl reads a byte of a string without `utf8` as the Latin-1 character, so `u` and a pattern switching to the Unicode rules give them to `0x80`–`0xFF` there too (e.g. `\w` matches `\xE9`).
-- `l` follows the C locale, where `0x80`–`0xFF` follow the ASCII rules even with `utf8`, whatever locale the environment has.
-  Under `i`, no character folds across `U+00FF` and `U+0100` there (e.g. `k` does not match the Kelvin sign `U+212A`, and `ß` matches neither `ẞ` nor `ss`).
+A pattern matches code points with `utf8: true` (the default), and bytes with `utf8: false`.
 
 The flags are the modifiers of `m//`, `qr//` and `s///`, and `recheck` takes all of them.
 
@@ -77,8 +68,8 @@ The flags are the modifiers of `m//`, `qr//` and `s///`, and `recheck` takes all
 | --------- | ----------- | --------------- | ------------------------------------------------------------------------------------------ |
 | `a`       | `/a`        | `(?a)`          | The ASCII rules.                                                                           |
 | `aa`      | `/aa`       | `(?aa)`         | The ASCII rules, and no case-insensitive match between an ASCII and a non-ASCII character. |
-| `d`       | `/d`        | `(?d)`          | The default rules (see above).                                                             |
-| `l`       | `/l`        | `(?l)`          | The rules of the C locale (see above).                                                     |
+| `d`       | `/d`        | `(?d)`          | The default rules.                                                                         |
+| `l`       | `/l`        | `(?l)`          | The rules of the C locale.                                                                 |
 | `u`       | `/u`        | `(?u)`          | The Unicode rules.                                                                         |
 | `i`       | `/i`        | `(?i)`          |                                                                                            |
 | `m`       | `/m`        | `(?m)`          |                                                                                            |
@@ -89,8 +80,6 @@ The flags are the modifiers of `m//`, `qr//` and `s///`, and `recheck` takes all
 | `o`       | `/o`        |                 | No effect on matching.                                                                     |
 | `g`, `c`  | `/g`, `/c`  |                 | No effect on matching, since `recheck` models a search from the start.                     |
 | `e`, `r`  | `/e`, `/r`  |                 | The modifiers of `s///`, no effect on matching.                                            |
-
-As in Perl, only one of `a` (or `aa`), `d`, `l` and `u` can be given.
 
 ## Syntax Limitations
 

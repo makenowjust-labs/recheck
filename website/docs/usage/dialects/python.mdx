@@ -51,11 +51,7 @@ ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Python(Dialect.Python.T
 
 ## Flags and Units
 
-- `str` (default) matches code points, and `bytes` matches bytes.
-- A `bytes` pattern has no `\u`, `\U` and `\N{...}` escapes, and a character above `U+00FF` is an error (each character of the pattern is a byte, as Latin-1).
-- In `bytes`, the attack string is a bytes literal (e.g. `b'\xc3\xa9'`).
-- The character set flags `a` (ASCII) and `u` (Unicode) change the meaning of `\w`, `\d`, `\s`, `\b` and case-insensitive matching in the same way as in `re`.
-- `L` follows the C locale, where `0x80`–`0xFF` follow the ASCII rules, whatever locale the environment has.
+A `str` pattern (the default `type`) matches code points, and a `bytes` pattern matches bytes.
 
 The flags are the letters of the `re` flags.
 
@@ -68,11 +64,6 @@ The flags are the letters of the `re` flags.
 | `s`  | `re.DOTALL` (`re.S`)     | `(?s)` |                                                                    |
 | `u`  | `re.UNICODE` (`re.U`)    | `(?u)` | The default of a `str` pattern, and an error in a `bytes` pattern. |
 | `x`  | `re.VERBOSE` (`re.X`)    | `(?x)` |                                                                    |
-
-The `re` flags that `recheck` does not take:
-
-- `re.DEBUG`: no effect on matching (it prints the compiled pattern).
-- `re.NOFLAG`: no flags, which are the empty flags.
 
 ## Syntax Limitations
 

@@ -48,12 +48,7 @@ ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.PCRE))
 
 ## Flags and Units
 
-- A pattern matches bytes, or code points of UTF-8 with the `u` flag or `(*UTF)`, as in PHP.
-  As in PHP, `u` also makes `\d`, `\w` and the like Unicode classes.
-- A pattern without `u` or `(*UTF)` is read by the UTF-8 bytes of the pattern.
-  A quantifier after a non-ASCII literal repeats its last byte (e.g. `é+` is `\xC3\xA9+`), and a character class has the bytes (e.g. `[é-à]` is `[\xC3\xA9-\xC3\xA0]`, which is valid).
-- Without `u` or `(*UTF)`, the attack string is a bytes literal (e.g. `"\xC3\xA9"`).
-- The character set options such as `(?aD)` change the meaning of `\w`, `\d`, `\s`, `\b`, POSIX classes and case-insensitive matching in the same way as in PCRE2.
+A pattern matches bytes, or code points of UTF-8 with the `u` flag or `(*UTF)`.
 
 The flags are PHP's pattern modifiers.
 
@@ -72,12 +67,6 @@ The flags are PHP's pattern modifiers.
 | `U`  | `PCRE2_UNGREEDY`                | `(?U)`         |                                                                           |
 | `S`  |                                 |                | No effect (PHP 7.3 or later).                                             |
 | `X`  |                                 |                | No effect (PHP 7.3 or later, where an unknown escape is always an error). |
-
-As PHP does, `recheck` skips spaces and line breaks (`\n` and `\r`) in the flags.
-
-The modifiers that `recheck` does not take:
-
-- `e`: removed in PHP 7.0 (PHP 8.5 reports it as an unknown modifier).
 
 ## Syntax Limitations
 
