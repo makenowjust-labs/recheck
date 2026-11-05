@@ -21,7 +21,7 @@ When the matching finishes, the runtime attack refutes the attack, and `recheck`
 ## Usage
 
 The runtime-attack verification runs when [`runtimeAttackTimeout`](parameters.mdx#runtimeattacktimeout) is positive, so it is off by default.
-It needs the runtime of the dialect (e.g. `ruby` for the `ruby` dialect), and it runs only where `recheck` can run commands: it does not run in the browser or with the Scala.js build (the `worker` and `pure` backends of the JavaScript library).
+It needs the runtime of the dialect (e.g. `ruby` for the `ruby` dialect).
 
 <Tabs>
 <TabItem value="cli" label="CLI">
@@ -72,6 +72,13 @@ Refuted attacks:
 ```
 
 The result records the runtime attack as `runtimeAttack` of `vulnerable` diagnostics, and the refuted attacks in `refutedAttacks` (see [Diagnostics](diagnostics.md#runtime-attack-verification)).
+
+:::info
+
+The runtime-attack verification runs only where `recheck` can run commands.
+It does not run in the browser or with the Scala.js build (the `worker` and `pure` backends of the JavaScript library).
+
+:::
 
 ## Refuted Attacks
 
