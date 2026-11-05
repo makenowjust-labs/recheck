@@ -19,7 +19,7 @@ Every `Diagnostics` has the following fields.
 - `source` is the given regular expression’s source string.
 - `flags` is the given regular expression’s flags string.
 - `dialect` is the given [`dialect`](parameters.mdx#dialect) parameter, as an object of the name and every setting of the dialect.
-- `unitMode` is the unit of the attack strings (see [Attack String](#attack-string)).
+- `unitMode` is the unit of the attack strings, which is one of `utf16`, `utf16-code-point`, `code-point`, `scalar-value` and `byte` (see [Matching Units](dialects.mdx#matching-units)).
   It is `null` in `unknown` diagnostics when the error happened on parsing the pattern.
 - `refutedAttacks` is the list of the attack strings that the runtime-attack verification refuted before the result (see [Runtime-Attack Verification](#runtime-attack-verification)).
 - `checker` is a checker type to be used (one of `fuzz` and `automaton`).
@@ -84,14 +84,6 @@ The `attack` field also has these fields.
 
 Note that the attack string is computed in theory, so it may not cause the explosion on the real engine because of the engine's optimizations.
 The runtime-attack verification checks it on the real engine.
-
-The units of the attack string are given by the `unitMode` field of the diagnostics, which takes one of these values (see [Matching Units](dialects.mdx#matching-units)).
-
-- `utf16`: UTF-16 code units (JavaScript without `u` or `v`, and .NET).
-- `utf16-code-point`: code points read from UTF-16, where a lone surrogate is a code point, but a high surrogate followed by a low surrogate is one code point (JavaScript with `u` or `v`, and Java).
-- `code-point`: code points, where the surrogates are ordinary code points in any order (Python's `str`, and Perl with `utf8`).
-- `scalar-value`: Unicode scalar values, which are the code points other than the surrogates (Ruby with `UTF-8`, and PCRE with `u` or `(*UTF)`).
-- `byte`: bytes.
 
 ## Runtime-Attack Verification
 
