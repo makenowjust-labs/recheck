@@ -66,7 +66,7 @@ The ESLint plugin (`eslint-plugin-redos`) checks JavaScript regular expressions 
 | [`javascript`](dialects/javascript.md) | ECMAScript 2026 `RegExp` (V8)                  | UTF-16 code units, or code points with `u` or `v`  |
 | [`python`](dialects/python.md)         | Python 3.15 `re`                               | code points (`str`), or bytes (`bytes`)            |
 | [`ruby`](dialects/ruby.md)             | Ruby 4.0 `Regexp` (Onigmo)                     | code points (`UTF-8`), or bytes (`ASCII-8BIT`)     |
-| [`java`](dialects/java.md)             | Java 25 `java.util.regex.Pattern`              | code points                                        |
+| [`java`](dialects/java.md)             | Java 27 `java.util.regex.Pattern`              | code points                                        |
 | [`dotnet`](dialects/dotnet.md)         | .NET 10 `System.Text.RegularExpressions.Regex` | UTF-16 code units                                  |
 | [`perl`](dialects/perl.md)             | Perl 5.44 regular expressions                  | code points (`utf8`), or bytes (no `utf8`)         |
 | [`pcre`](dialects/pcre.md)             | PCRE2 10.49 as PHP's `preg_*` functions use it | bytes, or code points (UTF-8) with `u` or `(*UTF)` |
@@ -116,7 +116,7 @@ Most engines have optimizations that make some vulnerable patterns fast, and `re
 The following is what we measured with `^(a|a)*$` against `'a'.repeat(n) + '!'`.
 
 - V8 (Node.js 26) and Python 3.15 take exponential time: about 2 seconds for `n = 24`.
-- Ruby 4.0, Java 25, .NET 10 and Perl 5.44 finish in less than 1 ms even for `n = 28`.
+- Ruby 4.0, Java 27, .NET 10 and Perl 5.44 finish in less than 1 ms even for `n = 28`.
 - PHP 8.5 (PCRE2 10.49 with the default `pcre.backtrack_limit`) gives up with the backtrack limit error for `n = 20`.
 
 So `recheck` reports `^(a|a)*$` as vulnerable in every dialect, but the attack is not effective on some engines.

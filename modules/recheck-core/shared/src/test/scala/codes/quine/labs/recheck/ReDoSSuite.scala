@@ -158,7 +158,7 @@ class ReDoSSuite extends munit.FunSuite:
   test("ReDoS.check: exponential patterns"):
     // Python 3.15 doubles its time for each `a` of `'a'.repeat(N) + '!'` (0.36 s at N = 22).
     assertVulnerable(check("^(a|a)*$", Python()), AttackComplexity.Exponential(false), Checker.Automaton)
-    // Java 25 and Ruby 4.0 (memoization) are fast on these patterns.
+    // Java 27 and Ruby 4.0 (memoization) are fast on these patterns.
     assertVulnerable(check("^(?:a|a)*$", Java), AttackComplexity.Exponential(false), Checker.Automaton)
     assertVulnerable(check("\\A(?:a|a)*\\z", Ruby()), AttackComplexity.Exponential(false), Checker.Automaton)
     // Ruby's `^` and `$` are line assertions, which the automaton handles with text assertions together.
@@ -178,7 +178,7 @@ class ReDoSSuite extends munit.FunSuite:
     assertVulnerable(check("(*CRLF)^(?:a|.)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)
 
   test("ReDoS.check: surrogates"):
-    // Node 26 and Java 25 read a high surrogate followed by a low surrogate as one character, so the alternatives do not
+    // Node 26 and Java 27 read a high surrogate followed by a low surrogate as one character, so the alternatives do not
     // overlap, unlike Python 3.15 and Node without `u`, which double their time for each pair.
     val pairs = "^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF]|[\\uDC00-\\uDFFF])*$"
     for checker <- Seq[Checker.Used](Checker.Automaton, Checker.Fuzz) do
@@ -221,7 +221,7 @@ class ReDoSSuite extends munit.FunSuite:
       assertVulnerable(check("\\A(?:[ß]|ss)*\\z", dialect, "i"), AttackComplexity.Exponential(false), Checker.Automaton)
 
   test("ReDoS.check: atomic groups"):
-    // Java 25 is linear on the first two (and Python 3.15 and PCRE2 10.49 on the second).
+    // Java 27 is linear on the first two (and Python 3.15 and PCRE2 10.49 on the second).
     // Python and PCRE2 (without JIT) are exponential on the third, and Java is fast on it.
     assertEquals(
       check("^(?>a|a)*$", Java),

@@ -7,7 +7,7 @@ Describes how `recheck` checks a regular expression of the `java` dialect.
 
 ## Engine
 
-`recheck` follows the syntax and the semantics of Java 25's `java.util.regex.Pattern`.
+`recheck` follows the syntax and the semantics of Java 27's `java.util.regex.Pattern`.
 
 ## Settings
 

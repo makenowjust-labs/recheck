@@ -14,7 +14,7 @@ object AssertionCases:
   private val all = Seq(JavaScript, Python(), Ruby(), Java, DotNet, Perl(), PCRE)
   private val noJS = all.filter(_ != JavaScript)
 
-  // Checked with Node 26, Python 3.15, Ruby 4.0, Java 25, .NET 10, Perl 5.44 and PHP 8.5 with PCRE2 10.49.
+  // Checked with Node 26, Python 3.15, Ruby 4.0, Java 27, .NET 10, Perl 5.44 and PHP 8.5 with PCRE2 10.49.
   val cases: Seq[Case] = Seq(
     // `^` does not match at the end after a final line terminator in Java, Perl, PCRE and Ruby, and Java's `^` never
     // matches at the end, even in the empty input.

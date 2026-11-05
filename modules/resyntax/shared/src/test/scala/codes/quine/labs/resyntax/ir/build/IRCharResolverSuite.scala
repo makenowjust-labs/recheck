@@ -619,7 +619,7 @@ class IRCharResolverSuite extends munit.FunSuite:
 
   def cp(s: String): Seq[Int] = UnitMode.CodePoint.decode(s).iterator.toSeq
 
-  // The first cluster's length in the engines (Java 25, PCRE2 10.49, Perl 5.44, Ruby 4.0), where they agree except PCRE2 on the conjuncts (see `PCREProbes`).
+  // The first cluster's length in the engines (Java 27, PCRE2 10.49, Perl 5.44, Ruby 4.0), where they agree except PCRE2 on the conjuncts (see `PCREProbes`).
   val Probes: Seq[(String, String, Int)] = Seq(
     ("CRLF", "\r\n\u0301", 2),
     ("LF and a mark", "\n\u0301", 1),
