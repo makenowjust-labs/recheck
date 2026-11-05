@@ -38,7 +38,7 @@ const scalaDefault = (property: Property): string => {
   return String(value);
 };
 
-export const sectionOf = (name: string, property: Property): Section => ({
+const sectionOf = (name: string, property: Property): Section => ({
   name,
   id: name.toLowerCase(),
   typescriptType: generateTypescriptType(property),

@@ -43,6 +43,25 @@ const paramType = (property: Property): ParamType => {
 const settingName = (key: string): string =>
   `dialect${key[0]!.toUpperCase()}${key.slice(1)}`;
 
+const settingType = (
+  key: string,
+  first: Setting,
+  entries: [string, Setting][],
+): ParamType => {
+  if (first.type === "boolean") return "boolean";
+  if (first.enum !== undefined) {
+    return {
+      selectByDialect: Object.fromEntries(
+        entries.map(([dialect, { enum: values = [], default: d }]) => [
+          dialect,
+          [String(d), ...values.filter((v) => v !== d)],
+        ]),
+      ),
+    };
+  }
+  throw new Error(`The Playground has no input for the ${key} setting`);
+};
+
 /** The settings of the dialects in the `oneOf` of `dialect`, as the parameters of the form. */
 const settingParams = (property: Property): Param[] => {
   const settings = new Map<string, [string, Setting][]>();
@@ -55,20 +74,7 @@ const settingParams = (property: Property): Param[] => {
   }
   return [...settings].flatMap(([key, entries]) => {
     const [, first] = entries[0]!;
-    const type: ParamType | null =
-      first.type === "boolean"
-        ? "boolean"
-        : first.enum !== undefined
-          ? {
-              selectByDialect: Object.fromEntries(
-                entries.map(([dialect, { enum: values = [], default: d }]) => [
-                  dialect,
-                  [String(d), ...values.filter((v) => v !== d)],
-                ]),
-              ),
-            }
-          : null;
-    if (type === null) return [];
+    const type = settingType(key, first, entries);
     return [
       {
         name: settingName(key),
