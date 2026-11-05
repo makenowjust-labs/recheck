@@ -166,7 +166,7 @@ const config = {
       prism: {
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme,
-        additionalLanguages: ["java", "scala"],
+        additionalLanguages: ["bash", "java", "scala", "shell-session"],
       },
       colorMode: {
         respectPrefersColorScheme: true,
