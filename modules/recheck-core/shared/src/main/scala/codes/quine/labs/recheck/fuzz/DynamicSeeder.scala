@@ -25,7 +25,7 @@ object DynamicSeeder:
   def seed(
       fuzz: FuzzProgram,
       limit: Int = Parameters.DefaultSeedingLimit,
-      timeout: Duration = Parameters.DefaultSeedingTimeout,
+      timeout: Duration,
       maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
       accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode
   )(using ctx: Context): Set[FString] = ctx.interrupt:

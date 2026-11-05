@@ -402,6 +402,14 @@ class InterpreterSuite extends munit.FunSuite:
       Status.Ok
     )
 
+  test("Interpreter.MatchState"):
+    val state = Interpreter.MatchState(Array(4, 2, 1))
+    assertEquals(state, Interpreter.MatchState(Array(4, 2, 1)))
+    assertEquals(state.hashCode, Interpreter.MatchState(Array(4, 2, 1)).hashCode)
+    assertNotEquals(state, Interpreter.MatchState(Array(4, 2, 0)))
+    assertNotEquals[Any, Any](state, Seq(4, 2, 1))
+    assertEquals(state.toString, "MatchState(4, 2, 1)")
+
   test("Interpreter.Status#toString"):
     assertEquals(Interpreter.Status.Ok.toString, "ok")
     assertEquals(Interpreter.Status.Fail.toString, "fail")
@@ -753,6 +761,8 @@ class InterpreterSuite extends munit.FunSuite:
     check("(?:a?(?=.(*THEN)c|(*F))|a)", "aca", PCRE, Perl())(Seq(g(0, 0)))
     check("(?:a?(?(?=.(*THEN)c)|x)|a)", "aca", PCRE)(Seq(g(0, 0)))
     check("(?:a?(?(?=.(*THEN)c)|x)|a)", "aca", Perl())(Seq(g(0, 1)))
+    check("(?:a?(?(?<=(*THEN)b)|)|zz)", "a", PCRE)(Seq(g(0, 1)))
+    check("(?:a?(?(?<=(*THEN)b)|)|zz)", "a", Perl())(NoMatch)
     check("(?:a?(?>.(*THEN)c)|a)", "aca", PCRE, Perl())(Seq(g(0, 1)))
     check("(?:a?(?!.(*THEN)c)|a)", "aca", PCRE, Perl())(Seq(g(0, 1)))
     check("(?!a(*COMMIT)b|a)a", "ac", PCRE, Perl())(Seq(g(0, 1)))

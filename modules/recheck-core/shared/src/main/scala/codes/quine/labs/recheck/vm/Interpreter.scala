@@ -838,8 +838,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
           case ReadKind.Char(d)     => c == d
           case ReadKind.Class(s)    => s.contains(c)
           case ReadKind.ClassNot(s) => !s.contains(c)
-          case _: ReadKind.Ref      =>
-            // $COVERAGE-OFF$
-            sys.error("unreachable")
-          // $COVERAGE-ON$
+          // $COVERAGE-OFF$ `instRead` and `instReadBack` take a back-reference before this.
+          case _: ReadKind.Ref => sys.error("unreachable")
+        // $COVERAGE-ON$
       case None => false

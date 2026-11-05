@@ -314,15 +314,11 @@ object EpsNFA:
       def accepts(prev: CharKindState, next: CharKindState): Boolean =
         isMarkWordBefore(prev, word, marks) != isMarkWordAfter(prev, next, word, marks)
 
-      override def seesBoundary: Boolean = false
-
     /** NotMarkWordBoundary is `\B` assertion of the `word`-th word set and the `marks`-th word marks. */
     final case class NotMarkWordBoundary(word: Int, marks: Int) extends AssertKind:
 
       def accepts(prev: CharKindState, next: CharKindState): Boolean =
         isMarkWordBefore(prev, word, marks) == isMarkWordAfter(prev, next, word, marks)
-
-      override def seesBoundary: Boolean = false
 
     /** NotBetweenCRLF is an assertion that the position is not between `\r` and `\n`. */
     case object NotBetweenCRLF extends AssertKind:

@@ -67,15 +67,15 @@ class AttackPatternStyleSuite extends munit.FunSuite:
 
     // A letter and a space separator are written as they are, and a format character, a line separator and a
     // surrogate are escaped.
-    val chars = "é\u00a0\u3000\u200b\u2028\ud800😀"
+    val chars = "é\u00a0\u3000\u200b\u2028\ud800😀\udb40\udc01"
     val shown = "é\u00a0\u3000"
-    assertEquals(show(JavaScript(unicode = true), chars), s"'$shown\\u200B\\u2028\\uD800😀'")
-    assertEquals(show(Python(bytes = false), chars), s"'$shown\\u200b\\u2028\\ud800😀'")
-    assertEquals(show(Ruby(bytes = false), chars), s"\"$shown\\u200B\\u2028\\xED\\xA0\\x80😀\"")
-    assertEquals(show(Java, chars), s"\"$shown\\u200B\\u2028\\uD800😀\"")
-    assertEquals(CSharp.literal(UnitMode.UTF16.decode(chars)), s"\"$shown\\u200B\\u2028\\uD800😀\"")
-    assertEquals(show(Perl, chars), "\"\\xE9\\xA0\\x{3000}\\x{200B}\\x{2028}\\x{D800}\\x{1F600}\"")
-    assertEquals(show(PHP(bytes = false), chars), s"\"$shown\\u{200B}\\u{2028}\\u{D800}😀\"")
+    assertEquals(show(JavaScript(unicode = true), chars), s"'$shown\\u200B\\u2028\\uD800😀\\u{E0001}'")
+    assertEquals(show(Python(bytes = false), chars), s"'$shown\\u200b\\u2028\\ud800😀\\U000e0001'")
+    assertEquals(show(Ruby(bytes = false), chars), s"\"$shown\\u200B\\u2028\\xED\\xA0\\x80😀\\u{E0001}\"")
+    assertEquals(show(Java, chars), s"\"$shown\\u200B\\u2028\\uD800😀\\uDB40\\uDC01\"")
+    assertEquals(CSharp.literal(UnitMode.UTF16.decode(chars)), s"\"$shown\\u200B\\u2028\\uD800😀\\uDB40\\uDC01\"")
+    assertEquals(show(Perl, chars), "\"\\xE9\\xA0\\x{3000}\\x{200B}\\x{2028}\\x{D800}\\x{1F600}\\x{E0001}\"")
+    assertEquals(show(PHP(bytes = false), chars), s"\"$shown\\u{200B}\\u{2028}\\u{D800}😀\\u{E0001}\"")
 
     val bytes = UString(0x27, 0x80, 0xff)
     assertEquals(Python(bytes = true).literal(bytes), "b'\\'\\x80\\xff'")
