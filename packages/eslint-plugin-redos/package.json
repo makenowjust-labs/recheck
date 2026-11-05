@@ -41,7 +41,7 @@
   },
   "devDependencies": {
     "@types/eslint": "9.6.1",
-    "@types/estree": "1.0.9",
+    "@types/estree": "1.0.10",
     "@types/jest": "30.0.0",
     "@types/node": "26.6.5",
     "esbuild": "0.28.2",
