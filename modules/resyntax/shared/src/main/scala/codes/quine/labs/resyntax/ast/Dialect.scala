@@ -76,13 +76,17 @@ object Dialect:
   object Python:
 
     /** Type is the string type of a Python pattern and its input. */
-    enum Type(val name: String):
+    enum Type:
 
       /** Str is a `str` pattern, which matches code points. */
-      case Str extends Type("str")
+      case Str
 
       /** Bytes is a `bytes` pattern, which matches bytes. */
-      case Bytes extends Type("bytes")
+      case Bytes
+
+      def name: String = this match
+        case Str   => "str"
+        case Bytes => "bytes"
 
     object Type:
 
@@ -91,13 +95,17 @@ object Dialect:
   object Ruby:
 
     /** Encoding is the encoding of a Ruby regexp. */
-    enum Encoding(val name: String):
+    enum Encoding:
 
       /** UTF8 is UTF-8, which matches code points. */
-      case UTF8 extends Encoding("UTF-8")
+      case UTF8
 
       /** ASCII8Bit is ASCII-8BIT (as `n` makes), which matches bytes. */
-      case ASCII8Bit extends Encoding("ASCII-8BIT")
+      case ASCII8Bit
+
+      def name: String = this match
+        case UTF8      => "UTF-8"
+        case ASCII8Bit => "ASCII-8BIT"
 
     object Encoding:
 
