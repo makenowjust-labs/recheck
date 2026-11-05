@@ -376,11 +376,11 @@ class IRCharResolverSuite extends munit.FunSuite:
   chars("[j-l]", "iu", Java)(of("jklJKL\u212a"))
   chars("[\\u212a-\\u212b]", "iu", Java)(of("kK\u212a\u00e5\u00c5\u212b"))
   chars("[\\u0130-\\u0130]", "iu", Java)(of("Ii\u0130\u0131"))
-  // Java 27 matches neither `İ` nor U+212A with `[A-Z]`, nor `İ` with `[ı-ı]`, which is not reproduced.
-  chars("[A-Z]", "iu", Java)(
+  chars("[A-Z]", "iu", Java)(CharSet.range('A', 'Z').union(CharSet.range('a', 'z')).union(of("\u0131\u017f")))
+  chars("[a-z]", "iu", Java)(
     CharSet.range('A', 'Z').union(CharSet.range('a', 'z')).union(of("\u0130\u0131\u017f\u212a"))
   )
-  chars("[\\u0131-\\u0131]", "iu", Java)(of("Ii\u0130\u0131"))
+  chars("[\\u0131-\\u0131]", "iu", Java)(of("Ii\u0131"))
   chars("[j-l]", "i", Python())(of("jklJKL\u212a"))
   chars("[^k]", "i", JavaScript)(of("kK").complement(UnitMode.UTF16))
   chars("[^k]", "iu", JavaScript)(of("kK\u212a").complement(UnitMode.CodePoint))

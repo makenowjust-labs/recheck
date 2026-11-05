@@ -76,5 +76,14 @@ object CaseFoldingCases:
     Case("(?u)^[\\u2120-\\u212B]$", "k", Seq(Java), Set(Java)),
     Case("(?u)^[\\u2120-\\u212B]$", "å", Seq(Java), Set(Java)),
     Case("(?u)^[Ā-ſ]$", "s", Seq(Java), Set(Java)),
-    Case("(?u)^[Ā-ſ]$", "k", Seq(Java), Set.empty)
+    Case("(?u)^[Ā-ſ]$", "k", Seq(Java), Set.empty),
+    // A range of Java misses a character that maps to a member only one way (e.g. U+212A to `k`).
+    Case("(?u)^[A-Z]$", "\u212A", Seq(Java), Set.empty),
+    Case("(?u)^[A-Z]$", "İ", Seq(Java), Set.empty),
+    Case("(?u)^[a-z]$", "\u212A", Seq(Java), Set(Java)),
+    Case("(?u)^[a-z]$", "İ", Seq(Java), Set(Java)),
+    Case("(?u)^[K-K]$", "\u212A", Seq(Java), Set.empty),
+    Case("(?u)^[I-I]$", "İ", Seq(Java), Set.empty),
+    Case("(?u)^[ı-ı]$", "İ", Seq(Java), Set.empty),
+    Case("(?u)^[ı-ı]$", "I", Seq(Java), Set(Java))
   )
