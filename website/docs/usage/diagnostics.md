@@ -21,7 +21,6 @@ Every `Diagnostics` has the following fields.
 - `dialect` is the given [`dialect`](parameters.mdx#dialect) parameter, as an object of the name and every setting of the dialect.
 - `unitMode` is the unit of the attack strings (see [Matching Units](dialects.mdx#matching-units)).
   It is `null` in `unknown` diagnostics when the error happened on parsing the pattern.
-- `refutedAttacks` is the list of the attack strings that the runtime-attack verification refuted before the result (see [Runtime-Attack Verification](#runtime-attack-verification)).
 - `checker` is a checker type to be used (one of `fuzz` and `automaton`).
 
 ## Status
@@ -90,7 +89,7 @@ The runtime-attack verification checks it on the real engine.
 `vulnerable` diagnostics have the `runtimeAttack` field.
 
 The runtime-attack verification runs the attack string on the real regex engine of the dialect (see [Runtime-Attack Verification](runtime-attack-verification.mdx)), and this field records the run.
-It is `null` if the runtime attack is not run: [`runtimeAttackTimeout`](parameters.mdx#runtimeattacktimeout) is not positive (the default), or commands cannot run (e.g. in the browser).
+It is `null` if the runtime attack is not run: [`runtimeAttackTimeout`](parameters.mdx#runtimeattacktimeout) is not positive, or commands cannot run (e.g. in the browser).
 
 - `runtime` is the runtime name and version (e.g. `node v26.11.1`).
 - `timeout` is the timeout of the matching in milliseconds (`null` if it is infinite).
