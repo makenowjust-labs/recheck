@@ -191,18 +191,15 @@ private[build] final class LookBehindAnalyzer(
     */
   private def backReferenceWidth(node: Node, ref: Reference, visiting: Set[Int]): Option[Width] =
     if featureSet.lookBehindRule == IRLookBehindRule.Perl then return Some(Width(0, Inf))
-    ref match
-      case _: Reference.LeveledReference => None
-      case ref                           =>
-        val site = table.siteOf(node)
-        val indices = resolver.backReference(ref, site, node.loc)
-        // A reference to a group enclosing it, to more than one group, or to a group in a branch reset is unbounded in PCRE (e.g. `(a(?<=\1))` and `(?|(a))(?<!\1)`).
-        if indices.isEmpty || indices.size > 1 || indices.exists(i => site.open.contains(i) || table.inBranchReset(i))
-        then Some(Width(0, Inf))
-        else groupWidth(indices, visiting)
+    val site = table.siteOf(node)
+    val indices = resolver.backReference(ref, site, node.loc)
+    // A reference to a group enclosing it, to more than one group, or to a group in a branch reset is unbounded in PCRE (e.g. `(a(?<=\1))` and `(?|(a))(?<!\1)`).
+    if indices.isEmpty || indices.size > 1 || indices.exists(i => site.open.contains(i) || table.inBranchReset(i))
+    then Some(Width(0, Inf))
+    else groupWidth(indices, visiting)
 
   /** Returns the width of a call, which is the width of the called groups, or unbounded for a recursion. */
-  private def callWidth(node: Node, ref: Reference, visiting: Set[Int]): Option[Width] =
+  private def callWidth(node: Node, ref: Reference.BaseReference, visiting: Set[Int]): Option[Width] =
     val site = table.siteOf(node)
     val indices = resolver.resolveCall(ref, site, node.loc)
     if indices.exists(site.open.contains) then Some(Width(0, Inf)) else groupWidth(indices, visiting)
@@ -220,12 +217,11 @@ private[build] final class LookBehindAnalyzer(
       case Some(widths) => widths
       case None         =>
         val before = recursions
-        val widths = table.groups
-          .getOrElse(index, Seq.empty)
+        val widths = table
+          .groups(index)
           .map: group =>
-            group.data match
-              case NodeData.Group(_, child) => width(child, visiting + index)
-              case _                        => None
+            val NodeData.Group(_, child) = group.data: @unchecked
+            width(child, visiting + index)
         if recursions == before then groupWidths(index) = widths
         widths
 
@@ -282,17 +278,12 @@ private[build] final class LookBehindAnalyzer(
             case w                  => w
         case _ => RubyWidth.Variable
     case NodeData.Group(_: GroupKind.PositiveLookBehind | _: GroupKind.NegativeLookBehind, _) => RubyWidth.Fixed(0)
-    case NodeData.Group(
-          GroupKind.NonCapture | GroupKind.IndexedCapture | _: GroupKind.NamedCapture | _: GroupKind.InlineFlag,
-          node
-        ) =>
-      rubyWidth(node)
-    case NodeData.Group(_, _)                                                 => RubyWidth.Unknown
-    case NodeData.Command(_: CommandKind.Comment | _: CommandKind.InlineFlag) => RubyWidth.Fixed(0)
-    case NodeData.Command(_)                                                  => RubyWidth.Unknown
-    case NodeData.Caret | NodeData.Dollar                                     => RubyWidth.Fixed(0)
-    case NodeData.Backslash(_: BackslashKind.Assert)                          => RubyWidth.Fixed(0)
-    case NodeData.Backslash(_: BackslashKind.EscapeCall)                      => RubyWidth.Unknown
+    // The other groups and commands are forbidden in a look-behind (see `rubyForbidden`).
+    case NodeData.Group(_, node)                         => rubyWidth(node)
+    case NodeData.Command(_)                             => RubyWidth.Fixed(0)
+    case NodeData.Caret | NodeData.Dollar                => RubyWidth.Fixed(0)
+    case NodeData.Backslash(_: BackslashKind.Assert)     => RubyWidth.Fixed(0)
+    case NodeData.Backslash(_: BackslashKind.EscapeCall) => RubyWidth.Unknown
     case NodeData.Literal(_) | NodeData.Class(_, _) | NodeData.Backslash(_: BackslashKind.BackslashValue) =>
       rubyCharWidth(Seq(node))
     case NodeData.Backslash(_: BackslashKind.EscapeClass) =>

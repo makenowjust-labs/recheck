@@ -120,10 +120,7 @@ private[build] final class IRCharResolver(
         case NodeData.Backslash(BackslashKind.EscapeClass(kind)) =>
           val data = escapeClass(kind, flags, node.loc)
           if isProperty(kind) then withRubyFoldings(data, flags, node.loc) else data
-        case _ =>
-          literals(Seq((node, flags))) match
-            case Seq(ir) => ir.data
-            case irs     => IRNodeData.Sequence(irs)
+        case _ => sequenceOf(literals(Seq((node, flags))))
     catch case _: NotModeledException => IRNodeData.Unsupported(node.data)
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -136,30 +133,6 @@ private[build] final class IRCharResolver(
     * see [[foldPart]]).
     */
   def literals(part: Seq[(Node, IRCharFlagSet)]): Seq[IRNode] =
-    try resolveLiterals(part)
-    catch
-      case _: NotModeledException =>
-        part.map((node, _) => IRNode(IRNodeData.Unsupported(node.data), node.loc))
-
-  /** Returns the widths of the alternatives that Ruby makes of a class matching the foldings of its characters (e.g.
-    * `[ßx]` is `[ßẞx]|ss|ss`), or `None` for another node, which decide whether Ruby accepts a look-behind.
-    *
-    * Onigmo reads a class of one character as a literal (e.g. `[ß]` is as wide as `ss`).
-    */
-  def rubyClassWidths(node: Node, flags: IRCharFlagSet): Option[Seq[Int]] =
-    if !rubyFolds(flags) then return None
-    try
-      val set = node.data match
-        case NodeData.Class(false, item)
-            if classItem(item, flags.copy(ignoreCase = false)).chars.intersect(universe).size != 1 =>
-          Some(classItem(item, flags).chars)
-        case NodeData.Backslash(BackslashKind.EscapeClass(kind)) if isProperty(kind) =>
-          Some(escapeClassSet(kind, flags, node.loc).chars)
-        case _ => None
-      set.map(s => rubyFoldings(s.intersect(universe))).filter(_.nonEmpty).map(keys => 1 +: keys.map(_.length))
-    catch case _: NotModeledException => None
-
-  private def resolveLiterals(part: Seq[(Node, IRCharFlagSet)]): Seq[IRNode] =
     val lits = mutable.ArrayBuffer.empty[Lit]
     for (node, flags) <- part do
       node.data match
@@ -169,7 +142,9 @@ private[build] final class IRCharResolver(
           lits += Lit(value, None, flags, node.loc)
         case NodeData.Backslash(BackslashKind.Escape(style, value)) =>
           lits += Lit(value, Some(style), flags, node.loc)
+        // $COVERAGE-OFF$ A part has only the nodes that `isLiteral` accepts.
         case data => throw new IllegalArgumentException(s"Not a literal: $data")
+      // $COVERAGE-ON$
     val merged =
       if dialect.isRuby && mode.isCodePoint then mergeRubyBytes(lits.toIndexedSeq) else lits.toIndexedSeq
     val units = merged.flatMap: lit =>
@@ -188,6 +163,22 @@ private[build] final class IRCharResolver(
         out += closed(units(i))
         i += 1
     out.result()
+
+  /** Returns the widths of the alternatives that Ruby makes of a class matching the foldings of its characters (e.g.
+    * `[ßx]` is `[ßẞx]|ss|ss`), or `None` for another node, which decide whether Ruby accepts a look-behind.
+    *
+    * Onigmo reads a class of one character as a literal (e.g. `[ß]` is as wide as `ss`).
+    */
+  def rubyClassWidths(node: Node, flags: IRCharFlagSet): Option[Seq[Int]] =
+    if !rubyFolds(flags) then return None
+    val set = node.data match
+      case NodeData.Class(false, item)
+          if classItem(item, flags.copy(ignoreCase = false)).chars.intersect(universe).size != 1 =>
+        Some(classItem(item, flags).chars)
+      case NodeData.Backslash(BackslashKind.EscapeClass(kind)) if isProperty(kind) =>
+        Some(escapeClassSet(kind, flags, node.loc).chars)
+      case _ => None
+    set.map(s => rubyFoldings(s.intersect(universe))).filter(_.nonEmpty).map(keys => 1 +: keys.map(_.length))
 
   private def closed(u: Lit): IRNode =
     if u.value == NoUnit then IRNode(IRNodeData.Chars(CharSet.empty), u.loc)
@@ -296,7 +287,9 @@ private[build] final class IRCharResolver(
       if lit.value <= 0xff then Seq(lit.value)
       // Perl makes the pattern UTF-8 for it, and it never matches a byte string.
       else if dialect.isPerl then Seq.empty
-      else throw new IRBuildingException("Character value is too large in byte mode", lit.loc)
+      // $COVERAGE-OFF$ The parsers of the other dialects reject a code point above `0xFF` in byte mode.
+      else throw new IllegalArgumentException(s"Character value is too large in byte mode: ${lit.value}")
+    // $COVERAGE-ON$
 
   // ---------------------------------------------------------------------------------------------------------------
   // Dot and escape classes

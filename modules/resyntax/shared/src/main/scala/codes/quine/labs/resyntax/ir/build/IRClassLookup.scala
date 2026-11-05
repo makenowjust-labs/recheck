@@ -135,9 +135,9 @@ private[build] final class IRClassLookup(dialect: Dialect, mode: UnitMode, perlN
         IRPropertyLookup.rubyPOSIX(name).map(u => pick(rule, asciiSet.get, u))
       case _: Dialect.Perl if name == "ascii" => asciiSet
       case _: Dialect.Perl                    =>
-        IRPropertyLookup.perl("XPosix" + name, None) match
-          case PropertyResult.Found(set, _) => asciiSet.map(a => pick(ruleOf(flags, _.posix), a, set.chars))
-          case _                            => None
+        asciiSet.map: a =>
+          val PropertyResult.Found(set, _) = IRPropertyLookup.perl("XPosix" + name, None): @unchecked
+          pick(ruleOf(flags, _.posix), a, set.chars)
       case Dialect.PCRE =>
         val rule = ruleOf(flags, a => if name == "digit" || name == "xdigit" then a.posixDigit else a.posix)
         asciiSet.map(a => pick(rule, a, pcrePOSIX(name).getOrElse(a)))

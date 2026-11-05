@@ -173,3 +173,7 @@ class ParserInlineFlagSuite extends munit.FunSuite with ParserHelper:
     Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), Some(FlagSet(ignoreCase = true)))), Literal('a'))
 
   error("a(?i)*", "", DotNet, Java, PCRE, Perl())("Nothing to repeat at 5")
+
+  error("(?i", "", Java, PCRE, Ruby())("Invalid flag at 3")
+  error("(?i!)", "", Ruby())("Invalid flag at 3")
+  error("(?i-m!)", "", Ruby())("Invalid flag at 5")

@@ -17,7 +17,6 @@ import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.ast.Quantifier
-import codes.quine.labs.resyntax.ast.QuoteLiteral
 import codes.quine.labs.resyntax.ast.Reference
 import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.charset.CharSet
@@ -215,7 +214,6 @@ object IRBuilder:
     deepExists(node):
       case NodeData.Literal(value)           => value >= 0x80
       case ClassItemData.ClassLiteral(value) => value >= 0x80
-      case QuoteLiteral.QuoteValue(value)    => value >= 0x80
 
   private def deepExists(x: Any)(p: PartialFunction[Any, Boolean]): Boolean =
     if p.isDefinedAt(x) then p(x)
@@ -397,8 +395,7 @@ private[build] class IRBuilder(
       else if dialect.isRuby then Right(IRCondition.Captured(set.take(1)))
       else Right(IRCondition.Captured(set))
 
-    def resolved: Seq[Int] =
-      backReferences.getOrElse(NodeKey(node), throw new IllegalStateException(s"No resolved test: $node"))
+    def resolved: Seq[Int] = backReferences(NodeKey(node))
 
     // A recursion test is false out of a recursion, so it is constant without calls.
     // PCRE reads `(R)` and `(R1)` as capture tests when a group has the name.
@@ -510,11 +507,7 @@ private[build] class IRBuilder(
     case BackslashKind.CaseCommand(_)                                        => IRNodeData.Empty
 
   def buildBackReference(node: Node): IRNodeData =
-    val indices = backReferences.getOrElse(
-      NodeKey(node),
-      throw new IllegalStateException(s"No resolved back-reference: $node")
-    )
-    chars.backReference(indices, charFlags)
+    chars.backReference(backReferences(NodeKey(node)), charFlags)
 
   def buildAssert(node: Node, kind: AssertKind): IRNodeData = kind match
     case AssertKind.Boundary(None) =>

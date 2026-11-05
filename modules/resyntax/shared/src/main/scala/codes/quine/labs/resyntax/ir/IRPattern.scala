@@ -89,11 +89,7 @@ final case class IRPattern(
       node.data match
         case Disjunction(ns) => ns.exists(loop(isBegin, isEnd, _))
         case Sequence(ns)    =>
-          ns match
-            case n1 +: ns :+ n2 =>
-              loop(isBegin, false, n1) || ns.exists(loop(false, false, _)) || loop(false, isEnd, n2)
-            case Seq(n) => loop(isBegin, isEnd, n)
-            case Seq()  => false
+          ns.indices.exists(i => loop(isBegin && i == 0, isEnd && i == ns.size - 1, ns(i)))
         case Capture(_, _, n)       => loop(isBegin, isEnd, n)
         case Atomic(n)              => loop(isBegin, isEnd, n)
         case Repeat(n, _)           => loop(false, false, n)

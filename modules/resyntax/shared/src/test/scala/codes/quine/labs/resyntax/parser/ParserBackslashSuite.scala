@@ -407,3 +407,8 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   check("[\\:]", "v", JavaScript)(Class(false, ClassBackslashValue(Unknown(':'))))
   check("[\\&]", "v", JavaScript)(Class(false, ClassBackslashValue(Escape(Single('&'), '&'))))
   error("\\E", "", Java)("Invalid backslash escape at 1")
+  error("\\M-\\d", "", Ruby())("Invalid backslash escape at 3")
+  error("\\gx", "", PCRE, Perl())("Invalid backslash escape at 2")
+  error("\\kx", "", DotNet, Java, PCRE, Perl())("Invalid backslash escape at 2")
+  // JavaScript without `u` reads `\x` without two hexadecimal digits as `x` (Annex B).
+  check("\\x1", "", JavaScript)(Sequence(Backslash(Unknown('x')), Literal('1')))

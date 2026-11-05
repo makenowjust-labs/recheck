@@ -63,3 +63,18 @@ class IRNodeSuite extends munit.FunSuite with IRHelper:
     for (source, expected) <- cases do assertEquals(node(source).canMatchEmpty, expected, source)
     for (source, expected) <- Seq("[\\q{ab|c}]" -> false, "[\\q{ab|}]" -> true) do
       assertEquals(node(source, "v").canMatchEmpty, expected, source)
+
+  test("IRNode#unsupportedMessage"):
+    def unsupported(node: IRNode): Option[IRNode] = node.data match
+      case _: IRNodeData.Unsupported => Some(node)
+      case _                         => node.children.iterator.flatMap(unsupported).nextOption()
+
+    def message(source: String, dialect: Dialect): String =
+      unsupported(node(source, "", dialect)).get.unsupportedMessage
+
+    assertEquals(message("(?C1)", Dialect.PCRE), "unsupported syntax (CalloutInt) at 0")
+    assertEquals(message("(?~a)", Dialect.Ruby()), "unsupported syntax (Absence) at 0")
+    assertEquals(message("a\\b{wb}", Dialect.Perl()), "unsupported syntax (Boundary) at 1")
+    assertEquals(message("(*UTF)\\C", Dialect.PCRE), "unsupported syntax (CodeUnit) at 6")
+    assertEquals(message("()\\g<1>", Dialect.PCRE), "unsupported syntax (EscapeCall) at 2")
+    assertEquals(message("(?c)a", Dialect.Java), "unsupported syntax (Literal) at 4")

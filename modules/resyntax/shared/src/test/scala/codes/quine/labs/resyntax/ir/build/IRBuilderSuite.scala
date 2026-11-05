@@ -217,6 +217,7 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
     Sequence(Capture(1, Some("x"), Empty), Conditional(IRCondition.Captured(Seq(1)), char('a'), char('b')))
   )
   check("(?(x)a|b)", "", DotNet)(Conditional(IRCondition.LookAhead(false, char('x')), char('a'), char('b')))
+  check("(?([x])a|b)", "", DotNet)(Conditional(IRCondition.LookAhead(false, char('x')), char('a'), char('b')))
   check("(?(?=x)a|b)", "", DotNet, PCRE, Perl())(
     Conditional(IRCondition.LookAhead(false, char('x')), char('a'), char('b'))
   )
@@ -320,6 +321,8 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   check("(?~|a|b)", "", Ruby())(
     Unsupported(NodeData.Command(CommandKind.AbsenceExpression(NodeData.Literal('a'), NodeData.Literal('b'))))
   )
+  check("(?~|a)", "", Ruby())(Unsupported(NodeData.Command(CommandKind.AbsenceStopper(NodeData.Literal('a')))))
+  check("(?~|)", "", Ruby())(Unsupported(NodeData.Command(CommandKind.AbsenceRangeClear)))
   check("(*CRLF)(*UTF)(*LIMIT_MATCH=1)", "", PCRE)(Sequence(Empty, Empty, Empty))
   check("(*NOTEMPTY)", "", PCRE)(Empty)
 

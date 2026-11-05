@@ -198,6 +198,6 @@ object PatternAlphabet:
       kindLineTerminators(pattern).exists(t =>
         t.crlf != IRLineTerminatorSet.CRLF.Ignored && !(t.chars(0x0a) && t.chars(0x0d))
       ) ||
-      pattern.chompTextEndsInMiddle.exists:
-        case IRNode(Assert(IRAssertKind.ChompTextEnd(t)), _) => t.crlf != IRLineTerminatorSet.CRLF.Ignored
-        case _                                               => false
+      pattern.chompTextEndsInMiddle.exists: node =>
+        val Assert(IRAssertKind.ChompTextEnd(t)) = node.data: @unchecked
+        t.crlf != IRLineTerminatorSet.CRLF.Ignored

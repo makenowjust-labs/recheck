@@ -266,3 +266,4 @@ class ParserCommandSuite extends munit.FunSuite with ParserHelper:
   error("(*TURKISH_CASING)", "", PCRE)("Invalid group at 2")
   check("(*TURKISH_CASING)", "u", PCRE)(Command(StartOption("TURKISH_CASING", None)))
   error("(*UCP)(*TURKISH_CASING)", "", PCRE)("Invalid group at 8")
+  error("(*COMMITx)", "", PCRE)("Invalid group at 8")
