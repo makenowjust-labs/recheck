@@ -1,4 +1,5 @@
 package codes.quine.labs.resyntax.parser
+import codes.quine.labs.resyntax.ast.AssertKind.*
 import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.Dialect.*
@@ -187,6 +188,9 @@ class ParserClassSuite extends munit.FunSuite with ParserHelper:
     Class(false, ClassUnion(ClassLiteral(':'), ClassLiteral('a'), ClassLiteral(':')))
   check("[[:<:]]", "", PCRE)(Class(false, ClassPOSIX(false, "<")))
   check("[[:>:]]", "", PCRE)(Class(false, ClassPOSIX(false, ">")))
+  // The class context ends with the POSIX word boundary, so `\B` after it is an assertion.
+  check("[[:<:]]\\B", "", PCRE):
+    Sequence(Class(false, ClassPOSIX(false, "<")), Backslash(Assert(NonBoundary(None))))
   error("[[:<:]a]", "", PCRE)("Unknown POSIX class at 1")
   check("[[a]]", "", Java, Ruby())(Class(false, ClassNest(false, ClassLiteral('a'))))
   check("[[a]]", "v", JavaScript)(Class(false, ClassNest(false, ClassLiteral('a'))))

@@ -445,14 +445,10 @@ private[parser] final class Parser(
         parseNamedCallGroup(stack, start)
       case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
         parseIndexedCallGroup(stack, start)
-      case '+' if featureSet.allowsInlineFlagSign =>
-        parseSignedInlineFlagGroup(stack, start)
-      case '-' if featureSet.allowsInlineFlagSign =>
-        parseSignedInlineFlagGroup(stack, start)
-      case '+' =>
-        parsePlusGroup(stack, start)
-      case '-' =>
-        parseMinusGroup(stack, start)
+      case '+' | '-' =>
+        if featureSet.allowsInlineFlagSign then parseSignedInlineFlagGroup(stack, start)
+        else if currentChar == '+' then parsePlusGroup(stack, start)
+        else parseMinusGroup(stack, start)
       case '^' =>
         parseResetFlagGroup(stack, start)
       case '#' =>
@@ -463,10 +459,9 @@ private[parser] final class Parser(
         parseEmbedCodeGroup(stack, start)
       case 'C' =>
         parseCalloutGroup(stack, start)
-      case _ if featureSet.allowsInlineFlagSign =>
-        parseSignedInlineFlagGroup(stack, start)
       case _ =>
-        parseInlineFlagGroup(stack, start)
+        if featureSet.allowsInlineFlagSign then parseSignedInlineFlagGroup(stack, start)
+        else parseInlineFlagGroup(stack, start)
 
   private def parseNonCaptureGroup(stack: mutable.Stack[Node], start: Int): Unit =
     next()
@@ -1710,8 +1705,9 @@ private[parser] final class Parser(
         val index = parseIntOption().getOrElse(fail("Invalid backslash escape"))
         if index != 0 then markNumberedReference(start)
         Reference.IndexedReference(index)
-      case '+' if featureSet.allowsForwardRelativeReference =>
-        parseRelativeReference()
+      case '+' =>
+        if featureSet.allowsForwardRelativeReference then parseRelativeReference()
+        else Reference.NamedReference(parseGroupNameBody(end))
       case '-' =>
         parseRelativeReference()
       case _ =>
@@ -2228,33 +2224,34 @@ private[parser] final class Parser(
     fail("Invalid backslash escape")
 
   private def parseClass(stack: mutable.Stack[Node]): Unit = protectContext:
-    context = context.copy(inClass = true)
+    boundary:
+      context = context.copy(inClass = true)
 
-    val start = offset
+      val start = offset
 
-    if featureSet.hasClassPOSIXWordBoundary && (startWith("[[:<:]]") || startWith("[[:>:]]")) then
-      val name = source.slice(start + 3, start + 4)
+      if featureSet.hasClassPOSIXWordBoundary && (startWith("[[:<:]]") || startWith("[[:>:]]")) then
+        val name = source.slice(start + 3, start + 4)
+        val end = offset
+        val item = ClassItem(ClassItemData.ClassPOSIX(false, name), SourceLocation(start + 1, end - 1))
+        stack.push(Node(NodeData.Class(false, item), SourceLocation(start, end)))
+        boundary.break()
+
+      next()
+
+      if featureSet.rejectsClassPOSIXOutsideClass then
+        findClassPOSIXEnd(start).foreach: _ =>
+          if currentChar == ':' then fail("POSIX class outside class", start)
+          fail("Unsupported POSIX collating element", start)
+
+      val invert = currentChar == '^'
+      if invert then next()
+
+      val item = nest(start)(parseClassItem(!featureSet.allowsClassEmpty))
+      expect(']', "Unclosed ']'")
+      validateNegatedClassSet(invert, item, start)
+
       val end = offset
-      val item = ClassItem(ClassItemData.ClassPOSIX(false, name), SourceLocation(start + 1, end - 1))
-      stack.push(Node(NodeData.Class(false, item), SourceLocation(start, end)))
-      return
-
-    next()
-
-    if featureSet.rejectsClassPOSIXOutsideClass then
-      findClassPOSIXEnd(start).foreach: _ =>
-        if currentChar == ':' then fail("POSIX class outside class", start)
-        fail("Unsupported POSIX collating element", start)
-
-    val invert = currentChar == '^'
-    if invert then next()
-
-    val item = nest(start)(parseClassItem(!featureSet.allowsClassEmpty))
-    expect(']', "Unclosed ']'")
-    validateNegatedClassSet(invert, item, start)
-
-    val end = offset
-    stack.push(Node(NodeData.Class(invert, item), SourceLocation(start, end)))
+      stack.push(Node(NodeData.Class(invert, item), SourceLocation(start, end)))
 
   private def parseClassItem(first: Boolean): ClassItem =
     val start = offset
@@ -2746,9 +2743,11 @@ private[parser] final class Parser(
 
   private def parseHex4(): Int =
     val start = offset
-    for _ <- 1 to 4 do
+    var i = 0
+    while i < 4 do
       if !isHexDigit then return -1
       next()
+      i += 1
     Integer.parseInt(sliceSource(start, offset), 16)
 
   private def isGroupNameStart: Boolean =
