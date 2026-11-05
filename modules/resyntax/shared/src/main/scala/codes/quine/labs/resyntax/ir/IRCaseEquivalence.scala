@@ -16,7 +16,7 @@ sealed abstract class IRCaseEquivalence:
 
   /** Returns the code values that a range of a class matches case-insensitively.
     *
-    * Java and Python test a code value against a range with its case mappings, which is weaker than [[closure]].
+    * Java tests a code value against a range with its case mappings, which differs from [[closure]].
     */
   def closeRange(set: CharSet): CharSet = closure(set)
 
@@ -36,19 +36,18 @@ object IRCaseEquivalence:
 
   /** JavaUnicode is Java's `CASE_INSENSITIVE` with `UNICODE_CASE`.
     *
-    * A character matches another iff `toLowerCase(toUpperCase(c))` is equal (`Pattern.SingleU`), and a code point
-    * matches a range iff it, its `toUpperCase` or its `toLowerCase` is in the range (`Pattern.CIRangeU`).
+    * A character matches another iff `toLowerCase(toUpperCase(c))` is equal (`Pattern.SingleU`).
+    *
+    * A code point matches a range iff it, its `toUpperCase` or its `toLowerCase(toUpperCase(c))` is in the range, or
+    * one of the latter two closes the range by [[javaClosingFold]] (`Pattern.CIRangeU`).
     */
   case object JavaUnicode extends IRCaseEquivalence:
 
-    // `Pattern.single` matches a character exactly if `toUpperCase(c) == toLowerCase(toUpperCase(c))` (e.g. `ß`).
-    def closure(set: CharSet): CharSet =
-      val cased = set.intersect(javaCased)
-      set.union(javaKey.closure(cased))
+    def closure(set: CharSet): CharSet = javaKey.closure(set)
 
-    // `Pattern.CIRangeU` tests `c`, `toUpperCase(c)` and `toLowerCase(toUpperCase(c))`.
     override def closeRange(set: CharSet): CharSet =
-      set.union(CaseMapping.SimpleUpper.preimage(set)).union(javaKey.preimage(set))
+      val targets = set.union(javaClosingFold.image(set.intersect(javaClosingFold.domain)))
+      set.union(CaseMapping.SimpleUpper.preimage(targets)).union(javaKey.preimage(targets))
 
   /** JavaASCII is Java's `CASE_INSENSITIVE` without `UNICODE_CASE`, which folds ASCII letters only. */
   case object JavaASCII extends IRCaseEquivalence:
@@ -94,12 +93,19 @@ object IRCaseEquivalence:
 
   lazy val asciiFold: CaseMapping = CaseMapping.fromEntries(('A'.toInt to 'Z').map(c => (c, c + 0x20)))
 
-  /** The characters that Java's `Pattern.single` folds under `UNICODE_CASE`: `toUpperCase(c)` differs from the key. */
-  lazy val javaCased: CharSet =
-    val domain = CaseMapping.SimpleUpper.domain.union(javaKey.domain)
-    CharSet.of(domain.iterator.filter(c => CaseMapping.SimpleUpper(c) != javaKey(c)).toSeq*)
-
-  /** Java's key `toLowerCase(toUpperCase(c))` of the simple mappings. */
+  /** Java's key `toLowerCase(toUpperCase(c))` of the simple mappings, which `UNICODE_CASE` compares. */
   lazy val javaKey: CaseMapping =
     val domain = CaseMapping.SimpleUpper.domain.union(CaseMapping.SimpleLower.domain)
     CaseMapping.fromEntries(domain.iterator.map(c => (c, CaseMapping.SimpleLower(CaseMapping.SimpleUpper(c)))))
+
+  /** Java's mapping of a code point of a range to the character closing the range under `UNICODE_CASE`.
+    *
+    * It is the `C`, `S` and `T` mappings of CaseFolding.txt whose image does not map back to the code point by
+    * `toUpperCase` or `toLowerCase`, and `ı` to `I`.
+    */
+  lazy val javaClosingFold: CaseMapping =
+    val turkic = CaseMapping.SimpleFoldTurkic.entries.filter((c, f) => CaseMapping.SimpleFold(c) != f)
+    val entries = (CaseMapping.SimpleFold.entries ++ turkic).filter: (c, f) =>
+      CaseMapping.SimpleUpper(f) != c && CaseMapping.SimpleLower(f) != c
+    // Java 26 adds `ı` to `I` by hand (`GenerateCaseFolding`), as CaseFolding.txt has no mapping from `ı`.
+    CaseMapping.fromEntries(entries ++ Iterator((0x131, 0x49)))

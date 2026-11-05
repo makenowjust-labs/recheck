@@ -369,12 +369,18 @@ class IRCharResolverSuite extends munit.FunSuite:
   chars("(?aa)[ßx]", "i", Perl())(sharpSs.union(of("xX")))
   chars("ß", "i", Python(), DotNet)(of("\u00df\u1e9e"))
   chars("ß", "i", JavaScript)(of("\u00df"))
-  // Java matches `ß` exactly, because its upper case is itself, but `ẞ` matches `ß`.
-  chars("ß", "iu", Java)(of("\u00df"))
+  chars("ß", "iu", Java)(of("\u00df\u1e9e"))
   chars("\u1e9e", "iu", Java)(of("\u00df\u1e9e"))
 
   // Case-insensitive classes
   chars("[j-l]", "iu", Java)(of("jklJKL\u212a"))
+  chars("[\\u212a-\\u212b]", "iu", Java)(of("kK\u212a\u00e5\u00c5\u212b"))
+  chars("[\\u0130-\\u0130]", "iu", Java)(of("Ii\u0130\u0131"))
+  chars("[A-Z]", "iu", Java)(CharSet.range('A', 'Z').union(CharSet.range('a', 'z')).union(of("\u0131\u017f")))
+  chars("[a-z]", "iu", Java)(
+    CharSet.range('A', 'Z').union(CharSet.range('a', 'z')).union(of("\u0130\u0131\u017f\u212a"))
+  )
+  chars("[\\u0131-\\u0131]", "iu", Java)(of("Ii\u0131"))
   chars("[j-l]", "i", Python())(of("jklJKL\u212a"))
   chars("[^k]", "i", JavaScript)(of("kK").complement(UnitMode.UTF16))
   chars("[^k]", "iu", JavaScript)(of("kK\u212a").complement(UnitMode.CodePoint))
@@ -613,7 +619,7 @@ class IRCharResolverSuite extends munit.FunSuite:
 
   def cp(s: String): Seq[Int] = UnitMode.CodePoint.decode(s).iterator.toSeq
 
-  // The first cluster's length in the engines (Java 25, PCRE2 10.49, Perl 5.44, Ruby 4.0), where they agree except PCRE2 on the conjuncts (see `PCREProbes`).
+  // The first cluster's length in the engines (Java 27, PCRE2 10.49, Perl 5.44, Ruby 4.0), where they agree except PCRE2 on the conjuncts (see `PCREProbes`).
   val Probes: Seq[(String, String, Int)] = Seq(
     ("CRLF", "\r\n\u0301", 2),
     ("LF and a mark", "\n\u0301", 1),
