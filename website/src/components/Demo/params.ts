@@ -37,6 +37,7 @@ const paramType = (property: Property): ParamType => {
   if (property["x-unit"] === "milliseconds") return "duration";
   if (property.type === "integer") return "integer";
   if (property.type === "number") return "float";
+  /* v8 ignore next -- Every parameter of the schema has an input or `x-exclude: ["playground"]`. */
   throw new Error(`The Playground has no input for ${property.title}`);
 };
 
@@ -59,6 +60,7 @@ const settingType = (
       ),
     };
   }
+  /* v8 ignore next -- Every dialect setting of the schema is a boolean or an enum. */
   throw new Error(`The Playground has no input for the ${key} setting`);
 };
 
