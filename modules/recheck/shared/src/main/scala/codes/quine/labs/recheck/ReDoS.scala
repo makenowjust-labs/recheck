@@ -105,13 +105,19 @@ object ReDoS:
     * deeper than [[Parser.MaxNestingDepth]] or with too many multi-character case foldings in a literal.
     */
   private[recheck] def parse(source: String, flags: String, dialect: Dialect)(using ctx: Context): IRPattern =
+    parseTree(source, flags, dialect)._3
+
+  /** Parses the source into its flags, its syntax tree and its IR. */
+  private[recheck] def parseTree(source: String, flags: String, dialect: Dialect)(using
+      ctx: Context
+  ): (FlagSet, Node, IRPattern) =
     ctx.log("parse: start")
     val flagSet = ctx.interrupt(parseFlags(flags, dialect))
     val mode = ctx.interrupt(Parser.determineUnitMode(source, flagSet, dialect))
     val node = ctx.interrupt(parseSource(source, flagSet, dialect, mode))
     val ir = ctx.interrupt(buildIR(node, flagSet, dialect, mode))
     ctx.log(s"parse: finish\n  pattern: /$source/$flags")
-    ir
+    (flagSet, node, ir)
 
   private def parseFlags(flags: String, dialect: Dialect): FlagSet =
     try FlagSet.parse(flags, dialect)
@@ -143,33 +149,9 @@ object ReDoS:
   )(using ctx: Context): Diagnostics =
     import params.*
     state.checker = Some(Diagnostics.Checker.Automaton)
-    val maxNFASize = if checker == Checker.Auto then params.maxNFASize else Int.MaxValue
-    val maxDFASize = if checker == Checker.Auto then params.maxDFASize else Int.MaxValue
-
-    def complexities: Iterator[Complexity[UChar]] =
-      if checker == Checker.Auto && ir.repeatCount >= maxRepeatCount then
-        ctx.log("auto: exceed maxRepeatCount")
-        throw UnsupportedException("The pattern contains too many repeat")
-      // When the pattern has no infinite repetition, then it is safe.
-      else if ir.isBounded then
-        ctx.log("automaton: constant pattern")
-        Iterator.empty
-      else if checker == Checker.Auto && ir.size >= maxPatternSize then
-        ctx.log("auto: exceed maxPatternSize")
-        throw UnsupportedException("The pattern is too large")
-      else
-        val epsNFA =
-          EpsNFABuilder.build(ir, Set.empty, maxBackReferenceStrings = maxBackReferenceStrings, maxNFASize = maxNFASize)
-        val orderedNFA = epsNFA.toOrderedNFA(false, maxDFASize = maxDFASize, maxNFASize = maxNFASize).rename
-        AutomatonChecker.check(
-          epsNFA.restrictInputs(orderedNFA).mapAlphabet(alphabetRepresentative.of),
-          false,
-          maxDFASize = maxDFASize,
-          maxNFASize = maxNFASize
-        )
 
     // The safe complexities follow the vulnerable ones.
-    val (vulnerable, rest) = complexities.span(_.isInstanceOf[Complexity.Vulnerable[?]])
+    val (vulnerable, rest) = computeAutomatonComplexities(ir, params).span(_.isInstanceOf[Complexity.Vulnerable[?]])
     val diagnostics = vulnerable
       .collect:
         case vul: Complexity.Vulnerable[UChar] => vul
@@ -186,6 +168,39 @@ object ReDoS:
           case Some(safe: Complexity.Safe) => safe.toAttackComplexity
           case _                           => AttackComplexity.Safe(false)
         state.safe(complexity)
+
+  /** Runs the automaton checker, and returns the complexities, the vulnerable ones from the worst followed by the safe
+    * one if any.
+    *
+    * It throws [[UnsupportedException]] when it gives up.
+    */
+  private[recheck] def computeAutomatonComplexities(ir: IRPattern, params: Parameters)(using
+      ctx: Context
+  ): Iterator[Complexity[UChar]] =
+    import params.*
+    val maxNFASize = if checker == Checker.Auto then params.maxNFASize else Int.MaxValue
+    val maxDFASize = if checker == Checker.Auto then params.maxDFASize else Int.MaxValue
+
+    if checker == Checker.Auto && ir.repeatCount >= maxRepeatCount then
+      ctx.log("auto: exceed maxRepeatCount")
+      throw UnsupportedException("The pattern contains too many repeat")
+    // When the pattern has no infinite repetition, then it is safe.
+    else if ir.isBounded then
+      ctx.log("automaton: constant pattern")
+      Iterator.empty
+    else if checker == Checker.Auto && ir.size >= maxPatternSize then
+      ctx.log("auto: exceed maxPatternSize")
+      throw UnsupportedException("The pattern is too large")
+    else
+      val epsNFA =
+        EpsNFABuilder.build(ir, Set.empty, maxBackReferenceStrings = maxBackReferenceStrings, maxNFASize = maxNFASize)
+      val orderedNFA = epsNFA.toOrderedNFA(false, maxDFASize = maxDFASize, maxNFASize = maxNFASize).rename
+      AutomatonChecker.check(
+        epsNFA.restrictInputs(orderedNFA).mapAlphabet(alphabetRepresentative.of),
+        false,
+        maxDFASize = maxDFASize,
+        maxNFASize = maxNFASize
+      )
 
   /** Runs the fuzz checker, and returns the diagnostics of its first attack that the runtime does not refute, or the
     * safe ones.
