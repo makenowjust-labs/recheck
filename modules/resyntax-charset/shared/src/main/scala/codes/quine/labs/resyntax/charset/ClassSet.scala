@@ -6,7 +6,7 @@ import scala.collection.immutable.SortedSet
   *
   * It is a set of strings: [[chars]] holds the strings of exactly one code value, and [[strings]] holds the other
   * strings (including the empty string). Union, intersection and difference are those of the sets of strings, as in
-  * ECMAScript `ClassSetExpression` (ES2024 22.2.2.9 `CompileToCharSet`).
+  * ECMAScript `ClassSetExpression` (ES2026 22.2.2.9 `CompileToCharSet`).
   */
 final class ClassSet private (val chars: CharSet, val strings: SortedSet[UString]):
 

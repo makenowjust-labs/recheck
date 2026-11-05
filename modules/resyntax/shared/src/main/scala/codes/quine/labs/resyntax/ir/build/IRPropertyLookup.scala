@@ -102,7 +102,7 @@ private[build] object IRPropertyLookup:
   // ---------------------------------------------------------------------------------------------------------------
   // JavaScript
 
-  /** The binary properties of ECMAScript (ES2025 Table 69), with their aliases. */
+  /** The binary properties of ECMAScript (ES2026 Table 65), with their aliases. */
   private val JavaScriptBinary: Map[String, String] =
     val names = Seq(
       "ASCII" -> "",
@@ -161,7 +161,7 @@ private[build] object IRPropertyLookup:
     )
     names.flatMap((long, short) => Seq(long -> long) ++ Option.when(short.nonEmpty)(short -> long)).toMap
 
-  /** The properties of strings of ECMAScript (ES2025 Table 70), only with the `v` flag. */
+  /** The properties of strings of ECMAScript (ES2026 Table 66), only with the `v` flag. */
   private val JavaScriptStringProperties: Set[String] = Set(
     "Basic_Emoji",
     "Emoji_Keycap_Sequence",

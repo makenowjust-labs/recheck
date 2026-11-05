@@ -7,7 +7,7 @@ Describes how `recheck` checks a regular expression of the `javascript` dialect,
 
 ## Engine
 
-`recheck` follows the syntax and the semantics of ECMAScript 2025 `RegExp`, as V8 implements it.
+`recheck` follows the syntax and the semantics of ECMAScript 2026 `RegExp`, as V8 implements it.
 
 ## Settings
 

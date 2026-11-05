@@ -142,14 +142,14 @@ object CaseMapping:
   /** SimpleLower maps a code point to its lowercase if it is one code point (`Simple_Lowercase_Mapping`). */
   lazy val SimpleLower: CaseMapping = decode(CaseData.SimpleLower)
 
-  /** ECMAScriptUpper is ECMAScript `Canonicalize` without the `u` and `v` flags, on UTF-16 code units (ES2024
+  /** ECMAScriptUpper is ECMAScript `Canonicalize` without the `u` and `v` flags, on UTF-16 code units (ES2026
     * 22.2.2.7.3).
     *
     * It maps a code unit to its full uppercase if that is a single code unit, except a non-ASCII code unit to ASCII.
     */
   lazy val ECMAScriptUpper: CaseMapping = decode(CaseData.ECMAScriptUpper)
 
-  /** Returns the mapping of ECMAScript `Canonicalize` (ES2024 22.2.2.7.3) on the units of the mode.
+  /** Returns the mapping of ECMAScript `Canonicalize` (ES2026 22.2.2.7.3) on the units of the mode.
     *
     * `UTF16CodePoint` is the mode with the `u` or `v` flag, and `UTF16` is the one without them.
     *

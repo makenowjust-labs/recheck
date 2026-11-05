@@ -63,7 +63,7 @@ The ESLint plugin (`eslint-plugin-redos`) checks JavaScript regular expressions 
 
 | `dialect`                              | Engine that `recheck` follows                  | Matching unit                                      |
 | -------------------------------------- | ---------------------------------------------- | -------------------------------------------------- |
-| [`javascript`](dialects/javascript.md) | ECMAScript 2025 `RegExp` (V8)                  | UTF-16 code units, or code points with `u` or `v`  |
+| [`javascript`](dialects/javascript.md) | ECMAScript 2026 `RegExp` (V8)                  | UTF-16 code units, or code points with `u` or `v`  |
 | [`python`](dialects/python.md)         | Python 3.15 `re`                               | code points (`str`), or bytes (`bytes`)            |
 | [`ruby`](dialects/ruby.md)             | Ruby 4.0 `Regexp` (Onigmo)                     | code points (`UTF-8`), or bytes (`ASCII-8BIT`)     |
 | [`java`](dialects/java.md)             | Java 25 `java.util.regex.Pattern`              | code points                                        |
@@ -103,7 +103,10 @@ A pattern that the engine rejects is reported as `unknown` with an `invalid` err
 Some constructs are recognized, but the checkers do not handle them.
 A pattern having one of them is reported as `unknown` with an `unsupported` error naming the construct (e.g. `a(?R)?` gives `unsupported syntax (RCall) at 1`).
 Each dialect's page lists the constructs that it does not support (e.g. .NET's balancing groups).
-In every dialect, nesting deeper than 150 levels is not supported either, where each group, look-around condition of a conditional, class, operand of a class set operation, and repeat of a repeat is one level (e.g. `(?:` repeated 151 times gives `Too deeply nested (limit 150) at 450`).
+
+The following are not supported in any dialect.
+
+- Nesting deeper than 150 levels, where each group, look-around condition of a conditional, class, operand of a class set operation, and repeat of a repeat is one level (e.g. `(?:` repeated 151 times gives `Too deeply nested (limit 150) at 450`).
 
 ## Approximations
 
