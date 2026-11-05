@@ -8,8 +8,9 @@ import Hotspot from "@site/src/components/Hotspot";
 `Diagnostics` is what `check` reports about a regular expression.
 It is not a final verdict on whether the regular expression is a threat.
 It is the evidence for judging the ReDoS risk: whether an attack string was found, the estimated complexity, the attack string itself, and how they were found.
-Whether a finding matters depends on where the regular expression is used, e.g. how long an input can reach it and which engine runs it.
-So the decision is left to you, or to the tool using `recheck` (e.g. the [ESLint plugin](as-eslint-plugin.mdx) decides it by its options).
+Whether a finding matters depends on how the regular expression is used, e.g. how long an input can reach it and which engine runs it.
+`recheck` cannot know them, so it gives you the evidence to decide for your use, and this page describes how to read it.
+A tool using `recheck` can also make the decision for you, as the [ESLint plugin](as-eslint-plugin.mdx) does by its options.
 
 In Scala, `Diagnostics` is a `sealed class`, and in TypeScript, it is a serialized object.
 They have the same information, which this page describes.
