@@ -5,6 +5,13 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.duration.MILLISECONDS
 import scala.concurrent.duration.SECONDS
 
+import codes.quine.labs.recheck.exception.CancelException
+import codes.quine.labs.recheck.exception.InvalidKeepException
+import codes.quine.labs.recheck.exception.InvalidRegExpException
+import codes.quine.labs.recheck.exception.RuntimeAttacksRefutedException
+import codes.quine.labs.recheck.exception.TimeoutException
+import codes.quine.labs.recheck.exception.UnexpectedException
+import codes.quine.labs.recheck.exception.UnsupportedException
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.dialect.PerlSource
@@ -272,10 +279,21 @@ class DiagnosticsSuite extends munit.FunSuite:
   test("Diagnostics.Checker#toString"):
     assertEquals(Seq(Diagnostics.Checker.Automaton, Diagnostics.Checker.Fuzz).map(_.toString), Seq("automaton", "fuzz"))
 
+  test("Diagnostics.ErrorKind.from"):
+    import Diagnostics.ErrorKind
+    assertEquals(ErrorKind.from(new TimeoutException("foo")), ErrorKind.Timeout)
+    assertEquals(ErrorKind.from(new CancelException("foo")), ErrorKind.Cancel)
+    assertEquals(ErrorKind.from(new UnsupportedException("foo")), ErrorKind.Unsupported("foo"))
+    assertEquals(ErrorKind.from(new InvalidRegExpException("foo")), ErrorKind.InvalidRegExp("foo"))
+    assertEquals(ErrorKind.from(new InvalidKeepException("foo")), ErrorKind.InvalidKeep("foo"))
+    assertEquals(ErrorKind.from(new RuntimeAttacksRefutedException), ErrorKind.RuntimeAttacksRefuted)
+    assertEquals(ErrorKind.from(new UnexpectedException("foo")), ErrorKind.Unexpected("foo"))
+
   test("Diagnostics.ErrorKind#toString"):
     assertEquals(Diagnostics.ErrorKind.Timeout.toString, "timeout")
     assertEquals(Diagnostics.ErrorKind.Cancel.toString, "cancel")
     assertEquals(Diagnostics.ErrorKind.Unsupported("foo").toString, "unsupported (foo)")
     assertEquals(Diagnostics.ErrorKind.InvalidRegExp("foo").toString, "invalid RegExp (foo)")
+    assertEquals(Diagnostics.ErrorKind.InvalidKeep("foo").toString, "invalid keep (foo)")
     assertEquals(Diagnostics.ErrorKind.RuntimeAttacksRefuted.toString, "runtime attacks refuted")
     assertEquals(Diagnostics.ErrorKind.Unexpected("foo").toString, "unexpected (foo)")

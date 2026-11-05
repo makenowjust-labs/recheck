@@ -3,13 +3,7 @@ package diagnostics
 
 import scala.collection.mutable
 
-import codes.quine.labs.recheck.exception.CancelException
-import codes.quine.labs.recheck.exception.InvalidRegExpException
 import codes.quine.labs.recheck.exception.ReDoSException
-import codes.quine.labs.recheck.exception.RuntimeAttacksRefutedException
-import codes.quine.labs.recheck.exception.TimeoutException
-import codes.quine.labs.recheck.exception.UnexpectedException
-import codes.quine.labs.recheck.exception.UnsupportedException
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 
@@ -55,11 +49,5 @@ final class DiagnosticsState(source: String, flags: String, dialect: Dialect):
 
   /** Returns the unknown diagnostics of the exception. */
   def unknown(ex: ReDoSException): Diagnostics.Unknown =
-    val error = ex match
-      case _: TimeoutException               => Diagnostics.ErrorKind.Timeout
-      case _: CancelException                => Diagnostics.ErrorKind.Cancel
-      case ex: UnsupportedException          => Diagnostics.ErrorKind.Unsupported(ex.getMessage)
-      case ex: InvalidRegExpException        => Diagnostics.ErrorKind.InvalidRegExp(ex.getMessage)
-      case _: RuntimeAttacksRefutedException => Diagnostics.ErrorKind.RuntimeAttacksRefuted
-      case ex: UnexpectedException           => Diagnostics.ErrorKind.Unexpected(ex.getMessage)
+    val error = Diagnostics.ErrorKind.from(ex)
     Diagnostics.Unknown(source, flags, dialect, unitMode, error, refutedAttacks.toSeq, checker, upperBound)

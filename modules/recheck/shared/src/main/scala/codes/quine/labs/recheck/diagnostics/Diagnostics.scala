@@ -1,6 +1,14 @@
 package codes.quine.labs.recheck
 package diagnostics
 
+import codes.quine.labs.recheck.exception.CancelException
+import codes.quine.labs.recheck.exception.InvalidKeepException
+import codes.quine.labs.recheck.exception.InvalidRegExpException
+import codes.quine.labs.recheck.exception.ReDoSException
+import codes.quine.labs.recheck.exception.RuntimeAttacksRefutedException
+import codes.quine.labs.recheck.exception.TimeoutException
+import codes.quine.labs.recheck.exception.UnexpectedException
+import codes.quine.labs.recheck.exception.UnsupportedException
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 
@@ -141,6 +149,16 @@ object Diagnostics:
   /** ErrorKind types. */
   object ErrorKind:
 
+    /** Returns the kind of the exception. */
+    def from(ex: ReDoSException): ErrorKind = ex match
+      case _: TimeoutException               => Timeout
+      case _: CancelException                => Cancel
+      case ex: UnsupportedException          => Unsupported(ex.getMessage)
+      case ex: InvalidRegExpException        => InvalidRegExp(ex.getMessage)
+      case ex: InvalidKeepException          => InvalidKeep(ex.getMessage)
+      case _: RuntimeAttacksRefutedException => RuntimeAttacksRefuted
+      case ex: UnexpectedException           => Unexpected(ex.getMessage)
+
     /** Timeout is a timeout on RegExp analyzing. */
     case object Timeout extends ErrorKind:
 
@@ -160,6 +178,11 @@ object Diagnostics:
     final case class InvalidRegExp(message: String) extends ErrorKind:
 
       override def toString: String = s"invalid RegExp ($message)"
+
+    /** InvalidKeep is an error that what a repair keeps refers to no capture of the RegExp. */
+    final case class InvalidKeep(message: String) extends ErrorKind:
+
+      override def toString: String = s"invalid keep ($message)"
 
     /** RuntimeAttacksRefuted is an error that the runtime refutes as many attacks as `maxRefutedAttacks`. */
     case object RuntimeAttacksRefuted extends ErrorKind:

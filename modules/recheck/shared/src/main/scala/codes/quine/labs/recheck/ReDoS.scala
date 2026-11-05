@@ -19,8 +19,13 @@ import codes.quine.labs.recheck.fuzz.FuzzChecker
 import codes.quine.labs.recheck.fuzz.FuzzProgram
 import codes.quine.labs.recheck.parameters.Checker
 import codes.quine.labs.recheck.parameters.Parameters
+import codes.quine.labs.recheck.repair.Keep
+import codes.quine.labs.recheck.repair.Repair
+import codes.quine.labs.recheck.repair.Rx
 import codes.quine.labs.recheck.verification.RuntimeAttackExecutor
 import codes.quine.labs.recheck.verification.RuntimeAttacker
+import codes.quine.labs.recheck.vm.Interpreter
+import codes.quine.labs.recheck.vm.ProgramBuilder
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetException
 import codes.quine.labs.resyntax.ast.Node
@@ -66,6 +71,43 @@ object ReDoS:
         case Checker.Fuzz      => checkFuzz(ir, params, state, runtimeAttacker, Seq.empty)
         case Checker.Auto      => checkAuto(ir, params, state, runtimeAttacker)
     catch case ex: ReDoSException => state.unknown(ex)
+
+  /** Returns a better RegExp for the given one, keeping what `keep` tells of its matches.
+    *
+    * The pattern and the flags are of `params.dialect`. The repair edits the pattern around the hotspots that the
+    * automaton checker finds, preferring the edits that keep the matches, until it is safe or no edit makes it better.
+    * The result has the complexity of the repaired RegExp, and the shortest input on which the matches differ if they
+    * do.
+    */
+  def repair(
+      source: String,
+      flags: String,
+      params: Parameters = Parameters(),
+      keep: Keep = Keep.All,
+      token: Option[CancellationToken] = None
+  ): Rx =
+    given ctx: Context = Context(params.timeout, token, params.logger)
+    val dialect = params.dialect
+    try
+      val original = Repair.Pattern.parse(source, flags, dialect)
+      val kept = keep.captureIndices(original.ir)
+      Repair.search(original, kept, params) match
+        case Repair.Result.Safe     => Rx.Safe(source, flags, dialect)
+        case Repair.Result.NotFound => Rx.Unknown(source, flags, dialect, None)
+        case Repair.Result.Repaired(repaired, captures, complexity, comparison) =>
+          val result = comparison match
+            case Repair.Comparison.Equivalent       => Rx.Comparison.Equivalent
+            case Repair.Comparison.Unknown          => Rx.Comparison.Unknown
+            case Repair.Comparison.Different(input) =>
+              // The captures are of the indices in each pattern, in the order of `kept`.
+              def run(pattern: IRPattern, indices: Seq[Int]): Option[Seq[Option[(Int, Int)]]] =
+                val result = Interpreter.run(ProgramBuilder.build(pattern, false), input, Interpreter.Options())
+                result.captures.map(cs => indices.map(i => Option.when(cs(2 * i) >= 0)((cs(2 * i), cs(2 * i + 1)))))
+
+              val counterexample = Rx.Counterexample(input, run(original.ir, kept), run(repaired.ir, captures))
+              Rx.Comparison.Different(counterexample)
+          Rx.Repaired(source, flags, dialect, original.ir.mode, repaired.source, complexity, kept, result)
+    catch case ex: ReDoSException => Rx.Unknown(source, flags, dialect, Some(Diagnostics.ErrorKind.from(ex)))
 
   /** Returns the runtime attacker of the checking of the pattern, which runs the attack strings on the runtime of the
     * dialect.
@@ -163,11 +205,15 @@ object ReDoS:
 
     diagnostics
       .nextOption()
-      .getOrElse:
-        val complexity = rest.nextOption() match
-          case Some(safe: Complexity.Safe) => safe.toAttackComplexity
-          case _                           => AttackComplexity.Safe(false)
-        state.safe(complexity)
+      .getOrElse(state.safe(toSafeComplexity(rest)))
+
+  /** Returns the complexity of a safe pattern from the complexities of [[computeAutomatonComplexities]] after the
+    * vulnerable ones.
+    */
+  private[recheck] def toSafeComplexity(rest: Iterator[Complexity[UChar]]): AttackComplexity.Safe =
+    rest.nextOption() match
+      case Some(safe: Complexity.Safe) => safe.toAttackComplexity
+      case _                           => AttackComplexity.Safe(false)
 
   /** Runs the automaton checker, and returns the complexities, the vulnerable ones from the worst followed by the safe
     * one if any.

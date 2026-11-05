@@ -7,6 +7,7 @@ import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.common.UnsupportedException
+import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.Hotspot
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.Node
@@ -27,10 +28,12 @@ private[recheck] object Repair:
     /** Safe is the result for a pattern without vulnerabilities. */
     case Safe
 
-    /** Repaired has a safe pattern, and how it compares with the original (see [[Equivalence.findCounterexample]]). */
-    case Repaired(pattern: Pattern, comparison: Comparison)
+    /** Repaired has a better pattern, the indices of the kept captures in it, its complexity, and how it compares with
+      * the original.
+      */
+    case Repaired(pattern: Pattern, captures: Seq[Int], complexity: AttackComplexity, comparison: Comparison)
 
-    /** NotFound is the result when no edit makes the pattern safe. */
+    /** NotFound is the result when no edit makes the pattern better. */
     case NotFound
 
   /** Comparison tells whether a repaired pattern extracts the same as the original. */
@@ -39,7 +42,7 @@ private[recheck] object Repair:
     /** Equivalent tells that it extracts the same from every input. */
     case Equivalent
 
-    /** Different has the shortest input on which it does not. */
+    /** Different has the shortest input on which it does not (see [[Equivalence.findCounterexample]]). */
     case Different(input: UString)
 
     /** Unknown tells that the comparison is not supported (e.g. for a back-reference). */
@@ -53,17 +56,15 @@ private[recheck] object Repair:
     *
     * The automaton checker checks the patterns with `params` (see [[ReDoS.computeAutomatonComplexities]]). Each round
     * takes the best edit by the complexity after it, and it stops when the pattern is safe, no edit makes it better, or
-    * after [[MaxRounds]] rounds.
+    * after [[MaxRounds]] rounds. An edit may remove a capture not kept, which renumbers the later ones.
     *
     * It throws [[UnsupportedException]] when the automaton checker gives up on the original pattern.
     */
   def search(original: Pattern, captures: Seq[Int], params: Parameters)(using ctx: Context): Result =
-    val pairs = captures.map(i => (i, i))
-
-    def compare(a: Pattern, b: Pattern): Comparison =
+    def compare(a: Pattern, aIndices: Seq[Int], b: Pattern, bIndices: Seq[Int]): Comparison =
       try
         Equivalence
-          .findCounterexample(a.ir, b.ir, pairs, params.maxNFASize)
+          .findCounterexample(a.ir, b.ir, aIndices.zip(bIndices), params.maxNFASize)
           .fold(Comparison.Equivalent)(Comparison.Different(_))
       catch case _: UnsupportedException => Comparison.Unknown
 
@@ -77,33 +78,37 @@ private[recheck] object Repair:
           throw new UnexpectedException(s"an edit makes an invalid pattern /$source/: ${ex.getMessage}")
         // $COVERAGE-ON$
 
-    def loop(current: Pattern, score: Score, round: Int): (Pattern, Score) =
-      if score.isSafe || round >= MaxRounds then (current, score)
+    // `indices` are the current indices of `captures`.
+    def loop(current: Pattern, indices: Seq[Int], score: Score, round: Int): (Pattern, Seq[Int], Score) =
+      if score.isSafe || round >= MaxRounds then (current, indices, score)
       else
         val improved = current
-          .candidates(score.spots)
-          .flatMap: edit =>
+          .candidates(score.spots, indices.toSet)
+          .flatMap: candidate =>
             for
-              next <- parseEdited(edit.applyTo(current.source))
+              next <- parseEdited(candidate.edit.applyTo(current.source))
               nextScore <- Score.of(next.ir, params)
               if nextScore > score
-            yield (next, nextScore, edit)
-          .sortBy((_, nextScore, edit) =>
+            yield
+              val nextIndices = indices.map(i => i - candidate.removedCaptures.count(_ < i))
+              (next, nextIndices, nextScore, candidate.edit)
+          .sortBy((_, _, nextScore, edit) =>
             (-nextScore.rank, nextScore.count, edit.text.length - (edit.end - edit.start))
           )
         val chosen = improved
-          .find((next, _, _) => compare(current, next) == Comparison.Equivalent)
+          .find((next, nextIndices, _, _) => compare(current, indices, next, nextIndices) == Comparison.Equivalent)
           .orElse(improved.headOption)
         chosen match
-          case Some((next, nextScore, _)) => loop(next, nextScore, round + 1)
-          case None                       => (current, score)
+          case Some((next, nextIndices, nextScore, _)) => loop(next, nextIndices, nextScore, round + 1)
+          case None                                    => (current, indices, score)
 
     Score.of(original.ir, params) match
       case None => throw new UnsupportedException("the automaton checker cannot check the pattern")
       case Some(score) if score.isSafe => Result.Safe
       case Some(score)                 =>
-        val (fixed, fixedScore) = loop(original, score, 0)
-        if fixedScore.isSafe then Result.Repaired(fixed, compare(original, fixed)) else Result.NotFound
+        val (fixed, indices, fixedScore) = loop(original, captures, score, 0)
+        if fixed eq original then Result.NotFound
+        else Result.Repaired(fixed, indices, fixedScore.complexity, compare(original, captures, fixed, indices))
 
   /** Pattern is a pattern parsed in the dialect, with its syntax tree for the edits and its IR for the checks. */
   final case class Pattern(
@@ -115,10 +120,10 @@ private[recheck] object Repair:
       ir: IRPattern
   ):
 
-    /** Lists the edits around the spots. */
-    def candidates(spots: Set[SourceLocation]): Seq[Edit] =
+    /** Lists the candidates around the spots, which keep the captures of `kept`. */
+    def candidates(spots: Set[SourceLocation], kept: Set[Int]): Seq[Candidate] =
       val features = FeatureSet.from(SourcePrescan.from(source), dialect, flagSet, ir.mode)
-      new CandidateFinder(source, node, ir, features).find(spots)
+      new CandidateFinder(source, node, ir, features, kept).find(spots)
 
   object Pattern:
 
@@ -130,8 +135,10 @@ private[recheck] object Repair:
       val (flagSet, node, ir) = ReDoS.parseTree(source, flags, dialect)
       Pattern(source, flags, dialect, flagSet, node, ir)
 
-  /** Score is the vulnerabilities of a pattern, with the rank of the worst one (higher is better) and their count. */
-  private final case class Score(rank: Int, count: Int, spots: Set[SourceLocation]):
+  /** Score is the vulnerabilities of a pattern, with the rank of the worst one (higher is better), their count, the
+    * spots of the worst one, and the complexity.
+    */
+  private final case class Score(rank: Int, count: Int, spots: Set[SourceLocation], complexity: AttackComplexity):
 
     def isSafe: Boolean = count == 0
 
@@ -145,18 +152,15 @@ private[recheck] object Repair:
     /** Checks the pattern by the automaton checker, or returns `None` if it gives up. */
     def of(ir: IRPattern, params: Parameters)(using ctx: Context): Option[Score] =
       try
-        val vulnerable = ReDoS
-          .computeAutomatonComplexities(ir, params)
-          .takeWhile(_.isInstanceOf[Complexity.Vulnerable[?]])
-          .collect { case v: Complexity.Vulnerable[UChar] => v }
-          .take(maxCount)
-          .toSeq
+        val (complexities, rest) =
+          ReDoS.computeAutomatonComplexities(ir, params).span(_.isInstanceOf[Complexity.Vulnerable[?]])
+        val vulnerable = complexities.collect { case v: Complexity.Vulnerable[UChar] => v }.take(maxCount).toSeq
         vulnerable.headOption match
-          case None        => Some(Score(Int.MaxValue, 0, Set.empty))
+          case None        => Some(Score(Int.MaxValue, 0, Set.empty, ReDoS.toSafeComplexity(rest)))
           case Some(worst) =>
             val rank = worst match
               case _: Complexity.Exponential[?] => Int.MinValue
               case p: Complexity.Polynomial[?]  => -p.degree
             val spots = worst.hotspot.spots.collect { case Hotspot.Spot(s, e, Hotspot.Hot) => SourceLocation(s, e) }
-            Some(Score(rank, vulnerable.size, spots.toSet))
+            Some(Score(rank, vulnerable.size, spots.toSet, worst.toAttackComplexity))
       catch case _: UnsupportedException => None
