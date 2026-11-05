@@ -198,7 +198,7 @@ class MainSuite extends munit.FunSuite:
     assertEquals(out, ReDoS.repair("^(a+)+$", "").toString + "\n")
     val (json, _, _) = runMain(Seq("repair", "--json", "--keep=match", "/^(a+)+$/"))
     assertEquals(parse(json), Right(encodeRx(ReDoS.repair("^(a+)+$", "", keep = Keep.Match))))
-    assertEquals(runMain(Seq("repair", "/^(a|aa)+$/"))._3, 1)
+    assertEquals(runMain(Seq("repair", "/(/"))._3, 1)
 
   test("Main#run: generate-runtime-attack-script"):
     // The input is the output of `--json`.

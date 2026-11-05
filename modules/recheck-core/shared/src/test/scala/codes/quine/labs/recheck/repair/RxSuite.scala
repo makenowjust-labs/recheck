@@ -66,3 +66,5 @@ class RxSuite extends munit.FunSuite:
       counterexample.toString(UnitMode.UTF16),
       "\"a\\\"\\\\\" (original: [\"a\\\"\\\\\", unset], repaired: [\"\\\"\", \"\"])"
     )
+    val controls = Rx.Counterexample(UString(0x0d, 0x09, 0x0a, 0x01, 0x7f), None, None)
+    assertEquals(controls.toString(UnitMode.UTF16), "\"\\r\\t\\n\\x01\\x7F\" (original: no match, repaired: no match)")

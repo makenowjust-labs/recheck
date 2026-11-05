@@ -54,7 +54,7 @@ class AgentCommandSuite extends munit.FunSuite:
         """{"jsonrpc":"2.0+push","id":4,"message":"parse: finish\n  pattern: /a/"}""",
         """{"jsonrpc":"2.0+push","id":4,"message":"parse: start"}""",
         """{"jsonrpc":"2.0+push","id":4,"result":{"source":"a","flags":"","dialect":{"name":"javascript"},"unitMode":"utf16","status":"safe","complexity":{"type":"safe","summary":"safe","isFuzz":false},"upperBound":null,"refutedAttacks":[],"checker":"automaton"}}""",
-        """{"jsonrpc":"2.0+push","id":5,"result":{"source":"^(a+)+$","flags":"","dialect":{"name":"javascript"},"unitMode":"utf16","status":"repaired","repaired":"^(a+)$","complexity":{"type":"linear","summary":"linear","isFuzz":false},"kept":[0],"comparison":{"kind":"equivalent"}}}""",
+        """{"jsonrpc":"2.0+push","id":5,"result":{"source":"^(a+)+$","flags":"","dialect":{"name":"javascript"},"unitMode":"utf16","status":"repaired","repaired":"^(a)+$","complexity":{"type":"linear","summary":"linear","isFuzz":false},"kept":[0],"comparison":{"kind":"equivalent"}}}""",
         """{"jsonrpc":"2.0+push","id":6,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"unitMode":null,"status":"unknown","error":{"kind":"cancel"},"upperBound":null,"refutedAttacks":[],"checker":null}}"""
       )
     )

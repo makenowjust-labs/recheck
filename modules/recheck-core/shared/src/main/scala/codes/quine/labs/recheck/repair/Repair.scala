@@ -51,12 +51,16 @@ private[recheck] object Repair:
   /** The rounds of edits that a search tries at most. */
   val MaxRounds = 8
 
+  /** The edits that a round compares at most by the inputs they differ on, without an equivalent one. */
+  val MaxDifferent = 8
+
   /** Searches for a safe pattern by edits around the hotspots, preferring the ones that keep the extraction, where
     * `captures` are the indices of the captures to keep and `0` is the whole match.
     *
     * The automaton checker checks the patterns with `params` (see [[ReDoS.computeAutomatonComplexities]]). Each round
-    * takes the best edit by the complexity after it, and it stops when the pattern is safe, no edit makes it better, or
-    * after [[MaxRounds]] rounds. An edit may remove a capture not kept, which renumbers the later ones.
+    * takes the best edit by the complexity after it, preferring an equivalent one, or else the one that differs on the
+    * longest input among the first [[MaxDifferent]] best ones. It stops when the pattern is safe, no edit makes it
+    * better, or after [[MaxRounds]] rounds. An edit may remove a capture not kept, which renumbers the later ones.
     *
     * It throws [[UnsupportedException]] when the automaton checker gives up on the original pattern.
     */
@@ -91,13 +95,26 @@ private[recheck] object Repair:
               if nextScore > score
             yield
               val nextIndices = indices.map(i => i - candidate.removedCaptures.count(_ < i))
-              (next, nextIndices, nextScore, candidate.edit)
-          .sortBy((_, _, nextScore, edit) =>
-            (-nextScore.rank, nextScore.count, edit.text.length - (edit.end - edit.start))
+              (next, nextIndices, nextScore, candidate)
+          .sortBy: (_, _, nextScore, candidate) =>
+            val edit = candidate.edit
+            (-nextScore.rank, nextScore.count, candidate.isFallback, edit.text.length - (edit.end - edit.start))
+        val compared = LazyList
+          .from(improved)
+          .map((next, nextIndices, nextScore, _) =>
+            (next, nextIndices, nextScore, compare(current, indices, next, nextIndices))
           )
-        val chosen = improved
-          .find((next, nextIndices, _, _) => compare(current, indices, next, nextIndices) == Comparison.Equivalent)
-          .orElse(improved.headOption)
+        // Without an equivalent edit, the best ones differ on the longest input.
+        val chosen = compared
+          .find(_._4 == Comparison.Equivalent)
+          .orElse:
+            compared.headOption.flatMap: (_, _, best, _) =>
+              compared
+                .takeWhile((_, _, score, _) => score.rank == best.rank && score.count == best.count)
+                .take(MaxDifferent)
+                .maxByOption:
+                  case (_, _, _, Comparison.Different(input)) => input.length
+                  case _                                      => -1
         chosen match
           case Some((next, nextIndices, nextScore, _)) => loop(next, nextIndices, nextScore, round + 1)
           case None                                    => (current, indices, score)

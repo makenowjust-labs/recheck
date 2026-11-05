@@ -98,7 +98,7 @@ describe.each(entries)(
       dialect: { name: "javascript" },
       unitMode: "utf16",
       status: "repaired",
-      repaired: "^(a+)$",
+      repaired: "^(a)+$",
       complexity: { type: "linear", summary: "linear", isFuzz: false },
       kept: [0],
       comparison: { kind: "equivalent" },

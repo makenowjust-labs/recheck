@@ -95,22 +95,39 @@ class ReDoSSuite extends munit.FunSuite:
         Rx.Comparison.Equivalent
       )
     )
+    val java = Parameters(dialect = Dialect.Java)
     assertEquals(
-      ReDoS.repair("^(\\s*)*$", ""),
+      ReDoS.repair("^(\\w+\\s?)+\\d$", "", java),
       Rx.Repaired(
-        "^(\\s*)*$",
+        "^(\\w+\\s?)+\\d$",
         "",
-        Dialect.JavaScript,
-        UnitMode.UTF16,
-        "^(\\s*)$",
+        Dialect.Java,
+        UnitMode.UTF16CodePoint,
+        "^(\\w+\\s?)\\d$",
         AttackComplexity.Linear,
         Seq(0, 1),
         Rx.Comparison.Different(
-          Rx.Counterexample(UString.empty, Some(Seq(Some((0, 0)), None)), Some(Seq(Some((0, 0)), Some((0, 0)))))
+          Rx.Counterexample(UString(0x30, 0x0d, 0x30, 0x30), Some(Seq(Some((0, 4)), Some((2, 3)))), None)
         )
       )
     )
-    assertEquals(ReDoS.repair("^(a|aa)+$", ""), Rx.Unknown("^(a|aa)+$", "", Dialect.JavaScript, None))
+    // No edit around the hotspot makes this better.
+    val notFound = "^[^*]*(?:\\*(?!/)[^*]*)*@[^*]*(?:\\*(?!/)[^*]*)*$"
+    assertEquals(ReDoS.repair(notFound, ""), Rx.Unknown(notFound, "", Dialect.JavaScript, None))
+    // Equivalence does not support a capture in a positive look-behind.
+    assertEquals(
+      ReDoS.repair("(?<=(a))(?:b|b)*$", ""),
+      Rx.Repaired(
+        "(?<=(a))(?:b|b)*$",
+        "",
+        Dialect.JavaScript,
+        UnitMode.UTF16,
+        "(?<=(a))(?:b)*$",
+        AttackComplexity.Linear,
+        Seq(0, 1),
+        Rx.Comparison.Unknown
+      )
+    )
     assertEquals(
       ReDoS.repair("(", ""),
       Rx.Unknown("(", "", Dialect.JavaScript, Some(Diagnostics.ErrorKind.InvalidRegExp("Unclosed group at 1")))
@@ -121,20 +138,20 @@ class ReDoSSuite extends munit.FunSuite:
     )
     // The repair removes the first capture, so the second one is the first in the repaired RegExp.
     assertEquals(
-      ReDoS.repair("^([a-z]+\\s?)+(\\s*)*$", "", keep = Keep.Captures(Seq(2))),
+      ReDoS.repair("^(\\s*x\\s*)*(a|aa)+$", "", keep = Keep.Captures(Seq(2))),
       Rx.Repaired(
-        "^([a-z]+\\s?)+(\\s*)*$",
+        "^(\\s*x\\s*)*(a|aa)+$",
         "",
         Dialect.JavaScript,
         UnitMode.UTF16,
-        "^[a-z]+(?:\\s[a-z]+)*\\s?(\\s*)$",
+        "^(?:\\s*x(?:\\s*x)*\\s*)?(a|aa)$",
         AttackComplexity.Linear,
         Seq(0, 2),
         Rx.Comparison.Different(
           Rx.Counterexample(
-            UString.from("a".map(_.toInt)),
-            Some(Seq(Some((0, 1)), None)),
-            Some(Seq(Some((0, 1)), Some((1, 1))))
+            UString.from("aa".map(_.toInt)),
+            Some(Seq(Some((0, 2)), Some((1, 2)))),
+            Some(Seq(Some((0, 2)), Some((0, 2))))
           )
         )
       )
