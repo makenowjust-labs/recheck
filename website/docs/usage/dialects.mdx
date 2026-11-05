@@ -63,18 +63,17 @@ The ESLint plugin (`eslint-plugin-redos`) checks JavaScript regular expressions 
 
 | `dialect`                               | Engine that `recheck` follows                  | Matching unit                                      |
 | --------------------------------------- | ---------------------------------------------- | -------------------------------------------------- |
-| [`javascript`](dialects/javascript.mdx) | ECMAScript 2026 `RegExp` (V8)                  | UTF-16 code units, or code points with `u` or `v`  |
-| [`python`](dialects/python.mdx)         | Python 3.15 `re`                               | code points (`str`), or bytes (`bytes`)            |
-| [`ruby`](dialects/ruby.mdx)             | Ruby 4.0 `Regexp` (Onigmo)                     | code points (`UTF-8`), or bytes (`ASCII-8BIT`)     |
-| [`java`](dialects/java.mdx)             | Java 27 `java.util.regex.Pattern`              | code points                                        |
-| [`dotnet`](dialects/dotnet.mdx)         | .NET 10 `System.Text.RegularExpressions.Regex` | UTF-16 code units                                  |
-| [`perl`](dialects/perl.mdx)             | Perl 5.44 regular expressions                  | code points (`utf8`), or bytes (no `utf8`)         |
-| [`pcre`](dialects/pcre.mdx)             | PCRE2 10.49 as PHP's `preg_*` functions use it | bytes, or code points (UTF-8) with `u` or `(*UTF)` |
+| [`javascript`](dialects/javascript.mdx) | ECMAScript 2026 `RegExp` (V8)                  | `utf16`, or `utf16-code-point` with `u` or `v`     |
+| [`python`](dialects/python.mdx)         | Python 3.15 `re`                               | `code-point` (`str`), or `byte` (`bytes`)          |
+| [`ruby`](dialects/ruby.mdx)             | Ruby 4.0 `Regexp` (Onigmo)                     | `scalar-value` (`UTF-8`), or `byte` (`ASCII-8BIT`) |
+| [`java`](dialects/java.mdx)             | Java 27 `java.util.regex.Pattern`              | `utf16-code-point`                                 |
+| [`dotnet`](dialects/dotnet.mdx)         | .NET 10 `System.Text.RegularExpressions.Regex` | `utf16`                                            |
+| [`perl`](dialects/perl.mdx)             | Perl 5.44 regular expressions                  | `code-point` (`utf8`), or `byte` (no `utf8`)       |
+| [`pcre`](dialects/pcre.mdx)             | PCRE2 10.49 as PHP's `preg_*` functions use it | `byte`, or `scalar-value` with `u` or `(*UTF)`     |
 
 ## Matching Units
 
 A (matching) unit is what a pattern reads as one character: `.` matches exactly one unit.
-It is a UTF-16 code unit, a code point, or a byte, which depends on the dialect and its settings.
 
 For example, `"😀"` (U+1F600) is one code point, two UTF-16 code units (`\ud83d\ude00`), and four bytes in UTF-8 (`\xf0\x9f\x98\x80`).
 Which of them `.` matches depends on the dialect, and on its flags or the type of the input.
@@ -96,11 +95,13 @@ re.match(b".", "😀".encode()).group() # => b'\xf0' (one byte in a `bytes` patt
 
 The matching units are of the following kinds, where the kinds of code points differ in what the surrogates are.
 
-- `utf16`: UTF-16 code units (JavaScript without `u` or `v`, and .NET).
-- `utf16-code-point`: code points read from UTF-16, where a lone surrogate is a code point, but a high surrogate followed by a low surrogate is one code point (JavaScript with `u` or `v`, and Java).
-- `code-point`: code points, where the surrogates are ordinary code points in any order (Python's `str`, and Perl with `utf8`).
-- `scalar-value`: Unicode scalar values, which are the code points other than the surrogates (Ruby with `UTF-8`, and PCRE with `u` or `(*UTF)`).
-- `byte`: bytes (Python's `bytes`, Ruby with `ASCII-8BIT`, Perl without `utf8`, and PCRE without `u` or `(*UTF)`).
+- `utf16`: UTF-16 code units.
+- `utf16-code-point`: code points read from UTF-16, where a lone surrogate is a code point, but a high surrogate followed by a low surrogate is one code point.
+- `code-point`: code points, where the surrogates are ordinary code points in any order.
+- `scalar-value`: Unicode scalar values, which are the code points other than the surrogates.
+- `byte`: bytes.
+
+The table in [Supported Dialects](#supported-dialects) shows the matching units of each dialect.
 
 ## Syntax Limitations
 

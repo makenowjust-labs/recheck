@@ -48,7 +48,7 @@ ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Java))
 
 ## Flags and Units
 
-A pattern matches code points, where a lone surrogate is a code point too.
+The matching unit is `utf16-code-point` (see [Matching Units](../dialects.mdx#matching-units)).
 
 `recheck` supports the following flags of `java.util.regex`, written as the letters of their inline flags.
 

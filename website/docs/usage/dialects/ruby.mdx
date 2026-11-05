@@ -53,7 +53,7 @@ ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Ruby(Dialect.Ruby.Encod
 
 ## Flags and Units
 
-A pattern in `UTF-8` (the default `encoding`) matches code points, and a pattern in `ASCII-8BIT` (or with the `n` flag) matches bytes.
+The matching unit is `scalar-value` in `UTF-8` (the default `encoding`), and `byte` in `ASCII-8BIT` (or with the `n` flag) (see [Matching Units](../dialects.mdx#matching-units)).
 
 `recheck` supports the following options of a regexp literal (e.g. `/.../i`) and inline options, written as their letters.
 

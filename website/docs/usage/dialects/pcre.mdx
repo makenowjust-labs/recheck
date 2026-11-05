@@ -48,7 +48,7 @@ ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.PCRE))
 
 ## Flags and Units
 
-A pattern matches bytes, or code points of UTF-8 with the `u` flag or `(*UTF)`.
+The matching unit is `byte`, or `scalar-value` with the `u` flag or `(*UTF)` (see [Matching Units](../dialects.mdx#matching-units)).
 
 `recheck` supports the following pattern modifiers of PHP.
 

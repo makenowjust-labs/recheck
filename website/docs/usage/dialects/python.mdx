@@ -51,7 +51,7 @@ ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Python(Dialect.Python.T
 
 ## Flags and Units
 
-A `str` pattern (the default `type`) matches code points, and a `bytes` pattern matches bytes.
+The matching unit is `code-point` for a `str` pattern (the default `type`), and `byte` for a `bytes` pattern (see [Matching Units](../dialects.mdx#matching-units)).
 
 `recheck` supports the following `re` flags, written as their letters.
 

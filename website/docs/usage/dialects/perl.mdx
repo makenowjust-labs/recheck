@@ -60,7 +60,7 @@ ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Perl(utf8 = false, sour
 
 ## Flags and Units
 
-A pattern matches code points with `utf8: true` (the default), and bytes with `utf8: false`.
+The matching unit is `code-point` with `utf8: true` (the default), and `byte` with `utf8: false` (see [Matching Units](../dialects.mdx#matching-units)).
 
 `recheck` supports all the modifiers of `m//`, `qr//` and `s///`.
 
