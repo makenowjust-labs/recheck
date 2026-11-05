@@ -6,5 +6,12 @@ export default /** @type {import("jest").Config} */ ({
   transform: {},
   extensionsToTreatAsEsm: [".ts"],
   coverageProvider: "v8",
+  // The lcov paths start from the repository root, since `index.js` is also in `packages/recheck`.
+  coverageReporters: [
+    "clover",
+    "json",
+    "text",
+    ["lcov", { projectRoot: "../.." }],
+  ],
   verbose: true,
 });
