@@ -9,7 +9,7 @@ import TabItem from "@theme/TabItem";
 Describes the regular expression dialects that `recheck` supports, and what is common to all of them.
 
 Each dialect has its own page on how it is checked:
-[JavaScript](dialects/javascript.md) / [Python](dialects/python.md) / [Ruby](dialects/ruby.md) / [Java](dialects/java.md) / [.NET](dialects/dotnet.md) / [Perl](dialects/perl.md) / [PCRE](dialects/pcre.md).
+[JavaScript](dialects/javascript.mdx) / [Python](dialects/python.mdx) / [Ruby](dialects/ruby.mdx) / [Java](dialects/java.mdx) / [.NET](dialects/dotnet.mdx) / [Perl](dialects/perl.mdx) / [PCRE](dialects/pcre.mdx).
 
 ## Choosing a Dialect
 
@@ -61,15 +61,15 @@ The ESLint plugin (`eslint-plugin-redos`) checks JavaScript regular expressions 
 
 ## Supported Dialects
 
-| `dialect`                              | Engine that `recheck` follows                  | Matching unit                                      |
-| -------------------------------------- | ---------------------------------------------- | -------------------------------------------------- |
-| [`javascript`](dialects/javascript.md) | ECMAScript 2026 `RegExp` (V8)                  | UTF-16 code units, or code points with `u` or `v`  |
-| [`python`](dialects/python.md)         | Python 3.15 `re`                               | code points (`str`), or bytes (`bytes`)            |
-| [`ruby`](dialects/ruby.md)             | Ruby 4.0 `Regexp` (Onigmo)                     | code points (`UTF-8`), or bytes (`ASCII-8BIT`)     |
-| [`java`](dialects/java.md)             | Java 25 `java.util.regex.Pattern`              | code points                                        |
-| [`dotnet`](dialects/dotnet.md)         | .NET 10 `System.Text.RegularExpressions.Regex` | UTF-16 code units                                  |
-| [`perl`](dialects/perl.md)             | Perl 5.44 regular expressions                  | code points (`utf8`), or bytes (no `utf8`)         |
-| [`pcre`](dialects/pcre.md)             | PCRE2 10.49 as PHP's `preg_*` functions use it | bytes, or code points (UTF-8) with `u` or `(*UTF)` |
+| `dialect`                               | Engine that `recheck` follows                  | Matching unit                                      |
+| --------------------------------------- | ---------------------------------------------- | -------------------------------------------------- |
+| [`javascript`](dialects/javascript.mdx) | ECMAScript 2026 `RegExp` (V8)                  | UTF-16 code units, or code points with `u` or `v`  |
+| [`python`](dialects/python.mdx)         | Python 3.15 `re`                               | code points (`str`), or bytes (`bytes`)            |
+| [`ruby`](dialects/ruby.mdx)             | Ruby 4.0 `Regexp` (Onigmo)                     | code points (`UTF-8`), or bytes (`ASCII-8BIT`)     |
+| [`java`](dialects/java.mdx)             | Java 25 `java.util.regex.Pattern`              | code points                                        |
+| [`dotnet`](dialects/dotnet.mdx)         | .NET 10 `System.Text.RegularExpressions.Regex` | UTF-16 code units                                  |
+| [`perl`](dialects/perl.mdx)             | Perl 5.44 regular expressions                  | code points (`utf8`), or bytes (no `utf8`)         |
+| [`pcre`](dialects/pcre.mdx)             | PCRE2 10.49 as PHP's `preg_*` functions use it | bytes, or code points (UTF-8) with `u` or `(*UTF)` |
 
 ## Matching Units
 

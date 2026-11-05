@@ -3,6 +3,9 @@ id: perl
 title: Perl
 ---
 
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
 Describes how `recheck` checks a regular expression of the `perl` dialect.
 
 ## Engine
@@ -15,23 +18,45 @@ Describes how `recheck` checks a regular expression of the `perl` dialect.
   `true` (default) is a program with `use utf8` whose strings are decoded text.
   `false` is a program without `use utf8` whose strings are bytes without the flag.
   A program reading text that is not decoded (e.g. Latin-1 bytes) is `utf8: false`.
-  The CLI takes `false` by `--no-perl-utf8`.
 - `source` tells how the pattern is given.
   `literal` (default) is a regular expression literal written in Perl source (e.g. `qr/.../`), where Perl applies `\U`, `\L`, `\u`, `\l`, `\F`, `\Q` and `\E` to the text before the regex engine reads it.
   `string` is a pattern from a string at runtime (e.g. `qr/$p/`), which the regex engine reads unchanged.
-  The CLI takes it by `--perl-source`.
 
-```bash
-recheck --dialect=perl --no-perl-utf8 --perl-source=string '/^(a|a)*$/'
+<Tabs>
+<TabItem value="cli" label="CLI">
+
+```console
+$ recheck --dialect=perl '/^(a|a)*$/'
+$ recheck --dialect=perl --no-perl-utf8 --perl-source=string '/^(a|a)*$/'
 ```
+
+</TabItem>
+<TabItem value="js" label="JavaScript">
 
 ```tsx
 import { check } from "recheck";
 
+await check("^(a|a)*$", "", { dialect: "perl" });
 await check("^(a|a)*$", "", {
   dialect: { name: "perl", utf8: false, source: "string" },
 });
 ```
+
+</TabItem>
+<TabItem value="scala" label="Scala">
+
+```scala
+import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.ast.PerlSource
+
+ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Perl()))
+ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Perl(utf8 = false, source = PerlSource.String)))
+```
+
+</TabItem>
+</Tabs>
 
 ## Flags and Units
 
