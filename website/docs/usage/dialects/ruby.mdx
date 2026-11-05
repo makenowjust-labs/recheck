@@ -77,6 +77,8 @@ The following constructs are not supported, and they are reported as `unsupporte
 - Absence operators (e.g. `(?~abc)`).
 - Under `i`, more than six places in a run of literals that match a folding to several characters, such as `ß` or `ss`, which matches `ß` (e.g. `ssssssss` gives `Too many multi-character case foldings in a literal (limit 6) at 0`).
 
+The encodings EUC-JP (`/e`) and Windows-31J (`/s`) are not supported, and their flags are reported as `invalid`.
+
 ## Approximations
 
 - Ruby has memoization (since Ruby 3.2) that `recheck` does not model, so an attack that `recheck` reports may not work on Ruby, and the runtime-attack verification checks whether it does.

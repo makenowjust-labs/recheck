@@ -67,10 +67,13 @@ The following constructs are not supported, and they are reported as `unsupporte
 - Balancing groups (e.g. `(?<close-open>...)`).
 - Internal property names (e.g. `\p{_xmlI}`).
 
+The `RegexOptions` `RightToLeft`, `ECMAScript` and `NonBacktracking` have no flag letter, so they cannot be given.
+
 ## Approximations
 
 - .NET has optimizations that `recheck` does not model, so an attack that `recheck` reports may not work on .NET, and the runtime-attack verification checks whether it does.
 - `\G` matches only at the start of the input, since `recheck` models a search from there, not one from a later position (e.g. `Match.NextMatch`).
+- Case-insensitive matching follows the invariant culture, not the current culture (e.g. `(?i)i` does not match `İ` as it does in the Turkish culture).
 
 ## Runtime-Attack Verification
 

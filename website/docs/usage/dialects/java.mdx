@@ -71,6 +71,8 @@ The following constructs are not supported, and they are reported as `unsupporte
 - `\N{name}` (e.g. `\N{EM DASH}`).
 - The grapheme cluster boundary (`\b{g}`).
 
+The `Pattern` flag `LITERAL` has no flag letter, so it cannot be given (`Pattern.quote` makes a pattern matching the same strings).
+
 ## Approximations
 
 - Java has optimizations of loops that `recheck` does not model, so an attack that `recheck` reports may not work on Java, and the runtime-attack verification checks whether it does.

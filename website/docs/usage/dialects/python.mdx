@@ -69,6 +69,10 @@ The flags are the letters of the `re` flags.
 
 `\N{...}` (e.g. `\N{EM DASH}`) is reported as `unsupported`, as in the other dialects having it.
 
+## Approximations
+
+- `L` follows the C locale, where `0x80`–`0xFF` follow the ASCII rules, whatever locale the environment has.
+
 ## Runtime-Attack Verification
 
 - Command: `python3 -I -`.
