@@ -126,8 +126,6 @@ The following approximations are common to the dialects.
 
 - The Unicode data (properties, case mappings) is of Unicode 18.0, while the engines use Unicode 16 or 17.
 - Look-arounds (including non-atomic ones), back-references, atomic groups, possessive quantifiers, conditionals and the backtracking control verbs other than `(*FAIL)` and `(*MARK)` are handled by the fuzz checker, not by the automaton checker.
-- Only a search from the start of the input is modeled, and `\G` matches there.
-  A search from a later position (e.g. the second match of a global search) is not, so `recheck` misses a pattern that is slow only there, such as `(?<=a)\G(?:b|b)*$` from the position `1` of `'a' + 'b'.repeat(n) + '!'`.
 
 ## Runtime-Attack Verification
 

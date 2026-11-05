@@ -90,6 +90,7 @@ The following constructs are not supported.
 ## Approximations
 
 - PCRE2 has auto-possessification and JIT that `recheck` does not model, so an attack that `recheck` reports may not work on PCRE2, and the runtime-attack verification checks whether it does.
+- `\G` matches only at the start of the input, since `recheck` models a search from there, not one from a later position (e.g. the second match of `preg_match_all`).
 - PCRE2 skips the attempts that cannot match by its start-of-match optimizations (e.g. `(*COMMIT)abc` matches `xyzabc` in PCRE2, unless the pattern starts with `(*NO_START_OPT)`), and `recheck` does not model them.
 
 ## Runtime-Attack Verification

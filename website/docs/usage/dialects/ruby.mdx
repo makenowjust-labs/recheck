@@ -92,6 +92,7 @@ The following constructs are not supported, and they are reported as `unsupporte
 ## Approximations
 
 - Ruby has memoization (since Ruby 3.2) that `recheck` does not model, so an attack that `recheck` reports may not work on Ruby, and the runtime-attack verification checks whether it does.
+- `\G` matches only at the start of the input, since `recheck` models a search from there, not one from a later position (e.g. the second match of `String#scan`).
 - Under `i`, `recheck` does not reproduce Onigmo's bugs in matching a character folded to several characters (e.g. `ß` and `ss`).
   For example, `(?<=ß)` and `(ß)\1` do not match `"ß"` and `"ßss"` in Ruby, but they do in `recheck`.
   Also, `[s]s` and `ßs` match `"ß"` and `"sß"` in Ruby, but not in `recheck`.

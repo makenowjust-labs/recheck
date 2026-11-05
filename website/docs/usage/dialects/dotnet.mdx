@@ -82,6 +82,7 @@ The following constructs are not supported, and they are reported as `unsupporte
 ## Approximations
 
 - .NET has optimizations that `recheck` does not model, so an attack that `recheck` reports may not work on .NET, and the runtime-attack verification checks whether it does.
+- `\G` matches only at the start of the input, since `recheck` models a search from there, not one from a later position (e.g. `Match.NextMatch`).
 
 ## Runtime-Attack Verification
 

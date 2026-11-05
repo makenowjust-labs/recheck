@@ -105,6 +105,7 @@ The following constructs are not supported.
 ## Approximations
 
 - Perl has caches of the super-linear matching that `recheck` does not model, so an attack that `recheck` reports may not work on Perl, and the runtime-attack verification checks whether it does.
+- `\G` matches only at the start of the input, since `recheck` models a search from there, not one from a later position (e.g. the second match of `m//g`).
 - Under `i`, Perl matches a character against its folding to several characters (e.g. `ß` against `ss`).
   Whether several nodes together match such a character depends on how Perl joins the nodes into a string on compiling, and `recheck` does not reproduce it.
   A non-capturing group and a class of one character or of a character and its case variants join (e.g. `(?:s)s`, `s[s]` and `[sS]s` match `ß`).
