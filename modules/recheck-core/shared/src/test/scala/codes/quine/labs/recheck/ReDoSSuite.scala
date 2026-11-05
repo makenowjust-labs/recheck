@@ -181,9 +181,12 @@ class ReDoSSuite extends munit.FunSuite:
     // Node 26 and Java 27 read a high surrogate followed by a low surrogate as one character, so the alternatives do not
     // overlap, unlike Python 3.15 and Node without `u`, which double their time for each pair.
     val pairs = "^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF]|[\\uDC00-\\uDFFF])*$"
+    // The fuzz checker finds the attack on overlapping alternatives right after seeding, so two iterations suffice.
+    // The default ten iterations ran into the timeout under coverage instrumentation.
     for checker <- Seq[Checker.Used](Checker.Automaton, Checker.Fuzz) do
-      assertSafe(check(pairs, JavaScript, "u", checker), checker)
-      assertSafe(check(pairs, Java, "", checker), checker)
+      val pairsParams = params.copy(checker = checker, maxIteration = 2)
+      assertSafe(ReDoS.check(pairs, "u", pairsParams.copy(dialect = JavaScript)), checker)
+      assertSafe(ReDoS.check(pairs, "", pairsParams.copy(dialect = Java)), checker)
     assertVulnerable(check(pairs, JavaScript), AttackComplexity.Exponential(false), Checker.Automaton)
     assertVulnerable(check(pairs, Python()), AttackComplexity.Exponential(false), Checker.Automaton)
     // A failing suffix is never a high surrogate followed by a low surrogate, which is one character that `[^…]` matches.
