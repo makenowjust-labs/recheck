@@ -76,7 +76,7 @@ Refuted attacks:
   Runtime attack: refuted (finished in 0 ms on ruby 4.0.7, timeout: 1000 ms)
 ```
 
-The result records the runtime attack as `runtimeAttack` of `vulnerable` diagnostics, and the refuted attacks in `refutedAttacks` (see [Diagnostics](diagnostics.md#runtime-attack-verification)).
+The result records the runtime attack as `runtimeAttack` of `vulnerable` diagnostics, and the refuted attacks in `refutedAttacks` (see [Diagnostics](diagnostics.mdx#runtime-attack-verification)).
 
 :::info
 
@@ -101,7 +101,7 @@ The result records it as `engine-limit`.
 
 An engine error is an error on the stack depth or the memory.
 The engines may raise it on a long string even if the matching takes linear time, so it does not show that the attack is effective, and the runtime-attack verification refutes the attack.
-The result records it as `engine-error` with the message (see [Diagnostics](diagnostics.md#runtime-attack-verification)).
+The result records it as `engine-error` with the message (see [Diagnostics](diagnostics.mdx#runtime-attack-verification)).
 
 When the command cannot run (e.g. the runtime is not installed), the result is `unknown` with an `unexpected` error.
 

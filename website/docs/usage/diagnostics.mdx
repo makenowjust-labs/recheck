@@ -3,6 +3,8 @@ id: diagnostics
 title: Diagnostics
 ---
 
+import Hotspot from "@site/src/components/Hotspot";
+
 `Diagnostics` is what `check` reports about a regular expression.
 It is not a final verdict on whether the regular expression is a threat.
 It is the evidence for judging the ReDoS risk: whether an attack string was found, the estimated complexity, the attack string itself, and how they were found.
@@ -104,9 +106,37 @@ Each element has the `complexity`, `attack`, `hotspot` and `runtimeAttack` field
 
 ## Hotspot
 
-`hotspot` is another interesting field in `vulnerable` status diagnostics.
+A hotspot is a part of the regular expression that the matching runs many times on the attack string.
+It shows where the matching time explodes, so it is where to look at when fixing the regular expression.
 
-It shows a hotspot in the given regular expression.
-A hotspot is a substring in the given regular expression that is executed many times against the attack string.
+`vulnerable` diagnostics have the `hotspot` field, and so do the elements of `refutedAttacks`.
+It is a list of spots, and each spot has the following fields.
 
-It helps you to fix the regular expression to a safe one.
+- `start` and `end` are the range of the spot in `source`, counted in UTF-16 code units, where `end` is exclusive.
+- `temperature` is `heat` or `normal`.
+  A `heat` spot is a part that the matching repeats many times, which causes the explosion.
+  A `normal` spot is a part that the matching runs on the way to a `heat` spot.
+
+For example, the hotspot of `/^x(a|a)*y$/` is the following.
+
+```json
+[
+  { "start": 1, "end": 2, "temperature": "normal" },
+  { "start": 3, "end": 4, "temperature": "heat" },
+  { "start": 5, "end": 6, "temperature": "heat" }
+]
+```
+
+The Playground shows it as follows, with the `heat` spots in red and the `normal` spots in yellow.
+
+<Hotspot
+  source="^x(a|a)*y$"
+  hotspot={[
+    { start: 1, end: 2, temperature: "normal" },
+    { start: 3, end: 4, temperature: "heat" },
+    { start: 5, end: 6, temperature: "heat" },
+  ]}
+/>
+
+The automaton checker makes the repeated part of the ambiguity `heat`.
+The fuzz checker counts how many times the matching runs each part on the attack string, and it makes a part `heat` when the count is at least [`heatRatio`](parameters.mdx#heatratio) times the largest count.

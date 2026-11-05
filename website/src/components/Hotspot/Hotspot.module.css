@@ -1,0 +1,9 @@
+.hotspotHeat {
+  color: var(--ifm-color-white);
+  background: var(--ifm-color-danger);
+}
+
+.hotspotNormal {
+  color: var(--ifm-color-white);
+  background: var(--ifm-color-warning);
+}

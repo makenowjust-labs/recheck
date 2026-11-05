@@ -1,6 +1,8 @@
 import Link from '@docusaurus/Link';
 import React from 'react';
 
+import Hotspot from '../Hotspot';
+
 import { formatBuild } from './builds';
 import styles from './Demo.module.css';
 
@@ -52,33 +54,6 @@ const Loading: React.FC = () => (
     </div>
   </div>
 );
-
-const Hotspot: React.FC<{ diagnostics: Extract<DiagnosticsSnapshot, { status: 'vulnerable' }> }> = ({
-  diagnostics,
-}) => {
-  const spots = [];
-  let index = 0;
-  for (const { start, end, temperature } of diagnostics.hotspot) {
-    if (index < start) {
-      spots.push(<span key={index}>{diagnostics.source.substring(index, start)}</span>);
-    }
-    const className = temperature === 'heat' ? styles.demoResultHotspotHeat : styles.demoResultHotspotNormal;
-    spots.push(
-      <span key={start} className={className}>
-        {diagnostics.source.substring(start, end)}
-      </span>,
-    );
-    index = end;
-  }
-  if (index < diagnostics.source.length) {
-    spots.push(<span key={index}>{diagnostics.source.substring(index)}</span>);
-  }
-  return (
-    <pre>
-      <code>/{spots}/</code>
-    </pre>
-  );
-};
 
 type Props = {
   recorded?: boolean;
@@ -177,7 +152,7 @@ const DemoResult: React.FC<Props> = ({ recorded = false, result, time, log, buil
             </pre>
           </Row>,
           <Row title="Hotspot" key="hotspot">
-            <Hotspot diagnostics={result} />
+            <Hotspot source={result.source} hotspot={result.hotspot} />
           </Row>,
           <Row title="Checker" key="checker">
             <Badge kind="secondary">{result.checker}</Badge>
