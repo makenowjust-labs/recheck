@@ -54,7 +54,22 @@ private class EpsNFABuilder(
     val q = counterQ
     counterQ += 1
     if isBackward then innerStates.add(q)
+    path.addOne(q)
     q
+
+  /** The states made on the paths of the node being built, except the inner expressions of the look-arounds and the
+    * tests of the atomic groups.
+    */
+  private var path: mutable.ArrayBuffer[Int] = mutable.ArrayBuffer.empty
+
+  /** Builds with `f`, and returns the states that it makes on the paths too, which are not on the current paths. */
+  private def withPath[A](f: => A): (A, Seq[Int]) =
+    val saved = path
+    path = mutable.ArrayBuffer.empty
+    val result = f
+    val made = path.toVector
+    path = saved
+    (result, made)
 
   /** The states of the inner expressions of the look-behinds. */
   private val innerStates: mutable.Set[Int] = mutable.Set.empty
@@ -155,7 +170,9 @@ private class EpsNFABuilder(
           case LoopExit(loop, q)                   => LoopExit(loop, f(q))
           case LookAheadAssert(negative, init, q)  => LookAheadAssert(negative, f(init), f(q))
           case LookBehindAssert(negative, init, q) => LookBehindAssert(negative, init, f(q))
-          case LookAroundAccept()                  => LookAroundAccept()
+          case AtomicEps(alternatives, last)       =>
+            AtomicEps(alternatives.map((test, q) => (f(test), f(q))), f(last))
+          case LookAroundAccept() => LookAroundAccept()
 
         for q <- start until end; t <- tau.get(q) do
           // `\K` returns to the first copy for `(*NOTEMPTY)`, which sees the reported match.
@@ -226,7 +243,7 @@ private class EpsNFABuilder(
       case IRNodeData.BacktrackControl(_)    => throw new UnsupportedException("backtracking control verb")
       case IRNodeData.Conditional(_, _, _)   => throw new UnsupportedException("conditional")
       case IRNodeData.LookAhead(negative, n) =>
-        val (i0, a0) = buildNode(n)
+        val ((i0, a0), _) = withPath(buildNode(n))
         val i = nextQ()
         val a = nextQ()
         emit(i -> LookAheadAssert(negative, i0, a))
@@ -237,7 +254,7 @@ private class EpsNFABuilder(
         validateLookBehindInner(n, matching)
         val wasBackward = isBackward
         isBackward = true
-        val (i0, a0) = buildNode(reverseLookBehindInner(n))
+        val ((i0, a0), _) = withPath(buildNode(reverseLookBehindInner(n)))
         emit(a0 -> LookAroundAccept())
         isBackward = wasBackward
         val i = nextQ()
@@ -245,9 +262,44 @@ private class EpsNFABuilder(
         emit(i -> LookBehindAssert(negative, i0, a))
         (i, a)
       case IRNodeData.NonAtomicLookBehind(_, _) => throw new UnsupportedException("look-behind assertion")
-      case IRNodeData.Atomic(_)                 => throw new UnsupportedException("atomic group")
+      case IRNodeData.Atomic(n)                 => buildAtomic(n)
       case IRNodeData.BackReference(_, _, _)    => throw new UnsupportedException("back-reference")
       case IRNodeData.Unsupported(_)            => throw new UnsupportedException(node.unsupportedMessage)
+
+  /** Builds EpsNFA transitions for an atomic group.
+    *
+    * A choice of the group tries the alternatives in order, and commits to the first one that reaches the end of the
+    * group ([[AtomicEps]]). The test of an alternative is its state in a copy of the paths of the group, which ends
+    * with a [[LookAroundAccept]] at the end of the group, and which only the [[AtomicEps]] refer to. The last
+    * alternative has no test, since it fails within the group anyway if it does not reach the end.
+    */
+  private def buildAtomic(n: IRNode): (Int, Int) =
+    val ((i0, a0), groupPath) = withPath(buildNode(n))
+    path.addAll(groupPath)
+    val transitions = if isBackward then innerTau else tau
+    val (test, _) = withPath(groupPath.map(q => q -> nextQ()).toMap)
+    for q <- groupPath do
+      // The copy of `\K` resets the reported match too (see `rejectEmpty`).
+      if resetMatchStarts.contains(q) then resetMatchStarts.add(test(q))
+      // The copy shares the inner expressions of the look-arounds and the tests of the nested atomic groups.
+      val t = transitions.get(q) match
+        case Some(Eps(qs))                              => Eps(qs.map(test))
+        case Some(Assert(kind, q1))                     => Assert(kind, test(q1))
+        case Some(Consume(set, q1, loc))                => Consume(set, test(q1), loc)
+        case Some(LoopEnter(loop, q1))                  => LoopEnter(loop, test(q1))
+        case Some(LoopExit(loop, q1))                   => LoopExit(loop, test(q1))
+        case Some(LookAheadAssert(negative, init, q1))  => LookAheadAssert(negative, init, test(q1))
+        case Some(LookBehindAssert(negative, init, q1)) => LookBehindAssert(negative, init, test(q1))
+        case Some(AtomicEps(alternatives, last))        =>
+          AtomicEps(alternatives.map((t, q1) => (t, test(q1))), test(last))
+        // `a0` is the end of the group, which has no transition yet.
+        case Some(LookAroundAccept()) | None => LookAroundAccept()
+      emit(test(q) -> t)
+    for q <- groupPath do
+      transitions.get(q) match
+        case Some(Eps(qs)) if qs.size > 1 => emit(q -> AtomicEps(qs.init.map(q1 => (test(q1), q1)), qs.last))
+        case _                            => ()
+    (i0, a0)
 
   /** Builds EpsNFA transitions for a repetition.
     *
@@ -392,6 +444,7 @@ private class EpsNFABuilder(
       case IRNodeData.Disjunction(ns) => node.copy(data = IRNodeData.Disjunction(ns.map(reverseLookBehindInner)))
       case IRNodeData.Sequence(ns)    => node.copy(data = IRNodeData.Sequence(ns.reverse.map(reverseLookBehindInner)))
       case IRNodeData.Capture(i, name, n) => node.copy(data = IRNodeData.Capture(i, name, reverseLookBehindInner(n)))
+      case IRNodeData.Atomic(n)           => node.copy(data = IRNodeData.Atomic(reverseLookBehindInner(n)))
       case IRNodeData.Repeat(n, q)        => node.copy(data = IRNodeData.Repeat(reverseLookBehindInner(n), q))
       case IRNodeData.Strings(set)        =>
         val strings = set.strings.map(s => UString.from(s.iterator.toSeq.reverse))
@@ -405,16 +458,20 @@ private class EpsNFABuilder(
   /** Throws [[UnsupportedException]] unless the automaton checker supports the inner expression of a look-behind that
     * the engine matches as `matching`.
     *
-    * An unbounded inner expression matched forward is unsupported (e.g. Java's `(?<=a*b)`).
+    * An inner expression matched forward with an unbounded repetition (e.g. Java's `(?<=a*b)`) or an atomic group is
+    * unsupported.
     */
   private def validateLookBehindInner(n: IRNode, matching: IRLookBehindMatch): Unit =
     // The engine tries it from each start in turn, which no backward path of the reversed one counts.
     // Its cost at a position is bounded if the inner expression is.
-    val unbounded = n.exists:
+    // An atomic group finds a different first success forward than backward.
+    // For example, `(?<=(?>a|ab)c)` succeeds backward after `abc`, but not forward.
+    val unsupported = n.exists:
       case IRNodeData.Repeat(_, _: IRQuantifier.Unbounded) => true
+      case IRNodeData.Atomic(_)                            => true
       case _                                               => false
-    if unbounded && matching != IRLookBehindMatch.Backward then
-      throw new UnsupportedException("unbounded look-behind assertion matched forward")
+    if unsupported && matching != IRLookBehindMatch.Backward then
+      throw new UnsupportedException("look-behind assertion matched forward")
 
   private def epsilon(): (Int, Int) =
     val i = nextQ()

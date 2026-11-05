@@ -48,6 +48,8 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     assertEquals(check("^(?:(?<=^|\\s)\\w+\\s*)*$", ""), Success(Linear))
     // .NET's `\Z` holds only before the final `\n`, so the look-behind is explored once though `\n` repeats.
     assertEquals(check("\\A(?:[a\\n]|\\Z(?<=[a\\n]*))*x", "", Dialect.DotNet), Success(Linear))
+    assertEquals(check("^(?>(?:a|a)*)b", "", Dialect.PCRE), Success(Linear))
+    assertEquals(check("^(?>a*)a*b", "", Dialect.PCRE), Success(Linear))
 
   test("AutomatonChecker.check: polynomial"):
     val a = CharSet.single('a')
@@ -138,6 +140,17 @@ class AutomatonCheckerSuite extends munit.FunSuite:
         )
       )
     )
+    // The search tries the atomic `a*` from each start, which backtracking does not enter again.
+    assertEquals(
+      check("(?>a*)a*b", "", Dialect.PCRE),
+      Success(
+        Polynomial(
+          2,
+          Witness(Seq((Seq.empty, Seq(a))), Seq(CharSet.union(Seq(a, b)).complement(UnitMode.Byte), b)),
+          Hotspot(Seq(Spot(3, 4, Hot)))
+        )
+      )
+    )
     assertEquals(
       check("^a*(?=a*$)", ""),
       Success(
@@ -224,4 +237,17 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     assertEquals(
       check("^(?!(?:a|a)*b)", ""),
       Success(Exponential(Witness(Seq((Seq(a), Seq(a))), Seq.empty), Hotspot(Seq(Spot(7, 8, Hot), Spot(9, 10, Hot)))))
+    )
+    assertEquals(
+      check("^(?:(?>a)|a)*b", "", Dialect.PCRE),
+      Success(
+        Exponential(Witness(Seq((Seq.empty, Seq(a))), Seq.empty), Hotspot(Seq(Spot(7, 8, Hot), Spot(10, 11, Hot))))
+      )
+    )
+    // The group backtracks within itself until its first success, though not after it.
+    assertEquals(
+      check("^(?>(?:a|a)*b)", "", Dialect.PCRE),
+      Success(
+        Exponential(Witness(Seq((Seq.empty, Seq(a))), Seq.empty), Hotspot(Seq(Spot(7, 8, Hot), Spot(9, 10, Hot))))
+      )
     )

@@ -135,15 +135,20 @@ class EpsNFASuite extends munit.FunSuite:
          |}""".stripMargin
     )
 
-    val lookAhead = EpsNFA(
+    val lookAround = EpsNFA(
       buildAlphabet(Seq(CharSet.single('a'))),
-      immutable.SortedSet(0, 1, 2),
+      immutable.SortedSet(0, 1, 2, 3, 4),
       0,
-      2,
-      Map(0 -> LookAheadAssert(true, 1, 2), 1 -> LookAroundAccept())
+      4,
+      Map(
+        0 -> LookAheadAssert(true, 1, 2),
+        1 -> LookAroundAccept(),
+        2 -> LookBehindAssert(false, 1, 3),
+        3 -> AtomicEps(Seq((1, 4)), 0)
+      )
     )
     assertEquals(
-      lookAhead.toGraphviz,
+      lookAround.toGraphviz,
       """|digraph {
          |  "" [shape=point];
          |  "" -> "0";
@@ -151,7 +156,13 @@ class EpsNFASuite extends munit.FunSuite:
          |  "0" -> "1" [label="?!"];
          |  "0" -> "2";
          |  "1" [shape=doubleoctagon];
-         |  "2" [shape=doublecircle];
+         |  "2" [shape=diamond];
+         |  "2" -> "1" [label="?<="];
+         |  "2" -> "3";
+         |  "3" [shape=diamond];
+         |  "3" -> "4" [label="0 if 1"];
+         |  "3" -> "0" [label=1];
+         |  "4" [shape=doublecircle];
          |}""".stripMargin
     )
 

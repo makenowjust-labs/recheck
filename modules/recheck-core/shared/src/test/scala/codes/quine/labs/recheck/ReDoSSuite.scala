@@ -226,31 +226,9 @@ class ReDoSSuite extends munit.FunSuite:
   test("ReDoS.check: atomic groups"):
     // Java 27 is linear on the first two (and Python 3.15 and PCRE2 10.49 on the second).
     // Python and PCRE2 (without JIT) are exponential on the third, and Java is fast on it.
-    assertEquals(
-      check("^(?>a|a)*$", Java),
-      Diagnostics.Safe(
-        "^(?>a|a)*$",
-        "",
-        Java,
-        UnitMode.UTF16CodePoint,
-        AttackComplexity.Safe(true),
-        Seq.empty,
-        Checker.Fuzz
-      )
-    )
-    assertEquals(
-      check("^(?:a++)+$", Java),
-      Diagnostics.Safe(
-        "^(?:a++)+$",
-        "",
-        Java,
-        UnitMode.UTF16CodePoint,
-        AttackComplexity.Safe(true),
-        Seq.empty,
-        Checker.Fuzz
-      )
-    )
-    assertVulnerable(check("^(?:(?>a|a)|a)*$", Java), AttackComplexity.Exponential(true), Checker.Fuzz)
+    assertSafe(check("^(?>a|a)*$", Java), Checker.Automaton)
+    assertSafe(check("^(?:a++)+$", Java), Checker.Automaton)
+    assertVulnerable(check("^(?:(?>a|a)|a)*$", Java), AttackComplexity.Exponential(false), Checker.Automaton)
 
   // The following PCRE times are of PHP 8.5 (PCRE2 10.49) without JIT, with a large `pcre.backtrack_limit`, and with
   // `(*NO_START_OPT)` where the start optimizations skip the attempts, on `'a'.repeat(n) + '!'`.

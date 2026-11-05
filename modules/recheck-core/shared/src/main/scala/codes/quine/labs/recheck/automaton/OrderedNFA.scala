@@ -93,7 +93,7 @@ final case class OrderedNFA[A, Q](
   def toLookAheadDFA(using ctx: Context): DFA[A, Set[Q]] =
     ctx.interrupt:
       val reverseLeaves = mutable.Map.empty[(Q, A), Set[Q]].withDefaultValue(Set.empty)
-      for ((q1, a) -> b) <- delta; q2 <- b.leaves do
+      for ((q1, a) -> b) <- delta; q2 <- b.allLeaves do
         ctx.interrupt:
           reverseLeaves((q2, a)) = reverseLeaves((q2, a)) | Set(q1)
       val unconditional = ctx.interrupt:

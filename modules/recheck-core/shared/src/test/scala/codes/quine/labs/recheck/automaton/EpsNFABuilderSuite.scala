@@ -287,8 +287,6 @@ class EpsNFABuilderSuite extends munit.FunSuite:
   test("EpsNFABuilder.build: unsupported"):
     interceptMessage[UnsupportedException]("back-reference")(build("(.)\\1"))
     interceptMessage[UnsupportedException]("back-reference")(build("(?<foo>.)\\k<foo>"))
-    interceptMessage[UnsupportedException]("atomic group")(build("(?>a)", "", Dialect.Java))
-    interceptMessage[UnsupportedException]("atomic group")(build("a++", "", Dialect.Java))
     interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(
       build("a(?R)?", "", Dialect.PCRE)
     )
@@ -401,7 +399,7 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     assert(matches("(?<=ab)c", "", Dialect.Python(), "abc"))
     assert(!matches("(?<=ab)c", "", Dialect.Python(), "bc"))
     // Java allows an unbounded inner expression, which the engine tries from each start in turn.
-    interceptMessage[UnsupportedException]("unbounded look-behind assertion matched forward")(
+    interceptMessage[UnsupportedException]("look-behind assertion matched forward")(
       build("(?<=a*b)c", "", Dialect.Java)
     )
 
@@ -411,6 +409,26 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     assert(matches("a\\Z(?<=a)", "", ruby, "a"))
     assert(matches("a\\Z(?<=a)", "", ruby, "a\n"))
     assert(!matches("a\\Z(?<=a)", "", ruby, "a\nb"))
+
+  test("EpsNFABuilder.build: Atomic"):
+    // An atomic group matches up to its first success, and backtracking does not enter it again.
+    assert(!matches("(?>a|ab)c", "", Dialect.Java, "abc"))
+    assert(matches("(?>a|ab)c", "", Dialect.Java, "ac"))
+    assert(!matches("a*+a", "", Dialect.Java, "aaa"))
+    assert(matches("(?>a*)b", "", Dialect.Java, "aab"))
+    assert(matches("(?>(?:ab|a)+)c", "", Dialect.Java, "abac"))
+    // The tests have the assertions, the look-arounds and the nested atomic groups too.
+    assert(!matches("(?>^a|ab)c", "", Dialect.Java, "abc"))
+    assert(!matches("(?>(?=a)a|ab)c", "", Dialect.Java, "abc"))
+    assert(!matches("x(?>(?<=x)a|ab)c", "", Dialect.Java, "xabc"))
+    assert(!matches("(?>(?>a|ab)|abc)c", "", Dialect.Java, "abcc"))
+    assert(matches("(?>(?>a|ab)|abc)c", "", Dialect.Java, "ac"))
+    // .NET matches the inner expression of a look-behind backward, where an atomic group finds its first success.
+    assert(matches("(?<=(?>a|ab)c)d", "", Dialect.DotNet, "abcd"))
+    // An atomic group in the inner expression of a look-behind matched forward finds its first success forward.
+    interceptMessage[UnsupportedException]("look-behind assertion matched forward")(
+      build("(?<=(?>a|ab)c)d", "", Dialect.PCRE)
+    )
 
   test("EpsNFABuilder.build: LookAhead with assertions guessing what follows"):
     // Python's `$` in the middle matches before a final line terminator, which the states guess.
@@ -447,6 +465,9 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     // The copy after a character has the look-behinds too.
     assert(matches("(*NOTEMPTY)(?<=a)b", "", Dialect.PCRE, "ab"))
     assert(!matches("(*NOTEMPTY)(?<=c)b", "", Dialect.PCRE, "ab"))
+    // The tests of an atomic group have `\K` and the choices too.
+    assert(!matches("(*NOTEMPTY)(?>a\\K)", "", Dialect.PCRE, "a"))
+    assert(matches("(*NOTEMPTY)(?>a|b)", "", Dialect.PCRE, "b"))
 
   test("EpsNFABuilder.build: line, text and word boundary assertions"):
     for c <- AssertionCases.cases; dialect <- c.dialects do

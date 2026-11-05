@@ -67,6 +67,11 @@ final case class EpsNFA[Q](
           sb.append(s"  ${escape(q0)} -> ${escape(q1)};\n")
         case Some(LookAroundAccept()) =>
           sb.append(s"  ${escape(q0)} [shape=doubleoctagon];\n")
+        case Some(AtomicEps(alternatives, last)) =>
+          sb.append(s"  ${escape(q0)} [shape=diamond];\n")
+          for ((t, q1), i) <- alternatives.zipWithIndex do
+            sb.append(s"  ${escape(q0)} -> ${escape(q1)} [label=${escape(s"$i if $t")}];\n")
+          sb.append(s"  ${escape(q0)} -> ${escape(last)} [label=${alternatives.size}];\n")
         case None =>
           sb.append(s"  ${escape(q0)} [shape=doublecircle];\n")
     sb.append("}")
@@ -172,7 +177,7 @@ final case class EpsNFA[Q](
             if end.succeeds(_ => false) then newAcceptSet.addOne(r0)
             val attemptsAtEnd = end.explore(_ => false)
             if attemptsAtEnd.nonEmpty then newAttemptsAtEnd.addOne(r0 -> attemptsAtEnd)
-            for ch <- stops.leaves.flatMap(fragment.charsOf).distinct do
+            for ch <- stops.allLeaves.flatMap(fragment.charsOf).distinct do
               val b = stops.flatMap(fragment.step(s0, d, ch))
               if b != Branch.Fail then
                 newDelta.addOne((r0, ch) -> b.map(visit(r0, ch)))
@@ -274,6 +279,14 @@ object EpsNFA:
     * the input in the same direction, and [[EpsNFABuilder]] builds it as a look-ahead of the reversed inner expression.
     */
   final case class LookBehind[Q](stateSet: Set[Q], tau: Map[Q, Transition[Q]])
+
+  /** AtomicEps is an ε-NFA transition of a choice in an atomic group, which tries the alternatives `(test, to)` in
+    * order, and commits to the first one whose `test` reaches a [[LookAroundAccept]], or else to `last`.
+    *
+    * `test` is the state of `to` in a copy of the group, which ends with the [[LookAroundAccept]] instead of going on
+    * after the group.
+    */
+  final case class AtomicEps[Q](alternatives: Seq[(Q, Q)], last: Q) extends Transition[Q]
 
   /** Fragment is a part of an ε-NFA, which [[EpsNFA#toOrderedNFA]] uses. */
   private[automaton] final class Fragment[Q](
@@ -424,7 +437,12 @@ object EpsNFA:
               Branch.lookAhead(negative, buildClosure(s0, ss, init, loops), buildClosure(s0, ss, q1, loops))
             case Some(LookBehindAssert(negative, _, q1)) =>
               Branch.lookAhead(negative, Branch.Leaf(Stop.LookBehind(q, ss)), buildClosure(s0, ss, q1, loops))
-            case Some(LookAroundAccept()) => Branch.Leaf(Stop.InnerEnd(ss))
+            case Some(LookAroundAccept())            => Branch.Leaf(Stop.InnerEnd(ss))
+            case Some(AtomicEps(alternatives, last)) =>
+              Branch.atomicChoice(
+                alternatives.map((t, q1) => (buildClosure(s0, ss, t, loops), buildClosure(s0, ss, q1, loops))),
+                buildClosure(s0, ss, last, loops)
+              )
             case Some(Consume(chs, _, _)) =>
               if chs.exists((_, k) => advance(s0, k).exists(ss.contains)) then Branch.Leaf(Stop.Read(q, ss))
               else Branch.Fail

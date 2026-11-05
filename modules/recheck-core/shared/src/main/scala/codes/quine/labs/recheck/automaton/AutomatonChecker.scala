@@ -42,7 +42,7 @@ object AutomatonChecker:
 
   /** Tests whether the NFA has a cycle of transitions. */
   private def hasCycle[A](nfa: OrderedNFA[A, Int])(using ctx: Context): Boolean =
-    val graph = Graph.from(nfa.delta.toIndexedSeq.flatMap { case ((s1, a), b) => b.leaves.map((s1, a, _)) })
+    val graph = Graph.from(nfa.delta.toIndexedSeq.flatMap { case ((s1, a), b) => b.allLeaves.map((s1, a, _)) })
     graph.scc.exists(sc => sc.size > 1 || graph.neighbors(sc.head).exists(_._2 == sc.head))
 
   /** Orders complexities from the worst. */
