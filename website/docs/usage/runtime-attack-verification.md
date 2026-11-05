@@ -25,36 +25,24 @@ The result is recorded as `runtimeAttack` of the diagnostics, or in `refutedAtta
 
 ## Programs
 
-For each attack string, `recheck` generates a small program in the dialect's language, and runs it with the command in the table below.
+For each attack string, `recheck` generates a small program in the dialect's language, and runs it with the dialect's command.
 The program is given on the standard input, except for `java` and `dotnet` (see [Program Files](#program-files)).
 The timeout counts from the start of the matching, so the startup of the runtime (e.g. compiling the program) is not counted.
-The program sets the locale that `recheck` assumes before compiling the pattern, so the result does not depend on the locale of the environment (e.g. `LC_ALL` or `LANG`): the C locale for `perl` and `python`, and the invariant culture for `dotnet`.
-
-| `dialect`                                                           | Command                                                   | Matching                              | Engine limits       | Engine errors                                                 |
-| ------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------- | ------------------- | ------------------------------------------------------------- |
-| [`javascript`](dialects/javascript.mdx#runtime-attack-verification) | `node -`                                                  | `RegExp.prototype.exec`               | none                | `RangeError`                                                  |
-| [`python`](dialects/python.mdx#runtime-attack-verification)         | `python3 -I -`                                            | `re.search`                           | none                | `RecursionError`, `MemoryError`                               |
-| [`ruby`](dialects/ruby.mdx#runtime-attack-verification)             | `ruby -`                                                  | `Regexp#match?` (no `Regexp.timeout`) | none                | `RegexpError`, `NoMemoryError`, `SystemStackError`            |
-| [`java`](dialects/java.mdx#runtime-attack-verification)             | `java --source 17 <dir>/RecheckRuntimeAttack-<hash>.java` | `Matcher#find`                        | none                | `StackOverflowError`, `OutOfMemoryError`                      |
-| [`dotnet`](dialects/dotnet.mdx#runtime-attack-verification)         | `dotnet run <dir>/RecheckRuntimeAttack-<hash>.cs`         | `Regex.Match`                         | none                | `OutOfMemoryException`, `InsufficientExecutionStackException` |
-| [`perl`](dialects/perl.mdx#runtime-attack-verification)             | `perl -`                                                  | `=~`                                  | none                | none                                                          |
-| [`pcre`](dialects/pcre.mdx#runtime-attack-verification)             | `php`                                                     | `preg_match`                          | the backtrack limit | the recursion limit and the JIT stack limit                   |
-
-Each dialect's page has the notes on its program (e.g. the requirements of `java` and `dotnet`, and when the runtime-attack verification of `perl` is skipped).
+The program sets the locale that `recheck` assumes before compiling the pattern, so the result does not depend on the locale of the environment (e.g. `LC_ALL` or `LANG`).
+Each dialect's page (see [Dialects](dialects.mdx#supported-dialects)) lists its command, its matching function, its engine limits and errors, its environment variable and its runtime-attack script, with the notes on its program.
 
 An engine limit is a limit on the number of the matching steps.
 When the engine stops on it, the attack is considered effective, so the runtime-attack verification confirms the attack as with a timeout.
 The result records it as `engine-limit`.
 
 An engine error is an error on the stack depth or the memory.
-The engines may raise it on a long string even if the matching takes linear time (e.g. V8 raises `RangeError` for `/^(?:a|b)*$/` on 10,000,000 characters), so it does not show that the attack is effective, and the runtime-attack verification refutes the attack.
+The engines may raise it on a long string even if the matching takes linear time, so it does not show that the attack is effective, and the runtime-attack verification refutes the attack.
 The result records it as `engine-error` with the message (see [Diagnostics](diagnostics.md#runtime-attack-verification)).
 
 When the command cannot run (e.g. the runtime is not installed), the result is `unknown` with an `unexpected` error.
 
 ### Program Files
 
-`java` and `dotnet` run a fixed program file, which reads the pattern and the attack string from the standard input.
 `recheck` writes the programs of `java` and `dotnet` once into the directory `recheck-<user>` in the temporary directory of the JVM (`java.io.tmpdir`), and it keeps them there.
 The directory must be owned only by the user (`rwx------`).
 If it is not, or the file system has no POSIX permissions (e.g. on Windows), `recheck` uses a new temporary directory, which it deletes on exit.
@@ -62,17 +50,7 @@ If it is not, or the file system has no POSIX permissions (e.g. on Windows), `re
 ## Runtime Command
 
 By default, the command is found by its name in `PATH`.
-An environment variable of each dialect replaces the runtime program with a command line.
-
-| `dialect`    | Environment variable |
-| ------------ | -------------------- |
-| `javascript` | `RECHECK_NODE`       |
-| `python`     | `RECHECK_PYTHON`     |
-| `ruby`       | `RECHECK_RUBY`       |
-| `java`       | `RECHECK_JAVA`       |
-| `dotnet`     | `RECHECK_DOTNET`     |
-| `perl`       | `RECHECK_PERL`       |
-| `pcre`       | `RECHECK_PHP`        |
+An environment variable of each dialect (e.g. `RECHECK_RUBY`) replaces the runtime program with a command line.
 
 The value is a command line run by `/bin/sh -c`, and `recheck` appends the dialect's own arguments to it (e.g. `-` for `ruby`, `-I -` for `python3`, and `run` and the program file for `dotnet`).
 So the shell splits the value on spaces, and a path with spaces needs quotes.
@@ -90,7 +68,6 @@ RECHECK_RUBY='docker run -i --rm ruby:4.0 ruby' recheck --dialect=ruby --runtime
 ```
 
 The JavaScript library and the ESLint plugin pass their environment to the `recheck` process, so the variables work there too.
-The command of `java` and `dotnet` must be able to read the program file in the temporary directory, so a container needs the directory mounted at the same path.
 On Windows, the variables need `sh` in `PATH` (e.g. from Git for Windows), and `recheck` has not been tested there.
 
 ## Refuted Attacks
@@ -138,17 +115,6 @@ python3 -I runtime-attack.py
 
 The first comment of the script shows the command to run it, which is the command of the runtime attack with the script file.
 The script is the program of the runtime-attack verification, so it sets the locale in the same way.
-The script of `java` and `dotnet` has the pattern and the attack string in itself.
-
-| `dialect`    | Command                                |
-| ------------ | -------------------------------------- |
-| `javascript` | `node runtime-attack.cjs`              |
-| `python`     | `python3 -I runtime-attack.py`         |
-| `ruby`       | `ruby runtime-attack.rb`               |
-| `java`       | `java --source 17 runtime-attack.java` |
-| `dotnet`     | `dotnet run runtime-attack.cs`         |
-| `perl`       | `perl runtime-attack.pl`               |
-| `pcre`       | `php runtime-attack.php`               |
 
 The script prints the lines that the runtime-attack verification reads: `recheck:runtime` with the runtime, `recheck:start` before the matching, and `recheck:time` with the matching time in milliseconds (or `recheck:engine-limit` or `recheck:engine-error` with the message).
 It has no timeout, so an effective attack does not end soon.

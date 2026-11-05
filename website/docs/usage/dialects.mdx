@@ -126,8 +126,3 @@ The following approximations are common to the dialects.
 
 - The Unicode data (properties, case mappings) is of Unicode 18.0, while the engines use Unicode 16 or 17.
 - Look-arounds (including non-atomic ones), back-references, atomic groups, possessive quantifiers, conditionals and the backtracking control verbs other than `(*FAIL)` and `(*MARK)` are handled by the fuzz checker, not by the automaton checker.
-
-## Runtime-Attack Verification
-
-The [runtime-attack verification](runtime-attack-verification.md) runs the attack string on the real engine of the dialect, and it tells whether the attack works there.
-Each dialect's page has the command of the runtime-attack verification and the notes on its program.
