@@ -102,20 +102,13 @@ A pattern that the engine rejects is reported as `unknown` with an `invalid` err
 
 Some constructs are recognized, but the checkers do not handle them.
 A pattern having one of them is reported as `unknown` with an `unsupported` error naming the construct (e.g. `a(?R)?` gives `unsupported syntax (RCall) at 1`).
-The following are not supported in any dialect having them, and each dialect's page lists its own ones (e.g. .NET's balancing groups).
-
-- Recursion and subroutine calls (e.g. `(?R)`, `(?1)`, `(?&name)`, `\g<name>`), and the conditionals depending on them (`(?(R)...)`, and `(?(DEFINE)...)` in a pattern with calls).
-- Callouts (e.g. `(?C1)`) and embedded code (e.g. Perl's `(?{ ... })` and `(??{ ... })`).
-- `\N{name}` and `\C` in a mode other than bytes.
-- Word boundaries of a kind, such as `\b{wb}`.
-- Nesting deeper than 150 levels, where each group, look-around condition of a conditional, class, operand of a class set operation, and repeat of a repeat is one level (e.g. `(?:` repeated 151 times gives `Too deeply nested (limit 150) at 450`).
-- Under `i` in Ruby and Perl, more than six places in a run of literals that match a folding to several characters, such as `ß` or `ss`, which matches `ß` (e.g. `ssssssss` gives `Too many multi-character case foldings in a literal (limit 6) at 0`).
+Each dialect's page lists the constructs that it does not support (e.g. .NET's balancing groups).
+In every dialect, nesting deeper than 150 levels is not supported either, where each group, look-around condition of a conditional, class, operand of a class set operation, and repeat of a repeat is one level (e.g. `(?:` repeated 151 times gives `Too deeply nested (limit 150) at 450`).
 
 ## Approximations
 
 `recheck` models the matching of a naive backtracking engine.
-Most engines have optimizations that make some vulnerable patterns fast, and `recheck` does not model them.
-Examples are Ruby's memoization (since Ruby 3.2), Perl's caches of the super-linear matching, Java's optimizations of loops, and PCRE2's auto-possessification and JIT.
+Most engines have optimizations that make some vulnerable patterns fast, and `recheck` does not model them (see each dialect's page).
 
 The following is what we measured with `^(a|a)*$` against `'a'.repeat(n) + '!'`.
 
@@ -126,7 +119,7 @@ The following is what we measured with `^(a|a)*$` against `'a'.repeat(n) + '!'`.
 So `recheck` reports `^(a|a)*$` as vulnerable in every dialect, but the attack is not effective on some engines.
 [Runtime-Attack Verification](runtime-attack-verification.md) runs the attack string on the real engine, and it tells whether the attack works there.
 
-The following approximations are common to the dialects, and each dialect's page describes its own ones.
+The following approximations are common to the dialects.
 
 - The Unicode data (properties, case mappings) is of Unicode 18.0, while the engines use Unicode 16 or 17.
 - Look-arounds (including non-atomic ones), back-references, atomic groups, possessive quantifiers, conditionals and the backtracking control verbs other than `(*FAIL)` and `(*MARK)` are handled by the fuzz checker, not by the automaton checker.

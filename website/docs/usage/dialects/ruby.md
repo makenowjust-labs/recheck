@@ -59,8 +59,10 @@ The options that `recheck` does not take:
 
 The following constructs are not supported, and they are reported as `unsupported`.
 
+- Subroutine calls (e.g. `\g<name>` and `\g<1>`).
 - Back-references with a nest level (e.g. `\k<n+1>`).
 - Absence operators (e.g. `(?~abc)`).
+- Under `i`, more than six places in a run of literals that match a folding to several characters, such as `ß` or `ss`, which matches `ß` (e.g. `ssssssss` gives `Too many multi-character case foldings in a literal (limit 6) at 0`).
 
 ## Approximations
 

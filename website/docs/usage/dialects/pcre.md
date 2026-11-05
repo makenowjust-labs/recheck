@@ -50,7 +50,8 @@ The modifiers that `recheck` does not take:
 
 The following constructs are not supported.
 
-- `(*scan_substring:...)` and script runs (e.g. `(*sr:...)`) are reported as `unsupported`.
+- Recursion and subroutine calls (e.g. `(?R)`, `(?1)`, `(?&name)` and `\g<name>`), including `(?(DEFINE)...)` in a pattern with calls, are reported as `unsupported`.
+- Callouts (e.g. `(?C1)`), `(*scan_substring:...)` and script runs (e.g. `(*sr:...)`) are reported as `unsupported`.
 - Extended bracketed character classes (`(?[ ... ])`) are not supported yet, and they are reported as `invalid`.
 
 ## Approximations

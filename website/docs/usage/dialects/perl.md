@@ -71,7 +71,10 @@ As in Perl, only one of `a` (or `aa`), `d`, `l` and `u` can be given.
 
 The following constructs are not supported.
 
+- Recursion and subroutine calls (e.g. `(?R)`, `(?1)` and `(?&name)`), including `(?(DEFINE)...)` in a pattern with calls, are reported as `unsupported`.
 - Embedded code (e.g. `(?{ ... })` and `(??{ ... })`), user-defined properties (e.g. `\p{IsFoo}`) and property wildcards (e.g. `\p{gc=/^L/}`) are reported as `unsupported`.
+- `\N{name}` (e.g. `\N{EM DASH}`) and word boundaries of a kind (e.g. `\b{wb}` and `\b{gcb}`) are reported as `unsupported`.
+- Under `i`, more than six places in a run of literals that match a folding to several characters, such as `ß` or `ss`, which matches `ß`, are reported as `unsupported` (e.g. `ssssssss` gives `Too many multi-character case foldings in a literal (limit 6) at 0`).
 - Extended bracketed character classes (`(?[ ... ])`) are not supported yet, and they are reported as `invalid`.
 
 ## Approximations

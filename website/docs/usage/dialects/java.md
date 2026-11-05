@@ -38,7 +38,11 @@ The `Pattern` flags that `recheck` does not take:
 
 ## Syntax Limitations
 
-The canonical equivalence (`(?c)`) is not supported, and it is reported as `unsupported`.
+The following constructs are not supported, and they are reported as `unsupported`.
+
+- The canonical equivalence (`(?c)`).
+- `\N{name}` (e.g. `\N{EM DASH}`).
+- The grapheme cluster boundary (`\b{g}`).
 
 ## Approximations
 
