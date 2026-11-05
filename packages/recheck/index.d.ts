@@ -236,8 +236,8 @@ export type Unexpected = {
  * AttackPattern is an attack pattern string.
  *
  * The strings are UTF-16 code units, or bytes as the characters of the same codes if `unitMode` is `byte`.
- * A string is the array of the units of `unitMode` instead when a string cannot hold them:
- * a lone surrogate, or a high surrogate followed by a low surrogate as two code points.
+ * A string is the array of the units of `unitMode` instead when they have a surrogate code point in `code-point`,
+ * or a lone surrogate in `utf16`.
  */
 export type AttackPattern = {
   pumps: {

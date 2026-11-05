@@ -25,6 +25,7 @@ import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.PerlSource
 import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UTF16Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
 
 /** Package `codec` provides recheck types `Decoder`/`Encoder` of circe. */
@@ -240,12 +241,16 @@ given encodeErrorKind: Encoder[ErrorKind] with
       Json.obj("kind" := "unexpected", "message" := message)
 
 /** Returns an `Encoder` for `UString` of the unit mode, which gives the string of the mode, or the array of the units
-  * when the string does not read back as them.
+  * when they have a surrogate code point in `CodePoint` mode or a lone surrogate in `UTF16` mode.
   */
 def encodeUString(mode: UnitMode): Encoder[UString] = (s: UString) =>
-  val str = mode.encode(s)
-  // A lone surrogate cannot be written in UTF-8, and a surrogate pair of code points reads back as one code point.
-  if !hasLoneSurrogate(str) && mode.decode(str) == s then str.asJson else s.iterator.toSeq.asJson
+  val isArray = mode match
+    // In UTF-16, a surrogate code point is a lone surrogate, or reads back as a part of another code point.
+    case UnitMode.CodePoint => s.iterator.exists(UTF16Encoding.isSurrogate)
+    // UTF-8 cannot write a lone surrogate.
+    case UnitMode.UTF16 => hasLoneSurrogate(s)
+    case UnitMode.Byte  => false
+  if isArray then s.iterator.toSeq.asJson else mode.encode(s).asJson
 
 /** Returns a `Decoder` for `UString` of the unit mode, which reads a string or an array of units. */
 def decodeUString(mode: UnitMode): Decoder[UString] =
@@ -257,13 +262,12 @@ def decodeUString(mode: UnitMode): Decoder[UString] =
       case None    => Right(UString.from(us))
   (c: HCursor) => if c.value.isArray then fromUnits(c) else fromString(c)
 
-/** Tests whether the string has a surrogate that is not a part of a surrogate pair. */
-private def hasLoneSurrogate(s: String): Boolean =
+/** Tests whether the UTF-16 code units have a surrogate that is not a part of a surrogate pair. */
+private def hasLoneSurrogate(s: UString): Boolean =
   var i = 0
   while i < s.length do
-    val c = s.charAt(i)
-    if Character.isHighSurrogate(c) && i + 1 < s.length && Character.isLowSurrogate(s.charAt(i + 1)) then i += 2
-    else if Character.isSurrogate(c) then return true
+    if UTF16Encoding.isHighSurrogate(s(i)) && i + 1 < s.length && UTF16Encoding.isLowSurrogate(s(i + 1)) then i += 2
+    else if UTF16Encoding.isSurrogate(s(i)) then return true
     else i += 1
   false
 
