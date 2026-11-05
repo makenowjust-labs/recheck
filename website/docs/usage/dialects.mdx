@@ -94,6 +94,15 @@ re.match(".", "😀").group()           # => '😀' (one code point in a `str` p
 re.match(b".", "😀".encode()).group() # => b'\xf0' (one byte in a `bytes` pattern)
 ```
 
+In the diagnostics, the `unitMode` field shows the unit as one of the following.
+The code points are distinguished by what the surrogates are.
+
+- `utf16`: UTF-16 code units (JavaScript without `u` or `v`, and .NET).
+- `utf16-code-point`: code points read from UTF-16, where a lone surrogate is a code point, but a high surrogate followed by a low surrogate is one code point (JavaScript with `u` or `v`, and Java).
+- `code-point`: code points, where the surrogates are ordinary code points in any order (Python's `str`, and Perl with `utf8`).
+- `scalar-value`: Unicode scalar values, which are the code points other than the surrogates (Ruby with `UTF-8`, and PCRE with `u` or `(*UTF)`).
+- `byte`: bytes (Python's `bytes`, Ruby with `ASCII-8BIT`, Perl without `utf8`, and PCRE without `u` or `(*UTF)`).
+
 ## Syntax Limitations
 
 `recheck` reads the whole syntax of the supported dialects.

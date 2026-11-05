@@ -19,7 +19,7 @@ Every `Diagnostics` has the following fields.
 - `source` is the given regular expression’s source string.
 - `flags` is the given regular expression’s flags string.
 - `dialect` is the given [`dialect`](parameters.mdx#dialect) parameter, as an object of the name and every setting of the dialect.
-- `unitMode` is the unit of the attack strings, which is one of `utf16`, `utf16-code-point`, `code-point`, `scalar-value` and `byte` (see [Matching Units](dialects.mdx#matching-units)).
+- `unitMode` is the unit of the attack strings (see [Matching Units](dialects.mdx#matching-units)).
   It is `null` in `unknown` diagnostics when the error happened on parsing the pattern.
 - `refutedAttacks` is the list of the attack strings that the runtime-attack verification refuted before the result (see [Runtime-Attack Verification](#runtime-attack-verification)).
 - `checker` is a checker type to be used (one of `fuzz` and `automaton`).
