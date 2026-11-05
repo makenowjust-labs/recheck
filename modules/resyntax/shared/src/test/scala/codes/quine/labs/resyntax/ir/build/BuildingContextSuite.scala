@@ -157,3 +157,4 @@ class BuildingContextSuite extends munit.FunSuite with IRHelper:
   // Perl's case commands are applied to a regex literal before parsing, so they leave no flags.
   checkChars("\\Ua\\Eb", "", Perl())(_ => Seq(char('A'), char('b')))
   checkChars("\\Qa\\Eb", "", Perl())(_ => Seq(char('a'), char('b')))
+  checkChars("(*BSR_ANYCRLF)(*BSR_UNICODE)\\R", "", PCRE)(d => charsIn("\\R", "", d))

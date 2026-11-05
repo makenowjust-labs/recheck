@@ -140,6 +140,12 @@ class CaseMappingSuite extends munit.FunSuite:
     )
     intercept[IllegalArgumentException](CaseMapping.fromEntries(Seq((0x41, 0x61), (0x41, 0x41))))
 
+  test("CaseMapping#toString"):
+    assertEquals(
+      CaseMapping.fromEntries(Seq((0x41, 0x61), (0x42, 0x62), (0x100, 0x101))).toString,
+      "CaseMapping(2 runs)"
+    )
+
   test("FullCaseFolding"):
     assertEquals(FullCaseFolding('A'), UString('a'))
     assertEquals(FullCaseFolding(Kelvin), UString('k'))

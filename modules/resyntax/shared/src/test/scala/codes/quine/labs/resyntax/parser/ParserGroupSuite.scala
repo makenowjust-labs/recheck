@@ -93,3 +93,8 @@ class ParserGroupSuite extends munit.FunSuite with ParserHelper:
 
   check("(a)", "", All*)(Group(IndexedCapture, Literal('a')))
   error("(", "", All*)("Unclosed group at 1")
+
+  error("(?Px)", "", PCRE, Python())("Invalid group at 3")
+  // PCRE in UTF mode takes letters and digits in a group name, and Java only ASCII ones.
+  check("(?<a\u00e9>x)", "u", PCRE)(Group(NamedCapture(Angle, "a\u00e9"), Literal('x')))
+  error("(?<a\u00e9>x)", "", Java)("Invalid identifier at 4")

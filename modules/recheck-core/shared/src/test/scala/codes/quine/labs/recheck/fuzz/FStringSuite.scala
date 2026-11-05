@@ -125,6 +125,8 @@ class FStringSuite extends munit.FunSuite:
         IndexedSeq(Repeat(0, 2), high, Wrap('a'), low)
       )
     do assert(FString(1, seq).admitsAnyRepeatCount(UnitMode.UTF16CodePoint), seq)
+    intercept[IllegalArgumentException]:
+      FString(1, IndexedSeq(Repeat(0, 2), Wrap('a'), Repeat(0, 1))).admitsAnyRepeatCount(UnitMode.UTF16CodePoint)
 
   test("FString#toAttackPattern"):
     assertEquals(

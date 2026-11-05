@@ -85,8 +85,7 @@ object IRNodeData:
   /** NonAtomicLookBehind is a positive look-behind assertion that backtracking can enter again (e.g. PCRE's
     * `(?<*...)`).
     */
-  final case class NonAtomicLookBehind(node: IRNode, matching: IRLookBehindMatch = IRLookBehindMatch.Backward)
-      extends IRNodeData
+  final case class NonAtomicLookBehind(node: IRNode, matching: IRLookBehindMatch) extends IRNodeData
 
   /** Conditional matches `yes` if the condition holds at the position, and `no` otherwise (e.g. `(?(1)a|b)`).
     *

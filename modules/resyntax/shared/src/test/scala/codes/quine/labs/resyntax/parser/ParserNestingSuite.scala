@@ -29,6 +29,8 @@ class ParserNestingSuite extends munit.FunSuite:
   val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())
 
   nesting("capture groups", "", All*)(groups("("), Max)
+  // The position in a source read by its UTF-8 bytes is the one in the source.
+  nesting("capture groups after a non-ASCII character", "", PCRE)(groups("(", "\u00e9"), 1 + Max)
   nesting("non-capture groups", "", All*)(groups("(?:"), Max * 3)
   nesting("look-ahead groups", "", All*)(groups("(?="), Max * 3)
   nesting("look-behind groups", "", All*)(groups("(?<!"), Max * 4)

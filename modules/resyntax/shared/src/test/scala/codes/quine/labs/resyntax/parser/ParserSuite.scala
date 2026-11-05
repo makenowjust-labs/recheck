@@ -9,6 +9,7 @@ import codes.quine.labs.resyntax.ast.EscapeClassKind.*
 import codes.quine.labs.resyntax.ast.EscapeStyle.*
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.GroupKind.*
+import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.Quantifier.*
 import codes.quine.labs.resyntax.charset.UnitMode
@@ -183,3 +184,10 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
     for (source, flags, dialect, mode) <- cases do
       val flagSet = FlagSet.parse(flags, dialect)
       assertEquals(Parser.determineUnitMode(source, flagSet, dialect), mode, (source, flags, dialect))
+
+  test("Parser.parse: a high surrogate without a low surrogate after it is a code point by itself"):
+    val node = Parser.parse("\uD800a", FlagSet.parse("u", JavaScript), JavaScript, UnitMode.UTF16CodePoint)
+    assert(node.equalsWithoutLoc(Node(Sequence(Literal(0xd800), Literal('a')))), node)
+
+  // The verbose flags skip the ASCII white spaces.
+  check("a\t\u000b\f\rb", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Sequence(Literal('a'), Literal('b')))

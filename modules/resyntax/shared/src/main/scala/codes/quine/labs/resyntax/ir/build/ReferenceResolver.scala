@@ -63,11 +63,10 @@ private[build] final class ReferenceResolver(table: CaptureTable, dialect: Diale
     if index >= 1 && table.defined.contains(index) then Seq(index) else fail("Reference to non-existent group", loc)
 
   /** Resolves a base reference of a call or a scan substring. */
-  def resolveCall(ref: Reference, site: ReferenceSite, loc: SourceLocation): Seq[Int] = ref match
-    case Reference.IndexedReference(n)      => resolveIndex(n, loc)
-    case Reference.NamedReference(name)     => calledName(name, loc)
-    case Reference.RelativeReference(n)     => resolveRelativeReference(n, site, loc)
-    case Reference.LeveledReference(ref, _) => resolveCall(ref, site, loc)
+  def resolveCall(ref: Reference.BaseReference, site: ReferenceSite, loc: SourceLocation): Seq[Int] = ref match
+    case Reference.IndexedReference(n)  => resolveIndex(n, loc)
+    case Reference.NamedReference(name) => calledName(name, loc)
+    case Reference.RelativeReference(n) => resolveRelativeReference(n, site, loc)
 
   /** Resolves a conditional test, which Python checks like a back-reference only in a look-behind. */
   def resolveTest(indices: => Seq[Int], site: ReferenceSite, loc: SourceLocation): Seq[Int] =
@@ -78,7 +77,7 @@ private[build] final class ReferenceResolver(table: CaptureTable, dialect: Diale
     else resolved
 
   /** Resolves a call by `\g<...>`, where Ruby rejects a name shared by groups. */
-  def escapeCall(ref: Reference, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
+  def escapeCall(ref: Reference.BaseReference, site: ReferenceSite, loc: SourceLocation): Seq[Int] =
     val indices = resolveCall(ref, site, loc)
     if featureSet.rejectsCallToSharedName && indices.size > 1 then fail("Call to a name shared by groups", loc)
     indices

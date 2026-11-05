@@ -2,8 +2,10 @@ package codes.quine.labs.resyntax.parser
 
 import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
+import codes.quine.labs.resyntax.ast.ClassItem
 import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.CommandKind
+import codes.quine.labs.resyntax.ast.ConditionalTest
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.EscapeClassKind
@@ -125,3 +127,35 @@ class ParserEncodingSuite extends munit.FunSuite:
     check("\\xff", flags, dialect)(Backslash(Escape(EscapeStyle.Hex2, 0xff)))
   check("a\u00e9", "", Ruby())(Sequence(Literal('a'), Literal(0xe9)))
   check("\\u00e9", "", Ruby())(Backslash(Escape(EscapeStyle.UnicodeHex4, 0xe9)))
+
+  test("Parser.parse: the locations of bytes in conditionals and branch resets point to their characters"):
+    val Command(CommandKind.Conditional(ConditionalTest.LookAround(_, look), yes, Some(no))) =
+      parse("(?(?=\u00e9)\u00e9|a)", "", PCRE).data: @unchecked
+    assertEquals(look.loc, SourceLocation(5, 6))
+    assertEquals(yes.loc, SourceLocation(7, 8))
+    assertEquals(no.loc, SourceLocation(9, 10))
+    val Command(CommandKind.Conditional(ConditionalTest.CalloutLookAround(_, callout), _, None)) =
+      parse("(?(?C1)(?=\u00e9)a)", "", PCRE).data: @unchecked
+    assertEquals(callout.node.loc, SourceLocation(10, 11))
+    val Sequence(Seq(_, Node(Command(CommandKind.Conditional(_, indexed, None)), _))) =
+      parse("()(?(1)\u00e9)", "", PCRE).data: @unchecked
+    assertEquals(indexed.loc, SourceLocation(7, 8))
+    val Command(CommandKind.BranchReset(Seq(first, second))) = parse("(?|\u00e9|a)", "", PCRE).data: @unchecked
+    assertEquals(first.loc, SourceLocation(3, 4))
+    assertEquals(second.loc, SourceLocation(5, 6))
+    val Sequence(Seq(_, _, comment)) = parse("\u00e9(?#a)", "", PCRE).data: @unchecked
+    assertEquals(comment, Node(Command(CommandKind.Comment("a")), SourceLocation(1, 6)))
+
+  test("Parser.parse: the locations of bytes in absence operators and class operations point to their characters"):
+    val Command(CommandKind.AbsenceExpression(absent, exp)) = parse("(?~|\u00e9|a)", "", RubyBytes).data: @unchecked
+    assertEquals(absent.loc, SourceLocation(4, 5))
+    assertEquals(exp.loc, SourceLocation(6, 7))
+    val Command(CommandKind.AbsenceStopper(stopper)) = parse("(?~|\u00e9)", "", RubyBytes).data: @unchecked
+    assertEquals(stopper.loc, SourceLocation(4, 5))
+    val Class(false, ClassItem.NonValue(ClassIntersection(left, right), loc)) =
+      parse("[\u00e9&&[\\d]]", "", RubyBytes).data: @unchecked
+    assertEquals(loc, SourceLocation(1, 8))
+    assertEquals(left.loc, SourceLocation(1, 2))
+    val ClassItem.NonValue(ClassNest(false, digit), nest) = right: @unchecked
+    assertEquals(nest, SourceLocation(4, 8))
+    assertEquals(digit.loc, SourceLocation(5, 7))

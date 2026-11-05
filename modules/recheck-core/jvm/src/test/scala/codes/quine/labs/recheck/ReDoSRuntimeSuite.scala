@@ -2,10 +2,12 @@ package codes.quine.labs.recheck
 
 import scala.concurrent.duration.*
 
+import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.resyntax.ast.Dialect
+import codes.quine.labs.resyntax.charset.UnitMode
 
 class ReDoSRuntimeSuite extends munit.FunSuite with RuntimeHelper:
 
@@ -23,6 +25,27 @@ class ReDoSRuntimeSuite extends munit.FunSuite with RuntimeHelper:
           assert(clue(r.runtimeAttack).result.isInstanceOf[RuntimeAttackResult.Finish])
           assert(!r.runtimeAttack.isConfirmed)
       case d => fail(s"not safe: $d")
+    // The fuzz checker goes on after a refuted attack.
+    ReDoS.check("^(a|a)*$", "", params.copy(dialect = Dialect.Ruby(), checker = Checker.Fuzz)) match
+      case d: Diagnostics.Vulnerable => fail(s"vulnerable: $d")
+      case d: Diagnostics.Safe       => assert(clue(d.refutedAttacks).nonEmpty)
+      case d: Diagnostics.Unknown    => assert(clue(d.refutedAttacks).nonEmpty)
+
+  runtimeTest("ReDoS.check: the deadline during a runtime attack", "node"):
+    // The diagnostics tell the checker that found the attack.
+    val d = ReDoS.check("^(a|a)*$", "", params.copy(timeout = 3.seconds, runtimeAttackTimeout = 10.seconds))
+    assertEquals(
+      d,
+      Diagnostics.Unknown(
+        "^(a|a)*$",
+        "",
+        Dialect.JavaScript,
+        Some(UnitMode.UTF16),
+        Diagnostics.ErrorKind.Timeout,
+        Seq.empty,
+        Some(Checker.Automaton)
+      )
+    )
 
   runtimeTest("ReDoS.check: Python", "python3"):
     ReDoS.check("^(a|a)*$", "", params.copy(dialect = Dialect.Python())) match

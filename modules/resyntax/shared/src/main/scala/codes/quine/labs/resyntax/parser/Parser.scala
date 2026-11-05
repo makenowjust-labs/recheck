@@ -295,8 +295,7 @@ private[parser] final class Parser(
         if max < min && !featureSet.allowsReversedBoundedRepeat then fail("Numbers out of order in {} quantifier", save)
         Quantifier.Bounded(min, max, strategy)
       case (Some(min), None) => Quantifier.Unbounded(min, strategy)
-      case (None, Some(max)) => Quantifier.MaxBounded(max, strategy)
-      case (None, None)      => throw new IllegalStateException("Unreachable")
+      case (None, max)       => Quantifier.MaxBounded(max.get, strategy)
     pushCurlyRepeat(stack, quantifier)
 
   private def pushCurlyRepeat(stack: mutable.Stack[Node], quantifier: Quantifier): Unit =
@@ -399,9 +398,9 @@ private[parser] final class Parser(
     stack.headOption.exists: node =>
       node.loc.end == pos && CodePointUtil.isAlphabetic(source.charAt(pos - 1).toInt) && (node.data match
         case _: NodeData.Backslash => node.loc.start + 2 == pos
+        // Only a literal is another node ending with a letter.
         // Perl looks only at the source text, so it also rejects a letter after an escaped backslash (e.g. `\\p{`).
-        case _: NodeData.Literal => node.loc.start + 1 == pos && pos >= 2 && source.charAt(pos - 2) == '\\'
-        case _                   => false)
+        case _ => node.loc.start + 1 == pos && pos >= 2 && source.charAt(pos - 2) == '\\')
 
   private def parseGroup(stack: mutable.Stack[Node]): Unit =
     val start = offset

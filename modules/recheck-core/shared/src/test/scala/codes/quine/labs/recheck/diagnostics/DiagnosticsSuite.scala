@@ -159,6 +159,16 @@ class DiagnosticsSuite extends munit.FunSuite:
     )
     assertEquals(
       Diagnostics
+        .Unknown("", "", Dialect.Python(), None, Diagnostics.ErrorKind.Cancel, Seq.empty, None)
+        .toString,
+      s"""|Input  : //
+          |Dialect: python (type: str)
+          |Status : unknown
+          |Error  : cancel
+          |Checker: (none)""".stripMargin
+    )
+    assertEquals(
+      Diagnostics
         .Unknown(
           "a*a*$",
           "",
@@ -258,3 +268,4 @@ class DiagnosticsSuite extends munit.FunSuite:
     assertEquals(Diagnostics.ErrorKind.Unsupported("foo").toString, "unsupported (foo)")
     assertEquals(Diagnostics.ErrorKind.InvalidRegExp("foo").toString, "invalid RegExp (foo)")
     assertEquals(Diagnostics.ErrorKind.RuntimeAttacksRefuted.toString, "runtime attacks refuted")
+    assertEquals(Diagnostics.ErrorKind.Unexpected("foo").toString, "unexpected (foo)")

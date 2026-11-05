@@ -64,7 +64,6 @@ private[parser] final class Rewritten(val text: String, starts: Array[Int], ends
   private def relocateItemData(data: ClassItemData): ClassItemData = data match
     case ClassItemData.ClassUnion(items)       => ClassItemData.ClassUnion(items.map(relocateItem))
     case ClassItemData.ClassIntersection(l, r) => ClassItemData.ClassIntersection(relocateItem(l), relocateItem(r))
-    case ClassItemData.ClassDiff(l, r)         => ClassItemData.ClassDiff(relocateItem(l), relocateItem(r))
     case ClassItemData.ClassNest(invert, item) => ClassItemData.ClassNest(invert, relocateItem(item))
     case ClassItemData.ClassRange(begin, end)  => ClassItemData.ClassRange(relocateValue(begin), relocateValue(end))
     case data                                  => data

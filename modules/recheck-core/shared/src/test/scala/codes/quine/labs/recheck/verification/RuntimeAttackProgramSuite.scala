@@ -126,6 +126,7 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
       line(generate("a", "auid", Dialect.Ruby()), "regex"),
       "regex = Regexp.new(\"(?d)\" + \"a\", Regexp::IGNORECASE)"
     )
+    assertEquals(line(generate("a", "mm", Dialect.Ruby()), "regex"), "regex = Regexp.new(\"a\", Regexp::MULTILINE)")
     // A pattern of bytes is the UTF-8 encoding of the source.
     val bytes = generate("é", "n", Dialect.Ruby(), nonASCII)
     assertEquals(line(bytes, "regex"), "regex = Regexp.new(\"\\xC3\\xA9\".b, Regexp::NOENCODING)")

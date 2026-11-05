@@ -378,6 +378,15 @@ class CodecSuite extends munit.FunSuite:
       decodeAttackPattern(UnitMode.UTF16CodePoint).decodeJson(json).left.map(_.message),
       Left("Invalid attack pattern in UTF16CodePoint mode: a high surrogate followed by a low surrogate")
     )
+    // The failure points to the attack pattern in the JSON.
+    assertEquals(
+      decodeAttackPattern(UnitMode.UTF16CodePoint)
+        .at("attack")
+        .decodeJson(Json.obj("attack" := json))
+        .left
+        .map(_.pathToRootString),
+      Left(Some(".attack"))
+    )
 
   test("codec.decodeParameters"):
 

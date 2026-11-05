@@ -146,6 +146,11 @@ class IRPatternSuite extends munit.FunSuite:
     "." -> false
   )
 
+  check("IRPattern#everyEndPointIsLineEnd", dialect = Dialect.Java)(_.everyEndPointIsLineEnd)(
+    "(?>a$)" -> true,
+    "(?>a)" -> false
+  )
+
   check("IRPattern#everyEndPointIsNotLineEnd")(_.everyEndPointIsNotLineEnd)(
     "$|$" -> false,
     ".|$" -> false,
@@ -216,6 +221,11 @@ class IRPatternSuite extends munit.FunSuite:
     "(?=.)" -> 2,
     "(?<=.)" -> 2,
     "." -> 1
+  )
+
+  check("IRPattern#size", dialect = Dialect.PCRE)(_.size)(
+    "(*napla:.)" -> 2,
+    "(?<*.)" -> 2
   )
 
   check("IRPattern#size", dialect = Dialect.Java)(_.size)(

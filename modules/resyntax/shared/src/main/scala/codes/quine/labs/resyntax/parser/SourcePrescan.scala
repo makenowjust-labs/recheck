@@ -6,7 +6,7 @@ import scala.annotation.switch
   * capture, the number of its captures, and whether it starts with PCRE's start options including `(*UTF)` or
   * `(*UTF8)`.
   */
-final case class SourcePrescan(containsNamedCapture: Boolean, captureSize: Int, hasUTFStartOption: Boolean = false)
+final case class SourcePrescan(containsNamedCapture: Boolean, captureSize: Int, hasUTFStartOption: Boolean)
 
 object SourcePrescan:
 

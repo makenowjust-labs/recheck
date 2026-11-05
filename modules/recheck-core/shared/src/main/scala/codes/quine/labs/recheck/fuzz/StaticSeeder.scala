@@ -19,9 +19,9 @@ object StaticSeeder:
   /** Computes an initial generation of the pattern. */
   def seed(
       pattern: IRPattern,
-      maxSimpleRepeatSize: Int = Parameters.DefaultMaxSimpleRepeatCount,
+      maxSimpleRepeatSize: Int,
       maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
-      limit: Int = Parameters.DefaultIncubationLimit,
+      limit: Int,
       maxSize: Int = Parameters.DefaultMaxGeneStringSize
   )(using
       ctx: Context

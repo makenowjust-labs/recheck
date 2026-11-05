@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.parser
 import codes.quine.labs.resyntax.ast.AssertKind.*
 import codes.quine.labs.resyntax.ast.BackslashKind.*
+import codes.quine.labs.resyntax.ast.CaseCommandKind
 import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.EscapeClassKind.*
@@ -336,3 +337,10 @@ class ParserClassSuite extends munit.FunSuite with ParserHelper:
   error("[[]", "", Java, Ruby())("Unclosed ']' at 3")
   error("[^[]a]", "", Java, Ruby())("Unclosed ']' at 6")
   error("[[]", "v", JavaScript)("Unclosed ']' at 3")
+  error("[\\q{\\d}]", "v", JavaScript)("Invalid backslash escape at 4")
+  error("[^a\\q{bc}]", "v", JavaScript)("Negated class may contain strings at 0")
+  error("[^\\q{bc}--a]", "v", JavaScript)("Negated class may contain strings at 0")
+  // PCRE ignores `\E` without `\Q` also in a class.
+  check("[a\\Eb]", "", PCRE)(
+    Class(false, ClassUnion(ClassLiteral('a'), ClassCaseCommand(CaseCommandKind.EndCaseCommand), ClassLiteral('b')))
+  )

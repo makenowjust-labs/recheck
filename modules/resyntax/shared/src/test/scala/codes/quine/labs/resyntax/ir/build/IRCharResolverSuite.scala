@@ -447,6 +447,15 @@ class IRCharResolverSuite extends munit.FunSuite:
   chars("\\h", "", Ruby())(of("0123456789abcdefABCDEF"))
   chars("\\h", "", Perl())(IRClassLookup.pcreHorizontal.diff(of("\u180E")))
   chars("\\v", "", Java, Perl())(IRClassLookup.Vertical)
+  chars("\\h", "", Java)(IRClassLookup.pcreHorizontal)
+  chars("\\S", "", PCRE)(of(" \t\n\u000b\f\r").complement(UnitMode.Byte))
+  chars("\\H", "", PCRE)(of("\t \u00a0").complement(UnitMode.Byte))
+  chars("\\V", "", PCRE)(IRClassLookup.Vertical.complement(UnitMode.Byte))
+  chars("\\H", "", Ruby())(of("0123456789abcdefABCDEF").complement(Scalars))
+  chars("\\s", "", DotNet)(gc("Zs").union(gc("Zl")).union(gc("Zp")).union(of("\t\n\u000b\f\r\u0085")))
+  // `\C` is a byte, which IR has no unit for in UTF mode.
+  chars("\\C", "", PCRE)(UnitMode.Byte.universe)
+  unsupported("(*UTF)\\C", "", PCRE)
   chars("\\N", "", Perl())(of("\n").complement(UnitMode.CodePoint))
   check("\\R", "", Perl(), Ruby())(
     Atomic(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical)))
@@ -469,6 +478,7 @@ class IRCharResolverSuite extends munit.FunSuite:
   error("\\p{RGI_Emoji}", "", Perl())("Unknown Unicode property name at 0")
   error("[\\xB1\\xB4-\\xB6]", "", Ruby())("Invalid multibyte escape at 1")
   error("\\C-\\M-a", "", Ruby())("Invalid multibyte escape at 0")
+  error("a\\xA9+", "", Ruby())("Invalid multibyte escape at 1")
   chars("\\N{U+263A}", "", Perl())(of("☺"))
 
   // Word boundaries
@@ -491,6 +501,35 @@ class IRCharResolverSuite extends munit.FunSuite:
     )
   )
   chars("[[:upper:]]", "i", PCRE)(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+  check("[[:>:]]", "", PCRE)(
+    Sequence(
+      Assert(IRAssertKind.WordBoundary(IRClassLookup.ASCIIWord)),
+      LookBehind(false, Chars(IRClassLookup.ASCIIWord))
+    )
+  )
+  // PCRE's POSIX classes in UCP mode (PHP 8.5.12 with PCRE2 10.49 agrees on U+00A2, U+061C, U+180E, U+200B and U+2066).
+  val PCREGraph: CharSet =
+    CharSet.union(Seq("L", "M", "N", "P", "S", "Cf").map(gc)).diff(of("\u061c\u180e\u2066\u2067\u2068\u2069"))
+  for (name, expected) <- Seq(
+      "alnum" -> gc("L").union(gc("N")),
+      "ascii" -> CharSet.range(0, 0x7f),
+      "blank" -> IRClassLookup.pcreHorizontal,
+      "cntrl" -> gc("Cc"),
+      "digit" -> gc("Nd"),
+      "graph" -> PCREGraph,
+      "lower" -> gc("Ll"),
+      "print" -> PCREGraph.union(gc("Zs")).union(of("\u180e")).diff(gc("Cc")),
+      "punct" -> gc("P").union(gc("S").intersect(CharSet.range(0, 0x7f))),
+      "space" -> IRClassLookup.pcreHorizontal.union(IRClassLookup.Vertical),
+      "upper" -> gc("Lu"),
+      "word" -> IRClassLookup.pcreWord,
+      "xdigit" -> PropertyTable.binary("Hex_Digit").get.set
+    )
+  do checkSet(s"[[:$name:]]", "u", PCRE)(_ == expected)
+  // Perl's `[[:upper:]]` and `[[:lower:]]` match the cased characters under `i`.
+  chars("[[:upper:]]", "i", Perl())(PropertyTable.binary("Cased").get.set)
+  chars("(?a)[[:alpha:]]", "", Ruby())(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+  chars("[[:lower:]]", "in", Ruby())(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
 
   // Properties
   chars("\\p{Lu}", "u", JavaScript, PCRE)(gc("Lu"))
@@ -500,6 +539,13 @@ class IRCharResolverSuite extends munit.FunSuite:
   chars("\\p{Lu}", "i", Java)(gc("LC"))
   chars("\\p{Lu}", "i", DotNet)(gc("LC").restrict(UnitMode.UTF16))
   chars("\\p{Lu}", "i", Perl())(gc("LC"))
+  chars("\\p{Lower}", "i", Perl())(PropertyTable.binary("Cased").get.set)
+  chars("\\p{Lu}", "iu", JavaScript)(CaseMapping.SimpleFold.closure(gc("Lu")))
+  chars("\\P{Lu}", "iu", JavaScript)(CaseMapping.SimpleFold.closure(gc("Lu").complement(UnitMode.CodePoint)))
+  chars("\\p{Lu}", "iv", JavaScript)(CaseMapping.SimpleFold.closure(gc("Lu")))
+  chars("\\P{Lu}", "iv", JavaScript)(CaseMapping.SimpleFold.closure(gc("Lu")).complement(UnitMode.CodePoint))
+  chars("\\pL", "", Perl())(gc("L"))
+  chars("\\PL", "", PCRE)(gc("L").complement(UnitMode.Byte))
   chars("\\p{Latin}", "u", PCRE)(PropertyTable.ScriptExtensions.value("Latin").get.set)
   chars("\\p{sc=Latin}", "u", JavaScript)(PropertyTable.Script.value("Latin").get.set)
   chars("\\p{IsLatin}", "", Java)(PropertyTable.Script.value("Latin").get.set)
@@ -525,6 +571,8 @@ class IRCharResolverSuite extends munit.FunSuite:
   unsupported("\\P{gc=!^L$!}", "", Perl())
   unsupported("\\p{gc=(^L$)}", "", Perl())
   unsupported("\\p{gc:/^L$/}", "", Perl())
+  unsupported("\\p{gc=[^L$]}", "", Perl())
+  unsupported("\\p{gc=<^L$>}", "", Perl())
   error("\\p{gc=/^L$}", "", Perl())("Unknown Unicode property name at 0")
   error("\\p{gc=(^L$(}", "", Perl())("Unknown Unicode property name at 0")
   error("\\p{Nv=.5}", "", Perl())("Unknown Unicode property name at 0")
@@ -536,6 +584,10 @@ class IRCharResolverSuite extends munit.FunSuite:
   error("\\P{RGI_Emoji}", "v", JavaScript)("Invalid property name at 0")
   error("[^\\p{RGI_Emoji}]", "v", JavaScript)("Negated character class may contain strings at 0")
   error("[[^\\p{RGI_Emoji}]]", "v", JavaScript)("Negated character class may contain strings at 1")
+  for s <- Seq("[^a\\p{RGI_Emoji}]", "[^\\p{RGI_Emoji}&&\\p{RGI_Emoji}]", "[^\\p{RGI_Emoji}--a]", "[^[\\p{RGI_Emoji}]]")
+  do error(s, "v", JavaScript)("Negated character class may contain strings at 0")
+  chars("[^a]", "v", JavaScript)(of("a").complement(UnitMode.CodePoint))
+  chars("[^\\q{a}]", "v", JavaScript)(of("a").complement(UnitMode.CodePoint))
 
   // Class set operations
   chars("[a-z&&[def]]", "", Java, Ruby())(of("def"))
@@ -545,6 +597,15 @@ class IRCharResolverSuite extends munit.FunSuite:
   chars("[\\p{L}&&\\p{ASCII}]", "v", JavaScript)(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
   check("[\\q{abc|d}]", "v", JavaScript)(Strings(ClassSet(of("d"), Seq(UnitMode.CodePoint.decode("abc")))))
   check("[\\q{ab}]", "iv", JavaScript)(Disjunction(Sequence(Chars(of("aA")), Chars(of("bB")))))
+  check("[\\q{ab|c|}]", "iv", JavaScript)(
+    Disjunction(Sequence(Chars(of("aA")), Chars(of("bB"))), Empty, Chars(of("cC")))
+  )
+  chars("[\\q{\\x41}]", "v", JavaScript)(of("A"))
+  // .NET's negated class negates the base before the subtraction.
+  chars("[^a-z-[0-9]]", "", DotNet)(CharSet.range('a', 'z').union(CharSet.range('0', '9')).complement(UnitMode.UTF16))
+  chars("[a\\Eb]", "", PCRE)(of("ab"))
+  // Perl with `u` matches a character folded to several characters in a class by its folding.
+  check("[\u00df]", "iu", Perl())(Disjunction(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))), Chars(sharpSs)))
 
   // Java's CANON_EQ is not supported.
   unsupported("(?c)a", "", Java)

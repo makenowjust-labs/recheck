@@ -280,3 +280,33 @@ class LookBehindAnalyzerSuite extends munit.FunSuite with IRHelper:
   matching("(?<=ba*)", Java)(IRLookBehindStartRange(1, Int.MaxValue))
   matching("(?<=(?:ab)?+c)", Java)(IRLookBehindStartRange(1, 3))
   matching("(?<=\\R\\X)", Java)(IRLookBehindStartRange(2, Int.MaxValue))
+
+  // PCRE takes the widths of branch resets, escape classes, references and calls, and the width of a recursion is
+  // unbounded.
+  matching("(?<=(?|a|bc))", PCRE)(IRLookBehindStartRange(1, 2))
+  matching("(?<=\\d)", PCRE)(IRLookBehindStartRange(1, 1))
+  matching("(?<=a{,2})", PCRE)(IRLookBehindStartRange(0, 2))
+  matching("(?P<n>a)(?<=(?P=n))", PCRE)(IRLookBehindStartRange(1, 1))
+  matching("(a)(?<=(?-1))", PCRE)(IRLookBehindStartRange(1, 1))
+  matching("(?<n>a)(?<=(?&n))", PCRE)(IRLookBehindStartRange(1, 1))
+  matching("(?<n>a)(?<=(?P>n))", PCRE)(IRLookBehindStartRange(1, 1))
+  matching("(a)(?<=\\g<1>)", PCRE)(IRLookBehindStartRange(1, 1))
+  error("(?<=a{2,})", "", PCRE)("Look-behind is not limited at 0")
+  error("(?<=(?0))", "", PCRE)("Look-behind is not limited at 0")
+  error("(?<=\\g<0>)", "", PCRE)("Look-behind is not limited at 0")
+  error("(?<=(?1))(a(?2))(b(?1))", "", PCRE)("Look-behind is not limited at 0")
+  matching("(?<=(?|a(*ACCEPT)bc|de))", Perl())(IRLookBehindStartRange(1, 3))
+
+  // Ruby rejects conditionals and absence operators in a look-behind, and accepts a call and `.`.
+  error("(a)(?<=(?(1)a|b))", "", Ruby())("Invalid pattern in look-behind at 3")
+  error("(?<=(?~|a|b))", "", Ruby())("Invalid pattern in look-behind at 0")
+  error("(?<=(?~|a))", "", Ruby())("Invalid pattern in look-behind at 0")
+  error("(?<=(?~|))", "", Ruby())("Invalid pattern in look-behind at 0")
+  valid("(a)(?<=b\\g<1>)", Ruby())
+  valid("(?<=.)", Ruby())
+  valid("(?i)(?<=\\d)", Ruby())
+
+  // Java counts an escape as a character, and an assertion as nothing.
+  matching("(?<=^a)", Java)(IRLookBehindStartRange(1, 1))
+  matching("(?<=\\x41)", Java)(IRLookBehindStartRange(1, 1))
+  error("(a)(?<=\\1{2})", "", Java)("Look-behind group does not have an obvious maximum length at 3")

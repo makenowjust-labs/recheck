@@ -111,10 +111,9 @@ object PropertyTable:
         val (n, d) = value match
           case "NaN" => (0L, 0L)
           case _     =>
-            value.split("/") match
-              case Array(n)    => (n.toLong, 1L)
-              case Array(n, d) => (n.toLong, d.toLong)
-              case _           => throw new IllegalStateException(s"invalid numeric value: $value")
+            value.indexOf('/') match
+              case -1 => (value.toLong, 1L)
+              case i  => (value.take(i).toLong, value.drop(i + 1).toLong)
         new NumericValue(n, d, table.setOf(_ == i))
     NumericProperty(names, short, values)
 

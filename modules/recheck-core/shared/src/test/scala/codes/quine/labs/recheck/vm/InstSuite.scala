@@ -13,6 +13,7 @@ import codes.quine.labs.resyntax.ir.IRCaseEquivalence
 import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
 import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
 import codes.quine.labs.resyntax.ir.IRLookBehindStartRange
+import codes.quine.labs.resyntax.ir.IRWordMarkSet
 
 class InstSuite extends munit.FunSuite:
 
@@ -120,6 +121,10 @@ class InstSuite extends munit.FunSuite:
     assertEquals(AssertKind.InputBegin.toString, "input_begin")
     assertEquals(AssertKind.InputEnd.toString, "input_end")
     assertEquals(AssertKind.ChompInputEnd(IRLineTerminatorSet.LF).toString, "chomp_input_end")
+    val marks = IRWordMarkSet(CharSet.single(0x300), CharSet.single(0x300), Word)
+    assertEquals(AssertKind.MarkWordBoundary(Word, marks).toString, "mark_word_boundary")
+    assertEquals(AssertKind.MarkWordBoundaryNot(Word, marks).toString, "mark_word_boundary_not")
+    assertEquals(AssertKind.NotBetweenCRLF.toString, "not_between_crlf")
 
   test("Inst.ReadKind#toString"):
     assertEquals(ReadKind.Any.toString, "any")

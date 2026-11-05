@@ -94,6 +94,7 @@ class CharSetSuite extends munit.FunSuite with CharSetHelper:
   test("CharSet#equals / hashCode / toString"):
     assertEquals(set((1, 3)), CharSet.range(1, 2))
     assertEquals(set((1, 3)).hashCode, CharSet.range(1, 2).hashCode)
+    assertNotEquals[Any, Any](CharSet.range(1, 2), ClassSet(CharSet.range(1, 2)))
     assertEquals(set((0x61, 0x7b), (0x5f, 0x60)).toString, "CharSet(0x5F, 0x61-0x7A)")
 
   test("CharSet.union"):

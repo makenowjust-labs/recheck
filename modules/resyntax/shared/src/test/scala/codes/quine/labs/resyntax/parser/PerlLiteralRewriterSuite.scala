@@ -138,3 +138,6 @@ class PerlLiteralRewriterSuite extends munit.FunSuite:
     assertEquals((0 to 5).map(r.position), Seq(0, 3, 3, 6, 6, 7))
     assertEquals(r.location(SourceLocation(1, 2)), SourceLocation(3, 4))
     assertEquals(r.location(SourceLocation(3, 5)), SourceLocation(6, 7))
+
+  // `\N{2,3}` is `\N` with a quantifier, not a name.
+  rewrite("\\U\\N{2,3}a")("\\N{2,3}A")

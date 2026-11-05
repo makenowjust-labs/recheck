@@ -59,18 +59,16 @@ final case class IRNode(data: IRNodeData, loc: SourceLocation):
     * `unsupported syntax (Callout) at 3`).
     */
   def unsupportedMessage: String =
-    val name = data match
-      case Unsupported(data) =>
-        data match
-          case NodeData.Command(kind)   => kind.productPrefix
-          case NodeData.Group(kind, _)  => kind.productPrefix
-          case NodeData.Backslash(kind) =>
-            kind match
-              case BackslashKind.Assert(k)      => k.productPrefix
-              case BackslashKind.EscapeClass(k) => k.productPrefix
-              case k                            => k.productPrefix
-          case data => data.productPrefix
-      case data => data.productPrefix
+    val Unsupported(syntax) = data: @unchecked
+    val name = syntax match
+      case NodeData.Command(kind)   => kind.productPrefix
+      case NodeData.Group(kind, _)  => kind.productPrefix
+      case NodeData.Backslash(kind) =>
+        kind match
+          case BackslashKind.Assert(k)      => k.productPrefix
+          case BackslashKind.EscapeClass(k) => k.productPrefix
+          case k                            => k.productPrefix
+      case syntax => syntax.productPrefix
     val at = Option.when(loc.start >= 0)(s" at ${loc.start}").getOrElse("")
     s"unsupported syntax ($name)$at"
 
