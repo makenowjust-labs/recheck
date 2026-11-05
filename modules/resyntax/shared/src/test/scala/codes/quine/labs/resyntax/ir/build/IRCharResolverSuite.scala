@@ -457,6 +457,8 @@ class IRCharResolverSuite extends munit.FunSuite:
   chars("\\C", "", PCRE)(UnitMode.Byte.universe)
   unsupported("(*UTF)\\C", "", PCRE)
   chars("\\N", "", Perl())(of("\n").complement(UnitMode.CodePoint))
+  // PCRE's `\N` is `.` without `s`.
+  chars("\\N", "s", PCRE)(of("\n").complement(UnitMode.Byte))
   check("\\R", "", Perl(), Ruby())(
     Atomic(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical)))
   )
