@@ -71,19 +71,28 @@ The ESLint plugin (`eslint-plugin-redos`) checks JavaScript regular expressions 
 | [`perl`](dialects/perl.md)             | Perl 5.44 regular expressions                  | code points (`utf8`), or bytes (no `utf8`)         |
 | [`pcre`](dialects/pcre.md)             | PCRE2 10.49 as PHP's `preg_*` functions use it | bytes, or code points (UTF-8) with `u` or `(*UTF)` |
 
-## Units
+## Matching Units
 
-A unit is what a pattern reads as one character: `.` matches exactly one unit.
-It is a UTF-16 code unit, a code point, or a byte, which depends on the dialect and its settings (see the table above).
+A (matching) unit is what a pattern reads as one character: `.` matches exactly one unit.
+It is a UTF-16 code unit, a code point, or a byte, which depends on the dialect and its settings.
 
-For example, `^.$` matches `😀` (U+1F600) in Python's `str` and in Java, where it is one code point.
-In JavaScript without `u` and in .NET, it does not match, since `😀` is two UTF-16 code units there, and `^..$` matches instead.
-Likewise, in Python's `bytes`, Ruby's `ASCII-8BIT`, Perl without `utf8` and PCRE without `u`, `é` is two bytes in UTF-8, so `^.$` does not match it, and `^..$` does.
+For example, `"😀"` (U+1F600) is one code point, two UTF-16 code units (`\ud83d\ude00`), and four bytes in UTF-8 (`\xf0\x9f\x98\x80`).
+Which of them `.` matches depends on the dialect, and on its flags or the type of the input.
 
-The dialects having the choice take a setting of the [`dialect`](parameters.mdx#dialect) in the dialect's own words: `type` of `python`, `encoding` of `ruby` and `utf8` of `perl`.
-The setting also changes how the pattern is read, as the engine does.
+In JavaScript, a pattern reads UTF-16 code units, and the `u` or `v` flag makes it read code points.
 
-The character set flags change the meaning of `\w`, `\d`, `\s`, `\b`, POSIX classes and case-insensitive matching in the same way as in the engine.
+{/* prettier-ignore */}
+```js
+"😀".match(/./)[0];  // => "\ud83d" (one UTF-16 code unit without `u`)
+"😀".match(/./u)[0]; // => "😀" (one code point with `u`)
+```
+
+In Python, a pattern reads code points when it is a `str`, and bytes when it is a `bytes`, which also takes `bytes` as the input.
+
+```python
+re.match(".", "😀").group()           # => '😀' (one code point in a `str` pattern)
+re.match(b".", "😀".encode()).group() # => b'\xf0' (one byte in a `bytes` pattern)
+```
 
 ## Attack Strings
 
