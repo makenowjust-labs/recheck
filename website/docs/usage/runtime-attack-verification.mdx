@@ -20,7 +20,7 @@ When the matching finishes, the runtime attack refutes the attack, and `recheck`
 
 ## Usage
 
-The runtime-attack verification runs when [`runtimeAttackTimeout`](parameters.mdx#runtimeattacktimeout) is positive, so it is off by default.
+The runtime-attack verification runs when [`runtimeAttackTimeout`](parameters.mdx#runtimeattacktimeout) is positive.
 It needs the runtime of the dialect (e.g. `ruby` for the `ruby` dialect).
 
 <Tabs>
@@ -54,6 +54,12 @@ ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Ruby(), runtimeAttackTi
 
 </TabItem>
 </Tabs>
+
+:::info
+
+The runtime-attack verification is off by default, since the default `runtimeAttackTimeout` is not positive, so enable it explicitly as above.
+
+:::
 
 On Ruby 4.0, the runtime attack refutes the attack of `^(a|a)*$`, so the result is `safe`, and the CLI shows the refuted attack after the result.
 
