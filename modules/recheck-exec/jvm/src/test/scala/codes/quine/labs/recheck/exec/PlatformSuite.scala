@@ -61,6 +61,26 @@ class PlatformSuite extends munit.FunSuite:
       assertEquals(run("bar"), ExecResult.Exit(0, "0 bar\n", ""))
     finally Files.deleteIfExists(SourceDirectory.path(file))
 
+  test("Platform.run: a file whose first run fails"):
+    // The content is unique to this test, so that no other run marks the same file.
+    val file = SourceFile("recheck-test.sh", s"exit 3 # ${System.nanoTime()}")
+    val path = SourceDirectory.path(file)
+    try
+      assertEquals(
+        Platform.run("sh", Seq.empty, None, Map.empty, Some(file), "", None, "start"),
+        ExecResult.Exit(3, "", "")
+      )
+      // The next run is a first run again.
+      assert(SourceDirectory.firstRunLock(path).isDefined)
+    finally Files.deleteIfExists(path)
+
+  test("Platform.run: a process exiting before reading the input"):
+    val input = "a" * 1000000
+    assertEquals(
+      Platform.run("sh", Seq("-c", "exit 0"), None, Map.empty, None, input, None, "start"),
+      ExecResult.Exit(0, "", "")
+    )
+
   test("Platform.run: shell"):
     val dir = Files.createTempDirectory("recheck exec ")
     val runtime = dir.resolve("my runtime")

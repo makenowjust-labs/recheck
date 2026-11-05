@@ -165,8 +165,8 @@ object RPC:
         request <- read(line)
         (optID, method, paramsJson) = request
         handler <- find(handlerMap, optID, method)
-        _ <- handler.handle(optID, paramsJson, push, send)
-      yield ()
+        result <- handler.handle(optID, paramsJson, push, send)
+      yield result
 
       result match
         case Left(Some(err))        => send(Left(err))

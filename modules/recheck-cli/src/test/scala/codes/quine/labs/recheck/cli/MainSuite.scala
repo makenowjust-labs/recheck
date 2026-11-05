@@ -239,3 +239,5 @@ class MainSuite extends munit.FunSuite:
     )
     val missing = runMain(Seq("generate-runtime-attack-script", "no such file.json"))
     assertEquals(missing, ("", "No such file: no such file.json\n", 1))
+    val directory = runMain(Seq("generate-runtime-attack-script", "."))
+    assertEquals(directory, ("", "Cannot read .: Is a directory\n", 1))
