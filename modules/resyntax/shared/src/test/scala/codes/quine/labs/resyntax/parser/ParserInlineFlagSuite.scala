@@ -97,6 +97,22 @@ class ParserInlineFlagSuite extends munit.FunSuite with ParserHelper:
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true, verboseMore = true), None)))
   check("(?xx)", "", DotNet, Java, Python(), Ruby()):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)))
+
+  // Java skips whitespace and comments around the flags, and reads an `x` at once (checked with Java 27.0.1).
+  check("(?i m)", "x", Java):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true, multiline = true), None)))
+  check("(?i - m)", "x", Java):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), Some(FlagSet(multiline = true)))))
+  check("(?i :a)", "x", Java):
+    Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None)), Literal('a'))
+  check("(?- i)", "x", Java):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(ignoreCase = true)))))
+  check("(?x i)", "", Java):
+    Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true, verbose = true), None)))
+  error("(?i x)", "", Java)("Invalid flag at 3")
+  error("(?i-x m)", "x", Java)("Invalid flag at 5")
+  error("(?-x i)", "x", Java)("Invalid group at 4")
+  error("(?i m)", "x", PCRE, Perl(), Python(), Ruby())("Invalid flag at 3")
   check("(?I)", "", DotNet):
     Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None)))
   error("(?I)", "", Java, PCRE, Perl(), Python(), Ruby())("Invalid flag at 2")

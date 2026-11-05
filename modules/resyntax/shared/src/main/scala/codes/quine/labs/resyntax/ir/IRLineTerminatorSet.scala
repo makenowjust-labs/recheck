@@ -46,3 +46,13 @@ object IRLineTerminatorSet:
 
   /** Java is the line terminators of `java.util.regex` without `d` (UNIX_LINES). */
   val Java: IRLineTerminatorSet = IRLineTerminatorSet(Set(0x0a, 0x0d, 0x85, 0x2028, 0x2029), CRLF.Atomic)
+
+  /** Returns the line terminators of the last newline option among PCRE's start option names (e.g. `CRLF`), if any. */
+  def fromPCREStartOptions(names: Seq[String]): Option[IRLineTerminatorSet] =
+    names.reverseIterator.collectFirst:
+      case "CR"      => CR
+      case "LF"      => LF
+      case "CRLF"    => PCRE_CRLF
+      case "ANYCRLF" => PCREAnyCRLF
+      case "ANY"     => PCREAny
+      case "NUL"     => NUL

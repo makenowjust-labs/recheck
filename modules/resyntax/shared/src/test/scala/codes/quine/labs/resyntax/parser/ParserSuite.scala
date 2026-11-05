@@ -4,10 +4,13 @@ import codes.quine.labs.resyntax.ast.AssertKind.*
 import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
 import codes.quine.labs.resyntax.ast.CommandKind.Comment
+import codes.quine.labs.resyntax.ast.CommandKind.InlineFlag
+import codes.quine.labs.resyntax.ast.CommandKind.StartOption
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.EscapeClassKind.*
 import codes.quine.labs.resyntax.ast.EscapeStyle.*
 import codes.quine.labs.resyntax.ast.FlagSet
+import codes.quine.labs.resyntax.ast.FlagSetDiff
 import codes.quine.labs.resyntax.ast.GroupKind.*
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData.*
@@ -23,6 +26,48 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
   check(" ", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Sequence())
   check("# foo", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Sequence())
   check("# \\\nfoo", "x", Python())(Sequence())
+  // Checked with Python 3.15.0.
+  error("#\\", "x", Python())("Invalid backslash escape at 1")
+  // The whitespace and the comment ends are checked with .NET 10.0.14, Java 27.0.1, PHP 8.5.12 with PCRE2 10.49,
+  // Perl 5.44.0, Python 3.15.0 and Ruby 4.0.7.
+  check("a\t\n\f\r b", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Sequence(Literal('a'), Literal('b')))
+  check("a\u000bb", "x", Java, PCRE, Perl(), Python())(Sequence(Literal('a'), Literal('b')))
+  check("a\u000bb", "x", DotNet, Ruby())(Sequence(Literal('a'), Literal(0x0b), Literal('b')))
+  check("\u00a0*", "x", DotNet, Java, Perl(), Python(), Ruby())(Repeat(Literal(0xa0), Star(Greedy)))
+  check("\u00a0*", "xu", PCRE)(Repeat(Literal(0xa0), Star(Greedy)))
+  check("a\u0085\u200e\u200f\u2028\u2029b", "x", Perl())(Sequence(Literal('a'), Literal('b')))
+  check("a\u0085\u200e\u200f\u2028\u2029b", "xu", PCRE)(Sequence(Literal('a'), Literal('b')))
+  check("a\u2028b", "x", DotNet, Java, Python(), Ruby())(Sequence(Literal('a'), Literal(0x2028), Literal('b')))
+  check("\u0085*", "x", DotNet, Java, Python(), Ruby())(Repeat(Literal(0x85), Star(Greedy)))
+  error("\u0085*", "x", Perl())("Nothing to repeat at 1")
+  error("\u0085*", "xu", PCRE)("Nothing to repeat at 1")
+  // In a byte mode, U+0085 is the bytes C2 85, and the byte 85 is whitespace.
+  check("\u0085*", "x", PCRE, Perl(utf8 = false))(Repeat(Literal(0xc2), Star(Greedy)))
+  check("#c\r)", "x", DotNet, PCRE, Perl(), Python(), Ruby())(Sequence())
+  error("#c\r)", "x", Java)("Unmatched ')' at 3")
+  check("#c\r)", "xd", Java)(Sequence())
+  check("(?d)#c\r)", "x", Java)(Command(InlineFlag(FlagSetDiff(FlagSet(hasIndices = true), None))))
+  error("#c\u0085)", "x", Java)("Unmatched ')' at 3")
+  check("#c\u2028*", "x", Java)(Repeat(Literal(0x2028), Star(Greedy)))
+  check("#c\u0000a", "x", Java)(Sequence(Literal(0x00), Literal('a')))
+  check("#c\u0000a", "x", DotNet, PCRE, Perl(), Python(), Ruby())(Sequence())
+  check("(*NUL)#c\u0000a", "x", PCRE)(Sequence(Command(StartOption("NUL", None)), Literal('a')))
+  check("(*CR)#c\n)", "xu", PCRE)(Command(StartOption("CR", None)))
+  error("(*CR)#c\r)", "xu", PCRE)("Unmatched ')' at 8")
+  check("(*CRLF)#c\r)", "x", PCRE)(Command(StartOption("CRLF", None)))
+  error("(*CRLF)#c\r\n)", "x", PCRE)("Unmatched ')' at 11")
+  error("(*ANY)#c\u0085)", "xu", PCRE)("Unmatched ')' at 9")
+  check("(*CR)(*LF)#c\r)", "x", PCRE)(Sequence(Command(StartOption("CR", None)), Command(StartOption("LF", None))))
+  // Java turns the extended mode on and off in the middle of a pattern.
+  check("(?x)a b(?-x) c", "", Java):
+    Sequence(
+      Command(InlineFlag(FlagSetDiff(FlagSet(verbose = true), None))),
+      Literal('a'),
+      Literal('b'),
+      Command(InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(verbose = true))))),
+      Literal(' '),
+      Literal('c')
+    )
 
   // Disjunction:
   check("a|b", "", All*)(Disjunction(Literal('a'), Literal('b')))
@@ -152,6 +197,11 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
   check("a{1,2} ?", "x", DotNet, Java, PCRE, Perl())(Repeat(Literal('a'), Bounded(1, 2, Lazy)))
   check("a+ ?", "x", Ruby())(Repeat(Repeat(Literal('a'), Plus(Greedy)), Question(Greedy)))
   error("a+ ?", "x", Python())("Nested quantifier at 3")
+  // Java skips whitespace and comments in `{n,m}` except before the first digit (checked with Java 27.0.1).
+  check("a{1 0}", "x", Java)(Repeat(Literal('a'), Exact(10, Greedy)))
+  check("a{1 ,2 }", "x", Java)(Repeat(Literal('a'), Bounded(1, 2, Greedy)))
+  check("a{1,#c\n}", "x", Java)(Repeat(Literal('a'), Unbounded(1, Greedy)))
+  error("a{ 1}", "x", Java)("Incomplete quantifier at 1")
 
   // Caret
   check("^", "", All*)(Caret)
@@ -188,6 +238,3 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
   test("Parser.parse: a high surrogate without a low surrogate after it is a code point by itself"):
     val node = Parser.parse("\uD800a", FlagSet.parse("u", JavaScript), JavaScript, UnitMode.UTF16CodePoint)
     assert(node.equalsWithoutLoc(Node(Sequence(Literal(0xd800), Literal('a')))), node)
-
-  // The verbose flags skip the ASCII white spaces.
-  check("a\t\u000b\f\rb", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Sequence(Literal('a'), Literal('b')))

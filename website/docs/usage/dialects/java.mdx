@@ -83,6 +83,8 @@ The `Pattern` flag `LITERAL` has no flag letter, so it cannot be given (`Pattern
 - Java tries the starts of a look-behind from the shortest by the lengths that its `TreeInfo` computes, where `\X` adds nothing to the maximum and the lengths can overflow as `int`.
   `recheck` does not reproduce them, and it tries the starts from the longest by the lengths of the body, as for PCRE.
   For example, `(?<=\X)a` never matches in Java, and `(?<=(a|aa))b` captures `"a"` of `"aab"` in Java, but `"aa"` in `recheck`.
+- With `x`, Java skips whitespace and comments also inside constructs (e.g. `(?<n a>x)`, `a{1 ,2}` and `\x4 1`), and `recheck` skips them at the same places.
+  `recheck` does not reproduce three quirks there: Java drops the `&` of `[a& b]`, reads `\uD83D\ uDE00` as one surrogate pair, and rejects `[a- [b]]`, while `recheck` reads them as `[a&b]`, `\uD83D` followed by `\ ` and `uDE00`, and `[a\-b]`.
 
 ## Runtime-Attack Verification
 

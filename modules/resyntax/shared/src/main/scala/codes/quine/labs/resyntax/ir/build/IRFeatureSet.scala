@@ -250,14 +250,6 @@ object IRFeatureSet:
     val isPython = dialect.isPython
     val isRuby = dialect.isRuby
 
-    // PCRE uses the last newline option.
-    val newline = startOptions.reverseIterator.collectFirst:
-      case "CR"      => IRLineTerminatorSet.CR
-      case "LF"      => IRLineTerminatorSet.LF
-      case "CRLF"    => IRLineTerminatorSet.PCRE_CRLF
-      case "ANYCRLF" => IRLineTerminatorSet.PCREAnyCRLF
-      case "ANY"     => IRLineTerminatorSet.PCREAny
-      case "NUL"     => IRLineTerminatorSet.NUL
     val bsr = startOptions.reverseIterator.collectFirst:
       case "BSR_ANYCRLF" => true
       case "BSR_UNICODE" => false
@@ -274,7 +266,7 @@ object IRFeatureSet:
       lineTerminators =
         if isJavaScript then IRLineTerminatorSet.JavaScript
         else if isJava then IRLineTerminatorSet.Java
-        else if isPCRE then newline.getOrElse(IRLineTerminatorSet.LF)
+        else if isPCRE then IRLineTerminatorSet.fromPCREStartOptions(startOptions).getOrElse(IRLineTerminatorSet.LF)
         else IRLineTerminatorSet.LF,
       hasUnixLinesFlag = isJava,
       hasUngreedyFlag = isPCRE,
