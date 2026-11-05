@@ -107,24 +107,26 @@ When the command cannot run (e.g. the runtime is not installed), the result is `
 
 ## Runtime Command
 
+By default, the runtime-attack verification runs the runtime of the dialect found by its name in `PATH` (e.g. `ruby` for the `ruby` dialect).
+To use another runtime, set the environment variable of the dialect (e.g. `RECHECK_RUBY`) to the command line to run instead.
 Each dialect's page (see [Dialects](dialects.mdx#supported-dialects)) lists its command and its environment variable.
-By default, the command is found by its name in `PATH`.
-An environment variable of each dialect (e.g. `RECHECK_RUBY`) replaces the runtime program with a command line.
+`recheck` adds the dialect's arguments after the command line (e.g. `-` for `ruby`), as it does to the default command.
 
-The value is a command line run by `/bin/sh -c`, and `recheck` appends the dialect's own arguments to it (e.g. `-` for `ruby`, `-I -` for `python3`, and `run` and the program file for `dotnet`).
-So the shell splits the value on spaces, and a path with spaces needs quotes.
-An empty value is ignored.
-
-For example, the following runs `/opt/ruby-4.0/bin/ruby --disable-gems -`.
+For example, the following uses Ruby installed in `/opt/ruby-4.0` with `--disable-gems`.
 
 ```console
 $ RECHECK_RUBY='/opt/ruby-4.0/bin/ruby --disable-gems' recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
 ```
 
-A path with spaces is quoted (e.g. `RECHECK_RUBY='"/Applications/My Ruby/bin/ruby" --disable-gems'`), and a container runs the runtime that reads the program from the standard input (e.g. `RECHECK_RUBY='docker run -i --rm ruby:4.0 ruby'`).
+The command line is written as in a shell, so a path with spaces needs quotes (e.g. `RECHECK_RUBY='"/Applications/My Ruby/bin/ruby"'`).
+It can also run the runtime in a container (e.g. `RECHECK_RUBY='docker run -i --rm ruby:4.0 ruby'`).
+The environment variables work with the JavaScript library and the ESLint plugin too, since they pass their environment to `recheck`.
 
-The JavaScript library and the ESLint plugin pass their environment to the `recheck` process, so the variables work there too.
-On Windows, the variables need `sh` in `PATH` (e.g. from Git for Windows), and `recheck` has not been tested there.
+:::info
+
+On Windows, the environment variables need `sh` in `PATH` (e.g. from Git for Windows), and `recheck` has not been tested there.
+
+:::
 
 ## Runtime-Attack Script
 
