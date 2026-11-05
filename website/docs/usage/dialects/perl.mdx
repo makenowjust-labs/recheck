@@ -129,10 +129,4 @@ The following constructs are not supported.
 - Engine errors: none.
 - Environment variable: `RECHECK_PERL`.
 
-The program sets the C locale by `POSIX::setlocale` before compiling the pattern, so the result does not depend on the locale of the environment (e.g. `LC_ALL` or `LANG`).
-
-With the `literal` source, the program has the pattern as a `qr` literal.
-When the literal would interpolate a variable or run code (e.g. `$name`, `@{...}` or `(?{ ... })`), the runtime-attack verification is skipped and `runtimeAttack` is `null`, and `generate-runtime-attack-script` fails.
-With the `string` source, the program builds the pattern from a string as `qr/$pattern/`.
-
-With `utf8`, the program has `use utf8`, and it sets the UTF-8 flag of the input string (and of a `string` pattern) by `utf8::upgrade`; without `utf8`, it has no `use utf8` and clears the flag by `utf8::downgrade`.
+With the `literal` source, the runtime-attack verification is skipped for a pattern that would interpolate a variable or run code as a literal (e.g. `$name`, `@{...}` or `(?{ ... })`), so `runtimeAttack` is `null`, and `generate-runtime-attack-script` fails.
