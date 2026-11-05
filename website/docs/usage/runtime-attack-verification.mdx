@@ -6,13 +6,22 @@ title: Runtime-Attack Verification
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 
-Describes the runtime-attack verification, which runs the attack string on the real engine of the [dialect](dialects.mdx).
+Describes the runtime-attack verification, which checks an attack string that `recheck` finds by running it on the real regex engine of the [dialect](dialects.mdx).
 
 ## Overview
 
-`recheck` models a naive backtracking engine, and some engines run a found attack fast by their optimizations (see [Approximations](dialects.mdx#approximations)).
-The runtime-attack verification runs the attack string on the real engine of the dialect (the runtime attack), and it tells whether the attack works there.
-It runs when [`runtimeAttackTimeout`](parameters.mdx#runtimeattacktimeout) is positive, and only where `recheck` can run commands: it does not run in the browser or with the Scala.js build (the `worker` and `pure` backends of the JavaScript library).
+An attack string that `recheck` reports may not work on the engine that actually runs the pattern.
+`recheck` models a naive backtracking engine, but most engines have optimizations that make some vulnerable patterns fast (see [Approximations](dialects.mdx#approximations)).
+For example, `recheck` reports `^(a|a)*$` as exponential in every dialect, while Ruby 4.0 matches its attack string in less than 1 ms by its memoization.
+
+To avoid such a wrong report, `recheck` can run each attack string on the real engine of the dialect before reporting it, which is called the runtime attack.
+When the matching does not finish within the timeout, the runtime attack confirms the attack, and `recheck` reports it.
+When the matching finishes, the runtime attack refutes the attack, and `recheck` looks for another attack string instead (see [Refuted Attacks](#refuted-attacks)).
+
+## Usage
+
+The runtime-attack verification runs when [`runtimeAttackTimeout`](parameters.mdx#runtimeattacktimeout) is positive, so it is off by default.
+It needs the runtime of the dialect (e.g. `ruby` for the `ruby` dialect), and it runs only where `recheck` can run commands: it does not run in the browser or with the Scala.js build (the `worker` and `pure` backends of the JavaScript library).
 
 <Tabs>
 <TabItem value="cli" label="CLI">
@@ -46,15 +55,38 @@ ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Ruby(), runtimeAttackTi
 </TabItem>
 </Tabs>
 
-The result is recorded as `runtimeAttack` of the diagnostics, or in `refutedAttacks` when the attack is refuted (see [Diagnostics](diagnostics.md#runtime-attack-verification)).
+On Ruby 4.0, the runtime attack refutes the attack of `^(a|a)*$`, so the result is `safe`, and the CLI shows the refuted attack after the result.
 
-## Programs
+```console
+$ recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
+Input     : /^(a|a)*$/
+Dialect   : ruby (encoding: UTF-8)
+Status    : safe
+Complexity: linear
+Checker   : automaton
 
-For each attack string, `recheck` generates a small program in the dialect's language, and runs it with the dialect's command.
-The program is given on the standard input, except for `java` and `dotnet` (see [Program Files](#program-files)).
-The timeout counts from the start of the matching, so the startup of the runtime (e.g. compiling the program) is not counted.
-The program sets the locale that `recheck` assumes before compiling the pattern, so the result does not depend on the locale of the environment (e.g. `LC_ALL` or `LANG`).
-Each dialect's page (see [Dialects](dialects.mdx#supported-dialects)) lists its command, its matching function, its engine limits and errors, its environment variable and its runtime-attack script, with the notes on its program.
+Refuted attacks:
+- Complexity    : exponential
+  Attack string : "a" + "a" * 31 + "\x00"
+  Runtime attack: refuted (finished in 0 ms on ruby 4.0.7, timeout: 1000 ms)
+```
+
+The result records the runtime attack as `runtimeAttack` of `vulnerable` diagnostics, and the refuted attacks in `refutedAttacks` (see [Diagnostics](diagnostics.md#runtime-attack-verification)).
+
+## Refuted Attacks
+
+A refuted attack shows that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by the attack.
+When no attack is confirmed, the result is `safe`, with the refuted attacks in `refutedAttacks`.
+
+The search avoids repeating a refuted attack.
+
+- An attack with the same complexity (the type and the degree) and the same hotspot (the heat spots) as a refuted one is skipped without the runtime attack, and it is not in `refutedAttacks`.
+- The fuzz checker gives the strings whose attacks were refuted a lower priority in the next generation, so that it looks into other structures of the pattern.
+- When the runtime-attack verification refutes [`maxRefutedAttacks`](parameters.mdx#maxrefutedattacks) attacks (10 by default), the checking stops, and the result is `unknown` with the `runtime-attacks-refuted` error.
+
+## Engine Limits and Errors
+
+Some engines stop a long matching before the timeout, and the runtime attack tells the two kinds of stops apart.
 
 An engine limit is a limit on the number of the matching steps.
 When the engine stops on it, the attack is considered effective, so the runtime-attack verification confirms the attack as with a timeout.
@@ -65,6 +97,14 @@ The engines may raise it on a long string even if the matching takes linear time
 The result records it as `engine-error` with the message (see [Diagnostics](diagnostics.md#runtime-attack-verification)).
 
 When the command cannot run (e.g. the runtime is not installed), the result is `unknown` with an `unexpected` error.
+
+## Programs
+
+For each attack string, `recheck` generates a small program in the dialect's language, and runs it with the dialect's command.
+The program is given on the standard input, except for `java` and `dotnet` (see [Program Files](#program-files)).
+The timeout counts from the start of the matching, so the startup of the runtime (e.g. compiling the program) is not counted.
+The program sets the locale that `recheck` assumes before compiling the pattern, so the result does not depend on the locale of the environment (e.g. `LC_ALL` or `LANG`).
+Each dialect's page (see [Dialects](dialects.mdx#supported-dialects)) lists its command, its matching function, its engine limits and errors, its environment variable and its runtime-attack script, with the notes on its program.
 
 ### Program Files
 
@@ -91,34 +131,6 @@ A path with spaces is quoted (e.g. `RECHECK_RUBY='"/Applications/My Ruby/bin/rub
 
 The JavaScript library and the ESLint plugin pass their environment to the `recheck` process, so the variables work there too.
 On Windows, the variables need `sh` in `PATH` (e.g. from Git for Windows), and `recheck` has not been tested there.
-
-## Refuted Attacks
-
-When the runtime-attack verification refutes an attack, `check` does not report the diagnostics, and it goes on to look for another attack string.
-If no attack is confirmed, the result is `safe`.
-The result lists the refuted attacks in its `refutedAttacks` field (see [Diagnostics](diagnostics.md#runtime-attack-verification)).
-They show that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by these attacks.
-The CLI shows them in the `Refuted attacks` section after the result.
-
-```console
-$ recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
-Input     : /^(a|a)*$/
-Dialect   : ruby (encoding: UTF-8)
-Status    : safe
-Complexity: linear
-Checker   : automaton
-
-Refuted attacks:
-- Complexity    : exponential
-  Attack string : "a" + "a" * 31 + "\x00"
-  Runtime attack: refuted (finished in 0 ms on ruby 4.0.7, timeout: 1000 ms)
-```
-
-The search avoids repeating a refuted attack.
-
-- An attack with the same complexity (the type and the degree) and the same hotspot (the heat spots) as a refuted one is skipped without the runtime attack, and it is not in `refutedAttacks`.
-- The fuzz checker gives the strings whose attacks were refuted a lower priority in the next generation, so that it looks into other structures of the pattern.
-- When the runtime-attack verification refutes [`maxRefutedAttacks`](parameters.mdx#maxrefutedattacks) attacks (10 by default), the checking stops, and the result is `unknown` with the `runtime-attacks-refuted` error.
 
 ## Runtime-Attack Script
 
