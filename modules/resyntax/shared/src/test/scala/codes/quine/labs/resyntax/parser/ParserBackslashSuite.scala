@@ -21,6 +21,44 @@ import codes.quine.labs.resyntax.ast.Reference.*
 
 class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
 
+  // Java skips whitespace and comments in an escape except right after the backslash (checked with Java 27.0.1).
+  check("\\p {L}", "x", Java)(Backslash(EscapeClass(UnicodeProperty("L"))))
+  check("\\p{ L}", "x", Java)(Backslash(EscapeClass(UnicodeProperty("L"))))
+  check("\\P #c\nL", "x", Java)(Backslash(EscapeClass(NonUnicodeBareProperty("L"))))
+  check("\\b {g}", "x", Java)(Backslash(Assert(Boundary(Some(GModifier)))))
+  check("\\b{g }", "x", Java)(Backslash(Assert(Boundary(Some(GModifier)))))
+  error("\\b{ g}", "x", Java)("Incomplete quantifier at 2")
+  check("(?<na>x)\\k <n a >", "x", Java):
+    Sequence(
+      Group(NamedCapture(Angle, "na"), Literal('x')),
+      Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("na")))
+    )
+  check(s"${"(a)" * 12}\\1 2", "x", Java):
+    Sequence(
+      Seq.fill(12)(Group(IndexedCapture, Literal('a'))) :+
+        Backslash(EscapeBackReference(BareBackReference, IndexedReference(12)))*
+    )
+  check("\\N {LATIN SMALL LETTER A}", "x", Java)(Backslash(EscapeClass(CharName("LATIN SMALL LETTER A"))))
+  check("\\c A", "x", Java)(Backslash(Escape(Control('A'), 0x01)))
+  check("\\0 1 2", "x", Java)(Backslash(Escape(BareOctal, 0x0a)))
+  check("\\x4 1", "x", Java)(Backslash(Escape(Hex2, 0x41)))
+  check("\\x {4 1 }", "x", Java)(Backslash(Escape(HexBracket, 0x41)))
+  check("\\u 00 #c\n41", "x", Java)(Backslash(Escape(UnicodeHex4, 0x41)))
+  check("\\uD83D \\uDE00", "x", Java)(Backslash(Escape(UnicodeHex4Pair, 0x1f600)))
+  check("\\uD83D \\u0041", "x", Java):
+    Sequence(Backslash(Escape(UnicodeHex4, 0xd83d)), Backslash(Escape(UnicodeHex4, 0x41)))
+  check("\\uD83D\\u{41}", "u", JavaScript):
+    Sequence(Backslash(Escape(UnicodeHex4, 0xd83d)), Backslash(Escape(UnicodeBracket, 0x41)))
+  check("\\ a", "x", Java)(Sequence(Backslash(Unknown(' ')), Literal('a')))
+  // Java reads `\uD83D\ uDE00` as a surrogate pair, which recheck does not reproduce.
+  check("\\uD83D\\ uDE00", "x", Java):
+    Sequence((Seq(Backslash(Escape(UnicodeHex4, 0xd83d)), Backslash(Unknown(' '))) ++ "uDE00".map(c => Literal(c)))*)
+  // .NET rejects an unknown escape of a character of `RegexCharClass.IsBoundaryWordChar` (checked with .NET 10.0.14).
+  error("\\\u0301", "", DotNet)("Invalid backslash escape at 1")
+  check("\\\u2160", "", DotNet)(Backslash(Unknown(0x2160)))
+  // It reads a UTF-16 unit, so a supplementary letter is not one.
+  check("\\\ud835\udc9c", "", DotNet)(Backslash(Unknown(0x1d49c)))
+
   // Backslash
   check("\\a", "", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Backslash(Escape(Single('a'), 0x07)))
   check("\\b", "", All*)(Backslash(Assert(Boundary(None))))
@@ -158,6 +196,8 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   check("\\o{010}", "", PCRE, Perl())(Backslash(Escape(Octal, 0x08)))
   check("\\p{Letter}", "", DotNet, Java, PCRE, Perl(), Ruby())(Backslash(EscapeClass(UnicodeProperty("Letter"))))
   check("\\p{Letter}", "u", JavaScript)(Backslash(EscapeClass(UnicodeProperty("Letter"))))
+  check("\\p{_a1}", "u", JavaScript)(Backslash(EscapeClass(UnicodeProperty("_a1"))))
+  error("\\p{1}", "u", JavaScript)("Invalid identifier at 3")
   check("\\p{Script=Hira}", "", DotNet, Java, PCRE, Perl(), Ruby()):
     Backslash(EscapeClass(UnicodePropertyValue("Script", "Hira")))
   check("\\p{Script=Hira}", "u", JavaScript)(Backslash(EscapeClass(UnicodePropertyValue("Script", "Hira"))))

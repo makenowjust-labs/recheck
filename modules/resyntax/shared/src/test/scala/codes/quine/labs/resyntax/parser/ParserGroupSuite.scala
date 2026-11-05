@@ -6,6 +6,7 @@ import codes.quine.labs.resyntax.ast.CommandKind.*
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetDiff
+import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.GroupKind.*
 import codes.quine.labs.resyntax.ast.NameStyle.*
 import codes.quine.labs.resyntax.ast.NodeData.*
@@ -45,6 +46,17 @@ class ParserGroupSuite extends munit.FunSuite with ParserHelper:
   check("(?<a\u0903\u200d>a)", "", Perl())(Group(NamedCapture(Angle, "a\u0903\u200d"), Literal('a')))
   error("(?<a\u0903>a)", "", DotNet)("Invalid identifier at 4")
   error("(?<a\u00b7>a)", "", DotNet, Perl())("Invalid identifier at 4")
+  // The non-ASCII names are checked with .NET 10.0.14 and Perl 5.44.0.
+  check("(?<a\u200d>a)", "", DotNet)(Group(NamedCapture(Angle, "a\u200d"), Literal('a')))
+  // U+A7CE is a letter of Unicode 17.
+  check("(?<\ua7ce>a)", "", Perl())(Group(NamedCapture(Angle, "\ua7ce"), Literal('a')))
+  // Perl takes `XID_Start` and `XID_Continue` restricted to `\w`.
+  error("(?<\u0e33>a)", "", Perl())("Invalid identifier at 3")
+  error("(?<\u2118>a)", "", Perl())("Invalid identifier at 3")
+  error("(?<a\u24b6>a)", "", Perl())("Invalid identifier at 4")
+  check("(?<a\u0e33>a)", "", Perl())(Group(NamedCapture(Angle, "a\u0e33"), Literal('a')))
+  // Perl's byte string takes only ASCII names.
+  error("(?<\u00e9>a)", "", Perl(utf8 = false))("Invalid identifier at 3")
   check("(?<\ud835\udc65>a)", "", Perl())(Group(NamedCapture(Angle, "\ud835\udc65"), Literal('a')))
   check("(?<\\u{41}\\u0042>a)", "", JavaScript)(Group(NamedCapture(Angle, "AB"), Literal('a')))
   check("(?<\\ud835\\udc65>a)", "", JavaScript)(Group(NamedCapture(Angle, "\ud835\udc65"), Literal('a')))
@@ -92,6 +104,15 @@ class ParserGroupSuite extends munit.FunSuite with ParserHelper:
   error("(?~|a)", "", DotNet, Java, JavaScript, PCRE, Perl(), Python())("Invalid group at 2")
 
   check("(a)", "", All*)(Group(IndexedCapture, Literal('a')))
+
+  // Java skips whitespace and comments in a group's opening except right after `(?` (checked with Java 27.0.1).
+  check("( ?:a)", "x", Java)(Group(NonCapture, Literal('a')))
+  check("(? :a)", "x", Java)(Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(), None)), Literal('a')))
+  check("(?#c\n:a)", "x", Java)(Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(), None)), Literal('a')))
+  error("(? =a)", "x", Java)("Invalid flag at 3")
+  error("(?#x)", "", Java)("Invalid flag at 2")
+  check("(?< =a)", "x", Java)(Group(PositiveLookBehind(Symbolic), Literal('a')))
+  check("(?<n #c\na >a)", "x", Java)(Group(NamedCapture(Angle, "na"), Literal('a')))
   error("(", "", All*)("Unclosed group at 1")
 
   error("(?Px)", "", PCRE, Python())("Invalid group at 3")

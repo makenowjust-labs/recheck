@@ -3,6 +3,7 @@ package codes.quine.labs.resyntax.parser
 import codes.quine.labs.resyntax.ast.Dialect
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.ir.IRLineTerminatorSet
 
 final case class FeatureSet(
     // JavaScript (without `uv`), Perl, Ruby
@@ -75,8 +76,6 @@ final case class FeatureSet(
     allowsRawPropertyName: Boolean,
     // Ruby
     allowsNegatedRawPropertyName: Boolean,
-    // .NET
-    allowsInvalidIdentifier: Boolean,
     // .NET, PCRE, Python, Ruby
     allowsLeadingZeroInCaptureTest: Boolean,
     // .NET, Java, JavaScript (without `uv`), PCRE, Perl, Python, Ruby
@@ -119,7 +118,7 @@ final case class FeatureSet(
     allowsUnicodeWordGroupName: Boolean,
     // .NET
     allowsWordClassGroupName: Boolean,
-    // Perl
+    // Perl (with `utf8`)
     allowsWordIdentifierGroupName: Boolean,
     // .NET
     allowsZeroIndexedCaptureTest: Boolean,
@@ -151,6 +150,10 @@ final case class FeatureSet(
     consumesBrokenClassRange: Boolean,
     // .NET (with `n`), PCRE (with `n`), Perl (with `n`)
     explicitCapture: Boolean,
+    // Java (with `d`)
+    unixLines: Boolean,
+    // Perl (with `xx`)
+    verboseMore: Boolean,
     // .NET, PCRE, Perl, Ruby
     fallsBackMultiDigitBackReferenceToOctal: Boolean,
     // Ruby
@@ -309,6 +312,8 @@ final case class FeatureSet(
     hasFlagUpperJ: Boolean,
     // Python (`bytes`)
     hasFlagUpperL: Boolean,
+    // Java
+    hasUnixLinesFlag: Boolean,
     // Java, PCRE
     hasFlagUpperU: Boolean,
     // Perl
@@ -399,6 +404,16 @@ final case class FeatureSet(
     skipsCommentBeforeBacktrackStrategy: Boolean,
     // Java
     skipsCommentInClass: Boolean,
+    // Java
+    skipsCommentInConstruct: Boolean,
+    // Java, PCRE, Perl, Python
+    skipsVerticalTab: Boolean,
+    // PCRE, Perl
+    skipsPatternWhiteSpace: Boolean,
+    // Java
+    endsCommentAtNUL: Boolean,
+    // Java
+    keepsCommentEnd: Boolean,
     // PCRE, Perl, Ruby
     treatsBackReferenceBackslashInClassAsLiteral: Boolean,
     // Perl
@@ -410,7 +425,9 @@ final case class FeatureSet(
     // PCRE: every name, Perl: 3 to 14 characters without upper case letters and blanks, Ruby: up to 20 characters without `:`
     classPOSIXNameRule: ClassPOSIXNameRule,
     // Python (`bytes`): Latin-1, PCRE (without `u`), Perl (without `utf8`), Ruby (ASCII-8BIT): UTF-8, the others: text
-    sourceEncoding: SourceEncoding
+    sourceEncoding: SourceEncoding,
+    // Java: `\n`, `\r`, U+0085, U+2028 and U+2029, PCRE: its newline start option (`\n` by default), the others: `\n`
+    commentTerminators: IRLineTerminatorSet
 )
 
 object FeatureSet:
@@ -466,7 +483,6 @@ object FeatureSet:
       allowsNamelessBackslashKG = isRuby,
       allowsRawPropertyName = isDotNet || isJava || isRuby,
       allowsNegatedRawPropertyName = isRuby,
-      allowsInvalidIdentifier = isDotNet,
       allowsLeadingZeroInCaptureTest = isDotNet || isPCRE || isPython || isRuby,
       allowsLookAheadRepeat =
         isDotNet || isJava || (isJavaScript && !isUnicode) || isPCRE || isPerl || isPython || isRuby,
@@ -490,7 +506,7 @@ object FeatureSet:
       allowsUnicodeIdentifierGroupName = isJavaScript || (isPython && !isByte),
       allowsUnicodeWordGroupName = isPCRE && isUnicode,
       allowsWordClassGroupName = isDotNet,
-      allowsWordIdentifierGroupName = isPerl,
+      allowsWordIdentifierGroupName = isPerl && !isByte,
       allowsZeroIndexedCaptureTest = isDotNet,
       allowsForwardRelativeReference = isPCRE || isRuby,
       allowsNonNameKBackReference = isRuby,
@@ -506,6 +522,8 @@ object FeatureSet:
       combinesSurrogatePairEscape = isJava || (isJavaScript && isUnicode),
       consumesBrokenClassRange = isJavaScript && !isUnicode,
       explicitCapture = (isDotNet || isPCRE || isPerl) && flagSet.explicitCapture,
+      unixLines = isJava && flagSet.hasIndices,
+      verboseMore = flagSet.verboseMore,
       fallsBackMultiDigitBackReferenceToOctal = isDotNet || isPCRE || isPerl || isRuby,
       fallsBackMultiDigitBackReferenceToLiteral = isRuby,
       hasAbsenceOperator = isRuby,
@@ -587,6 +605,7 @@ object FeatureSet:
       hasFlagXX = isPCRE || isPerl,
       hasFlagUpperJ = isPCRE,
       hasFlagUpperL = isPython && isByte,
+      hasUnixLinesFlag = isJava,
       hasFlagUpperU = isJava || isPCRE,
       hasInlineCode = isPerl,
       hasInlineFlag = isDotNet || isJava || isPCRE || isPerl || isPython || isRuby,
@@ -632,6 +651,11 @@ object FeatureSet:
       skipsComment = flagSet.verbose,
       skipsCommentBeforeBacktrackStrategy = isDotNet || isJava || isPCRE || isPerl,
       skipsCommentInClass = isJava,
+      skipsCommentInConstruct = isJava,
+      skipsVerticalTab = isJava || isPCRE || isPerl || isPython,
+      skipsPatternWhiteSpace = isPCRE || isPerl,
+      endsCommentAtNUL = isJava,
+      keepsCommentEnd = isJava,
       treatsBackReferenceBackslashInClassAsLiteral = isPCRE || isPerl || isRuby,
       treatsBackslashUpperCInClassAsLiteral = isPerl,
       treatsNonClassBackslashInClassAsLiteral = isPerl || isRuby,
@@ -650,5 +674,10 @@ object FeatureSet:
       sourceEncoding =
         if !isByte then SourceEncoding.Text
         else if isPython then SourceEncoding.Latin1
-        else SourceEncoding.UTF8
+        else SourceEncoding.UTF8,
+      commentTerminators =
+        if isJava then IRLineTerminatorSet.Java
+        else if isPCRE then
+          IRLineTerminatorSet.fromPCREStartOptions(prescan.startOptions).getOrElse(IRLineTerminatorSet.LF)
+        else IRLineTerminatorSet.LF
     )

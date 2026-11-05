@@ -3,9 +3,12 @@ import codes.quine.labs.resyntax.ast.AssertKind.*
 import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.CaseCommandKind
 import codes.quine.labs.resyntax.ast.ClassItemData.*
+import codes.quine.labs.resyntax.ast.CommandKind.InlineFlag
 import codes.quine.labs.resyntax.ast.Dialect.*
 import codes.quine.labs.resyntax.ast.EscapeClassKind.*
 import codes.quine.labs.resyntax.ast.EscapeStyle.*
+import codes.quine.labs.resyntax.ast.FlagSet
+import codes.quine.labs.resyntax.ast.FlagSetDiff
 import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.QuoteLiteral.*
@@ -229,6 +232,39 @@ class ParserClassSuite extends munit.FunSuite with ParserHelper:
   check("[ ]]", "x", Java)(Class(false, ClassLiteral(']')))
   error("[ ]", "x", Java)("Unclosed ']' at 3")
   error("[a- ]", "x", Java)("Out of order class range at 1")
+  // Java reads `^` only right after `[`, and skips whitespace and comments in `&&` (checked with Java 27.0.1).
+  check("[ ^a]", "x", Java)(Class(false, ClassUnion(ClassLiteral('^'), ClassLiteral('a'))))
+  check("[a& #c\n&b]", "x", Java)(Class(false, ClassIntersection(ClassLiteral('a'), ClassLiteral('b'))))
+  // Java drops the `&` of `[a& b]` and rejects `[a- [b]]`, which recheck does not reproduce.
+  check("[a& b]", "x", Java)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('&'), ClassLiteral('b'))))
+  check("[a- [b]]", "x", Java):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassNest(false, ClassLiteral('b'))))
+  // PCRE's and Perl's `xx` skip only U+0009 and U+0020 in a class, also before `^`, and a single `x` turns `xx` off
+  // (checked with PHP 8.5.12 with PCRE2 10.49 and Perl 5.44.0).
+  check("[a \tb]", "xx", Perl())(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('b'))))
+  check("[a\n#b]", "xx", Perl()):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('\n'), ClassLiteral('#'), ClassLiteral('b')))
+  check("[ ^ a - c ]", "xx", Perl())(Class(true, ClassRange(ClassLiteral('a'), ClassLiteral('c'))))
+  check("[a- ]", "xx", Perl())(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'))))
+  check("[ ]a]", "xx", Perl())(Class(false, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
+  error("[ ]", "xx", Perl())("Unclosed ']' at 3")
+  check("(?xx)[a b]", "", PCRE, Perl()):
+    Sequence(
+      Command(InlineFlag(FlagSetDiff(FlagSet(verbose = true, verboseMore = true), None))),
+      Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('b')))
+    )
+  check("(?xx)(?x)[a b]", "", PCRE, Perl()):
+    Sequence(
+      Command(InlineFlag(FlagSetDiff(FlagSet(verbose = true, verboseMore = true), None))),
+      Command(InlineFlag(FlagSetDiff(FlagSet(verbose = true), None))),
+      Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral(' '), ClassLiteral('b')))
+    )
+  check("(?xx)(?-x)[a b]", "", PCRE, Perl()):
+    Sequence(
+      Command(InlineFlag(FlagSetDiff(FlagSet(verbose = true, verboseMore = true), None))),
+      Command(InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(verbose = true))))),
+      Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral(' '), ClassLiteral('b')))
+    )
   check("[a&&b]", "", DotNet, JavaScript, PCRE, Perl(), Python()):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('&'), ClassLiteral('&'), ClassLiteral('b')))
   check("[[a]", "", DotNet, JavaScript, PCRE, Perl(), Python())(

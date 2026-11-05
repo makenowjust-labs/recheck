@@ -3,9 +3,11 @@ package codes.quine.labs.recheck
 import scala.concurrent.duration.*
 
 import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.exec.DotNetExecutor
+import codes.quine.labs.recheck.exec.JavaExecutor
 import codes.quine.labs.recheck.exec.NodeExecutor
 import codes.quine.labs.recheck.exec.PHPExecutor
 import codes.quine.labs.recheck.exec.PerlExecutor
@@ -191,3 +193,197 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     val model = subjects.iterator.map: c =>
       if !universe.contains(c) then "false" else if set.contains(c) then "1" else "0"
     assertEquals(cases(PHPExecutor, php(Seq(s"/\\A$source\\z/u"), subjects)), Seq(model.mkString(" ")))
+
+  /** The cases of the extended mode (`x`): a pattern, and the subjects matched against all of it. */
+  val extendedCases: Seq[(String, Seq[String])] = Seq(
+    "a\u000bb" -> Seq("ab", "a\u000bb"),
+    "a\u0085b" -> Seq("ab", "a\u0085b"),
+    "a\u00a0b" -> Seq("ab", "a\u00a0b"),
+    "a\u200eb" -> Seq("ab", "a\u200eb"),
+    "a\u2028b" -> Seq("ab", "a\u2028b"),
+    "a#c\rb" -> Seq("a", "ab"),
+    "a#c\u0085b" -> Seq("a", "a\u0085b"),
+    "a#c\u2028b" -> Seq("a", "a\u2028b"),
+    "a#c\u0000b" -> Seq("a", "a\u0000b"),
+    "[a b]" -> Seq(" ", "a")
+  )
+
+  /** The cases of Java's whitespace and comments inside constructs. */
+  val javaExtendedCases: Seq[(String, Seq[String])] = Seq(
+    "( ?:a)" -> Seq("a"),
+    "(? i)a" -> Seq("A"),
+    "(?<n a>x)\\k <na>" -> Seq("xx"),
+    "a{1 ,2 }" -> Seq("a", "aa"),
+    "a{ 1}" -> Seq("a"),
+    "[ ^a]" -> Seq("^", "b"),
+    "[a& &b]" -> Seq("a", "&"),
+    "\\x4 1" -> Seq("A"),
+    "\\p {Lu}" -> Seq("A", "a"),
+    "(?d)#c\rb" -> Seq("", "b")
+  )
+
+  /** The cases of PCRE's and Perl's `xx`. */
+  val verboseMoreCases: Seq[(String, Seq[String])] = Seq(
+    "(?xx)[a b]" -> Seq(" ", "a"),
+    "(?xx)[ ^a]" -> Seq("a", "b"),
+    "(?xx)[a- ]" -> Seq("-", "]"),
+    "(?xx)(?x)[a b]" -> Seq(" ")
+  )
+
+  /** Returns the pattern matching all of the source, where a comment at the end of the source ends at `\n`. */
+  def wholePattern(source: String, end: String = "\\z"): String = s"\\A(?:$source\n)$end"
+
+  /** Returns recheck's results of the cases: whether each subject matches, or `error`. */
+  def extendedModel(
+      patterns: Seq[(String, Seq[String])],
+      flags: String,
+      dialect: Dialect,
+      end: String = "\\z"
+  ): Seq[String] =
+    patterns.map: (source, subjects) =>
+      try
+        val ir = ReDoS.parse(wholePattern(source, end), flags, dialect)
+        val program = ProgramBuilder.build(ir)
+        subjects
+          .map: s =>
+            val status = Interpreter.run(program, ir.mode.decode(s), Interpreter.Options()).status
+            if status == Interpreter.Status.Ok then "1" else "0"
+          .mkString(" ")
+      catch case _: InvalidRegExpException => "error"
+
+  def literals(style: AttackPatternStyle, mode: UnitMode, strings: Seq[String]): String =
+    strings.map(s => style.literal(mode.decode(s))).mkString(", ")
+
+  // Checked with Python 3.15.0.
+  runtimeTest("Python: the extended mode", "python3"):
+    val style = AttackPatternStyle.Python(bytes = false)
+    val runs = extendedCases.map: (source, subjects) =>
+      val pattern = style.literal(UnitMode.CodePoint.decode(wholePattern(source, "\\Z")))
+      s"run($pattern, [${literals(style, UnitMode.CodePoint, subjects)}])"
+    val script =
+      s"""|import re
+          |def run(p, ss):
+          |    try:
+          |        r = re.compile(p, re.X)
+          |    except re.error:
+          |        print('case:error')
+          |        return
+          |    print('case:' + ' '.join('1' if r.search(s) else '0' for s in ss))
+          |${runs.mkString("\n")}
+          |""".stripMargin
+    assertEquals(cases(PythonExecutor, script), extendedModel(extendedCases, "x", Dialect.Python(), "\\Z"))
+
+  // Checked with Ruby 4.0.7.
+  runtimeTest("Ruby: the extended mode", "ruby"):
+    val style = AttackPatternStyle.Ruby(bytes = false)
+    val runs = extendedCases.map: (source, subjects) =>
+      val pattern = style.literal(UnitMode.CodePoint.decode(wholePattern(source)))
+      s"run($pattern, [${literals(style, UnitMode.CodePoint, subjects)}])"
+    val script =
+      s"""|def run(p, ss)
+          |  r = Regexp.new(p, Regexp::EXTENDED)
+          |  puts 'case:' + ss.map { |s| r.match?(s) ? '1' : '0' }.join(' ')
+          |rescue RegexpError
+          |  puts 'case:error'
+          |end
+          |${runs.mkString("\n")}
+          |""".stripMargin
+    assertEquals(cases(RubyExecutor, script), extendedModel(extendedCases, "x", Dialect.Ruby()))
+
+  // Checked with .NET 10.0.14.
+  runtimeTest(".NET: the extended mode", "dotnet"):
+    val style = AttackPatternStyle.CSharp
+    val runs = extendedCases.map: (source, subjects) =>
+      val pattern = style.literal(UnitMode.UTF16.decode(wholePattern(source)))
+      s"Run($pattern, new[] { ${literals(style, UnitMode.UTF16, subjects)} });"
+    val program =
+      s"""|using System;
+          |using System.Text.RegularExpressions;
+          |
+          |${runs.mkString("\n")}
+          |
+          |static void Run(string p, string[] ss)
+          |{
+          |    try
+          |    {
+          |        var r = new Regex(p, RegexOptions.IgnorePatternWhitespace);
+          |        Console.WriteLine("case:" + string.Join(" ", Array.ConvertAll(ss, s => r.IsMatch(s) ? "1" : "0")));
+          |    }
+          |    catch (ArgumentException)
+          |    {
+          |        Console.WriteLine("case:error");
+          |    }
+          |}
+          |""".stripMargin
+    assertEquals(
+      cases(DotNetExecutor(SourceFile("Main.cs", program))),
+      extendedModel(extendedCases, "x", Dialect.DotNet)
+    )
+
+  // Checked with Java 27.0.1.
+  runtimeTest("Java: the extended mode", "java"):
+    val style = AttackPatternStyle.Java
+    val all = extendedCases ++ javaExtendedCases
+    val runs = all.map: (source, subjects) =>
+      val pattern = style.literal(UnitMode.UTF16CodePoint.decode(wholePattern(source)))
+      s"run($pattern, ${literals(style, UnitMode.UTF16CodePoint, subjects)});"
+    val program =
+      s"""|import java.util.regex.*;
+          |
+          |public class Main {
+          |    static void run(String p, String... ss) {
+          |        Pattern r;
+          |        try {
+          |            r = Pattern.compile(p, Pattern.COMMENTS);
+          |        } catch (PatternSyntaxException e) {
+          |            System.out.println("case:error");
+          |            return;
+          |        }
+          |        StringBuilder sb = new StringBuilder("case:");
+          |        for (int i = 0; i < ss.length; i++) sb.append(i == 0 ? "" : " ").append(r.matcher(ss[i]).find() ? "1" : "0");
+          |        System.out.println(sb);
+          |    }
+          |
+          |    public static void main(String[] args) {
+          |        ${runs.mkString("\n        ")}
+          |    }
+          |}
+          |""".stripMargin
+    assertEquals(cases(JavaExecutor(SourceFile("Main.java", program))), extendedModel(all, "x", Dialect.Java))
+
+  // Checked with Perl 5.44.0.
+  runtimeTest("Perl: the extended mode", "perl"):
+    val style = AttackPatternStyle.Perl
+    val all = extendedCases ++ verboseMoreCases
+    val runs = all.map: (source, subjects) =>
+      val pattern = style.literal(UnitMode.CodePoint.decode(wholePattern(source)))
+      s"run($pattern, ${literals(style, UnitMode.CodePoint, subjects)});"
+    val script =
+      s"""|sub run {
+          |  my ($$p, @ss) = @_;
+          |  utf8::upgrade($$p);
+          |  my $$r = eval { qr/$$p/x };
+          |  if (!$$r) { print "case:error\\n"; return }
+          |  print 'case:' . join(' ', map { my $$s = $$_; utf8::upgrade($$s); $$s =~ $$r ? '1' : '0' } @ss) . "\\n";
+          |}
+          |${runs.mkString("\n")}
+          |""".stripMargin
+    val dialect = Dialect.Perl(utf8 = true, PerlSource.String)
+    assertEquals(cases(PerlExecutor, script), extendedModel(all, "x", dialect))
+
+  // Checked with PHP 8.5.12 and PCRE2 10.49.
+  runtimeTest("PCRE: the extended mode", "php"):
+    val style = AttackPatternStyle.PHP(bytes = false)
+    val all = extendedCases ++ verboseMoreCases
+    val runs = all.map: (source, subjects) =>
+      val pattern = style.literal(UnitMode.CodePoint.decode(s"/${wholePattern(source)}/xu"))
+      s"run($pattern, [${literals(style, UnitMode.CodePoint, subjects)}]);"
+    val script =
+      s"""|<?php
+          |function run($$p, $$ss) {
+          |  if (@preg_match($$p, '') === false) { echo "case:error\\n"; return; }
+          |  echo 'case:', implode(' ', array_map(fn($$s) => preg_match($$p, $$s) ? '1' : '0', $$ss)), "\\n";
+          |}
+          |${runs.mkString("\n")}
+          |""".stripMargin
+    assertEquals(cases(PHPExecutor, script), extendedModel(all, "xu", Dialect.PCRE))
