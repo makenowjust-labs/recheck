@@ -715,8 +715,11 @@ private[build] object IRPropertyLookup:
       case -1 => (s, 0)
       case i  => (s.take(i), s.drop(i + 1).stripPrefix("+").toInt)
     val point = mantissa.indexOf('.') match
-      case -1 => mantissa.length
-      case i  => i
+      case i if i >= 0 => i
+      // Only Scala.js writes a whole double without `.` (e.g. `1e+21`), and the coverage runs on the JVM.
+      // $COVERAGE-OFF$
+      case _ => mantissa.length
+      // $COVERAGE-ON$
     val digits = mantissa.filter(_ != '.')
     val lead = digits.indexWhere(_ != '0')
     val significant = digits.drop(lead)

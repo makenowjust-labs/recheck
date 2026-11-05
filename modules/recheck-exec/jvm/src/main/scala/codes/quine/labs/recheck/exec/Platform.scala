@@ -132,7 +132,10 @@ private[exec] object Platform:
   private def daemon(body: => Unit): Thread =
     val thread = new Thread(() =>
       try body
+      // Whether a stream fails under the reader depends on when a killed process closes it.
+      // $COVERAGE-OFF$
       catch case _: IOException | _: UncheckedIOException => ()
+        // $COVERAGE-ON$
     )
     thread.setDaemon(true)
     thread.start()

@@ -27,9 +27,12 @@ private[exec] object SourceDirectory:
     // A runtime caching the build of a file (e.g. `dotnet run`) reuses it in the next process.
     val user = System.getProperty("user.name", "").replaceAll("[^A-Za-z0-9._-]", "_")
     sharedDirectory(Paths.get(System.getProperty("java.io.tmpdir"), s"recheck-$user")).getOrElse:
+      // Only an unsafe shared directory (e.g. on Windows) leads here, which the tests cannot set up.
+      // $COVERAGE-OFF$
       val dir = Files.createTempDirectory("recheck-")
       Runtime.getRuntime.addShutdownHook(new Thread(() => delete(dir)))
       dir
+      // $COVERAGE-ON$
 
   /** The locks of the files on their first runs. */
   private val locks = new ConcurrentHashMap[Path, ReentrantLock]
@@ -79,6 +82,8 @@ private[exec] object SourceDirectory:
     warm.add(file)
     ()
 
+  // A shutdown hook runs it after the coverage data is written.
+  // $COVERAGE-OFF$
   private def delete(dir: Path): Unit =
     try
       val files = Files.list(dir)
@@ -86,4 +91,6 @@ private[exec] object SourceDirectory:
       finally files.close()
       Files.deleteIfExists(dir)
       ()
-    catch case _: IOException => ()
+    catch
+      case _: IOException => ()
+  // $COVERAGE-ON$

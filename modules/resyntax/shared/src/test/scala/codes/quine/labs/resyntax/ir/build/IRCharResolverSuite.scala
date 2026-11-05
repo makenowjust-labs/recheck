@@ -799,3 +799,11 @@ class IRCharResolverSuite extends munit.FunSuite:
   test("IRBuilder.build: \\X does not depend on case-insensitivity"):
     for dialect <- Seq(Java, Perl(), Ruby()) do
       assert(build("\\X", "i", dialect).node.equalsWithoutLoc(build("\\X", "", dialect).node))
+
+  test("IRCharResolver.prune"):
+    val a = IRNode(Chars(CharSet.single('a')))
+    val never = IRNode(Chars(CharSet.empty))
+    assertEquals(IRCharResolver.prune(IRNode(Disjunction(Seq(never, a)))), Some(a))
+    assertEquals(IRCharResolver.prune(IRNode(Disjunction(Seq(never, never)))), None)
+    assertEquals(IRCharResolver.prune(IRNode(Repeat(never, IRQuantifier.Exact(0)))), Some(IRNode(Empty)))
+    assertEquals(IRCharResolver.prune(IRNode(Repeat(never, IRQuantifier.Exact(2)))), None)

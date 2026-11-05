@@ -416,10 +416,8 @@ private[build] final class IRCharResolver(
       case EscapeClassKind.NonVertical   => not(classes.vertical)
       case EscapeClassKind.HexDigit      => set(classes.hexDigit)
       case EscapeClassKind.NonHexDigit   => not(classes.hexDigit)
-      case EscapeClassKind.NonNewline    =>
-        if featureSet.nonNewlineExcludesLineTerminators then not(CharSet.of(flags.lineTerminators.chars.toSeq*))
-        else not(CharSet.single(0x0a))
-      case EscapeClassKind.CodeUnit =>
+      case EscapeClassKind.NonNewline    => not(CharSet.single(0x0a))
+      case EscapeClassKind.CodeUnit      =>
         if mode == UnitMode.Byte then set(universe) else throw new NotModeledException
       // Java and Python look up a Unicode name, which starts with a letter and has letters, digits, spaces and hyphens.
       case EscapeClassKind.CharName(name) if featureSet.validatesCharName && !isUnicodeNameLike(name) =>

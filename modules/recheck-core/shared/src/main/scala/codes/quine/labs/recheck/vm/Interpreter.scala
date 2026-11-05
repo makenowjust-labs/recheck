@@ -235,9 +235,6 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       frame.time = tick()
       frame
 
-    override def toString: String =
-      s"Frame($label, $pos, $captures, $counters, $canaries, $rollback, $fallback, $junctions)"
-
   /** Rollback holds an information for rollbacks. */
   private sealed abstract class Rollback extends Product with Serializable
 
