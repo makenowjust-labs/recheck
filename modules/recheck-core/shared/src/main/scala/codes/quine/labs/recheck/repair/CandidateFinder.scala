@@ -3,7 +3,12 @@ package repair
 
 import scala.collection.mutable
 
+import codes.quine.labs.resyntax.ast.AssertNameStyle
+import codes.quine.labs.resyntax.ast.BackslashKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
+import codes.quine.labs.resyntax.ast.ClassItem
+import codes.quine.labs.resyntax.ast.ClassItemData
+import codes.quine.labs.resyntax.ast.EscapeClassKind
 import codes.quine.labs.resyntax.ast.GroupKind
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
@@ -15,13 +20,13 @@ import codes.quine.labs.resyntax.ir.IRNodeData
 import codes.quine.labs.resyntax.ir.IRPattern
 import codes.quine.labs.resyntax.parser.FeatureSet
 
-/** Candidate is an edit of a pattern, which may remove the captures of `removedCaptures` (their groups no longer
-  * capture).
+/** Candidate is an edited syntax tree of a pattern, which may remove the captures of `removedCaptures` (their groups no
+  * longer capture).
   *
   * An `isFallback` one comes after the others that make the pattern as good.
   */
 private[repair] final case class Candidate(
-    edit: Edit,
+    node: Node,
     removedCaptures: Seq[Int] = Seq.empty,
     isFallback: Boolean = false
 )
@@ -34,7 +39,7 @@ private[repair] final case class Candidate(
   *     `[a-z]+` to `[a-z]+(?![a-z])`),
   *   - a repetition read at most once or exactly its minimum (e.g. `(a+)+` to `(a+)`, and `(\s*)*` to `(\s*)?`),
   *   - the characters of the earlier alternatives removed from a later one, or a later alternative removed if an
-  *     earlier one is written the same or covers it (e.g. `(?:\w|\d)` to `(?:\w)`),
+  *     earlier one is the same or covers it (e.g. `(?:\w|\d)` to `(?:\w)`),
   *   - for adjacent repetitions (possibly with an optional part between them), the characters of the first removed from
   *     the start of the next, or the minimum of one of them if the other reads its characters (e.g. `a*[ab]*` to
   *     `[ab]*`, `\s*,?\s*` to `\s*(?:,\s*)?`, and `\d+\.?\d+` to `\d+(?:\.\d+|\d)`),
@@ -45,15 +50,10 @@ private[repair] final case class Candidate(
   *     characters (e.g. `\s*$` to `(?<!\s)\s*$`).
   *
   * An edit does not copy a capture, and it removes only the captures not in `kept`, which are the indices of the
-  * captures that a repair keeps.
+  * captures that a repair keeps. The blanks of the extended mode are skipped between the items of a sequence, and the
+  * nodes in the range of a quoting or case command (e.g. `\Q...\E`) are not edited.
   */
-private[repair] final class CandidateFinder(
-    source: String,
-    node: Node,
-    ir: IRPattern,
-    features: FeatureSet,
-    kept: Set[Int]
-):
+private[repair] final class CandidateFinder(node: Node, ir: IRPattern, features: FeatureSet, kept: Set[Int]):
 
   /** The sets of the atoms by their locations, unless a location has more than one. */
   private val sets: Map[SourceLocation, CharSet] =
@@ -82,14 +82,23 @@ private[repair] final class CandidateFinder(
     walk(ir.node)
     found.toMap
 
-  private def text(n: Node): String = source.substring(n.loc.start, n.loc.end)
-
   private def children(n: Node): Seq[Node] = n.data match
     case NodeData.Disjunction(ns) => ns
     case NodeData.Sequence(ns)    => ns
     case NodeData.Repeat(n, _, _) => Seq(n)
     case NodeData.Group(_, n)     => Seq(n)
     case _                        => Seq.empty
+
+  /** Returns the items of a sequence other than the blanks. */
+  private def items(ns: Seq[Node]): Seq[Node] = ns.filterNot(_.data.isInstanceOf[NodeData.Blank])
+
+  /** Returns the node without the blanks around it, if it is a sequence of one item and blanks. */
+  private def unblank(n: Node): Node = n.data match
+    case NodeData.Sequence(ns) =>
+      items(ns) match
+        case Seq(item) => item
+        case _         => n
+    case _ => n
 
   private def isAtom(n: Node): Boolean = n.data match
     case NodeData.Literal(_) | NodeData.Class(_, _) | NodeData.Dot | NodeData.Backslash(_) => true
@@ -117,19 +126,68 @@ private[repair] final class CandidateFinder(
       for set <- setOf(atom); m <- min(q) yield AtomLoop(set, m, atom)
     case _ => None
 
-  /** The text of exactly the minimum of the loop. */
-  private def writeMinimum(loop: AtomLoop): String =
-    if loop.min == 1 then text(loop.atom) else s"${text(loop.atom)}{${loop.min}}"
+  /** Returns a non-capture group of the nodes. */
+  private def group(ns: Node*): Node = Node(NodeData.Group(GroupKind.NonCapture, sequence(ns)))
 
-  /** Writes the set of the atom without the characters of `removed`, as the complement of the escape's complement if
+  /** Returns the nodes as one, a sequence of them unless it is only one, as the parser does. */
+  private def sequence(ns: Seq[Node]): Node =
+    val flattened = ns.flatMap: n =>
+      n.data match
+        case NodeData.Sequence(items) => items
+        case _                        => Seq(n)
+    flattened match
+      case Seq(n) => n
+      case _      => Node(NodeData.Sequence(flattened))
+
+  private def repeat(n: Node, q: Quantifier): Node = Node(NodeData.Repeat(n, q))
+
+  /** Returns exactly the minimum of the loop. */
+  private def minimum(loop: AtomLoop): Node =
+    if loop.min == 1 then loop.atom else repeat(loop.atom, Quantifier.Exact(loop.min, BacktrackStrategy.Greedy))
+
+  /** Returns the set of the atom without the characters of `removed`, as the complement of the escape's complement if
     * the atom is a class escape (e.g. `[^\S\n]` for `\s` without `\n`).
     */
-  private def writeWithout(atom: Node, set: CharSet, removed: CharSet): String =
-    val rest = set.diff(removed)
-    val escapes = Map("\\s" -> "\\S", "\\w" -> "\\W", "\\d" -> "\\D", "\\S" -> "\\s", "\\W" -> "\\w", "\\D" -> "\\d")
-    escapes.get(text(atom)) match
-      case Some(complement) => s"[^$complement${ClassWriter.writeRanges(set.intersect(removed), features, ir.mode)}]"
-      case None             => ClassWriter(rest, features, ir.mode)
+  private def without(atom: Node, set: CharSet, removed: CharSet): Node =
+    val complements = Map[EscapeClassKind, EscapeClassKind](
+      EscapeClassKind.Space -> EscapeClassKind.NonSpace,
+      EscapeClassKind.Word -> EscapeClassKind.NonWord,
+      EscapeClassKind.Digit -> EscapeClassKind.NonDigit,
+      EscapeClassKind.NonSpace -> EscapeClassKind.Space,
+      EscapeClassKind.NonWord -> EscapeClassKind.Word,
+      EscapeClassKind.NonDigit -> EscapeClassKind.Digit
+    )
+    val complement = atom.data match
+      case NodeData.Backslash(BackslashKind.EscapeClass(klass)) => complements.get(klass)
+      case _                                                    => None
+    complement match
+      case Some(klass) =>
+        val escape = ClassItem(ClassItemData.ClassBackslashClass(klass))
+        val classItems = escape +: ClassBuilder.items(set.intersect(removed), features, ir.mode)
+        Node(NodeData.Class(true, ClassBuilder.union(classItems)))
+      case None => Node(ClassBuilder(set.diff(removed), features, ir.mode))
+
+  /** Returns the tree where each node of the edits (the same object) becomes its nodes, which are spliced into the
+    * sequence that it is in, and grouped if a repetition repeats them.
+    */
+  private def edit(edits: (Node, Seq[Node])*): Node =
+    def update(n: Node): Seq[Node] =
+      edits.find(_._1 eq n) match
+        case Some((_, replacement)) => replacement
+        case None                   =>
+          val data = n.data match
+            case NodeData.Disjunction(ns)            => NodeData.Disjunction(ns.map(n => sequence(update(n))))
+            case NodeData.Sequence(ns)               => sequence(ns.flatMap(update)).data
+            case data @ NodeData.Repeat(child, _, _) =>
+              val repeated = update(child) match
+                case Seq(n) if !n.data.isInstanceOf[NodeData.Sequence] => n
+                case ns                                                => group(ns*)
+              data.copy(node = repeated)
+            case NodeData.Group(kind, child) => NodeData.Group(kind, sequence(update(child)))
+            case data                        => data
+          Seq(n.copy(data = data))
+
+    sequence(update(node))
 
   /** Strips the groups around the node that do not capture, or capture one not kept, with the indices of the latter.
     */
@@ -145,75 +203,84 @@ private[repair] final class CandidateFinder(
 
   /** Lists the candidates around the atoms at the spots. */
   def find(spots: Set[SourceLocation]): Seq[Candidate] =
-    val hot = mutable.LinkedHashSet.empty[(Node, Option[Node])]
+    val hot = mutable.LinkedHashSet.empty[Node]
 
     def overlaps(loc: SourceLocation): Boolean = spots.exists(s => s.start < loc.end && loc.start < s.end)
 
     def walk(n: Node, ancestors: List[Node]): Unit =
-      if isAtom(n) && overlaps(n.loc) then hot ++= ancestors.zip(ancestors.tail.map(Some(_)) :+ None)
+      if isAtom(n) && overlaps(n.loc) then hot ++= ancestors
       children(n).foreach(walk(_, n :: ancestors))
 
     walk(node, Nil)
 
     val candidates = Vector.newBuilder[Candidate]
-    for (n, parent) <- hot if n.loc != SourceLocation.Invalid do
+    for n <- hot if n.loc != SourceLocation.Invalid do
       n.data match
         case NodeData.Repeat(child, q, _) if min(q).nonEmpty =>
-          candidates ++= makePossessive(n, q)
+          candidates ++= makePossessive(n, child, q)
           candidates ++= reduceRepetition(n, child, q).map(Candidate(_))
-          candidates ++= unrollRepetition(n, child, q, parent)
-        case NodeData.Disjunction(alternatives) => candidates ++= trimAlternatives(alternatives).map(Candidate(_))
-        case NodeData.Sequence(elements)        => candidates ++= separateAdjacent(elements).map(Candidate(_))
+          candidates ++= unrollRepetition(n, child, q)
+        case NodeData.Disjunction(alternatives) => candidates ++= trimAlternatives(n, alternatives).map(Candidate(_))
+        case NodeData.Sequence(elements)        => candidates ++= separateAdjacent(items(elements)).map(Candidate(_))
         case _                                  => ()
     candidates ++= addLookBehind(overlaps).map(Candidate(_))
     candidates.result().distinct
 
-  private def makePossessive(n: Node, q: Quantifier): Option[Candidate] =
+  private def makePossessive(n: Node, child: Node, q: Quantifier): Option[Candidate] =
     if q.strategy != BacktrackStrategy.Greedy then None
     else
       val hasPossessive = q match
         case Quantifier.Star(_) | Quantifier.Plus(_) => features.hasPossessiveBacktrackStrategy
         case _                                       => features.hasPossessiveCurlyBacktrackStrategy
-      if hasPossessive then Some(Candidate(Edit(n.loc.end, n.loc.end, "+")))
-      else if features.hasAtomicGroup then Some(Candidate(Edit(n.loc.start, n.loc.end, s"(?>${text(n)})")))
+      if hasPossessive then Some(Candidate(edit(n -> Seq(repeat(child, possessive(q))))))
+      else if features.hasAtomicGroup then
+        Some(Candidate(edit(n -> Seq(Node(NodeData.Group(GroupKind.Atomic(AssertNameStyle.Symbolic), n))))))
       // A repetition of an atom followed by a negative look-ahead of it reads the most, as a possessive one does.
       else
         loopOf(n).map: loop =>
-          Candidate(Edit(n.loc.end, n.loc.end, s"(?!${text(loop.atom)})"), isFallback = true)
+          val lookAhead = Node(NodeData.Group(GroupKind.NegativeLookAhead(AssertNameStyle.Symbolic), loop.atom))
+          Candidate(edit(n -> Seq(n, lookAhead)), isFallback = true)
+
+  private def possessive(q: Quantifier): Quantifier = q match
+    case Quantifier.Star(_)         => Quantifier.Star(BacktrackStrategy.Possessive)
+    case Quantifier.Plus(_)         => Quantifier.Plus(BacktrackStrategy.Possessive)
+    case Quantifier.Unbounded(m, _) => Quantifier.Unbounded(m, BacktrackStrategy.Possessive)
+    // Only a repetition without a maximum has candidates.
+    // $COVERAGE-OFF$
+    case q => throw new IllegalArgumentException(s"a repetition with a maximum: $q")
+    // $COVERAGE-ON$
 
   /** The repetition read at most once, or exactly its minimum (e.g. `(a+)+` to `(a+)`, and `(.*,)+` to `(.*,)`). */
-  private def reduceRepetition(n: Node, child: Node, q: Quantifier): Seq[Edit] =
-    val lazily = if q.strategy == BacktrackStrategy.Lazy then "?" else ""
+  private def reduceRepetition(n: Node, child: Node, q: Quantifier): Seq[Node] =
     val quantifiers = min(q).toSeq.flatMap:
-      case 0 => Seq(s"?$lazily", "")
-      case 1 => Seq("")
-      case m => Seq(s"{$m}")
+      case 0 => Seq(Some(Quantifier.Question(q.strategy)), None)
+      case 1 => Seq(None)
+      case m => Seq(Some(Quantifier.Exact(m, BacktrackStrategy.Greedy)))
     if q.strategy == BacktrackStrategy.Possessive then Seq.empty
-    else quantifiers.map(Edit(child.loc.end, n.loc.end, _))
+    else quantifiers.map(q => edit(n -> Seq(q.fold(child)(repeat(child, _)))))
 
-  private def unrollRepetition(n: Node, child: Node, q: Quantifier, parent: Option[Node]): Option[Candidate] =
+  private def unrollRepetition(n: Node, child: Node, q: Quantifier): Option[Candidate] =
     val (body, removedCaptures) = strip(child)
-    body.data match
-      case NodeData.Sequence(Seq(word, separator)) if q.strategy == BacktrackStrategy.Greedy =>
+    val elements = body.data match
+      case NodeData.Sequence(ns) => items(ns)
+      case _                     => Seq.empty
+    elements match
+      case Seq(word, separator) if q.strategy == BacktrackStrategy.Greedy =>
         (loopOf(word), separator.data) match
           case (Some(AtomLoop(set, 1, _)), NodeData.Repeat(atom, Quantifier.Question(BacktrackStrategy.Greedy), _)) =>
             setOf(atom)
               .filter(s => s.intersect(set).isEmpty)
               .flatMap: _ =>
-                val unrolled = s"${text(word)}(?:${text(atom)}${text(word)})*${text(separator)}"
-                val inSequence = parent.forall:
-                  case Node(NodeData.Sequence(_) | NodeData.Disjunction(_) | NodeData.Group(_, _), _) => true
-                  case _                                                                              => false
+                val unrolled =
+                  Seq(word, repeat(group(atom, word), Quantifier.Star(BacktrackStrategy.Greedy)), separator)
                 min(q)
                   .collect:
-                    case 0               => s"(?:$unrolled)?"
-                    case 1 if inSequence => unrolled
-                    case 1               => s"(?:$unrolled)"
-                  .map(text => Candidate(Edit(n.loc.start, n.loc.end, text), removedCaptures))
+                    case 0 => Seq(repeat(group(unrolled*), Quantifier.Question(BacktrackStrategy.Greedy)))
+                    case 1 => unrolled
+                  .map(nodes => Candidate(edit(n -> nodes), removedCaptures))
           case _ => None
       // `(?:L M T)*` is `(?:L M (?:L M)* T)?` if `L` reads the characters of `T`, which then never meet.
-      case NodeData.Sequence(elements)
-          if elements.size >= 3 && q.strategy == BacktrackStrategy.Greedy && !hasCapture(body) =>
+      case _ if elements.size >= 3 && q.strategy == BacktrackStrategy.Greedy && !hasCapture(body) =>
         for
           first <- loopOf(elements.head)
           last <- loopOf(elements.last)
@@ -221,37 +288,38 @@ private[repair] final class CandidateFinder(
           m <- min(q)
           if m <= 1
         yield
-          val middle = source.substring(elements(1).loc.start, elements(elements.size - 2).loc.end)
-          val item = s"${text(elements.head)}$middle"
-          val unrolled = s"$item(?:$item)*${text(elements.last)}"
-          Candidate(
-            Edit(n.loc.start, n.loc.end, if m == 0 then s"(?:$unrolled)?" else s"(?:$unrolled)"),
-            removedCaptures
+          val item = elements.init
+          val unrolled = group(
+            (item :+ repeat(group(item*), Quantifier.Star(BacktrackStrategy.Greedy))) :+ elements.last*
           )
+          val replacement = if m == 0 then repeat(unrolled, Quantifier.Question(BacktrackStrategy.Greedy)) else unrolled
+          Candidate(edit(n -> Seq(replacement)), removedCaptures)
       case _ => None
 
-  private def trimAlternatives(alternatives: Seq[Node]): Seq[Edit] =
-    // The characters of the alternatives before each one, and the first alternative of each text.
-    val earlierSets = alternatives.scanLeft(CharSet.empty)((earlier, n) => setOf(n).fold(earlier)(earlier.union))
-    val firstByText =
-      alternatives.filter(_.loc != SourceLocation.Invalid).groupMapReduce(text)(identity)((first, _) => first)
-    alternatives
-      .zip(alternatives.drop(1))
+  private def trimAlternatives(n: Node, alternatives: Seq[Node]): Seq[Node] =
+    // The characters of the alternatives before each one.
+    val earlierSets =
+      alternatives.scanLeft(CharSet.empty)((earlier, a) => setOf(unblank(a)).fold(earlier)(earlier.union))
+    alternatives.zipWithIndex
+      .drop(1)
       .zip(earlierSets.drop(1))
       .flatMap:
-        case ((previous, alternative), earlier) =>
-          val remove =
-            Option.when(previous.loc != SourceLocation.Invalid)(Edit(previous.loc.end, alternative.loc.end, ""))
-          if hasCapture(alternative) || alternative.loc == SourceLocation.Invalid then None
-          else if firstByText(text(alternative)) != alternative then remove
+        case ((alternative, i), earlier) =>
+          lazy val remove = alternatives.patch(i, Nil, 1) match
+            case Seq(rest) => edit(n -> Seq(rest))
+            case rest      => edit(n -> Seq(Node(NodeData.Disjunction(rest))))
+          lazy val isRepeated =
+            alternatives.take(i).exists(a => unblank(a).data.equalsWithoutLoc(unblank(alternative).data))
+          if hasCapture(alternative) then None
+          else if isRepeated then Some(remove)
           else
-            setOf(alternative).flatMap: set =>
+            setOf(unblank(alternative)).flatMap: set =>
               val rest = set.diff(earlier)
               if rest == set then None
-              else if rest.isEmpty then remove
-              else Some(Edit(alternative.loc.start, alternative.loc.end, ClassWriter(rest, features, ir.mode)))
+              else if rest.isEmpty then Some(remove)
+              else Some(edit(unblank(alternative) -> Seq(Node(ClassBuilder(rest, features, ir.mode)))))
 
-  private def separateAdjacent(elements: Seq[Node]): Seq[Edit] =
+  private def separateAdjacent(elements: Seq[Node]): Seq[Node] =
     elements.indices.flatMap: i =>
       val first = elements(i)
       val pairs = for
@@ -259,19 +327,21 @@ private[repair] final class CandidateFinder(
         next <- elements.lift(i + 1).toSeq
         nextLoop <- loopOf(next).toSeq
         if loop.set.intersect(nextLoop.set).nonEmpty
-        edit <-
+        edited <-
           val rest = nextLoop.set.diff(loop.set)
-          val edits = Seq.newBuilder[Edit]
+          val edits = Seq.newBuilder[Node]
           // The next one reads the characters of this one.
-          if loop.set.diff(nextLoop.set).isEmpty && loop.min == 0 then edits += Edit(first.loc.start, first.loc.end, "")
-          if rest.isEmpty && nextLoop.min > 0 then edits += Edit(next.loc.start, next.loc.end, writeMinimum(nextLoop))
+          if loop.set.diff(nextLoop.set).isEmpty && loop.min == 0 then edits += edit(first -> Seq.empty)
+          if rest.isEmpty && nextLoop.min > 0 then edits += edit(next -> Seq(minimum(nextLoop)))
           if nextLoop.min == 0 then
-            val text =
-              if rest.isEmpty then ""
-              else s"(?:${writeWithout(nextLoop.atom, nextLoop.set, loop.set)}${this.text(next)})?"
-            edits += Edit(next.loc.start, next.loc.end, text)
+            val optional =
+              if rest.isEmpty then Seq.empty
+              else
+                val head = without(nextLoop.atom, nextLoop.set, loop.set)
+                Seq(repeat(group(head, next), Quantifier.Question(BacktrackStrategy.Greedy)))
+            edits += edit(next -> optional)
           edits.result()
-      yield edit
+      yield edited
       val optional = for
         loop <- loopOf(first).toSeq
         middle <- elements.lift(i + 1).toSeq
@@ -283,28 +353,30 @@ private[repair] final class CandidateFinder(
           case _                                                                        => Seq.empty
       yield
         // Without the optional part, the next one reads only its minimum after this one.
-        val text =
-          if nextLoop.min == 0 then s"(?:${this.text(inner)}${this.text(next)})?"
-          else s"(?:${this.text(inner)}${this.text(next)}|${writeMinimum(nextLoop)})"
-        Edit(middle.loc.start, next.loc.end, text)
+        val replacement =
+          if nextLoop.min == 0 then repeat(group(inner, next), Quantifier.Question(BacktrackStrategy.Greedy))
+          else group(Node(NodeData.Disjunction(Seq(sequence(Seq(inner, next)), minimum(nextLoop)))))
+        edit(middle -> Seq(replacement), next -> Seq.empty)
       // The characters of the next atom are removed from this one, so it reads up to the first of them.
       val atom = for
         loop <- loopOf(first).toSeq
         next <- elements.lift(i + 1).toSeq
         nextSet <- setOf(next).toSeq
         if loop.set.intersect(nextSet).nonEmpty && loop.set.diff(nextSet).nonEmpty
-      yield Edit(loop.atom.loc.start, loop.atom.loc.end, writeWithout(loop.atom, loop.set, nextSet))
+      yield edit(loop.atom -> Seq(without(loop.atom, loop.set, nextSet)))
       pairs ++ optional ++ atom
 
   /** A look-behind before the repetition at the start of a search, which is hot. */
-  private def addLookBehind(hot: SourceLocation => Boolean): Option[Edit] =
+  private def addLookBehind(hot: SourceLocation => Boolean): Option[Node] =
     def first(n: Node): Node = n.data match
-      case NodeData.Sequence(elements) if elements.nonEmpty                              => first(elements.head)
+      case NodeData.Sequence(elements) if items(elements).nonEmpty                       => first(items(elements).head)
       case NodeData.Group(GroupKind.NonCapture | GroupKind.IndexedCapture, child)        => first(child)
       case NodeData.Group(_: GroupKind.NamedCapture | _: GroupKind.PNamedCapture, child) => first(child)
       case _                                                                             => n
 
     for
       loop <- loopOf(first(node))
-      if ir.needsSigmaStarAtBegin && node.loc != SourceLocation.Invalid && hot(loop.atom.loc)
-    yield Edit(node.loc.start, node.loc.start, s"(?<!${text(loop.atom)})")
+      if ir.needsSigmaStarAtBegin && hot(loop.atom.loc)
+    yield
+      val lookBehind = Node(NodeData.Group(GroupKind.NegativeLookBehind(AssertNameStyle.Symbolic), loop.atom))
+      edit(node -> Seq(lookBehind, node))
