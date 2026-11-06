@@ -4,6 +4,7 @@ package automaton
 import codes.quine.labs.recheck.data.Graph
 
 class DFASuite extends munit.FunSuite:
+
   test("DFA#toGraph"):
     val dfa = DFA(
       Set('a', 'b'),

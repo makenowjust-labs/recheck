@@ -41,14 +41,14 @@ object RPC:
       def apply(c: HCursor): Decoder.Result[ID] =
         List[Decoder[ID]](NullID.decode.widen, StringID.decode.widen, IntID.decode.widen).reduceLeft(_ or _).apply(c)
 
-  /** StringID is an ID consists a string value. */
+  /** StringID is an ID of a string value. */
   final case class StringID(value: String) extends ID
 
   object StringID:
     given encode: Encoder[StringID] = _.value.asJson
     given decode: Decoder[StringID] = _.as[String].map(StringID(_))
 
-  /** IntID is an ID consists an integer value. */
+  /** IntID is an ID of an integer value. */
   final case class IntID(value: Int) extends ID
 
   object IntID:
@@ -114,7 +114,6 @@ object RPC:
     final val InvalidRequestCode = -32600
     final val MethodNotFoundCode = -32601
     final val InvalidParamsCode = -32602
-    final val InternalErrorCode = -32603
     // $COVERAGE-ON$
 
     given encode: Encoder[Error] = deriveEncoder
@@ -138,6 +137,7 @@ object RPC:
       */
     def stdio: IO = new IO:
       def read(): Iterator[String] = Iterator.continually(Console.in.readLine()).takeWhile(_ ne null)
+
       def write(line: String): Unit = synchronized:
         // It writes UTF-8 bytes directly to be independent of the platform's default charset (#1910).
         val bytes = line.getBytes(StandardCharsets.UTF_8)
@@ -165,8 +165,8 @@ object RPC:
         request <- read(line)
         (optID, method, paramsJson) = request
         handler <- find(handlerMap, optID, method)
-        _ <- handler.handle(optID, paramsJson, push, send)
-      yield ()
+        result <- handler.handle(optID, paramsJson, push, send)
+      yield result
 
       result match
         case Left(Some(err))        => send(Left(err))
@@ -200,7 +200,7 @@ object RPC:
         else Result.ok((optID, method, paramsJson))
       case Left(err) => Result.raise(ErrorResponse.ParseError(err.getMessage))
 
-  /** Finds an handler for the request. */
+  /** Finds a handler for the request. */
   private[cli] def find(handlerMap: Map[String, Handler], optID: Option[ID], method: String): Result[Handler] =
     handlerMap.get(method) match
       case Some(handler) => Result.ok(handler)
@@ -218,18 +218,24 @@ object RPC:
   /** A function type to send a response in handler. */
   private[cli] type ResponseSend = Either[ErrorResponse, ResultResponse] => Unit
 
-  /** Handler represents an handler of JSON-RPC. */
+  /** Handler is a handler of JSON-RPC. */
   sealed trait Handler:
     type Params
+
     def decodeParams: Decoder[Params]
+
     private[cli] def handle(optID: Option[ID], paramsJson: Json, push: ResponsePush, send: ResponseSend): Result[Unit]
 
-  /** RequestHandler represents an handler of JSON-RPC request. */
+  /** RequestHandler is a handler of JSON-RPC requests. */
   sealed trait RequestHandler extends Handler:
     type Message
+
     def encodeMessage: Encoder[Message]
+
     type Result
+
     def encodeResult: Encoder[Result]
+
     def apply(id: ID, params: Params, push: Push[Message], send: Send[Result]): Unit
 
     private[cli] def handle(
@@ -265,14 +271,20 @@ object RPC:
     def apply[P: Decoder, M: Encoder, R: Encoder](h: (ID, P, Push[M], Send[R]) => Unit): RequestHandler =
       new RequestHandler:
         type Params = P
+
         def decodeParams: Decoder[P] = Decoder[P]
+
         type Message = M
+
         def encodeMessage: Encoder[M] = Encoder[M]
+
         type Result = R
+
         def encodeResult: Encoder[R] = Encoder[R]
+
         def apply(id: ID, params: P, push: Push[M], send: Send[R]): Unit = h(id, params, push, send)
 
-  /** NotificationHandler represents an handler of JSON-RPC notification. */
+  /** NotificationHandler is a handler of JSON-RPC notifications. */
   sealed trait NotificationHandler extends Handler:
     def apply(params: Params): Unit
 
@@ -296,5 +308,7 @@ object RPC:
   object NotificationHandler:
     def apply[P: Decoder](h: P => Unit): NotificationHandler = new NotificationHandler:
       type Params = P
+
       def decodeParams: Decoder[P] = Decoder[P]
+
       def apply(params: P): Unit = h(params)

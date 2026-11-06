@@ -17,7 +17,8 @@ const FeatureList: Feature[] = [
     svgClass: styles.featureSvgGears,
     description: (
       <>
-        <code>recheck</code> supports practical regular expression features including backreferences and look-around operations.
+        <code>recheck</code> supports practical regular expression features including backreferences and look-around operations,
+        in JavaScript, Python, Ruby, Java, .NET, Perl and PCRE.
       </>
     ),
   },

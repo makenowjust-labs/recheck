@@ -1,0 +1,215 @@
+package codes.quine.labs.resyntax.charset
+
+import scala.collection.mutable
+
+import codes.quine.labs.resyntax.charset.CharSet.*
+
+/** CharSet is an immutable set of non-negative code values.
+  *
+  * It is represented by strictly increasing interval boundaries `b(0) < b(1) < ...` of even length. The set contains
+  * the half-open intervals `[b(0), b(1))`, `[b(2), b(3))`, and so on.
+  */
+final class CharSet private (private val bounds: Array[UChar]):
+
+  def isEmpty: Boolean = bounds.length == 0
+
+  def nonEmpty: Boolean = bounds.length != 0
+
+  def intervalCount: Int = bounds.length / 2
+
+  def intervalStart(i: Int): UChar = bounds(2 * i)
+
+  def intervalEnd(i: Int): UChar = bounds(2 * i + 1)
+
+  /** Iterates the maximal intervals of this set as half-open pairs `(start, end)` in ascending order. */
+  def intervals: Iterator[(UChar, UChar)] =
+    Iterator.range(0, intervalCount).map(i => (intervalStart(i), intervalEnd(i)))
+
+  def boundaries: IArray[UChar] = IArray.unsafeFromArray(bounds)
+
+  def iterator: Iterator[UChar] = intervals.flatMap((start, end) => Iterator.range(start, end))
+
+  def size: Int =
+    var n = 0
+    var i = 0
+    while i < bounds.length do
+      n += bounds(i + 1) - bounds(i)
+      i += 2
+    n
+
+  def head: UChar =
+    if isEmpty then throw new NoSuchElementException("CharSet.empty.head")
+    bounds(0)
+
+  def last: UChar =
+    if isEmpty then throw new NoSuchElementException("CharSet.empty.last")
+    bounds(bounds.length - 1) - 1
+
+  /** Returns the smallest member that is not a surrogate, or the smallest one if all are surrogates. */
+  def representative: UChar =
+    if isEmpty then throw new NoSuchElementException("CharSet.empty.representative")
+    // A surrogate is not a character of some inputs, and may join its neighbor in others.
+    var i = 0
+    while i < bounds.length do
+      if !UTF16Encoding.isSurrogate(bounds(i)) then return bounds(i)
+      if bounds(i + 1) > 0xe000 then return 0xe000
+      i += 2
+    bounds(0)
+
+  def contains(value: UChar): Boolean = (countLessOrEqual(bounds, value) & 1) == 1
+
+  /** Checks whether this set contains a code value in `[first, last]`. */
+  def intersectsRange(first: UChar, last: UChar): Boolean =
+    val i = countLessOrEqual(bounds, first)
+    (i & 1) == 1 || i < bounds.length && bounds(i) <= last
+
+  infix def union(that: CharSet): CharSet =
+    if isEmpty then that
+    else if that.isEmpty then this
+    else combine(bounds, that.bounds, UnionTable)
+
+  infix def intersect(that: CharSet): CharSet =
+    if isEmpty || that.isEmpty then CharSet.empty
+    else combine(bounds, that.bounds, IntersectTable)
+
+  infix def diff(that: CharSet): CharSet =
+    if isEmpty || that.isEmpty then this
+    else combine(bounds, that.bounds, DiffTable)
+
+  def complement(mode: UnitMode): CharSet = complement(mode.universe)
+
+  def complement(universe: CharSet): CharSet = universe.diff(this)
+
+  def restrict(mode: UnitMode): CharSet =
+    if isEmpty || mode != UnitMode.ScalarValue && bounds(bounds.length - 1) <= mode.limit then this
+    else intersect(mode.universe)
+
+  def subsetOf(that: CharSet): Boolean = diff(that).isEmpty
+
+  /** Calls the function with every non-empty intersection `[start, end)` of an interval of this set and
+    * `[from, until)`.
+    */
+  private[charset] def foreachIntervalWithin(from: UChar, until: UChar)(f: (UChar, UChar) => Unit): Unit =
+    var i = countLessOrEqual(bounds, from)
+    if (i & 1) == 1 then i -= 1
+    while i < bounds.length && bounds(i) < until do
+      val start = math.max(bounds(i), from)
+      val end = math.min(bounds(i + 1), until)
+      if start < end then f(start, end)
+      i += 2
+
+  override def equals(that: Any): Boolean = that match
+    case that: CharSet => java.util.Arrays.equals(bounds, that.bounds)
+    case _             => false
+
+  override def hashCode(): Int = java.util.Arrays.hashCode(bounds)
+
+  override def toString: String =
+    def hex(value: UChar): String = "0x" + Integer.toHexString(value).toUpperCase
+
+    intervals
+      .map((start, end) => if start + 1 == end then hex(start) else s"${hex(start)}-${hex(end - 1)}")
+      .mkString("CharSet(", ", ", ")")
+
+object CharSet:
+
+  /** Builder accumulates intervals in any order to build a set. */
+  final class Builder private[CharSet] ():
+
+    private val ranges = mutable.ArrayBuilder.make[Long]
+
+    /** Adds the half-open interval `[start, end)`; an empty interval is ignored. */
+    def addRange(start: UChar, end: UChar): this.type =
+      require(start >= 0, s"negative code value: $start")
+      if start < end then ranges.addOne((start.toLong << 32) | end.toLong)
+      this
+
+    def addOne(value: UChar): this.type = addRange(value, value + 1)
+
+    def addAll(set: CharSet): this.type =
+      var i = 0
+      while i < set.bounds.length do
+        addRange(set.bounds(i), set.bounds(i + 1))
+        i += 2
+      this
+
+    def result(): CharSet =
+      val rs = ranges.result()
+      java.util.Arrays.sort(rs)
+      val out = mutable.ArrayBuilder.make[Int]
+      var i = 0
+      while i < rs.length do
+        val start = (rs(i) >>> 32).toInt
+        var end = rs(i).toInt
+        i += 1
+        while i < rs.length && (rs(i) >>> 32).toInt <= end do
+          end = math.max(end, rs(i).toInt)
+          i += 1
+        out.addOne(start)
+        out.addOne(end)
+      new CharSet(out.result())
+
+  val empty: CharSet = new CharSet(Array.empty)
+
+  def newBuilder: Builder = new Builder
+
+  def single(value: UChar): CharSet =
+    require(value >= 0, s"negative code value: $value")
+    new CharSet(Array(value, value + 1))
+
+  /** Creates a set containing the code values in `[first, last]`; it is empty if `first > last`. */
+  def range(first: UChar, last: UChar): CharSet =
+    require(first >= 0, s"negative code value: $first")
+    if first > last then empty else new CharSet(Array(first, last + 1))
+
+  def of(values: UChar*): CharSet =
+    val builder = newBuilder
+    values.foreach(builder.addOne)
+    builder.result()
+
+  private[charset] def unsafeFromBoundaries(boundaries: Array[UChar]): CharSet = new CharSet(boundaries)
+
+  def union(sets: IterableOnce[CharSet]): CharSet =
+    val builder = newBuilder
+    sets.iterator.foreach(builder.addAll)
+    builder.result()
+
+  // Truth tables indexed by `inThis * 2 + inThat`.
+  private val UnionTable = 0xe
+  private val IntersectTable = 0x8
+  private val DiffTable = 0x4
+
+  private def combine(a: Array[Int], b: Array[Int], table: Int): CharSet =
+    val out = new Array[Int](a.length + b.length)
+    var i = 0
+    var j = 0
+    var n = 0
+    var inA = 0
+    var inB = 0
+    var inR = 0
+    while i < a.length || j < b.length do
+      val p =
+        if j >= b.length then a(i)
+        else if i >= a.length then b(j)
+        else math.min(a(i), b(j))
+      if i < a.length && a(i) == p then
+        inA ^= 1
+        i += 1
+      if j < b.length && b(j) == p then
+        inB ^= 1
+        j += 1
+      val r = (table >> (inA * 2 + inB)) & 1
+      if r != inR then
+        out(n) = p
+        n += 1
+        inR = r
+    new CharSet(java.util.Arrays.copyOf(out, n))
+
+  /** Returns the number of the elements of the sorted array that are less than or equal to the value. */
+  private[charset] def countLessOrEqual(array: Array[Int], value: Int): Int =
+    var lo = 0
+    var hi = array.length
+    while lo < hi do
+      val mid = (lo + hi) >>> 1
+      if array(mid) <= value then lo = mid + 1 else hi = mid
+    lo

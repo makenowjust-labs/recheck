@@ -16,6 +16,7 @@ import codes.quine.labs.recheck.common.CancellationTokenSource
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.Parameters
 import codes.quine.labs.recheck.diagnostics.Diagnostics
+import codes.quine.labs.resyntax.dialect.Dialect
 
 /** `recheck agent` method types. */
 object AgentCommand:
@@ -46,6 +47,7 @@ object AgentCommand:
   private[cli] final case class Token(
       source: String,
       flags: String,
+      dialect: Dialect,
       send: RPC.Send[Diagnostics],
       cancellation: CancellationTokenSource
   )
@@ -64,7 +66,7 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio):
     val token = synchronized:
       val source = new CancellationTokenSource
       tokens.remove(id).foreach(doCancel)
-      tokens.update(id, Token(check.source, check.flags, send, source))
+      tokens.update(id, Token(check.source, check.flags, check.params.dialect, send, source))
       source.token
     executor.execute: () =>
       val params =
@@ -86,7 +88,9 @@ class AgentCommand(threadSize: Int, io: RPC.IO = RPC.IO.stdio):
   /** Cancels the given token execution. */
   def doCancel(token: Token): Unit =
     token.cancellation.cancel()
-    token.send(Right(Diagnostics.Unknown(token.source, token.flags, Diagnostics.ErrorKind.Cancel, None)))
+    val cancelled =
+      Diagnostics.Unknown(token.source, token.flags, token.dialect, None, Diagnostics.ErrorKind.Cancel, Seq.empty, None)
+    token.send(Right(cancelled))
 
   /** `"ping"` method implementation. */
   @nowarn

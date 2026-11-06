@@ -33,6 +33,14 @@ const parseVersion = (text: string): Version | null => {
 const compareVersions = (a: Version, b: Version): number =>
   a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 
+/** Checks whether the build has the changes of the release version, as a later release or an unreleased build. */
+export const isAtLeast = (build: Build, version: string): boolean => {
+  if (build.type !== "release") return true;
+  const a = parseVersion(build.version);
+  const b = parseVersion(version);
+  return a === null || b === null || compareVersions(a, b) >= 0;
+};
+
 /** Stable release versions the Playground can load, newest first. */
 const releaseVersions = (candidates: readonly string[]): string[] => {
   const first = parseVersion(FIRST_ESM_VERSION)!;

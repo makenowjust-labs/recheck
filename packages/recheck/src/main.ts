@@ -23,12 +23,12 @@ export const __mock__: Mock = {
   pool: null,
 };
 
-/** `check` implementation. */
-export async function check(
-  source: string,
-  flags: string,
-  params: Parameters & HasAbortSignal = {},
-): Promise<Diagnostics> {
+type Backend =
+  | { type: "agent"; agent: Agent }
+  | { type: "pool"; pool: WorkerPool }
+  | { type: "pure" };
+
+const validateArguments = (source: unknown, flags: unknown): void => {
   /* c8 ignore start */
   if (typeof source !== "string") {
     throw new TypeError(
@@ -41,9 +41,19 @@ export async function check(
     );
   }
   /* c8 ignore stop */
+};
 
-  const backend = env.RECHECK_BACKEND();
-  switch (backend) {
+const ensurePoolBackend = (): Backend => {
+  if (__mock__.pool === null) {
+    __mock__.pool = new WorkerPool(1);
+  }
+  return { type: "pool", pool: __mock__.pool };
+};
+
+/** Returns the backend of `RECHECK_BACKEND`, starting the agent on the first call. */
+async function selectBackend(): Promise<Backend> {
+  const name = env.RECHECK_BACKEND();
+  switch (name) {
     case "auto":
       if (__mock__.agent === undefined) {
         try {
@@ -76,69 +86,73 @@ export async function check(
       }
       break;
     case "worker":
-      if (__mock__.pool === null) {
-        __mock__.pool = new WorkerPool(1);
-      }
-      return __mock__.pool.check(source, flags, params);
+      return ensurePoolBackend();
     case "pure":
-      return pure.check(source, flags, params);
+      return { type: "pure" };
     default:
-      throw new Error(`invalid backend: ${backend}`);
+      throw new Error(`invalid backend: ${name}`);
   }
 
   const agent = __mock__.agent;
   if (agent === null) {
-    if (backend !== "auto") {
+    if (name !== "auto") {
       throw new Error("there is no available implementation");
     }
-
-    if (__mock__.pool === null) {
-      __mock__.pool = new WorkerPool(1);
-    }
-    return __mock__.pool.check(source, flags, params);
+    return ensurePoolBackend();
   }
 
-  return checkAgent(agent, source, flags, params);
+  return { type: "agent", agent };
 }
 
-let syncFnCache: typeof pure.check | null = null;
+/** `check` implementation. */
+export async function check(
+  source: string,
+  flags: string,
+  params: Parameters & HasAbortSignal = {},
+): Promise<Diagnostics> {
+  validateArguments(source, flags);
+  const b = await selectBackend();
+  switch (b.type) {
+    case "agent":
+      return checkAgent(b.agent, source, flags, params);
+    case "pool":
+      return b.pool.check(source, flags, params);
+    case "pure":
+      return pure.check(source, flags, params);
+  }
+}
+
+type SyncFn = (
+  source: string,
+  flags: string,
+  params: Parameters,
+) => Diagnostics;
+
+/** The function calling the synckit worker, which is created on the first use. */
+let synckitFn: SyncFn | null = null;
+
+/** Returns the function of `RECHECK_SYNC_BACKEND`. */
+const selectSyncFn = (): SyncFn => {
+  const name = env.RECHECK_SYNC_BACKEND();
+  switch (name) {
+    case "synckit":
+      if (synckitFn === null) {
+        synckitFn = createSyncFn<SyncFn>(
+          nodeRequire.resolve("./synckit-worker"),
+        );
+      }
+      return synckitFn;
+    case "pure":
+      return pure.check;
+  }
+  throw new Error(`invalid sync backend: ${name}`);
+};
 
 export const checkSync = (
   source: string,
   flags: string,
   params: Parameters = {},
 ): Diagnostics => {
-  /* c8 ignore start */
-  if (typeof source !== "string") {
-    throw new TypeError(
-      `Expected 'source' to be a string, but got ${typeof source}`,
-    );
-  }
-  if (typeof flags !== "string") {
-    throw new TypeError(
-      `Expected 'flags' to be a string, but got ${typeof flags}`,
-    );
-  }
-  /* c8 ignore stop */
-
-  let syncFn: typeof pure.check | null = null;
-  const backend = env.RECHECK_SYNC_BACKEND();
-  switch (backend) {
-    case "synckit":
-      if (syncFnCache === null) {
-        syncFnCache = createSyncFn<typeof check>(
-          nodeRequire.resolve("./synckit-worker"),
-        );
-      }
-      syncFn = syncFnCache;
-      break;
-    case "pure":
-      syncFn = pure.check;
-      break;
-  }
-  if (syncFn === null) {
-    throw new Error(`invalid sync backend: ${backend}`);
-  }
-
-  return syncFn(source, flags, params);
+  validateArguments(source, flags);
+  return selectSyncFn()(source, flags, params);
 };

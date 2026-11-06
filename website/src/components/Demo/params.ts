@@ -1,207 +1,236 @@
 import type { Parameters } from "recheck";
+import type { Property, Setting } from "recheck-parameters";
 
-export type ParamType = "duration" | "float" | "integer" | { select: string[] };
+import { propertiesFor } from "recheck-parameters";
+
+import { isAtLeast } from "./builds";
+
+import type { Build } from "./builds";
+
+export type ParamType =
+  | "duration"
+  | "float"
+  | "integer"
+  | "boolean"
+  | { select: string[] }
+  /** A select whose values depend on the dialect, the first value being the default. */
+  | { selectByDialect: Record<string, string[]> };
 
 export type Param = {
   title: string;
   name: string;
   defaultValue: string | number;
   type: ParamType;
+  /** The first release having the parameter, or `null` if every release has it. */
+  since: string | null;
+  /** The dialects that the parameter applies to, or `null` if it applies to every dialect. */
+  dialects: string[] | null;
+  /** The key of a setting of the dialect, which goes into the `dialect` object, or `null` for a parameter. */
+  setting: string | null;
 };
 
-export const params: Param[] = [
-  {
-    name: "checker",
-    title: "Checker",
-    defaultValue: "auto",
-    type: { select: ["auto", "automaton", "fuzz"] },
-  },
-  {
-    name: "logger",
-    title: "Logger",
-    defaultValue: "off",
-    type: { select: ["on", "off"] },
-  },
-  {
-    name: "timeout",
-    title: "Timeout",
-    defaultValue: 10000,
-    type: "duration",
-  },
-  {
-    name: "accelerationMode",
-    title: "Acceleration Mode",
-    defaultValue: "auto",
-    type: { select: ["auto", "on", "off"] },
-  },
-  {
-    name: "attackLimit",
-    title: "Attack Limit",
-    defaultValue: 1500000000,
-    type: "integer",
-  },
-  {
-    name: "attackTimeout",
-    title: "Attack Timeout",
-    defaultValue: 1000,
-    type: "duration",
-  },
-  {
-    name: "crossoverSize",
-    title: "Crossover Size",
-    defaultValue: 25,
-    type: "integer",
-  },
-  {
-    name: "heatRatio",
-    title: "Heat Ratio",
-    defaultValue: 0.001,
-    type: "float",
-  },
-  {
-    name: "incubationLimit",
-    title: "Incubation Limit",
-    defaultValue: 25000,
-    type: "integer",
-  },
-  {
-    name: "incubationTimeout",
-    title: "Incubation Timeout",
-    defaultValue: 250,
-    type: "duration",
-  },
-  {
-    name: "maxAttackStringSize",
-    title: "Max Attack String Size",
-    defaultValue: 300000,
-    type: "integer",
-  },
-  {
-    name: "maxDegree",
-    title: "Max Degree",
-    defaultValue: 4,
-    type: "integer",
-  },
-  {
-    name: "maxGeneStringSize",
-    title: "Max Gene String Size",
-    defaultValue: 2400,
-    type: "integer",
-  },
-  {
-    name: "maxGenerationSize",
-    title: "Max Generation Size",
-    defaultValue: 100,
-    type: "integer",
-  },
-  {
-    name: "maxInitialGenerationSize",
-    title: "Max Initial Generation Size",
-    defaultValue: 500,
-    type: "integer",
-  },
-  {
-    name: "maxIteration",
-    title: "Max Iteration",
-    defaultValue: 10,
-    type: "integer",
-  },
-  {
-    name: "maxNFASize",
-    title: "Max NFA Size",
-    defaultValue: 35000,
-    type: "integer",
-  },
-  {
-    name: "maxPatternSize",
-    title: "Max Pattern Size",
-    defaultValue: 1500,
-    type: "integer",
-  },
-  {
-    name: "maxRecallStringSize",
-    title: "Max Recall String Size",
-    defaultValue: 300000,
-    type: "integer",
-  },
-  {
-    name: "maxRepeatCount",
-    title: "Max Repeat Count",
-    defaultValue: 30,
-    type: "integer",
-  },
-  {
-    name: "maxSimpleRepeatCount",
-    title: "Max Simple Repeat Count",
-    defaultValue: 30,
-    type: "integer",
-  },
-  {
-    name: "mutationSize",
-    title: "Mutation Size",
-    defaultValue: 50,
-    type: "integer",
-  },
-  {
-    name: "randomSeed",
-    title: "Random Seed",
-    defaultValue: 0,
-    type: "integer",
-  },
-  {
-    name: "recallLimit",
-    title: "Recall Limit",
-    defaultValue: 1500000000,
-    type: "integer",
-  },
-  {
-    name: "recallTimeout",
-    title: "Recall Timeout",
-    defaultValue: -1000,
-    type: "duration",
-  },
-  {
-    name: "seeder",
-    title: "Seeder",
-    defaultValue: "static",
-    type: { select: ["static", "dynamic"] },
-  },
-  {
-    name: "seedingLimit",
-    title: "Seeding Limit",
-    defaultValue: 1000,
-    type: "integer",
-  },
-  {
-    name: "seedingTimeout",
-    title: "Seeding Timeout",
-    defaultValue: 100,
-    type: "duration",
-  },
-];
+const paramType = (property: Property): ParamType => {
+  if (property.enum !== undefined) return { select: property.enum };
+  // `dialect` is the name of the language or an object of the name and the settings.
+  const names = property.oneOf?.find(({ type }) => type === "string")?.enum;
+  if (names !== undefined) return { select: names };
+  if (property["x-unit"] === "milliseconds") return "duration";
+  if (property.type === "integer") return "integer";
+  if (property.type === "number") return "float";
+  /* v8 ignore next -- Every parameter of the schema has an input or `x-exclude: ["playground"]`. */
+  throw new Error(`The Playground has no input for ${property.title}`);
+};
+
+const settingName = (key: string): string =>
+  `dialect${key[0]!.toUpperCase()}${key.slice(1)}`;
+
+const settingType = (
+  key: string,
+  first: Setting,
+  entries: [string, Setting][],
+): ParamType => {
+  if (first.type === "boolean") return "boolean";
+  if (first.enum !== undefined) {
+    return {
+      selectByDialect: Object.fromEntries(
+        entries.map(([dialect, { enum: values = [], default: d }]) => [
+          dialect,
+          [String(d), ...values.filter((v) => v !== d)],
+        ]),
+      ),
+    };
+  }
+  /* v8 ignore next -- Every dialect setting of the schema is a boolean or an enum. */
+  throw new Error(`The Playground has no input for the ${key} setting`);
+};
+
+/** The settings of the dialects in the `oneOf` of `dialect`, as the parameters of the form. */
+const settingParams = (property: Property): Param[] => {
+  const settings = new Map<string, [string, Setting][]>();
+  for (const variant of property.oneOf ?? []) {
+    const { name, ...rest } = variant.properties ?? {};
+    if (name?.const === undefined) continue;
+    for (const [key, setting] of Object.entries(rest)) {
+      settings.set(key, [...(settings.get(key) ?? []), [name.const, setting]]);
+    }
+  }
+  return [...settings].flatMap(([key, entries]) => {
+    const [, first] = entries[0]!;
+    const type = settingType(key, first, entries);
+    return [
+      {
+        name: settingName(key),
+        title: first.title ?? key,
+        defaultValue: String(first.default),
+        type,
+        since: property["x-since"] ?? null,
+        dialects: entries.map(([dialect]) => dialect),
+        setting: key,
+      },
+    ];
+  });
+};
+
+const BOOLEAN_VALUES = ["true", "false"];
+
+const schemaParams: Param[] = propertiesFor("playground").flatMap(
+  ([name, property]) => [
+    {
+      name,
+      title: property.title,
+      defaultValue: (property.default ?? "null") as string | number,
+      type: paramType(property),
+      since: property["x-since"] ?? null,
+      dialects: null,
+      setting: null,
+    },
+    ...(name === "dialect" ? settingParams(property) : []),
+  ],
+);
+
+const loggerParam: Param = {
+  name: "logger",
+  title: "Logger",
+  defaultValue: "off",
+  type: { select: ["on", "off"] },
+  since: null,
+  dialects: null,
+  setting: null,
+};
+
+/** The parameters shown first, in this order; the others follow in the schema order. */
+const FIRST = ["checker", "logger", "timeout", "dialect"];
+
+// The settings of the dialect follow `dialect`.
+const order = ({ name, setting }: Param): number => {
+  const index = FIRST.indexOf(setting === null ? name : "dialect");
+  return index === -1 ? FIRST.length : index;
+};
+
+/** All the parameters of the form, for the bundled build. */
+export const params: Param[] = [...schemaParams, loggerParam]
+  .map((param, index) => ({ param, index }))
+  .sort((a, b) => order(a.param) - order(b.param) || a.index - b.index)
+  .map(({ param }) => param);
+
+/** The default dialect, which is the only one of the builds without the `dialect` parameter. */
+export const DEFAULT_DIALECT = "javascript";
+
+export const paramsOf = (
+  build: Build,
+  dialect: string = DEFAULT_DIALECT,
+): Param[] =>
+  params.filter(
+    ({ since, dialects }) =>
+      (since === null || isAtLeast(build, since)) &&
+      (dialects === null || dialects.includes(dialect)),
+  );
+
+export const selectValues = (param: Param, dialect: string): string[] => {
+  const { type } = param;
+  if (type === "boolean") return BOOLEAN_VALUES;
+  if (typeof type !== "object") return [];
+  return "select" in type ? type.select : (type.selectByDialect[dialect] ?? []);
+};
+
+/** The dialect of the form values, or the default one if the build does not have the `dialect` parameter. */
+export const dialectOf = (
+  values: Record<string, unknown>,
+  build: Build,
+): string =>
+  paramsOf(build).some(({ name }) => name === "dialect")
+    ? String(values["dialect"] ?? DEFAULT_DIALECT)
+    : DEFAULT_DIALECT;
 
 // `logger` is a Playground option rather than a `recheck` parameter.
 export type CheckParams = Parameters & { logger: "on" | "off" };
 
 /** Converts the form values, where numbers are strings, to the parameters. */
-export const parseParams = (values: Record<string, unknown>): CheckParams => {
+export const parseParams = (
+  values: Record<string, unknown>,
+  build: Build,
+): CheckParams => {
   const parsed: Record<string, unknown> = {};
-  for (const { name, type, defaultValue } of params) {
+  const settings: Record<string, unknown> = {};
+  const dialect = dialectOf(values, build);
+  for (const param of paramsOf(build, dialect)) {
+    const { name, defaultValue, setting } = param;
     const value = values[name] ?? defaultValue;
-    switch (type) {
-      case "duration":
-      case "integer":
-        parsed[name] = Number.parseInt(String(value), 10);
-        break;
-      case "float":
-        parsed[name] = Number.parseFloat(String(value));
-        break;
-      default:
-        parsed[name] = String(value);
+    if (setting !== null) {
+      settings[setting] = parseValue(param, value, dialect);
+      continue;
     }
+    parsed[name] = parseValue(param, value, dialect);
   }
+  if ("dialect" in parsed) parsed["dialect"] = { name: dialect, ...settings };
   return parsed as CheckParams;
 };
+
+const parseValue = (param: Param, value: unknown, dialect: string): unknown => {
+  const { type } = param;
+  switch (type) {
+    case "duration":
+    case "integer":
+      return Number.parseInt(String(value), 10);
+    case "float":
+      return Number.parseFloat(String(value));
+    case "boolean":
+      return String(value) === "true";
+    default:
+      if (typeof type === "object" && "selectByDialect" in type) {
+        // A value left by another dialect falls back to this dialect's default.
+        const choices = selectValues(param, dialect);
+        return choices.includes(String(value)) ? String(value) : choices[0];
+      }
+      return String(value);
+  }
+};
+
+export const formValues = (
+  params: Record<string, unknown>,
+): Record<string, string | number> =>
+  Object.fromEntries(
+    Object.entries(params).flatMap(
+      ([name, value]): [string, string | number][] => {
+        if (name === "dialect" && typeof value === "object" && value !== null) {
+          const { name: dialect, ...settings } = value as Record<
+            string,
+            unknown
+          >;
+          return [
+            ["dialect", String(dialect)],
+            ...Object.entries(settings).map(
+              ([key, setting]): [string, string] => [
+                settingName(key),
+                String(setting),
+              ],
+            ),
+          ];
+        }
+        return [[name, typeof value === "number" ? value : String(value)]];
+      },
+    ),
+  );
 
 export const extract = (
   input: string,

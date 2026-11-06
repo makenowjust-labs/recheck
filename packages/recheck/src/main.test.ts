@@ -141,14 +141,17 @@ test("check: invalid", async () => {
   );
 });
 
+// The synckit function is created once per module, so this is the only test using it.
 test("checkSync: synckit", () => {
   syncBackend.mockReturnValueOnce("synckit");
+  const syncFn = jest.fn((..._: unknown[]) => ({ status: "vulnerable" }));
   const createSyncFn = jest.mocked(synckit.createSyncFn);
-  createSyncFn.mockReturnValueOnce((() => ({ status: "vulnerable" })) as any);
+  createSyncFn.mockReturnValueOnce(syncFn as any);
 
   const diagnostics = main.checkSync("^(a|a)+$", "");
   expect(diagnostics.status).toBe("vulnerable");
-  expect(createSyncFn).toHaveBeenCalled();
+  expect(createSyncFn).toHaveBeenCalledTimes(1);
+  expect(syncFn).toHaveBeenCalledWith("^(a|a)+$", "", {});
 });
 
 test("checkSync: pure", () => {
@@ -164,4 +167,43 @@ test("checkSync: invalid", () => {
   expect(() => main.checkSync("^(a|a)+$", "")).toThrow(
     "invalid sync backend: invalid",
   );
+});
+
+// A runtime command line whose runtime attack always finishes, so that every attack is refuted.
+const finishing =
+  "sh -c 'echo recheck:runtime fake; echo recheck:start; echo recheck:time 0' sh";
+
+test("check: java with refuted attacks", async () => {
+  backend.mockReturnValueOnce("java");
+  // Jest's `process.env` does not reach child processes, so `env` sets the variable.
+  javaEnsure.mockImplementationOnce(() =>
+    agent.start("env", [
+      `RECHECK_NODE=${finishing}`,
+      "java",
+      "-jar",
+      RECHECK_JAR,
+      "agent",
+    ]),
+  );
+
+  const diagnostics = await main.check("^(a|a)*$", "", {
+    checker: "automaton",
+    runtimeAttackTimeout: 1000,
+  });
+  expect(diagnostics).toMatchObject({
+    status: "safe",
+    unitMode: "utf16",
+    refutedAttacks: [
+      {
+        complexity: { type: "exponential" },
+        attack: { pattern: "'a'.repeat(31) + '\\x00'" },
+        runtimeAttack: {
+          runtime: "fake",
+          timeout: 1000,
+          result: { kind: "finish", time: 0 },
+          isConfirmed: false,
+        },
+      },
+    ],
+  });
 });

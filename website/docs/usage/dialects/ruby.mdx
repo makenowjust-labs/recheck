@@ -1,0 +1,101 @@
+---
+id: ruby
+title: Ruby
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+Describes how `recheck` checks a regular expression of the `ruby` dialect.
+
+## Engine
+
+`recheck` follows the syntax and the semantics of Ruby 4.0's `Regexp`, which is Onigmo.
+
+## Settings
+
+- `encoding` is the encoding of the regexp, `UTF-8` (default) or `ASCII-8BIT` (as the `n` flag makes).
+
+<Tabs>
+<TabItem value="cli" label="CLI">
+
+```console
+$ recheck --dialect=ruby '/^(a|a)*$/'
+$ recheck --dialect=ruby --ruby-encoding=ASCII-8BIT '/^(a|a)*$/'
+```
+
+</TabItem>
+<TabItem value="js" label="JavaScript">
+
+```tsx
+import { check } from "recheck";
+
+await check("^(a|a)*$", "", { dialect: "ruby" });
+await check("^(a|a)*$", "", {
+  dialect: { name: "ruby", encoding: "ASCII-8BIT" },
+});
+```
+
+</TabItem>
+<TabItem value="scala" label="Scala">
+
+```scala
+import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.resyntax.dialect.Dialect
+
+ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Ruby()))
+ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Ruby(Dialect.Ruby.Encoding.ASCII8Bit)))
+```
+
+</TabItem>
+</Tabs>
+
+## Flags and Units
+
+The matching unit is `scalar-value` in `UTF-8` (the default `encoding`), and `byte` in `ASCII-8BIT` (or with the `n` flag) (see [Matching Units](../dialects.mdx#matching-units)).
+
+`recheck` supports the following options of a regexp literal (e.g. `/.../i`) and inline options, written as their letters.
+
+| Flag | `Regexp` option      | Inline | Notes                                                                                                      |
+| ---- | -------------------- | ------ | ---------------------------------------------------------------------------------------------------------- |
+| `i`  | `Regexp::IGNORECASE` | `(?i)` |                                                                                                            |
+| `m`  | `Regexp::MULTILINE`  | `(?m)` | `.` matches a line break, as `s` does in the other dialects (`^` and `$` always match at line boundaries). |
+| `x`  | `Regexp::EXTENDED`   | `(?x)` |                                                                                                            |
+| `n`  | `Regexp::NOENCODING` |        | An `ASCII-8BIT` pattern (the literal `/n`), as `encoding: "ASCII-8BIT"` makes.                             |
+| `a`  |                      | `(?a)` | The ASCII character set.                                                                                   |
+| `d`  |                      | `(?d)` | The default character set.                                                                                 |
+| `u`  |                      | `(?u)` | The Unicode character set, which is not the literal `/u` (`Regexp::FIXEDENCODING`).                        |
+| `o`  |                      |        | The literal `/o`, no effect on matching.                                                                   |
+
+## Syntax Limitations
+
+The following constructs are not supported, and they are reported as `unsupported`.
+
+- Subroutine calls (e.g. `\g<name>` and `\g<1>`).
+- Back-references with a nest level (e.g. `\k<n+1>`).
+- Absence operators (e.g. `(?~abc)`).
+- Under `i`, more than six places in a run of literals that match a folding to several characters, such as `ß` or `ss`, which matches `ß` (e.g. `ssssssss` gives `Too many multi-character case foldings in a literal (limit 6) at 0`).
+
+The encodings EUC-JP (`/e`) and Windows-31J (`/s`) are not supported, and their flags are reported as `invalid`.
+
+## Approximations
+
+- Ruby has memoization (since Ruby 3.2) that `recheck` does not model, so an attack that `recheck` reports may not work on Ruby, and the runtime-attack verification checks whether it does.
+- `\G` matches only at the start of the input, since `recheck` models a search from there, not one from a later position (e.g. the second match of `String#scan`).
+- Under `i`, `recheck` does not reproduce Onigmo's bugs in matching a character folded to several characters (e.g. `ß` and `ss`).
+  For example, `(?<=ß)` and `(ß)\1` do not match `"ß"` and `"ßss"` in Ruby, but they do in `recheck`.
+  Also, `[s]s` and `ßs` match `"ß"` and `"sß"` in Ruby, but not in `recheck`.
+- Under `i`, `recheck` adds the folding of each character of a case-folded class, so `[sẞ]` tries `ss` twice, where Ruby tries it once.
+- A pattern of only ASCII characters has no fixed encoding: Ruby matches a string of only ASCII characters by the pattern compiled in `US-ASCII`, where no character is folded to several characters, and Ruby keeps the pattern compiled again in `UTF-8` after matching another string.
+  So `/[[:alpha:]]/i` matches `ss` only after matching a non-ASCII string, and `/(?<=a[[:lower:]])y/i` raises `RegexpError` on a non-ASCII string.
+  `recheck` takes such a pattern in `UTF-8` (e.g. it reports `(?<=a[[:lower:]])y` with `i` as invalid).
+- An iteration matching the empty string is not handled as Ruby does: Onigmo repeats copies of the node for a bounded repetition depending on the size of its compiled code, and it checks the captures in an empty iteration.
+
+## Runtime-Attack Verification
+
+- Command: `ruby -`.
+- Matching: `Regexp#match?` (no `Regexp.timeout`).
+- Engine limits: none.
+- Engine errors: `RegexpError`, `NoMemoryError`, `SystemStackError`.
+- Environment variable: `RECHECK_RUBY`.

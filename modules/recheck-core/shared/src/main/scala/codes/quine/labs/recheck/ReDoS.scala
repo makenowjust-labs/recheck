@@ -1,10 +1,9 @@
 package codes.quine.labs.recheck
 
+import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.concurrent.duration.Duration
-import scala.util.Failure
 import scala.util.Random
-import scala.util.Success
-import scala.util.Try
 
 import codes.quine.labs.recheck.automaton.AutomatonChecker
 import codes.quine.labs.recheck.automaton.Complexity
@@ -18,179 +17,307 @@ import codes.quine.labs.recheck.common.ReDoSException
 import codes.quine.labs.recheck.common.UnsupportedException
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.Diagnostics
-import codes.quine.labs.recheck.exec.NodeExecutor
+import codes.quine.labs.recheck.diagnostics.DiagnosticsIteratorUtil.*
+import codes.quine.labs.recheck.diagnostics.Hotspot
+import codes.quine.labs.recheck.diagnostics.RefutedAttack
 import codes.quine.labs.recheck.fuzz.FuzzChecker
 import codes.quine.labs.recheck.fuzz.FuzzProgram
-import codes.quine.labs.recheck.recall.RecallValidator
-import codes.quine.labs.recheck.regexp.Parser
-import codes.quine.labs.recheck.regexp.Pattern
-import codes.quine.labs.recheck.regexp.PatternExtensions.*
-import codes.quine.labs.recheck.unicode.UChar
+import codes.quine.labs.recheck.verification.RuntimeAttackVerifier
+import codes.quine.labs.resyntax.ast.FlagSet
+import codes.quine.labs.resyntax.ast.FlagSetException
+import codes.quine.labs.resyntax.ast.Node
+import codes.quine.labs.resyntax.charset.UChar
+import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.ir.IRPattern
+import codes.quine.labs.resyntax.ir.build.IRBuilder
+import codes.quine.labs.resyntax.ir.build.IRBuildingException
+import codes.quine.labs.resyntax.ir.build.MultiFoldingLimitException
+import codes.quine.labs.resyntax.parser.NestingLimitException
+import codes.quine.labs.resyntax.parser.Parser
+import codes.quine.labs.resyntax.parser.ParsingException
 
 /** ReDoS is a ReDoS checker frontend. */
 object ReDoS:
 
-  /** Tests the given RegExp pattern causes ReDoS. */
+  /** Returns the diagnostics of the given RegExp pattern.
+    *
+    * The pattern and the flags are of `params.dialect`. The result is the first vulnerable diagnostics whose runtime
+    * attack is not run or confirms the attack, or else the safe or unknown diagnostics, with the attacks refuted before
+    * them.
+    *
+    * An attack with the same complexity and hotspot as a refuted one is skipped. When runtime-attack verification
+    * refutes `maxRefutedAttacks` attacks, the result is unknown with [[Diagnostics.ErrorKind.RuntimeAttacksRefuted]].
+    */
   def check(
       source: String,
       flags: String,
       params: Parameters = Parameters(),
       token: Option[CancellationToken] = None
   ): Diagnostics =
-    import params._
+    given ctx: Context = Context(params.timeout, token, params.logger)
 
-    given ctx: Context = Context(params.timeout, token, logger)
+    def diagnose(ir: IRPattern): Diagnostics =
+      val refutedAttacks = mutable.ArrayBuffer.empty[RefutedAttack]
+      val avoidsAttack = (c: AttackComplexity.Vulnerable, h: Hotspot) => isRefuted(refutedAttacks, c, h)
+      try
+        val (candidates, safe) = params.checker match
+          case Checker.Automaton => checkAutomaton(source, flags, ir, params)
+          case Checker.Fuzz      => checkFuzz(source, flags, ir, params, avoidsAttack)
+          case Checker.Auto      => checkAuto(source, flags, ir, params, avoidsAttack)
+        val verify = runRuntimeAttack(source, flags, params.dialect, ir.mode, params.runtimeAttackTimeout)
+        verifyCandidates(candidates, safe, verify, refutedAttacks, params.maxRefutedAttacks)
+      catch
+        case ex: ReDoSException =>
+          Diagnostics.Unknown.from(source, flags, params.dialect, Some(ir.mode), refutedAttacks.toSeq, ex)
 
-    val result = for
-      _ <- Try(()) // Ensures `Try` context.
-      _ = ctx.log("parse: start")
-      pattern <- ctx.interrupt:
-        Parser.parse(source, flags) match
-          case Right(pattern) => Success(pattern)
-          case Left(ex)       => Failure(InvalidRegExpException(ex.getMessage))
-      _ = ctx.log(s"parse: finish\n  pattern: $pattern")
-      diagnostics <- checker match
-        case Checker.Automaton => checkAutomaton(source, flags, pattern, params)
-        case Checker.Fuzz      => checkFuzz(source, flags, pattern, params)
-        case Checker.Auto      => checkAuto(source, flags, pattern, params)
-    yield diagnostics
-    result
-      .recover:
-        case ex: ReDoSException => Diagnostics.Unknown.from(source, flags, ex)
-      .get
+    try diagnose(parse(source, flags, params.dialect))
+    catch case ex: ReDoSException => Diagnostics.Unknown.from(source, flags, params.dialect, None, Seq.empty, ex)
 
+  /** Runs `verify` on the candidates in order, and returns the final diagnostics of [[check]].
+    *
+    * `safe` gives the final diagnostics after the candidates run out. `refutedAttacks` collects the attacks that
+    * runtime attacks refute.
+    */
+  private[recheck] def verifyCandidates(
+      candidates: Iterator[Diagnostics.Vulnerable],
+      safe: () => Diagnostics.Safe,
+      verify: Diagnostics.Vulnerable => Diagnostics.Vulnerable,
+      refutedAttacks: mutable.Buffer[RefutedAttack],
+      maxRefutedAttacks: Int
+  )(using ctx: Context): Diagnostics =
+    val untried = candidates.filter: d =>
+      val skipped = isRefuted(refutedAttacks, d.complexity, d.hotspot)
+      if skipped then ctx.log("runtime attack: skip the same attack as a refuted one")
+      !skipped
+
+    @tailrec
+    def verifyNext(): Diagnostics =
+      if !untried.hasNext then safe().copy(refutedAttacks = refutedAttacks.toSeq)
+      else
+        val d = verify(untried.next())
+        d.runtimeAttack match
+          case Some(r) if !r.isConfirmed =>
+            refutedAttacks += RefutedAttack(d.complexity, d.attack, d.hotspot, r)
+            if refutedAttacks.size < maxRefutedAttacks then verifyNext()
+            else
+              Diagnostics.Unknown(
+                d.source,
+                d.flags,
+                d.dialect,
+                Some(d.unitMode),
+                Diagnostics.ErrorKind.RuntimeAttacksRefuted,
+                refutedAttacks.toSeq,
+                Some(d.checker)
+              )
+          case _ => d.copy(refutedAttacks = refutedAttacks.toSeq)
+
+    verifyNext()
+
+  /** Whether an attack of the complexity and the hotspot is the same as a refuted one. */
+  private[recheck] def isRefuted(
+      refutedAttacks: collection.Seq[RefutedAttack],
+      complexity: AttackComplexity.Vulnerable,
+      hotspot: Hotspot
+  ): Boolean =
+    val key = AttackKey(complexity, hotspot)
+    refutedAttacks.exists(r => AttackKey(r.complexity, r.hotspot) == key)
+
+  /** Parses the pattern and the flags in the dialect, and builds its IR.
+    *
+    * It throws [[InvalidRegExpException]] on an invalid pattern, and [[UnsupportedException]] on a pattern nested
+    * deeper than [[Parser.MaxNestingDepth]] or with too many multi-character case foldings in a literal.
+    */
+  private[recheck] def parse(source: String, flags: String, dialect: Dialect)(using ctx: Context): IRPattern =
+    ctx.log("parse: start")
+    val flagSet = ctx.interrupt(parseFlags(flags, dialect))
+    val mode = ctx.interrupt(Parser.determineUnitMode(source, flagSet, dialect))
+    val node = ctx.interrupt(parseSource(source, flagSet, dialect, mode))
+    val ir = ctx.interrupt(buildIR(node, flagSet, dialect, mode))
+    ctx.log(s"parse: finish\n  pattern: /$source/$flags")
+    ir
+
+  private def parseFlags(flags: String, dialect: Dialect): FlagSet =
+    try FlagSet.parse(flags, dialect)
+    catch case ex: FlagSetException => throw new InvalidRegExpException(ex.getMessage)
+
+  private def parseSource(source: String, flagSet: FlagSet, dialect: Dialect, mode: UnitMode): Node =
+    try Parser.parse(source, flagSet, dialect, mode)
+    catch
+      case ex: ParsingException      => throw new InvalidRegExpException(ex.getMessage)
+      case ex: NestingLimitException => throw new UnsupportedException(ex.getMessage)
+
+  private def buildIR(node: Node, flagSet: FlagSet, dialect: Dialect, mode: UnitMode): IRPattern =
+    try IRBuilder.build(node, flagSet, dialect, mode)
+    catch
+      case ex: IRBuildingException        => throw new InvalidRegExpException(ex.getMessage)
+      case ex: MultiFoldingLimitException => throw new UnsupportedException(ex.getMessage)
+
+  /** AttackKey identifies an attack by the degree of the polynomial complexity (or `None` for the exponential one) and
+    * the hotspot.
+    */
+  private[recheck] final case class AttackKey(degree: Option[Int], spots: Seq[(Int, Int)])
+
+  private[recheck] object AttackKey:
+
+    def apply(complexity: AttackComplexity.Vulnerable, hotspot: Hotspot): AttackKey =
+      val degree = complexity match
+        case AttackComplexity.Polynomial(degree, _) => Some(degree)
+        case AttackComplexity.Exponential(_)        => None
+      AttackKey(degree, hotspot.spots.collect { case Hotspot.Spot(s, e, Hotspot.Hot) => (s, e) })
+
+  /** Runs the automaton checker, and returns the vulnerable diagnostics it finds and a function giving the safe
+    * diagnostics once they run out.
+    */
   private[recheck] def checkAutomaton(
       source: String,
       flags: String,
-      pattern: Pattern,
+      ir: IRPattern,
       params: Parameters
-  )(using ctx: Context): Try[Diagnostics] =
+  )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
     import params.*
     val maxNFASize = if checker == Checker.Auto then params.maxNFASize else Int.MaxValue
 
-    val result = for
-      _ <- Try(()) // Ensures `Try` context.
-      _ <-
-        if checker == Checker.Auto && repeatCount(pattern) >= maxRepeatCount then
-          ctx.log("auto: exceed maxRepeatCount")
-          Failure(UnsupportedException("The pattern contains too many repeat"))
-        else Success(())
-      complexity <-
-        // When the pattern has no infinite repetition, then it is safe.
-        if pattern.isConstant then
-          ctx.log("automaton: constant pattern")
-          Success(Iterator.empty)
-        else
-          for
-            _ <-
-              if checker == Checker.Auto && pattern.size >= maxPatternSize then
-                ctx.log("auto: exceed maxPatternSize")
-                Failure(UnsupportedException("The pattern is too large"))
-              else Success(())
-            epsNFA <- EpsNFABuilder.build(pattern)
-            orderedNFA <- Try(epsNFA.toOrderedNFA(maxNFASize).rename.mapAlphabet(_.head))
-          yield AutomatonChecker.check(orderedNFA, maxNFASize)
-    yield complexity
+    def complexities: Iterator[Complexity[UChar]] =
+      if checker == Checker.Auto && ir.repeatCount >= maxRepeatCount then
+        ctx.log("auto: exceed maxRepeatCount")
+        throw UnsupportedException("The pattern contains too many repeat")
+      // When the pattern has no infinite repetition, then it is safe.
+      else if ir.isBounded then
+        ctx.log("automaton: constant pattern")
+        Iterator.empty
+      else if checker == Checker.Auto && ir.size >= maxPatternSize then
+        ctx.log("auto: exceed maxPatternSize")
+        throw UnsupportedException("The pattern is too large")
+      else
+        val epsNFA = EpsNFABuilder.build(ir)
+        val orderedNFA = epsNFA.restrictInputs(epsNFA.toOrderedNFA(maxNFASize).rename).mapAlphabet(_.representative)
+        AutomatonChecker.check(orderedNFA, maxNFASize)
 
-    result
-      .map: cs =>
-        cs.map:
-          case vul: Complexity.Vulnerable[UChar] =>
-            val attack = vul.buildAttackPattern(recallLimit, maxRecallStringSize)
-            Diagnostics.Vulnerable(source, flags, vul.toAttackComplexity, attack, vul.hotspot, Checker.Automaton)
-          case safe: Complexity.Safe => Diagnostics.Safe(source, flags, safe.toAttackComplexity, Checker.Automaton)
-        ++ Iterator(Diagnostics.Safe(source, flags, AttackComplexity.Safe(false), Checker.Automaton))
-      .map(recallValidation(source, flags, recallTimeout))
-      .recoverWith:
-        case ex: ReDoSException =>
-          ex.checker = Some(Checker.Automaton)
-          Failure(ex)
+    // The safe complexities follow the vulnerable ones.
+    lazy val (vulnerable, rest) = complexities.span(_.isInstanceOf[Complexity.Vulnerable[?]])
 
-  private[recheck] def checkFuzz(source: String, flags: String, pattern: Pattern, params: Parameters)(using
-      ctx: Context
-  ): Try[Diagnostics] =
-    import params._
+    val diagnostics = vulnerable
+      .collect:
+        case vul: Complexity.Vulnerable[UChar] =>
+          val attack = vul.buildAttackPattern(runtimeAttackLimit, maxRuntimeAttackStringSize, ir.mode)
+          Diagnostics.Vulnerable(
+            source,
+            flags,
+            params.dialect,
+            ir.mode,
+            vul.toAttackComplexity,
+            attack,
+            vul.hotspot,
+            None,
+            Seq.empty,
+            Checker.Automaton
+          )
+      .withChecker(Checker.Automaton)
 
-    val random = new Random(randomSeed)
+    def safe(): Diagnostics.Safe =
+      val complexity = rest.nextOption() match
+        case Some(safe: Complexity.Safe) => safe.toAttackComplexity
+        case _                           => AttackComplexity.Safe(false)
+      Diagnostics.Safe(source, flags, params.dialect, ir.mode, complexity, Seq.empty, Checker.Automaton)
 
-    val result = FuzzProgram
-      .from(pattern)
-      .map: fuzz =>
-        FuzzChecker.check(
-          pattern,
-          fuzz,
-          random,
-          seeder,
-          maxSimpleRepeatCount,
-          seedingLimit,
-          seedingTimeout,
-          incubationLimit,
-          incubationTimeout,
-          maxGeneStringSize,
-          attackLimit,
-          attackTimeout,
-          crossoverSize,
-          mutationSize,
-          maxAttackStringSize,
-          maxInitialGenerationSize,
-          maxGenerationSize,
-          maxIteration,
-          maxDegree,
-          heatRatio,
-          accelerationMode
-        )
+    (diagnostics, safe)
 
-    result
-      .map: rs =>
-        rs.map:
-          case (complexity, attack, hotspot) =>
-            val recallAttack = attack.adjust(complexity, recallLimit, maxRecallStringSize)
-            Diagnostics.Vulnerable(source, flags, complexity, recallAttack, hotspot, Checker.Fuzz)
-        ++ Iterator(Diagnostics.Safe(source, flags, AttackComplexity.Safe(true), Checker.Fuzz))
-      .map(recallValidation(source, flags, recallTimeout))
-      .recoverWith:
-        case ex: ReDoSException =>
-          ex.checker = Some(Checker.Fuzz)
-          Failure(ex)
+  /** Runs the fuzz checker, and returns the vulnerable diagnostics it finds and a function giving the safe diagnostics
+    * once they run out.
+    *
+    * `avoidsAttack` tells whether the fuzz checker avoids an attack of the complexity and the hotspot, which a runtime
+    * attack refuted.
+    */
+  private[recheck] def checkFuzz(
+      source: String,
+      flags: String,
+      ir: IRPattern,
+      params: Parameters,
+      avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
+  )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
+    import params.*
 
-  private[recheck] def checkAuto(source: String, flags: String, pattern: Pattern, params: Parameters)(using
-      ctx: Context
-  ): Try[Diagnostics] =
-    checkAutomaton(source, flags, pattern, params)
-      .recoverWith:
-        case _: UnsupportedException => checkFuzz(source, flags, pattern, params)
+    def diagnose: Iterator[Diagnostics.Vulnerable] =
+      val random = new Random(randomSeed)
+      val fuzz = FuzzProgram.from(ir)
+      val results = FuzzChecker.check(
+        ir,
+        fuzz,
+        random,
+        seeder,
+        maxSimpleRepeatCount,
+        seedingLimit,
+        seedingTimeout,
+        incubationLimit,
+        incubationTimeout,
+        maxGeneStringSize,
+        attackLimit,
+        attackTimeout,
+        crossoverSize,
+        mutationSize,
+        maxAttackStringSize,
+        maxInitialGenerationSize,
+        maxGenerationSize,
+        maxIteration,
+        maxDegree,
+        heatRatio,
+        accelerationMode,
+        avoidsAttack
+      )
 
-  /** Runs recall validation against diagnostics, then returns validated diagnostics. */
-  private[recheck] def recallValidation(source: String, flags: String, timeout: Duration)(
-      ds: Iterator[Diagnostics]
-  )(using ctx: Context): Diagnostics =
-    ds.filter:
-      case d: Diagnostics.Vulnerable =>
-        RecallValidator.checks(source, flags, d.attack, timeout)(NodeExecutor.exec)
-      case _ => true
-    .next()
+      results.map:
+        case (complexity, attack, hotspot) =>
+          val adjusted = attack.adjust(complexity, runtimeAttackLimit, maxRuntimeAttackStringSize, ir.mode)
+          Diagnostics.Vulnerable(
+            source,
+            flags,
+            params.dialect,
+            ir.mode,
+            complexity,
+            adjusted,
+            hotspot,
+            None,
+            Seq.empty,
+            Checker.Fuzz
+          )
 
-  /** Gets a sum of repeat specifier counts. */
-  private[recheck] def repeatCount(pattern: Pattern)(using ctx: Context): Int =
-    ctx.interrupt:
-      import Pattern._
+    val diagnostics = diagnose.withChecker(Checker.Fuzz)
+    val safe = () =>
+      Diagnostics.Safe(source, flags, params.dialect, ir.mode, AttackComplexity.Safe(true), Seq.empty, Checker.Fuzz)
+    (diagnostics, safe)
 
-      def loop(node: Node): Int = ctx.interrupt:
-        node match
-          case Disjunction(ns)       => ns.map(loop).sum
-          case Sequence(ns)          => ns.map(loop).sum
-          case Capture(_, n)         => loop(n)
-          case NamedCapture(_, _, n) => loop(n)
-          case Group(n)              => loop(n)
-          case Repeat(q, n)          =>
-            val count = loop(n)
-            q match
-              case Quantifier.Exact(n, _)        => count + n
-              case Quantifier.Unbounded(min, _)  => count + min
-              case Quantifier.Bounded(_, max, _) => count + max
-              case _                             => count
-          case LookAhead(_, n)  => loop(n)
-          case LookBehind(_, n) => loop(n)
-          case _                => 0
+  /** Runs the automaton checker, or the fuzz checker if the automaton checker gives up, and returns the vulnerable
+    * diagnostics they find and a function giving the safe diagnostics of the checker that ran last.
+    */
+  private[recheck] def checkAuto(
+      source: String,
+      flags: String,
+      ir: IRPattern,
+      params: Parameters,
+      avoidsAttack: (AttackComplexity.Vulnerable, Hotspot) => Boolean
+  )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
+    val (automaton, automatonSafe) = checkAutomaton(source, flags, ir, params)
+    var safe = automatonSafe
+    val diagnostics = automaton.recoverWith:
+      case _: UnsupportedException =>
+        val (fuzz, fuzzSafe) = checkFuzz(source, flags, ir, params, avoidsAttack)
+        safe = fuzzSafe
+        fuzz
+    (diagnostics, () => safe())
 
-      loop(pattern.node)
+  /** Runs the attack in the vulnerable diagnostics on the runtime of the dialect, and records the result in them. */
+  private[recheck] def runRuntimeAttack(
+      source: String,
+      flags: String,
+      dialect: Dialect,
+      mode: UnitMode,
+      timeout: Duration
+  )(
+      d: Diagnostics.Vulnerable
+  )(using ctx: Context): Diagnostics.Vulnerable =
+    try d.copy(runtimeAttack = RuntimeAttackVerifier.verify(source, flags, dialect, mode, d.attack, timeout, sys.env))
+    catch
+      case ex: ReDoSException =>
+        ex.checker = Some(d.checker)
+        throw ex

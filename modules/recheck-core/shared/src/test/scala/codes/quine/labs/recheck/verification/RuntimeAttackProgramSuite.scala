@@ -1,0 +1,350 @@
+package codes.quine.labs.recheck.verification
+
+import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.common.Context
+import codes.quine.labs.recheck.diagnostics.AttackPattern
+import codes.quine.labs.recheck.exec.DotNetExecutor
+import codes.quine.labs.recheck.exec.JavaExecutor
+import codes.quine.labs.recheck.exec.NodeExecutor
+import codes.quine.labs.recheck.exec.PHPExecutor
+import codes.quine.labs.recheck.exec.PerlExecutor
+import codes.quine.labs.recheck.exec.PythonExecutor
+import codes.quine.labs.recheck.exec.RubyExecutor
+import codes.quine.labs.recheck.exec.SourceFile
+import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.PerlSource
+
+class RuntimeAttackProgramSuite extends munit.FunSuite:
+
+  /** The attack string `'x' + 'y'.repeat(2) + 'z'`. */
+  val attack: AttackPattern =
+    AttackPattern(
+      Seq((UnitMode.CodePoint.decode("x"), UnitMode.CodePoint.decode("y"), 0)),
+      UnitMode.CodePoint.decode("z"),
+      2
+    )
+
+  /** The attack string `'é'.repeat(3) + '\0'`. */
+  val nonASCII: AttackPattern =
+    AttackPattern(Seq((UString.empty, UnitMode.CodePoint.decode("é"), 1)), UString(0), 2)
+
+  given Context = Context()
+
+  /** Returns the unit of the input that the pattern matches. */
+  def modeOf(source: String, flags: String, dialect: Dialect): UnitMode = ReDoS.parse(source, flags, dialect).mode
+
+  def generate(source: String, flags: String, dialect: Dialect, attack: AttackPattern = attack): RuntimeAttackProgram =
+    RuntimeAttackProgram.generate(source, flags, dialect, modeOf(source, flags, dialect), attack).toOption.get
+
+  /** Returns the program file of the executor of a Java or .NET program. */
+  def programFile(program: RuntimeAttackProgram): SourceFile = program.executor match
+    case JavaExecutor(file)   => file
+    case DotNetExecutor(file) => file
+    case executor             => fail(s"no program file: $executor")
+
+  /** Returns the line of the script starting with the prefix. */
+  def line(program: RuntimeAttackProgram, prefix: String): String =
+    program.script.linesIterator.find(_.startsWith(prefix)).getOrElse(fail(s"no line: $prefix\n${program.script}"))
+
+  test("RuntimeAttackProgram.generate: JavaScript"):
+    val program = generate("foo", "i", Dialect.JavaScript)
+    assertEquals(program.executor, NodeExecutor)
+    assertEquals(
+      program.script,
+      """|const { writeSync } = require('node:fs');
+         |writeSync(1, 'recheck:runtime node ' + process.version + '\n');
+         |const re = new RegExp('foo', 'i');
+         |const input = 'x' + 'y'.repeat(2) + 'z';
+         |writeSync(1, 'recheck:start\n');
+         |const start = performance.now();
+         |try {
+         |  re.exec(input);
+         |} catch (e) {
+         |  if (!(e instanceof RangeError)) throw e;
+         |  writeSync(1, 'recheck:engine-error ' + e.message + '\n');
+         |  process.exit(0);
+         |}
+         |writeSync(1, 'recheck:time ' + Math.floor(performance.now() - start) + '\n');
+         |""".stripMargin
+    )
+
+  test("RuntimeAttackProgram.generate: Python"):
+    val program = generate("f'o\\.", "im", Dialect.Python())
+    assertEquals(program.executor, PythonExecutor)
+    assertEquals(
+      program.script,
+      """|import locale, platform, re, sys, time
+         |locale.setlocale(locale.LC_ALL, 'C')
+         |sys.stdout.write('recheck:runtime python ' + platform.python_version() + '\n')
+         |regex = re.compile('f\'o\\.', re.I | re.M)
+         |string = 'x' + 'y' * 2 + 'z'
+         |sys.stdout.write('recheck:start\n')
+         |sys.stdout.flush()
+         |start = time.perf_counter_ns()
+         |try:
+         |    regex.search(string)
+         |except (RecursionError, MemoryError) as e:
+         |    sys.stdout.write('recheck:engine-error ' + type(e).__name__ + '\n')
+         |    sys.exit(0)
+         |sys.stdout.write('recheck:time ' + str((time.perf_counter_ns() - start) // 1000000) + '\n')
+         |""".stripMargin
+    )
+    assertEquals(line(generate("x", "", Dialect.Python(), nonASCII), "string"), "string = 'é' * 3 + '\\x00'")
+    // A bytes pattern is the Latin-1 encoding of the source, and the input is bytes.
+    val bytes = generate("éa", "", Dialect.Python(Dialect.Python.Type.Bytes), nonASCII)
+    assertEquals(line(bytes, "regex"), "regex = re.compile(b'\\xe9a', 0)")
+    assertEquals(line(bytes, "string"), "string = b'\\xe9' * 3 + b'\\x00'")
+
+  test("RuntimeAttackProgram.generate: Ruby"):
+    val program = generate("a#{b}\"", "ix", Dialect.Ruby())
+    assertEquals(program.executor, RubyExecutor)
+    assertEquals(
+      program.script,
+      """|$stdout.sync = true
+         |Regexp.timeout = nil if Regexp.respond_to?(:timeout=)
+         |puts "recheck:runtime ruby #{RUBY_VERSION}"
+         |regex = Regexp.new("a\#{b}\"", Regexp::IGNORECASE | Regexp::EXTENDED)
+         |string = "x" + "y" * 2 + "z"
+         |puts "recheck:start"
+         |start = Process.clock_gettime(Process::CLOCK_MONOTONIC, :millisecond)
+         |begin
+         |  regex.match?(string)
+         |rescue RegexpError, NoMemoryError, SystemStackError => e
+         |  puts "recheck:engine-error #{e.class}"
+         |  exit
+         |end
+         |puts "recheck:time #{Process.clock_gettime(Process::CLOCK_MONOTONIC, :millisecond) - start}"
+         |""".stripMargin
+    )
+    val utf8 = generate("é", "a", Dialect.Ruby(), nonASCII)
+    assertEquals(line(utf8, "regex"), "regex = Regexp.new(\"(?a)\" + \"é\", 0)")
+    assertEquals(line(utf8, "string"), "string = \"é\" * 3 + \"\\x00\"")
+    // The last character set option wins, as the inline options do.
+    assertEquals(
+      line(generate("a", "auid", Dialect.Ruby()), "regex"),
+      "regex = Regexp.new(\"(?d)\" + \"a\", Regexp::IGNORECASE)"
+    )
+    assertEquals(line(generate("a", "mm", Dialect.Ruby()), "regex"), "regex = Regexp.new(\"a\", Regexp::MULTILINE)")
+    // A pattern of bytes is the UTF-8 encoding of the source.
+    val bytes = generate("é", "n", Dialect.Ruby(), nonASCII)
+    assertEquals(line(bytes, "regex"), "regex = Regexp.new(\"\\xC3\\xA9\".b, Regexp::NOENCODING)")
+    assertEquals(line(bytes, "string"), "string = \"\\xE9\".b * 3 + \"\\x00\".b")
+
+  test("RuntimeAttackProgram.generate: Java"):
+    val program = generate("f\"oo\\d\r", "iU", Dialect.Java)
+    assertEquals(program.executor, JavaExecutor(programFile(program)))
+    assertEquals(programFile(program).name, "RecheckRuntimeAttack.java")
+    assertEquals(program.script, "iU\n00660022006f006f005c0064000d\n1:0078\n2:0079\n1:007a\n")
+    assert(programFile(program).content.contains("catch (StackOverflowError | OutOfMemoryError e)"))
+    assertEquals(generate("", "cdimsuxU", Dialect.Java).script.linesIterator.next(), "cdimsuxU")
+    assert(programFile(program).content.contains("case 'c' -> Pattern.CANON_EQ;"))
+
+  test("RuntimeAttackProgram.generate: .NET"):
+    val program = generate("foo", "in", Dialect.DotNet)
+    assertEquals(program.executor, DotNetExecutor(programFile(program)))
+    assertEquals(programFile(program).name, "RecheckRuntimeAttack.cs")
+    assertEquals(program.script, "in\n0066006f006f\n1:0078\n2:0079\n1:007a\n")
+    assert(programFile(program).content.contains("\nCultureInfo.CurrentCulture = CultureInfo.InvariantCulture;\n"))
+
+  test("RuntimeAttackProgram.generate: the data of Java and .NET"):
+    val repeat =
+      AttackPattern(Seq((UString.empty, UnitMode.CodePoint.decode("a"), 0)), UnitMode.CodePoint.decode("!"), 31)
+    assertEquals(generate("^a*$", "i", Dialect.Java, repeat).script, "i\n005e0061002a0024\n31:0061\n1:0021\n")
+    // Java's data has the UTF-16 encoding of the code points, and .NET's has the UTF-16 code units as they are.
+    val astral = AttackPattern(Seq((UString.empty, UnitMode.CodePoint.decode("😀"), 0)), UString.empty, 2)
+    assertEquals(generate("😀", "", Dialect.Java, astral).script, "-\nd83dde00\n2:d83dde00\n")
+    val utf16 = AttackPattern(Seq((UString.empty, UString(0xd83d, 0xde00), 0)), UString.empty, 2)
+    assertEquals(generate("😀", "", Dialect.DotNet, utf16).script, "-\nd83dde00\n2:d83dde00\n")
+    assertEquals(generate("", "", Dialect.Java, AttackPattern(Seq.empty, UString.empty, 0)).script, "-\n-\n")
+    // A negative repeat count is zero.
+    val negative = AttackPattern(Seq((UString.empty, UnitMode.CodePoint.decode("a"), -3)), UString.empty, 2)
+    assertEquals(generate("a", "i", Dialect.Java, negative).script, "i\n0061\n0:0061\n")
+
+  test("RuntimeAttackProgram.generate: Perl"):
+    val program = generate("f/o$", "ix", Dialect.Perl())
+    assertEquals(program.executor, PerlExecutor)
+    assertEquals(
+      program.script,
+      """|use utf8;
+         |use POSIX ();
+         |use Time::HiRes ();
+         |$| = 1;
+         |POSIX::setlocale(POSIX::LC_ALL(), "C");
+         |print "recheck:runtime perl " . sprintf("%vd", $^V) . "\n";
+         |my $regex = qr!f/o$!ix;
+         |my $input = "x" . "y" x 2 . "z";
+         |utf8::upgrade($input);
+         |print "recheck:start\n";
+         |my $start = Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC());
+         |my $matched = $input =~ $regex;
+         |printf "recheck:time %d\n", (Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC()) - $start) * 1000;
+         |""".stripMargin
+    )
+    assertEquals(
+      line(generate("a", "", Dialect.Perl(), nonASCII), "my $input"),
+      "my $input = \"\\xE9\" x 3 . \"\\x00\";"
+    )
+    // Modifiers that `qr` does not take are dropped.
+    assertEquals(line(generate("a", "gi", Dialect.Perl()), "my $regex"), "my $regex = qr/a/i;")
+
+  test("RuntimeAttackProgram.generate: Perl unsafe patterns"):
+    def generate(source: String): Either[String, RuntimeAttackProgram] =
+      RuntimeAttackProgram.generate(source, "", Dialect.Perl(), modeOf(source, "", Dialect.Perl()), attack)
+
+    val unsafe = "The pattern cannot be a Perl regex literal, which would interpolate a variable or run code"
+    assert(generate("a$|b$").isRight)
+    assert(generate("(a$)\\$x\\@x").isRight)
+    assertEquals(generate("a$x"), Left(unsafe))
+    assertEquals(generate("a@x"), Left(unsafe))
+    assertEquals(
+      generate("/!,;~%&:=\"|^-"),
+      Left("The pattern cannot be a Perl regex literal, since it contains every delimiter")
+    )
+
+  test("RuntimeAttackProgram.generate: Perl string patterns"):
+    def generate(source: String, flags: String, utf8: Boolean = true): RuntimeAttackProgram =
+      this.generate(source, flags, Dialect.Perl(utf8, PerlSource.String))
+
+    // A string pattern is not interpolated again, so any pattern can run.
+    val chars = generate("a$x@y/é", "gi")
+    assertEquals(
+      line(chars, "my $regex"),
+      "my $regex = do { my $pattern = \"a\\$x\\@y/\\xE9\"; utf8::upgrade($pattern); qr/$pattern/i };"
+    )
+    assert(chars.script.startsWith("use utf8;\n"))
+    assertEquals(line(chars, "utf8::"), "utf8::upgrade($input);")
+    val bytes = generate("é", "", utf8 = false)
+    assertEquals(
+      line(bytes, "my $regex"),
+      "my $regex = do { my $pattern = \"\\xC3\\xA9\"; utf8::downgrade($pattern, 1); qr/$pattern/ };"
+    )
+    assert(!bytes.script.contains("use utf8"))
+    assertEquals(line(bytes, "utf8::"), "utf8::downgrade($input, 1);")
+
+  test("RuntimeAttackProgram.generate: Perl literal patterns"):
+    def generate(source: String, utf8: Boolean): RuntimeAttackProgram =
+      this.generate(source, "", Dialect.Perl(utf8))
+
+    val chars = generate("é\\w", utf8 = true)
+    assertEquals(line(chars, "my $regex"), "my $regex = qr/é\\w/;")
+    assert(chars.script.startsWith("use utf8;\n"))
+    assertEquals(line(chars, "utf8::"), "utf8::upgrade($input);")
+    val bytes = generate("\\w", utf8 = false)
+    assertEquals(line(bytes, "my $regex"), "my $regex = qr/\\w/;")
+    assert(!bytes.script.contains("use utf8"))
+    assertEquals(line(bytes, "utf8::"), "utf8::downgrade($input, 1);")
+
+  test("RuntimeAttackProgram.generate: Perl code in patterns"):
+    def isGenerated(source: String): Boolean =
+      RuntimeAttackProgram.generate(source, "", Dialect.Perl(), UnitMode.CodePoint, attack).isRight
+
+    assert(isGenerated("a$"))
+    assert(isGenerated("\\$x"))
+    assert(isGenerated("a@-"))
+    assert(!isGenerated("${x}"))
+    assert(!isGenerated("@{[1]}"))
+    assert(!isGenerated("(?{ 1 })"))
+    assert(!isGenerated("(??{ 1 })"))
+    assert(!isGenerated("(*{ 1 })"))
+
+  test("RuntimeAttackProgram.generate: PCRE"):
+    val program = generate("/#é$", "iu", Dialect.PCRE)
+    assertEquals(program.executor, PHPExecutor)
+    assertEquals(
+      program.script,
+      """|<?php
+         |echo "recheck:runtime php ", PHP_VERSION, " (PCRE2 ", PCRE_VERSION, ", pcre.jit=", ini_get('pcre.jit'), ", pcre.backtrack_limit=", ini_get('pcre.backtrack_limit'), ", pcre.recursion_limit=", ini_get('pcre.recursion_limit'), ")\n";
+         |$regex = "~/#é\$~iu";
+         |$input = 'x' . str_repeat('y', 2) . 'z';
+         |if (@preg_match($regex, '') === false) {
+         |  fwrite(STDERR, (error_get_last()['message'] ?? preg_last_error_msg()) . "\n");
+         |  exit(1);
+         |}
+         |echo "recheck:start\n";
+         |$start = hrtime(true);
+         |$result = preg_match($regex, $input);
+         |$time = intdiv(hrtime(true) - $start, 1000000);
+         |if ($result === false) {
+         |  if (preg_last_error() === PREG_BACKTRACK_LIMIT_ERROR) {
+         |    echo "recheck:engine-limit ", preg_last_error_msg(), "\n";
+         |    exit(0);
+         |  }
+         |  if (in_array(preg_last_error(), [PREG_RECURSION_LIMIT_ERROR, PREG_JIT_STACKLIMIT_ERROR], true)) {
+         |    echo "recheck:engine-error ", preg_last_error_msg(), "\n";
+         |    exit(0);
+         |  }
+         |  fwrite(STDERR, preg_last_error_msg() . "\n");
+         |  exit(1);
+         |}
+         |echo "recheck:time ", $time, "\n";
+         |""".stripMargin
+    )
+    assertEquals(
+      line(generate("é", "u", Dialect.PCRE, nonASCII), "$input"),
+      "$input = str_repeat(\"é\", 3) . \"\\x00\";"
+    )
+    // Without `u`, the input is bytes.
+    assertEquals(
+      line(generate("é", "", Dialect.PCRE, nonASCII), "$input"),
+      "$input = str_repeat(\"\\xE9\", 3) . \"\\x00\";"
+    )
+    // The modifiers pass through.
+    assertEquals(line(generate("a", "ADJSUXimnrsux", Dialect.PCRE), "$regex"), "$regex = '/a/ADJSUXimnrsux';")
+    // It falls back to a control character for the delimiter.
+    assertEquals(line(generate("/#~!%@;,|=:", "", Dialect.PCRE), "$regex"), "$regex = \"\\x01/#~!%@;,|=:\\x01\";")
+
+  test("RuntimeAttackProgram.generateScript"):
+    def script(source: String, dialect: Dialect): RuntimeAttackProgram.Script =
+      RuntimeAttackProgram.generateScript(source, "", dialect, modeOf(source, "", dialect), attack).toOption.get
+
+    val js = script("foo", Dialect.JavaScript)
+    assertEquals(js.name, "runtime-attack.cjs")
+    assertEquals(js.command, "node runtime-attack.cjs")
+    assertEquals(js.content, "// Run: node runtime-attack.cjs\n" + generate("foo", "", Dialect.JavaScript).script)
+    assertEquals(script("foo", Dialect.Python()).command, "python3 -I runtime-attack.py")
+    assert(script("foo", Dialect.Python()).content.startsWith("# Run: python3 -I runtime-attack.py\nimport "))
+    assertEquals(script("foo", Dialect.Ruby()).command, "ruby runtime-attack.rb")
+    assertEquals(script("foo", Dialect.Perl()).command, "perl runtime-attack.pl")
+    assert(script("foo", Dialect.Perl()).content.startsWith("# Run: perl runtime-attack.pl\nuse utf8;\n"))
+    // PHP reads the comment after `<?php`.
+    val php = script("foo", Dialect.PCRE)
+    assertEquals(php.command, "php runtime-attack.php")
+    assert(clue(php.content).startsWith("<?php\n// Run: php runtime-attack.php\necho "))
+    // Java and .NET have the data in the program.
+    val java = script("foo", Dialect.Java)
+    assertEquals(java.command, "java --source 17 runtime-attack.java")
+    assert(java.content.startsWith("// Run: java --source 17 runtime-attack.java\nimport "))
+    assert(
+      clue(java.content).contains("String[] lines = \"-\\n0066006f006f\\n1:0078\\n2:0079\\n1:007a\\n\".split(\"\\n\");")
+    )
+    val dotnet = script("foo", Dialect.DotNet)
+    assertEquals(dotnet.command, "dotnet run runtime-attack.cs")
+    assert(dotnet.content.startsWith("// Run: dotnet run runtime-attack.cs\nusing "))
+    assert(clue(dotnet.content).contains("var lines = \"-\\n0066006f006f\\n1:0078\\n2:0079\\n1:007a\\n\".Split("))
+    assert(RuntimeAttackProgram.generateScript("a$x", "", Dialect.Perl(), UnitMode.CodePoint, attack).isLeft)
+    // Java splits long data into literals, since a string constant has at most 65535 bytes.
+    val long = script("a" * 2500, Dialect.Java).content
+    assert(clue(long).contains("String[] lines = String.join(\"\", \"-\\n00610061"))
+    assert(long.contains("006100\", \"61\\n1:0078\\n2:0079\\n1:007a\\n\").split("))
+
+  test("RuntimeAttackProgram.generate: the variables of the runtimes"):
+    val dialects = Seq(
+      Dialect.JavaScript,
+      Dialect.Python(Dialect.Python.Type.Bytes),
+      Dialect.Ruby(),
+      Dialect.Java,
+      Dialect.DotNet,
+      Dialect.Perl(utf8 = false, source = PerlSource.String),
+      Dialect.PCRE
+    )
+    assertEquals(
+      dialects.map(d => generate("a", "", d).executor.variable),
+      Seq("NODE", "PYTHON", "RUBY", "JAVA", "DOTNET", "PERL", "PHP").map("RECHECK_" + _)
+    )
+
+  test("RuntimeAttackProgram.generate: empty attack string"):
+    val empty = AttackPattern(Seq.empty, UString.empty, 0)
+    assertEquals(line(generate("a", "", Dialect.Python(), empty), "string"), "string = ''")
+    assertEquals(line(generate("a", "", Dialect.PCRE, empty), "$input"), "$input = '';")

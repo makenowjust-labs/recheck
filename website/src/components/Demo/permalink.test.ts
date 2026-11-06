@@ -4,6 +4,7 @@ import { parseParams } from "./params";
 import {
   decode,
   encode,
+  hotspotOf,
   makeSnapshot,
   sameRequest,
   summarize,
@@ -14,7 +15,7 @@ import type { Build } from "./builds";
 import type { Snapshot } from "./permalink";
 
 const build: Build = { type: "release", version: "4.6.1" };
-const params = parseParams({});
+const params = parseParams({}, build);
 const date = "2026-10-25T00:00:00.000Z";
 
 const safe: Snapshot = {
@@ -37,7 +38,10 @@ const vulnerable: Snapshot = {
     checker: "automaton",
     complexity: { type: "exponential", summary: "exponential" },
     attackPattern: "'a'.repeat(1000) + '\\x00'",
-    hotspot: [{ start: 2, end: 5, temperature: "heat" }],
+    hotspot: [
+      { start: 2, end: 3, temperature: "heat" },
+      { start: 4, end: 5, temperature: "normal" },
+    ],
   },
 };
 
@@ -51,6 +55,8 @@ describe("makeSnapshot", () => {
     const diagnostics: Diagnostics = {
       source: "^(a|a)*$",
       flags: "",
+      dialect: { name: "javascript" },
+      unitMode: "utf16",
       status: "vulnerable",
       checker: "automaton",
       complexity: {
@@ -65,7 +71,12 @@ describe("makeSnapshot", () => {
         string: "a".repeat(1000) + "\x00",
         pattern: "'a'.repeat(1000) + '\\x00'",
       },
-      hotspot: [{ start: 2, end: 5, temperature: "heat" }],
+      hotspot: [
+        { start: 2, end: 3, temperature: "hot" },
+        { start: 4, end: 5, temperature: "warm" },
+      ],
+      runtimeAttack: null,
+      refutedAttacks: [],
     };
     expect(snapshot("/^(a|a)*$/", diagnostics)).toEqual(vulnerable);
   });
@@ -74,9 +85,12 @@ describe("makeSnapshot", () => {
     const diagnostics: Diagnostics = {
       source: "a",
       flags: "",
+      dialect: { name: "javascript" },
+      unitMode: "utf16",
       status: "safe",
       checker: "automaton",
       complexity: { type: "safe", summary: "safe", isFuzz: false },
+      refutedAttacks: [],
     };
     expect(snapshot("/a/", diagnostics)).toEqual(safe);
   });
@@ -92,8 +106,11 @@ describe("makeSnapshot", () => {
     const unknown: Diagnostics = {
       source: "a",
       flags: "",
+      dialect: { name: "javascript" },
+      unitMode: null,
       status: "unknown",
       error: { kind: "timeout" },
+      refutedAttacks: [],
     };
     expect(snapshot("/a/", unknown).result).toEqual({
       status: "unknown",
@@ -144,8 +161,18 @@ describe("sameRequest", () => {
     expect(sameRequest(safe, safe.input, params)).toBe(true);
     expect(sameRequest(safe, "/b/", params)).toBe(false);
     expect(
-      sameRequest(safe, safe.input, parseParams({ checker: "fuzz" })),
+      sameRequest(safe, safe.input, parseParams({ checker: "fuzz" }, build)),
     ).toBe(false);
+  });
+});
+
+describe("hotspotOf", () => {
+  test("maps the temperatures of the permalinks to those of Diagnostics", () => {
+    const { result } = vulnerable;
+    expect(result.status === "vulnerable" && hotspotOf(result)).toEqual([
+      { start: 2, end: 3, temperature: "hot" },
+      { start: 4, end: 5, temperature: "warm" },
+    ]);
   });
 });
 

@@ -1,0 +1,135 @@
+---
+id: runtime-attack-verification
+title: Runtime-Attack Verification
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+Describes the runtime-attack verification, which checks an attack string that `recheck` finds by running it on the real regex engine of the [dialect](dialects.mdx).
+
+## Overview
+
+An attack string that `recheck` reports may not work on the engine that actually runs the pattern.
+`recheck` models a naive backtracking engine, but most engines have optimizations that make some vulnerable patterns fast (see [Approximations](dialects.mdx#approximations)).
+For example, `recheck` reports `^(a|a)*$` as exponential in every dialect, while Ruby 4.0 matches its attack string in less than 1 ms by its memoization.
+
+To avoid such a wrong report, `recheck` can run each attack string on the real engine of the dialect before reporting it, which is called the runtime attack.
+When the matching does not finish within the timeout, the runtime attack confirms the attack, and `recheck` reports it.
+When the matching finishes, the runtime attack refutes the attack, and `recheck` looks for another attack string instead (see [Refuted Attacks](#refuted-attacks)).
+
+## Usage
+
+The runtime-attack verification runs when [`runtimeAttackTimeout`](parameters.mdx#runtimeattacktimeout) is positive.
+
+<Tabs>
+<TabItem value="cli" label="CLI">
+
+```console
+$ recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
+```
+
+</TabItem>
+<TabItem value="js" label="JavaScript">
+
+```tsx
+import { check } from "recheck";
+
+await check("^(a|a)*$", "", { dialect: "ruby", runtimeAttackTimeout: 1000 });
+```
+
+</TabItem>
+<TabItem value="scala" label="Scala">
+
+```scala
+import scala.concurrent.duration.*
+
+import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.resyntax.dialect.Dialect
+
+ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Ruby(), runtimeAttackTimeout = 1.second))
+```
+
+</TabItem>
+</Tabs>
+
+:::info
+
+The runtime-attack verification is off by default, so enable it explicitly as above.
+
+:::
+
+On Ruby 4.0, the runtime attack refutes the attack of `^(a|a)*$`, so the result is `safe`, and the CLI shows the refuted attack after the result.
+
+```console
+$ recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
+Input     : /^(a|a)*$/
+Dialect   : ruby (encoding: UTF-8)
+Status    : safe
+Complexity: linear
+Checker   : automaton
+
+Refuted attacks:
+- Complexity    : exponential
+  Attack string : "a" + "a" * 31 + "\x00"
+  Runtime attack: refuted (finished in 0 ms on ruby 4.0.7, timeout: 1000 ms)
+```
+
+The result records the runtime attack as `runtimeAttack` of `vulnerable` diagnostics, and the refuted attacks in `refutedAttacks` (see [Diagnostics](diagnostics.mdx#runtime-attack-verification)).
+
+:::info
+
+The runtime-attack verification runs only where `recheck` can run commands.
+It does not run in the browser or with the Scala.js build (the `worker` and `pure` backends of the JavaScript library).
+
+:::
+
+## Refuted Attacks
+
+A refuted attack shows that the pattern is vulnerable on a naive backtracking engine, though the dialect's engine is not affected by the attack.
+When no attack is confirmed, the result is `safe`, with the refuted attacks in `refutedAttacks`.
+However, when [`maxRefutedAttacks`](parameters.mdx#maxrefutedattacks) attacks are refuted, the checking stops there, and the result is `unknown` with the `runtime-attacks-refuted` error.
+
+## Engine Limits and Errors
+
+Some engines stop a long matching before the timeout, and the runtime attack tells the two kinds of stops apart.
+
+An engine limit is a limit on the number of the matching steps.
+When the engine stops on it, the attack is considered effective, so the runtime-attack verification confirms the attack as with a timeout.
+The result records it as `engine-limit`.
+
+An engine error is an error on the stack depth or the memory.
+The engines may raise it on a long string even if the matching takes linear time, so it does not show that the attack is effective, and the runtime-attack verification refutes the attack.
+The result records it as `engine-error` with the message (see [Diagnostics](diagnostics.mdx#runtime-attack-verification)).
+
+When the command cannot run (e.g. the runtime is not installed), the result is `unknown` with an `unexpected` error.
+
+## Runtime Command
+
+By default, the runtime-attack verification runs the runtime of the dialect found by its name in `PATH` (e.g. `ruby` for the `ruby` dialect).
+To use another runtime, set the environment variable of the dialect (e.g. `RECHECK_RUBY`) to the command line to run instead.
+Each dialect's page (see [Dialects](dialects.mdx#supported-dialects)) lists its command and its environment variable.
+`recheck` adds the dialect's arguments after the command line (e.g. `-` for `ruby`), as it does to the default command.
+
+For example, the following uses Ruby installed in `/opt/ruby-4.0` with `--disable-gems`.
+
+```console
+$ RECHECK_RUBY='/opt/ruby-4.0/bin/ruby --disable-gems' recheck --dialect=ruby --runtime-attack-timeout=1s '/^(a|a)*$/'
+```
+
+The environment variables work with the JavaScript library and the ESLint plugin too, since they pass their environment to `recheck`.
+
+## Runtime-Attack Script
+
+The CLI's `generate-runtime-attack-script` subcommand writes the program that the runtime-attack verification runs as a standalone script, so that you can run the attack on the engine yourself.
+It takes a file of `vulnerable` diagnostics in JSON (`-` reads the standard input), which is the output of the CLI with `--json`, or the result of the JavaScript library.
+
+```console
+$ recheck --json --dialect=python '/^(a|a)*$/' > diagnostics.json
+$ recheck generate-runtime-attack-script diagnostics.json > runtime-attack.py
+$ python3 -I runtime-attack.py
+```
+
+The script prints the lines that the runtime-attack verification reads: `recheck:runtime` with the runtime, `recheck:start` before the matching, and `recheck:time` with the matching time in milliseconds (or `recheck:engine-limit` or `recheck:engine-error` with the message).
+It has no timeout, so an effective attack does not end soon.

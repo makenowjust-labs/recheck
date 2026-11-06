@@ -112,7 +112,7 @@ final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]):
 
     None
 
-  /** Computes a new graph collects vertices and edges can be reachable from the init vertices. */
+  /** Computes a new graph of the vertices and the edges reachable from the init vertices. */
   def reachable(init: Set[V])(using ctx: Context): Graph[V, L] = ctx.interrupt:
     val queue = mutable.Queue.empty[V]
     val reachable = mutable.Set.empty[V]
@@ -140,5 +140,6 @@ final case class Graph[V, L] private (neighbors: Map[V, IndexedSeq[(L, V)]]):
     val map = mutable.Map.empty[V, Set[V]]
     def dfs(v1: V): Set[V] = ctx.interrupt:
       map.getOrElseUpdate(v1, Set(v1) ++ neighbors(v1).flatMap { case (_, v) => dfs(v) }.toSet)
+
     vertices.foreach(dfs)
     map.toMap

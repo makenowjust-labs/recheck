@@ -1,0 +1,143 @@
+---
+id: diagnostics
+title: Diagnostics
+---
+
+import Hotspot from "@site/src/components/Hotspot";
+
+`Diagnostics` is what `check` reports about a regular expression.
+It is not a final verdict on whether the regular expression is a threat.
+It is the evidence for judging the ReDoS risk: whether an attack string was found, the estimated complexity, the attack string itself, and how they were found.
+Whether a finding matters depends on how the regular expression is used, e.g. how long an input can reach it and which engine runs it.
+`recheck` cannot know them, so it gives you the evidence to decide for your use, and this page describes how to read it.
+A tool using `recheck` can also make the decision for you, as the [ESLint plugin](as-eslint-plugin.mdx) does by its options.
+
+In Scala, `Diagnostics` is a `sealed class`, and in TypeScript, it is a serialized object.
+They have the same information, which this page describes.
+
+## Common Fields
+
+Every `Diagnostics` has the following fields.
+
+- `source` is the given regular expression’s source string.
+- `flags` is the given regular expression’s flags string.
+- `dialect` is the given [`dialect`](parameters.mdx#dialect) parameter, as an object of the name and every setting of the dialect.
+- `unitMode` is the unit of the attack strings (see [Matching Units](dialects.mdx#matching-units)).
+  It is `null` in `unknown` diagnostics when the error happened on parsing the pattern.
+- `checker` is a checker type to be used (one of `fuzz` and `automaton`).
+
+## Status
+
+`Diagnostics` has three statuses.
+
+- `safe` means that the checking found no attack string within its limits.
+  The fuzz checker may miss an attack string, so `safe` diagnostics from it (`complexity.isFuzz` is `true`) are weaker evidence than those from the automaton checker.
+- `vulnerable` means that the checking found an attack string, which is the evidence of the vulnerability (see [Attack String](#attack-string)).
+  When the runtime-attack verification is enabled, the attack string is also confirmed on the real engine (see [Runtime-Attack Verification](#runtime-attack-verification)).
+- `unknown` means that the checking could not finish (timeout, cancel, or error), so it gives no evidence either way. It has the `error` field to describe the reason for this result.
+  Its `kind` is one of `timeout`, `cancel`, `unsupported`, `invalid`, `runtime-attacks-refuted` (see [Runtime-Attack Verification](#runtime-attack-verification)) and `unexpected`.
+
+## Complexity
+
+`safe` and `vulnerable` have the `complexity` field.
+This field contains the matching time complexity estimated in this checking.
+There are five `complexity` varieties.
+
+- `safe`, `constant`, and `linear` are safe matching time complexities.
+  `safe` means that the checking found no attack string, but it did not estimate the complexity.
+- `polynomial` is a vulnerable matching time complexity. It has an additional field called `degree`, which is the degree of the polynomial.
+  The degree shows how fast the matching time grows: e.g. with degree 2, an input 10 times longer takes about 100 times longer.
+- `exponential` is a vulnerable matching time complexity.
+
+Every complexity has the `isFuzz` field.
+It is `true` when the fuzz checker estimated the complexity by running the matching, which may be wrong, and `false` when the automaton checker analysed it.
+
+:::caution
+
+If the complexity is exponential, you must fix the regular expression as soon as possible.
+It may invoke a matching time explosion against too little string (`length < 100`).
+
+:::
+
+## Attack String
+
+An attack string is a string that makes the matching time explode, which is the evidence of the ReDoS vulnerability.
+`vulnerable` diagnostics have it in the `attack` field.
+
+It has a repetition structure: it consists of `pumps`, `suffix`, and the `base` repetition count.
+Each element of `pumps` has `prefix`, the repeated substring `pump`, and its own repetition count `bias`.
+The actual string is `prefix + pump.repeat(base + bias) + ... + suffix`.
+
+The `attack` field also has these fields.
+
+- `string` is the actual string. Its characters are UTF-16 code units, or bytes as the characters of the same codes (as Latin-1) when `unitMode` is `byte`.
+- `pattern` is an expression that evaluates to the actual string in the host language of the [dialect](dialects.mdx).
+  The attack string of `/^(a|a)*$/` looks like the following.
+
+  | Dialect      | Language   | `attack.pattern`                                                               |
+  | ------------ | ---------- | ------------------------------------------------------------------------------ |
+  | `javascript` | JavaScript | `'a'.repeat(31) + '\x00'`                                                      |
+  | `python`     | Python     | `'a' * 31 + '\x00'`, or `b'a' * 31 + b'\x00'` for `bytes`                      |
+  | `ruby`       | Ruby       | `"a" + "a" * 31 + "\x00"`, or `"a".b + "a".b * 31 + "\x00".b` for `ASCII-8BIT` |
+  | `java`       | Java       | `"a".repeat(31) + "\u0000"`                                                    |
+  | `dotnet`     | C#         | `string.Concat(Enumerable.Repeat("a", 31)) + "\u0000"` (`System.Linq`)         |
+  | `perl`       | Perl       | `"a" x 31 . "\x00"`                                                            |
+  | `pcre`       | PHP        | `str_repeat('a', 31) . "\x00"`                                                 |
+
+Note that the attack string is computed in theory, so it may not cause the explosion on the real engine because of the engine's optimizations.
+The runtime-attack verification checks it on the real engine.
+
+## Runtime-Attack Verification
+
+These fields record the [runtime-attack verification](runtime-attack-verification.mdx).
+
+`vulnerable` diagnostics have the `runtimeAttack` field, which records the runtime attack of the attack string, or is `null` if it is not run.
+
+- `runtime` is the runtime name and version (e.g. `node v26.11.1`).
+- `timeout` is the timeout of the matching in milliseconds (`null` if it is infinite).
+- `result` is the result of the matching. Its `kind` is one of the following.
+  - `finish` means the matching finished in `time` milliseconds.
+  - `timeout` means the matching did not finish in time.
+  - `engine-limit` means the engine stopped on its limit of the matching steps. It has `message`.
+  - `engine-error` means the engine gave up with an error on the stack depth or the memory. It has `message`.
+- `isConfirmed` is whether the runtime attack confirms the attack (`timeout` or `engine-limit`).
+
+The diagnostics of every status have the `refutedAttacks` field, which lists the attacks that the runtime-attack verification refuted, in the order of the checking.
+Each element has the `complexity`, `attack`, `hotspot` and `runtimeAttack` fields of the refuted attack, which are the same as those of `vulnerable` diagnostics.
+
+## Hotspot
+
+A hotspot is a part of the regular expression that the matching runs many times on the attack string.
+It shows where the matching time explodes, so it is where to look at when fixing the regular expression.
+
+`vulnerable` diagnostics have the `hotspot` field, and so do the elements of `refutedAttacks`.
+It is a list of spots, and each spot has the following fields.
+
+- `start` and `end` are the range of the spot in `source`, counted in UTF-16 code units, where `end` is exclusive.
+- `temperature` is `hot` or `warm`.
+  A `hot` spot is a part that the matching repeats many times, which causes the explosion.
+  A `warm` spot is a part that the matching runs on the way to a `hot` spot.
+
+For example, the hotspot of `/^x(a|a)*y$/` is the following.
+
+```json
+[
+  { "start": 1, "end": 2, "temperature": "warm" },
+  { "start": 3, "end": 4, "temperature": "hot" },
+  { "start": 5, "end": 6, "temperature": "hot" }
+]
+```
+
+The Playground shows it as follows, with the `hot` spots in red and the `warm` spots in yellow.
+
+<Hotspot
+  source="^x(a|a)*y$"
+  hotspot={[
+    { start: 1, end: 2, temperature: "warm" },
+    { start: 3, end: 4, temperature: "hot" },
+    { start: 5, end: 6, temperature: "hot" },
+  ]}
+/>
+
+The automaton checker makes the repeated part of the ambiguity `hot`.
+The fuzz checker counts how many times the matching runs each part on the attack string, and it makes a part `hot` when the count is at least [`heatRatio`](parameters.mdx#heatratio) times the largest count.

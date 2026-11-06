@@ -38,23 +38,25 @@ ReDoS.check("^(a|a)*$", "")
 The first argument of `ReDoS.check` is the `source` which is corresponding to [`RegExp.prototype.source`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/source).
 And, the second argument is the `flags` which is corresponding to [`RegExp.prototype.flags`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/flags) too.
 The third argument is the `params` to specify parameters for the checker behavior, and the fourth is the `token` to cancel the checking in the middle.
+The `dialect` parameter (e.g. `Parameters(dialect = Dialect.Python())` or `Parameters(dialect = Dialect.Python(Dialect.Python.Type.Bytes))` with `codes.quine.labs.resyntax.dialect.Dialect`) checks a regular expression of another language (see [Dialects](dialects.mdx)).
 
 :::info
 
-See [this page](parameters.md) for detailed information on `Parameters` value.
+See [this page](parameters.mdx) for detailed information on `Parameters` value.
 
 :::
 
 The result of `ReDoS.check` is called `Diagnostics`.
+It is the evidence for judging the ReDoS risk of the regular expression, not a final verdict.
 `Diagnostics` is a `sealed class`, and it has three child classes.
 
-- `Diagnostics.Safe` means the given regular expression seems safe at least in this checking.
-- `Diagnostics.Vulnerable` means vulnerability in the given regular expression is found.
-- `Diagnostics.Unknown` means something wrong happened in checking (timeout, cancel, or error).
+- `Diagnostics.Safe` means that the checking found no attack string within its limits.
+- `Diagnostics.Vulnerable` means that the checking found an attack string.
+- `Diagnostics.Unknown` means that the checking could not finish (timeout, cancel, or error).
 
 :::info
 
-See [this page](diagnostics.md) for detailed information on `Diagnostics` value.
+See [this page](diagnostics.mdx) for detailed information on the `Diagnostics` value.
 
 :::
 
@@ -100,7 +102,7 @@ Please use this instead of the manual way.
 
 The above example does not work with `cats-effect` better actually, because `fiber` has `cancel` method and it does not work with this method.
 
-To fix this problem, we can use `IO.async`. The following is the complete example. However, by `cats-effect` restriction, it will lose a result diagnostics when a fiber is cancelled.
+To fix this problem, we can use `IO.async`. The following is the complete example. However, because of a restriction of `cats-effect`, it loses the diagnostics when a fiber is cancelled.
 
 ```scala
 import scala.concurrent.duration._

@@ -44,6 +44,7 @@ And, the importance of checking ReDoS vulnerability statically is increasing.
 
 `recheck` is a library to check ReDoS vulnerability in the given regular expression.
 Using `recheck`, you can find vulnerabilities in the given regular expression and can obtain an attack string to the vulnerability.
+The result of a check is the [diagnostics](usage/diagnostics.mdx) of the regular expression: the evidence for judging its ReDoS risk, such as the attack string and the estimated complexity, rather than a final verdict.
 
 The following is an incomplete list of `recheck` features.
 
@@ -51,9 +52,9 @@ The following is an incomplete list of `recheck` features.
   The implementation contains fuzzing with static analysis, and criteria to decide which algorithm is better to use against a regular expression,
   the algorithm based on automata theory or the fuzzing algorithm.
 - Supports practical regular expression including backreferences and look-around operations.
-  Especially, it follows ECMA-262 (as known as JavaScript) specification.
-- Integrated recall validation.
-  It can validate ReDoS vulnerability using the real interpreter when the candidate of the vulnerability is found.
+  It follows the ECMA-262 (also known as JavaScript) specification by default, and it also supports the dialects of Python, Ruby, Java, .NET, Perl and PCRE (see [Dialects](usage/dialects.mdx)).
+- Integrated runtime-attack verification.
+  It can verify ReDoS vulnerability using the real interpreter of the dialect when the candidate of the vulnerability is found.
 - Published as a library in JavaScript and Scala.
   You can embed `recheck` into your application easily.
 - Provides ESLint plugin.

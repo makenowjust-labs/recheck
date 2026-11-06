@@ -24,11 +24,11 @@ object ReDoSJS:
   def check(source: String, flags: String, originalParams: js.UndefOr[js.Any]): js.Any =
     decodeJs[Parameters](originalParams.getOrElse(js.Object())) match
       case Right(params) =>
-        // `params.logger` is
+        // `params.logger` is a dummy, so the logger calls the original JavaScript function.
         val logger = Option.when[Context.Logger](params.logger.isDefined):
           val jsLogger =
             originalParams.asInstanceOf[js.Dictionary[js.Any]]("logger").asInstanceOf[js.Function1[String, Unit]]
           (message: String) => jsLogger(message)
         val d = ReDoS.check(source, flags, params.copy(logger = logger))
-        convertJsonToJs(d.asJson) // Back it to JavaScript object.
+        convertJsonToJs(d.asJson)
       case Left(ex) => throw ex

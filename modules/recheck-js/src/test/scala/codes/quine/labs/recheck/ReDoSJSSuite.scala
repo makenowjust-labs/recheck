@@ -25,3 +25,17 @@ class ReDoSJSSuite extends munit.FunSuite:
       "safe"
     )
     assertEquals(seq.result().nonEmpty, true)
+
+  test("ReDoSJS.check: dialect"):
+    def dialect(params: js.Any): String =
+      js.JSON.stringify(ReDoSJS.check("a", "", params).asInstanceOf[js.Dictionary[js.Any]]("dialect"))
+
+    assertEquals(dialect(()), """{"name":"javascript"}""")
+    assertEquals(dialect(js.Dynamic.literal(dialect = "python")), """{"name":"python","type":"str"}""")
+    assertEquals(
+      dialect(js.Dynamic.literal(dialect = js.Dynamic.literal(name = "perl", source = "string"))),
+      """{"name":"perl","utf8":true,"source":"string"}"""
+    )
+    interceptMessage[DecodingFailure]("DecodingFailure at .dialect: Unknown encoding of ruby: str") {
+      ReDoSJS.check("a", "", js.Dynamic.literal(dialect = js.Dynamic.literal(name = "ruby", encoding = "str")))
+    }

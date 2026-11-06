@@ -1,0 +1,21 @@
+package codes.quine.labs.resyntax.dialect
+
+/** PerlSource is how a Perl pattern reaches the regex engine. */
+enum PerlSource:
+
+  /** Literal is a regex literal written in Perl source (e.g. `qr/.../`).
+    *
+    * Perl's lexer applies `\U`, `\L`, `\u`, `\l`, `\F`, `\Q` and `\E` to its text before the regex engine reads it.
+    */
+  case Literal
+
+  /** String is a pattern from a runtime string (e.g. `qr/$p/`), which the regex engine reads unchanged. */
+  case String
+
+  def name: String = this match
+    case Literal => "literal"
+    case String  => "string"
+
+object PerlSource:
+
+  def of(name: String): Option[PerlSource] = values.find(_.name == name)

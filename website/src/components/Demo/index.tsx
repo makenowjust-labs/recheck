@@ -6,7 +6,7 @@ import { availableBuilds, findBuild, formatBuild, sameBuild } from './builds';
 import { loadChecker } from './checker';
 import DemoInput from './DemoInput';
 import DemoResult from './DemoResult';
-import { extract, parseParams } from './params';
+import { extract, formValues, parseParams } from './params';
 import { decode, encode, makeSnapshot, sameRequest, summarize } from './permalink';
 
 import type { Diagnostics } from 'recheck';
@@ -32,7 +32,7 @@ const Demo: React.FC = () => {
     if (snapshot !== null) {
       setRecorded(snapshot);
       const recordedBuild = findBuild(builds, formatBuild(snapshot.build)) ?? defaultBuild;
-      methods.reset({ input: snapshot.input, ...snapshot.params, version: formatBuild(recordedBuild) });
+      methods.reset({ input: snapshot.input, ...formValues(snapshot.params), version: formatBuild(recordedBuild) });
     }
   }, []);
 
@@ -43,9 +43,9 @@ const Demo: React.FC = () => {
     setLoadError(null);
 
     const input = String(values['input']);
-    const params = parseParams(values);
-    const extracted = extract(input);
     const build = findBuild(builds, String(values['version'])) ?? defaultBuild;
+    const params = parseParams(values, build);
+    const extracted = extract(input);
 
     if (recorded !== null && !sameRequest(recorded, input, params)) {
       setRecorded(null);
@@ -124,7 +124,14 @@ const Demo: React.FC = () => {
           </div>
         ) : null}
 
-        <DemoInput running={running} check={check} cancel={cancel} builds={builds} defaultBuild={defaultBuild} />
+        <DemoInput
+          running={running}
+          check={check}
+          cancel={cancel}
+          builds={builds}
+          build={build}
+          defaultBuild={defaultBuild}
+        />
 
         {running || current !== null ? (
           <DemoResult

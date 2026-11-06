@@ -2,27 +2,31 @@ package codes.quine.labs.recheck
 package codec
 
 import scala.concurrent.duration.Duration
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.duration.MILLISECONDS
 
 import io.circe.Decoder
 import io.circe.DecodingFailure
-import io.circe.DecodingFailure.Reason.MissingField
 import io.circe.Encoder
 import io.circe.HCursor
 import io.circe.Json
 import io.circe.syntax.*
 
-import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Checker
-import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.Parameters
-import codes.quine.labs.recheck.common.Seeder
 import codes.quine.labs.recheck.diagnostics.AttackComplexity
 import codes.quine.labs.recheck.diagnostics.AttackPattern
+import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.diagnostics.Diagnostics
 import codes.quine.labs.recheck.diagnostics.Diagnostics.ErrorKind
 import codes.quine.labs.recheck.diagnostics.Hotspot
-import codes.quine.labs.recheck.unicode.UString
+import codes.quine.labs.recheck.diagnostics.RefutedAttack
+import codes.quine.labs.recheck.diagnostics.RuntimeAttack
+import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
+import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UTF16Encoding
+import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.PerlSource
 
 /** Package `codec` provides recheck types `Decoder`/`Encoder` of circe. */
 package object codec
@@ -30,32 +34,124 @@ package object codec
 /** An `Encoder` for `Diagnostics`. */
 given encodeDiagnostics: Encoder[Diagnostics] with
   def apply(d: Diagnostics): Json = d match
-    case Diagnostics.Safe(source, flags, complexity, checker) =>
+    case Diagnostics.Safe(source, flags, dialect, unitMode, complexity, refutedAttacks, checker) =>
       Json.obj(
         "source" := source,
         "flags" := flags,
+        "dialect" := dialect,
+        "unitMode" := unitMode,
         "status" := "safe",
-        "checker" := checker,
-        "complexity" := complexity.asInstanceOf[AttackComplexity]
-      )
-    case Diagnostics.Vulnerable(source, flags, complexity, attack, hotspot, checker) =>
-      Json.obj(
-        "source" := source,
-        "flags" := flags,
-        "status" := "vulnerable",
-        "checker" := checker,
         "complexity" := complexity.asInstanceOf[AttackComplexity],
-        "attack" := attack,
-        "hotspot" := hotspot
+        "refutedAttacks" := refutedAttacks.map(encodeRefutedAttack(dialect, unitMode)(_)),
+        "checker" := checker
       )
-    case Diagnostics.Unknown(source, flags, error, checker) =>
+    case Diagnostics.Vulnerable(
+          source,
+          flags,
+          dialect,
+          unitMode,
+          complexity,
+          attack,
+          hotspot,
+          runtimeAttack,
+          refutedAttacks,
+          checker
+        ) =>
       Json.obj(
         "source" := source,
         "flags" := flags,
-        "status" := "unknown",
-        "checker" := checker,
-        "error" := error
+        "dialect" := dialect,
+        "unitMode" := unitMode,
+        "status" := "vulnerable",
+        "complexity" := complexity.asInstanceOf[AttackComplexity],
+        "attack" -> encodeAttackPattern(dialect, unitMode)(attack),
+        "hotspot" := hotspot,
+        "runtimeAttack" := runtimeAttack,
+        "refutedAttacks" := refutedAttacks.map(encodeRefutedAttack(dialect, unitMode)(_)),
+        "checker" := (checker: Checker)
       )
+    case Diagnostics.Unknown(source, flags, dialect, unitMode, error, refutedAttacks, checker) =>
+      Json.obj(
+        "source" := source,
+        "flags" := flags,
+        "dialect" := dialect,
+        "unitMode" := unitMode,
+        "status" := "unknown",
+        "error" := error,
+        "refutedAttacks" := refutedAttacks.map(encodeRefutedAttack(dialect, unitMode.get)(_)),
+        "checker" := checker
+      )
+
+/** An `Encoder` for `Dialect`, an object of the name and every setting. */
+given encodeDialect: Encoder[Dialect] with
+  def apply(d: Dialect): Json =
+    val settings = d match
+      case Dialect.Python(tpe)        => Seq("type" := tpe.name)
+      case Dialect.Ruby(encoding)     => Seq("encoding" := encoding.name)
+      case Dialect.Perl(utf8, source) => Seq("utf8" := utf8, "source" := source.name)
+      case _                          => Seq.empty
+    Json.obj(("name" := d.name) +: settings*)
+
+/** A `Decoder` for `Dialect`, which is the name of the language, or an object of the name and the settings.
+  *
+  * An omitted or `null` setting takes the default.
+  */
+given decodeDialect: Decoder[Dialect] with
+  def apply(c: HCursor): Decoder.Result[Dialect] =
+    def fail(message: String): Decoder.Result[Dialect] = Left(DecodingFailure(message, c.history))
+
+    def setting[A](dialect: Dialect, key: String, default: A)(of: String => Option[A]): Decoder.Result[A] =
+      c.get[Option[String]](key)
+        .flatMap:
+          case None       => Right(default)
+          case Some(name) => of(name).toRight(DecodingFailure(s"Unknown $key of ${dialect.name}: $name", c.history))
+
+    c.value.asString match
+      case Some(name) => Dialect.of(name).fold(fail(s"Unknown dialect: $name"))(Right(_))
+      case None       =>
+        c.get[String]("name")
+          .flatMap: name =>
+            Dialect.of(name) match
+              case None          => fail(s"Unknown dialect: $name")
+              case Some(dialect) =>
+                val keys = c.keys.toSeq.flatten.filter(_ != "name")
+                val allowed = dialect match
+                  case _: Dialect.Python => Seq("type")
+                  case _: Dialect.Ruby   => Seq("encoding")
+                  case _: Dialect.Perl   => Seq("utf8", "source")
+                  case _                 => Seq.empty
+                keys.find(!allowed.contains(_)) match
+                  case Some(key) => fail(s"Unknown setting of $name: $key")
+                  case None      =>
+                    dialect match
+                      case python: Dialect.Python =>
+                        setting(python, "type", python.`type`)(Dialect.Python.Type.of).map(Dialect.Python(_))
+                      case ruby: Dialect.Ruby =>
+                        setting(ruby, "encoding", ruby.encoding)(Dialect.Ruby.Encoding.of).map(Dialect.Ruby(_))
+                      case perl: Dialect.Perl =>
+                        for
+                          utf8 <- c.get[Option[Boolean]]("utf8")
+                          source <- setting(perl, "source", perl.source)(PerlSource.of)
+                        yield Dialect.Perl(utf8.getOrElse(perl.utf8), source)
+                      case dialect => Right(dialect)
+
+/** An `Encoder` for `UnitMode`. */
+given encodeUnitMode: Encoder[UnitMode] with
+  def apply(m: UnitMode): Json = m match
+    case UnitMode.UTF16          => "utf16".asJson
+    case UnitMode.UTF16CodePoint => "utf16-code-point".asJson
+    case UnitMode.CodePoint      => "code-point".asJson
+    case UnitMode.ScalarValue    => "scalar-value".asJson
+    case UnitMode.Byte           => "byte".asJson
+
+/** A `Decoder` for `UnitMode`, which is the inverse of [[encodeUnitMode]]. */
+given decodeUnitMode: Decoder[UnitMode] = Decoder[String].emap:
+  case "utf16"            => Right(UnitMode.UTF16)
+  case "utf16-code-point" => Right(UnitMode.UTF16CodePoint)
+  case "code-point"       => Right(UnitMode.CodePoint)
+  case "scalar-value"     => Right(UnitMode.ScalarValue)
+  case "byte"             => Right(UnitMode.Byte)
+  case name               => Left(s"Unknown unit mode: $name")
 
 /** An `Encoder` for `Checker`. */
 given encodeChecker: Encoder[Checker] with
@@ -78,9 +174,11 @@ given encodeAttackComplexity: Encoder[AttackComplexity] with
     case c: AttackComplexity.Exponential =>
       Json.obj("type" := "exponential", "summary" := c.toString, "isFuzz" := c.isFuzz)
 
-/** An `Encoder` for `AttackPattern`. */
-given encodeAttackPattern: Encoder[AttackPattern] with
-  def apply(p: AttackPattern): Json =
+/** Returns an `Encoder` for `AttackPattern` of the unit mode, whose `pattern` is in the style of the dialect. */
+def encodeAttackPattern(dialect: Dialect, mode: UnitMode): Encoder[AttackPattern] =
+  given Encoder[UString] = encodeUString(mode)
+  val style = AttackPatternStyle.of(dialect, mode)
+  (p: AttackPattern) =>
     val pumps = p.pumps.map:
       case (p, s, n) => Json.obj("prefix" := p, "pump" := s, "bias" := n)
     Json.obj(
@@ -88,7 +186,18 @@ given encodeAttackPattern: Encoder[AttackPattern] with
       "suffix" := p.suffix,
       "base" := p.n,
       "string" := p.asUString,
-      "pattern" := p.toString
+      "pattern" := p.toString(style)
+    )
+
+/** Returns an `Encoder` for `RefutedAttack` of the unit mode, whose `attack` is in the style of the dialect. */
+def encodeRefutedAttack(dialect: Dialect, mode: UnitMode): Encoder[RefutedAttack] =
+  given Encoder[AttackPattern] = encodeAttackPattern(dialect, mode)
+  (r: RefutedAttack) =>
+    Json.obj(
+      "complexity" := r.complexity.asInstanceOf[AttackComplexity],
+      "attack" := r.attack,
+      "hotspot" := r.hotspot,
+      "runtimeAttack" := r.runtimeAttack
     )
 
 /** An `Encoder` for `Hotspot`. */
@@ -97,6 +206,27 @@ given encodeHotspot: Encoder[Hotspot] with
     val spots = h.spots.map:
       case Hotspot.Spot(s, e, t) => Json.obj("start" := s, "end" := e, "temperature" := t.toString)
     Json.arr(spots*)
+
+/** An `Encoder` for `RuntimeAttack`. */
+given encodeRuntimeAttack: Encoder[RuntimeAttack] with
+  def apply(r: RuntimeAttack): Json =
+    val timeout = r.timeout match
+      case d: FiniteDuration => d.toMillis.asJson
+      case _                 => Json.Null
+    Json.obj(
+      "runtime" := r.runtime,
+      "timeout" := timeout,
+      "result" := r.result,
+      "isConfirmed" := r.isConfirmed
+    )
+
+/** An `Encoder` for `RuntimeAttackResult`. */
+given encodeRuntimeAttackResult: Encoder[RuntimeAttackResult] with
+  def apply(r: RuntimeAttackResult): Json = r match
+    case RuntimeAttackResult.Finish(time)         => Json.obj("kind" := "finish", "time" := time.toMillis)
+    case RuntimeAttackResult.Timeout              => Json.obj("kind" := "timeout")
+    case RuntimeAttackResult.EngineLimit(message) => Json.obj("kind" := "engine-limit", "message" := message)
+    case RuntimeAttackResult.EngineError(message) => Json.obj("kind" := "engine-error", "message" := message)
 
 /** An `Encoder` for `ErrorKind`. */
 given encodeErrorKind: Encoder[ErrorKind] with
@@ -109,111 +239,78 @@ given encodeErrorKind: Encoder[ErrorKind] with
       Json.obj("kind" := "unsupported", "message" := message)
     case ErrorKind.InvalidRegExp(message) =>
       Json.obj("kind" := "invalid", "message" := message)
+    case ErrorKind.RuntimeAttacksRefuted =>
+      Json.obj("kind" := "runtime-attacks-refuted")
     case ErrorKind.Unexpected(message) =>
       Json.obj("kind" := "unexpected", "message" := message)
 
-/** An `Encoder` for `UString`. */
-given encodeUString: Encoder[UString] = _.asString.asJson
+/** Returns an `Encoder` for `UString` of the unit mode, which gives the string of the mode, or the array of the units
+  * when they have a surrogate code point in the code point modes, a lone surrogate in `UTF16` mode, or a byte above
+  * `0x7F` in `Byte` mode.
+  */
+def encodeUString(mode: UnitMode): Encoder[UString] = (s: UString) =>
+  val isArray = mode match
+    // In UTF-16, a surrogate code point is a lone surrogate, or reads back as a part of another code point.
+    case UnitMode.UTF16CodePoint | UnitMode.CodePoint | UnitMode.ScalarValue =>
+      s.iterator.exists(UTF16Encoding.isSurrogate)
+    // UTF-8 cannot write a lone surrogate.
+    case UnitMode.UTF16 => hasLoneSurrogate(s)
+    // A character above `0x7F` does not read as the same byte in every language.
+    case UnitMode.Byte => s.iterator.exists(_ > 0x7f)
+  if isArray then s.iterator.toSeq.asJson else mode.encode(s).asJson
 
-/** A `Decoder` for `Parameters`. */
-given decodeParameters(using decodeLogger: Decoder[Context.Logger]): Decoder[Parameters] with
+/** Returns a `Decoder` for `UString` of the unit mode, which reads a string or an array of units. */
+def decodeUString(mode: UnitMode): Decoder[UString] =
+  val fromString = Decoder[String].emap: s =>
+    try Right(mode.decode(s))
+    catch case ex: IllegalArgumentException => Left(ex.getMessage)
+  val fromUnits = Decoder[Seq[Int]].emap: us =>
+    us.find(!mode.contains(_)) match
+      case Some(u) => Left(f"Invalid unit in $mode mode: $u%X")
+      case None    => Right(UString.from(us))
+  (c: HCursor) => if c.value.isArray then fromUnits(c) else fromString(c)
 
-  def apply(c: HCursor): Decoder.Result[Parameters] =
+/** Tests whether the UTF-16 code units have a surrogate that is not a part of a surrogate pair. */
+private def hasLoneSurrogate(s: UString): Boolean =
+  var i = 0
+  while i < s.length do
+    if UTF16Encoding.isHighSurrogate(s(i)) && i + 1 < s.length && UTF16Encoding.isLowSurrogate(s(i + 1)) then i += 2
+    else if UTF16Encoding.isSurrogate(s(i)) then return true
+    else i += 1
+  false
 
-    /** Returns a decoded result if `key` is found, or returns the given fallback value as a result if key is missing.
-      *
-      * It is almost similar to `HCursor#getOrElse`. However, it only falls back on missing key (not on `null` case).
-      */
-    def getOrElse[A: Decoder](key: String)(fallback: A): Decoder.Result[A] =
-      c.get[A](key) match
-        case Left(failure) if failure.reason == MissingField => Right(fallback)
-        case result                                          => result
-
+/** Returns a `Decoder` for `AttackPattern` of the unit mode.
+  *
+  * It reads the fields of [[encodeAttackPattern]] except `string` and `pattern`, which are derived from the others. It
+  * fails on an attack pattern that is not one of the mode for some repeat count (see
+  * `AttackPattern.admitsAnyRepeatCount`).
+  */
+def decodeAttackPattern(mode: UnitMode): Decoder[AttackPattern] =
+  given Decoder[UString] = decodeUString(mode)
+  given Decoder[(UString, UString, Int)] = (c: HCursor) =>
     for
-      accelerationMode <- getOrElse[AccelerationMode]("accelerationMode")(Parameters.DefaultAccelerationMode)
-      attackLimit <- getOrElse[Int]("attackLimit")(Parameters.DefaultAttackLimit)
-      attackTimeout <- getOrElse[Duration]("attackTimeout")(Parameters.DefaultAttackTimeout)
-      checker <- getOrElse[Checker]("checker")(Parameters.DefaultChecker)
-      crossoverSize <- getOrElse[Int]("crossoverSize")(Parameters.DefaultCrossoverSize)
-      heatRatio <- getOrElse[Double]("heatRatio")(Parameters.DefaultHeatRatio)
-      incubationLimit <- getOrElse[Int]("incubationLimit")(Parameters.DefaultIncubationLimit)
-      incubationTimeout <- getOrElse[Duration]("incubationTimeout")(Parameters.DefaultIncubationTimeout)
-      logger <- getOrElse[Option[Context.Logger]]("logger")(Parameters.DefaultLogger)
-      maxAttackStringSize <- getOrElse[Int]("maxAttackStringSize")(Parameters.DefaultMaxAttackStringSize)
-      maxDegree <- getOrElse[Int]("maxDegree")(Parameters.DefaultMaxDegree)
-      maxGeneStringSize <- getOrElse[Int]("maxGeneStringSize")(Parameters.DefaultMaxGeneStringSize)
-      maxGenerationSize <- getOrElse[Int]("maxGenerationSize")(Parameters.DefaultMaxGenerationSize)
-      maxInitialGenerationSize <- getOrElse[Int]("maxInitialGenerationSize")(Parameters.DefaultMaxInitialGenerationSize)
-      maxIteration <- getOrElse[Int]("maxIteration")(Parameters.DefaultMaxIteration)
-      maxNFASize <- getOrElse[Int]("maxNFASize")(Parameters.DefaultMaxNFASize)
-      maxPatternSize <- getOrElse[Int]("maxPatternSize")(Parameters.DefaultMaxPatternSize)
-      maxRecallStringSize <- getOrElse[Int]("maxRecallStringSize")(Parameters.DefaultMaxRecallStringSize)
-      maxRepeatCount <- getOrElse[Int]("maxRepeatCount")(Parameters.DefaultMaxRepeatCount)
-      maxSimpleRepeatCount <- getOrElse[Int]("maxSimpleRepeatCount")(Parameters.DefaultMaxSimpleRepeatCount)
-      mutationSize <- getOrElse[Int]("mutationSize")(Parameters.DefaultMutationSize)
-      randomSeed <- getOrElse[Long]("randomSeed")(Parameters.DefaultRandomSeed)
-      recallLimit <- getOrElse[Int]("recallLimit")(Parameters.DefaultRecallLimit)
-      recallTimeout <- getOrElse[Duration]("recallTimeout")(Parameters.DefaultRecallTimeout)
-      seeder <- getOrElse[Seeder]("seeder")(Parameters.DefaultSeeder)
-      seedingLimit <- getOrElse[Int]("seedingLimit")(Parameters.DefaultSeedingLimit)
-      seedingTimeout <- getOrElse[Duration]("seedingTimeout")(Parameters.DefaultSeedingTimeout)
-      timeout <- getOrElse[Duration]("timeout")(Parameters.DefaultTimeout)
-    yield Parameters(
-      accelerationMode,
-      attackLimit,
-      attackTimeout,
-      checker,
-      crossoverSize,
-      heatRatio,
-      incubationLimit,
-      incubationTimeout,
-      logger,
-      maxAttackStringSize,
-      maxDegree,
-      maxGeneStringSize,
-      maxGenerationSize,
-      maxInitialGenerationSize,
-      maxIteration,
-      maxNFASize,
-      maxPatternSize,
-      maxRecallStringSize,
-      maxRepeatCount,
-      maxSimpleRepeatCount,
-      mutationSize,
-      randomSeed,
-      recallLimit,
-      recallTimeout,
-      seeder,
-      seedingLimit,
-      seedingTimeout,
-      timeout
-    )
+      prefix <- c.get[UString]("prefix")
+      pump <- c.get[UString]("pump")
+      bias <- c.get[Int]("bias")
+    yield (prefix, pump, bias)
+  (c: HCursor) =>
+    for
+      pumps <- c.get[Seq[(UString, UString, Int)]]("pumps")
+      suffix <- c.get[UString]("suffix")
+      n <- c.get[Int]("base")
+      attack = AttackPattern(pumps, suffix, n)
+      _ <- Either.cond(
+        attack.admitsAnyRepeatCount(mode),
+        (),
+        DecodingFailure(
+          s"Invalid attack pattern in $mode mode: a high surrogate followed by a low surrogate",
+          c.history
+        )
+      )
+    yield attack
 
 /** A `Decoder` for `Duration`. */
 given decodeDuration: Decoder[Duration] = (c: HCursor) =>
   if c.value.isNull then Right(Duration.Inf)
   else
     Decoder[Int].tryDecode(c).map(t => Duration(t, MILLISECONDS)).orElse(Left(DecodingFailure("Duration", c.history)))
-
-/** A `Decoder` for `Checker`. */
-given decodeChecker: Decoder[Checker] =
-  Decoder[String].emap:
-    case "auto"      => Right(Checker.Auto)
-    case "automaton" => Right(Checker.Automaton)
-    case "fuzz"      => Right(Checker.Fuzz)
-    case s           => Left(s"Unknown checker: $s")
-
-/** A `Decoder` for `Seeder`. */
-given decodeSeeder: Decoder[Seeder] =
-  Decoder[String].emap:
-    case "static"  => Right(Seeder.Static)
-    case "dynamic" => Right(Seeder.Dynamic)
-    case s         => Left(s"Unknown seeder: $s")
-
-/** A `Decoder` for `AccelerationMode`. */
-given decodeAccelerationMode: Decoder[AccelerationMode] =
-  Decoder[String].emap:
-    case "auto" => Right(AccelerationMode.Auto)
-    case "on"   => Right(AccelerationMode.On)
-    case "off"  => Right(AccelerationMode.Off)
-    case s      => Left(s"Unknown acceleration mode: $s")

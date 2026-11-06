@@ -17,7 +17,7 @@ final class Context private (
     private[recheck] val logger: Context.Logger
 ):
 
-  /** */
+  /** Whether this context has a logger. */
   private[recheck] val hasLogger: Boolean = logger ne null
 
   /** Checks whether this context is interrupted or not. */
@@ -44,6 +44,7 @@ object Context:
 
   /** Logger is a logger function. */
   abstract class Logger extends (String => Unit):
+
     def apply(message: String): Unit
 
   /** Creates a new context with the given timeout and the given cancellation token. */

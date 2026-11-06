@@ -1,0 +1,428 @@
+# This file is the JSON Schema of recheck's parameters, but it is written in YAML for readability.
+# This file is used to generate the Scala, JavaScript and TypeScript code of the parameters.
+#
+# Annotations:
+#
+# - `title`: the label in the Playground and in error messages.
+# - `description`: Markdown used in Scaladoc, TypeScript docs, the website and (the first paragraph) the CLI help.
+# - `x-scala-type`: the Scala type of the field.
+# - `x-scala-values`: the Scala value of each `enum` value.
+# - `x-typescript-type`: the TypeScript type when the JSON type does not tell it.
+# - `x-unit`: `milliseconds` for a duration, which is a number of milliseconds in JSON and a `Duration` in Scala.
+#   `null` means infinite.
+# - `x-cli`: the long option name of the CLI, and `x-cli-metavar` its metavar when it differs from the title.
+# - `x-exclude`: the targets not exposing the parameter (`cli`, `eslint-plugin`, `playground`).
+# - `x-since`: the first release having the parameter, so that the Playground hides it on older releases.
+# - `x-scala-default`: the Scala value of the default when `x-scala-values` does not give it.
+#
+# Annotations of the variants of `dialect` with settings, and of their settings:
+#
+# - `x-scala-type`: the Scala type of the variant (e.g. `Dialect.Python`), or of the setting, which is `Boolean` or an enum
+#   whose companion has `of(name)` (e.g. `Dialect.Python.Type`).
+# - `x-cli-help`: the help of the CLI option of the setting, which is `--<dialect>-<setting>`.
+#   A boolean setting whose default is `true` is `--no-<dialect>-<setting>`, and the help tells the `false` case.
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://makenowjust-labs.github.io/recheck/parameters.schema.json"
+title: "Parameters"
+description: "Parameters is the set of the parameters of the analysis."
+type: object
+additionalProperties: false
+properties:
+  accelerationMode:
+    title: "Acceleration Mode"
+    description: |-
+      The acceleration mode of the fuzzing.
+
+      - `auto` turns it on as `on` does, unless the pattern has back-references.
+      - `on` turns it on, unless the pattern has backtracking control verbs (e.g. `(*PRUNE)`) or non-atomic look-arounds (e.g. `(?*...)`), which memoization does not follow.
+      - `off` turns it off.
+    type: string
+    enum: ["auto", "on", "off"]
+    default: "auto"
+    x-scala-type: "AccelerationMode"
+    x-scala-values: { "auto": "AccelerationMode.Auto", "on": "AccelerationMode.On", "off": "AccelerationMode.Off" }
+    x-cli: "acceleration-mode"
+    x-cli-metavar: "mode"
+    x-since: "4.2.0"
+
+  attackLimit:
+    title: "Attack Limit"
+    description: |-
+      The upper limit of the VM's steps when the fuzz checker runs an attack string.
+
+      A step is a character that the VM reads, including each character that a back-reference compares.
+      The fuzz checker also sizes the attack string to reach this number of steps.
+    type: integer
+    default: 1500000000
+    x-scala-type: "Int"
+    x-cli: "attack-limit"
+    x-since: "1.0.0"
+
+  attackTimeout:
+    title: "Attack Timeout"
+    description: "The upper limit of matching time on the attack."
+    type: [integer, "null"]
+    default: 1000
+    x-unit: "milliseconds"
+    x-scala-type: "Duration"
+    x-cli: "attack-timeout"
+    x-since: "4.2.0"
+
+  checker:
+    title: "Checker"
+    description: |-
+      The checker to use.
+
+      - `auto` chooses one of the two below by the criteria.
+      - `fuzz` uses the fuzzing with static analysis.
+      - `automaton` uses the algorithm based on automata theory.
+    type: string
+    enum: ["auto", "fuzz", "automaton"]
+    default: "auto"
+    x-scala-type: "Checker"
+    x-scala-values: { "auto": "Checker.Auto", "fuzz": "Checker.Fuzz", "automaton": "Checker.Automaton" }
+    x-cli: "checker"
+    x-since: "1.0.0"
+
+  crossoverSize:
+    title: "Crossover Size"
+    description: "The number of crossovers on each generation."
+    type: integer
+    default: 25
+    x-scala-type: "Int"
+    x-cli: "crossover-size"
+    x-since: "4.2.0"
+
+  dialect:
+    title: "Dialect"
+    description: |-
+      The regular expression dialect of the pattern, with its settings.
+
+      It is the name of the dialect, which takes the default settings, or an object of the name and the settings (e.g. `"python"` or `{ "name": "python", "type": "bytes" }`).
+      The flags are the dialect's own flag letters.
+      See [Dialects](/docs/usage/dialects) for the dialects and their settings.
+    oneOf:
+      - type: string
+        enum: ["javascript", "java", "dotnet", "pcre", "python", "ruby", "perl"]
+      - type: object
+        properties:
+          name: { const: "javascript" }
+        required: ["name"]
+        additionalProperties: false
+      - type: object
+        properties:
+          name: { const: "java" }
+        required: ["name"]
+        additionalProperties: false
+      - type: object
+        properties:
+          name: { const: "dotnet" }
+        required: ["name"]
+        additionalProperties: false
+      - type: object
+        properties:
+          name: { const: "pcre" }
+        required: ["name"]
+        additionalProperties: false
+      - type: object
+        properties:
+          name: { const: "python" }
+          type:
+            title: "Python Type"
+            enum: ["str", "bytes"]
+            default: "str"
+            x-scala-type: "Dialect.Python.Type"
+            x-cli-help: "The string type."
+        required: ["name"]
+        additionalProperties: false
+        x-scala-type: "Dialect.Python"
+      - type: object
+        properties:
+          name: { const: "ruby" }
+          encoding:
+            title: "Ruby Encoding"
+            enum: ["UTF-8", "ASCII-8BIT"]
+            default: "UTF-8"
+            x-scala-type: "Dialect.Ruby.Encoding"
+            x-cli-help: "The encoding."
+        required: ["name"]
+        additionalProperties: false
+        x-scala-type: "Dialect.Ruby"
+      - type: object
+        properties:
+          name: { const: "perl" }
+          utf8:
+            title: "Perl UTF-8"
+            type: boolean
+            default: true
+            x-scala-type: "Boolean"
+            x-cli-help: "The program has no `use utf8`, and its strings are bytes."
+          source:
+            title: "Perl Source"
+            enum: ["literal", "string"]
+            default: "literal"
+            x-scala-type: "PerlSource"
+            x-cli-help: "How the pattern is given."
+        required: ["name"]
+        additionalProperties: false
+        x-scala-type: "Dialect.Perl"
+    default: "javascript"
+    x-scala-type: "Dialect"
+    x-typescript-type: "DialectParameter"
+    x-scala-default: "Dialect.JavaScript"
+    x-cli: "dialect"
+    x-exclude: ["eslint-plugin"]
+    x-since: "5.0.0"
+
+  heatRatio:
+    title: "Heat Ratio"
+    description: "The ratio of the number of characters read to the maximum number to be considered as a hot spot."
+    type: number
+    default: 0.001
+    x-scala-type: "Double"
+    x-cli: "heat-ratio"
+    x-since: "4.2.0"
+
+  incubationLimit:
+    title: "Incubation Limit"
+    description: |-
+      The upper limit of the VM's steps when the fuzz checker runs a gene string on incubation.
+
+      `static` seeding also sizes its seed strings to reach this number of steps.
+    type: integer
+    default: 25000
+    x-scala-type: "Int"
+    x-cli: "incubation-limit"
+    x-since: "3.0.0"
+
+  incubationTimeout:
+    title: "Incubation Timeout"
+    description: "The upper limit of matching time on incubation."
+    type: [integer, "null"]
+    default: 250
+    x-unit: "milliseconds"
+    x-scala-type: "Duration"
+    x-cli: "incubation-timeout"
+    x-since: "4.2.0"
+
+  logger:
+    title: "Logger"
+    description: |-
+      The logger function to record execution traces.
+
+      `null` in TypeScript or `None` in Scala disables the logging.
+      The CLI enables it with `--enable-log`.
+    default: null
+    x-scala-type: "Option[Context.Logger]"
+    x-typescript-type: "(message: string) => void"
+    x-exclude: ["cli", "eslint-plugin", "playground"]
+    x-since: "4.2.0"
+
+  maxAttackStringSize:
+    title: "Max Attack String Size"
+    description: "The maximum length of the attack string on fuzzing."
+    type: integer
+    default: 300000
+    x-scala-type: "Int"
+    x-cli: "max-attack-string-size"
+    x-since: "4.2.0"
+
+  maxDegree:
+    title: "Max Degree"
+    description: "The maximum degree to be considered in fuzzing."
+    type: integer
+    default: 4
+    x-scala-type: "Int"
+    x-cli: "max-degree"
+    x-since: "1.1.0"
+
+  maxGeneStringSize:
+    title: "Max Gene String Size"
+    description: "The maximum length of the gene string on fuzzing."
+    type: integer
+    default: 2400
+    x-scala-type: "Int"
+    x-cli: "max-gene-string-size"
+    x-since: "4.2.0"
+
+  maxGenerationSize:
+    title: "Max Generation Size"
+    description: "The maximum size of each generation on fuzzing."
+    type: integer
+    default: 100
+    x-scala-type: "Int"
+    x-cli: "max-generation-size"
+    x-since: "1.0.0"
+
+  maxInitialGenerationSize:
+    title: "Max Initial Generation Size"
+    description: "The maximum size of the initial generation on fuzzing."
+    type: integer
+    default: 500
+    x-scala-type: "Int"
+    x-cli: "max-initial-generation-size"
+    x-since: "4.2.0"
+
+  maxIteration:
+    title: "Max Iteration"
+    description: "The maximum number of fuzzing iterations."
+    type: integer
+    default: 10
+    x-scala-type: "Int"
+    x-cli: "max-iteration"
+    x-since: "1.0.0"
+
+  maxNFASize:
+    title: "Max NFA Size"
+    description: "The maximum size of the NFA to determine which algorithm is used."
+    type: integer
+    default: 35000
+    x-scala-type: "Int"
+    x-cli: "max-nfa-size"
+    x-since: "1.0.0"
+
+  maxPatternSize:
+    title: "Max Pattern Size"
+    description: "The maximum size of the regular expression pattern to determine which algorithm is used."
+    type: integer
+    default: 1500
+    x-scala-type: "Int"
+    x-cli: "max-pattern-size"
+    x-since: "1.1.1"
+
+  maxRefutedAttacks:
+    title: "Max Refuted Attacks"
+    description: |-
+      The maximum number of attacks that the runtime attacks refute.
+
+      When the runtime attacks refute this many attacks, the checking stops, and the result is `unknown` with the `runtime-attacks-refuted` error.
+    type: integer
+    default: 10
+    x-scala-type: "Int"
+    x-cli: "max-refuted-attacks"
+    x-since: "5.0.0"
+
+  maxRepeatCount:
+    title: "Max Repeat Count"
+    description: "The maximum sum of the repeat counts of the repetition quantifiers to determine which algorithm is used."
+    type: integer
+    default: 30
+    x-scala-type: "Int"
+    x-cli: "max-repeat-count"
+    x-since: "1.0.0"
+
+  maxRuntimeAttackStringSize:
+    title: "Max Runtime Attack String Size"
+    description: "The maximum length of the attack string in the diagnostics, which the runtime attack runs."
+    type: integer
+    default: 300000
+    x-scala-type: "Int"
+    x-cli: "max-runtime-attack-string-size"
+    x-since: "5.0.0"
+
+  maxSimpleRepeatCount:
+    title: "Max Simple Repeat Count"
+    description: "The maximum repeat count of each repetition quantifier on `static` seeding."
+    type: integer
+    default: 30
+    x-scala-type: "Int"
+    x-cli: "max-simple-repeat-count"
+    x-since: "4.2.0"
+
+  mutationSize:
+    title: "Mutation Size"
+    description: "The number of mutations on each generation."
+    type: integer
+    default: 50
+    x-scala-type: "Int"
+    x-cli: "mutation-size"
+    x-since: "4.2.0"
+
+  randomSeed:
+    title: "Random Seed"
+    description: "The PRNG seed number."
+    type: integer
+    default: 0
+    x-scala-type: "Long"
+    x-cli: "random-seed"
+    x-since: "4.0.0"
+
+  runtimeAttackLimit:
+    title: "Runtime Attack Limit"
+    description: |-
+      The number of steps that the attack string in the diagnostics is sized for.
+
+      It is not a limit of the VM.
+      The repeat count of the attack string, which the runtime attack runs, is chosen so that a backtracking matcher reads about this many characters, counted as the VM counts its steps (see `attackLimit`).
+    type: integer
+    default: 1500000000
+    x-scala-type: "Int"
+    x-cli: "runtime-attack-limit"
+    x-since: "5.0.0"
+
+  runtimeAttackTimeout:
+    title: "Runtime Attack Timeout"
+    description: |-
+      The upper limit of matching time on the runtime attack.
+
+      The runtime attack runs the attack string on the real engine of the dialect (see [Runtime-Attack Verification](/docs/usage/runtime-attack-verification)).
+      An attack string that the engine matches within this time is refuted: it is recorded in `refutedAttacks` of the diagnostics, and the checking goes on.
+      The time is also bounded by the time left of `timeout`.
+      The runtime attack is skipped if this value is not positive, or where commands cannot run (e.g. in the browser).
+    type: [integer, "null"]
+    default: -1000
+    x-unit: "milliseconds"
+    x-scala-type: "Duration"
+    x-cli: "runtime-attack-timeout"
+    x-since: "5.0.0"
+
+  seeder:
+    title: "Seeder"
+    description: |-
+      The seeder of the fuzzing.
+
+      - `static` uses the seeding based on automata theory.
+      - `dynamic` uses the seeding with dynamic analysis.
+    type: string
+    enum: ["static", "dynamic"]
+    default: "static"
+    x-scala-type: "Seeder"
+    x-scala-values: { "static": "Seeder.Static", "dynamic": "Seeder.Dynamic" }
+    x-cli: "seeder"
+    x-since: "4.2.0"
+
+  seedingLimit:
+    title: "Seeding Limit"
+    description: "The upper limit of the VM's steps on `dynamic` seeding."
+    type: integer
+    default: 1000
+    x-scala-type: "Int"
+    x-cli: "seeding-limit"
+    x-since: "4.2.0"
+
+  seedingTimeout:
+    title: "Seeding Timeout"
+    description: "The upper limit of matching time on `dynamic` seeding."
+    type: [integer, "null"]
+    default: 100
+    x-unit: "milliseconds"
+    x-scala-type: "Duration"
+    x-cli: "seeding-timeout"
+    x-since: "4.2.0"
+
+  timeout:
+    title: "Timeout"
+    description: |-
+      The upper limit of checking time.
+
+      When it is exceeded, the result is `unknown` with the `timeout` error.
+      It has no limit if it is infinite in Scala or `null` in TypeScript.
+      The time starts when the check starts, not while the check waits in a queue.
+      In TypeScript, it is in milliseconds.
+    type: [integer, "null"]
+    default: 10000
+    x-unit: "milliseconds"
+    x-scala-type: "Duration"
+    x-cli: "timeout"
+    x-since: "1.0.0"

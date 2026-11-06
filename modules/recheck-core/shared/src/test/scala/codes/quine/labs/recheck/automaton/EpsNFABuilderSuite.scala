@@ -2,537 +2,331 @@ package codes.quine.labs.recheck
 package automaton
 
 import scala.language.implicitConversions
-import scala.util.Success
 
 import codes.quine.labs.recheck.automaton.EpsNFA.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.UnsupportedException
-import codes.quine.labs.recheck.regexp.Pattern
-import codes.quine.labs.recheck.regexp.Pattern.*
-import codes.quine.labs.recheck.unicode.IChar
-import codes.quine.labs.recheck.unicode.ICharSet
-import codes.quine.labs.recheck.unicode.ICharSet.CharKind
+import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
+import codes.quine.labs.resyntax.ir.alphabet.CharKind
+import codes.quine.labs.resyntax.ir.alphabet.PatternAlphabet
 
 class EpsNFABuilderSuite extends munit.FunSuite:
 
   /** A default context. */
   given ctx: Context = Context()
 
-  locally:
-    val flagSet0 = FlagSet(false, false, false, false, false, false)
-    val flagSet1 = FlagSet(false, true, false, false, false, false)
-    val flagSet2 = FlagSet(false, false, false, true, false, false)
-    val flagSet3 = FlagSet(false, false, false, true, true, false)
+  /** Builds an ε-NFA from the source, without the locations of transitions. */
+  def build(source: String, flags: String = "", dialect: Dialect = Dialect.JavaScript): EpsNFA[Int] =
+    val nfa = EpsNFABuilder.build(ReDoS.parse(source, flags, dialect))
+    nfa.copy(tau = nfa.tau.view.mapValues {
+      case t: Consume[Int] => t.copy(loc = None)
+      case t               => t
+    }.toMap)
 
-    test("EpsNFABuilder.build: submatch"):
-      assertEquals(
-        EpsNFABuilder.build(Pattern(LineEnd(), flagSet0)),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4),
-            1,
-            0,
-            Map(
-              1 -> Eps(Seq(4, 2)),
-              2 -> LoopEnter(0, 3),
-              3 -> Consume(Set((IChar.Any16, CharKind.Normal)), 1),
-              4 -> LoopExit(0, 0)
-            )
-          )
-        )
-      )
-      assertEquals(
-        EpsNFABuilder.build(Pattern(LineBegin(), flagSet0)),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4),
-            0,
-            4,
-            Map(
-              0 -> Eps(Seq(3, 1)),
-              1 -> LoopEnter(0, 2),
-              2 -> Consume(Set((IChar.Any16, CharKind.Normal)), 0),
-              3 -> LoopExit(0, 4)
-            )
-          )
-        )
-      )
+  val utf16: UnitMode = UnitMode.UTF16
+  val any16: CharSet = utf16.universe
+  val lineTerminator: CharSet = CharSet.of(0x0a, 0x0d, 0x2028, 0x2029)
+  val word: CharSet =
+    CharSet.union(Seq(CharSet.range('0', '9'), CharSet.range('A', 'Z'), CharSet.single('_'), CharSet.range('a', 'z')))
 
-    test("EpsNFABuilder.build: LineBegin, LineEnd, Sequence"):
-      assertEquals(
-        EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), LineEnd())), flagSet0)),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, false),
-            Set(0, 1),
-            0,
-            1,
-            Map(
-              0 -> Eps(Seq(1))
-            )
-          )
-        )
-      )
-      assertEquals(
-        EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), Sequence(Seq.empty), LineEnd())), flagSet0)),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, false),
-            Set(0, 1, 2),
-            0,
-            2,
-            Map(
-              0 -> Eps(Seq(1)),
-              1 -> Eps(Seq(2))
-            )
-          )
-        )
-      )
+  def buildAlphabet(mode: UnitMode, sets: Seq[CharSet] = Seq.empty, word: Option[CharSet] = None): PatternAlphabet =
+    PatternAlphabet.build(mode, sets, None, word, false, Seq.empty, Seq.empty, Seq.empty)
 
-    test("EpsNFABuilder.build: WordBoundary"):
-      assertEquals(
-        EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), WordBoundary(false), LineEnd())), flagSet0)),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, false).add(IChar.Word, CharKind.Word),
-            Set(0, 1, 2, 3),
-            0,
-            3,
-            Map(
-              0 -> Eps(Seq(1)),
-              1 -> Assert(AssertKind.WordBoundary, 2),
-              2 -> Eps(Seq(3))
-            )
-          )
-        )
-      )
-      assertEquals(
-        EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), WordBoundary(true), LineEnd())), flagSet0)),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, false).add(IChar.Word, CharKind.Word),
-            Set(0, 1, 2, 3),
-            0,
-            3,
-            Map(
-              0 -> Eps(Seq(1)),
-              1 -> Assert(AssertKind.WordBoundaryNot, 2),
-              2 -> Eps(Seq(3))
-            )
-          )
-        )
-      )
+  /** Returns an ε-NFA of `^x$`, where `x` consumes the set. */
+  def single(alphabet: PatternAlphabet, set: CharSet): EpsNFA[Int] =
+    EpsNFA(
+      alphabet,
+      Set(0, 1, 2, 3),
+      0,
+      3,
+      Map(0 -> Eps(Seq(1)), 1 -> Consume(Set((set, CharKind.Normal)), 2), 2 -> Eps(Seq(3)))
+    )
 
-    test("EpsNFABuilder.build: Character, CharacterClass"):
-      assertEquals(
-        EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), Character('a'), LineEnd())), flagSet1)),
-        Success(
-          EpsNFA(
-            ICharSet.any(true, false).add(IChar.canonicalize(IChar('a'), false)),
-            Set(0, 1, 2, 3),
-            0,
-            3,
-            Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(Set((IChar.canonicalize(IChar('a'), false), CharKind.Normal)), 2),
-              2 -> Eps(Seq(3))
-            )
-          )
-        )
-      )
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), CharacterClass(false, Seq(Character('a'))), LineEnd())), flagSet0)
-        ),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, false).add(IChar('a')),
-            Set(0, 1, 2, 3),
-            0,
-            3,
-            Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(Set((IChar('a'), CharKind.Normal)), 2),
-              2 -> Eps(Seq(3))
-            )
-          )
-        )
-      )
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), CharacterClass(true, Seq(Character('a'))), LineEnd())), flagSet0)
-        ),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, false).add(IChar('a')),
-            Set(0, 1, 2, 3),
-            0,
-            3,
-            Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(Set((IChar.Any16.diff(IChar('a')), CharKind.Normal)), 2),
-              2 -> Eps(Seq(3))
-            )
-          )
-        )
-      )
-
-    test("EpsNFABuilder.build: Dot"):
-      assertEquals(
-        EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet0)),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, false).add(IChar.Any16.diff(IChar.LineTerminator)),
-            Set(0, 1, 2, 3),
-            0,
-            3,
-            Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(Set((IChar.Any16.diff(IChar.LineTerminator), CharKind.Normal)), 2),
-              2 -> Eps(Seq(3))
-            )
-          )
-        )
-      )
-      assertEquals(
-        EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet1)),
-        Success(
-          EpsNFA(
-            ICharSet.any(true, false).add(IChar.canonicalize(IChar.Any16.diff(IChar.LineTerminator), false)),
-            Set(0, 1, 2, 3),
-            0,
-            3,
-            Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(
-                Set((IChar.canonicalize(IChar.Any16.diff(IChar.LineTerminator), false), CharKind.Normal)),
-                2
-              ),
-              2 -> Eps(Seq(3))
-            )
-          )
-        )
-      )
-      assertEquals(
-        EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet2)),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, false),
-            Set(0, 1, 2, 3),
-            0,
-            3,
-            Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(Set((IChar.Any16, CharKind.Normal)), 2),
-              2 -> Eps(Seq(3))
-            )
-          )
-        )
-      )
-      assertEquals(
-        EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet3)),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, true),
-            Set(0, 1, 2, 3),
-            0,
-            3,
-            Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(Set((IChar.Any, CharKind.Normal)), 2),
-              2 -> Eps(Seq(3))
-            )
-          )
-        )
-      )
-
-    test("EpsNFABuilder.build: Disjunction"):
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Disjunction(Seq(Dot(), Dot())), LineEnd())), flagSet2)
-        ),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4, 5, 6, 7),
-            0,
-            7,
-            Map(
-              0 -> Eps(Seq(5)),
-              5 -> Eps(Seq(1, 3)),
-              1 -> Consume(Set((IChar.Any16, CharKind.Normal)), 2),
-              2 -> Eps(Seq(6)),
-              3 -> Consume(Set((IChar.Any16, CharKind.Normal)), 4),
-              4 -> Eps(Seq(6)),
-              6 -> Eps(Seq(7))
-            )
-          )
-        )
-      )
-
-    test("EpsNFABuilder.build: Star"):
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Star(false), Dot()), LineEnd())), flagSet2)
-        ),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4, 5, 6, 7),
-            0,
-            7,
-            Map(
-              0 -> Eps(Seq(3)),
-              3 -> Eps(Seq(4, 5)),
-              4 -> LoopEnter(0, 1),
-              1 -> Consume(Set((IChar.Any16, CharKind.Normal)), 2),
-              2 -> Eps(Seq(3)),
-              5 -> LoopExit(0, 6),
-              6 -> Eps(Seq(7))
-            )
-          )
-        )
-      )
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Star(true), Dot()), LineEnd())), flagSet2)
-        ),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4, 5, 6, 7),
-            0,
-            7,
-            Map(
-              0 -> Eps(Seq(3)),
-              3 -> Eps(Seq(5, 4)),
-              4 -> LoopEnter(0, 1),
-              1 -> Consume(Set((IChar.Any16, CharKind.Normal)), 2),
-              2 -> Eps(Seq(3)),
-              5 -> LoopExit(0, 6),
-              6 -> Eps(Seq(7))
-            )
-          )
-        )
-      )
-
-    test("EpsNFABuilder.build: Plus"):
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Plus(false), Dot()), LineEnd())), flagSet2)
-        ),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4, 5, 6),
-            0,
-            6,
-            Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(Set((IChar.Any16, CharKind.Normal)), 2),
-              2 -> Eps(Seq(3, 4)),
-              3 -> LoopEnter(0, 1),
-              4 -> LoopExit(0, 5),
-              5 -> Eps(Seq(6))
-            )
-          )
-        )
-      )
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Plus(true), Dot()), LineEnd())), flagSet2)
-        ),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4, 5, 6),
-            0,
-            6,
-            Map(
-              0 -> Eps(Seq(1)),
-              1 -> Consume(Set((IChar.Any16, CharKind.Normal)), 2),
-              2 -> Eps(Seq(4, 3)),
-              3 -> LoopEnter(0, 1),
-              4 -> LoopExit(0, 5),
-              5 -> Eps(Seq(6))
-            )
-          )
-        )
-      )
-
-    test("EpsNFABuilder.build: Question"):
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Question(false), Dot()), LineEnd())), flagSet2)
-        ),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4),
-            0,
-            4,
-            Map(
-              0 -> Eps(Seq(3)),
-              3 -> Eps(Seq(1, 2)),
-              1 -> Consume(Set((IChar.Any16, CharKind.Normal)), 2),
-              2 -> Eps(Seq(4))
-            )
-          )
-        )
-      )
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Question(true), Dot()), LineEnd())), flagSet2)
-        ),
-        Success(
-          EpsNFA(
-            ICharSet.any(false, false),
-            Set(0, 1, 2, 3, 4),
-            0,
-            4,
-            Map(
-              0 -> Eps(Seq(3)),
-              3 -> Eps(Seq(2, 1)),
-              1 -> Consume(Set((IChar.Any16, CharKind.Normal)), 2),
-              2 -> Eps(Seq(4))
-            )
-          )
-        )
-      )
-
-    test("EpsNFABuilder.build: Repeat"):
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Exact(1, false), Dot()), LineEnd())), flagSet2)
-        ),
-        EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet2))
-      )
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Exact(2, false), Dot()), LineEnd())), flagSet2)
-        ),
-        EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), Dot(), Dot(), LineEnd())), flagSet2))
-      )
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Unbounded(1, false), Dot()), LineEnd())), flagSet2)
-        ),
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Dot(), Repeat(Quantifier.Star(false), Dot()), LineEnd())), flagSet2)
-        )
-      )
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Unbounded(1, true), Dot()), LineEnd())), flagSet2)
-        ),
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Dot(), Repeat(Quantifier.Star(true), Dot()), LineEnd())), flagSet2)
-        )
-      )
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Bounded(1, 1, false), Dot()), LineEnd())), flagSet2)
-        ),
-        EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet2))
-      )
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Bounded(1, 1, true), Dot()), LineEnd())), flagSet2)
-        ),
-        EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), Dot(), LineEnd())), flagSet2))
-      )
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Bounded(1, 2, false), Dot()), LineEnd())), flagSet2)
-        ),
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Dot(), Repeat(Quantifier.Question(false), Dot()), LineEnd())), flagSet2)
-        )
-      )
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Bounded(1, 2, true), Dot()), LineEnd())), flagSet2)
-        ),
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Dot(), Repeat(Quantifier.Question(true), Dot()), LineEnd())), flagSet2)
-        )
-      )
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Bounded(1, 3, false), Dot()), LineEnd())), flagSet2)
-        ),
-        EpsNFABuilder.build(
-          Pattern(
-            Sequence(
-              Seq(
-                LineBegin(),
-                Dot(),
-                Repeat(Quantifier.Question(false), Sequence(Seq(Dot(), Repeat(Quantifier.Question(false), Dot())))),
-                LineEnd()
-              )
-            ),
-            flagSet2
-          )
-        )
-      )
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), Repeat(Quantifier.Bounded(1, 3, true), Dot()), LineEnd())), flagSet2)
-        ),
-        EpsNFABuilder.build(
-          Pattern(
-            Sequence(
-              Seq(
-                LineBegin(),
-                Dot(),
-                Repeat(Quantifier.Question(true), Sequence(Seq(Dot(), Repeat(Quantifier.Question(true), Dot())))),
-                LineEnd()
-              )
-            ),
-            flagSet2
-          )
-        )
-      )
-
-    test("EpsNFABuilder.build: Capture, NamedCapture, Group"):
-      val nfaA = EpsNFA(
-        ICharSet.any(false, false).add(IChar('a')),
-        Set(0, 1, 2, 3),
+  test("EpsNFABuilder.build: submatch"):
+    assertEquals(
+      build("$"),
+      EpsNFA(
+        buildAlphabet(utf16),
+        Set(0, 1, 2, 3, 4),
+        1,
         0,
-        3,
         Map(
-          0 -> Eps(Seq(1)),
-          1 -> Consume(Set((IChar('a'), CharKind.Normal)), 2),
-          2 -> Eps(Seq(3))
+          1 -> Eps(Seq(4, 2)),
+          2 -> LoopEnter(0, 3),
+          3 -> Consume(Set((any16, CharKind.Normal)), 1),
+          4 -> LoopExit(0, 0)
         )
       )
-      assertEquals(
-        EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), Character('a'), LineEnd())), flagSet0)),
-        Success(nfaA)
+    )
+    assertEquals(
+      build("^"),
+      EpsNFA(
+        buildAlphabet(utf16),
+        Set(0, 1, 2, 3, 4),
+        0,
+        4,
+        Map(
+          0 -> Eps(Seq(3, 1)),
+          1 -> LoopEnter(0, 2),
+          2 -> Consume(Set((any16, CharKind.Normal)), 0),
+          3 -> LoopExit(0, 4)
+        )
       )
+    )
+
+  test("EpsNFABuilder.build: LineBegin, LineEnd, Sequence"):
+    assertEquals(build("^$"), EpsNFA(buildAlphabet(utf16), Set(0, 1), 0, 1, Map(0 -> Eps(Seq(1)))))
+    assertEquals(
+      build("^(?:)$"),
+      EpsNFA(buildAlphabet(utf16), Set(0, 1, 2), 0, 2, Map(0 -> Eps(Seq(1)), 1 -> Eps(Seq(2))))
+    )
+
+  test("EpsNFABuilder.build: WordBoundary"):
+    for (source, kind) <- Seq("^\\b$" -> AssertKind.WordBoundary(0), "^\\B$" -> AssertKind.NotWordBoundary(0)) do
       assertEquals(
-        EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), Capture(1, Character('a')), LineEnd())), flagSet0)),
-        Success(nfaA)
-      )
-      assertEquals(
-        EpsNFABuilder.build(
-          Pattern(Sequence(Seq(LineBegin(), NamedCapture(1, "foo", Character('a')), LineEnd())), flagSet0)
-        ),
-        Success(nfaA)
-      )
-      assertEquals(
-        EpsNFABuilder.build(Pattern(Sequence(Seq(LineBegin(), Group(Character('a')), LineEnd())), flagSet0)),
-        Success(nfaA)
+        build(source),
+        EpsNFA(
+          buildAlphabet(utf16, word = Some(word)),
+          Set(0, 1, 2, 3),
+          0,
+          3,
+          Map(0 -> Eps(Seq(1)), 1 -> Assert(kind, 2), 2 -> Eps(Seq(3)))
+        )
       )
 
-    test("EpsNFABuilder.build: LookAhead, LookBehind, BackReference, NamedBackreference"):
-      interceptMessage[UnsupportedException]("look-ahead assertion"):
-        EpsNFABuilder.build(Pattern(LookAhead(false, Dot()), flagSet0)).get
-      interceptMessage[UnsupportedException]("look-behind assertion"):
-        EpsNFABuilder.build(Pattern(LookBehind(false, Dot()), flagSet0)).get
-      interceptMessage[UnsupportedException]("back-reference"):
-        EpsNFABuilder.build(Pattern(BackReference(1), flagSet0)).get
-      interceptMessage[UnsupportedException]("named back-reference"):
-        EpsNFABuilder.build(Pattern(NamedBackReference(1, "foo"), flagSet0)).get
+  test("EpsNFABuilder.build: Character, CharacterClass"):
+    assertEquals(
+      build("^a$", "i"),
+      single(buildAlphabet(utf16, Seq(CharSet.of('a', 'A'))), CharSet.of('a', 'A'))
+    )
+    assertEquals(
+      build("^[a]$"),
+      single(buildAlphabet(utf16, Seq(CharSet.single('a'))), CharSet.single('a'))
+    )
+    assertEquals(
+      build("^[^a]$"),
+      single(buildAlphabet(utf16, Seq(CharSet.single('a'))), any16.diff(CharSet.single('a')))
+    )
+
+  test("EpsNFABuilder.build: Dot"):
+    val dot16 = any16.diff(lineTerminator)
+    // `.` takes part in the order of atoms as its complement.
+    assertEquals(build("^.$"), single(buildAlphabet(utf16, Seq(lineTerminator)), dot16))
+    assertEquals(
+      build("^.$", "i"),
+      single(
+        buildAlphabet(utf16, Seq(lineTerminator)),
+        dot16
+      )
+    )
+    assertEquals(build("^.$", "s"), single(buildAlphabet(utf16), any16))
+    assertEquals(
+      build("^.$", "su"),
+      single(buildAlphabet(UnitMode.UTF16CodePoint), UnitMode.UTF16CodePoint.universe)
+    )
+
+  test("EpsNFABuilder.build: Disjunction"):
+    assertEquals(
+      build("^(?:.|.)$", "s"),
+      EpsNFA(
+        buildAlphabet(utf16),
+        Set(0, 1, 2, 3, 4, 5, 6, 7),
+        0,
+        7,
+        Map(
+          0 -> Eps(Seq(5)),
+          5 -> Eps(Seq(1, 3)),
+          1 -> Consume(Set((any16, CharKind.Normal)), 2),
+          2 -> Eps(Seq(6)),
+          3 -> Consume(Set((any16, CharKind.Normal)), 4),
+          4 -> Eps(Seq(6)),
+          6 -> Eps(Seq(7))
+        )
+      )
+    )
+
+  test("EpsNFABuilder.build: Star, Plus, Question"):
+    for (source, t) <- Seq("^.*$" -> Seq(4, 5), "^.*?$" -> Seq(5, 4)) do
+      assertEquals(
+        build(source, "s"),
+        EpsNFA(
+          buildAlphabet(utf16),
+          Set(0, 1, 2, 3, 4, 5, 6, 7),
+          0,
+          7,
+          Map(
+            0 -> Eps(Seq(3)),
+            3 -> Eps(t),
+            4 -> LoopEnter(0, 1),
+            1 -> Consume(Set((any16, CharKind.Normal)), 2),
+            2 -> Eps(Seq(3)),
+            5 -> LoopExit(0, 6),
+            6 -> Eps(Seq(7))
+          )
+        )
+      )
+    for (source, t) <- Seq("^.+$" -> Seq(3, 4), "^.+?$" -> Seq(4, 3)) do
+      assertEquals(
+        build(source, "s"),
+        EpsNFA(
+          buildAlphabet(utf16),
+          Set(0, 1, 2, 3, 4, 5, 6),
+          0,
+          6,
+          Map(
+            0 -> Eps(Seq(1)),
+            1 -> Consume(Set((any16, CharKind.Normal)), 2),
+            2 -> Eps(t),
+            3 -> LoopEnter(0, 1),
+            4 -> LoopExit(0, 5),
+            5 -> Eps(Seq(6))
+          )
+        )
+      )
+    for (source, t) <- Seq("^.?$" -> Seq(1, 2), "^.??$" -> Seq(2, 1)) do
+      assertEquals(
+        build(source, "s"),
+        EpsNFA(
+          buildAlphabet(utf16),
+          Set(0, 1, 2, 3, 4),
+          0,
+          4,
+          Map(
+            0 -> Eps(Seq(3)),
+            3 -> Eps(t),
+            1 -> Consume(Set((any16, CharKind.Normal)), 2),
+            2 -> Eps(Seq(4))
+          )
+        )
+      )
+
+  test("EpsNFABuilder.build: Repeat"):
+    val cases = Seq(
+      "^.{1}$" -> "^.$",
+      "^.{2}$" -> "^..$",
+      "^.{1,}$" -> "^.+$",
+      "^.{1,}?$" -> "^.+?$",
+      "^.{2,}$" -> "^..+$",
+      "^.{3,}?$" -> "^...+?$",
+      "^.{1,1}$" -> "^.$",
+      "^.{1,1}?$" -> "^.$",
+      "^.{1,2}$" -> "^..?$",
+      "^.{1,2}?$" -> "^..??$",
+      "^.{1,3}$" -> "^.(?:..?)?$",
+      "^.{1,3}?$" -> "^.(?:..??)??$",
+      "^.{0,}$" -> "^.*$",
+      "^.{0,1}$" -> "^.?$"
+    )
+    for (source, expected) <- cases do assertEquals(build(source, "s"), build(expected, "s"), source)
+
+  test("EpsNFABuilder.build: Capture, NamedCapture, Group"):
+    val nfaA = single(buildAlphabet(utf16, Seq(CharSet.single('a'))), CharSet.single('a'))
+    for source <- Seq("^a$", "^(a)$", "^(?<foo>a)$", "^(?:a)$") do assertEquals(build(source), nfaA, source)
+
+  test("EpsNFABuilder.build: Strings"):
+    // Strings are tried from the longest, and then the characters.
+    assertEquals(build("^[\\q{ab|c}d]$", "v"), build("^(?:ab|[cd])$", "u"))
+
+  test("EpsNFABuilder.build: unsupported"):
+    interceptMessage[UnsupportedException]("look-ahead assertion")(build("(?=.)"))
+    interceptMessage[UnsupportedException]("look-behind assertion")(build("(?<=.)"))
+    interceptMessage[UnsupportedException]("back-reference")(build("(.)\\1"))
+    interceptMessage[UnsupportedException]("back-reference")(build("(?<foo>.)\\k<foo>"))
+    interceptMessage[UnsupportedException]("atomic group")(build("(?>a)", "", Dialect.Java))
+    interceptMessage[UnsupportedException]("atomic group")(build("a++", "", Dialect.Java))
+    interceptMessage[UnsupportedException]("unsupported syntax (RCall) at 1")(
+      build("a(?R)?", "", Dialect.PCRE)
+    )
+    interceptMessage[UnsupportedException]("conditional")(build("(a)?(?(1)b|c)", "", Dialect.PCRE))
+    interceptMessage[UnsupportedException]("look-ahead assertion")(build("(?*a)", "", Dialect.PCRE))
+    interceptMessage[UnsupportedException]("look-behind assertion")(build("(?<*a)", "", Dialect.PCRE))
+    for verb <- Seq("ACCEPT", "COMMIT", "PRUNE", "SKIP", "SKIP:x", "THEN") do
+      interceptMessage[UnsupportedException]("backtracking control verb")(build(s"a(*$verb)b", "", Dialect.PCRE))
+
+  test("EpsNFABuilder.build: assertions of other dialects"):
+    // `$` before a final line terminator at an end point is the end after an optional line terminator.
+    assertEquals(build("^a$", "", Dialect.Python()), build("^a(?:|\\n)\\Z", "", Dialect.Python()))
+    assertEquals(
+      build("(*ANYCRLF)^a$", "", Dialect.PCRE),
+      build("(*ANYCRLF)^a(?:|[\\n\\r]|\\r\\n)\\z", "", Dialect.PCRE)
+    )
+    // Java's `$` before a final line terminator is guarded against the position between `\r` and `\n`.
+    val java = build("^a$", "", Dialect.Java)
+    assert(java.tau.values.exists { case Assert(k, _) => k == AssertKind.NotBetweenCRLF; case _ => false })
+    // Each line, text and word boundary assertion has its kind.
+    def kinds(source: String, flags: String, dialect: Dialect): Set[AssertKind] =
+      build(source, flags, dialect).tau.values.collect { case Assert(k, _) => k }.toSet
+
+    import IRLineBeginAtEnd.*
+    assertEquals(
+      kinds("^a$", "m", Dialect.JavaScript),
+      Set[AssertKind](AssertKind.LineBegin(0, AfterTerminator, false, false), AssertKind.LineEnd(0, false, false))
+    )
+    assertEquals(
+      kinds("^a$", "", Dialect.Ruby()),
+      Set[AssertKind](AssertKind.LineBegin(0, InputBegin, false, false), AssertKind.LineEnd(0, false, false))
+    )
+    assertEquals(
+      kinds("^a(?d:^)", "m", Dialect.Java),
+      Set[AssertKind](AssertKind.LineBegin(0, Never, false, true), AssertKind.LineBegin(1, Never, false, false))
+    )
+    assertEquals(
+      kinds("(*CRLF)(?m)^a$", "", Dialect.PCRE),
+      Set[AssertKind](AssertKind.LineBegin(0, InputBegin, true, false), AssertKind.LineEnd(0, true, false))
+    )
+    assertEquals(
+      kinds("\\Aa(?m:$)|b", "", Dialect.Ruby()),
+      Set[AssertKind](AssertKind.TextBegin, AssertKind.LineEnd(0, false, false))
+    )
+    assertEquals(kinds("a\\z|b", "", Dialect.Ruby()), Set[AssertKind](AssertKind.TextEnd))
+    assertEquals(kinds("a$\\n", "", Dialect.Python()), Set[AssertKind](AssertKind.ChompTextEnd(0, false, false)))
+    assertEquals(kinds("a$\\n", "", Dialect.Java), Set[AssertKind](AssertKind.ChompTextEnd(0, true, true)))
+    assertEquals(
+      kinds("\\b(?a:\\B)", "", Dialect.Python()),
+      Set[AssertKind](AssertKind.WordBoundary(0), AssertKind.NotWordBoundary(1))
+    )
+
+  /** Tests whether the automaton of the source accepts the input, i.e. the source matches in the input. */
+  def searches(source: String, flags: String, dialect: Dialect, input: String | UString): Boolean =
+    val nfa = build(source, flags, dialect).toOrderedNFA
+    val units = input match
+      case s: String  => ReDoS.parse(source, flags, dialect).mode.decode(s).iterator.toSeq
+      case u: UString => u.iterator.toSeq
+    val last = units.foldLeft(nfa.inits.toSet): (qs, c) =>
+      qs.flatMap(q => nfa.delta.collect { case ((p, a), ps) if p == q && a.contains(c) => ps }.flatten)
+    last.exists(nfa.acceptSet.contains)
+
+  test("EpsNFABuilder.build: verbs and assertions without effect on the language"):
+    assert(!searches("a(*FAIL)|(*F)", "", Dialect.PCRE, "a"))
+    assert(searches("a(*MARK:x)b", "", Dialect.PCRE, "ab"))
+    assert(searches("a\\Kb", "", Dialect.PCRE, "ab"))
+    assert(searches("\\Ga", "", Dialect.PCRE, "ab"))
+    assert(!searches("\\Gb", "", Dialect.PCRE, "ab"))
+
+  test("EpsNFABuilder.build: (*NOTEMPTY) and (*NOTEMPTY_ATSTART)"):
+    assert(searches("a*", "", Dialect.PCRE, ""))
+    assert(!searches("(*NOTEMPTY)a*", "", Dialect.PCRE, "b"))
+    assert(searches("(*NOTEMPTY)a*", "", Dialect.PCRE, "ba"))
+    assert(!searches("(*NOTEMPTY_ATSTART)a*", "", Dialect.PCRE, ""))
+    assert(searches("(*NOTEMPTY_ATSTART)a*", "", Dialect.PCRE, "b"))
+    assert(!searches("(*NOTEMPTY_ATSTART)^a*", "", Dialect.PCRE, "b"))
+    // The match is the reported one, which starts at `\K`.
+    assert(!searches("(*NOTEMPTY)a\\K", "", Dialect.PCRE, "a"))
+    assert(searches("(*NOTEMPTY)a\\Kb", "", Dialect.PCRE, "ab"))
+    assert(searches("(*NOTEMPTY_ATSTART)a\\K", "", Dialect.PCRE, "a"))
+    assert(!searches("(*NOTEMPTY_ATSTART)\\Ka*", "", Dialect.PCRE, ""))
+
+  test("EpsNFABuilder.build: line, text and word boundary assertions"):
+    for c <- AssertionCases.cases; dialect <- c.dialects do
+      val message = s"/${c.source}/${c.flags} in $dialect on ${c.input}"
+      assertEquals(searches(c.source, c.flags, dialect, c.input), c.matches.contains(dialect), message)
+
+  test("EpsNFABuilder.build: classes folded to several characters"):
+    for c <- CaseFoldingCases.cases; dialect <- c.dialects do
+      val message = s"/${c.source}/i in $dialect on ${c.input}"
+      val input = c.inputOf(ReDoS.parse(c.source, "i", dialect).mode)
+      assertEquals(searches(c.source, "i", dialect, input), c.matches.contains(dialect), message)

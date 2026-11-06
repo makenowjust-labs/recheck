@@ -1,0 +1,67 @@
+package codes.quine.labs.resyntax.charset
+
+import scala.collection.immutable.BitSet
+
+class AlphabetSuite extends munit.FunSuite with CharSetHelper:
+
+  test("Alphabet.refine: no sets"):
+    val a = Alphabet.refine(UnitMode.Byte, Seq.empty)
+    assertEquals(a.atoms, IndexedSeq(UnitMode.Byte.universe))
+    assertEquals(a.atomOf(0x41), 0)
+    intercept[IllegalArgumentException](a.atomOf(0x100))
+    intercept[IllegalArgumentException](a.atomOf(-1))
+    intercept[IllegalArgumentException](a.atomsOf(set((0x41, 0x101))))
+
+  test("Alphabet.refine: overlapping sets"):
+    val lower = set((0x61, 0x7b))
+    val hex = set((0x30, 0x3a), (0x41, 0x47), (0x61, 0x67))
+    val a = Alphabet.refine(UnitMode.Byte, Seq(lower, hex))
+    assertEquals(
+      a.atoms,
+      IndexedSeq(
+        set((0, 0x30), (0x3a, 0x41), (0x47, 0x61), (0x7b, 0x100)),
+        set((0x30, 0x3a), (0x41, 0x47)),
+        set((0x61, 0x67)),
+        set((0x67, 0x7b))
+      )
+    )
+    assertEquals(a.atomsOf(lower), BitSet(2, 3))
+    assertEquals(a.atomsOf(hex), BitSet(1, 2))
+    assertEquals(a.atomsOf(hex.diff(lower)), BitSet(1))
+    assertEquals(CharSet.union(a.atomsOf(lower).iterator.map(a.atoms)), lower)
+    assertEquals(a.atomOf(0x62), 2)
+    assertEquals(a.atomOf(0x7a), 3)
+    assertEquals(a.atomOf(0xff), 0)
+
+  test("Alphabet.refine: atoms partition the mode"):
+    val sets = Seq(set((10, 20)), set((15, 30)), set((0, 5), (25, 300)), set((0x100, 0x20000)))
+    for mode <- UnitMode.values do
+      val a = Alphabet.refine(mode, sets)
+      assertEquals(CharSet.union(a.atoms), mode.universe)
+      for i <- a.atoms.indices; j <- a.atoms.indices if i < j do assert(a.atoms(i).intersect(a.atoms(j)).isEmpty)
+      for s <- sets.map(_.restrict(mode)) do assertEquals(CharSet.union(a.atomsOf(s).iterator.map(a.atoms)), s)
+      for (atom, i) <- a.atoms.zipWithIndex; c <- Seq(atom.head, atom.last) do assertEquals(a.atomOf(c), i)
+      for atom <- a.atoms; s <- sets do assert(atom.subsetOf(s) || atom.intersect(s).isEmpty)
+
+  test("Alphabet.refine: no surrogates in ScalarValue"):
+    val a = Alphabet.refine(UnitMode.ScalarValue, Seq(set((0x41, 0x42)), set((0xd000, 0xe001))))
+    assertEquals(
+      a.atoms,
+      IndexedSeq(
+        set((0, 0x41), (0x42, 0xd000), (0xe001, 0x110000)),
+        set((0x41, 0x42)),
+        set((0xd000, 0xd800), (0xe000, 0xe001))
+      )
+    )
+    intercept[IllegalArgumentException](a.atomOf(0xd800))
+    intercept[IllegalArgumentException](a.atomsOf(set((0xdc00, 0xdc01))))
+
+  test("Alphabet.refine: coarsest"):
+    val a = Alphabet.refine(UnitMode.Byte, Seq(set((0x41, 0x42), (0x61, 0x62)), set((0x41, 0x42), (0x61, 0x62))))
+    assertEquals(a.size, 2)
+    val b = Alphabet.refine(UnitMode.Byte, Seq(set((0, 0x80)), set((0x80, 0x100))))
+    assertEquals(b.atoms, IndexedSeq(set((0, 0x80)), set((0x80, 0x100))))
+
+  test("Alphabet#toString"):
+    val a = Alphabet.refine(UnitMode.Byte, Seq(set((0x41, 0x42))))
+    assertEquals(a.toString, "Alphabet(Byte, CharSet(0x0-0x40, 0x42-0xFF), CharSet(0x41))")

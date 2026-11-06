@@ -1,0 +1,77 @@
+---
+id: javascript
+title: JavaScript
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+Describes how `recheck` checks a regular expression of the `javascript` dialect, which is the default.
+
+## Engine
+
+`recheck` follows the syntax and the semantics of ECMAScript 2026 `RegExp`, as V8 implements it.
+
+## Settings
+
+The `javascript` dialect has no settings.
+
+<Tabs>
+<TabItem value="cli" label="CLI">
+
+```console
+$ recheck --dialect=javascript '/^(a|a)*$/'
+```
+
+</TabItem>
+<TabItem value="js" label="JavaScript">
+
+```tsx
+import { check } from "recheck";
+
+await check("^(a|a)*$", "", { dialect: "javascript" });
+```
+
+</TabItem>
+<TabItem value="scala" label="Scala">
+
+```scala
+import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.resyntax.dialect.Dialect
+
+ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.JavaScript))
+```
+
+</TabItem>
+</Tabs>
+
+## Flags and Units
+
+The matching unit is `utf16`, or `utf16-code-point` with the `u` or `v` flag (see [Matching Units](../dialects.mdx#matching-units)).
+
+`recheck` supports the following flags of `RegExp`.
+
+| Flag | `RegExp` property | Inline     | Notes                                                                  |
+| ---- | ----------------- | ---------- | ---------------------------------------------------------------------- |
+| `d`  | `hasIndices`      |            | No effect on matching.                                                 |
+| `g`  | `global`          |            | No effect on matching, since `recheck` models a search from the start. |
+| `i`  | `ignoreCase`      | `(?i:...)` |                                                                        |
+| `m`  | `multiline`       | `(?m:...)` |                                                                        |
+| `s`  | `dotAll`          | `(?s:...)` |                                                                        |
+| `u`  | `unicode`         |            | An error with `v`.                                                     |
+| `v`  | `unicodeSets`     |            | An error with `u`.                                                     |
+| `y`  | `sticky`          |            | The match starts at the start of the input (`lastIndex` is `0`).       |
+
+## Approximations
+
+- With the `y` flag, the match starts only at the start of the input, as with `lastIndex` of `0`.
+  A match from a later `lastIndex` is not modeled, so `recheck` misses a pattern that is slow only there, where a look-behind, `\b`, `\B` or a multiline `^` sees the text before the starting position (e.g. `/(?<=a)(?:b|b)*$/y` with `lastIndex` of `1` on `'a' + 'b'.repeat(n) + '!'`).
+
+## Runtime-Attack Verification
+
+- Command: `node -`.
+- Matching: `RegExp.prototype.exec`.
+- Engine limits: none.
+- Engine errors: `RangeError` (e.g. V8 raises it for `/^(?:a|b)*$/` on 10,000,000 characters).
+- Environment variable: `RECHECK_NODE`.

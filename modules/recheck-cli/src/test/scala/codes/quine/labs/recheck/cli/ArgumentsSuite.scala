@@ -9,6 +9,7 @@ import codes.quine.labs.recheck.cli.arguments.given
 import codes.quine.labs.recheck.common.AccelerationMode
 import codes.quine.labs.recheck.common.Checker
 import codes.quine.labs.recheck.common.Seeder
+import codes.quine.labs.resyntax.dialect.Dialect
 
 class ArgumentsSuite extends munit.FunSuite:
   test("arguments.durationArgument"):
@@ -35,3 +36,9 @@ class ArgumentsSuite extends munit.FunSuite:
     assertEquals(seederArgument.read("dynamic"), Validated.validNel(Seeder.Dynamic))
     assertEquals(seederArgument.read("xxx"), Validated.invalidNel("unknown seeder: xxx"))
     assertEquals(seederArgument.defaultMetavar, "seeder")
+
+  test("arguments.dialectArgument"):
+    assertEquals(dialectArgument.read("python"), Validated.validNel(Dialect.Python()))
+    assertEquals(dialectArgument.read("dotnet"), Validated.validNel(Dialect.DotNet))
+    assertEquals(dialectArgument.read("xxx"), Validated.invalidNel("unknown dialect: xxx"))
+    assertEquals(dialectArgument.defaultMetavar, "dialect")

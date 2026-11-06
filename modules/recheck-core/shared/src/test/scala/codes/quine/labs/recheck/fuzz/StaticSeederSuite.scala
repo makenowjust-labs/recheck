@@ -1,11 +1,10 @@
 package codes.quine.labs.recheck.fuzz
 
-import scala.util.Failure
-import scala.util.Success
+import scala.util.Try
 
+import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.InvalidRegExpException
-import codes.quine.labs.recheck.regexp.Parser
+import codes.quine.labs.resyntax.dialect.Dialect
 
 class StaticSeederSuite extends munit.FunSuite:
 
@@ -14,10 +13,9 @@ class StaticSeederSuite extends munit.FunSuite:
 
   test("StaticSeeder.seed"):
     def seed(source: String, flags: String): Set[String] =
-      val result = for pattern <- Parser.parse(source, flags) match
-          case Right(pattern) => Success(pattern)
-          case Left(ex)       => Failure(InvalidRegExpException(ex.getMessage))
-      yield StaticSeeder.seed(pattern, limit = 25000, maxSimpleRepeatSize = 10)
+      val result =
+        for ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
+        yield StaticSeeder.seed(ir, limit = 25000, maxSimpleRepeatSize = 10)
       result.get.map(_.toString)
 
     assertEquals(seed("^a+a+$", ""), Set("'a' + 'a'.repeat(224) + '\\x00'", "'a' + 'a'.repeat(15) + '\\x00'"))
@@ -39,3 +37,14 @@ class StaticSeederSuite extends munit.FunSuite:
 
     assertEquals(seed("^a(?=a)$", ""), Set.empty[String])
     assertEquals(seed("^a(?<=a)$", ""), Set.empty[String])
+
+    // A dead suffix after a high surrogate is not a low surrogate, which the engine reads together with it.
+    assertEquals(
+      seed("^(?:\\uD800|\\uDC00)*(?:\\uD800|\\uDC00)*$", "u"),
+      Set(
+        "'\\uD800' + '\\uD800'.repeat(224) + '\\x00'",
+        "'\\uD800' + '\\uD800'.repeat(15) + '\\x00'",
+        "'\\uDC00' + '\\uDC00'.repeat(224) + '\\x00'",
+        "'\\uDC00' + '\\uDC00'.repeat(15) + '\\x00'"
+      )
+    )

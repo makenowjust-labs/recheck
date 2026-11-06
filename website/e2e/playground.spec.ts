@@ -6,6 +6,7 @@ import { parseParams } from "../src/components/Demo/params";
 import { encode } from "../src/components/Demo/permalink";
 
 import type { Page } from "@playwright/test";
+import type { Build } from "../src/components/Demo/builds";
 import type { Snapshot } from "../src/components/Demo/permalink";
 
 const CDN_MODULE = "https://cdn.jsdelivr.net/npm/recheck@*/lib/browser.mjs";
@@ -90,11 +91,12 @@ test("runs the input with the chosen build and records a permalink", async ({
 test("restores a permalink and compares a new run against it", async ({
   page,
 }) => {
+  const build: Build = { type: "release", version: "4.5.9" };
   const recorded: Snapshot = {
     v: 1,
-    build: { type: "release", version: "0.0.1" },
+    build,
     input: "/a/",
-    params: parseParams({ checker: "automaton" }),
+    params: parseParams({ checker: "automaton" }, build),
     result: { status: "safe", source: "a", flags: "", checker: "automaton" },
     time: 1,
     date: "2026-10-25T00:00:00.000Z",
@@ -103,9 +105,9 @@ test("restores a permalink and compares a new run against it", async ({
   await expect(input(page)).toHaveValue("/a/");
   await expect(page.locator('select[name="checker"]')).toHaveValue("automaton");
   await expect(page.locator(".card__header .badge")).toHaveText("recorded");
-  await expect(footers(page)).toContainText("recheck v0.0.1");
+  await expect(footers(page)).toContainText("recheck v4.5.9");
   await expect(page.locator(".alert--warning")).toContainText(
-    "recorded with recheck v0.0.1",
+    "recorded with recheck v4.5.9",
   );
 
   await check(page);
@@ -128,4 +130,57 @@ test("reports a release that cannot be loaded", async ({ page }) => {
     /^Failed to load recheck v/,
   );
   await expect(resultTitles(page)).toHaveCount(0);
+});
+
+test("shows the parameters of the selected dialect", async ({ page }) => {
+  await open(page);
+  const version = page.getByLabel("recheck version");
+  const bundled = (await version.locator("option").allTextContents()).at(-1)!;
+  await version.selectOption(bundled);
+  const select = (name: string) => page.locator(`select[name="${name}"]`);
+  const options = (name: string) =>
+    select(name).locator("option").allTextContents();
+  // The dialect is chosen outside the parameters, and its settings are in them.
+  await expect(select("dialect")).toBeVisible();
+  await expect(page.locator('details select[name="dialect"]')).toHaveCount(0);
+  await page.getByText("Parameters", { exact: true }).click();
+  await expect(select("dialect")).toHaveValue("javascript");
+  await expect(select("dialectType")).toHaveCount(0);
+  await expect(select("dialectSource")).toHaveCount(0);
+
+  await expect(
+    page.getByRole("link", { name: "Details of javascript" }),
+  ).toHaveAttribute("href", "/recheck/docs/usage/dialects/javascript/");
+
+  await expect(
+    page.getByRole("link", { name: "Details of javascript" }),
+  ).toHaveAttribute("target", "_blank");
+
+  await select("dialect").selectOption("perl");
+  await expect(
+    page.getByRole("link", { name: "Details of perl" }),
+  ).toHaveAttribute("href", "/recheck/docs/usage/dialects/perl/");
+  expect(await options("dialectUtf8")).toEqual(["true", "false"]);
+  await expect(select("dialectSource")).toHaveValue("literal");
+  await expect(select("dialectEncoding")).toHaveCount(0);
+
+  await select("dialect").selectOption("ruby");
+  expect(await options("dialectEncoding")).toEqual(["UTF-8", "ASCII-8BIT"]);
+  await select("dialect").selectOption("python");
+  expect(await options("dialectType")).toEqual(["str", "bytes"]);
+  await expect(select("dialectType")).toHaveValue("str");
+  await expect(select("dialectUtf8")).toHaveCount(0);
+
+  await select("dialect").selectOption("perl");
+  await select("dialectUtf8").selectOption("false");
+  await input(page).fill("/^(?:é|é)*$/");
+  await check(page);
+  await expect(page.locator(".badge", { hasText: "vulnerable" })).toBeVisible();
+
+  // The permalink restores the parameters of the dialect.
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+  await expect(select("dialect")).toHaveValue("perl");
+  await expect(select("dialectUtf8")).toHaveValue("false");
+  await expect(select("dialectSource")).toHaveValue("literal");
 });

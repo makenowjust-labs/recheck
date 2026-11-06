@@ -1,17 +1,16 @@
 package codes.quine.labs.recheck.vm
 
+import scala.annotation.tailrec
 import scala.collection.mutable
+import scala.compiletime.uninitialized
 import scala.concurrent.duration.Duration
 
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.TimeoutException
-import codes.quine.labs.recheck.regexp.Pattern.Location
-import codes.quine.labs.recheck.unicode.IChar.LineTerminator
-import codes.quine.labs.recheck.unicode.IChar.Word
-import codes.quine.labs.recheck.unicode.UChar
-import codes.quine.labs.recheck.unicode.UString
 import codes.quine.labs.recheck.vm.Inst.AssertKind
+import codes.quine.labs.recheck.vm.Inst.Barrier
 import codes.quine.labs.recheck.vm.Inst.ReadKind
+import codes.quine.labs.recheck.vm.Inst.VerbKind
 import codes.quine.labs.recheck.vm.Interpreter.CoverageItem
 import codes.quine.labs.recheck.vm.Interpreter.CoverageLocation
 import codes.quine.labs.recheck.vm.Interpreter.Diff
@@ -21,34 +20,45 @@ import codes.quine.labs.recheck.vm.Interpreter.MatchState
 import codes.quine.labs.recheck.vm.Interpreter.Options
 import codes.quine.labs.recheck.vm.Interpreter.Result
 import codes.quine.labs.recheck.vm.Interpreter.Status
+import codes.quine.labs.resyntax.ast.SourceLocation
+import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UChar
+import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.dialect.LineTerminatorSet
+import codes.quine.labs.resyntax.ir.IRBackReferenceChoice
+import codes.quine.labs.resyntax.ir.IRBackReferenceFolding
+import codes.quine.labs.resyntax.ir.IRCaseEquivalence
+import codes.quine.labs.resyntax.ir.IRLineBeginAtEnd
+import codes.quine.labs.resyntax.ir.IRLookBehindStartRange
+import codes.quine.labs.resyntax.ir.IRWordMarkSet
 
-/** Interpreter executes a program on a input. */
+/** Interpreter executes a program on an input. */
 object Interpreter:
 
   /** Runs a program on a given input.
     *
     * Note that we assume an input string is normalized here.
     */
-  def run(program: Program, input: UString, pos: Int, options: Options)(using ctx: Context): Result =
+  def run(program: Program, input: UString, options: Options)(using ctx: Context): Result =
     val interpreter = Interpreter(program, input, options)
-    interpreter.run(pos)
+    interpreter.run()
 
   /** Runs a program on a given input and a timeout. */
-  def runWithTimeout(program: Program, input: UString, pos: Int, options: Options, timeout: Duration)(using
+  def runWithTimeout(program: Program, input: UString, options: Options, timeout: Duration)(using
       ctx: Context
   ): Result =
     timeout match
       case d if d < Duration.Zero => Result(Status.Timeout, None, 0, Seq.empty, Set.empty, Set.empty, Map.empty)
-      case _: Duration.Infinite   => run(program, input, pos, options)
+      case _: Duration.Infinite   => run(program, input, options)
       case d                      =>
-        if (ctx.deadline ne null) && ctx.deadline.timeLeft < d then run(program, input, pos, options)
-        val newCtx = Context(d, Option(ctx.token))
+        if (ctx.deadline ne null) && ctx.deadline.timeLeft < d then run(program, input, options)
+        else
+          val newCtx = Context(d, Option(ctx.token))
+          val interpreter = new Interpreter(program, input, options)(using newCtx)
+          try interpreter.run()
+          catch case _: TimeoutException => interpreter.result(Status.Timeout, None)
 
-        val interpreter = new Interpreter(program, input, options)(using newCtx)
-        try interpreter.run(pos)
-        catch case _: TimeoutException => interpreter.result(Status.Timeout, None)
-
-  /** Options is an options for running an interpreter. */
+  /** Options is the options for running an interpreter. */
   final case class Options(
       limit: Int = Int.MaxValue,
       usesAcceleration: Boolean = false,
@@ -66,7 +76,7 @@ object Interpreter:
       loops: Seq[(Int, Int)],
       failedPoints: Set[FailedPoint],
       coverage: Set[CoverageItem],
-      heatmap: Map[Location, Int]
+      heatmap: Map[SourceLocation, Int]
   )
 
   /** Status is a matching status. */
@@ -74,19 +84,23 @@ object Interpreter:
 
   object Status:
 
-    /** Matching is succeeded. */
+    /** Ok is the status of a succeeded matching. */
     case object Ok extends Status:
+
       override def toString: String = "ok"
 
-    /** Matching is failed. */
+    /** Fail is the status of a failed matching. */
     case object Fail extends Status:
+
       override def toString: String = "fail"
 
-    /** A limit is exceeded on matching. */
+    /** Limit is the status of a matching that exceeds the limit of steps. */
     case object Limit extends Status:
+
       override def toString: String = "limit"
 
     case object Timeout extends Status:
+
       override def toString: String = "timeout"
 
   /** CoverageLocation is a location in coverage. */
@@ -98,14 +112,46 @@ object Interpreter:
   /** FailedPoint is a failed point on matching. */
   final case class FailedPoint(target: CoverageLocation, pos: Int, kind: ReadKind, capture: Option[UString])
 
-  /** MatchState is a state of matching. */
-  private[vm] final case class MatchState(blockID: Int, pos: Int, counters: Vector[Int], captures: Option[Vector[Int]])
+  /** MatchState is a state of matching, which the memoization table looks up on each junction block.
+    *
+    * For example, a state of a program reading the captures has `values` like the following.
+    * {{{
+    * MatchState(
+    *   4, 2,        // the block ID and the position
+    *   1,           // the counters
+    *   0, -1, 0, 1, // the begin and the end of each capture, or -1 (only when the program reads the captures)
+    *   1,           // the largest index of the closed captures (likewise)
+    *   1, 0         // 1 if the canary register holds the position, or 0
+    * )
+    * }}}
+    */
+  private[vm] final class MatchState(private val values: Array[Int]):
 
-  /** Junction is a state for a junction block. */
-  private[vm] final case class Junction(state: MatchState, steps: Int, heatmap: Option[Map[Location, Int]])
+    override val hashCode: Int = java.util.Arrays.hashCode(values)
 
-  /** Diff is a difference of state on matching. */
-  private[vm] final case class Diff(steps: Int, heatmap: Option[Map[Location, Int]])
+    override def equals(that: Any): Boolean = that match
+      case that: MatchState => java.util.Arrays.equals(values, that.values)
+      case _                => false
+
+    override def toString: String = values.mkString("MatchState(", ", ", ")")
+
+  /** Junction is a state for a junction block, with the time reaching it. */
+  private[vm] final case class Junction(
+      state: MatchState,
+      steps: Int,
+      heatmap: Option[Map[SourceLocation, Int]],
+      time: Long
+  )
+
+  /** Diff is a difference of state on matching, with the captures of the last failed matching, and the captures held in
+    * it.
+    */
+  private[vm] final case class Diff(
+      steps: Int,
+      heatmap: Option[Map[SourceLocation, Int]],
+      failedCaptures: Vector[Int],
+      held: Map[Int, (Int, Int)]
+  )
 
 /** Interpreter is an interpreter of a program and an input. */
 private[vm] class Interpreter(program: Program, input: UString, options: Options)(using ctx: Context):
@@ -122,11 +168,26 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       var junctions: Vector[Junction]
   ):
 
+    /** The largest index of the closed captures, which Perl uses to unset the captures on backtracking. */
+    var lastParen: Int = 0
+
+    /** The barrier that this frame is as a fallback for the backtracking control verbs, or `null`. */
+    var barrier: Barrier = uninitialized
+
+    /** The label retrying the search, for a [[Barrier.Search]] frame. */
+    var restart: Label = uninitialized
+
+    /** The verb acting when backtracking reaches this frame, or `null` for a usual frame. */
+    var verb: VerbKind = uninitialized
+
+    /** The time this frame is made, which tells whether the captures were held after it. */
+    var time: Long = 0
+
     /** Gets a previous character. */
-    def previousChar: Option[UChar] = input.getBefore(pos, program.meta.unicode)
+    def previousChar: Option[UChar] = input.getBefore(pos)
 
     /** Gets a current character. */
-    def currentChar: Option[UChar] = input.getAt(pos, program.meta.unicode)
+    def currentChar: Option[UChar] = input.getAt(pos)
 
     /** Captures a beginning position of the index. */
     def capBegin(index: Int): Unit =
@@ -135,6 +196,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     /** Captures an ending position of the index. */
     def capEnd(index: Int): Unit =
       captures = captures.updated(index * 2 + 1, pos)
+      lastParen = Math.max(lastParen, index)
 
     /** Resets captures between `from` and `to`. */
     def capReset(from: Int, to: Int): Unit =
@@ -146,17 +208,32 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
     def capture(index: Int): Option[UString] =
       (captures(index * 2), captures(index * 2 + 1)) match
         case (b, e) if b == -1 || e == -1 => None
-        case (b, e)                       => Some(input.substring(b, e))
+        case (b, e)                       => Some(input.slice(b, e))
 
     /** Converts this frame into a corresponding state. */
     def toState: MatchState =
-      Interpreter.MatchState(label.index, pos, counters, if program.meta.hasRef then Some(captures) else None)
+      val capturesSize = if program.meta.hasRef then captures.size + 1 else 0
+      val values = new Array[Int](2 + counters.size + capturesSize + canaries.size)
+      var size = 0
+
+      def add(n: Int): Unit =
+        values(size) = n
+        size += 1
+
+      add(label.index)
+      add(pos)
+      counters.foreach(add)
+      if program.meta.hasRef then
+        captures.foreach(add)
+        add(lastParen)
+      for canary <- canaries do add(if canary == pos then 1 else 0)
+      MatchState(values)
 
     override def clone(): Frame =
-      new Frame(label, pos, captures, counters, canaries, rollback, fallback, junctions)
-
-    override def toString: String =
-      s"Frame($label, $pos, $captures, $counters, $canaries, $rollback, $fallback, $junctions)"
+      val frame = new Frame(label, pos, captures, counters, canaries, rollback, fallback, junctions)
+      frame.lastParen = lastParen
+      frame.time = tick()
+      frame
 
   /** Rollback holds an information for rollbacks. */
   private sealed abstract class Rollback extends Product with Serializable
@@ -171,11 +248,12 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         next: Label,
         pos: Int,
         rollback: Option[Rollback],
-        fallback: Option[Frame]
+        fallback: Option[Frame],
+        junctions: Int
     ) extends Rollback
 
     /** Fallback is a fallback frame for rollback when `rollback` instruction has no rollback successor label. */
-    final case class Fallback(fallback: Option[Frame]) extends Rollback
+    final case class Fallback(fallback: Option[Frame], junctions: Int) extends Rollback
 
   /** A number of current execution step. */
   private var steps: Int = 0
@@ -189,11 +267,29 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
   /** A coverage set. */
   private val coverage: mutable.Set[CoverageItem] = mutable.Set.empty
 
-  /** A failed points list */
+  /** A failed points set. */
   private val failedPoints: mutable.Set[FailedPoint] = mutable.Set.empty
 
   /** A heatmap on matching. */
-  private var heatmap: Map[Location, Int] = Map.empty[Location, Int].withDefaultValue(0)
+  private var heatmap: Map[SourceLocation, Int] = Map.empty[SourceLocation, Int].withDefaultValue(0)
+
+  /** The captures of the last failed matching, which `cap_keep` takes. */
+  private var failedCaptures: Vector[Int] = Vector.empty
+
+  /** A clock ordering the frames and the held captures. */
+  private var clock: Long = 0
+
+  /** The captures held by `cap_hold`, with the time holding them, by the index. */
+  private val held: mutable.Map[Int, (Int, Int, Long)] = mutable.Map.empty
+
+  private def tick(): Long =
+    clock += 1
+    clock
+
+  /** Whether it memoizes the failed states. */
+  private val memoizes: Boolean = options.usesAcceleration
+
+  require(!memoizes || program.meta.allowsMemoization, "The program does not allow memoization")
 
   /** Constructs a result of matching. */
   private[vm] def result(status: Status, captures: Option[Seq[Int]]): Result =
@@ -203,11 +299,11 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       .toSeq
     Result(status, captures, steps, loops, failedPoints.toSet, coverage.toSet, heatmap)
 
-  /** Runs matching from a position. */
-  def run(pos: Int): Result =
+  /** Runs matching from the start of the input. */
+  def run(): Result =
     val frame = Frame(
       program.blocks.head._1,
-      pos,
+      0,
       Vector.fill((program.meta.capturesSize + 1) * 2)(-1),
       Vector.fill(program.meta.countersSize)(0),
       Vector.fill(program.meta.canariesSize)(0),
@@ -233,16 +329,19 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         // When acceleration mode is enabled and current block is junction,
         // it tries to retrieve a result from memoization table, or adds a junction information.
         var memoized = false
-        if options.usesAcceleration && program.meta.predecessors(frame.label.index).size >= 2 then
+        var memoizedCaptures: Option[Vector[Int]] = None
+        if memoizes && program.meta.predecessors(frame.label.index).size >= 2 then
           val state = frame.toState
           memoTable.get(state) match
             case Some(diff) =>
               memoized = true
+              memoizedCaptures = Some(diff.failedCaptures)
+              for (index, (begin, end)) <- diff.held do held(index) = (begin, end, tick())
               steps = Math.addExact(steps, diff.steps)
               if options.needsHeatmap then
                 for (loc, n) <- diff.heatmap.get do heatmap = heatmap.updated(loc, heatmap(loc) + n)
             case None =>
-              val junction = Junction(state, steps, if options.needsHeatmap then Some(heatmap) else None)
+              val junction = Junction(state, steps, if options.needsHeatmap then Some(heatmap) else None, tick())
               frame.junctions = junction +: frame.junctions
 
         if options.needsLoopAnalysis then
@@ -252,7 +351,12 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
         val failed = memoized || !block(frame, frame.label.block) ||
           (frame.label.block.terminator match
-            case Inst.Ok        => return result(Status.Ok, Some(frame.captures))
+            case Inst.Ok =>
+              // Ruby's `\K` in a look-ahead may set the start after the end, and Ruby reports the start as the end.
+              val captures =
+                if frame.captures(0) > frame.captures(1) then frame.captures.updated(0, frame.captures(1))
+                else frame.captures
+              return result(Status.Ok, Some(captures))
             case Inst.Jmp(next) =>
               frame.label = next
               false
@@ -262,6 +366,28 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
               frame.label = next
               frame.fallback = Some(fallbackFrame)
               false
+            case Inst.TryBarrier(next, fallback, barrier) =>
+              val fallbackFrame = frame.clone()
+              fallbackFrame.label = fallback
+              fallbackFrame.barrier = barrier
+              fallbackFrame.restart = frame.label
+              frame.label = next
+              frame.fallback = Some(fallbackFrame)
+              false
+            case Inst.IfCap(indices, yes, no) =>
+              val set = indices.exists(i => frame.captures(i * 2) >= 0 && frame.captures(i * 2 + 1) >= 0)
+              frame.label = if set then yes else no
+              false
+            case Inst.Leave =>
+              frame.rollback.get match
+                case Rollback.HasSuccessor(next, pos, rollback, _, _) =>
+                  frame.label = next
+                  frame.pos = pos
+                  frame.rollback = rollback
+                  false
+                // $COVERAGE-OFF$
+                case Rollback.Fallback(_, _) => sys.error("unreachable")
+              // $COVERAGE-ON$
             case Inst.TryLA(read, next, fallback) =>
               val oldPos = frame.pos
               if instRead(frame, read) then
@@ -272,6 +398,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                 frame.fallback = Some(fallbackFrame)
                 false
               else
+                failedCaptures = frame.captures
                 frame.label = fallback
                 false
             case Inst.TryLB(read, next, fallback) =>
@@ -284,33 +411,66 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
                 frame.fallback = Some(fallbackFrame)
                 false
               else
+                failedCaptures = frame.captures
                 frame.label = fallback
                 false
+            case Inst.StepBack(end, starts, next) =>
+              frame.counters = frame.counters.updated(end.index, frame.pos)
+              lookBehindStarts(frame.pos, starts) match
+                case first +: rest =>
+                  for pos <- rest.reverseIterator do
+                    val fallbackFrame = frame.clone()
+                    fallbackFrame.label = next
+                    fallbackFrame.pos = pos
+                    frame.fallback = Some(fallbackFrame)
+                  frame.label = next
+                  frame.pos = first
+                  false
+                case _ => true
+            case Inst.CmpCanary(reg, empty, advanced) =>
+              frame.label = if frame.canaries(reg.index) == frame.pos then empty else advanced
+              false
             case Inst.Cmp(reg, n, lt, ge) =>
               val r = frame.counters(reg.index)
               val next = if r < n then lt else ge
               frame.label = next
               false
+            case Inst.Fail     => true
             case Inst.Rollback =>
               val failed = frame.rollback.get match
-                case Rollback.HasSuccessor(next, pos, rollback, fallback) =>
+                case Rollback.HasSuccessor(next, pos, rollback, fallback, junctions) =>
                   frame.label = next
                   frame.pos = pos
                   frame.rollback = rollback
                   frame.fallback = fallback
+                  dropJunctions(frame, junctions)
                   false
-                case Rollback.Fallback(fallback) =>
+                case Rollback.Fallback(fallback, junctions) =>
                   frame.fallback = fallback
+                  dropJunctions(frame, junctions)
                   true
               failed
-            case Inst.Tx(next, rollback, fallback) =>
+            case Inst.Commit =>
+              frame.rollback.get match
+                case Rollback.HasSuccessor(next, _, rollback, fallback, junctions) =>
+                  frame.label = next
+                  frame.rollback = rollback
+                  frame.fallback = fallback
+                  dropJunctions(frame, junctions)
+                  false
+                // $COVERAGE-OFF$
+                case Rollback.Fallback(_, _) => sys.error("unreachable")
+              // $COVERAGE-ON$
+            case Inst.Tx(next, rollback, fallback, barrier) =>
               val nextRollback = rollback match
-                case Some(rollback) => Rollback.HasSuccessor(rollback, frame.pos, frame.rollback, frame.fallback)
-                case None           => Rollback.Fallback(frame.fallback)
+                case Some(rollback) =>
+                  Rollback.HasSuccessor(rollback, frame.pos, frame.rollback, frame.fallback, frame.junctions.size)
+                case None => Rollback.Fallback(frame.fallback, frame.junctions.size)
               val nextFallback = fallback match
                 case Some(fallback) =>
                   val fallbackFrame = frame.clone()
                   fallbackFrame.label = fallback
+                  for b <- barrier do fallbackFrame.barrier = b
                   Some(fallbackFrame)
                 case None => frame.fallback
               frame.label = next
@@ -319,25 +479,90 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
               false)
 
         if failed then
-          frame.fallback match
+          val captures = memoizedCaptures.getOrElse(frame.captures)
+          failedCaptures = captures
+          backtrack(frame.fallback) match
             case Some(fallback) =>
-              if options.usesAcceleration && frame.junctions.size > fallback.junctions.size then
+              if memoizes && frame.junctions.size > fallback.junctions.size then
                 val d = frame.junctions.size - fallback.junctions.size
                 for jx <- frame.junctions.take(d) do
                   val diffHeatmap = Option.when(options.needsHeatmap):
                     val jxHeatmap = jx.heatmap.get
-                    val builder = Map.newBuilder[Location, Int]
+                    val builder = Map.newBuilder[SourceLocation, Int]
                     for (loc, n) <- heatmap do
                       val m = jxHeatmap(loc)
                       if n != m then builder.addOne(loc -> (n - m))
                     builder.result()
-                  memoTable(jx.state) = Diff(steps - jx.steps, diffHeatmap)
+                  val diffHeld =
+                    if held.isEmpty then Map.empty
+                    else held.iterator.collect { case (i, (b, e, t)) if t > jx.time => (i, (b, e)) }.toMap
+                  memoTable(jx.state) = Diff(steps - jx.steps, diffHeatmap, captures, diffHeld)
               frame = fallback
+              restoreHeld(frame)
             case None => return result(Status.Fail, None)
 
     // $COVERAGE-OFF$
     sys.error("unreachable")
     // $COVERAGE-ON$
+
+  /** Sets the captures held after the frame is made, which backtracking to it does not restore. */
+  private def restoreHeld(frame: Frame): Unit =
+    for (index, (begin, end, time)) <- held.iterator if time > frame.time do
+      frame.captures = frame.captures.updated(index * 2, begin).updated(index * 2 + 1, end)
+
+  /** Drops the junctions reached in a transaction that ends, keeping the `size` ones before it. */
+  private def dropJunctions(frame: Frame, size: Int): Unit =
+    // The transaction drops the backtracking points in it, so a failure after it does not tell that they fail.
+    if frame.junctions.size > size then frame.junctions = frame.junctions.takeRight(size)
+
+  /** Returns the frame that backtracking resumes from the fallback, where the frames of the verbs act. */
+  @tailrec
+  private def backtrack(fallback: Option[Frame]): Option[Frame] =
+    fallback match
+      case Some(f) if f.verb ne null =>
+        f.verb match
+          case VerbKind.Commit           => cut(f.fallback, None).filter(_.barrier != Barrier.Search)
+          case VerbKind.Prune            => cut(f.fallback, None)
+          case VerbKind.Skip(None)       => cut(f.fallback, Some(f.pos))
+          case VerbKind.Skip(Some(name)) =>
+            // Without the mark of the name, `(*SKIP)` is ignored.
+            findMark(f.fallback, name) match
+              case Some(mark) => cut(f.fallback, Some(mark.pos))
+              case None       => backtrack(f.fallback)
+          case VerbKind.Then(Some(scope)) =>
+            find(f.fallback)(b => b == Barrier.Then(scope) || b == Barrier.Assertion(Some(scope)))
+          case VerbKind.Then(None) => cut(f.fallback, None)
+          case VerbKind.Mark(_)    => backtrack(f.fallback)
+      case fallback => fallback
+
+  /** Returns the nearest frame whose barrier satisfies the predicate. */
+  @tailrec
+  private def find(fallback: Option[Frame])(p: Barrier => Boolean): Option[Frame] =
+    fallback match
+      case Some(f) if (f.barrier ne null) && p(f.barrier) => Some(f)
+      case Some(f)                                        => find(f.fallback)(p)
+      case None                                           => None
+
+  /** Returns the nearest frame of the mark of the name. */
+  @tailrec
+  private def findMark(fallback: Option[Frame], name: String): Option[Frame] =
+    fallback match
+      case Some(f) if f.verb == VerbKind.Mark(name) => Some(f)
+      case Some(f)                                  => findMark(f.fallback, name)
+      case None                                     => None
+
+  /** Returns the frame failing the match at the starting position: the barrier of an assertion, or the retry of the
+    * search, from the position `skip` if it is after the starting position.
+    */
+  private def cut(fallback: Option[Frame], skip: Option[Int]): Option[Frame] =
+    find(fallback)(b => b == Barrier.Search || b.isInstanceOf[Barrier.Assertion]).map: f =>
+      skip.filter(f.barrier == Barrier.Search && _ > f.pos) match
+        case Some(pos) =>
+          val retry = f.clone()
+          retry.label = f.restart
+          retry.pos = pos
+          retry
+        case None => f
 
   /** Runs a given block. */
   private def block(frame: Frame, block: Block): Boolean =
@@ -351,7 +576,7 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       case Inst.SetCanary(reg) =>
         frame.canaries = frame.canaries.updated(reg.index, frame.pos)
         true
-      case Inst.CheckCanary(reg) =>
+      case Inst.RejectEmptyIteration(reg) =>
         frame.canaries(reg.index) != frame.pos
       case Inst.Reset(reg) =>
         frame.counters = frame.counters.updated(reg.index, 0)
@@ -361,28 +586,33 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
         true
       case Inst.Assert(kind) =>
         val ok = kind match
-          case AssertKind.WordBoundary =>
-            val c1 = frame.previousChar
-            val c2 = frame.currentChar
-            val w1 = c1.exists(Word.contains)
-            val w2 = c2.exists(Word.contains)
-            w1 != w2
-          case AssertKind.WordBoundaryNot =>
-            val c1 = frame.previousChar
-            val c2 = frame.currentChar
-            val w1 = c1.exists(Word.contains)
-            val w2 = c2.exists(Word.contains)
-            w1 == w2
-          case AssertKind.LineBegin =>
-            val c1 = frame.previousChar
-            c1.forall(LineTerminator.contains)
-          case AssertKind.LineEnd =>
-            val c2 = frame.currentChar
-            c2.forall(LineTerminator.contains)
+          case AssertKind.WordBoundary(word) =>
+            frame.previousChar.exists(word.contains) != frame.currentChar.exists(word.contains)
+          case AssertKind.WordBoundaryNot(word) =>
+            frame.previousChar.exists(word.contains) == frame.currentChar.exists(word.contains)
+          case AssertKind.MarkWordBoundary(word, marks) =>
+            isMarkWordBefore(frame, word, marks) != isMarkWordAt(frame, word, marks)
+          case AssertKind.MarkWordBoundaryNot(word, marks) =>
+            isMarkWordBefore(frame, word, marks) == isMarkWordAt(frame, word, marks)
+          case AssertKind.LineBegin(terminators, atEnd) =>
+            if frame.pos == input.length then
+              atEnd match
+                case IRLineBeginAtEnd.AfterTerminator => frame.pos == 0 || afterTerminator(frame.pos, terminators)
+                case IRLineBeginAtEnd.InputBegin      => frame.pos == 0
+                case IRLineBeginAtEnd.Never           => false
+            else frame.pos == 0 || afterTerminator(frame.pos, terminators)
+          case AssertKind.LineEnd(terminators) =>
+            frame.pos == input.length || beforeTerminator(frame.pos, terminators).isDefined
           case AssertKind.InputBegin =>
             frame.pos == 0
           case AssertKind.InputEnd =>
-            frame.pos == input.sizeAsString
+            frame.pos == input.length
+          case AssertKind.ChompInputEnd(terminators) =>
+            frame.pos == input.length || beforeTerminator(frame.pos, terminators).contains(input.length)
+          case AssertKind.LookBehindEnd(end) =>
+            frame.pos == frame.counters(end.index)
+          case AssertKind.NotBetweenCRLF =>
+            !(0 < frame.pos && frame.pos < input.length && input(frame.pos - 1) == 0x0d && input(frame.pos) == 0x0a)
         if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
         ok
       case read: Inst.Read      => instRead(frame, read)
@@ -396,40 +626,181 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       case Inst.CapReset(from, to) =>
         frame.capReset(from, to)
         true
+      case Inst.CapHold(from, to) =>
+        val time = tick()
+        for index <- from to to do held(index) = (frame.captures(index * 2), frame.captures(index * 2 + 1), time)
+        true
+      case Inst.Verb(kind) =>
+        val verbFrame = frame.clone()
+        verbFrame.verb = kind
+        frame.fallback = Some(verbFrame)
+        true
+      case Inst.RejectEmpty(atStart) =>
+        frame.captures(0) != frame.pos || atStart && frame.pos != 0
+      case Inst.TxDrop =>
+        frame.rollback = frame.rollback.get match
+          case Rollback.HasSuccessor(_, _, rollback, _, _) => rollback
+          // $COVERAGE-OFF$
+          case Rollback.Fallback(_, _) => sys.error("unreachable")
+        // $COVERAGE-ON$
+        true
+      case Inst.CapKeep =>
+        val captures = if failedCaptures.isEmpty then frame.captures else failedCaptures
+        frame.captures = Vector.tabulate(captures.size): i =>
+          val index = i / 2
+          // A capture above the last closed index is unset, but the beginning of an open capture remains.
+          // The whole match keeps its start, which `\K` sets.
+          if index == 0 then frame.captures(i)
+          else if index > frame.lastParen then if i % 2 == 0 then frame.captures(i) else -1
+          else captures(i)
+        true
+
+  /** Returns the starts of a look-behind at the position in the order that the engine tries them. */
+  private def lookBehindStarts(pos: Int, starts: IRLookBehindStartRange): Seq[Int] =
+    math.max(0, pos - starts.max) to pos - starts.min
+
+  /** Tests whether the text before the position ends with a base and then any extenders of the marks. */
+  private def hasBase(pos: Int, marks: IRWordMarkSet): Boolean =
+    var p = pos
+    while input.getBefore(p).exists(marks.extenders.contains) do p -= 1
+    input.getBefore(p).exists(marks.bases.contains)
+
+  /** Tests whether the character before the position is a word character, or an extender of the marks after a base. */
+  private def isMarkWordBefore(frame: Frame, word: CharSet, marks: IRWordMarkSet): Boolean =
+    frame.previousChar.exists(c => word.contains(c) || marks.extenders.contains(c) && hasBase(frame.pos, marks))
+
+  /** Tests whether the character at the position is a word character, or a mark after a base. */
+  private def isMarkWordAt(frame: Frame, word: CharSet, marks: IRWordMarkSet): Boolean =
+    frame.currentChar.exists(c => word.contains(c) || marks.marks.contains(c) && hasBase(frame.pos, marks))
+
+  /** Tests whether the position is after a line terminator. */
+  private def afterTerminator(pos: Int, terminators: LineTerminatorSet): Boolean =
+    val c = input.getBefore(pos)
+    val single = c.exists(terminators.chars.contains)
+    val crlf =
+      terminators.crlf != LineTerminatorSet.CRLF.Ignored && c.contains(0x0a) && pos >= 2 && input(pos - 2) == 0x0d
+    (single || crlf) && !betweenCRLF(pos, terminators)
+
+  /** Returns the end position of a line terminator at the position, if any. */
+  private def beforeTerminator(pos: Int, terminators: LineTerminatorSet): Option[Int] =
+    if betweenCRLF(pos, terminators) then None
+    else if terminators.crlf != LineTerminatorSet.CRLF.Ignored && pos + 1 < input.length &&
+      input(pos) == 0x0d && input(pos + 1) == 0x0a
+    then Some(pos + 2)
+    else Option.when(input.getAt(pos).exists(terminators.chars.contains))(pos + 1)
+
+  /** Tests whether the position is between `\r` and `\n`, where no line assertion matches with `CRLF.Atomic`. */
+  private def betweenCRLF(pos: Int, terminators: LineTerminatorSet): Boolean =
+    terminators.crlf == LineTerminatorSet.CRLF.Atomic && 0 < pos && pos < input.length &&
+      input(pos - 1) == 0x0d && input(pos) == 0x0a
+
+  /** Returns the captures that a back-reference compares in turn, where `None` matches the empty string. */
+  private def refCandidates(frame: Frame, ref: ReadKind.Ref): Seq[Option[UString]] =
+    val captures = ref.indices.flatMap(frame.capture)
+    ref.semantics.choice match
+      case IRBackReferenceChoice.FirstSet =>
+        captures.headOption match
+          case Some(s)                                 => Seq(Some(s))
+          case None if ref.semantics.unsetMatchesEmpty => Seq(None)
+          case None                                    => Seq.empty
+      case IRBackReferenceChoice.LastMatching =>
+        if captures.isEmpty && ref.semantics.unsetMatchesEmpty then Seq(None) else captures.reverse.map(Some(_))
+
+  /** Compares the capture with the input from the position forward (or backward), and returns the compared count and
+    * the matched width of the input if matched.
+    */
+  private def compare(s: UString, pos: Int, back: Boolean, ref: ReadKind.Ref): (Int, Option[Int]) =
+    val equivalence = ref.equivalence
+    ref.folding match
+      case full: IRBackReferenceFolding.Full => compareFolded(s, pos, back, equivalence, full)
+      case IRBackReferenceFolding.Simple     => compareChars(s, pos, back, equivalence)
+
+  private def compareChars(s: UString, pos: Int, back: Boolean, equivalence: IRCaseEquivalence): (Int, Option[Int]) =
+    val identity = equivalence == IRCaseEquivalence.Identity
+    def equiv(c1: UChar, c2: UChar): Boolean = c1 == c2 || !identity && equivalence.equiv(c1, c2)
+
+    var count = 0
+    if back then
+      while count < s.length && pos - count - 1 >= 0 && equiv(s(s.length - count - 1), input(pos - count - 1)) do
+        count += 1
+    else while count < s.length && pos + count < input.length && equiv(s(count), input(pos + count)) do count += 1
+    (count, Option.when(count == s.length)(s.length))
+
+  /** Compares the full case foldings of the capture and the input, where the input's characters must fold to the
+    * capture's folding exactly, and returns the compared width of the input and the matched width if matched.
+    */
+  private def compareFolded(
+      s: UString,
+      pos: Int,
+      back: Boolean,
+      equivalence: IRCaseEquivalence,
+      full: IRBackReferenceFolding.Full
+  ): (Int, Option[Int]) =
+    def folded(c: UChar): Seq[UChar] = full.fold(c).map(_.iterator.toSeq).getOrElse(Seq(c))
+
+    val target =
+      val units = s.iterator.flatMap(folded).toSeq
+      if back then units.reverse else units
+    var k = 0
+    var j = 0
+    var continues = true
+    while continues && k < target.length do
+      val c = if back then input.getBefore(pos - j) else input.getAt(pos + j)
+      c match
+        case Some(c) =>
+          val units = if back then folded(c).reverse else folded(c)
+          if k + units.length <= target.length &&
+            units.indices.forall(n => target(k + n) == units(n) || equivalence.equiv(target(k + n), units(n)))
+          then
+            k += units.length
+            j += 1
+          else continues = false
+        case None => continues = false
+    (j, Option.when(k == target.length)(j))
+
+  /** Runs a `read` (or `read_back`) instruction of a back-reference. */
+  private def instReadRef(
+      frame: Frame,
+      inst: Inst,
+      ref: ReadKind.Ref,
+      loc: Option[SourceLocation],
+      back: Boolean
+  ): Boolean =
+    val candidates = refCandidates(frame, ref)
+    var width: Option[Int] = None
+    val it = candidates.iterator
+    while width.isEmpty && it.hasNext do
+      it.next() match
+        case Some(s) =>
+          val (count, w) = compare(s, frame.pos, back, ref)
+          steps = Math.addExact(steps, count)
+          width = w
+        case None => width = Some(0)
+    val ok = width.isDefined
+
+    if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
+    if ok then
+      if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
+      frame.pos += (if back then -width.get else width.get)
+      true
+    else
+      if options.needsFailedPoints then
+        val capture = candidates.headOption.flatten
+        val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, ref, capture)
+        failedPoints.add(point)
+      false
 
   /** Runs a given `read` instruction. */
   private def instRead(frame: Frame, inst: Inst.Read): Boolean = inst match
-    case Inst.Read(kind @ ReadKind.Ref(index), loc) =>
-      val s = frame.capture(index).getOrElse(UString.empty)
-      val ss = s.asString
-      val is = input.asString
-
-      var count = 0
-      while count < ss.length &&
-        frame.pos + count < is.length &&
-        ss.charAt(count) == is.charAt(frame.pos + count)
-      do count += 1
-      val ok = count == s.sizeAsString
-      steps = Math.addExact(steps, count)
-
-      if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
-      if ok then
-        if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        frame.pos += s.sizeAsString
-        true
-      else
-        if options.needsFailedPoints then
-          val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, kind, Some(s))
-          failedPoints.add(point)
-        false
-    case Inst.Read(kind, loc) =>
+    case Inst.Read(ref: ReadKind.Ref, loc) => instReadRef(frame, inst, ref, loc, false)
+    case Inst.Read(kind, loc)              =>
       val c = frame.currentChar
       val ok = read(c, kind)
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if ok then
         if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        steps = Math.addExact(steps, c.map(_.size).getOrElse(0))
-        frame.pos += c.size
+        steps = Math.addExact(steps, 1)
+        frame.pos += 1
         true
       else
         if options.needsFailedPoints then
@@ -439,37 +810,15 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
 
   /** Runs a given `read-back` instruction. */
   private def instReadBack(frame: Frame, inst: Inst.ReadBack): Boolean = inst match
-    case Inst.ReadBack(kind @ ReadKind.Ref(index), loc) =>
-      val s = frame.capture(index).getOrElse(UString.empty)
-      val ss = s.asString
-      val is = input.asString
-
-      var count = 0
-      while count < ss.length &&
-        frame.pos - count - 1 >= 0 &&
-        ss.charAt(ss.length - count - 1) == is.charAt(frame.pos - count - 1)
-      do count += 1
-      val ok = count == s.sizeAsString
-      steps = Math.addExact(steps, count)
-
-      if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
-      if ok then
-        if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        frame.pos -= s.sizeAsString
-        true
-      else
-        if options.needsFailedPoints then
-          val point = FailedPoint(CoverageLocation(inst.id, frame.counters), frame.pos, kind, Some(s))
-          failedPoints.add(point)
-        false
-    case Inst.ReadBack(kind, loc) =>
+    case Inst.ReadBack(ref: ReadKind.Ref, loc) => instReadRef(frame, inst, ref, loc, true)
+    case Inst.ReadBack(kind, loc)              =>
       val c = frame.previousChar
       val ok = read(c, kind)
       if options.needsCoverage then coverage.add(CoverageItem(CoverageLocation(inst.id, frame.counters), ok))
       if ok then
         if options.needsHeatmap && loc.isDefined then heatmap = heatmap.updated(loc.get, heatmap(loc.get) + 1)
-        steps = Math.addExact(steps, c.map(_.size).getOrElse(0))
-        frame.pos -= c.size
+        steps = Math.addExact(steps, 1)
+        frame.pos -= 1
         true
       else
         if options.needsFailedPoints then
@@ -483,12 +832,11 @@ private[vm] class Interpreter(program: Program, input: UString, options: Options
       case Some(c) =>
         kind match
           case ReadKind.Any         => true
-          case ReadKind.Dot         => !LineTerminator.contains(c)
           case ReadKind.Char(d)     => c == d
           case ReadKind.Class(s)    => s.contains(c)
           case ReadKind.ClassNot(s) => !s.contains(c)
-          case ReadKind.Ref(_)      =>
-            // $COVERAGE-OFF$
-            sys.error("unreachable")
-          // $COVERAGE-ON$
+          // `instRead` and `instReadBack` take a back-reference before this.
+          // $COVERAGE-OFF$
+          case _: ReadKind.Ref => sys.error("unreachable")
+        // $COVERAGE-ON$
       case None => false

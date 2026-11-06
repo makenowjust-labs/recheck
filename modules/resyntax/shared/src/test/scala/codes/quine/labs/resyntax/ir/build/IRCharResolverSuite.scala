@@ -1,0 +1,809 @@
+package codes.quine.labs.resyntax.ir
+package build
+
+import codes.quine.labs.resyntax.ast.BacktrackStrategy
+import codes.quine.labs.resyntax.ast.FlagSet
+import codes.quine.labs.resyntax.charset.CaseMapping
+import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.ClassSet
+import codes.quine.labs.resyntax.charset.FullCaseFolding
+import codes.quine.labs.resyntax.charset.PropertyTable
+import codes.quine.labs.resyntax.charset.UTF16Encoding
+import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.Dialect.*
+import codes.quine.labs.resyntax.dialect.PerlSource
+import codes.quine.labs.resyntax.ir.IRLookBehindMatch.Forward
+import codes.quine.labs.resyntax.ir.IRNodeData.*
+import codes.quine.labs.resyntax.ir.build.IRHelper.equalsWithoutLoc
+import codes.quine.labs.resyntax.parser.Parser
+
+class IRCharResolverSuite extends munit.FunSuite:
+
+  val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())
+
+  /** The characters of the input without surrogates (Ruby and PCRE with `u`). */
+  val Scalars: CharSet = UnitMode.ScalarValue.universe
+
+  def build(s: String, flags: String, dialect: Dialect): IRPattern =
+    val flagSet = FlagSet.parse(flags, dialect)
+    val mode = Parser.determineUnitMode(s, flagSet, dialect)
+    IRBuilder.build(Parser.parse(s, flagSet, dialect, mode), flagSet, dialect, mode)
+
+  def of(s: String): CharSet = CharSet.of(UnitMode.CodePoint.decode(s).iterator.toSeq*)
+
+  def gc(name: String): CharSet = PropertyTable.GeneralCategory.value(name).get.set
+
+  /** Drops the empty nodes of inline flags, start options and case commands (e.g. `(?i)`). */
+  def strip(data: IRNodeData): IRNodeData = data match
+    case Sequence(nodes) =>
+      nodes.filter(_.data != Empty) match
+        case Seq(node) => strip(node.data)
+        case nodes     => Sequence(nodes)
+    case data => data
+
+  def setOf(data: IRNodeData): CharSet = strip(data) match
+    case Chars(set) => set
+    case data       => fail(s"Not a character set: $data")
+
+  def check(s: String, flags: String, dialects: Dialect*)(expected: IRNodeData)(using loc: munit.Location): Unit =
+    for dialect <- dialects do
+      test(s"IRBuilder.build: /$s/$flags in $dialect"):
+        val node = IRNode(strip(build(s, flags, dialect).node.data))
+        assert(node.equalsWithoutLoc(IRNode(expected)), node)
+
+  def chars(s: String, flags: String, dialects: Dialect*)(expected: CharSet)(using loc: munit.Location): Unit =
+    check(s, flags, dialects*)(Chars(expected))
+
+  /** Checks the IR of a Perl pattern from a runtime string, which Perl's lexer does not rewrite. */
+  def checkPerlString(s: String, flags: String)(expected: IRNodeData)(using loc: munit.Location): Unit =
+    test(s"IRBuilder.build: /$s/$flags in Perl from a string"):
+      val node = IRNode(strip(build(s, flags, Perl(source = PerlSource.String)).node.data))
+      assert(node.equalsWithoutLoc(IRNode(expected)), node)
+
+  /** Checks a set by a predicate, for a large set. */
+  def checkSet(s: String, flags: String, dialects: Dialect*)(
+      p: CharSet => Boolean
+  )(using loc: munit.Location): Unit =
+    for dialect <- dialects do
+      test(s"IRBuilder.build: /$s/$flags in $dialect (set)"):
+        val set = setOf(build(s, flags, dialect).node.data)
+        assert(p(set), set)
+
+  def error(s: String, flags: String, dialects: Dialect*)(message: String)(using loc: munit.Location): Unit =
+    for dialect <- dialects do
+      test(s"IRBuilder.build: /$s/$flags in $dialect with error \"$message\""):
+        interceptMessage[IRBuildingException](message)(build(s, flags, dialect))
+
+  def unsupported(s: String, flags: String, dialects: Dialect*)(using loc: munit.Location): Unit =
+    for dialect <- dialects do
+      test(s"IRBuilder.build: /$s/$flags in $dialect is unsupported"):
+        assert(strip(build(s, flags, dialect).node.data).isInstanceOf[Unsupported])
+
+  // Unit modes
+  for (dialect, flags, mode) <- Seq(
+      (JavaScript, "", UnitMode.UTF16),
+      (JavaScript, "u", UnitMode.UTF16CodePoint),
+      (JavaScript, "v", UnitMode.UTF16CodePoint),
+      (DotNet, "", UnitMode.UTF16),
+      (Java, "", UnitMode.UTF16CodePoint),
+      (PCRE, "", UnitMode.Byte),
+      (PCRE, "u", UnitMode.ScalarValue),
+      (Python(), "", UnitMode.CodePoint),
+      (Python(Python.Type.Bytes), "", UnitMode.Byte),
+      (Ruby(), "", UnitMode.ScalarValue),
+      (Ruby(), "n", UnitMode.Byte),
+      (Ruby(Ruby.Encoding.ASCII8Bit), "", UnitMode.Byte),
+      (Perl(), "", UnitMode.CodePoint),
+      (Perl(utf8 = false), "", UnitMode.Byte)
+    )
+  do
+    test(s"IRBuilder.build: the unit mode of $dialect with /$flags/"):
+      assertEquals(build("a", flags, dialect).mode, mode)
+  test("IRBuilder.build: the unit mode of PCRE with (*UTF)"):
+    assertEquals(build("(*UTF)a", "", PCRE).mode, UnitMode.ScalarValue)
+
+  // Literals
+  chars("a", "", All*)(of("a"))
+  check("ab", "", All*)(Sequence(Chars(of("a")), Chars(of("b"))))
+  check("😀", "", JavaScript, DotNet)(Sequence(Chars(CharSet.single(0xd83d)), Chars(CharSet.single(0xde00))))
+  chars("😀", "u", JavaScript)(CharSet.single(0x1f600))
+  chars("😀", "", Java, Perl(), Python(), Ruby())(CharSet.single(0x1f600))
+  chars("\\u{1F600}", "u", JavaScript)(CharSet.single(0x1f600))
+  // Without `u`, PCRE (as PHP) reads bytes, so a non-ASCII literal is its UTF-8 bytes.
+  check("é", "", PCRE)(Sequence(Chars(CharSet.single(0xc3)), Chars(CharSet.single(0xa9))))
+  check("😀", "", PCRE)(Sequence(Seq(0xf0, 0x9f, 0x98, 0x80).map(b => IRNode(Chars(CharSet.single(b))))))
+  chars("\\xe9", "", PCRE)(CharSet.single(0xe9))
+  chars("é", "u", PCRE)(CharSet.single(0xe9))
+  chars("[é]", "", PCRE)(CharSet.of(0xa9, 0xc3))
+  chars("[à-é]", "", PCRE)(CharSet.range(0xa0, 0xc3).union(CharSet.single(0xa9)))
+  // A quantifier repeats the last byte of a non-ASCII literal.
+  check("é+", "", PCRE)(
+    Sequence(
+      Chars(CharSet.single(0xc3)),
+      Repeat(IRNode(Chars(CharSet.single(0xa9))), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy))
+    )
+  )
+  check("(*UTF)é+", "", PCRE)(Repeat(IRNode(Chars(of("é"))), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy)))
+  chars("[𝌆-𝌈a-z]", "", PCRE)(
+    CharSet.of(0xf0, 0x9d, 0x8c, 0x88).union(CharSet.range(0x86, 0xf0)).union(CharSet.range('a', 'z'))
+  )
+  test("IRBuilder.build: Perl's byte strings"):
+    def set(s: String): CharSet = setOf(build(s, "", Perl(utf8 = false)).node.data)
+
+    assertEquals(set("[é]"), CharSet.of(0xa9, 0xc3))
+    assertEquals(set("\\x{100}"), CharSet.empty)
+    assertEquals(set("[a\\x{100}]"), of("a"))
+    assertEquals(set("[a-\\x{100}]"), CharSet.range('a', 0xff))
+    assertEquals(set("\\xe9"), CharSet.single(0xe9))
+    // Its non-ASCII literals are bytes, which do not make the pattern use Unicode rules.
+    val Sequence(nodes) = build("é\\w", "", Perl(utf8 = false)).node.data: @unchecked
+    assertEquals(nodes.last.data, Chars(IRClassLookup.ASCII_POSIX("word")))
+  // Perl reads the bytes of a byte string as Latin-1 characters, so a pattern switching `/d` to Unicode rules (e.g. by `\x{100}`) has the rules of `0x80..0xFF` of the text strings (checked against Perl 5.44).
+  for
+    body <- Seq(
+      "\\w",
+      "\\d",
+      "\\s",
+      "[[:alpha:]]",
+      "[[:upper:]]",
+      "[[:punct:]]",
+      "[[:print:]]",
+      "(?i)\\xC9",
+      "(?i)\\xDE"
+    )
+    modifiers <- Seq("", "(?u)", "(?a)", "(?aa)", "(?l)", "(?d)")
+  do
+    val source = s"$modifiers$body"
+    test(s"IRBuilder.build: /(?:\\x{100})?$source/ in Perl's byte strings"):
+      def lastSet(s: String, dialect: Dialect): CharSet = strip(build(s, "", dialect).node.data) match
+        case Sequence(nodes) => setOf(nodes.last.data)
+        case data            => setOf(data)
+
+      val bytes = lastSet(s"(?:\\x{100})?$source", Perl(utf8 = false))
+      assertEquals(bytes, lastSet(source, Perl()).restrict(UnitMode.Byte))
+  test("IRBuilder.build: Perl's byte strings with Unicode rules"):
+    def set(s: String): CharSet =
+      strip(build(s, "", Perl(utf8 = false)).node.data) match
+        case Sequence(nodes) => setOf(nodes.last.data)
+        case data            => setOf(data)
+
+    assert(!set("\\w").contains(0xe9))
+    assert(set("(?u)\\w").contains(0xe9))
+    for switch <- Seq("\\x{100}?", "\\o{400}?", "\\p{L}?", "\\N{U+41}?", "\\N{LATIN SMALL LETTER A}?") do
+      assert(set(s"$switch\\w").contains(0xe9), switch)
+    assert(!set("\\xFF?\\w").contains(0xe9))
+    assert(!set("(?:(?u)a)?\\w").contains(0xe9))
+    assert(!set("\\x{100}?(?a)\\w").contains(0xe9))
+    assert(!set("\\x{100}?(?l)\\w").contains(0xe9))
+    assertEquals(set("(?i)\\xC9"), CharSet.single(0xc9))
+    assertEquals(set("(?iu)\\xC9"), CharSet.of(0xc9, 0xe9))
+    assertEquals(set("\\x{100}?(?il)\\xC9"), CharSet.single(0xc9))
+  check("ss", "iu", Perl(utf8 = false))(
+    Disjunction(Sequence(Chars(of("sS")), Chars(of("sS"))), Chars(CharSet.single(0xdf)))
+  )
+  // Python's bytes pattern is Latin-1.
+  chars("é", "", Python(Python.Type.Bytes))(CharSet.single(0xe9))
+  // Ruby's ASCII-8BIT regexp has only the POSIX classes in ASCII as properties.
+  chars("\\p{Alpha}", "n", Ruby())(CharSet.range('A', 'Z').union(CharSet.range('a', 'z')))
+  chars("\\p{Punct}", "n", Ruby())(IRClassLookup.ASCII_POSIX("punct"))
+  chars("\\P{Space}", "n", Ruby())(of(" \t\n\u000b\f\r").complement(UnitMode.Byte))
+  error("\\p{L}", "n", Ruby())("Unknown Unicode property name at 0")
+  error("\\p{Any}", "n", Ruby())("Unknown Unicode property name at 0")
+  error("\\p{Age=1.1}", "n", Ruby())("Unknown Unicode property name at 0")
+  // Ruby reads byte escapes as the bytes of a UTF-8 character.
+  chars("\\xC3\\xA9", "", Ruby())(of("é"))
+  chars("[\\xC3\\xA9]", "", Ruby())(of("é"))
+  error("\\xC3", "", Ruby())("Invalid multibyte escape at 0")
+  // Ruby 4.0 rejects the UTF-8 bytes of a surrogate.
+  error("\\xED\\xA0\\x80", "", Ruby())("Invalid multibyte escape at 0")
+  error("[\\xED\\xA0\\x80]", "", Ruby())("Invalid multibyte escape at 1")
+  error("[\\xFF]", "", Ruby())("Invalid multibyte escape at 1")
+  error("[\\x00-\\xFF]", "", Ruby())("Invalid multibyte escape at 1")
+  error("[a\\xA1-\\uFFFF]", "", Ruby())("Invalid multibyte escape at 2")
+  // Onigmo reads the bytes of a character as one also at a range endpoint (checked against Ruby 4.0).
+  chars("[\\xC3\\xA0-\\xC3\\xA9]", "", Ruby())(CharSet.range(0xe0, 0xe9))
+  chars("[a-\\xC3\\xA9]", "", Ruby())(CharSet.range('a', 0xe9))
+  chars("[\\xC3\\xA0-\\u00E9]", "", Ruby())(CharSet.range(0xe0, 0xe9))
+  chars("[x\\xC3\\xA1\\xC3\\xA0-\\xC3\\xA9\\xC3\\xAF]", "", Ruby())(CharSet.range(0xe0, 0xe9).union(of("x\u00ef")))
+  chars("[\\xC3\\xA0-\\xC3\\xA9-\\xC3\\xAF]", "", Ruby())(CharSet.range(0xe0, 0xe9).union(of("-\u00ef")))
+  chars("[\\xC3\\xA0-\\xC3\\xA9]", "i", Ruby())(
+    CharSet.range(0xc0, 0xc9).union(CharSet.range(0xe0, 0xe9)).union(CharSet.single(0x212b))
+  )
+  error("[\\xC3\\xA0-\\xA9]", "", Ruby())("Invalid multibyte escape at 10")
+  error("[\\xC3\\xA0-\\xC3]", "", Ruby())("Invalid multibyte escape at 10")
+  error("[\\xC3\\xA9-\\xC3\\xA0]", "", Ruby())("Range out of order in character class at 1")
+  chars("[\\xC3\\xBD\\xC3\\xBF]", "", Ruby())(of("\u00fd\u00ff"))
+  // Onigmo repeats the whole character of byte escapes.
+  check("\\xC3\\xA9+", "", Ruby())(
+    Repeat(IRNode(Chars(of("\u00e9"))), IRQuantifier.Unbounded(1, BacktrackStrategy.Greedy))
+  )
+  chars("\\xC3", "n", Ruby())(CharSet.single(0xc3))
+  // Perl's lexer applies the case commands to the text of a regex literal, even across a class and its ranges.
+  chars("\\Ua", "", Perl())(of("A"))
+  chars("\\u\\La", "", Perl())(of("A"))
+  chars("[\\Ua]", "", Perl())(of("A"))
+  chars("[A\\L-z]", "", Perl())(CharSet.range('A', 'z'))
+  chars("[A-\\LZ]", "", Perl())(CharSet.range('A', 'z'))
+  chars("[\\Ua-z]", "", Perl())(CharSet.range('A', 'Z'))
+  check("[A\\L-z]B", "", Perl())(Sequence(Chars(CharSet.range('A', 'z')), Chars(of("b"))))
+  checkSet("\\U\\d", "", Perl())(set => set.contains('x') && !set.contains('1'))
+  check("\\Fß", "", Perl())(Sequence(Chars(of("s")), Chars(of("s"))))
+  check("\\uß", "", Perl())(Sequence(Chars(of("S")), Chars(of("s"))))
+  check("\\Uß", "", Perl())(Sequence(Chars(of("S")), Chars(of("S"))))
+  check("\\u\u01c6x", "", Perl())(Sequence(Chars(of("\u01c5")), Chars(of("x"))))
+  check("\\Ux\\L\\u\\Ey", "", Perl())(Sequence(Chars(of("X")), Chars(of("Y"))))
+  chars("\\Q.\\E", "", Perl())(of("."))
+  chars("[\\Q.\\E]", "", Perl())(of("."))
+  chars("[\\Qa-c\\E]", "", Perl())(of("a-c"))
+  chars("[a-\\Q\\Ez]", "", Perl())(CharSet.range('a', 'z'))
+  // A pattern from a runtime string reads the commands as letters, which the regex engine passes through.
+  checkPerlString("\\Ua", "")(Sequence(Chars(of("U")), Chars(of("a"))))
+  checkPerlString("[\\Q.\\E]", "")(Chars(of("Q.E")))
+  checkPerlString("[a\\U-z]", "")(Chars(of("a").union(CharSet.range('U', 'z'))))
+  checkPerlString("[A-\\LZ]", "")(Chars(CharSet.range('A', 'L').union(of("Z"))))
+
+  // Case-insensitive literals
+  chars("k", "i", JavaScript, Java, PCRE)(of("kK"))
+  chars("k", "i", DotNet, Perl(), Python(), Ruby())(of("kK\u212a"))
+  chars("k", "iu", JavaScript, Java, PCRE)(of("kK\u212a"))
+  chars("s", "i", Perl(), Python(), Ruby())(of("sS\u017f"))
+  chars("s", "i", DotNet)(of("sS"))
+  chars("ſ", "i", DotNet)(of("\u017f"))
+  chars("Σ", "i", DotNet)(of("Σσ"))
+  chars("Σ", "i", JavaScript, Python(), Ruby())(of("Σσς"))
+  chars("İ", "i", Python())(of("Ii\u0130\u0131"))
+  chars("İ", "iu", Java)(of("Ii\u0130\u0131"))
+  chars("İ", "i", DotNet, JavaScript)(of("\u0130"))
+  chars("µ", "i", DotNet, Java)(of("\u00b5"))
+  chars("µ", "i", Perl(), Python(), Ruby())(of("\u00b5\u039c\u03bc"))
+  chars("k", "ia", Python())(of("kK"))
+  chars("\\xe9", "i", Perl(utf8 = false))(of("é"))
+  chars("\\xe9", "i", Perl())(of("éÉ"))
+  chars("\\xb5", "i", Perl())(of("\u00b5\u039c\u03bc"))
+  chars("é", "i", Perl())(of("éÉ"))
+  chars("(?r)k", "iu", PCRE)(of("kK"))
+  // Perl's `aa` matches no ASCII and non-ASCII characters together, even by a multi-character folding.
+  chars("(?aa)k", "i", Perl())(of("kK"))
+  chars("(?aa)s", "i", Perl())(of("sS"))
+  chars("(?aa)ß", "i", Perl())(CaseMapping.SimpleFold.closure(CharSet.single(0xdf)))
+  check("(?aa)ss", "i", Perl())(Sequence(Chars(of("sS")), Chars(of("sS"))))
+  chars("(?a)k", "i", Perl())(of("kK\u212a"))
+  chars("(?aa)(?u)k", "i", Perl())(of("kK\u212a"))
+  chars("(?aa)(?^i)k", "", Perl())(of("kK\u212a"))
+  // Perl's `l` (the C locale) folds only ASCII letters below `U+0100` and no character across it.
+  chars("(?l)k", "i", Perl())(of("kK"))
+  chars("(?l)\u212a", "i", Perl())(of("\u212a"))
+  chars("(?l)\u017f", "i", Perl())(of("\u017f"))
+  chars("(?l)\u00df", "i", Perl())(of("\u00df"))
+  chars("(?l)\u00b5", "i", Perl())(of("\u00b5"))
+  chars("(?l)\u03bc", "i", Perl())(of("\u03bc\u039c"))
+  chars("(?l)[j-l]", "i", Perl())(of("jklJKL"))
+  check("(?l)ss", "i", Perl())(Sequence(Chars(of("sS")), Chars(of("sS"))))
+  chars("(?l)k", "i", Perl(utf8 = false))(of("kK"))
+  // `\N{U+...}` makes Perl's pattern use Unicode rules, as `\N{...}` does.
+  checkSet("[\\w\\N{U+41}]", "", Perl(utf8 = false))(set => set.contains(0xe9))
+  checkSet("[\\w\\x{41}]", "", Perl(utf8 = false))(set => !set.contains(0xe9))
+  chars("(*TURKISH_CASING)i", "iu", PCRE)(of("i\u0130"))
+  // Ruby and Perl fold literals to several characters (e.g. `ß` and `ss`), longest first.
+  // Unicode 18 adds a character folded to `ß`, so the sets come from the tables.
+  val sharpSs: CharSet = CaseMapping.SimpleFold.closure(CharSet.single(0xdf))
+  val sharpS: IRNodeData = Disjunction(
+    Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))),
+    Chars(FullCaseFolding.multiCodePointFoldings(UnitMode.CodePoint.decode("ss")))
+  )
+  check("ß", "i", Ruby(), Perl())(sharpS)
+  check("ss", "i", Ruby())(sharpS)
+  check("ass", "i", Ruby())(Sequence(Chars(of("aA")), sharpS))
+  for dialect <- Seq(Ruby(), Perl()) do
+    test(s"IRBuilder.build: too many multi-character case foldings in $dialect"):
+      val Max = IRCharResolver.MaxMultiFoldings
+      build("s" * (Max + 1), "i", dialect)
+      interceptMessage[MultiFoldingLimitException](
+        s"Too many multi-character case foldings in a literal (limit $Max) at 5"
+      ):
+        build("x(?i)" + "s" * (Max + 2), "", dialect)
+  // Perl's `/d` rules fold no Latin-1 character in a native string, unless the pattern is in Unicode rules.
+  check("ss", "iu", Perl())(sharpS)
+  check("ff", "i", Ruby())(Disjunction(Sequence(Chars(of("fF")), Chars(of("fF"))), Chars(of("\ufb00"))))
+  check("(?<=ß)", "i", Ruby())(LookBehind(false, sharpS))
+  check("(?<=ss)", "i", Ruby())(LookBehind(false, sharpS))
+  check("(?<=ß)", "i", Perl())(LookBehind(false, IRNode(sharpS), Forward(Seq(IRLookBehindStartRange(1, 2)))))
+  // Escapes fold as the literals, but Ruby keeps an escape of an ASCII character apart.
+  check("\\xDF", "i", Perl())(sharpS)
+  check("\\x{DF}", "i", Perl())(sharpS)
+  check("\\N{U+DF}", "i", Perl())(sharpS)
+  check("\\337", "i", Perl())(sharpS)
+  check("\\o{337}", "i", Perl())(sharpS)
+  check("\\ß", "i", Perl(), Ruby())(sharpS)
+  check("\\x73\\x73", "i", Perl())(sharpS)
+  check("s\\x{17F}", "i", Perl())(sharpS)
+  check("\\u00DF", "i", Ruby())(sharpS)
+  check("\\u{DF}", "i", Ruby())(sharpS)
+  check("\\xC3\\x9F", "i", Ruby())(sharpS)
+  check("\\303\\237", "i", Ruby())(sharpS)
+  check("\\u017Fs", "i", Ruby())(sharpS)
+  check("\\x73s", "i", Ruby())(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))
+  check("\\u0073s", "i", Ruby())(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))
+  check("(?<=\\u00DF)", "i", Ruby())(LookBehind(false, sharpS))
+  check("(?<=\\N{U+DF})", "i", Perl())(LookBehind(false, IRNode(sharpS), Forward(Seq(IRLookBehindStartRange(1, 2)))))
+  // Perl counts `\xDF` of a pattern that is not UTF-8 as one character in a look-behind, so it does not match `ss` there.
+  check("(?<=\\xDF)", "i", Perl())(LookBehind(false, IRNode(sharpS), Forward(Seq(IRLookBehindStartRange(1, 1)))))
+  // `İ` folds to `i` and U+0307 by default (the Turkic folding to `i` is apart).
+  val dottedI: IRNodeData = Disjunction(Sequence(Chars(of("iI")), Chars(of("\u0307"))), Chars(of("\u0130")))
+  check("İ", "i", Ruby(), Perl())(dottedI)
+  check("i\u0307", "i", Ruby(), Perl())(dottedI)
+  check("\\u0130", "i", Ruby())(dottedI)
+  check("\\x{130}", "i", Perl())(dottedI)
+  check("i\\x{307}", "i", Perl())(dottedI)
+  check("[İ]", "i", Perl())(dottedI)
+  check("[İ]", "i", Ruby())(Disjunction(Chars(of("\u0130")), dottedI))
+  check("(?<=İ)", "i", Perl())(LookBehind(false, IRNode(dottedI), Forward(Seq(IRLookBehindStartRange(1, 2)))))
+  // Perl's `aa` and `l` forbid it, because the folding has an ASCII character.
+  chars("İ", "iaa", Perl())(of("\u0130"))
+  chars("[İx]", "il", Perl())(of("\u0130xX"))
+  // A native string under `/d` has no character to match the folding.
+  chars("\\xDF", "i", Perl(utf8 = false))(of("\u00df"))
+  check("\\xDF", "iu", Perl(utf8 = false))(
+    Disjunction(Sequence(Chars(of("sS")), Chars(of("sS"))), Chars(CharSet.single(0xdf)))
+  )
+  // Folds across classes are intentionally not reproduced.
+  check("[s]s", "i", Ruby(), Perl())(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))))
+  // A class matches the foldings of its characters folded to several characters.
+  // Ruby tries the class first and then a folding for each character.
+  val ssCount: Int = FullCaseFolding.multiCodePointFoldings(UnitMode.CodePoint.decode("ss")).intersect(sharpSs).size
+  check("[ß]", "i", Perl())(sharpS)
+  check("[ß]", "i", Ruby())(Disjunction(Chars(sharpSs) +: Seq.fill(ssCount)(sharpS)*))
+  check("[ßx]", "i", Ruby())(Disjunction(Chars(sharpSs.union(of("xX"))) +: Seq.fill(ssCount)(sharpS)*))
+  check("(?<=[ßx])", "i", Ruby())(
+    LookBehind(false, Disjunction(Chars(sharpSs.union(of("xX"))) +: Seq.fill(ssCount)(sharpS)*))
+  )
+  // Perl tries the foldings first, the longest first and the latest first, and then the class of the others.
+  check("[ßx]", "i", Perl())(Disjunction(sharpS, Chars(of("xX"))))
+  check("[ßﬀ]", "i", Perl())(
+    Disjunction(Disjunction(Sequence(Chars(of("fF")), Chars(of("fF"))), Chars(of("\ufb00"))), sharpS)
+  )
+  check("[\\xDF-\\xDF]", "i", Perl())(sharpS)
+  chars("[\\xDE-\\xDF]", "i", Perl())(sharpSs.union(of("\u00de\u00fe")))
+  chars("[\\xDFx]", "i", Perl(utf8 = false))(of("\u00dfxX"))
+  chars("(?aa)[ßx]", "i", Perl())(sharpSs.union(of("xX")))
+  chars("ß", "i", Python(), DotNet)(of("\u00df\u1e9e"))
+  chars("ß", "i", JavaScript)(of("\u00df"))
+  chars("ß", "iu", Java)(of("\u00df\u1e9e"))
+  chars("\u1e9e", "iu", Java)(of("\u00df\u1e9e"))
+
+  // Case-insensitive classes
+  chars("[j-l]", "iu", Java)(of("jklJKL\u212a"))
+  chars("[\\u212a-\\u212b]", "iu", Java)(of("kK\u212a\u00e5\u00c5\u212b"))
+  chars("[\\u0130-\\u0130]", "iu", Java)(of("Ii\u0130\u0131"))
+  chars("[A-Z]", "iu", Java)(CharSet.range('A', 'Z').union(CharSet.range('a', 'z')).union(of("\u0131\u017f")))
+  chars("[a-z]", "iu", Java)(
+    CharSet.range('A', 'Z').union(CharSet.range('a', 'z')).union(of("\u0130\u0131\u017f\u212a"))
+  )
+  chars("[\\u0131-\\u0131]", "iu", Java)(of("Ii\u0131"))
+  chars("[j-l]", "i", Python())(of("jklJKL\u212a"))
+  chars("[^k]", "i", JavaScript)(of("kK").complement(UnitMode.UTF16))
+  chars("[^k]", "iu", JavaScript)(of("kK\u212a").complement(UnitMode.CodePoint))
+
+  // Dot
+  chars(".", "", JavaScript)(of("\n\r\u2028\u2029").complement(UnitMode.UTF16))
+  chars(".", "s", JavaScript)(UnitMode.UTF16.universe)
+  chars(".", "", DotNet)(of("\n").complement(UnitMode.UTF16))
+  chars(".", "", Java)(of("\n\r\u0085\u2028\u2029").complement(UnitMode.CodePoint))
+  chars(".", "d", Java)(of("\n").complement(UnitMode.CodePoint))
+  chars(".", "", PCRE)(of("\n").complement(UnitMode.Byte))
+  chars(".", "", Python(), Perl())(of("\n").complement(UnitMode.CodePoint))
+  // The input of Ruby and PCRE with `u` has no surrogate.
+  chars(".", "", Ruby())(of("\n").complement(Scalars))
+  chars(".", "m", Ruby())(Scalars)
+  chars(".", "su", PCRE)(Scalars)
+  chars("[^a]", "u", PCRE)(of("a").complement(Scalars))
+  chars("[^a]", "", Ruby())(of("a").complement(Scalars))
+  chars("[\\u{D7FF}-\\u{E000}]", "", Ruby())(of("\uD7FF\uE000"))
+  chars("[\\x{D7FF}-\\x{E000}]", "u", PCRE)(of("\uD7FF\uE000"))
+  chars("\\p{Cs}", "", Ruby())(CharSet.empty)
+  chars("\\p{Cs}", "u", PCRE)(CharSet.empty)
+
+  test("IRBuilder.build: a literal surrogate in Ruby"):
+    assertEquals(setOf(build("\uD800", "", Ruby()).node.data), CharSet.empty)
+
+  chars("[^a]", "", Python(), Perl())(of("a").complement(UnitMode.CodePoint))
+  chars("[^a]", "u", JavaScript)(of("a").complement(UnitMode.CodePoint))
+  check("(*CRLF).", "", PCRE)(Sequence(Chars(UnitMode.Byte.universe), Assert(IRAssertKind.NotBetweenCRLF)))
+
+  // Escape classes
+  chars("\\d", "", JavaScript, Java, PCRE, Ruby())(of("0123456789"))
+  checkSet("\\d", "", DotNet)(s => s.contains(0x0660) && s.last <= 0xffff)
+  checkSet("\\d", "", Perl(), Python())(s => s.contains(0x0660) && s.contains(0x104a0))
+  chars("\\d", "a", Perl(), Python())(of("0123456789"))
+  chars("\\s", "", Java, PCRE, Ruby())(of(" \t\n\u000b\f\r"))
+  checkSet("\\s", "", Python())(s => s.contains(0x1c) && s.contains(0x85) && !s.contains(0xfeff))
+  checkSet("\\s", "", JavaScript)(s => s.contains(0xfeff) && !s.contains(0x85))
+  checkSet("\\s", "", Perl())(s => s.contains(0x2028) && s.contains(0x85) && s.contains(0xa0))
+  checkSet("\\s", "", Perl(utf8 = false))(s => !s.contains(0x85) && !s.contains(0xa0))
+  checkSet("\\s", "u", Perl())(s => s.contains(0x85) && s.contains(0xa0))
+  chars("\\w", "", JavaScript, Java, PCRE, Ruby())(IRClassLookup.ASCIIWord)
+  chars("\\w", "iu", JavaScript)(IRClassLookup.ASCIIWord.union(of("\u017f\u212a")))
+  checkSet("\\w", "", Perl())(s => s.contains(0x100) && s.contains(0xe9))
+  checkSet("\\w", "", Perl(utf8 = false))(s => !s.contains(0xe9))
+
+  test("IRBuilder.build: Perl's /d follows utf8"):
+    def lastSet(s: String, dialect: Dialect): CharSet =
+      strip(build(s, "", dialect).node.data) match
+        case IRNodeData.Sequence(nodes) => setOf(nodes.last.data)
+        case data                       => setOf(data)
+
+    assert(lastSet("a\\w", Perl()).contains(0xe9))
+    assert(lastSet("a\\w", Perl(source = PerlSource.String)).contains(0xe9))
+    assert(!lastSet("a\\w", Perl(utf8 = false)).contains(0xe9))
+    assert(!lastSet("\u00e9\\w", Perl(utf8 = false)).contains(0xe9))
+    assert(lastSet("\\x{100}\\w", Perl(utf8 = false)).contains(0xe9))
+  checkSet("\\w", "", Python())(s => s.contains(0xe9) && s.contains(0xb2) && s.contains(0x2155) && !s.contains(0x300))
+  checkSet("\\w", "U", Java)(s => s.contains(0xe9) && s.contains(0x200c))
+  checkSet("(?u)\\w", "", Ruby())(s => s.contains(0xe9))
+  checkSet("\\w", "", DotNet)(s => s.contains(0xe9) && !s.contains(0x0903) && s.last <= 0xffff)
+  chars("\\W", "", JavaScript)(IRClassLookup.ASCIIWord.complement(UnitMode.UTF16))
+  chars("\\w", "", Python(Python.Type.Bytes))(IRClassLookup.ASCIIWord)
+  chars("\\h", "", Ruby())(of("0123456789abcdefABCDEF"))
+  chars("\\h", "", Perl())(IRClassLookup.pcreHorizontal.diff(of("\u180E")))
+  chars("\\v", "", Java, Perl())(IRClassLookup.Vertical)
+  chars("\\h", "", Java)(IRClassLookup.pcreHorizontal)
+  chars("\\S", "", PCRE)(of(" \t\n\u000b\f\r").complement(UnitMode.Byte))
+  chars("\\H", "", PCRE)(of("\t \u00a0").complement(UnitMode.Byte))
+  chars("\\V", "", PCRE)(IRClassLookup.Vertical.complement(UnitMode.Byte))
+  chars("\\H", "", Ruby())(of("0123456789abcdefABCDEF").complement(Scalars))
+  chars("\\s", "", DotNet)(gc("Zs").union(gc("Zl")).union(gc("Zp")).union(of("\t\n\u000b\f\r\u0085")))
+  // `\C` is a byte, which IR has no unit for in UTF mode.
+  chars("\\C", "", PCRE)(UnitMode.Byte.universe)
+  unsupported("(*UTF)\\C", "", PCRE)
+  chars("\\N", "", Perl())(of("\n").complement(UnitMode.CodePoint))
+  // PCRE's `\N` is `.` without `s`.
+  chars("\\N", "s", PCRE)(of("\n").complement(UnitMode.Byte))
+  check("\\R", "", Perl(), Ruby())(
+    Atomic(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical)))
+  )
+  check("\\R", "", Java)(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical)))
+  check("\\R*", "", Java)(
+    Repeat(
+      IRNode(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical))),
+      IRQuantifier.Unbounded(0, BacktrackStrategy.Greedy)
+    )
+  )
+  check("(?:\\R)?", "", Java)(
+    Repeat(
+      IRNode(Disjunction(Sequence(Chars(of("\r")), Chars(of("\n"))), Chars(IRClassLookup.Vertical))),
+      IRQuantifier.Bounded(0, 1, BacktrackStrategy.Greedy)
+    )
+  )
+  unsupported("\\N{LATIN SMALL LETTER A}", "", Perl(), Python())
+  error("\\N{U+41}", "", Java, Python())("Unknown character name at 0")
+  error("\\p{RGI_Emoji}", "", Perl())("Unknown Unicode property name at 0")
+  error("[\\xB1\\xB4-\\xB6]", "", Ruby())("Invalid multibyte escape at 1")
+  error("\\C-\\M-a", "", Ruby())("Invalid multibyte escape at 0")
+  error("a\\xA9+", "", Ruby())("Invalid multibyte escape at 1")
+  chars("\\N{U+263A}", "", Perl())(of("☺"))
+
+  // Word boundaries
+  test("IRBuilder.build: the word set of \\b in Ruby is Unicode under (?d)"):
+    val Assert(IRAssertKind.WordBoundary(word)) = build("\\b", "", Ruby()).node.data: @unchecked
+    assert(word.contains(0xe9))
+  test("IRBuilder.build: the word set of \\b in Ruby is ASCII in byte mode"):
+    val Assert(IRAssertKind.WordBoundary(word)) = build("\\b", "n", Ruby()).node.data: @unchecked
+    assertEquals(word, IRClassLookup.ASCIIWord)
+  test("IRBuilder.build: the word set of \\b in .NET has ZWJ and ZWNJ"):
+    val Assert(IRAssertKind.WordBoundary(word)) = build("\\b", "", DotNet).node.data: @unchecked
+    assert(word.contains(0x200c) && word.contains(0x200d))
+
+  // POSIX classes
+  chars("[[:alpha:]]", "", PCRE)(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+  checkSet("[[:alpha:]]", "", Ruby())(_ == PropertyTable.binary("Alphabetic").get.set)
+  checkSet("[[:alpha:]]", "u", PCRE)(_ == gc("L"))
+  chars("[[:alpha:]]", "a", Perl())(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+  check("[[:<:]]", "", PCRE)(
+    Sequence(
+      Assert(IRAssertKind.WordBoundary(IRClassLookup.ASCIIWord)),
+      LookAhead(false, Chars(IRClassLookup.ASCIIWord))
+    )
+  )
+  chars("[[:upper:]]", "i", PCRE)(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+  check("[[:>:]]", "", PCRE)(
+    Sequence(
+      Assert(IRAssertKind.WordBoundary(IRClassLookup.ASCIIWord)),
+      LookBehind(false, Chars(IRClassLookup.ASCIIWord))
+    )
+  )
+  // PCRE's POSIX classes in UCP mode (PHP 8.5.12 with PCRE2 10.49 agrees on U+00A2, U+061C, U+180E, U+200B and U+2066).
+  val PCREGraph: CharSet =
+    CharSet.union(Seq("L", "M", "N", "P", "S", "Cf").map(gc)).diff(of("\u061c\u180e\u2066\u2067\u2068\u2069"))
+  for (name, expected) <- Seq(
+      "alnum" -> gc("L").union(gc("N")),
+      "ascii" -> CharSet.range(0, 0x7f),
+      "blank" -> IRClassLookup.pcreHorizontal,
+      "cntrl" -> gc("Cc"),
+      "digit" -> gc("Nd"),
+      "graph" -> PCREGraph,
+      "lower" -> gc("Ll"),
+      "print" -> PCREGraph.union(gc("Zs")).union(of("\u180e")).diff(gc("Cc")),
+      "punct" -> gc("P").union(gc("S").intersect(CharSet.range(0, 0x7f))),
+      "space" -> IRClassLookup.pcreHorizontal.union(IRClassLookup.Vertical),
+      "upper" -> gc("Lu"),
+      "word" -> IRClassLookup.pcreWord,
+      "xdigit" -> PropertyTable.binary("Hex_Digit").get.set
+    )
+  do checkSet(s"[[:$name:]]", "u", PCRE)(_ == expected)
+  // Perl's `[[:upper:]]` and `[[:lower:]]` match the cased characters under `i`.
+  chars("[[:upper:]]", "i", Perl())(PropertyTable.binary("Cased").get.set)
+  chars("(?a)[[:alpha:]]", "", Ruby())(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+  chars("[[:lower:]]", "in", Ruby())(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+
+  // Properties
+  chars("\\p{Lu}", "u", JavaScript, PCRE)(gc("Lu"))
+  chars("\\p{Lu}", "", Java, Perl(), Ruby())(gc("Lu"))
+  chars("\\p{Lu}", "", DotNet)(gc("Lu").restrict(UnitMode.UTF16))
+  chars("\\P{Lu}", "u", JavaScript)(gc("Lu").complement(UnitMode.CodePoint))
+  chars("\\p{Lu}", "i", Java)(gc("LC"))
+  chars("\\p{Lu}", "i", DotNet)(gc("LC").restrict(UnitMode.UTF16))
+  chars("\\p{Lu}", "i", Perl())(gc("LC"))
+  chars("\\p{Lower}", "i", Perl())(PropertyTable.binary("Cased").get.set)
+  chars("\\p{Lu}", "iu", JavaScript)(CaseMapping.SimpleFold.closure(gc("Lu")))
+  chars("\\P{Lu}", "iu", JavaScript)(CaseMapping.SimpleFold.closure(gc("Lu").complement(UnitMode.CodePoint)))
+  chars("\\p{Lu}", "iv", JavaScript)(CaseMapping.SimpleFold.closure(gc("Lu")))
+  chars("\\P{Lu}", "iv", JavaScript)(CaseMapping.SimpleFold.closure(gc("Lu")).complement(UnitMode.CodePoint))
+  chars("\\pL", "", Perl())(gc("L"))
+  chars("\\PL", "", PCRE)(gc("L").complement(UnitMode.Byte))
+  chars("\\p{Latin}", "u", PCRE)(PropertyTable.ScriptExtensions.value("Latin").get.set)
+  chars("\\p{sc=Latin}", "u", JavaScript)(PropertyTable.Script.value("Latin").get.set)
+  chars("\\p{IsLatin}", "", Java)(PropertyTable.Script.value("Latin").get.set)
+  chars("\\p{InGreek}", "", Java, Perl())(PropertyTable.Block.value("Greek_And_Coptic").get.set)
+  chars("\\p{IsGreek}", "", DotNet)(CharSet.range(0x370, 0x3ff))
+  chars("\\p{Lower}", "", Java)(of("abcdefghijklmnopqrstuvwxyz"))
+  chars("\\p{Lower}", "U", Java)(PropertyTable.binary("Lowercase").get.set)
+  chars("\\p{Age=6.0}", "", Ruby())(
+    PropertyTable.presentIn(PropertyTable.Age.value("6.0").get).diff(UTF16Encoding.Surrogates)
+  )
+  chars("\\p{Xwd}", "u", PCRE)(IRClassLookup.pcreWord)
+  chars("\\p{Lu}", "", PCRE)(gc("Lu").restrict(UnitMode.Byte))
+  error("\\p{Foo}", "u", JavaScript, PCRE)("Unknown Unicode property name at 0")
+  error("\\p{Foo}", "", Java, DotNet, Perl(), Ruby())("Unknown Unicode property name at 0")
+  error("\\p{Alnum}", "u", JavaScript)("Unknown Unicode property name at 0")
+  error("\\p{InGreek}", "u", PCRE)("Unknown Unicode property name at 0")
+  error("\\p{Hiragana}", "", DotNet)("Unknown Unicode property name at 0")
+  // A name starting with `In` or `Is` may be a user-defined property in Perl.
+  unsupported("\\p{IsFoo}", "", Perl())
+  unsupported("\\p{Foo::IsBar}", "", Perl())
+  // Perl's property wildcards, delimited by a punctuation but `+`, `-`, `_` and the braces.
+  unsupported("\\p{nv=/\\A[0-5]\\z/}", "", Perl())
+  unsupported("\\P{gc=!^L$!}", "", Perl())
+  unsupported("\\p{gc=(^L$)}", "", Perl())
+  unsupported("\\p{gc:/^L$/}", "", Perl())
+  unsupported("\\p{gc=[^L$]}", "", Perl())
+  unsupported("\\p{gc=<^L$>}", "", Perl())
+  error("\\p{gc=/^L$}", "", Perl())("Unknown Unicode property name at 0")
+  error("\\p{gc=(^L$(}", "", Perl())("Unknown Unicode property name at 0")
+  error("\\p{Nv=.5}", "", Perl())("Unknown Unicode property name at 0")
+  chars("\\p{gc=-Lu}", "", Perl())(gc("Lu"))
+  check("\\p{RGI_Emoji_Flag_Sequence}", "v", JavaScript)(
+    Strings(PropertyTable.binary("RGI_Emoji_Flag_Sequence").get.classSet)
+  )
+  error("\\p{RGI_Emoji}", "u", JavaScript)("Unknown Unicode property name at 0")
+  error("\\P{RGI_Emoji}", "v", JavaScript)("Invalid property name at 0")
+  error("[^\\p{RGI_Emoji}]", "v", JavaScript)("Negated character class may contain strings at 0")
+  error("[[^\\p{RGI_Emoji}]]", "v", JavaScript)("Negated character class may contain strings at 1")
+  for s <- Seq("[^a\\p{RGI_Emoji}]", "[^\\p{RGI_Emoji}&&\\p{RGI_Emoji}]", "[^\\p{RGI_Emoji}--a]", "[^[\\p{RGI_Emoji}]]")
+  do error(s, "v", JavaScript)("Negated character class may contain strings at 0")
+  chars("[^a]", "v", JavaScript)(of("a").complement(UnitMode.CodePoint))
+  chars("[^\\q{a}]", "v", JavaScript)(of("a").complement(UnitMode.CodePoint))
+
+  // Class set operations
+  chars("[a-z&&[def]]", "", Java, Ruby())(of("def"))
+  chars("[a-c[x-z]]", "", Java, Ruby())(of("abcxyz"))
+  chars("[a-z-[aeiou]]", "", DotNet)(CharSet.range('a', 'z').diff(of("aeiou")))
+  chars("[[a-z]--[aeiou]]", "v", JavaScript)(CharSet.range('a', 'z').diff(of("aeiou")))
+  chars("[\\p{L}&&\\p{ASCII}]", "v", JavaScript)(of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+  check("[\\q{abc|d}]", "v", JavaScript)(Strings(ClassSet(of("d"), Seq(UnitMode.CodePoint.decode("abc")))))
+  check("[\\q{ab}]", "iv", JavaScript)(Disjunction(Sequence(Chars(of("aA")), Chars(of("bB")))))
+  check("[\\q{ab|c|}]", "iv", JavaScript)(
+    Disjunction(Sequence(Chars(of("aA")), Chars(of("bB"))), Empty, Chars(of("cC")))
+  )
+  chars("[\\q{\\x41}]", "v", JavaScript)(of("A"))
+  // .NET's negated class negates the base before the subtraction.
+  chars("[^a-z-[0-9]]", "", DotNet)(CharSet.range('a', 'z').union(CharSet.range('0', '9')).complement(UnitMode.UTF16))
+  chars("[a\\Eb]", "", PCRE)(of("ab"))
+  // Perl with `u` matches a character folded to several characters in a class by its folding.
+  check("[\u00df]", "iu", Perl())(Disjunction(Sequence(Chars(of("sS\u017f")), Chars(of("sS\u017f"))), Chars(sharpSs)))
+
+  // Java's CANON_EQ is not supported.
+  unsupported("(?c)a", "", Java)
+
+  // Look-behind widths in the engines' units
+  error("(?<=(?:é|a){100,128})b", "", PCRE)("Look-behind branch is too long at 0")
+  test("IRBuilder.build: /(?<=(?:é|a){100,127})b/ in PCRE"):
+    build("(?<=(?:é|a){100,127})b", "", PCRE)
+  test("IRBuilder.build: /(?<=(?:é|a){100,128})b/u in PCRE"):
+    build("(?<=(?:é|a){100,128})b", "u", PCRE)
+  error("(?<=ß{128})a", "i", Perl())("Look-behind longer than 255 at 0")
+  test("IRBuilder.build: /(?<=ß{128})a/ in Perl"):
+    build("(?<=ß{128})a", "", Perl())
+  // Perl counts the folding at the node's flags, of a literal, an escape and a class's characters but not its ranges.
+  for (body, flags, width) <- Seq(
+      ("(?i)ß", "", 2),
+      ("(?i:ß)", "", 2),
+      ("(?-i:ß)", "i", 1),
+      ("\\xDF", "i", 1),
+      ("\\xDF|\\x{100}", "i", 2),
+      ("\\N{U+DF}", "i", 2),
+      ("[aß]", "i", 2),
+      ("[ﬃa]", "i", 3),
+      ("[ß-ß]", "i", 2),
+      ("[ß-ẞ]", "i", 1),
+      ("[^ß]", "i", 1),
+      ("ſ", "i", 1),
+      ("(?a)ﬃ", "i", 3),
+      ("(?aa)ﬃ", "i", 1),
+      ("İ", "i", 2),
+      ("(?aa)İ", "i", 1),
+      ("(?l)İ", "i", 1),
+      ("(?aa)ß", "i", 2),
+      ("(?aa)ΐ", "i", 3),
+      ("(?u)ß", "i", 2)
+    )
+  do
+    val count = 255 / width
+    test(s"IRBuilder.build: /(?<=(?:$body){$count})/$flags in Perl"):
+      build(s"(?<=(?:$body){$count})", flags, Perl())
+    error(s"(?<=(?:$body){${count + 1}})", flags, Perl())("Look-behind longer than 255 at 0")
+
+  // Grapheme clusters
+  /** Returns the end positions of the matches of a node from a position, in the backtracking order. */
+  def ends(node: IRNode, input: IndexedSeq[Int], pos: Int): LazyList[Int] = node.data match
+    case IRNodeData.Empty      => LazyList(pos)
+    case IRNodeData.Chars(set) =>
+      if pos < input.length && set.contains(input(pos)) then LazyList(pos + 1) else LazyList()
+    case IRNodeData.Sequence(nodes) =>
+      nodes.foldLeft(LazyList(pos))((ps, n) => ps.flatMap(ends(n, input, _)))
+    case IRNodeData.Disjunction(nodes)            => nodes.to(LazyList).flatMap(ends(_, input, pos))
+    case IRNodeData.Atomic(node)                  => ends(node, input, pos).take(1)
+    case IRNodeData.LookBehind(negative, node, _) =>
+      val matches = (0 to pos).exists(start => ends(node, input, start).contains(pos))
+      if matches != negative then LazyList(pos) else LazyList()
+    case IRNodeData.Repeat(node, q) =>
+      val (min, max, greedy) = q match
+        case IRQuantifier.Exact(n)             => (n, n, true)
+        case IRQuantifier.Bounded(min, max, s) => (min, max, s == BacktrackStrategy.Greedy)
+        case IRQuantifier.Unbounded(min, s)    => (min, Int.MaxValue, s == BacktrackStrategy.Greedy)
+      def loop(p: Int, n: Int): LazyList[Int] =
+        val more = if n < max then ends(node, input, p).filter(_ != p).flatMap(loop(_, n + 1)) else LazyList()
+        val stop = if n >= min then LazyList(p) else LazyList()
+        if greedy then more ++ stop else stop ++ more
+
+      loop(pos, 0)
+    case data => fail(s"Unexpected: $data")
+
+  /** Returns the length of the first `\X` from the position of the code points. */
+  def cluster(input: Seq[Int], dialect: Dialect = Perl(), flags: String = "", pos: Int = 0): Option[Int] =
+    ends(build("\\X", flags, dialect).node, input.toIndexedSeq, pos).headOption.map(_ - pos)
+
+  def cp(s: String): Seq[Int] = UnitMode.CodePoint.decode(s).iterator.toSeq
+
+  // The first cluster's length in the engines (Java 27, PCRE2 10.49, Perl 5.44, Ruby 4.0), where they agree except PCRE2 on the conjuncts (see `PCREProbes`).
+  val Probes: Seq[(String, String, Int)] = Seq(
+    ("CRLF", "\r\n\u0301", 2),
+    ("LF and a mark", "\n\u0301", 1),
+    ("CR alone", "\rx", 1),
+    ("a control and a mark", "\u0001\u0301", 1),
+    ("marks", "e\u0301\u0302x", 3),
+    ("a mark and ZWJ", "a\u0308\u200Dx", 3),
+    ("L V T", "각x", 3),
+    ("LV T", "각x", 2),
+    ("LVT T", "각ᆨx", 2),
+    ("L L LV", "ᄀᄀ가x", 3),
+    ("V T", "ᅡᆨx", 2),
+    ("T T", "ᆨᆨx", 2),
+    ("LV V", "가ᅡx", 2),
+    ("LVT V", "각ᅡx", 1),
+    ("L T", "ᄀᆨ", 1),
+    ("LV LV", "가가", 1),
+    ("an emoji ZWJ sequence", "👨\u200D👩\u200D👧x", 5),
+    ("an emoji modifier", "👍🏽x", 2),
+    ("ExtPict Extend ZWJ ExtPict", "😀\u0301\u200D😀x", 4),
+    ("ZWJ ExtPict without a base", "a\u200D😀", 2),
+    ("four regional indicators", "🇯🇵🇺🇸", 2),
+    ("three regional indicators", "🇯🇵🇺", 2),
+    ("prepend and a digit", "\u0600١x", 2),
+    ("prepend and LF", "\u0600\n", 1),
+    ("two prepends", "\u0600\u0600ax", 3),
+    ("prepend and a mark", "\u0600\u0301", 2),
+    ("a spacing mark", "क\u093Fx", 2),
+    ("Thai SARA AM", "กำx", 2),
+    ("a spacing mark alone", "\u093Fx", 1),
+    ("a conjunct", "क\u094Dषx", 3),
+    ("a conjunct with ZWJ", "क\u094D\u200Dषx", 4),
+    ("a conjunct with a nukta", "क\u093C\u094Dषx", 4),
+    ("a conjunct with two viramas", "क\u094D\u094Dषx", 4),
+    ("consonants", "कषx", 1),
+    ("a virama", "क\u094Dx", 2),
+    ("a Bengali conjunct", "ক\u09CDষx", 3),
+    ("soft hyphen", "\u00AD\u0301", 1),
+    ("ZWSP", "\u200B\u0301", 1),
+    ("dot reph", "ൎകx", 2),
+    ("VS16", "❤\uFE0Fx", 2),
+    ("keycap", "1\uFE0F\u20E3x", 3),
+    ("a tag sequence", "🏴\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7Fx", 7),
+    ("LF LF", "\n\n", 1),
+    ("CR CR", "\r\r", 1),
+    ("marks alone", "\u0301\u0301x", 2),
+    ("ZWJ alone", "\u200D\u200Dx", 2)
+  )
+
+  for (name, input, expected) <- Probes do
+    test(s"IRBuilder.build: \\X matches $name"):
+      assertEquals(cluster(cp(input)), Some(expected))
+
+  test("IRBuilder.build: \\X is atomic"):
+    for (dialect, flags) <- Seq((Java, ""), (Perl(), ""), (Ruby(), ""), (PCRE, "u")) do
+      val node = build("\\X", flags, dialect).node
+      assert(node.data.isInstanceOf[IRNodeData.Atomic], node)
+    assertEquals(build("\\X", "", Java).node, build("\\X", "", Perl()).node)
+
+  // PCRE2 10.49 has its own rules (`pcre2_extuni.c`), checked with PHP 8.5.
+  val PCREProbes: Seq[(String, String, Int, Int)] = Seq(
+    ("a conjunct", "क\u094Dषx", 0, 2),
+    ("a conjunct with ZWJ", "क\u094D\u200Dषx", 0, 3),
+    ("a conjunct with a nukta", "क\u093C\u094Dषx", 0, 3),
+    ("a conjunct with two viramas", "क\u094D\u094Dषx", 0, 3),
+    ("a Bengali conjunct", "ক\u09CDষx", 0, 2),
+    ("a regional indicator and a mark", "🇯\u0301", 0, 1),
+    ("a regional indicator and ZWJ", "🇯\u200D", 0, 1),
+    ("a regional indicator and a spacing mark", "🇯\u0903", 0, 1),
+    ("prepend and an extended pictographic", "\u0600😀", 0, 1),
+    ("prepend and regional indicators", "\u0600🇯🇵🇺", 0, 3),
+    ("a regional indicator after one", "🇯🇵🇺", 1, 1),
+    ("a regional indicator after two", "🇯🇵🇺🇸", 2, 2),
+    ("a regional indicator after three", "🇯🇵🇺🇸🇯", 3, 1),
+    ("a regional indicator after a mark", "a\u0301🇯🇵", 2, 2)
+  )
+
+  for (name, input, expected) <- Probes if !PCREProbes.exists(_._1 == name) do
+    test(s"IRBuilder.build: PCRE's \\X matches $name"):
+      assertEquals(cluster(cp(input), PCRE, "u"), Some(expected))
+
+  for (name, input, pos, expected) <- PCREProbes do
+    test(s"IRBuilder.build: PCRE's \\X matches $name"):
+      assertEquals(cluster(cp(input), PCRE, "u", pos), Some(expected))
+
+  test("IRBuilder.build: \\X in byte mode reads Latin-1 bytes"):
+    for (dialect, flags) <- Seq((PCRE, ""), (Ruby(), "n")) do
+      assertEquals(build("\\X", flags, dialect).mode, UnitMode.Byte)
+      assertEquals(cluster(Seq(0x0d, 0x0a), dialect, flags), Some(2))
+      assertEquals(cluster(Seq(0x65, 0xcc, 0x81), dialect, flags), Some(1))
+      assertEquals(cluster(Seq(0x85, 0x41), dialect, flags), Some(1))
+      assertEquals(cluster(Seq(0xa9, 0x41), dialect, flags), Some(1))
+      assertEquals(cluster(Seq(), dialect, flags), None)
+
+  // Java accepts `\X` in a look-behind, whose starts are all the ones before the position.
+  test("IRBuilder.build: Java's look-behind with \\X"):
+    val IRNodeData.Sequence(nodes) = build("(?<=\\X)a", "", Java).node.data: @unchecked
+    nodes.head.data match
+      case IRNodeData.LookBehind(false, _, matching) =>
+        assertEquals(matching, IRLookBehindMatch.Forward(Seq(IRLookBehindStartRange(1, Int.MaxValue))))
+      case data => fail(s"unexpected: $data")
+
+  test("IRBuilder.build: \\X in a look-behind is an error in the others"):
+    for (dialect, flags, message) <- Seq(
+        (PCRE, "u", "Look-behind is not limited at 0"),
+        (Perl(), "", "Look-behind longer than 255 at 0"),
+        (Ruby(), "", "Invalid pattern in look-behind at 0")
+      )
+    do interceptMessage[IRBuildingException](message)(build("(?<=\\X)a", flags, dialect))
+
+  test("IRBuilder.build: \\X does not depend on case-insensitivity"):
+    for dialect <- Seq(Java, Perl(), Ruby()) do
+      assert(build("\\X", "i", dialect).node.equalsWithoutLoc(build("\\X", "", dialect).node))
+
+  test("IRCharResolver.prune"):
+    val a = IRNode(Chars(CharSet.single('a')))
+    val never = IRNode(Chars(CharSet.empty))
+    assertEquals(IRCharResolver.prune(IRNode(Disjunction(Seq(never, a)))), Some(a))
+    assertEquals(IRCharResolver.prune(IRNode(Disjunction(Seq(never, never)))), None)
+    assertEquals(IRCharResolver.prune(IRNode(Repeat(never, IRQuantifier.Exact(0)))), Some(IRNode(Empty)))
+    assertEquals(IRCharResolver.prune(IRNode(Repeat(never, IRQuantifier.Exact(2)))), None)

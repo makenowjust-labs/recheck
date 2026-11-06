@@ -17,15 +17,15 @@ The NPM package of `recheck` is named `recheck` simply. You can install the pack
 <Tabs>
 <TabItem value="npm" label="NPM">
 
-```bash
-npm install recheck
+```console
+$ npm install recheck
 ```
 
 </TabItem>
 <TabItem value="yarb" label="Yarn">
 
-```bash
-yarn add recheck
+```console
+$ yarn add recheck
 ```
 
 </TabItem>
@@ -61,6 +61,16 @@ The first argument `source` is a source string of `RegExp` (corresponding to [`R
 And, the second argument `flags` is a flags string of `RegExp` (corresponding to [`RegExp.prototype.flags`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/flags) in JavaScript too).
 The third optional argument `params` is an object of parameters to specify checker behavior.
 
+`recheck` checks JavaScript regular expressions by default.
+To check a regular expression of another language, specify its [`dialect`](parameters.mdx#dialect) parameter; `source` and `flags` are then the pattern and the flag letters of that language.
+See [Dialects](dialects.mdx) for the supported dialects.
+
+```tsx
+import { check } from "recheck";
+
+await check("^(a|a)*$", "", { dialect: "python" });
+```
+
 To check the ReDoS vulnerability in `/^(a|a)*$/`, then you should use this library in such a following way.
 
 ```tsx
@@ -73,20 +83,23 @@ The package provides both CommonJS and ES modules, so `require("recheck")` works
 
 :::info
 
-See [this page](parameters.md) for detailed information on `Parameters` value.
+See [this page](parameters.mdx) for detailed information on `Parameters` value.
 
 :::
 
 The result value of the `check` is called `Diagnostics`.
+It is the evidence for judging the ReDoS risk of the regular expression, not a final verdict.
 Though it has many fields, the most important one is `status`. This field takes one of the three values.
 
-- `'safe'` means the given regular expression seems safe at least in this checking.
-- `'vulnerable'` means vulnerability in the given regular expression is found.
-- `'unknown'` means something wrong happened in checking (timeout, cancel, or error).
+- `'safe'` means that the checking found no attack string within its limits.
+- `'vulnerable'` means that the checking found an attack string.
+- `'unknown'` means that the checking could not finish (timeout, cancel, or error).
+
+The strings of an attack (`string`, `suffix`, and `prefix` and `pump` of each pump, in `attack` and in `refutedAttacks`) are arrays of the units of `unitMode` instead when a string cannot carry them exactly: a surrogate code point in `utf16-code-point`, `code-point` or `scalar-value`, a lone surrogate in `utf16`, or a byte above `0x7F` in `byte`.
 
 :::info
 
-See [this page](diagnostics.md) for detailed information on `Diagnostics` value.
+See [this page](diagnostics.mdx) for detailed information on the `Diagnostics` value.
 
 :::
 
@@ -146,7 +159,7 @@ There are four options to the `RECHECK_BACKEND` value.
 
 - `RECHECK_BACKEND=native`
 
-  Uses the Graal `native-image` build contained by `recheck-${os}-${arch}` package. When the platform is not supported, it will be failed.
+  Uses the Graal `native-image` build contained by `recheck-${os}-${arch}` package. When the platform is not supported, it fails.
   The following table shows supported platforms.
 
   | package name        | OS      | CPU    |
@@ -161,7 +174,7 @@ There are four options to the `RECHECK_BACKEND` value.
 
 - `RECHECK_BACKEND=java`
 
-  Uses the JAR build contained by the `recheck-jar` package with the `java` command. When the system does not have the `java` command, it will be failed.
+  Uses the JAR build contained by the `recheck-jar` package with the `java` command. When the system does not have the `java` command, it fails.
 
   This backend is a bit slow for starting up, but the checking time is expected to be faster than other backends if the process lives a long time.
 
@@ -182,7 +195,7 @@ There are four options to the `RECHECK_BACKEND` value.
 The `java` and `native` backends are the external CLI command backend. They have some better features than the `worker` and `pure` backend.
 
 - Supports the `signal` parameter to cancel checking. `worker` also supports this feature.
-- Supports recall validation. `worker` backend does not support this feature for now.
+- Supports runtime-attack verification. `worker` backend does not support this feature for now.
 - Checks in true asynchronous. Although we can use the `pure` as a backend of the asynchronous API, it blocks the process, unfortunately. However, `worker` does not.
 - Works with multiple threads. On the external CLI command backend, it can check multiple regular expressions at once.
 

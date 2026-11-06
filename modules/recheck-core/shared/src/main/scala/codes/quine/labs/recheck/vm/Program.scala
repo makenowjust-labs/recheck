@@ -4,6 +4,7 @@ import codes.quine.labs.recheck.vm.Program.Meta
 
 /** Program is a compiled RegExp pattern. */
 final case class Program(blocks: Vector[(Label, Block)], meta: Meta):
+
   override def toString: String =
     val sb = new StringBuilder
     for (label, block) <- blocks do
@@ -16,11 +17,22 @@ object Program:
 
   /** Meta is a meta information of a program for matching and analysis. */
   final case class Meta(
-      ignoreCase: Boolean,
-      unicode: Boolean,
+      /** Whether the program reads the captures (back-references, capture tests and `reject_empty`). */
       hasRef: Boolean,
+      /** Whether the program has `verb` instructions, which skip backtracking points. */
+      hasVerb: Boolean,
+      /** Whether the program has `leave` instructions, after which the matching depends on the start of the
+        * look-around.
+        */
+      hasLeave: Boolean,
       capturesSize: Int,
       countersSize: Int,
       canariesSize: Int,
       predecessors: Vector[Set[Label]]
-  )
+  ):
+
+    /** Whether memoizing the failed states keeps the matching result. */
+    def allowsMemoization: Boolean =
+      // The verbs skip backtracking points.
+      // After a non-atomic look-around, the matching depends on its start, which a state does not have.
+      !hasVerb && !hasLeave

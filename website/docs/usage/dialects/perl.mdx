@@ -1,0 +1,123 @@
+---
+id: perl
+title: Perl
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+Describes how `recheck` checks a regular expression of the `perl` dialect.
+
+## Engine
+
+`recheck` follows the syntax and the semantics of Perl 5.44's regular expressions.
+
+## Settings
+
+- `utf8` tells whether the program has `use utf8` and its strings are decoded text, which has the UTF-8 flag.
+  `true` (default) is a program with `use utf8` whose strings are decoded text.
+  `false` is a program without `use utf8` whose strings are bytes without the flag.
+  A program reading text that is not decoded (e.g. Latin-1 bytes) is `utf8: false`.
+- `source` tells how the pattern is given.
+  `literal` (default) is a regular expression literal written in Perl source (e.g. `qr/.../`), where Perl applies `\U`, `\L`, `\u`, `\l`, `\F`, `\Q` and `\E` to the text before the regex engine reads it.
+  `string` is a pattern from a string at runtime (e.g. `qr/$p/`), which the regex engine reads unchanged.
+
+<Tabs>
+<TabItem value="cli" label="CLI">
+
+```console
+$ recheck --dialect=perl '/^(a|a)*$/'
+$ recheck --dialect=perl --no-perl-utf8 --perl-source=string '/^(a|a)*$/'
+```
+
+</TabItem>
+<TabItem value="js" label="JavaScript">
+
+```tsx
+import { check } from "recheck";
+
+await check("^(a|a)*$", "", { dialect: "perl" });
+await check("^(a|a)*$", "", {
+  dialect: { name: "perl", utf8: false, source: "string" },
+});
+```
+
+</TabItem>
+<TabItem value="scala" label="Scala">
+
+```scala
+import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.resyntax.dialect.Dialect
+import codes.quine.labs.resyntax.dialect.PerlSource
+
+ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Perl()))
+ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.Perl(utf8 = false, source = PerlSource.String)))
+```
+
+</TabItem>
+</Tabs>
+
+## Flags and Units
+
+The matching unit is `code-point` with `utf8: true` (the default), and `byte` with `utf8: false` (see [Matching Units](../dialects.mdx#matching-units)).
+
+`recheck` supports all the modifiers of `m//`, `qr//` and `s///`.
+
+| Flag      | Modifier    | Inline          | Notes                                                                                      |
+| --------- | ----------- | --------------- | ------------------------------------------------------------------------------------------ |
+| `a`       | `/a`        | `(?a)`          | The ASCII rules.                                                                           |
+| `aa`      | `/aa`       | `(?aa)`         | The ASCII rules, and no case-insensitive match between an ASCII and a non-ASCII character. |
+| `d`       | `/d`        | `(?d)`          | The default rules.                                                                         |
+| `l`       | `/l`        | `(?l)`          | The rules of the C locale.                                                                 |
+| `u`       | `/u`        | `(?u)`          | The Unicode rules.                                                                         |
+| `i`       | `/i`        | `(?i)`          |                                                                                            |
+| `m`       | `/m`        | `(?m)`          |                                                                                            |
+| `n`       | `/n`        | `(?n)`          |                                                                                            |
+| `s`       | `/s`        | `(?s)`          |                                                                                            |
+| `x`, `xx` | `/x`, `/xx` | `(?x)`, `(?xx)` |                                                                                            |
+| `p`       | `/p`        | `(?p)`          | No effect on matching.                                                                     |
+| `o`       | `/o`        |                 | No effect on matching.                                                                     |
+| `g`, `c`  | `/g`, `/c`  |                 | No effect on matching, since `recheck` models a search from the start.                     |
+| `e`, `r`  | `/e`, `/r`  |                 | The modifiers of `s///`, no effect on matching.                                            |
+
+## Syntax Limitations
+
+The following constructs are not supported.
+
+- Recursion and subroutine calls (e.g. `(?R)`, `(?1)` and `(?&name)`), including `(?(DEFINE)...)` in a pattern with calls, are reported as `unsupported`.
+- Embedded code (e.g. `(?{ ... })` and `(??{ ... })`), user-defined properties (e.g. `\p{IsFoo}`) and property wildcards (e.g. `\p{gc=/^L/}`) are reported as `unsupported`.
+- `\N{name}` (e.g. `\N{EM DASH}`) and word boundaries of a kind (e.g. `\b{wb}` and `\b{gcb}`) are reported as `unsupported`.
+- Under `i`, more than six places in a run of literals that match a folding to several characters, such as `ß` or `ss`, which matches `ß`, are reported as `unsupported` (e.g. `ssssssss` gives `Too many multi-character case foldings in a literal (limit 6) at 0`).
+- Extended bracketed character classes (`(?[ ... ])`) are not supported yet, and they are reported as `invalid`.
+
+## Approximations
+
+- Perl has caches of the super-linear matching that `recheck` does not model, so an attack that `recheck` reports may not work on Perl, and the runtime-attack verification checks whether it does.
+- `\G` matches only at the start of the input, since `recheck` models a search from there, not one from a later position (e.g. the second match of `m//g`).
+- Under `i`, Perl matches a character against its folding to several characters (e.g. `ß` against `ss`).
+  Whether several nodes together match such a character depends on how Perl joins the nodes into a string on compiling, and `recheck` does not reproduce it.
+  A non-capturing group and a class of one character or of a character and its case variants join (e.g. `(?:s)s`, `s[s]` and `[sS]s` match `ß`).
+  A quantifier and a capturing group do not join (e.g. `s{2}`, `[s]{2}`, `s?s` and `(s)s` do not match `ß`).
+- Under `i`, Perl also matches a run of literals against a string with the same folding whose characters split it differently, and `recheck` does not reproduce it.
+  For example, `ßs` matches `"sß"`, since both fold to `sss`, and `ﬀi` matches `"fﬁ"` and `ﬃ` matches `"ﬀi"`, since all of them fold to `ffi`.
+- Perl backs off one character at a time from `\R` under a simple quantifier, which can split `\r\n` (e.g. `^\R?\n$` matches `"\r\n"` in Perl, but not in PCRE or Ruby), and `recheck` does not reproduce it.
+- Perl skips the attempts that cannot match by its start-of-match optimizations, and `recheck` does not model them.
+- Perl compiles alternatives starting with literals into a trie, and `(*THEN)` in the trie skips the other alternatives in it (e.g. `aa(*THEN)b|a` matches the second `a` of `"aac"`).
+  `recheck` does not reproduce it, and `(*THEN)` takes the next alternative as in PCRE (matching the first `a`).
+- Under `i`, Perl lowers the minimum length of a look-behind by the literals that may match a shorter folded character, which comes from joining the literals on compiling (e.g. `(?<=ss)x` matches `"ßx"`).
+  `recheck` steps back by the lengths of the literals, so it does not reproduce such a match.
+- Perl compiles a repetition of a fixed-length node with no captures inside (e.g. `(a)?`) into a counting node, which unsets the capture of the node when the repetition matches nothing (e.g. `^(?:(a)?b){2}\1$` does not match `"abba"`).
+  `recheck` does not reproduce it, and such a repetition keeps the capture of an earlier iteration as the other repetitions do.
+- `l` follows the C locale, where `0x80`–`0xFF` follow the ASCII rules even with `utf8`, whatever locale the environment has.
+  Under `i`, no character folds across `U+00FF` and `U+0100` there (e.g. `k` does not match the Kelvin sign `U+212A`, and `ß` matches neither `ẞ` nor `ss`).
+
+## Runtime-Attack Verification
+
+- Command: `perl -`.
+- Matching: `=~`.
+- Engine limits: none.
+- Engine errors: none.
+- Environment variable: `RECHECK_PERL`.
+
+With the `literal` source, the runtime-attack verification is skipped for a pattern that would interpolate a variable or run code as a literal (e.g. `$name`, `@{...}` or `(?{ ... })`), so `runtimeAttack` is `null`, and `generate-runtime-attack-script` fails.

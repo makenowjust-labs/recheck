@@ -1,0 +1,21 @@
+---
+id: parameters
+title: Parameters
+---
+
+import Parameters, {
+  toc as parametersToc,
+} from "@site/src/components/Parameters";
+
+export const toc = [...parametersToc];
+
+`Parameters` is an object type to specify detailed checker behavior.
+It has many parameters.
+But, few parameters are useful to users, and the others are not needed to be set manually.
+
+The parameters are defined in [a JSON Schema written in YAML](https://github.com/makenowjust-labs/recheck/blob/main/schema/parameters.schema.yaml).
+The TypeScript type, the Scala class, the CLI options and the list below are generated from it.
+In TypeScript and JSON (e.g. the agent mode of the CLI), a duration is a number of milliseconds, and `null` means infinite.
+The CLI takes a duration with a unit, e.g. `--timeout=10s`.
+
+<Parameters />

@@ -3,15 +3,13 @@ package fuzz
 
 import scala.concurrent.duration.*
 import scala.language.implicitConversions
-import scala.util.Failure
-import scala.util.Success
+import scala.util.Try
 
 import codes.quine.labs.recheck.common.Context
-import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.fuzz.DynamicSeeder.*
-import codes.quine.labs.recheck.regexp.Parser
-import codes.quine.labs.recheck.unicode.IChar
-import codes.quine.labs.recheck.unicode.UString
+import codes.quine.labs.resyntax.charset.CharSet
+import codes.quine.labs.resyntax.charset.UnitMode
+import codes.quine.labs.resyntax.dialect.Dialect
 
 class DynamicSeederSuite extends munit.FunSuite:
 
@@ -21,31 +19,31 @@ class DynamicSeederSuite extends munit.FunSuite:
   test("DynamicSeeder.seed"):
     def seed(source: String, flags: String): Set[String] =
       val result = for
-        pattern <- Parser.parse(source, flags) match
-          case Right(pattern) => Success(pattern)
-          case Left(ex)       => Failure(new InvalidRegExpException(ex.getMessage))
-        fuzz <- FuzzProgram.from(pattern)
+        ir <- Try(ReDoS.parse(source, flags, Dialect.JavaScript))
+        fuzz = FuzzProgram.from(ir)
       yield DynamicSeeder.seed(fuzz, timeout = Duration.Inf)
       result.get.map(_.toString)
 
     assertEquals(seed("^(a|b)$", ""), Set("''", "'a'", "'b'"))
     assertEquals(seed("^(a|b)$", "i"), Set("''", "'A'", "'B'"))
-    assertEquals(seed("^(A|B)$", "iu"), Set("''", "'a'", "'b'"))
+    assertEquals(seed("^(A|B)$", "iu"), Set("''", "'A'", "'B'"))
     assertEquals(seed("^[ab]$", ""), Set("''", "'a'"))
     assertEquals(seed("^[^ab]$", ""), Set("''", "'\\x00'"))
     assertEquals(seed("^(a)\\1$", ""), Set("''", "'a'", "'aa'"))
     assertEquals(seed("^a*$", ""), Set("''", "'\\x00'", "'a'"))
     assertEquals(seed("^a{2}$", ""), Set("''", "'a'", "'aa'", "'a'.repeat(2)"))
     assertEquals(seed("^(a?){50}a{50}$", ""), Set("''", "'a'", "'aa'", "'a'.repeat(2)"))
+    // A high surrogate followed by a low surrogate is one code point with `u`, so the patch inserting it is discarded.
+    assertEquals(seed("^[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]$", "u"), Set("''", "'\\uD800'"))
 
   test("DynamicSeeder.Patch.InsertChar#apply"):
     assertEquals(
-      Patch.InsertChar(1, Set(IChar('x'))).apply(UString("012"), false),
-      Seq(UString("0x12"), UString("0x2"))
+      Patch.InsertChar(1, Set(CharSet.single('x'))).apply(UnitMode.UTF16.decode("012")),
+      Seq(UnitMode.UTF16.decode("0x12"), UnitMode.UTF16.decode("0x2"))
     )
 
   test("DynamicSeeder.Patch.InsertString#apply"):
     assertEquals(
-      Patch.InsertString(1, UString("xyz")).apply(UString("012"), false),
-      Seq(UString("0xyz12"))
+      Patch.InsertString(1, UnitMode.UTF16.decode("xyz")).apply(UnitMode.UTF16.decode("012")),
+      Seq(UnitMode.UTF16.decode("0xyz12"))
     )

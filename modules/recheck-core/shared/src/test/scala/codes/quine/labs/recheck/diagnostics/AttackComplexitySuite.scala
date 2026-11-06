@@ -1,6 +1,7 @@
 package codes.quine.labs.recheck.diagnostics
 
 class AttackComplexitySuite extends munit.FunSuite:
+
   test("AttackComplexity#toString"):
     assertEquals(AttackComplexity.Safe(false).toString, "safe")
     assertEquals(AttackComplexity.Safe(true).toString, "safe (fuzz)")

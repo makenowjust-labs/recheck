@@ -86,10 +86,10 @@ class RPCSuite extends munit.FunSuite:
       s"""{"jsonrpc": "${RPC.JsonRPCVersion}", "method": "bar", "params": {}}"""
     )
     val out = Seq.newBuilder[String]
-    val io = new RPC.IO {
+    val io = new RPC.IO:
       def read(): Iterator[String] = in.iterator
+
       def write(line: String): Unit = out.addOne(line)
-    }
 
     var fooPush: RPC.Push[String] = null
     var fooSend: RPC.Send[Unit] = null
@@ -147,20 +147,21 @@ class RPCSuite extends munit.FunSuite:
 
   test("RPC.RequestHandler#handle"):
     val handler = RPC.RequestHandler { (_, x: Boolean, _: RPC.Push[Unit], send: RPC.Send[Unit]) =>
-      send(if x then Right(()) else Left(RPC.Error(RPC.Error.InternalErrorCode, "foo")))
+      send(if x then Right(()) else Left(RPC.Error(RPC.Error.InvalidParamsCode, "foo")))
     }
     def cheat(f: (RPC.ResponsePush, RPC.ResponseSend) => Unit): Either[RPC.ErrorResponse, RPC.ResultResponse] = {
       var result: Either[RPC.ErrorResponse, RPC.ResultResponse] = null
       f(_ => ???, r => result = r)
       result
     }
+
     assertEquals(
       cheat(handler.handle(Some(RPC.IntID(1)), true.asJson, _, _)),
       Right(RPC.ResultResponse(RPC.JsonRPCVersion, RPC.IntID(1), Json.obj()))
     )
     assertEquals(
       cheat(handler.handle(Some(RPC.IntID(1)), false.asJson, _, _)),
-      Left(RPC.ErrorResponse(RPC.JsonRPCVersion, Some(RPC.IntID(1)), RPC.Error(RPC.Error.InternalErrorCode, "foo")))
+      Left(RPC.ErrorResponse(RPC.JsonRPCVersion, Some(RPC.IntID(1)), RPC.Error(RPC.Error.InvalidParamsCode, "foo")))
     )
     // Other exception cases are covered by the below tests.
 

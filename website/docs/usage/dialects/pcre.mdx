@@ -1,0 +1,93 @@
+---
+id: pcre
+title: PCRE
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+Describes how `recheck` checks a regular expression of the `pcre` dialect.
+
+## Engine
+
+`recheck` follows the syntax and the semantics of PCRE2 10.49 as PHP's `preg_*` functions use it.
+
+## Settings
+
+The `pcre` dialect has no settings.
+
+<Tabs>
+<TabItem value="cli" label="CLI">
+
+```console
+$ recheck --dialect=pcre '/^(a|a)*$/'
+```
+
+</TabItem>
+<TabItem value="js" label="JavaScript">
+
+```tsx
+import { check } from "recheck";
+
+await check("^(a|a)*$", "", { dialect: "pcre" });
+```
+
+</TabItem>
+<TabItem value="scala" label="Scala">
+
+```scala
+import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.common.Parameters
+import codes.quine.labs.resyntax.dialect.Dialect
+
+ReDoS.check("^(a|a)*$", "", Parameters(dialect = Dialect.PCRE))
+```
+
+</TabItem>
+</Tabs>
+
+## Flags and Units
+
+The matching unit is `byte`, or `scalar-value` with the `u` flag or `(*UTF)` (see [Matching Units](../dialects.mdx#matching-units)).
+
+`recheck` supports the following pattern modifiers of PHP.
+
+| Flag | PCRE2 option                    | Inline         | Notes                                                                     |
+| ---- | ------------------------------- | -------------- | ------------------------------------------------------------------------- |
+| `i`  | `PCRE2_CASELESS`                | `(?i)`         |                                                                           |
+| `m`  | `PCRE2_MULTILINE`               | `(?m)`         |                                                                           |
+| `n`  | `PCRE2_NO_AUTO_CAPTURE`         | `(?n)`         | PHP 8.2 or later.                                                         |
+| `r`  | `PCRE2_EXTRA_CASELESS_RESTRICT` | `(?r)`         | PHP 8.4 or later.                                                         |
+| `s`  | `PCRE2_DOTALL`                  | `(?s)`         |                                                                           |
+| `u`  | `PCRE2_UTF` and `PCRE2_UCP`     | `(*UTF)(*UCP)` |                                                                           |
+| `x`  | `PCRE2_EXTENDED`                | `(?x)`         | `xx` is `x` too, while `(?xx)` is `PCRE2_EXTENDED_MORE`.                  |
+| `A`  | `PCRE2_ANCHORED`                |                | The match starts at the start of the input.                               |
+| `D`  | `PCRE2_DOLLAR_ENDONLY`          |                | `$` matches only at the end of the input, unless with `m`.                |
+| `J`  | `PCRE2_DUPNAMES`                | `(?J)`         |                                                                           |
+| `U`  | `PCRE2_UNGREEDY`                | `(?U)`         |                                                                           |
+| `S`  |                                 |                | No effect (PHP 7.3 or later).                                             |
+| `X`  |                                 |                | No effect (PHP 7.3 or later, where an unknown escape is always an error). |
+
+## Syntax Limitations
+
+The following constructs are not supported.
+
+- Recursion and subroutine calls (e.g. `(?R)`, `(?1)`, `(?&name)` and `\g<name>`), including `(?(DEFINE)...)` in a pattern with calls, are reported as `unsupported`.
+- Callouts (e.g. `(?C1)`), `(*scan_substring:...)` and script runs (e.g. `(*sr:...)`) are reported as `unsupported`.
+- Extended bracketed character classes (`(?[ ... ])`) are not supported yet, and they are reported as `invalid`.
+
+## Approximations
+
+- PCRE2 has auto-possessification and JIT that `recheck` does not model, so an attack that `recheck` reports may not work on PCRE2, and the runtime-attack verification checks whether it does.
+- `\G` matches only at the start of the input, since `recheck` models a search from there, not one from a later position (e.g. the second match of `preg_match_all`).
+- PCRE2 skips the attempts that cannot match by its start-of-match optimizations (e.g. `(*COMMIT)abc` matches `xyzabc` in PCRE2, unless the pattern starts with `(*NO_START_OPT)`), and `recheck` does not model them.
+
+## Runtime-Attack Verification
+
+- Command: `php`.
+- Matching: `preg_match`.
+- Engine limits: the backtrack limit.
+- Engine errors: the recursion limit and the JIT stack limit.
+- Environment variable: `RECHECK_PHP`.
+
+The program runs with PHP's default settings of `pcre.backtrack_limit`, `pcre.recursion_limit` and `pcre.jit`.

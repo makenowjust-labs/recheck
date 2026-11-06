@@ -7,16 +7,13 @@ import codes.quine.labs.recheck.automaton.Complexity.*
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.data.Graph
 import codes.quine.labs.recheck.diagnostics.Hotspot
-import codes.quine.labs.recheck.regexp.Pattern.Location
+import codes.quine.labs.resyntax.ast.SourceLocation
 
 /** ReDoS vulnerable RegExp checker based on automata theory. */
 object AutomatonChecker:
 
   /** Checks a match time complexity of the NFA. */
-  def check[A, Q](
-      nfa: OrderedNFA[A, Q],
-      maxNFASize: Int = Int.MaxValue
-  )(using ctx: Context): Iterator[Complexity[A]] =
+  def check[A, Q](nfa: OrderedNFA[A, Q], maxNFASize: Int)(using ctx: Context): Iterator[Complexity[A]] =
     ctx.interrupt(new AutomatonChecker(nfa, maxNFASize).check())
 
 /** AutomatonChecker is a ReDoS vulnerable RegExp checker based on automata theory. */
@@ -26,9 +23,9 @@ private final class AutomatonChecker[A, Q](
 )(using private val ctx: Context):
 
   // Introduces `ctx` methods into the scope.
-  import ctx._
+  import ctx.*
 
-  /** A NFA with look-ahead constructed from [[nfa]]. */
+  /** An NFA with look-ahead constructed from [[nfa]]. */
   private val nfaWLA = nfa.toNFAwLA(maxNFASize)
 
   /** A [[nfaWLA]] transition graph. */
@@ -64,7 +61,7 @@ private final class AutomatonChecker[A, Q](
       .toMap
       .withDefaultValue(Map.empty.withDefaultValue(Vector.empty))
 
-  /** A map from a SCC to the lookahead DFA states in this. */
+  /** A map from an SCC to the lookahead DFA states in this. */
   private val sccLookaheadMap = scc.map { sc => sc -> sc.map(_._2).toSet }.toMap
 
   /** A type of [[nfaWLA]] state. */
@@ -74,7 +71,7 @@ private final class AutomatonChecker[A, Q](
   private type B = (A, Set[Q])
 
   /** A type of a pair of pumps of witness and hotspots. */
-  private type Pump = (R, Seq[B], R, Seq[Location])
+  private type Pump = (R, Seq[B], R, Seq[SourceLocation])
 
   /** Tests whether the SCC is an atom, which is a singleton and does not have a self-loop. */
   private def isAtom(sc: Seq[R]): Boolean =
@@ -93,13 +90,13 @@ private final class AutomatonChecker[A, Q](
     interrupt:
       scc.iterator
         .filterNot(isAtom)
-        .flatMap(checkExponentialComponent)
+        .flatMap(findEDA)
         .map: pump =>
           val (w, hotspot) = witness(Vector(pump))
           Exponential(w, hotspot)
 
   /** Finds an EDA structure in the SCC. */
-  private def checkExponentialComponent(sc: IndexedSeq[R]): Option[Pump] =
+  private def findEDA(sc: IndexedSeq[R]): Option[Pump] =
     interrupt:
       val edges = interrupt(sccPairEdges((sc, sc)))
 
@@ -123,7 +120,7 @@ private final class AutomatonChecker[A, Q](
             g2.scc.view
               .flatMap: sc =>
                 val eda = interrupt(for
-                  // If there is a SCC of g2 contains `(q1, q1)` and `(q2, q3)` (s.t. `q2 != q3`),
+                  // If there is an SCC of g2 that contains `(q1, q1)` and `(q2, q3)` (s.t. `q2 != q3`),
                   // then the SCC contains an EDA structure.
                   p1 <- sc.find { case (q1, q2) => q1 == q2 }
                   p2 <- sc.find { case (q1, q2) => q1 != q2 }
@@ -139,7 +136,7 @@ private final class AutomatonChecker[A, Q](
     log("automaton: find IDA")
     interrupt:
       scc
-        .map(checkPolynomialComponent)
+        .map(findIDAChain)
         .sortBy(-_._1)
         .map:
           case (0, _)          => Constant
@@ -148,19 +145,19 @@ private final class AutomatonChecker[A, Q](
             val (w, hotspot) = witness(pumps)
             Polynomial(degree, w, hotspot)
 
-  /** An internal cache of [[checkPolynomialComponent]] method's result. */
-  private val checkPolynomialComponentCache = mutable.Map.empty[Seq[R], (Int, Seq[Pump])]
+  /** An internal cache of [[findIDAChain]] method's result. */
+  private val idaChainCache = mutable.Map.empty[Seq[R], (Int, Seq[Pump])]
 
   /** Finds an IDA structure chain from the SCC. */
-  private def checkPolynomialComponent(sc: IndexedSeq[R]): (Int, Seq[Pump]) =
-    checkPolynomialComponentCache.getOrElseUpdate(
+  private def findIDAChain(sc: IndexedSeq[R]): (Int, Seq[Pump]) =
+    idaChainCache.getOrElseUpdate(
       sc,
       interrupt:
         // Computes the maximum IDA structure chain from neighbors.
         val (maxDegree, maxPumps) = interrupt:
           sccGraph
             .neighbors(sc)
-            .map { case ((), sc) => checkPolynomialComponent(sc) }
+            .map { case ((), sc) => findIDAChain(sc) }
             .maxByOption(_._1)
             .getOrElse((0, Vector.empty))
         if maxDegree == 0 then (if isAtom(sc) then 0 else 1, Vector.empty)
@@ -170,19 +167,19 @@ private final class AutomatonChecker[A, Q](
           val result = interrupt:
             sccReachableMap(sc).iterator
               .filter: target =>
-                sc != target && !isAtom(target) && checkPolynomialComponent(target)._1 == maxDegree &&
+                sc != target && !isAtom(target) && findIDAChain(target)._1 == maxDegree &&
                   // If the intersection of lookahead states of `sc` and `target` is empty,
                   // then there is no IDA structure between them.
                   (sccLookaheadMap(sc) & sccLookaheadMap(target)).nonEmpty
-              .flatMap(target => checkPolynomialComponentBetween(sc, target).map((target, _)))
-              .map { case (target, pump) => (maxDegree + 1, pump +: checkPolynomialComponent(target)._2) }
+              .flatMap(target => findIDABetween(sc, target).map((target, _)))
+              .map { case (target, pump) => (maxDegree + 1, pump +: findIDAChain(target)._2) }
               .nextOption()
               .getOrElse((maxDegree, maxPumps))
           result
     )
 
   /** Finds an IDA structure between source and target SCCs. */
-  private def checkPolynomialComponentBetween(source: IndexedSeq[R], target: IndexedSeq[R]): Option[Pump] =
+  private def findIDABetween(source: IndexedSeq[R], target: IndexedSeq[R]): Option[Pump] =
     val sourceEdges = interrupt(sccPairEdges((source, source)))
     val between = interrupt(sccReachableMap(source) & sccReverseReachableMap(target))
     val betweenEdges = interrupt(for sc1 <- between; sc2 <- between yield sccPairEdges((sc1, sc2)))
@@ -209,7 +206,7 @@ private final class AutomatonChecker[A, Q](
       g3back.scc.iterator
         .flatMap: sc =>
           val ida = interrupt:
-            // If there is a SCC of `g3back` contains `(q1, q1, q2)` and `(q1, q2, q2)`,
+            // If there is an SCC of `g3back` that contains `(q1, q1, q2)` and `(q1, q2, q2)`,
             // then an IDA structure exists between `source` and `target`.
             sc
               .collect:
@@ -230,28 +227,28 @@ private final class AutomatonChecker[A, Q](
       pumps.foldLeft((Vector.empty[(Seq[A], Seq[A])], nfaWLA.initSet.toSet, Vector.empty[Hotspot.Spot])):
         case ((pumpPaths, last, spots), (q1, path, q2, pos)) =>
           val (prefix, _) = graph.path(last, q1).get
-          val newSpots = spots ++ pos.map { case Location(s, e) => Hotspot.Spot(s, e, Hotspot.Heat) } ++
-            this.spots(prefix, q1).map { case Location(s, e) => Hotspot.Spot(s, e, Hotspot.Normal) }
+          val newSpots = spots ++ pos.map { case SourceLocation(s, e) => Hotspot.Spot(s, e, Hotspot.Hot) } ++
+            this.spots(prefix, q1).map { case SourceLocation(s, e) => Hotspot.Spot(s, e, Hotspot.Warm) }
           (pumpPaths :+ (prefix.map(_._2._1), path.map(_._1)), Set(q2), newSpots)
     val suffix = nfaWLA.lookAheadDFA.toGraph.path(Set(nfaWLA.lookAheadDFA.init), qs.head._2).get._1.map(_._2).reverse
     (Witness(pumpPaths, suffix), Hotspot(spots))
 
   /** Gets hotspots positions from a path. */
-  private def spots(path: Seq[(R, B)], last: R): Seq[Location] =
+  private def spots(path: Seq[(R, B)], last: R): Seq[SourceLocation] =
     path
-      .foldRight((last, Vector.empty[Location])):
+      .foldRight((last, Vector.empty[SourceLocation])):
         case ((q1, a), (q2, spots)) =>
           (q1, spots ++ nfaWLA.sourcemap.getOrElse((q1, a, q2), Vector.empty))
       ._2
 
   /** Gets hotspots positions from a G2 path. */
-  private def spotsG2(path: Seq[((R, R), B)], last: (R, R)): Seq[Location] =
+  private def spotsG2(path: Seq[((R, R), B)], last: (R, R)): Seq[SourceLocation] =
     val spots1 = spots(path.map { case ((q1, _), a) => (q1, a) }, last._1)
     val spots2 = spots(path.map { case ((_, q2), a) => (q2, a) }, last._2)
     spots1 ++ spots2
 
   /** Gets hotspots positions from a G3 path. */
-  private def spotsG3(path: Seq[((R, R, R), B)], last: (R, R, R)): Seq[Location] =
+  private def spotsG3(path: Seq[((R, R, R), B)], last: (R, R, R)): Seq[SourceLocation] =
     val spots1 = spots(path.map { case ((q1, _, _), a) => (q1, a) }, last._1)
     val spots2 = spots(path.map { case ((_, q2, _), a) => (q2, a) }, last._2)
     val spots3 = spots(path.map { case ((_, _, q3), a) => (q3, a) }, last._3)

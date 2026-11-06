@@ -60,13 +60,13 @@ tester.run("no-vulnerable", rule, {
           maxIteration: 10,
           maxNFASize: 35000,
           maxPatternSize: 1500,
-          maxRecallStringSize: 300000,
+          maxRuntimeAttackStringSize: 300000,
           maxRepeatCount: 30,
           maxSimpleRepeatCount: 30,
           mutationSize: 50,
           randomSeed: 0,
-          recallLimit: 1500000000,
-          recallTimeout: -1000,
+          runtimeAttackLimit: 1500000000,
+          runtimeAttackTimeout: -1000,
           seeder: "static",
           seedingLimit: 1000,
           seedingTimeout: 100,
@@ -104,7 +104,7 @@ tester.run("no-vulnerable", rule, {
       errors: [
         {
           message:
-            "Error on ReDoS vulnerability check: parsing failure (at 1) (invalid)",
+            "Error on ReDoS vulnerability check: Unclosed group at 1 (invalid)",
         },
       ],
     },
@@ -130,4 +130,15 @@ tester.run("no-vulnerable", rule, {
       errors: [{ message: "Error on ReDoS vulnerability check: timeout" }],
     },
   ],
+});
+
+test("no-vulnerable: the options exclude the logger and the dialect parameters", () => {
+  const [options] = rule.meta!.schema as [
+    { properties: Record<string, unknown> },
+  ];
+  expect(options.properties).toHaveProperty("timeout");
+  expect(options.properties).toHaveProperty("maxDegree");
+  for (const name of ["logger", "dialect"]) {
+    expect(options.properties).not.toHaveProperty(name);
+  }
 });

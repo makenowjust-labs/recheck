@@ -1,0 +1,54 @@
+package codes.quine.labs.recheck
+package diagnostics
+
+import scala.concurrent.duration.Duration
+import scala.concurrent.duration.FiniteDuration
+
+/** RuntimeAttack is a run of an attack string on the real regex engine of the dialect.
+  *
+  * `runtime` is the runtime name and version (e.g. `python 3.15.0`), and `result` is the result of the matching within
+  * `timeout`.
+  */
+final case class RuntimeAttack(runtime: String, timeout: Duration, result: RuntimeAttackResult):
+
+  /** Whether the engine confirms the attack, that is, the attack is effective on it. */
+  def isConfirmed: Boolean = result.isConfirmed
+
+  override def toString: String =
+    val limit = timeout match
+      case d: FiniteDuration => s"${d.toMillis} ms"
+      case _                 => "none"
+    s"${if isConfirmed then "confirmed" else "refuted"} ($result on $runtime, timeout: $limit)"
+
+/** RuntimeAttackResult is the result of matching an attack string on the real regex engine. */
+enum RuntimeAttackResult:
+
+  /** Finish is a matching finished in time, so the attack is not effective. */
+  case Finish(time: FiniteDuration)
+
+  /** Timeout is a matching not finished in time. */
+  case Timeout
+
+  /** EngineLimit is a matching that the engine stopped on its limit of the matching steps, e.g. PHP's backtrack limit.
+    */
+  case EngineLimit(message: String)
+
+  /** EngineError is a matching that the engine gave up with an error on the stack depth or the memory, e.g. Java's
+    * `StackOverflowError`.
+    */
+  case EngineError(message: String)
+
+  /** Whether the engine confirms the attack, that is, the attack is effective on it. */
+  def isConfirmed: Boolean = this match
+    case Finish(_) => false
+    case Timeout   => true
+    // The engine counts the steps of backtracking, so reaching the limit shows that the attack is effective.
+    case EngineLimit(_) => true
+    // The engine may raise it for a long string even if the matching takes linear time.
+    case EngineError(_) => false
+
+  override def toString: String = this match
+    case Finish(time)         => s"finished in ${time.toMillis} ms"
+    case Timeout              => "timed out"
+    case EngineLimit(message) => s"engine limit: $message"
+    case EngineError(message) => s"engine error: $message"

@@ -1,13 +1,3 @@
-.demoResultHotspotHeat {
-  color: var(--ifm-color-white);
-  background: var(--ifm-color-danger);
-}
-
-.demoResultHotspotNormal {
-  color: var(--ifm-color-white);
-  background: var(--ifm-color-warning);
-}
-
 .demoResultLoading {
   display: inline-flex;
   align-items: center;
@@ -61,6 +51,27 @@
 
 .version {
   flex: none;
+}
+
+.dialect {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.dialectSelect {
+  flex: none;
+}
+
+.dialectDetails {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ifm-color-emphasis-700);
+}
+
+.dialectDetails:hover {
+  color: var(--ifm-color-primary);
 }
 
 .localNote {

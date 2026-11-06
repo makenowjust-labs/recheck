@@ -1,6 +1,44 @@
+import { defaults, schema } from "recheck-parameters";
+
 import createWorker from "./worker";
 
-import type { Diagnostics, HasAbortSignal, Parameters } from "../..";
+import type {
+  Dialect,
+  DialectParameter,
+  DialectSettings,
+  Diagnostics,
+  HasAbortSignal,
+  Parameters,
+} from "../..";
+
+/** The default settings of each dialect, read from the variants of `dialect` in the schema. */
+const defaultSettings: Record<
+  string,
+  Record<string, unknown>
+> = Object.fromEntries(
+  (schema.properties["dialect"]!.oneOf ?? []).flatMap(({ properties }) => {
+    const { name, ...settings } = properties ?? {};
+    if (name?.const === undefined) return [];
+    const values = Object.entries(settings).map(([key, setting]) => [
+      key,
+      setting.default,
+    ]);
+    return [[name.const, Object.fromEntries(values)]];
+  }),
+);
+
+/** Returns the dialect of the parameter as the diagnostics have it, where an omitted setting is the default. */
+const dialectOf = (dialect: DialectParameter = defaults.dialect): Dialect => {
+  const given: DialectSettings =
+    typeof dialect === "string" ? { name: dialect } : dialect;
+  const settings = Object.entries(given).filter(
+    ([, value]) => value !== undefined,
+  );
+  return {
+    ...defaultSettings[given.name],
+    ...Object.fromEntries(settings),
+  } as Dialect;
+};
 
 /** Ref is an object contains a check information to resolve or to cancel. */
 type Ref = {
@@ -185,12 +223,16 @@ export class WorkerPool {
 
   /** Cancels the given reference. */
   private cancelRef(ref: Ref): void {
-    ref.resolve({
+    const cancelled: Diagnostics = {
       source: ref.source,
       flags: ref.flags,
+      dialect: dialectOf(ref.params.dialect),
+      unitMode: null,
       status: "unknown",
       error: { kind: "cancel" },
-    });
+      refutedAttacks: [],
+    };
+    ref.resolve(cancelled);
 
     this.unregisterRef(ref);
     if (ref.worker) {

@@ -1,28 +1,19 @@
 package codes.quine.labs.recheck
 package automaton
 
+import codes.quine.labs.recheck.common.UnexpectedException
+import codes.quine.labs.recheck.diagnostics.AttackPattern
+import codes.quine.labs.resyntax.charset.UString
+import codes.quine.labs.resyntax.charset.UnitMode
+
 class WitnessSuite extends munit.FunSuite {
-  test("Witness#map") {
+  test("Witness#buildAttackPattern") {
     assertEquals(
-      Witness(Seq((Seq(1), Seq(2))), Seq(3)).map(_ + 1),
-      Witness(Seq((Seq(2), Seq(3))), Seq(4))
+      Witness(Seq((Seq('a'.toInt), Seq('b'.toInt))), Seq('c'.toInt)).buildAttackPattern(2, UnitMode.UTF16),
+      AttackPattern(Seq((UString('a'), UString('b'), 0)), UString('c'), 2)
     )
-  }
-
-  test("Witness#buildAttack") {
-    assertEquals(Witness(Seq((Seq(1), Seq(2))), Seq(3)).buildAttack(0), Seq(1, 3))
-    assertEquals(Witness(Seq((Seq(1), Seq(2))), Seq(3)).buildAttack(1), Seq(1, 2, 3))
-    assertEquals(Witness(Seq((Seq(1), Seq(2))), Seq(3)).buildAttack(2), Seq(1, 2, 2, 3))
-  }
-
-  test("Witness#toLazyList") {
-    assertEquals(
-      Witness(Seq((Seq(1), Seq(2))), Seq(3)).toLazyList.take(3),
-      LazyList(
-        Seq(1, 3),
-        Seq(1, 2, 3),
-        Seq(1, 2, 2, 3)
-      )
+    intercept[UnexpectedException](
+      Witness(Seq((Seq(0xd800), Seq(0xdc00))), Seq.empty).buildAttackPattern(2, UnitMode.UTF16CodePoint)
     )
   }
 

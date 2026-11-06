@@ -1,16 +1,30 @@
+import Link from '@docusaurus/Link';
 import React from 'react';
+import { useFormContext } from 'react-hook-form';
 
 import NumberInput from '../form/NumberInput';
 import Select from '../form/Select';
 import TextArea from '../form/TextArea';
 import { formatBuild } from './builds';
 import styles from './Demo.module.css';
-import { params } from './params';
+import { DEFAULT_DIALECT, dialectOf, paramsOf, selectValues } from './params';
 
 import type { Build } from './builds';
 import type { Param } from './params';
 
-const ParamInput: React.FC<Param> = ({ name, defaultValue, type }) => {
+const ParamInput: React.FC<{ param: Param; dialect: string }> = ({ param, dialect }) => {
+  const { name, defaultValue, type } = param;
+  const { getValues, setValue } = useFormContext();
+  const values = selectValues(param, dialect);
+  const byDialect = typeof type === 'object' && 'selectByDialect' in type;
+
+  // A value of another dialect is replaced with this dialect's default.
+  React.useEffect(() => {
+    if (byDialect && !values.includes(String(getValues(name)))) {
+      setValue(name, values[0]);
+    }
+  }, [byDialect, dialect]);
+
   if (type === 'duration') {
     return <NumberInput name={name} defaultValue={defaultValue} step={100} />;
   }
@@ -20,27 +34,69 @@ const ParamInput: React.FC<Param> = ({ name, defaultValue, type }) => {
   if (type === 'integer') {
     return <NumberInput name={name} defaultValue={defaultValue} step={1} />;
   }
-  return <Select name={name} values={type.select} defaultValue={String(defaultValue)} />;
+  return <Select name={name} values={values} defaultValue={byDialect ? values[0]! : String(defaultValue)} />;
 };
 
-const DemoParams: React.FC = () => (
-  <details>
-    <summary>Parameters</summary>
+const DemoParams: React.FC<{ build: Build }> = ({ build }) => {
+  const { watch } = useFormContext();
+  const dialect = dialectOf({ dialect: watch('dialect') }, build);
+  return (
+    <details>
+      <summary>Parameters</summary>
 
-    <div className="container">
-      {params.map((param) => (
-        <div className="row margin-vert--sm" key={param.name}>
-          <div className="col col--3">
-            <h4>{`${param.title}${param.type === 'duration' ? ' (ms)' : ''}`}</h4>
-          </div>
-          <div className="col col--2 col--offset-1">
-            <ParamInput {...param} />
-          </div>
-        </div>
-      ))}
+      <div className="container">
+        {paramsOf(build, dialect)
+          .filter(({ name }) => name !== 'dialect')
+          .map((param) => (
+            <div className="row margin-vert--sm" key={param.name}>
+              <div className="col col--3">
+                <h4>{`${param.title}${param.type === 'duration' ? ' (ms)' : ''}`}</h4>
+              </div>
+              <div className="col col--2 col--offset-1">
+                <ParamInput param={param} dialect={dialect} />
+              </div>
+            </div>
+          ))}
+      </div>
+    </details>
+  );
+};
+
+const DemoDialect: React.FC<{ build: Build; disabled: boolean }> = ({ build, disabled }) => {
+  const { watch } = useFormContext();
+  const param = paramsOf(build).find(({ name }) => name === 'dialect');
+  if (param === undefined) return null;
+  const dialect = String(watch('dialect') ?? param.defaultValue);
+  return (
+    <div className={`margin-top--sm ${styles.dialect}`}>
+      <label htmlFor="dialect">{param.title}</label>
+      <div className={styles.dialectSelect}>
+        <Select
+          id="dialect"
+          name="dialect"
+          values={selectValues(param, DEFAULT_DIALECT)}
+          defaultValue={String(param.defaultValue)}
+          disabled={disabled}
+        />
+      </div>
+      <Link
+        className={styles.dialectDetails}
+        to={`/docs/usage/dialects/${dialect}`}
+        aria-label={`Details of ${dialect}`}
+        title={`Details of ${dialect}`}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 11v6M12 7.5v.01" />
+          </g>
+        </svg>
+      </Link>
     </div>
-  </details>
-);
+  );
+};
 
 const LOCAL_NOTE = 'Everything runs in your browser. The regular expression and the results are never sent to a server.';
 
@@ -72,10 +128,11 @@ type Props = {
   cancel: () => void;
   running: boolean;
   builds: Build[];
+  build: Build;
   defaultBuild: Build;
 };
 
-const DemoInput: React.FC<Props> = ({ check, cancel, running, builds, defaultBuild }) => (
+const DemoInput: React.FC<Props> = ({ check, cancel, running, builds, build, defaultBuild }) => (
   <div className="card margin-vert--lg">
     <div className="card__header">
       <h3>RegExp</h3>
@@ -87,6 +144,8 @@ const DemoInput: React.FC<Props> = ({ check, cancel, running, builds, defaultBui
             <TextArea name="input" defaultValue="/^(a|a)*$/" placeholder="/^(a|a)*$/" />
           </div>
         </div>
+
+        <DemoDialect build={build} disabled={running} />
 
         <div className={`margin-top--sm ${styles.actions}`}>
           <LocalNote />
@@ -113,7 +172,7 @@ const DemoInput: React.FC<Props> = ({ check, cancel, running, builds, defaultBui
 
         <div className="row margin-top--sm row--no-gutters">
           <div className="col col--12">
-            <DemoParams />
+            <DemoParams build={build} />
           </div>
         </div>
       </div>

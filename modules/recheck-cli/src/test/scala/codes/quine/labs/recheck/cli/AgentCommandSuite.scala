@@ -6,7 +6,7 @@ class AgentCommandSuite extends munit.FunSuite:
   test("AgentCommand.run"):
     val simple = """"method":"check","params":{"source":"a","flags":"","params":{}}"""
     val complex =
-      """"method":"check","params":{"source":"(a|b|aba)*$","flags":"","params":{"checker":"fuzz","usesAcceleration":false}}"""
+      """"method":"check","params":{"source":"(a|b|aba)*$","flags":"","params":{"checker":"fuzz","usesAcceleration":false,"dialect":"perl"}}"""
     val simpleLog = """"method":"check","params":{"source":"a","flags":"","params":{"logger":[]}}"""
     val in = Seq(
       Right(s"""{"jsonrpc":"${RPC.JsonRPCVersion}","id":0,"method":"ping","params":{}}"""),
@@ -33,6 +33,7 @@ class AgentCommandSuite extends munit.FunSuite:
           case Left(n)     =>
             sem.acquire(n)
             Iterator.empty
+
       def write(line: String): Unit =
         sem.release()
         out.addOne(line)
@@ -42,14 +43,14 @@ class AgentCommandSuite extends munit.FunSuite:
       out.result().sorted, // Result ordering depends on scheduling.
       Seq(
         """{"jsonrpc":"2.0+push","id":0,"result":{}}""",
-        """{"jsonrpc":"2.0+push","id":1,"result":{"source":"a","flags":"","status":"safe","checker":"automaton","complexity":{"type":"safe","summary":"safe","isFuzz":false}}}""",
-        """{"jsonrpc":"2.0+push","id":2,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"cancel"}}}""",
-        """{"jsonrpc":"2.0+push","id":3,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"cancel"}}}""",
-        """{"jsonrpc":"2.0+push","id":3,"result":{"source":"a","flags":"","status":"safe","checker":"automaton","complexity":{"type":"safe","summary":"safe","isFuzz":false}}}""",
+        """{"jsonrpc":"2.0+push","id":1,"result":{"source":"a","flags":"","dialect":{"name":"javascript"},"unitMode":"utf16","status":"safe","complexity":{"type":"safe","summary":"safe","isFuzz":false},"refutedAttacks":[],"checker":"automaton"}}""",
+        """{"jsonrpc":"2.0+push","id":2,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"unitMode":null,"status":"unknown","error":{"kind":"cancel"},"refutedAttacks":[],"checker":null}}""",
+        """{"jsonrpc":"2.0+push","id":3,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"unitMode":null,"status":"unknown","error":{"kind":"cancel"},"refutedAttacks":[],"checker":null}}""",
+        """{"jsonrpc":"2.0+push","id":3,"result":{"source":"a","flags":"","dialect":{"name":"javascript"},"unitMode":"utf16","status":"safe","complexity":{"type":"safe","summary":"safe","isFuzz":false},"refutedAttacks":[],"checker":"automaton"}}""",
         """{"jsonrpc":"2.0+push","id":4,"message":"automaton: constant pattern"}""",
         """{"jsonrpc":"2.0+push","id":4,"message":"parse: finish\n  pattern: /a/"}""",
         """{"jsonrpc":"2.0+push","id":4,"message":"parse: start"}""",
-        """{"jsonrpc":"2.0+push","id":4,"result":{"source":"a","flags":"","status":"safe","checker":"automaton","complexity":{"type":"safe","summary":"safe","isFuzz":false}}}""",
-        """{"jsonrpc":"2.0+push","id":5,"result":{"source":"(a|b|aba)*$","flags":"","status":"unknown","checker":null,"error":{"kind":"cancel"}}}"""
+        """{"jsonrpc":"2.0+push","id":4,"result":{"source":"a","flags":"","dialect":{"name":"javascript"},"unitMode":"utf16","status":"safe","complexity":{"type":"safe","summary":"safe","isFuzz":false},"refutedAttacks":[],"checker":"automaton"}}""",
+        """{"jsonrpc":"2.0+push","id":5,"result":{"source":"(a|b|aba)*$","flags":"","dialect":{"name":"perl","utf8":true,"source":"literal"},"unitMode":null,"status":"unknown","error":{"kind":"cancel"},"refutedAttacks":[],"checker":null}}"""
       )
     )

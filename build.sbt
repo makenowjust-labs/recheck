@@ -29,10 +29,22 @@ ThisBuild / semanticdbEnabled := true
 ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 
 val releaseVersion = taskKey[String]("A release version")
-ThisBuild / releaseVersion := {
-  if (version.value.endsWith("-SNAPSHOT")) previousStableVersion.value.getOrElse("0.0.0")
+ThisBuild / releaseVersion := (
+  if version.value.endsWith("-SNAPSHOT") then previousStableVersion.value.getOrElse("0.0.0")
   else version.value
-}
+)
+
+val generateParameters = taskKey[Seq[File]]("Generate the Scala sources of the parameters from the schema")
+
+val generateUnicodeData = taskKey[Seq[File]]("Generate the Scala sources of the Unicode data")
+
+def parametersGenerator(target: ParametersGen.Target): Seq[Def.Setting[?]] = Seq(
+  Compile / sourceGenerators += generateParameters.taskValue,
+  generateParameters := Def.uncached(
+    Seq(ParametersGen.generate(target, (ThisBuild / baseDirectory).value, (Compile / sourceManaged).value))
+  ),
+  coverageExcludedFiles := ".*[/\\\\]src_managed[/\\\\].*"
+)
 
 lazy val root = project
   .in(file("."))
@@ -47,10 +59,10 @@ lazy val root = project
     commonJS,
     execJVM,
     execJS,
-    unicodeJVM,
-    unicodeJS,
-    parseJVM,
-    parseJS,
+    resyntaxJVM,
+    resyntaxJS,
+    resyntaxCharsetJVM,
+    resyntaxCharsetJS,
     codecJVM,
     codecJS,
     js,
@@ -72,11 +84,17 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |import codes.quine.labs.recheck.data.*
       |import codes.quine.labs.recheck.diagnostics.*
       |import codes.quine.labs.recheck.fuzz.*
-      |import codes.quine.labs.recheck.recall.*
-      |import codes.quine.labs.recheck.regexp.*
-      |import codes.quine.labs.recheck.unicode.*
+      |import codes.quine.labs.recheck.verification.*
       |import codes.quine.labs.recheck.util.*
       |import codes.quine.labs.recheck.vm.*
+      |import codes.quine.labs.resyntax.ast.FlagSet
+      |import codes.quine.labs.resyntax.charset.*
+      |import codes.quine.labs.resyntax.dialect.Dialect
+      |import codes.quine.labs.resyntax.dialect.PerlSource
+      |import codes.quine.labs.resyntax.ir.*
+      |import codes.quine.labs.resyntax.ir.alphabet.*
+      |import codes.quine.labs.resyntax.ir.build.IRBuilder
+      |import codes.quine.labs.resyntax.parser.Parser
       |
       |def logger: Context.Logger = (message: String) =>
       |  val date = java.time.LocalDateTime.now()
@@ -90,33 +108,30 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |  finally
       |    println(s"$name: ${(System.nanoTime() - start) / 1e9} s")
       |
-      |def parse(source: String, flags: String): Pattern =
+      |def parse(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): IRPattern =
       |  time("parse"):
-      |    Parser.parse(source, flags) match
-      |      case Right(pattern) => pattern
-      |      case Left(ex)       => throw new InvalidRegExpException(ex.getMessage)
+      |    val flagSet = FlagSet.parse(flags, dialect)
+      |    val node = Parser.parse(source, flagSet, dialect)
+      |    IRBuilder.build(node, flagSet, dialect, Parser.determineUnitMode(source, flagSet, dialect))
       |
-      |def compile(source: String, flags: String): Program =
-      |  val pattern = parse(source, flags)
-      |  time("compile")(ProgramBuilder.build(pattern).get)
+      |def compile(source: String, flags: String, dialect: Dialect = Dialect.JavaScript): Program =
+      |  val ir = parse(source, flags, dialect)
+      |  time("compile")(ProgramBuilder.build(ir).get)
       |
       |def run(
       |    source: String,
       |    flags: String,
       |    input: String,
-      |    pos: Int = 0,
       |    limit: Int = Int.MaxValue,
       |    usesAcceleration: Boolean = true,
       |    needsLoopAnalysis: Boolean = false,
       |    needsFailedPoints: Boolean = false,
       |    needsCoverage: Boolean = false,
-      |    needsHeatmap: Boolean = false
+      |    needsHeatmap: Boolean = false,
+      |    dialect: Dialect = Dialect.JavaScript
       |)(using ctx: Context): Interpreter.Result =
-      |  val pattern = parse(source, flags)
-      |  val flagSet = pattern.flagSet
-      |  val program = time("compile")(ProgramBuilder.build(pattern).get)
-      |  val uinput0 = UString(input)
-      |  val uinput = if flagSet.ignoreCase then UString.canonicalize(uinput0, flagSet.unicode) else uinput0
+      |  val ir = parse(source, flags, dialect)
+      |  val program = time("compile")(ProgramBuilder.build(ir).get)
       |  val opts = Interpreter.Options(
       |    limit = limit,
       |    usesAcceleration = usesAcceleration,
@@ -125,90 +140,30 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       |    needsCoverage = needsCoverage,
       |    needsHeatmap = needsHeatmap
       |  )
-      |  time("run")(Interpreter.run(program, uinput, pos, opts))
+      |  time("run")(Interpreter.run(program, ir.mode.decode(input), opts))
       |
       |def seed(
       |    source: String,
       |    flags: String,
       |    maxSimpleRepeatSize: Int = Parameters.DefaultMaxSimpleRepeatCount,
       |    maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
-      |    limit: Int = Parameters.DefaultIncubationLimit
+      |    limit: Int = Parameters.DefaultIncubationLimit,
+      |    dialect: Dialect = Dialect.JavaScript
       |)(using ctx: Context): Set[FString] =
-      |  val pattern = parse(source, flags)
-      |  time("seed")(StaticSeeder.seed(pattern, maxSimpleRepeatSize, maxInitialGenerationSize, limit))
+      |  val ir = parse(source, flags, dialect)
+      |  time("seed")(StaticSeeder.seed(ir, maxSimpleRepeatSize, maxInitialGenerationSize, limit))
       |
-      |def validate(
-      |  source: String,
-      |  flags: String,
-      |  pattern: AttackPattern,
-      |  timeout: Duration = Duration(1, SECONDS)
-      |)(using ctx: Context): RecallResult =
-      |  time("validate")(RecallValidator.validate(source, flags, pattern, timeout)(NodeExecutor.exec))
-      |
-      |def check(
+      |def verify(
       |    source: String,
       |    flags: String,
-      |    accelerationMode: AccelerationMode = Parameters.DefaultAccelerationMode,
-      |    attackLimit: Int = Parameters.DefaultAttackLimit,
-      |    attackTimeout: Duration = Parameters.DefaultAttackTimeout,
-      |    checker: Checker = Parameters.DefaultChecker,
-      |    crossoverSize: Int = Parameters.DefaultCrossoverSize,
-      |    heatRatio: Double = Parameters.DefaultHeatRatio,
-      |    incubationLimit: Int = Parameters.DefaultIncubationLimit,
-      |    incubationTimeout: Duration = Parameters.DefaultIncubationTimeout,
-      |    logger: Option[Context.Logger] = Parameters.DefaultLogger,
-      |    maxAttackStringSize: Int = Parameters.DefaultMaxAttackStringSize,
-      |    maxDegree: Int = Parameters.DefaultMaxDegree,
-      |    maxGeneStringSize: Int = Parameters.DefaultMaxGeneStringSize,
-      |    maxGenerationSize: Int = Parameters.DefaultMaxGenerationSize,
-      |    maxInitialGenerationSize: Int = Parameters.DefaultMaxInitialGenerationSize,
-      |    maxIteration: Int = Parameters.DefaultMaxIteration,
-      |    maxNFASize: Int = Parameters.DefaultMaxNFASize,
-      |    maxPatternSize: Int = Parameters.DefaultMaxPatternSize,
-      |    maxRecallStringSize: Int = Parameters.DefaultMaxRecallStringSize,
-      |    maxRepeatCount: Int = Parameters.DefaultMaxRepeatCount,
-      |    maxSimpleRepeatCount: Int = Parameters.DefaultMaxSimpleRepeatCount,
-      |    mutationSize: Int = Parameters.DefaultMutationSize,
-      |    randomSeed: Long = Parameters.DefaultRandomSeed,
-      |    recallLimit: Int = Parameters.DefaultRecallLimit,
-      |    recallTimeout: Duration = Parameters.DefaultRecallTimeout,
-      |    seeder: Seeder = Parameters.DefaultSeeder,
-      |    seedingLimit: Int = Parameters.DefaultSeedingLimit,
-      |    seedingTimeout: Duration = Parameters.DefaultSeedingTimeout,
-      |    timeout: Duration = Parameters.DefaultTimeout,
-      |): Diagnostics =
-      |  val params = Parameters(
-      |    accelerationMode,
-      |    attackLimit,
-      |    attackTimeout,
-      |    checker,
-      |    crossoverSize,
-      |    heatRatio,
-      |    incubationLimit,
-      |    incubationTimeout,
-      |    logger,
-      |    maxAttackStringSize,
-      |    maxDegree,
-      |    maxGeneStringSize,
-      |    maxGenerationSize,
-      |    maxInitialGenerationSize,
-      |    maxIteration,
-      |    maxNFASize,
-      |    maxPatternSize,
-      |    maxRecallStringSize,
-      |    maxRepeatCount,
-      |    maxSimpleRepeatCount,
-      |    mutationSize,
-      |    randomSeed,
-      |    recallLimit,
-      |    recallTimeout,
-      |    seeder,
-      |    seedingLimit,
-      |    seedingTimeout,
-      |    timeout,
-      |  )
-      |  time("check")(ReDoS.check(source, flags, params))
-      |""".stripMargin,
+      |    attack: AttackPattern,
+      |    timeout: Duration = Duration(1, SECONDS),
+      |    dialect: Dialect = Dialect.JavaScript
+      |)(using ctx: Context): Option[RuntimeAttack] =
+      |  val ir = parse(source, flags, dialect)
+      |  time("verify")(RuntimeAttackVerifier.verify(source, flags, dialect, ir.mode, attack, timeout, sys.env))
+      |
+      |""".stripMargin + ParametersGen.consoleCheck((ThisBuild / baseDirectory).value),
     // Settings for test:
     libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -218,7 +173,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
-  .dependsOn(common, exec, unicode, parse)
+  .dependsOn(common, exec, resyntaxCharset, resyntax)
 
 lazy val coreJVM = core.jvm
 lazy val coreJS = core.js
@@ -227,6 +182,7 @@ lazy val common = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/recheck-common"))
   .settings(
     name := "recheck-common",
+    parametersGenerator(ParametersGen.Target.Parameters),
     console / initialCommands := """
       |import codes.quine.labs.recheck.common.*
       |""".stripMargin,
@@ -241,6 +197,7 @@ lazy val common = crossProject(JVMPlatform, JSPlatform)
     libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
       .cross(CrossVersion.for3Use2_13)
   )
+  .dependsOn(resyntax)
 
 lazy val commonJVM = common.jvm
 lazy val commonJS = common.js
@@ -250,7 +207,7 @@ lazy val exec = crossProject(JVMPlatform, JSPlatform)
   .settings(
     name := "recheck-exec",
     console / initialCommands := """
-      |import codes.quine.labs.recheck.exec._
+      |import codes.quine.labs.recheck.exec.*
       |""".stripMargin,
     // Settings for test:
     libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
@@ -266,35 +223,45 @@ lazy val exec = crossProject(JVMPlatform, JSPlatform)
 lazy val execJVM = exec.jvm
 lazy val execJS = exec.js
 
-lazy val unicode = crossProject(JVMPlatform, JSPlatform)
-  .in(file("modules/recheck-unicode"))
+lazy val resyntax = crossProject(JVMPlatform, JSPlatform)
+  .in(file("modules/resyntax"))
+  .dependsOn(resyntaxCharset)
   .settings(
-    name := "recheck-unicode",
+    name := "resyntax",
     console / initialCommands := """
-      |import codes.quine.labs.recheck.unicode.*
+      |import codes.quine.labs.resyntax.*
+      |import codes.quine.labs.resyntax.ast.*
+      |import codes.quine.labs.resyntax.dialect.*
+      |import codes.quine.labs.resyntax.ir.*
+      |import codes.quine.labs.resyntax.ir.build.*
+      |import codes.quine.labs.resyntax.parser.*
+      |""".stripMargin,
+    // Settings for test:
+    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
+    testFrameworks += new TestFramework("munit.Framework")
+  )
+  .jsSettings(
+    coverageEnabled := false,
+    libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
+      .cross(CrossVersion.for3Use2_13)
+  )
+
+lazy val resyntaxJVM = resyntax.jvm
+lazy val resyntaxJS = resyntax.js
+
+lazy val resyntaxCharset = crossProject(JVMPlatform, JSPlatform)
+  .in(file("modules/resyntax-charset"))
+  .settings(
+    name := "resyntax-charset",
+    console / initialCommands := """
+      |import codes.quine.labs.resyntax.charset.*
       |""".stripMargin,
     coverageExcludedFiles := ".*[/\\\\]src_managed[/\\\\].*",
     // Generators:
-    {
-      val generateUnicodeData = taskKey[Seq[File]]("Generate Unicode data")
-      Seq(
-        Compile / sourceGenerators += generateUnicodeData.taskValue,
-        generateUnicodeData := Def.uncached {
-          val gens = Map[String, UnicodeDataGen](
-            "CaseMapDataGen.scala" -> CaseMapDataGen,
-            "PropertyDataGen.scala" -> PropertyDataGen
-          )
-          val pkg = "codes.quine.labs.recheck.unicode"
-          val dir = (Compile / sourceManaged).value / "codes" / "quine" / "labs" / "recheck" / "unicode"
-          val projectDir = (ThisBuild / baseDirectory).value / "project"
-          for ((fileName, gen) <- gens) {
-            val output = gen.file(dir)
-            if (!output.exists() || (projectDir / fileName).lastModified() > output.lastModified()) gen.gen(pkg, dir)
-          }
-          gens.values.map(_.file(dir)).toSeq
-        }
-      )
-    },
+    Compile / sourceGenerators += generateUnicodeData.taskValue,
+    generateUnicodeData := Def.uncached(
+      UnicodeDataGen.generate((ThisBuild / baseDirectory).value / "project", (Compile / sourceManaged).value)
+    ),
     // Settings for test:
     libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
     testFrameworks += new TestFramework("munit.Framework")
@@ -305,36 +272,14 @@ lazy val unicode = crossProject(JVMPlatform, JSPlatform)
       .cross(CrossVersion.for3Use2_13)
   )
 
-lazy val unicodeJVM = unicode.jvm
-lazy val unicodeJS = unicode.js
-
-lazy val parse = crossProject(JVMPlatform, JSPlatform)
-  .in(file("modules/recheck-parse"))
-  .settings(
-    name := "recheck-parse",
-    console / initialCommands := """
-      |import codes.quine.labs.recheck.regexp.*
-      |""".stripMargin,
-    // Dependencies:
-    libraryDependencies += "com.lihaoyi" %% "fastparse" % "3.1.1",
-    // Settings for test:
-    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
-    testFrameworks += new TestFramework("munit.Framework")
-  )
-  .jsSettings(
-    coverageEnabled := false,
-    libraryDependencies += ("org.scala-js" %% "scalajs-java-securerandom" % "1.0.0" % Test)
-      .cross(CrossVersion.for3Use2_13)
-  )
-  .dependsOn(unicode)
-
-lazy val parseJVM = parse.jvm
-lazy val parseJS = parse.js
+lazy val resyntaxCharsetJVM = resyntaxCharset.jvm
+lazy val resyntaxCharsetJS = resyntaxCharset.js
 
 lazy val codec = crossProject(JVMPlatform, JSPlatform)
   .in(file("modules/recheck-codec"))
   .settings(
     name := "recheck-codec",
+    parametersGenerator(ParametersGen.Target.Codec),
     console / initialCommands := """
       |import io.circe.*
       |import io.circe.syntax.*
@@ -375,8 +320,8 @@ lazy val js = project
     testFrameworks += new TestFramework("munit.Framework"),
     // ScalaJS config:
     coverageEnabled := false,
-    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
-    Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) },
+    scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.ESModule)),
+    Test / scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.CommonJSModule)),
     // Output `recheck.js` to a path independent of the Scala version.
     Compile / fullLinkJS / scalaJSLinkerOutputDirectory := (ThisBuild / baseDirectory).value / "target" / "recheck-js-opt"
   )
@@ -387,6 +332,7 @@ lazy val cli = project
   .enablePlugins(NativeImagePlugin)
   .settings(
     name := "recheck-cli",
+    parametersGenerator(ParametersGen.Target.CLI),
     NativeImage / name := "recheck",
     publish / skip := true,
     Compile / mainClass := Some("codes.quine.labs.recheck.cli.Main"),
@@ -401,11 +347,11 @@ lazy val cli = project
     // `scala.runtime.LazyVals` uses `sun.misc.Unsafe`, and JDK 24+ warns on its first use (JEP 471).
     nativeImageOptions += "-Dsun.misc.unsafe.memory.access=allow",
     // The minimum macOS version of the binary is the build machine's version by default.
-    nativeImageOptions ++= {
-      if (scala.util.Properties.isMac)
+    nativeImageOptions ++= (
+      if scala.util.Properties.isMac then
         Seq("-H:+UnlockExperimentalVMOptions", "-H:NativeLinkerOption=-mmacosx-version-min=15.0")
       else Seq.empty
-    },
+    ),
     console / initialCommands := """
       |import io.circe.*
       |import io.circe.parser.*

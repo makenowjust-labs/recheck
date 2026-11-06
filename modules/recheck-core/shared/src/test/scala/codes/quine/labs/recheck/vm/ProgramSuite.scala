@@ -5,6 +5,7 @@ import scala.language.implicitConversions
 import codes.quine.labs.recheck.vm.Inst.ReadKind
 
 class ProgramSuite extends munit.FunSuite:
+
   test("Program#toString"):
     val block = Block(Seq(Inst.Read(ReadKind.Char('a'), None)), Inst.Ok)
     val meta = Program.Meta(false, false, false, 0, 0, 0, Vector(Set.empty))
@@ -12,7 +13,7 @@ class ProgramSuite extends munit.FunSuite:
     assertEquals(
       program.toString,
       """|#x@0:
-         |    read char 'a'
+         |    read char 0x61
          |    ok
          |
          |""".stripMargin
