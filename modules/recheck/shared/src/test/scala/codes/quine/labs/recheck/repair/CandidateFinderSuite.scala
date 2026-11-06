@@ -9,14 +9,29 @@ class CandidateFinderSuite extends munit.FunSuite:
 
   given ctx: Context = Context()
 
-  /** Returns the candidates around every atom of the source, keeping all the captures unless `kept` is given. */
-  def find(source: String, dialect: Dialect = Dialect.JavaScript, kept: Option[Set[Int]] = None): Seq[Candidate] =
-    val pattern = Repair.Pattern.parse(source, "", dialect)
-    pattern.candidates(Set(SourceLocation(0, source.length)), kept.getOrElse((0 to pattern.ir.captureCount).toSet))
+  /** Returns the sources of the candidates around every atom of the source with the removed captures and whether each
+    * is a fallback, keeping all the captures unless `kept` is given.
+    *
+    * It checks that each source reads back as the edited tree, which is in the shape that the parser makes.
+    */
+  def find(
+      source: String,
+      dialect: Dialect = Dialect.JavaScript,
+      flags: String = "",
+      kept: Option[Set[Int]] = None
+  ): Seq[(String, Seq[Int], Boolean)] =
+    val pattern = Repair.Pattern.parse(source, flags, dialect)
+    val kept1 = kept.getOrElse((0 to pattern.ir.captureCount).toSet)
+    pattern
+      .candidates(Set(SourceLocation(0, source.length)), kept1)
+      .map: candidate =>
+        val edited = pattern.print(candidate.node)
+        assert(Repair.Pattern.parse(edited, flags, dialect).node.equalsWithoutLoc(candidate.node), edited)
+        (edited, candidate.removedCaptures, candidate.isFallback)
 
-  /** Returns the sources that the candidates make. */
-  def edited(source: String, dialect: Dialect = Dialect.JavaScript): Seq[String] =
-    find(source, dialect).map(_.edit.applyTo(source))
+  /** Returns the sources of the candidates. */
+  def edited(source: String, dialect: Dialect = Dialect.JavaScript, flags: String = ""): Seq[String] =
+    find(source, dialect, flags).map(_._1)
 
   test("CandidateFinder#find: possessive quantifiers and atomic groups"):
     assertEquals(edited("a*b", Dialect.Java), Seq("a*+b", "a?b", "ab", "(?<!a)a*b"))
@@ -25,7 +40,7 @@ class CandidateFinderSuite extends munit.FunSuite:
     assertEquals(edited("a{2,}b", Dialect.Ruby()).head, "(?>a{2,})b")
     assertEquals(edited("a*b", Dialect.DotNet).head, "(?>a*)b")
     // JavaScript has neither, so a negative look-ahead of the atom comes as a fallback.
-    assertEquals(find("a*b").head, Candidate(Edit(2, 2, "(?!a)"), isFallback = true))
+    assertEquals(find("a*b").head, ("a*(?!a)b", Seq.empty, true))
     assertEquals(edited("a*?b", Dialect.Java), Seq("a??b", "ab"))
     assertEquals(edited("a++b", Dialect.Java), Seq.empty)
 
@@ -38,6 +53,7 @@ class CandidateFinderSuite extends munit.FunSuite:
 
   test("CandidateFinder#find: alternatives"):
     assertEquals(edited("(?:a|a)"), Seq("(?:a)"))
+    assertEquals(edited("(?:a|b|a)"), Seq("(?:a|b)"))
     assertEquals(edited("(?:[ab]|[bc])"), Seq("(?:[ab]|c)"))
     assertEquals(edited("(?:a|b)"), Seq.empty)
     // Ruby's `ß` with `i` reads `ss` too, so its location has several sets and gives none, and `s` stays.
@@ -68,7 +84,7 @@ class CandidateFinderSuite extends munit.FunSuite:
     // Unrolling removes a capture not kept.
     assert(
       clue(find("([a-z]+\\s?)*", kept = Some(Set(0))))
-        .contains(Candidate(Edit(0, 12, "(?:[a-z]+(?:\\s[a-z]+)*\\s?)?"), Seq(1)))
+        .contains(("(?:[a-z]+(?:\\s[a-z]+)*\\s?)?", Seq(1), false))
     )
     assert(!edited("([a-z]+\\s?)*").exists(_.startsWith("(?:")))
 
@@ -76,3 +92,16 @@ class CandidateFinderSuite extends munit.FunSuite:
     assert(clue(edited("\\s*$")).contains("(?<!\\s)\\s*$"))
     assert(clue(edited("(?<n>\\s*)$")).contains("(?<!\\s)(?<n>\\s*)$"))
     assert(!edited("^\\s*$").exists(_.contains("(?<!")))
+
+  test("CandidateFinder#find: written forms and quotes"):
+    // The nodes keep their written forms, including a repetition whose body is edited.
+    assertEquals(edited("\\x61{02}(?:a|a)"), Seq("\\x61{02}(?:a)"))
+    assertEquals(edited("(?:a|a){02}"), Seq("(?:a){02}"))
+    // A quote stays as it is.
+    assertEquals(edited("\\Q.\\E(?:a|a)", Dialect.Java), Seq("\\Q.\\E(?:a)"))
+
+  test("CandidateFinder#find: blanks of the extended mode"):
+    // The items of a sequence are adjacent over the blanks, which stay.
+    assert(clue(edited("a* # x\n [ab]*", Dialect.Java, "x")).containsSlice(Seq(" # x\n [ab]*", "a* # x\n (?:b[ab]*)?")))
+    assertEquals(edited("(?: a | a )", Dialect.Java, "x"), Seq("(?: a )"))
+    assert(clue(edited(" (?: \\w+ \\s? )* ", Dialect.Java, "x")).contains(" (?:\\w+(?:\\s\\w+)*\\s?)? "))

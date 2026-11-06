@@ -18,6 +18,7 @@ import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.ir.IRPattern
 import codes.quine.labs.resyntax.parser.FeatureSet
 import codes.quine.labs.resyntax.parser.SourcePrescan
+import codes.quine.labs.resyntax.printer.Printer
 
 /** Repair searches for a safe pattern that extracts the same as a vulnerable one. */
 private[recheck] object Repair:
@@ -76,7 +77,7 @@ private[recheck] object Repair:
       try Some(Pattern.parse(source, original.flags, original.dialect))
       catch
         case _: UnsupportedException => None
-        // An edit makes a valid pattern, though the parser may not support it.
+        // An edited tree is printed as a valid pattern, though the parser may not support it.
         // $COVERAGE-OFF$
         case ex: InvalidRegExpException =>
           throw new UnexpectedException(s"an edit makes an invalid pattern /$source/: ${ex.getMessage}")
@@ -90,15 +91,14 @@ private[recheck] object Repair:
           .candidates(score.spots, indices.toSet)
           .flatMap: candidate =>
             for
-              next <- parseEdited(candidate.edit.applyTo(current.source))
+              next <- parseEdited(current.print(candidate.node))
               nextScore <- Score.of(next.ir, params)
               if nextScore > score
             yield
               val nextIndices = indices.map(i => i - candidate.removedCaptures.count(_ < i))
               (next, nextIndices, nextScore, candidate)
-          .sortBy: (_, _, nextScore, candidate) =>
-            val edit = candidate.edit
-            (-nextScore.rank, nextScore.count, candidate.isFallback, edit.text.length - (edit.end - edit.start))
+          .sortBy: (next, _, nextScore, candidate) =>
+            (-nextScore.rank, nextScore.count, candidate.isFallback, next.source.length - current.source.length)
         val compared = LazyList
           .from(improved)
           .map((next, nextIndices, nextScore, _) =>
@@ -140,7 +140,10 @@ private[recheck] object Repair:
     /** Lists the candidates around the spots, which keep the captures of `kept`. */
     def candidates(spots: Set[SourceLocation], kept: Set[Int]): Seq[Candidate] =
       val features = FeatureSet.from(SourcePrescan.from(source), dialect, flagSet, ir.mode)
-      new CandidateFinder(source, node, ir, features, kept).find(spots)
+      new CandidateFinder(node, ir, features, kept).find(spots)
+
+    /** Prints an edited tree of this pattern as a source with the same flags. */
+    def print(edited: Node): String = Printer.print(edited, flagSet, dialect, ir.mode)
 
   object Pattern:
 
