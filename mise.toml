@@ -2,7 +2,7 @@
 java = "temurin-27.0.1"
 sbt = "2.0.12"
 node = "26.13.0"
-pnpm = "12.16.1"
+pnpm = "12.18.0"
 python = "3.15.2"
 ruby = "4.0.9"
 dotnet = "10.0.403"
