@@ -26,10 +26,10 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
   check(" ", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Sequence())
   check("# foo", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Sequence())
   check("# \\\nfoo", "x", Python())(Sequence())
-  // Checked with Python 3.15.0.
+  // Checked with Python 3.15.2.
   error("#\\", "x", Python())("Invalid backslash escape at 1")
   // The whitespace and the comment ends are checked with .NET 10.0.14, Java 27.0.1, PHP 8.5.12 with PCRE2 10.49,
-  // Perl 5.44.0, Python 3.15.0 and Ruby 4.0.7.
+  // Perl 5.44.0, Python 3.15.2 and Ruby 4.0.9.
   check("a\t\n\f\r b", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Sequence(Literal('a'), Literal('b')))
   check("a\u000bb", "x", Java, PCRE, Perl(), Python())(Sequence(Literal('a'), Literal('b')))
   check("a\u000bb", "x", DotNet, Ruby())(Sequence(Literal('a'), Literal(0x0b), Literal('b')))

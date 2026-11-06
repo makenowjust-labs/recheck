@@ -50,7 +50,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
 
   val surrogateInputs: Seq[UString] = Seq(UString(0xd800, 0xdc00), UString(0xd800), UString(0xdc00, 0xd800))
 
-  // Checked with Node 26.11.1.
+  // Checked with Node 26.13.0.
   runtimeTest("JavaScript: surrogates", "node"):
     val style = AttackPatternStyle.JavaScript(unicode = false)
     for flags <- Seq("", "u") do
@@ -61,7 +61,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
         matches(surrogates, flags, Dialect.JavaScript, mode.decode(UnitMode.UTF16.encode(s))).toString
       assertEquals(cases(NodeExecutor, script), model, flags)
 
-  // Checked with Python 3.15.0.
+  // Checked with Python 3.15.2.
   runtimeTest("Python: surrogates", "python3"):
     val style = AttackPatternStyle.Python(bytes = false)
     val script =
@@ -73,7 +73,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     val model = surrogateInputs.map(s => matches(surrogates, "", Dialect.Python(), s).toString)
     assertEquals(cases(PythonExecutor, script), model)
 
-  // Checked with Ruby 4.0.7.
+  // Checked with Ruby 4.0.9.
   runtimeTest("Ruby: the character set options", "ruby"):
     // The options `a`, `d` and `u` are the inline options, the last of which wins.
     val options = Seq("" -> "", "a" -> "(?a)", "d" -> "(?d)", "u" -> "(?u)", "ua" -> "(?u)(?a)", "au" -> "(?a)(?u)")
@@ -254,7 +254,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
   def literals(style: AttackPatternStyle, mode: UnitMode, strings: Seq[String]): String =
     strings.map(s => style.literal(mode.decode(s))).mkString(", ")
 
-  // Checked with Python 3.15.0.
+  // Checked with Python 3.15.2.
   runtimeTest("Python: the extended mode", "python3"):
     val style = AttackPatternStyle.Python(bytes = false)
     val runs = extendedCases.map: (source, subjects) =>
@@ -273,7 +273,7 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
           |""".stripMargin
     assertEquals(cases(PythonExecutor, script), extendedModel(extendedCases, "x", Dialect.Python(), "\\Z"))
 
-  // Checked with Ruby 4.0.7.
+  // Checked with Ruby 4.0.9.
   runtimeTest("Ruby: the extended mode", "ruby"):
     val style = AttackPatternStyle.Ruby(bytes = false)
     val runs = extendedCases.map: (source, subjects) =>
