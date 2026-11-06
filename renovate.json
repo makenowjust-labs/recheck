@@ -4,6 +4,23 @@
     "config:recommended"
   ],
   "automerge": true,
+  "packageRules": [
+    {
+      "description": "An update of a runtime that recheck checks against needs the checked versions in the tests and the docs updated too.",
+      "matchManagers": [
+        "mise"
+      ],
+      "matchDepNames": [
+        "java",
+        "node",
+        "python",
+        "ruby",
+        "dotnet",
+        "perl"
+      ],
+      "automerge": false
+    }
+  ],
   "customManagers": [
     {
       "customType": "regex",
