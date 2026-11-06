@@ -1,5 +1,5 @@
 name: mise
-description: Installs the tools of mise.toml, and the Node.js packages with the cached pnpm store.
+description: Installs the tools of mise, and the Node.js packages with the cached pnpm store.
 
 inputs:
   tools:
@@ -15,6 +15,15 @@ inputs:
 runs:
   using: composite
   steps:
+    # Restoring the builds of PHP and PCRE2 first keeps an update of another tool from building them again.
+    - if: inputs.tools == ''
+      name: Cache PHP and PCRE2
+      uses: actions/cache@v6
+      with:
+        path: |
+          ~/.local/share/mise/installs/http-pcre2
+          ~/.local/share/mise/installs/http-php
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ env.ImageOS }}-php-${{ hashFiles('.config/mise/conf.d/php.toml') }}
     - uses: jdx/mise-action@v5
       with:
         version: 2026.10.25
