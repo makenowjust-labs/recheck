@@ -387,3 +387,175 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
           |${runs.mkString("\n")}
           |""".stripMargin
     assertEquals(cases(PHPExecutor, script), extendedModel(all, "xu", Dialect.PCRE))
+
+  /** The cases of back-references in an open capture: a pattern, and the subjects. */
+  val openCaptureCases: Seq[(String, Seq[String])] = Seq(
+    "^(a|b\\1)+$" -> Seq("aba", "abab", "aab", "aabaa"),
+    "^(a\\1?)+$" -> Seq("aaa"),
+    "^(a|(b\\1))+$" -> Seq("abaa", "aabaa")
+  )
+
+  /** The cases of back-references in an open capture after backtracking in it, which Ruby does not restore. */
+  val openCaptureBacktrackCases: Seq[(String, Seq[String])] = Seq("^(a|ab\\1)*$" -> Seq("aba", "aaba", "aabaa"))
+
+  /** The cases of capture tests in an open capture. */
+  val openCaptureTestCases: Seq[(String, Seq[String])] = Seq("^(a(?(1)b|c))+$" -> Seq("acab", "acac"))
+
+  /** The cases of back-references in an open capture in a look-behind, which JavaScript and .NET match backward. */
+  val openCaptureLookBehindCases: Seq[(String, Seq[String])] = Seq("(?<=^(a|\\1b)+)$" -> Seq("aba", "abab"))
+
+  /** Returns recheck's spans of the match on each subject, as `0-3 1-3` (`-` for an unset capture), or `none`. */
+  def openCaptureModel(patterns: Seq[(String, Seq[String])], dialect: Dialect): Seq[String] =
+    for (source, subjects) <- patterns; subject <- subjects yield
+      val ir = ReDoS.parse(source, "", dialect)
+      val result = Interpreter.run(ProgramBuilder.build(ir), ir.mode.decode(subject), Interpreter.Options())
+      result.captures.fold("none"): captures =>
+        captures.grouped(2).map(c => if c(0) < 0 || c(1) < 0 then "-" else s"${c(0)}-${c(1)}").mkString(" ")
+
+  // Checked with Node 26.13.0.
+  runtimeTest("JavaScript: back-references in an open capture", "node"):
+    val style = AttackPatternStyle.JavaScript(unicode = false)
+    val all = openCaptureCases ++ openCaptureBacktrackCases ++ openCaptureLookBehindCases
+    val runs = all.map: (source, subjects) =>
+      s"run(${literals(style, UnitMode.UTF16, Seq(source))}, [${literals(style, UnitMode.UTF16, subjects)}]);"
+    val script =
+      s"""|function run(p, ss) {
+          |  for (const s of ss) {
+          |    const m = new RegExp(p, 'd').exec(s);
+          |    console.log('case:' + (m ? m.indices.map(x => x ? x.join('-') : '-').join(' ') : 'none'));
+          |  }
+          |}
+          |${runs.mkString("\n")}
+          |""".stripMargin
+    assertEquals(cases(NodeExecutor, script), openCaptureModel(all, Dialect.JavaScript))
+
+  // Checked with PHP 8.5.12 and PCRE2 10.49.
+  runtimeTest("PCRE: back-references in an open capture", "php"):
+    val style = AttackPatternStyle.PHP(bytes = false)
+    val all = openCaptureCases ++ openCaptureBacktrackCases ++ openCaptureTestCases
+    val runs = all.map: (source, subjects) =>
+      s"run(${literals(style, UnitMode.CodePoint, Seq(s"/$source/"))}, [${literals(style, UnitMode.CodePoint, subjects)}]);"
+    val script =
+      s"""|<?php
+          |function run($$p, $$ss) {
+          |  foreach ($$ss as $$s) {
+          |    if (!preg_match($$p, $$s, $$m, PREG_OFFSET_CAPTURE | PREG_UNMATCHED_AS_NULL)) { echo "case:none\\n"; continue; }
+          |    $$spans = array_map(fn($$c) => $$c[0] === null ? '-' : $$c[1] . '-' . ($$c[1] + strlen($$c[0])), $$m);
+          |    echo 'case:', implode(' ', $$spans), "\\n";
+          |  }
+          |}
+          |${runs.mkString("\n")}
+          |""".stripMargin
+    assertEquals(cases(PHPExecutor, script), openCaptureModel(all, Dialect.PCRE))
+
+  // Checked with Perl 5.44.0.
+  runtimeTest("Perl: back-references in an open capture", "perl"):
+    val style = AttackPatternStyle.Perl
+    val all = openCaptureCases ++ openCaptureBacktrackCases ++ openCaptureTestCases
+    val runs = all.map: (source, subjects) =>
+      s"run(${literals(style, UnitMode.CodePoint, source +: subjects)});"
+    val script =
+      s"""|sub run {
+          |  my ($$p, @ss) = @_;
+          |  for my $$s (@ss) {
+          |    if ($$s =~ /$$p/) { print 'case:' . join(' ', map { defined $$-[$$_] ? "$$-[$$_]-$$+[$$_]" : '-' } 0 .. $$#+) . "\\n" }
+          |    else { print "case:none\\n" }
+          |  }
+          |}
+          |${runs.mkString("\n")}
+          |""".stripMargin
+    assertEquals(cases(PerlExecutor, script), openCaptureModel(all, Dialect.Perl()))
+
+  // Checked with Java 27.0.1.
+  runtimeTest("Java: back-references in an open capture", "java"):
+    val style = AttackPatternStyle.Java
+    val all = openCaptureCases ++ openCaptureBacktrackCases
+    val runs = all.map: (source, subjects) =>
+      s"run(${literals(style, UnitMode.UTF16CodePoint, source +: subjects)});"
+    val program =
+      s"""|import java.util.regex.*;
+          |
+          |public class Main {
+          |    static void run(String p, String... ss) {
+          |        for (String s : ss) {
+          |            Matcher m = Pattern.compile(p).matcher(s);
+          |            if (!m.find()) {
+          |                System.out.println("case:none");
+          |                continue;
+          |            }
+          |            StringBuilder sb = new StringBuilder("case:");
+          |            for (int i = 0; i <= m.groupCount(); i++) {
+          |                sb.append(i == 0 ? "" : " ").append(m.start(i) < 0 ? "-" : m.start(i) + "-" + m.end(i));
+          |            }
+          |            System.out.println(sb);
+          |        }
+          |    }
+          |
+          |    public static void main(String[] args) {
+          |        ${runs.mkString("\n        ")}
+          |    }
+          |}
+          |""".stripMargin
+    assertEquals(cases(JavaExecutor(SourceFile("Main.java", program))), openCaptureModel(all, Dialect.Java))
+
+  // Checked with .NET 10.0.14.
+  runtimeTest(".NET: back-references in an open capture", "dotnet"):
+    val style = AttackPatternStyle.CSharp
+    val all = openCaptureCases ++ openCaptureBacktrackCases ++ openCaptureTestCases ++ openCaptureLookBehindCases
+    val runs = all.map: (source, subjects) =>
+      s"Run(${literals(style, UnitMode.UTF16, Seq(source))}, new[] { ${literals(style, UnitMode.UTF16, subjects)} });"
+    val program =
+      s"""|using System;
+          |using System.Text.RegularExpressions;
+          |
+          |${runs.mkString("\n")}
+          |
+          |static void Run(string p, string[] ss)
+          |{
+          |    foreach (var s in ss)
+          |    {
+          |        var m = new Regex(p).Match(s);
+          |        var spans = new string[m.Groups.Count];
+          |        for (var i = 0; i < spans.Length; i++)
+          |        {
+          |            var g = m.Groups[i];
+          |            spans[i] = g.Success ? g.Index + "-" + (g.Index + g.Length) : "-";
+          |        }
+          |        Console.WriteLine("case:" + (m.Success ? string.Join(" ", spans) : "none"));
+          |    }
+          |}
+          |""".stripMargin
+    assertEquals(cases(DotNetExecutor(SourceFile("Main.cs", program))), openCaptureModel(all, Dialect.DotNet))
+
+  // Checked with Ruby 4.0.9.
+  runtimeTest("Ruby: back-references in an open capture", "ruby"):
+    val style = AttackPatternStyle.Ruby(bytes = false)
+    val all = openCaptureCases ++ openCaptureTestCases
+    val runs = all.map: (source, subjects) =>
+      s"run(${literals(style, UnitMode.CodePoint, Seq(source))}, [${literals(style, UnitMode.CodePoint, subjects)}])"
+    val script =
+      s"""|def run(p, ss)
+          |  r = Regexp.new(p)
+          |  ss.each do |s|
+          |    m = r.match(s)
+          |    puts 'case:' + (m ? (0...m.size).map { |i| b, e = m.offset(i); b ? "#{b}-#{e}" : '-' }.join(' ') : 'none')
+          |  end
+          |end
+          |${runs.mkString("\n")}
+          |""".stripMargin
+    assertEquals(cases(RubyExecutor, script), openCaptureModel(all, Dialect.Ruby()))
+
+  // Checked with Python 3.15.2.
+  runtimeTest("Python: capture tests in an open capture", "python3"):
+    val style = AttackPatternStyle.Python(bytes = false)
+    val runs = openCaptureTestCases.map: (source, subjects) =>
+      s"run(${literals(style, UnitMode.CodePoint, Seq(source))}, [${literals(style, UnitMode.CodePoint, subjects)}])"
+    val script =
+      s"""|import re
+          |def run(p, ss):
+          |    for s in ss:
+          |        m = re.search(p, s)
+          |        print('case:' + ('none' if m is None else ' '.join('-' if b < 0 else f'{b}-{e}' for b, e in m.regs)))
+          |${runs.mkString("\n")}
+          |""".stripMargin
+    assertEquals(cases(PythonExecutor, script), openCaptureModel(openCaptureTestCases, Dialect.Python()))
