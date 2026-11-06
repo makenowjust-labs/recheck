@@ -130,6 +130,8 @@ final case class FeatureSet(
     allowsNonNameCaptureTest: Boolean,
     // .NET, Java, Perl, Ruby
     allowsZeroWidthAssertRepeat: Boolean,
+    // Python
+    allowsCurlyWithoutCount: Boolean,
     // Perl, Python
     rejectsConflictingCharsetInlineFlag: Boolean,
     // Perl
@@ -512,6 +514,7 @@ object FeatureSet:
       allowsNonNameKBackReference = isRuby,
       allowsNonNameCaptureTest = isRuby,
       allowsZeroWidthAssertRepeat = isDotNet || isJava || isPerl || isRuby,
+      allowsCurlyWithoutCount = isPython,
       rejectsConflictingCharsetInlineFlag = isPerl || isPython,
       limitsCharsetInlineFlagCount = isPerl,
       rejectsCharsetInlineFlagRemoval = isPerl || isPython || isRuby,

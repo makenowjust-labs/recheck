@@ -123,8 +123,15 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
   check("a{,3}+", "", Ruby())(Repeat(Repeat(Literal('a'), MaxBounded(3, Greedy)), Plus(Greedy)))
   check("a{", "", DotNet, JavaScript, PCRE, Perl(), Python(), Ruby())(Sequence(Literal('a'), Literal('{')))
   check("a{,3}", "", DotNet, JavaScript)(Sequence(Literal('a'), Literal('{'), Literal(','), Literal('3'), Literal('}')))
-  check("a{,}", "", DotNet, JavaScript, PCRE, Perl(), Python(), Ruby()):
+  check("a{,}", "", DotNet, JavaScript, PCRE, Perl(), Ruby()):
     Sequence(Literal('a'), Literal('{'), Literal(','), Literal('}'))
+  check("a{,}", "", Python())(Repeat(Literal('a'), Unbounded(0, Greedy)))
+  check("a{,}?", "", Python())(Repeat(Literal('a'), Unbounded(0, Lazy)))
+  check("a{,}+", "", Python())(Repeat(Literal('a'), Unbounded(0, Possessive)))
+  check("a{ ,}", "", Python())(Sequence(Literal('a'), Literal('{'), Literal(' '), Literal(','), Literal('}')))
+  error("{,}", "", Python())("Nothing to repeat at 3")
+  check("a {,}", "x", Python())(Repeat(Literal('a'), Unbounded(0, Greedy)))
+  check("a{, }", "x", Python())(Sequence(Literal('a'), Literal('{'), Literal(','), Literal('}')))
   check("a{,3x", "", PCRE, Perl(), Python(), Ruby()):
     Sequence(Literal('a'), Literal('{'), Literal(','), Literal('3'), Literal('x'))
   check("a{ 2 }", "", PCRE, Perl())(Repeat(Literal('a'), Exact(2, Greedy)))
