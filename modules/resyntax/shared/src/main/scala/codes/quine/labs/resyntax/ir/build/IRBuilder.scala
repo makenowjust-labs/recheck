@@ -93,6 +93,7 @@ object IRBuilder:
       ),
       IRBacktrackControlSemantics(featureSet.thenPassesAssertions, featureSet.acceptEndsAtomic),
       featureSet.anchored,
+      featureSet.longestMatch,
       mode,
       notEmpty(starts)
     )
@@ -319,21 +320,19 @@ object IRBuilder:
     if mode == UnitMode.Byte && last.unicode then
       throw new IRBuildingException("Cannot use UNICODE flag with a bytes pattern", SourceLocation.Invalid)
 
-  /** Returns an unsupported node for python-regex's `p` (POSIX) or `r` (REVERSE), which change the whole matching. */
+  /** Returns an unsupported node for python-regex's `r` (REVERSE), which changes the whole matching. */
   private def unsupportedGlobalFlag(node: Node, globalFlagSet: FlagSet, featureSet: IRFeatureSet): Option[IRNode] =
-    def isUnsupported(f: FlagSet): Boolean = f.preserve || f.nonDestructive
-
     def find(node: Node): Option[Node] = node.data match
-      case NodeData.Command(CommandKind.InlineFlag(diff)) if isUnsupported(diff.added) => Some(node)
-      case NodeData.Group(GroupKind.InlineFlag(diff), _) if isUnsupported(diff.added)  => Some(node)
+      case NodeData.Command(CommandKind.InlineFlag(diff)) if diff.added.nonDestructive => Some(node)
+      case NodeData.Group(GroupKind.InlineFlag(diff), _) if diff.added.nonDestructive  => Some(node)
       case _                                                                           =>
         NodeKey.children(node).iterator.flatMap(find).nextOption()
 
-    Option.when(featureSet.hasGlobalInlineFlag && isUnsupported(globalFlagSet)):
+    Option.when(featureSet.hasGlobalInlineFlag && globalFlagSet.nonDestructive):
       find(node) match
         case Some(flag) => IRNode(IRNodeData.Unsupported(flag.data), flag.loc)
         case None       =>
-          val flagSet = FlagSet(preserve = globalFlagSet.preserve, nonDestructive = globalFlagSet.nonDestructive)
+          val flagSet = FlagSet(nonDestructive = true)
           IRNode(IRNodeData.Unsupported(NodeData.Command(CommandKind.InlineFlag(FlagSetDiff(flagSet, None)))))
 
   /** Validates Python's flags with the global inline flags, which `re` validates together. */

@@ -334,6 +334,11 @@ class IRPatternSuite extends munit.FunSuite:
     "a.*$" -> (Seq(Unbounded(0, Greedy)), true)
   )
 
+  // A longest-match pattern keeps its tail.
+  check("IRPattern#dropUniversalTail", "sp", Dialect.PythonRegex())(tailDropped)(
+    "a*b.*" -> (Seq(Unbounded(0, Greedy), Unbounded(0, Greedy)), false)
+  )
+
   check("IRPattern#needsLineTerminatorDistinction", "m")(_.needsLineTerminatorDistinction)(
     ".|^" -> true,
     "^|." -> true,

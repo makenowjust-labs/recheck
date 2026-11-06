@@ -29,6 +29,13 @@ final case class IRPattern(
     backtrackControl: IRBacktrackControlSemantics,
     /** Whether a match starts only at the starting position (JavaScript `y`, PCRE `A`). */
     anchored: Boolean,
+    /** Whether a search takes the longest match at a start position, as POSIX does, instead of the first one
+      * (python-regex's `p`).
+      *
+      * The engine still tries every path at the position, and returns the first of the longest matches. A look-around
+      * and an atomic group still take the first match of their body.
+      */
+    longestMatch: Boolean,
     /** The unit of the input, which the character sets of the nodes consist of. */
     mode: UnitMode,
     /** Where an empty match is rejected (PCRE's `(*NOTEMPTY)` and `(*NOTEMPTY_ATSTART)`). */
@@ -80,6 +87,8 @@ final case class IRPattern(
 
   /** Returns the pattern without the repetition of any character at its end, and the end assertions after it (e.g.
     * `.*$` with the `s` flag).
+    *
+    * A longest-match pattern keeps its tail, since the matching tries every path of it.
     */
   def dropUniversalTail: IRPattern =
     def isEnd(node: IRNode): Boolean = node.data match
@@ -99,7 +108,7 @@ final case class IRPattern(
         Option.when(dropped.nonEmpty && dropped.forall(_.isDefined))(node.copy(data = Disjunction(dropped.flatten)))
       case _ => None
 
-    drop(node).fold(this)(node => copy(node = node))
+    if longestMatch then this else drop(node).fold(this)(node => copy(node = node))
 
   /** Returns the pattern where the quantifiers of repetitions are replaced from the largest count (the later first on a
     * tie), until the sum of the counts of the rest is below `maxCount`.

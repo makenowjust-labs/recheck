@@ -529,18 +529,20 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   check("(?a:(?u))", "", PythonRegex())(Empty)
   check("(?u:)", "", PythonRegex(Python.Type.Bytes))(Empty)
 
-  // python-regex's `p` (POSIX) and `r` (REVERSE) change the whole matching, and `w` (WORD) the boundaries and lines.
+  // python-regex's `r` (REVERSE) changes the whole matching, and `w` (WORD) the boundaries and lines.
   check("a(?r)", "", PythonRegex())(
     Unsupported(NodeData.Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(nonDestructive = true), None))))
   )
-  check("(?p:a)", "", PythonRegex())(
-    Unsupported(
-      NodeData.Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(preserve = true), None)), Node(NodeData.Literal('a')))
-    )
+  check("a", "r", PythonRegex())(
+    Unsupported(NodeData.Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(nonDestructive = true), None))))
   )
-  check("a", "p", PythonRegex())(
-    Unsupported(NodeData.Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(preserve = true), None))))
-  )
+  // python-regex's `p` (POSIX) takes the longest match in the whole pattern, even in a group.
+  check("(?p:a)", "", PythonRegex())(char('a'))
+  checkPattern("a", "p", PythonRegex())(pattern => assertEquals(pattern.longestMatch, true))
+  checkPattern("a(?p)", "", PythonRegex())(pattern => assertEquals(pattern.longestMatch, true))
+  checkPattern("(?:(?p:a))", "", PythonRegex())(pattern => assertEquals(pattern.longestMatch, true))
+  checkPattern("a", "", All*)(pattern => assertEquals(pattern.longestMatch, false))
+  checkPattern("a", "p", Perl())(pattern => assertEquals(pattern.longestMatch, false))
   check("(?be)a", "", PythonRegex())(Sequence(Empty, char('a')))
   check("(?w)\\b", "", PythonRegex())(
     Sequence(Empty, Unsupported(NodeData.Backslash(BackslashKind.Assert(AssertKind.Boundary(None)))))

@@ -195,6 +195,8 @@ final case class IRFeatureSet(
     validatesCharName: Boolean,
     // JavaScript (with `y`), PCRE (with `A`)
     anchored: Boolean,
+    // python-regex (with `p`)
+    longestMatch: Boolean,
     // PCRE (with `(*UCP)`)
     ucp: Boolean,
     // PCRE (with `(*CASELESS_RESTRICT)`)
@@ -656,6 +658,7 @@ object IRFeatureSet:
       dotAllMatchesCRLF = isICU,
       validatesCharName = isICU || isJava || isPython || isPythonRegex,
       anchored = isJavaScript && flagSet.sticky || isPCRE && flagSet.anchored,
+      longestMatch = isPythonRegex && flagSet.preserve,
       ucp = isPCRE && startOptions.contains("UCP"),
       caselessRestrict = isPCRE && startOptions.contains("CASELESS_RESTRICT"),
       turkishCasing = isPCRE && startOptions.contains("TURKISH_CASING"),
