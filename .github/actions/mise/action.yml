@@ -15,6 +15,11 @@ inputs:
 runs:
   using: composite
   steps:
+    - if: inputs.tools == ''
+      id: image
+      name: Locate the runner image
+      shell: bash
+      run: echo "os=$ImageOS" >> "$GITHUB_OUTPUT"
     # Restoring the builds of PHP and PCRE2 first keeps an update of another tool from building them again.
     - if: inputs.tools == ''
       name: Cache PHP and PCRE2
@@ -23,7 +28,7 @@ runs:
         path: |
           ~/.local/share/mise/installs/http-pcre2
           ~/.local/share/mise/installs/http-php
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ env.ImageOS }}-php-${{ hashFiles('.config/mise/conf.d/php.toml') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ steps.image.outputs.os }}-php-${{ hashFiles('.config/mise/conf.d/php.toml') }}
     - uses: jdx/mise-action@v5
       with:
         version: 2026.10.25
