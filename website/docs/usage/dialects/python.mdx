@@ -72,6 +72,8 @@ The matching unit is `code-point` for a `str` pattern (the default `type`), and 
 ## Approximations
 
 - `L` follows the C locale, where `0x80`–`0xFF` follow the ASCII rules, whatever locale the environment has.
+- A conditional on an open group (e.g. `(?(1)b|c)` in group 1) counts the group as unset when the end of its previous match is before the position where it opens again, and `recheck` does not reproduce it.
+  For example, `^(?:(a(?(1)b|c))x)+$` matches `"acxacx"` in Python 3.15, but `recheck` matches `"acxabx"` as the other engines do.
 
 ## Runtime-Attack Verification
 
