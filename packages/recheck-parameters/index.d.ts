@@ -14,6 +14,7 @@ export type ParametersFor<T extends Target> = Omit<
 /** Variant is an alternative of `oneOf` of a parameter: an enum of names, or an object of a name and its settings. */
 export type Variant = {
   type: "string" | "object";
+  title?: string;
   enum?: string[];
   properties?: Record<string, Setting>;
   required?: string[];

@@ -7,10 +7,12 @@ import styles from './Select.module.css';
 type Props = {
   name: string;
   values: string[];
+  /** The texts of the options by their values, which are the values themselves if absent. */
+  labels?: Record<string, string>;
   defaultValue: string;
 } & React.SelectHTMLAttributes<HTMLSelectElement>;
 
-const Select: React.FC<Props> = ({ name, values, defaultValue, className, ...props }) => {
+const Select: React.FC<Props> = ({ name, values, labels, defaultValue, className, ...props }) => {
   const { control } = useFormContext();
   const { field } = useController({
     control,
@@ -19,7 +21,7 @@ const Select: React.FC<Props> = ({ name, values, defaultValue, className, ...pro
   });
 
   const options = values.map(value => (
-    <option value={value} key={value}>{value}</option>
+    <option value={value} key={value}>{labels?.[value] ?? value}</option>
   ));
 
   return (

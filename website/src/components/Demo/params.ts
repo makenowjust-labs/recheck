@@ -136,6 +136,22 @@ export const params: Param[] = [...schemaParams, loggerParam]
 /** The default dialect, which is the only one of the builds without the `dialect` parameter. */
 export const DEFAULT_DIALECT = "javascript";
 
+/** The names of the dialects to show, by their values (e.g. `.NET` for `dotnet`). */
+export const DIALECT_TITLES: Record<string, string> = Object.fromEntries(
+  propertiesFor("playground")
+    .flatMap(([name, property]) =>
+      name === "dialect" ? (property.oneOf ?? []) : [],
+    )
+    .flatMap(({ title, properties }) => {
+      const name = properties?.["name"]?.const;
+      if (name === undefined) return [];
+      /* v8 ignore next -- Every variant of `dialect` in the schema has a title. */
+      if (title === undefined)
+        throw new Error(`The dialect ${name} has no title`);
+      return [[name, title]];
+    }),
+);
+
 export const paramsOf = (
   build: Build,
   dialect: string = DEFAULT_DIALECT,

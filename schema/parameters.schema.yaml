@@ -17,6 +17,7 @@
 #
 # Annotations of the variants of `dialect` with settings, and of their settings:
 #
+# - `title`: the name of the dialect in the Playground (e.g. `.NET` for `dotnet`).
 # - `x-scala-type`: the Scala type of the variant (e.g. `Dialect.Python`), or of the setting, which is `Boolean` or an enum
 #   whose companion has `of(name)` (e.g. `Dialect.Python.Type`).
 # - `x-cli-help`: the help of the CLI option of the setting, which is `--<dialect>-<setting>`.
@@ -106,26 +107,31 @@ properties:
       - type: string
         enum: ["javascript", "java", "dotnet", "pcre", "python", "ruby", "perl"]
       - type: object
+        title: "JavaScript"
         properties:
           name: { const: "javascript" }
         required: ["name"]
         additionalProperties: false
       - type: object
+        title: "Java"
         properties:
           name: { const: "java" }
         required: ["name"]
         additionalProperties: false
       - type: object
+        title: ".NET"
         properties:
           name: { const: "dotnet" }
         required: ["name"]
         additionalProperties: false
       - type: object
+        title: "PCRE"
         properties:
           name: { const: "pcre" }
         required: ["name"]
         additionalProperties: false
       - type: object
+        title: "Python"
         properties:
           name: { const: "python" }
           type:
@@ -138,6 +144,7 @@ properties:
         additionalProperties: false
         x-scala-type: "Dialect.Python"
       - type: object
+        title: "Ruby"
         properties:
           name: { const: "ruby" }
           encoding:
@@ -150,6 +157,7 @@ properties:
         additionalProperties: false
         x-scala-type: "Dialect.Ruby"
       - type: object
+        title: "Perl"
         properties:
           name: { const: "perl" }
           utf8:
