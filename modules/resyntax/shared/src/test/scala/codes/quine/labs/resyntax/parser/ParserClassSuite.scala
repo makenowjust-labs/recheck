@@ -102,6 +102,11 @@ class ParserClassSuite extends munit.FunSuite with ParserHelper:
   check("[a\\Q\\E-z]", "", Java, PCRE, Perl())(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
   check("[\\Q\\E]a]", "", Java, PCRE):
     Class(false, ClassUnion(ClassUnion(), ClassLiteral(']'), ClassLiteral('a')))
+  check("[\\Q\\E \\Q\\E]]", "x", Java):
+    Class(false, ClassUnion(ClassUnion(), ClassBlank(" "), ClassUnion(), ClassLiteral(']')))
+  check("[a\\Q\\E -z]", "x", Java)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  check("[a\\Q\\E b]", "x", Java):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassUnion(), ClassBlank(" "), ClassLiteral('b')))
   error("[\\Q\\E]", "", Java, PCRE)("Unclosed ']' at 6")
   // A pattern from a runtime string reads the commands as letters, which the regex engine passes through.
   checkPerlString("[\\Ua-z]", "")(
@@ -224,34 +229,46 @@ class ParserClassSuite extends munit.FunSuite with ParserHelper:
         ClassNest(false, ClassRange(ClassLiteral('a'), ClassLiteral('c')))
       )
     )
-  check("[a b]", "x", Java)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('b'))))
+  check("[a b]", "x", Java)(Class(false, ClassUnion(ClassLiteral('a'), ClassBlank(" "), ClassLiteral('b'))))
   check("[a b]", "x", DotNet, PCRE, Perl(), Python(), Ruby()):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral(' '), ClassLiteral('b')))
   check("[a - z]", "x", Java)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
-  check("[a#x\nb]", "x", Java)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('b'))))
-  check("[ ]]", "x", Java)(Class(false, ClassLiteral(']')))
+  check("[a#x\nb]", "x", Java)(Class(false, ClassUnion(ClassLiteral('a'), ClassBlank("#x\n"), ClassLiteral('b'))))
+  check("[ ]]", "x", Java)(Class(false, ClassUnion(ClassBlank(" "), ClassLiteral(']'))))
   error("[ ]", "x", Java)("Unclosed ']' at 3")
   error("[a- ]", "x", Java)("Out of order class range at 1")
   // Java reads `^` only right after `[`, and skips whitespace and comments in `&&` (checked with Java 27.0.1).
-  check("[ ^a]", "x", Java)(Class(false, ClassUnion(ClassLiteral('^'), ClassLiteral('a'))))
+  check("[ ^a]", "x", Java)(Class(false, ClassUnion(ClassBlank(" "), ClassLiteral('^'), ClassLiteral('a'))))
   check("[a& #c\n&b]", "x", Java)(Class(false, ClassIntersection(ClassLiteral('a'), ClassLiteral('b'))))
+  check("[a && b]", "x", Java):
+    Class(
+      false,
+      ClassIntersection(ClassUnion(ClassLiteral('a'), ClassBlank(" ")), ClassUnion(ClassBlank(" "), ClassLiteral('b')))
+    )
+  error("[ && ]", "x", Java)("Invalid class set operation at 1")
   // Java drops the `&` of `[a& b]` and rejects `[a- [b]]`, which recheck does not reproduce.
-  check("[a& b]", "x", Java)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('&'), ClassLiteral('b'))))
+  check("[a& b]", "x", Java):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('&'), ClassBlank(" "), ClassLiteral('b')))
   check("[a- [b]]", "x", Java):
-    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassNest(false, ClassLiteral('b'))))
+    Class(
+      false,
+      ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassBlank(" "), ClassNest(false, ClassLiteral('b')))
+    )
   // PCRE's and Perl's `xx` skip only U+0009 and U+0020 in a class, also before `^`, and a single `x` turns `xx` off
   // (checked with PHP 8.5.12 with PCRE2 10.49 and Perl 5.44.0).
-  check("[a \tb]", "xx", Perl())(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('b'))))
+  check("[a \tb]", "xx", Perl())(Class(false, ClassUnion(ClassLiteral('a'), ClassBlank(" \t"), ClassLiteral('b'))))
   check("[a\n#b]", "xx", Perl()):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('\n'), ClassLiteral('#'), ClassLiteral('b')))
-  check("[ ^ a - c ]", "xx", Perl())(Class(true, ClassRange(ClassLiteral('a'), ClassLiteral('c'))))
-  check("[a- ]", "xx", Perl())(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'))))
-  check("[ ]a]", "xx", Perl())(Class(false, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
+  // The blanks before `^` and in a range are not kept.
+  check("[ ^ a - c ]", "xx", Perl()):
+    Class(true, ClassUnion(ClassBlank(" "), ClassRange(ClassLiteral('a'), ClassLiteral('c')), ClassBlank(" ")))
+  check("[a- ]", "xx", Perl())(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassBlank(" "))))
+  check("[ ]a]", "xx", Perl())(Class(false, ClassUnion(ClassBlank(" "), ClassLiteral(']'), ClassLiteral('a'))))
   error("[ ]", "xx", Perl())("Unclosed ']' at 3")
   check("(?xx)[a b]", "", PCRE, Perl()):
     Sequence(
       Command(InlineFlag(FlagSetDiff(FlagSet(verbose = true, verboseMore = true), None))),
-      Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('b')))
+      Class(false, ClassUnion(ClassLiteral('a'), ClassBlank(" "), ClassLiteral('b')))
     )
   check("(?xx)(?x)[a b]", "", PCRE, Perl()):
     Sequence(

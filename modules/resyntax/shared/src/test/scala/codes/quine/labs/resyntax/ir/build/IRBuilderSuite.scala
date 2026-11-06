@@ -38,6 +38,14 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   check("(?:)(?:)", "", All*)(Sequence(Empty, Empty))
   check("ab", "", All*)(Sequence(char('a'), char('b')))
 
+  // Blank
+  check(" ", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Empty)
+  check(" a # b", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(char('a'))
+  check("a b", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Sequence(char('a'), char('b')))
+  check("[ a]", "x", Java)(char('a'))
+  check("[a b]", "x", Java)(Chars(CharSet.of('a', 'b')))
+  check("[a&& ]", "x", Java)(Chars(CharSet.empty))
+
   // Repeat
   check("(?:)*", "", All*)(Repeat(Empty, Unbounded(0, Greedy)))
   check("(?:)*?", "", All*)(Repeat(Empty, Unbounded(0, Lazy)))

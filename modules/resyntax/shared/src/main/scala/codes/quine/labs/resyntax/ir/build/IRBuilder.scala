@@ -5,6 +5,7 @@ import codes.quine.labs.resyntax.ast.AssertKind
 import codes.quine.labs.resyntax.ast.BackslashKind
 import codes.quine.labs.resyntax.ast.BacktrackControlKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
+import codes.quine.labs.resyntax.ast.ClassItem
 import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.ConditionalTest
@@ -32,7 +33,8 @@ object IRBuilder:
     *
     * The unit mode is the one that `Parser.determineUnitMode` determines for the source of the node.
     */
-  def build(node: Node, flagSet: FlagSet, dialect: Dialect, mode: UnitMode): IRPattern =
+  def build(parsed: Node, flagSet: FlagSet, dialect: Dialect, mode: UnitMode): IRPattern =
+    val node = removeBlanks(parsed)
     val starts = startOptions(node)
     val featureSet = IRFeatureSet.from(flagSet, dialect, starts)
     if featureSet.validatesCharsetFlags then
@@ -78,6 +80,51 @@ object IRBuilder:
       mode,
       notEmpty(starts)
     )
+
+  /** Returns the node without the blanks of the extended mode.
+    *
+    * A sequence or a class union left with one item becomes the item, and a blank alone becomes an empty one.
+    */
+  private def removeBlanks(node: Node): Node = node.data match
+    case NodeData.Sequence(nodes) =>
+      nodes.filterNot(_.data.isInstanceOf[NodeData.Blank]) match
+        case Seq(child) if nodes.size > 1 => removeBlanks(child)
+        case children                     => node.copy(data = NodeData.Sequence(children.map(removeBlanks)))
+    case NodeData.Blank(_)            => node.copy(data = NodeData.Sequence(Seq.empty))
+    case NodeData.Disjunction(nodes)  => node.copy(data = NodeData.Disjunction(nodes.map(removeBlanks)))
+    case NodeData.Repeat(child, q)    => node.copy(data = NodeData.Repeat(removeBlanks(child), q))
+    case NodeData.Group(kind, child)  => node.copy(data = NodeData.Group(kind, removeBlanks(child)))
+    case NodeData.Command(kind)       => node.copy(data = NodeData.Command(removeCommandBlanks(kind)))
+    case NodeData.Class(invert, item) => node.copy(data = NodeData.Class(invert, removeClassBlanks(item)))
+    case _                            => node
+
+  private def removeCommandBlanks(kind: CommandKind): CommandKind = kind match
+    case CommandKind.BranchReset(nodes)         => CommandKind.BranchReset(nodes.map(removeBlanks))
+    case CommandKind.Conditional(test, yes, no) =>
+      val removed = test match
+        case test: ConditionalTest.LookAround                 => test.copy(node = removeBlanks(test.node))
+        case ConditionalTest.CalloutLookAround(callout, test) =>
+          ConditionalTest.CalloutLookAround(callout, test.copy(node = removeBlanks(test.node)))
+        case test => test
+      CommandKind.Conditional(removed, removeBlanks(yes), no.map(removeBlanks))
+    case CommandKind.AbsenceExpression(absent, exp) =>
+      CommandKind.AbsenceExpression(removeBlanks(absent), removeBlanks(exp))
+    case CommandKind.AbsenceStopper(absent) => CommandKind.AbsenceStopper(removeBlanks(absent))
+    case kind                               => kind
+
+  private def removeClassBlanks(item: ClassItem): ClassItem = item.data match
+    case ClassItemData.ClassUnion(items) =>
+      items.filterNot(_.data.isInstanceOf[ClassItemData.ClassBlank]) match
+        case Seq(child) if items.size > 1 => removeClassBlanks(child)
+        case children => ClassItem(ClassItemData.ClassUnion(children.map(removeClassBlanks)), item.loc)
+    case ClassItemData.ClassBlank(_)                  => ClassItem(ClassItemData.ClassUnion(Seq.empty), item.loc)
+    case ClassItemData.ClassIntersection(left, right) =>
+      ClassItem(ClassItemData.ClassIntersection(removeClassBlanks(left), removeClassBlanks(right)), item.loc)
+    case ClassItemData.ClassDiff(left, right) =>
+      ClassItem(ClassItemData.ClassDiff(removeClassBlanks(left), removeClassBlanks(right)), item.loc)
+    case ClassItemData.ClassNest(invert, inner) =>
+      ClassItem(ClassItemData.ClassNest(invert, removeClassBlanks(inner)), item.loc)
+    case _ => item
 
   /** Checks whether Perl takes the full case folding of the character under the flags (e.g. `ß` as `ss`). */
   private def perlFoldsMulti(value: Int, flags: IRCharFlagSet, perlUTF8Pattern: Boolean): Boolean =
@@ -264,6 +311,10 @@ private[build] class IRBuilder(
       case NodeData.Dollar                                           => Left(buildDollar())
       case NodeData.Backslash(kind)                                  => Left(buildBackslash(node, kind))
       case NodeData.Dot | NodeData.Class(_, _) | NodeData.Literal(_) => Left(buildCharacter(node))
+      // `IRBuilder.build` removes the blanks.
+      // $COVERAGE-OFF$
+      case NodeData.Blank(_) => throw new IllegalStateException(s"Unexpected blank: $node")
+      // $COVERAGE-ON$
     result match
       case Left(data) => IRNode(data, node.loc)
       case Right(ir)  => ir

@@ -242,7 +242,7 @@ private[parser] final class Parser(
 
   private def parseSequenceItem(stack: mutable.Stack[Node]): Unit =
     pushRemovedComments(stack)
-    if context.skipsComment && skipComment() then return
+    if context.skipsComment && parseBlank(stack) then return
 
     (currentChar: @switch) match
       case '*' =>
@@ -322,9 +322,10 @@ private[parser] final class Parser(
     pushCurlyRepeat(stack, quantifier)
 
   private def pushCurlyRepeat(stack: mutable.Stack[Node], quantifier: Quantifier): Unit =
-    stack.headOption match
+    stack.find(!isComment(_)) match
       // Java ignores a curly quantifier following another quantifier or nothing: `a{2}{3}` matches `aa`.
       case Some(node @ Node(NodeData.Repeat(_, _), _)) if featureSet.ignoresCurlyAfterRepeat =>
+        while stack.headOption.exists(isComment) do stack.pop()
         stack.pop()
         stack.push(node.copy(loc = node.loc.copy(end = offset)))
       case None if featureSet.ignoresCurlyAfterRepeat =>
@@ -407,10 +408,17 @@ private[parser] final class Parser(
         parseCommentGroup(mutable.Stack.empty, start)
         continue = true
 
+  /** Parses the whitespace and comments of the extended mode as a blank node, and returns whether it found any. */
+  private def parseBlank(stack: mutable.Stack[Node]): Boolean =
+    val start = offset
+    val skipped = skipComment()
+    if skipped then stack.push(Node(NodeData.Blank(sliceSource(start, offset)), SourceLocation(start, offset)))
+    skipped
+
   private def isComment(node: Node): Boolean =
     node.data match
-      case NodeData.Command(_: CommandKind.Comment) => true
-      case _                                        => false
+      case NodeData.Command(_: CommandKind.Comment) | NodeData.Blank(_) => true
+      case _                                                            => false
 
   private def resetBracket(stack: mutable.Stack[Node], save: Int): Unit =
     if !featureSet.allowsBrokenCurly then fail("Incomplete quantifier", save)
@@ -1137,8 +1145,8 @@ private[parser] final class Parser(
     if diff.removed.isDefined then assert(featureSet.hasInlineFlagRemovalCommand, "Invalid group", start)
     if featureSet.requiresInlineFlagAtStart then
       val atStart = sequenceStart == 0 && stack.forall:
-        case Node(NodeData.Command(_: CommandKind.InlineFlag | _: CommandKind.Comment), _) => true
-        case _                                                                             => false
+        case Node(NodeData.Command(_: CommandKind.InlineFlag), _) => true
+        case node                                                 => isComment(node)
       assert(atStart, "Inline flag not at the start", start)
     pushCommand(stack, CommandKind.InlineFlag(diff), start)
     if featureSet.hasIncomprehensiveInlineFlag then parseOpaqueDisjunction(stack, diff, start)
@@ -2302,9 +2310,10 @@ private[parser] final class Parser(
           fail("Unsupported POSIX collating element", start)
 
       // PCRE and Perl skip the blanks of `xx` before `^` (e.g. `[ ^a]`), but Java reads `^` only right after `[`.
+      val save = offset
       if context.verboseMore then skipBlank()
       val invert = currentChar == '^'
-      if invert then next()
+      if invert then next() else reset(save)
 
       val item = nest(start)(parseClassItem(!featureSet.allowsClassEmpty))
       expect(']', "Unclosed ']'")
@@ -2369,6 +2378,13 @@ private[parser] final class Parser(
     if context.skipsComment && featureSet.skipsCommentInClass then skipComment()
     else if context.verboseMore then skipBlank()
 
+  /** Parses the text that [[skipClassComment]] skips as a blank item, if any. */
+  private def parseClassBlank(): Option[ClassItem] =
+    val start = offset
+    skipClassComment()
+    Option.when(offset > start):
+      ClassItem(ClassItemData.ClassBlank(sliceSource(start, offset)), SourceLocation(start, offset))
+
   /** Reads `&&`, between which Java skips whitespace and comments (e.g. `[a& &b]`). */
   private def startWithClassIntersection(): Boolean =
     if !featureSet.allowsClassIntersection || isEnd || currentChar != '&' then return false
@@ -2388,7 +2404,7 @@ private[parser] final class Parser(
     found
 
   private def isEmptyClassItem(item: ClassItem): Boolean =
-    item.data == ClassItemData.ClassUnion(Seq.empty)
+    item.data == ClassItemData.ClassUnion(Seq.empty) || isClassBlank(item)
 
   private def isClassSetOperand(item: ClassItem): Boolean =
     item.data match
@@ -2416,14 +2432,14 @@ private[parser] final class Parser(
     val start = offset
     val seq = mutable.ListBuffer.empty[ClassItem]
 
-    // A `]` after only empty quotes and `\E` is still the first character (e.g. `[\E]]` in PCRE).
+    // A `]` after only blanks, empty quotes and `\E` is still the first character (e.g. `[\E]]` in PCRE).
     var empty = true
 
-    skipClassComment()
+    seq.addAll(parseClassBlank())
     while (first && empty && !isEnd && currentChar == ']') || !isClassItemStop(start) do
       parseClassItemAtom(seq, start)
-      if empty then empty = seq.forall(isSkippableInClassRange)
-      skipClassComment()
+      if empty then empty = seq.forall(item => isClassBlank(item) || isSkippableInClassRange(item))
+      seq.addAll(parseClassBlank())
 
     val end = offset
     val items = seq.toSeq
@@ -2444,8 +2460,7 @@ private[parser] final class Parser(
       seq.addOne(item)
       return
 
-    skipClassComment()
-    val skippedBeforeHyphen = parseClassItemsSkippableInRange(unionStart)
+    val skippedBeforeHyphen = parseClassBlank().toSeq ++ parseClassItemsSkippableInRange(unionStart)
     if isClassItemStop(unionStart) || currentChar != '-' then
       seq.addOne(item).addAll(skippedBeforeHyphen)
       return
@@ -2486,8 +2501,8 @@ private[parser] final class Parser(
       case (begin: ClassItem.Value, end: ClassItem.Value) =>
         assert(begin.data.value <= end.data.value, "Out of order class range", begin.loc.start)
         seq.addOne(ClassItem(ClassItemData.ClassRange(begin, end), SourceLocation(begin.loc.start, end.loc.end)))
-        // The `\E` inside a range is kept after it, and the empty quotes are dropped.
-        seq.addAll((skippedBeforeHyphen ++ skippedAfterHyphen).filterNot(isEmptyClassQuote))
+        // The `\E` inside a range is kept after it, and the blanks and the empty quotes are dropped.
+        seq.addAll((skippedBeforeHyphen ++ skippedAfterHyphen).filterNot(i => isClassBlank(i) || isEmptyClassQuote(i)))
         seq.addAll(rest)
       case _ =>
         if !isValueClassItem(begin) then
@@ -2502,7 +2517,7 @@ private[parser] final class Parser(
           seq.addAll(rest)
         else reset(save)
 
-  /** Parses the empty quotes and `\E` between a range begin and its `-`, which do not break the range. */
+  /** Parses the empty quotes, `\E` and blanks between a range begin and its `-`, which do not break the range. */
   private def parseClassItemsSkippableInRange(unionStart: Int): Seq[ClassItem] =
     val items = mutable.ListBuffer.empty[ClassItem]
     if !featureSet.hasBackslashQuoteCommand then return items.toSeq
@@ -2514,11 +2529,14 @@ private[parser] final class Parser(
           reset(save)
           boundary.break()
         items.addOne(item)
-        skipClassComment()
+        items.addAll(parseClassBlank())
     items.toSeq
 
   private def isSkippableInClassRange(item: ClassItem): Boolean =
     isEmptyClassQuote(item) || item.data.isInstanceOf[ClassItemData.ClassCaseCommand]
+
+  private def isClassBlank(item: ClassItem): Boolean =
+    item.data.isInstanceOf[ClassItemData.ClassBlank]
 
   /** Returns the literals of a `\\Q...\\E` class item.
     *

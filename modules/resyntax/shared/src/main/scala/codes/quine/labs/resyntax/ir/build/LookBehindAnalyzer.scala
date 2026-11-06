@@ -159,6 +159,10 @@ private[build] final class LookBehindAnalyzer(
         case BackslashKind.EscapeCall(_, Reference.IndexedReference(0)) => Some(Width(0, Inf))
         case BackslashKind.EscapeCall(_, ref)                           => callWidth(node, ref, visiting)
         case _: BackslashKind.Assert | _: BackslashKind.CaseCommand     => Some(Width(0, 0))
+    // `IRBuilder.build` removes the blanks.
+    // $COVERAGE-OFF$
+    case NodeData.Blank(_) => throw new IllegalStateException(s"Unexpected blank: $node")
+    // $COVERAGE-ON$
 
   private def isAcceptOrFail(node: Node): Boolean = node.data match
     case NodeData.Command(CommandKind.BacktrackControl(Some(kind), _)) =>

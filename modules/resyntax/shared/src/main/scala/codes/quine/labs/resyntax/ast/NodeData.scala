@@ -34,7 +34,7 @@ object NodeData:
   /** Sequence is a sequence pattern node.
     *
     * {{{
-    * Sequence ::= Repeat*
+    * Sequence ::= (Repeat | Blank)*
     * }}}
     */
   final case class Sequence(nodes: Seq[Node]) extends NodeData
@@ -124,3 +124,6 @@ object NodeData:
     def apply(invert: Boolean, item: ClassItemData): Class = Class(invert, ClassItem(item))
 
   final case class Literal(value: Int) extends NodeData
+
+  /** Blank is the whitespace and comments that the extended mode skips, as they are written (e.g. ` # x\n`). */
+  final case class Blank(text: String) extends NodeData

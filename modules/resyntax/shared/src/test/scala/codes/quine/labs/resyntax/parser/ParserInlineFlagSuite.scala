@@ -160,6 +160,13 @@ class ParserInlineFlagSuite extends munit.FunSuite with ParserHelper:
       Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(multiline = true), None))),
       Literal('a')
     )
+  check("(?x) (?i)a", "", Python()):
+    Sequence(
+      Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None))),
+      Blank(" "),
+      Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None))),
+      Literal('a')
+    )
   error("a(?i)", "", Python())("Inline flag not at the start at 1")
   error("a|(?i)", "", Python())("Inline flag not at the start at 2")
   error("((?i))", "", Python())("Inline flag not at the start at 1")
@@ -179,7 +186,10 @@ class ParserInlineFlagSuite extends munit.FunSuite with ParserHelper:
   check(" (?x: a ) ", "", DotNet, Java, PCRE, Perl(), Python(), Ruby()):
     Sequence(
       Literal(' '),
-      Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)), Literal('a')),
+      Group(
+        GroupKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)),
+        Sequence(Blank(" "), Literal('a'), Blank(" "))
+      ),
       Literal(' ')
     )
   check("(?x-i)", "", DotNet, Java, PCRE, Perl(), Ruby()):

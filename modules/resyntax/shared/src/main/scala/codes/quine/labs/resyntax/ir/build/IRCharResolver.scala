@@ -614,6 +614,10 @@ private[build] final class IRCharResolver(
       case value: ClassItemData.ClassValue if readsByteEscapesAsUTF8 && isRubyByteValue(value) =>
         throw new IRBuildingException("Invalid multibyte escape", item.loc)
       case value: ClassItemData.ClassValue => ClassSet(closeChars(valueUnits(value, flags, item.loc), flags))
+      // `IRBuilder.build` removes the blanks.
+      // $COVERAGE-OFF$
+      case ClassItemData.ClassBlank(_) => throw new IllegalStateException(s"Unexpected blank: $item")
+      // $COVERAGE-ON$
 
   /** Evaluates a union, where Ruby's byte escapes make characters (e.g. `[\xC3\xA9]` is `[é]`). */
   private def classUnion(items: Seq[ClassItem], flags: IRCharFlagSet): ClassSet =

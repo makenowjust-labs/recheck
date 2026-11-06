@@ -194,7 +194,11 @@ class ParserCommandSuite extends munit.FunSuite with ParserHelper:
   error("\\(?#x)", "", Ruby())("Unmatched ')' at 5")
   error("(?x:#(?#\n))", "", Ruby())("Unmatched ')' at 10")
   check("(?x:#\n)(?#y)", "", Ruby()):
-    Sequence(Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)), Sequence()), Command(Comment("y")))
+    Sequence(
+      Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)), Blank("#\n")),
+      Command(Comment("y"))
+    )
+  check("a (?#x)b", "x", Ruby())(Sequence(Literal('a'), Blank(" "), Command(Comment("x")), Literal('b')))
   check("(?{x})", "", Perl())(Command(InlineCode("x")))
   check("(??{x})", "", Perl())(Command(EmbedCode("x")))
   check("(?C)", "", PCRE)(Command(Callout))

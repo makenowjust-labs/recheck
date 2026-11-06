@@ -57,6 +57,9 @@ object ClassItemData:
 
   final case class ClassBackslashClass(klass: EscapeClassKind) extends ClassItemData
 
+  /** ClassBlank is the text that the extended mode skips in a class (Java's `x`, and the `xx` of PCRE and Perl). */
+  final case class ClassBlank(text: String) extends ClassItemData
+
   sealed abstract class ClassValue extends ClassItemData:
 
     def value: Int

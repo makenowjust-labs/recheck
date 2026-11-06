@@ -23,46 +23,52 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
   error(")", "", All*)("Unmatched ')' at 0")
 
   // Comment
-  check(" ", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Sequence())
-  check("# foo", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Sequence())
-  check("# \\\nfoo", "x", Python())(Sequence())
+  check(" ", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Blank(" "))
+  check("# foo", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Blank("# foo"))
+  check("# \\\nfoo", "x", Python())(Blank("# \\\nfoo"))
   // Checked with Python 3.15.2.
   error("#\\", "x", Python())("Invalid backslash escape at 1")
   // The whitespace and the comment ends are checked with .NET 10.0.14, Java 27.0.1, PHP 8.5.12 with PCRE2 10.49,
   // Perl 5.44.0, Python 3.15.2 and Ruby 4.0.9.
-  check("a\t\n\f\r b", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Sequence(Literal('a'), Literal('b')))
-  check("a\u000bb", "x", Java, PCRE, Perl(), Python())(Sequence(Literal('a'), Literal('b')))
+  check("a\t\n\f\r b", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby()):
+    Sequence(Literal('a'), Blank("\t\n\f\r "), Literal('b'))
+  check("a\u000bb", "x", Java, PCRE, Perl(), Python())(Sequence(Literal('a'), Blank("\u000b"), Literal('b')))
   check("a\u000bb", "x", DotNet, Ruby())(Sequence(Literal('a'), Literal(0x0b), Literal('b')))
   check("\u00a0*", "x", DotNet, Java, Perl(), Python(), Ruby())(Repeat(Literal(0xa0), Star(Greedy)))
   check("\u00a0*", "xu", PCRE)(Repeat(Literal(0xa0), Star(Greedy)))
-  check("a\u0085\u200e\u200f\u2028\u2029b", "x", Perl())(Sequence(Literal('a'), Literal('b')))
-  check("a\u0085\u200e\u200f\u2028\u2029b", "xu", PCRE)(Sequence(Literal('a'), Literal('b')))
+  check("a\u0085\u200e\u200f\u2028\u2029b", "x", Perl()):
+    Sequence(Literal('a'), Blank("\u0085\u200e\u200f\u2028\u2029"), Literal('b'))
+  check("a\u0085\u200e\u200f\u2028\u2029b", "xu", PCRE):
+    Sequence(Literal('a'), Blank("\u0085\u200e\u200f\u2028\u2029"), Literal('b'))
   check("a\u2028b", "x", DotNet, Java, Python(), Ruby())(Sequence(Literal('a'), Literal(0x2028), Literal('b')))
   check("\u0085*", "x", DotNet, Java, Python(), Ruby())(Repeat(Literal(0x85), Star(Greedy)))
   error("\u0085*", "x", Perl())("Nothing to repeat at 1")
   error("\u0085*", "xu", PCRE)("Nothing to repeat at 1")
   // In a byte mode, U+0085 is the bytes C2 85, and the byte 85 is whitespace.
   check("\u0085*", "x", PCRE, Perl(utf8 = false))(Repeat(Literal(0xc2), Star(Greedy)))
-  check("#c\r)", "x", DotNet, PCRE, Perl(), Python(), Ruby())(Sequence())
+  check("#c\r)", "x", DotNet, PCRE, Perl(), Python(), Ruby())(Blank("#c\r)"))
   error("#c\r)", "x", Java)("Unmatched ')' at 3")
-  check("#c\r)", "xd", Java)(Sequence())
-  check("(?d)#c\r)", "x", Java)(Command(InlineFlag(FlagSetDiff(FlagSet(hasIndices = true), None))))
+  check("#c\r)", "xd", Java)(Blank("#c\r)"))
+  check("(?d)#c\r)", "x", Java):
+    Sequence(Command(InlineFlag(FlagSetDiff(FlagSet(hasIndices = true), None))), Blank("#c\r)"))
   error("#c\u0085)", "x", Java)("Unmatched ')' at 3")
-  check("#c\u2028*", "x", Java)(Repeat(Literal(0x2028), Star(Greedy)))
-  check("#c\u0000a", "x", Java)(Sequence(Literal(0x00), Literal('a')))
-  check("#c\u0000a", "x", DotNet, PCRE, Perl(), Python(), Ruby())(Sequence())
-  check("(*NUL)#c\u0000a", "x", PCRE)(Sequence(Command(StartOption("NUL", None)), Literal('a')))
-  check("(*CR)#c\n)", "xu", PCRE)(Command(StartOption("CR", None)))
+  check("#c\u2028*", "x", Java)(Sequence(Blank("#c"), Repeat(Literal(0x2028), Star(Greedy))))
+  check("#c\u0000a", "x", Java)(Sequence(Blank("#c"), Literal(0x00), Literal('a')))
+  check("#c\u0000a", "x", DotNet, PCRE, Perl(), Python(), Ruby())(Blank("#c\u0000a"))
+  check("(*NUL)#c\u0000a", "x", PCRE)(Sequence(Command(StartOption("NUL", None)), Blank("#c\u0000"), Literal('a')))
+  check("(*CR)#c\n)", "xu", PCRE)(Sequence(Command(StartOption("CR", None)), Blank("#c\n)")))
   error("(*CR)#c\r)", "xu", PCRE)("Unmatched ')' at 8")
-  check("(*CRLF)#c\r)", "x", PCRE)(Command(StartOption("CRLF", None)))
+  check("(*CRLF)#c\r)", "x", PCRE)(Sequence(Command(StartOption("CRLF", None)), Blank("#c\r)")))
   error("(*CRLF)#c\r\n)", "x", PCRE)("Unmatched ')' at 11")
   error("(*ANY)#c\u0085)", "xu", PCRE)("Unmatched ')' at 9")
-  check("(*CR)(*LF)#c\r)", "x", PCRE)(Sequence(Command(StartOption("CR", None)), Command(StartOption("LF", None))))
+  check("(*CR)(*LF)#c\r)", "x", PCRE):
+    Sequence(Command(StartOption("CR", None)), Command(StartOption("LF", None)), Blank("#c\r)"))
   // Java turns the extended mode on and off in the middle of a pattern.
   check("(?x)a b(?-x) c", "", Java):
     Sequence(
       Command(InlineFlag(FlagSetDiff(FlagSet(verbose = true), None))),
       Literal('a'),
+      Blank(" "),
       Literal('b'),
       Command(InlineFlag(FlagSetDiff(FlagSet(), Some(FlagSet(verbose = true))))),
       Literal(' '),
@@ -131,7 +137,7 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
   check("a{ ,}", "", Python())(Sequence(Literal('a'), Literal('{'), Literal(' '), Literal(','), Literal('}')))
   error("{,}", "", Python())("Nothing to repeat at 3")
   check("a {,}", "x", Python())(Repeat(Literal('a'), Unbounded(0, Greedy)))
-  check("a{, }", "x", Python())(Sequence(Literal('a'), Literal('{'), Literal(','), Literal('}')))
+  check("a{, }", "x", Python())(Sequence(Literal('a'), Literal('{'), Literal(','), Blank(" "), Literal('}')))
   check("a{,3x", "", PCRE, Perl(), Python(), Ruby()):
     Sequence(Literal('a'), Literal('{'), Literal(','), Literal('3'), Literal('x'))
   check("a{ 2 }", "", PCRE, Perl())(Repeat(Literal('a'), Exact(2, Greedy)))
@@ -169,6 +175,12 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
   check("({1})", "", Java)(Group(IndexedCapture, Sequence()))
   check("({1})", "", Perl())(Group(IndexedCapture, Sequence(Literal('{'), Literal('1'), Literal('}'))))
   error("({1})", "", DotNet, JavaScript, PCRE, Python(), Ruby())("Nothing to repeat at 4")
+  // The blanks before a quantifier are not kept.
+  check("a *", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Repeat(Literal('a'), Star(Greedy)))
+  check("a{2} {3}", "x", Java)(Repeat(Literal('a'), Exact(2, Greedy)))
+  check("a| {1}", "x", Java)(Disjunction(Literal('a'), Blank(" ")))
+  check("a| {1}", "x", Perl()):
+    Disjunction(Literal('a'), Sequence(Blank(" "), Literal('{'), Literal('1'), Literal('}')))
   error("a*+", "", DotNet, JavaScript)("Nested quantifier at 2")
   check("^*", "", DotNet, Java, Perl(), Ruby())(Repeat(Caret, Star(Greedy)))
   error("^*", "", JavaScript, PCRE, Python())("Nothing to repeat at 1")
