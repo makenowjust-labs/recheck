@@ -72,39 +72,45 @@ class ParserClassSuite extends munit.FunSuite with ParserHelper:
     Class(false, ClassUnion(ClassBackslashValue(Unknown('g')), ClassBackslashValue(Unknown('k'))))
   )
   // Perl's lexer applies the case commands of a regex literal to its text, even inside a class.
-  check("[\\uA]", "", Perl())(Class(false, ClassLiteral('A')))
-  check("[\\Ua-z]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('Z'))))
-  check("[\\Ux\\Ey]", "", Perl())(Class(false, ClassUnion(ClassLiteral('X'), ClassLiteral('y'))))
-  check("[A-\\Lz]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
-  check("[A-\\LZ]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
-  check("[A\\L-z]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
+  // The node keeps the text after the commands.
+  checkPrinted("[\\uA]", "[A]", "", Perl())(Class(false, ClassLiteral('A')))
+  checkPrinted("[\\Ua-z]", "[A-Z]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('Z'))))
+  checkPrinted("[\\Ux\\Ey]", "[Xy]", "", Perl())(Class(false, ClassUnion(ClassLiteral('X'), ClassLiteral('y'))))
+  checkPrinted("[A-\\Lz]", "[A-z]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
+  checkPrinted("[A-\\LZ]", "[A-z]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
+  checkPrinted("[A\\L-z]", "[A-z]", "", Perl())(Class(false, ClassRange(ClassLiteral('A'), ClassLiteral('z'))))
   error("[a\\U-z]", "", Perl())("Out of order class range at 1")
   error("[a-\\Uz]", "", Perl())("Out of order class range at 1")
-  check("[\\E]a]", "", Perl())(Class(false, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
+  checkPrinted("[\\E]a]", "[]a]", "", Perl())(Class(false, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
   error("[\\E]", "", Perl())("Unclosed ']' at 4")
-  check("[\\Qa-c\\E]", "", Perl()):
+  checkPrinted("[\\Qa-c\\E]", "[a\\-c]", "", Perl()):
     Class(false, ClassUnion(ClassLiteral('a'), ClassBackslashValue(Unknown('-')), ClassLiteral('c')))
   error("[\\Q]", "", Perl())("Unclosed ']' at 4")
   // Java and PCRE read `\Q...\E` as the regex syntax.
   check("[\\Qa]\\E]", "", Java, PCRE)(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral(']'))))
   check("[\\Q]\\E]", "", Java, PCRE)(Class(false, ClassUnion(ClassLiteral(']'))))
-  check("[a-\\Qz\\E]", "", Java, PCRE, Perl())(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
-  check("[\\Qa\\E-z]", "", Java, PCRE, Perl())(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
-  check("[\\Qxy\\E-\\Qza\\E]", "", Java, PCRE, Perl()):
+  // A quote at an end of a range is not kept.
+  checkPrinted("[a-\\Qz\\E]", "[a-z]", "", Java, PCRE, Perl()):
+    Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z')))
+  checkPrinted("[\\Qa\\E-z]", "[a-z]", "", Java, PCRE, Perl()):
+    Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z')))
+  checkPrinted("[\\Qxy\\E-\\Qza\\E]", "[xy-za]", "", Java, PCRE, Perl()):
     Class(false, ClassUnion(ClassLiteral('x'), ClassRange(ClassLiteral('y'), ClassLiteral('z')), ClassLiteral('a')))
   error("[\\Qxz\\E-y]", "", Java, PCRE)("Out of order class range at 4")
   error("[\\Qxz\\E-y]", "", Perl())("Out of order class range at 4")
-  check("[a-\\Q\\Ez]", "", Java, PCRE, Perl())(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  checkPrinted("[a-\\Q\\Ez]", "[a-z]", "", Java, PCRE, Perl()):
+    Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z')))
   check("[a-\\Q\\E]", "", Java, PCRE):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassUnion()))
   check("[\\Q\\E-z]", "", Java, PCRE):
     Class(false, ClassUnion(ClassUnion(), ClassLiteral('-'), ClassLiteral('z')))
-  check("[a\\Q\\E-z]", "", Java, PCRE, Perl())(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  checkPrinted("[a\\Q\\E-z]", "[a-z]", "", Java, PCRE, Perl()):
+    Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z')))
   check("[\\Q\\E]a]", "", Java, PCRE):
     Class(false, ClassUnion(ClassUnion(), ClassLiteral(']'), ClassLiteral('a')))
   check("[\\Q\\E \\Q\\E]]", "x", Java):
     Class(false, ClassUnion(ClassUnion(), ClassBlank(" "), ClassUnion(), ClassLiteral(']')))
-  check("[a\\Q\\E -z]", "x", Java)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  checkPrinted("[a\\Q\\E -z]", "[a-z]", "x", Java)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
   check("[a\\Q\\E b]", "x", Java):
     Class(false, ClassUnion(ClassLiteral('a'), ClassUnion(), ClassBlank(" "), ClassLiteral('b')))
   error("[\\Q\\E]", "", Java, PCRE)("Unclosed ']' at 6")
@@ -185,7 +191,10 @@ class ParserClassSuite extends munit.FunSuite with ParserHelper:
   error("[[:abcdefghijklmnopqrstu:]]", "", PCRE)("Unknown POSIX class at 1")
   check("[[:abcdefghijklmnopqrstu:]]", "", Perl(), Ruby())(classPOSIXLiteral("abcdefghijklmnopqrstu"))
   check("[[:]]", "", Ruby())(Class(false, ClassNest(false, ClassLiteral(':'))))
-  check("[[:]]", "", PCRE, Perl()):
+  check("[[:]]", "", Perl()):
+    Sequence(Class(false, ClassUnion(ClassLiteral('['), ClassLiteral(':'))), Literal(']'))
+  // The printer quotes `[:` in PCRE, which reads it as a POSIX class.
+  checkPrinted("[[:]]", "[\\Q[:\\E]]", "", PCRE):
     Sequence(Class(false, ClassUnion(ClassLiteral('['), ClassLiteral(':'))), Literal(']'))
   error("[[.a.]]", "", PCRE, Perl())("Unsupported POSIX collating element at 1")
   error("[[=a=]]", "", PCRE, Perl())("Unsupported POSIX collating element at 1")
@@ -232,14 +241,16 @@ class ParserClassSuite extends munit.FunSuite with ParserHelper:
   check("[a b]", "x", Java)(Class(false, ClassUnion(ClassLiteral('a'), ClassBlank(" "), ClassLiteral('b'))))
   check("[a b]", "x", DotNet, PCRE, Perl(), Python(), Ruby()):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral(' '), ClassLiteral('b')))
-  check("[a - z]", "x", Java)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+  // The blanks in a range and in `&&` are not kept.
+  checkPrinted("[a - z]", "[a-z]", "x", Java)(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
   check("[a#x\nb]", "x", Java)(Class(false, ClassUnion(ClassLiteral('a'), ClassBlank("#x\n"), ClassLiteral('b'))))
   check("[ ]]", "x", Java)(Class(false, ClassUnion(ClassBlank(" "), ClassLiteral(']'))))
   error("[ ]", "x", Java)("Unclosed ']' at 3")
   error("[a- ]", "x", Java)("Out of order class range at 1")
   // Java reads `^` only right after `[`, and skips whitespace and comments in `&&` (checked with Java 27.0.1).
   check("[ ^a]", "x", Java)(Class(false, ClassUnion(ClassBlank(" "), ClassLiteral('^'), ClassLiteral('a'))))
-  check("[a& #c\n&b]", "x", Java)(Class(false, ClassIntersection(ClassLiteral('a'), ClassLiteral('b'))))
+  checkPrinted("[a& #c\n&b]", "[a&&b]", "x", Java):
+    Class(false, ClassIntersection(ClassLiteral('a'), ClassLiteral('b')))
   check("[a && b]", "x", Java):
     Class(
       false,
@@ -260,7 +271,7 @@ class ParserClassSuite extends munit.FunSuite with ParserHelper:
   check("[a\n#b]", "xx", Perl()):
     Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('\n'), ClassLiteral('#'), ClassLiteral('b')))
   // The blanks before `^` and in a range are not kept.
-  check("[ ^ a - c ]", "xx", Perl()):
+  checkPrinted("[ ^ a - c ]", "[^ a-c ]", "xx", Perl()):
     Class(true, ClassUnion(ClassBlank(" "), ClassRange(ClassLiteral('a'), ClassLiteral('c')), ClassBlank(" ")))
   check("[a- ]", "xx", Perl())(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassBlank(" "))))
   check("[ ]a]", "xx", Perl())(Class(false, ClassUnion(ClassBlank(" "), ClassLiteral(']'), ClassLiteral('a'))))

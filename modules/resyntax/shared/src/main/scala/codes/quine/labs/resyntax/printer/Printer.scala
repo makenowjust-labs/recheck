@@ -28,6 +28,7 @@ import codes.quine.labs.resyntax.charset.UTF8Encoding
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.parser.FeatureSet
+import codes.quine.labs.resyntax.parser.PlainText
 import codes.quine.labs.resyntax.parser.SourceEncoding
 import codes.quine.labs.resyntax.parser.SourcePrescan
 
@@ -36,7 +37,7 @@ object Printer:
   /** Returns the source of the node in the dialect, which `Parser.parse` reads with the flags and the unit mode.
     *
     * The parser reads the source of a node that it made as the same node except the locations. What the node does not
-    * keep is not in the source (e.g. the blanks in `{1, 3}`, or the case commands of a Perl regex literal). In the
+    * keep is not in the source (e.g. the blanks in `\k{ n }`, or the case commands of a Perl regex literal). In the
     * extended mode, a space keeps apart the tokens that would be read together (e.g. `\1` and `1`), but out of it they
     * are written together and read as another node (e.g. `\11`).
     *
@@ -73,28 +74,26 @@ private[printer] final class Printer(featureSet: FeatureSet):
   /** Tests whether the last token reads a character after it as its part (e.g. a digit after `\1`). */
   private var isContinuedBy: Char => Boolean = NotContinued
 
-  /** The continuation bytes that the last character still needs, in a source read by its UTF-8 bytes. */
-  private var missingBytes: Int = 0
-
   /** Returns the source written so far, whose UTF-8 bytes are the chars written for a source of bytes. */
   def result: String =
     if featureSet.sourceEncoding == SourceEncoding.UTF8 then decodeUTF8(out.toString) else out.toString
 
   def writeNode(node: Node): Unit = node.data match
-    case NodeData.Disjunction(nodes)        => writeAlternatives(nodes)
-    case NodeData.Sequence(nodes)           => nodes.foreach(writeNode)
-    case NodeData.Repeat(child, quantifier) =>
+    case NodeData.Disjunction(nodes)                 => writeAlternatives(nodes)
+    case NodeData.Sequence(nodes)                    => nodes.foreach(writeNode)
+    case NodeData.Repeat(child, quantifier, written) =>
       writeNode(child)
-      writeQuantifier(quantifier)
-    case NodeData.Group(kind, child)  => writeGroup(kind, child)
-    case NodeData.Command(kind)       => writeCommand(kind)
-    case NodeData.Caret               => write("^")
-    case NodeData.Dollar              => write("$")
-    case NodeData.Dot                 => write(".")
-    case NodeData.Backslash(kind)     => writeBackslash(kind)
-    case NodeData.Class(invert, item) => writeClass(invert, item)
-    case NodeData.Literal(value)      => writeValue(value)
-    case NodeData.Blank(text)         => write(text)
+      writeQuantifier(quantifier, written)
+    case NodeData.Group(kind, child)          => writeGroup(kind, child)
+    case NodeData.Command(kind)               => writeCommand(kind)
+    case NodeData.Caret                       => write("^")
+    case NodeData.Dollar                      => write("$")
+    case NodeData.Dot                         => write(".")
+    case NodeData.Backslash(kind)             => writeBackslash(kind)
+    case NodeData.Class(invert, item)         => writeClass(invert, item)
+    case NodeData.Literal(value)              => writeValue(value)
+    case NodeData.Blank(text)                 => write(text)
+    case NodeData.UnicodeList(nodes, written) => writeUnicodeList(nodes, written)
 
   /** Writes the text of a token, after a space where the extended mode needs one to keep it apart from the last one.
     *
@@ -102,17 +101,41 @@ private[printer] final class Printer(featureSet: FeatureSet):
     */
   private def write(text: String, continuedBy: Char => Boolean = NotContinued): Unit =
     if text.headOption.exists(isContinuedBy) && isSeparable then out.append(' ')
-    // PCRE and Perl skip the byte 0x85 in the extended mode, which may be the rest of a character (e.g. `\u0085*`).
-    val skipsNEL = featureSet.skipsPatternWhiteSpace && verbose && !inClass
-    if missingBytes > 0 && text.headOption.exists(!UTF8Encoding.isContinuation(_)) && skipsNEL then
-      out.append("\u0085" * missingBytes)
     out.append(text)
     isContinuedBy = continuedBy
-    if featureSet.sourceEncoding == SourceEncoding.UTF8 then
-      for c <- text do
-        missingBytes =
-          if UTF8Encoding.isContinuation(c) then (missingBytes - 1).max(0)
-          else UTF8Encoding.sequenceLength(c).max(1) - 1
+
+  /** Writes Ruby's `\u{...}`, and the quantifiers after it, which repeat its last code point. */
+  private def writeUnicodeList(nodes: Seq[Node], written: Option[String]): Unit =
+    val values = (nodes.init :+ repeatedNode(nodes.last)).map:
+      case Node(NodeData.Backslash(BackslashKind.Escape(_, value, _)), _) => value
+      case node => throw new IllegalArgumentException(s"A Unicode list has a node other than an escape: $node")
+    write(s"\\u${written.getOrElse(PlainText.unicodeList(values))}")
+    writeQuantifiers(nodes.last)
+
+  /** Returns the node that the repeats repeat. */
+  private def repeatedNode(node: Node): Node = node.data match
+    case NodeData.Repeat(child, _, _) => repeatedNode(child)
+    case _                            => node
+
+  /** Writes the quantifiers of the repeats, innermost first. */
+  private def writeQuantifiers(node: Node): Unit = node.data match
+    case NodeData.Repeat(child, quantifier, written) =>
+      writeQuantifiers(child)
+      writeQuantifier(quantifier, written)
+    case _ => ()
+
+  private def writeQuantifier(quantifier: Quantifier, written: Option[String]): Unit =
+    write(written.getOrElse(quantifier.plainText), strategyContinuation(quantifier))
+
+  /** Returns the characters that the parser reads as the `?` or `+` of the quantifier when they follow it, as its
+    * `parseBacktrackStrategy` does (e.g. not `?` after Ruby's `{2}`, which `?` repeats again).
+    */
+  private def strategyContinuation(quantifier: Quantifier): Char => Boolean = quantifier match
+    case _ if quantifier.strategy != BacktrackStrategy.Greedy                                   => NotContinued
+    case Quantifier.Exact(_, _) if !featureSet.allowsMeaninglessBacktrackStrategy               => NotContinued
+    case Quantifier.Bounded(_, _, _) | Quantifier.Unbounded(_, _) | Quantifier.MaxBounded(_, _) =>
+      c => c == '?' || c == '+' && featureSet.hasPossessiveCurlyBacktrackStrategy
+    case _ => c => c == '?' || c == '+' && featureSet.hasPossessiveBacktrackStrategy
 
   /** Tests whether the parser skips a space here, as the extended mode does between tokens. */
   private def isSeparable: Boolean =
@@ -145,27 +168,13 @@ private[printer] final class Printer(featureSet: FeatureSet):
       if i > 0 then write("|")
       writeNode(node)
 
-  private def writeQuantifier(quantifier: Quantifier): Unit =
-    val text = quantifier match
-      case Quantifier.Star(_)              => "*"
-      case Quantifier.Plus(_)              => "+"
-      case Quantifier.Question(_)          => "?"
-      case Quantifier.Exact(n, _)          => s"{$n}"
-      case Quantifier.Bounded(min, max, _) => s"{$min,$max}"
-      case Quantifier.MaxBounded(max, _)   => s"{,$max}"
-      case Quantifier.Unbounded(min, _)    => s"{$min,}"
-    quantifier.strategy match
-      case BacktrackStrategy.Greedy     => write(text, c => c == '?' || c == '+')
-      case BacktrackStrategy.Lazy       => write(s"$text?")
-      case BacktrackStrategy.Possessive => write(s"$text+")
-
   private def writeGroup(kind: GroupKind, child: Node): Unit =
     write(s"(${printGroupKind(kind)}")
     scoped:
       kind match
-        case GroupKind.InlineFlag(diff)   => applyFlagSetDiff(diff)
-        case GroupKind.ResetFlag(flagSet) => applyResetFlag(flagSet)
-        case _                            => ()
+        case GroupKind.InlineFlag(diff)      => applyFlagSetDiff(diff)
+        case GroupKind.ResetFlag(flagSet, _) => applyResetFlag(flagSet)
+        case _                               => ()
       writeNode(child)
     write(")")
 
@@ -191,12 +200,9 @@ private[printer] final class Printer(featureSet: FeatureSet):
         case Reference.NamedReference(name) => s"<$name>"
         case ref                            => printReference(ref)
       printAssertName(style, None, "scan_substring", Some("scs")) + names.mkString("(", ",", ")")
-    case GroupKind.InlineFlag(diff) =>
-      val flags = printFlagSetDiff(diff)
-      // Java reads `(? :` in the extended mode as an inline flag group without flags, but `(?:` as a non-capture group.
-      s"?${if flags.isEmpty && verbose && featureSet.skipsCommentInConstruct then " " else flags}:"
-    case GroupKind.ResetFlag(flagSet) => s"?^${printFlagSet(flagSet)}:"
-    case GroupKind.Absence            => "?~"
+    case GroupKind.InlineFlag(diff)            => s"?${printFlagSetDiff(diff, group = true)}:"
+    case GroupKind.ResetFlag(flagSet, written) => s"?^${written.getOrElse(flagSet.letters)}:"
+    case GroupKind.Absence                     => "?~"
 
   /** Returns the opening of a group in the style (e.g. `?=`, `*positive_lookahead:` or `*pla:`).
     *
@@ -228,52 +234,15 @@ private[printer] final class Printer(featureSet: FeatureSet):
 
   private def printSigned(n: Int): String = if n < 0 then n.toString else s"+$n"
 
-  private def printFlagSet(flagSet: FlagSet): String =
-    Seq(
-      flagSet.anchored -> "A",
-      flagSet.dollarEndOnly -> "D",
-      flagSet.dupNames -> "J",
-      flagSet.localeUpper -> "L",
-      flagSet.analyze -> "S",
-      flagSet.ungreedy -> "U",
-      flagSet.extra -> "X",
-      (flagSet.ascii && !flagSet.asciiRestrict) -> "a",
-      flagSet.asciiRestrict -> "aa",
-      flagSet.asciiDigit -> "aD",
-      flagSet.asciiPOSIX -> "aP",
-      flagSet.asciiSpace -> "aS",
-      flagSet.asciiPOSIXDigit -> "aT",
-      flagSet.asciiWord -> "aW",
-      flagSet.continue -> "c",
-      flagSet.hasIndices -> "d",
-      flagSet.evaluate -> "e",
-      flagSet.global -> "g",
-      flagSet.ignoreCase -> "i",
-      flagSet.localeLower -> "l",
-      flagSet.multiline -> "m",
-      flagSet.explicitCapture -> "n",
-      flagSet.once -> "o",
-      flagSet.preserve -> "p",
-      flagSet.nonDestructive -> "r",
-      flagSet.dotAll -> "s",
-      flagSet.unicode -> "u",
-      flagSet.unicodeSets -> "v",
-      (flagSet.verbose && !flagSet.verboseMore) -> "x",
-      flagSet.verboseMore -> "xx",
-      flagSet.sticky -> "y"
-    ).collect { case (true, letters) => letters }.mkString
-
-  private def printFlagSetDiff(diff: FlagSetDiff): String =
-    val flags = printFlagSet(diff.added) + diff.removed.fold("")(removed => s"-${printFlagSet(removed)}")
-    // .NET rejects `(?)`, and reads `(?+)` as inline flags without flags.
-    if flags.isEmpty && featureSet.allowsInlineFlagSign then "+" else flags
+  private def printFlagSetDiff(diff: FlagSetDiff, group: Boolean): String =
+    diff.written.getOrElse(PlainText.flagSetDiff(diff, group, verbose, featureSet))
 
   private def writeCommand(kind: CommandKind): Unit = kind match
     case CommandKind.InlineFlag(diff) =>
-      write(s"(?${printFlagSetDiff(diff)})")
+      write(s"(?${printFlagSetDiff(diff, group = false)})")
       applyFlagSetDiff(diff)
-    case CommandKind.ResetFlag(flagSet) =>
-      write(s"(?^${printFlagSet(flagSet)})")
+    case CommandKind.ResetFlag(flagSet, written) =>
+      write(s"(?^${written.getOrElse(flagSet.letters)})")
       applyResetFlag(flagSet)
     case CommandKind.PBackReference(name)             => write(s"(?P=$name)")
     case CommandKind.RCall                            => write("(?R)")
@@ -380,42 +349,29 @@ private[printer] final class Printer(featureSet: FeatureSet):
 
   private def writeBackslashValue(kind: BackslashKind.BackslashValue): Unit =
     val continuedBy: Char => Boolean = kind match
-      case BackslashKind.Escape(EscapeStyle.Hex1, _) => isHexDigit
-      case BackslashKind.Escape(EscapeStyle.Hex0, _) => c => isHexDigit(c) || c == '{'
+      case BackslashKind.Escape(EscapeStyle.Hex1, _, _) => isHexDigit
+      case BackslashKind.Escape(EscapeStyle.Hex0, _, _) => c => isHexDigit(c) || c == '{'
       // Ruby reads `\k<`, `\g<` and `\p{` as escapes, but `\k`, `\g` and `\p` before another character as letters.
       case BackslashKind.Unknown(value) if isLetter(value) => c => c == '{' || c == '<' || c == '\''
       case _                                               => NotContinued
     write(printBackslashValue(kind), continuedBy)
 
   private def printBackslashValue(kind: BackslashKind.BackslashValue): String = kind match
-    case BackslashKind.Unknown(value)       => s"\\${printValue(value)}"
-    case BackslashKind.Escape(style, value) =>
-      style match
-        case EscapeStyle.Single(char) => s"\\$char"
-        // Ruby's `\c\` takes a backslash escape, and gives a control character of its value.
-        case EscapeStyle.Control('\\') if featureSet.hasBackslashMetaControl => s"\\c${printMetaControlTarget(value)}"
-        case EscapeStyle.Control(char)                                       => s"\\c$char"
-        case EscapeStyle.ControlDash                                         => s"\\C-${printMetaControlTarget(value)}"
-        case EscapeStyle.Meta                                                => f"\\M-\\x${value & 0x7f}%02X"
-        case EscapeStyle.Octal                                               => s"\\o{${Integer.toOctalString(value)}}"
-        // Three digits keep a following digit apart, and Java's octal escape starts with `\0`.
-        case EscapeStyle.BareOctal =>
-          if featureSet.hasBackslashZeroOctal then f"\\0$value%03o" else f"\\$value%03o"
-        case EscapeStyle.UnicodeHex4     => f"\\u$value%04X"
-        case EscapeStyle.UnicodeHex4Pair =>
-          f"\\u${Character.highSurrogate(value).toInt}%04X\\u${Character.lowSurrogate(value).toInt}%04X"
-        case EscapeStyle.UnicodeHex8    => f"\\U$value%08X"
-        case EscapeStyle.UnicodeBracket => f"\\u{$value%X}"
-        case EscapeStyle.NamedHex       => f"\\N{U+$value%X}"
-        case EscapeStyle.Hex2           => f"\\x$value%02X"
-        case EscapeStyle.Hex1           => f"\\x$value%X"
-        case EscapeStyle.Hex0           => "\\x"
-        case EscapeStyle.HexBracket     => f"\\x{$value%X}"
-
-  /** Returns an escape after Ruby's `\c\` or `\C-`, which gives the control character of the value. */
-  private def printMetaControlTarget(value: Int): String =
-    // Ruby takes `?` there as DEL, and the value of any other character without its bits 0x60.
-    if value == 0x7f then "\\?" else f"\\x$value%02X"
+    case BackslashKind.Unknown(value)                => s"\\${printValue(value)}"
+    case BackslashKind.Escape(style, value, written) =>
+      val letters = style match
+        case EscapeStyle.Single(char) => char.toString
+        case EscapeStyle.Control(_)   => "c"
+        case EscapeStyle.ControlDash  => "C-"
+        case EscapeStyle.Meta         => "M-"
+        case EscapeStyle.Octal        => "o"
+        // Java's bare octal escape starts with `\0`.
+        case EscapeStyle.BareOctal => if featureSet.hasBackslashZeroOctal then "0" else ""
+        case EscapeStyle.UnicodeHex4 | EscapeStyle.UnicodeHex4Pair | EscapeStyle.UnicodeBracket => "u"
+        case EscapeStyle.UnicodeHex8                                                            => "U"
+        case EscapeStyle.NamedHex                                                               => "N"
+        case EscapeStyle.Hex2 | EscapeStyle.Hex1 | EscapeStyle.Hex0 | EscapeStyle.HexBracket    => "x"
+      s"\\$letters${written.getOrElse(PlainText.escape(style, value, featureSet))}"
 
   private def writeEscapeClass(klass: EscapeClassKind): Unit =
     val text = klass match
@@ -484,23 +440,18 @@ private[printer] final class Printer(featureSet: FeatureSet):
       writeClassItem(begin)
       write("-")
       writeClassItem(end)
-    case ClassItemData.ClassCaseCommand(kind)     => write(printCaseCommand(kind))
-    case ClassItemData.ClassBackslashClass(klass) => writeEscapeClass(klass)
-    case ClassItemData.ClassBackslashValue(kind)  => writeBackslashValue(kind)
-    case ClassItemData.ClassLiteral(value)        => writeValue(value)
-    case ClassItemData.ClassBlank(text)           => write(text)
+    case ClassItemData.ClassCaseCommand(kind)           => write(printCaseCommand(kind))
+    case ClassItemData.ClassBackslashClass(klass)       => writeEscapeClass(klass)
+    case ClassItemData.ClassBackslashValue(kind)        => writeBackslashValue(kind)
+    case ClassItemData.ClassLiteral(value)              => writeValue(value)
+    case ClassItemData.ClassBlank(text)                 => write(text)
+    case ClassItemData.ClassUnicodeList(items, written) =>
+      write(s"\\u${written.getOrElse(PlainText.unicodeList(items.map(_.data.value)))}")
 
-  /** Writes an item of a union, where a union in a union is one that only a quote or Ruby's `\u{...}` makes. */
+  /** Writes an item of a union, where a union in a union is one that only a quote makes. */
   private def writeClassUnionItem(item: ClassItem): Unit = item.data match
     case ClassItemData.ClassUnion(items) =>
-      val codePoints = items
-        .map(_.data)
-        .collect:
-          case ClassItemData.ClassBackslashValue(BackslashKind.Escape(EscapeStyle.UnicodeBracket, value)) => value
-      if featureSet.hasBackslashQuoteCommand then writeClassQuote(items)
-      else if featureSet.hasBackslashUnicodeList && codePoints.size == items.size then
-        write(codePoints.map(c => f"$c%X").mkString("\\u{", " ", "}"))
-      else items.foreach(writeClassUnionItem)
+      if featureSet.hasBackslashQuoteCommand then writeClassQuote(items) else items.foreach(writeClassUnionItem)
     case _ => writeClassItem(item)
 
   private def writeClassQuote(items: Seq[ClassItem]): Unit =

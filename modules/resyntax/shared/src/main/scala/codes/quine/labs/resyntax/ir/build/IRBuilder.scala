@@ -34,7 +34,7 @@ object IRBuilder:
     * The unit mode is the one that `Parser.determineUnitMode` determines for the source of the node.
     */
   def build(parsed: Node, flagSet: FlagSet, dialect: Dialect, mode: UnitMode): IRPattern =
-    val node = removeBlanks(parsed)
+    val node = stripSource(parsed)
     val starts = startOptions(node)
     val featureSet = IRFeatureSet.from(flagSet, dialect, starts)
     if featureSet.validatesCharsetFlags then
@@ -81,49 +81,59 @@ object IRBuilder:
       notEmpty(starts)
     )
 
-  /** Returns the node without the blanks of the extended mode.
+  /** Returns the node without what only its source has: the blanks of the extended mode are removed, and Ruby's
+    * `\u{...}` of several code points becomes their escapes.
     *
     * A sequence or a class union left with one item becomes the item, and a blank alone becomes an empty one.
     */
-  private def removeBlanks(node: Node): Node = node.data match
+  private def stripSource(node: Node): Node = node.data match
     case NodeData.Sequence(nodes) =>
-      nodes.filterNot(_.data.isInstanceOf[NodeData.Blank]) match
-        case Seq(child) if nodes.size > 1 => removeBlanks(child)
-        case children                     => node.copy(data = NodeData.Sequence(children.map(removeBlanks)))
-    case NodeData.Blank(_)            => node.copy(data = NodeData.Sequence(Seq.empty))
-    case NodeData.Disjunction(nodes)  => node.copy(data = NodeData.Disjunction(nodes.map(removeBlanks)))
-    case NodeData.Repeat(child, q)    => node.copy(data = NodeData.Repeat(removeBlanks(child), q))
-    case NodeData.Group(kind, child)  => node.copy(data = NodeData.Group(kind, removeBlanks(child)))
-    case NodeData.Command(kind)       => node.copy(data = NodeData.Command(removeCommandBlanks(kind)))
-    case NodeData.Class(invert, item) => node.copy(data = NodeData.Class(invert, removeClassBlanks(item)))
-    case _                            => node
+      expandNodes(nodes) match
+        case Seq(child) if nodes.size > 1 => stripSource(child)
+        case children                     => node.copy(data = NodeData.Sequence(children.map(stripSource)))
+    case NodeData.UnicodeList(nodes, _) => node.copy(data = NodeData.Sequence(nodes.map(stripSource)))
+    case NodeData.Blank(_)              => node.copy(data = NodeData.Sequence(Seq.empty))
+    case NodeData.Disjunction(nodes)    => node.copy(data = NodeData.Disjunction(nodes.map(stripSource)))
+    case data: NodeData.Repeat          => node.copy(data = data.copy(node = stripSource(data.node)))
+    case NodeData.Group(kind, child)    => node.copy(data = NodeData.Group(kind, stripSource(child)))
+    case NodeData.Command(kind)         => node.copy(data = NodeData.Command(stripCommandSource(kind)))
+    case NodeData.Class(invert, item)   => node.copy(data = NodeData.Class(invert, stripClassSource(item)))
+    case _                              => node
 
-  private def removeCommandBlanks(kind: CommandKind): CommandKind = kind match
-    case CommandKind.BranchReset(nodes)         => CommandKind.BranchReset(nodes.map(removeBlanks))
+  /** Returns the nodes where Ruby's `\u{...}` is its escapes, without the blanks. */
+  private def expandNodes(nodes: Seq[Node]): Seq[Node] = nodes.flatMap: node =>
+    node.data match
+      case NodeData.UnicodeList(nodes, _) => nodes
+      case NodeData.Blank(_)              => Seq.empty
+      case _                              => Seq(node)
+
+  private def stripCommandSource(kind: CommandKind): CommandKind = kind match
+    case CommandKind.BranchReset(nodes)         => CommandKind.BranchReset(nodes.map(stripSource))
     case CommandKind.Conditional(test, yes, no) =>
-      val removed = test match
-        case test: ConditionalTest.LookAround                 => test.copy(node = removeBlanks(test.node))
+      val stripped = test match
+        case test: ConditionalTest.LookAround                 => test.copy(node = stripSource(test.node))
         case ConditionalTest.CalloutLookAround(callout, test) =>
-          ConditionalTest.CalloutLookAround(callout, test.copy(node = removeBlanks(test.node)))
+          ConditionalTest.CalloutLookAround(callout, test.copy(node = stripSource(test.node)))
         case test => test
-      CommandKind.Conditional(removed, removeBlanks(yes), no.map(removeBlanks))
+      CommandKind.Conditional(stripped, stripSource(yes), no.map(stripSource))
     case CommandKind.AbsenceExpression(absent, exp) =>
-      CommandKind.AbsenceExpression(removeBlanks(absent), removeBlanks(exp))
-    case CommandKind.AbsenceStopper(absent) => CommandKind.AbsenceStopper(removeBlanks(absent))
+      CommandKind.AbsenceExpression(stripSource(absent), stripSource(exp))
+    case CommandKind.AbsenceStopper(absent) => CommandKind.AbsenceStopper(stripSource(absent))
     case kind                               => kind
 
-  private def removeClassBlanks(item: ClassItem): ClassItem = item.data match
+  private def stripClassSource(item: ClassItem): ClassItem = item.data match
     case ClassItemData.ClassUnion(items) =>
       items.filterNot(_.data.isInstanceOf[ClassItemData.ClassBlank]) match
-        case Seq(child) if items.size > 1 => removeClassBlanks(child)
-        case children => ClassItem(ClassItemData.ClassUnion(children.map(removeClassBlanks)), item.loc)
+        case Seq(child) if items.size > 1 => stripClassSource(child)
+        case children => ClassItem(ClassItemData.ClassUnion(children.map(stripClassSource)), item.loc)
+    case ClassItemData.ClassUnicodeList(items, _)     => ClassItem(ClassItemData.ClassUnion(items), item.loc)
     case ClassItemData.ClassBlank(_)                  => ClassItem(ClassItemData.ClassUnion(Seq.empty), item.loc)
     case ClassItemData.ClassIntersection(left, right) =>
-      ClassItem(ClassItemData.ClassIntersection(removeClassBlanks(left), removeClassBlanks(right)), item.loc)
+      ClassItem(ClassItemData.ClassIntersection(stripClassSource(left), stripClassSource(right)), item.loc)
     case ClassItemData.ClassDiff(left, right) =>
-      ClassItem(ClassItemData.ClassDiff(removeClassBlanks(left), removeClassBlanks(right)), item.loc)
+      ClassItem(ClassItemData.ClassDiff(stripClassSource(left), stripClassSource(right)), item.loc)
     case ClassItemData.ClassNest(invert, inner) =>
-      ClassItem(ClassItemData.ClassNest(invert, removeClassBlanks(inner)), item.loc)
+      ClassItem(ClassItemData.ClassNest(invert, stripClassSource(inner)), item.loc)
     case _ => item
 
   /** Checks whether Perl takes the full case folding of the character under the flags (e.g. `ß` as `ss`). */
@@ -193,7 +203,7 @@ object IRBuilder:
               node.data match
                 case _ if nodes.size > 1 =>
                   val bytes = nodes.collect:
-                    case Node(NodeData.Backslash(BackslashKind.Escape(_, b)), _) => b
+                    case Node(NodeData.Backslash(BackslashKind.Escape(_, b, _)), _) => b
                   single(fold(UTF8Encoding.decode(bytes)))
                 case NodeData.Literal(value)                                 => single(fold(value))
                 case NodeData.Backslash(value: BackslashKind.BackslashValue) => single(fold(value.value))
@@ -228,8 +238,8 @@ object IRBuilder:
   private def usesPerlUnicodeSyntax(node: Node): Boolean =
     deepExists(node):
       case AssertKind.Boundary(Some(_)) | AssertKind.NonBoundary(Some(_)) => true
-      case BackslashKind.Escape(EscapeStyle.NamedHex, _)                  => true
-      case BackslashKind.Escape(_, value)                                 => value > 0xff
+      case BackslashKind.Escape(EscapeStyle.NamedHex, _, _)               => true
+      case BackslashKind.Escape(_, value, _)                              => value > 0xff
       case _: EscapeClassKind.CharName                                    => true
       case _: EscapeClassKind.UnicodeProperty | _: EscapeClassKind.UnicodeBareProperty |
           _: EscapeClassKind.UnicodePropertyValue | _: EscapeClassKind.NonUnicodeProperty |
@@ -304,16 +314,17 @@ private[build] class IRBuilder(
     val result = node.data match
       case NodeData.Disjunction(children)                            => Left(buildDisjunction(children))
       case NodeData.Sequence(children)                               => buildSequence(children)
-      case NodeData.Repeat(child, quantifier)                        => Left(buildRepeat(node, child, quantifier))
+      case NodeData.Repeat(child, quantifier, _)                     => Left(buildRepeat(node, child, quantifier))
       case NodeData.Group(kind, child)                               => buildGroup(node, kind, child)
       case NodeData.Command(kind)                                    => buildCommand(node, kind)
       case NodeData.Caret                                            => Left(buildCaret())
       case NodeData.Dollar                                           => Left(buildDollar())
       case NodeData.Backslash(kind)                                  => Left(buildBackslash(node, kind))
       case NodeData.Dot | NodeData.Class(_, _) | NodeData.Literal(_) => Left(buildCharacter(node))
-      // `IRBuilder.build` removes the blanks.
+      // `IRBuilder.build` removes the blanks and expands Ruby's `\u{...}`.
       // $COVERAGE-OFF$
-      case NodeData.Blank(_) => throw new IllegalStateException(s"Unexpected blank: $node")
+      case NodeData.Blank(_) | NodeData.UnicodeList(_, _) =>
+        throw new IllegalStateException(s"Unexpected source node: $node")
       // $COVERAGE-ON$
     result match
       case Left(data) => IRNode(data, node.loc)
@@ -385,7 +396,7 @@ private[build] class IRBuilder(
     case CommandKind.InlineFlag(diff) =>
       context = context.update(diff)
       Left(IRNodeData.Empty)
-    case CommandKind.ResetFlag(flagSet) =>
+    case CommandKind.ResetFlag(flagSet, _) =>
       context = context.reset(flagSet)
       Left(IRNodeData.Empty)
     case CommandKind.PBackReference(_)  => Left(buildBackReference(node))
@@ -509,7 +520,7 @@ private[build] class IRBuilder(
       Right(scoped:
         context = context.update(diff)
         build(child))
-    case GroupKind.ResetFlag(flagSet) =>
+    case GroupKind.ResetFlag(flagSet, _) =>
       Right(scoped:
         context = context.reset(flagSet)
         build(child))

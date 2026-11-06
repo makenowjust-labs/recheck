@@ -5,6 +5,7 @@ import codes.quine.labs.resyntax.ast.AssertNameStyle.*
 import codes.quine.labs.resyntax.ast.BackReferenceStyle.*
 import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
+import codes.quine.labs.resyntax.ast.ClassItem
 import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.CommandKind.*
 import codes.quine.labs.resyntax.ast.ConditionalTest
@@ -39,6 +40,15 @@ class PrinterSuite extends munit.FunSuite:
         assertEquals(printed, expected)
         assert(Parser.parse(printed, flagSet, dialect, mode).equalsWithoutLoc(node), printed)
 
+  /** Asserts that the node is printed as the text, which the parser reads as the node. */
+  def checkPlain(data: NodeData, flags: String, dialect: Dialect)(expected: String)(using munit.Location): Unit =
+    val flagSet = FlagSet.parse(flags, dialect)
+    val mode = Parser.determineUnitMode(expected, flagSet, dialect)
+    val printed = Printer.print(Node(data), flagSet, dialect, mode)
+    assertEquals(printed, expected)
+    val reparsed = Parser.parse(printed, flagSet, dialect, mode)
+    assert(reparsed.equalsWithoutLoc(Node(data)), reparsed)
+
   val ref1: NodeData = Backslash(EscapeBackReference(BareBackReference, IndexedReference(1)))
 
   val verbose: NodeData = Command(InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)))
@@ -56,6 +66,14 @@ class PrinterSuite extends munit.FunSuite:
     assertEquals(print(Sequence(Backslash(Assert(NonBoundary(None))), Literal('{')), "x", Perl()), "\\B {")
     assertEquals(print(Repeat(Repeat(Literal('a'), Plus(Greedy)), Question(Greedy)), "x", Ruby()), "a+ ?")
     assertEquals(print(Repeat(Repeat(Literal('a'), Plus(Greedy)), Question(Greedy)), "", Ruby()), "a+?")
+    val lazyPlus = Repeat(Node(Repeat(Literal('a'), Plus(Greedy))), Question(Greedy), Some(" ?"))
+    assertEquals(print(lazyPlus, "x", Ruby()), "a+ ?")
+    // Ruby reads `?` after `{2}`, and `+` after `{2}` and `{2,3}`, as another repeat.
+    assertEquals(print(Repeat(Repeat(Literal('a'), Exact(2, Greedy)), Question(Greedy)), "x", Ruby()), "a{2}?")
+    assertEquals(print(Repeat(Repeat(Literal('a'), Exact(2, Greedy)), Plus(Greedy)), "x", Ruby()), "a{2}+")
+    assertEquals(print(Repeat(Repeat(Literal('a'), Bounded(2, 3, Greedy)), Plus(Greedy)), "x", Ruby()), "a{2,3}+")
+    assertEquals(print(Repeat(Repeat(Literal('a'), Bounded(2, 3, Greedy)), Question(Greedy)), "x", Ruby()), "a{2,3} ?")
+    assertEquals(print(Repeat(Repeat(Literal('a'), Plus(Lazy)), Question(Greedy)), "x", Ruby()), "a+??")
     assertEquals(print(Sequence(Literal(0xd83d), Literal(0xde00)), "x", Perl()), "\ud83d \ude00")
     assertEquals(print(Sequence(Literal(0xd83d), Literal(0xde00)), "x", DotNet), "\ud83d\ude00")
 
@@ -84,10 +102,34 @@ class PrinterSuite extends munit.FunSuite:
     assertEquals(print(Command(AbsenceExpression(verboseA, sequence)), "", Ruby()), "(?~|(?x)a|\\11)")
     assertEquals(print(Sequence(Command(AbsenceStopper(verboseA)), sequence), "", Ruby()), "(?~|(?x)a)\\11")
 
-  test("Printer.print: the byte 0x85 that the extended mode skips completes a character"):
-    assertEquals(print(Repeat(Literal(0xc3), Star(Greedy)), "x", PCRE), "\u00c5*")
-    val subscript = Sequence(Literal(0xe2), Repeat(Literal(0x82), Star(Greedy)))
-    assertEquals(print(subscript, "x", Perl(utf8 = false)), "\u2085*")
+  test("Printer.print: a node without written texts is written in the plain text"):
+    checkPlain(Backslash(Escape(Hex2, 0x7f)), "", PCRE)("\\x7F")
+    checkPlain(Backslash(Escape(UnicodeHex4, 0x0d)), "", Java)("\\u000D")
+    checkPlain(Backslash(Escape(UnicodeHex4Pair, 0x1f600)), "", Java)("\\uD83D\\uDE00")
+    checkPlain(Backslash(Escape(UnicodeHex8, 0x1f600)), "", Python())("\\U0001F600")
+    checkPlain(Backslash(Escape(UnicodeBracket, 0x41)), "", Ruby())("\\u{41}")
+    checkPlain(Backslash(Escape(HexBracket, 0x41)), "", PCRE)("\\x{41}")
+    checkPlain(Backslash(Escape(Octal, 0x41)), "", PCRE)("\\o{101}")
+    checkPlain(Backslash(Escape(NamedHex, 0x41)), "", Perl())("\\N{U+41}")
+    checkPlain(Backslash(Escape(Control('A'), 0x01)), "", PCRE)("\\cA")
+    checkPlain(Sequence(Backslash(Escape(BareOctal, 1)), Literal('1')), "", PCRE)("\\0011")
+    checkPlain(Sequence(Backslash(Escape(BareOctal, 1)), Literal('1')), "", Java)("\\00011")
+    val ruby = Sequence(
+      Backslash(Escape(ControlDash, 0x7f)),
+      Backslash(Escape(Control('\\'), 0x81)),
+      Backslash(Escape(Meta, 0xe1)),
+      Backslash(Escape(Meta, 0x81))
+    )
+    checkPlain(ruby, "", Ruby())("\\C-\\?\\c\\x81\\M-\\x61\\M-\\x01")
+    checkPlain(Repeat(Literal('a'), Bounded(1, 3, Lazy)), "", PCRE)("a{1,3}?")
+    checkPlain(Repeat(Literal('a'), Unbounded(2, Possessive)), "", PCRE)("a{2,}+")
+    val diff = FlagSetDiff(FlagSet(ignoreCase = true, multiline = true), Some(FlagSet(verbose = true)))
+    checkPlain(Command(InlineFlag(diff)), "", PCRE)("(?im-x)")
+    checkPlain(Command(ResetFlag(FlagSet(ascii = true, asciiRestrict = true))), "", Perl())("(?^aa)")
+    checkPlain(Group(GroupKind.ResetFlag(FlagSet(ignoreCase = true)), Literal('a')), "", PCRE)("(?^i:a)")
+    // .NET rejects `(?)`, and Java reads `(?:` as a non-capture group.
+    checkPlain(Command(InlineFlag(FlagSetDiff(FlagSet(), None))), "", DotNet)("(?+)")
+    checkPlain(Group(GroupKind.InlineFlag(FlagSetDiff(FlagSet(), None)), Literal('a')), "x", Java)("(? :a)")
 
   test("Printer.print: bytes that are not UTF-8 throw"):
     interceptMessage[IllegalArgumentException]("Invalid UTF-8 bytes at 0")(print(Literal(0xc3), "", PCRE))
@@ -107,10 +149,18 @@ class PrinterSuite extends munit.FunSuite:
     val klass = Class(false, ClassUnion(ClassLiteral('a'), ClassUnion(ClassLiteral('b'), ClassLiteral('c'))))
     assertEquals(print(klass, "", Ruby()), "[abc]")
 
-  // The extended mode keeps its blanks, but not the ones in a construct or before a quantifier.
+  test("Printer.print: Ruby's `\\u{...}` of several code points is written with the quantifiers after it"):
+    val escapes = Seq(0x41, 0x42).map(value => Escape(UnicodeBracket, value))
+    val nodes = escapes.map(escape => Node(Backslash(escape)))
+    checkPlain(UnicodeList(nodes.init :+ Node(Repeat(nodes.last, Star(Lazy)))), "", Ruby())("\\u{41 42}*?")
+    val items = escapes.map(escape => ClassItem.Value(ClassBackslashValue(escape)))
+    checkPlain(Class(false, ClassUnicodeList(items)), "", Ruby())("[\\u{41 42}]")
+    val message = "A Unicode list has a node other than an escape: Node(Dot,SourceLocation(-1,-1))"
+    interceptMessage[IllegalArgumentException](message)(print(UnicodeList(Seq(Node(Dot), nodes.last)), "", Ruby()))
+
+  // The extended mode keeps its blanks, but not the ones in a construct.
   check(" a # b\n\tc", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(" a # b\n\tc")
-  check("( ?:a ) *", "x", Java)("(?:a )*")
-  check("(?#c\n:a)", "x", Java)("(? :a)")
+  check("( ?:a ) *", "x", Java)("(?:a ) *")
 
   // A union of literals is written in `\Q...\E` if it has a character that the class reads otherwise.
   check("[\\Q]\\E]", "", Java, PCRE)("[\\Q]\\E]")
@@ -127,12 +177,7 @@ class PrinterSuite extends munit.FunSuite:
   check("[\\Qa b\\E]", "x", Java)("[\\Qa b\\E]")
   check("[a b]", "", Java)("[a b]")
 
-  // Ruby's `\u{...}` with several code points is a union in a class.
-  check("[a\\u{41 42}]", "", Ruby())("[a\\u{41 42}]")
-  // Ruby's control escapes are written with `\xHH`, which keeps the value.
-  check("\\C-?\\c\\M-a\\M-\\C-a", "", Ruby())("\\C-\\?\\c\\x81\\M-\\x01")
-  // The octal escapes are written in three digits.
-  check("[\\1]\\0", "", PCRE)("[\\001]\\000")
-  check("\\01", "", Java)("\\0001")
+  // Ruby's `\u{...}` with several code points is written as it is.
+  check("[a\\u{ 41 42}]", "", Ruby())("[a\\u{ 41 42}]")
   // A Perl regex literal is printed as Perl's lexer rewrites it.
   check("\\Uab\\E\\Q.\\E", "", Perl())("AB\\.")

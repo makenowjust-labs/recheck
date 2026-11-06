@@ -100,7 +100,7 @@ class ParserEncodingSuite extends munit.FunSuite with ParserHelper:
   )
   error("[\u00e9-\u00e0]", "", Perl())("Out of order class range at 1")
   // The case commands do not change non-ASCII bytes.
-  check("\\U\u00e9a", "", PerlBytes)(Sequence((bytes("\u00e9") :+ Literal('A'))*))
+  checkPrinted("\\U\u00e9a", "\u00e9A", "", PerlBytes)(Sequence((bytes("\u00e9") :+ Literal('A'))*))
 
   // Ruby's ASCII-8BIT regexp reads the UTF-8 bytes of the source (as `Regexp.new(source.b, Regexp::NOENCODING)`).
   val RubyBytes: Dialect = Ruby(Ruby.Encoding.ASCII8Bit)
@@ -115,9 +115,14 @@ class ParserEncodingSuite extends munit.FunSuite with ParserHelper:
     error("\\u00e9", flags, dialect)("Incompatible character encoding at 1")
     error("\\u{41 e9}", flags, dialect)("Incompatible character encoding at 6")
     check("\\u0041", flags, dialect)(Backslash(Escape(EscapeStyle.UnicodeHex4, 0x41)))
-    check("\\xff", flags, dialect)(Backslash(Escape(EscapeStyle.Hex2, 0xff)))
+    check("\\xff", flags, dialect)(Backslash(Escape(EscapeStyle.Hex2, 0xff, Some("ff"))))
+    check("é\\u{41 42}[\\u{41 42}]", flags, dialect):
+      val escapes = Seq(0x41, 0x42).map(value => Escape(EscapeStyle.UnicodeBracket, value))
+      val list = UnicodeList(escapes.map(escape => Node(Backslash(escape))))
+      val items = escapes.map(escape => ClassItem.Value(ClassBackslashValue(escape)))
+      Sequence(Literal(0xc3), Literal(0xa9), list, Class(false, ClassUnicodeList(items)))
   check("a\u00e9", "", Ruby())(Sequence(Literal('a'), Literal(0xe9)))
-  check("\\u00e9", "", Ruby())(Backslash(Escape(EscapeStyle.UnicodeHex4, 0xe9)))
+  check("\\u00e9", "", Ruby())(Backslash(Escape(EscapeStyle.UnicodeHex4, 0xe9, Some("00e9"))))
 
   test("Parser.parse: the locations of bytes in conditionals and branch resets point to their characters"):
     val Command(CommandKind.Conditional(ConditionalTest.LookAround(_, look), yes, Some(no))) =

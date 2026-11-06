@@ -272,6 +272,7 @@ class LookBehindAnalyzerSuite extends munit.FunSuite with IRHelper:
   matching("(?<=(a(*ACCEPT)b))", PCRE)(IRLookBehindStartRange(1, 1))
   matching("(?<=(?:a(*ACCEPT))bc)", Perl())(IRLookBehindStartRange(1, 3))
   matching("(?<=(?>a(*ACCEPT))bc)", Perl())(IRLookBehindStartRange(3, 3))
+  matching("(?<=(?:a(*ACCEPT))?+bc)", Perl())(IRLookBehindStartRange(2, 3))
   // Perl's starts are of the lengths of the literals, even where case-insensitive `ss` may match `ß`.
   matching("(?iu)(?<=ass)", Perl())(IRLookBehindStartRange(3, 3))
   // Java's starts are of the lengths of the body, where an unbounded one tries all the starts before the position.

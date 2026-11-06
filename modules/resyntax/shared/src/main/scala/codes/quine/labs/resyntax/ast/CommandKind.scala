@@ -41,8 +41,11 @@ object CommandKind:
   /** InlineFlag is an inline flag command (e.g. `(?im-x)`). */
   final case class InlineFlag(diff: FlagSetDiff) extends CommandKind
 
-  /** ResetFlag is a reset flag command (e.g. `(?^i)`). */
-  final case class ResetFlag(flagSet: FlagSet) extends CommandKind
+  /** ResetFlag is a reset flag command (e.g. `(?^i)`).
+    *
+    * `written` is the text of the flags as written, or `None` for their letters.
+    */
+  final case class ResetFlag(flagSet: FlagSet, written: Option[String] = None) extends CommandKind
 
   /** PBackReference is a named back-reference (e.g. `(?P=foo)`). */
   final case class PBackReference(name: String) extends CommandKind

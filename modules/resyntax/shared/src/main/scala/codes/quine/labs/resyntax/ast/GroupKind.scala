@@ -77,8 +77,11 @@ object GroupKind:
   /** InlineFlag is a kind of inline flag group (e.g. `(?im-x:...)`). */
   final case class InlineFlag(diff: FlagSetDiff) extends GroupKind
 
-  /** ResetFlag is a kind of reset flag group (e.g. `(?^i:...)`). */
-  final case class ResetFlag(flagSet: FlagSet) extends GroupKind
+  /** ResetFlag is a kind of reset flag group (e.g. `(?^i:...)`).
+    *
+    * `written` is the text of the flags as written, or `None` for their letters.
+    */
+  final case class ResetFlag(flagSet: FlagSet, written: Option[String] = None) extends GroupKind
 
   /** Absence is a kind of absence operator (e.g. `(?~...)`). */
   case object Absence extends GroupKind

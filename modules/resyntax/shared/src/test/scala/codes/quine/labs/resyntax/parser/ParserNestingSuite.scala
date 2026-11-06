@@ -21,7 +21,7 @@ class ParserNestingSuite extends munit.FunSuite with ParserHelper:
         val s = pattern(Max)
         val flagSet = FlagSet.parse(flags, dialect)
         val mode = Parser.determineUnitMode(s, flagSet, dialect)
-        assertReparsed(Parser.parse(s, flagSet, dialect, mode), flagSet, dialect, mode)
+        assertPrinted(Parser.parse(s, flagSet, dialect, mode), s, flagSet, dialect, mode)
       test(s"Parser.parse: $name nested beyond the limit in $dialect"):
         interceptMessage[NestingLimitException](s"Too deeply nested (limit $Max) at $pos"):
           parse(pattern(Max + 1), flags, dialect)

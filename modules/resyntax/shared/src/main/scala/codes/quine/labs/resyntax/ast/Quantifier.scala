@@ -17,6 +17,21 @@ sealed abstract class Quantifier extends Product with Serializable:
 
   def strategy: BacktrackStrategy
 
+  /** Returns the plain text of the quantifier (e.g. `{2,3}?`), which a repeat without a written text has. */
+  def plainText: String =
+    val text = this match
+      case Quantifier.Star(_)              => "*"
+      case Quantifier.Plus(_)              => "+"
+      case Quantifier.Question(_)          => "?"
+      case Quantifier.Exact(n, _)          => s"{$n}"
+      case Quantifier.Bounded(min, max, _) => s"{$min,$max}"
+      case Quantifier.MaxBounded(max, _)   => s"{,$max}"
+      case Quantifier.Unbounded(min, _)    => s"{$min,}"
+    strategy match
+      case BacktrackStrategy.Greedy     => text
+      case BacktrackStrategy.Lazy       => s"$text?"
+      case BacktrackStrategy.Possessive => s"$text+"
+
 object Quantifier:
 
   /** Star is a star quantifier (e.g. `*`). */

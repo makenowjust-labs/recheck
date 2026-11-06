@@ -12,15 +12,21 @@ import codes.quine.labs.resyntax.printer.Printer
 trait ParserHelper:
   self: munit.FunSuite =>
 
-  /** Checks the node of a pattern, and that the parser reads the printed node as the same node. */
+  /** Checks the node of a pattern, and that the printed node is the pattern. */
   def check(s: String, flags: String, dialects: Dialect*)(expected: NodeData)(using loc: munit.Location): Unit =
+    checkPrinted(s, s, flags, dialects*)(expected)
+
+  /** Checks the node of a pattern, and that the printed node is `printed`, without the text that it does not keep. */
+  def checkPrinted(s: String, printed: String, flags: String, dialects: Dialect*)(expected: NodeData)(using
+      loc: munit.Location
+  ): Unit =
     for dialect <- dialects do
       test(s"Parser.parse: /$s/$flags in $dialect"):
         val flagSet = FlagSet.parse(flags, dialect)
         val mode = Parser.determineUnitMode(s, flagSet, dialect)
         val result = Parser.parse(s, flagSet, dialect, mode)
-        assert(result.equalsWithoutLoc(Node(expected)))
-        assertReparsed(result, flagSet, dialect, mode)
+        assert(result.equalsWithoutLoc(Node(expected)), result)
+        assertPrinted(result, printed, flagSet, dialect, mode)
 
   def error(s: String, flags: String, dialects: Dialect*)(message: String)(using loc: munit.Location): Unit =
     for dialect <- dialects do
@@ -36,16 +42,19 @@ trait ParserHelper:
       val mode = Parser.determineUnitMode(s, flagSet, PerlString)
       val result = Parser.parse(s, flagSet, PerlString, mode)
       assert(result.equalsWithoutLoc(Node(expected)), result)
-      assertReparsed(result, flagSet, PerlString, mode)
+      assertPrinted(result, s, flagSet, PerlString, mode)
 
   def errorPerlString(s: String, flags: String)(message: String)(using loc: munit.Location): Unit =
     test(s"Parser.parse: /$s/$flags in Perl from a string with error \"$message\""):
       interceptMessage[ParsingException](message):
         parsePerlString(s, flags)
 
-  /** Asserts that the parser reads the printed node as the same node. */
-  def assertReparsed(node: Node, flagSet: FlagSet, dialect: Dialect, mode: UnitMode)(using munit.Location): Unit =
+  /** Asserts that the printed node is the text, and that the parser reads it as the same node. */
+  def assertPrinted(node: Node, text: String, flagSet: FlagSet, dialect: Dialect, mode: UnitMode)(using
+      munit.Location
+  ): Unit =
     val printed = Printer.print(node, flagSet, dialect, mode)
+    assertEquals(printed, text)
     assert(Parser.parse(printed, flagSet, dialect, mode).equalsWithoutLoc(node), printed)
 
   val PerlString: Dialect = Perl(source = PerlSource.String)

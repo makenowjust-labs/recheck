@@ -408,6 +408,11 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
     )
   )
 
+  // Ruby's `\u{...}` of several code points is their escapes, and a quantifier after it repeats the last one.
+  check("x\\u{41 42}*", "", Ruby())(Sequence(char('x'), char('A'), Repeat(char('B'), Unbounded(0, Greedy))))
+  check("(\\u{41 42})", "", Ruby())(Capture(1, None, Sequence(char('A'), char('B'))))
+  check("[x\\u{41 42}]", "", Ruby())(Chars(CharSet.of('A', 'B', 'x')))
+
   // Quoting command
   check("\\Qa\\E", "", Java, PCRE)(Sequence(Empty, char('a'), Empty))
   // Perl's lexer rewrites a regex literal, so its commands leave no nodes.

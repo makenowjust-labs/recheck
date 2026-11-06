@@ -14,6 +14,8 @@ sealed abstract class ClassItemData extends Product with Serializable:
         li == ri && l.equalsWithoutLoc(r)
       case (ClassItemData.ClassRange(ll, lr), ClassItemData.ClassRange(rl, rr)) =>
         ll.equalsWithoutLoc(rl) && lr.equalsWithoutLoc(rr)
+      case (ClassItemData.ClassUnicodeList(ls, wl), ClassItemData.ClassUnicodeList(rs, wr)) =>
+        ls.length == rs.length && ls.zip(rs).forall((l, r) => l.equalsWithoutLoc(r)) && wl == wr
       case (l, r) => l == r
 
 object ClassItemData:
@@ -59,6 +61,13 @@ object ClassItemData:
 
   /** ClassBlank is the text that the extended mode skips in a class (Java's `x`, and the `xx` of PCRE and Perl). */
   final case class ClassBlank(text: String) extends ClassItemData
+
+  /** ClassUnicodeList is Ruby's `\u{...}` of several code points in a class (e.g. `[\u{41 42}]`), whose items are their
+    * escapes.
+    *
+    * `written` is the text after `\u` as written (e.g. `{41  42}`), or `None` for the plain text.
+    */
+  final case class ClassUnicodeList(items: Seq[ClassItem.Value], written: Option[String] = None) extends ClassItemData
 
   sealed abstract class ClassValue extends ClassItemData:
 

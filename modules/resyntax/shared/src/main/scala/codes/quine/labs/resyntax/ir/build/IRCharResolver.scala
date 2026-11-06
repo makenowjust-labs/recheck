@@ -93,13 +93,13 @@ private[build] final class IRCharResolver(
     // The parser puts a quantifier on the last escape, but Onigmo reads the bytes of a character as one.
     if !readsByteEscapesAsUTF8 then return children
     def byteOf(node: Node): Option[Int] = node.data match
-      case NodeData.Backslash(BackslashKind.Escape(style, value)) if isRubyByte(style, value) => Some(value)
-      case _                                                                                  => None
+      case NodeData.Backslash(BackslashKind.Escape(style, value, _)) if isRubyByte(style, value) => Some(value)
+      case _                                                                                     => None
 
     val out = mutable.ArrayBuffer.empty[Node]
     for child <- children do
       child.data match
-        case NodeData.Repeat(inner, quantifier) if byteOf(inner).exists(UTF8Encoding.isContinuation) =>
+        case NodeData.Repeat(inner, quantifier, _) if byteOf(inner).exists(UTF8Encoding.isContinuation) =>
           var k = out.length
           while k > 0 && byteOf(out(k - 1)).exists(UTF8Encoding.isContinuation) do k -= 1
           val lead = if k > 0 then byteOf(out(k - 1)) else None
@@ -143,7 +143,7 @@ private[build] final class IRCharResolver(
           lits += Lit(value, None, flags, node.loc)
         case NodeData.Backslash(BackslashKind.Unknown(value)) =>
           lits += Lit(value, None, flags, node.loc)
-        case NodeData.Backslash(BackslashKind.Escape(style, value)) =>
+        case NodeData.Backslash(BackslashKind.Escape(style, value, _)) =>
           lits += Lit(value, Some(style), flags, node.loc)
         // A part has only the nodes that `isLiteral` accepts.
         // $COVERAGE-OFF$
@@ -614,9 +614,10 @@ private[build] final class IRCharResolver(
       case value: ClassItemData.ClassValue if readsByteEscapesAsUTF8 && isRubyByteValue(value) =>
         throw new IRBuildingException("Invalid multibyte escape", item.loc)
       case value: ClassItemData.ClassValue => ClassSet(closeChars(valueUnits(value, flags, item.loc), flags))
-      // `IRBuilder.build` removes the blanks.
+      // `IRBuilder.build` removes the blanks and expands Ruby's `\u{...}`.
       // $COVERAGE-OFF$
-      case ClassItemData.ClassBlank(_) => throw new IllegalStateException(s"Unexpected blank: $item")
+      case ClassItemData.ClassBlank(_) | ClassItemData.ClassUnicodeList(_, _) =>
+        throw new IllegalStateException(s"Unexpected source item: $item")
       // $COVERAGE-ON$
 
   /** Evaluates a union, where Ruby's byte escapes make characters (e.g. `[\xC3\xA9]` is `[é]`). */
@@ -680,9 +681,9 @@ private[build] final class IRCharResolver(
     out.toIndexedSeq
 
   private def classLit(value: ClassItemData.ClassValue, flags: IRCharFlagSet, loc: SourceLocation): Lit = value match
-    case ClassItemData.ClassLiteral(v)                                     => Lit(v, None, flags, loc)
-    case ClassItemData.ClassBackslashValue(BackslashKind.Unknown(v))       => Lit(v, None, flags, loc)
-    case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v)) => Lit(v, Some(style), flags, loc)
+    case ClassItemData.ClassLiteral(v)                                        => Lit(v, None, flags, loc)
+    case ClassItemData.ClassBackslashValue(BackslashKind.Unknown(v))          => Lit(v, None, flags, loc)
+    case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v, _)) => Lit(v, Some(style), flags, loc)
 
   private def valueUnits(value: ClassItemData.ClassValue, flags: IRCharFlagSet, loc: SourceLocation): Seq[UChar] =
     val units = unitsOf(classLit(value, flags, loc))
@@ -713,8 +714,8 @@ private[build] final class IRCharResolver(
     ClassSet(eq.closure(CharSet.of((b.init ++ e.tail)*)).union(eq.closeRange(CharSet.range(b.last, e.head))))
 
   private def isRubyByteValue(value: ClassItemData.ClassValue): Boolean = value match
-    case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v)) => isRubyByte(style, v)
-    case _                                                                 => false
+    case ClassItemData.ClassBackslashValue(BackslashKind.Escape(style, v, _)) => isRubyByte(style, v)
+    case _                                                                    => false
 
   private def posix(name: String, flags: IRCharFlagSet, loc: SourceLocation): CharSet =
     val set = classes.posix(name, flags).getOrElse(throw new IRBuildingException("Unknown POSIX class name", loc))

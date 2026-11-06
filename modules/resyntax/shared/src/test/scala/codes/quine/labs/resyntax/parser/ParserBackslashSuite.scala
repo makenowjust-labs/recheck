@@ -6,6 +6,7 @@ import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
 import codes.quine.labs.resyntax.ast.BoundaryModifier.*
 import codes.quine.labs.resyntax.ast.CaseCommandKind.*
+import codes.quine.labs.resyntax.ast.ClassItem
 import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.CommandKind
 import codes.quine.labs.resyntax.ast.EscapeClassKind.*
@@ -14,6 +15,7 @@ import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.FlagSetDiff
 import codes.quine.labs.resyntax.ast.GroupKind.*
 import codes.quine.labs.resyntax.ast.NameStyle.*
+import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.Quantifier.*
 import codes.quine.labs.resyntax.ast.Reference.*
@@ -21,32 +23,44 @@ import codes.quine.labs.resyntax.dialect.Dialect.*
 
 class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
 
+  val escapeA: Node = Node(Backslash(Escape(UnicodeBracket, 0x41)))
+
+  val escapeB: Node = Node(Backslash(Escape(UnicodeBracket, 0x42)))
+
   // Java skips whitespace and comments in an escape except right after the backslash (checked with Java 27.0.1).
-  check("\\p {L}", "x", Java)(Backslash(EscapeClass(UnicodeProperty("L"))))
-  check("\\p{ L}", "x", Java)(Backslash(EscapeClass(UnicodeProperty("L"))))
-  check("\\P #c\nL", "x", Java)(Backslash(EscapeClass(NonUnicodeBareProperty("L"))))
-  check("\\b {g}", "x", Java)(Backslash(Assert(Boundary(Some(GModifier)))))
-  check("\\b{g }", "x", Java)(Backslash(Assert(Boundary(Some(GModifier)))))
+  // They are kept in the escapes of values, but not in the others.
+  checkPrinted("\\p {L}", "\\p{L}", "x", Java)(Backslash(EscapeClass(UnicodeProperty("L"))))
+  checkPrinted("\\p{ L}", "\\p{L}", "x", Java)(Backslash(EscapeClass(UnicodeProperty("L"))))
+  checkPrinted("\\P #c\nL", "\\PL", "x", Java)(Backslash(EscapeClass(NonUnicodeBareProperty("L"))))
+  checkPrinted("\\b {g}", "\\b{g}", "x", Java)(Backslash(Assert(Boundary(Some(GModifier)))))
+  checkPrinted("\\b{g }", "\\b{g}", "x", Java)(Backslash(Assert(Boundary(Some(GModifier)))))
   error("\\b{ g}", "x", Java)("Incomplete quantifier at 2")
-  check("(?<na>x)\\k <n a >", "x", Java):
+  checkPrinted("(?<na>x)\\k <n a >", "(?<na>x)\\k<na>", "x", Java):
     Sequence(
       Group(NamedCapture(Angle, "na"), Literal('x')),
       Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("na")))
     )
-  check(s"${"(a)" * 12}\\1 2", "x", Java):
+  checkPrinted(s"${"(a)" * 12}\\1 2", s"${"(a)" * 12}\\12", "x", Java):
     Sequence(
       Seq.fill(12)(Group(IndexedCapture, Literal('a'))) :+
         Backslash(EscapeBackReference(BareBackReference, IndexedReference(12)))*
     )
-  check("\\N {LATIN SMALL LETTER A}", "x", Java)(Backslash(EscapeClass(CharName("LATIN SMALL LETTER A"))))
-  check("\\c A", "x", Java)(Backslash(Escape(Control('A'), 0x01)))
-  check("\\0 1 2", "x", Java)(Backslash(Escape(BareOctal, 0x0a)))
-  check("\\x4 1", "x", Java)(Backslash(Escape(Hex2, 0x41)))
-  check("\\x {4 1 }", "x", Java)(Backslash(Escape(HexBracket, 0x41)))
-  check("\\u 00 #c\n41", "x", Java)(Backslash(Escape(UnicodeHex4, 0x41)))
-  check("\\uD83D \\uDE00", "x", Java)(Backslash(Escape(UnicodeHex4Pair, 0x1f600)))
+  check("(a)\\1 2", "x", Java):
+    val ref = Backslash(EscapeBackReference(BareBackReference, IndexedReference(1)))
+    Sequence(Group(IndexedCapture, Literal('a')), ref, Blank(" "), Literal('2'))
+  check("(a)\\1 *", "x", Java):
+    val ref = Backslash(EscapeBackReference(BareBackReference, IndexedReference(1)))
+    Sequence(Group(IndexedCapture, Literal('a')), Repeat(Node(ref), Star(Greedy), Some(" *")))
+  checkPrinted("\\N {LATIN SMALL LETTER A}", "\\N{LATIN SMALL LETTER A}", "x", Java):
+    Backslash(EscapeClass(CharName("LATIN SMALL LETTER A")))
+  check("\\c A", "x", Java)(Backslash(Escape(Control('A'), 0x01, Some(" A"))))
+  check("\\0 1 2", "x", Java)(Backslash(Escape(BareOctal, 0x0a, Some(" 1 2"))))
+  check("\\x4 1", "x", Java)(Backslash(Escape(Hex2, 0x41, Some("4 1"))))
+  check("\\x {4 1 }", "x", Java)(Backslash(Escape(HexBracket, 0x41, Some(" {4 1 }"))))
+  check("\\u 00 #c\n41", "x", Java)(Backslash(Escape(UnicodeHex4, 0x41, Some(" 00 #c\n41"))))
+  check("\\uD83D \\uDE00", "x", Java)(Backslash(Escape(UnicodeHex4Pair, 0x1f600, Some("D83D \\uDE00"))))
   check("\\uD83D \\u0041", "x", Java):
-    Sequence(Backslash(Escape(UnicodeHex4, 0xd83d)), Backslash(Escape(UnicodeHex4, 0x41)))
+    Sequence(Backslash(Escape(UnicodeHex4, 0xd83d, Some("D83D "))), Backslash(Escape(UnicodeHex4, 0x41)))
   check("\\uD83D\\u{41}", "u", JavaScript):
     Sequence(Backslash(Escape(UnicodeHex4, 0xd83d)), Backslash(Escape(UnicodeBracket, 0x41)))
   check("\\ a", "x", Java)(Sequence(Backslash(Unknown(' ')), Literal('a')))
@@ -81,10 +95,12 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   check("\\c{", "", Ruby())(Backslash(Escape(Control('{'), 0x1b)))
   error("\\c{", "", Perl())("Invalid backslash escape at 2")
   error("\\c", "", DotNet, Java, PCRE, Perl(), Ruby())("Invalid backslash escape at 2")
-  check("\\c\\\\", "", Ruby())(Backslash(Escape(Control('\\'), 0x1c)))
-  check("\\C-a", "", Ruby())(Backslash(Escape(ControlDash, 0x01)))
-  check("\\M-a", "", Ruby())(Backslash(Escape(Meta, 0xe1)))
-  check("\\M-\\C-a", "", Ruby())(Backslash(Escape(Meta, 0x81)))
+  check("\\c\\\\", "", Ruby())(Backslash(Escape(Control('\\'), 0x1c, Some("\\\\"))))
+  check("\\C-a", "", Ruby())(Backslash(Escape(ControlDash, 0x01, Some("a"))))
+  check("\\C-j\\C-\\x0A", "", Ruby()):
+    Sequence(Backslash(Escape(ControlDash, 0x0a, Some("j"))), Backslash(Escape(ControlDash, 0x0a)))
+  check("\\M-a", "", Ruby())(Backslash(Escape(Meta, 0xe1, Some("a"))))
+  check("\\M-\\C-a", "", Ruby())(Backslash(Escape(Meta, 0x81, Some("\\C-a"))))
   error("\\C-", "", Ruby())("Invalid backslash escape at 3")
   check("\\C", "", PCRE)(Backslash(EscapeClass(CodeUnit)))
   error("\\C", "", Perl())("Invalid backslash escape at 1")
@@ -168,7 +184,8 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
       Group(NamedCapture(Angle, "foo"), Sequence()),
       Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("foo")))
     )
-  check("(?<AB>)\\k<\\u0041\\u{42}>", "", JavaScript):
+  // The escapes in a group name are not kept.
+  checkPrinted("(?<AB>)\\k<\\u0041\\u{42}>", "(?<AB>)\\k<AB>", "", JavaScript):
     Sequence(
       Group(NamedCapture(Angle, "AB"), Sequence()),
       Backslash(EscapeBackReference(KBackReference(Angle), NamedReference("AB")))
@@ -183,17 +200,18 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   check("\\k'1-1'", "", Ruby()):
     Backslash(EscapeBackReference(KBackReference(Quote), LeveledReference(IndexedReference(1), -1)))
   error("\\k<1>", "", PCRE, Perl())("Invalid identifier at 3")
-  check("\\k{ foo }", "", PCRE, Perl()):
+  checkPrinted("\\k{ foo }", "\\k{foo}", "", PCRE, Perl()):
     Backslash(EscapeBackReference(KBackReference(Curly), NamedReference("foo")))
   error("\\k{foo}", "", DotNet, Java)("Invalid backslash escape at 2")
   error("\\k'foo'", "", Java)("Invalid backslash escape at 2")
   check("\\kx", "", Ruby())(Sequence(Backslash(Unknown('k')), Literal('x')))
-  check("\\g{ 1 }", "", PCRE, Perl())(Backslash(EscapeBackReference(GBackReference(Curly), IndexedReference(1))))
+  checkPrinted("\\g{ 1 }", "\\g{1}", "", PCRE, Perl()):
+    Backslash(EscapeBackReference(GBackReference(Curly), IndexedReference(1)))
   check("\\g1", "", Ruby())(Sequence(Backslash(Unknown('g')), Literal('1')))
-  check("\\la", "", Perl())(Literal('a'))
+  checkPrinted("\\la", "a", "", Perl())(Literal('a'))
   checkPerlString("\\l", "")(Backslash(Unknown('l')))
   check("\\n", "", All*)(Backslash(Escape(Single('n'), 0x0a)))
-  check("\\o{010}", "", PCRE, Perl())(Backslash(Escape(Octal, 0x08)))
+  check("\\o{010}", "", PCRE, Perl())(Backslash(Escape(Octal, 0x08, Some("{010}"))))
   check("\\p{Letter}", "", DotNet, Java, PCRE, Perl(), Ruby())(Backslash(EscapeClass(UnicodeProperty("Letter"))))
   check("\\p{Letter}", "u", JavaScript)(Backslash(EscapeClass(UnicodeProperty("Letter"))))
   check("\\p{_a1}", "u", JavaScript)(Backslash(EscapeClass(UnicodeProperty("_a1"))))
@@ -205,45 +223,53 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   check("\\pL", "", Ruby())(Sequence(Backslash(Unknown('p')), Literal('L')))
   check("[\\p]", "", Ruby())(Class(false, ClassBackslashValue(Unknown('p'))))
   error("\\pL", "", DotNet)("Invalid backslash escape at 2")
-  check("\\p{^L}", "", PCRE, Perl(), Ruby())(Backslash(EscapeClass(NonUnicodeProperty("L"))))
-  check("\\P{^L}", "", PCRE, Perl(), Ruby())(Backslash(EscapeClass(UnicodeProperty("L"))))
+  // The negation by `^`, the blanks and the separator of a property name are not kept.
+  checkPrinted("\\p{^L}", "\\P{L}", "", PCRE, Perl(), Ruby())(Backslash(EscapeClass(NonUnicodeProperty("L"))))
+  checkPrinted("\\P{^L}", "\\p{L}", "", PCRE, Perl(), Ruby())(Backslash(EscapeClass(UnicodeProperty("L"))))
   // .NET reads a property name as it is, and IR rejects an unknown one.
   check("\\p{^L}", "", DotNet)(Backslash(EscapeClass(UnicodeProperty("^L"))))
   // .NET's block names have hyphens (e.g. `IsLatin-1Supplement`).
   check("\\p{IsLatin-1Supplement}", "", DotNet)(Backslash(EscapeClass(UnicodeProperty("IsLatin-1Supplement"))))
   check("\\p{block=Basic Latin}", "", Java)(Backslash(EscapeClass(UnicodePropertyValue("block", "Basic Latin"))))
-  check("\\p{ L& }", "", PCRE, Perl())(Backslash(EscapeClass(UnicodeProperty("L&"))))
-  check("\\p{Bc:EN}", "", PCRE, Perl())(Backslash(EscapeClass(UnicodePropertyValue("Bc", "EN"))))
+  checkPrinted("\\p{ L& }", "\\p{L&}", "", PCRE, Perl())(Backslash(EscapeClass(UnicodeProperty("L&"))))
+  checkPrinted("\\p{Bc:EN}", "\\p{Bc=EN}", "", PCRE, Perl()):
+    Backslash(EscapeClass(UnicodePropertyValue("Bc", "EN")))
   // Ruby reads a property name as it is, which only `=` separates, and IR rejects an unknown one.
   check("\\p{ L& }", "", Ruby())(Backslash(EscapeClass(UnicodeProperty(" L& "))))
   check("\\p{ ^L}", "", Ruby())(Backslash(EscapeClass(UnicodeProperty(" ^L"))))
-  check("\\p{^In CB = Linker}", "", Ruby())(Backslash(EscapeClass(NonUnicodePropertyValue("In CB ", " Linker"))))
+  checkPrinted("\\p{^In CB = Linker}", "\\P{In CB = Linker}", "", Ruby()):
+    Backslash(EscapeClass(NonUnicodePropertyValue("In CB ", " Linker")))
   check("\\p{Bc:EN}", "", Ruby())(Backslash(EscapeClass(UnicodeProperty("Bc:EN"))))
   error("\\p{}", "", PCRE, Perl(), Ruby())("Invalid backslash escape at 3")
   error("\\p{L", "", PCRE, Perl(), Ruby())("Invalid backslash escape at 4")
   check("\\r", "", All*)(Backslash(Escape(Single('r'), 0x0d)))
   check("\\s", "", All*)(Backslash(EscapeClass(Space)))
   check("\\t", "", All*)(Backslash(Escape(Single('t'), 0x09)))
-  check("\\ua", "", Perl())(Literal('A'))
+  checkPrinted("\\ua", "A", "", Perl())(Literal('A'))
   checkPerlString("\\u", "")(Backslash(Unknown('u')))
   check("\\uABCD", "", DotNet, Java, JavaScript, Python(), Ruby())(Backslash(Escape(UnicodeHex4, 0xabcd)))
   check("\\u{ABCDE}", "u", JavaScript)(Backslash(Escape(UnicodeBracket, 0xabcde)))
   check("\\uA", "", JavaScript)(Sequence(Backslash(Unknown('u')), Literal('A')))
   error("\\uA", "", DotNet, Java, Python(), Ruby())("Invalid backslash escape at 2")
   check("\\u{41}", "", Ruby())(Backslash(Escape(UnicodeBracket, 0x41)))
-  check("\\u{ 41  42 }", "", Ruby()):
-    Sequence(Backslash(Escape(UnicodeBracket, 0x41)), Backslash(Escape(UnicodeBracket, 0x42)))
+  // Ruby expands `\u{...}` of several code points into their escapes before reading the pattern.
+  check("\\u{41 42}", "", Ruby())(UnicodeList(Seq(escapeA, escapeB)))
+  check("\\u{ 41  42 }", "", Ruby())(UnicodeList(Seq(escapeA, escapeB), Some("{ 41  42 }")))
   check("[\\u{41 42}]", "", Ruby()):
-    Class(
-      false,
-      ClassUnion(ClassBackslashValue(Escape(UnicodeBracket, 0x41)), ClassBackslashValue(Escape(UnicodeBracket, 0x42)))
-    )
+    val items = Seq(0x41, 0x42).map(value => ClassItem.Value(ClassBackslashValue(Escape(UnicodeBracket, value))))
+    Class(false, ClassUnicodeList(items))
+  check("(\\u{41 42})", "", Ruby())(Group(IndexedCapture, UnicodeList(Seq(escapeA, escapeB))))
+  error("\\C-\\u{41 42}", "", Ruby())("Invalid backslash escape at 3")
+  // So a quantifier after it repeats the last code point.
+  check("\\u{41 42}*", "", Ruby()):
+    UnicodeList(Seq(escapeA, Node(Repeat(escapeB, Star(Greedy)))))
+  check("\\u{41 42}+ *", "x", Ruby()):
+    UnicodeList(Seq(escapeA, Node(Repeat(Node(Repeat(escapeB, Plus(Greedy))), Star(Greedy), Some(" *")))))
   // Ruby separates the code points by ASCII spaces, and reads at most six digits for each.
   check("\\u{\n41\t\r\u000b\f42\n}", "", Ruby()):
-    Sequence(Backslash(Escape(UnicodeBracket, 0x41)), Backslash(Escape(UnicodeBracket, 0x42)))
-  check("\\u{41\n42}", "x", Ruby()):
-    Sequence(Backslash(Escape(UnicodeBracket, 0x41)), Backslash(Escape(UnicodeBracket, 0x42)))
-  check("\\u{000041}", "", Ruby())(Backslash(Escape(UnicodeBracket, 0x41)))
+    UnicodeList(Seq(escapeA, escapeB), Some("{\n41\t\r\u000b\f42\n}"))
+  check("\\u{41\n42}", "x", Ruby())(UnicodeList(Seq(escapeA, escapeB), Some("{41\n42}")))
+  check("\\u{000041}", "", Ruby())(Backslash(Escape(UnicodeBracket, 0x41, Some("{000041}"))))
   error("\\u{0000041}", "", Ruby())("Invalid backslash escape at 3")
   error("\\u{41\u00a042}", "", Ruby())("Invalid backslash escape at 5")
   error("\\u{41\u001c42}", "", Ruby())("Invalid backslash escape at 5")
@@ -260,15 +286,28 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   check("\\v", "", DotNet, JavaScript, Python(), Ruby())(Backslash(Escape(Single('v'), 0x0b)))
   check("\\w", "", All*)(Backslash(EscapeClass(Word)))
   check("\\xAB", "", All*)(Backslash(Escape(Hex2, 0xab)))
+  // An escape keeps its digits as written.
+  check("\\x7f", "", All*)(Backslash(Escape(Hex2, 0x7f, Some("7f"))))
+  check("\\u000d", "", DotNet, Java, JavaScript, Python(), Ruby()):
+    Backslash(Escape(UnicodeHex4, 0x0d, Some("000d")))
+  check("\\U0001f600", "", Python())(Backslash(Escape(UnicodeHex8, 0x1f600, Some("0001f600"))))
+  check("\\uD83D\\ude00", "", Java)(Backslash(Escape(UnicodeHex4Pair, 0x1f600, Some("D83D\\ude00"))))
+  check("\\uD83D\\ude00", "u", JavaScript)(Backslash(Escape(UnicodeHex4Pair, 0x1f600, Some("D83D\\ude00"))))
+  check("\\u{0041}", "u", JavaScript)(Backslash(Escape(UnicodeBracket, 0x41, Some("{0041}"))))
+  check("\\u{0041}", "", Ruby())(Backslash(Escape(UnicodeBracket, 0x41, Some("{0041}"))))
+  check("\\x{0041}", "", Java, PCRE, Perl())(Backslash(Escape(HexBracket, 0x41, Some("{0041}"))))
+  check("\\o{0101}", "", PCRE, Perl())(Backslash(Escape(Octal, 0x41, Some("{0101}"))))
+  check("\\N{U+0041}", "", Perl())(Backslash(Escape(NamedHex, 0x41, Some("{U+0041}"))))
+  check("\\01", "", PCRE, Python())(Backslash(Escape(BareOctal, 1, Some("01"))))
   check("\\xA", "", PCRE, Perl(), Ruby())(Backslash(Escape(Hex1, 0x0a)))
   check("\\x", "", Perl())(Backslash(Escape(Hex0, 0x00)))
   check("\\xG", "", JavaScript)(Sequence(Backslash(Unknown('x')), Literal('G')))
   error("\\xG", "", DotNet, Java, PCRE, Python(), Ruby())("Invalid backslash escape at 2")
   error("\\xA", "", DotNet, Java, Python())("Invalid backslash escape at 2")
-  check("\\x{}", "", Perl())(Backslash(Escape(HexBracket, 0x00)))
+  check("\\x{}", "", Perl())(Backslash(Escape(HexBracket, 0x00, Some("{}"))))
   error("\\x{}", "", Java, PCRE)("Invalid backslash escape at 3")
-  check("\\x{ 41 }", "", PCRE, Perl())(Backslash(Escape(HexBracket, 0x41)))
-  check("\\x{4G}", "", Perl())(Backslash(Escape(HexBracket, 0x04)))
+  check("\\x{ 41 }", "", PCRE, Perl())(Backslash(Escape(HexBracket, 0x41, Some("{ 41 }"))))
+  check("\\x{4G}", "", Perl())(Backslash(Escape(HexBracket, 0x04, Some("{4G}"))))
   error("\\x{4G}", "", Java, PCRE)("Invalid backslash escape at 4")
   error("\\x{100}", "", PCRE)("Code point too large at 3")
   check("\\x{10FFFF}", "u", PCRE)(Backslash(Escape(HexBracket, 0x10ffff)))
@@ -278,7 +317,7 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   error("\\N{U+DFFF}", "u", PCRE)("Invalid Unicode escape at 5")
   error("\\x{110000}", "", Java)("Code point too large at 3")
   check("\\x{110000}", "", Perl())(Backslash(Escape(HexBracket, 0x110000)))
-  check("\\o{8}", "", Perl())(Backslash(Escape(Octal, 0x00)))
+  check("\\o{8}", "", Perl())(Backslash(Escape(Octal, 0x00, Some("{8}"))))
   error("\\o{8}", "", PCRE)("Invalid backslash escape at 3")
   error("\\o{}", "", PCRE, Perl())("Invalid backslash escape at 3")
   check("\\x{ABCD}", "", Java, Perl())(Backslash(Escape(HexBracket, 0xabcd)))
@@ -292,15 +331,15 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   check("\\B{sb}", "", Perl())(Backslash(Assert(NonBoundary(Some(SbModifier)))))
   check("\\D", "", All*)(Backslash(EscapeClass(NonDigit)))
   check("\\E", "", PCRE)(Backslash(CaseCommand(EndCaseCommand)))
-  check("a\\E", "", Perl())(Literal('a'))
+  checkPrinted("a\\E", "a", "", Perl())(Literal('a'))
   checkPerlString("\\E", "")(Backslash(Unknown('E')))
-  check("\\FA", "", Perl())(Literal('a'))
+  checkPrinted("\\FA", "a", "", Perl())(Literal('a'))
   checkPerlString("\\F", "")(Backslash(Unknown('F')))
   check("\\G", "", DotNet, Java, PCRE, Perl(), Ruby())(Backslash(Assert(Sticky)))
   check("\\H", "", Java, PCRE, Perl())(Backslash(EscapeClass(NonHorizontal)))
   check("\\H", "", Ruby())(Backslash(EscapeClass(NonHexDigit)))
   check("\\K", "", PCRE, Perl(), Ruby())(Backslash(Assert(Cut)))
-  check("\\LA", "", Perl())(Literal('a'))
+  checkPrinted("\\LA", "a", "", Perl())(Literal('a'))
   checkPerlString("\\L", "")(Backslash(Unknown('L')))
   check("\\P{Letter}", "", DotNet, Java, PCRE, Perl(), Ruby())(Backslash(EscapeClass(NonUnicodeProperty("Letter"))))
   check("\\P{Letter}", "u", JavaScript)(Backslash(EscapeClass(NonUnicodeProperty("Letter"))))
@@ -328,9 +367,9 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
       Literal('\\'),
       Backslash(CaseCommand(EndCaseCommand))
     )
-  check("\\Qa.\\E", "", Perl())(Sequence(Literal('a'), Backslash(Escape(Single('.'), '.'))))
-  check("\\Q\\d\\E", "", Perl())(Sequence(Backslash(Escape(Single('\\'), '\\')), Literal('d')))
-  check("\\U\\d", "", Perl())(Backslash(EscapeClass(NonDigit)))
+  checkPrinted("\\Qa.\\E", "a\\.", "", Perl())(Sequence(Literal('a'), Backslash(Escape(Single('.'), '.'))))
+  checkPrinted("\\Q\\d\\E", "\\\\d", "", Perl())(Sequence(Backslash(Escape(Single('\\'), '\\')), Literal('d')))
+  checkPrinted("\\U\\d", "\\D", "", Perl())(Backslash(EscapeClass(NonDigit)))
   checkPerlString("\\Qa.\\E", "")(Sequence(Backslash(Unknown('Q')), Literal('a'), Dot, Backslash(Unknown('E'))))
   checkPerlString("\\U\\d", "")(Sequence(Backslash(Unknown('U')), Backslash(EscapeClass(Digit))))
   check("\\N", "", PCRE, Perl())(Backslash(EscapeClass(NonNewline)))
@@ -353,25 +392,26 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   check("\\W", "", All*)(Backslash(EscapeClass(NonWord)))
   check("\\X", "", Java, PCRE, Perl(), Ruby())(Backslash(EscapeClass(GraphemeCluster)))
   check("\\Z", "", DotNet, Java, PCRE, Perl(), Python(), Ruby())(Backslash(Assert(UpperEnd)))
-  check("\\010", "", DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())(Backslash(Escape(BareOctal, 8)))
-  check("\\0", "", DotNet, JavaScript, PCRE, Perl(), Python(), Ruby())(Backslash(Escape(BareOctal, 0)))
+  check("\\010", "", DotNet, JavaScript, PCRE, Perl(), Python(), Ruby())(Backslash(Escape(BareOctal, 8)))
+  check("\\010", "", Java)(Backslash(Escape(BareOctal, 8, Some("10"))))
+  check("\\0", "", DotNet, JavaScript, PCRE, Perl(), Python(), Ruby())(Backslash(Escape(BareOctal, 0, Some("0"))))
   error("\\0", "", Java)("Invalid octal escape at 2")
   check("\\0", "u", JavaScript)(Backslash(Escape(Single('0'), 0)))
   check("[\\0]", "v", JavaScript)(Class(false, ClassBackslashValue(Escape(Single('0'), 0))))
   error("\\00", "u", JavaScript)("Invalid backslash escape at 1")
-  check("\\0477", "", Java)(Sequence(Backslash(Escape(BareOctal, 39)), Literal('7')))
+  check("\\0477", "", Java)(Sequence(Backslash(Escape(BareOctal, 39, Some("47"))), Literal('7')))
   check("\\0377", "", Java)(Backslash(Escape(BareOctal, 0xff)))
   check("[\\8]", "", JavaScript, PCRE, Perl(), Ruby())(Class(false, ClassBackslashValue(Unknown('8'))))
   error("[\\8]", "", DotNet, Java, Python())("Invalid backslash escape at 2")
   error("[\\1]", "", Java)("Invalid backslash escape at 2")
   check("[\\1]", "", DotNet, JavaScript, PCRE, Perl(), Python(), Ruby())(
-    Class(false, ClassBackslashValue(Escape(BareOctal, 1)))
+    Class(false, ClassBackslashValue(Escape(BareOctal, 1, Some("1"))))
   )
   check("\\400", "", DotNet, Perl())(Backslash(Escape(BareOctal, 0x100)))
   check("\\400", "u", PCRE)(Backslash(Escape(BareOctal, 0x100)))
   error("\\400", "", PCRE, Python(), Ruby())("Octal escape value too large at 1")
-  check("\\10", "", DotNet, PCRE, Perl(), Ruby())(Backslash(Escape(BareOctal, 8)))
-  check("\\18", "", DotNet, PCRE, Perl(), Ruby())(Sequence(Backslash(Escape(BareOctal, 1)), Literal('8')))
+  check("\\10", "", DotNet, PCRE, Perl(), Ruby())(Backslash(Escape(BareOctal, 8, Some("10"))))
+  check("\\18", "", DotNet, PCRE, Perl(), Ruby())(Sequence(Backslash(Escape(BareOctal, 1, Some("1"))), Literal('8')))
   check("\\123", "", Python())(Backslash(Escape(BareOctal, 83)))
   check("\\128", "", Python())(
     Sequence(Backslash(EscapeBackReference(BareBackReference, IndexedReference(12))), Literal('8'))
@@ -387,7 +427,7 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
     val empty = Group(IndexedCapture, Sequence())
     val ref1 = Backslash(EscapeBackReference(BareBackReference, IndexedReference(1)))
     val ref10 = Backslash(EscapeBackReference(BareBackReference, IndexedReference(10)))
-    val octal10 = Backslash(Escape(BareOctal, 8))
+    val octal10 = Backslash(Escape(BareOctal, 8, Some("10")))
     check("()" * 9 + "\\10()", "", PCRE, Perl(), Ruby())(Sequence(Seq.fill(9)(empty) ++ Seq(octal10, empty)*))
     check("()" * 9 + "\\10()", "", Java)(Sequence(Seq.fill(9)(empty) ++ Seq(ref1, Literal('0'), empty)*))
     check("()" * 9 + "\\10()", "", DotNet)(Sequence(Seq.fill(9)(empty) ++ Seq(ref10, empty)*))
@@ -427,7 +467,7 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
     Sequence(Group(IndexedCapture, Sequence()) +: Backslash(Unknown('9')) +: Seq.fill(10)(Literal('9'))*)
   check("()\\89", "", Ruby())(Sequence(Group(IndexedCapture, Sequence()), Backslash(Unknown('8')), Literal('9')))
   check("\\9", "", Ruby())(Backslash(EscapeBackReference(BareBackReference, IndexedReference(9))))
-  check("\\412", "", JavaScript)(Sequence(Backslash(Escape(BareOctal, 33)), Literal('2')))
+  check("\\412", "", JavaScript)(Sequence(Backslash(Escape(BareOctal, 33, Some("41"))), Literal('2')))
   check("()\\1", "", All*):
     Sequence(Group(IndexedCapture, Sequence()), Backslash(EscapeBackReference(BareBackReference, IndexedReference(1))))
   check("\\1", "", DotNet, Java, PCRE, Perl(), Python(), Ruby()):

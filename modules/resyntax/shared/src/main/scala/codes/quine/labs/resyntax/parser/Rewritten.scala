@@ -33,10 +33,11 @@ private[parser] final class Rewritten(val text: String, starts: Array[Int], ends
   private def relocateData(data: NodeData): NodeData = data match
     case NodeData.Disjunction(nodes)  => NodeData.Disjunction(nodes.map(relocate))
     case NodeData.Sequence(nodes)     => NodeData.Sequence(nodes.map(relocate))
-    case NodeData.Repeat(node, q)     => NodeData.Repeat(relocate(node), q)
+    case data: NodeData.Repeat        => data.copy(node = relocate(data.node))
     case NodeData.Group(kind, node)   => NodeData.Group(kind, relocate(node))
     case NodeData.Command(kind)       => NodeData.Command(relocateCommand(kind))
     case NodeData.Class(invert, item) => NodeData.Class(invert, relocateItem(item))
+    case data: NodeData.UnicodeList   => data.copy(nodes = data.nodes.map(relocate))
     case data                         => data
 
   private def relocateCommand(kind: CommandKind): CommandKind = kind match
@@ -66,6 +67,7 @@ private[parser] final class Rewritten(val text: String, starts: Array[Int], ends
     case ClassItemData.ClassIntersection(l, r) => ClassItemData.ClassIntersection(relocateItem(l), relocateItem(r))
     case ClassItemData.ClassNest(invert, item) => ClassItemData.ClassNest(invert, relocateItem(item))
     case ClassItemData.ClassRange(begin, end)  => ClassItemData.ClassRange(relocateValue(begin), relocateValue(end))
+    case data: ClassItemData.ClassUnicodeList  => data.copy(items = data.items.map(relocateValue))
     case data                                  => data
 
 private[parser] object Rewritten:

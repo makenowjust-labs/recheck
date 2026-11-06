@@ -169,8 +169,11 @@ private[parser] final class Parser(
   /** The offset of the first reference by a group number, which Ruby rejects in a pattern with named captures. */
   private var numberedReferenceOffset: Option[Int] = None
 
-  /** The code points of Ruby's `\u{X Y}` after the first one, which is read first, until the caller takes them. */
-  private var pendingCodePoints: List[Int] = Nil
+  /** Ruby's `\u{X Y}` just read, whose first code point is read as an escape, until the caller takes it. */
+  private var pendingUnicodeList: Option[PendingUnicodeList] = None
+
+  /** PendingUnicodeList is the code points of Ruby's `\u{X Y}`, and the text after `\u` unless it is the plain text. */
+  private final case class PendingUnicodeList(values: Seq[Int], written: Option[String])
 
   /** The `(?#...)` ranges that Ruby removes from the source before parsing, as maps from start to end and back. */
   private val removedCommentEnds: Map[Int, Int] =
@@ -273,14 +276,20 @@ private[parser] final class Parser(
         parseLiteral(stack)
 
   private def parseSimpleRepeat(stack: mutable.Stack[Node], buildQuantifier: BacktrackStrategy => Quantifier): Unit =
+    val textStart = quantifierTextStart(stack)
     val node = popRepeatable(stack)
     next()
     val strategy = parseBacktrackStrategy(exact = false)
     val quantifier = buildQuantifier(strategy)
-    pushRepeat(stack, node, quantifier)
+    pushRepeat(stack, node, quantifier, textStart)
+
+  /** Returns the start of the text of a quantifier here, which has the blanks and comments before it. */
+  private def quantifierTextStart(stack: mutable.Stack[Node]): Int =
+    stack.takeWhile(isComment).lastOption.fold(offset)(_.loc.start)
 
   private def parseCurlyQuantifier(stack: mutable.Stack[Node]): Unit =
     val save = offset
+    val textStart = quantifierTextStart(stack)
     if stack.forall(isComment) && featureSet.readsLeadingCurlyAsLiteral then
       resetBracket(stack, save)
       return
@@ -293,7 +302,7 @@ private[parser] final class Parser(
     if minOption.isDefined && currentChar == '}' then
       next()
       val strategy = parseBacktrackStrategy(exact = true)
-      pushCurlyRepeat(stack, Quantifier.Exact(minOption.get, strategy))
+      pushCurlyRepeat(stack, Quantifier.Exact(minOption.get, strategy), textStart)
       return
 
     if isEnd || currentChar != ',' || minOption.isEmpty && !featureSet.hasMaxBounded then
@@ -319,19 +328,25 @@ private[parser] final class Parser(
       case (Some(min), None) => Quantifier.Unbounded(min, strategy)
       case (None, Some(max)) => Quantifier.MaxBounded(max, strategy)
       case (None, None)      => Quantifier.Unbounded(0, strategy)
-    pushCurlyRepeat(stack, quantifier)
+    pushCurlyRepeat(stack, quantifier, textStart)
 
-  private def pushCurlyRepeat(stack: mutable.Stack[Node], quantifier: Quantifier): Unit =
+  private def pushCurlyRepeat(stack: mutable.Stack[Node], quantifier: Quantifier, textStart: Int): Unit =
     stack.find(!isComment(_)) match
       // Java ignores a curly quantifier following another quantifier or nothing: `a{2}{3}` matches `aa`.
-      case Some(node @ Node(NodeData.Repeat(_, _), _)) if featureSet.ignoresCurlyAfterRepeat =>
+      case Some(node @ Node(repeat: NodeData.Repeat, _)) if featureSet.ignoresCurlyAfterRepeat =>
         while stack.headOption.exists(isComment) do stack.pop()
         stack.pop()
-        stack.push(node.copy(loc = node.loc.copy(end = offset)))
+        val written = repeat.written.getOrElse(repeat.quantifier.plainText) + writtenText(node.loc.end)
+        stack.push(Node(repeat.copy(written = Some(written)), node.loc.copy(end = offset)))
+      // The blank before an ignored curly quantifier keeps its text (e.g. ` {2}` of the extended mode).
       case None if featureSet.ignoresCurlyAfterRepeat =>
-        ()
+        stack.headOption match
+          case Some(Node(NodeData.Blank(text), loc)) =>
+            stack.pop()
+            stack.push(Node(NodeData.Blank(text + writtenText(loc.end)), loc.copy(end = offset)))
+          case _ => ()
       case _ =>
-        pushRepeat(stack, popRepeatable(stack), quantifier)
+        pushRepeat(stack, popRepeatable(stack), quantifier, textStart)
 
   private def parseRepeatCountOption(): Option[Int] =
     parseSaturatedIntOption(featureSet.maxRepeatCount, "Number too big in {} quantifier", offset)
@@ -346,8 +361,15 @@ private[parser] final class Parser(
     while stack.headOption.exists(isComment) do stack.pop()
     assert(stack.nonEmpty, "Nothing to repeat")
     val node = stack.pop()
-    validateRepeatable(node)
+    validateRepeatable(repeatTarget(node))
     node
+
+  /** Returns the node that a quantifier after the node repeats, which is the last code point of Ruby's `\u{...}` (e.g.
+    * `\u{42}` of `\u{41 42}*`).
+    */
+  private def repeatTarget(node: Node): Node = node.data match
+    case NodeData.UnicodeList(nodes, _) => nodes.last
+    case _                              => node
 
   private def validateRepeatable(node: Node): Unit =
     node.data match
@@ -357,7 +379,7 @@ private[parser] final class Parser(
         assert(featureSet.allowsLookBehindRepeat, "Nothing to repeat")
       case NodeData.Caret | NodeData.Dollar | NodeData.Backslash(_: BackslashKind.Assert) =>
         assert(featureSet.allowsZeroWidthAssertRepeat, "Nothing to repeat")
-      case NodeData.Repeat(_, _) =>
+      case NodeData.Repeat(_, _, _) =>
         assert(featureSet.allowsNestedRepeat, "Nested quantifier")
       case NodeData.Command(
             _: CommandKind.InlineFlag | _: CommandKind.ResetFlag | _: CommandKind.StartOption | CommandKind.Callout |
@@ -372,10 +394,17 @@ private[parser] final class Parser(
       case _ =>
         ()
 
-  private def pushRepeat(stack: mutable.Stack[Node], node: Node, quantifier: Quantifier): Unit =
+  private def pushRepeat(stack: mutable.Stack[Node], node: Node, quantifier: Quantifier, textStart: Int): Unit =
+    val written = writtenUnlessPlain(textStart, quantifier.plainText)
+    node.data match
+      case list @ NodeData.UnicodeList(nodes, _) =>
+        val data = list.copy(nodes = nodes.init :+ repeat(nodes.last, quantifier, written))
+        stack.push(Node(data, node.loc.copy(end = offset)))
+      case _ => stack.push(repeat(node, quantifier, written))
+
+  private def repeat(node: Node, quantifier: Quantifier, written: Option[String]): Node =
     validateRepeatNesting(node)
-    val end = offset
-    stack.push(Node(NodeData.Repeat(node, quantifier), node.loc.copy(end = end)))
+    Node(NodeData.Repeat(node, quantifier, written), node.loc.copy(end = offset))
 
   private def parseBacktrackStrategy(exact: Boolean, curly: Boolean = false): BacktrackStrategy =
     if isEnd || exact && !featureSet.allowsMeaninglessBacktrackStrategy then return BacktrackStrategy.Greedy
@@ -439,6 +468,7 @@ private[parser] final class Parser(
   private def parseGroup(stack: mutable.Stack[Node]): Unit =
     val start = offset
     next()
+    val bodyStart = offset
     skipConstructComment()
     (currentChar: @switch) match
       case '?' =>
@@ -446,6 +476,8 @@ private[parser] final class Parser(
       case '*' =>
         parseAlphabeticGroup(stack, start)
       case _ =>
+        // Java skips whitespace and comments after `(` to find `?`, and they are in the body otherwise (e.g. `( a)`).
+        reset(bodyStart)
         parseGroupBody(stack, GroupKind.IndexedCapture, start)
 
   private def parseExtendedGroup(stack: mutable.Stack[Node], start: Int): Unit =
@@ -854,6 +886,7 @@ private[parser] final class Parser(
     pushCommand(stack, CommandKind.RelativeCall(n), start)
 
   private def parseMinusGroup(stack: mutable.Stack[Node], start: Int): Unit =
+    val flagsStart = offset
     next()
     parseIntOption() match
       case Some(n) =>
@@ -864,7 +897,7 @@ private[parser] final class Parser(
         val removedStart = offset
         val (removed, removedFlags) = parseRemovedFlagSet(context.skipsComment)
         validateInlineFlagRemoval("", removedFlags, removedStart)
-        val diff = FlagSetDiff(FlagSet(), Some(removed))
+        val diff = flagSetDiff(FlagSet(), Some(removed), flagsStart)
         (currentChar: @switch) match
           case ')' =>
             pushInlineFlagCommand(stack, diff, start)
@@ -878,15 +911,17 @@ private[parser] final class Parser(
   private def parseResetFlagGroup(stack: mutable.Stack[Node], start: Int): Unit =
     assert(featureSet.hasResetFlag, "Invalid group")
     next()
+    val flagsStart = offset
     val (flagSet, _) = parseFlagSet(resetting = true)
+    val written = writtenUnlessPlain(flagsStart, flagSet.letters)
     (currentChar: @switch) match
       case ')' =>
-        pushCommand(stack, CommandKind.ResetFlag(flagSet), start)
+        pushCommand(stack, CommandKind.ResetFlag(flagSet, written), start)
         applyResetFlag(flagSet)
       case ':' =>
         next()
         applyResetFlagWith(flagSet):
-          parseGroupBody(stack, GroupKind.ResetFlag(flagSet), start)
+          parseGroupBody(stack, GroupKind.ResetFlag(flagSet, written), start)
       case _ =>
         fail("Invalid group")
 
@@ -1058,6 +1093,7 @@ private[parser] final class Parser(
   private def parseInlineFlagGroup(stack: mutable.Stack[Node], start: Int): Unit =
     assert(featureSet.hasInlineFlagGroup, "Invalid group")
 
+    val flagsStart = offset
     val (added, addedFlags) = parseFlagSet()
 
     (currentChar: @switch) match
@@ -1066,7 +1102,7 @@ private[parser] final class Parser(
         val removedStart = offset
         val (removed, removedFlags) = parseRemovedFlagSet(context.skipsComment || added.verbose)
         validateInlineFlagRemoval(addedFlags, removedFlags, removedStart)
-        val diff = FlagSetDiff(added, Some(removed))
+        val diff = flagSetDiff(added, Some(removed), flagsStart)
         (currentChar: @switch) match
           case ':' =>
             next()
@@ -1077,13 +1113,13 @@ private[parser] final class Parser(
           case _ =>
             fail("Invalid flag")
       case ':' =>
+        val diff = flagSetDiff(added, None, flagsStart)
         next()
-        val diff = FlagSetDiff(added, None)
         applyFlagSetDiffWith(diff):
           parseGroupBody(stack, GroupKind.InlineFlag(diff), start)
       case ')' =>
         assert(addedFlags.nonEmpty || featureSet.allowsEmptyInlineFlag, "Invalid flag")
-        val diff = FlagSetDiff(added, None)
+        val diff = flagSetDiff(added, None, flagsStart)
         pushInlineFlagCommand(stack, diff, start)
       case _ =>
         fail("Invalid flag")
@@ -1109,7 +1145,7 @@ private[parser] final class Parser(
           if flags.isEmpty then boundary.break()
     assert(offset > flagsStart || featureSet.allowsEmptyInlineFlag, "Invalid flag")
 
-    val diff = FlagSetDiff(added, removed)
+    val diff = flagSetDiff(added, removed, flagsStart)
     (currentChar: @switch) match
       case ':' =>
         next()
@@ -1119,6 +1155,12 @@ private[parser] final class Parser(
         pushInlineFlagCommand(stack, diff, start)
       case _ =>
         fail("Invalid flag")
+
+  /** Returns the diff of the inline flags whose text starts at the position and ends here before `:` or `)`. */
+  private def flagSetDiff(added: FlagSet, removed: Option[FlagSet], textStart: Int): FlagSetDiff =
+    val diff = FlagSetDiff(added, removed)
+    val plain = PlainText.flagSetDiff(diff, currentChar == ':', context.skipsComment, featureSet)
+    diff.copy(written = writtenUnlessPlain(textStart, plain))
 
   /** Parses inline flag letters to remove, and Ruby also accepts more `-` among them (e.g. `(?i-m-x)`).
     *
@@ -1481,14 +1523,13 @@ private[parser] final class Parser(
     val start = offset
     next()
     val backslash = parseBackslashKind()
-    val end = offset
-    stack.push(Node(NodeData.Backslash(backslash), SourceLocation(start, end)))
-
-    for value <- pendingCodePoints do
-      stack.push(
-        Node(NodeData.Backslash(BackslashKind.Escape(EscapeStyle.UnicodeBracket, value)), SourceLocation(start, end))
-      )
-    pendingCodePoints = Nil
+    val loc = SourceLocation(start, offset)
+    pendingUnicodeList match
+      case Some(PendingUnicodeList(values, written)) =>
+        pendingUnicodeList = None
+        val escapes = values.map(value => NodeData.Backslash(BackslashKind.Escape(EscapeStyle.UnicodeBracket, value)))
+        stack.push(Node(NodeData.UnicodeList(escapes.map(Node(_, loc)), written), loc))
+      case None => stack.push(Node(NodeData.Backslash(backslash), loc))
 
     if backslash != BackslashKind.CaseCommand(CaseCommandKind.QuoteCommand) then return
 
@@ -1600,10 +1641,11 @@ private[parser] final class Parser(
     if !featureSet.hasBackslashControl then return parseBackslashUnknown()
 
     next()
+    val textStart = offset
     skipConstructComment()
     if featureSet.hasBackslashMetaControl && !isEnd && currentChar == '\\' then
       val value = parseMetaControlTarget()
-      return BackslashKind.Escape(EscapeStyle.Control('\\'), metaControlValue(value))
+      return escape(EscapeStyle.Control('\\'), metaControlValue(value), textStart)
 
     if !isControl then
       assert(featureSet.allowsBrokenBackslashControl, "Invalid backslash escape")
@@ -1617,7 +1659,7 @@ private[parser] final class Parser(
       else if featureSet.hasBackslashMetaControl then metaControlValue(char)
       else if isAlphabetic(char) || featureSet.hasBackslashControlDigitInClass then char % 32
       else char ^ 0x40
-    BackslashKind.Escape(EscapeStyle.Control(char), value)
+    escape(EscapeStyle.Control(char), value, textStart)
 
   private def metaControlValue(value: Int): Int =
     if value == '?' then 0x7f else value & 0x9f
@@ -1628,6 +1670,8 @@ private[parser] final class Parser(
       val save = offset
       next()
       parseBackslashKind() match
+        // Ruby rejects `\u` here (e.g. `\C-\u{41 42}`), and so does the parser for several code points.
+        case _ if pendingUnicodeList.isDefined  => fail("Invalid backslash escape", save)
         case kind: BackslashKind.BackslashValue => kind.value
         case _                                  => fail("Invalid backslash escape", save)
     else
@@ -1796,9 +1840,10 @@ private[parser] final class Parser(
     if !featureSet.hasBackslashOctal then return parseBackslashUnknown()
 
     next()
+    val textStart = offset
     expect('{', "Invalid backslash escape")
     val value = parseBracedCodePoint(8)
-    BackslashKind.Escape(EscapeStyle.Octal, value)
+    escape(EscapeStyle.Octal, value, textStart)
 
   private def parseBackslashLowerP(): BackslashKind = parseBackslashProperty(invert = false)
 
@@ -1933,13 +1978,14 @@ private[parser] final class Parser(
 
     val save = offset
     next()
+    val textStart = offset
     skipConstructComment()
 
     if featureSet.hasBackslashUnicodeBracket && currentChar == '{' then
       next()
-      if featureSet.hasBackslashUnicodeList then return parseUnicodeList()
+      if featureSet.hasBackslashUnicodeList then return parseUnicodeList(textStart)
       val value = parseBracedCodePoint(16)
-      return BackslashKind.Escape(EscapeStyle.UnicodeBracket, value)
+      return escape(EscapeStyle.UnicodeBracket, value, textStart)
 
     if !hasHexDigitsAhead(4) then
       assert(featureSet.allowsBrokenBackslashHex, "Invalid backslash escape")
@@ -1956,15 +2002,15 @@ private[parser] final class Parser(
           val lowValue = parseHexDigits(4).toInt
           if UTF16Encoding.isLowSurrogate(lowValue) then
             val pairValue = UTF16Encoding.decodeSurrogatePair(value, lowValue)
-            return BackslashKind.Escape(EscapeStyle.UnicodeHex4Pair, pairValue)
+            return escape(EscapeStyle.UnicodeHex4Pair, pairValue, textStart)
       reset(lowStart)
 
-    BackslashKind.Escape(EscapeStyle.UnicodeHex4, value)
+    escape(EscapeStyle.UnicodeHex4, value, textStart)
 
   /** Parses the code points of Ruby's `\u{...}`, which are separated by ASCII spaces (`ISSPACE`, e.g. `\n`), with at
     * most six digits for each.
     */
-  private def parseUnicodeList(): BackslashKind =
+  private def parseUnicodeList(textStart: Int): BackslashKind =
     def skipSpaces(): Unit = while !isEnd && " \t\n\u000b\f\r".contains(currentChar) do next()
 
     skipSpaces()
@@ -1977,10 +2023,12 @@ private[parser] final class Parser(
       skipSpaces()
     expect('}', "Invalid backslash escape")
     values.result() match
-      case Seq()         => fail("Invalid backslash escape")
-      case value +: rest =>
-        pendingCodePoints = rest.toList
-        BackslashKind.Escape(EscapeStyle.UnicodeBracket, value)
+      case Seq()      => fail("Invalid backslash escape")
+      case Seq(value) => escape(EscapeStyle.UnicodeBracket, value, textStart)
+      case values     =>
+        val written = writtenUnlessPlain(textStart, PlainText.unicodeList(values))
+        pendingUnicodeList = Some(PendingUnicodeList(values, written))
+        BackslashKind.Escape(EscapeStyle.UnicodeBracket, values.head)
 
   private def parseBackslashLowerV(): BackslashKind =
     if !(featureSet.hasBackslashVerticalSpace || featureSet.hasBackslashVerticalTab) then return parseBackslashUnknown()
@@ -1998,12 +2046,13 @@ private[parser] final class Parser(
   private def parseBackslashLowerX(): BackslashKind =
     val save = offset
     next()
+    val textStart = offset
     skipConstructComment()
 
     if featureSet.hasBackslashXBracket && currentChar == '{' then
       next()
       val value = parseBracedCodePoint(16)
-      return BackslashKind.Escape(EscapeStyle.HexBracket, value)
+      return escape(EscapeStyle.HexBracket, value, textStart)
 
     if !isHexDigit then
       if featureSet.allowsBackslashXWithoutDigit then return BackslashKind.Escape(EscapeStyle.Hex0, 0x00)
@@ -2011,9 +2060,9 @@ private[parser] final class Parser(
       reset(save)
       return parseBackslashUnknown()
 
-    if hasHexDigitsAhead(2) then return BackslashKind.Escape(EscapeStyle.Hex2, parseHexDigits(2).toInt)
+    if hasHexDigitsAhead(2) then return escape(EscapeStyle.Hex2, parseHexDigits(2).toInt, textStart)
 
-    if featureSet.hasBackslashXHex1 then return BackslashKind.Escape(EscapeStyle.Hex1, parseHexDigits(1).toInt)
+    if featureSet.hasBackslashXHex1 then return escape(EscapeStyle.Hex1, parseHexDigits(1).toInt, textStart)
 
     assert(featureSet.allowsBrokenBackslashHex, "Invalid backslash escape")
     reset(save)
@@ -2057,8 +2106,9 @@ private[parser] final class Parser(
 
     next()
     expect('-', "Invalid backslash escape")
+    val textStart = offset
     val value = parseMetaControlTarget()
-    BackslashKind.Escape(EscapeStyle.ControlDash, metaControlValue(value))
+    escape(EscapeStyle.ControlDash, metaControlValue(value), textStart)
 
   private def parseBackslashUpperD(): BackslashKind =
     next()
@@ -2096,14 +2146,16 @@ private[parser] final class Parser(
 
     next()
     expect('-', "Invalid backslash escape")
+    val textStart = offset
     val value = parseMetaControlTarget()
-    BackslashKind.Escape(EscapeStyle.Meta, value | 0x80)
+    escape(EscapeStyle.Meta, value | 0x80, textStart)
 
   private def parseBackslashUpperN(): BackslashKind =
     if !(featureSet.hasBackslashNonNewline || featureSet.hasBackslashCharName || featureSet.hasBackslashCharNameHex)
     then return parseBackslashUnknown()
 
     next()
+    val textStart = offset
     skipConstructComment()
 
     val isCharName = !isEnd && currentChar == '{' && !(featureSet.hasBackslashNonNewline && isCurlyQuantifierAhead)
@@ -2117,7 +2169,7 @@ private[parser] final class Parser(
       assert(isHexDigit, "Invalid backslash escape")
       val value = validateCodePoint(parseHexDigits(Int.MaxValue), start)
       expect('}', "Invalid backslash escape")
-      return BackslashKind.Escape(EscapeStyle.NamedHex, value)
+      return escape(EscapeStyle.NamedHex, value, textStart)
 
     assert(featureSet.hasBackslashCharName, "Invalid backslash escape")
     val start = offset
@@ -2157,10 +2209,11 @@ private[parser] final class Parser(
 
     val save = offset
     next()
+    val textStart = offset
 
     assert(hasHexDigitsAhead(8), "Invalid backslash escape")
 
-    BackslashKind.Escape(EscapeStyle.UnicodeHex8, validateCodePoint(parseHexDigits(8), save))
+    escape(EscapeStyle.UnicodeHex8, validateCodePoint(parseHexDigits(8), save), textStart)
 
   private def parseBackslashUpperV(): BackslashKind =
     if !featureSet.hasBackslashVerticalSpace then return parseBackslashUnknown()
@@ -2200,14 +2253,15 @@ private[parser] final class Parser(
     val start = offset
     val value = parseOctalDigits(size)
     if value > 0xff && !featureSet.allowsOctalAbove0377 then fail("Octal escape value too large", start)
-    BackslashKind.Escape(EscapeStyle.BareOctal, value)
+    escape(EscapeStyle.BareOctal, value, start)
 
   private def parseBackslashZeroOctal(): BackslashKind =
     next()
+    val textStart = offset
     skipConstructComment()
     assert(isOctalDigit, "Invalid octal escape")
     val size = if currentChar <= '3' then 3 else 2
-    BackslashKind.Escape(EscapeStyle.BareOctal, parseOctalDigits(size))
+    escape(EscapeStyle.BareOctal, parseOctalDigits(size), textStart)
 
   private def parseOctalDigits(size: Int): Int =
     var value = 0
@@ -2255,14 +2309,20 @@ private[parser] final class Parser(
     markNumberedReference(save)
     BackslashKind.EscapeBackReference(BackReferenceStyle.BareBackReference, Reference.IndexedReference(n))
 
+  /** Parses the digits while they make a number that continues, where Java skips whitespace and comments only between
+    * them (e.g. `\1 2`), so the ones after the number are kept.
+    */
   private def parseBoundedDigits(continues: Int => Boolean): Int =
     var value = currentChar - '0'
     next()
+    var end = offset
     skipConstructComment()
     while isDigit && continues(value * 10 + (currentChar - '0')) do
       value = value * 10 + (currentChar - '0')
       next()
+      end = offset
       skipConstructComment()
+    reset(end)
     value
 
   private def parseBackslashEscape(): BackslashKind =
@@ -2576,12 +2636,15 @@ private[parser] final class Parser(
         return ClassItem.Value(ClassItemData.ClassBackslashValue(kind), SourceLocation(start, offset))
       val backslash = parseBackslashKind()
       val end = offset
+      pendingUnicodeList match
+        case Some(PendingUnicodeList(values, written)) =>
+          pendingUnicodeList = None
+          val items = values.map: value =>
+            val escape = BackslashKind.Escape(EscapeStyle.UnicodeBracket, value)
+            ClassItem.Value(ClassItemData.ClassBackslashValue(escape), SourceLocation(start, end))
+          return ClassItem(ClassItemData.ClassUnicodeList(items, written), SourceLocation(start, end))
+        case None => ()
       backslash match
-        case kind: BackslashKind.BackslashValue if pendingCodePoints.nonEmpty =>
-          val values = (kind.value :: pendingCodePoints).map: value =>
-            ClassItem.Value(ClassItemData.ClassBackslashValue(BackslashKind.Escape(EscapeStyle.UnicodeBracket, value)))
-          pendingCodePoints = Nil
-          return ClassItem(ClassItemData.ClassUnion(values), SourceLocation(start, end))
         case kind: BackslashKind.BackslashValue =>
           return ClassItem.Value(ClassItemData.ClassBackslashValue(kind), SourceLocation(start, end))
         case BackslashKind.EscapeClass(
@@ -2733,7 +2796,7 @@ private[parser] final class Parser(
   private def validateRepeatNesting(node: Node): Unit =
     @tailrec def loop(current: Node, repeatDepth: Int): Unit =
       current.data match
-        case NodeData.Repeat(inner, _) =>
+        case NodeData.Repeat(inner, _, _) =>
           if repeatDepth >= Parser.MaxNestingDepth then
             throw new NestingLimitException(Parser.MaxNestingDepth, node.loc.end)
           loop(inner, repeatDepth + 1)
@@ -3028,6 +3091,21 @@ private[parser] final class Parser(
           builder.append(source.charAt(i))
           i += 1
     builder.toString
+
+  /** Returns the source text from the position to here, without the comments that Ruby removes at its end. */
+  private def writtenText(start: Int): String =
+    var end = offset
+    while removedCommentStarts.contains(end) do end = removedCommentStarts(end)
+    source.slice(start, end)
+
+  /** Returns the source text from the position to here, or `None` if it is the plain text. */
+  private def writtenUnlessPlain(start: Int, plain: String): Option[String] =
+    val text = writtenText(start)
+    Option.when(text != plain)(text)
+
+  /** Returns the escape whose text after its letters starts at the position. */
+  private def escape(style: EscapeStyle, value: Int, textStart: Int): BackslashKind.Escape =
+    BackslashKind.Escape(style, value, writtenUnlessPlain(textStart, PlainText.escape(style, value, featureSet)))
 
   private def next(): Unit = reset(offset + 1)
 
