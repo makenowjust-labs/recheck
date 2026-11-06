@@ -1,4 +1,10 @@
-import { availableBuilds, findBuild, formatBuild, sameBuild } from "./builds";
+import {
+  availableBuilds,
+  findBuild,
+  formatBuild,
+  isAtLeast,
+  sameBuild,
+} from "./builds";
 
 import type { Build } from "./builds";
 
@@ -61,6 +67,33 @@ describe("availableBuilds", () => {
     ]);
   });
 
+  test("puts the prereleases newer than the stable releases first, in semver order", () => {
+    expect(
+      availableBuilds({
+        tags: [
+          "v4.6.2",
+          "v5.0.0-beta.2",
+          "v5.0.0-beta.10",
+          "v5.0.0-beta.1",
+          "v4.6.0-beta.4",
+        ],
+        latestVersion: "5.0.0-beta.10",
+      }),
+    ).toEqual([
+      { type: "release", version: "5.0.0-beta.10" },
+      { type: "release", version: "5.0.0-beta.2" },
+      { type: "release", version: "5.0.0-beta.1" },
+      { type: "release", version: "4.6.2" },
+      { type: "dev" },
+    ]);
+  });
+
+  test("drops the prereleases of a released version", () => {
+    expect(
+      availableBuilds({ tags: ["v5.0.0-beta.1", "v5.0.0", "v5.1.0-SNAPSHOT"] }),
+    ).toEqual([{ type: "release", version: "5.0.0" }, { type: "dev" }]);
+  });
+
   test("accepts versions without the prefix and drops duplicates and junk", () => {
     expect(
       availableBuilds({
@@ -91,5 +124,20 @@ describe("findBuild", () => {
       commit: "0123456789",
     });
     expect(findBuild(builds, "v4.6.0")).toBeNull();
+  });
+});
+
+describe("isAtLeast", () => {
+  test("compares a release with the version, counting a prerelease as its release", () => {
+    expect(isAtLeast({ type: "release", version: "4.6.2" }, "5.0.0")).toBe(
+      false,
+    );
+    expect(isAtLeast({ type: "release", version: "5.0.0" }, "5.0.0")).toBe(
+      true,
+    );
+    expect(
+      isAtLeast({ type: "release", version: "5.0.0-beta.1" }, "5.0.0"),
+    ).toBe(true);
+    expect(isAtLeast({ type: "dev" }, "5.0.0")).toBe(true);
   });
 });
