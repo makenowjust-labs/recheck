@@ -1,0 +1,109 @@
+---
+id: repair
+title: Repair
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+`repair` suggests a better regular expression for a vulnerable one.
+It edits the regular expression around the hotspot that the automaton checker finds, preferring the edits whose matches extract the same as the original ones.
+The result `Rx` has the repaired regular expression, its complexity, and how its matches compare with the original ones, with the shortest input on which they differ if they do.
+Read the comparison before you replace the original regular expression.
+
+## Usage
+
+<Tabs>
+<TabItem value="cli" label="CLI">
+
+```console
+$ recheck repair '/^(\w+\s?)+$/'
+Input     : /^(\w+\s?)+$/
+Dialect   : javascript
+Status    : repaired
+Repaired  : /^(\w+(?!\w)\s?)+$/
+Complexity: linear
+Kept      : match, 1
+Comparison: equivalent
+```
+
+`--keep` tells what the repair keeps (see [Keep](#keep)), and `--json` prints the result in JSON.
+The command exits with `1` when the status is `unknown`.
+
+</TabItem>
+<TabItem value="javascript" label="JavaScript">
+
+```tsx
+import { repair } from "recheck";
+
+const rx = await repair("^(\\w+\\s?)+$", "");
+// rx.repaired is "^(\\w+(?!\\w)\\s?)+$".
+```
+
+`repair` takes the same arguments as `check`, and the parameters also have `keep` (see [Keep](#keep)).
+`repairSync` is its synchronous version.
+
+</TabItem>
+<TabItem value="scala" label="Scala">
+
+```scala
+import codes.quine.labs.recheck.ReDoS
+import codes.quine.labs.recheck.repair.Keep
+
+ReDoS.repair("^(\\w+\\s?)+$", "", keep = Keep.All)
+```
+
+`ReDoS.repair` takes the same arguments as `ReDoS.check`, and `keep` (see [Keep](#keep)).
+
+</TabItem>
+</Tabs>
+
+The pattern and the flags are of the [`dialect`](parameters.mdx#dialect) parameter, as in `check`.
+
+## Keep
+
+`keep` tells what the repair keeps of the matches, besides whether the regular expression matches.
+
+| `keep`                                 | Scala                           | Kept                                       |
+| -------------------------------------- | ------------------------------- | ------------------------------------------ |
+| `"all"` (default)                      | `Keep.All`                      | The range of the match and every capture.  |
+| `"named"`                              | `Keep.Named`                    | The range of the match and named captures. |
+| `"match-range"`                        | `Keep.MatchRange`               | The range of the match.                    |
+| `"match"`                              | `Keep.Match`                    | Only whether it matches.                   |
+| `[1, "year"]` (`--keep=1,year` in CLI) | `Keep.Captures(Seq(1, "year"))` | The range of the match and these captures. |
+
+The captures that a back-reference or a conditional refers to are kept always.
+A number or a name that refers to no capture makes the result `unknown` with the `invalid-keep` error.
+An edit may remove a capture that is not kept, so the later captures may have smaller numbers in the repaired regular expression.
+
+## Result
+
+`Rx` has three statuses.
+
+- `safe` means that the automaton checker finds the regular expression safe, so it needs no repair.
+- `repaired` means that the repair found a better regular expression.
+- `unknown` means that the repair found no better regular expression (`error` is `null`), or it could not finish because of the `error`.
+  The `kind` of the error is one of `timeout`, `cancel`, `unsupported`, `invalid`, `invalid-keep` and `unexpected`.
+  The repair needs the automaton checker, so a regular expression that the automaton checker gives up on (e.g. one with a back-reference whose upper bound is not linear) is `unknown` with an `unsupported` error.
+
+Every `Rx` has `source`, `flags` and `dialect` as [`Diagnostics`](diagnostics.mdx#common-fields) has.
+A `repaired` one also has the following fields.
+
+- `repaired` is the source of the repaired regular expression, whose flags are the same.
+- `complexity` is the complexity of the repaired regular expression (see [Complexity](diagnostics.mdx#complexity)).
+  It is safe unless no edit makes the regular expression safe (e.g. an exponential one repaired into a quadratic one).
+- `kept` is the numbers of the kept captures, where `0` is the match.
+- `unitMode` is the unit of the input of the comparison (see [Matching Units](dialects.mdx#matching-units)).
+- `comparison` tells how the matches compare.
+  - `equivalent` means that the regular expressions match the same on every input, with the same kept captures.
+  - `different` means that they do not.
+    `input` is the shortest input on which they differ, which is an array of the units instead when a string cannot carry them exactly, as an attack string is.
+    `original` and `repaired` are their matches on it: the begin and the end of each kept capture in the order of `kept` (`null` for an unset capture), or `null` for no match.
+    The positions are in the units of `unitMode`.
+  - `unknown` means that the comparison does not support the regular expressions.
+
+## Approximations
+
+- The comparison is `unknown` when a kept capture is in a nested look-behind (e.g. `(?<=a(?<=(b)))`), or in a look-behind that the engine matches forward from several starts (e.g. Java's `(?<=(a??)(a|aa))`), which may set other captures than matching it backward.
+  It is `unknown` also when `\K` is in a positive look-around and the match is kept, since Ruby reports a start after the end as the end.
+- The repair tries the edits around the hotspot for a few rounds, so it misses a repair that needs a larger rewrite.

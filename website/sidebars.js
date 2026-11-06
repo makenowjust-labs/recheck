@@ -39,6 +39,7 @@ const sidebars = {
         "usage/runtime-attack-verification",
         "usage/parameters",
         "usage/diagnostics",
+        "usage/repair",
       ],
     },
     {
