@@ -533,6 +533,14 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   check("a(?r)", "", PythonRegex())(
     Unsupported(NodeData.Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(nonDestructive = true), None))))
   )
+  check("(?r:a)", "", PythonRegex())(
+    Unsupported(
+      NodeData.Group(
+        GroupKind.InlineFlag(FlagSetDiff(FlagSet(nonDestructive = true), None)),
+        Node(NodeData.Literal('a'))
+      )
+    )
+  )
   check("a", "r", PythonRegex())(
     Unsupported(NodeData.Command(CommandKind.InlineFlag(FlagSetDiff(FlagSet(nonDestructive = true), None))))
   )
