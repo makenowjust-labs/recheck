@@ -79,8 +79,9 @@ private class EpsNFABuilder(
     private val alphabet: PatternAlphabet,
     private val isSimplified: Boolean,
     private val lookBehindsAsLookAheads: Boolean,
-    /** The indices of the captures that the ε-NFA marks (see [[CaptureMark]]), where the 0th is the whole match. A
-      * marked capture or `\K` in the inner expression of a look-around is unsupported.
+    /** The indices of the captures that the ε-NFA marks (see [[CaptureMark]]), where the 0th is the whole match. The
+      * captures and `\K` in a negative look-around have no marks, since they never take effect, and a marked capture or
+      * `\K` in the inner expression of a positive look-around is unsupported.
       */
     private val marks: Set[Int],
     private val expandsBackReferences: Boolean,
@@ -293,9 +294,10 @@ private class EpsNFABuilder(
             () => buildSequence(s.iterator.toSeq.map(c => () => consume(refine(CharSet.single(c)), loc)))
         val chars = Option.when(set.chars.nonEmpty)(() => consume(refine(set.chars), loc))
         buildChoice(strings ++ chars)
-      case IRNodeData.ResetMatchStart if ignoresAssertions                   => epsilon()
-      case IRNodeData.ResetMatchStart if marks.contains(0) && isInLookAround =>
-        throw new UnsupportedException("\\K in look-around assertion")
+      case IRNodeData.ResetMatchStart if ignoresAssertions || isInNegativeLookAround =>
+        epsilon()
+      case IRNodeData.ResetMatchStart if marks.contains(0) && isInPositiveLookAround =>
+        throw new UnsupportedException("\\K in positive look-around assertion")
       case IRNodeData.ResetMatchStart =>
         val (i, a) = (nextQ(), nextQ())
         // `\K` begins the reported match again.
@@ -307,7 +309,7 @@ private class EpsNFABuilder(
       case IRNodeData.BacktrackControl(_)             => throw new UnsupportedException("backtracking control verb")
       case IRNodeData.Conditional(condition, yes, no) => buildNode(conditionalChoice(condition, yes, no))
       case IRNodeData.LookAhead(negative, n)          =>
-        val ((i0, a0), _) = withPath(buildInLookAround(buildNode(n)))
+        val ((i0, a0), _) = withPath(buildInLookAround(negative)(buildNode(n)))
         val i = nextQ()
         val a = nextQ()
         emit(i -> LookAheadAssert(negative, i0, a))
@@ -327,7 +329,7 @@ private class EpsNFABuilder(
         validateLookBehindInner(n, matching)
         val wasBackward = isBackward
         isBackward = true
-        val ((i0, a0), _) = withPath(buildInLookAround(buildNode(reverseLookBehindInner(n))))
+        val ((i0, a0), _) = withPath(buildInLookAround(negative)(buildNode(reverseLookBehindInner(n))))
         emit(a0 -> LookAroundAccept())
         isBackward = wasBackward
         val i = nextQ()
@@ -399,13 +401,17 @@ private class EpsNFABuilder(
         built
       buildChoice(bodies :+ (() => epsilon()))
 
-  /** Whether the builder builds the inner expression of a look-around. */
-  private var isInLookAround = false
+  /** Whether the builder builds the inner expression of a negative look-around, which may be in a positive one. */
+  private var isInNegativeLookAround = false
+
+  /** Whether the builder builds the inner expression of a positive look-around, which may be in a negative one. */
+  private var isInPositiveLookAround = false
 
   /** Builds EpsNFA transitions marking the begin and the end of the `i`-th capture around `build`, if it is marked. */
   private def buildMarkedCapture(i: Int)(build: => (Int, Int)): (Int, Int) =
-    if !marks.contains(i) then build
-    else if isInLookAround then throw new UnsupportedException("capture in look-around assertion")
+    // A negative look-around succeeds only when its inner expression fails, which leaves no capture set.
+    if !marks.contains(i) || isInNegativeLookAround then build
+    else if isInPositiveLookAround then throw new UnsupportedException("capture in positive look-around assertion")
     else
       val begin = nextQ()
       val (i0, a0) = build
@@ -414,12 +420,13 @@ private class EpsNFABuilder(
       emit(a0 -> MarkCapture(CaptureMark.End(i), end))
       (begin, end)
 
-  /** Builds the inner expression of a look-around. */
-  private def buildInLookAround(build: => (Int, Int)): (Int, Int) =
-    val wasInLookAround = isInLookAround
-    isInLookAround = true
+  /** Builds the inner expression of a look-around, which is negative with `negative`. */
+  private def buildInLookAround(negative: Boolean)(build: => (Int, Int)): (Int, Int) =
+    val (wasInNegative, wasInPositive) = (isInNegativeLookAround, isInPositiveLookAround)
+    if negative then isInNegativeLookAround = true else isInPositiveLookAround = true
     val built = build
-    isInLookAround = wasInLookAround
+    isInNegativeLookAround = wasInNegative
+    isInPositiveLookAround = wasInPositive
     built
 
   /** Builds EpsNFA transitions for an atomic group.
@@ -517,7 +524,7 @@ private class EpsNFABuilder(
     */
   private def buildIteration(n: IRNode, empty: Option[Option[Int]]): (Int, Int) =
     val unsets =
-      if !pattern.captures.resetsEachIteration then Seq.empty
+      if !pattern.captures.resetsEachIteration || isInNegativeLookAround then Seq.empty
       else n.captureRange.toSeq.flatMap((min, max) => (min to max).filter(marks.contains))
     val (i0, a0) =
       if unsets.isEmpty then buildNode(n)

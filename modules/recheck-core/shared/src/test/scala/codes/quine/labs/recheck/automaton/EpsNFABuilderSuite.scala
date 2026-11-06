@@ -278,9 +278,16 @@ class EpsNFABuilderSuite extends munit.FunSuite:
     // The copies for `(*NOTEMPTY)` have the marks too, but the tests of an atomic group do not.
     assertEquals(countMarks("(*NOTEMPTY)(a)", Set(1), Dialect.PCRE), Map(Begin(1) -> 2, End(1) -> 2))
     assertEquals(countMarks("(?>(a))", Set(1), Dialect.PCRE), Map(Begin(1) -> 1, End(1) -> 1))
-    interceptMessage[UnsupportedException]("capture in look-around assertion")(countMarks("(?=(a))", Set(1)))
+    // The captures and `\K` in a negative look-around never take effect.
+    assertEquals(countMarks("(?!(a))(?<!(?:(b)|c)*)", Set(1, 2)), Map.empty)
+    assertEquals(countMarks("(?=(?!(a)))(?!(?<=(b)))", Set(1, 2)), Map.empty)
+    assertEquals(countMarks("^(?!a\\K)", Set(0), Dialect.Ruby()), Map(Begin(0) -> 1, End(0) -> 1))
+    interceptMessage[UnsupportedException]("capture in positive look-around assertion")(countMarks("(?=(a))", Set(1)))
+    interceptMessage[UnsupportedException]("capture in positive look-around assertion")(
+      countMarks("(?<=(a))", Set(1))
+    )
     assertEquals(countMarks("(?=a\\K)", Set.empty, Dialect.Ruby()), Map.empty)
-    interceptMessage[UnsupportedException]("\\K in look-around assertion")(
+    interceptMessage[UnsupportedException]("\\K in positive look-around assertion")(
       countMarks("(?=a\\K)", Set(0), Dialect.Ruby())
     )
 
