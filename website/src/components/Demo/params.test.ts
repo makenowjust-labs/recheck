@@ -1,4 +1,5 @@
 import {
+  DIALECT_TITLES,
   extract,
   formValues,
   params,
@@ -200,5 +201,15 @@ describe("extract", () => {
     expect(extract("a")).toBeNull();
     expect(extract("/")).toBeNull();
     expect(extract("/a")).toBeNull();
+  });
+});
+
+describe("DIALECT_TITLES", () => {
+  test("names every dialect of the select", () => {
+    const dialect = params.find(({ name }) => name === "dialect")!;
+    expect(Object.keys(DIALECT_TITLES).sort()).toEqual(
+      selectValues(dialect, "javascript").sort(),
+    );
+    expect(DIALECT_TITLES["dotnet"]).toBe(".NET");
   });
 });

@@ -7,7 +7,7 @@ import Select from '../form/Select';
 import TextArea from '../form/TextArea';
 import { formatBuild } from './builds';
 import styles from './Demo.module.css';
-import { DEFAULT_DIALECT, dialectOf, paramsOf, selectValues } from './params';
+import { DEFAULT_DIALECT, DIALECT_TITLES, dialectOf, paramsOf, selectValues } from './params';
 
 import type { Build } from './builds';
 import type { Param } from './params';
@@ -75,6 +75,7 @@ const DemoDialect: React.FC<{ build: Build; disabled: boolean }> = ({ build, dis
           id="dialect"
           name="dialect"
           values={selectValues(param, DEFAULT_DIALECT)}
+          labels={DIALECT_TITLES}
           defaultValue={String(param.defaultValue)}
           disabled={disabled}
         />
@@ -82,8 +83,8 @@ const DemoDialect: React.FC<{ build: Build; disabled: boolean }> = ({ build, dis
       <Link
         className={styles.dialectDetails}
         to={`/docs/usage/dialects/${dialect}`}
-        aria-label={`Details of ${dialect}`}
-        title={`Details of ${dialect}`}
+        aria-label={`Details of ${DIALECT_TITLES[dialect] ?? dialect}`}
+        title={`Details of ${DIALECT_TITLES[dialect] ?? dialect}`}
         target="_blank"
         rel="noopener noreferrer"
       >
