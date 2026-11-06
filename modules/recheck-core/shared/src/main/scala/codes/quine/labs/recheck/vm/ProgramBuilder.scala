@@ -281,8 +281,17 @@ private[vm] class ProgramBuilder(
 
     val blocks = labelsBuffer.iterator.map(label => (label, label.block)).toVector
     val predecessors = predecessorsBuffer.iterator.map(_.toSet).toVector
-    val meta =
-      Meta(hasRef, hasVerb, hasLeave, capturesSize, counters.size, canaries.size, referencedCaptures, predecessors)
+    val meta = Meta(
+      hasRef,
+      hasVerb,
+      hasLeave,
+      pattern.longestMatch,
+      capturesSize,
+      counters.size,
+      canaries.size,
+      referencedCaptures,
+      predecessors
+    )
 
     Program(blocks, meta)
 
@@ -296,7 +305,9 @@ private[vm] class ProgramBuilder(
       val loop = allocateLabel("loop")
       val cont = allocateLabel("cont")
 
-      emitTerminator(if hasCut then Inst.TryBarrier(cont, loop, Barrier.Search) else Inst.Try(cont, loop))
+      // A longest-match search returns its match when backtracking reaches the next position.
+      val needsBarrier = hasCut || pattern.longestMatch
+      emitTerminator(if needsBarrier then Inst.TryBarrier(cont, loop, Barrier.Search) else Inst.Try(cont, loop))
 
       enterBlock(loop)
       emitInst(Inst.Read(ReadKind.Any, None))

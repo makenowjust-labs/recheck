@@ -373,6 +373,22 @@ class ReDoSSuite extends munit.FunSuite:
     )
     assertSafe(check("(?:|(?:a|a)*c)", PCRE), Checker.Automaton)
 
+  test("ReDoS.check: longest match"):
+    // python-regex's `p` tries every path at the start position, which doubles for each `a` even on a match (2.9 s at
+    // n = 24 with regex 2026.9.29), and the first match of the others is instant.
+    assertVulnerable(
+      check("(a|a)*", PythonRegex(), "p", Checker.Fuzz),
+      AttackComplexity.Exponential(true),
+      Checker.Fuzz
+    )
+    assertSafe(check("(a|a)*", PythonRegex(), "", Checker.Fuzz), Checker.Fuzz)
+    // The tail `.*` is tried at every split too, so the upper bound keeps it.
+    assertVulnerable(
+      check("x(?:a|b)*.*", PythonRegex(), "sp", Checker.Fuzz),
+      AttackComplexity.Polynomial(2, true),
+      Checker.Fuzz
+    )
+
   test("ReDoS.check: unsupported syntax"):
     assertEquals(
       check("^(a|a)*(?R)?$", PCRE),

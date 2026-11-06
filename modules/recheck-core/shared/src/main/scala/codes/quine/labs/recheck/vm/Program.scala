@@ -137,6 +137,8 @@ object Program:
         * look-around.
         */
       hasLeave: Boolean,
+      /** Whether the search takes the longest match at a start position, after trying every path there. */
+      longestMatch: Boolean,
       capturesSize: Int,
       countersSize: Int,
       canariesSize: Int,

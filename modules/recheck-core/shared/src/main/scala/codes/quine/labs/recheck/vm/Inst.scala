@@ -33,7 +33,10 @@ object Inst:
     /** A successor block's labels. */
     def successors: Set[Label]
 
-  /** `ok`: Terminates a matching with a success. */
+  /** `ok`: Terminates a matching with a success.
+    *
+    * In a longest-match search, it records the match instead, and backtracking continues.
+    */
   case object Ok extends Terminator:
 
     def successors: Set[Label] = Set.empty
@@ -176,7 +179,8 @@ object Inst:
 
     /** Search is the fallback retrying the search at the next position.
       *
-      * `(*COMMIT)` fails the whole search there, `(*PRUNE)` takes it, and `(*SKIP)` retries at its position.
+      * `(*COMMIT)` fails the whole search there, `(*PRUNE)` takes it, and `(*SKIP)` retries at its position. A
+      * longest-match search that has recorded a match returns it there instead.
       */
     case object Search extends Barrier:
 
