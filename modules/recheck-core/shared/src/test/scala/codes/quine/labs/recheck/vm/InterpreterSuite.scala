@@ -443,6 +443,34 @@ class InterpreterSuite extends munit.FunSuite:
       refutes("^(?:(a)?b){2}\\1$", dialect, "abb")
       accepts("^(?:(a)|b){1,2}\\1$", dialect, "aba")
 
+  test("Interpreter.run: back-references and capture tests in an open capture"):
+    // They see the capture before it opens, which is from the previous iteration.
+    check("^(a|b\\1)+$", "aba", PCRE, Perl(), Java, DotNet)(Seq(g(0, 3), g(1, 3)))
+    check("^(a|b\\1)+$", "abab", PCRE, Perl(), Java, DotNet, Ruby())(NoMatch)
+    check("^(a|b\\1)+$", "aabaa", PCRE, Perl(), Java, DotNet)(Seq(g(0, 5), g(4, 5)))
+    check("^(a\\1?)+$", "aaa", PCRE, Perl(), Java, DotNet)(Seq(g(0, 3), g(1, 3)))
+    check("^(a|ab\\1)*$", "aaba", PCRE, Perl(), Java, DotNet)(Seq(g(0, 4), g(1, 4)))
+    check("^(a|(b\\1))+$", "aabaa", PCRE, Perl(), Java, DotNet)(Seq(g(0, 5), g(4, 5), g(2, 4)))
+    check("^(a(?(1)b|c))+$", "acab", PCRE, Perl(), Python(), DotNet)(Seq(g(0, 4), g(2, 4)))
+    check("^(a(?(1)b|c))+$", "acac", PCRE, Perl(), Python(), DotNet)(NoMatch)
+    // A capture in a look-behind matched backward opens at its end.
+    check("(?<=^(a|\\1b)+)$", "aba", DotNet)(Seq(g(3, 3), g(0, 2)))
+    // JavaScript resets the capture on each iteration, so it is unset and the reference matches the empty string.
+    check("^(a|b\\1)+$", "abab", JavaScript)(Seq(g(0, 4), g(3, 4)))
+    check("^(a\\1)", "a", JavaScript)(Seq(g(0, 1), g(0, 1)))
+    check("(?<=^(a|\\1b)+)$", "aba", JavaScript)(Seq(g(3, 3), g(0, 1)))
+    // Ruby unsets a capture while it is open.
+    check("^(a|b\\1)+$", "aba", Ruby())(NoMatch)
+    check("^(a\\1?)+$", "aaa", Ruby())(Seq(g(0, 3), g(2, 3)))
+    check("^(a(?(1)b|c))+$", "acab", Ruby())(NoMatch)
+    check("^(a(?(1)b|c))+$", "acac", Ruby())(Seq(g(0, 4), g(2, 4)))
+    // Onigmo does not restore the end of an open capture on backtracking in it, and a reference sees the end of a
+    // failed attempt (e.g. this matches `"aba"` in Ruby 4.0.9), which is not reproduced.
+    check("^(a|ab\\1)*$", "aba", Ruby())(NoMatch)
+    // Python's `re` sees an open capture as unset when its old end is before its new start (e.g. this matches
+    // `"acxacx"` in Python 3.15.2), which is not reproduced.
+    check("^(?:(a(?(1)b|c))x)+$", "acxabx", PCRE, Perl(), Python(), DotNet)(Seq(g(0, 6), g(3, 5)))
+
   test("Interpreter.run: Perl's captures on backtracking"):
     def perlOnly(source: String, input: String)(using munit.Location): Unit =
       refutes(source, Perl(), input)

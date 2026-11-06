@@ -229,19 +229,30 @@ object Inst:
         case None                             => ""
       s"read_back $kind$loc"
 
-  /** `cap_begin`: Captures current position as a beginning of a capture `index`. */
+  /** `cap_open`: Saves current position as the position where a capture `index` opens.
+    *
+    * The capture keeps its previous value until it closes, which a back-reference in it sees.
+    */
+  final case class CapOpen(index: Int) extends NonTerminator:
+
+    override def toString: String = s"cap_open $index"
+
+  /** `cap_begin`: Closes a capture `index` matched backward, which spans from current position to the position where it
+    * opens.
+    */
   final case class CapBegin(index: Int) extends NonTerminator:
 
     override def toString: String = s"cap_begin $index"
 
-  /** `cap_end`: Captures current position as an ending of a capture `index`. */
+  /** `cap_end`: Closes a capture `index`, which spans from the position where it opens to current position. */
   final case class CapEnd(index: Int) extends NonTerminator:
 
     override def toString: String = s"cap_end $index"
 
   /** `cap_keep`: Takes the captures of the last failed matching, as Perl does not restore them on backtracking.
     *
-    * The captures above the last closed index of the current matching are unset.
+    * The captures above the last closed index of the current matching are unset, and the open captures keep the
+    * positions where they open.
     */
   case object CapKeep extends NonTerminator:
 
@@ -264,8 +275,8 @@ object Inst:
 
     override def toString: String = s"verb $kind"
 
-  /** `reject_empty`: Fails if the match from the start of the capture `0` is empty, only at the start of the input with
-    * `atStart`.
+  /** `reject_empty`: Fails if the match from the position where the capture `0` opens is empty, only at the start of
+    * the input with `atStart`.
     */
   final case class RejectEmpty(atStart: Boolean) extends NonTerminator:
 

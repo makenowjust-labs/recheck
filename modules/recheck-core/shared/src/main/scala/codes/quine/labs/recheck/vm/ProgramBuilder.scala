@@ -57,13 +57,18 @@ private[vm] class ProgramBuilder(
   /** Whether captures in a repetition are reset on each iteration. */
   private val resetsCaptures = pattern.captures.resetsEachIteration
 
+  /** Whether the pattern has back-references or capture tests, which read the captures while matching. */
+  private val readsCaptures = pattern.node.exists:
+    case _: IRNodeData.BackReference                           => true
+    case IRNodeData.Conditional(_: IRCondition.Captured, _, _) => true
+    case _                                                     => false
+
   /** Whether backtracking keeps the captures of the failed matching, which back-references and capture tests only see.
     */
-  private val keepsCaptures =
-    pattern.captures.keptOnBacktracking && pattern.node.exists:
-      case _: IRNodeData.BackReference                           => true
-      case IRNodeData.Conditional(_: IRCondition.Captured, _, _) => true
-      case _                                                     => false
+  private val keepsCaptures = pattern.captures.keptOnBacktracking && readsCaptures
+
+  /** Whether a capture is unset while it is open, which back-references and capture tests in it only see. */
+  private val unsetsOpenCaptures = pattern.captures.unsetWhileOpen && readsCaptures
 
   /** Whether the captures in an atomic group or a look-around are held over backtracking once it matches, which
     * back-references only see.
@@ -280,7 +285,7 @@ private[vm] class ProgramBuilder(
 
       enterBlock(cont)
 
-    emitInst(Inst.CapBegin(0))
+    emitInst(Inst.CapOpen(0))
     build(pattern.node)
     emitOk()
 
@@ -320,7 +325,7 @@ private[vm] class ProgramBuilder(
       case IRNodeData.NonAtomicLookBehind(child, m) => buildLookBehind(m)(buildNonAtomicLookAround(child, _))
       case IRNodeData.Conditional(cond, yes, no)    => buildConditional(cond, yes, no)
       // `\K` sets the start of the whole match, which is the capture `0`.
-      case IRNodeData.ResetMatchStart        => emitInst(Inst.CapBegin(0))
+      case IRNodeData.ResetMatchStart        => emitInst(Inst.CapOpen(0))
       case IRNodeData.BacktrackControl(verb) => buildBacktrackControl(verb)
       case IRNodeData.Chars(set)             => emitRead(readKind(set), node.loc.toOption)
       case IRNodeData.Strings(set)           =>
@@ -470,7 +475,8 @@ private[vm] class ProgramBuilder(
 
   /** A builder for a capture node. */
   def buildCapture(index: Int, children: IRNode): Unit =
-    emitInst(if back then Inst.CapEnd(index) else Inst.CapBegin(index))
+    if unsetsOpenCaptures then emitInst(Inst.CapReset(index, index))
+    emitInst(Inst.CapOpen(index))
     val saved = openCaptures
     openCaptures = index :: openCaptures
     build(children)
