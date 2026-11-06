@@ -20,6 +20,7 @@ Misc:
 - [#1829](https://github.com/makenowjust-labs/recheck/pull/1829) Update dependency sbt/sbt to v2.0.12 ([@renovate[bot]](https://github.com/apps/renovate))
 - [#1952](https://github.com/makenowjust-labs/recheck/pull/1952) Update dependency node to v26 ([@renovate[bot]](https://github.com/apps/renovate))
 - [#1961](https://github.com/makenowjust-labs/recheck/pull/1961) Update Node to 26.13.0, Python to 3.15.2 and Ruby to 4.0.9 ([@makenowjust](https://github.com/makenowjust))
+- [#1964](https://github.com/makenowjust-labs/recheck/pull/1964) Cache the builds of PHP and PCRE2 apart from the other mise tools ([@makenowjust](https://github.com/makenowjust))
 
 # 4.6.2 (2026-10-26)
 
