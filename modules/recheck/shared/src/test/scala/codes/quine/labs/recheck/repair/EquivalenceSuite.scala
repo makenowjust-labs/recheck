@@ -115,6 +115,12 @@ class EquivalenceSuite extends munit.FunSuite:
     assertEquals(counterexample("\\ba", "(?<!\\w)a", Seq((0, 0))), None)
     assertEquals(counterexample(Pattern("a\\Kb", Dialect.PCRE), Pattern("(?<=a)b", Dialect.PCRE), Seq((0, 0))), None)
 
+  test("Equivalence.findCounterexample: captures in negative look-around assertions"):
+    // A capture in a negative look-around is never set.
+    assertEquals(counterexample("(?!(b))a", "(?!b)a()", Seq((1, 1))), Some("a"))
+    assertEquals(counterexample("(?:(?!(a)b)\\w)*$", "(?:(?!ab)\\w)*$(x)?", Seq((0, 0), (1, 1))), None)
+    assertEquals(counterexample("(?<!(a))b", "(?<!a)b", Seq((0, 0))), None)
+
   test("Equivalence.findCounterexample: atomic groups"):
     val perl = Dialect.Perl()
     assertEquals(counterexample(Pattern("(?>a|ab)c", perl), Pattern("ac", perl), Seq((0, 0))), None)
