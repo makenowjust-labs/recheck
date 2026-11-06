@@ -108,7 +108,7 @@ object Diagnostics:
     * Refuted attacks:
     * - Complexity    : exponential
     *   Attack string : 'a'.repeat(31) + '\x00'
-    *   Runtime attack: refuted (finished in 3 ms on node v26.11.1, timeout: 1000 ms)
+    *   Runtime attack: refuted (finished in 3 ms on node v26.13.0, timeout: 1000 ms)
     * }}}
     */
   private def showRefutedAttacks(dialect: Dialect, unitMode: UnitMode, refutedAttacks: Seq[RefutedAttack]): String =

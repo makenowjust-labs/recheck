@@ -73,7 +73,7 @@ Checker   : automaton
 Refuted attacks:
 - Complexity    : exponential
   Attack string : "a" + "a" * 31 + "\x00"
-  Runtime attack: refuted (finished in 0 ms on ruby 4.0.7, timeout: 1000 ms)
+  Runtime attack: refuted (finished in 0 ms on ruby 4.0.9, timeout: 1000 ms)
 ```
 
 The result records the runtime attack as `runtimeAttack` of `vulnerable` diagnostics, and the refuted attacks in `refutedAttacks` (see [Diagnostics](diagnostics.mdx#runtime-attack-verification)).

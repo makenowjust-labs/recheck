@@ -6,7 +6,7 @@ import scala.concurrent.duration.FiniteDuration
 
 /** RuntimeAttack is a run of an attack string on the real regex engine of the dialect.
   *
-  * `runtime` is the runtime name and version (e.g. `python 3.15.0`), and `result` is the result of the matching within
+  * `runtime` is the runtime name and version (e.g. `python 3.15.2`), and `result` is the result of the matching within
   * `timeout`.
   */
 final case class RuntimeAttack(runtime: String, timeout: Duration, result: RuntimeAttackResult):
