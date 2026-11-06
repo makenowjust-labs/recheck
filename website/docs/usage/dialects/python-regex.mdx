@@ -67,7 +67,7 @@ The version flags are two letters, `V0` or `V1` (e.g. `iV1`), and the version is
 | `i`  | `regex.IGNORECASE` (`regex.I`)   | `(?i)`  |                                                                                        |
 | `L`  | `regex.LOCALE` (`regex.L`)       | `(?L)`  | The C locale. An error with `a` or `u`.                                                |
 | `m`  | `regex.MULTILINE` (`regex.M`)    | `(?m)`  |                                                                                        |
-| `p`  | `regex.POSIX` (`regex.P`)        | `(?p)`  | Not supported.                                                                         |
+| `p`  | `regex.POSIX` (`regex.P`)        | `(?p)`  | Takes the longest match at a start position after trying every path there.             |
 | `r`  | `regex.REVERSE` (`regex.R`)      | `(?r)`  | Not supported.                                                                         |
 | `s`  | `regex.DOTALL` (`regex.S`)       | `(?s)`  |                                                                                        |
 | `u`  | `regex.UNICODE` (`regex.U`)      | `(?u)`  | The default of a `str` pattern, and an error in a `bytes` pattern out of a group.      |
@@ -87,7 +87,7 @@ The following constructs are not supported, and they are reported as `unsupporte
 - Fuzzy constraints (e.g. `(?:abc){e<=1}`).
 - Named lists (e.g. `\L<name>`), whose strings are given on compiling the pattern.
 - The backtracking control verbs `(*PRUNE)` and `(*SKIP)`.
-- The flags `p` (`POSIX`) and `r` (`REVERSE`), and `w` (`WORD`) with `\b`, `\B`, `\m`, `\M`, `.`, `^` or `$`.
+- The flag `r` (`REVERSE`), and `w` (`WORD`) with `\b`, `\B`, `\m`, `\M`, `.`, `^` or `$`.
 - `\N{...}` (e.g. `\N{EM DASH}`), as in the other dialects having it.
 
 ## Approximations
