@@ -430,6 +430,7 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v3
         with:
+          prerelease: ${{ contains(github.ref, '-beta') }}
           files: |
             recheck.jar
             recheck-macos-x64
