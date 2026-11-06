@@ -4,7 +4,7 @@ import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.dialect.Dialect.*
 
-class ParserNestingSuite extends munit.FunSuite:
+class ParserNestingSuite extends munit.FunSuite with ParserHelper:
 
   val Max: Int = Parser.MaxNestingDepth
 
@@ -12,21 +12,22 @@ class ParserNestingSuite extends munit.FunSuite:
     val flagSet = FlagSet.parse(flags, dialect)
     Parser.parse(s, flagSet, dialect, Parser.determineUnitMode(s, flagSet, dialect))
 
-  /** Checks that a pattern of the depth `Max` is parsed, and that of `Max + 1` fails at the position. */
+  /** Checks that a pattern of the depth `Max` is parsed and printed, and that of `Max + 1` fails at the position. */
   def nesting(name: String, flags: String, dialects: Dialect*)(pattern: Int => String, pos: Int)(using
       loc: munit.Location
   ): Unit =
     for dialect <- dialects do
       test(s"Parser.parse: $name nested at the limit in $dialect"):
-        parse(pattern(Max), flags, dialect)
+        val s = pattern(Max)
+        val flagSet = FlagSet.parse(flags, dialect)
+        val mode = Parser.determineUnitMode(s, flagSet, dialect)
+        assertReparsed(Parser.parse(s, flagSet, dialect, mode), flagSet, dialect, mode)
       test(s"Parser.parse: $name nested beyond the limit in $dialect"):
         interceptMessage[NestingLimitException](s"Too deeply nested (limit $Max) at $pos"):
           parse(pattern(Max + 1), flags, dialect)
 
   def groups(open: String, prefix: String = ""): Int => String =
     n => prefix + open * n + "a" + ")" * n
-
-  val All: Seq[Dialect] = Seq(DotNet, Java, JavaScript, PCRE, Perl(), Python(), Ruby())
 
   nesting("capture groups", "", All*)(groups("("), Max)
   // The position in a source read by its UTF-8 bytes is the one in the source.
