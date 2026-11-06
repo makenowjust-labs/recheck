@@ -1,7 +1,7 @@
 [tools]
 java = "temurin-27.0.1"
 sbt = "2.0.12"
-node = "26.11.1"
+node = "26.13.0"
 pnpm = "12.16.1"
 python = "3.15.0"
 ruby = "4.0.7"
