@@ -2,6 +2,7 @@ package codes.quine.labs.resyntax.ir
 package build
 
 import codes.quine.labs.resyntax.ast.FlagSet
+import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.dialect.LineTerminatorSet
 import codes.quine.labs.resyntax.dialect.PerlSource
@@ -217,6 +218,55 @@ enum IRMultiCharFoldingKind:
   case Perl
 
   /** Ruby folds literals other than escapes of ASCII characters, classes, properties and back-references in UTF-8. */
+  case Ruby
+
+  /** Whether characters match their foldings to several characters in the unit mode. */
+  def foldsIn(mode: UnitMode): Boolean = this match
+    case OneToOne => false
+    case Perl     => true
+    case Ruby     => mode.isCodePoint
+
+  /** Whether an escape of an ASCII character takes part in the folding of the literals around it.
+    *
+    * Perl compiles an escape into the same node as the literals around it. Ruby passes an escape of an ASCII character
+    * to Onigmo as an escape, which is a node apart (e.g. `\x73s` and `\u0073s` do not match `ß`), but writes the others
+    * as the characters (e.g. `\u00DF` and `\xC3\x9F` are `ß`).
+    */
+  def foldsASCIIEscapes: Boolean = this match
+    case OneToOne | Ruby => false
+    case Perl            => true
+
+  /** Whether a literal folded to several characters joins the literals next to it in a folding (e.g. `ﬀi` matches `ﬃ`).
+    *
+    * Onigmo joins several literals only when each of them folds to one character.
+    */
+  def joinsMultiCharFoldings: Boolean = this match
+    case OneToOne | Ruby => false
+    case Perl            => true
+
+  /** Returns how a case-insensitive class matches the foldings of its characters to several characters. */
+  def classFoldingKind: IRClassFoldingKind = this match
+    case OneToOne => IRClassFoldingKind.OneToOne
+    case Perl     => IRClassFoldingKind.Perl
+    case Ruby     => IRClassFoldingKind.Ruby
+
+  /** Whether the charset flags restrict the foldings (e.g. `/l` forbids a folding with a character below `U+0100`). */
+  def isRestrictedByCharset: Boolean = this match
+    case OneToOne | Ruby => false
+    case Perl            => true
+
+/** IRClassFoldingKind is how a case-insensitive class matches the foldings of its characters to several characters. */
+enum IRClassFoldingKind:
+
+  /** OneToOne matches no folding to several characters. */
+  case OneToOne
+
+  /** Perl matches the foldings of the characters, escapes and ranges of one character instead of them, the foldings
+    * first (e.g. `[ßx]` is `ss|[x]`).
+    */
+  case Perl
+
+  /** Ruby matches the foldings of the characters of a class or a property after it (e.g. `[ßx]` is `[ßẞx]|ss|ss`). */
   case Ruby
 
 /** IRClassLookupKind is the family of a dialect's table of escape classes and POSIX classes.

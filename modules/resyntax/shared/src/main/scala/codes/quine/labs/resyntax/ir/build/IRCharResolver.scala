@@ -187,17 +187,11 @@ private[build] final class IRCharResolver(
     if u.value == NoUnit then IRNode(IRNodeData.Chars(CharSet.empty), u.loc)
     else IRNode(IRNodeData.Chars(equivalence(u.flags).closure(CharSet.single(u.value)).intersect(universe)), u.loc)
 
-  /** Whether a literal takes part in Ruby's and Perl's multi-character case folding.
-    *
-    * Perl compiles an escape into the same node as the literals around it. Ruby passes an escape of an ASCII character
-    * to Onigmo as an escape, which is a node apart (e.g. `\x73s` and `\u0073s` do not match `ß`), but writes the others
-    * as the characters (e.g. `\u00DF` and `\xC3\x9F` are `ß`).
-    */
+  /** Whether a literal takes part in Ruby's and Perl's multi-character case folding. */
   private def foldsMultiChar(u: Lit): Boolean =
-    u.flags.ignoreCase && u.value != NoUnit && (featureSet.multiCharFoldingKind match
-      case IRMultiCharFoldingKind.Perl     => true
-      case IRMultiCharFoldingKind.Ruby     => mode.isCodePoint && (u.escape.isEmpty || u.value >= 0x80)
-      case IRMultiCharFoldingKind.OneToOne => false)
+    val kind = featureSet.multiCharFoldingKind
+    u.flags.ignoreCase && u.value != NoUnit && kind.foldsIn(mode) &&
+    (u.escape.isEmpty || u.value >= 0x80 || kind.foldsASCIIEscapes)
 
   /** Resolves a part with the multi-character case folding of Ruby and Perl.
     *
@@ -212,8 +206,7 @@ private[build] final class IRCharResolver(
     // Perl's `aa` forbids a non-ASCII character to match a folding with ASCII characters (e.g. `ß` and `ss`), and `l` one with characters below `U+0100`.
     val minFoldedValue =
       if flags.caselessRestrict then 0x80
-      else if featureSet.multiCharFoldingKind == IRMultiCharFoldingKind.Perl && flags.charset == IRCharset.Locale then
-        0x100
+      else if featureSet.multiCharFoldingKind.isRestrictedByCharset && flags.charset == IRCharset.Locale then 0x100
       else 0
     val folded = mutable.ArrayBuffer.empty[(Int, Int)]
     for (u, i) <- units.zipWithIndex; c <- FullCaseFolding(u.value).iterator do folded += ((c, i))
@@ -228,8 +221,7 @@ private[build] final class IRCharResolver(
       // A key must start and end at literal boundaries.
       if (i == 0 || folded(i - 1)._2 != folded(i)._2) &&
         (i + key.length == folded.length || folded(i + key.length)._2 != folded(i + key.length - 1)._2)
-      // Onigmo joins several literals only when each of them folds to one character (e.g. `ﬀi` does not match `ﬃ`).
-      if featureSet.multiCharFoldingKind != IRMultiCharFoldingKind.Ruby ||
+      if featureSet.multiCharFoldingKind.joinsMultiCharFoldings ||
         folded(i)._2 == folded(i + key.length - 1)._2 ||
         folded(i + key.length - 1)._2 - folded(i)._2 + 1 == key.length
       // A native string under Perl's `/d` has no character to match a Latin-1 character's folding (e.g. `\xDF`).
@@ -498,14 +490,19 @@ private[build] final class IRCharResolver(
     if invert && flags.unicodeSets && mayContainStrings(item) then
       throw new IRBuildingException("Negated character class may contain strings", loc)
     if invert then output(negate(item, flags), flags)
-    else if featureSet.multiCharFoldingKind == IRMultiCharFoldingKind.Perl && flags.ignoreCase then
-      perlClass(item, flags, loc)
+    else if perlFolds(flags) then perlClass(item, flags, loc)
     else if rubyFolds(flags) then withRubyFoldings(output(classItem(item, flags), flags), flags, loc)
     else output(classItem(item, flags), flags)
 
+  /** Whether Perl matches a class under the flags with the foldings of its values to several characters. */
+  private def perlFolds(flags: IRCharFlagSet): Boolean =
+    val kind = featureSet.multiCharFoldingKind
+    flags.ignoreCase && kind.classFoldingKind == IRClassFoldingKind.Perl && kind.foldsIn(mode)
+
   /** Whether Ruby matches a class under the flags with the foldings of its characters to several characters. */
   private def rubyFolds(flags: IRCharFlagSet): Boolean =
-    featureSet.multiCharFoldingKind == IRMultiCharFoldingKind.Ruby && mode.isCodePoint && flags.ignoreCase
+    val kind = featureSet.multiCharFoldingKind
+    flags.ignoreCase && kind.classFoldingKind == IRClassFoldingKind.Ruby && kind.foldsIn(mode)
 
   /** Adds the foldings of the characters of Ruby's class to several characters after the class, as Onigmo tries them
     * (e.g. `[ßx]` is `[ßẞx]|ss|ss`).
@@ -905,14 +902,11 @@ private[build] object IRCharResolver:
       flags: IRCharFlagSet
   ): IRBackReferenceFolding =
     import IRBackReferenceFolding.*
-    if !flags.ignoreCase then Simple
+    if !flags.ignoreCase || !kind.foldsIn(mode) then Simple
+    else if !kind.isRestrictedByCharset then Full(0)
     else
-      kind match
-        case IRMultiCharFoldingKind.Ruby if mode.isCodePoint => Full(0)
-        case IRMultiCharFoldingKind.Perl                     =>
-          flags.charset match
-            case IRCharset.Default                            => Simple
-            case IRCharset.Locale                             => Full(0x100)
-            case _: IRCharset.ASCII if flags.caselessRestrict => Full(0x80)
-            case _                                            => Full(0)
-        case _ => Simple
+      flags.charset match
+        case IRCharset.Default                            => Simple
+        case IRCharset.Locale                             => Full(0x100)
+        case _: IRCharset.ASCII if flags.caselessRestrict => Full(0x80)
+        case _                                            => Full(0)
