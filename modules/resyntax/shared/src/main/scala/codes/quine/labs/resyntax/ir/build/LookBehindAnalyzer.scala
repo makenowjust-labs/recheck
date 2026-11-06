@@ -159,9 +159,9 @@ private[build] final class LookBehindAnalyzer(
         case BackslashKind.EscapeCall(_, Reference.IndexedReference(0)) => Some(Width(0, Inf))
         case BackslashKind.EscapeCall(_, ref)                           => callWidth(node, ref, visiting)
         case _: BackslashKind.Assert | _: BackslashKind.CaseCommand     => Some(Width(0, 0))
-    // `IRBuilder.build` removes the blanks and expands Ruby's `\u{...}`.
+    // `IRBuilder.build` removes the blanks and expands Ruby's `\u{...}` and the case regions.
     // $COVERAGE-OFF$
-    case NodeData.Blank(_) | NodeData.UnicodeList(_, _) =>
+    case NodeData.Blank(_) | NodeData.UnicodeList(_, _) | NodeData.CaseRegion(_, _, _) =>
       throw new IllegalStateException(s"Unexpected source node: $node")
     // $COVERAGE-ON$
 

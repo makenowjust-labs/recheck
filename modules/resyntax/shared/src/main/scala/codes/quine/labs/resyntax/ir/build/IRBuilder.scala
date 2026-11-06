@@ -82,7 +82,7 @@ object IRBuilder:
     )
 
   /** Returns the node without what only its source has: the blanks of the extended mode are removed, and Ruby's
-    * `\u{...}` of several code points becomes their escapes.
+    * `\u{...}` of several code points and the case regions become their nodes.
     *
     * A sequence or a class union left with one item becomes the item, and a blank alone becomes an empty one.
     */
@@ -91,21 +91,26 @@ object IRBuilder:
       expandNodes(nodes) match
         case Seq(child) if nodes.size > 1 => stripSource(child)
         case children                     => node.copy(data = NodeData.Sequence(children.map(stripSource)))
-    case NodeData.UnicodeList(nodes, _) => node.copy(data = NodeData.Sequence(nodes.map(stripSource)))
-    case NodeData.Blank(_)              => node.copy(data = NodeData.Sequence(Seq.empty))
-    case NodeData.Disjunction(nodes)    => node.copy(data = NodeData.Disjunction(nodes.map(stripSource)))
-    case data: NodeData.Repeat          => node.copy(data = data.copy(node = stripSource(data.node)))
-    case NodeData.Group(kind, child)    => node.copy(data = NodeData.Group(kind, stripSource(child)))
-    case NodeData.Command(kind)         => node.copy(data = NodeData.Command(stripCommandSource(kind)))
-    case NodeData.Class(invert, item)   => node.copy(data = NodeData.Class(invert, stripClassSource(item)))
-    case _                              => node
+    case NodeData.UnicodeList(nodes, _)   => node.copy(data = NodeData.Sequence(nodes.map(stripSource)))
+    case NodeData.CaseRegion(_, parts, _) =>
+      expandNodes(parts.map(_.value)) match
+        case Seq(child) => stripSource(child)
+        case children   => node.copy(data = NodeData.Sequence(children.map(stripSource)))
+    case NodeData.Blank(_)            => node.copy(data = NodeData.Sequence(Seq.empty))
+    case NodeData.Disjunction(nodes)  => node.copy(data = NodeData.Disjunction(nodes.map(stripSource)))
+    case data: NodeData.Repeat        => node.copy(data = data.copy(node = stripSource(data.node)))
+    case NodeData.Group(kind, child)  => node.copy(data = NodeData.Group(kind, stripSource(child)))
+    case NodeData.Command(kind)       => node.copy(data = NodeData.Command(stripCommandSource(kind)))
+    case NodeData.Class(invert, item) => node.copy(data = NodeData.Class(invert, stripClassSource(item)))
+    case _                            => node
 
-  /** Returns the nodes where Ruby's `\u{...}` is its escapes, without the blanks. */
+  /** Returns the nodes where Ruby's `\u{...}` and a case region are their nodes, without the blanks. */
   private def expandNodes(nodes: Seq[Node]): Seq[Node] = nodes.flatMap: node =>
     node.data match
-      case NodeData.UnicodeList(nodes, _) => nodes
-      case NodeData.Blank(_)              => Seq.empty
-      case _                              => Seq(node)
+      case NodeData.UnicodeList(nodes, _)   => nodes
+      case NodeData.CaseRegion(_, parts, _) => expandNodes(parts.map(_.value))
+      case NodeData.Blank(_)                => Seq.empty
+      case _                                => Seq(node)
 
   private def stripCommandSource(kind: CommandKind): CommandKind = kind match
     case CommandKind.BranchReset(nodes)         => CommandKind.BranchReset(nodes.map(stripSource))
@@ -123,10 +128,14 @@ object IRBuilder:
 
   private def stripClassSource(item: ClassItem): ClassItem = item.data match
     case ClassItemData.ClassUnion(items) =>
-      items.filterNot(_.data.isInstanceOf[ClassItemData.ClassBlank]) match
+      expandClassItems(items) match
         case Seq(child) if items.size > 1 => stripClassSource(child)
         case children => ClassItem(ClassItemData.ClassUnion(children.map(stripClassSource)), item.loc)
-    case ClassItemData.ClassUnicodeList(items, _)     => ClassItem(ClassItemData.ClassUnion(items), item.loc)
+    case ClassItemData.ClassUnicodeList(items, _)   => ClassItem(ClassItemData.ClassUnion(items), item.loc)
+    case ClassItemData.ClassCaseRegion(_, parts, _) =>
+      expandClassItems(parts.map(_.value)) match
+        case Seq(child) => stripClassSource(child)
+        case children   => ClassItem(ClassItemData.ClassUnion(children.map(stripClassSource)), item.loc)
     case ClassItemData.ClassBlank(_)                  => ClassItem(ClassItemData.ClassUnion(Seq.empty), item.loc)
     case ClassItemData.ClassIntersection(left, right) =>
       ClassItem(ClassItemData.ClassIntersection(stripClassSource(left), stripClassSource(right)), item.loc)
@@ -135,6 +144,13 @@ object IRBuilder:
     case ClassItemData.ClassNest(invert, inner) =>
       ClassItem(ClassItemData.ClassNest(invert, stripClassSource(inner)), item.loc)
     case _ => item
+
+  /** Returns the items where a case region is its items, without the blanks. */
+  private def expandClassItems(items: Seq[ClassItem]): Seq[ClassItem] = items.flatMap: item =>
+    item.data match
+      case ClassItemData.ClassCaseRegion(_, parts, _) => expandClassItems(parts.map(_.value))
+      case ClassItemData.ClassBlank(_)                => Seq.empty
+      case _                                          => Seq(item)
 
   /** Checks whether Perl takes the full case folding of the character under the flags (e.g. `ß` as `ss`). */
   private def perlFoldsMulti(value: Int, flags: IRCharFlagSet, perlUTF8Pattern: Boolean): Boolean =
@@ -321,9 +337,9 @@ private[build] class IRBuilder(
       case NodeData.Dollar                                           => Left(buildDollar())
       case NodeData.Backslash(kind)                                  => Left(buildBackslash(node, kind))
       case NodeData.Dot | NodeData.Class(_, _) | NodeData.Literal(_) => Left(buildCharacter(node))
-      // `IRBuilder.build` removes the blanks and expands Ruby's `\u{...}`.
+      // `IRBuilder.build` removes the blanks and expands Ruby's `\u{...}` and the case regions.
       // $COVERAGE-OFF$
-      case NodeData.Blank(_) | NodeData.UnicodeList(_, _) =>
+      case NodeData.Blank(_) | NodeData.UnicodeList(_, _) | NodeData.CaseRegion(_, _, _) =>
         throw new IllegalStateException(s"Unexpected source node: $node")
       // $COVERAGE-ON$
     result match

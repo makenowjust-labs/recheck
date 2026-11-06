@@ -26,5 +26,5 @@ object BackslashKind:
 
   final case class Assert(kind: AssertKind) extends BackslashKind
 
-  /** CaseCommand is Java's and PCRE's quoting command (`\Q` or `\E`). */
+  /** CaseCommand is a command out of a case region, which is PCRE's `\E` out of a quote that does nothing. */
   final case class CaseCommand(kind: CaseCommandKind) extends BackslashKind

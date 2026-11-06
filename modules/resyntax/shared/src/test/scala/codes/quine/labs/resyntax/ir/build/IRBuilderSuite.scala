@@ -413,11 +413,17 @@ class IRBuilderSuite extends munit.FunSuite with IRHelper:
   check("(\\u{41 42})", "", Ruby())(Capture(1, None, Sequence(char('A'), char('B'))))
   check("[x\\u{41 42}]", "", Ruby())(Chars(CharSet.of('A', 'B', 'x')))
 
-  // Quoting command
-  check("\\Qa\\E", "", Java, PCRE)(Sequence(Empty, char('a'), Empty))
-  // Perl's lexer rewrites a regex literal, so its commands leave no nodes.
+  // Quoting and case commands are their nodes, and a quantifier after `\E` repeats the last one.
+  check("\\Qa\\E", "", Java, PCRE, Perl())(char('a'))
+  check("x\\Qab\\E*", "", Java, PCRE, Perl())(Sequence(char('x'), char('a'), Repeat(char('b'), Unbounded(0, Greedy))))
+  check("a\\Q\\Eb", "", Java, PCRE)(Sequence(char('a'), char('b')))
   check("\\Ua\\E", "", Perl())(char('A'))
-  check("\\Qa\\E", "", Perl())(char('a'))
+  check("\\Uab\\E", "", Perl())(Sequence(char('A'), char('B')))
+  check("[\\Qa\\E]", "", Java, PCRE, Perl())(char('a'))
+  check("[\\Qab\\E]", "", Java, PCRE, Perl())(Chars(CharSet.of('a', 'b')))
+  check("[x\\Qab\\E]", "", Java, PCRE, Perl())(Chars(CharSet.of('a', 'b', 'x')))
+  check("[\\Qa\\E-\\Qc\\E]", "", Java, PCRE, Perl())(Chars(CharSet.range('a', 'c')))
+  check("[A-\\LC\\E]", "", Perl())(Chars(CharSet.range('A', 'c')))
 
   // Java's CANON_EQ makes a character-level node unsupported.
   check("a(?c)b", "", Java)(Sequence(char('a'), Empty, Unsupported(NodeData.Literal('b'))))

@@ -3,6 +3,8 @@ package codes.quine.labs.resyntax.parser
 import codes.quine.labs.resyntax.ast.AssertKind.*
 import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
+import codes.quine.labs.resyntax.ast.CaseCommandKind
+import codes.quine.labs.resyntax.ast.CaseRegionEnd
 import codes.quine.labs.resyntax.ast.CommandKind.Comment
 import codes.quine.labs.resyntax.ast.CommandKind.InlineFlag
 import codes.quine.labs.resyntax.ast.CommandKind.StartOption
@@ -162,7 +164,8 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
   error("\\d{", "", Perl())("Unescaped left brace at 2")
   // Perl's lexer removes the commands of a regex literal, so the regex compiler does not see them before `{`.
   checkPrinted("\\E{x", "{x", "", Perl())(Sequence(Literal('{'), Literal('x')))
-  checkPrinted("\\u{", "{", "", Perl())(Literal('{'))
+  check("\\u{", "", Perl()):
+    CaseRegion(CaseCommandKind.UpperFirstCommand, Seq(part(Literal('{'), "{")), CaseRegionEnd.NextCharacter)
   checkPrinted("a\\u{3}", "a{3}", "", Perl())(Repeat(Literal('a'), Exact(3, Greedy)))
   errorPerlString("\\E{x", "")("Unescaped left brace at 2")
   errorPerlString("\\u{", "")("Unescaped left brace at 2")

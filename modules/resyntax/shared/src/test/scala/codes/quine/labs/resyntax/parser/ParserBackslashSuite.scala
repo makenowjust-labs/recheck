@@ -6,6 +6,8 @@ import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
 import codes.quine.labs.resyntax.ast.BoundaryModifier.*
 import codes.quine.labs.resyntax.ast.CaseCommandKind.*
+import codes.quine.labs.resyntax.ast.CasePart
+import codes.quine.labs.resyntax.ast.CaseRegionEnd.*
 import codes.quine.labs.resyntax.ast.ClassItem
 import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.CommandKind
@@ -208,7 +210,7 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   checkPrinted("\\g{ 1 }", "\\g{1}", "", PCRE, Perl()):
     Backslash(EscapeBackReference(GBackReference(Curly), IndexedReference(1)))
   check("\\g1", "", Ruby())(Sequence(Backslash(Unknown('g')), Literal('1')))
-  checkPrinted("\\la", "a", "", Perl())(Literal('a'))
+  check("\\la", "", Perl())(CaseRegion(LowerFirstCommand, Seq(part(Literal('a'), "a")), NextCharacter))
   checkPerlString("\\l", "")(Backslash(Unknown('l')))
   check("\\n", "", All*)(Backslash(Escape(Single('n'), 0x0a)))
   check("\\o{010}", "", PCRE, Perl())(Backslash(Escape(Octal, 0x08, Some("{010}"))))
@@ -245,7 +247,7 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   check("\\r", "", All*)(Backslash(Escape(Single('r'), 0x0d)))
   check("\\s", "", All*)(Backslash(EscapeClass(Space)))
   check("\\t", "", All*)(Backslash(Escape(Single('t'), 0x09)))
-  checkPrinted("\\ua", "A", "", Perl())(Literal('A'))
+  check("\\ua", "", Perl())(CaseRegion(UpperFirstCommand, Seq(part(Literal('A'), "a")), NextCharacter))
   checkPerlString("\\u", "")(Backslash(Unknown('u')))
   check("\\uABCD", "", DotNet, Java, JavaScript, Python(), Ruby())(Backslash(Escape(UnicodeHex4, 0xabcd)))
   check("\\u{ABCDE}", "u", JavaScript)(Backslash(Escape(UnicodeBracket, 0xabcde)))
@@ -331,15 +333,16 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   check("\\B{sb}", "", Perl())(Backslash(Assert(NonBoundary(Some(SbModifier)))))
   check("\\D", "", All*)(Backslash(EscapeClass(NonDigit)))
   check("\\E", "", PCRE)(Backslash(CaseCommand(EndCaseCommand)))
+  // Perl's `\E` without a command is not kept.
   checkPrinted("a\\E", "a", "", Perl())(Literal('a'))
   checkPerlString("\\E", "")(Backslash(Unknown('E')))
-  checkPrinted("\\FA", "a", "", Perl())(Literal('a'))
+  check("\\FA", "", Perl())(CaseRegion(FoldCommand, Seq(part(Literal('a'), "A")), Unclosed))
   checkPerlString("\\F", "")(Backslash(Unknown('F')))
   check("\\G", "", DotNet, Java, PCRE, Perl(), Ruby())(Backslash(Assert(Sticky)))
   check("\\H", "", Java, PCRE, Perl())(Backslash(EscapeClass(NonHorizontal)))
   check("\\H", "", Ruby())(Backslash(EscapeClass(NonHexDigit)))
   check("\\K", "", PCRE, Perl(), Ruby())(Backslash(Assert(Cut)))
-  checkPrinted("\\LA", "a", "", Perl())(Literal('a'))
+  check("\\LA", "", Perl())(CaseRegion(LowerCommand, Seq(part(Literal('a'), "A")), Unclosed))
   checkPerlString("\\L", "")(Backslash(Unknown('L')))
   check("\\P{Letter}", "", DotNet, Java, PCRE, Perl(), Ruby())(Backslash(EscapeClass(NonUnicodeProperty("Letter"))))
   check("\\P{Letter}", "u", JavaScript)(Backslash(EscapeClass(NonUnicodeProperty("Letter"))))
@@ -348,28 +351,106 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   check("\\P{Script=Hira}", "u", JavaScript)(Backslash(EscapeClass(NonUnicodePropertyValue("Script", "Hira"))))
   check("\\PL", "", Java, PCRE, Perl())(Backslash(EscapeClass(NonUnicodeBareProperty("L"))))
   check("\\Qab\\E", "", Java, PCRE):
-    Sequence(
-      Backslash(CaseCommand(QuoteCommand)),
-      Literal('a'),
-      Literal('b'),
-      Backslash(CaseCommand(EndCaseCommand))
-    )
+    CaseRegion(QuoteCommand, Seq(part(Literal('a'), "a"), part(Literal('b'), "b")), Closed)
   check("\\Qab", "", Java, PCRE):
-    Sequence(
-      Backslash(CaseCommand(QuoteCommand)),
-      Literal('a'),
-      Literal('b')
-    )
+    CaseRegion(QuoteCommand, Seq(part(Literal('a'), "a"), part(Literal('b'), "b")), Unclosed)
   check("\\Q\\\\\\E", "", Java, PCRE):
-    Sequence(
-      Backslash(CaseCommand(QuoteCommand)),
-      Literal('\\'),
-      Literal('\\'),
-      Backslash(CaseCommand(EndCaseCommand))
+    CaseRegion(QuoteCommand, Seq(part(Literal('\\'), "\\"), part(Literal('\\'), "\\")), Closed)
+  check("\\Q\\E", "", Java, PCRE)(CaseRegion(QuoteCommand, Seq(), Closed))
+  check("(\\Q)\\E)", "x", Java):
+    Group(IndexedCapture, CaseRegion(QuoteCommand, Seq(part(Literal(')'), ")")), Closed))
+  // A quantifier after `\E` repeats the last character, and the one after an empty quote or `\E` out of a quote the
+  // node before them.
+  check("\\Qab\\E*", "", Java, PCRE):
+    CaseRegion(
+      QuoteCommand,
+      Seq(part(Literal('a'), "a"), part(Repeat(Literal('b'), Star(Greedy)), "b")),
+      ClosedBeforeQuantifier
     )
-  checkPrinted("\\Qa.\\E", "a\\.", "", Perl())(Sequence(Literal('a'), Backslash(Escape(Single('.'), '.'))))
-  checkPrinted("\\Q\\d\\E", "\\\\d", "", Perl())(Sequence(Backslash(Escape(Single('\\'), '\\')), Literal('d')))
-  checkPrinted("\\U\\d", "\\D", "", Perl())(Backslash(EscapeClass(NonDigit)))
+  check("\\Qab\\E #c\n{2}", "x", Java):
+    CaseRegion(
+      QuoteCommand,
+      Seq(part(Literal('a'), "a"), part(Repeat(Node(Literal('b')), Exact(2, Greedy), Some(" #c\n{2}")), "b")),
+      ClosedBeforeQuantifier
+    )
+  check("\\Qa\\E*{2}", "", Java):
+    CaseRegion(
+      QuoteCommand,
+      Seq(part(Repeat(Node(Literal('a')), Star(Greedy), Some("*{2}")), "a")),
+      ClosedBeforeQuantifier
+    )
+  check("\\Qa\\E* {2}", "x", Java):
+    CaseRegion(
+      QuoteCommand,
+      Seq(part(Repeat(Node(Literal('a')), Star(Greedy), Some("* {2}")), "a")),
+      ClosedBeforeQuantifier
+    )
+  error("\\Qa\\E**", "", Java, PCRE)("Nested quantifier at 6")
+  check("a\\Q\\E*", "", Java, PCRE)(Repeat(Node(Literal('a')), Star(Greedy), Some("\\Q\\E*")))
+  check("a\\E+", "", PCRE)(Repeat(Node(Literal('a')), Plus(Greedy), Some("\\E+")))
+  error("\\Q\\E*", "", Java, PCRE)("Nothing to repeat at 4")
+  // Perl's lexer applies the commands of a regex literal to its text, and the nodes made by a command are its region.
+  check("\\Qa.\\E", "", Perl()):
+    CaseRegion(QuoteCommand, Seq(part(Literal('a'), "a"), part(Backslash(Escape(Single('.'), '.')), ".")), Closed)
+  check("\\Q\\d\\E", "", Perl()):
+    CaseRegion(QuoteCommand, Seq(part(Backslash(Escape(Single('\\'), '\\')), "\\"), part(Literal('d'), "d")), Closed)
+  check("\\Q(\\E", "", Perl())(CaseRegion(QuoteCommand, Seq(part(Backslash(Escape(Single('('), '(')), "(")), Closed))
+  check("\\U\\d", "", Perl())(CaseRegion(UpperCommand, Seq(part(Backslash(EscapeClass(NonDigit)), "\\d")), Unclosed))
+  check("x\\Uab\\Ey", "", Perl()):
+    Sequence(
+      Literal('x'),
+      CaseRegion(UpperCommand, Seq(part(Literal('A'), "a"), part(Literal('B'), "b")), Closed),
+      Literal('y')
+    )
+  check("\\Ua*\\E", "", Perl())(CaseRegion(UpperCommand, Seq(part(Repeat(Literal('A'), Star(Greedy)), "a*")), Closed))
+  check("\\Uab\\E*", "", Perl()):
+    CaseRegion(
+      UpperCommand,
+      Seq(part(Literal('A'), "a"), part(Repeat(Literal('B'), Star(Greedy)), "b")),
+      ClosedBeforeQuantifier
+    )
+  check("\\Ua\\Qb.\\E\\E", "", Perl()):
+    val dot = part(Backslash(Escape(Single('.'), '.')), ".")
+    val quote = CaseRegion(QuoteCommand, Seq(part(Literal('B'), "b"), dot), Closed)
+    CaseRegion(UpperCommand, Seq(part(Literal('A'), "a"), CasePart(Node(quote), None)), Closed)
+  // `\u` and `\l` change only the next character, which is their region without their own `\E`.
+  check("\\u2028", "", Perl()):
+    val first = CaseRegion(UpperFirstCommand, Seq(part(Literal('2'), "2")), NextCharacter)
+    Sequence(first, Literal('0'), Literal('2'), Literal('8'))
+  check("\\uab\\E", "", Perl()):
+    CaseRegion(UpperFirstCommand, Seq(part(Literal('A'), "a"), part(Literal('b'), "b")), Closed)
+  check("\\ua*", "", Perl()):
+    Repeat(CaseRegion(UpperFirstCommand, Seq(part(Literal('A'), "a")), NextCharacter), Star(Greedy))
+  check("\\ua\\ub", "", Perl()):
+    Sequence(
+      CaseRegion(UpperFirstCommand, Seq(part(Literal('A'), "a")), NextCharacter),
+      CaseRegion(UpperFirstCommand, Seq(part(Literal('B'), "b")), NextCharacter)
+    )
+  check("\\u\\lab", "", Perl()):
+    val lower = CaseRegion(LowerFirstCommand, Seq(part(Literal('A'), "a")), NextCharacter)
+    Sequence(CaseRegion(UpperFirstCommand, Seq(CasePart(Node(lower), None)), NextCharacter), Literal('b'))
+  check("\\U\\uab\\E", "", Perl()):
+    val first = CaseRegion(UpperFirstCommand, Seq(part(Literal('A'), "a")), NextCharacter)
+    CaseRegion(UpperCommand, Seq(CasePart(Node(first), None), part(Literal('B'), "b")), Closed)
+  // The lexer swaps `\L\u` and `\U\l`, and the regions keep the commands as written.
+  check("\\L\\uAB\\E", "", Perl()):
+    val first = CaseRegion(UpperFirstCommand, Seq(part(Literal('A'), "A"), part(Literal('b'), "B")), Closed)
+    CaseRegion(LowerCommand, Seq(CasePart(Node(first), None)), Unclosed)
+  check("\\U\\lab\\E", "", Perl()):
+    val first = CaseRegion(LowerFirstCommand, Seq(part(Literal('a'), "a"), part(Literal('B'), "b")), Closed)
+    CaseRegion(UpperCommand, Seq(CasePart(Node(first), None)), Unclosed)
+  // The commands whose ranges are not those of nodes, or that end without `\E` before more text, are not kept.
+  checkPrinted("\\x\\U4a\\E", "\\x4A", "", Perl())(Backslash(Escape(Hex2, 0x4a)))
+  checkPrinted("x\\Ua|b\\Ey", "xA|By", "", Perl()):
+    Disjunction(Sequence(Literal('x'), Literal('A')), Sequence(Literal('B'), Literal('y')))
+  checkPrinted("(\\Ua)\\E", "(A)", "", Perl())(Group(IndexedCapture, Literal('A')))
+  checkPrinted("a\\Ub{2\\E}", "aB{2}", "", Perl())(Sequence(Literal('a'), Repeat(Literal('B'), Exact(2, Greedy))))
+  checkPrinted("\\Ua\\Lb", "A\\Lb", "", Perl()):
+    Sequence(Literal('A'), CaseRegion(LowerCommand, Seq(part(Literal('b'), "b")), Unclosed))
+  // A command with a quantifier after another `\E` is not kept, and neither is the command around it.
+  checkPrinted("\\U\\Qab\\E\\E*", "AB*", "", Perl())(Sequence(Literal('A'), Repeat(Literal('B'), Star(Greedy))))
+  // The lexer skips an empty command.
+  checkPrinted("a\\U\\Eb", "ab", "", Perl())(Sequence(Literal('a'), Literal('b')))
   checkPerlString("\\Qa.\\E", "")(Sequence(Backslash(Unknown('Q')), Literal('a'), Dot, Backslash(Unknown('E'))))
   checkPerlString("\\U\\d", "")(Sequence(Backslash(Unknown('U')), Backslash(EscapeClass(Digit))))
   check("\\N", "", PCRE, Perl())(Backslash(EscapeClass(NonNewline)))

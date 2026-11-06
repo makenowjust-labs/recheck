@@ -1,5 +1,8 @@
 package codes.quine.labs.resyntax.parser
 
+import codes.quine.labs.resyntax.ast.CasePart
+import codes.quine.labs.resyntax.ast.ClassItem
+import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData
@@ -56,6 +59,12 @@ trait ParserHelper:
     val printed = Printer.print(node, flagSet, dialect, mode)
     assertEquals(printed, text)
     assert(Parser.parse(printed, flagSet, dialect, mode).equalsWithoutLoc(node), printed)
+
+  /** Returns a part of a case region, made from the text. */
+  def part(data: NodeData, written: String): CasePart[Node] = CasePart(Node(data), Some(written))
+
+  /** Returns a part of a case region in a class, made from the text. */
+  def classPart(data: ClassItemData, written: String): CasePart[ClassItem] = CasePart(ClassItem(data), Some(written))
 
   val PerlString: Dialect = Perl(source = PerlSource.String)
 

@@ -17,6 +17,9 @@ sealed abstract class NodeData extends Product with Serializable:
       li == ri && l.equalsWithoutLoc(r)
     case (NodeData.UnicodeList(ls, wl), NodeData.UnicodeList(rs, wr)) =>
       ls.length == rs.length && ls.zip(rs).forall((l, r) => l.equalsWithoutLoc(r)) && wl == wr
+    case (NodeData.CaseRegion(kl, ls, el), NodeData.CaseRegion(kr, rs, er)) =>
+      kl == kr && el == er && ls.length == rs.length &&
+      ls.zip(rs).forall((l, r) => l.value.equalsWithoutLoc(r.value) && l.written == r.written)
     case (l, r) => l == r
 
 object NodeData:
@@ -143,3 +146,10 @@ object NodeData:
     * `\u{41}\u{42}*`). `written` is the text after `\u` as written (e.g. `{41  42}`), or `None` for the plain text.
     */
   final case class UnicodeList(nodes: Seq[Node], written: Option[String] = None) extends NodeData
+
+  /** CaseRegion is the nodes in the range of a quoting or case command (e.g. `\Qa.\E`, or Perl's `\Uab\E`).
+    *
+    * The nodes are what the command makes (see [[CasePart]]). Perl's lexer swaps `\L\u` and `\U\l`, so the nodes in
+    * their regions are the ones of `\u\L` and `\l\U`.
+    */
+  final case class CaseRegion(kind: CaseCommandKind, parts: Seq[CasePart[Node]], end: CaseRegionEnd) extends NodeData

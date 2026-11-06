@@ -13,6 +13,9 @@ import codes.quine.labs.resyntax.ast.BacktrackControlKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.ast.BoundaryModifier
 import codes.quine.labs.resyntax.ast.CaseCommandKind
+import codes.quine.labs.resyntax.ast.CaseForm
+import codes.quine.labs.resyntax.ast.CasePart
+import codes.quine.labs.resyntax.ast.CaseRegionEnd
 import codes.quine.labs.resyntax.ast.ClassItem
 import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.CommandKind
@@ -336,8 +339,17 @@ private[parser] final class Parser(
       case Some(node @ Node(repeat: NodeData.Repeat, _)) if featureSet.ignoresCurlyAfterRepeat =>
         while stack.headOption.exists(isComment) do stack.pop()
         stack.pop()
-        val written = repeat.written.getOrElse(repeat.quantifier.plainText) + writtenText(node.loc.end)
-        stack.push(Node(repeat.copy(written = Some(written)), node.loc.copy(end = offset)))
+        stack.push(Node(withIgnoredCurly(node, repeat), node.loc.copy(end = offset)))
+      case Some(
+            node @ Node(
+              region @ NodeData.CaseRegion(_, init :+ CasePart(last @ Node(repeat: NodeData.Repeat, _), text), _),
+              _
+            )
+          ) if featureSet.ignoresCurlyAfterRepeat =>
+        while stack.headOption.exists(isComment) do stack.pop()
+        stack.pop()
+        val part = CasePart(Node(withIgnoredCurly(last, repeat), last.loc.copy(end = offset)), text)
+        stack.push(Node(region.copy(parts = init :+ part), node.loc.copy(end = offset)))
       // The blank before an ignored curly quantifier keeps its text (e.g. ` {2}` of the extended mode).
       case None if featureSet.ignoresCurlyAfterRepeat =>
         stack.headOption match
@@ -347,6 +359,10 @@ private[parser] final class Parser(
           case _ => ()
       case _ =>
         pushRepeat(stack, popRepeatable(stack), quantifier, textStart)
+
+  /** Returns the repeat with the text up to here, where Java ignores a curly quantifier. */
+  private def withIgnoredCurly(node: Node, repeat: NodeData.Repeat): NodeData.Repeat =
+    repeat.copy(written = Some(repeat.written.getOrElse(repeat.quantifier.plainText) + writtenText(node.loc.end)))
 
   private def parseRepeatCountOption(): Option[Int] =
     parseSaturatedIntOption(featureSet.maxRepeatCount, "Number too big in {} quantifier", offset)
@@ -365,11 +381,12 @@ private[parser] final class Parser(
     node
 
   /** Returns the node that a quantifier after the node repeats, which is the last code point of Ruby's `\u{...}` (e.g.
-    * `\u{42}` of `\u{41 42}*`).
+    * `\u{42}` of `\u{41 42}*`) or the last character of a quote (e.g. `b` of `\Qab\E*`).
     */
   private def repeatTarget(node: Node): Node = node.data match
-    case NodeData.UnicodeList(nodes, _) => nodes.last
-    case _                              => node
+    case NodeData.UnicodeList(nodes, _)   => nodes.last
+    case NodeData.CaseRegion(_, parts, _) => parts.last.value
+    case _                                => node
 
   private def validateRepeatable(node: Node): Unit =
     node.data match
@@ -399,6 +416,10 @@ private[parser] final class Parser(
     node.data match
       case list @ NodeData.UnicodeList(nodes, _) =>
         val data = list.copy(nodes = nodes.init :+ repeat(nodes.last, quantifier, written))
+        stack.push(Node(data, node.loc.copy(end = offset)))
+      case region @ NodeData.CaseRegion(_, parts, _) =>
+        val part = parts.last.copy(value = repeat(parts.last.value, quantifier, written))
+        val data = region.copy(parts = parts.init :+ part, end = CaseRegionEnd.ClosedBeforeQuantifier)
         stack.push(Node(data, node.loc.copy(end = offset)))
       case _ => stack.push(repeat(node, quantifier, written))
 
@@ -444,10 +465,16 @@ private[parser] final class Parser(
     if skipped then stack.push(Node(NodeData.Blank(sliceSource(start, offset)), SourceLocation(start, offset)))
     skipped
 
+  /** Tests whether a quantifier after the node repeats the node before it, as after a comment (e.g. `a(?#c)*`).
+    *
+    * PCRE ignores an empty quote and `\E` out of a quote, and so does Java an empty quote (e.g. `a\Q\E*` is `a*`).
+    */
   private def isComment(node: Node): Boolean =
     node.data match
-      case NodeData.Command(_: CommandKind.Comment) | NodeData.Blank(_) => true
-      case _                                                            => false
+      case NodeData.Command(_: CommandKind.Comment) | NodeData.Blank(_)                  => true
+      case NodeData.CaseRegion(_, parts, _)                                              => parts.isEmpty
+      case NodeData.Backslash(BackslashKind.CaseCommand(CaseCommandKind.EndCaseCommand)) => true
+      case _                                                                             => false
 
   private def resetBracket(stack: mutable.Stack[Node], save: Int): Unit =
     if !featureSet.allowsBrokenCurly then fail("Incomplete quantifier", save)
@@ -1523,6 +1550,10 @@ private[parser] final class Parser(
     val start = offset
     next()
     val backslash = parseBackslashKind()
+    if backslash == BackslashKind.CaseCommand(CaseCommandKind.QuoteCommand) then
+      parseQuote(stack, start)
+      return
+
     val loc = SourceLocation(start, offset)
     pendingUnicodeList match
       case Some(PendingUnicodeList(values, written)) =>
@@ -1531,15 +1562,14 @@ private[parser] final class Parser(
         stack.push(Node(NodeData.UnicodeList(escapes.map(Node(_, loc)), written), loc))
       case None => stack.push(Node(NodeData.Backslash(backslash), loc))
 
-    if backslash != BackslashKind.CaseCommand(CaseCommandKind.QuoteCommand) then return
-
-    while !isEnd && !source.startsWith("\\E", offset) do parseLiteral(stack)
-
-    val eStart = offset
-    if startWith("\\E") then
-      val backslash = NodeData.Backslash(BackslashKind.CaseCommand(CaseCommandKind.EndCaseCommand))
-      val eEnd = offset
-      stack.push(Node(backslash, SourceLocation(eStart, eEnd)))
+  /** Parses the characters after `\Q` up to `\E` or the end, which Java and PCRE read as literals. */
+  private def parseQuote(stack: mutable.Stack[Node], start: Int): Unit =
+    val literals = mutable.Stack.empty[Node]
+    while !isEnd && !source.startsWith("\\E", offset) do parseLiteral(literals)
+    val parts = literals.reverseIterator.map(node => CasePart(node, Some(source.slice(node.loc.start, node.loc.end))))
+    val end = if startWith("\\E") then CaseRegionEnd.Closed else CaseRegionEnd.Unclosed
+    val region = NodeData.CaseRegion(CaseCommandKind.QuoteCommand, parts.toSeq, end)
+    stack.push(Node(region, SourceLocation(start, offset)))
 
   private def parseBackslashKind(): BackslashKind =
     (currentChar: @switch) match
@@ -2464,7 +2494,7 @@ private[parser] final class Parser(
     found
 
   private def isEmptyClassItem(item: ClassItem): Boolean =
-    item.data == ClassItemData.ClassUnion(Seq.empty) || isClassBlank(item)
+    item.data == ClassItemData.ClassUnion(Seq.empty) || isClassBlank(item) || isEmptyClassQuote(item)
 
   private def isClassSetOperand(item: ClassItem): Boolean =
     item.data match
@@ -2535,11 +2565,10 @@ private[parser] final class Parser(
       seq.addOne(item).addAll(skippedBeforeHyphen)
       return
 
-    val begin = classQuoteLiterals(item) match
-      case Some(literals) if literals.nonEmpty =>
-        seq.addAll(literals.init)
-        literals.last
-      case _ => item
+    val (beforeBegin, begin) = (quotedValue(item), classQuoteLiterals(item)) match
+      case (Some(value), _)                            => (Seq.empty, value)
+      case (None, Some(literals)) if literals.nonEmpty => (literals.init, literals.last)
+      case _                                           => (Seq.empty, item)
 
     skipClassComment()
     var endItem = parseClassItemNonRange()
@@ -2550,31 +2579,32 @@ private[parser] final class Parser(
       endItem = parseClassItemNonRange()
     if isSkippableInClassRange(endItem) then
       reset(save)
-      seq.addOne(begin).addAll(skippedBeforeHyphen)
+      seq.addOne(item).addAll(skippedBeforeHyphen)
       return
 
-    val (end, rest) = classQuoteLiterals(endItem) match
-      case Some(literals) if literals.nonEmpty => (literals.head, literals.tail)
-      case _                                   => (endItem, Seq.empty)
+    val (end, afterEnd) = (quotedValue(endItem), classQuoteLiterals(endItem)) match
+      case (Some(value), _)                            => (value, Seq.empty)
+      case (None, Some(literals)) if literals.nonEmpty => (literals.head, literals.tail)
+      case _                                           => (endItem, Seq.empty)
 
     (begin, end) match
       case (begin: ClassItem.Value, end: ClassItem.Value) =>
         assert(begin.data.value <= end.data.value, "Out of order class range", begin.loc.start)
+        seq.addAll(beforeBegin)
         seq.addOne(ClassItem(ClassItemData.ClassRange(begin, end), SourceLocation(begin.loc.start, end.loc.end)))
         // The `\E` inside a range is kept after it, and the blanks and the empty quotes are dropped.
         seq.addAll((skippedBeforeHyphen ++ skippedAfterHyphen).filterNot(i => isClassBlank(i) || isEmptyClassQuote(i)))
-        seq.addAll(rest)
+        seq.addAll(afterEnd)
       case _ =>
         if !isValueClassItem(begin) then
           if !isClassNestItem(begin) then assert(featureSet.allowsBrokenClassRangeBegin, "Invalid class range", start)
         else if !isClassNestItem(end) then assert(featureSet.allowsBrokenClassRangeEnd, "Invalid class range", start)
 
-        seq.addOne(begin).addAll(skippedBeforeHyphen)
+        seq.addOne(item).addAll(skippedBeforeHyphen)
         if featureSet.consumesBrokenClassRange then
           seq.addOne(ClassItem.Value(ClassItemData.ClassLiteral('-'), SourceLocation(save, save + 1)))
           seq.addAll(skippedAfterHyphen)
-          seq.addOne(end)
-          seq.addAll(rest)
+          seq.addOne(endItem)
         else reset(save)
 
   /** Parses the empty quotes, `\E` and blanks between a range begin and its `-`, which do not break the range. */
@@ -2604,8 +2634,14 @@ private[parser] final class Parser(
     */
   private def classQuoteLiterals(item: ClassItem): Option[Seq[ClassItem]] =
     item.data match
-      case ClassItemData.ClassUnion(items) if source.startsWith("\\Q", item.loc.start) => Some(items)
-      case _                                                                           => None
+      case ClassItemData.ClassCaseRegion(_, parts, _) => Some(parts.map(_.value))
+      case _                                          => None
+
+  /** Returns the value of a quote of one character, with the quote as its form at an end of a range (e.g. `\Qa\E`). */
+  private def quotedValue(item: ClassItem): Option[ClassItem.Value] = item.data match
+    case ClassItemData.ClassCaseRegion(kind, Seq(CasePart(value: ClassItem.Value, Some(written))), end) =>
+      Some(value.copy(loc = item.loc, caseForm = Some(CaseForm(kind, written, end))))
+    case _ => None
 
   private def isEmptyClassQuote(item: ClassItem): Boolean =
     classQuoteLiterals(item).exists(_.isEmpty)
@@ -2733,10 +2769,13 @@ private[parser] final class Parser(
       case _                                       => false)
 
   private def parseClassQuote(start: Int): ClassItem =
-    val items = Seq.newBuilder[ClassItem]
-    while !isEnd && !source.startsWith("\\E", offset) do items.addOne(parseClassItemLiteral())
+    val parts = Seq.newBuilder[CasePart[ClassItem]]
+    while !isEnd && !source.startsWith("\\E", offset) do
+      val item = parseClassItemLiteral()
+      parts.addOne(CasePart(item, Some(source.slice(item.loc.start, item.loc.end))))
     startWith("\\E")
-    ClassItem(ClassItemData.ClassUnion(items.result()), SourceLocation(start, offset))
+    val region = ClassItemData.ClassCaseRegion(CaseCommandKind.QuoteCommand, parts.result(), CaseRegionEnd.Closed)
+    ClassItem(region, SourceLocation(start, offset))
 
   private def parseClassItemLiteral(): ClassItem =
     if featureSet.validatesClassSetSyntax then

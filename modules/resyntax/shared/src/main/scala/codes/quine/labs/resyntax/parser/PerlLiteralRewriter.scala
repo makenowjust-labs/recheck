@@ -3,6 +3,7 @@ package codes.quine.labs.resyntax.parser
 import scala.collection.mutable
 import scala.util.boundary
 
+import codes.quine.labs.resyntax.ast.CaseCommandKind
 import codes.quine.labs.resyntax.charset.CharSet
 import codes.quine.labs.resyntax.charset.FullCaseFolding
 import codes.quine.labs.resyntax.charset.FullCaseMapping
@@ -40,6 +41,18 @@ private[parser] object PerlLiteralRewriter:
 
   private def isLUF(c: Char): Boolean = c == 'L' || c == 'U' || c == 'F'
 
+  private def commandKind(c: Char): CaseCommandKind = c match
+    case 'Q' => CaseCommandKind.QuoteCommand
+    case 'U' => CaseCommandKind.UpperCommand
+    case 'L' => CaseCommandKind.LowerCommand
+    case 'F' => CaseCommandKind.FoldCommand
+    case 'u' => CaseCommandKind.UpperFirstCommand
+    case 'l' => CaseCommandKind.LowerFirstCommand
+    // A frame has one of the commands above.
+    // $COVERAGE-OFF$
+    case _ => throw new IllegalStateException(s"Unknown command: $c")
+    // $COVERAGE-ON$
+
 private final class PerlLiteralRewriter(source: String, extended: Boolean, bytes: Boolean):
 
   import PerlLiteralRewriter.*
@@ -53,12 +66,13 @@ private final class PerlLiteralRewriter(source: String, extended: Boolean, bytes
 
   private var changed: Boolean = false
 
-  /** Frame is an open command (or the whole text) and its text so far. */
-  private final class Frame(val command: Char):
+  /** Frame is an open command at `start` (or the whole text), its text so far, and the commands closed in it. */
+  private final class Frame(val command: Char, val start: Int):
 
     val text: java.lang.StringBuilder = new java.lang.StringBuilder
     val starts: mutable.ArrayBuilder.ofInt = new mutable.ArrayBuilder.ofInt
     val ends: mutable.ArrayBuilder.ofInt = new mutable.ArrayBuilder.ofInt
+    val inner: mutable.Builder[PerlCaseCommand, Seq[PerlCaseCommand]] = Seq.newBuilder
 
     /** Whether the command has any argument, without which Perl's parser reports a syntax error on its closing. */
     var hasContent: Boolean = false
@@ -71,7 +85,7 @@ private final class PerlLiteralRewriter(source: String, extended: Boolean, bytes
     def addCodePoints(cs: UString, start: Int, end: Int): Unit =
       for c <- cs.iterator; u <- UTF16Encoding.encode(c) do add(u.toChar, start, end)
 
-  private val root: Frame = new Frame('\u0000')
+  private val root: Frame = new Frame('\u0000', -1)
 
   private var stack: List[Frame] = Nil
 
@@ -88,14 +102,16 @@ private final class PerlLiteralRewriter(source: String, extended: Boolean, bytes
         else if stack.nonEmpty then inCaseMod = true
         else boundary.break()
     if !changed then None
-    else Some(new Rewritten(root.text.toString, root.starts.result(), root.ends.result(), n))
+    else Some(new Rewritten(root.text.toString, root.starts.result(), root.ends.result(), source, root.inner.result()))
 
   /** Processes a command at `\`, or the end, and returns whether the next is a command again. */
   private def caseModifier(): Boolean =
     changed = true
     if pos >= n || src(pos + 1) == 'E' then
       if stack.nonEmpty then
-        val command = pop()
+        // The `\E` closes `\L`, `\U`, `\Q` or `\F`, or `\u` or `\l` without a command around it.
+        val ownsEnd = pos < n && ("LUQF".indexOf(stack.head.command.toInt) >= 0 || stack.tail.isEmpty)
+        val command = pop(if ownsEnd then pos + 2 else pos)
         if pos < n && "LUQF".indexOf(command.toInt) >= 0 then
           pos += 2
           false
@@ -116,22 +132,25 @@ private final class PerlLiteralRewriter(source: String, extended: Boolean, bytes
       val command = src(s)
       if isLUF(command) && stack.exists(f => isLUF(f.command)) then
         if !stack.head.hasContent then throw new ParsingException("Syntax error", Some(pos))
-        pop()
+        pop(pos)
         true
       else
         top.hasContent = true
-        stack = new Frame(command) :: stack
+        stack = new Frame(command, pos) :: stack
         pos = s + 1
         false
 
-  /** Closes the innermost command, and adds its result to the outer one. */
-  private def pop(): Char =
+  /** Closes the innermost command here, which ends at `closeEnd` after its own `\E` or here without one, and adds its
+    * result to the outer one.
+    */
+  private def pop(closeEnd: Int): Char =
     val frame = stack.head
     stack = stack.tail
     val text = frame.text.toString
     val starts = frame.starts.result()
     val ends = frame.ends.result()
     val out = top
+    out.inner.addAll(closedCommands(frame, closeEnd, ends))
     var i = 0
     while i < text.length do
       val c = text.codePointAt(i)
@@ -153,6 +172,22 @@ private final class PerlLiteralRewriter(source: String, extended: Boolean, bytes
       // $COVERAGE-ON$
       i += len
     frame.command
+
+  /** Returns the command of the frame closed here, and the commands in it to be in the outer one.
+    *
+    * `\u` and `\l` change only the next character, so without their own `\E` their range is the first character that
+    * they make, unless a command in them crosses its end, and the commands after it are in the outer one.
+    */
+  private def closedCommands(frame: Frame, closeEnd: Int, ends: Array[Int]): Seq[PerlCaseCommand] =
+    val kind = commandKind(source.charAt(frame.start + 1))
+    val inner = frame.inner.result()
+    val nextEnd = ends.headOption.filter(_ => "ul".indexOf(frame.command.toInt) >= 0 && closeEnd == pos)
+    nextEnd.filter(end => inner.forall(command => command.end <= end || end <= command.start)) match
+      case Some(end) =>
+        val (within, after) = inner.partition(_.end <= end)
+        PerlCaseCommand(kind, frame.start, frame.start + 2, end, end, within, nextCharacter = true) +: after
+      case None =>
+        Seq(PerlCaseCommand(kind, frame.start, frame.start + 2, pos, closeEnd, inner, nextCharacter = false))
 
   /** Copies the text up to the next command or the end, as `S_scan_const` does for a pattern. */
   private def scanChunk(): Unit =

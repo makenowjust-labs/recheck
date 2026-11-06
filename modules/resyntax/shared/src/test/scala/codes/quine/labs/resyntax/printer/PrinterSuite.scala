@@ -5,6 +5,10 @@ import codes.quine.labs.resyntax.ast.AssertNameStyle.*
 import codes.quine.labs.resyntax.ast.BackReferenceStyle.*
 import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
+import codes.quine.labs.resyntax.ast.CaseCommandKind.*
+import codes.quine.labs.resyntax.ast.CaseForm
+import codes.quine.labs.resyntax.ast.CasePart
+import codes.quine.labs.resyntax.ast.CaseRegionEnd.*
 import codes.quine.labs.resyntax.ast.ClassItem
 import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.CommandKind.*
@@ -20,6 +24,7 @@ import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.Quantifier.*
 import codes.quine.labs.resyntax.ast.Reference.*
+import codes.quine.labs.resyntax.ast.SourceLocation
 import codes.quine.labs.resyntax.dialect.Dialect
 import codes.quine.labs.resyntax.dialect.Dialect.*
 import codes.quine.labs.resyntax.parser.Parser
@@ -48,6 +53,8 @@ class PrinterSuite extends munit.FunSuite:
     assertEquals(printed, expected)
     val reparsed = Parser.parse(printed, flagSet, dialect, mode)
     assert(reparsed.equalsWithoutLoc(Node(data)), reparsed)
+
+  def part(data: NodeData, written: String): CasePart[Node] = CasePart(Node(data), Some(written))
 
   val ref1: NodeData = Backslash(EscapeBackReference(BareBackReference, IndexedReference(1)))
 
@@ -162,7 +169,49 @@ class PrinterSuite extends munit.FunSuite:
   check(" a # b\n\tc", "x", DotNet, Java, PCRE, Perl(), Python(), Ruby())(" a # b\n\tc")
   check("( ?:a ) *", "x", Java)("(?:a ) *")
 
-  // A union of literals is written in `\Q...\E` if it has a character that the class reads otherwise.
+  test("Printer.print: a part of a case region without a text is written out of the commands"):
+    val digit = CasePart(Node(Backslash(EscapeClass(Digit))), None)
+    val quote = CaseRegion(QuoteCommand, Seq(part(Literal('a'), "a"), digit, part(Literal('b'), "b")), Closed)
+    assertEquals(print(quote, "", Java), "\\Qa\\E\\d\\Qb\\E")
+    val dot = part(Backslash(Escape(Single('.'), '.')), ".")
+    val inner = CasePart(Node(CaseRegion(QuoteCommand, Seq(dot, digit, part(Literal('B'), "b")), Closed)), None)
+    assertEquals(print(CaseRegion(UpperCommand, Seq(inner), Closed), "", Perl()), "\\U\\Q.\\E\\E\\d\\U\\Qb\\E\\E")
+    assertEquals(print(CaseRegion(QuoteCommand, Seq(digit), Unclosed), "", Java), "\\d")
+    val star = CasePart(Node(Repeat(Literal('b'), Star(Greedy))), None)
+    val repeated = CaseRegion(QuoteCommand, Seq(part(Literal('a'), "a"), star), ClosedBeforeQuantifier)
+    assertEquals(print(repeated, "", Java), "\\Qa\\Eb*")
+    val classDigit = CasePart(ClassItem(ClassBackslashClass(Digit)), None)
+    val classA = CasePart(ClassItem(ClassLiteral('a')), Some("a"))
+    val classQuote = ClassCaseRegion(QuoteCommand, Seq(classA, classDigit), Closed)
+    assertEquals(print(Class(false, classQuote), "", Java), "[\\Qa\\E\\d]")
+    val classFirst = ClassCaseRegion(UpperFirstCommand, Seq(classA, classDigit), NextCharacter)
+    assertEquals(print(Class(false, classFirst), "", Perl()), "[\\ua\\E\\d]")
+
+  test("Printer.print: the inline flags in a case region change the extended mode"):
+    val verbose = Command(InlineFlag(FlagSetDiff(FlagSet(verbose = true), None)))
+    val reset = Command(ResetFlag(FlagSet(verbose = true)))
+    for (flag, text) <- Seq((verbose, "(?X)"), (reset, "(?^X)")) do
+      val region = CaseRegion(LowerCommand, Seq(part(flag, text)), Closed)
+      assertEquals(print(Sequence(region, ref1, Literal('1')), "", Perl()), s"\\L$text\\E\\1 1")
+
+  test("Printer.print: a case region that its commands cannot make throws"):
+    interceptMessage[IllegalArgumentException]("A case region of \\E"):
+      print(CaseRegion(EndCaseCommand, Seq(), Closed), "", PCRE)
+    interceptMessage[IllegalArgumentException]("A case region without \\E is followed by a node"):
+      print(Sequence(CaseRegion(QuoteCommand, Seq(part(Literal('a'), "a")), Unclosed), Literal('b')), "", Java)
+    interceptMessage[IllegalArgumentException]("A case region closed before a quantifier has no repeat"):
+      print(CaseRegion(QuoteCommand, Seq(part(Literal('a'), "a")), ClosedBeforeQuantifier), "", Java)
+    interceptMessage[IllegalArgumentException]("A case region of UpperFirstCommand is opened again"):
+      val parts = Seq(CasePart(Node(Literal('x')), None), part(Literal('A'), "a"))
+      print(CaseRegion(UpperFirstCommand, parts, NextCharacter), "", Perl())
+    interceptMessage[IllegalArgumentException]("A case region in a class ends with \\E or the next character"):
+      val parts = Seq(CasePart(ClassItem(ClassLiteral('a')), Some("a")))
+      print(Class(false, ClassCaseRegion(QuoteCommand, parts, Unclosed)), "", PCRE)
+    interceptMessage[IllegalArgumentException]("A case form ends with \\E or the next character: Unclosed"):
+      val end = ClassItem.Value(ClassLiteral('z'), SourceLocation.Invalid, Some(CaseForm(LowerCommand, "Z", Unclosed)))
+      print(Class(false, ClassRange(ClassItem.Value(ClassLiteral('a')), end)), "", Perl())
+
+  // A quote in a class is written as it is, and a class without one has none.
   check("[\\Q]\\E]", "", Java, PCRE)("[\\Q]\\E]")
   check("[\\Q\\\\E]", "", Java, PCRE)("[\\Q\\\\E]")
   check("[\\Q^a\\E]", "", Java, PCRE)("[\\Q^a\\E]")
@@ -179,5 +228,6 @@ class PrinterSuite extends munit.FunSuite:
 
   // Ruby's `\u{...}` with several code points is written as it is.
   check("[a\\u{ 41 42}]", "", Ruby())("[a\\u{ 41 42}]")
-  // A Perl regex literal is printed as Perl's lexer rewrites it.
-  check("\\Uab\\E\\Q.\\E", "", Perl())("AB\\.")
+  // The commands of a Perl regex literal are written as they are, except the ones that are not case regions.
+  check("\\Uab\\E\\Q.\\E", "", Perl())("\\Uab\\E\\Q.\\E")
+  check("x\\Ua|b\\Ey", "", Perl())("xA|By")

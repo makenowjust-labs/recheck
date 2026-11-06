@@ -8,6 +8,9 @@ import codes.quine.labs.resyntax.ast.BacktrackControlKind
 import codes.quine.labs.resyntax.ast.BacktrackStrategy
 import codes.quine.labs.resyntax.ast.BoundaryModifier
 import codes.quine.labs.resyntax.ast.CaseCommandKind
+import codes.quine.labs.resyntax.ast.CaseForm
+import codes.quine.labs.resyntax.ast.CasePart
+import codes.quine.labs.resyntax.ast.CaseRegionEnd
 import codes.quine.labs.resyntax.ast.ClassItem
 import codes.quine.labs.resyntax.ast.ClassItemData
 import codes.quine.labs.resyntax.ast.CommandKind
@@ -37,7 +40,7 @@ object Printer:
   /** Returns the source of the node in the dialect, which `Parser.parse` reads with the flags and the unit mode.
     *
     * The parser reads the source of a node that it made as the same node except the locations. What the node does not
-    * keep is not in the source (e.g. the blanks in `\k{ n }`, or the case commands of a Perl regex literal). In the
+    * keep is not in the source (e.g. the blanks in `\k{ n }`, or a Perl case command that is not a case region). In the
     * extended mode, a space keeps apart the tokens that would be read together (e.g. `\1` and `1`), but out of it they
     * are written together and read as another node (e.g. `\11`).
     *
@@ -74,6 +77,19 @@ private[printer] final class Printer(featureSet: FeatureSet):
   /** Tests whether the last token reads a character after it as its part (e.g. a digit after `\1`). */
   private var isContinuedBy: Char => Boolean = NotContinued
 
+  /** The case regions being written, innermost first. */
+  private var regions: List[OpenRegion] = Nil
+
+  /** Whether the last region has no `\E`, after which only the `\E` of a region around it is written. */
+  private var isUnclosed: Boolean = false
+
+  /** OpenRegion is a case region being written, whose command is written and not closed if `isOpen`. */
+  private final class OpenRegion(val kind: CaseCommandKind):
+
+    var isOpen: Boolean = false
+
+    var hasPart: Boolean = false
+
   /** Returns the source written so far, whose UTF-8 bytes are the chars written for a source of bytes. */
   def result: String =
     if featureSet.sourceEncoding == SourceEncoding.UTF8 then decodeUTF8(out.toString) else out.toString
@@ -84,22 +100,24 @@ private[printer] final class Printer(featureSet: FeatureSet):
     case NodeData.Repeat(child, quantifier, written) =>
       writeNode(child)
       writeQuantifier(quantifier, written)
-    case NodeData.Group(kind, child)          => writeGroup(kind, child)
-    case NodeData.Command(kind)               => writeCommand(kind)
-    case NodeData.Caret                       => write("^")
-    case NodeData.Dollar                      => write("$")
-    case NodeData.Dot                         => write(".")
-    case NodeData.Backslash(kind)             => writeBackslash(kind)
-    case NodeData.Class(invert, item)         => writeClass(invert, item)
-    case NodeData.Literal(value)              => writeValue(value)
-    case NodeData.Blank(text)                 => write(text)
-    case NodeData.UnicodeList(nodes, written) => writeUnicodeList(nodes, written)
+    case NodeData.Group(kind, child)                 => writeGroup(kind, child)
+    case NodeData.Command(kind)                      => writeCommand(kind)
+    case NodeData.Caret                              => write("^")
+    case NodeData.Dollar                             => write("$")
+    case NodeData.Dot                                => write(".")
+    case NodeData.Backslash(kind)                    => writeBackslash(kind)
+    case NodeData.Class(invert, item)                => writeClass(invert, item)
+    case NodeData.Literal(value)                     => writeValue(value)
+    case NodeData.Blank(text)                        => write(text)
+    case NodeData.UnicodeList(nodes, written)        => writeUnicodeList(nodes, written)
+    case NodeData.CaseRegion(kind, parts, regionEnd) => writeCaseRegion(kind, parts, regionEnd)
 
   /** Writes the text of a token, after a space where the extended mode needs one to keep it apart from the last one.
     *
     * `continuedBy` tells the characters that the token reads as its part when they follow it.
     */
   private def write(text: String, continuedBy: Char => Boolean = NotContinued): Unit =
+    if isUnclosed then throw new IllegalArgumentException("A case region without \\E is followed by a node")
     if text.headOption.exists(isContinuedBy) && isSeparable then out.append(' ')
     out.append(text)
     isContinuedBy = continuedBy
@@ -136,6 +154,93 @@ private[printer] final class Printer(featureSet: FeatureSet):
     case Quantifier.Bounded(_, _, _) | Quantifier.Unbounded(_, _) | Quantifier.MaxBounded(_, _) =>
       c => c == '?' || c == '+' && featureSet.hasPossessiveCurlyBacktrackStrategy
     case _ => c => c == '?' || c == '+' && featureSet.hasPossessiveBacktrackStrategy
+
+  /** Writes a case region, where a part with a text is in the command, and a part without one is out of all the
+    * commands, which are written again before the next part with a text.
+    *
+    * A region without parts is written as its command (e.g. `\Q\E`).
+    */
+  private def writeCaseRegion(kind: CaseCommandKind, parts: Seq[CasePart[Node]], regionEnd: CaseRegionEnd): Unit =
+    val region = enterRegion(kind)
+    if parts.isEmpty then openRegions()
+    for part <- parts do
+      (part.written, part.value.data) match
+        case (Some(text), _) =>
+          openRegions()
+          write(text)
+          applyFlags(part.value)
+        case (None, _: NodeData.CaseRegion) => writeNode(part.value)
+        case (None, _)                      =>
+          closeRegions()
+          writeNode(part.value)
+      region.hasPart = true
+    regions = regions.tail
+    if region.isOpen then
+      regionEnd match
+        case CaseRegionEnd.Closed                 => closeRegion(region)
+        case CaseRegionEnd.Unclosed               => isUnclosed = true
+        case CaseRegionEnd.NextCharacter          => ()
+        case CaseRegionEnd.ClosedBeforeQuantifier =>
+          closeRegion(region)
+          parts.last.value.data match
+            case NodeData.Repeat(_, quantifier, written) => writeQuantifier(quantifier, written)
+            case _ => throw new IllegalArgumentException("A case region closed before a quantifier has no repeat")
+
+  /** Applies the inline flags of a node written as its text. */
+  private def applyFlags(node: Node): Unit = node.data match
+    case NodeData.Command(CommandKind.InlineFlag(diff))    => applyFlagSetDiff(diff)
+    case NodeData.Command(CommandKind.ResetFlag(flags, _)) => applyResetFlag(flags)
+    case _                                                 => ()
+
+  private def writeClassCaseRegion(
+      kind: CaseCommandKind,
+      parts: Seq[CasePart[ClassItem]],
+      regionEnd: CaseRegionEnd
+  ): Unit =
+    val region = enterRegion(kind)
+    if parts.isEmpty then openRegions()
+    for part <- parts do
+      (part.written, part.value.data) match
+        case (Some(text), _) =>
+          openRegions()
+          write(text)
+        case (None, _: ClassItemData.ClassCaseRegion) => writeClassItem(part.value)
+        case (None, _)                                =>
+          closeRegions()
+          writeClassItem(part.value)
+      region.hasPart = true
+    regions = regions.tail
+    if region.isOpen then
+      regionEnd match
+        case CaseRegionEnd.Closed        => closeRegion(region)
+        case CaseRegionEnd.NextCharacter => ()
+        case _ => throw new IllegalArgumentException("A case region in a class ends with \\E or the next character")
+
+  private def enterRegion(kind: CaseCommandKind): OpenRegion =
+    if kind == CaseCommandKind.EndCaseCommand then throw new IllegalArgumentException("A case region of \\E")
+    val region = OpenRegion(kind)
+    regions = region :: regions
+    region
+
+  /** Writes the commands of the regions that are not open. */
+  private def openRegions(): Unit =
+    for region <- regions.reverse if !region.isOpen do
+      // `\u` and `\l` change the first character after them, which is not the first one of their region again.
+      val changesFirst =
+        region.kind == CaseCommandKind.UpperFirstCommand || region.kind == CaseCommandKind.LowerFirstCommand
+      if changesFirst && region.hasPart then
+        throw new IllegalArgumentException(s"A case region of ${region.kind} is opened again")
+      write(printCaseCommand(region.kind))
+      region.isOpen = true
+
+  /** Closes the commands of the regions, where a `\E` that Perl reads together with another closes nothing. */
+  private def closeRegions(): Unit =
+    regions.filter(_.isOpen).foreach(closeRegion)
+
+  private def closeRegion(region: OpenRegion): Unit =
+    isUnclosed = false
+    write("\\E")
+    region.isOpen = false
 
   /** Tests whether the parser skips a space here, as the extended mode does between tokens. */
   private def isSeparable: Boolean =
@@ -344,8 +449,13 @@ private[printer] final class Printer(featureSet: FeatureSet):
     case BoundaryModifier.WbModifier  => "{wb}"
 
   private def printCaseCommand(kind: CaseCommandKind): String = kind match
-    case CaseCommandKind.QuoteCommand   => "\\Q"
-    case CaseCommandKind.EndCaseCommand => "\\E"
+    case CaseCommandKind.QuoteCommand      => "\\Q"
+    case CaseCommandKind.EndCaseCommand    => "\\E"
+    case CaseCommandKind.UpperCommand      => "\\U"
+    case CaseCommandKind.LowerCommand      => "\\L"
+    case CaseCommandKind.FoldCommand       => "\\F"
+    case CaseCommandKind.UpperFirstCommand => "\\u"
+    case CaseCommandKind.LowerFirstCommand => "\\l"
 
   private def writeBackslashValue(kind: BackslashKind.BackslashValue): Unit =
     val continuedBy: Char => Boolean = kind match
@@ -420,8 +530,7 @@ private[printer] final class Printer(featureSet: FeatureSet):
     write("]")
 
   private def writeClassItem(item: ClassItem): Unit = item.data match
-    case ClassItemData.ClassUnion(items) =>
-      if isClassQuote(items) then writeClassQuote(items) else items.foreach(writeClassUnionItem)
+    case ClassItemData.ClassUnion(items)              => items.foreach(writeClassItem)
     case ClassItemData.ClassIntersection(left, right) =>
       writeClassItem(left)
       write("&&")
@@ -437,9 +546,9 @@ private[printer] final class Printer(featureSet: FeatureSet):
       write("]")
     case ClassItemData.ClassPOSIX(invert, name) => write(s"[:${if invert then "^" else ""}$name:]")
     case ClassItemData.ClassRange(begin, end)   =>
-      writeClassItem(begin)
+      writeRangeEnd(begin)
       write("-")
-      writeClassItem(end)
+      writeRangeEnd(end)
     case ClassItemData.ClassCaseCommand(kind)           => write(printCaseCommand(kind))
     case ClassItemData.ClassBackslashClass(klass)       => writeEscapeClass(klass)
     case ClassItemData.ClassBackslashValue(kind)        => writeBackslashValue(kind)
@@ -447,35 +556,18 @@ private[printer] final class Printer(featureSet: FeatureSet):
     case ClassItemData.ClassBlank(text)                 => write(text)
     case ClassItemData.ClassUnicodeList(items, written) =>
       write(s"\\u${written.getOrElse(PlainText.unicodeList(items.map(_.data.value)))}")
+    case ClassItemData.ClassCaseRegion(kind, parts, regionEnd) => writeClassCaseRegion(kind, parts, regionEnd)
 
-  /** Writes an item of a union, where a union in a union is one that only a quote makes. */
-  private def writeClassUnionItem(item: ClassItem): Unit = item.data match
-    case ClassItemData.ClassUnion(items) =>
-      if featureSet.hasBackslashQuoteCommand then writeClassQuote(items) else items.foreach(writeClassUnionItem)
-    case _ => writeClassItem(item)
-
-  private def writeClassQuote(items: Seq[ClassItem]): Unit =
-    write("\\Q")
-    items.foreach(writeClassItem)
-    write("\\E")
-
-  /** Tests whether a union of literals is written as `\Q...\E`, which a quote of one literal needs, and so do the
-    * characters that the class reads otherwise (e.g. `]`).
-    */
-  private def isClassQuote(items: Seq[ClassItem]): Boolean =
-    val values = items.map(_.data).collect { case ClassItemData.ClassLiteral(value) => value }
-    def isAt(i: Int, chars: String): Boolean = values.lift(i).exists(value => chars.exists(_ == value))
-
-    def hasSyntax(i: Int): Boolean =
-      if isAt(i, "\\]") then true
-      else if isAt(i, "[") then featureSet.allowsClassNest || isAt(i + 1, ":.=")
-      else if isAt(i, "-") then 0 < i && i < values.size - 1
-      else if isAt(i, "^") then i == 0
-      else if isAt(i, "&") then featureSet.allowsClassIntersection && isAt(i + 1, "&")
-      else isSeparable && isAt(i, "# \t\n\u000b\f\r")
-
-    featureSet.hasBackslashQuoteCommand && items.nonEmpty && values.size == items.size &&
-    (values.size == 1 || values.indices.exists(hasSyntax))
+  /** Writes an end of a range, in the command of its form if it has one. */
+  private def writeRangeEnd(item: ClassItem.Value): Unit = item.caseForm match
+    case Some(CaseForm(kind, written, regionEnd)) =>
+      write(printCaseCommand(kind))
+      write(written)
+      regionEnd match
+        case CaseRegionEnd.Closed        => write("\\E")
+        case CaseRegionEnd.NextCharacter => ()
+        case _ => throw new IllegalArgumentException(s"A case form ends with \\E or the next character: $regionEnd")
+    case None => writeClassItem(item)
 
   /** Returns the text whose UTF-8 bytes are the chars of the given text, and throws for bytes that are not UTF-8. */
   private def decodeUTF8(bytes: String): String =

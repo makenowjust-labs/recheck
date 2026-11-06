@@ -16,6 +16,9 @@ sealed abstract class ClassItemData extends Product with Serializable:
         ll.equalsWithoutLoc(rl) && lr.equalsWithoutLoc(rr)
       case (ClassItemData.ClassUnicodeList(ls, wl), ClassItemData.ClassUnicodeList(rs, wr)) =>
         ls.length == rs.length && ls.zip(rs).forall((l, r) => l.equalsWithoutLoc(r)) && wl == wr
+      case (ClassItemData.ClassCaseRegion(kl, ls, el), ClassItemData.ClassCaseRegion(kr, rs, er)) =>
+        kl == kr && el == er && ls.length == rs.length &&
+        ls.zip(rs).forall((l, r) => l.value.equalsWithoutLoc(r.value) && l.written == r.written)
       case (l, r) => l == r
 
 object ClassItemData:
@@ -56,6 +59,14 @@ object ClassItemData:
 
   /** ClassCaseCommand is PCRE's `\E` in a class, which does nothing. */
   final case class ClassCaseCommand(kind: CaseCommandKind) extends ClassItemData
+
+  /** ClassCaseRegion is the items in the range of a quoting or case command in a class (e.g. `[\Q]a\E]`).
+    *
+    * The items are what the command makes (see [[CasePart]]). A region in a class ends with `\E`, or after the next
+    * character for Perl's `\u` and `\l`.
+    */
+  final case class ClassCaseRegion(kind: CaseCommandKind, parts: Seq[CasePart[ClassItem]], end: CaseRegionEnd)
+      extends ClassItemData
 
   final case class ClassBackslashClass(klass: EscapeClassKind) extends ClassItemData
 

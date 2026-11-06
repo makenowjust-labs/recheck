@@ -2,6 +2,8 @@ package codes.quine.labs.resyntax.parser
 
 import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
+import codes.quine.labs.resyntax.ast.CaseCommandKind
+import codes.quine.labs.resyntax.ast.CaseRegionEnd
 import codes.quine.labs.resyntax.ast.ClassItem
 import codes.quine.labs.resyntax.ast.ClassItemData.*
 import codes.quine.labs.resyntax.ast.CommandKind
@@ -10,7 +12,6 @@ import codes.quine.labs.resyntax.ast.EscapeClassKind
 import codes.quine.labs.resyntax.ast.EscapeStyle
 import codes.quine.labs.resyntax.ast.FlagSet
 import codes.quine.labs.resyntax.ast.Node
-import codes.quine.labs.resyntax.ast.NodeData
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.Quantifier.*
 import codes.quine.labs.resyntax.ast.SourceLocation
@@ -22,8 +23,6 @@ class ParserEncodingSuite extends munit.FunSuite with ParserHelper:
   def parse(s: String, flags: String, dialect: Dialect): Node =
     val flagSet = FlagSet.parse(flags, dialect)
     Parser.parse(s, flagSet, dialect, Parser.determineUnitMode(s, flagSet, dialect))
-
-  def bytes(s: String): Seq[NodeData] = s.getBytes("UTF-8").toSeq.map(b => Literal(b & 0xff))
 
   // Python's bytes pattern has no Unicode escape, and its characters are bytes of Latin-1.
   val PythonBytes: Dialect = Python(Python.Type.Bytes)
@@ -40,6 +39,15 @@ class ParserEncodingSuite extends munit.FunSuite with ParserHelper:
   // PCRE reads UTF-8 by `u` or `(*UTF)`, and bytes otherwise.
   check("\u00e9+", "", PCRE)(Sequence(Literal(0xc3), Repeat(Literal(0xa9), Plus(Greedy))))
   check("\u00e9+", "u", PCRE)(Repeat(Literal(0xe9), Plus(Greedy)))
+  check("\\Q\u00e9\\E*", "", PCRE):
+    CaseRegion(
+      CaseCommandKind.QuoteCommand,
+      Seq(part(Literal(0xc3), "\u00c3"), part(Repeat(Literal(0xa9), Star(Greedy)), "\u00a9")),
+      CaseRegionEnd.ClosedBeforeQuantifier
+    )
+  check("[\\Q\u00e9\\E]", "", PCRE):
+    val parts = Seq(classPart(ClassLiteral(0xc3), "\u00c3"), classPart(ClassLiteral(0xa9), "\u00a9"))
+    Class(false, ClassCaseRegion(CaseCommandKind.QuoteCommand, parts, CaseRegionEnd.Closed))
   check("[\uD834\uDF06-\uD834\uDF08a-z]", "", PCRE)(
     Class(
       false,
@@ -100,7 +108,12 @@ class ParserEncodingSuite extends munit.FunSuite with ParserHelper:
   )
   error("[\u00e9-\u00e0]", "", Perl())("Out of order class range at 1")
   // The case commands do not change non-ASCII bytes.
-  checkPrinted("\\U\u00e9a", "\u00e9A", "", PerlBytes)(Sequence((bytes("\u00e9") :+ Literal('A'))*))
+  check("\\U\u00e9a", "", PerlBytes):
+    CaseRegion(
+      CaseCommandKind.UpperCommand,
+      Seq(part(Literal(0xc3), "\u00c3"), part(Literal(0xa9), "\u00a9"), part(Literal('A'), "a")),
+      CaseRegionEnd.Unclosed
+    )
 
   // Ruby's ASCII-8BIT regexp reads the UTF-8 bytes of the source (as `Regexp.new(source.b, Regexp::NOENCODING)`).
   val RubyBytes: Dialect = Ruby(Ruby.Encoding.ASCII8Bit)
