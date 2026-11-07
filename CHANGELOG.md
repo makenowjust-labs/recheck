@@ -22,6 +22,7 @@ Misc:
 - [#1961](https://github.com/makenowjust-labs/recheck/pull/1961) Update Node to 26.13.0, Python to 3.15.2 and Ruby to 4.0.9 ([@makenowjust](https://github.com/makenowjust))
 - [#1964](https://github.com/makenowjust-labs/recheck/pull/1964) Cache the builds of PHP and PCRE2 apart from the other mise tools ([@makenowjust](https://github.com/makenowjust))
 - [#1965](https://github.com/makenowjust-labs/recheck/pull/1965) Show the dialects by their names in the Playground ([@makenowjust](https://github.com/makenowjust))
+- [#1962](https://github.com/makenowjust-labs/recheck/pull/1962) Update dependency @playwright/test to v1.65.0 ([@renovate[bot]](https://github.com/apps/renovate))
 
 # 4.6.2 (2026-10-26)
 
