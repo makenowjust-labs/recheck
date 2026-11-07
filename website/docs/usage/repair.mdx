@@ -84,7 +84,9 @@ An edit may remove a capture that is not kept, so the later captures may have sm
 - `repaired` means that the repair found a better regular expression.
 - `unknown` means that the repair found no better regular expression (`error` is `null`), or it could not finish because of the `error`.
   The `kind` of the error is one of `timeout`, `cancel`, `unsupported`, `invalid`, `invalid-keep` and `unexpected`.
-  The repair needs the automaton checker, so a regular expression that the automaton checker gives up on (e.g. one with a back-reference whose upper bound is not linear) is `unknown` with an `unsupported` error.
+  The repair needs the automaton checker.
+  When the automaton checker cannot tell the exact complexity (e.g. with a back-reference), the repair uses the upper bound of the matching time (see [Criteria](../internals/criteria.mdx)), and reports a repair only when the bound of the repaired regular expression is linear, which shows it safe.
+  A regular expression that the automaton checker cannot bound either (e.g. one with a recursion) is `unknown` with an `unsupported` error.
 
 Every `Rx` has `source`, `flags` and `dialect` as [`Diagnostics`](diagnostics.mdx#common-fields) has.
 A `repaired` one also has the following fields.
