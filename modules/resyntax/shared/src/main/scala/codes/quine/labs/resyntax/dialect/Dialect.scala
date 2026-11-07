@@ -41,6 +41,11 @@ enum Dialect:
     */
   case ICU
 
+  /** BoostRegex specifies the dialect of Boost.Regex's perl syntax (`boost::regex_constants::perl`), whose `type` is
+    * the character type of the pattern and its input.
+    */
+  case BoostRegex(`type`: BoostRegex.Type = BoostRegex.Type.Char)
+
   def name: String = this match
     case JavaScript     => "javascript"
     case Java           => "java"
@@ -51,6 +56,7 @@ enum Dialect:
     case _: Ruby        => "ruby"
     case _: Perl        => "perl"
     case ICU            => "icu"
+    case _: BoostRegex  => "boost-regex"
 
   def isJavaScript: Boolean = this == JavaScript
 
@@ -78,6 +84,10 @@ enum Dialect:
 
   def isICU: Boolean = this == ICU
 
+  def isBoostRegex: Boolean = this match
+    case _: BoostRegex => true
+    case _             => false
+
 object Dialect:
 
   /** Returns the dialect with its default settings. */
@@ -91,6 +101,7 @@ object Dialect:
     case "ruby"         => Some(Ruby())
     case "perl"         => Some(Perl())
     case "icu"          => Some(ICU)
+    case "boost-regex"  => Some(BoostRegex())
     case _              => None
 
   object Python:
@@ -130,3 +141,22 @@ object Dialect:
     object Encoding:
 
       def of(name: String): Option[Encoding] = values.find(_.name == name)
+
+  object BoostRegex:
+
+    /** Type is the character type of a Boost.Regex pattern and its input. */
+    enum Type:
+
+      /** Char is `boost::regex` over `char`, which matches bytes and classifies them in the C locale. */
+      case Char
+
+      /** U32Regex is `boost::u32regex`, which matches code points and classifies them by ICU. */
+      case U32Regex
+
+      def name: String = this match
+        case Char     => "char"
+        case U32Regex => "u32regex"
+
+    object Type:
+
+      def of(name: String): Option[Type] = values.find(_.name == name)

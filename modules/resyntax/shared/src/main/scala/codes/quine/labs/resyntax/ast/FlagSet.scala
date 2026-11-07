@@ -18,7 +18,11 @@ final case class FlagSet(
     dupNames: Boolean = false,
     // `L` (Python, python-regex)
     localeUpper: Boolean = false,
-    // `S` (PCRE)
+    // `M` (Boost.Regex)
+    noMultiline: Boolean = false,
+    // `N` (Boost.Regex)
+    newlineAlternation: Boolean = false,
+    // `S` (Boost.Regex, PCRE)
     analyze: Boolean = false,
     // `U` (Java, PCRE)
     ungreedy: Boolean = false,
@@ -44,7 +48,7 @@ final case class FlagSet(
     asciiWord: Boolean = false,
     // `b` (python-regex)
     bestMatch: Boolean = false,
-    // `c` (Java, Perl)
+    // `c` (Boost.Regex, Java, Perl)
     continue: Boolean = false,
     // `d` (ICU, Java, JavaScript, Perl, Ruby)
     hasIndices: Boolean = false,
@@ -54,7 +58,7 @@ final case class FlagSet(
     fullCase: Boolean = false,
     // `g` (JavaScript, Perl)
     global: Boolean = false,
-    // `i` (.NET, ICU, Java, JavaScript, PCRE, Perl, Python, python-regex, Ruby)
+    // `i` (.NET, Boost.Regex, ICU, Java, JavaScript, PCRE, Perl, Python, python-regex, Ruby)
     ignoreCase: Boolean = false,
     // `l` (Perl)
     localeLower: Boolean = false,
@@ -76,7 +80,7 @@ final case class FlagSet(
     unicodeSets: Boolean = false,
     // `w` (ICU, python-regex)
     word: Boolean = false,
-    // `x` (.NET, ICU, Java, PCRE, Perl, Python, python-regex, Ruby)
+    // `x` (.NET, Boost.Regex, ICU, Java, PCRE, Perl, Python, python-regex, Ruby)
     verbose: Boolean = false,
     // `xx` (PCRE, Perl)
     verboseMore: Boolean = false,
@@ -91,6 +95,8 @@ final case class FlagSet(
       dollarEndOnly -> "D",
       dupNames -> "J",
       localeUpper -> "L",
+      noMultiline -> "M",
+      newlineAlternation -> "N",
       analyze -> "S",
       ungreedy -> "U",
       version0 -> "V0",
@@ -156,6 +162,7 @@ object FlagSet:
   private def add(flagSet: FlagSet, c: Char, count: Int, offset: Int, dialect: Dialect): FlagSet =
     val isPythonRegex = dialect.isPythonRegex
     val isICU = dialect.isICU
+    val isBoostRegex = dialect.isBoostRegex
     def validateFlag(accepted: Boolean): Unit =
       if !accepted then throw new FlagSetException(s"Unknown flag '$c'", Some(offset))
 
@@ -176,8 +183,14 @@ object FlagSet:
       case 'L' =>
         validateFlag(dialect.isPython || isPythonRegex)
         flagSet.copy(localeUpper = true)
+      case 'M' =>
+        validateFlag(isBoostRegex)
+        flagSet.copy(noMultiline = true)
+      case 'N' =>
+        validateFlag(isBoostRegex)
+        flagSet.copy(newlineAlternation = true)
       case 'S' =>
-        validateFlag(dialect.isPCRE)
+        validateFlag(isBoostRegex || dialect.isPCRE)
         flagSet.copy(analyze = true)
       case 'U' =>
         validateFlag(dialect.isJava || dialect.isPCRE)
@@ -195,7 +208,7 @@ object FlagSet:
         validateFlag(isPythonRegex)
         flagSet.copy(bestMatch = true)
       case 'c' =>
-        validateFlag(dialect.isJava || dialect.isPerl)
+        validateFlag(isBoostRegex || dialect.isJava || dialect.isPerl)
         flagSet.copy(continue = true)
       case 'd' =>
         validateFlag(isICU || dialect.isJava || dialect.isJavaScript || dialect.isPerl || dialect.isRuby)
@@ -214,7 +227,9 @@ object FlagSet:
       case 'l' =>
         validateFlag(dialect.isPerl)
         flagSet.copy(localeLower = true)
+      // Boost.Regex's `^` and `$` are multi-line by default, which `M` turns off.
       case 'm' =>
+        validateFlag(!isBoostRegex)
         flagSet.copy(multiline = true)
       case 'n' =>
         validateFlag(dialect.isDotNet || dialect.isPCRE || dialect.isPerl || dialect.isRuby)
@@ -248,8 +263,8 @@ object FlagSet:
         flagSet.copy(word = true)
       case 'x' =>
         validateFlag(
-          dialect.isDotNet || isICU || dialect.isJava || dialect.isPCRE || dialect.isPerl || dialect.isPython ||
-            isPythonRegex || dialect.isRuby
+          dialect.isDotNet || isBoostRegex || isICU || dialect.isJava || dialect.isPCRE || dialect.isPerl ||
+            dialect.isPython || isPythonRegex || dialect.isRuby
         )
         flagSet.copy(verbose = true, verboseMore = flagSet.verboseMore || count >= 2 && dialect.isPerl)
       case 'y' =>
