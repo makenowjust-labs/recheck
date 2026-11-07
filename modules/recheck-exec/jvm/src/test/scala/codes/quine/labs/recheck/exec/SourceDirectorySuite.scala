@@ -1,7 +1,9 @@
 package codes.quine.labs.recheck.exec
 
 import java.nio.file.Files
+import java.nio.file.attribute.FileTime
 import java.nio.file.attribute.PosixFilePermissions
+import java.util.concurrent.TimeUnit
 
 import codes.quine.labs.recheck.common.UnexpectedException
 
@@ -11,6 +13,26 @@ class SourceDirectorySuite extends munit.FunSuite:
     val dir = SourceDirectory.directory
     assert(Files.isDirectory(dir))
     assertEquals(Files.getPosixFilePermissions(dir), PosixFilePermissions.fromString("rwx------"))
+
+  test("SourceDirectory.reopen"):
+    val dir = Files.createTempDirectory("recheck-exec-")
+    try
+      assertEquals(SourceDirectory.reopen(dir), dir)
+      // A directory that is gone is opened again.
+      assertEquals(SourceDirectory.reopen(dir.resolve("missing")), SourceDirectory.directory)
+    finally Files.delete(dir)
+
+  test("SourceDirectory.deleteLeftovers"):
+    val old = Files.createTempDirectory(SourceDirectory.directory, "compile-")
+    Files.createFile(old.resolve("output"))
+    Files.setLastModifiedTime(old, FileTime.fromMillis(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2)))
+    val young = Files.createTempDirectory(SourceDirectory.directory, "compile-")
+    try
+      SourceDirectory.deleteLeftovers()
+      assert(!Files.exists(old))
+      // A directory of a compilation that may be running stays.
+      assert(Files.isDirectory(young))
+    finally SourceDirectory.delete(young)
 
   test("SourceDirectory.path"):
     // The content is unique to this test, so that no other run writes the same file.
@@ -32,6 +54,20 @@ class SourceDirectorySuite extends munit.FunSuite:
     finally
       Files.deleteIfExists(file)
       Files.deleteIfExists(changed)
+
+  test("SourceDirectory.binaryPath"):
+    val source = SourceFile("Foo.cpp", "int main() {}")
+    val binary = SourceDirectory.binaryPath(source, Seq("c++", "-lfoo"), "c++ 1")
+    assertEquals(binary.getParent, SourceDirectory.directory)
+    assert(clue(binary.getFileName.toString).matches("Foo-[0-9a-f]{16}"))
+    assertEquals(SourceDirectory.binaryPath(source, Seq("c++", "-lfoo"), "c++ 1"), binary)
+    // Another command line, version or source has another binary.
+    assertNotEquals(SourceDirectory.binaryPath(source, Seq("c++ -O", "-lfoo"), "c++ 1"), binary)
+    assertNotEquals(SourceDirectory.binaryPath(source, Seq("c++", "-lfoo"), "c++ 2"), binary)
+    assertNotEquals(
+      SourceDirectory.binaryPath(source.copy(content = "int main() { }"), Seq("c++", "-lfoo"), "c++ 1"),
+      binary
+    )
 
   test("SourceDirectory.path: a file that cannot be written"):
     val source = SourceFile("Foo.java", s"class Foo {} // ${System.nanoTime()}")

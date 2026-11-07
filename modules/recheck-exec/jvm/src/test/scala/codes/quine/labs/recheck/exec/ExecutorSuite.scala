@@ -13,13 +13,21 @@ class ExecutorSuite extends munit.FunSuite:
 
   val dotnet: DotNetExecutor = DotNetExecutor(SourceFile("RecheckTest.cs", "// test"))
 
+  val icu: ICUExecutor = ICUExecutor(SourceFile("RecheckTest.cpp", "// test"))
+
+  /** A fake compiler, which prints its version for `--version`, and otherwise copies the program, a shell script, to
+    * the binary.
+    */
+  val fakeCompiler: String =
+    "#!/bin/sh\nif [ \"$1\" = --version ]; then echo fake 1.0; exit 0; fi\nfor a in \"$@\"; do\n  if [ \"$prev\" = -o ]; then out=\"$a\"; fi\n  case \"$a\" in *.sh) src=\"$a\" ;; esac\n  prev=\"$a\"\ndone\ncp \"$src\" \"$out\"\nchmod +x \"$out\"\n"
+
   val executors: Seq[Executor] =
-    Seq(NodeExecutor, PythonExecutor, PythonRegexExecutor, RubyExecutor, java, dotnet, PerlExecutor, PHPExecutor)
+    Seq(NodeExecutor, PythonExecutor, PythonRegexExecutor, RubyExecutor, java, dotnet, PerlExecutor, PHPExecutor, icu)
 
   test("Executor#variable"):
     assertEquals(
       executors.map(_.variable),
-      Seq("NODE", "PYTHON", "PYTHON_REGEX", "RUBY", "JAVA", "DOTNET", "PERL", "PHP").map("RECHECK_" + _)
+      Seq("NODE", "PYTHON", "PYTHON_REGEX", "RUBY", "JAVA", "DOTNET", "PERL", "PHP", "ICU").map("RECHECK_" + _)
     )
 
   test("Executor#commandLine"):
@@ -33,7 +41,8 @@ class ExecutorSuite extends munit.FunSuite:
         "java --source 17 RecheckTest.java",
         "dotnet run RecheckTest.cs",
         "perl -",
-        "php"
+        "php",
+        "c++ RecheckTest.cpp -o RecheckTest -licui18n -licuuc -licudata"
       )
     )
     // The variable replaces the command, and an empty value is ignored.
@@ -46,6 +55,10 @@ class ExecutorSuite extends munit.FunSuite:
       "venv/bin/python -I -"
     )
     assertEquals(java.commandLine(Map("RECHECK_JAVA" -> "my-java")), "my-java --source 17 RecheckTest.java")
+    assertEquals(
+      icu.commandLine(Map("RECHECK_ICU" -> "c++ -I/icu/include")),
+      "c++ -I/icu/include RecheckTest.cpp -o RecheckTest -licui18n -licuuc -licudata"
+    )
 
   test("Executor#scriptCommandLine"):
     assertEquals(
@@ -58,8 +71,13 @@ class ExecutorSuite extends munit.FunSuite:
         "java --source 17 script",
         "dotnet run script",
         "perl script",
-        "php script"
+        "php script",
+        "c++ script -o script -licui18n -licuuc -licudata && ./script"
       )
+    )
+    assertEquals(
+      icu.scriptCommandLine("runtime-attack.cpp"),
+      "c++ runtime-attack.cpp -o runtime-attack -licui18n -licuuc -licudata && ./runtime-attack"
     )
 
   test("Executor#exec"):
@@ -100,4 +118,24 @@ class ExecutorSuite extends munit.FunSuite:
       Files.deleteIfExists(SourceDirectory.path(java.program))
       Files.deleteIfExists(SourceDirectory.path(dotnet.program))
       Files.deleteIfExists(runtime)
+      Files.deleteIfExists(dir)
+
+  test("Executor#exec: a compiled program"):
+    val dir = Files.createTempDirectory("recheck executor ")
+    val compiler = dir.resolve("my compiler")
+    Files.writeString(compiler, fakeCompiler)
+    compiler.toFile.setExecutable(true)
+    val program = SourceFile("RecheckTest.sh", s"#!/bin/sh\necho \"$$(cat)\" # ${System.nanoTime()}\n")
+    val executor = ICUExecutor(program)
+    try
+      assertEquals(
+        executor.exec("input", None, "start", Map("RECHECK_ICU" -> s"'$compiler'")),
+        ExecResult.Exit(0, "input\n", "")
+      )
+    finally
+      Files.deleteIfExists(SourceDirectory.path(program))
+      Files.deleteIfExists(
+        SourceDirectory.binaryPath(program, Seq(s"'$compiler'", "-licui18n", "-licuuc", "-licudata"), "fake 1.0\n")
+      )
+      Files.deleteIfExists(compiler)
       Files.deleteIfExists(dir)

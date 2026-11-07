@@ -23,3 +23,14 @@ private[exec] object Platform:
     // $COVERAGE-OFF$
     throw new UnexpectedException("Running a command is not supported on Scala.js.")
     // $COVERAGE-ON$
+
+  def compile(
+      command: String,
+      replacement: Option[String],
+      program: SourceFile,
+      versionArgs: Seq[String],
+      libraries: Seq[String]
+  )(using Context): String =
+    // $COVERAGE-OFF$
+    throw new UnexpectedException("Running a command is not supported on Scala.js.")
+    // $COVERAGE-ON$

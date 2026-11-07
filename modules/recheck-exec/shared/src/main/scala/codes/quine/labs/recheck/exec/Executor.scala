@@ -48,7 +48,8 @@ sealed abstract class Executor:
   ): ExecResult =
     Platform.run(command, args, replacement(env), variables, file, input, timeout, marker)
 
-  private def replacement(env: Map[String, String]): Option[String] =
+  /** Returns the command line replacing the command in the environment variables, if any. */
+  protected def replacement(env: Map[String, String]): Option[String] =
     env.get(variable).map(_.trim).filter(_.nonEmpty)
 
 object Executor:
@@ -80,3 +81,43 @@ object Executor:
 
     protected val args: Seq[String] = options
     override protected val file: Option[SourceFile] = Some(program)
+
+  /** Compiled is an executor running a program file that the command compiles once, whose input is the data of the
+    * program on the standard input.
+    *
+    * The command line compiling the program is `<command> <source> -o <binary> <libraries>`, where the libraries follow
+    * the source for the linker. The binary is written into a directory of this user, and stays there for the same
+    * source, the same command line and the same version of the command.
+    */
+  abstract class Compiled private[exec] (
+      val command: String,
+      val variable: String,
+      program: SourceFile,
+      libraries: Seq[String]
+  ) extends Executor:
+
+    val options: Seq[String] = Seq.empty
+
+    protected val args: Seq[String] = Seq.empty
+
+    /** The arguments of the command printing its version, whose output tells a binary from another. */
+    protected def versionArgs: Seq[String]
+
+    override def commandLine(env: Map[String, String]): String = compileCommandLine(runtime(env), program.name)
+
+    override def scriptCommandLine(name: String): String =
+      s"${compileCommandLine(command, name)} && ./${binaryName(name)}"
+
+    override def exec(input: String, timeout: Option[FiniteDuration], marker: String, env: Map[String, String])(using
+        Context
+    ): ExecResult =
+      val binary = Platform.compile(command, replacement(env), program, versionArgs, libraries)
+      Platform.run(binary, Seq.empty, None, variables, None, input, timeout, marker)
+
+    private def compileCommandLine(compiler: String, name: String): String =
+      (Seq(compiler, name, "-o", binaryName(name)) ++ libraries).mkString(" ")
+
+  /** Returns the name of the binary of a source file, which is the name without the extension. */
+  private[exec] def binaryName(name: String): String =
+    val dot = name.lastIndexOf('.')
+    if dot < 0 then name else name.take(dot)

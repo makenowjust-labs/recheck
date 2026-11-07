@@ -127,7 +127,7 @@ The following constructs are not supported, and they are reported as `unsupporte
 ```console
 $ python3 -m venv .venv
 $ .venv/bin/pip install regex
-$ RECHECK_PYTHON_REGEX=.venv/bin/python recheck --dialect=python-regex '/^(a|a)*$/'
+$ RECHECK_PYTHON_REGEX="$PWD/.venv/bin/python" recheck --dialect=python-regex '/^(a|a)*$/'
 ```
 
 A Python without the package makes the runtime-attack verification fail with an `unexpected` error telling it.

@@ -1,7 +1,9 @@
 package codes.quine.labs.recheck.exec
 
 import java.nio.file.Files
+import java.nio.file.Paths
 import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
 
 import codes.quine.labs.recheck.common.CancelException
 import codes.quine.labs.recheck.common.CancellationTokenSource
@@ -95,4 +97,56 @@ class PlatformSuite extends munit.FunSuite:
       )
     finally
       Files.deleteIfExists(runtime)
+      Files.deleteIfExists(dir)
+
+  test("Platform.run: the working directory"):
+    assertEquals(sh("pwd -P", None), ExecResult.Exit(0, s"${SourceDirectory.directory.toRealPath()}\n", ""))
+
+  test("Platform.compile"):
+    // A fake compiler logs its arguments, prints its version for `-v`, and otherwise copies the program, which is a
+    // shell script, to the binary.
+    val dir = Files.createTempDirectory("recheck compile ")
+    val compiler = dir.resolve("my compiler")
+    val log = dir.resolve("log")
+    Files.writeString(
+      compiler,
+      s"#!/bin/sh\necho \"$$*\" >> '$log'\nfor a in \"$$@\"; do\n  if [ \"$$a\" = -v ]; then echo fake 1.0; exit 0; fi\n  if [ \"$$prev\" = -o ]; then out=\"$$a\"; fi\n  case \"$$a\" in *.sh) src=\"$$a\" ;; esac\n  prev=\"$$a\"\ndone\ncp \"$$src\" \"$$out\"\nchmod +x \"$$out\"\n"
+    )
+    compiler.toFile.setExecutable(true)
+    val program = SourceFile("recheck-test.sh", s"#!/bin/sh\necho \"$$(cat)\" # ${System.nanoTime()}\n")
+    val line = s"'$compiler' -O"
+    try
+      val binary = Platform.compile("cc", Some(line), program, Seq("-v"), Seq("-lfoo"))
+      assertEquals(Paths.get(binary), SourceDirectory.binaryPath(program, Seq(line, "-lfoo"), "fake 1.0\n"))
+      assertEquals(
+        Platform.run(binary, Seq.empty, None, Map.empty, None, "input", None, "start"),
+        ExecResult.Exit(0, "input\n", "")
+      )
+      // The binary of the same source and command line is compiled once, and the version is printed once.
+      assertEquals(Platform.compile("cc", Some(line), program, Seq("-v"), Seq("-lfoo")), binary)
+      val Seq(version, args) = Files.readAllLines(log).asScala.toSeq: @unchecked
+      assertEquals(version, "-O -v")
+      assert(clue(args).matches("-O .*/recheck-test-[0-9a-f]{16}\\.sh -o .*/recheck-test-[0-9a-f]{16} -lfoo"))
+      // The command runs without the replacement.
+      val direct = Platform.compile(compiler.toString, None, program, Seq("-v"), Seq("-O", "-lfoo"))
+      assertEquals(Files.readAllLines(log).size, 4)
+      Files.deleteIfExists(Paths.get(direct))
+      // A failed command printing the version tells its output.
+      val failing = Some("sh -c 'echo bad; echo worse >&2; exit 1'")
+      interceptMessage[UnexpectedException]("cannot run `sh -c 'echo bad; echo worse >&2; exit 1' -v`:\nbad\nworse"):
+        Platform.compile("cc", failing, program, Seq("-v"), Seq.empty)
+      // A command printing no version fails too.
+      interceptMessage[UnexpectedException]("cannot run `true -v`: no output"):
+        Platform.compile("cc", Some("true"), program, Seq("-v"), Seq.empty)
+      // A failed compilation tells the output of the compiler.
+      val failingCompilation = Some("sh -c 'echo bad; echo worse >&2; test \"$1\" = -v' sh")
+      interceptMessage[UnexpectedException](
+        "cannot compile `sh -c 'echo bad; echo worse >&2; test \"$1\" = -v' sh recheck-test.sh -o recheck-test`:\nbad\nworse"
+      ):
+        Platform.compile("cc", failingCompilation, program, Seq("-v"), Seq.empty)
+      Files.deleteIfExists(Paths.get(binary))
+    finally
+      Files.deleteIfExists(SourceDirectory.path(program))
+      Files.deleteIfExists(compiler)
+      Files.deleteIfExists(log)
       Files.deleteIfExists(dir)
