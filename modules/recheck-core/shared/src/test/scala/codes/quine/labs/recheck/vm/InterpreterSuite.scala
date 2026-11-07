@@ -505,6 +505,10 @@ class InterpreterSuite extends munit.FunSuite:
     // Python's `re` sees an open capture as unset when its old end is before its new start (e.g. this matches
     // `"acxacx"` in Python 3.15.2), which is not reproduced.
     check("^(?:(a(?(1)b|c))x)+$", "acxabx", PCRE, Perl(), Python(), DotNet)(Seq(g(0, 6), g(3, 5)))
+    // Boost.Regex sets only the start of a capture on entering it, so a reference in it matches the empty string (e.g.
+    // this matches `"abab"` in Boost.Regex 1.92.0), which is not reproduced.
+    check("^(a|b\\1)+$", "aba", BoostRegex())(Seq(g(0, 3), g(1, 3)))
+    check("^(a|b\\1)+$", "abab", BoostRegex())(NoMatch)
 
   test("Interpreter.run: Perl's captures on backtracking"):
     def perlOnly(source: String, input: String)(using munit.Location): Unit =

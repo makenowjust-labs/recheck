@@ -60,3 +60,8 @@ trait RuntimeHelper:
     * the ICU 79.1 that it installs.
     */
   def icuEnv: Map[String, String] = sys.env.filter((key, _) => key == "RECHECK_ICU")
+
+  /** The environment variable of Boost.Regex's compiler (`RECHECK_BOOST_REGEX`), which mise sets to the command line
+    * with the paths of the Boost.Regex 1.92.0 and the ICU 79.1 that it installs.
+    */
+  def boostRegexEnv: Map[String, String] = sys.env.filter((key, _) => key == "RECHECK_BOOST_REGEX")

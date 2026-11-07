@@ -6,6 +6,7 @@ import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
+import codes.quine.labs.recheck.exec.BoostRegexExecutor
 import codes.quine.labs.recheck.exec.DotNetExecutor
 import codes.quine.labs.recheck.exec.ICUExecutor
 import codes.quine.labs.recheck.exec.JavaExecutor
@@ -1397,3 +1398,457 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     val model = icuSets.map: (flags, source) =>
       chars(source, flags, Dialect.ICU).intervals.map((s, e) => f"$s%x-${e - 1}%x,").mkString
     assertEquals(cases(ICUExecutor(SourceFile("Sets.cpp", program)), input, icuEnv), model)
+
+  /** The cases of Boost.Regex, `(type, flags, pattern, subject)`, which recheck models as Boost.Regex 1.92.0 matches
+    * them.
+    */
+  val boostRegexCases: Seq[(String, String, String, String)] = Seq(
+    ("char", "", "^b", "a\nb"),
+    ("char", "M", "^b", "a\nb"),
+    ("char", "", "a$", "a\nb"),
+    ("char", "M", "a$", "a\n"),
+    ("char", "", "^b", "a\rb"),
+    ("char", "", "^b", "a\fb"),
+    ("char", "", "^b", "a\u000bb"),
+    ("char", "", "^$", "a\r\nb"),
+    ("char", "", "a\\r^", "a\r\nb"),
+    ("char", "", "\\r$", "a\r\nb"),
+    ("char", "", "$", "\r\n"),
+    ("char", "", "^$", "a\n"),
+    ("char", "", "^$", "a\r\n"),
+    ("char", "", "^", "a\r"),
+    ("char", "M", "\\Z", "a\n"),
+    ("char", "", ".", "\n"),
+    ("char", "S", ".", "\n"),
+    ("char", "S", ".", "\r"),
+    ("char", "S", ".", "\f"),
+    ("char", "S", ".", "\u000b"),
+    ("char", "", "(?-s).", "\n"),
+    ("char", "S", "(?s).", "\n"),
+    ("char", "", "a\\Z", "a\n\n"),
+    ("char", "", "a\\Z", "a\r\n"),
+    ("char", "", "a\\Z", "a\n\r\f"),
+    ("char", "", "a\\Z", "a\n\u000b"),
+    ("char", "", "a\\z", "a\n"),
+    ("char", "", "(?-m)a$", "a\n"),
+    ("char", "", "\\x41\\x4g\\x{41}", "A\u0004gA"),
+    ("char", "", "\\0\\0101\\0128", "\u0000A\n8"),
+    ("char", "", "\\cA\\c1\\c?\\e\\a", "\u0001\u0011\u001f\u001b\u0007"),
+    ("char", "", "\\Q.*\\E+", ".**"),
+    ("char", "", "\\Qa.b", "a.b"),
+    ("char", "", "a\\Eb", "aEb"),
+    ("char", "", "\\j\\y\\@", "jy@"),
+    ("char", "", "\\v", "\u000b"),
+    ("char", "", "\\h", "\t"),
+    ("char", "", "[\\v]", "\n"),
+    ("char", "", "\\l\\u\\L\\U", "aA1a"),
+    ("char", "", "\\<a", "ba a"),
+    ("char", "", "a\\>", "ab a"),
+    ("char", "", "\\`a\\'", "a"),
+    ("char", "", "a\\Kb", "ab"),
+    ("char", "", "\\R", "\r\n"),
+    ("char", "", "^\\R\\n$", "\r\n"),
+    ("char", "", "\\X", "\u00e9"),
+    ("char", "", "^\\C$", "\u00e9"),
+    ("char", "", "\\bb", "\u00e9b"),
+    ("char", "", "(a)\\g1(a)\\g{2}(a)\\g-1", "aaaaaa"),
+    ("char", "", "(?<n>a)\\k<n>\\k'n'\\g{n}\\k1", "aaaaa"),
+    ("char", "", "(a|b)\\g<1>", "ab"),
+    ("char", "", "(a|b)\\g<1>", "aa"),
+    ("char", "", "(?<n>a)|(?<n>b)", "b"),
+    ("char", "", "(?:(?<n>a)|(?<n>b))\\k<n>", "bb"),
+    ("char", "", "(?<a>x)(?<a>y)\\k<a>", "xyx"),
+    ("char", "", "(a)|b\\1", "b"),
+    ("char", "", "(a)?b\\1", "b"),
+    ("char", "", "(\\2two|(one))+", "oneonetwo"),
+    ("char", "", "(a)\\10", "aa0"),
+    ("char", "", "(?|(a)|(b))\\1", "bb"),
+    ("char", "", "(?>a+)a", "aaa"),
+    ("char", "", "a++a", "aaa"),
+    ("char", "", "a{1,2}+a", "aa"),
+    ("char", "", "(?i)A", "a"),
+    ("char", "", "(?i:A)a", "aA"),
+    ("char", "i", "(a)\\1", "aA"),
+    ("char", "", "(?x) a b # c", "ab"),
+    ("char", "", "(?x)a # c\nb", "ab"),
+    ("char", "", "(?x)a # c\rb", "ab"),
+    ("char", "", "(?x)a\u000bb", "ab"),
+    ("char", "", "(?x)[ a]", " "),
+    ("char", "", "(?x)a{1, 2}", "aa"),
+    ("char", "", "(?x)a +", "aa"),
+    ("char", "", "(?x)a\\ b", "a b"),
+    ("char", "", "(?x)a* ?", "aa"),
+    ("char", "", "(?x)\\Q a\\E", " a"),
+    ("char", "x", "a#b\u000bc", "ac"),
+    ("char", "x", "a#b\fc", "ac"),
+    ("char", "", "a(?#c)b", "ab"),
+    ("char", "", "a(?#c", "a"),
+    ("char", "", "(?i-i)a(?-)a", "aa"),
+    ("char", "", "(?<=ab|cd)x", "cdx"),
+    ("char", "", "(?<=(?:ab|cd)e)x", "cdex"),
+    ("char", "", "(?<=a{2}[ab]{2})x", "aabax"),
+    ("char", "", "(?<=(?=ab)a)b", "ab"),
+    ("char", "", "(?<=\\bfoo)x", "foox"),
+    ("char", "", "(?<=(a))x\\1", "axa"),
+    ("char", "", "(?<=(?>ab))x", "abx"),
+    ("char", "", "(?<!a)b", "cb"),
+    ("char", "", "(?<=(?=a*)\\Ca)x", "bax"),
+    ("char", "", "(?<=(?:ab|c))x", "cx"),
+    ("char", "", "(?<=a(?:b|cd))x", "acdx"),
+    ("char", "", "(?<=(?:a){2})x", "aax"),
+    ("char", "", "(?=a)*a", "a"),
+    ("char", "", "(?<=a)+b", "ab"),
+    ("char", "", "\\b*a", "a"),
+    ("char", "", "(?=(a+))a*b\\1", "baaabac"),
+    ("char", "", "a{,3}", "a{,3}"),
+    ("char", "", "a{ 1 , 2 }", "aa"),
+    ("char", "", "x{", "x{"),
+    ("char", "", "x{a}", "x{a}"),
+    ("char", "", "x{1", "x{1"),
+    ("char", "", "a**", "aa"),
+    ("char", "", "a|", "b"),
+    ("char", "", "|a", "a"),
+    ("char", "", "(|a)", "a"),
+    ("char", "", "]}", "]}"),
+    ("char", "", "[]a]", "]"),
+    ("char", "", "[^]a]", "b"),
+    ("char", "", "[a-][-b]", "--"),
+    ("char", "", "[a-\\d]", "5"),
+    ("char", "", "[a-\\d]", "c"),
+    ("char", "", "[\\d-z]", "-"),
+    ("char", "", "[a-c-e]", "-"),
+    ("char", "", "[a-c-]", "-"),
+    ("char", "", "[\\x41\\0101\\e]", "\u001b"),
+    ("char", "", "[\\h\\R\\X\\pL]+", " RXpL"),
+    ("char", "", "[\\pL]", "a"),
+    ("char", "", "[\\Q]\\E]", "QE]"),
+    ("char", "", "[[:alpha:]][[:^alpha:]][[:word:]][[:ALPHA:]]", "a1_Z"),
+    ("char", "", "[[:blank:]][[:h:]][[:v:]][[:l:]]", "\u000b \na"),
+    ("char", "", "[[:alpha]]", "a"),
+    ("char", "", "[[:foo:]]", "a"),
+    ("char", "", "[:alpha:]+", "a:hp"),
+    ("char", "", "[a[:digit:]]", "5"),
+    ("char", "", "[a&&b]", "&"),
+    ("char", "", "[[a]]", "a]"),
+    ("char", "", "[a[]", "["),
+    ("char", "", "\\pL", "A"),
+    ("char", "", "\\p{alpha}\\p{Alpha}\\p{word}\\pd\\P{alpha}", "aB_11"),
+    ("char", "", "\\p{Lu}", "A"),
+    ("char", "", "\\p{ alpha }", "a"),
+    ("char", "i", "[[:lower:]][[:upper:]]\\l\\p{lower}", "aAAA"),
+    ("char", "i", "[a-z]", "K"),
+    ("char", "i", "[^a]", "A"),
+    ("char", "i", "[@-Z]", "["),
+    ("char", "i", "[Z-a]", "["),
+    ("char", "i", "\\L", "a"),
+    ("char", "", "^(?:(a)|b)*$", "ab"),
+    ("char", "", "^(?:(a)|(b))*$", "ab"),
+    ("char", "", "(a?)*?b", "ab"),
+    ("char", "", "^(?:a?){2,3}?$", "a"),
+    ("char", "", "^(a?){3}$", "a"),
+    ("char", "", "^(?:(a)?b){2}\\1$", "abba"),
+    ("char", "", "^(?:x|(a)?)*$", "ax"),
+    ("char", "", "(?:a|())*\\1b", "ab"),
+    ("char", "", "(?!(a))\\1b", "b"),
+    ("char", "", "(?=(a))\\1", "a"),
+    ("char", "", "^(?:()|a)*$", "a"),
+    ("char", "", "^(a|)*$", "aa"),
+    ("char", "", "a(?i)b|c", "C"),
+    ("char", "", "(a(?i)b|c)", "C"),
+    ("char", "", "(?i)a(?-i)b|C", "c"),
+    ("char", "", "(?:(?i)a|b)B", "Ab"),
+    ("char", "", "(?i:a(?-i)b)", "Ab"),
+    ("char", "", "(?s-m:.)", "\n"),
+    ("char", "M", "(?m)a$", "a\nb"),
+    ("char", "", "(?x:a b)c", "abc"),
+    ("char", "", "(?x)(?-x)a b", "a b"),
+    ("char", "", "\\Bb\\>", "ab"),
+    ("char", "", "\\<", "-"),
+    ("char", "", "\\>", "a"),
+    ("char", "", "a\\b", "a"),
+    ("char", "", "[[:<:]]a", "ba a"),
+    ("char", "", "a(*FAIL)|b", "ab"),
+    ("char", "N", "a\nb", "b"),
+    ("char", "Nx", "a #c\nb", "b"),
+    ("char", "Nx", "a\n b", "b"),
+    ("char", "N", "[\n]", "\n"),
+    ("char", "N", "\\Qa\nb\\E", "a\nb"),
+    ("char", "c", "[ac]", "c"),
+    ("u32regex", "", "^b", "a\u0085b"),
+    ("u32regex", "", "^b", "a\u2028b"),
+    ("u32regex", "", "^b", "a\u2029b"),
+    ("u32regex", "S", ".", "\u0085"),
+    ("u32regex", "S", ".", "\u000b"),
+    ("u32regex", "", "a\\Z", "a\u2028\u0085"),
+    ("u32regex", "", "\\w\\w\\w", "\u00e9\u03b1\u0301"),
+    ("u32regex", "", "\\w", "\u200c"),
+    ("u32regex", "", "\\d\\s\\s\\h", "\u0663\u3000\u0085\u3000"),
+    ("u32regex", "i", "\u00e9", "\u00c9"),
+    ("u32regex", "i", "k", "\u212a"),
+    ("u32regex", "i", "\u00df", "\u1e9e"),
+    ("u32regex", "i", "\u00df", "ss"),
+    ("u32regex", "i", "\u03c3", "\u03c2"),
+    ("u32regex", "i", "\u0130", "i"),
+    ("u32regex", "i", "[a-z][k]K", "\u212a\u212ak"),
+    ("u32regex", "", "\\pL", "\u00e9"),
+    ("u32regex", "", "\\pL", "A"),
+    ("u32regex", "", "\\p{L}", "A"),
+    ("u32regex", "", "\\p{Lu}\\p{Letter}\\p{letter}\\p{Any}\\p{Assigned}\\p{ASCII}", "Aaa\u0378a"),
+    ("u32regex", "", "\\p{Lu}", "a"),
+    ("u32regex", "", "\\p{alpha}\\p{Uppercase Letter}\\p{uppercase_letter}", "\u00e9AB"),
+    ("u32regex", "", "\\p{Greek}", "\u03b1"),
+    ("u32regex", "", "\\p{L&}", "a"),
+    ("u32regex", "", "[[:alpha:]][[:word:]][[:L*:]][[:Lu:]]", "\u00e9\u00e9aA"),
+    ("u32regex", "", "[[:Greek:]]", "\u03b1"),
+    ("u32regex", "", "^.$", "\ud83d\ude00"),
+    ("u32regex", "", "^\\X$", "e\u0301\u0302"),
+    ("u32regex", "", "^\\X$", "\u0301"),
+    ("u32regex", "", "^\\X$", "\ud83c\uddef\ud83c\uddf5"),
+    ("u32regex", "", "^\\X$", "\r\n"),
+    ("u32regex", "", "^\\X$", "a\ufe20"),
+    ("u32regex", "", "^\\X$", "a\ufe26"),
+    ("u32regex", "", "\\bb", "\u00e9b"),
+    ("u32regex", "", "\\x{1F600}[\\x{1F600}-\\x{1F64F}]", "\ud83d\ude00\ud83d\ude10"),
+    ("u32regex", "i", "\\p{Lt}", "\u01c5"),
+    ("u32regex", "i", "\\p{Lu}[[:upper:]]", "\u00aaa"),
+    ("u32regex", "", "\\d", "\ud835\udfce"),
+    ("u32regex", "i", "\ud801\udc00", "\ud801\udc28"),
+    ("u32regex", "", "(?x)a\u3000b", "ab"),
+    ("u32regex", "x", "a#b\u2028c", "ac"),
+    ("u32regex", "x", "a#b\u0085c", "ac"),
+    ("u32regex", "", "\\0777", "\u01ff"),
+    ("u32regex", "", "\\x{100}", "\u0100"),
+    ("char", "", "a(?x)? b(?s)+.", "ab\n"),
+    ("char", "", "\\g{-0}(a)", "aa"),
+    ("char", "", "(a)\\g 1\\g+1\\g- 1", "aaaa"),
+    ("char", "", "(a)\\g{ -1}", "aa"),
+    ("char", "", "[^[:<:]]a[[:^>:]]", "ba a"),
+    ("char", "", "\\x 41\\x{ +41}\\x{0x41}", "\u00041AA"),
+    ("char", "", "\\x{80}", "a"),
+    ("char", "", "\\0200", "a"),
+    ("u32regex", "", "\\x{\uff21\uff22}\\0\u0663", "\u00ab\u0003"),
+    ("u32regex", "", "\\x{110000}|a", "a"),
+    ("char", "", "a{+2}b{1,-2}", "aabbb"),
+    ("char", "", "a{-1}", "a{-1}"),
+    ("u32regex", "", "a{\uff12}", "aa"),
+    ("u32regex", "", "a{+2}", "a{+2}"),
+    ("u32regex", "", "a{1,9223372036854775807}", "aaa"),
+    ("char", "N", "a{1\n}", "a"),
+    ("char", "x", "a* ?", "aa"),
+    ("char", "x", "a* #c\n?", "aa"),
+    ("char", "", "(?=)a", "a"),
+    ("char", "", "(?>(?#c))a", "a"),
+    ("char", "", "(?!)a|(?=|)b", "b")
+  )
+
+  /** The patterns of Boost.Regex, `(type, flags, pattern)`, whose characters recheck has as Boost.Regex 1.92.0 does.
+    *
+    * In `u32regex`, `\v` and `.` without `s` are left out, since Boost.Regex takes U+12028 and the other characters
+    * sharing the low 16 bits of a line terminator as one too, which recheck does not reproduce.
+    */
+  val boostRegexSets: Seq[(String, String, String)] = Seq(
+    ("char", "", "\\w"),
+    ("char", "", "\\s"),
+    ("char", "", "\\d"),
+    ("char", "", "\\h"),
+    ("char", "", "\\v"),
+    ("char", "", "\\l"),
+    ("char", "", "\\U"),
+    ("char", "", "[[:blank:]]"),
+    ("char", "", "[[:punct:]]"),
+    ("char", "", "[[:print:]]"),
+    ("char", "", "[[:graph:]]"),
+    ("char", "", "[[:cntrl:]]"),
+    ("char", "", "[[:xdigit:]]"),
+    ("char", "", "[^[:unicode:]]"),
+    ("char", "", "."),
+    ("char", "S", "."),
+    ("char", "i", "\\l"),
+    ("char", "i", "\\L"),
+    ("char", "i", "[@-Z]"),
+    ("char", "i", "[^k]"),
+    ("char", "i", "\\W"),
+    ("u32regex", "", "\\w"),
+    ("u32regex", "", "\\s"),
+    ("u32regex", "", "\\d"),
+    ("u32regex", "", "\\h"),
+    ("u32regex", "", "\\l"),
+    ("u32regex", "", "\\U"),
+    ("u32regex", "", "[[:alnum:]]"),
+    ("u32regex", "", "[[:blank:]]"),
+    ("u32regex", "", "[[:cntrl:]]"),
+    ("u32regex", "", "[[:graph:]]"),
+    ("u32regex", "", "[[:punct:]]"),
+    ("u32regex", "", "[[:xdigit:]]"),
+    ("u32regex", "", "[[:unicode:]]"),
+    ("u32regex", "", "\\p{Lt}"),
+    ("u32regex", "", "\\p{Any}"),
+    ("u32regex", "", "\\p{Assigned}"),
+    ("u32regex", "", "\\p{C*}"),
+    ("u32regex", "", "\\p{Zs}"),
+    ("u32regex", "", "."),
+    ("u32regex", "i", "\\p{Lt}"),
+    ("u32regex", "i", "\\p{Lu}"),
+    ("u32regex", "i", "[a-z]"),
+    ("u32regex", "i", "\\w"),
+    ("u32regex", "i", "[^k]")
+  )
+
+  /** Returns the units of the string of the type of Boost.Regex: UTF-8 bytes over `char`, and code points. */
+  def boostRegexUnits(tpe: String, s: String): UString =
+    val mode = if tpe == "char" then UnitMode.Byte else UnitMode.ScalarValue
+    mode.fromCodePoints(IArray.from(UnitMode.CodePoint.decode(s).iterator))
+
+  /** Returns the hexadecimal digits of the units, eight for each, or `-` for no unit. */
+  def boostRegexHex(units: UString): String =
+    if units.isEmpty then "-" else units.iterator.map(c => f"$c%08x").mkString
+
+  def boostRegexDialect(tpe: String): Dialect =
+    if tpe == "char" then Dialect.BoostRegex() else Dialect.BoostRegex(Dialect.BoostRegex.Type.U32Regex)
+
+  /** The part of the C++ programs of Boost.Regex before `main`, which reads the units and the flags. */
+  val boostRegexPrelude: String =
+    """|#include <boost/regex.hpp>
+       |#include <boost/regex/icu.hpp>
+       |#include <cstdint>
+       |#include <cstdio>
+       |#include <cstdlib>
+       |#include <iostream>
+       |#include <string>
+       |#include <vector>
+       |
+       |typedef std::vector<std::uint32_t> Units;
+       |
+       |static Units decode(const std::string &hex) {
+       |  Units s;
+       |  if (hex == "-") return s;
+       |  for (std::size_t i = 0; i + 8 <= hex.size(); i += 8) {
+       |    s.push_back(static_cast<std::uint32_t>(std::strtoul(hex.substr(i, 8).c_str(), nullptr, 16)));
+       |  }
+       |  return s;
+       |}
+       |
+       |static boost::regbase::flag_type options(const std::string &flags) {
+       |  boost::regbase::flag_type f = boost::regbase::perl;
+       |  for (char c : flags) {
+       |    if (c == 'M') f |= boost::regbase::no_mod_m;
+       |    if (c == 'N') f |= boost::regbase::newline_alt;
+       |    if (c == 'S') f |= boost::regbase::no_mod_s;
+       |    if (c == 'c') f |= boost::regbase::collate;
+       |    if (c == 'i') f |= boost::regbase::icase;
+       |    if (c == 'x') f |= boost::regbase::mod_x;
+       |  }
+       |  return f;
+       |}
+       |""".stripMargin
+
+  /** Returns recheck's results of Boost.Regex's cases: the spans of the groups of the first match in units, `none` or
+    * `error`.
+    */
+  def boostRegexModel(cases: Seq[(String, String, String, String)]): Seq[String] =
+    cases.map: (tpe, flags, source, subject) =>
+      try
+        val ir = ReDoS.parse(source, flags, boostRegexDialect(tpe))
+        val program = ProgramBuilder.build(ir, false)
+        val result = Interpreter.run(program, boostRegexUnits(tpe, subject), Interpreter.Options())
+        result.captures.filter(_ => result.status == Interpreter.Status.Ok) match
+          case Some(captures) => captures.grouped(2).map(g => s"${g(0)},${g(1)}").mkString(" ")
+          case None           => "none"
+      catch case _: InvalidRegExpException => "error"
+
+  // Checked with Boost.Regex 1.92.0 and ICU 79.1.
+  runtimeTest("Boost.Regex: the syntax and the matching", "c++"):
+    val program =
+      boostRegexPrelude +
+        """|template <class Iterator>
+           |static void print(bool found, const boost::match_results<Iterator> &match, Iterator begin) {
+           |  if (!found) {
+           |    std::printf("case:none\n");
+           |    return;
+           |  }
+           |  std::printf("case:");
+           |  for (std::size_t g = 0; g < match.size(); g++) {
+           |    if (match[g].matched) {
+           |      std::printf("%s%ld,%ld", g == 0 ? "" : " ", static_cast<long>(match[g].first - begin),
+           |                  static_cast<long>(match[g].second - begin));
+           |    } else {
+           |      std::printf("%s-1,-1", g == 0 ? "" : " ");
+           |    }
+           |  }
+           |  std::printf("\n");
+           |}
+           |
+           |int main() {
+           |  std::string type, flags, pattern, subject;
+           |  while (std::getline(std::cin, type) && std::getline(std::cin, flags) && std::getline(std::cin, pattern) &&
+           |         std::getline(std::cin, subject)) {
+           |    Units p = decode(pattern), s = decode(subject);
+           |    try {
+           |      if (type == "char") {
+           |        boost::regex regex(std::string(p.begin(), p.end()), options(flags));
+           |        std::string string(s.begin(), s.end());
+           |        boost::smatch match;
+           |        bool found = boost::regex_search(string, match, regex);
+           |        print<std::string::const_iterator>(found, match, string.cbegin());
+           |      } else {
+           |        boost::u32regex regex = boost::make_u32regex(p.begin(), p.end(), options(flags));
+           |        boost::match_results<Units::const_iterator> match;
+           |        bool found = boost::u32regex_search(s.cbegin(), s.cend(), match, regex);
+           |        print<Units::const_iterator>(found, match, s.cbegin());
+           |      }
+           |    } catch (const boost::regex_error &) {
+           |      std::printf("case:error\n");
+           |    }
+           |  }
+           |}
+           |""".stripMargin
+    val input = boostRegexCases
+      .map: (tpe, flags, source, subject) =>
+        s"$tpe\n$flags\n${boostRegexHex(boostRegexUnits(tpe, source))}\n${boostRegexHex(boostRegexUnits(tpe, subject))}\n"
+      .mkString
+    val executor = BoostRegexExecutor(SourceFile("Cases.cpp", program), hasICU = true)
+    assertEquals(cases(executor, input, boostRegexEnv), boostRegexModel(boostRegexCases))
+
+  // Checked with Boost.Regex 1.92.0 and ICU 79.1.
+  runtimeTest("Boost.Regex: the characters of the classes and the properties", "c++"):
+    val program =
+      boostRegexPrelude +
+        """|int main() {
+           |  std::string type, flags, pattern;
+           |  while (std::getline(std::cin, type) && std::getline(std::cin, flags) && std::getline(std::cin, pattern)) {
+           |    Units p = decode(pattern);
+           |    boost::regex narrow;
+           |    boost::u32regex wide;
+           |    long limit = type == "char" ? 0x100 : 0x110000;
+           |    if (type == "char") narrow.assign(std::string(p.begin(), p.end()), options(flags));
+           |    else wide = boost::make_u32regex(p.begin(), p.end(), options(flags));
+           |    std::printf("case:");
+           |    long start = -1;
+           |    for (long c = 0; c <= limit; c++) {
+           |      bool matched = false;
+           |      if (c < limit && !(type != "char" && 0xd800 <= c && c <= 0xdfff)) {
+           |        if (type == "char") {
+           |          std::string s(1, static_cast<char>(c));
+           |          matched = boost::regex_match(s, narrow);
+           |        } else {
+           |          Units s(1, static_cast<std::uint32_t>(c));
+           |          matched = boost::u32regex_match(s.cbegin(), s.cend(), wide);
+           |        }
+           |      }
+           |      if (matched && start < 0) start = c;
+           |      if (!matched && start >= 0) {
+           |        std::printf("%lx-%lx,", start, c - 1);
+           |        start = -1;
+           |      }
+           |    }
+           |    std::printf("\n");
+           |  }
+           |}
+           |""".stripMargin
+    val input = boostRegexSets
+      .map((tpe, flags, source) => s"$tpe\n$flags\n${boostRegexHex(boostRegexUnits(tpe, source))}\n")
+      .mkString
+    val model = boostRegexSets.map: (tpe, flags, source) =>
+      chars(source, flags, boostRegexDialect(tpe)).intervals.map((s, e) => f"$s%x-${e - 1}%x,").mkString
+    val executor = BoostRegexExecutor(SourceFile("Sets.cpp", program), hasICU = true)
+    assertEquals(cases(executor, input, boostRegexEnv), model)

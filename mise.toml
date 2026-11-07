@@ -31,10 +31,27 @@ linux-x64 = { url = "https://github.com/unicode-org/icu/releases/download/releas
 macos-arm64 = { url = "https://github.com/unicode-org/icu/releases/download/release-{{ version }}/icu4c-{{ version }}-sources.tgz" }
 macos-x64 = { url = "https://github.com/unicode-org/icu/releases/download/release-{{ version }}/icu4c-{{ version }}-sources.tgz" }
 
+# The tests of boost-regex compile programs with the headers of Boost.Regex 1.92.0, which needs no other library of
+# Boost.
+[tools."http:boost-regex"]
+version = "1.92.0"
+url = "https://github.com/boostorg/regex/archive/refs/tags/boost-{{ version }}.tar.gz"
+strip_components = 1
+
+# The programs of boost-regex print the version of Boost, which `boost/version.hpp` of Boost.Config has.
+[tools."http:boost-config"]
+version = "1.92.0"
+url = "https://github.com/boostorg/config/archive/refs/tags/boost-{{ version }}.tar.gz"
+strip_components = 1
+
 [env]
 # The tests of icu compile programs with this command line, where the prebuilt shared libraries on Linux need a run path.
 # The run path is an old `DT_RPATH` (`--disable-new-dtags`), which also finds `libicudata` that `libicuuc` loads.
 RECHECK_ICU = { value = "{% if tools['http:icu4c'] is defined %}{% set icu = tools['http:icu4c'].path %}{% if os() == 'linux' %}{% set icu = icu ~ '/usr/local' %}{% endif %}c++ -I{{ icu }}/include -L{{ icu }}/lib{% if os() == 'linux' %} -Wl,--disable-new-dtags,-rpath,{{ icu }}/lib{% endif %}{% endif %}", tools = true }
+# The tests of boost-regex compile programs with this command line, which has the paths of ICU too for `u32regex`.
+# Boost.Regex uses the other libraries of Boost when it finds `boost/version.hpp`, unless `BOOST_REGEX_STANDALONE` is
+# defined.
+RECHECK_BOOST_REGEX = { value = "{% if tools['http:boost-regex'] is defined and tools['http:boost-config'] is defined %}c++ -std=c++17 -O2 -DBOOST_REGEX_STANDALONE -I{{ tools['http:boost-regex'].path }}/include -I{{ tools['http:boost-config'].path }}/include{% if tools['http:icu4c'] is defined %}{% set icu = tools['http:icu4c'].path %}{% if os() == 'linux' %}{% set icu = icu ~ '/usr/local' %}{% endif %} -I{{ icu }}/include -L{{ icu }}/lib{% if os() == 'linux' %} -Wl,--disable-new-dtags,-rpath,{{ icu }}/lib{% endif %}{% endif %}{% endif %}", tools = true }
 # The tests of python-regex need Python's regex package, which `mise run python-requirements` installs here.
 _.python.venv = { path = ".venv", create = true }
 

@@ -14,6 +14,7 @@ import codes.quine.labs.recheck.common.UnexpectedException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
+import codes.quine.labs.recheck.exec.BoostRegexExecutor
 import codes.quine.labs.recheck.exec.DotNetExecutor
 import codes.quine.labs.recheck.exec.ICUExecutor
 import codes.quine.labs.recheck.exec.JavaExecutor
@@ -179,10 +180,12 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
   /** Runs the standalone program on the runtime of the program of the dialect, and returns the output. */
   def runScript(script: RuntimeAttackProgram.Script, program: RuntimeAttackProgram): String = program.executor match
     // The class of the Java program is `RecheckRuntimeAttack`, which names the program file.
-    case _: JavaExecutor   => run(JavaExecutor(SourceFile("RecheckRuntimeAttack.java", script.content)))
-    case _: DotNetExecutor => run(DotNetExecutor(SourceFile(script.name, script.content)))
-    case _: ICUExecutor    => run(ICUExecutor(SourceFile(script.name, script.content)), env = icuEnv)
-    case executor          => run(executor, script.content)
+    case _: JavaExecutor               => run(JavaExecutor(SourceFile("RecheckRuntimeAttack.java", script.content)))
+    case _: DotNetExecutor             => run(DotNetExecutor(SourceFile(script.name, script.content)))
+    case _: ICUExecutor                => run(ICUExecutor(SourceFile(script.name, script.content)), env = icuEnv)
+    case BoostRegexExecutor(_, hasICU) =>
+      run(BoostRegexExecutor(SourceFile(script.name, script.content), hasICU), env = boostRegexEnv)
+    case executor => run(executor, script.content)
 
   for (dialect, program) <- Seq(
       Dialect.JavaScript -> "node",
@@ -192,7 +195,9 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
       Dialect.DotNet -> "dotnet",
       Dialect.Perl() -> "perl",
       Dialect.PCRE -> "php",
-      Dialect.ICU -> "c++"
+      Dialect.ICU -> "c++",
+      Dialect.BoostRegex() -> "c++",
+      Dialect.BoostRegex(Dialect.BoostRegex.Type.U32Regex) -> "c++"
     )
   do
     runtimeTest(s"RuntimeAttackProgram.generateScript: $dialect", program):
@@ -227,6 +232,35 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
     // A pattern that ICU rejects, though recheck accepts it, exits with the error.
     val invalid = intercept[UnexpectedException](verify("[&-c]", "", Dialect.ICU, attack("a", 3, ""), env = icuEnv))
     assertEquals(invalid.getMessage, "U_REGEX_INVALID_RANGE at 4")
+
+  // Checked with Boost.Regex 1.92.0, whose complexity limit stops most attacks of short patterns within a second.
+  runtimeTest("Boost.Regex", "c++"):
+    val r = verify("^(a|a)*$", "", Dialect.BoostRegex(), attack("a", 31, "\u0000"), env = boostRegexEnv)
+    assert(clue(r.result).isInstanceOf[RuntimeAttackResult.EngineLimit])
+    assert(r.isConfirmed)
+    assertEquals(r.runtime, "boost-regex 1.92.0")
+    assertFinish(verify("^(a|a)*$", "", Dialect.BoostRegex(), attack("a", 3, "\u0000"), env = boostRegexEnv))
+    // The limit grows with the length of the pattern, so a long one makes a polynomial attack slow.
+    val long = s"^a*a*${"(?:z)?" * 50}$$"
+    val slow = verify(long, "", Dialect.BoostRegex(), attack("a", 100_000, "b"), env = boostRegexEnv)
+    assertEquals(slow.result, RuntimeAttackResult.Timeout)
+    // The backtracking stack overflows even on a linear matching.
+    val overflow = verify("^(a)*$", "", Dialect.BoostRegex(), attack("a", 100_000, ""), env = boostRegexEnv)
+    assertEquals(
+      overflow.result,
+      RuntimeAttackResult.EngineError("Ran out of stack space trying to match the regular expression.")
+    )
+    // `u32regex` has the classes of ICU, where `\w` has `é`.
+    val u32 = Dialect.BoostRegex(Dialect.BoostRegex.Type.U32Regex)
+    val unicode = verify("^(\\w|\u00e9)*$", "", u32, attack("\u00e9", 31, "!"), env = boostRegexEnv)
+    assert(clue(unicode.result).isInstanceOf[RuntimeAttackResult.EngineLimit])
+    assertEquals(unicode.runtime, "boost-regex 1.92.0 (ICU 79.1)")
+
+  runtimeTest("RECHECK_BOOST_REGEX", "c++"):
+    // A failed compiler, which runs first for its version, tells its output.
+    val env = Map("RECHECK_BOOST_REGEX" -> "sh -c 'echo no Boost >&2; exit 1'")
+    val ex = intercept[UnexpectedException](verify("a", "", Dialect.BoostRegex(), attack("a", 3, ""), env = env))
+    assertEquals(ex.getMessage, "cannot run `sh -c 'echo no Boost >&2; exit 1' --version`:\nno Boost")
 
   runtimeTest("RECHECK_RUBY", "ruby"):
     // The wrapper's runtime line comes first, and it shows the arguments.
