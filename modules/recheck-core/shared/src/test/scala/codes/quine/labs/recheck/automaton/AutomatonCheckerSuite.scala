@@ -29,8 +29,13 @@ class AutomatonCheckerSuite extends munit.FunSuite:
       ir <- Try(ReDoS.parse(source, flags, dialect))
       nfa =
         if isUpperBound then EpsNFABuilder.buildSimplified(ir, Int.MaxValue, false).orderedNFA
-        else EpsNFABuilder.build(ir).toOrderedNFA(Int.MaxValue, false).rename
-      result <- Try(AutomatonChecker.check(nfa, Int.MaxValue, isUpperBound).nextOption().getOrElse(Complexity.Constant))
+        else EpsNFABuilder.build(ir).toOrderedNFA(Int.MaxValue, Int.MaxValue, false).rename
+      result <- Try(
+        AutomatonChecker
+          .check(nfa, Int.MaxValue, Int.MaxValue, isUpperBound)
+          .nextOption()
+          .getOrElse(Complexity.Constant)
+      )
     yield result
 
   /** Returns the degree of the complexity, where an exponential one is the largest. */
@@ -177,8 +182,8 @@ class AutomatonCheckerSuite extends munit.FunSuite:
     // The complexities of the inner expressions of the look-behinds merge into the others, from the worst.
     def degrees(source: String): Seq[Int] =
       val ir = ReDoS.parse(source, "", Dialect.JavaScript)
-      val nfa = EpsNFABuilder.build(ir).toOrderedNFA(Int.MaxValue, false).rename
-      AutomatonChecker.check(nfa, Int.MaxValue, false).map(degree).toSeq
+      val nfa = EpsNFABuilder.build(ir).toOrderedNFA(Int.MaxValue, Int.MaxValue, false).rename
+      AutomatonChecker.check(nfa, Int.MaxValue, Int.MaxValue, false).map(degree).toSeq
 
     assertEquals(degrees("^(?:b|b)*a+(?<=a*)$"), Seq(Int.MaxValue, Int.MaxValue, 2, 1, 0))
     assertEquals(degrees("c?a+(?<=ba*)$"), Seq(3, 3) ++ Seq.fill(9)(2) ++ Seq(1, 0))

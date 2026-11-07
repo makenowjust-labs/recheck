@@ -236,6 +236,15 @@ properties:
     x-cli: "max-attack-string-size"
     x-since: "4.2.0"
 
+  maxDFASize:
+    title: "Max DFA Size"
+    description: "The maximum size of the DFA to determine which algorithm is used."
+    type: integer
+    default: 10000
+    x-scala-type: "Int"
+    x-cli: "max-dfa-size"
+    x-since: "5.0.0"
+
   maxDegree:
     title: "Max Degree"
     description: "The maximum degree to be considered in fuzzing."

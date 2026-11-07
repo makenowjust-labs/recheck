@@ -439,6 +439,7 @@ class CodecSuite extends munit.FunSuite:
           "accelerationMode" := "off",
           "maxRepeatCount" := 123,
           "maxNFASize" := 123,
+          "maxDFASize" := 123,
           "maxPatternSize" := 123,
           "dialect" := Json.obj("name" := "perl", "utf8" := false, "source" := "string"),
           "maxRefutedAttacks" := 123
@@ -470,6 +471,7 @@ class CodecSuite extends munit.FunSuite:
           accelerationMode = AccelerationMode.Off,
           maxRepeatCount = 123,
           maxNFASize = 123,
+          maxDFASize = 123,
           maxPatternSize = 123,
           dialect = Dialect.Perl(utf8 = false, source = PerlSource.String),
           maxRefutedAttacks = 123

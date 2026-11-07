@@ -47,7 +47,8 @@ object EpsNFABuilder:
       ctx: Context
   ): Simplified =
     val (epsNFA, isUpperBound) = build(pattern, maxNFASize, true, lookBehindsAsLookAheads)
-    Simplified(epsNFA, epsNFA.toOrderedNFA(maxNFASize, true).rename, isUpperBound)
+    // The DFA of the look-behinds of the simplified ε-NFA has the single state.
+    Simplified(epsNFA, epsNFA.toOrderedNFA(maxNFASize, Int.MaxValue, true).rename, isUpperBound)
 
   private def build(pattern: IRPattern, maxNFASize: Int, isSimplified: Boolean, lookBehindsAsLookAheads: Boolean)(using
       ctx: Context

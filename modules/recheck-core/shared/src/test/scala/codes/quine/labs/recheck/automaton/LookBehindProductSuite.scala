@@ -13,8 +13,8 @@ class LookBehindProductSuite extends munit.FunSuite:
   /** Builds the ordered NFA of the source and its NFA with look-ahead. */
   def build(source: String): (OrderedNFA[Int, Int], NFAwLA[Int, Int, Set[Int]]) =
     val ir = ReDoS.parse(source, "", Dialect.JavaScript)
-    val nfa = EpsNFABuilder.build(ir).toOrderedNFA(Int.MaxValue, false).rename.mapAlphabet(_.head)
-    (nfa, nfa.toNFAwLA(Int.MaxValue, false))
+    val nfa = EpsNFABuilder.build(ir).toOrderedNFA(Int.MaxValue, Int.MaxValue, false).rename.mapAlphabet(_.head)
+    (nfa, nfa.toNFAwLA(Int.MaxValue, Int.MaxValue, false))
 
   test("LookBehindProduct.build"):
     val (nfa, nfaWLA) = build("^a*(?<=a)a*$")

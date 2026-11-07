@@ -128,8 +128,9 @@ object FuzzChecker:
         val simplified = EpsNFABuilder.buildSimplified(approximated, maxNFASize, false)
         Option.when(simplified.isUpperBound):
           val orderedNFA = simplified.epsNFA.restrictInputs(simplified.orderedNFA)
+          // The look-ahead DFA of the upper bound has the single state.
           AutomatonChecker
-            .check(orderedNFA.mapAlphabet(_.representative), maxNFASize, true)
+            .check(orderedNFA.mapAlphabet(_.representative), maxNFASize, Int.MaxValue, true)
             .collect { case v: Complexity.Vulnerable[UChar] => v }
             .take(maxInitialGenerationSize.max(1))
             .toVector

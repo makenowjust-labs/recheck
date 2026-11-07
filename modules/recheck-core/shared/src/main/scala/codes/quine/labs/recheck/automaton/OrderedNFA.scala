@@ -89,8 +89,9 @@ final case class OrderedNFA[A, Q](
   /** Builds a look-ahead DFA from this NFA.
     *
     * The DFA reads the input backward. Its state is a set of states of this NFA which succeed on the rest of the input.
+    * It throws [[UnsupportedException]] when the DFA would have `maxDFASize` transitions or more.
     */
-  def toLookAheadDFA(using ctx: Context): DFA[A, Set[Q]] =
+  def toLookAheadDFA(maxDFASize: Int)(using ctx: Context): DFA[A, Set[Q]] =
     ctx.interrupt:
       val reverseLeaves = mutable.Map.empty[(Q, A), Set[Q]].withDefaultValue(Set.empty)
       for ((q1, a) -> b) <- delta; q2 <- b.allLeaves do
@@ -107,9 +108,15 @@ final case class OrderedNFA[A, Q](
       val newAcceptSet = Set.newBuilder[Set[Q]]
       val newDelta = Map.newBuilder[(Set[Q], A), Set[Q]]
 
-      queue.enqueue(acceptSet)
-      newStateSet.add(acceptSet)
+      def add(p: Set[Q]): Unit =
+        queue.enqueue(p)
+        newStateSet.add(p)
+        // Each state has a transition on every character.
+        if newStateSet.size.toLong * alphabet.size >= maxDFASize then
+          ctx.log("auto: exceed maxDFASize on look-ahead DFA construction")
+          throw new UnsupportedException("look-ahead DFA size is too large")
 
+      add(acceptSet)
       while queue.nonEmpty do
         ctx.interrupt:
           val p2 = queue.dequeue()
@@ -118,9 +125,7 @@ final case class OrderedNFA[A, Q](
             val p1 = (p2.flatMap(q2 => reverseLeaves((q2, a))) | unconditional(a))
               .filter(q1 => delta((q1, a)).succeeds(p2.contains))
             newDelta.addOne((p2, a) -> p1)
-            if !newStateSet.contains(p1) then
-              queue.enqueue(p1)
-              newStateSet.add(p1)
+            if !newStateSet.contains(p1) then add(p1)
 
       val dfa = DFA(alphabet, newStateSet.toSet, acceptSet, newAcceptSet.result(), newDelta.result())
       ctx.log:
@@ -133,12 +138,12 @@ final case class OrderedNFA[A, Q](
     *
     * With [[inputStates]], a look-ahead that none of them has is of no input, which the result does not have.
     *
-    * With `isUpperBound`, the look-ahead DFA has the single state of no success, and the result has every leaf of the
-    * transitions, which bounds the explored paths from above.
+    * With `isUpperBound`, the result has every leaf of the transitions, as no look-ahead prunes them, so its paths
+    * include every explored path.
     */
-  def toNFAwLA(maxNFASize: Int, isUpperBound: Boolean)(using ctx: Context): NFAwLA[A, Q, Set[Q]] =
+  def toNFAwLA(maxNFASize: Int, maxDFASize: Int, isUpperBound: Boolean)(using ctx: Context): NFAwLA[A, Q, Set[Q]] =
     ctx.interrupt:
-      val lookAheadDFA = if isUpperBound then DFA.universal(alphabet, Set.empty[Q]) else toLookAheadDFA
+      val lookAheadDFA = if isUpperBound then DFA.universal(alphabet, Set.empty[Q]) else toLookAheadDFA(maxDFASize)
       def isInput(p: Set[Q]): Boolean = isUpperBound || inputStates.isEmpty || p.exists(inputStates.contains)
 
       val reverseDelta = ctx.interrupt:

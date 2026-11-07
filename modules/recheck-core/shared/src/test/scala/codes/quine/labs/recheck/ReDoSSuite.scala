@@ -291,6 +291,15 @@ class ReDoSSuite extends munit.FunSuite:
     // The upper bound of `^(?:a|a)+$` is exponential, so the fuzz checker decides it.
     assertVulnerable(check("^(?:a|a){1,40}$", JavaScript), AttackComplexity.Exponential(true), Checker.Fuzz)
 
+  test("ReDoS.check: too large DFA"):
+    val small = params.copy(maxDFASize = 1)
+    // The upper bound of `^[a-z]+$`, which builds no DFA, is linear.
+    assertBounded(ReDoS.check("^[a-z]+$", "", small))
+    assertVulnerable(ReDoS.check("^(?:a|a)*$", "", small), AttackComplexity.Exponential(true), Checker.Fuzz)
+    // The automaton checker builds the DFA of any size.
+    val automaton = small.copy(checker = Checker.Automaton)
+    assertVulnerable(ReDoS.check("^(?:a|a)*$", "", automaton), AttackComplexity.Exponential(false), Checker.Automaton)
+
   test("ReDoS.check: look-behinds matched forward"):
     // PCRE matches the inner expression forward from the starts of its widths, which succeeds as matching it backward.
     assertVulnerable(check("^(?:a|(?<=a)a)*$", PCRE), AttackComplexity.Exponential(false), Checker.Automaton)

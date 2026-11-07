@@ -23,7 +23,7 @@ class OrderedNFASuite extends munit.FunSuite:
         (1, 'b') -> Branch.Leaf(1)
       )
     )
-    val nfaWLA = nfa.toNFAwLA(Int.MaxValue, false)
+    val nfaWLA = nfa.toNFAwLA(Int.MaxValue, Int.MaxValue, false)
     assertEquals(
       nfaWLA,
       NFAwLA(
@@ -37,12 +37,14 @@ class OrderedNFASuite extends munit.FunSuite:
           ((1, Set(0, 1)), ('a', Set(0, 1))) -> MultiSet((1, Set(0, 1))),
           ((1, Set(0, 1)), ('b', Set(0, 1))) -> MultiSet((1, Set(0, 1)))
         ),
-        nfa.toLookAheadDFA
+        nfa.toLookAheadDFA(Int.MaxValue)
       )
     )
     interceptMessage[UnsupportedException]("NFAwLA size is too large") {
-      nfa.toNFAwLA(1, false)
+      nfa.toNFAwLA(1, Int.MaxValue, false)
     }
+    interceptMessage[UnsupportedException]("look-ahead DFA size is too large"):
+      nfa.toNFAwLA(Int.MaxValue, 1, false)
 
     // It corresponds to `^(?!ab)a[ab]*$`.
     // The state `1` is in the inner expression of the look-ahead, and the state `3` is its end.
@@ -60,14 +62,14 @@ class OrderedNFASuite extends munit.FunSuite:
         (3, 'b') -> Branch.Succeed
       )
     )
-    val nfaWLA2 = nfa2.toNFAwLA(Int.MaxValue, false)
+    val nfaWLA2 = nfa2.toNFAwLA(Int.MaxValue, Int.MaxValue, false)
     assertEquals(nfaWLA2.delta(((0, Set(2, 3)), ('a', Set(1, 2, 3)))), MultiSet((1, Set(1, 2, 3))))
     assertEquals(
       nfaWLA2.delta(((0, Set(0, 2, 3)), ('a', Set(0, 2, 3)))),
       MultiSet((1, Set(0, 2, 3)), (2, Set(0, 2, 3)))
     )
     // The upper bound has the single look-ahead state, and every leaf.
-    val upperBound = nfa2.toNFAwLA(Int.MaxValue, true)
+    val upperBound = nfa2.toNFAwLA(Int.MaxValue, Int.MaxValue, true)
     assertEquals(upperBound.lookAheadDFA.stateSet, Set(Set.empty[Int]))
     assertEquals(upperBound.delta(((0, Set.empty), ('a', Set.empty))), MultiSet((1, Set.empty), (2, Set.empty)))
 
@@ -93,8 +95,8 @@ class OrderedNFASuite extends munit.FunSuite:
       )
     )
     // A look-ahead of no input, such as that of `hl` (`{0}`), is not in the NFAwLA.
-    assert(nfa.toNFAwLA(Int.MaxValue, false).stateSet.contains((0, Set(0))))
-    val nfaWLA = restricted.toNFAwLA(Int.MaxValue, false)
+    assert(nfa.toNFAwLA(Int.MaxValue, Int.MaxValue, false).stateSet.contains((0, Set(0))))
+    val nfaWLA = restricted.toNFAwLA(Int.MaxValue, Int.MaxValue, false)
     assert(clue(nfaWLA.stateSet).forall((q, p) => q == 0 && p.exists(Set(1, 2).contains)))
     assertEquals(nfaWLA.stateSet.size, 2)
 
@@ -112,7 +114,7 @@ class OrderedNFASuite extends munit.FunSuite:
   test("OrderedNFA#toLookAheadDFA"):
     val nfa1 = OrderedNFA(Set('a', 'b'), Set(0, 1), Seq(0), Set(1), Map((0, 'a') -> Branch.Leaf(1)))
     assertEquals(
-      nfa1.toLookAheadDFA,
+      nfa1.toLookAheadDFA(Int.MaxValue),
       DFA(
         Set('a', 'b'),
         Set(Set(1), Set(0), Set.empty[Int]),
@@ -128,6 +130,9 @@ class OrderedNFASuite extends munit.FunSuite:
         )
       )
     )
+    assertEquals(nfa1.toLookAheadDFA(7).delta.size, 6)
+    interceptMessage[UnsupportedException]("look-ahead DFA size is too large"):
+      nfa1.toLookAheadDFA(6)
 
     // It corresponds to `^(?!ab)a[ab]*$`.
     // The state `1` is in the inner expression of the look-ahead, and the state `3` is its end.
@@ -146,7 +151,7 @@ class OrderedNFASuite extends munit.FunSuite:
       )
     )
     assertEquals(
-      nfa2.toLookAheadDFA,
+      nfa2.toLookAheadDFA(Int.MaxValue),
       DFA(
         Set('a', 'b'),
         Set(Set(2, 3), Set(0, 2, 3), Set(1, 2, 3)),
@@ -170,7 +175,7 @@ class OrderedNFASuite extends munit.FunSuite:
       Map((0, 'a') -> Branch.Succeed, (1, 'a') -> Branch.Succeed)
     )
     assertEquals(
-      nfa3.toLookAheadDFA,
+      nfa3.toLookAheadDFA(Int.MaxValue),
       DFA(
         Set('a', 'b'),
         Set(Set.empty[Int], Set(0, 1)),

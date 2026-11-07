@@ -92,13 +92,14 @@ final case class EpsNFA[Q](
   /** Converts this ε-NFA to ordered NFA with ε-elimination.
     *
     * Its state is a [[CharKindState]], an ε-closure, whose leaves are the [[Stop]]s that the ε-transitions reach, and
-    * the state of the DFA of the [[LookBehindAutomaton]] of [[lookBehind]].
+    * the state of the DFA of the [[LookBehindAutomaton]] of [[lookBehind]], which has less than `maxDFASize`
+    * transitions (see [[OrderedNFA.toLookAheadDFA]]).
     *
     * With `isSimplified`, it converts a simplified ε-NFA (see [[EpsNFABuilder.buildSimplified]]) without telling
     * whether a look-around succeeds: a look-around is a choice of its inner expression, whose end may end the match,
     * and the continuation, and a choice in an atomic group is a choice of all its alternatives.
     */
-  def toOrderedNFA(maxNFASize: Int, isSimplified: Boolean)(using
+  def toOrderedNFA(maxNFASize: Int, maxDFASize: Int, isSimplified: Boolean)(using
       ctx: Context
   ): OrderedNFA[CharSet, (CharKindState, Branch[Stop[Q]], Set[Int])] =
     ctx.interrupt:
@@ -217,7 +218,8 @@ final case class EpsNFA[Q](
               |     state size: ${nfa.stateSet.size}""".stripMargin
         val indexed = nfa.mapState(index)
         // The simplified ε-NFA does not tell whether a look-behind succeeds.
-        val dfa = if isSimplified then DFA.universal(newAlphabet, Set.empty[Int]) else indexed.toLookAheadDFA
+        val dfa =
+          if isSimplified then DFA.universal(newAlphabet, Set.empty[Int]) else indexed.toLookAheadDFA(maxDFASize)
         LookBehindAutomaton(indexed, dfa, inits.map((init, r) => init -> index(r)).toMap)
 
       val pattern = fragment(tau, false, lookBehindAutomaton)

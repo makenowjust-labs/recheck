@@ -177,6 +177,7 @@ object ReDoS:
   )(using ctx: Context): (Iterator[Diagnostics.Vulnerable], () => Diagnostics.Safe) =
     import params.*
     val maxNFASize = if checker == Checker.Auto then params.maxNFASize else Int.MaxValue
+    val maxDFASize = if checker == Checker.Auto then params.maxDFASize else Int.MaxValue
 
     def complexities: Iterator[Complexity[UChar]] =
       if checker == Checker.Auto && ir.repeatCount >= maxRepeatCount then
@@ -191,9 +192,13 @@ object ReDoS:
         throw UnsupportedException("The pattern is too large")
       else
         val epsNFA = EpsNFABuilder.build(ir)
-        val orderedNFA =
-          epsNFA.restrictInputs(epsNFA.toOrderedNFA(maxNFASize, false).rename).mapAlphabet(_.representative)
-        AutomatonChecker.check(orderedNFA, maxNFASize, false)
+        val orderedNFA = epsNFA.toOrderedNFA(maxNFASize, maxDFASize, false).rename
+        AutomatonChecker.check(
+          epsNFA.restrictInputs(orderedNFA).mapAlphabet(_.representative),
+          maxNFASize,
+          maxDFASize,
+          false
+        )
 
     // The safe complexities follow the vulnerable ones.
     lazy val (vulnerable, rest) = complexities.span(_.isInstanceOf[Complexity.Vulnerable[?]])

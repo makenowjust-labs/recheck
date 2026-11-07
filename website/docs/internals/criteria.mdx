@@ -39,7 +39,7 @@ Based on these pros and cons, we will consider the criteria for deciding an appr
 
 If it is likely to be detected correctly by the algorithm based on automata theory, we should use that, otherwise, or if detection is impossible, we should use the fuzzing algorithm.
 
-In practice, as shown in the following flowchart, the algorithm is assumed to be based on automata theory at first and performs NFA conversion, etc., and then falls back to the fuzzing if the size of the NFA exceeds the threshold.
+In practice, as shown in the following flowchart, the algorithm is assumed to be based on automata theory at first and performs NFA conversion, etc., and then falls back to the fuzzing if the size of the NFA, or of the DFA built from it, exceeds the threshold.
 
 <p className="text--center">
   <Image

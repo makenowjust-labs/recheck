@@ -14,13 +14,14 @@ object AutomatonChecker:
 
   /** Checks a match time complexity of the NFA.
     *
-    * With `isUpperBound`, it bounds the complexity from above by exploring every path (see [[OrderedNFA.toNFAwLA]]).
+    * With `isUpperBound`, it checks an upper bound of the complexity, where every path is explored (see
+    * [[OrderedNFA.toNFAwLA]]).
     */
-  def check[A, Q](nfa: OrderedNFA[A, Q], maxNFASize: Int, isUpperBound: Boolean)(using
+  def check[A, Q](nfa: OrderedNFA[A, Q], maxNFASize: Int, maxDFASize: Int, isUpperBound: Boolean)(using
       ctx: Context
   ): Iterator[Complexity[A]] =
     ctx.interrupt:
-      val nfaWLA = nfa.toNFAwLA(maxNFASize, isUpperBound)
+      val nfaWLA = nfa.toNFAwLA(maxNFASize, maxDFASize, isUpperBound)
       val complexities = new AutomatonChecker(nfaWLA, false, isUpperBound).check()
       nfa.lookBehind match
         case None => complexities

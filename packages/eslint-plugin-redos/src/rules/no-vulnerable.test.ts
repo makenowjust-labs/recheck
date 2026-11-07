@@ -53,6 +53,7 @@ tester.run("no-vulnerable", rule, {
           incubationLimit: 25000,
           incubationTimeout: 250,
           maxAttackStringSize: 300000,
+          maxDFASize: 10000,
           maxDegree: 4,
           maxGeneStringSize: 2400,
           maxGenerationSize: 100,
