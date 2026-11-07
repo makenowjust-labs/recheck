@@ -64,3 +64,30 @@ class FlagSetSuite extends munit.FunSuite:
   error("aua", Perl())("Incompatible flags 'a' and 'u'")
   error("aaa", Perl())("Duplicated flag 'a' at 2")
   error("uu", Perl())("Duplicated flag 'u' at 1")
+
+  // python-regex's flags are the inline letters, where `V` takes the digit of its version.
+  check("abefimprswx", PythonRegex()): f =>
+    f == FlagSet(
+      ascii = true,
+      bestMatch = true,
+      evaluate = true,
+      fullCase = true,
+      ignoreCase = true,
+      multiline = true,
+      preserve = true,
+      nonDestructive = true,
+      dotAll = true,
+      word = true,
+      verbose = true
+    )
+  check("LV0", PythonRegex())(_ == FlagSet(localeUpper = true, version0 = true))
+  check("iV1", PythonRegex())(_ == FlagSet(ignoreCase = true, version1 = true))
+  check("u", PythonRegex(Python.Type.Bytes))(_.unicode)
+  error("V2", PythonRegex())("Unknown flag 'V' at 0")
+  error("iV", PythonRegex())("Unknown flag 'V' at 1")
+  error("V1", Python())("Unknown flag 'V' at 0")
+  // `regex.compile('a', regex.V0 | regex.V1)` raises `KeyError`, and the encodings exclude each other.
+  error("V0V1", PythonRegex())("Incompatible flags 'V0' and 'V1'")
+  error("au", PythonRegex())("Incompatible flags 'a' and 'u'")
+  error("aL", PythonRegex())("Incompatible flags 'a' and 'L'")
+  error("Lu", PythonRegex())("Incompatible flags 'L' and 'u'")

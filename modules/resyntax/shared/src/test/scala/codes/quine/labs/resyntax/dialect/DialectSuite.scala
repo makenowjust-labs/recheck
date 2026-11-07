@@ -4,10 +4,10 @@ import codes.quine.labs.resyntax.dialect.Dialect.*
 
 class DialectSuite extends munit.FunSuite:
 
-  val All: Seq[Dialect] = Seq(JavaScript, Java, DotNet, PCRE, Python(), Ruby(), Perl())
+  val All: Seq[Dialect] = Seq(JavaScript, Java, DotNet, PCRE, Python(), PythonRegex(), Ruby(), Perl())
 
   test("Dialect#name and Dialect.of"):
-    assertEquals(All.map(_.name), Seq("javascript", "java", "dotnet", "pcre", "python", "ruby", "perl"))
+    assertEquals(All.map(_.name), Seq("javascript", "java", "dotnet", "pcre", "python", "python-regex", "ruby", "perl"))
     for dialect <- All do assertEquals(Dialect.of(dialect.name), Some(dialect))
     assertEquals(Dialect.of("perl5"), None)
 
@@ -18,6 +18,7 @@ class DialectSuite extends munit.FunSuite:
       _.isDotNet,
       _.isPCRE,
       _.isPython,
+      _.isPythonRegex,
       _.isRuby,
       _.isPerl
     )
@@ -32,4 +33,5 @@ class DialectSuite extends munit.FunSuite:
     assertEquals(Ruby.Encoding.of("ASCII-8BIT"), Some(Ruby.Encoding.ASCII8Bit))
     assertEquals(Ruby.Encoding.of("str"), None)
     assertEquals(Python(), Python(Python.Type.Str))
+    assertEquals(PythonRegex(), PythonRegex(Python.Type.Str))
     assertEquals(Perl(), Perl(utf8 = true, source = PerlSource.Literal))

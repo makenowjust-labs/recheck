@@ -21,6 +21,11 @@ enum Dialect:
   /** Python specifies Python dialect, whose `type` is the string type of the pattern and its input. */
   case Python(`type`: Python.Type = Python.Type.Str)
 
+  /** PythonRegex specifies the dialect of Python's third-party `regex` package, whose `type` is the string type of the
+    * pattern and its input.
+    */
+  case PythonRegex(`type`: Python.Type = Python.Type.Str)
+
   /** Ruby specifies Ruby dialect, whose `encoding` is the encoding of the regexp. */
   case Ruby(encoding: Ruby.Encoding = Ruby.Encoding.UTF8)
 
@@ -32,13 +37,14 @@ enum Dialect:
   case Perl(utf8: Boolean = true, source: PerlSource = PerlSource.Literal)
 
   def name: String = this match
-    case JavaScript => "javascript"
-    case Java       => "java"
-    case DotNet     => "dotnet"
-    case PCRE       => "pcre"
-    case _: Python  => "python"
-    case _: Ruby    => "ruby"
-    case _: Perl    => "perl"
+    case JavaScript     => "javascript"
+    case Java           => "java"
+    case DotNet         => "dotnet"
+    case PCRE           => "pcre"
+    case _: Python      => "python"
+    case _: PythonRegex => "python-regex"
+    case _: Ruby        => "ruby"
+    case _: Perl        => "perl"
 
   def isJavaScript: Boolean = this == JavaScript
 
@@ -52,6 +58,10 @@ enum Dialect:
     case _: Python => true
     case _         => false
 
+  def isPythonRegex: Boolean = this match
+    case _: PythonRegex => true
+    case _              => false
+
   def isRuby: Boolean = this match
     case _: Ruby => true
     case _       => false
@@ -64,14 +74,15 @@ object Dialect:
 
   /** Returns the dialect with its default settings. */
   def of(name: String): Option[Dialect] = name match
-    case "javascript" => Some(JavaScript)
-    case "java"       => Some(Java)
-    case "dotnet"     => Some(DotNet)
-    case "pcre"       => Some(PCRE)
-    case "python"     => Some(Python())
-    case "ruby"       => Some(Ruby())
-    case "perl"       => Some(Perl())
-    case _            => None
+    case "javascript"   => Some(JavaScript)
+    case "java"         => Some(Java)
+    case "dotnet"       => Some(DotNet)
+    case "pcre"         => Some(PCRE)
+    case "python"       => Some(Python())
+    case "python-regex" => Some(PythonRegex())
+    case "ruby"         => Some(Ruby())
+    case "perl"         => Some(Perl())
+    case _              => None
 
   object Python:
 
