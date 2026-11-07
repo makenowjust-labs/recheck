@@ -4,6 +4,7 @@ import codes.quine.labs.recheck.ReDoS
 import codes.quine.labs.recheck.common.Context
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.exec.DotNetExecutor
+import codes.quine.labs.recheck.exec.ICUExecutor
 import codes.quine.labs.recheck.exec.JavaExecutor
 import codes.quine.labs.recheck.exec.NodeExecutor
 import codes.quine.labs.recheck.exec.PHPExecutor
@@ -39,10 +40,11 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
   def generate(source: String, flags: String, dialect: Dialect, attack: AttackPattern = attack): RuntimeAttackProgram =
     RuntimeAttackProgram.generate(source, flags, dialect, modeOf(source, flags, dialect), attack).toOption.get
 
-  /** Returns the program file of the executor of a Java or .NET program. */
+  /** Returns the program file of the executor of a Java, .NET or ICU program. */
   def programFile(program: RuntimeAttackProgram): SourceFile = program.executor match
     case JavaExecutor(file)   => file
     case DotNetExecutor(file) => file
+    case ICUExecutor(file)    => file
     case executor             => fail(s"no program file: $executor")
 
   /** Returns the line of the script starting with the prefix. */
@@ -184,6 +186,17 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
     assertEquals(programFile(program).name, "RecheckRuntimeAttack.cs")
     assertEquals(program.script, "in\n0066006f006f\n1:0078\n2:0079\n1:007a\n")
     assert(programFile(program).content.contains("\nCultureInfo.CurrentCulture = CultureInfo.InvariantCulture;\n"))
+
+  test("RuntimeAttackProgram.generate: ICU"):
+    val program = generate("f\"oo\\d\r", "dimswx", Dialect.ICU)
+    assertEquals(program.executor, ICUExecutor(programFile(program)))
+    assertEquals(programFile(program).name, "RecheckRuntimeAttack.cpp")
+    assertEquals(program.script, "dimswx\n00660022006f006f005c0064000d\n1:0078\n2:0079\n1:007a\n")
+    assert(
+      programFile(program).content
+        .contains("std::istringstream lines(std::string(std::istreambuf_iterator<char>(std::cin), {}));")
+    )
+    assert(programFile(program).content.contains("case 'w': flags |= UREGEX_UWORD; break;"))
 
   test("RuntimeAttackProgram.generate: the data of Java and .NET"):
     val repeat =
@@ -361,11 +374,27 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
     assertEquals(dotnet.command, "dotnet run runtime-attack.cs")
     assert(dotnet.content.startsWith("// Run: dotnet run runtime-attack.cs\nusing "))
     assert(clue(dotnet.content).contains("var lines = \"-\\n0066006f006f\\n1:0078\\n2:0079\\n1:007a\\n\".Split("))
+    // ICU's program has the data in itself.
+    val icu = script("foo", Dialect.ICU)
+    assertEquals(
+      icu.command,
+      "c++ runtime-attack.cpp -o runtime-attack -licui18n -licuuc -licudata && ./runtime-attack"
+    )
+    assert(icu.content.startsWith(s"// Run: ${icu.command}\n#define "))
+    assert(
+      clue(icu.content).contains(
+        "std::istringstream lines(std::string(\"-\\n0066006f006f\\n1:0078\\n2:0079\\n1:007a\\n\"));"
+      )
+    )
     assert(RuntimeAttackProgram.generateScript("a$x", "", Dialect.Perl(), UnitMode.CodePoint, attack).isLeft)
     // Java splits long data into literals, since a string constant has at most 65535 bytes.
     val long = script("a" * 2500, Dialect.Java).content
     assert(clue(long).contains("String[] lines = String.join(\"\", \"-\\n00610061"))
     assert(long.contains("006100\", \"61\\n1:0078\\n2:0079\\n1:007a\\n\").split("))
+    // ICU joins the literals of long data in C++.
+    val longICU = script("a" * 2500, Dialect.ICU).content
+    assert(clue(longICU).contains("std::istringstream lines(std::string(\"-\\n00610061"))
+    assert(longICU.contains("006100\"\n    \"61\\n1:0078\\n2:0079\\n1:007a\\n\"));"))
 
   test("RuntimeAttackProgram.generate: the variables of the runtimes"):
     val dialects = Seq(
@@ -376,11 +405,12 @@ class RuntimeAttackProgramSuite extends munit.FunSuite:
       Dialect.Java,
       Dialect.DotNet,
       Dialect.Perl(utf8 = false, source = PerlSource.String),
-      Dialect.PCRE
+      Dialect.PCRE,
+      Dialect.ICU
     )
     assertEquals(
       dialects.map(d => generate("a", "", d).executor.variable),
-      Seq("NODE", "PYTHON", "PYTHON_REGEX", "RUBY", "JAVA", "DOTNET", "PERL", "PHP").map("RECHECK_" + _)
+      Seq("NODE", "PYTHON", "PYTHON_REGEX", "RUBY", "JAVA", "DOTNET", "PERL", "PHP", "ICU").map("RECHECK_" + _)
     )
 
   test("RuntimeAttackProgram.generate: empty attack string"):

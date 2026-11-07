@@ -15,6 +15,7 @@ import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.RuntimeAttack
 import codes.quine.labs.recheck.diagnostics.RuntimeAttackResult
 import codes.quine.labs.recheck.exec.DotNetExecutor
+import codes.quine.labs.recheck.exec.ICUExecutor
 import codes.quine.labs.recheck.exec.JavaExecutor
 import codes.quine.labs.recheck.exec.PythonExecutor
 import codes.quine.labs.recheck.exec.SourceFile
@@ -180,6 +181,7 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
     // The class of the Java program is `RecheckRuntimeAttack`, which names the program file.
     case _: JavaExecutor   => run(JavaExecutor(SourceFile("RecheckRuntimeAttack.java", script.content)))
     case _: DotNetExecutor => run(DotNetExecutor(SourceFile(script.name, script.content)))
+    case _: ICUExecutor    => run(ICUExecutor(SourceFile(script.name, script.content)), env = icuEnv)
     case executor          => run(executor, script.content)
 
   for (dialect, program) <- Seq(
@@ -189,7 +191,8 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
       Dialect.Java -> "java",
       Dialect.DotNet -> "dotnet",
       Dialect.Perl() -> "perl",
-      Dialect.PCRE -> "php"
+      Dialect.PCRE -> "php",
+      Dialect.ICU -> "c++"
     )
   do
     runtimeTest(s"RuntimeAttackProgram.generateScript: $dialect", program):
@@ -202,6 +205,28 @@ class RuntimeAttackVerifierRuntimeSuite extends munit.FunSuite with RuntimeHelpe
       val out = runScript(script, RuntimeAttackProgram.generate(source, "", dialect, mode, astral).toOption.get)
       val lines = out.linesIterator.map(_.takeWhile(_ != ' ')).toSeq
       assertEquals(lines.filter(_.startsWith("recheck:")), Seq("recheck:runtime", "recheck:start", "recheck:time"))
+
+  // Checked with ICU 79.1, which has no time limit and a backtrack stack of 8,000,000 bytes by default.
+  runtimeTest("ICU", "c++"):
+    val r = verify("^(a|a)*$", "", Dialect.ICU, attack("a", 31, "\u0000"), env = icuEnv)
+    assertEquals(r.result, RuntimeAttackResult.Timeout)
+    assertEquals(r.runtime, "icu 79.1 (Unicode 18.0)")
+    assertFinish(verify("^(a|a)*$", "", Dialect.ICU, attack("a", 3, "\u0000"), env = icuEnv))
+    // ICU's full case folding makes `ß` and `ss` ambiguous.
+    val folding = verify("^(?:ss|ß)*$", "i", Dialect.ICU, attack("ß", 31, "!"), env = icuEnv)
+    assertEquals(folding.result, RuntimeAttackResult.Timeout)
+    // The backtrack stack overflows even on a linear matching.
+    val overflow = verify("^(?:a|b)*$", "", Dialect.ICU, attack("a", 1_000_000, "!"), 10.seconds, icuEnv)
+    assertEquals(overflow.result, RuntimeAttackResult.EngineError("U_REGEX_STACK_OVERFLOW"))
+
+  runtimeTest("RECHECK_ICU", "c++"):
+    // A failed compiler, which runs first for its version, tells its output.
+    val env = Map("RECHECK_ICU" -> "sh -c 'echo no ICU >&2; exit 1'")
+    val ex = intercept[UnexpectedException](verify("a", "", Dialect.ICU, attack("a", 3, ""), env = env))
+    assertEquals(ex.getMessage, "cannot run `sh -c 'echo no ICU >&2; exit 1' --version`:\nno ICU")
+    // A pattern that ICU rejects, though recheck accepts it, exits with the error.
+    val invalid = intercept[UnexpectedException](verify("[&-c]", "", Dialect.ICU, attack("a", 3, ""), env = icuEnv))
+    assertEquals(invalid.getMessage, "U_REGEX_INVALID_RANGE at 4")
 
   runtimeTest("RECHECK_RUBY", "ruby"):
     // The wrapper's runtime line comes first, and it shows the arguments.

@@ -31,7 +31,7 @@ object AttackPatternStyle:
       case Dialect.JavaScript                         => JavaScript(unicode = mode == UnitMode.UTF16CodePoint)
       case _: Dialect.Python | _: Dialect.PythonRegex => Python(bytes)
       case _: Dialect.Ruby                            => Ruby(bytes)
-      case Dialect.Java                               => Java
+      case Dialect.Java | Dialect.ICU                 => Java
       case Dialect.DotNet                             => CSharp
       case _: Dialect.Perl                            => Perl
       case Dialect.PCRE                               => PHP(bytes)

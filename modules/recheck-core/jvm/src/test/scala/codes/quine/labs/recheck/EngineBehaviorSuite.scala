@@ -7,6 +7,7 @@ import codes.quine.labs.recheck.common.InvalidRegExpException
 import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.exec.DotNetExecutor
+import codes.quine.labs.recheck.exec.ICUExecutor
 import codes.quine.labs.recheck.exec.JavaExecutor
 import codes.quine.labs.recheck.exec.NodeExecutor
 import codes.quine.labs.recheck.exec.PHPExecutor
@@ -771,3 +772,628 @@ class EngineBehaviorSuite extends munit.FunSuite with RuntimeHelper:
     val patterns = for (source, subjects) <- all; subject <- subjects yield (source, "V1", subject)
     val script = pythonRegexScript(patterns, UnitMode.CodePoint)
     assertEquals(cases(PythonRegexExecutor, script), pythonRegexModel(patterns, Dialect.PythonRegex()))
+
+  /** The cases of ICU, which recheck models as ICU 79.1 matches them. */
+  val icuCases: Seq[(String, String, String)] = Seq(
+    ("\uFB00i", "i", "\uFB03"),
+    ("ffi", "i", "\uFB03"),
+    ("\\x73s", "i", "\u00DF"),
+    ("\\u0073s", "i", "\u00DF"),
+    ("\u00DF", "i", "ss"),
+    ("ss", "i", "\u00DF"),
+    ("\u00DF", "i", "\u1E9E"),
+    ("\u1E9E", "i", "ss"),
+    ("[\u00DF]", "i", "ss"),
+    ("[\u00DF]", "i", "\u1E9E"),
+    ("\u0130", "i", "i\u0307"),
+    ("i\u0307", "i", "\u0130"),
+    ("\u0130", "i", "i"),
+    ("i", "i", "\u0130"),
+    ("I", "i", "\u0131"),
+    ("\u0131", "i", "I"),
+    ("k", "i", "\u212A"),
+    ("s", "i", "\u017F"),
+    ("\u03A3", "i", "\u03C2"),
+    ("\u0390", "i", "\u03B9\u0308\u0301"),
+    ("\u00DF+", "i", "ssss"),
+    ("a\u00DF+", "i", "assss"),
+    ("s+", "i", "\u00DF"),
+    ("s{2}", "i", "\u00DF"),
+    ("(s)(s)", "i", "\u00DF"),
+    ("s(?:s)", "i", "\u00DF"),
+    ("xs", "i", "x\u00DF"),
+    ("s\\Qs\\E", "i", "\u00DF"),
+    ("\\Qs\\Es", "i", "\u00DF"),
+    ("s\\Q\\Es", "i", "\u00DF"),
+    ("(ss)\\1", "i", "ss\u00DF"),
+    ("(\u00DF)\\1", "i", "\u00DFss"),
+    ("(a\u00DF)\\1", "i", "assass"),
+    ("(s)\\1", "i", "\u00DF"),
+    ("(?<=\u00DF)x", "i", "ssx"),
+    ("(?=ss)\u00DF", "i", "\u00DF"),
+    ("st$", "i", "\uFB06"),
+    ("\\p{Ll}", "i", "ss"),
+    ("\uFB01", "i", "fi"),
+    ("fi", "i", "\uFB01"),
+    ("^(?:ss|\u00DF)*$", "i", "\u00DF\u00DFss"),
+    ("\\x{DF}", "i", "SS"),
+    ("(?-i:s)s", "i", "\u00DF"),
+    ("s(?-i)s", "i", "\u00DF"),
+    ("(?i)ss", "", "\u00DF"),
+    ("\\x{1F600}", "i", "\uD83D\uDE00"),
+    ("\u01F0", "i", "J\u030C"),
+    ("\uFB03+", "i", "ffiffi"),
+    ("f+i", "i", "\uFB01"),
+    ("\\x{D83D}\\x{DE00}", "", "\uD83D\uDE00"),
+    ("\\uD83D\\Q\\E\\uDE00", "", "\uD83D\uDE00"),
+    ("\\uD83D\\uDE00", "", "\uD83D\uDE00"),
+    ("\\x{D83D}", "", "\uD83D\uDE00"),
+    ("^.$", "", "\uD83D\uDE00"),
+    ("^..$", "", "\uDC00\uD800"),
+    ("\\uD83D", "", "\uD83D"),
+    ("[\\uD83D\\uDE00]", "", "\uD83D\uDE00"),
+    ("\\x{D83D}+\\x{DE00}", "", "\uD83D\uDE00"),
+    ("a\\b", "", "a\u00ADb"),
+    ("a\u00AD\\b", "", "a\u00ADb"),
+    ("\\b", "", "\u00AD"),
+    ("\\bb", "", "\u00ADb"),
+    (" \\b", "", " \u00ADb"),
+    ("\\b\u0301", "", "a\u0301"),
+    ("\\B\u0301", "", "a\u0301"),
+    ("a\\B", "", "a\u200Db"),
+    ("a\\b", "", "a\u200D "),
+    ("\\b", "", "\u200D"),
+    ("\\bx", "", "\u200Dx"),
+    ("^\\B", "", "\u200D"),
+    ("a\\b", "", "a\u0301"),
+    ("\\b$", "", "a\u0301"),
+    ("\\b", "", "\u0301"),
+    ("\\b", "", "\uDB40\uDC20a"),
+    ("a\\b", "", "a\uDB40\uDC20"),
+    ("\\b.", "", "\uDB40\uDC20a"),
+    ("1\\b", "", "1\u0300."),
+    ("_\\b", "", "_ "),
+    ("\\b", "", "\u00E9"),
+    ("\u00E9\\b", "", "\u00E9"),
+    ("\\b", "", "\u0663"),
+    ("a.b", "", "a\u000Bb"),
+    ("a.b", "", "a\u000Cb"),
+    ("a.b", "", "a\u0085b"),
+    ("a.b", "", "a\u2028b"),
+    ("a.b", "d", "a\u000Db"),
+    ("a$", "", "a\u000B"),
+    ("a$", "", "a\u000C"),
+    ("a$", "", "a\u000D\u000A"),
+    ("a$", "", "a\u000A\u000A"),
+    ("a$", "m", "a\u000Cb"),
+    ("^b", "m", "a\u000Bb"),
+    ("^b", "m", "a\u0085b"),
+    ("^b", "dm", "a\u000Db"),
+    ("^b", "dm", "a\u000Ab"),
+    ("a$", "d", "a\u000D"),
+    ("a\\Z", "", "a\u000C"),
+    ("a\\Z", "d", "a\u000C"),
+    ("$\\n", "m", "\u000D\u000A"),
+    ("a$\\r", "m", "a\u000D\u000A"),
+    ("^", "m", ""),
+    ("a\u000A^", "m", "a\u000A"),
+    ("\\R", "", "\u000B"),
+    ("^\\R\\n$", "", "\u000D\u000A"),
+    ("^(?:\\R)\\n$", "", "\u000D\u000A"),
+    ("\\v", "", "\u0085"),
+    ("\\h", "", "\u180E"),
+    ("\\h", "", "\u3000"),
+    ("\\h", "", "\u000B"),
+    ("\\H", "", "\u180E"),
+    ("^.$", "s", "\u000D\u000A"),
+    ("^..$", "s", "\u000D\u000A"),
+    ("^.\\n$", "s", "\u000D\u000A"),
+    ("^.*?\\n", "s", "\u000D\u000A"),
+    ("^.$", "sd", "\u000D\u000A"),
+    ("^.{2}$", "s", "\u000D\u000A\u000D\u000A"),
+    ("^[^a]$", "s", "\u000D\u000A"),
+    ("^\\X$", "s", "\u000D\u000A"),
+    (".\\n", "s", "a\u000D\u000A"),
+    ("\\r.", "s", "\u000D\u000A"),
+    ("^(?:.|\\r)\\n$", "s", "\u000D\u000A"),
+    ("(?<=.)x", "s", "\u000D\u000Ax"),
+    ("(?<=^..)x", "s", "\u000D\u000Ax"),
+    ("[a&-c]", "", "b"),
+    ("[a&-c]", "", "&"),
+    ("[a-c&-e]", "", "d"),
+    ("[[a]&-c]", "", "b"),
+    ("[a-c-e]", "", "d"),
+    ("[a-c-e]", "", "-"),
+    ("[\\w-a-c]", "", "b"),
+    ("[\\w-a]", "", "-"),
+    ("[a-\\x{63}]", "", "b"),
+    ("[a-\\y]", "", "x"),
+    ("[a-\\w]", "", "b"),
+    ("[\\-a]", "", "-"),
+    ("[a\\-c]", "", "b"),
+    ("[]-a]", "", "^"),
+    ("[^]-a]", "", "b"),
+    ("[a-]", "", "-"),
+    ("[[a]-]", "", "-"),
+    ("[[ab]&&b]", "", "b"),
+    ("[[ab]&&b]", "", "a"),
+    ("[ab&&b]", "", "a"),
+    ("[a&&[b]]", "", "b"),
+    ("[a-c&&[b]]", "", "b"),
+    ("[[a-c]&[b]-[b]]", "", "b"),
+    ("[[a-c]-[b]&[a]]", "", "a"),
+    ("[[a-c]-[b]&[b]]", "", "b"),
+    ("[^[a]]", "", "a"),
+    ("[^[a]]", "", "b"),
+    ("[[^a]b]", "", "a"),
+    ("[a[^a]]", "", "a"),
+    ("[\\Qa-c\\E]", "", "b"),
+    ("[\\Qa\\E-c]", "", "b"),
+    ("[a\\Q-\\Ec]", "", "b"),
+    ("[\\Q\\E]", "", "]"),
+    ("[\\Q\\E]]", "", "]"),
+    ("[\\Q]]", "", "]"),
+    ("[a\\Q]\\E]", "", "]"),
+    ("[[a]\\Q-\\E[b]]", "", "-"),
+    ("[[a]-\\Q[b]\\E]", "", "b"),
+    ("[[a]-\\Q[b]\\E]", "", "["),
+    ("[\\x{41}-\\x{43}]", "", "B"),
+    ("[\\0101]", "", "A"),
+    ("[\\cA]", "", "\u0001"),
+    ("[\\b]", "", "b"),
+    ("[\\B]", "", "B"),
+    ("[\\R]", "", "R"),
+    ("[\\X]", "", "X"),
+    ("[\\1]", "", "1"),
+    ("[\\k]", "", "k"),
+    ("[\\e]", "", "\u001B"),
+    ("[\\N]", "", "N"),
+    ("[\\p]", "", "p"),
+    ("[\\pL]", "", "a"),
+    ("[\\h]", "", " "),
+    ("[\\V]", "", "a"),
+    ("[\\H-a]", "", "-"),
+    ("[\\s-\\w]", "", "-"),
+    ("[\\d-z]", "", "y"),
+    ("[\\d-z]", "", "-"),
+    ("[\\p{L}-z]", "", "-"),
+    ("[\\p{L}-[a]]", "", "a"),
+    ("[\\p{L}&[a]]", "", "b"),
+    ("[\\p{L}&&a]", "", "b"),
+    ("[:L:]", "", "a"),
+    ("[:^L:]", "", "a"),
+    ("[[:L:]]", "", "a"),
+    ("[[:^L:]]", "", "1"),
+    ("[^[:L:]]", "", "1"),
+    ("[:L:]x", "", "ax"),
+    ("[:L:]]", "", "a]"),
+    ("[::]", "", ":"),
+    ("[:a:b:]", "", "b"),
+    ("[^:L:]", "", ":"),
+    ("[^:L:]", "", "a"),
+    ("[ :L:]", "", "a"),
+    ("[ :L:]", "x", "a"),
+    ("[ ^ a ]", "x", "b"),
+    ("[a - c]", "x", "b"),
+    ("[a - - c]", "x", "a"),
+    ("[a # c]\u000A]", "x", "c"),
+    ("[a-z--[aeiou]&&[a-c]]", "", "b"),
+    ("[a-z--[aeiou]&&[a-c]]", "", "d"),
+    ("[[a-c]--[b]x]", "", "x"),
+    ("[[a-c]--b[c]]", "", "a"),
+    ("[[a-c]--b[c]]", "", "c"),
+    ("[a----c]", "", "-"),
+    ("[a&&&&b]", "", "&"),
+    ("[a&&-b]", "", "-"),
+    ("[a--&b]", "", "a"),
+    ("[a&]", "", "&"),
+    ("[a&&]", "", "a"),
+    ("[&a]", "", "&"),
+    ("[a--]", "", "a"),
+    ("[[a]--]", "", "a"),
+    ("[a-&]", "", "a"),
+    ("[[", "", "["),
+    ("[a", "", "a"),
+    ("[a-", "", "a"),
+    ("[a--", "", "a"),
+    ("[\\", "", "a"),
+    ("[\\Qa", "", "a"),
+    ("[[a]", "", "a"),
+    ("[^a]", "i", "A"),
+    ("[[a]--[A]]", "i", "a"),
+    ("[a-c--[B]]", "i", "b"),
+    ("[^[a]]", "i", "A"),
+    ("[\\P{Lu}]", "i", "A"),
+    ("\\P{Lu}", "i", "a"),
+    ("[^\\p{Lu}]", "i", "a"),
+    ("[[:^Lu:]]", "i", "a"),
+    ("[k]", "i", "\u212A"),
+    ("[\\x{212A}]", "i", "k"),
+    ("\\p{ L }", "", "a"),
+    ("\\p{gc = L}", "", "a"),
+    ("\\p{Letter}", "", "a"),
+    ("\\p{isgreek}", "", "\u03B1"),
+    ("\\pL", "", "a"),
+    ("\\p{^L}", "", "b"),
+    ("\\P{gc\u2260L}", "", "a"),
+    ("\\p{L}", "", "\uD83D\uDE00"),
+    ("\\p{RGI_Emoji}", "", "\uD83D\uDE00"),
+    ("\\p{RGI_Emoji}", "", "#\uFE0F\u20E3"),
+    ("\\p {L}", "x", "a"),
+    ("\\p{ L }", "x", "a"),
+    ("\\p{L}+", "", "ab"),
+    ("\\p{All}", "", "a"),
+    ("\\p{IsScript=Greek}", "", "\u03B1"),
+    ("\\cA", "", "\u0001"),
+    ("\\ca", "", "\u0001"),
+    ("\\c1", "", "\u0011"),
+    ("\\c?", "", "\u001F"),
+    ("\\c", "", "c"),
+    ("a\\c", "", "ac"),
+    ("\\c\\\\", "", "\u001C"),
+    ("\\x4g", "", "\u0004g"),
+    ("\\x41", "", "A"),
+    ("\\U0001F600", "", "\uD83D\uDE00"),
+    ("\\E", "", "E"),
+    ("a\\Eb", "", "aEb"),
+    ("\\Qa\\Eb", "", "ab"),
+    ("\\Qab", "", "ab"),
+    ("\\Q\\E", "", ""),
+    ("a\\Q\\E*", "", "aa"),
+    ("\\0101", "", "A"),
+    ("\\0400", "", " 0"),
+    ("\\0", "", "\u0000"),
+    ("\\_", "", "_"),
+    ("\\y", "", "y"),
+    ("\\K", "", "K"),
+    ("\\g", "", "g"),
+    ("\\m", "", "m"),
+    ("\\M", "", "M"),
+    ("\\C", "", "C"),
+    ("\\L", "", "L"),
+    ("\\i", "", "i"),
+    ("\\o", "", "o"),
+    ("\\q", "", "q"),
+    ("\\O", "", "O"),
+    ("\\\u00E9", "", "\u00E9"),
+    ("\\\uD83D\uDE00", "", "\uD83D\uDE00"),
+    ("\\u{41}", "", "A"),
+    ("\\x{41}", "", "A"),
+    ("\\x{110000}", "", "A"),
+    ("\\", "", "a"),
+    ("\\k<n>", "", "a"),
+    ("(?<n>a)\\k<n>", "", "aa"),
+    ("\\X", "", "a\u0301"),
+    ("\\G", "", ""),
+    ("a\\z", "", "a\u000A"),
+    ("\\Aa", "", "a"),
+    ("(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)\\11", "", "abcdefghijj"),
+    ("(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)(k)\\11", "", "abcdefghijkk"),
+    ("(a)\\10", "", "aa0"),
+    ("(a)\\2", "", "a"),
+    ("\\1(a)", "", "a"),
+    ("(a\\1)", "", "a"),
+    ("(a)|\\1", "", "x"),
+    ("(a)\\1 0", "x", "aa0"),
+    ("()\\1", "", ""),
+    ("(a)\\1", "i", "aA"),
+    ("()*a", "", "a"),
+    ("(?:()|a){1,3}$", "", "a"),
+    ("^(?:()|a){1,3}$", "", "a"),
+    ("(a|)*b", "", "aab"),
+    ("(?:(a)|b)*$", "", "ab"),
+    ("(a?)+$", "", "aa"),
+    ("(a*)*b", "", "aab"),
+    ("(a*){2,}b", "", "aab"),
+    ("^(?:(.)b)*cb\\1$", "", "abcba"),
+    ("(?<=[a-z]{0,8388607})x", "", "ax"),
+    ("(?<=[a-z]{0,8388608})x", "", "ax"),
+    ("(?<=a{0,16777215})x", "", "ax"),
+    ("(?<=a{0,16777216})x", "", "ax"),
+    ("(?<=(?:ab){8388607})x", "", "abx"),
+    ("(?<=(?:ab){8388608})x", "", "abx"),
+    ("(?<=(?:ab){8388607})x", "i", "abx"),
+    ("(?<=(?:ab){8388608})x", "i", "abx"),
+    ("(?<=a{0,8388607})x", "i", "ax"),
+    ("(?<=a{0,8388608})x", "i", "ax"),
+    ("(?<=\u00DF{0,8388607})x", "i", "ax"),
+    ("(?<=\u00DF{0,8388608})x", "i", "ax"),
+    ("(?<=\uFB03{0,5592405})x", "i", "x"),
+    ("(?<=\uFB03{0,5592406})x", "i", "x"),
+    ("(?<=\\x{1F600}{0,8388607})x", "", "x"),
+    ("(?<=\\x{1F600}{0,8388608})x", "", "x"),
+    ("(?<=(a)\\1)x", "", "aax"),
+    ("(?<=\\X)x", "", "ax"),
+    ("(?<=a*)x", "", "x"),
+    ("(?<=a+)x", "", "ax"),
+    ("(?<=(?=a*)a)x", "", "ax"),
+    ("(?<=(?<=a*)b)x", "", "abx"),
+    ("(?<=a|bc)x", "", "bcx"),
+    ("(?<=\\R)x", "", "\u000D\u000Ax"),
+    ("(?<=\\d{8388607})x", "", "x"),
+    ("(?<=\\d{8388608})x", "", "x"),
+    ("(?<=.{8388608})x", "", "x"),
+    ("(?<=\\Qab\\E{0,8388607})x", "", "x"),
+    ("(?<=(?:a|bb){0,8388607})x", "", "x"),
+    ("(?<=(?:a|bb){0,8388608})x", "", "x"),
+    ("(?<=a{0,16777215}b)x", "", "x"),
+    ("(?<=(?>a{0,16777215}))x", "", "x"),
+    ("(?<!a{0,16777216})x", "", "x"),
+    ("(?<=ss)x", "i", "\u00DFx"),
+    ("(?<=\u00DF)x", "i", "ssx"),
+    ("(?<=\uFB01)x", "i", "fix"),
+    ("(?<=a(?=b))b", "", "ab"),
+    ("(?<=$)", "", ""),
+    ("a(?<=\\ba)", "", "a"),
+    ("(?<=\\uDE00)a", "", "\uD83D\uDE00a"),
+    ("(?<=^|,)x", "", "a,x"),
+    ("a{16777215}", "", "a"),
+    ("a{16777216}", "", "a"),
+    ("a{1,16777216}", "", "a"),
+    ("a{2}{3}", "", "aaaaaa"),
+    ("a**", "", "a"),
+    ("a*+", "", "aa"),
+    ("a*?+", "", "aa"),
+    ("a{2}+", "", "aa"),
+    ("a{2}?", "", "aa"),
+    ("^*a", "", "a"),
+    ("$*", "", ""),
+    ("\\b*", "", ""),
+    ("(?=a)*a", "", "a"),
+    ("(?<=a)*a", "", "a"),
+    ("\\A*", "", ""),
+    ("\\Z?", "", ""),
+    ("a(?#c)*", "", "aa"),
+    ("a*(?#c)?", "", "aa"),
+    ("a* ?", "x", "aa"),
+    ("a {2}", "x", "aa"),
+    ("a{1 0}", "x", "aaaaaaaaaa"),
+    ("a{,2}", "", "a"),
+    ("a{x}", "", "a"),
+    ("a}", "", "a}"),
+    ("a]", "", "a]"),
+    ("{", "", "{"),
+    ("a{", "", "a{"),
+    ("a{1", "", "a"),
+    ("a{1,", "", "a"),
+    ("a{3,2}", "", "a"),
+    ("(?i)a(?-i)a", "", "Aa"),
+    ("(?i:a)a", "", "Aa"),
+    ("(?u)a", "", "a"),
+    ("(?U)a", "", "a"),
+    ("(?c)a", "", "a"),
+    ("(?x)a b", "", "ab"),
+    ("(?x i)a", "", "A"),
+    ("(?)a", "", "a"),
+    ("(?-)a", "", "a"),
+    ("(?-i-i)a", "", "a"),
+    ("(?ii)a", "", "A"),
+    ("(?i-i)a", "", "A"),
+    ("(?d)a$", "", "a\u000D"),
+    ("(?s).", "", "\u000A"),
+    ("(?m)^a", "", "b\u000Aa"),
+    ("(?#c)a", "", "a"),
+    ("(?#a\\)b)c", "", "c"),
+    ("(?>a|ab)c", "", "abc"),
+    ("(?<n>a)(?<n>b)", "", "ab"),
+    ("(?<n1>a)", "", "a"),
+    ("(?<_n>a)", "", "a"),
+    ("(?'n'a)", "", "a"),
+    ("(?P<n>a)", "", "a"),
+    ("(?|a)", "", "a"),
+    ("(?(1)a|b)", "", "b"),
+    ("(?R)", "", "a"),
+    ("(*FAIL)", "", "a"),
+    ("(?^i)a", "", "a"),
+    ("(?<=a)(?<!b)", "", "a"),
+    ("(?i)(?w)a", "", "A"),
+    ("a#b\u2029c", "x", "ac"),
+    ("a#b\u2028c", "x", "ac"),
+    ("a\u200Eb", "x", "ab"),
+    ("a\u0085b", "x", "ab"),
+    ("\\ ", "x", " "),
+    ("[ ]", "x", " "),
+    ("\\Q \\E", "x", " "),
+    ("a#\u000Ab", "x", "ab"),
+    ("a#\u000Db", "x", "ab"),
+    ("(?x)a#\u2029b", "", "ab")
+  )
+
+  /** The patterns of ICU whose characters recheck has as ICU 79.1 does. */
+  val icuSets: Seq[(String, String)] = Seq(
+    ("", "\\p{L}"),
+    ("", "\\p{Greek}"),
+    ("", "\\p{Alphabetic}"),
+    ("", "\\p{alnum}"),
+    ("", "\\p{graph}"),
+    ("", "\\p{print}"),
+    ("", "\\p{punct}"),
+    ("", "\\p{gc=Cn}"),
+    ("", "\\p{Assigned}"),
+    ("", "\\p{Any}"),
+    ("", "\\p{ASCII}"),
+    ("", "\\p{RGI_Emoji}"),
+    ("", "\\P{RGI_Emoji}"),
+    ("", "\\p{Basic_Emoji}"),
+    ("", "\\p{scx=Grek}"),
+    ("", "\\p{Age=3.0}"),
+    ("", "\\p{age=foo}"),
+    ("", "\\p{nv=0.5}"),
+    ("", "\\p{ccc=230}"),
+    ("", "\\p{ccc=231}"),
+    ("", "\\p{lb=ID}"),
+    ("", "\\p{InCB=Linker}"),
+    ("", "\\p{Identifier_Type=Recommended}"),
+    ("", "\\p{Identifier_Status=Allowed}"),
+    ("", "\\p{Block=Greek}"),
+    ("", "\\p{InBasic_Latin}"),
+    ("", "\\p{IsLu}"),
+    ("", "\\p{IsAssigned}"),
+    ("", "\\p{word}"),
+    ("", "\\p{all}"),
+    ("", "\\p{javaLowerCase}"),
+    ("", "\\p{javaWhitespace}"),
+    ("", "\\p{javaJavaIdentifierPart}"),
+    ("", "\\p{gc\u2260L}"),
+    ("", "\\P{gc\u2260L}"),
+    ("", "[:^Letter:]"),
+    ("", "\\w"),
+    ("", "\\s"),
+    ("", "\\d"),
+    ("", "\\h"),
+    ("", "\\v"),
+    ("", "."),
+    ("d", "."),
+    ("", "[\\p{L}--\\p{Latin}]"),
+    ("", "[[a-z]-[aeiou]&[a-m]]"),
+    ("i", "\\p{Lu}"),
+    ("i", "\\P{Lu}"),
+    ("i", "[^\\p{Lu}]"),
+    ("i", "[a-z]"),
+    ("i", "[^k]"),
+    ("i", "\\p{javaLowerCase}"),
+    ("i", "\\p{IsLl}"),
+    ("i", "[:Lt:]")
+  )
+
+  /** Returns the hexadecimal UTF-16 code units of the string, or `-` for the empty string. */
+  def utf16Hex(s: String): String = if s.isEmpty then "-" else s.map(c => f"${c.toInt}%04x").mkString
+
+  /** The part of the C++ programs of ICU before `main`, which reads the flags and the strings of the standard input. */
+  val icuPrelude: String =
+    """|#define U_SHOW_CPLUSPLUS_API 0
+       |#define U_SHOW_CPLUSPLUS_HEADER_API 0
+       |#include <unicode/uregex.h>
+       |#include <cstdio>
+       |#include <cstdlib>
+       |#include <iostream>
+       |#include <string>
+       |#include <vector>
+       |
+       |static std::vector<UChar> decode(const std::string &hex) {
+       |  std::vector<UChar> s;
+       |  if (hex == "-") return s;
+       |  for (size_t i = 0; i + 4 <= hex.size(); i += 4) {
+       |    s.push_back(static_cast<UChar>(std::strtoul(hex.substr(i, 4).c_str(), nullptr, 16)));
+       |  }
+       |  return s;
+       |}
+       |
+       |static URegularExpression *compile(const std::string &flags, const std::string &hex) {
+       |  uint32_t f = 0;
+       |  for (char c : flags) {
+       |    if (c == 'd') f |= UREGEX_UNIX_LINES;
+       |    if (c == 'i') f |= UREGEX_CASE_INSENSITIVE;
+       |    if (c == 'm') f |= UREGEX_MULTILINE;
+       |    if (c == 's') f |= UREGEX_DOTALL;
+       |    if (c == 'x') f |= UREGEX_COMMENTS;
+       |  }
+       |  std::vector<UChar> pattern = decode(hex);
+       |  static const UChar empty[1] = {0};
+       |  UErrorCode status = U_ZERO_ERROR;
+       |  URegularExpression *regex = uregex_open(pattern.empty() ? empty : pattern.data(),
+       |                                         pattern.empty() ? -1 : static_cast<int32_t>(pattern.size()), f,
+       |                                         nullptr, &status);
+       |  return U_FAILURE(status) ? nullptr : regex;
+       |}
+       |""".stripMargin
+
+  /** Returns recheck's results of ICU's cases: the spans of the groups of the first match in UTF-16 units, `none` or
+    * `error`.
+    */
+  def icuModel(patterns: Seq[(String, String, String)]): Seq[String] =
+    patterns.map: (source, flags, subject) =>
+      try
+        val ir = ReDoS.parse(source, flags, Dialect.ICU)
+        val input = ir.mode.decode(subject)
+        val result = Interpreter.run(ProgramBuilder.build(ir, false), input, Interpreter.Options())
+        def utf16(n: Int): Int = if n < 0 then n else ir.mode.encode(input.slice(0, n)).length
+
+        result.captures.filter(_ => result.status == Interpreter.Status.Ok) match
+          case Some(captures) => captures.grouped(2).map(g => s"${utf16(g(0))},${utf16(g(1))}").mkString(" ")
+          case None           => "none"
+      catch case _: InvalidRegExpException => "error"
+
+  /** Returns ICU's results of the cases, as `icuModel` returns recheck's. */
+  def icuResults(patterns: Seq[(String, String, String)])(using munit.Location): Seq[String] =
+    val program =
+      icuPrelude +
+        """|int main() {
+           |  std::string flags, pattern, subject;
+           |  while (std::getline(std::cin, flags) && std::getline(std::cin, pattern) && std::getline(std::cin, subject)) {
+           |    URegularExpression *regex = compile(flags, pattern);
+           |    if (regex == nullptr) {
+           |      std::printf("case:error\n");
+           |      continue;
+           |    }
+           |    std::vector<UChar> s = decode(subject);
+           |    static const UChar empty[1] = {0};
+           |    UErrorCode status = U_ZERO_ERROR;
+           |    uregex_setText(regex, s.empty() ? empty : s.data(), static_cast<int32_t>(s.size()), &status);
+           |    if (!uregex_find(regex, 0, &status)) {
+           |      std::printf("case:none\n");
+           |    } else {
+           |      std::printf("case:");
+           |      for (int32_t g = 0; g <= uregex_groupCount(regex, &status); g++) {
+           |        std::printf("%s%d,%d", g == 0 ? "" : " ", uregex_start(regex, g, &status), uregex_end(regex, g, &status));
+           |      }
+           |      std::printf("\n");
+           |    }
+           |    uregex_close(regex);
+           |  }
+           |}
+           |""".stripMargin
+    val input =
+      patterns.map((source, flags, subject) => s"$flags\n${utf16Hex(source)}\n${utf16Hex(subject)}\n").mkString
+    cases(ICUExecutor(SourceFile("Cases.cpp", program)), input, icuEnv)
+
+  // Checked with ICU 79.1.
+  runtimeTest("ICU: the syntax and the matching", "c++"):
+    assertEquals(icuResults(icuCases), icuModel(icuCases))
+
+  // Checked with ICU 79.1.
+  runtimeTest("ICU: back-references in an open capture", "c++"):
+    val patterns =
+      for (source, subjects) <- openCaptureCases ++ openCaptureBacktrackCases; subject <- subjects
+      yield (source, "", subject)
+    assertEquals(icuResults(patterns), icuModel(patterns))
+
+  // Checked with ICU 79.1.
+  runtimeTest("ICU: the characters of the classes and the properties", "c++"):
+    val program =
+      icuPrelude +
+        """|int main() {
+           |  std::string flags, pattern;
+           |  while (std::getline(std::cin, flags) && std::getline(std::cin, pattern)) {
+           |    URegularExpression *regex = compile(flags, pattern);
+           |    std::printf("case:");
+           |    long start = -1;
+           |    for (long c = 0; c <= 0x110000; c++) {
+           |      bool matched = false;
+           |      if (c <= 0x10ffff) {
+           |        UChar s[2] = {static_cast<UChar>(c), 0};
+           |        int32_t length = 1;
+           |        if (c >= 0x10000) {
+           |          s[0] = static_cast<UChar>(0xd7c0 + (c >> 10));
+           |          s[1] = static_cast<UChar>(0xdc00 | (c & 0x3ff));
+           |          length = 2;
+           |        }
+           |        UErrorCode status = U_ZERO_ERROR;
+           |        uregex_setText(regex, s, length, &status);
+           |        matched = uregex_matches(regex, 0, &status);
+           |      }
+           |      if (matched && start < 0) start = c;
+           |      if (!matched && start >= 0) {
+           |        std::printf("%lx-%lx,", start, c - 1);
+           |        start = -1;
+           |      }
+           |    }
+           |    std::printf("\n");
+           |    uregex_close(regex);
+           |  }
+           |}
+           |""".stripMargin
+    val input = icuSets.map((flags, source) => s"$flags\n${utf16Hex(source)}\n").mkString
+    val model = icuSets.map: (flags, source) =>
+      chars(source, flags, Dialect.ICU).intervals.map((s, e) => f"$s%x-${e - 1}%x,").mkString
+    assertEquals(cases(ICUExecutor(SourceFile("Sets.cpp", program)), input, icuEnv), model)

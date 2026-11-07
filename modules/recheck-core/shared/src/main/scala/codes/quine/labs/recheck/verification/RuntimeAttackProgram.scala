@@ -4,6 +4,7 @@ import codes.quine.labs.recheck.diagnostics.AttackPattern
 import codes.quine.labs.recheck.diagnostics.AttackPatternStyle
 import codes.quine.labs.recheck.exec.DotNetExecutor
 import codes.quine.labs.recheck.exec.Executor
+import codes.quine.labs.recheck.exec.ICUExecutor
 import codes.quine.labs.recheck.exec.JavaExecutor
 import codes.quine.labs.recheck.exec.NodeExecutor
 import codes.quine.labs.recheck.exec.PHPExecutor
@@ -63,6 +64,7 @@ object RuntimeAttackProgram:
       case Dialect.DotNet            => Right(dotnet(pattern, flags, mode, attack))
       case perlDialect: Dialect.Perl => perl(source, pattern, flags, perlDialect, mode, attack)
       case Dialect.PCRE              => php(source, pattern, flags, mode, attack)
+      case Dialect.ICU               => Right(icu(pattern, flags, mode, attack))
 
   /** Returns the units of the mode that the engine of the dialect reads from the source.
     *
@@ -97,6 +99,7 @@ object RuntimeAttackProgram:
         case Dialect.Java       => s"// Run: $command\n" + javaProgram(javaString(program.script))
         case Dialect.DotNet     => s"// Run: $command\n" + dotnetProgram(quote(program.script))
         case Dialect.PCRE       => s"$php// Run: $command\n" + program.script.stripPrefix(php)
+        case Dialect.ICU        => s"// Run: $command\n" + icuProgram(cppString(program.script))
         case Dialect.JavaScript => s"// Run: $command\n" + program.script
         case _: Dialect.Python | _: Dialect.PythonRegex | _: Dialect.Ruby | _: Dialect.Perl =>
           s"# Run: $command\n" + program.script
@@ -112,6 +115,7 @@ object RuntimeAttackProgram:
     case Dialect.DotNet         => "runtime-attack.cs"
     case _: Dialect.Perl        => "runtime-attack.pl"
     case Dialect.PCRE           => "runtime-attack.php"
+    case Dialect.ICU            => "runtime-attack.cpp"
 
   /** Returns a Java expression of the data, which is a join of literals for a long data. */
   private def javaString(data: String): String =
@@ -374,6 +378,118 @@ object RuntimeAttackProgram:
         |    return;
         |}
         |Console.WriteLine("$TimeLine " + stopwatch.ElapsedMilliseconds);
+        |""".stripMargin
+
+  /** Returns the data for the C++ program using ICU4C's `uregex_find`, with ICU's default limits: no time limit and a
+    * backtrack stack of 8,000,000 bytes.
+    */
+  private def icu(pattern: UString, flags: String, mode: UnitMode, attack: AttackPattern): RuntimeAttackProgram =
+    val options = flags.distinct.filter(c => "dimswx".contains(c))
+    RuntimeAttackProgram(ICUExecutor(ICUSource), encodeData(options, pattern, mode, attack))
+
+  /** The C++ program, which reads the data of [[encodeData]] from the standard input. */
+  private val ICUSource: SourceFile =
+    SourceFile("RecheckRuntimeAttack.cpp", icuProgram("std::string(std::istreambuf_iterator<char>(std::cin), {})"))
+
+  /** Returns a C++ expression of the data, which joins literals of at most [[CppLiteralSize]] characters. */
+  private def cppString(data: String): String =
+    data.grouped(CppLiteralSize).map(quote).mkString("std::string(", "\n    ", ")")
+
+  // MSVC limits a string literal to 16380 bytes.
+  private val CppLiteralSize: Int = 10000
+
+  /** Returns the C++ program reading the data of [[encodeData]] from the expression.
+    *
+    * It hides ICU's C++ API, which needs C++17, so that a compiler of an older standard by default compiles it.
+    */
+  private def icuProgram(data: String): String =
+    s"""|#define U_SHOW_CPLUSPLUS_API 0
+        |#define U_SHOW_CPLUSPLUS_HEADER_API 0
+        |#include <unicode/uchar.h>
+        |#include <unicode/uregex.h>
+        |#include <unicode/uversion.h>
+        |
+        |#include <chrono>
+        |#include <cstdio>
+        |#include <cstdlib>
+        |#include <iostream>
+        |#include <iterator>
+        |#include <sstream>
+        |#include <string>
+        |#include <vector>
+        |
+        |static std::vector<UChar> decode(const std::string &hex) {
+        |  std::vector<UChar> s;
+        |  if (hex == "-") return s;
+        |  for (size_t i = 0; i + 4 <= hex.size(); i += 4) {
+        |    s.push_back(static_cast<UChar>(std::strtoul(hex.substr(i, 4).c_str(), nullptr, 16)));
+        |  }
+        |  return s;
+        |}
+        |
+        |int main() {
+        |  UVersionInfo version, unicode;
+        |  char versionString[U_MAX_VERSION_STRING_LENGTH], unicodeString[U_MAX_VERSION_STRING_LENGTH];
+        |  u_getVersion(version);
+        |  u_versionToString(version, versionString);
+        |  u_getUnicodeVersion(unicode);
+        |  u_versionToString(unicode, unicodeString);
+        |  std::printf("$RuntimeLine icu %s (Unicode %s)\\n", versionString, unicodeString);
+        |  std::fflush(stdout);
+        |  std::istringstream lines($data);
+        |  std::string flagsLine, patternLine, line;
+        |  std::getline(lines, flagsLine);
+        |  std::getline(lines, patternLine);
+        |  uint32_t flags = 0;
+        |  for (char c : flagsLine) {
+        |    switch (c) {
+        |      case 'd': flags |= UREGEX_UNIX_LINES; break;
+        |      case 'i': flags |= UREGEX_CASE_INSENSITIVE; break;
+        |      case 'm': flags |= UREGEX_MULTILINE; break;
+        |      case 's': flags |= UREGEX_DOTALL; break;
+        |      case 'w': flags |= UREGEX_UWORD; break;
+        |      case 'x': flags |= UREGEX_COMMENTS; break;
+        |      default: break;
+        |    }
+        |  }
+        |  std::vector<UChar> pattern = decode(patternLine);
+        |  std::vector<UChar> input;
+        |  while (std::getline(lines, line)) {
+        |    size_t colon = line.find(':');
+        |    long count = std::atol(line.substr(0, colon).c_str());
+        |    std::vector<UChar> part = decode(line.substr(colon + 1));
+        |    for (long i = 0; i < count; i++) input.insert(input.end(), part.begin(), part.end());
+        |  }
+        |  UErrorCode status = U_ZERO_ERROR;
+        |  UParseError parseError;
+        |  static const UChar empty[1] = {0};
+        |  // `uregex_open` rejects the length 0, but takes -1 for a NUL-terminated pattern.
+        |  URegularExpression *regex = uregex_open(pattern.empty() ? empty : pattern.data(),
+        |                                         pattern.empty() ? -1 : static_cast<int32_t>(pattern.size()), flags,
+        |                                         &parseError, &status);
+        |  if (U_FAILURE(status)) {
+        |    std::fprintf(stderr, "%s at %d\\n", u_errorName(status), parseError.offset);
+        |    return 1;
+        |  }
+        |  uregex_setText(regex, input.empty() ? empty : input.data(), static_cast<int32_t>(input.size()), &status);
+        |  std::printf("$StartLine\\n");
+        |  std::fflush(stdout);
+        |  auto start = std::chrono::steady_clock::now();
+        |  uregex_find(regex, 0, &status);
+        |  auto time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+        |  if (status == U_REGEX_TIME_OUT) {
+        |    std::printf("$EngineLimitLine %s\\n", u_errorName(status));
+        |  } else if (status == U_REGEX_STACK_OVERFLOW || status == U_MEMORY_ALLOCATION_ERROR) {
+        |    std::printf("$EngineErrorLine %s\\n", u_errorName(status));
+        |  } else if (U_FAILURE(status)) {
+        |    std::fprintf(stderr, "%s\\n", u_errorName(status));
+        |    return 1;
+        |  } else {
+        |    std::printf("$TimeLine %lld\\n", static_cast<long long>(time.count()));
+        |  }
+        |  uregex_close(regex);
+        |  return 0;
+        |}
         |""".stripMargin
 
   /** Returns the data of a pattern and an attack string of the mode for the programs reading it from the standard

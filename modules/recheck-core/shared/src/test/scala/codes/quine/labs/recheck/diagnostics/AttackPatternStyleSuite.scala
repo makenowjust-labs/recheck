@@ -92,6 +92,7 @@ class AttackPatternStyleSuite extends munit.FunSuite:
     assertEquals(of(Dialect.Ruby(), UnitMode.ScalarValue), Ruby(bytes = false))
     assertEquals(of(Dialect.Ruby(), UnitMode.Byte), Ruby(bytes = true))
     assertEquals(of(Dialect.Java, UnitMode.UTF16CodePoint), Java)
+    assertEquals(of(Dialect.ICU, UnitMode.UTF16CodePoint), Java)
     assertEquals(of(Dialect.DotNet, UnitMode.UTF16), CSharp)
     assertEquals(of(Dialect.Perl(), UnitMode.Byte), Perl)
     assertEquals(of(Dialect.PCRE, UnitMode.ScalarValue), PHP(bytes = false))

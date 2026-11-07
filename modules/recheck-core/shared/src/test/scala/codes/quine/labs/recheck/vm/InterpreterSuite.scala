@@ -476,12 +476,12 @@ class InterpreterSuite extends munit.FunSuite:
 
   test("Interpreter.run: back-references and capture tests in an open capture"):
     // They see the capture before it opens, which is from the previous iteration.
-    check("^(a|b\\1)+$", "aba", PCRE, Perl(), Java, DotNet)(Seq(g(0, 3), g(1, 3)))
-    check("^(a|b\\1)+$", "abab", PCRE, Perl(), Java, DotNet, Ruby())(NoMatch)
-    check("^(a|b\\1)+$", "aabaa", PCRE, Perl(), Java, DotNet)(Seq(g(0, 5), g(4, 5)))
-    check("^(a\\1?)+$", "aaa", PCRE, Perl(), Java, DotNet)(Seq(g(0, 3), g(1, 3)))
-    check("^(a|ab\\1)*$", "aaba", PCRE, Perl(), Java, DotNet)(Seq(g(0, 4), g(1, 4)))
-    check("^(a|(b\\1))+$", "aabaa", PCRE, Perl(), Java, DotNet)(Seq(g(0, 5), g(4, 5), g(2, 4)))
+    check("^(a|b\\1)+$", "aba", PCRE, Perl(), Java, DotNet, ICU)(Seq(g(0, 3), g(1, 3)))
+    check("^(a|b\\1)+$", "abab", PCRE, Perl(), Java, DotNet, ICU, Ruby())(NoMatch)
+    check("^(a|b\\1)+$", "aabaa", PCRE, Perl(), Java, DotNet, ICU)(Seq(g(0, 5), g(4, 5)))
+    check("^(a\\1?)+$", "aaa", PCRE, Perl(), Java, DotNet, ICU)(Seq(g(0, 3), g(1, 3)))
+    check("^(a|ab\\1)*$", "aaba", PCRE, Perl(), Java, DotNet, ICU)(Seq(g(0, 4), g(1, 4)))
+    check("^(a|(b\\1))+$", "aabaa", PCRE, Perl(), Java, DotNet, ICU)(Seq(g(0, 5), g(4, 5), g(2, 4)))
     check("^(a(?(1)b|c))+$", "acab", PCRE, Perl(), Python(), DotNet)(Seq(g(0, 4), g(2, 4)))
     check("^(a(?(1)b|c))+$", "acac", PCRE, Perl(), Python(), DotNet)(NoMatch)
     // A capture in a look-behind matched backward opens at its end.
