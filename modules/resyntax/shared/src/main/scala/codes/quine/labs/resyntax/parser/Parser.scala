@@ -306,7 +306,7 @@ private[parser] final class Parser(
     val maxOption = parseRepeatCountOption()
     skipBraceBlank()
 
-    if isEnd || currentChar != '}' || minOption.isEmpty && maxOption.isEmpty then
+    if isEnd || currentChar != '}' || minOption.isEmpty && maxOption.isEmpty && !featureSet.allowsCurlyWithoutCount then
       resetBracket(stack, save)
       return
 
@@ -317,7 +317,8 @@ private[parser] final class Parser(
         if max < min && !featureSet.allowsReversedBoundedRepeat then fail("Numbers out of order in {} quantifier", save)
         Quantifier.Bounded(min, max, strategy)
       case (Some(min), None) => Quantifier.Unbounded(min, strategy)
-      case (None, max)       => Quantifier.MaxBounded(max.get, strategy)
+      case (None, Some(max)) => Quantifier.MaxBounded(max, strategy)
+      case (None, None)      => Quantifier.Unbounded(0, strategy)
     pushCurlyRepeat(stack, quantifier)
 
   private def pushCurlyRepeat(stack: mutable.Stack[Node], quantifier: Quantifier): Unit =
