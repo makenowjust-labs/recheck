@@ -19,6 +19,10 @@ class ExecutorSuite extends munit.FunSuite:
 
   val icu: ICUExecutor = ICUExecutor(SourceFile("RecheckTest.cpp", "// test"))
 
+  val boostRegex: BoostRegexExecutor = BoostRegexExecutor(SourceFile("RecheckTest.cpp", "// test"), hasICU = false)
+
+  val boostRegexICU: BoostRegexExecutor = BoostRegexExecutor(SourceFile("RecheckTest.cpp", "// test"), hasICU = true)
+
   /** A fake compiler, which prints its version for `--version`, and otherwise copies the program, a shell script, to
     * the output.
     */
@@ -26,12 +30,37 @@ class ExecutorSuite extends munit.FunSuite:
     "#!/bin/sh\nif [ \"$1\" = --version ]; then echo fake 1.0; exit 0; fi\nfor a in \"$@\"; do\n  if [ \"$prev\" = -o ]; then out=\"$a\"; fi\n  case \"$a\" in *.sh) src=\"$a\" ;; esac\n  prev=\"$a\"\ndone\ncp \"$src\" \"$out\"\nchmod +x \"$out\"\n"
 
   val executors: Seq[Executor] =
-    Seq(NodeExecutor, PythonExecutor, PythonRegexExecutor, RubyExecutor, java, dotnet, PerlExecutor, PHPExecutor, icu)
+    Seq(
+      NodeExecutor,
+      PythonExecutor,
+      PythonRegexExecutor,
+      RubyExecutor,
+      java,
+      dotnet,
+      PerlExecutor,
+      PHPExecutor,
+      icu,
+      boostRegex,
+      boostRegexICU
+    )
 
   test("Executor#variable"):
     assertEquals(
       executors.map(_.variable),
-      Seq("NODE", "PYTHON", "PYTHON_REGEX", "RUBY", "JAVA", "DOTNET", "PERL", "PHP", "ICU").map("RECHECK_" + _)
+      Seq(
+        "NODE",
+        "PYTHON",
+        "PYTHON_REGEX",
+        "RUBY",
+        "JAVA",
+        "DOTNET",
+        "PERL",
+        "PHP",
+        "ICU",
+        "BOOST_REGEX",
+        "BOOST_REGEX"
+      )
+        .map("RECHECK_" + _)
     )
 
   test("Executor#commandLine"):
@@ -46,6 +75,8 @@ class ExecutorSuite extends munit.FunSuite:
         "dotnet build RecheckTest.cs -o RecheckTest --disable-build-servers && dotnet RecheckTest/RecheckTest.dll",
         "perl -",
         "php",
+        "c++ RecheckTest.cpp -o RecheckTest -licui18n -licuuc -licudata && ./RecheckTest",
+        "c++ RecheckTest.cpp -o RecheckTest && ./RecheckTest",
         "c++ RecheckTest.cpp -o RecheckTest -licui18n -licuuc -licudata && ./RecheckTest"
       )
     )
@@ -66,6 +97,10 @@ class ExecutorSuite extends munit.FunSuite:
       icu.commandLine(Map("RECHECK_ICU" -> "c++ -I/icu/include")),
       "c++ -I/icu/include RecheckTest.cpp -o RecheckTest -licui18n -licuuc -licudata && ./RecheckTest"
     )
+    assertEquals(
+      boostRegex.commandLine(Map("RECHECK_BOOST_REGEX" -> "c++ -I/boost/include")),
+      "c++ -I/boost/include RecheckTest.cpp -o RecheckTest && ./RecheckTest"
+    )
 
   test("Executor#scriptCommandLine"):
     assertEquals(
@@ -79,6 +114,8 @@ class ExecutorSuite extends munit.FunSuite:
         "dotnet run script",
         "perl script",
         "php script",
+        "c++ script -o script -licui18n -licuuc -licudata && ./script",
+        "c++ script -o script && ./script",
         "c++ script -o script -licui18n -licuuc -licudata && ./script"
       )
     )
@@ -170,7 +207,7 @@ class ExecutorSuite extends munit.FunSuite:
           ExecResult.Exit(0, "input\n", "")
         )
       finally
-        val args = Seq(line, "RecheckTest.sh", "-o", "RecheckTest", "-licui18n", "-licuuc", "-licudata")
+        val args = Seq(line, "RecheckTest.sh", "-o", "RecheckTest") ++ ICUExecutor.Libraries
         delete(SourceDirectory.outputPath(program, args, "fake 1.0\n"))
 
   test("Executor#exec: the compilation does not count toward the timeout"):
@@ -183,5 +220,5 @@ class ExecutorSuite extends munit.FunSuite:
         )
         assertEquals(result, ExecResult.Exit(0, "input\n", ""))
       finally
-        val args = Seq(line, "RecheckTest.sh", "-o", "RecheckTest", "-licui18n", "-licuuc", "-licudata")
+        val args = Seq(line, "RecheckTest.sh", "-o", "RecheckTest") ++ ICUExecutor.Libraries
         delete(SourceDirectory.outputPath(program, args, "fake 1.0\n"))

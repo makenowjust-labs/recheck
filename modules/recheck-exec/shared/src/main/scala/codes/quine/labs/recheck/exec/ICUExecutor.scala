@@ -10,4 +10,9 @@ final case class ICUExecutor(program: SourceFile) extends Executor.Compiled("c++
   protected val versionArgs: Seq[Seq[String]] = Seq(Seq("--version"))
 
   protected def compileArgs(source: String, output: String): Seq[String] =
-    Seq(source, "-o", output, "-licui18n", "-licuuc", "-licudata")
+    Seq(source, "-o", output) ++ ICUExecutor.Libraries
+
+object ICUExecutor:
+
+  /** The libraries of ICU on a command line, which follow the program. */
+  val Libraries: Seq[String] = Seq("-licui18n", "-licuuc", "-licudata")
