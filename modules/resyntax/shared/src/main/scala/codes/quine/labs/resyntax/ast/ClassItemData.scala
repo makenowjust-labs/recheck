@@ -10,6 +10,10 @@ sealed abstract class ClassItemData extends Product with Serializable:
         ll.equalsWithoutLoc(rl) && lr.equalsWithoutLoc(rr)
       case (ClassItemData.ClassDiff(ll, lr), ClassItemData.ClassDiff(rl, rr)) =>
         ll.equalsWithoutLoc(rl) && lr.equalsWithoutLoc(rr)
+      case (ClassItemData.ClassSymmetricDiff(ll, lr), ClassItemData.ClassSymmetricDiff(rl, rr)) =>
+        ll.equalsWithoutLoc(rl) && lr.equalsWithoutLoc(rr)
+      case (ClassItemData.ClassExplicitUnion(ll, lr), ClassItemData.ClassExplicitUnion(rl, rr)) =>
+        ll.equalsWithoutLoc(rl) && lr.equalsWithoutLoc(rr)
       case (ClassItemData.ClassNest(li, l), ClassItemData.ClassNest(ri, r)) =>
         li == ri && l.equalsWithoutLoc(r)
       case (ClassItemData.ClassRange(ll, lr), ClassItemData.ClassRange(rl, rr)) =>
@@ -41,6 +45,24 @@ object ClassItemData:
   object ClassDiff:
 
     def apply(left: ClassItemData, right: ClassItemData): ClassDiff = ClassDiff(ClassItem(left), ClassItem(right))
+
+  /** ClassSymmetricDiff is python-regex's symmetric difference (e.g. `[a-c~~b-d]`). */
+  final case class ClassSymmetricDiff(left: ClassItem, right: ClassItem) extends ClassItemData
+
+  object ClassSymmetricDiff:
+
+    def apply(left: ClassItemData, right: ClassItemData): ClassSymmetricDiff =
+      ClassSymmetricDiff(ClassItem(left), ClassItem(right))
+
+  /** ClassExplicitUnion is python-regex's union operator `||` (e.g. `[a-c||x]`), unlike the implicit union of the items
+    * in a row.
+    */
+  final case class ClassExplicitUnion(left: ClassItem, right: ClassItem) extends ClassItemData
+
+  object ClassExplicitUnion:
+
+    def apply(left: ClassItemData, right: ClassItemData): ClassExplicitUnion =
+      ClassExplicitUnion(ClassItem(left), ClassItem(right))
 
   final case class ClassNest(invert: Boolean, item: ClassItem) extends ClassItemData
 

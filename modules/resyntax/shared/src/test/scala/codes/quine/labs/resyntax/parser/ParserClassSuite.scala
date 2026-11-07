@@ -475,3 +475,68 @@ class ParserClassSuite extends munit.FunSuite with ParserHelper:
   check("[a\\Eb]", "", PCRE)(
     Class(false, ClassUnion(ClassLiteral('a'), ClassCaseCommand(CaseCommandKind.EndCaseCommand), ClassLiteral('b')))
   )
+
+  // python-regex's classes (`parse_set` of `_regex_core.py`), whose `V1` has the set operators and nested classes.
+  check("[a-\\d]", "", PythonRegex()):
+    Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'), ClassBackslashClass(Digit)))
+  check("[\\d-z]", "", PythonRegex()):
+    Class(false, ClassUnion(ClassBackslashClass(Digit), ClassLiteral('-'), ClassLiteral('z')))
+  check("[a-]", "", PythonRegex())(Class(false, ClassUnion(ClassLiteral('a'), ClassLiteral('-'))))
+  check("[]a]", "", PythonRegex())(Class(false, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
+  check("[^]a]", "", PythonRegex())(Class(true, ClassUnion(ClassLiteral(']'), ClassLiteral('a'))))
+  check("[a-a]", "", PythonRegex())(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('a'))))
+  error("[z-a]", "", PythonRegex())("Out of order class range at 1")
+  error("[]", "", PythonRegex())("Unclosed ']' at 2")
+  error("[a", "", PythonRegex())("Unclosed ']' at 2")
+  check("[ ^a]", "x", PythonRegex())(Class(false, ClassUnion(ClassLiteral(' '), ClassLiteral('^'), ClassLiteral('a'))))
+  check("[[:alpha:]]", "", PythonRegex())(Class(false, ClassPOSIX(false, "alpha")))
+  check("[[:^Lu:]]", "", PythonRegex())(Class(false, ClassPOSIX(true, "Lu")))
+  check("[[:sc=Latin:]]", "", PythonRegex())(Class(false, ClassPOSIX(false, "sc=Latin")))
+  check("[[:alpha]]", "", PythonRegex()):
+    Sequence(Class(false, ClassUnion("[:alpha".map(c => ClassLiteral(c))*)), Literal(']'))
+  check("[[a]]", "", PythonRegex())(
+    Sequence(Class(false, ClassUnion(ClassLiteral('['), ClassLiteral('a'))), Literal(']'))
+  )
+  error("[a--b]", "", PythonRegex())("Out of order class range at 1")
+  check("[a-z--aeiou]", "V1", PythonRegex()):
+    Class(
+      false,
+      ClassDiff(ClassRange(ClassLiteral('a'), ClassLiteral('z')), ClassUnion("aeiou".map(c => ClassLiteral(c))*))
+    )
+  check("[ab||cd]", "V1", PythonRegex()):
+    Class(
+      false,
+      ClassExplicitUnion(
+        ClassUnion(ClassLiteral('a'), ClassLiteral('b')),
+        ClassUnion(ClassLiteral('c'), ClassLiteral('d'))
+      )
+    )
+  check("[a~~b]", "V1", PythonRegex())(Class(false, ClassSymmetricDiff(ClassLiteral('a'), ClassLiteral('b'))))
+  check("[a&&b||c]", "V1", PythonRegex()):
+    Class(false, ClassExplicitUnion(ClassIntersection(ClassLiteral('a'), ClassLiteral('b')), ClassLiteral('c')))
+  check("[\\w&&[a-z]]", "V1", PythonRegex()):
+    Class(
+      false,
+      ClassIntersection(ClassBackslashClass(Word), ClassNest(false, ClassRange(ClassLiteral('a'), ClassLiteral('z'))))
+    )
+  check("[a[b]c]", "V1", PythonRegex())(
+    Class(false, ClassUnion(ClassLiteral('a'), ClassNest(false, ClassLiteral('b')), ClassLiteral('c')))
+  )
+  check("[a[^b]]", "V1", PythonRegex())(Class(false, ClassUnion(ClassLiteral('a'), ClassNest(true, ClassLiteral('b')))))
+  // A nested class of one character is an end of a range, which the AST keeps as the character.
+  checkPrinted("[a-[c]]", "[a-c]", "V1", PythonRegex())(Class(false, ClassRange(ClassLiteral('a'), ClassLiteral('c'))))
+  check("[a-c--e]", "V1", PythonRegex()):
+    Class(false, ClassDiff(ClassRange(ClassLiteral('a'), ClassLiteral('c')), ClassLiteral('e')))
+  check("[--a]", "V1", PythonRegex())(Class(false, ClassRange(ClassLiteral('-'), ClassLiteral('a'))))
+  check("[||a]", "V1", PythonRegex()):
+    Class(false, ClassUnion(ClassLiteral('|'), ClassLiteral('|'), ClassLiteral('a')))
+  check("[[:alpha:]--a]", "V1", PythonRegex())(Class(false, ClassDiff(ClassPOSIX(false, "alpha"), ClassLiteral('a'))))
+  error("[a--]", "V1", PythonRegex())("Unclosed ']' at 5")
+  error("[[]]", "V1", PythonRegex())("Unclosed ']' at 4")
+  // `(?V1)` parses the pattern again from the start in `V1`.
+  check("(?V1)[a--b]", "", PythonRegex()):
+    Sequence(
+      Command(InlineFlag(FlagSetDiff(FlagSet(version1 = true), None))),
+      Class(false, ClassDiff(ClassLiteral('a'), ClassLiteral('b')))
+    )
+  error("[z-a](?V1)", "", PythonRegex())("Out of order class range at 1")

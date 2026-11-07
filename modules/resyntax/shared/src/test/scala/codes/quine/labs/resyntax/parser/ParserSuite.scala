@@ -1,6 +1,7 @@
 package codes.quine.labs.resyntax.parser
 
 import codes.quine.labs.resyntax.ast.AssertKind.*
+import codes.quine.labs.resyntax.ast.BackReferenceStyle.*
 import codes.quine.labs.resyntax.ast.BackslashKind.*
 import codes.quine.labs.resyntax.ast.BacktrackStrategy.*
 import codes.quine.labs.resyntax.ast.CaseCommandKind
@@ -16,6 +17,7 @@ import codes.quine.labs.resyntax.ast.GroupKind.*
 import codes.quine.labs.resyntax.ast.Node
 import codes.quine.labs.resyntax.ast.NodeData.*
 import codes.quine.labs.resyntax.ast.Quantifier.*
+import codes.quine.labs.resyntax.ast.Reference.*
 import codes.quine.labs.resyntax.charset.UnitMode
 import codes.quine.labs.resyntax.dialect.Dialect.*
 
@@ -276,3 +278,22 @@ class ParserSuite extends munit.FunSuite with ParserHelper:
   test("Parser.parse: a high surrogate without a low surrogate after it is a code point by itself"):
     val node = Parser.parse("\uD800a", FlagSet.parse("u", JavaScript), JavaScript, UnitMode.UTF16CodePoint)
     assert(node.equalsWithoutLoc(Node(Sequence(Literal(0xd800), Literal('a')))), node)
+
+  // python-regex reads `{,}` as `*`, and repeats the node before inline flags and comments (regex 2026.9.29).
+  check("a{,}", "", PythonRegex())(Repeat(Node(Literal('a')), Unbounded(0, Greedy), Some("{,}")))
+  // The AST keeps the inline flags after the repeat.
+  checkPrinted("a(?i)*", "a*(?i)", "", PythonRegex()):
+    Sequence(Repeat(Literal('a'), Star(Greedy)), Command(InlineFlag(FlagSetDiff(FlagSet(ignoreCase = true), None))))
+  error("(?i)*", "", PythonRegex())("Nothing to repeat at 4")
+  error("a*(?#x)?", "", PythonRegex())("Nested quantifier at 7")
+  // python-regex skips the whitespace of `str.isspace` and the comments in the extended mode also in a construct.
+  check("a{ 1, 2 }", "x", PythonRegex())(Repeat(Node(Literal('a')), Bounded(1, 2, Greedy), Some("{ 1, 2 }")))
+  check("a* ?", "x", PythonRegex())(Repeat(Node(Literal('a')), Star(Lazy), Some("* ?")))
+  check("a\u3000\u001cb", "x", PythonRegex())(Sequence(Literal('a'), Blank("\u3000\u001c"), Literal('b')))
+  check("a\u00a0b", "x", PythonRegex(Python.Type.Bytes))(Sequence(Literal('a'), Blank("\u00a0"), Literal('b')))
+  check("a#\u0085b", "x", PythonRegex())(Sequence(Literal('a'), Blank("#\u0085b")))
+  check("a\u2005b", "x", PythonRegex())(Sequence(Literal('a'), Blank("\u2005"), Literal('b')))
+  error("( ?:a)", "x", PythonRegex())("Nothing to repeat at 2")
+  check("\\1 23", "x", PythonRegex())(Backslash(Escape(BareOctal, 0x53, Some("1 23"))))
+  checkPrinted("\\1 2", "\\12", "x", PythonRegex()):
+    Backslash(EscapeBackReference(BareBackReference, IndexedReference(12)))

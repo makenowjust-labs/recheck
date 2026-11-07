@@ -28,6 +28,9 @@ object EscapeClassKind:
   /** NonHorizontal is `\H` class. */
   case object NonHorizontal extends EscapeClassKind
 
+  /** POSIXBlank is python-regex's `\h` class, which is POSIX's `[[:blank:]]`. */
+  case object POSIXBlank extends EscapeClassKind
+
   /** Vertical is `\v` class. */
   case object Vertical extends EscapeClassKind
 
@@ -72,6 +75,9 @@ object EscapeClassKind:
 
   /** NonUnicodePropertyValue is `\P{XXX=YYY}` class. */
   final case class NonUnicodePropertyValue(name: String, value: String) extends EscapeClassKind
+
+  /** NamedList is python-regex's `\L<name>` class, the strings of a list given on compiling the pattern. */
+  final case class NamedList(name: String) extends EscapeClassKind
 
   /** QuoteSet is `\q{...}` class. */
   final case class QuoteSet(strings: Seq[Seq[QuoteLiteral]]) extends EscapeClassKind

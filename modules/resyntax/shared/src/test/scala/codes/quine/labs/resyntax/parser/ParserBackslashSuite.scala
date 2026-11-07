@@ -613,3 +613,51 @@ class ParserBackslashSuite extends munit.FunSuite with ParserHelper:
   error("\\kx", "", DotNet, Java, PCRE, Perl())("Invalid backslash escape at 2")
   // JavaScript without `u` reads `\x` without two hexadecimal digits as `x` (Annex B).
   check("\\x1", "", JavaScript)(Sequence(Backslash(Unknown('x')), Literal('1')))
+
+  // python-regex's `\g<...>`, `\N{...}` and `\p{...}` are the letters when they are broken (regex 2026.9.29).
+  check("\\g<1>", "", PythonRegex())(Backslash(EscapeBackReference(GBackReference(Angle), IndexedReference(1))))
+  check("\\g<x>", "", PythonRegex())(Backslash(EscapeBackReference(GBackReference(Angle), NamedReference("x"))))
+  checkPrinted("\\g <1 >", "\\g<1>", "x", PythonRegex()):
+    Backslash(EscapeBackReference(GBackReference(Angle), IndexedReference(1)))
+  check("\\g<0>", "", PythonRegex())(Sequence(Backslash(Unknown('g')), Literal('<'), Literal('0'), Literal('>')))
+  check("\\g<a-b>", "", PythonRegex()):
+    Sequence(Backslash(Unknown('g')), Literal('<'), Literal('a'), Literal('-'), Literal('b'), Literal('>'))
+  check("\\g<-1>", "", PythonRegex()):
+    Sequence(Backslash(Unknown('g')), Literal('<'), Literal('-'), Literal('1'), Literal('>'))
+  check("\\g", "", PythonRegex())(Backslash(Unknown('g')))
+  error("[\\g]", "", PythonRegex())("Invalid backslash escape at 2")
+  check("\\N{LATIN SMALL LETTER A}", "", PythonRegex(), PythonRegex(Python.Type.Bytes)):
+    Backslash(EscapeClass(CharName("LATIN SMALL LETTER A")))
+  check("\\N", "", PythonRegex())(Backslash(Unknown('N')))
+  check("\\N{x", "", PythonRegex())(Sequence(Backslash(Unknown('N')), Literal('{'), Literal('x')))
+  check("[\\N]", "", PythonRegex())(Class(false, ClassBackslashValue(Unknown('N'))))
+  check("\\p{L}", "", PythonRegex())(Backslash(EscapeClass(UnicodeProperty("L"))))
+  checkPrinted("\\p{^L}", "\\P{L}", "", PythonRegex())(Backslash(EscapeClass(NonUnicodeProperty("L"))))
+  checkPrinted("\\P{^L}", "\\p{L}", "", PythonRegex())(Backslash(EscapeClass(UnicodeProperty("L"))))
+  checkPrinted("\\P{sc:Latin}", "\\P{sc=Latin}", "", PythonRegex()):
+    Backslash(EscapeClass(NonUnicodePropertyValue("sc", "Latin")))
+  check("\\p{NV=1/2}", "", PythonRegex())(Backslash(EscapeClass(UnicodePropertyValue("NV", "1/2"))))
+  check("\\p{Lowercase Letter}", "", PythonRegex())(Backslash(EscapeClass(UnicodeProperty("Lowercase Letter"))))
+  checkPrinted("\\p { L }", "\\p{L}", "x", PythonRegex())(Backslash(EscapeClass(UnicodeProperty("L"))))
+  check("\\pL", "", PythonRegex())(Backslash(EscapeClass(UnicodeBareProperty("L"))))
+  checkPrinted("\\P L", "\\PL", "x", PythonRegex())(Backslash(EscapeClass(NonUnicodeBareProperty("L"))))
+  check("\\pX", "", PythonRegex())(Sequence(Backslash(Unknown('p')), Literal('X')))
+  check("\\P", "", PythonRegex())(Backslash(Unknown('P')))
+  check("\\p{L", "", PythonRegex())(Sequence(Backslash(Unknown('p')), Literal('{'), Literal('L')))
+  // The literal `{` after the letter starts a fuzzy constraint (e.g. `{s` as the constraint `s`).
+  error("\\p{sc=}", "", PythonRegex())("Expected } at 4")
+  // python-regex's other escapes.
+  check("\\L<x>", "", PythonRegex())(Backslash(EscapeClass(NamedList("x"))))
+  checkPrinted("\\L <1 >", "\\L<1>", "x", PythonRegex())(Backslash(EscapeClass(NamedList("1"))))
+  error("\\L", "", PythonRegex())("Invalid backslash escape at 2")
+  error("[\\L]", "", PythonRegex())("Invalid backslash escape at 2")
+  check("\\h", "", PythonRegex())(Backslash(EscapeClass(POSIXBlank)))
+  error("\\H", "", PythonRegex())("Invalid backslash escape at 1")
+  check("\\m", "", PythonRegex())(Backslash(Assert(WordStart)))
+  check("\\M", "", PythonRegex())(Backslash(Assert(WordEnd)))
+  error("[\\m]", "", PythonRegex())("Invalid escape sequence at 1")
+  error("\\m", "", Python())("Invalid backslash escape at 1")
+  check("\\777", "", PythonRegex())(Backslash(Escape(BareOctal, 0x1ff)))
+  check("\\u0100", "", PythonRegex(Python.Type.Bytes))(Backslash(Escape(UnicodeHex4, 0x100)))
+  error("\\e", "", PythonRegex())("Invalid backslash escape at 1")
+  check("\\_", "", PythonRegex())(Backslash(Unknown('_')))

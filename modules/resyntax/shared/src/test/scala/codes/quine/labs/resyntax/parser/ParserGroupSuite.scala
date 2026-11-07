@@ -125,3 +125,17 @@ class ParserGroupSuite extends munit.FunSuite with ParserHelper:
   // PCRE in UTF mode takes letters and digits in a group name, and Java only ASCII ones.
   check("(?<a\u00e9>x)", "u", PCRE)(Group(NamedCapture(Angle, "a\u00e9"), Literal('x')))
   error("(?<a\u00e9>x)", "", Java)("Invalid identifier at 4")
+
+  // python-regex's groups, whose names may repeat, and whose references may be numbers.
+  check("(?<x>a)(?<x>b)", "", PythonRegex()):
+    Sequence(Group(NamedCapture(Angle, "x"), Literal('a')), Group(NamedCapture(Angle, "x"), Literal('b')))
+  check("(?P<x>a)", "", PythonRegex())(Group(PNamedCapture("x"), Literal('a')))
+  checkPrinted("(?P <x>a)", "(?P<x>a)", "x", PythonRegex())(Group(PNamedCapture("x"), Literal('a')))
+  check("(?P=x)", "", PythonRegex())(Command(PBackReference("x")))
+  check("(?P=1)", "", PythonRegex())(Command(PBackReference("1")))
+  error("(?P=0)", "", PythonRegex())("Invalid identifier at 4")
+  error("(?P=1)", "", Python())("Invalid identifier at 4")
+  check("(?<é>a)", "", PythonRegex())(Group(NamedCapture(Angle, "é"), Literal('a')))
+  error("(?<é>a)", "", PythonRegex(Python.Type.Bytes))("Invalid identifier at 3")
+  check("(?|(a)|(b))", "", PythonRegex()):
+    Command(BranchReset(Group(IndexedCapture, Literal('a')), Group(IndexedCapture, Literal('b'))))

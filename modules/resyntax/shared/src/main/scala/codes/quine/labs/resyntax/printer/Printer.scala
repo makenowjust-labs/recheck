@@ -387,6 +387,9 @@ private[printer] final class Printer(featureSet: FeatureSet):
       write(")")
     case CommandKind.AbsenceRangeClear        => write("(?~|)")
     case CommandKind.StartOption(name, value) => write(s"(*$name${value.fold("")(value => s"=$value")})")
+    case CommandKind.Fuzzy(node, constraint)  =>
+      writeNode(node)
+      write(s"{$constraint}")
 
   private def printBacktrackControlKind(kind: BacktrackControlKind): String = kind match
     case BacktrackControlKind.Accept => "ACCEPT"
@@ -439,6 +442,8 @@ private[printer] final class Printer(featureSet: FeatureSet):
         case AssertKind.Begin                => write("\\A")
         case AssertKind.LowerEnd             => write("\\z")
         case AssertKind.UpperEnd             => write("\\Z")
+        case AssertKind.WordStart            => write("\\m")
+        case AssertKind.WordEnd              => write("\\M")
     case BackslashKind.CaseCommand(kind) => write(printCaseCommand(kind))
 
   private def printBoundaryModifier(modifier: BoundaryModifier): String = modifier match
@@ -493,6 +498,7 @@ private[printer] final class Printer(featureSet: FeatureSet):
       case EscapeClassKind.NonWord                                     => "W"
       case EscapeClassKind.Horizontal | EscapeClassKind.HexDigit       => "h"
       case EscapeClassKind.NonHorizontal | EscapeClassKind.NonHexDigit => "H"
+      case EscapeClassKind.POSIXBlank                                  => "h"
       case EscapeClassKind.Vertical                                    => "v"
       case EscapeClassKind.NonVertical                                 => "V"
       case EscapeClassKind.NonNewline                                  => "N"
@@ -506,6 +512,7 @@ private[printer] final class Printer(featureSet: FeatureSet):
       case EscapeClassKind.NonUnicodeProperty(name)                    => s"P{$name}"
       case EscapeClassKind.NonUnicodeBareProperty(name)                => s"P$name"
       case EscapeClassKind.NonUnicodePropertyValue(name, value)        => s"P{$name=$value}"
+      case EscapeClassKind.NamedList(name)                             => s"L<$name>"
       case EscapeClassKind.QuoteSet(strings)                           =>
         strings.map(_.map(printQuoteLiteral).mkString).mkString("q{", "|", "}")
     write(s"\\$text", if klass == EscapeClassKind.NonNewline then _ == '{' else NotContinued)
@@ -539,6 +546,14 @@ private[printer] final class Printer(featureSet: FeatureSet):
       writeClassItem(left)
       // .NET's subtraction is `-` before a nested class (e.g. `[a-z-[aeiou]]`).
       write(if featureSet.charClass.hasClassSubtraction then "-" else "--")
+      writeClassItem(right)
+    case ClassItemData.ClassSymmetricDiff(left, right) =>
+      writeClassItem(left)
+      write("~~")
+      writeClassItem(right)
+    case ClassItemData.ClassExplicitUnion(left, right) =>
+      writeClassItem(left)
+      write("||")
       writeClassItem(right)
     case ClassItemData.ClassNest(invert, inner) =>
       write(if invert then "[^" else "[")
