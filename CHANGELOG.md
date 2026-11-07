@@ -11,6 +11,7 @@ Fixes:
 - [#1948](https://github.com/makenowjust-labs/recheck/pull/1948) Give the #1865 fuzz test a long attack timeout ([@makenowjust](https://github.com/makenowjust))
 - [#1949](https://github.com/makenowjust-labs/recheck/pull/1949) Cancel the remaining checks under the lock when the agent input ends ([@makenowjust](https://github.com/makenowjust))
 - [#1972](https://github.com/makenowjust-labs/recheck/pull/1972) Read a{,} as a* in the python dialect ([@makenowjust](https://github.com/makenowjust))
+- [#1973](https://github.com/makenowjust-labs/recheck/pull/1973) Keep the value of a capture until it closes, which a back-reference in it sees ([@makenowjust](https://github.com/makenowjust))
 
 Misc:
 
