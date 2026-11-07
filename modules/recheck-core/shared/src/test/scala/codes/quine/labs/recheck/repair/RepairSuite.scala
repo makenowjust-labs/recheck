@@ -17,10 +17,15 @@ class RepairSuite extends munit.FunSuite:
   /** Searches for a repair keeping the captures (by default, the whole match and every capture), and drops the
     * complexity of a safe one.
     */
-  def search(source: String, dialect: Dialect = Dialect.JavaScript, captures: Option[Seq[Int]] = None): Result =
+  def search(
+      source: String,
+      dialect: Dialect = Dialect.JavaScript,
+      captures: Option[Seq[Int]] = None,
+      params: Parameters = Parameters()
+  ): Result =
     val original = Repair.Pattern.parse(source, "", dialect)
     val kept = captures.getOrElse(0 to original.ir.captureCount)
-    Repair.search(original, kept, Parameters(dialect = dialect)) match
+    Repair.search(original, kept, params.copy(dialect = dialect)) match
       case Result.Repaired(repaired, indices, _: AttackComplexity.Safe, comparison) =>
         Result.Repaired(repaired, indices, AttackComplexity.Linear, comparison)
       case result => result
@@ -92,6 +97,14 @@ class RepairSuite extends munit.FunSuite:
 
   test("Repair.search: not found"):
     assertEquals(search("^[^*]*(?:\\*(?!/)[^*]*)*@[^*]*(?:\\*(?!/)[^*]*)*$"), Result.NotFound)
+
+  test("Repair.search: upper bounds"):
+    // Without the expansion, the exact complexity of a back-reference is unknown, but the linear upper bound of the
+    // repair shows it safe.
+    val bound = Parameters(maxBackReferenceStrings = 0)
+    assertEquals(search("^(a|a)\\1*$", params = bound), repaired("^(a)\\1*$"))
+    // The repair lowers the upper bound to quadratic, which does not show the pattern better.
+    assertEquals(search("^(?:a|a)*(x)\\1*\\1*$", params = bound), Result.NotFound)
 
   test("Repair.search: unsupported"):
     interceptMessage[UnsupportedException]("the automaton checker cannot check the pattern"):

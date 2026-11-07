@@ -119,7 +119,7 @@ object FuzzChecker:
     * It returns the vulnerable complexities of the bound from the worst, at most `maxInitialGenerationSize` but at
     * least one if any, which are empty if the bound is linear, or `None` if there is no bound.
     */
-  private[fuzz] def upperBound(
+  private[recheck] def upperBound(
       pattern: IRPattern,
       maxRepeatCount: Int,
       maxNFASize: Int,
