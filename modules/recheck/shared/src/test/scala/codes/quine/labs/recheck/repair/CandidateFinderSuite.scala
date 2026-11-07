@@ -44,6 +44,19 @@ class CandidateFinderSuite extends munit.FunSuite:
     assertEquals(edited("a*?b", Dialect.Java), Seq("a??b", "ab"))
     assertEquals(edited("a++b", Dialect.Java), Seq.empty)
 
+  test("CandidateFinder#find: lazy repetitions before a delimiter"):
+    assert(clue(edited("<(.*?)>", flags = "s")).contains("<([^>]*)>"))
+    // The next item may be after the end of a group, and it may be a repetition reading at least once.
+    // The minimum reads the characters of the next item too.
+    assert(clue(edited("\\[(.+?)\\]x", flags = "s")).contains("\\[(.[^\\]]*)\\]x"))
+    assert(clue(edited("\\[(.{2,}?)\\]x", flags = "s")).contains("\\[(.{2}[^\\]]*)\\]x"))
+    assert(clue(edited("x(.*?)\\d+", flags = "s")).contains("x([^0-9]*)\\d+"))
+    assert(clue(edited("x(.*?)\\d{2}", flags = "s")).contains("x([^0-9]*)\\d{2}"))
+    assert(clue(edited("x(.*?)\\d{1,3}", flags = "s")).contains("x([^0-9]*)\\d{1,3}"))
+    // An item that may not read a character first stops nothing.
+    assert(!edited("(.*?)(?:x|y)", flags = "s").exists(_.contains("[^")))
+    assert(!edited("(.*?)$", flags = "s").exists(_.contains("[^")))
+
   test("CandidateFinder#find: repetitions read at most once or exactly their minimums"):
     assertEquals(edited("(?:ab)*c"), Seq("(?:ab)?c", "(?:ab)c"))
     assertEquals(edited("(?:ab)*?c"), Seq("(?:ab)??c", "(?:ab)c"))
