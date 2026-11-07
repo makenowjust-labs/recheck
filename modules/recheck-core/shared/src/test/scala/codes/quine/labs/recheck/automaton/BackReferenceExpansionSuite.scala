@@ -23,6 +23,10 @@ class BackReferenceExpansionSuite extends munit.FunSuite:
     assertEquals(groups("^(a+)\\1$"), None)
     assertEquals(groups("^(a(?=b))\\1$"), None)
     assertEquals(groups("^(?>(a))\\1$", "", Dialect.PCRE), None)
+    // python-regex's iteration changing the group is not empty.
+    assertEquals(groups("^(?:(a|)\\1)*$", "", Dialect.PythonRegex()), None)
+    assertEquals(groups("^(?:(a|)\\1)+$", "", Dialect.PCRE), Some(Set(1)))
+    assertEquals(groups("^(a|)\\1(?:b|)*$", "", Dialect.PythonRegex()), Some(Set(1)))
 
   test("BackReferenceExpansion.refinements"):
     val pattern = ReDoS.parse("^([\\q{ab}c])\\1$", "v", Dialect.JavaScript)

@@ -84,6 +84,16 @@ private[vm] class ProgramBuilder(
   private val holdsCaptures =
     pattern.captures.heldAfterAtomicMatch && pattern.node.exists(_.isInstanceOf[IRNodeData.BackReference])
 
+  /** The captures that back-references refer to, which make an iteration not empty when they change in python-regex. */
+  private val referencedCaptures =
+    if !pattern.emptyIteration.countsReferencedCaptures then Seq.empty
+    else
+      pattern.node
+        .collect { case IRNodeData.BackReference(indices, _, _) => indices }
+        .flatten
+        .distinct
+        .sorted
+
   /** Whether `(*THEN)` ends at a look-around assertion or a condition. */
   private val assertionIsThenScope = !pattern.backtrackControl.thenPassesAssertions
 
@@ -271,7 +281,8 @@ private[vm] class ProgramBuilder(
 
     val blocks = labelsBuffer.iterator.map(label => (label, label.block)).toVector
     val predecessors = predecessorsBuffer.iterator.map(_.toSet).toVector
-    val meta = Meta(hasRef, hasVerb, hasLeave, capturesSize, counters.size, canaries.size, predecessors)
+    val meta =
+      Meta(hasRef, hasVerb, hasLeave, capturesSize, counters.size, canaries.size, referencedCaptures, predecessors)
 
     Program(blocks, meta)
 

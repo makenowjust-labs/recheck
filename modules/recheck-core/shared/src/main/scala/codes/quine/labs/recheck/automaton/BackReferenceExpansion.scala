@@ -31,7 +31,8 @@ object BackReferenceExpansion:
     * look-arounds, atomic groups nor conditionals hold them, which would carry the captures to where the states do not.
     * Neither does the pattern have a look-behind, nor `(*NOTEMPTY)`, and the dialect restores the captures on
     * backtracking (not Perl), chooses the first set group of a name (not Ruby), and compares character by character
-    * (not the full case folding).
+    * (not the full case folding). Where an iteration changing a referred group is not empty (python-regex), which the
+    * states do not tell, no repetition that may match the empty string holds the groups.
     */
   def groups(pattern: IRPattern, maxStrings: Int): Option[Set[Int]] =
     val refs = pattern.node.collect { case IRNodeData.BackReference(indices, eq, folding) => (indices, eq, folding) }
@@ -49,6 +50,7 @@ object BackReferenceExpansion:
     val groups = refs.flatMap(_._1).toSet
     val bodies = plainCaptures(pattern.node)
     if !groups.forall(bodies.contains) then return None
+    if pattern.emptyIteration.countsReferencedCaptures && hasEmptyRepeatedGroup(pattern.node, groups) then return None
     val sizes = for g <- groups.toSeq yield
       val eq = equivalenceOf(pattern, g)
       bodies(g)
@@ -57,6 +59,14 @@ object BackReferenceExpansion:
           for a <- acc; s <- size yield a + s
     val total = sizes.foldLeft(Option(1.0))((acc, size) => for a <- acc; s <- size yield a * s)
     Option.when(total.exists(_ <= maxStrings))(groups)
+
+  /** Tests whether a repetition whose iteration may match the empty string holds one of the groups. */
+  private def hasEmptyRepeatedGroup(node: IRNode, groups: Set[Int]): Boolean = node.exists:
+    case IRNodeData.Repeat(n, _) =>
+      n.canMatchEmpty && n.exists:
+        case IRNodeData.Capture(i, _, _) => groups.contains(i)
+        case _                           => false
+    case _ => false
 
   /** The bodies of the capture groups that no look-around, atomic group or conditional holds, by the indices. */
   private def plainCaptures(node: IRNode): Map[Int, Seq[IRNode]] =

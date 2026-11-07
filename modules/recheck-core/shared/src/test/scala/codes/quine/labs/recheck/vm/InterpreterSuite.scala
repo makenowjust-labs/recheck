@@ -962,6 +962,35 @@ class InterpreterSuite extends munit.FunSuite:
     check("^(?:b?(?:|(a))|b?)+", "aaca", Java, PCRE, Python(), DotNet)(Seq(g(0, 0)))
     check("^(?:b?(?:|(a))|b?)+", "aaca", JavaScript)(Seq(g(0, 2), g(1, 2)))
 
+  test("Interpreter.run: python-regex's empty iterations"):
+    // python-regex's iteration that changes a capture that a back-reference refers to is not empty (regex 2026.9.29).
+    val pr = PythonRegex()
+    check("^(?:()|a){2}\\1$", "a", pr)(Seq(g(0, 1), g(0, 0)))
+    check("^(?:()|a){0,2}\\1$", "a", pr)(Seq(g(0, 1), g(0, 0)))
+    check("^(?:()|a){1,2}\\1$", "a", pr)(Seq(g(0, 1), g(0, 0)))
+    check("^(?:()|a){2,}\\1$", "a", pr)(Seq(g(0, 1), g(1, 1)))
+    check("^(?:()|a)*?\\1$", "a", pr)(Seq(g(0, 1), g(0, 0)))
+    check("^(?:()|a)+\\1$", "a", pr)(Seq(g(0, 1), g(1, 1)))
+    check("^(?:()|a){3}\\1$", "aa", pr)(Seq(g(0, 2), g(0, 0)))
+    check("^(?:()|a){1,3}\\1$", "aa", pr)(Seq(g(0, 2), g(0, 0)))
+    check("(?:(a?))?\\1\\1$", "aa", pr)(Seq(g(2, 2), g(2, 2)))
+    check("^(?:(a?)|()(a?))+\\3c", "cc", pr)(Seq(g(0, 1), g(0, 0), g(0, 0), g(0, 0)))
+    check("(?:()(a?)|()(a?)){2}\\4\\1b", "bb", pr)(Seq(g(0, 1), g(0, 0), g(0, 0), g(0, 0), g(0, 0)))
+    // An empty iteration ends the repetition even before the minimum.
+    check("^(?:x?|(a)){3}", "a", pr)(Seq(g(0, 0)))
+
+  test("Interpreter.run: python-regex's case-insensitive back-references"):
+    val pr = PythonRegex()
+    accepts("\\A(I)\\1\\z", pr, "I\u0131", "i")
+    refutes("\\A(i)\\1\\z", pr, "i\u0131", "i")
+    accepts("\\A(\u00df)\\1\\z", pr, "\u00dfss", "iV1")
+    refutes("\\A(\u00df)\\1\\z", pr, "\u00dfss", "iV0")
+    refutes("\\A(s)\\1\\z", pr, "s\u00df", "iV1")
+    // `İ` keeps its simple folding, which matches `i`.
+    accepts("\\A(\u0130)\\1\\z", pr, "\u0130i", "iV1")
+    refutes("\\A(\u0130)\\1\\z", pr, "\u0130i\u0307", "iV1")
+    accepts("(?<=[\u00df])y", pr, "ssy", "iV1")
+
   test("Interpreter.run: look-behinds"):
     // .NET and JavaScript match a look-behind backward, and the others forward from the starts before the position.
     check("(?<=(a|aa))b", "aab", JavaScript, DotNet)(Seq(g(2, 3), g(1, 2)))
